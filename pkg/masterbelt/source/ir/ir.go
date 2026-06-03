@@ -8,7 +8,11 @@
 // type checking and, later, evaluation and codegen.
 package ir
 
-import "github.com/masterbelt/masterbelt/pkg/masterbelt/source/ast"
+import (
+	"math/big"
+
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ast"
+)
 
 // Module is a resolved program: its constants in source order.
 type Module struct {
@@ -22,6 +26,7 @@ type Const struct {
 	Doc    []string
 	Type   Type           // the inferred or annotated type
 	Value  Value          // the resolved initializer, or nil if missing/invalid
+	Eval   *big.Int       // the evaluated value, or nil if it could not be evaluated
 	Syntax *ast.ConstDecl // the declaration this was lowered from
 }
 
@@ -111,4 +116,32 @@ var namedTypes = map[string]Type{
 func LookupType(name string) (Type, bool) {
 	t, ok := namedTypes[name]
 	return t, ok
+}
+
+// bounds holds the inclusive value range of a concrete integer type.
+type bounds struct{ min, max *big.Int }
+
+var typeBounds = func() map[Type]bounds {
+	one := big.NewInt(1)
+	signed := func(bits uint) bounds {
+		half := new(big.Int).Lsh(one, bits-1)
+		return bounds{min: new(big.Int).Neg(half), max: new(big.Int).Sub(half, one)}
+	}
+	unsigned := func(bits uint) bounds {
+		return bounds{min: big.NewInt(0), max: new(big.Int).Sub(new(big.Int).Lsh(one, bits), one)}
+	}
+	return map[Type]bounds{
+		Int8: signed(8), Int16: signed(16), Int32: signed(32), Int64: signed(64),
+		Uint8: unsigned(8), Uint16: unsigned(16), Uint32: unsigned(32), Uint64: unsigned(64),
+	}
+}()
+
+// Fits reports whether v is within the range of type t. Types without a fixed
+// range — UntypedInt (arbitrary precision) and Invalid — accept any value.
+func (t Type) Fits(v *big.Int) bool {
+	b, ok := typeBounds[t]
+	if !ok {
+		return true
+	}
+	return v.Cmp(b.min) >= 0 && v.Cmp(b.max) <= 0
 }

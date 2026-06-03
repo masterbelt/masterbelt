@@ -11,3 +11,4 @@ masterbelt.semantic.duplicate_declaration,error,name:string
 masterbelt.semantic.undefined_name,error,name:string
 masterbelt.semantic.unknown_type,error,name:string
 masterbelt.semantic.cyclic_reference,error,name:string
+masterbelt.semantic.constant_overflow,error,value:string typ:string

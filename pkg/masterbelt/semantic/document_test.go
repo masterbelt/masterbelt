@@ -110,3 +110,19 @@ func TestDocumentFuzz(t *testing.T) {
 		assertMatchesReference(t, doc, content)
 	}
 }
+
+// TestEarlyCutoffValue is the value-side mirror of TestEarlyCutoff: changing a
+// constant's annotation (not its value) must not re-evaluate a constant two
+// references away.
+func TestEarlyCutoffValue(t *testing.T) {
+	doc := NewDocument([]byte("const A: int64 = 1\nconst B = A\nconst C = B\n"))
+	cDecl := doc.AST().File().Decls[2]
+
+	// Change A's annotation int64 -> int32; A's value (1) is unchanged.
+	doc.Edit(source.Edit{Start: 9, End: 14, NewText: []byte("int32")})
+	assertMatchesReference(t, doc, []byte("const A: int32 = 1\nconst B = A\nconst C = B\n"))
+
+	if doc.db.computed[valueKey(cDecl)] {
+		t.Error("valueOf(C) was recomputed; an annotation change should not affect values")
+	}
+}

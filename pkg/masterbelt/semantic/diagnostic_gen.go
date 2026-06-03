@@ -9,11 +9,27 @@ import (
 )
 
 const (
+	CodeConstantOverflow     diagnostic.Code = "masterbelt.semantic.constant_overflow"
 	CodeCyclicReference      diagnostic.Code = "masterbelt.semantic.cyclic_reference"
 	CodeDuplicateDeclaration diagnostic.Code = "masterbelt.semantic.duplicate_declaration"
 	CodeUndefinedName        diagnostic.Code = "masterbelt.semantic.undefined_name"
 	CodeUnknownType          diagnostic.Code = "masterbelt.semantic.unknown_type"
 )
+
+func newConstantOverflowDiagnostic(offset int, width int, value string, typ string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"value": diagnostic.Str(value),
+		"typ":   diagnostic.Str(typ),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeConstantOverflow,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeConstantOverflow, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
 
 func newCyclicReferenceDiagnostic(offset int, width int, name string) diagnostic.Diagnostic {
 	fields := map[string]fmt.Stringer{

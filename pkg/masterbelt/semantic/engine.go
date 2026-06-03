@@ -1,6 +1,7 @@
 package semantic
 
 import (
+	"math/big"
 	"reflect"
 
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ast"
@@ -27,6 +28,7 @@ const (
 	qSymbols                  // name -> declaration table
 	qResolve                  // *ast.ConstDecl -> referent declaration
 	qTypeOf                   // *ast.ConstDecl -> ir.Type
+	qValue                    // *ast.ConstDecl -> *big.Int
 )
 
 // queryKey identifies a memoized computation. decl is nil for the input and the
@@ -43,6 +45,7 @@ var (
 
 func resolveKey(decl *ast.ConstDecl) queryKey { return queryKey{kind: qResolve, decl: decl} }
 func typeOfKey(decl *ast.ConstDecl) queryKey  { return queryKey{kind: qTypeOf, decl: decl} }
+func valueKey(decl *ast.ConstDecl) queryKey   { return queryKey{kind: qValue, decl: decl} }
 
 type depEdge struct {
 	key       queryKey
@@ -177,6 +180,8 @@ func (db *database) compute(key queryKey) any {
 		return syms[ref.Name]
 	case qTypeOf:
 		return computeType(key.decl, engineQueries{db})
+	case qValue:
+		return computeValue(key.decl, engineQueries{db})
 	default:
 		return nil
 	}
@@ -188,6 +193,8 @@ func cycleValue(key queryKey) any {
 	switch key.kind {
 	case qTypeOf:
 		return ir.Invalid
+	case qValue:
+		return (*big.Int)(nil)
 	case qResolve:
 		return (*ast.ConstDecl)(nil)
 	default:
@@ -208,4 +215,9 @@ func (e engineQueries) resolve(decl *ast.ConstDecl) *ast.ConstDecl {
 
 func (e engineQueries) typeOf(decl *ast.ConstDecl) ir.Type {
 	return e.db.read(typeOfKey(decl)).(ir.Type)
+}
+
+func (e engineQueries) valueOf(decl *ast.ConstDecl) *big.Int {
+	v, _ := e.db.read(valueKey(decl)).(*big.Int)
+	return v
 }

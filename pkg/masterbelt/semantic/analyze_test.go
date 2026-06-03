@@ -90,3 +90,38 @@ func TestCyclicReference(t *testing.T) {
 		t.Errorf("cyclic consts should have invalid type, got %s/%s", m.Consts[0].Type, m.Consts[1].Type)
 	}
 }
+
+func TestValueEvaluation(t *testing.T) {
+	m, diags := analyze("const A = 100\nconst B = A\nconst C: int64 = B\n")
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	for i, want := range []int64{100, 100, 100} {
+		if m.Consts[i].Eval == nil || m.Consts[i].Eval.Int64() != want {
+			t.Errorf("const %d eval = %v, want %d", i, m.Consts[i].Eval, want)
+		}
+	}
+}
+
+func TestConstantOverflow(t *testing.T) {
+	_, diags := analyze("const X: int8 = 1000\n")
+	if got := codes(diags); len(got) != 1 || got[0] != CodeConstantOverflow {
+		t.Fatalf("codes = %v, want [constant_overflow]", got)
+	}
+}
+
+func TestUntypedDoesNotOverflow(t *testing.T) {
+	// An untyped constant is arbitrary precision; only a concrete type triggers
+	// the range check.
+	_, diags := analyze("const X = 99999999999999999999999999\n")
+	if len(diags) != 0 {
+		t.Fatalf("untyped constant should not overflow: %v", diags)
+	}
+}
+
+func TestOverflowThroughReference(t *testing.T) {
+	_, diags := analyze("const A = 1000\nconst B: int8 = A\n")
+	if got := codes(diags); len(got) != 1 || got[0] != CodeConstantOverflow {
+		t.Fatalf("codes = %v, want [constant_overflow]", got)
+	}
+}

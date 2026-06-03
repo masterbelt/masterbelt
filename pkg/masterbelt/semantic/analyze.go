@@ -12,6 +12,7 @@
 package semantic
 
 import (
+	"math/big"
 	"sort"
 
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/diagnostic"
@@ -28,6 +29,9 @@ type queries interface {
 	resolve(decl *ast.ConstDecl) *ast.ConstDecl
 	// typeOf returns a constant's type (ir.Invalid when undeterminable).
 	typeOf(decl *ast.ConstDecl) ir.Type
+	// valueOf returns a constant's evaluated value, or nil when it cannot be
+	// evaluated (missing initializer, undefined reference, or cycle).
+	valueOf(decl *ast.ConstDecl) *big.Int
 }
 
 // Analyze resolves and types the document's program, returning the IR module and
@@ -85,6 +89,7 @@ func assemble(file *ast.File, positions map[cst.Green]span, q queries) (*ir.Modu
 		}
 
 		c.Type = q.typeOf(decl)
+		c.Eval = q.valueOf(decl)
 
 		if decl.Type != nil {
 			if _, ok := ir.LookupType(decl.Type.Name); !ok {
@@ -95,6 +100,12 @@ func assemble(file *ast.File, positions map[cst.Green]span, q queries) (*ir.Modu
 		if cyclic[decl] {
 			s := at(decl)
 			diags.Add(newCyclicReferenceDiagnostic(s.offset, s.width, decl.Name))
+		}
+		// A value that does not fit its concrete type overflows. Untyped
+		// constants have no fixed range, so Fits accepts them.
+		if c.Eval != nil && !c.Type.Fits(c.Eval) {
+			s := at(decl.Value)
+			diags.Add(newConstantOverflowDiagnostic(s.offset, s.width, c.Eval.String(), c.Type.String()))
 		}
 	}
 
@@ -137,6 +148,30 @@ func computeType(decl *ast.ConstDecl, q queries) ir.Type {
 		return ir.Invalid
 	default:
 		return ir.Invalid
+	}
+}
+
+// computeValue is the evaluation rule, shared by both query implementations: a
+// literal parses to its integer, a reference takes its referent's value. Reading
+// other facts through q lets the engine track dependencies (and reuses its cycle
+// guard). Overflow is intentionally not checked here — untyped constants are
+// arbitrary precision; the range check happens in assemble where a concrete type
+// is known.
+func computeValue(decl *ast.ConstDecl, q queries) *big.Int {
+	switch v := decl.Value.(type) {
+	case *ast.IntLit:
+		n, ok := new(big.Int).SetString(v.Text, 10)
+		if !ok {
+			return nil
+		}
+		return n
+	case *ast.NameRef:
+		if target := q.resolve(decl); target != nil {
+			return q.valueOf(target)
+		}
+		return nil
+	default:
+		return nil
 	}
 }
 
@@ -200,17 +235,21 @@ func cyclicDecls(file *ast.File, q queries) map[*ast.ConstDecl]bool {
 // single analysis (and guarding against cycles). It carries no state across
 // analyses — that is the incremental engine's job.
 type directQueries struct {
-	file     *ast.File
-	syms     map[string]*ast.ConstDecl
-	typeMemo map[*ast.ConstDecl]ir.Type
-	typing   map[*ast.ConstDecl]bool
+	file      *ast.File
+	syms      map[string]*ast.ConstDecl
+	typeMemo  map[*ast.ConstDecl]ir.Type
+	typing    map[*ast.ConstDecl]bool
+	valueMemo map[*ast.ConstDecl]*big.Int
+	valuing   map[*ast.ConstDecl]bool
 }
 
 func newDirectQueries(file *ast.File) *directQueries {
 	return &directQueries{
-		file:     file,
-		typeMemo: map[*ast.ConstDecl]ir.Type{},
-		typing:   map[*ast.ConstDecl]bool{},
+		file:      file,
+		typeMemo:  map[*ast.ConstDecl]ir.Type{},
+		typing:    map[*ast.ConstDecl]bool{},
+		valueMemo: map[*ast.ConstDecl]*big.Int{},
+		valuing:   map[*ast.ConstDecl]bool{},
 	}
 }
 
@@ -241,6 +280,20 @@ func (d *directQueries) typeOf(decl *ast.ConstDecl) ir.Type {
 	d.typing[decl] = false
 	d.typeMemo[decl] = t
 	return t
+}
+
+func (d *directQueries) valueOf(decl *ast.ConstDecl) *big.Int {
+	if v, done := d.valueMemo[decl]; done {
+		return v
+	}
+	if d.valuing[decl] {
+		return nil // cycle
+	}
+	d.valuing[decl] = true
+	v := computeValue(decl, d)
+	d.valuing[decl] = false
+	d.valueMemo[decl] = v
+	return v
 }
 
 // --- positions --------------------------------------------------------------

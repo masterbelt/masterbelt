@@ -29,6 +29,9 @@ func dumpConst(b *strings.Builder, c *Const) {
 	}
 	fmt.Fprintf(b, "    type %s\n", c.Type)
 	fmt.Fprintf(b, "    value %s\n", dumpValue(c.Value))
+	if c.Eval != nil {
+		fmt.Fprintf(b, "    eval %s\n", c.Eval)
+	}
 }
 
 func dumpValue(v Value) string {

@@ -71,6 +71,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "unexpected token: " + f["kind"].String()
 		}
 	},
+	"masterbelt.semantic.constant_overflow": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "定数 " + f["value"].String() + " は " + f["typ"].String() + " に収まりません"
+		default:
+			return "constant " + f["value"].String() + " overflows " + f["typ"].String()
+		}
+	},
 	"masterbelt.semantic.cyclic_reference": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":

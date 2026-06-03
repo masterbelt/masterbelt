@@ -93,6 +93,10 @@ func constHover(c *ir.Const, buf source.Buffer, rng cst.Tree) *protocol.Hover {
 		b.WriteString(": ")
 		b.WriteString(c.Type.String())
 	}
+	if c.Eval != nil {
+		b.WriteString(" = ")
+		b.WriteString(c.Eval.String())
+	}
 	b.WriteString("\n```")
 	if len(c.Doc) > 0 {
 		b.WriteString("\n\n")
