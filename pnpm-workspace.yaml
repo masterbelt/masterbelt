@@ -1,2 +1,8 @@
+packages:
+  - toolchain/editors/vscode
+
+allowBuilds:
+  esbuild: true
+
 minimumReleaseAgeExclude:
   - commitlint-config-agent-coauthor@1.0.0

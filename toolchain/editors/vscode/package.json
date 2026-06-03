@@ -1,0 +1,78 @@
+{
+  "name": "masterbelt-vscode",
+  "displayName": "masterbelt",
+  "description": "Language support for the masterbelt language: syntax highlighting, diagnostics, symbols, and formatting via the masterbelt language server.",
+  "version": "0.1.0",
+  "publisher": "masterbelt",
+  "private": true,
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onLanguage:masterbelt"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "masterbelt",
+        "aliases": [
+          "masterbelt"
+        ],
+        "extensions": [
+          ".belt"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "masterbelt",
+        "scopeName": "source.masterbelt",
+        "path": "./syntaxes/masterbelt.tmLanguage.json"
+      }
+    ],
+    "configuration": {
+      "title": "masterbelt",
+      "properties": {
+        "masterbelt.server.path": {
+          "type": "string",
+          "default": "masterbelt",
+          "description": "Path to the masterbelt executable that provides the language server (run as `masterbelt lsp`). Defaults to looking it up on PATH."
+        },
+        "masterbelt.trace.server": {
+          "type": "string",
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
+          "default": "off",
+          "description": "Trace the communication between VS Code and the masterbelt language server."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "check-types": "tsc --noEmit",
+    "test": "node --test",
+    "vscode:prepublish": "pnpm run build"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/vscode": "^1.90.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.6.0",
+    "vscode-oniguruma": "^2.0.1",
+    "vscode-textmate": "^9.0.0"
+  }
+}

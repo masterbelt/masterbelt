@@ -4,6 +4,7 @@ package token
 
 import (
 	"fmt"
+	"sort"
 	"strconv"
 
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source"
@@ -78,6 +79,31 @@ func Lookup(ident string) Kind {
 	}
 	return Ident
 }
+
+// Keywords returns the reserved words in sorted order. It is the single source
+// of truth for the language's keywords: the lexer matches against it (via
+// Lookup), and external tooling — such as the editor grammar generator — reads
+// it so the syntax highlighting never has to be maintained separately.
+func Keywords() []string {
+	out := make([]string, 0, len(keywords))
+	for kw := range keywords {
+		out = append(out, kw)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// Comment markers are the language's comment syntax. The lexer scans them and
+// the editor-config generator emits its grammar and language configuration from
+// them, so syntax highlighting and comment toggling never drift from the lexer.
+// A lexer test (TestCommentMarkersMatchLexer) pins these to the scanner's actual
+// behaviour.
+const (
+	LineCommentPrefix = "//"
+	DocCommentPrefix  = "///"
+	BlockCommentOpen  = "/*"
+	BlockCommentClose = "*/"
+)
 
 // Token is a single lexical token. It stores only its byte range within the
 // file — Kind, the start Offset, and the byte Width — and never the absolute
