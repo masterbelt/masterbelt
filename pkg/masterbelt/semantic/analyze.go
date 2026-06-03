@@ -20,6 +20,7 @@ package semantic
 import (
 	"math/big"
 	"sort"
+	"strings"
 
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/diagnostic"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/parser/abstract"
@@ -99,12 +100,30 @@ func assemble(file *ast.File, positions map[cst.Green]span, q queries) (*ir.Modu
 					diags.Add(newUndefinedNameDiagnostic(s.offset, s.width, id.Name))
 				}
 			})
+			// Operator type errors: the innermost method call whose operand
+			// types it is not defined on.
+			checkExprTypes(decl.Value, q, func(node ast.Node, method, types string) {
+				s := at(node)
+				diags.Add(newInvalidOperationDiagnostic(s.offset, s.width, method, types))
+			})
+			// Division or remainder by a zero divisor.
+			checkDivByZero(decl.Value, q, func(node ast.Node) {
+				s := at(node)
+				diags.Add(newDivisionByZeroDiagnostic(s.offset, s.width))
+			})
 		}
 
 		if decl.Type != nil {
-			if _, ok := ir.LookupType(decl.Type.Name); !ok {
+			if annType, ok := ir.LookupType(decl.Type.Name); !ok {
 				s := at(decl.Type)
 				diags.Add(newUnknownTypeDiagnostic(s.offset, s.width, decl.Type.Name))
+			} else if decl.Value != nil {
+				// An annotation must agree in kind (integer vs boolean) with the
+				// initializer's natural type; its value range is checked below.
+				if exprT := typeOfExpr(decl.Value, q); exprT != ir.Invalid && !compatible(annType, exprT) {
+					s := at(decl.Value)
+					diags.Add(newTypeMismatchDiagnostic(s.offset, s.width, exprT.String(), annType.String()))
+				}
 			}
 		}
 		if cyclic[decl] {
@@ -123,6 +142,83 @@ func assemble(file *ast.File, positions map[cst.Green]span, q queries) (*ir.Modu
 	items := diags.Items()
 	sort.SliceStable(items, func(i, j int) bool { return items[i].Offset < items[j].Offset })
 	return module, items
+}
+
+// --- expression diagnostics -------------------------------------------------
+
+// checkExprTypes type-checks an expression, reporting the innermost method call
+// whose operand types it is not defined on. It returns the expression's type so
+// recursion can propagate an existing error — an operand that is itself Invalid,
+// or an undefined reference reported elsewhere — without re-reporting it.
+func checkExprTypes(e ast.Expr, q queries, report func(node ast.Node, method, types string)) ir.Type {
+	switch e := e.(type) {
+	case *ast.IntLit:
+		return ir.UntypedInt
+	case *ast.BoolLit:
+		return ir.UntypedBool
+	case *ast.Identifier:
+		if t := q.resolve(e); t != nil {
+			return q.typeOf(t)
+		}
+		return ir.Invalid
+	case *ast.CallExpr:
+		member, ok := e.Callee.(*ast.MemberExpr)
+		if !ok {
+			return ir.Invalid
+		}
+		recv := checkExprTypes(member.Receiver, q, report)
+		bad := recv == ir.Invalid
+		args := make([]ir.Type, len(e.Arguments))
+		for i, a := range e.Arguments {
+			args[i] = checkExprTypes(a, q, report)
+			bad = bad || args[i] == ir.Invalid
+		}
+		res := methodResult(recv, member.Member.Name, args)
+		if res == ir.Invalid && !bad {
+			report(e, member.Member.Name, typesList(recv, args))
+		}
+		return res
+	default:
+		return ir.Invalid
+	}
+}
+
+// typesList renders the receiver and argument types as "recv, arg, ..." for the
+// invalid-operation diagnostic.
+func typesList(recv ir.Type, args []ir.Type) string {
+	parts := make([]string, 0, len(args)+1)
+	parts = append(parts, recv.String())
+	for _, a := range args {
+		parts = append(parts, a.String())
+	}
+	return strings.Join(parts, ", ")
+}
+
+// checkDivByZero reports each div/rem whose divisor folds to zero.
+func checkDivByZero(e ast.Expr, q queries, report func(node ast.Node)) {
+	call, ok := e.(*ast.CallExpr)
+	if !ok {
+		return
+	}
+	member, ok := call.Callee.(*ast.MemberExpr)
+	if !ok {
+		return
+	}
+	if (member.Member.Name == "div" || member.Member.Name == "rem") && len(call.Arguments) == 1 {
+		if d := evalExpr(call.Arguments[0], q); d != nil && d.Kind == ir.ConstInt && d.Int.Sign() == 0 {
+			report(call)
+		}
+	}
+	checkDivByZero(member.Receiver, q, report)
+	for _, a := range call.Arguments {
+		checkDivByZero(a, q, report)
+	}
+}
+
+// compatible reports whether an annotation and an initializer's inferred type
+// agree in kind — both integer or both boolean.
+func compatible(annotation, expr ir.Type) bool {
+	return (annotation.IsInteger() && expr.IsInteger()) || (annotation.IsBoolean() && expr.IsBoolean())
 }
 
 // buildSymbols maps each declared name to its first declaration.

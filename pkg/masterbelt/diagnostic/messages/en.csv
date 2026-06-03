@@ -13,3 +13,6 @@ masterbelt.semantic.undefined_name,undefined name: {name}
 masterbelt.semantic.unknown_type,unknown type: {name}
 masterbelt.semantic.cyclic_reference,cyclic reference involving {name}
 masterbelt.semantic.constant_overflow,constant {value} overflows {typ}
+masterbelt.semantic.invalid_operation,cannot apply method {method} to {types}
+masterbelt.semantic.division_by_zero,division by zero
+masterbelt.semantic.type_mismatch,cannot use {actual} as {expected}

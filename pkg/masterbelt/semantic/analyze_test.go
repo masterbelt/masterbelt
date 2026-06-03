@@ -126,3 +126,106 @@ func TestOverflowThroughReference(t *testing.T) {
 		t.Fatalf("codes = %v, want [constant_overflow]", got)
 	}
 }
+
+func hasCode(diags []diagnostic.Diagnostic, code diagnostic.Code) bool {
+	for _, c := range codes(diags) {
+		if c == code {
+			return true
+		}
+	}
+	return false
+}
+
+func TestOperatorTypeErrors(t *testing.T) {
+	bad := []string{
+		"const x = 1 && 2\n",   // logical operator on integers
+		"const x = true + 1\n", // arithmetic on a boolean
+		"const x = 1 < true\n", // comparison of mixed kinds
+		"const x = !1\n",       // not on an integer
+		"const x = -true\n",    // neg on a boolean
+	}
+	for _, src := range bad {
+		_, diags := analyze(src)
+		if !hasCode(diags, CodeInvalidOperation) {
+			t.Errorf("%q: want invalid_operation, got %v", src, codes(diags))
+		}
+	}
+	for _, src := range []string{"const x = 1 + 2\n", "const x = true && false\n", "const x = 1 < 2\n"} {
+		if _, diags := analyze(src); len(diags) != 0 {
+			t.Errorf("%q: unexpected diagnostics %v", src, codes(diags))
+		}
+	}
+}
+
+func TestOperatorErrorReportedOnce(t *testing.T) {
+	// The inner type error is reported once; the outer call sees an Invalid
+	// operand and does not pile on.
+	_, diags := analyze("const x = 1 && 2 && 3\n")
+	n := 0
+	for _, c := range codes(diags) {
+		if c == CodeInvalidOperation {
+			n++
+		}
+	}
+	if n != 1 {
+		t.Errorf("want exactly one invalid_operation, got %d: %v", n, codes(diags))
+	}
+}
+
+func TestDivisionByZero(t *testing.T) {
+	for _, src := range []string{
+		"const x = 1 / 0\n",
+		"const x = 1 % 0\n",
+		"const z = 0\nconst x = 1 / z\n", // zero through a reference
+	} {
+		_, diags := analyze(src)
+		if !hasCode(diags, CodeDivisionByZero) {
+			t.Errorf("%q: want division_by_zero, got %v", src, codes(diags))
+		}
+	}
+	if _, diags := analyze("const x = 1 / 2\n"); hasCode(diags, CodeDivisionByZero) {
+		t.Error("1 / 2 should not be division by zero")
+	}
+}
+
+func TestAnnotationMismatch(t *testing.T) {
+	for _, src := range []string{
+		"const x: int8 = true\n",
+		"const x: bool = 1\n",
+		"const x: bool = 1 + 2\n",
+	} {
+		_, diags := analyze(src)
+		if !hasCode(diags, CodeTypeMismatch) {
+			t.Errorf("%q: want type_mismatch, got %v", src, codes(diags))
+		}
+	}
+	for _, src := range []string{
+		"const x: int8 = 1 + 2\n",
+		"const x: bool = true && false\n",
+		"const x: bool = 1 < 2\n",
+	} {
+		if _, diags := analyze(src); hasCode(diags, CodeTypeMismatch) {
+			t.Errorf("%q: unexpected type_mismatch %v", src, codes(diags))
+		}
+	}
+}
+
+func TestDiagnosticMessages(t *testing.T) {
+	cases := []struct{ src, code, message string }{
+		{"const x = 1 && 2\n", string(CodeInvalidOperation), "cannot apply method anan to untyped int, untyped int"},
+		{"const x = 1 / 0\n", string(CodeDivisionByZero), "division by zero"},
+		{"const x: int8 = true\n", string(CodeTypeMismatch), "cannot use untyped bool as int8"},
+	}
+	for _, tc := range cases {
+		_, diags := analyze(tc.src)
+		var msg string
+		for _, d := range diags {
+			if string(d.Code) == tc.code {
+				msg = d.Message
+			}
+		}
+		if msg != tc.message {
+			t.Errorf("%q: message = %q, want %q", tc.src, msg, tc.message)
+		}
+	}
+}

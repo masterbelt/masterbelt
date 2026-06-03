@@ -11,7 +11,10 @@ import (
 const (
 	CodeConstantOverflow     diagnostic.Code = "masterbelt.semantic.constant_overflow"
 	CodeCyclicReference      diagnostic.Code = "masterbelt.semantic.cyclic_reference"
+	CodeDivisionByZero       diagnostic.Code = "masterbelt.semantic.division_by_zero"
 	CodeDuplicateDeclaration diagnostic.Code = "masterbelt.semantic.duplicate_declaration"
+	CodeInvalidOperation     diagnostic.Code = "masterbelt.semantic.invalid_operation"
+	CodeTypeMismatch         diagnostic.Code = "masterbelt.semantic.type_mismatch"
 	CodeUndefinedName        diagnostic.Code = "masterbelt.semantic.undefined_name"
 	CodeUnknownType          diagnostic.Code = "masterbelt.semantic.unknown_type"
 )
@@ -45,6 +48,17 @@ func newCyclicReferenceDiagnostic(offset int, width int, name string) diagnostic
 	}
 }
 
+func newDivisionByZeroDiagnostic(offset int, width int) diagnostic.Diagnostic {
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeDivisionByZero,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeDivisionByZero, nil),
+		Fields:   nil,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
 func newDuplicateDeclarationDiagnostic(offset int, width int, name string) diagnostic.Diagnostic {
 	fields := map[string]fmt.Stringer{
 		"name": diagnostic.Str(name),
@@ -53,6 +67,36 @@ func newDuplicateDeclarationDiagnostic(offset int, width int, name string) diagn
 		Severity: diagnostic.Error,
 		Code:     CodeDuplicateDeclaration,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeDuplicateDeclaration, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newInvalidOperationDiagnostic(offset int, width int, method string, types string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"method": diagnostic.Str(method),
+		"types":  diagnostic.Str(types),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeInvalidOperation,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeInvalidOperation, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newTypeMismatchDiagnostic(offset int, width int, actual string, expected string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"actual":   diagnostic.Str(actual),
+		"expected": diagnostic.Str(expected),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeTypeMismatch,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeTypeMismatch, fields),
 		Fields:   fields,
 		Offset:   offset,
 		Width:    width,

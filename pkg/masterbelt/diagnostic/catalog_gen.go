@@ -95,12 +95,36 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "cyclic reference involving " + f["name"].String()
 		}
 	},
+	"masterbelt.semantic.division_by_zero": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "ゼロ除算です"
+		default:
+			return "division by zero"
+		}
+	},
 	"masterbelt.semantic.duplicate_declaration": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return f["name"].String() + " が重複して宣言されています"
 		default:
 			return "duplicate declaration of " + f["name"].String()
+		}
+	},
+	"masterbelt.semantic.invalid_operation": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "メソッド " + f["method"].String() + " を " + f["types"].String() + " に適用できません"
+		default:
+			return "cannot apply method " + f["method"].String() + " to " + f["types"].String()
+		}
+	},
+	"masterbelt.semantic.type_mismatch": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return f["actual"].String() + " を " + f["expected"].String() + " として使えません"
+		default:
+			return "cannot use " + f["actual"].String() + " as " + f["expected"].String()
 		}
 	},
 	"masterbelt.semantic.undefined_name": func(loc Locale, f map[string]fmt.Stringer) string {
