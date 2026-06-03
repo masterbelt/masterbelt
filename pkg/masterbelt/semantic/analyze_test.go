@@ -81,8 +81,10 @@ func TestUnknownType(t *testing.T) {
 
 func TestCyclicReference(t *testing.T) {
 	m, diags := analyze("const A = B\nconst B = A\n")
-	if got := codes(diags); len(got) != 1 || got[0] != CodeCyclicReference {
-		t.Fatalf("codes = %v, want [cyclic_reference]", got)
+	// Both declarations are on the cycle, so both are flagged.
+	got := codes(diags)
+	if len(got) != 2 || got[0] != CodeCyclicReference || got[1] != CodeCyclicReference {
+		t.Fatalf("codes = %v, want two cyclic_reference", got)
 	}
 	if m.Consts[0].Type != ir.Invalid || m.Consts[1].Type != ir.Invalid {
 		t.Errorf("cyclic consts should have invalid type, got %s/%s", m.Consts[0].Type, m.Consts[1].Type)

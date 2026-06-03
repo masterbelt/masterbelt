@@ -1,9 +1,14 @@
 // Package semantic resolves names and infers types for a masterbelt program,
 // producing the resolved IR (package source/ir).
 //
-// Analyze here is the reference analysis: it recomputes everything from the AST
-// in one pass set. It defines the language's static semantics and serves as the
-// oracle the incremental (query-based) analyzer is checked against.
+// The semantic facts a program needs — the symbol table, what each reference
+// resolves to, and each constant's type — are expressed as a small set of pure
+// queries (the queries interface). assemble turns those queries plus the AST
+// into the IR and diagnostics. Two query implementations share that one
+// assembler: a direct one (this file), used by Analyze for a full recompute and
+// as the oracle, and an incremental, memoizing one backed by the query database
+// (engine.go), used by Document. Because both feed the same assembler, the
+// incremental result is identical to the full one.
 package semantic
 
 import (
@@ -16,146 +21,245 @@ import (
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ir"
 )
 
+// queries are the pure, memoizable semantic facts the assembler needs.
+type queries interface {
+	// resolve returns the declaration a constant's reference initializer binds
+	// to, or nil if its initializer is not a (resolvable) reference.
+	resolve(decl *ast.ConstDecl) *ast.ConstDecl
+	// typeOf returns a constant's type (ir.Invalid when undeterminable).
+	typeOf(decl *ast.ConstDecl) ir.Type
+}
+
 // Analyze resolves and types the document's program, returning the IR module and
-// the semantic diagnostics (ordered by source position).
+// the semantic diagnostics. It recomputes everything from scratch; it is the
+// reference analysis and the oracle for the incremental Document.
 func Analyze(doc *abstract.Document) (*ir.Module, []diagnostic.Diagnostic) {
-	a := &analyzer{
-		positions: positionsOf(doc.Concrete().Tree()),
-		irByDecl:  map[*ast.ConstDecl]*ir.Const{},
-		byName:    map[string]*ast.ConstDecl{},
-		typeMemo:  map[*ast.ConstDecl]ir.Type{},
-		typing:    map[*ast.ConstDecl]bool{},
-		diags:     &diagnostic.List{},
-	}
-	return a.run(doc.File())
+	file := doc.File()
+	return assemble(file, positionsOf(doc.Concrete().Tree()), newDirectQueries(file))
 }
 
-type span struct{ offset, width int }
+// assemble builds the IR module and all semantic diagnostics from the AST, using
+// q for the resolution and typing facts. It is shared by the reference and
+// incremental analyzers, so they cannot diverge.
+func assemble(file *ast.File, positions map[cst.Green]span, q queries) (*ir.Module, []diagnostic.Diagnostic) {
+	diags := &diagnostic.List{}
+	at := func(n ast.Node) span { return spanOf(positions, n) }
 
-type analyzer struct {
-	positions map[cst.Green]span
-	irByDecl  map[*ast.ConstDecl]*ir.Const
-	byName    map[string]*ast.ConstDecl // first declaration of each name
-	typeMemo  map[*ast.ConstDecl]ir.Type
-	typing    map[*ast.ConstDecl]bool // decls whose type is being inferred (cycle guard)
-	diags     *diagnostic.List
-}
-
-func (a *analyzer) run(file *ast.File) (*ir.Module, []diagnostic.Diagnostic) {
+	// Create the IR constants first so references can bind to them.
 	module := &ir.Module{}
-
-	// Pass 1: collect declarations, so references can bind to their IR nodes,
-	// and flag redeclarations of the same name.
+	irOf := make(map[*ast.ConstDecl]*ir.Const, len(file.Decls))
 	for _, decl := range file.Decls {
 		c := &ir.Const{Name: decl.Name, Public: decl.Public, Doc: decl.Doc, Syntax: decl}
-		a.irByDecl[decl] = c
+		irOf[decl] = c
 		module.Consts = append(module.Consts, c)
+	}
 
+	// Redeclarations of the same name.
+	seen := map[string]bool{}
+	for _, decl := range file.Decls {
 		if decl.Name == "" {
-			continue // a missing name is already a parse diagnostic
+			continue // already a parse diagnostic
 		}
-		if _, dup := a.byName[decl.Name]; dup {
-			s := a.span(decl)
-			a.diags.Add(newDuplicateDeclarationDiagnostic(s.offset, s.width, decl.Name))
-		} else {
-			a.byName[decl.Name] = decl
+		if seen[decl.Name] {
+			s := at(decl)
+			diags.Add(newDuplicateDeclarationDiagnostic(s.offset, s.width, decl.Name))
+		}
+		seen[decl.Name] = true
+	}
+
+	cyclic := cyclicDecls(file, q)
+
+	for _, decl := range file.Decls {
+		c := irOf[decl]
+
+		switch v := decl.Value.(type) {
+		case *ast.IntLit:
+			c.Value = &ir.IntLiteral{Text: v.Text}
+		case *ast.NameRef:
+			if target := q.resolve(decl); target != nil {
+				c.Value = &ir.Reference{Target: irOf[target]}
+			} else if v.Name != "" {
+				s := at(v)
+				diags.Add(newUndefinedNameDiagnostic(s.offset, s.width, v.Name))
+			}
+		}
+
+		c.Type = q.typeOf(decl)
+
+		if decl.Type != nil {
+			if _, ok := ir.LookupType(decl.Type.Name); !ok {
+				s := at(decl.Type)
+				diags.Add(newUnknownTypeDiagnostic(s.offset, s.width, decl.Type.Name))
+			}
+		}
+		if cyclic[decl] {
+			s := at(decl)
+			diags.Add(newCyclicReferenceDiagnostic(s.offset, s.width, decl.Name))
 		}
 	}
 
-	// Pass 2: resolve initializers (binding references, flagging undefined names).
-	for _, decl := range file.Decls {
-		a.irByDecl[decl].Value = a.resolveValue(decl)
-	}
-
-	// Pass 3: infer types (annotation / untyped literal / referent, with cycle
-	// and unknown-type checks).
-	for _, decl := range file.Decls {
-		a.irByDecl[decl].Type = a.typeOf(decl)
-	}
-
-	items := a.diags.Items()
+	items := diags.Items()
 	sort.SliceStable(items, func(i, j int) bool { return items[i].Offset < items[j].Offset })
 	return module, items
 }
 
-// resolveValue lowers a declaration's initializer to a resolved ir.Value, or nil
-// when it is missing (already a parse diagnostic) or names an undefined constant.
-func (a *analyzer) resolveValue(decl *ast.ConstDecl) ir.Value {
-	switch v := decl.Value.(type) {
-	case *ast.IntLit:
-		return &ir.IntLiteral{Text: v.Text}
-	case *ast.NameRef:
-		target, ok := a.byName[v.Name]
-		if !ok {
-			s := a.span(v)
-			a.diags.Add(newUndefinedNameDiagnostic(s.offset, s.width, v.Name))
-			return nil
+// buildSymbols maps each declared name to its first declaration.
+func buildSymbols(file *ast.File) map[string]*ast.ConstDecl {
+	syms := map[string]*ast.ConstDecl{}
+	for _, decl := range file.Decls {
+		if decl.Name != "" {
+			if _, exists := syms[decl.Name]; !exists {
+				syms[decl.Name] = decl
+			}
 		}
-		return &ir.Reference{Target: a.irByDecl[target]}
-	default:
-		return nil
 	}
+	return syms
 }
 
-// typeOf returns a declaration's type, memoizing the result and detecting cycles
-// among un-annotated references.
-func (a *analyzer) typeOf(decl *ast.ConstDecl) ir.Type {
-	if t, done := a.typeMemo[decl]; done {
-		return t
-	}
-	if a.typing[decl] {
-		s := a.span(decl)
-		a.diags.Add(newCyclicReferenceDiagnostic(s.offset, s.width, decl.Name))
+// computeType is the type rule, shared by both query implementations: an
+// annotation gives a concrete type, an integer literal is untyped, and a
+// reference inherits its referent's type. It reads other facts through q so the
+// memoizing engine can track the dependencies.
+func computeType(decl *ast.ConstDecl, q queries) ir.Type {
+	if decl.Type != nil {
+		if t, ok := ir.LookupType(decl.Type.Name); ok {
+			return t
+		}
 		return ir.Invalid
 	}
-	a.typing[decl] = true
-	t := a.computeType(decl)
-	a.typing[decl] = false
-	a.typeMemo[decl] = t
-	return t
-}
-
-func (a *analyzer) computeType(decl *ast.ConstDecl) ir.Type {
-	// An annotation gives a concrete type directly.
-	if decl.Type != nil {
-		t, ok := ir.LookupType(decl.Type.Name)
-		if !ok {
-			s := a.span(decl.Type)
-			a.diags.Add(newUnknownTypeDiagnostic(s.offset, s.width, decl.Type.Name))
-			return ir.Invalid
-		}
-		return t
-	}
-	// Otherwise infer from the initializer: an integer literal is untyped, a
-	// reference inherits its referent's type.
-	switch v := decl.Value.(type) {
+	switch decl.Value.(type) {
 	case *ast.IntLit:
 		return ir.UntypedInt
 	case *ast.NameRef:
-		if target, ok := a.byName[v.Name]; ok {
-			return a.typeOf(target)
+		if target := q.resolve(decl); target != nil {
+			return q.typeOf(target)
 		}
-		return ir.Invalid // undefined; already reported
+		return ir.Invalid
 	default:
-		return ir.Invalid // missing initializer
+		return ir.Invalid
 	}
 }
 
-// span returns the byte range of an AST node, read from the positioned concrete
-// tree it was lowered from.
-func (a *analyzer) span(n ast.Node) span {
+// cyclicDecls returns the declarations caught in a type-inference cycle. The
+// only type-level dependency is an un-annotated reference inheriting its
+// referent's type, so the dependency graph is functional (each such declaration
+// has exactly one out-edge); its cycles are found with a coloured chain walk.
+func cyclicDecls(file *ast.File, q queries) map[*ast.ConstDecl]bool {
+	next := func(decl *ast.ConstDecl) *ast.ConstDecl {
+		if decl.Type != nil {
+			return nil // an annotation breaks the inheritance chain
+		}
+		if _, ok := decl.Value.(*ast.NameRef); !ok {
+			return nil
+		}
+		return q.resolve(decl)
+	}
+
+	const (
+		white = iota
+		gray
+		black
+	)
+	color := map[*ast.ConstDecl]int{}
+	cyclic := map[*ast.ConstDecl]bool{}
+
+	for _, start := range file.Decls {
+		if color[start] != white {
+			continue
+		}
+		var path []*ast.ConstDecl
+		decl := start
+		for decl != nil && color[decl] == white {
+			color[decl] = gray
+			path = append(path, decl)
+			decl = next(decl)
+		}
+		if decl != nil && color[decl] == gray {
+			// The chain re-entered a node on the current path: everything from
+			// that node to the end of the path forms a cycle.
+			inCycle := false
+			for _, n := range path {
+				if n == decl {
+					inCycle = true
+				}
+				if inCycle {
+					cyclic[n] = true
+				}
+			}
+		}
+		for _, n := range path {
+			color[n] = black
+		}
+	}
+	return cyclic
+}
+
+// --- direct (reference) query implementation --------------------------------
+
+// directQueries computes the semantic facts directly, memoizing types within a
+// single analysis (and guarding against cycles). It carries no state across
+// analyses — that is the incremental engine's job.
+type directQueries struct {
+	file     *ast.File
+	syms     map[string]*ast.ConstDecl
+	typeMemo map[*ast.ConstDecl]ir.Type
+	typing   map[*ast.ConstDecl]bool
+}
+
+func newDirectQueries(file *ast.File) *directQueries {
+	return &directQueries{
+		file:     file,
+		typeMemo: map[*ast.ConstDecl]ir.Type{},
+		typing:   map[*ast.ConstDecl]bool{},
+	}
+}
+
+func (d *directQueries) symbols() map[string]*ast.ConstDecl {
+	if d.syms == nil {
+		d.syms = buildSymbols(d.file)
+	}
+	return d.syms
+}
+
+func (d *directQueries) resolve(decl *ast.ConstDecl) *ast.ConstDecl {
+	ref, ok := decl.Value.(*ast.NameRef)
+	if !ok {
+		return nil
+	}
+	return d.symbols()[ref.Name]
+}
+
+func (d *directQueries) typeOf(decl *ast.ConstDecl) ir.Type {
+	if t, done := d.typeMemo[decl]; done {
+		return t
+	}
+	if d.typing[decl] {
+		return ir.Invalid // cycle
+	}
+	d.typing[decl] = true
+	t := computeType(decl, d)
+	d.typing[decl] = false
+	d.typeMemo[decl] = t
+	return t
+}
+
+// --- positions --------------------------------------------------------------
+
+type span struct{ offset, width int }
+
+func spanOf(positions map[cst.Green]span, n ast.Node) span {
 	if n == nil {
 		return span{}
 	}
-	if s, ok := a.positions[n.Syntax()]; ok {
+	if s, ok := positions[n.Syntax()]; ok {
 		return s
 	}
 	return span{}
 }
 
 // positionsOf records the offset and width of every element of the positioned
-// concrete tree, keyed by its green node, so the analyzer can anchor diagnostics
-// from a position-independent AST node back to its source.
+// concrete tree, keyed by its green node, so diagnostics can be anchored from a
+// position-independent AST node back to its source.
 func positionsOf(root cst.Tree) map[cst.Green]span {
 	positions := map[cst.Green]span{}
 	var walk func(t cst.Tree)
