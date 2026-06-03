@@ -7,6 +7,7 @@ masterbelt.parser.concrete.expected_type,expected type
 masterbelt.parser.concrete.expected_assign,expected '='
 masterbelt.parser.concrete.expected_expression,expected expression
 masterbelt.parser.concrete.unexpected_token,unexpected token: {kind}
+masterbelt.parser.concrete.expected_operand,expected operand after '{operator}'
 masterbelt.semantic.duplicate_declaration,duplicate declaration of {name}
 masterbelt.semantic.undefined_name,undefined name: {name}
 masterbelt.semantic.unknown_type,unknown type: {name}

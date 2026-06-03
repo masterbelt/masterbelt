@@ -97,6 +97,37 @@ func (k Kind) String() string {
 	return "Kind(" + strconv.Itoa(int(k)) + ")"
 }
 
+// spelling maps each fixed-spelling token — the operators and punctuation — to
+// its source text. Variable-text kinds (Ident, Int, comments, trivia) and the
+// keywords (whose spellings live in the keywords map) are absent. It is the
+// source of truth for operator spellings, used to name them in diagnostics and
+// available to tooling such as the editor grammar generator.
+var spelling = map[Kind]string{
+	Colon:    ":",
+	Assign:   "=",
+	Plus:     "+",
+	Minus:    "-",
+	Star:     "*",
+	Slash:    "/",
+	Percent:  "%",
+	EqEq:     "==",
+	BangEq:   "!=",
+	Lt:       "<",
+	LtEq:     "<=",
+	Gt:       ">",
+	GtEq:     ">=",
+	AmpAmp:   "&&",
+	PipePipe: "||",
+	Bang:     "!",
+}
+
+// Symbol returns the source spelling of a fixed operator or punctuation kind, or
+// "" for kinds whose text varies (identifiers, literals, comments) or that have
+// no spelling.
+func (k Kind) Symbol() string {
+	return spelling[k]
+}
+
 // keywords maps reserved identifiers to their keyword Kind.
 var keywords = map[string]Kind{
 	"const": Const,

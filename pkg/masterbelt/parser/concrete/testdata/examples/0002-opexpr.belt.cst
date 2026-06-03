@@ -1,0 +1,268 @@
+# tree
+File
+  ConstDecl
+    Const "const"
+    Whitespace " "
+    Ident "add"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      BinaryExpr
+        Literal
+          Int "1"
+        Whitespace " "
+        Plus "+"
+        Whitespace " "
+        Literal
+          Int "2"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "sub"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      BinaryExpr
+        Literal
+          Int "1"
+        Whitespace " "
+        Minus "-"
+        Whitespace " "
+        Literal
+          Int "2"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "mul"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      BinaryExpr
+        Literal
+          Int "1"
+        Whitespace " "
+        Star "*"
+        Whitespace " "
+        Literal
+          Int "2"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "div"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      BinaryExpr
+        Literal
+          Int "1"
+        Whitespace " "
+        Slash "/"
+        Whitespace " "
+        Literal
+          Int "2"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "rem"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      BinaryExpr
+        Literal
+          Int "1"
+        Whitespace " "
+        Percent "%"
+        Whitespace " "
+        Literal
+          Int "2"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "eql"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      BinaryExpr
+        Literal
+          Int "1"
+        Whitespace " "
+        EqEq "=="
+        Whitespace " "
+        Literal
+          Int "1"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "neq"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      BinaryExpr
+        Literal
+          Int "1"
+        Whitespace " "
+        BangEq "!="
+        Whitespace " "
+        Literal
+          Int "1"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "lt"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      BinaryExpr
+        Literal
+          Int "1"
+        Whitespace " "
+        Lt "<"
+        Whitespace " "
+        Literal
+          Int "2"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "lteq"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      BinaryExpr
+        Literal
+          Int "1"
+        Whitespace " "
+        LtEq "<="
+        Whitespace " "
+        Literal
+          Int "2"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "gt"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      BinaryExpr
+        Literal
+          Int "1"
+        Whitespace " "
+        Gt ">"
+        Whitespace " "
+        Literal
+          Int "2"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "gteq"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      BinaryExpr
+        Literal
+          Int "1"
+        Whitespace " "
+        GtEq ">="
+        Whitespace " "
+        Literal
+          Int "2"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "anan"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      BinaryExpr
+        Literal
+          True "true"
+        Whitespace " "
+        AmpAmp "&&"
+        Whitespace " "
+        Literal
+          False "false"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "oror"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      BinaryExpr
+        Literal
+          False "false"
+        Whitespace " "
+        PipePipe "||"
+        Whitespace " "
+        Literal
+          True "true"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "pos"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      UnaryExpr
+        Plus "+"
+        Literal
+          Int "1"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "neg"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      UnaryExpr
+        Minus "-"
+        Literal
+          Int "1"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "not"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      UnaryExpr
+        Bang "!"
+        Literal
+          False "false"
+  Newline "\n"
+  EOF ""
+# diagnostics

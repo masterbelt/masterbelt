@@ -40,7 +40,9 @@ const (
 	Initializer             // "= Expr"
 	TypeRef                 // an identifier naming a type
 	NameRef                 // an identifier used as a value
-	Literal                 // a literal value, e.g. an integer
+	Literal                 // a literal value: an integer or a boolean (true/false)
+	BinaryExpr              // a binary operation: Expr Op Expr
+	UnaryExpr               // a prefix operation: Op Expr
 	Error                   // a run of tokens that did not fit the grammar
 )
 
@@ -53,6 +55,8 @@ var kindNames = [...]string{
 	TypeRef:     "TypeRef",
 	NameRef:     "NameRef",
 	Literal:     "Literal",
+	BinaryExpr:  "BinaryExpr",
+	UnaryExpr:   "UnaryExpr",
 	Error:       "Error",
 }
 

@@ -123,6 +123,10 @@ func TestDocumentFuzz(t *testing.T) {
 	alphabet := []string{
 		"a", "Z", "x", "0", "9", " ", "\n", "/", "*", ":", "=", "あ",
 		"const ", "pub ", "// c\n", "/* b */", "int64",
+		// Operators, booleans, and a few expression fragments so the reparse
+		// oracle covers binary/unary expressions and the maximal-munch edits.
+		"+", "-", "%", "!", "<", ">", "&&", "||", "==", "!=", "<=", ">=",
+		"true", "false", "1 + 2", "a && b", "-x", "!true",
 	}
 
 	start := "const x = 0\n"

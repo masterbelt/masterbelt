@@ -7,6 +7,7 @@ masterbelt.parser.concrete.expected_type,型が必要です
 masterbelt.parser.concrete.expected_assign,'=' が必要です
 masterbelt.parser.concrete.expected_expression,式が必要です
 masterbelt.parser.concrete.unexpected_token,予期しないトークン: {kind}
+masterbelt.parser.concrete.expected_operand,'{operator}' の後にオペランドが必要です
 masterbelt.semantic.duplicate_declaration,{name} が重複して宣言されています
 masterbelt.semantic.undefined_name,未定義の名前: {name}
 masterbelt.semantic.unknown_type,未知の型: {name}

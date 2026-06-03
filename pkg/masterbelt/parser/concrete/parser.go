@@ -6,10 +6,23 @@
 //	File        := ( ConstDecl | Error )*
 //	ConstDecl   := [pub] const Ident [TypeClause] [Initializer]
 //	TypeClause  := ":" TypeRef
-//	Initializer := "=" ( Literal | NameRef )
+//	Initializer := "=" Expr
+//	Expr        := OrExpr
+//	OrExpr      := AndExpr ( "||" AndExpr )*
+//	AndExpr     := CmpExpr ( "&&" CmpExpr )*
+//	CmpExpr     := AddExpr ( ( "==" | "!=" | "<" | "<=" | ">" | ">=" ) AddExpr )*
+//	AddExpr     := MulExpr ( ( "+" | "-" ) MulExpr )*
+//	MulExpr     := Unary ( ( "*" | "/" | "%" ) Unary )*
+//	Unary       := ( "+" | "-" | "!" ) Unary | Operand
+//	Operand     := Literal | NameRef
 //	TypeRef     := Ident
 //	NameRef     := Ident
-//	Literal     := Int
+//	Literal     := Int | "true" | "false"
+//
+// The binary levels are parsed by precedence climbing (parseExpr) rather than a
+// function per level; the binaryPrec table is the single source of operator
+// precedence. Comparisons are left-associative here (Go forbids chaining them),
+// which keeps the parser uniform and defers "bool < int" to the type checker.
 //
 // Two properties make the parser usable as the front half of an incremental
 // pipeline (see Document):
@@ -207,17 +220,70 @@ func (p *parser) parseTypeClause() *cst.Node {
 // parseInitializer parses "= Expr". The cursor sits on the equals sign.
 func (p *parser) parseInitializer() *cst.Node {
 	children := []cst.Green{p.bump()} // "="
-	switch p.peekSignificant() {
-	case token.Int:
+	if startsExpr(p.peekSignificant()) {
 		p.skipTrivia(&children)
-		children = append(children, cst.NewNode(cst.Literal, []cst.Green{p.bump()}))
-	case token.Ident:
-		p.skipTrivia(&children)
-		children = append(children, cst.NewNode(cst.NameRef, []cst.Green{p.bump()}))
-	default:
+		children = append(children, p.parseExpr(precLowest))
+	} else {
 		p.report(newExpectedExpressionDiagnostic(p.lastStart, 0))
 	}
 	return cst.NewNode(cst.Initializer, children)
+}
+
+// parseExpr parses an expression whose operators bind at least as tightly as
+// minPrec, by precedence climbing. The cursor sits on the first significant
+// token of the expression. It returns the single green node for the whole
+// expression — a Literal/NameRef for an atom, or a BinaryExpr/UnaryExpr tree.
+func (p *parser) parseExpr(minPrec int) cst.Green {
+	left := p.parseUnary()
+	for {
+		prec, ok := binaryPrec[p.peekSignificant()]
+		if !ok || prec < minPrec {
+			return left
+		}
+		children := []cst.Green{left}
+		p.skipTrivia(&children)
+		op := p.cur() // the binary operator (cursor is on it)
+		children = append(children, p.bump())
+		if startsExpr(p.peekSignificant()) {
+			p.skipTrivia(&children)
+			children = append(children, p.parseExpr(prec+1)) // prec+1 ⇒ left-associative
+		} else {
+			p.report(newExpectedOperandDiagnostic(p.lastStart, 0, op.Kind.Symbol()))
+		}
+		left = cst.NewNode(cst.BinaryExpr, children)
+	}
+}
+
+// parseUnary parses a chain of prefix operators ending in an operand, or a bare
+// operand. The cursor sits on the first significant token.
+func (p *parser) parseUnary() cst.Green {
+	if !unaryOps[p.kind()] {
+		return p.parseOperand()
+	}
+	op := p.cur() // the unary operator (cursor is on it)
+	children := []cst.Green{p.bump()}
+	if startsExpr(p.peekSignificant()) {
+		p.skipTrivia(&children)
+		children = append(children, p.parseUnary())
+	} else {
+		p.report(newExpectedOperandDiagnostic(p.lastStart, 0, op.Kind.Symbol()))
+	}
+	return cst.NewNode(cst.UnaryExpr, children)
+}
+
+// parseOperand parses an atom: an integer or boolean Literal, or a NameRef. The
+// cursor sits on the operand token — startsExpr gates every call site, so the
+// default arm is defensive and consumes nothing.
+func (p *parser) parseOperand() cst.Green {
+	switch p.kind() {
+	case token.Int, token.True, token.False:
+		return cst.NewNode(cst.Literal, []cst.Green{p.bump()})
+	case token.Ident:
+		return cst.NewNode(cst.NameRef, []cst.Green{p.bump()})
+	default:
+		p.report(newExpectedExpressionDiagnostic(p.lastStart, 0))
+		return cst.NewNode(cst.Error, nil)
+	}
 }
 
 // parseError consumes a run of significant tokens that begin no declaration,
@@ -245,6 +311,49 @@ func (p *parser) parseError(lead []cst.Green) *cst.Node {
 // report records a parse diagnostic.
 func (p *parser) report(d diagnostic.Diagnostic) {
 	p.diags.Add(d)
+}
+
+// precLowest is the minimum binary precedence; parseExpr starts here so it
+// accepts every operator.
+const precLowest = 1
+
+// binaryPrec maps each binary operator to its precedence — higher binds tighter
+// — and is the single source of operator precedence. A token absent from the
+// table is not a binary operator, which ends the precedence-climbing loop.
+var binaryPrec = map[token.Kind]int{
+	token.PipePipe: 1,
+	token.AmpAmp:   2,
+	token.EqEq:     3,
+	token.BangEq:   3,
+	token.Lt:       3,
+	token.LtEq:     3,
+	token.Gt:       3,
+	token.GtEq:     3,
+	token.Plus:     4,
+	token.Minus:    4,
+	token.Star:     5,
+	token.Slash:    5,
+	token.Percent:  5,
+}
+
+// unaryOps is the set of prefix operators.
+var unaryOps = map[token.Kind]bool{
+	token.Plus:  true,
+	token.Minus: true,
+	token.Bang:  true,
+}
+
+// startsExpr reports whether kind can begin an expression. The parser checks it
+// before committing to an operand so a missing one is reported (and leaves
+// trailing trivia for the next construct) rather than mis-parsed.
+func startsExpr(kind token.Kind) bool {
+	switch kind {
+	case token.Int, token.Ident, token.True, token.False,
+		token.Plus, token.Minus, token.Bang:
+		return true
+	default:
+		return false
+	}
 }
 
 // isTrivia reports whether k is a trivia kind — one the grammar skips over but

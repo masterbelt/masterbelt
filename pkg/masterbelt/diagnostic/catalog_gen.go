@@ -55,6 +55,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "expected identifier"
 		}
 	},
+	"masterbelt.parser.concrete.expected_operand": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "'" + f["operator"].String() + "' の後にオペランドが必要です"
+		default:
+			return "expected operand after '" + f["operator"].String() + "'"
+		}
+	},
 	"masterbelt.parser.concrete.expected_type": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":

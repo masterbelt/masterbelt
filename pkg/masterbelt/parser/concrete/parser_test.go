@@ -52,6 +52,11 @@ func TestParseLossless(t *testing.T) {
 		"const = \nconst X\n= = =\npub pub const Z = 9",
 		"   \t  ",
 		"@#$ const X = 1",
+		"const x = 1+2*3\n",
+		"const y = !a && b || -c\n",
+		"const z = 1 <= 2 == true\n",
+		"const w = - - 1\n",
+		"const e = 1 +\n", // missing right operand stays lossless
 	}
 	for _, src := range cases {
 		assertLossless(t, src)
@@ -102,6 +107,72 @@ func TestParseConstDeclChildren(t *testing.T) {
 	}
 }
 
+// exprSexpr renders an expression subtree as a parenthesized infix form, with
+// trivia skipped, so precedence and associativity are easy to assert. Operators
+// render as their text; literals and names render as their text.
+func exprSexpr(buf source.Buffer, t cst.Tree) string {
+	if _, ok := t.Token(); ok {
+		return strings.TrimSpace(t.Text(buf))
+	}
+	if k, _ := t.Kind(); k == cst.Literal || k == cst.NameRef {
+		return strings.TrimSpace(t.Text(buf))
+	}
+	var parts []string
+	for _, c := range t.Children() {
+		if tk, ok := c.TokenKind(); ok && isTrivia(tk) {
+			continue
+		}
+		parts = append(parts, exprSexpr(buf, c))
+	}
+	return "(" + strings.Join(parts, " ") + ")"
+}
+
+// initExpr parses src and returns the first declaration's initializer
+// expression subtree.
+func initExpr(t *testing.T, src string) (source.Buffer, cst.Tree) {
+	t.Helper()
+	d := NewDocument([]byte(src))
+	for _, decl := range cst.Root(d.Root()).Children() {
+		if k, ok := decl.Kind(); !ok || k != cst.ConstDecl {
+			continue
+		}
+		for _, ch := range decl.Children() {
+			if k, ok := ch.Kind(); !ok || k != cst.Initializer {
+				continue
+			}
+			for _, ic := range ch.Children() {
+				if k, ok := ic.Kind(); ok && k != cst.Error {
+					return d.Buffer(), ic
+				}
+			}
+		}
+	}
+	t.Fatalf("no initializer expression in %q", src)
+	panic("unreachable")
+}
+
+func TestParseExpressionShape(t *testing.T) {
+	cases := []struct{ src, want string }{
+		{"const x = 1 + 2\n", "(1 + 2)"},
+		{"const x = 1 + 2 * 3\n", "(1 + (2 * 3))"},     // * binds tighter than +
+		{"const x = 1 * 2 + 3\n", "((1 * 2) + 3)"},
+		{"const x = 1 - 2 - 3\n", "((1 - 2) - 3)"},     // left-associative
+		{"const x = 1 < 2 && 3 > 4\n", "((1 < 2) && (3 > 4))"},
+		{"const x = a || b && c\n", "(a || (b && c))"}, // && binds tighter than ||
+		{"const x = -1 + 2\n", "((- 1) + 2)"},          // unary binds tightest
+		{"const x = !a && b\n", "((! a) && b)"},
+		{"const x = - - 1\n", "(- (- 1))"},
+		{"const x = true\n", "true"},
+		{"const x = false || true\n", "(false || true)"},
+	}
+	for _, tc := range cases {
+		buf, e := initExpr(t, tc.src)
+		if got := exprSexpr(buf, e); got != tc.want {
+			t.Errorf("%q: shape = %s, want %s", tc.src, got, tc.want)
+		}
+	}
+}
+
 func TestParseDiagnostics(t *testing.T) {
 	cases := []struct {
 		name string
@@ -111,6 +182,8 @@ func TestParseDiagnostics(t *testing.T) {
 		{"missing name", "const = 1", CodeExpectedIdentifier},
 		{"missing assign", "const X\n", CodeExpectedAssign},
 		{"missing expr", "const X = \n", CodeExpectedExpression},
+		{"missing rhs", "const X = 1 +\n", CodeExpectedOperand},
+		{"missing unary operand", "const X = -\n", CodeExpectedOperand},
 		{"missing type", "const X: = 1", CodeExpectedType},
 		{"stray token", "= 1\n", CodeUnexpectedToken},
 	}
@@ -129,6 +202,29 @@ func TestParseDiagnostics(t *testing.T) {
 			// Even malformed input must stay lossless.
 			assertLossless(t, tc.src)
 		})
+	}
+}
+
+// TestExpectedOperandNamesOperator checks the operand-expected diagnostic is
+// specific to the operator, not the generic "expected expression".
+func TestExpectedOperandNamesOperator(t *testing.T) {
+	cases := []struct{ src, operator string }{
+		{"const X = 1 +\n", "+"},
+		{"const X = 1 &&\n", "&&"},
+		{"const X = !\n", "!"},
+	}
+	for _, tc := range cases {
+		_, diags := Parse([]byte(tc.src))
+		var msg string
+		for _, d := range diags {
+			if d.Code == CodeExpectedOperand {
+				msg = d.Message
+			}
+		}
+		want := "expected operand after '" + tc.operator + "'"
+		if msg != want {
+			t.Errorf("src %q: message = %q, want %q", tc.src, msg, want)
+		}
 	}
 }
 
