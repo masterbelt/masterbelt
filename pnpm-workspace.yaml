@@ -1,0 +1,2 @@
+minimumReleaseAgeExclude:
+  - commitlint-config-agent-coauthor@1.0.0

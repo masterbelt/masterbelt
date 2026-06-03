@@ -1,0 +1,15 @@
+{
+  "name": "masterbelt",
+  "type": "module",
+  "packageManager": "pnpm@11.5.1",
+  "devDependencies": {
+    "@commitlint/cli": "^21.0.2",
+    "@commitlint/config-conventional": "^21.0.2",
+    "@commitlint/types": "^21.0.1",
+    "commitlint-config-agent-coauthor": "^1.0.0",
+    "husky": "^9.1.7"
+  },
+  "scripts": {
+    "prepare": "husky"
+  }
+}
