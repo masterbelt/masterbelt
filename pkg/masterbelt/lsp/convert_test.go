@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/parser/abstract"
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/semantic"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source"
 	protocol "github.com/owenrumney/go-lsp/lsp"
 )
@@ -34,7 +35,7 @@ func TestPositionUTF16RoundTrip(t *testing.T) {
 }
 
 func TestToDiagnostics(t *testing.T) {
-	doc := abstract.NewDocument([]byte("const = 1\n"))
+	doc := semantic.NewDocument([]byte("const = 1\n"))
 	diags := toDiagnostics(doc)
 	if len(diags) != 1 {
 		t.Fatalf("got %d diagnostics, want 1: %+v", len(diags), diags)
@@ -56,7 +57,7 @@ func TestToDiagnostics(t *testing.T) {
 }
 
 func TestToDiagnosticsEmptyIsNonNil(t *testing.T) {
-	diags := toDiagnostics(abstract.NewDocument([]byte("const X = 1\n")))
+	diags := toDiagnostics(semantic.NewDocument([]byte("const X = 1\n")))
 	if diags == nil {
 		t.Fatal("toDiagnostics returned nil; want an empty (clearing) slice")
 	}
@@ -66,7 +67,7 @@ func TestToDiagnosticsEmptyIsNonNil(t *testing.T) {
 }
 
 func TestDocumentSymbols(t *testing.T) {
-	doc := abstract.NewDocument([]byte("const MaxLevel: int64 = 100\nconst Min = 0\n"))
+	doc := semantic.NewDocument([]byte("const MaxLevel: int64 = 100\nconst Min = 0\n"))
 	syms := documentSymbols(doc)
 	if len(syms) != 2 {
 		t.Fatalf("got %d symbols, want 2", len(syms))
@@ -84,8 +85,8 @@ func TestDocumentSymbols(t *testing.T) {
 		t.Errorf("symbol 0 selection range = %+v, want cols 6..14 on line 0", sel)
 	}
 
-	if syms[1].Name != "Min" || syms[1].Detail != "" {
-		t.Errorf("symbol 1 = %+v, want Min with no detail", syms[1])
+	if syms[1].Name != "Min" || syms[1].Detail != ": untyped int" {
+		t.Errorf("symbol 1 = %+v, want Min: untyped int", syms[1])
 	}
 }
 

@@ -1,27 +1,27 @@
 // Package lsp implements a Language Server Protocol server for masterbelt.
 //
-// It is a thin adapter: the language work — lexing, parsing, lowering, and
-// diagnostics — all lives in the incremental pipeline under parser/ and source/,
-// and this package only translates LSP requests into that pipeline and its
-// results back into LSP types. The translation hinges on source.Buffer's UTF-16
-// support (see convert.go), which is exactly LSP's position model.
+// It is a thin adapter: the language work — lexing, parsing, lowering, name
+// resolution, and type inference — all lives in the incremental pipeline under
+// parser/, source/, and semantic/, and this package only translates LSP requests
+// into that pipeline and its results back into LSP types. The translation hinges
+// on source.Buffer's UTF-16 support (see convert.go), which is exactly LSP's
+// position model.
 //
-// The server keeps one incremental abstract.Document per open file. A
-// didChange with a range becomes a source.Edit, so a keystroke re-lexes,
-// re-parses, and re-lowers only the touched declaration rather than the whole
-// file — the property the whole pipeline was built for.
+// The server keeps one incremental semantic.Document per open file. A didChange
+// with a range becomes a source.Edit, so a keystroke re-lexes, re-parses,
+// re-lowers, and re-analyzes only what it touched.
 //
-// Implemented features: lifecycle, incremental text sync, push diagnostics,
-// document symbols (outline), and minimal formatting. The protocol plumbing
-// (JSON-RPC over stdio, request routing) is provided by github.com/owenrumney/
-// go-lsp; this package implements only the handler interfaces it needs.
+// Implemented features: lifecycle, incremental text sync, push diagnostics
+// (lexer, parser, and semantic), document symbols, formatting, semantic-token
+// highlighting, hover, and go-to-definition. The protocol plumbing (JSON-RPC
+// over stdio, request routing) is provided by github.com/owenrumney/go-lsp.
 package lsp
 
 import (
 	"context"
 	"sync"
 
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/parser/abstract"
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/semantic"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source"
 	protocol "github.com/owenrumney/go-lsp/lsp"
 	"github.com/owenrumney/go-lsp/server"
@@ -30,17 +30,17 @@ import (
 const serverName = "masterbelt"
 
 // Server is the masterbelt language server. It satisfies go-lsp's
-// LifecycleHandler plus the optional sync, symbol, and formatting handler
-// interfaces; unimplemented requests are declined by the library.
+// LifecycleHandler plus the optional handler interfaces for the features it
+// implements; unimplemented requests are declined by the library.
 type Server struct {
 	mu     sync.Mutex
-	docs   map[protocol.DocumentURI]*abstract.Document
+	docs   map[protocol.DocumentURI]*semantic.Document
 	client *server.Client
 }
 
 // NewServer creates a language server with no open documents.
 func NewServer() *Server {
-	return &Server{docs: map[protocol.DocumentURI]*abstract.Document{}}
+	return &Server{docs: map[protocol.DocumentURI]*semantic.Document{}}
 }
 
 // Initialize advertises the server's capabilities.
@@ -53,6 +53,8 @@ func (s *Server) Initialize(_ context.Context, _ *protocol.InitializeParams) (*p
 			},
 			DocumentSymbolProvider:     new(true),
 			DocumentFormattingProvider: new(true),
+			HoverProvider:              new(true),
+			DefinitionProvider:         new(true),
 			SemanticTokensProvider: &protocol.SemanticTokensOptions{
 				Legend: semanticLegend,
 				Full:   &protocol.SemanticTokensFull{},
@@ -75,7 +77,7 @@ func (s *Server) DidOpen(ctx context.Context, params *protocol.DidOpenTextDocume
 	defer s.mu.Unlock()
 
 	uri := params.TextDocument.URI
-	doc := abstract.NewDocument([]byte(params.TextDocument.Text))
+	doc := semantic.NewDocument([]byte(params.TextDocument.Text))
 	s.docs[uri] = doc
 	s.publish(ctx, uri, doc)
 	return nil
@@ -83,7 +85,7 @@ func (s *Server) DidOpen(ctx context.Context, params *protocol.DidOpenTextDocume
 
 // DidChange applies the edits to the document incrementally and republishes its
 // diagnostics. Range-based changes drive the incremental pipeline; a change
-// without a range (a whole-document replacement) reparses from scratch.
+// without a range (a whole-document replacement) re-analyzes from scratch.
 func (s *Server) DidChange(ctx context.Context, params *protocol.DidChangeTextDocumentParams) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -96,7 +98,7 @@ func (s *Server) DidChange(ctx context.Context, params *protocol.DidChangeTextDo
 
 	for _, change := range params.ContentChanges {
 		if change.Range == nil {
-			doc = abstract.NewDocument([]byte(change.Text))
+			doc = semantic.NewDocument([]byte(change.Text))
 			continue
 		}
 		// Each change's range refers to the document state left by the previous
@@ -150,7 +152,7 @@ func (s *Server) SemanticTokensFull(_ context.Context, params *protocol.Semantic
 	if doc == nil {
 		return nil, nil
 	}
-	return semanticTokens(doc), nil
+	return semanticTokens(doc.AST()), nil
 }
 
 // Formatting returns the edits to format the whole document.
@@ -162,12 +164,37 @@ func (s *Server) Formatting(_ context.Context, params *protocol.DocumentFormatti
 	if doc == nil {
 		return nil, nil
 	}
-	return formatEdits(doc), nil
+	return formatEdits(doc.AST()), nil
+}
+
+// Hover returns documentation and type information for the symbol under the
+// cursor.
+func (s *Server) Hover(_ context.Context, params *protocol.HoverParams) (*protocol.Hover, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	doc := s.docs[params.TextDocument.URI]
+	if doc == nil {
+		return nil, nil
+	}
+	return hover(doc, fromPosition(doc.Buffer(), params.Position)), nil
+}
+
+// Definition resolves the reference under the cursor to its declaration.
+func (s *Server) Definition(_ context.Context, params *protocol.DefinitionParams) ([]protocol.Location, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	doc := s.docs[params.TextDocument.URI]
+	if doc == nil {
+		return nil, nil
+	}
+	return definition(doc, fromPosition(doc.Buffer(), params.Position), params.TextDocument.URI), nil
 }
 
 // publish sends the document's current diagnostics to the client. It is a no-op
 // when no client is attached (as in unit tests that drive the handler directly).
-func (s *Server) publish(ctx context.Context, uri protocol.DocumentURI, doc *abstract.Document) {
+func (s *Server) publish(ctx context.Context, uri protocol.DocumentURI, doc *semantic.Document) {
 	if s.client == nil {
 		return
 	}

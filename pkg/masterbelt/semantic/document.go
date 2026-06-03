@@ -42,6 +42,9 @@ func (d *Document) Diagnostics() []diagnostic.Diagnostic { return d.diags }
 // AST returns the underlying incremental syntax document.
 func (d *Document) AST() *abstract.Document { return d.ast }
 
+// Buffer returns the underlying editable source buffer.
+func (d *Document) Buffer() source.Buffer { return d.ast.Buffer() }
+
 // refresh re-runs the assembler over the engine. setInput opens a new revision
 // so the engine knows the input changed; the assembler then pulls resolution and
 // type facts through the engine, which recomputes only what the edit disturbed.

@@ -5,9 +5,11 @@ import (
 
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/diagnostic"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/parser/abstract"
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/semantic"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/cst"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/formatter"
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ir"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/token"
 	protocol "github.com/owenrumney/go-lsp/lsp"
 )
@@ -34,14 +36,15 @@ func fromPosition(buf source.Buffer, p protocol.Position) int {
 	return buf.OffsetAt(p.Line, p.Character, source.UTF16Encoding)
 }
 
-// toDiagnostics renders every diagnostic of the document — lexer and parser
-// alike — as LSP diagnostics, ordered by position. The result is never nil:
+// toDiagnostics renders every diagnostic of the document — lexer, parser, and
+// semantic — as LSP diagnostics, ordered by position. The result is never nil:
 // publishing an empty array is how the server clears stale diagnostics.
-func toDiagnostics(doc *abstract.Document) []protocol.Diagnostic {
+func toDiagnostics(doc *semantic.Document) []protocol.Diagnostic {
 	buf := doc.Buffer()
 
-	raw := make([]diagnostic.Diagnostic, 0, len(doc.Diagnostics()))
-	raw = append(raw, doc.Concrete().LexDiagnostics()...)
+	var raw []diagnostic.Diagnostic
+	raw = append(raw, doc.AST().Concrete().LexDiagnostics()...)
+	raw = append(raw, doc.AST().Diagnostics()...)
 	raw = append(raw, doc.Diagnostics()...)
 	sort.SliceStable(raw, func(i, j int) bool { return raw[i].Offset < raw[j].Offset })
 
@@ -71,49 +74,63 @@ func toSeverity(s diagnostic.Severity) protocol.DiagnosticSeverity {
 	}
 }
 
-// documentSymbols turns the file's declarations into an LSP outline. Each
-// constant becomes a symbol whose Range covers the whole declaration (computed
-// from the positioned concrete tree) and whose SelectionRange covers just the
-// name — the part an editor highlights when you pick the symbol.
-func documentSymbols(doc *abstract.Document) []protocol.DocumentSymbol {
+// documentSymbols turns the program's constants into an LSP outline. Each
+// constant becomes a symbol whose Detail is its inferred type, whose Range
+// covers the whole declaration, and whose SelectionRange covers just the name —
+// the part an editor highlights when you pick the symbol.
+func documentSymbols(doc *semantic.Document) []protocol.DocumentSymbol {
 	buf := doc.Buffer()
-
-	// The abstract declarations carry the resolved names; pair them with their
-	// positioned concrete nodes (same green node, by identity) to get spans.
-	byNode := map[*cst.Node]string{}
-	details := map[*cst.Node]string{}
-	for _, decl := range doc.File().Decls {
-		byNode[decl.Syntax()] = decl.Name
-		if decl.Type != nil {
-			details[decl.Syntax()] = ": " + decl.Type.Name
-		}
-	}
+	trees := positionedTrees(doc.AST().Concrete().Tree())
 
 	var symbols []protocol.DocumentSymbol
-	for _, child := range doc.Concrete().Tree().Children() {
-		node, ok := child.Node()
-		if !ok || node.Kind() != cst.ConstDecl {
+	for _, c := range doc.Module().Consts {
+		declTree, ok := trees[c.Syntax.Syntax()]
+		if !ok {
 			continue
 		}
 
-		name := byNode[node]
+		name := c.Name
 		if name == "" {
 			name = "<anonymous>"
 		}
-		selection := toRange(buf, child.Offset(), child.End())
-		if nameTok, ok := nameToken(child); ok {
+		selection := toRange(buf, declTree.Offset(), declTree.End())
+		if nameTok, ok := nameToken(declTree); ok {
 			selection = toRange(buf, nameTok.Offset(), nameTok.End())
+		}
+		detail := ""
+		if c.Type != ir.Invalid {
+			detail = ": " + c.Type.String()
 		}
 
 		symbols = append(symbols, protocol.DocumentSymbol{
 			Name:           name,
-			Detail:         details[node], // "" when the type is inferred; omitted on the wire
+			Detail:         detail,
 			Kind:           protocol.SymbolKindConstant,
-			Range:          toRange(buf, child.Offset(), child.End()),
+			Range:          toRange(buf, declTree.Offset(), declTree.End()),
 			SelectionRange: selection,
 		})
 	}
 	return symbols
+}
+
+// positionedTrees maps each green node of the concrete tree to its positioned
+// view, so an AST node's green Syntax can be turned back into a source range.
+func positionedTrees(root cst.Tree) map[cst.Green]cst.Tree {
+	trees := map[cst.Green]cst.Tree{}
+	var walk func(t cst.Tree)
+	walk = func(t cst.Tree) {
+		trees[t.Green()] = t
+		for _, child := range t.Children() {
+			walk(child)
+		}
+	}
+	walk(root)
+	return trees
+}
+
+// within reports whether offset falls inside an element's byte span.
+func within(t cst.Tree, offset int) bool {
+	return t.Offset() <= offset && offset < t.End()
 }
 
 // nameToken returns the positioned identifier that names the declaration — its
