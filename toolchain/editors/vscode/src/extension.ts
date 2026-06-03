@@ -14,7 +14,11 @@ let client: LanguageClient | undefined;
 // grammar and needs no server.
 export function activate(_context: vscode.ExtensionContext): void {
   const settings = vscode.workspace.getConfiguration('masterbelt');
-  const command = settings.get<string>('server.path', 'masterbelt');
+  // MASTERBELT_SERVER_PATH lets the F5 launch config point at a freshly built
+  // binary regardless of which folder the development host opens (see
+  // .vscode/launch.json); otherwise fall back to the setting, then PATH.
+  const command =
+    process.env.MASTERBELT_SERVER_PATH || settings.get<string>('server.path', 'masterbelt');
 
   const serverOptions: ServerOptions = {
     command,

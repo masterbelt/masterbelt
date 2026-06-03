@@ -1,0 +1,23 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "build server",
+      "type": "shell",
+      "command": "make build",
+      "problemMatcher": []
+    },
+    {
+      "label": "build extension",
+      "type": "shell",
+      "command": "pnpm --filter masterbelt-vscode run build",
+      "problemMatcher": []
+    },
+    {
+      "label": "build",
+      "dependsOn": ["build server", "build extension"],
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": []
+    }
+  ]
+}
