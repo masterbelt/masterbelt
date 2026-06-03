@@ -1,0 +1,10 @@
+/* this is comment block here */
+
+/// DocComment for MaxLevel
+const MaxLevel: int64 = 100
+
+/// DocComment for MinLevel
+/// with multiline.
+const MinLevel = 0 // type inference
+
+pub const PublishedMaxLevel = MaxLevel
