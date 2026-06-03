@@ -21,7 +21,6 @@ import (
 // plausible tokens, so an editor or incremental parser can keep working on a
 // half-typed buffer.
 type Lexer struct {
-	file   *source.File
 	src    []byte
 	offset int // offset of the next unread byte
 	diags  *diagnostic.List
@@ -30,7 +29,6 @@ type Lexer struct {
 // New creates a Lexer over file.
 func New(file *source.File) *Lexer {
 	return &Lexer{
-		file:  file,
 		src:   file.Source(),
 		diags: &diagnostic.List{},
 	}
@@ -181,35 +179,30 @@ func (l *Lexer) token(kind token.Kind, start int) token.Token {
 }
 
 // reportUnexpectedChar records an "unexpected character" diagnostic for the
-// rune in [start, end). reporting is a no-op when the lexer has no file to
-// resolve spans against, which is the case when re-lexing a detached window
-// during incremental relexing.
+// rune in [start, end). Diagnostics carry only byte offsets, so reporting needs
+// no file and works the same whether lexing a whole file or a detached window.
 func (l *Lexer) reportUnexpectedChar(start, end int, char rune) {
-	if l.file == nil {
-		return
-	}
-	l.diags.Add(newUnexpectedCharacterDiagnostic(l.file.Span(start, end), char))
+	l.diags.Add(newUnexpectedCharacterDiagnostic(start, end-start, char))
 }
 
 // reportUnterminatedBlockComment records an "unterminated block comment"
 // diagnostic for the comment in [start, end).
 func (l *Lexer) reportUnterminatedBlockComment(start, end int) {
-	if l.file == nil {
-		return
-	}
-	l.diags.Add(newUnterminatedBlockCommentDiagnostic(l.file.Span(start, end)))
+	l.diags.Add(newUnterminatedBlockCommentDiagnostic(start, end-start))
 }
 
-// lexTokens scans src in isolation and returns its tokens with offsets relative
-// to src, excluding the trailing EOF. It produces no diagnostics; the
-// incremental relexer uses it to re-scan a detached window of bytes.
-func lexTokens(src []byte) []token.Token {
+// lex scans src in isolation and returns its tokens (offsets relative to src,
+// excluding the trailing EOF) together with any diagnostics. The incremental
+// relexer uses it to re-scan a detached window of bytes; because tokens and
+// diagnostics are both offset-based, the window's results can be shifted and
+// spliced back into the document.
+func lex(src []byte) ([]token.Token, []diagnostic.Diagnostic) {
 	l := &Lexer{src: src, diags: &diagnostic.List{}}
 	var tokens []token.Token
 	for {
 		tok := l.Next()
 		if tok.Kind == token.EOF {
-			return tokens
+			return tokens, l.diags.Items()
 		}
 		tokens = append(tokens, tok)
 	}

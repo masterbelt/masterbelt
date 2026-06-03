@@ -12,14 +12,30 @@ func TestDiagnosticString(t *testing.T) {
 		Severity: Error,
 		Code:     Code("masterbelt.lexer.unterminated_block_comment"),
 		Message:  "unterminated block comment",
-		Span: source.Span{
-			Start: source.Position{ByteOffset: 12, Line: 3, Column: 5},
-			End:   source.Position{ByteOffset: 20, Line: 3, Column: 13},
-		},
+		Offset:   12,
+		Width:    8,
 	}
-	want := "error[masterbelt.lexer.unterminated_block_comment]: unterminated block comment (3:5)"
+	want := "error[masterbelt.lexer.unterminated_block_comment]: unterminated block comment"
 	if got := d.String(); got != want {
 		t.Errorf("String() = %q, want %q", got, want)
+	}
+}
+
+func TestDiagnosticSpan(t *testing.T) {
+	// The diagnostic stores only a byte range; Span resolves line/column from a
+	// buffer on demand.
+	buf := source.NewFile("t.belt", []byte("ab\ncdef"))
+	d := Diagnostic{Offset: 4, Width: 2} // "de" on line 2
+
+	if d.End() != 6 {
+		t.Errorf("End() = %d, want 6", d.End())
+	}
+	span := d.Span(buf)
+	if span.Start != (source.Position{ByteOffset: 4, Line: 2, Column: 2}) {
+		t.Errorf("Span().Start = %+v", span.Start)
+	}
+	if span.End != (source.Position{ByteOffset: 6, Line: 2, Column: 4}) {
+		t.Errorf("Span().End = %+v", span.End)
 	}
 }
 

@@ -28,14 +28,14 @@ func formatTokens(toks []token.Token) string {
 	return b.String()
 }
 
-// assertMatchesFullLex is the oracle: the incrementally maintained stream must
-// be byte-for-byte identical to lexing the current content from scratch.
+// assertMatchesFullLex is the oracle: the incrementally maintained token stream
+// and diagnostics must be identical to lexing the current content from scratch.
 func assertMatchesFullLex(t *testing.T, doc *Document, content []byte) {
 	t.Helper()
 
-	got := doc.Tokens()
-	want := NewDocument(content).Tokens()
+	oracle := NewDocument(content)
 
+	got, want := doc.Tokens(), oracle.Tokens()
 	if len(got) != len(want) {
 		t.Fatalf("token count = %d, want %d\n got:  %s\n want: %s\n content: %q",
 			len(got), len(want), formatTokens(got), formatTokens(want), content)
@@ -44,6 +44,19 @@ func assertMatchesFullLex(t *testing.T, doc *Document, content []byte) {
 		if got[i] != want[i] {
 			t.Fatalf("token[%d] = %s, want %s (content %q)\n got:  %s\n want: %s",
 				i, got[i], want[i], content, formatTokens(got), formatTokens(want))
+		}
+	}
+
+	gotD, wantD := doc.Diagnostics(), oracle.Diagnostics()
+	if len(gotD) != len(wantD) {
+		t.Fatalf("diagnostic count = %d, want %d (content %q)\n got:  %v\n want: %v",
+			len(gotD), len(wantD), content, gotD, wantD)
+	}
+	for i := range wantD {
+		if gotD[i].Code != wantD[i].Code || gotD[i].Severity != wantD[i].Severity ||
+			gotD[i].Offset != wantD[i].Offset || gotD[i].Width != wantD[i].Width ||
+			gotD[i].Message != wantD[i].Message {
+			t.Fatalf("diagnostic[%d] = %+v, want %+v (content %q)", i, gotD[i], wantD[i], content)
 		}
 	}
 }

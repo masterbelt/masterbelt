@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/diagnostic"
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source"
 )
 
 const (
@@ -14,7 +13,7 @@ const (
 	CodeUnterminatedBlockComment diagnostic.Code = "masterbelt.lexer.unterminated_block_comment"
 )
 
-func newUnexpectedCharacterDiagnostic(span source.Span, char rune) diagnostic.Diagnostic {
+func newUnexpectedCharacterDiagnostic(offset int, width int, char rune) diagnostic.Diagnostic {
 	fields := map[string]fmt.Stringer{
 		"char": diagnostic.Rune(char),
 	}
@@ -23,16 +22,18 @@ func newUnexpectedCharacterDiagnostic(span source.Span, char rune) diagnostic.Di
 		Code:     CodeUnexpectedCharacter,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeUnexpectedCharacter, fields),
 		Fields:   fields,
-		Span:     span,
+		Offset:   offset,
+		Width:    width,
 	}
 }
 
-func newUnterminatedBlockCommentDiagnostic(span source.Span) diagnostic.Diagnostic {
+func newUnterminatedBlockCommentDiagnostic(offset int, width int) diagnostic.Diagnostic {
 	return diagnostic.Diagnostic{
 		Severity: diagnostic.Error,
 		Code:     CodeUnterminatedBlockComment,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeUnterminatedBlockComment, nil),
 		Fields:   nil,
-		Span:     span,
+		Offset:   offset,
+		Width:    width,
 	}
 }

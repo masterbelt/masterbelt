@@ -3,38 +3,43 @@ package lexer
 import (
 	"sort"
 
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/diagnostic"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/token"
 )
 
-// Document is an incrementally maintained token stream over an editable Text.
+// Document is an incrementally maintained token stream and diagnostic set over
+// an editable Text.
 //
 // It exists to back an incremental parser: after an edit, re-tokenizing the
 // whole file is wasteful, so Edit re-lexes only a bounded window around the
-// change and reuses the unaffected tokens on either side. This works because
-// the lexer is context-free at token boundaries — a token's identity depends
-// only on the bytes it covers, not on any carried lexer state — so re-lexing
-// can start at any token boundary and stop as soon as it realigns with the old
-// stream.
+// change and reuses the unaffected tokens (and diagnostics) on either side.
+// This works because the lexer is context-free at token boundaries — a token's
+// identity depends only on the bytes it covers, not on any carried lexer state —
+// so re-lexing can start at any token boundary and stop as soon as it realigns
+// with the old stream. Because tokens and diagnostics are both offset-based,
+// reuse is just an offset shift.
 //
-// The token stream is always identical to what a fresh lex of the current text
-// would produce. Diagnostics are not maintained incrementally; obtain them with
-// a one-shot Lexer over Buffer when needed.
+// The token stream and diagnostics are always identical to what a fresh lex of
+// the current text would produce.
 type Document struct {
 	text   *source.Text
 	tokens []token.Token
+	diags  []diagnostic.Diagnostic
 }
 
 // NewDocument creates a Document over a copy-free view of src and lexes it once.
 func NewDocument(src []byte) *Document {
+	tokens, diags := lex(src)
 	return &Document{
 		text:   source.NewText(src),
-		tokens: lexAll(src),
+		tokens: append(tokens, token.Token{Kind: token.EOF, Offset: len(src), Width: 0}),
+		diags:  diags,
 	}
 }
 
-// Buffer returns the underlying editable buffer, for resolving token text and
-// spans (tok.Text(doc.Buffer()), tok.Span(doc.Buffer())).
+// Buffer returns the underlying editable buffer, for resolving token and
+// diagnostic spans (tok.Span(doc.Buffer()), diag.Span(doc.Buffer())).
 func (d *Document) Buffer() source.Buffer {
 	return d.text
 }
@@ -44,14 +49,19 @@ func (d *Document) Tokens() []token.Token {
 	return d.tokens
 }
 
-// lexAll lexes src in full and appends the terminating EOF token.
-func lexAll(src []byte) []token.Token {
-	return append(lexTokens(src), token.Token{Kind: token.EOF, Offset: len(src), Width: 0})
+// Diagnostics returns the current diagnostics, ordered by offset.
+func (d *Document) Diagnostics() []diagnostic.Diagnostic {
+	return d.diags
 }
 
-// Edit applies e to the document and incrementally updates the token stream.
+// relexMargin is how far past the edited region the first relex window reaches,
+// in bytes, before the window starts doubling.
+const relexMargin = 32
+
+// Edit applies e to the document and incrementally updates the token stream and
+// diagnostics.
 func (d *Document) Edit(e source.Edit) {
-	old := d.tokens
+	oldTokens, oldDiags := d.tokens, d.diags
 	delta := len(e.NewText) - (e.End - e.Start)
 
 	d.text.Edit(e.Start, e.End, e.NewText)
@@ -62,13 +72,13 @@ func (d *Document) Edit(e source.Edit) {
 	// lexer has no lookbehind, and the only token that scans arbitrarily far
 	// ahead is the block comment, whose span (to its */ or to EOF) makes its
 	// End reach e.Start whenever the edit could change it. The terminating EOF
-	// always satisfies End() >= e.Start, so old[iStart] is always valid.
+	// always satisfies End() >= e.Start, so oldTokens[iStart] is always valid.
 	iStart := 0
-	for iStart < len(old) && old[iStart].End() < e.Start {
+	for iStart < len(oldTokens) && oldTokens[iStart].End() < e.Start {
 		iStart++
 	}
-	winStart := min(e.Start, old[iStart].Offset)
-	prefix := old[:iStart]
+	winStart := min(e.Start, oldTokens[iStart].Offset)
+	prefix := oldTokens[:iStart]
 
 	// changedEnd is the end of the edited region in the new coordinates; the
 	// reusable suffix can only begin at or after it.
@@ -76,37 +86,31 @@ func (d *Document) Edit(e source.Edit) {
 	winEnd := min(changedEnd+relexMargin, newLen)
 
 	for {
-		fresh := lexTokens(d.text.Slice(winStart, winEnd))
+		freshTokens, freshDiags := lex(d.text.Slice(winStart, winEnd))
 		atEnd := winEnd >= newLen
 
-		if spliced, ok := splice(prefix, fresh, old, winStart, winEnd, delta, changedEnd, atEnd); ok {
-			d.tokens = spliced
+		if fi, oi, ok := findResync(freshTokens, oldTokens, winStart, winEnd, delta, changedEnd, atEnd); ok {
+			resyncNew := winStart + freshTokens[fi].Offset
+			resyncOld := oldTokens[oi].Offset
+			d.tokens = spliceTokens(prefix, freshTokens[:fi], oldTokens[oi:], winStart, delta)
+			d.diags = spliceDiags(oldDiags, freshDiags, winStart, resyncNew, resyncOld, delta)
 			return
 		}
 		if atEnd {
-			// No reusable suffix: keep the prefix and the freshly lexed tail.
-			res := make([]token.Token, 0, len(prefix)+len(fresh)+1)
-			res = append(res, prefix...)
-			for _, ft := range fresh {
-				res = append(res, shift(ft, winStart))
-			}
-			res = append(res, token.Token{Kind: token.EOF, Offset: newLen, Width: 0})
-			d.tokens = res
+			// No reusable suffix: keep the prefixes and the freshly lexed tail.
+			d.tokens = appendEOF(spliceTokens(prefix, freshTokens, nil, winStart, delta), newLen)
+			d.diags = spliceDiags(oldDiags, freshDiags, winStart, newLen, newLen-delta, delta)
 			return
 		}
 		winEnd = min(newLen, winStart+max(2*relexMargin, 2*(winEnd-winStart)))
 	}
 }
 
-// relexMargin is how far past the edited region the first relex window reaches,
-// in bytes, before the window starts doubling.
-const relexMargin = 32
-
-// splice tries to realign the freshly lexed window with the old token stream.
-// On success it returns prefix + freshly lexed middle + the old suffix shifted
-// by delta. It fails (false) when no complete fresh token inside the window
-// aligns with an unchanged old token, signalling that the window must grow.
-func splice(prefix, fresh, old []token.Token, winStart, winEnd, delta, changedEnd int, atEnd bool) ([]token.Token, bool) {
+// findResync looks for the first complete fresh token (past the changed region)
+// that realigns with an unchanged old token at the shifted offset. It returns
+// the fresh and old indices of that token; ok is false when the window must
+// grow to find one.
+func findResync(fresh, old []token.Token, winStart, winEnd, delta, changedEnd int, atEnd bool) (int, int, bool) {
 	for fi := range fresh {
 		ft := fresh[fi]
 		absStart := winStart + ft.Offset
@@ -118,33 +122,61 @@ func splice(prefix, fresh, old []token.Token, winStart, winEnd, delta, changedEn
 		if !atEnd && absStart+ft.Width >= winEnd {
 			break
 		}
-
-		// absStart >= changedEnd guarantees oldStart >= e.End, so any match here
-		// is necessarily in the unchanged suffix.
-		oldStart := absStart - delta
-		oi := findToken(old, oldStart)
+		// absStart >= changedEnd guarantees the match is in the unchanged suffix.
+		oi := findToken(old, absStart-delta)
 		if oi < 0 || old[oi].Kind != ft.Kind || old[oi].Width != ft.Width {
 			continue
 		}
-
-		// Realigned: identical token at the shifted offset means every
-		// subsequent token matches too, since the suffix bytes are unchanged.
-		res := make([]token.Token, 0, len(prefix)+fi+len(old)-oi)
-		res = append(res, prefix...)
-		for _, mt := range fresh[:fi] {
-			res = append(res, shift(mt, winStart))
-		}
-		for _, st := range old[oi:] {
-			res = append(res, token.Token{Kind: st.Kind, Offset: st.Offset + delta, Width: st.Width})
-		}
-		return res, true
+		return fi, oi, true
 	}
-	return nil, false
+	return 0, 0, false
 }
 
-// shift relocates a window-relative token to its absolute document offset.
-func shift(t token.Token, base int) token.Token {
-	return token.Token{Kind: t.Kind, Offset: base + t.Offset, Width: t.Width}
+// spliceTokens assembles prefix + the window-relative freshMiddle (shifted to
+// absolute) + the old suffix (shifted by delta).
+func spliceTokens(prefix, freshMiddle, oldSuffix []token.Token, winStart, delta int) []token.Token {
+	res := make([]token.Token, 0, len(prefix)+len(freshMiddle)+len(oldSuffix))
+	res = append(res, prefix...)
+	for _, t := range freshMiddle {
+		res = append(res, token.Token{Kind: t.Kind, Offset: winStart + t.Offset, Width: t.Width})
+	}
+	for _, t := range oldSuffix {
+		res = append(res, token.Token{Kind: t.Kind, Offset: t.Offset + delta, Width: t.Width})
+	}
+	return res
+}
+
+func appendEOF(tokens []token.Token, offset int) []token.Token {
+	return append(tokens, token.Token{Kind: token.EOF, Offset: offset, Width: 0})
+}
+
+// spliceDiags assembles the diagnostics the same way as tokens: old diagnostics
+// before the window, the freshly lexed ones inside it (up to the realignment
+// point), and the old suffix shifted by delta. The three ranges are disjoint and
+// offset-ordered, matching a full lex.
+func spliceDiags(old, fresh []diagnostic.Diagnostic, winStart, resyncNew, resyncOld, delta int) []diagnostic.Diagnostic {
+	var res []diagnostic.Diagnostic
+	for _, d := range old {
+		if d.End() <= winStart {
+			res = append(res, d)
+		}
+	}
+	for _, d := range fresh {
+		if winStart+d.Offset < resyncNew {
+			res = append(res, shiftDiag(d, winStart))
+		}
+	}
+	for _, d := range old {
+		if d.Offset >= resyncOld {
+			res = append(res, shiftDiag(d, delta))
+		}
+	}
+	return res
+}
+
+func shiftDiag(d diagnostic.Diagnostic, by int) diagnostic.Diagnostic {
+	d.Offset += by
+	return d
 }
 
 // findToken returns the index of the token starting exactly at off, or -1.

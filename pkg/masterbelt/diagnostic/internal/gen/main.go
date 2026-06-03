@@ -255,16 +255,6 @@ func checkFields(locale string, c codeDef, msg string) error {
 
 func generatePackage(defs []codeDef) ([]byte, error) {
 	pkgName := defs[0].pkgName
-	pkgImport := defs[0].pkgImport
-
-	// A code's owner is never the diagnostic package, but it may be the source
-	// package itself, in which case Span is local and source must not be
-	// self-imported.
-	inSource := pkgImport == modulePrefix+"/source"
-	spanType := "source.Span"
-	if inSource {
-		spanType = "Span"
-	}
 
 	needsFmt := false
 	for _, d := range defs {
@@ -280,9 +270,6 @@ func generatePackage(defs []codeDef) ([]byte, error) {
 		b.WriteString("\t\"fmt\"\n\n")
 	}
 	fmt.Fprintf(&b, "\t%q\n", modulePrefix+"/diagnostic")
-	if !inSource {
-		fmt.Fprintf(&b, "\t%q\n", modulePrefix+"/source")
-	}
 	b.WriteString(")\n\n")
 
 	b.WriteString("const (\n")
@@ -292,7 +279,7 @@ func generatePackage(defs []codeDef) ([]byte, error) {
 	b.WriteString(")\n")
 
 	for _, d := range defs {
-		params := []string{"span " + spanType}
+		params := []string{"offset int", "width int"}
 		for _, f := range d.fields {
 			params = append(params, f.name+" "+f.typ)
 		}
@@ -312,7 +299,8 @@ func generatePackage(defs []codeDef) ([]byte, error) {
 		fmt.Fprintf(&b, "\t\tCode:     %s,\n", d.constName)
 		fmt.Fprintf(&b, "\t\tMessage:  diagnostic.Render(diagnostic.DefaultLocale, %s, %s),\n", d.constName, fieldsRef)
 		fmt.Fprintf(&b, "\t\tFields:   %s,\n", fieldsRef)
-		b.WriteString("\t\tSpan:     span,\n")
+		b.WriteString("\t\tOffset:   offset,\n")
+		b.WriteString("\t\tWidth:    width,\n")
 		b.WriteString("\t}\n}\n")
 	}
 

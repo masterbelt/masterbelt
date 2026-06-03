@@ -31,22 +31,36 @@ import (
 // "masterbelt.lexer.unexpected_character".
 type Code string
 
-// Diagnostic is a single message anchored to a source span. It is produced only
-// by the generated per-code constructors; the exported fields exist so those
+// Diagnostic is a single message anchored to a byte range of the source. Like a
+// token it stores only its range (Offset, Width), never a resolved line/column,
+// so an edit shifts at most its Offset and diagnostics can be reused across
+// edits. Resolve a source span on demand with Span. It is produced only by the
+// generated per-code constructors; the exported fields exist so those
 // constructors (which live in other packages) can populate them.
 type Diagnostic struct {
 	Severity Severity
 	Code     Code
 	Message  string
 	Fields   map[string]fmt.Stringer
-	Span     source.Span
+	Offset   int // byte offset of the diagnostic's start within the file
+	Width    int // byte length of the diagnostic's span
 }
 
-// String renders the diagnostic as "severity[code]: message (line:col)" using
-// the 1-based start position of the span and the default-locale Message.
+// End returns the byte offset one past the diagnostic (Offset + Width).
+func (d Diagnostic) End() int {
+	return d.Offset + d.Width
+}
+
+// Span resolves the diagnostic's source span, computing line/column positions
+// from buf on demand.
+func (d Diagnostic) Span(buf source.Buffer) source.Span {
+	return buf.Span(d.Offset, d.End())
+}
+
+// String renders the diagnostic as "severity[code]: message". Resolve a
+// human-facing source location with Span when a buffer is available.
 func (d Diagnostic) String() string {
-	p := d.Span.Start
-	return fmt.Sprintf("%s[%s]: %s (%d:%d)", d.Severity, d.Code, d.Message, p.Line, p.Column)
+	return fmt.Sprintf("%s[%s]: %s", d.Severity, d.Code, d.Message)
 }
 
 // Localize re-renders the diagnostic's message in locale. The stored Message is
