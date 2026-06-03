@@ -1,0 +1,20 @@
+const add = 1 + 2
+const sub = 1 - 2
+const mul = 1 * 2
+const div = 1 / 2
+const rem = 1 % 2
+
+const eql = 1 == 1
+const neq = 1 != 1
+
+const lt = 1 < 2
+const lteq = 1 <= 2
+const gt = 1 > 2
+const gteq = 1 >= 2
+
+const anan = true && false
+const oror = false || true
+
+const pos = +1
+const neg = -1
+const not = !false

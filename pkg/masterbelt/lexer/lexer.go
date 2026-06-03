@@ -75,11 +75,33 @@ func (l *Lexer) Next() token.Token {
 	case c == '/':
 		return l.scanSlash(start)
 	case c == ':':
-		l.offset++
-		return l.token(token.Colon, start)
-	case c == '=':
-		l.offset++
-		return l.token(token.Assign, start)
+		return l.scanFixed(start, 1, token.Colon)
+	case c == '+':
+		return l.scanFixed(start, 1, token.Plus)
+	case c == '-':
+		return l.scanFixed(start, 1, token.Minus)
+	case c == '*':
+		return l.scanFixed(start, 1, token.Star)
+	case c == '%':
+		return l.scanFixed(start, 1, token.Percent)
+	case c == '=': // "=" or "=="
+		return l.scanFixed2(start, '=', token.EqEq, token.Assign)
+	case c == '!': // "!" or "!="
+		return l.scanFixed2(start, '=', token.BangEq, token.Bang)
+	case c == '<': // "<" or "<="
+		return l.scanFixed2(start, '=', token.LtEq, token.Lt)
+	case c == '>': // ">" or ">="
+		return l.scanFixed2(start, '=', token.GtEq, token.Gt)
+	case c == '&': // "&&" only; a lone "&" begins no token
+		if l.peek(1) == '&' {
+			return l.scanFixed(start, 2, token.AmpAmp)
+		}
+		return l.scanIllegal(start)
+	case c == '|': // "||" only; a lone "|" begins no token
+		if l.peek(1) == '|' {
+			return l.scanFixed(start, 2, token.PipePipe)
+		}
+		return l.scanIllegal(start)
 	case isLetter(c):
 		return l.scanIdent(start)
 	case isDigit(c):
@@ -87,6 +109,15 @@ func (l *Lexer) Next() token.Token {
 	default:
 		return l.scanIllegal(start)
 	}
+}
+
+// peek returns the byte n positions past the cursor, or 0 if that is past the
+// end of input. It lets the maximal-munch operators look one byte ahead.
+func (l *Lexer) peek(n int) byte {
+	if l.offset+n < len(l.src) {
+		return l.src[l.offset+n]
+	}
+	return 0
 }
 
 // token builds a token of the given kind spanning [start, l.offset).

@@ -169,6 +169,11 @@ func TestDocumentFuzz(t *testing.T) {
 	alphabet := []string{
 		"a", "Z", "x", "0", "9", " ", "\n", "/", "*", ":", "=", "あ",
 		"const ", "pub ", "// c\n", "/* b */",
+		// Operators and the boolean keywords. Single "&"/"|" and the bytes that
+		// the two-byte operators share ("=", "!", "<", ">") exercise the
+		// maximal-munch merge/split paths in the incremental relexer.
+		"+", "-", "%", "!", "<", ">", "&", "|", "==", "!=", "<=", ">=", "&&", "||",
+		"true ", "false ",
 	}
 
 	doc := NewDocument([]byte("const x = 0\n"))

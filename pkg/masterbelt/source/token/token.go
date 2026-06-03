@@ -29,10 +29,26 @@ const (
 	// Keywords.
 	Const // const
 	Pub   // pub
+	True  // true
+	False // false
 
 	// Operators and punctuation.
-	Colon  // :
-	Assign // =
+	Colon    // :
+	Assign   // =
+	Plus     // +
+	Minus    // -
+	Star     // *
+	Slash    // /
+	Percent  // %
+	EqEq     // ==
+	BangEq   // !=
+	Lt       // <
+	LtEq     // <=
+	Gt       // >
+	GtEq     // >=
+	AmpAmp   // &&
+	PipePipe // ||
+	Bang     // !
 
 	// Trivia. Emitted so the token stream covers every byte and can reproduce
 	// the source exactly (needed by formatters and faithful round-tripping).
@@ -51,8 +67,24 @@ var kindNames = [...]string{
 	Int:          "Int",
 	Const:        "Const",
 	Pub:          "Pub",
+	True:         "True",
+	False:        "False",
 	Colon:        "Colon",
 	Assign:       "Assign",
+	Plus:         "Plus",
+	Minus:        "Minus",
+	Star:         "Star",
+	Slash:        "Slash",
+	Percent:      "Percent",
+	EqEq:         "EqEq",
+	BangEq:       "BangEq",
+	Lt:           "Lt",
+	LtEq:         "LtEq",
+	Gt:           "Gt",
+	GtEq:         "GtEq",
+	AmpAmp:       "AmpAmp",
+	PipePipe:     "PipePipe",
+	Bang:         "Bang",
 	Whitespace:   "Whitespace",
 	Newline:      "Newline",
 }
@@ -69,6 +101,8 @@ func (k Kind) String() string {
 var keywords = map[string]Kind{
 	"const": Const,
 	"pub":   Pub,
+	"true":  True,
+	"false": False,
 }
 
 // Lookup returns the keyword Kind for ident, or Ident if it is not a

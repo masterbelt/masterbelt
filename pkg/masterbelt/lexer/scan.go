@@ -20,8 +20,25 @@ func (l *Lexer) scanWhitespace(start int) token.Token {
 	return l.token(token.Whitespace, start)
 }
 
-// scanSlash dispatches the three comment forms (//, ///, /* */). A lone '/'
-// begins no token in this language and is reported as Illegal.
+// scanFixed emits a fixed-width operator or punctuation token of width bytes
+// (1 or 2) starting at start.
+func (l *Lexer) scanFixed(start, width int, kind token.Kind) token.Token {
+	l.offset += width
+	return l.token(kind, start)
+}
+
+// scanFixed2 emits a two-byte operator (kind two) when the byte after the
+// cursor is next, and the one-byte operator (kind one) otherwise. It is the
+// maximal-munch rule shared by "==", "!=", "<=", and ">=".
+func (l *Lexer) scanFixed2(start int, next byte, two, one token.Kind) token.Token {
+	if l.peek(1) == next {
+		return l.scanFixed(start, 2, two)
+	}
+	return l.scanFixed(start, 1, one)
+}
+
+// scanSlash dispatches the comment forms (//, ///, /* */). A '/' that opens no
+// comment is the division operator.
 func (l *Lexer) scanSlash(start int) token.Token {
 	if l.offset+1 < len(l.src) {
 		switch l.src[l.offset+1] {
@@ -31,9 +48,7 @@ func (l *Lexer) scanSlash(start int) token.Token {
 			return l.scanBlockComment(start)
 		}
 	}
-	l.offset++
-	l.reportUnexpectedChar(start, l.offset, '/')
-	return l.token(token.Illegal, start)
+	return l.scanFixed(start, 1, token.Slash)
 }
 
 // scanLineComment scans from "//" to the end of the line (the newline is left

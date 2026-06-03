@@ -123,25 +123,26 @@ func TestLexerDiagnostics(t *testing.T) {
 		}
 	})
 
-	t.Run("lone slash is illegal", func(t *testing.T) {
-		file := source.NewFile("t.belt", []byte("a / b"))
+	t.Run("lone ampersand is illegal", func(t *testing.T) {
+		// "&&" is the only use of '&'; a lone one begins no token.
+		file := source.NewFile("t.belt", []byte("a & b"))
 		lex := New(file)
 		tokens := lex.Tokens()
 
-		var slash token.Token
+		var amp token.Token
 		for _, tok := range tokens {
 			if tok.Kind == token.Illegal {
-				slash = tok
+				amp = tok
 			}
 		}
-		if slash.Text(file) != "/" {
-			t.Errorf("illegal token = %q, want %q", slash.Text(file), "/")
+		if amp.Text(file) != "&" {
+			t.Errorf("illegal token = %q, want %q", amp.Text(file), "&")
 		}
 		diags := lex.Diagnostics()
 		if len(diags) != 1 || diags[0].Code != CodeUnexpectedCharacter {
 			t.Fatalf("Diagnostics() = %v, want one %q", diags, CodeUnexpectedCharacter)
 		}
-		if got, want := diags[0].Message, "unexpected character: '/'"; got != want {
+		if got, want := diags[0].Message, "unexpected character: '&'"; got != want {
 			t.Errorf("message = %q, want %q", got, want)
 		}
 	})
@@ -164,6 +165,60 @@ func TestLexerDiagnostics(t *testing.T) {
 		}
 		if got, want := diags[0].Message, "unexpected character: 'あ'"; got != want {
 			t.Errorf("message = %q, want %q", got, want)
+		}
+	})
+}
+
+// TestLexerOperators checks each operator and boolean keyword, including the
+// maximal-munch boundaries where a one-byte operator and a two-byte operator
+// share a leading byte.
+func TestLexerOperators(t *testing.T) {
+	cases := []struct {
+		src  string
+		kind token.Kind
+	}{
+		{"+", token.Plus}, {"-", token.Minus}, {"*", token.Star},
+		{"/", token.Slash}, {"%", token.Percent},
+		{"=", token.Assign}, {"==", token.EqEq},
+		{"!", token.Bang}, {"!=", token.BangEq},
+		{"<", token.Lt}, {"<=", token.LtEq},
+		{">", token.Gt}, {">=", token.GtEq},
+		{"&&", token.AmpAmp}, {"||", token.PipePipe},
+		{"true", token.True}, {"false", token.False},
+	}
+	for _, c := range cases {
+		file := source.NewFile("op.belt", []byte(c.src))
+		tokens := New(file).Tokens()
+		if len(tokens) != 2 { // operator + EOF
+			t.Errorf("%q: got %d tokens, want 2: %v", c.src, len(tokens), tokens)
+			continue
+		}
+		if tokens[0].Kind != c.kind || tokens[0].Text(file) != c.src {
+			t.Errorf("%q: got %s %q, want %s", c.src, tokens[0].Kind, tokens[0].Text(file), c.kind)
+		}
+	}
+
+	// Maximal munch must not glue separated operators together.
+	t.Run("separated equals are two assigns", func(t *testing.T) {
+		file := source.NewFile("op.belt", []byte("= ="))
+		tokens := New(file).Tokens()
+		if len(tokens) != 4 || tokens[0].Kind != token.Assign || tokens[2].Kind != token.Assign {
+			t.Errorf("%q tokenized as %v, want Assign Whitespace Assign EOF", "= =", tokens)
+		}
+	})
+
+	// "<=" is one token, not Lt then Assign.
+	t.Run("le is one token", func(t *testing.T) {
+		file := source.NewFile("op.belt", []byte("a<=b"))
+		tokens := New(file).Tokens()
+		var le token.Token
+		for _, tok := range tokens {
+			if tok.Kind == token.LtEq {
+				le = tok
+			}
+		}
+		if le.Text(file) != "<=" {
+			t.Errorf("got %v, want a single LtEq token", tokens)
 		}
 	})
 }
