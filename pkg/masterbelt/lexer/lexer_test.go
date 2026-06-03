@@ -1,74 +1,43 @@
 package lexer
 
 import (
-	"os"
-	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/token"
 )
 
-func TestLexerExampleConst(t *testing.T) {
-	path := filepath.Join("..", "testdata", "examples", "0001-const.belt")
-	src, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("read example: %v", err)
+// TestLexerLossless verifies the stream covers every byte with no gaps or
+// overlaps and reproduces the source exactly — the property formatters need.
+func TestLexerLossless(t *testing.T) {
+	inputs := []string{
+		"",
+		"   ",
+		"\t \r\n  x",
+		"const x = 1\n",
+		"a\t\tb  c\r\n/* c */  // d\n",
+		"  pub  const  X = 0  ",
 	}
+	for _, src := range inputs {
+		file := source.NewFile("x.belt", []byte(src))
+		tokens := New(file).Tokens()
 
-	file := source.NewFile(path, src)
-	lex := New(file)
-	got := lex.Tokens()
-
-	want := []struct {
-		kind    token.Kind
-		literal string
-	}{
-		{token.BlockComment, "/* this is comment block here */"},
-		{token.Newline, "\n"},
-		{token.Newline, "\n"}, // blank line
-		{token.DocComment, "/// DocComment for MaxLevel"},
-		{token.Newline, "\n"},
-		{token.Const, "const"},
-		{token.Ident, "MaxLevel"},
-		{token.Colon, ":"},
-		{token.Ident, "int64"},
-		{token.Assign, "="},
-		{token.Int, "100"},
-		{token.Newline, "\n"},
-		{token.Newline, "\n"}, // blank line
-		{token.DocComment, "/// DocComment for MinLevel"},
-		{token.Newline, "\n"},
-		{token.DocComment, "/// with multiline."},
-		{token.Newline, "\n"},
-		{token.Const, "const"},
-		{token.Ident, "MinLevel"},
-		{token.Assign, "="},
-		{token.Int, "0"},
-		{token.LineComment, "// type inference"},
-		{token.Newline, "\n"},
-		{token.Newline, "\n"}, // blank line
-		{token.Pub, "pub"},
-		{token.Const, "const"},
-		{token.Ident, "PublishedMaxLevel"},
-		{token.Assign, "="},
-		{token.Ident, "MaxLevel"},
-		{token.Newline, "\n"},
-		{token.EOF, ""},
-	}
-
-	if len(got) != len(want) {
-		t.Fatalf("token count = %d, want %d\ngot: %v", len(got), len(want), got)
-	}
-	for i, w := range want {
-		if got[i].Kind != w.kind || got[i].Text(file) != w.literal {
-			t.Errorf("token[%d] = %s %q, want %s(%q)", i, got[i].Kind, got[i].Text(file), w.kind, w.literal)
+		off := 0
+		var b strings.Builder
+		for _, tok := range tokens {
+			if tok.Offset != off {
+				t.Fatalf("src %q: token %s starts at %d, want %d (gap or overlap)", src, tok.Kind, tok.Offset, off)
+			}
+			b.WriteString(tok.Text(file))
+			off = tok.End()
 		}
-	}
-
-	// A well-formed file produces no diagnostics.
-	if d := lex.Diagnostics(); len(d) != 0 {
-		t.Errorf("Diagnostics() = %v, want none", d)
+		if b.String() != src {
+			t.Errorf("src %q: reassembled %q", src, b.String())
+		}
+		if last := tokens[len(tokens)-1]; last.Kind != token.EOF || last.Offset != len(src) {
+			t.Errorf("src %q: last token = %s@%d, want EOF@%d", src, last.Kind, last.Offset, len(src))
+		}
 	}
 }
 

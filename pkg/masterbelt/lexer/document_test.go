@@ -110,14 +110,14 @@ func TestDocumentWindowGrowth(t *testing.T) {
 }
 
 func TestDocumentTruncatedTokenAtWindowEdge(t *testing.T) {
-	// Editing the identifier immediately before a very long one makes that long
-	// identifier the first realignment candidate. It overruns the initial relex
-	// window, so the freshly lexed token is truncated at the edge and the window
-	// must grow before it can realign with the unchanged tail.
-	initial := []byte("head " + strings.Repeat("Z", 80) + " b\n")
+	// Splitting a long identifier near its start leaves a long identifier
+	// beginning exactly at the changed region, with nothing alignable before it.
+	// It overruns the initial relex window, so the freshly lexed token is
+	// truncated at the edge and the window must grow before it realigns.
+	initial := []byte("x" + strings.Repeat("a", 100) + "\n")
 	doc := NewDocument(initial)
 
-	edit := source.Edit{Start: 1, End: 1, NewText: []byte("X")} // head -> hXead
+	edit := source.Edit{Start: 1, End: 1, NewText: []byte(" ")} // x|aaa... -> x aaa...
 	content := naiveSplice(initial, edit.Start, edit.End, edit.NewText)
 	doc.Edit(edit)
 	assertMatchesFullLex(t, doc, content)

@@ -33,8 +33,10 @@ const (
 	Colon  // :
 	Assign // =
 
-	// Whitespace that is significant to the parser.
-	Newline // \n
+	// Trivia. Emitted so the token stream covers every byte and can reproduce
+	// the source exactly (needed by formatters and faithful round-tripping).
+	Whitespace // a run of spaces, tabs, and carriage returns
+	Newline    // \n
 )
 
 // kindNames maps each Kind to its name, indexed by Kind value.
@@ -50,6 +52,7 @@ var kindNames = [...]string{
 	Pub:          "Pub",
 	Colon:        "Colon",
 	Assign:       "Assign",
+	Whitespace:   "Whitespace",
 	Newline:      "Newline",
 }
 
