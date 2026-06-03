@@ -55,6 +55,8 @@ func (s *Server) Initialize(_ context.Context, _ *protocol.InitializeParams) (*p
 			DocumentFormattingProvider: new(true),
 			HoverProvider:              new(true),
 			DefinitionProvider:         new(true),
+			ReferencesProvider:         new(true),
+			RenameProvider:             &protocol.RenameOptions{PrepareProvider: new(true)},
 			SemanticTokensProvider: &protocol.SemanticTokensOptions{
 				Legend: semanticLegend,
 				Full:   &protocol.SemanticTokensFull{},
@@ -190,6 +192,46 @@ func (s *Server) Definition(_ context.Context, params *protocol.DefinitionParams
 		return nil, nil
 	}
 	return definition(doc, fromPosition(doc.Buffer(), params.Position), params.TextDocument.URI), nil
+}
+
+// References returns every reference to the symbol under the cursor.
+func (s *Server) References(_ context.Context, params *protocol.ReferenceParams) ([]protocol.Location, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	doc := s.docs[params.TextDocument.URI]
+	if doc == nil {
+		return nil, nil
+	}
+	offset := fromPosition(doc.Buffer(), params.Position)
+	return references(doc, offset, params.TextDocument.URI, params.Context.IncludeDeclaration), nil
+}
+
+// PrepareRename reports whether (and where) the symbol under the cursor can be
+// renamed.
+func (s *Server) PrepareRename(_ context.Context, params *protocol.PrepareRenameParams) (*protocol.PrepareRenameResult, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	doc := s.docs[params.TextDocument.URI]
+	if doc == nil {
+		return nil, nil
+	}
+	return prepareRename(doc, fromPosition(doc.Buffer(), params.Position)), nil
+}
+
+// Rename renames the symbol under the cursor — its declaration and every
+// reference — to params.NewName.
+func (s *Server) Rename(_ context.Context, params *protocol.RenameParams) (*protocol.WorkspaceEdit, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	doc := s.docs[params.TextDocument.URI]
+	if doc == nil {
+		return nil, nil
+	}
+	offset := fromPosition(doc.Buffer(), params.Position)
+	return rename(doc, offset, params.NewName, params.TextDocument.URI), nil
 }
 
 // publish sends the document's current diagnostics to the client. It is a no-op

@@ -169,3 +169,49 @@ func TestServerSemanticFeatures(t *testing.T) {
 		t.Fatalf("definition = %+v, want MaxLevel on line 1", locs)
 	}
 }
+
+// TestServerReferencesRename drives references, prepare-rename, and rename over
+// the harness.
+func TestServerReferencesRename(t *testing.T) {
+	h := servertest.New(t, NewServer())
+	uri := protocol.DocumentURI("file:///r.belt")
+
+	//	line 0: const MaxLevel = 1
+	//	line 1: const A = MaxLevel
+	//	line 2: const B = MaxLevel
+	if err := h.DidOpen(uri, "masterbelt", "const MaxLevel = 1\nconst A = MaxLevel\nconst B = MaxLevel\n"); err != nil {
+		t.Fatal(err)
+	}
+
+	// References from the declaration name (line 0, char 7), including it.
+	locs, err := h.References(uri, 0, 7, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(locs) != 3 {
+		t.Fatalf("references = %d, want 3 (declaration + 2 references)", len(locs))
+	}
+
+	// Prepare-rename on a reference (line 1, char 12) offers "MaxLevel".
+	pr, err := h.PrepareRename(uri, 1, 12)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pr == nil || pr.Placeholder != "MaxLevel" {
+		t.Fatalf("prepareRename = %+v, want placeholder MaxLevel", pr)
+	}
+
+	// Rename to Cap edits the declaration and both references.
+	we, err := h.Rename(uri, 0, 7, "Cap")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if we == nil || len(we.Changes[uri]) != 3 {
+		t.Fatalf("rename edits = %+v, want 3", we)
+	}
+	for _, e := range we.Changes[uri] {
+		if e.NewText != "Cap" {
+			t.Errorf("edit NewText = %q, want Cap", e.NewText)
+		}
+	}
+}
