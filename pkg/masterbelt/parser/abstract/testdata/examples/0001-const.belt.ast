@@ -1,0 +1,15 @@
+File
+  ConstDecl
+    doc "DocComment for MaxLevel"
+    name "MaxLevel"
+    type "int64"
+    value IntLit "100"
+  ConstDecl
+    doc "DocComment for MinLevel"
+    doc "with multiline."
+    name "MinLevel"
+    value IntLit "0"
+  ConstDecl
+    pub
+    name "PublishedMaxLevel"
+    value NameRef "MaxLevel"
