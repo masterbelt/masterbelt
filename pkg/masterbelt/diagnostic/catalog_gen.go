@@ -23,4 +23,52 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "unterminated block comment"
 		}
 	},
+	"masterbelt.parser.concrete.expected_assign": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "'=' が必要です"
+		default:
+			return "expected '='"
+		}
+	},
+	"masterbelt.parser.concrete.expected_const": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "'const' が必要です"
+		default:
+			return "expected 'const'"
+		}
+	},
+	"masterbelt.parser.concrete.expected_expression": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "式が必要です"
+		default:
+			return "expected expression"
+		}
+	},
+	"masterbelt.parser.concrete.expected_identifier": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "識別子が必要です"
+		default:
+			return "expected identifier"
+		}
+	},
+	"masterbelt.parser.concrete.expected_type": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "型が必要です"
+		default:
+			return "expected type"
+		}
+	},
+	"masterbelt.parser.concrete.unexpected_token": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "予期しないトークン: " + f["kind"].String()
+		default:
+			return "unexpected token: " + f["kind"].String()
+		}
+	},
 }

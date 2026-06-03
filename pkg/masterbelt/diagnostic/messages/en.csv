@@ -1,3 +1,9 @@
 code,message
 masterbelt.lexer.unexpected_character,unexpected character: {char}
 masterbelt.lexer.unterminated_block_comment,unterminated block comment
+masterbelt.parser.concrete.expected_const,expected 'const'
+masterbelt.parser.concrete.expected_identifier,expected identifier
+masterbelt.parser.concrete.expected_type,expected type
+masterbelt.parser.concrete.expected_assign,expected '='
+masterbelt.parser.concrete.expected_expression,expected expression
+masterbelt.parser.concrete.unexpected_token,unexpected token: {kind}

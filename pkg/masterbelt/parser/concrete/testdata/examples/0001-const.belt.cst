@@ -1,0 +1,57 @@
+# tree
+File
+  ConstDecl
+    BlockComment "/* this is comment block here */"
+    Newline "\n"
+    Newline "\n"
+    DocComment "/// DocComment for MaxLevel"
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "MaxLevel"
+    TypeClause
+      Colon ":"
+      Whitespace " "
+      TypeRef
+        Ident "int64"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      Literal
+        Int "100"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    DocComment "/// DocComment for MinLevel"
+    Newline "\n"
+    DocComment "/// with multiline."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "MinLevel"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      Literal
+        Int "0"
+  ConstDecl
+    Whitespace " "
+    LineComment "// type inference"
+    Newline "\n"
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Const "const"
+    Whitespace " "
+    Ident "PublishedMaxLevel"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      NameRef
+        Ident "MaxLevel"
+  Newline "\n"
+  EOF ""
+# diagnostics
