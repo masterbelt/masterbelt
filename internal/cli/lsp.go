@@ -7,6 +7,9 @@ import (
 
 func init() {
 	RootCmd.AddCommand(LspCmd)
+	// Many LSP clients launch a server as `<bin> lsp --stdio`. We always use
+	// stdio, so accept the flag for compatibility and ignore it.
+	LspCmd.Flags().Bool("stdio", true, "communicate over stdio (the default and only transport)")
 }
 
 var LspCmd = &cobra.Command{
