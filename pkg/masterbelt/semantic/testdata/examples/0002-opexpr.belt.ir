@@ -1,0 +1,65 @@
+Module
+  Const "add"
+    type untyped int
+    value IntLiteral "1".add(IntLiteral "2")
+    eval 3
+  Const "sub"
+    type untyped int
+    value IntLiteral "1".sub(IntLiteral "2")
+    eval -1
+  Const "mul"
+    type untyped int
+    value IntLiteral "1".mul(IntLiteral "2")
+    eval 2
+  Const "div"
+    type untyped int
+    value IntLiteral "1".div(IntLiteral "2")
+    eval 0
+  Const "rem"
+    type untyped int
+    value IntLiteral "1".rem(IntLiteral "2")
+    eval 1
+  Const "eql"
+    type untyped bool
+    value IntLiteral "1".eql(IntLiteral "1")
+    eval true
+  Const "neq"
+    type untyped bool
+    value IntLiteral "1".neq(IntLiteral "1")
+    eval false
+  Const "lt"
+    type untyped bool
+    value IntLiteral "1".lt(IntLiteral "2")
+    eval true
+  Const "lteq"
+    type untyped bool
+    value IntLiteral "1".lteq(IntLiteral "2")
+    eval true
+  Const "gt"
+    type untyped bool
+    value IntLiteral "1".gt(IntLiteral "2")
+    eval false
+  Const "gteq"
+    type untyped bool
+    value IntLiteral "1".gteq(IntLiteral "2")
+    eval false
+  Const "anan"
+    type untyped bool
+    value BoolLiteral true.anan(BoolLiteral false)
+    eval false
+  Const "oror"
+    type untyped bool
+    value BoolLiteral false.oror(BoolLiteral true)
+    eval true
+  Const "pos"
+    type untyped int
+    value IntLiteral "1".pos()
+    eval 1
+  Const "neg"
+    type untyped int
+    value IntLiteral "1".neg()
+    eval -1
+  Const "not"
+    type untyped bool
+    value BoolLiteral false.not()
+    eval true

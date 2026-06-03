@@ -38,12 +38,21 @@ func dumpValue(v Value) string {
 	switch x := v.(type) {
 	case *IntLiteral:
 		return fmt.Sprintf("IntLiteral %q", x.Text)
+	case *BoolLiteral:
+		return fmt.Sprintf("BoolLiteral %v", x.Value)
 	case *Reference:
 		name := "<unresolved>"
 		if x.Target != nil {
 			name = x.Target.Name
 		}
 		return fmt.Sprintf("Reference -> %q", name)
+	case *Call:
+		// receiver.method(arg, arg) with each operand rendered recursively.
+		args := make([]string, len(x.Args))
+		for i, a := range x.Args {
+			args[i] = dumpValue(a)
+		}
+		return fmt.Sprintf("%s.%s(%s)", dumpValue(x.Receiver), x.Method, strings.Join(args, ", "))
 	default:
 		return "<none>"
 	}

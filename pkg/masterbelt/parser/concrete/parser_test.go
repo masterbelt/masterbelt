@@ -154,9 +154,9 @@ func initExpr(t *testing.T, src string) (source.Buffer, cst.Tree) {
 func TestParseExpressionShape(t *testing.T) {
 	cases := []struct{ src, want string }{
 		{"const x = 1 + 2\n", "(1 + 2)"},
-		{"const x = 1 + 2 * 3\n", "(1 + (2 * 3))"},     // * binds tighter than +
+		{"const x = 1 + 2 * 3\n", "(1 + (2 * 3))"}, // * binds tighter than +
 		{"const x = 1 * 2 + 3\n", "((1 * 2) + 3)"},
-		{"const x = 1 - 2 - 3\n", "((1 - 2) - 3)"},     // left-associative
+		{"const x = 1 - 2 - 3\n", "((1 - 2) - 3)"}, // left-associative
 		{"const x = 1 < 2 && 3 > 4\n", "((1 < 2) && (3 > 4))"},
 		{"const x = a || b && c\n", "(a || (b && c))"}, // && binds tighter than ||
 		{"const x = -1 + 2\n", "((- 1) + 2)"},          // unary binds tightest

@@ -97,8 +97,9 @@ func TestValueEvaluation(t *testing.T) {
 		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
 	for i, want := range []int64{100, 100, 100} {
-		if m.Consts[i].Eval == nil || m.Consts[i].Eval.Int64() != want {
-			t.Errorf("const %d eval = %v, want %d", i, m.Consts[i].Eval, want)
+		ev := m.Consts[i].Eval
+		if ev == nil || ev.Kind != ir.ConstInt || ev.Int.Int64() != want {
+			t.Errorf("const %d eval = %v, want %d", i, ev, want)
 		}
 	}
 }

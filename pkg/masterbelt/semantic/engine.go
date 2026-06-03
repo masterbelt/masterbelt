@@ -1,7 +1,6 @@
 package semantic
 
 import (
-	"math/big"
 	"reflect"
 
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ast"
@@ -9,7 +8,7 @@ import (
 )
 
 // This is a small demand-driven, memoizing query engine in the style of Salsa /
-// rust-analyzer, specialised to the semantic queries (symbols, resolve, typeOf).
+// rust-analyzer, specialised to the semantic queries (symbols, typeOf, value).
 //
 // Each query result is memoized with the dependencies it read and two revision
 // stamps: changedAt (when its value last changed) and verifiedAt (when it was
@@ -26,16 +25,18 @@ type queryKind int
 const (
 	qInput   queryKind = iota // the AST file (the engine's only input)
 	qSymbols                  // name -> declaration table
-	qResolve                  // *ast.ConstDecl -> referent declaration
+	qResolve                  // *ast.Identifier -> referent declaration
 	qTypeOf                   // *ast.ConstDecl -> ir.Type
-	qValue                    // *ast.ConstDecl -> *big.Int
+	qValue                    // *ast.ConstDecl -> *ir.Constant
 )
 
-// queryKey identifies a memoized computation. decl is nil for the input and the
-// symbol table; both are comparable so the key works as a map key.
+// queryKey identifies a memoized computation: decl keys the per-declaration
+// queries (typeOf, value), id keys resolve, and both are nil for the input and
+// the symbol table. All fields are comparable, so the key works as a map key.
 type queryKey struct {
 	kind queryKind
 	decl *ast.ConstDecl
+	id   *ast.Identifier
 }
 
 var (
@@ -43,9 +44,9 @@ var (
 	symbolsKey = queryKey{kind: qSymbols}
 )
 
-func resolveKey(decl *ast.ConstDecl) queryKey { return queryKey{kind: qResolve, decl: decl} }
-func typeOfKey(decl *ast.ConstDecl) queryKey  { return queryKey{kind: qTypeOf, decl: decl} }
-func valueKey(decl *ast.ConstDecl) queryKey   { return queryKey{kind: qValue, decl: decl} }
+func resolveKey(id *ast.Identifier) queryKey { return queryKey{kind: qResolve, id: id} }
+func typeOfKey(decl *ast.ConstDecl) queryKey { return queryKey{kind: qTypeOf, decl: decl} }
+func valueKey(decl *ast.ConstDecl) queryKey  { return queryKey{kind: qValue, decl: decl} }
 
 type depEdge struct {
 	key       queryKey
@@ -172,12 +173,8 @@ func (db *database) compute(key queryKey) any {
 	case qSymbols:
 		return buildSymbols(db.read(inputKey).(*ast.File))
 	case qResolve:
-		ref, ok := key.decl.Value.(*ast.Identifier)
-		if !ok {
-			return (*ast.ConstDecl)(nil)
-		}
 		syms := db.read(symbolsKey).(map[string]*ast.ConstDecl)
-		return syms[ref.Name]
+		return syms[key.id.Name]
 	case qTypeOf:
 		return computeType(key.decl, engineQueries{db})
 	case qValue:
@@ -187,14 +184,14 @@ func (db *database) compute(key queryKey) any {
 	}
 }
 
-// cycleValue is the fallback a query yields when a cycle is detected. Only typeOf
-// can form one (an un-annotated reference depending on its referent's type).
+// cycleValue is the fallback a query yields when a cycle is detected (an
+// un-annotated reference depending on, transitively, its own type or value).
 func cycleValue(key queryKey) any {
 	switch key.kind {
 	case qTypeOf:
 		return ir.Invalid
 	case qValue:
-		return (*big.Int)(nil)
+		return (*ir.Constant)(nil)
 	case qResolve:
 		return (*ast.ConstDecl)(nil)
 	default:
@@ -208,8 +205,8 @@ type engineQueries struct {
 	db *database
 }
 
-func (e engineQueries) resolve(decl *ast.ConstDecl) *ast.ConstDecl {
-	target, _ := e.db.read(resolveKey(decl)).(*ast.ConstDecl)
+func (e engineQueries) resolve(id *ast.Identifier) *ast.ConstDecl {
+	target, _ := e.db.read(resolveKey(id)).(*ast.ConstDecl)
 	return target
 }
 
@@ -217,7 +214,7 @@ func (e engineQueries) typeOf(decl *ast.ConstDecl) ir.Type {
 	return e.db.read(typeOfKey(decl)).(ir.Type)
 }
 
-func (e engineQueries) valueOf(decl *ast.ConstDecl) *big.Int {
-	v, _ := e.db.read(valueKey(decl)).(*big.Int)
+func (e engineQueries) valueOf(decl *ast.ConstDecl) *ir.Constant {
+	v, _ := e.db.read(valueKey(decl)).(*ir.Constant)
 	return v
 }

@@ -10,6 +10,7 @@ package ir
 
 import (
 	"math/big"
+	"strconv"
 
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ast"
 )
@@ -26,7 +27,7 @@ type Const struct {
 	Doc    []string
 	Type   Type           // the inferred or annotated type
 	Value  Value          // the resolved initializer, or nil if missing/invalid
-	Eval   *big.Int       // the evaluated value, or nil if it could not be evaluated
+	Eval   *Constant      // the evaluated value, or nil if it could not be evaluated
 	Syntax *ast.ConstDecl // the declaration this was lowered from
 }
 
@@ -35,13 +36,20 @@ type Value interface {
 	value()
 }
 
-// IntLiteral is an integer literal. Its Text is the literal as written; this
-// layer does not yet evaluate it.
+// IntLiteral is an integer literal. Its Text is the literal as written; the
+// evaluated value lives on Const.Eval.
 type IntLiteral struct {
 	Text string
 }
 
 func (*IntLiteral) value() {}
+
+// BoolLiteral is a boolean literal, true or false.
+type BoolLiteral struct {
+	Value bool
+}
+
+func (*BoolLiteral) value() {}
 
 // Reference is a use of another constant, resolved to its declaration.
 type Reference struct {
@@ -49,6 +57,18 @@ type Reference struct {
 }
 
 func (*Reference) value() {}
+
+// Call is a resolved method call, the form every operator desugars to: the
+// receiver, the method name, and the argument values (one for a binary
+// operator, none for a unary). Receiver and arguments are themselves resolved
+// values, so a Call is the whole operator expression with references bound.
+type Call struct {
+	Receiver Value
+	Method   string
+	Args     []Value
+}
+
+func (*Call) value() {}
 
 // Type is a masterbelt type. Integer literals are untyped constants
 // (UntypedInt) whose default type is Int64; an annotation gives a constant a
@@ -66,19 +86,23 @@ const (
 	Uint16
 	Uint32
 	Uint64
+	UntypedBool // an un-annotated boolean constant; defaults to Bool
+	Bool
 )
 
 var typeNames = map[Type]string{
-	Invalid:    "invalid",
-	UntypedInt: "untyped int",
-	Int8:       "int8",
-	Int16:      "int16",
-	Int32:      "int32",
-	Int64:      "int64",
-	Uint8:      "uint8",
-	Uint16:     "uint16",
-	Uint32:     "uint32",
-	Uint64:     "uint64",
+	Invalid:     "invalid",
+	UntypedInt:  "untyped int",
+	Int8:        "int8",
+	Int16:       "int16",
+	Int32:       "int32",
+	Int64:       "int64",
+	Uint8:       "uint8",
+	Uint16:      "uint16",
+	Uint32:      "uint32",
+	Uint64:      "uint64",
+	UntypedBool: "untyped bool",
+	Bool:        "bool",
 }
 
 // String returns the type's name.
@@ -92,10 +116,29 @@ func (t Type) String() string {
 // Default returns the concrete type an untyped constant takes when no annotation
 // forces another; every concrete type is its own default.
 func (t Type) Default() Type {
-	if t == UntypedInt {
+	switch t {
+	case UntypedInt:
 		return Int64
+	case UntypedBool:
+		return Bool
+	default:
+		return t
 	}
-	return t
+}
+
+// IsInteger reports whether t is an integer type (untyped or concrete).
+func (t Type) IsInteger() bool {
+	return t == UntypedInt || (Int8 <= t && t <= Uint64)
+}
+
+// IsBoolean reports whether t is a boolean type (untyped or concrete).
+func (t Type) IsBoolean() bool {
+	return t == UntypedBool || t == Bool
+}
+
+// IsUntyped reports whether t is an untyped constant type.
+func (t Type) IsUntyped() bool {
+	return t == UntypedInt || t == UntypedBool
 }
 
 // namedTypes maps the concrete type names that may appear in an annotation to
@@ -109,6 +152,7 @@ var namedTypes = map[string]Type{
 	"uint16": Uint16,
 	"uint32": Uint32,
 	"uint64": Uint64,
+	"bool":   Bool,
 }
 
 // LookupType returns the concrete builtin type named name, or false if name is
@@ -137,11 +181,47 @@ var typeBounds = func() map[Type]bounds {
 }()
 
 // Fits reports whether v is within the range of type t. Types without a fixed
-// range — UntypedInt (arbitrary precision) and Invalid — accept any value.
+// range — UntypedInt (arbitrary precision), the boolean types, and Invalid —
+// accept any value.
 func (t Type) Fits(v *big.Int) bool {
 	b, ok := typeBounds[t]
 	if !ok {
 		return true
 	}
 	return v.Cmp(b.min) >= 0 && v.Cmp(b.max) <= 0
+}
+
+// ConstKind distinguishes the two kinds of evaluated constant value.
+type ConstKind int
+
+const (
+	ConstInt  ConstKind = iota // an arbitrary-precision integer (Constant.Int)
+	ConstBool                  // a boolean (Constant.Bool)
+)
+
+// Constant is the evaluated value of a constant expression: an arbitrary-
+// precision integer or a boolean. A nil *Constant means "could not be
+// evaluated" — a missing initializer, an undefined reference, a cycle, a type
+// error, or a division by zero.
+type Constant struct {
+	Kind ConstKind
+	Int  *big.Int // valid when Kind == ConstInt
+	Bool bool     // valid when Kind == ConstBool
+}
+
+// IntConstant builds an integer constant.
+func IntConstant(n *big.Int) *Constant { return &Constant{Kind: ConstInt, Int: n} }
+
+// BoolConstant builds a boolean constant.
+func BoolConstant(b bool) *Constant { return &Constant{Kind: ConstBool, Bool: b} }
+
+// String renders the constant's value: the integer, or "true"/"false".
+func (c *Constant) String() string {
+	if c == nil {
+		return "<unevaluated>"
+	}
+	if c.Kind == ConstBool {
+		return strconv.FormatBool(c.Bool)
+	}
+	return c.Int.String()
 }

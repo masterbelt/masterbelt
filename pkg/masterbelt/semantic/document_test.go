@@ -90,6 +90,11 @@ func TestDocumentFuzz(t *testing.T) {
 	alphabet := []string{
 		"const ", "pub ", "A", "B", "C", "Name", " = ", " : ", "int64", "int32",
 		"nope", "0", "1", "42", " ", "\n", "=", ":",
+		// Operators, booleans, and the bool type so the oracle checks that
+		// incremental typing and evaluation of expressions match a full
+		// analysis (division by zero and type errors included).
+		"+", "-", "*", "/", "%", "&&", "||", "!", "<", "==", "bool",
+		"true", "false", " + ", " && ", "A + B", "!true",
 	}
 
 	start := "const A = 1\nconst B = A\n"
