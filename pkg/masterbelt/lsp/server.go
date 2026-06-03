@@ -53,6 +53,10 @@ func (s *Server) Initialize(_ context.Context, _ *protocol.InitializeParams) (*p
 			},
 			DocumentSymbolProvider:     new(true),
 			DocumentFormattingProvider: new(true),
+			SemanticTokensProvider: &protocol.SemanticTokensOptions{
+				Legend: semanticLegend,
+				Full:   &protocol.SemanticTokensFull{},
+			},
 		},
 		ServerInfo: &protocol.ServerInfo{Name: serverName, Version: "0.1.0"},
 	}, nil
@@ -134,6 +138,19 @@ func (s *Server) DocumentSymbol(_ context.Context, params *protocol.DocumentSymb
 		return nil, nil
 	}
 	return documentSymbols(doc), nil
+}
+
+// SemanticTokensFull returns the syntax-highlighting tokens for the whole
+// document, classified from the concrete tree.
+func (s *Server) SemanticTokensFull(_ context.Context, params *protocol.SemanticTokensParams) (*protocol.SemanticTokens, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	doc := s.docs[params.TextDocument.URI]
+	if doc == nil {
+		return nil, nil
+	}
+	return semanticTokens(doc), nil
 }
 
 // Formatting returns the edits to format the whole document.
