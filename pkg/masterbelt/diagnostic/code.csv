@@ -1,0 +1,3 @@
+code,severity,fields
+masterbelt.lexer.unexpected_character,error,char:rune
+masterbelt.lexer.unterminated_block_comment,error,

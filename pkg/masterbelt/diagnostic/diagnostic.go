@@ -1,7 +1,24 @@
 // Package diagnostic models compiler diagnostics — errors, warnings, and
-// notes — anchored to the source span they refer to. It is shared by the
-// lexer, parser, and later analysis phases as the common channel for
-// reporting problems without aborting on the first one.
+// notes — anchored to the source span they refer to.
+//
+// Diagnostics are not constructed freely. Every diagnostic has a stable Code
+// (e.g. masterbelt.lexer.unexpected_character) with a fixed set of typed Fields
+// and a per-locale message template, declared in code.csv and
+// messages/<locale>.csv. The generator (go generate ./...) compiles those tables
+// into a typed constructor per code in each owning package — the only way to
+// build a Diagnostic — and a locale-aware renderer per code in this package.
+// Nothing is parsed at run time; because the structured Code and Fields are
+// retained on the value, a message can be re-rendered in any language with
+// Render or Diagnostic.Localize.
+//
+// The package is organised as:
+//
+//	diagnostic.go  the Diagnostic value and its Code
+//	severity.go    the Severity scale
+//	field.go       the fmt.Stringer field-value wrappers
+//	render.go      Locale and message rendering
+//	list.go        the List collector
+//	catalog_gen.go the generated per-code renderers
 package diagnostic
 
 import (
@@ -10,84 +27,31 @@ import (
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source"
 )
 
-// Severity classifies a diagnostic. The values mirror the Language Server
-// Protocol DiagnosticSeverity scale (Error = 1, Warning = 2, Info = 3,
-// Hint = 4) so they can be surfaced to an editor without translation.
-type Severity int
+// Code is the stable identifier of a diagnostic kind, e.g.
+// "masterbelt.lexer.unexpected_character".
+type Code string
 
-const (
-	Error Severity = iota + 1
-	Warning
-	Info
-	Hint
-)
-
-var severityNames = map[Severity]string{
-	Error:   "error",
-	Warning: "warning",
-	Info:    "info",
-	Hint:    "hint",
-}
-
-func (s Severity) String() string {
-	if name, ok := severityNames[s]; ok {
-		return name
-	}
-	return fmt.Sprintf("Severity(%d)", int(s))
-}
-
-// Diagnostic is a single message anchored to a source span.
+// Diagnostic is a single message anchored to a source span. It is produced only
+// by the generated per-code constructors; the exported fields exist so those
+// constructors (which live in other packages) can populate them.
 type Diagnostic struct {
 	Severity Severity
+	Code     Code
 	Message  string
+	Fields   map[string]fmt.Stringer
 	Span     source.Span
 }
 
-// String renders the diagnostic as "severity: message (line:col)", using the
-// 1-based start position of the span.
+// String renders the diagnostic as "severity[code]: message (line:col)" using
+// the 1-based start position of the span and the default-locale Message.
 func (d Diagnostic) String() string {
 	p := d.Span.Start
-	return fmt.Sprintf("%s: %s (%d:%d)", d.Severity, d.Message, p.Line, p.Column)
+	return fmt.Sprintf("%s[%s]: %s (%d:%d)", d.Severity, d.Code, d.Message, p.Line, p.Column)
 }
 
-// List accumulates diagnostics produced during a phase such as lexing or
-// parsing. The zero value is an empty, ready-to-use list.
-type List struct {
-	items []Diagnostic
-}
-
-// Add appends d to the list.
-func (l *List) Add(d Diagnostic) {
-	l.items = append(l.items, d)
-}
-
-// Errorf records an Error-severity diagnostic at span.
-func (l *List) Errorf(span source.Span, format string, args ...any) {
-	l.Add(Diagnostic{Severity: Error, Message: fmt.Sprintf(format, args...), Span: span})
-}
-
-// Warnf records a Warning-severity diagnostic at span.
-func (l *List) Warnf(span source.Span, format string, args ...any) {
-	l.Add(Diagnostic{Severity: Warning, Message: fmt.Sprintf(format, args...), Span: span})
-}
-
-// Items returns the recorded diagnostics in insertion order. The result
-// aliases the list's backing storage; do not mutate it.
-func (l *List) Items() []Diagnostic {
-	return l.items
-}
-
-// Len reports how many diagnostics have been recorded.
-func (l *List) Len() int {
-	return len(l.items)
-}
-
-// HasErrors reports whether any recorded diagnostic has Error severity.
-func (l *List) HasErrors() bool {
-	for _, d := range l.items {
-		if d.Severity == Error {
-			return true
-		}
-	}
-	return false
+// Localize re-renders the diagnostic's message in locale. The stored Message is
+// the DefaultLocale rendering; Localize uses the retained Code and Fields to
+// produce the message in another language without rebuilding the diagnostic.
+func (d Diagnostic) Localize(locale Locale) string {
+	return Render(locale, d.Code, d.Fields)
 }

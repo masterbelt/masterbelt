@@ -111,7 +111,7 @@ func (l *Lexer) scanSlash(start int) token.Token {
 		}
 	}
 	l.offset++
-	l.errorf(start, l.offset, "unexpected character %q", '/')
+	l.reportUnexpectedChar(start, l.offset, '/')
 	return l.token(token.Illegal, start)
 }
 
@@ -140,7 +140,7 @@ func (l *Lexer) scanBlockComment(start int) token.Token {
 		}
 		l.offset++
 	}
-	l.errorf(start, l.offset, "unterminated block comment")
+	l.reportUnterminatedBlockComment(start, l.offset)
 	return l.token(token.BlockComment, start)
 }
 
@@ -167,7 +167,7 @@ func (l *Lexer) scanInt(start int) token.Token {
 func (l *Lexer) scanIllegal(start int) token.Token {
 	r, size := utf8.DecodeRune(l.src[l.offset:])
 	l.offset += size
-	l.errorf(start, l.offset, "unexpected character %q", r)
+	l.reportUnexpectedChar(start, l.offset, r)
 	return l.token(token.Illegal, start)
 }
 
@@ -180,14 +180,24 @@ func (l *Lexer) token(kind token.Kind, start int) token.Token {
 	}
 }
 
-// errorf records an error diagnostic covering the byte range [start, end).
-// It is a no-op when the lexer has no file to resolve spans against, which is
-// the case when re-lexing a detached window during incremental relexing.
-func (l *Lexer) errorf(start, end int, format string, args ...any) {
+// reportUnexpectedChar records an "unexpected character" diagnostic for the
+// rune in [start, end). reporting is a no-op when the lexer has no file to
+// resolve spans against, which is the case when re-lexing a detached window
+// during incremental relexing.
+func (l *Lexer) reportUnexpectedChar(start, end int, char rune) {
 	if l.file == nil {
 		return
 	}
-	l.diags.Errorf(l.file.Span(start, end), format, args...)
+	l.diags.Add(newUnexpectedCharacterDiagnostic(l.file.Span(start, end), char))
+}
+
+// reportUnterminatedBlockComment records an "unterminated block comment"
+// diagnostic for the comment in [start, end).
+func (l *Lexer) reportUnterminatedBlockComment(start, end int) {
+	if l.file == nil {
+		return
+	}
+	l.diags.Add(newUnterminatedBlockCommentDiagnostic(l.file.Span(start, end)))
 }
 
 // lexTokens scans src in isolation and returns its tokens with offsets relative

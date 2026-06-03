@@ -3,7 +3,6 @@ package lexer
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source"
@@ -123,8 +122,11 @@ func TestLexerDiagnostics(t *testing.T) {
 		if len(diags) != 1 {
 			t.Fatalf("Diagnostics() = %v, want exactly one", diags)
 		}
-		if !strings.Contains(diags[0].Message, "unterminated block comment") {
-			t.Errorf("message = %q, want it to mention an unterminated block comment", diags[0].Message)
+		if diags[0].Code != CodeUnterminatedBlockComment {
+			t.Errorf("code = %q, want %q", diags[0].Code, CodeUnterminatedBlockComment)
+		}
+		if got, want := diags[0].Message, "unterminated block comment"; got != want {
+			t.Errorf("message = %q, want %q", got, want)
 		}
 	})
 
@@ -138,8 +140,17 @@ func TestLexerDiagnostics(t *testing.T) {
 			t.Errorf("token = %s %q, want Illegal %q", bad.Kind, bad.Text(file), "#")
 		}
 		diags := lex.Diagnostics()
-		if len(diags) != 1 || !strings.Contains(diags[0].Message, "unexpected character") {
-			t.Fatalf("Diagnostics() = %v, want one 'unexpected character'", diags)
+		if len(diags) != 1 {
+			t.Fatalf("Diagnostics() = %v, want exactly one", diags)
+		}
+		if diags[0].Code != CodeUnexpectedCharacter {
+			t.Errorf("code = %q, want %q", diags[0].Code, CodeUnexpectedCharacter)
+		}
+		if got, want := diags[0].Message, "unexpected character: '#'"; got != want {
+			t.Errorf("message = %q, want %q", got, want)
+		}
+		if got := diags[0].Fields["char"].String(); got != "'#'" {
+			t.Errorf("Fields[char] = %q, want %q", got, "'#'")
 		}
 	})
 
@@ -157,8 +168,12 @@ func TestLexerDiagnostics(t *testing.T) {
 		if slash.Text(file) != "/" {
 			t.Errorf("illegal token = %q, want %q", slash.Text(file), "/")
 		}
-		if diags := lex.Diagnostics(); len(diags) != 1 || !strings.Contains(diags[0].Message, "unexpected character") {
-			t.Fatalf("Diagnostics() = %v, want one 'unexpected character'", diags)
+		diags := lex.Diagnostics()
+		if len(diags) != 1 || diags[0].Code != CodeUnexpectedCharacter {
+			t.Fatalf("Diagnostics() = %v, want one %q", diags, CodeUnexpectedCharacter)
+		}
+		if got, want := diags[0].Message, "unexpected character: '/'"; got != want {
+			t.Errorf("message = %q, want %q", got, want)
 		}
 	})
 
@@ -174,8 +189,12 @@ func TestLexerDiagnostics(t *testing.T) {
 		if tokens[0].Kind != token.Illegal || tokens[0].Width != 3 {
 			t.Errorf("token = %s width %d, want Illegal width 3", tokens[0].Kind, tokens[0].Width)
 		}
-		if n := lex.Diagnostics(); len(n) != 1 {
-			t.Errorf("Diagnostics() = %v, want exactly one", n)
+		diags := lex.Diagnostics()
+		if len(diags) != 1 || diags[0].Code != CodeUnexpectedCharacter {
+			t.Fatalf("Diagnostics() = %v, want one %q", diags, CodeUnexpectedCharacter)
+		}
+		if got, want := diags[0].Message, "unexpected character: 'あ'"; got != want {
+			t.Errorf("message = %q, want %q", got, want)
 		}
 	})
 }

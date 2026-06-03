@@ -1,0 +1,3 @@
+code,message
+masterbelt.lexer.unexpected_character,unexpected character: {char}
+masterbelt.lexer.unterminated_block_comment,unterminated block comment

@@ -1,0 +1,3 @@
+code,message
+masterbelt.lexer.unexpected_character,予期しない文字: {char}
+masterbelt.lexer.unterminated_block_comment,ブロックコメントが閉じられていません
