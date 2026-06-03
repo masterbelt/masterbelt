@@ -95,3 +95,21 @@ func (c *CallExpr) expr()             {}
 func NewCallExpr(callee Expr, arguments []Expr, syntax *cst.Node) *CallExpr {
 	return &CallExpr{Callee: callee, Arguments: arguments, syntax: syntax}
 }
+
+// WalkValueIdents calls fn for every value-position identifier in e — the
+// operands of the expression — but not the member names operators desugared to
+// (those are method names, not references to declarations). It is how name
+// resolution and the editor reach the references inside an expression.
+func WalkValueIdents(e Expr, fn func(*Identifier)) {
+	switch e := e.(type) {
+	case *Identifier:
+		fn(e)
+	case *MemberExpr:
+		WalkValueIdents(e.Receiver, fn)
+	case *CallExpr:
+		WalkValueIdents(e.Callee, fn)
+		for _, a := range e.Arguments {
+			WalkValueIdents(a, fn)
+		}
+	}
+}

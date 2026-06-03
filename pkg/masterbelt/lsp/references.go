@@ -21,20 +21,30 @@ type occurrence struct {
 	target *ir.Const
 }
 
-// occurrenceAt finds the declaration name or value reference at offset.
+// occurrenceAt finds the declaration name or value-position identifier at
+// offset — including a reference nested inside an expression — and the constant
+// it denotes.
 func occurrenceAt(doc *semantic.Document, offset int, trees map[cst.Green]cst.Tree) (occurrence, bool) {
 	for _, c := range doc.Module().Consts {
 		decl := c.Syntax
 
-		if ref, ok := decl.Value.(*ast.Identifier); ok {
-			if t, ok := trees[ref.Syntax()]; ok && within(t, offset) {
-				if target := referenceTarget(c); target != nil {
-					return occurrence{token: t, target: target}, true
+		// A value-position identifier in the initializer, at any depth.
+		if decl.Value != nil {
+			var hit *ast.Identifier
+			ast.WalkValueIdents(decl.Value, func(id *ast.Identifier) {
+				if t, ok := trees[id.Syntax()]; ok && within(t, offset) {
+					hit = id
 				}
-				return occurrence{}, false
+			})
+			if hit != nil {
+				if target := doc.Resolve(hit); target != nil {
+					return occurrence{token: trees[hit.Syntax()], target: target}, true
+				}
+				return occurrence{}, false // an undefined reference denotes nothing
 			}
 		}
 
+		// The declaration's own name.
 		if declTree, ok := trees[decl.Syntax()]; ok {
 			if nameTok, ok := nameToken(declTree); ok && within(nameTok, offset) {
 				return occurrence{token: nameTok, target: c}, true
@@ -45,8 +55,8 @@ func occurrenceAt(doc *semantic.Document, offset int, trees map[cst.Green]cst.Tr
 }
 
 // occurrencesOf returns every token that names target — its declaration name
-// (when includeDecl is set) and every value reference that resolves to it. This
-// is the reverse of resolve, read straight off the resolved IR.
+// (when includeDecl is set) and every value-position identifier that resolves to
+// it, wherever it sits in an expression. This is the reverse of resolution.
 func occurrencesOf(doc *semantic.Document, target *ir.Const, trees map[cst.Green]cst.Tree, includeDecl bool) []cst.Tree {
 	var tokens []cst.Tree
 
@@ -59,15 +69,16 @@ func occurrencesOf(doc *semantic.Document, target *ir.Const, trees map[cst.Green
 	}
 
 	for _, c := range doc.Module().Consts {
-		ref, ok := c.Value.(*ir.Reference)
-		if !ok || ref.Target != target {
+		if c.Syntax.Value == nil {
 			continue
 		}
-		// A Reference comes from an Identifier initializer.
-		ident := c.Syntax.Value.(*ast.Identifier)
-		if t, ok := trees[ident.Syntax()]; ok {
-			tokens = append(tokens, t)
-		}
+		ast.WalkValueIdents(c.Syntax.Value, func(id *ast.Identifier) {
+			if doc.Resolve(id) == target {
+				if t, ok := trees[id.Syntax()]; ok {
+					tokens = append(tokens, t)
+				}
+			}
+		})
 	}
 	return tokens
 }

@@ -94,7 +94,7 @@ func assemble(file *ast.File, positions map[cst.Green]span, q queries) (*ir.Modu
 		// no declaration (method names are not value references, so walkIdents
 		// skips them).
 		if decl.Value != nil {
-			walkIdents(decl.Value, func(id *ast.Identifier) {
+			ast.WalkValueIdents(decl.Value, func(id *ast.Identifier) {
 				if id.Name != "" && q.resolve(id) == nil {
 					s := at(id)
 					diags.Add(newUndefinedNameDiagnostic(s.offset, s.width, id.Name))
@@ -567,23 +567,6 @@ func lowerValue(e ast.Expr, irOf map[*ast.ConstDecl]*ir.Const, q queries) ir.Val
 	}
 }
 
-// walkIdents calls fn for every value-position identifier in e — the operands of
-// the expression, but not the member names that operators desugared to (those
-// are method names, not references to declarations).
-func walkIdents(e ast.Expr, fn func(*ast.Identifier)) {
-	switch e := e.(type) {
-	case *ast.Identifier:
-		fn(e)
-	case *ast.MemberExpr:
-		walkIdents(e.Receiver, fn)
-	case *ast.CallExpr:
-		walkIdents(e.Callee, fn)
-		for _, a := range e.Arguments {
-			walkIdents(a, fn)
-		}
-	}
-}
-
 // cyclicDecls returns the declarations caught in a type-inference cycle. A
 // declaration's type depends on the types of the value references in its
 // initializer, unless an annotation fixes it; the result is a general directed
@@ -595,7 +578,7 @@ func cyclicDecls(file *ast.File, q queries) map[*ast.ConstDecl]bool {
 			return nil // an annotation breaks the inheritance chain
 		}
 		var out []*ast.ConstDecl
-		walkIdents(decl.Value, func(id *ast.Identifier) {
+		ast.WalkValueIdents(decl.Value, func(id *ast.Identifier) {
 			if t := q.resolve(id); t != nil {
 				out = append(out, t)
 			}

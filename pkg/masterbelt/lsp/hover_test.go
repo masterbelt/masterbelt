@@ -60,3 +60,31 @@ func TestDefinition(t *testing.T) {
 		t.Errorf("definition range = %+v, want line 1 cols 6..14", r)
 	}
 }
+
+func TestHoverInExpression(t *testing.T) {
+	// exprRefSrc is "const M = 1\nconst z = M + M\n"; the first M reference is at
+	// offset 22, inside the expression.
+	doc := semantic.NewDocument([]byte(exprRefSrc))
+	h := hover(doc, 22)
+	if h == nil {
+		t.Fatal("no hover on a reference inside an expression")
+	}
+	if !strings.Contains(h.Contents.Value, "const M") {
+		t.Errorf("hover = %q, want it to describe M", h.Contents.Value)
+	}
+}
+
+func TestDefinitionInExpression(t *testing.T) {
+	doc := semantic.NewDocument([]byte(exprRefSrc))
+	uri := protocol.DocumentURI("file:///x.belt")
+
+	locs := definition(doc, 26, uri) // second M reference, inside the expression
+	if len(locs) != 1 {
+		t.Fatalf("got %d locations, want 1", len(locs))
+	}
+	// M's name is on line 0, columns 6..7.
+	r := locs[0].Range
+	if r.Start.Line != 0 || r.Start.Character != 6 || r.End.Character != 7 {
+		t.Errorf("definition range = %+v, want line 0 cols 6..7", r)
+	}
+}

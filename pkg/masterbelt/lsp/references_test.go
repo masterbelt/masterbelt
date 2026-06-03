@@ -77,3 +77,40 @@ func TestPrepareRename(t *testing.T) {
 		t.Error("prepareRename should be nil off a symbol")
 	}
 }
+
+// References/rename inside an expression. Offsets:
+//
+//	line 0: "const M = 1"       name [6,7)
+//	line 1: "const z = M + M"   refs at [22,23) and [26,27)
+const exprRefSrc = "const M = 1\nconst z = M + M\n"
+
+func TestReferencesInExpression(t *testing.T) {
+	doc := semantic.NewDocument([]byte(exprRefSrc))
+	uri := protocol.DocumentURI("file:///x.belt")
+
+	// From the declaration, including it: decl + 2 in-expression references.
+	if got := references(doc, 6, uri, true); len(got) != 3 {
+		t.Fatalf("references(M decl) = %d, want 3", len(got))
+	}
+	// From a reference inside the expression, still all 3.
+	if got := references(doc, 22, uri, true); len(got) != 3 {
+		t.Fatalf("references(M ref) = %d, want 3", len(got))
+	}
+	// Excluding the declaration: just the 2 references.
+	if got := references(doc, 22, uri, false); len(got) != 2 {
+		t.Fatalf("references(!includeDecl) = %d, want 2", len(got))
+	}
+}
+
+func TestRenameInExpression(t *testing.T) {
+	doc := semantic.NewDocument([]byte(exprRefSrc))
+	uri := protocol.DocumentURI("file:///x.belt")
+
+	we := rename(doc, 26, "N", uri) // on the second M reference
+	if we == nil {
+		t.Fatal("rename returned nil")
+	}
+	if edits := we.Changes[uri]; len(edits) != 3 { // declaration + 2 references
+		t.Fatalf("got %d edits, want 3 (declaration + 2 references)", len(edits))
+	}
+}

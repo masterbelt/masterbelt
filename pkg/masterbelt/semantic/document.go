@@ -4,6 +4,7 @@ import (
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/diagnostic"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/parser/abstract"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source"
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ir"
 )
 
@@ -41,6 +42,24 @@ func (d *Document) Diagnostics() []diagnostic.Diagnostic { return d.diags }
 
 // AST returns the underlying incremental syntax document.
 func (d *Document) AST() *abstract.Document { return d.ast }
+
+// Resolve returns the constant a value-position identifier refers to, or nil if
+// it resolves to no declaration. It is the resolution the editor uses for hover,
+// go-to-definition, find-references, and rename, including references nested in
+// an expression. The lookup goes through the engine, so it reuses the memoized
+// resolution from the last analysis.
+func (d *Document) Resolve(id *ast.Identifier) *ir.Const {
+	decl, _ := d.db.read(resolveKey(id)).(*ast.ConstDecl)
+	if decl == nil {
+		return nil
+	}
+	for _, c := range d.module.Consts {
+		if c.Syntax == decl {
+			return c
+		}
+	}
+	return nil
+}
 
 // Buffer returns the underlying editable source buffer.
 func (d *Document) Buffer() source.Buffer { return d.ast.Buffer() }
