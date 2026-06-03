@@ -37,10 +37,22 @@ func dumpConstDecl(b *strings.Builder, d *ConstDecl) {
 
 func dumpExpr(e Expr) string {
 	switch x := e.(type) {
+	case nil:
+		return "<missing>"
 	case *IntLit:
 		return fmt.Sprintf("IntLit %q", x.Text)
-	case *NameRef:
-		return fmt.Sprintf("NameRef %q", x.Name)
+	case *BoolLit:
+		return fmt.Sprintf("BoolLit %v", x.Value)
+	case *Identifier:
+		return fmt.Sprintf("Identifier %q", x.Name)
+	case *MemberExpr:
+		return fmt.Sprintf("(. %s %s)", dumpExpr(x.Receiver), x.Member.Name)
+	case *CallExpr:
+		parts := []string{"call", dumpExpr(x.Callee)}
+		for _, a := range x.Arguments {
+			parts = append(parts, dumpExpr(a))
+		}
+		return "(" + strings.Join(parts, " ") + ")"
 	default:
 		return "Expr(?)"
 	}

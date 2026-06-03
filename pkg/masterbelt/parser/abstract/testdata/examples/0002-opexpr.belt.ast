@@ -1,0 +1,49 @@
+File
+  ConstDecl
+    name "add"
+    value (call (. IntLit "1" add) IntLit "2")
+  ConstDecl
+    name "sub"
+    value (call (. IntLit "1" sub) IntLit "2")
+  ConstDecl
+    name "mul"
+    value (call (. IntLit "1" mul) IntLit "2")
+  ConstDecl
+    name "div"
+    value (call (. IntLit "1" div) IntLit "2")
+  ConstDecl
+    name "rem"
+    value (call (. IntLit "1" rem) IntLit "2")
+  ConstDecl
+    name "eql"
+    value (call (. IntLit "1" eql) IntLit "1")
+  ConstDecl
+    name "neq"
+    value (call (. IntLit "1" neq) IntLit "1")
+  ConstDecl
+    name "lt"
+    value (call (. IntLit "1" lt) IntLit "2")
+  ConstDecl
+    name "lteq"
+    value (call (. IntLit "1" lteq) IntLit "2")
+  ConstDecl
+    name "gt"
+    value (call (. IntLit "1" gt) IntLit "2")
+  ConstDecl
+    name "gteq"
+    value (call (. IntLit "1" gteq) IntLit "2")
+  ConstDecl
+    name "anan"
+    value (call (. BoolLit true anan) BoolLit false)
+  ConstDecl
+    name "oror"
+    value (call (. BoolLit false oror) BoolLit true)
+  ConstDecl
+    name "pos"
+    value (call (. IntLit "1" pos))
+  ConstDecl
+    name "neg"
+    value (call (. IntLit "1" neg))
+  ConstDecl
+    name "not"
+    value (call (. BoolLit false not))

@@ -12,4 +12,4 @@ File
   ConstDecl
     pub
     name "PublishedMaxLevel"
-    value NameRef "MaxLevel"
+    value Identifier "MaxLevel"

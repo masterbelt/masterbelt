@@ -26,7 +26,7 @@ func occurrenceAt(doc *semantic.Document, offset int, trees map[cst.Green]cst.Tr
 	for _, c := range doc.Module().Consts {
 		decl := c.Syntax
 
-		if ref, ok := decl.Value.(*ast.NameRef); ok {
+		if ref, ok := decl.Value.(*ast.Identifier); ok {
 			if t, ok := trees[ref.Syntax()]; ok && within(t, offset) {
 				if target := referenceTarget(c); target != nil {
 					return occurrence{token: t, target: target}, true
@@ -63,9 +63,9 @@ func occurrencesOf(doc *semantic.Document, target *ir.Const, trees map[cst.Green
 		if !ok || ref.Target != target {
 			continue
 		}
-		// A Reference comes from a NameRef initializer.
-		nameRef := c.Syntax.Value.(*ast.NameRef)
-		if t, ok := trees[nameRef.Syntax()]; ok {
+		// A Reference comes from an Identifier initializer.
+		ident := c.Syntax.Value.(*ast.Identifier)
+		if t, ok := trees[ident.Syntax()]; ok {
 			tokens = append(tokens, t)
 		}
 	}

@@ -79,7 +79,7 @@ func assemble(file *ast.File, positions map[cst.Green]span, q queries) (*ir.Modu
 		switch v := decl.Value.(type) {
 		case *ast.IntLit:
 			c.Value = &ir.IntLiteral{Text: v.Text}
-		case *ast.NameRef:
+		case *ast.Identifier:
 			if target := q.resolve(decl); target != nil {
 				c.Value = &ir.Reference{Target: irOf[target]}
 			} else if v.Name != "" {
@@ -141,7 +141,7 @@ func computeType(decl *ast.ConstDecl, q queries) ir.Type {
 	switch decl.Value.(type) {
 	case *ast.IntLit:
 		return ir.UntypedInt
-	case *ast.NameRef:
+	case *ast.Identifier:
 		if target := q.resolve(decl); target != nil {
 			return q.typeOf(target)
 		}
@@ -165,7 +165,7 @@ func computeValue(decl *ast.ConstDecl, q queries) *big.Int {
 			return nil
 		}
 		return n
-	case *ast.NameRef:
+	case *ast.Identifier:
 		if target := q.resolve(decl); target != nil {
 			return q.valueOf(target)
 		}
@@ -184,7 +184,7 @@ func cyclicDecls(file *ast.File, q queries) map[*ast.ConstDecl]bool {
 		if decl.Type != nil {
 			return nil // an annotation breaks the inheritance chain
 		}
-		if _, ok := decl.Value.(*ast.NameRef); !ok {
+		if _, ok := decl.Value.(*ast.Identifier); !ok {
 			return nil
 		}
 		return q.resolve(decl)
@@ -261,7 +261,7 @@ func (d *directQueries) symbols() map[string]*ast.ConstDecl {
 }
 
 func (d *directQueries) resolve(decl *ast.ConstDecl) *ast.ConstDecl {
-	ref, ok := decl.Value.(*ast.NameRef)
+	ref, ok := decl.Value.(*ast.Identifier)
 	if !ok {
 		return nil
 	}

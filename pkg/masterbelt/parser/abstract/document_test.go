@@ -90,6 +90,10 @@ func TestDocumentFuzz(t *testing.T) {
 	alphabet := []string{
 		"a", "Z", "x", "0", "9", " ", "\n", ":", "=", "あ",
 		"const ", "pub ", "/// d\n", "// c\n", "int64", "MaxLevel",
+		// Operators, booleans, and expression fragments so the oracle checks
+		// that incremental lowering of expressions matches a full lowering.
+		"+", "-", "*", "%", "!", "<", ">", "&&", "||", "==", "<=",
+		"true", "false", "1 + 2", "-x", "!a && b",
 	}
 
 	start := "const x = 0\n"

@@ -172,7 +172,7 @@ func (db *database) compute(key queryKey) any {
 	case qSymbols:
 		return buildSymbols(db.read(inputKey).(*ast.File))
 	case qResolve:
-		ref, ok := key.decl.Value.(*ast.NameRef)
+		ref, ok := key.decl.Value.(*ast.Identifier)
 		if !ok {
 			return (*ast.ConstDecl)(nil)
 		}

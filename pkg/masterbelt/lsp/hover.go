@@ -21,7 +21,7 @@ func hover(doc *semantic.Document, offset int) *protocol.Hover {
 	for _, c := range doc.Module().Consts {
 		decl := c.Syntax
 
-		if ref, ok := decl.Value.(*ast.NameRef); ok {
+		if ref, ok := decl.Value.(*ast.Identifier); ok {
 			if t, ok := trees[ref.Syntax()]; ok && within(t, offset) {
 				if target := referenceTarget(c); target != nil {
 					return constHover(target, buf, t)
@@ -46,7 +46,7 @@ func definition(doc *semantic.Document, offset int, uri protocol.DocumentURI) []
 	trees := positionedTrees(doc.AST().Concrete().Tree())
 
 	for _, c := range doc.Module().Consts {
-		ref, ok := c.Syntax.Value.(*ast.NameRef)
+		ref, ok := c.Syntax.Value.(*ast.Identifier)
 		if !ok {
 			continue
 		}

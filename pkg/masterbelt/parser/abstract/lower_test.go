@@ -1,6 +1,7 @@
 package abstract
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ast"
@@ -41,9 +42,45 @@ func TestLowerInference(t *testing.T) {
 	if d := file.Decls[0]; d.Type != nil {
 		t.Errorf("decl 0 Type = %+v, want nil (inferred)", d.Type)
 	}
-	ref, ok := file.Decls[1].Value.(*ast.NameRef)
+	ref, ok := file.Decls[1].Value.(*ast.Identifier)
 	if !ok || ref.Name != "MinLevel" {
-		t.Errorf("decl 1 Value = %+v, want NameRef MinLevel", file.Decls[1].Value)
+		t.Errorf("decl 1 Value = %+v, want Identifier MinLevel", file.Decls[1].Value)
+	}
+}
+
+// valueLine lowers src and returns the rendered initializer of its first
+// declaration, read from the AST dump so the test exercises the same rendering
+// the snapshots use.
+func valueLine(t *testing.T, src string) string {
+	t.Helper()
+	file, _ := Lower([]byte(src))
+	for _, line := range strings.Split(ast.Dump(file), "\n") {
+		if rest, ok := strings.CutPrefix(strings.TrimSpace(line), "value "); ok {
+			return rest
+		}
+	}
+	t.Fatalf("no value line in dump of %q", src)
+	return ""
+}
+
+func TestLowerExpressions(t *testing.T) {
+	// Operators desugar to method calls: 1 + 2 is 1.add(2). dumpExpr renders a
+	// CallExpr as (call callee args...) and a MemberExpr as (. receiver member).
+	cases := []struct{ src, want string }{
+		{"const x = 1 + 2\n", `(call (. IntLit "1" add) IntLit "2")`},
+		{"const x = 1 + 2 * 3\n", `(call (. IntLit "1" add) (call (. IntLit "2" mul) IntLit "3"))`},
+		{"const x = +1\n", `(call (. IntLit "1" pos))`}, // unary: receiver, no args
+		{"const x = -1\n", `(call (. IntLit "1" neg))`},
+		{"const x = !true\n", `(call (. BoolLit true not))`},
+		{"const x = a && b\n", `(call (. Identifier "a" anan) Identifier "b")`},
+		{"const x = false\n", `BoolLit false`},
+		{"const x = 1 <= 2\n", `(call (. IntLit "1" lteq) IntLit "2")`},
+		{"const x = 1 +\n", `(call (. IntLit "1" add))`}, // recovered: right operand absent
+	}
+	for _, tc := range cases {
+		if got := valueLine(t, tc.src); got != tc.want {
+			t.Errorf("%q: value = %s, want %s", tc.src, got, tc.want)
+		}
 	}
 }
 
