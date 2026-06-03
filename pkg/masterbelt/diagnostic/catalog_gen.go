@@ -71,4 +71,36 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "unexpected token: " + f["kind"].String()
 		}
 	},
+	"masterbelt.semantic.cyclic_reference": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return f["name"].String() + " を含む循環参照です"
+		default:
+			return "cyclic reference involving " + f["name"].String()
+		}
+	},
+	"masterbelt.semantic.duplicate_declaration": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return f["name"].String() + " が重複して宣言されています"
+		default:
+			return "duplicate declaration of " + f["name"].String()
+		}
+	},
+	"masterbelt.semantic.undefined_name": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "未定義の名前: " + f["name"].String()
+		default:
+			return "undefined name: " + f["name"].String()
+		}
+	},
+	"masterbelt.semantic.unknown_type": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "未知の型: " + f["name"].String()
+		default:
+			return "unknown type: " + f["name"].String()
+		}
+	},
 }

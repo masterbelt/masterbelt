@@ -7,3 +7,7 @@ masterbelt.parser.concrete.expected_type,error,
 masterbelt.parser.concrete.expected_assign,error,
 masterbelt.parser.concrete.expected_expression,error,
 masterbelt.parser.concrete.unexpected_token,error,kind:string
+masterbelt.semantic.duplicate_declaration,error,name:string
+masterbelt.semantic.undefined_name,error,name:string
+masterbelt.semantic.unknown_type,error,name:string
+masterbelt.semantic.cyclic_reference,error,name:string

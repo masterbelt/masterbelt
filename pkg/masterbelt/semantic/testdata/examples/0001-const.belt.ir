@@ -1,0 +1,13 @@
+Module
+  Const "MaxLevel"
+    doc "DocComment for MaxLevel"
+    type int64
+    value IntLiteral "100"
+  Const "MinLevel"
+    doc "DocComment for MinLevel"
+    doc "with multiline."
+    type untyped int
+    value IntLiteral "0"
+  Const "PublishedMaxLevel" pub
+    type int64
+    value Reference -> "MaxLevel"
