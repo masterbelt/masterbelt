@@ -27,16 +27,13 @@ const FileName = "masterbelt.toml"
 
 // Config is the decoded masterbelt.toml:
 //
-//	name = "mygame"
-//	version = "0.1.0"
 //	entry = "src/main.belt"   # the entry point, relative to the root
 //
-// Unknown keys are ignored so future sections ([dependencies], [build]) can
-// land without breaking older toolchains.
+// The schema holds exactly what the toolchain reads — nothing is declared
+// ahead of a consumer. Unknown keys are ignored, so future keys and sections
+// ([dependencies], [build]) can land without breaking older toolchains.
 type Config struct {
-	Name    string `toml:"name"`
-	Version string `toml:"version"`
-	Entry   string `toml:"entry"`
+	Entry string `toml:"entry"`
 }
 
 // Load reads and parses the manifest at path. A file that exists but cannot

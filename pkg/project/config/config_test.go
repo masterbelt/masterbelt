@@ -8,31 +8,20 @@ import (
 )
 
 func TestParse(t *testing.T) {
-	src := []byte("name = \"mygame\"\nversion = \"0.1.0\"\nentry = \"src/main.belt\"\n")
-	cfg, diags := Parse(src)
+	cfg, diags := Parse([]byte("entry = \"src/main.belt\"\n"))
 	if diags.Len() != 0 {
 		t.Fatalf("Parse() diagnostics = %v, want none", diags.Items())
 	}
-	want := Config{Name: "mygame", Version: "0.1.0", Entry: "src/main.belt"}
+	want := Config{Entry: "src/main.belt"}
 	if cfg != want {
 		t.Errorf("Parse() = %+v, want %+v", cfg, want)
 	}
 }
 
-func TestParseEntryOnly(t *testing.T) {
-	// Only entry is required; name and version may be omitted.
-	cfg, diags := Parse([]byte("entry = \"main.belt\"\n"))
-	if diags.Len() != 0 {
-		t.Fatalf("Parse() diagnostics = %v, want none", diags.Items())
-	}
-	if cfg.Entry != "main.belt" {
-		t.Errorf("Entry = %q, want %q", cfg.Entry, "main.belt")
-	}
-}
-
 func TestParseIgnoresUnknownKeys(t *testing.T) {
-	// Future manifest sections must not break older toolchains.
-	_, diags := Parse([]byte("entry = \"main.belt\"\n[dependencies]\nfoo = \"1.0\"\n"))
+	// Keys and sections the toolchain does not read must not break it,
+	// whichever side is older.
+	_, diags := Parse([]byte("name = \"mygame\"\nversion = \"0.1.0\"\nentry = \"main.belt\"\n[dependencies]\nfoo = \"1.0\"\n"))
 	if diags.Len() != 0 {
 		t.Errorf("Parse() diagnostics = %v, want none", diags.Items())
 	}

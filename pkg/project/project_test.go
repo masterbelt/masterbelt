@@ -46,7 +46,7 @@ func TestFindRootNotFound(t *testing.T) {
 
 func TestOpen(t *testing.T) {
 	root := t.TempDir()
-	write(t, root, "masterbelt.toml", "name = \"mygame\"\nversion = \"0.1.0\"\nentry = \"src/main.belt\"\n")
+	write(t, root, "masterbelt.toml", "entry = \"src/main.belt\"\n")
 	write(t, root, "src/main.belt", "const MaxLevel: int64 = 100\n")
 
 	proj, diags := Open(root)
@@ -56,8 +56,8 @@ func TestOpen(t *testing.T) {
 	if proj.Root != root {
 		t.Errorf("Root = %q, want %q", proj.Root, root)
 	}
-	if proj.Config.Name != "mygame" {
-		t.Errorf("Config.Name = %q, want %q", proj.Config.Name, "mygame")
+	if proj.Config.Entry != "src/main.belt" {
+		t.Errorf("Config.Entry = %q, want %q", proj.Config.Entry, "src/main.belt")
 	}
 	if proj.Entry != FileID("src/main.belt") {
 		t.Errorf("Entry = %q, want %q", proj.Entry, "src/main.belt")
