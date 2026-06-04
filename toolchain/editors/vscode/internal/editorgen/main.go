@@ -146,19 +146,37 @@ type pair struct {
 }
 
 func buildLanguageConfig() languageConfig {
+	// The bracket pairs the language uses: parentheses (calls, parameter and
+	// function-type lists), braces (records, impl and method blocks), and square
+	// brackets (list and map literals). Their spellings come from the token
+	// package, so they cannot drift from the lexer. Each pair drives bracket
+	// matching, auto-closing, and surround-selection.
+	bracketPairs := [][2]string{
+		{token.LParen.Symbol(), token.RParen.Symbol()},
+		{token.LBrace.Symbol(), token.RBrace.Symbol()},
+		{token.LBracket.Symbol(), token.RBracket.Symbol()},
+	}
+
+	brackets := make([][]string, 0, len(bracketPairs))
+	autoClosing := []pair{
+		{Open: token.BlockCommentOpen, Close: token.BlockCommentClose},
+		{Open: `"`, Close: `"`},
+	}
+	surrounding := []pair{{Open: `"`, Close: `"`}}
+	for _, bp := range bracketPairs {
+		brackets = append(brackets, []string{bp[0], bp[1]})
+		autoClosing = append(autoClosing, pair{Open: bp[0], Close: bp[1]})
+		surrounding = append(surrounding, pair{Open: bp[0], Close: bp[1]})
+	}
+
 	return languageConfig{
 		Comments: commentConfig{
 			LineComment:  token.LineCommentPrefix,
 			BlockComment: [2]string{token.BlockCommentOpen, token.BlockCommentClose},
 		},
-		// The language has no brackets yet; block comments and string quotes
-		// auto-close, and quotes can surround a selection.
-		Brackets: [][]string{},
-		AutoClosingPairs: []pair{
-			{Open: token.BlockCommentOpen, Close: token.BlockCommentClose},
-			{Open: `"`, Close: `"`},
-		},
-		SurroundingPairs: []pair{{Open: `"`, Close: `"`}},
+		Brackets:         brackets,
+		AutoClosingPairs: autoClosing,
+		SurroundingPairs: surrounding,
 	}
 }
 
