@@ -1,16 +1,19 @@
 Module
   Const "Doubled"
-    type invalid
-    value [IntLiteral "1", IntLiteral "2", IntLiteral "3"].map((fn(x)))
+    type list<int>
+    value [IntLiteral "1", IntLiteral "2", IntLiteral "3"].map((fn(x) (return ParamRef "x".mul(IntLiteral "2"))))
+    eval [2, 4, 6]
   Const "Evens"
-    type invalid
-    value [IntLiteral "1", IntLiteral "2", IntLiteral "3", IntLiteral "4"].map((fn(x)))
+    type list<bool>
+    value [IntLiteral "1", IntLiteral "2", IntLiteral "3", IntLiteral "4"].map((fn(x) (return ParamRef "x".rem(IntLiteral "2").eql(IntLiteral "0"))))
+    eval [false, true, false, true]
   Const "Tripled"
-    type invalid
-    value [IntLiteral "1", IntLiteral "2", IntLiteral "3"].map((fn(x)))
+    type list<int>
+    value [IntLiteral "1", IntLiteral "2", IntLiteral "3"].map((fn(x) (return ParamRef "x".mul(IntLiteral "3"))))
+    eval [3, 6, 9]
   Const "Twice"
     type fn(int): int
-    value (fn(x))
+    value (fn(x) (return ParamRef "x".mul(IntLiteral "2")))
     eval <func>
   Const "Stepped"
     type list<int>

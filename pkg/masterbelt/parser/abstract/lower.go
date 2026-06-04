@@ -459,9 +459,13 @@ func lowerCallExpr(t cst.Tree, buf source.Buffer, node *cst.Node) ast.Expr {
 	return ast.NewCallExpr(callee, args, node)
 }
 
-// lowerFuncLit lowers a function-literal expression, fn(Params): Result { Body },
-// to an ast.FuncLit. Its parameter list, result type, and block body lower the
-// same way a method declaration's do.
+// lowerFuncLit lowers a function-literal expression — fn(Params): Result with
+// either a block body or an arrow body — to an ast.FuncLit. Its parameter list,
+// result type, and block body lower the same way a method declaration's do. An
+// arrow body, "->" Expr, is normalized here — and only here — to a single
+// implicit return, so inference, lowering, and evaluation see the same FuncLit
+// shape for both body forms. The kinds keep the children apart: a result type
+// is a type-expression node, the arrow body an expression node.
 func lowerFuncLit(t cst.Tree, buf source.Buffer, node *cst.Node) ast.Expr {
 	var params []*ast.ParamDef
 	var result ast.TypeExpr
@@ -478,6 +482,8 @@ func lowerFuncLit(t cst.Tree, buf source.Buffer, node *cst.Node) ast.Expr {
 			body = lowerBlock(child, buf)
 		case isTypeExprKind(n.Kind()):
 			result = lowerTypeExpr(child, buf)
+		case isExprKind(n.Kind()):
+			body = []ast.Stmt{ast.NewReturnStmt(lowerExpr(child, buf), n)}
 		}
 	}
 	return ast.NewFuncLit(params, result, body, node)

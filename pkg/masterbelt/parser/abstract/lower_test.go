@@ -143,6 +143,32 @@ func TestLowerFuncLit(t *testing.T) {
 	}
 }
 
+// TestLowerArrowFuncLit checks that an arrow body normalizes to a single
+// implicit return — the same FuncLit shape a block with one return lowers to,
+// so the layers below never see which body form was written.
+func TestLowerArrowFuncLit(t *testing.T) {
+	arrow := valueLine(t, "const f = fn(x) -> x * 2\n")
+	block := valueLine(t, "const f = fn(x) { return x * 2 }\n")
+	if arrow != block {
+		t.Errorf("arrow lowers to %s, want the block form %s", arrow, block)
+	}
+	if want := `(fn(x: <missing>): <missing> (return (call (. Identifier "x" mul) IntLit "2")))`; arrow != want {
+		t.Errorf("arrow = %s, want %s", arrow, want)
+	}
+
+	// A result annotation survives alongside the arrow body.
+	annotated := valueLine(t, "const f = fn(x): int -> x\n")
+	if want := `(fn(x: <missing>): int (return Identifier "x"))`; annotated != want {
+		t.Errorf("annotated arrow = %s, want %s", annotated, want)
+	}
+
+	// Arrow bodies nest: the outer body is the inner literal's return.
+	nested := valueLine(t, "const f = fn(x) -> fn(y) -> y\n")
+	if want := `(fn(x: <missing>): <missing> (return (fn(y: <missing>): <missing> (return Identifier "y"))))`; nested != want {
+		t.Errorf("nested arrow = %s, want %s", nested, want)
+	}
+}
+
 func TestLowerUseDecl(t *testing.T) {
 	cases := []struct {
 		name string
