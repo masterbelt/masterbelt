@@ -22,12 +22,15 @@ Module
   TypeDef "Level" pub
     doc "A character level between 0 and 100."
     body int8
+    where self >= 0 && self <= 100
   TypeDef "Port" pub
     doc "A TCP port number."
     body int32
+    where self >= 1 && self <= 65535
   TypeDef "Percent" pub
     doc "A percentage from 0 to 100."
     body int8
+    where self >= 0 && self <= 100
     method "increment" pub
       doc "The next percentage point."
       result self

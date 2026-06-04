@@ -226,7 +226,7 @@ func buildTypeDefs(q queries, file *ast.File, imp importTable) typeDefs {
 		return td
 	}
 	extern := outerTypes(q, imp)
-	td.list = resolveTypes(file, nil, nil, extern, qualifiedFrom(q, imp))
+	td.list = resolveTypes(file, nil, nil, q.registry(), extern, qualifiedFrom(q, imp))
 	for _, def := range td.list {
 		if def.Name != "" {
 			if _, ok := td.byName[def.Name]; !ok {

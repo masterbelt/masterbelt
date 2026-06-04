@@ -239,6 +239,30 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return f["path"].String() + " does not export " + f["name"].String()
 		}
 	},
+	"masterbelt.semantic.refinement_not_bool": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "where 節は bool でなければなりません(" + f["typ"].String() + ")"
+		default:
+			return "where clause must be a bool; got " + f["typ"].String()
+		}
+	},
+	"masterbelt.semantic.refinement_not_constant": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "where 節はコンパイル時に評価できる述語ではありません"
+		default:
+			return "where clause is not a compile-time predicate"
+		}
+	},
+	"masterbelt.semantic.refinement_violation": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "値 " + f["value"].String() + " は " + f["typ"].String() + " の制約を満たしません: " + f["predicate"].String()
+		default:
+			return "value " + f["value"].String() + " does not satisfy " + f["typ"].String() + ": " + f["predicate"].String()
+		}
+	},
 	"masterbelt.semantic.type_mismatch": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":

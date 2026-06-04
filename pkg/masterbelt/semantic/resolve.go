@@ -1,8 +1,13 @@
 package semantic
 
 import (
+	"math/big"
+
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/eval"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/lower"
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/types"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/types/infer"
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
@@ -27,12 +32,14 @@ func unknownTypeReporter(at func(ast.Node) span, diags *diagnostic.List) func(as
 // (so a declaration may refer to a type defined later in the file), extern —
 // everything beneath them: the file's imported type definitions over the
 // prelude surface — and qualified, the lookup for namespace-qualified names
-// (geo.Point; nil when no namespaces are in scope).
+// (geo.Point; nil when no namespaces are in scope). reg supplies the native
+// semantics a refinement predicate types and folds against.
 //
 // Only the declarations' structure is resolved: the generic parameters and their
-// bounds, the defined body type, and each method's signature. Method bodies are
-// lowered to IR here (lower.Body) but not type-checked.
-func resolveTypes(file *ast.File, at func(ast.Node) span, diags *diagnostic.List, extern map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef) []*ir.TypeDef {
+// bounds, the defined body type, each method's signature, and the where-clause
+// predicate. Method bodies are lowered to IR here (lower.Body) but not
+// type-checked.
+func resolveTypes(file *ast.File, at func(ast.Node) span, diags *diagnostic.List, reg *builtin.Registry, extern map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef) []*ir.TypeDef {
 	if len(file.Types) == 0 {
 		return nil
 	}
@@ -68,15 +75,15 @@ func resolveTypes(file *ast.File, at func(ast.Node) span, diags *diagnostic.List
 	// unknown type names.
 	r := &infer.TypeResolver{Defs: defs, Qualified: qualified, Report: unknownTypeReporter(at, diags)}
 	for i, td := range file.Types {
-		resolveDecl(r, td, out[i])
+		resolveDecl(r, reg, td, out[i], at, diags)
 	}
 	return out
 }
 
 // resolveDecl fills in def from the declaration: its generic parameters (whose
-// names are in scope for the bounds, body, and methods), the body type, and the
-// method signatures.
-func resolveDecl(r *infer.TypeResolver, td *ast.TypeDecl, def *ir.TypeDef) {
+// names are in scope for the bounds, body, and methods), the body type, the
+// method signatures, and the refinement predicate.
+func resolveDecl(r *infer.TypeResolver, reg *builtin.Registry, td *ast.TypeDecl, def *ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List) {
 	scope := make(map[string]bool, len(td.Params))
 	for _, p := range td.Params {
 		scope[p.Name] = true
@@ -96,10 +103,83 @@ func resolveDecl(r *infer.TypeResolver, td *ast.TypeDecl, def *ir.TypeDef) {
 	} else {
 		def.Body = r.ResolveType(td.Body, scope)
 	}
+	resolveWhere(r, reg, td, def, at, diags)
 	for _, m := range td.Methods {
 		def.Methods = append(def.Methods, resolveMethod(r, m, scope))
 	}
 }
+
+// resolveWhere type-checks the declaration's refinement predicate — self is the
+// underlying body type, so the comparisons type against the body's operators —
+// and keeps it on the definition only when it is a usable compile-time
+// predicate: a bool that folds. An unusable predicate is reported here, once,
+// at the declaration; the definition's Where stays nil so the per-constant
+// check never fires for it (the ir.Invalid style of suppression). The silent
+// pass (nil at/diags) decides usability identically and just skips the
+// reporting, so the memoized definitions and the diagnostics never disagree.
+func resolveWhere(r *infer.TypeResolver, reg *builtin.Registry, td *ast.TypeDecl, def *ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List) {
+	if td.Where == nil || def.Body == nil || ir.HasInvalid(def.Body) {
+		return
+	}
+	report := at != nil && diags != nil
+	var sink *infer.Sink
+	if report {
+		sink = exprSink(at, diags)
+	}
+	// The predicate types in a body scope with no parameters: self and literals
+	// only, which is exactly what the evaluator can fold (a reference to a
+	// constant would need a value the declaration does not have).
+	bs := infer.BodyScope{Reg: reg, Universe: r.Defs, Qualified: r.Qualified, Self: def.Body}
+	t := infer.CheckPredicate(td.Where, bs, sink)
+	if t == ir.Invalid {
+		return // the operator error was reported by the sink
+	}
+	if !types.IsBoolean(reg, t) {
+		if report {
+			s := at(td.Where)
+			diags.Add(newRefinementNotBoolDiagnostic(s.offset, s.width, t.String()))
+		}
+		return
+	}
+	// The predicate must fold. A witness value of the body type stands in for
+	// self — the fold is value-independent for everything the type rules let
+	// through (intrinsic-backed methods over self and literals), so a witness
+	// that folds proves every constant's check will.
+	if v := eval.Predicate(td.Where, witness(reg, def.Body), predicateEnv{reg}); v == nil || v.Kind != ir.ConstBool {
+		if report {
+			s := at(td.Where)
+			diags.Add(newRefinementNotConstantDiagnostic(s.offset, s.width))
+		}
+		return
+	}
+	def.Where = td.Where
+}
+
+// witness is a representative constant of t for the declaration-time probe
+// fold: 1 for an integer (avoiding a divide-by-self zero), true for a boolean,
+// the empty string for a string, nil — never foldable — for anything else.
+func witness(reg *builtin.Registry, t ir.Type) *ir.Constant {
+	switch {
+	case types.IsInteger(reg, t):
+		return ir.IntConstant(big.NewInt(1))
+	case types.IsBoolean(reg, t):
+		return ir.BoolConstant(true)
+	case types.IsString(reg, t):
+		return ir.StringConstant("")
+	default:
+		return nil
+	}
+}
+
+// predicateEnv is the eval environment of a refinement predicate: just the
+// registry. The type rules guarantee a usable predicate references nothing but
+// self and literals, so resolution never happens.
+type predicateEnv struct{ reg *builtin.Registry }
+
+func (e predicateEnv) Resolve(*ast.Identifier) *ast.ConstDecl       { return nil }
+func (e predicateEnv) ResolveMember(*ast.MemberExpr) *ast.ConstDecl { return nil }
+func (e predicateEnv) ValueOf(*ast.ConstDecl) *ir.Constant          { return nil }
+func (e predicateEnv) Registry() *builtin.Registry                  { return e.reg }
 
 // resolveMethod resolves a method's signature (parameter types and result type)
 // and lowers its body to IR. The body is not yet type-checked.

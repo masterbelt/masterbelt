@@ -21,6 +21,9 @@ const (
 	CodeInvalidOperation      diagnostic.Code = "masterbelt.semantic.invalid_operation"
 	CodeLambdaArityMismatch   diagnostic.Code = "masterbelt.semantic.lambda_arity_mismatch"
 	CodeNotExported           diagnostic.Code = "masterbelt.semantic.not_exported"
+	CodeRefinementNotBool     diagnostic.Code = "masterbelt.semantic.refinement_not_bool"
+	CodeRefinementNotConstant diagnostic.Code = "masterbelt.semantic.refinement_not_constant"
+	CodeRefinementViolation   diagnostic.Code = "masterbelt.semantic.refinement_violation"
 	CodeTypeMismatch          diagnostic.Code = "masterbelt.semantic.type_mismatch"
 	CodeUndefinedName         diagnostic.Code = "masterbelt.semantic.undefined_name"
 	CodeUninferableCollection diagnostic.Code = "masterbelt.semantic.uninferable_collection"
@@ -193,6 +196,47 @@ func newNotExportedDiagnostic(offset int, width int, name string, path string) d
 		Severity: diagnostic.Error,
 		Code:     CodeNotExported,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeNotExported, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newRefinementNotBoolDiagnostic(offset int, width int, typ string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"typ": diagnostic.Str(typ),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeRefinementNotBool,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeRefinementNotBool, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newRefinementNotConstantDiagnostic(offset int, width int) diagnostic.Diagnostic {
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeRefinementNotConstant,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeRefinementNotConstant, nil),
+		Fields:   nil,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newRefinementViolationDiagnostic(offset int, width int, value string, typ string, predicate string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"value":     diagnostic.Str(value),
+		"typ":       diagnostic.Str(typ),
+		"predicate": diagnostic.Str(predicate),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeRefinementViolation,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeRefinementViolation, fields),
 		Fields:   fields,
 		Offset:   offset,
 		Width:    width,

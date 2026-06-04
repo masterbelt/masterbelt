@@ -460,6 +460,14 @@ func CheckBody(e ast.Expr, want ir.Type, s BodyScope, sink *Sink) ir.Type {
 	return checkType(e, want, s, map[string]ir.Type{}, sink)
 }
 
+// CheckPredicate is Check over a body scope: it synthesizes the expression's
+// type with self bound to s.Self, reporting operator errors through sink. A
+// refinement predicate types this way — whether the result must be a bool is
+// the caller's rule, reported as its own diagnostic rather than a mismatch.
+func CheckPredicate(e ast.Expr, s BodyScope, sink *Sink) ir.Type {
+	return check(e, s, sink)
+}
+
 // checkType is the checking walk: the bidirectional half of the type rules.
 // want may contain still-unbound method type variables — a call site passes
 // its bindings in subst and gains the ones the walk solves; the declaration

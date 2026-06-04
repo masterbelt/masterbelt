@@ -53,6 +53,19 @@ func IsBoolean(reg *builtin.Registry, t ir.Type) bool {
 	return false
 }
 
+// IsString reports whether t is a string type: the string builtin or a named
+// type whose underlying type is a string.
+func IsString(reg *builtin.Registry, t ir.Type) bool {
+	switch t := t.(type) {
+	case *ir.Builtin:
+		n, ok := reg.Native(t.Name)
+		return ok && n.IsString()
+	case *ir.Named:
+		return t.Def != nil && IsString(reg, t.Def.Body)
+	}
+	return false
+}
+
 // defaultInt is the type of an integer literal: the arbitrary-precision integer
 // that adapts to any sized integer type.
 const defaultInt = "int"

@@ -200,8 +200,14 @@ type TypeDef struct {
 	Params  []*TypeParam // generic parameters, in declaration order
 	Body    Type         // the defined type (nil if missing/invalid)
 	Methods []*Method
-	Builtin bool          // declared as `= builtin`: its semantics come from the registry
-	Syntax  *ast.TypeDecl // the declaration this was resolved from
+	Builtin bool // declared as `= builtin`: its semantics come from the registry
+	// Where is the refinement predicate over self, kept in its evaluable AST
+	// form so the predicate can fold per constant (self bound to each value).
+	// It is set only when the predicate type-checks to a foldable bool; an
+	// unusable predicate is reported at the declaration and stays nil, so the
+	// per-constant check never fires for it.
+	Where  ast.Expr
+	Syntax *ast.TypeDecl // the declaration this was resolved from
 }
 
 // TypeParam is one generic parameter of a TypeDef: a name and an optional

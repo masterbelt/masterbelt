@@ -3,6 +3,8 @@ package ir
 import (
 	"fmt"
 	"strings"
+
+	"github.com/masterbelt/masterbelt/pkg/source/ast"
 )
 
 // Dump renders a Module as a stable, diffable text tree. It reads only resolved
@@ -56,6 +58,11 @@ func dumpTypeDef(b *strings.Builder, t *TypeDef) {
 	}
 	if t.Body != nil {
 		fmt.Fprintf(b, "    body %s\n", t.Body)
+	}
+	if t.Where != nil {
+		// The canonical surface form (ast.Render inverts the operator
+		// desugaring), so the snapshot reads like the declaration.
+		fmt.Fprintf(b, "    where %s\n", ast.Render(t.Where))
 	}
 	for _, m := range t.Methods {
 		dumpMethod(b, m)

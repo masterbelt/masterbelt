@@ -310,9 +310,26 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 		// An integer value outside its concrete type's range overflows. The
 		// arbitrary-precision int has no fixed range (Fits accepts any value),
 		// and booleans never overflow.
-		if c.Eval != nil && c.Eval.Kind == ir.ConstInt && !types.Fits(reg, c.Type, c.Eval.Int) {
+		overflow := c.Eval != nil && c.Eval.Kind == ir.ConstInt && !types.Fits(reg, c.Type, c.Eval.Int)
+		if overflow {
 			s := at(decl.Value)
 			diags.Add(newConstantOverflowDiagnostic(s.offset, s.width, c.Eval.String(), c.Type.String()))
+		}
+		// Refinement: a nominal annotation whose definition carries a usable
+		// where-clause admits only the values that satisfy it, so the predicate
+		// folds with self bound to the evaluated value. An overflowed value is
+		// already reported as outside the type; a predicate that does not fold
+		// to a bool was reported at the type declaration, so both stay silent
+		// here (the ir.Invalid style of suppression).
+		if !overflow && c.Eval != nil {
+			if def := refinedDef(c.Type); def != nil {
+				v := eval.Predicate(def.Where, c.Eval, evalEnv{q: q, file: fileID})
+				if v != nil && v.Kind == ir.ConstBool && !v.Bool {
+					s := at(decl.Value)
+					diags.Add(newRefinementViolationDiagnostic(
+						s.offset, s.width, c.Eval.String(), c.Type.String(), ast.Render(def.Where)))
+				}
+			}
 		}
 		// An empty or heterogeneous collection literal with no annotation has
 		// no type to infer (checking mode never sees it without one).
@@ -417,12 +434,30 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 	// pass re-resolves the declarations fresh and discards the definitions.
 	module.Types = q.typeDefs(fileID)
 	imp := q.importsOf(fileID)
-	resolveTypes(file, at, diags, outerTypes(q, imp), qualifiedFrom(q, imp))
+	resolveTypes(file, at, diags, reg, outerTypes(q, imp), qualifiedFrom(q, imp))
 	checkMethodBodies(file, reg, module.Types, q.universe(fileID), qualifiedFrom(q, imp), exprSink(at, diags))
 
 	items := diags.Items()
 	sort.SliceStable(items, func(i, j int) bool { return items[i].Offset < items[j].Offset })
 	return module, items
+}
+
+// refinedDef returns the definition behind a nominal (or applied) annotation
+// type when it carries a usable refinement predicate, or nil. An unannotated
+// constant's type is the underlying composite, never a Named, so refinement is
+// annotation-driven by construction.
+func refinedDef(t ir.Type) *ir.TypeDef {
+	var def *ir.TypeDef
+	switch t := t.(type) {
+	case *ir.Named:
+		def = t.Def
+	case *ir.App:
+		def = t.Def
+	}
+	if def == nil || def.Where == nil {
+		return nil
+	}
+	return def
 }
 
 // buildSymbols maps each declared name to its first declaration. A nil file
