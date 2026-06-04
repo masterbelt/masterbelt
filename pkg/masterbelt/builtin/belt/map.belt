@@ -1,9 +1,13 @@
+/// A key-value mapping, written [k: v, ...].
 pub type map<K, V> = builtin<K, V> impl {
+  /// The number of entries.
   pub extern fn len(): int
 
+  /// The + operator: the merge of the two maps.
   pub extern fn add(other: self): self
 
+  /// The == operator: entry-wise equality.
   pub extern fn eql(other: self): bool
+  /// The != operator.
   pub extern fn neq(other: self): bool
 }
-

@@ -3,6 +3,9 @@ File
   TypeDecl
     LineComment "// The exporter: a public type and two public constants."
     Newline "\n"
+    Newline "\n"
+    DocComment "/// A 1-D coordinate."
+    Newline "\n"
     Pub "pub"
     Whitespace " "
     Type "type"
@@ -14,6 +17,8 @@ File
     TypeName
       Ident "int32"
   ConstDecl
+    Newline "\n"
+    DocComment "/// The zero point every path starts from."
     Newline "\n"
     Pub "pub"
     Whitespace " "
@@ -27,6 +32,8 @@ File
       Literal
         Int "0"
   ConstDecl
+    Newline "\n"
+    DocComment "/// One step along the axis."
     Newline "\n"
     Pub "pub"
     Whitespace " "

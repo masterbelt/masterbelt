@@ -1,5 +1,6 @@
 File
   ConstDecl
+    doc "The zero point every path starts from."
     pub
     name "Origin"
     value IntLit "0"
@@ -7,6 +8,7 @@ File
     name "hidden"
     value IntLit "1"
   TypeDecl
+    doc "A 1-D coordinate."
     pub
     name "Point"
     body int32

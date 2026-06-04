@@ -1,13 +1,16 @@
 File
   ConstDecl
+    doc "The zero point every path starts from."
     pub
     name "Origin"
     value IntLit "0"
   ConstDecl
+    doc "One step along the axis."
     pub
     name "Unit"
     value IntLit "1"
   TypeDecl
+    doc "A 1-D coordinate."
     pub
     name "Point"
     body int32

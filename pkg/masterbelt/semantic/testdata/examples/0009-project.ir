@@ -1,6 +1,7 @@
 # geometry.belt
 Module
   Const "Origin" pub
+    doc "The zero point every path starts from."
     type int
     value IntLiteral "0"
     eval 0
@@ -9,6 +10,7 @@ Module
     value IntLiteral "1"
     eval 1
   TypeDef "Point" pub
+    doc "A 1-D coordinate."
     body int32
 # main.belt
 Module

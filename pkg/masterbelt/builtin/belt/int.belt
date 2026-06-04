@@ -1,96 +1,167 @@
+/// The signed integer types as one union: a generic constraint for any signed integer.
 pub type snumeric = int | int8 | int16 | int32 | int64
 
+/// The arbitrary-precision integer: the type of an un-annotated integer literal. It has no fixed range and fits wherever a sized integer is expected.
 pub type int = builtin impl {
+  /// The unary + operator: the value unchanged.
   pub extern fn pos(): self
+  /// The unary - operator: the negation.
   pub extern fn neg(): self
 
+  /// The == operator.
   pub extern fn eql(other: self): bool
+  /// The != operator.
   pub extern fn neq(other: self): bool
 
+  /// The < operator.
   pub extern fn lt(other: self): bool
+  /// The <= operator.
   pub extern fn lteq(other: self): bool
+  /// The > operator.
   pub extern fn gt(other: self): bool
+  /// The >= operator.
   pub extern fn gteq(other: self): bool
 
+  /// The + operator: the sum.
   pub extern fn add(other: self): self
+  /// The - operator: the difference.
   pub extern fn sub(other: self): self
+  /// The * operator: the product.
   pub extern fn mul(other: self): self
+  /// The / operator: the quotient. A zero divisor is a compile-time error.
   pub extern fn div(other: self): self
+  /// The % operator: the remainder. A zero divisor is a compile-time error.
   pub extern fn rem(other: self): self
 }
 
+/// A signed 8-bit integer (-128 to 127).
 pub type int8 = builtin impl {
+  /// The unary + operator: the value unchanged.
   pub extern fn pos(): self
+  /// The unary - operator: the negation.
   pub extern fn neg(): self
 
+  /// The == operator.
   pub extern fn eql(other: self): bool
+  /// The != operator.
   pub extern fn neq(other: self): bool
 
+  /// The < operator.
   pub extern fn lt(other: self): bool
+  /// The <= operator.
   pub extern fn lteq(other: self): bool
+  /// The > operator.
   pub extern fn gt(other: self): bool
+  /// The >= operator.
   pub extern fn gteq(other: self): bool
 
+  /// The + operator: the sum.
   pub extern fn add(other: self): self
+  /// The - operator: the difference.
   pub extern fn sub(other: self): self
+  /// The * operator: the product.
   pub extern fn mul(other: self): self
+  /// The / operator: the quotient. A zero divisor is a compile-time error.
   pub extern fn div(other: self): self
+  /// The % operator: the remainder. A zero divisor is a compile-time error.
   pub extern fn rem(other: self): self
 }
 
+/// A signed 16-bit integer (-32768 to 32767).
 pub type int16 = builtin impl {
+  /// The unary + operator: the value unchanged.
   pub extern fn pos(): self
+  /// The unary - operator: the negation.
   pub extern fn neg(): self
 
+  /// The == operator.
   pub extern fn eql(other: self): bool
+  /// The != operator.
   pub extern fn neq(other: self): bool
 
+  /// The < operator.
   pub extern fn lt(other: self): bool
+  /// The <= operator.
   pub extern fn lteq(other: self): bool
+  /// The > operator.
   pub extern fn gt(other: self): bool
+  /// The >= operator.
   pub extern fn gteq(other: self): bool
 
+  /// The + operator: the sum.
   pub extern fn add(other: self): self
+  /// The - operator: the difference.
   pub extern fn sub(other: self): self
+  /// The * operator: the product.
   pub extern fn mul(other: self): self
+  /// The / operator: the quotient. A zero divisor is a compile-time error.
   pub extern fn div(other: self): self
+  /// The % operator: the remainder. A zero divisor is a compile-time error.
   pub extern fn rem(other: self): self
 }
 
+/// A signed 32-bit integer (-2147483648 to 2147483647).
 pub type int32 = builtin impl {
+  /// The unary + operator: the value unchanged.
   pub extern fn pos(): self
+  /// The unary - operator: the negation.
   pub extern fn neg(): self
 
+  /// The == operator.
   pub extern fn eql(other: self): bool
+  /// The != operator.
   pub extern fn neq(other: self): bool
 
+  /// The < operator.
   pub extern fn lt(other: self): bool
+  /// The <= operator.
   pub extern fn lteq(other: self): bool
+  /// The > operator.
   pub extern fn gt(other: self): bool
+  /// The >= operator.
   pub extern fn gteq(other: self): bool
 
+  /// The + operator: the sum.
   pub extern fn add(other: self): self
+  /// The - operator: the difference.
   pub extern fn sub(other: self): self
+  /// The * operator: the product.
   pub extern fn mul(other: self): self
+  /// The / operator: the quotient. A zero divisor is a compile-time error.
   pub extern fn div(other: self): self
+  /// The % operator: the remainder. A zero divisor is a compile-time error.
   pub extern fn rem(other: self): self
 }
 
+/// A signed 64-bit integer (-9223372036854775808 to 9223372036854775807).
 pub type int64 = builtin impl {
+  /// The unary + operator: the value unchanged.
   pub extern fn pos(): self
+  /// The unary - operator: the negation.
   pub extern fn neg(): self
 
+  /// The == operator.
   pub extern fn eql(other: self): bool
+  /// The != operator.
   pub extern fn neq(other: self): bool
 
+  /// The < operator.
   pub extern fn lt(other: self): bool
+  /// The <= operator.
   pub extern fn lteq(other: self): bool
+  /// The > operator.
   pub extern fn gt(other: self): bool
+  /// The >= operator.
   pub extern fn gteq(other: self): bool
 
+  /// The + operator: the sum.
   pub extern fn add(other: self): self
+  /// The - operator: the difference.
   pub extern fn sub(other: self): self
+  /// The * operator: the product.
   pub extern fn mul(other: self): self
+  /// The / operator: the quotient. A zero divisor is a compile-time error.
   pub extern fn div(other: self): self
+  /// The % operator: the remainder. A zero divisor is a compile-time error.
   pub extern fn rem(other: self): self
 }

@@ -1,10 +1,16 @@
+/// An ordered sequence of T values, written [a, b, c].
 pub type list<T> = builtin<T> impl {
+  /// The number of elements.
   pub extern fn len(): int
 
+  /// A new list: func applied to each element, in order.
   pub extern fn map(func: fn(item: T): R): list<R>
 
+  /// The + operator: the concatenation.
   pub extern fn add(other: self): self
 
+  /// The == operator: element-wise equality.
   pub extern fn eql(other: self): bool
+  /// The != operator.
   pub extern fn neq(other: self): bool
 }

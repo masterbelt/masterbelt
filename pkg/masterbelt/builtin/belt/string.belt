@@ -1,11 +1,19 @@
+/// An immutable UTF-8 string, written "...".
 pub type string = builtin impl {
+  /// The == operator.
   pub extern fn eql(other: self): bool
+  /// The != operator.
   pub extern fn neq(other: self): bool
 
+  /// The < operator: lexicographic order.
   pub extern fn lt(other: self): bool
+  /// The <= operator: lexicographic order.
   pub extern fn lteq(other: self): bool
+  /// The > operator: lexicographic order.
   pub extern fn gt(other: self): bool
+  /// The >= operator: lexicographic order.
   pub extern fn gteq(other: self): bool
 
+  /// The + operator: the concatenation.
   pub extern fn add(other: self): self
 }

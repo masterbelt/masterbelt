@@ -1,5 +1,8 @@
 // The imported module: only pub declarations are visible across files.
+
+/// The zero point every path starts from.
 pub const Origin = 0
+/// A 1-D coordinate.
 pub type Point = int32
 
 // Not exported — main.belt must not be able to use this.

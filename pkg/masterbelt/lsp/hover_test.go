@@ -311,12 +311,18 @@ func TestTypeHoverMethods(t *testing.T) {
 		t.Errorf("hover sections out of order: sig %d, doc %d, methods %d", sig, docAt, methods)
 	}
 
-	// A prelude builtin lists its operator methods the same way.
+	// A prelude builtin lists its operator methods the same way, each under
+	// its doc comment, with the type's own doc up top.
 	h = hover(doc, strings.Index(src, "= int8")+3)
 	if h == nil {
 		t.Fatal("no hover on int8")
 	}
-	if !strings.Contains(h.Contents.Value, "pub extern add(other: self): self") {
-		t.Errorf("int8 hover = %q, want its add method signature", h.Contents.Value)
+	for _, want := range []string{
+		"A signed 8-bit integer (-128 to 127).",
+		"/// The + operator: the sum.\npub extern add(other: self): self",
+	} {
+		if !strings.Contains(h.Contents.Value, want) {
+			t.Errorf("int8 hover = %q, want it to contain %q", h.Contents.Value, want)
+		}
 	}
 }
