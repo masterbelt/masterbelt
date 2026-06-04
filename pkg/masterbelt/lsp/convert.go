@@ -79,7 +79,7 @@ func toSeverity(s diagnostic.Severity) protocol.DiagnosticSeverity {
 // the part an editor highlights when you pick the symbol.
 func documentSymbols(doc view) []protocol.DocumentSymbol {
 	buf := doc.Buffer()
-	trees := positionedTrees(doc.AST().Concrete().Tree())
+	trees := doc.Trees()
 
 	var symbols []protocol.DocumentSymbol
 	for _, c := range doc.Module().Consts {

@@ -18,7 +18,7 @@ import (
 // the hint materializes it in the source.
 func inlayHints(doc view, startOff, endOff int) []protocol.InlayHint {
 	buf := doc.Buffer()
-	trees := positionedTrees(doc.AST().Concrete().Tree())
+	trees := doc.Trees()
 	kind := protocol.InlayHintKindType
 
 	var hints []protocol.InlayHint

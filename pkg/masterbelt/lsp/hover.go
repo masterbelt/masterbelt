@@ -15,7 +15,7 @@ import (
 // resolves to; hovering a function-literal parameter — its declaration or a
 // use in the body — shows its (possibly inferred) type.
 func hover(doc view, offset int) *protocol.Hover {
-	trees := positionedTrees(doc.AST().Concrete().Tree())
+	trees := doc.Trees()
 	occ, ok := occurrenceAt(doc, offset, trees)
 	if !ok {
 		return lambdaParamHover(doc, offset, trees)
@@ -27,7 +27,7 @@ func hover(doc view, offset int) *protocol.Hover {
 // declaration's name — in this file, or in the sibling file an import brought
 // it from.
 func definition(doc view, offset int) []protocol.Location {
-	occ, ok := occurrenceAt(doc, offset, positionedTrees(doc.AST().Concrete().Tree()))
+	occ, ok := occurrenceAt(doc, offset, doc.Trees())
 	if !ok {
 		return nil
 	}
@@ -36,7 +36,7 @@ func definition(doc view, offset int) []protocol.Location {
 		return nil
 	}
 
-	trees := positionedTrees(target.AST().Concrete().Tree())
+	trees := target.Trees()
 	targetTree, ok := trees[occ.target.Syntax.Syntax()]
 	if !ok {
 		return nil

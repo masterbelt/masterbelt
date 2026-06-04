@@ -11,7 +11,7 @@ import (
 // counterpart of the inlay type hint.
 func codeActions(doc view, startOff, endOff int) []protocol.CodeAction {
 	buf := doc.Buffer()
-	trees := positionedTrees(doc.AST().Concrete().Tree())
+	trees := doc.Trees()
 	kind := protocol.CodeActionRefactorRewrite
 
 	var actions []protocol.CodeAction

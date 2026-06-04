@@ -11,6 +11,7 @@ import (
 	"github.com/masterbelt/masterbelt/pkg/project"
 	"github.com/masterbelt/masterbelt/pkg/source"
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
+	"github.com/masterbelt/masterbelt/pkg/source/cst"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
 	protocol "github.com/owenrumney/go-lsp/lsp"
 )
@@ -20,10 +21,18 @@ import (
 // project loads its siblings from disk, so imports resolve in the editor even
 // when their files are not open; open buffers override the disk copies.
 type workspace struct {
-	root string           // the project root directory, "" when standalone
-	proj *project.Project // nil when standalone
-	prog *semantic.Program
-	open map[semantic.FileID]protocol.DocumentURI
+	root  string           // the project root directory, "" when standalone
+	proj  *project.Project // nil when standalone
+	prog  *semantic.Program
+	open  map[semantic.FileID]protocol.DocumentURI
+	trees map[semantic.FileID]*treeIndex // positioned-tree cache, one entry per parse
+}
+
+// treeIndex is one file's positioned-tree cache: the green root it was built
+// over — the parse's identity — and the green-to-positioned-tree map.
+type treeIndex struct {
+	root  cst.Green
+	trees map[cst.Green]cst.Tree
 }
 
 // view is one file of a workspace, presenting the surface the feature
@@ -36,6 +45,24 @@ type view struct {
 }
 
 func (v view) AST() *abstract.Document { return v.ws.prog.Document(v.id) }
+
+// Trees returns the positioned-tree index of the file's concrete tree,
+// cached on the workspace and rebuilt only when an edit produced a new tree
+// (the green root's identity is the parse's identity). The read-only
+// handlers — hover, definition, references, highlights, hints, actions —
+// share one index per parse instead of re-walking the tree per request.
+func (v view) Trees() map[cst.Green]cst.Tree {
+	root := v.AST().Concrete().Tree()
+	if c := v.ws.trees[v.id]; c != nil && c.root == root.Green() {
+		return c.trees
+	}
+	trees := positionedTrees(root)
+	if v.ws.trees == nil {
+		v.ws.trees = map[semantic.FileID]*treeIndex{}
+	}
+	v.ws.trees[v.id] = &treeIndex{root: root.Green(), trees: trees}
+	return trees
+}
 
 func (v view) Buffer() source.Buffer { return v.AST().Buffer() }
 
@@ -114,6 +141,7 @@ func (ws *workspace) sync() {
 		for _, id := range ws.prog.Files() {
 			if !current[id] {
 				ws.prog.RemoveFile(id)
+				delete(ws.trees, id)
 			}
 		}
 	}

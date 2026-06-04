@@ -216,7 +216,7 @@ func programOccurrences(v view, target *ir.Const, includeDecl bool) map[protocol
 	out := map[protocol.DocumentURI][]protocol.Range{}
 	for _, id := range v.ws.prog.Files() {
 		fv := view{ws: v.ws, id: id, uri: v.ws.uriFor(id)}
-		trees := positionedTrees(fv.AST().Concrete().Tree())
+		trees := fv.Trees()
 		buf := fv.Buffer()
 		for _, tok := range occurrencesOf(fv, target, trees, includeDecl) {
 			out[fv.uri] = append(out[fv.uri], toRange(buf, tok.Offset(), tok.End()))
@@ -229,7 +229,7 @@ func programOccurrences(v view, target *ir.Const, includeDecl bool) map[protocol
 // across every file of the workspace (including its declaration when
 // includeDecl is set).
 func references(doc view, offset int, includeDecl bool) []protocol.Location {
-	occ, ok := occurrenceAt(doc, offset, positionedTrees(doc.AST().Concrete().Tree()))
+	occ, ok := occurrenceAt(doc, offset, doc.Trees())
 	if !ok {
 		return nil
 	}
@@ -257,7 +257,7 @@ func references(doc view, offset int, includeDecl bool) []protocol.Location {
 // reference, across every file of the workspace. It returns nil if there is no
 // symbol under the cursor or newName is not a valid identifier.
 func rename(doc view, offset int, newName string) *protocol.WorkspaceEdit {
-	occ, ok := occurrenceAt(doc, offset, positionedTrees(doc.AST().Concrete().Tree()))
+	occ, ok := occurrenceAt(doc, offset, doc.Trees())
 	if !ok || !isIdentifier(newName) {
 		return nil
 	}
@@ -288,7 +288,7 @@ func rename(doc view, offset int, newName string) *protocol.WorkspaceEdit {
 // occurrencesOf rendered for the in-file "highlight all uses" feature.
 func documentHighlights(doc view, offset int) []protocol.DocumentHighlight {
 	buf := doc.Buffer()
-	trees := positionedTrees(doc.AST().Concrete().Tree())
+	trees := doc.Trees()
 
 	occ, ok := occurrenceAt(doc, offset, trees)
 	if !ok {
@@ -319,7 +319,7 @@ func documentHighlights(doc view, offset int) []protocol.DocumentHighlight {
 // prepareRename reports the range of the identifier under the cursor so the
 // editor can offer to rename it, pre-filled with the current name.
 func prepareRename(doc view, offset int) *protocol.PrepareRenameResult {
-	trees := positionedTrees(doc.AST().Concrete().Tree())
+	trees := doc.Trees()
 	occ, ok := occurrenceAt(doc, offset, trees)
 	if !ok {
 		return nil
