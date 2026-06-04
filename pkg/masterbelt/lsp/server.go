@@ -12,9 +12,10 @@
 // re-lowers, and re-analyzes only what it touched.
 //
 // Implemented features: lifecycle, incremental text sync, push diagnostics
-// (lexer, parser, and semantic), document symbols, formatting, semantic-token
-// highlighting, hover, and go-to-definition. The protocol plumbing (JSON-RPC
-// over stdio, request routing) is provided by github.com/owenrumney/go-lsp.
+// (lexer, parser, and semantic), completion, document symbols, formatting,
+// semantic-token highlighting, hover, go-to-definition, find-references, and
+// rename. The protocol plumbing (JSON-RPC over stdio, request routing) is
+// provided by github.com/owenrumney/go-lsp.
 package lsp
 
 import (
@@ -51,6 +52,7 @@ func (s *Server) Initialize(_ context.Context, _ *protocol.InitializeParams) (*p
 				OpenClose: new(true),
 				Change:    protocol.SyncIncremental,
 			},
+			CompletionProvider:         &protocol.CompletionOptions{},
 			DocumentSymbolProvider:     new(true),
 			DocumentFormattingProvider: new(true),
 			HoverProvider:              new(true),
@@ -130,6 +132,18 @@ func (s *Server) DidClose(ctx context.Context, params *protocol.DidCloseTextDocu
 		})
 	}
 	return nil
+}
+
+// Completion returns the value-namespace candidates at the cursor.
+func (s *Server) Completion(_ context.Context, params *protocol.CompletionParams) (*protocol.CompletionList, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	doc := s.docs[params.TextDocument.URI]
+	if doc == nil {
+		return nil, nil
+	}
+	return completion(doc, fromPosition(doc.Buffer(), params.Position)), nil
 }
 
 // DocumentSymbol returns the document's outline.
