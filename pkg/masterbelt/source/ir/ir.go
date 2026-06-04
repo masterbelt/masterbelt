@@ -49,6 +49,14 @@ type IntLiteral struct {
 
 func (*IntLiteral) value() {}
 
+// StringLiteral is a string literal. Value is the decoded string; the evaluated
+// value lives on Const.Eval (the same string).
+type StringLiteral struct {
+	Value string
+}
+
+func (*StringLiteral) value() {}
+
 // BoolLiteral is a boolean literal, true or false.
 type BoolLiteral struct {
 	Value bool

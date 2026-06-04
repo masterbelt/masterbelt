@@ -119,6 +119,8 @@ func (bc bodyChecker) infer(e ast.Expr, scope bodyScope) ir.Type {
 		return scope.self
 	case *ast.IntLit:
 		return &ir.Builtin{Name: "int"}
+	case *ast.StringLit:
+		return &ir.Builtin{Name: "string"}
 	case *ast.BoolLit:
 		return &ir.Builtin{Name: "bool"}
 	case *ast.NullLit:
@@ -282,6 +284,8 @@ func (r *typeResolver) lowerBodyExpr(e ast.Expr, params, tscope map[string]bool)
 		return &ir.SelfValue{}
 	case *ast.IntLit:
 		return &ir.IntLiteral{Text: e.Text}
+	case *ast.StringLit:
+		return &ir.StringLiteral{Value: e.Value}
 	case *ast.BoolLit:
 		return &ir.BoolLiteral{Value: e.Value}
 	case *ast.NullLit:

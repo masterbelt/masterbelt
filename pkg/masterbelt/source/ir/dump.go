@@ -94,6 +94,8 @@ func dumpValue(v Value) string {
 	switch x := v.(type) {
 	case *IntLiteral:
 		return fmt.Sprintf("IntLiteral %q", x.Text)
+	case *StringLiteral:
+		return fmt.Sprintf("StringLiteral %q", x.Value)
 	case *BoolLiteral:
 		return fmt.Sprintf("BoolLiteral %v", x.Value)
 	case *Reference:

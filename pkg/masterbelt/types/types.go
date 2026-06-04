@@ -88,10 +88,14 @@ func Fits(reg *builtin.Registry, t ir.Type, v *big.Int) bool {
 }
 
 // Compatible reports whether an annotation and an initializer's inferred type
-// agree in kind — both integer or both boolean.
+// agree: both integer (so the default int adapts to any sized integer), both
+// boolean, or the same concrete type — the last of which lets a string (or any
+// non-numeric primitive) annotation accept a matching initializer. The value
+// range is checked separately (Fits).
 func Compatible(reg *builtin.Registry, annotation, expr ir.Type) bool {
 	return (IsInteger(reg, annotation) && IsInteger(reg, expr)) ||
-		(IsBoolean(reg, annotation) && IsBoolean(reg, expr))
+		(IsBoolean(reg, annotation) && IsBoolean(reg, expr)) ||
+		sameBuiltin(annotation, expr) || sameNamed(annotation, expr)
 }
 
 // Assignable reports whether a value of type from may be used where type to is

@@ -104,6 +104,46 @@ func TestValueEvaluation(t *testing.T) {
 	}
 }
 
+func TestStringLiteral(t *testing.T) {
+	m, diags := analyze("const X = \"label\"\npub const Y: string = \"\\u{1F389}\"\n")
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	// Inferred and annotated string constants both have type string.
+	if m.Consts[0].Type.String() != "string" || m.Consts[1].Type.String() != "string" {
+		t.Fatalf("types = %s/%s, want string/string", m.Consts[0].Type, m.Consts[1].Type)
+	}
+	// The literal is lowered to a StringLiteral value and folds to a string
+	// constant holding the decoded text.
+	lit, ok := m.Consts[0].Value.(*ir.StringLiteral)
+	if !ok || lit.Value != "label" {
+		t.Errorf("X value = %v, want StringLiteral \"label\"", m.Consts[0].Value)
+	}
+	if ev := m.Consts[0].Eval; ev == nil || ev.Kind != ir.ConstString || ev.Str != "label" {
+		t.Errorf("X eval = %v, want string constant \"label\"", ev)
+	}
+	if ev := m.Consts[1].Eval; ev == nil || ev.Kind != ir.ConstString || ev.Str != "🎉" {
+		t.Errorf("Y eval = %v, want string constant \"🎉\"", ev)
+	}
+}
+
+func TestStringAnnotationMismatch(t *testing.T) {
+	// A string initializer under a non-string annotation (and vice versa) is a
+	// type mismatch; a string under a string annotation is fine.
+	for _, src := range []string{
+		"const x: int8 = \"no\"\n",
+		"const x: string = 1\n",
+		"const x: bool = \"no\"\n",
+	} {
+		if _, diags := analyze(src); !hasCode(diags, CodeTypeMismatch) {
+			t.Errorf("%q: want type_mismatch, got %v", src, codes(diags))
+		}
+	}
+	if _, diags := analyze("const x: string = \"yes\"\n"); hasCode(diags, CodeTypeMismatch) {
+		t.Errorf("string = string should not mismatch, got %v", codes(diags))
+	}
+}
+
 func TestConstantOverflow(t *testing.T) {
 	_, diags := analyze("const X: int8 = 1000\n")
 	if got := codes(diags); len(got) != 1 || got[0] != CodeConstantOverflow {

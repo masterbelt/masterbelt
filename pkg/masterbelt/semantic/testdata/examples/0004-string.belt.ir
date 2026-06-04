@@ -1,0 +1,25 @@
+Module
+  Const "LabelName" pub
+    type string
+    value StringLiteral "label"
+    eval "label"
+  Const "Greeting" pub
+    type string
+    value StringLiteral "Hello, \"world\"!\n"
+    eval "Hello, \"world\"!\n"
+  Const "Control" pub
+    type string
+    value StringLiteral "a\tb\r\n\x00"
+    eval "a\tb\r\n\x00"
+  Const "Unicode" pub
+    type string
+    value StringLiteral "日本語 🎉"
+    eval "日本語 🎉"
+  Const "Party" pub
+    type string
+    value StringLiteral "🎉"
+    eval "🎉"
+  Const "Empty" pub
+    type string
+    value StringLiteral ""
+    eval ""

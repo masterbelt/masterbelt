@@ -236,6 +236,8 @@ func evalExpr(e ast.Expr, q queries) *ir.Constant {
 			return nil
 		}
 		return ir.IntConstant(n)
+	case *ast.StringLit:
+		return ir.StringConstant(e.Value)
 	case *ast.BoolLit:
 		return ir.BoolConstant(e.Value)
 	case *ast.Identifier:
@@ -299,6 +301,8 @@ func lowerValue(e ast.Expr, irOf map[*ast.ConstDecl]*ir.Const, q queries) ir.Val
 	switch e := e.(type) {
 	case *ast.IntLit:
 		return &ir.IntLiteral{Text: e.Text}
+	case *ast.StringLit:
+		return &ir.StringLiteral{Value: e.Value}
 	case *ast.BoolLit:
 		return &ir.BoolLiteral{Value: e.Value}
 	case *ast.Identifier:

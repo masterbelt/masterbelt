@@ -61,6 +61,8 @@ func Expr(e ast.Expr, env Env) ir.Type {
 	switch e := e.(type) {
 	case *ast.IntLit:
 		return &ir.Builtin{Name: "int"}
+	case *ast.StringLit:
+		return &ir.Builtin{Name: "string"}
 	case *ast.BoolLit:
 		return &ir.Builtin{Name: "bool"}
 	case *ast.Identifier:
@@ -94,6 +96,8 @@ func Check(e ast.Expr, env Env, report func(node ast.Node, method, operands stri
 	switch e := e.(type) {
 	case *ast.IntLit:
 		return &ir.Builtin{Name: "int"}
+	case *ast.StringLit:
+		return &ir.Builtin{Name: "string"}
 	case *ast.BoolLit:
 		return &ir.Builtin{Name: "bool"}
 	case *ast.Identifier:
