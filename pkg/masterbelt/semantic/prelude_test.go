@@ -20,12 +20,8 @@ func TestLoadPrelude(t *testing.T) {
 		byName[d.Name] = d
 	}
 
-	// Every registry primitive is declared in the prelude as a builtin (null
-	// excepted: it is a keyword, provided lexically rather than declared).
+	// Every registry primitive is declared in the prelude as a builtin.
 	for _, name := range builtin.Default().Names() {
-		if name == "null" {
-			continue
-		}
 		d, ok := byName[name]
 		if !ok {
 			t.Errorf("prelude is missing registry primitive %q", name)

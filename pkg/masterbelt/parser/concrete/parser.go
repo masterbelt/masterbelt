@@ -287,7 +287,9 @@ func (p *parser) parseTypeDecl(lead []cst.Green) *cst.Node {
 	p.skipTrivia(&children)
 	children = append(children, p.bump()) // "type" (guaranteed by the dispatcher)
 
-	if p.peekSignificant() == token.Ident {
+	// The declared name is an identifier, or the null keyword — null is a
+	// builtin type and may be declared (type null = builtin).
+	if k := p.peekSignificant(); k == token.Ident || k == token.Null {
 		p.skipTrivia(&children)
 		children = append(children, p.bump()) // the declared name
 	} else {

@@ -271,8 +271,9 @@ func lowerTypeDecl(t cst.Tree, buf source.Buffer) *ast.TypeDecl {
 				public = true
 			case token.DocComment:
 				doc = append(doc, docText(child.Text(buf)))
-			case token.Ident:
-				// The only direct Ident child is the declared name; generic
+			case token.Ident, token.Null:
+				// The declared name: an identifier, or the null keyword (null is
+				// a builtin type, declarable as `type null = builtin`). Generic
 				// parameters and the body's names are nested in their own nodes.
 				name = child.Text(buf)
 			}

@@ -47,12 +47,6 @@ func validatePrelude(reg *builtin.Registry, defs []*ir.TypeDef) error {
 	}
 
 	for _, name := range reg.Names() {
-		// null is a keyword, not an identifier, so it cannot be declared as
-		// `type null = builtin`; like self it is provided by the registry and
-		// recognized lexically rather than through the prelude.
-		if name == "null" {
-			continue
-		}
 		d, ok := declared[name]
 		if !ok {
 			return fmt.Errorf("prelude: registry primitive %q is not declared", name)

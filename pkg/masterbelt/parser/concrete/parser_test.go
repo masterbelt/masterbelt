@@ -156,6 +156,7 @@ func TestParseTypeDeclChildren(t *testing.T) {
 		{"record", "type Rec = {\n  a: int8\n}\n", []cst.Kind{cst.RecordType}},
 		{"func type", "type M<T, R> = fn(src: T): R\n", []cst.Kind{cst.GenericParams, cst.FuncType}},
 		{"impl", "type Lvl = int8 impl {\n  pub inc(): self {\n    return self\n  }\n}\n", []cst.Kind{cst.TypeName, cst.ImplBlock}},
+		{"null name", "pub type null = builtin\n", []cst.Kind{cst.BuiltinType}}, // null may be declared
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
