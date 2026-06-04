@@ -1,0 +1,8 @@
+const MaxLevel = 100
+const MinLevel = 0
+
+/// The level range is not empty.
+assert MaxLevel > MinLevel
+assert MinLevel == 0
+assert MaxLevel - MinLevel == 100
+assert MaxLevel > 0 && !(MinLevel > 0)

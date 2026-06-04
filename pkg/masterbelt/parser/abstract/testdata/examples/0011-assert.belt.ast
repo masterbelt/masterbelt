@@ -1,0 +1,7 @@
+File
+  ConstDecl
+    name "MaxLevel"
+    value IntLit "100"
+  ConstDecl
+    name "MinLevel"
+    value IntLit "0"
