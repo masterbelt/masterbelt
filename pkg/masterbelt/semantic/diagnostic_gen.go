@@ -9,19 +9,38 @@ import (
 )
 
 const (
+	CodeAmbiguousImport       diagnostic.Code = "masterbelt.semantic.ambiguous_import"
 	CodeConstantOverflow      diagnostic.Code = "masterbelt.semantic.constant_overflow"
+	CodeCyclicModule          diagnostic.Code = "masterbelt.semantic.cyclic_module"
 	CodeCyclicReference       diagnostic.Code = "masterbelt.semantic.cyclic_reference"
 	CodeDivisionByZero        diagnostic.Code = "masterbelt.semantic.division_by_zero"
 	CodeDuplicateDeclaration  diagnostic.Code = "masterbelt.semantic.duplicate_declaration"
 	CodeInvalidOperation      diagnostic.Code = "masterbelt.semantic.invalid_operation"
 	CodeLambdaArityMismatch   diagnostic.Code = "masterbelt.semantic.lambda_arity_mismatch"
+	CodeNotExported           diagnostic.Code = "masterbelt.semantic.not_exported"
 	CodeTypeMismatch          diagnostic.Code = "masterbelt.semantic.type_mismatch"
 	CodeUndefinedName         diagnostic.Code = "masterbelt.semantic.undefined_name"
 	CodeUninferableCollection diagnostic.Code = "masterbelt.semantic.uninferable_collection"
 	CodeUninferableParameter  diagnostic.Code = "masterbelt.semantic.uninferable_parameter"
 	CodeUninferableResult     diagnostic.Code = "masterbelt.semantic.uninferable_result"
+	CodeUnknownMember         diagnostic.Code = "masterbelt.semantic.unknown_member"
 	CodeUnknownType           diagnostic.Code = "masterbelt.semantic.unknown_type"
+	CodeUseNotFound           diagnostic.Code = "masterbelt.semantic.use_not_found"
 )
+
+func newAmbiguousImportDiagnostic(offset int, width int, name string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"name": diagnostic.Str(name),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeAmbiguousImport,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeAmbiguousImport, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
 
 func newConstantOverflowDiagnostic(offset int, width int, value string, typ string) diagnostic.Diagnostic {
 	fields := map[string]fmt.Stringer{
@@ -32,6 +51,20 @@ func newConstantOverflowDiagnostic(offset int, width int, value string, typ stri
 		Severity: diagnostic.Error,
 		Code:     CodeConstantOverflow,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeConstantOverflow, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newCyclicModuleDiagnostic(offset int, width int, path string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"path": diagnostic.Str(path),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeCyclicModule,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeCyclicModule, fields),
 		Fields:   fields,
 		Offset:   offset,
 		Width:    width,
@@ -107,6 +140,21 @@ func newLambdaArityMismatchDiagnostic(offset int, width int, actual int, expecte
 	}
 }
 
+func newNotExportedDiagnostic(offset int, width int, name string, path string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"name": diagnostic.Str(name),
+		"path": diagnostic.Str(path),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeNotExported,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeNotExported, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
 func newTypeMismatchDiagnostic(offset int, width int, actual string, expected string) diagnostic.Diagnostic {
 	fields := map[string]fmt.Stringer{
 		"actual":   diagnostic.Str(actual),
@@ -172,6 +220,21 @@ func newUninferableResultDiagnostic(offset int, width int) diagnostic.Diagnostic
 	}
 }
 
+func newUnknownMemberDiagnostic(offset int, width int, name string, namespace string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"name":      diagnostic.Str(name),
+		"namespace": diagnostic.Str(namespace),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeUnknownMember,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeUnknownMember, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
 func newUnknownTypeDiagnostic(offset int, width int, name string) diagnostic.Diagnostic {
 	fields := map[string]fmt.Stringer{
 		"name": diagnostic.Str(name),
@@ -180,6 +243,20 @@ func newUnknownTypeDiagnostic(offset int, width int, name string) diagnostic.Dia
 		Severity: diagnostic.Error,
 		Code:     CodeUnknownType,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeUnknownType, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newUseNotFoundDiagnostic(offset int, width int, path string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"path": diagnostic.Str(path),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeUseNotFound,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeUseNotFound, fields),
 		Fields:   fields,
 		Offset:   offset,
 		Width:    width,

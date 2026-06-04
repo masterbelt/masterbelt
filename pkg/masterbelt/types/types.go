@@ -81,12 +81,26 @@ func Lookup(reg *builtin.Registry, name string) (ir.Type, bool) {
 // Fits reports whether v is within the value range of type t. Non-integer types
 // — and integer types without a fixed range — accept any value.
 func Fits(reg *builtin.Registry, t ir.Type, v *big.Int) bool {
-	if b, ok := t.(*ir.Builtin); ok {
-		if n, ok := reg.Native(b.Name); ok {
-			return n.Fits(v)
+	seen := map[*ir.TypeDef]bool{}
+	for {
+		switch x := t.(type) {
+		case *ir.Builtin:
+			if n, ok := reg.Native(x.Name); ok {
+				return n.Fits(v)
+			}
+			return true
+		case *ir.Named:
+			// A named type's range is its underlying type's; the visited set
+			// keeps a self-referential definition finite.
+			if x.Def == nil || x.Def.Body == nil || seen[x.Def] {
+				return true
+			}
+			seen[x.Def] = true
+			t = x.Def.Body
+		default:
+			return true
 		}
 	}
-	return true
 }
 
 // Assignable reports whether a value of type from may be used where type to is

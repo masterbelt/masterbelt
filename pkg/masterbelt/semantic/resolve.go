@@ -24,22 +24,28 @@ func unknownTypeReporter(at func(ast.Node) span, diags *diagnostic.List) func(as
 }
 
 // resolveTypes resolves the file's type declarations into ir.TypeDefs, in source
-// order. A type reference resolves against the builtin registry (the primitives)
-// and the other declarations in the file, so a declaration may refer to a type
-// defined later in the file.
+// order. A type reference resolves against the builtin registry (the primitives),
+// the other declarations in the file (so a declaration may refer to a type
+// defined later in the file), and extern — the file's imported type definitions,
+// which the file's own declarations shadow.
 //
 // Only the declarations' structure is resolved: the generic parameters and their
 // bounds, the defined body type, and each method's signature. Method bodies are
 // lowered to IR here (lower.Body) but not type-checked.
-func resolveTypes(file *ast.File, reg *builtin.Registry, at func(ast.Node) span, diags *diagnostic.List) []*ir.TypeDef {
+func resolveTypes(file *ast.File, reg *builtin.Registry, at func(ast.Node) span, diags *diagnostic.List, extern map[string]*ir.TypeDef) []*ir.TypeDef {
 	if len(file.Types) == 0 {
 		return nil
 	}
 
 	// First pass: a definition per declaration, by name, so references (including
 	// forward ones) bind before any body is resolved. A redeclared name keeps the
-	// first definition and is reported.
-	defs := make(map[string]*ir.TypeDef, len(file.Types))
+	// first definition and is reported; shadowing an imported name is not a
+	// redeclaration.
+	defs := make(map[string]*ir.TypeDef, len(file.Types)+len(extern))
+	for name, def := range extern {
+		defs[name] = def
+	}
+	own := make(map[string]bool, len(file.Types))
 	out := make([]*ir.TypeDef, len(file.Types))
 	for i, td := range file.Types {
 		def := &ir.TypeDef{Name: td.Name, Public: td.Public, Doc: td.Doc}
@@ -47,12 +53,13 @@ func resolveTypes(file *ast.File, reg *builtin.Registry, at func(ast.Node) span,
 		if td.Name == "" {
 			continue
 		}
-		if _, dup := defs[td.Name]; dup {
+		if own[td.Name] {
 			if at != nil && diags != nil {
 				s := at(td)
 				diags.Add(newDuplicateDeclarationDiagnostic(s.offset, s.width, td.Name))
 			}
 		} else {
+			own[td.Name] = true
 			defs[td.Name] = def
 		}
 	}

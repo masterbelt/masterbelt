@@ -25,6 +25,11 @@ masterbelt.semantic.uninferable_collection,このコレクションリテラル�
 masterbelt.semantic.uninferable_result,この関数リテラルの結果型を推論できません。注釈を付けるか値を返してください
 masterbelt.semantic.uninferable_parameter,パラメータ {name} の型を推論できません。型注釈を付けてください
 masterbelt.semantic.lambda_arity_mismatch,関数リテラルのパラメータが {actual} 個ありますが、{expected} 個が必要です
+masterbelt.semantic.use_not_found,インポートするファイルが見つかりません: {path}
+masterbelt.semantic.not_exported,{path} は {name} を公開していません
+masterbelt.semantic.unknown_member,{namespace} に公開メンバ {name} はありません
+masterbelt.semantic.ambiguous_import,{name} は曖昧です。複数のインポートから到来しています
+masterbelt.semantic.cyclic_module,{path} を経由するインポートサイクルです
 project.config.missing,masterbelt.toml がこのディレクトリにも親ディレクトリにも見つかりません
 project.config.invalid,不正な masterbelt.toml: {detail}
 project.config.missing_entry,masterbelt.toml に entry が指定されていません

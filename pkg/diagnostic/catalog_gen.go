@@ -119,12 +119,28 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "unexpected token: " + f["kind"].String()
 		}
 	},
+	"masterbelt.semantic.ambiguous_import": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return f["name"].String() + " は曖昧です。複数のインポートから到来しています"
+		default:
+			return f["name"].String() + " is ambiguous; it arrives from more than one import"
+		}
+	},
 	"masterbelt.semantic.constant_overflow": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "定数 " + f["value"].String() + " は " + f["typ"].String() + " に収まりません"
 		default:
 			return "constant " + f["value"].String() + " overflows " + f["typ"].String()
+		}
+	},
+	"masterbelt.semantic.cyclic_module": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return f["path"].String() + " を経由するインポートサイクルです"
+		default:
+			return "import cycle through " + f["path"].String()
 		}
 	},
 	"masterbelt.semantic.cyclic_reference": func(loc Locale, f map[string]fmt.Stringer) string {
@@ -167,6 +183,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "function literal has " + f["actual"].String() + " parameters; " + f["expected"].String() + " expected"
 		}
 	},
+	"masterbelt.semantic.not_exported": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return f["path"].String() + " は " + f["name"].String() + " を公開していません"
+		default:
+			return f["path"].String() + " does not export " + f["name"].String()
+		}
+	},
 	"masterbelt.semantic.type_mismatch": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
@@ -207,12 +231,28 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "cannot infer this function literal's result type; annotate it or return a value"
 		}
 	},
+	"masterbelt.semantic.unknown_member": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return f["namespace"].String() + " に公開メンバ " + f["name"].String() + " はありません"
+		default:
+			return f["namespace"].String() + " has no exported member " + f["name"].String()
+		}
+	},
 	"masterbelt.semantic.unknown_type": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "未知の型: " + f["name"].String()
 		default:
 			return "unknown type: " + f["name"].String()
+		}
+	},
+	"masterbelt.semantic.use_not_found": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "インポートするファイルが見つかりません: " + f["path"].String()
+		default:
+			return "imported file not found: " + f["path"].String()
 		}
 	},
 	"project.config.entry_not_found": func(loc Locale, f map[string]fmt.Stringer) string {

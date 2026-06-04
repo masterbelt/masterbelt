@@ -51,7 +51,7 @@ func LoadPrelude(reg *builtin.Registry) ([]*ir.TypeDef, error) {
 		if len(diags) > 0 {
 			return nil, fmt.Errorf("prelude %s: %s", src.Name, diags[0].Message)
 		}
-		defs = append(defs, resolveTypes(doc.File(), reg, nil, nil)...)
+		defs = append(defs, resolveTypes(doc.File(), reg, nil, nil, nil)...)
 	}
 	if err := validatePrelude(reg, defs); err != nil {
 		return nil, err

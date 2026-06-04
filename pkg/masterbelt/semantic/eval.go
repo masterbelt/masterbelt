@@ -17,8 +17,11 @@ type evalEnv struct {
 }
 
 func (e evalEnv) Resolve(id *ast.Identifier) *ast.ConstDecl { return e.q.resolve(e.file, id) }
-func (e evalEnv) ValueOf(decl *ast.ConstDecl) *ir.Constant  { return e.q.valueOf(decl) }
-func (e evalEnv) Registry() *builtin.Registry               { return e.q.registry() }
+func (e evalEnv) ResolveMember(m *ast.MemberExpr) *ast.ConstDecl {
+	return e.q.resolveMember(e.file, m)
+}
+func (e evalEnv) ValueOf(decl *ast.ConstDecl) *ir.Constant { return e.q.valueOf(decl) }
+func (e evalEnv) Registry() *builtin.Registry              { return e.q.registry() }
 
 // computeValue is the evaluation rule, shared by both query implementations.
 // The file is the one decl sits in.

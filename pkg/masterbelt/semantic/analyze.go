@@ -47,12 +47,34 @@ type queries interface {
 	// a reference in an unedited declaration is a stable pointer, so editing an
 	// unrelated constant does not invalidate it.
 	resolve(file FileID, id *ast.Identifier) *ast.ConstDecl
+	// ambiguousImport reports whether the identifier's name arrived from two or
+	// more imports with distinct targets — harmless until used, then reported
+	// at the reference.
+	ambiguousImport(file FileID, id *ast.Identifier) bool
+	// resolveMember returns the declaration a namespace member access
+	// (geo.Origin) refers to, or nil when the receiver names no namespace or
+	// the member is not among the target's exported values.
+	resolveMember(file FileID, m *ast.MemberExpr) *ast.ConstDecl
 	// typeOf returns a constant's type (ir.Invalid when undeterminable).
 	typeOf(decl *ast.ConstDecl) ir.Type
 	// valueOf returns a constant's evaluated value, or nil when it cannot be
 	// evaluated (missing initializer, undefined reference, cycle, type error,
 	// or division by zero).
 	valueOf(decl *ast.ConstDecl) *ir.Constant
+	// typeDefs returns a file's resolved type definitions in source order —
+	// the very objects Named types point at, shared by module assembly and
+	// annotation resolution so type identity never forks.
+	typeDefs(file FileID) []*ir.TypeDef
+	// universe returns the named type definitions a file's type annotations
+	// resolve in: its own declarations shadowing its imported ones.
+	universe(file FileID) map[string]*ir.TypeDef
+	// exportsOf returns a file's public surface.
+	exportsOf(file FileID) exports
+	// importsOf returns the bindings a file's use declarations introduce.
+	importsOf(file FileID) importTable
+	// usesOf returns where the project layer resolved a file's use paths; a
+	// use absent from the table resolved to no file.
+	usesOf(file FileID) map[*ast.UseDecl]FileID
 	// registry returns the builtin registry the analysis types and evaluates
 	// against — the source of primitive types, their value ranges, and the
 	// native implementations of their operator methods.
@@ -69,8 +91,12 @@ type typeEnv struct {
 }
 
 func (e typeEnv) Resolve(id *ast.Identifier) *ast.ConstDecl { return e.q.resolve(e.file, id) }
-func (e typeEnv) TypeOf(decl *ast.ConstDecl) ir.Type        { return e.q.typeOf(decl) }
-func (e typeEnv) Registry() *builtin.Registry               { return e.q.registry() }
+func (e typeEnv) ResolveMember(m *ast.MemberExpr) *ast.ConstDecl {
+	return e.q.resolveMember(e.file, m)
+}
+func (e typeEnv) TypeOf(decl *ast.ConstDecl) ir.Type { return e.q.typeOf(decl) }
+func (e typeEnv) Universe() map[string]*ir.TypeDef   { return e.q.universe(e.file) }
+func (e typeEnv) Registry() *builtin.Registry        { return e.q.registry() }
 
 // exprSink wires the checking walk's findings to their diagnostics. The
 // Checked stream is left unset — the const path hooks it to the eval-based
@@ -105,27 +131,46 @@ func exprSink(at func(ast.Node) span, diags *diagnostic.List) *infer.Sink {
 // reference analysis and the oracle for the incremental Document.
 func Analyze(doc *abstract.Document) (*ir.Module, []diagnostic.Diagnostic) {
 	file := doc.File()
-	return assemble(soleFileID, file, positionsOf(doc.Concrete().Tree()), newDirectQueries(file, universe()))
+	shells := constShells(map[FileID]*ast.File{soleFileID: file})
+	return assemble(soleFileID, file, positionsOf(doc.Concrete().Tree()), newDirectQueries(file, universe()), shells)
+}
+
+// constShells creates the identity ir.Const for every declaration across the
+// program — references, including cross-file ones, bind to the same objects
+// the owning module publishes, which is what makes the IR one pointer graph.
+func constShells(files map[FileID]*ast.File) map[*ast.ConstDecl]*ir.Const {
+	shells := map[*ast.ConstDecl]*ir.Const{}
+	for _, f := range files {
+		if f == nil {
+			continue
+		}
+		for _, decl := range f.Decls {
+			shells[decl] = &ir.Const{Name: decl.Name, Public: decl.Public, Doc: decl.Doc, Syntax: decl}
+		}
+	}
+	return shells
 }
 
 // assemble builds one file's IR module and semantic diagnostics from its AST,
 // using q for the resolution and typing facts; fileID names the file within
-// the program, scoping its identifier resolution. It is shared by the
-// reference and incremental analyzers, so they cannot diverge.
-func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q queries) (*ir.Module, []diagnostic.Diagnostic) {
+// the program, scoping its identifier resolution, and shells holds the
+// program-wide IR constants (this file's and every importable file's). It is
+// shared by the reference and incremental analyzers, so they cannot diverge.
+func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q queries, shells map[*ast.ConstDecl]*ir.Const) (*ir.Module, []diagnostic.Diagnostic) {
 	diags := &diagnostic.List{}
 	at := func(n ast.Node) span { return spanOf(positions, n) }
 	env := typeEnv{q: q, file: fileID}
 	reg := q.registry()
 
-	// Create the IR constants first so references can bind to them.
+	// The module's constants are this file's shells, in source order.
 	module := &ir.Module{}
-	irOf := make(map[*ast.ConstDecl]*ir.Const, len(file.Decls))
 	for _, decl := range file.Decls {
-		c := &ir.Const{Name: decl.Name, Public: decl.Public, Doc: decl.Doc, Syntax: decl}
-		irOf[decl] = c
-		module.Consts = append(module.Consts, c)
+		module.Consts = append(module.Consts, shells[decl])
 	}
+
+	// The use declarations' own problems: imports that resolved to no file,
+	// selective names the target does not export, and module cycles.
+	checkUses(fileID, file, q, at, diags)
 
 	// Redeclarations of the same name.
 	seen := map[string]bool{}
@@ -143,31 +188,48 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 	cyclic := cyclicDecls(fileID, file, q)
 
 	for _, decl := range file.Decls {
-		c := irOf[decl]
-		c.Value = lower.Value(decl.Value, constBinder{q: q, file: fileID, irOf: irOf})
+		c := shells[decl]
+		c.Value = lower.Value(decl.Value, constBinder{q: q, file: fileID, irOf: shells})
 		c.Type = q.typeOf(decl)
 		c.Eval = q.valueOf(decl)
 
 		// Resolve the annotation with reporting enabled, so an unknown type
 		// name anywhere in it (e.g. list<Bogus>) is diagnosed at its own node.
-		// A file's own type declarations are not visible to a const annotation,
-		// so the resolver is given no file defs.
+		// The annotation resolves in the file's universe: its own type
+		// declarations shadowing its imported ones, over the registry.
 		annType := ir.Invalid
 		if decl.Type != nil {
-			r := &infer.TypeResolver{Reg: reg, Report: unknownTypeReporter(at, diags)}
+			r := &infer.TypeResolver{Reg: reg, Defs: q.universe(fileID), Report: typeNameReporter(fileID, q, at, diags)}
 			annType = r.ResolveType(decl.Type, nil)
 		}
 
-		// Undefined references: every value-position identifier that resolves to
-		// no declaration (method names are not value references, so walkIdents
-		// skips them).
+		// Undefined references: every value-position identifier that resolves
+		// to no declaration — distinguishing names that failed because two or
+		// more imports claimed them (ambiguous_import) — and every namespace
+		// member access whose member the target does not export
+		// (unknown_member). Method names are not value references; the walk
+		// skips them, and it treats a namespace access as one unit, so its
+		// receiver is never reported as an undefined value.
 		if decl.Value != nil {
-			ast.WalkValueIdents(decl.Value, func(id *ast.Identifier) {
-				if id.Name != "" && q.resolve(fileID, id) == nil {
+			walkRefs(fileID, decl.Value, q,
+				func(id *ast.Identifier) {
+					if id.Name == "" || q.resolve(fileID, id) != nil {
+						return
+					}
 					s := at(id)
+					if q.ambiguousImport(fileID, id) {
+						diags.Add(newAmbiguousImportDiagnostic(s.offset, s.width, id.Name))
+						return
+					}
 					diags.Add(newUndefinedNameDiagnostic(s.offset, s.width, id.Name))
-				}
-			})
+				},
+				func(m *ast.MemberExpr) {
+					if q.resolveMember(fileID, m) == nil {
+						s := at(m)
+						ns, _ := m.Receiver.(*ast.Identifier)
+						diags.Add(newUnknownMemberDiagnostic(s.offset, s.width, m.Member.Name, ns.Name))
+					}
+				})
 			// One checking walk reports the expression diagnostics: operator
 			// type errors, type mismatches (against the annotation when there
 			// is one, and inside function-literal bodies), and literals whose
@@ -218,11 +280,19 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 		}
 	}
 
-	// Resolve the file's type declarations into the module's type definitions,
-	// then type-check each method body against its declared result type — the
-	// same checking walk the constants use, so a returned function or
-	// collection literal receives the declared result type.
-	module.Types = resolveTypes(file, reg, at, diags)
+	// The module's type definitions come from the memoized query — the same
+	// objects annotations resolved against, so Named identity never forks. The
+	// query resolves silently (its result is reused across revisions, but
+	// diagnostics carry offsets that shift on every edit), so the reporting
+	// pass re-resolves the declarations fresh and discards the definitions.
+	module.Types = q.typeDefs(fileID)
+	extern := make(map[string]*ir.TypeDef)
+	for name, b := range q.importsOf(fileID).types {
+		if !b.ambiguous {
+			extern[name] = b.target
+		}
+	}
+	resolveTypes(file, reg, at, diags, extern)
 	checkMethodBodies(file, reg, module.Types, exprSink(at, diags))
 
 	items := diags.Items()
@@ -253,13 +323,21 @@ func buildSymbols(file *ast.File) map[string]*ast.ConstDecl {
 // graph (an expression may reference several names), so its cycles are found
 // with a coloured depth-first search.
 func cyclicDecls(fileID FileID, file *ast.File, q queries) map[*ast.ConstDecl]bool {
+	// The walk stays within the file: an identifier of another file's decl
+	// would resolve in the wrong scope here, and a cross-file inference cycle
+	// necessarily rides a module cycle, which checkUses reports (the engine's
+	// runtime cycle guard keeps such types finite, as Invalid).
+	own := make(map[*ast.ConstDecl]bool, len(file.Decls))
+	for _, decl := range file.Decls {
+		own[decl] = true
+	}
 	deps := func(decl *ast.ConstDecl) []*ast.ConstDecl {
 		if decl.Type != nil || decl.Value == nil {
 			return nil // an annotation breaks the inheritance chain
 		}
 		var out []*ast.ConstDecl
 		ast.WalkValueIdents(decl.Value, func(id *ast.Identifier) {
-			if t := q.resolve(fileID, id); t != nil {
+			if t := q.resolve(fileID, id); t != nil && own[t] {
 				out = append(out, t)
 			}
 		})
@@ -306,15 +384,129 @@ func cyclicDecls(fileID FileID, file *ast.File, q queries) map[*ast.ConstDecl]bo
 	return cyclic
 }
 
+// typeNameReporter builds the callback the type resolver reports a failed type
+// name through: a name two or more imports claimed is ambiguous_import, any
+// other unresolved name is unknown_type.
+func typeNameReporter(fileID FileID, q queries, at func(ast.Node) span, diags *diagnostic.List) func(ast.Node, string) {
+	ambiguous := map[string]bool{}
+	for name, b := range q.importsOf(fileID).types {
+		if b.ambiguous {
+			ambiguous[name] = true
+		}
+	}
+	return func(node ast.Node, name string) {
+		s := at(node)
+		if ambiguous[name] {
+			diags.Add(newAmbiguousImportDiagnostic(s.offset, s.width, name))
+			return
+		}
+		diags.Add(newUnknownTypeDiagnostic(s.offset, s.width, name))
+	}
+}
+
+// checkUses reports the problems of a file's use declarations: a path that
+// resolved to no file (use_not_found), a selectively imported name the target
+// does not export (not_exported), and an import that can reach back to this
+// file (cyclic_module — reported, Go style, on each edge that closes a cycle).
+func checkUses(fileID FileID, file *ast.File, q queries, at func(ast.Node) span, diags *diagnostic.List) {
+	uses := q.usesOf(fileID)
+	for _, u := range file.Uses {
+		if u.Path == "" {
+			continue // already a parse diagnostic
+		}
+		s := at(u)
+		target, ok := uses[u]
+		if !ok {
+			diags.Add(newUseNotFoundDiagnostic(s.offset, s.width, u.Path))
+			continue
+		}
+		for _, name := range u.Names {
+			exp := q.exportsOf(target)
+			if _, isConst := exp.consts[name]; isConst {
+				continue
+			}
+			if _, isType := exp.types[name]; isType {
+				continue
+			}
+			diags.Add(newNotExportedDiagnostic(s.offset, s.width, name, u.Path))
+		}
+		if reaches(q, target, fileID, map[FileID]bool{}) {
+			diags.Add(newCyclicModuleDiagnostic(s.offset, s.width, u.Path))
+		}
+	}
+}
+
+// reaches reports whether the use graph can reach goal from id.
+func reaches(q queries, id, goal FileID, visited map[FileID]bool) bool {
+	if id == goal {
+		return true
+	}
+	if visited[id] {
+		return false
+	}
+	visited[id] = true
+	for _, next := range q.usesOf(id) {
+		if reaches(q, next, goal, visited) {
+			return true
+		}
+	}
+	return false
+}
+
+// walkRefs visits the value references of an expression: every value-position
+// identifier through onIdent, except that a namespace member access
+// (geo.Origin) is one unit visited through onMember — its receiver names a
+// namespace, not a value. Like ast.WalkValueIdents it does not descend into a
+// FuncLit body (a lambda has its own parameter scope).
+func walkRefs(fileID FileID, e ast.Expr, q queries, onIdent func(*ast.Identifier), onMember func(*ast.MemberExpr)) {
+	switch e := e.(type) {
+	case *ast.Identifier:
+		onIdent(e)
+	case *ast.MemberExpr:
+		if recv, ok := e.Receiver.(*ast.Identifier); ok && isNamespace(fileID, recv, q) {
+			onMember(e)
+			return
+		}
+		walkRefs(fileID, e.Receiver, q, onIdent, onMember)
+	case *ast.CallExpr:
+		walkRefs(fileID, e.Callee, q, onIdent, onMember)
+		for _, a := range e.Arguments {
+			walkRefs(fileID, a, q, onIdent, onMember)
+		}
+	case *ast.CollectionLit:
+		for _, entry := range e.Entries {
+			if entry.Key != nil {
+				walkRefs(fileID, entry.Key, q, onIdent, onMember)
+			}
+			if entry.Value != nil {
+				walkRefs(fileID, entry.Value, q, onIdent, onMember)
+			}
+		}
+	}
+}
+
+// isNamespace reports whether an identifier names a namespace import in its
+// file — and no value, since locals and imported values shadow namespaces.
+func isNamespace(fileID FileID, id *ast.Identifier, q queries) bool {
+	if q.resolve(fileID, id) != nil {
+		return false
+	}
+	_, ok := q.importsOf(fileID).namespaces[id.Name]
+	return ok
+}
+
 // --- direct (reference) query implementation --------------------------------
 
 // directQueries computes the semantic facts directly, memoizing types and values
 // within a single analysis (and guarding against cycles). It carries no state
-// across analyses — that is the incremental engine's job.
+// across analyses — that is the incremental engine's job. This implementation
+// serves a single file (it ignores the file dimension); the multi-file oracle
+// (P-2 M5e) generalizes it.
 type directQueries struct {
 	file      *ast.File
 	reg       *builtin.Registry
 	syms      map[string]*ast.ConstDecl
+	defs      *typeDefs
 	typeMemo  map[*ast.ConstDecl]ir.Type
 	typing    map[*ast.ConstDecl]bool
 	valueMemo map[*ast.ConstDecl]*ir.Constant
@@ -341,11 +533,13 @@ func (d *directQueries) symbols() map[string]*ast.ConstDecl {
 	return d.syms
 }
 
-// resolve serves the oracle's single file regardless of the file asked for;
-// the multi-file Analyze (P-2 M5e) replaces this with a real per-file lookup.
 func (d *directQueries) resolve(_ FileID, id *ast.Identifier) *ast.ConstDecl {
 	return d.symbols()[id.Name]
 }
+
+func (d *directQueries) ambiguousImport(FileID, *ast.Identifier) bool { return false }
+
+func (d *directQueries) resolveMember(FileID, *ast.MemberExpr) *ast.ConstDecl { return nil }
 
 func (d *directQueries) typeOf(decl *ast.ConstDecl) ir.Type {
 	if t, done := d.typeMemo[decl]; done {
@@ -374,3 +568,47 @@ func (d *directQueries) valueOf(decl *ast.ConstDecl) *ir.Constant {
 	d.valueMemo[decl] = v
 	return v
 }
+
+// ownTypeDefs lazily resolves the file's type declarations, silently; the
+// reporting pass in assemble re-resolves them for diagnostics.
+func (d *directQueries) ownTypeDefs() typeDefs {
+	if d.defs == nil {
+		td := typeDefs{byName: map[string]*ir.TypeDef{}, universe: map[string]*ir.TypeDef{}}
+		td.list = resolveTypes(d.file, d.reg, nil, nil, nil)
+		for _, def := range td.list {
+			if def.Name != "" {
+				if _, ok := td.byName[def.Name]; !ok {
+					td.byName[def.Name] = def
+				}
+			}
+		}
+		td.universe = td.byName
+		d.defs = &td
+	}
+	return *d.defs
+}
+
+func (d *directQueries) typeDefs(FileID) []*ir.TypeDef { return d.ownTypeDefs().list }
+
+func (d *directQueries) universe(FileID) map[string]*ir.TypeDef { return d.ownTypeDefs().universe }
+
+func (d *directQueries) exportsOf(FileID) exports {
+	out := exports{consts: map[string]*ast.ConstDecl{}, types: map[string]*ir.TypeDef{}}
+	for _, decl := range d.file.Decls {
+		if decl.Public && decl.Name != "" {
+			if _, ok := out.consts[decl.Name]; !ok {
+				out.consts[decl.Name] = decl
+			}
+		}
+	}
+	for name, def := range d.ownTypeDefs().byName {
+		if def.Public {
+			out.types[name] = def
+		}
+	}
+	return out
+}
+
+func (d *directQueries) importsOf(FileID) importTable { return importTable{} }
+
+func (d *directQueries) usesOf(FileID) map[*ast.UseDecl]FileID { return nil }

@@ -37,8 +37,15 @@ type Env interface {
 	// Resolve returns the declaration a value-position identifier refers to, or
 	// nil if no declaration has that name.
 	Resolve(id *ast.Identifier) *ast.ConstDecl
+	// ResolveMember returns the declaration a namespace member access
+	// (geo.Origin) refers to, or nil when the receiver names no namespace or
+	// the member is not among the namespace's exported values.
+	ResolveMember(m *ast.MemberExpr) *ast.ConstDecl
 	// TypeOf returns a declaration's type (ir.Invalid when undeterminable).
 	TypeOf(decl *ast.ConstDecl) ir.Type
+	// Universe returns the named type definitions annotations resolve in: the
+	// file's own type declarations shadowing its imported ones.
+	Universe() map[string]*ir.TypeDef
 	// Registry returns the builtin registry the program types against.
 	Registry() *builtin.Registry
 }
@@ -49,6 +56,9 @@ type Env interface {
 // walk (exprType) so it sees the scope's own rules.
 type scope interface {
 	registry() *builtin.Registry
+	// universe is the named type definitions annotations resolve in within
+	// this scope.
+	universe() map[string]*ir.TypeDef
 	// leaf types an expression form whose meaning is context-specific — a value
 	// name, self, a field access, a conversion, the null literal — returning
 	// ir.Invalid when the form is not meaningful in this scope.
@@ -58,12 +68,12 @@ type scope interface {
 // Decl is the type rule for a declaration: an annotation gives a concrete type,
 // otherwise the type is inferred from the initializer expression. It reads other
 // declarations' types through env so a memoizing engine can track the
-// dependencies. A file's own type declarations are not visible to a constant
-// annotation, so the annotation resolves against the registry alone; the
-// diagnostic pass resolves it again with reporting enabled.
+// dependencies. The annotation resolves in env's universe — the file's own type
+// declarations and its imports, over the registry — silently; the diagnostic
+// pass resolves it again with reporting enabled.
 func Decl(decl *ast.ConstDecl, env Env) ir.Type {
 	if decl.Type != nil {
-		r := &TypeResolver{Reg: env.Registry()}
+		r := &TypeResolver{Reg: env.Registry(), Defs: env.Universe()}
 		return r.ResolveType(decl.Type, nil)
 	}
 	if decl.Value == nil {
@@ -106,15 +116,14 @@ func exprType(e ast.Expr, s scope) ir.Type {
 
 // funcLitType is the type of a function-literal expression: the Func type built
 // from its declared parameter types and its declared — or, when the annotation
-// is omitted, inferred — result type. The annotations resolve against the
-// registry alone — the same universe a constant annotation resolves against —
-// so a literal whose annotations name only primitives types precisely, while
-// one naming a file-local type leaves that part invalid (as a const annotation
-// would). An omitted result type is synthesized from the body's return values,
-// typed in a funcScope over s; an omitted parameter type is ir.Invalid here
-// (only a checking context can supply it).
+// is omitted, inferred — result type. The annotations resolve in the scope's
+// universe — the same one a constant annotation resolves in — so file-local
+// and imported type names work in a literal's signature exactly as they do on
+// a declaration. An omitted result type is synthesized from the body's return
+// values, typed in a funcScope over s; an omitted parameter type is ir.Invalid
+// here (only a checking context can supply it).
 func funcLitType(e *ast.FuncLit, s scope) ir.Type {
-	r := &TypeResolver{Reg: s.registry()}
+	r := &TypeResolver{Reg: s.registry(), Defs: s.universe()}
 	params := make([]ir.Type, len(e.Params))
 	names := make(map[string]ir.Type, len(e.Params))
 	for i, p := range e.Params {
@@ -162,6 +171,8 @@ type funcScope struct {
 }
 
 func (s funcScope) registry() *builtin.Registry { return s.outer.registry() }
+
+func (s funcScope) universe() map[string]*ir.TypeDef { return s.outer.universe() }
 
 func (s funcScope) leaf(e ast.Expr) ir.Type {
 	if id, ok := e.(*ast.Identifier); ok {
@@ -228,9 +239,18 @@ type constScope struct{ env Env }
 
 func (s constScope) registry() *builtin.Registry { return s.env.Registry() }
 
+func (s constScope) universe() map[string]*ir.TypeDef { return s.env.Universe() }
+
 func (s constScope) leaf(e ast.Expr) ir.Type {
-	if id, ok := e.(*ast.Identifier); ok {
-		if target := s.env.Resolve(id); target != nil {
+	switch e := e.(type) {
+	case *ast.Identifier:
+		if target := s.env.Resolve(e); target != nil {
+			return s.env.TypeOf(target)
+		}
+	case *ast.MemberExpr:
+		// A member access on a namespace import (geo.Origin) inherits the
+		// referenced declaration's type.
+		if target := s.env.ResolveMember(e); target != nil {
 			return s.env.TypeOf(target)
 		}
 	}
@@ -253,6 +273,8 @@ type BodyScope struct {
 func Body(e ast.Expr, s BodyScope) ir.Type { return exprType(e, s) }
 
 func (s BodyScope) registry() *builtin.Registry { return s.Reg }
+
+func (s BodyScope) universe() map[string]*ir.TypeDef { return s.Universe }
 
 func (s BodyScope) leaf(e ast.Expr) ir.Type {
 	switch e := e.(type) {
@@ -519,7 +541,7 @@ func checkFuncLitAgainst(lit *ast.FuncLit, want *ir.Func, s scope, subst map[str
 		sink.arityMismatch(lit, len(lit.Params), len(want.Params))
 		return ir.Invalid
 	}
-	r := &TypeResolver{Reg: reg}
+	r := &TypeResolver{Reg: reg, Defs: s.universe()}
 	params := make([]ir.Type, len(lit.Params))
 	names := make(map[string]ir.Type, len(lit.Params))
 	for i, p := range lit.Params {
@@ -849,7 +871,7 @@ func observe(sink *Sink, fired *bool) *Sink {
 // returns is built from the same walk, so it agrees with funcLitType's (the
 // silent twin over exprType) without typing the body a second time.
 func checkFuncLit(lit *ast.FuncLit, s scope, sink *Sink) ir.Type {
-	r := &TypeResolver{Reg: s.registry()}
+	r := &TypeResolver{Reg: s.registry(), Defs: s.universe()}
 	params := make([]ir.Type, len(lit.Params))
 	names := make(map[string]ir.Type, len(lit.Params))
 	for i, p := range lit.Params {

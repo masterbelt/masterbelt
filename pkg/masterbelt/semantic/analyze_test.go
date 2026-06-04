@@ -69,6 +69,31 @@ func TestDuplicateDeclaration(t *testing.T) {
 	}
 }
 
+func TestLocalTypeAnnotation(t *testing.T) {
+	// A file's own type declarations are visible to its const annotations —
+	// the same universe imported types join (P-2). The annotated constant's
+	// Named type points at the very TypeDef the module publishes.
+	m, diags := analyze("pub type Coin = int8\nconst c: Coin = 1\n")
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if m.Consts[0].Type.String() != "Coin" {
+		t.Errorf("c type = %s, want Coin", m.Consts[0].Type)
+	}
+	named, ok := m.Consts[0].Type.(*ir.Named)
+	if !ok || named.Def != m.Types[0] {
+		t.Errorf("c's Named.Def = %v, want the module's Coin definition", m.Consts[0].Type)
+	}
+}
+
+func TestLocalTypeAnnotationRangeChecked(t *testing.T) {
+	// The named type's underlying range still applies.
+	_, diags := analyze("pub type Coin = int8\nconst c: Coin = 1000\n")
+	if got := codes(diags); len(got) != 1 || got[0] != CodeConstantOverflow {
+		t.Fatalf("codes = %v, want [constant_overflow]", got)
+	}
+}
+
 func TestUnknownType(t *testing.T) {
 	m, diags := analyze("const X: notatype = 1\n")
 	if got := codes(diags); len(got) != 1 || got[0] != CodeUnknownType {

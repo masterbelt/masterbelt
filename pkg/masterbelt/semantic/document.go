@@ -51,11 +51,11 @@ func (d *Document) AST() *abstract.Document { return d.ast }
 // an expression. The lookup goes through the engine, so it reuses the memoized
 // resolution from the last analysis.
 func (d *Document) Resolve(id *ast.Identifier) *ir.Const {
-	decl, _ := d.db.read(resolveKey(soleFileID, id)).(*ast.ConstDecl)
-	if decl == nil {
+	r, _ := d.db.read(resolveKey(soleFileID, id)).(resolution)
+	if r.decl == nil {
 		return nil
 	}
-	return d.byDecl[decl]
+	return d.byDecl[r.decl]
 }
 
 // Buffer returns the underlying editable source buffer.
@@ -126,12 +126,13 @@ func (d *Document) FuncLitTypes() map[*ast.FuncLit]*ir.Func {
 // declarations) and re-done each edit, since diagnostics carry source offsets
 // that shift on every edit and so cannot be memoized.
 func (d *Document) refresh() {
-	d.db.setInput(soleFileID, d.ast.File())
+	d.db.setInput(soleFileID, d.ast.File(), nil)
 	d.module, d.diags = assemble(
 		soleFileID,
 		d.ast.File(),
 		positionsOf(d.ast.Concrete().Tree()),
 		engineQueries{d.db},
+		constShells(map[FileID]*ast.File{soleFileID: d.ast.File()}),
 	)
 	d.byDecl = make(map[*ast.ConstDecl]*ir.Const, len(d.module.Consts))
 	for _, c := range d.module.Consts {

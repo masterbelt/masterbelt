@@ -28,6 +28,10 @@ type Env interface {
 	// Resolve returns the declaration a value-position identifier refers to, or
 	// nil if no declaration has that name.
 	Resolve(id *ast.Identifier) *ast.ConstDecl
+	// ResolveMember returns the declaration a namespace member access
+	// (geo.Origin) refers to, or nil when the receiver names no namespace or
+	// the member is not among the namespace's exported values.
+	ResolveMember(m *ast.MemberExpr) *ast.ConstDecl
 	// ValueOf returns a declaration's evaluated value, or nil when it cannot be
 	// evaluated.
 	ValueOf(decl *ast.ConstDecl) *ir.Constant
@@ -79,6 +83,13 @@ func evalExpr(e ast.Expr, env Env, locals map[string]*ir.Constant) *ir.Constant 
 			return v
 		}
 		if target := env.Resolve(e); target != nil {
+			return env.ValueOf(target)
+		}
+		return nil
+	case *ast.MemberExpr:
+		// A member access on a namespace import (geo.Origin) folds to the
+		// referenced declaration's value.
+		if target := env.ResolveMember(e); target != nil {
 			return env.ValueOf(target)
 		}
 		return nil

@@ -25,6 +25,11 @@ masterbelt.semantic.uninferable_collection,cannot infer the type of this collect
 masterbelt.semantic.uninferable_result,cannot infer this function literal's result type; annotate it or return a value
 masterbelt.semantic.uninferable_parameter,cannot infer the type of parameter {name}; annotate it
 masterbelt.semantic.lambda_arity_mismatch,function literal has {actual} parameters; {expected} expected
+masterbelt.semantic.use_not_found,imported file not found: {path}
+masterbelt.semantic.not_exported,{path} does not export {name}
+masterbelt.semantic.unknown_member,{namespace} has no exported member {name}
+masterbelt.semantic.ambiguous_import,{name} is ambiguous; it arrives from more than one import
+masterbelt.semantic.cyclic_module,import cycle through {path}
 project.config.missing,masterbelt.toml not found in this directory or any parent
 project.config.invalid,invalid masterbelt.toml: {detail}
 project.config.missing_entry,masterbelt.toml does not set entry

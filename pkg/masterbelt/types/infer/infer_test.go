@@ -37,9 +37,11 @@ type stubEnv struct {
 	reg *builtin.Registry
 }
 
-func (e stubEnv) Resolve(id *ast.Identifier) *ast.ConstDecl { return e.res[id] }
-func (e stubEnv) TypeOf(decl *ast.ConstDecl) ir.Type        { return e.typ[decl] }
-func (e stubEnv) Registry() *builtin.Registry               { return e.reg }
+func (e stubEnv) Resolve(id *ast.Identifier) *ast.ConstDecl      { return e.res[id] }
+func (e stubEnv) ResolveMember(m *ast.MemberExpr) *ast.ConstDecl { return nil }
+func (e stubEnv) TypeOf(decl *ast.ConstDecl) ir.Type             { return e.typ[decl] }
+func (e stubEnv) Universe() map[string]*ir.TypeDef               { return nil }
+func (e stubEnv) Registry() *builtin.Registry                    { return e.reg }
 
 func emptyEnv() stubEnv {
 	return stubEnv{
