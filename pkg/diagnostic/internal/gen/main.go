@@ -6,8 +6,10 @@
 // code.csv columns:   code,severity,fields
 //
 //	code     dotted identifier; all but the last segment name the owning
-//	         package (masterbelt.lexer.unexpected_character -> package
-//	         pkg/masterbelt/lexer, code "unexpected_character")
+//	         package by its path under pkg/
+//	         (masterbelt.lexer.unexpected_character -> package
+//	         pkg/masterbelt/lexer, code "unexpected_character";
+//	         project.config.missing -> package pkg/project/config)
 //	severity error | warning | info | hint
 //	fields   space-separated name:type pairs (e.g. "char:rune", "start:int end:int")
 //
@@ -36,11 +38,14 @@ const (
 	// diagnosticPkg is the import path of the diagnostic package itself, which
 	// every generated constructor file imports.
 	diagnosticPkg = "github.com/masterbelt/masterbelt/pkg/diagnostic"
-	// ownerPrefix is the import-path prefix of the packages that own the
-	// generated diagnostic_gen.go files; ownerDir is the same location on disk,
-	// relative to this (the diagnostic) package, where those files are written.
-	ownerPrefix = "github.com/masterbelt/masterbelt/pkg/masterbelt"
-	ownerDir    = "../masterbelt"
+	// pkgPrefix is the import-path prefix of pkg/, the tree that owns every
+	// generated diagnostic_gen.go: a code's package path mirrors its owner's
+	// location under pkg/ (masterbelt.lexer.* -> pkg/masterbelt/lexer,
+	// project.config.* -> pkg/project/config). pkgDir is the same tree on
+	// disk, relative to this (the diagnostic) package, where those files are
+	// written.
+	pkgPrefix = "github.com/masterbelt/masterbelt/pkg"
+	pkgDir    = ".."
 
 	defaultLocale = "en"
 )
@@ -147,8 +152,8 @@ func readCodes(path string) ([]codeDef, error) {
 		}
 
 		parts := strings.Split(code, ".")
-		if len(parts) < 2 || parts[0] != "masterbelt" {
-			return nil, fmt.Errorf("code %q: must be masterbelt.<pkg>....<name>", code)
+		if len(parts) < 2 {
+			return nil, fmt.Errorf("code %q: must be <pkg>....<name>, the owner's path under pkg/", code)
 		}
 		pkgParts := parts[:len(parts)-1] // drop the code name
 		name := parts[len(parts)-1]
@@ -158,8 +163,8 @@ func readCodes(path string) ([]codeDef, error) {
 			severity:  sevConst,
 			fields:    fields,
 			pkgName:   pkgParts[len(pkgParts)-1],
-			pkgImport: ownerPrefix + "/" + strings.Join(pkgParts[1:], "/"),
-			relDir:    filepath.Join(append([]string{ownerDir}, pkgParts[1:]...)...),
+			pkgImport: pkgPrefix + "/" + strings.Join(pkgParts, "/"),
+			relDir:    filepath.Join(append([]string{pkgDir}, pkgParts...)...),
 			constName: "Code" + camel(name),
 			ctorName:  "new" + camel(name) + "Diagnostic",
 		})

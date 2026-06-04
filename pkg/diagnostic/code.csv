@@ -23,3 +23,7 @@ masterbelt.semantic.uninferable_collection,error,
 masterbelt.semantic.uninferable_result,error,
 masterbelt.semantic.uninferable_parameter,error,name:string
 masterbelt.semantic.lambda_arity_mismatch,error,actual:int expected:int
+project.config.missing,error,
+project.config.invalid,error,detail:string
+project.config.missing_entry,error,
+project.config.entry_not_found,error,path:string

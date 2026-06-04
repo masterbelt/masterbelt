@@ -199,4 +199,36 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "unknown type: " + f["name"].String()
 		}
 	},
+	"project.config.entry_not_found": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "エントリファイルが見つかりません: " + f["path"].String()
+		default:
+			return "entry file not found: " + f["path"].String()
+		}
+	},
+	"project.config.invalid": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "不正な masterbelt.toml: " + f["detail"].String()
+		default:
+			return "invalid masterbelt.toml: " + f["detail"].String()
+		}
+	},
+	"project.config.missing": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "masterbelt.toml がこのディレクトリにも親ディレクトリにも見つかりません"
+		default:
+			return "masterbelt.toml not found in this directory or any parent"
+		}
+	},
+	"project.config.missing_entry": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "masterbelt.toml に entry が指定されていません"
+		default:
+			return "masterbelt.toml does not set entry"
+		}
+	},
 }
