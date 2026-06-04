@@ -22,8 +22,8 @@ func TestLowerConstDecl(t *testing.T) {
 	if d.Name != "MaxLevel" {
 		t.Errorf("Name = %q, want MaxLevel", d.Name)
 	}
-	if d.Type == nil || d.Type.Name != "int64" {
-		t.Errorf("Type = %+v, want int64", d.Type)
+	if nt, ok := d.Type.(*ast.NamedType); !ok || nt.Name != "int64" {
+		t.Errorf("Type = %+v, want NamedType int64", d.Type)
 	}
 	lit, ok := d.Value.(*ast.IntLit)
 	if !ok || lit.Text != "100" {
@@ -83,6 +83,12 @@ func TestLowerExpressions(t *testing.T) {
 		{"const x = \"say \\\"hi\\\"\"\n", `StringLit "say \"hi\""`},
 		{"const x = \"\\u{1F389}\"\n", `StringLit "🎉"`},
 		{"const x = \"a\" == \"b\"\n", `(call (. StringLit "a" eql) StringLit "b")`},
+		// Collection literals: a list renders (list elems...), a map (map k: v ...),
+		// and an empty literal (collection) since its kind is not yet fixed.
+		{"const x = [1, 2, 3]\n", `(list IntLit "1" IntLit "2" IntLit "3")`},
+		{"const x = [\"a\": 1, \"b\": 2]\n", `(map StringLit "a": IntLit "1" StringLit "b": IntLit "2")`},
+		{"const x = []\n", `(collection)`},
+		{"const x = [[1], [2]]\n", `(list (list IntLit "1") (list IntLit "2"))`},
 	}
 	for _, tc := range cases {
 		if got := valueLine(t, tc.src); got != tc.want {

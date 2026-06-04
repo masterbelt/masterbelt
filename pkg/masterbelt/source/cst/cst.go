@@ -36,9 +36,8 @@ type Kind int
 const (
 	File          Kind = iota // the whole source: a sequence of declarations and trailing trivia
 	ConstDecl                 // [doc] [pub] const Name [TypeClause] [Initializer]
-	TypeClause                // ": Type"
+	TypeClause                // ": TypeExpr"
 	Initializer               // "= Expr"
-	TypeRef                   // an identifier naming a type
 	NameRef                   // an identifier used as a value
 	Literal                   // a literal value: an integer, a string, a boolean (true/false), or null
 	BinaryExpr                // a binary operation: Expr Op Expr
@@ -78,7 +77,6 @@ var kindNames = [...]string{
 	ConstDecl:     "ConstDecl",
 	TypeClause:    "TypeClause",
 	Initializer:   "Initializer",
-	TypeRef:       "TypeRef",
 	NameRef:       "NameRef",
 	Literal:       "Literal",
 	BinaryExpr:    "BinaryExpr",

@@ -80,7 +80,7 @@ func lowerConstDecl(t cst.Tree, buf source.Buffer) *ast.ConstDecl {
 		doc    []string
 		public bool
 		name   string
-		typ    *ast.TypeRef
+		typ    ast.TypeExpr
 		value  ast.Expr
 	)
 
@@ -112,12 +112,13 @@ func lowerConstDecl(t cst.Tree, buf source.Buffer) *ast.ConstDecl {
 	return ast.NewConstDecl(doc, public, name, typ, value, green)
 }
 
-// lowerTypeClause lowers a ": Type" clause to its TypeRef, or nil when the type
-// is missing (a recovered "const x: = 1").
-func lowerTypeClause(t cst.Tree, buf source.Buffer) *ast.TypeRef {
+// lowerTypeClause lowers a ": Type" clause to its type expression, or nil when
+// the type is missing (a recovered "const x: = 1"). The annotation is a full
+// type expression, lowered the same way a type declaration's is.
+func lowerTypeClause(t cst.Tree, buf source.Buffer) ast.TypeExpr {
 	for _, child := range t.Children() {
-		if node, ok := child.Node(); ok && node.Kind() == cst.TypeRef {
-			return ast.NewTypeRef(child.Text(buf), node)
+		if node, ok := child.Node(); ok && isTypeExprKind(node.Kind()) {
+			return lowerTypeExpr(child, buf)
 		}
 	}
 	return nil
@@ -137,7 +138,7 @@ func lowerInitializer(t cst.Tree, buf source.Buffer) ast.Expr {
 // isExprKind reports whether a CST node kind is an expression node.
 func isExprKind(k cst.Kind) bool {
 	switch k {
-	case cst.Literal, cst.NameRef, cst.SelfExpr, cst.UnaryExpr, cst.BinaryExpr, cst.CallExpr, cst.MemberExpr:
+	case cst.Literal, cst.NameRef, cst.SelfExpr, cst.UnaryExpr, cst.BinaryExpr, cst.CallExpr, cst.MemberExpr, cst.CollectionLit:
 		return true
 	default:
 		return false
@@ -155,6 +156,8 @@ func lowerExpr(t cst.Tree, buf source.Buffer) ast.Expr {
 	switch node.Kind() {
 	case cst.Literal:
 		return lowerLiteral(t, buf, node)
+	case cst.CollectionLit:
+		return lowerCollectionLit(t, buf, node)
 	case cst.NameRef:
 		return ast.NewIdentifier(t.Text(buf), node)
 	case cst.SelfExpr:
@@ -292,6 +295,46 @@ func decodeUnicodeEscape(s string) (r rune, n int, ok bool) {
 		return 0, 0, false
 	}
 	return rune(v), end + 1, true
+}
+
+// lowerCollectionLit lowers a CollectionLit node to its entries: a bare element
+// child becomes a value-only entry (a list element), and a MapEntry child
+// becomes a key/value entry. An empty literal yields no entries.
+func lowerCollectionLit(t cst.Tree, buf source.Buffer, node *cst.Node) ast.Expr {
+	var entries []*ast.CollectionEntry
+	for _, child := range t.Children() {
+		n, ok := child.Node()
+		if !ok {
+			continue
+		}
+		switch {
+		case n.Kind() == cst.MapEntry:
+			entries = append(entries, lowerMapEntry(child, buf))
+		case isExprKind(n.Kind()):
+			entries = append(entries, &ast.CollectionEntry{Value: lowerExpr(child, buf)})
+		}
+	}
+	return ast.NewCollectionLit(entries, node)
+}
+
+// lowerMapEntry lowers a MapEntry node (key ":" value) to a collection entry.
+// The two expression children are the key and the value, in order; either is nil
+// when the source omitted it.
+func lowerMapEntry(t cst.Tree, buf source.Buffer) *ast.CollectionEntry {
+	var exprs []ast.Expr
+	for _, child := range t.Children() {
+		if n, ok := child.Node(); ok && isExprKind(n.Kind()) {
+			exprs = append(exprs, lowerExpr(child, buf))
+		}
+	}
+	entry := &ast.CollectionEntry{}
+	if len(exprs) > 0 {
+		entry.Key = exprs[0]
+	}
+	if len(exprs) > 1 {
+		entry.Value = exprs[1]
+	}
+	return entry
 }
 
 // lowerMemberExpr lowers an explicit member access, receiver.member, to an

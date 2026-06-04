@@ -61,6 +61,39 @@ func NewBoolLit(value bool, syntax *cst.Node) *BoolLit {
 	return &BoolLit{Value: value, syntax: syntax}
 }
 
+// CollectionLit is a list or map literal. A list's entries each carry only a
+// Value; a map's entries each carry a Key and a Value. An empty literal has no
+// entries, so its kind (list vs map) is not fixed by the syntax — the type
+// checker resolves it from the annotation. The parser never mixes the two forms,
+// so either every entry has a Key or none does.
+type CollectionLit struct {
+	Entries []*CollectionEntry
+	syntax  *cst.Node
+}
+
+func (l *CollectionLit) Syntax() *cst.Node { return l.syntax }
+func (l *CollectionLit) node()             {}
+func (l *CollectionLit) expr()             {}
+
+// IsMap reports whether the literal is a map (its entries have keys). An empty
+// literal is not a map (nor a list); its kind comes from the annotation.
+func (l *CollectionLit) IsMap() bool {
+	return len(l.Entries) > 0 && l.Entries[0].Key != nil
+}
+
+// NewCollectionLit builds a CollectionLit node.
+func NewCollectionLit(entries []*CollectionEntry, syntax *cst.Node) *CollectionLit {
+	return &CollectionLit{Entries: entries, syntax: syntax}
+}
+
+// CollectionEntry is one entry of a collection literal: a Value, and for a map a
+// Key (nil for a list element). Either component may be nil when the source was
+// malformed and the parser recovered.
+type CollectionEntry struct {
+	Key   Expr // nil for a list element
+	Value Expr
+}
+
 // NullLit is the null literal.
 type NullLit struct {
 	syntax *cst.Node
@@ -158,6 +191,15 @@ func WalkValueIdents(e Expr, fn func(*Identifier)) {
 		WalkValueIdents(e.Callee, fn)
 		for _, a := range e.Arguments {
 			WalkValueIdents(a, fn)
+		}
+	case *CollectionLit:
+		for _, entry := range e.Entries {
+			if entry.Key != nil {
+				WalkValueIdents(entry.Key, fn)
+			}
+			if entry.Value != nil {
+				WalkValueIdents(entry.Value, fn)
+			}
 		}
 	}
 }

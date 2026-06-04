@@ -39,7 +39,18 @@ type stubEnv struct {
 func (e stubEnv) Resolve(id *ast.Identifier) *ast.ConstDecl { return e.res[id] }
 func (e stubEnv) TypeOf(decl *ast.ConstDecl) ir.Type        { return e.typ[decl] }
 func (e stubEnv) Registry() *builtin.Registry               { return e.reg }
-func (e stubEnv) LookupType(name string) (ir.Type, bool)    { return types.Lookup(e.reg, name) }
+
+// ResolveType resolves a simple named annotation through the registry — enough
+// for these unit tests, which only use bare primitive names. The semantic engine
+// supplies the full resolver (generics, unions, ...).
+func (e stubEnv) ResolveType(t ast.TypeExpr) ir.Type {
+	if nt, ok := t.(*ast.NamedType); ok && len(nt.Args) == 0 {
+		if typ, ok := types.Lookup(e.reg, nt.Name); ok {
+			return typ
+		}
+	}
+	return ir.Invalid
+}
 
 func emptyEnv() stubEnv {
 	return stubEnv{
@@ -106,8 +117,8 @@ func TestDecl(t *testing.T) {
 		decl *ast.ConstDecl
 		want string
 	}{
-		{"annotation wins", ast.NewConstDecl(nil, false, "X", ast.NewTypeRef("int32", nil), intLit("1"), nil), "int32"},
-		{"unknown annotation", ast.NewConstDecl(nil, false, "X", ast.NewTypeRef("notatype", nil), intLit("1"), nil), "invalid"},
+		{"annotation wins", ast.NewConstDecl(nil, false, "X", ast.NewNamedType("int32", nil, nil), intLit("1"), nil), "int32"},
+		{"unknown annotation", ast.NewConstDecl(nil, false, "X", ast.NewNamedType("notatype", nil, nil), intLit("1"), nil), "invalid"},
 		{"inferred from value", ast.NewConstDecl(nil, false, "X", nil, intLit("1"), nil), "int"},
 		{"no type, no value", ast.NewConstDecl(nil, false, "X", nil, nil, nil), "invalid"},
 	}

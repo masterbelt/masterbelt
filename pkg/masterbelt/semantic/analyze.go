@@ -60,11 +60,15 @@ func (e typeEnv) Resolve(id *ast.Identifier) *ast.ConstDecl { return e.q.resolve
 func (e typeEnv) TypeOf(decl *ast.ConstDecl) ir.Type        { return e.q.typeOf(decl) }
 func (e typeEnv) Registry() *builtin.Registry               { return e.q.registry() }
 
-// LookupType resolves a type name in the program's type universe: the builtin
-// primitives and the prelude's types (installed into the registry). A file's own
-// type declarations are not yet visible to a const annotation.
-func (e typeEnv) LookupType(name string) (ir.Type, bool) {
-	return types.Lookup(e.q.registry(), name)
+// ResolveType resolves a constant's type annotation — a full type expression, so
+// it covers a generic type such as list<int> — against the program's type
+// universe: the builtin primitives and the prelude's types (installed into the
+// registry). A file's own type declarations are not yet visible to a const
+// annotation, so the resolver is given no file defs. It reports nothing; the
+// diagnostic pass in assemble resolves again with reporting enabled.
+func (e typeEnv) ResolveType(t ast.TypeExpr) ir.Type {
+	r := &typeResolver{reg: e.q.registry(), defs: map[string]*ir.TypeDef{}}
+	return r.resolveType(t, nil)
 }
 
 // Analyze resolves and types the document's program, returning the IR module and
@@ -138,12 +142,13 @@ func assemble(file *ast.File, positions map[cst.Green]span, q queries) (*ir.Modu
 		}
 
 		if decl.Type != nil {
-			if annType, ok := types.Lookup(reg, decl.Type.Name); !ok {
-				s := at(decl.Type)
-				diags.Add(newUnknownTypeDiagnostic(s.offset, s.width, decl.Type.Name))
-			} else if decl.Value != nil {
-				// An annotation must agree in kind (integer vs boolean) with the
-				// initializer's natural type; its value range is checked below.
+			// Resolve the annotation with reporting enabled, so an unknown type
+			// name anywhere in it (e.g. list<Bogus>) is diagnosed at its own node.
+			r := &typeResolver{reg: reg, defs: map[string]*ir.TypeDef{}, at: at, diags: diags}
+			annType := r.resolveType(decl.Type, nil)
+			if annType != ir.Invalid && decl.Value != nil {
+				// An annotation must be compatible with the initializer's natural
+				// type; its value range is checked below.
 				if exprT := infer.Expr(decl.Value, env); exprT != ir.Invalid && !types.Compatible(reg, annType, exprT) {
 					s := at(decl.Value)
 					diags.Add(newTypeMismatchDiagnostic(s.offset, s.width, exprT.String(), annType.String()))

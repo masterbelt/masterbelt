@@ -31,8 +31,9 @@ type Env interface {
 	Resolve(id *ast.Identifier) *ast.ConstDecl
 	// TypeOf returns a declaration's type (ir.Invalid when undeterminable).
 	TypeOf(decl *ast.ConstDecl) ir.Type
-	// LookupType resolves a type name in the program's type universe.
-	LookupType(name string) (ir.Type, bool)
+	// ResolveType resolves a type annotation (a full type expression, e.g.
+	// list<int>) to its type, or ir.Invalid when it does not resolve.
+	ResolveType(t ast.TypeExpr) ir.Type
 	// Registry returns the builtin registry the program types against.
 	Registry() *builtin.Registry
 }
@@ -43,10 +44,7 @@ type Env interface {
 // dependencies.
 func Decl(decl *ast.ConstDecl, env Env) ir.Type {
 	if decl.Type != nil {
-		if t, ok := env.LookupType(decl.Type.Name); ok {
-			return t
-		}
-		return ir.Invalid
+		return env.ResolveType(decl.Type)
 	}
 	if decl.Value == nil {
 		return ir.Invalid

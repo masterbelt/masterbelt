@@ -15,8 +15,9 @@
 // green node, so it does not pin the AST node to one location either.
 //
 // The node set is split across files: this file holds the Node interface, decl.go
-// the declaration nodes (File, ConstDecl, TypeRef), and expr.go the expression
-// nodes (Expr and its variants). dump.go renders a File as a diffable snapshot.
+// the declaration nodes (File, ConstDecl), types.go the type-expression nodes,
+// and expr.go the expression nodes (Expr and its variants). dump.go renders a
+// File as a diffable snapshot.
 package ast
 
 import "github.com/masterbelt/masterbelt/pkg/masterbelt/source/cst"

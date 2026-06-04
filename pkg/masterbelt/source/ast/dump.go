@@ -31,7 +31,7 @@ func dumpConstDecl(b *strings.Builder, d *ConstDecl) {
 	}
 	fmt.Fprintf(b, "    name %q\n", d.Name)
 	if d.Type != nil {
-		fmt.Fprintf(b, "    type %q\n", d.Type.Name)
+		fmt.Fprintf(b, "    type %s\n", dumpType(d.Type))
 	}
 	if d.Value != nil {
 		fmt.Fprintf(b, "    value %s\n", dumpExpr(d.Value))
@@ -50,6 +50,22 @@ func dumpExpr(e Expr) string {
 		return fmt.Sprintf("BoolLit %v", x.Value)
 	case *NullLit:
 		return "NullLit"
+	case *CollectionLit:
+		label := "collection"
+		if x.IsMap() {
+			label = "map"
+		} else if len(x.Entries) > 0 {
+			label = "list"
+		}
+		parts := []string{label}
+		for _, e := range x.Entries {
+			if e.Key != nil {
+				parts = append(parts, dumpExpr(e.Key)+": "+dumpExpr(e.Value))
+			} else {
+				parts = append(parts, dumpExpr(e.Value))
+			}
+		}
+		return "(" + strings.Join(parts, " ") + ")"
 	case *SelfExpr:
 		return "self"
 	case *Identifier:
