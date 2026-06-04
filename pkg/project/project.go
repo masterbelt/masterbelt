@@ -171,7 +171,14 @@ func loadFile(root string, id FileID) (*File, error) {
 // job), and each file's Uses table records where its imports resolved.
 func closeOver(root string, entry *File) map[FileID]*File {
 	files := map[FileID]*File{entry.ID: entry}
-	queue := []*File{entry}
+	extend(root, files, entry)
+	return files
+}
+
+// extend grows files with everything reachable from f, (re)wiring the Uses
+// table of every file it visits.
+func extend(root string, files map[FileID]*File, f *File) {
+	queue := []*File{f}
 	for len(queue) > 0 {
 		f := queue[0]
 		queue = queue[1:]
@@ -193,7 +200,36 @@ func closeOver(root string, entry *File) map[FileID]*File {
 			f.Uses[u] = target
 		}
 	}
-	return files
+}
+
+// Include ensures the file named id is part of the project's set — an editor
+// may open a file the entry does not (yet) import — loading it and everything
+// it reaches from disk. It returns the file, or nil when id names no readable
+// file under the root.
+func (p *Project) Include(id FileID) *File {
+	if f, ok := p.files[id]; ok {
+		return f
+	}
+	f, err := loadFile(p.Root, id)
+	if err != nil {
+		return nil
+	}
+	p.files[id] = f
+	extend(p.Root, p.files, f)
+	return f
+}
+
+// Resync re-resolves id's use declarations after its document changed (an
+// editor edit), loading any newly referenced files from disk into the set.
+// Files no other use reaches anymore are kept — stale but harmless — until the
+// project is reopened.
+func (p *Project) Resync(id FileID) *File {
+	f, ok := p.files[id]
+	if !ok {
+		return p.Include(id)
+	}
+	extend(p.Root, p.files, f)
+	return f
 }
 
 // resolveUse resolves a use path as written in importer's source to the

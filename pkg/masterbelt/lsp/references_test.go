@@ -3,7 +3,6 @@ package lsp
 import (
 	"testing"
 
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/semantic"
 	protocol "github.com/owenrumney/go-lsp/lsp"
 )
 
@@ -15,7 +14,7 @@ import (
 const refSrc = "const MaxLevel = 1\nconst A = MaxLevel\nconst B = MaxLevel\n"
 
 func TestReferences(t *testing.T) {
-	doc := semantic.NewDocument([]byte(refSrc))
+	doc := testView(refSrc)
 	uri := protocol.DocumentURI("file:///x.belt")
 
 	// From the declaration name, including the declaration: decl + 2 references.
@@ -33,7 +32,7 @@ func TestReferences(t *testing.T) {
 }
 
 func TestRename(t *testing.T) {
-	doc := semantic.NewDocument([]byte("const MaxLevel = 1\nconst A = MaxLevel\n"))
+	doc := testView("const MaxLevel = 1\nconst A = MaxLevel\n")
 	uri := protocol.DocumentURI("file:///x.belt")
 
 	we := rename(doc, 10, "Cap", uri)
@@ -59,7 +58,7 @@ func TestRename(t *testing.T) {
 }
 
 func TestPrepareRename(t *testing.T) {
-	doc := semantic.NewDocument([]byte("const MaxLevel = 1\nconst A = MaxLevel\n"))
+	doc := testView("const MaxLevel = 1\nconst A = MaxLevel\n")
 
 	pr := prepareRename(doc, 31) // on the reference in A
 	if pr == nil {
@@ -85,7 +84,7 @@ func TestPrepareRename(t *testing.T) {
 const exprRefSrc = "const M = 1\nconst z = M + M\n"
 
 func TestReferencesInExpression(t *testing.T) {
-	doc := semantic.NewDocument([]byte(exprRefSrc))
+	doc := testView(exprRefSrc)
 	uri := protocol.DocumentURI("file:///x.belt")
 
 	// From the declaration, including it: decl + 2 in-expression references.
@@ -103,7 +102,7 @@ func TestReferencesInExpression(t *testing.T) {
 }
 
 func TestRenameInExpression(t *testing.T) {
-	doc := semantic.NewDocument([]byte(exprRefSrc))
+	doc := testView(exprRefSrc)
 	uri := protocol.DocumentURI("file:///x.belt")
 
 	we := rename(doc, 26, "N", uri) // on the second M reference

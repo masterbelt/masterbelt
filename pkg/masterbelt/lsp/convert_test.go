@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/parser/abstract"
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/semantic"
 	"github.com/masterbelt/masterbelt/pkg/source"
 	protocol "github.com/owenrumney/go-lsp/lsp"
 )
@@ -35,7 +34,7 @@ func TestPositionUTF16RoundTrip(t *testing.T) {
 }
 
 func TestToDiagnostics(t *testing.T) {
-	doc := semantic.NewDocument([]byte("const = 1\n"))
+	doc := testView("const = 1\n")
 	diags := toDiagnostics(doc)
 	if len(diags) != 1 {
 		t.Fatalf("got %d diagnostics, want 1: %+v", len(diags), diags)
@@ -57,7 +56,7 @@ func TestToDiagnostics(t *testing.T) {
 }
 
 func TestToDiagnosticsEmptyIsNonNil(t *testing.T) {
-	diags := toDiagnostics(semantic.NewDocument([]byte("const X = 1\n")))
+	diags := toDiagnostics(testView("const X = 1\n"))
 	if diags == nil {
 		t.Fatal("toDiagnostics returned nil; want an empty (clearing) slice")
 	}
@@ -67,7 +66,7 @@ func TestToDiagnosticsEmptyIsNonNil(t *testing.T) {
 }
 
 func TestDocumentSymbols(t *testing.T) {
-	doc := semantic.NewDocument([]byte("const MaxLevel: int64 = 100\nconst Min = 0\n"))
+	doc := testView("const MaxLevel: int64 = 100\nconst Min = 0\n")
 	syms := documentSymbols(doc)
 	if len(syms) != 2 {
 		t.Fatalf("got %d symbols, want 2", len(syms))

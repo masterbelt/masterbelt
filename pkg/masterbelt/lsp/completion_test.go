@@ -4,7 +4,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/semantic"
 	protocol "github.com/owenrumney/go-lsp/lsp"
 )
 
@@ -21,7 +20,7 @@ func byLabel(items []protocol.CompletionItem) map[string]protocol.CompletionItem
 }
 
 func TestCompletionInValuePosition(t *testing.T) {
-	doc := semantic.NewDocument([]byte(completionSrc))
+	doc := testView(completionSrc)
 
 	// Inside the "Max" reference in "const Cur = Max" — a value position.
 	offset := strings.Index(completionSrc, "= Max") + 3
@@ -52,7 +51,7 @@ func TestCompletionInValuePosition(t *testing.T) {
 }
 
 func TestCompletionInTypePosition(t *testing.T) {
-	doc := semantic.NewDocument([]byte(completionSrc))
+	doc := testView(completionSrc)
 
 	// Inside the "int64" annotation — a type position. Type names are offered,
 	// constant names are not.
@@ -75,7 +74,7 @@ func TestCompletionInTypePosition(t *testing.T) {
 func TestCompletionOffersDeclaredTypes(t *testing.T) {
 	// A user-declared type is offered in a type position, as a Class.
 	src := "pub type Level = int8\nconst x: Level = 1\n"
-	doc := semantic.NewDocument([]byte(src))
+	doc := testView(src)
 	offset := strings.Index(src, ": Level") + 3 // inside "Level" annotation
 	got := byLabel(completion(doc, offset).Items)
 	if _, ok := got["Level"]; !ok {
@@ -88,7 +87,7 @@ func TestCompletionOffersDeclaredTypes(t *testing.T) {
 
 func TestCompletionDedupesNames(t *testing.T) {
 	// A redeclared name contributes a single completion item.
-	doc := semantic.NewDocument([]byte("const A = 1\nconst A = 2\nconst B = A\n"))
+	doc := testView("const A = 1\nconst A = 2\nconst B = A\n")
 	offset := strings.Index("const A = 1\nconst A = 2\nconst B = A\n", "= A") + 3
 	n := 0
 	for _, it := range completion(doc, offset).Items {

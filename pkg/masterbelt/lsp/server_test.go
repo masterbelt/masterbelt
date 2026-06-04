@@ -44,8 +44,8 @@ func TestIncrementalDidChange(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	doc := s.docs[uri]
-	if doc == nil {
+	doc, ok := s.open[uri]
+	if !ok {
 		t.Fatal("document is no longer tracked")
 	}
 	if got := string(doc.Buffer().Slice(0, doc.Buffer().Len())); got != "const x = 42\n" {

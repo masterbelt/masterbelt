@@ -1,7 +1,6 @@
 package lsp
 
 import (
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/semantic"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
 	protocol "github.com/owenrumney/go-lsp/lsp"
 )
@@ -10,7 +9,7 @@ import (
 // range whose type the analyzer inferred, a refactor that writes the inferred
 // type as an explicit annotation (": <type>" after the name). It is the explicit
 // counterpart of the inlay type hint.
-func codeActions(doc *semantic.Document, startOff, endOff int, uri protocol.DocumentURI) []protocol.CodeAction {
+func codeActions(doc view, startOff, endOff int, uri protocol.DocumentURI) []protocol.CodeAction {
 	buf := doc.Buffer()
 	trees := positionedTrees(doc.AST().Concrete().Tree())
 	kind := protocol.CodeActionRefactorRewrite

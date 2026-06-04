@@ -3,7 +3,6 @@ package lsp
 import (
 	"encoding/json"
 
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/semantic"
 	"github.com/masterbelt/masterbelt/pkg/source"
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/source/cst"
@@ -24,7 +23,7 @@ import (
 // annotations already show themselves; an unsolved (invalid) part has nothing
 // to show. Like the constant hints, each hint carries a TextEdit that
 // materializes the annotation.
-func lambdaHints(doc *semantic.Document, trees map[cst.Green]cst.Tree, startOff, endOff int) []protocol.InlayHint {
+func lambdaHints(doc view, trees map[cst.Green]cst.Tree, startOff, endOff int) []protocol.InlayHint {
 	buf := doc.Buffer()
 	kind := protocol.InlayHintKindType
 
@@ -76,7 +75,7 @@ func lambdaHints(doc *semantic.Document, trees map[cst.Green]cst.Tree, startOff,
 // body. The innermost literal containing the offset is consulted first, so a
 // nested literal's parameter shadows an outer one's — the same way the body's
 // own scope resolves the name.
-func lambdaParamHover(doc *semantic.Document, offset int, trees map[cst.Green]cst.Tree) *protocol.Hover {
+func lambdaParamHover(doc view, offset int, trees map[cst.Green]cst.Tree) *protocol.Hover {
 	buf := doc.Buffer()
 	tok, name, ok := identAt(doc.AST().Concrete().Tree(), buf, offset)
 	if !ok {
@@ -118,7 +117,7 @@ func lambdaParamHover(doc *semantic.Document, offset int, trees map[cst.Green]cs
 // forEachFuncLit visits every function literal in the document's constants and
 // method bodies, in source order, an enclosing literal before the ones nested
 // in its body.
-func forEachFuncLit(doc *semantic.Document, fn func(*ast.FuncLit)) {
+func forEachFuncLit(doc view, fn func(*ast.FuncLit)) {
 	var walkExpr func(e ast.Expr)
 	walkStmts := func(stmts []ast.Stmt) {
 		for _, stmt := range stmts {

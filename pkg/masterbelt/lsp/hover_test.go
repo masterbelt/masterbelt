@@ -3,9 +3,6 @@ package lsp
 import (
 	"strings"
 	"testing"
-
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/semantic"
-	protocol "github.com/owenrumney/go-lsp/lsp"
 )
 
 // const source used by the hover/definition tests. Offsets:
@@ -16,7 +13,7 @@ import (
 const hoverSrc = "/// docs\nconst MaxLevel: int64 = 100\nconst Alias = MaxLevel\n"
 
 func TestHover(t *testing.T) {
-	doc := semantic.NewDocument([]byte(hoverSrc))
+	doc := testView(hoverSrc)
 
 	t.Run("declaration name shows type and doc", func(t *testing.T) {
 		h := hover(doc, 18) // inside "MaxLevel"
@@ -45,7 +42,7 @@ func TestHover(t *testing.T) {
 
 func TestLambdaParamHover(t *testing.T) {
 	src := "const Doubled = [1, 2].map(fn(x) { return x * 2 })\n"
-	doc := semantic.NewDocument([]byte(src))
+	doc := testView(src)
 
 	t.Run("parameter declaration", func(t *testing.T) {
 		h := hover(doc, strings.Index(src, "x)")) // the x in fn(x)
@@ -71,7 +68,7 @@ func TestLambdaParamHover(t *testing.T) {
 		// The outer x is int, the inner x is bool (pushed in from the
 		// annotation); the innermost scope wins for the body use.
 		nested := "const F: fn(x: int): fn(x: bool): bool = fn(x) { return fn(x) { return x } }\n"
-		ndoc := semantic.NewDocument([]byte(nested))
+		ndoc := testView(nested)
 		h := hover(ndoc, strings.LastIndex(nested, "x }")) // the inner return x
 		if h == nil {
 			t.Fatal("no hover on the nested parameter use")
@@ -83,15 +80,14 @@ func TestLambdaParamHover(t *testing.T) {
 }
 
 func TestDefinition(t *testing.T) {
-	doc := semantic.NewDocument([]byte(hoverSrc))
-	uri := protocol.DocumentURI("file:///x.belt")
+	doc := testView(hoverSrc)
 
-	locs := definition(doc, 54, uri) // on the "MaxLevel" reference
+	locs := definition(doc, 54) // on the "MaxLevel" reference
 	if len(locs) != 1 {
 		t.Fatalf("got %d locations, want 1", len(locs))
 	}
-	if locs[0].URI != uri {
-		t.Errorf("URI = %q, want %q", locs[0].URI, uri)
+	if locs[0].URI != doc.uri {
+		t.Errorf("URI = %q, want %q", locs[0].URI, doc.uri)
 	}
 	// MaxLevel's name is on line 1, columns 6..14.
 	r := locs[0].Range
@@ -103,7 +99,7 @@ func TestDefinition(t *testing.T) {
 func TestHoverInExpression(t *testing.T) {
 	// exprRefSrc is "const M = 1\nconst z = M + M\n"; the first M reference is at
 	// offset 22, inside the expression.
-	doc := semantic.NewDocument([]byte(exprRefSrc))
+	doc := testView(exprRefSrc)
 	h := hover(doc, 22)
 	if h == nil {
 		t.Fatal("no hover on a reference inside an expression")
@@ -114,10 +110,9 @@ func TestHoverInExpression(t *testing.T) {
 }
 
 func TestDefinitionInExpression(t *testing.T) {
-	doc := semantic.NewDocument([]byte(exprRefSrc))
-	uri := protocol.DocumentURI("file:///x.belt")
+	doc := testView(exprRefSrc)
 
-	locs := definition(doc, 26, uri) // second M reference, inside the expression
+	locs := definition(doc, 26) // second M reference, inside the expression
 	if len(locs) != 1 {
 		t.Fatalf("got %d locations, want 1", len(locs))
 	}

@@ -91,13 +91,18 @@ func (d *Document) TypeNames() []*ir.TypeDef {
 // through the engine, so it reuses the memoized resolution and types of the
 // last analysis.
 func (d *Document) FuncLitTypes() map[*ast.FuncLit]*ir.Func {
+	return funcLitTypesOf(d.db, soleFileID, d.ast.File())
+}
+
+// funcLitTypesOf is the walk behind Document.FuncLitTypes and
+// Program.FuncLitTypes, reading every fact through the engine.
+func funcLitTypesOf(db *database, fileID FileID, file *ast.File) map[*ast.FuncLit]*ir.Func {
 	out := map[*ast.FuncLit]*ir.Func{}
 	sink := &infer.Sink{SolvedFuncLit: func(lit *ast.FuncLit, t *ir.Func) { out[lit] = t }}
 
-	q := engineQueries{d.db}
-	env := typeEnv{q: q, file: soleFileID}
+	q := engineQueries{db}
+	env := typeEnv{q: q, file: fileID}
 	reg := q.registry()
-	file := d.ast.File()
 	for _, decl := range file.Decls {
 		if decl.Value == nil {
 			continue
@@ -106,7 +111,7 @@ func (d *Document) FuncLitTypes() map[*ast.FuncLit]*ir.Func {
 		// annotation resolved silently (its problems are already diagnosed).
 		annType := ir.Invalid
 		if decl.Type != nil {
-			r := &infer.TypeResolver{Reg: reg}
+			r := &infer.TypeResolver{Reg: reg, Defs: q.universe(fileID)}
 			annType = r.ResolveType(decl.Type, nil)
 		}
 		if annType != ir.Invalid {
@@ -115,7 +120,7 @@ func (d *Document) FuncLitTypes() map[*ast.FuncLit]*ir.Func {
 			infer.Check(decl.Value, env, sink)
 		}
 	}
-	checkMethodBodies(file, reg, d.module.Types, sink)
+	checkMethodBodies(file, reg, q.typeDefs(fileID), sink)
 	return out
 }
 

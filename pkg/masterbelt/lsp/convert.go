@@ -5,7 +5,6 @@ import (
 
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/parser/abstract"
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/semantic"
 	"github.com/masterbelt/masterbelt/pkg/source"
 	"github.com/masterbelt/masterbelt/pkg/source/cst"
 	"github.com/masterbelt/masterbelt/pkg/source/formatter"
@@ -39,7 +38,7 @@ func fromPosition(buf source.Buffer, p protocol.Position) int {
 // toDiagnostics renders every diagnostic of the document — lexer, parser, and
 // semantic — as LSP diagnostics, ordered by position. The result is never nil:
 // publishing an empty array is how the server clears stale diagnostics.
-func toDiagnostics(doc *semantic.Document) []protocol.Diagnostic {
+func toDiagnostics(doc view) []protocol.Diagnostic {
 	buf := doc.Buffer()
 
 	var raw []diagnostic.Diagnostic
@@ -78,7 +77,7 @@ func toSeverity(s diagnostic.Severity) protocol.DiagnosticSeverity {
 // constant becomes a symbol whose Detail is its inferred type, whose Range
 // covers the whole declaration, and whose SelectionRange covers just the name —
 // the part an editor highlights when you pick the symbol.
-func documentSymbols(doc *semantic.Document) []protocol.DocumentSymbol {
+func documentSymbols(doc view) []protocol.DocumentSymbol {
 	buf := doc.Buffer()
 	trees := positionedTrees(doc.AST().Concrete().Tree())
 

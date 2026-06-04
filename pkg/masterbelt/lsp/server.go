@@ -7,23 +7,29 @@
 // on source.Buffer's UTF-16 support (see convert.go), which is exactly LSP's
 // position model.
 //
-// The server keeps one incremental semantic.Document per open file. A didChange
-// with a range becomes a source.Edit, so a keystroke re-lexes, re-parses,
-// re-lowers, and re-analyzes only what it touched.
+// An opened file is analyzed in its project: the server finds masterbelt.toml
+// above it, loads the import closure from disk (open buffers override the disk
+// copies), and keeps one incremental semantic.Program per project — so use
+// imports resolve in the editor, an edit re-analyzes only what it touched, and
+// a change in one file updates its importers' diagnostics. A file outside any
+// project analyzes standalone. (workspace.go holds that machinery.)
 //
 // Implemented features: lifecycle, incremental text sync, push diagnostics
 // (lexer, parser, and semantic), completion, document symbols, formatting,
-// semantic-token highlighting, hover, go-to-definition, find-references,
-// document highlight, inlay type hints, code actions, and rename. The protocol
-// plumbing (JSON-RPC over stdio, request routing) is provided by
-// github.com/owenrumney/go-lsp.
+// semantic-token highlighting, hover, go-to-definition (across files),
+// find-references, document highlight, inlay type hints, code actions, and
+// rename. The protocol plumbing (JSON-RPC over stdio, request routing) is
+// provided by github.com/owenrumney/go-lsp.
 package lsp
 
 import (
 	"context"
+	"path/filepath"
 	"sync"
 
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/parser/abstract"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/semantic"
+	"github.com/masterbelt/masterbelt/pkg/project"
 	"github.com/masterbelt/masterbelt/pkg/source"
 	protocol "github.com/owenrumney/go-lsp/lsp"
 	"github.com/owenrumney/go-lsp/server"
@@ -36,13 +42,17 @@ const serverName = "masterbelt"
 // implements; unimplemented requests are declined by the library.
 type Server struct {
 	mu     sync.Mutex
-	docs   map[protocol.DocumentURI]*semantic.Document
+	open   map[protocol.DocumentURI]view
+	roots  map[string]*workspace // project workspaces, by root directory
 	client *server.Client
 }
 
 // NewServer creates a language server with no open documents.
 func NewServer() *Server {
-	return &Server{docs: map[protocol.DocumentURI]*semantic.Document{}}
+	return &Server{
+		open:  map[protocol.DocumentURI]view{},
+		roots: map[string]*workspace{},
+	}
 }
 
 // Initialize advertises the server's capabilities.
@@ -79,56 +89,121 @@ func (s *Server) Shutdown(_ context.Context) error { return nil }
 // diagnostics).
 func (s *Server) SetClient(client *server.Client) { s.client = client }
 
-// DidOpen starts tracking a document and publishes its initial diagnostics.
+// DidOpen starts tracking a document — in its project's workspace when it has
+// one — and publishes diagnostics for the workspace's open files.
 func (s *Server) DidOpen(ctx context.Context, params *protocol.DidOpenTextDocumentParams) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	uri := params.TextDocument.URI
-	doc := semantic.NewDocument([]byte(params.TextDocument.Text))
-	s.docs[uri] = doc
-	s.publish(ctx, uri, doc)
+	v := s.openFile(params.TextDocument.URI, []byte(params.TextDocument.Text))
+	s.publishWorkspace(ctx, v.ws)
 	return nil
 }
 
-// DidChange applies the edits to the document incrementally and republishes its
-// diagnostics. Range-based changes drive the incremental pipeline; a change
-// without a range (a whole-document replacement) re-analyzes from scratch.
+// openFile places a document in a workspace: the project found at or above it
+// (siblings load from disk; the editor's text overrides the disk copy), or a
+// standalone single-file workspace.
+func (s *Server) openFile(uri protocol.DocumentURI, text []byte) view {
+	path := uriPath(uri)
+
+	if root, ok := project.FindRoot(filepath.Dir(path)); ok {
+		ws := s.roots[root]
+		if ws == nil {
+			if proj, diags := project.Open(root); !diags.HasErrors() {
+				ws = &workspace{
+					root: root,
+					proj: proj,
+					prog: semantic.NewProgram(),
+					open: map[semantic.FileID]protocol.DocumentURI{},
+				}
+				s.roots[root] = ws
+			}
+		}
+		if ws != nil {
+			if rel, err := filepath.Rel(root, path); err == nil {
+				id := project.FileID(filepath.ToSlash(rel))
+				if f := ws.proj.Include(id); f != nil {
+					// The editor's text wins over the disk copy.
+					buf := f.AST.Buffer()
+					f.AST.Edit(source.Edit{Start: 0, End: buf.Len(), NewText: text})
+					ws.proj.Resync(id)
+					ws.sync()
+
+					v := view{ws: ws, id: semantic.FileID(id), uri: uri}
+					ws.open[v.id] = uri
+					s.open[uri] = v
+					return v
+				}
+			}
+		}
+	}
+
+	// No project (or the file is unreachable in it): analyze standalone.
+	ws := &workspace{
+		prog: semantic.NewProgram(),
+		open: map[semantic.FileID]protocol.DocumentURI{},
+	}
+	id := semantic.FileID(path)
+	ws.prog.SetFile(id, abstract.NewDocument(text), nil)
+	ws.prog.Refresh()
+	ws.open[id] = uri
+
+	v := view{ws: ws, id: id, uri: uri}
+	s.open[uri] = v
+	return v
+}
+
+// DidChange applies the edits to the document incrementally, re-resolves its
+// imports, and republishes diagnostics for the workspace's open files (a
+// change here may surface in an importer). Range-based changes drive the
+// incremental pipeline; a change without a range replaces the whole text.
 func (s *Server) DidChange(ctx context.Context, params *protocol.DidChangeTextDocumentParams) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	uri := params.TextDocument.URI
-	doc := s.docs[uri]
-	if doc == nil {
+	v, ok := s.open[params.TextDocument.URI]
+	if !ok {
 		return nil
 	}
 
+	doc := v.AST()
 	for _, change := range params.ContentChanges {
-		if change.Range == nil {
-			doc = semantic.NewDocument([]byte(change.Text))
-			continue
-		}
-		// Each change's range refers to the document state left by the previous
-		// changes in this batch, so resolve offsets against the current buffer.
 		buf := doc.Buffer()
-		start := fromPosition(buf, change.Range.Start)
-		end := fromPosition(buf, change.Range.End)
+		start, end := 0, buf.Len()
+		if change.Range != nil {
+			// Each change's range refers to the document state left by the
+			// previous changes in this batch.
+			start = fromPosition(buf, change.Range.Start)
+			end = fromPosition(buf, change.Range.End)
+		}
 		doc.Edit(source.Edit{Start: start, End: end, NewText: []byte(change.Text)})
 	}
 
-	s.docs[uri] = doc
-	s.publish(ctx, uri, doc)
+	if v.ws.proj != nil {
+		v.ws.proj.Resync(project.FileID(v.id))
+		v.ws.sync()
+	} else {
+		v.ws.prog.SetFile(v.id, doc, nil)
+		v.ws.prog.Refresh()
+	}
+	s.publishWorkspace(ctx, v.ws)
 	return nil
 }
 
-// DidClose stops tracking a document and clears its diagnostics.
+// DidClose stops tracking a document and clears its diagnostics. A project
+// workspace is dropped with its last open file.
 func (s *Server) DidClose(ctx context.Context, params *protocol.DidCloseTextDocumentParams) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	uri := params.TextDocument.URI
-	delete(s.docs, uri)
+	if v, ok := s.open[uri]; ok {
+		delete(v.ws.open, v.id)
+		if v.ws.root != "" && len(v.ws.open) == 0 {
+			delete(s.roots, v.ws.root)
+		}
+	}
+	delete(s.open, uri)
 	if s.client != nil {
 		_ = s.client.PublishDiagnostics(ctx, &protocol.PublishDiagnosticsParams{
 			URI:         uri,
@@ -143,11 +218,11 @@ func (s *Server) Completion(_ context.Context, params *protocol.CompletionParams
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	doc := s.docs[params.TextDocument.URI]
-	if doc == nil {
+	v, ok := s.open[params.TextDocument.URI]
+	if !ok {
 		return nil, nil
 	}
-	return completion(doc, fromPosition(doc.Buffer(), params.Position)), nil
+	return completion(v, fromPosition(v.Buffer(), params.Position)), nil
 }
 
 // DocumentSymbol returns the document's outline.
@@ -155,11 +230,11 @@ func (s *Server) DocumentSymbol(_ context.Context, params *protocol.DocumentSymb
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	doc := s.docs[params.TextDocument.URI]
-	if doc == nil {
+	v, ok := s.open[params.TextDocument.URI]
+	if !ok {
 		return nil, nil
 	}
-	return documentSymbols(doc), nil
+	return documentSymbols(v), nil
 }
 
 // SemanticTokensFull returns the syntax-highlighting tokens for the whole
@@ -168,11 +243,11 @@ func (s *Server) SemanticTokensFull(_ context.Context, params *protocol.Semantic
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	doc := s.docs[params.TextDocument.URI]
-	if doc == nil {
+	v, ok := s.open[params.TextDocument.URI]
+	if !ok {
 		return nil, nil
 	}
-	return semanticTokens(doc.AST()), nil
+	return semanticTokens(v.AST()), nil
 }
 
 // Formatting returns the edits to format the whole document.
@@ -180,11 +255,11 @@ func (s *Server) Formatting(_ context.Context, params *protocol.DocumentFormatti
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	doc := s.docs[params.TextDocument.URI]
-	if doc == nil {
+	v, ok := s.open[params.TextDocument.URI]
+	if !ok {
 		return nil, nil
 	}
-	return formatEdits(doc.AST()), nil
+	return formatEdits(v.AST()), nil
 }
 
 // Hover returns documentation and type information for the symbol under the
@@ -193,23 +268,24 @@ func (s *Server) Hover(_ context.Context, params *protocol.HoverParams) (*protoc
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	doc := s.docs[params.TextDocument.URI]
-	if doc == nil {
+	v, ok := s.open[params.TextDocument.URI]
+	if !ok {
 		return nil, nil
 	}
-	return hover(doc, fromPosition(doc.Buffer(), params.Position)), nil
+	return hover(v, fromPosition(v.Buffer(), params.Position)), nil
 }
 
-// Definition resolves the reference under the cursor to its declaration.
+// Definition resolves the reference under the cursor to its declaration —
+// possibly in another file of the project.
 func (s *Server) Definition(_ context.Context, params *protocol.DefinitionParams) ([]protocol.Location, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	doc := s.docs[params.TextDocument.URI]
-	if doc == nil {
+	v, ok := s.open[params.TextDocument.URI]
+	if !ok {
 		return nil, nil
 	}
-	return definition(doc, fromPosition(doc.Buffer(), params.Position), params.TextDocument.URI), nil
+	return definition(v, fromPosition(v.Buffer(), params.Position)), nil
 }
 
 // DocumentHighlight highlights every occurrence of the symbol under the cursor.
@@ -217,11 +293,11 @@ func (s *Server) DocumentHighlight(_ context.Context, params *protocol.DocumentH
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	doc := s.docs[params.TextDocument.URI]
-	if doc == nil {
+	v, ok := s.open[params.TextDocument.URI]
+	if !ok {
 		return nil, nil
 	}
-	return documentHighlights(doc, fromPosition(doc.Buffer(), params.Position)), nil
+	return documentHighlights(v, fromPosition(v.Buffer(), params.Position)), nil
 }
 
 // InlayHint returns the inferred-type hints for un-annotated constants in range.
@@ -229,12 +305,12 @@ func (s *Server) InlayHint(_ context.Context, params *protocol.InlayHintParams) 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	doc := s.docs[params.TextDocument.URI]
-	if doc == nil {
+	v, ok := s.open[params.TextDocument.URI]
+	if !ok {
 		return nil, nil
 	}
-	buf := doc.Buffer()
-	return inlayHints(doc, fromPosition(buf, params.Range.Start), fromPosition(buf, params.Range.End)), nil
+	buf := v.Buffer()
+	return inlayHints(v, fromPosition(buf, params.Range.Start), fromPosition(buf, params.Range.End)), nil
 }
 
 // CodeAction returns the refactorings available for the requested range.
@@ -242,12 +318,12 @@ func (s *Server) CodeAction(_ context.Context, params *protocol.CodeActionParams
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	doc := s.docs[params.TextDocument.URI]
-	if doc == nil {
+	v, ok := s.open[params.TextDocument.URI]
+	if !ok {
 		return nil, nil
 	}
-	buf := doc.Buffer()
-	return codeActions(doc, fromPosition(buf, params.Range.Start), fromPosition(buf, params.Range.End), params.TextDocument.URI), nil
+	buf := v.Buffer()
+	return codeActions(v, fromPosition(buf, params.Range.Start), fromPosition(buf, params.Range.End), params.TextDocument.URI), nil
 }
 
 // References returns every reference to the symbol under the cursor.
@@ -255,12 +331,12 @@ func (s *Server) References(_ context.Context, params *protocol.ReferenceParams)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	doc := s.docs[params.TextDocument.URI]
-	if doc == nil {
+	v, ok := s.open[params.TextDocument.URI]
+	if !ok {
 		return nil, nil
 	}
-	offset := fromPosition(doc.Buffer(), params.Position)
-	return references(doc, offset, params.TextDocument.URI, params.Context.IncludeDeclaration), nil
+	offset := fromPosition(v.Buffer(), params.Position)
+	return references(v, offset, params.TextDocument.URI, params.Context.IncludeDeclaration), nil
 }
 
 // PrepareRename reports whether (and where) the symbol under the cursor can be
@@ -269,11 +345,11 @@ func (s *Server) PrepareRename(_ context.Context, params *protocol.PrepareRename
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	doc := s.docs[params.TextDocument.URI]
-	if doc == nil {
+	v, ok := s.open[params.TextDocument.URI]
+	if !ok {
 		return nil, nil
 	}
-	return prepareRename(doc, fromPosition(doc.Buffer(), params.Position)), nil
+	return prepareRename(v, fromPosition(v.Buffer(), params.Position)), nil
 }
 
 // Rename renames the symbol under the cursor — its declaration and every
@@ -282,22 +358,26 @@ func (s *Server) Rename(_ context.Context, params *protocol.RenameParams) (*prot
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	doc := s.docs[params.TextDocument.URI]
-	if doc == nil {
+	v, ok := s.open[params.TextDocument.URI]
+	if !ok {
 		return nil, nil
 	}
-	offset := fromPosition(doc.Buffer(), params.Position)
-	return rename(doc, offset, params.NewName, params.TextDocument.URI), nil
+	offset := fromPosition(v.Buffer(), params.Position)
+	return rename(v, offset, params.NewName, params.TextDocument.URI), nil
 }
 
-// publish sends the document's current diagnostics to the client. It is a no-op
-// when no client is attached (as in unit tests that drive the handler directly).
-func (s *Server) publish(ctx context.Context, uri protocol.DocumentURI, doc *semantic.Document) {
+// publishWorkspace sends current diagnostics for every open file of the
+// workspace — a change in one file may add or clear diagnostics in an
+// importer. It is a no-op when no client is attached (as in unit tests that
+// drive the handlers directly).
+func (s *Server) publishWorkspace(ctx context.Context, ws *workspace) {
 	if s.client == nil {
 		return
 	}
-	_ = s.client.PublishDiagnostics(ctx, &protocol.PublishDiagnosticsParams{
-		URI:         uri,
-		Diagnostics: toDiagnostics(doc),
-	})
+	for id, uri := range ws.open {
+		_ = s.client.PublishDiagnostics(ctx, &protocol.PublishDiagnosticsParams{
+			URI:         uri,
+			Diagnostics: toDiagnostics(view{ws: ws, id: id, uri: uri}),
+		})
+	}
 }

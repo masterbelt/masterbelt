@@ -3,7 +3,6 @@ package lsp
 import (
 	"strings"
 
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/semantic"
 	"github.com/masterbelt/masterbelt/pkg/source"
 	"github.com/masterbelt/masterbelt/pkg/source/cst"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
@@ -15,7 +14,7 @@ import (
 // reference (including one nested in an expression) describes the constant it
 // resolves to; hovering a function-literal parameter — its declaration or a
 // use in the body — shows its (possibly inferred) type.
-func hover(doc *semantic.Document, offset int) *protocol.Hover {
+func hover(doc view, offset int) *protocol.Hover {
 	trees := positionedTrees(doc.AST().Concrete().Tree())
 	occ, ok := occurrenceAt(doc, offset, trees)
 	if !ok {
@@ -25,15 +24,19 @@ func hover(doc *semantic.Document, offset int) *protocol.Hover {
 }
 
 // definition resolves the reference at offset to the location of its target
-// declaration's name.
-func definition(doc *semantic.Document, offset int, uri protocol.DocumentURI) []protocol.Location {
-	buf := doc.Buffer()
-	trees := positionedTrees(doc.AST().Concrete().Tree())
-
-	occ, ok := occurrenceAt(doc, offset, trees)
+// declaration's name — in this file, or in the sibling file an import brought
+// it from.
+func definition(doc view, offset int) []protocol.Location {
+	occ, ok := occurrenceAt(doc, offset, positionedTrees(doc.AST().Concrete().Tree()))
 	if !ok {
 		return nil
 	}
+	target, ok := doc.viewOf(occ.target)
+	if !ok {
+		return nil
+	}
+
+	trees := positionedTrees(target.AST().Concrete().Tree())
 	targetTree, ok := trees[occ.target.Syntax.Syntax()]
 	if !ok {
 		return nil
@@ -42,7 +45,7 @@ func definition(doc *semantic.Document, offset int, uri protocol.DocumentURI) []
 	if nameTok, ok := nameToken(targetTree); ok {
 		rng = nameTok
 	}
-	return []protocol.Location{{URI: uri, Range: toRange(buf, rng.Offset(), rng.End())}}
+	return []protocol.Location{{URI: target.uri, Range: toRange(target.Buffer(), rng.Offset(), rng.End())}}
 }
 
 // constHover renders a constant's signature (modifiers, name, inferred type) and

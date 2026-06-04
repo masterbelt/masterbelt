@@ -5,14 +5,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/semantic"
 	protocol "github.com/owenrumney/go-lsp/lsp"
 )
 
 func TestDocumentHighlights(t *testing.T) {
 	// M is declared once and referenced twice: one write (the declaration) and
 	// two reads.
-	doc := semantic.NewDocument([]byte("const M = 1\nconst z = M + M\n"))
+	doc := testView("const M = 1\nconst z = M + M\n")
 	hls := documentHighlights(doc, 6) // on the declaration name M
 
 	var writes, reads int
@@ -31,7 +30,7 @@ func TestDocumentHighlights(t *testing.T) {
 
 func TestInlayHints(t *testing.T) {
 	// A is un-annotated (gets a hint); B is annotated (gets none).
-	doc := semantic.NewDocument([]byte("const A = 1\nconst B: int64 = 2\n"))
+	doc := testView("const A = 1\nconst B: int64 = 2\n")
 	buf := doc.Buffer()
 	hints := inlayHints(doc, 0, buf.Len())
 
@@ -70,7 +69,7 @@ func TestLambdaInlayHints(t *testing.T) {
 	// The lambda's parameter and result types are solved from map's signature
 	// and the body; the hints render them where the annotations would sit.
 	src := "const Doubled = [1, 2].map(fn(x) { return x * 2 })\n"
-	doc := semantic.NewDocument([]byte(src))
+	doc := testView(src)
 	hints := inlayHints(doc, 0, doc.Buffer().Len())
 
 	labels := hintLabels(t, hints)
@@ -93,7 +92,7 @@ func TestLambdaInlayHintsSkipWritten(t *testing.T) {
 	// Written annotations already show themselves: only the inferred result
 	// gets a hint here.
 	src := "const Tripled = [1, 2].map(fn(x: int) { return x * 3 })\n"
-	doc := semantic.NewDocument([]byte(src))
+	doc := testView(src)
 	labels := hintLabels(t, inlayHints(doc, 0, doc.Buffer().Len()))
 	want := []string{": list<int>", ": int"} // Tripled and the result; x is written
 	if strings.Join(labels, "|") != strings.Join(want, "|") {
@@ -102,7 +101,7 @@ func TestLambdaInlayHintsSkipWritten(t *testing.T) {
 
 	// A fully annotated literal needs no lambda hints at all.
 	src = "const Twice: fn(x: int): int = fn(x: int): int { return x * 2 }\n"
-	doc = semantic.NewDocument([]byte(src))
+	doc = testView(src)
 	if hints := inlayHints(doc, 0, doc.Buffer().Len()); len(hints) != 0 {
 		t.Fatalf("got %d hints, want none (everything is written)", len(hints))
 	}
@@ -112,7 +111,7 @@ func TestLambdaInlayHintsInMethodBody(t *testing.T) {
 	// The method's declared result type reaches the returned literal, so its
 	// parameter and result infer and get hints.
 	src := "pub type T = int8 impl {\n  pub f(): fn(x: int): int {\n    return fn(x) { return x }\n  }\n}\n"
-	doc := semantic.NewDocument([]byte(src))
+	doc := testView(src)
 	labels := hintLabels(t, inlayHints(doc, 0, doc.Buffer().Len()))
 	want := []string{": int", ": int"} // the literal's x and result
 	if strings.Join(labels, "|") != strings.Join(want, "|") {
@@ -123,14 +122,14 @@ func TestLambdaInlayHintsInMethodBody(t *testing.T) {
 func TestLambdaInlayHintsSkipUninferable(t *testing.T) {
 	// An unsolvable signature renders no hint (the diagnostics carry the news).
 	src := "const A = fn(x) { return x }\n"
-	doc := semantic.NewDocument([]byte(src))
+	doc := testView(src)
 	if hints := inlayHints(doc, 0, doc.Buffer().Len()); len(hints) != 0 {
 		t.Fatalf("got %d hints, want none (nothing is solved)", len(hints))
 	}
 }
 
 func TestCodeActionAddsTypeAnnotation(t *testing.T) {
-	doc := semantic.NewDocument([]byte("const A = 1\n"))
+	doc := testView("const A = 1\n")
 	uri := protocol.DocumentURI("file:///x.belt")
 	actions := codeActions(doc, 0, 11, uri) // range over the whole declaration
 
@@ -148,7 +147,7 @@ func TestCodeActionAddsTypeAnnotation(t *testing.T) {
 
 func TestCodeActionSkipsAnnotated(t *testing.T) {
 	// An already-annotated constant offers no add-annotation action.
-	doc := semantic.NewDocument([]byte("const A: int64 = 1\n"))
+	doc := testView("const A: int64 = 1\n")
 	if actions := codeActions(doc, 0, 18, protocol.DocumentURI("file:///x.belt")); len(actions) != 0 {
 		t.Errorf("got %d code actions for an annotated const, want 0", len(actions))
 	}

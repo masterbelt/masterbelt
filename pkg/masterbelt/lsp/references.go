@@ -1,7 +1,6 @@
 package lsp
 
 import (
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/semantic"
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/source/cst"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
@@ -21,10 +20,11 @@ type occurrence struct {
 	target *ir.Const
 }
 
-// occurrenceAt finds the declaration name or value-position identifier at
-// offset — including a reference nested inside an expression — and the constant
-// it denotes.
-func occurrenceAt(doc *semantic.Document, offset int, trees map[cst.Green]cst.Tree) (occurrence, bool) {
+// occurrenceAt finds the declaration name, value-position identifier, or
+// namespace member access at offset — including a reference nested inside an
+// expression — and the constant it denotes (which may be declared in another
+// file of the program).
+func occurrenceAt(doc view, offset int, trees map[cst.Green]cst.Tree) (occurrence, bool) {
 	for _, c := range doc.Module().Consts {
 		decl := c.Syntax
 
@@ -40,6 +40,21 @@ func occurrenceAt(doc *semantic.Document, offset int, trees map[cst.Green]cst.Tr
 				if target := doc.Resolve(hit); target != nil {
 					return occurrence{token: trees[hit.Syntax()], target: target}, true
 				}
+				// Fall through: the cursor may sit on a namespace access
+				// (its receiver is an identifier that names no value).
+			}
+
+			// A namespace member access (geo.Origin), as one unit.
+			var member *ast.MemberExpr
+			walkMemberExprs(decl.Value, func(m *ast.MemberExpr) {
+				if t, ok := trees[m.Syntax()]; ok && within(t, offset) && doc.ResolveMember(m) != nil {
+					member = m
+				}
+			})
+			if member != nil {
+				return occurrence{token: trees[member.Syntax()], target: doc.ResolveMember(member)}, true
+			}
+			if hit != nil {
 				return occurrence{}, false // an undefined reference denotes nothing
 			}
 		}
@@ -54,10 +69,34 @@ func occurrenceAt(doc *semantic.Document, offset int, trees map[cst.Green]cst.Tr
 	return occurrence{}, false
 }
 
+// walkMemberExprs visits every member access in e, without descending into
+// function-literal bodies (mirroring ast.WalkValueIdents).
+func walkMemberExprs(e ast.Expr, fn func(*ast.MemberExpr)) {
+	switch e := e.(type) {
+	case *ast.MemberExpr:
+		walkMemberExprs(e.Receiver, fn)
+		fn(e)
+	case *ast.CallExpr:
+		walkMemberExprs(e.Callee, fn)
+		for _, a := range e.Arguments {
+			walkMemberExprs(a, fn)
+		}
+	case *ast.CollectionLit:
+		for _, entry := range e.Entries {
+			if entry.Key != nil {
+				walkMemberExprs(entry.Key, fn)
+			}
+			if entry.Value != nil {
+				walkMemberExprs(entry.Value, fn)
+			}
+		}
+	}
+}
+
 // occurrencesOf returns every token that names target — its declaration name
 // (when includeDecl is set) and every value-position identifier that resolves to
 // it, wherever it sits in an expression. This is the reverse of resolution.
-func occurrencesOf(doc *semantic.Document, target *ir.Const, trees map[cst.Green]cst.Tree, includeDecl bool) []cst.Tree {
+func occurrencesOf(doc view, target *ir.Const, trees map[cst.Green]cst.Tree, includeDecl bool) []cst.Tree {
 	var tokens []cst.Tree
 
 	if includeDecl {
@@ -79,13 +118,20 @@ func occurrencesOf(doc *semantic.Document, target *ir.Const, trees map[cst.Green
 				}
 			}
 		})
+		walkMemberExprs(c.Syntax.Value, func(m *ast.MemberExpr) {
+			if doc.ResolveMember(m) == target {
+				if t, ok := trees[m.Syntax()]; ok {
+					tokens = append(tokens, t)
+				}
+			}
+		})
 	}
 	return tokens
 }
 
 // references returns the locations of every reference to the symbol at offset
 // (including its declaration when includeDecl is set).
-func references(doc *semantic.Document, offset int, uri protocol.DocumentURI, includeDecl bool) []protocol.Location {
+func references(doc view, offset int, uri protocol.DocumentURI, includeDecl bool) []protocol.Location {
 	buf := doc.Buffer()
 	trees := positionedTrees(doc.AST().Concrete().Tree())
 
@@ -104,7 +150,7 @@ func references(doc *semantic.Document, offset int, uri protocol.DocumentURI, in
 // rename renames the symbol at offset to newName at its declaration and every
 // reference. It returns nil if there is no symbol under the cursor or newName is
 // not a valid identifier.
-func rename(doc *semantic.Document, offset int, newName string, uri protocol.DocumentURI) *protocol.WorkspaceEdit {
+func rename(doc view, offset int, newName string, uri protocol.DocumentURI) *protocol.WorkspaceEdit {
 	buf := doc.Buffer()
 	trees := positionedTrees(doc.AST().Concrete().Tree())
 
@@ -128,7 +174,7 @@ func rename(doc *semantic.Document, offset int, newName string, uri protocol.Doc
 // documentHighlights returns every occurrence of the symbol under the cursor as
 // a highlight: its declaration as a write, each value reference as a read. It is
 // occurrencesOf rendered for the in-file "highlight all uses" feature.
-func documentHighlights(doc *semantic.Document, offset int) []protocol.DocumentHighlight {
+func documentHighlights(doc view, offset int) []protocol.DocumentHighlight {
 	buf := doc.Buffer()
 	trees := positionedTrees(doc.AST().Concrete().Tree())
 
@@ -160,7 +206,7 @@ func documentHighlights(doc *semantic.Document, offset int) []protocol.DocumentH
 
 // prepareRename reports the range of the identifier under the cursor so the
 // editor can offer to rename it, pre-filled with the current name.
-func prepareRename(doc *semantic.Document, offset int) *protocol.PrepareRenameResult {
+func prepareRename(doc view, offset int) *protocol.PrepareRenameResult {
 	trees := positionedTrees(doc.AST().Concrete().Tree())
 	occ, ok := occurrenceAt(doc, offset, trees)
 	if !ok {

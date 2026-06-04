@@ -3,7 +3,6 @@ package lsp
 import (
 	"encoding/json"
 
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/semantic"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
 	protocol "github.com/owenrumney/go-lsp/lsp"
 )
@@ -17,7 +16,7 @@ import (
 //
 // Each hint carries a TextEdit that inserts the same annotation, so accepting
 // the hint materializes it in the source.
-func inlayHints(doc *semantic.Document, startOff, endOff int) []protocol.InlayHint {
+func inlayHints(doc view, startOff, endOff int) []protocol.InlayHint {
 	buf := doc.Buffer()
 	trees := positionedTrees(doc.AST().Concrete().Tree())
 	kind := protocol.InlayHintKindType

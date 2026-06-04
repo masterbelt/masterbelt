@@ -3,7 +3,6 @@ package lsp
 import (
 	"strings"
 
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/semantic"
 	"github.com/masterbelt/masterbelt/pkg/source/cst"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
 	protocol "github.com/owenrumney/go-lsp/lsp"
@@ -22,7 +21,7 @@ import (
 // completion returns the completion candidates at offset: type names in a type
 // position, and the value namespace (constants plus the value literals)
 // otherwise.
-func completion(doc *semantic.Document, offset int) *protocol.CompletionList {
+func completion(doc view, offset int) *protocol.CompletionList {
 	if typeContextAt(doc.AST().Concrete().Tree(), offset) {
 		return &protocol.CompletionList{Items: typeItems(doc)}
 	}
@@ -34,7 +33,7 @@ func completion(doc *semantic.Document, offset int) *protocol.CompletionList {
 // typeItems is one completion item per in-scope type name: the file's own types
 // (kind Class) and the builtin/prelude primitives (kind Struct), each documented
 // with its doc comment when it has one.
-func typeItems(doc *semantic.Document) []protocol.CompletionItem {
+func typeItems(doc view) []protocol.CompletionItem {
 	items := make([]protocol.CompletionItem, 0)
 	for _, t := range doc.TypeNames() {
 		if t.Name == "" {
@@ -59,7 +58,7 @@ func typeItems(doc *semantic.Document) []protocol.CompletionItem {
 // constantItems is one completion item per declared constant, labelled with the
 // name, detailed with the inferred type, and documented with the doc comment.
 // Duplicate declarations of a name contribute a single item.
-func constantItems(doc *semantic.Document) []protocol.CompletionItem {
+func constantItems(doc view) []protocol.CompletionItem {
 	kind := protocol.CompletionItemKindConstant
 	var items []protocol.CompletionItem
 	seen := map[string]bool{}
