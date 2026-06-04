@@ -35,7 +35,7 @@
 //	Operand       := Literal | NameRef | "self"
 //	TypeRef       := Ident
 //	NameRef       := Ident
-//	Literal       := Int | "true" | "false" | "null"
+//	Literal       := Int | String | "true" | "false" | "null"
 //
 // The binary levels are parsed by precedence climbing (parseExpr) rather than a
 // function per level; the binaryPrec table is the single source of operator
@@ -781,12 +781,13 @@ func (p *parser) parseCallArgs(children *[]cst.Green) {
 	}
 }
 
-// parseOperand parses an atom: a literal (integer, boolean, or null), a NameRef,
-// or the self receiver. The cursor sits on the operand token — startsExpr gates
-// every call site, so the default arm is defensive and consumes nothing.
+// parseOperand parses an atom: a literal (integer, string, boolean, or null), a
+// NameRef, or the self receiver. The cursor sits on the operand token —
+// startsExpr gates every call site, so the default arm is defensive and consumes
+// nothing.
 func (p *parser) parseOperand() cst.Green {
 	switch p.kind() {
-	case token.Int, token.True, token.False, token.Null:
+	case token.Int, token.String, token.True, token.False, token.Null:
 		return cst.NewNode(cst.Literal, []cst.Green{p.bump()})
 	case token.Ident:
 		return cst.NewNode(cst.NameRef, []cst.Green{p.bump()})
@@ -860,7 +861,7 @@ var unaryOps = map[token.Kind]bool{
 // trailing trivia for the next construct) rather than mis-parsed.
 func startsExpr(kind token.Kind) bool {
 	switch kind {
-	case token.Int, token.Ident, token.True, token.False, token.Null, token.Self,
+	case token.Int, token.String, token.Ident, token.True, token.False, token.Null, token.Self,
 		token.Plus, token.Minus, token.Bang:
 		return true
 	default:

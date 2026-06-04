@@ -1,0 +1,97 @@
+# tree
+File
+  ConstDecl
+    Pub "pub"
+    Whitespace " "
+    Const "const"
+    Whitespace " "
+    Ident "LabelName"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      Literal
+        String "\"label\""
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// An escaped quote and a newline escape."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Const "const"
+    Whitespace " "
+    Ident "Greeting"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      Literal
+        String "\"Hello, \\\"world\\\"!\\n\""
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// Tab, carriage return, and the null escape."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Const "const"
+    Whitespace " "
+    Ident "Control"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      Literal
+        String "\"a\\tb\\r\\n\\0\""
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// Raw multi-byte UTF-8 written directly in the source."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Const "const"
+    Whitespace " "
+    Ident "Unicode"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      Literal
+        String "\"日本語 🎉\""
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// A Unicode code point written as an escape."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Const "const"
+    Whitespace " "
+    Ident "Party"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      Literal
+        String "\"\\u{1F389}\""
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// The empty string."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Const "const"
+    Whitespace " "
+    Ident "Empty"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      Literal
+        String "\"\""
+  Newline "\n"
+  EOF ""
+# diagnostics

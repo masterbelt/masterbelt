@@ -238,6 +238,8 @@ func TestParseExpressionShape(t *testing.T) {
 		{"const x = - - 1\n", "(- (- 1))"},
 		{"const x = true\n", "true"},
 		{"const x = false || true\n", "(false || true)"},
+		{"const x = \"hi\"\n", `"hi"`},                 // a string literal is an operand
+		{"const x = \"a\" == \"b\"\n", `("a" == "b")`}, // strings compose like any operand
 	}
 	for _, tc := range cases {
 		buf, e := initExpr(t, tc.src)
