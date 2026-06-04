@@ -58,11 +58,12 @@ type ruleGroup struct {
 }
 
 type rule struct {
-	Include string `json:"include,omitempty"`
-	Name    string `json:"name,omitempty"`
-	Match   string `json:"match,omitempty"`
-	Begin   string `json:"begin,omitempty"`
-	End     string `json:"end,omitempty"`
+	Include  string `json:"include,omitempty"`
+	Name     string `json:"name,omitempty"`
+	Match    string `json:"match,omitempty"`
+	Begin    string `json:"begin,omitempty"`
+	End      string `json:"end,omitempty"`
+	Patterns []rule `json:"patterns,omitempty"`
 }
 
 func buildGrammar() grammar {
@@ -74,6 +75,7 @@ func buildGrammar() grammar {
 			{Include: "#comments"},
 			{Include: "#keywords"},
 			{Include: "#numbers"},
+			{Include: "#strings"},
 			{Include: "#operators"},
 			{Include: "#identifiers"},
 		},
@@ -88,6 +90,19 @@ func buildGrammar() grammar {
 			}},
 			"numbers": {Patterns: []rule{
 				{Name: "constant.numeric.integer.masterbelt", Match: `\b[0-9]+\b`},
+			}},
+			// A double-quoted string with the escapes the lexer recognizes —
+			// \n \r \t \0 \\ \" and \u{...}. Only a cold-start approximation; the
+			// server's semantic tokens are authoritative.
+			"strings": {Patterns: []rule{
+				{
+					Name:  "string.quoted.double.masterbelt",
+					Begin: `"`,
+					End:   `"`,
+					Patterns: []rule{
+						{Name: "constant.character.escape.masterbelt", Match: `\\(u\{[0-9A-Fa-f]{1,6}\}|[nrt0\\"])`},
+					},
+				},
 			}},
 			"operators": {Patterns: []rule{
 				{Name: "keyword.operator.assignment.masterbelt", Match: `=`},
@@ -136,10 +151,14 @@ func buildLanguageConfig() languageConfig {
 			LineComment:  token.LineCommentPrefix,
 			BlockComment: [2]string{token.BlockCommentOpen, token.BlockCommentClose},
 		},
-		// The language has no brackets yet; block comments auto-close.
-		Brackets:         [][]string{},
-		AutoClosingPairs: []pair{{Open: token.BlockCommentOpen, Close: token.BlockCommentClose}},
-		SurroundingPairs: []pair{},
+		// The language has no brackets yet; block comments and string quotes
+		// auto-close, and quotes can surround a selection.
+		Brackets: [][]string{},
+		AutoClosingPairs: []pair{
+			{Open: token.BlockCommentOpen, Close: token.BlockCommentClose},
+			{Open: `"`, Close: `"`},
+		},
+		SurroundingPairs: []pair{{Open: `"`, Close: `"`}},
 	}
 }
 

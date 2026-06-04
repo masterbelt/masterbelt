@@ -51,6 +51,17 @@ func TestSemanticTokens(t *testing.T) {
 	}
 }
 
+func TestSemanticTokensStringLiteral(t *testing.T) {
+	doc := abstract.NewDocument([]byte("const X = \"label\"\n"))
+	got := decode(semanticTokens(doc).Data)
+	// The initializer "label" (8 columns: the quotes included) is a string token.
+	last := got[len(got)-1]
+	want := decodedToken{0, 10, 7, stString, 0}
+	if last != want {
+		t.Errorf("string literal token = %+v, want %+v", last, want)
+	}
+}
+
 func TestSemanticTokensNameRefIsReadonlyVariable(t *testing.T) {
 	doc := abstract.NewDocument([]byte("const Alias = MaxLevel\n"))
 	got := decode(semanticTokens(doc).Data)

@@ -22,6 +22,7 @@ const (
 	stType
 	stVariable
 	stNumber
+	stString
 	stOperator
 )
 
@@ -34,7 +35,7 @@ const (
 // semanticLegend is advertised at initialize and tells the editor how to read
 // the token type and modifier indices the server emits.
 var semanticLegend = protocol.SemanticTokensLegend{
-	TokenTypes:     []string{"keyword", "comment", "type", "variable", "number", "operator"},
+	TokenTypes:     []string{"keyword", "comment", "type", "variable", "number", "string", "operator"},
 	TokenModifiers: []string{"declaration", "readonly"},
 }
 
@@ -99,6 +100,8 @@ func classifyToken(kind token.Kind, parent cst.Kind) (tokenType, mods int, ok bo
 		return stComment, 0, true
 	case token.Int:
 		return stNumber, 0, true
+	case token.String:
+		return stString, 0, true
 	case token.Colon, token.Assign:
 		return stOperator, 0, true
 	case token.Ident:

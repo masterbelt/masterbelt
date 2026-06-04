@@ -13,6 +13,9 @@
       "include": "#numbers"
     },
     {
+      "include": "#strings"
+    },
+    {
       "include": "#operators"
     },
     {
@@ -70,6 +73,21 @@
         {
           "name": "punctuation.separator.type.masterbelt",
           "match": ":"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.masterbelt",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.masterbelt",
+              "match": "\\\\(u\\{[0-9A-Fa-f]{1,6}\\}|[nrt0\\\\\"])"
+            }
+          ]
         }
       ]
     }
