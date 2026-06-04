@@ -1,12 +1,14 @@
 // Package project models a masterbelt project: the root directory marked by
 // masterbelt.toml, the parsed manifest, and the set of source files reachable
-// from the entry point. In P-1 that set is exactly the entry file; multi-file
-// resolution (`use`) grows it in P-2.
+// from the entry point — the closure of the entry's use declarations.
 //
-// The package depends on pkg/diagnostic and the manifest parser only — never
-// on the compiler under pkg/masterbelt. The compiler's callers (the CLI today,
-// the multi-file engine in P-2) are the ones that bind a Project's files to
-// documents, so the dependency arrow always points from them to both.
+// The project layer owns the meaning of a use path: relative to the importing
+// file, confined to the project root. It parses files (pkg/masterbelt/parser)
+// to follow their imports, but never resolves names or types — the semantic
+// layer consumes each File's resolved Uses table as an input, so the path
+// semantics live in exactly one place. The dependency arrow keeps pointing
+// downward: project reads the parsers, and semantic's callers (CLI, LSP) bind
+// a Project to the engine; neither parser nor semantic imports project.
 package project
 
 import (
@@ -14,9 +16,12 @@ import (
 	"path"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/parser/abstract"
 	"github.com/masterbelt/masterbelt/pkg/project/config"
+	"github.com/masterbelt/masterbelt/pkg/source/ast"
 )
 
 // FileID identifies a file within its project: the file's path relative to
@@ -33,11 +38,18 @@ func fileID(rel string) FileID {
 }
 
 // File is one source file of the project: its identity, its absolute location
-// on disk, and its raw content.
+// on disk, its raw content, and its parsed syntax.
 type File struct {
 	ID   FileID
 	Path string
 	Data []byte
+	// AST is the file's parsed, incrementally editable syntax document.
+	AST *abstract.Document
+	// Uses maps each of the file's use declarations to the FileID its path
+	// resolves to. A use whose path is malformed, escapes the project root,
+	// or names a file that cannot be read is absent — the file set simply
+	// does not grow there, and the semantic layer reports it at the use site.
+	Uses map[*ast.UseDecl]FileID
 }
 
 // Project is an opened masterbelt project.
@@ -124,8 +136,7 @@ func OpenProfile(dir, profile string) (*Project, diagnostic.List) {
 	}
 
 	entry := fileID(rawEntry)
-	entryPath := filepath.Join(root, filepath.FromSlash(string(entry)))
-	data, err := os.ReadFile(entryPath)
+	entryFile, err := loadFile(root, entry)
 	if err != nil {
 		if profile == "" {
 			diags.Add(config.EntryNotFound(rawEntry))
@@ -140,10 +151,63 @@ func OpenProfile(dir, profile string) (*Project, diagnostic.List) {
 		Config:  cfg,
 		Profile: profile,
 		Entry:   entry,
-		files: map[FileID]*File{
-			entry: {ID: entry, Path: entryPath, Data: data},
-		},
+		files:   closeOver(root, entryFile),
 	}, diags
+}
+
+// loadFile reads and parses one project file.
+func loadFile(root string, id FileID) (*File, error) {
+	p := filepath.Join(root, filepath.FromSlash(string(id)))
+	data, err := os.ReadFile(p)
+	if err != nil {
+		return nil, err
+	}
+	return &File{ID: id, Path: p, Data: data, AST: abstract.NewDocument(data)}, nil
+}
+
+// closeOver follows use declarations from the entry until the file set is
+// closed: every reachable file is loaded and parsed exactly once (a visited
+// set makes import cycles terminate; reporting them is the semantic layer's
+// job), and each file's Uses table records where its imports resolved.
+func closeOver(root string, entry *File) map[FileID]*File {
+	files := map[FileID]*File{entry.ID: entry}
+	queue := []*File{entry}
+	for len(queue) > 0 {
+		f := queue[0]
+		queue = queue[1:]
+
+		f.Uses = map[*ast.UseDecl]FileID{}
+		for _, u := range f.AST.File().Uses {
+			target, ok := resolveUse(f.ID, u.Path)
+			if !ok {
+				continue // malformed or escaping: absent from the table
+			}
+			if _, seen := files[target]; !seen {
+				loaded, err := loadFile(root, target)
+				if err != nil {
+					continue // no such file: absent from the table
+				}
+				files[target] = loaded
+				queue = append(queue, loaded)
+			}
+			f.Uses[u] = target
+		}
+	}
+	return files
+}
+
+// resolveUse resolves a use path as written in importer's source to the
+// FileID it names: use paths are relative to the importing file and must stay
+// inside the project root.
+func resolveUse(importer FileID, usePath string) (FileID, bool) {
+	if usePath == "" || path.IsAbs(usePath) {
+		return "", false
+	}
+	target := path.Join(path.Dir(string(importer)), usePath) // Join also cleans
+	if target == ".." || strings.HasPrefix(target, "../") {
+		return "", false
+	}
+	return FileID(target), true
 }
 
 // profileEntry resolves the entry point of the requested profile. Parse has

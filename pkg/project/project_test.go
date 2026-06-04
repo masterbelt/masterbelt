@@ -3,6 +3,9 @@ package project
 import (
 	"os"
 	"path/filepath"
+	"slices"
+	"sort"
+	"strings"
 	"testing"
 
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
@@ -180,6 +183,115 @@ func TestOpenDefaultOfProfileOnlyManifest(t *testing.T) {
 
 	if proj, diags := OpenProfile(root, "editor"); proj == nil || diags.Len() != 0 {
 		t.Errorf("OpenProfile(editor) = %v, %v; want the project", proj, diags.Items())
+	}
+}
+
+// useTargets renders a file's resolved Uses table as "path->target" pairs,
+// sorted, for compact assertions.
+func useTargets(f *File) []string {
+	var out []string
+	for u, target := range f.Uses {
+		out = append(out, u.Path+"->"+string(target))
+	}
+	sort.Strings(out)
+	return out
+}
+
+func TestOpenClosesOverUses(t *testing.T) {
+	root := t.TempDir()
+	write(t, root, "masterbelt.toml", "entry = \"main.belt\"\n")
+	write(t, root, "main.belt", "use geo from \"geometry.belt\"\nconst A = 1\n")
+	write(t, root, "geometry.belt", "use { C } from \"palette.belt\"\npub const Origin = 0\n")
+	write(t, root, "palette.belt", "pub const C = 2\n")
+
+	proj, diags := Open(root)
+	if diags.Len() != 0 {
+		t.Fatalf("Open() diagnostics = %v, want none", diags.Items())
+	}
+
+	// The set is the closure of the entry's imports, ordered by id.
+	var ids []string
+	for _, f := range proj.Files() {
+		ids = append(ids, string(f.ID))
+	}
+	if got, want := strings.Join(ids, ","), "geometry.belt,main.belt,palette.belt"; got != want {
+		t.Fatalf("Files() = %s, want %s", got, want)
+	}
+
+	// Each file's Uses table records where its imports resolved.
+	if got := useTargets(proj.EntryFile()); !slices.Equal(got, []string{"geometry.belt->geometry.belt"}) {
+		t.Errorf("entry Uses = %v", got)
+	}
+	if got := useTargets(proj.File("geometry.belt")); !slices.Equal(got, []string{"palette.belt->palette.belt"}) {
+		t.Errorf("geometry Uses = %v", got)
+	}
+	if f := proj.File("palette.belt"); f.AST == nil || len(f.Uses) != 0 {
+		t.Errorf("palette = %+v, want parsed with no uses", f)
+	}
+}
+
+func TestOpenUseCycle(t *testing.T) {
+	// A use cycle terminates the closure; both files load, both tables wire.
+	// Reporting the cycle is the semantic layer's job.
+	root := t.TempDir()
+	write(t, root, "masterbelt.toml", "entry = \"a.belt\"\n")
+	write(t, root, "a.belt", "use b from \"b.belt\"\n")
+	write(t, root, "b.belt", "use a from \"a.belt\"\n")
+
+	proj, diags := Open(root)
+	if diags.Len() != 0 || len(proj.Files()) != 2 {
+		t.Fatalf("Open() = %v files, %v; want 2 files", len(proj.Files()), diags.Items())
+	}
+	if got := useTargets(proj.File("b.belt")); !slices.Equal(got, []string{"a.belt->a.belt"}) {
+		t.Errorf("b Uses = %v", got)
+	}
+}
+
+func TestOpenUnresolvableUse(t *testing.T) {
+	root := t.TempDir()
+	write(t, root, "masterbelt.toml", "entry = \"main.belt\"\n")
+	write(t, root, "main.belt", "use ghost from \"missing.belt\"\nconst A = 1\n")
+
+	proj, diags := Open(root)
+	if diags.Len() != 0 {
+		t.Fatalf("Open() diagnostics = %v, want none (the use site reports later)", diags.Items())
+	}
+	if len(proj.Files()) != 1 {
+		t.Errorf("Files() = %d, want just the entry", len(proj.Files()))
+	}
+	if got := useTargets(proj.EntryFile()); len(got) != 0 {
+		t.Errorf("entry Uses = %v, want empty (unresolvable)", got)
+	}
+}
+
+func TestOpenUseEscapesRoot(t *testing.T) {
+	root := t.TempDir()
+	write(t, root, "masterbelt.toml", "entry = \"main.belt\"\n")
+	write(t, root, "main.belt", "use out from \"../outside.belt\"\n")
+	write(t, filepath.Dir(root), "outside.belt", "pub const X = 1\n")
+
+	proj, _ := Open(root)
+	if len(proj.Files()) != 1 || len(proj.EntryFile().Uses) != 0 {
+		t.Errorf("escape was followed: files = %d, uses = %v", len(proj.Files()), useTargets(proj.EntryFile()))
+	}
+}
+
+func TestOpenUseRelativeToImporter(t *testing.T) {
+	// Use paths are relative to the importing file, not the root; ".." may
+	// move between directories as long as it stays inside the root.
+	root := t.TempDir()
+	write(t, root, "masterbelt.toml", "entry = \"src/main.belt\"\n")
+	write(t, root, "src/main.belt", "use geo from \"geometry.belt\"\nuse util from \"../lib/util.belt\"\n")
+	write(t, root, "src/geometry.belt", "pub const Origin = 0\n")
+	write(t, root, "lib/util.belt", "pub const U = 1\n")
+
+	proj, diags := Open(root)
+	if diags.Len() != 0 {
+		t.Fatalf("Open() diagnostics = %v, want none", diags.Items())
+	}
+	want := []string{"../lib/util.belt->lib/util.belt", "geometry.belt->src/geometry.belt"}
+	if got := useTargets(proj.EntryFile()); !slices.Equal(got, want) {
+		t.Errorf("entry Uses = %v, want %v", got, want)
 	}
 }
 
