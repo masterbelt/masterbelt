@@ -172,3 +172,74 @@ func TestAssertHoverDoc(t *testing.T) {
 		t.Errorf("hover = %q, want the doc comment after the diagram", h.Contents.Value)
 	}
 }
+
+func TestTypeHover(t *testing.T) {
+	src := "/// a coin\npub type Coin = int8\nconst c: Coin = 1\n"
+	doc := testView(src)
+
+	t.Run("annotation reference describes the type", func(t *testing.T) {
+		h := hover(doc, strings.Index(src, ": Coin")+3)
+		if h == nil {
+			t.Fatal("no hover on the type reference")
+		}
+		if !strings.Contains(h.Contents.Value, "pub type Coin = int8") {
+			t.Errorf("hover = %q, want the type signature", h.Contents.Value)
+		}
+		if !strings.Contains(h.Contents.Value, "a coin") {
+			t.Errorf("hover = %q, want the doc comment", h.Contents.Value)
+		}
+	})
+
+	t.Run("declaration name describes itself", func(t *testing.T) {
+		h := hover(doc, strings.Index(src, "type Coin")+6)
+		if h == nil {
+			t.Fatal("no hover on the declaration name")
+		}
+		if !strings.Contains(h.Contents.Value, "pub type Coin = int8") {
+			t.Errorf("hover = %q, want the type signature", h.Contents.Value)
+		}
+	})
+
+	t.Run("a builtin from the prelude describes itself", func(t *testing.T) {
+		h := hover(doc, strings.Index(src, "= int8")+3)
+		if h == nil {
+			t.Fatal("no hover on int8")
+		}
+		if !strings.Contains(h.Contents.Value, "type int8 = builtin") {
+			t.Errorf("hover = %q, want the builtin signature", h.Contents.Value)
+		}
+	})
+}
+
+func TestTypeHoverGenericParams(t *testing.T) {
+	src := "type Opt<T> = T | null\nconst o: Opt<int8> = 1\n"
+	doc := testView(src)
+
+	h := hover(doc, strings.Index(src, ": Opt")+3)
+	if h == nil {
+		t.Fatal("no hover on the generic type reference")
+	}
+	if !strings.Contains(h.Contents.Value, "type Opt<T> = T | null") {
+		t.Errorf("hover = %q, want the generic signature", h.Contents.Value)
+	}
+}
+
+func TestTypeDefinition(t *testing.T) {
+	src := "pub type Coin = int8\nconst c: Coin = 1\n"
+	doc := testView(src)
+
+	locs := definition(doc, strings.Index(src, ": Coin")+3)
+	if len(locs) != 1 {
+		t.Fatalf("definition = %d locations, want 1", len(locs))
+	}
+	// The location is the declaration's name, "Coin" on line 0 (cols 9..13).
+	r := locs[0].Range
+	if r.Start.Line != 0 || r.Start.Character != 9 || r.End.Character != 13 {
+		t.Errorf("definition range = %+v, want line 0 cols 9..13", r)
+	}
+
+	// A prelude builtin is declared in no workspace file: no jump, no panic.
+	if locs := definition(doc, strings.Index(src, "= int8")+3); locs != nil {
+		t.Errorf("definition(int8) = %v, want nil for a prelude type", locs)
+	}
+}

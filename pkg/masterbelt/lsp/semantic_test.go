@@ -166,3 +166,50 @@ func TestSemanticTokensDeclaredNames(t *testing.T) {
 		}
 	}
 }
+
+func TestSemanticTokensMembers(t *testing.T) {
+	// Record fields, method names, parameters, and member accesses each get
+	// their own classification; a reference in a body stays a variable.
+	src := "type Rec = {\n" +
+		"  id: int8\n" +
+		"}\n" +
+		"type Lvl = int8 impl {\n" +
+		"  pub inc(x: int8): self {\n" +
+		"    return self.bump(x)\n" +
+		"  }\n" +
+		"}\n"
+	doc := abstract.NewDocument([]byte(src))
+	got := decode(semanticTokens(doc).Data)
+
+	find := func(line, char int) (decodedToken, bool) {
+		for _, tok := range got {
+			if tok.line == line && tok.char == char {
+				return tok, true
+			}
+		}
+		return decodedToken{}, false
+	}
+	cases := []struct {
+		name       string
+		line, char int
+		tokenType  int
+		mods       int
+	}{
+		{"record field", 1, 2, stProperty, smDeclaration},    // id
+		{"method name", 4, 6, stMethod, smDeclaration},       // inc
+		{"parameter", 4, 10, stParameter, smDeclaration},     // x
+		{"self keyword", 5, 11, stKeyword, 0},                // self
+		{"member access", 5, 16, stProperty, 0},              // bump
+		{"reference in body", 5, 21, stVariable, smReadonly}, // x
+	}
+	for _, tc := range cases {
+		tok, ok := find(tc.line, tc.char)
+		if !ok {
+			t.Errorf("%s: no token at %d:%d (got %+v)", tc.name, tc.line, tc.char, got)
+			continue
+		}
+		if tok.tokenType != tc.tokenType || tok.mods != tc.mods {
+			t.Errorf("%s = %+v, want type %d mods %d", tc.name, tok, tc.tokenType, tc.mods)
+		}
+	}
+}

@@ -511,3 +511,47 @@ func TestQualifiedTypeCompletion(t *testing.T) {
 		}
 	}
 }
+
+// TestCrossFileTypeDefinition: go-to-definition and hover on a
+// namespace-qualified type name reach the sibling file's declaration.
+func TestCrossFileTypeDefinition(t *testing.T) {
+	mainSrc := "use geo from \"geometry.belt\"\nconst p: geo.Point = 1\n"
+	root := belttest.WriteFiles(t, map[string]string{
+		"masterbelt.toml": "entry = \"main.belt\"\n",
+		"main.belt":       mainSrc,
+		"geometry.belt":   "/// a 1D point\npub type Point = int8\n",
+	})
+	s := NewServer()
+	uri := openOnDisk(t, s, root, "main.belt")
+	v := s.open[uri]
+
+	offset := strings.Index(mainSrc, "Point")
+	locs := definition(v, offset)
+	if len(locs) != 1 {
+		t.Fatalf("got %d locations, want 1", len(locs))
+	}
+	if want := fileURI(root, "geometry.belt"); locs[0].URI != want {
+		t.Errorf("URI = %q, want %q", locs[0].URI, want)
+	}
+	// geometry.belt line 1: `pub type Point = int8` — the name is cols 9..14.
+	r := locs[0].Range
+	if r.Start.Line != 1 || r.Start.Character != 9 || r.End.Character != 14 {
+		t.Errorf("range = %+v, want line 1 cols 9..14", r)
+	}
+
+	h := hover(v, offset)
+	if h == nil {
+		t.Fatal("no hover on the qualified type name")
+	}
+	if !strings.Contains(h.Contents.Value, "pub type Point = int8") {
+		t.Errorf("hover = %q, want the type signature", h.Contents.Value)
+	}
+	if !strings.Contains(h.Contents.Value, "a 1D point") {
+		t.Errorf("hover = %q, want the doc comment", h.Contents.Value)
+	}
+
+	// The qualifier names a namespace, not a type: no hover claims it as one.
+	if locs := definition(v, strings.Index(mainSrc, "geo.Point")); locs != nil {
+		t.Errorf("definition(geo) = %v, want nil for the qualifier", locs)
+	}
+}

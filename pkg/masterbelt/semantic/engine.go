@@ -119,6 +119,7 @@ type database struct {
 	revision       int
 	files          map[FileID]fileInput
 	declFile       map[*ast.ConstDecl]FileID    // which file each declaration sits in
+	typeFile       map[*ast.TypeDecl]FileID     // which file each type declaration sits in
 	shells         map[*ast.ConstDecl]*ir.Const // the identity ir.Const of every declaration
 	reg            *builtin.Registry
 	prelude        map[string]*ir.TypeDef // the implicit base tier: the prelude barrel's exported types
@@ -135,6 +136,7 @@ func newDatabase(u builtins) *database {
 		prelude:        u.prelude,
 		files:          map[FileID]fileInput{},
 		declFile:       map[*ast.ConstDecl]FileID{},
+		typeFile:       map[*ast.TypeDecl]FileID{},
 		shells:         map[*ast.ConstDecl]*ir.Const{},
 		inputChangedAt: map[FileID]int{},
 		memos:          map[queryKey]*memo{},
@@ -181,6 +183,7 @@ func (db *database) dropInput(id FileID) {
 // refreshes) keep binding the same ir.Const objects.
 func (db *database) rebindDecls(id FileID, old, new *ast.File) {
 	keep := map[*ast.ConstDecl]bool{}
+	keepTypes := map[*ast.TypeDecl]bool{}
 	if new != nil {
 		for _, d := range new.Decls {
 			keep[d] = true
@@ -189,12 +192,21 @@ func (db *database) rebindDecls(id FileID, old, new *ast.File) {
 				db.shells[d] = &ir.Const{Name: d.Name, Public: d.Public, Doc: d.Doc, Syntax: d}
 			}
 		}
+		for _, t := range new.Types {
+			keepTypes[t] = true
+			db.typeFile[t] = id
+		}
 	}
 	if old != nil {
 		for _, d := range old.Decls {
 			if !keep[d] {
 				delete(db.declFile, d)
 				delete(db.shells, d)
+			}
+		}
+		for _, t := range old.Types {
+			if !keepTypes[t] {
+				delete(db.typeFile, t)
 			}
 		}
 	}

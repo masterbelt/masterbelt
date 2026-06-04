@@ -48,7 +48,7 @@ func resolveTypes(file *ast.File, at func(ast.Node) span, diags *diagnostic.List
 	own := make(map[string]bool, len(file.Types))
 	out := make([]*ir.TypeDef, len(file.Types))
 	for i, td := range file.Types {
-		def := &ir.TypeDef{Name: td.Name, Public: td.Public, Doc: td.Doc}
+		def := &ir.TypeDef{Name: td.Name, Public: td.Public, Doc: td.Doc, Syntax: td}
 		out[i] = def
 		if td.Name == "" {
 			continue

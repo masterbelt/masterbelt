@@ -129,6 +129,16 @@ func (p *Program) FileOf(c *ir.Const) (FileID, bool) {
 	return id, ok
 }
 
+// FileOfType returns the file a type definition was declared in. A definition
+// outside the program — the prelude's — is in no file.
+func (p *Program) FileOfType(t *ir.TypeDef) (FileID, bool) {
+	if t == nil || t.Syntax == nil {
+		return "", false
+	}
+	id, ok := p.db.typeFile[t.Syntax]
+	return id, ok
+}
+
 // FuncLitTypes returns the settled signature of every function literal in
 // file, exactly as the checking walk settles them — what the editor reads to
 // hover a lambda parameter or render its inlay hint.

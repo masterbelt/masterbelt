@@ -1,6 +1,10 @@
 package ir
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/masterbelt/masterbelt/pkg/source/ast"
+)
 
 // Type is a masterbelt type. It is a sealed interface — the variants in this
 // file are the only implementations — and it carries no native semantics of its
@@ -196,7 +200,8 @@ type TypeDef struct {
 	Params  []*TypeParam // generic parameters, in declaration order
 	Body    Type         // the defined type (nil if missing/invalid)
 	Methods []*Method
-	Builtin bool // declared as `= builtin`: its semantics come from the registry
+	Builtin bool          // declared as `= builtin`: its semantics come from the registry
+	Syntax  *ast.TypeDecl // the declaration this was resolved from
 }
 
 // TypeParam is one generic parameter of a TypeDef: a name and an optional

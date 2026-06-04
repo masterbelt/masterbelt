@@ -102,6 +102,19 @@ func (v view) viewOf(c *ir.Const) (view, bool) {
 	return view{ws: v.ws, id: id, uri: v.ws.uriFor(id)}, true
 }
 
+// viewOfType is viewOf for a type definition. The prelude's definitions are
+// declared in no workspace file, so they resolve to no view.
+func (v view) viewOfType(t *ir.TypeDef) (view, bool) {
+	id, ok := v.ws.prog.FileOfType(t)
+	if !ok {
+		return view{}, false
+	}
+	if id == v.id {
+		return v, true
+	}
+	return view{ws: v.ws, id: id, uri: v.ws.uriFor(id)}, true
+}
+
 // uriFor returns the URI of a workspace file: the open document's URI when the
 // editor has it open, otherwise the file's location on disk.
 func (ws *workspace) uriFor(id semantic.FileID) protocol.DocumentURI {

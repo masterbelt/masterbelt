@@ -25,6 +25,9 @@ const (
 	stString
 	stOperator
 	stNamespace
+	stProperty
+	stMethod
+	stParameter
 )
 
 // Semantic token modifier bits, matching the legend's TokenModifiers order.
@@ -36,7 +39,10 @@ const (
 // semanticLegend is advertised at initialize and tells the editor how to read
 // the token type and modifier indices the server emits.
 var semanticLegend = protocol.SemanticTokensLegend{
-	TokenTypes:     []string{"keyword", "comment", "type", "variable", "number", "string", "operator", "namespace"},
+	TokenTypes: []string{
+		"keyword", "comment", "type", "variable", "number", "string", "operator",
+		"namespace", "property", "method", "parameter",
+	},
 	TokenModifiers: []string{"declaration", "readonly"},
 }
 
@@ -126,6 +132,22 @@ func classifyToken(kind token.Kind, parent cst.Kind) (tokenType, mods int, ok bo
 		case cst.UseDecl:
 			// The namespace a use declaration binds (use geo from ...).
 			return stNamespace, smDeclaration, true
+		case cst.Field:
+			// A record field's declared name ({ id: int8 }).
+			return stProperty, smDeclaration, true
+		case cst.MethodDecl:
+			// A method's declared name inside an impl block.
+			return stMethod, smDeclaration, true
+		case cst.Param:
+			// A declared parameter — a method's, a function type's, or a
+			// function literal's.
+			return stParameter, smDeclaration, true
+		case cst.MemberExpr:
+			// A member access (self.id, list.map): the member's role — field,
+			// method, or an imported constant — is a semantic fact, so this
+			// lexical pass settles for property; resolution-aware tokens are
+			// a possible refinement.
+			return stProperty, 0, true
 		case cst.NameRef:
 			return stVariable, smReadonly, true
 		case cst.ConstDecl:
