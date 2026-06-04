@@ -71,6 +71,9 @@ func dumpMethod(b *strings.Builder, m *Method) {
 		mod += " extern"
 	}
 	fmt.Fprintf(b, "    method %q%s\n", m.Name, mod)
+	for _, doc := range m.Doc {
+		fmt.Fprintf(b, "      doc %q\n", doc)
+	}
 	for _, p := range m.Params {
 		fmt.Fprintf(b, "      param %s: %s\n", p.Name, typeString(p.Type))
 	}

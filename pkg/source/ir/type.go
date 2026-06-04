@@ -219,6 +219,7 @@ type Method struct {
 	Name   string
 	Public bool
 	Extern bool
+	Doc    []string
 	Params []Param
 	Result Type
 	Body   []Stmt // the resolved body, or nil for an extern method

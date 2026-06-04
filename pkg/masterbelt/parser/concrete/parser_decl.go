@@ -293,8 +293,11 @@ func (p *parser) parseImplBlock() *cst.Node {
 		case p.peekSignificant() == token.EOF:
 			return cst.NewNode(cst.ImplBlock, children)
 		case startsMethod(p.peekSignificant()):
-			p.skipTrivia(&children)
-			children = append(children, p.parseMethodDecl())
+			// The leading trivia belongs to the method (its doc comment most
+			// of all), exactly as a top-level declaration's does.
+			var lead []cst.Green
+			p.skipTrivia(&lead)
+			children = append(children, p.parseMethodDecl(lead))
 		default:
 			p.skipTrivia(&children)
 			p.report(newUnexpectedTokenDiagnostic(p.cur().Offset, p.cur().Width, p.kind().String()))
@@ -303,14 +306,15 @@ func (p *parser) parseImplBlock() *cst.Node {
 	}
 }
 
-// parseMethodDecl parses a method inside an impl block:
+// parseMethodDecl parses a method inside an impl block, prepending the
+// already-collected leading trivia:
 //
-//	[pub] [extern] [fn] Ident ParamList ":" TypeExpr [Block]
+//	[doc] [pub] [extern] [fn] Ident ParamList ":" TypeExpr [Block]
 //
 // fn is optional (some methods omit it) and the body Block is absent for an
 // extern method. The cursor sits on the first of pub/extern/fn/Ident.
-func (p *parser) parseMethodDecl() *cst.Node {
-	var children []cst.Green
+func (p *parser) parseMethodDecl(lead []cst.Green) *cst.Node {
+	children := lead
 	if p.kind() == token.Pub {
 		children = append(children, p.bump())
 	}

@@ -360,3 +360,16 @@ func TestRenderRoundTrip(t *testing.T) {
 		}
 	}
 }
+
+func TestLowerMethodDoc(t *testing.T) {
+	// A doc comment before a method attaches to the method, not to the
+	// surrounding impl block.
+	file, diags := Lower([]byte("type L = int8 impl {\n  /// bumps the level\n  inc(): self {\n    return self\n  }\n}\n"))
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	m := file.Types[0].Methods[0]
+	if len(m.Doc) != 1 || m.Doc[0] != "bumps the level" {
+		t.Fatalf("method Doc = %q, want [bumps the level]", m.Doc)
+	}
+}

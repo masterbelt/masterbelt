@@ -104,7 +104,7 @@ func resolveDecl(r *infer.TypeResolver, td *ast.TypeDecl, def *ir.TypeDef) {
 // resolveMethod resolves a method's signature (parameter types and result type)
 // and lowers its body to IR. The body is not yet type-checked.
 func resolveMethod(r *infer.TypeResolver, m *ast.MethodDecl, scope map[string]bool) *ir.Method {
-	method := &ir.Method{Name: m.Name, Public: m.Public, Extern: m.Extern}
+	method := &ir.Method{Name: m.Name, Public: m.Public, Extern: m.Extern, Doc: m.Doc}
 
 	// Method-introduced type variables: free type names appearing in a parameter
 	// type that the enclosing type does not bind and that name no known type — the

@@ -217,7 +217,15 @@ func typeHover(t *ir.TypeDef, buf source.Buffer, rng cst.Tree) *protocol.Hover {
 	}
 	if len(t.Methods) > 0 {
 		b.WriteString("\n\n```masterbelt\n")
-		for _, m := range t.Methods {
+		for i, m := range t.Methods {
+			// Each method renders as declared, its doc comment above it, so
+			// the card reads like the impl block itself.
+			if i > 0 && len(m.Doc) > 0 {
+				b.WriteString("\n")
+			}
+			for _, doc := range m.Doc {
+				b.WriteString("/// " + doc + "\n")
+			}
 			b.WriteString(methodSignature(m))
 			b.WriteString("\n")
 		}

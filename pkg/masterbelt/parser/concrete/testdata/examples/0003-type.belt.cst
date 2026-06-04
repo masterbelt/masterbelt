@@ -33,9 +33,9 @@ File
       Impl "impl"
       Whitespace " "
       LBrace "{"
-      Newline "\n"
-      Whitespace "  "
       MethodDecl
+        Newline "\n"
+        Whitespace "  "
         Pub "pub"
         Whitespace " "
         Ident "increment"
@@ -188,9 +188,9 @@ File
       Impl "impl"
       Whitespace " "
       LBrace "{"
-      Newline "\n"
-      Whitespace "  "
       MethodDecl
+        Newline "\n"
+        Whitespace "  "
         Pub "pub"
         Whitespace " "
         Fn "fn"

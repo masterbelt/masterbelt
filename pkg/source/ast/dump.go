@@ -165,6 +165,9 @@ func dumpTypeDecl(b *strings.Builder, d *TypeDecl) {
 
 func dumpMethod(b *strings.Builder, m *MethodDecl) {
 	fmt.Fprintf(b, "    method %q\n", m.Name)
+	for _, doc := range m.Doc {
+		fmt.Fprintf(b, "      doc %q\n", doc)
+	}
 	if m.Public {
 		b.WriteString("      pub\n")
 	}
