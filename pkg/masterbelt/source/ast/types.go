@@ -119,6 +119,24 @@ func NewFuncType(params []*ParamDef, result TypeExpr, syntax *cst.Node) *FuncTyp
 	return &FuncType{Params: params, Result: result, syntax: syntax}
 }
 
+// BuiltinType is the body of a primitive declaration (`= builtin`): the type's
+// representation and operator implementations come from the builtin registry,
+// not from this declaration. Args mirrors the declaration's generic parameters
+// for a generic builtin (builtin<T>).
+type BuiltinType struct {
+	Args   []TypeExpr
+	syntax *cst.Node
+}
+
+func (t *BuiltinType) Syntax() *cst.Node { return t.syntax }
+func (t *BuiltinType) node()             {}
+func (t *BuiltinType) typeExpr()         {}
+
+// NewBuiltinType builds a BuiltinType node.
+func NewBuiltinType(args []TypeExpr, syntax *cst.Node) *BuiltinType {
+	return &BuiltinType{Args: args, syntax: syntax}
+}
+
 // FieldDef is one record field: a name and its type.
 type FieldDef struct {
 	Name   string

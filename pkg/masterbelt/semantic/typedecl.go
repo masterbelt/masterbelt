@@ -61,7 +61,14 @@ func (r *typeResolver) resolveDecl(td *ast.TypeDecl, def *ir.TypeDef) {
 		}
 		def.Params = append(def.Params, &ir.TypeParam{Name: p.Name, Bound: bound})
 	}
-	def.Body = r.resolveType(td.Body, scope)
+	// A `= builtin` body marks a primitive: its type is itself, and its native
+	// semantics come from the registry rather than from a defining type.
+	if _, ok := td.Body.(*ast.BuiltinType); ok {
+		def.Builtin = true
+		def.Body = &ir.Builtin{Name: td.Name}
+	} else {
+		def.Body = r.resolveType(td.Body, scope)
+	}
 	for _, m := range td.Methods {
 		def.Methods = append(def.Methods, r.resolveMethod(m, scope))
 	}

@@ -150,6 +150,15 @@ func dumpType(t TypeExpr) string {
 			params[i] = p.Name + ": " + dumpType(p.Type)
 		}
 		return "fn(" + strings.Join(params, ", ") + "): " + dumpType(t.Result)
+	case *BuiltinType:
+		if len(t.Args) == 0 {
+			return "builtin"
+		}
+		args := make([]string, len(t.Args))
+		for i, a := range t.Args {
+			args[i] = dumpType(a)
+		}
+		return "builtin<" + strings.Join(args, ", ") + ">"
 	default:
 		return "Type(?)"
 	}

@@ -57,6 +57,7 @@ const (
 	RecordType    // "{" Field* "}"
 	Field         // Ident ":" TypeExpr
 	FuncType      // fn ParamList ":" TypeExpr
+	BuiltinType   // builtin [GenericArgs] — a primitive whose semantics come from the registry
 
 	// Implementations and method bodies.
 	ImplBlock  // impl "{" MethodDecl* "}"
@@ -92,6 +93,7 @@ var kindNames = [...]string{
 	RecordType:    "RecordType",
 	Field:         "Field",
 	FuncType:      "FuncType",
+	BuiltinType:   "BuiltinType",
 	ImplBlock:     "ImplBlock",
 	MethodDecl:    "MethodDecl",
 	ParamList:     "ParamList",

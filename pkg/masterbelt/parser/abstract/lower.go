@@ -245,7 +245,7 @@ func lowerCallExpr(t cst.Tree, buf source.Buffer, node *cst.Node) ast.Expr {
 // isTypeExprKind reports whether a CST node kind is a type-expression node.
 func isTypeExprKind(k cst.Kind) bool {
 	switch k {
-	case cst.TypeName, cst.UnionType, cst.RecordType, cst.FuncType:
+	case cst.TypeName, cst.UnionType, cst.RecordType, cst.FuncType, cst.BuiltinType:
 		return true
 	default:
 		return false
@@ -336,9 +336,22 @@ func lowerTypeExpr(t cst.Tree, buf source.Buffer) ast.TypeExpr {
 		return lowerRecordType(t, buf, node)
 	case cst.FuncType:
 		return lowerFuncType(t, buf, node)
+	case cst.BuiltinType:
+		return lowerBuiltinType(t, buf, node)
 	default:
 		return nil
 	}
+}
+
+// lowerBuiltinType lowers a BuiltinType node (its optional generic arguments).
+func lowerBuiltinType(t cst.Tree, buf source.Buffer, node *cst.Node) ast.TypeExpr {
+	var args []ast.TypeExpr
+	for _, child := range t.Children() {
+		if n, ok := child.Node(); ok && n.Kind() == cst.GenericArgs {
+			args = lowerGenericArgs(child, buf)
+		}
+	}
+	return ast.NewBuiltinType(args, node)
 }
 
 // lowerTypeName lowers a TypeName node: an identifier with optional generic

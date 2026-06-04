@@ -403,10 +403,23 @@ func (p *parser) parsePrimaryType() cst.Green {
 		return p.parseRecordType()
 	case token.Fn:
 		return p.parseFuncType()
+	case token.Builtin:
+		return p.parseBuiltinType()
 	default:
 		p.report(newExpectedTypeDiagnostic(p.lastStart, 0))
 		return cst.NewNode(cst.Error, nil)
 	}
+}
+
+// parseBuiltinType parses a builtin type body: builtin [GenericArgs]. The cursor
+// sits on "builtin".
+func (p *parser) parseBuiltinType() *cst.Node {
+	children := []cst.Green{p.bump()} // "builtin"
+	if p.peekSignificant() == token.Lt {
+		p.skipTrivia(&children)
+		children = append(children, p.parseGenericArgs())
+	}
+	return cst.NewNode(cst.BuiltinType, children)
 }
 
 // parseGenericArgs parses a "<...>" type-argument list on the application side:
@@ -856,7 +869,7 @@ func startsExpr(kind token.Kind) bool {
 // startsType reports whether kind can begin a type expression.
 func startsType(kind token.Kind) bool {
 	switch kind {
-	case token.Ident, token.Self, token.Null, token.LBrace, token.Fn:
+	case token.Ident, token.Self, token.Null, token.LBrace, token.Fn, token.Builtin:
 		return true
 	default:
 		return false
