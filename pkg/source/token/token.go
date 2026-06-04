@@ -43,6 +43,7 @@ const (
 	Use     // use
 	From    // from
 	Assert  // assert
+	Where   // where
 
 	// Operators and punctuation.
 	Colon    // :
@@ -103,6 +104,7 @@ var kindNames = [...]string{
 	Use:          "Use",
 	From:         "From",
 	Assert:       "Assert",
+	Where:        "Where",
 	Colon:        "Colon",
 	Assign:       "Assign",
 	Plus:         "Plus",
@@ -199,6 +201,7 @@ var keywords = map[string]Kind{
 	"use":     Use,
 	"from":    From,
 	"assert":  Assert,
+	"where":   Where,
 }
 
 // Lookup returns the keyword Kind for ident, or Ident if it is not a

@@ -22,7 +22,7 @@ File
       Ident "int8"
   Error
     Whitespace " "
-    Ident "where"
+    Where "where"
     Whitespace " "
     Self "self"
     Whitespace " "
@@ -54,7 +54,7 @@ File
       Ident "int32"
   Error
     Whitespace " "
-    Ident "where"
+    Where "where"
     Whitespace " "
     Self "self"
     Whitespace " "
@@ -88,7 +88,7 @@ File
       Ident "int8"
   Error
     Whitespace " "
-    Ident "where"
+    Where "where"
     Whitespace " "
     Self "self"
     Whitespace " "
@@ -222,9 +222,9 @@ File
   Newline "\n"
   EOF ""
 # diagnostics
-error[masterbelt.parser.concrete.unexpected_token] 6:23 unexpected token: Ident
-error[masterbelt.parser.concrete.unexpected_token] 9:23 unexpected token: Ident
-error[masterbelt.parser.concrete.unexpected_token] 13:25 unexpected token: Ident
+error[masterbelt.parser.concrete.unexpected_token] 6:23 unexpected token: Where
+error[masterbelt.parser.concrete.unexpected_token] 9:23 unexpected token: Where
+error[masterbelt.parser.concrete.unexpected_token] 13:25 unexpected token: Where
 error[masterbelt.parser.concrete.expected_const] 15:3 expected 'const'
 error[masterbelt.parser.concrete.expected_assign] 15:7 expected '='
 error[masterbelt.parser.concrete.unexpected_token] 15:16 unexpected token: LParen
