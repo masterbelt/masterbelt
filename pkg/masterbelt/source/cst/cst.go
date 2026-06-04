@@ -47,6 +47,7 @@ const (
 	SelfExpr                  // the "self" receiver inside a method body
 	CollectionLit             // a list or map literal: "[" ( Expr | MapEntry )* "]"
 	MapEntry                  // one map-literal entry: Expr ":" Expr
+	FuncLit                   // a function literal: fn ParamList ":" TypeExpr Block
 
 	// Type declarations and the type-expression grammar.
 	TypeDecl      // [doc] [pub] type Name [GenericParams] "=" TypeExpr [ImplBlock]
@@ -86,6 +87,7 @@ var kindNames = [...]string{
 	SelfExpr:      "SelfExpr",
 	CollectionLit: "CollectionLit",
 	MapEntry:      "MapEntry",
+	FuncLit:       "FuncLit",
 	TypeDecl:      "TypeDecl",
 	GenericParams: "GenericParams",
 	GenericParam:  "GenericParam",

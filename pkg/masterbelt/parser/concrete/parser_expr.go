@@ -160,10 +160,45 @@ func (p *parser) parseOperand() cst.Green {
 		return cst.NewNode(cst.NameRef, []cst.Green{p.bump()})
 	case token.Self:
 		return cst.NewNode(cst.SelfExpr, []cst.Green{p.bump()})
+	case token.Fn:
+		return p.parseFuncLit()
 	default:
 		p.report(newExpectedExpressionDiagnostic(p.lastStart, 0))
 		return cst.NewNode(cst.Error, nil)
 	}
+}
+
+// parseFuncLit parses a function-literal expression: fn ParamList ":" TypeExpr
+// Block. It is the value form of a function type (parseFuncType) — same header,
+// but with a brace body — and is the only way to construct a value of a function
+// type. The cursor sits on "fn".
+func (p *parser) parseFuncLit() *cst.Node {
+	children := []cst.Green{p.bump()} // "fn"
+	if p.peekSignificant() == token.LParen {
+		p.skipTrivia(&children)
+		children = append(children, p.parseParamList())
+	} else {
+		p.report(newUnexpectedTokenDiagnostic(p.cur().Offset, p.cur().Width, p.kind().String()))
+	}
+	if p.peekSignificant() == token.Colon {
+		p.skipTrivia(&children)
+		children = append(children, p.bump()) // ":"
+		if startsType(p.peekSignificant()) {
+			p.skipTrivia(&children)
+			children = append(children, p.parseTypeExpr())
+		} else {
+			p.report(newExpectedTypeDiagnostic(p.lastStart, 0))
+		}
+	} else {
+		p.report(newExpectedTypeDiagnostic(p.lastStart, 0))
+	}
+	if p.peekSignificant() == token.LBrace {
+		p.skipTrivia(&children)
+		children = append(children, p.parseBlock())
+	} else {
+		p.report(newUnexpectedTokenDiagnostic(p.cur().Offset, p.cur().Width, p.kind().String()))
+	}
+	return cst.NewNode(cst.FuncLit, children)
 }
 
 // parseCollectionLiteral parses a list or map literal:
@@ -294,7 +329,7 @@ var unaryOps = map[token.Kind]bool{
 func startsExpr(kind token.Kind) bool {
 	switch kind {
 	case token.Int, token.String, token.Ident, token.True, token.False, token.Null, token.Self,
-		token.LBracket, token.Plus, token.Minus, token.Bang:
+		token.LBracket, token.Plus, token.Minus, token.Bang, token.Fn:
 		return true
 	default:
 		return false

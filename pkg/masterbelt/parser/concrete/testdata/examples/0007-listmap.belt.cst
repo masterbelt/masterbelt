@@ -31,30 +31,39 @@ File
           Dot "."
           Ident "map"
         LParen "("
-  Error
-    Fn "fn"
-    LParen "("
-    Ident "x"
-    Colon ":"
-    Whitespace " "
-    Ident "int"
-    RParen ")"
-    Colon ":"
-    Whitespace " "
-    Ident "int"
-    Whitespace " "
-    LBrace "{"
-    Whitespace " "
-    Return "return"
-    Whitespace " "
-    Ident "x"
-    Whitespace " "
-    Star "*"
-    Whitespace " "
-    Int "2"
-    Whitespace " "
-    RBrace "}"
-    RParen ")"
+        FuncLit
+          Fn "fn"
+          ParamList
+            LParen "("
+            Param
+              Ident "x"
+              Colon ":"
+              Whitespace " "
+              TypeName
+                Ident "int"
+            RParen ")"
+          Colon ":"
+          Whitespace " "
+          TypeName
+            Ident "int"
+          Whitespace " "
+          Block
+            LBrace "{"
+            Whitespace " "
+            ReturnStmt
+              Return "return"
+              Whitespace " "
+              BinaryExpr
+                NameRef
+                  Ident "x"
+                Whitespace " "
+                Star "*"
+                Whitespace " "
+                Literal
+                  Int "2"
+            Whitespace " "
+            RBrace "}"
+        RParen ")"
   ConstDecl
     Newline "\n"
     Newline "\n"
@@ -91,38 +100,45 @@ File
           Dot "."
           Ident "map"
         LParen "("
-  Error
-    Fn "fn"
-    LParen "("
-    Ident "x"
-    Colon ":"
-    Whitespace " "
-    Ident "int"
-    RParen ")"
-    Colon ":"
-    Whitespace " "
-    Ident "bool"
-    Whitespace " "
-    LBrace "{"
-    Whitespace " "
-    Return "return"
-    Whitespace " "
-    Ident "x"
-    Whitespace " "
-    Percent "%"
-    Whitespace " "
-    Int "2"
-    Whitespace " "
-    EqEq "=="
-    Whitespace " "
-    Int "0"
-    Whitespace " "
-    RBrace "}"
-    RParen ")"
+        FuncLit
+          Fn "fn"
+          ParamList
+            LParen "("
+            Param
+              Ident "x"
+              Colon ":"
+              Whitespace " "
+              TypeName
+                Ident "int"
+            RParen ")"
+          Colon ":"
+          Whitespace " "
+          TypeName
+            Ident "bool"
+          Whitespace " "
+          Block
+            LBrace "{"
+            Whitespace " "
+            ReturnStmt
+              Return "return"
+              Whitespace " "
+              BinaryExpr
+                BinaryExpr
+                  NameRef
+                    Ident "x"
+                  Whitespace " "
+                  Percent "%"
+                  Whitespace " "
+                  Literal
+                    Int "2"
+                Whitespace " "
+                EqEq "=="
+                Whitespace " "
+                Literal
+                  Int "0"
+            Whitespace " "
+            RBrace "}"
+        RParen ")"
   Newline "\n"
   EOF ""
 # diagnostics
-error[masterbelt.parser.concrete.unexpected_token] 4:31 unexpected token: Fn
-error[masterbelt.parser.concrete.unexpected_token] 4:31 unexpected token: Fn
-error[masterbelt.parser.concrete.unexpected_token] 8:32 unexpected token: Fn
-error[masterbelt.parser.concrete.unexpected_token] 8:32 unexpected token: Fn

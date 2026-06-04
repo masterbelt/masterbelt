@@ -32,7 +32,8 @@
 //	MulExpr       := Unary ( ( "*" | "/" | "%" ) Unary )*
 //	Unary         := ( "+" | "-" | "!" ) Unary | Postfix
 //	Postfix       := Operand ( "." Ident | "(" [ Expr ( "," Expr )* ] ")" )*
-//	Operand       := Literal | CollectionLit | NameRef | "self"
+//	Operand       := Literal | CollectionLit | NameRef | "self" | FuncLit
+//	FuncLit       := fn ParamList ":" TypeExpr Block
 //	CollectionLit := "[" [ Element ( "," Element )* [","] ] "]"
 //	Element       := Expr [ ":" Expr ]
 //	NameRef       := Ident
