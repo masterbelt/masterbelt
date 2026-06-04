@@ -826,7 +826,8 @@ func observe(sink *Sink, fired *bool) *Sink {
 }
 
 // hasInvalid reports whether t contains the invalid type anywhere — a part of
-// the expression's type that some failure already poisoned.
+// the expression's type that some failure already poisoned. A type variable is
+// not invalid (a variable surviving to a call's result is hasTypeVar's case).
 func hasInvalid(t ir.Type) bool {
 	switch t := t.(type) {
 	case *ir.App:

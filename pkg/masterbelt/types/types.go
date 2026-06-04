@@ -123,6 +123,10 @@ func Assignable(reg *builtin.Registry, from, to ir.Type) bool {
 // Because the method signatures come from the registry's type definitions (and,
 // once loaded, the prelude's), this one rule covers every operator on every
 // primitive — there is no per-operator table.
+//
+// The AST-driven checker types calls through the same pieces (BindReceiver,
+// Match, Substitute) bidirectionally; this purely type-level composition is
+// kept for callers that have argument types but no syntax.
 func MethodResult(reg *builtin.Registry, recv ir.Type, method string, args []ir.Type) ir.Type {
 	m, subst, ok := BindReceiver(reg, recv, method)
 	if !ok || len(args) != len(m.Params) {
