@@ -18,9 +18,11 @@ import (
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ast"
 )
 
-// Module is a resolved program: its constants in source order.
+// Module is a resolved program: its constants and type definitions in source
+// order.
 type Module struct {
 	Consts []*Const
+	Types  []*TypeDef
 }
 
 // Const is a resolved constant declaration.

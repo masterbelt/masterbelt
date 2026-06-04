@@ -1,0 +1,23 @@
+Module
+  TypeDef "Coin" pub
+    body int8
+  TypeDef "Level" pub
+    body int8
+    method "increment" pub
+      result self
+  TypeDef "GameValue" pub
+    body Coin | Level
+  TypeDef "Optional" pub
+    param "T"
+    body T | null
+  TypeDef "OptionalNumeric" pub
+    param "T": int8 | int16
+    body T | null
+  TypeDef "Record" pub
+    body { id: int8, level: Level }
+    method "game_id" pub
+      result int32
+  TypeDef "Mapper" pub
+    param "T"
+    param "R"
+    body fn(T): R

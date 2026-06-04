@@ -15,7 +15,51 @@ func Dump(m *Module) string {
 	for _, c := range m.Consts {
 		dumpConst(&b, c)
 	}
+	for _, t := range m.Types {
+		dumpTypeDef(&b, t)
+	}
 	return b.String()
+}
+
+func dumpTypeDef(b *strings.Builder, t *TypeDef) {
+	mod := ""
+	if t.Public {
+		mod = " pub"
+	}
+	fmt.Fprintf(b, "  TypeDef %q%s\n", t.Name, mod)
+	for _, doc := range t.Doc {
+		fmt.Fprintf(b, "    doc %q\n", doc)
+	}
+	for _, p := range t.Params {
+		if p.Bound != nil {
+			fmt.Fprintf(b, "    param %q: %s\n", p.Name, p.Bound)
+		} else {
+			fmt.Fprintf(b, "    param %q\n", p.Name)
+		}
+	}
+	if t.Body != nil {
+		fmt.Fprintf(b, "    body %s\n", t.Body)
+	}
+	for _, m := range t.Methods {
+		dumpMethod(b, m)
+	}
+}
+
+func dumpMethod(b *strings.Builder, m *Method) {
+	mod := ""
+	if m.Public {
+		mod += " pub"
+	}
+	if m.Extern {
+		mod += " extern"
+	}
+	fmt.Fprintf(b, "    method %q%s\n", m.Name, mod)
+	for _, p := range m.Params {
+		fmt.Fprintf(b, "      param %s: %s\n", p.Name, typeString(p.Type))
+	}
+	if m.Result != nil {
+		fmt.Fprintf(b, "      result %s\n", m.Result)
+	}
 }
 
 func dumpConst(b *strings.Builder, c *Const) {

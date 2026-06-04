@@ -162,6 +162,9 @@ func assemble(file *ast.File, positions map[cst.Green]span, q queries) (*ir.Modu
 		}
 	}
 
+	// Resolve the file's type declarations into the module's type definitions.
+	module.Types = resolveTypes(file, reg)
+
 	items := diags.Items()
 	sort.SliceStable(items, func(i, j int) bool { return items[i].Offset < items[j].Offset })
 	return module, items
