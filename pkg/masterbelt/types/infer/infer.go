@@ -92,6 +92,8 @@ func exprType(e ast.Expr, s scope) ir.Type {
 		return &ir.Builtin{Name: "bool"}
 	case *ast.CollectionLit:
 		return collectionType(e, s)
+	case *ast.FuncLit:
+		return funcLitType(e, s.registry())
 	case *ast.CallExpr:
 		// A call through a member access is a method call; any other callee is a
 		// context-specific form (a conversion in a method body, otherwise nothing).
@@ -107,6 +109,21 @@ func exprType(e ast.Expr, s scope) ir.Type {
 	default:
 		return s.leaf(e)
 	}
+}
+
+// funcLitType is the type of a function-literal expression: the Func type built
+// from its declared parameter and result types. The annotations resolve against
+// the registry alone — the same universe a constant annotation resolves against
+// — so a literal whose annotations name only primitives types precisely, while
+// one naming a file-local type leaves that part invalid (as a const annotation
+// would).
+func funcLitType(e *ast.FuncLit, reg *builtin.Registry) ir.Type {
+	r := &TypeResolver{Reg: reg}
+	params := make([]ir.Type, len(e.Params))
+	for i, p := range e.Params {
+		params[i] = r.ResolveType(p.Type, nil)
+	}
+	return &ir.Func{Params: params, Result: r.ResolveType(e.Result, nil)}
 }
 
 // collectionType infers a collection literal's type: list<E> from the unified
@@ -288,6 +305,11 @@ func Check(e ast.Expr, env Env, report func(node ast.Node, method, operands stri
 			}
 		}
 		return collectionType(e, constScope{env})
+	case *ast.FuncLit:
+		// A function literal's type is its signature; its body introduces a
+		// parameter scope this const-context walk does not enter, so the body's
+		// own operator errors are not reported here.
+		return funcLitType(e, env.Registry())
 	case *ast.Identifier:
 		if t := env.Resolve(e); t != nil {
 			return env.TypeOf(t)

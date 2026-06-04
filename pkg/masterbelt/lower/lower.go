@@ -25,6 +25,10 @@ type Binder interface {
 	// its sub-expressions. It returns nil when the form does not lower in this
 	// context.
 	Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value
+	// EnterFunc returns the binder for a function literal's body, with the
+	// literal's parameters bound (so they lower to ir.ParamRef) on top of this
+	// binder's own scope.
+	EnterFunc(params []*ast.ParamDef) Binder
 }
 
 // Value lowers an expression to its resolved IR value. The shared forms are
@@ -58,6 +62,14 @@ func Value(e ast.Expr, b Binder) ir.Value {
 			return &ir.Call{Receiver: Value(member.Receiver, b), Method: member.Member.Name, Args: args}
 		}
 		return b.Leaf(e, sub(b))
+	case *ast.FuncLit:
+		// The body lowers in a binder that binds the literal's parameters; its
+		// own parameter values are supplied at evaluation, not here.
+		names := make([]string, len(e.Params))
+		for i, p := range e.Params {
+			names[i] = p.Name
+		}
+		return &ir.FuncLiteral{Params: names, Body: Body(e.Body, b.EnterFunc(e.Params))}
 	default:
 		return b.Leaf(e, sub(b))
 	}

@@ -1,6 +1,7 @@
 package semantic
 
 import (
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/lower"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ir"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/types/infer"
@@ -23,6 +24,8 @@ func (b constBinder) Leaf(e ast.Expr, _ func(ast.Expr) ir.Value) ir.Value {
 	return nil
 }
 
+func (b constBinder) EnterFunc(params []*ast.ParamDef) lower.Binder { return enterFunc(b, params) }
+
 // bodyBinder lowers the leaves of a method body: self, a parameter reference,
 // a record field access (recv.field), a type conversion (T(x), when the callee
 // names a type), or nothing. The type-name resolution for a conversion is the
@@ -33,6 +36,8 @@ type bodyBinder struct {
 	params map[string]bool
 	tscope map[string]bool
 }
+
+func (b bodyBinder) EnterFunc(params []*ast.ParamDef) lower.Binder { return enterFunc(b, params) }
 
 func (b bodyBinder) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
 	switch e := e.(type) {
@@ -64,3 +69,32 @@ func (b bodyBinder) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
 		return nil
 	}
 }
+
+// funcBinder lowers the body of a function literal: its own parameters lower to
+// ir.ParamRef, and any other leaf is delegated to the enclosing binder — so a
+// reference to an outer constant, a conversion, or self still lowers as it would
+// outside the lambda. Nesting a literal wraps another funcBinder around this one,
+// chaining the parameter scopes.
+type funcBinder struct {
+	outer  lower.Binder
+	params map[string]bool
+}
+
+// enterFunc builds the binder for a function literal's body from the enclosing
+// binder and the literal's parameters.
+func enterFunc(outer lower.Binder, params []*ast.ParamDef) funcBinder {
+	m := make(map[string]bool, len(params))
+	for _, p := range params {
+		m[p.Name] = true
+	}
+	return funcBinder{outer: outer, params: m}
+}
+
+func (b funcBinder) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
+	if id, ok := e.(*ast.Identifier); ok && b.params[id.Name] {
+		return &ir.ParamRef{Name: id.Name}
+	}
+	return b.outer.Leaf(e, sub)
+}
+
+func (b funcBinder) EnterFunc(params []*ast.ParamDef) lower.Binder { return enterFunc(b, params) }

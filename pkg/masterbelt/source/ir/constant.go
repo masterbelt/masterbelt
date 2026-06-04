@@ -4,6 +4,8 @@ import (
 	"math/big"
 	"strconv"
 	"strings"
+
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ast"
 )
 
 // ConstKind distinguishes the kinds of evaluated constant value.
@@ -14,6 +16,7 @@ const (
 	ConstBool                        // a boolean (Constant.Bool)
 	ConstString                      // a string (Constant.Str)
 	ConstCollection                  // a list or map (Constant.Coll)
+	ConstFunc                        // a function value (Constant.Fn / Constant.Captured)
 )
 
 // Constant is the evaluated value of a constant expression: an arbitrary-
@@ -26,6 +29,11 @@ type Constant struct {
 	Bool bool         // valid when Kind == ConstBool
 	Str  string       // valid when Kind == ConstString
 	Coll []ConstEntry // valid when Kind == ConstCollection
+
+	// valid when Kind == ConstFunc: the function literal and the values it
+	// captured from its enclosing scope (the closure environment).
+	Fn       *ast.FuncLit
+	Captured map[string]*Constant
 }
 
 // ConstEntry is one entry of a folded collection constant: a Value, and for a
@@ -50,6 +58,13 @@ func CollectionConstant(entries []ConstEntry) *Constant {
 	return &Constant{Kind: ConstCollection, Coll: entries}
 }
 
+// FuncConstant builds a function-value constant from a function literal and the
+// closure environment it captured (the parameter values of any enclosing
+// function literals, nil at the top level).
+func FuncConstant(fn *ast.FuncLit, captured map[string]*Constant) *Constant {
+	return &Constant{Kind: ConstFunc, Fn: fn, Captured: captured}
+}
+
 // String renders the constant's value: the integer, "true"/"false", the quoted
 // string, or the bracketed collection ([a, b] for a list, ["k": v] for a map).
 func (c *Constant) String() string {
@@ -61,6 +76,8 @@ func (c *Constant) String() string {
 		return strconv.FormatBool(c.Bool)
 	case ConstString:
 		return strconv.Quote(c.Str)
+	case ConstFunc:
+		return "<func>"
 	case ConstCollection:
 		parts := make([]string, len(c.Coll))
 		for i, e := range c.Coll {

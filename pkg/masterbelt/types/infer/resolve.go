@@ -103,6 +103,45 @@ func (r *TypeResolver) ResolveName(name string, scope map[string]bool) ir.Type {
 	return ir.Invalid
 }
 
+// FreeTypeVars returns the bare type names appearing in ts that are neither in
+// scope nor a known type — the implicit type variables a method signature
+// introduces (the R in map(func: fn(T): R): list<R>). They are returned in order
+// of first appearance, so a caller can add them to the scope before resolving.
+func (r *TypeResolver) FreeTypeVars(scope map[string]bool, ts ...ast.TypeExpr) []string {
+	var out []string
+	seen := map[string]bool{}
+	var walk func(t ast.TypeExpr)
+	walk = func(t ast.TypeExpr) {
+		switch t := t.(type) {
+		case *ast.NamedType:
+			if len(t.Args) == 0 && t.Name != "self" && !scope[t.Name] && !seen[t.Name] && r.lookup(t.Name) == nil {
+				seen[t.Name] = true
+				out = append(out, t.Name)
+			}
+			for _, a := range t.Args {
+				walk(a)
+			}
+		case *ast.UnionType:
+			for _, m := range t.Members {
+				walk(m)
+			}
+		case *ast.RecordType:
+			for _, f := range t.Fields {
+				walk(f.Type)
+			}
+		case *ast.FuncType:
+			for _, p := range t.Params {
+				walk(p.Type)
+			}
+			walk(t.Result)
+		}
+	}
+	for _, t := range ts {
+		walk(t)
+	}
+	return out
+}
+
 // lookup finds the definition of a type name: a named definition first, then a
 // builtin primitive.
 func (r *TypeResolver) lookup(name string) *ir.TypeDef {

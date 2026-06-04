@@ -98,12 +98,35 @@ func resolveDecl(r *infer.TypeResolver, td *ast.TypeDecl, def *ir.TypeDef) {
 // and lowers its body to IR. The body is not yet type-checked.
 func resolveMethod(r *infer.TypeResolver, m *ast.MethodDecl, scope map[string]bool) *ir.Method {
 	method := &ir.Method{Name: m.Name, Public: m.Public, Extern: m.Extern}
+
+	// Method-introduced type variables: free type names appearing in a parameter
+	// type that the enclosing type does not bind and that name no known type — the
+	// R in map(func: fn(T): R): list<R>. They join the scope for this method's
+	// signature so they resolve to ir.TypeVar instead of being reported unknown.
+	// Only parameter positions are scanned: a variable must be inferable from an
+	// argument, so an unknown name in the result alone (a typo like `Nope`) stays
+	// an unknown-type error rather than becoming a silent, unsolvable variable.
+	mscope := scope
+	paramTypes := make([]ast.TypeExpr, 0, len(m.Params))
+	for _, p := range m.Params {
+		paramTypes = append(paramTypes, p.Type)
+	}
+	if vars := r.FreeTypeVars(scope, paramTypes...); len(vars) > 0 {
+		mscope = make(map[string]bool, len(scope)+len(vars))
+		for k := range scope {
+			mscope[k] = true
+		}
+		for _, v := range vars {
+			mscope[v] = true
+		}
+	}
+
 	params := make(map[string]bool, len(m.Params))
 	for _, p := range m.Params {
-		method.Params = append(method.Params, ir.Param{Name: p.Name, Type: r.ResolveType(p.Type, scope)})
+		method.Params = append(method.Params, ir.Param{Name: p.Name, Type: r.ResolveType(p.Type, mscope)})
 		params[p.Name] = true
 	}
-	method.Result = r.ResolveType(m.Result, scope)
-	method.Body = lower.Body(m.Body, bodyBinder{r: r, params: params, tscope: scope})
+	method.Result = r.ResolveType(m.Result, mscope)
+	method.Body = lower.Body(m.Body, bodyBinder{r: r, params: params, tscope: mscope})
 	return method
 }

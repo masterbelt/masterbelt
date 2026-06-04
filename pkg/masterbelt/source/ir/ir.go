@@ -99,6 +99,17 @@ type Call struct {
 
 func (*Call) value() {}
 
+// FuncLiteral is a function-literal value: its parameter names and its lowered
+// statement body. Like the rest of the value graph it is untyped — the
+// expression's type lives on the constant's Type and in the type system — so it
+// carries names and a body, not resolved parameter types.
+type FuncLiteral struct {
+	Params []string
+	Body   []Stmt
+}
+
+func (*FuncLiteral) value() {}
+
 // SelfValue is the method receiver (the self keyword) inside a method body.
 type SelfValue struct{}
 

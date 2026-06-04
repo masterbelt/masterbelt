@@ -74,6 +74,20 @@ func dumpStmt(b *strings.Builder, s Stmt) {
 	}
 }
 
+// dumpStmtInline renders a statement compactly on one line, for a function
+// literal that appears inside an enclosing value. (dumpStmt is the multi-line,
+// indented form used for a method body.)
+func dumpStmtInline(s Stmt) string {
+	switch s := s.(type) {
+	case *Return:
+		return "(return " + dumpValue(s.Value) + ")"
+	case *ExprStmt:
+		return "(expr " + dumpValue(s.Value) + ")"
+	default:
+		return ""
+	}
+}
+
 func dumpConst(b *strings.Builder, c *Const) {
 	mod := ""
 	if c.Public {
@@ -121,6 +135,12 @@ func dumpValue(v Value) string {
 			args[i] = dumpValue(a)
 		}
 		return fmt.Sprintf("%s.%s(%s)", dumpValue(x.Receiver), x.Method, strings.Join(args, ", "))
+	case *FuncLiteral:
+		parts := []string{"fn(" + strings.Join(x.Params, ", ") + ")"}
+		for _, s := range x.Body {
+			parts = append(parts, dumpStmtInline(s))
+		}
+		return "(" + strings.Join(parts, " ") + ")"
 	case *SelfValue:
 		return "self"
 	case *ParamRef:

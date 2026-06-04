@@ -156,21 +156,117 @@ func MethodResult(reg *builtin.Registry, recv ir.Type, method string, args []ir.
 		return ir.Invalid
 	}
 
+	// The substitution that instantiates the method's type variables. It starts
+	// bound by the receiver's type arguments — a method on list<int> sees T = int
+	// — and the per-method variables (the R in map(func: fn(T): R): list<R>) are
+	// solved by matching the parameter patterns against the argument types.
+	subst := map[string]ir.Type{}
+	if app, ok := recv.(*ir.App); ok && app.Def != nil && len(app.Args) == len(app.Def.Params) {
+		for i, p := range app.Def.Params {
+			subst[p.Name] = app.Args[i]
+		}
+	}
+
 	operand := recv // the unified type of the receiver and the self-typed args
 	for i, p := range m.Params {
-		if _, isSelf := p.Type.(*ir.SelfType); isSelf {
+		pt := substitute(p.Type, subst)
+		if _, isSelf := pt.(*ir.SelfType); isSelf {
 			operand = Unify(reg, operand, args[i])
 			if operand == ir.Invalid {
 				return ir.Invalid
 			}
-		} else if !Assignable(reg, args[i], p.Type) {
+		} else if !match(reg, pt, args[i], subst) {
 			return ir.Invalid
 		}
 	}
 	if _, isSelf := m.Result.(*ir.SelfType); isSelf {
 		return operand
 	}
-	return m.Result
+	return substitute(m.Result, subst)
+}
+
+// substitute replaces every bound type variable in t with its binding from
+// subst, recursing through the composite types. An unbound variable is left as
+// is, so a concrete type (no variables) is returned unchanged.
+func substitute(t ir.Type, subst map[string]ir.Type) ir.Type {
+	if len(subst) == 0 {
+		return t
+	}
+	switch t := t.(type) {
+	case *ir.TypeVar:
+		if b, ok := subst[t.Name]; ok {
+			return b
+		}
+		return t
+	case *ir.App:
+		args := make([]ir.Type, len(t.Args))
+		for i, a := range t.Args {
+			args[i] = substitute(a, subst)
+		}
+		return &ir.App{Def: t.Def, Args: args}
+	case *ir.Func:
+		params := make([]ir.Type, len(t.Params))
+		for i, p := range t.Params {
+			params[i] = substitute(p, subst)
+		}
+		return &ir.Func{Params: params, Result: substitute(t.Result, subst)}
+	case *ir.Union:
+		members := make([]ir.Type, len(t.Members))
+		for i, m := range t.Members {
+			members[i] = substitute(m, subst)
+		}
+		return &ir.Union{Members: members}
+	case *ir.Record:
+		fields := make([]ir.Field, len(t.Fields))
+		for i, f := range t.Fields {
+			fields[i] = ir.Field{Name: f.Name, Type: substitute(f.Type, subst)}
+		}
+		return &ir.Record{Fields: fields}
+	default:
+		return t
+	}
+}
+
+// match matches a parameter pattern — which may contain still-unbound method
+// type variables — against a concrete argument type, recording each variable it
+// solves in subst. A bare variable binds to the argument (and, if already bound,
+// must agree); a function or generic-application pattern matches structurally;
+// anything else falls back to assignability, the same rule a non-generic
+// parameter used before.
+func match(reg *builtin.Registry, pattern, arg ir.Type, subst map[string]ir.Type) bool {
+	if v, ok := pattern.(*ir.TypeVar); ok {
+		if bound, ok := subst[v.Name]; ok {
+			return arg == bound || Assignable(reg, arg, bound)
+		}
+		subst[v.Name] = arg
+		return true
+	}
+	switch p := pattern.(type) {
+	case *ir.Func:
+		a, ok := arg.(*ir.Func)
+		if !ok || len(a.Params) != len(p.Params) {
+			return false
+		}
+		for i := range p.Params {
+			if !match(reg, p.Params[i], a.Params[i], subst) {
+				return false
+			}
+		}
+		return match(reg, p.Result, a.Result, subst)
+	case *ir.App:
+		a, ok := arg.(*ir.App)
+		if !ok || a.Def != p.Def || len(a.Args) != len(p.Args) {
+			return false
+		}
+		for i := range p.Args {
+			if !match(reg, p.Args[i], a.Args[i], subst) {
+				return false
+			}
+		}
+		return true
+	default:
+		return Assignable(reg, arg, pattern)
+	}
 }
 
 // defOf returns the type definition whose methods apply to a value of type t:
@@ -182,6 +278,10 @@ func defOf(reg *builtin.Registry, t ir.Type) *ir.TypeDef {
 			return d
 		}
 	case *ir.Named:
+		return t.Def
+	case *ir.App:
+		// A generic application (list<int>) carries the methods of its
+		// constructor; the type arguments are bound in MethodResult.
 		return t.Def
 	}
 	return nil

@@ -149,6 +149,51 @@ func TestMethodResult(t *testing.T) {
 	}
 }
 
+// TestGenericMethodResult checks the generic method rule: a method on a generic
+// application binds the receiver's type arguments (T = int for list<int>) and
+// solves its own type variables (the R in map(func: fn(T): R): list<R>) by
+// matching the parameter patterns against the argument types.
+func TestGenericMethodResult(t *testing.T) {
+	reg := builtin.Default()
+
+	// A synthetic list<T> with len, the generic map, and a self-typed add — the
+	// prelude is not available to this package, so the definition is built by hand.
+	tvar := func(name string) ir.Type { return &ir.TypeVar{Name: name} }
+	listDef := &ir.TypeDef{Name: "list", Builtin: true, Params: []*ir.TypeParam{{Name: "T"}}}
+	listOf := func(arg ir.Type) ir.Type { return &ir.App{Def: listDef, Args: []ir.Type{arg}} }
+	listDef.Methods = []*ir.Method{
+		{Name: "len", Result: bt("int")},
+		{Name: "map", Params: []ir.Param{{Name: "func", Type: &ir.Func{Params: []ir.Type{tvar("T")}, Result: tvar("R")}}}, Result: listOf(tvar("R"))},
+		{Name: "add", Params: []ir.Param{{Name: "other", Type: &ir.SelfType{}}}, Result: &ir.SelfType{}},
+	}
+	fn := func(param, result ir.Type) ir.Type { return &ir.Func{Params: []ir.Type{param}, Result: result} }
+
+	cases := []struct {
+		name   string
+		recv   ir.Type
+		method string
+		args   []ir.Type
+		want   string
+	}{
+		// map binds T from the receiver and R from the function's result type.
+		{"map int->int", listOf(bt("int")), "map", []ir.Type{fn(bt("int"), bt("int"))}, "list<int>"},
+		{"map int->bool", listOf(bt("int")), "map", []ir.Type{fn(bt("int"), bt("bool"))}, "list<bool>"},
+		// The function's parameter type must accept the element type.
+		{"map wrong elem", listOf(bt("int")), "map", []ir.Type{fn(bt("int8"), bt("bool"))}, "invalid"},
+		{"map non-function arg", listOf(bt("int")), "map", []ir.Type{bt("int")}, "invalid"},
+		// A non-generic method on a generic receiver still resolves (App was not
+		// understood before): len returns int, and the self-typed add returns the
+		// receiver.
+		{"len on list", listOf(bt("int")), "len", nil, "int"},
+		{"add on list", listOf(bt("int")), "add", []ir.Type{listOf(bt("int"))}, "list<int>"},
+	}
+	for _, tc := range cases {
+		if got := MethodResult(reg, tc.recv, tc.method, tc.args).String(); got != tc.want {
+			t.Errorf("%s: MethodResult(%s, %q, ...) = %s, want %s", tc.name, tc.recv, tc.method, got, tc.want)
+		}
+	}
+}
+
 // TestNominalDerivation checks that a nominal type (type Level = int8) is
 // integer-like, derives its underlying type's operator methods, and keeps its
 // own identity in the result.
