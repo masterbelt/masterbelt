@@ -62,12 +62,16 @@ func isDefaultInt(t ir.Type) bool {
 	return ok && b.Name == defaultInt
 }
 
-// Lookup resolves a builtin type name to its type, or false if name is not a
-// known builtin. (User-declared types are resolved by the analyzer's type
-// universe, not here.)
+// Lookup resolves a type name in the registry (the builtin primitives and,
+// once the prelude is installed, its aliases and collections), or false if the
+// name is unknown. A primitive resolves to a Builtin, any other definition to a
+// Named.
 func Lookup(reg *builtin.Registry, name string) (ir.Type, bool) {
-	if _, ok := reg.Lookup(name); ok {
-		return &ir.Builtin{Name: name}, true
+	if d, ok := reg.Lookup(name); ok {
+		if d.Builtin {
+			return &ir.Builtin{Name: name}, true
+		}
+		return &ir.Named{Def: d}, true
 	}
 	return ir.Invalid, false
 }

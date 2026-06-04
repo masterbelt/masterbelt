@@ -5,6 +5,7 @@ import (
 
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ir"
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/types"
 )
 
 // TestLoadPrelude checks that the embedded prelude parses, resolves, and
@@ -55,6 +56,27 @@ func TestLoadPrelude(t *testing.T) {
 		t.Errorf("snumeric alias not loaded")
 	} else if sn.Builtin {
 		t.Errorf("snumeric should be a union alias, not a builtin")
+	}
+}
+
+// TestPreludeIsTheMethodSource checks that, once the prelude is installed, a
+// primitive's methods come from the prelude — not from the bootstrap registry —
+// so uint (declared without neg, being unsigned) has no neg method even though
+// the bootstrap registry shares one integer method set.
+func TestPreludeIsTheMethodSource(t *testing.T) {
+	reg := universe()
+	uintT := &ir.Builtin{Name: "uint"}
+
+	if got := types.MethodResult(reg, uintT, "neg", nil); got != ir.Invalid {
+		t.Errorf("uint.neg = %s, want invalid (the prelude's uint has no neg)", got)
+	}
+	if got := types.MethodResult(reg, uintT, "add", []ir.Type{uintT}).String(); got != "uint" {
+		t.Errorf("uint.add(uint) = %s, want uint", got)
+	}
+	// The bootstrap registry, with no prelude installed, still has neg — so the
+	// difference is the prelude's doing.
+	if got := types.MethodResult(builtin.Default(), uintT, "neg", nil).String(); got != "uint" {
+		t.Errorf("bootstrap uint.neg = %s, want uint", got)
 	}
 }
 

@@ -1,7 +1,6 @@
 package semantic
 
 import (
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/diagnostic"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/parser/abstract"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source"
@@ -24,7 +23,7 @@ type Document struct {
 // NewDocument lexes, parses, lowers, and analyzes src, then keeps the analysis
 // up to date across Edits.
 func NewDocument(src []byte) *Document {
-	d := &Document{ast: abstract.NewDocument(src), db: newDatabase(builtin.Default())}
+	d := &Document{ast: abstract.NewDocument(src), db: newDatabase(universe())}
 	d.refresh()
 	return d
 }

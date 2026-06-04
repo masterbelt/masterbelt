@@ -116,8 +116,23 @@ func (r *Registry) Intrinsic(typeName, method string) (Intrinsic, bool) {
 	return fn, ok
 }
 
-// Names returns the primitive names in registration order.
+// Names returns the natively-backed primitive names in registration order. It is
+// unaffected by Install, so it stays the set of primitives validation must cover.
 func (r *Registry) Names() []string { return r.order }
+
+// Install makes the given type definitions — typically the prelude's, after it
+// has been loaded and validated — the source for type lookup, replacing the
+// bootstrap definitions matched by name and adding any new ones (the prelude's
+// aliases and collections). The native descriptors and intrinsics are unchanged,
+// so a primitive's value range and operator implementations still come from the
+// registry while its method signatures now come from the prelude.
+func (r *Registry) Install(defs []*ir.TypeDef) {
+	for _, d := range defs {
+		if d.Name != "" {
+			r.defs[d.Name] = d
+		}
+	}
+}
 
 // boolType is the shared boolean primitive type used in operator-method
 // signatures (the result of the comparison and equality methods).

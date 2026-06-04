@@ -2,12 +2,34 @@ package semantic
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/diagnostic"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/parser/abstract"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ir"
 )
+
+// universe is the registry every analysis types against: the standard registry
+// with the prelude loaded and installed, so primitive method signatures come
+// from the prelude. It is built once and shared, since it is read-only during
+// analysis. If the prelude fails to load (a build-time bug the prelude test
+// catches), analysis degrades to the bootstrap registry rather than crashing.
+var (
+	universeOnce sync.Once
+	universeReg  *builtin.Registry
+)
+
+func universe() *builtin.Registry {
+	universeOnce.Do(func() {
+		reg := builtin.Default()
+		if defs, err := LoadPrelude(reg); err == nil {
+			reg.Install(defs)
+		}
+		universeReg = reg
+	})
+	return universeReg
+}
 
 // LoadPrelude parses the embedded prelude — the masterbelt source that declares
 // the builtin primitives — resolves its type declarations, and validates them
