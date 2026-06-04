@@ -367,6 +367,14 @@ type Sink struct {
 	// InvalidOp fires at the innermost method call whose operand types it is
 	// not defined on, with the operand types rendered as "recv, arg, ...".
 	InvalidOp func(node ast.Node, method, operands string)
+	// NoMatchingOverload fires at a call whose receiver declares the method
+	// under several signatures, none of which the operand types fit. (A
+	// single-signature method that does not fit stays InvalidOp.)
+	NoMatchingOverload func(node ast.Node, method, operands string)
+	// AmbiguousOverload fires at a call whose operand types fit two or more
+	// signatures of the method — resolved by annotating an operand, never by
+	// an implicit priority.
+	AmbiguousOverload func(node ast.Node, method, operands string)
 	// Mismatch fires where got cannot be used as the expected type want. The
 	// node is the offending expression — or, for a function-literal parameter
 	// whose annotation conflicts with the pushed-down type, the parameter.
@@ -394,6 +402,18 @@ type Sink struct {
 func (s *Sink) invalidOp(node ast.Node, method, operands string) {
 	if s != nil && s.InvalidOp != nil {
 		s.InvalidOp(node, method, operands)
+	}
+}
+
+func (s *Sink) noMatchingOverload(node ast.Node, method, operands string) {
+	if s != nil && s.NoMatchingOverload != nil {
+		s.NoMatchingOverload(node, method, operands)
+	}
+}
+
+func (s *Sink) ambiguousOverload(node ast.Node, method, operands string) {
+	if s != nil && s.AmbiguousOverload != nil {
+		s.AmbiguousOverload(node, method, operands)
 	}
 }
 
@@ -758,14 +778,18 @@ func check(e ast.Expr, s scope, sink *Sink) ir.Type {
 }
 
 // callType is the type rule for a method call, bidirectionally: the receiver
-// and the non-literal arguments are synthesized first (left to right), solving
-// the method's type variables they pin down; the function-literal arguments
-// are then checked against their parameter patterns, so the call's expectation
-// reaches into each literal — and the literal bodies solve what remains (the R
-// of list<T>.map). A nil sink types silently; with one, the innermost call
-// whose operands do not fit is reported, except when the failure is inside a
-// literal — the checking walk reported its precise cause already, and the
-// Invalid propagation suppresses the pile-on (the bad flag).
+// and the non-literal arguments are synthesized first (left to right), the
+// overload the argument types fit is selected (types.SelectOverload — solving
+// the type variables the synthesized arguments pin down), and the
+// function-literal arguments are then checked against the selected
+// signature's parameter patterns, so the call's expectation reaches into each
+// literal — and the literal bodies solve what remains (the R of list<T>.map).
+// A nil sink types silently; with one, the innermost call whose operands fit
+// no signature is reported — InvalidOp for a single-signature method,
+// NoMatchingOverload/AmbiguousOverload across an overload set — except when
+// the failure is inside a literal: the checking walk reported its precise
+// cause already, and the Invalid propagation suppresses the pile-on (the bad
+// flag).
 func callType(e *ast.CallExpr, s scope, sink *Sink) ir.Type {
 	member, ok := e.Callee.(*ast.MemberExpr)
 	if !ok {
@@ -776,10 +800,10 @@ func callType(e *ast.CallExpr, s scope, sink *Sink) ir.Type {
 	bad := recv == ir.Invalid
 	args := make([]ir.Type, len(e.Arguments))
 
-	m, subst, found := types.BindReceiver(reg, recv, member.Member.Name)
-	if !found || len(e.Arguments) != len(m.Params) {
-		// No such method, or the wrong argument count: synthesize the
-		// arguments for their own diagnostics, then report the call.
+	candidates, _, found := types.Candidates(reg, recv, member.Member.Name)
+	if !found {
+		// No such method: synthesize the arguments for their own diagnostics,
+		// then report the call.
 		for i, a := range e.Arguments {
 			args[i] = check(a, s, sink)
 			bad = bad || args[i] == ir.Invalid
@@ -790,12 +814,13 @@ func callType(e *ast.CallExpr, s scope, sink *Sink) ir.Type {
 		return ir.Invalid
 	}
 
-	// Pass 1 — the non-literal arguments, left to right. Self-typed operands
-	// unify with the receiver (the default int adapts); pattern-typed ones
-	// match, binding the method's type variables. Going literal-last maximizes
-	// what pass 2 can push into each literal.
-	operand := recv // the unified type of the receiver and the self-typed args
-	fail := false   // the operands do not fit (and no precise report fired)
+	// Pass 1 — synthesize the non-literal arguments, left to right. The
+	// function literals stay nil — they fit any parameter during selection —
+	// so the overload settles before any literal is checked, and pass 2 can
+	// push the winner's parameter patterns into each one. An Invalid argument
+	// (its cause reported at its own node) also selects as fits-anything, so
+	// the suppression style survives overloading.
+	known := make([]ir.Type, len(e.Arguments))
 	for i, a := range e.Arguments {
 		if _, isLit := a.(*ast.FuncLit); isLit {
 			continue
@@ -805,15 +830,32 @@ func callType(e *ast.CallExpr, s scope, sink *Sink) ir.Type {
 			bad = true
 			continue
 		}
-		pt := types.Substitute(m.Params[i].Type, subst)
-		if _, isSelf := pt.(*ir.SelfType); isSelf {
-			if operand = types.Unify(reg, operand, args[i]); operand == ir.Invalid {
-				fail = true
-			}
-		} else if !types.Match(reg, pt, args[i], subst) {
-			fail = true
-		}
+		known[i] = args[i]
 	}
+
+	matches, _ := types.SelectOverload(reg, recv, member.Member.Name, known)
+	if len(matches) != 1 {
+		// No fitting signature, or several: check the literals bare for their
+		// own diagnostics, then report the call — unless an operand already
+		// carried its own report.
+		for i, a := range e.Arguments {
+			if lit, isLit := a.(*ast.FuncLit); isLit {
+				args[i] = check(lit, s, sink)
+			}
+		}
+		if !bad {
+			switch {
+			case len(matches) > 1:
+				sink.ambiguousOverload(e, member.Member.Name, typesList(recv, args))
+			case len(candidates) > 1:
+				sink.noMatchingOverload(e, member.Member.Name, typesList(recv, args))
+			default:
+				sink.invalidOp(e, member.Member.Name, typesList(recv, args))
+			}
+		}
+		return ir.Invalid
+	}
+	m, subst, operand := matches[0].Method, matches[0].Subst, matches[0].Operand
 
 	// Pass 2 — the function literals, each checked against its parameter
 	// pattern. A finding inside the literal (a mismatch, an uninferable part)
@@ -832,10 +874,7 @@ func callType(e *ast.CallExpr, s scope, sink *Sink) ir.Type {
 		}
 	}
 
-	if fail || bad {
-		if fail && !bad {
-			sink.invalidOp(e, member.Member.Name, typesList(recv, args))
-		}
+	if bad {
 		return ir.Invalid
 	}
 	if _, isSelf := m.Result.(*ir.SelfType); isSelf {
@@ -858,6 +897,14 @@ func observe(sink *Sink, fired *bool) *Sink {
 		InvalidOp: func(node ast.Node, method, operands string) {
 			*fired = true
 			sink.invalidOp(node, method, operands)
+		},
+		NoMatchingOverload: func(node ast.Node, method, operands string) {
+			*fired = true
+			sink.noMatchingOverload(node, method, operands)
+		},
+		AmbiguousOverload: func(node ast.Node, method, operands string) {
+			*fired = true
+			sink.ambiguousOverload(node, method, operands)
 		},
 		Mismatch: func(node ast.Node, got, want ir.Type) {
 			*fired = true

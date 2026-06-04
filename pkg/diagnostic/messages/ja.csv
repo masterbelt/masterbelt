@@ -22,6 +22,9 @@ masterbelt.semantic.unknown_type,未知の型: {name}
 masterbelt.semantic.cyclic_reference,{name} を含む循環参照です
 masterbelt.semantic.constant_overflow,定数 {value} は {typ} に収まりません
 masterbelt.semantic.invalid_operation,メソッド {method} を {types} に適用できません
+masterbelt.semantic.no_matching_overload,メソッド {method} のどのオーバーロードも {types} に適合しません
+masterbelt.semantic.ambiguous_overload,メソッド {method} の呼び出しが曖昧です: {types} に複数のオーバーロードが適合します
+masterbelt.semantic.duplicate_overload,メソッド {method} が同じ引数型 ({types}) で再宣言されています
 masterbelt.semantic.division_by_zero,ゼロ除算です
 masterbelt.semantic.type_mismatch,{actual} を {expected} として使えません
 masterbelt.semantic.uninferable_collection,このコレクションリテラルの型を推論できません。型注釈を付けてください

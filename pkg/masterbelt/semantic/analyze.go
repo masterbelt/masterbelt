@@ -120,6 +120,14 @@ func exprSink(at func(ast.Node) span, diags *diagnostic.List) *infer.Sink {
 			s := at(node)
 			diags.Add(newInvalidOperationDiagnostic(s.offset, s.width, method, operands))
 		},
+		NoMatchingOverload: func(node ast.Node, method, operands string) {
+			s := at(node)
+			diags.Add(newNoMatchingOverloadDiagnostic(s.offset, s.width, method, operands))
+		},
+		AmbiguousOverload: func(node ast.Node, method, operands string) {
+			s := at(node)
+			diags.Add(newAmbiguousOverloadDiagnostic(s.offset, s.width, method, operands))
+		},
 		Mismatch: func(node ast.Node, got, want ir.Type) {
 			s := at(node)
 			diags.Add(newTypeMismatchDiagnostic(s.offset, s.width, got.String(), want.String()))

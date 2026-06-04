@@ -2,6 +2,7 @@ package semantic
 
 import (
 	"math/big"
+	"strings"
 
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
@@ -104,9 +105,48 @@ func resolveDecl(r *infer.TypeResolver, reg *builtin.Registry, td *ast.TypeDecl,
 		def.Body = r.ResolveType(td.Body, scope)
 	}
 	resolveWhere(r, reg, td, def, at, diags)
+	// Same-name methods are overloads — legal as long as their parameter
+	// types differ. A signature that repeats an earlier one (the same name
+	// and the same parameter-type list) is a true redeclaration: the first
+	// wins, the repeat is dropped and reported, mirroring how a redeclared
+	// type keeps its first definition. The signature key is built from the
+	// resolved types, so both resolution passes (the silent memoized one and
+	// the reporting one) drop identically.
+	seen := make(map[string]bool, len(td.Methods))
 	for _, m := range td.Methods {
-		def.Methods = append(def.Methods, resolveMethod(r, m, scope))
+		rm := resolveMethod(r, m, scope)
+		key := rm.Name + signatureKey(rm)
+		if m.Name != "" && seen[key] {
+			if at != nil && diags != nil {
+				s := at(m)
+				diags.Add(newDuplicateOverloadDiagnostic(s.offset, s.width, rm.Name, paramTypes(rm)))
+			}
+			continue
+		}
+		seen[key] = true
+		def.Methods = append(def.Methods, rm)
 	}
+}
+
+// signatureKey renders a method's parameter-type list as the duplicate-
+// detection key: two same-name methods collide exactly when their resolved
+// parameter types read the same.
+func signatureKey(m *ir.Method) string {
+	parts := make([]string, len(m.Params))
+	for i, p := range m.Params {
+		parts[i] = p.Type.String()
+	}
+	return "(" + strings.Join(parts, ", ") + ")"
+}
+
+// paramTypes renders a method's parameter types as "a, b" for the
+// duplicate-overload diagnostic.
+func paramTypes(m *ir.Method) string {
+	parts := make([]string, len(m.Params))
+	for i, p := range m.Params {
+		parts[i] = p.Type.String()
+	}
+	return strings.Join(parts, ", ")
 }
 
 // resolveWhere type-checks the declaration's refinement predicate — self is the

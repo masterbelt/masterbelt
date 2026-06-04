@@ -10,6 +10,7 @@ import (
 
 const (
 	CodeAmbiguousImport       diagnostic.Code = "masterbelt.semantic.ambiguous_import"
+	CodeAmbiguousOverload     diagnostic.Code = "masterbelt.semantic.ambiguous_overload"
 	CodeAssertionFailed       diagnostic.Code = "masterbelt.semantic.assertion_failed"
 	CodeAssertionNotBool      diagnostic.Code = "masterbelt.semantic.assertion_not_bool"
 	CodeAssertionNotConstant  diagnostic.Code = "masterbelt.semantic.assertion_not_constant"
@@ -18,8 +19,10 @@ const (
 	CodeCyclicReference       diagnostic.Code = "masterbelt.semantic.cyclic_reference"
 	CodeDivisionByZero        diagnostic.Code = "masterbelt.semantic.division_by_zero"
 	CodeDuplicateDeclaration  diagnostic.Code = "masterbelt.semantic.duplicate_declaration"
+	CodeDuplicateOverload     diagnostic.Code = "masterbelt.semantic.duplicate_overload"
 	CodeInvalidOperation      diagnostic.Code = "masterbelt.semantic.invalid_operation"
 	CodeLambdaArityMismatch   diagnostic.Code = "masterbelt.semantic.lambda_arity_mismatch"
+	CodeNoMatchingOverload    diagnostic.Code = "masterbelt.semantic.no_matching_overload"
 	CodeNotExported           diagnostic.Code = "masterbelt.semantic.not_exported"
 	CodeRefinementNotBool     diagnostic.Code = "masterbelt.semantic.refinement_not_bool"
 	CodeRefinementNotConstant diagnostic.Code = "masterbelt.semantic.refinement_not_constant"
@@ -42,6 +45,21 @@ func newAmbiguousImportDiagnostic(offset int, width int, name string) diagnostic
 		Severity: diagnostic.Error,
 		Code:     CodeAmbiguousImport,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeAmbiguousImport, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newAmbiguousOverloadDiagnostic(offset int, width int, method string, types string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"method": diagnostic.Str(method),
+		"types":  diagnostic.Str(types),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeAmbiguousOverload,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeAmbiguousOverload, fields),
 		Fields:   fields,
 		Offset:   offset,
 		Width:    width,
@@ -157,6 +175,21 @@ func newDuplicateDeclarationDiagnostic(offset int, width int, name string) diagn
 	}
 }
 
+func newDuplicateOverloadDiagnostic(offset int, width int, method string, types string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"method": diagnostic.Str(method),
+		"types":  diagnostic.Str(types),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeDuplicateOverload,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeDuplicateOverload, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
 func newInvalidOperationDiagnostic(offset int, width int, method string, types string) diagnostic.Diagnostic {
 	fields := map[string]fmt.Stringer{
 		"method": diagnostic.Str(method),
@@ -181,6 +214,21 @@ func newLambdaArityMismatchDiagnostic(offset int, width int, actual int, expecte
 		Severity: diagnostic.Error,
 		Code:     CodeLambdaArityMismatch,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeLambdaArityMismatch, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newNoMatchingOverloadDiagnostic(offset int, width int, method string, types string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"method": diagnostic.Str(method),
+		"types":  diagnostic.Str(types),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeNoMatchingOverload,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeNoMatchingOverload, fields),
 		Fields:   fields,
 		Offset:   offset,
 		Width:    width,

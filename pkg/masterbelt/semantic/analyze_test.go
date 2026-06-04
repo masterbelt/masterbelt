@@ -386,6 +386,104 @@ func TestOperatorErrorReportedOnce(t *testing.T) {
 	}
 }
 
+// overloadSrc declares a type with merge overloaded by parameter type — the
+// 0013-overload example's Score — for the overload diagnostics tests.
+const overloadSrc = `pub type Score = int32 impl {
+  pub fn merge(points: self): self {
+    return self + points
+  }
+  pub fn merge(active: bool): bool {
+    return active && self > 0
+  }
+}
+const Base: Score = 100
+`
+
+func TestOverloadResolution(t *testing.T) {
+	m, diags := analyze(overloadSrc + "const Bumped = Base.merge(50)\nconst Counted = Base.merge(true)\n")
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	// The integer argument picks merge(points: self), the boolean argument
+	// merge(active: bool) — the same name resolves per call site.
+	if got := m.Consts[1].Type.String(); got != "Score" {
+		t.Errorf("Bumped type = %s, want Score", got)
+	}
+	if got := m.Consts[2].Type.String(); got != "bool" {
+		t.Errorf("Counted type = %s, want bool", got)
+	}
+}
+
+func TestNoMatchingOverload(t *testing.T) {
+	m, diags := analyze(overloadSrc + "const X = Base.merge(\"badge\")\n")
+	if got := codes(diags); len(got) != 1 || got[0] != CodeNoMatchingOverload {
+		t.Fatalf("codes = %v, want [no_matching_overload]", got)
+	}
+	if m.Consts[1].Type.String() != "invalid" {
+		t.Errorf("X type = %s, want invalid", m.Consts[1].Type)
+	}
+	// A single-signature method that does not fit stays invalid_operation —
+	// the overload diagnostics never replace it.
+	_, diags = analyze("const X = 1 + true\n")
+	if got := codes(diags); len(got) != 1 || got[0] != CodeInvalidOperation {
+		t.Fatalf("codes = %v, want [invalid_operation]", got)
+	}
+}
+
+func TestAmbiguousOverload(t *testing.T) {
+	// The default integer fits both sized overloads at once; the resolution
+	// is an annotated operand, never an implicit priority.
+	src := `pub type Gauge = int32 impl {
+  pub fn set(v: int8): bool {
+    return v > 0
+  }
+  pub fn set(v: int16): bool {
+    return v > 0
+  }
+}
+const G: Gauge = 1
+`
+	_, diags := analyze(src + "const X = G.set(5)\n")
+	if got := codes(diags); len(got) != 1 || got[0] != CodeAmbiguousOverload {
+		t.Fatalf("codes = %v, want [ambiguous_overload]", got)
+	}
+	// An annotated argument is exact: unambiguous.
+	m, diags := analyze(src + "const V: int16 = 5\nconst X = G.set(V)\n")
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if got := m.Consts[2].Type.String(); got != "bool" {
+		t.Errorf("X type = %s, want bool", got)
+	}
+}
+
+func TestDuplicateOverload(t *testing.T) {
+	// The same name with the same parameter types is a true redeclaration:
+	// the first wins, the repeat is reported.
+	src := `pub type Score = int32 impl {
+  pub fn merge(points: self): self {
+    return self + points
+  }
+  pub fn merge(other: self): self {
+    return self
+  }
+}
+const Base: Score = 100
+const X = Base.merge(5)
+`
+	m, diags := analyze(src)
+	if got := codes(diags); len(got) != 1 || got[0] != CodeDuplicateOverload {
+		t.Fatalf("codes = %v, want [duplicate_overload]", got)
+	}
+	if len(m.Types[0].Methods) != 1 {
+		t.Errorf("Score has %d methods, want 1 (the repeat dropped)", len(m.Types[0].Methods))
+	}
+	// The call still resolves through the surviving first declaration.
+	if got := m.Consts[1].Type.String(); got != "Score" {
+		t.Errorf("X type = %s, want Score", got)
+	}
+}
+
 func TestAnnotatedFuncLit(t *testing.T) {
 	// The annotation is a checking context: it supplies the literal's omitted
 	// parameter and result types.

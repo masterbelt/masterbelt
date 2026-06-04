@@ -151,6 +151,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return f["name"].String() + " is ambiguous; it arrives from more than one import"
 		}
 	},
+	"masterbelt.semantic.ambiguous_overload": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "メソッド " + f["method"].String() + " の呼び出しが曖昧です: " + f["types"].String() + " に複数のオーバーロードが適合します"
+		default:
+			return "ambiguous call: more than one overload of method " + f["method"].String() + " accepts " + f["types"].String()
+		}
+	},
 	"masterbelt.semantic.assertion_failed": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
@@ -215,6 +223,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "duplicate declaration of " + f["name"].String()
 		}
 	},
+	"masterbelt.semantic.duplicate_overload": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "メソッド " + f["method"].String() + " が同じ引数型 (" + f["types"].String() + ") で再宣言されています"
+		default:
+			return "method " + f["method"].String() + " redeclares the parameter types (" + f["types"].String() + ")"
+		}
+	},
 	"masterbelt.semantic.invalid_operation": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
@@ -229,6 +245,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "関数リテラルのパラメータが " + f["actual"].String() + " 個ありますが、" + f["expected"].String() + " 個が必要です"
 		default:
 			return "function literal has " + f["actual"].String() + " parameters; " + f["expected"].String() + " expected"
+		}
+	},
+	"masterbelt.semantic.no_matching_overload": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "メソッド " + f["method"].String() + " のどのオーバーロードも " + f["types"].String() + " に適合しません"
+		default:
+			return "no overload of method " + f["method"].String() + " accepts " + f["types"].String()
 		}
 	},
 	"masterbelt.semantic.not_exported": func(loc Locale, f map[string]fmt.Stringer) string {

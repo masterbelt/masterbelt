@@ -7,7 +7,7 @@ Module
     type Score
     value Reference -> "Base".merge(IntLiteral "50")
   Const "Counted"
-    type invalid
+    type bool
     value Reference -> "Base".merge(BoolLiteral true)
   Const "Start"
     type Level
@@ -17,7 +17,7 @@ Module
     type Level
     value Reference -> "Start".next()
   Const "Fifth"
-    type invalid
+    type Level
     value Reference -> "Start".next(IntLiteral "4")
   TypeDef "Score" pub
     doc "A game score in points."

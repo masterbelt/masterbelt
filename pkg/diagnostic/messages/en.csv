@@ -22,6 +22,9 @@ masterbelt.semantic.unknown_type,unknown type: {name}
 masterbelt.semantic.cyclic_reference,cyclic reference involving {name}
 masterbelt.semantic.constant_overflow,constant {value} overflows {typ}
 masterbelt.semantic.invalid_operation,cannot apply method {method} to {types}
+masterbelt.semantic.no_matching_overload,no overload of method {method} accepts {types}
+masterbelt.semantic.ambiguous_overload,ambiguous call: more than one overload of method {method} accepts {types}
+masterbelt.semantic.duplicate_overload,method {method} redeclares the parameter types ({types})
 masterbelt.semantic.division_by_zero,division by zero
 masterbelt.semantic.type_mismatch,cannot use {actual} as {expected}
 masterbelt.semantic.uninferable_collection,cannot infer the type of this collection literal; annotate it
