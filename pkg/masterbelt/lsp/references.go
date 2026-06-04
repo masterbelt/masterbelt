@@ -125,6 +125,39 @@ func rename(doc *semantic.Document, offset int, newName string, uri protocol.Doc
 	}
 }
 
+// documentHighlights returns every occurrence of the symbol under the cursor as
+// a highlight: its declaration as a write, each value reference as a read. It is
+// occurrencesOf rendered for the in-file "highlight all uses" feature.
+func documentHighlights(doc *semantic.Document, offset int) []protocol.DocumentHighlight {
+	buf := doc.Buffer()
+	trees := positionedTrees(doc.AST().Concrete().Tree())
+
+	occ, ok := occurrenceAt(doc, offset, trees)
+	if !ok {
+		return nil
+	}
+
+	write := protocol.DocumentHighlightKindWrite
+	read := protocol.DocumentHighlightKindRead
+
+	var highlights []protocol.DocumentHighlight
+	if declTree, ok := trees[occ.target.Syntax.Syntax()]; ok {
+		if nameTok, ok := nameToken(declTree); ok {
+			highlights = append(highlights, protocol.DocumentHighlight{
+				Range: toRange(buf, nameTok.Offset(), nameTok.End()),
+				Kind:  &write,
+			})
+		}
+	}
+	for _, tok := range occurrencesOf(doc, occ.target, trees, false) {
+		highlights = append(highlights, protocol.DocumentHighlight{
+			Range: toRange(buf, tok.Offset(), tok.End()),
+			Kind:  &read,
+		})
+	}
+	return highlights
+}
+
 // prepareRename reports the range of the identifier under the cursor so the
 // editor can offer to rename it, pre-filled with the current name.
 func prepareRename(doc *semantic.Document, offset int) *protocol.PrepareRenameResult {

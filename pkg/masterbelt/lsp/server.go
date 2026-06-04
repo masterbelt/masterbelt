@@ -13,9 +13,10 @@
 //
 // Implemented features: lifecycle, incremental text sync, push diagnostics
 // (lexer, parser, and semantic), completion, document symbols, formatting,
-// semantic-token highlighting, hover, go-to-definition, find-references, and
-// rename. The protocol plumbing (JSON-RPC over stdio, request routing) is
-// provided by github.com/owenrumney/go-lsp.
+// semantic-token highlighting, hover, go-to-definition, find-references,
+// document highlight, inlay type hints, code actions, and rename. The protocol
+// plumbing (JSON-RPC over stdio, request routing) is provided by
+// github.com/owenrumney/go-lsp.
 package lsp
 
 import (
@@ -55,10 +56,13 @@ func (s *Server) Initialize(_ context.Context, _ *protocol.InitializeParams) (*p
 			CompletionProvider:         &protocol.CompletionOptions{},
 			DocumentSymbolProvider:     new(true),
 			DocumentFormattingProvider: new(true),
+			DocumentHighlightProvider:  new(true),
 			HoverProvider:              new(true),
 			DefinitionProvider:         new(true),
 			ReferencesProvider:         new(true),
 			RenameProvider:             &protocol.RenameOptions{PrepareProvider: new(true)},
+			InlayHintProvider:          &protocol.InlayHintOptions{},
+			CodeActionProvider:         &protocol.CodeActionOptions{},
 			SemanticTokensProvider: &protocol.SemanticTokensOptions{
 				Legend: semanticLegend,
 				Full:   &protocol.SemanticTokensFull{},
@@ -206,6 +210,44 @@ func (s *Server) Definition(_ context.Context, params *protocol.DefinitionParams
 		return nil, nil
 	}
 	return definition(doc, fromPosition(doc.Buffer(), params.Position), params.TextDocument.URI), nil
+}
+
+// DocumentHighlight highlights every occurrence of the symbol under the cursor.
+func (s *Server) DocumentHighlight(_ context.Context, params *protocol.DocumentHighlightParams) ([]protocol.DocumentHighlight, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	doc := s.docs[params.TextDocument.URI]
+	if doc == nil {
+		return nil, nil
+	}
+	return documentHighlights(doc, fromPosition(doc.Buffer(), params.Position)), nil
+}
+
+// InlayHint returns the inferred-type hints for un-annotated constants in range.
+func (s *Server) InlayHint(_ context.Context, params *protocol.InlayHintParams) ([]protocol.InlayHint, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	doc := s.docs[params.TextDocument.URI]
+	if doc == nil {
+		return nil, nil
+	}
+	buf := doc.Buffer()
+	return inlayHints(doc, fromPosition(buf, params.Range.Start), fromPosition(buf, params.Range.End)), nil
+}
+
+// CodeAction returns the refactorings available for the requested range.
+func (s *Server) CodeAction(_ context.Context, params *protocol.CodeActionParams) ([]protocol.CodeAction, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	doc := s.docs[params.TextDocument.URI]
+	if doc == nil {
+		return nil, nil
+	}
+	buf := doc.Buffer()
+	return codeActions(doc, fromPosition(buf, params.Range.Start), fromPosition(buf, params.Range.End), params.TextDocument.URI), nil
 }
 
 // References returns every reference to the symbol under the cursor.
