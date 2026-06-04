@@ -283,3 +283,40 @@ func TestLambdaParamHoverInAssert(t *testing.T) {
 		t.Errorf("hover = %q, want v: int", h.Contents.Value)
 	}
 }
+
+func TestTypeHoverMethods(t *testing.T) {
+	// The type hover reads like a card: the signature, the doc, then every
+	// method's signature — what the type can do, at a glance.
+	src := "/// a level\ntype Level = int8 impl {\n" +
+		"  pub increment(): self {\n    return self + 1\n  }\n" +
+		"  extern shift(by: int8): self\n" +
+		"}\nconst l: Level = 1\n"
+	doc := testView(src)
+
+	h := hover(doc, strings.Index(src, ": Level")+3)
+	if h == nil {
+		t.Fatal("no hover on the type reference")
+	}
+	val := h.Contents.Value
+	for _, want := range []string{"type Level = int8", "a level", "pub increment(): self", "extern shift(by: int8): self"} {
+		if !strings.Contains(val, want) {
+			t.Errorf("hover = %q, want it to contain %q", val, want)
+		}
+	}
+	// Signature, then doc, then methods.
+	sig := strings.Index(val, "type Level")
+	docAt := strings.Index(val, "a level")
+	methods := strings.Index(val, "pub increment")
+	if !(sig < docAt && docAt < methods) {
+		t.Errorf("hover sections out of order: sig %d, doc %d, methods %d", sig, docAt, methods)
+	}
+
+	// A prelude builtin lists its operator methods the same way.
+	h = hover(doc, strings.Index(src, "= int8")+3)
+	if h == nil {
+		t.Fatal("no hover on int8")
+	}
+	if !strings.Contains(h.Contents.Value, "pub extern add(other: self): self") {
+		t.Errorf("int8 hover = %q, want its add method signature", h.Contents.Value)
+	}
+}

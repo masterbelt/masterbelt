@@ -182,9 +182,10 @@ func leafAt(root cst.Tree, offset int) (leaf, parent cst.Tree, ok bool) {
 	}
 }
 
-// typeHover renders a type definition's signature (modifiers, name, generic
-// parameters, body) and its doc comments as Markdown, with the hovered token
-// as the hover's range.
+// typeHover renders a type definition the way a reader wants it: the
+// signature (modifiers, name, generic parameters, body), the doc comment, and
+// then every method's signature — what the type can do, at a glance. The
+// hovered token is the hover's range.
 func typeHover(t *ir.TypeDef, buf source.Buffer, rng cst.Tree) *protocol.Hover {
 	var b strings.Builder
 	b.WriteString("```masterbelt\n")
@@ -214,12 +215,48 @@ func typeHover(t *ir.TypeDef, buf source.Buffer, rng cst.Tree) *protocol.Hover {
 		b.WriteString("\n\n")
 		b.WriteString(strings.Join(t.Doc, "\n"))
 	}
+	if len(t.Methods) > 0 {
+		b.WriteString("\n\n```masterbelt\n")
+		for _, m := range t.Methods {
+			b.WriteString(methodSignature(m))
+			b.WriteString("\n")
+		}
+		b.WriteString("```")
+	}
 
 	r := toRange(buf, rng.Offset(), rng.End())
 	return &protocol.Hover{
 		Contents: protocol.MarkupContent{Kind: protocol.Markdown, Value: b.String()},
 		Range:    &r,
 	}
+}
+
+// methodSignature renders one method as it is declared: modifiers, name,
+// parameters, and result, in source syntax.
+func methodSignature(m *ir.Method) string {
+	var b strings.Builder
+	if m.Public {
+		b.WriteString("pub ")
+	}
+	if m.Extern {
+		b.WriteString("extern ")
+	}
+	b.WriteString(m.Name)
+	b.WriteString("(")
+	for i, p := range m.Params {
+		if i > 0 {
+			b.WriteString(", ")
+		}
+		b.WriteString(p.Name)
+		if p.Type != nil {
+			b.WriteString(": " + p.Type.String())
+		}
+	}
+	b.WriteString(")")
+	if m.Result != nil {
+		b.WriteString(": " + m.Result.String())
+	}
+	return b.String()
 }
 
 // assertHover renders the assertion at offset as its power-assert diagram —
