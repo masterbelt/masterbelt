@@ -1,0 +1,8 @@
+// list<T>.map applies a function to every element, yielding a list<R>.
+
+// Same element type: int -> int.
+const Doubled = [1, 2, 3].map(fn(x: int): int { return x * 2 })
+
+// Changing element type: int -> bool exercises the method type variable R,
+// which is introduced by map and is not a parameter of list<T>.
+const Evens = [1, 2, 3, 4].map(fn(x: int): bool { return x % 2 == 0 })

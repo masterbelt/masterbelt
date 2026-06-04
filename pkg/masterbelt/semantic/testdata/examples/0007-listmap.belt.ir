@@ -1,0 +1,7 @@
+Module
+  Const "Doubled"
+    type invalid
+    value [IntLiteral "1", IntLiteral "2", IntLiteral "3"].map()
+  Const "Evens"
+    type invalid
+    value [IntLiteral "1", IntLiteral "2", IntLiteral "3", IntLiteral "4"].map()
