@@ -1,9 +1,5 @@
 File
   ConstDecl
-    doc "The next percentage point."
-    pub
-    name "increment"
-  ConstDecl
     name "ServerPort"
     type Port
     value IntLit "8080"
@@ -37,3 +33,8 @@ File
     pub
     name "Percent"
     body int8
+    method "increment"
+      doc "The next percentage point."
+      pub
+      result self
+      return (call (. self add) IntLit "1")

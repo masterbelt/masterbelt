@@ -68,6 +68,11 @@ func TestParseLossless(t *testing.T) {
 		"type Mapper<T, R> = fn(src: T): R\n",
 		"const x = 1\ntype T = int8\npub const y = 2\n", // const/type interleaved
 		"type Bad =\ntype Worse <\n",                    // malformed type decls stay lossless
+		// Where clauses (refinement predicates).
+		"type Port = int32 where self >= 1 && self <= 65535\n",
+		"type Pct = int8 where self >= 0 impl {\n  inc(): self {\n    return self\n  }\n}\n",
+		"type Bad = int8 where\n",      // missing predicate stays lossless
+		"type Bad = int8 where impl\n", // a keyword starts no expression (must not consume it)
 		// Function literals: annotations are optional in every position.
 		"const f = fn(x: int): int { return x }\n",
 		"const f = fn(x) { return x }\n",
@@ -189,6 +194,8 @@ func TestParseTypeDeclChildren(t *testing.T) {
 		{"func type", "type M<T, R> = fn(src: T): R\n", []cst.Kind{cst.GenericParams, cst.FuncType}},
 		{"impl", "type Lvl = int8 impl {\n  pub inc(): self {\n    return self\n  }\n}\n", []cst.Kind{cst.TypeName, cst.ImplBlock}},
 		{"null name", "pub type null = builtin\n", []cst.Kind{cst.BuiltinType}}, // null may be declared
+		{"where", "type Port = int32 where self <= 65535\n", []cst.Kind{cst.TypeName, cst.WhereClause}},
+		{"where impl", "type Pct = int8 where self >= 0 impl {\n  inc(): self {\n    return self\n  }\n}\n", []cst.Kind{cst.TypeName, cst.WhereClause, cst.ImplBlock}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -209,6 +216,34 @@ func TestParseTypeDeclChildren(t *testing.T) {
 					t.Fatalf("sub-nodes = %v, want %v", got, tc.want)
 				}
 			}
+		})
+	}
+}
+
+// TestParseWhereClauseDiagnostics checks local recovery for malformed
+// where-clauses.
+func TestParseWhereClauseDiagnostics(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+		code diagnostic.Code
+	}{
+		{"missing predicate", "type Bad = int8 where\n", CodeExpectedExpression},
+		{"keyword predicate", "type Bad = int8 where impl {}\n", CodeExpectedExpression},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, diags := Parse([]byte(tc.src))
+			found := false
+			for _, d := range diags {
+				if d.Code == tc.code {
+					found = true
+				}
+			}
+			if !found {
+				t.Fatalf("src %q: want diagnostic %s, got %v", tc.src, tc.code, diags)
+			}
+			assertLossless(t, tc.src)
 		})
 	}
 }

@@ -51,7 +51,7 @@ const (
 	ParenExpr                 // a parenthesized grouping: "(" Expr ")"
 
 	// Type declarations and the type-expression grammar.
-	TypeDecl      // [doc] [pub] type Name [GenericParams] "=" TypeExpr [ImplBlock]
+	TypeDecl      // [doc] [pub] type Name [GenericParams] "=" TypeExpr [WhereClause] [ImplBlock]
 	GenericParams // "<" GenericParam ("," GenericParam)* ">"  (declaration side)
 	GenericParam  // Ident [":" TypeExpr]  (a type parameter with an optional constraint)
 	GenericArgs   // "<" TypeExpr ("," TypeExpr)* ">"  (application side)
@@ -61,6 +61,7 @@ const (
 	Field         // Ident ":" TypeExpr
 	FuncType      // fn ParamList ":" TypeExpr
 	BuiltinType   // builtin [GenericArgs] — a primitive whose semantics come from the registry
+	WhereClause   // where Expr — the refinement predicate of a nominal type
 
 	// Implementations and method bodies.
 	ImplBlock  // impl "{" MethodDecl* "}"
@@ -107,6 +108,7 @@ var kindNames = [...]string{
 	Field:         "Field",
 	FuncType:      "FuncType",
 	BuiltinType:   "BuiltinType",
+	WhereClause:   "WhereClause",
 	ImplBlock:     "ImplBlock",
 	MethodDecl:    "MethodDecl",
 	ParamList:     "ParamList",

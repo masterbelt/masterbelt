@@ -20,23 +20,30 @@ File
     Whitespace " "
     TypeName
       Ident "int8"
-  Error
     Whitespace " "
-    Where "where"
-    Whitespace " "
-    Self "self"
-    Whitespace " "
-    GtEq ">="
-    Whitespace " "
-    Int "0"
-    Whitespace " "
-    AmpAmp "&&"
-    Whitespace " "
-    Self "self"
-    Whitespace " "
-    LtEq "<="
-    Whitespace " "
-    Int "100"
+    WhereClause
+      Where "where"
+      Whitespace " "
+      BinaryExpr
+        BinaryExpr
+          SelfExpr
+            Self "self"
+          Whitespace " "
+          GtEq ">="
+          Whitespace " "
+          Literal
+            Int "0"
+        Whitespace " "
+        AmpAmp "&&"
+        Whitespace " "
+        BinaryExpr
+          SelfExpr
+            Self "self"
+          Whitespace " "
+          LtEq "<="
+          Whitespace " "
+          Literal
+            Int "100"
   TypeDecl
     Newline "\n"
     Newline "\n"
@@ -52,23 +59,30 @@ File
     Whitespace " "
     TypeName
       Ident "int32"
-  Error
     Whitespace " "
-    Where "where"
-    Whitespace " "
-    Self "self"
-    Whitespace " "
-    GtEq ">="
-    Whitespace " "
-    Int "1"
-    Whitespace " "
-    AmpAmp "&&"
-    Whitespace " "
-    Self "self"
-    Whitespace " "
-    LtEq "<="
-    Whitespace " "
-    Int "65535"
+    WhereClause
+      Where "where"
+      Whitespace " "
+      BinaryExpr
+        BinaryExpr
+          SelfExpr
+            Self "self"
+          Whitespace " "
+          GtEq ">="
+          Whitespace " "
+          Literal
+            Int "1"
+        Whitespace " "
+        AmpAmp "&&"
+        Whitespace " "
+        BinaryExpr
+          SelfExpr
+            Self "self"
+          Whitespace " "
+          LtEq "<="
+          Whitespace " "
+          Literal
+            Int "65535"
   TypeDecl
     Newline "\n"
     Newline "\n"
@@ -86,58 +100,72 @@ File
     Whitespace " "
     TypeName
       Ident "int8"
-  Error
     Whitespace " "
-    Where "where"
+    WhereClause
+      Where "where"
+      Whitespace " "
+      BinaryExpr
+        BinaryExpr
+          SelfExpr
+            Self "self"
+          Whitespace " "
+          GtEq ">="
+          Whitespace " "
+          Literal
+            Int "0"
+        Whitespace " "
+        AmpAmp "&&"
+        Whitespace " "
+        BinaryExpr
+          SelfExpr
+            Self "self"
+          Whitespace " "
+          LtEq "<="
+          Whitespace " "
+          Literal
+            Int "100"
     Whitespace " "
-    Self "self"
-    Whitespace " "
-    GtEq ">="
-    Whitespace " "
-    Int "0"
-    Whitespace " "
-    AmpAmp "&&"
-    Whitespace " "
-    Self "self"
-    Whitespace " "
-    LtEq "<="
-    Whitespace " "
-    Int "100"
-    Whitespace " "
-    Impl "impl"
-    Whitespace " "
-    LBrace "{"
-  ConstDecl
-    Newline "\n"
-    Whitespace "  "
-    DocComment "/// The next percentage point."
-    Newline "\n"
-    Whitespace "  "
-    Pub "pub"
-    Whitespace " "
-    Ident "increment"
-  Error
-    LParen "("
-    RParen ")"
-    Colon ":"
-    Whitespace " "
-    Self "self"
-    Whitespace " "
-    LBrace "{"
-    Newline "\n"
-    Whitespace "    "
-    Return "return"
-    Whitespace " "
-    Self "self"
-    Whitespace " "
-    Plus "+"
-    Whitespace " "
-    Int "1"
-    Newline "\n"
-    Whitespace "  "
-    RBrace "}"
-    Newline "\n"
-    RBrace "}"
+    ImplBlock
+      Impl "impl"
+      Whitespace " "
+      LBrace "{"
+      MethodDecl
+        Newline "\n"
+        Whitespace "  "
+        DocComment "/// The next percentage point."
+        Newline "\n"
+        Whitespace "  "
+        Pub "pub"
+        Whitespace " "
+        Ident "increment"
+        ParamList
+          LParen "("
+          RParen ")"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Self "self"
+        Whitespace " "
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            BinaryExpr
+              SelfExpr
+                Self "self"
+              Whitespace " "
+              Plus "+"
+              Whitespace " "
+              Literal
+                Int "1"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
+      Newline "\n"
+      RBrace "}"
   ConstDecl
     Newline "\n"
     Newline "\n"
@@ -222,9 +250,3 @@ File
   Newline "\n"
   EOF ""
 # diagnostics
-error[masterbelt.parser.concrete.unexpected_token] 6:23 unexpected token: Where
-error[masterbelt.parser.concrete.unexpected_token] 9:23 unexpected token: Where
-error[masterbelt.parser.concrete.unexpected_token] 13:25 unexpected token: Where
-error[masterbelt.parser.concrete.expected_const] 15:3 expected 'const'
-error[masterbelt.parser.concrete.expected_assign] 15:7 expected '='
-error[masterbelt.parser.concrete.unexpected_token] 15:16 unexpected token: LParen

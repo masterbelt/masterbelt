@@ -5,7 +5,7 @@
 //
 //	File          := ( ConstDecl | TypeDecl | UseDecl | AssertDecl | Error )*
 //	ConstDecl     := [pub] const Ident [TypeClause] [Initializer]
-//	TypeDecl      := [pub] type Ident [GenericParams] "=" TypeExpr [ImplBlock]
+//	TypeDecl      := [pub] type Ident [GenericParams] "=" TypeExpr [WhereClause] [ImplBlock]
 //	UseDecl       := [pub] use UseTarget from String
 //	AssertDecl    := assert Expr
 //	UseTarget     := Ident | UseList | "*"
@@ -14,6 +14,7 @@
 //	GenericParam  := Ident [ ":" TypeExpr ]
 //	TypeClause    := ":" TypeExpr
 //	Initializer   := "=" Expr
+//	WhereClause   := where Expr
 //	TypeExpr      := PrimaryType ( "|" PrimaryType )*
 //	PrimaryType   := TypeName | RecordType | FuncType
 //	TypeName      := ( Ident ["." Ident] [GenericArgs] ) | "self" | "null"

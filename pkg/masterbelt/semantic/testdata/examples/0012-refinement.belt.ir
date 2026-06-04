@@ -1,8 +1,4 @@
 Module
-  Const "increment" pub
-    doc "The next percentage point."
-    type invalid
-    value <none>
   Const "ServerPort"
     type Port
     value IntLiteral "8080"
@@ -32,3 +28,7 @@ Module
   TypeDef "Percent" pub
     doc "A percentage from 0 to 100."
     body int8
+    method "increment" pub
+      doc "The next percentage point."
+      result self
+      return self.add(IntLiteral "1")

@@ -76,7 +76,7 @@ func (p *parser) parseInitializer() *cst.Node {
 // parseTypeDecl parses a type declaration, prepending the already-collected
 // leading trivia:
 //
-//	[pub] type Name [GenericParams] "=" TypeExpr [ImplBlock]
+//	[pub] type Name [GenericParams] "=" TypeExpr [WhereClause] [ImplBlock]
 //
 // As in parseConstDecl every expected element is optional in the parse, so a
 // malformed declaration records a diagnostic and is simply absent from the tree
@@ -117,12 +117,30 @@ func (p *parser) parseTypeDecl(lead []cst.Green) *cst.Node {
 		p.report(newExpectedAssignDiagnostic(p.lastStart, 0))
 	}
 
+	if p.peekSignificant() == token.Where {
+		p.skipTrivia(&children)
+		children = append(children, p.parseWhereClause())
+	}
+
 	if p.peekSignificant() == token.Impl {
 		p.skipTrivia(&children)
 		children = append(children, p.parseImplBlock())
 	}
 
 	return cst.NewNode(cst.TypeDecl, children)
+}
+
+// parseWhereClause parses the refinement predicate of a type declaration:
+// where Expr. The cursor sits on "where".
+func (p *parser) parseWhereClause() *cst.Node {
+	children := []cst.Green{p.bump()} // "where"
+	if startsExpr(p.peekSignificant()) {
+		p.skipTrivia(&children)
+		children = append(children, p.parseExpr(precLowest))
+	} else {
+		p.report(newExpectedExpressionDiagnostic(p.lastStart, 0))
+	}
+	return cst.NewNode(cst.WhereClause, children)
 }
 
 // parseGenericParams parses a "<...>" type-parameter list on the declaration
