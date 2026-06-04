@@ -4,9 +4,9 @@ File
     from "geometry.belt"
   ConstDecl
     name "start"
-    type Point
+    type geo.Point
     value (. Identifier "geo" Origin)
   ConstDecl
     name "path"
-    type list<Point>
+    type list<geo.Point>
     value (list (. Identifier "geo" Origin) (. Identifier "geo" Unit))

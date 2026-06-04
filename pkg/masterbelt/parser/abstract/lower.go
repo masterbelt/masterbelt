@@ -568,16 +568,22 @@ func lowerBuiltinType(t cst.Tree, buf source.Buffer, node *cst.Node) ast.TypeExp
 	return ast.NewBuiltinType(args, node)
 }
 
-// lowerTypeName lowers a TypeName node: an identifier with optional generic
-// arguments, or the self/null type keyword.
+// lowerTypeName lowers a TypeName node: an identifier — qualified by a
+// namespace import as in geo.Point — with optional generic arguments, or the
+// self/null type keyword. A dangling qualifier (geo.) keeps its namespace and
+// leaves the name empty, as elsewhere for recovered parts.
 func lowerTypeName(t cst.Tree, buf source.Buffer, node *cst.Node) ast.TypeExpr {
-	var name string
+	var idents []string
+	var namespace, name string
+	var dotted bool
 	var args []ast.TypeExpr
 	for _, child := range t.Children() {
 		if tok, ok := child.Token(); ok {
 			switch tok.Kind() {
 			case token.Ident:
-				name = child.Text(buf)
+				idents = append(idents, child.Text(buf))
+			case token.Dot:
+				dotted = true
 			case token.Self:
 				name = "self"
 			case token.Null:
@@ -589,7 +595,15 @@ func lowerTypeName(t cst.Tree, buf source.Buffer, node *cst.Node) ast.TypeExpr {
 			args = lowerGenericArgs(child, buf)
 		}
 	}
-	return ast.NewNamedType(name, args, node)
+	switch {
+	case len(idents) >= 2:
+		namespace, name = idents[0], idents[1]
+	case len(idents) == 1 && dotted:
+		namespace = idents[0] // geo. — the qualified name is missing
+	case len(idents) == 1:
+		name = idents[0]
+	}
+	return ast.NewNamedType(namespace, name, args, node)
 }
 
 // lowerGenericArgs lowers a GenericArgs node to its type arguments.

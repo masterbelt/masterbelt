@@ -187,14 +187,18 @@ func dumpType(t TypeExpr) string {
 	case nil:
 		return "<missing>"
 	case *NamedType:
+		name := t.Name
+		if t.Namespace != "" {
+			name = t.Namespace + "." + t.Name
+		}
 		if len(t.Args) == 0 {
-			return t.Name
+			return name
 		}
 		args := make([]string, len(t.Args))
 		for i, a := range t.Args {
 			args[i] = dumpType(a)
 		}
-		return t.Name + "<" + strings.Join(args, ", ") + ">"
+		return name + "<" + strings.Join(args, ", ") + ">"
 	case *UnionType:
 		parts := make([]string, len(t.Members))
 		for i, m := range t.Members {

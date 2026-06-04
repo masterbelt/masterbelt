@@ -57,11 +57,14 @@ type TypeExpr interface {
 }
 
 // NamedType is a type named by an identifier, with optional generic arguments:
-// int8, Coin, Optional<int8>, the type parameter T, or the self/null types.
+// int8, Coin, Optional<int8>, the type parameter T, or the self/null types. A
+// type reached through a namespace import carries its qualifier — geo.Point
+// has Namespace "geo" and Name "Point"; a plain name has Namespace "".
 type NamedType struct {
-	Name   string
-	Args   []TypeExpr // generic arguments, empty if none
-	syntax *cst.Node
+	Namespace string     // the namespace qualifier, or "" for a plain name
+	Name      string     // the type's own name, or "" if missing (geo.)
+	Args      []TypeExpr // generic arguments, empty if none
+	syntax    *cst.Node
 }
 
 func (t *NamedType) Syntax() *cst.Node { return t.syntax }
@@ -69,8 +72,8 @@ func (t *NamedType) node()             {}
 func (t *NamedType) typeExpr()         {}
 
 // NewNamedType builds a NamedType node.
-func NewNamedType(name string, args []TypeExpr, syntax *cst.Node) *NamedType {
-	return &NamedType{Name: name, Args: args, syntax: syntax}
+func NewNamedType(namespace, name string, args []TypeExpr, syntax *cst.Node) *NamedType {
+	return &NamedType{Namespace: namespace, Name: name, Args: args, syntax: syntax}
 }
 
 // UnionType is a union of member types: A | B | ...
