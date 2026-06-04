@@ -55,7 +55,14 @@
           "description": "Trace the communication between VS Code and the masterbelt language server."
         }
       }
-    }
+    },
+    "commands": [
+      {
+        "command": "masterbelt.restartServer",
+        "title": "Restart Language Server",
+        "category": "masterbelt"
+      }
+    ]
   },
   "scripts": {
     "build": "node esbuild.mjs",

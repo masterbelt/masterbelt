@@ -15,6 +15,30 @@ export function activate(context: vscode.ExtensionContext): void {
   const output = vscode.window.createOutputChannel('masterbelt');
   context.subscriptions.push(output);
 
+  startClient(output);
+
+  // Restart re-reads the configuration and spawns a fresh server process —
+  // the way to pick up a rebuilt binary or a changed server path without
+  // reloading the window.
+  context.subscriptions.push(
+    vscode.commands.registerCommand('masterbelt.restartServer', async () => {
+      output.appendLine('restarting language server...');
+      if (client) {
+        await client.stop().catch((err: unknown) => {
+          output.appendLine(`stopping the old server failed: ${String(err)}`);
+        });
+        client = undefined;
+      }
+      startClient(output);
+    }),
+  );
+}
+
+// startClient builds a client from the current configuration and starts it,
+// reporting a failed launch clearly (a stale binary without the `lsp`
+// subcommand exits immediately, which otherwise surfaces only as a cryptic
+// EPIPE).
+function startClient(output: vscode.OutputChannel): void {
   const settings = vscode.workspace.getConfiguration('masterbelt');
   // MASTERBELT_SERVER_PATH lets the F5 launch config point at a freshly built
   // binary regardless of which folder the development host opens (see the
@@ -40,10 +64,6 @@ export function activate(context: vscode.ExtensionContext): void {
   // The client id "masterbelt" makes it read the `masterbelt.trace.server`
   // setting automatically.
   client = new LanguageClient('masterbelt', 'masterbelt', serverOptions, clientOptions);
-
-  // start() rejects if the server cannot be spawned or exits during the
-  // handshake (a stale binary without the `lsp` subcommand exits immediately,
-  // which otherwise surfaces only as a cryptic EPIPE). Report it clearly.
   client.start().catch((err: unknown) => {
     output.appendLine(`language server failed to start: ${String(err)}`);
     void vscode.window.showErrorMessage(
