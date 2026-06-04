@@ -63,3 +63,11 @@ Module
     type bool
     value BoolLiteral false.not()
     eval true
+  Const "grouped"
+    type int
+    value IntLiteral "1".add(IntLiteral "2").mul(IntLiteral "3")
+    eval 9
+  Const "nested"
+    type bool
+    value IntLiteral "1".gt(IntLiteral "2").not()
+    eval true

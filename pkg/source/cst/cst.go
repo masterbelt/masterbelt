@@ -48,6 +48,7 @@ const (
 	CollectionLit             // a list or map literal: "[" ( Expr | MapEntry )* "]"
 	MapEntry                  // one map-literal entry: Expr ":" Expr
 	FuncLit                   // a function literal: fn ParamList ":" TypeExpr Block
+	ParenExpr                 // a parenthesized grouping: "(" Expr ")"
 
 	// Type declarations and the type-expression grammar.
 	TypeDecl      // [doc] [pub] type Name [GenericParams] "=" TypeExpr [ImplBlock]
@@ -95,6 +96,7 @@ var kindNames = [...]string{
 	CollectionLit: "CollectionLit",
 	MapEntry:      "MapEntry",
 	FuncLit:       "FuncLit",
+	ParenExpr:     "ParenExpr",
 	TypeDecl:      "TypeDecl",
 	GenericParams: "GenericParams",
 	GenericParam:  "GenericParam",

@@ -263,6 +263,55 @@ File
         Bang "!"
         Literal
           False "false"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "grouped"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      BinaryExpr
+        ParenExpr
+          LParen "("
+          BinaryExpr
+            Literal
+              Int "1"
+            Whitespace " "
+            Plus "+"
+            Whitespace " "
+            Literal
+              Int "2"
+          RParen ")"
+        Whitespace " "
+        Star "*"
+        Whitespace " "
+        Literal
+          Int "3"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "nested"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      UnaryExpr
+        Bang "!"
+        ParenExpr
+          LParen "("
+          BinaryExpr
+            Literal
+              Int "1"
+            Whitespace " "
+            Gt ">"
+            Whitespace " "
+            Literal
+              Int "2"
+          RParen ")"
   Newline "\n"
   EOF ""
 # diagnostics

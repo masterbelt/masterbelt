@@ -17,3 +17,5 @@ File
     cond (call (. (call (. Identifier "MaxLevel" sub) Identifier "MinLevel") eql) IntLit "100")
   AssertDecl
     cond (call (. Identifier "Enabled" anan) (call (. BoolLit false not)))
+  AssertDecl
+    cond (call (. (call (. Identifier "MaxLevel" gt) IntLit "0") anan) (call (. (call (. Identifier "MinLevel" gt) IntLit "0") not)))

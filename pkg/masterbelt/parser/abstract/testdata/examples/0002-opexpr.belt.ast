@@ -47,3 +47,9 @@ File
   ConstDecl
     name "not"
     value (call (. BoolLit false not))
+  ConstDecl
+    name "grouped"
+    value (call (. (call (. IntLit "1" add) IntLit "2") mul) IntLit "3")
+  ConstDecl
+    name "nested"
+    value (call (. (call (. IntLit "1" gt) IntLit "2") not))

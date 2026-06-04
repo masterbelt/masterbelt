@@ -76,6 +76,11 @@ func TestLowerExpressions(t *testing.T) {
 		{"const x = false\n", `BoolLit false`},
 		{"const x = 1 <= 2\n", `(call (. IntLit "1" lteq) IntLit "2")`},
 		{"const x = 1 +\n", `(call (. IntLit "1" add))`}, // recovered: right operand absent
+		// Parenthesized groupings unwrap: the tree shape already encodes the
+		// precedence they overrode, so the AST carries no grouping node.
+		{"const x = (1 + 2) * 3\n", `(call (. (call (. IntLit "1" add) IntLit "2") mul) IntLit "3")`},
+		{"const x = !(a && b)\n", `(call (. (call (. Identifier "a" anan) Identifier "b") not))`},
+		{"const x = (1)\n", `IntLit "1"`},
 		// String literals are decoded at lowering: quotes dropped, escapes
 		// interpreted (so the dump shows the value, which %q then re-quotes).
 		{"const x = \"hi\"\n", `StringLit "hi"`},
@@ -249,6 +254,15 @@ func TestLowerMalformedRecovers(t *testing.T) {
 	}
 	if d := file.Decls[0]; d.Name != "X" || d.Value != nil {
 		t.Errorf("decl = %+v, want name X with nil Value", d)
+	}
+
+	// An empty grouping unwraps to nothing: a nil Value, not a panic.
+	file, diags := Lower([]byte("const X = ()\n"))
+	if len(diags) == 0 {
+		t.Fatal("expected a diagnostic for the empty grouping")
+	}
+	if d := file.Decls[0]; d.Value != nil {
+		t.Errorf("decl Value = %+v, want nil", d.Value)
 	}
 }
 

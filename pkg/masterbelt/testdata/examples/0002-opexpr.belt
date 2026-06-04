@@ -18,3 +18,6 @@ const oror = false || true
 const pos = +1
 const neg = -1
 const not = !false
+
+const grouped = (1 + 2) * 3
+const nested = !(1 > 2)

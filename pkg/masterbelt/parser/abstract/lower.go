@@ -218,7 +218,7 @@ func lowerInitializer(t cst.Tree, buf source.Buffer) ast.Expr {
 // isExprKind reports whether a CST node kind is an expression node.
 func isExprKind(k cst.Kind) bool {
 	switch k {
-	case cst.Literal, cst.NameRef, cst.SelfExpr, cst.UnaryExpr, cst.BinaryExpr, cst.CallExpr, cst.MemberExpr, cst.CollectionLit, cst.FuncLit:
+	case cst.Literal, cst.NameRef, cst.SelfExpr, cst.UnaryExpr, cst.BinaryExpr, cst.CallExpr, cst.MemberExpr, cst.CollectionLit, cst.FuncLit, cst.ParenExpr:
 		return true
 	default:
 		return false
@@ -248,6 +248,10 @@ func lowerExpr(t cst.Tree, buf source.Buffer) ast.Expr {
 		return lowerCallExpr(t, buf, node)
 	case cst.FuncLit:
 		return lowerFuncLit(t, buf, node)
+	case cst.ParenExpr:
+		// The parentheses exist only to override precedence, which the tree
+		// shape already encodes; the grouping unwraps to its inner expression.
+		return firstOperand(t, buf)
 	case cst.UnaryExpr:
 		// -x desugars to x.neg(): the operand is the receiver, no arguments.
 		return desugarCall(firstOperand(t, buf), unaryMethod(operatorKind(t)), nil, node)

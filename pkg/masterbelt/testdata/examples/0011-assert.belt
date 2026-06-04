@@ -7,3 +7,4 @@ assert MaxLevel > MinLevel
 assert MinLevel == 0
 assert MaxLevel - MinLevel == 100
 assert Enabled && !false
+assert MaxLevel > 0 && !(MinLevel > 0)

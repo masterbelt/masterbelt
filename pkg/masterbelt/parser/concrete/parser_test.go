@@ -85,6 +85,13 @@ func TestParseLossless(t *testing.T) {
 		"assert\n",        // missing expression stays lossless
 		"assert 1 >\n",    // missing right operand stays lossless
 		"assert assert\n", // a keyword starts no expression (must not consume it)
+		// Parenthesized groupings.
+		"const x = (1 + 2) * 3\n",
+		"const x = !(a && b)\n",
+		"const x = ((1))\n",
+		"const x = (1\n",   // unclosed grouping stays lossless
+		"const x = ()\n",   // empty grouping stays lossless
+		"const x = (1))\n", // stray closer becomes an error run
 	}
 	for _, src := range cases {
 		assertLossless(t, src)
@@ -514,6 +521,54 @@ func TestParseUseDiagnostics(t *testing.T) {
 		{"name after comma", "use { a, } from \"x.belt\"\n", CodeExpectedIdentifier},
 		{"junk after star", "use * x from \"a.belt\"\n", CodeExpectedFrom},
 		{"unclosed list", "use { a from \"x.belt\"\n", CodeUnexpectedToken},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, diags := Parse([]byte(tc.src))
+			found := false
+			for _, d := range diags {
+				if d.Code == tc.code {
+					found = true
+				}
+			}
+			if !found {
+				t.Fatalf("src %q: want diagnostic %s, got %v", tc.src, tc.code, diags)
+			}
+			assertLossless(t, tc.src)
+		})
+	}
+}
+
+// TestParseParenExpr checks a parenthesized grouping forms a ParenExpr operand
+// that overrides the operator precedence around it.
+func TestParseParenExpr(t *testing.T) {
+	root, diags := Parse([]byte("const x = (1 + 2) * 3"))
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	decl := root.Children()[0].(*cst.Node)
+	init := decl.Children()[len(decl.Children())-1].(*cst.Node) // the Initializer
+	mul := init.Children()[len(init.Children())-1].(*cst.Node)  // the BinaryExpr
+	if mul.Kind() != cst.BinaryExpr {
+		t.Fatalf("initializer expr = %s, want BinaryExpr", mul.Kind())
+	}
+	// The grouping binds tighter: the multiplication's left operand is the
+	// ParenExpr, not a bare literal.
+	if kinds := subNodeKinds(mul); len(kinds) != 2 || kinds[0] != cst.ParenExpr || kinds[1] != cst.Literal {
+		t.Fatalf("mul sub-nodes = %v, want [ParenExpr Literal]", kinds)
+	}
+}
+
+// TestParseParenExprDiagnostics checks local recovery for malformed groupings.
+func TestParseParenExprDiagnostics(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+		code diagnostic.Code
+	}{
+		{"empty", "const x = ()\n", CodeExpectedExpression},
+		{"unclosed", "const x = (1\n", CodeUnexpectedToken},
+		{"unclosed nested", "const x = ((1)\n", CodeUnexpectedToken},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

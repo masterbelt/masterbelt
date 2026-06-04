@@ -91,6 +91,35 @@ File
         Bang "!"
         Literal
           False "false"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      BinaryExpr
+        NameRef
+          Ident "MaxLevel"
+        Whitespace " "
+        Gt ">"
+        Whitespace " "
+        Literal
+          Int "0"
+      Whitespace " "
+      AmpAmp "&&"
+      Whitespace " "
+      UnaryExpr
+        Bang "!"
+        ParenExpr
+          LParen "("
+          BinaryExpr
+            NameRef
+              Ident "MinLevel"
+            Whitespace " "
+            Gt ">"
+            Whitespace " "
+            Literal
+              Int "0"
+          RParen ")"
   Newline "\n"
   EOF ""
 # diagnostics
