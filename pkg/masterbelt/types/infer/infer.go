@@ -1,0 +1,129 @@
+// Package infer is the syntax-driven half of masterbelt's type system: it
+// derives the type of an expression or declaration by walking the AST, and
+// checks an expression for operator-method type errors. Where package types is
+// the pure algebra over a type value (no syntax), infer applies that algebra to
+// the tree.
+//
+// Inference reads name resolution and declaration types through an Env, so it
+// has no dependency on the semantic query engine — the engine supplies a
+// memoizing Env, but the rules here are a pure function of the AST and that
+// environment, which is what makes them testable in isolation.
+package infer
+
+import (
+	"strings"
+
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ast"
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ir"
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/types"
+)
+
+// Env is what inference and checking need from their driver: name resolution and
+// the type of a referenced declaration. Keeping this an interface lets the
+// semantic engine supply a memoizing implementation (so an identifier's type is
+// computed once and dependencies are tracked) while this package stays a pure
+// set of rules.
+type Env interface {
+	// Resolve returns the declaration a value-position identifier refers to, or
+	// nil if no declaration has that name.
+	Resolve(id *ast.Identifier) *ast.ConstDecl
+	// TypeOf returns a declaration's type (ir.Invalid when undeterminable).
+	TypeOf(decl *ast.ConstDecl) ir.Type
+}
+
+// Decl is the type rule for a declaration: an annotation gives a concrete type,
+// otherwise the type is inferred from the initializer expression. It reads other
+// declarations' types through env so a memoizing engine can track the
+// dependencies.
+func Decl(decl *ast.ConstDecl, env Env) ir.Type {
+	if decl.Type != nil {
+		if t, ok := types.Lookup(decl.Type.Name); ok {
+			return t
+		}
+		return ir.Invalid
+	}
+	if decl.Value == nil {
+		return ir.Invalid
+	}
+	return Expr(decl.Value, env)
+}
+
+// Expr infers the type of an expression: literals are untyped, a value reference
+// inherits its referent's type, and a method call's type comes from the builtin
+// method rules (types.MethodResult).
+func Expr(e ast.Expr, env Env) ir.Type {
+	switch e := e.(type) {
+	case *ast.IntLit:
+		return ir.UntypedInt
+	case *ast.BoolLit:
+		return ir.UntypedBool
+	case *ast.Identifier:
+		if target := env.Resolve(e); target != nil {
+			return env.TypeOf(target)
+		}
+		return ir.Invalid
+	case *ast.CallExpr:
+		member, ok := e.Callee.(*ast.MemberExpr)
+		if !ok {
+			return ir.Invalid
+		}
+		recv := Expr(member.Receiver, env)
+		args := make([]ir.Type, len(e.Arguments))
+		for i, a := range e.Arguments {
+			args[i] = Expr(a, env)
+		}
+		return types.MethodResult(recv, member.Member.Name, args)
+	default:
+		return ir.Invalid
+	}
+}
+
+// Check type-checks an expression, reporting the innermost method call whose
+// operand types it is not defined on. It returns the expression's type so
+// recursion can propagate an existing error — an operand that is itself Invalid,
+// or an undefined reference reported elsewhere — without re-reporting it. The
+// report callback receives the offending call node, the method name, and the
+// operand types rendered as "recv, arg, ...".
+func Check(e ast.Expr, env Env, report func(node ast.Node, method, operands string)) ir.Type {
+	switch e := e.(type) {
+	case *ast.IntLit:
+		return ir.UntypedInt
+	case *ast.BoolLit:
+		return ir.UntypedBool
+	case *ast.Identifier:
+		if t := env.Resolve(e); t != nil {
+			return env.TypeOf(t)
+		}
+		return ir.Invalid
+	case *ast.CallExpr:
+		member, ok := e.Callee.(*ast.MemberExpr)
+		if !ok {
+			return ir.Invalid
+		}
+		recv := Check(member.Receiver, env, report)
+		bad := recv == ir.Invalid
+		args := make([]ir.Type, len(e.Arguments))
+		for i, a := range e.Arguments {
+			args[i] = Check(a, env, report)
+			bad = bad || args[i] == ir.Invalid
+		}
+		res := types.MethodResult(recv, member.Member.Name, args)
+		if res == ir.Invalid && !bad {
+			report(e, member.Member.Name, typesList(recv, args))
+		}
+		return res
+	default:
+		return ir.Invalid
+	}
+}
+
+// typesList renders the receiver and argument types as "recv, arg, ..." for the
+// invalid-operation diagnostic.
+func typesList(recv ir.Type, args []ir.Type) string {
+	parts := make([]string, 0, len(args)+1)
+	parts = append(parts, recv.String())
+	for _, a := range args {
+		parts = append(parts, a.String())
+	}
+	return strings.Join(parts, ", ")
+}

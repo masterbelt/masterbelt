@@ -20,13 +20,14 @@ package semantic
 import (
 	"math/big"
 	"sort"
-	"strings"
 
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/diagnostic"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/parser/abstract"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/cst"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ir"
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/types"
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/types/infer"
 )
 
 // queries are the pure, memoizable semantic facts the assembler needs.
@@ -45,6 +46,14 @@ type queries interface {
 	valueOf(decl *ast.ConstDecl) *ir.Constant
 }
 
+// typeEnv adapts the semantic query interface to infer.Env, so the type
+// inference and checking in package types/infer can read resolution and
+// declaration types through the same memoizing engine.
+type typeEnv struct{ q queries }
+
+func (e typeEnv) Resolve(id *ast.Identifier) *ast.ConstDecl { return e.q.resolve(id) }
+func (e typeEnv) TypeOf(decl *ast.ConstDecl) ir.Type        { return e.q.typeOf(decl) }
+
 // Analyze resolves and types the document's program, returning the IR module and
 // the semantic diagnostics. It recomputes everything from scratch; it is the
 // reference analysis and the oracle for the incremental Document.
@@ -59,6 +68,7 @@ func Analyze(doc *abstract.Document) (*ir.Module, []diagnostic.Diagnostic) {
 func assemble(file *ast.File, positions map[cst.Green]span, q queries) (*ir.Module, []diagnostic.Diagnostic) {
 	diags := &diagnostic.List{}
 	at := func(n ast.Node) span { return spanOf(positions, n) }
+	env := typeEnv{q}
 
 	// Create the IR constants first so references can bind to them.
 	module := &ir.Module{}
@@ -102,9 +112,9 @@ func assemble(file *ast.File, positions map[cst.Green]span, q queries) (*ir.Modu
 			})
 			// Operator type errors: the innermost method call whose operand
 			// types it is not defined on.
-			checkExprTypes(decl.Value, q, func(node ast.Node, method, types string) {
+			infer.Check(decl.Value, env, func(node ast.Node, method, operands string) {
 				s := at(node)
-				diags.Add(newInvalidOperationDiagnostic(s.offset, s.width, method, types))
+				diags.Add(newInvalidOperationDiagnostic(s.offset, s.width, method, operands))
 			})
 			// Division or remainder by a zero divisor.
 			checkDivByZero(decl.Value, q, func(node ast.Node) {
@@ -114,13 +124,13 @@ func assemble(file *ast.File, positions map[cst.Green]span, q queries) (*ir.Modu
 		}
 
 		if decl.Type != nil {
-			if annType, ok := ir.LookupType(decl.Type.Name); !ok {
+			if annType, ok := types.Lookup(decl.Type.Name); !ok {
 				s := at(decl.Type)
 				diags.Add(newUnknownTypeDiagnostic(s.offset, s.width, decl.Type.Name))
 			} else if decl.Value != nil {
 				// An annotation must agree in kind (integer vs boolean) with the
 				// initializer's natural type; its value range is checked below.
-				if exprT := typeOfExpr(decl.Value, q); exprT != ir.Invalid && !compatible(annType, exprT) {
+				if exprT := infer.Expr(decl.Value, env); exprT != ir.Invalid && !types.Compatible(annType, exprT) {
 					s := at(decl.Value)
 					diags.Add(newTypeMismatchDiagnostic(s.offset, s.width, exprT.String(), annType.String()))
 				}
@@ -133,7 +143,7 @@ func assemble(file *ast.File, positions map[cst.Green]span, q queries) (*ir.Modu
 		// An integer value outside its concrete type's range overflows. Untyped
 		// constants have no fixed range (Fits accepts them), and booleans never
 		// overflow.
-		if c.Eval != nil && c.Eval.Kind == ir.ConstInt && !c.Type.Fits(c.Eval.Int) {
+		if c.Eval != nil && c.Eval.Kind == ir.ConstInt && !types.Fits(c.Type, c.Eval.Int) {
 			s := at(decl.Value)
 			diags.Add(newConstantOverflowDiagnostic(s.offset, s.width, c.Eval.String(), c.Type.String()))
 		}
@@ -145,54 +155,6 @@ func assemble(file *ast.File, positions map[cst.Green]span, q queries) (*ir.Modu
 }
 
 // --- expression diagnostics -------------------------------------------------
-
-// checkExprTypes type-checks an expression, reporting the innermost method call
-// whose operand types it is not defined on. It returns the expression's type so
-// recursion can propagate an existing error — an operand that is itself Invalid,
-// or an undefined reference reported elsewhere — without re-reporting it.
-func checkExprTypes(e ast.Expr, q queries, report func(node ast.Node, method, types string)) ir.Type {
-	switch e := e.(type) {
-	case *ast.IntLit:
-		return ir.UntypedInt
-	case *ast.BoolLit:
-		return ir.UntypedBool
-	case *ast.Identifier:
-		if t := q.resolve(e); t != nil {
-			return q.typeOf(t)
-		}
-		return ir.Invalid
-	case *ast.CallExpr:
-		member, ok := e.Callee.(*ast.MemberExpr)
-		if !ok {
-			return ir.Invalid
-		}
-		recv := checkExprTypes(member.Receiver, q, report)
-		bad := recv == ir.Invalid
-		args := make([]ir.Type, len(e.Arguments))
-		for i, a := range e.Arguments {
-			args[i] = checkExprTypes(a, q, report)
-			bad = bad || args[i] == ir.Invalid
-		}
-		res := methodResult(recv, member.Member.Name, args)
-		if res == ir.Invalid && !bad {
-			report(e, member.Member.Name, typesList(recv, args))
-		}
-		return res
-	default:
-		return ir.Invalid
-	}
-}
-
-// typesList renders the receiver and argument types as "recv, arg, ..." for the
-// invalid-operation diagnostic.
-func typesList(recv ir.Type, args []ir.Type) string {
-	parts := make([]string, 0, len(args)+1)
-	parts = append(parts, recv.String())
-	for _, a := range args {
-		parts = append(parts, a.String())
-	}
-	return strings.Join(parts, ", ")
-}
 
 // checkDivByZero reports each div/rem whose divisor folds to zero.
 func checkDivByZero(e ast.Expr, q queries, report func(node ast.Node)) {
@@ -215,12 +177,6 @@ func checkDivByZero(e ast.Expr, q queries, report func(node ast.Node)) {
 	}
 }
 
-// compatible reports whether an annotation and an initializer's inferred type
-// agree in kind — both integer or both boolean.
-func compatible(annotation, expr ir.Type) bool {
-	return (annotation.IsInteger() && expr.IsInteger()) || (annotation.IsBoolean() && expr.IsBoolean())
-}
-
 // buildSymbols maps each declared name to its first declaration.
 func buildSymbols(file *ast.File) map[string]*ast.ConstDecl {
 	syms := map[string]*ast.ConstDecl{}
@@ -232,144 +188,6 @@ func buildSymbols(file *ast.File) map[string]*ast.ConstDecl {
 		}
 	}
 	return syms
-}
-
-// --- type inference ---------------------------------------------------------
-
-// computeType is the type rule, shared by both query implementations: an
-// annotation gives a concrete type, otherwise the type is inferred from the
-// initializer expression. It reads other facts through q so the memoizing
-// engine can track the dependencies.
-func computeType(decl *ast.ConstDecl, q queries) ir.Type {
-	if decl.Type != nil {
-		if t, ok := ir.LookupType(decl.Type.Name); ok {
-			return t
-		}
-		return ir.Invalid
-	}
-	if decl.Value == nil {
-		return ir.Invalid
-	}
-	return typeOfExpr(decl.Value, q)
-}
-
-// typeOfExpr infers the type of an expression: literals are untyped, a value
-// reference inherits its referent's type, and a method call's type comes from
-// the builtin method table.
-func typeOfExpr(e ast.Expr, q queries) ir.Type {
-	switch e := e.(type) {
-	case *ast.IntLit:
-		return ir.UntypedInt
-	case *ast.BoolLit:
-		return ir.UntypedBool
-	case *ast.Identifier:
-		if target := q.resolve(e); target != nil {
-			return q.typeOf(target)
-		}
-		return ir.Invalid
-	case *ast.CallExpr:
-		member, ok := e.Callee.(*ast.MemberExpr)
-		if !ok {
-			return ir.Invalid
-		}
-		recv := typeOfExpr(member.Receiver, q)
-		args := make([]ir.Type, len(e.Arguments))
-		for i, a := range e.Arguments {
-			args[i] = typeOfExpr(a, q)
-		}
-		return methodResult(recv, member.Member.Name, args)
-	default:
-		return ir.Invalid
-	}
-}
-
-var (
-	arithMethods = map[string]bool{"add": true, "sub": true, "mul": true, "div": true, "rem": true}
-	orderMethods = map[string]bool{"lt": true, "lteq": true, "gt": true, "gteq": true}
-	equalMethods = map[string]bool{"eql": true, "neq": true}
-	logicMethods = map[string]bool{"anan": true, "oror": true}
-	signMethods  = map[string]bool{"pos": true, "neg": true}
-)
-
-// methodResult is the type rule for the builtin operator methods: arithmetic on
-// integers yields an integer, the comparisons and logical operators yield a
-// boolean, and the unary sign/not operators preserve their operand's type. It
-// returns ir.Invalid when the method does not apply to the operand types (a type
-// error), which the IR records as an Invalid type.
-func methodResult(recv ir.Type, method string, args []ir.Type) ir.Type {
-	switch {
-	case arithMethods[method]:
-		if len(args) != 1 {
-			return ir.Invalid
-		}
-		return unifyNumeric(recv, args[0])
-	case orderMethods[method]:
-		if len(args) != 1 || !recv.IsInteger() || !args[0].IsInteger() {
-			return ir.Invalid
-		}
-		return ir.UntypedBool
-	case equalMethods[method]:
-		if len(args) != 1 {
-			return ir.Invalid
-		}
-		a := args[0]
-		if (recv.IsInteger() && a.IsInteger()) || (recv.IsBoolean() && a.IsBoolean()) {
-			return ir.UntypedBool
-		}
-		return ir.Invalid
-	case logicMethods[method]:
-		if len(args) != 1 {
-			return ir.Invalid
-		}
-		return unifyBool(recv, args[0])
-	case signMethods[method]:
-		if len(args) != 0 || !recv.IsInteger() {
-			return ir.Invalid
-		}
-		return recv
-	case method == "not":
-		if len(args) != 0 || !recv.IsBoolean() {
-			return ir.Invalid
-		}
-		return recv
-	default:
-		return ir.Invalid
-	}
-}
-
-// unifyNumeric is the result type of an arithmetic op on two integer types: an
-// untyped operand adapts to the other, two equal types keep that type, and two
-// different concrete types are a mismatch (ir.Invalid).
-func unifyNumeric(a, b ir.Type) ir.Type {
-	switch {
-	case !a.IsInteger() || !b.IsInteger():
-		return ir.Invalid
-	case a == ir.UntypedInt:
-		return b
-	case b == ir.UntypedInt:
-		return a
-	case a == b:
-		return a
-	default:
-		return ir.Invalid
-	}
-}
-
-// unifyBool is the result type of a logical op on two boolean types, with the
-// same untyped-adapts-to-concrete rule as unifyNumeric.
-func unifyBool(a, b ir.Type) ir.Type {
-	switch {
-	case !a.IsBoolean() || !b.IsBoolean():
-		return ir.Invalid
-	case a == ir.UntypedBool:
-		return b
-	case b == ir.UntypedBool:
-		return a
-	case a == b:
-		return a
-	default:
-		return ir.Invalid
-	}
 }
 
 // --- evaluation -------------------------------------------------------------
@@ -669,7 +487,7 @@ func (d *directQueries) typeOf(decl *ast.ConstDecl) ir.Type {
 		return ir.Invalid // cycle
 	}
 	d.typing[decl] = true
-	t := computeType(decl, d)
+	t := infer.Decl(decl, typeEnv{d})
 	d.typing[decl] = false
 	d.typeMemo[decl] = t
 	return t

@@ -5,6 +5,7 @@ import (
 
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ir"
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/types/infer"
 )
 
 // This is a small demand-driven, memoizing query engine in the style of Salsa /
@@ -176,7 +177,7 @@ func (db *database) compute(key queryKey) any {
 		syms := db.read(symbolsKey).(map[string]*ast.ConstDecl)
 		return syms[key.id.Name]
 	case qTypeOf:
-		return computeType(key.decl, engineQueries{db})
+		return infer.Decl(key.decl, typeEnv{engineQueries{db}})
 	case qValue:
 		return computeValue(key.decl, engineQueries{db})
 	default:
