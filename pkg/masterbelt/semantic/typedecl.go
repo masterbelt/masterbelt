@@ -125,6 +125,8 @@ func (bc bodyChecker) infer(e ast.Expr, scope bodyScope) ir.Type {
 		return &ir.Builtin{Name: "bool"}
 	case *ast.NullLit:
 		return &ir.Builtin{Name: "null"}
+	case *ast.CollectionLit:
+		return bc.collectionType(e, scope)
 	case *ast.Identifier:
 		if t, ok := scope.params[e.Name]; ok {
 			return t
@@ -154,6 +156,51 @@ func (bc bodyChecker) infer(e ast.Expr, scope bodyScope) ir.Type {
 	default:
 		return ir.Invalid
 	}
+}
+
+// collectionType infers the type of a collection literal in a method body —
+// list<E> or map<K, V> — unifying the entry types, the same rule the const path
+// uses (package types/infer). An empty or non-unifying literal is ir.Invalid.
+func (bc bodyChecker) collectionType(e *ast.CollectionLit, scope bodyScope) ir.Type {
+	if len(e.Entries) == 0 {
+		return ir.Invalid
+	}
+	if e.IsMap() {
+		def, ok := bc.reg.Lookup("map")
+		if !ok {
+			return ir.Invalid
+		}
+		var keyT, valT ir.Type
+		for i, entry := range e.Entries {
+			k, v := bc.infer(entry.Key, scope), bc.infer(entry.Value, scope)
+			if i == 0 {
+				keyT, valT = k, v
+			} else {
+				keyT, valT = types.Unify(bc.reg, keyT, k), types.Unify(bc.reg, valT, v)
+			}
+		}
+		if keyT == ir.Invalid || valT == ir.Invalid {
+			return ir.Invalid
+		}
+		return &ir.App{Def: def, Args: []ir.Type{keyT, valT}}
+	}
+	def, ok := bc.reg.Lookup("list")
+	if !ok {
+		return ir.Invalid
+	}
+	var elemT ir.Type
+	for i, entry := range e.Entries {
+		t := bc.infer(entry.Value, scope)
+		if i == 0 {
+			elemT = t
+		} else {
+			elemT = types.Unify(bc.reg, elemT, t)
+		}
+	}
+	if elemT == ir.Invalid {
+		return ir.Invalid
+	}
+	return &ir.App{Def: def, Args: []ir.Type{elemT}}
 }
 
 // lookupType resolves a type name (a conversion callee) to its type.
@@ -290,6 +337,16 @@ func (r *typeResolver) lowerBodyExpr(e ast.Expr, params, tscope map[string]bool)
 		return &ir.BoolLiteral{Value: e.Value}
 	case *ast.NullLit:
 		return &ir.NullValue{}
+	case *ast.CollectionLit:
+		entries := make([]ir.CollectionEntry, len(e.Entries))
+		for i, entry := range e.Entries {
+			var key ir.Value
+			if entry.Key != nil {
+				key = r.lowerBodyExpr(entry.Key, params, tscope)
+			}
+			entries[i] = ir.CollectionEntry{Key: key, Value: r.lowerBodyExpr(entry.Value, params, tscope)}
+		}
+		return &ir.CollectionLiteral{Entries: entries}
 	case *ast.Identifier:
 		if params[e.Name] {
 			return &ir.ParamRef{Name: e.Name}

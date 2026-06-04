@@ -146,9 +146,11 @@ func assemble(file *ast.File, positions map[cst.Green]span, q queries) (*ir.Modu
 			// name anywhere in it (e.g. list<Bogus>) is diagnosed at its own node.
 			r := &typeResolver{reg: reg, defs: map[string]*ir.TypeDef{}, at: at, diags: diags}
 			annType := r.resolveType(decl.Type, nil)
-			if annType != ir.Invalid && decl.Value != nil {
-				// An annotation must be compatible with the initializer's natural
-				// type; its value range is checked below.
+			// A collection literal is checked element-wise below (collectionCheck),
+			// which reports precisely; any other value's inferred type must be
+			// compatible with the annotation here.
+			_, isColl := decl.Value.(*ast.CollectionLit)
+			if annType != ir.Invalid && decl.Value != nil && !isColl {
 				if exprT := infer.Expr(decl.Value, env); exprT != ir.Invalid && !types.Compatible(reg, annType, exprT) {
 					s := at(decl.Value)
 					diags.Add(newTypeMismatchDiagnostic(s.offset, s.width, exprT.String(), annType.String()))
@@ -165,6 +167,14 @@ func assemble(file *ast.File, positions map[cst.Green]span, q queries) (*ir.Modu
 		if c.Eval != nil && c.Eval.Kind == ir.ConstInt && !types.Fits(reg, c.Type, c.Eval.Int) {
 			s := at(decl.Value)
 			diags.Add(newConstantOverflowDiagnostic(s.offset, s.width, c.Eval.String(), c.Type.String()))
+		}
+		// A collection literal is type-checked element-wise against its type
+		// (the annotation, or the inferred element type), with each element's
+		// value range checked too. An empty or heterogeneous literal with no
+		// annotation cannot be inferred and is reported.
+		if lit, ok := decl.Value.(*ast.CollectionLit); ok {
+			cc := collectionChecker{env: env, q: q, reg: reg, at: at, diags: diags}
+			cc.check(lit, decl.Type != nil, c.Type)
 		}
 	}
 
@@ -202,6 +212,103 @@ func checkDivByZero(e ast.Expr, q queries, report func(node ast.Node)) {
 	for _, a := range call.Arguments {
 		checkDivByZero(a, q, report)
 	}
+}
+
+// --- collection literals ----------------------------------------------------
+
+// collectionChecker type-checks a collection literal against an expected type,
+// element by element, reporting element type mismatches and out-of-range
+// element values precisely at the offending entry.
+type collectionChecker struct {
+	env   typeEnv
+	q     queries
+	reg   *builtin.Registry
+	at    func(ast.Node) span
+	diags *diagnostic.List
+}
+
+// check is the entry point for a collection-valued constant. An annotated
+// literal is checked against its annotation; an un-annotated one only needs its
+// inferred type to be determinable (a non-empty, homogeneous literal) — an empty
+// or heterogeneous one is reported as uninferable.
+func (c collectionChecker) check(lit *ast.CollectionLit, annotated bool, t ir.Type) {
+	if annotated {
+		c.against(lit, t)
+		return
+	}
+	if t == ir.Invalid {
+		s := c.at(lit)
+		c.diags.Add(newUninferableCollectionDiagnostic(s.offset, s.width))
+	}
+}
+
+// against checks expression e against the expected type want: a collection
+// literal must match want's shape (a list or map of the right constructor) and
+// then have each entry checked against the element type; any other expression is
+// checked for assignability and integer range.
+func (c collectionChecker) against(e ast.Expr, want ir.Type) {
+	if e == nil {
+		return
+	}
+	if lit, ok := e.(*ast.CollectionLit); ok {
+		app, isColl := collectionApp(want)
+		if !isColl {
+			c.mismatch(lit, want)
+			return
+		}
+		if len(lit.Entries) > 0 && lit.IsMap() != (len(app.Args) == 2) {
+			c.mismatch(lit, want) // a map literal under a list annotation, or vice versa
+			return
+		}
+		c.entries(lit, app)
+		return
+	}
+	if got := infer.Expr(e, c.env); want != ir.Invalid && got != ir.Invalid && !types.Assignable(c.reg, got, want) {
+		s := c.at(e)
+		c.diags.Add(newTypeMismatchDiagnostic(s.offset, s.width, got.String(), want.String()))
+	}
+	if v := evalExpr(e, c.q); v != nil && v.Kind == ir.ConstInt && !types.Fits(c.reg, want, v.Int) {
+		s := c.at(e)
+		c.diags.Add(newConstantOverflowDiagnostic(s.offset, s.width, v.String(), want.String()))
+	}
+}
+
+// entries checks each entry of lit against app's element types: a list's
+// elements against its one argument, a map's keys and values against its two.
+func (c collectionChecker) entries(lit *ast.CollectionLit, app *ir.App) {
+	switch len(app.Args) {
+	case 1:
+		for _, entry := range lit.Entries {
+			c.against(entry.Value, app.Args[0])
+		}
+	case 2:
+		for _, entry := range lit.Entries {
+			if entry.Key != nil {
+				c.against(entry.Key, app.Args[0])
+			}
+			c.against(entry.Value, app.Args[1])
+		}
+	}
+}
+
+// mismatch reports that the literal's inferred type cannot be used where want is
+// expected (a non-collection annotation, or the wrong collection kind).
+func (c collectionChecker) mismatch(lit *ast.CollectionLit, want ir.Type) {
+	s := c.at(lit)
+	c.diags.Add(newTypeMismatchDiagnostic(s.offset, s.width, infer.Expr(lit, c.env).String(), want.String()))
+}
+
+// collectionApp returns t as a list or map application, or false if t is not a
+// builtin collection type.
+func collectionApp(t ir.Type) (*ir.App, bool) {
+	app, ok := t.(*ir.App)
+	if !ok || app.Def == nil {
+		return nil, false
+	}
+	if app.Def.Name == "list" || app.Def.Name == "map" {
+		return app, true
+	}
+	return nil, false
 }
 
 // buildSymbols maps each declared name to its first declaration.
@@ -245,6 +352,8 @@ func evalExpr(e ast.Expr, q queries) *ir.Constant {
 		return ir.StringConstant(e.Value)
 	case *ast.BoolLit:
 		return ir.BoolConstant(e.Value)
+	case *ast.CollectionLit:
+		return evalCollection(e, q)
 	case *ast.Identifier:
 		if target := q.resolve(e); target != nil {
 			return q.valueOf(target)
@@ -264,6 +373,27 @@ func evalExpr(e ast.Expr, q queries) *ir.Constant {
 	default:
 		return nil
 	}
+}
+
+// evalCollection folds a collection literal: each entry's value (and key, for a
+// map) is folded, in order. It returns nil if any element is unevaluated, so a
+// collection with an unfoldable element does not fold to a partial value.
+func evalCollection(e *ast.CollectionLit, q queries) *ir.Constant {
+	entries := make([]ir.ConstEntry, 0, len(e.Entries))
+	for _, entry := range e.Entries {
+		var key *ir.Constant
+		if entry.Key != nil {
+			if key = evalExpr(entry.Key, q); key == nil {
+				return nil
+			}
+		}
+		val := evalExpr(entry.Value, q)
+		if val == nil {
+			return nil
+		}
+		entries = append(entries, ir.ConstEntry{Key: key, Value: val})
+	}
+	return ir.CollectionConstant(entries)
 }
 
 // evalMethod evaluates an operator method by dispatching to its native
@@ -312,6 +442,16 @@ func lowerValue(e ast.Expr, irOf map[*ast.ConstDecl]*ir.Const, q queries) ir.Val
 		return &ir.StringLiteral{Value: e.Value}
 	case *ast.BoolLit:
 		return &ir.BoolLiteral{Value: e.Value}
+	case *ast.CollectionLit:
+		entries := make([]ir.CollectionEntry, len(e.Entries))
+		for i, entry := range e.Entries {
+			var key ir.Value
+			if entry.Key != nil {
+				key = lowerValue(entry.Key, irOf, q)
+			}
+			entries[i] = ir.CollectionEntry{Key: key, Value: lowerValue(entry.Value, irOf, q)}
+		}
+		return &ir.CollectionLiteral{Entries: entries}
 	case *ast.Identifier:
 		if target := q.resolve(e); target != nil {
 			return &ir.Reference{Target: irOf[target]}

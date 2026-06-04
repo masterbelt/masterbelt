@@ -9,14 +9,15 @@ import (
 )
 
 const (
-	CodeConstantOverflow     diagnostic.Code = "masterbelt.semantic.constant_overflow"
-	CodeCyclicReference      diagnostic.Code = "masterbelt.semantic.cyclic_reference"
-	CodeDivisionByZero       diagnostic.Code = "masterbelt.semantic.division_by_zero"
-	CodeDuplicateDeclaration diagnostic.Code = "masterbelt.semantic.duplicate_declaration"
-	CodeInvalidOperation     diagnostic.Code = "masterbelt.semantic.invalid_operation"
-	CodeTypeMismatch         diagnostic.Code = "masterbelt.semantic.type_mismatch"
-	CodeUndefinedName        diagnostic.Code = "masterbelt.semantic.undefined_name"
-	CodeUnknownType          diagnostic.Code = "masterbelt.semantic.unknown_type"
+	CodeConstantOverflow      diagnostic.Code = "masterbelt.semantic.constant_overflow"
+	CodeCyclicReference       diagnostic.Code = "masterbelt.semantic.cyclic_reference"
+	CodeDivisionByZero        diagnostic.Code = "masterbelt.semantic.division_by_zero"
+	CodeDuplicateDeclaration  diagnostic.Code = "masterbelt.semantic.duplicate_declaration"
+	CodeInvalidOperation      diagnostic.Code = "masterbelt.semantic.invalid_operation"
+	CodeTypeMismatch          diagnostic.Code = "masterbelt.semantic.type_mismatch"
+	CodeUndefinedName         diagnostic.Code = "masterbelt.semantic.undefined_name"
+	CodeUninferableCollection diagnostic.Code = "masterbelt.semantic.uninferable_collection"
+	CodeUnknownType           diagnostic.Code = "masterbelt.semantic.unknown_type"
 )
 
 func newConstantOverflowDiagnostic(offset int, width int, value string, typ string) diagnostic.Diagnostic {
@@ -112,6 +113,17 @@ func newUndefinedNameDiagnostic(offset int, width int, name string) diagnostic.D
 		Code:     CodeUndefinedName,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeUndefinedName, fields),
 		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newUninferableCollectionDiagnostic(offset int, width int) diagnostic.Diagnostic {
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeUninferableCollection,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeUninferableCollection, nil),
+		Fields:   nil,
 		Offset:   offset,
 		Width:    width,
 	}

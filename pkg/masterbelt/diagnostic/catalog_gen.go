@@ -159,6 +159,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "undefined name: " + f["name"].String()
 		}
 	},
+	"masterbelt.semantic.uninferable_collection": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "このコレクションリテラルの型を推論できません。型注釈を付けてください"
+		default:
+			return "cannot infer the type of this collection literal; annotate it"
+		}
+	},
 	"masterbelt.semantic.unknown_type": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":

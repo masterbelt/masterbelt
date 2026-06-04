@@ -151,6 +151,72 @@ func TestStringOperationsFold(t *testing.T) {
 	}
 }
 
+func TestCollectionLiteral(t *testing.T) {
+	m, diags := analyze("const L: list<int> = [1, 2, 3]\nconst M: map<string, int> = [\"k\": 1]\nconst I = [10, 20]\nconst E: list<int> = []\n")
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if m.Consts[0].Type.String() != "list<int>" {
+		t.Errorf("L type = %s, want list<int>", m.Consts[0].Type)
+	}
+	// The list folds to a collection constant of its elements.
+	if ev := m.Consts[0].Eval; ev == nil || ev.Kind != ir.ConstCollection || len(ev.Coll) != 3 ||
+		ev.Coll[0].Key != nil || ev.Coll[0].Value.Int.Int64() != 1 {
+		t.Errorf("L eval = %v, want collection [1 2 3]", m.Consts[0].Eval)
+	}
+	if m.Consts[1].Type.String() != "map<string, int>" {
+		t.Errorf("M type = %s, want map<string, int>", m.Consts[1].Type)
+	}
+	if ev := m.Consts[1].Eval; ev == nil || ev.Kind != ir.ConstCollection || len(ev.Coll) != 1 ||
+		ev.Coll[0].Key == nil || ev.Coll[0].Key.Str != "k" || ev.Coll[0].Value.Int.Int64() != 1 {
+		t.Errorf("M eval = %v, want collection [k: 1]", m.Consts[1].Eval)
+	}
+	// An un-annotated list infers its element type.
+	if m.Consts[2].Type.String() != "list<int>" {
+		t.Errorf("I type = %s, want list<int>", m.Consts[2].Type)
+	}
+	// An empty list takes its type from the annotation and folds to [].
+	if m.Consts[3].Type.String() != "list<int>" {
+		t.Errorf("E type = %s, want list<int>", m.Consts[3].Type)
+	}
+	if ev := m.Consts[3].Eval; ev == nil || ev.Kind != ir.ConstCollection || len(ev.Coll) != 0 {
+		t.Errorf("E eval = %v, want empty collection", m.Consts[3].Eval)
+	}
+}
+
+func TestCollectionElementAdaptsAndChecks(t *testing.T) {
+	// Integer elements adapt to the annotation's element type, range-checked.
+	if _, diags := analyze("const X: list<int8> = [1, 2, 3]\n"); len(diags) != 0 {
+		t.Errorf("list<int8> = [1,2,3] should be fine, got %v", codes(diags))
+	}
+	if m, diags := analyze("const X: map<string, int> = [\"a\": 1, \"b\": 2]\n"); len(diags) != 0 {
+		t.Errorf("map literal should be fine, got %v", codes(diags))
+	} else if m.Consts[0].Type.String() != "map<string, int>" {
+		t.Errorf("type = %s, want map<string, int>", m.Consts[0].Type)
+	}
+}
+
+func TestCollectionDiagnostics(t *testing.T) {
+	cases := []struct {
+		src  string
+		code diagnostic.Code
+	}{
+		{"const X: list<int8> = [1, 999]\n", CodeConstantOverflow}, // element out of range
+		{"const X: list<int> = [\"a\"]\n", CodeTypeMismatch},       // wrong element type
+		{"const X = []\n", CodeUninferableCollection},              // empty, no annotation
+		{"const X = [1, \"a\"]\n", CodeUninferableCollection},      // heterogeneous, no annotation
+		{"const X: int = [1]\n", CodeTypeMismatch},                 // collection under scalar annotation
+		{"const X: list<int> = [\"k\": 1]\n", CodeTypeMismatch},    // map literal, list annotation
+		{"const X: map<string, int> = [1, 2]\n", CodeTypeMismatch}, // list literal, map annotation
+	}
+	for _, tc := range cases {
+		_, diags := analyze(tc.src)
+		if !hasCode(diags, tc.code) {
+			t.Errorf("%q: want %s, got %v", tc.src, tc.code, codes(diags))
+		}
+	}
+}
+
 func TestStringAnnotationMismatch(t *testing.T) {
 	// A string initializer under a non-string annotation (and vice versa) is a
 	// type mismatch; a string under a string annotation is fine.

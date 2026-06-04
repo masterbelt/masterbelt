@@ -1,0 +1,25 @@
+Module
+  Const "ExampleList"
+    type list<int>
+    value [IntLiteral "1", IntLiteral "2", IntLiteral "3"]
+    eval [1, 2, 3]
+  Const "ExampleMap"
+    type map<string, int>
+    value [StringLiteral "key": IntLiteral "100"]
+    eval ["key": 100]
+  Const "Inferred"
+    type list<int>
+    value [IntLiteral "10", IntLiteral "20", IntLiteral "30"]
+    eval [10, 20, 30]
+  Const "Bytes"
+    type list<int8>
+    value [IntLiteral "1", IntLiteral "2", IntLiteral "3"]
+    eval [1, 2, 3]
+  Const "EmptyList"
+    type list<int>
+    value []
+    eval []
+  Const "EmptyMap"
+    type map<string, int>
+    value []
+    eval []

@@ -19,3 +19,4 @@ masterbelt.semantic.constant_overflow,constant {value} overflows {typ}
 masterbelt.semantic.invalid_operation,cannot apply method {method} to {types}
 masterbelt.semantic.division_by_zero,division by zero
 masterbelt.semantic.type_mismatch,cannot use {actual} as {expected}
+masterbelt.semantic.uninferable_collection,cannot infer the type of this collection literal; annotate it

@@ -64,6 +64,22 @@ type BoolLiteral struct {
 
 func (*BoolLiteral) value() {}
 
+// CollectionLiteral is a list or map literal. A list's entries each carry only a
+// Value; a map's entries each carry a Key and a Value. An empty literal has no
+// entries; its kind comes from the constant's type.
+type CollectionLiteral struct {
+	Entries []CollectionEntry
+}
+
+func (*CollectionLiteral) value() {}
+
+// CollectionEntry is one entry of a CollectionLiteral: a Value, and for a map a
+// Key (nil for a list element).
+type CollectionEntry struct {
+	Key   Value // nil for a list element
+	Value Value
+}
+
 // Reference is a use of another constant, resolved to its declaration.
 type Reference struct {
 	Target *Const

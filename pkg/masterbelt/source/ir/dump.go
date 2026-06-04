@@ -98,6 +98,16 @@ func dumpValue(v Value) string {
 		return fmt.Sprintf("StringLiteral %q", x.Value)
 	case *BoolLiteral:
 		return fmt.Sprintf("BoolLiteral %v", x.Value)
+	case *CollectionLiteral:
+		parts := make([]string, len(x.Entries))
+		for i, e := range x.Entries {
+			if e.Key != nil {
+				parts[i] = dumpValue(e.Key) + ": " + dumpValue(e.Value)
+			} else {
+				parts[i] = dumpValue(e.Value)
+			}
+		}
+		return "[" + strings.Join(parts, ", ") + "]"
 	case *Reference:
 		name := "<unresolved>"
 		if x.Target != nil {

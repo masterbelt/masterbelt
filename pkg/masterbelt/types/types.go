@@ -93,9 +93,23 @@ func Fits(reg *builtin.Registry, t ir.Type, v *big.Int) bool {
 // non-numeric primitive) annotation accept a matching initializer. The value
 // range is checked separately (Fits).
 func Compatible(reg *builtin.Registry, annotation, expr ir.Type) bool {
-	return (IsInteger(reg, annotation) && IsInteger(reg, expr)) ||
+	if (IsInteger(reg, annotation) && IsInteger(reg, expr)) ||
 		(IsBoolean(reg, annotation) && IsBoolean(reg, expr)) ||
-		sameBuiltin(annotation, expr) || sameNamed(annotation, expr)
+		sameBuiltin(annotation, expr) || sameNamed(annotation, expr) {
+		return true
+	}
+	// Two applications of the same generic constructor agree when their
+	// arguments do, so list<int> satisfies a list<int8> annotation (the
+	// elements' value ranges are checked separately).
+	if x, y, ok := sameAppShape(annotation, expr); ok {
+		for i := range x.Args {
+			if !Compatible(reg, x.Args[i], y.Args[i]) {
+				return false
+			}
+		}
+		return true
+	}
+	return false
 }
 
 // Assignable reports whether a value of type from may be used where type to is
@@ -107,6 +121,16 @@ func Assignable(reg *builtin.Registry, from, to ir.Type) bool {
 		return true
 	}
 	if isDefaultInt(from) && IsInteger(reg, to) {
+		return true
+	}
+	if x, y, ok := sameAppShape(from, to); ok {
+		// list<A> is assignable to list<B> when A is assignable to B (the same,
+		// covariant, element-wise rule that lets list<int> flow into list<int8>).
+		for i := range x.Args {
+			if !Assignable(reg, x.Args[i], y.Args[i]) {
+				return false
+			}
+		}
 		return true
 	}
 	return sameBuiltin(from, to) || sameNamed(from, to)
@@ -135,7 +159,7 @@ func MethodResult(reg *builtin.Registry, recv ir.Type, method string, args []ir.
 	operand := recv // the unified type of the receiver and the self-typed args
 	for i, p := range m.Params {
 		if _, isSelf := p.Type.(*ir.SelfType); isSelf {
-			operand = combine(reg, operand, args[i])
+			operand = Unify(reg, operand, args[i])
 			if operand == ir.Invalid {
 				return ir.Invalid
 			}
@@ -191,11 +215,13 @@ func findMethodSeen(reg *builtin.Registry, def *ir.TypeDef, name string, seen ma
 	return nil
 }
 
-// combine unifies two operand types: the default integer adapts to the other
-// integer operand, two equal types keep that type, and anything else is a
-// mismatch (ir.Invalid). It is how an integer literal takes the type of the
-// sized integer it is combined with.
-func combine(reg *builtin.Registry, a, b ir.Type) ir.Type {
+// Unify combines two operand types: the default integer adapts to the other
+// integer operand, two equal types keep that type, and two applications of the
+// same generic constructor (list<A> and list<B>) unify element-wise. Anything
+// else is a mismatch (ir.Invalid). It is how an integer literal takes the type
+// of the sized integer it is combined with, and how a collection literal's
+// element type is inferred across its entries.
+func Unify(reg *builtin.Registry, a, b ir.Type) ir.Type {
 	switch {
 	case a == b:
 		return a
@@ -205,6 +231,15 @@ func combine(reg *builtin.Registry, a, b ir.Type) ir.Type {
 		return a
 	case sameBuiltin(a, b), sameNamed(a, b):
 		return a
+	}
+	if x, y, ok := sameAppShape(a, b); ok {
+		args := make([]ir.Type, len(x.Args))
+		for i := range args {
+			if args[i] = Unify(reg, x.Args[i], y.Args[i]); args[i] == ir.Invalid {
+				return ir.Invalid
+			}
+		}
+		return &ir.App{Def: x.Def, Args: args}
 	}
 	return ir.Invalid
 }
@@ -225,4 +260,17 @@ func sameNamed(a, b ir.Type) bool {
 	}
 	y, ok := b.(*ir.Named)
 	return ok && x.Def == y.Def
+}
+
+// sameAppShape reports whether a and b are both applications of the same generic
+// constructor with the same number of arguments (e.g. both list<...> with one
+// argument), returning the two applications so a caller can relate their
+// arguments pairwise.
+func sameAppShape(a, b ir.Type) (x, y *ir.App, ok bool) {
+	x, oka := a.(*ir.App)
+	y, okb := b.(*ir.App)
+	if !oka || !okb || x.Def != y.Def || len(x.Args) != len(y.Args) {
+		return nil, nil, false
+	}
+	return x, y, true
 }
