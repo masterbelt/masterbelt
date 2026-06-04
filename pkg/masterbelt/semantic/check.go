@@ -3,6 +3,7 @@ package semantic
 import (
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/diagnostic"
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/eval"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ir"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/types"
@@ -22,7 +23,7 @@ func checkDivByZero(e ast.Expr, q queries, report func(node ast.Node)) {
 		return
 	}
 	if (member.Member.Name == "div" || member.Member.Name == "rem") && len(call.Arguments) == 1 {
-		if d := evalExpr(call.Arguments[0], q); d != nil && d.Kind == ir.ConstInt && d.Int.Sign() == 0 {
+		if d := eval.Expr(call.Arguments[0], evalEnv{q}); d != nil && d.Kind == ir.ConstInt && d.Int.Sign() == 0 {
 			report(call)
 		}
 	}
@@ -85,7 +86,7 @@ func (c collectionChecker) against(e ast.Expr, want ir.Type) {
 		s := c.at(e)
 		c.diags.Add(newTypeMismatchDiagnostic(s.offset, s.width, got.String(), want.String()))
 	}
-	if v := evalExpr(e, c.q); v != nil && v.Kind == ir.ConstInt && !types.Fits(c.reg, want, v.Int) {
+	if v := eval.Expr(e, evalEnv{c.q}); v != nil && v.Kind == ir.ConstInt && !types.Fits(c.reg, want, v.Int) {
 		s := c.at(e)
 		c.diags.Add(newConstantOverflowDiagnostic(s.offset, s.width, v.String(), want.String()))
 	}
