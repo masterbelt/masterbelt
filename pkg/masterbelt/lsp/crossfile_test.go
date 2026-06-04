@@ -175,6 +175,142 @@ func TestCrossFileDiagnosticsUpdate(t *testing.T) {
 	}
 }
 
+// TestCrossFileReferences: find-references from the declaration reaches every
+// file of the workspace — the declaration, the namespace member access, and
+// the selectively imported reference.
+func TestCrossFileReferences(t *testing.T) {
+	root := crossProject(t)
+	s := NewServer()
+	mainURI := openOnDisk(t, s, root, "main.belt")
+	geoURI := openOnDisk(t, s, root, "geometry.belt")
+
+	// From Origin's declaration in geometry.belt (line 0, col 10).
+	v := s.open[geoURI]
+	locs, err := s.References(context.Background(), &protocol.ReferenceParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: geoURI},
+			Position:     toPosition(v.Buffer(), strings.Index("pub const Origin", "Origin")),
+		},
+		Context: protocol.ReferenceContext{IncludeDeclaration: true},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	byURI := map[protocol.DocumentURI]int{}
+	for _, l := range locs {
+		byURI[l.URI]++
+	}
+	if byURI[geoURI] != 1 || byURI[mainURI] != 1 {
+		t.Fatalf("references = %v, want the declaration in geometry.belt and the geo.Origin access in main.belt", byURI)
+	}
+}
+
+// TestCrossFileRename: renaming an imported constant edits its declaration,
+// the namespace member access, the selective import list, and the reference —
+// across both files.
+func TestCrossFileRename(t *testing.T) {
+	root := crossProject(t)
+	s := NewServer()
+	mainURI := openOnDisk(t, s, root, "main.belt")
+	geoURI := openOnDisk(t, s, root, "geometry.belt")
+
+	// Rename Unit from its reference in main.belt (const step = Unit).
+	v := s.open[mainURI]
+	we, err := s.Rename(context.Background(), &protocol.RenameParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: mainURI},
+			Position:     toPosition(v.Buffer(), strings.LastIndex(crossMainSrc, "Unit")),
+		},
+		NewName: "Step",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if we == nil {
+		t.Fatal("rename returned nil")
+	}
+	if len(we.Changes[geoURI]) != 1 {
+		t.Errorf("geometry edits = %v, want the declaration", we.Changes[geoURI])
+	}
+	// main.belt: the reference (the import-list name is not an expression and
+	// stays — renaming it is follow-up work).
+	if len(we.Changes[mainURI]) != 1 {
+		t.Errorf("main edits = %v, want the Unit reference", we.Changes[mainURI])
+	}
+	for _, edits := range we.Changes {
+		for _, e := range edits {
+			if e.NewText != "Step" {
+				t.Errorf("edit = %+v, want NewText Step", e)
+			}
+		}
+	}
+}
+
+// TestCrossFileRenameMemberEditsOnlyTheName: renaming through geo.Origin must
+// replace just "Origin", never the "geo." qualifier.
+func TestCrossFileRenameMemberEditsOnlyTheName(t *testing.T) {
+	root := crossProject(t)
+	s := NewServer()
+	mainURI := openOnDisk(t, s, root, "main.belt")
+	v := s.open[mainURI]
+
+	memberOffset := strings.Index(crossMainSrc, "geo.Origin") + 4
+	we, err := s.Rename(context.Background(), &protocol.RenameParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: mainURI},
+			Position:     toPosition(v.Buffer(), memberOffset),
+		},
+		NewName: "Zero",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if we == nil {
+		t.Fatal("rename returned nil")
+	}
+	edits := we.Changes[mainURI]
+	if len(edits) != 1 {
+		t.Fatalf("main edits = %+v, want just the member name", edits)
+	}
+	r := edits[0].Range
+	// "Origin" inside "const start = geo.Origin" on line 2: cols 18..24.
+	if r.Start.Line != 2 || r.Start.Character != 18 || r.End.Character != 24 {
+		t.Errorf("member edit range = %+v, want line 2 cols 18..24", r)
+	}
+}
+
+// TestUsePathCompletion: completing inside a use path offers the project's
+// sibling files, relative to the importing file.
+func TestUsePathCompletion(t *testing.T) {
+	root := writeProject(t, map[string]string{
+		"masterbelt.toml": "entry = \"src/main.belt\"\n",
+		"src/main.belt":   "use geo from \"g\"\n",
+		"src/geo.belt":    "pub const G = 1\n",
+		"lib/util.belt":   "pub const U = 2\n",
+	})
+	s := NewServer()
+	uri := openOnDisk(t, s, root, filepath.Join("src", "main.belt"))
+	v := s.open[uri]
+
+	list, err := s.Completion(context.Background(), &protocol.CompletionParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			Position:     toPosition(v.Buffer(), strings.Index("use geo from \"g\"", "\"g")+2),
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var labels []string
+	for _, item := range list.Items {
+		labels = append(labels, item.Label)
+	}
+	want := "../lib/util.belt,geo.belt"
+	if got := strings.Join(labels, ","); got != want {
+		t.Errorf("use-path completions = %s, want %s", got, want)
+	}
+}
+
 // TestProjectlessFileStaysStandalone: a file outside any project analyzes
 // alone, exactly as before.
 func TestProjectlessFileStaysStandalone(t *testing.T) {

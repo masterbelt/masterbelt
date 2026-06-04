@@ -6,6 +6,7 @@ import (
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
 	"github.com/masterbelt/masterbelt/pkg/source/token"
 	protocol "github.com/owenrumney/go-lsp/lsp"
+	"sort"
 )
 
 // References, rename, and prepare-rename are all the reverse of the resolver:
@@ -44,15 +45,25 @@ func occurrenceAt(doc view, offset int, trees map[cst.Green]cst.Tree) (occurrenc
 				// (its receiver is an identifier that names no value).
 			}
 
-			// A namespace member access (geo.Origin), as one unit.
-			var member *ast.MemberExpr
+			// A namespace member access (geo.Origin): the cursor must sit on
+			// the member's own name — the receiver names a namespace, not a
+			// value, and denotes nothing by itself.
+			var member occurrence
 			walkMemberExprs(decl.Value, func(m *ast.MemberExpr) {
-				if t, ok := trees[m.Syntax()]; ok && within(t, offset) && doc.ResolveMember(m) != nil {
-					member = m
+				t, ok := trees[m.Syntax()]
+				if !ok {
+					return
+				}
+				nameTok, ok := memberNameToken(t)
+				if !ok || !within(nameTok, offset) {
+					return
+				}
+				if target := doc.ResolveMember(m); target != nil {
+					member = occurrence{token: nameTok, target: target}
 				}
 			})
-			if member != nil {
-				return occurrence{token: trees[member.Syntax()], target: doc.ResolveMember(member)}, true
+			if member.target != nil {
+				return member, true
 			}
 			if hit != nil {
 				return occurrence{}, false // an undefined reference denotes nothing
@@ -121,7 +132,9 @@ func occurrencesOf(doc view, target *ir.Const, trees map[cst.Green]cst.Tree, inc
 		walkMemberExprs(c.Syntax.Value, func(m *ast.MemberExpr) {
 			if doc.ResolveMember(m) == target {
 				if t, ok := trees[m.Syntax()]; ok {
-					tokens = append(tokens, t)
+					if nameTok, ok := memberNameToken(t); ok {
+						tokens = append(tokens, nameTok)
+					}
 				}
 			}
 		})
@@ -129,46 +142,84 @@ func occurrencesOf(doc view, target *ir.Const, trees map[cst.Green]cst.Tree, inc
 	return tokens
 }
 
-// references returns the locations of every reference to the symbol at offset
-// (including its declaration when includeDecl is set).
-func references(doc view, offset int, uri protocol.DocumentURI, includeDecl bool) []protocol.Location {
-	buf := doc.Buffer()
-	trees := positionedTrees(doc.AST().Concrete().Tree())
+// memberNameToken returns the positioned identifier naming the member of a
+// member-access tree — its last Ident token child (the receiver's identifier
+// is nested in a NameRef node).
+func memberNameToken(member cst.Tree) (cst.Tree, bool) {
+	children := member.Children()
+	for i := len(children) - 1; i >= 0; i-- {
+		if tok, ok := children[i].Token(); ok && tok.Kind() == token.Ident {
+			return children[i], true
+		}
+	}
+	return cst.Tree{}, false
+}
 
-	occ, ok := occurrenceAt(doc, offset, trees)
+// programOccurrences finds every name denoting target across the whole
+// workspace — the declaration (when includeDecl is set) and every value
+// reference and namespace member access in every file — as per-file location
+// lists. occurrencesOf only yields the declaration in the file whose tree
+// holds it, so passing includeDecl to each file stays correct.
+func programOccurrences(v view, target *ir.Const, includeDecl bool) map[protocol.DocumentURI][]protocol.Range {
+	out := map[protocol.DocumentURI][]protocol.Range{}
+	for _, id := range v.ws.prog.Files() {
+		fv := view{ws: v.ws, id: id, uri: v.ws.uriFor(id)}
+		trees := positionedTrees(fv.AST().Concrete().Tree())
+		buf := fv.Buffer()
+		for _, tok := range occurrencesOf(fv, target, trees, includeDecl) {
+			out[fv.uri] = append(out[fv.uri], toRange(buf, tok.Offset(), tok.End()))
+		}
+	}
+	return out
+}
+
+// references returns the locations of every reference to the symbol at offset,
+// across every file of the workspace (including its declaration when
+// includeDecl is set).
+func references(doc view, offset int, includeDecl bool) []protocol.Location {
+	occ, ok := occurrenceAt(doc, offset, positionedTrees(doc.AST().Concrete().Tree()))
 	if !ok {
 		return nil
 	}
 
 	var locations []protocol.Location
-	for _, tok := range occurrencesOf(doc, occ.target, trees, includeDecl) {
-		locations = append(locations, protocol.Location{URI: uri, Range: toRange(buf, tok.Offset(), tok.End())})
+	for uri, ranges := range programOccurrences(doc, occ.target, includeDecl) {
+		for _, r := range ranges {
+			locations = append(locations, protocol.Location{URI: uri, Range: r})
+		}
 	}
+	sort.Slice(locations, func(i, j int) bool {
+		if locations[i].URI != locations[j].URI {
+			return locations[i].URI < locations[j].URI
+		}
+		a, b := locations[i].Range.Start, locations[j].Range.Start
+		if a.Line != b.Line {
+			return a.Line < b.Line
+		}
+		return a.Character < b.Character
+	})
 	return locations
 }
 
 // rename renames the symbol at offset to newName at its declaration and every
-// reference. It returns nil if there is no symbol under the cursor or newName is
-// not a valid identifier.
-func rename(doc view, offset int, newName string, uri protocol.DocumentURI) *protocol.WorkspaceEdit {
-	buf := doc.Buffer()
-	trees := positionedTrees(doc.AST().Concrete().Tree())
-
-	occ, ok := occurrenceAt(doc, offset, trees)
+// reference, across every file of the workspace. It returns nil if there is no
+// symbol under the cursor or newName is not a valid identifier.
+func rename(doc view, offset int, newName string) *protocol.WorkspaceEdit {
+	occ, ok := occurrenceAt(doc, offset, positionedTrees(doc.AST().Concrete().Tree()))
 	if !ok || !isIdentifier(newName) {
 		return nil
 	}
 
-	var edits []protocol.TextEdit
-	for _, tok := range occurrencesOf(doc, occ.target, trees, true) {
-		edits = append(edits, protocol.TextEdit{Range: toRange(buf, tok.Offset(), tok.End()), NewText: newName})
+	changes := map[protocol.DocumentURI][]protocol.TextEdit{}
+	for uri, ranges := range programOccurrences(doc, occ.target, true) {
+		for _, r := range ranges {
+			changes[uri] = append(changes[uri], protocol.TextEdit{Range: r, NewText: newName})
+		}
 	}
-	if len(edits) == 0 {
+	if len(changes) == 0 {
 		return nil
 	}
-	return &protocol.WorkspaceEdit{
-		Changes: map[protocol.DocumentURI][]protocol.TextEdit{uri: edits},
-	}
+	return &protocol.WorkspaceEdit{Changes: changes}
 }
 
 // documentHighlights returns every occurrence of the symbol under the cursor as

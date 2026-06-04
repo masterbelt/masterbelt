@@ -336,7 +336,7 @@ func (s *Server) References(_ context.Context, params *protocol.ReferenceParams)
 		return nil, nil
 	}
 	offset := fromPosition(v.Buffer(), params.Position)
-	return references(v, offset, params.TextDocument.URI, params.Context.IncludeDeclaration), nil
+	return references(v, offset, params.Context.IncludeDeclaration), nil
 }
 
 // PrepareRename reports whether (and where) the symbol under the cursor can be
@@ -363,7 +363,7 @@ func (s *Server) Rename(_ context.Context, params *protocol.RenameParams) (*prot
 		return nil, nil
 	}
 	offset := fromPosition(v.Buffer(), params.Position)
-	return rename(v, offset, params.NewName, params.TextDocument.URI), nil
+	return rename(v, offset, params.NewName), nil
 }
 
 // publishWorkspace sends current diagnostics for every open file of the

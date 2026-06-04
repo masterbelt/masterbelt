@@ -2,8 +2,6 @@ package lsp
 
 import (
 	"testing"
-
-	protocol "github.com/owenrumney/go-lsp/lsp"
 )
 
 // References/rename test source. Offsets:
@@ -15,31 +13,28 @@ const refSrc = "const MaxLevel = 1\nconst A = MaxLevel\nconst B = MaxLevel\n"
 
 func TestReferences(t *testing.T) {
 	doc := testView(refSrc)
-	uri := protocol.DocumentURI("file:///x.belt")
 
 	// From the declaration name, including the declaration: decl + 2 references.
-	if got := references(doc, 10, uri, true); len(got) != 3 {
+	if got := references(doc, 10, true); len(got) != 3 {
 		t.Fatalf("references(decl, includeDecl) = %d, want 3", len(got))
 	}
 	// Excluding the declaration: just the 2 references.
-	if got := references(doc, 10, uri, false); len(got) != 2 {
+	if got := references(doc, 10, false); len(got) != 2 {
 		t.Fatalf("references(decl, !includeDecl) = %d, want 2", len(got))
 	}
 	// From a reference, it still finds all of them.
-	if got := references(doc, 31, uri, true); len(got) != 3 {
+	if got := references(doc, 31, true); len(got) != 3 {
 		t.Fatalf("references(reference) = %d, want 3", len(got))
 	}
 }
 
 func TestRename(t *testing.T) {
 	doc := testView("const MaxLevel = 1\nconst A = MaxLevel\n")
-	uri := protocol.DocumentURI("file:///x.belt")
-
-	we := rename(doc, 10, "Cap", uri)
+	we := rename(doc, 10, "Cap")
 	if we == nil {
 		t.Fatal("rename returned nil")
 	}
-	edits := we.Changes[uri]
+	edits := we.Changes[doc.uri]
 	if len(edits) != 2 {
 		t.Fatalf("got %d edits, want 2 (declaration + 1 reference)", len(edits))
 	}
@@ -49,10 +44,10 @@ func TestRename(t *testing.T) {
 		}
 	}
 
-	if rename(doc, 10, "1bad", uri) != nil {
+	if rename(doc, 10, "1bad") != nil {
 		t.Error("an invalid identifier should be rejected")
 	}
-	if rename(doc, 10, "const", uri) != nil {
+	if rename(doc, 10, "const") != nil {
 		t.Error("a reserved word should be rejected")
 	}
 }
@@ -85,31 +80,29 @@ const exprRefSrc = "const M = 1\nconst z = M + M\n"
 
 func TestReferencesInExpression(t *testing.T) {
 	doc := testView(exprRefSrc)
-	uri := protocol.DocumentURI("file:///x.belt")
 
 	// From the declaration, including it: decl + 2 in-expression references.
-	if got := references(doc, 6, uri, true); len(got) != 3 {
+	if got := references(doc, 6, true); len(got) != 3 {
 		t.Fatalf("references(M decl) = %d, want 3", len(got))
 	}
 	// From a reference inside the expression, still all 3.
-	if got := references(doc, 22, uri, true); len(got) != 3 {
+	if got := references(doc, 22, true); len(got) != 3 {
 		t.Fatalf("references(M ref) = %d, want 3", len(got))
 	}
 	// Excluding the declaration: just the 2 references.
-	if got := references(doc, 22, uri, false); len(got) != 2 {
+	if got := references(doc, 22, false); len(got) != 2 {
 		t.Fatalf("references(!includeDecl) = %d, want 2", len(got))
 	}
 }
 
 func TestRenameInExpression(t *testing.T) {
 	doc := testView(exprRefSrc)
-	uri := protocol.DocumentURI("file:///x.belt")
 
-	we := rename(doc, 26, "N", uri) // on the second M reference
+	we := rename(doc, 26, "N") // on the second M reference
 	if we == nil {
 		t.Fatal("rename returned nil")
 	}
-	if edits := we.Changes[uri]; len(edits) != 3 { // declaration + 2 references
+	if edits := we.Changes[doc.uri]; len(edits) != 3 { // declaration + 2 references
 		t.Fatalf("got %d edits, want 3 (declaration + 2 references)", len(edits))
 	}
 }

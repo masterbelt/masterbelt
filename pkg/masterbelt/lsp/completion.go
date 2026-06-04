@@ -1,10 +1,15 @@
 package lsp
 
 import (
+	"io/fs"
+	"path"
+	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/masterbelt/masterbelt/pkg/source/cst"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
+	"github.com/masterbelt/masterbelt/pkg/source/token"
 	protocol "github.com/owenrumney/go-lsp/lsp"
 )
 
@@ -18,16 +23,83 @@ import (
 // editor filters the list against the characters already typed, so re-querying
 // on each keystroke is unnecessary and IsIncomplete stays false.
 
-// completion returns the completion candidates at offset: type names in a type
-// position, and the value namespace (constants plus the value literals)
-// otherwise.
+// completion returns the completion candidates at offset: the project's files
+// inside a use declaration's path string, type names in a type position, and
+// the value namespace (constants plus the value literals) otherwise.
 func completion(doc view, offset int) *protocol.CompletionList {
-	if typeContextAt(doc.AST().Concrete().Tree(), offset) {
+	root := doc.AST().Concrete().Tree()
+	if inUsePath(root, offset) {
+		return &protocol.CompletionList{Items: usePathItems(doc)}
+	}
+	if typeContextAt(root, offset) {
 		return &protocol.CompletionList{Items: typeItems(doc)}
 	}
 	items := constantItems(doc)
 	items = append(items, valueKeywordItems()...)
 	return &protocol.CompletionList{Items: items}
+}
+
+// inUsePath reports whether offset sits inside the path string of a use
+// declaration — where completion offers the project's files instead of value
+// or type names. Like typeContextAt it probes one byte back as well, since the
+// cursor usually sits just past the characters being typed.
+func inUsePath(root cst.Tree, offset int) bool {
+	if onUseString(root, offset) {
+		return true
+	}
+	return offset > 0 && onUseString(root, offset-1)
+}
+
+// onUseString descends to the leaf at offset and reports whether it is the
+// String token of a use declaration.
+func onUseString(root cst.Tree, offset int) bool {
+	node := root
+	inUse := false
+	for {
+		if kind, ok := node.Kind(); ok && kind == cst.UseDecl {
+			inUse = true
+		}
+		child, found := childContaining(node, offset)
+		if !found {
+			tok, ok := node.Token()
+			return ok && tok.Kind() == token.String && inUse
+		}
+		node = child
+	}
+}
+
+// usePathItems lists every .belt file of the project as a use path relative to
+// the importing file — the same path the project layer will resolve. Outside a
+// project there are no siblings to offer.
+func usePathItems(doc view) []protocol.CompletionItem {
+	ws := doc.ws
+	if ws.proj == nil {
+		return nil
+	}
+	kind := protocol.CompletionItemKindFile
+	importerDir := filepath.FromSlash(path.Dir(string(doc.id)))
+
+	var items []protocol.CompletionItem
+	_ = filepath.WalkDir(ws.root, func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() || !strings.HasSuffix(p, ".belt") {
+			return nil
+		}
+		rel, err := filepath.Rel(ws.root, p)
+		if err != nil {
+			return nil
+		}
+		if filepath.ToSlash(rel) == string(doc.id) {
+			return nil // a file does not import itself
+		}
+		usePath, err := filepath.Rel(importerDir, rel)
+		if err != nil {
+			return nil
+		}
+		items = append(items, protocol.CompletionItem{Label: filepath.ToSlash(usePath), Kind: &kind})
+		return nil
+	})
+	sort.Slice(items, func(i, j int) bool { return items[i].Label < items[j].Label })
+	return items
 }
 
 // typeItems is one completion item per in-scope type name: the file's own types

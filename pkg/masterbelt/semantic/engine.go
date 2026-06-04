@@ -1,7 +1,9 @@
 package semantic
 
 import (
+	"maps"
 	"reflect"
+	"slices"
 
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/types/infer"
@@ -187,17 +189,120 @@ func (db *database) demand(key queryKey) any {
 	db.computed[key] = true
 
 	changedAt := db.revision
-	if m != nil && reflect.DeepEqual(m.value, value) {
+	if m != nil && equalValue(key.kind, m.value, value) {
 		// Early cutoff: the value is unchanged. Keep the old object, not just
-		// the old stamp — values containing pointers (the type definitions a
-		// Named's identity hangs on) must stay the same objects, or memos
-		// recorded before this recompute and queries computed after it would
-		// hold different pointers for the same fact.
+		// the old stamp — equal means pointer-identical wherever pointers are
+		// the fact, so memos recorded before this recompute and queries
+		// computed after it keep agreeing.
 		changedAt = m.changedAt
 		value = m.value
 	}
 	db.memos[key] = &memo{value: value, verifiedAt: db.revision, changedAt: changedAt, deps: f.deps}
 	return value
+}
+
+// equalValue is the early-cutoff equality, per query kind. Values carrying AST
+// or definition pointers compare them by identity, never structurally: the
+// pointer is the fact — a resolution binds a declaration object, a Named hangs
+// type equality on its Def — so a structurally identical table built from a
+// re-parsed file is a different fact and must propagate.
+func equalValue(kind queryKind, old, new any) bool {
+	switch kind {
+	case qSymbols:
+		a, _ := old.(map[string]*ast.ConstDecl)
+		b, _ := new.(map[string]*ast.ConstDecl)
+		return maps.Equal(a, b)
+	case qResolve:
+		return old == new // resolution is comparable
+	case qImports:
+		a, _ := old.(importTable)
+		b, _ := new.(importTable)
+		return maps.Equal(a.values, b.values) && maps.Equal(a.types, b.types) && maps.Equal(a.namespaces, b.namespaces)
+	case qExports:
+		a, _ := old.(exports)
+		b, _ := new.(exports)
+		return maps.Equal(a.consts, b.consts) && maps.Equal(a.types, b.types)
+	case qTypeDefs:
+		a, _ := old.(typeDefs)
+		b, _ := new.(typeDefs)
+		return slices.Equal(a.list, b.list) && maps.Equal(a.byName, b.byName) && maps.Equal(a.universe, b.universe)
+	case qTypeOf:
+		a, _ := old.(ir.Type)
+		b, _ := new.(ir.Type)
+		return equalTypes(a, b)
+	default:
+		// Values (ir.Constant trees) carry no identity-bearing pointers;
+		// structural equality is the right cutoff for them.
+		return reflect.DeepEqual(old, new)
+	}
+}
+
+// equalTypes is type equality for the cutoff: named types by their definition
+// pointer, the rest structurally.
+func equalTypes(a, b ir.Type) bool {
+	if a == b {
+		return true
+	}
+	switch x := a.(type) {
+	case *ir.Builtin:
+		y, ok := b.(*ir.Builtin)
+		return ok && x.Name == y.Name
+	case *ir.Named:
+		y, ok := b.(*ir.Named)
+		return ok && x.Def == y.Def
+	case *ir.App:
+		y, ok := b.(*ir.App)
+		if !ok || x.Def != y.Def || len(x.Args) != len(y.Args) {
+			return false
+		}
+		for i := range x.Args {
+			if !equalTypes(x.Args[i], y.Args[i]) {
+				return false
+			}
+		}
+		return true
+	case *ir.Union:
+		y, ok := b.(*ir.Union)
+		if !ok || len(x.Members) != len(y.Members) {
+			return false
+		}
+		for i := range x.Members {
+			if !equalTypes(x.Members[i], y.Members[i]) {
+				return false
+			}
+		}
+		return true
+	case *ir.Record:
+		y, ok := b.(*ir.Record)
+		if !ok || len(x.Fields) != len(y.Fields) {
+			return false
+		}
+		for i := range x.Fields {
+			if x.Fields[i].Name != y.Fields[i].Name || !equalTypes(x.Fields[i].Type, y.Fields[i].Type) {
+				return false
+			}
+		}
+		return true
+	case *ir.Func:
+		y, ok := b.(*ir.Func)
+		if !ok || len(x.Params) != len(y.Params) || !equalTypes(x.Result, y.Result) {
+			return false
+		}
+		for i := range x.Params {
+			if !equalTypes(x.Params[i], y.Params[i]) {
+				return false
+			}
+		}
+		return true
+	case *ir.TypeVar:
+		y, ok := b.(*ir.TypeVar)
+		return ok && x.Name == y.Name
+	case *ir.SelfType:
+		_, ok := b.(*ir.SelfType)
+		return ok
+	default:
+		return false
+	}
 }
 
 // verify reports whether a memo's dependencies are all unchanged, so the memo
