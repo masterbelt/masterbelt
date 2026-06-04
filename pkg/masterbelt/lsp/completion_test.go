@@ -46,14 +46,38 @@ func TestCompletionInValuePosition(t *testing.T) {
 	}
 }
 
-func TestCompletionSuppressedInTypePosition(t *testing.T) {
+func TestCompletionInTypePosition(t *testing.T) {
 	doc := semantic.NewDocument([]byte(completionSrc))
 
-	// Inside the "int64" annotation — a type position, where a constant name
-	// would be wrong.
+	// Inside the "int64" annotation — a type position. Type names are offered,
+	// constant names are not.
 	offset := strings.Index(completionSrc, "int64") + 2
-	if items := completion(doc, offset).Items; len(items) != 0 {
-		t.Errorf("type-position completion = %d items, want 0", len(items))
+	got := byLabel(completion(doc, offset).Items)
+
+	for _, want := range []string{"int64", "bool", "string"} {
+		if _, ok := got[want]; !ok {
+			t.Errorf("type completion missing builtin %q", want)
+		}
+	}
+	if _, ok := got["Max"]; ok {
+		t.Error("type completion offered the constant Max")
+	}
+	if k := got["int64"].Kind; k == nil || *k != protocol.CompletionItemKindStruct {
+		t.Errorf("int64 kind = %v, want Struct (a builtin)", k)
+	}
+}
+
+func TestCompletionOffersDeclaredTypes(t *testing.T) {
+	// A user-declared type is offered in a type position, as a Class.
+	src := "pub type Level = int8\nconst x: Level = 1\n"
+	doc := semantic.NewDocument([]byte(src))
+	offset := strings.Index(src, ": Level") + 3 // inside "Level" annotation
+	got := byLabel(completion(doc, offset).Items)
+	if _, ok := got["Level"]; !ok {
+		t.Fatal("type completion missing the declared type Level")
+	}
+	if k := got["Level"].Kind; k == nil || *k != protocol.CompletionItemKindClass {
+		t.Errorf("Level kind = %v, want Class (a declared type)", k)
 	}
 }
 

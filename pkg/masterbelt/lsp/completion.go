@@ -19,14 +19,41 @@ import (
 // editor filters the list against the characters already typed, so re-querying
 // on each keystroke is unnecessary and IsIncomplete stays false.
 
-// completion returns the completion candidates at offset.
+// completion returns the completion candidates at offset: type names in a type
+// position, and the value namespace (constants plus the value literals)
+// otherwise.
 func completion(doc *semantic.Document, offset int) *protocol.CompletionList {
 	if typeContextAt(doc.AST().Concrete().Tree(), offset) {
-		return &protocol.CompletionList{Items: []protocol.CompletionItem{}}
+		return &protocol.CompletionList{Items: typeItems(doc)}
 	}
 	items := constantItems(doc)
 	items = append(items, valueKeywordItems()...)
 	return &protocol.CompletionList{Items: items}
+}
+
+// typeItems is one completion item per in-scope type name: the file's own types
+// (kind Class) and the builtin/prelude primitives (kind Struct), each documented
+// with its doc comment when it has one.
+func typeItems(doc *semantic.Document) []protocol.CompletionItem {
+	items := make([]protocol.CompletionItem, 0)
+	for _, t := range doc.TypeNames() {
+		if t.Name == "" {
+			continue
+		}
+		kind := protocol.CompletionItemKindClass
+		if t.Builtin {
+			kind = protocol.CompletionItemKindStruct
+		}
+		item := protocol.CompletionItem{Label: t.Name, Kind: &kind}
+		if len(t.Doc) > 0 {
+			item.Documentation = &protocol.MarkupContent{
+				Kind:  protocol.Markdown,
+				Value: strings.Join(t.Doc, "\n"),
+			}
+		}
+		items = append(items, item)
+	}
+	return items
 }
 
 // constantItems is one completion item per declared constant, labelled with the

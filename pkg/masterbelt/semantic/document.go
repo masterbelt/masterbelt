@@ -60,6 +60,29 @@ func (d *Document) Resolve(id *ast.Identifier) *ir.Const {
 // Buffer returns the underlying editable source buffer.
 func (d *Document) Buffer() source.Buffer { return d.ast.Buffer() }
 
+// TypeNames returns the type definitions in scope, for an editor completing a
+// type name: the file's own type declarations and the builtin/prelude types, by
+// name, with a file declaration shadowing a builtin of the same name.
+func (d *Document) TypeNames() []*ir.TypeDef {
+	seen := map[string]bool{}
+	var out []*ir.TypeDef
+	for _, t := range d.module.Types {
+		if t.Name == "" || seen[t.Name] {
+			continue
+		}
+		seen[t.Name] = true
+		out = append(out, t)
+	}
+	for _, def := range d.db.reg.Defs() {
+		if def.Name == "" || seen[def.Name] {
+			continue
+		}
+		seen[def.Name] = true
+		out = append(out, def)
+	}
+	return out
+}
+
 // refresh re-runs the assembler over the engine. setInput opens a new revision
 // so the engine knows the input changed; the assembler then pulls resolution and
 // type facts through the engine, which recomputes only what the edit disturbed.

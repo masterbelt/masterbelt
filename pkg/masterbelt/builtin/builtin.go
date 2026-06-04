@@ -18,6 +18,7 @@ package builtin
 
 import (
 	"math/big"
+	"sort"
 
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ir"
 )
@@ -123,6 +124,20 @@ func (r *Registry) Intrinsic(typeName, method string) (Intrinsic, bool) {
 // Names returns the natively-backed primitive names in registration order. It is
 // unaffected by Install, so it stays the set of primitives validation must cover.
 func (r *Registry) Names() []string { return r.order }
+
+// Defs returns every type definition currently in scope, by name: the bootstrap
+// primitives together with whatever the prelude installed (its numeric aliases
+// and the generic collections). Unlike Names — the natively-backed primitives in
+// registration order — this reflects Install, so it is the set a client (e.g. an
+// editor completing a type name) should see.
+func (r *Registry) Defs() []*ir.TypeDef {
+	out := make([]*ir.TypeDef, 0, len(r.defs))
+	for _, d := range r.defs {
+		out = append(out, d)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	return out
+}
 
 // Install makes the given type definitions — typically the prelude's, after it
 // has been loaded and validated — the source for type lookup, replacing the
