@@ -31,36 +31,31 @@ File
           Dot "."
           Ident "map"
         LParen "("
-        BinaryExpr
-          BinaryExpr
-            FuncLit
-              Fn "fn"
-              ParamList
-                LParen "("
-                Param
-                  Ident "x"
-                  Colon ":"
-                  Whitespace " "
-                  TypeName
-                    Ident "int"
-                RParen ")"
+        FuncLit
+          Fn "fn"
+          ParamList
+            LParen "("
+            Param
+              Ident "x"
               Colon ":"
               Whitespace " "
               TypeName
                 Ident "int"
-            Whitespace " "
-            Minus "-"
-          Gt ">"
+            RParen ")"
+          Colon ":"
           Whitespace " "
-          BinaryExpr
-            NameRef
-              Ident "x"
-            Whitespace " "
-            Star "*"
-            Whitespace " "
-            Literal
-              Int "2"
-        RParen ")"
+          TypeName
+            Ident "int"
+  Error
+    Whitespace " "
+    Arrow "->"
+    Whitespace " "
+    Ident "x"
+    Whitespace " "
+    Star "*"
+    Whitespace " "
+    Int "2"
+    RParen ")"
   ConstDecl
     Newline "\n"
     Newline "\n"
@@ -97,46 +92,41 @@ File
           Dot "."
           Ident "map"
         LParen "("
-        BinaryExpr
-          BinaryExpr
-            BinaryExpr
-              FuncLit
-                Fn "fn"
-                ParamList
-                  LParen "("
-                  Param
-                    Ident "x"
-                    Colon ":"
-                    Whitespace " "
-                    TypeName
-                      Ident "int"
-                  RParen ")"
-                Colon ":"
-                Whitespace " "
-                TypeName
-                  Ident "bool"
+        FuncLit
+          Fn "fn"
+          ParamList
+            LParen "("
+            Param
+              Ident "x"
+              Colon ":"
               Whitespace " "
-              Minus "-"
-            Gt ">"
-            Whitespace " "
-            BinaryExpr
-              NameRef
-                Ident "x"
-              Whitespace " "
-              Percent "%"
-              Whitespace " "
-              Literal
-                Int "2"
+              TypeName
+                Ident "int"
+            RParen ")"
+          Colon ":"
           Whitespace " "
-          EqEq "=="
-          Whitespace " "
-          Literal
-            Int "0"
-        RParen ")"
+          TypeName
+            Ident "bool"
+  Error
+    Whitespace " "
+    Arrow "->"
+    Whitespace " "
+    Ident "x"
+    Whitespace " "
+    Percent "%"
+    Whitespace " "
+    Int "2"
+    Whitespace " "
+    EqEq "=="
+    Whitespace " "
+    Int "0"
+    RParen ")"
   Newline "\n"
   EOF ""
 # diagnostics
 error[masterbelt.parser.concrete.unexpected_token] 4:46 unexpected token: Whitespace
-error[masterbelt.parser.concrete.expected_operand] 4:47 expected operand after '-'
+error[masterbelt.parser.concrete.unexpected_token] 4:46 unexpected token: Whitespace
+error[masterbelt.parser.concrete.unexpected_token] 4:47 unexpected token: Arrow
 error[masterbelt.parser.concrete.unexpected_token] 8:48 unexpected token: Whitespace
-error[masterbelt.parser.concrete.expected_operand] 8:49 expected operand after '-'
+error[masterbelt.parser.concrete.unexpected_token] 8:48 unexpected token: Whitespace
+error[masterbelt.parser.concrete.unexpected_token] 8:49 unexpected token: Arrow

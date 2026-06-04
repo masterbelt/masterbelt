@@ -32,28 +32,23 @@ File
           Dot "."
           Ident "map"
         LParen "("
-        BinaryExpr
-          BinaryExpr
-            FuncLit
-              Fn "fn"
-              ParamList
-                LParen "("
-                Param
-                  Ident "x"
-                RParen ")"
-            Whitespace " "
-            Minus "-"
-          Gt ">"
-          Whitespace " "
-          BinaryExpr
-            NameRef
+        FuncLit
+          Fn "fn"
+          ParamList
+            LParen "("
+            Param
               Ident "x"
-            Whitespace " "
-            Star "*"
-            Whitespace " "
-            Literal
-              Int "2"
-        RParen ")"
+            RParen ")"
+  Error
+    Whitespace " "
+    Arrow "->"
+    Whitespace " "
+    Ident "x"
+    Whitespace " "
+    Star "*"
+    Whitespace " "
+    Int "2"
+    RParen ")"
   ConstDecl
     Newline "\n"
     Newline "\n"
@@ -88,34 +83,27 @@ File
           Dot "."
           Ident "map"
         LParen "("
-        BinaryExpr
-          BinaryExpr
-            BinaryExpr
-              FuncLit
-                Fn "fn"
-                ParamList
-                  LParen "("
-                  Param
-                    Ident "x"
-                  RParen ")"
-              Whitespace " "
-              Minus "-"
-            Gt ">"
-            Whitespace " "
-            BinaryExpr
-              NameRef
-                Ident "x"
-              Whitespace " "
-              Percent "%"
-              Whitespace " "
-              Literal
-                Int "2"
-          Whitespace " "
-          EqEq "=="
-          Whitespace " "
-          Literal
-            Int "0"
-        RParen ")"
+        FuncLit
+          Fn "fn"
+          ParamList
+            LParen "("
+            Param
+              Ident "x"
+            RParen ")"
+  Error
+    Whitespace " "
+    Arrow "->"
+    Whitespace " "
+    Ident "x"
+    Whitespace " "
+    Percent "%"
+    Whitespace " "
+    Int "2"
+    Whitespace " "
+    EqEq "=="
+    Whitespace " "
+    Int "0"
+    RParen ")"
   ConstDecl
     Newline "\n"
     Newline "\n"
@@ -148,32 +136,27 @@ File
           Dot "."
           Ident "map"
         LParen "("
-        BinaryExpr
-          BinaryExpr
-            FuncLit
-              Fn "fn"
-              ParamList
-                LParen "("
-                Param
-                  Ident "x"
-                  Colon ":"
-                  Whitespace " "
-                  TypeName
-                    Ident "int"
-                RParen ")"
-            Whitespace " "
-            Minus "-"
-          Gt ">"
-          Whitespace " "
-          BinaryExpr
-            NameRef
+        FuncLit
+          Fn "fn"
+          ParamList
+            LParen "("
+            Param
               Ident "x"
-            Whitespace " "
-            Star "*"
-            Whitespace " "
-            Literal
-              Int "3"
-        RParen ")"
+              Colon ":"
+              Whitespace " "
+              TypeName
+                Ident "int"
+            RParen ")"
+  Error
+    Whitespace " "
+    Arrow "->"
+    Whitespace " "
+    Ident "x"
+    Whitespace " "
+    Star "*"
+    Whitespace " "
+    Int "3"
+    RParen ")"
   ConstDecl
     Newline "\n"
     Newline "\n"
@@ -204,27 +187,22 @@ File
     Initializer
       Assign "="
       Whitespace " "
-      BinaryExpr
-        BinaryExpr
-          FuncLit
-            Fn "fn"
-            ParamList
-              LParen "("
-              Param
-                Ident "x"
-              RParen ")"
-          Whitespace " "
-          Minus "-"
-        Gt ">"
-        Whitespace " "
-        BinaryExpr
-          NameRef
+      FuncLit
+        Fn "fn"
+        ParamList
+          LParen "("
+          Param
             Ident "x"
-          Whitespace " "
-          Star "*"
-          Whitespace " "
-          Literal
-            Int "2"
+          RParen ")"
+  Error
+    Whitespace " "
+    Arrow "->"
+    Whitespace " "
+    Ident "x"
+    Whitespace " "
+    Star "*"
+    Whitespace " "
+    Int "2"
   ConstDecl
     Newline "\n"
     Newline "\n"
@@ -341,10 +319,13 @@ File
   EOF ""
 # diagnostics
 error[masterbelt.parser.concrete.unexpected_token] 4:36 unexpected token: Whitespace
-error[masterbelt.parser.concrete.expected_operand] 4:37 expected operand after '-'
+error[masterbelt.parser.concrete.unexpected_token] 4:36 unexpected token: Whitespace
+error[masterbelt.parser.concrete.unexpected_token] 4:37 unexpected token: Arrow
 error[masterbelt.parser.concrete.unexpected_token] 7:37 unexpected token: Whitespace
-error[masterbelt.parser.concrete.expected_operand] 7:38 expected operand after '-'
+error[masterbelt.parser.concrete.unexpected_token] 7:37 unexpected token: Whitespace
+error[masterbelt.parser.concrete.unexpected_token] 7:38 unexpected token: Arrow
 error[masterbelt.parser.concrete.unexpected_token] 11:41 unexpected token: Whitespace
-error[masterbelt.parser.concrete.expected_operand] 11:42 expected operand after '-'
+error[masterbelt.parser.concrete.unexpected_token] 11:41 unexpected token: Whitespace
+error[masterbelt.parser.concrete.unexpected_token] 11:42 unexpected token: Arrow
 error[masterbelt.parser.concrete.unexpected_token] 14:37 unexpected token: Whitespace
-error[masterbelt.parser.concrete.expected_operand] 14:38 expected operand after '-'
+error[masterbelt.parser.concrete.unexpected_token] 14:38 unexpected token: Arrow

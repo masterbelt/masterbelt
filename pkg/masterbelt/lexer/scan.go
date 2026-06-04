@@ -30,7 +30,7 @@ func (l *Lexer) scanFixed(start, width int, kind token.Kind) token.Token {
 
 // scanFixed2 emits a two-byte operator (kind two) when the byte after the
 // cursor is next, and the one-byte operator (kind one) otherwise. It is the
-// maximal-munch rule shared by "==", "!=", "<=", and ">=".
+// maximal-munch rule shared by "==", "!=", "<=", ">=", and "->".
 func (l *Lexer) scanFixed2(start int, next byte, two, one token.Kind) token.Token {
 	if l.peek(1) == next {
 		return l.scanFixed(start, 2, two)

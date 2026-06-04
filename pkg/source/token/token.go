@@ -70,6 +70,7 @@ const (
 	Comma    // ,
 	Dot      // .
 	Pipe     // |
+	Arrow    // ->
 
 	// Trivia. Emitted so the token stream covers every byte and can reproduce
 	// the source exactly (needed by formatters and faithful round-tripping).
@@ -127,6 +128,7 @@ var kindNames = [...]string{
 	Comma:        "Comma",
 	Dot:          "Dot",
 	Pipe:         "Pipe",
+	Arrow:        "Arrow",
 	Whitespace:   "Whitespace",
 	Newline:      "Newline",
 }
@@ -170,6 +172,7 @@ var spelling = map[Kind]string{
 	Comma:    ",",
 	Dot:      ".",
 	Pipe:     "|",
+	Arrow:    "->",
 }
 
 // Symbol returns the source spelling of a fixed operator or punctuation kind, or

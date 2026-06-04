@@ -1,17 +1,17 @@
 File
   ConstDecl
     name "Doubled"
-    value (call (. (list IntLit "1" IntLit "2" IntLit "3") map) (call (. (call (. (fn(x: <missing>): <missing>) sub)) gt) (call (. Identifier "x" mul) IntLit "2")))
+    value (call (. (list IntLit "1" IntLit "2" IntLit "3") map) (fn(x: <missing>): <missing>))
   ConstDecl
     name "Evens"
-    value (call (. (list IntLit "1" IntLit "2" IntLit "3" IntLit "4") map) (call (. (call (. (call (. (fn(x: <missing>): <missing>) sub)) gt) (call (. Identifier "x" rem) IntLit "2")) eql) IntLit "0"))
+    value (call (. (list IntLit "1" IntLit "2" IntLit "3" IntLit "4") map) (fn(x: <missing>): <missing>))
   ConstDecl
     name "Tripled"
-    value (call (. (list IntLit "1" IntLit "2" IntLit "3") map) (call (. (call (. (fn(x: int): <missing>) sub)) gt) (call (. Identifier "x" mul) IntLit "3")))
+    value (call (. (list IntLit "1" IntLit "2" IntLit "3") map) (fn(x: int): <missing>))
   ConstDecl
     name "Twice"
     type fn(x: int): int
-    value (call (. (call (. (fn(x: <missing>): <missing>) sub)) gt) (call (. Identifier "x" mul) IntLit "2"))
+    value (fn(x: <missing>): <missing>)
   ConstDecl
     name "Stepped"
     value (call (. (list IntLit "1" IntLit "2" IntLit "3") map) (fn(x: <missing>): <missing> (return (call (. Identifier "x" add) IntLit "1"))))

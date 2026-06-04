@@ -1,16 +1,17 @@
 Module
   Const "Doubled"
     type invalid
-    value [IntLiteral "1", IntLiteral "2", IntLiteral "3"].map((fn(x)).sub().gt(<none>.mul(IntLiteral "2")))
+    value [IntLiteral "1", IntLiteral "2", IntLiteral "3"].map((fn(x)))
   Const "Evens"
     type invalid
-    value [IntLiteral "1", IntLiteral "2", IntLiteral "3", IntLiteral "4"].map((fn(x)).sub().gt(<none>.rem(IntLiteral "2")).eql(IntLiteral "0"))
+    value [IntLiteral "1", IntLiteral "2", IntLiteral "3", IntLiteral "4"].map((fn(x)))
   Const "Tripled"
     type invalid
-    value [IntLiteral "1", IntLiteral "2", IntLiteral "3"].map((fn(x)).sub().gt(<none>.mul(IntLiteral "3")))
+    value [IntLiteral "1", IntLiteral "2", IntLiteral "3"].map((fn(x)))
   Const "Twice"
     type fn(int): int
-    value (fn(x)).sub().gt(<none>.mul(IntLiteral "2"))
+    value (fn(x))
+    eval <func>
   Const "Stepped"
     type list<int>
     value [IntLiteral "1", IntLiteral "2", IntLiteral "3"].map((fn(x) (return ParamRef "x".add(IntLiteral "1"))))

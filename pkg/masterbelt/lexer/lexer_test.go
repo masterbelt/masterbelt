@@ -221,7 +221,7 @@ func TestLexerOperators(t *testing.T) {
 		src  string
 		kind token.Kind
 	}{
-		{"+", token.Plus}, {"-", token.Minus}, {"*", token.Star},
+		{"+", token.Plus}, {"-", token.Minus}, {"->", token.Arrow}, {"*", token.Star},
 		{"/", token.Slash}, {"%", token.Percent},
 		{"=", token.Assign}, {"==", token.EqEq},
 		{"!", token.Bang}, {"!=", token.BangEq},
@@ -252,6 +252,28 @@ func TestLexerOperators(t *testing.T) {
 		tokens := New(file).Tokens()
 		if len(tokens) != 4 || tokens[0].Kind != token.Assign || tokens[2].Kind != token.Assign {
 			t.Errorf("%q tokenized as %v, want Assign Whitespace Assign EOF", "= =", tokens)
+		}
+	})
+
+	// "->" is one token, not Minus then Gt — and "- >" stays two tokens.
+	t.Run("arrow is one token", func(t *testing.T) {
+		file := source.NewFile("op.belt", []byte("a->b"))
+		tokens := New(file).Tokens()
+		var arrow token.Token
+		for _, tok := range tokens {
+			if tok.Kind == token.Arrow {
+				arrow = tok
+			}
+		}
+		if arrow.Text(file) != "->" {
+			t.Errorf("got %v, want a single Arrow token", tokens)
+		}
+	})
+	t.Run("separated minus gt are two tokens", func(t *testing.T) {
+		file := source.NewFile("op.belt", []byte("- >"))
+		tokens := New(file).Tokens()
+		if len(tokens) != 4 || tokens[0].Kind != token.Minus || tokens[2].Kind != token.Gt {
+			t.Errorf("%q tokenized as %v, want Minus Whitespace Gt EOF", "- >", tokens)
 		}
 	})
 

@@ -96,8 +96,8 @@ func (l *Lexer) Next() token.Token {
 		return l.scanFixed(start, 1, token.Dot)
 	case c == '+':
 		return l.scanFixed(start, 1, token.Plus)
-	case c == '-':
-		return l.scanFixed(start, 1, token.Minus)
+	case c == '-': // "->" or "-"
+		return l.scanFixed2(start, '>', token.Arrow, token.Minus)
 	case c == '*':
 		return l.scanFixed(start, 1, token.Star)
 	case c == '%':
