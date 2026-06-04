@@ -493,3 +493,49 @@ func TestProgramReachableEarlyCutoff(t *testing.T) {
 		}
 	}
 }
+
+func TestProgramRefreshSkipsUnchangedFiles(t *testing.T) {
+	// Re-assembly is per file and demand-verified: editing one file must
+	// re-assemble it (and any file that read a changed fact), but a file
+	// whose inputs and read facts are untouched is only re-verified.
+	srcs := map[string]string{
+		"a.belt": "pub const X = 1\n",
+		"b.belt": "use { X } from \"a.belt\"\nconst Y = X\n",
+		"c.belt": "pub const Z = 9\n",
+	}
+	p := buildProgram(srcs)
+
+	p.SetFile("c.belt", abstract.NewDocument([]byte("pub const Z = 10\n")), nil)
+	p.Refresh()
+
+	if !p.db.computed[moduleKey("c.belt")] {
+		t.Error("c.belt was not re-assembled after its own edit")
+	}
+	for _, id := range []FileID{"a.belt", "b.belt"} {
+		if p.db.computed[moduleKey(id)] {
+			t.Errorf("%s was re-assembled; the edit to c.belt must not reach it", id)
+		}
+	}
+}
+
+func TestProgramShellsStableAcrossRefresh(t *testing.T) {
+	// An unedited declaration keeps its ir.Const identity across refreshes —
+	// what lets an unchanged module be reused and cross-file references keep
+	// pointing at the same objects.
+	srcs := map[string]string{
+		"a.belt": "pub const X = 1\n",
+		"b.belt": "use { X } from \"a.belt\"\nconst Y = X\n",
+	}
+	p := buildProgram(srcs)
+	before := p.Module("b.belt").Consts[0]
+
+	p.SetFile("a.belt", abstract.NewDocument([]byte("pub const X = 2\n")), nil)
+	p.Refresh()
+
+	if after := p.Module("b.belt").Consts[0]; after != before {
+		t.Error("b.belt's unedited declaration changed its ir.Const identity")
+	}
+	if _, eval := constInfo(p, "b.belt", "Y"); eval != "2" {
+		t.Errorf("Y = %s, want the re-evaluated 2", eval)
+	}
+}

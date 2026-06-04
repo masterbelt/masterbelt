@@ -21,7 +21,6 @@ type Program struct {
 	docs    map[FileID]*abstract.Document
 	modules map[FileID]*ir.Module
 	diags   map[FileID][]diagnostic.Diagnostic
-	shells  map[*ast.ConstDecl]*ir.Const
 }
 
 // NewProgram returns an empty program; add files with SetFile and analyze with
@@ -51,22 +50,16 @@ func (p *Program) RemoveFile(id FileID) {
 	p.db.dropInput(id)
 }
 
-// Refresh re-assembles every file's module and diagnostics over the engine.
-// Assembling is the cheap outer pass re-done per change (its diagnostics
-// carry offsets); the expensive facts behind it are memoized.
+// Refresh brings every file's module and diagnostics up to date over the
+// engine. Assembly itself is a memoized query: a file is re-assembled only
+// when its text or a fact its last assembly read changed; an untouched file
+// costs one verification walk.
 func (p *Program) Refresh() {
-	files := make(map[FileID]*ast.File, len(p.docs))
-	for id, doc := range p.docs {
-		files[id] = doc.File()
-	}
-	p.shells = constShells(files)
-
 	q := engineQueries{p.db}
 	for _, id := range p.Files() {
-		doc := p.docs[id]
-		module, diags := assemble(id, doc.File(), positionsOf(doc.Concrete().Tree()), q, p.shells)
-		p.modules[id] = module
-		p.diags[id] = diags
+		a := q.moduleOf(id)
+		p.modules[id] = a.module
+		p.diags[id] = a.diags
 	}
 }
 
@@ -92,14 +85,14 @@ func (p *Program) Document(id FileID) *abstract.Document { return p.docs[id] }
 // memoized resolution of the last analysis is reused.
 func (p *Program) Resolve(file FileID, id *ast.Identifier) *ir.Const {
 	q := engineQueries{p.db}
-	return p.shells[q.resolve(file, id)]
+	return p.db.shells[q.resolve(file, id)]
 }
 
 // ResolveMember returns the constant a namespace member access (geo.Origin) in
 // file refers to, or nil.
 func (p *Program) ResolveMember(file FileID, m *ast.MemberExpr) *ir.Const {
 	q := engineQueries{p.db}
-	return p.shells[q.resolveMember(file, m)]
+	return p.db.shells[q.resolveMember(file, m)]
 }
 
 // ResolveUseName returns the constant a selective-import name in one of file's
@@ -112,7 +105,7 @@ func (p *Program) ResolveUseName(file FileID, u *ast.UseDecl, name string) *ir.C
 	if !ok {
 		return nil
 	}
-	return p.shells[q.exportsOf(target).consts[name]]
+	return p.db.shells[q.exportsOf(target).consts[name]]
 }
 
 // FileOf returns the file a constant of the last Refresh is declared in.

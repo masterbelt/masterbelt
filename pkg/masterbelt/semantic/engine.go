@@ -5,9 +5,11 @@ import (
 	"reflect"
 	"slices"
 
+	"github.com/masterbelt/masterbelt/pkg/diagnostic"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/types/infer"
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
+	"github.com/masterbelt/masterbelt/pkg/source/cst"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
 )
 
@@ -48,6 +50,7 @@ const (
 	qExports                    // a file's public surface: pub decls + pub use re-exports
 	qImports                    // a file's import bindings: selective/wildcard names + namespaces
 	qReachable                  // the files a file's use graph reaches (itself included)
+	qModule                     // a file's assembled IR module and diagnostics
 )
 
 // queryKey identifies a memoized computation. The per-declaration queries
@@ -69,6 +72,7 @@ func typeDefsKey(file FileID) queryKey  { return queryKey{kind: qTypeDefs, file:
 func exportsKey(file FileID) queryKey   { return queryKey{kind: qExports, file: file} }
 func importsKey(file FileID) queryKey   { return queryKey{kind: qImports, file: file} }
 func reachableKey(file FileID) queryKey { return queryKey{kind: qReachable, file: file} }
+func moduleKey(file FileID) queryKey    { return queryKey{kind: qModule, file: file} }
 
 func resolveKey(file FileID, id *ast.Identifier) queryKey {
 	return queryKey{kind: qResolve, file: file, id: id}
@@ -101,11 +105,21 @@ type fileInput struct {
 	uses map[*ast.UseDecl]FileID
 }
 
+// assembly is the value of a module query: one file's assembled IR module
+// and diagnostics. Assembling is the outer pass over the memoized facts;
+// memoizing it per file turns an unchanged file's refresh into a single
+// verification walk over what its last assembly read.
+type assembly struct {
+	module *ir.Module
+	diags  []diagnostic.Diagnostic
+}
+
 // database is the query engine state.
 type database struct {
 	revision       int
 	files          map[FileID]fileInput
-	declFile       map[*ast.ConstDecl]FileID // which file each declaration sits in
+	declFile       map[*ast.ConstDecl]FileID    // which file each declaration sits in
+	shells         map[*ast.ConstDecl]*ir.Const // the identity ir.Const of every declaration
 	reg            *builtin.Registry
 	inputChangedAt map[FileID]int
 	memos          map[queryKey]*memo
@@ -119,6 +133,7 @@ func newDatabase(reg *builtin.Registry) *database {
 		reg:            reg,
 		files:          map[FileID]fileInput{},
 		declFile:       map[*ast.ConstDecl]FileID{},
+		shells:         map[*ast.ConstDecl]*ir.Const{},
 		inputChangedAt: map[FileID]int{},
 		memos:          map[queryKey]*memo{},
 		running:        map[queryKey]bool{},
@@ -157,20 +172,28 @@ func (db *database) dropInput(id FileID) {
 	db.rebindDecls(id, old.file, nil)
 }
 
-// rebindDecls updates the declaration-to-file index for one file's input
-// change: the old tree's declarations leave the index, the new tree's enter
-// it. Unedited declarations keep their AST pointers (the old and new trees
-// share them), so they are simply rewritten in place; other files' entries are
-// untouched.
+// rebindDecls updates the declaration-to-file index and the shell table for
+// one file's input change: declarations that left the tree drop their entries,
+// new ones enter, and unedited declarations — whose AST pointers the old and
+// new trees share — keep their shells, so references across files (and across
+// refreshes) keep binding the same ir.Const objects.
 func (db *database) rebindDecls(id FileID, old, new *ast.File) {
-	if old != nil {
-		for _, d := range old.Decls {
-			delete(db.declFile, d)
-		}
-	}
+	keep := map[*ast.ConstDecl]bool{}
 	if new != nil {
 		for _, d := range new.Decls {
+			keep[d] = true
 			db.declFile[d] = id
+			if db.shells[d] == nil {
+				db.shells[d] = &ir.Const{Name: d.Name, Public: d.Public, Doc: d.Doc, Syntax: d}
+			}
+		}
+	}
+	if old != nil {
+		for _, d := range old.Decls {
+			if !keep[d] {
+				delete(db.declFile, d)
+				delete(db.shells, d)
+			}
 		}
 	}
 }
@@ -241,6 +264,11 @@ func equalValue(kind queryKind, old, new any) bool {
 		a, _ := old.(map[FileID]bool)
 		b, _ := new.(map[FileID]bool)
 		return maps.Equal(a, b)
+	case qModule:
+		// A sink: no query depends on a module, so there is no propagation
+		// to cut off, and comparing whole modules would cost more than it
+		// could save.
+		return false
 	case qTypeDefs:
 		a, _ := old.(typeDefs)
 		b, _ := new.(typeDefs)
@@ -446,6 +474,17 @@ func (db *database) compute(key queryKey) any {
 		// The walk reads each visited file's input through the engine, so
 		// the set's dependencies are exactly the files it covers.
 		return computeReachable(engineQueries{db}, key.file)
+	case qModule:
+		in, _ := db.read(inputKey(key.file)).(fileInput)
+		if in.file == nil {
+			return assembly{}
+		}
+		// Every fact assemble pulls is read through the engine inside this
+		// computation, so the memo's dependencies are exactly what the
+		// module was built from; positions derive from the file's own tree,
+		// which the input read above covers.
+		module, diags := assemble(key.file, in.file, positionsOf(cst.Root(in.file.Syntax())), engineQueries{db}, db.shells)
+		return assembly{module: module, diags: diags}
 	default:
 		return nil
 	}
@@ -471,6 +510,8 @@ func cycleValue(key queryKey) any {
 		return importTable{}
 	case qReachable:
 		return map[FileID]bool{} // unreachable: the walk reads only inputs
+	case qModule:
+		return assembly{} // unreachable: nothing assemble reads reads it back
 	default:
 		return nil
 	}
@@ -536,6 +577,11 @@ func (e engineQueries) usesOf(file FileID) map[*ast.UseDecl]FileID {
 func (e engineQueries) reachableFrom(file FileID) map[FileID]bool {
 	m, _ := e.db.read(reachableKey(file)).(map[FileID]bool)
 	return m
+}
+
+func (e engineQueries) moduleOf(file FileID) assembly {
+	a, _ := e.db.read(moduleKey(file)).(assembly)
+	return a
 }
 
 func (e engineQueries) registry() *builtin.Registry { return e.db.reg }
