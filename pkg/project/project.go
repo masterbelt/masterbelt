@@ -12,6 +12,7 @@
 package project
 
 import (
+	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
@@ -292,6 +293,50 @@ func resolveUse(importer FileID, usePath string) (FileID, bool) {
 		return "", false
 	}
 	return FileID(target), true
+}
+
+// CandidateImports returns every use path importer could write: each .belt
+// file under the project root (hidden directories skipped, the importer
+// itself excluded) rendered relative to the importer, sorted. Each candidate
+// is the inverse of resolveUse and is verified through it, so the paths an
+// editor offers and the paths the project resolves cannot drift.
+func (p *Project) CandidateImports(importer FileID) []string {
+	importerDir := filepath.FromSlash(path.Dir(string(importer)))
+	var out []string
+	_ = filepath.WalkDir(p.Root, func(fp string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if d.IsDir() {
+			if fp != p.Root && strings.HasPrefix(d.Name(), ".") {
+				return filepath.SkipDir // .git and friends hold no use targets
+			}
+			return nil
+		}
+		if !strings.HasSuffix(fp, ".belt") {
+			return nil
+		}
+		rel, err := filepath.Rel(p.Root, fp)
+		if err != nil {
+			return nil
+		}
+		target := fileID(rel)
+		if target == importer {
+			return nil // a file does not import itself
+		}
+		usePath, err := filepath.Rel(importerDir, filepath.FromSlash(string(target)))
+		if err != nil {
+			return nil
+		}
+		candidate := filepath.ToSlash(usePath)
+		if resolved, ok := resolveUse(importer, candidate); !ok || resolved != target {
+			return nil // the inverse disagrees with the rule: never offer it
+		}
+		out = append(out, candidate)
+		return nil
+	})
+	sort.Strings(out)
+	return out
 }
 
 // profileEntry resolves the entry point of the requested profile. Parse has

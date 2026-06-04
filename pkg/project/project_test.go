@@ -427,3 +427,37 @@ func TestIncludePinsAndReleaseUnpins(t *testing.T) {
 		t.Errorf("Files() after releasing the entry = %s, want the entry kept", got)
 	}
 }
+
+func TestCandidateImports(t *testing.T) {
+	root := t.TempDir()
+	write(t, root, "masterbelt.toml", "entry = \"src/main.belt\"\n")
+	write(t, root, "src/main.belt", "const A = 1\n")
+	write(t, root, "src/geo.belt", "pub const G = 1\n")
+	write(t, root, "lib/util.belt", "pub const U = 2\n")
+	write(t, root, ".cache/junk.belt", "const J = 3\n") // hidden: never offered
+	write(t, root, "notes.txt", "not a module\n")
+
+	proj, diags := Open(root)
+	if diags.Len() != 0 {
+		t.Fatalf("Open() diagnostics = %v, want none", diags.Items())
+	}
+
+	got := strings.Join(proj.CandidateImports("src/main.belt"), ",")
+	want := "../lib/util.belt,geo.belt"
+	if got != want {
+		t.Fatalf("CandidateImports(src/main.belt) = %s, want %s", got, want)
+	}
+
+	// Every candidate resolves back to a real target — the inverse and the
+	// rule agree.
+	for _, c := range proj.CandidateImports("src/main.belt") {
+		if _, ok := resolveUse("src/main.belt", c); !ok {
+			t.Errorf("candidate %q does not resolve", c)
+		}
+	}
+
+	// From the project root the same files render without the climb.
+	if got := strings.Join(proj.CandidateImports("entry.belt"), ","); got != "lib/util.belt,src/geo.belt,src/main.belt" {
+		t.Errorf("CandidateImports(entry.belt) = %s", got)
+	}
+}

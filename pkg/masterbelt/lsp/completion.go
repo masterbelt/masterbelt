@@ -1,14 +1,11 @@
 package lsp
 
 import (
-	"io/fs"
 	"maps"
-	"path"
-	"path/filepath"
 	"slices"
-	"sort"
 	"strings"
 
+	"github.com/masterbelt/masterbelt/pkg/project"
 	"github.com/masterbelt/masterbelt/pkg/source/cst"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
 	"github.com/masterbelt/masterbelt/pkg/source/token"
@@ -70,46 +67,21 @@ func onUseString(root cst.Tree, offset int) bool {
 	}
 }
 
-// usePathItems lists every .belt file of the project as a use path relative to
-// the importing file — the same path the project layer will resolve. Outside a
-// project there are no siblings to offer.
+// usePathItems lists every use path the importing file could write — the
+// project layer's CandidateImports, the verified inverse of its resolution
+// rule, so the editor can never offer a path the project would reject.
+// Outside a project there are no siblings to offer.
 func usePathItems(doc view) []protocol.CompletionItem {
 	ws := doc.ws
 	if ws.proj == nil {
 		return nil
 	}
 	kind := protocol.CompletionItemKindFile
-	importerDir := filepath.FromSlash(path.Dir(string(doc.id)))
-
-	var items []protocol.CompletionItem
-	_ = filepath.WalkDir(ws.root, func(p string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return nil
-		}
-		if d.IsDir() {
-			if p != ws.root && strings.HasPrefix(d.Name(), ".") {
-				return filepath.SkipDir // .git and friends hold no use targets
-			}
-			return nil
-		}
-		if !strings.HasSuffix(p, ".belt") {
-			return nil
-		}
-		rel, err := filepath.Rel(ws.root, p)
-		if err != nil {
-			return nil
-		}
-		if filepath.ToSlash(rel) == string(doc.id) {
-			return nil // a file does not import itself
-		}
-		usePath, err := filepath.Rel(importerDir, rel)
-		if err != nil {
-			return nil
-		}
-		items = append(items, protocol.CompletionItem{Label: filepath.ToSlash(usePath), Kind: &kind})
-		return nil
-	})
-	sort.Slice(items, func(i, j int) bool { return items[i].Label < items[j].Label })
+	candidates := ws.proj.CandidateImports(project.FileID(doc.id))
+	items := make([]protocol.CompletionItem, 0, len(candidates))
+	for _, c := range candidates {
+		items = append(items, protocol.CompletionItem{Label: c, Kind: &kind})
+	}
 	return items
 }
 
