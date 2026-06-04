@@ -81,7 +81,16 @@ func usePathItems(doc view) []protocol.CompletionItem {
 
 	var items []protocol.CompletionItem
 	_ = filepath.WalkDir(ws.root, func(p string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() || !strings.HasSuffix(p, ".belt") {
+		if err != nil {
+			return nil
+		}
+		if d.IsDir() {
+			if p != ws.root && strings.HasPrefix(d.Name(), ".") {
+				return filepath.SkipDir // .git and friends hold no use targets
+			}
+			return nil
+		}
+		if !strings.HasSuffix(p, ".belt") {
 			return nil
 		}
 		rel, err := filepath.Rel(ws.root, p)

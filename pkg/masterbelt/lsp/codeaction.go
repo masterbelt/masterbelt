@@ -9,7 +9,7 @@ import (
 // range whose type the analyzer inferred, a refactor that writes the inferred
 // type as an explicit annotation (": <type>" after the name). It is the explicit
 // counterpart of the inlay type hint.
-func codeActions(doc view, startOff, endOff int, uri protocol.DocumentURI) []protocol.CodeAction {
+func codeActions(doc view, startOff, endOff int) []protocol.CodeAction {
 	buf := doc.Buffer()
 	trees := positionedTrees(doc.AST().Concrete().Tree())
 	kind := protocol.CodeActionRefactorRewrite
@@ -39,7 +39,7 @@ func codeActions(doc view, startOff, endOff int, uri protocol.DocumentURI) []pro
 			Title: "Add type annotation: " + c.Type.String(),
 			Kind:  &actionKind,
 			Edit: &protocol.WorkspaceEdit{
-				Changes: map[protocol.DocumentURI][]protocol.TextEdit{uri: {edit}},
+				Changes: map[protocol.DocumentURI][]protocol.TextEdit{doc.uri: {edit}},
 			},
 		})
 	}

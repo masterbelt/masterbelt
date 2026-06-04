@@ -23,7 +23,9 @@
 package lsp
 
 import (
+	"bytes"
 	"context"
+	"os"
 	"path/filepath"
 	"sync"
 
@@ -95,7 +97,7 @@ func (s *Server) DidOpen(ctx context.Context, params *protocol.DidOpenTextDocume
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	v := s.openFile(params.TextDocument.URI, []byte(params.TextDocument.Text))
+	v := s.openFile(ctx, params.TextDocument.URI, []byte(params.TextDocument.Text))
 	s.publishWorkspace(ctx, v.ws)
 	return nil
 }
@@ -103,13 +105,14 @@ func (s *Server) DidOpen(ctx context.Context, params *protocol.DidOpenTextDocume
 // openFile places a document in a workspace: the project found at or above it
 // (siblings load from disk; the editor's text overrides the disk copy), or a
 // standalone single-file workspace.
-func (s *Server) openFile(uri protocol.DocumentURI, text []byte) view {
+func (s *Server) openFile(ctx context.Context, uri protocol.DocumentURI, text []byte) view {
 	path := uriPath(uri)
 
 	if root, ok := project.FindRoot(filepath.Dir(path)); ok {
 		ws := s.roots[root]
 		if ws == nil {
-			if proj, diags := project.Open(root); !diags.HasErrors() {
+			proj, diags := project.Open(root)
+			if !diags.HasErrors() {
 				ws = &workspace{
 					root: root,
 					proj: proj,
@@ -117,6 +120,16 @@ func (s *Server) openFile(uri protocol.DocumentURI, text []byte) view {
 					open: map[semantic.FileID]protocol.DocumentURI{},
 				}
 				s.roots[root] = ws
+			} else if s.client != nil {
+				// The manifest fails to load, so the file analyzes standalone
+				// and its imports will not resolve. Say why — otherwise the
+				// user sees only mystery use_not_found diagnostics.
+				for _, d := range diags.Items() {
+					_ = s.client.LogMessage(ctx, &protocol.LogMessageParams{
+						Type:    protocol.MessageTypeWarning,
+						Message: serverName + ": project at " + root + " not loaded: " + d.String(),
+					})
+				}
 			}
 		}
 		if ws != nil {
@@ -191,7 +204,9 @@ func (s *Server) DidChange(ctx context.Context, params *protocol.DidChangeTextDo
 }
 
 // DidClose stops tracking a document and clears its diagnostics. A project
-// workspace is dropped with its last open file.
+// workspace is dropped with its last open file; while siblings stay open, the
+// closed file reverts to its on-disk content — the buffer's unsaved edits die
+// with it, and the remaining importers' diagnostics must stop reflecting them.
 func (s *Server) DidClose(ctx context.Context, params *protocol.DidCloseTextDocumentParams) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -201,6 +216,13 @@ func (s *Server) DidClose(ctx context.Context, params *protocol.DidCloseTextDocu
 		delete(v.ws.open, v.id)
 		if v.ws.root != "" && len(v.ws.open) == 0 {
 			delete(s.roots, v.ws.root)
+		} else if v.ws.proj != nil {
+			id := project.FileID(v.id)
+			revertToDisk(v)
+			v.ws.proj.Resync(id)  // rewire the reverted file's uses
+			v.ws.proj.Release(id) // unpin it: closed files stay only while imported
+			v.ws.sync()
+			s.publishWorkspace(ctx, v.ws)
 		}
 	}
 	delete(s.open, uri)
@@ -211,6 +233,26 @@ func (s *Server) DidClose(ctx context.Context, params *protocol.DidCloseTextDocu
 		})
 	}
 	return nil
+}
+
+// revertToDisk replaces a closed project file's text with its on-disk content,
+// so the workspace's remaining files see the file as it is, not as the
+// abandoned buffer left it. A file that cannot be read (deleted while open)
+// keeps its last text — the import closure may still reference it.
+func revertToDisk(v view) {
+	f := v.ws.proj.File(project.FileID(v.id))
+	if f == nil {
+		return
+	}
+	data, err := os.ReadFile(f.Path)
+	if err != nil {
+		return
+	}
+	buf := f.AST.Buffer()
+	if bytes.Equal(buf.Slice(0, buf.Len()), data) {
+		return // never edited (or saved): nothing to revert
+	}
+	f.AST.Edit(source.Edit{Start: 0, End: buf.Len(), NewText: data})
 }
 
 // Completion returns the value-namespace candidates at the cursor.
@@ -323,7 +365,7 @@ func (s *Server) CodeAction(_ context.Context, params *protocol.CodeActionParams
 		return nil, nil
 	}
 	buf := v.Buffer()
-	return codeActions(v, fromPosition(buf, params.Range.Start), fromPosition(buf, params.Range.End), params.TextDocument.URI), nil
+	return codeActions(v, fromPosition(buf, params.Range.Start), fromPosition(buf, params.Range.End)), nil
 }
 
 // References returns every reference to the symbol under the cursor.

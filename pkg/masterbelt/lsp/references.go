@@ -21,11 +21,29 @@ type occurrence struct {
 	target *ir.Const
 }
 
-// occurrenceAt finds the declaration name, value-position identifier, or
-// namespace member access at offset — including a reference nested inside an
-// expression — and the constant it denotes (which may be declared in another
-// file of the program).
+// occurrenceAt finds the declaration name, value-position identifier,
+// namespace member access, or selective-import name at offset — including a
+// reference nested inside an expression — and the constant it denotes (which
+// may be declared in another file of the program).
 func occurrenceAt(doc view, offset int, trees map[cst.Green]cst.Tree) (occurrence, bool) {
+	// A selective-import name (the cursor on Origin in use { Origin } from ...)
+	// denotes the constant it imports.
+	buf := doc.Buffer()
+	for _, u := range doc.AST().File().Uses {
+		t, ok := trees[u.Syntax()]
+		if !ok || !within(t, offset) {
+			continue
+		}
+		for _, nameTok := range useNameTokens(t) {
+			if !within(nameTok, offset) {
+				continue
+			}
+			if target := doc.ResolveUseName(u, nameTok.Text(buf)); target != nil {
+				return occurrence{token: nameTok, target: target}, true
+			}
+		}
+	}
+
 	for _, c := range doc.Module().Consts {
 		decl := c.Syntax
 
@@ -105,14 +123,30 @@ func walkMemberExprs(e ast.Expr, fn func(*ast.MemberExpr)) {
 }
 
 // occurrencesOf returns every token that names target — its declaration name
-// (when includeDecl is set) and every value-position identifier that resolves to
-// it, wherever it sits in an expression. This is the reverse of resolution.
+// (when includeDecl is set), every selective-import name that binds it, and
+// every value-position identifier that resolves to it, wherever it sits in an
+// expression. This is the reverse of resolution.
 func occurrencesOf(doc view, target *ir.Const, trees map[cst.Green]cst.Tree, includeDecl bool) []cst.Tree {
 	var tokens []cst.Tree
 
 	if includeDecl {
 		if declTree, ok := trees[target.Syntax.Syntax()]; ok {
 			if nameTok, ok := nameToken(declTree); ok {
+				tokens = append(tokens, nameTok)
+			}
+		}
+	}
+
+	// A selective-import name (use { Origin } from ...) names the constant it
+	// binds: a rename must rewrite it too, or it would leave a dangling import.
+	buf := doc.Buffer()
+	for _, u := range doc.AST().File().Uses {
+		t, ok := trees[u.Syntax()]
+		if !ok {
+			continue
+		}
+		for _, nameTok := range useNameTokens(t) {
+			if doc.ResolveUseName(u, nameTok.Text(buf)) == target {
 				tokens = append(tokens, nameTok)
 			}
 		}
@@ -138,6 +172,24 @@ func occurrencesOf(doc view, target *ir.Const, trees map[cst.Green]cst.Tree, inc
 				}
 			}
 		})
+	}
+	return tokens
+}
+
+// useNameTokens returns the positioned name tokens of a use declaration's
+// selective-import list, in source order — empty for namespace and wildcard
+// imports (whose Ident children sit outside a UseList node).
+func useNameTokens(use cst.Tree) []cst.Tree {
+	var tokens []cst.Tree
+	for _, child := range use.Children() {
+		if kind, ok := child.Kind(); !ok || kind != cst.UseList {
+			continue
+		}
+		for _, item := range child.Children() {
+			if tok, ok := item.Token(); ok && tok.Kind() == token.Ident {
+				tokens = append(tokens, item)
+			}
+		}
 	}
 	return tokens
 }
@@ -218,6 +270,15 @@ func rename(doc view, offset int, newName string) *protocol.WorkspaceEdit {
 	}
 	if len(changes) == 0 {
 		return nil
+	}
+	for _, edits := range changes {
+		sort.Slice(edits, func(i, j int) bool {
+			a, b := edits[i].Range.Start, edits[j].Range.Start
+			if a.Line != b.Line {
+				return a.Line < b.Line
+			}
+			return a.Character < b.Character
+		})
 	}
 	return &protocol.WorkspaceEdit{Changes: changes}
 }

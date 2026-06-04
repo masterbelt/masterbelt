@@ -47,6 +47,10 @@ func (v view) ResolveMember(m *ast.MemberExpr) *ir.Const {
 	return v.ws.prog.ResolveMember(v.id, m)
 }
 
+func (v view) ResolveUseName(u *ast.UseDecl, name string) *ir.Const {
+	return v.ws.prog.ResolveUseName(v.id, u, name)
+}
+
 func (v view) FuncLitTypes() map[*ast.FuncLit]*ir.Func { return v.ws.prog.FuncLitTypes(v.id) }
 
 func (v view) Diagnostics() []diagnostic.Diagnostic { return v.ws.prog.Diagnostics(v.id) }
@@ -73,20 +77,40 @@ func (ws *workspace) uriFor(id semantic.FileID) protocol.DocumentURI {
 	if uri, ok := ws.open[id]; ok {
 		return uri
 	}
-	path := filepath.Join(ws.root, filepath.FromSlash(string(id)))
-	return protocol.DocumentURI("file://" + filepath.ToSlash(path))
+	return pathURI(filepath.Join(ws.root, filepath.FromSlash(string(id))))
 }
 
-// sync pushes the project's current file set into the program and re-analyzes.
-// A standalone workspace has exactly one file, pushed by its caller.
+// pathURI renders an absolute filesystem path as a file:// URI: forward
+// slashes, a leading slash even for a Windows drive path (file:///C:/...),
+// and percent-escaped segments — the inverse of uriPath.
+func pathURI(path string) protocol.DocumentURI {
+	p := filepath.ToSlash(path)
+	if !strings.HasPrefix(p, "/") {
+		p = "/" + p
+	}
+	u := url.URL{Scheme: "file", Path: p}
+	return protocol.DocumentURI(u.String())
+}
+
+// sync mirrors the project's current file set into the program — files the
+// project pruned leave it, the rest are (re)pushed — and re-analyzes. A
+// standalone workspace has exactly one file, pushed by its caller.
 func (ws *workspace) sync() {
 	if ws.proj != nil {
+		current := map[semantic.FileID]bool{}
 		for _, f := range ws.proj.Files() {
+			id := semantic.FileID(f.ID)
+			current[id] = true
 			uses := make(map[*ast.UseDecl]semantic.FileID, len(f.Uses))
 			for u, target := range f.Uses {
 				uses[u] = semantic.FileID(target)
 			}
-			ws.prog.SetFile(semantic.FileID(f.ID), f.AST, uses)
+			ws.prog.SetFile(id, f.AST, uses)
+		}
+		for _, id := range ws.prog.Files() {
+			if !current[id] {
+				ws.prog.RemoveFile(id)
+			}
 		}
 	}
 	ws.prog.Refresh()
@@ -98,6 +122,11 @@ func uriPath(uri protocol.DocumentURI) string {
 	s := strings.TrimPrefix(string(uri), "file://")
 	if p, err := url.PathUnescape(s); err == nil {
 		s = p
+	}
+	// A Windows URI carries the drive behind the empty authority
+	// (file:///C:/...): drop the slash in front of the drive letter.
+	if len(s) >= 3 && s[0] == '/' && s[2] == ':' {
+		s = s[1:]
 	}
 	return s
 }

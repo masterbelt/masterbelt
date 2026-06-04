@@ -28,8 +28,10 @@ func writeProject(t *testing.T, files map[string]string) string {
 	return root
 }
 
+// fileURI builds the URI of a project file through the same conversion the
+// server uses for unopened siblings, so the two stay symmetric.
 func fileURI(root, name string) protocol.DocumentURI {
-	return protocol.DocumentURI("file://" + filepath.ToSlash(filepath.Join(root, name)))
+	return pathURI(filepath.Join(root, name))
 }
 
 // openOnDisk opens the named project file in the server with its on-disk text.
@@ -232,10 +234,10 @@ func TestCrossFileRename(t *testing.T) {
 	if len(we.Changes[geoURI]) != 1 {
 		t.Errorf("geometry edits = %v, want the declaration", we.Changes[geoURI])
 	}
-	// main.belt: the reference (the import-list name is not an expression and
-	// stays — renaming it is follow-up work).
-	if len(we.Changes[mainURI]) != 1 {
-		t.Errorf("main edits = %v, want the Unit reference", we.Changes[mainURI])
+	// main.belt: the import-list name in use { Unit } and the reference —
+	// leaving the import list behind would dangle it.
+	if len(we.Changes[mainURI]) != 2 {
+		t.Errorf("main edits = %v, want the import-list name and the Unit reference", we.Changes[mainURI])
 	}
 	for _, edits := range we.Changes {
 		for _, e := range edits {
@@ -328,5 +330,166 @@ func TestProjectlessFileStaysStandalone(t *testing.T) {
 	}
 	if diags := v.Diagnostics(); len(diags) != 0 {
 		t.Fatalf("diagnostics = %v, want none", diags)
+	}
+}
+
+// TestCrossFileRenameFromImportList: a rename may start on the import-list
+// name itself (use { Unit }) and reaches the declaration and every reference.
+func TestCrossFileRenameFromImportList(t *testing.T) {
+	root := crossProject(t)
+	s := NewServer()
+	mainURI := openOnDisk(t, s, root, "main.belt")
+	geoURI := openOnDisk(t, s, root, "geometry.belt")
+
+	v := s.open[mainURI]
+	we, err := s.Rename(context.Background(), &protocol.RenameParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: mainURI},
+			Position:     toPosition(v.Buffer(), strings.Index(crossMainSrc, "{ Unit }")+2),
+		},
+		NewName: "Step",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if we == nil {
+		t.Fatal("rename returned nil")
+	}
+	if len(we.Changes[geoURI]) != 1 || len(we.Changes[mainURI]) != 2 {
+		t.Errorf("edits = geo %d / main %d, want 1 / 2", len(we.Changes[geoURI]), len(we.Changes[mainURI]))
+	}
+	for _, edits := range we.Changes {
+		for i := 1; i < len(edits); i++ {
+			a, b := edits[i-1].Range.Start, edits[i].Range.Start
+			if a.Line > b.Line || (a.Line == b.Line && a.Character > b.Character) {
+				t.Errorf("edits out of order: %+v before %+v", edits[i-1], edits[i])
+			}
+		}
+	}
+}
+
+// TestDidCloseRevertsToDisk: closing a modified-but-unsaved exporter reverts
+// it to the on-disk content, so the still-open importer's diagnostics stop
+// reflecting the abandoned edits.
+func TestDidCloseRevertsToDisk(t *testing.T) {
+	root := crossProject(t)
+	s := NewServer()
+	mainURI := openOnDisk(t, s, root, "main.belt")
+	geoURI := openOnDisk(t, s, root, "geometry.belt")
+
+	// Unexport Unit in the buffer only — never saved.
+	err := s.DidChange(context.Background(), &protocol.DidChangeTextDocumentParams{
+		TextDocument: protocol.VersionedTextDocumentIdentifier{
+			TextDocumentIdentifier: protocol.TextDocumentIdentifier{URI: geoURI},
+		},
+		ContentChanges: []protocol.TextDocumentContentChangeEvent{
+			{Text: "pub const Origin = 0\nconst Unit = 1\n"},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if diags := s.open[mainURI].Diagnostics(); len(diags) == 0 {
+		t.Fatal("the unsaved edit must surface not_exported in the importer first")
+	}
+
+	// Closing the buffer abandons the edit: disk still says pub Unit.
+	if err := s.DidClose(context.Background(), &protocol.DidCloseTextDocumentParams{
+		TextDocument: protocol.TextDocumentIdentifier{URI: geoURI},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if diags := s.open[mainURI].Diagnostics(); len(diags) != 0 {
+		t.Fatalf("importer diagnostics = %v, want none after the close reverts to disk", diags)
+	}
+}
+
+// TestEditDropsOrphanedSibling: removing the last import of an unopened
+// sibling drops it from the analyzed program on the very edit.
+func TestEditDropsOrphanedSibling(t *testing.T) {
+	root := crossProject(t)
+	s := NewServer()
+	mainURI := openOnDisk(t, s, root, "main.belt") // geometry.belt stays unopened
+	v := s.open[mainURI]
+	if n := len(v.ws.prog.Files()); n != 2 {
+		t.Fatalf("program holds %d files, want main + geometry", n)
+	}
+
+	err := s.DidChange(context.Background(), &protocol.DidChangeTextDocumentParams{
+		TextDocument: protocol.VersionedTextDocumentIdentifier{
+			TextDocumentIdentifier: protocol.TextDocumentIdentifier{URI: mainURI},
+		},
+		ContentChanges: []protocol.TextDocumentContentChangeEvent{
+			{Text: "const start = 1\n"}, // both use lines gone
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := v.ws.prog.Files(); len(got) != 1 || got[0] != v.id {
+		t.Errorf("program files = %v, want just main.belt", got)
+	}
+}
+
+// TestOpenFileSurvivesOrphaning: an edit that orphans a file the editor has
+// open must not drop it — the open pins it until it closes.
+func TestOpenFileSurvivesOrphaning(t *testing.T) {
+	root := crossProject(t)
+	s := NewServer()
+	mainURI := openOnDisk(t, s, root, "main.belt")
+	geoURI := openOnDisk(t, s, root, "geometry.belt")
+
+	err := s.DidChange(context.Background(), &protocol.DidChangeTextDocumentParams{
+		TextDocument: protocol.VersionedTextDocumentIdentifier{
+			TextDocumentIdentifier: protocol.TextDocumentIdentifier{URI: mainURI},
+		},
+		ContentChanges: []protocol.TextDocumentContentChangeEvent{
+			{Text: "const start = 1\n"},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	v := s.open[mainURI]
+	if n := len(v.ws.prog.Files()); n != 2 {
+		t.Fatalf("program holds %d files, want the open geometry.belt kept", n)
+	}
+	// The orphaned-but-open file keeps its full view.
+	geo := s.open[geoURI]
+	if geo.AST() == nil || geo.Module() == nil {
+		t.Error("the open orphan lost its analysis")
+	}
+
+	// Closing it releases the pin: now it leaves the program.
+	if err := s.DidClose(context.Background(), &protocol.DidCloseTextDocumentParams{
+		TextDocument: protocol.TextDocumentIdentifier{URI: geoURI},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if got := v.ws.prog.Files(); len(got) != 1 || got[0] != v.id {
+		t.Errorf("program files after the close = %v, want just main.belt", got)
+	}
+}
+
+// TestCloseKeepsImportedFile: closing a file the entry still imports keeps it
+// in the program — only the pin goes, not the file.
+func TestCloseKeepsImportedFile(t *testing.T) {
+	root := crossProject(t)
+	s := NewServer()
+	mainURI := openOnDisk(t, s, root, "main.belt")
+	geoURI := openOnDisk(t, s, root, "geometry.belt")
+
+	if err := s.DidClose(context.Background(), &protocol.DidCloseTextDocumentParams{
+		TextDocument: protocol.TextDocumentIdentifier{URI: geoURI},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	v := s.open[mainURI]
+	if n := len(v.ws.prog.Files()); n != 2 {
+		t.Fatalf("program holds %d files, want geometry.belt kept while imported", n)
+	}
+	if diags := v.Diagnostics(); len(diags) != 0 {
+		t.Errorf("main diagnostics = %v, want none", diags)
 	}
 }

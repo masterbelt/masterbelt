@@ -130,8 +130,8 @@ func TestLambdaInlayHintsSkipUninferable(t *testing.T) {
 
 func TestCodeActionAddsTypeAnnotation(t *testing.T) {
 	doc := testView("const A = 1\n")
-	uri := protocol.DocumentURI("file:///x.belt")
-	actions := codeActions(doc, 0, 11, uri) // range over the whole declaration
+	uri := doc.uri
+	actions := codeActions(doc, 0, 11) // range over the whole declaration
 
 	if len(actions) != 1 {
 		t.Fatalf("got %d code actions, want 1", len(actions))
@@ -148,7 +148,7 @@ func TestCodeActionAddsTypeAnnotation(t *testing.T) {
 func TestCodeActionSkipsAnnotated(t *testing.T) {
 	// An already-annotated constant offers no add-annotation action.
 	doc := testView("const A: int64 = 1\n")
-	if actions := codeActions(doc, 0, 18, protocol.DocumentURI("file:///x.belt")); len(actions) != 0 {
+	if actions := codeActions(doc, 0, 18); len(actions) != 0 {
 		t.Errorf("got %d code actions for an annotated const, want 0", len(actions))
 	}
 }
