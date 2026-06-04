@@ -5,9 +5,14 @@
 //
 // The grammar is only a "cold start" approximation (the lexical basics that
 // colour a file before the language server responds); the accurate highlighting
-// comes from the server's semantic tokens, which read the same parse. The
-// language-configuration's comment settings are derived from the same comment
-// markers the lexer scans.
+// comes from the server's semantic tokens, which read the same parse. So the
+// colours do not shift when the server comes up, every scope here is chosen to
+// be the one VS Code falls back to for the matching semantic token type
+// (keyword -> keyword.control, operator -> keyword.operator, ...), and the one
+// thing lexing cannot decide — an identifier's role (type, reference,
+// declaration) — is deliberately left uncoloured for the semantic tokens to
+// enrich. The language-configuration's comment settings are derived from the
+// same comment markers the lexer scans.
 //
 //go:generate go run .
 package main
@@ -77,7 +82,10 @@ func buildGrammar() grammar {
 			{Include: "#numbers"},
 			{Include: "#strings"},
 			{Include: "#operators"},
-			{Include: "#identifiers"},
+			// Identifiers are deliberately not matched: whether one is a type,
+			// a reference, or a declaration name is not a lexical fact, so the
+			// cold start leaves them uncoloured and the server's semantic
+			// tokens enrich them — never correct them.
 		},
 		Repository: map[string]ruleGroup{
 			"comments": {Patterns: []rule{
@@ -85,8 +93,11 @@ func buildGrammar() grammar {
 				{Name: "comment.line.double-slash.masterbelt", Match: regexp.QuoteMeta(token.LineCommentPrefix) + `.*$`},
 				{Name: "comment.block.masterbelt", Begin: regexp.QuoteMeta(token.BlockCommentOpen), End: regexp.QuoteMeta(token.BlockCommentClose)},
 			}},
+			// keyword.control is where VS Code lands a semantic `keyword`
+			// token when the theme defines no semanticTokenColors, so the
+			// keywords wear the same colour before and after the server is up.
 			"keywords": {Patterns: []rule{
-				{Name: "keyword.other.masterbelt", Match: keywordPattern()},
+				{Name: "keyword.control.masterbelt", Match: keywordPattern()},
 			}},
 			"numbers": {Patterns: []rule{
 				{Name: "constant.numeric.integer.masterbelt", Match: `\b[0-9]+\b`},
@@ -104,12 +115,11 @@ func buildGrammar() grammar {
 					},
 				},
 			}},
+			// Both spellings the server classifies as `operator` sit under
+			// keyword.operator, their semantic fallback scope.
 			"operators": {Patterns: []rule{
 				{Name: "keyword.operator.assignment.masterbelt", Match: `=`},
-				{Name: "punctuation.separator.type.masterbelt", Match: `:`},
-			}},
-			"identifiers": {Patterns: []rule{
-				{Name: "variable.other.masterbelt", Match: `\b[A-Za-z_][A-Za-z0-9_]*\b`},
+				{Name: "keyword.operator.masterbelt", Match: `:`},
 			}},
 		},
 	}

@@ -17,9 +17,6 @@
     },
     {
       "include": "#operators"
-    },
-    {
-      "include": "#identifiers"
     }
   ],
   "repository": {
@@ -40,18 +37,10 @@
         }
       ]
     },
-    "identifiers": {
-      "patterns": [
-        {
-          "name": "variable.other.masterbelt",
-          "match": "\\b[A-Za-z_][A-Za-z0-9_]*\\b"
-        }
-      ]
-    },
     "keywords": {
       "patterns": [
         {
-          "name": "keyword.other.masterbelt",
+          "name": "keyword.control.masterbelt",
           "match": "\\b(assert|builtin|const|extern|false|fn|from|impl|null|pub|return|self|true|type|use)\\b"
         }
       ]
@@ -71,7 +60,7 @@
           "match": "="
         },
         {
-          "name": "punctuation.separator.type.masterbelt",
+          "name": "keyword.operator.masterbelt",
           "match": ":"
         }
       ]
