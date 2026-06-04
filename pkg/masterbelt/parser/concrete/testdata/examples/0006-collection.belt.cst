@@ -1,0 +1,181 @@
+# tree
+File
+  ConstDecl
+    Const "const"
+    Whitespace " "
+    Ident "ExampleList"
+    TypeClause
+      Colon ":"
+      Whitespace " "
+      TypeName
+        Ident "list"
+        GenericArgs
+          Lt "<"
+          TypeName
+            Ident "int"
+          Gt ">"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CollectionLit
+        LBracket "["
+        Literal
+          Int "1"
+        Comma ","
+        Whitespace " "
+        Literal
+          Int "2"
+        Comma ","
+        Whitespace " "
+        Literal
+          Int "3"
+        RBracket "]"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "ExampleMap"
+    TypeClause
+      Colon ":"
+      Whitespace " "
+      TypeName
+        Ident "map"
+        GenericArgs
+          Lt "<"
+          TypeName
+            Ident "string"
+          Comma ","
+          Whitespace " "
+          TypeName
+            Ident "int"
+          Gt ">"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CollectionLit
+        LBracket "["
+        MapEntry
+          Literal
+            String "\"key\""
+          Colon ":"
+          Whitespace " "
+          Literal
+            Int "100"
+        RBracket "]"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// Element types are inferred when there is no annotation."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Inferred"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CollectionLit
+        LBracket "["
+        Literal
+          Int "10"
+        Comma ","
+        Whitespace " "
+        Literal
+          Int "20"
+        Comma ","
+        Whitespace " "
+        Literal
+          Int "30"
+        RBracket "]"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// The integer elements adapt to the annotation's element type."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Bytes"
+    TypeClause
+      Colon ":"
+      Whitespace " "
+      TypeName
+        Ident "list"
+        GenericArgs
+          Lt "<"
+          TypeName
+            Ident "int8"
+          Gt ">"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CollectionLit
+        LBracket "["
+        Literal
+          Int "1"
+        Comma ","
+        Whitespace " "
+        Literal
+          Int "2"
+        Comma ","
+        Whitespace " "
+        Literal
+          Int "3"
+        RBracket "]"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// Empty collections take their type from the annotation."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "EmptyList"
+    TypeClause
+      Colon ":"
+      Whitespace " "
+      TypeName
+        Ident "list"
+        GenericArgs
+          Lt "<"
+          TypeName
+            Ident "int"
+          Gt ">"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CollectionLit
+        LBracket "["
+        RBracket "]"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "EmptyMap"
+    TypeClause
+      Colon ":"
+      Whitespace " "
+      TypeName
+        Ident "map"
+        GenericArgs
+          Lt "<"
+          TypeName
+            Ident "string"
+          Comma ","
+          Whitespace " "
+          TypeName
+            Ident "int"
+          Gt ">"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CollectionLit
+        LBracket "["
+        RBracket "]"
+  Newline "\n"
+  EOF ""
+# diagnostics

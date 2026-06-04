@@ -106,7 +106,9 @@ func classifyToken(kind token.Kind, parent cst.Kind) (tokenType, mods int, ok bo
 		return stOperator, 0, true
 	case token.Ident:
 		switch parent {
-		case cst.TypeRef:
+		case cst.TypeRef, cst.TypeName:
+			// A type name: a const annotation (TypeName, since a constant's
+			// annotation is a full type expression) or a type-expression name.
 			return stType, 0, true
 		case cst.NameRef:
 			return stVariable, smReadonly, true

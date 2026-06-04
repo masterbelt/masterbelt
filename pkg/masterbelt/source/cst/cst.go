@@ -34,18 +34,20 @@ import (
 type Kind int
 
 const (
-	File        Kind = iota // the whole source: a sequence of declarations and trailing trivia
-	ConstDecl               // [doc] [pub] const Name [TypeClause] [Initializer]
-	TypeClause              // ": Type"
-	Initializer             // "= Expr"
-	TypeRef                 // an identifier naming a type
-	NameRef                 // an identifier used as a value
-	Literal                 // a literal value: an integer, a string, a boolean (true/false), or null
-	BinaryExpr              // a binary operation: Expr Op Expr
-	UnaryExpr               // a prefix operation: Op Expr
-	CallExpr                // a call: Callee "(" [Expr ("," Expr)*] ")"
-	MemberExpr              // a member access: Receiver "." Ident
-	SelfExpr                // the "self" receiver inside a method body
+	File          Kind = iota // the whole source: a sequence of declarations and trailing trivia
+	ConstDecl                 // [doc] [pub] const Name [TypeClause] [Initializer]
+	TypeClause                // ": Type"
+	Initializer               // "= Expr"
+	TypeRef                   // an identifier naming a type
+	NameRef                   // an identifier used as a value
+	Literal                   // a literal value: an integer, a string, a boolean (true/false), or null
+	BinaryExpr                // a binary operation: Expr Op Expr
+	UnaryExpr                 // a prefix operation: Op Expr
+	CallExpr                  // a call: Callee "(" [Expr ("," Expr)*] ")"
+	MemberExpr                // a member access: Receiver "." Ident
+	SelfExpr                  // the "self" receiver inside a method body
+	CollectionLit             // a list or map literal: "[" ( Expr | MapEntry )* "]"
+	MapEntry                  // one map-literal entry: Expr ":" Expr
 
 	// Type declarations and the type-expression grammar.
 	TypeDecl      // [doc] [pub] type Name [GenericParams] "=" TypeExpr [ImplBlock]
@@ -84,6 +86,8 @@ var kindNames = [...]string{
 	CallExpr:      "CallExpr",
 	MemberExpr:    "MemberExpr",
 	SelfExpr:      "SelfExpr",
+	CollectionLit: "CollectionLit",
+	MapEntry:      "MapEntry",
 	TypeDecl:      "TypeDecl",
 	GenericParams: "GenericParams",
 	GenericParam:  "GenericParam",

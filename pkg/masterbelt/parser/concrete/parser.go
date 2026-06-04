@@ -8,7 +8,7 @@
 //	TypeDecl      := [pub] type Ident [GenericParams] "=" TypeExpr [ImplBlock]
 //	GenericParams := "<" GenericParam ( "," GenericParam )* ">"
 //	GenericParam  := Ident [ ":" TypeExpr ]
-//	TypeClause    := ":" TypeRef
+//	TypeClause    := ":" TypeExpr
 //	Initializer   := "=" Expr
 //	TypeExpr      := PrimaryType ( "|" PrimaryType )*
 //	PrimaryType   := TypeName | RecordType | FuncType
@@ -32,8 +32,9 @@
 //	MulExpr       := Unary ( ( "*" | "/" | "%" ) Unary )*
 //	Unary         := ( "+" | "-" | "!" ) Unary | Postfix
 //	Postfix       := Operand ( "." Ident | "(" [ Expr ( "," Expr )* ] ")" )*
-//	Operand       := Literal | NameRef | "self"
-//	TypeRef       := Ident
+//	Operand       := Literal | CollectionLit | NameRef | "self"
+//	CollectionLit := "[" [ Element ( "," Element )* [","] ] "]"
+//	Element       := Expr [ ":" Expr ]
 //	NameRef       := Ident
 //	Literal       := Int | String | "true" | "false" | "null"
 //
@@ -244,12 +245,14 @@ func (p *parser) parseConstDecl(lead []cst.Green) *cst.Node {
 	return cst.NewNode(cst.ConstDecl, children)
 }
 
-// parseTypeClause parses ": Type". The cursor sits on the colon.
+// parseTypeClause parses ": Type", where Type is a full type expression (the
+// same grammar a type declaration uses), so a constant may be annotated with a
+// generic type like list<int>. The cursor sits on the colon.
 func (p *parser) parseTypeClause() *cst.Node {
 	children := []cst.Green{p.bump()} // ":"
-	if p.peekSignificant() == token.Ident {
+	if startsType(p.peekSignificant()) {
 		p.skipTrivia(&children)
-		children = append(children, cst.NewNode(cst.TypeRef, []cst.Green{p.bump()}))
+		children = append(children, p.parseTypeExpr())
 	} else {
 		p.report(newExpectedTypeDiagnostic(p.lastStart, 0))
 	}
@@ -782,13 +785,15 @@ func (p *parser) parseCallArgs(children *[]cst.Green) {
 }
 
 // parseOperand parses an atom: a literal (integer, string, boolean, or null), a
-// NameRef, or the self receiver. The cursor sits on the operand token —
-// startsExpr gates every call site, so the default arm is defensive and consumes
-// nothing.
+// collection literal ("[...]"), a NameRef, or the self receiver. The cursor sits
+// on the operand token — startsExpr gates every call site, so the default arm is
+// defensive and consumes nothing.
 func (p *parser) parseOperand() cst.Green {
 	switch p.kind() {
 	case token.Int, token.String, token.True, token.False, token.Null:
 		return cst.NewNode(cst.Literal, []cst.Green{p.bump()})
+	case token.LBracket:
+		return p.parseCollectionLiteral()
 	case token.Ident:
 		return cst.NewNode(cst.NameRef, []cst.Green{p.bump()})
 	case token.Self:
@@ -796,6 +801,98 @@ func (p *parser) parseOperand() cst.Green {
 	default:
 		p.report(newExpectedExpressionDiagnostic(p.lastStart, 0))
 		return cst.NewNode(cst.Error, nil)
+	}
+}
+
+// parseCollectionLiteral parses a list or map literal:
+//
+//	CollectionLit := "[" [ Element ( "," Element )* [","] ] "]"
+//	Element       := Expr [ ":" Expr ]
+//
+// An element with a ":" is a map entry (key ":" value); without one it is a list
+// element. The first element decides which: once a ":" follows it the literal is
+// a map, otherwise a list. An empty "[]" is neither — its kind is left to the
+// type checker, which resolves it from the annotation. The cursor sits on "[".
+func (p *parser) parseCollectionLiteral() *cst.Node {
+	children := []cst.Green{p.bump()} // "["
+	if !startsExpr(p.peekSignificant()) {
+		p.closeBracket(&children)
+		return cst.NewNode(cst.CollectionLit, children)
+	}
+
+	p.skipTrivia(&children)
+	first := p.parseExpr(precLowest)
+	if p.peekSignificant() == token.Colon {
+		return p.parseMapRest(children, first)
+	}
+	return p.parseListRest(children, first)
+}
+
+// parseListRest parses the remaining list elements after the first, then the
+// closing "]". first is the already-parsed first element.
+func (p *parser) parseListRest(children []cst.Green, first cst.Green) *cst.Node {
+	children = append(children, first)
+	for p.peekSignificant() == token.Comma {
+		p.skipTrivia(&children)
+		children = append(children, p.bump()) // ","
+		if !startsExpr(p.peekSignificant()) {
+			break // a trailing comma, or recovery
+		}
+		p.skipTrivia(&children)
+		children = append(children, p.parseExpr(precLowest))
+	}
+	p.closeBracket(&children)
+	return cst.NewNode(cst.CollectionLit, children)
+}
+
+// parseMapRest parses the remaining map entries after the first key, then the
+// closing "]". firstKey is the already-parsed key of the first entry, whose ":"
+// the cursor now sits on.
+func (p *parser) parseMapRest(children []cst.Green, firstKey cst.Green) *cst.Node {
+	children = append(children, p.finishMapEntry(firstKey))
+	for p.peekSignificant() == token.Comma {
+		p.skipTrivia(&children)
+		children = append(children, p.bump()) // ","
+		if !startsExpr(p.peekSignificant()) {
+			break // a trailing comma, or recovery
+		}
+		p.skipTrivia(&children)
+		children = append(children, p.finishMapEntry(p.parseExpr(precLowest)))
+	}
+	p.closeBracket(&children)
+	return cst.NewNode(cst.CollectionLit, children)
+}
+
+// finishMapEntry builds a MapEntry from an already-parsed key: it consumes the
+// ":" and parses the value. The cursor sits just past the key — on the ":" for a
+// well-formed entry. A missing ":" (a malformed entry, e.g. a bare element in a
+// map) is reported, leaving the entry with only its key so recovery is local and
+// the closing "]" is not mistaken for the separator.
+func (p *parser) finishMapEntry(key cst.Green) *cst.Node {
+	entry := []cst.Green{key}
+	if p.peekSignificant() != token.Colon {
+		p.report(newUnexpectedTokenDiagnostic(p.cur().Offset, p.cur().Width, p.kind().String()))
+		return cst.NewNode(cst.MapEntry, entry)
+	}
+	p.skipTrivia(&entry)
+	entry = append(entry, p.bump()) // ":"
+	if startsExpr(p.peekSignificant()) {
+		p.skipTrivia(&entry)
+		entry = append(entry, p.parseExpr(precLowest))
+	} else {
+		p.report(newExpectedExpressionDiagnostic(p.lastStart, 0))
+	}
+	return cst.NewNode(cst.MapEntry, entry)
+}
+
+// closeBracket consumes the closing "]" of a collection literal, or reports an
+// unexpected token when it is absent.
+func (p *parser) closeBracket(children *[]cst.Green) {
+	if p.peekSignificant() == token.RBracket {
+		p.skipTrivia(children)
+		*children = append(*children, p.bump()) // "]"
+	} else {
+		p.report(newUnexpectedTokenDiagnostic(p.cur().Offset, p.cur().Width, p.kind().String()))
 	}
 }
 
@@ -862,7 +959,7 @@ var unaryOps = map[token.Kind]bool{
 func startsExpr(kind token.Kind) bool {
 	switch kind {
 	case token.Int, token.String, token.Ident, token.True, token.False, token.Null, token.Self,
-		token.Plus, token.Minus, token.Bang:
+		token.LBracket, token.Plus, token.Minus, token.Bang:
 		return true
 	default:
 		return false

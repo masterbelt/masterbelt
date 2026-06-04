@@ -12,7 +12,7 @@ File
     TypeClause
       Colon ":"
       Whitespace " "
-      TypeRef
+      TypeName
         Ident "int64"
     Whitespace " "
     Initializer

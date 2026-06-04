@@ -249,6 +249,75 @@ func TestParseExpressionShape(t *testing.T) {
 	}
 }
 
+// collectionChildKinds returns the kinds of a CollectionLit's direct child
+// nodes (skipping the bracket/comma/colon leaves and trivia).
+func collectionChildKinds(t cst.Tree) []cst.Kind {
+	var out []cst.Kind
+	for _, c := range t.Children() {
+		if k, ok := c.Kind(); ok {
+			out = append(out, k)
+		}
+	}
+	return out
+}
+
+func TestParseCollectionLiteral(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+		want []cst.Kind
+	}{
+		{"list", "const x = [1, 2, 3]\n", []cst.Kind{cst.Literal, cst.Literal, cst.Literal}},
+		{"map", "const x = [\"a\": 1, \"b\": 2]\n", []cst.Kind{cst.MapEntry, cst.MapEntry}},
+		{"empty", "const x = []\n", nil},
+		{"nested", "const x = [[1], [2]]\n", []cst.Kind{cst.CollectionLit, cst.CollectionLit}},
+		{"trailing comma", "const x = [1, 2,]\n", []cst.Kind{cst.Literal, cst.Literal}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, diags := Parse([]byte(tc.src))
+			if len(diags) != 0 {
+				t.Fatalf("unexpected diagnostics: %v", diags)
+			}
+			_, e := initExpr(t, tc.src)
+			if k, ok := e.Kind(); !ok || k != cst.CollectionLit {
+				t.Fatalf("initializer kind = %v, want CollectionLit", k)
+			}
+			got := collectionChildKinds(e)
+			if len(got) != len(tc.want) {
+				t.Fatalf("child nodes = %v, want %v", got, tc.want)
+			}
+			for i := range got {
+				if got[i] != tc.want[i] {
+					t.Fatalf("child nodes = %v, want %v", got, tc.want)
+				}
+			}
+		})
+	}
+}
+
+// TestParseGenericConstAnnotation checks that a constant's type annotation is a
+// full type expression, so generic types like list<int> are accepted.
+func TestParseGenericConstAnnotation(t *testing.T) {
+	root, diags := Parse([]byte("const x: list<int> = [1]\n"))
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	decl := root.Children()[0].(*cst.Node)
+	var clause *cst.Node
+	for _, c := range decl.Children() {
+		if n, ok := c.(*cst.Node); ok && n.Kind() == cst.TypeClause {
+			clause = n
+		}
+	}
+	if clause == nil {
+		t.Fatal("no TypeClause")
+	}
+	if got := subNodeKinds(clause); len(got) != 1 || got[0] != cst.TypeName {
+		t.Fatalf("type clause sub-nodes = %v, want [TypeName]", got)
+	}
+}
+
 func TestParseDiagnostics(t *testing.T) {
 	cases := []struct {
 		name string
