@@ -8,10 +8,10 @@ import (
 	"github.com/masterbelt/masterbelt/pkg/source"
 )
 
-func TestReport(t *testing.T) {
+func TestTextReport(t *testing.T) {
 	file := source.NewFile("src/main.belt", []byte("ab\ncdef\n"))
 	var out bytes.Buffer
-	r := New(&out)
+	r := NewText(&out, diagnostic.DefaultLocale)
 
 	// Deliberately unordered: the reporter presents by position.
 	r.Report(file, []diagnostic.Diagnostic{
@@ -27,11 +27,14 @@ func TestReport(t *testing.T) {
 	if r.Errors() != 1 {
 		t.Errorf("Errors() = %d, want 1 (the warning does not count)", r.Errors())
 	}
+	if err := r.Flush(); err != nil {
+		t.Errorf("Flush() = %v", err)
+	}
 }
 
-func TestReportBare(t *testing.T) {
+func TestTextReportBare(t *testing.T) {
 	var out bytes.Buffer
-	r := New(&out)
+	r := NewText(&out, diagnostic.DefaultLocale)
 
 	r.ReportBare([]diagnostic.Diagnostic{
 		{Severity: diagnostic.Error, Code: "x.lost", Message: "nowhere to anchor"},
@@ -46,11 +49,32 @@ func TestReportBare(t *testing.T) {
 	}
 }
 
-func TestErrorsAccumulate(t *testing.T) {
+func TestTextLocale(t *testing.T) {
+	// A non-default locale re-renders the message from Code + Fields; the
+	// stored Message is the DefaultLocale rendering.
+	file := source.NewFile("a.belt", []byte("\"x"))
+	var out bytes.Buffer
+	r := NewText(&out, "ja")
+
+	r.Report(file, []diagnostic.Diagnostic{{
+		Severity: diagnostic.Error,
+		Code:     "masterbelt.lexer.unterminated_string",
+		Message:  "unterminated string literal",
+		Offset:   0,
+		Width:    2,
+	}})
+
+	want := "a.belt:1:1: error[masterbelt.lexer.unterminated_string]: 文字列リテラルが閉じられていません\n"
+	if out.String() != want {
+		t.Errorf("Report() wrote %q, want %q", out.String(), want)
+	}
+}
+
+func TestTextErrorsAccumulate(t *testing.T) {
 	// One reporter may report several sources (a manifest, then a file); the
 	// error count spans all of them.
 	var out bytes.Buffer
-	r := New(&out)
+	r := NewText(&out, diagnostic.DefaultLocale)
 
 	file := source.NewFile("a.belt", []byte("x"))
 	r.Report(file, []diagnostic.Diagnostic{{Severity: diagnostic.Error, Code: "x.a", Message: "a"}})

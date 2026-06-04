@@ -2,7 +2,6 @@ package cli
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -18,6 +17,8 @@ import (
 
 func init() {
 	RootCmd.AddCommand(CheckCmd)
+	CheckCmd.Flags().String("format", "text", "output format: text or json")
+	CheckCmd.Flags().String("locale", string(diagnostic.DefaultLocale), "message locale (en, ja)")
 }
 
 var CheckCmd = &cobra.Command{
@@ -33,38 +34,68 @@ var CheckCmd = &cobra.Command{
 		if len(args) == 1 {
 			target = args[0]
 		}
-		info, err := os.Stat(target)
+		rep, err := newReporter(cmd)
 		if err != nil {
 			return err
-		}
-		if !info.IsDir() {
-			// An explicit file is checked ad hoc, without a project.
-			data, err := os.ReadFile(target)
-			if err != nil {
-				return err
-			}
-			return checkSource(cmd.OutOrStdout(), target, data)
 		}
 
-		proj, err := loadProject(cmd.OutOrStdout(), target)
+		checkErr := runCheck(rep, target)
+		if err := rep.Flush(); err != nil {
+			return err
+		}
+		return checkErr
+	},
+}
+
+// newReporter builds the reporter the flags ask for: the format picks the
+// implementation (text streams lines, json emits one document on Flush) and
+// the locale picks the language messages render in.
+func newReporter(cmd *cobra.Command) (reporter.Reporter, error) {
+	format, _ := cmd.Flags().GetString("format")
+	locale, _ := cmd.Flags().GetString("locale")
+	switch format {
+	case "text":
+		return reporter.NewText(cmd.OutOrStdout(), diagnostic.Locale(locale)), nil
+	case "json":
+		return reporter.NewJSON(cmd.OutOrStdout(), diagnostic.Locale(locale)), nil
+	default:
+		return nil, fmt.Errorf("unknown format %q (want text or json)", format)
+	}
+}
+
+// runCheck checks target — a project directory or an ad-hoc file — reporting
+// every diagnostic through rep.
+func runCheck(rep reporter.Reporter, target string) error {
+	info, err := os.Stat(target)
+	if err != nil {
+		return err
+	}
+	if !info.IsDir() {
+		// An explicit file is checked ad hoc, without a project.
+		data, err := os.ReadFile(target)
 		if err != nil {
 			return err
 		}
-		entry := proj.EntryFile()
-		return checkSource(cmd.OutOrStdout(), entry.Path, entry.Data)
-	},
+		return checkSource(rep, target, data)
+	}
+
+	proj, err := loadProject(rep, target)
+	if err != nil {
+		return err
+	}
+	entry := proj.EntryFile()
+	return checkSource(rep, entry.Path, entry.Data)
 }
 
 // loadProject opens the project at or above dir, reporting the manifest's
 // diagnostics when there are any. It is the project-opening front door shared
 // by every project-scoped subcommand (check today, fmt when B-3 lands).
-func loadProject(w io.Writer, dir string) (*project.Project, error) {
+func loadProject(rep reporter.Reporter, dir string) (*project.Project, error) {
 	proj, diags := project.Open(dir)
 	if diags.Len() == 0 {
 		return proj, nil
 	}
 
-	rep := reporter.New(w)
 	if file := manifestFile(dir); file != nil {
 		rep.Report(file, diags.Items())
 	} else {
@@ -95,7 +126,7 @@ func manifestFile(dir string) *source.File {
 // checkSource runs the full pipeline over one file and reports its
 // diagnostics — lexer, parser, and semantic, the same aggregation the LSP
 // publishes. It fails when any diagnostic is an error.
-func checkSource(w io.Writer, path string, data []byte) error {
+func checkSource(rep reporter.Reporter, path string, data []byte) error {
 	doc := semantic.NewDocument(data)
 
 	var raw []diagnostic.Diagnostic
@@ -103,7 +134,6 @@ func checkSource(w io.Writer, path string, data []byte) error {
 	raw = append(raw, doc.AST().Diagnostics()...)
 	raw = append(raw, doc.Diagnostics()...)
 
-	rep := reporter.New(w)
 	rep.Report(source.NewFile(displayPath(path), data), raw)
 	if n := rep.Errors(); n > 0 {
 		return fmt.Errorf("%s: %d error(s)", displayPath(path), n)
