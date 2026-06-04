@@ -57,6 +57,10 @@ func (v view) Diagnostics() []diagnostic.Diagnostic { return v.ws.prog.Diagnosti
 
 func (v view) TypeNames() []*ir.TypeDef { return v.ws.prog.TypeNames(v.id) }
 
+func (v view) QualifiedTypeNames() map[string][]*ir.TypeDef {
+	return v.ws.prog.QualifiedTypeNames(v.id)
+}
+
 // viewOf returns the view of the file that declares c — v itself, or a sibling
 // of the same workspace. This is how a definition or hover follows a
 // cross-file reference home.

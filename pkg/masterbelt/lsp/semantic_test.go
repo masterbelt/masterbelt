@@ -87,3 +87,25 @@ func TestSemanticTokensSkipsMultilineBlockComment(t *testing.T) {
 		t.Fatalf("first token = %+v, want a keyword on line 1", got)
 	}
 }
+
+func TestSemanticTokensQualifiedTypeName(t *testing.T) {
+	// Both halves of a qualified type annotation (geo.Point) classify as type
+	// tokens: the qualifier has no colour of its own in the legend, and the
+	// whole dotted form names one type.
+	doc := abstract.NewDocument([]byte("const start: geo.Point = 1\n"))
+	got := decode(semanticTokens(doc).Data)
+
+	var typed []decodedToken
+	for _, tok := range got {
+		if tok.tokenType == stType {
+			typed = append(typed, tok)
+		}
+	}
+	want := []decodedToken{
+		{0, 13, 3, stType, 0}, // geo
+		{0, 17, 5, stType, 0}, // Point
+	}
+	if len(typed) != len(want) || typed[0] != want[0] || typed[1] != want[1] {
+		t.Errorf("type tokens = %+v, want %+v", typed, want)
+	}
+}

@@ -134,6 +134,27 @@ func (p *Program) FuncLitTypes(id FileID) map[*ast.FuncLit]*ir.Func {
 	return funcLitTypesOf(p.db, id, doc.File())
 }
 
+// QualifiedTypeNames returns the namespace-qualified type names in scope in
+// file: each namespace import paired with its target's exported types, in
+// name order — what an editor offers in a type position beyond the plain
+// names of TypeNames (geo.Point for use geo from ...).
+func (p *Program) QualifiedTypeNames(id FileID) map[string][]*ir.TypeDef {
+	q := engineQueries{p.db}
+	out := map[string][]*ir.TypeDef{}
+	for ns, target := range q.importsOf(id).namespaces {
+		exp := q.exportsOf(target).types
+		if len(exp) == 0 {
+			continue
+		}
+		defs := make([]*ir.TypeDef, 0, len(exp))
+		for _, name := range slices.Sorted(maps.Keys(exp)) {
+			defs = append(defs, exp[name])
+		}
+		out[ns] = defs
+	}
+	return out
+}
+
 // TypeNames returns the type definitions in scope in file, for an editor
 // completing a type name: the file's own type declarations, its imported
 // ones, and the builtin/prelude types, by name, with nearer declarations

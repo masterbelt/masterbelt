@@ -493,3 +493,37 @@ func TestCloseKeepsImportedFile(t *testing.T) {
 		t.Errorf("main diagnostics = %v, want none", diags)
 	}
 }
+
+// TestQualifiedTypeCompletion: a type position offers the namespace-qualified
+// names of the file's namespace imports alongside the plain in-scope names.
+func TestQualifiedTypeCompletion(t *testing.T) {
+	src := "use geo from \"geometry.belt\"\nconst start: P = geo.Origin\n"
+	root := writeProject(t, map[string]string{
+		"masterbelt.toml": "entry = \"main.belt\"\n",
+		"main.belt":       src,
+		"geometry.belt":   "pub type Point = int32\npub const Origin = 0\n",
+	})
+	s := NewServer()
+	uri := openOnDisk(t, s, root, "main.belt")
+	v := s.open[uri]
+
+	// Type position: the cursor just past the partial annotation ": P".
+	list, err := s.Completion(context.Background(), &protocol.CompletionParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			Position:     toPosition(v.Buffer(), strings.Index(src, ": P")+3),
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	labels := map[string]bool{}
+	for _, item := range list.Items {
+		labels[item.Label] = true
+	}
+	for _, want := range []string{"geo.Point", "int32"} {
+		if !labels[want] {
+			t.Errorf("type completion misses %q (got %d items)", want, len(list.Items))
+		}
+	}
+}

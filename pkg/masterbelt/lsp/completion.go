@@ -2,8 +2,10 @@ package lsp
 
 import (
 	"io/fs"
+	"maps"
 	"path"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -112,28 +114,41 @@ func usePathItems(doc view) []protocol.CompletionItem {
 }
 
 // typeItems is one completion item per in-scope type name: the file's own types
-// (kind Class) and the builtin/prelude primitives (kind Struct), each documented
-// with its doc comment when it has one.
+// (kind Class), the builtin/prelude primitives (kind Struct), and the
+// namespace-qualified names of the file's namespace imports (geo.Point), each
+// documented with its doc comment when it has one.
 func typeItems(doc view) []protocol.CompletionItem {
 	items := make([]protocol.CompletionItem, 0)
 	for _, t := range doc.TypeNames() {
 		if t.Name == "" {
 			continue
 		}
-		kind := protocol.CompletionItemKindClass
-		if t.Builtin {
-			kind = protocol.CompletionItemKindStruct
+		items = append(items, typeItem(t.Name, t))
+	}
+	qualified := doc.QualifiedTypeNames()
+	for _, ns := range slices.Sorted(maps.Keys(qualified)) {
+		for _, t := range qualified[ns] {
+			items = append(items, typeItem(ns+"."+t.Name, t))
 		}
-		item := protocol.CompletionItem{Label: t.Name, Kind: &kind}
-		if len(t.Doc) > 0 {
-			item.Documentation = &protocol.MarkupContent{
-				Kind:  protocol.Markdown,
-				Value: strings.Join(t.Doc, "\n"),
-			}
-		}
-		items = append(items, item)
 	}
 	return items
+}
+
+// typeItem renders one type definition as a completion item under the given
+// label (its plain or namespace-qualified name).
+func typeItem(label string, t *ir.TypeDef) protocol.CompletionItem {
+	kind := protocol.CompletionItemKindClass
+	if t.Builtin {
+		kind = protocol.CompletionItemKindStruct
+	}
+	item := protocol.CompletionItem{Label: label, Kind: &kind}
+	if len(t.Doc) > 0 {
+		item.Documentation = &protocol.MarkupContent{
+			Kind:  protocol.Markdown,
+			Value: strings.Join(t.Doc, "\n"),
+		}
+	}
+	return item
 }
 
 // constantItems is one completion item per declared constant, labelled with the
