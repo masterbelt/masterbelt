@@ -361,6 +361,54 @@ func TestOperatorErrorReportedOnce(t *testing.T) {
 	}
 }
 
+func TestFuncLitResultInference(t *testing.T) {
+	// An omitted result type is synthesized from the body's returns; declared
+	// parameter types carry into the body scope.
+	m, diags := analyze("const F = fn(x: int) { return x * 2 }\n")
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if got := m.Consts[0].Type.String(); got != "fn(int): int" {
+		t.Errorf("F type = %s, want fn(int): int", got)
+	}
+}
+
+func TestFuncLitBodyDiagnostics(t *testing.T) {
+	cases := []struct {
+		src  string
+		code diagnostic.Code
+	}{
+		// An operator error inside the body is reported now that the checking
+		// walk descends into the literal.
+		{"const F = fn(x: int): int { return x && x }\n", CodeInvalidOperation},
+		// A return that does not satisfy the declared result type.
+		{"const F = fn(x: int): bool { return x }\n", CodeTypeMismatch},
+		// Conflicting unannotated returns cannot unify.
+		{"const F = fn(x: int) { return 1\n  return true }\n", CodeTypeMismatch},
+		// No result annotation and no return to infer one from.
+		{"const F = fn() {}\n", CodeUninferableResult},
+		// A division by zero inside the body.
+		{"const F = fn(x: int): int { return x / 0 }\n", CodeDivisionByZero},
+	}
+	for _, tc := range cases {
+		_, diags := analyze(tc.src)
+		if !hasCode(diags, tc.code) {
+			t.Errorf("%q: want %s, got %v", tc.src, tc.code, codes(diags))
+		}
+	}
+	// A healthy annotated literal — and one whose result is inferred — report
+	// nothing.
+	for _, src := range []string{
+		"const F = fn(x: int): int { return x * 2 }\n",
+		"const F = fn(x: int) { return x % 2 == 0 }\n",
+		"const F = fn(): int {}\n", // the signature is complete without a return
+	} {
+		if _, diags := analyze(src); len(diags) != 0 {
+			t.Errorf("%q: unexpected diagnostics %v", src, diags)
+		}
+	}
+}
+
 func TestDivisionByZero(t *testing.T) {
 	for _, src := range []string{
 		"const x = 1 / 0\n",

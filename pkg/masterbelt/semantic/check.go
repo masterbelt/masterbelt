@@ -12,8 +12,23 @@ import (
 
 // --- expression diagnostics -------------------------------------------------
 
-// checkDivByZero reports each div/rem whose divisor folds to zero.
+// checkDivByZero reports each div/rem whose divisor folds to zero. It descends
+// into a function literal's body — a divisor folds (or doesn't) the same way
+// there, since parameters never fold to a constant.
 func checkDivByZero(e ast.Expr, q queries, report func(node ast.Node)) {
+	if lit, ok := e.(*ast.FuncLit); ok {
+		for _, stmt := range lit.Body {
+			switch stmt := stmt.(type) {
+			case *ast.ReturnStmt:
+				if stmt.Value != nil {
+					checkDivByZero(stmt.Value, q, report)
+				}
+			case *ast.ExprStmt:
+				checkDivByZero(stmt.X, q, report)
+			}
+		}
+		return
+	}
 	call, ok := e.(*ast.CallExpr)
 	if !ok {
 		return

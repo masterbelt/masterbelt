@@ -20,3 +20,4 @@ masterbelt.semantic.invalid_operation,メソッド {method} を {types} に適�
 masterbelt.semantic.division_by_zero,ゼロ除算です
 masterbelt.semantic.type_mismatch,{actual} を {expected} として使えません
 masterbelt.semantic.uninferable_collection,このコレクションリテラルの型を推論できません。型注釈を付けてください
+masterbelt.semantic.uninferable_result,この関数リテラルの結果型を推論できません。注釈を付けるか値を返してください

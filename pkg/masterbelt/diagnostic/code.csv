@@ -20,3 +20,4 @@ masterbelt.semantic.invalid_operation,error,method:string types:string
 masterbelt.semantic.division_by_zero,error,
 masterbelt.semantic.type_mismatch,error,actual:string expected:string
 masterbelt.semantic.uninferable_collection,error,
+masterbelt.semantic.uninferable_result,error,

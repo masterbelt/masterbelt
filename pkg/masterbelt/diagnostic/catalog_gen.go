@@ -167,6 +167,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "cannot infer the type of this collection literal; annotate it"
 		}
 	},
+	"masterbelt.semantic.uninferable_result": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "この関数リテラルの結果型を推論できません。注釈を付けるか値を返してください"
+		default:
+			return "cannot infer this function literal's result type; annotate it or return a value"
+		}
+	},
 	"masterbelt.semantic.unknown_type": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":

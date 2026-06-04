@@ -123,11 +123,23 @@ func assemble(file *ast.File, positions map[cst.Green]span, q queries) (*ir.Modu
 					diags.Add(newUndefinedNameDiagnostic(s.offset, s.width, id.Name))
 				}
 			})
-			// Operator type errors: the innermost method call whose operand
-			// types it is not defined on.
-			infer.Check(decl.Value, env, func(node ast.Node, method, operands string) {
-				s := at(node)
-				diags.Add(newInvalidOperationDiagnostic(s.offset, s.width, method, operands))
+			// Operator type errors (the innermost method call whose operand
+			// types it is not defined on), return-type mismatches inside
+			// function-literal bodies, and literals whose result type cannot
+			// be inferred.
+			infer.Check(decl.Value, env, &infer.Sink{
+				InvalidOp: func(node ast.Node, method, operands string) {
+					s := at(node)
+					diags.Add(newInvalidOperationDiagnostic(s.offset, s.width, method, operands))
+				},
+				Mismatch: func(e ast.Expr, got, want ir.Type) {
+					s := at(e)
+					diags.Add(newTypeMismatchDiagnostic(s.offset, s.width, got.String(), want.String()))
+				},
+				UninferableResult: func(lit *ast.FuncLit) {
+					s := at(lit)
+					diags.Add(newUninferableResultDiagnostic(s.offset, s.width))
+				},
 			})
 			// Division or remainder by a zero divisor.
 			checkDivByZero(decl.Value, q, func(node ast.Node) {

@@ -93,7 +93,7 @@ func exprType(e ast.Expr, s scope) ir.Type {
 	case *ast.CollectionLit:
 		return collectionType(e, s)
 	case *ast.FuncLit:
-		return funcLitType(e, s.registry())
+		return funcLitType(e, s)
 	case *ast.CallExpr:
 		// A call through a member access is a method call; any other callee is a
 		// context-specific form (a conversion in a method body, otherwise nothing).
@@ -112,18 +112,71 @@ func exprType(e ast.Expr, s scope) ir.Type {
 }
 
 // funcLitType is the type of a function-literal expression: the Func type built
-// from its declared parameter and result types. The annotations resolve against
-// the registry alone — the same universe a constant annotation resolves against
-// — so a literal whose annotations name only primitives types precisely, while
+// from its declared parameter types and its declared — or, when the annotation
+// is omitted, inferred — result type. The annotations resolve against the
+// registry alone — the same universe a constant annotation resolves against —
+// so a literal whose annotations name only primitives types precisely, while
 // one naming a file-local type leaves that part invalid (as a const annotation
-// would).
-func funcLitType(e *ast.FuncLit, reg *builtin.Registry) ir.Type {
-	r := &TypeResolver{Reg: reg}
+// would). An omitted result type is synthesized from the body's return values,
+// typed in a funcScope over s; an omitted parameter type is ir.Invalid here
+// (only a checking context can supply it).
+func funcLitType(e *ast.FuncLit, s scope) ir.Type {
+	r := &TypeResolver{Reg: s.registry()}
 	params := make([]ir.Type, len(e.Params))
+	names := make(map[string]ir.Type, len(e.Params))
 	for i, p := range e.Params {
 		params[i] = r.ResolveType(p.Type, nil)
+		names[p.Name] = params[i]
 	}
-	return &ir.Func{Params: params, Result: r.ResolveType(e.Result, nil)}
+	result := r.ResolveType(e.Result, nil)
+	if e.Result == nil {
+		result = returnedType(e.Body, funcScope{outer: s, params: names})
+	}
+	return &ir.Func{Params: params, Result: result}
+}
+
+// returnedType synthesizes a function body's result type: the unified type of
+// every returned value. A body that returns nothing — or whose returns do not
+// unify — has no synthesizable result and is ir.Invalid.
+func returnedType(body []ast.Stmt, s scope) ir.Type {
+	var result ir.Type
+	for _, stmt := range body {
+		ret, ok := stmt.(*ast.ReturnStmt)
+		if !ok || ret.Value == nil {
+			continue
+		}
+		t := exprType(ret.Value, s)
+		if result == nil {
+			result = t
+		} else {
+			result = types.Unify(s.registry(), result, t)
+		}
+	}
+	if result == nil {
+		return ir.Invalid
+	}
+	return result
+}
+
+// funcScope types a function literal's body: the literal's own parameters
+// resolve to their (declared or pushed-down) types, and every other leaf is
+// delegated to the enclosing scope — mirroring how funcBinder chains the
+// lowering scopes for the same body. A nested literal just wraps another
+// funcScope around this one.
+type funcScope struct {
+	outer  scope
+	params map[string]ir.Type
+}
+
+func (s funcScope) registry() *builtin.Registry { return s.outer.registry() }
+
+func (s funcScope) leaf(e ast.Expr) ir.Type {
+	if id, ok := e.(*ast.Identifier); ok {
+		if t, ok := s.params[id.Name]; ok {
+			return t
+		}
+	}
+	return s.outer.leaf(e)
 }
 
 // collectionType infers a collection literal's type: list<E> from the unified
@@ -279,13 +332,52 @@ func recordOf(t ir.Type) *ir.Record {
 	return nil
 }
 
-// Check type-checks an expression, reporting the innermost method call whose
-// operand types it is not defined on. It returns the expression's type so
-// recursion can propagate an existing error — an operand that is itself Invalid,
-// or an undefined reference reported elsewhere — without re-reporting it. The
-// report callback receives the offending call node, the method name, and the
-// operand types rendered as "recv, arg, ...".
-func Check(e ast.Expr, env Env, report func(node ast.Node, method, operands string)) ir.Type {
+// Sink receives the checking walk's findings. Every field is optional and a
+// nil Sink checks silently, so the same walk serves pure typing and the
+// diagnostic pass; the semantic layer wires each callback to its diagnostic.
+type Sink struct {
+	// InvalidOp fires at the innermost method call whose operand types it is
+	// not defined on, with the operand types rendered as "recv, arg, ...".
+	InvalidOp func(node ast.Node, method, operands string)
+	// Mismatch fires where got cannot be used as the expected type want.
+	Mismatch func(e ast.Expr, got, want ir.Type)
+	// UninferableResult fires at a function literal that neither annotates its
+	// result type nor returns a value to infer it from.
+	UninferableResult func(lit *ast.FuncLit)
+}
+
+func (s *Sink) invalidOp(node ast.Node, method, operands string) {
+	if s != nil && s.InvalidOp != nil {
+		s.InvalidOp(node, method, operands)
+	}
+}
+
+func (s *Sink) mismatch(e ast.Expr, got, want ir.Type) {
+	if s != nil && s.Mismatch != nil {
+		s.Mismatch(e, got, want)
+	}
+}
+
+func (s *Sink) uninferableResult(lit *ast.FuncLit) {
+	if s != nil && s.UninferableResult != nil {
+		s.UninferableResult(lit)
+	}
+}
+
+// Check type-checks an expression, reporting through sink the innermost method
+// call whose operand types it is not defined on, and — inside a function
+// literal's body — each return value that does not satisfy the literal's
+// declared (or, across several returns, unified) result type. It returns the
+// expression's type so recursion can propagate an existing error — an operand
+// that is itself Invalid, or an undefined reference reported elsewhere —
+// without re-reporting it.
+func Check(e ast.Expr, env Env, sink *Sink) ir.Type {
+	return check(e, constScope{env}, sink)
+}
+
+// check is the checking walk behind Check, parameterized over the scope so a
+// function literal's body is checked in its parameter scope.
+func check(e ast.Expr, s scope, sink *Sink) ir.Type {
 	switch e := e.(type) {
 	case *ast.IntLit:
 		return &ir.Builtin{Name: "int"}
@@ -298,43 +390,90 @@ func Check(e ast.Expr, env Env, report func(node ast.Node, method, operands stri
 		// checks against the (possibly annotated) element type are the caller's.
 		for _, entry := range e.Entries {
 			if entry.Key != nil {
-				Check(entry.Key, env, report)
+				check(entry.Key, s, sink)
 			}
 			if entry.Value != nil {
-				Check(entry.Value, env, report)
+				check(entry.Value, s, sink)
 			}
 		}
-		return collectionType(e, constScope{env})
+		return collectionType(e, s)
 	case *ast.FuncLit:
-		// A function literal's type is its signature; its body introduces a
-		// parameter scope this const-context walk does not enter, so the body's
-		// own operator errors are not reported here.
-		return funcLitType(e, env.Registry())
-	case *ast.Identifier:
-		if t := env.Resolve(e); t != nil {
-			return env.TypeOf(t)
-		}
-		return ir.Invalid
+		return checkFuncLit(e, s, sink)
 	case *ast.CallExpr:
 		member, ok := e.Callee.(*ast.MemberExpr)
 		if !ok {
-			return ir.Invalid
+			return s.leaf(e)
 		}
-		recv := Check(member.Receiver, env, report)
+		recv := check(member.Receiver, s, sink)
 		bad := recv == ir.Invalid
 		args := make([]ir.Type, len(e.Arguments))
 		for i, a := range e.Arguments {
-			args[i] = Check(a, env, report)
+			args[i] = check(a, s, sink)
 			bad = bad || args[i] == ir.Invalid
 		}
-		res := types.MethodResult(env.Registry(), recv, member.Member.Name, args)
+		res := types.MethodResult(s.registry(), recv, member.Member.Name, args)
 		if res == ir.Invalid && !bad {
-			report(e, member.Member.Name, typesList(recv, args))
+			sink.invalidOp(e, member.Member.Name, typesList(recv, args))
 		}
 		return res
 	default:
-		return ir.Invalid
+		return s.leaf(e)
 	}
+}
+
+// checkFuncLit checks a function literal: its body is walked in the literal's
+// parameter scope, each return value is checked against the declared result
+// type (or unified with the other returns when the annotation is omitted), and
+// a literal with neither a result annotation nor a return to infer one from is
+// reported as uninferable. The literal's type is funcLitType's — the signature,
+// with an omitted result synthesized from the body.
+func checkFuncLit(lit *ast.FuncLit, s scope, sink *Sink) ir.Type {
+	reg := s.registry()
+	r := &TypeResolver{Reg: reg}
+	names := make(map[string]ir.Type, len(lit.Params))
+	for _, p := range lit.Params {
+		names[p.Name] = r.ResolveType(p.Type, nil)
+	}
+	body := funcScope{outer: s, params: names}
+
+	var want ir.Type // the declared result type, nil when omitted
+	if lit.Result != nil {
+		want = r.ResolveType(lit.Result, nil)
+	}
+	var unified ir.Type // the returns unified so far, when no annotation
+	sawReturn := false
+	for _, stmt := range lit.Body {
+		switch stmt := stmt.(type) {
+		case *ast.ReturnStmt:
+			if stmt.Value == nil {
+				continue
+			}
+			sawReturn = true
+			got := check(stmt.Value, body, sink)
+			switch {
+			case got == ir.Invalid:
+				// Already reported (or reported elsewhere); do not pile on.
+			case want != nil:
+				if want != ir.Invalid && !types.Assignable(reg, got, want) {
+					sink.mismatch(stmt.Value, got, want)
+				}
+			case unified == nil:
+				unified = got
+			default:
+				if u := types.Unify(reg, unified, got); u == ir.Invalid {
+					sink.mismatch(stmt.Value, got, unified)
+				} else {
+					unified = u
+				}
+			}
+		case *ast.ExprStmt:
+			check(stmt.X, body, sink)
+		}
+	}
+	if lit.Result == nil && !sawReturn {
+		sink.uninferableResult(lit)
+	}
+	return funcLitType(lit, s)
 }
 
 // typesList renders the receiver and argument types as "recv, arg, ..." for the

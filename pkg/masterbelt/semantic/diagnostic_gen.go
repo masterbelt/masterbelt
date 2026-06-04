@@ -17,6 +17,7 @@ const (
 	CodeTypeMismatch          diagnostic.Code = "masterbelt.semantic.type_mismatch"
 	CodeUndefinedName         diagnostic.Code = "masterbelt.semantic.undefined_name"
 	CodeUninferableCollection diagnostic.Code = "masterbelt.semantic.uninferable_collection"
+	CodeUninferableResult     diagnostic.Code = "masterbelt.semantic.uninferable_result"
 	CodeUnknownType           diagnostic.Code = "masterbelt.semantic.unknown_type"
 )
 
@@ -123,6 +124,17 @@ func newUninferableCollectionDiagnostic(offset int, width int) diagnostic.Diagno
 		Severity: diagnostic.Error,
 		Code:     CodeUninferableCollection,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeUninferableCollection, nil),
+		Fields:   nil,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newUninferableResultDiagnostic(offset int, width int) diagnostic.Diagnostic {
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeUninferableResult,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeUninferableResult, nil),
 		Fields:   nil,
 		Offset:   offset,
 		Width:    width,
