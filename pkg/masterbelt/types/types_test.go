@@ -206,6 +206,188 @@ func TestBindReceiver(t *testing.T) {
 	}
 }
 
+// overloadedScore builds a nominal type with an overloaded method — the merge
+// of the 0013-overload example: merge(points: self): self and
+// merge(active: bool): bool — for the selection tests.
+func overloadedScore() *ir.Named {
+	return &ir.Named{Def: &ir.TypeDef{
+		Name: "Score",
+		Body: bt("int32"),
+		Methods: []*ir.Method{
+			{Name: "merge", Params: []ir.Param{{Name: "points", Type: &ir.SelfType{}}}, Result: &ir.SelfType{}},
+			{Name: "merge", Params: []ir.Param{{Name: "active", Type: bt("bool")}}, Result: bt("bool")},
+		},
+	}}
+}
+
+// TestSelectOverload checks the overload selection rule: the candidates are
+// filtered by arity and argument fit, and the call resolves exactly when one
+// survives.
+func TestSelectOverload(t *testing.T) {
+	reg := builtin.Default()
+	score := overloadedScore()
+
+	// A self-typed argument picks the points signature; the default integer
+	// adapts to the receiver.
+	matches, found := SelectOverload(reg, score, "merge", []ir.Type{bt("int")})
+	if !found || len(matches) != 1 {
+		t.Fatalf("merge(int): matches = %d, found = %v, want 1, true", len(matches), found)
+	}
+	if got := matches[0].Operand.String(); got != "Score" {
+		t.Errorf("merge(int): operand = %s, want Score", got)
+	}
+
+	// A boolean argument picks the flag signature.
+	matches, _ = SelectOverload(reg, score, "merge", []ir.Type{bt("bool")})
+	if len(matches) != 1 || matches[0].Method.Result.String() != "bool" {
+		t.Fatalf("merge(bool): matches = %d, want the bool overload", len(matches))
+	}
+
+	// A string fits neither overload: found, but no match.
+	matches, found = SelectOverload(reg, score, "merge", []ir.Type{bt("string")})
+	if !found || len(matches) != 0 {
+		t.Errorf("merge(string): matches = %d, found = %v, want 0, true", len(matches), found)
+	}
+
+	// An unknown method is not found at all — the caller distinguishes the
+	// missing method from the unmatched overload.
+	if _, found := SelectOverload(reg, score, "frobnicate", nil); found {
+		t.Error("frobnicate: found = true, want false")
+	}
+
+	// Arity selects among same-name signatures: next() vs next(steps: self).
+	level := &ir.Named{Def: &ir.TypeDef{
+		Name: "Level",
+		Body: bt("int8"),
+		Methods: []*ir.Method{
+			{Name: "next", Result: &ir.SelfType{}},
+			{Name: "next", Params: []ir.Param{{Name: "steps", Type: &ir.SelfType{}}}, Result: &ir.SelfType{}},
+		},
+	}}
+	if matches, _ := SelectOverload(reg, level, "next", nil); len(matches) != 1 || len(matches[0].Method.Params) != 0 {
+		t.Errorf("next(): want the zero-parameter overload")
+	}
+	if matches, _ := SelectOverload(reg, level, "next", []ir.Type{bt("int")}); len(matches) != 1 || len(matches[0].Method.Params) != 1 {
+		t.Errorf("next(int): want the stepping overload")
+	}
+
+	// The default integer fits both sized-integer overloads at once: ambiguous,
+	// resolved by an annotation at the call site, never an implicit priority.
+	gauge := &ir.Named{Def: &ir.TypeDef{
+		Name: "Gauge",
+		Body: bt("int32"),
+		Methods: []*ir.Method{
+			{Name: "set", Params: []ir.Param{{Name: "v", Type: bt("int8")}}, Result: bt("bool")},
+			{Name: "set", Params: []ir.Param{{Name: "v", Type: bt("int16")}}, Result: bt("bool")},
+		},
+	}}
+	if matches, _ := SelectOverload(reg, gauge, "set", []ir.Type{bt("int")}); len(matches) != 2 {
+		t.Errorf("set(int): matches = %d, want 2 (ambiguous)", len(matches))
+	}
+	// A sized argument is exact: unambiguous.
+	if matches, _ := SelectOverload(reg, gauge, "set", []ir.Type{bt("int16")}); len(matches) != 1 || matches[0].Method.Params[0].Type.String() != "int16" {
+		t.Errorf("set(int16): want the int16 overload alone")
+	}
+
+	// A nil argument type (a function literal checked after selection) fits
+	// any parameter, so only the arity discriminates.
+	if matches, _ := SelectOverload(reg, score, "merge", []ir.Type{nil}); len(matches) != 2 {
+		t.Errorf("merge(<literal>): matches = %d, want 2", len(matches))
+	}
+
+	// A single-candidate method behaves as before: the generic map solves its
+	// variables from the argument, and each selection works on a fresh
+	// substitution.
+	tvar := func(name string) ir.Type { return &ir.TypeVar{Name: name} }
+	listDef := &ir.TypeDef{Name: "list", Builtin: true, Params: []*ir.TypeParam{{Name: "T"}}}
+	listDef.Methods = []*ir.Method{
+		{Name: "map", Params: []ir.Param{{Name: "func", Type: &ir.Func{Params: []ir.Type{tvar("T")}, Result: tvar("R")}}}, Result: &ir.App{Def: listDef, Args: []ir.Type{tvar("R")}}},
+	}
+	recv := &ir.App{Def: listDef, Args: []ir.Type{bt("int")}}
+	fn := &ir.Func{Params: []ir.Type{bt("int")}, Result: bt("bool")}
+	matches, _ = SelectOverload(reg, recv, "map", []ir.Type{fn})
+	if len(matches) != 1 {
+		t.Fatalf("map(fn): matches = %d, want 1", len(matches))
+	}
+	if got := matches[0].Subst["R"]; got == nil || got.String() != "bool" {
+		t.Errorf("map(fn): subst[R] = %v, want bool", got)
+	}
+}
+
+// TestOverloadedMethodResult checks MethodResult over an overload set: the
+// unique fit's result, and Invalid for no fit or an ambiguous one.
+func TestOverloadedMethodResult(t *testing.T) {
+	reg := builtin.Default()
+	score := overloadedScore()
+	cases := []struct {
+		name string
+		args []ir.Type
+		want string
+	}{
+		{"int picks points", []ir.Type{bt("int")}, "Score"},
+		{"Score picks points", []ir.Type{score}, "Score"},
+		{"bool picks flag", []ir.Type{bt("bool")}, "bool"},
+		{"string fits neither", []ir.Type{bt("string")}, "invalid"},
+		{"arity fits neither", nil, "invalid"},
+	}
+	for _, tc := range cases {
+		if got := MethodResult(reg, score, "merge", tc.args).String(); got != tc.want {
+			t.Errorf("%s: MethodResult(Score, merge, ...) = %s, want %s", tc.name, got, tc.want)
+		}
+	}
+}
+
+// TestOverloadShadowing checks the level rule: a definition that declares a
+// name itself shadows every same-name method it would derive from its
+// underlying type, and ReceiverMethods keeps one level's overloads together.
+func TestOverloadShadowing(t *testing.T) {
+	reg := builtin.Default()
+	// Tally redeclares add(bool) over int8: the derived add(self) is shadowed.
+	tally := &ir.Named{Def: &ir.TypeDef{
+		Name: "Tally",
+		Body: bt("int8"),
+		Methods: []*ir.Method{
+			{Name: "add", Params: []ir.Param{{Name: "flag", Type: bt("bool")}}, Result: &ir.SelfType{}},
+		},
+	}}
+
+	ms, _, ok := Candidates(reg, tally, "add")
+	if !ok || len(ms) != 1 || ms[0].Params[0].Type.String() != "bool" {
+		t.Fatalf("Candidates(Tally, add) = %d methods, want the own add(bool) alone", len(ms))
+	}
+	// Tally + Tally no longer resolves: the own add shadows the derived one.
+	if got := MethodResult(reg, tally, "add", []ir.Type{tally}).String(); got != "invalid" {
+		t.Errorf("MethodResult(Tally, add, Tally) = %s, want invalid (shadowed)", got)
+	}
+	// A method Tally does not declare still derives from int8.
+	if got := MethodResult(reg, tally, "sub", []ir.Type{tally}).String(); got != "Tally" {
+		t.Errorf("MethodResult(Tally, sub, Tally) = %s, want Tally", got)
+	}
+
+	// ReceiverMethods lists the own add(bool) once and never the derived add,
+	// while an overloaded own name appears with every signature.
+	score := overloadedScore()
+	methods, _, ok := ReceiverMethods(reg, score)
+	if !ok {
+		t.Fatal("ReceiverMethods(Score) not found")
+	}
+	merges, adds := 0, 0
+	for _, m := range methods {
+		switch m.Name {
+		case "merge":
+			merges++
+		case "add":
+			adds++
+		}
+	}
+	if merges != 2 {
+		t.Errorf("ReceiverMethods(Score): %d merge signatures, want 2", merges)
+	}
+	if adds != 1 {
+		t.Errorf("ReceiverMethods(Score): %d derived add signatures, want 1", adds)
+	}
+}
+
 // TestSubstituteAndMatch covers the exported substitution and pattern-match
 // rules directly: Substitute pins bound variables through composite types, and
 // Match solves a pattern's variables against a concrete argument.

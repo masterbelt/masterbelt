@@ -20,6 +20,7 @@
 package types
 
 import (
+	"maps"
 	"math/big"
 
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
@@ -140,84 +141,148 @@ func Assignable(reg *builtin.Registry, from, to ir.Type) bool {
 	return sameBuiltin(from, to) || sameNamed(from, to)
 }
 
-// MethodResult is the type rule for a method call: it finds the method on the
-// receiver's type, unifies the self-typed operands (so the default integer
-// adapts to a sized one), and returns the substituted result type — self for a
-// self-returning method, the declared result otherwise. It returns ir.Invalid
-// when the method does not exist on the receiver or the operands do not fit,
-// which the IR records as an Invalid type.
+// MethodResult is the type rule for a method call: it selects the one overload
+// of the method the argument types fit (SelectOverload), unifying the
+// self-typed operands (so the default integer adapts to a sized one), and
+// returns the substituted result type — self for a self-returning method, the
+// declared result otherwise. It returns ir.Invalid when the method does not
+// exist on the receiver, the operands fit no overload, or they fit several
+// (ambiguous), which the IR records as an Invalid type.
 //
 // Because the method signatures come from the registry's type definitions (and,
 // once loaded, the prelude's), this one rule covers every operator on every
 // primitive — there is no per-operator table.
 //
-// The AST-driven checker types calls through the same pieces (BindReceiver,
+// The AST-driven checker types calls through the same pieces (SelectOverload,
 // Match, Substitute) bidirectionally; this purely type-level composition is
 // kept for callers that have argument types but no syntax.
 func MethodResult(reg *builtin.Registry, recv ir.Type, method string, args []ir.Type) ir.Type {
-	m, subst, ok := BindReceiver(reg, recv, method)
-	if !ok || len(args) != len(m.Params) {
+	matches, _ := SelectOverload(reg, recv, method, args)
+	if len(matches) != 1 {
 		return ir.Invalid
 	}
-
-	operand := recv // the unified type of the receiver and the self-typed args
-	for i, p := range m.Params {
-		pt := Substitute(p.Type, subst)
-		if _, isSelf := pt.(*ir.SelfType); isSelf {
-			operand = Unify(reg, operand, args[i])
-			if operand == ir.Invalid {
-				return ir.Invalid
-			}
-		} else if !Match(reg, pt, args[i], subst) {
-			return ir.Invalid
-		}
+	sel := matches[0]
+	if _, isSelf := sel.Method.Result.(*ir.SelfType); isSelf {
+		return sel.Operand
 	}
-	if _, isSelf := m.Result.(*ir.SelfType); isSelf {
-		return operand
-	}
-	return Substitute(m.Result, subst)
+	return Substitute(sel.Method.Result, sel.Subst)
 }
 
-// BindReceiver finds method on the receiver's type and starts the substitution
-// that instantiates the method's type variables: it is bound by the receiver's
-// type arguments — a method on list<int> sees T = int — while the per-method
-// variables (the R in map(func: fn(T): R): list<R>) stay unbound for the caller
-// to solve from the arguments (Match). It reports false when the receiver has
-// no such method.
+// BindReceiver finds a method on the receiver's type and starts the
+// substitution that instantiates the method's type variables: it is bound by
+// the receiver's type arguments — a method on list<int> sees T = int — while
+// the per-method variables (the R in map(func: fn(T): R): list<R>) stay
+// unbound for the caller to solve from the arguments (Match). It reports false
+// when the receiver has no such method. For an overloaded name it returns the
+// first declaration; a caller selecting among overloads wants Candidates or
+// SelectOverload instead.
 func BindReceiver(reg *builtin.Registry, recv ir.Type, method string) (*ir.Method, map[string]ir.Type, bool) {
+	ms, subst, ok := Candidates(reg, recv, method)
+	if !ok {
+		return nil, nil, false
+	}
+	return ms[0], subst, true
+}
+
+// Candidates returns the overload set of method on the receiver's type — every
+// same-name method the receiver binds, the nearest declaring definition
+// shadowing the same name derived from its underlying type — together with the
+// substitution the receiver's type arguments pin. It reports false when the
+// receiver has no method of that name.
+func Candidates(reg *builtin.Registry, recv ir.Type, method string) ([]*ir.Method, map[string]ir.Type, bool) {
 	def := defOf(reg, recv)
 	if def == nil {
 		return nil, nil, false
 	}
-	m := findMethod(reg, def, method)
-	if m == nil {
+	ms := findMethods(reg, def, method, map[*ir.TypeDef]bool{})
+	if len(ms) == 0 {
 		return nil, nil, false
 	}
+	return ms, receiverSubst(recv), true
+}
+
+// receiverSubst is the substitution a receiver's type arguments pin: a
+// list<int> receiver binds the element parameter T = int.
+func receiverSubst(recv ir.Type) map[string]ir.Type {
 	subst := map[string]ir.Type{}
 	if app, ok := recv.(*ir.App); ok && app.Def != nil && len(app.Args) == len(app.Def.Params) {
 		for i, p := range app.Def.Params {
 			subst[p.Name] = app.Args[i]
 		}
 	}
-	return m, subst, true
+	return subst
+}
+
+// Overload is one resolution of an overloaded method call: the selected
+// method, the substitution combining the receiver's bindings with what the
+// argument matching solved, and the unified self operand — the receiver and
+// the self-typed arguments combined, so the default integer adapts.
+type Overload struct {
+	Method  *ir.Method
+	Subst   map[string]ir.Type
+	Operand ir.Type
+}
+
+// SelectOverload resolves a method call against the receiver's overload set:
+// of the same-name methods (Candidates), it keeps those the argument types
+// fit. The arity must agree, and each known argument must fit its parameter —
+// a self-typed parameter unifies with the receiver (the default integer
+// adapts), a parameter pattern with method type variables matches structurally
+// (binding them), and any other parameter takes assignability. A nil argument
+// type (a function literal the caller checks bidirectionally after selecting)
+// fits any parameter.
+//
+// The call is well-typed exactly when one overload survives: none means no
+// overload matches, several mean the call is ambiguous — belt has no
+// subtyping, so there is no most-specific tiebreak; the resolution is an
+// annotation at the call site, never an implicit priority. found reports
+// whether the receiver has the method at all, distinguishing an unknown
+// method from an unmatched one.
+func SelectOverload(reg *builtin.Registry, recv ir.Type, method string, args []ir.Type) (matches []Overload, found bool) {
+	ms, base, ok := Candidates(reg, recv, method)
+	if !ok {
+		return nil, false
+	}
+	for _, m := range ms {
+		if len(args) != len(m.Params) {
+			continue
+		}
+		subst := maps.Clone(base) // each candidate solves its own variables
+		operand := recv           // the unified type of the receiver and the self-typed args
+		fits := true
+		for i, p := range m.Params {
+			if args[i] == nil {
+				continue
+			}
+			pt := Substitute(p.Type, subst)
+			if _, isSelf := pt.(*ir.SelfType); isSelf {
+				if operand = Unify(reg, operand, args[i]); operand == ir.Invalid {
+					fits = false
+					break
+				}
+			} else if !Match(reg, pt, args[i], subst) {
+				fits = false
+				break
+			}
+		}
+		if fits {
+			matches = append(matches, Overload{Method: m, Subst: subst, Operand: operand})
+		}
+	}
+	return matches, true
 }
 
 // ReceiverMethods returns every method a receiver type binds — its own and,
 // for a nominal type, those derived from its underlying type, nearer
-// declarations shadowing derived ones of the same name — together with the
-// substitution the receiver's type arguments pin (a list<int> receiver binds
-// the element parameter). It is the all-methods companion of BindReceiver,
-// for an editor completing a member access.
+// declarations shadowing derived ones of the same name (a name's overloads at
+// one level all appear; a farther level's same name does not) — together with
+// the substitution the receiver's type arguments pin (a list<int> receiver
+// binds the element parameter). It is the all-methods companion of
+// Candidates, for an editor completing a member access.
 func ReceiverMethods(reg *builtin.Registry, recv ir.Type) ([]*ir.Method, map[string]ir.Type, bool) {
 	def := defOf(reg, recv)
 	if def == nil {
 		return nil, nil, false
-	}
-	subst := map[string]ir.Type{}
-	if app, ok := recv.(*ir.App); ok && app.Def != nil && len(app.Args) == len(app.Def.Params) {
-		for i, p := range app.Def.Params {
-			subst[p.Name] = app.Args[i]
-		}
 	}
 
 	var out []*ir.Method
@@ -225,19 +290,23 @@ func ReceiverMethods(reg *builtin.Registry, recv ir.Type) ([]*ir.Method, map[str
 	seenNames := map[string]bool{}
 	for d := def; d != nil && !seenDefs[d]; {
 		seenDefs[d] = true
+		level := map[string]bool{} // the names this definition declares itself
 		for _, m := range d.Methods {
 			if !seenNames[m.Name] {
-				seenNames[m.Name] = true
 				out = append(out, m)
+				level[m.Name] = true
 			}
 		}
-		// Derive from the underlying type, exactly as findMethodSeen does.
+		for name := range level {
+			seenNames[name] = true
+		}
+		// Derive from the underlying type, exactly as findMethods does.
 		if d.Builtin {
 			break
 		}
 		d = defOf(reg, d.Body)
 	}
-	return out, subst, true
+	return out, receiverSubst(recv), true
 }
 
 // Substitute replaces every bound type variable in t with its binding from
@@ -342,29 +411,31 @@ func defOf(reg *builtin.Registry, t ir.Type) *ir.TypeDef {
 	return nil
 }
 
-// findMethod looks up a method by name on def, deriving from the underlying type
-// when def does not declare it itself: a nominal type (type Level = int8) thus
-// inherits the operator methods of its underlying type. The seen set guards
-// against a cyclic definition.
-func findMethod(reg *builtin.Registry, def *ir.TypeDef, name string) *ir.Method {
-	return findMethodSeen(reg, def, name, map[*ir.TypeDef]bool{})
-}
-
-func findMethodSeen(reg *builtin.Registry, def *ir.TypeDef, name string, seen map[*ir.TypeDef]bool) *ir.Method {
+// findMethods collects every method named name on def — the overload set a
+// call site selects from — deriving from the underlying type when def does not
+// declare the name itself: a nominal type (type Level = int8) thus inherits
+// the operator methods of its underlying type. A definition that declares the
+// name at all (however many overloads) shadows every same-name method it
+// would derive. The seen set guards against a cyclic definition.
+func findMethods(reg *builtin.Registry, def *ir.TypeDef, name string, seen map[*ir.TypeDef]bool) []*ir.Method {
 	if def == nil || seen[def] {
 		return nil
 	}
 	seen[def] = true
+	var out []*ir.Method
 	for _, m := range def.Methods {
 		if m.Name == name {
-			return m
+			out = append(out, m)
 		}
+	}
+	if len(out) > 0 {
+		return out
 	}
 	// Derive from the underlying type, unless this is a primitive (whose body is
 	// itself) or has no underlying definition.
 	if !def.Builtin {
 		if ud := defOf(reg, def.Body); ud != nil {
-			return findMethodSeen(reg, ud, name, seen)
+			return findMethods(reg, ud, name, seen)
 		}
 	}
 	return nil
