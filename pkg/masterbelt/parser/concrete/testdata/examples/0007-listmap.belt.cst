@@ -4,7 +4,7 @@ File
     LineComment "// list<T>.map applies a function to every element, yielding a list<R>."
     Newline "\n"
     Newline "\n"
-    LineComment "// Same element type: int -> int."
+    LineComment "// Same element type: int -> int, written as an arrow lambda."
     Newline "\n"
     Const "const"
     Whitespace " "
@@ -31,38 +31,35 @@ File
           Dot "."
           Ident "map"
         LParen "("
-        FuncLit
-          Fn "fn"
-          ParamList
-            LParen "("
-            Param
-              Ident "x"
+        BinaryExpr
+          BinaryExpr
+            FuncLit
+              Fn "fn"
+              ParamList
+                LParen "("
+                Param
+                  Ident "x"
+                  Colon ":"
+                  Whitespace " "
+                  TypeName
+                    Ident "int"
+                RParen ")"
               Colon ":"
               Whitespace " "
               TypeName
                 Ident "int"
-            RParen ")"
-          Colon ":"
-          Whitespace " "
-          TypeName
-            Ident "int"
-          Whitespace " "
-          Block
-            LBrace "{"
             Whitespace " "
-            ReturnStmt
-              Return "return"
-              Whitespace " "
-              BinaryExpr
-                NameRef
-                  Ident "x"
-                Whitespace " "
-                Star "*"
-                Whitespace " "
-                Literal
-                  Int "2"
+            Minus "-"
+          Gt ">"
+          Whitespace " "
+          BinaryExpr
+            NameRef
+              Ident "x"
             Whitespace " "
-            RBrace "}"
+            Star "*"
+            Whitespace " "
+            Literal
+              Int "2"
         RParen ")"
   ConstDecl
     Newline "\n"
@@ -100,45 +97,46 @@ File
           Dot "."
           Ident "map"
         LParen "("
-        FuncLit
-          Fn "fn"
-          ParamList
-            LParen "("
-            Param
-              Ident "x"
-              Colon ":"
-              Whitespace " "
-              TypeName
-                Ident "int"
-            RParen ")"
-          Colon ":"
-          Whitespace " "
-          TypeName
-            Ident "bool"
-          Whitespace " "
-          Block
-            LBrace "{"
-            Whitespace " "
-            ReturnStmt
-              Return "return"
-              Whitespace " "
-              BinaryExpr
-                BinaryExpr
-                  NameRef
+        BinaryExpr
+          BinaryExpr
+            BinaryExpr
+              FuncLit
+                Fn "fn"
+                ParamList
+                  LParen "("
+                  Param
                     Ident "x"
-                  Whitespace " "
-                  Percent "%"
-                  Whitespace " "
-                  Literal
-                    Int "2"
+                    Colon ":"
+                    Whitespace " "
+                    TypeName
+                      Ident "int"
+                  RParen ")"
+                Colon ":"
                 Whitespace " "
-                EqEq "=="
-                Whitespace " "
-                Literal
-                  Int "0"
+                TypeName
+                  Ident "bool"
+              Whitespace " "
+              Minus "-"
+            Gt ">"
             Whitespace " "
-            RBrace "}"
+            BinaryExpr
+              NameRef
+                Ident "x"
+              Whitespace " "
+              Percent "%"
+              Whitespace " "
+              Literal
+                Int "2"
+          Whitespace " "
+          EqEq "=="
+          Whitespace " "
+          Literal
+            Int "0"
         RParen ")"
   Newline "\n"
   EOF ""
 # diagnostics
+error[masterbelt.parser.concrete.unexpected_token] 4:46 unexpected token: Whitespace
+error[masterbelt.parser.concrete.expected_operand] 4:47 expected operand after '-'
+error[masterbelt.parser.concrete.unexpected_token] 8:48 unexpected token: Whitespace
+error[masterbelt.parser.concrete.expected_operand] 8:49 expected operand after '-'

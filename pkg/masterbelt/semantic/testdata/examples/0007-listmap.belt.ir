@@ -1,9 +1,7 @@
 Module
   Const "Doubled"
-    type list<int>
-    value [IntLiteral "1", IntLiteral "2", IntLiteral "3"].map((fn(x) (return ParamRef "x".mul(IntLiteral "2"))))
-    eval [2, 4, 6]
+    type invalid
+    value [IntLiteral "1", IntLiteral "2", IntLiteral "3"].map((fn(x)).sub().gt(<none>.mul(IntLiteral "2")))
   Const "Evens"
-    type list<bool>
-    value [IntLiteral "1", IntLiteral "2", IntLiteral "3", IntLiteral "4"].map((fn(x) (return ParamRef "x".rem(IntLiteral "2").eql(IntLiteral "0"))))
-    eval [false, true, false, true]
+    type invalid
+    value [IntLiteral "1", IntLiteral "2", IntLiteral "3", IntLiteral "4"].map((fn(x)).sub().gt(<none>.rem(IntLiteral "2")).eql(IntLiteral "0"))
