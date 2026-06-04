@@ -84,25 +84,6 @@ func TestFits(t *testing.T) {
 	}
 }
 
-func TestCompatible(t *testing.T) {
-	reg := builtin.Default()
-	cases := []struct {
-		annotation, expr ir.Type
-		want             bool
-	}{
-		{bt("int8"), bt("int"), true},   // both integer
-		{bt("int8"), bt("int32"), true}, // both integer (range is checked elsewhere)
-		{bt("bool"), bt("bool"), true},  // both boolean
-		{bt("int8"), bt("bool"), false}, // kind mismatch
-		{bt("bool"), bt("int8"), false}, //
-	}
-	for _, tc := range cases {
-		if got := Compatible(reg, tc.annotation, tc.expr); got != tc.want {
-			t.Errorf("Compatible(%s, %s) = %v, want %v", tc.annotation, tc.expr, got, tc.want)
-		}
-	}
-}
-
 func TestMethodResult(t *testing.T) {
 	reg := builtin.Default()
 	cases := []struct {

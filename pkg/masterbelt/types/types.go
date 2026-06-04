@@ -89,31 +89,6 @@ func Fits(reg *builtin.Registry, t ir.Type, v *big.Int) bool {
 	return true
 }
 
-// Compatible reports whether an annotation and an initializer's inferred type
-// agree: both integer (so the default int adapts to any sized integer), both
-// boolean, or the same concrete type — the last of which lets a string (or any
-// non-numeric primitive) annotation accept a matching initializer. The value
-// range is checked separately (Fits).
-func Compatible(reg *builtin.Registry, annotation, expr ir.Type) bool {
-	if (IsInteger(reg, annotation) && IsInteger(reg, expr)) ||
-		(IsBoolean(reg, annotation) && IsBoolean(reg, expr)) ||
-		sameBuiltin(annotation, expr) || sameNamed(annotation, expr) {
-		return true
-	}
-	// Two applications of the same generic constructor agree when their
-	// arguments do, so list<int> satisfies a list<int8> annotation (the
-	// elements' value ranges are checked separately).
-	if x, y, ok := sameAppShape(annotation, expr); ok {
-		for i := range x.Args {
-			if !Compatible(reg, x.Args[i], y.Args[i]) {
-				return false
-			}
-		}
-		return true
-	}
-	return false
-}
-
 // Assignable reports whether a value of type from may be used where type to is
 // expected: the same type, or the default integer flowing into any other
 // integer type (range-checked at the boundary, so an overflow is reported
