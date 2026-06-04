@@ -425,14 +425,17 @@ func check(e ast.Expr, s scope, sink *Sink) ir.Type {
 // parameter scope, each return value is checked against the declared result
 // type (or unified with the other returns when the annotation is omitted), and
 // a literal with neither a result annotation nor a return to infer one from is
-// reported as uninferable. The literal's type is funcLitType's — the signature,
-// with an omitted result synthesized from the body.
+// reported as uninferable. The signature it returns is built from the same
+// walk, so it agrees with funcLitType's (the silent twin over exprType)
+// without typing the body a second time.
 func checkFuncLit(lit *ast.FuncLit, s scope, sink *Sink) ir.Type {
 	reg := s.registry()
 	r := &TypeResolver{Reg: reg}
+	params := make([]ir.Type, len(lit.Params))
 	names := make(map[string]ir.Type, len(lit.Params))
-	for _, p := range lit.Params {
-		names[p.Name] = r.ResolveType(p.Type, nil)
+	for i, p := range lit.Params {
+		params[i] = r.ResolveType(p.Type, nil)
+		names[p.Name] = params[i]
 	}
 	body := funcScope{outer: s, params: names}
 
@@ -451,17 +454,22 @@ func checkFuncLit(lit *ast.FuncLit, s scope, sink *Sink) ir.Type {
 			sawReturn = true
 			got := check(stmt.Value, body, sink)
 			switch {
-			case got == ir.Invalid:
-				// Already reported (or reported elsewhere); do not pile on.
 			case want != nil:
-				if want != ir.Invalid && !types.Assignable(reg, got, want) {
+				// An Invalid return is already reported (or reported
+				// elsewhere); do not pile on.
+				if got != ir.Invalid && want != ir.Invalid && !types.Assignable(reg, got, want) {
 					sink.mismatch(stmt.Value, got, want)
 				}
 			case unified == nil:
 				unified = got
+			case unified == ir.Invalid || got == ir.Invalid:
+				// An Invalid return poisons the synthesis — the same outcome
+				// returnedType reaches through Unify — without a report.
+				unified = ir.Invalid
 			default:
 				if u := types.Unify(reg, unified, got); u == ir.Invalid {
 					sink.mismatch(stmt.Value, got, unified)
+					unified = ir.Invalid
 				} else {
 					unified = u
 				}
@@ -473,7 +481,14 @@ func checkFuncLit(lit *ast.FuncLit, s scope, sink *Sink) ir.Type {
 	if lit.Result == nil && !sawReturn {
 		sink.uninferableResult(lit)
 	}
-	return funcLitType(lit, s)
+	result := want
+	if lit.Result == nil {
+		result = unified
+		if result == nil {
+			result = ir.Invalid
+		}
+	}
+	return &ir.Func{Params: params, Result: result}
 }
 
 // typesList renders the receiver and argument types as "recv, arg, ..." for the

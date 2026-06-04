@@ -178,6 +178,11 @@ func TestFuncLitResultSynthesis(t *testing.T) {
 		if got := Expr(tc.lit, env).String(); got != tc.want {
 			t.Errorf("%s: Expr = %s, want %s", tc.name, got, tc.want)
 		}
+		// The checking walk types the literal identically (and a nil sink is
+		// silent), so the pure and reporting walks cannot drift apart.
+		if got := Check(tc.lit, env, nil).String(); got != tc.want {
+			t.Errorf("%s: Check = %s, want %s", tc.name, got, tc.want)
+		}
 	}
 }
 
@@ -272,6 +277,29 @@ func TestCheckFuncLitBody(t *testing.T) {
 	Check(funcLit([]*ast.ParamDef{x}, namedType("int"), ret(ident("missing"))), env, r6.sink())
 	if len(r6.mismatches) != 0 {
 		t.Errorf("invalid return re-reported: %v", r6.mismatches)
+	}
+
+	// A bare expression statement's operator error is reported too.
+	var r7 report
+	Check(funcLit([]*ast.ParamDef{x}, namedType("int"),
+		ast.NewExprStmt(binary(ident("x"), "anan", ident("x")), nil),
+		ret(ident("x")),
+	), env, r7.sink())
+	if len(r7.methods) != 1 || r7.methods[0] != "anan" {
+		t.Errorf("expr-stmt operator error: methods = %v, want [anan]", r7.methods)
+	}
+
+	// An error inside a nested literal's body surfaces through the outer walk,
+	// and only once.
+	var r8 report
+	inner := funcLit([]*ast.ParamDef{param("y", namedType("int"))}, nil,
+		ret(binary(ident("y"), "anan", intLit("1"))))
+	Check(funcLit([]*ast.ParamDef{x}, nil, ret(inner)), env, r8.sink())
+	if len(r8.methods) != 1 || r8.methods[0] != "anan" {
+		t.Errorf("nested body operator error: methods = %v, want [anan]", r8.methods)
+	}
+	if len(r8.mismatches) != 0 {
+		t.Errorf("nested invalid result re-reported: %v", r8.mismatches)
 	}
 }
 
