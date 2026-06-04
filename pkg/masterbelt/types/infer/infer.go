@@ -4,6 +4,14 @@
 // the pure algebra over a type value (no syntax), infer applies that algebra to
 // the tree.
 //
+// One walk (exprType) types every expression. The forms shared by every context
+// — int, string, and boolean literals, collection literals, and method calls —
+// are typed here uniformly; the forms whose meaning depends on context — a value
+// name, the receiver self, a record field access, a conversion, the null literal
+// — are delegated to a scope. A constant initializer (Expr/Decl) and a method
+// body (Body) are the same walk over two scopes, so the collection and method
+// rules are written once.
+//
 // Inference reads name resolution and declaration types through an Env, so it
 // has no dependency on the semantic query engine — the engine supplies a
 // memoizing Env, but the rules here are a pure function of the AST and that
@@ -38,6 +46,18 @@ type Env interface {
 	Registry() *builtin.Registry
 }
 
+// scope is the typing context an expression is walked in. It owns the registry
+// (so method and collection rules can reach the builtin types) and types the
+// context-specific leaf forms, recursing into sub-expressions through the same
+// walk (exprType) so it sees the scope's own rules.
+type scope interface {
+	registry() *builtin.Registry
+	// leaf types an expression form whose meaning is context-specific — a value
+	// name, self, a field access, a conversion, the null literal — returning
+	// ir.Invalid when the form is not meaningful in this scope.
+	leaf(e ast.Expr) ir.Type
+}
+
 // Decl is the type rule for a declaration: an annotation gives a concrete type,
 // otherwise the type is inferred from the initializer expression. It reads other
 // declarations' types through env so a memoizing engine can track the
@@ -52,10 +72,17 @@ func Decl(decl *ast.ConstDecl, env Env) ir.Type {
 	return Expr(decl.Value, env)
 }
 
-// Expr infers the type of an expression: an integer literal is int and a
-// boolean literal is bool, a value reference inherits its referent's type, and a
-// method call's type comes from the builtin method rules (types.MethodResult).
+// Expr infers the type of a constant initializer: an integer literal is int, a
+// string literal string, a boolean literal bool, a value reference inherits its
+// referent's type, and a method call's type comes from the builtin method rules
+// (types.MethodResult).
 func Expr(e ast.Expr, env Env) ir.Type {
+	return exprType(e, constScope{env})
+}
+
+// exprType is the one inference walk. The shared forms are typed here; the
+// context-specific leaves go through scope.leaf.
+func exprType(e ast.Expr, s scope) ir.Type {
 	switch e := e.(type) {
 	case *ast.IntLit:
 		return &ir.Builtin{Name: "int"}
@@ -64,25 +91,21 @@ func Expr(e ast.Expr, env Env) ir.Type {
 	case *ast.BoolLit:
 		return &ir.Builtin{Name: "bool"}
 	case *ast.CollectionLit:
-		return collectionType(e, env)
-	case *ast.Identifier:
-		if target := env.Resolve(e); target != nil {
-			return env.TypeOf(target)
-		}
-		return ir.Invalid
+		return collectionType(e, s)
 	case *ast.CallExpr:
-		member, ok := e.Callee.(*ast.MemberExpr)
-		if !ok {
-			return ir.Invalid
+		// A call through a member access is a method call; any other callee is a
+		// context-specific form (a conversion in a method body, otherwise nothing).
+		if member, ok := e.Callee.(*ast.MemberExpr); ok {
+			recv := exprType(member.Receiver, s)
+			args := make([]ir.Type, len(e.Arguments))
+			for i, a := range e.Arguments {
+				args[i] = exprType(a, s)
+			}
+			return types.MethodResult(s.registry(), recv, member.Member.Name, args)
 		}
-		recv := Expr(member.Receiver, env)
-		args := make([]ir.Type, len(e.Arguments))
-		for i, a := range e.Arguments {
-			args[i] = Expr(a, env)
-		}
-		return types.MethodResult(env.Registry(), recv, member.Member.Name, args)
+		return s.leaf(e)
 	default:
-		return ir.Invalid
+		return s.leaf(e)
 	}
 }
 
@@ -91,11 +114,11 @@ func Expr(e ast.Expr, env Env) ir.Type {
 // literal has no entries to infer from, so its type comes from the annotation,
 // not from here — it returns ir.Invalid. A literal whose entries do not unify
 // (mismatched element types) is ir.Invalid too.
-func collectionType(e *ast.CollectionLit, env Env) ir.Type {
+func collectionType(e *ast.CollectionLit, s scope) ir.Type {
 	if len(e.Entries) == 0 {
 		return ir.Invalid
 	}
-	reg := env.Registry()
+	reg := s.registry()
 	if e.IsMap() {
 		def, ok := reg.Lookup("map")
 		if !ok {
@@ -103,7 +126,7 @@ func collectionType(e *ast.CollectionLit, env Env) ir.Type {
 		}
 		keyT, valT := ir.Type(nil), ir.Type(nil)
 		for i, entry := range e.Entries {
-			k, v := Expr(entry.Key, env), Expr(entry.Value, env)
+			k, v := exprType(entry.Key, s), exprType(entry.Value, s)
 			if i == 0 {
 				keyT, valT = k, v
 			} else {
@@ -121,7 +144,7 @@ func collectionType(e *ast.CollectionLit, env Env) ir.Type {
 	}
 	var elemT ir.Type
 	for i, entry := range e.Entries {
-		t := Expr(entry.Value, env)
+		t := exprType(entry.Value, s)
 		if i == 0 {
 			elemT = t
 		} else {
@@ -132,6 +155,111 @@ func collectionType(e *ast.CollectionLit, env Env) ir.Type {
 		return ir.Invalid
 	}
 	return &ir.App{Def: def, Args: []ir.Type{elemT}}
+}
+
+// constScope types a constant initializer: the only context-specific form is a
+// value reference, whose type is its referent's. Self, field access, a
+// conversion, and the null literal are not meaningful in a constant, so they are
+// ir.Invalid.
+type constScope struct{ env Env }
+
+func (s constScope) registry() *builtin.Registry { return s.env.Registry() }
+
+func (s constScope) leaf(e ast.Expr) ir.Type {
+	if id, ok := e.(*ast.Identifier); ok {
+		if target := s.env.Resolve(id); target != nil {
+			return s.env.TypeOf(target)
+		}
+	}
+	return ir.Invalid
+}
+
+// BodyScope types a method body: the receiver type (Self), the parameter types
+// (Params), and the type universe (Universe) a conversion resolves against,
+// alongside the registry.
+type BodyScope struct {
+	Reg      *builtin.Registry
+	Universe map[string]*ir.TypeDef
+	Self     ir.Type
+	Params   map[string]ir.Type
+}
+
+// Body infers the type of a method-body expression: self, a parameter, a
+// literal, a record field access, a type conversion (T(x)), or a method call
+// (the form operators desugar to). An unresolvable expression is ir.Invalid.
+func Body(e ast.Expr, s BodyScope) ir.Type { return exprType(e, s) }
+
+func (s BodyScope) registry() *builtin.Registry { return s.Reg }
+
+func (s BodyScope) leaf(e ast.Expr) ir.Type {
+	switch e := e.(type) {
+	case *ast.SelfExpr:
+		return s.Self
+	case *ast.NullLit:
+		return &ir.Builtin{Name: "null"}
+	case *ast.Identifier:
+		if t, ok := s.Params[e.Name]; ok {
+			return t
+		}
+		return ir.Invalid
+	case *ast.MemberExpr:
+		// A member access used as a value is a record field access.
+		return fieldType(exprType(e.Receiver, s), e.Member.Name)
+	case *ast.CallExpr:
+		// A non-method call whose callee names a type is a conversion T(x).
+		if id, ok := e.Callee.(*ast.Identifier); ok {
+			if _, isParam := s.Params[id.Name]; !isParam {
+				if t := s.lookupType(id.Name); t != ir.Invalid {
+					return t
+				}
+			}
+		}
+		return ir.Invalid
+	default:
+		return ir.Invalid
+	}
+}
+
+// lookupType resolves a type name (a conversion callee) to its type, against the
+// body's universe of declared types and then the builtin registry.
+func (s BodyScope) lookupType(name string) ir.Type {
+	if d, ok := s.Universe[name]; ok {
+		if d.Builtin {
+			return &ir.Builtin{Name: name}
+		}
+		return &ir.Named{Def: d}
+	}
+	if _, ok := s.Reg.Lookup(name); ok {
+		return &ir.Builtin{Name: name}
+	}
+	return ir.Invalid
+}
+
+// fieldType returns the type of a record's field, following named types to their
+// underlying record.
+func fieldType(recv ir.Type, name string) ir.Type {
+	rec := recordOf(recv)
+	if rec == nil {
+		return ir.Invalid
+	}
+	for _, f := range rec.Fields {
+		if f.Name == name {
+			return f.Type
+		}
+	}
+	return ir.Invalid
+}
+
+func recordOf(t ir.Type) *ir.Record {
+	switch t := t.(type) {
+	case *ir.Record:
+		return t
+	case *ir.Named:
+		if t.Def != nil {
+			return recordOf(t.Def.Body)
+		}
+	}
+	return nil
 }
 
 // Check type-checks an expression, reporting the innermost method call whose
@@ -159,7 +287,7 @@ func Check(e ast.Expr, env Env, report func(node ast.Node, method, operands stri
 				Check(entry.Value, env, report)
 			}
 		}
-		return collectionType(e, env)
+		return collectionType(e, constScope{env})
 	case *ast.Identifier:
 		if t := env.Resolve(e); t != nil {
 			return env.TypeOf(t)
