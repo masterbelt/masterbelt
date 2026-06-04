@@ -99,3 +99,22 @@ func TestCompletionDedupesNames(t *testing.T) {
 		t.Errorf("got %d completion items for A, want 1", n)
 	}
 }
+
+func TestCompletionInAssertCondition(t *testing.T) {
+	// An assert's condition is a value position: constants and the value
+	// keywords are offered, type names are not the candidates.
+	src := "/// the maximum\nconst Max: int64 = 100\nassert Max > 0\n"
+	doc := testView(src)
+
+	offset := strings.Index(src, "assert Max") + len("assert Ma")
+	got := byLabel(completion(doc, offset).Items)
+
+	for _, want := range []string{"Max", "true", "false", "null", "fn"} {
+		if _, ok := got[want]; !ok {
+			t.Errorf("assert-condition completion missing %q", want)
+		}
+	}
+	if d := got["Max"].Detail; d != ": int64" {
+		t.Errorf("Max detail = %q, want %q", d, ": int64")
+	}
+}

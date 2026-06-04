@@ -223,7 +223,7 @@ func contextKind(t cst.Tree) (isType, set bool) {
 		return true, true
 	case cst.Initializer, cst.BinaryExpr, cst.UnaryExpr, cst.MemberExpr, cst.CallExpr,
 		cst.NameRef, cst.Literal, cst.SelfExpr, cst.CollectionLit, cst.MapEntry, cst.ReturnStmt,
-		cst.ParenExpr:
+		cst.ParenExpr, cst.AssertDecl:
 		return false, true
 	default:
 		return false, false

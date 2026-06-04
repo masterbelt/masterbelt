@@ -66,7 +66,8 @@ func TestToDiagnosticsEmptyIsNonNil(t *testing.T) {
 }
 
 func TestDocumentSymbols(t *testing.T) {
-	doc := testView("const MaxLevel: int64 = 100\nconst Min = 0\n")
+	// The assert contributes no symbol: it has no name to outline.
+	doc := testView("const MaxLevel: int64 = 100\nconst Min = 0\nassert MaxLevel > Min\n")
 	syms := documentSymbols(doc)
 	if len(syms) != 2 {
 		t.Fatalf("got %d symbols, want 2", len(syms))

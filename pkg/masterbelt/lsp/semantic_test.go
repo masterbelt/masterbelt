@@ -109,3 +109,29 @@ func TestSemanticTokensQualifiedTypeName(t *testing.T) {
 		t.Errorf("type tokens = %+v, want %+v", typed, want)
 	}
 }
+
+func TestSemanticTokensAssert(t *testing.T) {
+	// assert is a keyword like const; the condition's names and literals
+	// classify as in any other expression.
+	doc := abstract.NewDocument([]byte("const X = 1\nassert X > 0\n"))
+	got := decode(semanticTokens(doc).Data)
+
+	want := []decodedToken{
+		{0, 0, 5, stKeyword, 0},                           // const
+		{0, 6, 1, stVariable, smDeclaration | smReadonly}, // X (declared name)
+		{0, 8, 1, stOperator, 0},                          // =
+		{0, 10, 1, stNumber, 0},                           // 1
+		{1, 0, 6, stKeyword, 0},                           // assert
+		{1, 7, 1, stVariable, smReadonly},                 // X (reference)
+		{1, 11, 1, stNumber, 0},                           // 0
+	}
+
+	if len(got) != len(want) {
+		t.Fatalf("got %d tokens, want %d:\n got:  %+v\n want: %+v", len(got), len(want), got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("token[%d] = %+v, want %+v", i, got[i], want[i])
+		}
+	}
+}

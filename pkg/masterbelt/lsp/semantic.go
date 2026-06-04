@@ -94,7 +94,7 @@ func semanticTokens(doc *abstract.Document) *protocol.SemanticTokens {
 // no colour (whitespace, newlines, EOF, illegal bytes).
 func classifyToken(kind token.Kind, parent cst.Kind) (tokenType, mods int, ok bool) {
 	switch kind {
-	case token.Const, token.Pub:
+	case token.Const, token.Pub, token.Assert:
 		return stKeyword, 0, true
 	case token.LineComment, token.BlockComment, token.DocComment:
 		return stComment, 0, true
