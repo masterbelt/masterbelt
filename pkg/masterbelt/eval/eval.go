@@ -12,6 +12,7 @@
 package eval
 
 import (
+	"maps"
 	"math/big"
 
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
@@ -54,13 +55,29 @@ func Decl(decl *ast.ConstDecl, env Env) *ir.Constant {
 // evaluated. Reading references through env lets the engine track dependencies
 // and reuse its cycle guard.
 func Expr(e ast.Expr, env Env) *ir.Constant {
-	return evalExpr(e, env, nil)
+	return evalExpr(e, evalCtx{env: env})
 }
 
-// evalExpr folds an expression, resolving an identifier first against locals —
-// the parameter bindings of the enclosing function literals, nil at the top
-// level — and then against the environment's declarations.
-func evalExpr(e ast.Expr, env Env, locals map[string]*ir.Constant) *ir.Constant {
+// Predicate folds a refinement predicate with the self keyword bound to self.
+// The semantic layer uses it to check that a constant's value satisfies its
+// type's where-clause. It returns nil when the predicate cannot be folded.
+func Predicate(pred ast.Expr, self *ir.Constant, env Env) *ir.Constant {
+	return evalExpr(pred, evalCtx{env: env, self: self})
+}
+
+// evalCtx carries the evaluation context through the recursive fold: the
+// driver's environment, the local bindings of the enclosing function literals
+// (nil at the top level), and the value the self keyword folds to (refinement
+// predicates; nil where self has no value).
+type evalCtx struct {
+	env    Env
+	locals map[string]*ir.Constant
+	self   *ir.Constant
+}
+
+// evalExpr folds an expression, resolving an identifier first against the
+// context's locals and then against the environment's declarations.
+func evalExpr(e ast.Expr, ctx evalCtx) *ir.Constant {
 	switch e := e.(type) {
 	case *ast.IntLit:
 		n, ok := new(big.Int).SetString(e.Text, 10)
@@ -72,25 +89,29 @@ func evalExpr(e ast.Expr, env Env, locals map[string]*ir.Constant) *ir.Constant 
 		return ir.StringConstant(e.Value)
 	case *ast.BoolLit:
 		return ir.BoolConstant(e.Value)
+	case *ast.SelfExpr:
+		// The bound self value, or nil outside a self-binding context (a method
+		// body is not folded here yet).
+		return ctx.self
 	case *ast.CollectionLit:
-		return collection(e, env, locals)
+		return collection(e, ctx)
 	case *ast.FuncLit:
 		// A function literal folds to a closure over the bindings in scope, so it
 		// can be applied later (by list.map) or stored in a constant.
-		return ir.FuncConstant(e, locals)
+		return ir.FuncConstant(e, ctx.locals)
 	case *ast.Identifier:
-		if v, ok := locals[e.Name]; ok {
+		if v, ok := ctx.locals[e.Name]; ok {
 			return v
 		}
-		if target := env.Resolve(e); target != nil {
-			return env.ValueOf(target)
+		if target := ctx.env.Resolve(e); target != nil {
+			return ctx.env.ValueOf(target)
 		}
 		return nil
 	case *ast.MemberExpr:
 		// A member access on a namespace import (geo.Origin) folds to the
 		// referenced declaration's value.
-		if target := env.ResolveMember(e); target != nil {
-			return env.ValueOf(target)
+		if target := ctx.env.ResolveMember(e); target != nil {
+			return ctx.env.ValueOf(target)
 		}
 		return nil
 	case *ast.CallExpr:
@@ -98,12 +119,12 @@ func evalExpr(e ast.Expr, env Env, locals map[string]*ir.Constant) *ir.Constant 
 		if !ok {
 			return nil
 		}
-		recv := evalExpr(member.Receiver, env, locals)
+		recv := evalExpr(member.Receiver, ctx)
 		args := make([]*ir.Constant, len(e.Arguments))
 		for i, a := range e.Arguments {
-			args[i] = evalExpr(a, env, locals)
+			args[i] = evalExpr(a, ctx)
 		}
-		return call(env, recv, member.Member.Name, args)
+		return call(ctx.env, recv, member.Member.Name, args)
 	default:
 		return nil
 	}
@@ -112,16 +133,16 @@ func evalExpr(e ast.Expr, env Env, locals map[string]*ir.Constant) *ir.Constant 
 // collection folds a collection literal: each entry's value (and key, for a map)
 // is folded, in order. It returns nil if any element is unevaluated, so a
 // collection with an unfoldable element does not fold to a partial value.
-func collection(e *ast.CollectionLit, env Env, locals map[string]*ir.Constant) *ir.Constant {
+func collection(e *ast.CollectionLit, ctx evalCtx) *ir.Constant {
 	entries := make([]ir.ConstEntry, 0, len(e.Entries))
 	for _, entry := range e.Entries {
 		var key *ir.Constant
 		if entry.Key != nil {
-			if key = evalExpr(entry.Key, env, locals); key == nil {
+			if key = evalExpr(entry.Key, ctx); key == nil {
 				return nil
 			}
 		}
-		val := evalExpr(entry.Value, env, locals)
+		val := evalExpr(entry.Value, ctx)
 		if val == nil {
 			return nil
 		}
@@ -199,9 +220,7 @@ func apply(env Env, fn *ir.Constant, args []*ir.Constant) *ir.Constant {
 		return nil
 	}
 	locals := make(map[string]*ir.Constant, len(fn.Captured)+len(args))
-	for k, v := range fn.Captured {
-		locals[k] = v
-	}
+	maps.Copy(locals, fn.Captured)
 	for i, p := range fn.Fn.Params {
 		locals[p.Name] = args[i]
 	}
@@ -210,7 +229,9 @@ func apply(env Env, fn *ir.Constant, args []*ir.Constant) *ir.Constant {
 			if ret.Value == nil {
 				return nil
 			}
-			return evalExpr(ret.Value, env, locals)
+			// A function body sees its parameters and captures, never an outer
+			// self: a literal has no receiver.
+			return evalExpr(ret.Value, evalCtx{env: env, locals: locals})
 		}
 	}
 	return nil
