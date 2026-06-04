@@ -79,7 +79,7 @@ type scope interface {
 // pass resolves it again with reporting enabled.
 func Decl(decl *ast.ConstDecl, env Env) ir.Type {
 	if decl.Type != nil {
-		r := &TypeResolver{Reg: env.Registry(), Defs: env.Universe(), Qualified: env.QualifiedType}
+		r := &TypeResolver{Defs: env.Universe(), Qualified: env.QualifiedType}
 		return r.ResolveType(decl.Type, nil)
 	}
 	if decl.Value == nil {
@@ -129,7 +129,7 @@ func exprType(e ast.Expr, s scope) ir.Type {
 // values, typed in a funcScope over s; an omitted parameter type is ir.Invalid
 // here (only a checking context can supply it).
 func funcLitType(e *ast.FuncLit, s scope) ir.Type {
-	r := &TypeResolver{Reg: s.registry(), Defs: s.universe(), Qualified: s.qualified()}
+	r := &TypeResolver{Defs: s.universe(), Qualified: s.qualified()}
 	params := make([]ir.Type, len(e.Params))
 	names := make(map[string]ir.Type, len(e.Params))
 	for i, p := range e.Params {
@@ -320,17 +320,15 @@ func (s BodyScope) leaf(e ast.Expr) ir.Type {
 	}
 }
 
-// lookupType resolves a type name (a conversion callee) to its type, against the
-// body's universe of declared types and then the builtin registry.
+// lookupType resolves a type name (a conversion callee) to its type against
+// the body's universe — which carries the prelude beneath the declared and
+// imported types, so there is no second source to consult.
 func (s BodyScope) lookupType(name string) ir.Type {
 	if d, ok := s.Universe[name]; ok {
 		if d.Builtin {
 			return &ir.Builtin{Name: name}
 		}
 		return &ir.Named{Def: d}
-	}
-	if _, ok := s.Reg.Lookup(name); ok {
-		return &ir.Builtin{Name: name}
 	}
 	return ir.Invalid
 }
@@ -556,7 +554,7 @@ func checkFuncLitAgainst(lit *ast.FuncLit, want *ir.Func, s scope, subst map[str
 		sink.arityMismatch(lit, len(lit.Params), len(want.Params))
 		return ir.Invalid
 	}
-	r := &TypeResolver{Reg: reg, Defs: s.universe(), Qualified: s.qualified()}
+	r := &TypeResolver{Defs: s.universe(), Qualified: s.qualified()}
 	params := make([]ir.Type, len(lit.Params))
 	names := make(map[string]ir.Type, len(lit.Params))
 	for i, p := range lit.Params {
@@ -886,7 +884,7 @@ func observe(sink *Sink, fired *bool) *Sink {
 // returns is built from the same walk, so it agrees with funcLitType's (the
 // silent twin over exprType) without typing the body a second time.
 func checkFuncLit(lit *ast.FuncLit, s scope, sink *Sink) ir.Type {
-	r := &TypeResolver{Reg: s.registry(), Defs: s.universe(), Qualified: s.qualified()}
+	r := &TypeResolver{Defs: s.universe(), Qualified: s.qualified()}
 	params := make([]ir.Type, len(lit.Params))
 	names := make(map[string]ir.Type, len(lit.Params))
 	for i, p := range lit.Params {

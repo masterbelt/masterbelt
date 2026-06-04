@@ -147,7 +147,7 @@ func funcLitTypesOf(db *database, fileID FileID, file *ast.File) map[*ast.FuncLi
 		// annotation resolved silently (its problems are already diagnosed).
 		annType := ir.Invalid
 		if decl.Type != nil {
-			r := &infer.TypeResolver{Reg: reg, Defs: q.universe(fileID), Qualified: qualified}
+			r := &infer.TypeResolver{Defs: q.universe(fileID), Qualified: qualified}
 			annType = r.ResolveType(decl.Type, nil)
 		}
 		if annType != ir.Invalid {
@@ -182,9 +182,10 @@ func (p *Program) QualifiedTypeNames(id FileID) map[string][]*ir.TypeDef {
 }
 
 // TypeNames returns the type definitions in scope in file, for an editor
-// completing a type name: the file's own type declarations, its imported
-// ones, and the builtin/prelude types, by name, with nearer declarations
-// shadowing.
+// completing a type name: the file's own type declarations, then the rest of
+// its universe — imports over the prelude — by name, with nearer declarations
+// shadowing. The universe is the complete answer: the prelude is its base
+// tier, not a second source.
 func (p *Program) TypeNames(id FileID) []*ir.TypeDef {
 	q := engineQueries{p.db}
 	seen := map[string]bool{}
@@ -202,9 +203,6 @@ func (p *Program) TypeNames(id FileID) []*ir.TypeDef {
 	uni := q.universe(id)
 	for _, name := range slices.Sorted(maps.Keys(uni)) {
 		add(uni[name])
-	}
-	for _, def := range p.db.reg.Defs() {
-		add(def)
 	}
 	return out
 }

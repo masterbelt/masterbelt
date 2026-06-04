@@ -15,6 +15,22 @@ import (
 //go:embed belt/*.belt
 var preludeFS embed.FS
 
+// The prelude is itself a masterbelt project: its manifest names the entry —
+// the barrel that re-exports every prelude module — and PreludeEntry mirrors
+// it (the prelude test pins the two together). Analyses treat every file as
+// implicitly importing the barrel's exports: `use * from "builtin.belt"`, as
+// it were.
+//
+//go:embed belt/masterbelt.toml
+var preludeManifest []byte
+
+// PreludeEntry is the prelude project's entry file: the barrel whose exported
+// surface every analyzed file implicitly imports.
+const PreludeEntry = "builtin.belt"
+
+// PreludeManifest returns the prelude project's manifest.
+func PreludeManifest() []byte { return preludeManifest }
+
 // PreludeSource is one prelude file: its base name and contents.
 type PreludeSource struct {
 	Name    string

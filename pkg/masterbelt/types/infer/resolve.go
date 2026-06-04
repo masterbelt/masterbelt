@@ -1,19 +1,17 @@
 package infer
 
 import (
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
 )
 
 // TypeResolver resolves a type expression to its ir.Type. Where Expr types a
 // value expression, TypeResolver types a type expression — the other syntax-to-
-// type direction. It resolves a name against a set of named definitions (a
-// file's own type declarations) and then the builtin registry, and reports an
-// unknown name through Report (nil to report nothing, as when resolving the
-// prelude or a constant annotation before diagnostics run).
+// type direction. It resolves a name against Defs — the file's whole universe:
+// its own type declarations shadowing its imports shadowing the prelude — and
+// reports an unknown name through Report (nil to report nothing, as when
+// resolving the prelude or a constant annotation before diagnostics run).
 type TypeResolver struct {
-	Reg  *builtin.Registry
 	Defs map[string]*ir.TypeDef
 	// Qualified resolves a namespace-qualified name (geo.Point) to the
 	// definition the namespace's target exports, or nil. A nil func means no
@@ -184,14 +182,9 @@ func (r *TypeResolver) FreeTypeVars(scope map[string]bool, ts ...ast.TypeExpr) [
 	return out
 }
 
-// lookup finds the definition of a type name: a named definition first, then a
-// builtin primitive.
+// lookup finds the definition of a type name in the universe. The prelude's
+// primitives are part of Defs like every other import, so there is no second
+// source to consult.
 func (r *TypeResolver) lookup(name string) *ir.TypeDef {
-	if def, ok := r.Defs[name]; ok {
-		return def
-	}
-	if def, ok := r.Reg.Lookup(name); ok {
-		return def
-	}
-	return nil
+	return r.Defs[name]
 }

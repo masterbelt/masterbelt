@@ -3,7 +3,6 @@ package semantic
 import (
 	"maps"
 
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
 )
@@ -217,16 +216,17 @@ func buildExports(q queries, file *ast.File, uses map[*ast.UseDecl]FileID, ownTy
 }
 
 // buildTypeDefs resolves a file's type declarations with its imported type
-// names in scope (its own declarations shadow them) and its namespace-
-// qualified names resolvable through q, and assembles the annotation universe
-// from the same definitions. imp must be the file's import table.
-func buildTypeDefs(q queries, file *ast.File, reg *builtin.Registry, imp importTable) typeDefs {
+// names and the prelude surface in scope (its own declarations shadow both)
+// and its namespace-qualified names resolvable through q, and assembles the
+// annotation universe from the same definitions. imp must be the file's
+// import table.
+func buildTypeDefs(q queries, file *ast.File, imp importTable) typeDefs {
 	td := typeDefs{byName: map[string]*ir.TypeDef{}, universe: map[string]*ir.TypeDef{}}
 	if file == nil {
 		return td
 	}
-	extern := externTypes(imp)
-	td.list = resolveTypes(file, reg, nil, nil, extern, qualifiedFrom(q, imp))
+	extern := outerTypes(q, imp)
+	td.list = resolveTypes(file, nil, nil, extern, qualifiedFrom(q, imp))
 	for _, def := range td.list {
 		if def.Name != "" {
 			if _, ok := td.byName[def.Name]; !ok {
@@ -239,10 +239,13 @@ func buildTypeDefs(q queries, file *ast.File, reg *builtin.Registry, imp importT
 	return td
 }
 
-// externTypes is an import table's unambiguous type bindings — the names a
-// file's type annotations may resolve to beyond its own declarations.
-func externTypes(imp importTable) map[string]*ir.TypeDef {
-	out := make(map[string]*ir.TypeDef, len(imp.types))
+// outerTypes is everything a file's type names resolve to beneath its own
+// declarations: the prelude surface with the import table's unambiguous type
+// bindings over it. Imports shadow the prelude; the file's own declarations
+// (layered on by the callers) shadow both.
+func outerTypes(q queries, imp importTable) map[string]*ir.TypeDef {
+	out := make(map[string]*ir.TypeDef, len(q.preludeTypes())+len(imp.types))
+	maps.Copy(out, q.preludeTypes())
 	for name, b := range imp.types {
 		if !b.ambiguous {
 			out[name] = b.target
@@ -269,5 +272,5 @@ func (db *database) computeExports(f FileID) exports {
 func (db *database) computeTypeDefs(f FileID) typeDefs {
 	in, _ := db.read(inputKey(f)).(fileInput)
 	imp, _ := db.read(importsKey(f)).(importTable)
-	return buildTypeDefs(engineQueries{db}, in.file, db.reg, imp)
+	return buildTypeDefs(engineQueries{db}, in.file, imp)
 }

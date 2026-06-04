@@ -2,61 +2,122 @@ package semantic
 
 import (
 	"fmt"
+	"path"
 	"sync"
 
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/parser/abstract"
+	"github.com/masterbelt/masterbelt/pkg/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
 )
 
-// universe is the registry every analysis types against: the standard registry
-// with the prelude loaded and installed, so primitive method signatures come
-// from the prelude. It is built once and shared, since it is read-only during
-// analysis. If the prelude fails to load (a build-time bug the prelude test
-// catches), analysis degrades to the bootstrap registry rather than crashing.
-var (
-	universeOnce sync.Once
-	universeReg  *builtin.Registry
-)
-
-func universe() *builtin.Registry {
-	universeOnce.Do(func() {
-		reg := builtin.Default()
-		if defs, err := LoadPrelude(reg); err == nil {
-			reg.Install(defs)
-		}
-		universeReg = reg
-	})
-	return universeReg
+// builtins is everything an analysis types against: the registry — the
+// primitives' value ranges and the native implementations of their operator
+// methods — and the prelude surface, the exported types of the prelude
+// project's entry barrel. Every file's universe layers the surface beneath
+// its imports, as if each file began with `use * from "builtin.belt"`.
+type builtins struct {
+	reg     *builtin.Registry
+	prelude map[string]*ir.TypeDef
 }
 
-// LoadPrelude parses the embedded prelude — the masterbelt source that declares
-// the builtin primitives — resolves its type declarations, and validates them
-// against the registry. It returns the prelude's type definitions (the builtin
-// primitives and the numeric union aliases) and an error if a prelude file does
-// not parse or if its declarations do not agree with the registry.
+// universe is the builtins every analysis types against, built once and
+// shared (read-only during analysis). If the prelude fails to load (a
+// build-time bug the prelude test catches), the surface degrades to the
+// bootstrap registry's definitions rather than crashing.
+var (
+	universeOnce sync.Once
+	universeVal  builtins
+)
+
+func universe() builtins {
+	universeOnce.Do(func() {
+		reg := builtin.Default()
+		u := builtins{reg: reg, prelude: registryTypes(reg)}
+		if surface, defs, err := LoadPrelude(reg); err == nil {
+			reg.Install(defs)
+			u.prelude = surface
+		}
+		universeVal = u
+	})
+	return universeVal
+}
+
+// registryTypes is a registry's definitions by name — the bootstrap surface
+// the prelude itself resolves against, and the fallback when it fails to
+// load.
+func registryTypes(reg *builtin.Registry) map[string]*ir.TypeDef {
+	defs := reg.Defs()
+	out := make(map[string]*ir.TypeDef, len(defs))
+	for _, d := range defs {
+		if d.Name != "" {
+			out[d.Name] = d
+		}
+	}
+	return out
+}
+
+// LoadPrelude analyzes the embedded prelude as the project it is: each module
+// declares primitives in the language, and the entry barrel (builtin.belt)
+// re-exports them all. Cross-module names bootstrap against the registry's
+// native definitions; the analysis is validated against the registry, so the
+// in-language declarations and the native descriptors cannot drift.
 //
-// The prelude declares the primitives' types and operator-method signatures in
-// the language; the registry supplies their value ranges and the native
-// implementations of those methods. Validating one against the other is what
-// keeps the in-language declarations and the native descriptors from drifting.
-func LoadPrelude(reg *builtin.Registry) ([]*ir.TypeDef, error) {
-	var defs []*ir.TypeDef
-	for _, src := range builtin.PreludeSources() {
+// It returns the barrel's exported types — the surface every analyzed file
+// implicitly imports — together with every resolved definition (for
+// installing into the registry, where value ranges and intrinsics live).
+func LoadPrelude(reg *builtin.Registry) (map[string]*ir.TypeDef, []*ir.TypeDef, error) {
+	sources := builtin.PreludeSources()
+	files := make(map[FileID]*ast.File, len(sources))
+	uses := map[FileID]map[*ast.UseDecl]FileID{}
+	ids := make([]FileID, 0, len(sources))
+	for _, src := range sources {
 		doc := abstract.NewDocument(src.Content)
 		var diags []diagnostic.Diagnostic
 		diags = append(diags, doc.Concrete().LexDiagnostics()...)
 		diags = append(diags, doc.Diagnostics()...)
 		if len(diags) > 0 {
-			return nil, fmt.Errorf("prelude %s: %s", src.Name, diags[0].Message)
+			return nil, nil, fmt.Errorf("prelude %s: %s", src.Name, diags[0].Message)
 		}
-		defs = append(defs, resolveTypes(doc.File(), reg, nil, nil, nil, nil)...)
+		id := FileID(src.Name)
+		files[id] = doc.File()
+		ids = append(ids, id)
+	}
+
+	// Wire the use declarations among the embedded files — the project
+	// layer's path rule (relative to the importer), without a disk.
+	for id, f := range files {
+		table := map[*ast.UseDecl]FileID{}
+		for _, u := range f.Uses {
+			target := FileID(path.Join(path.Dir(string(id)), u.Path))
+			if _, ok := files[target]; !ok {
+				return nil, nil, fmt.Errorf("prelude %s: use %q names no prelude file", id, u.Path)
+			}
+			table[u] = target
+		}
+		uses[id] = table
+	}
+
+	q := newDirectQueries(files, uses, builtins{reg: reg, prelude: registryTypes(reg)})
+	var defs []*ir.TypeDef
+	for _, id := range ids {
+		defs = append(defs, q.typeDefs(id)...)
 	}
 	if err := validatePrelude(reg, defs); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return defs, nil
+
+	// The surface is what the entry barrel exports; every registry primitive
+	// must be on it, or the implicit import would hide a primitive the
+	// runtime backs.
+	surface := q.exportsOf(FileID(builtin.PreludeEntry)).types
+	for _, name := range reg.Names() {
+		if _, ok := surface[name]; !ok {
+			return nil, nil, fmt.Errorf("prelude: %s does not re-export registry primitive %q", builtin.PreludeEntry, name)
+		}
+	}
+	return surface, defs, nil
 }
 
 // validatePrelude checks that the prelude and the registry agree: every registry

@@ -79,9 +79,13 @@ type queries interface {
 	// itself included — the fact behind cyclic_module: an import whose
 	// target's reachable set contains the importer closes a cycle.
 	reachableFrom(file FileID) map[FileID]bool
-	// registry returns the builtin registry the analysis types and evaluates
-	// against — the source of primitive types, their value ranges, and the
-	// native implementations of their operator methods.
+	// preludeTypes returns the implicit base tier of every file's universe:
+	// the prelude barrel's exported types, beneath the file's imports — as if
+	// each file began with `use * from "builtin.belt"`.
+	preludeTypes() map[string]*ir.TypeDef
+	// registry returns the builtin registry the analysis evaluates against —
+	// the primitives' value ranges and the native implementations of their
+	// operator methods. Their names resolve through preludeTypes, not here.
 	registry() *builtin.Registry
 }
 
@@ -229,7 +233,6 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 		annType := ir.Invalid
 		if decl.Type != nil {
 			r := &infer.TypeResolver{
-				Reg:       reg,
 				Defs:      q.universe(fileID),
 				Qualified: qualifiedFrom(q, q.importsOf(fileID)),
 				Report:    typeNameReporter(fileID, q, at, diags),
@@ -324,7 +327,7 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 	// pass re-resolves the declarations fresh and discards the definitions.
 	module.Types = q.typeDefs(fileID)
 	imp := q.importsOf(fileID)
-	resolveTypes(file, reg, at, diags, externTypes(imp), qualifiedFrom(q, imp))
+	resolveTypes(file, at, diags, outerTypes(q, imp), qualifiedFrom(q, imp))
 	checkMethodBodies(file, reg, module.Types, q.universe(fileID), qualifiedFrom(q, imp), exprSink(at, diags))
 
 	items := diags.Items()
@@ -531,6 +534,7 @@ type directQueries struct {
 	uses     map[FileID]map[*ast.UseDecl]FileID
 	declFile map[*ast.ConstDecl]FileID
 	reg      *builtin.Registry
+	prelude  map[string]*ir.TypeDef
 
 	syms map[FileID]map[string]*ast.ConstDecl
 	imps map[FileID]importTable
@@ -549,12 +553,13 @@ type directQueries struct {
 	reach map[FileID]map[FileID]bool
 }
 
-func newDirectQueries(files map[FileID]*ast.File, uses map[FileID]map[*ast.UseDecl]FileID, reg *builtin.Registry) *directQueries {
+func newDirectQueries(files map[FileID]*ast.File, uses map[FileID]map[*ast.UseDecl]FileID, u builtins) *directQueries {
 	d := &directQueries{
 		files:     files,
 		uses:      uses,
 		declFile:  map[*ast.ConstDecl]FileID{},
-		reg:       reg,
+		reg:       u.reg,
+		prelude:   u.prelude,
 		syms:      map[FileID]map[string]*ast.ConstDecl{},
 		imps:      map[FileID]importTable{},
 		exps:      map[FileID]exports{},
@@ -596,6 +601,8 @@ func memoize[K comparable, V any](memo map[K]V, running map[K]bool, key K, zero 
 	memo[key] = v
 	return v
 }
+
+func (d *directQueries) preludeTypes() map[string]*ir.TypeDef { return d.prelude }
 
 func (d *directQueries) registry() *builtin.Registry { return d.reg }
 
@@ -656,7 +663,7 @@ func (d *directQueries) exportsOf(f FileID) exports {
 
 func (d *directQueries) typeDefsOf(f FileID) typeDefs {
 	return memoize(d.defs, d.resolving, f, typeDefs{}, func() typeDefs {
-		return buildTypeDefs(d, d.files[f], d.reg, d.importsOf(f))
+		return buildTypeDefs(d, d.files[f], d.importsOf(f))
 	})
 }
 

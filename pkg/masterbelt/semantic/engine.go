@@ -121,6 +121,7 @@ type database struct {
 	declFile       map[*ast.ConstDecl]FileID    // which file each declaration sits in
 	shells         map[*ast.ConstDecl]*ir.Const // the identity ir.Const of every declaration
 	reg            *builtin.Registry
+	prelude        map[string]*ir.TypeDef // the implicit base tier: the prelude barrel's exported types
 	inputChangedAt map[FileID]int
 	memos          map[queryKey]*memo
 	stack          []*frame // active computations, for dependency capture
@@ -128,9 +129,10 @@ type database struct {
 	computed       map[queryKey]bool // keys (re)computed since the last setInput; for tests
 }
 
-func newDatabase(reg *builtin.Registry) *database {
+func newDatabase(u builtins) *database {
 	return &database{
-		reg:            reg,
+		reg:            u.reg,
+		prelude:        u.prelude,
 		files:          map[FileID]fileInput{},
 		declFile:       map[*ast.ConstDecl]FileID{},
 		shells:         map[*ast.ConstDecl]*ir.Const{},
@@ -583,5 +585,7 @@ func (e engineQueries) moduleOf(file FileID) assembly {
 	a, _ := e.db.read(moduleKey(file)).(assembly)
 	return a
 }
+
+func (e engineQueries) preludeTypes() map[string]*ir.TypeDef { return e.db.prelude }
 
 func (e engineQueries) registry() *builtin.Registry { return e.db.reg }

@@ -2,7 +2,6 @@ package semantic
 
 import (
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/lower"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/types/infer"
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
@@ -24,16 +23,16 @@ func unknownTypeReporter(at func(ast.Node) span, diags *diagnostic.List) func(as
 }
 
 // resolveTypes resolves the file's type declarations into ir.TypeDefs, in source
-// order. A type reference resolves against the builtin registry (the primitives),
-// the other declarations in the file (so a declaration may refer to a type
-// defined later in the file), extern — the file's imported type definitions,
-// which the file's own declarations shadow — and qualified, the lookup for
-// namespace-qualified names (geo.Point; nil when no namespaces are in scope).
+// order. A type reference resolves against the other declarations in the file
+// (so a declaration may refer to a type defined later in the file), extern —
+// everything beneath them: the file's imported type definitions over the
+// prelude surface — and qualified, the lookup for namespace-qualified names
+// (geo.Point; nil when no namespaces are in scope).
 //
 // Only the declarations' structure is resolved: the generic parameters and their
 // bounds, the defined body type, and each method's signature. Method bodies are
 // lowered to IR here (lower.Body) but not type-checked.
-func resolveTypes(file *ast.File, reg *builtin.Registry, at func(ast.Node) span, diags *diagnostic.List, extern map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef) []*ir.TypeDef {
+func resolveTypes(file *ast.File, at func(ast.Node) span, diags *diagnostic.List, extern map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef) []*ir.TypeDef {
 	if len(file.Types) == 0 {
 		return nil
 	}
@@ -67,7 +66,7 @@ func resolveTypes(file *ast.File, reg *builtin.Registry, at func(ast.Node) span,
 
 	// Second pass: resolve parameters, body, and method signatures, reporting any
 	// unknown type names.
-	r := &infer.TypeResolver{Reg: reg, Defs: defs, Qualified: qualified, Report: unknownTypeReporter(at, diags)}
+	r := &infer.TypeResolver{Defs: defs, Qualified: qualified, Report: unknownTypeReporter(at, diags)}
 	for i, td := range file.Types {
 		resolveDecl(r, td, out[i])
 	}
