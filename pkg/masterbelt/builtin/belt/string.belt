@@ -1,0 +1,11 @@
+pub type string = builtin impl {
+  pub extern fn eql(other: self): bool
+  pub extern fn neq(other: self): bool
+
+  pub extern fn lt(other: self): bool
+  pub extern fn lteq(other: self): bool
+  pub extern fn gt(other: self): bool
+  pub extern fn gteq(other: self): bool
+
+  pub extern fn add(other: self): self
+}

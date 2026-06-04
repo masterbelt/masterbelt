@@ -1,0 +1,8 @@
+pub type list<T> = builtin<T> impl {
+  pub extern fn len(): int
+
+  pub extern fn add(other: self): self
+
+  pub extern fn eql(other: self): bool
+  pub extern fn neq(other: self): bool
+}

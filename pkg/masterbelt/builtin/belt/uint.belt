@@ -1,0 +1,92 @@
+pub type unumeric = uint | uint8 | uint16 | uint32 | uint64
+
+pub type uint = builtin impl {
+  pub extern fn pos(): self
+
+  pub extern fn eql(other: self): bool
+  pub extern fn neq(other: self): bool
+
+  pub extern fn lt(other: self): bool
+  pub extern fn lteq(other: self): bool
+  pub extern fn gt(other: self): bool
+  pub extern fn gteq(other: self): bool
+
+  pub extern fn add(other: self): self
+  pub extern fn sub(other: self): self
+  pub extern fn mul(other: self): self
+  pub extern fn div(other: self): self
+  pub extern fn rem(other: self): self
+}
+
+pub type uint8 = builtin impl {
+  pub extern fn pos(): self
+
+  pub extern fn eql(other: self): bool
+  pub extern fn neq(other: self): bool
+
+  pub extern fn lt(other: self): bool
+  pub extern fn lteq(other: self): bool
+  pub extern fn gt(other: self): bool
+  pub extern fn gteq(other: self): bool
+
+  pub extern fn add(other: self): self
+  pub extern fn sub(other: self): self
+  pub extern fn mul(other: self): self
+  pub extern fn div(other: self): self
+  pub extern fn rem(other: self): self
+}
+
+pub type uint16 = builtin impl {
+  pub extern fn pos(): self
+
+  pub extern fn eql(other: self): bool
+  pub extern fn neq(other: self): bool
+
+  pub extern fn lt(other: self): bool
+  pub extern fn lteq(other: self): bool
+  pub extern fn gt(other: self): bool
+  pub extern fn gteq(other: self): bool
+
+  pub extern fn add(other: self): self
+  pub extern fn sub(other: self): self
+  pub extern fn mul(other: self): self
+  pub extern fn div(other: self): self
+  pub extern fn rem(other: self): self
+}
+
+pub type uint32 = builtin impl {
+  pub extern fn pos(): self
+
+  pub extern fn eql(other: self): bool
+  pub extern fn neq(other: self): bool
+
+  pub extern fn lt(other: self): bool
+  pub extern fn lteq(other: self): bool
+  pub extern fn gt(other: self): bool
+  pub extern fn gteq(other: self): bool
+
+  pub extern fn add(other: self): self
+  pub extern fn sub(other: self): self
+  pub extern fn mul(other: self): self
+  pub extern fn div(other: self): self
+  pub extern fn rem(other: self): self
+}
+
+pub type uint64 = builtin impl {
+  pub extern fn pos(): self
+
+  pub extern fn eql(other: self): bool
+  pub extern fn neq(other: self): bool
+
+  pub extern fn lt(other: self): bool
+  pub extern fn lteq(other: self): bool
+  pub extern fn gt(other: self): bool
+  pub extern fn gteq(other: self): bool
+
+  pub extern fn add(other: self): self
+  pub extern fn sub(other: self): self
+  pub extern fn mul(other: self): self
+  pub extern fn div(other: self): self
+  pub extern fn rem(other: self): self
+}
+

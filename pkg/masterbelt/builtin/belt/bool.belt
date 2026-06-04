@@ -1,0 +1,9 @@
+pub type bool = builtin impl {
+  pub extern fn not(): self
+
+  pub extern fn eql(other: self): self
+  pub extern fn neq(other: self): self
+
+  pub extern fn anan(other: self): self
+  pub extern fn oror(other: self): self
+}

@@ -1,0 +1,96 @@
+pub type snumeric = int | int8 | int16 | int32 | int64
+
+pub type int = builtin impl {
+  pub extern fn pos(): self
+  pub extern fn neg(): self
+
+  pub extern fn eql(other: self): bool
+  pub extern fn neq(other: self): bool
+
+  pub extern fn lt(other: self): bool
+  pub extern fn lteq(other: self): bool
+  pub extern fn gt(other: self): bool
+  pub extern fn gteq(other: self): bool
+
+  pub extern fn add(other: self): self
+  pub extern fn sub(other: self): self
+  pub extern fn mul(other: self): self
+  pub extern fn div(other: self): self
+  pub extern fn rem(other: self): self
+}
+
+pub type int8 = builtin impl {
+  pub extern fn pos(): self
+  pub extern fn neg(): self
+
+  pub extern fn eql(other: self): bool
+  pub extern fn neq(other: self): bool
+
+  pub extern fn lt(other: self): bool
+  pub extern fn lteq(other: self): bool
+  pub extern fn gt(other: self): bool
+  pub extern fn gteq(other: self): bool
+
+  pub extern fn add(other: self): self
+  pub extern fn sub(other: self): self
+  pub extern fn mul(other: self): self
+  pub extern fn div(other: self): self
+  pub extern fn rem(other: self): self
+}
+
+pub type int16 = builtin impl {
+  pub extern fn pos(): self
+  pub extern fn neg(): self
+
+  pub extern fn eql(other: self): bool
+  pub extern fn neq(other: self): bool
+
+  pub extern fn lt(other: self): bool
+  pub extern fn lteq(other: self): bool
+  pub extern fn gt(other: self): bool
+  pub extern fn gteq(other: self): bool
+
+  pub extern fn add(other: self): self
+  pub extern fn sub(other: self): self
+  pub extern fn mul(other: self): self
+  pub extern fn div(other: self): self
+  pub extern fn rem(other: self): self
+}
+
+pub type int32 = builtin impl {
+  pub extern fn pos(): self
+  pub extern fn neg(): self
+
+  pub extern fn eql(other: self): bool
+  pub extern fn neq(other: self): bool
+
+  pub extern fn lt(other: self): bool
+  pub extern fn lteq(other: self): bool
+  pub extern fn gt(other: self): bool
+  pub extern fn gteq(other: self): bool
+
+  pub extern fn add(other: self): self
+  pub extern fn sub(other: self): self
+  pub extern fn mul(other: self): self
+  pub extern fn div(other: self): self
+  pub extern fn rem(other: self): self
+}
+
+pub type int64 = builtin impl {
+  pub extern fn pos(): self
+  pub extern fn neg(): self
+
+  pub extern fn eql(other: self): bool
+  pub extern fn neq(other: self): bool
+
+  pub extern fn lt(other: self): bool
+  pub extern fn lteq(other: self): bool
+  pub extern fn gt(other: self): bool
+  pub extern fn gteq(other: self): bool
+
+  pub extern fn add(other: self): self
+  pub extern fn sub(other: self): self
+  pub extern fn mul(other: self): self
+  pub extern fn div(other: self): self
+  pub extern fn rem(other: self): self
+}
