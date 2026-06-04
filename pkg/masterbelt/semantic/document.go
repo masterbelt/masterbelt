@@ -18,6 +18,7 @@ type Document struct {
 	db     *database
 	module *ir.Module
 	diags  []diagnostic.Diagnostic
+	byDecl map[*ast.ConstDecl]*ir.Const // module consts indexed by their syntax, for Resolve
 }
 
 // NewDocument lexes, parses, lowers, and analyzes src, then keeps the analysis
@@ -53,12 +54,7 @@ func (d *Document) Resolve(id *ast.Identifier) *ir.Const {
 	if decl == nil {
 		return nil
 	}
-	for _, c := range d.module.Consts {
-		if c.Syntax == decl {
-			return c
-		}
-	}
-	return nil
+	return d.byDecl[decl]
 }
 
 // Buffer returns the underlying editable source buffer.
@@ -77,4 +73,8 @@ func (d *Document) refresh() {
 		positionsOf(d.ast.Concrete().Tree()),
 		engineQueries{d.db},
 	)
+	d.byDecl = make(map[*ast.ConstDecl]*ir.Const, len(d.module.Consts))
+	for _, c := range d.module.Consts {
+		d.byDecl[c.Syntax] = c
+	}
 }
