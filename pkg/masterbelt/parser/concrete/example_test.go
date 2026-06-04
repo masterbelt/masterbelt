@@ -43,7 +43,7 @@ const (
 //
 //	go test ./pkg/masterbelt/parser/concrete/ -update
 func TestExamples(t *testing.T) {
-	paths, err := filepath.Glob(filepath.Join(sharedExamples, "*.belt"))
+	paths, err := exampleSources(sharedExamples)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,7 +52,11 @@ func TestExamples(t *testing.T) {
 	}
 
 	for _, path := range paths {
-		t.Run(filepath.Base(path), func(t *testing.T) {
+		name, err := filepath.Rel(sharedExamples, path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Run(filepath.ToSlash(name), func(t *testing.T) {
 			src, err := os.ReadFile(path)
 			if err != nil {
 				t.Fatal(err)
@@ -62,9 +66,9 @@ func TestExamples(t *testing.T) {
 			root, diags := Parse(src)
 			got := formatSnapshot(file, root, diags)
 
-			snapshot := filepath.Join(snapshotDir, filepath.Base(path)+".cst")
+			snapshot := filepath.Join(snapshotDir, name+".cst")
 			if *update {
-				if err := os.MkdirAll(snapshotDir, 0o755); err != nil {
+				if err := os.MkdirAll(filepath.Dir(snapshot), 0o755); err != nil {
 					t.Fatal(err)
 				}
 				if err := os.WriteFile(snapshot, []byte(got), 0o644); err != nil {
@@ -78,8 +82,25 @@ func TestExamples(t *testing.T) {
 				t.Fatalf("missing snapshot (run: go test ./pkg/masterbelt/parser/concrete/ -update): %v", err)
 			}
 			if got != string(want) {
-				t.Errorf("snapshot mismatch for %s\n--- got ---\n%s--- want ---\n%s", filepath.Base(path), got, want)
+				t.Errorf("snapshot mismatch for %s\n--- got ---\n%s--- want ---\n%s", name, got, want)
 			}
 		})
 	}
+}
+
+// exampleSources lists every shared example .belt: the flat single-file
+// examples plus the files of project examples, which are directories holding a
+// masterbelt.toml and several .belt sources. Each project file goes through
+// this layer like any other example — the project as a whole only matters to
+// the layers that resolve across files.
+func exampleSources(dir string) ([]string, error) {
+	flat, err := filepath.Glob(filepath.Join(dir, "*.belt"))
+	if err != nil {
+		return nil, err
+	}
+	nested, err := filepath.Glob(filepath.Join(dir, "*", "*.belt"))
+	if err != nil {
+		return nil, err
+	}
+	return append(flat, nested...), nil
 }

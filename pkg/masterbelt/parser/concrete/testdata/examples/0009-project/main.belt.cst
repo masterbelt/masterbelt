@@ -1,0 +1,50 @@
+# tree
+File
+  Error
+    LineComment "// The project entry point: pulls geometry.belt in by namespace and by name."
+    Newline "\n"
+    Ident "use"
+    Whitespace " "
+    Ident "geo"
+    Whitespace " "
+    Ident "from"
+    Whitespace " "
+    String "\"geometry.belt\""
+    Newline "\n"
+    Ident "use"
+    Whitespace " "
+    LBrace "{"
+    Whitespace " "
+    Ident "Point"
+    Whitespace " "
+    RBrace "}"
+    Whitespace " "
+    Ident "from"
+    Whitespace " "
+    String "\"geometry.belt\""
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// A cross-file type annotation and a cross-file constant reference."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "start"
+    TypeClause
+      Colon ":"
+      Whitespace " "
+      TypeName
+        Ident "Point"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      MemberExpr
+        NameRef
+          Ident "geo"
+        Dot "."
+        Ident "Origin"
+  Newline "\n"
+  EOF ""
+# diagnostics
+error[masterbelt.parser.concrete.unexpected_token] 2:1 unexpected token: Ident

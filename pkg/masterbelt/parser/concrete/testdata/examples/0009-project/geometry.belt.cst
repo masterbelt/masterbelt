@@ -1,0 +1,45 @@
+# tree
+File
+  ConstDecl
+    LineComment "// The imported module: only pub declarations are visible across files."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Const "const"
+    Whitespace " "
+    Ident "Origin"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      Literal
+        Int "0"
+  TypeDecl
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Type "type"
+    Whitespace " "
+    Ident "Point"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    TypeName
+      Ident "int32"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// Not exported — main.belt must not be able to use this."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "hidden"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      Literal
+        Int "1"
+  Newline "\n"
+  EOF ""
+# diagnostics

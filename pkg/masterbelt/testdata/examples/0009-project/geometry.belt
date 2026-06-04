@@ -1,0 +1,6 @@
+// The imported module: only pub declarations are visible across files.
+pub const Origin = 0
+pub type Point = int32
+
+// Not exported — main.belt must not be able to use this.
+const hidden = 1

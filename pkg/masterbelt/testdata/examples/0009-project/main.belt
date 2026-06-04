@@ -1,0 +1,6 @@
+// The project entry point: pulls geometry.belt in by namespace and by name.
+use geo from "geometry.belt"
+use { Point } from "geometry.belt"
+
+// A cross-file type annotation and a cross-file constant reference.
+const start: Point = geo.Origin

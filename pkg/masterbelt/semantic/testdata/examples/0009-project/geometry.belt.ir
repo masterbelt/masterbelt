@@ -1,0 +1,11 @@
+Module
+  Const "Origin" pub
+    type int
+    value IntLiteral "0"
+    eval 0
+  Const "hidden"
+    type int
+    value IntLiteral "1"
+    eval 1
+  TypeDef "Point" pub
+    body int32

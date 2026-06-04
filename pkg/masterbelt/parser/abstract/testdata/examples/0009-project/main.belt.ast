@@ -1,0 +1,5 @@
+File
+  ConstDecl
+    name "start"
+    type Point
+    value (. Identifier "geo" Origin)
