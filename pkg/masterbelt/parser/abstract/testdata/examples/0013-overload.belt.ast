@@ -1,0 +1,54 @@
+File
+  ConstDecl
+    name "Base"
+    type Score
+    value IntLit "100"
+  ConstDecl
+    name "Bumped"
+    value (call (. Identifier "Base" merge) IntLit "50")
+  ConstDecl
+    name "Counted"
+    value (call (. Identifier "Base" merge) BoolLit true)
+  ConstDecl
+    name "Start"
+    type Level
+    value IntLit "1"
+  ConstDecl
+    name "Second"
+    value (call (. Identifier "Start" next))
+  ConstDecl
+    name "Fifth"
+    value (call (. Identifier "Start" next) IntLit "4")
+  TypeDecl
+    doc "A game score in points."
+    pub
+    name "Score"
+    body int32
+    method "merge"
+      doc "The score with points merged in."
+      pub
+      param points: self
+      result self
+      return (call (. self add) Identifier "points")
+    method "merge"
+      doc "Whether an active run with this score counts."
+      pub
+      param active: bool
+      result bool
+      return (call (. Identifier "active" anan) (call (. self gt) IntLit "0"))
+  TypeDecl
+    doc "A character level."
+    pub
+    name "Level"
+    body int8
+    method "next"
+      doc "The next level."
+      pub
+      result self
+      return (call (. self add) IntLit "1")
+    method "next"
+      doc "The level a number of steps up."
+      pub
+      param steps: self
+      result self
+      return (call (. self add) Identifier "steps")

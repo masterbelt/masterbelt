@@ -1,0 +1,46 @@
+Module
+  Const "Base"
+    type Score
+    value IntLiteral "100"
+    eval 100
+  Const "Bumped"
+    type Score
+    value Reference -> "Base".merge(IntLiteral "50")
+  Const "Counted"
+    type invalid
+    value Reference -> "Base".merge(BoolLiteral true)
+  Const "Start"
+    type Level
+    value IntLiteral "1"
+    eval 1
+  Const "Second"
+    type Level
+    value Reference -> "Start".next()
+  Const "Fifth"
+    type invalid
+    value Reference -> "Start".next(IntLiteral "4")
+  TypeDef "Score" pub
+    doc "A game score in points."
+    body int32
+    method "merge" pub
+      doc "The score with points merged in."
+      param points: self
+      result self
+      return self.add(ParamRef "points")
+    method "merge" pub
+      doc "Whether an active run with this score counts."
+      param active: bool
+      result bool
+      return ParamRef "active".anan(self.gt(IntLiteral "0"))
+  TypeDef "Level" pub
+    doc "A character level."
+    body int8
+    method "next" pub
+      doc "The next level."
+      result self
+      return self.add(IntLiteral "1")
+    method "next" pub
+      doc "The level a number of steps up."
+      param steps: self
+      result self
+      return self.add(ParamRef "steps")

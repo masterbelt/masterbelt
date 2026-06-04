@@ -1,0 +1,39 @@
+// Method overloading: one method name declared several times with
+// different parameter types (or arities); each call site picks the
+// signature its arguments fit.
+
+/// A game score in points.
+pub type Score = int32 impl {
+  /// The score with points merged in.
+  pub fn merge(points: self): self {
+    return self + points
+  }
+  /// Whether an active run with this score counts.
+  pub fn merge(active: bool): bool {
+    return active && self > 0
+  }
+}
+
+/// A character level.
+pub type Level = int8 impl {
+  /// The next level.
+  pub fn next(): self {
+    return self + 1
+  }
+  /// The level a number of steps up.
+  pub fn next(steps: self): self {
+    return self + steps
+  }
+}
+
+const Base: Score = 100
+// The integer argument picks merge(points: self).
+const Bumped = Base.merge(50)
+// The boolean argument picks merge(active: bool).
+const Counted = Base.merge(true)
+
+const Start: Level = 1
+// An empty argument list picks next().
+const Second = Start.next()
+// One argument picks next(steps: self).
+const Fifth = Start.next(4)

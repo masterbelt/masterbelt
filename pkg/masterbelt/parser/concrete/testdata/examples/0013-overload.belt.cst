@@ -1,0 +1,342 @@
+# tree
+File
+  TypeDecl
+    LineComment "// Method overloading: one method name declared several times with"
+    Newline "\n"
+    LineComment "// different parameter types (or arities); each call site picks the"
+    Newline "\n"
+    LineComment "// signature its arguments fit."
+    Newline "\n"
+    Newline "\n"
+    DocComment "/// A game score in points."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Type "type"
+    Whitespace " "
+    Ident "Score"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    TypeName
+      Ident "int32"
+    Whitespace " "
+    ImplBlock
+      Impl "impl"
+      Whitespace " "
+      LBrace "{"
+      MethodDecl
+        Newline "\n"
+        Whitespace "  "
+        DocComment "/// The score with points merged in."
+        Newline "\n"
+        Whitespace "  "
+        Pub "pub"
+        Whitespace " "
+        Fn "fn"
+        Whitespace " "
+        Ident "merge"
+        ParamList
+          LParen "("
+          Param
+            Ident "points"
+            Colon ":"
+            Whitespace " "
+            TypeName
+              Self "self"
+          RParen ")"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Self "self"
+        Whitespace " "
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            BinaryExpr
+              SelfExpr
+                Self "self"
+              Whitespace " "
+              Plus "+"
+              Whitespace " "
+              NameRef
+                Ident "points"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
+      MethodDecl
+        Newline "\n"
+        Whitespace "  "
+        DocComment "/// Whether an active run with this score counts."
+        Newline "\n"
+        Whitespace "  "
+        Pub "pub"
+        Whitespace " "
+        Fn "fn"
+        Whitespace " "
+        Ident "merge"
+        ParamList
+          LParen "("
+          Param
+            Ident "active"
+            Colon ":"
+            Whitespace " "
+            TypeName
+              Ident "bool"
+          RParen ")"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "bool"
+        Whitespace " "
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            BinaryExpr
+              NameRef
+                Ident "active"
+              Whitespace " "
+              AmpAmp "&&"
+              Whitespace " "
+              BinaryExpr
+                SelfExpr
+                  Self "self"
+                Whitespace " "
+                Gt ">"
+                Whitespace " "
+                Literal
+                  Int "0"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
+      Newline "\n"
+      RBrace "}"
+  TypeDecl
+    Newline "\n"
+    Newline "\n"
+    DocComment "/// A character level."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Type "type"
+    Whitespace " "
+    Ident "Level"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    TypeName
+      Ident "int8"
+    Whitespace " "
+    ImplBlock
+      Impl "impl"
+      Whitespace " "
+      LBrace "{"
+      MethodDecl
+        Newline "\n"
+        Whitespace "  "
+        DocComment "/// The next level."
+        Newline "\n"
+        Whitespace "  "
+        Pub "pub"
+        Whitespace " "
+        Fn "fn"
+        Whitespace " "
+        Ident "next"
+        ParamList
+          LParen "("
+          RParen ")"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Self "self"
+        Whitespace " "
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            BinaryExpr
+              SelfExpr
+                Self "self"
+              Whitespace " "
+              Plus "+"
+              Whitespace " "
+              Literal
+                Int "1"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
+      MethodDecl
+        Newline "\n"
+        Whitespace "  "
+        DocComment "/// The level a number of steps up."
+        Newline "\n"
+        Whitespace "  "
+        Pub "pub"
+        Whitespace " "
+        Fn "fn"
+        Whitespace " "
+        Ident "next"
+        ParamList
+          LParen "("
+          Param
+            Ident "steps"
+            Colon ":"
+            Whitespace " "
+            TypeName
+              Self "self"
+          RParen ")"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Self "self"
+        Whitespace " "
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            BinaryExpr
+              SelfExpr
+                Self "self"
+              Whitespace " "
+              Plus "+"
+              Whitespace " "
+              NameRef
+                Ident "steps"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
+      Newline "\n"
+      RBrace "}"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Base"
+    TypeClause
+      Colon ":"
+      Whitespace " "
+      TypeName
+        Ident "Score"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      Literal
+        Int "100"
+  ConstDecl
+    Newline "\n"
+    LineComment "// The integer argument picks merge(points: self)."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Bumped"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        MemberExpr
+          NameRef
+            Ident "Base"
+          Dot "."
+          Ident "merge"
+        LParen "("
+        Literal
+          Int "50"
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    LineComment "// The boolean argument picks merge(active: bool)."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Counted"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        MemberExpr
+          NameRef
+            Ident "Base"
+          Dot "."
+          Ident "merge"
+        LParen "("
+        Literal
+          True "true"
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Start"
+    TypeClause
+      Colon ":"
+      Whitespace " "
+      TypeName
+        Ident "Level"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      Literal
+        Int "1"
+  ConstDecl
+    Newline "\n"
+    LineComment "// An empty argument list picks next()."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Second"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        MemberExpr
+          NameRef
+            Ident "Start"
+          Dot "."
+          Ident "next"
+        LParen "("
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    LineComment "// One argument picks next(steps: self)."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Fifth"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        MemberExpr
+          NameRef
+            Ident "Start"
+          Dot "."
+          Ident "next"
+        LParen "("
+        Literal
+          Int "4"
+        RParen ")"
+  Newline "\n"
+  EOF ""
+# diagnostics
