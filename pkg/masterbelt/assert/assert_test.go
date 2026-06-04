@@ -55,7 +55,7 @@ func TestDiagram(t *testing.T) {
 			"comparison",
 			"const MaxLevel = 100\nconst MinLevel = 0\nassert MaxLevel < MinLevel\n",
 			"MaxLevel < MinLevel\n" +
-				"|        | |\n" +
+				"^        ^ ^\n" +
 				"100      | 0\n" +
 				"         false",
 		},
@@ -63,7 +63,7 @@ func TestDiagram(t *testing.T) {
 			"compound arithmetic",
 			"const Max = 100\nconst Min = 0\nassert Max - Min == 99\n",
 			"Max - Min == 99\n" +
-				"|   | |   |\n" +
+				"^   ^ ^   ^\n" +
 				"100 | 0   false\n" +
 				"    100",
 		},
@@ -71,7 +71,7 @@ func TestDiagram(t *testing.T) {
 			"unary over a grouping",
 			"const Max = 100\nconst Min = 0\nassert !(Max > Min)\n",
 			"!(Max > Min)\n" +
-				"| |   | |\n" +
+				"^ ^   ^ ^\n" +
 				"| 100 | 0\n" +
 				"false true",
 		},
@@ -79,7 +79,7 @@ func TestDiagram(t *testing.T) {
 			"strings",
 			"const Name = \"hi\"\nassert Name == \"yo\"\n",
 			"Name == \"yo\"\n" +
-				"|    |\n" +
+				"^    ^\n" +
 				"\"hi\" false",
 		},
 		{
@@ -88,7 +88,7 @@ func TestDiagram(t *testing.T) {
 			// intrinsic; the foldable map call still shows its value.
 			"assert [1, 2].map(fn(x) { return x * 2 }) == [1, 2]\n",
 			"[1, 2].map(fn(x) { return x * 2 }) == [1, 2]\n" +
-				"       |\n" +
+				"       ^\n" +
 				"       [2, 4]",
 		},
 		{
@@ -116,8 +116,9 @@ func TestDiagramSelf(t *testing.T) {
 	pred := file.Types[0].Where
 	got := assert.DiagramSelf(pred, ir.IntConstant(big.NewInt(70000)), fileEnv{file: file, reg: builtin.Default()})
 	want := "self >= 1 && self <= 65535\n" +
-		"|    |    |  |    |\n" +
-		"70000true |  70000false\n" +
+		"^    ^    ^  ^    ^\n" +
+		"|    true |  |    false\n" +
+		"70000     |  70000\n" +
 		"          false"
 	if got != want {
 		t.Errorf("diagram:\n%s\nwant:\n%s", got, want)

@@ -15,30 +15,31 @@ Module
     doc "The level range is not empty."
     eval true
       MaxLevel > MinLevel
-      |        | |
+      ^        ^ ^
       100      | 0
                true
   Assert "MinLevel == 0"
     eval true
       MinLevel == 0
-      |        |
+      ^        ^
       0        true
   Assert "MaxLevel - MinLevel == 100"
     eval true
       MaxLevel - MinLevel == 100
-      |        | |        |
+      ^        ^ ^        ^
       100      | 0        true
                100
   Assert "Enabled && !false"
     eval true
       Enabled && !false
-      |       |  |
+      ^       ^  ^
       true    |  true
               true
   Assert "MaxLevel > 0 && !(MinLevel > 0)"
     eval true
       MaxLevel > 0 && !(MinLevel > 0)
-      |        |   |  | |        |
-      100      true|  | 0        false
-                   |  true
-                   true
+      ^        ^   ^  ^ ^        ^
+      100      |   |  | 0        false
+               |   |  true
+               |   true
+               true

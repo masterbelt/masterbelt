@@ -134,7 +134,7 @@ func TestAssertHover(t *testing.T) {
 		}
 		want := "```\n" +
 			"assert Max > Min\n" +
-			"       |   | |\n" +
+			"       ^   ^ ^\n" +
 			"       100 | 0\n" +
 			"           true\n" +
 			"```"

@@ -3,7 +3,7 @@
 // of every sub-expression drawn beneath the place it appears.
 //
 //	MaxLevel < MinLevel
-//	|        | |
+//	^        ^ ^
 //	100      | 0
 //	         false
 //
@@ -26,9 +26,10 @@ import (
 )
 
 // Diagram renders the power-assert diagram for cond: the rendered condition
-// followed by a pipe row and the value rows. A sub-expression that does not
-// fold (or folds to a function value) contributes no row; with no foldable
-// sub-expressions at all the diagram is just the condition line.
+// followed by a caret row pointing at the anchors and the value rows. A
+// sub-expression that does not fold (or folds to a function value) contributes
+// no row; with no foldable sub-expressions at all the diagram is just the
+// condition line.
 func Diagram(cond ast.Expr, env eval.Env) string {
 	return DiagramSelf(cond, nil, env)
 }
@@ -65,18 +66,20 @@ type marker struct {
 	val string
 }
 
-// layout arranges the markers below the condition: first a row of pipes at
-// every column, then value rows packed greedily from the right — a value is
-// printed on the earliest row where it fits before the next marker's column,
-// and keeps a pipe on the rows above, so values never collide:
+// layout arranges the markers below the condition: first a row of carets
+// pointing up at every anchored column, then value rows packed greedily from
+// the right — a value is printed on the earliest row where it ends at least
+// one space before the next marker's column (so neighbouring values never
+// touch), and keeps a pipe on the rows above, so values never collide:
 //
-//	|   |   | |
-//	100 | 0   false
-//	    100
+//	^    ^    ^  ^    ^
+//	|    true |  |    false
+//	70000     |  70000
+//	          false
 func layout(markers []marker) []string {
 	row := newRow()
 	for _, m := range markers {
-		row.put(m.col, "|")
+		row.put(m.col, "^")
 	}
 	rows := []string{row.String()}
 
@@ -87,7 +90,7 @@ func layout(markers []marker) []string {
 		limit := int(^uint(0) >> 1) // the column the previous (righter) marker starts at
 		for i := len(pending) - 1; i >= 0; i-- {
 			m := pending[i]
-			if m.col+utf8.RuneCountInString(m.val) <= limit {
+			if m.col+utf8.RuneCountInString(m.val) < limit {
 				row.put(m.col, m.val)
 			} else {
 				row.put(m.col, "|")

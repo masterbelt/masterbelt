@@ -662,7 +662,7 @@ func TestAssertFailed(t *testing.T) {
 	// every sub-expression's folded value under the place it appears.
 	want := "assertion failed: Max < Min\n" +
 		"  Max < Min\n" +
-		"  |   | |\n" +
+		"  ^   ^ ^\n" +
 		"  100 | 0\n" +
 		"      false"
 	if diags[0].Message != want {
@@ -751,7 +751,7 @@ func TestAssertOutcomeInModule(t *testing.T) {
 		t.Errorf("assert = {Cond: %q, Held: %v}, want A > 0 holding", a.Cond, a.Held())
 	}
 	want := "A > 0\n" +
-		"| |\n" +
+		"^ ^\n" +
 		"1 true"
 	if a.Diagram != want {
 		t.Errorf("diagram:\n%s\nwant:\n%s", a.Diagram, want)
@@ -768,7 +768,7 @@ func TestAssertFailedWithDoc(t *testing.T) {
 	want := "assertion failed: Max < Min\n" +
 		"  the maximum dominates\n" +
 		"  Max < Min\n" +
-		"  |   | |\n" +
+		"  ^   ^ ^\n" +
 		"  100 | 0\n" +
 		"      false"
 	if diags[0].Message != want {
