@@ -131,8 +131,29 @@ func exprSink(at func(ast.Node) span, diags *diagnostic.List) *infer.Sink {
 // reference analysis and the oracle for the incremental Document.
 func Analyze(doc *abstract.Document) (*ir.Module, []diagnostic.Diagnostic) {
 	file := doc.File()
-	shells := constShells(map[FileID]*ast.File{soleFileID: file})
-	return assemble(soleFileID, file, positionsOf(doc.Concrete().Tree()), newDirectQueries(file, universe()), shells)
+	files := map[FileID]*ast.File{soleFileID: file}
+	q := newDirectQueries(files, nil, universe())
+	return assemble(soleFileID, file, positionsOf(doc.Concrete().Tree()), q, constShells(files))
+}
+
+// AnalyzeProgram resolves and types a whole program from scratch: every file
+// reachable from the entry, with the use targets the project layer resolved
+// for each. It is the reference analysis and the oracle the incremental
+// Program is checked against.
+func AnalyzeProgram(docs map[FileID]*abstract.Document, uses map[FileID]map[*ast.UseDecl]FileID) (map[FileID]*ir.Module, map[FileID][]diagnostic.Diagnostic) {
+	files := make(map[FileID]*ast.File, len(docs))
+	for id, doc := range docs {
+		files[id] = doc.File()
+	}
+	q := newDirectQueries(files, uses, universe())
+	shells := constShells(files)
+
+	modules := make(map[FileID]*ir.Module, len(docs))
+	diags := make(map[FileID][]diagnostic.Diagnostic, len(docs))
+	for id, doc := range docs {
+		modules[id], diags[id] = assemble(id, doc.File(), positionsOf(doc.Concrete().Tree()), q, shells)
+	}
+	return modules, diags
 }
 
 // constShells creates the identity ir.Const for every declaration across the
@@ -497,49 +518,93 @@ func isNamespace(fileID FileID, id *ast.Identifier, q queries) bool {
 
 // --- direct (reference) query implementation --------------------------------
 
-// directQueries computes the semantic facts directly, memoizing types and values
-// within a single analysis (and guarding against cycles). It carries no state
-// across analyses — that is the incremental engine's job. This implementation
-// serves a single file (it ignores the file dimension); the multi-file oracle
-// (P-2 M5e) generalizes it.
+// directQueries computes the semantic facts directly, memoizing within a
+// single analysis and guarding against cycles — both the per-declaration kind
+// (an un-annotated reference chain) and the per-file kind (a module cycle
+// re-entering its own tables, mirroring the engine's running guard). It
+// carries no state across analyses — that is the incremental engine's job.
 type directQueries struct {
-	file      *ast.File
-	reg       *builtin.Registry
-	syms      map[string]*ast.ConstDecl
-	defs      *typeDefs
+	files    map[FileID]*ast.File
+	uses     map[FileID]map[*ast.UseDecl]FileID
+	declFile map[*ast.ConstDecl]FileID
+	reg      *builtin.Registry
+
+	syms map[FileID]map[string]*ast.ConstDecl
+	imps map[FileID]*importTable
+	exps map[FileID]*exports
+	defs map[FileID]*typeDefs
+
+	importing map[FileID]bool
+	exporting map[FileID]bool
+	resolving map[FileID]bool
+
 	typeMemo  map[*ast.ConstDecl]ir.Type
 	typing    map[*ast.ConstDecl]bool
 	valueMemo map[*ast.ConstDecl]*ir.Constant
 	valuing   map[*ast.ConstDecl]bool
 }
 
-func newDirectQueries(file *ast.File, reg *builtin.Registry) *directQueries {
-	return &directQueries{
-		file:      file,
+func newDirectQueries(files map[FileID]*ast.File, uses map[FileID]map[*ast.UseDecl]FileID, reg *builtin.Registry) *directQueries {
+	d := &directQueries{
+		files:     files,
+		uses:      uses,
+		declFile:  map[*ast.ConstDecl]FileID{},
 		reg:       reg,
+		syms:      map[FileID]map[string]*ast.ConstDecl{},
+		imps:      map[FileID]*importTable{},
+		exps:      map[FileID]*exports{},
+		defs:      map[FileID]*typeDefs{},
+		importing: map[FileID]bool{},
+		exporting: map[FileID]bool{},
+		resolving: map[FileID]bool{},
 		typeMemo:  map[*ast.ConstDecl]ir.Type{},
 		typing:    map[*ast.ConstDecl]bool{},
 		valueMemo: map[*ast.ConstDecl]*ir.Constant{},
 		valuing:   map[*ast.ConstDecl]bool{},
 	}
+	for id, f := range files {
+		if f == nil {
+			continue
+		}
+		for _, decl := range f.Decls {
+			d.declFile[decl] = id
+		}
+	}
+	return d
 }
 
 func (d *directQueries) registry() *builtin.Registry { return d.reg }
 
-func (d *directQueries) symbols() map[string]*ast.ConstDecl {
-	if d.syms == nil {
-		d.syms = buildSymbols(d.file)
+func (d *directQueries) symbols(f FileID) map[string]*ast.ConstDecl {
+	if s, ok := d.syms[f]; ok {
+		return s
 	}
-	return d.syms
+	s := buildSymbols(d.files[f])
+	d.syms[f] = s
+	return s
 }
 
-func (d *directQueries) resolve(_ FileID, id *ast.Identifier) *ast.ConstDecl {
-	return d.symbols()[id.Name]
+func (d *directQueries) resolve(f FileID, id *ast.Identifier) *ast.ConstDecl {
+	if decl := d.symbols(f)[id.Name]; decl != nil {
+		return decl
+	}
+	if b, ok := d.importsOf(f).values[id.Name]; ok && !b.ambiguous {
+		return b.target
+	}
+	return nil
 }
 
-func (d *directQueries) ambiguousImport(FileID, *ast.Identifier) bool { return false }
+func (d *directQueries) ambiguousImport(f FileID, id *ast.Identifier) bool {
+	if d.symbols(f)[id.Name] != nil {
+		return false
+	}
+	b, ok := d.importsOf(f).values[id.Name]
+	return ok && b.ambiguous
+}
 
-func (d *directQueries) resolveMember(FileID, *ast.MemberExpr) *ast.ConstDecl { return nil }
+func (d *directQueries) resolveMember(f FileID, m *ast.MemberExpr) *ast.ConstDecl {
+	return resolveMemberThrough(d, f, m)
+}
 
 func (d *directQueries) typeOf(decl *ast.ConstDecl) ir.Type {
 	if t, done := d.typeMemo[decl]; done {
@@ -549,7 +614,7 @@ func (d *directQueries) typeOf(decl *ast.ConstDecl) ir.Type {
 		return ir.Invalid // cycle
 	}
 	d.typing[decl] = true
-	t := infer.Decl(decl, typeEnv{q: d, file: soleFileID})
+	t := infer.Decl(decl, typeEnv{q: d, file: d.declFile[decl]})
 	d.typing[decl] = false
 	d.typeMemo[decl] = t
 	return t
@@ -563,52 +628,56 @@ func (d *directQueries) valueOf(decl *ast.ConstDecl) *ir.Constant {
 		return nil // cycle
 	}
 	d.valuing[decl] = true
-	v := computeValue(soleFileID, decl, d)
+	v := computeValue(d.declFile[decl], decl, d)
 	d.valuing[decl] = false
 	d.valueMemo[decl] = v
 	return v
 }
 
-// ownTypeDefs lazily resolves the file's type declarations, silently; the
-// reporting pass in assemble re-resolves them for diagnostics.
-func (d *directQueries) ownTypeDefs() typeDefs {
-	if d.defs == nil {
-		td := typeDefs{byName: map[string]*ir.TypeDef{}, universe: map[string]*ir.TypeDef{}}
-		td.list = resolveTypes(d.file, d.reg, nil, nil, nil)
-		for _, def := range td.list {
-			if def.Name != "" {
-				if _, ok := td.byName[def.Name]; !ok {
-					td.byName[def.Name] = def
-				}
-			}
-		}
-		td.universe = td.byName
-		d.defs = &td
+func (d *directQueries) importsOf(f FileID) importTable {
+	if t, ok := d.imps[f]; ok {
+		return *t
 	}
-	return *d.defs
+	if d.importing[f] {
+		return importTable{}
+	}
+	d.importing[f] = true
+	t := buildImports(d, d.files[f], d.uses[f])
+	delete(d.importing, f)
+	d.imps[f] = &t
+	return t
 }
 
-func (d *directQueries) typeDefs(FileID) []*ir.TypeDef { return d.ownTypeDefs().list }
-
-func (d *directQueries) universe(FileID) map[string]*ir.TypeDef { return d.ownTypeDefs().universe }
-
-func (d *directQueries) exportsOf(FileID) exports {
-	out := exports{consts: map[string]*ast.ConstDecl{}, types: map[string]*ir.TypeDef{}}
-	for _, decl := range d.file.Decls {
-		if decl.Public && decl.Name != "" {
-			if _, ok := out.consts[decl.Name]; !ok {
-				out.consts[decl.Name] = decl
-			}
-		}
+func (d *directQueries) exportsOf(f FileID) exports {
+	if e, ok := d.exps[f]; ok {
+		return *e
 	}
-	for name, def := range d.ownTypeDefs().byName {
-		if def.Public {
-			out.types[name] = def
-		}
+	if d.exporting[f] {
+		return exports{}
 	}
-	return out
+	d.exporting[f] = true
+	e := buildExports(d, d.files[f], d.uses[f], d.typeDefsOf(f).byName)
+	delete(d.exporting, f)
+	d.exps[f] = &e
+	return e
 }
 
-func (d *directQueries) importsOf(FileID) importTable { return importTable{} }
+func (d *directQueries) typeDefsOf(f FileID) typeDefs {
+	if td, ok := d.defs[f]; ok {
+		return *td
+	}
+	if d.resolving[f] {
+		return typeDefs{}
+	}
+	d.resolving[f] = true
+	td := buildTypeDefs(d.files[f], d.reg, d.importsOf(f))
+	delete(d.resolving, f)
+	d.defs[f] = &td
+	return td
+}
 
-func (d *directQueries) usesOf(FileID) map[*ast.UseDecl]FileID { return nil }
+func (d *directQueries) typeDefs(f FileID) []*ir.TypeDef { return d.typeDefsOf(f).list }
+
+func (d *directQueries) universe(f FileID) map[string]*ir.TypeDef { return d.typeDefsOf(f).universe }
+
+func (d *directQueries) usesOf(f FileID) map[*ast.UseDecl]FileID { return d.uses[f] }

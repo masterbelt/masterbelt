@@ -110,6 +110,43 @@ func TestCheckWithoutProject(t *testing.T) {
 	}
 }
 
+func TestCheckMultiFileProject(t *testing.T) {
+	// The whole import closure analyzes as one program: a clean cross-file
+	// reference passes, and an error inside an imported file is reported at
+	// that file's own path.
+	root := t.TempDir()
+	write(t, root, "masterbelt.toml", "entry = \"main.belt\"\n")
+	write(t, root, "main.belt", "use geo from \"geometry.belt\"\nconst start = geo.Origin\n")
+	write(t, root, "geometry.belt", "pub const Origin = 0\n")
+
+	if out, err := execCheck(t, root); err != nil {
+		t.Fatalf("check = %v\n%s", err, out)
+	}
+
+	write(t, root, "geometry.belt", "pub const Origin = Broken\n")
+	out, err := execCheck(t, root)
+	if err == nil {
+		t.Fatalf("check succeeded, want an error\n%s", out)
+	}
+	if !strings.Contains(out, "geometry.belt:1:20: error[masterbelt.semantic.undefined_name]: undefined name: Broken") {
+		t.Errorf("output = %q, want the error anchored in geometry.belt", out)
+	}
+}
+
+func TestCheckUseNotFound(t *testing.T) {
+	root := t.TempDir()
+	write(t, root, "masterbelt.toml", "entry = \"main.belt\"\n")
+	write(t, root, "main.belt", "use ghost from \"missing.belt\"\nconst a = 1\n")
+
+	out, err := execCheck(t, root)
+	if err == nil {
+		t.Fatalf("check succeeded, want an error\n%s", out)
+	}
+	if !strings.Contains(out, "error[masterbelt.semantic.use_not_found]: imported file not found: missing.belt") {
+		t.Errorf("output = %q, want the use_not_found diagnostic", out)
+	}
+}
+
 func TestCheckJSON(t *testing.T) {
 	root := t.TempDir()
 	write(t, root, "masterbelt.toml", "entry = \"main.belt\"\n")

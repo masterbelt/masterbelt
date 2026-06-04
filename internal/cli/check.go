@@ -12,6 +12,7 @@ import (
 	"github.com/masterbelt/masterbelt/pkg/project"
 	"github.com/masterbelt/masterbelt/pkg/project/config"
 	"github.com/masterbelt/masterbelt/pkg/source"
+	"github.com/masterbelt/masterbelt/pkg/source/ast"
 	"github.com/spf13/cobra"
 )
 
@@ -85,8 +86,34 @@ func runCheck(rep reporter.Reporter, target, profile string) error {
 	if err != nil {
 		return err
 	}
-	entry := proj.EntryFile()
-	return checkSource(rep, entry.Path, entry.Data)
+	return checkProject(rep, proj)
+}
+
+// checkProject analyzes every file of the project — the closure of the entry
+// profile's imports — as one program, and reports each file's lexer, parser,
+// and semantic diagnostics, files in id order.
+func checkProject(rep reporter.Reporter, proj *project.Project) error {
+	prog := semantic.NewProgram()
+	for _, f := range proj.Files() {
+		uses := make(map[*ast.UseDecl]semantic.FileID, len(f.Uses))
+		for u, target := range f.Uses {
+			uses[u] = semantic.FileID(target)
+		}
+		prog.SetFile(semantic.FileID(f.ID), f.AST, uses)
+	}
+	prog.Refresh()
+
+	for _, f := range proj.Files() {
+		var raw []diagnostic.Diagnostic
+		raw = append(raw, f.AST.Concrete().LexDiagnostics()...)
+		raw = append(raw, f.AST.Diagnostics()...)
+		raw = append(raw, prog.Diagnostics(semantic.FileID(f.ID))...)
+		rep.Report(source.NewFile(displayPath(f.Path), f.Data), raw)
+	}
+	if n := rep.Errors(); n > 0 {
+		return fmt.Errorf("%d error(s)", n)
+	}
+	return nil
 }
 
 // loadProject opens the project at or above dir with the given profile ("" is

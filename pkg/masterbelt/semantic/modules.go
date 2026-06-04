@@ -3,6 +3,7 @@ package semantic
 import (
 	"maps"
 
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
 )
@@ -91,20 +92,21 @@ func resolveMemberThrough(q queries, file FileID, m *ast.MemberExpr) *ast.ConstD
 	return q.exportsOf(target).consts[m.Member.Name]
 }
 
-// computeImports builds a file's import table from its use declarations and
-// the exports of their targets.
-func (db *database) computeImports(f FileID) importTable {
-	in, _ := db.read(inputKey(f)).(fileInput)
+// buildImports builds a file's import table from its use declarations and the
+// exports of their targets, read through q so both query implementations (the
+// engine, which tracks the reads as dependencies, and the direct oracle) share
+// one rule.
+func buildImports(q queries, file *ast.File, uses map[*ast.UseDecl]FileID) importTable {
 	t := importTable{
 		values:     map[string]binding[*ast.ConstDecl]{},
 		types:      map[string]binding[*ir.TypeDef]{},
 		namespaces: map[string]FileID{},
 	}
-	if in.file == nil {
+	if file == nil {
 		return t
 	}
-	for _, u := range in.file.Uses {
-		target, ok := in.uses[u]
+	for _, u := range file.Uses {
+		target, ok := uses[u]
 		if !ok {
 			continue // unresolved: assemble reports use_not_found at the decl
 		}
@@ -114,7 +116,7 @@ func (db *database) computeImports(f FileID) importTable {
 				t.namespaces[u.Namespace] = target
 			}
 		case u.Star:
-			exp, _ := db.read(exportsKey(target)).(exports)
+			exp := q.exportsOf(target)
 			for name, decl := range exp.consts {
 				addBinding(t.values, name, decl)
 			}
@@ -122,7 +124,7 @@ func (db *database) computeImports(f FileID) importTable {
 				addBinding(t.types, name, def)
 			}
 		default:
-			exp, _ := db.read(exportsKey(target)).(exports)
+			exp := q.exportsOf(target)
 			for _, name := range u.Names {
 				if decl, ok := exp.consts[name]; ok {
 					addBinding(t.values, name, decl)
@@ -137,39 +139,38 @@ func (db *database) computeImports(f FileID) importTable {
 	return t
 }
 
-// computeExports builds a file's public surface: its own pub declarations,
-// then its pub use re-exports in source order. A pub namespace import
-// re-exports nothing — a namespace binding is file-local.
-func (db *database) computeExports(f FileID) exports {
+// buildExports builds a file's public surface: its own pub declarations (with
+// ownTypes its resolved public type definitions), then its pub use re-exports
+// in source order. A pub namespace import re-exports nothing — a namespace
+// binding is file-local.
+func buildExports(q queries, file *ast.File, uses map[*ast.UseDecl]FileID, ownTypes map[string]*ir.TypeDef) exports {
 	out := exports{consts: map[string]*ast.ConstDecl{}, types: map[string]*ir.TypeDef{}}
-	in, _ := db.read(inputKey(f)).(fileInput)
-	if in.file == nil {
+	if file == nil {
 		return out
 	}
 
-	for _, decl := range in.file.Decls {
+	for _, decl := range file.Decls {
 		if decl.Public && decl.Name != "" {
 			if _, ok := out.consts[decl.Name]; !ok {
 				out.consts[decl.Name] = decl
 			}
 		}
 	}
-	defs, _ := db.read(typeDefsKey(f)).(typeDefs)
-	for name, def := range defs.byName {
+	for name, def := range ownTypes {
 		if def.Public {
 			out.types[name] = def
 		}
 	}
 
-	for _, u := range in.file.Uses {
+	for _, u := range file.Uses {
 		if !u.Public || u.Namespace != "" {
 			continue
 		}
-		target, ok := in.uses[u]
+		target, ok := uses[u]
 		if !ok {
 			continue
 		}
-		exp, _ := db.read(exportsKey(target)).(exports)
+		exp := q.exportsOf(target)
 		reexport := func(name string) {
 			if decl, ok := exp.consts[name]; ok {
 				if _, taken := out.consts[name]; !taken {
@@ -201,25 +202,17 @@ func (db *database) computeExports(f FileID) exports {
 	return out
 }
 
-// computeTypeDefs resolves a file's type declarations with its imported type
+// buildTypeDefs resolves a file's type declarations with its imported type
 // names in scope (its own declarations shadow them), and assembles the
-// annotation universe from the same definitions.
-func (db *database) computeTypeDefs(f FileID) typeDefs {
+// annotation universe from the same definitions. imp must be the file's import
+// table.
+func buildTypeDefs(file *ast.File, reg *builtin.Registry, imp importTable) typeDefs {
 	td := typeDefs{byName: map[string]*ir.TypeDef{}, universe: map[string]*ir.TypeDef{}}
-	in, _ := db.read(inputKey(f)).(fileInput)
-	if in.file == nil {
+	if file == nil {
 		return td
 	}
-
-	imp, _ := db.read(importsKey(f)).(importTable)
-	extern := make(map[string]*ir.TypeDef, len(imp.types))
-	for name, b := range imp.types {
-		if !b.ambiguous {
-			extern[name] = b.target
-		}
-	}
-
-	td.list = resolveTypes(in.file, db.reg, nil, nil, extern)
+	extern := externTypes(imp)
+	td.list = resolveTypes(file, reg, nil, nil, extern)
 	for _, def := range td.list {
 		if def.Name != "" {
 			if _, ok := td.byName[def.Name]; !ok {
@@ -230,4 +223,37 @@ func (db *database) computeTypeDefs(f FileID) typeDefs {
 	maps.Copy(td.universe, extern)
 	maps.Copy(td.universe, td.byName) // own definitions shadow imports
 	return td
+}
+
+// externTypes is an import table's unambiguous type bindings — the names a
+// file's type annotations may resolve to beyond its own declarations.
+func externTypes(imp importTable) map[string]*ir.TypeDef {
+	out := make(map[string]*ir.TypeDef, len(imp.types))
+	for name, b := range imp.types {
+		if !b.ambiguous {
+			out[name] = b.target
+		}
+	}
+	return out
+}
+
+// computeImports, computeExports, and computeTypeDefs are the engine-side
+// query functions: they read the inputs (and each other) through the database
+// so every read is captured as a dependency, then delegate to the shared
+// builders.
+func (db *database) computeImports(f FileID) importTable {
+	in, _ := db.read(inputKey(f)).(fileInput)
+	return buildImports(engineQueries{db}, in.file, in.uses)
+}
+
+func (db *database) computeExports(f FileID) exports {
+	in, _ := db.read(inputKey(f)).(fileInput)
+	defs, _ := db.read(typeDefsKey(f)).(typeDefs)
+	return buildExports(engineQueries{db}, in.file, in.uses, defs.byName)
+}
+
+func (db *database) computeTypeDefs(f FileID) typeDefs {
+	in, _ := db.read(inputKey(f)).(fileInput)
+	imp, _ := db.read(importsKey(f)).(importTable)
+	return buildTypeDefs(in.file, db.reg, imp)
 }

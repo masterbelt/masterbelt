@@ -2,11 +2,15 @@ package semantic
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/parser/abstract"
+	"github.com/masterbelt/masterbelt/pkg/project"
+	"github.com/masterbelt/masterbelt/pkg/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
 )
 
@@ -18,67 +22,98 @@ const (
 )
 
 // TestExamples analyzes every shared example and compares the IR dump against
-// this package's committed snapshot. Refresh with:
+// this package's committed snapshot. A flat <name>.belt analyzes standalone; a
+// project directory (masterbelt.toml + several .belt) analyzes as one program
+// — through both the reference AnalyzeProgram and the incremental Program,
+// which must agree — and snapshots as one <name>.ir with a section per file.
+// Refresh with:
 //
 //	go test ./pkg/masterbelt/semantic/ -update
 func TestExamples(t *testing.T) {
-	paths, err := exampleSources(sharedExamples)
+	entries, err := os.ReadDir(sharedExamples)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(paths) == 0 {
-		t.Fatal("no example .belt files found")
+	if len(entries) == 0 {
+		t.Fatal("no examples found")
 	}
 
-	for _, path := range paths {
-		name, err := filepath.Rel(sharedExamples, path)
-		if err != nil {
-			t.Fatal(err)
+	for _, entry := range entries {
+		name := entry.Name()
+		switch {
+		case entry.IsDir():
+			t.Run(name, func(t *testing.T) {
+				compareSnapshot(t, name+".ir", dumpProject(t, filepath.Join(sharedExamples, name)))
+			})
+		case strings.HasSuffix(name, ".belt"):
+			t.Run(name, func(t *testing.T) {
+				src, err := os.ReadFile(filepath.Join(sharedExamples, name))
+				if err != nil {
+					t.Fatal(err)
+				}
+				module, _ := Analyze(abstract.NewDocument(src))
+				compareSnapshot(t, name+".ir", ir.Dump(module))
+			})
 		}
-		t.Run(filepath.ToSlash(name), func(t *testing.T) {
-			src, err := os.ReadFile(path)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			module, _ := Analyze(abstract.NewDocument(src))
-			got := ir.Dump(module)
-
-			snapshot := filepath.Join(snapshotDir, name+".ir")
-			if *update {
-				if err := os.MkdirAll(filepath.Dir(snapshot), 0o755); err != nil {
-					t.Fatal(err)
-				}
-				if err := os.WriteFile(snapshot, []byte(got), 0o644); err != nil {
-					t.Fatal(err)
-				}
-				return
-			}
-
-			want, err := os.ReadFile(snapshot)
-			if err != nil {
-				t.Fatalf("missing snapshot (run: go test ./pkg/masterbelt/semantic/ -update): %v", err)
-			}
-			if got != string(want) {
-				t.Errorf("snapshot mismatch for %s\n--- got ---\n%s--- want ---\n%s", name, got, want)
-			}
-		})
 	}
 }
 
-// exampleSources lists every shared example .belt: the flat single-file
-// examples plus the files of project examples, which are directories holding a
-// masterbelt.toml and several .belt sources. For now each project file is
-// analyzed standalone like any other example; the multi-file engine (P-2 M5)
-// re-designs this layer's snapshot unit to the whole project.
-func exampleSources(dir string) ([]string, error) {
-	flat, err := filepath.Glob(filepath.Join(dir, "*.belt"))
-	if err != nil {
-		return nil, err
+// dumpProject opens the example project, analyzes it twice — the from-scratch
+// oracle and the incremental engine — checks the two agree, and renders the
+// per-file modules in id order.
+func dumpProject(t *testing.T, dir string) string {
+	t.Helper()
+	proj, pdiags := project.Open(dir)
+	if pdiags.Len() > 0 {
+		t.Fatalf("project diagnostics: %v", pdiags.Items())
 	}
-	nested, err := filepath.Glob(filepath.Join(dir, "*", "*.belt"))
-	if err != nil {
-		return nil, err
+
+	docs := map[FileID]*abstract.Document{}
+	uses := map[FileID]map[*ast.UseDecl]FileID{}
+	prog := NewProgram()
+	for _, f := range proj.Files() {
+		id := FileID(f.ID)
+		fileUses := make(map[*ast.UseDecl]FileID, len(f.Uses))
+		for u, target := range f.Uses {
+			fileUses[u] = FileID(target)
+		}
+		docs[id] = f.AST
+		uses[id] = fileUses
+		prog.SetFile(id, f.AST, fileUses)
 	}
-	return append(flat, nested...), nil
+	prog.Refresh()
+	modules, _ := AnalyzeProgram(docs, uses)
+
+	var b strings.Builder
+	for _, id := range prog.Files() {
+		full := ir.Dump(modules[id])
+		incremental := ir.Dump(prog.Module(id))
+		if incremental != full {
+			t.Errorf("%s: incremental != full analysis\n--- incremental ---\n%s--- full ---\n%s", id, incremental, full)
+		}
+		fmt.Fprintf(&b, "# %s\n%s", id, full)
+	}
+	return b.String()
+}
+
+func compareSnapshot(t *testing.T, name, got string) {
+	t.Helper()
+	snapshot := filepath.Join(snapshotDir, name)
+	if *update {
+		if err := os.MkdirAll(filepath.Dir(snapshot), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(snapshot, []byte(got), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return
+	}
+
+	want, err := os.ReadFile(snapshot)
+	if err != nil {
+		t.Fatalf("missing snapshot (run: go test ./pkg/masterbelt/semantic/ -update): %v", err)
+	}
+	if got != string(want) {
+		t.Errorf("snapshot mismatch for %s\n--- got ---\n%s--- want ---\n%s", name, got, want)
+	}
 }

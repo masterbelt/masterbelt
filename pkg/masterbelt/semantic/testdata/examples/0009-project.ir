@@ -1,3 +1,4 @@
+# geometry.belt
 Module
   Const "Origin" pub
     type int
@@ -9,3 +10,9 @@ Module
     eval 1
   TypeDef "Point" pub
     body int32
+# main.belt
+Module
+  Const "start"
+    type Point
+    value Reference -> "Origin"
+    eval 0

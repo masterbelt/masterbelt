@@ -255,6 +255,28 @@ func TestProgramCyclicModule(t *testing.T) {
 	}
 }
 
+func TestProgramEarlyCutoffCrossFile(t *testing.T) {
+	// Editing a's exported constant re-analyzes its importer b, but a file
+	// that imports nothing from a is left untouched — the cross-file version
+	// of the early-cutoff guarantee.
+	p := buildProgram(map[string]string{
+		"a.belt": "pub const X = 1\n",
+		"b.belt": "use { X } from \"a.belt\"\nconst Y = X\n",
+		"c.belt": "pub const Z = 9\n",
+	})
+	zDecl := p.Document("c.belt").File().Decls[0]
+
+	p.SetFile("a.belt", abstract.NewDocument([]byte("pub const X = 2\n")), nil)
+	p.Refresh()
+
+	if _, eval := constInfo(p, "b.belt", "Y"); eval != "2" {
+		t.Errorf("Y = %s, want the new 2", eval)
+	}
+	if p.db.computed[typeOfKey(zDecl)] || p.db.computed[valueKey(zDecl)] {
+		t.Error("c.belt was re-analyzed; the edit to a.belt must not reach it")
+	}
+}
+
 func TestProgramIncrementalCrossFile(t *testing.T) {
 	// Editing an exported constant's body re-evaluates its importers; the
 	// settled type is unchanged, so importer types survive untouched.
