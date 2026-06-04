@@ -12,6 +12,9 @@ import (
 func Dump(f *File) string {
 	var b strings.Builder
 	b.WriteString("File\n")
+	for _, d := range f.Uses {
+		dumpUseDecl(&b, d)
+	}
 	for _, d := range f.Decls {
 		dumpConstDecl(&b, d)
 	}
@@ -19,6 +22,24 @@ func Dump(f *File) string {
 		dumpTypeDecl(&b, d)
 	}
 	return b.String()
+}
+
+func dumpUseDecl(b *strings.Builder, d *UseDecl) {
+	b.WriteString("  UseDecl\n")
+	if d.Public {
+		b.WriteString("    pub\n")
+	}
+	switch {
+	case d.Star:
+		b.WriteString("    target *\n")
+	case d.Namespace != "":
+		fmt.Fprintf(b, "    namespace %q\n", d.Namespace)
+	default:
+		for _, n := range d.Names {
+			fmt.Fprintf(b, "    name %q\n", n)
+		}
+	}
+	fmt.Fprintf(b, "    from %q\n", d.Path)
 }
 
 func dumpConstDecl(b *strings.Builder, d *ConstDecl) {

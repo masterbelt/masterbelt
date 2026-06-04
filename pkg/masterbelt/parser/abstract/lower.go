@@ -39,23 +39,26 @@ func Lower(src []byte) (*ast.File, []diagnostic.Diagnostic) {
 // (foreachDecl) but lowers through its cache instead.
 func lowerFile(root cst.Tree, buf source.Buffer) *ast.File {
 	rootNode, _ := root.Node()
+	var uses []*ast.UseDecl
 	var decls []*ast.ConstDecl
 	var types []*ast.TypeDecl
 	foreachDecl(root, func(child cst.Tree, green *cst.Node) {
 		switch green.Kind() {
+		case cst.UseDecl:
+			uses = append(uses, lowerUseDecl(child, buf))
 		case cst.ConstDecl:
 			decls = append(decls, lowerConstDecl(child, buf))
 		case cst.TypeDecl:
 			types = append(types, lowerTypeDecl(child, buf))
 		}
 	})
-	return ast.NewFile(decls, types, rootNode)
+	return ast.NewFile(uses, decls, types, rootNode)
 }
 
-// foreachDecl calls fn for each top-level declaration child of root (a ConstDecl
-// or a TypeDecl), in source order, passing the positioned child and its green
-// node. Trivia tokens, the EOF leaf, and unparsable Error regions are skipped:
-// they have no place in the abstract tree.
+// foreachDecl calls fn for each top-level declaration child of root (a
+// UseDecl, ConstDecl, or TypeDecl), in source order, passing the positioned
+// child and its green node. Trivia tokens, the EOF leaf, and unparsable Error
+// regions are skipped: they have no place in the abstract tree.
 func foreachDecl(root cst.Tree, fn func(child cst.Tree, green *cst.Node)) {
 	for _, child := range root.Children() {
 		node, ok := child.Node()
@@ -63,10 +66,61 @@ func foreachDecl(root cst.Tree, fn func(child cst.Tree, green *cst.Node)) {
 			continue
 		}
 		switch node.Kind() {
-		case cst.ConstDecl, cst.TypeDecl:
+		case cst.UseDecl, cst.ConstDecl, cst.TypeDecl:
 			fn(child, node)
 		}
 	}
+}
+
+// lowerUseDecl lowers a positioned UseDecl CST node into an ast.UseDecl. The
+// target's shape decides which field is set: a direct Ident is a namespace
+// import, a UseList child carries the selective names, and a Star leaf marks
+// the wildcard. The path is decoded from its string literal.
+func lowerUseDecl(t cst.Tree, buf source.Buffer) *ast.UseDecl {
+	green, _ := t.Node()
+
+	var (
+		public    bool
+		namespace string
+		names     []string
+		star      bool
+		path      string
+	)
+
+	for _, child := range t.Children() {
+		if tok, ok := child.Token(); ok {
+			switch tok.Kind() {
+			case token.Pub:
+				public = true
+			case token.Ident:
+				// The only direct Ident child is the namespace name; the
+				// selective names are nested in the UseList node.
+				namespace = child.Text(buf)
+			case token.Star:
+				star = true
+			case token.String:
+				path = decodeString(child.Text(buf))
+			}
+			continue
+		}
+
+		if node, _ := child.Node(); node.Kind() == cst.UseList {
+			names = lowerUseList(child, buf)
+		}
+	}
+
+	return ast.NewUseDecl(public, namespace, names, star, path, green)
+}
+
+// lowerUseList lowers a selective-import list to its names, in source order.
+func lowerUseList(t cst.Tree, buf source.Buffer) []string {
+	var names []string
+	for _, child := range t.Children() {
+		if tok, ok := child.Token(); ok && tok.Kind() == token.Ident {
+			names = append(names, child.Text(buf))
+		}
+	}
+	return names
 }
 
 // lowerConstDecl lowers a positioned ConstDecl CST node into an ast.ConstDecl.

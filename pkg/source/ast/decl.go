@@ -2,9 +2,11 @@ package ast
 
 import "github.com/masterbelt/masterbelt/pkg/source/cst"
 
-// File is a whole source file: its constant and type declarations in source
-// order. Trivia and any unparsable regions present in the CST are dropped here.
+// File is a whole source file: its use, constant, and type declarations in
+// source order. Trivia and any unparsable regions present in the CST are
+// dropped here.
 type File struct {
+	Uses   []*UseDecl
 	Decls  []*ConstDecl
 	Types  []*TypeDecl
 	syntax *cst.Node
@@ -15,8 +17,30 @@ func (f *File) node()             {}
 
 // NewFile builds a File node. The constructors keep each node's syntax backlink
 // unexported while package parser/abstract populates it.
-func NewFile(decls []*ConstDecl, types []*TypeDecl, syntax *cst.Node) *File {
-	return &File{Decls: decls, Types: types, syntax: syntax}
+func NewFile(uses []*UseDecl, decls []*ConstDecl, types []*TypeDecl, syntax *cst.Node) *File {
+	return &File{Uses: uses, Decls: decls, Types: types, syntax: syntax}
+}
+
+// UseDecl is a cross-file import: an optional pub modifier (re-export the
+// imported names from this file), a target — exactly one of Namespace
+// (use geo from ...), Names (use { a, b } from ...), or Star (use * from ...)
+// — and the Path of the file imported from, relative to the importing file.
+// Malformed parts are zero values, as elsewhere.
+type UseDecl struct {
+	Public    bool     // whether the import is re-exported (pub use)
+	Namespace string   // the namespace name, or "" for the other targets
+	Names     []string // the selective-import names, or nil
+	Star      bool     // whether the target is the wildcard "*"
+	Path      string   // the imported file's path, decoded, or "" if missing
+	syntax    *cst.Node
+}
+
+func (d *UseDecl) Syntax() *cst.Node { return d.syntax }
+func (d *UseDecl) node()             {}
+
+// NewUseDecl builds a UseDecl node.
+func NewUseDecl(public bool, namespace string, names []string, star bool, path string, syntax *cst.Node) *UseDecl {
+	return &UseDecl{Public: public, Namespace: namespace, Names: names, Star: star, Path: path, syntax: syntax}
 }
 
 // ConstDecl is a constant declaration: an optional run of doc-comment lines, an

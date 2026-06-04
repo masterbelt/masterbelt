@@ -138,6 +138,61 @@ func TestLowerFuncLit(t *testing.T) {
 	}
 }
 
+func TestLowerUseDecl(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+		want ast.UseDecl
+	}{
+		{"namespace", "use geo from \"geometry.belt\"\n",
+			ast.UseDecl{Namespace: "geo", Path: "geometry.belt"}},
+		{"selective", "use { Point, Vector } from \"shapes.belt\"\n",
+			ast.UseDecl{Names: []string{"Point", "Vector"}, Path: "shapes.belt"}},
+		{"wildcard", "use * from \"prelude.belt\"\n",
+			ast.UseDecl{Star: true, Path: "prelude.belt"}},
+		{"re-export", "pub use { Color } from \"palette.belt\"\n",
+			ast.UseDecl{Public: true, Names: []string{"Color"}, Path: "palette.belt"}},
+		{"barrel", "pub use * from \"geometry.belt\"\n",
+			ast.UseDecl{Public: true, Star: true, Path: "geometry.belt"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			file, diags := Lower([]byte(tc.src))
+			if len(diags) != 0 {
+				t.Fatalf("unexpected diagnostics: %v", diags)
+			}
+			if len(file.Uses) != 1 {
+				t.Fatalf("got %d uses, want 1", len(file.Uses))
+			}
+			u := file.Uses[0]
+			if u.Public != tc.want.Public || u.Namespace != tc.want.Namespace || u.Star != tc.want.Star || u.Path != tc.want.Path {
+				t.Errorf("use = %+v, want %+v", u, tc.want)
+			}
+			if strings.Join(u.Names, ",") != strings.Join(tc.want.Names, ",") {
+				t.Errorf("Names = %v, want %v", u.Names, tc.want.Names)
+			}
+			if u.Syntax() == nil {
+				t.Error("Syntax() = nil, want the backing CST node")
+			}
+		})
+	}
+}
+
+func TestLowerUseDeclMalformed(t *testing.T) {
+	// A missing path lowers to "", not a panic; the decl is still present so
+	// later layers can anchor diagnostics to it.
+	file, diags := Lower([]byte("use geo from\n"))
+	if len(diags) == 0 {
+		t.Fatal("expected a diagnostic for the missing path")
+	}
+	if len(file.Uses) != 1 {
+		t.Fatalf("got %d uses, want 1", len(file.Uses))
+	}
+	if u := file.Uses[0]; u.Namespace != "geo" || u.Path != "" {
+		t.Errorf("use = %+v, want namespace geo with empty Path", u)
+	}
+}
+
 func TestLowerSkipsNonDecls(t *testing.T) {
 	// A stray "= 1" forms an Error node in the CST; it must not appear as a decl.
 	file, diags := Lower([]byte("= 1\nconst X = 2\n"))

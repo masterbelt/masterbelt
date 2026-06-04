@@ -24,6 +24,7 @@ type Document struct {
 	file      *ast.File
 	cache     map[*cst.Node]*ast.ConstDecl
 	typeCache map[*cst.Node]*ast.TypeDecl
+	useCache  map[*cst.Node]*ast.UseDecl
 }
 
 // NewDocument lexes, parses, and lowers src, then keeps the AST up to date
@@ -33,6 +34,7 @@ func NewDocument(src []byte) *Document {
 		cst:       concrete.NewDocument(src),
 		cache:     map[*cst.Node]*ast.ConstDecl{},
 		typeCache: map[*cst.Node]*ast.TypeDecl{},
+		useCache:  map[*cst.Node]*ast.UseDecl{},
 	}
 	d.rebuild()
 	return d
@@ -69,10 +71,19 @@ func (d *Document) rebuild() {
 
 	next := make(map[*cst.Node]*ast.ConstDecl, len(d.cache))
 	nextTypes := make(map[*cst.Node]*ast.TypeDecl, len(d.typeCache))
+	nextUses := make(map[*cst.Node]*ast.UseDecl, len(d.useCache))
+	var uses []*ast.UseDecl
 	var decls []*ast.ConstDecl
 	var types []*ast.TypeDecl
 	foreachDecl(root, func(child cst.Tree, green *cst.Node) {
 		switch green.Kind() {
+		case cst.UseDecl:
+			ud, ok := d.useCache[green]
+			if !ok {
+				ud = lowerUseDecl(child, buf)
+			}
+			nextUses[green] = ud
+			uses = append(uses, ud)
 		case cst.ConstDecl:
 			decl, ok := d.cache[green]
 			if !ok {
@@ -92,5 +103,6 @@ func (d *Document) rebuild() {
 
 	d.cache = next
 	d.typeCache = nextTypes
-	d.file = ast.NewFile(decls, types, rootNode)
+	d.useCache = nextUses
+	d.file = ast.NewFile(uses, decls, types, rootNode)
 }
