@@ -511,6 +511,7 @@ func lowerTypeDecl(t cst.Tree, buf source.Buffer) *ast.TypeDecl {
 		name    string
 		params  []*ast.TypeParam
 		body    ast.TypeExpr
+		where   ast.Expr
 		methods []*ast.MethodDecl
 	)
 	for _, child := range t.Children() {
@@ -532,13 +533,26 @@ func lowerTypeDecl(t cst.Tree, buf source.Buffer) *ast.TypeDecl {
 		switch {
 		case node.Kind() == cst.GenericParams:
 			params = lowerGenericParams(child, buf)
+		case node.Kind() == cst.WhereClause:
+			where = lowerWhereClause(child, buf)
 		case node.Kind() == cst.ImplBlock:
 			methods = lowerImpl(child, buf)
 		case isTypeExprKind(node.Kind()):
 			body = lowerTypeExpr(child, buf)
 		}
 	}
-	return ast.NewTypeDecl(doc, public, name, params, body, methods, green)
+	return ast.NewTypeDecl(doc, public, name, params, body, where, methods, green)
+}
+
+// lowerWhereClause lowers a "where Expr" clause to its predicate expression, or
+// nil when the predicate is missing (a recovered "type T = int8 where").
+func lowerWhereClause(t cst.Tree, buf source.Buffer) ast.Expr {
+	for _, child := range t.Children() {
+		if node, ok := child.Node(); ok && isExprKind(node.Kind()) {
+			return lowerExpr(child, buf)
+		}
+	}
+	return nil
 }
 
 // lowerGenericParams lowers a GenericParams node to its type parameters.

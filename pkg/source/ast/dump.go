@@ -158,6 +158,9 @@ func dumpTypeDecl(b *strings.Builder, d *TypeDecl) {
 	if d.Body != nil {
 		fmt.Fprintf(b, "    body %s\n", dumpType(d.Body))
 	}
+	if d.Where != nil {
+		fmt.Fprintf(b, "    where %s\n", dumpExpr(d.Where))
+	}
 	for _, m := range d.Methods {
 		dumpMethod(b, m)
 	}

@@ -23,16 +23,19 @@ File
     pub
     name "Level"
     body int8
+    where (call (. (call (. self gteq) IntLit "0") anan) (call (. self lteq) IntLit "100"))
   TypeDecl
     doc "A TCP port number."
     pub
     name "Port"
     body int32
+    where (call (. (call (. self gteq) IntLit "1") anan) (call (. self lteq) IntLit "65535"))
   TypeDecl
     doc "A percentage from 0 to 100."
     pub
     name "Percent"
     body int8
+    where (call (. (call (. self gteq) IntLit "0") anan) (call (. self lteq) IntLit "100"))
     method "increment"
       doc "The next percentage point."
       pub

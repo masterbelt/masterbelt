@@ -11,13 +11,15 @@ import "github.com/masterbelt/masterbelt/pkg/source/cst"
 
 // TypeDecl is a type declaration: an optional run of doc-comment lines, an
 // optional pub modifier, the declared Name, its generic Params, the type it is
-// defined as (Body), and the methods of its impl block.
+// defined as (Body), its refinement predicate (Where), and the methods of its
+// impl block.
 type TypeDecl struct {
 	Doc     []string
 	Public  bool
 	Name    string       // the declared identifier, or "" if missing
 	Params  []*TypeParam // generic parameters, in declaration order
 	Body    TypeExpr     // the defined type, or nil if missing
+	Where   Expr         // the refinement predicate over self, or nil if none
 	Methods []*MethodDecl
 	syntax  *cst.Node
 }
@@ -26,8 +28,8 @@ func (d *TypeDecl) Syntax() *cst.Node { return d.syntax }
 func (d *TypeDecl) node()             {}
 
 // NewTypeDecl builds a TypeDecl node.
-func NewTypeDecl(doc []string, public bool, name string, params []*TypeParam, body TypeExpr, methods []*MethodDecl, syntax *cst.Node) *TypeDecl {
-	return &TypeDecl{Doc: doc, Public: public, Name: name, Params: params, Body: body, Methods: methods, syntax: syntax}
+func NewTypeDecl(doc []string, public bool, name string, params []*TypeParam, body TypeExpr, where Expr, methods []*MethodDecl, syntax *cst.Node) *TypeDecl {
+	return &TypeDecl{Doc: doc, Public: public, Name: name, Params: params, Body: body, Where: where, Methods: methods, syntax: syntax}
 }
 
 // TypeParam is one generic parameter of a TypeDecl: a name and an optional

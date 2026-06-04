@@ -261,6 +261,37 @@ func TestLowerAssertDeclMalformed(t *testing.T) {
 	}
 }
 
+func TestLowerTypeDeclWhere(t *testing.T) {
+	file, diags := Lower([]byte("pub type Port = int32 where self >= 1 && self <= 65535\n"))
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if len(file.Types) != 1 {
+		t.Fatalf("got %d types, want 1", len(file.Types))
+	}
+	// The predicate desugars like any expression: self >= 1 && self <= 65535 is
+	// self.gteq(1).anan(self.lteq(65535)).
+	want := `where (call (. (call (. self gteq) IntLit "1") anan) (call (. self lteq) IntLit "65535"))`
+	if got := ast.Dump(file); !strings.Contains(got, want) {
+		t.Errorf("dump = %s, want it to contain %s", got, want)
+	}
+}
+
+func TestLowerTypeDeclWhereMalformed(t *testing.T) {
+	// A missing predicate lowers to a nil Where, not a panic; the decl is still
+	// present so the semantic layer can anchor diagnostics to it.
+	file, diags := Lower([]byte("type Bad = int8 where\n"))
+	if len(diags) == 0 {
+		t.Fatal("expected a diagnostic for the missing predicate")
+	}
+	if len(file.Types) != 1 {
+		t.Fatalf("got %d types, want 1", len(file.Types))
+	}
+	if d := file.Types[0]; d.Where != nil {
+		t.Errorf("Where = %+v, want nil", d.Where)
+	}
+}
+
 func TestLowerSkipsNonDecls(t *testing.T) {
 	// A stray "= 1" forms an Error node in the CST; it must not appear as a decl.
 	file, diags := Lower([]byte("= 1\nconst X = 2\n"))
