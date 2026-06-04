@@ -1,0 +1,299 @@
+# tree
+File
+  ConstDecl
+    LineComment "// Parameter and result types flow in from list<T>.map's signature:"
+    Newline "\n"
+    LineComment "// T = int binds from the receiver, x: int is pushed into the lambda,"
+    Newline "\n"
+    LineComment "// and R = int is solved from the body's return type."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Doubled"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        MemberExpr
+          CollectionLit
+            LBracket "["
+            Literal
+              Int "1"
+            Comma ","
+            Whitespace " "
+            Literal
+              Int "2"
+            Comma ","
+            Whitespace " "
+            Literal
+              Int "3"
+            RBracket "]"
+          Dot "."
+          Ident "map"
+        LParen "("
+        FuncLit
+          Fn "fn"
+          ParamList
+            LParen "("
+            Param
+              Ident "x"
+            RParen ")"
+          Whitespace " "
+          Block
+            LBrace "{"
+            Whitespace " "
+            ReturnStmt
+              Return "return"
+              Whitespace " "
+              BinaryExpr
+                NameRef
+                  Ident "x"
+                Whitespace " "
+                Star "*"
+                Whitespace " "
+                Literal
+                  Int "2"
+            Whitespace " "
+            RBrace "}"
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// R = bool, solved from the body."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Evens"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        MemberExpr
+          CollectionLit
+            LBracket "["
+            Literal
+              Int "1"
+            Comma ","
+            Whitespace " "
+            Literal
+              Int "2"
+            Comma ","
+            Whitespace " "
+            Literal
+              Int "3"
+            Comma ","
+            Whitespace " "
+            Literal
+              Int "4"
+            RBracket "]"
+          Dot "."
+          Ident "map"
+        LParen "("
+        FuncLit
+          Fn "fn"
+          ParamList
+            LParen "("
+            Param
+              Ident "x"
+            RParen ")"
+          Whitespace " "
+          Block
+            LBrace "{"
+            Whitespace " "
+            ReturnStmt
+              Return "return"
+              Whitespace " "
+              BinaryExpr
+                BinaryExpr
+                  NameRef
+                    Ident "x"
+                  Whitespace " "
+                  Percent "%"
+                  Whitespace " "
+                  Literal
+                    Int "2"
+                Whitespace " "
+                EqEq "=="
+                Whitespace " "
+                Literal
+                  Int "0"
+            Whitespace " "
+            RBrace "}"
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// A partially annotated literal: the annotation must agree with the"
+    Newline "\n"
+    LineComment "// pushed-down type, and still wins for the body scope."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Tripled"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        MemberExpr
+          CollectionLit
+            LBracket "["
+            Literal
+              Int "1"
+            Comma ","
+            Whitespace " "
+            Literal
+              Int "2"
+            Comma ","
+            Whitespace " "
+            Literal
+              Int "3"
+            RBracket "]"
+          Dot "."
+          Ident "map"
+        LParen "("
+        FuncLit
+          Fn "fn"
+          ParamList
+            LParen "("
+            Param
+              Ident "x"
+              Colon ":"
+              Whitespace " "
+              TypeName
+                Ident "int"
+            RParen ")"
+          Whitespace " "
+          Block
+            LBrace "{"
+            Whitespace " "
+            ReturnStmt
+              Return "return"
+              Whitespace " "
+              BinaryExpr
+                NameRef
+                  Ident "x"
+                Whitespace " "
+                Star "*"
+                Whitespace " "
+                Literal
+                  Int "3"
+            Whitespace " "
+            RBrace "}"
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// An annotated function-typed constant: the annotation checks the literal."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Twice"
+    TypeClause
+      Colon ":"
+      Whitespace " "
+      FuncType
+        Fn "fn"
+        ParamList
+          LParen "("
+          Param
+            Ident "x"
+            Colon ":"
+            Whitespace " "
+            TypeName
+              Ident "int"
+          RParen ")"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "int"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      FuncLit
+        Fn "fn"
+        ParamList
+          LParen "("
+          Param
+            Ident "x"
+          RParen ")"
+        Whitespace " "
+        Block
+          LBrace "{"
+          Whitespace " "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            BinaryExpr
+              NameRef
+                Ident "x"
+              Whitespace " "
+              Star "*"
+              Whitespace " "
+              Literal
+                Int "2"
+          Whitespace " "
+          RBrace "}"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// Checking mode subsumes the collection special cases that exist today."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Bytes"
+    TypeClause
+      Colon ":"
+      Whitespace " "
+      TypeName
+        Ident "list"
+        GenericArgs
+          Lt "<"
+          TypeName
+            Ident "int8"
+          Gt ">"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CollectionLit
+        LBracket "["
+        Literal
+          Int "1"
+        Comma ","
+        Whitespace " "
+        Literal
+          Int "2"
+        Comma ","
+        Whitespace " "
+        Literal
+          Int "3"
+        RBracket "]"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Empty"
+    TypeClause
+      Colon ":"
+      Whitespace " "
+      TypeName
+        Ident "list"
+        GenericArgs
+          Lt "<"
+          TypeName
+            Ident "int"
+          Gt ">"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CollectionLit
+        LBracket "["
+        RBracket "]"
+  Newline "\n"
+  EOF ""
+# diagnostics

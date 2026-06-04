@@ -74,8 +74,9 @@ func Decl(decl *ast.ConstDecl, env Env) ir.Type {
 
 // Expr infers the type of a constant initializer: an integer literal is int, a
 // string literal string, a boolean literal bool, a value reference inherits its
-// referent's type, and a method call's type comes from the builtin method rules
-// (types.MethodResult).
+// referent's type, and a method call's type comes from the builtin method
+// rules driven bidirectionally (callType), so a function-literal argument is
+// typed against the parameter it is passed to.
 func Expr(e ast.Expr, env Env) ir.Type {
 	return exprType(e, constScope{env})
 }
@@ -97,15 +98,7 @@ func exprType(e ast.Expr, s scope) ir.Type {
 	case *ast.CallExpr:
 		// A call through a member access is a method call; any other callee is a
 		// context-specific form (a conversion in a method body, otherwise nothing).
-		if member, ok := e.Callee.(*ast.MemberExpr); ok {
-			recv := exprType(member.Receiver, s)
-			args := make([]ir.Type, len(e.Arguments))
-			for i, a := range e.Arguments {
-				args[i] = exprType(a, s)
-			}
-			return types.MethodResult(s.registry(), recv, member.Member.Name, args)
-		}
-		return s.leaf(e)
+		return callType(e, s, nil)
 	default:
 		return s.leaf(e)
 	}
@@ -523,7 +516,7 @@ func checkFuncLitAgainst(lit *ast.FuncLit, want *ir.Func, s scope, subst map[str
 		switch {
 		case p.Type != nil:
 			ap := r.ResolveType(p.Type, nil)
-			if ap != ir.Invalid && !hasTypeVar(wp) && types.Unify(reg, ap, wp) == ir.Invalid {
+			if conflicts(reg, ap, wp, subst) {
 				sink.mismatch(p, ap, wp)
 			}
 			params[i] = ap
@@ -546,7 +539,7 @@ func checkFuncLitAgainst(lit *ast.FuncLit, want *ir.Func, s scope, subst map[str
 		// The annotation wins for the returns, after agreeing with the
 		// expectation the same way a parameter annotation must.
 		result = r.ResolveType(lit.Result, nil)
-		if result != ir.Invalid && !hasTypeVar(wr) && types.Unify(reg, result, wr) == ir.Invalid {
+		if conflicts(reg, result, wr, subst) {
 			sink.mismatch(lit.Result, result, wr)
 		}
 		checkReturns(lit, result, body, subst, sink)
@@ -573,6 +566,23 @@ func checkFuncLitAgainst(lit *ast.FuncLit, want *ir.Func, s scope, subst map[str
 		}
 	}
 	return &ir.Func{Params: params, Result: result}
+}
+
+// conflicts reports whether a written annotation disagrees with the expected
+// type at the same position. A concrete expectation must unify with the
+// annotation (default-int adaption only); one still carrying a method type
+// variable is instead bound by the annotation through Match — which is how a
+// fully annotated literal solves the R of list<T>.map — and conflicts only if
+// the variable was already bound incompatibly. An unresolved annotation was
+// reported at its own node.
+func conflicts(reg *builtin.Registry, annotation, want ir.Type, subst map[string]ir.Type) bool {
+	if annotation == ir.Invalid {
+		return false
+	}
+	if hasTypeVar(want) {
+		return !types.Match(reg, want, annotation, subst)
+	}
+	return types.Unify(reg, annotation, want) == ir.Invalid
 }
 
 // checkReturns walks a literal's body with a known result type: every return
@@ -685,25 +695,169 @@ func check(e ast.Expr, s scope, sink *Sink) ir.Type {
 	case *ast.FuncLit:
 		return checkFuncLit(e, s, sink)
 	case *ast.CallExpr:
-		member, ok := e.Callee.(*ast.MemberExpr)
-		if !ok {
-			return s.leaf(e)
-		}
-		recv := check(member.Receiver, s, sink)
-		bad := recv == ir.Invalid
-		args := make([]ir.Type, len(e.Arguments))
+		return callType(e, s, sink)
+	default:
+		return s.leaf(e)
+	}
+}
+
+// callType is the type rule for a method call, bidirectionally: the receiver
+// and the non-literal arguments are synthesized first (left to right), solving
+// the method's type variables they pin down; the function-literal arguments
+// are then checked against their parameter patterns, so the call's expectation
+// reaches into each literal — and the literal bodies solve what remains (the R
+// of list<T>.map). A nil sink types silently; with one, the innermost call
+// whose operands do not fit is reported, except when the failure is inside a
+// literal — the checking walk reported its precise cause already, and the
+// Invalid propagation suppresses the pile-on (the bad flag).
+func callType(e *ast.CallExpr, s scope, sink *Sink) ir.Type {
+	member, ok := e.Callee.(*ast.MemberExpr)
+	if !ok {
+		return s.leaf(e)
+	}
+	reg := s.registry()
+	recv := check(member.Receiver, s, sink)
+	bad := recv == ir.Invalid
+	args := make([]ir.Type, len(e.Arguments))
+
+	m, subst, found := types.BindReceiver(reg, recv, member.Member.Name)
+	if !found || len(e.Arguments) != len(m.Params) {
+		// No such method, or the wrong argument count: synthesize the
+		// arguments for their own diagnostics, then report the call.
 		for i, a := range e.Arguments {
 			args[i] = check(a, s, sink)
 			bad = bad || args[i] == ir.Invalid
 		}
-		res := types.MethodResult(s.registry(), recv, member.Member.Name, args)
-		if res == ir.Invalid && !bad {
+		if !bad {
 			sink.invalidOp(e, member.Member.Name, typesList(recv, args))
 		}
-		return res
-	default:
-		return s.leaf(e)
+		return ir.Invalid
 	}
+
+	// Pass 1 — the non-literal arguments, left to right. Self-typed operands
+	// unify with the receiver (the default int adapts); pattern-typed ones
+	// match, binding the method's type variables. Going literal-last maximizes
+	// what pass 2 can push into each literal.
+	operand := recv // the unified type of the receiver and the self-typed args
+	fail := false   // the operands do not fit (and no precise report fired)
+	for i, a := range e.Arguments {
+		if _, isLit := a.(*ast.FuncLit); isLit {
+			continue
+		}
+		args[i] = check(a, s, sink)
+		if args[i] == ir.Invalid {
+			bad = true
+			continue
+		}
+		pt := types.Substitute(m.Params[i].Type, subst)
+		if _, isSelf := pt.(*ir.SelfType); isSelf {
+			if operand = types.Unify(reg, operand, args[i]); operand == ir.Invalid {
+				fail = true
+			}
+		} else if !types.Match(reg, pt, args[i], subst) {
+			fail = true
+		}
+	}
+
+	// Pass 2 — the function literals, each checked against its parameter
+	// pattern. A finding inside the literal (a mismatch, an uninferable part)
+	// fails the call without the generic report; so does an Invalid left in
+	// the literal's type by a cause reported elsewhere.
+	for i, a := range e.Arguments {
+		lit, isLit := a.(*ast.FuncLit)
+		if !isLit {
+			continue
+		}
+		pt := types.Substitute(m.Params[i].Type, subst)
+		litFailed := false
+		args[i] = checkType(lit, pt, s, subst, observe(sink, &litFailed))
+		if litFailed || hasInvalid(args[i]) {
+			bad = true
+		}
+	}
+
+	if fail || bad {
+		if fail && !bad {
+			sink.invalidOp(e, member.Member.Name, typesList(recv, args))
+		}
+		return ir.Invalid
+	}
+	if _, isSelf := m.Result.(*ir.SelfType); isSelf {
+		return operand
+	}
+	result := types.Substitute(m.Result, subst)
+	if hasTypeVar(result) {
+		// A variable no argument could solve survived to the result.
+		sink.invalidOp(e, member.Member.Name, typesList(recv, args))
+		return ir.Invalid
+	}
+	return result
+}
+
+// observe wraps sink so the caller learns whether the wrapped walk reported a
+// finding (Checked is a stream, not a finding). The wrapper stays valid for a
+// nil sink, which is what lets the silent walk share the call rule.
+func observe(sink *Sink, fired *bool) *Sink {
+	return &Sink{
+		InvalidOp: func(node ast.Node, method, operands string) {
+			*fired = true
+			sink.invalidOp(node, method, operands)
+		},
+		Mismatch: func(node ast.Node, got, want ir.Type) {
+			*fired = true
+			sink.mismatch(node, got, want)
+		},
+		Checked: func(e ast.Expr, want ir.Type) {
+			sink.checked(e, want)
+		},
+		ArityMismatch: func(lit *ast.FuncLit, got, want int) {
+			*fired = true
+			sink.arityMismatch(lit, got, want)
+		},
+		UninferableParam: func(p *ast.ParamDef) {
+			*fired = true
+			sink.uninferableParam(p)
+		},
+		UninferableResult: func(lit *ast.FuncLit) {
+			*fired = true
+			sink.uninferableResult(lit)
+		},
+	}
+}
+
+// hasInvalid reports whether t contains the invalid type anywhere — a part of
+// the expression's type that some failure already poisoned.
+func hasInvalid(t ir.Type) bool {
+	switch t := t.(type) {
+	case *ir.App:
+		for _, a := range t.Args {
+			if hasInvalid(a) {
+				return true
+			}
+		}
+	case *ir.Func:
+		for _, p := range t.Params {
+			if hasInvalid(p) {
+				return true
+			}
+		}
+		return hasInvalid(t.Result)
+	case *ir.Union:
+		for _, m := range t.Members {
+			if hasInvalid(m) {
+				return true
+			}
+		}
+	case *ir.Record:
+		for _, f := range t.Fields {
+			if hasInvalid(f.Type) {
+				return true
+			}
+		}
+	default:
+		return t == ir.Invalid
+	}
+	return false
 }
 
 // checkFuncLit checks a function literal with no expected type: its body is

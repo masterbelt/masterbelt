@@ -407,6 +407,41 @@ func TestAnnotatedFuncLitDiagnostics(t *testing.T) {
 	}
 }
 
+func TestBidirectionalCall(t *testing.T) {
+	// The headline: list<T>.map's signature reaches into an unannotated
+	// lambda — T = int binds from the receiver and is pushed into x, R solves
+	// from the body — and the call folds at compile time.
+	m, diags := analyze("const Doubled = [1, 2, 3].map(fn(x) { return x * 2 })\nconst Evens = [1, 2].map(fn(x) { return x % 2 == 0 })\n")
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if got := m.Consts[0].Type.String(); got != "list<int>" {
+		t.Errorf("Doubled type = %s, want list<int>", got)
+	}
+	if got := m.Consts[0].Eval.String(); got != "[2, 4, 6]" {
+		t.Errorf("Doubled eval = %s, want [2, 4, 6]", got)
+	}
+	if got := m.Consts[1].Type.String(); got != "list<bool>" {
+		t.Errorf("Evens type = %s, want list<bool>", got)
+	}
+	if got := m.Consts[1].Eval.String(); got != "[false, true]" {
+		t.Errorf("Evens eval = %s, want [false, true]", got)
+	}
+}
+
+func TestBidirectionalCallDiagnostics(t *testing.T) {
+	// A lambda whose result type the call cannot solve (no return to bind R
+	// from) reports the precise cause, not a generic invalid_operation.
+	_, diags := analyze("const D = [1, 2].map(fn(x) {})\n")
+	if got := codes(diags); len(got) != 1 || got[0] != CodeUninferableResult {
+		t.Errorf("codes = %v, want exactly [uninferable_result]", got)
+	}
+	// An argument that is not a function at all is still the call's error.
+	if _, diags := analyze("const E = [1, 2].map(3)\n"); !hasCode(diags, CodeInvalidOperation) {
+		t.Errorf("want invalid_operation, got %v", codes(diags))
+	}
+}
+
 func TestUninferableParameter(t *testing.T) {
 	// With no checking context at all, an unannotated parameter has nothing to
 	// infer from.

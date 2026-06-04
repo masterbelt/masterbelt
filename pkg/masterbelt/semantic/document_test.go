@@ -2,6 +2,7 @@ package semantic
 
 import (
 	"math/rand"
+	"strings"
 	"testing"
 
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/parser/abstract"
@@ -113,6 +114,24 @@ func TestDocumentFuzz(t *testing.T) {
 		content = naiveSplice(content, s, e, repl)
 		doc.Edit(edit)
 		assertMatchesReference(t, doc, content)
+	}
+}
+
+// TestEarlyCutoffLambdaBody checks that editing a lambda body re-checks only
+// what depends on it: the edit changes F's value but not its type
+// (list<int>), so the change must not propagate past F's dependents.
+func TestEarlyCutoffLambdaBody(t *testing.T) {
+	src := "const F = [1, 2].map(fn(x) { return x * 2 })\nconst G = F\nconst H = G\n"
+	doc := NewDocument([]byte(src))
+	hDecl := doc.AST().File().Decls[2]
+
+	// x * 2 -> x * 9: the body's fold changes, the solved types do not.
+	i := strings.Index(src, "x * 2") + len("x * ")
+	doc.Edit(source.Edit{Start: i, End: i + 1, NewText: []byte("9")})
+	assertMatchesReference(t, doc, []byte(strings.Replace(src, "x * 2", "x * 9", 1)))
+
+	if doc.db.computed[typeOfKey(hDecl)] {
+		t.Error("typeOf(H) was recomputed; the lambda edit left F's type unchanged")
 	}
 }
 
