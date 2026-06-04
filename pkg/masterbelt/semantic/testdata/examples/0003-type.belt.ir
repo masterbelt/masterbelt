@@ -5,7 +5,7 @@ Module
     body int8
     method "increment" pub
       result self
-      body self.add(IntLiteral "1")
+      return self.add(IntLiteral "1")
   TypeDef "GameValue" pub
     body Coin | Level
   TypeDef "Optional" pub
@@ -18,7 +18,7 @@ Module
     body { id: int8, level: Level }
     method "game_id" pub
       result int32
-      body int32(self.id).mul(IntLiteral "1000")
+      return int32(self.id).mul(IntLiteral "1000")
   TypeDef "Mapper" pub
     param "T"
     param "R"

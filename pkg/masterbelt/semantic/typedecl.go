@@ -233,17 +233,20 @@ func (r *typeResolver) resolveMethod(m *ast.MethodDecl, scope map[string]bool) *
 	return method
 }
 
-// lowerBody lowers a method body to an IR value. Only the single-return body
-// form is modelled so far: the body lowers to its returned expression's value
-// (nil for an extern or empty body). params is the set of parameter names in
-// scope, and tscope the generic-parameter names (for type conversions).
-func (r *typeResolver) lowerBody(body []ast.Stmt, params, tscope map[string]bool) ir.Value {
+// lowerBody lowers a method body to its IR statements (nil for an extern or
+// empty body). params is the set of parameter names in scope, and tscope the
+// generic-parameter names (for type conversions).
+func (r *typeResolver) lowerBody(body []ast.Stmt, params, tscope map[string]bool) []ir.Stmt {
+	var stmts []ir.Stmt
 	for _, s := range body {
-		if ret, ok := s.(*ast.ReturnStmt); ok {
-			return r.lowerBodyExpr(ret.Value, params, tscope)
+		switch s := s.(type) {
+		case *ast.ReturnStmt:
+			stmts = append(stmts, &ir.Return{Value: r.lowerBodyExpr(s.Value, params, tscope)})
+		case *ast.ExprStmt:
+			stmts = append(stmts, &ir.ExprStmt{Value: r.lowerBodyExpr(s.X, params, tscope)})
 		}
 	}
-	return nil
+	return stmts
 }
 
 // lowerBodyExpr lowers a method-body expression to an IR value: self, a

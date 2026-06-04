@@ -143,6 +143,23 @@ func TestMethodBodyTypeMismatch(t *testing.T) {
 	}
 }
 
+func TestMultiStatementMethodBody(t *testing.T) {
+	m, _ := analyze("pub type Level = int8 impl {\n  pub inc(): self {\n    self + 1\n    return self\n  }\n}\n")
+	if len(m.Types) == 0 || len(m.Types[0].Methods) == 0 {
+		t.Fatalf("Level.inc not resolved: %+v", m.Types)
+	}
+	body := m.Types[0].Methods[0].Body
+	if len(body) != 2 {
+		t.Fatalf("body has %d statements, want 2 (an expr statement and a return)", len(body))
+	}
+	if _, ok := body[0].(*ir.ExprStmt); !ok {
+		t.Errorf("stmt 0 = %T, want *ir.ExprStmt", body[0])
+	}
+	if _, ok := body[1].(*ir.Return); !ok {
+		t.Errorf("stmt 1 = %T, want *ir.Return", body[1])
+	}
+}
+
 func hasCode(diags []diagnostic.Diagnostic, code diagnostic.Code) bool {
 	for _, c := range codes(diags) {
 		if c == code {

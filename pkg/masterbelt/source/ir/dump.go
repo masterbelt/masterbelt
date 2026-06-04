@@ -60,8 +60,17 @@ func dumpMethod(b *strings.Builder, m *Method) {
 	if m.Result != nil {
 		fmt.Fprintf(b, "      result %s\n", m.Result)
 	}
-	if m.Body != nil {
-		fmt.Fprintf(b, "      body %s\n", dumpValue(m.Body))
+	for _, s := range m.Body {
+		dumpStmt(b, s)
+	}
+}
+
+func dumpStmt(b *strings.Builder, s Stmt) {
+	switch s := s.(type) {
+	case *Return:
+		fmt.Fprintf(b, "      return %s\n", dumpValue(s.Value))
+	case *ExprStmt:
+		fmt.Fprintf(b, "      expr %s\n", dumpValue(s.Value))
 	}
 }
 

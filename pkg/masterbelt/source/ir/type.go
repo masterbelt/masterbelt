@@ -170,16 +170,37 @@ type TypeParam struct {
 }
 
 // Method is one method declared in a type's impl block: its signature and, for a
-// non-extern method, the body that computes its result. Extern methods have no
-// body — their implementation is a native intrinsic in the builtin registry.
+// non-extern method, the statement body that computes its result. Extern methods
+// have no body — their implementation is a native intrinsic in the builtin
+// registry.
 type Method struct {
 	Name   string
 	Public bool
 	Extern bool
 	Params []Param
 	Result Type
-	Body   Value // the resolved body expression, or nil for an extern method
+	Body   []Stmt // the resolved body, or nil for an extern method
 }
+
+// Stmt is a statement in a method body. It is a sealed interface; the only
+// implementations are Return and ExprStmt.
+type Stmt interface {
+	stmt()
+}
+
+// Return is a return statement: it yields Value (nil if the source omitted it).
+type Return struct {
+	Value Value
+}
+
+func (*Return) stmt() {}
+
+// ExprStmt is an expression evaluated as a statement.
+type ExprStmt struct {
+	Value Value
+}
+
+func (*ExprStmt) stmt() {}
 
 // Param is one method parameter: a name and its type.
 type Param struct {
