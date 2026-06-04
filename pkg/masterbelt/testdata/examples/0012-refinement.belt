@@ -1,0 +1,27 @@
+// Refinement types: a where-clause constrains a nominal type to the
+// values that satisfy its predicate. The predicate is folded at compile
+// time with self bound to each annotated constant's value.
+
+/// A character level between 0 and 100.
+pub type Level = int8 where self >= 0 && self <= 100
+
+/// A TCP port number.
+pub type Port = int32 where self >= 1 && self <= 65535
+
+// A where-clause composes with an impl block.
+/// A percentage from 0 to 100.
+pub type Percent = int8 where self >= 0 && self <= 100 impl {
+  /// The next percentage point.
+  pub increment(): self {
+    return self + 1
+  }
+}
+
+// Annotated constants are checked against their type's predicate.
+const ServerPort: Port = 8080
+const MinPort: Port = 1
+const MaxPort: Port = 65535
+const FullLevel: Level = 100
+
+// An unannotated constant is a plain int: no refinement applies.
+const Unrefined = 70000

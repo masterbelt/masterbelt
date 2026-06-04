@@ -1,0 +1,39 @@
+File
+  ConstDecl
+    doc "The next percentage point."
+    pub
+    name "increment"
+  ConstDecl
+    name "ServerPort"
+    type Port
+    value IntLit "8080"
+  ConstDecl
+    name "MinPort"
+    type Port
+    value IntLit "1"
+  ConstDecl
+    name "MaxPort"
+    type Port
+    value IntLit "65535"
+  ConstDecl
+    name "FullLevel"
+    type Level
+    value IntLit "100"
+  ConstDecl
+    name "Unrefined"
+    value IntLit "70000"
+  TypeDecl
+    doc "A character level between 0 and 100."
+    pub
+    name "Level"
+    body int8
+  TypeDecl
+    doc "A TCP port number."
+    pub
+    name "Port"
+    body int32
+  TypeDecl
+    doc "A percentage from 0 to 100."
+    pub
+    name "Percent"
+    body int8

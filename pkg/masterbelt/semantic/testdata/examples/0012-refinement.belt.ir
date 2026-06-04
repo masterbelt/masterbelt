@@ -1,0 +1,34 @@
+Module
+  Const "increment" pub
+    doc "The next percentage point."
+    type invalid
+    value <none>
+  Const "ServerPort"
+    type Port
+    value IntLiteral "8080"
+    eval 8080
+  Const "MinPort"
+    type Port
+    value IntLiteral "1"
+    eval 1
+  Const "MaxPort"
+    type Port
+    value IntLiteral "65535"
+    eval 65535
+  Const "FullLevel"
+    type Level
+    value IntLiteral "100"
+    eval 100
+  Const "Unrefined"
+    type int
+    value IntLiteral "70000"
+    eval 70000
+  TypeDef "Level" pub
+    doc "A character level between 0 and 100."
+    body int8
+  TypeDef "Port" pub
+    doc "A TCP port number."
+    body int32
+  TypeDef "Percent" pub
+    doc "A percentage from 0 to 100."
+    body int8
