@@ -86,6 +86,8 @@ func (v view) BindMethod(recv ir.Type, name string) (*ir.Method, map[string]ir.T
 	return v.ws.prog.BindMethod(recv, name)
 }
 
+func (v view) TypeOfExpr(e ast.Expr) ir.Type { return v.ws.prog.TypeOfExpr(v.id, e) }
+
 func (v view) FuncLitTypes() map[*ast.FuncLit]*ir.Func { return v.ws.prog.FuncLitTypes(v.id) }
 
 func (v view) Diagnostics() []diagnostic.Diagnostic { return v.ws.prog.Diagnostics(v.id) }

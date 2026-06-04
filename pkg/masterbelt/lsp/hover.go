@@ -353,11 +353,12 @@ func memberHover(doc view, offset int, trees map[cst.Green]cst.Tree) *protocol.H
 	return nil
 }
 
-// receiverTypeOf resolves the type a member access's receiver has, as far as
-// resolution alone can carry it: self is the enclosing impl's type, an
-// identifier is the constant it names, a namespace member is the constant it
-// imports, and a chained access is the field's type on the inner receiver.
-// Anything needing full inference (a literal, a call) is nil.
+// receiverTypeOf resolves the type a member access's receiver has: self is
+// the enclosing impl's type, an identifier is the constant it names or the
+// parameter it denotes, a namespace member is the constant it imports, and a
+// chained access is the field's type on the inner receiver. Anything else —
+// a collection literal, an operator chain — goes through the real inference
+// in the file's top-level scope.
 func receiverTypeOf(doc view, e ast.Expr, trees map[cst.Green]cst.Tree, offset int) ir.Type {
 	switch e := e.(type) {
 	case *ast.SelfExpr:
@@ -373,10 +374,12 @@ func receiverTypeOf(doc view, e ast.Expr, trees map[cst.Green]cst.Tree, offset i
 				}
 			}
 		}
+		return nil
 	case *ast.Identifier:
 		if c := doc.Resolve(e); c != nil {
 			return c.Type
 		}
+		return paramTypeAt(doc, e.Name, trees, offset)
 	case *ast.MemberExpr:
 		if c := doc.ResolveMember(e); c != nil {
 			return c.Type
@@ -384,6 +387,60 @@ func receiverTypeOf(doc view, e ast.Expr, trees map[cst.Green]cst.Tree, offset i
 		if inner := receiverTypeOf(doc, e.Receiver, trees, offset); inner != nil {
 			if f, ok := fieldOf(inner, e.Member.Name); ok {
 				return f.Type
+			}
+		}
+		return nil
+	}
+	if t := doc.TypeOfExpr(e); t != ir.Invalid {
+		return t
+	}
+	return nil
+}
+
+// paramTypeAt resolves name as a parameter of what encloses offset: the
+// innermost function literal first (its parameters shadow the method's),
+// then the method's signature. A self-typed parameter resolves to the
+// enclosing impl's type, so its methods bind through it.
+func paramTypeAt(doc view, name string, trees map[cst.Green]cst.Tree, offset int) ir.Type {
+	types := doc.FuncLitTypes()
+	var enclosing []*ast.FuncLit
+	forEachFuncLit(doc, func(lit *ast.FuncLit) {
+		if t, ok := trees[lit.Syntax()]; ok && within(t, offset) {
+			enclosing = append(enclosing, lit)
+		}
+	})
+	for i := len(enclosing) - 1; i >= 0; i-- {
+		lit := enclosing[i]
+		ft := types[lit]
+		if ft == nil {
+			continue
+		}
+		for j, p := range lit.Params {
+			if p.Name == name && j < len(ft.Params) && ft.Params[j] != ir.Invalid {
+				return ft.Params[j]
+			}
+		}
+	}
+
+	file := doc.AST().File()
+	module := doc.Module()
+	for i, td := range file.Types {
+		if i >= len(module.Types) {
+			break
+		}
+		for j, m := range td.Methods {
+			mt, ok := trees[m.Syntax()]
+			if !ok || !within(mt, offset) || j >= len(module.Types[i].Methods) {
+				continue
+			}
+			for _, p := range module.Types[i].Methods[j].Params {
+				if p.Name != name || p.Type == nil || p.Type == ir.Invalid {
+					continue
+				}
+				if _, isSelf := p.Type.(*ir.SelfType); isSelf {
+					return &ir.Named{Def: module.Types[i]}
+				}
+				return p.Type
 			}
 		}
 	}

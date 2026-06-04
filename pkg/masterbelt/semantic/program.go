@@ -133,6 +133,14 @@ func (p *Program) ResolveUseType(file FileID, u *ast.UseDecl, name string) *ir.T
 	return q.exportsOf(target).types[name]
 }
 
+// TypeOfExpr infers an expression's type in file's top-level scope — what a
+// member-access receiver needs when it is not a plain reference (a collection
+// literal, an operator chain). Identifiers resolve to the file's constants;
+// self and parameters mean nothing at the top level (ir.Invalid).
+func (p *Program) TypeOfExpr(file FileID, e ast.Expr) ir.Type {
+	return infer.Expr(e, typeEnv{q: engineQueries{p.db}, file: file})
+}
+
 // BindMethod returns the method recv binds for name — through a named type,
 // a builtin, or a generic application — together with the substitution the
 // binding solved (a list<int> receiver pins the element parameter), or false

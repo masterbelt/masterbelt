@@ -421,3 +421,49 @@ func TestFieldHover(t *testing.T) {
 		}
 	})
 }
+
+func TestMethodHoverLiteralReceiver(t *testing.T) {
+	// The receiver of 0007-listmap's shape: a collection literal, typed by
+	// the real inference rather than name resolution.
+	src := "const Doubled = [1, 2, 3].map(fn(x: int): int { return x * 2 })\n"
+	doc := testView(src)
+
+	h := hover(doc, strings.Index(src, ".map")+2)
+	if h == nil {
+		t.Fatal("no hover on map with a literal receiver")
+	}
+	for _, want := range []string{"map(func: fn(int): R): list<R>", "A new list: func applied to each element, in order."} {
+		if !strings.Contains(h.Contents.Value, want) {
+			t.Errorf("hover = %q, want it to contain %q", h.Contents.Value, want)
+		}
+	}
+}
+
+func TestMethodHoverParamReceiver(t *testing.T) {
+	t.Run("lambda parameter", func(t *testing.T) {
+		src := "const ys = [1, 2].map(fn(x: int): int { return x.add(1) })\n"
+		doc := testView(src)
+		h := hover(doc, strings.Index(src, "x.add")+3)
+		if h == nil {
+			t.Fatal("no hover on a method through a lambda parameter")
+		}
+		if !strings.Contains(h.Contents.Value, "The + operator: the sum.") {
+			t.Errorf("hover = %q, want int's add doc", h.Contents.Value)
+		}
+	})
+
+	t.Run("self-typed method parameter", func(t *testing.T) {
+		src := "type Lvl = int8 impl {\n  /// the larger of the two\n  max(other: self): self {\n    return other\n  }\n" +
+			"  pick(other: self): self {\n    return other.max(self)\n  }\n}\n"
+		doc := testView(src)
+		h := hover(doc, strings.Index(src, "other.max")+7)
+		if h == nil {
+			t.Fatal("no hover on a method through a self-typed parameter")
+		}
+		for _, want := range []string{"max(other: self): self", "the larger of the two"} {
+			if !strings.Contains(h.Contents.Value, want) {
+				t.Errorf("hover = %q, want it to contain %q", h.Contents.Value, want)
+			}
+		}
+	})
+}
