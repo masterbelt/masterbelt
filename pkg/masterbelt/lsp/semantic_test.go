@@ -135,3 +135,34 @@ func TestSemanticTokensAssert(t *testing.T) {
 		}
 	}
 }
+
+func TestSemanticTokensDeclaredNames(t *testing.T) {
+	// The names a declaration introduces classify by what they declare: a
+	// type declaration's name (and a generic parameter) as a type, a use
+	// declaration's binding as a namespace — and every keyword uniformly as
+	// a keyword, so `type` and `use` colour exactly like `const`.
+	doc := abstract.NewDocument([]byte("use geo from \"geo.belt\"\ntype Opt<T> = T | null\n"))
+	got := decode(semanticTokens(doc).Data)
+
+	want := []decodedToken{
+		{0, 0, 3, stKeyword, 0},               // use
+		{0, 4, 3, stNamespace, smDeclaration}, // geo
+		{0, 8, 4, stKeyword, 0},               // from
+		{0, 13, 10, stString, 0},              // "geo.belt"
+		{1, 0, 4, stKeyword, 0},               // type
+		{1, 5, 3, stType, smDeclaration},      // Opt
+		{1, 9, 1, stType, smDeclaration},      // T (declared parameter)
+		{1, 12, 1, stOperator, 0},             // =
+		{1, 14, 1, stType, 0},                 // T (use in the body)
+		{1, 18, 4, stKeyword, 0},              // null
+	}
+
+	if len(got) != len(want) {
+		t.Fatalf("got %d tokens, want %d:\n got:  %+v\n want: %+v", len(got), len(want), got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("token[%d] = %+v, want %+v", i, got[i], want[i])
+		}
+	}
+}

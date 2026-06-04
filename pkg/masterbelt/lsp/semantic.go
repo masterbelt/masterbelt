@@ -24,6 +24,7 @@ const (
 	stNumber
 	stString
 	stOperator
+	stNamespace
 )
 
 // Semantic token modifier bits, matching the legend's TokenModifiers order.
@@ -35,7 +36,7 @@ const (
 // semanticLegend is advertised at initialize and tells the editor how to read
 // the token type and modifier indices the server emits.
 var semanticLegend = protocol.SemanticTokensLegend{
-	TokenTypes:     []string{"keyword", "comment", "type", "variable", "number", "string", "operator"},
+	TokenTypes:     []string{"keyword", "comment", "type", "variable", "number", "string", "operator", "namespace"},
 	TokenModifiers: []string{"declaration", "readonly"},
 }
 
@@ -94,7 +95,11 @@ func semanticTokens(doc *abstract.Document) *protocol.SemanticTokens {
 // no colour (whitespace, newlines, EOF, illegal bytes).
 func classifyToken(kind token.Kind, parent cst.Kind) (tokenType, mods int, ok bool) {
 	switch kind {
-	case token.Const, token.Pub, token.Assert:
+	case token.Const, token.Pub, token.Assert, token.Type, token.Impl, token.Fn,
+		token.Return, token.Self, token.Null, token.Extern, token.Builtin,
+		token.Use, token.From, token.True, token.False:
+		// Every keyword, uniformly — the cold-start grammar colours the same
+		// set keyword.control, so the two layers cannot drift apart per word.
 		return stKeyword, 0, true
 	case token.LineComment, token.BlockComment, token.DocComment:
 		return stComment, 0, true
@@ -110,6 +115,17 @@ func classifyToken(kind token.Kind, parent cst.Kind) (tokenType, mods int, ok bo
 			// A type name: a const annotation (now a full type expression) or a
 			// name inside a type expression.
 			return stType, 0, true
+		case cst.TypeDecl:
+			// The declared type's own name.
+			return stType, smDeclaration, true
+		case cst.GenericParam:
+			// A declared type parameter — its uses in the body sit in
+			// TypeName nodes and classify as types, so the declaration
+			// matches them.
+			return stType, smDeclaration, true
+		case cst.UseDecl:
+			// The namespace a use declaration binds (use geo from ...).
+			return stNamespace, smDeclaration, true
 		case cst.NameRef:
 			return stVariable, smReadonly, true
 		case cst.ConstDecl:
