@@ -75,6 +75,10 @@ type queries interface {
 	// usesOf returns where the project layer resolved a file's use paths; a
 	// use absent from the table resolved to no file.
 	usesOf(file FileID) map[*ast.UseDecl]FileID
+	// reachableFrom returns the set of files the use graph reaches from file,
+	// itself included — the fact behind cyclic_module: an import whose
+	// target's reachable set contains the importer closes a cycle.
+	reachableFrom(file FileID) map[FileID]bool
 	// registry returns the builtin registry the analysis types and evaluates
 	// against — the source of primitive types, their value ranges, and the
 	// native implementations of their operator methods.
@@ -457,27 +461,31 @@ func checkUses(fileID FileID, file *ast.File, q queries, at func(ast.Node) span,
 			}
 			diags.Add(newNotExportedDiagnostic(s.offset, s.width, name, u.Path))
 		}
-		if reaches(q, target, fileID, map[FileID]bool{}) {
+		if q.reachableFrom(target)[fileID] {
 			diags.Add(newCyclicModuleDiagnostic(s.offset, s.width, u.Path))
 		}
 	}
 }
 
-// reaches reports whether the use graph can reach goal from id.
-func reaches(q queries, id, goal FileID, visited map[FileID]bool) bool {
-	if id == goal {
-		return true
-	}
-	if visited[id] {
-		return false
-	}
-	visited[id] = true
-	for _, next := range q.usesOf(id) {
-		if reaches(q, next, goal, visited) {
-			return true
+// computeReachable walks the use graph from from, collecting every file it
+// reaches (from itself included, so a self-import closes a cycle trivially).
+// It is the shared rule behind the reachableFrom query: the walk reads usesOf
+// through q, so the memoizing engine records every visited file's input as a
+// dependency and the set recomputes only when a file it covers changes.
+func computeReachable(q queries, from FileID) map[FileID]bool {
+	reached := map[FileID]bool{from: true}
+	queue := []FileID{from}
+	for len(queue) > 0 {
+		id := queue[0]
+		queue = queue[1:]
+		for _, next := range q.usesOf(id) {
+			if !reached[next] {
+				reached[next] = true
+				queue = append(queue, next)
+			}
 		}
 	}
-	return false
+	return reached
 }
 
 // walkRefs visits the value references of an expression: every value-position
@@ -548,6 +556,8 @@ type directQueries struct {
 	typing    map[*ast.ConstDecl]bool
 	valueMemo map[*ast.ConstDecl]*ir.Constant
 	valuing   map[*ast.ConstDecl]bool
+
+	reach map[FileID]map[FileID]bool
 }
 
 func newDirectQueries(files map[FileID]*ast.File, uses map[FileID]map[*ast.UseDecl]FileID, reg *builtin.Registry) *directQueries {
@@ -567,6 +577,7 @@ func newDirectQueries(files map[FileID]*ast.File, uses map[FileID]map[*ast.UseDe
 		typing:    map[*ast.ConstDecl]bool{},
 		valueMemo: map[*ast.ConstDecl]*ir.Constant{},
 		valuing:   map[*ast.ConstDecl]bool{},
+		reach:     map[FileID]map[FileID]bool{},
 	}
 	for id, f := range files {
 		if f == nil {
@@ -687,3 +698,12 @@ func (d *directQueries) typeDefs(f FileID) []*ir.TypeDef { return d.typeDefsOf(f
 func (d *directQueries) universe(f FileID) map[string]*ir.TypeDef { return d.typeDefsOf(f).universe }
 
 func (d *directQueries) usesOf(f FileID) map[*ast.UseDecl]FileID { return d.uses[f] }
+
+func (d *directQueries) reachableFrom(f FileID) map[FileID]bool {
+	if r, ok := d.reach[f]; ok {
+		return r
+	}
+	r := computeReachable(d, f)
+	d.reach[f] = r
+	return r
+}

@@ -39,14 +39,15 @@ const soleFileID FileID = ""
 type queryKind int
 
 const (
-	qInput    queryKind = iota // a file's AST + resolved use targets (the engine's only inputs)
-	qSymbols                   // a file's name -> declaration table
-	qResolve                   // *ast.Identifier -> referent declaration
-	qTypeOf                    // *ast.ConstDecl -> ir.Type
-	qValue                     // *ast.ConstDecl -> *ir.Constant
-	qTypeDefs                  // a file's resolved type definitions (and its annotation universe)
-	qExports                   // a file's public surface: pub decls + pub use re-exports
-	qImports                   // a file's import bindings: selective/wildcard names + namespaces
+	qInput     queryKind = iota // a file's AST + resolved use targets (the engine's only inputs)
+	qSymbols                    // a file's name -> declaration table
+	qResolve                    // *ast.Identifier -> referent declaration
+	qTypeOf                     // *ast.ConstDecl -> ir.Type
+	qValue                      // *ast.ConstDecl -> *ir.Constant
+	qTypeDefs                   // a file's resolved type definitions (and its annotation universe)
+	qExports                    // a file's public surface: pub decls + pub use re-exports
+	qImports                    // a file's import bindings: selective/wildcard names + namespaces
+	qReachable                  // the files a file's use graph reaches (itself included)
 )
 
 // queryKey identifies a memoized computation. The per-declaration queries
@@ -62,11 +63,12 @@ type queryKey struct {
 	id   *ast.Identifier
 }
 
-func inputKey(file FileID) queryKey    { return queryKey{kind: qInput, file: file} }
-func symbolsKey(file FileID) queryKey  { return queryKey{kind: qSymbols, file: file} }
-func typeDefsKey(file FileID) queryKey { return queryKey{kind: qTypeDefs, file: file} }
-func exportsKey(file FileID) queryKey  { return queryKey{kind: qExports, file: file} }
-func importsKey(file FileID) queryKey  { return queryKey{kind: qImports, file: file} }
+func inputKey(file FileID) queryKey     { return queryKey{kind: qInput, file: file} }
+func symbolsKey(file FileID) queryKey   { return queryKey{kind: qSymbols, file: file} }
+func typeDefsKey(file FileID) queryKey  { return queryKey{kind: qTypeDefs, file: file} }
+func exportsKey(file FileID) queryKey   { return queryKey{kind: qExports, file: file} }
+func importsKey(file FileID) queryKey   { return queryKey{kind: qImports, file: file} }
+func reachableKey(file FileID) queryKey { return queryKey{kind: qReachable, file: file} }
 
 func resolveKey(file FileID, id *ast.Identifier) queryKey {
 	return queryKey{kind: qResolve, file: file, id: id}
@@ -235,6 +237,10 @@ func equalValue(kind queryKind, old, new any) bool {
 		a, _ := old.(exports)
 		b, _ := new.(exports)
 		return maps.Equal(a.consts, b.consts) && maps.Equal(a.types, b.types)
+	case qReachable:
+		a, _ := old.(map[FileID]bool)
+		b, _ := new.(map[FileID]bool)
+		return maps.Equal(a, b)
 	case qTypeDefs:
 		a, _ := old.(typeDefs)
 		b, _ := new.(typeDefs)
@@ -436,6 +442,10 @@ func (db *database) compute(key queryKey) any {
 		return db.computeExports(key.file)
 	case qImports:
 		return db.computeImports(key.file)
+	case qReachable:
+		// The walk reads each visited file's input through the engine, so
+		// the set's dependencies are exactly the files it covers.
+		return computeReachable(engineQueries{db}, key.file)
 	default:
 		return nil
 	}
@@ -459,6 +469,8 @@ func cycleValue(key queryKey) any {
 		return exports{}
 	case qImports:
 		return importTable{}
+	case qReachable:
+		return map[FileID]bool{} // unreachable: the walk reads only inputs
 	default:
 		return nil
 	}
@@ -519,6 +531,11 @@ func (e engineQueries) importsOf(file FileID) importTable {
 func (e engineQueries) usesOf(file FileID) map[*ast.UseDecl]FileID {
 	in, _ := e.db.read(inputKey(file)).(fileInput)
 	return in.uses
+}
+
+func (e engineQueries) reachableFrom(file FileID) map[FileID]bool {
+	m, _ := e.db.read(reachableKey(file)).(map[FileID]bool)
+	return m
 }
 
 func (e engineQueries) registry() *builtin.Registry { return e.db.reg }

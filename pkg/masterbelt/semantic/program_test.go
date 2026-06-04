@@ -453,3 +453,43 @@ func TestProgramQualifiedTypeThroughReexport(t *testing.T) {
 		t.Errorf("c = %s, want Color", typ)
 	}
 }
+
+func TestProgramCyclicModuleThreeWay(t *testing.T) {
+	// Every edge of a three-file cycle reports cyclic_module — the reachable
+	// sets must be exact even when their computations interleave.
+	p := buildProgram(map[string]string{
+		"a.belt": "use b from \"b.belt\"\npub const A = 1\n",
+		"b.belt": "use c from \"c.belt\"\npub const B = 2\n",
+		"c.belt": "use a from \"a.belt\"\npub const C = 3\n",
+	})
+	for _, file := range []FileID{"a.belt", "b.belt", "c.belt"} {
+		findDiag(t, p, file, CodeCyclicModule)
+	}
+}
+
+func TestProgramCyclicModuleSelfImport(t *testing.T) {
+	// A file importing itself is the smallest cycle.
+	p := buildProgram(map[string]string{
+		"a.belt": "use a from \"a.belt\"\npub const A = 1\n",
+	})
+	findDiag(t, p, "a.belt", CodeCyclicModule)
+}
+
+func TestProgramReachableEarlyCutoff(t *testing.T) {
+	// Editing a file outside a use subgraph must not recompute that
+	// subgraph's reachability.
+	p := buildProgram(map[string]string{
+		"a.belt": "pub const X = 1\n",
+		"b.belt": "use { X } from \"a.belt\"\nconst Y = X\n",
+		"c.belt": "pub const Z = 9\n",
+	})
+
+	p.SetFile("c.belt", abstract.NewDocument([]byte("pub const Z = 10\n")), nil)
+	p.Refresh()
+
+	for _, id := range []FileID{"a.belt", "b.belt"} {
+		if p.db.computed[reachableKey(id)] {
+			t.Errorf("reachability of %s was recomputed; the edit to c.belt must not reach it", id)
+		}
+	}
+}
