@@ -14,7 +14,9 @@ Module
 Module
   Const "start"
     type invalid
-    value <none>
+    value Reference -> "Origin"
+    eval 0
   Const "path"
     type list<invalid>
-    value <none>
+    value [Reference -> "Origin", Reference -> "Unit"]
+    eval [0, 1]

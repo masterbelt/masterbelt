@@ -28,13 +28,24 @@ func (p *parser) parseTypeExpr() cst.Green {
 	return cst.NewNode(cst.UnionType, children)
 }
 
-// parsePrimaryType parses a single, non-union type: a named type (with optional
-// generic arguments), the self or null type, a record type, or a function type.
-// The cursor sits on the type's first token.
+// parsePrimaryType parses a single, non-union type: a named type (qualified by
+// a namespace import as in geo.Point, with optional generic arguments), the
+// self or null type, a record type, or a function type. The cursor sits on the
+// type's first token.
 func (p *parser) parsePrimaryType() cst.Green {
 	switch p.kind() {
 	case token.Ident:
-		children := []cst.Green{p.bump()} // the type name
+		children := []cst.Green{p.bump()} // the type name, or its namespace qualifier
+		if p.peekSignificant() == token.Dot {
+			p.skipTrivia(&children)
+			children = append(children, p.bump()) // "."
+			if p.peekSignificant() == token.Ident {
+				p.skipTrivia(&children)
+				children = append(children, p.bump()) // the qualified type name
+			} else {
+				p.report(newExpectedIdentifierDiagnostic(p.lastStart, 0))
+			}
+		}
 		if p.peekSignificant() == token.Lt {
 			p.skipTrivia(&children)
 			children = append(children, p.parseGenericArgs())

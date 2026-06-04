@@ -23,15 +23,17 @@ File
       Whitespace " "
       TypeName
         Ident "geo"
-  Error
-    Dot "."
-    Ident "Point"
+        Dot "."
+        Ident "Point"
     Whitespace " "
-    Assign "="
-    Whitespace " "
-    Ident "geo"
-    Dot "."
-    Ident "Origin"
+    Initializer
+      Assign "="
+      Whitespace " "
+      MemberExpr
+        NameRef
+          Ident "geo"
+        Dot "."
+        Ident "Origin"
   ConstDecl
     Newline "\n"
     Const "const"
@@ -46,28 +48,28 @@ File
           Lt "<"
           TypeName
             Ident "geo"
-  Error
-    Dot "."
-    Ident "Point"
-    Gt ">"
+            Dot "."
+            Ident "Point"
+          Gt ">"
     Whitespace " "
-    Assign "="
-    Whitespace " "
-    LBracket "["
-    Ident "geo"
-    Dot "."
-    Ident "Origin"
-    Comma ","
-    Whitespace " "
-    Ident "geo"
-    Dot "."
-    Ident "Unit"
-    RBracket "]"
+    Initializer
+      Assign "="
+      Whitespace " "
+      CollectionLit
+        LBracket "["
+        MemberExpr
+          NameRef
+            Ident "geo"
+          Dot "."
+          Ident "Origin"
+        Comma ","
+        Whitespace " "
+        MemberExpr
+          NameRef
+            Ident "geo"
+          Dot "."
+          Ident "Unit"
+        RBracket "]"
   Newline "\n"
   EOF ""
 # diagnostics
-error[masterbelt.parser.concrete.expected_assign] 5:14 expected '='
-error[masterbelt.parser.concrete.unexpected_token] 5:17 unexpected token: Dot
-error[masterbelt.parser.concrete.expected_type] 6:18 expected type
-error[masterbelt.parser.concrete.expected_assign] 6:18 expected '='
-error[masterbelt.parser.concrete.unexpected_token] 6:21 unexpected token: Dot

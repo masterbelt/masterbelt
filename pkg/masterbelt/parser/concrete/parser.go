@@ -15,7 +15,7 @@
 //	Initializer   := "=" Expr
 //	TypeExpr      := PrimaryType ( "|" PrimaryType )*
 //	PrimaryType   := TypeName | RecordType | FuncType
-//	TypeName      := ( Ident [GenericArgs] ) | "self" | "null"
+//	TypeName      := ( Ident ["." Ident] [GenericArgs] ) | "self" | "null"
 //	GenericArgs   := "<" TypeExpr ( "," TypeExpr )* ">"
 //	RecordType    := "{" Field* "}"
 //	Field         := Ident ":" TypeExpr
