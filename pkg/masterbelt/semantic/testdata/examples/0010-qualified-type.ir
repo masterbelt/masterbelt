@@ -13,10 +13,10 @@ Module
 # main.belt
 Module
   Const "start"
-    type invalid
+    type Point
     value Reference -> "Origin"
     eval 0
   Const "path"
-    type list<invalid>
+    type list<Point>
     value [Reference -> "Origin", Reference -> "Unit"]
     eval [0, 1]

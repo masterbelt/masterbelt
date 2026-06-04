@@ -373,3 +373,83 @@ func TestProgramValueCutoffKeepsFnIdentity(t *testing.T) {
 	}
 	t.Fatal("main.belt declares no g")
 }
+
+func TestProgramQualifiedTypes(t *testing.T) {
+	// geo.Point works in an annotation, a generic application, a type-decl
+	// body, and a function-literal signature — and names the same definition
+	// the selective import binds, so the two forms are one type.
+	srcs := map[string]string{
+		"geometry.belt": "pub type Point = int32\npub type Opt<T> = T | null\npub const Origin = 0\n",
+		"main.belt": "use geo from \"geometry.belt\"\nuse { Point } from \"geometry.belt\"\n" +
+			"const start: geo.Point = geo.Origin\n" +
+			"const same: Point = start\n" +
+			"type MyOpt = geo.Opt<int8>\n" +
+			"const f = fn(p: geo.Point): geo.Point { return p }\n",
+	}
+	p := buildProgram(srcs)
+	assertClean(t, p, "main.belt")
+	if typ, eval := constInfo(p, "main.belt", "start"); typ != "Point" || eval != "0" {
+		t.Errorf("start = %s / %s, want Point / 0", typ, eval)
+	}
+	if typ, _ := constInfo(p, "main.belt", "same"); typ != "Point" {
+		t.Errorf("same = %s, want Point (geo.Point and Point are one definition)", typ)
+	}
+}
+
+func TestProgramQualifiedTypeUnknown(t *testing.T) {
+	// A qualified name the target does not export — and a qualifier that
+	// names no namespace — both report unknown_type with the full form.
+	srcs := map[string]string{
+		"geometry.belt": "pub type Point = int32\n",
+		"main.belt":     "use geo from \"geometry.belt\"\nconst a: geo.Bogus = 1\nconst b: bogus.Point = 2\n",
+	}
+	p := buildProgram(srcs)
+	var named []string
+	for _, d := range p.Diagnostics("main.belt") {
+		if d.Code == CodeUnknownType {
+			named = append(named, d.Message)
+		}
+	}
+	if len(named) != 2 || !strings.Contains(named[0], "geo.Bogus") || !strings.Contains(named[1], "bogus.Point") {
+		t.Errorf("unknown_type messages = %v, want geo.Bogus and bogus.Point", named)
+	}
+}
+
+func TestProgramQualifiedTypeInMethodSignature(t *testing.T) {
+	// Qualified names resolve in method signatures, and an unknown one in a
+	// parameter is reported rather than becoming a silent type variable.
+	srcs := map[string]string{
+		"geometry.belt": "pub type Point = int32\n",
+		"main.belt": "use geo from \"geometry.belt\"\n" +
+			"pub type W = int8 impl {\n  pub f(p: geo.Point): geo.Point {\n    return p\n  }\n}\n",
+	}
+	assertClean(t, buildProgram(srcs), "main.belt")
+
+	srcs["main.belt"] = "use geo from \"geometry.belt\"\n" +
+		"pub type W = int8 impl {\n  pub f(p: geo.Bogus): int8 {\n    return 1\n  }\n}\n"
+	findDiag(t, buildProgram(srcs), "main.belt", CodeUnknownType)
+}
+
+func TestProgramQualifiedTypeDanglingQualifier(t *testing.T) {
+	// `geo.` is already a parse diagnostic; the semantic layer stays silent.
+	srcs := map[string]string{
+		"geometry.belt": "pub type Point = int32\n",
+		"main.belt":     "use geo from \"geometry.belt\"\nconst a: geo. = 1\n",
+	}
+	assertClean(t, buildProgram(srcs), "main.belt")
+}
+
+func TestProgramQualifiedTypeThroughReexport(t *testing.T) {
+	// A namespace surfaces its target's re-exports: geo.Color reaches through
+	// geometry's pub use into palette.
+	srcs := map[string]string{
+		"palette.belt":  "pub type Color = int8\n",
+		"geometry.belt": "pub use { Color } from \"palette.belt\"\n",
+		"main.belt":     "use geo from \"geometry.belt\"\nconst c: geo.Color = 1\n",
+	}
+	p := buildProgram(srcs)
+	assertClean(t, p, "main.belt")
+	if typ, _ := constInfo(p, "main.belt", "c"); typ != "Color" {
+		t.Errorf("c = %s, want Color", typ)
+	}
+}

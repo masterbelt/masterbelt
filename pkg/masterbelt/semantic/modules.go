@@ -73,6 +73,20 @@ func addBinding[T comparable](m map[string]binding[T], name string, target T) {
 	m[name] = binding[T]{target: target}
 }
 
+// qualifiedFrom builds the namespace-qualified type lookup (geo.Point) over an
+// import table: the qualifier must be one of its namespace bindings and the
+// name among the target's exported types. Reads go through q, so the engine
+// tracks the target's exports as a dependency of whatever resolves the name.
+func qualifiedFrom(q queries, imp importTable) func(namespace, name string) *ir.TypeDef {
+	return func(namespace, name string) *ir.TypeDef {
+		target, ok := imp.namespaces[namespace]
+		if !ok {
+			return nil
+		}
+		return q.exportsOf(target).types[name]
+	}
+}
+
 // resolveMemberThrough resolves a namespace member access (geo.Origin) through
 // q: the receiver must name a namespace import of file — and resolve to no
 // value, since locals and imported values shadow namespaces — and the member
@@ -203,16 +217,16 @@ func buildExports(q queries, file *ast.File, uses map[*ast.UseDecl]FileID, ownTy
 }
 
 // buildTypeDefs resolves a file's type declarations with its imported type
-// names in scope (its own declarations shadow them), and assembles the
-// annotation universe from the same definitions. imp must be the file's import
-// table.
-func buildTypeDefs(file *ast.File, reg *builtin.Registry, imp importTable) typeDefs {
+// names in scope (its own declarations shadow them) and its namespace-
+// qualified names resolvable through q, and assembles the annotation universe
+// from the same definitions. imp must be the file's import table.
+func buildTypeDefs(q queries, file *ast.File, reg *builtin.Registry, imp importTable) typeDefs {
 	td := typeDefs{byName: map[string]*ir.TypeDef{}, universe: map[string]*ir.TypeDef{}}
 	if file == nil {
 		return td
 	}
 	extern := externTypes(imp)
-	td.list = resolveTypes(file, reg, nil, nil, extern)
+	td.list = resolveTypes(file, reg, nil, nil, extern, qualifiedFrom(q, imp))
 	for _, def := range td.list {
 		if def.Name != "" {
 			if _, ok := td.byName[def.Name]; !ok {
@@ -255,5 +269,5 @@ func (db *database) computeExports(f FileID) exports {
 func (db *database) computeTypeDefs(f FileID) typeDefs {
 	in, _ := db.read(inputKey(f)).(fileInput)
 	imp, _ := db.read(importsKey(f)).(importTable)
-	return buildTypeDefs(in.file, db.reg, imp)
+	return buildTypeDefs(engineQueries{db}, in.file, db.reg, imp)
 }

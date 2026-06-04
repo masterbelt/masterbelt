@@ -46,6 +46,9 @@ type Env interface {
 	// Universe returns the named type definitions annotations resolve in: the
 	// file's own type declarations shadowing its imported ones.
 	Universe() map[string]*ir.TypeDef
+	// QualifiedType resolves a namespace-qualified type name (geo.Point) to
+	// the definition the namespace's target exports, or nil.
+	QualifiedType(namespace, name string) *ir.TypeDef
 	// Registry returns the builtin registry the program types against.
 	Registry() *builtin.Registry
 }
@@ -59,6 +62,9 @@ type scope interface {
 	// universe is the named type definitions annotations resolve in within
 	// this scope.
 	universe() map[string]*ir.TypeDef
+	// qualified is the namespace-qualified type lookup in effect within this
+	// scope (nil when no namespaces are in scope).
+	qualified() func(namespace, name string) *ir.TypeDef
 	// leaf types an expression form whose meaning is context-specific — a value
 	// name, self, a field access, a conversion, the null literal — returning
 	// ir.Invalid when the form is not meaningful in this scope.
@@ -73,7 +79,7 @@ type scope interface {
 // pass resolves it again with reporting enabled.
 func Decl(decl *ast.ConstDecl, env Env) ir.Type {
 	if decl.Type != nil {
-		r := &TypeResolver{Reg: env.Registry(), Defs: env.Universe()}
+		r := &TypeResolver{Reg: env.Registry(), Defs: env.Universe(), Qualified: env.QualifiedType}
 		return r.ResolveType(decl.Type, nil)
 	}
 	if decl.Value == nil {
@@ -123,7 +129,7 @@ func exprType(e ast.Expr, s scope) ir.Type {
 // values, typed in a funcScope over s; an omitted parameter type is ir.Invalid
 // here (only a checking context can supply it).
 func funcLitType(e *ast.FuncLit, s scope) ir.Type {
-	r := &TypeResolver{Reg: s.registry(), Defs: s.universe()}
+	r := &TypeResolver{Reg: s.registry(), Defs: s.universe(), Qualified: s.qualified()}
 	params := make([]ir.Type, len(e.Params))
 	names := make(map[string]ir.Type, len(e.Params))
 	for i, p := range e.Params {
@@ -173,6 +179,8 @@ type funcScope struct {
 func (s funcScope) registry() *builtin.Registry { return s.outer.registry() }
 
 func (s funcScope) universe() map[string]*ir.TypeDef { return s.outer.universe() }
+
+func (s funcScope) qualified() func(namespace, name string) *ir.TypeDef { return s.outer.qualified() }
 
 func (s funcScope) leaf(e ast.Expr) ir.Type {
 	if id, ok := e.(*ast.Identifier); ok {
@@ -241,6 +249,8 @@ func (s constScope) registry() *builtin.Registry { return s.env.Registry() }
 
 func (s constScope) universe() map[string]*ir.TypeDef { return s.env.Universe() }
 
+func (s constScope) qualified() func(namespace, name string) *ir.TypeDef { return s.env.QualifiedType }
+
 func (s constScope) leaf(e ast.Expr) ir.Type {
 	switch e := e.(type) {
 	case *ast.Identifier:
@@ -263,8 +273,11 @@ func (s constScope) leaf(e ast.Expr) ir.Type {
 type BodyScope struct {
 	Reg      *builtin.Registry
 	Universe map[string]*ir.TypeDef
-	Self     ir.Type
-	Params   map[string]ir.Type
+	// Qualified is the namespace-qualified type lookup the body's annotations
+	// and conversions resolve through, or nil when no namespaces are in scope.
+	Qualified func(namespace, name string) *ir.TypeDef
+	Self      ir.Type
+	Params    map[string]ir.Type
 }
 
 // Body infers the type of a method-body expression: self, a parameter, a
@@ -275,6 +288,8 @@ func Body(e ast.Expr, s BodyScope) ir.Type { return exprType(e, s) }
 func (s BodyScope) registry() *builtin.Registry { return s.Reg }
 
 func (s BodyScope) universe() map[string]*ir.TypeDef { return s.Universe }
+
+func (s BodyScope) qualified() func(namespace, name string) *ir.TypeDef { return s.Qualified }
 
 func (s BodyScope) leaf(e ast.Expr) ir.Type {
 	switch e := e.(type) {
@@ -541,7 +556,7 @@ func checkFuncLitAgainst(lit *ast.FuncLit, want *ir.Func, s scope, subst map[str
 		sink.arityMismatch(lit, len(lit.Params), len(want.Params))
 		return ir.Invalid
 	}
-	r := &TypeResolver{Reg: reg, Defs: s.universe()}
+	r := &TypeResolver{Reg: reg, Defs: s.universe(), Qualified: s.qualified()}
 	params := make([]ir.Type, len(lit.Params))
 	names := make(map[string]ir.Type, len(lit.Params))
 	for i, p := range lit.Params {
@@ -871,7 +886,7 @@ func observe(sink *Sink, fired *bool) *Sink {
 // returns is built from the same walk, so it agrees with funcLitType's (the
 // silent twin over exprType) without typing the body a second time.
 func checkFuncLit(lit *ast.FuncLit, s scope, sink *Sink) ir.Type {
-	r := &TypeResolver{Reg: s.registry(), Defs: s.universe()}
+	r := &TypeResolver{Reg: s.registry(), Defs: s.universe(), Qualified: s.qualified()}
 	params := make([]ir.Type, len(lit.Params))
 	names := make(map[string]ir.Type, len(lit.Params))
 	for i, p := range lit.Params {

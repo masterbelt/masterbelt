@@ -103,6 +103,7 @@ func funcLitTypesOf(db *database, fileID FileID, file *ast.File) map[*ast.FuncLi
 	q := engineQueries{db}
 	env := typeEnv{q: q, file: fileID}
 	reg := q.registry()
+	qualified := qualifiedFrom(q, q.importsOf(fileID))
 	for _, decl := range file.Decls {
 		if decl.Value == nil {
 			continue
@@ -111,7 +112,7 @@ func funcLitTypesOf(db *database, fileID FileID, file *ast.File) map[*ast.FuncLi
 		// annotation resolved silently (its problems are already diagnosed).
 		annType := ir.Invalid
 		if decl.Type != nil {
-			r := &infer.TypeResolver{Reg: reg, Defs: q.universe(fileID)}
+			r := &infer.TypeResolver{Reg: reg, Defs: q.universe(fileID), Qualified: qualified}
 			annType = r.ResolveType(decl.Type, nil)
 		}
 		if annType != ir.Invalid {
@@ -120,7 +121,7 @@ func funcLitTypesOf(db *database, fileID FileID, file *ast.File) map[*ast.FuncLi
 			infer.Check(decl.Value, env, sink)
 		}
 	}
-	checkMethodBodies(file, reg, q.typeDefs(fileID), q.universe(fileID), sink)
+	checkMethodBodies(file, reg, q.typeDefs(fileID), q.universe(fileID), qualified, sink)
 	return out
 }
 

@@ -96,7 +96,10 @@ func (e typeEnv) ResolveMember(m *ast.MemberExpr) *ast.ConstDecl {
 }
 func (e typeEnv) TypeOf(decl *ast.ConstDecl) ir.Type { return e.q.typeOf(decl) }
 func (e typeEnv) Universe() map[string]*ir.TypeDef   { return e.q.universe(e.file) }
-func (e typeEnv) Registry() *builtin.Registry        { return e.q.registry() }
+func (e typeEnv) QualifiedType(namespace, name string) *ir.TypeDef {
+	return qualifiedFrom(e.q, e.q.importsOf(e.file))(namespace, name)
+}
+func (e typeEnv) Registry() *builtin.Registry { return e.q.registry() }
 
 // exprSink wires the checking walk's findings to their diagnostics. The
 // Checked stream is left unset — the const path hooks it to the eval-based
@@ -220,7 +223,12 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 		// declarations shadowing its imported ones, over the registry.
 		annType := ir.Invalid
 		if decl.Type != nil {
-			r := &infer.TypeResolver{Reg: reg, Defs: q.universe(fileID), Report: typeNameReporter(fileID, q, at, diags)}
+			r := &infer.TypeResolver{
+				Reg:       reg,
+				Defs:      q.universe(fileID),
+				Qualified: qualifiedFrom(q, q.importsOf(fileID)),
+				Report:    typeNameReporter(fileID, q, at, diags),
+			}
 			annType = r.ResolveType(decl.Type, nil)
 		}
 
@@ -310,8 +318,9 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 	// diagnostics carry offsets that shift on every edit), so the reporting
 	// pass re-resolves the declarations fresh and discards the definitions.
 	module.Types = q.typeDefs(fileID)
-	resolveTypes(file, reg, at, diags, externTypes(q.importsOf(fileID)))
-	checkMethodBodies(file, reg, module.Types, q.universe(fileID), exprSink(at, diags))
+	imp := q.importsOf(fileID)
+	resolveTypes(file, reg, at, diags, externTypes(imp), qualifiedFrom(q, imp))
+	checkMethodBodies(file, reg, module.Types, q.universe(fileID), qualifiedFrom(q, imp), exprSink(at, diags))
 
 	items := diags.Items()
 	sort.SliceStable(items, func(i, j int) bool { return items[i].Offset < items[j].Offset })
@@ -667,7 +676,7 @@ func (d *directQueries) typeDefsOf(f FileID) typeDefs {
 		return typeDefs{}
 	}
 	d.resolving[f] = true
-	td := buildTypeDefs(d.files[f], d.reg, d.importsOf(f))
+	td := buildTypeDefs(d, d.files[f], d.reg, d.importsOf(f))
 	delete(d.resolving, f)
 	d.defs[f] = &td
 	return td

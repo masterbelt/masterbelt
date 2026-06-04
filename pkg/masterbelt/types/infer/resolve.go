@@ -13,9 +13,14 @@ import (
 // unknown name through Report (nil to report nothing, as when resolving the
 // prelude or a constant annotation before diagnostics run).
 type TypeResolver struct {
-	Reg    *builtin.Registry
-	Defs   map[string]*ir.TypeDef
-	Report func(node ast.Node, name string)
+	Reg  *builtin.Registry
+	Defs map[string]*ir.TypeDef
+	// Qualified resolves a namespace-qualified name (geo.Point) to the
+	// definition the namespace's target exports, or nil. A nil func means no
+	// namespaces are in scope (the prelude, a file without imports), so every
+	// qualified name is unknown.
+	Qualified func(namespace, name string) *ir.TypeDef
+	Report    func(node ast.Node, name string)
 }
 
 func (r *TypeResolver) reportUnknown(node ast.Node, name string) {
@@ -55,10 +60,13 @@ func (r *TypeResolver) ResolveType(t ast.TypeExpr, scope map[string]bool) ir.Typ
 	}
 }
 
-// resolveNamed resolves a named type: the self type, a generic parameter in
-// scope, a generic application, a builtin primitive, or a reference to a
-// declared type.
+// resolveNamed resolves a named type: a namespace-qualified type, the self
+// type, a generic parameter in scope, a generic application, a builtin
+// primitive, or a reference to a declared type.
 func (r *TypeResolver) resolveNamed(t *ast.NamedType, scope map[string]bool) ir.Type {
+	if t.Namespace != "" {
+		return r.resolveQualified(t, scope)
+	}
 	if t.Name == "self" {
 		return &ir.SelfType{}
 	}
@@ -84,6 +92,37 @@ func (r *TypeResolver) resolveNamed(t *ast.NamedType, scope map[string]bool) ir.
 	}
 	if def.Builtin {
 		return &ir.Builtin{Name: t.Name}
+	}
+	return &ir.Named{Def: def}
+}
+
+// resolveQualified resolves a namespace-qualified named type (geo.Point): the
+// qualifier must name a namespace import and the name one of its target's
+// exported types. The qualifier is opaque to the generic scope and the
+// registry — only the import surface can satisfy it — and a local type never
+// shadows it: types have no members, so the dotted form has exactly one
+// meaning.
+func (r *TypeResolver) resolveQualified(t *ast.NamedType, scope map[string]bool) ir.Type {
+	if t.Name == "" {
+		return ir.Invalid // a recovered geo. — already a parse diagnostic
+	}
+	var def *ir.TypeDef
+	if r.Qualified != nil {
+		def = r.Qualified(t.Namespace, t.Name)
+	}
+	if def == nil {
+		r.reportUnknown(t, t.Namespace+"."+t.Name)
+		return ir.Invalid
+	}
+	if len(t.Args) > 0 {
+		args := make([]ir.Type, len(t.Args))
+		for i, a := range t.Args {
+			args[i] = r.ResolveType(a, scope)
+		}
+		return &ir.App{Def: def, Args: args}
+	}
+	if def.Builtin {
+		return &ir.Builtin{Name: def.Name}
 	}
 	return &ir.Named{Def: def}
 }
@@ -114,7 +153,10 @@ func (r *TypeResolver) FreeTypeVars(scope map[string]bool, ts ...ast.TypeExpr) [
 	walk = func(t ast.TypeExpr) {
 		switch t := t.(type) {
 		case *ast.NamedType:
-			if len(t.Args) == 0 && t.Name != "self" && !scope[t.Name] && !seen[t.Name] && r.lookup(t.Name) == nil {
+			// A qualified name (geo.Point) is never a type variable: it can
+			// only mean a namespace's export, and resolves (or is reported)
+			// there.
+			if t.Namespace == "" && len(t.Args) == 0 && t.Name != "self" && !scope[t.Name] && !seen[t.Name] && r.lookup(t.Name) == nil {
 				seen[t.Name] = true
 				out = append(out, t.Name)
 			}

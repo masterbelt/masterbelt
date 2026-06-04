@@ -54,9 +54,10 @@ func checkDivByZero(e ast.Expr, env evalEnv, report func(node ast.Node)) {
 // its resolved signature. The walk is the same checking walk the const path
 // uses (infer.CheckBody), so the declared result type reaches into a returned
 // function or collection literal. universe is the file's annotation universe —
-// its own definitions shadowing its imported ones — so a type conversion in a
-// body resolves an imported type exactly as an annotation does.
-func checkMethodBodies(file *ast.File, reg *builtin.Registry, defs []*ir.TypeDef, universe map[string]*ir.TypeDef, sink *infer.Sink) {
+// its own definitions shadowing its imported ones — and qualified its
+// namespace-qualified lookup, so a type in a body resolves exactly as an
+// annotation does.
+func checkMethodBodies(file *ast.File, reg *builtin.Registry, defs []*ir.TypeDef, universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, sink *infer.Sink) {
 	for i, td := range file.Types {
 		def := defs[i]
 		self := &ir.Named{Def: def}
@@ -70,7 +71,7 @@ func checkMethodBodies(file *ast.File, reg *builtin.Registry, defs []*ir.TypeDef
 				params[p.Name] = substSelf(p.Type, self)
 			}
 			want := substSelf(irm.Result, self)
-			bs := infer.BodyScope{Reg: reg, Universe: universe, Self: self, Params: params}
+			bs := infer.BodyScope{Reg: reg, Universe: universe, Qualified: qualified, Self: self, Params: params}
 			for _, stmt := range m.Body {
 				ret, ok := stmt.(*ast.ReturnStmt)
 				if !ok || ret.Value == nil {
