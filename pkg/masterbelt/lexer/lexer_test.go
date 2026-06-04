@@ -230,6 +230,7 @@ func TestLexerOperators(t *testing.T) {
 		{"&&", token.AmpAmp}, {"||", token.PipePipe}, {"|", token.Pipe},
 		{"(", token.LParen}, {")", token.RParen},
 		{"{", token.LBrace}, {"}", token.RBrace},
+		{"[", token.LBracket}, {"]", token.RBracket},
 		{",", token.Comma}, {".", token.Dot},
 		{"true", token.True}, {"false", token.False},
 	}

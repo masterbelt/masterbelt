@@ -86,6 +86,10 @@ func (l *Lexer) Next() token.Token {
 		return l.scanFixed(start, 1, token.LBrace)
 	case c == '}':
 		return l.scanFixed(start, 1, token.RBrace)
+	case c == '[':
+		return l.scanFixed(start, 1, token.LBracket)
+	case c == ']':
+		return l.scanFixed(start, 1, token.RBracket)
 	case c == ',':
 		return l.scanFixed(start, 1, token.Comma)
 	case c == '.':

@@ -62,6 +62,8 @@ const (
 	RParen   // )
 	LBrace   // {
 	RBrace   // }
+	LBracket // [
+	RBracket // ]
 	Comma    // ,
 	Dot      // .
 	Pipe     // |
@@ -114,6 +116,8 @@ var kindNames = [...]string{
 	RParen:       "RParen",
 	LBrace:       "LBrace",
 	RBrace:       "RBrace",
+	LBracket:     "LBracket",
+	RBracket:     "RBracket",
 	Comma:        "Comma",
 	Dot:          "Dot",
 	Pipe:         "Pipe",
@@ -155,6 +159,8 @@ var spelling = map[Kind]string{
 	RParen:   ")",
 	LBrace:   "{",
 	RBrace:   "}",
+	LBracket: "[",
+	RBracket: "]",
 	Comma:    ",",
 	Dot:      ".",
 	Pipe:     "|",
