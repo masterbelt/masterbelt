@@ -165,6 +165,88 @@ func (p *parser) parseGenericParam() *cst.Node {
 	return cst.NewNode(cst.GenericParam, children)
 }
 
+// --- use declarations ---------------------------------------------------------
+
+// parseUseDecl parses a cross-file import, prepending the already-collected
+// leading trivia:
+//
+//	[pub] use ( Ident | UseList | "*" ) from String
+//
+// The target is a namespace name, a selective-import list, or the wildcard "*".
+// As elsewhere every expected element is optional in the parse: a malformed
+// declaration records a diagnostic and the element is simply absent from the
+// tree, keeping recovery local and the tree lossless.
+func (p *parser) parseUseDecl(lead []cst.Green) *cst.Node {
+	children := lead
+
+	if p.kind() == token.Pub {
+		children = append(children, p.bump())
+	}
+	p.skipTrivia(&children)
+	children = append(children, p.bump()) // "use" (guaranteed by the dispatcher)
+
+	switch p.peekSignificant() {
+	case token.Ident: // namespace import: use geo from "..."
+		p.skipTrivia(&children)
+		children = append(children, p.bump())
+	case token.LBrace: // selective import: use { a, b } from "..."
+		p.skipTrivia(&children)
+		children = append(children, p.parseUseList())
+	case token.Star: // wildcard import: use * from "..."
+		p.skipTrivia(&children)
+		children = append(children, p.bump())
+	default:
+		p.report(newExpectedIdentifierDiagnostic(p.lastStart, 0))
+	}
+
+	if p.peekSignificant() == token.From {
+		p.skipTrivia(&children)
+		children = append(children, p.bump()) // "from"
+	} else {
+		p.report(newExpectedFromDiagnostic(p.lastStart, 0))
+	}
+
+	if p.peekSignificant() == token.String {
+		p.skipTrivia(&children)
+		children = append(children, p.bump()) // the source path
+	} else {
+		p.report(newExpectedPathDiagnostic(p.lastStart, 0))
+	}
+
+	return cst.NewNode(cst.UseDecl, children)
+}
+
+// parseUseList parses the selective-import list: "{" Ident ("," Ident)* "}".
+// The cursor sits on "{". An empty list is reported — importing nothing has no
+// purpose — and, as in parseParamList, a comma promises another name.
+func (p *parser) parseUseList() *cst.Node {
+	children := []cst.Green{p.bump()} // "{"
+	if p.peekSignificant() == token.Ident {
+		for {
+			p.skipTrivia(&children)
+			children = append(children, p.bump()) // an imported name
+			if p.peekSignificant() == token.Comma {
+				p.skipTrivia(&children)
+				children = append(children, p.bump()) // ","
+				if p.peekSignificant() == token.Ident {
+					continue
+				}
+				p.report(newExpectedIdentifierDiagnostic(p.lastStart, 0))
+			}
+			break
+		}
+	} else {
+		p.report(newExpectedIdentifierDiagnostic(p.lastStart, 0))
+	}
+	if p.peekSignificant() == token.RBrace {
+		p.skipTrivia(&children)
+		children = append(children, p.bump()) // "}"
+	} else {
+		p.report(newUnexpectedTokenDiagnostic(p.cur().Offset, p.cur().Width, p.kind().String()))
+	}
+	return cst.NewNode(cst.UseList, children)
+}
+
 // --- implementations and method bodies --------------------------------------
 
 // parseImplBlock parses an implementation block: impl "{" MethodDecl* "}". The

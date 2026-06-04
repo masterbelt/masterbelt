@@ -1,6 +1,6 @@
 # tree
 File
-  Error
+  UseDecl
     LineComment "// The project entry point: pulls geometry.belt in by namespace and by name."
     Newline "\n"
     Use "use"
@@ -10,14 +10,16 @@ File
     From "from"
     Whitespace " "
     String "\"geometry.belt\""
+  UseDecl
     Newline "\n"
     Use "use"
     Whitespace " "
-    LBrace "{"
-    Whitespace " "
-    Ident "Point"
-    Whitespace " "
-    RBrace "}"
+    UseList
+      LBrace "{"
+      Whitespace " "
+      Ident "Point"
+      Whitespace " "
+      RBrace "}"
     Whitespace " "
     From "from"
     Whitespace " "
@@ -47,4 +49,3 @@ File
   Newline "\n"
   EOF ""
 # diagnostics
-error[masterbelt.parser.concrete.unexpected_token] 2:1 unexpected token: Use

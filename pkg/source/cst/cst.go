@@ -69,6 +69,10 @@ const (
 	Block      // "{" Stmt* "}"
 	ReturnStmt // return Expr
 
+	// Cross-file imports.
+	UseDecl // [pub] use ( Ident | UseList | "*" ) from String
+	UseList // "{" Ident ("," Ident)* "}"  (the selective-import list)
+
 	Error // a run of tokens that did not fit the grammar
 )
 
@@ -104,6 +108,8 @@ var kindNames = [...]string{
 	Param:         "Param",
 	Block:         "Block",
 	ReturnStmt:    "ReturnStmt",
+	UseDecl:       "UseDecl",
+	UseList:       "UseList",
 	Error:         "Error",
 }
 

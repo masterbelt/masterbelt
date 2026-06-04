@@ -3,9 +3,12 @@
 //
 // The grammar is small and recursive-descent:
 //
-//	File          := ( ConstDecl | TypeDecl | Error )*
+//	File          := ( ConstDecl | TypeDecl | UseDecl | Error )*
 //	ConstDecl     := [pub] const Ident [TypeClause] [Initializer]
 //	TypeDecl      := [pub] type Ident [GenericParams] "=" TypeExpr [ImplBlock]
+//	UseDecl       := [pub] use UseTarget from String
+//	UseTarget     := Ident | UseList | "*"
+//	UseList       := "{" Ident ( "," Ident )* "}"
 //	GenericParams := "<" GenericParam ( "," GenericParam )* ">"
 //	GenericParam  := Ident [ ":" TypeExpr ]
 //	TypeClause    := ":" TypeExpr
@@ -183,20 +186,24 @@ func (p *parser) nextChildren() (batch []cst.Green, done bool) {
 	case p.atEOF():
 		lead = append(lead, p.bump()) // the EOF leaf
 		return lead, true
-	case p.kind() == token.Pub || p.kind() == token.Const || p.kind() == token.Type:
-		if p.declKind() == token.Type {
+	case p.kind() == token.Pub || p.kind() == token.Const || p.kind() == token.Type || p.kind() == token.Use:
+		switch p.declKind() {
+		case token.Type:
 			return []cst.Green{p.parseTypeDecl(lead)}, false
+		case token.Use:
+			return []cst.Green{p.parseUseDecl(lead)}, false
+		default:
+			return []cst.Green{p.parseConstDecl(lead)}, false
 		}
-		return []cst.Green{p.parseConstDecl(lead)}, false
 	default:
 		return []cst.Green{p.parseError(lead)}, false
 	}
 }
 
 // declKind reports which declaration keyword begins the construct at the cursor
-// — Const or Type — looking past an optional leading pub. For malformed input
-// (a lone pub) it returns whatever significant kind follows, and the caller
-// falls back to the const parser, which reports the missing keyword.
+// — Const, Type, or Use — looking past an optional leading pub. For malformed
+// input (a lone pub) it returns whatever significant kind follows, and the
+// caller falls back to the const parser, which reports the missing keyword.
 func (p *parser) declKind() token.Kind {
 	i := p.pos
 	for isTrivia(p.toks[i].Kind) {
@@ -213,15 +220,15 @@ func (p *parser) declKind() token.Kind {
 
 // parseError consumes a run of significant tokens that begin no declaration,
 // folding in the interleaving trivia, until the next declaration starter
-// (pub/const) or EOF. The trivia that precedes that stopping token is left
-// behind to become the next construct's leading trivia. A single diagnostic is
-// reported at the first offending token.
+// (pub/const/type/use) or EOF. The trivia that precedes that stopping token is
+// left behind to become the next construct's leading trivia. A single
+// diagnostic is reported at the first offending token.
 func (p *parser) parseError(lead []cst.Green) *cst.Node {
 	children := lead
 	reported := false
 	for {
 		switch p.peekSignificant() {
-		case token.EOF, token.Pub, token.Const, token.Type:
+		case token.EOF, token.Pub, token.Const, token.Type, token.Use:
 			return cst.NewNode(cst.Error, children)
 		}
 		p.skipTrivia(&children)

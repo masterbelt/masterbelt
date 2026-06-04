@@ -452,6 +452,78 @@ func TestParseGenericConstAnnotation(t *testing.T) {
 	}
 }
 
+// --- use declarations ---------------------------------------------------------
+
+// TestParseUseDeclForms checks that every use form — namespace, selective,
+// wildcard, and their pub re-export variants — parses to a single clean
+// UseDecl file child.
+func TestParseUseDeclForms(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+	}{
+		{"namespace", "use geo from \"geometry.belt\"\n"},
+		{"selective", "use { Point, Vector } from \"shapes.belt\"\n"},
+		{"wildcard", "use * from \"prelude.belt\"\n"},
+		{"re-export", "pub use { Color } from \"palette.belt\"\n"},
+		{"barrel", "pub use * from \"geometry.belt\"\n"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			root, diags := Parse([]byte(tc.src))
+			if len(diags) != 0 {
+				t.Fatalf("unexpected diagnostics: %v", diags)
+			}
+			decl, ok := root.Children()[0].(*cst.Node)
+			if !ok || decl.Kind() != cst.UseDecl {
+				t.Fatalf("first child = %v, want UseDecl", root.Children()[0])
+			}
+			assertLossless(t, tc.src)
+		})
+	}
+}
+
+func TestParseUseListChildren(t *testing.T) {
+	root, _ := Parse([]byte("use { Point, Vector } from \"shapes.belt\""))
+	decl := root.Children()[0].(*cst.Node)
+	if kinds := subNodeKinds(decl); len(kinds) != 1 || kinds[0] != cst.UseList {
+		t.Fatalf("decl sub-nodes = %v, want [UseList]", kinds)
+	}
+}
+
+// TestParseUseDiagnostics checks local recovery for malformed use
+// declarations: each case reports its specific diagnostic and stays lossless.
+func TestParseUseDiagnostics(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+		code diagnostic.Code
+	}{
+		{"missing target", "use from \"a.belt\"\n", CodeExpectedIdentifier},
+		{"missing from", "use geo \"a.belt\"\n", CodeExpectedFrom},
+		{"missing path", "use geo from\n", CodeExpectedPath},
+		{"empty list", "use {} from \"a.belt\"\n", CodeExpectedIdentifier},
+		{"name after comma", "use { a, } from \"x.belt\"\n", CodeExpectedIdentifier},
+		{"junk after star", "use * x from \"a.belt\"\n", CodeExpectedFrom},
+		{"unclosed list", "use { a from \"x.belt\"\n", CodeUnexpectedToken},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, diags := Parse([]byte(tc.src))
+			found := false
+			for _, d := range diags {
+				if d.Code == tc.code {
+					found = true
+				}
+			}
+			if !found {
+				t.Fatalf("src %q: want diagnostic %s, got %v", tc.src, tc.code, diags)
+			}
+			assertLossless(t, tc.src)
+		})
+	}
+}
+
 func TestParseDiagnostics(t *testing.T) {
 	cases := []struct {
 		name string
