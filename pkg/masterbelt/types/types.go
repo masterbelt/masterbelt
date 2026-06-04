@@ -189,6 +189,44 @@ func BindReceiver(reg *builtin.Registry, recv ir.Type, method string) (*ir.Metho
 	return m, subst, true
 }
 
+// ReceiverMethods returns every method a receiver type binds — its own and,
+// for a nominal type, those derived from its underlying type, nearer
+// declarations shadowing derived ones of the same name — together with the
+// substitution the receiver's type arguments pin (a list<int> receiver binds
+// the element parameter). It is the all-methods companion of BindReceiver,
+// for an editor completing a member access.
+func ReceiverMethods(reg *builtin.Registry, recv ir.Type) ([]*ir.Method, map[string]ir.Type, bool) {
+	def := defOf(reg, recv)
+	if def == nil {
+		return nil, nil, false
+	}
+	subst := map[string]ir.Type{}
+	if app, ok := recv.(*ir.App); ok && app.Def != nil && len(app.Args) == len(app.Def.Params) {
+		for i, p := range app.Def.Params {
+			subst[p.Name] = app.Args[i]
+		}
+	}
+
+	var out []*ir.Method
+	seenDefs := map[*ir.TypeDef]bool{}
+	seenNames := map[string]bool{}
+	for d := def; d != nil && !seenDefs[d]; {
+		seenDefs[d] = true
+		for _, m := range d.Methods {
+			if !seenNames[m.Name] {
+				seenNames[m.Name] = true
+				out = append(out, m)
+			}
+		}
+		// Derive from the underlying type, exactly as findMethodSeen does.
+		if d.Builtin {
+			break
+		}
+		d = defOf(reg, d.Body)
+	}
+	return out, subst, true
+}
+
 // Substitute replaces every bound type variable in t with its binding from
 // subst, recursing through the composite types. An unbound variable is left as
 // is, so a concrete type (no variables) is returned unchanged.

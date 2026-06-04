@@ -118,3 +118,82 @@ func TestCompletionInAssertCondition(t *testing.T) {
 		t.Errorf("Max detail = %q, want %q", d, ": int64")
 	}
 }
+
+func TestMemberCompletion(t *testing.T) {
+	src := "const xs: list<int8> = [1]\nconst ys = xs.map(fn(x: int8): int8 { return x })\n"
+	doc := testView(src)
+
+	got := byLabel(completion(doc, strings.Index(src, "xs.map")+4).Items)
+
+	// The receiver's methods, not the value namespace.
+	if _, ok := got["xs"]; ok {
+		t.Error("member completion offered the constant xs")
+	}
+	if _, ok := got["true"]; ok {
+		t.Error("member completion offered a value keyword")
+	}
+
+	m, ok := got["map"]
+	if !ok {
+		t.Fatalf("member completion missing map; got %v", got)
+	}
+	if m.Kind == nil || *m.Kind != protocol.CompletionItemKindMethod {
+		t.Errorf("map kind = %v, want Method", m.Kind)
+	}
+	if want := "pub extern map(func: fn(int8): R): list<R>"; m.Detail != want {
+		t.Errorf("map detail = %q, want %q", m.Detail, want)
+	}
+	// The function parameter expands to a fn literal, the solved element type
+	// annotated, the unsolved result left to inference.
+	if want := "map(fn(${1:x}: int8) { ${2} })"; m.InsertText != want {
+		t.Errorf("map snippet = %q, want %q", m.InsertText, want)
+	}
+	if m.InsertTextFormat == nil || *m.InsertTextFormat != protocol.InsertTextFormatSnippet {
+		t.Errorf("map insert format = %v, want snippet", m.InsertTextFormat)
+	}
+	if m.Documentation == nil || !strings.Contains(m.Documentation.Value, "func applied to each element") {
+		t.Errorf("map documentation = %v, want the prelude doc", m.Documentation)
+	}
+
+	// A plain parameter is a plain tab stop.
+	if add, ok := got["add"]; !ok || add.InsertText != "add(${1:other})" {
+		t.Errorf("add snippet = %+v, want add(${1:other})", got["add"])
+	}
+	if l, ok := got["len"]; !ok || l.InsertText != "len()" {
+		t.Errorf("len snippet = %+v, want len()", got["len"])
+	}
+}
+
+func TestMemberCompletionAfterBareDot(t *testing.T) {
+	// The moment after typing the dot: the parse recovered a member access
+	// with its name missing, and completion already knows the receiver.
+	src := "const xs: list<int8> = [1]\nconst ys = xs.\n"
+	doc := testView(src)
+
+	got := byLabel(completion(doc, strings.Index(src, "xs.")+3).Items)
+	for _, want := range []string{"map", "len", "add", "eql", "neq"} {
+		if _, ok := got[want]; !ok {
+			t.Errorf("completion after the dot missing %q; got %v", want, got)
+		}
+	}
+}
+
+func TestMemberCompletionFields(t *testing.T) {
+	src := "type Rec = {\n  id: int8\n  level: int16\n} impl {\n  get(): int8 {\n    return self.id\n  }\n}\n"
+	doc := testView(src)
+
+	got := byLabel(completion(doc, strings.Index(src, "self.id")+6).Items)
+	id, ok := got["id"]
+	if !ok {
+		t.Fatalf("member completion missing the field id; got %v", got)
+	}
+	if id.Kind == nil || *id.Kind != protocol.CompletionItemKindField || id.Detail != ": int8" {
+		t.Errorf("id item = %+v, want a Field: int8", id)
+	}
+	if _, ok := got["level"]; !ok {
+		t.Error("member completion missing the field level")
+	}
+	if _, ok := got["get"]; !ok {
+		t.Error("member completion missing the method get")
+	}
+}

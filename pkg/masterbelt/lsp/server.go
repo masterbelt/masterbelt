@@ -65,7 +65,9 @@ func (s *Server) Initialize(_ context.Context, _ *protocol.InitializeParams) (*p
 				OpenClose: new(true),
 				Change:    protocol.SyncIncremental,
 			},
-			CompletionProvider:         &protocol.CompletionOptions{},
+			// The dot triggers member completion: the receiver's methods and
+			// fields pop the moment it is typed.
+			CompletionProvider:         &protocol.CompletionOptions{TriggerCharacters: []string{"."}},
 			DocumentSymbolProvider:     new(true),
 			DocumentFormattingProvider: new(true),
 			DocumentHighlightProvider:  new(true),

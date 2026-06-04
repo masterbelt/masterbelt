@@ -149,6 +149,12 @@ func (p *Program) BindMethod(recv ir.Type, name string) (*ir.Method, map[string]
 	return types.BindReceiver(p.db.reg, recv, name)
 }
 
+// ReceiverMethods returns every method recv binds, with the substitution its
+// type arguments pin — what completion offers after a member dot.
+func (p *Program) ReceiverMethods(recv ir.Type) ([]*ir.Method, map[string]ir.Type, bool) {
+	return types.ReceiverMethods(p.db.reg, recv)
+}
+
 // FileOf returns the file a constant of the last Refresh is declared in.
 func (p *Program) FileOf(c *ir.Const) (FileID, bool) {
 	if c == nil || c.Syntax == nil {
