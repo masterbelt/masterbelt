@@ -28,10 +28,15 @@ func TestCompletionInValuePosition(t *testing.T) {
 	items := completion(doc, offset).Items
 	got := byLabel(items)
 
-	for _, want := range []string{"Max", "Cur", "true", "false", "null"} {
+	for _, want := range []string{"Max", "Cur", "true", "false", "null", "fn"} {
 		if _, ok := got[want]; !ok {
 			t.Errorf("value completion missing %q", want)
 		}
+	}
+
+	// fn begins a function literal and is offered as a value keyword.
+	if k := got["fn"].Kind; k == nil || *k != protocol.CompletionItemKindKeyword {
+		t.Errorf("fn kind = %v, want Keyword", k)
 	}
 
 	// A constant carries its inferred type as detail and its doc comment.

@@ -10,10 +10,10 @@ import (
 )
 
 // Completion offers the program's value namespace. masterbelt's nameable values
-// are its constants, plus the value literals true/false/null, so in a value
-// position those are the candidates; a type position (an annotation, union,
-// generic argument, record field, or parameter type) yields nothing, since a
-// constant name would be wrong there (type-name completion is future work).
+// are its constants, plus the value keywords true/false/null and fn (which
+// begins a function literal), so in a value position those are the candidates; a
+// type position (an annotation, union, generic argument, record field, or
+// parameter type) yields the in-scope type names instead.
 //
 // The candidate set is the whole namespace, not a prefix-filtered slice: the
 // editor filters the list against the characters already typed, so re-querying
@@ -84,12 +84,13 @@ func constantItems(doc *semantic.Document) []protocol.CompletionItem {
 	return items
 }
 
-// valueKeywordItems is the literal keywords that may appear where a value is
-// expected.
+// valueKeywordItems is the keywords that may begin a value: the literals
+// true/false/null, and fn, which starts a function literal (the value form of a
+// function type, e.g. the argument to list.map).
 func valueKeywordItems() []protocol.CompletionItem {
 	kind := protocol.CompletionItemKindKeyword
-	items := make([]protocol.CompletionItem, 0, 3)
-	for _, w := range []string{"false", "null", "true"} {
+	items := make([]protocol.CompletionItem, 0, 4)
+	for _, w := range []string{"false", "fn", "null", "true"} {
 		items = append(items, protocol.CompletionItem{Label: w, Kind: &kind})
 	}
 	return items
