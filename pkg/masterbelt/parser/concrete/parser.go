@@ -3,21 +3,39 @@
 //
 // The grammar is small and recursive-descent:
 //
-//	File        := ( ConstDecl | Error )*
-//	ConstDecl   := [pub] const Ident [TypeClause] [Initializer]
-//	TypeClause  := ":" TypeRef
-//	Initializer := "=" Expr
-//	Expr        := OrExpr
-//	OrExpr      := AndExpr ( "||" AndExpr )*
-//	AndExpr     := CmpExpr ( "&&" CmpExpr )*
-//	CmpExpr     := AddExpr ( ( "==" | "!=" | "<" | "<=" | ">" | ">=" ) AddExpr )*
-//	AddExpr     := MulExpr ( ( "+" | "-" ) MulExpr )*
-//	MulExpr     := Unary ( ( "*" | "/" | "%" ) Unary )*
-//	Unary       := ( "+" | "-" | "!" ) Unary | Operand
-//	Operand     := Literal | NameRef
-//	TypeRef     := Ident
-//	NameRef     := Ident
-//	Literal     := Int | "true" | "false"
+//	File          := ( ConstDecl | TypeDecl | Error )*
+//	ConstDecl     := [pub] const Ident [TypeClause] [Initializer]
+//	TypeDecl      := [pub] type Ident [GenericParams] "=" TypeExpr [ImplBlock]
+//	GenericParams := "<" GenericParam ( "," GenericParam )* ">"
+//	GenericParam  := Ident [ ":" TypeExpr ]
+//	TypeClause    := ":" TypeRef
+//	Initializer   := "=" Expr
+//	TypeExpr      := PrimaryType ( "|" PrimaryType )*
+//	PrimaryType   := TypeName | RecordType | FuncType
+//	TypeName      := ( Ident [GenericArgs] ) | "self" | "null"
+//	GenericArgs   := "<" TypeExpr ( "," TypeExpr )* ">"
+//	RecordType    := "{" Field* "}"
+//	Field         := Ident ":" TypeExpr
+//	FuncType      := fn ParamList ":" TypeExpr
+//	ImplBlock     := impl "{" MethodDecl* "}"
+//	MethodDecl    := [pub] [extern] [fn] Ident ParamList ":" TypeExpr [Block]
+//	ParamList     := "(" [ Param ( "," Param )* ] ")"
+//	Param         := Ident ":" TypeExpr
+//	Block         := "{" Stmt* "}"
+//	Stmt          := ReturnStmt | Expr
+//	ReturnStmt    := return Expr
+//	Expr          := OrExpr
+//	OrExpr        := AndExpr ( "||" AndExpr )*
+//	AndExpr       := CmpExpr ( "&&" CmpExpr )*
+//	CmpExpr       := AddExpr ( ( "==" | "!=" | "<" | "<=" | ">" | ">=" ) AddExpr )*
+//	AddExpr       := MulExpr ( ( "+" | "-" ) MulExpr )*
+//	MulExpr       := Unary ( ( "*" | "/" | "%" ) Unary )*
+//	Unary         := ( "+" | "-" | "!" ) Unary | Postfix
+//	Postfix       := Operand ( "." Ident | "(" [ Expr ( "," Expr )* ] ")" )*
+//	Operand       := Literal | NameRef | "self"
+//	TypeRef       := Ident
+//	NameRef       := Ident
+//	Literal       := Int | "true" | "false" | "null"
 //
 // The binary levels are parsed by precedence climbing (parseExpr) rather than a
 // function per level; the binaryPrec table is the single source of operator
@@ -158,11 +176,32 @@ func (p *parser) nextChildren() (batch []cst.Green, done bool) {
 	case p.atEOF():
 		lead = append(lead, p.bump()) // the EOF leaf
 		return lead, true
-	case p.kind() == token.Pub || p.kind() == token.Const:
+	case p.kind() == token.Pub || p.kind() == token.Const || p.kind() == token.Type:
+		if p.declKind() == token.Type {
+			return []cst.Green{p.parseTypeDecl(lead)}, false
+		}
 		return []cst.Green{p.parseConstDecl(lead)}, false
 	default:
 		return []cst.Green{p.parseError(lead)}, false
 	}
+}
+
+// declKind reports which declaration keyword begins the construct at the cursor
+// — Const or Type — looking past an optional leading pub. For malformed input
+// (a lone pub) it returns whatever significant kind follows, and the caller
+// falls back to the const parser, which reports the missing keyword.
+func (p *parser) declKind() token.Kind {
+	i := p.pos
+	for isTrivia(p.toks[i].Kind) {
+		i++
+	}
+	if p.toks[i].Kind == token.Pub {
+		i++
+		for isTrivia(p.toks[i].Kind) {
+			i++
+		}
+	}
+	return p.toks[i].Kind
 }
 
 // parseConstDecl parses a constant declaration, prepending the already-collected
@@ -229,6 +268,408 @@ func (p *parser) parseInitializer() *cst.Node {
 	return cst.NewNode(cst.Initializer, children)
 }
 
+// --- type declarations ------------------------------------------------------
+
+// parseTypeDecl parses a type declaration, prepending the already-collected
+// leading trivia:
+//
+//	[pub] type Name [GenericParams] "=" TypeExpr [ImplBlock]
+//
+// As in parseConstDecl every expected element is optional in the parse, so a
+// malformed declaration records a diagnostic and is simply absent from the tree
+// while the surrounding structure (and losslessness) is preserved.
+func (p *parser) parseTypeDecl(lead []cst.Green) *cst.Node {
+	children := lead
+
+	if p.kind() == token.Pub {
+		children = append(children, p.bump())
+	}
+	p.skipTrivia(&children)
+	children = append(children, p.bump()) // "type" (guaranteed by the dispatcher)
+
+	if p.peekSignificant() == token.Ident {
+		p.skipTrivia(&children)
+		children = append(children, p.bump()) // the declared name
+	} else {
+		p.report(newExpectedIdentifierDiagnostic(p.lastStart, 0))
+	}
+
+	if p.peekSignificant() == token.Lt {
+		p.skipTrivia(&children)
+		children = append(children, p.parseGenericParams())
+	}
+
+	if p.peekSignificant() == token.Assign {
+		p.skipTrivia(&children)
+		children = append(children, p.bump()) // "="
+		if startsType(p.peekSignificant()) {
+			p.skipTrivia(&children)
+			children = append(children, p.parseTypeExpr())
+		} else {
+			p.report(newExpectedTypeDiagnostic(p.lastStart, 0))
+		}
+	} else {
+		p.report(newExpectedAssignDiagnostic(p.lastStart, 0))
+	}
+
+	if p.peekSignificant() == token.Impl {
+		p.skipTrivia(&children)
+		children = append(children, p.parseImplBlock())
+	}
+
+	return cst.NewNode(cst.TypeDecl, children)
+}
+
+// parseGenericParams parses a "<...>" type-parameter list on the declaration
+// side: "<" GenericParam ( "," GenericParam )* ">". The cursor sits on "<".
+func (p *parser) parseGenericParams() *cst.Node {
+	children := []cst.Green{p.bump()} // "<"
+	for p.peekSignificant() == token.Ident {
+		p.skipTrivia(&children)
+		children = append(children, p.parseGenericParam())
+		if p.peekSignificant() == token.Comma {
+			p.skipTrivia(&children)
+			children = append(children, p.bump()) // ","
+			continue
+		}
+		break
+	}
+	if p.peekSignificant() == token.Gt {
+		p.skipTrivia(&children)
+		children = append(children, p.bump()) // ">"
+	} else {
+		p.report(newExpectedTypeDiagnostic(p.lastStart, 0))
+	}
+	return cst.NewNode(cst.GenericParams, children)
+}
+
+// parseGenericParam parses one type parameter: Ident [ ":" TypeExpr ], where the
+// optional ":" introduces a constraint (which may itself be a union).
+func (p *parser) parseGenericParam() *cst.Node {
+	children := []cst.Green{p.bump()} // the parameter name
+	if p.peekSignificant() == token.Colon {
+		p.skipTrivia(&children)
+		children = append(children, p.bump()) // ":"
+		if startsType(p.peekSignificant()) {
+			p.skipTrivia(&children)
+			children = append(children, p.parseTypeExpr())
+		} else {
+			p.report(newExpectedTypeDiagnostic(p.lastStart, 0))
+		}
+	}
+	return cst.NewNode(cst.GenericParam, children)
+}
+
+// --- type expressions -------------------------------------------------------
+
+// parseTypeExpr parses a type expression: a union of primary types,
+// "A | B | ...". A lone primary type is returned directly; only an actual "|"
+// produces a UnionType node, mirroring how parseExpr only builds a BinaryExpr
+// when an operator is present. The cursor sits on the first type token.
+func (p *parser) parseTypeExpr() cst.Green {
+	left := p.parsePrimaryType()
+	if p.peekSignificant() != token.Pipe {
+		return left
+	}
+	children := []cst.Green{left}
+	for p.peekSignificant() == token.Pipe {
+		p.skipTrivia(&children)
+		children = append(children, p.bump()) // "|"
+		if startsType(p.peekSignificant()) {
+			p.skipTrivia(&children)
+			children = append(children, p.parsePrimaryType())
+		} else {
+			p.report(newExpectedTypeDiagnostic(p.lastStart, 0))
+		}
+	}
+	return cst.NewNode(cst.UnionType, children)
+}
+
+// parsePrimaryType parses a single, non-union type: a named type (with optional
+// generic arguments), the self or null type, a record type, or a function type.
+// The cursor sits on the type's first token.
+func (p *parser) parsePrimaryType() cst.Green {
+	switch p.kind() {
+	case token.Ident:
+		children := []cst.Green{p.bump()} // the type name
+		if p.peekSignificant() == token.Lt {
+			p.skipTrivia(&children)
+			children = append(children, p.parseGenericArgs())
+		}
+		return cst.NewNode(cst.TypeName, children)
+	case token.Self, token.Null:
+		return cst.NewNode(cst.TypeName, []cst.Green{p.bump()})
+	case token.LBrace:
+		return p.parseRecordType()
+	case token.Fn:
+		return p.parseFuncType()
+	default:
+		p.report(newExpectedTypeDiagnostic(p.lastStart, 0))
+		return cst.NewNode(cst.Error, nil)
+	}
+}
+
+// parseGenericArgs parses a "<...>" type-argument list on the application side:
+// "<" TypeExpr ( "," TypeExpr )* ">". The cursor sits on "<".
+func (p *parser) parseGenericArgs() *cst.Node {
+	children := []cst.Green{p.bump()} // "<"
+	if startsType(p.peekSignificant()) {
+		for {
+			p.skipTrivia(&children)
+			children = append(children, p.parseTypeExpr())
+			if p.peekSignificant() == token.Comma {
+				p.skipTrivia(&children)
+				children = append(children, p.bump()) // ","
+				continue
+			}
+			break
+		}
+	}
+	if p.peekSignificant() == token.Gt {
+		p.skipTrivia(&children)
+		children = append(children, p.bump()) // ">"
+	} else {
+		p.report(newExpectedTypeDiagnostic(p.lastStart, 0))
+	}
+	return cst.NewNode(cst.GenericArgs, children)
+}
+
+// parseRecordType parses an anonymous product type, "{" Field* "}", with fields
+// separated by newlines (trivia). The cursor sits on "{".
+func (p *parser) parseRecordType() *cst.Node {
+	children := []cst.Green{p.bump()} // "{"
+	for {
+		switch p.peekSignificant() {
+		case token.RBrace:
+			p.skipTrivia(&children)
+			children = append(children, p.bump()) // "}"
+			return cst.NewNode(cst.RecordType, children)
+		case token.EOF:
+			return cst.NewNode(cst.RecordType, children) // unterminated; the leaves are still lossless
+		case token.Ident:
+			p.skipTrivia(&children)
+			children = append(children, p.parseField())
+		default:
+			p.skipTrivia(&children)
+			p.report(newUnexpectedTokenDiagnostic(p.cur().Offset, p.cur().Width, p.kind().String()))
+			children = append(children, p.bump())
+		}
+	}
+}
+
+// parseField parses one record field: Ident ":" TypeExpr.
+func (p *parser) parseField() *cst.Node {
+	children := []cst.Green{p.bump()} // the field name
+	if p.peekSignificant() == token.Colon {
+		p.skipTrivia(&children)
+		children = append(children, p.bump()) // ":"
+		if startsType(p.peekSignificant()) {
+			p.skipTrivia(&children)
+			children = append(children, p.parseTypeExpr())
+		} else {
+			p.report(newExpectedTypeDiagnostic(p.lastStart, 0))
+		}
+	} else {
+		p.report(newExpectedTypeDiagnostic(p.lastStart, 0))
+	}
+	return cst.NewNode(cst.Field, children)
+}
+
+// parseFuncType parses a function type: fn ParamList ":" TypeExpr. The cursor
+// sits on "fn".
+func (p *parser) parseFuncType() *cst.Node {
+	children := []cst.Green{p.bump()} // "fn"
+	if p.peekSignificant() == token.LParen {
+		p.skipTrivia(&children)
+		children = append(children, p.parseParamList())
+	} else {
+		p.report(newUnexpectedTokenDiagnostic(p.cur().Offset, p.cur().Width, p.kind().String()))
+	}
+	if p.peekSignificant() == token.Colon {
+		p.skipTrivia(&children)
+		children = append(children, p.bump()) // ":"
+		if startsType(p.peekSignificant()) {
+			p.skipTrivia(&children)
+			children = append(children, p.parseTypeExpr())
+		} else {
+			p.report(newExpectedTypeDiagnostic(p.lastStart, 0))
+		}
+	} else {
+		p.report(newExpectedTypeDiagnostic(p.lastStart, 0))
+	}
+	return cst.NewNode(cst.FuncType, children)
+}
+
+// --- implementations and method bodies --------------------------------------
+
+// parseImplBlock parses an implementation block: impl "{" MethodDecl* "}". The
+// cursor sits on "impl".
+func (p *parser) parseImplBlock() *cst.Node {
+	children := []cst.Green{p.bump()} // "impl"
+	if p.peekSignificant() == token.LBrace {
+		p.skipTrivia(&children)
+		children = append(children, p.bump()) // "{"
+	} else {
+		p.report(newUnexpectedTokenDiagnostic(p.cur().Offset, p.cur().Width, p.kind().String()))
+		return cst.NewNode(cst.ImplBlock, children)
+	}
+	for {
+		switch {
+		case p.peekSignificant() == token.RBrace:
+			p.skipTrivia(&children)
+			children = append(children, p.bump()) // "}"
+			return cst.NewNode(cst.ImplBlock, children)
+		case p.peekSignificant() == token.EOF:
+			return cst.NewNode(cst.ImplBlock, children)
+		case startsMethod(p.peekSignificant()):
+			p.skipTrivia(&children)
+			children = append(children, p.parseMethodDecl())
+		default:
+			p.skipTrivia(&children)
+			p.report(newUnexpectedTokenDiagnostic(p.cur().Offset, p.cur().Width, p.kind().String()))
+			children = append(children, p.bump())
+		}
+	}
+}
+
+// parseMethodDecl parses a method inside an impl block:
+//
+//	[pub] [extern] [fn] Ident ParamList ":" TypeExpr [Block]
+//
+// fn is optional (some methods omit it) and the body Block is absent for an
+// extern method. The cursor sits on the first of pub/extern/fn/Ident.
+func (p *parser) parseMethodDecl() *cst.Node {
+	var children []cst.Green
+	if p.kind() == token.Pub {
+		children = append(children, p.bump())
+	}
+	if p.peekSignificant() == token.Extern {
+		p.skipTrivia(&children)
+		children = append(children, p.bump())
+	}
+	if p.peekSignificant() == token.Fn {
+		p.skipTrivia(&children)
+		children = append(children, p.bump())
+	}
+	if p.peekSignificant() == token.Ident {
+		p.skipTrivia(&children)
+		children = append(children, p.bump()) // the method name
+	} else {
+		p.report(newExpectedIdentifierDiagnostic(p.lastStart, 0))
+	}
+	if p.peekSignificant() == token.LParen {
+		p.skipTrivia(&children)
+		children = append(children, p.parseParamList())
+	} else {
+		p.report(newUnexpectedTokenDiagnostic(p.cur().Offset, p.cur().Width, p.kind().String()))
+	}
+	if p.peekSignificant() == token.Colon {
+		p.skipTrivia(&children)
+		children = append(children, p.bump()) // ":"
+		if startsType(p.peekSignificant()) {
+			p.skipTrivia(&children)
+			children = append(children, p.parseTypeExpr())
+		} else {
+			p.report(newExpectedTypeDiagnostic(p.lastStart, 0))
+		}
+	} else {
+		p.report(newExpectedTypeDiagnostic(p.lastStart, 0))
+	}
+	if p.peekSignificant() == token.LBrace {
+		p.skipTrivia(&children)
+		children = append(children, p.parseBlock())
+	}
+	return cst.NewNode(cst.MethodDecl, children)
+}
+
+// parseParamList parses a parenthesized parameter list:
+// "(" [ Param ( "," Param )* ] ")". The cursor sits on "(".
+func (p *parser) parseParamList() *cst.Node {
+	children := []cst.Green{p.bump()} // "("
+	if p.peekSignificant() == token.Ident {
+		for {
+			p.skipTrivia(&children)
+			children = append(children, p.parseParam())
+			if p.peekSignificant() == token.Comma {
+				p.skipTrivia(&children)
+				children = append(children, p.bump()) // ","
+				continue
+			}
+			break
+		}
+	}
+	if p.peekSignificant() == token.RParen {
+		p.skipTrivia(&children)
+		children = append(children, p.bump()) // ")"
+	} else {
+		p.report(newUnexpectedTokenDiagnostic(p.cur().Offset, p.cur().Width, p.kind().String()))
+	}
+	return cst.NewNode(cst.ParamList, children)
+}
+
+// parseParam parses one parameter: Ident ":" TypeExpr.
+func (p *parser) parseParam() *cst.Node {
+	children := []cst.Green{p.bump()} // the parameter name
+	if p.peekSignificant() == token.Colon {
+		p.skipTrivia(&children)
+		children = append(children, p.bump()) // ":"
+		if startsType(p.peekSignificant()) {
+			p.skipTrivia(&children)
+			children = append(children, p.parseTypeExpr())
+		} else {
+			p.report(newExpectedTypeDiagnostic(p.lastStart, 0))
+		}
+	} else {
+		p.report(newExpectedTypeDiagnostic(p.lastStart, 0))
+	}
+	return cst.NewNode(cst.Param, children)
+}
+
+// parseBlock parses a brace-delimited statement block: "{" Stmt* "}". The cursor
+// sits on "{".
+func (p *parser) parseBlock() *cst.Node {
+	children := []cst.Green{p.bump()} // "{"
+	for {
+		switch p.peekSignificant() {
+		case token.RBrace:
+			p.skipTrivia(&children)
+			children = append(children, p.bump()) // "}"
+			return cst.NewNode(cst.Block, children)
+		case token.EOF:
+			return cst.NewNode(cst.Block, children)
+		default:
+			p.skipTrivia(&children)
+			children = append(children, p.parseStmt())
+		}
+	}
+}
+
+// parseStmt parses a single statement: a return statement or a bare expression
+// statement. The cursor sits on the statement's first significant token.
+func (p *parser) parseStmt() cst.Green {
+	switch {
+	case p.kind() == token.Return:
+		return p.parseReturnStmt()
+	case startsExpr(p.kind()):
+		return p.parseExpr(precLowest)
+	default:
+		p.report(newUnexpectedTokenDiagnostic(p.cur().Offset, p.cur().Width, p.kind().String()))
+		return p.bump()
+	}
+}
+
+// parseReturnStmt parses "return Expr". The cursor sits on "return".
+func (p *parser) parseReturnStmt() *cst.Node {
+	children := []cst.Green{p.bump()} // "return"
+	if startsExpr(p.peekSignificant()) {
+		p.skipTrivia(&children)
+		children = append(children, p.parseExpr(precLowest))
+	} else {
+		p.report(newExpectedExpressionDiagnostic(p.lastStart, 0))
+	}
+	return cst.NewNode(cst.ReturnStmt, children)
+}
+
 // parseExpr parses an expression whose operators bind at least as tightly as
 // minPrec, by precedence climbing. The cursor sits on the first significant
 // token of the expression. It returns the single green node for the whole
@@ -254,11 +695,11 @@ func (p *parser) parseExpr(minPrec int) cst.Green {
 	}
 }
 
-// parseUnary parses a chain of prefix operators ending in an operand, or a bare
-// operand. The cursor sits on the first significant token.
+// parseUnary parses a chain of prefix operators ending in a postfix expression,
+// or a bare postfix expression. The cursor sits on the first significant token.
 func (p *parser) parseUnary() cst.Green {
 	if !unaryOps[p.kind()] {
-		return p.parseOperand()
+		return p.parsePostfix()
 	}
 	op := p.cur() // the unary operator (cursor is on it)
 	children := []cst.Green{p.bump()}
@@ -271,15 +712,71 @@ func (p *parser) parseUnary() cst.Green {
 	return cst.NewNode(cst.UnaryExpr, children)
 }
 
-// parseOperand parses an atom: an integer or boolean Literal, or a NameRef. The
-// cursor sits on the operand token — startsExpr gates every call site, so the
-// default arm is defensive and consumes nothing.
+// parsePostfix parses an operand followed by any chain of member accesses and
+// calls — receiver.member and callee(args) — applied left to right, so self.id
+// and int32(self.id) form left-leaning MemberExpr/CallExpr trees.
+func (p *parser) parsePostfix() cst.Green {
+	left := p.parseOperand()
+	for {
+		switch p.peekSignificant() {
+		case token.Dot:
+			children := []cst.Green{left}
+			p.skipTrivia(&children)
+			children = append(children, p.bump()) // "."
+			if p.peekSignificant() == token.Ident {
+				p.skipTrivia(&children)
+				children = append(children, p.bump()) // the member name
+			} else {
+				p.report(newExpectedIdentifierDiagnostic(p.lastStart, 0))
+			}
+			left = cst.NewNode(cst.MemberExpr, children)
+		case token.LParen:
+			children := []cst.Green{left}
+			p.skipTrivia(&children)
+			children = append(children, p.bump()) // "("
+			p.parseCallArgs(&children)
+			left = cst.NewNode(cst.CallExpr, children)
+		default:
+			return left
+		}
+	}
+}
+
+// parseCallArgs parses a call's argument list up to and including the closing
+// ")", appending the argument expressions and punctuation to *children. The
+// cursor sits just past the opening "(".
+func (p *parser) parseCallArgs(children *[]cst.Green) {
+	if startsExpr(p.peekSignificant()) {
+		for {
+			p.skipTrivia(children)
+			*children = append(*children, p.parseExpr(precLowest))
+			if p.peekSignificant() == token.Comma {
+				p.skipTrivia(children)
+				*children = append(*children, p.bump()) // ","
+				continue
+			}
+			break
+		}
+	}
+	if p.peekSignificant() == token.RParen {
+		p.skipTrivia(children)
+		*children = append(*children, p.bump()) // ")"
+	} else {
+		p.report(newUnexpectedTokenDiagnostic(p.cur().Offset, p.cur().Width, p.kind().String()))
+	}
+}
+
+// parseOperand parses an atom: a literal (integer, boolean, or null), a NameRef,
+// or the self receiver. The cursor sits on the operand token — startsExpr gates
+// every call site, so the default arm is defensive and consumes nothing.
 func (p *parser) parseOperand() cst.Green {
 	switch p.kind() {
-	case token.Int, token.True, token.False:
+	case token.Int, token.True, token.False, token.Null:
 		return cst.NewNode(cst.Literal, []cst.Green{p.bump()})
 	case token.Ident:
 		return cst.NewNode(cst.NameRef, []cst.Green{p.bump()})
+	case token.Self:
+		return cst.NewNode(cst.SelfExpr, []cst.Green{p.bump()})
 	default:
 		p.report(newExpectedExpressionDiagnostic(p.lastStart, 0))
 		return cst.NewNode(cst.Error, nil)
@@ -296,7 +793,7 @@ func (p *parser) parseError(lead []cst.Green) *cst.Node {
 	reported := false
 	for {
 		switch p.peekSignificant() {
-		case token.EOF, token.Pub, token.Const:
+		case token.EOF, token.Pub, token.Const, token.Type:
 			return cst.NewNode(cst.Error, children)
 		}
 		p.skipTrivia(&children)
@@ -348,8 +845,29 @@ var unaryOps = map[token.Kind]bool{
 // trailing trivia for the next construct) rather than mis-parsed.
 func startsExpr(kind token.Kind) bool {
 	switch kind {
-	case token.Int, token.Ident, token.True, token.False,
+	case token.Int, token.Ident, token.True, token.False, token.Null, token.Self,
 		token.Plus, token.Minus, token.Bang:
+		return true
+	default:
+		return false
+	}
+}
+
+// startsType reports whether kind can begin a type expression.
+func startsType(kind token.Kind) bool {
+	switch kind {
+	case token.Ident, token.Self, token.Null, token.LBrace, token.Fn:
+		return true
+	default:
+		return false
+	}
+}
+
+// startsMethod reports whether kind can begin a method declaration inside an
+// impl block.
+func startsMethod(kind token.Kind) bool {
+	switch kind {
+	case token.Pub, token.Extern, token.Fn, token.Ident:
 		return true
 	default:
 		return false

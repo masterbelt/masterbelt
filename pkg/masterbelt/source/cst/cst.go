@@ -40,24 +40,65 @@ const (
 	Initializer             // "= Expr"
 	TypeRef                 // an identifier naming a type
 	NameRef                 // an identifier used as a value
-	Literal                 // a literal value: an integer or a boolean (true/false)
+	Literal                 // a literal value: an integer, a boolean (true/false), or null
 	BinaryExpr              // a binary operation: Expr Op Expr
 	UnaryExpr               // a prefix operation: Op Expr
-	Error                   // a run of tokens that did not fit the grammar
+	CallExpr                // a call: Callee "(" [Expr ("," Expr)*] ")"
+	MemberExpr              // a member access: Receiver "." Ident
+	SelfExpr                // the "self" receiver inside a method body
+
+	// Type declarations and the type-expression grammar.
+	TypeDecl      // [doc] [pub] type Name [GenericParams] "=" TypeExpr [ImplBlock]
+	GenericParams // "<" GenericParam ("," GenericParam)* ">"  (declaration side)
+	GenericParam  // Ident [":" TypeExpr]  (a type parameter with an optional constraint)
+	GenericArgs   // "<" TypeExpr ("," TypeExpr)* ">"  (application side)
+	TypeName      // a named type, possibly applied: Ident [GenericArgs] — or the self/null types
+	UnionType     // PrimaryType ("|" PrimaryType)+
+	RecordType    // "{" Field* "}"
+	Field         // Ident ":" TypeExpr
+	FuncType      // fn ParamList ":" TypeExpr
+
+	// Implementations and method bodies.
+	ImplBlock  // impl "{" MethodDecl* "}"
+	MethodDecl // [pub] [extern] [fn] Ident ParamList ":" TypeExpr [Block]
+	ParamList  // "(" [Param ("," Param)*] ")"
+	Param      // Ident ":" TypeExpr
+	Block      // "{" Stmt* "}"
+	ReturnStmt // return Expr
+
+	Error // a run of tokens that did not fit the grammar
 )
 
 // kindNames maps each Kind to its name, indexed by Kind value.
 var kindNames = [...]string{
-	File:        "File",
-	ConstDecl:   "ConstDecl",
-	TypeClause:  "TypeClause",
-	Initializer: "Initializer",
-	TypeRef:     "TypeRef",
-	NameRef:     "NameRef",
-	Literal:     "Literal",
-	BinaryExpr:  "BinaryExpr",
-	UnaryExpr:   "UnaryExpr",
-	Error:       "Error",
+	File:          "File",
+	ConstDecl:     "ConstDecl",
+	TypeClause:    "TypeClause",
+	Initializer:   "Initializer",
+	TypeRef:       "TypeRef",
+	NameRef:       "NameRef",
+	Literal:       "Literal",
+	BinaryExpr:    "BinaryExpr",
+	UnaryExpr:     "UnaryExpr",
+	CallExpr:      "CallExpr",
+	MemberExpr:    "MemberExpr",
+	SelfExpr:      "SelfExpr",
+	TypeDecl:      "TypeDecl",
+	GenericParams: "GenericParams",
+	GenericParam:  "GenericParam",
+	GenericArgs:   "GenericArgs",
+	TypeName:      "TypeName",
+	UnionType:     "UnionType",
+	RecordType:    "RecordType",
+	Field:         "Field",
+	FuncType:      "FuncType",
+	ImplBlock:     "ImplBlock",
+	MethodDecl:    "MethodDecl",
+	ParamList:     "ParamList",
+	Param:         "Param",
+	Block:         "Block",
+	ReturnStmt:    "ReturnStmt",
+	Error:         "Error",
 }
 
 // String returns the name of the kind, for snapshots and debugging.

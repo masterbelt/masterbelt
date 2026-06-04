@@ -57,6 +57,16 @@ func TestParseLossless(t *testing.T) {
 		"const z = 1 <= 2 == true\n",
 		"const w = - - 1\n",
 		"const e = 1 +\n", // missing right operand stays lossless
+		// Type declarations.
+		"pub type Coin = int8\n",
+		"type Pair = A | B\n",
+		"type Opt<T> = T | null\n",
+		"type Num<T: int8 | int16> = T\n",
+		"type Rec = {\n  a: int8\n  b: Level\n}\n",
+		"type Lvl = int8 impl {\n  pub increment(): self {\n    return self + 1\n  }\n}\n",
+		"type Mapper<T, R> = fn(src: T): R\n",
+		"const x = 1\ntype T = int8\npub const y = 2\n", // const/type interleaved
+		"type Bad =\ntype Worse <\n",                    // malformed type decls stay lossless
 	}
 	for _, src := range cases {
 		assertLossless(t, src)
@@ -104,6 +114,69 @@ func TestParseConstDeclChildren(t *testing.T) {
 	}
 	if len(nodeKinds) != 2 || nodeKinds[0] != cst.TypeClause || nodeKinds[1] != cst.Initializer {
 		t.Fatalf("decl sub-nodes = %v, want [TypeClause Initializer]", nodeKinds)
+	}
+}
+
+// subNodeKinds returns the kinds of a node's direct child nodes, skipping leaf
+// tokens (and therefore trivia).
+func subNodeKinds(n *cst.Node) []cst.Kind {
+	var out []cst.Kind
+	for _, c := range n.Children() {
+		if sn, ok := c.(*cst.Node); ok {
+			out = append(out, sn.Kind())
+		}
+	}
+	return out
+}
+
+// TestParseTypeDeclFileShape checks that type declarations are recognised at the
+// file level and that the const/type choice is made by looking past pub.
+func TestParseTypeDeclFileShape(t *testing.T) {
+	root, diags := Parse([]byte("const X = 1\npub type Coin = int8\ntype Pair = A | B\n"))
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	got := declKinds(root)
+	want := []string{"ConstDecl", "TypeDecl", "TypeDecl", "<Newline>", "<EOF>"}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("file children = %v, want %v", got, want)
+	}
+}
+
+func TestParseTypeDeclChildren(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+		want []cst.Kind
+	}{
+		{"nominal", "type Coin = int8\n", []cst.Kind{cst.TypeName}},
+		{"union", "type Pair = A | B\n", []cst.Kind{cst.UnionType}},
+		{"generic union", "pub type Opt<T> = T | null\n", []cst.Kind{cst.GenericParams, cst.UnionType}},
+		{"constrained generic", "type Num<T: int8 | int16> = T\n", []cst.Kind{cst.GenericParams, cst.TypeName}},
+		{"record", "type Rec = {\n  a: int8\n}\n", []cst.Kind{cst.RecordType}},
+		{"func type", "type M<T, R> = fn(src: T): R\n", []cst.Kind{cst.GenericParams, cst.FuncType}},
+		{"impl", "type Lvl = int8 impl {\n  pub inc(): self {\n    return self\n  }\n}\n", []cst.Kind{cst.TypeName, cst.ImplBlock}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			root, diags := Parse([]byte(tc.src))
+			if len(diags) != 0 {
+				t.Fatalf("unexpected diagnostics: %v", diags)
+			}
+			decl := root.Children()[0].(*cst.Node)
+			if decl.Kind() != cst.TypeDecl {
+				t.Fatalf("first child kind = %s, want TypeDecl", decl.Kind())
+			}
+			got := subNodeKinds(decl)
+			if len(got) != len(tc.want) {
+				t.Fatalf("sub-nodes = %v, want %v", got, tc.want)
+			}
+			for i := range got {
+				if got[i] != tc.want[i] {
+					t.Fatalf("sub-nodes = %v, want %v", got, tc.want)
+				}
+			}
+		})
 	}
 }
 

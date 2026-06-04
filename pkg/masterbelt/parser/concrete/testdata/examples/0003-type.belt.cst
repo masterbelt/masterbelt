@@ -1,0 +1,274 @@
+# tree
+File
+  TypeDecl
+    LineComment "// Nominal type"
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Type "type"
+    Whitespace " "
+    Ident "Coin"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    TypeName
+      Ident "int8"
+  TypeDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// Nominal type with methods"
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Type "type"
+    Whitespace " "
+    Ident "Level"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    TypeName
+      Ident "int8"
+    Whitespace " "
+    ImplBlock
+      Impl "impl"
+      Whitespace " "
+      LBrace "{"
+      Newline "\n"
+      Whitespace "  "
+      MethodDecl
+        Pub "pub"
+        Whitespace " "
+        Ident "increment"
+        ParamList
+          LParen "("
+          RParen ")"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Self "self"
+        Whitespace " "
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            BinaryExpr
+              SelfExpr
+                Self "self"
+              Whitespace " "
+              Plus "+"
+              Whitespace " "
+              Literal
+                Int "1"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
+      Newline "\n"
+      RBrace "}"
+  TypeDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// Union type"
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Type "type"
+    Whitespace " "
+    Ident "GameValue"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    UnionType
+      TypeName
+        Ident "Coin"
+      Whitespace " "
+      Pipe "|"
+      Whitespace " "
+      TypeName
+        Ident "Level"
+  TypeDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// Generics"
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Type "type"
+    Whitespace " "
+    Ident "Optional"
+    GenericParams
+      Lt "<"
+      GenericParam
+        Ident "T"
+      Gt ">"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    UnionType
+      TypeName
+        Ident "T"
+      Whitespace " "
+      Pipe "|"
+      Whitespace " "
+      TypeName
+        Null "null"
+  TypeDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// Generics with type constraint"
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Type "type"
+    Whitespace " "
+    Ident "OptionalNumeric"
+    GenericParams
+      Lt "<"
+      GenericParam
+        Ident "T"
+        Colon ":"
+        Whitespace " "
+        UnionType
+          TypeName
+            Ident "int8"
+          Whitespace " "
+          Pipe "|"
+          Whitespace " "
+          TypeName
+            Ident "int16"
+      Gt ">"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    UnionType
+      TypeName
+        Ident "T"
+      Whitespace " "
+      Pipe "|"
+      Whitespace " "
+      TypeName
+        Null "null"
+  TypeDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// Product type"
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Type "type"
+    Whitespace " "
+    Ident "Record"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    RecordType
+      LBrace "{"
+      Newline "\n"
+      Whitespace "  "
+      Field
+        Ident "id"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "int8"
+      Newline "\n"
+      Whitespace "  "
+      Field
+        Ident "level"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "Level"
+      Newline "\n"
+      RBrace "}"
+    Whitespace " "
+    ImplBlock
+      Impl "impl"
+      Whitespace " "
+      LBrace "{"
+      Newline "\n"
+      Whitespace "  "
+      MethodDecl
+        Pub "pub"
+        Whitespace " "
+        Fn "fn"
+        Whitespace " "
+        Ident "game_id"
+        ParamList
+          LParen "("
+          RParen ")"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "int32"
+        Whitespace " "
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            BinaryExpr
+              CallExpr
+                NameRef
+                  Ident "int32"
+                LParen "("
+                MemberExpr
+                  SelfExpr
+                    Self "self"
+                  Dot "."
+                  Ident "id"
+                RParen ")"
+              Whitespace " "
+              Star "*"
+              Whitespace " "
+              Literal
+                Int "1000"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
+      Newline "\n"
+      RBrace "}"
+  TypeDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// Function type"
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Type "type"
+    Whitespace " "
+    Ident "Mapper"
+    GenericParams
+      Lt "<"
+      GenericParam
+        Ident "T"
+      Comma ","
+      Whitespace " "
+      GenericParam
+        Ident "R"
+      Gt ">"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    FuncType
+      Fn "fn"
+      ParamList
+        LParen "("
+        Param
+          Ident "src"
+          Colon ":"
+          Whitespace " "
+          TypeName
+            Ident "T"
+        RParen ")"
+      Colon ":"
+      Whitespace " "
+      TypeName
+        Ident "R"
+  Newline "\n"
+  EOF ""
+# diagnostics
