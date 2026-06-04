@@ -339,8 +339,20 @@ type Sink struct {
 	// InvalidOp fires at the innermost method call whose operand types it is
 	// not defined on, with the operand types rendered as "recv, arg, ...".
 	InvalidOp func(node ast.Node, method, operands string)
-	// Mismatch fires where got cannot be used as the expected type want.
-	Mismatch func(e ast.Expr, got, want ir.Type)
+	// Mismatch fires where got cannot be used as the expected type want. The
+	// node is the offending expression — or, for a function-literal parameter
+	// whose annotation conflicts with the pushed-down type, the parameter.
+	Mismatch func(node ast.Node, got, want ir.Type)
+	// Checked fires for every (expression, expected-type) pair the checking
+	// walk visits, so the semantic layer can hook value-range (Fits) checks
+	// without this package depending on eval.
+	Checked func(e ast.Expr, want ir.Type)
+	// ArityMismatch fires at a function literal whose parameter count differs
+	// from the expected function type's.
+	ArityMismatch func(lit *ast.FuncLit, got, want int)
+	// UninferableParam fires at a function-literal parameter that neither has
+	// an annotation nor receives a concrete type from the checking context.
+	UninferableParam func(p *ast.ParamDef)
 	// UninferableResult fires at a function literal that neither annotates its
 	// result type nor returns a value to infer it from.
 	UninferableResult func(lit *ast.FuncLit)
@@ -352,9 +364,27 @@ func (s *Sink) invalidOp(node ast.Node, method, operands string) {
 	}
 }
 
-func (s *Sink) mismatch(e ast.Expr, got, want ir.Type) {
+func (s *Sink) mismatch(node ast.Node, got, want ir.Type) {
 	if s != nil && s.Mismatch != nil {
-		s.Mismatch(e, got, want)
+		s.Mismatch(node, got, want)
+	}
+}
+
+func (s *Sink) checked(e ast.Expr, want ir.Type) {
+	if s != nil && s.Checked != nil {
+		s.Checked(e, want)
+	}
+}
+
+func (s *Sink) arityMismatch(lit *ast.FuncLit, got, want int) {
+	if s != nil && s.ArityMismatch != nil {
+		s.ArityMismatch(lit, got, want)
+	}
+}
+
+func (s *Sink) uninferableParam(p *ast.ParamDef) {
+	if s != nil && s.UninferableParam != nil {
+		s.UninferableParam(p)
 	}
 }
 
@@ -373,6 +403,261 @@ func (s *Sink) uninferableResult(lit *ast.FuncLit) {
 // without re-reporting it.
 func Check(e ast.Expr, env Env, sink *Sink) ir.Type {
 	return check(e, constScope{env}, sink)
+}
+
+// CheckAgainst checks expression e against the expected type want, pushing
+// want into the forms that benefit (function and collection literals) and
+// falling back to synthesis plus subsumption for everything else. It returns
+// the expression's type — concrete where want filled in what the expression
+// omitted. A nil sink checks silently (pure typing); diagnostic callers pass
+// callbacks.
+func CheckAgainst(e ast.Expr, want ir.Type, env Env, sink *Sink) ir.Type {
+	return checkType(e, want, constScope{env}, map[string]ir.Type{}, sink)
+}
+
+// CheckBody is CheckAgainst over a method-body scope, so a returned function
+// or collection literal receives the method's declared result type.
+func CheckBody(e ast.Expr, want ir.Type, s BodyScope, sink *Sink) ir.Type {
+	return checkType(e, want, s, map[string]ir.Type{}, sink)
+}
+
+// checkType is the checking walk: the bidirectional half of the type rules.
+// want may contain still-unbound method type variables — a call site passes
+// its bindings in subst and gains the ones the walk solves; the declaration
+// paths pass a fresh map.
+func checkType(e ast.Expr, want ir.Type, s scope, subst map[string]ir.Type, sink *Sink) ir.Type {
+	if e == nil {
+		return ir.Invalid
+	}
+	if want == ir.Invalid {
+		// No usable expectation (an annotation that failed to resolve is
+		// reported at its own node): synthesize, keeping the body diagnostics.
+		return check(e, s, sink)
+	}
+	want = types.Substitute(want, subst) // pin what the context already solved
+	sink.checked(e, want)
+	switch e := e.(type) {
+	case *ast.FuncLit:
+		fw, ok := want.(*ir.Func)
+		if !ok {
+			got := check(e, s, sink)
+			sink.mismatch(e, got, want)
+			return got
+		}
+		return checkFuncLitAgainst(e, fw, s, subst, sink)
+	case *ast.CollectionLit:
+		return checkCollectionAgainst(e, want, s, subst, sink)
+	default:
+		// Synthesis plus subsumption: any other form's type is its own; it
+		// must merely satisfy want (binding any type variable want still has).
+		got := check(e, s, sink)
+		if got != ir.Invalid && !types.Match(s.registry(), want, got, subst) {
+			sink.mismatch(e, got, want)
+		}
+		return got
+	}
+}
+
+// checkCollectionAgainst checks a collection literal against an expected list
+// or map type: the shape must agree, and every entry is checked against the
+// element type — which is how an annotation reaches into the literal, and how
+// an empty literal gets a type at all (it is exactly its expectation).
+func checkCollectionAgainst(lit *ast.CollectionLit, want ir.Type, s scope, subst map[string]ir.Type, sink *Sink) ir.Type {
+	app, ok := collectionApp(want)
+	if !ok || (len(lit.Entries) > 0 && lit.IsMap() != (len(app.Args) == 2)) {
+		// Not a collection expectation, or a map literal under a list type
+		// (or vice versa): report with the synthesized type, as the const
+		// annotation check always has.
+		got := check(lit, s, sink)
+		sink.mismatch(lit, got, want)
+		return got
+	}
+	switch len(app.Args) {
+	case 1:
+		for _, entry := range lit.Entries {
+			checkType(entry.Value, app.Args[0], s, subst, sink)
+		}
+	case 2:
+		for _, entry := range lit.Entries {
+			if entry.Key != nil {
+				checkType(entry.Key, app.Args[0], s, subst, sink)
+			}
+			checkType(entry.Value, app.Args[1], s, subst, sink)
+		}
+	}
+	return want
+}
+
+// collectionApp returns t as a list or map application, or false if t is not a
+// builtin collection type.
+func collectionApp(t ir.Type) (*ir.App, bool) {
+	app, ok := t.(*ir.App)
+	if !ok || app.Def == nil {
+		return nil, false
+	}
+	if app.Def.Name == "list" || app.Def.Name == "map" {
+		return app, true
+	}
+	return nil, false
+}
+
+// checkFuncLitAgainst checks a function literal against an expected function
+// type — the heart of the bidirectional rules. The expectation supplies what
+// the literal omits: an unannotated parameter takes the expected parameter
+// type, and an unannotated result is either checked against the expected
+// result or, when that still contains an unbound method type variable (map's
+// R), synthesized from the body and matched to bind the variable in subst.
+// A written annotation wins for the body scope but must agree with the
+// expectation (default-int adaption only).
+func checkFuncLitAgainst(lit *ast.FuncLit, want *ir.Func, s scope, subst map[string]ir.Type, sink *Sink) ir.Type {
+	reg := s.registry()
+	if len(lit.Params) != len(want.Params) {
+		sink.arityMismatch(lit, len(lit.Params), len(want.Params))
+		return ir.Invalid
+	}
+	r := &TypeResolver{Reg: reg}
+	params := make([]ir.Type, len(lit.Params))
+	names := make(map[string]ir.Type, len(lit.Params))
+	for i, p := range lit.Params {
+		wp := types.Substitute(want.Params[i], subst)
+		switch {
+		case p.Type != nil:
+			ap := r.ResolveType(p.Type, nil)
+			if ap != ir.Invalid && !hasTypeVar(wp) && types.Unify(reg, ap, wp) == ir.Invalid {
+				sink.mismatch(p, ap, wp)
+			}
+			params[i] = ap
+		case !hasTypeVar(wp):
+			params[i] = wp
+		default:
+			// The context has not pinned the variable this parameter needs
+			// (and pass-2 ordering means it never will).
+			sink.uninferableParam(p)
+			params[i] = ir.Invalid
+		}
+		names[p.Name] = params[i]
+	}
+	body := funcScope{outer: s, params: names}
+
+	wr := types.Substitute(want.Result, subst)
+	var result ir.Type
+	switch {
+	case lit.Result != nil:
+		// The annotation wins for the returns, after agreeing with the
+		// expectation the same way a parameter annotation must.
+		result = r.ResolveType(lit.Result, nil)
+		if result != ir.Invalid && !hasTypeVar(wr) && types.Unify(reg, result, wr) == ir.Invalid {
+			sink.mismatch(lit.Result, result, wr)
+		}
+		checkReturns(lit, result, body, subst, sink)
+	case !hasTypeVar(wr):
+		// The expectation determines the result; every return is checked
+		// against it (no return at all still leaves the signature complete).
+		result = wr
+		checkReturns(lit, wr, body, subst, sink)
+	default:
+		// The expected result still has an unbound method type variable (the
+		// R of map): synthesize the body's result and bind the variable.
+		unified, sawReturn := synthesizeReturns(lit, body, sink)
+		switch {
+		case !sawReturn:
+			sink.uninferableResult(lit)
+			result = ir.Invalid
+		case unified == ir.Invalid:
+			result = ir.Invalid
+		case types.Match(reg, wr, unified, subst):
+			result = types.Substitute(wr, subst)
+		default:
+			sink.mismatch(lit, unified, wr)
+			result = ir.Invalid
+		}
+	}
+	return &ir.Func{Params: params, Result: result}
+}
+
+// checkReturns walks a literal's body with a known result type: every return
+// value is checked against it (pushing it into nested literals), and bare
+// expression statements are checked for their own errors.
+func checkReturns(lit *ast.FuncLit, want ir.Type, body funcScope, subst map[string]ir.Type, sink *Sink) {
+	for _, stmt := range lit.Body {
+		switch stmt := stmt.(type) {
+		case *ast.ReturnStmt:
+			if stmt.Value != nil {
+				checkType(stmt.Value, want, body, subst, sink)
+			}
+		case *ast.ExprStmt:
+			check(stmt.X, body, sink)
+		}
+	}
+}
+
+// synthesizeReturns walks a literal's body in synthesis mode, unifying the
+// returned types the way checkFuncLit does: the unified type (Invalid when a
+// return is Invalid or the returns conflict, reported at the later return)
+// and whether any return carried a value.
+func synthesizeReturns(lit *ast.FuncLit, body funcScope, sink *Sink) (unified ir.Type, sawReturn bool) {
+	reg := body.registry()
+	for _, stmt := range lit.Body {
+		switch stmt := stmt.(type) {
+		case *ast.ReturnStmt:
+			if stmt.Value == nil {
+				continue
+			}
+			sawReturn = true
+			got := check(stmt.Value, body, sink)
+			switch {
+			case unified == nil:
+				unified = got
+			case unified == ir.Invalid || got == ir.Invalid:
+				unified = ir.Invalid
+			default:
+				if u := types.Unify(reg, unified, got); u == ir.Invalid {
+					sink.mismatch(stmt.Value, got, unified)
+					unified = ir.Invalid
+				} else {
+					unified = u
+				}
+			}
+		case *ast.ExprStmt:
+			check(stmt.X, body, sink)
+		}
+	}
+	return unified, sawReturn
+}
+
+// hasTypeVar reports whether t still contains a type variable — i.e. the
+// checking context has not pinned every generic part to a concrete type.
+func hasTypeVar(t ir.Type) bool {
+	switch t := t.(type) {
+	case *ir.TypeVar:
+		return true
+	case *ir.App:
+		for _, a := range t.Args {
+			if hasTypeVar(a) {
+				return true
+			}
+		}
+	case *ir.Func:
+		for _, p := range t.Params {
+			if hasTypeVar(p) {
+				return true
+			}
+		}
+		return hasTypeVar(t.Result)
+	case *ir.Union:
+		for _, m := range t.Members {
+			if hasTypeVar(m) {
+				return true
+			}
+		}
+	case *ir.Record:
+		for _, f := range t.Fields {
+			if hasTypeVar(f.Type) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // check is the checking walk behind Check, parameterized over the scope so a
@@ -421,68 +706,37 @@ func check(e ast.Expr, s scope, sink *Sink) ir.Type {
 	}
 }
 
-// checkFuncLit checks a function literal: its body is walked in the literal's
-// parameter scope, each return value is checked against the declared result
-// type (or unified with the other returns when the annotation is omitted), and
-// a literal with neither a result annotation nor a return to infer one from is
-// reported as uninferable. The signature it returns is built from the same
-// walk, so it agrees with funcLitType's (the silent twin over exprType)
-// without typing the body a second time.
+// checkFuncLit checks a function literal with no expected type: its body is
+// walked in the literal's parameter scope, each return value is checked
+// against the declared result type (or unified with the other returns when
+// the annotation is omitted), and a literal with neither a result annotation
+// nor a return to infer one from is reported as uninferable. The signature it
+// returns is built from the same walk, so it agrees with funcLitType's (the
+// silent twin over exprType) without typing the body a second time.
 func checkFuncLit(lit *ast.FuncLit, s scope, sink *Sink) ir.Type {
-	reg := s.registry()
-	r := &TypeResolver{Reg: reg}
+	r := &TypeResolver{Reg: s.registry()}
 	params := make([]ir.Type, len(lit.Params))
 	names := make(map[string]ir.Type, len(lit.Params))
 	for i, p := range lit.Params {
+		if p.Type == nil {
+			// With no expected type there is no context to infer an
+			// unannotated parameter from.
+			sink.uninferableParam(p)
+		}
 		params[i] = r.ResolveType(p.Type, nil)
 		names[p.Name] = params[i]
 	}
 	body := funcScope{outer: s, params: names}
 
-	var want ir.Type // the declared result type, nil when omitted
+	var result ir.Type
 	if lit.Result != nil {
-		want = r.ResolveType(lit.Result, nil)
-	}
-	var unified ir.Type // the returns unified so far, when no annotation
-	sawReturn := false
-	for _, stmt := range lit.Body {
-		switch stmt := stmt.(type) {
-		case *ast.ReturnStmt:
-			if stmt.Value == nil {
-				continue
-			}
-			sawReturn = true
-			got := check(stmt.Value, body, sink)
-			switch {
-			case want != nil:
-				// An Invalid return is already reported (or reported
-				// elsewhere); do not pile on.
-				if got != ir.Invalid && want != ir.Invalid && !types.Assignable(reg, got, want) {
-					sink.mismatch(stmt.Value, got, want)
-				}
-			case unified == nil:
-				unified = got
-			case unified == ir.Invalid || got == ir.Invalid:
-				// An Invalid return poisons the synthesis — the same outcome
-				// returnedType reaches through Unify — without a report.
-				unified = ir.Invalid
-			default:
-				if u := types.Unify(reg, unified, got); u == ir.Invalid {
-					sink.mismatch(stmt.Value, got, unified)
-					unified = ir.Invalid
-				} else {
-					unified = u
-				}
-			}
-		case *ast.ExprStmt:
-			check(stmt.X, body, sink)
+		result = r.ResolveType(lit.Result, nil)
+		checkReturns(lit, result, body, map[string]ir.Type{}, sink)
+	} else {
+		unified, sawReturn := synthesizeReturns(lit, body, sink)
+		if !sawReturn {
+			sink.uninferableResult(lit)
 		}
-	}
-	if lit.Result == nil && !sawReturn {
-		sink.uninferableResult(lit)
-	}
-	result := want
-	if lit.Result == nil {
 		result = unified
 		if result == nil {
 			result = ir.Invalid

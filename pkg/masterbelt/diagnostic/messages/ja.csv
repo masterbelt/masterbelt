@@ -21,3 +21,5 @@ masterbelt.semantic.division_by_zero,ゼロ除算です
 masterbelt.semantic.type_mismatch,{actual} を {expected} として使えません
 masterbelt.semantic.uninferable_collection,このコレクションリテラルの型を推論できません。型注釈を付けてください
 masterbelt.semantic.uninferable_result,この関数リテラルの結果型を推論できません。注釈を付けるか値を返してください
+masterbelt.semantic.uninferable_parameter,パラメータ {name} の型を推論できません。型注釈を付けてください
+masterbelt.semantic.lambda_arity_mismatch,関数リテラルのパラメータが {actual} 個ありますが、{expected} 個が必要です

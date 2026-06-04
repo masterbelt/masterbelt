@@ -1,6 +1,7 @@
 package infer
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
@@ -303,13 +304,252 @@ func TestCheckFuncLitBody(t *testing.T) {
 	}
 }
 
+// --- checking mode (CheckAgainst) --------------------------------------------
+
+func stringLit(value string) *ast.StringLit { return ast.NewStringLit(value, nil) }
+
+func listLit(values ...ast.Expr) *ast.CollectionLit {
+	entries := make([]*ast.CollectionEntry, len(values))
+	for i, v := range values {
+		entries[i] = &ast.CollectionEntry{Value: v}
+	}
+	return ast.NewCollectionLit(entries, nil)
+}
+
+func mapLit(pairs ...[2]ast.Expr) *ast.CollectionLit {
+	entries := make([]*ast.CollectionEntry, len(pairs))
+	for i, p := range pairs {
+		entries[i] = &ast.CollectionEntry{Key: p[0], Value: p[1]}
+	}
+	return ast.NewCollectionLit(entries, nil)
+}
+
+// builtinT and the type builders construct expected types directly — the want
+// side of checking is an ir.Type, not syntax.
+func builtinT(name string) ir.Type { return &ir.Builtin{Name: name} }
+func fnT(result ir.Type, params ...ir.Type) *ir.Func {
+	return &ir.Func{Params: params, Result: result}
+}
+
+// collectionEnv is emptyEnv with synthetic list and map definitions installed —
+// the prelude (which declares the real ones) is not available to this package.
+func collectionEnv() stubEnv {
+	env := emptyEnv()
+	env.reg.Install([]*ir.TypeDef{
+		{Name: "list", Builtin: true, Params: []*ir.TypeParam{{Name: "T"}}},
+		{Name: "map", Builtin: true, Params: []*ir.TypeParam{{Name: "K"}, {Name: "V"}}},
+	})
+	return env
+}
+
+// listT resolves list<elem> through the registry, so the App's Def is the one
+// collection rules compare against.
+func listT(t *testing.T, env stubEnv, elem ir.Type) ir.Type {
+	t.Helper()
+	def, ok := env.reg.Lookup("list")
+	if !ok {
+		t.Fatal("no list in the registry")
+	}
+	return &ir.App{Def: def, Args: []ir.Type{elem}}
+}
+
+func mapT(t *testing.T, env stubEnv, key, value ir.Type) ir.Type {
+	t.Helper()
+	def, ok := env.reg.Lookup("map")
+	if !ok {
+		t.Fatal("no map in the registry")
+	}
+	return &ir.App{Def: def, Args: []ir.Type{key, value}}
+}
+
+// TestCheckAgainst covers the checking rules (form × want): push-down into
+// function and collection literals, synthesis plus subsumption for everything
+// else.
+func TestCheckAgainst(t *testing.T) {
+	env := collectionEnv()
+	cases := []struct {
+		name       string
+		expr       ast.Expr
+		want       ir.Type
+		typ        string   // the returned type
+		mismatches []string // expected Mismatch reports, "got -> want"
+	}{
+		// Synthesis + subsumption.
+		{"int adapts", intLit("1"), builtinT("int8"), "int", nil},
+		{"same type", boolLit(true), builtinT("bool"), "bool", nil},
+		{"scalar mismatch", intLit("1"), builtinT("bool"), "int", []string{"int -> bool"}},
+		// Collection literals: the annotation reaches each entry.
+		{"list adapts", listLit(intLit("1"), intLit("2")), nil, "list<int8>", nil},
+		{"list entry mismatch", listLit(intLit("1"), boolLit(true)), nil, "list<int8>", []string{"bool -> int8"}},
+		{"empty list takes want", listLit(), nil, "list<int8>", nil},
+		{"non-collection want", listLit(intLit("1")), builtinT("int"), "list<int>", []string{"list<int> -> int"}},
+		// Function literals: the expectation fills in what the literal omits.
+		{
+			"params and result pushed",
+			funcLit([]*ast.ParamDef{param("x", nil)}, nil, ret(binary(ident("x"), "mul", intLit("2")))),
+			fnT(builtinT("int"), builtinT("int")),
+			"fn(int): int", nil,
+		},
+		{
+			"annotation agrees and wins",
+			funcLit([]*ast.ParamDef{param("x", namedType("int"))}, nil, ret(binary(ident("x"), "mul", intLit("3")))),
+			fnT(builtinT("int"), builtinT("int")),
+			"fn(int): int", nil,
+		},
+		{
+			"annotation conflicts",
+			funcLit([]*ast.ParamDef{param("x", namedType("string"))}, nil, ret(ident("x"))),
+			fnT(builtinT("int"), builtinT("int")),
+			"fn(string): int", []string{"string -> int", "string -> int"}, // the parameter and its return
+		},
+		{
+			"result annotation conflicts",
+			funcLit([]*ast.ParamDef{param("x", namedType("int"))}, namedType("string"), ret(stringLit("s"))),
+			fnT(builtinT("int"), builtinT("int")),
+			"fn(int): string", []string{"string -> int"},
+		},
+		{
+			"non-function want",
+			funcLit(nil, namedType("int"), ret(intLit("1"))),
+			builtinT("int"),
+			"fn(): int", []string{"fn(): int -> int"},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			want := tc.want
+			if want == nil {
+				want = listT(t, env, builtinT("int8"))
+			}
+			var r report
+			got := CheckAgainst(tc.expr, want, env, r.sink())
+			if got.String() != tc.typ {
+				t.Errorf("CheckAgainst = %s, want %s", got, tc.typ)
+			}
+			if len(r.mismatches) != len(tc.mismatches) {
+				t.Fatalf("mismatches = %v, want %v", r.mismatches, tc.mismatches)
+			}
+			for i := range r.mismatches {
+				if r.mismatches[i] != tc.mismatches[i] {
+					t.Errorf("mismatch %d = %s, want %s", i, r.mismatches[i], tc.mismatches[i])
+				}
+			}
+		})
+	}
+}
+
+func TestCheckAgainstMapLiteral(t *testing.T) {
+	env := collectionEnv()
+	want := mapT(t, env, builtinT("string"), builtinT("int8"))
+
+	var r report
+	got := CheckAgainst(mapLit([2]ast.Expr{stringLit("a"), intLit("1")}), want, env, r.sink())
+	if got.String() != "map<string, int8>" || len(r.mismatches) != 0 {
+		t.Errorf("map literal = %s (mismatches %v), want map<string, int8>", got, r.mismatches)
+	}
+
+	// A key of the wrong type is reported at the key.
+	var r2 report
+	CheckAgainst(mapLit([2]ast.Expr{intLit("1"), intLit("2")}), want, env, r2.sink())
+	if len(r2.mismatches) != 1 || r2.mismatches[0] != "int -> string" {
+		t.Errorf("map key mismatch = %v, want [int -> string]", r2.mismatches)
+	}
+
+	// A map literal under a list expectation is a shape mismatch.
+	var r3 report
+	CheckAgainst(mapLit([2]ast.Expr{stringLit("a"), intLit("1")}), listT(t, env, builtinT("int")), env, r3.sink())
+	if len(r3.mismatches) != 1 || r3.mismatches[0] != "map<string, int> -> list<int>" {
+		t.Errorf("shape mismatch = %v", r3.mismatches)
+	}
+}
+
+func TestCheckAgainstArityAndInference(t *testing.T) {
+	env := emptyEnv()
+	intT := builtinT("int")
+
+	// Too many parameters: reported, the type is Invalid.
+	var r report
+	got := CheckAgainst(
+		funcLit([]*ast.ParamDef{param("x", nil), param("y", nil)}, nil, ret(ident("x"))),
+		fnT(intT, intT), env, r.sink())
+	if got != ir.Invalid {
+		t.Errorf("arity mismatch type = %s, want invalid", got)
+	}
+	if len(r.arities) != 1 || r.arities[0] != "2 of 1" {
+		t.Errorf("arities = %v, want [2 of 1]", r.arities)
+	}
+
+	// A parameter the context cannot pin (an unbound variable) is reported.
+	var r2 report
+	got = CheckAgainst(
+		funcLit([]*ast.ParamDef{param("x", nil)}, nil, ret(ident("x"))),
+		fnT(intT, &ir.TypeVar{Name: "T"}), env, r2.sink())
+	if got.String() != "fn(invalid): int" {
+		t.Errorf("uninferable parameter type = %s, want fn(invalid): int", got)
+	}
+	if len(r2.uninferableParams) != 1 || r2.uninferableParams[0] != "x" {
+		t.Errorf("uninferable params = %v, want [x]", r2.uninferableParams)
+	}
+
+	// An unbound result variable (map's R) is solved from the body.
+	var r3 report
+	subst := map[string]ir.Type{}
+	got = checkType(
+		funcLit([]*ast.ParamDef{param("x", nil)}, nil, ret(binary(ident("x"), "lt", intLit("0")))),
+		fnT(&ir.TypeVar{Name: "R"}, intT), constScope{env}, subst, r3.sink())
+	if got.String() != "fn(int): bool" {
+		t.Errorf("solved literal = %s, want fn(int): bool", got)
+	}
+	if subst["R"] == nil || subst["R"].String() != "bool" {
+		t.Errorf("subst[R] = %v, want bool", subst["R"])
+	}
+	if len(r3.mismatches) != 0 || r3.uninferables != 0 {
+		t.Errorf("unexpected reports: %v / %d", r3.mismatches, r3.uninferables)
+	}
+
+	// No return to solve the variable from: uninferable result.
+	var r4 report
+	got = checkType(
+		funcLit([]*ast.ParamDef{param("x", nil)}, nil),
+		fnT(&ir.TypeVar{Name: "R"}, intT), constScope{env}, map[string]ir.Type{}, r4.sink())
+	if got.String() != "fn(int): invalid" {
+		t.Errorf("unsolved literal = %s, want fn(int): invalid", got)
+	}
+	if r4.uninferables != 1 {
+		t.Errorf("uninferable result reported %d times, want 1", r4.uninferables)
+	}
+}
+
+func TestCheckAgainstNested(t *testing.T) {
+	env := collectionEnv()
+	intT := builtinT("int")
+
+	// The expectation reaches a literal nested in a collection...
+	var r report
+	want := listT(t, env, fnT(intT, intT))
+	got := CheckAgainst(listLit(funcLit([]*ast.ParamDef{param("x", nil)}, nil, ret(ident("x")))), want, env, r.sink())
+	if got.String() != "list<fn(int): int>" || len(r.mismatches) != 0 {
+		t.Errorf("nested in list = %s (mismatches %v)", got, r.mismatches)
+	}
+
+	// ...and one returned from another literal.
+	var r2 report
+	outer := funcLit(nil, nil, ret(funcLit([]*ast.ParamDef{param("x", nil)}, nil, ret(ident("x")))))
+	got = CheckAgainst(outer, fnT(fnT(intT, intT)), env, r2.sink())
+	if got.String() != "fn(): fn(int): int" || len(r2.mismatches) != 0 {
+		t.Errorf("nested in literal = %s (mismatches %v)", got, r2.mismatches)
+	}
+}
+
 // report collects the findings Check sinks, for asserting both count and
 // detail.
 type report struct {
-	methods      []string
-	operands     []string
-	mismatches   []string // rendered "got -> want"
-	uninferables int
+	methods           []string
+	operands          []string
+	mismatches        []string // rendered "got -> want"
+	arities           []string // rendered "got of want"
+	uninferableParams []string // parameter names
+	uninferables      int      // uninferable results
 }
 
 func (r *report) sink() *Sink {
@@ -318,8 +558,14 @@ func (r *report) sink() *Sink {
 			r.methods = append(r.methods, method)
 			r.operands = append(r.operands, operands)
 		},
-		Mismatch: func(_ ast.Expr, got, want ir.Type) {
+		Mismatch: func(_ ast.Node, got, want ir.Type) {
 			r.mismatches = append(r.mismatches, got.String()+" -> "+want.String())
+		},
+		ArityMismatch: func(_ *ast.FuncLit, got, want int) {
+			r.arities = append(r.arities, fmt.Sprintf("%d of %d", got, want))
+		},
+		UninferableParam: func(p *ast.ParamDef) {
+			r.uninferableParams = append(r.uninferableParams, p.Name)
 		},
 		UninferableResult: func(*ast.FuncLit) { r.uninferables++ },
 	}

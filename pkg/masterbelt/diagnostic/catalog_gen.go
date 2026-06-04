@@ -143,6 +143,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "cannot apply method " + f["method"].String() + " to " + f["types"].String()
 		}
 	},
+	"masterbelt.semantic.lambda_arity_mismatch": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "関数リテラルのパラメータが " + f["actual"].String() + " 個ありますが、" + f["expected"].String() + " 個が必要です"
+		default:
+			return "function literal has " + f["actual"].String() + " parameters; " + f["expected"].String() + " expected"
+		}
+	},
 	"masterbelt.semantic.type_mismatch": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
@@ -165,6 +173,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "このコレクションリテラルの型を推論できません。型注釈を付けてください"
 		default:
 			return "cannot infer the type of this collection literal; annotate it"
+		}
+	},
+	"masterbelt.semantic.uninferable_parameter": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "パラメータ " + f["name"].String() + " の型を推論できません。型注釈を付けてください"
+		default:
+			return "cannot infer the type of parameter " + f["name"].String() + "; annotate it"
 		}
 	},
 	"masterbelt.semantic.uninferable_result": func(loc Locale, f map[string]fmt.Stringer) string {

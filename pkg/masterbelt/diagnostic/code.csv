@@ -21,3 +21,5 @@ masterbelt.semantic.division_by_zero,error,
 masterbelt.semantic.type_mismatch,error,actual:string expected:string
 masterbelt.semantic.uninferable_collection,error,
 masterbelt.semantic.uninferable_result,error,
+masterbelt.semantic.uninferable_parameter,error,name:string
+masterbelt.semantic.lambda_arity_mismatch,error,actual:int expected:int

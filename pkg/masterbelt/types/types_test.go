@@ -194,6 +194,78 @@ func TestGenericMethodResult(t *testing.T) {
 	}
 }
 
+// TestBindReceiver checks the carved-out first half of the method rule: the
+// lookup and the receiver-argument bindings, with the per-method variables
+// left for the caller to solve.
+func TestBindReceiver(t *testing.T) {
+	reg := builtin.Default()
+	listDef := &ir.TypeDef{Name: "list", Builtin: true, Params: []*ir.TypeParam{{Name: "T"}}}
+	listDef.Methods = []*ir.Method{
+		{Name: "map", Params: []ir.Param{{Name: "func", Type: &ir.Func{Params: []ir.Type{&ir.TypeVar{Name: "T"}}, Result: &ir.TypeVar{Name: "R"}}}}, Result: &ir.App{Def: listDef, Args: []ir.Type{&ir.TypeVar{Name: "R"}}}},
+	}
+	recv := &ir.App{Def: listDef, Args: []ir.Type{bt("int")}}
+
+	m, subst, ok := BindReceiver(reg, recv, "map")
+	if !ok || m == nil || m.Name != "map" {
+		t.Fatalf("BindReceiver(list<int>, map) = %v, %v, %v", m, subst, ok)
+	}
+	// T is bound from the receiver; R stays unbound for Match to solve.
+	if got := subst["T"]; got == nil || got.String() != "int" {
+		t.Errorf("subst[T] = %v, want int", got)
+	}
+	if _, bound := subst["R"]; bound {
+		t.Errorf("R must stay unbound, got %v", subst["R"])
+	}
+
+	if _, _, ok := BindReceiver(reg, recv, "frobnicate"); ok {
+		t.Error("BindReceiver found a method that does not exist")
+	}
+	if _, _, ok := BindReceiver(reg, ir.Invalid, "map"); ok {
+		t.Error("BindReceiver resolved a method on the invalid type")
+	}
+}
+
+// TestSubstituteAndMatch covers the exported substitution and pattern-match
+// rules directly: Substitute pins bound variables through composite types, and
+// Match solves a pattern's variables against a concrete argument.
+func TestSubstituteAndMatch(t *testing.T) {
+	reg := builtin.Default()
+	tvar := func(name string) ir.Type { return &ir.TypeVar{Name: name} }
+	fn := func(param, result ir.Type) ir.Type { return &ir.Func{Params: []ir.Type{param}, Result: result} }
+
+	// Substitute reaches into a function type and leaves unbound variables.
+	subst := map[string]ir.Type{"T": bt("int")}
+	if got := Substitute(fn(tvar("T"), tvar("R")), subst).String(); got != "fn(int): R" {
+		t.Errorf("Substitute = %s, want fn(int): R", got)
+	}
+	// An empty substitution returns the type unchanged.
+	pattern := fn(tvar("T"), tvar("R"))
+	if got := Substitute(pattern, map[string]ir.Type{}); got != pattern {
+		t.Errorf("Substitute with no bindings = %v, want the original", got)
+	}
+
+	// Match binds the pattern's variables structurally...
+	subst = map[string]ir.Type{}
+	if !Match(reg, fn(tvar("T"), tvar("R")), fn(bt("int"), bt("bool")), subst) {
+		t.Fatal("Match(fn(T): R, fn(int): bool) failed")
+	}
+	if subst["T"].String() != "int" || subst["R"].String() != "bool" {
+		t.Errorf("subst = %v, want T=int R=bool", subst)
+	}
+	// ...requires an already-bound variable to agree...
+	if Match(reg, tvar("T"), bt("bool"), subst) {
+		t.Error("Match rebound T=int to bool")
+	}
+	// ...and falls back to assignability for concrete patterns, so the
+	// default int adapts.
+	if !Match(reg, bt("int8"), bt("int"), map[string]ir.Type{}) {
+		t.Error("Match(int8, int) must allow the default-int adaption")
+	}
+	if Match(reg, bt("int8"), bt("bool"), map[string]ir.Type{}) {
+		t.Error("Match(int8, bool) must fail")
+	}
+}
+
 // TestNominalDerivation checks that a nominal type (type Level = int8) is
 // integer-like, derives its underlying type's operator methods, and keeps its
 // own identity in the result.

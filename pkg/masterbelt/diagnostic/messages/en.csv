@@ -21,3 +21,5 @@ masterbelt.semantic.division_by_zero,division by zero
 masterbelt.semantic.type_mismatch,cannot use {actual} as {expected}
 masterbelt.semantic.uninferable_collection,cannot infer the type of this collection literal; annotate it
 masterbelt.semantic.uninferable_result,cannot infer this function literal's result type; annotate it or return a value
+masterbelt.semantic.uninferable_parameter,cannot infer the type of parameter {name}; annotate it
+masterbelt.semantic.lambda_arity_mismatch,function literal has {actual} parameters; {expected} expected

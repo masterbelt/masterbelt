@@ -14,9 +14,11 @@ const (
 	CodeDivisionByZero        diagnostic.Code = "masterbelt.semantic.division_by_zero"
 	CodeDuplicateDeclaration  diagnostic.Code = "masterbelt.semantic.duplicate_declaration"
 	CodeInvalidOperation      diagnostic.Code = "masterbelt.semantic.invalid_operation"
+	CodeLambdaArityMismatch   diagnostic.Code = "masterbelt.semantic.lambda_arity_mismatch"
 	CodeTypeMismatch          diagnostic.Code = "masterbelt.semantic.type_mismatch"
 	CodeUndefinedName         diagnostic.Code = "masterbelt.semantic.undefined_name"
 	CodeUninferableCollection diagnostic.Code = "masterbelt.semantic.uninferable_collection"
+	CodeUninferableParameter  diagnostic.Code = "masterbelt.semantic.uninferable_parameter"
 	CodeUninferableResult     diagnostic.Code = "masterbelt.semantic.uninferable_result"
 	CodeUnknownType           diagnostic.Code = "masterbelt.semantic.unknown_type"
 )
@@ -90,6 +92,21 @@ func newInvalidOperationDiagnostic(offset int, width int, method string, types s
 	}
 }
 
+func newLambdaArityMismatchDiagnostic(offset int, width int, actual int, expected int) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"actual":   diagnostic.Int(actual),
+		"expected": diagnostic.Int(expected),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeLambdaArityMismatch,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeLambdaArityMismatch, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
 func newTypeMismatchDiagnostic(offset int, width int, actual string, expected string) diagnostic.Diagnostic {
 	fields := map[string]fmt.Stringer{
 		"actual":   diagnostic.Str(actual),
@@ -125,6 +142,20 @@ func newUninferableCollectionDiagnostic(offset int, width int) diagnostic.Diagno
 		Code:     CodeUninferableCollection,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeUninferableCollection, nil),
 		Fields:   nil,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newUninferableParameterDiagnostic(offset int, width int, name string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"name": diagnostic.Str(name),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeUninferableParameter,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeUninferableParameter, fields),
+		Fields:   fields,
 		Offset:   offset,
 		Width:    width,
 	}

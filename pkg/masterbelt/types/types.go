@@ -3,7 +3,9 @@
 // package owns everything that reasons about a type — the classification
 // predicates (IsInteger, IsBoolean), the lookup of builtin types by name
 // (Lookup), the value-range check (Fits), the operator-method type rules
-// (MethodResult), and assignability/compatibility.
+// (MethodResult, built from BindReceiver, Match, and Substitute, which the
+// bidirectional checker also drives directly), and
+// assignability/compatibility.
 //
 // There is no "untyped" type: an integer literal has type int (the
 // arbitrary-precision integer, which adapts to any sized integer and is
@@ -147,48 +149,57 @@ func Assignable(reg *builtin.Registry, from, to ir.Type) bool {
 // once loaded, the prelude's), this one rule covers every operator on every
 // primitive — there is no per-operator table.
 func MethodResult(reg *builtin.Registry, recv ir.Type, method string, args []ir.Type) ir.Type {
-	def := defOf(reg, recv)
-	if def == nil {
+	m, subst, ok := BindReceiver(reg, recv, method)
+	if !ok || len(args) != len(m.Params) {
 		return ir.Invalid
-	}
-	m := findMethod(reg, def, method)
-	if m == nil || len(args) != len(m.Params) {
-		return ir.Invalid
-	}
-
-	// The substitution that instantiates the method's type variables. It starts
-	// bound by the receiver's type arguments — a method on list<int> sees T = int
-	// — and the per-method variables (the R in map(func: fn(T): R): list<R>) are
-	// solved by matching the parameter patterns against the argument types.
-	subst := map[string]ir.Type{}
-	if app, ok := recv.(*ir.App); ok && app.Def != nil && len(app.Args) == len(app.Def.Params) {
-		for i, p := range app.Def.Params {
-			subst[p.Name] = app.Args[i]
-		}
 	}
 
 	operand := recv // the unified type of the receiver and the self-typed args
 	for i, p := range m.Params {
-		pt := substitute(p.Type, subst)
+		pt := Substitute(p.Type, subst)
 		if _, isSelf := pt.(*ir.SelfType); isSelf {
 			operand = Unify(reg, operand, args[i])
 			if operand == ir.Invalid {
 				return ir.Invalid
 			}
-		} else if !match(reg, pt, args[i], subst) {
+		} else if !Match(reg, pt, args[i], subst) {
 			return ir.Invalid
 		}
 	}
 	if _, isSelf := m.Result.(*ir.SelfType); isSelf {
 		return operand
 	}
-	return substitute(m.Result, subst)
+	return Substitute(m.Result, subst)
 }
 
-// substitute replaces every bound type variable in t with its binding from
+// BindReceiver finds method on the receiver's type and starts the substitution
+// that instantiates the method's type variables: it is bound by the receiver's
+// type arguments — a method on list<int> sees T = int — while the per-method
+// variables (the R in map(func: fn(T): R): list<R>) stay unbound for the caller
+// to solve from the arguments (Match). It reports false when the receiver has
+// no such method.
+func BindReceiver(reg *builtin.Registry, recv ir.Type, method string) (*ir.Method, map[string]ir.Type, bool) {
+	def := defOf(reg, recv)
+	if def == nil {
+		return nil, nil, false
+	}
+	m := findMethod(reg, def, method)
+	if m == nil {
+		return nil, nil, false
+	}
+	subst := map[string]ir.Type{}
+	if app, ok := recv.(*ir.App); ok && app.Def != nil && len(app.Args) == len(app.Def.Params) {
+		for i, p := range app.Def.Params {
+			subst[p.Name] = app.Args[i]
+		}
+	}
+	return m, subst, true
+}
+
+// Substitute replaces every bound type variable in t with its binding from
 // subst, recursing through the composite types. An unbound variable is left as
 // is, so a concrete type (no variables) is returned unchanged.
-func substitute(t ir.Type, subst map[string]ir.Type) ir.Type {
+func Substitute(t ir.Type, subst map[string]ir.Type) ir.Type {
 	if len(subst) == 0 {
 		return t
 	}
@@ -201,25 +212,25 @@ func substitute(t ir.Type, subst map[string]ir.Type) ir.Type {
 	case *ir.App:
 		args := make([]ir.Type, len(t.Args))
 		for i, a := range t.Args {
-			args[i] = substitute(a, subst)
+			args[i] = Substitute(a, subst)
 		}
 		return &ir.App{Def: t.Def, Args: args}
 	case *ir.Func:
 		params := make([]ir.Type, len(t.Params))
 		for i, p := range t.Params {
-			params[i] = substitute(p, subst)
+			params[i] = Substitute(p, subst)
 		}
-		return &ir.Func{Params: params, Result: substitute(t.Result, subst)}
+		return &ir.Func{Params: params, Result: Substitute(t.Result, subst)}
 	case *ir.Union:
 		members := make([]ir.Type, len(t.Members))
 		for i, m := range t.Members {
-			members[i] = substitute(m, subst)
+			members[i] = Substitute(m, subst)
 		}
 		return &ir.Union{Members: members}
 	case *ir.Record:
 		fields := make([]ir.Field, len(t.Fields))
 		for i, f := range t.Fields {
-			fields[i] = ir.Field{Name: f.Name, Type: substitute(f.Type, subst)}
+			fields[i] = ir.Field{Name: f.Name, Type: Substitute(f.Type, subst)}
 		}
 		return &ir.Record{Fields: fields}
 	default:
@@ -227,13 +238,13 @@ func substitute(t ir.Type, subst map[string]ir.Type) ir.Type {
 	}
 }
 
-// match matches a parameter pattern — which may contain still-unbound method
+// Match matches a parameter pattern — which may contain still-unbound method
 // type variables — against a concrete argument type, recording each variable it
 // solves in subst. A bare variable binds to the argument (and, if already bound,
 // must agree); a function or generic-application pattern matches structurally;
 // anything else falls back to assignability, the same rule a non-generic
 // parameter used before.
-func match(reg *builtin.Registry, pattern, arg ir.Type, subst map[string]ir.Type) bool {
+func Match(reg *builtin.Registry, pattern, arg ir.Type, subst map[string]ir.Type) bool {
 	if v, ok := pattern.(*ir.TypeVar); ok {
 		if bound, ok := subst[v.Name]; ok {
 			return arg == bound || Assignable(reg, arg, bound)
@@ -248,18 +259,18 @@ func match(reg *builtin.Registry, pattern, arg ir.Type, subst map[string]ir.Type
 			return false
 		}
 		for i := range p.Params {
-			if !match(reg, p.Params[i], a.Params[i], subst) {
+			if !Match(reg, p.Params[i], a.Params[i], subst) {
 				return false
 			}
 		}
-		return match(reg, p.Result, a.Result, subst)
+		return Match(reg, p.Result, a.Result, subst)
 	case *ir.App:
 		a, ok := arg.(*ir.App)
 		if !ok || a.Def != p.Def || len(a.Args) != len(p.Args) {
 			return false
 		}
 		for i := range p.Args {
-			if !match(reg, p.Args[i], a.Args[i], subst) {
+			if !Match(reg, p.Args[i], a.Args[i], subst) {
 				return false
 			}
 		}

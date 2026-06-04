@@ -361,6 +361,92 @@ func TestOperatorErrorReportedOnce(t *testing.T) {
 	}
 }
 
+func TestAnnotatedFuncLit(t *testing.T) {
+	// The annotation is a checking context: it supplies the literal's omitted
+	// parameter and result types.
+	m, diags := analyze("const Twice: fn(x: int): int = fn(x) { return x * 2 }\n")
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if got := m.Consts[0].Type.String(); got != "fn(int): int" {
+		t.Errorf("Twice type = %s, want fn(int): int", got)
+	}
+	// A fully annotated literal under a matching annotation is fine too (this
+	// used to false-positive through types.Compatible, which had no function
+	// rule).
+	if _, diags := analyze("const Twice: fn(x: int): int = fn(x: int): int { return x * 2 }\n"); len(diags) != 0 {
+		t.Errorf("fully annotated literal: unexpected diagnostics %v", diags)
+	}
+}
+
+func TestAnnotatedFuncLitDiagnostics(t *testing.T) {
+	cases := []struct {
+		src  string
+		code diagnostic.Code
+	}{
+		// Parameter-count mismatch against the annotation.
+		{"const B: fn(x: int): int = fn(x, y) { return x }\n", CodeLambdaArityMismatch},
+		// A written parameter annotation must agree with the expectation.
+		{"const C: fn(x: int): int = fn(x: string) { return \"\" }\n", CodeTypeMismatch},
+		// A written result annotation must agree too.
+		{"const R: fn(x: int): int = fn(x): string { return \"\" }\n", CodeTypeMismatch},
+		// A return that does not satisfy the pushed-down result type.
+		{"const S: fn(x: int): int = fn(x) { return x == 0 }\n", CodeTypeMismatch},
+		// A literal under a non-function annotation.
+		{"const N: int = fn() { return 1 }\n", CodeTypeMismatch},
+		// An operator error inside a context-typed body still surfaces.
+		{"const O: fn(x: int): int = fn(x) { return x && x }\n", CodeInvalidOperation},
+		// A literal value out of the pushed-down range.
+		{"const V: fn(): int8 = fn() { return 1000 }\n", CodeConstantOverflow},
+	}
+	for _, tc := range cases {
+		_, diags := analyze(tc.src)
+		if !hasCode(diags, tc.code) {
+			t.Errorf("%q: want %s, got %v", tc.src, tc.code, codes(diags))
+		}
+	}
+}
+
+func TestUninferableParameter(t *testing.T) {
+	// With no checking context at all, an unannotated parameter has nothing to
+	// infer from.
+	_, diags := analyze("const A = fn(x) { return x }\n")
+	if !hasCode(diags, CodeUninferableParameter) {
+		t.Errorf("want uninferable_parameter, got %v", codes(diags))
+	}
+	// An annotation that pins it reports nothing.
+	if _, diags := analyze("const A: fn(x: int): int = fn(x) { return x }\n"); len(diags) != 0 {
+		t.Errorf("pinned parameter: unexpected diagnostics %v", diags)
+	}
+}
+
+func TestAnnotatedEmptyCollection(t *testing.T) {
+	// Checking mode gives an empty literal its annotation's type, so it is not
+	// uninferable.
+	for _, src := range []string{
+		"const Empty: list<int> = []\n",
+		"const Empty: map<string, int> = []\n",
+	} {
+		if _, diags := analyze(src); len(diags) != 0 {
+			t.Errorf("%q: unexpected diagnostics %v", src, diags)
+		}
+	}
+}
+
+func TestMethodResultTypeReachesLiteral(t *testing.T) {
+	// The method's declared result type checks a returned literal, so its
+	// lambda parameters infer.
+	src := "pub type T = int8 impl {\n  pub f(): fn(x: int): int {\n    return fn(x) { return x }\n  }\n}\n"
+	if _, diags := analyze(src); len(diags) != 0 {
+		t.Errorf("unexpected diagnostics: %v", diags)
+	}
+	// And a literal that does not satisfy it is reported.
+	bad := "pub type T = int8 impl {\n  pub f(): fn(x: int): int {\n    return fn(x, y) { return x }\n  }\n}\n"
+	if _, diags := analyze(bad); !hasCode(diags, CodeLambdaArityMismatch) {
+		t.Errorf("want lambda_arity_mismatch, got %v", codes(diags))
+	}
+}
+
 func TestFuncLitResultInference(t *testing.T) {
 	// An omitted result type is synthesized from the body's returns; declared
 	// parameter types carry into the body scope.
