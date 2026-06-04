@@ -3,6 +3,7 @@ package semantic
 import (
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/diagnostic"
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/lower"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ir"
 )
@@ -107,7 +108,7 @@ func (r *typeResolver) resolveMethod(m *ast.MethodDecl, scope map[string]bool) *
 		params[p.Name] = true
 	}
 	method.Result = r.resolveType(m.Result, scope)
-	method.Body = r.lowerBody(m.Body, params, scope)
+	method.Body = lower.Body(m.Body, bodyBinder{r: r, params: params, tscope: scope})
 	return method
 }
 

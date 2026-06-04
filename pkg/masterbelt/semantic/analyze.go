@@ -17,10 +17,10 @@
 // incremental result is identical to the full one.
 //
 // The package is split by concern: this file holds the query interface and the
-// assembler; eval.go folds constants; lower.go lowers the AST to the IR graph;
-// resolve.go resolves type declarations; check.go runs the expression and
-// method-body diagnostics; positions.go anchors diagnostics to source; engine.go
-// and document.go are the incremental façade.
+// assembler; eval.go folds constants; lower.go binds names for the AST-to-IR
+// walk (package lower); resolve.go resolves type declarations; check.go runs the
+// expression and method-body diagnostics; positions.go anchors diagnostics to
+// source; engine.go and document.go are the incremental façade.
 package semantic
 
 import (
@@ -28,6 +28,7 @@ import (
 
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/diagnostic"
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/lower"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/parser/abstract"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/cst"
@@ -119,7 +120,7 @@ func assemble(file *ast.File, positions map[cst.Green]span, q queries) (*ir.Modu
 
 	for _, decl := range file.Decls {
 		c := irOf[decl]
-		c.Value = lowerValue(decl.Value, irOf, q)
+		c.Value = lower.Value(decl.Value, constBinder{q: q, irOf: irOf})
 		c.Type = q.typeOf(decl)
 		c.Eval = q.valueOf(decl)
 
