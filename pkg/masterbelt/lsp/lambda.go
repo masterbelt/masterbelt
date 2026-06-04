@@ -12,7 +12,7 @@ import (
 )
 
 // The editor's view of a function literal: what the checker settled for its
-// signature (semantic.Document.FuncLitTypes) rendered back at the literal's
+// signature (semantic.Program.FuncLitTypes) rendered back at the literal's
 // tokens — an inlay hint where an annotation was omitted, a hover on a
 // parameter name. The helpers here bridge the solved types (keyed by AST
 // node) to source positions (the literal's concrete tree).

@@ -11,6 +11,27 @@ import (
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
 )
 
+// editable drives a one-file Program the way an editor does: edits go to the
+// syntax document, then the file is re-pushed and the program refreshed. It
+// is the test stand-in for the LSP's standalone-file flow.
+type editable struct {
+	prog *Program
+	doc  *abstract.Document
+}
+
+func newEditable(src []byte) *editable {
+	e := &editable{prog: NewProgram(), doc: abstract.NewDocument(src)}
+	e.prog.SetFile(soleFileID, e.doc, nil)
+	e.prog.Refresh()
+	return e
+}
+
+func (e *editable) edit(ed source.Edit) {
+	e.doc.Edit(ed)
+	e.prog.SetFile(soleFileID, e.doc, nil)
+	e.prog.Refresh()
+}
+
 func naiveSplice(src []byte, start, end int, repl []byte) []byte {
 	out := make([]byte, 0, len(src)-(end-start)+len(repl))
 	out = append(out, src[:start]...)
@@ -21,15 +42,15 @@ func naiveSplice(src []byte, start, end int, repl []byte) []byte {
 
 // assertMatchesReference is the oracle: the incrementally analyzed module and
 // diagnostics must equal a full Analyze of the current source.
-func assertMatchesReference(t *testing.T, doc *Document, content []byte) {
+func assertMatchesReference(t *testing.T, e *editable, content []byte) {
 	t.Helper()
 	refModule, refDiags := Analyze(abstract.NewDocument(content))
 
-	if got, want := ir.Dump(doc.Module()), ir.Dump(refModule); got != want {
+	if got, want := ir.Dump(e.prog.Module(soleFileID)), ir.Dump(refModule); got != want {
 		t.Fatalf("IR mismatch (content %q)\n--- got ---\n%s--- want ---\n%s", content, got, want)
 	}
 
-	got, want := doc.Diagnostics(), refDiags
+	got, want := e.prog.Diagnostics(soleFileID), refDiags
 	if len(got) != len(want) {
 		t.Fatalf("diagnostic count = %d, want %d (content %q)\n got:  %v\n want: %v",
 			len(got), len(want), content, got, want)
@@ -43,7 +64,7 @@ func assertMatchesReference(t *testing.T, doc *Document, content []byte) {
 	}
 }
 
-func TestDocumentScriptedEdits(t *testing.T) {
+func TestScriptedEdits(t *testing.T) {
 	cases := []struct {
 		name    string
 		initial string
@@ -63,10 +84,10 @@ func TestDocumentScriptedEdits(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			doc := NewDocument([]byte(tc.initial))
+			e := newEditable([]byte(tc.initial))
 			content := naiveSplice([]byte(tc.initial), tc.edit.Start, tc.edit.End, tc.edit.NewText)
-			doc.Edit(tc.edit)
-			assertMatchesReference(t, doc, content)
+			e.edit(tc.edit)
+			assertMatchesReference(t, e, content)
 		})
 	}
 }
@@ -75,19 +96,19 @@ func TestDocumentScriptedEdits(t *testing.T) {
 // value without changing its type does not ripple through to a constant two
 // references away — the change is cut off once a type comes out unchanged.
 func TestEarlyCutoff(t *testing.T) {
-	doc := NewDocument([]byte("const A: int64 = 1\nconst B = A\nconst C = B\n"))
-	cDecl := doc.AST().File().Decls[2] // unchanged by the edit below
+	e := newEditable([]byte("const A: int64 = 1\nconst B = A\nconst C = B\n"))
+	cDecl := e.doc.File().Decls[2] // unchanged by the edit below
 
 	// Change A's value 1 -> 2; A stays int64, so B's type is unchanged.
-	doc.Edit(source.Edit{Start: 17, End: 18, NewText: []byte("2")})
-	assertMatchesReference(t, doc, []byte("const A: int64 = 2\nconst B = A\nconst C = B\n"))
+	e.edit(source.Edit{Start: 17, End: 18, NewText: []byte("2")})
+	assertMatchesReference(t, e, []byte("const A: int64 = 2\nconst B = A\nconst C = B\n"))
 
-	if doc.db.computed[typeOfKey(cDecl)] {
+	if e.prog.db.computed[typeOfKey(cDecl)] {
 		t.Error("typeOf(C) was recomputed; early cutoff should have stopped the change at B")
 	}
 }
 
-func TestDocumentFuzz(t *testing.T) {
+func TestEditFuzz(t *testing.T) {
 	r := rand.New(rand.NewSource(0x5E3A))
 	alphabet := []string{
 		"const ", "pub ", "A", "B", "C", "Name", " = ", " : ", "int64", "int32",
@@ -100,21 +121,21 @@ func TestDocumentFuzz(t *testing.T) {
 	}
 
 	start := "const A = 1\nconst B = A\n"
-	doc := NewDocument([]byte(start))
+	e := newEditable([]byte(start))
 	content := []byte(start)
 
 	for range 2000 {
 		s := r.Intn(len(content) + 1)
-		e := s + r.Intn(len(content)-s+1)
+		en := s + r.Intn(len(content)-s+1)
 		var repl []byte
 		for n := r.Intn(5); n > 0; n-- {
 			repl = append(repl, alphabet[r.Intn(len(alphabet))]...)
 		}
 
-		edit := source.Edit{Start: s, End: e, NewText: repl}
-		content = naiveSplice(content, s, e, repl)
-		doc.Edit(edit)
-		assertMatchesReference(t, doc, content)
+		edit := source.Edit{Start: s, End: en, NewText: repl}
+		content = naiveSplice(content, s, en, repl)
+		e.edit(edit)
+		assertMatchesReference(t, e, content)
 	}
 }
 
@@ -125,10 +146,10 @@ func TestFuncLitTypes(t *testing.T) {
 	src := "const Doubled = [1, 2].map(fn(x) { return x * 2 })\n" +
 		"const Twice: fn(x: int): int = fn(x) { return x * 2 }\n" +
 		"pub type T = int8 impl {\n  pub f(): fn(x: bool): bool {\n    return fn(b) { return b }\n  }\n}\n"
-	doc := NewDocument([]byte(src))
+	e := newEditable([]byte(src))
 
 	var got []string
-	for _, ft := range doc.FuncLitTypes() {
+	for _, ft := range e.prog.FuncLitTypes(soleFileID) {
 		got = append(got, ft.String())
 	}
 	sort.Strings(got)
@@ -143,15 +164,15 @@ func TestFuncLitTypes(t *testing.T) {
 // (list<int>), so the change must not propagate past F's dependents.
 func TestEarlyCutoffLambdaBody(t *testing.T) {
 	src := "const F = [1, 2].map(fn(x) { return x * 2 })\nconst G = F\nconst H = G\n"
-	doc := NewDocument([]byte(src))
-	hDecl := doc.AST().File().Decls[2]
+	e := newEditable([]byte(src))
+	hDecl := e.doc.File().Decls[2]
 
 	// x * 2 -> x * 9: the body's fold changes, the solved types do not.
 	i := strings.Index(src, "x * 2") + len("x * ")
-	doc.Edit(source.Edit{Start: i, End: i + 1, NewText: []byte("9")})
-	assertMatchesReference(t, doc, []byte(strings.Replace(src, "x * 2", "x * 9", 1)))
+	e.edit(source.Edit{Start: i, End: i + 1, NewText: []byte("9")})
+	assertMatchesReference(t, e, []byte(strings.Replace(src, "x * 2", "x * 9", 1)))
 
-	if doc.db.computed[typeOfKey(hDecl)] {
+	if e.prog.db.computed[typeOfKey(hDecl)] {
 		t.Error("typeOf(H) was recomputed; the lambda edit left F's type unchanged")
 	}
 }
@@ -160,14 +181,14 @@ func TestEarlyCutoffLambdaBody(t *testing.T) {
 // constant's annotation (not its value) must not re-evaluate a constant two
 // references away.
 func TestEarlyCutoffValue(t *testing.T) {
-	doc := NewDocument([]byte("const A: int64 = 1\nconst B = A\nconst C = B\n"))
-	cDecl := doc.AST().File().Decls[2]
+	e := newEditable([]byte("const A: int64 = 1\nconst B = A\nconst C = B\n"))
+	cDecl := e.doc.File().Decls[2]
 
 	// Change A's annotation int64 -> int32; A's value (1) is unchanged.
-	doc.Edit(source.Edit{Start: 9, End: 14, NewText: []byte("int32")})
-	assertMatchesReference(t, doc, []byte("const A: int32 = 1\nconst B = A\nconst C = B\n"))
+	e.edit(source.Edit{Start: 9, End: 14, NewText: []byte("int32")})
+	assertMatchesReference(t, e, []byte("const A: int32 = 1\nconst B = A\nconst C = B\n"))
 
-	if doc.db.computed[valueKey(cDecl)] {
+	if e.prog.db.computed[valueKey(cDecl)] {
 		t.Error("valueOf(C) was recomputed; an annotation change should not affect values")
 	}
 }

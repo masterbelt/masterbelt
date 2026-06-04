@@ -36,8 +36,8 @@ type treeIndex struct {
 }
 
 // view is one file of a workspace, presenting the surface the feature
-// implementations consume — the same one semantic.Document presents, routed
-// through the program so imports resolve across files.
+// implementations consume, routed through the program so imports resolve
+// across files.
 type view struct {
 	ws  *workspace
 	id  semantic.FileID

@@ -30,10 +30,10 @@ import (
 // project layer; the binding layers (CLI, LSP) convert between them.
 type FileID string
 
-// soleFileID is the identity a single-file analysis gives its one file. A
-// standalone Document (and the ad-hoc single-file paths) analyzes exactly one
-// file, whose name does not matter; multi-file analysis keys files by their
-// real project FileIDs.
+// soleFileID is the identity a single-file analysis gives its one file —
+// Analyze (the oracle) and ad-hoc single-file paths analyze exactly one file,
+// whose name does not matter; multi-file analysis keys files by their real
+// project FileIDs.
 const soleFileID FileID = ""
 
 type queryKind int
@@ -477,7 +477,7 @@ func cycleValue(key queryKey) any {
 }
 
 // engineQueries is the memoizing implementation of the queries interface, used
-// by Document; reads go through the database so dependencies are tracked.
+// by Program; reads go through the database so dependencies are tracked.
 type engineQueries struct {
 	db *database
 }

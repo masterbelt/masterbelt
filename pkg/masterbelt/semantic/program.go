@@ -6,6 +6,7 @@ import (
 
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/parser/abstract"
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/types/infer"
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
 )
@@ -51,8 +52,8 @@ func (p *Program) RemoveFile(id FileID) {
 }
 
 // Refresh re-assembles every file's module and diagnostics over the engine.
-// As in Document, assembling is the cheap outer pass re-done per change (its
-// diagnostics carry offsets); the expensive facts behind it are memoized.
+// Assembling is the cheap outer pass re-done per change (its diagnostics
+// carry offsets); the expensive facts behind it are memoized.
 func (p *Program) Refresh() {
 	files := make(map[FileID]*ast.File, len(p.docs))
 	for id, doc := range p.docs {
@@ -132,6 +133,38 @@ func (p *Program) FuncLitTypes(id FileID) map[*ast.FuncLit]*ir.Func {
 		return nil
 	}
 	return funcLitTypesOf(p.db, id, doc.File())
+}
+
+// funcLitTypesOf is the walk behind FuncLitTypes, reading every fact through
+// the engine so it reuses the memoized resolution and types of the last
+// analysis.
+func funcLitTypesOf(db *database, fileID FileID, file *ast.File) map[*ast.FuncLit]*ir.Func {
+	out := map[*ast.FuncLit]*ir.Func{}
+	sink := &infer.Sink{SolvedFuncLit: func(lit *ast.FuncLit, t *ir.Func) { out[lit] = t }}
+
+	q := engineQueries{db}
+	env := typeEnv{q: q, file: fileID}
+	reg := q.registry()
+	qualified := qualifiedFrom(q, q.importsOf(fileID))
+	for _, decl := range file.Decls {
+		if decl.Value == nil {
+			continue
+		}
+		// The same annotated/un-annotated split assemble makes, with the
+		// annotation resolved silently (its problems are already diagnosed).
+		annType := ir.Invalid
+		if decl.Type != nil {
+			r := &infer.TypeResolver{Reg: reg, Defs: q.universe(fileID), Qualified: qualified}
+			annType = r.ResolveType(decl.Type, nil)
+		}
+		if annType != ir.Invalid {
+			infer.CheckAgainst(decl.Value, annType, env, sink)
+		} else {
+			infer.Check(decl.Value, env, sink)
+		}
+	}
+	checkMethodBodies(file, reg, q.typeDefs(fileID), q.universe(fileID), qualified, sink)
+	return out
 }
 
 // QualifiedTypeNames returns the namespace-qualified type names in scope in

@@ -13,14 +13,14 @@
 // into the IR and diagnostics. Two query implementations share that one
 // assembler: a direct one (this file), used by Analyze for a full recompute and
 // as the oracle, and an incremental, memoizing one backed by the query database
-// (engine.go), used by Document. Because both feed the same assembler, the
+// (engine.go), used by Program. Because both feed the same assembler, the
 // incremental result is identical to the full one.
 //
 // The package is split by concern: this file holds the query interface and the
 // assembler; eval.go folds constants; lower.go binds names for the AST-to-IR
 // walk (package lower); resolve.go resolves type declarations; check.go runs the
 // expression and method-body diagnostics; positions.go anchors diagnostics to
-// source; engine.go and document.go are the incremental façade.
+// source; engine.go and program.go are the incremental façade.
 package semantic
 
 import (
@@ -133,9 +133,10 @@ func exprSink(at func(ast.Node) span, diags *diagnostic.List) *infer.Sink {
 	}
 }
 
-// Analyze resolves and types the document's program, returning the IR module and
+// Analyze resolves and types one standalone file, returning the IR module and
 // the semantic diagnostics. It recomputes everything from scratch; it is the
-// reference analysis and the oracle for the incremental Document.
+// single-file reference analysis and the oracle the incremental Program is
+// checked against.
 func Analyze(doc *abstract.Document) (*ir.Module, []diagnostic.Diagnostic) {
 	file := doc.File()
 	files := map[FileID]*ast.File{soleFileID: file}

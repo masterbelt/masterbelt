@@ -8,6 +8,7 @@ import (
 
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
 	"github.com/masterbelt/masterbelt/pkg/diagnostic/reporter"
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/parser/abstract"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/semantic"
 	"github.com/masterbelt/masterbelt/pkg/project"
 	"github.com/masterbelt/masterbelt/pkg/project/config"
@@ -155,14 +156,20 @@ func manifestFile(dir string) *source.File {
 
 // checkSource runs the full pipeline over one file and reports its
 // diagnostics — lexer, parser, and semantic, the same aggregation the LSP
-// publishes. It fails when any diagnostic is an error.
+// publishes. A standalone file is a program of one file, exactly as the LSP
+// treats a file outside any project. It fails when any diagnostic is an
+// error.
 func checkSource(rep reporter.Reporter, path string, data []byte) error {
-	doc := semantic.NewDocument(data)
+	doc := abstract.NewDocument(data)
+	prog := semantic.NewProgram()
+	id := semantic.FileID(filepath.ToSlash(path))
+	prog.SetFile(id, doc, nil)
+	prog.Refresh()
 
 	var raw []diagnostic.Diagnostic
-	raw = append(raw, doc.AST().Concrete().LexDiagnostics()...)
-	raw = append(raw, doc.AST().Diagnostics()...)
+	raw = append(raw, doc.Concrete().LexDiagnostics()...)
 	raw = append(raw, doc.Diagnostics()...)
+	raw = append(raw, prog.Diagnostics(id)...)
 
 	rep.Report(source.NewFile(displayPath(path), data), raw)
 	if n := rep.Errors(); n > 0 {
