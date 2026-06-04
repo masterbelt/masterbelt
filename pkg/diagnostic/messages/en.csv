@@ -27,3 +27,6 @@ project.config.missing,masterbelt.toml not found in this directory or any parent
 project.config.invalid,invalid masterbelt.toml: {detail}
 project.config.missing_entry,masterbelt.toml does not set entry
 project.config.entry_not_found,entry file not found: {path}
+project.config.profile_missing_entry,profile {profile} does not set entry
+project.config.profile_entry_not_found,entry file not found for profile {profile}: {path}
+project.config.unknown_profile,profile {profile} is not defined in masterbelt.toml

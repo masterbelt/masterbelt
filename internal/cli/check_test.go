@@ -24,6 +24,7 @@ func execCheck(t *testing.T, args ...string) (string, error) {
 		// Flag values persist on the command between Execute calls.
 		_ = CheckCmd.Flags().Set("format", "text")
 		_ = CheckCmd.Flags().Set("locale", "en")
+		_ = CheckCmd.Flags().Set("profile", "")
 	})
 	err := RootCmd.Execute()
 	return out.String(), err
@@ -208,6 +209,41 @@ func TestCheckLocale(t *testing.T) {
 	}
 	if !strings.Contains(out, "未定義の名前: B") {
 		t.Errorf("output = %q, want the ja rendering", out)
+	}
+}
+
+func TestCheckProfile(t *testing.T) {
+	// --profile selects a [profile.<name>] entry; the default stays on the
+	// top-level one. The default entry is clean and the editor entry broken,
+	// so the flag's effect is observable.
+	root := t.TempDir()
+	write(t, root, "masterbelt.toml", "entry = \"main.belt\"\n\n[profile.editor]\nentry = \"editor.belt\"\n")
+	write(t, root, "main.belt", "const A = 1\n")
+	write(t, root, "editor.belt", "const E = F\n")
+
+	if out, err := execCheck(t, root); err != nil {
+		t.Fatalf("check (default profile) = %v\n%s", err, out)
+	}
+	out, err := execCheck(t, "--profile=editor", root)
+	if err == nil {
+		t.Fatalf("check --profile=editor succeeded, want an error\n%s", out)
+	}
+	if !strings.Contains(out, "editor.belt:1:11: error[masterbelt.semantic.undefined_name]") {
+		t.Errorf("output = %q, want the editor entry's diagnostic", out)
+	}
+}
+
+func TestCheckUnknownProfile(t *testing.T) {
+	root := t.TempDir()
+	write(t, root, "masterbelt.toml", "entry = \"main.belt\"\n")
+	write(t, root, "main.belt", "const A = 1\n")
+
+	out, err := execCheck(t, "--profile=editor", root)
+	if err == nil {
+		t.Fatalf("check succeeded, want an error\n%s", out)
+	}
+	if !strings.Contains(out, "error[project.config.unknown_profile]: profile editor is not defined") {
+		t.Errorf("output = %q, want the unknown_profile diagnostic", out)
 	}
 }
 

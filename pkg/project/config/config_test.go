@@ -12,9 +12,57 @@ func TestParse(t *testing.T) {
 	if diags.Len() != 0 {
 		t.Fatalf("Parse() diagnostics = %v, want none", diags.Items())
 	}
-	want := Config{Entry: "src/main.belt"}
-	if cfg != want {
-		t.Errorf("Parse() = %+v, want %+v", cfg, want)
+	if cfg.Entry != "src/main.belt" {
+		t.Errorf("Entry = %q, want %q", cfg.Entry, "src/main.belt")
+	}
+}
+
+func TestParseProfiles(t *testing.T) {
+	// Top-level keys form the default profile; [profile.<name>] sections
+	// declare named ones.
+	src := []byte("entry = \"src/main.belt\"\n\n[profile.editor]\nentry = \"src/editor.belt\"\n")
+	cfg, diags := Parse(src)
+	if diags.Len() != 0 {
+		t.Fatalf("Parse() diagnostics = %v, want none", diags.Items())
+	}
+	if cfg.Entry != "src/main.belt" {
+		t.Errorf("Entry = %q, want the default profile's entry", cfg.Entry)
+	}
+	if cfg.Profiles["editor"].Entry != "src/editor.belt" {
+		t.Errorf("Profiles = %+v, want editor -> src/editor.belt", cfg.Profiles)
+	}
+}
+
+func TestParseProfilesOnly(t *testing.T) {
+	// A manifest may declare only named profiles. Using the default profile
+	// is then the error (reported by whoever resolves it), not declaring
+	// nothing here.
+	cfg, diags := Parse([]byte("[profile.editor]\nentry = \"editor.belt\"\n"))
+	if diags.Len() != 0 {
+		t.Fatalf("Parse() diagnostics = %v, want none", diags.Items())
+	}
+	if cfg.Entry != "" {
+		t.Errorf("Entry = %q, want empty", cfg.Entry)
+	}
+}
+
+func TestParseProfileMissingEntry(t *testing.T) {
+	// A named profile is an explicit declaration; one without an entry has
+	// no purpose.
+	_, diags := Parse([]byte("entry = \"main.belt\"\n\n[profile.editor]\n"))
+	d := singleError(t, diags, CodeProfileMissingEntry)
+	if !strings.Contains(d.Message, "editor") {
+		t.Errorf("Message = %q, want it to name the profile", d.Message)
+	}
+}
+
+func TestParseProfileEscapingEntry(t *testing.T) {
+	_, diags := Parse([]byte("entry = \"main.belt\"\n\n[profile.editor]\nentry = \"../outside.belt\"\n"))
+	d := singleError(t, diags, CodeInvalid)
+	for _, fragment := range []string{`profile "editor"`, "escape"} {
+		if !strings.Contains(d.Message, fragment) {
+			t.Errorf("Message = %q, want it to contain %q", d.Message, fragment)
+		}
 	}
 }
 
@@ -86,6 +134,35 @@ func TestEntryNotFound(t *testing.T) {
 	}
 	if !strings.Contains(d.Message, "src/main.belt") {
 		t.Errorf("Message = %q, want it to name the entry", d.Message)
+	}
+}
+
+func TestMissingEntry(t *testing.T) {
+	d := MissingEntry()
+	if d.Code != CodeMissingEntry || d.Severity != diagnostic.Error {
+		t.Errorf("MissingEntry() = %v", d)
+	}
+}
+
+func TestUnknownProfile(t *testing.T) {
+	d := UnknownProfile("editor")
+	if d.Code != CodeUnknownProfile || d.Severity != diagnostic.Error {
+		t.Errorf("UnknownProfile() = %v", d)
+	}
+	if !strings.Contains(d.Message, "editor") {
+		t.Errorf("Message = %q, want it to name the profile", d.Message)
+	}
+}
+
+func TestProfileEntryNotFound(t *testing.T) {
+	d := ProfileEntryNotFound("editor", "src/editor.belt")
+	if d.Code != CodeProfileEntryNotFound || d.Severity != diagnostic.Error {
+		t.Errorf("ProfileEntryNotFound() = %v", d)
+	}
+	for _, fragment := range []string{"editor", "src/editor.belt"} {
+		if !strings.Contains(d.Message, fragment) {
+			t.Errorf("Message = %q, want it to contain %q", d.Message, fragment)
+		}
 	}
 }
 

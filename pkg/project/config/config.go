@@ -1,19 +1,22 @@
 // Package config reads and validates masterbelt.toml, the manifest whose
-// presence marks a project root and whose entry key names the project's entry
-// point.
+// presence marks a project root and whose profiles name the project's entry
+// points.
 //
 // Parsing is pure: Parse works on bytes; Load is the thin filesystem wrapper
-// over it. Finding the manifest and resolving entry against the root belong to
-// pkg/project, so the diagnostics for those failures (project.config.missing,
-// project.config.entry_not_found) are exported from here as thin wrappers over
-// the generated constructors — the codes are owned by this package even though
-// the conditions are detected a layer up.
+// over it. Finding the manifest, choosing a profile, and resolving its entry
+// against the root belong to pkg/project, so the diagnostics for those
+// failures are exported from here as thin wrappers over the generated
+// constructors — the codes are owned by this package even though the
+// conditions are detected a layer up.
 package config
 
 import (
 	"errors"
+	"fmt"
+	"maps"
 	"os"
 	"path"
+	"slices"
 	"strings"
 
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
@@ -25,14 +28,25 @@ import (
 // project root.
 const FileName = "masterbelt.toml"
 
-// Config is the decoded masterbelt.toml:
+// Config is the decoded masterbelt.toml. The top-level keys form the default
+// profile, and each [profile.<name>] section declares a named one:
 //
-//	entry = "src/main.belt"   # the entry point, relative to the root
+//	entry = "src/main.belt"     # the default profile's entry point
+//
+//	[profile.editor]            # a named profile
+//	entry = "src/editor.belt"
 //
 // The schema holds exactly what the toolchain reads — nothing is declared
 // ahead of a consumer. Unknown keys are ignored, so future keys and sections
 // ([dependencies], [build]) can land without breaking older toolchains.
 type Config struct {
+	ProfileConfig                          // the default profile: the manifest's top-level keys
+	Profiles      map[string]ProfileConfig `toml:"profile"`
+}
+
+// ProfileConfig is one profile's settings: an entry point, relative to the
+// project root.
+type ProfileConfig struct {
 	Entry string `toml:"entry"`
 }
 
@@ -65,15 +79,42 @@ func Parse(src []byte) (Config, diagnostic.List) {
 		return cfg, diags
 	}
 
-	switch cleaned := path.Clean(cfg.Entry); {
-	case cfg.Entry == "":
+	// The default profile may stay silent when named profiles exist — using
+	// it is then the error, not declaring nothing. A named profile is an
+	// explicit declaration, so one without an entry has no purpose.
+	if cfg.Entry == "" && len(cfg.Profiles) == 0 {
 		diags.Add(newMissingEntryDiagnostic(0, 0))
-	case path.IsAbs(cfg.Entry):
-		diags.Add(newInvalidDiagnostic(0, 0, "entry must be relative to the project root"))
-	case cleaned == ".." || strings.HasPrefix(cleaned, "../"):
-		diags.Add(newInvalidDiagnostic(0, 0, "entry must not escape the project root"))
+	}
+	if cfg.Entry != "" {
+		validateEntry(cfg.Entry, "", &diags)
+	}
+	for _, name := range slices.Sorted(maps.Keys(cfg.Profiles)) {
+		profile := cfg.Profiles[name]
+		if profile.Entry == "" {
+			diags.Add(newProfileMissingEntryDiagnostic(0, 0, name))
+			continue
+		}
+		validateEntry(profile.Entry, name, &diags)
 	}
 	return cfg, diags
+}
+
+// validateEntry checks one profile's entry path policy: relative to the root
+// and staying inside it. profile is "" for the default profile.
+func validateEntry(entry, profile string, diags *diagnostic.List) {
+	var problem string
+	switch cleaned := path.Clean(entry); {
+	case path.IsAbs(entry):
+		problem = "entry must be relative to the project root"
+	case cleaned == ".." || strings.HasPrefix(cleaned, "../"):
+		problem = "entry must not escape the project root"
+	default:
+		return
+	}
+	if profile != "" {
+		problem = fmt.Sprintf("profile %q: %s", profile, problem)
+	}
+	diags.Add(newInvalidDiagnostic(0, 0, problem))
 }
 
 // invalid adapts a TOML decode error to the config.invalid diagnostic. The
@@ -96,9 +137,28 @@ func Missing() diagnostic.Diagnostic {
 	return newMissingDiagnostic(0, 0)
 }
 
-// EntryNotFound reports that entry names a file that does not exist on disk.
-// The manifest does not track the value's offset, so the diagnostic spans
-// nothing.
+// MissingEntry reports that the default profile was asked for but the
+// manifest's top-level keys do not set entry. Parse accepts such a manifest
+// when named profiles exist, so this fires from whoever resolves the default
+// profile (pkg/project).
+func MissingEntry() diagnostic.Diagnostic {
+	return newMissingEntryDiagnostic(0, 0)
+}
+
+// UnknownProfile reports that the manifest declares no [profile.<name>]
+// section for the requested name.
+func UnknownProfile(profile string) diagnostic.Diagnostic {
+	return newUnknownProfileDiagnostic(0, 0, profile)
+}
+
+// EntryNotFound reports that the default profile's entry names a file that
+// does not exist on disk. The manifest does not track the value's offset, so
+// the diagnostic spans nothing.
 func EntryNotFound(entry string) diagnostic.Diagnostic {
 	return newEntryNotFoundDiagnostic(0, 0, entry)
+}
+
+// ProfileEntryNotFound is EntryNotFound for a named profile.
+func ProfileEntryNotFound(profile, entry string) diagnostic.Diagnostic {
+	return newProfileEntryNotFoundDiagnostic(0, 0, profile, entry)
 }

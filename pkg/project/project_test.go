@@ -108,6 +108,81 @@ func TestOpenNormalizesEntry(t *testing.T) {
 	}
 }
 
+func TestOpenProfile(t *testing.T) {
+	root := t.TempDir()
+	write(t, root, "masterbelt.toml", "entry = \"src/main.belt\"\n\n[profile.editor]\nentry = \"src/editor.belt\"\n")
+	write(t, root, "src/main.belt", "const A = 1\n")
+	write(t, root, "src/editor.belt", "const E = 2\n")
+
+	proj, diags := OpenProfile(root, "editor")
+	if diags.Len() != 0 {
+		t.Fatalf("OpenProfile() diagnostics = %v, want none", diags.Items())
+	}
+	if proj.Profile != "editor" {
+		t.Errorf("Profile = %q, want %q", proj.Profile, "editor")
+	}
+	if proj.Entry != FileID("src/editor.belt") {
+		t.Errorf("Entry = %q, want the editor profile's entry", proj.Entry)
+	}
+	if got := string(proj.EntryFile().Data); got != "const E = 2\n" {
+		t.Errorf("entry data = %q, want the editor source", got)
+	}
+
+	// The default profile of the same manifest stays reachable as "".
+	proj, diags = OpenProfile(root, "")
+	if diags.Len() != 0 || proj.Entry != FileID("src/main.belt") || proj.Profile != "" {
+		t.Errorf("OpenProfile(\"\") = %+v, %v; want the default entry", proj, diags.Items())
+	}
+}
+
+func TestOpenUnknownProfile(t *testing.T) {
+	root := t.TempDir()
+	write(t, root, "masterbelt.toml", "entry = \"main.belt\"\n")
+	write(t, root, "main.belt", "const A = 1\n")
+
+	proj, diags := OpenProfile(root, "editor")
+	if proj != nil {
+		t.Fatalf("OpenProfile() = %+v, want nil", proj)
+	}
+	d := assertSingleError(t, diags, config.CodeUnknownProfile)
+	if want := "profile editor is not defined in masterbelt.toml"; d.Message != want {
+		t.Errorf("Message = %q, want %q", d.Message, want)
+	}
+}
+
+func TestOpenProfileEntryNotFound(t *testing.T) {
+	root := t.TempDir()
+	write(t, root, "masterbelt.toml", "entry = \"main.belt\"\n\n[profile.editor]\nentry = \"editor.belt\"\n")
+	write(t, root, "main.belt", "const A = 1\n")
+
+	proj, diags := OpenProfile(root, "editor")
+	if proj != nil {
+		t.Fatalf("OpenProfile() = %+v, want nil", proj)
+	}
+	d := assertSingleError(t, diags, config.CodeProfileEntryNotFound)
+	if want := "entry file not found for profile editor: editor.belt"; d.Message != want {
+		t.Errorf("Message = %q, want %q", d.Message, want)
+	}
+}
+
+func TestOpenDefaultOfProfileOnlyManifest(t *testing.T) {
+	// The manifest is valid with named profiles alone; asking for the silent
+	// default profile is what fails.
+	root := t.TempDir()
+	write(t, root, "masterbelt.toml", "[profile.editor]\nentry = \"editor.belt\"\n")
+	write(t, root, "editor.belt", "const E = 1\n")
+
+	proj, diags := Open(root)
+	if proj != nil {
+		t.Fatalf("Open() = %+v, want nil", proj)
+	}
+	assertSingleError(t, diags, config.CodeMissingEntry)
+
+	if proj, diags := OpenProfile(root, "editor"); proj == nil || diags.Len() != 0 {
+		t.Errorf("OpenProfile(editor) = %v, %v; want the project", proj, diags.Items())
+	}
+}
+
 func TestOpenMissingManifest(t *testing.T) {
 	proj, diags := Open(t.TempDir())
 	if proj != nil {

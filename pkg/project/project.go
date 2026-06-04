@@ -46,7 +46,10 @@ type Project struct {
 	Root string
 	// Config is the parsed manifest.
 	Config config.Config
-	// Entry is the id of the entry point the manifest names.
+	// Profile is the name of the profile the project was opened with; ""
+	// is the default profile (the manifest's top-level keys).
+	Profile string
+	// Entry is the id of the entry point the opened profile names.
 	Entry FileID
 
 	files map[FileID]*File
@@ -90,11 +93,18 @@ func FindRoot(dir string) (string, bool) {
 	}
 }
 
-// Open finds the project root at or above dir, parses its manifest, and loads
-// the entry file. On failure it returns nil and the problems found; every
-// diagnostic is about the manifest (masterbelt.toml), never about masterbelt
-// source — analyzing the loaded files is the caller's business.
+// Open opens the project at or above dir with its default profile.
 func Open(dir string) (*Project, diagnostic.List) {
+	return OpenProfile(dir, "")
+}
+
+// OpenProfile finds the project root at or above dir, parses its manifest,
+// resolves the profile — "" for the default, otherwise a [profile.<name>]
+// section — and loads its entry file. On failure it returns nil and the
+// problems found; every diagnostic is about the manifest (masterbelt.toml),
+// never about masterbelt source — analyzing the loaded files is the caller's
+// business.
+func OpenProfile(dir, profile string) (*Project, diagnostic.List) {
 	var diags diagnostic.List
 
 	root, ok := FindRoot(dir)
@@ -108,20 +118,50 @@ func Open(dir string) (*Project, diagnostic.List) {
 		return nil, diags
 	}
 
-	entry := fileID(cfg.Entry)
+	rawEntry, ok := profileEntry(cfg, profile, &diags)
+	if !ok {
+		return nil, diags
+	}
+
+	entry := fileID(rawEntry)
 	entryPath := filepath.Join(root, filepath.FromSlash(string(entry)))
 	data, err := os.ReadFile(entryPath)
 	if err != nil {
-		diags.Add(config.EntryNotFound(cfg.Entry))
+		if profile == "" {
+			diags.Add(config.EntryNotFound(rawEntry))
+		} else {
+			diags.Add(config.ProfileEntryNotFound(profile, rawEntry))
+		}
 		return nil, diags
 	}
 
 	return &Project{
-		Root:   root,
-		Config: cfg,
-		Entry:  entry,
+		Root:    root,
+		Config:  cfg,
+		Profile: profile,
+		Entry:   entry,
 		files: map[FileID]*File{
 			entry: {ID: entry, Path: entryPath, Data: data},
 		},
 	}, diags
+}
+
+// profileEntry resolves the entry point of the requested profile. Parse has
+// already vetted every declared entry, so the failures left are asking for a
+// profile the manifest does not declare, or for the default profile of a
+// manifest that only declares named ones.
+func profileEntry(cfg config.Config, profile string, diags *diagnostic.List) (string, bool) {
+	if profile == "" {
+		if cfg.Entry == "" {
+			diags.Add(config.MissingEntry())
+			return "", false
+		}
+		return cfg.Entry, true
+	}
+	p, ok := cfg.Profiles[profile]
+	if !ok {
+		diags.Add(config.UnknownProfile(profile))
+		return "", false
+	}
+	return p.Entry, true
 }

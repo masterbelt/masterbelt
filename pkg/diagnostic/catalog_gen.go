@@ -231,4 +231,28 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "masterbelt.toml does not set entry"
 		}
 	},
+	"project.config.profile_entry_not_found": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "プロファイル " + f["profile"].String() + " のエントリファイルが見つかりません: " + f["path"].String()
+		default:
+			return "entry file not found for profile " + f["profile"].String() + ": " + f["path"].String()
+		}
+	},
+	"project.config.profile_missing_entry": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "プロファイル " + f["profile"].String() + " に entry が指定されていません"
+		default:
+			return "profile " + f["profile"].String() + " does not set entry"
+		}
+	},
+	"project.config.unknown_profile": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "プロファイル " + f["profile"].String() + " は masterbelt.toml に定義されていません"
+		default:
+			return "profile " + f["profile"].String() + " is not defined in masterbelt.toml"
+		}
+	},
 }

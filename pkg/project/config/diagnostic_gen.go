@@ -9,10 +9,13 @@ import (
 )
 
 const (
-	CodeEntryNotFound diagnostic.Code = "project.config.entry_not_found"
-	CodeInvalid       diagnostic.Code = "project.config.invalid"
-	CodeMissing       diagnostic.Code = "project.config.missing"
-	CodeMissingEntry  diagnostic.Code = "project.config.missing_entry"
+	CodeEntryNotFound        diagnostic.Code = "project.config.entry_not_found"
+	CodeInvalid              diagnostic.Code = "project.config.invalid"
+	CodeMissing              diagnostic.Code = "project.config.missing"
+	CodeMissingEntry         diagnostic.Code = "project.config.missing_entry"
+	CodeProfileEntryNotFound diagnostic.Code = "project.config.profile_entry_not_found"
+	CodeProfileMissingEntry  diagnostic.Code = "project.config.profile_missing_entry"
+	CodeUnknownProfile       diagnostic.Code = "project.config.unknown_profile"
 )
 
 func newEntryNotFoundDiagnostic(offset int, width int, path string) diagnostic.Diagnostic {
@@ -60,6 +63,49 @@ func newMissingEntryDiagnostic(offset int, width int) diagnostic.Diagnostic {
 		Code:     CodeMissingEntry,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeMissingEntry, nil),
 		Fields:   nil,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newProfileEntryNotFoundDiagnostic(offset int, width int, profile string, path string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"profile": diagnostic.Str(profile),
+		"path":    diagnostic.Str(path),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeProfileEntryNotFound,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeProfileEntryNotFound, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newProfileMissingEntryDiagnostic(offset int, width int, profile string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"profile": diagnostic.Str(profile),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeProfileMissingEntry,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeProfileMissingEntry, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newUnknownProfileDiagnostic(offset int, width int, profile string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"profile": diagnostic.Str(profile),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeUnknownProfile,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeUnknownProfile, fields),
+		Fields:   fields,
 		Offset:   offset,
 		Width:    width,
 	}

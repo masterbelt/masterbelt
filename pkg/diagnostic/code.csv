@@ -27,3 +27,6 @@ project.config.missing,error,
 project.config.invalid,error,detail:string
 project.config.missing_entry,error,
 project.config.entry_not_found,error,path:string
+project.config.profile_missing_entry,error,profile:string
+project.config.profile_entry_not_found,error,profile:string path:string
+project.config.unknown_profile,error,profile:string

@@ -19,6 +19,7 @@ func init() {
 	RootCmd.AddCommand(CheckCmd)
 	CheckCmd.Flags().String("format", "text", "output format: text or json")
 	CheckCmd.Flags().String("locale", string(diagnostic.DefaultLocale), "message locale (en, ja)")
+	CheckCmd.Flags().String("profile", "", "manifest profile to check (default: the top-level profile)")
 }
 
 var CheckCmd = &cobra.Command{
@@ -38,8 +39,9 @@ var CheckCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+		profile, _ := cmd.Flags().GetString("profile")
 
-		checkErr := runCheck(rep, target)
+		checkErr := runCheck(rep, target, profile)
 		if err := rep.Flush(); err != nil {
 			return err
 		}
@@ -65,7 +67,7 @@ func newReporter(cmd *cobra.Command) (reporter.Reporter, error) {
 
 // runCheck checks target — a project directory or an ad-hoc file — reporting
 // every diagnostic through rep.
-func runCheck(rep reporter.Reporter, target string) error {
+func runCheck(rep reporter.Reporter, target, profile string) error {
 	info, err := os.Stat(target)
 	if err != nil {
 		return err
@@ -79,7 +81,7 @@ func runCheck(rep reporter.Reporter, target string) error {
 		return checkSource(rep, target, data)
 	}
 
-	proj, err := loadProject(rep, target)
+	proj, err := loadProject(rep, target, profile)
 	if err != nil {
 		return err
 	}
@@ -87,11 +89,12 @@ func runCheck(rep reporter.Reporter, target string) error {
 	return checkSource(rep, entry.Path, entry.Data)
 }
 
-// loadProject opens the project at or above dir, reporting the manifest's
-// diagnostics when there are any. It is the project-opening front door shared
-// by every project-scoped subcommand (check today, fmt when B-3 lands).
-func loadProject(rep reporter.Reporter, dir string) (*project.Project, error) {
-	proj, diags := project.Open(dir)
+// loadProject opens the project at or above dir with the given profile ("" is
+// the default), reporting the manifest's diagnostics when there are any. It is
+// the project-opening front door shared by every project-scoped subcommand
+// (check today, fmt when B-3 lands).
+func loadProject(rep reporter.Reporter, dir, profile string) (*project.Project, error) {
+	proj, diags := project.OpenProfile(dir, profile)
 	if diags.Len() == 0 {
 		return proj, nil
 	}

@@ -27,3 +27,6 @@ project.config.missing,masterbelt.toml がこのディレクトリにも親デ�
 project.config.invalid,不正な masterbelt.toml: {detail}
 project.config.missing_entry,masterbelt.toml に entry が指定されていません
 project.config.entry_not_found,エントリファイルが見つかりません: {path}
+project.config.profile_missing_entry,プロファイル {profile} に entry が指定されていません
+project.config.profile_entry_not_found,プロファイル {profile} のエントリファイルが見つかりません: {path}
+project.config.unknown_profile,プロファイル {profile} は masterbelt.toml に定義されていません
