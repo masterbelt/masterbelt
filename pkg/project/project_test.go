@@ -8,26 +8,15 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/masterbelt/masterbelt/internal/belttest"
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
 	"github.com/masterbelt/masterbelt/pkg/project/config"
 	"github.com/masterbelt/masterbelt/pkg/source"
 )
 
-// write creates path under root (and any parent directories) with content.
-func write(t *testing.T, root, path, content string) {
-	t.Helper()
-	full := filepath.Join(root, filepath.FromSlash(path))
-	if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
-		t.Fatal(err)
-	}
-}
-
 func TestFindRoot(t *testing.T) {
 	root := t.TempDir()
-	write(t, root, "masterbelt.toml", "entry = \"main.belt\"\n")
+	belttest.WriteFile(t, root, "masterbelt.toml", "entry = \"main.belt\"\n")
 	deep := filepath.Join(root, "src", "deep")
 	if err := os.MkdirAll(deep, 0o755); err != nil {
 		t.Fatal(err)
@@ -50,8 +39,8 @@ func TestFindRootNotFound(t *testing.T) {
 
 func TestOpen(t *testing.T) {
 	root := t.TempDir()
-	write(t, root, "masterbelt.toml", "entry = \"src/main.belt\"\n")
-	write(t, root, "src/main.belt", "const MaxLevel: int64 = 100\n")
+	belttest.WriteFile(t, root, "masterbelt.toml", "entry = \"src/main.belt\"\n")
+	belttest.WriteFile(t, root, "src/main.belt", "const MaxLevel: int64 = 100\n")
 
 	proj, diags := Open(root)
 	if diags.Len() != 0 {
@@ -83,9 +72,9 @@ func TestOpen(t *testing.T) {
 
 func TestOpenFromSubdirectory(t *testing.T) {
 	root := t.TempDir()
-	write(t, root, "masterbelt.toml", "entry = \"main.belt\"\n")
-	write(t, root, "main.belt", "const A = 1\n")
-	write(t, root, "sub/keep", "") // a directory beneath the root to open from
+	belttest.WriteFile(t, root, "masterbelt.toml", "entry = \"main.belt\"\n")
+	belttest.WriteFile(t, root, "main.belt", "const A = 1\n")
+	belttest.WriteFile(t, root, "sub/keep", "") // a directory beneath the root to open from
 
 	proj, diags := Open(filepath.Join(root, "sub"))
 	if diags.Len() != 0 || proj == nil {
@@ -98,8 +87,8 @@ func TestOpenFromSubdirectory(t *testing.T) {
 
 func TestOpenNormalizesEntry(t *testing.T) {
 	root := t.TempDir()
-	write(t, root, "masterbelt.toml", "entry = \"./src/main.belt\"\n")
-	write(t, root, "src/main.belt", "const A = 1\n")
+	belttest.WriteFile(t, root, "masterbelt.toml", "entry = \"./src/main.belt\"\n")
+	belttest.WriteFile(t, root, "src/main.belt", "const A = 1\n")
 
 	proj, diags := Open(root)
 	if diags.Len() != 0 || proj == nil {
@@ -114,9 +103,9 @@ func TestOpenNormalizesEntry(t *testing.T) {
 
 func TestOpenProfile(t *testing.T) {
 	root := t.TempDir()
-	write(t, root, "masterbelt.toml", "entry = \"src/main.belt\"\n\n[profile.editor]\nentry = \"src/editor.belt\"\n")
-	write(t, root, "src/main.belt", "const A = 1\n")
-	write(t, root, "src/editor.belt", "const E = 2\n")
+	belttest.WriteFile(t, root, "masterbelt.toml", "entry = \"src/main.belt\"\n\n[profile.editor]\nentry = \"src/editor.belt\"\n")
+	belttest.WriteFile(t, root, "src/main.belt", "const A = 1\n")
+	belttest.WriteFile(t, root, "src/editor.belt", "const E = 2\n")
 
 	proj, diags := OpenProfile(root, "editor")
 	if diags.Len() != 0 {
@@ -141,8 +130,8 @@ func TestOpenProfile(t *testing.T) {
 
 func TestOpenUnknownProfile(t *testing.T) {
 	root := t.TempDir()
-	write(t, root, "masterbelt.toml", "entry = \"main.belt\"\n")
-	write(t, root, "main.belt", "const A = 1\n")
+	belttest.WriteFile(t, root, "masterbelt.toml", "entry = \"main.belt\"\n")
+	belttest.WriteFile(t, root, "main.belt", "const A = 1\n")
 
 	proj, diags := OpenProfile(root, "editor")
 	if proj != nil {
@@ -156,8 +145,8 @@ func TestOpenUnknownProfile(t *testing.T) {
 
 func TestOpenProfileEntryNotFound(t *testing.T) {
 	root := t.TempDir()
-	write(t, root, "masterbelt.toml", "entry = \"main.belt\"\n\n[profile.editor]\nentry = \"editor.belt\"\n")
-	write(t, root, "main.belt", "const A = 1\n")
+	belttest.WriteFile(t, root, "masterbelt.toml", "entry = \"main.belt\"\n\n[profile.editor]\nentry = \"editor.belt\"\n")
+	belttest.WriteFile(t, root, "main.belt", "const A = 1\n")
 
 	proj, diags := OpenProfile(root, "editor")
 	if proj != nil {
@@ -173,8 +162,8 @@ func TestOpenDefaultOfProfileOnlyManifest(t *testing.T) {
 	// The manifest is valid with named profiles alone; asking for the silent
 	// default profile is what fails.
 	root := t.TempDir()
-	write(t, root, "masterbelt.toml", "[profile.editor]\nentry = \"editor.belt\"\n")
-	write(t, root, "editor.belt", "const E = 1\n")
+	belttest.WriteFile(t, root, "masterbelt.toml", "[profile.editor]\nentry = \"editor.belt\"\n")
+	belttest.WriteFile(t, root, "editor.belt", "const E = 1\n")
 
 	proj, diags := Open(root)
 	if proj != nil {
@@ -200,10 +189,10 @@ func useTargets(f *File) []string {
 
 func TestOpenClosesOverUses(t *testing.T) {
 	root := t.TempDir()
-	write(t, root, "masterbelt.toml", "entry = \"main.belt\"\n")
-	write(t, root, "main.belt", "use geo from \"geometry.belt\"\nconst A = 1\n")
-	write(t, root, "geometry.belt", "use { C } from \"palette.belt\"\npub const Origin = 0\n")
-	write(t, root, "palette.belt", "pub const C = 2\n")
+	belttest.WriteFile(t, root, "masterbelt.toml", "entry = \"main.belt\"\n")
+	belttest.WriteFile(t, root, "main.belt", "use geo from \"geometry.belt\"\nconst A = 1\n")
+	belttest.WriteFile(t, root, "geometry.belt", "use { C } from \"palette.belt\"\npub const Origin = 0\n")
+	belttest.WriteFile(t, root, "palette.belt", "pub const C = 2\n")
 
 	proj, diags := Open(root)
 	if diags.Len() != 0 {
@@ -235,9 +224,9 @@ func TestOpenUseCycle(t *testing.T) {
 	// A use cycle terminates the closure; both files load, both tables wire.
 	// Reporting the cycle is the semantic layer's job.
 	root := t.TempDir()
-	write(t, root, "masterbelt.toml", "entry = \"a.belt\"\n")
-	write(t, root, "a.belt", "use b from \"b.belt\"\n")
-	write(t, root, "b.belt", "use a from \"a.belt\"\n")
+	belttest.WriteFile(t, root, "masterbelt.toml", "entry = \"a.belt\"\n")
+	belttest.WriteFile(t, root, "a.belt", "use b from \"b.belt\"\n")
+	belttest.WriteFile(t, root, "b.belt", "use a from \"a.belt\"\n")
 
 	proj, diags := Open(root)
 	if diags.Len() != 0 || len(proj.Files()) != 2 {
@@ -250,8 +239,8 @@ func TestOpenUseCycle(t *testing.T) {
 
 func TestOpenUnresolvableUse(t *testing.T) {
 	root := t.TempDir()
-	write(t, root, "masterbelt.toml", "entry = \"main.belt\"\n")
-	write(t, root, "main.belt", "use ghost from \"missing.belt\"\nconst A = 1\n")
+	belttest.WriteFile(t, root, "masterbelt.toml", "entry = \"main.belt\"\n")
+	belttest.WriteFile(t, root, "main.belt", "use ghost from \"missing.belt\"\nconst A = 1\n")
 
 	proj, diags := Open(root)
 	if diags.Len() != 0 {
@@ -267,9 +256,9 @@ func TestOpenUnresolvableUse(t *testing.T) {
 
 func TestOpenUseEscapesRoot(t *testing.T) {
 	root := t.TempDir()
-	write(t, root, "masterbelt.toml", "entry = \"main.belt\"\n")
-	write(t, root, "main.belt", "use out from \"../outside.belt\"\n")
-	write(t, filepath.Dir(root), "outside.belt", "pub const X = 1\n")
+	belttest.WriteFile(t, root, "masterbelt.toml", "entry = \"main.belt\"\n")
+	belttest.WriteFile(t, root, "main.belt", "use out from \"../outside.belt\"\n")
+	belttest.WriteFile(t, filepath.Dir(root), "outside.belt", "pub const X = 1\n")
 
 	proj, _ := Open(root)
 	if len(proj.Files()) != 1 || len(proj.EntryFile().Uses) != 0 {
@@ -281,10 +270,10 @@ func TestOpenUseRelativeToImporter(t *testing.T) {
 	// Use paths are relative to the importing file, not the root; ".." may
 	// move between directories as long as it stays inside the root.
 	root := t.TempDir()
-	write(t, root, "masterbelt.toml", "entry = \"src/main.belt\"\n")
-	write(t, root, "src/main.belt", "use geo from \"geometry.belt\"\nuse util from \"../lib/util.belt\"\n")
-	write(t, root, "src/geometry.belt", "pub const Origin = 0\n")
-	write(t, root, "lib/util.belt", "pub const U = 1\n")
+	belttest.WriteFile(t, root, "masterbelt.toml", "entry = \"src/main.belt\"\n")
+	belttest.WriteFile(t, root, "src/main.belt", "use geo from \"geometry.belt\"\nuse util from \"../lib/util.belt\"\n")
+	belttest.WriteFile(t, root, "src/geometry.belt", "pub const Origin = 0\n")
+	belttest.WriteFile(t, root, "lib/util.belt", "pub const U = 1\n")
 
 	proj, diags := Open(root)
 	if diags.Len() != 0 {
@@ -306,7 +295,7 @@ func TestOpenMissingManifest(t *testing.T) {
 
 func TestOpenInvalidManifest(t *testing.T) {
 	root := t.TempDir()
-	write(t, root, "masterbelt.toml", "entry = @broken\n")
+	belttest.WriteFile(t, root, "masterbelt.toml", "entry = @broken\n")
 
 	proj, diags := Open(root)
 	if proj != nil {
@@ -317,7 +306,7 @@ func TestOpenInvalidManifest(t *testing.T) {
 
 func TestOpenMissingEntryKey(t *testing.T) {
 	root := t.TempDir()
-	write(t, root, "masterbelt.toml", "name = \"mygame\"\n")
+	belttest.WriteFile(t, root, "masterbelt.toml", "name = \"mygame\"\n")
 
 	proj, diags := Open(root)
 	if proj != nil {
@@ -328,7 +317,7 @@ func TestOpenMissingEntryKey(t *testing.T) {
 
 func TestOpenEntryNotFound(t *testing.T) {
 	root := t.TempDir()
-	write(t, root, "masterbelt.toml", "entry = \"src/main.belt\"\n")
+	belttest.WriteFile(t, root, "masterbelt.toml", "entry = \"src/main.belt\"\n")
 
 	proj, diags := Open(root)
 	if proj != nil {
@@ -365,10 +354,10 @@ func fileIDList(p *Project) string {
 
 func TestResyncPrunesOrphans(t *testing.T) {
 	root := t.TempDir()
-	write(t, root, "masterbelt.toml", "entry = \"main.belt\"\n")
-	write(t, root, "main.belt", "use geo from \"geometry.belt\"\nconst A = 1\n")
-	write(t, root, "geometry.belt", "use { C } from \"palette.belt\"\npub const Origin = 0\n")
-	write(t, root, "palette.belt", "pub const C = 2\n")
+	belttest.WriteFile(t, root, "masterbelt.toml", "entry = \"main.belt\"\n")
+	belttest.WriteFile(t, root, "main.belt", "use geo from \"geometry.belt\"\nconst A = 1\n")
+	belttest.WriteFile(t, root, "geometry.belt", "use { C } from \"palette.belt\"\npub const Origin = 0\n")
+	belttest.WriteFile(t, root, "palette.belt", "pub const C = 2\n")
 
 	proj, diags := Open(root)
 	if diags.Len() != 0 {
@@ -397,9 +386,9 @@ func TestResyncPrunesOrphans(t *testing.T) {
 
 func TestIncludePinsAndReleaseUnpins(t *testing.T) {
 	root := t.TempDir()
-	write(t, root, "masterbelt.toml", "entry = \"main.belt\"\n")
-	write(t, root, "main.belt", "const A = 1\n")
-	write(t, root, "lib/util.belt", "pub const U = 2\n")
+	belttest.WriteFile(t, root, "masterbelt.toml", "entry = \"main.belt\"\n")
+	belttest.WriteFile(t, root, "main.belt", "const A = 1\n")
+	belttest.WriteFile(t, root, "lib/util.belt", "pub const U = 2\n")
 
 	proj, diags := Open(root)
 	if diags.Len() != 0 {
@@ -430,12 +419,12 @@ func TestIncludePinsAndReleaseUnpins(t *testing.T) {
 
 func TestCandidateImports(t *testing.T) {
 	root := t.TempDir()
-	write(t, root, "masterbelt.toml", "entry = \"src/main.belt\"\n")
-	write(t, root, "src/main.belt", "const A = 1\n")
-	write(t, root, "src/geo.belt", "pub const G = 1\n")
-	write(t, root, "lib/util.belt", "pub const U = 2\n")
-	write(t, root, ".cache/junk.belt", "const J = 3\n") // hidden: never offered
-	write(t, root, "notes.txt", "not a module\n")
+	belttest.WriteFile(t, root, "masterbelt.toml", "entry = \"src/main.belt\"\n")
+	belttest.WriteFile(t, root, "src/main.belt", "const A = 1\n")
+	belttest.WriteFile(t, root, "src/geo.belt", "pub const G = 1\n")
+	belttest.WriteFile(t, root, "lib/util.belt", "pub const U = 2\n")
+	belttest.WriteFile(t, root, ".cache/junk.belt", "const J = 3\n") // hidden: never offered
+	belttest.WriteFile(t, root, "notes.txt", "not a module\n")
 
 	proj, diags := Open(root)
 	if diags.Len() != 0 {

@@ -3,10 +3,11 @@ package cli
 import (
 	"bytes"
 	"encoding/json"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/masterbelt/masterbelt/internal/belttest"
 )
 
 // execCheck executes `masterbelt check args...` through the root command and
@@ -31,21 +32,10 @@ func execCheck(t *testing.T, args ...string) (string, error) {
 }
 
 // write creates path under root (and any parent directories) with content.
-func write(t *testing.T, root, path, content string) {
-	t.Helper()
-	full := filepath.Join(root, filepath.FromSlash(path))
-	if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
-		t.Fatal(err)
-	}
-}
-
 func TestCheckProject(t *testing.T) {
 	root := t.TempDir()
-	write(t, root, "masterbelt.toml", "entry = \"src/main.belt\"\n")
-	write(t, root, "src/main.belt", "const MaxLevel: int64 = 100\n")
+	belttest.WriteFile(t, root, "masterbelt.toml", "entry = \"src/main.belt\"\n")
+	belttest.WriteFile(t, root, "src/main.belt", "const MaxLevel: int64 = 100\n")
 
 	out, err := execCheck(t, root)
 	if err != nil {
@@ -60,9 +50,9 @@ func TestCheckProjectFromSubdirectory(t *testing.T) {
 	// With no argument, check starts the manifest search at the current
 	// directory, go.mod style.
 	root := t.TempDir()
-	write(t, root, "masterbelt.toml", "entry = \"main.belt\"\n")
-	write(t, root, "main.belt", "const A = 1\n")
-	write(t, root, "sub/keep", "")
+	belttest.WriteFile(t, root, "masterbelt.toml", "entry = \"main.belt\"\n")
+	belttest.WriteFile(t, root, "main.belt", "const A = 1\n")
+	belttest.WriteFile(t, root, "sub/keep", "")
 	t.Chdir(filepath.Join(root, "sub"))
 
 	if out, err := execCheck(t); err != nil {
@@ -72,8 +62,8 @@ func TestCheckProjectFromSubdirectory(t *testing.T) {
 
 func TestCheckReportsSourceErrors(t *testing.T) {
 	root := t.TempDir()
-	write(t, root, "masterbelt.toml", "entry = \"main.belt\"\n")
-	write(t, root, "main.belt", "const A = B\n")
+	belttest.WriteFile(t, root, "masterbelt.toml", "entry = \"main.belt\"\n")
+	belttest.WriteFile(t, root, "main.belt", "const A = B\n")
 
 	out, err := execCheck(t, root)
 	if err == nil {
@@ -87,7 +77,7 @@ func TestCheckReportsSourceErrors(t *testing.T) {
 
 func TestCheckReportsManifestErrors(t *testing.T) {
 	root := t.TempDir()
-	write(t, root, "masterbelt.toml", "name = \"broken\"\n")
+	belttest.WriteFile(t, root, "masterbelt.toml", "name = \"broken\"\n")
 
 	out, err := execCheck(t, root)
 	if err == nil {
@@ -115,15 +105,15 @@ func TestCheckMultiFileProject(t *testing.T) {
 	// reference passes, and an error inside an imported file is reported at
 	// that file's own path.
 	root := t.TempDir()
-	write(t, root, "masterbelt.toml", "entry = \"main.belt\"\n")
-	write(t, root, "main.belt", "use geo from \"geometry.belt\"\nconst start = geo.Origin\n")
-	write(t, root, "geometry.belt", "pub const Origin = 0\n")
+	belttest.WriteFile(t, root, "masterbelt.toml", "entry = \"main.belt\"\n")
+	belttest.WriteFile(t, root, "main.belt", "use geo from \"geometry.belt\"\nconst start = geo.Origin\n")
+	belttest.WriteFile(t, root, "geometry.belt", "pub const Origin = 0\n")
 
 	if out, err := execCheck(t, root); err != nil {
 		t.Fatalf("check = %v\n%s", err, out)
 	}
 
-	write(t, root, "geometry.belt", "pub const Origin = Broken\n")
+	belttest.WriteFile(t, root, "geometry.belt", "pub const Origin = Broken\n")
 	out, err := execCheck(t, root)
 	if err == nil {
 		t.Fatalf("check succeeded, want an error\n%s", out)
@@ -135,8 +125,8 @@ func TestCheckMultiFileProject(t *testing.T) {
 
 func TestCheckUseNotFound(t *testing.T) {
 	root := t.TempDir()
-	write(t, root, "masterbelt.toml", "entry = \"main.belt\"\n")
-	write(t, root, "main.belt", "use ghost from \"missing.belt\"\nconst a = 1\n")
+	belttest.WriteFile(t, root, "masterbelt.toml", "entry = \"main.belt\"\n")
+	belttest.WriteFile(t, root, "main.belt", "use ghost from \"missing.belt\"\nconst a = 1\n")
 
 	out, err := execCheck(t, root)
 	if err == nil {
@@ -149,8 +139,8 @@ func TestCheckUseNotFound(t *testing.T) {
 
 func TestCheckJSON(t *testing.T) {
 	root := t.TempDir()
-	write(t, root, "masterbelt.toml", "entry = \"main.belt\"\n")
-	write(t, root, "main.belt", "const A = B\n")
+	belttest.WriteFile(t, root, "masterbelt.toml", "entry = \"main.belt\"\n")
+	belttest.WriteFile(t, root, "main.belt", "const A = B\n")
 
 	out, err := execCheck(t, "--format=json", root)
 	if err == nil {
@@ -202,8 +192,8 @@ func TestCheckJSON(t *testing.T) {
 func TestCheckJSONClean(t *testing.T) {
 	// A clean run still emits a well-formed document, and exits zero.
 	root := t.TempDir()
-	write(t, root, "masterbelt.toml", "entry = \"main.belt\"\n")
-	write(t, root, "main.belt", "const A = 1\n")
+	belttest.WriteFile(t, root, "masterbelt.toml", "entry = \"main.belt\"\n")
+	belttest.WriteFile(t, root, "main.belt", "const A = 1\n")
 
 	out, err := execCheck(t, "--format=json", root)
 	if err != nil {
@@ -222,7 +212,7 @@ func TestCheckJSONClean(t *testing.T) {
 
 func TestCheckJSONManifestError(t *testing.T) {
 	root := t.TempDir()
-	write(t, root, "masterbelt.toml", "name = \"broken\"\n")
+	belttest.WriteFile(t, root, "masterbelt.toml", "name = \"broken\"\n")
 
 	out, err := execCheck(t, "--format=json", root)
 	if err == nil {
@@ -237,8 +227,8 @@ func TestCheckJSONManifestError(t *testing.T) {
 
 func TestCheckLocale(t *testing.T) {
 	root := t.TempDir()
-	write(t, root, "masterbelt.toml", "entry = \"main.belt\"\n")
-	write(t, root, "main.belt", "const A = B\n")
+	belttest.WriteFile(t, root, "masterbelt.toml", "entry = \"main.belt\"\n")
+	belttest.WriteFile(t, root, "main.belt", "const A = B\n")
 
 	out, err := execCheck(t, "--locale=ja", root)
 	if err == nil {
@@ -254,9 +244,9 @@ func TestCheckProfile(t *testing.T) {
 	// top-level one. The default entry is clean and the editor entry broken,
 	// so the flag's effect is observable.
 	root := t.TempDir()
-	write(t, root, "masterbelt.toml", "entry = \"main.belt\"\n\n[profile.editor]\nentry = \"editor.belt\"\n")
-	write(t, root, "main.belt", "const A = 1\n")
-	write(t, root, "editor.belt", "const E = F\n")
+	belttest.WriteFile(t, root, "masterbelt.toml", "entry = \"main.belt\"\n\n[profile.editor]\nentry = \"editor.belt\"\n")
+	belttest.WriteFile(t, root, "main.belt", "const A = 1\n")
+	belttest.WriteFile(t, root, "editor.belt", "const E = F\n")
 
 	if out, err := execCheck(t, root); err != nil {
 		t.Fatalf("check (default profile) = %v\n%s", err, out)
@@ -272,8 +262,8 @@ func TestCheckProfile(t *testing.T) {
 
 func TestCheckUnknownProfile(t *testing.T) {
 	root := t.TempDir()
-	write(t, root, "masterbelt.toml", "entry = \"main.belt\"\n")
-	write(t, root, "main.belt", "const A = 1\n")
+	belttest.WriteFile(t, root, "masterbelt.toml", "entry = \"main.belt\"\n")
+	belttest.WriteFile(t, root, "main.belt", "const A = 1\n")
 
 	out, err := execCheck(t, "--profile=editor", root)
 	if err == nil {
@@ -286,8 +276,8 @@ func TestCheckUnknownProfile(t *testing.T) {
 
 func TestCheckUnknownFormat(t *testing.T) {
 	root := t.TempDir()
-	write(t, root, "masterbelt.toml", "entry = \"main.belt\"\n")
-	write(t, root, "main.belt", "const A = 1\n")
+	belttest.WriteFile(t, root, "masterbelt.toml", "entry = \"main.belt\"\n")
+	belttest.WriteFile(t, root, "main.belt", "const A = 1\n")
 
 	if out, err := execCheck(t, "--format=yaml", root); err == nil || !strings.Contains(err.Error(), "unknown format") {
 		t.Errorf("check = %v, want an unknown-format error\n%s", err, out)
@@ -297,7 +287,7 @@ func TestCheckUnknownFormat(t *testing.T) {
 func TestCheckExplicitFile(t *testing.T) {
 	// An explicit file is checked ad hoc: no manifest required.
 	dir := t.TempDir()
-	write(t, dir, "lone.belt", "const A = B\n")
+	belttest.WriteFile(t, dir, "lone.belt", "const A = B\n")
 
 	out, err := execCheck(t, filepath.Join(dir, "lone.belt"))
 	if err == nil {

@@ -7,26 +7,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/masterbelt/masterbelt/internal/belttest"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/semantic"
 	protocol "github.com/owenrumney/go-lsp/lsp"
 )
-
-// writeProject lays a project on disk and returns its root: the editor's
-// workspace loads unopened siblings from there.
-func writeProject(t *testing.T, files map[string]string) string {
-	t.Helper()
-	root := t.TempDir()
-	for name, content := range files {
-		path := filepath.Join(root, filepath.FromSlash(name))
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
-	return root
-}
 
 // fileURI builds the URI of a project file through the same conversion the
 // server uses for unopened siblings, so the two stay symmetric.
@@ -53,7 +37,7 @@ func openOnDisk(t *testing.T, s *Server, root, name string) protocol.DocumentURI
 const crossMainSrc = "use geo from \"geometry.belt\"\nuse { Unit } from \"geometry.belt\"\nconst start = geo.Origin\nconst step = Unit\n"
 
 func crossProject(t *testing.T) (root string) {
-	return writeProject(t, map[string]string{
+	return belttest.WriteFiles(t, map[string]string{
 		"masterbelt.toml": "entry = \"main.belt\"\n",
 		"main.belt":       crossMainSrc,
 		"geometry.belt":   "pub const Origin = 0\npub const Unit = 1\n",
@@ -284,7 +268,7 @@ func TestCrossFileRenameMemberEditsOnlyTheName(t *testing.T) {
 // TestUsePathCompletion: completing inside a use path offers the project's
 // sibling files, relative to the importing file.
 func TestUsePathCompletion(t *testing.T) {
-	root := writeProject(t, map[string]string{
+	root := belttest.WriteFiles(t, map[string]string{
 		"masterbelt.toml": "entry = \"src/main.belt\"\n",
 		"src/main.belt":   "use geo from \"g\"\n",
 		"src/geo.belt":    "pub const G = 1\n",
@@ -498,7 +482,7 @@ func TestCloseKeepsImportedFile(t *testing.T) {
 // names of the file's namespace imports alongside the plain in-scope names.
 func TestQualifiedTypeCompletion(t *testing.T) {
 	src := "use geo from \"geometry.belt\"\nconst start: P = geo.Origin\n"
-	root := writeProject(t, map[string]string{
+	root := belttest.WriteFiles(t, map[string]string{
 		"masterbelt.toml": "entry = \"main.belt\"\n",
 		"main.belt":       src,
 		"geometry.belt":   "pub type Point = int32\npub const Origin = 0\n",
