@@ -132,11 +132,7 @@ func (ws *workspace) sync() {
 		for _, f := range ws.proj.Files() {
 			id := semantic.FileID(f.ID)
 			current[id] = true
-			uses := make(map[*ast.UseDecl]semantic.FileID, len(f.Uses))
-			for u, target := range f.Uses {
-				uses[u] = semantic.FileID(target)
-			}
-			ws.prog.SetFile(id, f.AST, uses)
+			ws.prog.SetFile(id, f.AST, semantic.UsesOf(f.Uses))
 		}
 		for _, id := range ws.prog.Files() {
 			if !current[id] {

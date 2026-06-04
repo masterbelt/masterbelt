@@ -42,6 +42,18 @@ func (p *Program) SetFile(id FileID, doc *abstract.Document, uses map[*ast.UseDe
 	p.db.setInput(id, doc.File(), uses)
 }
 
+// UsesOf re-keys a use table from another layer's file identifier to the
+// engine's. The project layer's FileID is deliberately a distinct type — the
+// compiler core never imports the project layer — so the binding layers (the
+// CLI, the LSP) bridge the two here, in exactly one place.
+func UsesOf[T ~string](uses map[*ast.UseDecl]T) map[*ast.UseDecl]FileID {
+	out := make(map[*ast.UseDecl]FileID, len(uses))
+	for u, target := range uses {
+		out[u] = FileID(target)
+	}
+	return out
+}
+
 // RemoveFile drops a file that left the project.
 func (p *Program) RemoveFile(id FileID) {
 	delete(p.docs, id)

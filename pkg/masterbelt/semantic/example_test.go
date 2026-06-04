@@ -73,10 +73,7 @@ func dumpProject(t *testing.T, dir string) string {
 	prog := NewProgram()
 	for _, f := range proj.Files() {
 		id := FileID(f.ID)
-		fileUses := make(map[*ast.UseDecl]FileID, len(f.Uses))
-		for u, target := range f.Uses {
-			fileUses[u] = FileID(target)
-		}
+		fileUses := UsesOf(f.Uses)
 		docs[id] = f.AST
 		uses[id] = fileUses
 		prog.SetFile(id, f.AST, fileUses)

@@ -13,7 +13,6 @@ import (
 	"github.com/masterbelt/masterbelt/pkg/project"
 	"github.com/masterbelt/masterbelt/pkg/project/config"
 	"github.com/masterbelt/masterbelt/pkg/source"
-	"github.com/masterbelt/masterbelt/pkg/source/ast"
 	"github.com/spf13/cobra"
 )
 
@@ -96,11 +95,7 @@ func runCheck(rep reporter.Reporter, target, profile string) error {
 func checkProject(rep reporter.Reporter, proj *project.Project) error {
 	prog := semantic.NewProgram()
 	for _, f := range proj.Files() {
-		uses := make(map[*ast.UseDecl]semantic.FileID, len(f.Uses))
-		for u, target := range f.Uses {
-			uses[u] = semantic.FileID(target)
-		}
-		prog.SetFile(semantic.FileID(f.ID), f.AST, uses)
+		prog.SetFile(semantic.FileID(f.ID), f.AST, semantic.UsesOf(f.Uses))
 	}
 	prog.Refresh()
 
