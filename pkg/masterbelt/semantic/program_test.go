@@ -298,3 +298,78 @@ func TestProgramIncrementalCrossFile(t *testing.T) {
 	}
 	assertClean(t, p, "main.belt")
 }
+
+func TestProgramImportedTypeInMethodBody(t *testing.T) {
+	// A type conversion inside a method body resolves an imported type the
+	// same way an annotation does — int32-typed Meters(1) cannot be returned
+	// as int8.
+	p := buildProgram(map[string]string{
+		"geometry.belt": "pub type Meters = int32\n",
+		"main.belt":     "use { Meters } from \"geometry.belt\"\npub type T = int8 impl {\n  pub f(): int8 {\n    return Meters(1)\n  }\n}\n",
+	})
+	findDiag(t, p, "main.belt", CodeTypeMismatch)
+}
+
+func TestProgramRepushUnchangedInputs(t *testing.T) {
+	// Re-pushing every file unchanged — what the LSP workspace does after each
+	// keystroke — must not open a new revision, or every file would be stamped
+	// changed and the cross-file early cutoff lost.
+	srcs := map[string]string{
+		"a.belt": "pub const X = 1\n",
+		"b.belt": "use { X } from \"a.belt\"\nconst Y = X\n",
+	}
+	p := buildProgram(srcs)
+	rev := p.db.revision
+
+	for id, doc := range p.docs {
+		uses := map[*ast.UseDecl]FileID{}
+		for _, u := range doc.File().Uses {
+			if _, ok := p.docs[FileID(u.Path)]; ok {
+				uses[u] = FileID(u.Path)
+			}
+		}
+		p.SetFile(id, doc, uses)
+	}
+	p.Refresh()
+
+	if p.db.revision != rev {
+		t.Errorf("revision = %d, want %d (unchanged inputs are no-ops)", p.db.revision, rev)
+	}
+	if _, eval := constInfo(p, "b.belt", "Y"); eval != "1" {
+		t.Errorf("Y = %s, want 1", eval)
+	}
+}
+
+func TestProgramValueCutoffKeepsFnIdentity(t *testing.T) {
+	// g's value is a function constant whose Fn literal lives in a.belt.
+	// Re-parsing a.belt must propagate the new literal pointer into g's value
+	// — a structurally identical function from a re-parsed file is a new fact,
+	// and keeping the old one would leave g holding a detached tree.
+	srcs := map[string]string{
+		"a.belt":    "pub const f = fn(x: int): int { return x }\n",
+		"main.belt": "use { f } from \"a.belt\"\nconst g = f\n",
+	}
+	p := buildProgram(srcs)
+
+	doc := abstract.NewDocument([]byte("pub const f = fn(x: int): int { return x }\n"))
+	p.SetFile("a.belt", doc, nil)
+	p.Refresh()
+
+	want, ok := doc.File().Decls[0].Value.(*ast.FuncLit)
+	if !ok {
+		t.Fatal("a.belt's f is not a function literal")
+	}
+	for _, c := range p.Module("main.belt").Consts {
+		if c.Name != "g" {
+			continue
+		}
+		if c.Eval == nil || c.Eval.Kind != ir.ConstFunc {
+			t.Fatalf("g = %v, want a function constant", c.Eval)
+		}
+		if c.Eval.Fn != want {
+			t.Error("g's function literal points into the detached old tree")
+		}
+		return
+	}
+	t.Fatal("main.belt declares no g")
+}

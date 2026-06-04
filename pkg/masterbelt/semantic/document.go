@@ -120,7 +120,7 @@ func funcLitTypesOf(db *database, fileID FileID, file *ast.File) map[*ast.FuncLi
 			infer.Check(decl.Value, env, sink)
 		}
 	}
-	checkMethodBodies(file, reg, q.typeDefs(fileID), sink)
+	checkMethodBodies(file, reg, q.typeDefs(fileID), q.universe(fileID), sink)
 	return out
 }
 

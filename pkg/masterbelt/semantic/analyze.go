@@ -245,6 +245,9 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 					diags.Add(newUndefinedNameDiagnostic(s.offset, s.width, id.Name))
 				},
 				func(m *ast.MemberExpr) {
+					if m.Member.Name == "" {
+						return // a recovered `ns.` — already a parse diagnostic
+					}
 					if q.resolveMember(fileID, m) == nil {
 						s := at(m)
 						ns, _ := m.Receiver.(*ast.Identifier)
@@ -307,14 +310,8 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 	// diagnostics carry offsets that shift on every edit), so the reporting
 	// pass re-resolves the declarations fresh and discards the definitions.
 	module.Types = q.typeDefs(fileID)
-	extern := make(map[string]*ir.TypeDef)
-	for name, b := range q.importsOf(fileID).types {
-		if !b.ambiguous {
-			extern[name] = b.target
-		}
-	}
-	resolveTypes(file, reg, at, diags, extern)
-	checkMethodBodies(file, reg, module.Types, exprSink(at, diags))
+	resolveTypes(file, reg, at, diags, externTypes(q.importsOf(fileID)))
+	checkMethodBodies(file, reg, module.Types, q.universe(fileID), exprSink(at, diags))
 
 	items := diags.Items()
 	sort.SliceStable(items, func(i, j int) bool { return items[i].Offset < items[j].Offset })

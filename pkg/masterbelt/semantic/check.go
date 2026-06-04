@@ -53,14 +53,10 @@ func checkDivByZero(e ast.Expr, env evalEnv, report func(node ast.Node)) {
 // resolveTypes, so defs are in file.Types order and each method lines up with
 // its resolved signature. The walk is the same checking walk the const path
 // uses (infer.CheckBody), so the declared result type reaches into a returned
-// function or collection literal.
-func checkMethodBodies(file *ast.File, reg *builtin.Registry, defs []*ir.TypeDef, sink *infer.Sink) {
-	universe := make(map[string]*ir.TypeDef, len(defs))
-	for _, d := range defs {
-		if d.Name != "" {
-			universe[d.Name] = d
-		}
-	}
+// function or collection literal. universe is the file's annotation universe —
+// its own definitions shadowing its imported ones — so a type conversion in a
+// body resolves an imported type exactly as an annotation does.
+func checkMethodBodies(file *ast.File, reg *builtin.Registry, defs []*ir.TypeDef, universe map[string]*ir.TypeDef, sink *infer.Sink) {
 	for i, td := range file.Types {
 		def := defs[i]
 		self := &ir.Named{Def: def}

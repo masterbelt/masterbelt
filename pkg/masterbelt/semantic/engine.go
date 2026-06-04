@@ -125,36 +125,49 @@ func newDatabase(reg *builtin.Registry) *database {
 }
 
 // setInput installs a new AST and resolved use targets for one file and opens
-// a new revision. Other files' inputs keep their change stamps, so queries
-// that read only them re-verify cheaply.
+// a new revision. An input that did not actually change (the same syntax tree,
+// the same use targets) is a no-op, keeping its change stamp — callers may
+// re-push a whole project after one file's edit, and the untouched siblings
+// must stay verifiable cheaply. Other files' inputs keep their change stamps
+// regardless, so queries that read only them re-verify cheaply.
 func (db *database) setInput(id FileID, file *ast.File, uses map[*ast.UseDecl]FileID) {
+	old, known := db.files[id]
+	if known && old.file == file && maps.Equal(old.uses, uses) {
+		return
+	}
 	db.revision++
 	db.files[id] = fileInput{file: file, uses: uses}
 	db.inputChangedAt[id] = db.revision
 	db.computed = map[queryKey]bool{}
-	db.reindexDecls()
+	db.rebindDecls(id, old.file, file)
 }
 
 // dropInput removes a file that has left the project and opens a new revision.
 func (db *database) dropInput(id FileID) {
+	old, known := db.files[id]
+	if !known {
+		return
+	}
 	db.revision++
 	delete(db.files, id)
 	delete(db.inputChangedAt, id)
 	db.computed = map[queryKey]bool{}
-	db.reindexDecls()
+	db.rebindDecls(id, old.file, nil)
 }
 
-// reindexDecls rebuilds the declaration-to-file index after an input change.
-// Unedited declarations keep their AST pointers, so entries are mostly
-// rewritten in place; the rebuild is linear in the program and never retains
-// declarations that have left the trees.
-func (db *database) reindexDecls() {
-	db.declFile = make(map[*ast.ConstDecl]FileID, len(db.declFile))
-	for id, in := range db.files {
-		if in.file == nil {
-			continue
+// rebindDecls updates the declaration-to-file index for one file's input
+// change: the old tree's declarations leave the index, the new tree's enter
+// it. Unedited declarations keep their AST pointers (the old and new trees
+// share them), so they are simply rewritten in place; other files' entries are
+// untouched.
+func (db *database) rebindDecls(id FileID, old, new *ast.File) {
+	if old != nil {
+		for _, d := range old.Decls {
+			delete(db.declFile, d)
 		}
-		for _, d := range in.file.Decls {
+	}
+	if new != nil {
+		for _, d := range new.Decls {
 			db.declFile[d] = id
 		}
 	}
@@ -230,10 +243,57 @@ func equalValue(kind queryKind, old, new any) bool {
 		a, _ := old.(ir.Type)
 		b, _ := new.(ir.Type)
 		return equalTypes(a, b)
+	case qValue:
+		a, _ := old.(*ir.Constant)
+		b, _ := new.(*ir.Constant)
+		return equalConstants(a, b)
 	default:
-		// Values (ir.Constant trees) carry no identity-bearing pointers;
-		// structural equality is the right cutoff for them.
 		return reflect.DeepEqual(old, new)
+	}
+}
+
+// equalConstants is constant equality for the cutoff: structural for the data
+// kinds, but a function value compares its literal by pointer — Constant.Fn is
+// an AST node, and like every other AST pointer in the engine the pointer is
+// the fact, so a structurally identical literal from a re-parsed file must
+// propagate rather than leave consumers holding a detached tree.
+func equalConstants(a, b *ir.Constant) bool {
+	if a == b {
+		return true
+	}
+	if a == nil || b == nil || a.Kind != b.Kind {
+		return false
+	}
+	switch a.Kind {
+	case ir.ConstInt:
+		return a.Int != nil && b.Int != nil && a.Int.Cmp(b.Int) == 0
+	case ir.ConstBool:
+		return a.Bool == b.Bool
+	case ir.ConstString:
+		return a.Str == b.Str
+	case ir.ConstCollection:
+		if len(a.Coll) != len(b.Coll) {
+			return false
+		}
+		for i := range a.Coll {
+			if !equalConstants(a.Coll[i].Key, b.Coll[i].Key) || !equalConstants(a.Coll[i].Value, b.Coll[i].Value) {
+				return false
+			}
+		}
+		return true
+	case ir.ConstFunc:
+		if a.Fn != b.Fn || len(a.Captured) != len(b.Captured) {
+			return false
+		}
+		for name, v := range a.Captured {
+			w, ok := b.Captured[name]
+			if !ok || !equalConstants(v, w) {
+				return false
+			}
+		}
+		return true
+	default:
+		return false
 	}
 }
 

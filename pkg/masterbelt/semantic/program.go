@@ -18,7 +18,6 @@ import (
 type Program struct {
 	db      *database
 	docs    map[FileID]*abstract.Document
-	uses    map[FileID]map[*ast.UseDecl]FileID
 	modules map[FileID]*ir.Module
 	diags   map[FileID][]diagnostic.Diagnostic
 	shells  map[*ast.ConstDecl]*ir.Const
@@ -30,7 +29,6 @@ func NewProgram() *Program {
 	return &Program{
 		db:      newDatabase(universe()),
 		docs:    map[FileID]*abstract.Document{},
-		uses:    map[FileID]map[*ast.UseDecl]FileID{},
 		modules: map[FileID]*ir.Module{},
 		diags:   map[FileID][]diagnostic.Diagnostic{},
 	}
@@ -41,14 +39,12 @@ func NewProgram() *Program {
 // changes to re-analyze.
 func (p *Program) SetFile(id FileID, doc *abstract.Document, uses map[*ast.UseDecl]FileID) {
 	p.docs[id] = doc
-	p.uses[id] = uses
 	p.db.setInput(id, doc.File(), uses)
 }
 
 // RemoveFile drops a file that left the project.
 func (p *Program) RemoveFile(id FileID) {
 	delete(p.docs, id)
-	delete(p.uses, id)
 	delete(p.modules, id)
 	delete(p.diags, id)
 	p.db.dropInput(id)
@@ -103,6 +99,19 @@ func (p *Program) Resolve(file FileID, id *ast.Identifier) *ir.Const {
 func (p *Program) ResolveMember(file FileID, m *ast.MemberExpr) *ir.Const {
 	q := engineQueries{p.db}
 	return p.shells[q.resolveMember(file, m)]
+}
+
+// ResolveUseName returns the constant a selective-import name in one of file's
+// use declarations binds (use { Origin } from ...), or nil when the use is
+// unresolved or the target exports no such value. It is how the editor treats
+// an import-list name as one more occurrence of the constant it imports.
+func (p *Program) ResolveUseName(file FileID, u *ast.UseDecl, name string) *ir.Const {
+	q := engineQueries{p.db}
+	target, ok := q.usesOf(file)[u]
+	if !ok {
+		return nil
+	}
+	return p.shells[q.exportsOf(target).consts[name]]
 }
 
 // FileOf returns the file a constant of the last Refresh is declared in.
