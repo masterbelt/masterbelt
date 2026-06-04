@@ -3,7 +3,7 @@ package concrete
 import (
 	"sort"
 
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/diagnostic"
+	"github.com/masterbelt/masterbelt/pkg/diagnostic"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/lexer"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/cst"

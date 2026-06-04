@@ -3,7 +3,7 @@ package lsp
 import (
 	"sort"
 
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/diagnostic"
+	"github.com/masterbelt/masterbelt/pkg/diagnostic"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/parser/abstract"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/semantic"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source"

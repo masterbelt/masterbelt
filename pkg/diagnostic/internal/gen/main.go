@@ -33,7 +33,15 @@ import (
 )
 
 const (
-	modulePrefix  = "github.com/masterbelt/masterbelt/pkg/masterbelt"
+	// diagnosticPkg is the import path of the diagnostic package itself, which
+	// every generated constructor file imports.
+	diagnosticPkg = "github.com/masterbelt/masterbelt/pkg/diagnostic"
+	// ownerPrefix is the import-path prefix of the packages that own the
+	// generated diagnostic_gen.go files; ownerDir is the same location on disk,
+	// relative to this (the diagnostic) package, where those files are written.
+	ownerPrefix = "github.com/masterbelt/masterbelt/pkg/masterbelt"
+	ownerDir    = "../masterbelt"
+
 	defaultLocale = "en"
 )
 
@@ -150,8 +158,8 @@ func readCodes(path string) ([]codeDef, error) {
 			severity:  sevConst,
 			fields:    fields,
 			pkgName:   pkgParts[len(pkgParts)-1],
-			pkgImport: modulePrefix + "/" + strings.Join(pkgParts[1:], "/"),
-			relDir:    filepath.Join(append([]string{".."}, pkgParts[1:]...)...),
+			pkgImport: ownerPrefix + "/" + strings.Join(pkgParts[1:], "/"),
+			relDir:    filepath.Join(append([]string{ownerDir}, pkgParts[1:]...)...),
 			constName: "Code" + camel(name),
 			ctorName:  "new" + camel(name) + "Diagnostic",
 		})
@@ -269,7 +277,7 @@ func generatePackage(defs []codeDef) ([]byte, error) {
 	if needsFmt {
 		b.WriteString("\t\"fmt\"\n\n")
 	}
-	fmt.Fprintf(&b, "\t%q\n", modulePrefix+"/diagnostic")
+	fmt.Fprintf(&b, "\t%q\n", diagnosticPkg)
 	b.WriteString(")\n\n")
 
 	b.WriteString("const (\n")

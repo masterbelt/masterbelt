@@ -5,7 +5,7 @@ package concrete
 import (
 	"fmt"
 
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/diagnostic"
+	"github.com/masterbelt/masterbelt/pkg/diagnostic"
 )
 
 const (
