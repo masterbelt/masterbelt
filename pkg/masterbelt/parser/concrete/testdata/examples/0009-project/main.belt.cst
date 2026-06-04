@@ -3,15 +3,15 @@ File
   Error
     LineComment "// The project entry point: pulls geometry.belt in by namespace and by name."
     Newline "\n"
-    Ident "use"
+    Use "use"
     Whitespace " "
     Ident "geo"
     Whitespace " "
-    Ident "from"
+    From "from"
     Whitespace " "
     String "\"geometry.belt\""
     Newline "\n"
-    Ident "use"
+    Use "use"
     Whitespace " "
     LBrace "{"
     Whitespace " "
@@ -19,7 +19,7 @@ File
     Whitespace " "
     RBrace "}"
     Whitespace " "
-    Ident "from"
+    From "from"
     Whitespace " "
     String "\"geometry.belt\""
   ConstDecl
@@ -47,4 +47,4 @@ File
   Newline "\n"
   EOF ""
 # diagnostics
-error[masterbelt.parser.concrete.unexpected_token] 2:1 unexpected token: Ident
+error[masterbelt.parser.concrete.unexpected_token] 2:1 unexpected token: Use

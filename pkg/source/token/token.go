@@ -40,6 +40,8 @@ const (
 	Null    // null
 	Extern  // extern
 	Builtin // builtin
+	Use     // use
+	From    // from
 
 	// Operators and punctuation.
 	Colon    // :
@@ -96,6 +98,8 @@ var kindNames = [...]string{
 	Null:         "Null",
 	Extern:       "Extern",
 	Builtin:      "Builtin",
+	Use:          "Use",
+	From:         "From",
 	Colon:        "Colon",
 	Assign:       "Assign",
 	Plus:         "Plus",
@@ -187,6 +191,8 @@ var keywords = map[string]Kind{
 	"null":    Null,
 	"extern":  Extern,
 	"builtin": Builtin,
+	"use":     Use,
+	"from":    From,
 }
 
 // Lookup returns the keyword Kind for ident, or Ident if it is not a
