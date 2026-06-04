@@ -49,7 +49,7 @@
       "patterns": [
         {
           "name": "keyword.other.masterbelt",
-          "match": "\\b(const|pub)\\b"
+          "match": "\\b(builtin|const|extern|false|fn|impl|null|pub|return|self|true|type)\\b"
         }
       ]
     },
