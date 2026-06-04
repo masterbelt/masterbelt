@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/semantic"
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ir"
 	protocol "github.com/owenrumney/go-lsp/lsp"
 )
 
@@ -25,7 +26,7 @@ func inlayHints(doc *semantic.Document, startOff, endOff int) []protocol.InlayHi
 	for _, c := range doc.Module().Consts {
 		// An annotated constant already shows its type; one whose type is (or
 		// contains) an unsolved part has nothing useful to show.
-		if c.Syntax.Type != nil || containsInvalid(c.Type) {
+		if c.Syntax.Type != nil || ir.HasInvalid(c.Type) {
 			continue
 		}
 		declTree, ok := trees[c.Syntax.Syntax()]

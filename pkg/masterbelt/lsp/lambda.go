@@ -187,42 +187,6 @@ func litParams(lit cst.Tree) ([]cst.Tree, int) {
 	return nil, -1
 }
 
-// containsInvalid reports whether t is — or contains — the invalid type, i.e.
-// some part of it never resolved. A hint rendering "invalid" would only
-// restate the diagnostic.
-func containsInvalid(t ir.Type) bool {
-	switch t := t.(type) {
-	case *ir.App:
-		for _, a := range t.Args {
-			if containsInvalid(a) {
-				return true
-			}
-		}
-	case *ir.Func:
-		for _, p := range t.Params {
-			if containsInvalid(p) {
-				return true
-			}
-		}
-		return containsInvalid(t.Result)
-	case *ir.Union:
-		for _, m := range t.Members {
-			if containsInvalid(m) {
-				return true
-			}
-		}
-	case *ir.Record:
-		for _, f := range t.Fields {
-			if containsInvalid(f.Type) {
-				return true
-			}
-		}
-	default:
-		return t == ir.Invalid
-	}
-	return false
-}
-
 // identAt returns the positioned identifier token at offset whose parent is a
 // name reference or a parameter — the two positions where an identifier
 // denotes a value — together with its text.

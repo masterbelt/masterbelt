@@ -41,6 +41,43 @@ func (*invalid) String() string { return "invalid" }
 // value suffices and it can be compared with ==.
 var Invalid Type = &invalid{}
 
+// HasInvalid reports whether t is — or contains, anywhere in a composite —
+// the invalid type: some part of it never resolved. Callers use it to keep a
+// poisoned type from flowing on (the checker) or from being rendered (the
+// editor's hints).
+func HasInvalid(t Type) bool {
+	switch t := t.(type) {
+	case *App:
+		for _, a := range t.Args {
+			if HasInvalid(a) {
+				return true
+			}
+		}
+	case *Func:
+		for _, p := range t.Params {
+			if HasInvalid(p) {
+				return true
+			}
+		}
+		return HasInvalid(t.Result)
+	case *Union:
+		for _, m := range t.Members {
+			if HasInvalid(m) {
+				return true
+			}
+		}
+	case *Record:
+		for _, f := range t.Fields {
+			if HasInvalid(f.Type) {
+				return true
+			}
+		}
+	default:
+		return t == Invalid
+	}
+	return false
+}
+
 // --- declared and composite types -------------------------------------------
 
 // Named is a reference to a declared type (Coin, Level, ...): a resolved pointer

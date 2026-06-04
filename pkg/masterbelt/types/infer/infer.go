@@ -784,7 +784,7 @@ func callType(e *ast.CallExpr, s scope, sink *Sink) ir.Type {
 		pt := types.Substitute(m.Params[i].Type, subst)
 		litFailed := false
 		args[i] = checkType(lit, pt, s, subst, observe(sink, &litFailed))
-		if litFailed || hasInvalid(args[i]) {
+		if litFailed || ir.HasInvalid(args[i]) {
 			bad = true
 		}
 	}
@@ -839,42 +839,6 @@ func observe(sink *Sink, fired *bool) *Sink {
 			sink.solvedFuncLit(lit, t)
 		},
 	}
-}
-
-// hasInvalid reports whether t contains the invalid type anywhere — a part of
-// the expression's type that some failure already poisoned. A type variable is
-// not invalid (a variable surviving to a call's result is hasTypeVar's case).
-func hasInvalid(t ir.Type) bool {
-	switch t := t.(type) {
-	case *ir.App:
-		for _, a := range t.Args {
-			if hasInvalid(a) {
-				return true
-			}
-		}
-	case *ir.Func:
-		for _, p := range t.Params {
-			if hasInvalid(p) {
-				return true
-			}
-		}
-		return hasInvalid(t.Result)
-	case *ir.Union:
-		for _, m := range t.Members {
-			if hasInvalid(m) {
-				return true
-			}
-		}
-	case *ir.Record:
-		for _, f := range t.Fields {
-			if hasInvalid(f.Type) {
-				return true
-			}
-		}
-	default:
-		return t == ir.Invalid
-	}
-	return false
 }
 
 // checkFuncLit checks a function literal with no expected type: its body is

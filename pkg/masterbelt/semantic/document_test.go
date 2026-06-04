@@ -2,6 +2,7 @@ package semantic
 
 import (
 	"math/rand"
+	"sort"
 	"strings"
 	"testing"
 
@@ -114,6 +115,26 @@ func TestDocumentFuzz(t *testing.T) {
 		content = naiveSplice(content, s, e, repl)
 		doc.Edit(edit)
 		assertMatchesReference(t, doc, content)
+	}
+}
+
+// TestFuncLitTypes checks the editor-facing query over all three paths the
+// assembler distinguishes: a call-typed literal (un-annotated const), an
+// annotation-typed literal, and one typed by a method's declared result.
+func TestFuncLitTypes(t *testing.T) {
+	src := "const Doubled = [1, 2].map(fn(x) { return x * 2 })\n" +
+		"const Twice: fn(x: int): int = fn(x) { return x * 2 }\n" +
+		"pub type T = int8 impl {\n  pub f(): fn(x: bool): bool {\n    return fn(b) { return b }\n  }\n}\n"
+	doc := NewDocument([]byte(src))
+
+	var got []string
+	for _, ft := range doc.FuncLitTypes() {
+		got = append(got, ft.String())
+	}
+	sort.Strings(got)
+	want := "fn(bool): bool|fn(int): int|fn(int): int"
+	if strings.Join(got, "|") != want {
+		t.Fatalf("FuncLitTypes = %v, want %s", got, want)
 	}
 }
 
