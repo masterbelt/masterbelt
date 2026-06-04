@@ -349,6 +349,11 @@ type Sink struct {
 	// UninferableResult fires at a function literal that neither annotates its
 	// result type nor returns a value to infer it from.
 	UninferableResult func(lit *ast.FuncLit)
+	// SolvedFuncLit fires for every function literal the walk types, with its
+	// settled signature — annotations, pushed-down expectations, and inferred
+	// parts combined. It is informational (the editor's hover and inlay hints
+	// read it), never a finding.
+	SolvedFuncLit func(lit *ast.FuncLit, t *ir.Func)
 }
 
 func (s *Sink) invalidOp(node ast.Node, method, operands string) {
@@ -384,6 +389,12 @@ func (s *Sink) uninferableParam(p *ast.ParamDef) {
 func (s *Sink) uninferableResult(lit *ast.FuncLit) {
 	if s != nil && s.UninferableResult != nil {
 		s.UninferableResult(lit)
+	}
+}
+
+func (s *Sink) solvedFuncLit(lit *ast.FuncLit, t *ir.Func) {
+	if s != nil && s.SolvedFuncLit != nil {
+		s.SolvedFuncLit(lit, t)
 	}
 }
 
@@ -565,7 +576,9 @@ func checkFuncLitAgainst(lit *ast.FuncLit, want *ir.Func, s scope, subst map[str
 			result = ir.Invalid
 		}
 	}
-	return &ir.Func{Params: params, Result: result}
+	t := &ir.Func{Params: params, Result: result}
+	sink.solvedFuncLit(lit, t)
+	return t
 }
 
 // conflicts reports whether a written annotation disagrees with the expected
@@ -822,6 +835,9 @@ func observe(sink *Sink, fired *bool) *Sink {
 			*fired = true
 			sink.uninferableResult(lit)
 		},
+		SolvedFuncLit: func(lit *ast.FuncLit, t *ir.Func) {
+			sink.solvedFuncLit(lit, t)
+		},
 	}
 }
 
@@ -897,7 +913,9 @@ func checkFuncLit(lit *ast.FuncLit, s scope, sink *Sink) ir.Type {
 			result = ir.Invalid
 		}
 	}
-	return &ir.Func{Params: params, Result: result}
+	t := &ir.Func{Params: params, Result: result}
+	sink.solvedFuncLit(lit, t)
+	return t
 }
 
 // typesList renders the receiver and argument types as "recv, arg, ..." for the

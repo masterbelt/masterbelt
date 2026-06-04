@@ -13,12 +13,13 @@ import (
 // hover returns documentation and type information for the symbol at offset:
 // hovering a declaration's name describes that constant; hovering a value
 // reference (including one nested in an expression) describes the constant it
-// resolves to.
+// resolves to; hovering a function-literal parameter — its declaration or a
+// use in the body — shows its (possibly inferred) type.
 func hover(doc *semantic.Document, offset int) *protocol.Hover {
 	trees := positionedTrees(doc.AST().Concrete().Tree())
 	occ, ok := occurrenceAt(doc, offset, trees)
 	if !ok {
-		return nil
+		return lambdaParamHover(doc, offset, trees)
 	}
 	return constHover(occ.target, doc.Buffer(), occ.token)
 }

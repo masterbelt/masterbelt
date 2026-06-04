@@ -6,6 +6,7 @@ import (
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ir"
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/types/infer"
 )
 
 // Document is an incrementally analyzed program. It layers the query engine over
@@ -80,6 +81,41 @@ func (d *Document) TypeNames() []*ir.TypeDef {
 		seen[def.Name] = true
 		out = append(out, def)
 	}
+	return out
+}
+
+// FuncLitTypes returns the settled signature of every function literal in the
+// document — annotations, pushed-down expectations, and inferred parts
+// combined, exactly as the checking walk settles them. It is what the editor
+// reads to hover a lambda parameter or render its inlay hint. The walk reads
+// through the engine, so it reuses the memoized resolution and types of the
+// last analysis.
+func (d *Document) FuncLitTypes() map[*ast.FuncLit]*ir.Func {
+	out := map[*ast.FuncLit]*ir.Func{}
+	sink := &infer.Sink{SolvedFuncLit: func(lit *ast.FuncLit, t *ir.Func) { out[lit] = t }}
+
+	q := engineQueries{d.db}
+	env := typeEnv{q}
+	reg := q.registry()
+	file := d.ast.File()
+	for _, decl := range file.Decls {
+		if decl.Value == nil {
+			continue
+		}
+		// The same annotated/un-annotated split assemble makes, with the
+		// annotation resolved silently (its problems are already diagnosed).
+		annType := ir.Invalid
+		if decl.Type != nil {
+			r := &infer.TypeResolver{Reg: reg}
+			annType = r.ResolveType(decl.Type, nil)
+		}
+		if annType != ir.Invalid {
+			infer.CheckAgainst(decl.Value, annType, env, sink)
+		} else {
+			infer.Check(decl.Value, env, sink)
+		}
+	}
+	checkMethodBodies(file, reg, d.module.Types, sink)
 	return out
 }
 

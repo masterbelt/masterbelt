@@ -43,6 +43,45 @@ func TestHover(t *testing.T) {
 	})
 }
 
+func TestLambdaParamHover(t *testing.T) {
+	src := "const Doubled = [1, 2].map(fn(x) { return x * 2 })\n"
+	doc := semantic.NewDocument([]byte(src))
+
+	t.Run("parameter declaration", func(t *testing.T) {
+		h := hover(doc, strings.Index(src, "x)")) // the x in fn(x)
+		if h == nil {
+			t.Fatal("no hover on the lambda parameter")
+		}
+		if !strings.Contains(h.Contents.Value, "x: int") {
+			t.Errorf("hover = %q, want the inferred x: int", h.Contents.Value)
+		}
+	})
+
+	t.Run("use in the body", func(t *testing.T) {
+		h := hover(doc, strings.Index(src, "x * 2")) // the x in return x * 2
+		if h == nil {
+			t.Fatal("no hover on the parameter use")
+		}
+		if !strings.Contains(h.Contents.Value, "x: int") {
+			t.Errorf("hover = %q, want the inferred x: int", h.Contents.Value)
+		}
+	})
+
+	t.Run("nested literal shadows", func(t *testing.T) {
+		// The outer x is int, the inner x is bool (pushed in from the
+		// annotation); the innermost scope wins for the body use.
+		nested := "const F: fn(x: int): fn(x: bool): bool = fn(x) { return fn(x) { return x } }\n"
+		ndoc := semantic.NewDocument([]byte(nested))
+		h := hover(ndoc, strings.LastIndex(nested, "x }")) // the inner return x
+		if h == nil {
+			t.Fatal("no hover on the nested parameter use")
+		}
+		if !strings.Contains(h.Contents.Value, "x: bool") {
+			t.Errorf("hover = %q, want the inner x: bool", h.Contents.Value)
+		}
+	})
+}
+
 func TestDefinition(t *testing.T) {
 	doc := semantic.NewDocument([]byte(hoverSrc))
 	uri := protocol.DocumentURI("file:///x.belt")

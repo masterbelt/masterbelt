@@ -54,6 +54,81 @@ func TestInlayHints(t *testing.T) {
 	}
 }
 
+// hintLabels decodes the hints' labels, in order.
+func hintLabels(t *testing.T, hints []protocol.InlayHint) []string {
+	t.Helper()
+	labels := make([]string, len(hints))
+	for i, h := range hints {
+		if err := json.Unmarshal(h.Label, &labels[i]); err != nil {
+			t.Fatalf("hint %d label is not a JSON string: %v", i, err)
+		}
+	}
+	return labels
+}
+
+func TestLambdaInlayHints(t *testing.T) {
+	// The lambda's parameter and result types are solved from map's signature
+	// and the body; the hints render them where the annotations would sit.
+	src := "const Doubled = [1, 2].map(fn(x) { return x * 2 })\n"
+	doc := semantic.NewDocument([]byte(src))
+	hints := inlayHints(doc, 0, doc.Buffer().Len())
+
+	labels := hintLabels(t, hints)
+	want := []string{": list<int>", ": int", ": int"} // Doubled, x, the result
+	if strings.Join(labels, "|") != strings.Join(want, "|") {
+		t.Fatalf("hint labels = %v, want %v", labels, want)
+	}
+	// The parameter hint sits just after x; the result hint just after ")".
+	xEnd := strings.Index(src, "x)") + 1
+	if at := hints[1].Position.Character; at != xEnd {
+		t.Errorf("parameter hint at char %d, want %d", at, xEnd)
+	}
+	parenEnd := strings.Index(src, ") {") + 1
+	if at := hints[2].Position.Character; at != parenEnd {
+		t.Errorf("result hint at char %d, want %d", at, parenEnd)
+	}
+}
+
+func TestLambdaInlayHintsSkipWritten(t *testing.T) {
+	// Written annotations already show themselves: only the inferred result
+	// gets a hint here.
+	src := "const Tripled = [1, 2].map(fn(x: int) { return x * 3 })\n"
+	doc := semantic.NewDocument([]byte(src))
+	labels := hintLabels(t, inlayHints(doc, 0, doc.Buffer().Len()))
+	want := []string{": list<int>", ": int"} // Tripled and the result; x is written
+	if strings.Join(labels, "|") != strings.Join(want, "|") {
+		t.Fatalf("hint labels = %v, want %v", labels, want)
+	}
+
+	// A fully annotated literal needs no lambda hints at all.
+	src = "const Twice: fn(x: int): int = fn(x: int): int { return x * 2 }\n"
+	doc = semantic.NewDocument([]byte(src))
+	if hints := inlayHints(doc, 0, doc.Buffer().Len()); len(hints) != 0 {
+		t.Fatalf("got %d hints, want none (everything is written)", len(hints))
+	}
+}
+
+func TestLambdaInlayHintsInMethodBody(t *testing.T) {
+	// The method's declared result type reaches the returned literal, so its
+	// parameter and result infer and get hints.
+	src := "pub type T = int8 impl {\n  pub f(): fn(x: int): int {\n    return fn(x) { return x }\n  }\n}\n"
+	doc := semantic.NewDocument([]byte(src))
+	labels := hintLabels(t, inlayHints(doc, 0, doc.Buffer().Len()))
+	want := []string{": int", ": int"} // the literal's x and result
+	if strings.Join(labels, "|") != strings.Join(want, "|") {
+		t.Fatalf("hint labels = %v, want %v", labels, want)
+	}
+}
+
+func TestLambdaInlayHintsSkipUninferable(t *testing.T) {
+	// An unsolvable signature renders no hint (the diagnostics carry the news).
+	src := "const A = fn(x) { return x }\n"
+	doc := semantic.NewDocument([]byte(src))
+	if hints := inlayHints(doc, 0, doc.Buffer().Len()); len(hints) != 0 {
+		t.Fatalf("got %d hints, want none (nothing is solved)", len(hints))
+	}
+}
+
 func TestCodeActionAddsTypeAnnotation(t *testing.T) {
 	doc := semantic.NewDocument([]byte("const A = 1\n"))
 	uri := protocol.DocumentURI("file:///x.belt")
