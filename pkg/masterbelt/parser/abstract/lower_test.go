@@ -76,6 +76,13 @@ func TestLowerExpressions(t *testing.T) {
 		{"const x = false\n", `BoolLit false`},
 		{"const x = 1 <= 2\n", `(call (. IntLit "1" lteq) IntLit "2")`},
 		{"const x = 1 +\n", `(call (. IntLit "1" add))`}, // recovered: right operand absent
+		// String literals are decoded at lowering: quotes dropped, escapes
+		// interpreted (so the dump shows the value, which %q then re-quotes).
+		{"const x = \"hi\"\n", `StringLit "hi"`},
+		{"const x = \"a\\tb\\n\"\n", `StringLit "a\tb\n"`},
+		{"const x = \"say \\\"hi\\\"\"\n", `StringLit "say \"hi\""`},
+		{"const x = \"\\u{1F389}\"\n", `StringLit "🎉"`},
+		{"const x = \"a\" == \"b\"\n", `(call (. StringLit "a" eql) StringLit "b")`},
 	}
 	for _, tc := range cases {
 		if got := valueLine(t, tc.src); got != tc.want {

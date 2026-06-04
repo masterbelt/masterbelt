@@ -15,6 +15,7 @@
 package abstract
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/diagnostic"
@@ -187,12 +188,14 @@ func desugarCall(receiver ast.Expr, method string, args []ast.Expr, node *cst.No
 	return ast.NewCallExpr(member, args, node)
 }
 
-// lowerLiteral lowers a Literal node (its single Int/True/False leaf) to the
-// matching literal expression.
+// lowerLiteral lowers a Literal node (its single Int/String/True/False/Null
+// leaf) to the matching literal expression.
 func lowerLiteral(t cst.Tree, buf source.Buffer, node *cst.Node) ast.Expr {
 	switch literalKind(t) {
 	case token.Int:
 		return ast.NewIntLit(t.Text(buf), node)
+	case token.String:
+		return ast.NewStringLit(decodeString(t.Text(buf)), node)
 	case token.True:
 		return ast.NewBoolLit(true, node)
 	case token.False:
@@ -202,6 +205,93 @@ func lowerLiteral(t cst.Tree, buf source.Buffer, node *cst.Node) ast.Expr {
 	default:
 		return nil
 	}
+}
+
+// decodeString turns a string literal's raw source text (with the surrounding
+// quotes) into its value, interpreting the escapes the lexer recognizes: the
+// simple ones (\n \r \t \0 \\ \") and the unicode escape \u{...}. The lexer has
+// already reported any malformed escape, so a bad one here is decoded
+// best-effort (the backslash is dropped) rather than reported a second time; raw
+// multi-byte UTF-8 is copied through verbatim.
+func decodeString(raw string) string {
+	// Drop the surrounding quotes. An unterminated literal may lack the closing
+	// one, so strip each end only when present.
+	body := raw
+	if len(body) > 0 && body[0] == '"' {
+		body = body[1:]
+	}
+	if len(body) > 0 && body[len(body)-1] == '"' {
+		body = body[:len(body)-1]
+	}
+
+	var b strings.Builder
+	for i := 0; i < len(body); {
+		c := body[i]
+		if c != '\\' {
+			b.WriteByte(c) // ordinary byte, including a UTF-8 continuation byte
+			i++
+			continue
+		}
+		i++ // consume the backslash
+		if i >= len(body) {
+			break // a trailing backslash (only reachable for an unterminated literal)
+		}
+		switch body[i] {
+		case 'n':
+			b.WriteByte('\n')
+			i++
+		case 'r':
+			b.WriteByte('\r')
+			i++
+		case 't':
+			b.WriteByte('\t')
+			i++
+		case '0':
+			b.WriteByte(0)
+			i++
+		case '\\':
+			b.WriteByte('\\')
+			i++
+		case '"':
+			b.WriteByte('"')
+			i++
+		case 'u':
+			i++ // consume the "u"
+			if r, n, ok := decodeUnicodeEscape(body[i:]); ok {
+				b.WriteRune(r)
+				i += n
+			}
+			// A malformed \u{...} was lexer-reported; drop it best-effort.
+		default:
+			// An unknown escape was lexer-reported; keep the escaped byte.
+			b.WriteByte(body[i])
+			i++
+		}
+	}
+	return b.String()
+}
+
+// decodeUnicodeEscape decodes the body of a \u{...} escape from the start of s
+// (which begins just after the "u", i.e. at the "{"). It returns the code point,
+// the number of bytes consumed (through the closing "}"), and whether s held a
+// well-formed escape.
+func decodeUnicodeEscape(s string) (r rune, n int, ok bool) {
+	if len(s) == 0 || s[0] != '{' {
+		return 0, 0, false
+	}
+	end := strings.IndexByte(s, '}')
+	if end < 0 {
+		return 0, 0, false
+	}
+	hex := s[1:end]
+	if len(hex) == 0 {
+		return 0, 0, false
+	}
+	v, err := strconv.ParseInt(hex, 16, 32)
+	if err != nil {
+		return 0, 0, false
+	}
+	return rune(v), end + 1, true
 }
 
 // lowerMemberExpr lowers an explicit member access, receiver.member, to an

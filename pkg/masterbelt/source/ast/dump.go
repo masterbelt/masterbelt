@@ -44,6 +44,8 @@ func dumpExpr(e Expr) string {
 		return "<missing>"
 	case *IntLit:
 		return fmt.Sprintf("IntLit %q", x.Text)
+	case *StringLit:
+		return fmt.Sprintf("StringLit %q", x.Value)
 	case *BoolLit:
 		return fmt.Sprintf("BoolLit %v", x.Value)
 	case *NullLit:

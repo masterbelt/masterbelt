@@ -2,9 +2,10 @@ package ast
 
 import "github.com/masterbelt/masterbelt/pkg/masterbelt/source/cst"
 
-// Expr is an initializer expression: a literal (IntLit/BoolLit), an identifier
-// (Identifier), a member access (MemberExpr), or a call (CallExpr). Operators
-// desugar to method calls — 1 + 2 becomes 1.add(2) — so no operator node here.
+// Expr is an initializer expression: a literal (IntLit/StringLit/BoolLit/
+// NullLit), an identifier (Identifier), a member access (MemberExpr), or a call
+// (CallExpr). Operators desugar to method calls — 1 + 2 becomes 1.add(2) — so no
+// operator node here.
 type Expr interface {
 	Node
 	expr()
@@ -24,6 +25,25 @@ func (l *IntLit) expr()             {}
 // NewIntLit builds an IntLit node.
 func NewIntLit(text string, syntax *cst.Node) *IntLit {
 	return &IntLit{Text: text, syntax: syntax}
+}
+
+// StringLit is a string literal. Value is the decoded string — the surrounding
+// quotes removed and the escape sequences (\n \r \t \0 \\ \" and \u{...})
+// interpreted — so it holds the literal's actual value rather than its source
+// spelling. (Contrast IntLit, which keeps its raw text because an integer's
+// representation depends on the type it flows into; a string's value does not.)
+type StringLit struct {
+	Value  string
+	syntax *cst.Node
+}
+
+func (l *StringLit) Syntax() *cst.Node { return l.syntax }
+func (l *StringLit) node()             {}
+func (l *StringLit) expr()             {}
+
+// NewStringLit builds a StringLit node.
+func NewStringLit(value string, syntax *cst.Node) *StringLit {
+	return &StringLit{Value: value, syntax: syntax}
 }
 
 // BoolLit is a boolean literal: true or false.
