@@ -6,6 +6,7 @@ import (
 
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/parser/abstract"
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/types"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/types/infer"
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
@@ -130,6 +131,14 @@ func (p *Program) ResolveUseType(file FileID, u *ast.UseDecl, name string) *ir.T
 		return nil
 	}
 	return q.exportsOf(target).types[name]
+}
+
+// BindMethod returns the method recv binds for name — through a named type,
+// a builtin, or a generic application — together with the substitution the
+// binding solved (a list<int> receiver pins the element parameter), or false
+// when the receiver has no such method.
+func (p *Program) BindMethod(recv ir.Type, name string) (*ir.Method, map[string]ir.Type, bool) {
+	return types.BindReceiver(p.db.reg, recv, name)
 }
 
 // FileOf returns the file a constant of the last Refresh is declared in.

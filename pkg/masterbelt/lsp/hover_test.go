@@ -326,3 +326,98 @@ func TestTypeHoverMethods(t *testing.T) {
 		}
 	}
 }
+
+func TestMethodHover(t *testing.T) {
+	src := "type Level = int8 impl {\n" +
+		"  /// the next level up\n" +
+		"  pub increment(): self {\n    return self\n  }\n" +
+		"}\n" +
+		"const l: Level = 1\n" +
+		"const n = l.increment()\n"
+	doc := testView(src)
+
+	t.Run("declaration name shows the signature and doc", func(t *testing.T) {
+		h := hover(doc, strings.Index(src, "pub increment")+6)
+		if h == nil {
+			t.Fatal("no hover on the method declaration")
+		}
+		for _, want := range []string{"pub increment(): self", "the next level up"} {
+			if !strings.Contains(h.Contents.Value, want) {
+				t.Errorf("hover = %q, want it to contain %q", h.Contents.Value, want)
+			}
+		}
+	})
+
+	t.Run("call site resolves through the receiver's type", func(t *testing.T) {
+		h := hover(doc, strings.Index(src, "l.increment")+4)
+		if h == nil {
+			t.Fatal("no hover on the call site")
+		}
+		for _, want := range []string{"pub increment(): self", "the next level up"} {
+			if !strings.Contains(h.Contents.Value, want) {
+				t.Errorf("hover = %q, want it to contain %q", h.Contents.Value, want)
+			}
+		}
+	})
+}
+
+func TestMethodHoverPrelude(t *testing.T) {
+	// A prelude method resolves through the builtin's definition, doc and all.
+	src := "const a = 1\nconst b = a.add(2)\n"
+	doc := testView(src)
+
+	h := hover(doc, strings.Index(src, "a.add")+3)
+	if h == nil {
+		t.Fatal("no hover on the prelude method")
+	}
+	for _, want := range []string{"pub extern add(other: self): self", "The + operator: the sum."} {
+		if !strings.Contains(h.Contents.Value, want) {
+			t.Errorf("hover = %q, want it to contain %q", h.Contents.Value, want)
+		}
+	}
+}
+
+func TestMethodHoverGenericSubstitution(t *testing.T) {
+	// The receiver's type arguments substitute into the signature: map on a
+	// list<int8> takes an int8 item.
+	src := "const xs: list<int8> = [1]\nconst ys = xs.map(fn(x) { return x })\n"
+	doc := testView(src)
+
+	h := hover(doc, strings.Index(src, "xs.map")+4)
+	if h == nil {
+		t.Fatal("no hover on map")
+	}
+	// The function type renders from the type algebra, which carries no
+	// parameter names: fn(int8), with the receiver's element substituted.
+	if !strings.Contains(h.Contents.Value, "map(func: fn(int8): R): list<R>") {
+		t.Errorf("hover = %q, want the substituted signature", h.Contents.Value)
+	}
+}
+
+func TestFieldHover(t *testing.T) {
+	src := "type Rec = {\n  id: int8\n  level: int16\n} impl {\n" +
+		"  get(): int8 {\n    return self.id\n  }\n" +
+		"}\n" +
+		"const r: Rec = 0\nconst sum = r.id\n"
+	doc := testView(src)
+
+	t.Run("self field access shows the field's type", func(t *testing.T) {
+		h := hover(doc, strings.Index(src, "self.id")+5)
+		if h == nil {
+			t.Fatal("no hover on the field access")
+		}
+		if !strings.Contains(h.Contents.Value, "id: int8") {
+			t.Errorf("hover = %q, want id: int8", h.Contents.Value)
+		}
+	})
+
+	t.Run("field access through a constant", func(t *testing.T) {
+		h := hover(doc, strings.Index(src, "r.id")+2)
+		if h == nil {
+			t.Fatal("no hover on the field access")
+		}
+		if !strings.Contains(h.Contents.Value, "id: int8") {
+			t.Errorf("hover = %q, want id: int8", h.Contents.Value)
+		}
+	})
+}

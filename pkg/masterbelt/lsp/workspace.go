@@ -82,6 +82,10 @@ func (v view) ResolveUseType(u *ast.UseDecl, name string) *ir.TypeDef {
 	return v.ws.prog.ResolveUseType(v.id, u, name)
 }
 
+func (v view) BindMethod(recv ir.Type, name string) (*ir.Method, map[string]ir.Type, bool) {
+	return v.ws.prog.BindMethod(recv, name)
+}
+
 func (v view) FuncLitTypes() map[*ast.FuncLit]*ir.Func { return v.ws.prog.FuncLitTypes(v.id) }
 
 func (v view) Diagnostics() []diagnostic.Diagnostic { return v.ws.prog.Diagnostics(v.id) }
