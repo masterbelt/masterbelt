@@ -3,10 +3,11 @@
 //
 // The grammar is small and recursive-descent:
 //
-//	File          := ( ConstDecl | TypeDecl | UseDecl | Error )*
+//	File          := ( ConstDecl | TypeDecl | UseDecl | AssertDecl | Error )*
 //	ConstDecl     := [pub] const Ident [TypeClause] [Initializer]
 //	TypeDecl      := [pub] type Ident [GenericParams] "=" TypeExpr [ImplBlock]
 //	UseDecl       := [pub] use UseTarget from String
+//	AssertDecl    := assert Expr
 //	UseTarget     := Ident | UseList | "*"
 //	UseList       := "{" Ident ( "," Ident )* "}"
 //	GenericParams := "<" GenericParam ( "," GenericParam )* ">"
@@ -195,6 +196,8 @@ func (p *parser) nextChildren() (batch []cst.Green, done bool) {
 		default:
 			return []cst.Green{p.parseConstDecl(lead)}, false
 		}
+	case p.kind() == token.Assert:
+		return []cst.Green{p.parseAssertDecl(lead)}, false
 	default:
 		return []cst.Green{p.parseError(lead)}, false
 	}
@@ -220,15 +223,15 @@ func (p *parser) declKind() token.Kind {
 
 // parseError consumes a run of significant tokens that begin no declaration,
 // folding in the interleaving trivia, until the next declaration starter
-// (pub/const/type/use) or EOF. The trivia that precedes that stopping token is
-// left behind to become the next construct's leading trivia. A single
+// (pub/const/type/use/assert) or EOF. The trivia that precedes that stopping
+// token is left behind to become the next construct's leading trivia. A single
 // diagnostic is reported at the first offending token.
 func (p *parser) parseError(lead []cst.Green) *cst.Node {
 	children := lead
 	reported := false
 	for {
 		switch p.peekSignificant() {
-		case token.EOF, token.Pub, token.Const, token.Type, token.Use:
+		case token.EOF, token.Pub, token.Const, token.Type, token.Use, token.Assert:
 			return cst.NewNode(cst.Error, children)
 		}
 		p.skipTrivia(&children)

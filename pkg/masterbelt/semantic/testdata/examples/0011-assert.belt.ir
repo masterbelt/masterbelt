@@ -7,3 +7,7 @@ Module
     type int
     value IntLiteral "0"
     eval 0
+  Const "Enabled"
+    type bool
+    value BoolLiteral true
+    eval true

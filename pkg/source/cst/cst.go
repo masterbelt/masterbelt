@@ -73,6 +73,9 @@ const (
 	UseDecl // [pub] use ( Ident | UseList | "*" ) from String
 	UseList // "{" Ident ("," Ident)* "}"  (the selective-import list)
 
+	// Compile-time assertions.
+	AssertDecl // [doc] assert Expr
+
 	Error // a run of tokens that did not fit the grammar
 )
 
@@ -110,6 +113,7 @@ var kindNames = [...]string{
 	ReturnStmt:    "ReturnStmt",
 	UseDecl:       "UseDecl",
 	UseList:       "UseList",
+	AssertDecl:    "AssertDecl",
 	Error:         "Error",
 }
 

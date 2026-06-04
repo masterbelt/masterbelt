@@ -78,6 +78,13 @@ func TestParseLossless(t *testing.T) {
 		"const f = fn(x,)",           // trailing comma is not part of the grammar
 		"type F = fn(x: int,",        // truncated func type param list
 		"type L = int8 impl {\nm(x,", // truncated method param list
+		// Assert declarations.
+		"assert Max > Min\n",
+		"/// doc\nassert Max > Min\n",
+		"const X = 1\nassert X == 1\ntype T = int8\n", // interleaved with other decls
+		"assert\n",        // missing expression stays lossless
+		"assert 1 >\n",    // missing right operand stays lossless
+		"assert assert\n", // a keyword starts no expression (must not consume it)
 	}
 	for _, src := range cases {
 		assertLossless(t, src)
@@ -507,6 +514,80 @@ func TestParseUseDiagnostics(t *testing.T) {
 		{"name after comma", "use { a, } from \"x.belt\"\n", CodeExpectedIdentifier},
 		{"junk after star", "use * x from \"a.belt\"\n", CodeExpectedFrom},
 		{"unclosed list", "use { a from \"x.belt\"\n", CodeUnexpectedToken},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, diags := Parse([]byte(tc.src))
+			found := false
+			for _, d := range diags {
+				if d.Code == tc.code {
+					found = true
+				}
+			}
+			if !found {
+				t.Fatalf("src %q: want diagnostic %s, got %v", tc.src, tc.code, diags)
+			}
+			assertLossless(t, tc.src)
+		})
+	}
+}
+
+// TestParseAssertDeclForms checks well-formed assertions parse to an
+// AssertDecl whose only sub-node is the asserted expression.
+func TestParseAssertDeclForms(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+		expr cst.Kind
+	}{
+		{"name", "assert Enabled\n", cst.NameRef},
+		{"comparison", "assert MaxLevel > MinLevel\n", cst.BinaryExpr},
+		{"logical", "assert A == 1 && !B\n", cst.BinaryExpr},
+		{"documented", "/// the range is not empty\nassert Max > Min\n", cst.BinaryExpr},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			root, diags := Parse([]byte(tc.src))
+			if len(diags) != 0 {
+				t.Fatalf("unexpected diagnostics: %v", diags)
+			}
+			decl, ok := root.Children()[0].(*cst.Node)
+			if !ok || decl.Kind() != cst.AssertDecl {
+				t.Fatalf("first child = %v, want AssertDecl", root.Children()[0])
+			}
+			if kinds := subNodeKinds(decl); len(kinds) != 1 || kinds[0] != tc.expr {
+				t.Fatalf("decl sub-nodes = %v, want [%s]", kinds, tc.expr)
+			}
+			assertLossless(t, tc.src)
+		})
+	}
+}
+
+// TestParseAssertDeclFileShape checks assertions are recognised at the file
+// level and interleave with the other declaration forms.
+func TestParseAssertDeclFileShape(t *testing.T) {
+	root, diags := Parse([]byte("const X = 1\nassert X > 0\ntype Coin = int8\n"))
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	got := declKinds(root)
+	want := []string{"ConstDecl", "AssertDecl", "TypeDecl", "<Newline>", "<EOF>"}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("file children = %v, want %v", got, want)
+	}
+}
+
+// TestParseAssertDiagnostics checks local recovery for malformed assertions:
+// each case reports its specific diagnostic and stays lossless.
+func TestParseAssertDiagnostics(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+		code diagnostic.Code
+	}{
+		{"missing expr", "assert\n", CodeExpectedExpression},
+		{"missing expr before decl", "assert\nconst X = 1\n", CodeExpectedExpression},
+		{"missing rhs", "assert 1 >\n", CodeExpectedOperand},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

@@ -247,6 +247,30 @@ func (p *parser) parseUseList() *cst.Node {
 	return cst.NewNode(cst.UseList, children)
 }
 
+// --- assert declarations ------------------------------------------------------
+
+// parseAssertDecl parses a compile-time assertion, prepending the already-
+// collected leading trivia:
+//
+//	assert Expr
+//
+// An assertion has no name and no visibility (pub does not apply). As elsewhere
+// the expression is optional in the parse: a missing one records a diagnostic
+// and is simply absent from the tree.
+func (p *parser) parseAssertDecl(lead []cst.Green) *cst.Node {
+	children := lead
+	children = append(children, p.bump()) // "assert" (guaranteed by the dispatcher)
+
+	if startsExpr(p.peekSignificant()) {
+		p.skipTrivia(&children)
+		children = append(children, p.parseExpr(precLowest))
+	} else {
+		p.report(newExpectedExpressionDiagnostic(p.lastStart, 0))
+	}
+
+	return cst.NewNode(cst.AssertDecl, children)
+}
+
 // --- implementations and method bodies --------------------------------------
 
 // parseImplBlock parses an implementation block: impl "{" MethodDecl* "}". The

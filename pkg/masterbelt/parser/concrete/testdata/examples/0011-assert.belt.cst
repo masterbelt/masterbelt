@@ -21,58 +21,76 @@ File
       Whitespace " "
       Literal
         Int "0"
-  Error
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Enabled"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      Literal
+        True "true"
+  AssertDecl
     Newline "\n"
     Newline "\n"
     DocComment "/// The level range is not empty."
     Newline "\n"
     Assert "assert"
     Whitespace " "
-    Ident "MaxLevel"
-    Whitespace " "
-    Gt ">"
-    Whitespace " "
-    Ident "MinLevel"
+    BinaryExpr
+      NameRef
+        Ident "MaxLevel"
+      Whitespace " "
+      Gt ">"
+      Whitespace " "
+      NameRef
+        Ident "MinLevel"
+  AssertDecl
     Newline "\n"
     Assert "assert"
     Whitespace " "
-    Ident "MinLevel"
-    Whitespace " "
-    EqEq "=="
-    Whitespace " "
-    Int "0"
+    BinaryExpr
+      NameRef
+        Ident "MinLevel"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "0"
+  AssertDecl
     Newline "\n"
     Assert "assert"
     Whitespace " "
-    Ident "MaxLevel"
-    Whitespace " "
-    Minus "-"
-    Whitespace " "
-    Ident "MinLevel"
-    Whitespace " "
-    EqEq "=="
-    Whitespace " "
-    Int "100"
+    BinaryExpr
+      BinaryExpr
+        NameRef
+          Ident "MaxLevel"
+        Whitespace " "
+        Minus "-"
+        Whitespace " "
+        NameRef
+          Ident "MinLevel"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "100"
+  AssertDecl
     Newline "\n"
     Assert "assert"
     Whitespace " "
-    Ident "MaxLevel"
-    Whitespace " "
-    Gt ">"
-    Whitespace " "
-    Int "0"
-    Whitespace " "
-    AmpAmp "&&"
-    Whitespace " "
-    Bang "!"
-    LParen "("
-    Ident "MinLevel"
-    Whitespace " "
-    Gt ">"
-    Whitespace " "
-    Int "0"
-    RParen ")"
+    BinaryExpr
+      NameRef
+        Ident "Enabled"
+      Whitespace " "
+      AmpAmp "&&"
+      Whitespace " "
+      UnaryExpr
+        Bang "!"
+        Literal
+          False "false"
   Newline "\n"
   EOF ""
 # diagnostics
-error[masterbelt.parser.concrete.unexpected_token] 5:1 unexpected token: Assert

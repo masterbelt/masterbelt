@@ -5,3 +5,6 @@ File
   ConstDecl
     name "MinLevel"
     value IntLit "0"
+  ConstDecl
+    name "Enabled"
+    value BoolLit true
