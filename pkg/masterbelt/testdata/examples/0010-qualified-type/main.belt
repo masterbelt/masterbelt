@@ -1,0 +1,6 @@
+// Qualified type access: geo.Point names the sibling's exported type without
+// a selective import, in a direct annotation and inside a generic argument.
+use geo from "geometry.belt"
+
+const start: geo.Point = geo.Origin
+const path: list<geo.Point> = [geo.Origin, geo.Unit]

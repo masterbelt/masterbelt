@@ -1,0 +1,4 @@
+// The exporter: a public type and two public constants.
+pub type Point = int32
+pub const Origin = 0
+pub const Unit = 1

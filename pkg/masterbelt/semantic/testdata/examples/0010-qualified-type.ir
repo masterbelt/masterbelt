@@ -1,0 +1,20 @@
+# geometry.belt
+Module
+  Const "Origin" pub
+    type int
+    value IntLiteral "0"
+    eval 0
+  Const "Unit" pub
+    type int
+    value IntLiteral "1"
+    eval 1
+  TypeDef "Point" pub
+    body int32
+# main.belt
+Module
+  Const "start"
+    type invalid
+    value <none>
+  Const "path"
+    type list<invalid>
+    value <none>

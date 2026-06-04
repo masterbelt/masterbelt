@@ -1,0 +1,73 @@
+# tree
+File
+  UseDecl
+    LineComment "// Qualified type access: geo.Point names the sibling's exported type without"
+    Newline "\n"
+    LineComment "// a selective import, in a direct annotation and inside a generic argument."
+    Newline "\n"
+    Use "use"
+    Whitespace " "
+    Ident "geo"
+    Whitespace " "
+    From "from"
+    Whitespace " "
+    String "\"geometry.belt\""
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "start"
+    TypeClause
+      Colon ":"
+      Whitespace " "
+      TypeName
+        Ident "geo"
+  Error
+    Dot "."
+    Ident "Point"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    Ident "geo"
+    Dot "."
+    Ident "Origin"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "path"
+    TypeClause
+      Colon ":"
+      Whitespace " "
+      TypeName
+        Ident "list"
+        GenericArgs
+          Lt "<"
+          TypeName
+            Ident "geo"
+  Error
+    Dot "."
+    Ident "Point"
+    Gt ">"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    LBracket "["
+    Ident "geo"
+    Dot "."
+    Ident "Origin"
+    Comma ","
+    Whitespace " "
+    Ident "geo"
+    Dot "."
+    Ident "Unit"
+    RBracket "]"
+  Newline "\n"
+  EOF ""
+# diagnostics
+error[masterbelt.parser.concrete.expected_assign] 5:14 expected '='
+error[masterbelt.parser.concrete.unexpected_token] 5:17 unexpected token: Dot
+error[masterbelt.parser.concrete.expected_type] 6:18 expected type
+error[masterbelt.parser.concrete.expected_assign] 6:18 expected '='
+error[masterbelt.parser.concrete.unexpected_token] 6:21 unexpected token: Dot

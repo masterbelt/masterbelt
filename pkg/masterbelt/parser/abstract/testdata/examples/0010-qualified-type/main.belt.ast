@@ -1,0 +1,10 @@
+File
+  UseDecl
+    namespace "geo"
+    from "geometry.belt"
+  ConstDecl
+    name "start"
+    type geo
+  ConstDecl
+    name "path"
+    type list<geo>

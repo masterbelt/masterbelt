@@ -1,0 +1,13 @@
+File
+  ConstDecl
+    pub
+    name "Origin"
+    value IntLit "0"
+  ConstDecl
+    pub
+    name "Unit"
+    value IntLit "1"
+  TypeDecl
+    pub
+    name "Point"
+    body int32
