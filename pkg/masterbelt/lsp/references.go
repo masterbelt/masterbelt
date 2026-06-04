@@ -98,28 +98,16 @@ func occurrenceAt(doc view, offset int, trees map[cst.Green]cst.Tree) (occurrenc
 	return occurrence{}, false
 }
 
-// walkMemberExprs visits every member access in e, without descending into
-// function-literal bodies (mirroring ast.WalkValueIdents).
+// walkMemberExprs visits every member access in e — a thin filter over the
+// shared ast.WalkExprs traversal, so it can never drift from the walks name
+// resolution uses.
 func walkMemberExprs(e ast.Expr, fn func(*ast.MemberExpr)) {
-	switch e := e.(type) {
-	case *ast.MemberExpr:
-		walkMemberExprs(e.Receiver, fn)
-		fn(e)
-	case *ast.CallExpr:
-		walkMemberExprs(e.Callee, fn)
-		for _, a := range e.Arguments {
-			walkMemberExprs(a, fn)
+	ast.WalkExprs(e, func(e ast.Expr) bool {
+		if m, ok := e.(*ast.MemberExpr); ok {
+			fn(m)
 		}
-	case *ast.CollectionLit:
-		for _, entry := range e.Entries {
-			if entry.Key != nil {
-				walkMemberExprs(entry.Key, fn)
-			}
-			if entry.Value != nil {
-				walkMemberExprs(entry.Value, fn)
-			}
-		}
-	}
+		return true
+	})
 }
 
 // occurrencesOf returns every token that names target — its declaration name

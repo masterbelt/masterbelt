@@ -492,33 +492,21 @@ func computeReachable(q queries, from FileID) map[FileID]bool {
 // walkRefs visits the value references of an expression: every value-position
 // identifier through onIdent, except that a namespace member access
 // (geo.Origin) is one unit visited through onMember — its receiver names a
-// namespace, not a value. Like ast.WalkValueIdents it does not descend into a
-// FuncLit body (a lambda has its own parameter scope).
+// namespace, not a value, and is skipped. The namespace decision layers on
+// the shared ast.WalkExprs traversal, so the skeleton lives in one place.
 func walkRefs(fileID FileID, e ast.Expr, q queries, onIdent func(*ast.Identifier), onMember func(*ast.MemberExpr)) {
-	switch e := e.(type) {
-	case *ast.Identifier:
-		onIdent(e)
-	case *ast.MemberExpr:
-		if recv, ok := e.Receiver.(*ast.Identifier); ok && isNamespace(fileID, recv, q) {
-			onMember(e)
-			return
-		}
-		walkRefs(fileID, e.Receiver, q, onIdent, onMember)
-	case *ast.CallExpr:
-		walkRefs(fileID, e.Callee, q, onIdent, onMember)
-		for _, a := range e.Arguments {
-			walkRefs(fileID, a, q, onIdent, onMember)
-		}
-	case *ast.CollectionLit:
-		for _, entry := range e.Entries {
-			if entry.Key != nil {
-				walkRefs(fileID, entry.Key, q, onIdent, onMember)
-			}
-			if entry.Value != nil {
-				walkRefs(fileID, entry.Value, q, onIdent, onMember)
+	ast.WalkExprs(e, func(e ast.Expr) bool {
+		switch e := e.(type) {
+		case *ast.Identifier:
+			onIdent(e)
+		case *ast.MemberExpr:
+			if recv, ok := e.Receiver.(*ast.Identifier); ok && isNamespace(fileID, recv, q) {
+				onMember(e)
+				return false
 			}
 		}
-	}
+		return true
+	})
 }
 
 // isNamespace reports whether an identifier names a namespace import in its

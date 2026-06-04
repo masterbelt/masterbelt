@@ -197,33 +197,49 @@ func NewFuncLit(params []*ParamDef, result TypeExpr, body []Stmt, syntax *cst.No
 	return &FuncLit{Params: params, Result: result, Body: body, syntax: syntax}
 }
 
-// WalkValueIdents calls fn for every value-position identifier in e — the
-// operands of the expression — but not the member names operators desugared to
-// (those are method names, not references to declarations). It is how name
-// resolution and the editor reach the references inside an expression.
+// WalkExprs visits every expression node of e in pre-order — the node itself,
+// then its operands: a member access's receiver, a call's callee and
+// arguments, a collection's keys and values. The callback may return false to
+// skip a node's operands. It never descends into a FuncLit body: a lambda
+// introduces its own parameter scope, so its inner expressions are not part
+// of the enclosing expression's reference structure.
 //
-// It does not descend into a FuncLit body: a lambda introduces its own parameter
-// scope, so its identifiers are not all references to top-level declarations and
-// must not be reported as undefined here.
-func WalkValueIdents(e Expr, fn func(*Identifier)) {
+// This is the one traversal skeleton — name resolution and the editor's
+// occurrence walks all layer on it — so a new expression form is wired into
+// every walk by adding its operands here, exactly once.
+func WalkExprs(e Expr, fn func(Expr) bool) {
+	if e == nil || !fn(e) {
+		return
+	}
 	switch e := e.(type) {
-	case *Identifier:
-		fn(e)
 	case *MemberExpr:
-		WalkValueIdents(e.Receiver, fn)
+		WalkExprs(e.Receiver, fn)
 	case *CallExpr:
-		WalkValueIdents(e.Callee, fn)
+		WalkExprs(e.Callee, fn)
 		for _, a := range e.Arguments {
-			WalkValueIdents(a, fn)
+			WalkExprs(a, fn)
 		}
 	case *CollectionLit:
 		for _, entry := range e.Entries {
 			if entry.Key != nil {
-				WalkValueIdents(entry.Key, fn)
+				WalkExprs(entry.Key, fn)
 			}
 			if entry.Value != nil {
-				WalkValueIdents(entry.Value, fn)
+				WalkExprs(entry.Value, fn)
 			}
 		}
 	}
+}
+
+// WalkValueIdents calls fn for every value-position identifier in e — the
+// operands of the expression — but not the member names operators desugared to
+// (those are method names, not references to declarations). It is how name
+// resolution and the editor reach the references inside an expression.
+func WalkValueIdents(e Expr, fn func(*Identifier)) {
+	WalkExprs(e, func(e Expr) bool {
+		if id, ok := e.(*Identifier); ok {
+			fn(id)
+		}
+		return true
+	})
 }
