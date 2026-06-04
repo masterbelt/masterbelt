@@ -21,6 +21,9 @@ func Dump(f *File) string {
 	for _, d := range f.Types {
 		dumpTypeDecl(&b, d)
 	}
+	for _, d := range f.Asserts {
+		dumpAssertDecl(&b, d)
+	}
 	return b.String()
 }
 
@@ -57,6 +60,14 @@ func dumpConstDecl(b *strings.Builder, d *ConstDecl) {
 	if d.Value != nil {
 		fmt.Fprintf(b, "    value %s\n", dumpExpr(d.Value))
 	}
+}
+
+func dumpAssertDecl(b *strings.Builder, d *AssertDecl) {
+	b.WriteString("  AssertDecl\n")
+	for _, doc := range d.Doc {
+		fmt.Fprintf(b, "    doc %q\n", doc)
+	}
+	fmt.Fprintf(b, "    cond %s\n", dumpExpr(d.Cond))
 }
 
 func dumpExpr(e Expr) string {

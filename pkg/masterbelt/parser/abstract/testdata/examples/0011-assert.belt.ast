@@ -8,3 +8,12 @@ File
   ConstDecl
     name "Enabled"
     value BoolLit true
+  AssertDecl
+    doc "The level range is not empty."
+    cond (call (. Identifier "MaxLevel" gt) Identifier "MinLevel")
+  AssertDecl
+    cond (call (. Identifier "MinLevel" eql) IntLit "0")
+  AssertDecl
+    cond (call (. (call (. Identifier "MaxLevel" sub) Identifier "MinLevel") eql) IntLit "100")
+  AssertDecl
+    cond (call (. Identifier "Enabled" anan) (call (. BoolLit false not)))

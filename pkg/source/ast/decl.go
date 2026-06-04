@@ -2,14 +2,15 @@ package ast
 
 import "github.com/masterbelt/masterbelt/pkg/source/cst"
 
-// File is a whole source file: its use, constant, and type declarations in
-// source order. Trivia and any unparsable regions present in the CST are
-// dropped here.
+// File is a whole source file: its use, constant, type, and assert
+// declarations in source order. Trivia and any unparsable regions present in
+// the CST are dropped here.
 type File struct {
-	Uses   []*UseDecl
-	Decls  []*ConstDecl
-	Types  []*TypeDecl
-	syntax *cst.Node
+	Uses    []*UseDecl
+	Decls   []*ConstDecl
+	Types   []*TypeDecl
+	Asserts []*AssertDecl
+	syntax  *cst.Node
 }
 
 func (f *File) Syntax() *cst.Node { return f.syntax }
@@ -17,8 +18,8 @@ func (f *File) node()             {}
 
 // NewFile builds a File node. The constructors keep each node's syntax backlink
 // unexported while package parser/abstract populates it.
-func NewFile(uses []*UseDecl, decls []*ConstDecl, types []*TypeDecl, syntax *cst.Node) *File {
-	return &File{Uses: uses, Decls: decls, Types: types, syntax: syntax}
+func NewFile(uses []*UseDecl, decls []*ConstDecl, types []*TypeDecl, asserts []*AssertDecl, syntax *cst.Node) *File {
+	return &File{Uses: uses, Decls: decls, Types: types, Asserts: asserts, syntax: syntax}
 }
 
 // UseDecl is a cross-file import: an optional pub modifier (re-export the
@@ -66,4 +67,22 @@ func (d *ConstDecl) node()             {}
 // NewConstDecl builds a ConstDecl node.
 func NewConstDecl(doc []string, public bool, name string, typ TypeExpr, value Expr, syntax *cst.Node) *ConstDecl {
 	return &ConstDecl{Doc: doc, Public: public, Name: name, Type: typ, Value: value, syntax: syntax}
+}
+
+// AssertDecl is a compile-time assertion: an optional run of doc-comment lines
+// and the asserted Cond expression. An assertion declares no name and has no
+// visibility; it exists purely to be checked during analysis. Cond is nil when
+// the source omitted the expression (a recovered "assert").
+type AssertDecl struct {
+	Doc    []string // doc-comment lines ("///"), stripped of the marker
+	Cond   Expr     // the asserted expression, or nil if missing
+	syntax *cst.Node
+}
+
+func (d *AssertDecl) Syntax() *cst.Node { return d.syntax }
+func (d *AssertDecl) node()             {}
+
+// NewAssertDecl builds an AssertDecl node.
+func NewAssertDecl(doc []string, cond Expr, syntax *cst.Node) *AssertDecl {
+	return &AssertDecl{Doc: doc, Cond: cond, syntax: syntax}
 }

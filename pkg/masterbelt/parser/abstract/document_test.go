@@ -43,6 +43,9 @@ func TestDocumentScriptedEdits(t *testing.T) {
 		{"join two decls", "const x = 1\nconst y = 2\n", source.Edit{Start: 11, End: 12, NewText: nil}},
 		{"delete everything", "const x = 1\n", source.Edit{Start: 0, End: 12, NewText: nil}},
 		{"introduce junk", "const x = 1\n", source.Edit{Start: 0, End: 0, NewText: []byte("= =\n")}},
+		{"insert an assert", "const x = 1\n", source.Edit{Start: 12, End: 12, NewText: []byte("assert x > 0\n")}},
+		{"edit an assert", "const x = 1\nassert x > 0\n", source.Edit{Start: 23, End: 24, NewText: []byte("2")}},
+		{"remove assert expr", "const x = 1\nassert x > 0\n", source.Edit{Start: 18, End: 24, NewText: nil}},
 	}
 
 	for _, tc := range cases {
@@ -69,6 +72,20 @@ func TestDocumentReusesUneditedDecls(t *testing.T) {
 	}
 	if v, ok := d.File().Decls[2].Value.(*ast.IntLit); !ok || v.Text != "9" {
 		t.Fatalf("edited decl Value = %+v, want IntLit 9", d.File().Decls[2].Value)
+	}
+}
+
+func TestDocumentReusesUneditedAsserts(t *testing.T) {
+	// Editing the const after the assert must leave the assert's AST node
+	// reused by identity, like any other unedited declaration.
+	d := NewDocument([]byte("const a = 1\nassert a > 0\nconst b = 2\n"))
+	a0 := d.File().Asserts[0]
+
+	d.Edit(source.Edit{Start: 35, End: 36, NewText: []byte("9")}) // b's value 2 -> 9
+	assertMatchesFreshLower(t, d, []byte("const a = 1\nassert a > 0\nconst b = 9\n"))
+
+	if d.File().Asserts[0] != a0 {
+		t.Fatal("unedited assert was re-lowered; expected it to be reused")
 	}
 }
 

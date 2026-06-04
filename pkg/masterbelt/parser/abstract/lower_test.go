@@ -193,6 +193,43 @@ func TestLowerUseDeclMalformed(t *testing.T) {
 	}
 }
 
+func TestLowerAssertDecl(t *testing.T) {
+	file, diags := Lower([]byte("/// the range is not empty\nassert Max > Min\n"))
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if len(file.Asserts) != 1 {
+		t.Fatalf("got %d asserts, want 1", len(file.Asserts))
+	}
+	a := file.Asserts[0]
+	if len(a.Doc) != 1 || a.Doc[0] != "the range is not empty" {
+		t.Errorf("Doc = %q, want [the range is not empty]", a.Doc)
+	}
+	// The condition desugars like any expression: Max > Min is Max.gt(Min).
+	want := `cond (call (. Identifier "Max" gt) Identifier "Min")`
+	if got := ast.Dump(file); !strings.Contains(got, want) {
+		t.Errorf("dump = %s, want it to contain %s", got, want)
+	}
+	if a.Syntax() == nil {
+		t.Error("Syntax() = nil, want the backing CST node")
+	}
+}
+
+func TestLowerAssertDeclMalformed(t *testing.T) {
+	// A missing expression lowers to a nil Cond, not a panic; the decl is still
+	// present so the semantic layer can anchor diagnostics to it.
+	file, diags := Lower([]byte("assert\n"))
+	if len(diags) == 0 {
+		t.Fatal("expected a diagnostic for the missing expression")
+	}
+	if len(file.Asserts) != 1 {
+		t.Fatalf("got %d asserts, want 1", len(file.Asserts))
+	}
+	if a := file.Asserts[0]; a.Cond != nil {
+		t.Errorf("Cond = %+v, want nil", a.Cond)
+	}
+}
+
 func TestLowerSkipsNonDecls(t *testing.T) {
 	// A stray "= 1" forms an Error node in the CST; it must not appear as a decl.
 	file, diags := Lower([]byte("= 1\nconst X = 2\n"))

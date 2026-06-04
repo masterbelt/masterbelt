@@ -42,6 +42,7 @@ func lowerFile(root cst.Tree, buf source.Buffer) *ast.File {
 	var uses []*ast.UseDecl
 	var decls []*ast.ConstDecl
 	var types []*ast.TypeDecl
+	var asserts []*ast.AssertDecl
 	foreachDecl(root, func(child cst.Tree, green *cst.Node) {
 		switch green.Kind() {
 		case cst.UseDecl:
@@ -50,15 +51,18 @@ func lowerFile(root cst.Tree, buf source.Buffer) *ast.File {
 			decls = append(decls, lowerConstDecl(child, buf))
 		case cst.TypeDecl:
 			types = append(types, lowerTypeDecl(child, buf))
+		case cst.AssertDecl:
+			asserts = append(asserts, lowerAssertDecl(child, buf))
 		}
 	})
-	return ast.NewFile(uses, decls, types, rootNode)
+	return ast.NewFile(uses, decls, types, asserts, rootNode)
 }
 
 // foreachDecl calls fn for each top-level declaration child of root (a
-// UseDecl, ConstDecl, or TypeDecl), in source order, passing the positioned
-// child and its green node. Trivia tokens, the EOF leaf, and unparsable Error
-// regions are skipped: they have no place in the abstract tree.
+// UseDecl, ConstDecl, TypeDecl, or AssertDecl), in source order, passing the
+// positioned child and its green node. Trivia tokens, the EOF leaf, and
+// unparsable Error regions are skipped: they have no place in the abstract
+// tree.
 func foreachDecl(root cst.Tree, fn func(child cst.Tree, green *cst.Node)) {
 	for _, child := range root.Children() {
 		node, ok := child.Node()
@@ -66,7 +70,7 @@ func foreachDecl(root cst.Tree, fn func(child cst.Tree, green *cst.Node)) {
 			continue
 		}
 		switch node.Kind() {
-		case cst.UseDecl, cst.ConstDecl, cst.TypeDecl:
+		case cst.UseDecl, cst.ConstDecl, cst.TypeDecl, cst.AssertDecl:
 			fn(child, node)
 		}
 	}
@@ -164,6 +168,28 @@ func lowerConstDecl(t cst.Tree, buf source.Buffer) *ast.ConstDecl {
 	}
 
 	return ast.NewConstDecl(doc, public, name, typ, value, green)
+}
+
+// lowerAssertDecl lowers a positioned AssertDecl CST node into an
+// ast.AssertDecl: its doc-comment lines and the asserted expression, nil when
+// the expression is missing (a recovered "assert").
+func lowerAssertDecl(t cst.Tree, buf source.Buffer) *ast.AssertDecl {
+	green, _ := t.Node()
+
+	var doc []string
+	var cond ast.Expr
+	for _, child := range t.Children() {
+		if tok, ok := child.Token(); ok {
+			if tok.Kind() == token.DocComment {
+				doc = append(doc, docText(child.Text(buf)))
+			}
+			continue
+		}
+		if node, _ := child.Node(); isExprKind(node.Kind()) {
+			cond = lowerExpr(child, buf)
+		}
+	}
+	return ast.NewAssertDecl(doc, cond, green)
 }
 
 // lowerTypeClause lowers a ": Type" clause to its type expression, or nil when

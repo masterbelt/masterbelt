@@ -20,21 +20,23 @@ import (
 // The File is always identical to lowering the current concrete tree from
 // scratch.
 type Document struct {
-	cst       *concrete.Document
-	file      *ast.File
-	cache     map[*cst.Node]*ast.ConstDecl
-	typeCache map[*cst.Node]*ast.TypeDecl
-	useCache  map[*cst.Node]*ast.UseDecl
+	cst         *concrete.Document
+	file        *ast.File
+	cache       map[*cst.Node]*ast.ConstDecl
+	typeCache   map[*cst.Node]*ast.TypeDecl
+	useCache    map[*cst.Node]*ast.UseDecl
+	assertCache map[*cst.Node]*ast.AssertDecl
 }
 
 // NewDocument lexes, parses, and lowers src, then keeps the AST up to date
 // across Edits.
 func NewDocument(src []byte) *Document {
 	d := &Document{
-		cst:       concrete.NewDocument(src),
-		cache:     map[*cst.Node]*ast.ConstDecl{},
-		typeCache: map[*cst.Node]*ast.TypeDecl{},
-		useCache:  map[*cst.Node]*ast.UseDecl{},
+		cst:         concrete.NewDocument(src),
+		cache:       map[*cst.Node]*ast.ConstDecl{},
+		typeCache:   map[*cst.Node]*ast.TypeDecl{},
+		useCache:    map[*cst.Node]*ast.UseDecl{},
+		assertCache: map[*cst.Node]*ast.AssertDecl{},
 	}
 	d.rebuild()
 	return d
@@ -72,9 +74,11 @@ func (d *Document) rebuild() {
 	next := make(map[*cst.Node]*ast.ConstDecl, len(d.cache))
 	nextTypes := make(map[*cst.Node]*ast.TypeDecl, len(d.typeCache))
 	nextUses := make(map[*cst.Node]*ast.UseDecl, len(d.useCache))
+	nextAsserts := make(map[*cst.Node]*ast.AssertDecl, len(d.assertCache))
 	var uses []*ast.UseDecl
 	var decls []*ast.ConstDecl
 	var types []*ast.TypeDecl
+	var asserts []*ast.AssertDecl
 	foreachDecl(root, func(child cst.Tree, green *cst.Node) {
 		switch green.Kind() {
 		case cst.UseDecl:
@@ -98,11 +102,19 @@ func (d *Document) rebuild() {
 			}
 			nextTypes[green] = td
 			types = append(types, td)
+		case cst.AssertDecl:
+			ad, ok := d.assertCache[green]
+			if !ok {
+				ad = lowerAssertDecl(child, buf)
+			}
+			nextAsserts[green] = ad
+			asserts = append(asserts, ad)
 		}
 	})
 
 	d.cache = next
 	d.typeCache = nextTypes
 	d.useCache = nextUses
-	d.file = ast.NewFile(uses, decls, types, rootNode)
+	d.assertCache = nextAsserts
+	d.file = ast.NewFile(uses, decls, types, asserts, rootNode)
 }
