@@ -16,8 +16,9 @@ import (
 	"path"
 	"strings"
 
-	"github.com/BurntSushi/toml"
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
+	"github.com/masterbelt/masterbelt/pkg/source"
+	"github.com/pelletier/go-toml/v2"
 )
 
 // FileName is the manifest's file name. The directory that contains it is the
@@ -63,7 +64,7 @@ func Parse(src []byte) (Config, diagnostic.List) {
 		diags diagnostic.List
 	)
 	if err := toml.Unmarshal(src, &cfg); err != nil {
-		diags.Add(invalid(err))
+		diags.Add(invalid(src, err))
 		return cfg, diags
 	}
 
@@ -78,13 +79,17 @@ func Parse(src []byte) (Config, diagnostic.List) {
 	return cfg, diags
 }
 
-// invalid adapts a TOML decode error to the config.invalid diagnostic,
-// preserving the parser's byte position when it reports one.
-func invalid(err error) diagnostic.Diagnostic {
-	if perr, ok := errors.AsType[toml.ParseError](err); ok {
-		return newInvalidDiagnostic(perr.Position.Start, perr.Position.Len, perr.Message)
+// invalid adapts a TOML decode error to the config.invalid diagnostic. The
+// parser reports a row/column for both syntax and type errors; that is
+// resolved to a byte offset into src (the parser exposes no length, so the
+// diagnostic spans nothing).
+func invalid(src []byte, err error) diagnostic.Diagnostic {
+	detail := strings.TrimPrefix(err.Error(), "toml: ")
+	if derr, ok := errors.AsType[*toml.DecodeError](err); ok {
+		row, col := derr.Position()
+		return newInvalidDiagnostic(source.NewFile("", src).Offset(row, col), 0, detail)
 	}
-	return newInvalidDiagnostic(0, 0, err.Error())
+	return newInvalidDiagnostic(0, 0, detail)
 }
 
 // Missing reports that no masterbelt.toml exists at or above the directory the

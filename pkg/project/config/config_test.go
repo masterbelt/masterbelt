@@ -50,9 +50,13 @@ func TestParseSyntaxError(t *testing.T) {
 }
 
 func TestParseSchemaMismatch(t *testing.T) {
-	// A well-formed document with a wrongly typed value is just as invalid.
+	// A well-formed document with a wrongly typed value is just as invalid,
+	// and the parser reports the value's position for it too.
 	_, diags := Parse([]byte("entry = 1\n"))
-	singleError(t, diags, CodeInvalid)
+	d := singleError(t, diags, CodeInvalid)
+	if d.Offset != 8 {
+		t.Errorf("Offset = %d, want 8 (the mistyped value)", d.Offset)
+	}
 }
 
 func TestParseMissingEntry(t *testing.T) {
