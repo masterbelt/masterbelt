@@ -632,9 +632,15 @@ func TestAssertFailed(t *testing.T) {
 	if got := codes(diags); len(got) != 1 || got[0] != CodeAssertionFailed {
 		t.Fatalf("codes = %v, want [assertion_failed]", got)
 	}
-	// The message quotes the condition in surface syntax, rendered back from
-	// the desugared AST.
-	if want := "assertion failed: Max < Min"; diags[0].Message != want {
+	// The message summarizes the condition in surface syntax — rendered back
+	// from the desugared AST — and draws the power-assert diagram beneath it,
+	// every sub-expression's folded value under the place it appears.
+	want := "assertion failed: Max < Min\n" +
+		"  Max < Min\n" +
+		"  |   | |\n" +
+		"  100 | 0\n" +
+		"      false"
+	if diags[0].Message != want {
 		t.Errorf("message = %q, want %q", diags[0].Message, want)
 	}
 }
@@ -703,12 +709,44 @@ func TestAssertMissingExprIsTheParsersProblem(t *testing.T) {
 	}
 }
 
-func TestAssertProducesNoIR(t *testing.T) {
-	// An assert is a diagnostic-only declaration: the module is identical
-	// with and without it.
+func TestAssertOutcomeInModule(t *testing.T) {
+	// An assert declares no value — the constants are untouched — but its
+	// outcome (the folded condition and its power-assert diagram) is module
+	// data, so hover and tooling read the very values it was checked with.
 	with, _ := analyze("const A = 1\nassert A > 0\n")
 	without, _ := analyze("const A = 1\n")
-	if ir.Dump(with) != ir.Dump(without) {
-		t.Errorf("assert changed the IR:\n--- with ---\n%s--- without ---\n%s", ir.Dump(with), ir.Dump(without))
+	if len(with.Consts) != len(without.Consts) || len(with.Types) != len(without.Types) {
+		t.Errorf("assert changed the constants or types")
+	}
+	if len(with.Asserts) != 1 {
+		t.Fatalf("got %d asserts in the module, want 1", len(with.Asserts))
+	}
+	a := with.Asserts[0]
+	if a.Cond != "A > 0" || !a.Held() {
+		t.Errorf("assert = {Cond: %q, Held: %v}, want A > 0 holding", a.Cond, a.Held())
+	}
+	want := "A > 0\n" +
+		"| |\n" +
+		"1 true"
+	if a.Diagram != want {
+		t.Errorf("diagram:\n%s\nwant:\n%s", a.Diagram, want)
+	}
+}
+
+func TestAssertFailedWithDoc(t *testing.T) {
+	// The doc comment is the invariant in the author's words: a failure
+	// quotes it above the diagram.
+	_, diags := analyze("const Max = 100\nconst Min = 0\n/// the maximum dominates\nassert Max < Min\n")
+	if got := codes(diags); len(got) != 1 || got[0] != CodeAssertionFailed {
+		t.Fatalf("codes = %v, want [assertion_failed]", got)
+	}
+	want := "assertion failed: Max < Min\n" +
+		"  the maximum dominates\n" +
+		"  Max < Min\n" +
+		"  |   | |\n" +
+		"  100 | 0\n" +
+		"      false"
+	if diags[0].Message != want {
+		t.Errorf("message = %q, want %q", diags[0].Message, want)
 	}
 }

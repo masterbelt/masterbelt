@@ -130,9 +130,9 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 	"masterbelt.semantic.assertion_failed": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
-			return "表明が成立しません: " + f["cond"].String()
+			return "表明が成立しません: " + f["cond"].String() + f["doc"].String() + f["diagram"].String()
 		default:
-			return "assertion failed: " + f["cond"].String()
+			return "assertion failed: " + f["cond"].String() + f["doc"].String() + f["diagram"].String()
 		}
 	},
 	"masterbelt.semantic.assertion_not_bool": func(loc Locale, f map[string]fmt.Stringer) string {

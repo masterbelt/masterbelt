@@ -45,9 +45,11 @@ func newAmbiguousImportDiagnostic(offset int, width int, name string) diagnostic
 	}
 }
 
-func newAssertionFailedDiagnostic(offset int, width int, cond string) diagnostic.Diagnostic {
+func newAssertionFailedDiagnostic(offset int, width int, cond string, doc string, diagram string) diagnostic.Diagnostic {
 	fields := map[string]fmt.Stringer{
-		"cond": diagnostic.Str(cond),
+		"cond":    diagnostic.Str(cond),
+		"doc":     diagnostic.Str(doc),
+		"diagram": diagnostic.Str(diagram),
 	}
 	return diagnostic.Diagnostic{
 		Severity: diagnostic.Error,

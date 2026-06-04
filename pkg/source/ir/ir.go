@@ -18,12 +18,29 @@ import (
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
 )
 
-// Module is a resolved program: its constants and type definitions in source
-// order.
+// Module is a resolved program: its constants, type definitions, and
+// compile-time assertions in source order.
 type Module struct {
-	Consts []*Const
-	Types  []*TypeDef
+	Consts  []*Const
+	Types   []*TypeDef
+	Asserts []*Assert
 }
+
+// Assert is one compile-time assertion's outcome: the condition in canonical
+// surface syntax, its folded value (nil when it cannot fold), and the
+// power-assert diagram of its sub-expression values — precomputed here so the
+// editor's hover and the failure diagnostic render the very values the
+// assertion was checked with.
+type Assert struct {
+	Cond    string          // canonical surface rendering of the condition
+	Doc     []string        // the doc comment — the invariant in the author's words
+	Eval    *Constant       // the folded condition, or nil if it could not be evaluated
+	Diagram string          // the condition line plus the pipe/value rows
+	Syntax  *ast.AssertDecl // the declaration this was checked from
+}
+
+// Held reports whether the assertion folded to true.
+func (a *Assert) Held() bool { return a.Eval != nil && a.Eval.Kind == ConstBool && a.Eval.Bool }
 
 // Const is a resolved constant declaration.
 type Const struct {

@@ -49,41 +49,11 @@ func occurrenceAt(doc view, offset int, trees map[cst.Green]cst.Tree) (occurrenc
 
 		// A value-position identifier in the initializer, at any depth.
 		if decl.Value != nil {
-			var hit *ast.Identifier
-			ast.WalkValueIdents(decl.Value, func(id *ast.Identifier) {
-				if t, ok := trees[id.Syntax()]; ok && within(t, offset) {
-					hit = id
-				}
-			})
-			if hit != nil {
-				if target := doc.Resolve(hit); target != nil {
-					return occurrence{token: trees[hit.Syntax()], target: target}, true
-				}
-				// Fall through: the cursor may sit on a namespace access
-				// (its receiver is an identifier that names no value).
+			occ, found, sawIdent := exprOccurrenceAt(doc, decl.Value, offset, trees)
+			if found {
+				return occ, true
 			}
-
-			// A namespace member access (geo.Origin): the cursor must sit on
-			// the member's own name — the receiver names a namespace, not a
-			// value, and denotes nothing by itself.
-			var member occurrence
-			walkMemberExprs(decl.Value, func(m *ast.MemberExpr) {
-				t, ok := trees[m.Syntax()]
-				if !ok {
-					return
-				}
-				nameTok, ok := memberNameToken(t)
-				if !ok || !within(nameTok, offset) {
-					return
-				}
-				if target := doc.ResolveMember(m); target != nil {
-					member = occurrence{token: nameTok, target: target}
-				}
-			})
-			if member.target != nil {
-				return member, true
-			}
-			if hit != nil {
+			if sawIdent {
 				return occurrence{}, false // an undefined reference denotes nothing
 			}
 		}
@@ -95,7 +65,60 @@ func occurrenceAt(doc view, offset int, trees map[cst.Green]cst.Tree) (occurrenc
 			}
 		}
 	}
+
+	// A reference inside an assertion's condition, exactly as in an
+	// initializer.
+	for _, a := range doc.Module().Asserts {
+		if a.Syntax.Cond == nil {
+			continue
+		}
+		if occ, found, _ := exprOccurrenceAt(doc, a.Syntax.Cond, offset, trees); found {
+			return occ, true
+		}
+	}
 	return occurrence{}, false
+}
+
+// exprOccurrenceAt finds the value-position identifier or namespace member
+// access at offset within e: the reference and the constant it denotes.
+// sawIdent reports that the cursor sat on an identifier even when it denotes
+// nothing (an undefined reference), so the caller can stop searching.
+func exprOccurrenceAt(doc view, e ast.Expr, offset int, trees map[cst.Green]cst.Tree) (occ occurrence, found, sawIdent bool) {
+	var hit *ast.Identifier
+	ast.WalkValueIdents(e, func(id *ast.Identifier) {
+		if t, ok := trees[id.Syntax()]; ok && within(t, offset) {
+			hit = id
+		}
+	})
+	if hit != nil {
+		if target := doc.Resolve(hit); target != nil {
+			return occurrence{token: trees[hit.Syntax()], target: target}, true, true
+		}
+		// Fall through: the cursor may sit on a namespace access (its
+		// receiver is an identifier that names no value).
+	}
+
+	// A namespace member access (geo.Origin): the cursor must sit on the
+	// member's own name — the receiver names a namespace, not a value, and
+	// denotes nothing by itself.
+	var member occurrence
+	walkMemberExprs(e, func(m *ast.MemberExpr) {
+		t, ok := trees[m.Syntax()]
+		if !ok {
+			return
+		}
+		nameTok, ok := memberNameToken(t)
+		if !ok || !within(nameTok, offset) {
+			return
+		}
+		if target := doc.ResolveMember(m); target != nil {
+			member = occurrence{token: nameTok, target: target}
+		}
+	})
+	if member.target != nil {
+		return member, true, hit != nil
+	}
+	return occurrence{}, false, hit != nil
 }
 
 // walkMemberExprs visits every member access in e — a thin filter over the
@@ -144,23 +167,37 @@ func occurrencesOf(doc view, target *ir.Const, trees map[cst.Green]cst.Tree, inc
 		if c.Syntax.Value == nil {
 			continue
 		}
-		ast.WalkValueIdents(c.Syntax.Value, func(id *ast.Identifier) {
-			if doc.Resolve(id) == target {
-				if t, ok := trees[id.Syntax()]; ok {
-					tokens = append(tokens, t)
-				}
-			}
-		})
-		walkMemberExprs(c.Syntax.Value, func(m *ast.MemberExpr) {
-			if doc.ResolveMember(m) == target {
-				if t, ok := trees[m.Syntax()]; ok {
-					if nameTok, ok := memberNameToken(t); ok {
-						tokens = append(tokens, nameTok)
-					}
-				}
-			}
-		})
+		tokens = append(tokens, exprOccurrencesOf(doc, c.Syntax.Value, target, trees)...)
 	}
+	for _, a := range doc.Module().Asserts {
+		if a.Syntax.Cond == nil {
+			continue
+		}
+		tokens = append(tokens, exprOccurrencesOf(doc, a.Syntax.Cond, target, trees)...)
+	}
+	return tokens
+}
+
+// exprOccurrencesOf returns the tokens within e that name target: every
+// value-position identifier and namespace member access that resolves to it.
+func exprOccurrencesOf(doc view, e ast.Expr, target *ir.Const, trees map[cst.Green]cst.Tree) []cst.Tree {
+	var tokens []cst.Tree
+	ast.WalkValueIdents(e, func(id *ast.Identifier) {
+		if doc.Resolve(id) == target {
+			if t, ok := trees[id.Syntax()]; ok {
+				tokens = append(tokens, t)
+			}
+		}
+	})
+	walkMemberExprs(e, func(m *ast.MemberExpr) {
+		if doc.ResolveMember(m) == target {
+			if t, ok := trees[m.Syntax()]; ok {
+				if nameTok, ok := memberNameToken(t); ok {
+					tokens = append(tokens, nameTok)
+				}
+			}
+		}
+	})
 	return tokens
 }
 

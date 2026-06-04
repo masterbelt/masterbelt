@@ -122,3 +122,53 @@ func TestDefinitionInExpression(t *testing.T) {
 		t.Errorf("definition range = %+v, want line 0 cols 6..7", r)
 	}
 }
+
+func TestAssertHover(t *testing.T) {
+	src := "const Max = 100\nconst Min = 0\nassert Max > Min\n"
+	doc := testView(src)
+
+	t.Run("keyword shows the power-assert diagram", func(t *testing.T) {
+		h := hover(doc, strings.Index(src, "assert")+2) // inside "assert"
+		if h == nil {
+			t.Fatal("no hover on the assert keyword")
+		}
+		want := "```\n" +
+			"assert Max > Min\n" +
+			"       |   | |\n" +
+			"       100 | 0\n" +
+			"           true\n" +
+			"```"
+		if h.Contents.Value != want {
+			t.Errorf("hover = %q, want %q", h.Contents.Value, want)
+		}
+	})
+
+	t.Run("identifiers in the condition keep their const hover", func(t *testing.T) {
+		h := hover(doc, strings.Index(src, "assert Max")+8) // inside the "Max" reference
+		if h == nil {
+			t.Fatal("no hover on the reference")
+		}
+		if !strings.Contains(h.Contents.Value, "const Max") {
+			t.Errorf("hover = %q, want it to describe the constant Max", h.Contents.Value)
+		}
+	})
+
+	t.Run("leading trivia hovers nothing", func(t *testing.T) {
+		if h := hover(doc, strings.Index(src, "\nassert")); h != nil {
+			t.Errorf("hover on the newline before assert = %q, want nil", h.Contents.Value)
+		}
+	})
+}
+
+func TestAssertHoverDoc(t *testing.T) {
+	src := "const Max = 100\n/// the range is not empty\nassert Max > 0\n"
+	doc := testView(src)
+
+	h := hover(doc, strings.Index(src, "assert")+2)
+	if h == nil {
+		t.Fatal("no hover on the assert keyword")
+	}
+	if !strings.HasSuffix(h.Contents.Value, "```\n\nthe range is not empty") {
+		t.Errorf("hover = %q, want the doc comment after the diagram", h.Contents.Value)
+	}
+}

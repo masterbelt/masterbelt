@@ -30,7 +30,7 @@ masterbelt.semantic.not_exported,{path} は {name} を公開していません
 masterbelt.semantic.unknown_member,{namespace} に公開メンバ {name} はありません
 masterbelt.semantic.ambiguous_import,{name} は曖昧です。複数のインポートから到来しています
 masterbelt.semantic.cyclic_module,{path} を経由するインポートサイクルです
-masterbelt.semantic.assertion_failed,表明が成立しません: {cond}
+masterbelt.semantic.assertion_failed,表明が成立しません: {cond}{doc}{diagram}
 masterbelt.semantic.assertion_not_bool,表明は bool でなければなりません({typ})
 masterbelt.semantic.assertion_not_constant,表明はコンパイル時定数ではありません
 project.config.missing,masterbelt.toml がこのディレクトリにも親ディレクトリにも見つかりません

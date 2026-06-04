@@ -30,7 +30,7 @@ masterbelt.semantic.not_exported,error,name:string path:string
 masterbelt.semantic.unknown_member,error,name:string namespace:string
 masterbelt.semantic.ambiguous_import,error,name:string
 masterbelt.semantic.cyclic_module,error,path:string
-masterbelt.semantic.assertion_failed,error,cond:string
+masterbelt.semantic.assertion_failed,error,cond:string doc:string diagram:string
 masterbelt.semantic.assertion_not_bool,error,typ:string
 masterbelt.semantic.assertion_not_constant,error,
 project.config.missing,error,

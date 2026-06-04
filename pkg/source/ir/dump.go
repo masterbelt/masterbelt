@@ -18,7 +18,24 @@ func Dump(m *Module) string {
 	for _, t := range m.Types {
 		dumpTypeDef(&b, t)
 	}
+	for _, a := range m.Asserts {
+		dumpAssert(&b, a)
+	}
 	return b.String()
+}
+
+// dumpAssert renders one assertion's outcome: its canonical condition, its
+// folded value, and the power-assert diagram (indented as a block), so the
+// snapshot proves what every assertion evaluated to.
+func dumpAssert(b *strings.Builder, a *Assert) {
+	fmt.Fprintf(b, "  Assert %q\n", a.Cond)
+	for _, doc := range a.Doc {
+		fmt.Fprintf(b, "    doc %q\n", doc)
+	}
+	fmt.Fprintf(b, "    eval %s\n", a.Eval)
+	for _, line := range strings.Split(a.Diagram, "\n") {
+		fmt.Fprintf(b, "      %s\n", line)
+	}
 }
 
 func dumpTypeDef(b *strings.Builder, t *TypeDef) {

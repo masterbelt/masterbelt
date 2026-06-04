@@ -106,3 +106,20 @@ func TestRenameInExpression(t *testing.T) {
 		t.Fatalf("got %d edits, want 3 (declaration + 2 references)", len(edits))
 	}
 }
+
+func TestReferencesInAssertCondition(t *testing.T) {
+	// References inside an assertion's condition participate exactly as
+	// initializer references do: find-references sees them, and a rename
+	// from either end rewrites them.
+	src := "const Max = 100\nassert Max > 0\nconst Twice = Max + Max\n"
+	doc := testView(src)
+
+	// From the declaration: decl + the assert reference + 2 initializer refs.
+	if got := references(doc, 6, true); len(got) != 4 {
+		t.Fatalf("references(Max decl) = %d, want 4", len(got))
+	}
+	// From the reference inside the assert condition, the same set.
+	if got := references(doc, 23, true); len(got) != 4 { // inside "Max" in the assert
+		t.Fatalf("references(assert ref) = %d, want 4", len(got))
+	}
+}

@@ -3,6 +3,7 @@ package ast
 import (
 	"fmt"
 	"strings"
+	"unicode/utf8"
 )
 
 // Render renders an expression in surface syntax, inverting the operator
@@ -16,7 +17,30 @@ import (
 // The operator spellings and precedences mirror the desugaring in
 // parser/abstract and the precedence table in parser/concrete; a round-trip
 // test in parser/abstract pins the three to one another.
-func Render(e Expr) string { return render(e, 0) }
+func Render(e Expr) string {
+	r := &renderer{}
+	r.expr(e, 0)
+	return r.b.String()
+}
+
+// Anchor is one value-bearing sub-expression of a rendered expression and the
+// rune column its value reads best under: an identifier or self anchors at its
+// own start, a member access and a method call at the member name, and an
+// operator form at the operator symbol — the spot a power-assert diagram
+// points its pipe at.
+type Anchor struct {
+	Expr Expr
+	Col  int // rune column within the rendered text
+}
+
+// RenderTrace renders e exactly as Render does and additionally returns the
+// anchors of its value-bearing sub-expressions, in render order. Literals and
+// collection literals carry no anchor — their value is their own spelling.
+func RenderTrace(e Expr) (string, []Anchor) {
+	r := &renderer{trace: true}
+	r.expr(e, 0)
+	return r.b.String(), r.anchors
+}
 
 // binaryOps maps each binary operator method to its surface spelling and
 // precedence (higher binds tighter, matching parser/concrete's binaryPrec).
@@ -50,97 +74,170 @@ const (
 	precPostfix = 7
 )
 
-// render renders e, parenthesizing it when its own binding is looser than min
-// — the binding the enclosing context requires.
-func render(e Expr, min int) string {
+// renderer accumulates the rendered text, tracking the rune column so anchors
+// can be recorded as the writes happen.
+type renderer struct {
+	b       strings.Builder
+	col     int // runes written so far
+	trace   bool
+	anchors []Anchor
+}
+
+func (r *renderer) str(s string) {
+	r.b.WriteString(s)
+	r.col += utf8.RuneCountInString(s)
+}
+
+// anchor records e's value anchor at the current column.
+func (r *renderer) anchor(e Expr) {
+	if r.trace {
+		r.anchors = append(r.anchors, Anchor{Expr: e, Col: r.col})
+	}
+}
+
+// expr renders e, parenthesizing it when its own binding is looser than min —
+// the binding the enclosing context requires.
+func (r *renderer) expr(e Expr, min int) {
 	switch x := e.(type) {
 	case nil:
-		return "<missing>"
+		r.str("<missing>")
 	case *IntLit:
-		return x.Text
+		r.str(x.Text)
 	case *StringLit:
-		return fmt.Sprintf("%q", x.Value)
+		r.str(fmt.Sprintf("%q", x.Value))
 	case *BoolLit:
 		if x.Value {
-			return "true"
+			r.str("true")
+		} else {
+			r.str("false")
 		}
-		return "false"
 	case *NullLit:
-		return "null"
+		r.str("null")
 	case *SelfExpr:
-		return "self"
+		r.anchor(x)
+		r.str("self")
 	case *Identifier:
-		return x.Name
+		r.anchor(x)
+		r.str(x.Name)
 	case *CollectionLit:
-		parts := make([]string, len(x.Entries))
+		r.str("[")
 		for i, entry := range x.Entries {
-			if entry.Key != nil {
-				parts[i] = render(entry.Key, 0) + ": " + render(entry.Value, 0)
-			} else {
-				parts[i] = render(entry.Value, 0)
-			}
-		}
-		return "[" + strings.Join(parts, ", ") + "]"
-	case *MemberExpr:
-		return render(x.Receiver, precPostfix) + "." + x.Member.Name
-	case *CallExpr:
-		if m, ok := x.Callee.(*MemberExpr); ok {
-			if op, ok := binaryOps[m.Member.Name]; ok && len(x.Arguments) == 1 {
-				// prec+1 on the right keeps the rendering left-associative,
-				// exactly as the parser is.
-				s := render(m.Receiver, op.prec) + " " + op.sym + " " + render(x.Arguments[0], op.prec+1)
-				if op.prec < min {
-					return "(" + s + ")"
-				}
-				return s
-			}
-			if sym, ok := unaryOps[m.Member.Name]; ok && len(x.Arguments) == 0 {
-				s := sym + render(m.Receiver, precUnary)
-				if precUnary < min {
-					return "(" + s + ")"
-				}
-				return s
-			}
-		}
-		args := make([]string, len(x.Arguments))
-		for i, a := range x.Arguments {
-			args[i] = render(a, 0)
-		}
-		return render(x.Callee, precPostfix) + "(" + strings.Join(args, ", ") + ")"
-	case *FuncLit:
-		params := make([]string, len(x.Params))
-		for i, p := range x.Params {
-			params[i] = p.Name
-			if p.Type != nil {
-				params[i] += ": " + dumpType(p.Type)
-			}
-		}
-		var b strings.Builder
-		b.WriteString("fn(" + strings.Join(params, ", ") + ")")
-		if x.Result != nil {
-			b.WriteString(": " + dumpType(x.Result))
-		}
-		// The body renders on one line — statements joined by "; " — since the
-		// rendering is quoted inside a single-line diagnostic message.
-		if len(x.Body) == 0 {
-			b.WriteString(" {}")
-			return b.String()
-		}
-		b.WriteString(" {")
-		for i, s := range x.Body {
 			if i > 0 {
-				b.WriteString(";")
+				r.str(", ")
 			}
-			switch s := s.(type) {
-			case *ReturnStmt:
-				b.WriteString(" return " + render(s.Value, 0))
-			case *ExprStmt:
-				b.WriteString(" " + render(s.X, 0))
+			if entry.Key != nil {
+				r.expr(entry.Key, 0)
+				r.str(": ")
 			}
+			r.expr(entry.Value, 0)
 		}
-		b.WriteString(" }")
-		return b.String()
+		r.str("]")
+	case *MemberExpr:
+		r.expr(x.Receiver, precPostfix)
+		r.str(".")
+		r.anchor(x)
+		r.str(x.Member.Name)
+	case *CallExpr:
+		r.call(x, min)
+	case *FuncLit:
+		r.funcLit(x)
 	default:
-		return "<expr>"
+		r.str("<expr>")
 	}
+}
+
+// call renders a call expression: an operator method back as its operator
+// form, anything else as callee(args). The call's value anchors at the
+// operator symbol or the callee's name — the callee itself is not a value, so
+// it records no anchor of its own.
+func (r *renderer) call(x *CallExpr, min int) {
+	if m, ok := x.Callee.(*MemberExpr); ok {
+		if op, ok := binaryOps[m.Member.Name]; ok && len(x.Arguments) == 1 {
+			paren := op.prec < min
+			if paren {
+				r.str("(")
+			}
+			r.expr(m.Receiver, op.prec)
+			r.str(" ")
+			r.anchor(x)
+			r.str(op.sym + " ")
+			// prec+1 on the right keeps the rendering left-associative,
+			// exactly as the parser is.
+			r.expr(x.Arguments[0], op.prec+1)
+			if paren {
+				r.str(")")
+			}
+			return
+		}
+		if sym, ok := unaryOps[m.Member.Name]; ok && len(x.Arguments) == 0 {
+			paren := precUnary < min
+			if paren {
+				r.str("(")
+			}
+			r.anchor(x)
+			r.str(sym)
+			r.expr(m.Receiver, precUnary)
+			if paren {
+				r.str(")")
+			}
+			return
+		}
+		r.expr(m.Receiver, precPostfix)
+		r.str(".")
+		r.anchor(x)
+		r.str(m.Member.Name)
+	} else if id, ok := x.Callee.(*Identifier); ok {
+		// A conversion (Level(50)): the name is a type, not a value.
+		r.anchor(x)
+		r.str(id.Name)
+	} else {
+		r.expr(x.Callee, precPostfix)
+		r.anchor(x)
+	}
+	r.str("(")
+	for i, a := range x.Arguments {
+		if i > 0 {
+			r.str(", ")
+		}
+		r.expr(a, 0)
+	}
+	r.str(")")
+}
+
+// funcLit renders a function literal on one line — statements joined by ";" —
+// since the rendering is quoted inside a diagnostic message.
+func (r *renderer) funcLit(x *FuncLit) {
+	r.str("fn(")
+	for i, p := range x.Params {
+		if i > 0 {
+			r.str(", ")
+		}
+		r.str(p.Name)
+		if p.Type != nil {
+			r.str(": " + dumpType(p.Type))
+		}
+	}
+	r.str(")")
+	if x.Result != nil {
+		r.str(": " + dumpType(x.Result))
+	}
+	if len(x.Body) == 0 {
+		r.str(" {}")
+		return
+	}
+	r.str(" {")
+	for i, s := range x.Body {
+		if i > 0 {
+			r.str(";")
+		}
+		switch s := s.(type) {
+		case *ReturnStmt:
+			r.str(" return ")
+			r.expr(s.Value, 0)
+		case *ExprStmt:
+			r.str(" ")
+			r.expr(s.X, 0)
+		}
+	}
+	r.str(" }")
 }

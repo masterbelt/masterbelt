@@ -25,8 +25,10 @@ package semantic
 
 import (
 	"sort"
+	"strings"
 
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/assert"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/eval"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/lower"
@@ -363,6 +365,14 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 			diags.Add(newDivisionByZeroDiagnostic(s.offset, s.width))
 		})
 
+		// The outcome — the folded condition and its power-assert diagram —
+		// is module data: the editor's hover and the failure diagnostic both
+		// read the very values the assertion was checked with.
+		v := eval.Expr(a.Cond, evalEnv{q: q, file: fileID})
+		d := assert.Diagram(a.Cond, evalEnv{q: q, file: fileID})
+		cond, _, _ := strings.Cut(d, "\n")
+		module.Asserts = append(module.Asserts, &ir.Assert{Cond: cond, Doc: a.Doc, Eval: v, Diagram: d, Syntax: a})
+
 		// The condition must be a bool. An Invalid type was reported above
 		// (an undefined name, a misapplied operator), so it is not re-reported
 		// as a non-bool here.
@@ -375,7 +385,6 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 		// The condition must fold at compile time. When it does not — and
 		// nothing above explained why — the assertion itself is the problem:
 		// it asks for something the evaluator cannot verify.
-		v := eval.Expr(a.Cond, evalEnv{q: q, file: fileID})
 		if v == nil || v.Kind != ir.ConstBool {
 			if diags.Len() == before {
 				s := at(a.Cond)
@@ -384,10 +393,20 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 			continue
 		}
 
-		// The assertion proper.
+		// The assertion proper. The failure quotes the condition twice — the
+		// canonical one-liner (the summary a diagnostic list shows) and the
+		// power-assert diagram beneath it, indented as a block so its pipe
+		// columns align independently of the message prefix — with the doc
+		// comment above the diagram: the broken invariant in the author's
+		// own words.
 		if !v.Bool {
 			s := at(a.Cond)
-			diags.Add(newAssertionFailedDiagnostic(s.offset, s.width, ast.Render(a.Cond)))
+			doc := ""
+			if len(a.Doc) > 0 {
+				doc = "\n  " + strings.Join(a.Doc, "\n  ")
+			}
+			diagram := "\n  " + strings.ReplaceAll(d, "\n", "\n  ")
+			diags.Add(newAssertionFailedDiagnostic(s.offset, s.width, cond, doc, diagram))
 		}
 	}
 
