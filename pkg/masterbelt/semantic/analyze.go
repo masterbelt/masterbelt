@@ -41,11 +41,12 @@ import (
 // queries are the pure, memoizable semantic facts the assembler needs.
 type queries interface {
 	// resolve returns the declaration a value-position identifier refers to, or
-	// nil if no declaration has that name. Keying resolution on the identifier
-	// (not the whole symbol table) is what keeps early cutoff sharp: a reference
-	// in an unedited declaration is a stable pointer, so editing an unrelated
-	// constant does not invalidate it.
-	resolve(id *ast.Identifier) *ast.ConstDecl
+	// nil if no declaration has that name. The file is the one the identifier
+	// sits in — it decides the resolution scope. Keying resolution on the
+	// identifier (not the whole symbol table) is what keeps early cutoff sharp:
+	// a reference in an unedited declaration is a stable pointer, so editing an
+	// unrelated constant does not invalidate it.
+	resolve(file FileID, id *ast.Identifier) *ast.ConstDecl
 	// typeOf returns a constant's type (ir.Invalid when undeterminable).
 	typeOf(decl *ast.ConstDecl) ir.Type
 	// valueOf returns a constant's evaluated value, or nil when it cannot be
@@ -60,10 +61,14 @@ type queries interface {
 
 // typeEnv adapts the semantic query interface to infer.Env, so the type
 // inference and checking in package types/infer can read resolution, declaration
-// types, and the builtin registry through the same memoizing engine.
-type typeEnv struct{ q queries }
+// types, and the builtin registry through the same memoizing engine. It carries
+// the file whose scope identifiers resolve in, so infer.Env stays file-blind.
+type typeEnv struct {
+	q    queries
+	file FileID
+}
 
-func (e typeEnv) Resolve(id *ast.Identifier) *ast.ConstDecl { return e.q.resolve(id) }
+func (e typeEnv) Resolve(id *ast.Identifier) *ast.ConstDecl { return e.q.resolve(e.file, id) }
 func (e typeEnv) TypeOf(decl *ast.ConstDecl) ir.Type        { return e.q.typeOf(decl) }
 func (e typeEnv) Registry() *builtin.Registry               { return e.q.registry() }
 
@@ -100,16 +105,17 @@ func exprSink(at func(ast.Node) span, diags *diagnostic.List) *infer.Sink {
 // reference analysis and the oracle for the incremental Document.
 func Analyze(doc *abstract.Document) (*ir.Module, []diagnostic.Diagnostic) {
 	file := doc.File()
-	return assemble(file, positionsOf(doc.Concrete().Tree()), newDirectQueries(file, universe()))
+	return assemble(soleFileID, file, positionsOf(doc.Concrete().Tree()), newDirectQueries(file, universe()))
 }
 
-// assemble builds the IR module and all semantic diagnostics from the AST, using
-// q for the resolution and typing facts. It is shared by the reference and
-// incremental analyzers, so they cannot diverge.
-func assemble(file *ast.File, positions map[cst.Green]span, q queries) (*ir.Module, []diagnostic.Diagnostic) {
+// assemble builds one file's IR module and semantic diagnostics from its AST,
+// using q for the resolution and typing facts; fileID names the file within
+// the program, scoping its identifier resolution. It is shared by the
+// reference and incremental analyzers, so they cannot diverge.
+func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q queries) (*ir.Module, []diagnostic.Diagnostic) {
 	diags := &diagnostic.List{}
 	at := func(n ast.Node) span { return spanOf(positions, n) }
-	env := typeEnv{q}
+	env := typeEnv{q: q, file: fileID}
 	reg := q.registry()
 
 	// Create the IR constants first so references can bind to them.
@@ -134,11 +140,11 @@ func assemble(file *ast.File, positions map[cst.Green]span, q queries) (*ir.Modu
 		seen[decl.Name] = true
 	}
 
-	cyclic := cyclicDecls(file, q)
+	cyclic := cyclicDecls(fileID, file, q)
 
 	for _, decl := range file.Decls {
 		c := irOf[decl]
-		c.Value = lower.Value(decl.Value, constBinder{q: q, irOf: irOf})
+		c.Value = lower.Value(decl.Value, constBinder{q: q, file: fileID, irOf: irOf})
 		c.Type = q.typeOf(decl)
 		c.Eval = q.valueOf(decl)
 
@@ -157,7 +163,7 @@ func assemble(file *ast.File, positions map[cst.Green]span, q queries) (*ir.Modu
 		// skips them).
 		if decl.Value != nil {
 			ast.WalkValueIdents(decl.Value, func(id *ast.Identifier) {
-				if id.Name != "" && q.resolve(id) == nil {
+				if id.Name != "" && q.resolve(fileID, id) == nil {
 					s := at(id)
 					diags.Add(newUndefinedNameDiagnostic(s.offset, s.width, id.Name))
 				}
@@ -177,7 +183,7 @@ func assemble(file *ast.File, positions map[cst.Green]span, q queries) (*ir.Modu
 					if e == decl.Value {
 						return
 					}
-					if v := eval.Expr(e, evalEnv{q}); v != nil && v.Kind == ir.ConstInt && !types.Fits(reg, want, v.Int) {
+					if v := eval.Expr(e, evalEnv{q: q, file: fileID}); v != nil && v.Kind == ir.ConstInt && !types.Fits(reg, want, v.Int) {
 						s := at(e)
 						diags.Add(newConstantOverflowDiagnostic(s.offset, s.width, v.String(), want.String()))
 					}
@@ -187,7 +193,7 @@ func assemble(file *ast.File, positions map[cst.Green]span, q queries) (*ir.Modu
 				infer.Check(decl.Value, env, sink)
 			}
 			// Division or remainder by a zero divisor.
-			checkDivByZero(decl.Value, q, func(node ast.Node) {
+			checkDivByZero(decl.Value, evalEnv{q: q, file: fileID}, func(node ast.Node) {
 				s := at(node)
 				diags.Add(newDivisionByZeroDiagnostic(s.offset, s.width))
 			})
@@ -224,9 +230,13 @@ func assemble(file *ast.File, positions map[cst.Green]span, q queries) (*ir.Modu
 	return module, items
 }
 
-// buildSymbols maps each declared name to its first declaration.
+// buildSymbols maps each declared name to its first declaration. A nil file
+// (an input never set) has no symbols.
 func buildSymbols(file *ast.File) map[string]*ast.ConstDecl {
 	syms := map[string]*ast.ConstDecl{}
+	if file == nil {
+		return syms
+	}
 	for _, decl := range file.Decls {
 		if decl.Name != "" {
 			if _, exists := syms[decl.Name]; !exists {
@@ -242,14 +252,14 @@ func buildSymbols(file *ast.File) map[string]*ast.ConstDecl {
 // initializer, unless an annotation fixes it; the result is a general directed
 // graph (an expression may reference several names), so its cycles are found
 // with a coloured depth-first search.
-func cyclicDecls(file *ast.File, q queries) map[*ast.ConstDecl]bool {
+func cyclicDecls(fileID FileID, file *ast.File, q queries) map[*ast.ConstDecl]bool {
 	deps := func(decl *ast.ConstDecl) []*ast.ConstDecl {
 		if decl.Type != nil || decl.Value == nil {
 			return nil // an annotation breaks the inheritance chain
 		}
 		var out []*ast.ConstDecl
 		ast.WalkValueIdents(decl.Value, func(id *ast.Identifier) {
-			if t := q.resolve(id); t != nil {
+			if t := q.resolve(fileID, id); t != nil {
 				out = append(out, t)
 			}
 		})
@@ -331,7 +341,9 @@ func (d *directQueries) symbols() map[string]*ast.ConstDecl {
 	return d.syms
 }
 
-func (d *directQueries) resolve(id *ast.Identifier) *ast.ConstDecl {
+// resolve serves the oracle's single file regardless of the file asked for;
+// the multi-file Analyze (P-2 M5e) replaces this with a real per-file lookup.
+func (d *directQueries) resolve(_ FileID, id *ast.Identifier) *ast.ConstDecl {
 	return d.symbols()[id.Name]
 }
 
@@ -343,7 +355,7 @@ func (d *directQueries) typeOf(decl *ast.ConstDecl) ir.Type {
 		return ir.Invalid // cycle
 	}
 	d.typing[decl] = true
-	t := infer.Decl(decl, typeEnv{d})
+	t := infer.Decl(decl, typeEnv{q: d, file: soleFileID})
 	d.typing[decl] = false
 	d.typeMemo[decl] = t
 	return t
@@ -357,7 +369,7 @@ func (d *directQueries) valueOf(decl *ast.ConstDecl) *ir.Constant {
 		return nil // cycle
 	}
 	d.valuing[decl] = true
-	v := computeValue(decl, d)
+	v := computeValue(soleFileID, decl, d)
 	d.valuing[decl] = false
 	d.valueMemo[decl] = v
 	return v

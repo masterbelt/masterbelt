@@ -22,31 +22,46 @@ import (
 // stable for unedited declarations, so an edit only disturbs the declarations it
 // actually touched and whatever transitively depended on their results.
 
+// FileID identifies a file within the analyzed program: its normalized,
+// "/"-separated path relative to the project root. It mirrors pkg/project's
+// FileID — the two stay distinct types so the compiler core never imports the
+// project layer; the binding layers (CLI, LSP) convert between them.
+type FileID string
+
+// soleFileID is the identity a single-file analysis gives its one file. A
+// standalone Document (and the ad-hoc single-file paths) analyzes exactly one
+// file, whose name does not matter; multi-file analysis keys files by their
+// real project FileIDs.
+const soleFileID FileID = ""
+
 type queryKind int
 
 const (
-	qInput   queryKind = iota // the AST file (the engine's only input)
-	qSymbols                  // name -> declaration table
+	qInput   queryKind = iota // a file's AST (the engine's only inputs)
+	qSymbols                  // a file's name -> declaration table
 	qResolve                  // *ast.Identifier -> referent declaration
 	qTypeOf                   // *ast.ConstDecl -> ir.Type
 	qValue                    // *ast.ConstDecl -> *ir.Constant
 )
 
-// queryKey identifies a memoized computation: decl keys the per-declaration
-// queries (typeOf, value), id keys resolve, and both are nil for the input and
-// the symbol table. All fields are comparable, so the key works as a map key.
+// queryKey identifies a memoized computation. The per-declaration queries
+// (typeOf, value) are keyed by decl alone and resolve by id — AST pointers are
+// globally unique, even across files — so only the per-file queries (input,
+// symbols) and resolve (whose scope is the file the identifier sits in) carry
+// the file dimension. All fields are comparable, so the key works as a map key.
 type queryKey struct {
 	kind queryKind
+	file FileID
 	decl *ast.ConstDecl
 	id   *ast.Identifier
 }
 
-var (
-	inputKey   = queryKey{kind: qInput}
-	symbolsKey = queryKey{kind: qSymbols}
-)
+func inputKey(file FileID) queryKey   { return queryKey{kind: qInput, file: file} }
+func symbolsKey(file FileID) queryKey { return queryKey{kind: qSymbols, file: file} }
 
-func resolveKey(id *ast.Identifier) queryKey { return queryKey{kind: qResolve, id: id} }
+func resolveKey(file FileID, id *ast.Identifier) queryKey {
+	return queryKey{kind: qResolve, file: file, id: id}
+}
 func typeOfKey(decl *ast.ConstDecl) queryKey { return queryKey{kind: qTypeOf, decl: decl} }
 func valueKey(decl *ast.ConstDecl) queryKey  { return queryKey{kind: qValue, decl: decl} }
 
@@ -69,9 +84,10 @@ type frame struct {
 // database is the query engine state.
 type database struct {
 	revision       int
-	file           *ast.File
+	files          map[FileID]*ast.File
+	declFile       map[*ast.ConstDecl]FileID // which file each declaration sits in
 	reg            *builtin.Registry
-	inputChangedAt int
+	inputChangedAt map[FileID]int
 	memos          map[queryKey]*memo
 	stack          []*frame // active computations, for dependency capture
 	running        map[queryKey]bool
@@ -80,26 +96,45 @@ type database struct {
 
 func newDatabase(reg *builtin.Registry) *database {
 	return &database{
-		reg:      reg,
-		memos:    map[queryKey]*memo{},
-		running:  map[queryKey]bool{},
-		computed: map[queryKey]bool{},
+		reg:            reg,
+		files:          map[FileID]*ast.File{},
+		declFile:       map[*ast.ConstDecl]FileID{},
+		inputChangedAt: map[FileID]int{},
+		memos:          map[queryKey]*memo{},
+		running:        map[queryKey]bool{},
+		computed:       map[queryKey]bool{},
 	}
 }
 
-// setInput installs a new AST file as the input and opens a new revision.
-func (db *database) setInput(file *ast.File) {
+// setInput installs a new AST for one file and opens a new revision. Other
+// files' inputs keep their change stamps, so queries that read only them
+// re-verify cheaply.
+func (db *database) setInput(id FileID, file *ast.File) {
 	db.revision++
-	db.file = file
-	db.inputChangedAt = db.revision
+	db.files[id] = file
+	db.inputChangedAt[id] = db.revision
 	db.computed = map[queryKey]bool{}
+	db.reindexDecls()
+}
+
+// reindexDecls rebuilds the declaration-to-file index after an input change.
+// Unedited declarations keep their AST pointers, so entries are mostly
+// rewritten in place; the rebuild is linear in the program and never retains
+// declarations that have left the trees.
+func (db *database) reindexDecls() {
+	db.declFile = make(map[*ast.ConstDecl]FileID, len(db.declFile))
+	for id, f := range db.files {
+		for _, d := range f.Decls {
+			db.declFile[d] = id
+		}
+	}
 }
 
 // demand returns a query's value, ensuring its memo is valid for the current
 // revision. It records nothing; use read to also capture a dependency.
 func (db *database) demand(key queryKey) any {
 	if key.kind == qInput {
-		return db.file
+		return db.files[key.file]
 	}
 	if db.running[key] {
 		return cycleValue(key) // re-entered while computing/verifying: a cycle
@@ -160,7 +195,7 @@ func (db *database) read(key queryKey) any {
 func (db *database) changedAtOf(key queryKey) int {
 	switch {
 	case key.kind == qInput:
-		return db.inputChangedAt
+		return db.inputChangedAt[key.file]
 	case db.running[key]:
 		return db.revision
 	}
@@ -175,14 +210,15 @@ func (db *database) changedAtOf(key queryKey) int {
 func (db *database) compute(key queryKey) any {
 	switch key.kind {
 	case qSymbols:
-		return buildSymbols(db.read(inputKey).(*ast.File))
+		file, _ := db.read(inputKey(key.file)).(*ast.File)
+		return buildSymbols(file)
 	case qResolve:
-		syms := db.read(symbolsKey).(map[string]*ast.ConstDecl)
+		syms := db.read(symbolsKey(key.file)).(map[string]*ast.ConstDecl)
 		return syms[key.id.Name]
 	case qTypeOf:
-		return infer.Decl(key.decl, typeEnv{engineQueries{db}})
+		return infer.Decl(key.decl, typeEnv{q: engineQueries{db}, file: db.declFile[key.decl]})
 	case qValue:
-		return computeValue(key.decl, engineQueries{db})
+		return computeValue(db.declFile[key.decl], key.decl, engineQueries{db})
 	default:
 		return nil
 	}
@@ -209,8 +245,8 @@ type engineQueries struct {
 	db *database
 }
 
-func (e engineQueries) resolve(id *ast.Identifier) *ast.ConstDecl {
-	target, _ := e.db.read(resolveKey(id)).(*ast.ConstDecl)
+func (e engineQueries) resolve(file FileID, id *ast.Identifier) *ast.ConstDecl {
+	target, _ := e.db.read(resolveKey(file, id)).(*ast.ConstDecl)
 	return target
 }
 

@@ -51,7 +51,7 @@ func (d *Document) AST() *abstract.Document { return d.ast }
 // an expression. The lookup goes through the engine, so it reuses the memoized
 // resolution from the last analysis.
 func (d *Document) Resolve(id *ast.Identifier) *ir.Const {
-	decl, _ := d.db.read(resolveKey(id)).(*ast.ConstDecl)
+	decl, _ := d.db.read(resolveKey(soleFileID, id)).(*ast.ConstDecl)
 	if decl == nil {
 		return nil
 	}
@@ -95,7 +95,7 @@ func (d *Document) FuncLitTypes() map[*ast.FuncLit]*ir.Func {
 	sink := &infer.Sink{SolvedFuncLit: func(lit *ast.FuncLit, t *ir.Func) { out[lit] = t }}
 
 	q := engineQueries{d.db}
-	env := typeEnv{q}
+	env := typeEnv{q: q, file: soleFileID}
 	reg := q.registry()
 	file := d.ast.File()
 	for _, decl := range file.Decls {
@@ -126,8 +126,9 @@ func (d *Document) FuncLitTypes() map[*ast.FuncLit]*ir.Func {
 // declarations) and re-done each edit, since diagnostics carry source offsets
 // that shift on every edit and so cannot be memoized.
 func (d *Document) refresh() {
-	d.db.setInput(d.ast.File())
+	d.db.setInput(soleFileID, d.ast.File())
 	d.module, d.diags = assemble(
+		soleFileID,
 		d.ast.File(),
 		positionsOf(d.ast.Concrete().Tree()),
 		engineQueries{d.db},

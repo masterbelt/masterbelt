@@ -13,16 +13,16 @@ import (
 // checkDivByZero reports each div/rem whose divisor folds to zero. It descends
 // into a function literal's body — a divisor folds (or doesn't) the same way
 // there, since parameters never fold to a constant.
-func checkDivByZero(e ast.Expr, q queries, report func(node ast.Node)) {
+func checkDivByZero(e ast.Expr, env evalEnv, report func(node ast.Node)) {
 	if lit, ok := e.(*ast.FuncLit); ok {
 		for _, stmt := range lit.Body {
 			switch stmt := stmt.(type) {
 			case *ast.ReturnStmt:
 				if stmt.Value != nil {
-					checkDivByZero(stmt.Value, q, report)
+					checkDivByZero(stmt.Value, env, report)
 				}
 			case *ast.ExprStmt:
-				checkDivByZero(stmt.X, q, report)
+				checkDivByZero(stmt.X, env, report)
 			}
 		}
 		return
@@ -36,13 +36,13 @@ func checkDivByZero(e ast.Expr, q queries, report func(node ast.Node)) {
 		return
 	}
 	if (member.Member.Name == "div" || member.Member.Name == "rem") && len(call.Arguments) == 1 {
-		if d := eval.Expr(call.Arguments[0], evalEnv{q}); d != nil && d.Kind == ir.ConstInt && d.Int.Sign() == 0 {
+		if d := eval.Expr(call.Arguments[0], env); d != nil && d.Kind == ir.ConstInt && d.Int.Sign() == 0 {
 			report(call)
 		}
 	}
-	checkDivByZero(member.Receiver, q, report)
+	checkDivByZero(member.Receiver, env, report)
 	for _, a := range call.Arguments {
-		checkDivByZero(a, q, report)
+		checkDivByZero(a, env, report)
 	}
 }
 

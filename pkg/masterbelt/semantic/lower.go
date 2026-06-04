@@ -9,15 +9,17 @@ import (
 
 // constBinder lowers the leaves of a constant initializer: a value-position
 // identifier binds to its declaration's *Const (through the resolution query and
-// the IR-const table); no other leaf form lowers in a constant.
+// the IR-const table); no other leaf form lowers in a constant. The file is the
+// one the initializer sits in, scoping its resolution.
 type constBinder struct {
 	q    queries
+	file FileID
 	irOf map[*ast.ConstDecl]*ir.Const
 }
 
 func (b constBinder) Leaf(e ast.Expr, _ func(ast.Expr) ir.Value) ir.Value {
 	if id, ok := e.(*ast.Identifier); ok {
-		if target := b.q.resolve(id); target != nil {
+		if target := b.q.resolve(b.file, id); target != nil {
 			return &ir.Reference{Target: b.irOf[target]}
 		}
 	}
