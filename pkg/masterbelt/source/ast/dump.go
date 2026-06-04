@@ -78,8 +78,32 @@ func dumpExpr(e Expr) string {
 			parts = append(parts, dumpExpr(a))
 		}
 		return "(" + strings.Join(parts, " ") + ")"
+	case *FuncLit:
+		params := make([]string, len(x.Params))
+		for i, p := range x.Params {
+			params[i] = p.Name + ": " + dumpType(p.Type)
+		}
+		parts := []string{"fn(" + strings.Join(params, ", ") + "): " + dumpType(x.Result)}
+		for _, s := range x.Body {
+			parts = append(parts, dumpStmtInline(s))
+		}
+		return "(" + strings.Join(parts, " ") + ")"
 	default:
 		return "Expr(?)"
+	}
+}
+
+// dumpStmtInline renders a statement compactly on one line, for a function
+// literal dumped as part of an enclosing expression. (dumpStmt is the
+// multi-line, indented form used for a method body.)
+func dumpStmtInline(s Stmt) string {
+	switch s := s.(type) {
+	case *ReturnStmt:
+		return "(return " + dumpExpr(s.Value) + ")"
+	case *ExprStmt:
+		return "(expr " + dumpExpr(s.X) + ")"
+	default:
+		return ""
 	}
 }
 

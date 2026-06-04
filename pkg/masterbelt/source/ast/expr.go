@@ -177,10 +177,34 @@ func NewCallExpr(callee Expr, arguments []Expr, syntax *cst.Node) *CallExpr {
 	return &CallExpr{Callee: callee, Arguments: arguments, syntax: syntax}
 }
 
+// FuncLit is a function-literal expression: fn(Params): Result { Body }. It is
+// the value form of a FuncType (it carries a statement body) and the only way to
+// construct a value of a function type. Its Params, Result, and Body reuse the
+// same nodes a method declaration is built from.
+type FuncLit struct {
+	Params []*ParamDef
+	Result TypeExpr // the declared result type, or nil if missing
+	Body   []Stmt   // the statement body
+	syntax *cst.Node
+}
+
+func (l *FuncLit) Syntax() *cst.Node { return l.syntax }
+func (l *FuncLit) node()             {}
+func (l *FuncLit) expr()             {}
+
+// NewFuncLit builds a FuncLit node.
+func NewFuncLit(params []*ParamDef, result TypeExpr, body []Stmt, syntax *cst.Node) *FuncLit {
+	return &FuncLit{Params: params, Result: result, Body: body, syntax: syntax}
+}
+
 // WalkValueIdents calls fn for every value-position identifier in e — the
 // operands of the expression — but not the member names operators desugared to
 // (those are method names, not references to declarations). It is how name
 // resolution and the editor reach the references inside an expression.
+//
+// It does not descend into a FuncLit body: a lambda introduces its own parameter
+// scope, so its identifiers are not all references to top-level declarations and
+// must not be reported as undefined here.
 func WalkValueIdents(e Expr, fn func(*Identifier)) {
 	switch e := e.(type) {
 	case *Identifier:

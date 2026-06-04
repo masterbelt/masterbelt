@@ -1,7 +1,7 @@
 File
   ConstDecl
     name "Doubled"
-    value (call (. (list IntLit "1" IntLit "2" IntLit "3") map))
+    value (call (. (list IntLit "1" IntLit "2" IntLit "3") map) (fn(x: int): int (return (call (. Identifier "x" mul) IntLit "2"))))
   ConstDecl
     name "Evens"
-    value (call (. (list IntLit "1" IntLit "2" IntLit "3" IntLit "4") map))
+    value (call (. (list IntLit "1" IntLit "2" IntLit "3" IntLit "4") map) (fn(x: int): bool (return (call (. (call (. Identifier "x" rem) IntLit "2") eql) IntLit "0"))))

@@ -138,7 +138,7 @@ func lowerInitializer(t cst.Tree, buf source.Buffer) ast.Expr {
 // isExprKind reports whether a CST node kind is an expression node.
 func isExprKind(k cst.Kind) bool {
 	switch k {
-	case cst.Literal, cst.NameRef, cst.SelfExpr, cst.UnaryExpr, cst.BinaryExpr, cst.CallExpr, cst.MemberExpr, cst.CollectionLit:
+	case cst.Literal, cst.NameRef, cst.SelfExpr, cst.UnaryExpr, cst.BinaryExpr, cst.CallExpr, cst.MemberExpr, cst.CollectionLit, cst.FuncLit:
 		return true
 	default:
 		return false
@@ -166,6 +166,8 @@ func lowerExpr(t cst.Tree, buf source.Buffer) ast.Expr {
 		return lowerMemberExpr(t, buf, node)
 	case cst.CallExpr:
 		return lowerCallExpr(t, buf, node)
+	case cst.FuncLit:
+		return lowerFuncLit(t, buf, node)
 	case cst.UnaryExpr:
 		// -x desugars to x.neg(): the operand is the receiver, no arguments.
 		return desugarCall(firstOperand(t, buf), unaryMethod(operatorKind(t)), nil, node)
@@ -371,6 +373,30 @@ func lowerCallExpr(t cst.Tree, buf source.Buffer, node *cst.Node) ast.Expr {
 		}
 	}
 	return ast.NewCallExpr(callee, args, node)
+}
+
+// lowerFuncLit lowers a function-literal expression, fn(Params): Result { Body },
+// to an ast.FuncLit. Its parameter list, result type, and block body lower the
+// same way a method declaration's do.
+func lowerFuncLit(t cst.Tree, buf source.Buffer, node *cst.Node) ast.Expr {
+	var params []*ast.ParamDef
+	var result ast.TypeExpr
+	var body []ast.Stmt
+	for _, child := range t.Children() {
+		n, ok := child.Node()
+		if !ok {
+			continue
+		}
+		switch {
+		case n.Kind() == cst.ParamList:
+			params = lowerParamList(child, buf)
+		case n.Kind() == cst.Block:
+			body = lowerBlock(child, buf)
+		case isTypeExprKind(n.Kind()):
+			result = lowerTypeExpr(child, buf)
+		}
+	}
+	return ast.NewFuncLit(params, result, body, node)
 }
 
 // --- type declarations ------------------------------------------------------
