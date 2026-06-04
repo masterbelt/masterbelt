@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/parser/abstract"
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source"
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ir"
+	"github.com/masterbelt/masterbelt/pkg/source"
+	"github.com/masterbelt/masterbelt/pkg/source/ir"
 )
 
 func naiveSplice(src []byte, start, end int, repl []byte) []byte {

@@ -12,8 +12,8 @@
 package lower
 
 import (
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ast"
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ir"
+	"github.com/masterbelt/masterbelt/pkg/source/ast"
+	"github.com/masterbelt/masterbelt/pkg/source/ir"
 )
 
 // Binder lowers the context-specific leaf forms of an expression — value names,

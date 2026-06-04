@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strconv"
 
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source"
+	"github.com/masterbelt/masterbelt/pkg/source"
 )
 
 // Kind identifies the lexical category of a Token.

@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ast"
+	"github.com/masterbelt/masterbelt/pkg/source/ast"
 )
 
 var update = flag.Bool("update", false, "update the example snapshots in testdata/examples")

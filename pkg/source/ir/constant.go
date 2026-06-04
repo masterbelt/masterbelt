@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ast"
+	"github.com/masterbelt/masterbelt/pkg/source/ast"
 )
 
 // ConstKind distinguishes the kinds of evaluated constant value.

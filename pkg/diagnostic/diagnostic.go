@@ -24,7 +24,7 @@ package diagnostic
 import (
 	"fmt"
 
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source"
+	"github.com/masterbelt/masterbelt/pkg/source"
 )
 
 // Code is the stable identifier of a diagnostic kind, e.g.

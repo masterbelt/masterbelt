@@ -20,7 +20,7 @@ import (
 	"math/big"
 	"sort"
 
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ir"
+	"github.com/masterbelt/masterbelt/pkg/source/ir"
 )
 
 // IntKind describes an integer primitive's representation. Bits == 0 means

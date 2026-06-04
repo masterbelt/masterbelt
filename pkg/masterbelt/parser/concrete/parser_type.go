@@ -1,8 +1,8 @@
 package concrete
 
 import (
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/cst"
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/token"
+	"github.com/masterbelt/masterbelt/pkg/source/cst"
+	"github.com/masterbelt/masterbelt/pkg/source/token"
 )
 
 // parseTypeExpr parses a type expression: a union of primary types,

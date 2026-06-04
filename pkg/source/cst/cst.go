@@ -25,7 +25,7 @@ package cst
 import (
 	"strconv"
 
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/token"
+	"github.com/masterbelt/masterbelt/pkg/source/token"
 )
 
 // Kind classifies an internal Node — a grammatical construct assembled from

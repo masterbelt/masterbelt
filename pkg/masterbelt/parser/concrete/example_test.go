@@ -9,8 +9,8 @@ import (
 	"testing"
 
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source"
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/cst"
+	"github.com/masterbelt/masterbelt/pkg/source"
+	"github.com/masterbelt/masterbelt/pkg/source/cst"
 )
 
 var update = flag.Bool("update", false, "update the example snapshots in testdata/examples")

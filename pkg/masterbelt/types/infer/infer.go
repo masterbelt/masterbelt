@@ -22,9 +22,9 @@ import (
 	"strings"
 
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ast"
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ir"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/types"
+	"github.com/masterbelt/masterbelt/pkg/source/ast"
+	"github.com/masterbelt/masterbelt/pkg/source/ir"
 )
 
 // Env is what inference and checking need from their driver: name resolution,

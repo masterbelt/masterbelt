@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ir"
+	"github.com/masterbelt/masterbelt/pkg/source/ir"
 )
 
 // bt is shorthand for a builtin type by name.

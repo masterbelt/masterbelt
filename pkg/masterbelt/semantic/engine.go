@@ -4,9 +4,9 @@ import (
 	"reflect"
 
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ast"
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ir"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/types/infer"
+	"github.com/masterbelt/masterbelt/pkg/source/ast"
+	"github.com/masterbelt/masterbelt/pkg/source/ir"
 )
 
 // This is a small demand-driven, memoizing query engine in the style of Salsa /

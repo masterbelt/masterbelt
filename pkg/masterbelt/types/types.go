@@ -23,7 +23,7 @@ import (
 	"math/big"
 
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ir"
+	"github.com/masterbelt/masterbelt/pkg/source/ir"
 )
 
 // IsInteger reports whether t is an integer type: an integer builtin (per the

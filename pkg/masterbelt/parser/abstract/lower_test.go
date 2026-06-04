@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ast"
+	"github.com/masterbelt/masterbelt/pkg/source/ast"
 )
 
 func TestLowerConstDecl(t *testing.T) {

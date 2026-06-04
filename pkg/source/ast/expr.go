@@ -1,6 +1,6 @@
 package ast
 
-import "github.com/masterbelt/masterbelt/pkg/masterbelt/source/cst"
+import "github.com/masterbelt/masterbelt/pkg/source/cst"
 
 // Expr is an initializer expression: a literal (IntLit/StringLit/BoolLit/
 // NullLit), an identifier (Identifier), a member access (MemberExpr), or a call

@@ -9,8 +9,8 @@ package lexer
 
 import (
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source"
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/token"
+	"github.com/masterbelt/masterbelt/pkg/source"
+	"github.com/masterbelt/masterbelt/pkg/source/token"
 )
 
 // Lexer scans a source.File and produces tokens one at a time.

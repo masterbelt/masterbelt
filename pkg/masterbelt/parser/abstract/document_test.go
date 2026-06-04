@@ -4,8 +4,8 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source"
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ast"
+	"github.com/masterbelt/masterbelt/pkg/source"
+	"github.com/masterbelt/masterbelt/pkg/source/ast"
 )
 
 func naiveSplice(src []byte, start, end int, repl []byte) []byte {

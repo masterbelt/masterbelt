@@ -3,9 +3,9 @@ package printer
 import (
 	"testing"
 
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source"
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/cst"
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/token"
+	"github.com/masterbelt/masterbelt/pkg/source"
+	"github.com/masterbelt/masterbelt/pkg/source/cst"
+	"github.com/masterbelt/masterbelt/pkg/source/token"
 )
 
 func TestPrintReproducesSource(t *testing.T) {

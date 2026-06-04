@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source"
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/token"
+	"github.com/masterbelt/masterbelt/pkg/source"
+	"github.com/masterbelt/masterbelt/pkg/source/token"
 )
 
 // Tree is a positioned view of a Green element: the element paired with its

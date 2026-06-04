@@ -3,9 +3,9 @@ package abstract
 import (
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/parser/concrete"
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source"
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ast"
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/cst"
+	"github.com/masterbelt/masterbelt/pkg/source"
+	"github.com/masterbelt/masterbelt/pkg/source/ast"
+	"github.com/masterbelt/masterbelt/pkg/source/cst"
 )
 
 // Document is an incrementally maintained abstract syntax tree over an editable

@@ -1,6 +1,6 @@
 package ast
 
-import "github.com/masterbelt/masterbelt/pkg/masterbelt/source/cst"
+import "github.com/masterbelt/masterbelt/pkg/source/cst"
 
 // File is a whole source file: its constant and type declarations in source
 // order. Trivia and any unparsable regions present in the CST are dropped here.

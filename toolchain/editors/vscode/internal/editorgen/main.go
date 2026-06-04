@@ -20,7 +20,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/token"
+	"github.com/masterbelt/masterbelt/pkg/source/token"
 )
 
 // Output paths, relative to this package's directory (where `go generate` runs).

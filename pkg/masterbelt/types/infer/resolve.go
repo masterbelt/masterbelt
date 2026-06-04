@@ -2,8 +2,8 @@ package infer
 
 import (
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ast"
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ir"
+	"github.com/masterbelt/masterbelt/pkg/source/ast"
+	"github.com/masterbelt/masterbelt/pkg/source/ir"
 )
 
 // TypeResolver resolves a type expression to its ir.Type. Where Expr types a

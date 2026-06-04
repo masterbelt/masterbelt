@@ -2,10 +2,10 @@ package lsp
 
 import (
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/semantic"
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ast"
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/cst"
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ir"
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/token"
+	"github.com/masterbelt/masterbelt/pkg/source/ast"
+	"github.com/masterbelt/masterbelt/pkg/source/cst"
+	"github.com/masterbelt/masterbelt/pkg/source/ir"
+	"github.com/masterbelt/masterbelt/pkg/source/token"
 	protocol "github.com/owenrumney/go-lsp/lsp"
 )
 

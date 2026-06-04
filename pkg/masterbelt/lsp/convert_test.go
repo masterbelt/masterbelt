@@ -5,7 +5,7 @@ import (
 
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/parser/abstract"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/semantic"
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source"
+	"github.com/masterbelt/masterbelt/pkg/source"
 	protocol "github.com/owenrumney/go-lsp/lsp"
 )
 

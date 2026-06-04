@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"unicode/utf8"
 
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/token"
+	"github.com/masterbelt/masterbelt/pkg/source/token"
 )
 
 // scanWhitespace scans a run of spaces, tabs, and carriage returns. Newlines are

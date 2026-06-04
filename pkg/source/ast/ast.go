@@ -20,7 +20,7 @@
 // File as a diffable snapshot.
 package ast
 
-import "github.com/masterbelt/masterbelt/pkg/masterbelt/source/cst"
+import "github.com/masterbelt/masterbelt/pkg/source/cst"
 
 // Node is any AST node. The interface is sealed: the node set is closed to the
 // types declared in this package.

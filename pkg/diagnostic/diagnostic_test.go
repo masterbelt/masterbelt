@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source"
+	"github.com/masterbelt/masterbelt/pkg/source"
 )
 
 func TestDiagnosticString(t *testing.T) {

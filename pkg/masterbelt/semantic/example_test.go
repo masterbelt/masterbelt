@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/parser/abstract"
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ir"
+	"github.com/masterbelt/masterbelt/pkg/source/ir"
 )
 
 var update = flag.Bool("update", false, "update the example snapshots in testdata/examples")

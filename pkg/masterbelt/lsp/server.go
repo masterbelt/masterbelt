@@ -24,7 +24,7 @@ import (
 	"sync"
 
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/semantic"
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source"
+	"github.com/masterbelt/masterbelt/pkg/source"
 	protocol "github.com/owenrumney/go-lsp/lsp"
 	"github.com/owenrumney/go-lsp/server"
 )

@@ -3,7 +3,7 @@ package token
 import (
 	"testing"
 
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source"
+	"github.com/masterbelt/masterbelt/pkg/source"
 )
 
 func TestKindString(t *testing.T) {

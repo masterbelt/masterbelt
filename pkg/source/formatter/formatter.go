@@ -17,9 +17,9 @@ package formatter
 import (
 	"strings"
 
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source"
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/cst"
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/printer"
+	"github.com/masterbelt/masterbelt/pkg/source"
+	"github.com/masterbelt/masterbelt/pkg/source/cst"
+	"github.com/masterbelt/masterbelt/pkg/source/printer"
 )
 
 // Format returns the canonical formatting of the file rooted at root, reading

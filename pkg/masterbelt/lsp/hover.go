@@ -4,9 +4,9 @@ import (
 	"strings"
 
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/semantic"
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source"
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/cst"
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ir"
+	"github.com/masterbelt/masterbelt/pkg/source"
+	"github.com/masterbelt/masterbelt/pkg/source/cst"
+	"github.com/masterbelt/masterbelt/pkg/source/ir"
 	protocol "github.com/owenrumney/go-lsp/lsp"
 )
 

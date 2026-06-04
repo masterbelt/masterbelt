@@ -11,8 +11,8 @@ package printer
 import (
 	"strings"
 
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source"
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/cst"
+	"github.com/masterbelt/masterbelt/pkg/source"
+	"github.com/masterbelt/masterbelt/pkg/source/cst"
 )
 
 // Print renders node and its descendants to text, reading each leaf token's

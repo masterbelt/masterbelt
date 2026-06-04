@@ -1,8 +1,8 @@
 package semantic
 
 import (
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ast"
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/cst"
+	"github.com/masterbelt/masterbelt/pkg/source/ast"
+	"github.com/masterbelt/masterbelt/pkg/source/cst"
 )
 
 // span is the source offset and width of a node, used to anchor a diagnostic.

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ast"
+	"github.com/masterbelt/masterbelt/pkg/source/ast"
 	protocol "github.com/owenrumney/go-lsp/lsp"
 	"github.com/owenrumney/go-lsp/servertest"
 )

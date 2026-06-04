@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source"
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/token"
+	"github.com/masterbelt/masterbelt/pkg/source"
+	"github.com/masterbelt/masterbelt/pkg/source/token"
 )
 
 // naiveSplice is the obvious reference for applying an edit to bytes.

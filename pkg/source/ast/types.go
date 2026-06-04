@@ -1,6 +1,6 @@
 package ast
 
-import "github.com/masterbelt/masterbelt/pkg/masterbelt/source/cst"
+import "github.com/masterbelt/masterbelt/pkg/source/cst"
 
 // This file holds the type-declaration side of the AST: the TypeDecl node, the
 // type-expression nodes (TypeExpr and its variants), and the impl members

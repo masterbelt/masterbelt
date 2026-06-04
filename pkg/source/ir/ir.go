@@ -15,7 +15,7 @@
 package ir
 
 import (
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ast"
+	"github.com/masterbelt/masterbelt/pkg/source/ast"
 )
 
 // Module is a resolved program: its constants and type definitions in source

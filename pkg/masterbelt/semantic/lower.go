@@ -2,9 +2,9 @@ package semantic
 
 import (
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/lower"
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ast"
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ir"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/types/infer"
+	"github.com/masterbelt/masterbelt/pkg/source/ast"
+	"github.com/masterbelt/masterbelt/pkg/source/ir"
 )
 
 // constBinder lowers the leaves of a constant initializer: a value-position

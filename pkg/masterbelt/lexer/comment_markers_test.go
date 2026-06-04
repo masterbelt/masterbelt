@@ -3,7 +3,7 @@ package lexer
 import (
 	"testing"
 
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/token"
+	"github.com/masterbelt/masterbelt/pkg/source/token"
 )
 
 // TestCommentMarkersMatchLexer pins the comment-marker constants (which the

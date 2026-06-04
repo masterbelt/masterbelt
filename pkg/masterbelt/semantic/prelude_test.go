@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ir"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/types"
+	"github.com/masterbelt/masterbelt/pkg/source/ir"
 )
 
 // TestLoadPrelude checks that the embedded prelude parses, resolves, and

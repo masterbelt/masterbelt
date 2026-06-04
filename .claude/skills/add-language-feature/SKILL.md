@@ -82,7 +82,7 @@ compares its output against a committed snapshot under that layer's
 
 ## Stage 2 — Lexer
 
-- New tokens: add the `Kind` in `pkg/masterbelt/source/token/token.go` (and its
+- New tokens: add the `Kind` in `pkg/source/token/token.go` (and its
   name/keyword mapping there), then recognize it in `pkg/masterbelt/lexer/`.
 - Run `make generate` if you added a token/keyword — it regenerates the editor
   grammar (and diagnostics); review the generated diff.
@@ -90,7 +90,7 @@ compares its output against a committed snapshot under that layer's
 
 ## Stage 3 — Parser / CST
 
-- New node kinds: add the `Kind` in `pkg/masterbelt/source/cst/cst.go` (and its
+- New node kinds: add the `Kind` in `pkg/source/cst/cst.go` (and its
   `kindNames` entry).
 - Parse it in `pkg/masterbelt/parser/concrete/` — the parser is split by
   concern: `parser_decl.go` (declarations), `parser_type.go` (type expressions),
@@ -103,7 +103,7 @@ compares its output against a committed snapshot under that layer's
 
 ## Stage 4 — Parser / AST
 
-- New AST nodes: `pkg/masterbelt/source/ast/`. Lower CST → AST in
+- New AST nodes: `pkg/source/ast/`. Lower CST → AST in
   `pkg/masterbelt/parser/abstract/`. Operators are desugared to method calls
   here (e.g. `1 + 2` → `1.add(2)`), which keeps the later layers uniform.
 - Refresh/review snapshot: `go test ./pkg/masterbelt/parser/abstract/ -update`.
@@ -114,7 +114,7 @@ This is where the program becomes resolved, typed, and evaluated. Touch only the
 layers the feature needs; the dependency direction is strictly one-way (see
 *Architecture map*).
 
-- **IR data** — `pkg/masterbelt/source/ir/` (`ir.go` value graph, `type.go`
+- **IR data** — `pkg/source/ir/` (`ir.go` value graph, `type.go`
   types, `constant.go` evaluated values). Add `dump.go` rendering for any new
   node so the `.ir` snapshot stays meaningful (Dump is the oracle).
 - **Type rules** — `pkg/masterbelt/types/` (pure algebra) and
