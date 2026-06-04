@@ -211,6 +211,21 @@ func TestTypeHover(t *testing.T) {
 	})
 }
 
+func TestTypeHoverWhere(t *testing.T) {
+	// The refinement predicate is part of the signature: hovering the type
+	// shows the values it admits, in canonical surface form.
+	src := "pub type Port = int32 where self >= 1 && self <= 65535\nconst p: Port = 8080\n"
+	doc := testView(src)
+
+	h := hover(doc, strings.Index(src, ": Port")+3)
+	if h == nil {
+		t.Fatal("no hover on the refined type reference")
+	}
+	if !strings.Contains(h.Contents.Value, "pub type Port = int32 where self >= 1 && self <= 65535") {
+		t.Errorf("hover = %q, want the signature with the where clause", h.Contents.Value)
+	}
+}
+
 func TestTypeHoverGenericParams(t *testing.T) {
 	src := "type Opt<T> = T | null\nconst o: Opt<int8> = 1\n"
 	doc := testView(src)

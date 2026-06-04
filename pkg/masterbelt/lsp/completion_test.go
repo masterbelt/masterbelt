@@ -119,6 +119,25 @@ func TestCompletionInAssertCondition(t *testing.T) {
 	}
 }
 
+func TestCompletionInWhereClause(t *testing.T) {
+	// A where-clause predicate is a value position: the value keywords are
+	// offered, not the type names the declaration's body position would be.
+	src := "type Port = int32 where self >= 1\n"
+	doc := testView(src)
+
+	offset := strings.Index(src, "self >=") + len("se")
+	got := byLabel(completion(doc, offset).Items)
+
+	for _, want := range []string{"true", "false", "null", "fn"} {
+		if _, ok := got[want]; !ok {
+			t.Errorf("where-clause completion missing %q", want)
+		}
+	}
+	if _, ok := got["int32"]; ok {
+		t.Error("where-clause completion offered a type name")
+	}
+}
+
 func TestMemberCompletion(t *testing.T) {
 	src := "const xs: list<int8> = [1]\nconst ys = xs.map(fn(x: int8): int8 { return x })\n"
 	doc := testView(src)

@@ -218,6 +218,11 @@ func typeHover(t *ir.TypeDef, buf source.Buffer, rng cst.Tree) *protocol.Hover {
 	case t.Body != nil:
 		b.WriteString(" = " + t.Body.String())
 	}
+	if t.Where != nil {
+		// The refinement predicate in its canonical surface form — the values
+		// the type admits, right on the signature.
+		b.WriteString(" where " + ast.Render(t.Where))
+	}
 	b.WriteString("\n```")
 	if len(t.Doc) > 0 {
 		b.WriteString("\n\n")

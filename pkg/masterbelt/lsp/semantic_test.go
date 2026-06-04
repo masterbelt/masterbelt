@@ -77,6 +77,32 @@ func TestSemanticTokensArrowLambda(t *testing.T) {
 	}
 }
 
+func TestSemanticTokensWhereClause(t *testing.T) {
+	// where colours as a keyword like the rest of the declaration; the
+	// comparison operator carries no semantic token (the grammar colours it).
+	doc := abstract.NewDocument([]byte("type Port = int32 where self >= 1\n"))
+	got := decode(semanticTokens(doc).Data)
+
+	want := []decodedToken{
+		{0, 0, 4, stKeyword, 0},          // type
+		{0, 5, 4, stType, smDeclaration}, // Port (declared name)
+		{0, 10, 1, stOperator, 0},        // =
+		{0, 12, 5, stType, 0},            // int32
+		{0, 18, 5, stKeyword, 0},         // where
+		{0, 24, 4, stKeyword, 0},         // self
+		{0, 32, 1, stNumber, 0},          // 1
+	}
+
+	if len(got) != len(want) {
+		t.Fatalf("got %d tokens, want %d:\n got:  %+v\n want: %+v", len(got), len(want), got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("token[%d] = %+v, want %+v", i, got[i], want[i])
+		}
+	}
+}
+
 func TestSemanticTokensStringLiteral(t *testing.T) {
 	doc := abstract.NewDocument([]byte("const X = \"label\"\n"))
 	got := decode(semanticTokens(doc).Data)

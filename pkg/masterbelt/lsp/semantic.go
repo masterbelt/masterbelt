@@ -147,8 +147,8 @@ func semanticTokensWith(doc *abstract.Document, isImportedConst func(*cst.Node) 
 // carry no colour (whitespace, newlines, EOF, illegal bytes).
 func classifyToken(kind token.Kind, parent cst.Kind, calleeMember bool) (tokenType, mods int, ok bool) {
 	switch kind {
-	case token.Const, token.Pub, token.Assert, token.Type, token.Impl, token.Fn,
-		token.Return, token.Self, token.Null, token.Extern, token.Builtin,
+	case token.Const, token.Pub, token.Assert, token.Where, token.Type, token.Impl,
+		token.Fn, token.Return, token.Self, token.Null, token.Extern, token.Builtin,
 		token.Use, token.From, token.True, token.False:
 		// Every keyword, uniformly — the cold-start grammar colours the same
 		// set keyword.control, so the two layers cannot drift apart per word.
