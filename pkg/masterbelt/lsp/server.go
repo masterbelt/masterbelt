@@ -289,7 +289,7 @@ func (s *Server) SemanticTokensFull(_ context.Context, params *protocol.Semantic
 	if !ok {
 		return nil, nil
 	}
-	return semanticTokens(v.AST()), nil
+	return semanticTokensIn(v), nil
 }
 
 // Formatting returns the edits to format the whole document.

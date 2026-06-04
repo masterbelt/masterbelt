@@ -250,18 +250,99 @@ func programOccurrences(v view, target *ir.Const, includeDecl bool) map[protocol
 	return out
 }
 
-// references returns the locations of every reference to the symbol at offset,
-// across every file of the workspace (including its declaration when
-// includeDecl is set).
+// typeOccurrencesOf returns every token in fv that names target: its
+// declaration name (when includeDecl is set and fv declares it), every
+// selective-import name that binds it, and every type-expression name that
+// resolves to it (qualified or not). This is occurrencesOf for types.
+func typeOccurrencesOf(fv view, target *ir.TypeDef, trees map[cst.Green]cst.Tree, includeDecl bool) []cst.Tree {
+	var tokens []cst.Tree
+	buf := fv.Buffer()
+
+	if includeDecl && target.Syntax != nil {
+		if declTree, ok := trees[target.Syntax.Syntax()]; ok {
+			if nameTok, ok := nameToken(declTree); ok {
+				tokens = append(tokens, nameTok)
+			}
+		}
+	}
+
+	// A selective-import name (use { Point } from ...) binds the type: a
+	// rename must rewrite it too, or it would leave a dangling import.
+	for _, u := range fv.AST().File().Uses {
+		t, ok := trees[u.Syntax()]
+		if !ok {
+			continue
+		}
+		for _, nameTok := range useNameTokens(t) {
+			if fv.ResolveUseType(u, nameTok.Text(buf)) == target {
+				tokens = append(tokens, nameTok)
+			}
+		}
+	}
+
+	// Every TypeName in the concrete tree — annotations, type-declaration
+	// bodies, signatures — resolving exactly as an annotation does. TypeNames
+	// nest (list<Coin>), so the walk continues into a TypeName's children.
+	own := fv.TypeNames()
+	qualified := fv.QualifiedTypeNames()
+	var walk func(t cst.Tree)
+	walk = func(t cst.Tree) {
+		if k, ok := t.Kind(); ok && k == cst.TypeName {
+			var idents []cst.Tree
+			for _, c := range t.Children() {
+				if kk, isTok := c.TokenKind(); isTok && kk == token.Ident {
+					idents = append(idents, c)
+				}
+			}
+			switch len(idents) {
+			case 1:
+				if findTypeDef(own, idents[0].Text(buf)) == target {
+					tokens = append(tokens, idents[0])
+				}
+			case 2:
+				if findTypeDef(qualified[idents[0].Text(buf)], idents[1].Text(buf)) == target {
+					tokens = append(tokens, idents[1])
+				}
+			}
+		}
+		for _, c := range t.Children() {
+			walk(c)
+		}
+	}
+	walk(fv.AST().Concrete().Tree())
+	return tokens
+}
+
+// programTypeOccurrences is programOccurrences for a type definition.
+func programTypeOccurrences(v view, target *ir.TypeDef, includeDecl bool) map[protocol.DocumentURI][]protocol.Range {
+	out := map[protocol.DocumentURI][]protocol.Range{}
+	for _, id := range v.ws.prog.Files() {
+		fv := view{ws: v.ws, id: id, uri: v.ws.uriFor(id)}
+		trees := fv.Trees()
+		buf := fv.Buffer()
+		for _, tok := range typeOccurrencesOf(fv, target, trees, includeDecl) {
+			out[fv.uri] = append(out[fv.uri], toRange(buf, tok.Offset(), tok.End()))
+		}
+	}
+	return out
+}
+
+// references returns the locations of every reference to the symbol at offset
+// — a constant or a type — across every file of the workspace (including its
+// declaration when includeDecl is set).
 func references(doc view, offset int, includeDecl bool) []protocol.Location {
-	occ, ok := occurrenceAt(doc, offset, doc.Trees())
-	if !ok {
+	var ranges map[protocol.DocumentURI][]protocol.Range
+	if occ, ok := occurrenceAt(doc, offset, doc.Trees()); ok {
+		ranges = programOccurrences(doc, occ.target, includeDecl)
+	} else if t, _, ok := typeAt(doc, offset); ok {
+		ranges = programTypeOccurrences(doc, t, includeDecl)
+	} else {
 		return nil
 	}
 
 	var locations []protocol.Location
-	for uri, ranges := range programOccurrences(doc, occ.target, includeDecl) {
-		for _, r := range ranges {
+	for uri, rs := range ranges {
+		for _, r := range rs {
 			locations = append(locations, protocol.Location{URI: uri, Range: r})
 		}
 	}
@@ -278,18 +359,29 @@ func references(doc view, offset int, includeDecl bool) []protocol.Location {
 	return locations
 }
 
-// rename renames the symbol at offset to newName at its declaration and every
-// reference, across every file of the workspace. It returns nil if there is no
-// symbol under the cursor or newName is not a valid identifier.
+// rename renames the symbol at offset — a constant or a type — to newName at
+// its declaration and every reference, across every file of the workspace. It
+// returns nil if there is no symbol under the cursor, newName is not a valid
+// identifier, or the declaration lies outside the workspace (the prelude's).
 func rename(doc view, offset int, newName string) *protocol.WorkspaceEdit {
-	occ, ok := occurrenceAt(doc, offset, doc.Trees())
-	if !ok || !isIdentifier(newName) {
+	if !isIdentifier(newName) {
+		return nil
+	}
+	var ranges map[protocol.DocumentURI][]protocol.Range
+	if occ, ok := occurrenceAt(doc, offset, doc.Trees()); ok {
+		ranges = programOccurrences(doc, occ.target, true)
+	} else if t, _, ok := typeAt(doc, offset); ok {
+		if _, declared := doc.viewOfType(t); !declared {
+			return nil // a prelude type cannot be renamed
+		}
+		ranges = programTypeOccurrences(doc, t, true)
+	} else {
 		return nil
 	}
 
 	changes := map[protocol.DocumentURI][]protocol.TextEdit{}
-	for uri, ranges := range programOccurrences(doc, occ.target, true) {
-		for _, r := range ranges {
+	for uri, rs := range ranges {
+		for _, r := range rs {
 			changes[uri] = append(changes[uri], protocol.TextEdit{Range: r, NewText: newName})
 		}
 	}
@@ -308,15 +400,24 @@ func rename(doc view, offset int, newName string) *protocol.WorkspaceEdit {
 	return &protocol.WorkspaceEdit{Changes: changes}
 }
 
-// documentHighlights returns every occurrence of the symbol under the cursor as
-// a highlight: its declaration as a write, each value reference as a read. It is
-// occurrencesOf rendered for the in-file "highlight all uses" feature.
+// documentHighlights returns every occurrence of the symbol under the cursor —
+// a constant or a type — as a highlight: its declaration as a write, each
+// reference as a read.
 func documentHighlights(doc view, offset int) []protocol.DocumentHighlight {
 	buf := doc.Buffer()
 	trees := doc.Trees()
 
-	occ, ok := occurrenceAt(doc, offset, trees)
-	if !ok {
+	var declSyntax *cst.Node
+	var reads []cst.Tree
+	if occ, ok := occurrenceAt(doc, offset, trees); ok {
+		declSyntax = occ.target.Syntax.Syntax()
+		reads = occurrencesOf(doc, occ.target, trees, false)
+	} else if t, _, ok := typeAt(doc, offset); ok {
+		if t.Syntax != nil {
+			declSyntax = t.Syntax.Syntax()
+		}
+		reads = typeOccurrencesOf(doc, t, trees, false)
+	} else {
 		return nil
 	}
 
@@ -324,7 +425,7 @@ func documentHighlights(doc view, offset int) []protocol.DocumentHighlight {
 	read := protocol.DocumentHighlightKindRead
 
 	var highlights []protocol.DocumentHighlight
-	if declTree, ok := trees[occ.target.Syntax.Syntax()]; ok {
+	if declTree, ok := trees[declSyntax]; ok {
 		if nameTok, ok := nameToken(declTree); ok {
 			highlights = append(highlights, protocol.DocumentHighlight{
 				Range: toRange(buf, nameTok.Offset(), nameTok.End()),
@@ -332,7 +433,7 @@ func documentHighlights(doc view, offset int) []protocol.DocumentHighlight {
 			})
 		}
 	}
-	for _, tok := range occurrencesOf(doc, occ.target, trees, false) {
+	for _, tok := range reads {
 		highlights = append(highlights, protocol.DocumentHighlight{
 			Range: toRange(buf, tok.Offset(), tok.End()),
 			Kind:  &read,
@@ -345,14 +446,22 @@ func documentHighlights(doc view, offset int) []protocol.DocumentHighlight {
 // editor can offer to rename it, pre-filled with the current name.
 func prepareRename(doc view, offset int) *protocol.PrepareRenameResult {
 	trees := doc.Trees()
-	occ, ok := occurrenceAt(doc, offset, trees)
-	if !ok {
-		return nil
+	if occ, ok := occurrenceAt(doc, offset, trees); ok {
+		return &protocol.PrepareRenameResult{
+			Range:       toRange(doc.Buffer(), occ.token.Offset(), occ.token.End()),
+			Placeholder: occ.target.Name,
+		}
 	}
-	return &protocol.PrepareRenameResult{
-		Range:       toRange(doc.Buffer(), occ.token.Offset(), occ.token.End()),
-		Placeholder: occ.target.Name,
+	if t, leaf, ok := typeAt(doc, offset); ok {
+		if _, declared := doc.viewOfType(t); !declared {
+			return nil // a prelude type cannot be renamed
+		}
+		return &protocol.PrepareRenameResult{
+			Range:       toRange(doc.Buffer(), leaf.Offset(), leaf.End()),
+			Placeholder: t.Name,
+		}
 	}
+	return nil
 }
 
 // isIdentifier reports whether s is a valid masterbelt identifier and not a

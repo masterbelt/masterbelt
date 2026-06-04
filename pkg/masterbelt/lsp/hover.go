@@ -29,7 +29,51 @@ func hover(doc view, offset int) *protocol.Hover {
 	if h := lambdaParamHover(doc, offset, trees); h != nil {
 		return h
 	}
+	if h := methodParamHover(doc, offset, trees); h != nil {
+		return h
+	}
 	return assertHover(doc, offset, trees)
+}
+
+// methodParamHover describes the method parameter denoted at offset: its name
+// in the signature's parameter list, or a reference to it inside the method's
+// body. The type comes from the module's resolved signature, so it renders as
+// the checker sees it. Function literals nest inside method bodies and their
+// parameters shadow the method's — lambdaParamHover runs first.
+func methodParamHover(doc view, offset int, trees map[cst.Green]cst.Tree) *protocol.Hover {
+	buf := doc.Buffer()
+	tok, name, ok := identAt(doc.AST().Concrete().Tree(), buf, offset)
+	if !ok {
+		return nil
+	}
+
+	file := doc.AST().File()
+	module := doc.Module()
+	for i, td := range file.Types {
+		if i >= len(module.Types) {
+			break
+		}
+		for j, m := range td.Methods {
+			mt, found := trees[m.Syntax()]
+			if !found || !within(mt, offset) || j >= len(module.Types[i].Methods) {
+				continue
+			}
+			for _, p := range module.Types[i].Methods[j].Params {
+				if p.Name != name || p.Type == nil || p.Type == ir.Invalid {
+					continue
+				}
+				r := toRange(buf, tok.Offset(), tok.End())
+				return &protocol.Hover{
+					Contents: protocol.MarkupContent{
+						Kind:  protocol.Markdown,
+						Value: "```masterbelt\n" + name + ": " + p.Type.String() + "\n```",
+					},
+					Range: &r,
+				}
+			}
+		}
+	}
+	return nil
 }
 
 // definition resolves the reference at offset — a value reference or a type

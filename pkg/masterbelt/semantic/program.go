@@ -120,6 +120,18 @@ func (p *Program) ResolveUseName(file FileID, u *ast.UseDecl, name string) *ir.C
 	return p.db.shells[q.exportsOf(target).consts[name]]
 }
 
+// ResolveUseType returns the type definition a selective-import name binds
+// (use { Point } from ...), or nil when the use resolves to no file or the
+// name is not among the target's exported types.
+func (p *Program) ResolveUseType(file FileID, u *ast.UseDecl, name string) *ir.TypeDef {
+	q := engineQueries{p.db}
+	target, ok := q.usesOf(file)[u]
+	if !ok {
+		return nil
+	}
+	return q.exportsOf(target).types[name]
+}
+
 // FileOf returns the file a constant of the last Refresh is declared in.
 func (p *Program) FileOf(c *ir.Const) (FileID, bool) {
 	if c == nil || c.Syntax == nil {
@@ -176,6 +188,13 @@ func funcLitTypesOf(db *database, fileID FileID, file *ast.File) map[*ast.FuncLi
 			infer.CheckAgainst(decl.Value, annType, env, sink)
 		} else {
 			infer.Check(decl.Value, env, sink)
+		}
+	}
+	// An assert condition is checked exactly as an un-annotated initializer,
+	// so a literal inside one settles its signature here too.
+	for _, a := range file.Asserts {
+		if a.Cond != nil {
+			infer.Check(a.Cond, env, sink)
 		}
 	}
 	checkMethodBodies(file, reg, q.typeDefs(fileID), q.universe(fileID), qualified, sink)

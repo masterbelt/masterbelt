@@ -114,10 +114,20 @@ func lambdaParamHover(doc view, offset int, trees map[cst.Green]cst.Tree) *proto
 	return nil
 }
 
-// forEachFuncLit visits every function literal in the document's constants and
-// method bodies, in source order, an enclosing literal before the ones nested
-// in its body.
+// forEachFuncLit visits every function literal in the document, in source
+// order, an enclosing literal before the ones nested in its body.
 func forEachFuncLit(doc view, fn func(*ast.FuncLit)) {
+	forEachExpr(doc.AST().File(), func(e ast.Expr) {
+		if lit, ok := e.(*ast.FuncLit); ok {
+			fn(lit)
+		}
+	})
+}
+
+// forEachExpr visits every expression of a file — constant initializers,
+// assert conditions, and method bodies, descending into function-literal
+// bodies — an enclosing expression before the ones nested in it.
+func forEachExpr(file *ast.File, fn func(ast.Expr)) {
 	var walkExpr func(e ast.Expr)
 	walkStmts := func(stmts []ast.Stmt) {
 		for _, stmt := range stmts {
@@ -132,9 +142,12 @@ func forEachFuncLit(doc view, fn func(*ast.FuncLit)) {
 		}
 	}
 	walkExpr = func(e ast.Expr) {
+		if e == nil {
+			return
+		}
+		fn(e)
 		switch e := e.(type) {
 		case *ast.FuncLit:
-			fn(e)
 			walkStmts(e.Body)
 		case *ast.CallExpr:
 			walkExpr(e.Callee)
@@ -155,10 +168,14 @@ func forEachFuncLit(doc view, fn func(*ast.FuncLit)) {
 		}
 	}
 
-	file := doc.AST().File()
 	for _, decl := range file.Decls {
 		if decl.Value != nil {
 			walkExpr(decl.Value)
+		}
+	}
+	for _, a := range file.Asserts {
+		if a.Cond != nil {
+			walkExpr(a.Cond)
 		}
 	}
 	for _, td := range file.Types {

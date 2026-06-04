@@ -555,3 +555,52 @@ func TestCrossFileTypeDefinition(t *testing.T) {
 		t.Errorf("definition(geo) = %v, want nil for the qualifier", locs)
 	}
 }
+
+// TestCrossFileSemanticTokens: resolution-aware tokens — a namespace member
+// access that names an imported constant renders as that constant, not as a
+// property.
+func TestCrossFileSemanticTokens(t *testing.T) {
+	root := crossProject(t)
+	s := NewServer()
+	uri := openOnDisk(t, s, root, "main.belt")
+	v := s.open[uri]
+
+	got := decode(semanticTokensIn(v).Data)
+	// main.belt line 2: "const start = geo.Origin" — Origin at col 18.
+	for _, tok := range got {
+		if tok.line == 2 && tok.char == 18 {
+			if tok.tokenType != stVariable || tok.mods != smReadonly {
+				t.Errorf("geo.Origin token = %+v, want variable/readonly", tok)
+			}
+			return
+		}
+	}
+	t.Fatalf("no token for Origin; got %+v", got)
+}
+
+// TestCrossFileTypeRename: renaming a type rewrites its declaration, its
+// selective import, and every reference, across the project's files.
+func TestCrossFileTypeRename(t *testing.T) {
+	mainSrc := "use { Point } from \"geometry.belt\"\nconst p: Point = 1\n"
+	root := belttest.WriteFiles(t, map[string]string{
+		"masterbelt.toml": "entry = \"main.belt\"\n",
+		"main.belt":       mainSrc,
+		"geometry.belt":   "pub type Point = int8\nconst origin: Point = 0\n",
+	})
+	s := NewServer()
+	uri := openOnDisk(t, s, root, "main.belt")
+	v := s.open[uri]
+
+	edit := rename(v, strings.Index(mainSrc, ": Point")+3, "Spot")
+	if edit == nil {
+		t.Fatal("rename returned nil")
+	}
+	// main.belt: the use-list name and the annotation; geometry.belt: the
+	// declaration and its local annotation reference.
+	if got := len(edit.Changes[fileURI(root, "main.belt")]); got != 2 {
+		t.Errorf("main.belt edits = %d, want 2 (use list + annotation)", got)
+	}
+	if got := len(edit.Changes[fileURI(root, "geometry.belt")]); got != 2 {
+		t.Errorf("geometry.belt edits = %d, want 2 (declaration + reference)", got)
+	}
+}

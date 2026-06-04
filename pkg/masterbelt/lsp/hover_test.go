@@ -243,3 +243,43 @@ func TestTypeDefinition(t *testing.T) {
 		t.Errorf("definition(int8) = %v, want nil for a prelude type", locs)
 	}
 }
+
+func TestMethodParamHover(t *testing.T) {
+	src := "type Lvl = int8 impl {\n  inc(amount: int8): self {\n    return self + amount\n  }\n}\n"
+	doc := testView(src)
+
+	t.Run("declaration in the signature", func(t *testing.T) {
+		h := hover(doc, strings.Index(src, "amount")+2)
+		if h == nil {
+			t.Fatal("no hover on the parameter declaration")
+		}
+		if !strings.Contains(h.Contents.Value, "amount: int8") {
+			t.Errorf("hover = %q, want amount: int8", h.Contents.Value)
+		}
+	})
+
+	t.Run("reference in the body", func(t *testing.T) {
+		h := hover(doc, strings.Index(src, "+ amount")+4)
+		if h == nil {
+			t.Fatal("no hover on the body reference")
+		}
+		if !strings.Contains(h.Contents.Value, "amount: int8") {
+			t.Errorf("hover = %q, want amount: int8", h.Contents.Value)
+		}
+	})
+}
+
+func TestLambdaParamHoverInAssert(t *testing.T) {
+	// A function literal inside an assert condition is part of the expression
+	// walk like any other: its parameter hovers with its inferred type.
+	src := "assert [1, 2].map(fn(v) { return v * 2 }) == [2, 4]\n"
+	doc := testView(src)
+
+	h := hover(doc, strings.Index(src, "return v")+7)
+	if h == nil {
+		t.Fatal("no hover on the lambda parameter in an assert")
+	}
+	if !strings.Contains(h.Contents.Value, "v: int") {
+		t.Errorf("hover = %q, want v: int", h.Contents.Value)
+	}
+}

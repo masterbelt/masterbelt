@@ -3,6 +3,7 @@ package lsp
 import (
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/parser/abstract"
 	"github.com/masterbelt/masterbelt/pkg/source"
+	"github.com/masterbelt/masterbelt/pkg/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/source/cst"
 	"github.com/masterbelt/masterbelt/pkg/source/token"
 	protocol "github.com/owenrumney/go-lsp/lsp"
@@ -53,17 +54,48 @@ type rawSemanticToken struct {
 }
 
 // semanticTokens classifies every leaf of the concrete tree and returns the
-// tokens in the LSP's relative-encoded form.
+// tokens in the LSP's relative-encoded form, lexically — the server passes the
+// program's resolution through semanticTokensIn.
 func semanticTokens(doc *abstract.Document) *protocol.SemanticTokens {
+	return semanticTokensWith(doc, nil)
+}
+
+// semanticTokensIn classifies with the program's resolution layered over the
+// lexical pass: a member access that names an imported constant (geo.Origin)
+// renders as the constant it is, not as a property.
+func semanticTokensIn(v view) *protocol.SemanticTokens {
+	members := map[*cst.Node]*ast.MemberExpr{}
+	forEachExpr(v.AST().File(), func(e ast.Expr) {
+		if m, ok := e.(*ast.MemberExpr); ok {
+			members[m.Syntax()] = m
+		}
+	})
+	return semanticTokensWith(v.AST(), func(green *cst.Node) bool {
+		m, ok := members[green]
+		return ok && v.ResolveMember(m) != nil
+	})
+}
+
+// semanticTokensWith is the classification walk. isImportedConst, when set,
+// reports whether a member-access node resolves to an imported constant —
+// the one classification a lexical pass cannot make.
+func semanticTokensWith(doc *abstract.Document, isImportedConst func(*cst.Node) bool) *protocol.SemanticTokens {
 	buf := doc.Buffer()
 
 	var raws []rawSemanticToken
-	var walk func(t cst.Tree, parent cst.Kind)
-	walk = func(t cst.Tree, parent cst.Kind) {
+	// walk carries the leaf-classification context of t's parent: its kind,
+	// its green node, and whether the parent is the callee member access of a
+	// call (which makes the member name a method). selfCallee says t itself is
+	// one, propagated to t's own children.
+	var walk func(t cst.Tree, parent cst.Kind, parentGreen *cst.Node, parentIsCallee, selfIsCallee bool)
+	walk = func(t cst.Tree, parent cst.Kind, parentGreen *cst.Node, parentIsCallee, selfIsCallee bool) {
 		if leaf, ok := t.Token(); ok {
-			tokenType, mods, ok := classifyToken(leaf.Kind(), parent)
+			tokenType, mods, ok := classifyToken(leaf.Kind(), parent, parentIsCallee)
 			if !ok {
 				return
+			}
+			if leaf.Kind() == token.Ident && parent == cst.MemberExpr && isImportedConst != nil && isImportedConst(parentGreen) {
+				tokenType, mods = stVariable, smReadonly
 			}
 			startLine, startChar := buf.LineColumn(t.Offset(), source.UTF16Encoding)
 			endLine, endChar := buf.LineColumn(t.End(), source.UTF16Encoding)
@@ -76,11 +108,24 @@ func semanticTokens(doc *abstract.Document) *protocol.SemanticTokens {
 			return
 		}
 		node, _ := t.Node()
+		// The callee of a call is its first child node; when it is a member
+		// access, the member's name is the method being called.
+		var callee cst.Green
+		if node.Kind() == cst.CallExpr {
+			for _, child := range t.Children() {
+				if n, isNode := child.Node(); isNode {
+					if n.Kind() == cst.MemberExpr {
+						callee = child.Green()
+					}
+					break
+				}
+			}
+		}
 		for _, child := range t.Children() {
-			walk(child, node.Kind())
+			walk(child, node.Kind(), node, selfIsCallee, callee != nil && child.Green() == callee)
 		}
 	}
-	walk(doc.Concrete().Tree(), cst.File)
+	walk(doc.Concrete().Tree(), cst.File, nil, false, false)
 
 	data := make([]int, 0, len(raws)*5)
 	prevLine, prevChar := 0, 0
@@ -96,10 +141,11 @@ func semanticTokens(doc *abstract.Document) *protocol.SemanticTokens {
 	return &protocol.SemanticTokens{Data: data}
 }
 
-// classifyToken maps a leaf token to a semantic type and modifiers from its kind
-// and the kind of the node that contains it. ok is false for elements that carry
-// no colour (whitespace, newlines, EOF, illegal bytes).
-func classifyToken(kind token.Kind, parent cst.Kind) (tokenType, mods int, ok bool) {
+// classifyToken maps a leaf token to a semantic type and modifiers from its
+// kind, the kind of the node that contains it, and — for a member access —
+// whether that access is the callee of a call. ok is false for elements that
+// carry no colour (whitespace, newlines, EOF, illegal bytes).
+func classifyToken(kind token.Kind, parent cst.Kind, calleeMember bool) (tokenType, mods int, ok bool) {
 	switch kind {
 	case token.Const, token.Pub, token.Assert, token.Type, token.Impl, token.Fn,
 		token.Return, token.Self, token.Null, token.Extern, token.Builtin,
@@ -143,10 +189,13 @@ func classifyToken(kind token.Kind, parent cst.Kind) (tokenType, mods int, ok bo
 			// function literal's.
 			return stParameter, smDeclaration, true
 		case cst.MemberExpr:
-			// A member access (self.id, list.map): the member's role — field,
-			// method, or an imported constant — is a semantic fact, so this
-			// lexical pass settles for property; resolution-aware tokens are
-			// a possible refinement.
+			// A member access: the callee of a call names the method being
+			// called (self.bump(x)); anything else reads as a property
+			// (self.id) — unless resolution says it is an imported constant,
+			// which the walk's override handles.
+			if calleeMember {
+				return stMethod, 0, true
+			}
 			return stProperty, 0, true
 		case cst.NameRef:
 			return stVariable, smReadonly, true

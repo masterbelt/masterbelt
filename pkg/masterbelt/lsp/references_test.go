@@ -1,6 +1,7 @@
 package lsp
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -121,5 +122,44 @@ func TestReferencesInAssertCondition(t *testing.T) {
 	// From the reference inside the assert condition, the same set.
 	if got := references(doc, 23, true); len(got) != 4 { // inside "Max" in the assert
 		t.Fatalf("references(assert ref) = %d, want 4", len(got))
+	}
+}
+
+func TestTypeReferences(t *testing.T) {
+	src := "pub type Coin = int8\nconst a: Coin = 1\nconst b: list<Coin> = [2]\n"
+	doc := testView(src)
+
+	// From the annotation: the declaration + 2 references (one nested in a
+	// generic argument).
+	if got := references(doc, strings.Index(src, ": Coin")+3, true); len(got) != 3 {
+		t.Fatalf("references(Coin) = %d, want 3", len(got))
+	}
+	// Excluding the declaration.
+	if got := references(doc, strings.Index(src, ": Coin")+3, false); len(got) != 2 {
+		t.Fatalf("references(!includeDecl) = %d, want 2", len(got))
+	}
+}
+
+func TestTypeRenamePreludeRefused(t *testing.T) {
+	// A prelude type is declared outside the workspace: renaming it would
+	// orphan every other program, so the rename (and its prepare) refuse.
+	src := "const a: int8 = 1\n"
+	doc := testView(src)
+	offset := strings.Index(src, "int8")
+	if edit := rename(doc, offset, "tiny"); edit != nil {
+		t.Errorf("rename(int8) = %+v, want nil", edit)
+	}
+	if pr := prepareRename(doc, offset); pr != nil {
+		t.Errorf("prepareRename(int8) = %+v, want nil", pr)
+	}
+}
+
+func TestTypeDocumentHighlights(t *testing.T) {
+	src := "pub type Coin = int8\nconst a: Coin = 1\n"
+	doc := testView(src)
+	got := documentHighlights(doc, strings.Index(src, ": Coin")+3)
+	// The declaration (write) and the annotation reference (read).
+	if len(got) != 2 {
+		t.Fatalf("highlights = %d, want 2", len(got))
 	}
 }

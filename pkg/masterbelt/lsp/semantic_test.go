@@ -177,6 +177,9 @@ func TestSemanticTokensMembers(t *testing.T) {
 		"  pub inc(x: int8): self {\n" +
 		"    return self.bump(x)\n" +
 		"  }\n" +
+		"  get(): int8 {\n" +
+		"    return self.id\n" +
+		"  }\n" +
 		"}\n"
 	doc := abstract.NewDocument([]byte(src))
 	got := decode(semanticTokens(doc).Data)
@@ -199,8 +202,9 @@ func TestSemanticTokensMembers(t *testing.T) {
 		{"method name", 4, 6, stMethod, smDeclaration},       // inc
 		{"parameter", 4, 10, stParameter, smDeclaration},     // x
 		{"self keyword", 5, 11, stKeyword, 0},                // self
-		{"member access", 5, 16, stProperty, 0},              // bump
+		{"method call", 5, 16, stMethod, 0},                  // bump (the callee)
 		{"reference in body", 5, 21, stVariable, smReadonly}, // x
+		{"field access", 8, 16, stProperty, 0},               // id (not a call)
 	}
 	for _, tc := range cases {
 		tok, ok := find(tc.line, tc.char)
