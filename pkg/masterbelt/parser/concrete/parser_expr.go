@@ -191,19 +191,22 @@ func (p *parser) parseParenExpr() *cst.Node {
 }
 
 // parseFuncLit parses a function-literal expression: fn ParamList [":" TypeExpr]
-// Block. It is the value form of a function type (parseFuncType) — same header,
-// but with a brace body — and is the only way to construct a value of a function
-// type. Unlike a function type or a method declaration, the literal's parameter
-// and result annotations are optional: a checking context (the expected type)
-// may supply them, so the parser accepts their absence and leaves the complaint
-// to the type checker. The cursor sits on "fn".
+// ( "->" Expr | Block ). It is the value form of a function type (parseFuncType)
+// — same header, but with a body — and is the only way to construct a value of a
+// function type. The body comes in two forms: an arrow body, "->" followed by a
+// single expression (an implicit return), and a brace block for statement
+// bodies. An arrow followed by "{" is rejected with a pointer to drop the arrow:
+// the two forms stay disjoint. Unlike a function type or a method declaration,
+// the literal's parameter and result annotations are optional: a checking
+// context (the expected type) may supply them, so the parser accepts their
+// absence and leaves the complaint to the type checker. The cursor sits on "fn".
 func (p *parser) parseFuncLit() *cst.Node {
 	children := []cst.Green{p.bump()} // "fn"
 	if p.peekSignificant() == token.LParen {
 		p.skipTrivia(&children)
 		children = append(children, p.parseParamList(false))
 	} else {
-		p.report(newUnexpectedTokenDiagnostic(p.cur().Offset, p.cur().Width, p.kind().String()))
+		p.report(newExpectedParamListDiagnostic(p.cur().Offset, p.cur().Width))
 	}
 	if p.peekSignificant() == token.Colon {
 		p.skipTrivia(&children)
@@ -215,11 +218,29 @@ func (p *parser) parseFuncLit() *cst.Node {
 			p.report(newExpectedTypeDiagnostic(p.lastStart, 0))
 		}
 	}
-	if p.peekSignificant() == token.LBrace {
+	switch p.peekSignificant() {
+	case token.Arrow:
+		p.skipTrivia(&children)
+		children = append(children, p.bump()) // "->"
+		switch {
+		case p.peekSignificant() == token.LBrace:
+			// "fn(x) -> { ... }": an arrow body must be an expression. Report
+			// it, then parse the block anyway so recovery stays local and the
+			// rest of the literal round-trips.
+			p.skipTrivia(&children)
+			p.report(newArrowBlockBodyDiagnostic(p.cur().Offset, p.cur().Width))
+			children = append(children, p.parseBlock())
+		case startsExpr(p.peekSignificant()):
+			p.skipTrivia(&children)
+			children = append(children, p.parseExpr(precLowest))
+		default:
+			p.report(newExpectedExpressionDiagnostic(p.lastStart, 0))
+		}
+	case token.LBrace:
 		p.skipTrivia(&children)
 		children = append(children, p.parseBlock())
-	} else {
-		p.report(newUnexpectedTokenDiagnostic(p.cur().Offset, p.cur().Width, p.kind().String()))
+	default:
+		p.report(newExpectedFuncBodyDiagnostic(p.cur().Offset, p.cur().Width))
 	}
 	return cst.NewNode(cst.FuncLit, children)
 }

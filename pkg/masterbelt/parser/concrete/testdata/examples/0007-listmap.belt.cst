@@ -46,16 +46,18 @@ File
           Whitespace " "
           TypeName
             Ident "int"
-  Error
-    Whitespace " "
-    Arrow "->"
-    Whitespace " "
-    Ident "x"
-    Whitespace " "
-    Star "*"
-    Whitespace " "
-    Int "2"
-    RParen ")"
+          Whitespace " "
+          Arrow "->"
+          Whitespace " "
+          BinaryExpr
+            NameRef
+              Ident "x"
+            Whitespace " "
+            Star "*"
+            Whitespace " "
+            Literal
+              Int "2"
+        RParen ")"
   ConstDecl
     Newline "\n"
     Newline "\n"
@@ -107,26 +109,24 @@ File
           Whitespace " "
           TypeName
             Ident "bool"
-  Error
-    Whitespace " "
-    Arrow "->"
-    Whitespace " "
-    Ident "x"
-    Whitespace " "
-    Percent "%"
-    Whitespace " "
-    Int "2"
-    Whitespace " "
-    EqEq "=="
-    Whitespace " "
-    Int "0"
-    RParen ")"
+          Whitespace " "
+          Arrow "->"
+          Whitespace " "
+          BinaryExpr
+            BinaryExpr
+              NameRef
+                Ident "x"
+              Whitespace " "
+              Percent "%"
+              Whitespace " "
+              Literal
+                Int "2"
+            Whitespace " "
+            EqEq "=="
+            Whitespace " "
+            Literal
+              Int "0"
+        RParen ")"
   Newline "\n"
   EOF ""
 # diagnostics
-error[masterbelt.parser.concrete.unexpected_token] 4:46 unexpected token: Whitespace
-error[masterbelt.parser.concrete.unexpected_token] 4:46 unexpected token: Whitespace
-error[masterbelt.parser.concrete.unexpected_token] 4:47 unexpected token: Arrow
-error[masterbelt.parser.concrete.unexpected_token] 8:48 unexpected token: Whitespace
-error[masterbelt.parser.concrete.unexpected_token] 8:48 unexpected token: Whitespace
-error[masterbelt.parser.concrete.unexpected_token] 8:49 unexpected token: Arrow

@@ -47,6 +47,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "unterminated string literal"
 		}
 	},
+	"masterbelt.parser.concrete.arrow_block_body": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "'->' の後には式が必要です。ブロック本体にするには '->' を削除してください"
+		default:
+			return "expected expression after '->'; remove '->' to use a block body"
+		}
+	},
 	"masterbelt.parser.concrete.expected_assign": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
@@ -79,6 +87,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "expected 'from'"
 		}
 	},
+	"masterbelt.parser.concrete.expected_func_body": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "'->' か '{' が必要です"
+		default:
+			return "expected '->' or '{'"
+		}
+	},
 	"masterbelt.parser.concrete.expected_identifier": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
@@ -93,6 +109,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "'" + f["operator"].String() + "' の後にオペランドが必要です"
 		default:
 			return "expected operand after '" + f["operator"].String() + "'"
+		}
+	},
+	"masterbelt.parser.concrete.expected_param_list": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "'(' が必要です"
+		default:
+			return "expected '('"
 		}
 	},
 	"masterbelt.parser.concrete.expected_path": func(loc Locale, f map[string]fmt.Stringer) string {

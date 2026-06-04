@@ -39,16 +39,18 @@ File
             Param
               Ident "x"
             RParen ")"
-  Error
-    Whitespace " "
-    Arrow "->"
-    Whitespace " "
-    Ident "x"
-    Whitespace " "
-    Star "*"
-    Whitespace " "
-    Int "2"
-    RParen ")"
+          Whitespace " "
+          Arrow "->"
+          Whitespace " "
+          BinaryExpr
+            NameRef
+              Ident "x"
+            Whitespace " "
+            Star "*"
+            Whitespace " "
+            Literal
+              Int "2"
+        RParen ")"
   ConstDecl
     Newline "\n"
     Newline "\n"
@@ -90,20 +92,24 @@ File
             Param
               Ident "x"
             RParen ")"
-  Error
-    Whitespace " "
-    Arrow "->"
-    Whitespace " "
-    Ident "x"
-    Whitespace " "
-    Percent "%"
-    Whitespace " "
-    Int "2"
-    Whitespace " "
-    EqEq "=="
-    Whitespace " "
-    Int "0"
-    RParen ")"
+          Whitespace " "
+          Arrow "->"
+          Whitespace " "
+          BinaryExpr
+            BinaryExpr
+              NameRef
+                Ident "x"
+              Whitespace " "
+              Percent "%"
+              Whitespace " "
+              Literal
+                Int "2"
+            Whitespace " "
+            EqEq "=="
+            Whitespace " "
+            Literal
+              Int "0"
+        RParen ")"
   ConstDecl
     Newline "\n"
     Newline "\n"
@@ -147,16 +153,18 @@ File
               TypeName
                 Ident "int"
             RParen ")"
-  Error
-    Whitespace " "
-    Arrow "->"
-    Whitespace " "
-    Ident "x"
-    Whitespace " "
-    Star "*"
-    Whitespace " "
-    Int "3"
-    RParen ")"
+          Whitespace " "
+          Arrow "->"
+          Whitespace " "
+          BinaryExpr
+            NameRef
+              Ident "x"
+            Whitespace " "
+            Star "*"
+            Whitespace " "
+            Literal
+              Int "3"
+        RParen ")"
   ConstDecl
     Newline "\n"
     Newline "\n"
@@ -194,15 +202,17 @@ File
           Param
             Ident "x"
           RParen ")"
-  Error
-    Whitespace " "
-    Arrow "->"
-    Whitespace " "
-    Ident "x"
-    Whitespace " "
-    Star "*"
-    Whitespace " "
-    Int "2"
+        Whitespace " "
+        Arrow "->"
+        Whitespace " "
+        BinaryExpr
+          NameRef
+            Ident "x"
+          Whitespace " "
+          Star "*"
+          Whitespace " "
+          Literal
+            Int "2"
   ConstDecl
     Newline "\n"
     Newline "\n"
@@ -318,14 +328,3 @@ File
   Newline "\n"
   EOF ""
 # diagnostics
-error[masterbelt.parser.concrete.unexpected_token] 4:36 unexpected token: Whitespace
-error[masterbelt.parser.concrete.unexpected_token] 4:36 unexpected token: Whitespace
-error[masterbelt.parser.concrete.unexpected_token] 4:37 unexpected token: Arrow
-error[masterbelt.parser.concrete.unexpected_token] 7:37 unexpected token: Whitespace
-error[masterbelt.parser.concrete.unexpected_token] 7:37 unexpected token: Whitespace
-error[masterbelt.parser.concrete.unexpected_token] 7:38 unexpected token: Arrow
-error[masterbelt.parser.concrete.unexpected_token] 11:41 unexpected token: Whitespace
-error[masterbelt.parser.concrete.unexpected_token] 11:41 unexpected token: Whitespace
-error[masterbelt.parser.concrete.unexpected_token] 11:42 unexpected token: Arrow
-error[masterbelt.parser.concrete.unexpected_token] 14:37 unexpected token: Whitespace
-error[masterbelt.parser.concrete.unexpected_token] 14:38 unexpected token: Arrow

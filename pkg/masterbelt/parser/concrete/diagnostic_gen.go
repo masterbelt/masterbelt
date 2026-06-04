@@ -9,16 +9,30 @@ import (
 )
 
 const (
+	CodeArrowBlockBody     diagnostic.Code = "masterbelt.parser.concrete.arrow_block_body"
 	CodeExpectedAssign     diagnostic.Code = "masterbelt.parser.concrete.expected_assign"
 	CodeExpectedConst      diagnostic.Code = "masterbelt.parser.concrete.expected_const"
 	CodeExpectedExpression diagnostic.Code = "masterbelt.parser.concrete.expected_expression"
 	CodeExpectedFrom       diagnostic.Code = "masterbelt.parser.concrete.expected_from"
+	CodeExpectedFuncBody   diagnostic.Code = "masterbelt.parser.concrete.expected_func_body"
 	CodeExpectedIdentifier diagnostic.Code = "masterbelt.parser.concrete.expected_identifier"
 	CodeExpectedOperand    diagnostic.Code = "masterbelt.parser.concrete.expected_operand"
+	CodeExpectedParamList  diagnostic.Code = "masterbelt.parser.concrete.expected_param_list"
 	CodeExpectedPath       diagnostic.Code = "masterbelt.parser.concrete.expected_path"
 	CodeExpectedType       diagnostic.Code = "masterbelt.parser.concrete.expected_type"
 	CodeUnexpectedToken    diagnostic.Code = "masterbelt.parser.concrete.unexpected_token"
 )
+
+func newArrowBlockBodyDiagnostic(offset int, width int) diagnostic.Diagnostic {
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeArrowBlockBody,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeArrowBlockBody, nil),
+		Fields:   nil,
+		Offset:   offset,
+		Width:    width,
+	}
+}
 
 func newExpectedAssignDiagnostic(offset int, width int) diagnostic.Diagnostic {
 	return diagnostic.Diagnostic{
@@ -64,6 +78,17 @@ func newExpectedFromDiagnostic(offset int, width int) diagnostic.Diagnostic {
 	}
 }
 
+func newExpectedFuncBodyDiagnostic(offset int, width int) diagnostic.Diagnostic {
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeExpectedFuncBody,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeExpectedFuncBody, nil),
+		Fields:   nil,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
 func newExpectedIdentifierDiagnostic(offset int, width int) diagnostic.Diagnostic {
 	return diagnostic.Diagnostic{
 		Severity: diagnostic.Error,
@@ -84,6 +109,17 @@ func newExpectedOperandDiagnostic(offset int, width int, operator string) diagno
 		Code:     CodeExpectedOperand,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeExpectedOperand, fields),
 		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newExpectedParamListDiagnostic(offset int, width int) diagnostic.Diagnostic {
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeExpectedParamList,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeExpectedParamList, nil),
+		Fields:   nil,
 		Offset:   offset,
 		Width:    width,
 	}

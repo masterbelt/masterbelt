@@ -38,7 +38,7 @@
 //	Postfix       := Operand ( "." Ident | "(" [ Expr ( "," Expr )* ] ")" )*
 //	Operand       := Literal | CollectionLit | NameRef | "self" | FuncLit | ParenExpr
 //	ParenExpr     := "(" Expr ")"
-//	FuncLit       := fn LitParamList [":" TypeExpr] Block
+//	FuncLit       := fn LitParamList [":" TypeExpr] ( "->" Expr | Block )
 //	LitParamList  := "(" [ LitParam ( "," LitParam )* ] ")"
 //	LitParam      := Ident [":" TypeExpr]
 //	CollectionLit := "[" [ Element ( "," Element )* [","] ] "]"

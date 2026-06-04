@@ -73,11 +73,18 @@ func TestParseLossless(t *testing.T) {
 		"const f = fn(x) { return x }\n",
 		"const f = fn(x: int, y) { return x }\n",
 		"const f = fn() {}\n",
-		"const f = fn(x",             // truncated literal stays lossless
-		"const f = fn(x,",            // truncated after a comma (must not panic)
-		"const f = fn(x,)",           // trailing comma is not part of the grammar
-		"type F = fn(x: int,",        // truncated func type param list
-		"type L = int8 impl {\nm(x,", // truncated method param list
+		"const f = fn(x",      // truncated literal stays lossless
+		"const f = fn(x,",     // truncated after a comma (must not panic)
+		"const f = fn(x,)",    // trailing comma is not part of the grammar
+		"type F = fn(x: int,", // truncated func type param list
+		// Arrow bodies: a single expression after "->".
+		"const f = fn(x) -> x * 2\n",
+		"const f = fn(x: int): int -> x\n",
+		"const f = fn() -> 1\n",
+		"const f = fn(x) ->",                // missing arrow body stays lossless
+		"const f = fn(x) -> { return 1 }\n", // block after arrow is an error, stays lossless
+		"const f = fn(x) => x\n",            // a fat arrow is no body starter
+		"type L = int8 impl {\nm(x,",        // truncated method param list
 		// Assert declarations.
 		"assert Max > Min\n",
 		"/// doc\nassert Max > Min\n",
@@ -364,6 +371,37 @@ func TestParseFuncLit(t *testing.T) {
 		{
 			"nested", "const f = fn(x) { return fn(y) { return y } }\n",
 			[]cst.Kind{cst.ParamList, cst.Block},
+			[][]cst.Kind{nil},
+		},
+		// Arrow bodies: "->" followed by a single expression instead of a block.
+		{
+			"arrow", "const f = fn(x) -> x * 2\n",
+			[]cst.Kind{cst.ParamList, cst.BinaryExpr},
+			[][]cst.Kind{nil},
+		},
+		{
+			"arrow annotated param", "const f = fn(x: int) -> x * 3\n",
+			[]cst.Kind{cst.ParamList, cst.BinaryExpr},
+			[][]cst.Kind{{cst.TypeName}},
+		},
+		{
+			"arrow two params", "const f = fn(x, y) -> x\n",
+			[]cst.Kind{cst.ParamList, cst.NameRef},
+			[][]cst.Kind{nil, nil},
+		},
+		{
+			"arrow zero params", "const f = fn() -> 1\n",
+			[]cst.Kind{cst.ParamList, cst.Literal},
+			nil,
+		},
+		{
+			"arrow with result", "const f = fn(x): int -> x\n",
+			[]cst.Kind{cst.ParamList, cst.TypeName, cst.NameRef},
+			[][]cst.Kind{nil},
+		},
+		{
+			"arrow nested", "const f = fn(x) -> fn(y) -> y\n",
+			[]cst.Kind{cst.ParamList, cst.FuncLit},
 			[][]cst.Kind{nil},
 		},
 	}
@@ -675,6 +713,10 @@ func TestParseDiagnostics(t *testing.T) {
 		{"missing type", "const X: = 1", CodeExpectedType},
 		{"stray token", "= 1\n", CodeUnexpectedToken},
 		{"param after comma", "const f = fn(x,) { return x }\n", CodeExpectedIdentifier},
+		{"func lit without parens", "const f = fn x -> x * 2\n", CodeExpectedParamList},
+		{"fat arrow is no body", "const f = fn(x) => x * 2\n", CodeExpectedFuncBody},
+		{"block after arrow", "const f = fn(x) -> { return 1 }\n", CodeArrowBlockBody},
+		{"missing arrow body", "const f = fn(x) ->\n", CodeExpectedExpression},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
