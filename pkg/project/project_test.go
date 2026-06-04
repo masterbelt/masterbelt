@@ -10,6 +10,7 @@ import (
 
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
 	"github.com/masterbelt/masterbelt/pkg/project/config"
+	"github.com/masterbelt/masterbelt/pkg/source"
 )
 
 // write creates path under root (and any parent directories) with content.
@@ -351,4 +352,78 @@ func assertSingleError(t *testing.T, diags diagnostic.List, code diagnostic.Code
 		t.Fatalf("diagnostic = %v, want error %s", d, code)
 	}
 	return d
+}
+
+// fileIDList flattens the project's file ids for compact assertions.
+func fileIDList(p *Project) string {
+	var ids []string
+	for _, f := range p.Files() {
+		ids = append(ids, string(f.ID))
+	}
+	return strings.Join(ids, ",")
+}
+
+func TestResyncPrunesOrphans(t *testing.T) {
+	root := t.TempDir()
+	write(t, root, "masterbelt.toml", "entry = \"main.belt\"\n")
+	write(t, root, "main.belt", "use geo from \"geometry.belt\"\nconst A = 1\n")
+	write(t, root, "geometry.belt", "use { C } from \"palette.belt\"\npub const Origin = 0\n")
+	write(t, root, "palette.belt", "pub const C = 2\n")
+
+	proj, diags := Open(root)
+	if diags.Len() != 0 {
+		t.Fatalf("Open() diagnostics = %v, want none", diags.Items())
+	}
+	if got := fileIDList(proj); got != "geometry.belt,main.belt,palette.belt" {
+		t.Fatalf("Files() = %s, want the full closure", got)
+	}
+
+	// Editing the entry to drop the import orphans geometry and, through it,
+	// palette: both leave the set on Resync.
+	entry := proj.EntryFile()
+	entry.AST.Edit(source.Edit{Start: 0, End: entry.AST.Buffer().Len(), NewText: []byte("const A = 1\n")})
+	proj.Resync("main.belt")
+	if got := fileIDList(proj); got != "main.belt" {
+		t.Errorf("Files() after the edit = %s, want just the entry", got)
+	}
+
+	// Restoring the import reloads the subtree from disk.
+	entry.AST.Edit(source.Edit{Start: 0, End: entry.AST.Buffer().Len(), NewText: []byte("use geo from \"geometry.belt\"\nconst A = 1\n")})
+	proj.Resync("main.belt")
+	if got := fileIDList(proj); got != "geometry.belt,main.belt,palette.belt" {
+		t.Errorf("Files() after restoring = %s, want the full closure again", got)
+	}
+}
+
+func TestIncludePinsAndReleaseUnpins(t *testing.T) {
+	root := t.TempDir()
+	write(t, root, "masterbelt.toml", "entry = \"main.belt\"\n")
+	write(t, root, "main.belt", "const A = 1\n")
+	write(t, root, "lib/util.belt", "pub const U = 2\n")
+
+	proj, diags := Open(root)
+	if diags.Len() != 0 {
+		t.Fatalf("Open() diagnostics = %v, want none", diags.Items())
+	}
+
+	// Include pins a file no use reaches: edits elsewhere never prune it.
+	if f := proj.Include("lib/util.belt"); f == nil {
+		t.Fatal("Include(lib/util.belt) = nil, want the file")
+	}
+	proj.Resync("main.belt")
+	if got := fileIDList(proj); got != "lib/util.belt,main.belt" {
+		t.Errorf("Files() = %s, want the pinned file to survive Resync", got)
+	}
+
+	// Release drops the pin; nothing reaches the file, so it leaves the set.
+	proj.Release("lib/util.belt")
+	if got := fileIDList(proj); got != "main.belt" {
+		t.Errorf("Files() after Release = %s, want just the entry", got)
+	}
+
+	// The entry itself is never released.
+	proj.Release("main.belt")
+	if got := fileIDList(proj); got != "main.belt" {
+		t.Errorf("Files() after releasing the entry = %s, want the entry kept", got)
+	}
 }

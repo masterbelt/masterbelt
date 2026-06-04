@@ -65,6 +65,11 @@ type Project struct {
 	Entry FileID
 
 	files map[FileID]*File
+	// roots pins the files that stay in the set regardless of who imports
+	// them: the entry, plus every file Include added (an editor has it open).
+	// Everything else lives in the set only while a use chain from a root
+	// reaches it — prune drops the rest.
+	roots map[FileID]bool
 }
 
 // File returns the project file with the given id, or nil if the id is not
@@ -152,6 +157,7 @@ func OpenProfile(dir, profile string) (*Project, diagnostic.List) {
 		Profile: profile,
 		Entry:   entry,
 		files:   closeOver(root, entryFile),
+		roots:   map[FileID]bool{entry: true},
 	}, diags
 }
 
@@ -204,10 +210,12 @@ func extend(root string, files map[FileID]*File, f *File) {
 
 // Include ensures the file named id is part of the project's set — an editor
 // may open a file the entry does not (yet) import — loading it and everything
-// it reaches from disk. It returns the file, or nil when id names no readable
+// it reaches from disk, and pinning it as a root so no edit elsewhere prunes
+// it while it is open. It returns the file, or nil when id names no readable
 // file under the root.
 func (p *Project) Include(id FileID) *File {
 	if f, ok := p.files[id]; ok {
+		p.roots[id] = true
 		return f
 	}
 	f, err := loadFile(p.Root, id)
@@ -215,21 +223,61 @@ func (p *Project) Include(id FileID) *File {
 		return nil
 	}
 	p.files[id] = f
+	p.roots[id] = true
 	extend(p.Root, p.files, f)
 	return f
 }
 
+// Release drops the pin Include placed on id — the editor closed the file —
+// so it stays in the set only while a use chain from a root reaches it; the
+// files the release orphaned leave the set. The entry is never released.
+func (p *Project) Release(id FileID) {
+	if id == p.Entry {
+		return
+	}
+	delete(p.roots, id)
+	p.prune()
+}
+
 // Resync re-resolves id's use declarations after its document changed (an
-// editor edit), loading any newly referenced files from disk into the set.
-// Files no other use reaches anymore are kept — stale but harmless — until the
-// project is reopened.
+// editor edit), loading any newly referenced files from disk into the set and
+// dropping the files no root reaches anymore.
 func (p *Project) Resync(id FileID) *File {
 	f, ok := p.files[id]
 	if !ok {
 		return p.Include(id)
 	}
 	extend(p.Root, p.files, f)
+	p.prune()
 	return f
+}
+
+// prune drops every file no use chain from a root reaches. Survivors never
+// hold a dangling use: a use target of a reachable file is reachable itself.
+func (p *Project) prune() {
+	reached := make(map[FileID]bool, len(p.files))
+	var queue []FileID
+	for id := range p.roots {
+		if p.files[id] != nil && !reached[id] {
+			reached[id] = true
+			queue = append(queue, id)
+		}
+	}
+	for len(queue) > 0 {
+		id := queue[0]
+		queue = queue[1:]
+		for _, target := range p.files[id].Uses {
+			if !reached[target] && p.files[target] != nil {
+				reached[target] = true
+				queue = append(queue, target)
+			}
+		}
+	}
+	for id := range p.files {
+		if !reached[id] {
+			delete(p.files, id)
+		}
+	}
 }
 
 // resolveUse resolves a use path as written in importer's source to the
