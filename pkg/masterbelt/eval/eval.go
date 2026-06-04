@@ -154,18 +154,22 @@ func collection(e *ast.CollectionLit, ctx evalCtx) *ir.Constant {
 // call evaluates a method call: a collection receiver is handled here (the only
 // foldable collection method is list.map), and a primitive receiver dispatches
 // to its native intrinsic in the builtin registry, keyed on the receiver's value
-// kind (every integer type shares one set of intrinsics, every boolean another).
-// It returns nil when an operand is unevaluated, the method has no value for the
-// receiver (only reachable for a type-incorrect program), or the intrinsic
-// itself has no value (a division by zero).
+// kind (every integer type shares one set of intrinsics, every boolean another)
+// and the arguments' kinds — which is how an overloaded method (a name with
+// several signatures) evaluates through the same implementation the type rules
+// selected. It returns nil when an operand is unevaluated, the method has no
+// value for the receiver (only reachable for a type-incorrect program), or the
+// intrinsic itself has no value (a division by zero).
 func call(env Env, recv *ir.Constant, name string, args []*ir.Constant) *ir.Constant {
 	if recv == nil {
 		return nil
 	}
-	for _, a := range args {
+	kinds := make([]ir.ConstKind, len(args))
+	for i, a := range args {
 		if a == nil {
 			return nil
 		}
+		kinds[i] = a.Kind
 	}
 	if recv.Kind == ir.ConstCollection {
 		return collectionMethod(env, recv, name, args)
@@ -181,7 +185,7 @@ func call(env Env, recv *ir.Constant, name string, args []*ir.Constant) *ir.Cons
 	default:
 		return nil
 	}
-	fn, ok := env.Registry().Intrinsic(typeName, name)
+	fn, ok := env.Registry().Intrinsic(typeName, name, kinds)
 	if !ok {
 		return nil
 	}

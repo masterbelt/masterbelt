@@ -90,12 +90,21 @@ func (n *NativeType) Fits(v *big.Int) bool {
 // type-incorrect program, or a division by zero.
 type Intrinsic func(recv *ir.Constant, args []*ir.Constant) *ir.Constant
 
+// intrinsicEntry is one native implementation of an extern method: the
+// function and the argument-kind signature it dispatches on. A nil kinds list
+// marks a kind-agnostic implementation — the match for any arguments when no
+// exact signature claims them (every un-overloaded method registers this way).
+type intrinsicEntry struct {
+	kinds []ir.ConstKind
+	fn    Intrinsic
+}
+
 // Registry is a set of native primitives. Build the standard one with Default.
 type Registry struct {
 	order      []string
 	defs       map[string]*ir.TypeDef
 	natives    map[string]*NativeType
-	intrinsics map[string]map[string]Intrinsic
+	intrinsics map[string]map[string][]intrinsicEntry
 }
 
 // Lookup returns the type definition of the primitive named name.
@@ -110,15 +119,50 @@ func (r *Registry) Native(name string) (*NativeType, bool) {
 	return n, ok
 }
 
-// Intrinsic returns the native implementation of the named method on the named
-// primitive type.
-func (r *Registry) Intrinsic(typeName, method string) (Intrinsic, bool) {
-	ms, ok := r.intrinsics[typeName]
-	if !ok {
-		return nil, false
+// Intrinsic returns the native implementation of the named method on the
+// named primitive type for the given argument kinds: the implementation
+// registered for exactly those kinds, or the method's kind-agnostic sole
+// implementation. The evaluator dispatches here with the evaluated arguments'
+// kinds, mirroring the argument-type overload selection the type rules made —
+// the two agree because an overload's parameter types determine its argument
+// kinds.
+func (r *Registry) Intrinsic(typeName, method string, kinds []ir.ConstKind) (Intrinsic, bool) {
+	var fallback Intrinsic
+	for _, e := range r.intrinsics[typeName][method] {
+		if e.kinds == nil {
+			if fallback == nil {
+				fallback = e.fn
+			}
+			continue
+		}
+		if kindsEqual(e.kinds, kinds) {
+			return e.fn, true
+		}
 	}
-	fn, ok := ms[method]
-	return fn, ok
+	if fallback != nil {
+		return fallback, true
+	}
+	return nil, false
+}
+
+// HasIntrinsic reports whether the named method has any native implementation
+// on the named primitive — what the prelude validation asks, where no
+// argument values exist yet.
+func (r *Registry) HasIntrinsic(typeName, method string) bool {
+	return len(r.intrinsics[typeName][method]) > 0
+}
+
+// kindsEqual reports whether the two kind signatures are the same.
+func kindsEqual(a, b []ir.ConstKind) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 // Names returns the natively-backed primitive names in registration order. It is
@@ -342,7 +386,7 @@ func Default() *Registry {
 	r := &Registry{
 		defs:       map[string]*ir.TypeDef{},
 		natives:    map[string]*NativeType{},
-		intrinsics: map[string]map[string]Intrinsic{},
+		intrinsics: map[string]map[string][]intrinsicEntry{},
 	}
 	for _, spec := range integerSpecs {
 		kind := spec.kind
@@ -364,7 +408,20 @@ func (r *Registry) register(name string, native *NativeType, methods []*ir.Metho
 		Builtin: true,
 	}
 	r.natives[name] = native
-	if intrinsics != nil {
-		r.intrinsics[name] = intrinsics
+	for method, fn := range intrinsics {
+		r.registerIntrinsic(name, method, nil, fn)
 	}
+}
+
+// registerIntrinsic adds one native implementation of method on the named
+// primitive, dispatching on the given argument kinds. nil kinds registers the
+// method's kind-agnostic sole implementation; an overloaded method registers
+// one entry per argument-kind signature.
+func (r *Registry) registerIntrinsic(typeName, method string, kinds []ir.ConstKind, fn Intrinsic) {
+	ms, ok := r.intrinsics[typeName]
+	if !ok {
+		ms = map[string][]intrinsicEntry{}
+		r.intrinsics[typeName] = ms
+	}
+	ms[method] = append(ms[method], intrinsicEntry{kinds: kinds, fn: fn})
 }

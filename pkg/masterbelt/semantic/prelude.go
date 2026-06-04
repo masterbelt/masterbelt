@@ -154,7 +154,7 @@ func validatePrelude(reg *builtin.Registry, defs []*ir.TypeDef) error {
 			if !m.Extern {
 				continue
 			}
-			if _, ok := reg.Intrinsic(d.Name, m.Name); !ok {
+			if !reg.HasIntrinsic(d.Name, m.Name) {
 				return fmt.Errorf("prelude: %s.%s is extern but the registry has no intrinsic for it", d.Name, m.Name)
 			}
 		}
