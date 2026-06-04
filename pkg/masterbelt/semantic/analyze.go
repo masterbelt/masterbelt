@@ -165,7 +165,7 @@ func assemble(file *ast.File, positions map[cst.Green]span, q queries) (*ir.Modu
 
 	// Resolve the file's type declarations into the module's type definitions,
 	// then type-check each method body against its declared result type.
-	module.Types = resolveTypes(file, reg)
+	module.Types = resolveTypes(file, reg, at, diags)
 	checkMethodBodies(file, reg, module.Types, func(node ast.Node, got, want ir.Type) {
 		s := at(node)
 		diags.Add(newTypeMismatchDiagnostic(s.offset, s.width, got.String(), want.String()))

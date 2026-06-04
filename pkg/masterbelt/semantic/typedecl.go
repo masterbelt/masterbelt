@@ -2,6 +2,7 @@ package semantic
 
 import (
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/diagnostic"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ir"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/types"
@@ -15,25 +16,35 @@ import (
 // Only the declarations' structure is resolved: the generic parameters and their
 // bounds, the defined body type, and each method's signature. Method bodies are
 // not lowered or type-checked here.
-func resolveTypes(file *ast.File, reg *builtin.Registry) []*ir.TypeDef {
+func resolveTypes(file *ast.File, reg *builtin.Registry, at func(ast.Node) span, diags *diagnostic.List) []*ir.TypeDef {
 	if len(file.Types) == 0 {
 		return nil
 	}
 
 	// First pass: a definition per declaration, by name, so references (including
-	// forward ones) bind before any body is resolved.
+	// forward ones) bind before any body is resolved. A redeclared name keeps the
+	// first definition and is reported.
 	defs := make(map[string]*ir.TypeDef, len(file.Types))
 	out := make([]*ir.TypeDef, len(file.Types))
 	for i, td := range file.Types {
 		def := &ir.TypeDef{Name: td.Name, Public: td.Public, Doc: td.Doc}
 		out[i] = def
-		if td.Name != "" {
+		if td.Name == "" {
+			continue
+		}
+		if _, dup := defs[td.Name]; dup {
+			if at != nil && diags != nil {
+				s := at(td)
+				diags.Add(newDuplicateDeclarationDiagnostic(s.offset, s.width, td.Name))
+			}
+		} else {
 			defs[td.Name] = def
 		}
 	}
 
-	// Second pass: resolve parameters, body, and method signatures.
-	r := &typeResolver{reg: reg, defs: defs}
+	// Second pass: resolve parameters, body, and method signatures, reporting any
+	// unknown type names.
+	r := &typeResolver{reg: reg, defs: defs, at: at, diags: diags}
 	for i, td := range file.Types {
 		r.resolveDecl(td, out[i])
 	}
@@ -185,10 +196,22 @@ func recordOf(t ir.Type) *ir.Record {
 }
 
 // typeResolver resolves type expressions against the builtin registry and the
-// file's own type definitions.
+// file's own type definitions, reporting unknown type names through at/diags
+// (both nil when resolving the prelude, which carries no positions).
 type typeResolver struct {
-	reg  *builtin.Registry
-	defs map[string]*ir.TypeDef
+	reg   *builtin.Registry
+	defs  map[string]*ir.TypeDef
+	at    func(ast.Node) span
+	diags *diagnostic.List
+}
+
+// reportUnknownType reports that node names a type that does not resolve.
+func (r *typeResolver) reportUnknownType(node ast.Node, name string) {
+	if r.at == nil || r.diags == nil {
+		return
+	}
+	s := r.at(node)
+	r.diags.Add(newUnknownTypeDiagnostic(s.offset, s.width, name))
 }
 
 // resolveDecl fills in def from the declaration: its generic parameters (whose
@@ -359,6 +382,7 @@ func (r *typeResolver) resolveNamed(t *ast.NamedType, scope map[string]bool) ir.
 	if len(t.Args) > 0 {
 		def := r.lookup(t.Name)
 		if def == nil {
+			r.reportUnknownType(t, t.Name)
 			return ir.Invalid
 		}
 		args := make([]ir.Type, len(t.Args))
@@ -369,6 +393,7 @@ func (r *typeResolver) resolveNamed(t *ast.NamedType, scope map[string]bool) ir.
 	}
 	def := r.lookup(t.Name)
 	if def == nil {
+		r.reportUnknownType(t, t.Name)
 		return ir.Invalid
 	}
 	if def.Builtin {
