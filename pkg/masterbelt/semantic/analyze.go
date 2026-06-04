@@ -533,9 +533,9 @@ type directQueries struct {
 	reg      *builtin.Registry
 
 	syms map[FileID]map[string]*ast.ConstDecl
-	imps map[FileID]*importTable
-	exps map[FileID]*exports
-	defs map[FileID]*typeDefs
+	imps map[FileID]importTable
+	exps map[FileID]exports
+	defs map[FileID]typeDefs
 
 	importing map[FileID]bool
 	exporting map[FileID]bool
@@ -556,9 +556,9 @@ func newDirectQueries(files map[FileID]*ast.File, uses map[FileID]map[*ast.UseDe
 		declFile:  map[*ast.ConstDecl]FileID{},
 		reg:       reg,
 		syms:      map[FileID]map[string]*ast.ConstDecl{},
-		imps:      map[FileID]*importTable{},
-		exps:      map[FileID]*exports{},
-		defs:      map[FileID]*typeDefs{},
+		imps:      map[FileID]importTable{},
+		exps:      map[FileID]exports{},
+		defs:      map[FileID]typeDefs{},
 		importing: map[FileID]bool{},
 		exporting: map[FileID]bool{},
 		resolving: map[FileID]bool{},
@@ -577,6 +577,24 @@ func newDirectQueries(files map[FileID]*ast.File, uses map[FileID]map[*ast.UseDe
 		}
 	}
 	return d
+}
+
+// memoize returns the cached value for key, computing and caching it on the
+// first demand. A re-entered computation (a cycle) yields zero without
+// caching — the same fallback the engine's running guard gives the
+// corresponding query, so the two implementations cannot diverge on cycles.
+func memoize[K comparable, V any](memo map[K]V, running map[K]bool, key K, zero V, compute func() V) V {
+	if v, ok := memo[key]; ok {
+		return v
+	}
+	if running[key] {
+		return zero
+	}
+	running[key] = true
+	v := compute()
+	delete(running, key)
+	memo[key] = v
+	return v
 }
 
 func (d *directQueries) registry() *builtin.Registry { return d.reg }
@@ -613,73 +631,33 @@ func (d *directQueries) resolveMember(f FileID, m *ast.MemberExpr) *ast.ConstDec
 }
 
 func (d *directQueries) typeOf(decl *ast.ConstDecl) ir.Type {
-	if t, done := d.typeMemo[decl]; done {
-		return t
-	}
-	if d.typing[decl] {
-		return ir.Invalid // cycle
-	}
-	d.typing[decl] = true
-	t := infer.Decl(decl, typeEnv{q: d, file: d.declFile[decl]})
-	d.typing[decl] = false
-	d.typeMemo[decl] = t
-	return t
+	return memoize(d.typeMemo, d.typing, decl, ir.Invalid, func() ir.Type {
+		return infer.Decl(decl, typeEnv{q: d, file: d.declFile[decl]})
+	})
 }
 
 func (d *directQueries) valueOf(decl *ast.ConstDecl) *ir.Constant {
-	if v, done := d.valueMemo[decl]; done {
-		return v
-	}
-	if d.valuing[decl] {
-		return nil // cycle
-	}
-	d.valuing[decl] = true
-	v := computeValue(d.declFile[decl], decl, d)
-	d.valuing[decl] = false
-	d.valueMemo[decl] = v
-	return v
+	return memoize(d.valueMemo, d.valuing, decl, nil, func() *ir.Constant {
+		return computeValue(d.declFile[decl], decl, d)
+	})
 }
 
 func (d *directQueries) importsOf(f FileID) importTable {
-	if t, ok := d.imps[f]; ok {
-		return *t
-	}
-	if d.importing[f] {
-		return importTable{}
-	}
-	d.importing[f] = true
-	t := buildImports(d, d.files[f], d.uses[f])
-	delete(d.importing, f)
-	d.imps[f] = &t
-	return t
+	return memoize(d.imps, d.importing, f, importTable{}, func() importTable {
+		return buildImports(d, d.files[f], d.uses[f])
+	})
 }
 
 func (d *directQueries) exportsOf(f FileID) exports {
-	if e, ok := d.exps[f]; ok {
-		return *e
-	}
-	if d.exporting[f] {
-		return exports{}
-	}
-	d.exporting[f] = true
-	e := buildExports(d, d.files[f], d.uses[f], d.typeDefsOf(f).byName)
-	delete(d.exporting, f)
-	d.exps[f] = &e
-	return e
+	return memoize(d.exps, d.exporting, f, exports{}, func() exports {
+		return buildExports(d, d.files[f], d.uses[f], d.typeDefsOf(f).byName)
+	})
 }
 
 func (d *directQueries) typeDefsOf(f FileID) typeDefs {
-	if td, ok := d.defs[f]; ok {
-		return *td
-	}
-	if d.resolving[f] {
-		return typeDefs{}
-	}
-	d.resolving[f] = true
-	td := buildTypeDefs(d, d.files[f], d.reg, d.importsOf(f))
-	delete(d.resolving, f)
-	d.defs[f] = &td
-	return td
+	return memoize(d.defs, d.resolving, f, typeDefs{}, func() typeDefs {
+		return buildTypeDefs(d, d.files[f], d.reg, d.importsOf(f))
+	})
 }
 
 func (d *directQueries) typeDefs(f FileID) []*ir.TypeDef { return d.typeDefsOf(f).list }
