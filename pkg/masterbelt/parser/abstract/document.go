@@ -20,17 +20,19 @@ import (
 // The File is always identical to lowering the current concrete tree from
 // scratch.
 type Document struct {
-	cst   *concrete.Document
-	file  *ast.File
-	cache map[*cst.Node]*ast.ConstDecl
+	cst       *concrete.Document
+	file      *ast.File
+	cache     map[*cst.Node]*ast.ConstDecl
+	typeCache map[*cst.Node]*ast.TypeDecl
 }
 
 // NewDocument lexes, parses, and lowers src, then keeps the AST up to date
 // across Edits.
 func NewDocument(src []byte) *Document {
 	d := &Document{
-		cst:   concrete.NewDocument(src),
-		cache: map[*cst.Node]*ast.ConstDecl{},
+		cst:       concrete.NewDocument(src),
+		cache:     map[*cst.Node]*ast.ConstDecl{},
+		typeCache: map[*cst.Node]*ast.TypeDecl{},
 	}
 	d.rebuild()
 	return d
@@ -66,16 +68,29 @@ func (d *Document) rebuild() {
 	buf := d.cst.Buffer()
 
 	next := make(map[*cst.Node]*ast.ConstDecl, len(d.cache))
+	nextTypes := make(map[*cst.Node]*ast.TypeDecl, len(d.typeCache))
 	var decls []*ast.ConstDecl
+	var types []*ast.TypeDecl
 	foreachDecl(root, func(child cst.Tree, green *cst.Node) {
-		decl, ok := d.cache[green]
-		if !ok {
-			decl = lowerConstDecl(child, buf)
+		switch green.Kind() {
+		case cst.ConstDecl:
+			decl, ok := d.cache[green]
+			if !ok {
+				decl = lowerConstDecl(child, buf)
+			}
+			next[green] = decl
+			decls = append(decls, decl)
+		case cst.TypeDecl:
+			td, ok := d.typeCache[green]
+			if !ok {
+				td = lowerTypeDecl(child, buf)
+			}
+			nextTypes[green] = td
+			types = append(types, td)
 		}
-		next[green] = decl
-		decls = append(decls, decl)
 	})
 
 	d.cache = next
-	d.file = ast.NewFile(decls, rootNode)
+	d.typeCache = nextTypes
+	d.file = ast.NewFile(decls, types, rootNode)
 }

@@ -2,10 +2,11 @@ package ast
 
 import "github.com/masterbelt/masterbelt/pkg/masterbelt/source/cst"
 
-// File is a whole source file: the sequence of its declarations in source order.
-// Trivia and any unparsable regions present in the CST are dropped here.
+// File is a whole source file: its constant and type declarations in source
+// order. Trivia and any unparsable regions present in the CST are dropped here.
 type File struct {
 	Decls  []*ConstDecl
+	Types  []*TypeDecl
 	syntax *cst.Node
 }
 
@@ -14,8 +15,8 @@ func (f *File) node()             {}
 
 // NewFile builds a File node. The constructors keep each node's syntax backlink
 // unexported while package parser/abstract populates it.
-func NewFile(decls []*ConstDecl, syntax *cst.Node) *File {
-	return &File{Decls: decls, syntax: syntax}
+func NewFile(decls []*ConstDecl, types []*TypeDecl, syntax *cst.Node) *File {
+	return &File{Decls: decls, Types: types, syntax: syntax}
 }
 
 // ConstDecl is a constant declaration: an optional run of doc-comment lines, an

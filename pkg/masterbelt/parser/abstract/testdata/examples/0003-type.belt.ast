@@ -1,0 +1,41 @@
+File
+  TypeDecl
+    pub
+    name "Coin"
+    body int8
+  TypeDecl
+    pub
+    name "Level"
+    body int8
+    method "increment"
+      pub
+      result self
+      return (call (. self add) IntLit "1")
+  TypeDecl
+    pub
+    name "GameValue"
+    body Coin | Level
+  TypeDecl
+    pub
+    name "Optional"
+    param T
+    body T | null
+  TypeDecl
+    pub
+    name "OptionalNumeric"
+    param T: int8 | int16
+    body T | null
+  TypeDecl
+    pub
+    name "Record"
+    body { id: int8, level: Level }
+    method "game_id"
+      pub
+      result int32
+      return (call (. (call Identifier "int32" (. self id)) mul) IntLit "1000")
+  TypeDecl
+    pub
+    name "Mapper"
+    param T
+    param R
+    body fn(src: T): R

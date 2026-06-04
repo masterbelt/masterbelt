@@ -41,6 +41,34 @@ func NewBoolLit(value bool, syntax *cst.Node) *BoolLit {
 	return &BoolLit{Value: value, syntax: syntax}
 }
 
+// NullLit is the null literal.
+type NullLit struct {
+	syntax *cst.Node
+}
+
+func (l *NullLit) Syntax() *cst.Node { return l.syntax }
+func (l *NullLit) node()             {}
+func (l *NullLit) expr()             {}
+
+// NewNullLit builds a NullLit node.
+func NewNullLit(syntax *cst.Node) *NullLit {
+	return &NullLit{syntax: syntax}
+}
+
+// SelfExpr is the self receiver inside a method body.
+type SelfExpr struct {
+	syntax *cst.Node
+}
+
+func (s *SelfExpr) Syntax() *cst.Node { return s.syntax }
+func (s *SelfExpr) node()             {}
+func (s *SelfExpr) expr()             {}
+
+// NewSelfExpr builds a SelfExpr node.
+func NewSelfExpr(syntax *cst.Node) *SelfExpr {
+	return &SelfExpr{syntax: syntax}
+}
+
 // Identifier is a name occurrence: either a value reference to another
 // declaration (the "a" in "const x = a") or the member name of a MemberExpr
 // (the method an operator desugars to). Resolving a value reference to its
