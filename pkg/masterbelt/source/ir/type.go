@@ -1,48 +1,214 @@
 package ir
 
-// Type is a masterbelt type. Integer literals are untyped constants (UntypedInt)
-// whose default type is Int64; an annotation gives a constant a concrete type.
+import "strings"
+
+// Type is a masterbelt type. It is a sealed interface — the variants in this
+// file are the only implementations — and it carries no native semantics of its
+// own: the primitive types (int8, bool, null, ...) are Builtins whose value
+// range and operator implementations are supplied by package builtin, keyed on
+// the builtin's name, rather than baked into this representation. That is what
+// lets a new primitive be injected by the prelude and the registry without the
+// type system hardcoding anything.
 //
-// This file holds only the type as data — the enum and its name. The rules that
-// reason about types (range checks, lookup by name, the operator-method type
-// rules, inference) live in package types, which depends on ir rather than the
-// other way around.
-type Type int
-
-const (
-	Invalid    Type = iota // could not be determined (unknown type name, cycle, ...)
-	UntypedInt             // an un-annotated integer constant; defaults to Int64
-	Int8
-	Int16
-	Int32
-	Int64
-	Uint8
-	Uint16
-	Uint32
-	Uint64
-	UntypedBool // an un-annotated boolean constant; defaults to Bool
-	Bool
-)
-
-var typeNames = map[Type]string{
-	Invalid:     "invalid",
-	UntypedInt:  "untyped int",
-	Int8:        "int8",
-	Int16:       "int16",
-	Int32:       "int32",
-	Int64:       "int64",
-	Uint8:       "uint8",
-	Uint16:      "uint16",
-	Uint32:      "uint32",
-	Uint64:      "uint64",
-	UntypedBool: "untyped bool",
-	Bool:        "bool",
+// String renders a stable, human-readable form used by diagnostics, hovers, and
+// the IR dump.
+type Type interface {
+	typ()
+	String() string
 }
 
-// String returns the type's name.
-func (t Type) String() string {
-	if name, ok := typeNames[t]; ok {
-		return name
+// UntypedKind distinguishes the two kinds of untyped literal constant.
+type UntypedKind int
+
+const (
+	untypedIntKind UntypedKind = iota
+	untypedBoolKind
+)
+
+// --- primitive and untyped types --------------------------------------------
+
+// Builtin is a primitive type, identified by name. Whether it is an integer, its
+// value range, and its operator methods are provided by the builtin registry
+// keyed on Name — this struct holds only the name.
+type Builtin struct{ Name string }
+
+func (*Builtin) typ()             {}
+func (b *Builtin) String() string { return b.Name }
+
+// untyped is the type of an un-annotated literal before a concrete type is
+// forced. The two values are interned as the UntypedInt and UntypedBool
+// singletons so they can be compared with ==.
+type untyped struct{ kind UntypedKind }
+
+func (*untyped) typ() {}
+func (u *untyped) String() string {
+	if u.kind == untypedBoolKind {
+		return "untyped bool"
 	}
-	return "Type(?)"
+	return "untyped int"
+}
+
+// Kind reports whether an untyped type is the integer or boolean kind. It is
+// valid only for the UntypedInt/UntypedBool singletons.
+func (u *untyped) Kind() UntypedKind { return u.kind }
+
+// invalid is the type of an expression whose type could not be determined. It is
+// interned as the Invalid singleton.
+type invalid struct{}
+
+func (*invalid) typ()           {}
+func (*invalid) String() string { return "invalid" }
+
+// The singleton types. Invalid and the untyped constants have no fields, so a
+// single shared value of each suffices and they can be compared with ==.
+var (
+	Invalid     Type = &invalid{}
+	UntypedInt  Type = &untyped{kind: untypedIntKind}
+	UntypedBool Type = &untyped{kind: untypedBoolKind}
+)
+
+// --- declared and composite types -------------------------------------------
+
+// Named is a reference to a declared type (Coin, Level, ...): a resolved pointer
+// to its definition, mirroring how Reference points at a *Const.
+type Named struct{ Def *TypeDef }
+
+func (*Named) typ() {}
+func (n *Named) String() string {
+	if n.Def == nil {
+		return "<unresolved type>"
+	}
+	return n.Def.Name
+}
+
+// Union is a sum of member types: A | B | ...
+type Union struct{ Members []Type }
+
+func (*Union) typ() {}
+func (u *Union) String() string {
+	parts := make([]string, len(u.Members))
+	for i, m := range u.Members {
+		parts[i] = typeString(m)
+	}
+	return strings.Join(parts, " | ")
+}
+
+// Record is an anonymous product type: a sequence of named fields.
+type Record struct{ Fields []Field }
+
+// Field is one record field: a name and its type.
+type Field struct {
+	Name string
+	Type Type
+}
+
+func (*Record) typ() {}
+func (r *Record) String() string {
+	parts := make([]string, len(r.Fields))
+	for i, f := range r.Fields {
+		parts[i] = f.Name + ": " + typeString(f.Type)
+	}
+	return "{ " + strings.Join(parts, ", ") + " }"
+}
+
+// Func is a function type: fn(Params): Result.
+type Func struct {
+	Params []Type
+	Result Type
+}
+
+func (*Func) typ() {}
+func (f *Func) String() string {
+	parts := make([]string, len(f.Params))
+	for i, p := range f.Params {
+		parts[i] = typeString(p)
+	}
+	return "fn(" + strings.Join(parts, ", ") + "): " + typeString(f.Result)
+}
+
+// TypeVar is a generic type parameter in scope, with an optional constraint.
+type TypeVar struct {
+	Name  string
+	Bound Type // the constraint, or nil if unconstrained
+}
+
+func (*TypeVar) typ()             {}
+func (v *TypeVar) String() string { return v.Name }
+
+// App is the application of a generic type constructor: Def<Args...>, e.g.
+// Optional<int8>.
+type App struct {
+	Def  *TypeDef
+	Args []Type
+}
+
+func (*App) typ() {}
+func (a *App) String() string {
+	name := "<unresolved type>"
+	if a.Def != nil {
+		name = a.Def.Name
+	}
+	parts := make([]string, len(a.Args))
+	for i, arg := range a.Args {
+		parts[i] = typeString(arg)
+	}
+	return name + "<" + strings.Join(parts, ", ") + ">"
+}
+
+// SelfType is the receiver type inside a method signature or body; it resolves
+// to the enclosing type during method typing.
+type SelfType struct{}
+
+func (*SelfType) typ()           {}
+func (*SelfType) String() string { return "self" }
+
+// typeString renders t, treating a nil type as "<none>" so the renderers above
+// never panic on a partially-resolved type.
+func typeString(t Type) string {
+	if t == nil {
+		return "<none>"
+	}
+	return t.String()
+}
+
+// --- type definitions -------------------------------------------------------
+
+// TypeDef is a declared type: its name, its generic parameters, the type it is
+// defined as (Body), and its methods. A primitive is a TypeDef whose Body is a
+// Builtin; a nominal type's Body is its underlying type; a union/record/func
+// type's Body is the corresponding composite. Named and App point at a TypeDef,
+// so type references form a graph just like value references.
+type TypeDef struct {
+	Name    string
+	Public  bool
+	Doc     []string
+	Params  []*TypeParam // generic parameters, in declaration order
+	Body    Type         // the defined type (nil if missing/invalid)
+	Methods []*Method
+	Builtin bool // declared as `= builtin`: its semantics come from the registry
+}
+
+// TypeParam is one generic parameter of a TypeDef: a name and an optional
+// constraint bound.
+type TypeParam struct {
+	Name  string
+	Bound Type // the constraint, or nil if unconstrained
+}
+
+// Method is one method declared in a type's impl block: its signature and, for a
+// non-extern method, the body that computes its result. Extern methods have no
+// body — their implementation is a native intrinsic in the builtin registry.
+type Method struct {
+	Name   string
+	Public bool
+	Extern bool
+	Params []Param
+	Result Type
+	Body   Value // the resolved body expression, or nil for an extern method
+}
+
+// Param is one method parameter: a name and its type.
+type Param struct {
+	Name string
+	Type Type
 }

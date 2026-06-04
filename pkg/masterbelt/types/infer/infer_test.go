@@ -3,8 +3,10 @@ package infer
 import (
 	"testing"
 
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ir"
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/types"
 )
 
 // --- ast builders (nil syntax: the type rules never read Syntax) ------------
@@ -26,17 +28,25 @@ func unary(recv ast.Expr, method string) *ast.CallExpr {
 }
 
 // stubEnv is a fixed resolution/typing environment for driving inference
-// without the semantic engine.
+// without the semantic engine. It resolves type names through the builtin
+// registry, like the const path does before user types exist.
 type stubEnv struct {
 	res map[*ast.Identifier]*ast.ConstDecl
 	typ map[*ast.ConstDecl]ir.Type
+	reg *builtin.Registry
 }
 
 func (e stubEnv) Resolve(id *ast.Identifier) *ast.ConstDecl { return e.res[id] }
 func (e stubEnv) TypeOf(decl *ast.ConstDecl) ir.Type        { return e.typ[decl] }
+func (e stubEnv) Registry() *builtin.Registry               { return e.reg }
+func (e stubEnv) LookupType(name string) (ir.Type, bool)    { return types.Lookup(e.reg, name) }
 
 func emptyEnv() stubEnv {
-	return stubEnv{res: map[*ast.Identifier]*ast.ConstDecl{}, typ: map[*ast.ConstDecl]ir.Type{}}
+	return stubEnv{
+		res: map[*ast.Identifier]*ast.ConstDecl{},
+		typ: map[*ast.ConstDecl]ir.Type{},
+		reg: builtin.Default(),
+	}
 }
 
 func TestExprLiterals(t *testing.T) {
@@ -53,11 +63,12 @@ func TestExprReference(t *testing.T) {
 	env := emptyEnv()
 	decl := ast.NewConstDecl(nil, false, "A", nil, intLit("1"), nil)
 	id := ident("A")
+	int32Type := &ir.Builtin{Name: "int32"}
 	env.res[id] = decl
-	env.typ[decl] = ir.Int32
+	env.typ[decl] = int32Type
 
 	// A reference inherits its referent's type.
-	if got := Expr(id, env); got != ir.Int32 {
+	if got := Expr(id, env); got != int32Type {
 		t.Errorf("Expr(ref to int32) = %s, want int32", got)
 	}
 	// An unresolved reference is Invalid.
@@ -71,18 +82,18 @@ func TestExprCalls(t *testing.T) {
 	cases := []struct {
 		name string
 		expr ast.Expr
-		want ir.Type
+		want string
 	}{
-		{"add untyped ints", binary(intLit("1"), "add", intLit("2")), ir.UntypedInt},
-		{"lt yields bool", binary(intLit("1"), "lt", intLit("2")), ir.UntypedBool},
-		{"and yields bool", binary(boolLit(true), "anan", boolLit(false)), ir.UntypedBool},
-		{"neg preserves type", unary(intLit("1"), "neg"), ir.UntypedInt},
-		{"arith on bool is invalid", binary(boolLit(true), "add", intLit("1")), ir.Invalid},
-		{"nested propagates invalid", binary(binary(boolLit(true), "add", intLit("1")), "add", intLit("2")), ir.Invalid},
-		{"callee not a member", ast.NewCallExpr(intLit("1"), nil, nil), ir.Invalid},
+		{"add untyped ints", binary(intLit("1"), "add", intLit("2")), "untyped int"},
+		{"lt yields bool", binary(intLit("1"), "lt", intLit("2")), "bool"},
+		{"and stays untyped bool", binary(boolLit(true), "anan", boolLit(false)), "untyped bool"},
+		{"neg preserves type", unary(intLit("1"), "neg"), "untyped int"},
+		{"arith on bool is invalid", binary(boolLit(true), "add", intLit("1")), "invalid"},
+		{"nested propagates invalid", binary(binary(boolLit(true), "add", intLit("1")), "add", intLit("2")), "invalid"},
+		{"callee not a member", ast.NewCallExpr(intLit("1"), nil, nil), "invalid"},
 	}
 	for _, tc := range cases {
-		if got := Expr(tc.expr, env); got != tc.want {
+		if got := Expr(tc.expr, env).String(); got != tc.want {
 			t.Errorf("%s: Expr = %s, want %s", tc.name, got, tc.want)
 		}
 	}
@@ -93,15 +104,15 @@ func TestDecl(t *testing.T) {
 	cases := []struct {
 		name string
 		decl *ast.ConstDecl
-		want ir.Type
+		want string
 	}{
-		{"annotation wins", ast.NewConstDecl(nil, false, "X", ast.NewTypeRef("int32", nil), intLit("1"), nil), ir.Int32},
-		{"unknown annotation", ast.NewConstDecl(nil, false, "X", ast.NewTypeRef("notatype", nil), intLit("1"), nil), ir.Invalid},
-		{"inferred from value", ast.NewConstDecl(nil, false, "X", nil, intLit("1"), nil), ir.UntypedInt},
-		{"no type, no value", ast.NewConstDecl(nil, false, "X", nil, nil, nil), ir.Invalid},
+		{"annotation wins", ast.NewConstDecl(nil, false, "X", ast.NewTypeRef("int32", nil), intLit("1"), nil), "int32"},
+		{"unknown annotation", ast.NewConstDecl(nil, false, "X", ast.NewTypeRef("notatype", nil), intLit("1"), nil), "invalid"},
+		{"inferred from value", ast.NewConstDecl(nil, false, "X", nil, intLit("1"), nil), "untyped int"},
+		{"no type, no value", ast.NewConstDecl(nil, false, "X", nil, nil, nil), "invalid"},
 	}
 	for _, tc := range cases {
-		if got := Decl(tc.decl, env); got != tc.want {
+		if got := Decl(tc.decl, env).String(); got != tc.want {
 			t.Errorf("%s: Decl = %s, want %s", tc.name, got, tc.want)
 		}
 	}
@@ -122,7 +133,7 @@ func TestCheckValid(t *testing.T) {
 	env := emptyEnv()
 	var r report
 	got := Check(binary(intLit("1"), "add", intLit("2")), env, r.fn)
-	if got != ir.UntypedInt {
+	if got.String() != "untyped int" {
 		t.Errorf("Check(1.add(2)) = %s, want untyped int", got)
 	}
 	if len(r.methods) != 0 {
@@ -133,7 +144,7 @@ func TestCheckValid(t *testing.T) {
 func TestCheckReportsInvalid(t *testing.T) {
 	env := emptyEnv()
 	var r report
-	// 1 && 2 desugars to (1).anan(2): a logical operator on untyped ints.
+	// 1 && 2 desugars to (1).anan(2): a logical operator on integers.
 	got := Check(binary(intLit("1"), "anan", intLit("2")), env, r.fn)
 	if got != ir.Invalid {
 		t.Errorf("Check = %s, want invalid", got)

@@ -20,27 +20,27 @@ Module
     value IntLiteral "1".rem(IntLiteral "2")
     eval 1
   Const "eql"
-    type untyped bool
+    type bool
     value IntLiteral "1".eql(IntLiteral "1")
     eval true
   Const "neq"
-    type untyped bool
+    type bool
     value IntLiteral "1".neq(IntLiteral "1")
     eval false
   Const "lt"
-    type untyped bool
+    type bool
     value IntLiteral "1".lt(IntLiteral "2")
     eval true
   Const "lteq"
-    type untyped bool
+    type bool
     value IntLiteral "1".lteq(IntLiteral "2")
     eval true
   Const "gt"
-    type untyped bool
+    type bool
     value IntLiteral "1".gt(IntLiteral "2")
     eval false
   Const "gteq"
-    type untyped bool
+    type bool
     value IntLiteral "1".gteq(IntLiteral "2")
     eval false
   Const "anan"

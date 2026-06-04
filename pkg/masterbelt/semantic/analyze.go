@@ -4,8 +4,8 @@
 // Operators have already been desugared to method calls by the AST layer, so
 // 1 + 2 arrives as 1.add(2). Typing and evaluation are therefore uniform: every
 // expression is a literal, a value reference, or a method call, and a call's
-// type and value come from a small table of builtin methods keyed by name
-// (methodResult and evalMethod).
+// type comes from the method's signature (package types) while its value comes
+// from the method's native implementation (the builtin registry's intrinsics).
 //
 // The semantic facts a program needs — the symbol table, each constant's type,
 // and each constant's evaluated value — are expressed as a small set of pure
@@ -21,6 +21,7 @@ import (
 	"math/big"
 	"sort"
 
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/diagnostic"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/parser/abstract"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ast"
@@ -44,22 +45,33 @@ type queries interface {
 	// evaluated (missing initializer, undefined reference, cycle, type error,
 	// or division by zero).
 	valueOf(decl *ast.ConstDecl) *ir.Constant
+	// registry returns the builtin registry the analysis types and evaluates
+	// against — the source of primitive types, their value ranges, and the
+	// native implementations of their operator methods.
+	registry() *builtin.Registry
 }
 
 // typeEnv adapts the semantic query interface to infer.Env, so the type
-// inference and checking in package types/infer can read resolution and
-// declaration types through the same memoizing engine.
+// inference and checking in package types/infer can read resolution, declaration
+// types, and the builtin registry through the same memoizing engine.
 type typeEnv struct{ q queries }
 
 func (e typeEnv) Resolve(id *ast.Identifier) *ast.ConstDecl { return e.q.resolve(id) }
 func (e typeEnv) TypeOf(decl *ast.ConstDecl) ir.Type        { return e.q.typeOf(decl) }
+func (e typeEnv) Registry() *builtin.Registry               { return e.q.registry() }
+
+// LookupType resolves a type name in the program's type universe. For now that
+// is the builtin primitives; user-declared types join it in a later phase.
+func (e typeEnv) LookupType(name string) (ir.Type, bool) {
+	return types.Lookup(e.q.registry(), name)
+}
 
 // Analyze resolves and types the document's program, returning the IR module and
 // the semantic diagnostics. It recomputes everything from scratch; it is the
 // reference analysis and the oracle for the incremental Document.
 func Analyze(doc *abstract.Document) (*ir.Module, []diagnostic.Diagnostic) {
 	file := doc.File()
-	return assemble(file, positionsOf(doc.Concrete().Tree()), newDirectQueries(file))
+	return assemble(file, positionsOf(doc.Concrete().Tree()), newDirectQueries(file, builtin.Default()))
 }
 
 // assemble builds the IR module and all semantic diagnostics from the AST, using
@@ -69,6 +81,7 @@ func assemble(file *ast.File, positions map[cst.Green]span, q queries) (*ir.Modu
 	diags := &diagnostic.List{}
 	at := func(n ast.Node) span { return spanOf(positions, n) }
 	env := typeEnv{q}
+	reg := q.registry()
 
 	// Create the IR constants first so references can bind to them.
 	module := &ir.Module{}
@@ -124,13 +137,13 @@ func assemble(file *ast.File, positions map[cst.Green]span, q queries) (*ir.Modu
 		}
 
 		if decl.Type != nil {
-			if annType, ok := types.Lookup(decl.Type.Name); !ok {
+			if annType, ok := types.Lookup(reg, decl.Type.Name); !ok {
 				s := at(decl.Type)
 				diags.Add(newUnknownTypeDiagnostic(s.offset, s.width, decl.Type.Name))
 			} else if decl.Value != nil {
 				// An annotation must agree in kind (integer vs boolean) with the
 				// initializer's natural type; its value range is checked below.
-				if exprT := infer.Expr(decl.Value, env); exprT != ir.Invalid && !types.Compatible(annType, exprT) {
+				if exprT := infer.Expr(decl.Value, env); exprT != ir.Invalid && !types.Compatible(reg, annType, exprT) {
 					s := at(decl.Value)
 					diags.Add(newTypeMismatchDiagnostic(s.offset, s.width, exprT.String(), annType.String()))
 				}
@@ -143,7 +156,7 @@ func assemble(file *ast.File, positions map[cst.Green]span, q queries) (*ir.Modu
 		// An integer value outside its concrete type's range overflows. Untyped
 		// constants have no fixed range (Fits accepts them), and booleans never
 		// overflow.
-		if c.Eval != nil && c.Eval.Kind == ir.ConstInt && !types.Fits(c.Type, c.Eval.Int) {
+		if c.Eval != nil && c.Eval.Kind == ir.ConstInt && !types.Fits(reg, c.Type, c.Eval.Int) {
 			s := at(decl.Value)
 			diags.Add(newConstantOverflowDiagnostic(s.offset, s.width, c.Eval.String(), c.Type.String()))
 		}
@@ -230,16 +243,19 @@ func evalExpr(e ast.Expr, q queries) *ir.Constant {
 		for i, a := range e.Arguments {
 			args[i] = evalExpr(a, q)
 		}
-		return evalMethod(recv, member.Member.Name, args)
+		return evalMethod(q.registry(), recv, member.Member.Name, args)
 	default:
 		return nil
 	}
 }
 
-// evalMethod evaluates a builtin operator method. It returns nil when an operand
-// is unevaluated, when the operand kinds do not match the method (only reachable
-// for a type-incorrect program), or on division by zero.
-func evalMethod(recv *ir.Constant, method string, args []*ir.Constant) *ir.Constant {
+// evalMethod evaluates an operator method by dispatching to its native
+// implementation in the builtin registry, keyed on the receiver's value kind
+// (every integer type shares one set of intrinsics, every boolean type another).
+// It returns nil when an operand is unevaluated, the method has no intrinsic for
+// the receiver kind (only reachable for a type-incorrect program), or the
+// intrinsic itself has no value (a division by zero).
+func evalMethod(reg *builtin.Registry, recv *ir.Constant, method string, args []*ir.Constant) *ir.Constant {
 	if recv == nil {
 		return nil
 	}
@@ -248,110 +264,20 @@ func evalMethod(recv *ir.Constant, method string, args []*ir.Constant) *ir.Const
 			return nil
 		}
 	}
-
-	switch method {
-	case "add", "sub", "mul", "div", "rem":
-		if len(args) != 1 || recv.Kind != ir.ConstInt || args[0].Kind != ir.ConstInt {
-			return nil
-		}
-		return evalArith(method, recv.Int, args[0].Int)
-	case "lt", "lteq", "gt", "gteq":
-		if len(args) != 1 || recv.Kind != ir.ConstInt || args[0].Kind != ir.ConstInt {
-			return nil
-		}
-		return ir.BoolConstant(evalOrder(method, recv.Int.Cmp(args[0].Int)))
-	case "eql", "neq":
-		if len(args) != 1 {
-			return nil
-		}
-		eq, ok := constEqual(recv, args[0])
-		if !ok {
-			return nil
-		}
-		if method == "neq" {
-			eq = !eq
-		}
-		return ir.BoolConstant(eq)
-	case "anan", "oror":
-		if len(args) != 1 || recv.Kind != ir.ConstBool || args[0].Kind != ir.ConstBool {
-			return nil
-		}
-		if method == "anan" {
-			return ir.BoolConstant(recv.Bool && args[0].Bool)
-		}
-		return ir.BoolConstant(recv.Bool || args[0].Bool)
-	case "pos":
-		if len(args) != 0 || recv.Kind != ir.ConstInt {
-			return nil
-		}
-		return recv
-	case "neg":
-		if len(args) != 0 || recv.Kind != ir.ConstInt {
-			return nil
-		}
-		return ir.IntConstant(new(big.Int).Neg(recv.Int))
-	case "not":
-		if len(args) != 0 || recv.Kind != ir.ConstBool {
-			return nil
-		}
-		return ir.BoolConstant(!recv.Bool)
+	var typeName string
+	switch recv.Kind {
+	case ir.ConstInt:
+		typeName = "int"
+	case ir.ConstBool:
+		typeName = "bool"
 	default:
 		return nil
 	}
-}
-
-// evalArith evaluates an integer arithmetic method, returning nil on division by
-// zero. Division truncates toward zero, as the surface "/" and "%" do.
-func evalArith(method string, a, b *big.Int) *ir.Constant {
-	switch method {
-	case "add":
-		return ir.IntConstant(new(big.Int).Add(a, b))
-	case "sub":
-		return ir.IntConstant(new(big.Int).Sub(a, b))
-	case "mul":
-		return ir.IntConstant(new(big.Int).Mul(a, b))
-	case "div":
-		if b.Sign() == 0 {
-			return nil
-		}
-		return ir.IntConstant(new(big.Int).Quo(a, b))
-	case "rem":
-		if b.Sign() == 0 {
-			return nil
-		}
-		return ir.IntConstant(new(big.Int).Rem(a, b))
-	default:
+	fn, ok := reg.Intrinsic(typeName, method)
+	if !ok {
 		return nil
 	}
-}
-
-// evalOrder turns a big.Int comparison result into the ordering method's bool.
-func evalOrder(method string, cmp int) bool {
-	switch method {
-	case "lt":
-		return cmp < 0
-	case "lteq":
-		return cmp <= 0
-	case "gt":
-		return cmp > 0
-	case "gteq":
-		return cmp >= 0
-	default:
-		return false
-	}
-}
-
-// constEqual reports whether two constants of the same kind are equal; ok is
-// false when their kinds differ (a type error).
-func constEqual(a, b *ir.Constant) (eq, ok bool) {
-	switch {
-	case a.Kind == ir.ConstInt && b.Kind == ir.ConstInt:
-		return a.Int.Cmp(b.Int) == 0, true
-	case a.Kind == ir.ConstBool && b.Kind == ir.ConstBool:
-		return a.Bool == b.Bool, true
-	default:
-		return false, false
-	}
+	return fn(recv, args)
 }
 
 // --- IR value lowering ------------------------------------------------------
@@ -451,6 +377,7 @@ func cyclicDecls(file *ast.File, q queries) map[*ast.ConstDecl]bool {
 // across analyses — that is the incremental engine's job.
 type directQueries struct {
 	file      *ast.File
+	reg       *builtin.Registry
 	syms      map[string]*ast.ConstDecl
 	typeMemo  map[*ast.ConstDecl]ir.Type
 	typing    map[*ast.ConstDecl]bool
@@ -458,15 +385,18 @@ type directQueries struct {
 	valuing   map[*ast.ConstDecl]bool
 }
 
-func newDirectQueries(file *ast.File) *directQueries {
+func newDirectQueries(file *ast.File, reg *builtin.Registry) *directQueries {
 	return &directQueries{
 		file:      file,
+		reg:       reg,
 		typeMemo:  map[*ast.ConstDecl]ir.Type{},
 		typing:    map[*ast.ConstDecl]bool{},
 		valueMemo: map[*ast.ConstDecl]*ir.Constant{},
 		valuing:   map[*ast.ConstDecl]bool{},
 	}
 }
+
+func (d *directQueries) registry() *builtin.Registry { return d.reg }
 
 func (d *directQueries) symbols() map[string]*ast.ConstDecl {
 	if d.syms == nil {

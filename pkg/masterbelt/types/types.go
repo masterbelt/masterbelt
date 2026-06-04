@@ -1,195 +1,217 @@
 // Package types is masterbelt's type algebra: the rules and operations over a
-// type value. ir owns the type representation — ir.Type and its constants are
-// the data each constant is tagged with — while this package owns everything
-// that reasons about that value: the classification predicates (IsInteger,
-// IsBoolean, IsUntyped), Default, the lookup of builtin types by name (Lookup),
-// the value-range check (Fits), the operator-method type rules (MethodResult),
-// and kind compatibility (Compatible).
+// type value. ir owns the type representation (ir.Type and its variants); this
+// package owns everything that reasons about a type — the classification
+// predicates (IsInteger, IsBoolean, IsUntyped), Default, the lookup of builtin
+// types by name (Lookup), the value-range check (Fits), the operator-method type
+// rules (MethodResult), and assignability/compatibility.
 //
-// It is deliberately syntax-free: it depends on ir (the type data) and math/big,
-// and on nothing else of masterbelt's. The AST-driven half of the type system —
-// inferring a type from an expression or declaration, and checking an expression
-// for type errors — lives in the subpackage types/infer, which depends on this
-// package and on ast.
+// None of these hardcode the set of primitives: every "is this an integer", its
+// value range, and the result type of an operator method is derived from the
+// builtin registry (package builtin) and the method signatures it carries, so a
+// primitive added to the registry and the prelude is understood here with no
+// change. The AST-driven half of the type system — inferring a type from an
+// expression or declaration — lives in the subpackage types/infer.
 package types
 
 import (
 	"math/big"
 
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ir"
 )
 
+// IsInteger reports whether t is an integer type: an integer builtin (per the
+// registry) or the untyped integer constant.
+func IsInteger(reg *builtin.Registry, t ir.Type) bool {
+	if b, ok := t.(*ir.Builtin); ok {
+		if n, ok := reg.Native(b.Name); ok {
+			return n.IsInteger()
+		}
+		return false
+	}
+	return t == ir.UntypedInt
+}
+
+// IsBoolean reports whether t is a boolean type: the boolean builtin or the
+// untyped boolean constant.
+func IsBoolean(reg *builtin.Registry, t ir.Type) bool {
+	if b, ok := t.(*ir.Builtin); ok {
+		if n, ok := reg.Native(b.Name); ok {
+			return n.IsBoolean()
+		}
+		return false
+	}
+	return t == ir.UntypedBool
+}
+
+// IsUntyped reports whether t is an untyped constant type.
+func IsUntyped(t ir.Type) bool { return t == ir.UntypedInt || t == ir.UntypedBool }
+
 // Default returns the concrete type an untyped constant takes when no annotation
-// forces another; every concrete type is its own default.
+// forces another; every other type is its own default.
 func Default(t ir.Type) ir.Type {
 	switch t {
 	case ir.UntypedInt:
-		return ir.Int64
+		return &ir.Builtin{Name: "int64"}
 	case ir.UntypedBool:
-		return ir.Bool
+		return &ir.Builtin{Name: "bool"}
 	default:
 		return t
 	}
 }
 
-// IsInteger reports whether t is an integer type (untyped or concrete).
-func IsInteger(t ir.Type) bool {
-	return t == ir.UntypedInt || (ir.Int8 <= t && t <= ir.Uint64)
-}
-
-// IsBoolean reports whether t is a boolean type (untyped or concrete).
-func IsBoolean(t ir.Type) bool {
-	return t == ir.UntypedBool || t == ir.Bool
-}
-
-// IsUntyped reports whether t is an untyped constant type.
-func IsUntyped(t ir.Type) bool {
-	return t == ir.UntypedInt || t == ir.UntypedBool
-}
-
-// namedTypes maps the concrete type names that may appear in an annotation to
-// their ir.Type. UntypedInt and Invalid are not nameable.
-var namedTypes = map[string]ir.Type{
-	"int8":   ir.Int8,
-	"int16":  ir.Int16,
-	"int32":  ir.Int32,
-	"int64":  ir.Int64,
-	"uint8":  ir.Uint8,
-	"uint16": ir.Uint16,
-	"uint32": ir.Uint32,
-	"uint64": ir.Uint64,
-	"bool":   ir.Bool,
-}
-
-// Lookup returns the concrete builtin type named name, or false if name is not a
-// known type.
-func Lookup(name string) (ir.Type, bool) {
-	t, ok := namedTypes[name]
-	return t, ok
-}
-
-// bounds holds the inclusive value range of a concrete integer type.
-type bounds struct{ min, max *big.Int }
-
-var typeBounds = func() map[ir.Type]bounds {
-	one := big.NewInt(1)
-	signed := func(bits uint) bounds {
-		half := new(big.Int).Lsh(one, bits-1)
-		return bounds{min: new(big.Int).Neg(half), max: new(big.Int).Sub(half, one)}
+// Lookup resolves a builtin type name to its type, or false if name is not a
+// known builtin. (User-declared types are resolved by the analyzer's type
+// universe, not here.)
+func Lookup(reg *builtin.Registry, name string) (ir.Type, bool) {
+	if _, ok := reg.Lookup(name); ok {
+		return &ir.Builtin{Name: name}, true
 	}
-	unsigned := func(bits uint) bounds {
-		return bounds{min: big.NewInt(0), max: new(big.Int).Sub(new(big.Int).Lsh(one, bits), one)}
-	}
-	return map[ir.Type]bounds{
-		ir.Int8: signed(8), ir.Int16: signed(16), ir.Int32: signed(32), ir.Int64: signed(64),
-		ir.Uint8: unsigned(8), ir.Uint16: unsigned(16), ir.Uint32: unsigned(32), ir.Uint64: unsigned(64),
-	}
-}()
-
-// Fits reports whether v is within the range of type t. Types without a fixed
-// range — UntypedInt (arbitrary precision), the boolean types, and Invalid —
-// accept any value.
-func Fits(t ir.Type, v *big.Int) bool {
-	b, ok := typeBounds[t]
-	if !ok {
-		return true
-	}
-	return v.Cmp(b.min) >= 0 && v.Cmp(b.max) <= 0
+	return ir.Invalid, false
 }
 
-// --- operator-method type rules ---------------------------------------------
-
-var (
-	arithMethods = map[string]bool{"add": true, "sub": true, "mul": true, "div": true, "rem": true}
-	orderMethods = map[string]bool{"lt": true, "lteq": true, "gt": true, "gteq": true}
-	equalMethods = map[string]bool{"eql": true, "neq": true}
-	logicMethods = map[string]bool{"anan": true, "oror": true}
-	signMethods  = map[string]bool{"pos": true, "neg": true}
-)
-
-// MethodResult is the type rule for the builtin operator methods: arithmetic on
-// integers yields an integer, the comparisons and logical operators yield a
-// boolean, and the unary sign/not operators preserve their operand's type. It
-// returns ir.Invalid when the method does not apply to the operand types (a type
-// error), which the IR records as an Invalid type.
-func MethodResult(recv ir.Type, method string, args []ir.Type) ir.Type {
-	switch {
-	case arithMethods[method]:
-		if len(args) != 1 {
-			return ir.Invalid
+// Fits reports whether v is within the value range of type t. Non-integer types
+// — and integer types without a fixed range — accept any value.
+func Fits(reg *builtin.Registry, t ir.Type, v *big.Int) bool {
+	if b, ok := t.(*ir.Builtin); ok {
+		if n, ok := reg.Native(b.Name); ok {
+			return n.Fits(v)
 		}
-		return unifyNumeric(recv, args[0])
-	case orderMethods[method]:
-		if len(args) != 1 || !IsInteger(recv) || !IsInteger(args[0]) {
-			return ir.Invalid
-		}
-		return ir.UntypedBool
-	case equalMethods[method]:
-		if len(args) != 1 {
-			return ir.Invalid
-		}
-		a := args[0]
-		if (IsInteger(recv) && IsInteger(a)) || (IsBoolean(recv) && IsBoolean(a)) {
-			return ir.UntypedBool
-		}
-		return ir.Invalid
-	case logicMethods[method]:
-		if len(args) != 1 {
-			return ir.Invalid
-		}
-		return unifyBool(recv, args[0])
-	case signMethods[method]:
-		if len(args) != 0 || !IsInteger(recv) {
-			return ir.Invalid
-		}
-		return recv
-	case method == "not":
-		if len(args) != 0 || !IsBoolean(recv) {
-			return ir.Invalid
-		}
-		return recv
-	default:
-		return ir.Invalid
 	}
-}
-
-// unifyNumeric is the result type of an arithmetic op on two integer types: an
-// untyped operand adapts to the other, two equal types keep that type, and two
-// different concrete types are a mismatch (ir.Invalid).
-func unifyNumeric(a, b ir.Type) ir.Type {
-	switch {
-	case !IsInteger(a) || !IsInteger(b):
-		return ir.Invalid
-	case a == ir.UntypedInt:
-		return b
-	case b == ir.UntypedInt:
-		return a
-	case a == b:
-		return a
-	default:
-		return ir.Invalid
-	}
-}
-
-// unifyBool is the result type of a logical op on two boolean types, with the
-// same untyped-adapts-to-concrete rule as unifyNumeric.
-func unifyBool(a, b ir.Type) ir.Type {
-	switch {
-	case !IsBoolean(a) || !IsBoolean(b):
-		return ir.Invalid
-	case a == ir.UntypedBool:
-		return b
-	case b == ir.UntypedBool:
-		return a
-	case a == b:
-		return a
-	default:
-		return ir.Invalid
-	}
+	return true
 }
 
 // Compatible reports whether an annotation and an initializer's inferred type
 // agree in kind — both integer or both boolean.
-func Compatible(annotation, expr ir.Type) bool {
-	return (IsInteger(annotation) && IsInteger(expr)) || (IsBoolean(annotation) && IsBoolean(expr))
+func Compatible(reg *builtin.Registry, annotation, expr ir.Type) bool {
+	return (IsInteger(reg, annotation) && IsInteger(reg, expr)) ||
+		(IsBoolean(reg, annotation) && IsBoolean(reg, expr))
+}
+
+// Assignable reports whether a value of type from may be used where type to is
+// expected: the same type, or an untyped constant flowing into a matching
+// concrete type.
+func Assignable(reg *builtin.Registry, from, to ir.Type) bool {
+	if from == to {
+		return true
+	}
+	if from == ir.UntypedInt && IsInteger(reg, to) {
+		return true
+	}
+	if from == ir.UntypedBool && IsBoolean(reg, to) {
+		return true
+	}
+	if a, ok := from.(*ir.Builtin); ok {
+		if b, ok := to.(*ir.Builtin); ok {
+			return a.Name == b.Name
+		}
+	}
+	return false
+}
+
+// MethodResult is the type rule for a method call: it finds the method on the
+// receiver's type, unifies the self-typed operands (so an untyped operand adapts
+// to a concrete one), and returns the substituted result type — self for a
+// self-returning method, the declared result otherwise. It returns ir.Invalid
+// when the method does not exist on the receiver or the operands do not fit,
+// which the IR records as an Invalid type.
+//
+// Because the method signatures come from the registry's type definitions (and,
+// once loaded, the prelude's), this one rule covers every operator on every
+// primitive — there is no per-operator table.
+func MethodResult(reg *builtin.Registry, recv ir.Type, method string, args []ir.Type) ir.Type {
+	def := defOf(reg, recv)
+	if def == nil {
+		return ir.Invalid
+	}
+	m := findMethod(def, method)
+	if m == nil || len(args) != len(m.Params) {
+		return ir.Invalid
+	}
+
+	operand := recv // the unified type of the receiver and the self-typed args
+	for i, p := range m.Params {
+		if _, isSelf := p.Type.(*ir.SelfType); isSelf {
+			operand = combine(reg, operand, args[i])
+			if operand == ir.Invalid {
+				return ir.Invalid
+			}
+		} else if !Assignable(reg, args[i], p.Type) {
+			return ir.Invalid
+		}
+	}
+	if _, isSelf := m.Result.(*ir.SelfType); isSelf {
+		return operand
+	}
+	return m.Result
+}
+
+// defOf returns the type definition whose methods apply to a value of type t:
+// the registry definition for a builtin, the referent for a named type, and the
+// canonical integer/boolean definition for an untyped constant.
+func defOf(reg *builtin.Registry, t ir.Type) *ir.TypeDef {
+	switch t := t.(type) {
+	case *ir.Builtin:
+		if d, ok := reg.Lookup(t.Name); ok {
+			return d
+		}
+	case *ir.Named:
+		return t.Def
+	}
+	switch t {
+	case ir.UntypedInt:
+		d, _ := reg.Lookup("int")
+		return d
+	case ir.UntypedBool:
+		d, _ := reg.Lookup("bool")
+		return d
+	}
+	return nil
+}
+
+func findMethod(def *ir.TypeDef, name string) *ir.Method {
+	for _, m := range def.Methods {
+		if m.Name == name {
+			return m
+		}
+	}
+	return nil
+}
+
+// combine unifies two operand types under the untyped-adapts-to-concrete rule:
+// an untyped constant takes the other operand's type when kinds agree, two equal
+// types keep that type, and anything else is a mismatch (ir.Invalid).
+func combine(reg *builtin.Registry, a, b ir.Type) ir.Type {
+	switch {
+	case a == b:
+		return a
+	case a == ir.UntypedInt:
+		if IsInteger(reg, b) {
+			return b
+		}
+	case b == ir.UntypedInt:
+		if IsInteger(reg, a) {
+			return a
+		}
+	case a == ir.UntypedBool:
+		if IsBoolean(reg, b) {
+			return b
+		}
+	case b == ir.UntypedBool:
+		if IsBoolean(reg, a) {
+			return a
+		}
+	case sameBuiltin(a, b):
+		return a
+	}
+	return ir.Invalid
+}
+
+func sameBuiltin(a, b ir.Type) bool {
+	x, ok := a.(*ir.Builtin)
+	if !ok {
+		return false
+	}
+	y, ok := b.(*ir.Builtin)
+	return ok && x.Name == y.Name
 }

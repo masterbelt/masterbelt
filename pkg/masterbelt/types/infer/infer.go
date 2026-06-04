@@ -13,22 +13,28 @@ package infer
 import (
 	"strings"
 
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ir"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/types"
 )
 
-// Env is what inference and checking need from their driver: name resolution and
-// the type of a referenced declaration. Keeping this an interface lets the
-// semantic engine supply a memoizing implementation (so an identifier's type is
-// computed once and dependencies are tracked) while this package stays a pure
-// set of rules.
+// Env is what inference and checking need from their driver: name resolution,
+// the type of a referenced declaration, the type universe (to resolve a type
+// annotation), and the builtin registry (to type operator-method calls). Keeping
+// this an interface lets the semantic engine supply a memoizing implementation
+// (so an identifier's type is computed once and dependencies are tracked) while
+// this package stays a pure set of rules.
 type Env interface {
 	// Resolve returns the declaration a value-position identifier refers to, or
 	// nil if no declaration has that name.
 	Resolve(id *ast.Identifier) *ast.ConstDecl
 	// TypeOf returns a declaration's type (ir.Invalid when undeterminable).
 	TypeOf(decl *ast.ConstDecl) ir.Type
+	// LookupType resolves a type name in the program's type universe.
+	LookupType(name string) (ir.Type, bool)
+	// Registry returns the builtin registry the program types against.
+	Registry() *builtin.Registry
 }
 
 // Decl is the type rule for a declaration: an annotation gives a concrete type,
@@ -37,7 +43,7 @@ type Env interface {
 // dependencies.
 func Decl(decl *ast.ConstDecl, env Env) ir.Type {
 	if decl.Type != nil {
-		if t, ok := types.Lookup(decl.Type.Name); ok {
+		if t, ok := env.LookupType(decl.Type.Name); ok {
 			return t
 		}
 		return ir.Invalid
@@ -72,7 +78,7 @@ func Expr(e ast.Expr, env Env) ir.Type {
 		for i, a := range e.Arguments {
 			args[i] = Expr(a, env)
 		}
-		return types.MethodResult(recv, member.Member.Name, args)
+		return types.MethodResult(env.Registry(), recv, member.Member.Name, args)
 	default:
 		return ir.Invalid
 	}
@@ -107,7 +113,7 @@ func Check(e ast.Expr, env Env, report func(node ast.Node, method, operands stri
 			args[i] = Check(a, env, report)
 			bad = bad || args[i] == ir.Invalid
 		}
-		res := types.MethodResult(recv, member.Member.Name, args)
+		res := types.MethodResult(env.Registry(), recv, member.Member.Name, args)
 		if res == ir.Invalid && !bad {
 			report(e, member.Member.Name, typesList(recv, args))
 		}

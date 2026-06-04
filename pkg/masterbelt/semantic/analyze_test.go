@@ -25,10 +25,10 @@ func TestAnnotatedAndUntyped(t *testing.T) {
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
-	if m.Consts[0].Type != ir.Int32 {
+	if m.Consts[0].Type.String() != "int32" {
 		t.Errorf("A type = %s, want int32", m.Consts[0].Type)
 	}
-	if m.Consts[1].Type != ir.UntypedInt {
+	if m.Consts[1].Type.String() != "untyped int" {
 		t.Errorf("B type = %s, want untyped int", m.Consts[1].Type)
 	}
 }
@@ -39,7 +39,7 @@ func TestReferenceResolutionAndTypeInheritance(t *testing.T) {
 		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
 	// B = A inherits A's concrete int8.
-	if m.Consts[1].Type != ir.Int8 {
+	if m.Consts[1].Type.String() != "int8" {
 		t.Errorf("B type = %s, want int8", m.Consts[1].Type)
 	}
 	ref, ok := m.Consts[1].Value.(*ir.Reference)
@@ -47,7 +47,7 @@ func TestReferenceResolutionAndTypeInheritance(t *testing.T) {
 		t.Errorf("B value = %v, want Reference -> A", m.Consts[1].Value)
 	}
 	// D = C inherits C's untyped int.
-	if m.Consts[3].Type != ir.UntypedInt {
+	if m.Consts[3].Type.String() != "untyped int" {
 		t.Errorf("D type = %s, want untyped int", m.Consts[3].Type)
 	}
 }
@@ -74,7 +74,7 @@ func TestUnknownType(t *testing.T) {
 	if got := codes(diags); len(got) != 1 || got[0] != CodeUnknownType {
 		t.Fatalf("codes = %v, want [unknown_type]", got)
 	}
-	if m.Consts[0].Type != ir.Invalid {
+	if m.Consts[0].Type.String() != "invalid" {
 		t.Errorf("X type = %s, want invalid", m.Consts[0].Type)
 	}
 }
@@ -86,7 +86,7 @@ func TestCyclicReference(t *testing.T) {
 	if len(got) != 2 || got[0] != CodeCyclicReference || got[1] != CodeCyclicReference {
 		t.Fatalf("codes = %v, want two cyclic_reference", got)
 	}
-	if m.Consts[0].Type != ir.Invalid || m.Consts[1].Type != ir.Invalid {
+	if m.Consts[0].Type.String() != "invalid" || m.Consts[1].Type.String() != "invalid" {
 		t.Errorf("cyclic consts should have invalid type, got %s/%s", m.Consts[0].Type, m.Consts[1].Type)
 	}
 }

@@ -3,6 +3,7 @@ package semantic
 import (
 	"reflect"
 
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ir"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/types/infer"
@@ -69,6 +70,7 @@ type frame struct {
 type database struct {
 	revision       int
 	file           *ast.File
+	reg            *builtin.Registry
 	inputChangedAt int
 	memos          map[queryKey]*memo
 	stack          []*frame // active computations, for dependency capture
@@ -76,8 +78,9 @@ type database struct {
 	computed       map[queryKey]bool // keys (re)computed since the last setInput; for tests
 }
 
-func newDatabase() *database {
+func newDatabase(reg *builtin.Registry) *database {
 	return &database{
+		reg:      reg,
 		memos:    map[queryKey]*memo{},
 		running:  map[queryKey]bool{},
 		computed: map[queryKey]bool{},
@@ -219,3 +222,5 @@ func (e engineQueries) valueOf(decl *ast.ConstDecl) *ir.Constant {
 	v, _ := e.db.read(valueKey(decl)).(*ir.Constant)
 	return v
 }
+
+func (e engineQueries) registry() *builtin.Registry { return e.db.reg }
