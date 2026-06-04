@@ -1,0 +1,92 @@
+# tree
+File
+  ConstDecl
+    LineComment "// String concatenation folds at compile time."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "greeting"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      BinaryExpr
+        Literal
+          String "\"Hello, \""
+        Whitespace " "
+        Plus "+"
+        Whitespace " "
+        Literal
+          String "\"world!\""
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// Comparisons on strings yield booleans."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Const "const"
+    Whitespace " "
+    Ident "same"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      BinaryExpr
+        Literal
+          String "\"abc\""
+        Whitespace " "
+        EqEq "=="
+        Whitespace " "
+        Literal
+          String "\"abc\""
+  ConstDecl
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Const "const"
+    Whitespace " "
+    Ident "ordered"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      BinaryExpr
+        Literal
+          String "\"a\""
+        Whitespace " "
+        Lt "<"
+        Whitespace " "
+        Literal
+          String "\"b\""
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// References compose with the operators and still fold."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Const "const"
+    Whitespace " "
+    Ident "banner"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      BinaryExpr
+        BinaryExpr
+          Literal
+            String "\"[\""
+          Whitespace " "
+          Plus "+"
+          Whitespace " "
+          NameRef
+            Ident "greeting"
+        Whitespace " "
+        Plus "+"
+        Whitespace " "
+        Literal
+          String "\"]\""
+  Newline "\n"
+  EOF ""
+# diagnostics

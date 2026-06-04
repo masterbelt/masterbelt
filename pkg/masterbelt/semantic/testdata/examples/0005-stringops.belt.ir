@@ -1,0 +1,17 @@
+Module
+  Const "greeting"
+    type string
+    value StringLiteral "Hello, ".add(StringLiteral "world!")
+    eval "Hello, world!"
+  Const "same" pub
+    type bool
+    value StringLiteral "abc".eql(StringLiteral "abc")
+    eval true
+  Const "ordered" pub
+    type bool
+    value StringLiteral "a".lt(StringLiteral "b")
+    eval true
+  Const "banner" pub
+    type string
+    value StringLiteral "[".add(Reference -> "greeting").add(StringLiteral "]")
+    eval "[Hello, world!]"

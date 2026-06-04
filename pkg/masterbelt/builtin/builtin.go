@@ -48,11 +48,12 @@ func (k IntKind) bounds() (min, max *big.Int) {
 }
 
 // NativeType is the native description of a primitive: its numeric kind (for an
-// integer), or a flag marking the boolean or null type.
+// integer), or a flag marking the boolean, string, or null type.
 type NativeType struct {
 	Name string
 	Int  *IntKind // non-nil for an integer primitive
 	Bool bool     // the boolean type
+	Str  bool     // the string type
 	Null bool     // the null type
 }
 
@@ -61,6 +62,9 @@ func (n *NativeType) IsInteger() bool { return n.Int != nil }
 
 // IsBoolean reports whether the primitive is the boolean type.
 func (n *NativeType) IsBoolean() bool { return n.Bool }
+
+// IsString reports whether the primitive is the string type.
+func (n *NativeType) IsString() bool { return n.Str }
 
 // Fits reports whether v is within the primitive's value range. A non-integer
 // primitive (or an arbitrary-precision integer) accepts any value within its
@@ -183,6 +187,21 @@ func booleanMethods() []*ir.Method {
 	}
 }
 
+// stringMethods is the operator-method signature set of the string primitive:
+// add concatenates (returning self), and equality and the lexicographic
+// comparisons return bool. It mirrors the prelude's string.belt.
+func stringMethods() []*ir.Method {
+	return []*ir.Method{
+		externMethod("add", self(), self()),
+		externMethod("eql", boolType, self()),
+		externMethod("neq", boolType, self()),
+		externMethod("lt", boolType, self()),
+		externMethod("lteq", boolType, self()),
+		externMethod("gt", boolType, self()),
+		externMethod("gteq", boolType, self()),
+	}
+}
+
 // --- intrinsics -------------------------------------------------------------
 
 // unaryInt is a nullary-argument integer intrinsic (pos, neg).
@@ -212,6 +231,16 @@ func binaryBool(f func(a, b bool) *ir.Constant) Intrinsic {
 			return nil
 		}
 		return f(r.Bool, args[0].Bool)
+	}
+}
+
+// binaryStr is a one-argument string intrinsic over two string operands.
+func binaryStr(f func(a, b string) *ir.Constant) Intrinsic {
+	return func(r *ir.Constant, args []*ir.Constant) *ir.Constant {
+		if len(args) != 1 || r.Kind != ir.ConstString || args[0].Kind != ir.ConstString {
+			return nil
+		}
+		return f(r.Str, args[0].Str)
 	}
 }
 
@@ -260,6 +289,20 @@ func notBool(r *ir.Constant, args []*ir.Constant) *ir.Constant {
 	return ir.BoolConstant(!r.Bool)
 }
 
+// stringIntrinsics evaluates the string operators: add concatenates, and the
+// comparisons use Go's lexicographic byte ordering on the operands.
+func stringIntrinsics() map[string]Intrinsic {
+	return map[string]Intrinsic{
+		"add":  binaryStr(func(a, b string) *ir.Constant { return ir.StringConstant(a + b) }),
+		"eql":  binaryStr(func(a, b string) *ir.Constant { return ir.BoolConstant(a == b) }),
+		"neq":  binaryStr(func(a, b string) *ir.Constant { return ir.BoolConstant(a != b) }),
+		"lt":   binaryStr(func(a, b string) *ir.Constant { return ir.BoolConstant(a < b) }),
+		"lteq": binaryStr(func(a, b string) *ir.Constant { return ir.BoolConstant(a <= b) }),
+		"gt":   binaryStr(func(a, b string) *ir.Constant { return ir.BoolConstant(a > b) }),
+		"gteq": binaryStr(func(a, b string) *ir.Constant { return ir.BoolConstant(a >= b) }),
+	}
+}
+
 // --- the standard registry --------------------------------------------------
 
 var integerSpecs = []struct {
@@ -278,7 +321,8 @@ var integerSpecs = []struct {
 	{"uint64", IntKind{Signed: false, Bits: 64}},
 }
 
-// Default returns the standard registry: the integer family, bool, and null.
+// Default returns the standard registry: the integer family, bool, string, and
+// null.
 func Default() *Registry {
 	r := &Registry{
 		defs:       map[string]*ir.TypeDef{},
@@ -290,6 +334,7 @@ func Default() *Registry {
 		r.register(spec.name, &NativeType{Name: spec.name, Int: &kind}, integerMethods(), integerIntrinsics())
 	}
 	r.register("bool", &NativeType{Name: "bool", Bool: true}, booleanMethods(), booleanIntrinsics())
+	r.register("string", &NativeType{Name: "string", Str: true}, stringMethods(), stringIntrinsics())
 	r.register("null", &NativeType{Name: "null", Null: true}, nil, nil)
 	return r
 }

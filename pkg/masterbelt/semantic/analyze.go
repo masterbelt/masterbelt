@@ -282,6 +282,8 @@ func evalMethod(reg *builtin.Registry, recv *ir.Constant, method string, args []
 		typeName = "int"
 	case ir.ConstBool:
 		typeName = "bool"
+	case ir.ConstString:
+		typeName = "string"
 	default:
 		return nil
 	}

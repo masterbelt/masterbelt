@@ -1,0 +1,16 @@
+File
+  ConstDecl
+    name "greeting"
+    value (call (. StringLit "Hello, " add) StringLit "world!")
+  ConstDecl
+    pub
+    name "same"
+    value (call (. StringLit "abc" eql) StringLit "abc")
+  ConstDecl
+    pub
+    name "ordered"
+    value (call (. StringLit "a" lt) StringLit "b")
+  ConstDecl
+    pub
+    name "banner"
+    value (call (. (call (. StringLit "[" add) Identifier "greeting") add) StringLit "]")

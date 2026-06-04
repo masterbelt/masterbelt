@@ -1,0 +1,9 @@
+// String concatenation folds at compile time.
+const greeting = "Hello, " + "world!"
+
+// Comparisons on strings yield booleans.
+pub const same = "abc" == "abc"
+pub const ordered = "a" < "b"
+
+// References compose with the operators and still fold.
+pub const banner = "[" + greeting + "]"

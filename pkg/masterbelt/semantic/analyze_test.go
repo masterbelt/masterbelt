@@ -127,6 +127,30 @@ func TestStringLiteral(t *testing.T) {
 	}
 }
 
+func TestStringOperationsFold(t *testing.T) {
+	m, diags := analyze("const g = \"a\" + \"b\"\nconst eq = \"x\" == \"x\"\nconst lt = \"a\" < \"b\"\nconst banner = \"[\" + g + \"]\"\n")
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	// Concatenation folds to a string; comparisons fold to booleans.
+	if ev := m.Consts[0].Eval; ev == nil || ev.Kind != ir.ConstString || ev.Str != "ab" {
+		t.Errorf("g eval = %v, want string \"ab\"", ev)
+	}
+	if m.Consts[0].Type.String() != "string" {
+		t.Errorf("g type = %s, want string", m.Consts[0].Type)
+	}
+	if ev := m.Consts[1].Eval; ev == nil || ev.Kind != ir.ConstBool || ev.Bool != true {
+		t.Errorf("eq eval = %v, want bool true", ev)
+	}
+	if ev := m.Consts[2].Eval; ev == nil || ev.Kind != ir.ConstBool || ev.Bool != true {
+		t.Errorf("lt eval = %v, want bool true", ev)
+	}
+	// Concatenation through a reference folds too.
+	if ev := m.Consts[3].Eval; ev == nil || ev.Kind != ir.ConstString || ev.Str != "[ab]" {
+		t.Errorf("banner eval = %v, want string \"[ab]\"", ev)
+	}
+}
+
 func TestStringAnnotationMismatch(t *testing.T) {
 	// A string initializer under a non-string annotation (and vice versa) is a
 	// type mismatch; a string under a string annotation is fine.
