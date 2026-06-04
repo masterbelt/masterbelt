@@ -7,6 +7,22 @@ import "fmt"
 // renderers maps each diagnostic code to a function that renders its message
 // in a given locale from the diagnostic's fields.
 var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
+	"masterbelt.lexer.invalid_escape": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "不正なエスケープシーケンス: " + f["escape"].String()
+		default:
+			return "invalid escape sequence: " + f["escape"].String()
+		}
+	},
+	"masterbelt.lexer.invalid_unicode_escape": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "不正なUnicodeエスケープ: " + f["escape"].String()
+		default:
+			return "invalid unicode escape: " + f["escape"].String()
+		}
+	},
 	"masterbelt.lexer.unexpected_character": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
@@ -21,6 +37,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "ブロックコメントが閉じられていません"
 		default:
 			return "unterminated block comment"
+		}
+	},
+	"masterbelt.lexer.unterminated_string": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "文字列リテラルが閉じられていません"
+		default:
+			return "unterminated string literal"
 		}
 	},
 	"masterbelt.parser.concrete.expected_assign": func(loc Locale, f map[string]fmt.Stringer) string {

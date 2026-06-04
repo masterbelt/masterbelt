@@ -1,6 +1,9 @@
 code,message
 masterbelt.lexer.unexpected_character,予期しない文字: {char}
 masterbelt.lexer.unterminated_block_comment,ブロックコメントが閉じられていません
+masterbelt.lexer.unterminated_string,文字列リテラルが閉じられていません
+masterbelt.lexer.invalid_escape,不正なエスケープシーケンス: {escape}
+masterbelt.lexer.invalid_unicode_escape,不正なUnicodeエスケープ: {escape}
 masterbelt.parser.concrete.expected_const,'const' が必要です
 masterbelt.parser.concrete.expected_identifier,識別子が必要です
 masterbelt.parser.concrete.expected_type,型が必要です

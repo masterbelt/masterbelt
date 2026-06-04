@@ -1,6 +1,9 @@
 code,severity,fields
 masterbelt.lexer.unexpected_character,error,char:rune
 masterbelt.lexer.unterminated_block_comment,error,
+masterbelt.lexer.unterminated_string,error,
+masterbelt.lexer.invalid_escape,error,escape:string
+masterbelt.lexer.invalid_unicode_escape,error,escape:string
 masterbelt.parser.concrete.expected_const,error,
 masterbelt.parser.concrete.expected_identifier,error,
 masterbelt.parser.concrete.expected_type,error,

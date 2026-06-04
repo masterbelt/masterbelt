@@ -9,9 +9,40 @@ import (
 )
 
 const (
+	CodeInvalidEscape            diagnostic.Code = "masterbelt.lexer.invalid_escape"
+	CodeInvalidUnicodeEscape     diagnostic.Code = "masterbelt.lexer.invalid_unicode_escape"
 	CodeUnexpectedCharacter      diagnostic.Code = "masterbelt.lexer.unexpected_character"
 	CodeUnterminatedBlockComment diagnostic.Code = "masterbelt.lexer.unterminated_block_comment"
+	CodeUnterminatedString       diagnostic.Code = "masterbelt.lexer.unterminated_string"
 )
+
+func newInvalidEscapeDiagnostic(offset int, width int, escape string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"escape": diagnostic.Str(escape),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeInvalidEscape,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeInvalidEscape, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newInvalidUnicodeEscapeDiagnostic(offset int, width int, escape string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"escape": diagnostic.Str(escape),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeInvalidUnicodeEscape,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeInvalidUnicodeEscape, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
 
 func newUnexpectedCharacterDiagnostic(offset int, width int, char rune) diagnostic.Diagnostic {
 	fields := map[string]fmt.Stringer{
@@ -32,6 +63,17 @@ func newUnterminatedBlockCommentDiagnostic(offset int, width int) diagnostic.Dia
 		Severity: diagnostic.Error,
 		Code:     CodeUnterminatedBlockComment,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeUnterminatedBlockComment, nil),
+		Fields:   nil,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newUnterminatedStringDiagnostic(offset int, width int) diagnostic.Diagnostic {
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeUnterminatedString,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeUnterminatedString, nil),
 		Fields:   nil,
 		Offset:   offset,
 		Width:    width,

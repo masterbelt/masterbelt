@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/diagnostic"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/token"
 )
@@ -96,6 +97,49 @@ func TestLexerDiagnostics(t *testing.T) {
 		}
 		if got, want := diags[0].Message, "unterminated block comment"; got != want {
 			t.Errorf("message = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("unterminated string literal", func(t *testing.T) {
+		file := source.NewFile("t.belt", []byte(`const x = "oops`))
+		lex := New(file)
+		tokens := lex.Tokens()
+
+		// The dangling string is still returned as a String token, so editors
+		// keep highlighting it while the closing quote is being typed.
+		last := tokens[len(tokens)-2] // before EOF
+		if last.Kind != token.String || last.Text(file) != `"oops` {
+			t.Errorf("last token = %s %q, want String %q", last.Kind, last.Text(file), `"oops`)
+		}
+
+		diags := lex.Diagnostics()
+		if len(diags) != 1 {
+			t.Fatalf("Diagnostics() = %v, want exactly one", diags)
+		}
+		if diags[0].Code != CodeUnterminatedString {
+			t.Errorf("code = %q, want %q", diags[0].Code, CodeUnterminatedString)
+		}
+		if got, want := diags[0].Message, "unterminated string literal"; got != want {
+			t.Errorf("message = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("string is not closed across a newline", func(t *testing.T) {
+		file := source.NewFile("t.belt", []byte("\"oops\nx"))
+		lex := New(file)
+		tokens := lex.Tokens()
+
+		// The newline terminates the unterminated string rather than being
+		// swallowed: it remains its own token so the stream stays lossless.
+		if tokens[0].Kind != token.String || tokens[0].Text(file) != `"oops` {
+			t.Errorf("token[0] = %s %q, want String %q", tokens[0].Kind, tokens[0].Text(file), `"oops`)
+		}
+		if tokens[1].Kind != token.Newline {
+			t.Errorf("token[1] = %s, want Newline", tokens[1].Kind)
+		}
+		diags := lex.Diagnostics()
+		if len(diags) != 1 || diags[0].Code != CodeUnterminatedString {
+			t.Fatalf("Diagnostics() = %v, want one %q", diags, CodeUnterminatedString)
 		}
 	})
 
@@ -224,6 +268,74 @@ func TestLexerOperators(t *testing.T) {
 			t.Errorf("got %v, want a single LtEq token", tokens)
 		}
 	})
+}
+
+// TestLexerStrings checks that a well-formed double-quoted string is one String
+// token whose text includes the quotes, covering every recognized escape, the
+// \u{...} unicode escape, and raw multi-byte UTF-8 — none of which produces a
+// diagnostic.
+func TestLexerStrings(t *testing.T) {
+	cases := []string{
+		`""`,
+		`"label"`,
+		`"a b\tc"`,
+		`"say \"hi\""`,            // an escaped quote stays inside the string
+		`"trailing backslash \\"`, // an escaped backslash
+		`"\n\r\t\0"`,              // the simple escapes
+		`"\u{41}"`,                // a unicode escape, one digit short of the max width
+		`"\u{1F389}"`,             // a six-digit unicode escape (an emoji)
+		`"日本語 🎉"`,                 // raw multi-byte UTF-8 carried through verbatim
+	}
+	for _, src := range cases {
+		file := source.NewFile("s.belt", []byte(src))
+		lex := New(file)
+		tokens := lex.Tokens()
+		if len(tokens) != 2 { // String + EOF
+			t.Errorf("%q: got %d tokens, want 2: %v", src, len(tokens), tokens)
+			continue
+		}
+		if tokens[0].Kind != token.String || tokens[0].Text(file) != src {
+			t.Errorf("%q: got %s %q, want String %q", src, tokens[0].Kind, tokens[0].Text(file), src)
+		}
+		if diags := lex.Diagnostics(); len(diags) != 0 {
+			t.Errorf("%q: unexpected diagnostics %v", src, diags)
+		}
+	}
+}
+
+// TestLexerStringEscapeDiagnostics checks that a malformed escape is reported
+// while the string is still returned as one lossless String token.
+func TestLexerStringEscapeDiagnostics(t *testing.T) {
+	cases := []struct {
+		src  string
+		code diagnostic.Code
+		msg  string
+	}{
+		{`"\q"`, CodeInvalidEscape, `invalid escape sequence: \q`},
+		{"\"\\uABCD\"", CodeInvalidUnicodeEscape, `invalid unicode escape: \u`},          // \u must be braced
+		{`"\u{}"`, CodeInvalidUnicodeEscape, `invalid unicode escape: \u{}`},             // no digits
+		{`"\u{110000}"`, CodeInvalidUnicodeEscape, `invalid unicode escape: \u{110000}`}, // beyond 0x10FFFF
+		{`"\u{D800}"`, CodeInvalidUnicodeEscape, `invalid unicode escape: \u{D800}`},     // a surrogate
+		{`"\u{XYZ}"`, CodeInvalidUnicodeEscape, `invalid unicode escape: \u{`},           // not hex
+	}
+	for _, c := range cases {
+		file := source.NewFile("s.belt", []byte(c.src))
+		lex := New(file)
+		tokens := lex.Tokens()
+		if tokens[0].Kind != token.String || tokens[0].Text(file) != c.src {
+			t.Errorf("%q: token = %s %q, want a lossless String", c.src, tokens[0].Kind, tokens[0].Text(file))
+		}
+		diags := lex.Diagnostics()
+		if len(diags) != 1 {
+			t.Fatalf("%q: Diagnostics() = %v, want exactly one", c.src, diags)
+		}
+		if diags[0].Code != c.code {
+			t.Errorf("%q: code = %q, want %q", c.src, diags[0].Code, c.code)
+		}
+		if got := diags[0].Message; got != c.msg {
+			t.Errorf("%q: message = %q, want %q", c.src, got, c.msg)
+		}
+	}
 }
 
 func TestLexerEOFIsIdempotent(t *testing.T) {

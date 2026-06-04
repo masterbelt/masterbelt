@@ -1,0 +1,16 @@
+pub const LabelName = "label"
+
+// An escaped quote and a newline escape.
+pub const Greeting = "Hello, \"world\"!\n"
+
+// Tab, carriage return, and the null escape.
+pub const Control = "a\tb\r\n\0"
+
+// Raw multi-byte UTF-8 written directly in the source.
+pub const Unicode = "日本語 🎉"
+
+// A Unicode code point written as an escape.
+pub const Party = "\u{1F389}"
+
+// The empty string.
+pub const Empty = ""

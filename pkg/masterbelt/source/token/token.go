@@ -23,8 +23,9 @@ const (
 	DocComment   // /// ...
 
 	// Identifiers and literals.
-	Ident // identifier or type name, e.g. MaxLevel, int64
-	Int   // integer literal, e.g. 100
+	Ident  // identifier or type name, e.g. MaxLevel, int64
+	Int    // integer literal, e.g. 100
+	String // string literal, e.g. "label"
 
 	// Keywords.
 	Const   // const
@@ -80,6 +81,7 @@ var kindNames = [...]string{
 	DocComment:   "DocComment",
 	Ident:        "Ident",
 	Int:          "Int",
+	String:       "String",
 	Const:        "Const",
 	Pub:          "Pub",
 	True:         "True",
