@@ -454,6 +454,31 @@ func TestBidirectionalCall(t *testing.T) {
 	}
 }
 
+// TestArrowFuncLit checks that an arrow body rides the existing FuncLit paths
+// untouched: bidirectional inference, checking against an annotation, and
+// compile-time evaluation all behave exactly as the block form does, because
+// the arrow normalized to a single return during AST lowering.
+func TestArrowFuncLit(t *testing.T) {
+	m, diags := analyze("const Doubled = [1, 2, 3].map(fn(x) -> x * 2)\nconst Twice: fn(x: int): int = fn(x) -> x * 2\n")
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if got := m.Consts[0].Type.String(); got != "list<int>" {
+		t.Errorf("Doubled type = %s, want list<int>", got)
+	}
+	if got := m.Consts[0].Eval.String(); got != "[2, 4, 6]" {
+		t.Errorf("Doubled eval = %s, want [2, 4, 6]", got)
+	}
+	if got := m.Consts[1].Type.String(); got != "fn(int): int" {
+		t.Errorf("Twice type = %s, want fn(int): int", got)
+	}
+
+	// Body-type errors surface through the arrow form too.
+	if _, diags := analyze("const S: fn(x: int): int = fn(x) -> x == 0\n"); !hasCode(diags, CodeTypeMismatch) {
+		t.Errorf("want type_mismatch, got %v", codes(diags))
+	}
+}
+
 func TestBidirectionalCallDiagnostics(t *testing.T) {
 	// A lambda whose result type the call cannot solve (no return to bind R
 	// from) reports the precise cause, not a generic invalid_operation.
