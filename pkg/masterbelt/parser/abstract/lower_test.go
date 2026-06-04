@@ -97,6 +97,47 @@ func TestLowerExpressions(t *testing.T) {
 	}
 }
 
+// TestLowerFuncLit checks that omitted function-literal annotations lower to
+// nil — the checker later fills them in from the expected type — while written
+// annotations survive as type expressions.
+func TestLowerFuncLit(t *testing.T) {
+	file, diags := Lower([]byte("const f = fn(x: int, y): int { return y }\nconst g = fn(x) { return x }\n"))
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if len(file.Decls) != 2 {
+		t.Fatalf("got %d decls, want 2", len(file.Decls))
+	}
+
+	f, ok := file.Decls[0].Value.(*ast.FuncLit)
+	if !ok {
+		t.Fatalf("decl 0 Value = %+v, want FuncLit", file.Decls[0].Value)
+	}
+	if len(f.Params) != 2 {
+		t.Fatalf("f has %d params, want 2", len(f.Params))
+	}
+	if nt, ok := f.Params[0].Type.(*ast.NamedType); !ok || nt.Name != "int" {
+		t.Errorf("f param 0 Type = %+v, want NamedType int", f.Params[0].Type)
+	}
+	if f.Params[1].Type != nil {
+		t.Errorf("f param 1 Type = %+v, want nil (omitted)", f.Params[1].Type)
+	}
+	if nt, ok := f.Result.(*ast.NamedType); !ok || nt.Name != "int" {
+		t.Errorf("f Result = %+v, want NamedType int", f.Result)
+	}
+
+	g, ok := file.Decls[1].Value.(*ast.FuncLit)
+	if !ok {
+		t.Fatalf("decl 1 Value = %+v, want FuncLit", file.Decls[1].Value)
+	}
+	if len(g.Params) != 1 || g.Params[0].Type != nil {
+		t.Errorf("g params = %+v, want one unannotated param", g.Params)
+	}
+	if g.Result != nil {
+		t.Errorf("g Result = %+v, want nil (omitted)", g.Result)
+	}
+}
+
 func TestLowerSkipsNonDecls(t *testing.T) {
 	// A stray "= 1" forms an Error node in the CST; it must not appear as a decl.
 	file, diags := Lower([]byte("= 1\nconst X = 2\n"))

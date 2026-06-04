@@ -224,7 +224,7 @@ func (p *parser) parseMethodDecl() *cst.Node {
 	}
 	if p.peekSignificant() == token.LParen {
 		p.skipTrivia(&children)
-		children = append(children, p.parseParamList())
+		children = append(children, p.parseParamList(true))
 	} else {
 		p.report(newUnexpectedTokenDiagnostic(p.cur().Offset, p.cur().Width, p.kind().String()))
 	}
@@ -248,13 +248,17 @@ func (p *parser) parseMethodDecl() *cst.Node {
 }
 
 // parseParamList parses a parenthesized parameter list:
-// "(" [ Param ( "," Param )* ] ")". The cursor sits on "(".
-func (p *parser) parseParamList() *cst.Node {
+// "(" [ Param ( "," Param )* ] ")". requireType says whether each parameter
+// must carry a ":" TypeExpr annotation — true for method declarations and
+// function types (their signatures are the source of types), false for
+// function literals (the annotation may be inferred from context). The cursor
+// sits on "(".
+func (p *parser) parseParamList(requireType bool) *cst.Node {
 	children := []cst.Green{p.bump()} // "("
 	if p.peekSignificant() == token.Ident {
 		for {
 			p.skipTrivia(&children)
-			children = append(children, p.parseParam())
+			children = append(children, p.parseParam(requireType))
 			if p.peekSignificant() == token.Comma {
 				p.skipTrivia(&children)
 				children = append(children, p.bump()) // ","
@@ -272,8 +276,10 @@ func (p *parser) parseParamList() *cst.Node {
 	return cst.NewNode(cst.ParamList, children)
 }
 
-// parseParam parses one parameter: Ident ":" TypeExpr.
-func (p *parser) parseParam() *cst.Node {
+// parseParam parses one parameter: Ident [":" TypeExpr]. When requireType is
+// true a missing annotation is reported; a ":" always promises a type, so a
+// dangling colon is reported either way.
+func (p *parser) parseParam(requireType bool) *cst.Node {
 	children := []cst.Green{p.bump()} // the parameter name
 	if p.peekSignificant() == token.Colon {
 		p.skipTrivia(&children)
@@ -284,7 +290,7 @@ func (p *parser) parseParam() *cst.Node {
 		} else {
 			p.report(newExpectedTypeDiagnostic(p.lastStart, 0))
 		}
-	} else {
+	} else if requireType {
 		p.report(newExpectedTypeDiagnostic(p.lastStart, 0))
 	}
 	return cst.NewNode(cst.Param, children)

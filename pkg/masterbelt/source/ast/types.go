@@ -153,9 +153,11 @@ func NewFieldDef(name string, typ TypeExpr, syntax *cst.Node) *FieldDef {
 }
 
 // ParamDef is one parameter of a function type or method: a name and its type.
+// In a function literal the annotation is optional — Type is nil when omitted,
+// and the checker fills it in from the expected type.
 type ParamDef struct {
 	Name   string
-	Type   TypeExpr
+	Type   TypeExpr // the declared type, or nil if omitted (function literals only)
 	syntax *cst.Node
 }
 

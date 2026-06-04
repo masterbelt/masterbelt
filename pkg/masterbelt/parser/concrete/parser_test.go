@@ -67,6 +67,12 @@ func TestParseLossless(t *testing.T) {
 		"type Mapper<T, R> = fn(src: T): R\n",
 		"const x = 1\ntype T = int8\npub const y = 2\n", // const/type interleaved
 		"type Bad =\ntype Worse <\n",                    // malformed type decls stay lossless
+		// Function literals: annotations are optional in every position.
+		"const f = fn(x: int): int { return x }\n",
+		"const f = fn(x) { return x }\n",
+		"const f = fn(x: int, y) { return x }\n",
+		"const f = fn() {}\n",
+		"const f = fn(x", // truncated literal stays lossless
 	}
 	for _, src := range cases {
 		assertLossless(t, src)
@@ -292,6 +298,130 @@ func TestParseCollectionLiteral(t *testing.T) {
 					t.Fatalf("child nodes = %v, want %v", got, tc.want)
 				}
 			}
+		})
+	}
+}
+
+// TestParseFuncLit checks the function-literal header: the parameter and result
+// annotations are optional (the checker may infer them from context), and the
+// shape of the node reflects exactly what was written.
+func TestParseFuncLit(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+		want []cst.Kind   // FuncLit's direct sub-nodes
+		prm  [][]cst.Kind // each Param's sub-nodes (annotation present or not)
+	}{
+		{
+			"fully annotated", "const f = fn(x: int): int { return x }\n",
+			[]cst.Kind{cst.ParamList, cst.TypeName, cst.Block},
+			[][]cst.Kind{{cst.TypeName}},
+		},
+		{
+			"no result", "const f = fn(x: int) { return x }\n",
+			[]cst.Kind{cst.ParamList, cst.Block},
+			[][]cst.Kind{{cst.TypeName}},
+		},
+		{
+			"no annotations", "const f = fn(x) { return x }\n",
+			[]cst.Kind{cst.ParamList, cst.Block},
+			[][]cst.Kind{nil},
+		},
+		{
+			"partially annotated", "const f = fn(x: int, y) { return x }\n",
+			[]cst.Kind{cst.ParamList, cst.Block},
+			[][]cst.Kind{{cst.TypeName}, nil},
+		},
+		{
+			"result only", "const f = fn(x): int { return x }\n",
+			[]cst.Kind{cst.ParamList, cst.TypeName, cst.Block},
+			[][]cst.Kind{nil},
+		},
+		{
+			"zero params", "const f = fn() {}\n",
+			[]cst.Kind{cst.ParamList, cst.Block},
+			nil,
+		},
+		{
+			"nested", "const f = fn(x) { return fn(y) { return y } }\n",
+			[]cst.Kind{cst.ParamList, cst.Block},
+			[][]cst.Kind{nil},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, diags := Parse([]byte(tc.src))
+			if len(diags) != 0 {
+				t.Fatalf("unexpected diagnostics: %v", diags)
+			}
+			_, e := initExpr(t, tc.src)
+			if k, ok := e.Kind(); !ok || k != cst.FuncLit {
+				t.Fatalf("initializer kind = %v, want FuncLit", k)
+			}
+			node, _ := e.Node()
+			if got := subNodeKinds(node); strings.Join(kindStrings(got), ",") != strings.Join(kindStrings(tc.want), ",") {
+				t.Fatalf("sub-nodes = %v, want %v", got, tc.want)
+			}
+			var params []cst.Tree
+			for _, c := range e.Children() {
+				if k, ok := c.Kind(); ok && k == cst.ParamList {
+					for _, pc := range c.Children() {
+						if pk, ok := pc.Kind(); ok && pk == cst.Param {
+							params = append(params, pc)
+						}
+					}
+				}
+			}
+			if len(params) != len(tc.prm) {
+				t.Fatalf("got %d params, want %d", len(params), len(tc.prm))
+			}
+			for i, p := range params {
+				pn, _ := p.Node()
+				got := subNodeKinds(pn)
+				if strings.Join(kindStrings(got), ",") != strings.Join(kindStrings(tc.prm[i]), ",") {
+					t.Fatalf("param %d sub-nodes = %v, want %v", i, got, tc.prm[i])
+				}
+			}
+		})
+	}
+}
+
+// kindStrings renders kinds for joining in comparisons.
+func kindStrings(kinds []cst.Kind) []string {
+	out := make([]string, len(kinds))
+	for i, k := range kinds {
+		out[i] = k.String()
+	}
+	return out
+}
+
+// TestParamAnnotationStillRequired checks that relaxing the function-literal
+// header did not leak into the forms whose signatures are the source of types:
+// method declarations and function types still require parameter annotations,
+// and a written ":" still promises a type everywhere.
+func TestParamAnnotationStillRequired(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+	}{
+		{"method param", "type L = int8 impl {\n  m(x): self {\n    return self\n  }\n}\n"},
+		{"func type param", "type F = fn(x): int\n"},
+		{"dangling colon in func lit", "const f = fn(x:) { return x }\n"},
+		{"dangling result colon in func lit", "const f = fn(x): { return x }\n"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, diags := Parse([]byte(tc.src))
+			found := false
+			for _, d := range diags {
+				if d.Code == CodeExpectedType {
+					found = true
+				}
+			}
+			if !found {
+				t.Fatalf("src %q: want diagnostic %s, got %v", tc.src, CodeExpectedType, diags)
+			}
+			assertLossless(t, tc.src)
 		})
 	}
 }

@@ -137,7 +137,7 @@ func (p *parser) parseFuncType() *cst.Node {
 	children := []cst.Green{p.bump()} // "fn"
 	if p.peekSignificant() == token.LParen {
 		p.skipTrivia(&children)
-		children = append(children, p.parseParamList())
+		children = append(children, p.parseParamList(true))
 	} else {
 		p.report(newUnexpectedTokenDiagnostic(p.cur().Offset, p.cur().Width, p.kind().String()))
 	}

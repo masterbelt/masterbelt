@@ -33,7 +33,9 @@
 //	Unary         := ( "+" | "-" | "!" ) Unary | Postfix
 //	Postfix       := Operand ( "." Ident | "(" [ Expr ( "," Expr )* ] ")" )*
 //	Operand       := Literal | CollectionLit | NameRef | "self" | FuncLit
-//	FuncLit       := fn ParamList ":" TypeExpr Block
+//	FuncLit       := fn LitParamList [":" TypeExpr] Block
+//	LitParamList  := "(" [ LitParam ( "," LitParam )* ] ")"
+//	LitParam      := Ident [":" TypeExpr]
 //	CollectionLit := "[" [ Element ( "," Element )* [","] ] "]"
 //	Element       := Expr [ ":" Expr ]
 //	NameRef       := Ident

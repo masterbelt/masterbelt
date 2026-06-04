@@ -168,15 +168,18 @@ func (p *parser) parseOperand() cst.Green {
 	}
 }
 
-// parseFuncLit parses a function-literal expression: fn ParamList ":" TypeExpr
+// parseFuncLit parses a function-literal expression: fn ParamList [":" TypeExpr]
 // Block. It is the value form of a function type (parseFuncType) — same header,
 // but with a brace body — and is the only way to construct a value of a function
-// type. The cursor sits on "fn".
+// type. Unlike a function type or a method declaration, the literal's parameter
+// and result annotations are optional: a checking context (the expected type)
+// may supply them, so the parser accepts their absence and leaves the complaint
+// to the type checker. The cursor sits on "fn".
 func (p *parser) parseFuncLit() *cst.Node {
 	children := []cst.Green{p.bump()} // "fn"
 	if p.peekSignificant() == token.LParen {
 		p.skipTrivia(&children)
-		children = append(children, p.parseParamList())
+		children = append(children, p.parseParamList(false))
 	} else {
 		p.report(newUnexpectedTokenDiagnostic(p.cur().Offset, p.cur().Width, p.kind().String()))
 	}
@@ -189,8 +192,6 @@ func (p *parser) parseFuncLit() *cst.Node {
 		} else {
 			p.report(newExpectedTypeDiagnostic(p.lastStart, 0))
 		}
-	} else {
-		p.report(newExpectedTypeDiagnostic(p.lastStart, 0))
 	}
 	if p.peekSignificant() == token.LBrace {
 		p.skipTrivia(&children)
