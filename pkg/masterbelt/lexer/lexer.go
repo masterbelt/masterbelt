@@ -76,6 +76,18 @@ func (l *Lexer) Next() token.Token {
 		return l.scanSlash(start)
 	case c == ':':
 		return l.scanFixed(start, 1, token.Colon)
+	case c == '(':
+		return l.scanFixed(start, 1, token.LParen)
+	case c == ')':
+		return l.scanFixed(start, 1, token.RParen)
+	case c == '{':
+		return l.scanFixed(start, 1, token.LBrace)
+	case c == '}':
+		return l.scanFixed(start, 1, token.RBrace)
+	case c == ',':
+		return l.scanFixed(start, 1, token.Comma)
+	case c == '.':
+		return l.scanFixed(start, 1, token.Dot)
 	case c == '+':
 		return l.scanFixed(start, 1, token.Plus)
 	case c == '-':
@@ -97,11 +109,11 @@ func (l *Lexer) Next() token.Token {
 			return l.scanFixed(start, 2, token.AmpAmp)
 		}
 		return l.scanIllegal(start)
-	case c == '|': // "||" only; a lone "|" begins no token
+	case c == '|': // "||" (logical or) or a lone "|" (union)
 		if l.peek(1) == '|' {
 			return l.scanFixed(start, 2, token.PipePipe)
 		}
-		return l.scanIllegal(start)
+		return l.scanFixed(start, 1, token.Pipe)
 	case isLetter(c):
 		return l.scanIdent(start)
 	case isDigit(c):

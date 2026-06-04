@@ -17,10 +17,18 @@ func TestKindString(t *testing.T) {
 
 func TestLookup(t *testing.T) {
 	cases := map[string]Kind{
-		"const": Const,
-		"pub":   Pub,
-		"int64": Ident, // a type name is an ordinary identifier, not a keyword
-		"x":     Ident,
+		"const":   Const,
+		"pub":     Pub,
+		"type":    Type,
+		"impl":    Impl,
+		"fn":      Fn,
+		"return":  Return,
+		"self":    Self,
+		"null":    Null,
+		"extern":  Extern,
+		"builtin": Builtin,
+		"int64":   Ident, // a type name is an ordinary identifier, not a keyword
+		"x":       Ident,
 	}
 	for ident, want := range cases {
 		if got := Lookup(ident); got != want {

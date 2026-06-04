@@ -183,7 +183,10 @@ func TestLexerOperators(t *testing.T) {
 		{"!", token.Bang}, {"!=", token.BangEq},
 		{"<", token.Lt}, {"<=", token.LtEq},
 		{">", token.Gt}, {">=", token.GtEq},
-		{"&&", token.AmpAmp}, {"||", token.PipePipe},
+		{"&&", token.AmpAmp}, {"||", token.PipePipe}, {"|", token.Pipe},
+		{"(", token.LParen}, {")", token.RParen},
+		{"{", token.LBrace}, {"}", token.RBrace},
+		{",", token.Comma}, {".", token.Dot},
 		{"true", token.True}, {"false", token.False},
 	}
 	for _, c := range cases {

@@ -27,10 +27,18 @@ const (
 	Int   // integer literal, e.g. 100
 
 	// Keywords.
-	Const // const
-	Pub   // pub
-	True  // true
-	False // false
+	Const   // const
+	Pub     // pub
+	True    // true
+	False   // false
+	Type    // type
+	Impl    // impl
+	Fn      // fn
+	Return  // return
+	Self    // self
+	Null    // null
+	Extern  // extern
+	Builtin // builtin
 
 	// Operators and punctuation.
 	Colon    // :
@@ -49,6 +57,13 @@ const (
 	AmpAmp   // &&
 	PipePipe // ||
 	Bang     // !
+	LParen   // (
+	RParen   // )
+	LBrace   // {
+	RBrace   // }
+	Comma    // ,
+	Dot      // .
+	Pipe     // |
 
 	// Trivia. Emitted so the token stream covers every byte and can reproduce
 	// the source exactly (needed by formatters and faithful round-tripping).
@@ -69,6 +84,14 @@ var kindNames = [...]string{
 	Pub:          "Pub",
 	True:         "True",
 	False:        "False",
+	Type:         "Type",
+	Impl:         "Impl",
+	Fn:           "Fn",
+	Return:       "Return",
+	Self:         "Self",
+	Null:         "Null",
+	Extern:       "Extern",
+	Builtin:      "Builtin",
 	Colon:        "Colon",
 	Assign:       "Assign",
 	Plus:         "Plus",
@@ -85,6 +108,13 @@ var kindNames = [...]string{
 	AmpAmp:       "AmpAmp",
 	PipePipe:     "PipePipe",
 	Bang:         "Bang",
+	LParen:       "LParen",
+	RParen:       "RParen",
+	LBrace:       "LBrace",
+	RBrace:       "RBrace",
+	Comma:        "Comma",
+	Dot:          "Dot",
+	Pipe:         "Pipe",
 	Whitespace:   "Whitespace",
 	Newline:      "Newline",
 }
@@ -119,6 +149,13 @@ var spelling = map[Kind]string{
 	AmpAmp:   "&&",
 	PipePipe: "||",
 	Bang:     "!",
+	LParen:   "(",
+	RParen:   ")",
+	LBrace:   "{",
+	RBrace:   "}",
+	Comma:    ",",
+	Dot:      ".",
+	Pipe:     "|",
 }
 
 // Symbol returns the source spelling of a fixed operator or punctuation kind, or
@@ -130,10 +167,18 @@ func (k Kind) Symbol() string {
 
 // keywords maps reserved identifiers to their keyword Kind.
 var keywords = map[string]Kind{
-	"const": Const,
-	"pub":   Pub,
-	"true":  True,
-	"false": False,
+	"const":   Const,
+	"pub":     Pub,
+	"true":    True,
+	"false":   False,
+	"type":    Type,
+	"impl":    Impl,
+	"fn":      Fn,
+	"return":  Return,
+	"self":    Self,
+	"null":    Null,
+	"extern":  Extern,
+	"builtin": Builtin,
 }
 
 // Lookup returns the keyword Kind for ident, or Ident if it is not a

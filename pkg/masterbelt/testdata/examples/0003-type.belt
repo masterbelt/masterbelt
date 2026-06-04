@@ -1,0 +1,31 @@
+// Nominal type
+pub type Coin = int8
+
+// Nominal type with methods
+pub type Level = int8 impl {
+  pub increment(): self {
+    return self + 1
+  }
+}
+
+// Union type
+pub type GameValue = Coin | Level
+
+// Generics
+pub type Optional<T> = T | null
+
+// Generics with type constraint
+pub type OptionalNumeric<T: int8 | int16> = T | null
+
+// Product type
+pub type Record = {
+  id: int8
+  level: Level
+} impl {
+  pub fn game_id(): int32 {
+    return int32(self.id) * 1000
+  }
+}
+
+// Function type
+pub type Mapper<T, R> = fn(src: T): R
