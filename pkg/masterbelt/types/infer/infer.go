@@ -39,9 +39,6 @@ type Env interface {
 	Resolve(id *ast.Identifier) *ast.ConstDecl
 	// TypeOf returns a declaration's type (ir.Invalid when undeterminable).
 	TypeOf(decl *ast.ConstDecl) ir.Type
-	// ResolveType resolves a type annotation (a full type expression, e.g.
-	// list<int>) to its type, or ir.Invalid when it does not resolve.
-	ResolveType(t ast.TypeExpr) ir.Type
 	// Registry returns the builtin registry the program types against.
 	Registry() *builtin.Registry
 }
@@ -61,10 +58,13 @@ type scope interface {
 // Decl is the type rule for a declaration: an annotation gives a concrete type,
 // otherwise the type is inferred from the initializer expression. It reads other
 // declarations' types through env so a memoizing engine can track the
-// dependencies.
+// dependencies. A file's own type declarations are not visible to a constant
+// annotation, so the annotation resolves against the registry alone; the
+// diagnostic pass resolves it again with reporting enabled.
 func Decl(decl *ast.ConstDecl, env Env) ir.Type {
 	if decl.Type != nil {
-		return env.ResolveType(decl.Type)
+		r := &TypeResolver{Reg: env.Registry()}
+		return r.ResolveType(decl.Type, nil)
 	}
 	if decl.Value == nil {
 		return ir.Invalid

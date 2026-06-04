@@ -66,17 +66,6 @@ func (e typeEnv) Resolve(id *ast.Identifier) *ast.ConstDecl { return e.q.resolve
 func (e typeEnv) TypeOf(decl *ast.ConstDecl) ir.Type        { return e.q.typeOf(decl) }
 func (e typeEnv) Registry() *builtin.Registry               { return e.q.registry() }
 
-// ResolveType resolves a constant's type annotation — a full type expression, so
-// it covers a generic type such as list<int> — against the program's type
-// universe: the builtin primitives and the prelude's types (installed into the
-// registry). A file's own type declarations are not yet visible to a const
-// annotation, so the resolver is given no file defs. It reports nothing; the
-// diagnostic pass in assemble resolves again with reporting enabled.
-func (e typeEnv) ResolveType(t ast.TypeExpr) ir.Type {
-	r := &typeResolver{reg: e.q.registry(), defs: map[string]*ir.TypeDef{}}
-	return r.resolveType(t, nil)
-}
-
 // Analyze resolves and types the document's program, returning the IR module and
 // the semantic diagnostics. It recomputes everything from scratch; it is the
 // reference analysis and the oracle for the incremental Document.
@@ -150,8 +139,10 @@ func assemble(file *ast.File, positions map[cst.Green]span, q queries) (*ir.Modu
 		if decl.Type != nil {
 			// Resolve the annotation with reporting enabled, so an unknown type
 			// name anywhere in it (e.g. list<Bogus>) is diagnosed at its own node.
-			r := &typeResolver{reg: reg, defs: map[string]*ir.TypeDef{}, at: at, diags: diags}
-			annType := r.resolveType(decl.Type, nil)
+			// A file's own type declarations are not visible to a const annotation,
+			// so the resolver is given no file defs.
+			r := &infer.TypeResolver{Reg: reg, Report: unknownTypeReporter(at, diags)}
+			annType := r.ResolveType(decl.Type, nil)
 			// A collection literal is checked element-wise below (collectionCheck),
 			// which reports precisely; any other value's inferred type must be
 			// compatible with the annotation here.

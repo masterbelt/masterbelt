@@ -6,7 +6,6 @@ import (
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ir"
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/types"
 )
 
 // --- ast builders (nil syntax: the type rules never read Syntax) ------------
@@ -28,8 +27,9 @@ func unary(recv ast.Expr, method string) *ast.CallExpr {
 }
 
 // stubEnv is a fixed resolution/typing environment for driving inference
-// without the semantic engine. It resolves type names through the builtin
-// registry, like the const path does before user types exist.
+// without the semantic engine. Type annotations resolve through the shared
+// TypeResolver (Decl builds one from the registry), so the stub need only supply
+// resolution and the registry.
 type stubEnv struct {
 	res map[*ast.Identifier]*ast.ConstDecl
 	typ map[*ast.ConstDecl]ir.Type
@@ -39,18 +39,6 @@ type stubEnv struct {
 func (e stubEnv) Resolve(id *ast.Identifier) *ast.ConstDecl { return e.res[id] }
 func (e stubEnv) TypeOf(decl *ast.ConstDecl) ir.Type        { return e.typ[decl] }
 func (e stubEnv) Registry() *builtin.Registry               { return e.reg }
-
-// ResolveType resolves a simple named annotation through the registry — enough
-// for these unit tests, which only use bare primitive names. The semantic engine
-// supplies the full resolver (generics, unions, ...).
-func (e stubEnv) ResolveType(t ast.TypeExpr) ir.Type {
-	if nt, ok := t.(*ast.NamedType); ok && len(nt.Args) == 0 {
-		if typ, ok := types.Lookup(e.reg, nt.Name); ok {
-			return typ
-		}
-	}
-	return ir.Invalid
-}
 
 func emptyEnv() stubEnv {
 	return stubEnv{

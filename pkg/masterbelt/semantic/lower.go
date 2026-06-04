@@ -3,6 +3,7 @@ package semantic
 import (
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ir"
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/types/infer"
 )
 
 // constBinder lowers the leaves of a constant initializer: a value-position
@@ -28,7 +29,7 @@ func (b constBinder) Leaf(e ast.Expr, _ func(ast.Expr) ir.Value) ir.Value {
 // resolver's; params and tscope are the parameter and generic-parameter names in
 // scope.
 type bodyBinder struct {
-	r      *typeResolver
+	r      *infer.TypeResolver
 	params map[string]bool
 	tscope map[string]bool
 }
@@ -50,7 +51,7 @@ func (b bodyBinder) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
 	case *ast.CallExpr:
 		// A call whose callee names a type is a conversion T(x).
 		if id, ok := e.Callee.(*ast.Identifier); ok && !b.params[id.Name] {
-			if t := b.r.resolveNamedName(id.Name, b.tscope); t != ir.Invalid {
+			if t := b.r.ResolveName(id.Name, b.tscope); t != ir.Invalid {
 				var arg ir.Value
 				if len(e.Arguments) > 0 {
 					arg = sub(e.Arguments[0])
