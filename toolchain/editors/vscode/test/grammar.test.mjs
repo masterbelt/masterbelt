@@ -65,15 +65,17 @@ test('grammar assigns the expected scopes', async () => {
   ].join('\n');
   const lines = tokenize(grammar, source);
 
+  // The scopes are the ones VS Code falls back to for the matching semantic
+  // token types, so the colours cannot shift when the server comes up; an
+  // identifier is deliberately scope-less (the semantic tokens enrich it).
   const cases = [
-    ['const', 'keyword.other'],
-    ['pub', 'keyword.other'],
-    ['MyConst', 'variable.other'],
-    ['int64', 'variable.other'],
+    ['const', 'keyword.control'],
+    ['pub', 'keyword.control'],
     ['100', 'constant.numeric'],
     ['///', 'comment.line.documentation'],
     ['// trailing', 'comment.line.double-slash'],
     ['=', 'keyword.operator'],
+    [':', 'keyword.operator'],
   ];
 
   for (const [substr, want] of cases) {
@@ -81,6 +83,17 @@ test('grammar assigns the expected scopes', async () => {
     assert.ok(
       scopes.some((scope) => scope.includes(want)),
       `${JSON.stringify(substr)} -> ${JSON.stringify(scopes)} should include ${want}`,
+    );
+  }
+
+  // Identifiers carry no grammar scope of their own: whether one is a type,
+  // a reference, or a declaration name is not a lexical fact.
+  for (const substr of ['MyConst', 'int64']) {
+    const scopes = scopesOf(lines, substr);
+    assert.deepEqual(
+      scopes,
+      ['source.masterbelt'],
+      `${JSON.stringify(substr)} should be uncoloured at cold start, got ${JSON.stringify(scopes)}`,
     );
   }
 });

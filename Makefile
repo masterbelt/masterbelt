@@ -15,10 +15,13 @@ build:
 clean:
 	rm -rf $(BIN_DIR)
 
-# test runs the full test suite.
+# test runs the full test suite: the Go packages and the VS Code extension's
+# grammar tests (which go test cannot reach — the generated TextMate grammar
+# is pinned there).
 .PHONY: test
 test:
 	$(GO) test ./...
+	cd toolchain/editors/vscode && node --test
 
 # generate runs code generation (the diagnostic tables, etc.).
 .PHONY: generate
