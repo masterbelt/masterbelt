@@ -1,22 +1,22 @@
 Module
   Const "add"
-    type untyped int
+    type int
     value IntLiteral "1".add(IntLiteral "2")
     eval 3
   Const "sub"
-    type untyped int
+    type int
     value IntLiteral "1".sub(IntLiteral "2")
     eval -1
   Const "mul"
-    type untyped int
+    type int
     value IntLiteral "1".mul(IntLiteral "2")
     eval 2
   Const "div"
-    type untyped int
+    type int
     value IntLiteral "1".div(IntLiteral "2")
     eval 0
   Const "rem"
-    type untyped int
+    type int
     value IntLiteral "1".rem(IntLiteral "2")
     eval 1
   Const "eql"
@@ -44,22 +44,22 @@ Module
     value IntLiteral "1".gteq(IntLiteral "2")
     eval false
   Const "anan"
-    type untyped bool
+    type bool
     value BoolLiteral true.anan(BoolLiteral false)
     eval false
   Const "oror"
-    type untyped bool
+    type bool
     value BoolLiteral false.oror(BoolLiteral true)
     eval true
   Const "pos"
-    type untyped int
+    type int
     value IntLiteral "1".pos()
     eval 1
   Const "neg"
-    type untyped int
+    type int
     value IntLiteral "1".neg()
     eval -1
   Const "not"
-    type untyped bool
+    type bool
     value BoolLiteral false.not()
     eval true

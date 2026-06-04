@@ -54,15 +54,15 @@ func Decl(decl *ast.ConstDecl, env Env) ir.Type {
 	return Expr(decl.Value, env)
 }
 
-// Expr infers the type of an expression: literals are untyped, a value reference
-// inherits its referent's type, and a method call's type comes from the builtin
-// method rules (types.MethodResult).
+// Expr infers the type of an expression: an integer literal is int and a
+// boolean literal is bool, a value reference inherits its referent's type, and a
+// method call's type comes from the builtin method rules (types.MethodResult).
 func Expr(e ast.Expr, env Env) ir.Type {
 	switch e := e.(type) {
 	case *ast.IntLit:
-		return ir.UntypedInt
+		return &ir.Builtin{Name: "int"}
 	case *ast.BoolLit:
-		return ir.UntypedBool
+		return &ir.Builtin{Name: "bool"}
 	case *ast.Identifier:
 		if target := env.Resolve(e); target != nil {
 			return env.TypeOf(target)
@@ -93,9 +93,9 @@ func Expr(e ast.Expr, env Env) ir.Type {
 func Check(e ast.Expr, env Env, report func(node ast.Node, method, operands string)) ir.Type {
 	switch e := e.(type) {
 	case *ast.IntLit:
-		return ir.UntypedInt
+		return &ir.Builtin{Name: "int"}
 	case *ast.BoolLit:
-		return ir.UntypedBool
+		return &ir.Builtin{Name: "bool"}
 	case *ast.Identifier:
 		if t := env.Resolve(e); t != nil {
 			return env.TypeOf(t)

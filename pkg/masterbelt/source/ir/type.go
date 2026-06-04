@@ -17,40 +17,18 @@ type Type interface {
 	String() string
 }
 
-// UntypedKind distinguishes the two kinds of untyped literal constant.
-type UntypedKind int
-
-const (
-	untypedIntKind UntypedKind = iota
-	untypedBoolKind
-)
-
-// --- primitive and untyped types --------------------------------------------
+// --- primitive and invalid types --------------------------------------------
 
 // Builtin is a primitive type, identified by name. Whether it is an integer, its
 // value range, and its operator methods are provided by the builtin registry
-// keyed on Name — this struct holds only the name.
+// keyed on Name — this struct holds only the name. An un-annotated integer
+// literal has type Builtin{"int"} (the arbitrary-precision integer that adapts
+// to any sized integer) and a boolean literal has type Builtin{"bool"}; there is
+// no separate "untyped" kind.
 type Builtin struct{ Name string }
 
 func (*Builtin) typ()             {}
 func (b *Builtin) String() string { return b.Name }
-
-// untyped is the type of an un-annotated literal before a concrete type is
-// forced. The two values are interned as the UntypedInt and UntypedBool
-// singletons so they can be compared with ==.
-type untyped struct{ kind UntypedKind }
-
-func (*untyped) typ() {}
-func (u *untyped) String() string {
-	if u.kind == untypedBoolKind {
-		return "untyped bool"
-	}
-	return "untyped int"
-}
-
-// Kind reports whether an untyped type is the integer or boolean kind. It is
-// valid only for the UntypedInt/UntypedBool singletons.
-func (u *untyped) Kind() UntypedKind { return u.kind }
 
 // invalid is the type of an expression whose type could not be determined. It is
 // interned as the Invalid singleton.
@@ -59,13 +37,9 @@ type invalid struct{}
 func (*invalid) typ()           {}
 func (*invalid) String() string { return "invalid" }
 
-// The singleton types. Invalid and the untyped constants have no fields, so a
-// single shared value of each suffices and they can be compared with ==.
-var (
-	Invalid     Type = &invalid{}
-	UntypedInt  Type = &untyped{kind: untypedIntKind}
-	UntypedBool Type = &untyped{kind: untypedBoolKind}
-)
+// Invalid is the singleton invalid type; it has no fields, so a single shared
+// value suffices and it can be compared with ==.
+var Invalid Type = &invalid{}
 
 // --- declared and composite types -------------------------------------------
 

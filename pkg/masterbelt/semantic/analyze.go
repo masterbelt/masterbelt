@@ -153,9 +153,9 @@ func assemble(file *ast.File, positions map[cst.Green]span, q queries) (*ir.Modu
 			s := at(decl)
 			diags.Add(newCyclicReferenceDiagnostic(s.offset, s.width, decl.Name))
 		}
-		// An integer value outside its concrete type's range overflows. Untyped
-		// constants have no fixed range (Fits accepts them), and booleans never
-		// overflow.
+		// An integer value outside its concrete type's range overflows. The
+		// arbitrary-precision int has no fixed range (Fits accepts any value),
+		// and booleans never overflow.
 		if c.Eval != nil && c.Eval.Kind == ir.ConstInt && !types.Fits(reg, c.Type, c.Eval.Int) {
 			s := at(decl.Value)
 			diags.Add(newConstantOverflowDiagnostic(s.offset, s.width, c.Eval.String(), c.Type.String()))
@@ -206,8 +206,9 @@ func buildSymbols(file *ast.File) map[string]*ast.ConstDecl {
 // --- evaluation -------------------------------------------------------------
 
 // computeValue is the evaluation rule, shared by both query implementations.
-// Overflow is intentionally not checked here — untyped constants are arbitrary
-// precision; the range check happens in assemble where a concrete type is known.
+// Overflow is intentionally not checked here — an integer literal is the
+// arbitrary-precision int; the range check happens in assemble where the
+// constant's concrete type is known.
 func computeValue(decl *ast.ConstDecl, q queries) *ir.Constant {
 	if decl.Value == nil {
 		return nil

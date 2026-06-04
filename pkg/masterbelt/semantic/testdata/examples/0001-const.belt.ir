@@ -7,7 +7,7 @@ Module
   Const "MinLevel"
     doc "DocComment for MinLevel"
     doc "with multiline."
-    type untyped int
+    type int
     value IntLiteral "0"
     eval 0
   Const "PublishedMaxLevel" pub

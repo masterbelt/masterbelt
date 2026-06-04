@@ -136,8 +136,8 @@ func externMethod(name string, result ir.Type, params ...ir.Type) *ir.Method {
 }
 
 // integerMethods is the operator-method signature set shared by every integer
-// primitive and by the untyped integer constant: arithmetic returns self,
-// comparisons and equality return bool, and the unary signs return self.
+// primitive: arithmetic returns self, comparisons and equality return bool, and
+// the unary signs return self.
 func integerMethods() []*ir.Method {
 	return []*ir.Method{
 		externMethod("pos", self()),
@@ -156,9 +156,8 @@ func integerMethods() []*ir.Method {
 	}
 }
 
-// booleanMethods is the operator-method signature set of the boolean primitive
-// and the untyped boolean constant: logical ops return self, equality returns
-// bool, and not returns self.
+// booleanMethods is the operator-method signature set of the boolean primitive:
+// logical ops return self, equality returns bool, and not returns self.
 func booleanMethods() []*ir.Method {
 	return []*ir.Method{
 		externMethod("not", self()),

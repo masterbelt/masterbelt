@@ -1,9 +1,13 @@
 // Package types is masterbelt's type algebra: the rules and operations over a
 // type value. ir owns the type representation (ir.Type and its variants); this
 // package owns everything that reasons about a type — the classification
-// predicates (IsInteger, IsBoolean, IsUntyped), Default, the lookup of builtin
-// types by name (Lookup), the value-range check (Fits), the operator-method type
-// rules (MethodResult), and assignability/compatibility.
+// predicates (IsInteger, IsBoolean), the lookup of builtin types by name
+// (Lookup), the value-range check (Fits), the operator-method type rules
+// (MethodResult), and assignability/compatibility.
+//
+// There is no "untyped" type: an integer literal has type int (the
+// arbitrary-precision integer, which adapts to any sized integer and is
+// range-checked at the boundary) and a boolean literal has type bool.
 //
 // None of these hardcode the set of primitives: every "is this an integer", its
 // value range, and the result type of an operator method is derived from the
@@ -20,44 +24,35 @@ import (
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ir"
 )
 
-// IsInteger reports whether t is an integer type: an integer builtin (per the
-// registry) or the untyped integer constant.
+// IsInteger reports whether t is an integer builtin, per the registry.
 func IsInteger(reg *builtin.Registry, t ir.Type) bool {
 	if b, ok := t.(*ir.Builtin); ok {
 		if n, ok := reg.Native(b.Name); ok {
 			return n.IsInteger()
 		}
-		return false
 	}
-	return t == ir.UntypedInt
+	return false
 }
 
-// IsBoolean reports whether t is a boolean type: the boolean builtin or the
-// untyped boolean constant.
+// IsBoolean reports whether t is the boolean builtin, per the registry.
 func IsBoolean(reg *builtin.Registry, t ir.Type) bool {
 	if b, ok := t.(*ir.Builtin); ok {
 		if n, ok := reg.Native(b.Name); ok {
 			return n.IsBoolean()
 		}
-		return false
 	}
-	return t == ir.UntypedBool
+	return false
 }
 
-// IsUntyped reports whether t is an untyped constant type.
-func IsUntyped(t ir.Type) bool { return t == ir.UntypedInt || t == ir.UntypedBool }
+// defaultInt is the type of an integer literal: the arbitrary-precision integer
+// that adapts to any sized integer type.
+const defaultInt = "int"
 
-// Default returns the concrete type an untyped constant takes when no annotation
-// forces another; every other type is its own default.
-func Default(t ir.Type) ir.Type {
-	switch t {
-	case ir.UntypedInt:
-		return &ir.Builtin{Name: "int64"}
-	case ir.UntypedBool:
-		return &ir.Builtin{Name: "bool"}
-	default:
-		return t
-	}
+// isDefaultInt reports whether t is the literal/default integer type, which
+// adapts to any other integer type.
+func isDefaultInt(t ir.Type) bool {
+	b, ok := t.(*ir.Builtin)
+	return ok && b.Name == defaultInt
 }
 
 // Lookup resolves a builtin type name to its type, or false if name is not a
@@ -89,16 +84,14 @@ func Compatible(reg *builtin.Registry, annotation, expr ir.Type) bool {
 }
 
 // Assignable reports whether a value of type from may be used where type to is
-// expected: the same type, or an untyped constant flowing into a matching
-// concrete type.
+// expected: the same type, or the default integer flowing into any other
+// integer type (range-checked at the boundary, so an overflow is reported
+// separately).
 func Assignable(reg *builtin.Registry, from, to ir.Type) bool {
 	if from == to {
 		return true
 	}
-	if from == ir.UntypedInt && IsInteger(reg, to) {
-		return true
-	}
-	if from == ir.UntypedBool && IsBoolean(reg, to) {
+	if isDefaultInt(from) && IsInteger(reg, to) {
 		return true
 	}
 	if a, ok := from.(*ir.Builtin); ok {
@@ -110,8 +103,8 @@ func Assignable(reg *builtin.Registry, from, to ir.Type) bool {
 }
 
 // MethodResult is the type rule for a method call: it finds the method on the
-// receiver's type, unifies the self-typed operands (so an untyped operand adapts
-// to a concrete one), and returns the substituted result type — self for a
+// receiver's type, unifies the self-typed operands (so the default integer
+// adapts to a sized one), and returns the substituted result type — self for a
 // self-returning method, the declared result otherwise. It returns ir.Invalid
 // when the method does not exist on the receiver or the operands do not fit,
 // which the IR records as an Invalid type.
@@ -147,8 +140,7 @@ func MethodResult(reg *builtin.Registry, recv ir.Type, method string, args []ir.
 }
 
 // defOf returns the type definition whose methods apply to a value of type t:
-// the registry definition for a builtin, the referent for a named type, and the
-// canonical integer/boolean definition for an untyped constant.
+// the registry definition for a builtin, the referent for a named type.
 func defOf(reg *builtin.Registry, t ir.Type) *ir.TypeDef {
 	switch t := t.(type) {
 	case *ir.Builtin:
@@ -157,14 +149,6 @@ func defOf(reg *builtin.Registry, t ir.Type) *ir.TypeDef {
 		}
 	case *ir.Named:
 		return t.Def
-	}
-	switch t {
-	case ir.UntypedInt:
-		d, _ := reg.Lookup("int")
-		return d
-	case ir.UntypedBool:
-		d, _ := reg.Lookup("bool")
-		return d
 	}
 	return nil
 }
@@ -178,29 +162,18 @@ func findMethod(def *ir.TypeDef, name string) *ir.Method {
 	return nil
 }
 
-// combine unifies two operand types under the untyped-adapts-to-concrete rule:
-// an untyped constant takes the other operand's type when kinds agree, two equal
-// types keep that type, and anything else is a mismatch (ir.Invalid).
+// combine unifies two operand types: the default integer adapts to the other
+// integer operand, two equal types keep that type, and anything else is a
+// mismatch (ir.Invalid). It is how an integer literal takes the type of the
+// sized integer it is combined with.
 func combine(reg *builtin.Registry, a, b ir.Type) ir.Type {
 	switch {
 	case a == b:
 		return a
-	case a == ir.UntypedInt:
-		if IsInteger(reg, b) {
-			return b
-		}
-	case b == ir.UntypedInt:
-		if IsInteger(reg, a) {
-			return a
-		}
-	case a == ir.UntypedBool:
-		if IsBoolean(reg, b) {
-			return b
-		}
-	case b == ir.UntypedBool:
-		if IsBoolean(reg, a) {
-			return a
-		}
+	case isDefaultInt(a) && IsInteger(reg, b):
+		return b
+	case isDefaultInt(b) && IsInteger(reg, a):
+		return a
 	case sameBuiltin(a, b):
 		return a
 	}

@@ -85,8 +85,8 @@ func TestDocumentSymbols(t *testing.T) {
 		t.Errorf("symbol 0 selection range = %+v, want cols 6..14 on line 0", sel)
 	}
 
-	if syms[1].Name != "Min" || syms[1].Detail != ": untyped int" {
-		t.Errorf("symbol 1 = %+v, want Min: untyped int", syms[1])
+	if syms[1].Name != "Min" || syms[1].Detail != ": int" {
+		t.Errorf("symbol 1 = %+v, want Min: int", syms[1])
 	}
 }
 

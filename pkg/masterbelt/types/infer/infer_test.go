@@ -51,11 +51,11 @@ func emptyEnv() stubEnv {
 
 func TestExprLiterals(t *testing.T) {
 	env := emptyEnv()
-	if got := Expr(intLit("1"), env); got != ir.UntypedInt {
-		t.Errorf("Expr(int literal) = %s, want untyped int", got)
+	if got := Expr(intLit("1"), env).String(); got != "int" {
+		t.Errorf("Expr(int literal) = %s, want int", got)
 	}
-	if got := Expr(boolLit(true), env); got != ir.UntypedBool {
-		t.Errorf("Expr(bool literal) = %s, want untyped bool", got)
+	if got := Expr(boolLit(true), env).String(); got != "bool" {
+		t.Errorf("Expr(bool literal) = %s, want bool", got)
 	}
 }
 
@@ -84,10 +84,10 @@ func TestExprCalls(t *testing.T) {
 		expr ast.Expr
 		want string
 	}{
-		{"add untyped ints", binary(intLit("1"), "add", intLit("2")), "untyped int"},
+		{"add int literals", binary(intLit("1"), "add", intLit("2")), "int"},
 		{"lt yields bool", binary(intLit("1"), "lt", intLit("2")), "bool"},
-		{"and stays untyped bool", binary(boolLit(true), "anan", boolLit(false)), "untyped bool"},
-		{"neg preserves type", unary(intLit("1"), "neg"), "untyped int"},
+		{"and yields bool", binary(boolLit(true), "anan", boolLit(false)), "bool"},
+		{"neg preserves type", unary(intLit("1"), "neg"), "int"},
 		{"arith on bool is invalid", binary(boolLit(true), "add", intLit("1")), "invalid"},
 		{"nested propagates invalid", binary(binary(boolLit(true), "add", intLit("1")), "add", intLit("2")), "invalid"},
 		{"callee not a member", ast.NewCallExpr(intLit("1"), nil, nil), "invalid"},
@@ -108,7 +108,7 @@ func TestDecl(t *testing.T) {
 	}{
 		{"annotation wins", ast.NewConstDecl(nil, false, "X", ast.NewTypeRef("int32", nil), intLit("1"), nil), "int32"},
 		{"unknown annotation", ast.NewConstDecl(nil, false, "X", ast.NewTypeRef("notatype", nil), intLit("1"), nil), "invalid"},
-		{"inferred from value", ast.NewConstDecl(nil, false, "X", nil, intLit("1"), nil), "untyped int"},
+		{"inferred from value", ast.NewConstDecl(nil, false, "X", nil, intLit("1"), nil), "int"},
 		{"no type, no value", ast.NewConstDecl(nil, false, "X", nil, nil, nil), "invalid"},
 	}
 	for _, tc := range cases {
@@ -133,8 +133,8 @@ func TestCheckValid(t *testing.T) {
 	env := emptyEnv()
 	var r report
 	got := Check(binary(intLit("1"), "add", intLit("2")), env, r.fn)
-	if got.String() != "untyped int" {
-		t.Errorf("Check(1.add(2)) = %s, want untyped int", got)
+	if got.String() != "int" {
+		t.Errorf("Check(1.add(2)) = %s, want int", got)
 	}
 	if len(r.methods) != 0 {
 		t.Errorf("valid expression reported %v, want no reports", r.methods)
@@ -152,8 +152,8 @@ func TestCheckReportsInvalid(t *testing.T) {
 	if len(r.methods) != 1 || r.methods[0] != "anan" {
 		t.Fatalf("methods = %v, want [anan]", r.methods)
 	}
-	if r.operands[0] != "untyped int, untyped int" {
-		t.Errorf("operands = %q, want %q", r.operands[0], "untyped int, untyped int")
+	if r.operands[0] != "int, int" {
+		t.Errorf("operands = %q, want %q", r.operands[0], "int, int")
 	}
 }
 

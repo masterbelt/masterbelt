@@ -20,7 +20,7 @@ func codes(diags []diagnostic.Diagnostic) []diagnostic.Code {
 	return out
 }
 
-func TestAnnotatedAndUntyped(t *testing.T) {
+func TestAnnotatedAndInferred(t *testing.T) {
 	m, diags := analyze("const A: int32 = 1\nconst B = 0\n")
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", diags)
@@ -28,8 +28,8 @@ func TestAnnotatedAndUntyped(t *testing.T) {
 	if m.Consts[0].Type.String() != "int32" {
 		t.Errorf("A type = %s, want int32", m.Consts[0].Type)
 	}
-	if m.Consts[1].Type.String() != "untyped int" {
-		t.Errorf("B type = %s, want untyped int", m.Consts[1].Type)
+	if m.Consts[1].Type.String() != "int" {
+		t.Errorf("B type = %s, want int", m.Consts[1].Type)
 	}
 }
 
@@ -46,9 +46,9 @@ func TestReferenceResolutionAndTypeInheritance(t *testing.T) {
 	if !ok || ref.Target != m.Consts[0] {
 		t.Errorf("B value = %v, want Reference -> A", m.Consts[1].Value)
 	}
-	// D = C inherits C's untyped int.
-	if m.Consts[3].Type.String() != "untyped int" {
-		t.Errorf("D type = %s, want untyped int", m.Consts[3].Type)
+	// D = C inherits C's int.
+	if m.Consts[3].Type.String() != "int" {
+		t.Errorf("D type = %s, want int", m.Consts[3].Type)
 	}
 }
 
@@ -111,12 +111,12 @@ func TestConstantOverflow(t *testing.T) {
 	}
 }
 
-func TestUntypedDoesNotOverflow(t *testing.T) {
-	// An untyped constant is arbitrary precision; only a concrete type triggers
-	// the range check.
+func TestIntLiteralDoesNotOverflow(t *testing.T) {
+	// An un-annotated integer literal is the arbitrary-precision int; only a
+	// sized concrete type triggers the range check.
 	_, diags := analyze("const X = 99999999999999999999999999\n")
 	if len(diags) != 0 {
-		t.Fatalf("untyped constant should not overflow: %v", diags)
+		t.Fatalf("an int literal should not overflow: %v", diags)
 	}
 }
 
@@ -212,9 +212,9 @@ func TestAnnotationMismatch(t *testing.T) {
 
 func TestDiagnosticMessages(t *testing.T) {
 	cases := []struct{ src, code, message string }{
-		{"const x = 1 && 2\n", string(CodeInvalidOperation), "cannot apply method anan to untyped int, untyped int"},
+		{"const x = 1 && 2\n", string(CodeInvalidOperation), "cannot apply method anan to int, int"},
 		{"const x = 1 / 0\n", string(CodeDivisionByZero), "division by zero"},
-		{"const x: int8 = true\n", string(CodeTypeMismatch), "cannot use untyped bool as int8"},
+		{"const x: int8 = true\n", string(CodeTypeMismatch), "cannot use bool as int8"},
 	}
 	for _, tc := range cases {
 		_, diags := analyze(tc.src)
