@@ -30,6 +30,9 @@ masterbelt.semantic.not_exported,{path} does not export {name}
 masterbelt.semantic.unknown_member,{namespace} has no exported member {name}
 masterbelt.semantic.ambiguous_import,{name} is ambiguous; it arrives from more than one import
 masterbelt.semantic.cyclic_module,import cycle through {path}
+masterbelt.semantic.assertion_failed,assertion failed: {cond}
+masterbelt.semantic.assertion_not_bool,assertion must be a bool; got {typ}
+masterbelt.semantic.assertion_not_constant,assertion is not a compile-time constant
 project.config.missing,masterbelt.toml not found in this directory or any parent
 project.config.invalid,invalid masterbelt.toml: {detail}
 project.config.missing_entry,masterbelt.toml does not set entry

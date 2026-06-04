@@ -10,6 +10,9 @@ import (
 
 const (
 	CodeAmbiguousImport       diagnostic.Code = "masterbelt.semantic.ambiguous_import"
+	CodeAssertionFailed       diagnostic.Code = "masterbelt.semantic.assertion_failed"
+	CodeAssertionNotBool      diagnostic.Code = "masterbelt.semantic.assertion_not_bool"
+	CodeAssertionNotConstant  diagnostic.Code = "masterbelt.semantic.assertion_not_constant"
 	CodeConstantOverflow      diagnostic.Code = "masterbelt.semantic.constant_overflow"
 	CodeCyclicModule          diagnostic.Code = "masterbelt.semantic.cyclic_module"
 	CodeCyclicReference       diagnostic.Code = "masterbelt.semantic.cyclic_reference"
@@ -37,6 +40,45 @@ func newAmbiguousImportDiagnostic(offset int, width int, name string) diagnostic
 		Code:     CodeAmbiguousImport,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeAmbiguousImport, fields),
 		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newAssertionFailedDiagnostic(offset int, width int, cond string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"cond": diagnostic.Str(cond),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeAssertionFailed,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeAssertionFailed, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newAssertionNotBoolDiagnostic(offset int, width int, typ string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"typ": diagnostic.Str(typ),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeAssertionNotBool,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeAssertionNotBool, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newAssertionNotConstantDiagnostic(offset int, width int) diagnostic.Diagnostic {
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeAssertionNotConstant,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeAssertionNotConstant, nil),
+		Fields:   nil,
 		Offset:   offset,
 		Width:    width,
 	}

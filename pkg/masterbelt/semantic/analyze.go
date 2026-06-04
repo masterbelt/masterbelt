@@ -320,6 +320,77 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 		}
 	}
 
+	// Compile-time assertions: each condition must resolve, type as bool, and
+	// fold to true. An assert produces no IR — it is a diagnostic-only
+	// declaration — and every fact it needs is read through q, so the
+	// incremental engine tracks its dependencies exactly as it does a const's.
+	for _, a := range file.Asserts {
+		if a.Cond == nil {
+			continue // already a parse diagnostic
+		}
+		before := diags.Len()
+
+		// Undefined references and unknown namespace members, exactly as for a
+		// const's initializer.
+		walkRefs(fileID, a.Cond, q,
+			func(id *ast.Identifier) {
+				if id.Name == "" || q.resolve(fileID, id) != nil {
+					return
+				}
+				s := at(id)
+				if q.ambiguousImport(fileID, id) {
+					diags.Add(newAmbiguousImportDiagnostic(s.offset, s.width, id.Name))
+					return
+				}
+				diags.Add(newUndefinedNameDiagnostic(s.offset, s.width, id.Name))
+			},
+			func(m *ast.MemberExpr) {
+				if m.Member.Name == "" {
+					return // a recovered `ns.` — already a parse diagnostic
+				}
+				if q.resolveMember(fileID, m) == nil {
+					s := at(m)
+					ns, _ := m.Receiver.(*ast.Identifier)
+					diags.Add(newUnknownMemberDiagnostic(s.offset, s.width, m.Member.Name, ns.Name))
+				}
+			})
+
+		// Operator type errors and zero divisors, through the same checking
+		// walks the const path uses.
+		condType := infer.Check(a.Cond, env, exprSink(at, diags))
+		checkDivByZero(a.Cond, evalEnv{q: q, file: fileID}, func(node ast.Node) {
+			s := at(node)
+			diags.Add(newDivisionByZeroDiagnostic(s.offset, s.width))
+		})
+
+		// The condition must be a bool. An Invalid type was reported above
+		// (an undefined name, a misapplied operator), so it is not re-reported
+		// as a non-bool here.
+		if condType != ir.Invalid && !types.IsBoolean(reg, condType) {
+			s := at(a.Cond)
+			diags.Add(newAssertionNotBoolDiagnostic(s.offset, s.width, condType.String()))
+			continue
+		}
+
+		// The condition must fold at compile time. When it does not — and
+		// nothing above explained why — the assertion itself is the problem:
+		// it asks for something the evaluator cannot verify.
+		v := eval.Expr(a.Cond, evalEnv{q: q, file: fileID})
+		if v == nil || v.Kind != ir.ConstBool {
+			if diags.Len() == before {
+				s := at(a.Cond)
+				diags.Add(newAssertionNotConstantDiagnostic(s.offset, s.width))
+			}
+			continue
+		}
+
+		// The assertion proper.
+		if !v.Bool {
+			s := at(a.Cond)
+			diags.Add(newAssertionFailedDiagnostic(s.offset, s.width, ast.Render(a.Cond)))
+		}
+	}
+
 	// The module's type definitions come from the memoized query — the same
 	// objects annotations resolved against, so Named identity never forks. The
 	// query resolves silently (its result is reused across revisions, but

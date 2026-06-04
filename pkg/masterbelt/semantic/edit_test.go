@@ -80,6 +80,10 @@ func TestScriptedEdits(t *testing.T) {
 		{"add pub", "const A = 1\n", source.Edit{Start: 0, End: 0, NewText: []byte("pub ")}},
 		{"duplicate name", "const A = 1\nconst B = 2\n", source.Edit{Start: 18, End: 19, NewText: []byte("A")}},
 		{"delete a declaration", "const A = 1\nconst B = A\n", source.Edit{Start: 0, End: 12, NewText: nil}},
+		{"break an assertion", "const A = 1\nassert A > 0\n", source.Edit{Start: 21, End: 22, NewText: []byte("<")}},
+		{"fix an assertion via its const", "const A = 1\nassert A < 0\n", source.Edit{Start: 10, End: 11, NewText: []byte("-1")}},
+		{"insert an assertion", "const A = 1\n", source.Edit{Start: 12, End: 12, NewText: []byte("assert A == 1\n")}},
+		{"delete an assertion", "const A = 1\nassert A < 0\n", source.Edit{Start: 12, End: 25, NewText: nil}},
 	}
 
 	for _, tc := range cases {
@@ -118,9 +122,12 @@ func TestEditFuzz(t *testing.T) {
 		// analysis (division by zero and type errors included).
 		"+", "-", "*", "/", "%", "&&", "||", "!", "<", "==", "bool",
 		"true", "false", " + ", " && ", "A + B", "!true",
+		// Assertions and groupings, so the oracle covers the assert loop's
+		// diagnostics (failed/not bool/not constant) incrementally.
+		"assert ", "assert A > 0\n", "(", ")",
 	}
 
-	start := "const A = 1\nconst B = A\n"
+	start := "const A = 1\nconst B = A\nassert A > 0\n"
 	e := newEditable([]byte(start))
 	content := []byte(start)
 
@@ -174,6 +181,24 @@ func TestEarlyCutoffLambdaBody(t *testing.T) {
 
 	if e.prog.db.computed[typeOfKey(hDecl)] {
 		t.Error("typeOf(H) was recomputed; the lambda edit left F's type unchanged")
+	}
+}
+
+// TestEarlyCutoffAssert checks an assertion is a pure consumer: editing it
+// re-checks the assertion (its diagnostic flips) but recomputes neither the
+// type nor the value of the constants it reads.
+func TestEarlyCutoffAssert(t *testing.T) {
+	src := "const A: int64 = 1\nconst B = A\nassert B > 0\n"
+	e := newEditable([]byte(src))
+	bDecl := e.doc.File().Decls[1]
+
+	// B > 0 -> B > 9: the assertion now fails; B itself is untouched.
+	i := strings.Index(src, "> 0") + 2
+	e.edit(source.Edit{Start: i, End: i + 1, NewText: []byte("9")})
+	assertMatchesReference(t, e, []byte(strings.Replace(src, "> 0", "> 9", 1)))
+
+	if e.prog.db.computed[typeOfKey(bDecl)] || e.prog.db.computed[valueKey(bDecl)] {
+		t.Error("editing the assertion recomputed B; the assert is a pure consumer")
 	}
 }
 

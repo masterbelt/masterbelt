@@ -612,3 +612,103 @@ func TestDiagnosticMessages(t *testing.T) {
 		}
 	}
 }
+
+// --- assert declarations ------------------------------------------------------
+
+func TestAssertPasses(t *testing.T) {
+	_, diags := analyze("const Max = 100\nconst Min = 0\n" +
+		"assert Max > Min\n" +
+		"assert Min == 0\n" +
+		"assert Max - Min == 100\n" +
+		"assert !(Min > Max)\n" +
+		"assert true\n")
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+}
+
+func TestAssertFailed(t *testing.T) {
+	_, diags := analyze("const Max = 100\nconst Min = 0\nassert Max < Min\n")
+	if got := codes(diags); len(got) != 1 || got[0] != CodeAssertionFailed {
+		t.Fatalf("codes = %v, want [assertion_failed]", got)
+	}
+	// The message quotes the condition in surface syntax, rendered back from
+	// the desugared AST.
+	if want := "assertion failed: Max < Min"; diags[0].Message != want {
+		t.Errorf("message = %q, want %q", diags[0].Message, want)
+	}
+}
+
+func TestAssertNotBool(t *testing.T) {
+	_, diags := analyze("const Max = 100\nassert Max + 1\n")
+	if got := codes(diags); len(got) != 1 || got[0] != CodeAssertionNotBool {
+		t.Fatalf("codes = %v, want [assertion_not_bool]", got)
+	}
+	if want := "assertion must be a bool; got int"; diags[0].Message != want {
+		t.Errorf("message = %q, want %q", diags[0].Message, want)
+	}
+}
+
+func TestAssertUndefinedName(t *testing.T) {
+	// An undefined reference is the existing diagnostic, once — not an extra
+	// assertion_* on top of it.
+	_, diags := analyze("assert missing > 0\n")
+	if got := codes(diags); len(got) != 1 || got[0] != CodeUndefinedName {
+		t.Fatalf("codes = %v, want [undefined_name]", got)
+	}
+}
+
+func TestAssertDivisionByZero(t *testing.T) {
+	_, diags := analyze("assert 1 / 0 == 0\n")
+	if got := codes(diags); len(got) != 1 || got[0] != CodeDivisionByZero {
+		t.Fatalf("codes = %v, want [division_by_zero]", got)
+	}
+}
+
+func TestAssertOperatorTypeError(t *testing.T) {
+	_, diags := analyze("assert 1 && true\n")
+	if got := codes(diags); len(got) != 1 || got[0] != CodeInvalidOperation {
+		t.Fatalf("codes = %v, want [invalid_operation]", got)
+	}
+}
+
+func TestAssertNotConstant(t *testing.T) {
+	// A user-defined method body is beyond the compile-time evaluator: the
+	// condition types as bool but cannot fold, which is itself the error —
+	// an assertion the compiler cannot verify must not pass silently.
+	src := "type Level = int8 impl {\n  increment(): self {\n    return self + 1\n  }\n}\n" +
+		"const L: Level = 50\n" +
+		"assert L.increment() == 51\n"
+	_, diags := analyze(src)
+	if got := codes(diags); len(got) != 1 || got[0] != CodeAssertionNotConstant {
+		t.Fatalf("codes = %v, want [assertion_not_constant]", got)
+	}
+}
+
+func TestAssertSelfNotConstant(t *testing.T) {
+	// self has no referent at the top level; no other pass reports it, so the
+	// assertion is reported as unverifiable rather than passing silently.
+	_, diags := analyze("assert self == self\n")
+	if got := codes(diags); len(got) != 1 || got[0] != CodeAssertionNotConstant {
+		t.Fatalf("codes = %v, want [assertion_not_constant]", got)
+	}
+}
+
+func TestAssertMissingExprIsTheParsersProblem(t *testing.T) {
+	// A recovered "assert" without an expression already carries a parse
+	// diagnostic; the semantic layer adds nothing.
+	_, diags := analyze("assert\n")
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+}
+
+func TestAssertProducesNoIR(t *testing.T) {
+	// An assert is a diagnostic-only declaration: the module is identical
+	// with and without it.
+	with, _ := analyze("const A = 1\nassert A > 0\n")
+	without, _ := analyze("const A = 1\n")
+	if ir.Dump(with) != ir.Dump(without) {
+		t.Errorf("assert changed the IR:\n--- with ---\n%s--- without ---\n%s", ir.Dump(with), ir.Dump(without))
+	}
+}

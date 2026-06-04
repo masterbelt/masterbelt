@@ -127,6 +127,30 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return f["name"].String() + " is ambiguous; it arrives from more than one import"
 		}
 	},
+	"masterbelt.semantic.assertion_failed": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "表明が成立しません: " + f["cond"].String()
+		default:
+			return "assertion failed: " + f["cond"].String()
+		}
+	},
+	"masterbelt.semantic.assertion_not_bool": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "表明は bool でなければなりません(" + f["typ"].String() + ")"
+		default:
+			return "assertion must be a bool; got " + f["typ"].String()
+		}
+	},
+	"masterbelt.semantic.assertion_not_constant": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "表明はコンパイル時定数ではありません"
+		default:
+			return "assertion is not a compile-time constant"
+		}
+	},
 	"masterbelt.semantic.constant_overflow": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":

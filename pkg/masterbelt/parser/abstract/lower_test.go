@@ -322,3 +322,41 @@ func TestLowerQualifiedTypeNameInGenericArg(t *testing.T) {
 		t.Fatalf("argument = %+v, want geo.Point", outer.Args[0])
 	}
 }
+
+// TestRenderRoundTrip pins ast.Render to the desugaring: parsing then
+// rendering reproduces the expression text, so the renderer's operator
+// spellings and precedences cannot drift from binaryMethod/unaryMethod here
+// and the precedence table in parser/concrete.
+func TestRenderRoundTrip(t *testing.T) {
+	cases := []string{
+		"1 + 2 * 3",
+		"(1 + 2) * 3",
+		"(1 + 2).foo(3)", // a postfix on an operator form keeps its grouping
+		"a && !b || c",
+		"1 < 2 == true",
+		"a == (b == c)",
+		"!(a && b)",
+		"-x.value",
+		"Level(50)",
+		"x.increment()",
+		"geo.Origin",
+		"[1, 2, 3].map(fn(x) { return x * 2 })",
+		"[\"a\": 1, \"b\": 2]",
+		"\"hi\" == \"yo\"",
+		"100 % 7 - -1",
+		"fn(x: int): int { return x }",
+		"self",
+		"null",
+	}
+	for _, expr := range cases {
+		src := "const x = " + expr + "\n"
+		file, diags := Lower([]byte(src))
+		if len(diags) != 0 {
+			t.Errorf("%q: unexpected diagnostics: %v", expr, diags)
+			continue
+		}
+		if got := ast.Render(file.Decls[0].Value); got != expr {
+			t.Errorf("Render = %q, want %q", got, expr)
+		}
+	}
+}
