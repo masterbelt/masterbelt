@@ -72,7 +72,11 @@ func TestParseLossless(t *testing.T) {
 		"const f = fn(x) { return x }\n",
 		"const f = fn(x: int, y) { return x }\n",
 		"const f = fn() {}\n",
-		"const f = fn(x", // truncated literal stays lossless
+		"const f = fn(x",             // truncated literal stays lossless
+		"const f = fn(x,",            // truncated after a comma (must not panic)
+		"const f = fn(x,)",           // trailing comma is not part of the grammar
+		"type F = fn(x: int,",        // truncated func type param list
+		"type L = int8 impl {\nm(x,", // truncated method param list
 	}
 	for _, src := range cases {
 		assertLossless(t, src)
@@ -461,6 +465,7 @@ func TestParseDiagnostics(t *testing.T) {
 		{"missing unary operand", "const X = -\n", CodeExpectedOperand},
 		{"missing type", "const X: = 1", CodeExpectedType},
 		{"stray token", "= 1\n", CodeUnexpectedToken},
+		{"param after comma", "const f = fn(x,) { return x }\n", CodeExpectedIdentifier},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

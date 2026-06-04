@@ -262,7 +262,13 @@ func (p *parser) parseParamList(requireType bool) *cst.Node {
 			if p.peekSignificant() == token.Comma {
 				p.skipTrivia(&children)
 				children = append(children, p.bump()) // ","
-				continue
+				// A comma promises another parameter; without the check a
+				// truncated list ("fn(x,") would bump EOF as the next name and
+				// run the cursor off the token slice.
+				if p.peekSignificant() == token.Ident {
+					continue
+				}
+				p.report(newExpectedIdentifierDiagnostic(p.lastStart, 0))
 			}
 			break
 		}
