@@ -159,7 +159,7 @@ func classifyToken(kind token.Kind, parent cst.Kind, calleeMember bool) (tokenTy
 		return stNumber, 0, true
 	case token.String:
 		return stString, 0, true
-	case token.Colon, token.Assign:
+	case token.Colon, token.Assign, token.Arrow:
 		return stOperator, 0, true
 	case token.Ident:
 		switch parent {

@@ -149,9 +149,10 @@ func recordOf(t ir.Type) (*ir.Record, bool) {
 // callSnippet renders a method as an insertable call: each parameter a tab
 // stop, and a function-typed parameter expanded to a fn literal — its
 // parameters named and annotated where the receiver solved them concretely,
-// left to inference otherwise — with a tab stop in the body:
+// left to inference otherwise — with a tab stop for the arrow body (the
+// expression idiom; typing "{" instead opens a block for statement bodies):
 //
-//	map(fn(${1:x}: int8) { ${2} })
+//	map(fn(${1:x}: int8) -> ${2})
 func callSnippet(m *ir.Method, subst map[string]ir.Type) string {
 	var b strings.Builder
 	b.WriteString(m.Name)
@@ -174,7 +175,7 @@ func callSnippet(m *ir.Method, subst map[string]ir.Type) string {
 					b.WriteString(": " + snippetEscape(ft.String()))
 				}
 			}
-			fmt.Fprintf(&b, ") { ${%d} }", nextStop())
+			fmt.Fprintf(&b, ") -> ${%d}", nextStop())
 			continue
 		}
 		fmt.Fprintf(&b, "${%d:%s}", nextStop(), p.Name)

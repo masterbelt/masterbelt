@@ -62,6 +62,7 @@ test('grammar assigns the expected scopes', async () => {
   const source = [
     '/// docs',
     'pub const MyConst: int64 = 100 // trailing',
+    'const Twice = fn(x) -> x',
   ].join('\n');
   const lines = tokenize(grammar, source);
 
@@ -71,11 +72,13 @@ test('grammar assigns the expected scopes', async () => {
   const cases = [
     ['const', 'keyword.control'],
     ['pub', 'keyword.control'],
+    ['fn', 'keyword.control'],
     ['100', 'constant.numeric'],
     ['///', 'comment.line.documentation'],
     ['// trailing', 'comment.line.double-slash'],
     ['=', 'keyword.operator'],
     [':', 'keyword.operator'],
+    ['->', 'keyword.operator'],
   ];
 
   for (const [substr, want] of cases) {

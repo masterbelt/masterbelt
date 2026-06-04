@@ -51,6 +51,32 @@ func TestSemanticTokens(t *testing.T) {
 	}
 }
 
+func TestSemanticTokensArrowLambda(t *testing.T) {
+	// The arrow of an arrow-bodied lambda colours as an operator, like : and =;
+	// fn stays a keyword.
+	doc := abstract.NewDocument([]byte("const F = fn(x) -> x\n"))
+	got := decode(semanticTokens(doc).Data)
+
+	want := []decodedToken{
+		{0, 0, 5, stKeyword, 0},                           // const
+		{0, 6, 1, stVariable, smDeclaration | smReadonly}, // F (declared name)
+		{0, 8, 1, stOperator, 0},                          // =
+		{0, 10, 2, stKeyword, 0},                          // fn
+		{0, 13, 1, stParameter, smDeclaration},            // x (declared parameter)
+		{0, 16, 2, stOperator, 0},                         // ->
+		{0, 19, 1, stVariable, smReadonly},                // x (reference)
+	}
+
+	if len(got) != len(want) {
+		t.Fatalf("got %d tokens, want %d:\n got:  %+v\n want: %+v", len(got), len(want), got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("token[%d] = %+v, want %+v", i, got[i], want[i])
+		}
+	}
+}
+
 func TestSemanticTokensStringLiteral(t *testing.T) {
 	doc := abstract.NewDocument([]byte("const X = \"label\"\n"))
 	got := decode(semanticTokens(doc).Data)

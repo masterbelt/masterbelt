@@ -115,9 +115,12 @@ func buildGrammar() grammar {
 					},
 				},
 			}},
-			// Both spellings the server classifies as `operator` sit under
-			// keyword.operator, their semantic fallback scope.
+			// The spellings the server classifies as `operator` sit under
+			// keyword.operator, their semantic fallback scope. The arrow is
+			// listed before "=" and ":" only for clarity; none of the three
+			// overlaps another's first byte.
 			"operators": {Patterns: []rule{
+				{Name: "keyword.operator.masterbelt", Match: regexp.QuoteMeta(token.Arrow.Symbol())},
 				{Name: "keyword.operator.assignment.masterbelt", Match: `=`},
 				{Name: "keyword.operator.masterbelt", Match: `:`},
 			}},

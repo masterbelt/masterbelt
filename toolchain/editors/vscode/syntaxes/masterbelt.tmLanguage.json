@@ -56,6 +56,10 @@
     "operators": {
       "patterns": [
         {
+          "name": "keyword.operator.masterbelt",
+          "match": "->"
+        },
+        {
           "name": "keyword.operator.assignment.masterbelt",
           "match": "="
         },

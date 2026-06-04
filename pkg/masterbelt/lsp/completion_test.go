@@ -143,9 +143,9 @@ func TestMemberCompletion(t *testing.T) {
 	if want := "pub extern map(func: fn(int8): R): list<R>"; m.Detail != want {
 		t.Errorf("map detail = %q, want %q", m.Detail, want)
 	}
-	// The function parameter expands to a fn literal, the solved element type
-	// annotated, the unsolved result left to inference.
-	if want := "map(fn(${1:x}: int8) { ${2} })"; m.InsertText != want {
+	// The function parameter expands to an arrow-bodied fn literal, the solved
+	// element type annotated, the unsolved result left to inference.
+	if want := "map(fn(${1:x}: int8) -> ${2})"; m.InsertText != want {
 		t.Errorf("map snippet = %q, want %q", m.InsertText, want)
 	}
 	if m.InsertTextFormat == nil || *m.InsertTextFormat != protocol.InsertTextFormatSnippet {
