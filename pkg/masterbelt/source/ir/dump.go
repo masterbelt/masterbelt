@@ -60,6 +60,9 @@ func dumpMethod(b *strings.Builder, m *Method) {
 	if m.Result != nil {
 		fmt.Fprintf(b, "      result %s\n", m.Result)
 	}
+	if m.Body != nil {
+		fmt.Fprintf(b, "      body %s\n", dumpValue(m.Body))
+	}
 }
 
 func dumpConst(b *strings.Builder, c *Const) {
@@ -97,6 +100,16 @@ func dumpValue(v Value) string {
 			args[i] = dumpValue(a)
 		}
 		return fmt.Sprintf("%s.%s(%s)", dumpValue(x.Receiver), x.Method, strings.Join(args, ", "))
+	case *SelfValue:
+		return "self"
+	case *ParamRef:
+		return fmt.Sprintf("ParamRef %q", x.Name)
+	case *FieldAccess:
+		return fmt.Sprintf("%s.%s", dumpValue(x.Receiver), x.Field)
+	case *Conversion:
+		return fmt.Sprintf("%s(%s)", x.Type, dumpValue(x.Value))
+	case *NullValue:
+		return "null"
 	default:
 		return "<none>"
 	}

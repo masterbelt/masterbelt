@@ -74,3 +74,37 @@ type Call struct {
 }
 
 func (*Call) value() {}
+
+// SelfValue is the method receiver (the self keyword) inside a method body.
+type SelfValue struct{}
+
+func (*SelfValue) value() {}
+
+// ParamRef is a use of a method parameter, by name.
+type ParamRef struct {
+	Name string
+}
+
+func (*ParamRef) value() {}
+
+// FieldAccess is a record field access: Receiver.Field.
+type FieldAccess struct {
+	Receiver Value
+	Field    string
+}
+
+func (*FieldAccess) value() {}
+
+// Conversion is a type conversion T(Value), as written T(x) — the form a builtin
+// type name takes when applied to a value.
+type Conversion struct {
+	Type  Type
+	Value Value
+}
+
+func (*Conversion) value() {}
+
+// NullValue is the null literal.
+type NullValue struct{}
+
+func (*NullValue) value() {}

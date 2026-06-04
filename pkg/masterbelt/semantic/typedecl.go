@@ -74,15 +74,97 @@ func (r *typeResolver) resolveDecl(td *ast.TypeDecl, def *ir.TypeDef) {
 	}
 }
 
-// resolveMethod resolves a method's signature: its parameter types and result
-// type. The body is not lowered.
+// resolveMethod resolves a method's signature (parameter types and result type)
+// and lowers its body to an IR value. The body is not yet type-checked.
 func (r *typeResolver) resolveMethod(m *ast.MethodDecl, scope map[string]bool) *ir.Method {
 	method := &ir.Method{Name: m.Name, Public: m.Public, Extern: m.Extern}
+	params := make(map[string]bool, len(m.Params))
 	for _, p := range m.Params {
 		method.Params = append(method.Params, ir.Param{Name: p.Name, Type: r.resolveType(p.Type, scope)})
+		params[p.Name] = true
 	}
 	method.Result = r.resolveType(m.Result, scope)
+	method.Body = r.lowerBody(m.Body, params, scope)
 	return method
+}
+
+// lowerBody lowers a method body to an IR value. Only the single-return body
+// form is modelled so far: the body lowers to its returned expression's value
+// (nil for an extern or empty body). params is the set of parameter names in
+// scope, and tscope the generic-parameter names (for type conversions).
+func (r *typeResolver) lowerBody(body []ast.Stmt, params, tscope map[string]bool) ir.Value {
+	for _, s := range body {
+		if ret, ok := s.(*ast.ReturnStmt); ok {
+			return r.lowerBodyExpr(ret.Value, params, tscope)
+		}
+	}
+	return nil
+}
+
+// lowerBodyExpr lowers a method-body expression to an IR value: self, a
+// parameter reference, a literal, a record field access (recv.field), a type
+// conversion (T(x), when the callee names a type), or a method call
+// (recv.method(args), the form operators also desugar to).
+func (r *typeResolver) lowerBodyExpr(e ast.Expr, params, tscope map[string]bool) ir.Value {
+	switch e := e.(type) {
+	case *ast.SelfExpr:
+		return &ir.SelfValue{}
+	case *ast.IntLit:
+		return &ir.IntLiteral{Text: e.Text}
+	case *ast.BoolLit:
+		return &ir.BoolLiteral{Value: e.Value}
+	case *ast.NullLit:
+		return &ir.NullValue{}
+	case *ast.Identifier:
+		if params[e.Name] {
+			return &ir.ParamRef{Name: e.Name}
+		}
+		return nil
+	case *ast.MemberExpr:
+		// A member access used as a value is a record field access.
+		return &ir.FieldAccess{Receiver: r.lowerBodyExpr(e.Receiver, params, tscope), Field: e.Member.Name}
+	case *ast.CallExpr:
+		// A call whose callee names a type is a conversion T(x).
+		if id, ok := e.Callee.(*ast.Identifier); ok && !params[id.Name] {
+			if t := r.resolveNamedName(id.Name, tscope); t != ir.Invalid {
+				var arg ir.Value
+				if len(e.Arguments) > 0 {
+					arg = r.lowerBodyExpr(e.Arguments[0], params, tscope)
+				}
+				return &ir.Conversion{Type: t, Value: arg}
+			}
+		}
+		// A call whose callee is a member access is a method call.
+		if member, ok := e.Callee.(*ast.MemberExpr); ok {
+			args := make([]ir.Value, len(e.Arguments))
+			for i, a := range e.Arguments {
+				args[i] = r.lowerBodyExpr(a, params, tscope)
+			}
+			return &ir.Call{
+				Receiver: r.lowerBodyExpr(member.Receiver, params, tscope),
+				Method:   member.Member.Name,
+				Args:     args,
+			}
+		}
+		return nil
+	default:
+		return nil
+	}
+}
+
+// resolveNamedName resolves a bare type name (a conversion's callee) to its type,
+// or ir.Invalid if it is not a known type.
+func (r *typeResolver) resolveNamedName(name string, tscope map[string]bool) ir.Type {
+	if tscope[name] {
+		return &ir.TypeVar{Name: name}
+	}
+	if def := r.lookup(name); def != nil {
+		if def.Builtin {
+			return &ir.Builtin{Name: name}
+		}
+		return &ir.Named{Def: def}
+	}
+	return ir.Invalid
 }
 
 // resolveType resolves a type expression to its ir.Type, with scope holding the
