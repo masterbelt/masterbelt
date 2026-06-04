@@ -127,6 +127,22 @@ func TestOverflowThroughReference(t *testing.T) {
 	}
 }
 
+func TestMethodBodyTypeChecks(t *testing.T) {
+	// self + 1 on a nominal integer derives int8's add and returns the nominal
+	// type, which matches the declared result `self` — no diagnostic.
+	if _, diags := analyze("pub type Level = int8 impl {\n  pub inc(): self {\n    return self + 1\n  }\n}\n"); len(diags) != 0 {
+		t.Errorf("well-typed method body should have no diagnostics, got %v", codes(diags))
+	}
+}
+
+func TestMethodBodyTypeMismatch(t *testing.T) {
+	// A body returning self (an integer) where bool is declared is a mismatch.
+	_, diags := analyze("pub type Bad = int8 impl {\n  pub wrong(): bool {\n    return self\n  }\n}\n")
+	if !hasCode(diags, CodeTypeMismatch) {
+		t.Errorf("want type_mismatch for a bad method body, got %v", codes(diags))
+	}
+}
+
 func hasCode(diags []diagnostic.Diagnostic, code diagnostic.Code) bool {
 	for _, c := range codes(diags) {
 		if c == code {

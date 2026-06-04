@@ -101,12 +101,7 @@ func Assignable(reg *builtin.Registry, from, to ir.Type) bool {
 	if isDefaultInt(from) && IsInteger(reg, to) {
 		return true
 	}
-	if a, ok := from.(*ir.Builtin); ok {
-		if b, ok := to.(*ir.Builtin); ok {
-			return a.Name == b.Name
-		}
-	}
-	return false
+	return sameBuiltin(from, to) || sameNamed(from, to)
 }
 
 // MethodResult is the type rule for a method call: it finds the method on the

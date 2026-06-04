@@ -4,6 +4,7 @@ import (
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ir"
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/types"
 )
 
 // resolveTypes resolves the file's type declarations into ir.TypeDefs, in source
@@ -37,6 +38,150 @@ func resolveTypes(file *ast.File, reg *builtin.Registry) []*ir.TypeDef {
 		r.resolveDecl(td, out[i])
 	}
 	return out
+}
+
+// checkMethodBodies type-checks each method body's returned value against the
+// method's declared result type, reporting a mismatch through report. It runs
+// after resolveTypes, so defs are in file.Types order and each method lines up
+// with its resolved signature.
+func checkMethodBodies(file *ast.File, reg *builtin.Registry, defs []*ir.TypeDef, report func(node ast.Node, got, want ir.Type)) {
+	universe := make(map[string]*ir.TypeDef, len(defs))
+	for _, d := range defs {
+		if d.Name != "" {
+			universe[d.Name] = d
+		}
+	}
+	bc := bodyChecker{reg: reg, universe: universe}
+	for i, td := range file.Types {
+		def := defs[i]
+		self := &ir.Named{Def: def}
+		for j, m := range td.Methods {
+			if len(m.Body) == 0 || j >= len(def.Methods) {
+				continue // an extern or empty body has nothing to check
+			}
+			irm := def.Methods[j]
+			scope := bodyScope{self: self, params: map[string]ir.Type{}}
+			for _, p := range irm.Params {
+				scope.params[p.Name] = substSelf(p.Type, self)
+			}
+			want := substSelf(irm.Result, self)
+			for _, stmt := range m.Body {
+				ret, ok := stmt.(*ast.ReturnStmt)
+				if !ok || ret.Value == nil {
+					continue
+				}
+				if got := bc.infer(ret.Value, scope); !types.Assignable(reg, got, want) {
+					report(ret.Value, got, want)
+				}
+			}
+		}
+	}
+}
+
+// substSelf substitutes the self type for ir.SelfType.
+func substSelf(t, self ir.Type) ir.Type {
+	if _, ok := t.(*ir.SelfType); ok {
+		return self
+	}
+	return t
+}
+
+// bodyScope binds the names visible in a method body: the receiver (self) and
+// the parameters.
+type bodyScope struct {
+	self   ir.Type
+	params map[string]ir.Type
+}
+
+// bodyChecker infers the type of a method-body expression against a scope.
+type bodyChecker struct {
+	reg      *builtin.Registry
+	universe map[string]*ir.TypeDef
+}
+
+// infer returns the type of a method-body expression: self, a parameter, a
+// literal, a record field access, a type conversion (T(x)), or a method call
+// (the form operators desugar to). An unresolvable expression is ir.Invalid.
+func (bc bodyChecker) infer(e ast.Expr, scope bodyScope) ir.Type {
+	switch e := e.(type) {
+	case *ast.SelfExpr:
+		return scope.self
+	case *ast.IntLit:
+		return &ir.Builtin{Name: "int"}
+	case *ast.BoolLit:
+		return &ir.Builtin{Name: "bool"}
+	case *ast.NullLit:
+		return &ir.Builtin{Name: "null"}
+	case *ast.Identifier:
+		if t, ok := scope.params[e.Name]; ok {
+			return t
+		}
+		return ir.Invalid
+	case *ast.MemberExpr:
+		return bc.fieldType(bc.infer(e.Receiver, scope), e.Member.Name)
+	case *ast.CallExpr:
+		// A call whose callee names a type is a conversion T(x): its type is T.
+		if id, ok := e.Callee.(*ast.Identifier); ok {
+			if _, isParam := scope.params[id.Name]; !isParam {
+				if t := bc.lookupType(id.Name); t != ir.Invalid {
+					return t
+				}
+			}
+		}
+		// A call whose callee is a member access is a method call.
+		if member, ok := e.Callee.(*ast.MemberExpr); ok {
+			recv := bc.infer(member.Receiver, scope)
+			args := make([]ir.Type, len(e.Arguments))
+			for i, a := range e.Arguments {
+				args[i] = bc.infer(a, scope)
+			}
+			return types.MethodResult(bc.reg, recv, member.Member.Name, args)
+		}
+		return ir.Invalid
+	default:
+		return ir.Invalid
+	}
+}
+
+// lookupType resolves a type name (a conversion callee) to its type.
+func (bc bodyChecker) lookupType(name string) ir.Type {
+	if d, ok := bc.universe[name]; ok {
+		if d.Builtin {
+			return &ir.Builtin{Name: name}
+		}
+		return &ir.Named{Def: d}
+	}
+	if _, ok := bc.reg.Lookup(name); ok {
+		return &ir.Builtin{Name: name}
+	}
+	return ir.Invalid
+}
+
+// fieldType returns the type of a record's field, following named types to their
+// underlying record.
+func (bc bodyChecker) fieldType(recv ir.Type, name string) ir.Type {
+	rec := recordOf(recv)
+	if rec == nil {
+		return ir.Invalid
+	}
+	for _, f := range rec.Fields {
+		if f.Name == name {
+			return f.Type
+		}
+	}
+	return ir.Invalid
+}
+
+func recordOf(t ir.Type) *ir.Record {
+	switch t := t.(type) {
+	case *ir.Record:
+		return t
+	case *ir.Named:
+		if t.Def != nil {
+			return recordOf(t.Def.Body)
+		}
+	}
+	return nil
 }
 
 // typeResolver resolves type expressions against the builtin registry and the
