@@ -31,6 +31,15 @@ func TestRefinementViolation(t *testing.T) {
 			t.Errorf("message %q does not mention %q", diags[0].Message, want)
 		}
 	}
+	// The power-assert diagram follows, indented as a block, with self bound
+	// to the value — it shows which comparison rejected the constant.
+	diagram := "\n  self >= 1 && self <= 65535\n" +
+		"  |    |    |  |    |\n" +
+		"  70000true |  70000false\n" +
+		"            false"
+	if !strings.Contains(diags[0].Message, diagram) {
+		t.Errorf("message %q does not contain the diagram %q", diags[0].Message, diagram)
+	}
 }
 
 func TestRefinementViolationNegative(t *testing.T) {

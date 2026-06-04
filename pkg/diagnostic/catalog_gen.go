@@ -258,9 +258,9 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 	"masterbelt.semantic.refinement_violation": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
-			return "値 " + f["value"].String() + " は " + f["typ"].String() + " の制約を満たしません: " + f["predicate"].String()
+			return "値 " + f["value"].String() + " は " + f["typ"].String() + " の制約を満たしません: " + f["predicate"].String() + f["diagram"].String()
 		default:
-			return "value " + f["value"].String() + " does not satisfy " + f["typ"].String() + ": " + f["predicate"].String()
+			return "value " + f["value"].String() + " does not satisfy " + f["typ"].String() + ": " + f["predicate"].String() + f["diagram"].String()
 		}
 	},
 	"masterbelt.semantic.type_mismatch": func(loc Locale, f map[string]fmt.Stringer) string {

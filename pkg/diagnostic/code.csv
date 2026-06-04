@@ -36,7 +36,7 @@ masterbelt.semantic.cyclic_module,error,path:string
 masterbelt.semantic.assertion_failed,error,cond:string doc:string diagram:string
 masterbelt.semantic.assertion_not_bool,error,typ:string
 masterbelt.semantic.assertion_not_constant,error,
-masterbelt.semantic.refinement_violation,error,value:string typ:string predicate:string
+masterbelt.semantic.refinement_violation,error,value:string typ:string predicate:string diagram:string
 masterbelt.semantic.refinement_not_bool,error,typ:string
 masterbelt.semantic.refinement_not_constant,error,
 project.config.missing,error,

@@ -326,8 +326,13 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 				v := eval.Predicate(def.Where, c.Eval, evalEnv{q: q, file: fileID})
 				if v != nil && v.Kind == ir.ConstBool && !v.Bool {
 					s := at(decl.Value)
+					// The power-assert diagram with self bound to the value,
+					// indented as a block exactly like a failed assertion's —
+					// it shows which comparison rejected the constant.
+					d := assert.DiagramSelf(def.Where, c.Eval, evalEnv{q: q, file: fileID})
+					diagram := "\n  " + strings.ReplaceAll(d, "\n", "\n  ")
 					diags.Add(newRefinementViolationDiagnostic(
-						s.offset, s.width, c.Eval.String(), c.Type.String(), ast.Render(def.Where)))
+						s.offset, s.width, c.Eval.String(), c.Type.String(), ast.Render(def.Where), diagram))
 				}
 			}
 		}

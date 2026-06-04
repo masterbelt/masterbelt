@@ -227,11 +227,12 @@ func newRefinementNotConstantDiagnostic(offset int, width int) diagnostic.Diagno
 	}
 }
 
-func newRefinementViolationDiagnostic(offset int, width int, value string, typ string, predicate string) diagnostic.Diagnostic {
+func newRefinementViolationDiagnostic(offset int, width int, value string, typ string, predicate string, diagram string) diagnostic.Diagnostic {
 	fields := map[string]fmt.Stringer{
 		"value":     diagnostic.Str(value),
 		"typ":       diagnostic.Str(typ),
 		"predicate": diagnostic.Str(predicate),
+		"diagram":   diagnostic.Str(diagram),
 	}
 	return diagnostic.Diagnostic{
 		Severity: diagnostic.Error,

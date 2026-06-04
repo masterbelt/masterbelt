@@ -36,7 +36,7 @@ masterbelt.semantic.cyclic_module,import cycle through {path}
 masterbelt.semantic.assertion_failed,assertion failed: {cond}{doc}{diagram}
 masterbelt.semantic.assertion_not_bool,assertion must be a bool; got {typ}
 masterbelt.semantic.assertion_not_constant,assertion is not a compile-time constant
-masterbelt.semantic.refinement_violation,value {value} does not satisfy {typ}: {predicate}
+masterbelt.semantic.refinement_violation,value {value} does not satisfy {typ}: {predicate}{diagram}
 masterbelt.semantic.refinement_not_bool,where clause must be a bool; got {typ}
 masterbelt.semantic.refinement_not_constant,where clause is not a compile-time predicate
 project.config.missing,masterbelt.toml not found in this directory or any parent

@@ -1,6 +1,7 @@
 package assert_test
 
 import (
+	"math/big"
 	"testing"
 
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/assert"
@@ -102,5 +103,36 @@ func TestDiagram(t *testing.T) {
 				t.Errorf("diagram:\n%s\nwant:\n%s", got, tc.want)
 			}
 		})
+	}
+}
+
+func TestDiagramSelf(t *testing.T) {
+	// A refinement predicate folds with self bound to the violating value, so
+	// the diagram shows which comparison rejected it.
+	file, diags := abstract.Lower([]byte("type Port = int32 where self >= 1 && self <= 65535\n"))
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	pred := file.Types[0].Where
+	got := assert.DiagramSelf(pred, ir.IntConstant(big.NewInt(70000)), fileEnv{file: file, reg: builtin.Default()})
+	want := "self >= 1 && self <= 65535\n" +
+		"|    |    |  |    |\n" +
+		"70000true |  70000false\n" +
+		"          false"
+	if got != want {
+		t.Errorf("diagram:\n%s\nwant:\n%s", got, want)
+	}
+}
+
+func TestDiagramSelfUnbound(t *testing.T) {
+	// Diagram (no self binding) leaves a predicate's self rows out: nothing
+	// folds, so only the condition line renders.
+	file, diags := abstract.Lower([]byte("type Port = int32 where self >= 1\n"))
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	got := assert.Diagram(file.Types[0].Where, fileEnv{file: file, reg: builtin.Default()})
+	if got != "self >= 1" {
+		t.Errorf("diagram = %q, want the bare condition line", got)
 	}
 }
