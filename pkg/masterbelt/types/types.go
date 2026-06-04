@@ -24,22 +24,29 @@ import (
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/source/ir"
 )
 
-// IsInteger reports whether t is an integer builtin, per the registry.
+// IsInteger reports whether t is an integer type: an integer builtin (per the
+// registry) or a named type whose underlying type is an integer (so a nominal
+// type like `type Level = int8` is integer-like and derives int8's operators).
 func IsInteger(reg *builtin.Registry, t ir.Type) bool {
-	if b, ok := t.(*ir.Builtin); ok {
-		if n, ok := reg.Native(b.Name); ok {
-			return n.IsInteger()
-		}
+	switch t := t.(type) {
+	case *ir.Builtin:
+		n, ok := reg.Native(t.Name)
+		return ok && n.IsInteger()
+	case *ir.Named:
+		return t.Def != nil && IsInteger(reg, t.Def.Body)
 	}
 	return false
 }
 
-// IsBoolean reports whether t is the boolean builtin, per the registry.
+// IsBoolean reports whether t is a boolean type: the boolean builtin or a named
+// type whose underlying type is boolean.
 func IsBoolean(reg *builtin.Registry, t ir.Type) bool {
-	if b, ok := t.(*ir.Builtin); ok {
-		if n, ok := reg.Native(b.Name); ok {
-			return n.IsBoolean()
-		}
+	switch t := t.(type) {
+	case *ir.Builtin:
+		n, ok := reg.Native(t.Name)
+		return ok && n.IsBoolean()
+	case *ir.Named:
+		return t.Def != nil && IsBoolean(reg, t.Def.Body)
 	}
 	return false
 }
@@ -117,7 +124,7 @@ func MethodResult(reg *builtin.Registry, recv ir.Type, method string, args []ir.
 	if def == nil {
 		return ir.Invalid
 	}
-	m := findMethod(def, method)
+	m := findMethod(reg, def, method)
 	if m == nil || len(args) != len(m.Params) {
 		return ir.Invalid
 	}
@@ -153,10 +160,29 @@ func defOf(reg *builtin.Registry, t ir.Type) *ir.TypeDef {
 	return nil
 }
 
-func findMethod(def *ir.TypeDef, name string) *ir.Method {
+// findMethod looks up a method by name on def, deriving from the underlying type
+// when def does not declare it itself: a nominal type (type Level = int8) thus
+// inherits the operator methods of its underlying type. The seen set guards
+// against a cyclic definition.
+func findMethod(reg *builtin.Registry, def *ir.TypeDef, name string) *ir.Method {
+	return findMethodSeen(reg, def, name, map[*ir.TypeDef]bool{})
+}
+
+func findMethodSeen(reg *builtin.Registry, def *ir.TypeDef, name string, seen map[*ir.TypeDef]bool) *ir.Method {
+	if def == nil || seen[def] {
+		return nil
+	}
+	seen[def] = true
 	for _, m := range def.Methods {
 		if m.Name == name {
 			return m
+		}
+	}
+	// Derive from the underlying type, unless this is a primitive (whose body is
+	// itself) or has no underlying definition.
+	if !def.Builtin {
+		if ud := defOf(reg, def.Body); ud != nil {
+			return findMethodSeen(reg, ud, name, seen)
 		}
 	}
 	return nil
@@ -174,7 +200,7 @@ func combine(reg *builtin.Registry, a, b ir.Type) ir.Type {
 		return b
 	case isDefaultInt(b) && IsInteger(reg, a):
 		return a
-	case sameBuiltin(a, b):
+	case sameBuiltin(a, b), sameNamed(a, b):
 		return a
 	}
 	return ir.Invalid
@@ -187,4 +213,13 @@ func sameBuiltin(a, b ir.Type) bool {
 	}
 	y, ok := b.(*ir.Builtin)
 	return ok && x.Name == y.Name
+}
+
+func sameNamed(a, b ir.Type) bool {
+	x, ok := a.(*ir.Named)
+	if !ok {
+		return false
+	}
+	y, ok := b.(*ir.Named)
+	return ok && x.Def == y.Def
 }

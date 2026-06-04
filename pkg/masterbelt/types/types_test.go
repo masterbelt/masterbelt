@@ -148,3 +148,47 @@ func TestMethodResult(t *testing.T) {
 		}
 	}
 }
+
+// TestNominalDerivation checks that a nominal type (type Level = int8) is
+// integer-like, derives its underlying type's operator methods, and keeps its
+// own identity in the result.
+func TestNominalDerivation(t *testing.T) {
+	reg := builtin.Default()
+	level := &ir.Named{Def: &ir.TypeDef{
+		Name: "Level",
+		Body: bt("int8"),
+		Methods: []*ir.Method{
+			{Name: "increment", Result: &ir.SelfType{}},
+		},
+	}}
+
+	if !IsInteger(reg, level) {
+		t.Errorf("IsInteger(Level) = false, want true (underlying int8)")
+	}
+
+	// add is not declared on Level; it is derived from int8 and returns self,
+	// which is Level. The default integer literal adapts to Level.
+	if got := MethodResult(reg, level, "add", []ir.Type{bt("int")}).String(); got != "Level" {
+		t.Errorf("MethodResult(Level, add, int) = %s, want Level", got)
+	}
+	// Level + Level is Level.
+	if got := MethodResult(reg, level, "add", []ir.Type{level}).String(); got != "Level" {
+		t.Errorf("MethodResult(Level, add, Level) = %s, want Level", got)
+	}
+	// A comparison derived from int8 returns bool.
+	if got := MethodResult(reg, level, "lt", []ir.Type{bt("int")}).String(); got != "bool" {
+		t.Errorf("MethodResult(Level, lt, int) = %s, want bool", got)
+	}
+	// Level's own method is found directly.
+	if got := MethodResult(reg, level, "increment", nil).String(); got != "Level" {
+		t.Errorf("MethodResult(Level, increment) = %s, want Level", got)
+	}
+	// Level does not implicitly convert to its underlying int8.
+	if Assignable(reg, level, bt("int8")) {
+		t.Errorf("Level should not be assignable to int8")
+	}
+	// The default integer adapts to Level.
+	if !Assignable(reg, bt("int"), level) {
+		t.Errorf("int should be assignable to the nominal integer Level")
+	}
+}
