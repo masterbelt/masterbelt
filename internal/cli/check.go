@@ -5,10 +5,10 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
+	"github.com/masterbelt/masterbelt/pkg/diagnostic/reporter"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/semantic"
 	"github.com/masterbelt/masterbelt/pkg/project"
 	"github.com/masterbelt/masterbelt/pkg/project/config"
@@ -55,23 +55,46 @@ var CheckCmd = &cobra.Command{
 	},
 }
 
-// loadProject opens the project at or above dir, printing the manifest's
+// loadProject opens the project at or above dir, reporting the manifest's
 // diagnostics when there are any. It is the project-opening front door shared
 // by every project-scoped subcommand (check today, fmt when B-3 lands).
 func loadProject(w io.Writer, dir string) (*project.Project, error) {
 	proj, diags := project.Open(dir)
-	if diags.Len() > 0 {
-		printManifestDiagnostics(w, dir, diags.Items())
+	if diags.Len() == 0 {
+		return proj, nil
 	}
-	if diags.HasErrors() {
-		return nil, fmt.Errorf("%s: %d error(s)", config.FileName, countErrors(diags.Items()))
+
+	rep := reporter.New(w)
+	if file := manifestFile(dir); file != nil {
+		rep.Report(file, diags.Items())
+	} else {
+		rep.ReportBare(diags.Items())
+	}
+	if n := rep.Errors(); n > 0 {
+		return nil, fmt.Errorf("%s: %d error(s)", config.FileName, n)
 	}
 	return proj, nil
 }
 
-// checkSource runs the full pipeline over one file and prints its diagnostics
-// — lexer, parser, and semantic, ordered by position, the same aggregation the
-// LSP publishes. It fails when any diagnostic is an error.
+// manifestFile loads the manifest at or above dir so its diagnostics can be
+// anchored to it, or nil when there is none to read (then there is nothing to
+// anchor to).
+func manifestFile(dir string) *source.File {
+	root, ok := project.FindRoot(dir)
+	if !ok {
+		return nil
+	}
+	path := filepath.Join(root, config.FileName)
+	src, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+	return source.NewFile(displayPath(path), src)
+}
+
+// checkSource runs the full pipeline over one file and reports its
+// diagnostics — lexer, parser, and semantic, the same aggregation the LSP
+// publishes. It fails when any diagnostic is an error.
 func checkSource(w io.Writer, path string, data []byte) error {
 	doc := semantic.NewDocument(data)
 
@@ -79,45 +102,18 @@ func checkSource(w io.Writer, path string, data []byte) error {
 	raw = append(raw, doc.AST().Concrete().LexDiagnostics()...)
 	raw = append(raw, doc.AST().Diagnostics()...)
 	raw = append(raw, doc.Diagnostics()...)
-	sort.SliceStable(raw, func(i, j int) bool { return raw[i].Offset < raw[j].Offset })
 
-	printDiagnostics(w, path, data, raw)
-	if n := countErrors(raw); n > 0 {
+	rep := reporter.New(w)
+	rep.Report(source.NewFile(displayPath(path), data), raw)
+	if n := rep.Errors(); n > 0 {
 		return fmt.Errorf("%s: %d error(s)", displayPath(path), n)
 	}
 	return nil
 }
 
-// printManifestDiagnostics prints diagnostics that are about the project
-// manifest, anchored to the masterbelt.toml found at or above dir. A missing
-// manifest has nothing to anchor to, so its diagnostics print bare.
-func printManifestDiagnostics(w io.Writer, dir string, diags []diagnostic.Diagnostic) {
-	if root, ok := project.FindRoot(dir); ok {
-		path := filepath.Join(root, config.FileName)
-		if src, err := os.ReadFile(path); err == nil {
-			printDiagnostics(w, path, src, diags)
-			return
-		}
-	}
-	for _, d := range diags {
-		fmt.Fprintln(w, d.String())
-	}
-}
-
-// printDiagnostics prints diagnostics anchored to a file, one per line as
-// "path:line:col: severity[code]: message", resolving each offset against the
-// file's content.
-func printDiagnostics(w io.Writer, path string, src []byte, diags []diagnostic.Diagnostic) {
-	buf := source.NewFile(path, src)
-	disp := displayPath(path)
-	for _, d := range diags {
-		pos := buf.Position(d.Offset)
-		fmt.Fprintf(w, "%s:%d:%d: %s\n", disp, pos.Line, pos.Column, d)
-	}
-}
-
 // displayPath renders path relative to the working directory when it lies
-// beneath it, the way compilers conventionally report locations.
+// beneath it, the way compilers conventionally report locations. Labeling is
+// CLI policy; the reporter prints whatever name it is handed.
 func displayPath(path string) string {
 	wd, err := os.Getwd()
 	if err != nil {
@@ -128,14 +124,4 @@ func displayPath(path string) string {
 		return path
 	}
 	return rel
-}
-
-func countErrors(diags []diagnostic.Diagnostic) int {
-	n := 0
-	for _, d := range diags {
-		if d.Severity == diagnostic.Error {
-			n++
-		}
-	}
-	return n
 }

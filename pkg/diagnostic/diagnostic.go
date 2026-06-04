@@ -19,6 +19,10 @@
 //	render.go      Locale and message rendering
 //	list.go        the List collector
 //	catalog_gen.go the generated per-code renderers
+//	reporter/      how diagnostics look on an output stream
+//
+// The Diagnostic value itself stays presentation-free; whoever writes
+// diagnostics out goes through the reporter subpackage.
 package diagnostic
 
 import (
