@@ -42,6 +42,7 @@ const (
 	Builtin // builtin
 	Use     // use
 	From    // from
+	Assert  // assert
 
 	// Operators and punctuation.
 	Colon    // :
@@ -100,6 +101,7 @@ var kindNames = [...]string{
 	Builtin:      "Builtin",
 	Use:          "Use",
 	From:         "From",
+	Assert:       "Assert",
 	Colon:        "Colon",
 	Assign:       "Assign",
 	Plus:         "Plus",
@@ -193,6 +195,7 @@ var keywords = map[string]Kind{
 	"builtin": Builtin,
 	"use":     Use,
 	"from":    From,
+	"assert":  Assert,
 }
 
 // Lookup returns the keyword Kind for ident, or Ident if it is not a

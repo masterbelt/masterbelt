@@ -26,7 +26,7 @@ File
     Newline "\n"
     DocComment "/// The level range is not empty."
     Newline "\n"
-    Ident "assert"
+    Assert "assert"
     Whitespace " "
     Ident "MaxLevel"
     Whitespace " "
@@ -34,7 +34,7 @@ File
     Whitespace " "
     Ident "MinLevel"
     Newline "\n"
-    Ident "assert"
+    Assert "assert"
     Whitespace " "
     Ident "MinLevel"
     Whitespace " "
@@ -42,7 +42,7 @@ File
     Whitespace " "
     Int "0"
     Newline "\n"
-    Ident "assert"
+    Assert "assert"
     Whitespace " "
     Ident "MaxLevel"
     Whitespace " "
@@ -54,7 +54,7 @@ File
     Whitespace " "
     Int "100"
     Newline "\n"
-    Ident "assert"
+    Assert "assert"
     Whitespace " "
     Ident "MaxLevel"
     Whitespace " "
@@ -75,4 +75,4 @@ File
   Newline "\n"
   EOF ""
 # diagnostics
-error[masterbelt.parser.concrete.unexpected_token] 5:1 unexpected token: Ident
+error[masterbelt.parser.concrete.unexpected_token] 5:1 unexpected token: Assert
