@@ -122,7 +122,10 @@ func LoadPrelude(reg *builtin.Registry) (map[string]*ir.TypeDef, []*ir.TypeDef, 
 
 // validatePrelude checks that the prelude and the registry agree: every registry
 // primitive is declared in the prelude as a `= builtin`, and every extern method
-// a builtin declares has a registered native implementation.
+// a builtin declares has a registered native implementation — per overload
+// signature, so a declared arm whose intrinsic was never registered (a
+// duration.add(at: datetime) without its kind-keyed implementation) cannot
+// drift past the build.
 func validatePrelude(reg *builtin.Registry, defs []*ir.TypeDef) error {
 	declared := make(map[string]*ir.TypeDef, len(defs))
 	for _, d := range defs {
@@ -147,17 +150,75 @@ func validatePrelude(reg *builtin.Registry, defs []*ir.TypeDef) error {
 		if !d.Builtin {
 			continue
 		}
-		if _, native := reg.Native(d.Name); !native {
+		native, ok := reg.Native(d.Name)
+		if !ok {
 			continue
 		}
 		for _, m := range d.Methods {
 			if !m.Extern {
 				continue
 			}
-			if !reg.HasIntrinsic(d.Name, m.Name) {
-				return fmt.Errorf("prelude: %s.%s is extern but the registry has no intrinsic for it", d.Name, m.Name)
+			kinds, known := paramKinds(reg, native, m.Params)
+			if !known {
+				// A parameter type the evaluator has no constant kind for
+				// (none exists on a natively-backed primitive today): the
+				// per-name check is the strongest claim left.
+				if !reg.HasIntrinsic(d.Name, m.Name) {
+					return fmt.Errorf("prelude: %s.%s is extern but the registry has no intrinsic for it", d.Name, m.Name)
+				}
+				continue
+			}
+			if _, ok := reg.Intrinsic(d.Name, m.Name, kinds); !ok {
+				return fmt.Errorf("prelude: %s.%s is extern but the registry has no intrinsic for its argument kinds", d.Name, m.Name)
 			}
 		}
 	}
 	return nil
+}
+
+// paramKinds maps an extern method's parameter types to the argument kinds
+// the evaluator will dispatch with: self is the receiver's own kind, any
+// other primitive its native kind. known is false when a parameter has no
+// constant kind to dispatch on (a type variable, a function, a collection).
+func paramKinds(reg *builtin.Registry, recv *builtin.NativeType, params []ir.Param) ([]ir.ConstKind, bool) {
+	kinds := make([]ir.ConstKind, len(params))
+	for i, p := range params {
+		var n *builtin.NativeType
+		switch t := p.Type.(type) {
+		case *ir.SelfType:
+			n = recv
+		case *ir.Builtin:
+			n, _ = reg.Native(t.Name)
+		case *ir.Named:
+			if t.Def != nil && t.Def.Builtin {
+				n, _ = reg.Native(t.Def.Name)
+			}
+		}
+		k, ok := nativeKind(n)
+		if !ok {
+			return nil, false
+		}
+		kinds[i] = k
+	}
+	return kinds, true
+}
+
+// nativeKind is the constant kind a native primitive's values carry.
+func nativeKind(n *builtin.NativeType) (ir.ConstKind, bool) {
+	switch {
+	case n == nil:
+		return 0, false
+	case n.IsInteger():
+		return ir.ConstInt, true
+	case n.Bool:
+		return ir.ConstBool, true
+	case n.Str:
+		return ir.ConstString, true
+	case n.Datetime:
+		return ir.ConstDatetime, true
+	case n.Duration:
+		return ir.ConstDuration, true
+	default:
+		return 0, false
+	}
 }

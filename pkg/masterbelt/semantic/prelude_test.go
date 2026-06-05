@@ -98,6 +98,50 @@ func TestPreludeValidationCatchesMissingIntrinsic(t *testing.T) {
 	}
 }
 
+func TestPreludeValidationCatchesMissingOverloadIntrinsic(t *testing.T) {
+	// The check is per overload arm, not per name: duration.add has
+	// kind-keyed intrinsics for a duration and a datetime argument, so a
+	// declared third arm (add(n: int)) with no implementation must fail even
+	// though the name has intrinsics.
+	reg := builtin.Default()
+	withDuration := func(d *ir.TypeDef) []*ir.TypeDef {
+		// Every other registry primitive declared minimally, so the
+		// declaration check stays out of the way of the arm check.
+		defs := []*ir.TypeDef{d}
+		for _, name := range reg.Names() {
+			if name != d.Name {
+				defs = append(defs, &ir.TypeDef{Name: name, Builtin: true})
+			}
+		}
+		return defs
+	}
+
+	bogus := &ir.TypeDef{
+		Name:    "duration",
+		Builtin: true,
+		Methods: []*ir.Method{{
+			Name:   "add",
+			Extern: true,
+			Params: []ir.Param{{Name: "n", Type: &ir.Builtin{Name: "int"}}},
+		}},
+	}
+	if err := validatePrelude(reg, withDuration(bogus)); err == nil {
+		t.Fatal("validatePrelude accepted an overload arm with no intrinsic for its argument kinds")
+	}
+	// The genuinely implemented arms still validate.
+	ok := &ir.TypeDef{
+		Name:    "duration",
+		Builtin: true,
+		Methods: []*ir.Method{
+			{Name: "add", Extern: true, Params: []ir.Param{{Name: "other", Type: &ir.SelfType{}}}},
+			{Name: "add", Extern: true, Params: []ir.Param{{Name: "at", Type: &ir.Builtin{Name: "datetime"}}}},
+		},
+	}
+	if err := validatePrelude(reg, withDuration(ok)); err != nil {
+		t.Fatalf("validatePrelude rejected the implemented overload arms: %v", err)
+	}
+}
+
 // TestPreludeSurfaceIsTheBarrel checks the prelude-as-a-project story: the
 // surface every file implicitly imports is exactly what the manifest's entry
 // barrel re-exports, definition objects included.
