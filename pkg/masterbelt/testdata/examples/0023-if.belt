@@ -1,0 +1,39 @@
+// if is the boolean control statement: it runs a block when its condition holds,
+// otherwise the else branch (another if, for an else-if chain, or a block). An if
+// is a statement, not an expression — it yields no value, so each branch drives
+// control flow by returning. The value form of a two-way choice is the ternary
+// "?:" (E-13), not if.
+
+// An else-if chain: the first condition that holds wins, and the trailing return
+// covers the values no branch named. else is optional, so a lone guarded return
+// needs no else at all.
+pub fn clamp(x: int, lo: int, hi: int): int {
+  if x < lo {
+    return lo
+  } else if x > hi {
+    return hi
+  }
+  return x
+}
+
+// A bare guard with no else: the if returns for one case and falls through to the
+// trailing return for the rest.
+pub fn warn(n: int): int {
+  if n > 100 {
+    return 0
+  }
+  return n
+}
+
+// if nests, and a branch body may itself be a switch (or any statement block) —
+// the branches share the body executor with switch and the function body.
+pub fn sign(n: int): string {
+  if n > 0 {
+    return "positive"
+  } else {
+    if n < 0 {
+      return "negative"
+    }
+    return "zero"
+  }
+}
