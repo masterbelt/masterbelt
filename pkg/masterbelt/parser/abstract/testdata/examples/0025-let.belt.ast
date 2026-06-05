@@ -10,20 +10,28 @@ File
     name "pick"
     param flag: bool
     result int
+      let "base" = IntLit "10"
+      let "result" = Identifier "base"
       if Identifier "flag"
+          assign Identifier "result" = (call (. Identifier "base" mul) IntLit "2")
       return Identifier "result"
   FuncDecl
     pub
     name "step"
     param n: int
     result int
+      let "acc": int = Identifier "n"
+      assign Identifier "acc" = (call (. Identifier "acc" add) IntLit "1")
       return Identifier "acc"
   FuncDecl
     pub
     name "shadow"
     param flag: bool
     result int
+      let "result" = IntLit "1"
       if Identifier "flag"
+          let "result" = IntLit "2"
+          assign Identifier "result" = (call (. Identifier "result" add) IntLit "10")
           return Identifier "result"
       return Identifier "result"
   AssertDecl

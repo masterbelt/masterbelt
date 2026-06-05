@@ -124,8 +124,9 @@ func lowerBlock(t cst.Tree, buf source.Buffer) []ast.Stmt {
 	return stmts
 }
 
-// lowerStmt lowers a statement node: a return statement, a switch statement, an
-// if statement, or a bare expression statement.
+// lowerStmt lowers a statement node: a let binding, a return statement, an
+// assignment, a switch statement, an if statement, or a bare expression
+// statement.
 func lowerStmt(t cst.Tree, buf source.Buffer, node *cst.Node) ast.Stmt {
 	switch {
 	case node.Kind() == cst.ReturnStmt:
@@ -136,6 +137,10 @@ func lowerStmt(t cst.Tree, buf source.Buffer, node *cst.Node) ast.Stmt {
 			}
 		}
 		return ast.NewReturnStmt(value, node)
+	case node.Kind() == cst.LetStmt:
+		return lowerLetStmt(t, buf, node)
+	case node.Kind() == cst.AssignStmt:
+		return lowerAssignStmt(t, buf, node)
 	case node.Kind() == cst.SwitchStmt:
 		return lowerSwitchStmt(t, buf, node)
 	case node.Kind() == cst.IfStmt:
@@ -145,6 +150,55 @@ func lowerStmt(t cst.Tree, buf source.Buffer, node *cst.Node) ast.Stmt {
 	default:
 		return nil
 	}
+}
+
+// lowerLetStmt lowers a LetStmt node: its bound name (the bare Ident leaf), its
+// optional type annotation (a TypeClause holding the type expression), and its
+// initializer value (the Initializer's expression). A missing name lowers to the
+// empty string and a missing value to a nil expr — the semantic layer reports
+// either, mirroring how a malformed constant declaration lowers.
+func lowerLetStmt(t cst.Tree, buf source.Buffer, node *cst.Node) ast.Stmt {
+	var name string
+	var typ ast.TypeExpr
+	var value ast.Expr
+	for _, child := range t.Children() {
+		if tok, ok := child.Token(); ok {
+			if tok.Kind() == token.Ident && name == "" {
+				name = child.Text(buf)
+			}
+			continue
+		}
+		n, ok := child.Node()
+		if !ok {
+			continue
+		}
+		switch n.Kind() {
+		case cst.TypeClause:
+			typ = lowerTypeClause(child, buf)
+		case cst.Initializer:
+			value = lowerInitializer(child, buf)
+		}
+	}
+	return ast.NewLetStmt(name, typ, value, node)
+}
+
+// lowerAssignStmt lowers an AssignStmt node: its target expression (the first
+// expression child, before the "=") and its value (the second). Either is nil
+// when the source omitted it, which the semantic layer reports.
+func lowerAssignStmt(t cst.Tree, buf source.Buffer, node *cst.Node) ast.Stmt {
+	var target, value ast.Expr
+	for _, child := range t.Children() {
+		n, ok := child.Node()
+		if !ok || !isExprKind(n.Kind()) {
+			continue
+		}
+		if target == nil {
+			target = lowerExpr(child, buf)
+		} else {
+			value = lowerExpr(child, buf)
+		}
+	}
+	return ast.NewAssignStmt(target, value, node)
 }
 
 // lowerIfStmt lowers an IfStmt node: its condition (the first expression child),
