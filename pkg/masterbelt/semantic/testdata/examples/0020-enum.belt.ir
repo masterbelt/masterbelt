@@ -1,0 +1,38 @@
+Module
+  Const "enum" pub
+    doc "A card's rarity tier."
+    type invalid
+    value <none>
+  Const "enum" pub
+    doc "An elemental affinity."
+    type invalid
+    value <none>
+  Const "isFire" pub
+    doc "Whether this element is Fire."
+    type invalid
+    value <none>
+  Const "enum" pub
+    doc "A supported display locale."
+    type invalid
+    value <none>
+  Const "Top"
+    type invalid
+    value <none>
+  Const "Bare"
+    type invalid
+    value <none>
+  Assert "Rarity.Common != Rarity.Legend"
+    eval <unevaluated>
+      Rarity.Common != Rarity.Legend
+  Assert "Rarity.Common < Rarity.Legend"
+    eval <unevaluated>
+      Rarity.Common < Rarity.Legend
+  Assert "Rarity.Legend == Top"
+    eval <unevaluated>
+      Rarity.Legend == Top
+  Assert "Bare == Rarity.Common"
+    eval <unevaluated>
+      Bare == Rarity.Common
+  Assert "Locale.Ja < Locale.En"
+    eval <unevaluated>
+      Locale.Ja < Locale.En

@@ -1,0 +1,281 @@
+# tree
+File
+  ConstDecl
+    LineComment "// Enum with an explicit integer base type and explicit member values."
+    Newline "\n"
+    DocComment "/// A card's rarity tier."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Ident "enum"
+  Error
+    Whitespace " "
+    Ident "Rarity"
+    Colon ":"
+    Whitespace " "
+    Ident "uint8"
+    Whitespace " "
+    LBrace "{"
+    Newline "\n"
+    Whitespace "  "
+    Ident "Common"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    Int "1"
+    Newline "\n"
+    Whitespace "  "
+    Ident "Rare"
+    Whitespace "   "
+    Assign "="
+    Whitespace " "
+    Int "2"
+    Newline "\n"
+    Whitespace "  "
+    Ident "Legend"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    Int "10"
+    Newline "\n"
+    RBrace "}"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// Enum with no base type (int by default) and auto-numbered members; it also"
+    Newline "\n"
+    LineComment "// carries an impl block, exactly as a nominal type can."
+    Newline "\n"
+    DocComment "/// An elemental affinity."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Ident "enum"
+  Error
+    Whitespace " "
+    Ident "Element"
+    Whitespace " "
+    LBrace "{"
+    Newline "\n"
+    Whitespace "  "
+    Ident "Fire"
+    Comma ","
+    Whitespace " "
+    Ident "Water"
+    Comma ","
+    Whitespace " "
+    Ident "Wind"
+    Newline "\n"
+    RBrace "}"
+    Whitespace " "
+    Impl "impl"
+    Whitespace " "
+    LBrace "{"
+  ConstDecl
+    Newline "\n"
+    Whitespace "  "
+    DocComment "/// Whether this element is Fire."
+    Newline "\n"
+    Whitespace "  "
+    Pub "pub"
+    Whitespace " "
+    Ident "isFire"
+  Error
+    LParen "("
+    RParen ")"
+    Colon ":"
+    Whitespace " "
+    Ident "bool"
+    Whitespace " "
+    LBrace "{"
+    Newline "\n"
+    Whitespace "    "
+    Return "return"
+    Whitespace " "
+    Self "self"
+    Whitespace " "
+    EqEq "=="
+    Whitespace " "
+    Ident "Element"
+    Dot "."
+    Ident "Fire"
+    Newline "\n"
+    Whitespace "  "
+    RBrace "}"
+    Newline "\n"
+    RBrace "}"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// Enum with a string base type: a member with no initializer takes its own"
+    Newline "\n"
+    LineComment "// name as its value, an explicit initializer overrides it."
+    Newline "\n"
+    DocComment "/// A supported display locale."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Ident "enum"
+  Error
+    Whitespace " "
+    Ident "Locale"
+    Colon ":"
+    Whitespace " "
+    Ident "string"
+    Whitespace " "
+    LBrace "{"
+    Newline "\n"
+    Whitespace "  "
+    Ident "Ja"
+    Newline "\n"
+    Whitespace "  "
+    Ident "En"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    String "\"en-US\""
+    Newline "\n"
+    RBrace "}"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// Qualified member access is canonical."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Top"
+    TypeClause
+      Colon ":"
+      Whitespace " "
+      TypeName
+        Ident "Rarity"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      MemberExpr
+        NameRef
+          Ident "Rarity"
+        Dot "."
+        Ident "Legend"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// A bare member resolves through the expected type (bidirectional inference)."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Bare"
+    TypeClause
+      Colon ":"
+      Whitespace " "
+      TypeName
+        Ident "Rarity"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      NameRef
+        Ident "Common"
+  AssertDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// Equality compares the member identity; ordering compares the base value."
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      MemberExpr
+        NameRef
+          Ident "Rarity"
+        Dot "."
+        Ident "Common"
+      Whitespace " "
+      BangEq "!="
+      Whitespace " "
+      MemberExpr
+        NameRef
+          Ident "Rarity"
+        Dot "."
+        Ident "Legend"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      MemberExpr
+        NameRef
+          Ident "Rarity"
+        Dot "."
+        Ident "Common"
+      Whitespace " "
+      Lt "<"
+      Whitespace " "
+      MemberExpr
+        NameRef
+          Ident "Rarity"
+        Dot "."
+        Ident "Legend"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      MemberExpr
+        NameRef
+          Ident "Rarity"
+        Dot "."
+        Ident "Legend"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      NameRef
+        Ident "Top"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      NameRef
+        Ident "Bare"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      MemberExpr
+        NameRef
+          Ident "Rarity"
+        Dot "."
+        Ident "Common"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      MemberExpr
+        NameRef
+          Ident "Locale"
+        Dot "."
+        Ident "Ja"
+      Whitespace " "
+      Lt "<"
+      Whitespace " "
+      MemberExpr
+        NameRef
+          Ident "Locale"
+        Dot "."
+        Ident "En"
+  Newline "\n"
+  EOF ""
+# diagnostics
+error[masterbelt.parser.concrete.expected_const] 3:1 expected 'const'
+error[masterbelt.parser.concrete.expected_assign] 3:5 expected '='
+error[masterbelt.parser.concrete.unexpected_token] 3:10 unexpected token: Ident
+error[masterbelt.parser.concrete.expected_const] 12:1 expected 'const'
+error[masterbelt.parser.concrete.expected_assign] 12:5 expected '='
+error[masterbelt.parser.concrete.unexpected_token] 12:10 unexpected token: Ident
+error[masterbelt.parser.concrete.expected_const] 16:3 expected 'const'
+error[masterbelt.parser.concrete.expected_assign] 16:7 expected '='
+error[masterbelt.parser.concrete.unexpected_token] 16:13 unexpected token: LParen
+error[masterbelt.parser.concrete.expected_const] 24:1 expected 'const'
+error[masterbelt.parser.concrete.expected_assign] 24:5 expected '='
+error[masterbelt.parser.concrete.unexpected_token] 24:10 unexpected token: Ident

@@ -1,0 +1,40 @@
+// Enum with an explicit integer base type and explicit member values.
+/// A card's rarity tier.
+pub enum Rarity: uint8 {
+  Common = 1
+  Rare   = 2
+  Legend = 10
+}
+
+// Enum with no base type (int by default) and auto-numbered members; it also
+// carries an impl block, exactly as a nominal type can.
+/// An elemental affinity.
+pub enum Element {
+  Fire, Water, Wind
+} impl {
+  /// Whether this element is Fire.
+  pub isFire(): bool {
+    return self == Element.Fire
+  }
+}
+
+// Enum with a string base type: a member with no initializer takes its own
+// name as its value, an explicit initializer overrides it.
+/// A supported display locale.
+pub enum Locale: string {
+  Ja
+  En = "en-US"
+}
+
+// Qualified member access is canonical.
+const Top: Rarity = Rarity.Legend
+
+// A bare member resolves through the expected type (bidirectional inference).
+const Bare: Rarity = Common
+
+// Equality compares the member identity; ordering compares the base value.
+assert Rarity.Common != Rarity.Legend
+assert Rarity.Common < Rarity.Legend
+assert Rarity.Legend == Top
+assert Bare == Rarity.Common
+assert Locale.Ja < Locale.En
