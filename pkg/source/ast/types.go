@@ -11,8 +11,9 @@ import "github.com/masterbelt/masterbelt/pkg/source/cst"
 
 // TypeDecl is a type declaration: an optional run of doc-comment lines, an
 // optional pub modifier, the declared Name, its generic Params, the type it is
-// defined as (Body), its refinement predicate (Where), and the methods of its
-// impl block.
+// defined as (Body), its refinement predicate (Where), and the impl block's
+// members — its methods and its associated constants (Consts, read as
+// TypeName.Name).
 type TypeDecl struct {
 	Doc     []string
 	Public  bool
@@ -21,6 +22,7 @@ type TypeDecl struct {
 	Body    TypeExpr     // the defined type, or nil if missing
 	Where   Expr         // the refinement predicate over self, or nil if none
 	Methods []*MethodDecl
+	Consts  []*ConstDecl // the impl block's associated constants, in source order
 	syntax  *cst.Node
 }
 
@@ -28,8 +30,8 @@ func (d *TypeDecl) Syntax() *cst.Node { return d.syntax }
 func (d *TypeDecl) node()             {}
 
 // NewTypeDecl builds a TypeDecl node.
-func NewTypeDecl(doc []string, public bool, name string, params []*TypeParam, body TypeExpr, where Expr, methods []*MethodDecl, syntax *cst.Node) *TypeDecl {
-	return &TypeDecl{Doc: doc, Public: public, Name: name, Params: params, Body: body, Where: where, Methods: methods, syntax: syntax}
+func NewTypeDecl(doc []string, public bool, name string, params []*TypeParam, body TypeExpr, where Expr, methods []*MethodDecl, consts []*ConstDecl, syntax *cst.Node) *TypeDecl {
+	return &TypeDecl{Doc: doc, Public: public, Name: name, Params: params, Body: body, Where: where, Methods: methods, Consts: consts, syntax: syntax}
 }
 
 // TypeParam is one generic parameter of a TypeDecl: a name and an optional
@@ -63,6 +65,7 @@ type EnumDecl struct {
 	Base    TypeExpr // the base-type annotation, or nil if omitted (defaults to int)
 	Members []*EnumMember
 	Methods []*MethodDecl
+	Consts  []*ConstDecl // the impl block's associated constants, in source order
 	syntax  *cst.Node
 }
 
@@ -70,8 +73,8 @@ func (d *EnumDecl) Syntax() *cst.Node { return d.syntax }
 func (d *EnumDecl) node()             {}
 
 // NewEnumDecl builds an EnumDecl node.
-func NewEnumDecl(doc []string, public bool, name string, base TypeExpr, members []*EnumMember, methods []*MethodDecl, syntax *cst.Node) *EnumDecl {
-	return &EnumDecl{Doc: doc, Public: public, Name: name, Base: base, Members: members, Methods: methods, syntax: syntax}
+func NewEnumDecl(doc []string, public bool, name string, base TypeExpr, members []*EnumMember, methods []*MethodDecl, consts []*ConstDecl, syntax *cst.Node) *EnumDecl {
+	return &EnumDecl{Doc: doc, Public: public, Name: name, Base: base, Members: members, Methods: methods, Consts: consts, syntax: syntax}
 }
 
 // EnumMember is one member of an enum: its Name and an optional Value

@@ -54,13 +54,21 @@ func NewUseDecl(public bool, namespace string, names []string, star bool, path s
 // The Type annotation is a full type expression (the same grammar a type
 // declaration uses), so a constant may be annotated with a generic type such as
 // list<int>.
+//
+// The same node is reused for an associated constant — a constant scoped to a
+// type, declared inside an impl block and read as TypeName.Name (a type
+// declaration's Consts and an enum's Consts). Such a constant may carry the
+// Builtin marker (`const Max = builtin`): its value comes from the builtin
+// registry rather than from an initializer, mirroring a primitive type's
+// `= builtin` body. Builtin is never set for a top-level constant.
 type ConstDecl struct {
-	Doc    []string // doc-comment lines ("///"), stripped of the marker
-	Public bool     // whether the declaration is marked pub
-	Name   string   // the declared identifier, or "" if missing
-	Type   TypeExpr // the type annotation, or nil if inferred/missing
-	Value  Expr     // the initializer expression, or nil if missing
-	syntax *cst.Node
+	Doc     []string // doc-comment lines ("///"), stripped of the marker
+	Public  bool     // whether the declaration is marked pub
+	Name    string   // the declared identifier, or "" if missing
+	Type    TypeExpr // the type annotation, or nil if inferred/missing
+	Value   Expr     // the initializer expression, or nil if missing/builtin
+	Builtin bool     // an associated constant whose value comes from the registry
+	syntax  *cst.Node
 }
 
 func (d *ConstDecl) Syntax() *cst.Node { return d.syntax }
@@ -69,6 +77,12 @@ func (d *ConstDecl) node()             {}
 // NewConstDecl builds a ConstDecl node.
 func NewConstDecl(doc []string, public bool, name string, typ TypeExpr, value Expr, syntax *cst.Node) *ConstDecl {
 	return &ConstDecl{Doc: doc, Public: public, Name: name, Type: typ, Value: value, syntax: syntax}
+}
+
+// NewAssocConstDecl builds an associated-constant ConstDecl, including the
+// Builtin marker for a `= builtin` body (whose Value is nil).
+func NewAssocConstDecl(doc []string, public bool, name string, typ TypeExpr, value Expr, builtin bool, syntax *cst.Node) *ConstDecl {
+	return &ConstDecl{Doc: doc, Public: public, Name: name, Type: typ, Value: value, Builtin: builtin, syntax: syntax}
 }
 
 // FuncDecl is a top-level function declaration: a method without a receiver.

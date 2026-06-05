@@ -25,6 +25,14 @@ File
     pub
     name "Level"
     body int8
+    const "Max"
+      doc "The highest level."
+      pub
+      value IntLit "100"
+    const "Min"
+      doc "The lowest level."
+      pub
+      value IntLit "0"
     method "increment"
       doc "The next level."
       pub
@@ -34,6 +42,11 @@ File
     pub
     name "Bits"
     body int32
+    const "Width"
+      doc "The width in bits."
+      pub
+      type int32
+      value IntLit "32"
   TypeDecl
     pub
     name "Port"
