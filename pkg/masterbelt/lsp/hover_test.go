@@ -376,6 +376,36 @@ func TestMethodHover(t *testing.T) {
 	})
 }
 
+func TestLiteralHover(t *testing.T) {
+	// A datetime or duration literal hovers as its canonical value: the UTC
+	// instant an offset spelling normalizes to, and the largest-units-first
+	// decomposition of a duration.
+	src := "const Launch = D2026-06-05T09:00:00.000+09:00\n" +
+		"const Wait = 90m\n" +
+		"const Sum = 90m + D2026-06-05T00:00:00.000Z - D2026-06-05T00:00:00.000Z\n"
+	doc := testView(src)
+
+	t.Run("offset datetime normalizes", func(t *testing.T) {
+		h := hover(doc, strings.Index(src, "D2026")+3)
+		if h == nil {
+			t.Fatal("no hover on the datetime literal")
+		}
+		if want := "datetime = D2026-06-05T00:00:00.000Z"; !strings.Contains(h.Contents.Value, want) {
+			t.Errorf("hover = %q, want it to contain %q", h.Contents.Value, want)
+		}
+	})
+
+	t.Run("duration shows canonical decomposition", func(t *testing.T) {
+		h := hover(doc, strings.Index(src, "90m")+1)
+		if h == nil {
+			t.Fatal("no hover on the duration literal")
+		}
+		if want := "duration = 1h30m"; !strings.Contains(h.Contents.Value, want) {
+			t.Errorf("hover = %q, want it to contain %q", h.Contents.Value, want)
+		}
+	})
+}
+
 func TestMethodHoverOverloads(t *testing.T) {
 	// An overloaded name hovers as the whole overload set: every signature,
 	// each under its own doc comment.

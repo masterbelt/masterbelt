@@ -79,6 +79,10 @@ func buildGrammar() grammar {
 		Patterns: []rule{
 			{Include: "#comments"},
 			{Include: "#keywords"},
+			// The datetime/duration literals must precede #numbers, or their
+			// digit runs would half-match as plain integers.
+			{Include: "#datetimes"},
+			{Include: "#durations"},
 			{Include: "#numbers"},
 			{Include: "#strings"},
 			{Include: "#operators"},
@@ -98,6 +102,19 @@ func buildGrammar() grammar {
 			// keywords wear the same colour before and after the server is up.
 			"keywords": {Patterns: []rule{
 				{Name: "keyword.control.masterbelt", Match: keywordPattern()},
+			}},
+			// A D-prefixed ISO-8601 instant: the same shape the lexer commits
+			// on, milliseconds and signed offsets included. The semantic
+			// `number` token lands on constant.numeric, so the literal wears
+			// the same colour before and after the server is up.
+			"datetimes": {Patterns: []rule{
+				{Name: "constant.numeric.datetime.masterbelt", Match: `\bD[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]{3})?(Z|[+-][0-9]{2}:[0-9]{2})`},
+			}},
+			// Concatenated digit+unit groups (3w4d5h6m7s8ms); ms is listed
+			// before its prefix letters so the alternation munches maximally,
+			// exactly as the lexer does.
+			"durations": {Patterns: []rule{
+				{Name: "constant.numeric.duration.masterbelt", Match: `\b([0-9]+(ms|w|d|h|m|s))+\b`},
 			}},
 			"numbers": {Patterns: []rule{
 				{Name: "constant.numeric.integer.masterbelt", Match: `\b[0-9]+\b`},

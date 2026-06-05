@@ -3,6 +3,7 @@ package lsp
 import (
 	"strings"
 
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/eval"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/types"
 	"github.com/masterbelt/masterbelt/pkg/source"
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
@@ -40,7 +41,54 @@ func hover(doc view, offset int) *protocol.Hover {
 	if h := methodParamHover(doc, offset, trees); h != nil {
 		return h
 	}
+	if h := literalHover(doc, offset); h != nil {
+		return h
+	}
 	return assertHover(doc, offset, trees)
+}
+
+// literalHover describes the datetime or duration literal at offset by its
+// canonical value: the UTC instant an offset spelling normalizes to, or the
+// largest-units-first decomposition of a duration (90m is 1h30m). A malformed
+// literal — already diagnosed by the lexer — hovers nothing.
+func literalHover(doc view, offset int) *protocol.Hover {
+	leaf, _, ok := leafAt(doc.AST().Concrete().Tree(), offset)
+	if !ok {
+		return nil
+	}
+	kind, isTok := leaf.TokenKind()
+	if !isTok {
+		return nil
+	}
+	text := leaf.Text(doc.Buffer())
+
+	var typ string
+	var canon *ir.Constant
+	switch kind {
+	case token.DatetimeLit:
+		ms, ok := eval.DatetimeMillis(text)
+		if !ok {
+			return nil
+		}
+		typ, canon = "datetime", ir.DatetimeConstant(ms)
+	case token.DurationLit:
+		ms, ok := eval.DurationMillis(text)
+		if !ok {
+			return nil
+		}
+		typ, canon = "duration", ir.DurationConstant(ms)
+	default:
+		return nil
+	}
+
+	r := toRange(doc.Buffer(), leaf.Offset(), leaf.End())
+	return &protocol.Hover{
+		Contents: protocol.MarkupContent{
+			Kind:  protocol.Markdown,
+			Value: "```masterbelt\n" + typ + " = " + canon.String() + "\n```",
+		},
+		Range: &r,
+	}
 }
 
 // methodParamHover describes the method parameter denoted at offset: its name

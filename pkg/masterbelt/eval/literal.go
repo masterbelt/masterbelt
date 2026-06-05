@@ -10,11 +10,12 @@ import (
 // shapes the lexer validated.
 var instantLayouts = [...]string{"2006-01-02T15:04:05.000Z07:00", "2006-01-02T15:04:05Z07:00"}
 
-// datetimeMillis normalizes a datetime literal's text (the D prefix included)
+// DatetimeMillis normalizes a datetime literal's text (the D prefix included)
 // to a UTC instant in epoch milliseconds. It reports false for a malformed
 // literal — one the lexer already diagnosed — so a broken literal never folds
-// to a value.
-func datetimeMillis(text string) (int64, bool) {
+// to a value. The editor's literal hover shares it to show the canonical
+// instant.
+func DatetimeMillis(text string) (int64, bool) {
 	if len(text) < 2 || text[0] != 'D' {
 		return 0, false
 	}
@@ -36,10 +37,11 @@ var unitMillis = map[string]int64{
 	"ms": 1,
 }
 
-// durationMillis totals a duration literal's digit+unit groups into
+// DurationMillis totals a duration literal's digit+unit groups into
 // milliseconds. It reports false for a malformed literal or a total that
-// overflows int64, so neither folds to a value.
-func durationMillis(text string) (int64, bool) {
+// overflows int64, so neither folds to a value. The editor's literal hover
+// shares it to show the canonical decomposition.
+func DurationMillis(text string) (int64, bool) {
 	var total int64
 	i := 0
 	for i < len(text) {

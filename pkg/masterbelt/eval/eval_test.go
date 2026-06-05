@@ -114,7 +114,7 @@ func TestDatetimeMillis(t *testing.T) {
 		{"", 0, false},
 	}
 	for _, c := range cases {
-		got, ok := datetimeMillis(c.text)
+		got, ok := DatetimeMillis(c.text)
 		if got != c.want || ok != c.ok {
 			t.Errorf("datetimeMillis(%q) = (%d, %v), want (%d, %v)", c.text, got, ok, c.want, c.ok)
 		}
@@ -147,7 +147,7 @@ func TestDurationMillis(t *testing.T) {
 		{"", 0, true}, // vacuously zero; the lexer never produces it
 	}
 	for _, c := range cases {
-		got, ok := durationMillis(c.text)
+		got, ok := DurationMillis(c.text)
 		if got != c.want || ok != c.ok {
 			t.Errorf("durationMillis(%q) = (%d, %v), want (%d, %v)", c.text, got, ok, c.want, c.ok)
 		}

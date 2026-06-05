@@ -92,14 +92,14 @@ func evalExpr(e ast.Expr, ctx evalCtx) *ir.Constant {
 	case *ast.DatetimeLit:
 		// The literal normalizes to a UTC instant here; a malformed one (the
 		// lexer diagnosed it) folds to nothing.
-		if ms, ok := datetimeMillis(e.Text); ok {
+		if ms, ok := DatetimeMillis(e.Text); ok {
 			return ir.DatetimeConstant(ms)
 		}
 		return nil
 	case *ast.DurationLit:
 		// The groups total into milliseconds here; a malformed or overflowing
 		// literal folds to nothing.
-		if ms, ok := durationMillis(e.Text); ok {
+		if ms, ok := DurationMillis(e.Text); ok {
 			return ir.DurationConstant(ms)
 		}
 		return nil

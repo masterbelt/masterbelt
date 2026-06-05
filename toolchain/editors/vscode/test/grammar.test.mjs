@@ -63,6 +63,8 @@ test('grammar assigns the expected scopes', async () => {
     '/// docs',
     'pub const MyConst: int64 = 100 // trailing',
     'const Twice = fn(x) -> x',
+    'const Release = D2009-03-31T23:59:59.000Z',
+    'const Cooldown = 3w4d5h6m7s8ms',
   ].join('\n');
   const lines = tokenize(grammar, source);
 
@@ -74,6 +76,8 @@ test('grammar assigns the expected scopes', async () => {
     ['pub', 'keyword.control'],
     ['fn', 'keyword.control'],
     ['100', 'constant.numeric'],
+    ['D2009-03-31T23:59:59.000Z', 'constant.numeric.datetime'],
+    ['3w4d5h6m7s8ms', 'constant.numeric.duration'],
     ['///', 'comment.line.documentation'],
     ['// trailing', 'comment.line.double-slash'],
     ['=', 'keyword.operator'],

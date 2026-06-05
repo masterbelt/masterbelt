@@ -10,6 +10,12 @@
       "include": "#keywords"
     },
     {
+      "include": "#datetimes"
+    },
+    {
+      "include": "#durations"
+    },
+    {
       "include": "#numbers"
     },
     {
@@ -34,6 +40,22 @@
           "name": "comment.block.masterbelt",
           "begin": "/\\*",
           "end": "\\*/"
+        }
+      ]
+    },
+    "datetimes": {
+      "patterns": [
+        {
+          "name": "constant.numeric.datetime.masterbelt",
+          "match": "\\bD[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{3})?(Z|[+-][0-9]{2}:[0-9]{2})"
+        }
+      ]
+    },
+    "durations": {
+      "patterns": [
+        {
+          "name": "constant.numeric.duration.masterbelt",
+          "match": "\\b([0-9]+(ms|w|d|h|m|s))+\\b"
         }
       ]
     },

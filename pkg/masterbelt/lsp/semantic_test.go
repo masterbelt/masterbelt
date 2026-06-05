@@ -51,6 +51,33 @@ func TestSemanticTokens(t *testing.T) {
 	}
 }
 
+func TestSemanticTokensLiterals(t *testing.T) {
+	// Datetime and duration literals colour as numbers, one token each —
+	// matching their cold-start constant.numeric scopes.
+	doc := abstract.NewDocument([]byte("const D = D2009-03-31T23:59:59.000Z\nconst W = 3w4d\n"))
+	got := decode(semanticTokens(doc).Data)
+
+	want := []decodedToken{
+		{0, 0, 5, stKeyword, 0},
+		{0, 6, 1, stVariable, smDeclaration | smReadonly},
+		{0, 8, 1, stOperator, 0},
+		{0, 10, 25, stNumber, 0}, // the whole datetime literal
+		{1, 0, 5, stKeyword, 0},
+		{1, 6, 1, stVariable, smDeclaration | smReadonly},
+		{1, 8, 1, stOperator, 0},
+		{1, 10, 4, stNumber, 0}, // the whole duration literal
+	}
+
+	if len(got) != len(want) {
+		t.Fatalf("got %d tokens, want %d:\n got:  %+v\n want: %+v", len(got), len(want), got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("token[%d] = %+v, want %+v", i, got[i], want[i])
+		}
+	}
+}
+
 func TestSemanticTokensArrowLambda(t *testing.T) {
 	// The arrow of an arrow-bodied lambda colours as an operator, like : and =;
 	// fn stays a keyword.
