@@ -1,20 +1,25 @@
 File
   ConstDecl
     name "Origin"
+    value (record Point x: IntLit "0" y: IntLit "0")
   ConstDecl
     name "P"
     type Point
+    value (record x: IntLit "1" y: IntLit "2")
   ConstDecl
     name "Q"
+    value (record Point x: IntLit "3" y: IntLit "4")
   ConstDecl
     name "Sword"
+    value (record Item id: IntLit "1" name: StringLit "Sword" pos: (record Point x: IntLit "0" y: IntLit "0"))
   ConstDecl
     name "Path"
     type list<Point>
-    value (collection)
+    value (list (record x: IntLit "0" y: IntLit "0") (record Point x: IntLit "1" y: IntLit "1"))
   ConstDecl
     name "U"
     type Unit
+    value (record)
   TypeDecl
     pub
     name "Point"

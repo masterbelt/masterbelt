@@ -13,8 +13,7 @@ Module
     value <none>
   Const "Path"
     type list<Point>
-    value []
-    eval []
+    value [<none>, <none>]
   Const "U"
     type Unit
     value <none>

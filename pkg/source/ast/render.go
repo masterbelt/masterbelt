@@ -136,6 +136,21 @@ func (r *renderer) expr(e Expr, min int) {
 			r.expr(entry.Value, 0)
 		}
 		r.str("]")
+	case *RecordLit:
+		r.str(x.TypeName) // "" for the inferred form
+		if len(x.Fields) == 0 {
+			r.str("{}")
+			break
+		}
+		r.str("{ ")
+		for i, f := range x.Fields {
+			if i > 0 {
+				r.str(", ")
+			}
+			r.str(f.Name + ": ")
+			r.expr(f.Value, 0)
+		}
+		r.str(" }")
 	case *MemberExpr:
 		r.expr(x.Receiver, precPostfix)
 		r.str(".")

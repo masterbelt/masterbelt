@@ -102,6 +102,16 @@ func dumpExpr(e Expr) string {
 			}
 		}
 		return "(" + strings.Join(parts, " ") + ")"
+	case *RecordLit:
+		label := "record"
+		if x.TypeName != "" {
+			label = "record " + x.TypeName
+		}
+		parts := []string{label}
+		for _, f := range x.Fields {
+			parts = append(parts, f.Name+": "+dumpExpr(f.Value))
+		}
+		return "(" + strings.Join(parts, " ") + ")"
 	case *SelfExpr:
 		return "self"
 	case *Identifier:

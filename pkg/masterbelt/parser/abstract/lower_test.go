@@ -102,6 +102,15 @@ func TestLowerExpressions(t *testing.T) {
 		{"const x = [\"a\": 1, \"b\": 2]\n", `(map StringLit "a": IntLit "1" StringLit "b": IntLit "2")`},
 		{"const x = []\n", `(collection)`},
 		{"const x = [[1], [2]]\n", `(list (list IntLit "1") (list IntLit "2"))`},
+		// Record literals: the typed form keeps its type name, the inferred form
+		// has none, and both carry their field initializers in source order.
+		{"const x = Point{ x: 1, y: 2 }\n", `(record Point x: IntLit "1" y: IntLit "2")`},
+		{"const x = { x: 1, y: 2 }\n", `(record x: IntLit "1" y: IntLit "2")`},
+		{"const x = Point{\n  x: 1\n  y: 2\n}\n", `(record Point x: IntLit "1" y: IntLit "2")`},
+		{"const x = Item{ pos: Point{ x: 1 } }\n", `(record Item pos: (record Point x: IntLit "1"))`},
+		{"const x = {}\n", `(record)`},
+		{"const x = Point{ x: }\n", `(record Point x: <missing>)`}, // recovered: value absent
+		{"const x = [{ a: 1 }]\n", `(list (record a: IntLit "1"))`},
 	}
 	for _, tc := range cases {
 		if got := valueLine(t, tc.src); got != tc.want {
@@ -412,6 +421,10 @@ func TestRenderRoundTrip(t *testing.T) {
 		"fn(x: int): int { return x }",
 		"self",
 		"null",
+		"Point{ x: 1, y: 2 }",
+		"{ x: 1, y: 2 }",
+		"Item{ pos: Point{ x: 0 } }",
+		"{}",
 	}
 	for _, expr := range cases {
 		src := "const x = " + expr + "\n"

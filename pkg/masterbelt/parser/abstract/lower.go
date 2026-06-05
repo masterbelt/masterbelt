@@ -218,7 +218,7 @@ func lowerInitializer(t cst.Tree, buf source.Buffer) ast.Expr {
 // isExprKind reports whether a CST node kind is an expression node.
 func isExprKind(k cst.Kind) bool {
 	switch k {
-	case cst.Literal, cst.NameRef, cst.SelfExpr, cst.UnaryExpr, cst.BinaryExpr, cst.CallExpr, cst.MemberExpr, cst.CollectionLit, cst.FuncLit, cst.ParenExpr:
+	case cst.Literal, cst.NameRef, cst.SelfExpr, cst.UnaryExpr, cst.BinaryExpr, cst.CallExpr, cst.MemberExpr, cst.CollectionLit, cst.RecordLit, cst.FuncLit, cst.ParenExpr:
 		return true
 	default:
 		return false
@@ -238,6 +238,8 @@ func lowerExpr(t cst.Tree, buf source.Buffer) ast.Expr {
 		return lowerLiteral(t, buf, node)
 	case cst.CollectionLit:
 		return lowerCollectionLit(t, buf, node)
+	case cst.RecordLit:
+		return lowerRecordLit(t, buf, node)
 	case cst.NameRef:
 		return ast.NewIdentifier(t.Text(buf), node)
 	case cst.SelfExpr:
@@ -425,6 +427,47 @@ func lowerMapEntry(t cst.Tree, buf source.Buffer) *ast.CollectionEntry {
 		entry.Value = exprs[1]
 	}
 	return entry
+}
+
+// lowerRecordLit lowers a RecordLit node to an ast.RecordLit: the optional
+// leading type name (the typed form Point{...}; "" for the inferred form
+// {...}) and the field initializers. The only direct Ident token child is the
+// type name — the field names are nested in the RecordField nodes.
+func lowerRecordLit(t cst.Tree, buf source.Buffer, node *cst.Node) ast.Expr {
+	var typeName string
+	var fields []*ast.FieldInit
+	for _, child := range t.Children() {
+		if tok, ok := child.Token(); ok {
+			if tok.Kind() == token.Ident {
+				typeName = child.Text(buf)
+			}
+			continue
+		}
+		if n, ok := child.Node(); ok && n.Kind() == cst.RecordField {
+			fields = append(fields, lowerRecordField(child, buf))
+		}
+	}
+	return ast.NewRecordLit(typeName, fields, node)
+}
+
+// lowerRecordField lowers one field initializer: its name and value, the value
+// nil when the source omitted it (a recovered "x:").
+func lowerRecordField(t cst.Tree, buf source.Buffer) *ast.FieldInit {
+	green, _ := t.Node()
+	var name string
+	var value ast.Expr
+	for _, child := range t.Children() {
+		if tok, ok := child.Token(); ok {
+			if tok.Kind() == token.Ident && name == "" {
+				name = child.Text(buf)
+			}
+			continue
+		}
+		if n, ok := child.Node(); ok && isExprKind(n.Kind()) {
+			value = lowerExpr(child, buf)
+		}
+	}
+	return ast.NewFieldInit(name, value, green)
 }
 
 // lowerMemberExpr lowers an explicit member access, receiver.member, to an
