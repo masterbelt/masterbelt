@@ -1,0 +1,31 @@
+Module
+  Const "Origin"
+    type Point
+    value Point{x: IntLiteral "0", y: IntLiteral "0"}
+    eval { x: 0, y: 0 }
+  Const "P"
+    type Point
+    value {x: IntLiteral "1", y: IntLiteral "2"}
+    eval { x: 1, y: 2 }
+  Const "Q"
+    type Point
+    value Point{x: IntLiteral "3", y: IntLiteral "4"}
+    eval { x: 3, y: 4 }
+  Const "Sword"
+    type Item
+    value Item{id: IntLiteral "1", name: StringLiteral "Sword", pos: Point{x: IntLiteral "0", y: IntLiteral "0"}}
+    eval { id: 1, name: "Sword", pos: { x: 0, y: 0 } }
+  Const "Path"
+    type list<Point>
+    value [{x: IntLiteral "0", y: IntLiteral "0"}, Point{x: IntLiteral "1", y: IntLiteral "1"}]
+    eval [{ x: 0, y: 0 }, { x: 1, y: 1 }]
+  Const "U"
+    type Unit
+    value {}
+    eval {}
+  TypeDef "Point" pub
+    body { x: int, y: int }
+  TypeDef "Item" pub
+    body { id: int, name: string, pos: Point }
+  TypeDef "Unit" pub
+    body {  }

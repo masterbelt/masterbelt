@@ -153,6 +153,13 @@ func dumpValue(v Value) string {
 			}
 		}
 		return "[" + strings.Join(parts, ", ") + "]"
+	case *RecordValue:
+		// TypeName{f: v, ...} for the typed form, {f: v, ...} for the inferred.
+		parts := make([]string, len(x.Fields))
+		for i, f := range x.Fields {
+			parts[i] = f.Name + ": " + dumpValue(f.Value)
+		}
+		return x.TypeName + "{" + strings.Join(parts, ", ") + "}"
 	case *Reference:
 		name := "<unresolved>"
 		if x.Target != nil {

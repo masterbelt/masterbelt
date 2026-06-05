@@ -165,6 +165,12 @@ func forEachExpr(file *ast.File, fn func(ast.Expr)) {
 					walkExpr(entry.Value)
 				}
 			}
+		case *ast.RecordLit:
+			for _, f := range e.Fields {
+				if f.Value != nil {
+					walkExpr(f.Value)
+				}
+			}
 		}
 	}
 

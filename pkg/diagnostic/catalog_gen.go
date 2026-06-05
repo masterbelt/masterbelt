@@ -263,12 +263,28 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "function literal has " + f["actual"].String() + " parameters; " + f["expected"].String() + " expected"
 		}
 	},
+	"masterbelt.semantic.missing_field": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return f["typ"].String() + " のレコードリテラルにフィールド " + f["field"].String() + " がありません"
+		default:
+			return "record literal of " + f["typ"].String() + " is missing field " + f["field"].String()
+		}
+	},
 	"masterbelt.semantic.no_matching_overload": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "メソッド " + f["method"].String() + " のどのオーバーロードも " + f["types"].String() + " に適合しません"
 		default:
 			return "no overload of method " + f["method"].String() + " accepts " + f["types"].String()
+		}
+	},
+	"masterbelt.semantic.not_a_record": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return f["typ"].String() + " はレコード型ではありません"
+		default:
+			return f["typ"].String() + " is not a record type"
 		}
 	},
 	"masterbelt.semantic.not_exported": func(loc Locale, f map[string]fmt.Stringer) string {
@@ -335,12 +351,28 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "cannot infer the type of parameter " + f["name"].String() + "; annotate it"
 		}
 	},
+	"masterbelt.semantic.uninferable_record": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "このレコードリテラルの型を推論できません。型名を付けるか型注釈を付けてください"
+		default:
+			return "cannot infer the type of this record literal; name its type or annotate it"
+		}
+	},
 	"masterbelt.semantic.uninferable_result": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "この関数リテラルの結果型を推論できません。注釈を付けるか値を返してください"
 		default:
 			return "cannot infer this function literal's result type; annotate it or return a value"
+		}
+	},
+	"masterbelt.semantic.unknown_field": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return f["typ"].String() + " にフィールド " + f["field"].String() + " はありません"
+		default:
+			return f["typ"].String() + " has no field " + f["field"].String()
 		}
 	},
 	"masterbelt.semantic.unknown_member": func(loc Locale, f map[string]fmt.Stringer) string {

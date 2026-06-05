@@ -109,6 +109,8 @@ func evalExpr(e ast.Expr, ctx evalCtx) *ir.Constant {
 		return ctx.self
 	case *ast.CollectionLit:
 		return collection(e, ctx)
+	case *ast.RecordLit:
+		return record(e, ctx)
 	case *ast.FuncLit:
 		// A function literal folds to a closure over the bindings in scope, so it
 		// can be applied later (by list.map) or stored in a constant.
@@ -163,6 +165,25 @@ func collection(e *ast.CollectionLit, ctx evalCtx) *ir.Constant {
 		entries = append(entries, ir.ConstEntry{Key: key, Value: val})
 	}
 	return ir.CollectionConstant(entries)
+}
+
+// record folds a record literal: each field's value is folded in source order,
+// and the constant normalizes the fields to their canonical (name) order. It
+// returns nil if any field is malformed or unevaluated, so a record with an
+// unfoldable field does not fold to a partial value.
+func record(e *ast.RecordLit, ctx evalCtx) *ir.Constant {
+	fields := make([]ir.ConstField, 0, len(e.Fields))
+	for _, f := range e.Fields {
+		if f.Name == "" {
+			return nil // recovered away; already a parse diagnostic
+		}
+		v := evalExpr(f.Value, ctx)
+		if v == nil {
+			return nil
+		}
+		fields = append(fields, ir.ConstField{Name: f.Name, Value: v})
+	}
+	return ir.RecordConstant(fields)
 }
 
 // call evaluates a method call: a collection receiver is handled here (the only

@@ -47,6 +47,8 @@ const (
 	SelfExpr                  // the "self" receiver inside a method body
 	CollectionLit             // a list or map literal: "[" ( Expr | MapEntry )* "]"
 	MapEntry                  // one map-literal entry: Expr ":" Expr
+	RecordLit                 // a record literal: [Ident] "{" RecordField* "}"
+	RecordField               // one record-literal field initializer: Ident ":" Expr
 	FuncLit                   // a function literal: fn ParamList ":" TypeExpr Block
 	ParenExpr                 // a parenthesized grouping: "(" Expr ")"
 
@@ -96,6 +98,8 @@ var kindNames = [...]string{
 	SelfExpr:      "SelfExpr",
 	CollectionLit: "CollectionLit",
 	MapEntry:      "MapEntry",
+	RecordLit:     "RecordLit",
+	RecordField:   "RecordField",
 	FuncLit:       "FuncLit",
 	ParenExpr:     "ParenExpr",
 	TypeDecl:      "TypeDecl",

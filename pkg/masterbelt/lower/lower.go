@@ -55,6 +55,12 @@ func Value(e ast.Expr, b Binder) ir.Value {
 			entries[i] = ir.CollectionEntry{Key: key, Value: Value(entry.Value, b)}
 		}
 		return &ir.CollectionLiteral{Entries: entries}
+	case *ast.RecordLit:
+		fields := make([]ir.RecordField, len(e.Fields))
+		for i, f := range e.Fields {
+			fields[i] = ir.RecordField{Name: f.Name, Value: Value(f.Value, b)}
+		}
+		return &ir.RecordValue{TypeName: e.TypeName, Fields: fields}
 	case *ast.CallExpr:
 		// A call through a member access is a method call; any other callee is a
 		// context-specific form (a conversion in a method body, otherwise nothing).

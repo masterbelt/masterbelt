@@ -183,6 +183,13 @@ func classifyToken(kind token.Kind, parent cst.Kind, calleeMember bool) (tokenTy
 		case cst.Field:
 			// A record field's declared name ({ id: int8 }).
 			return stProperty, smDeclaration, true
+		case cst.RecordField:
+			// A field initializer's name in a record literal (Point{ x: 1 })
+			// reads as the field it fills.
+			return stProperty, 0, true
+		case cst.RecordLit:
+			// The typed form's leading type name (Point{ ... }).
+			return stType, 0, true
 		case cst.MethodDecl:
 			// A method's declared name inside an impl block.
 			return stMethod, smDeclaration, true

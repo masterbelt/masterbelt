@@ -147,17 +147,24 @@ func (p *parser) parseCallArgs(children *[]cst.Green) {
 }
 
 // parseOperand parses an atom: a literal (integer, string, boolean, or null), a
-// collection literal ("[...]"), a NameRef, the self receiver, or a parenthesized
-// grouping. The cursor sits on the operand token — startsExpr gates every call
-// site, so the default arm is defensive and consumes nothing.
+// collection literal ("[...]"), a record literal ("Name{...}" or "{...}"), a
+// NameRef, the self receiver, or a parenthesized grouping. The cursor sits on
+// the operand token — startsExpr gates every call site, so the default arm is
+// defensive and consumes nothing.
 func (p *parser) parseOperand() cst.Green {
 	switch p.kind() {
 	case token.Int, token.String, token.DatetimeLit, token.DurationLit, token.True, token.False, token.Null:
 		return cst.NewNode(cst.Literal, []cst.Green{p.bump()})
 	case token.LBracket:
 		return p.parseCollectionLiteral()
+	case token.LBrace:
+		return p.parseRecordLit(nil) // the inferred form: "{" with no type name
 	case token.Ident:
-		return cst.NewNode(cst.NameRef, []cst.Green{p.bump()})
+		name := p.bump()
+		if p.peekSignificant() == token.LBrace {
+			return p.parseRecordLit([]cst.Green{name}) // the typed form: Name "{"
+		}
+		return cst.NewNode(cst.NameRef, []cst.Green{name})
 	case token.Self:
 		return cst.NewNode(cst.SelfExpr, []cst.Green{p.bump()})
 	case token.Fn:
@@ -168,6 +175,68 @@ func (p *parser) parseOperand() cst.Green {
 		p.report(newExpectedExpressionDiagnostic(p.lastStart, 0))
 		return cst.NewNode(cst.Error, nil)
 	}
+}
+
+// parseRecordLit parses a record literal's field block:
+//
+//	RecordLit   := [Ident] "{" ( RecordField [","] )* "}"
+//	RecordField := Ident ":" Expr
+//
+// children holds the already-consumed type name for the typed form (Point{...})
+// and is nil for the inferred form ({...}), whose type comes from the expected
+// type. Fields separate with commas and/or newlines — the comma after a field
+// is optional because a newline (trivia) separates just as well, mirroring the
+// record type. The cursor sits before "{" (on it, or on the trivia run ahead of
+// it for the typed form).
+func (p *parser) parseRecordLit(children []cst.Green) *cst.Node {
+	p.skipTrivia(&children)
+	children = append(children, p.bump()) // "{"
+	for {
+		switch p.peekSignificant() {
+		case token.RBrace:
+			p.skipTrivia(&children)
+			children = append(children, p.bump()) // "}"
+			return cst.NewNode(cst.RecordLit, children)
+		case token.EOF, token.Pub, token.Const, token.Type, token.Use, token.Assert:
+			// Unterminated: report the missing "}" and stop before the next
+			// declaration so recovery stays local. The diagnostic anchors at the
+			// last consumed token to stay inside this construct (see lastStart);
+			// the leaves are still lossless.
+			p.report(newUnexpectedTokenDiagnostic(p.lastStart, 0, p.peekSignificant().String()))
+			return cst.NewNode(cst.RecordLit, children)
+		case token.Ident:
+			p.skipTrivia(&children)
+			children = append(children, p.parseRecordField())
+			if p.peekSignificant() == token.Comma {
+				p.skipTrivia(&children)
+				children = append(children, p.bump()) // ","
+			}
+		default:
+			p.skipTrivia(&children)
+			p.report(newUnexpectedTokenDiagnostic(p.cur().Offset, p.cur().Width, p.kind().String()))
+			children = append(children, p.bump())
+		}
+	}
+}
+
+// parseRecordField parses one field initializer: Ident ":" Expr. A missing ":"
+// or value is reported, leaving the field with what was parsed so recovery is
+// local and the closing "}" is not swallowed. The cursor sits on the field name.
+func (p *parser) parseRecordField() *cst.Node {
+	children := []cst.Green{p.bump()} // the field name
+	if p.peekSignificant() != token.Colon {
+		p.report(newUnexpectedTokenDiagnostic(p.cur().Offset, p.cur().Width, p.kind().String()))
+		return cst.NewNode(cst.RecordField, children)
+	}
+	p.skipTrivia(&children)
+	children = append(children, p.bump()) // ":"
+	if startsExpr(p.peekSignificant()) {
+		p.skipTrivia(&children)
+		children = append(children, p.parseExpr(precLowest))
+	} else {
+		p.report(newExpectedExpressionDiagnostic(p.lastStart, 0))
+	}
+	return cst.NewNode(cst.RecordField, children)
 }
 
 // parseParenExpr parses a parenthesized grouping: "(" Expr ")". The node exists
@@ -374,7 +443,8 @@ func startsExpr(kind token.Kind) bool {
 	switch kind {
 	case token.Int, token.String, token.DatetimeLit, token.DurationLit,
 		token.Ident, token.True, token.False, token.Null, token.Self,
-		token.LBracket, token.Plus, token.Minus, token.Bang, token.Fn, token.LParen:
+		token.LBracket, token.LBrace, token.Plus, token.Minus, token.Bang,
+		token.Fn, token.LParen:
 		return true
 	default:
 		return false

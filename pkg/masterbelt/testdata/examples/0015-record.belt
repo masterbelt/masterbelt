@@ -1,0 +1,28 @@
+// Record literals: the typed form names its record type, the inferred
+// form takes it from the expected type. Fields separate with commas
+// and/or newlines.
+
+pub type Point = { x: int, y: int }
+
+// Typed (single line, commas).
+const Origin = Point{ x: 0, y: 0 }
+
+// Inferred from the annotation's expected type.
+const P: Point = { x: 1, y: 2 }
+
+// Newline-separated fields.
+const Q = Point{
+  x: 3
+  y: 4
+}
+
+// Nested records compose with other literals.
+pub type Item = { id: int, name: string, pos: Point }
+const Sword = Item{ id: 1, name: "Sword", pos: Point{ x: 0, y: 0 } }
+
+// The expected type pushes down into collection elements.
+const Path: list<Point> = [{ x: 0, y: 0 }, Point{ x: 1, y: 1 }]
+
+// An empty literal takes its type from the annotation.
+pub type Unit = {}
+const U: Unit = {}

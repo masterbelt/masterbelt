@@ -1,0 +1,335 @@
+# tree
+File
+  TypeDecl
+    LineComment "// Record literals: the typed form names its record type, the inferred"
+    Newline "\n"
+    LineComment "// form takes it from the expected type. Fields separate with commas"
+    Newline "\n"
+    LineComment "// and/or newlines."
+    Newline "\n"
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Type "type"
+    Whitespace " "
+    Ident "Point"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    RecordType
+      LBrace "{"
+      Whitespace " "
+      Field
+        Ident "x"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "int"
+      Comma ","
+      Whitespace " "
+      Field
+        Ident "y"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "int"
+      Whitespace " "
+      RBrace "}"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// Typed (single line, commas)."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Origin"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      RecordLit
+        Ident "Point"
+        LBrace "{"
+        Whitespace " "
+        RecordField
+          Ident "x"
+          Colon ":"
+          Whitespace " "
+          Literal
+            Int "0"
+        Comma ","
+        Whitespace " "
+        RecordField
+          Ident "y"
+          Colon ":"
+          Whitespace " "
+          Literal
+            Int "0"
+        Whitespace " "
+        RBrace "}"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// Inferred from the annotation's expected type."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "P"
+    TypeClause
+      Colon ":"
+      Whitespace " "
+      TypeName
+        Ident "Point"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      RecordLit
+        LBrace "{"
+        Whitespace " "
+        RecordField
+          Ident "x"
+          Colon ":"
+          Whitespace " "
+          Literal
+            Int "1"
+        Comma ","
+        Whitespace " "
+        RecordField
+          Ident "y"
+          Colon ":"
+          Whitespace " "
+          Literal
+            Int "2"
+        Whitespace " "
+        RBrace "}"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// Newline-separated fields."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Q"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      RecordLit
+        Ident "Point"
+        LBrace "{"
+        Newline "\n"
+        Whitespace "  "
+        RecordField
+          Ident "x"
+          Colon ":"
+          Whitespace " "
+          Literal
+            Int "3"
+        Newline "\n"
+        Whitespace "  "
+        RecordField
+          Ident "y"
+          Colon ":"
+          Whitespace " "
+          Literal
+            Int "4"
+        Newline "\n"
+        RBrace "}"
+  TypeDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// Nested records compose with other literals."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Type "type"
+    Whitespace " "
+    Ident "Item"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    RecordType
+      LBrace "{"
+      Whitespace " "
+      Field
+        Ident "id"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "int"
+      Comma ","
+      Whitespace " "
+      Field
+        Ident "name"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "string"
+      Comma ","
+      Whitespace " "
+      Field
+        Ident "pos"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "Point"
+      Whitespace " "
+      RBrace "}"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Sword"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      RecordLit
+        Ident "Item"
+        LBrace "{"
+        Whitespace " "
+        RecordField
+          Ident "id"
+          Colon ":"
+          Whitespace " "
+          Literal
+            Int "1"
+        Comma ","
+        Whitespace " "
+        RecordField
+          Ident "name"
+          Colon ":"
+          Whitespace " "
+          Literal
+            String "\"Sword\""
+        Comma ","
+        Whitespace " "
+        RecordField
+          Ident "pos"
+          Colon ":"
+          Whitespace " "
+          RecordLit
+            Ident "Point"
+            LBrace "{"
+            Whitespace " "
+            RecordField
+              Ident "x"
+              Colon ":"
+              Whitespace " "
+              Literal
+                Int "0"
+            Comma ","
+            Whitespace " "
+            RecordField
+              Ident "y"
+              Colon ":"
+              Whitespace " "
+              Literal
+                Int "0"
+            Whitespace " "
+            RBrace "}"
+        Whitespace " "
+        RBrace "}"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// The expected type pushes down into collection elements."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Path"
+    TypeClause
+      Colon ":"
+      Whitespace " "
+      TypeName
+        Ident "list"
+        GenericArgs
+          Lt "<"
+          TypeName
+            Ident "Point"
+          Gt ">"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CollectionLit
+        LBracket "["
+        RecordLit
+          LBrace "{"
+          Whitespace " "
+          RecordField
+            Ident "x"
+            Colon ":"
+            Whitespace " "
+            Literal
+              Int "0"
+          Comma ","
+          Whitespace " "
+          RecordField
+            Ident "y"
+            Colon ":"
+            Whitespace " "
+            Literal
+              Int "0"
+          Whitespace " "
+          RBrace "}"
+        Comma ","
+        Whitespace " "
+        RecordLit
+          Ident "Point"
+          LBrace "{"
+          Whitespace " "
+          RecordField
+            Ident "x"
+            Colon ":"
+            Whitespace " "
+            Literal
+              Int "1"
+          Comma ","
+          Whitespace " "
+          RecordField
+            Ident "y"
+            Colon ":"
+            Whitespace " "
+            Literal
+              Int "1"
+          Whitespace " "
+          RBrace "}"
+        RBracket "]"
+  TypeDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// An empty literal takes its type from the annotation."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Type "type"
+    Whitespace " "
+    Ident "Unit"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    RecordType
+      LBrace "{"
+      RBrace "}"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "U"
+    TypeClause
+      Colon ":"
+      Whitespace " "
+      TypeName
+        Ident "Unit"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      RecordLit
+        LBrace "{"
+        RBrace "}"
+  Newline "\n"
+  EOF ""
+# diagnostics

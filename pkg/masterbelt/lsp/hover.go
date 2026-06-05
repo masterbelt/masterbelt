@@ -41,6 +41,9 @@ func hover(doc view, offset int) *protocol.Hover {
 	if h := methodParamHover(doc, offset, trees); h != nil {
 		return h
 	}
+	if h := recordFieldHover(doc, offset); h != nil {
+		return h
+	}
 	if h := literalHover(doc, offset); h != nil {
 		return h
 	}

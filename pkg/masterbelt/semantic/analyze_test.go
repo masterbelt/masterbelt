@@ -993,3 +993,180 @@ func TestAssertFailedWithDoc(t *testing.T) {
 		t.Errorf("message = %q, want %q", diags[0].Message, want)
 	}
 }
+
+// --- record literals ----------------------------------------------------------
+
+const pointDecl = "pub type Point = { x: int, y: int }\n"
+
+func TestRecordLiteralTypedForm(t *testing.T) {
+	m, diags := analyze(pointDecl + "const O = Point{ x: 1, y: 2 }\n")
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if m.Consts[0].Type.String() != "Point" {
+		t.Errorf("O type = %s, want Point", m.Consts[0].Type)
+	}
+	named, ok := m.Consts[0].Type.(*ir.Named)
+	if !ok || named.Def != m.Types[0] {
+		t.Errorf("O's Named.Def = %v, want the module's Point definition", m.Consts[0].Type)
+	}
+	if got := m.Consts[0].Eval.String(); got != "{ x: 1, y: 2 }" {
+		t.Errorf("O eval = %s, want { x: 1, y: 2 }", got)
+	}
+}
+
+func TestRecordLiteralInferredForm(t *testing.T) {
+	// The annotation supplies the inferred form's type, exactly as it types an
+	// empty collection.
+	m, diags := analyze(pointDecl + "const P: Point = { x: 1, y: 2 }\n")
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if m.Consts[0].Type.String() != "Point" {
+		t.Errorf("P type = %s, want Point", m.Consts[0].Type)
+	}
+	if got := m.Consts[0].Eval.String(); got != "{ x: 1, y: 2 }" {
+		t.Errorf("P eval = %s, want { x: 1, y: 2 }", got)
+	}
+}
+
+func TestRecordLiteralEmpty(t *testing.T) {
+	m, diags := analyze("pub type Unit = {}\nconst U: Unit = {}\n")
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if got := m.Consts[0].Eval.String(); got != "{}" {
+		t.Errorf("U eval = %s, want {}", got)
+	}
+}
+
+func TestRecordLiteralNormalizesFieldOrder(t *testing.T) {
+	// The literal may write fields in any order; the folded constant is
+	// canonical, so the two spellings evaluate identically.
+	m, diags := analyze(pointDecl + "const A = Point{ y: 2, x: 1 }\nconst B = Point{ x: 1, y: 2 }\n")
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if a, b := m.Consts[0].Eval.String(), m.Consts[1].Eval.String(); a != b {
+		t.Errorf("evals differ: %s vs %s", a, b)
+	}
+}
+
+func TestRecordLiteralNested(t *testing.T) {
+	m, diags := analyze(pointDecl +
+		"pub type Item = { id: int, name: string, pos: Point }\n" +
+		"const Sword = Item{ id: 1, name: \"Sword\", pos: { x: 0, y: 0 } }\n")
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if got := m.Consts[0].Eval.String(); got != "{ id: 1, name: \"Sword\", pos: { x: 0, y: 0 } }" {
+		t.Errorf("Sword eval = %s", got)
+	}
+}
+
+func TestRecordLiteralDatetimeDurationFields(t *testing.T) {
+	m, diags := analyze("pub type Event = { at: datetime, cooldown: duration }\n" +
+		"const E = Event{ at: D2026-06-05T00:00:00.000Z, cooldown: 90m }\n")
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if got := m.Consts[0].Eval.String(); got != "{ at: D2026-06-05T00:00:00.000Z, cooldown: 1h30m }" {
+		t.Errorf("E eval = %s", got)
+	}
+}
+
+func TestRecordLiteralDiagnostics(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+		want diagnostic.Code
+	}{
+		{"missing field", pointDecl + "const A = Point{ x: 1 }\n", CodeMissingField},
+		{"unknown field", pointDecl + "const B = Point{ x: 1, y: 2, z: 3 }\n", CodeUnknownField},
+		{"missing field through annotation", pointDecl + "const C: Point = { x: 1 }\n", CodeMissingField},
+		{"no expectation", "const D = { x: 1, y: 2 }\n", CodeUninferableRecord},
+		{"unknown type name", "const E = Bogus{ x: 1 }\n", CodeUnknownType},
+		{"not a record", "pub type Coin = int8\nconst F = Coin{ x: 1 }\n", CodeNotARecord},
+		{"non-record expectation", "const G: int = { x: 1 }\n", CodeTypeMismatch},
+		{"wrong record type", pointDecl + "pub type Unit = {}\nconst H: Unit = Point{ x: 1, y: 2 }\n", CodeTypeMismatch},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, diags := analyze(tc.src)
+			if got := codes(diags); len(got) != 1 || got[0] != tc.want {
+				t.Fatalf("codes = %v, want [%s]", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestRecordLiteralMissingFieldsReportedEach(t *testing.T) {
+	_, diags := analyze(pointDecl + "const A = Point{}\n")
+	got := codes(diags)
+	if len(got) != 2 || got[0] != CodeMissingField || got[1] != CodeMissingField {
+		t.Fatalf("codes = %v, want two missing_field", got)
+	}
+}
+
+func TestRecordFieldRangeChecked(t *testing.T) {
+	// A field value adapts to the field's declared type and is range-checked
+	// against it — with and without an annotation on the constant.
+	for _, src := range []string{
+		"pub type B = { v: int8 }\nconst X = B{ v: 1000 }\n",
+		"pub type B = { v: int8 }\nconst X: B = { v: 1000 }\n",
+	} {
+		_, diags := analyze(src)
+		if got := codes(diags); len(got) != 1 || got[0] != CodeConstantOverflow {
+			t.Fatalf("%q: codes = %v, want [constant_overflow]", src, got)
+		}
+	}
+}
+
+func TestRecordFieldTypeMismatch(t *testing.T) {
+	_, diags := analyze(pointDecl + "const A = Point{ x: \"a\", y: 2 }\n")
+	if got := codes(diags); len(got) != 1 || got[0] != CodeTypeMismatch {
+		t.Fatalf("codes = %v, want [type_mismatch]", got)
+	}
+}
+
+func TestRecordExpectationReachesCollectionElements(t *testing.T) {
+	// The annotation's element type reaches each element, so an inferred
+	// record literal works inside a list.
+	m, diags := analyze(pointDecl + "const Path: list<Point> = [{ x: 0, y: 0 }, Point{ x: 1, y: 1 }]\n")
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if got := m.Consts[0].Eval.String(); got != "[{ x: 0, y: 0 }, { x: 1, y: 1 }]" {
+		t.Errorf("Path eval = %s", got)
+	}
+}
+
+func TestRecordAnnotationFailureSuppressesUninferable(t *testing.T) {
+	// The broken annotation is the problem; had it resolved it would have
+	// typed the literal, so only unknown_type reports.
+	_, diags := analyze("const X: Bogus = { x: 1 }\n")
+	if got := codes(diags); len(got) != 1 || got[0] != CodeUnknownType {
+		t.Fatalf("codes = %v, want [unknown_type]", got)
+	}
+}
+
+func TestRecordLiteralInMethodBodyReturn(t *testing.T) {
+	// The method's declared result type reaches an inferred record literal in
+	// a return, through the same checking walk the const path uses.
+	_, diags := analyze("pub type Point = { x: int, y: int } impl {\n" +
+		"  pub origin(): Point {\n    return { x: 0, y: 0 }\n  }\n}\n")
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+}
+
+func TestRecordLiteralStructuralAnnotation(t *testing.T) {
+	// A structural record annotation works exactly like a named one.
+	m, diags := analyze("const P: { x: int, y: int } = { x: 1, y: 2 }\n")
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if got := m.Consts[0].Eval.String(); got != "{ x: 1, y: 2 }" {
+		t.Errorf("P eval = %s", got)
+	}
+}

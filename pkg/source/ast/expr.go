@@ -129,6 +129,41 @@ type CollectionEntry struct {
 	Value Expr
 }
 
+// RecordLit is a record literal: the value form of a record type. The typed
+// form names the type it builds (Point{ x: 1 }, TypeName "Point"); the
+// inferred form ({ x: 1 }, TypeName "") leaves the type to the checking
+// context, exactly as an empty collection takes its kind from the annotation.
+type RecordLit struct {
+	TypeName string       // the named record type, or "" for the inferred form
+	Fields   []*FieldInit // the field initializers, in source order
+	syntax   *cst.Node
+}
+
+func (l *RecordLit) Syntax() *cst.Node { return l.syntax }
+func (l *RecordLit) node()             {}
+func (l *RecordLit) expr()             {}
+
+// NewRecordLit builds a RecordLit node.
+func NewRecordLit(typeName string, fields []*FieldInit, syntax *cst.Node) *RecordLit {
+	return &RecordLit{TypeName: typeName, Fields: fields, syntax: syntax}
+}
+
+// FieldInit is one field initializer of a record literal: a name and its
+// value. Value is nil when the source was malformed and the parser recovered.
+type FieldInit struct {
+	Name   string
+	Value  Expr
+	syntax *cst.Node
+}
+
+func (f *FieldInit) Syntax() *cst.Node { return f.syntax }
+func (f *FieldInit) node()             {}
+
+// NewFieldInit builds a FieldInit node.
+func NewFieldInit(name string, value Expr, syntax *cst.Node) *FieldInit {
+	return &FieldInit{Name: name, Value: value, syntax: syntax}
+}
+
 // NullLit is the null literal.
 type NullLit struct {
 	syntax *cst.Node
@@ -261,6 +296,14 @@ func WalkExprs(e Expr, fn func(Expr) bool) {
 			}
 			if entry.Value != nil {
 				WalkExprs(entry.Value, fn)
+			}
+		}
+	case *RecordLit:
+		// Only the field values are expressions; the field names name the
+		// record's fields, and the type name names a type, not a value.
+		for _, field := range e.Fields {
+			if field.Value != nil {
+				WalkExprs(field.Value, fn)
 			}
 		}
 	}

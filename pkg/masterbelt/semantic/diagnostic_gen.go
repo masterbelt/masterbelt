@@ -22,7 +22,9 @@ const (
 	CodeDuplicateOverload     diagnostic.Code = "masterbelt.semantic.duplicate_overload"
 	CodeInvalidOperation      diagnostic.Code = "masterbelt.semantic.invalid_operation"
 	CodeLambdaArityMismatch   diagnostic.Code = "masterbelt.semantic.lambda_arity_mismatch"
+	CodeMissingField          diagnostic.Code = "masterbelt.semantic.missing_field"
 	CodeNoMatchingOverload    diagnostic.Code = "masterbelt.semantic.no_matching_overload"
+	CodeNotARecord            diagnostic.Code = "masterbelt.semantic.not_a_record"
 	CodeNotExported           diagnostic.Code = "masterbelt.semantic.not_exported"
 	CodeRefinementNotBool     diagnostic.Code = "masterbelt.semantic.refinement_not_bool"
 	CodeRefinementNotConstant diagnostic.Code = "masterbelt.semantic.refinement_not_constant"
@@ -31,7 +33,9 @@ const (
 	CodeUndefinedName         diagnostic.Code = "masterbelt.semantic.undefined_name"
 	CodeUninferableCollection diagnostic.Code = "masterbelt.semantic.uninferable_collection"
 	CodeUninferableParameter  diagnostic.Code = "masterbelt.semantic.uninferable_parameter"
+	CodeUninferableRecord     diagnostic.Code = "masterbelt.semantic.uninferable_record"
 	CodeUninferableResult     diagnostic.Code = "masterbelt.semantic.uninferable_result"
+	CodeUnknownField          diagnostic.Code = "masterbelt.semantic.unknown_field"
 	CodeUnknownMember         diagnostic.Code = "masterbelt.semantic.unknown_member"
 	CodeUnknownType           diagnostic.Code = "masterbelt.semantic.unknown_type"
 	CodeUseNotFound           diagnostic.Code = "masterbelt.semantic.use_not_found"
@@ -220,6 +224,21 @@ func newLambdaArityMismatchDiagnostic(offset int, width int, actual int, expecte
 	}
 }
 
+func newMissingFieldDiagnostic(offset int, width int, field string, typ string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"field": diagnostic.Str(field),
+		"typ":   diagnostic.Str(typ),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeMissingField,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeMissingField, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
 func newNoMatchingOverloadDiagnostic(offset int, width int, method string, types string) diagnostic.Diagnostic {
 	fields := map[string]fmt.Stringer{
 		"method": diagnostic.Str(method),
@@ -229,6 +248,20 @@ func newNoMatchingOverloadDiagnostic(offset int, width int, method string, types
 		Severity: diagnostic.Error,
 		Code:     CodeNoMatchingOverload,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeNoMatchingOverload, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newNotARecordDiagnostic(offset int, width int, typ string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"typ": diagnostic.Str(typ),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeNotARecord,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeNotARecord, fields),
 		Fields:   fields,
 		Offset:   offset,
 		Width:    width,
@@ -346,12 +379,38 @@ func newUninferableParameterDiagnostic(offset int, width int, name string) diagn
 	}
 }
 
+func newUninferableRecordDiagnostic(offset int, width int) diagnostic.Diagnostic {
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeUninferableRecord,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeUninferableRecord, nil),
+		Fields:   nil,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
 func newUninferableResultDiagnostic(offset int, width int) diagnostic.Diagnostic {
 	return diagnostic.Diagnostic{
 		Severity: diagnostic.Error,
 		Code:     CodeUninferableResult,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeUninferableResult, nil),
 		Fields:   nil,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newUnknownFieldDiagnostic(offset int, width int, field string, typ string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"field": diagnostic.Str(field),
+		"typ":   diagnostic.Str(typ),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeUnknownField,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeUnknownField, fields),
+		Fields:   fields,
 		Offset:   offset,
 		Width:    width,
 	}

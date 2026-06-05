@@ -2,6 +2,7 @@ package ir
 
 import (
 	"math/big"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -20,6 +21,7 @@ const (
 	ConstFunc                        // a function value (Constant.Fn / Constant.Captured)
 	ConstDatetime                    // a UTC instant in epoch milliseconds (Constant.Millis)
 	ConstDuration                    // a span of time in milliseconds (Constant.Millis)
+	ConstRecord                      // a record value (Constant.Fields)
 )
 
 // Constant is the evaluated value of a constant expression: an arbitrary-
@@ -33,6 +35,7 @@ type Constant struct {
 	Bool   bool         // valid when Kind == ConstBool
 	Str    string       // valid when Kind == ConstString
 	Coll   []ConstEntry // valid when Kind == ConstCollection
+	Fields []ConstField // valid when Kind == ConstRecord, in canonical (name) order
 	Millis int64        // valid when Kind == ConstDatetime (UTC epoch) or ConstDuration (total)
 
 	// valid when Kind == ConstFunc: the function literal and the values it
@@ -45,6 +48,12 @@ type Constant struct {
 // map entry a Key (nil for a list element).
 type ConstEntry struct {
 	Key   *Constant // nil for a list element
+	Value *Constant
+}
+
+// ConstField is one field of a folded record constant: its name and value.
+type ConstField struct {
+	Name  string
 	Value *Constant
 }
 
@@ -61,6 +70,25 @@ func StringConstant(s string) *Constant { return &Constant{Kind: ConstString, St
 // slice is the empty list/map; a list's entries have a nil Key.
 func CollectionConstant(entries []ConstEntry) *Constant {
 	return &Constant{Kind: ConstCollection, Coll: entries}
+}
+
+// RecordConstant builds a record constant from its fields, normalizing to the
+// canonical order — sorted by field name, a duplicate name keeping the last
+// value — so two records with the same fields render identically regardless of
+// the order the literal wrote them in.
+func RecordConstant(fields []ConstField) *Constant {
+	canon := make([]ConstField, 0, len(fields))
+	index := make(map[string]int, len(fields))
+	for _, f := range fields {
+		if i, ok := index[f.Name]; ok {
+			canon[i] = f // a duplicate initializer: the last value wins
+			continue
+		}
+		index[f.Name] = len(canon)
+		canon = append(canon, f)
+	}
+	sort.Slice(canon, func(i, j int) bool { return canon[i].Name < canon[j].Name })
+	return &Constant{Kind: ConstRecord, Fields: canon}
 }
 
 // FuncConstant builds a function-value constant from a function literal and the
@@ -82,10 +110,11 @@ func DurationConstant(millis int64) *Constant {
 }
 
 // String renders the constant's value: the integer, "true"/"false", the quoted
-// string, the bracketed collection ([a, b] for a list, ["k": v] for a map), or
-// the canonical datetime/duration form — the UTC instant regardless of the
-// offset written, and the largest-units-first decomposition regardless of the
-// groups written (90m evaluates as 1h30m).
+// string, the bracketed collection ([a, b] for a list, ["k": v] for a map),
+// the braced record ({ x: 1, y: 2 }, fields in canonical order), or the
+// canonical datetime/duration form — the UTC instant regardless of the offset
+// written, and the largest-units-first decomposition regardless of the groups
+// written (90m evaluates as 1h30m).
 func (c *Constant) String() string {
 	if c == nil {
 		return "<unevaluated>"
@@ -107,6 +136,15 @@ func (c *Constant) String() string {
 			}
 		}
 		return "[" + strings.Join(parts, ", ") + "]"
+	case ConstRecord:
+		if len(c.Fields) == 0 {
+			return "{}"
+		}
+		parts := make([]string, len(c.Fields))
+		for i, f := range c.Fields {
+			parts[i] = f.Name + ": " + f.Value.String()
+		}
+		return "{ " + strings.Join(parts, ", ") + " }"
 	case ConstDatetime:
 		return "D" + time.UnixMilli(c.Millis).UTC().Format("2006-01-02T15:04:05.000Z07:00")
 	case ConstDuration:
