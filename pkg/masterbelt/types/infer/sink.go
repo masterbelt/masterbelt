@@ -78,6 +78,18 @@ type Sink struct {
 	// parts combined. It is informational (the editor's hover and inlay hints
 	// read it), never a finding.
 	SolvedFuncLit func(lit *ast.FuncLit, t *ir.Func)
+	// BoundNotSatisfied fires at a generic-function call whose solved concrete
+	// type for a type parameter does not implement the parameter's interface
+	// bound (E-17): the argument's type carries no opt-in impl of the bound.
+	BoundNotSatisfied func(call *ast.CallExpr, typ, bound ir.Type)
+	// UninferableTypeParam fires at a generic-function call from which a type
+	// parameter cannot be solved — no argument pins it (fn h<T>(): T) — so the
+	// call has no concrete type to fold with.
+	UninferableTypeParam func(call *ast.CallExpr, name string)
+	// NoMethodOnUnboundedTypeVar fires at a method call whose receiver is an
+	// unbounded type parameter: nothing is known about the type, so it has no
+	// methods — only pass-through (receive, store, return) is allowed.
+	NoMethodOnUnboundedTypeVar func(node ast.Node, method string)
 }
 
 func (s *Sink) invalidOp(node ast.Node, method, operands string) {
@@ -191,5 +203,23 @@ func (s *Sink) notARecord(lit *ast.RecordLit, typ ir.Type) {
 func (s *Sink) solvedFuncLit(lit *ast.FuncLit, t *ir.Func) {
 	if s != nil && s.SolvedFuncLit != nil {
 		s.SolvedFuncLit(lit, t)
+	}
+}
+
+func (s *Sink) boundNotSatisfied(call *ast.CallExpr, typ, bound ir.Type) {
+	if s != nil && s.BoundNotSatisfied != nil {
+		s.BoundNotSatisfied(call, typ, bound)
+	}
+}
+
+func (s *Sink) uninferableTypeParam(call *ast.CallExpr, name string) {
+	if s != nil && s.UninferableTypeParam != nil {
+		s.UninferableTypeParam(call, name)
+	}
+}
+
+func (s *Sink) noMethodOnUnboundedTypeVar(node ast.Node, method string) {
+	if s != nil && s.NoMethodOnUnboundedTypeVar != nil {
+		s.NoMethodOnUnboundedTypeVar(node, method)
 	}
 }

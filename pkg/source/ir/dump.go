@@ -46,6 +46,13 @@ func dumpFunction(b *strings.Builder, f *Function) {
 	if len(f.Effects) > 0 {
 		fmt.Fprintf(b, "    effects %s\n", strings.Join(f.Effects, " "))
 	}
+	for _, p := range f.TypeParams {
+		if p.Bound != nil {
+			fmt.Fprintf(b, "    typeparam %q: %s\n", p.Name, p.Bound)
+		} else {
+			fmt.Fprintf(b, "    typeparam %q\n", p.Name)
+		}
+	}
 	for _, p := range f.Params {
 		fmt.Fprintf(b, "    param %s: %s\n", p.Name, typeString(p.Type))
 	}

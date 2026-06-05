@@ -283,11 +283,16 @@ func checkFuncBodies(reg *builtin.Registry, file *ast.File, universe map[string]
 		diags.Add(newSelfOutsideMethodDiagnostic(s.offset, s.width))
 	}
 	for _, fd := range file.Funcs {
+		// The function's generic type parameters are in scope for its parameter
+		// and result annotations, so a `c: T` where `T: foldable<int>` resolves
+		// to a bounded TypeVar — the body may then call the bound interface's
+		// methods on it, and nothing else.
+		tscope := infer.FuncTypeParamScope(fd.TypeParams)
 		params := make(map[string]ir.Type, len(fd.Params))
 		for _, p := range fd.Params {
-			params[p.Name] = r.ResolveType(p.Type, nil)
+			params[p.Name] = r.ResolveType(p.Type, tscope)
 		}
-		want := r.ResolveType(fd.Result, nil)
+		want := r.ResolveType(fd.Result, tscope)
 		bs := infer.BodyScope{Reg: reg, Universe: universe, Qualified: qualified, Self: ir.Invalid, Params: params, Funcs: funcs, QualifiedFuncs: qualifiedFuncs}
 		checkStmts(fd.Body, want, bs, env, noSelf, sink, at, diags)
 		checkIndexWrites(fd.Body, env, at, diags)

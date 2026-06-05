@@ -34,12 +34,13 @@ func unary(recv ast.Expr, method string) *ast.CallExpr {
 type stubEnv struct {
 	res map[*ast.Identifier]*ast.ConstDecl
 	typ map[*ast.ConstDecl]ir.Type
+	fns map[string][]*ast.FuncDecl // top-level functions by name, or nil
 	reg *builtin.Registry
 }
 
 func (e stubEnv) Resolve(id *ast.Identifier) *ast.ConstDecl           { return e.res[id] }
 func (e stubEnv) ResolveMember(m *ast.MemberExpr) *ast.ConstDecl      { return nil }
-func (e stubEnv) ResolveFunc(id *ast.Identifier) []*ast.FuncDecl      { return nil }
+func (e stubEnv) ResolveFunc(id *ast.Identifier) []*ast.FuncDecl      { return e.fns[id.Name] }
 func (e stubEnv) ResolveFuncMember(m *ast.MemberExpr) []*ast.FuncDecl { return nil }
 func (e stubEnv) TypeOf(decl *ast.ConstDecl) ir.Type                  { return e.typ[decl] }
 
@@ -262,12 +263,15 @@ func mapT(t *testing.T, env stubEnv, key, value ir.Type) ir.Type {
 // report collects the findings Check sinks, for asserting both count and
 // detail.
 type report struct {
-	methods           []string
-	operands          []string
-	mismatches        []string // rendered "got -> want"
-	arities           []string // rendered "got of want"
-	uninferableParams []string // parameter names
-	uninferables      int      // uninferable results
+	methods            []string
+	operands           []string
+	mismatches         []string // rendered "got -> want"
+	arities            []string // rendered "got of want"
+	uninferableParams  []string // parameter names
+	uninferables       int      // uninferable results
+	boundsNotSatisfied []string // rendered "typ -> bound"
+	uninferableTypeVar []string // type-parameter names
+	unboundedMethods   []string // method names called on an unbounded type var
 }
 
 func (r *report) sink() *Sink {
@@ -286,5 +290,14 @@ func (r *report) sink() *Sink {
 			r.uninferableParams = append(r.uninferableParams, p.Name)
 		},
 		UninferableResult: func(*ast.FuncLit) { r.uninferables++ },
+		BoundNotSatisfied: func(_ *ast.CallExpr, typ, bound ir.Type) {
+			r.boundsNotSatisfied = append(r.boundsNotSatisfied, typ.String()+" -> "+bound.String())
+		},
+		UninferableTypeParam: func(_ *ast.CallExpr, name string) {
+			r.uninferableTypeVar = append(r.uninferableTypeVar, name)
+		},
+		NoMethodOnUnboundedTypeVar: func(_ ast.Node, method string) {
+			r.unboundedMethods = append(r.unboundedMethods, method)
+		},
 	}
 }

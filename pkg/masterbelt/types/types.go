@@ -220,8 +220,14 @@ func Candidates(reg *builtin.Registry, recv ir.Type, method string) ([]*ir.Metho
 }
 
 // receiverSubst is the substitution a receiver's type arguments pin: a
-// list<int> receiver binds the element parameter T = int.
+// list<int> receiver binds the element parameter T = int. A bounded generic
+// type parameter pins the bound interface's parameters from the bound's
+// arguments — a receiver typed T where T: foldable<int, int> binds the
+// interface's K = int, V = int, so fold's signature reads against them.
 func receiverSubst(recv ir.Type) map[string]ir.Type {
+	if v, ok := recv.(*ir.TypeVar); ok && v.Bound != nil {
+		return receiverSubst(v.Bound)
+	}
 	subst := map[string]ir.Type{}
 	if app, ok := recv.(*ir.App); ok && app.Def != nil && len(app.Args) == len(app.Def.Params) {
 		for i, p := range app.Def.Params {
@@ -422,8 +428,67 @@ func Match(reg *builtin.Registry, pattern, arg ir.Type, subst map[string]ir.Type
 	}
 }
 
+// Satisfies reports whether the concrete type typ satisfies the interface bound
+// — the nominal-satisfaction rule of E-16/E-17: typ's definition must opt into
+// the bound's interface at its own definition site (an entry in its Impls), and
+// the impl's type arguments must agree with the bound's. A bound that is not an
+// interface, or a type with no matching impl, does not satisfy. The check looks
+// through a nominal type to its underlying definition's impls, so an alias of a
+// foldable type is itself foldable.
+func Satisfies(reg *builtin.Registry, typ, bound ir.Type) bool {
+	idef := interfaceDefOf(bound)
+	if idef == nil {
+		return false
+	}
+	var bArgs []ir.Type
+	if app, ok := bound.(*ir.App); ok {
+		bArgs = app.Args
+	}
+	seen := map[*ir.TypeDef]bool{}
+	for def := defOf(reg, typ); def != nil && !seen[def]; {
+		seen[def] = true
+		for _, impl := range def.Impls {
+			if implMatches(reg, impl, idef, bArgs) {
+				return true
+			}
+		}
+		if def.Builtin {
+			break
+		}
+		def = defOf(reg, def.Body)
+	}
+	return false
+}
+
+// implMatches reports whether an opt-in impl (foldable<int, T>) is the interface
+// idef applied to the bound's arguments. The interface must be the same
+// definition, and each of the bound's arguments must agree with the impl's
+// (assignability, so a default-int bound matches an int8 impl element).
+func implMatches(reg *builtin.Registry, impl ir.Type, idef *ir.TypeDef, bArgs []ir.Type) bool {
+	if interfaceDefOf(impl) != idef {
+		return false
+	}
+	var iArgs []ir.Type
+	if app, ok := impl.(*ir.App); ok {
+		iArgs = app.Args
+	}
+	if len(iArgs) != len(bArgs) {
+		return false
+	}
+	for i := range bArgs {
+		if !Assignable(reg, iArgs[i], bArgs[i]) && !Assignable(reg, bArgs[i], iArgs[i]) {
+			return false
+		}
+	}
+	return true
+}
+
 // defOf returns the type definition whose methods apply to a value of type t:
-// the registry definition for a builtin, the referent for a named type.
+// the registry definition for a builtin, the referent for a named type, and —
+// for a bounded generic type parameter (the T of fn f<T: foldable<int>>) — the
+// definition of its bound interface, so the only methods in scope on the
+// parameter are the interface's own (E-17: a bound fixes T to the interface's
+// methods). An unbounded type parameter has no methods.
 func defOf(reg *builtin.Registry, t ir.Type) *ir.TypeDef {
 	switch t := t.(type) {
 	case *ir.Builtin:
@@ -436,6 +501,27 @@ func defOf(reg *builtin.Registry, t ir.Type) *ir.TypeDef {
 		// A generic application (list<int>) carries the methods of its
 		// constructor; the type arguments are bound in MethodResult.
 		return t.Def
+	case *ir.TypeVar:
+		if t.Bound != nil {
+			return interfaceDefOf(t.Bound)
+		}
+	}
+	return nil
+}
+
+// interfaceDefOf returns the interface definition a bound resolved to, or nil
+// when the bound is not an interface. A bound written with type arguments
+// (foldable<int, int>) is an App; a bare one (comparable) is a Named.
+func interfaceDefOf(t ir.Type) *ir.TypeDef {
+	switch t := t.(type) {
+	case *ir.App:
+		if t.Def != nil && t.Def.Interface != nil {
+			return t.Def
+		}
+	case *ir.Named:
+		if t.Def != nil && t.Def.Interface != nil {
+			return t.Def
+		}
 	}
 	return nil
 }

@@ -766,17 +766,24 @@ func resolveFuncs(file *ast.File, at func(ast.Node) span, diags *diagnostic.List
 		fn := shells[fd]
 		fn.Extern = fd.Extern
 		fn.Effects = fd.Effects
+		// The function's generic type parameters join a scope, so a parameter or
+		// the result whose type names one resolves to a TypeVar (carrying its
+		// bound) rather than being reported as an unknown type. Every parameter's
+		// name is in scope for every bound — a bound may name a later parameter
+		// (fn first<T: foldable<U>, U>) — so the names are gathered first.
+		tscope := infer.FuncTypeParamScope(fd.TypeParams)
+		fn.TypeParams = infer.ResolveFuncTypeParams(r, fd.TypeParams, tscope)
 		params := make(map[string]bool, len(fd.Params))
 		paramTypes := make(map[string]ir.Type, len(fd.Params))
 		fn.Params = make([]ir.Param, 0, len(fd.Params))
 		for _, p := range fd.Params {
-			t := r.ResolveType(p.Type, nil)
+			t := r.ResolveType(p.Type, tscope)
 			fn.Params = append(fn.Params, ir.Param{Name: p.Name, Type: t})
 			params[p.Name] = true
 			paramTypes[p.Name] = t
 		}
-		fn.Result = r.ResolveType(fd.Result, nil)
-		fn.Body = lower.Body(fd.Body, bodyBinder{r: r, reg: reg, params: params, paramTypes: paramTypes, funcs: fns})
+		fn.Result = r.ResolveType(fd.Result, tscope)
+		fn.Body = lower.Body(fd.Body, bodyBinder{r: r, reg: reg, params: params, paramTypes: paramTypes, tscope: tscope, funcs: fns})
 
 		key := fn.Name + funcSignatureKey(fn)
 		if fn.Name != "" && seen[key] {

@@ -522,6 +522,56 @@ func TestSubstituteAndMatch(t *testing.T) {
 	}
 }
 
+// TestSatisfies checks the nominal-satisfaction rule a generic-function bound
+// uses (E-17): a type satisfies an interface bound only when it opts into the
+// interface (an entry in its Impls) with matching arguments, and a bounded type
+// parameter resolves its bound interface's methods (defOf/receiverSubst).
+func TestSatisfies(t *testing.T) {
+	reg := builtin.Default()
+
+	// An interface foldable<K, V> with one method fold(): V, and a Bag that opts
+	// into foldable<int, int>.
+	foldable := &ir.TypeDef{
+		Name:      "foldable",
+		Interface: &ir.InterfaceDef{Required: []string{"fold"}},
+		Params:    []*ir.TypeParam{{Name: "K"}, {Name: "V"}},
+		Methods: []*ir.Method{
+			{Name: "fold", Result: &ir.TypeVar{Name: "V"}},
+		},
+	}
+	bound := &ir.App{Def: foldable, Args: []ir.Type{bt("int"), bt("int")}}
+	bag := &ir.TypeDef{Name: "Bag", Body: bt("int"), Impls: []ir.Type{bound}}
+
+	if !Satisfies(reg, &ir.Named{Def: bag}, bound) {
+		t.Error("Satisfies(Bag, foldable<int, int>) = false, want true (Bag opts in)")
+	}
+	// A type with no impl does not satisfy.
+	plain := &ir.TypeDef{Name: "Plain", Body: bt("int")}
+	if Satisfies(reg, &ir.Named{Def: plain}, bound) {
+		t.Error("Satisfies(Plain, foldable<int, int>) = true, want false (no impl)")
+	}
+	// A bare builtin does not satisfy a bound it never opts into.
+	if Satisfies(reg, bt("int"), bound) {
+		t.Error("Satisfies(int, foldable<int, int>) = true, want false")
+	}
+	// A non-interface bound never satisfies.
+	if Satisfies(reg, &ir.Named{Def: bag}, bt("int")) {
+		t.Error("Satisfies(Bag, int) = true, want false (int is not an interface)")
+	}
+
+	// A bounded type parameter resolves its bound interface's methods: a value
+	// typed T where T: foldable<int, int> can call fold, whose V reads as int.
+	tvarBounded := &ir.TypeVar{Name: "T", Bound: bound}
+	if got := MethodResult(reg, tvarBounded, "fold", nil).String(); got != "int" {
+		t.Errorf("MethodResult(T: foldable<int, int>, fold) = %s, want int", got)
+	}
+	// An unbounded type parameter has no methods.
+	tvarBare := &ir.TypeVar{Name: "T"}
+	if got := MethodResult(reg, tvarBare, "fold", nil); got != ir.Invalid {
+		t.Errorf("MethodResult(unbounded T, fold) = %s, want invalid", got)
+	}
+}
+
 // TestNominalDerivation checks that a nominal type (type Level = int8) is
 // integer-like, derives its underlying type's operator methods, and keeps its
 // own identity in the result.

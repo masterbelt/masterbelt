@@ -85,6 +85,117 @@ func TestCallTypeTwoPasses(t *testing.T) {
 	}
 }
 
+// genericFnEnv installs an interface foldable<K, V> (required fold) and a Bag
+// that opts into foldable<int, int>, plus three generic functions:
+//
+//	fn total<T: foldable<int, int>>(c: T): int
+//	fn identity<T>(x: T): T
+//	fn pick<T>(): T            // T appears only in the result — uninferable
+func genericFnEnv() stubEnv {
+	env := emptyEnv()
+	foldable := &ir.TypeDef{
+		Name:      "foldable",
+		Interface: &ir.InterfaceDef{Required: []string{"fold"}},
+		Params:    []*ir.TypeParam{{Name: "K"}, {Name: "V"}},
+		Methods:   []*ir.Method{{Name: "fold", Result: &ir.TypeVar{Name: "V"}}},
+	}
+	bound := &ir.App{Def: foldable, Args: []ir.Type{&ir.Builtin{Name: "int"}, &ir.Builtin{Name: "int"}}}
+	bag := &ir.TypeDef{Name: "Bag", Body: &ir.Builtin{Name: "int"}, Impls: []ir.Type{bound}}
+	env.reg.Install([]*ir.TypeDef{foldable, bag})
+
+	// foldable<int, int> as a type expression for the bound.
+	foldableBound := ast.NewNamedType("", "foldable", []ast.TypeExpr{namedType("int"), namedType("int")}, nil)
+	total := ast.NewFuncDecl(nil, true, false, nil, "total",
+		[]*ast.TypeParam{ast.NewTypeParam("T", foldableBound, nil)},
+		[]*ast.ParamDef{param("c", namedType("T"))}, namedType("int"),
+		[]ast.Stmt{ret(intLit("0"))}, nil)
+	identity := ast.NewFuncDecl(nil, true, false, nil, "identity",
+		[]*ast.TypeParam{ast.NewTypeParam("T", nil, nil)},
+		[]*ast.ParamDef{param("x", namedType("T"))}, namedType("T"),
+		[]ast.Stmt{ret(ident("x"))}, nil)
+	pick := ast.NewFuncDecl(nil, true, false, nil, "pick",
+		[]*ast.TypeParam{ast.NewTypeParam("T", nil, nil)},
+		nil, namedType("T"),
+		[]ast.Stmt{ret(intLit("0"))}, nil)
+	env.fns = map[string][]*ast.FuncDecl{
+		"total":    {total},
+		"identity": {identity},
+		"pick":     {pick},
+	}
+	return env
+}
+
+// fnCall builds name(args...).
+func fnCall(name string, args ...ast.Expr) *ast.CallExpr {
+	return ast.NewCallExpr(ident(name), args, nil)
+}
+
+// TestFuncCallSolvesTypeParam checks a generic-function call resolves its type
+// parameter from the argument and substitutes it into the result.
+func TestFuncCallSolvesTypeParam(t *testing.T) {
+	env := genericFnEnv()
+
+	// identity(42): T = int, result T -> int.
+	var r report
+	if got := Check(fnCall("identity", intLit("42")), env, r.sink()).String(); got != "int" {
+		t.Errorf("identity(42) = %s, want int", got)
+	}
+	if len(r.boundsNotSatisfied)+len(r.uninferableTypeVar)+len(r.methods) != 0 {
+		t.Errorf("unexpected reports: %+v", r)
+	}
+
+	// The silent walk agrees (purity).
+	if got := Expr(fnCall("identity", intLit("42")), env).String(); got != "int" {
+		t.Errorf("Expr(identity(42)) = %s, want int", got)
+	}
+}
+
+// TestFuncCallBoundSatisfied checks a bound the argument satisfies types the
+// call, while one it does not is reported as bound_not_satisfied.
+func TestFuncCallBoundSatisfied(t *testing.T) {
+	env := genericFnEnv()
+	bagType := func() ir.Type {
+		d, _ := env.reg.Lookup("Bag")
+		return &ir.Named{Def: d}
+	}()
+
+	// A Bag value satisfies foldable<int, int>. The argument is a const ref
+	// typed Bag.
+	decl := ast.NewConstDecl(nil, false, "b", nil, nil, nil)
+	id := ident("b")
+	env.res[id] = decl
+	env.typ[decl] = bagType
+	var r report
+	if got := Check(fnCall("total", id), env, r.sink()).String(); got != "int" {
+		t.Errorf("total(Bag) = %s, want int", got)
+	}
+	if len(r.boundsNotSatisfied) != 0 {
+		t.Errorf("Bag satisfies foldable<int, int>; unexpected bound reports: %+v", r.boundsNotSatisfied)
+	}
+
+	// A plain int does not opt into foldable: bound_not_satisfied.
+	var r2 report
+	if got := Check(fnCall("total", intLit("1")), env, r2.sink()); got != ir.Invalid {
+		t.Errorf("total(1) = %s, want invalid", got)
+	}
+	if len(r2.boundsNotSatisfied) != 1 || r2.boundsNotSatisfied[0] != "int -> foldable<int, int>" {
+		t.Errorf("want [int -> foldable<int, int>], got %+v", r2.boundsNotSatisfied)
+	}
+}
+
+// TestFuncCallUninferableTypeParam checks a type parameter no argument pins
+// (the T appears only in the result) is reported as uninferable.
+func TestFuncCallUninferableTypeParam(t *testing.T) {
+	env := genericFnEnv()
+	var r report
+	if got := Check(fnCall("pick"), env, r.sink()); got != ir.Invalid {
+		t.Errorf("pick() = %s, want invalid", got)
+	}
+	if len(r.uninferableTypeVar) != 1 || r.uninferableTypeVar[0] != "T" {
+		t.Errorf("want one uninferable type param T, got %+v", r.uninferableTypeVar)
+	}
+}
+
 func TestCallTypeLambdaFailures(t *testing.T) {
 	env := genericListEnv()
 
