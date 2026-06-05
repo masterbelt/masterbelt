@@ -1,0 +1,225 @@
+# tree
+File
+  EnumDecl
+    LineComment "// switch is the value-dispatch control statement: it branches on the equality"
+    Newline "\n"
+    LineComment "// of a scrutinee against compile-time constant values. Each arm's body is a"
+    Newline "\n"
+    LineComment "// statement (an early return) or a block, so a switch dispatches a value by"
+    Newline "\n"
+    LineComment "// returning from the matching arm."
+    Newline "\n"
+    Newline "\n"
+    DocComment "/// A card's rarity tier."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Enum "enum"
+    Whitespace " "
+    Ident "Rarity"
+    Whitespace " "
+    LBrace "{"
+    EnumMember
+      Newline "\n"
+      Whitespace "  "
+      Ident "Common"
+    Comma ","
+    EnumMember
+      Whitespace " "
+      Ident "Rare"
+    Comma ","
+    EnumMember
+      Whitespace " "
+      Ident "Legend"
+    Newline "\n"
+    RBrace "}"
+  FuncDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// An enum switch covering every member needs no wildcard: the arms are"
+    Newline "\n"
+    LineComment "// exhaustive, and because every arm returns the function always returns."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Fn "fn"
+    Whitespace " "
+    Ident "color"
+    ParamList
+      LParen "("
+      Param
+        Ident "r"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "Rarity"
+      RParen ")"
+    Colon ":"
+    Whitespace " "
+    TypeName
+      Ident "string"
+    Whitespace " "
+    Block
+      LBrace "{"
+      Newline "\n"
+      Whitespace "  "
+      NameRef
+        Ident "switch"
+      Whitespace " "
+      RecordLit
+        Ident "r"
+        Whitespace " "
+        LBrace "{"
+        Newline "\n"
+        Whitespace "    "
+        RecordField
+          Ident "Common"
+        Whitespace " "
+        Arrow "->"
+        Whitespace " "
+        Return "return"
+        Whitespace " "
+        String "\"white\""
+        Newline "\n"
+        Whitespace "    "
+        RecordField
+          Ident "Rare"
+        Whitespace "   "
+        Arrow "->"
+        Whitespace " "
+        Return "return"
+        Whitespace " "
+        String "\"blue\""
+        Newline "\n"
+        Whitespace "    "
+        RecordField
+          Ident "Legend"
+        Whitespace " "
+        Arrow "->"
+        Whitespace " "
+        Return "return"
+        Whitespace " "
+        String "\"gold\""
+        Newline "\n"
+        Whitespace "  "
+        RBrace "}"
+      Newline "\n"
+      RBrace "}"
+  FuncDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// A scalar switch is over an unbounded domain, so it must carry a \"_\" wildcard"
+    Newline "\n"
+    LineComment "// for the values no arm names. One arm may list several values, and an arm body"
+    Newline "\n"
+    LineComment "// may be a block of several statements."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Fn "fn"
+    Whitespace " "
+    Ident "grade"
+    ParamList
+      LParen "("
+      Param
+        Ident "n"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "int"
+      RParen ")"
+    Colon ":"
+    Whitespace " "
+    TypeName
+      Ident "string"
+    Whitespace " "
+    Block
+      LBrace "{"
+      Newline "\n"
+      Whitespace "  "
+      NameRef
+        Ident "switch"
+      Whitespace " "
+      RecordLit
+        Ident "n"
+        Whitespace " "
+        LBrace "{"
+        Newline "\n"
+        Whitespace "    "
+        Int "0"
+        Whitespace "       "
+        Arrow "->"
+        Whitespace " "
+        Return "return"
+        Whitespace " "
+        String "\"zero\""
+        Newline "\n"
+        Whitespace "    "
+        Int "1"
+        Comma ","
+        Whitespace " "
+        Int "2"
+        Comma ","
+        Whitespace " "
+        Int "3"
+        Whitespace " "
+        Arrow "->"
+        Whitespace " "
+        Return "return"
+        Whitespace " "
+        String "\"low\""
+        Newline "\n"
+        Whitespace "    "
+        RecordField
+          Ident "_"
+        Whitespace "       "
+        Arrow "->"
+        Whitespace " "
+        LBrace "{"
+        Newline "\n"
+        Whitespace "      "
+        Return "return"
+        Whitespace " "
+        String "\"high\""
+        Newline "\n"
+        Whitespace "    "
+        RBrace "}"
+      Newline "\n"
+      Whitespace "  "
+      RBrace "}"
+  Error
+    Newline "\n"
+    RBrace "}"
+  Newline "\n"
+  EOF ""
+# diagnostics
+error[masterbelt.parser.concrete.unexpected_token] 15:11 unexpected token: Whitespace
+error[masterbelt.parser.concrete.unexpected_token] 15:12 unexpected token: Arrow
+error[masterbelt.parser.concrete.unexpected_token] 15:15 unexpected token: Return
+error[masterbelt.parser.concrete.unexpected_token] 15:22 unexpected token: String
+error[masterbelt.parser.concrete.unexpected_token] 16:9 unexpected token: Whitespace
+error[masterbelt.parser.concrete.unexpected_token] 16:12 unexpected token: Arrow
+error[masterbelt.parser.concrete.unexpected_token] 16:15 unexpected token: Return
+error[masterbelt.parser.concrete.unexpected_token] 16:22 unexpected token: String
+error[masterbelt.parser.concrete.unexpected_token] 17:11 unexpected token: Whitespace
+error[masterbelt.parser.concrete.unexpected_token] 17:12 unexpected token: Arrow
+error[masterbelt.parser.concrete.unexpected_token] 17:15 unexpected token: Return
+error[masterbelt.parser.concrete.unexpected_token] 17:22 unexpected token: String
+error[masterbelt.parser.concrete.unexpected_token] 26:5 unexpected token: Int
+error[masterbelt.parser.concrete.unexpected_token] 26:13 unexpected token: Arrow
+error[masterbelt.parser.concrete.unexpected_token] 26:16 unexpected token: Return
+error[masterbelt.parser.concrete.unexpected_token] 26:23 unexpected token: String
+error[masterbelt.parser.concrete.unexpected_token] 27:5 unexpected token: Int
+error[masterbelt.parser.concrete.unexpected_token] 27:6 unexpected token: Comma
+error[masterbelt.parser.concrete.unexpected_token] 27:8 unexpected token: Int
+error[masterbelt.parser.concrete.unexpected_token] 27:9 unexpected token: Comma
+error[masterbelt.parser.concrete.unexpected_token] 27:11 unexpected token: Int
+error[masterbelt.parser.concrete.unexpected_token] 27:13 unexpected token: Arrow
+error[masterbelt.parser.concrete.unexpected_token] 27:16 unexpected token: Return
+error[masterbelt.parser.concrete.unexpected_token] 27:23 unexpected token: String
+error[masterbelt.parser.concrete.unexpected_token] 28:6 unexpected token: Whitespace
+error[masterbelt.parser.concrete.unexpected_token] 28:13 unexpected token: Arrow
+error[masterbelt.parser.concrete.unexpected_token] 28:16 unexpected token: LBrace
+error[masterbelt.parser.concrete.unexpected_token] 29:7 unexpected token: Return
+error[masterbelt.parser.concrete.unexpected_token] 29:14 unexpected token: String
+error[masterbelt.parser.concrete.unexpected_token] 32:1 unexpected token: RBrace

@@ -1,0 +1,22 @@
+File
+  EnumDecl
+    doc "A card's rarity tier."
+    pub
+    name "Rarity"
+    member "Common"
+    member "Rare"
+    member "Legend"
+  FuncDecl
+    pub
+    name "color"
+    param r: Rarity
+    result string
+      expr Identifier "switch"
+      expr (record r Common: <missing> Rare: <missing> Legend: <missing>)
+  FuncDecl
+    pub
+    name "grade"
+    param n: int
+    result string
+      expr Identifier "switch"
+      expr (record n _: <missing>)
