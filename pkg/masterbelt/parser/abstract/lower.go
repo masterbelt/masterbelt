@@ -305,6 +305,28 @@ func twoOperands(t cst.Tree, buf source.Buffer) (x, y ast.Expr) {
 	return x, y
 }
 
+// threeOperands lowers the condition, then-branch, and else-branch nodes of a
+// TernaryExpr, in source order. Any is nil when the source omitted it (a
+// recovered "a ? b").
+func threeOperands(t cst.Tree, buf source.Buffer) (cond, then, els ast.Expr) {
+	var operands []ast.Expr
+	for _, c := range t.Children() {
+		if _, ok := c.Node(); ok {
+			operands = append(operands, lowerExpr(c, buf))
+		}
+	}
+	if len(operands) > 0 {
+		cond = operands[0]
+	}
+	if len(operands) > 1 {
+		then = operands[1]
+	}
+	if len(operands) > 2 {
+		els = operands[2]
+	}
+	return cond, then, els
+}
+
 // isTrivia reports whether k is a trivia token kind (interleaved in an
 // expression node between operands and operators).
 func isTrivia(k token.Kind) bool {

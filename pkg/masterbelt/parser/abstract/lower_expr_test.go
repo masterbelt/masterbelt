@@ -58,6 +58,16 @@ func TestLowerExpressions(t *testing.T) {
 		{"const x = {}\n", `(record)`},
 		{"const x = Point{ x: }\n", `(record Point x: <missing>)`}, // recovered: value absent
 		{"const x = [{ a: 1 }]\n", `(list (record a: IntLit "1"))`},
+		// The ternary keeps its own node: dumpExpr renders it (? cond then else),
+		// with the condition's operator desugared like any expression.
+		{"const x = a ? b : c\n", `(? Identifier "a" Identifier "b" Identifier "c")`},
+		{"const x = n > 1 ? 1 : 0\n", `(? (call (. Identifier "n" gt) IntLit "1") IntLit "1" IntLit "0")`},
+		// Right-associative: the else-branch is itself a ternary.
+		{"const x = a ? b : c ? d : e\n", `(? Identifier "a" Identifier "b" (? Identifier "c" Identifier "d" Identifier "e"))`},
+		// A parenthesized ternary is one operand of the surrounding operator: the
+		// grouping unwraps, leaving the ternary as the receiver of .add.
+		{"const x = (a ? b : c) + 1\n", `(call (. (? Identifier "a" Identifier "b" Identifier "c") add) IntLit "1")`},
+		{"const x = a ? b\n", `(? Identifier "a" Identifier "b" <missing>)`}, // recovered: else absent
 	}
 	for _, tc := range cases {
 		if got := valueLine(t, tc.src); got != tc.want {
@@ -161,6 +171,14 @@ func TestRenderRoundTrip(t *testing.T) {
 		"{ x: 1, y: 2 }",
 		"Item{ pos: Point{ x: 0 } }",
 		"{}",
+		// The ternary binds loosest: a binary condition needs no parentheses, and
+		// the chain nests on the right without them either.
+		"a > b ? a : b",
+		"a ? b : c ? d : e",
+		// A ternary inside a binary operand, or in the then-branch, is
+		// parenthesized — it would otherwise rebind the surrounding operator.
+		"(a ? b : c) + 1",
+		"a ? (b ? c : d) : e",
 	}
 	for _, expr := range cases {
 		src := "const x = " + expr + "\n"

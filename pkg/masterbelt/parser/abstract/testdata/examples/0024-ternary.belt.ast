@@ -1,16 +1,20 @@
 File
   ConstDecl
     name "Bigger"
+    value (? (call (. IntLit "3" gt) IntLit "2") IntLit "10" IntLit "20")
   ConstDecl
     name "Label"
+    value (? (call (. IntLit "7" gt) IntLit "100") StringLit "high" StringLit "low")
   ConstDecl
     name "Capped"
     type Level
+    value (? (call (. (. Identifier "Level" Max) gt) IntLit "50") (. Identifier "Level" Max) IntLit "0")
   ConstDecl
     name "Clamp"
+    value (? (call (. IntLit "150" lt) IntLit "0") IntLit "0" (? (call (. IntLit "150" gt) IntLit "100") IntLit "100" IntLit "150"))
   ConstDecl
     name "Score"
-    value (call (. <missing> add) IntLit "5")
+    value (call (. (? (call (. IntLit "3" gt) IntLit "2") IntLit "1" IntLit "0") add) IntLit "5")
   TypeDecl
     pub
     name "Level"
@@ -26,4 +30,4 @@ File
       doc "-1, 0, or 1 by sign."
       pub
       result int32
-      return <missing>
+      return (? (call (. self gt) IntLit "0") IntLit "1" (? (call (. self lt) IntLit "0") (call (. IntLit "1" neg)) IntLit "0"))

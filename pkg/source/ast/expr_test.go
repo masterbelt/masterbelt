@@ -62,3 +62,29 @@ func TestWalkExprs(t *testing.T) {
 		t.Errorf("pruned order = %s, want %s (false must skip the receiver)", got, want)
 	}
 }
+
+// TestWalkExprsTernary pins that the ternary's three operands — condition,
+// then, and else — are walked in source order, so name resolution and the
+// editor's occurrence walks reach every reference inside a conditional value.
+func TestWalkExprsTernary(t *testing.T) {
+	// c ? t : e
+	expr := NewTernaryExpr(
+		NewIdentifier("c", nil),
+		NewIdentifier("t", nil),
+		NewIdentifier("e", nil),
+		nil,
+	)
+	var order []string
+	WalkExprs(expr, func(e Expr) bool {
+		switch e := e.(type) {
+		case *Identifier:
+			order = append(order, e.Name)
+		case *TernaryExpr:
+			order = append(order, "?")
+		}
+		return true
+	})
+	if got, want := strings.Join(order, ","), "?,c,t,e"; got != want {
+		t.Errorf("visit order = %s, want %s", got, want)
+	}
+}
