@@ -1,6 +1,7 @@
 package lexer
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -291,6 +292,127 @@ func TestLexerOperators(t *testing.T) {
 			t.Errorf("got %v, want a single LtEq token", tokens)
 		}
 	})
+}
+
+// kindsOf lexes src and returns the non-trivia token kinds with their texts,
+// plus the diagnostics — the compact form the literal tests assert against.
+func kindsOf(t *testing.T, src string) ([]token.Kind, []string, []diagnostic.Diagnostic) {
+	t.Helper()
+	file := source.NewFile("lit.belt", []byte(src))
+	lex := New(file)
+	var kinds []token.Kind
+	var texts []string
+	for _, tok := range lex.Tokens() {
+		switch tok.Kind {
+		case token.Whitespace, token.Newline, token.EOF:
+			continue
+		}
+		kinds = append(kinds, tok.Kind)
+		texts = append(texts, tok.Text(file))
+	}
+	return kinds, texts, lex.Diagnostics()
+}
+
+// TestLexerDatetime covers the datetime literal: the D+ISO lookahead commits
+// only on the full date shape, offsets are accepted, and anything short of
+// the shape stays an identifier expression.
+func TestLexerDatetime(t *testing.T) {
+	cases := []struct {
+		src   string
+		kinds []token.Kind
+		texts []string
+		diags int
+	}{
+		// Well-formed instants, with and without milliseconds, Z and offsets.
+		{"D2009-03-31T23:59:59.000Z", []token.Kind{token.DatetimeLit}, []string{"D2009-03-31T23:59:59.000Z"}, 0},
+		{"D1970-01-01T00:00:00Z", []token.Kind{token.DatetimeLit}, []string{"D1970-01-01T00:00:00Z"}, 0},
+		{"D2026-06-05T09:00:00.000+09:00", []token.Kind{token.DatetimeLit}, []string{"D2026-06-05T09:00:00.000+09:00"}, 0},
+		{"D2026-06-05T00:30:00.000-05:30", []token.Kind{token.DatetimeLit}, []string{"D2026-06-05T00:30:00.000-05:30"}, 0},
+		// Below the commit point the D run is an identifier: D2009 subtracts,
+		// Dragon is a name, and a lowercase t never commits.
+		{"D2009", []token.Kind{token.Ident}, []string{"D2009"}, 0},
+		{"D2009-03", []token.Kind{token.Ident, token.Minus, token.Int}, []string{"D2009", "-", "03"}, 0},
+		{"Dragon", []token.Kind{token.Ident}, []string{"Dragon"}, 0},
+		{"D2009-03-31t00", []token.Kind{token.Ident, token.Minus, token.Int, token.Minus, token.Int, token.Ident}, []string{"D2009", "-", "03", "-", "31", "t00"}, 1},
+		// The literal ends exactly at the zone; what follows lexes on its own.
+		{"D2009-03-31T23:59:59.000Z+1h", []token.Kind{token.DatetimeLit, token.Plus, token.DurationLit}, []string{"D2009-03-31T23:59:59.000Z", "+", "1h"}, 0},
+	}
+	for _, c := range cases {
+		kinds, texts, diags := kindsOf(t, c.src)
+		if !slices.Equal(kinds, c.kinds) || !slices.Equal(texts, c.texts) {
+			t.Errorf("%q: lexed %v %v, want %v %v", c.src, kinds, texts, c.kinds, c.texts)
+		}
+		if len(diags) != c.diags {
+			t.Errorf("%q: %d diagnostics %v, want %d", c.src, len(diags), diags, c.diags)
+		}
+	}
+}
+
+// TestLexerDatetimeInvalid covers invalid_datetime: a committed literal whose
+// clock or zone is malformed (consumed as one broken token), and a
+// well-shaped instant whose fields are impossible.
+func TestLexerDatetimeInvalid(t *testing.T) {
+	cases := []string{
+		"D2009-13-40T99:99:99.000Z",      // out-of-range fields
+		"D2009-02-30T00:00:00.000Z",      // February 30th
+		"D2009-03-31T23:59Z",             // clock too short
+		"D2009-03-31T23:59:59.00Z",       // two millisecond digits
+		"D2009-03-31T23:59:59",           // missing zone
+		"D2026-06-05T00:00:00.000+99:00", // offset hour out of range
+	}
+	for _, src := range cases {
+		kinds, _, diags := kindsOf(t, src)
+		if len(kinds) == 0 || kinds[0] != token.DatetimeLit {
+			t.Errorf("%q: first token %v, want DatetimeLit", src, kinds)
+		}
+		if len(diags) != 1 || diags[0].Code != CodeInvalidDatetime {
+			t.Errorf("%q: diagnostics = %v, want one invalid_datetime", src, diags)
+		}
+	}
+}
+
+// TestLexerDuration covers the duration literal: digit+unit runs concatenate
+// into one token by maximal munch (m vs ms stays unambiguous), an unknown
+// unit falls back to an integer and a name with a diagnostic, and a space
+// separates an integer from an identifier silently.
+func TestLexerDuration(t *testing.T) {
+	cases := []struct {
+		src   string
+		kinds []token.Kind
+		texts []string
+		diags int
+	}{
+		{"5s", []token.Kind{token.DurationLit}, []string{"5s"}, 0},
+		{"1500ms", []token.Kind{token.DurationLit}, []string{"1500ms"}, 0},
+		{"3w4d5h6m7s8ms", []token.Kind{token.DurationLit}, []string{"3w4d5h6m7s8ms"}, 0},
+		{"6m7s8ms", []token.Kind{token.DurationLit}, []string{"6m7s8ms"}, 0},
+		// Adjacent literals via an operator split exactly at the operator.
+		{"1h+30m", []token.Kind{token.DurationLit, token.Plus, token.DurationLit}, []string{"1h", "+", "30m"}, 0},
+		// An unknown unit is an integer and a name, reported as a unit typo.
+		{"3x", []token.Kind{token.Int, token.Ident}, []string{"3", "x"}, 1},
+		{"5sec", []token.Kind{token.Int, token.Ident}, []string{"5", "sec"}, 1},
+		{"3x4d", []token.Kind{token.Int, token.Ident}, []string{"3", "x4d"}, 1},
+		// A group whose unit is missing or unknown ends the literal before it.
+		{"3w4", []token.Kind{token.DurationLit, token.Int}, []string{"3w", "4"}, 0},
+		{"3w4x", []token.Kind{token.DurationLit, token.Int, token.Ident}, []string{"3w", "4", "x"}, 1},
+		// A space separates: an integer and a name, no duration and no report.
+		{"100 m", []token.Kind{token.Int, token.Ident}, []string{"100", "m"}, 0},
+		{"100m", []token.Kind{token.DurationLit}, []string{"100m"}, 0},
+	}
+	for _, c := range cases {
+		kinds, texts, diags := kindsOf(t, c.src)
+		if !slices.Equal(kinds, c.kinds) || !slices.Equal(texts, c.texts) {
+			t.Errorf("%q: lexed %v %v, want %v %v", c.src, kinds, texts, c.kinds, c.texts)
+		}
+		if len(diags) != c.diags {
+			t.Errorf("%q: %d diagnostics %v, want %d", c.src, len(diags), diags, c.diags)
+		}
+		for _, d := range diags {
+			if d.Code != CodeUnknownDurationUnit {
+				t.Errorf("%q: diagnostic %v, want unknown_duration_unit", c.src, d)
+			}
+		}
+	}
 }
 
 // TestLexerStrings checks that a well-formed double-quoted string is one String

@@ -7,6 +7,14 @@ import "fmt"
 // renderers maps each diagnostic code to a function that renders its message
 // in a given locale from the diagnostic's fields.
 var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
+	"masterbelt.lexer.invalid_datetime": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "不正な日時リテラル: " + f["text"].String()
+		default:
+			return "invalid datetime literal: " + f["text"].String()
+		}
+	},
 	"masterbelt.lexer.invalid_escape": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
@@ -29,6 +37,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "予期しない文字: " + f["char"].String()
 		default:
 			return "unexpected character: " + f["char"].String()
+		}
+	},
+	"masterbelt.lexer.unknown_duration_unit": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "未知の期間単位: " + f["unit"].String()
+		default:
+			return "unknown duration unit: " + f["unit"].String()
 		}
 	},
 	"masterbelt.lexer.unterminated_block_comment": func(loc Locale, f map[string]fmt.Stringer) string {

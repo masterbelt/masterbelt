@@ -121,9 +121,16 @@ func (l *Lexer) Next() token.Token {
 		}
 		return l.scanFixed(start, 1, token.Pipe)
 	case isLetter(c):
+		// A D opening an ISO date shape is a datetime literal; any other D
+		// run — D2009 without its date, Dragon — is an identifier.
+		if c == 'D' {
+			if tok, ok := l.scanDatetime(start); ok {
+				return tok
+			}
+		}
 		return l.scanIdent(start)
 	case isDigit(c):
-		return l.scanInt(start)
+		return l.scanNumber(start)
 	default:
 		return l.scanIllegal(start)
 	}

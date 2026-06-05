@@ -4,6 +4,8 @@ masterbelt.lexer.unterminated_block_comment,error,
 masterbelt.lexer.unterminated_string,error,
 masterbelt.lexer.invalid_escape,error,escape:string
 masterbelt.lexer.invalid_unicode_escape,error,escape:string
+masterbelt.lexer.invalid_datetime,error,text:string
+masterbelt.lexer.unknown_duration_unit,error,unit:string
 masterbelt.parser.concrete.expected_const,error,
 masterbelt.parser.concrete.expected_identifier,error,
 masterbelt.parser.concrete.expected_type,error,

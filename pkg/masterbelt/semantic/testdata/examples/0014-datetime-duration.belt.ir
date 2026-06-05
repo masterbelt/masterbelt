@@ -1,43 +1,36 @@
 Module
   Const "Epoch"
     type invalid
-    value <none>.sub(IntLiteral "01").sub(IntLiteral "01")
+    value <none>
   Const "Release"
     type invalid
-    value <none>.sub(IntLiteral "03").sub(IntLiteral "31")
+    value <none>
   Const "Launch"
     type invalid
-    value <none>.sub(IntLiteral "06").sub(IntLiteral "05")
+    value <none>
   Const "Cooldown"
-    type int
-    value IntLiteral "5"
-    eval 5
+    type invalid
+    value <none>
   Const "Complex"
-    type int
-    value IntLiteral "3"
-    eval 3
+    type invalid
+    value <none>
   Const "Deadline"
     type invalid
-    value Reference -> "Release".add(IntLiteral "7")
+    value Reference -> "Release".add()
   Const "Span"
     type invalid
     value Reference -> "Release".sub(Reference -> "Epoch")
   Const "Shift"
     type invalid
-    value Reference -> "Release".sub(IntLiteral "1")
+    value Reference -> "Release".sub()
   Const "TwoH"
-    type int
-    value IntLiteral "1"
-    eval 1
+    type invalid
+    value <none>
   Const "Triple"
-    type int
-    value IntLiteral "5"
-    eval 5
+    type invalid
+    value <none>
   TypeDef "Event" pub
     body { id: int, starts_at: invalid, cooldown: invalid }
   Assert "Release > Epoch"
     eval <unevaluated>
       Release > Epoch
-  Assert "1"
-    eval 1
-      1

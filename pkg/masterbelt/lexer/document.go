@@ -68,14 +68,24 @@ func (d *Document) Edit(e source.Edit) {
 	newLen := d.text.Len()
 
 	// Re-lex from the first token that reaches the edit — the one containing or
-	// immediately left of e.Start. Earlier tokens cannot be affected: this
-	// lexer has no lookbehind, and the only token that scans arbitrarily far
-	// ahead is the block comment, whose span (to its */ or to EOF) makes its
-	// End reach e.Start whenever the edit could change it. The terminating EOF
-	// always satisfies End() >= e.Start, so oldTokens[iStart] is always valid.
+	// immediately left of e.Start. Earlier tokens can be affected only through
+	// adjacency: this lexer has no lookbehind, and the only token that scans
+	// arbitrarily far ahead is the block comment, whose span (to its */ or to
+	// EOF) makes its End reach e.Start whenever the edit could change it. The
+	// terminating EOF always satisfies End() >= e.Start, so oldTokens[iStart]
+	// is always valid.
 	iStart := 0
 	for iStart < len(oldTokens) && oldTokens[iStart].End() < e.Start {
 		iStart++
+	}
+	// The datetime and duration literals commit several tokens to the right
+	// of their start: typing the T of D2009-03-31T23:59:59.000Z merges the
+	// D-identifier, the minuses, and the ints into one literal, and typing the
+	// d of 3w4d merges the trailing 4. Trivia never joins a token, so backing
+	// the window to the nearest trivia boundary covers every token the edit
+	// could fuse while keeping the lex context-free at the window start.
+	for iStart > 0 && !isTrivia(oldTokens[iStart-1].Kind) && oldTokens[iStart-1].End() == oldTokens[iStart].Offset {
+		iStart--
 	}
 	winStart := min(e.Start, oldTokens[iStart].Offset)
 	prefix := oldTokens[:iStart]
@@ -177,6 +187,17 @@ func spliceDiags(old, fresh []diagnostic.Diagnostic, winStart, resyncNew, resync
 func shiftDiag(d diagnostic.Diagnostic, by int) diagnostic.Diagnostic {
 	d.Offset += by
 	return d
+}
+
+// isTrivia reports whether a token kind never fuses with what follows it:
+// whitespace, newlines, and comments end any literal, so a relex window can
+// safely start just past one.
+func isTrivia(k token.Kind) bool {
+	switch k {
+	case token.Whitespace, token.Newline, token.LineComment, token.DocComment, token.BlockComment:
+		return true
+	}
+	return false
 }
 
 // findToken returns the index of the token starting exactly at off, or -1.

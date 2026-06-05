@@ -164,6 +164,66 @@ func TestDocumentTokenTextAfterEdit(t *testing.T) {
 	}
 }
 
+// TestDocumentLiteralMerges types the multi-token-fusing literals through
+// their dangerous edits: a datetime commits on a T typed long after its D, a
+// duration extends across a previously separate integer, and deleting a space
+// fuses an integer with a unit. Each edit must leave the stream identical to
+// a full lex (the window has to back up across the abutting run).
+func TestDocumentLiteralMerges(t *testing.T) {
+	cases := []struct {
+		name  string
+		start string
+		edit  func(content []byte) source.Edit
+	}{
+		{
+			// D2009-03-31 lexes as five tokens until the clock arrives.
+			"typing the clock commits the datetime",
+			"const a = D2009-03-31\n",
+			func(c []byte) source.Edit {
+				at := strings.Index(string(c), "31") + 2
+				return source.Edit{Start: at, End: at, NewText: []byte("T23:59:59.000Z")}
+			},
+		},
+		{
+			// 3w 4 is a duration then an integer; the d fuses them.
+			"typing a unit extends the duration left",
+			"const a = 3w4\n",
+			func(c []byte) source.Edit {
+				at := strings.Index(string(c), "3w4") + 3
+				return source.Edit{Start: at, End: at, NewText: []byte("d")}
+			},
+		},
+		{
+			// 100 m is an integer and a name; removing the space makes 100m.
+			"deleting the space fuses integer and unit",
+			"const a = 100 m\n",
+			func(c []byte) source.Edit {
+				at := strings.Index(string(c), "100 m") + 3
+				return source.Edit{Start: at, End: at + 1, NewText: nil}
+			},
+		},
+		{
+			// Breaking a datetime apart again: deleting the T shatters it.
+			"deleting the T shatters the datetime",
+			"const a = D2009-03-31T23:59:59.000Z\n",
+			func(c []byte) source.Edit {
+				at := strings.Index(string(c), "T23")
+				return source.Edit{Start: at, End: at + 1, NewText: nil}
+			},
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			content := []byte(c.start)
+			doc := NewDocument(content)
+			e := c.edit(content)
+			content = naiveSplice(content, e.Start, e.End, e.NewText)
+			doc.Edit(e)
+			assertMatchesFullLex(t, doc, content)
+		})
+	}
+}
+
 func TestDocumentFuzz(t *testing.T) {
 	r := rand.New(rand.NewSource(0x5EED))
 	alphabet := []string{
@@ -174,6 +234,11 @@ func TestDocumentFuzz(t *testing.T) {
 		// maximal-munch merge/split paths in the incremental relexer.
 		"+", "-", "%", "!", "<", ">", "&", "|", "==", "!=", "<=", ">=", "&&", "||",
 		"true ", "false ",
+		// Datetime and duration ingredients: the D/T/Z markers, unit letters,
+		// and digit clusters exercise the literal merge/shatter paths (a "."
+		// or ":" insertion can fuse or break a committed datetime).
+		"D", "T", ".", "w", "d", "h", "m", "s", "ms",
+		"D2009-03-31T23:59:59.000Z", "D2009-03-31", "00", "3w4d", "5s", "1h",
 	}
 
 	doc := NewDocument([]byte("const x = 0\n"))

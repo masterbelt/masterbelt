@@ -23,9 +23,11 @@ const (
 	DocComment   // /// ...
 
 	// Identifiers and literals.
-	Ident  // identifier or type name, e.g. MaxLevel, int64
-	Int    // integer literal, e.g. 100
-	String // string literal, e.g. "label"
+	Ident       // identifier or type name, e.g. MaxLevel, int64
+	Int         // integer literal, e.g. 100
+	String      // string literal, e.g. "label"
+	DatetimeLit // datetime literal, e.g. D2009-03-31T23:59:59.000Z
+	DurationLit // duration literal, e.g. 3w4d5h6m7s8ms
 
 	// Keywords.
 	Const   // const
@@ -89,6 +91,8 @@ var kindNames = [...]string{
 	Ident:        "Ident",
 	Int:          "Int",
 	String:       "String",
+	DatetimeLit:  "DatetimeLit",
+	DurationLit:  "DurationLit",
 	Const:        "Const",
 	Pub:          "Pub",
 	True:         "True",

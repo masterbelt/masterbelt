@@ -9,12 +9,28 @@ import (
 )
 
 const (
+	CodeInvalidDatetime          diagnostic.Code = "masterbelt.lexer.invalid_datetime"
 	CodeInvalidEscape            diagnostic.Code = "masterbelt.lexer.invalid_escape"
 	CodeInvalidUnicodeEscape     diagnostic.Code = "masterbelt.lexer.invalid_unicode_escape"
 	CodeUnexpectedCharacter      diagnostic.Code = "masterbelt.lexer.unexpected_character"
+	CodeUnknownDurationUnit      diagnostic.Code = "masterbelt.lexer.unknown_duration_unit"
 	CodeUnterminatedBlockComment diagnostic.Code = "masterbelt.lexer.unterminated_block_comment"
 	CodeUnterminatedString       diagnostic.Code = "masterbelt.lexer.unterminated_string"
 )
+
+func newInvalidDatetimeDiagnostic(offset int, width int, text string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"text": diagnostic.Str(text),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeInvalidDatetime,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeInvalidDatetime, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
 
 func newInvalidEscapeDiagnostic(offset int, width int, escape string) diagnostic.Diagnostic {
 	fields := map[string]fmt.Stringer{
@@ -52,6 +68,20 @@ func newUnexpectedCharacterDiagnostic(offset int, width int, char rune) diagnost
 		Severity: diagnostic.Error,
 		Code:     CodeUnexpectedCharacter,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeUnexpectedCharacter, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newUnknownDurationUnitDiagnostic(offset int, width int, unit string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"unit": diagnostic.Str(unit),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeUnknownDurationUnit,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeUnknownDurationUnit, fields),
 		Fields:   fields,
 		Offset:   offset,
 		Width:    width,

@@ -2,6 +2,7 @@ package lexer
 
 import (
 	"strconv"
+	"time"
 	"unicode/utf8"
 
 	"github.com/masterbelt/masterbelt/pkg/source/token"
@@ -183,12 +184,162 @@ func (l *Lexer) scanIdent(start int) token.Token {
 	return l.token(token.Lookup(string(l.src[start:l.offset])), start)
 }
 
-// scanInt scans a run of decimal digits.
-func (l *Lexer) scanInt(start int) token.Token {
+// scanDatetime recognizes a datetime literal: "D" + an ISO-8601 instant
+// (D2009-03-31T23:59:59.000Z, offsets allowed). The scan commits only on the
+// full date prefix D dddd-dd-ddT — "-" is not an identifier byte, so without
+// the lookahead D2009 would shatter into D2009 - 03 - 31; with it, D2009
+// alone (or Dragon) reports false and stays an identifier. Once committed, a
+// malformed clock or zone consumes the datetime-shaped run and is reported as
+// invalid_datetime, as is a well-shaped instant whose fields are out of range
+// (month 13, hour 99, February 30th).
+func (l *Lexer) scanDatetime(start int) (token.Token, bool) {
+	if !(l.peekDigits(1, 4) && l.peek(5) == '-' && l.peekDigits(6, 2) && l.peek(8) == '-' && l.peekDigits(9, 2) && l.peek(11) == 'T') {
+		return token.Token{}, false
+	}
+	l.offset += 12 // D dddd - dd - dd T
+
+	if !(l.scanClock() && l.scanZone()) {
+		// Malformed past the commit point: consume the datetime-shaped run
+		// (digits, colons, dots, and a closing Z) so the broken literal stays
+		// one token, and report it. The signs are left alone — they are more
+		// plausibly the neighbouring operators.
+		for l.offset < len(l.src) && (isDigit(l.src[l.offset]) || l.src[l.offset] == ':' || l.src[l.offset] == '.') {
+			l.offset++
+		}
+		if l.offset < len(l.src) && l.src[l.offset] == 'Z' {
+			l.offset++
+		}
+		l.reportInvalidDatetime(start, l.offset)
+		return l.token(token.DatetimeLit, start), true
+	}
+	if !validInstant(string(l.src[start+1 : l.offset])) {
+		l.reportInvalidDatetime(start, l.offset)
+	}
+	return l.token(token.DatetimeLit, start), true
+}
+
+// scanClock consumes the hh:mm:ss[.sss] half of a committed datetime literal,
+// reporting whether the shape held (the cursor stops at the first mismatch).
+func (l *Lexer) scanClock() bool {
+	if !(l.peekDigits(0, 2) && l.peek(2) == ':' && l.peekDigits(3, 2) && l.peek(5) == ':' && l.peekDigits(6, 2)) {
+		return false
+	}
+	l.offset += 8 // dd : dd : dd
+	if l.peek(0) == '.' {
+		if !l.peekDigits(1, 3) {
+			return false
+		}
+		l.offset += 4 // . ddd
+	}
+	return true
+}
+
+// scanZone consumes a committed datetime literal's zone: "Z", or a
+// "+"/"-"-signed hh:mm offset (normalized to UTC by the later layers).
+func (l *Lexer) scanZone() bool {
+	switch l.peek(0) {
+	case 'Z':
+		l.offset++
+		return true
+	case '+', '-':
+		if !(l.peekDigits(1, 2) && l.peek(3) == ':' && l.peekDigits(4, 2)) {
+			return false
+		}
+		l.offset += 6 // ± dd : dd
+		return true
+	}
+	return false
+}
+
+// peekDigits reports whether the n bytes starting at offset+from are all
+// decimal digits.
+func (l *Lexer) peekDigits(from, n int) bool {
+	for i := range n {
+		if !isDigit(l.peek(from + i)) {
+			return false
+		}
+	}
+	return true
+}
+
+// instantLayouts are the accepted ISO-8601 spellings after the D prefix, with
+// and without the millisecond part. time.Parse validates the field ranges
+// (month 13, hour 99, and February 30th all fail), which is exactly the
+// "shape fine, values impossible" half of invalid_datetime.
+var instantLayouts = [...]string{"2006-01-02T15:04:05.000Z07:00", "2006-01-02T15:04:05Z07:00"}
+
+// validInstant reports whether a structurally sound datetime literal (sans
+// the D prefix) names a real instant, offset bounds included.
+func validInstant(s string) bool {
+	for _, layout := range instantLayouts {
+		if _, err := time.Parse(layout, s); err == nil {
+			return offsetInRange(s)
+		}
+	}
+	return false
+}
+
+// offsetInRange bounds a signed zone offset to ±23:59 (time.Parse is lenient
+// about the hour count). The literal ends with either Z or ±hh:mm, and the
+// structural scan guarantees the digits.
+func offsetInRange(s string) bool {
+	if s[len(s)-1] == 'Z' {
+		return true
+	}
+	hh, _ := strconv.Atoi(s[len(s)-5 : len(s)-3])
+	mm, _ := strconv.Atoi(s[len(s)-2:])
+	return hh <= 23 && mm <= 59
+}
+
+// durationUnits is the unit alphabet of a duration literal, each unit's worth
+// in milliseconds: w/d/h/m/s/ms. The maximal letter munch keeps m and ms
+// unambiguous (6m7s8ms).
+var durationUnits = map[string]bool{"w": true, "d": true, "h": true, "m": true, "s": true, "ms": true}
+
+// scanNumber scans an integer literal, extending into a duration literal when
+// the digits run straight into a known unit: 5s, 100ms, and the concatenated
+// 3w4d5h6m7s8ms are each one token. Digits whose letter run is no unit stay
+// an integer — with the run reported as unknown_duration_unit, since an
+// identifier can never directly follow a number (5sec is a unit typo, 100 m
+// with a space is an integer and a name) — and a trailing group without its
+// unit is left for the next token (3w4 → 3w, 4).
+func (l *Lexer) scanNumber(start int) token.Token {
 	for l.offset < len(l.src) && isDigit(l.src[l.offset]) {
 		l.offset++
 	}
-	return l.token(token.Int, start)
+	unitEnd := l.offset
+	for unitEnd < len(l.src) && isLetter(l.src[unitEnd]) {
+		unitEnd++
+	}
+	if !durationUnits[string(l.src[l.offset:unitEnd])] {
+		if unitEnd > l.offset {
+			// The diagnostic spans from the digits (the token that produced
+			// it) through the letters, so the incremental relexer can splice
+			// it exactly like the token itself.
+			l.reportUnknownDurationUnit(start, l.offset, unitEnd)
+		}
+		return l.token(token.Int, start)
+	}
+	l.offset = unitEnd
+
+	// Further digit+unit groups extend the literal; a group whose letters are
+	// no unit rewinds to before its digits and ends the token there.
+	for l.offset < len(l.src) && isDigit(l.src[l.offset]) {
+		groupStart := l.offset
+		for l.offset < len(l.src) && isDigit(l.src[l.offset]) {
+			l.offset++
+		}
+		unitEnd := l.offset
+		for unitEnd < len(l.src) && isLetter(l.src[unitEnd]) {
+			unitEnd++
+		}
+		if !durationUnits[string(l.src[l.offset:unitEnd])] {
+			l.offset = groupStart
+			break
+		}
+		l.offset = unitEnd
+	}
+	return l.token(token.DurationLit, start)
 }
 
 // scanIllegal consumes one whole rune that begins no valid token, reports it,
@@ -230,6 +381,19 @@ func (l *Lexer) reportInvalidEscape(start, end int) {
 // the escape in [start, end).
 func (l *Lexer) reportInvalidUnicodeEscape(start, end int) {
 	l.diags.Add(newInvalidUnicodeEscapeDiagnostic(start, end-start, string(l.src[start:end])))
+}
+
+// reportInvalidDatetime records an "invalid datetime literal" diagnostic for
+// the literal in [start, end).
+func (l *Lexer) reportInvalidDatetime(start, end int) {
+	l.diags.Add(newInvalidDatetimeDiagnostic(start, end-start, string(l.src[start:end])))
+}
+
+// reportUnknownDurationUnit records an "unknown duration unit" diagnostic
+// spanning [start, end) — the digits and their letter run — naming the
+// letters in [unitStart, end) as the unit.
+func (l *Lexer) reportUnknownDurationUnit(start, unitStart, end int) {
+	l.diags.Add(newUnknownDurationUnitDiagnostic(start, end-start, string(l.src[unitStart:end])))
 }
 
 func isLetter(c byte) bool {
