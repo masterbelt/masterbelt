@@ -1,0 +1,23 @@
+File
+  ConstDecl
+    name "E"
+    value (call Identifier "error" StringLit "boom")
+  ConstDecl
+    name "M"
+    value (call (. Identifier "E" message))
+  ConstDecl
+    name "P"
+    type int | error
+    value (call Identifier "parseLevel" StringLit "99")
+  FuncDecl
+    pub
+    name "parseLevel"
+    param s: string
+    result int | error
+      return (call Identifier "error" (call (. StringLit "invalid level: " add) Identifier "s"))
+  AssertDecl
+    cond (call (. (call (. (call Identifier "error" StringLit "x") message)) eql) StringLit "x")
+  AssertDecl
+    cond (call (. (call (. Identifier "E" message)) eql) StringLit "boom")
+  AssertDecl
+    cond (call (. Identifier "M" eql) StringLit "boom")

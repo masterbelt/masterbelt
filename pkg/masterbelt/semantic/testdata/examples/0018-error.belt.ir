@@ -1,0 +1,23 @@
+Module
+  Const "E"
+    type invalid
+    value <none>
+  Const "M"
+    type invalid
+    value Reference -> "E".message()
+  Const "P"
+    type int | invalid
+    value parseLevel(StringLiteral "99")
+  Func "parseLevel" pub
+    param s: string
+    result int | invalid
+      return <none>
+  Assert "error(\"x\").message() == \"x\""
+    eval <unevaluated>
+      error("x").message() == "x"
+  Assert "E.message() == \"boom\""
+    eval <unevaluated>
+      E.message() == "boom"
+  Assert "M == \"boom\""
+    eval <unevaluated>
+      M == "boom"

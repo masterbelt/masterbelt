@@ -1,0 +1,186 @@
+# tree
+File
+  ConstDecl
+    LineComment "// The builtin error type: a recoverable failure as a value (belt has no"
+    Newline "\n"
+    LineComment "// exceptions). error(\"msg\") constructs one — the conversion form, like"
+    Newline "\n"
+    LineComment "// int8(5) — and .message() reads the message back. A fallible function"
+    Newline "\n"
+    LineComment "// declares failure in its result type as a union (T | error), never as a"
+    Newline "\n"
+    LineComment "// thrown exception."
+    Newline "\n"
+    Newline "\n"
+    LineComment "// An error is an ordinary compile-time value."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "E"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "error"
+        LParen "("
+        Literal
+          String "\"boom\""
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "M"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        MemberExpr
+          NameRef
+            Ident "E"
+          Dot "."
+          Ident "message"
+        LParen "("
+        RParen ")"
+  FuncDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// A fallible pure function: failure is a value in the result union."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Fn "fn"
+    Whitespace " "
+    Ident "parseLevel"
+    ParamList
+      LParen "("
+      Param
+        Ident "s"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "string"
+      RParen ")"
+    Colon ":"
+    Whitespace " "
+    UnionType
+      TypeName
+        Ident "int"
+      Whitespace " "
+      Pipe "|"
+      Whitespace " "
+      TypeName
+        Ident "error"
+    Whitespace " "
+    Block
+      LBrace "{"
+      Newline "\n"
+      Whitespace "  "
+      ReturnStmt
+        Return "return"
+        Whitespace " "
+        CallExpr
+          NameRef
+            Ident "error"
+          LParen "("
+          BinaryExpr
+            Literal
+              String "\"invalid level: \""
+            Whitespace " "
+            Plus "+"
+            Whitespace " "
+            NameRef
+              Ident "s"
+          RParen ")"
+      Newline "\n"
+      RBrace "}"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// The failure value flows into a union-typed constant."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "P"
+    TypeClause
+      Colon ":"
+      Whitespace " "
+      UnionType
+        TypeName
+          Ident "int"
+        Whitespace " "
+        Pipe "|"
+        Whitespace " "
+        TypeName
+          Ident "error"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "parseLevel"
+        LParen "("
+        Literal
+          String "\"99\""
+        RParen ")"
+  AssertDecl
+    Newline "\n"
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      CallExpr
+        MemberExpr
+          CallExpr
+            NameRef
+              Ident "error"
+            LParen "("
+            Literal
+              String "\"x\""
+            RParen ")"
+          Dot "."
+          Ident "message"
+        LParen "("
+        RParen ")"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        String "\"x\""
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      CallExpr
+        MemberExpr
+          NameRef
+            Ident "E"
+          Dot "."
+          Ident "message"
+        LParen "("
+        RParen ")"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        String "\"boom\""
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      NameRef
+        Ident "M"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        String "\"boom\""
+  Newline "\n"
+  EOF ""
+# diagnostics
