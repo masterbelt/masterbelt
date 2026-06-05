@@ -19,7 +19,7 @@
 //	PrimaryType   := TypeName | RecordType | FuncType
 //	TypeName      := ( Ident ["." Ident] [GenericArgs] ) | "self" | "null"
 //	GenericArgs   := "<" TypeExpr ( "," TypeExpr )* ">"
-//	RecordType    := "{" Field* "}"
+//	RecordType    := "{" ( Field [","] )* "}"
 //	Field         := Ident ":" TypeExpr
 //	FuncType      := fn ParamList ":" TypeExpr
 //	ImplBlock     := impl "{" MethodDecl* "}"
@@ -37,13 +37,15 @@
 //	MulExpr       := Unary ( ( "*" | "/" | "%" ) Unary )*
 //	Unary         := ( "+" | "-" | "!" ) Unary | Postfix
 //	Postfix       := Operand ( "." Ident | "(" [ Expr ( "," Expr )* ] ")" )*
-//	Operand       := Literal | CollectionLit | NameRef | "self" | FuncLit | ParenExpr
+//	Operand       := Literal | CollectionLit | RecordLit | NameRef | "self" | FuncLit | ParenExpr
 //	ParenExpr     := "(" Expr ")"
 //	FuncLit       := fn LitParamList [":" TypeExpr] ( "->" Expr | Block )
 //	LitParamList  := "(" [ LitParam ( "," LitParam )* ] ")"
 //	LitParam      := Ident [":" TypeExpr]
 //	CollectionLit := "[" [ Element ( "," Element )* [","] ] "]"
 //	Element       := Expr [ ":" Expr ]
+//	RecordLit     := [Ident] "{" ( RecordField [","] )* "}"
+//	RecordField   := Ident ":" Expr
 //	NameRef       := Ident
 //	Literal       := Int | String | DatetimeLit | DurationLit | "true" | "false" | "null"
 //

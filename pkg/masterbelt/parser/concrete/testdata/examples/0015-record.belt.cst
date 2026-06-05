@@ -47,23 +47,26 @@ File
     Initializer
       Assign "="
       Whitespace " "
-      NameRef
+      RecordLit
         Ident "Point"
-  Error
-    LBrace "{"
-    Whitespace " "
-    Ident "x"
-    Colon ":"
-    Whitespace " "
-    Int "0"
-    Comma ","
-    Whitespace " "
-    Ident "y"
-    Colon ":"
-    Whitespace " "
-    Int "0"
-    Whitespace " "
-    RBrace "}"
+        LBrace "{"
+        Whitespace " "
+        RecordField
+          Ident "x"
+          Colon ":"
+          Whitespace " "
+          Literal
+            Int "0"
+        Comma ","
+        Whitespace " "
+        RecordField
+          Ident "y"
+          Colon ":"
+          Whitespace " "
+          Literal
+            Int "0"
+        Whitespace " "
+        RBrace "}"
   ConstDecl
     Newline "\n"
     Newline "\n"
@@ -80,22 +83,26 @@ File
     Whitespace " "
     Initializer
       Assign "="
-  Error
-    Whitespace " "
-    LBrace "{"
-    Whitespace " "
-    Ident "x"
-    Colon ":"
-    Whitespace " "
-    Int "1"
-    Comma ","
-    Whitespace " "
-    Ident "y"
-    Colon ":"
-    Whitespace " "
-    Int "2"
-    Whitespace " "
-    RBrace "}"
+      Whitespace " "
+      RecordLit
+        LBrace "{"
+        Whitespace " "
+        RecordField
+          Ident "x"
+          Colon ":"
+          Whitespace " "
+          Literal
+            Int "1"
+        Comma ","
+        Whitespace " "
+        RecordField
+          Ident "y"
+          Colon ":"
+          Whitespace " "
+          Literal
+            Int "2"
+        Whitespace " "
+        RBrace "}"
   ConstDecl
     Newline "\n"
     Newline "\n"
@@ -108,24 +115,27 @@ File
     Initializer
       Assign "="
       Whitespace " "
-      NameRef
+      RecordLit
         Ident "Point"
-  Error
-    LBrace "{"
-    Newline "\n"
-    Whitespace "  "
-    Ident "x"
-    Colon ":"
-    Whitespace " "
-    Int "3"
-    Newline "\n"
-    Whitespace "  "
-    Ident "y"
-    Colon ":"
-    Whitespace " "
-    Int "4"
-    Newline "\n"
-    RBrace "}"
+        LBrace "{"
+        Newline "\n"
+        Whitespace "  "
+        RecordField
+          Ident "x"
+          Colon ":"
+          Whitespace " "
+          Literal
+            Int "3"
+        Newline "\n"
+        Whitespace "  "
+        RecordField
+          Ident "y"
+          Colon ":"
+          Whitespace " "
+          Literal
+            Int "4"
+        Newline "\n"
+        RBrace "}"
   TypeDecl
     Newline "\n"
     Newline "\n"
@@ -175,43 +185,52 @@ File
     Initializer
       Assign "="
       Whitespace " "
-      NameRef
+      RecordLit
         Ident "Item"
-  Error
-    LBrace "{"
-    Whitespace " "
-    Ident "id"
-    Colon ":"
-    Whitespace " "
-    Int "1"
-    Comma ","
-    Whitespace " "
-    Ident "name"
-    Colon ":"
-    Whitespace " "
-    String "\"Sword\""
-    Comma ","
-    Whitespace " "
-    Ident "pos"
-    Colon ":"
-    Whitespace " "
-    Ident "Point"
-    LBrace "{"
-    Whitespace " "
-    Ident "x"
-    Colon ":"
-    Whitespace " "
-    Int "0"
-    Comma ","
-    Whitespace " "
-    Ident "y"
-    Colon ":"
-    Whitespace " "
-    Int "0"
-    Whitespace " "
-    RBrace "}"
-    Whitespace " "
-    RBrace "}"
+        LBrace "{"
+        Whitespace " "
+        RecordField
+          Ident "id"
+          Colon ":"
+          Whitespace " "
+          Literal
+            Int "1"
+        Comma ","
+        Whitespace " "
+        RecordField
+          Ident "name"
+          Colon ":"
+          Whitespace " "
+          Literal
+            String "\"Sword\""
+        Comma ","
+        Whitespace " "
+        RecordField
+          Ident "pos"
+          Colon ":"
+          Whitespace " "
+          RecordLit
+            Ident "Point"
+            LBrace "{"
+            Whitespace " "
+            RecordField
+              Ident "x"
+              Colon ":"
+              Whitespace " "
+              Literal
+                Int "0"
+            Comma ","
+            Whitespace " "
+            RecordField
+              Ident "y"
+              Colon ":"
+              Whitespace " "
+              Literal
+                Int "0"
+            Whitespace " "
+            RBrace "}"
+        Whitespace " "
+        RBrace "}"
   ConstDecl
     Newline "\n"
     Newline "\n"
@@ -236,39 +255,48 @@ File
       Whitespace " "
       CollectionLit
         LBracket "["
-  Error
-    LBrace "{"
-    Whitespace " "
-    Ident "x"
-    Colon ":"
-    Whitespace " "
-    Int "0"
-    Comma ","
-    Whitespace " "
-    Ident "y"
-    Colon ":"
-    Whitespace " "
-    Int "0"
-    Whitespace " "
-    RBrace "}"
-    Comma ","
-    Whitespace " "
-    Ident "Point"
-    LBrace "{"
-    Whitespace " "
-    Ident "x"
-    Colon ":"
-    Whitespace " "
-    Int "1"
-    Comma ","
-    Whitespace " "
-    Ident "y"
-    Colon ":"
-    Whitespace " "
-    Int "1"
-    Whitespace " "
-    RBrace "}"
-    RBracket "]"
+        RecordLit
+          LBrace "{"
+          Whitespace " "
+          RecordField
+            Ident "x"
+            Colon ":"
+            Whitespace " "
+            Literal
+              Int "0"
+          Comma ","
+          Whitespace " "
+          RecordField
+            Ident "y"
+            Colon ":"
+            Whitespace " "
+            Literal
+              Int "0"
+          Whitespace " "
+          RBrace "}"
+        Comma ","
+        Whitespace " "
+        RecordLit
+          Ident "Point"
+          LBrace "{"
+          Whitespace " "
+          RecordField
+            Ident "x"
+            Colon ":"
+            Whitespace " "
+            Literal
+              Int "1"
+          Comma ","
+          Whitespace " "
+          RecordField
+            Ident "y"
+            Colon ":"
+            Whitespace " "
+            Literal
+              Int "1"
+          Whitespace " "
+          RBrace "}"
+        RBracket "]"
   TypeDecl
     Newline "\n"
     Newline "\n"
@@ -298,22 +326,10 @@ File
     Whitespace " "
     Initializer
       Assign "="
-  Error
-    Whitespace " "
-    LBrace "{"
-    RBrace "}"
+      Whitespace " "
+      RecordLit
+        LBrace "{"
+        RBrace "}"
   Newline "\n"
   EOF ""
 # diagnostics
-error[masterbelt.parser.concrete.unexpected_token] 5:26 unexpected token: Comma
-error[masterbelt.parser.concrete.unexpected_token] 8:21 unexpected token: LBrace
-error[masterbelt.parser.concrete.expected_expression] 11:16 expected expression
-error[masterbelt.parser.concrete.unexpected_token] 11:18 unexpected token: LBrace
-error[masterbelt.parser.concrete.unexpected_token] 14:16 unexpected token: LBrace
-error[masterbelt.parser.concrete.unexpected_token] 20:26 unexpected token: Comma
-error[masterbelt.parser.concrete.unexpected_token] 20:40 unexpected token: Comma
-error[masterbelt.parser.concrete.unexpected_token] 21:19 unexpected token: LBrace
-error[masterbelt.parser.concrete.unexpected_token] 24:28 unexpected token: LBrace
-error[masterbelt.parser.concrete.unexpected_token] 24:28 unexpected token: LBrace
-error[masterbelt.parser.concrete.expected_expression] 28:15 expected expression
-error[masterbelt.parser.concrete.unexpected_token] 28:17 unexpected token: LBrace

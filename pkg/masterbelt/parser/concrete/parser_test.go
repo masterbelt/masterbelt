@@ -363,6 +363,128 @@ func TestParseCollectionLiteral(t *testing.T) {
 	}
 }
 
+// TestParseRecordLiteral checks both record-literal forms — typed (Point{...})
+// and inferred ({...}) — across the separator styles, nesting, and the empty
+// literal. The child kinds skip the brace/comma leaves and trivia, so a typed
+// literal looks exactly like an inferred one here; the leading Ident leaf is
+// asserted separately.
+func TestParseRecordLiteral(t *testing.T) {
+	cases := []struct {
+		name  string
+		src   string
+		typed bool
+		want  []cst.Kind
+	}{
+		{"typed single line", "const x = Point{ x: 1, y: 2 }\n", true, []cst.Kind{cst.RecordField, cst.RecordField}},
+		{"inferred", "const x: Point = { x: 1, y: 2 }\n", false, []cst.Kind{cst.RecordField, cst.RecordField}},
+		{"newline separated", "const x = Point{\n  x: 1\n  y: 2\n}\n", true, []cst.Kind{cst.RecordField, cst.RecordField}},
+		{"trailing comma", "const x = Point{ x: 1, y: 2, }\n", true, []cst.Kind{cst.RecordField, cst.RecordField}},
+		{"nested", "const x = Item{ pos: Point{ x: 1 } }\n", true, []cst.Kind{cst.RecordField}},
+		{"empty", "const x: Unit = {}\n", false, nil},
+		{"empty typed", "const x = Unit{}\n", true, nil},
+		{"record in list", "const x = [{ x: 1 }]\n", false, nil}, // asserted below via the literal's parent
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, diags := Parse([]byte(tc.src))
+			if len(diags) != 0 {
+				t.Fatalf("unexpected diagnostics: %v", diags)
+			}
+			assertLossless(t, tc.src)
+			if tc.name == "record in list" {
+				return // parse-clean and lossless is the point here
+			}
+			_, e := initExpr(t, tc.src)
+			if k, ok := e.Kind(); !ok || k != cst.RecordLit {
+				t.Fatalf("initializer kind = %v, want RecordLit", k)
+			}
+			gotTyped := false
+			if tk, ok := e.Children()[0].TokenKind(); ok && tk == token.Ident {
+				gotTyped = true
+			}
+			if gotTyped != tc.typed {
+				t.Fatalf("typed = %v, want %v", gotTyped, tc.typed)
+			}
+			got := collectionChildKinds(e)
+			if len(got) != len(tc.want) {
+				t.Fatalf("child nodes = %v, want %v", got, tc.want)
+			}
+			for i := range got {
+				if got[i] != tc.want[i] {
+					t.Fatalf("child nodes = %v, want %v", got, tc.want)
+				}
+			}
+		})
+	}
+}
+
+// TestParseRecordLiteralVsMap pins the bracket split: "[K: V]" stays a map
+// (CollectionLit/MapEntry) and "{...}" is always a record — the two literals
+// never collide.
+func TestParseRecordLiteralVsMap(t *testing.T) {
+	_, e := initExpr(t, "const x = [\"k\": { a: 1 }]\n")
+	if k, ok := e.Kind(); !ok || k != cst.CollectionLit {
+		t.Fatalf("initializer kind = %v, want CollectionLit", k)
+	}
+	kinds := collectionChildKinds(e)
+	if len(kinds) != 1 || kinds[0] != cst.MapEntry {
+		t.Fatalf("child nodes = %v, want [MapEntry]", kinds)
+	}
+}
+
+// TestParseRecordTypeSeparators checks that a record type accepts comma
+// separators alongside newlines, matching the literal's separator rule.
+func TestParseRecordTypeSeparators(t *testing.T) {
+	cases := []string{
+		"type Point = { x: int, y: int }\n",
+		"type Point = { x: int, y: int, }\n",
+		"type Point = {\n  x: int\n  y: int\n}\n",
+	}
+	for _, src := range cases {
+		root, diags := Parse([]byte(src))
+		if len(diags) != 0 {
+			t.Fatalf("%q: unexpected diagnostics: %v", src, diags)
+		}
+		assertLossless(t, src)
+		decl := root.Children()[0].(*cst.Node)
+		got := subNodeKinds(decl)
+		if len(got) != 1 || got[0] != cst.RecordType {
+			t.Fatalf("%q: sub-nodes = %v, want [RecordType]", src, got)
+		}
+	}
+}
+
+// TestParseRecordLiteralDiagnostics checks local recovery for malformed record
+// literals: every case reports, stays lossless, and never swallows the
+// following declaration.
+func TestParseRecordLiteralDiagnostics(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+		code diagnostic.Code
+	}{
+		{"missing colon", "const x = Point{ x 1 }\nconst y = 2\n", CodeUnexpectedToken},
+		{"missing value", "const x = Point{ x: }\nconst y = 2\n", CodeExpectedExpression},
+		{"missing close", "const x = Point{ x: 1\n", CodeUnexpectedToken},
+		{"stray comma", "const x = Point{ , x: 1 }\nconst y = 2\n", CodeUnexpectedToken},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, diags := Parse([]byte(tc.src))
+			found := false
+			for _, d := range diags {
+				if d.Code == tc.code {
+					found = true
+				}
+			}
+			if !found {
+				t.Fatalf("src %q: want diagnostic %s, got %v", tc.src, tc.code, diags)
+			}
+			assertLossless(t, tc.src)
+		})
+	}
+}
+
 // TestParseFuncLit checks the function-literal header: the parameter and result
 // annotations are optional (the checker may infer them from context), and the
 // shape of the node reflects exactly what was written.

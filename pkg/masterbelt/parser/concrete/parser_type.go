@@ -101,8 +101,9 @@ func (p *parser) parseGenericArgs() *cst.Node {
 	return cst.NewNode(cst.GenericArgs, children)
 }
 
-// parseRecordType parses an anonymous product type, "{" Field* "}", with fields
-// separated by newlines (trivia). The cursor sits on "{".
+// parseRecordType parses an anonymous product type, "{" ( Field [","] )* "}",
+// with fields separated by commas and/or newlines (trivia) — the same separator
+// rule as the record literal. The cursor sits on "{".
 func (p *parser) parseRecordType() *cst.Node {
 	children := []cst.Green{p.bump()} // "{"
 	for {
@@ -116,6 +117,10 @@ func (p *parser) parseRecordType() *cst.Node {
 		case token.Ident:
 			p.skipTrivia(&children)
 			children = append(children, p.parseField())
+			if p.peekSignificant() == token.Comma {
+				p.skipTrivia(&children)
+				children = append(children, p.bump()) // ","
+			}
 		default:
 			p.skipTrivia(&children)
 			p.report(newUnexpectedTokenDiagnostic(p.cur().Offset, p.cur().Width, p.kind().String()))

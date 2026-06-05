@@ -1,16 +1,13 @@
 File
   ConstDecl
     name "Origin"
-    value Identifier "Point"
   ConstDecl
     name "P"
     type Point
   ConstDecl
     name "Q"
-    value Identifier "Point"
   ConstDecl
     name "Sword"
-    value Identifier "Item"
   ConstDecl
     name "Path"
     type list<Point>
