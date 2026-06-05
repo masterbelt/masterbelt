@@ -1,0 +1,46 @@
+Module
+  Const "Hi"
+    type invalid
+    value <none>
+  Const "Lo"
+    type invalid
+    value <none>
+  Const "Top"
+    type Level
+    value <none>
+  Const "Bottom"
+    type Level
+    value <none>
+  Const "W"
+    type invalid
+    value <none>
+  Const "ServerPort"
+    type Port
+    value IntLiteral "8080"
+    eval 8080
+  TypeDef "Level" pub
+    doc "A character level, capped at 100."
+    body int8
+    method "" pub
+      doc "The highest level."
+      result invalid
+    method "Max"
+      result invalid
+    method "" pub
+      doc "The lowest level."
+      result invalid
+    method "Min"
+      result invalid
+    method "increment" pub
+      doc "The next level."
+      result self
+      return self.add(IntLiteral "1")
+  TypeDef "Bits" pub
+    body int32
+    method "" pub
+      doc "The width in bits."
+      result invalid
+    method "Width"
+      result int32
+  TypeDef "Port" pub
+    body int32

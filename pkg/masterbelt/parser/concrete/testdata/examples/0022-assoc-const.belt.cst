@@ -1,0 +1,318 @@
+# tree
+File
+  ConstDecl
+    LineComment "// Associated constants: a constant scoped to a type, declared with `const`"
+    Newline "\n"
+    LineComment "// inside an impl block and read as `TypeName.Name`. It shares the `Type.Name`"
+    Newline "\n"
+    LineComment "// resolution path with enum members — the left side names a type, not a value."
+    Newline "\n"
+    Newline "\n"
+    LineComment "// The builtin integer bounds are first-class associated constants: the registry"
+    Newline "\n"
+    LineComment "// value range, exposed as `int8.Max` / `int8.Min`."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Hi"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      MemberExpr
+        NameRef
+          Ident "int8"
+        Dot "."
+        Ident "Max"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Lo"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      MemberExpr
+        NameRef
+          Ident "int8"
+        Dot "."
+        Ident "Min"
+  TypeDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// A user type's associated constants live in its impl block, alongside methods."
+    Newline "\n"
+    DocComment "/// A character level, capped at 100."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Type "type"
+    Whitespace " "
+    Ident "Level"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    TypeName
+      Ident "int8"
+    Whitespace " "
+    ImplBlock
+      Impl "impl"
+      Whitespace " "
+      LBrace "{"
+      MethodDecl
+        Newline "\n"
+        Whitespace "  "
+        DocComment "/// The highest level."
+        Newline "\n"
+        Whitespace "  "
+        Pub "pub"
+      Whitespace " "
+      Const "const"
+      MethodDecl
+        Whitespace " "
+        Ident "Max"
+      Whitespace " "
+      Assign "="
+      Whitespace " "
+      Int "100"
+      MethodDecl
+        Newline "\n"
+        Whitespace "  "
+        DocComment "/// The lowest level."
+        Newline "\n"
+        Whitespace "  "
+        Pub "pub"
+      Whitespace " "
+      Const "const"
+      MethodDecl
+        Whitespace " "
+        Ident "Min"
+      Whitespace " "
+      Assign "="
+      Whitespace " "
+      Int "0"
+      MethodDecl
+        Newline "\n"
+        Newline "\n"
+        Whitespace "  "
+        DocComment "/// The next level."
+        Newline "\n"
+        Whitespace "  "
+        Pub "pub"
+        Whitespace " "
+        Ident "increment"
+        ParamList
+          LParen "("
+          RParen ")"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Self "self"
+        Whitespace " "
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            BinaryExpr
+              SelfExpr
+                Self "self"
+              Whitespace " "
+              Plus "+"
+              Whitespace " "
+              Literal
+                Int "1"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
+      Newline "\n"
+      RBrace "}"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// A qualified associated-const access is canonical, and a const may be annotated"
+    Newline "\n"
+    LineComment "// with the owning type."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Top"
+    TypeClause
+      Colon ":"
+      Whitespace " "
+      TypeName
+        Ident "Level"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      MemberExpr
+        NameRef
+          Ident "Level"
+        Dot "."
+        Ident "Max"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Bottom"
+    TypeClause
+      Colon ":"
+      Whitespace " "
+      TypeName
+        Ident "Level"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      MemberExpr
+        NameRef
+          Ident "Level"
+        Dot "."
+        Ident "Min"
+  TypeDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// An associated constant carries its own type annotation when written."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Type "type"
+    Whitespace " "
+    Ident "Bits"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    TypeName
+      Ident "int32"
+    Whitespace " "
+    ImplBlock
+      Impl "impl"
+      Whitespace " "
+      LBrace "{"
+      MethodDecl
+        Newline "\n"
+        Whitespace "  "
+        DocComment "/// The width in bits."
+        Newline "\n"
+        Whitespace "  "
+        Pub "pub"
+      Whitespace " "
+      Const "const"
+      MethodDecl
+        Whitespace " "
+        Ident "Width"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "int32"
+      Whitespace " "
+      Assign "="
+      Whitespace " "
+      Int "32"
+      Newline "\n"
+      RBrace "}"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "W"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      MemberExpr
+        NameRef
+          Ident "Bits"
+        Dot "."
+        Ident "Width"
+  TypeDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// The builtin bounds kill the magic numbers in a refinement: a port is between 1"
+    Newline "\n"
+    LineComment "// and the 16-bit ceiling."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Type "type"
+    Whitespace " "
+    Ident "Port"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    TypeName
+      Ident "int32"
+    Whitespace " "
+    WhereClause
+      Where "where"
+      Whitespace " "
+      BinaryExpr
+        BinaryExpr
+          SelfExpr
+            Self "self"
+          Whitespace " "
+          GtEq ">="
+          Whitespace " "
+          Literal
+            Int "1"
+        Whitespace " "
+        AmpAmp "&&"
+        Whitespace " "
+        BinaryExpr
+          SelfExpr
+            Self "self"
+          Whitespace " "
+          LtEq "<="
+          Whitespace " "
+          MemberExpr
+            NameRef
+              Ident "int16"
+            Dot "."
+            Ident "Max"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "ServerPort"
+    TypeClause
+      Colon ":"
+      Whitespace " "
+      TypeName
+        Ident "Port"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      Literal
+        Int "8080"
+  Newline "\n"
+  EOF ""
+# diagnostics
+error[masterbelt.parser.concrete.expected_identifier] 14:3 expected identifier
+error[masterbelt.parser.concrete.unexpected_token] 14:6 unexpected token: Whitespace
+error[masterbelt.parser.concrete.expected_type] 14:3 expected type
+error[masterbelt.parser.concrete.unexpected_token] 14:7 unexpected token: Const
+error[masterbelt.parser.concrete.unexpected_token] 14:16 unexpected token: Whitespace
+error[masterbelt.parser.concrete.expected_type] 14:13 expected type
+error[masterbelt.parser.concrete.unexpected_token] 14:17 unexpected token: Assign
+error[masterbelt.parser.concrete.unexpected_token] 14:19 unexpected token: Int
+error[masterbelt.parser.concrete.expected_identifier] 16:3 expected identifier
+error[masterbelt.parser.concrete.unexpected_token] 16:6 unexpected token: Whitespace
+error[masterbelt.parser.concrete.expected_type] 16:3 expected type
+error[masterbelt.parser.concrete.unexpected_token] 16:7 unexpected token: Const
+error[masterbelt.parser.concrete.unexpected_token] 16:16 unexpected token: Whitespace
+error[masterbelt.parser.concrete.expected_type] 16:13 expected type
+error[masterbelt.parser.concrete.unexpected_token] 16:17 unexpected token: Assign
+error[masterbelt.parser.concrete.unexpected_token] 16:19 unexpected token: Int
+error[masterbelt.parser.concrete.expected_identifier] 32:3 expected identifier
+error[masterbelt.parser.concrete.unexpected_token] 32:6 unexpected token: Whitespace
+error[masterbelt.parser.concrete.expected_type] 32:3 expected type
+error[masterbelt.parser.concrete.unexpected_token] 32:7 unexpected token: Const
+error[masterbelt.parser.concrete.unexpected_token] 32:18 unexpected token: Colon
+error[masterbelt.parser.concrete.unexpected_token] 32:26 unexpected token: Assign
+error[masterbelt.parser.concrete.unexpected_token] 32:28 unexpected token: Int

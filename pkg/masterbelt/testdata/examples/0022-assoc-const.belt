@@ -1,0 +1,40 @@
+// Associated constants: a constant scoped to a type, declared with `const`
+// inside an impl block and read as `TypeName.Name`. It shares the `Type.Name`
+// resolution path with enum members — the left side names a type, not a value.
+
+// The builtin integer bounds are first-class associated constants: the registry
+// value range, exposed as `int8.Max` / `int8.Min`.
+const Hi = int8.Max
+const Lo = int8.Min
+
+// A user type's associated constants live in its impl block, alongside methods.
+/// A character level, capped at 100.
+pub type Level = int8 impl {
+  /// The highest level.
+  pub const Max = 100
+  /// The lowest level.
+  pub const Min = 0
+
+  /// The next level.
+  pub increment(): self {
+    return self + 1
+  }
+}
+
+// A qualified associated-const access is canonical, and a const may be annotated
+// with the owning type.
+const Top: Level = Level.Max
+const Bottom: Level = Level.Min
+
+// An associated constant carries its own type annotation when written.
+pub type Bits = int32 impl {
+  /// The width in bits.
+  pub const Width: int32 = 32
+}
+
+const W = Bits.Width
+
+// The builtin bounds kill the magic numbers in a refinement: a port is between 1
+// and the 16-bit ceiling.
+pub type Port = int32 where self >= 1 && self <= int16.Max
+const ServerPort: Port = 8080
