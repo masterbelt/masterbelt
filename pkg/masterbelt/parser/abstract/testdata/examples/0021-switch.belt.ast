@@ -11,10 +11,8 @@ File
     name "color"
     param r: Rarity
     result string
-      expr (record r Common: <missing> Rare: <missing> Legend: <missing>)
   FuncDecl
     pub
     name "grade"
     param n: int
     result string
-      expr (record n _: <missing>)

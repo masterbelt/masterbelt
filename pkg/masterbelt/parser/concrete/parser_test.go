@@ -1353,3 +1353,159 @@ func TestParseEnumEmpty(t *testing.T) {
 	}
 	assertLossless(t, src)
 }
+
+// findFirst returns the first node of the given kind in a pre-order walk of
+// root, or nil when none is present. It lets the switch tests reach into a
+// function body to the SwitchStmt without spelling out every wrapper node.
+func findFirst(root *cst.Node, kind cst.Kind) *cst.Node {
+	if root.Kind() == kind {
+		return root
+	}
+	for _, c := range root.Children() {
+		if n, ok := c.(*cst.Node); ok {
+			if found := findFirst(n, kind); found != nil {
+				return found
+			}
+		}
+	}
+	return nil
+}
+
+// armNodes returns the SwitchArm children of a SwitchStmt, in order.
+func armNodes(sw *cst.Node) []*cst.Node {
+	var arms []*cst.Node
+	for _, c := range sw.Children() {
+		if n, ok := c.(*cst.Node); ok && n.Kind() == cst.SwitchArm {
+			arms = append(arms, n)
+		}
+	}
+	return arms
+}
+
+// TestParseSwitchStmt checks the shape of a parsed switch: its scrutinee, its
+// arms, the value patterns and body of each arm, the multi-value and wildcard
+// forms, and comma vs newline arm separators.
+func TestParseSwitchStmt(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+		// scrutinee is the scrutinee node's kind.
+		scrutinee cst.Kind
+		// arms is, per arm, the kinds of its direct sub-nodes (the value
+		// patterns followed by the body).
+		arms [][]cst.Kind
+	}{
+		{
+			"enum arms, newline separated",
+			"pub fn c(r: R): string {\n  switch r {\n    A -> return \"a\"\n    B -> return \"b\"\n  }\n}\n",
+			cst.NameRef,
+			[][]cst.Kind{
+				{cst.NameRef, cst.ReturnStmt},
+				{cst.NameRef, cst.ReturnStmt},
+			},
+		},
+		{
+			"multi-value arm and wildcard with a block body",
+			"pub fn g(n: int): string {\n  switch n {\n    0 -> return \"z\"\n    1, 2, 3 -> return \"l\"\n    _ -> {\n      return \"h\"\n    }\n  }\n}\n",
+			cst.NameRef,
+			[][]cst.Kind{
+				{cst.Literal, cst.ReturnStmt},
+				{cst.Literal, cst.Literal, cst.Literal, cst.ReturnStmt},
+				{cst.NameRef, cst.Block},
+			},
+		},
+		{
+			"comma separated arms",
+			"pub fn c(r: R): string {\n  switch r { A -> return \"a\", B -> return \"b\" }\n}\n",
+			cst.NameRef,
+			[][]cst.Kind{
+				{cst.NameRef, cst.ReturnStmt},
+				{cst.NameRef, cst.ReturnStmt},
+			},
+		},
+		{
+			"expression body arm",
+			"pub fn c(r: R): string {\n  switch r {\n    A -> log(r)\n  }\n}\n",
+			cst.NameRef,
+			[][]cst.Kind{
+				{cst.NameRef, cst.CallExpr},
+			},
+		},
+		{
+			"qualified-member scrutinee is not a record literal",
+			"pub fn c(r: R): string {\n  switch self.x {\n    A -> return \"a\"\n  }\n}\n",
+			cst.MemberExpr,
+			[][]cst.Kind{
+				{cst.NameRef, cst.ReturnStmt},
+			},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			root, diags := Parse([]byte(tc.src))
+			if len(diags) != 0 {
+				t.Fatalf("unexpected diagnostics: %v", diags)
+			}
+			sw := findFirst(root, cst.SwitchStmt)
+			if sw == nil {
+				t.Fatal("no SwitchStmt parsed")
+			}
+			sub := subNodeKinds(sw)
+			if len(sub) == 0 || sub[0] != tc.scrutinee {
+				t.Fatalf("scrutinee kind = %v, want %v", sub, tc.scrutinee)
+			}
+			arms := armNodes(sw)
+			if len(arms) != len(tc.arms) {
+				t.Fatalf("got %d arms, want %d", len(arms), len(tc.arms))
+			}
+			for i, arm := range arms {
+				got := subNodeKinds(arm)
+				if strings.Join(kindStrings(got), ",") != strings.Join(kindStrings(tc.arms[i]), ",") {
+					t.Fatalf("arm %d sub-nodes = %v, want %v", i, got, tc.arms[i])
+				}
+			}
+			assertLossless(t, tc.src)
+		})
+	}
+}
+
+// TestParseSwitchNested checks that a switch arm body may itself be a switch
+// (statements compose), so the inner switch is found inside the outer arm.
+func TestParseSwitchNested(t *testing.T) {
+	src := "pub fn c(r: R): string {\n  switch r {\n    A -> switch r {\n      B -> return \"b\"\n    }\n  }\n}\n"
+	root, diags := Parse([]byte(src))
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	outer := findFirst(root, cst.SwitchStmt)
+	if outer == nil {
+		t.Fatal("no outer SwitchStmt")
+	}
+	arms := armNodes(outer)
+	if len(arms) != 1 {
+		t.Fatalf("got %d outer arms, want 1", len(arms))
+	}
+	if inner := findFirst(arms[0], cst.SwitchStmt); inner == nil {
+		t.Fatal("arm body is not a nested SwitchStmt")
+	}
+	assertLossless(t, src)
+}
+
+// TestParseSwitchLossless checks that malformed and well-formed switches alike
+// round-trip to the source byte for byte (the incremental pipeline's invariant).
+func TestParseSwitchLossless(t *testing.T) {
+	cases := []string{
+		"pub fn c(r: R): string {\n  switch r {\n    A -> return \"a\"\n  }\n}\n",
+		"pub fn c(r: R): string {\n  switch r { A -> return \"a\", B -> return \"b\" }\n}\n",
+		"pub fn g(n: int): string {\n  switch n {\n    1, 2, 3 -> return \"l\"\n    _ -> return \"h\"\n  }\n}\n",
+		"pub fn c(r: R): string {\n  switch r {\n    A -> {\n      return \"a\"\n    }\n  }\n}\n",
+		"pub fn c(r: R): string {\n  switch\n}\n",                                   // missing scrutinee and body
+		"pub fn c(r: R): string {\n  switch r\n}\n",                                 // missing arm block
+		"pub fn c(r: R): string {\n  switch r {\n}\n}\n",                            // empty arm block
+		"pub fn c(r: R): string {\n  switch r {\n    A ->\n  }\n}\n",                // arm missing body
+		"pub fn c(r: R): string {\n  switch r {\n    A B -> return \"a\"\n  }\n}\n", // missing arrow
+	}
+	for _, src := range cases {
+		assertLossless(t, src)
+	}
+}

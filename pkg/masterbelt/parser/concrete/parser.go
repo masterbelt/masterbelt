@@ -31,8 +31,10 @@
 //	ParamList     := "(" [ Param ( "," Param )* ] ")"
 //	Param         := Ident ":" TypeExpr
 //	Block         := "{" Stmt* "}"
-//	Stmt          := ReturnStmt | Expr
+//	Stmt          := ReturnStmt | SwitchStmt | Expr
 //	ReturnStmt    := return Expr
+//	SwitchStmt    := switch Expr "{" ( SwitchArm ( ("," | NL) SwitchArm )* )? "}"
+//	SwitchArm     := ( Expr ( "," Expr )* | "_" ) "->" ( Stmt | Block )
 //	Expr          := OrExpr
 //	OrExpr        := AndExpr ( "||" AndExpr )*
 //	AndExpr       := CmpExpr ( "&&" CmpExpr )*
@@ -110,6 +112,15 @@ type parser struct {
 	toks  []token.Token
 	pos   int
 	diags *diagnostic.List
+
+	// noRecordLit suppresses the "Ident {" / "{" record-literal reading of an
+	// operand, so the "{" that opens a switch's arm block is not mistaken for a
+	// record literal on the scrutinee (the same restriction Rust/Go put on the
+	// condition of if/switch). It is set only while parsing the scrutinee's
+	// outermost expression and cleared the moment a bracketed context — parens,
+	// call arguments, a collection, a record's field values — makes "{"
+	// unambiguous again.
+	noRecordLit bool
 
 	// lastStart is the start offset of the most recently consumed token. A
 	// "missing element" diagnostic is anchored here rather than at the cursor:
