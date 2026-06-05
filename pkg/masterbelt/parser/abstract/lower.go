@@ -277,14 +277,18 @@ func desugarCall(receiver ast.Expr, method string, args []ast.Expr, node *cst.No
 	return ast.NewCallExpr(member, args, node)
 }
 
-// lowerLiteral lowers a Literal node (its single Int/String/True/False/Null
-// leaf) to the matching literal expression.
+// lowerLiteral lowers a Literal node (its single Int/String/Datetime/Duration/
+// True/False/Null leaf) to the matching literal expression.
 func lowerLiteral(t cst.Tree, buf source.Buffer, node *cst.Node) ast.Expr {
 	switch literalKind(t) {
 	case token.Int:
 		return ast.NewIntLit(t.Text(buf), node)
 	case token.String:
 		return ast.NewStringLit(decodeString(t.Text(buf)), node)
+	case token.DatetimeLit:
+		return ast.NewDatetimeLit(t.Text(buf), node)
+	case token.DurationLit:
+		return ast.NewDurationLit(t.Text(buf), node)
 	case token.True:
 		return ast.NewBoolLit(true, node)
 	case token.False:

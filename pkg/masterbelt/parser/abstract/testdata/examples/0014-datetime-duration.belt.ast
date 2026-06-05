@@ -1,29 +1,34 @@
 File
   ConstDecl
     name "Epoch"
+    value DatetimeLit "D1970-01-01T00:00:00.000Z"
   ConstDecl
     name "Release"
+    value DatetimeLit "D2009-03-31T23:59:59.000Z"
   ConstDecl
     name "Launch"
+    value DatetimeLit "D2026-06-05T09:00:00.000+09:00"
   ConstDecl
     name "Cooldown"
+    value DurationLit "5s"
   ConstDecl
     name "Complex"
+    value DurationLit "3w4d5h6m7s8ms"
   ConstDecl
     name "Deadline"
-    value (call (. Identifier "Release" add))
+    value (call (. Identifier "Release" add) DurationLit "7d")
   ConstDecl
     name "Span"
     value (call (. Identifier "Release" sub) Identifier "Epoch")
   ConstDecl
     name "Shift"
-    value (call (. Identifier "Release" sub))
+    value (call (. Identifier "Release" sub) DurationLit "1h")
   ConstDecl
     name "TwoH"
-    value (call (. <missing> add))
+    value (call (. DurationLit "1h" add) DurationLit "1h")
   ConstDecl
     name "Triple"
-    value (call (. <missing> mul) IntLit "3")
+    value (call (. DurationLit "5m" mul) IntLit "3")
   TypeDecl
     pub
     name "Event"
@@ -31,4 +36,4 @@ File
   AssertDecl
     cond (call (. Identifier "Release" gt) Identifier "Epoch")
   AssertDecl
-    cond (call (. <missing> gt))
+    cond (call (. DurationLit "1h" gt) DurationLit "59m")

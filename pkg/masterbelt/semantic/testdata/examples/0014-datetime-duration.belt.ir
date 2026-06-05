@@ -16,16 +16,16 @@ Module
     value <none>
   Const "Deadline"
     type invalid
-    value Reference -> "Release".add()
+    value Reference -> "Release".add(<none>)
   Const "Span"
     type invalid
     value Reference -> "Release".sub(Reference -> "Epoch")
   Const "Shift"
     type invalid
-    value Reference -> "Release".sub()
+    value Reference -> "Release".sub(<none>)
   Const "TwoH"
     type invalid
-    value <none>.add()
+    value <none>.add(<none>)
   Const "Triple"
     type invalid
     value <none>.mul(IntLiteral "3")
@@ -34,6 +34,6 @@ Module
   Assert "Release > Epoch"
     eval <unevaluated>
       Release > Epoch
-  Assert "<missing>.gt()"
+  Assert "1h > 59m"
     eval <unevaluated>
-      <missing>.gt()
+      1h > 59m

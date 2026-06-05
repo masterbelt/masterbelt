@@ -27,6 +27,41 @@ func NewIntLit(text string, syntax *cst.Node) *IntLit {
 	return &IntLit{Text: text, syntax: syntax}
 }
 
+// DatetimeLit is a datetime literal: a D-prefixed ISO-8601 instant
+// (D2009-03-31T23:59:59.000Z, offsets allowed). Its Text is the literal as
+// written; the normalization to a UTC epoch-millisecond value happens where
+// the constant folds, exactly as IntLit's numeric parsing does.
+type DatetimeLit struct {
+	Text   string
+	syntax *cst.Node
+}
+
+func (l *DatetimeLit) Syntax() *cst.Node { return l.syntax }
+func (l *DatetimeLit) node()             {}
+func (l *DatetimeLit) expr()             {}
+
+// NewDatetimeLit builds a DatetimeLit node.
+func NewDatetimeLit(text string, syntax *cst.Node) *DatetimeLit {
+	return &DatetimeLit{Text: text, syntax: syntax}
+}
+
+// DurationLit is a duration literal: concatenated digit+unit groups
+// (3w4d5h6m7s8ms). Its Text is the literal as written; the totalling into
+// milliseconds happens where the constant folds.
+type DurationLit struct {
+	Text   string
+	syntax *cst.Node
+}
+
+func (l *DurationLit) Syntax() *cst.Node { return l.syntax }
+func (l *DurationLit) node()             {}
+func (l *DurationLit) expr()             {}
+
+// NewDurationLit builds a DurationLit node.
+func NewDurationLit(text string, syntax *cst.Node) *DurationLit {
+	return &DurationLit{Text: text, syntax: syntax}
+}
+
 // StringLit is a string literal. Value is the decoded string — the surrounding
 // quotes removed and the escape sequences (\n \r \t \0 \\ \" and \u{...})
 // interpreted — so it holds the literal's actual value rather than its source

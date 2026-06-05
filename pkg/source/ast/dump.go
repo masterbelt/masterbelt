@@ -78,6 +78,10 @@ func dumpExpr(e Expr) string {
 		return fmt.Sprintf("IntLit %q", x.Text)
 	case *StringLit:
 		return fmt.Sprintf("StringLit %q", x.Value)
+	case *DatetimeLit:
+		return fmt.Sprintf("DatetimeLit %q", x.Text)
+	case *DurationLit:
+		return fmt.Sprintf("DurationLit %q", x.Text)
 	case *BoolLit:
 		return fmt.Sprintf("BoolLit %v", x.Value)
 	case *NullLit:

@@ -105,6 +105,10 @@ func (r *renderer) expr(e Expr, min int) {
 		r.str(x.Text)
 	case *StringLit:
 		r.str(fmt.Sprintf("%q", x.Value))
+	case *DatetimeLit:
+		r.str(x.Text)
+	case *DurationLit:
+		r.str(x.Text)
 	case *BoolLit:
 		if x.Value {
 			r.str("true")

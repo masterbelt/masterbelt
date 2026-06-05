@@ -88,6 +88,14 @@ func TestLowerExpressions(t *testing.T) {
 		{"const x = \"say \\\"hi\\\"\"\n", `StringLit "say \"hi\""`},
 		{"const x = \"\\u{1F389}\"\n", `StringLit "🎉"`},
 		{"const x = \"a\" == \"b\"\n", `(call (. StringLit "a" eql) StringLit "b")`},
+		// Datetime and duration literals keep their raw text, exactly like
+		// IntLit (their normalization happens where the constant folds), and
+		// the operator desugaring carries them as receivers and arguments.
+		{"const x = D2009-03-31T23:59:59.000Z\n", `DatetimeLit "D2009-03-31T23:59:59.000Z"`},
+		{"const x = 3w4d5h6m7s8ms\n", `DurationLit "3w4d5h6m7s8ms"`},
+		{"const x = D2009-03-31T23:59:59.000Z + 7d\n", `(call (. DatetimeLit "D2009-03-31T23:59:59.000Z" add) DurationLit "7d")`},
+		{"const x = 1h > 59m\n", `(call (. DurationLit "1h" gt) DurationLit "59m")`},
+		{"const x = 5m * 3\n", `(call (. DurationLit "5m" mul) IntLit "3")`},
 		// Collection literals: a list renders (list elems...), a map (map k: v ...),
 		// and an empty literal (collection) since its kind is not yet fixed.
 		{"const x = [1, 2, 3]\n", `(list IntLit "1" IntLit "2" IntLit "3")`},
