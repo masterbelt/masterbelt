@@ -314,6 +314,49 @@ func TestSelectOverload(t *testing.T) {
 	}
 }
 
+// TestSelectOverloadSubstIsolation checks that each candidate solves its own
+// substitution: a generic candidate's variable bindings must not leak into a
+// sibling's selection (the per-candidate maps.Clone), in either direction.
+func TestSelectOverloadSubstIsolation(t *testing.T) {
+	reg := builtin.Default()
+	tvar := func(name string) ir.Type { return &ir.TypeVar{Name: name} }
+	// pick(f: fn(T): R): R  /  pick(other: self): self — the same name with a
+	// generic arm and a self arm.
+	def := &ir.TypeDef{
+		Name: "Chooser",
+		Body: bt("int32"),
+		Methods: []*ir.Method{
+			{Name: "pick", Params: []ir.Param{{Name: "f", Type: &ir.Func{Params: []ir.Type{tvar("T")}, Result: tvar("R")}}}, Result: tvar("R")},
+			{Name: "pick", Params: []ir.Param{{Name: "other", Type: &ir.SelfType{}}}, Result: &ir.SelfType{}},
+		},
+	}
+	chooser := &ir.Named{Def: def}
+
+	// The function argument fits only the generic arm, solving T and R in its
+	// own substitution.
+	fn := &ir.Func{Params: []ir.Type{bt("int")}, Result: bt("bool")}
+	matches, _ := SelectOverload(reg, chooser, "pick", []ir.Type{fn})
+	if len(matches) != 1 || len(matches[0].Method.Params) != 1 {
+		t.Fatalf("pick(fn): matches = %d, want the generic arm alone", len(matches))
+	}
+	if got := matches[0].Subst["R"]; got == nil || got.String() != "bool" {
+		t.Errorf("pick(fn): subst[R] = %v, want bool", got)
+	}
+
+	// The self argument fits only the self arm — and its substitution must
+	// not have inherited the generic arm's failed trial bindings.
+	matches, _ = SelectOverload(reg, chooser, "pick", []ir.Type{chooser})
+	if len(matches) != 1 || matches[0].Method.Params[0].Type.String() != "self" {
+		t.Fatalf("pick(self): matches = %d, want the self arm alone", len(matches))
+	}
+	if _, leaked := matches[0].Subst["T"]; leaked {
+		t.Errorf("pick(self): the generic arm's T leaked into the self arm's substitution")
+	}
+	if _, leaked := matches[0].Subst["R"]; leaked {
+		t.Errorf("pick(self): the generic arm's R leaked into the self arm's substitution")
+	}
+}
+
 // TestOverloadedMethodResult checks MethodResult over an overload set: the
 // unique fit's result, and Invalid for no fit or an ambiguous one.
 func TestOverloadedMethodResult(t *testing.T) {
