@@ -52,8 +52,7 @@ File
         Int "10"
       Newline "\n"
       Whitespace "  "
-      NameRef
-        Ident "let"
+      Let "let"
       Whitespace " "
       NameRef
         Ident "result"
@@ -129,8 +128,7 @@ File
       LBrace "{"
       Newline "\n"
       Whitespace "  "
-      NameRef
-        Ident "let"
+      Let "let"
       Whitespace " "
       NameRef
         Ident "acc"
@@ -199,8 +197,7 @@ File
       LBrace "{"
       Newline "\n"
       Whitespace "  "
-      NameRef
-        Ident "let"
+      Let "let"
       Whitespace " "
       NameRef
         Ident "result"
@@ -221,8 +218,7 @@ File
           LBrace "{"
           Newline "\n"
           Whitespace "    "
-          NameRef
-            Ident "let"
+          Let "let"
           Whitespace " "
           NameRef
             Ident "result"
@@ -338,11 +334,15 @@ File
 # diagnostics
 error[masterbelt.parser.concrete.unexpected_token] 11:3 unexpected token: Const
 error[masterbelt.parser.concrete.unexpected_token] 11:14 unexpected token: Assign
+error[masterbelt.parser.concrete.unexpected_token] 12:3 unexpected token: Let
 error[masterbelt.parser.concrete.unexpected_token] 12:14 unexpected token: Assign
 error[masterbelt.parser.concrete.unexpected_token] 14:12 unexpected token: Assign
+error[masterbelt.parser.concrete.unexpected_token] 22:3 unexpected token: Let
 error[masterbelt.parser.concrete.unexpected_token] 22:10 unexpected token: Colon
 error[masterbelt.parser.concrete.unexpected_token] 22:16 unexpected token: Assign
 error[masterbelt.parser.concrete.unexpected_token] 23:7 unexpected token: Assign
+error[masterbelt.parser.concrete.unexpected_token] 31:3 unexpected token: Let
 error[masterbelt.parser.concrete.unexpected_token] 31:14 unexpected token: Assign
+error[masterbelt.parser.concrete.unexpected_token] 33:5 unexpected token: Let
 error[masterbelt.parser.concrete.unexpected_token] 33:16 unexpected token: Assign
 error[masterbelt.parser.concrete.unexpected_token] 34:12 unexpected token: Assign

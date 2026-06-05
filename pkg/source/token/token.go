@@ -54,6 +54,7 @@ const (
 	Switch  // switch (value-dispatch control statement)
 	If      // if (boolean control statement)
 	Else    // else (the alternative branch of an if)
+	Let     // let (mutable block-local binding)
 
 	// Operators and punctuation.
 	Colon    // :
@@ -126,6 +127,7 @@ var kindNames = [...]string{
 	Switch:       "Switch",
 	If:           "If",
 	Else:         "Else",
+	Let:          "Let",
 	Colon:        "Colon",
 	Question:     "Question",
 	Assign:       "Assign",
@@ -233,6 +235,7 @@ var keywords = map[string]Kind{
 	"switch":  Switch,
 	"if":      If,
 	"else":    Else,
+	"let":     Let,
 }
 
 // Effect reports whether the kind is an effect keyword — the declarations a

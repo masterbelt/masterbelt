@@ -27,6 +27,7 @@ func TestLookup(t *testing.T) {
 		"null":    Null,
 		"extern":  Extern,
 		"builtin": Builtin,
+		"let":     Let,
 		"int64":   Ident, // a type name is an ordinary identifier, not a keyword
 		"x":       Ident,
 	}

@@ -12,7 +12,6 @@ Module
       expr IntLiteral "10"
       expr <none>
       expr <none>
-      expr <none>
       if ParamRef "flag"
           expr <none>
           expr <none>.mul(IntLiteral "2")
@@ -20,7 +19,6 @@ Module
   Func "step" pub
     param n: int
     result int
-      expr <none>
       expr <none>
       expr <none>
       expr ParamRef "n"
@@ -31,10 +29,8 @@ Module
     param flag: bool
     result int
       expr <none>
-      expr <none>
       expr IntLiteral "1"
       if ParamRef "flag"
-          expr <none>
           expr <none>
           expr IntLiteral "2"
           expr <none>
