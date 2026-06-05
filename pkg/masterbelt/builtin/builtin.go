@@ -50,8 +50,8 @@ func (k IntKind) bounds() (min, max *big.Int) {
 }
 
 // NativeType is the native description of a primitive: its numeric kind (for an
-// integer), or a flag marking the boolean, string, null, datetime, or duration
-// type.
+// integer), or a flag marking the boolean, string, null, datetime, duration, or
+// error type.
 type NativeType struct {
 	Name     string
 	Int      *IntKind // non-nil for an integer primitive
@@ -60,6 +60,7 @@ type NativeType struct {
 	Null     bool     // the null type
 	Datetime bool     // the datetime type (a UTC instant in epoch milliseconds)
 	Duration bool     // the duration type (a span in milliseconds)
+	Err      bool     // the error type (a recoverable failure carrying its message)
 }
 
 // IsInteger reports whether the primitive is an integer type.
@@ -204,6 +205,10 @@ func (r *Registry) Install(defs []*ir.TypeDef) {
 // boolType is the shared boolean primitive type used in operator-method
 // signatures (the result of the comparison and equality methods).
 var boolType ir.Type = &ir.Builtin{Name: "bool"}
+
+// stringType is the shared string primitive type used in method signatures
+// (the result of error.message).
+var stringType ir.Type = &ir.Builtin{Name: "string"}
 
 func self() ir.Type { return &ir.SelfType{} }
 
@@ -398,6 +403,28 @@ func notBool(r *ir.Constant, args []*ir.Constant) *ir.Constant {
 	return ir.BoolConstant(!r.Bool)
 }
 
+// errorMethods is the method signature set of the error primitive: message
+// reads back the message the error was constructed with. It mirrors the
+// prelude's error.belt.
+func errorMethods() []*ir.Method {
+	return []*ir.Method{
+		externMethod("message", stringType),
+	}
+}
+
+// errorIntrinsics evaluates the error methods: message yields the message the
+// error value carries.
+func errorIntrinsics() map[string]Intrinsic {
+	return map[string]Intrinsic{
+		"message": func(r *ir.Constant, args []*ir.Constant) *ir.Constant {
+			if len(args) != 0 || r.Kind != ir.ConstError {
+				return nil
+			}
+			return ir.StringConstant(r.Str)
+		},
+	}
+}
+
 // stringIntrinsics evaluates the string operators: add concatenates, and the
 // comparisons use Go's lexicographic byte ordering on the operands.
 func stringIntrinsics() map[string]Intrinsic {
@@ -522,6 +549,7 @@ func Default() *Registry {
 	r.register("bool", &NativeType{Name: "bool", Bool: true}, booleanMethods(), booleanIntrinsics())
 	r.register("string", &NativeType{Name: "string", Str: true}, stringMethods(), stringIntrinsics())
 	r.register("null", &NativeType{Name: "null", Null: true}, nil, nil)
+	r.register("error", &NativeType{Name: "error", Err: true}, errorMethods(), errorIntrinsics())
 
 	// datetime: the comparisons and the single-signature add are kind-
 	// agnostic; sub is overloaded by the argument's kind — another instant

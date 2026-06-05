@@ -22,6 +22,7 @@ const (
 	ConstDatetime                    // a UTC instant in epoch milliseconds (Constant.Millis)
 	ConstDuration                    // a span of time in milliseconds (Constant.Millis)
 	ConstRecord                      // a record value (Constant.Fields)
+	ConstError                       // an error value carrying its message (Constant.Str)
 )
 
 // Constant is the evaluated value of a constant expression: an arbitrary-
@@ -33,7 +34,7 @@ type Constant struct {
 	Kind   ConstKind
 	Int    *big.Int     // valid when Kind == ConstInt
 	Bool   bool         // valid when Kind == ConstBool
-	Str    string       // valid when Kind == ConstString
+	Str    string       // valid when Kind == ConstString (the string) or ConstError (the message)
 	Coll   []ConstEntry // valid when Kind == ConstCollection
 	Fields []ConstField // valid when Kind == ConstRecord, in canonical (name) order
 	Millis int64        // valid when Kind == ConstDatetime (UTC epoch) or ConstDuration (total)
@@ -65,6 +66,9 @@ func BoolConstant(b bool) *Constant { return &Constant{Kind: ConstBool, Bool: b}
 
 // StringConstant builds a string constant.
 func StringConstant(s string) *Constant { return &Constant{Kind: ConstString, Str: s} }
+
+// ErrorConstant builds an error constant from its message.
+func ErrorConstant(message string) *Constant { return &Constant{Kind: ConstError, Str: message} }
 
 // CollectionConstant builds a collection constant from its entries. An empty
 // slice is the empty list/map; a list's entries have a nil Key.
@@ -145,6 +149,8 @@ func (c *Constant) String() string {
 			parts[i] = f.Name + ": " + f.Value.String()
 		}
 		return "{ " + strings.Join(parts, ", ") + " }"
+	case ConstError:
+		return "error(" + strconv.Quote(c.Str) + ")"
 	case ConstDatetime:
 		return "D" + time.UnixMilli(c.Millis).UTC().Format("2006-01-02T15:04:05.000Z07:00")
 	case ConstDuration:

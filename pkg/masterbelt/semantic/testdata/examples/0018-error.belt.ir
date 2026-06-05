@@ -6,12 +6,12 @@ Module
     type invalid
     value Reference -> "E".message()
   Const "P"
-    type int | invalid
+    type int | error
     value parseLevel(StringLiteral "99")
   Func "parseLevel" pub
     param s: string
-    result int | invalid
-      return <none>
+    result int | error
+      return error(StringLiteral "invalid level: ".add(ParamRef "s"))
   Assert "error(\"x\").message() == \"x\""
     eval <unevaluated>
       error("x").message() == "x"

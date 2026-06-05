@@ -1,0 +1,8 @@
+/// A recoverable failure as a value: constructed from its message with
+/// error("msg") — the conversion form, like int8(5) — and carried in a result
+/// union (T | error). belt has no exceptions; a fallible function returns an
+/// error value and the caller handles it.
+pub type error = builtin impl {
+  /// The message the error was constructed with.
+  pub extern fn message(): string
+}

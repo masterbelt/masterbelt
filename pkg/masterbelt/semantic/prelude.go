@@ -218,6 +218,8 @@ func nativeKind(n *builtin.NativeType) (ir.ConstKind, bool) {
 		return ir.ConstDatetime, true
 	case n.Duration:
 		return ir.ConstDuration, true
+	case n.Err:
+		return ir.ConstError, true
 	default:
 		return 0, false
 	}
