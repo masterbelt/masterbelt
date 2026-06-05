@@ -407,6 +407,9 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "let " + f["name"].String() + " must be initialized: write let " + f["name"].String() + " = value"
 		}
 	},
+	"masterbelt.semantic.missing_required_method": func(loc Locale, f map[string]fmt.Stringer) string {
+		return f["typ"].String() + " does not implement " + f["iface"].String() + ": missing required method " + f["method"].String()
+	},
 	"masterbelt.semantic.missing_return": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
@@ -455,6 +458,9 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return f["typ"].String() + " is not a record type"
 		}
 	},
+	"masterbelt.semantic.not_an_interface": func(loc Locale, f map[string]fmt.Stringer) string {
+		return f["name"].String() + " is not an interface"
+	},
 	"masterbelt.semantic.not_exported": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
@@ -462,6 +468,9 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 		default:
 			return f["path"].String() + " does not export " + f["name"].String()
 		}
+	},
+	"masterbelt.semantic.orphan_impl": func(loc Locale, f map[string]fmt.Stringer) string {
+		return f["iface"].String() + " can only be implemented at the definition site of the type"
 	},
 	"masterbelt.semantic.refinement_not_bool": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {

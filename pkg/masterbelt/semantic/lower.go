@@ -3,6 +3,7 @@ package semantic
 import (
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/lower"
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/types"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/types/infer"
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
@@ -299,6 +300,19 @@ func (b bodyBinder) EnumMember(def *ir.TypeDef, name string) ir.Value {
 	return nil
 }
 
+// selfHasMethod reports whether the receiver type binds a method of the given
+// name — what an implicit self-call (a bare call inside a method body) needs to
+// distinguish a self-method from an unresolved name. It uses the same overload
+// lookup a written self.method() call would, so the two forms resolve
+// identically.
+func (b bodyBinder) selfHasMethod(name string) bool {
+	if b.selfType == nil || b.selfType == ir.Invalid {
+		return false
+	}
+	_, _, ok := types.Candidates(b.reg, b.selfType, name)
+	return ok
+}
+
 // enumDefOf returns the enum definition a type names, or nil when it is not a
 // nominal enum.
 func enumDefOf(t ir.Type) *ir.TypeDef {
@@ -373,6 +387,17 @@ func (b bodyBinder) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
 			}
 			if cands := b.funcs.local[callee.Name]; len(cands) > 0 {
 				return funcCall(pickShellOverload(cands, len(e.Arguments)), e.Arguments, sub)
+			}
+			// A bare call inside a method body whose name is a method of self is
+			// an implicit self-call (self omitted) — the form an interface's
+			// provided method uses to call the required fold. It lowers to the
+			// same ir.Call a written self.fold(...) would.
+			if b.self && b.selfHasMethod(callee.Name) {
+				args := make([]ir.Value, len(e.Arguments))
+				for i, a := range e.Arguments {
+					args[i] = sub(a)
+				}
+				return &ir.Call{Receiver: &ir.SelfValue{}, Method: callee.Name, Args: args}
 			}
 		case *ast.MemberExpr:
 			recv, ok := callee.Receiver.(*ast.Identifier)

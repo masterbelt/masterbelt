@@ -3,11 +3,13 @@
 //
 // The grammar is small and recursive-descent:
 //
-//	File          := ( ConstDecl | TypeDecl | EnumDecl | UseDecl | AssertDecl | FuncDecl | Error )*
+//	File          := ( ConstDecl | TypeDecl | EnumDecl | InterfaceDecl | UseDecl | AssertDecl | FuncDecl | Error )*
 //	ConstDecl     := [pub] const Ident [TypeClause] [Initializer]
 //	TypeDecl      := [pub] type Ident [GenericParams] "=" TypeExpr [WhereClause] [ImplBlock]
 //	EnumDecl      := [pub] enum Ident [":" TypeExpr] "{" ( EnumMember ( ("," | NL) EnumMember )* )? "}" [ImplBlock]
 //	EnumMember    := Ident [Initializer]
+//	InterfaceDecl := [pub] interface Ident [GenericParams] "{" ( InterfaceMember ( ("," | NL) InterfaceMember )* )? "}"
+//	InterfaceMember := [pub] Ident [GenericParams] ParamList ":" TypeExpr [Block]
 //	UseDecl       := [pub] use UseTarget from String
 //	AssertDecl    := assert Expr
 //	FuncDecl      := [pub] [extern] fn Effect* Ident ParamList ":" TypeExpr ( Block | "->" Expr )
@@ -26,9 +28,9 @@
 //	RecordType    := "{" ( Field [","] )* "}"
 //	Field         := Ident ":" TypeExpr
 //	FuncType      := fn ParamList ":" TypeExpr
-//	ImplBlock     := impl "{" ( MethodDecl | AssocConst )* "}"
+//	ImplBlock     := impl [TypeName] "{" ( MethodDecl | AssocConst )* "}"
 //	AssocConst    := [pub] const Ident [TypeClause] "=" ( Expr | "builtin" )
-//	MethodDecl    := [pub] [extern] [fn] Effect* Ident ParamList ":" TypeExpr [Block]
+//	MethodDecl    := [pub] [extern] [fn] Effect* Ident [GenericParams] ParamList ":" TypeExpr [Block]
 //	ParamList     := "(" [ Param ( "," Param )* ] ")"
 //	Param         := Ident ":" TypeExpr
 //	Block         := "{" Stmt* "}"
@@ -232,12 +234,14 @@ func (p *parser) nextChildren() (batch []cst.Green, done bool) {
 	case p.atEOF():
 		lead = append(lead, p.bump()) // the EOF leaf
 		return lead, true
-	case p.kind() == token.Pub || p.kind() == token.Const || p.kind() == token.Type || p.kind() == token.Enum || p.kind() == token.Use || p.kind() == token.Extern:
+	case p.kind() == token.Pub || p.kind() == token.Const || p.kind() == token.Type || p.kind() == token.Enum || p.kind() == token.Interface || p.kind() == token.Use || p.kind() == token.Extern:
 		switch p.declKind() {
 		case token.Type:
 			return []cst.Green{p.parseTypeDecl(lead)}, false
 		case token.Enum:
 			return []cst.Green{p.parseEnumDecl(lead)}, false
+		case token.Interface:
+			return []cst.Green{p.parseInterfaceDecl(lead)}, false
 		case token.Use:
 			return []cst.Green{p.parseUseDecl(lead)}, false
 		case token.Fn:
@@ -303,7 +307,7 @@ func (p *parser) nextSignificantIndex(i int) int {
 }
 
 // declKind reports which declaration keyword begins the construct at the cursor
-// — Const, Type, Enum, or Use — looking past an optional leading pub. For malformed
+// — Const, Type, Enum, Interface, or Use — looking past an optional leading pub. For malformed
 // input (a lone pub) it returns whatever significant kind follows, and the
 // caller falls back to the const parser, which reports the missing keyword.
 func (p *parser) declKind() token.Kind {
@@ -331,7 +335,7 @@ func (p *parser) parseError(lead []cst.Green) *cst.Node {
 	reported := false
 	for {
 		switch p.peekSignificant() {
-		case token.EOF, token.Pub, token.Const, token.Type, token.Enum, token.Use, token.Assert, token.Extern:
+		case token.EOF, token.Pub, token.Const, token.Type, token.Enum, token.Interface, token.Use, token.Assert, token.Extern:
 			return cst.NewNode(cst.Error, children)
 		case token.Fn:
 			// fn stops the error run only as a declaration (fn name); a bare

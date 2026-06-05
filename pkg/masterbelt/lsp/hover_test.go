@@ -81,6 +81,35 @@ func TestTypeHover(t *testing.T) {
 	})
 }
 
+func TestInterfaceHover(t *testing.T) {
+	src := "/// a behaviour\npub interface foldable<V> {\n  count(): int\n}\n" +
+		"pub type Bag = list<int> impl foldable<int> {\n  count(): int {\n    return 0\n  }\n}\n"
+	doc := testView(src)
+
+	t.Run("the interface declaration describes itself", func(t *testing.T) {
+		h := hover(doc, strings.Index(src, "interface foldable")+11)
+		if h == nil {
+			t.Fatal("no hover on the interface declaration name")
+		}
+		if !strings.Contains(h.Contents.Value, "pub interface foldable<V>") {
+			t.Errorf("hover = %q, want the interface signature", h.Contents.Value)
+		}
+		if !strings.Contains(h.Contents.Value, "a behaviour") {
+			t.Errorf("hover = %q, want the doc comment", h.Contents.Value)
+		}
+	})
+
+	t.Run("a type that impls an interface shows it on its card", func(t *testing.T) {
+		h := hover(doc, strings.Index(src, "type Bag")+6)
+		if h == nil {
+			t.Fatal("no hover on Bag")
+		}
+		if !strings.Contains(h.Contents.Value, "impl foldable<int>") {
+			t.Errorf("hover = %q, want the impl'd interface on the card", h.Contents.Value)
+		}
+	})
+}
+
 func TestTypeHoverWhere(t *testing.T) {
 	// The refinement predicate is part of the signature: hovering the type
 	// shows the values it admits, in canonical surface form.

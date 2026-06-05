@@ -1,6 +1,7 @@
 use { bool } from "./bool.belt"
 use { int } from "./int.belt"
 use { error } from "./error.belt"
+use { foldable } from "./foldable.belt"
 
 /// A key-value mapping, written [k: v, ...].
 pub type map<K, V> = builtin<K, V> impl {
@@ -22,4 +23,9 @@ pub type map<K, V> = builtin<K, V> impl {
   pub extern fn eql(other: self): bool
   /// The != operator.
   pub extern fn neq(other: self): bool
+} impl foldable<K, V> {
+  /// The required primitive: visit each entry with its key and value, threading
+  /// the accumulator. The provided count/any/all/map/filter/keys/values are
+  /// defined on top of this.
+  pub extern fn fold(init: A, step: fn(acc: A, key: K, value: V): A): A
 }

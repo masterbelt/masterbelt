@@ -1,0 +1,463 @@
+# tree
+File
+  InterfaceDecl
+    LineComment "// An interface (E-16): a nominal, explicit-impl behaviour. A type gains the"
+    Newline "\n"
+    LineComment "// interface's methods only by writing `impl <interface>` at its definition site"
+    Newline "\n"
+    LineComment "// (no structural auto-fit, no orphan impls), and an interface may be written in"
+    Newline "\n"
+    LineComment "// a type-requirement position, where the value's usable methods are fixed to the"
+    Newline "\n"
+    LineComment "// interface's own."
+    Newline "\n"
+    Newline "\n"
+    DocComment "/// A behaviour over a keyed collection: implement the required fold and the"
+    Newline "\n"
+    DocComment "/// provided methods (count, map, filter, ...) come for free, defined on top of"
+    Newline "\n"
+    DocComment "/// it. iterability is foldable."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Interface "interface"
+    Whitespace " "
+    Ident "foldable"
+    GenericParams
+      Lt "<"
+      GenericParam
+        Ident "K"
+      Comma ","
+      Whitespace " "
+      GenericParam
+        Ident "V"
+      Gt ">"
+    Whitespace " "
+    LBrace "{"
+    InterfaceMember
+      Newline "\n"
+      Whitespace "  "
+      LineComment "// Required: the one primitive an implementor must supply. Everything else is"
+      Newline "\n"
+      Whitespace "  "
+      LineComment "// derived from it."
+      Newline "\n"
+      Whitespace "  "
+      Ident "fold"
+      GenericParams
+        Lt "<"
+        GenericParam
+          Ident "A"
+        Gt ">"
+      ParamList
+        LParen "("
+        Param
+          Ident "init"
+          Colon ":"
+          Whitespace " "
+          TypeName
+            Ident "A"
+        Comma ","
+        Whitespace " "
+        Param
+          Ident "step"
+          Colon ":"
+          Whitespace " "
+          FuncType
+            Fn "fn"
+            ParamList
+              LParen "("
+              Param
+                Ident "acc"
+                Colon ":"
+                Whitespace " "
+                TypeName
+                  Ident "A"
+              Comma ","
+              Whitespace " "
+              Param
+                Ident "key"
+                Colon ":"
+                Whitespace " "
+                TypeName
+                  Ident "K"
+              Comma ","
+              Whitespace " "
+              Param
+                Ident "value"
+                Colon ":"
+                Whitespace " "
+                TypeName
+                  Ident "V"
+              RParen ")"
+            Colon ":"
+            Whitespace " "
+            TypeName
+              Ident "A"
+        RParen ")"
+      Colon ":"
+      Whitespace " "
+      TypeName
+        Ident "A"
+    InterfaceMember
+      Newline "\n"
+      Newline "\n"
+      Whitespace "  "
+      DocComment "/// Provided: the number of elements, folded from the primitive."
+      Newline "\n"
+      Whitespace "  "
+      Pub "pub"
+      Whitespace " "
+      Ident "count"
+      ParamList
+        LParen "("
+        RParen ")"
+      Colon ":"
+      Whitespace " "
+      TypeName
+        Ident "int"
+      Whitespace " "
+      Block
+        LBrace "{"
+        Newline "\n"
+        Whitespace "    "
+        ReturnStmt
+          Return "return"
+          Whitespace " "
+          CallExpr
+            NameRef
+              Ident "fold"
+            LParen "("
+            Literal
+              Int "0"
+            Comma ","
+            Whitespace " "
+            FuncLit
+              Fn "fn"
+              ParamList
+                LParen "("
+                Param
+                  Ident "acc"
+                Comma ","
+                Whitespace " "
+                Param
+                  Ident "key"
+                Comma ","
+                Whitespace " "
+                Param
+                  Ident "value"
+                RParen ")"
+              Whitespace " "
+              Arrow "->"
+              Whitespace " "
+              BinaryExpr
+                NameRef
+                  Ident "acc"
+                Whitespace " "
+                Plus "+"
+                Whitespace " "
+                Literal
+                  Int "1"
+            RParen ")"
+        Newline "\n"
+        Whitespace "  "
+        RBrace "}"
+    InterfaceMember
+      Newline "\n"
+      Newline "\n"
+      Whitespace "  "
+      DocComment "/// Provided: whether any element satisfies the predicate."
+      Newline "\n"
+      Whitespace "  "
+      Pub "pub"
+      Whitespace " "
+      Ident "any"
+      ParamList
+        LParen "("
+        Param
+          Ident "pred"
+          Colon ":"
+          Whitespace " "
+          FuncType
+            Fn "fn"
+            ParamList
+              LParen "("
+              Param
+                Ident "value"
+                Colon ":"
+                Whitespace " "
+                TypeName
+                  Ident "V"
+              RParen ")"
+            Colon ":"
+            Whitespace " "
+            TypeName
+              Ident "bool"
+        RParen ")"
+      Colon ":"
+      Whitespace " "
+      TypeName
+        Ident "bool"
+      Whitespace " "
+      Block
+        LBrace "{"
+        Newline "\n"
+        Whitespace "    "
+        ReturnStmt
+          Return "return"
+          Whitespace " "
+          CallExpr
+            NameRef
+              Ident "fold"
+            LParen "("
+            Literal
+              False "false"
+            Comma ","
+            Whitespace " "
+            FuncLit
+              Fn "fn"
+              ParamList
+                LParen "("
+                Param
+                  Ident "acc"
+                Comma ","
+                Whitespace " "
+                Param
+                  Ident "key"
+                Comma ","
+                Whitespace " "
+                Param
+                  Ident "value"
+                RParen ")"
+              Whitespace " "
+              Arrow "->"
+              Whitespace " "
+              BinaryExpr
+                NameRef
+                  Ident "acc"
+                Whitespace " "
+                PipePipe "||"
+                Whitespace " "
+                CallExpr
+                  NameRef
+                    Ident "pred"
+                  LParen "("
+                  NameRef
+                    Ident "value"
+                  RParen ")"
+            RParen ")"
+        Newline "\n"
+        Whitespace "  "
+        RBrace "}"
+    Newline "\n"
+    RBrace "}"
+  TypeDecl
+    Newline "\n"
+    Newline "\n"
+    DocComment "/// A small bag of T values that folds over its contents. The `impl foldable<int, T>`"
+    Newline "\n"
+    DocComment "/// tag is what gives Bag the count/any methods — written here, at Bag's own"
+    Newline "\n"
+    DocComment "/// definition site."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Type "type"
+    Whitespace " "
+    Ident "Bag"
+    GenericParams
+      Lt "<"
+      GenericParam
+        Ident "T"
+      Gt ">"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    TypeName
+      Ident "list"
+      GenericArgs
+        Lt "<"
+        TypeName
+          Ident "T"
+        Gt ">"
+    Whitespace " "
+    ImplBlock
+      Impl "impl"
+      Whitespace " "
+      TypeName
+        Ident "foldable"
+        GenericArgs
+          Lt "<"
+          TypeName
+            Ident "int"
+          Comma ","
+          Whitespace " "
+          TypeName
+            Ident "T"
+          Gt ">"
+      Whitespace " "
+      LBrace "{"
+      MethodDecl
+        Newline "\n"
+        Whitespace "  "
+        DocComment "/// The required primitive: fold the underlying list."
+        Newline "\n"
+        Whitespace "  "
+        Ident "fold"
+        GenericParams
+          Lt "<"
+          GenericParam
+            Ident "A"
+          Gt ">"
+        ParamList
+          LParen "("
+          Param
+            Ident "init"
+            Colon ":"
+            Whitespace " "
+            TypeName
+              Ident "A"
+          Comma ","
+          Whitespace " "
+          Param
+            Ident "step"
+            Colon ":"
+            Whitespace " "
+            FuncType
+              Fn "fn"
+              ParamList
+                LParen "("
+                Param
+                  Ident "acc"
+                  Colon ":"
+                  Whitespace " "
+                  TypeName
+                    Ident "A"
+                Comma ","
+                Whitespace " "
+                Param
+                  Ident "key"
+                  Colon ":"
+                  Whitespace " "
+                  TypeName
+                    Ident "int"
+                Comma ","
+                Whitespace " "
+                Param
+                  Ident "value"
+                  Colon ":"
+                  Whitespace " "
+                  TypeName
+                    Ident "T"
+                RParen ")"
+              Colon ":"
+              Whitespace " "
+              TypeName
+                Ident "A"
+          RParen ")"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "A"
+        Whitespace " "
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            NameRef
+              Ident "init"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
+      Newline "\n"
+      RBrace "}"
+  FuncDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// An interface written in a type-requirement position: c may be called only"
+    Newline "\n"
+    LineComment "// through foldable's methods, fixed at this signature."
+    Newline "\n"
+    DocComment "/// The total of a collection of ints, folded with addition."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Fn "fn"
+    Whitespace " "
+    Ident "total"
+    ParamList
+      LParen "("
+      Param
+        Ident "c"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "foldable"
+          GenericArgs
+            Lt "<"
+            TypeName
+              Ident "int"
+            Comma ","
+            Whitespace " "
+            TypeName
+              Ident "int"
+            Gt ">"
+      RParen ")"
+    Colon ":"
+    Whitespace " "
+    TypeName
+      Ident "int"
+    Whitespace " "
+    Block
+      LBrace "{"
+      Newline "\n"
+      Whitespace "  "
+      ReturnStmt
+        Return "return"
+        Whitespace " "
+        CallExpr
+          MemberExpr
+            NameRef
+              Ident "c"
+            Dot "."
+            Ident "fold"
+          LParen "("
+          Literal
+            Int "0"
+          Comma ","
+          Whitespace " "
+          FuncLit
+            Fn "fn"
+            ParamList
+              LParen "("
+              Param
+                Ident "acc"
+              Comma ","
+              Whitespace " "
+              Param
+                Ident "key"
+              Comma ","
+              Whitespace " "
+              Param
+                Ident "value"
+              RParen ")"
+            Whitespace " "
+            Arrow "->"
+            Whitespace " "
+            BinaryExpr
+              NameRef
+                Ident "acc"
+              Whitespace " "
+              Plus "+"
+              Whitespace " "
+              NameRef
+                Ident "value"
+          RParen ")"
+      Newline "\n"
+      RBrace "}"
+  Newline "\n"
+  EOF ""
+# diagnostics

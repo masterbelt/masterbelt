@@ -181,7 +181,7 @@ func semanticTokensWith(doc *abstract.Document, isImportedConst, isFuncCallee, i
 // carry no colour (whitespace, newlines, EOF, illegal bytes).
 func classifyToken(kind token.Kind, parent cst.Kind, calleeMember bool) (tokenType, mods int, ok bool) {
 	switch kind {
-	case token.Const, token.Pub, token.Assert, token.Where, token.Type, token.Enum, token.Impl,
+	case token.Const, token.Pub, token.Assert, token.Where, token.Type, token.Enum, token.Interface, token.Impl,
 		token.Fn, token.Return, token.Self, token.Null, token.Extern, token.Builtin,
 		token.Use, token.From, token.True, token.False,
 		token.Io, token.Async, token.Nondet, token.Await, token.Switch, token.If, token.Else, token.Let:
@@ -212,6 +212,13 @@ func classifyToken(kind token.Kind, parent cst.Kind, calleeMember bool) (tokenTy
 		case cst.EnumDecl:
 			// The declared enum's own name — a nominal type.
 			return stType, smDeclaration, true
+		case cst.InterfaceDecl:
+			// The declared interface's own name — a nominal behaviour, coloured
+			// as a type (it is written in type-requirement positions).
+			return stType, smDeclaration, true
+		case cst.InterfaceMember:
+			// An interface member's declared name (a required or provided method).
+			return stMethod, smDeclaration, true
 		case cst.EnumMember:
 			// A member's declared name (Common, Rare) reads as an enum member, a
 			// read-only named value.

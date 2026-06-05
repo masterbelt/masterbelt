@@ -251,6 +251,82 @@ func TestLowerMethodDoc(t *testing.T) {
 	}
 }
 
+func TestLowerInterfaceDecl(t *testing.T) {
+	// An interface lowers to File.Interfaces, with required members (no body)
+	// and provided members (a default body) distinguished by Provided.
+	src := "pub interface foldable<K, V> {\n  fold<A>(init: A, step: fn(acc: A, key: K, value: V): A): A\n  pub count(): int {\n    return 0\n  }\n}\n"
+	file, diags := Lower([]byte(src))
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if len(file.Interfaces) != 1 {
+		t.Fatalf("got %d interfaces, want 1", len(file.Interfaces))
+	}
+	iface := file.Interfaces[0]
+	if !iface.Public || iface.Name != "foldable" {
+		t.Fatalf("interface = %+v, want pub foldable", iface)
+	}
+	if len(iface.Params) != 2 || iface.Params[0].Name != "K" || iface.Params[1].Name != "V" {
+		t.Fatalf("interface params = %+v, want [K V]", iface.Params)
+	}
+	if len(iface.Members) != 2 {
+		t.Fatalf("got %d members, want 2", len(iface.Members))
+	}
+	fold := iface.Members[0]
+	if fold.Name != "fold" || fold.Provided() {
+		t.Errorf("fold = %+v, want a required member named fold", fold)
+	}
+	if len(fold.TypeParams) != 1 || fold.TypeParams[0].Name != "A" {
+		t.Errorf("fold type params = %+v, want [A]", fold.TypeParams)
+	}
+	count := iface.Members[1]
+	if count.Name != "count" || !count.Provided() || !count.Public {
+		t.Errorf("count = %+v, want a public provided member named count", count)
+	}
+}
+
+func TestLowerImplInterfaceTag(t *testing.T) {
+	// A type's interface-tagged impl block records the interface in Impls while
+	// its methods flatten into Methods alongside any inherent impl's.
+	src := "pub type Bag<T> = list<T> impl foldable<int, T> {\n  fold<A>(init: A): A {\n    return init\n  }\n} impl {\n  pub size(): int {\n    return 0\n  }\n}\n"
+	file, diags := Lower([]byte(src))
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	td := file.Types[0]
+	if len(td.Impls) != 1 {
+		t.Fatalf("got %d impls, want 1 (the tagged one)", len(td.Impls))
+	}
+	if got := ast.Dump(file); !strings.Contains(got, "impl foldable<int, T>") {
+		t.Errorf("dump = %s, want it to contain the interface tag", got)
+	}
+	// Both the tagged block's fold and the inherent block's size are flattened.
+	names := map[string]bool{}
+	for _, m := range td.Methods {
+		names[m.Name] = true
+	}
+	if !names["fold"] || !names["size"] {
+		t.Errorf("methods = %v, want both fold and size flattened", names)
+	}
+}
+
+func TestLowerMethodTypeParam(t *testing.T) {
+	// A method's explicit type parameter (the A in fold<A>) lowers to its
+	// TypeParams, separate from its value parameters.
+	src := "type Bag = list<int> impl {\n  fold<A>(init: A): A {\n    return init\n  }\n}\n"
+	file, diags := Lower([]byte(src))
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	m := file.Types[0].Methods[0]
+	if len(m.TypeParams) != 1 || m.TypeParams[0].Name != "A" {
+		t.Fatalf("method type params = %+v, want [A]", m.TypeParams)
+	}
+	if len(m.Params) != 1 || m.Params[0].Name != "init" {
+		t.Fatalf("method params = %+v, want [init]", m.Params)
+	}
+}
+
 func TestLowerImplConst(t *testing.T) {
 	// An impl block's const items lower to the type's Consts, alongside its
 	// Methods. A typed const keeps its annotation; a method beside them is

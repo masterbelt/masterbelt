@@ -40,13 +40,16 @@ const (
 	CodeMissingEffect           diagnostic.Code = "masterbelt.semantic.missing_effect"
 	CodeMissingField            diagnostic.Code = "masterbelt.semantic.missing_field"
 	CodeMissingInitializer      diagnostic.Code = "masterbelt.semantic.missing_initializer"
+	CodeMissingRequiredMethod   diagnostic.Code = "masterbelt.semantic.missing_required_method"
 	CodeMissingReturn           diagnostic.Code = "masterbelt.semantic.missing_return"
 	CodeNoBound                 diagnostic.Code = "masterbelt.semantic.no_bound"
 	CodeNoMatchingFuncOverload  diagnostic.Code = "masterbelt.semantic.no_matching_func_overload"
 	CodeNoMatchingOverload      diagnostic.Code = "masterbelt.semantic.no_matching_overload"
 	CodeNonExhaustiveSwitch     diagnostic.Code = "masterbelt.semantic.non_exhaustive_switch"
 	CodeNotARecord              diagnostic.Code = "masterbelt.semantic.not_a_record"
+	CodeNotAnInterface          diagnostic.Code = "masterbelt.semantic.not_an_interface"
 	CodeNotExported             diagnostic.Code = "masterbelt.semantic.not_exported"
+	CodeOrphanImpl              diagnostic.Code = "masterbelt.semantic.orphan_impl"
 	CodeRefinementNotBool       diagnostic.Code = "masterbelt.semantic.refinement_not_bool"
 	CodeRefinementNotConstant   diagnostic.Code = "masterbelt.semantic.refinement_not_constant"
 	CodeRefinementViolation     diagnostic.Code = "masterbelt.semantic.refinement_violation"
@@ -513,6 +516,22 @@ func newMissingInitializerDiagnostic(offset int, width int, name string) diagnos
 	}
 }
 
+func newMissingRequiredMethodDiagnostic(offset int, width int, typ string, iface string, method string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"typ":    diagnostic.Str(typ),
+		"iface":  diagnostic.Str(iface),
+		"method": diagnostic.Str(method),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeMissingRequiredMethod,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeMissingRequiredMethod, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
 func newMissingReturnDiagnostic(offset int, width int, name string) diagnostic.Diagnostic {
 	fields := map[string]fmt.Stringer{
 		"name": diagnostic.Str(name),
@@ -601,6 +620,20 @@ func newNotARecordDiagnostic(offset int, width int, typ string) diagnostic.Diagn
 	}
 }
 
+func newNotAnInterfaceDiagnostic(offset int, width int, name string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"name": diagnostic.Str(name),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeNotAnInterface,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeNotAnInterface, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
 func newNotExportedDiagnostic(offset int, width int, name string, path string) diagnostic.Diagnostic {
 	fields := map[string]fmt.Stringer{
 		"name": diagnostic.Str(name),
@@ -610,6 +643,20 @@ func newNotExportedDiagnostic(offset int, width int, name string, path string) d
 		Severity: diagnostic.Error,
 		Code:     CodeNotExported,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeNotExported, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newOrphanImplDiagnostic(offset int, width int, iface string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"iface": diagnostic.Str(iface),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeOrphanImpl,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeOrphanImpl, fields),
 		Fields:   fields,
 		Offset:   offset,
 		Width:    width,

@@ -72,10 +72,17 @@ const (
 	EnumDecl   // [doc] [pub] enum Name [":" TypeExpr] "{" EnumMember ( ("," | NL) EnumMember )* "}" [ImplBlock]
 	EnumMember // Ident [Initializer]  (one named member, with an optional "= ConstExpr" value)
 
+	// Interface declarations. An interface is a nominal behaviour: a set of
+	// required methods (no body) a type must implement, and provided methods
+	// (with a body, the default) it gets for free. A type opts in by writing an
+	// interface-tagged impl block at its own definition site.
+	InterfaceDecl   // [doc] [pub] interface Name [GenericParams] "{" InterfaceMember* "}"
+	InterfaceMember // [pub] Name [GenericParams] ParamList ":" TypeExpr [Block]  (required when no Block, provided otherwise)
+
 	// Implementations and method bodies. An impl item is a MethodDecl or a
 	// ConstDecl (an associated constant, read as TypeName.Name); the latter
 	// reuses the same node a top-level constant uses.
-	ImplBlock  // impl "{" (MethodDecl | ConstDecl)* "}"
+	ImplBlock  // impl [TypeName] "{" (MethodDecl | ConstDecl)* "}"  (the optional TypeName tags the interface this block implements)
 	MethodDecl // [pub] [extern] [fn] Ident ParamList ":" TypeExpr [Block]
 	ParamList  // "(" [Param ("," Param)*] ")"
 	Param      // Ident ":" TypeExpr
@@ -102,55 +109,57 @@ const (
 
 // kindNames maps each Kind to its name, indexed by Kind value.
 var kindNames = [...]string{
-	File:          "File",
-	ConstDecl:     "ConstDecl",
-	TypeClause:    "TypeClause",
-	Initializer:   "Initializer",
-	NameRef:       "NameRef",
-	Literal:       "Literal",
-	BinaryExpr:    "BinaryExpr",
-	TernaryExpr:   "TernaryExpr",
-	UnaryExpr:     "UnaryExpr",
-	CallExpr:      "CallExpr",
-	MemberExpr:    "MemberExpr",
-	IndexExpr:     "IndexExpr",
-	SelfExpr:      "SelfExpr",
-	CollectionLit: "CollectionLit",
-	MapEntry:      "MapEntry",
-	RecordLit:     "RecordLit",
-	RecordField:   "RecordField",
-	FuncLit:       "FuncLit",
-	ParenExpr:     "ParenExpr",
-	AwaitExpr:     "AwaitExpr",
-	TypeDecl:      "TypeDecl",
-	GenericParams: "GenericParams",
-	GenericParam:  "GenericParam",
-	GenericArgs:   "GenericArgs",
-	TypeName:      "TypeName",
-	UnionType:     "UnionType",
-	RecordType:    "RecordType",
-	Field:         "Field",
-	FuncType:      "FuncType",
-	BuiltinType:   "BuiltinType",
-	WhereClause:   "WhereClause",
-	EnumDecl:      "EnumDecl",
-	EnumMember:    "EnumMember",
-	ImplBlock:     "ImplBlock",
-	MethodDecl:    "MethodDecl",
-	ParamList:     "ParamList",
-	Param:         "Param",
-	Block:         "Block",
-	ReturnStmt:    "ReturnStmt",
-	LetStmt:       "LetStmt",
-	AssignStmt:    "AssignStmt",
-	SwitchStmt:    "SwitchStmt",
-	SwitchArm:     "SwitchArm",
-	IfStmt:        "IfStmt",
-	FuncDecl:      "FuncDecl",
-	UseDecl:       "UseDecl",
-	UseList:       "UseList",
-	AssertDecl:    "AssertDecl",
-	Error:         "Error",
+	File:            "File",
+	ConstDecl:       "ConstDecl",
+	TypeClause:      "TypeClause",
+	Initializer:     "Initializer",
+	NameRef:         "NameRef",
+	Literal:         "Literal",
+	BinaryExpr:      "BinaryExpr",
+	TernaryExpr:     "TernaryExpr",
+	UnaryExpr:       "UnaryExpr",
+	CallExpr:        "CallExpr",
+	MemberExpr:      "MemberExpr",
+	IndexExpr:       "IndexExpr",
+	SelfExpr:        "SelfExpr",
+	CollectionLit:   "CollectionLit",
+	MapEntry:        "MapEntry",
+	RecordLit:       "RecordLit",
+	RecordField:     "RecordField",
+	FuncLit:         "FuncLit",
+	ParenExpr:       "ParenExpr",
+	AwaitExpr:       "AwaitExpr",
+	TypeDecl:        "TypeDecl",
+	GenericParams:   "GenericParams",
+	GenericParam:    "GenericParam",
+	GenericArgs:     "GenericArgs",
+	TypeName:        "TypeName",
+	UnionType:       "UnionType",
+	RecordType:      "RecordType",
+	Field:           "Field",
+	FuncType:        "FuncType",
+	BuiltinType:     "BuiltinType",
+	WhereClause:     "WhereClause",
+	EnumDecl:        "EnumDecl",
+	EnumMember:      "EnumMember",
+	InterfaceDecl:   "InterfaceDecl",
+	InterfaceMember: "InterfaceMember",
+	ImplBlock:       "ImplBlock",
+	MethodDecl:      "MethodDecl",
+	ParamList:       "ParamList",
+	Param:           "Param",
+	Block:           "Block",
+	ReturnStmt:      "ReturnStmt",
+	LetStmt:         "LetStmt",
+	AssignStmt:      "AssignStmt",
+	SwitchStmt:      "SwitchStmt",
+	SwitchArm:       "SwitchArm",
+	IfStmt:          "IfStmt",
+	FuncDecl:        "FuncDecl",
+	UseDecl:         "UseDecl",
+	UseList:         "UseList",
+	AssertDecl:      "AssertDecl",
+	Error:           "Error",
 }
 
 // String returns the name of the kind, for snapshots and debugging.

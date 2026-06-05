@@ -319,6 +319,146 @@ func TestParseImplConstChildren(t *testing.T) {
 	}
 }
 
+// TestParseInterfaceDeclFileShape checks that an interface declaration is
+// recognised at the file level, the choice made by looking past pub.
+func TestParseInterfaceDeclFileShape(t *testing.T) {
+	root, diags := Parse([]byte("pub interface foldable<T> {\n  fold(init: T): T\n}\n"))
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	got := declKinds(root)
+	want := []string{"InterfaceDecl", "<Newline>", "<EOF>"}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("file children = %v, want %v", got, want)
+	}
+}
+
+// TestParseInterfaceDeclChildren checks the sub-node shape of an interface: its
+// optional generic parameters and its members (required and provided alike land
+// as InterfaceMember nodes).
+func TestParseInterfaceDeclChildren(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+		want []cst.Kind
+	}{
+		{"required only", "interface eq {\n  eql(other: self): bool\n}\n",
+			[]cst.Kind{cst.InterfaceMember}},
+		{"generic with provided", "pub interface foldable<K, V> {\n  fold<A>(init: A): A\n  pub count(): int {\n    return 0\n  }\n}\n",
+			[]cst.Kind{cst.GenericParams, cst.InterfaceMember, cst.InterfaceMember}},
+		{"empty", "interface marker {\n}\n", nil},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			root, diags := Parse([]byte(tc.src))
+			if len(diags) != 0 {
+				t.Fatalf("unexpected diagnostics: %v", diags)
+			}
+			decl := root.Children()[0].(*cst.Node)
+			if decl.Kind() != cst.InterfaceDecl {
+				t.Fatalf("first child kind = %s, want InterfaceDecl", decl.Kind())
+			}
+			got := subNodeKinds(decl)
+			if len(got) != len(tc.want) {
+				t.Fatalf("sub-nodes = %v, want %v", got, tc.want)
+			}
+			for i := range got {
+				if got[i] != tc.want[i] {
+					t.Fatalf("sub-nodes = %v, want %v", got, tc.want)
+				}
+			}
+		})
+	}
+}
+
+// TestParseInterfaceMemberChildren checks that a required member carries no
+// Block (only its ParamList and result type) while a provided member carries a
+// Block, and that an explicit member type parameter lands as GenericParams.
+func TestParseInterfaceMemberChildren(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+		want []cst.Kind
+	}{
+		{"required", "interface i {\n  m(x: int): int\n}\n",
+			[]cst.Kind{cst.ParamList, cst.TypeName}},
+		{"provided", "interface i {\n  m(x: int): int {\n    return x\n  }\n}\n",
+			[]cst.Kind{cst.ParamList, cst.TypeName, cst.Block}},
+		{"generic required", "interface i {\n  fold<A>(init: A): A\n}\n",
+			[]cst.Kind{cst.GenericParams, cst.ParamList, cst.TypeName}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			root, diags := Parse([]byte(tc.src))
+			if len(diags) != 0 {
+				t.Fatalf("unexpected diagnostics: %v", diags)
+			}
+			decl := root.Children()[0].(*cst.Node)
+			var member *cst.Node
+			for _, c := range decl.Children() {
+				if n, ok := c.(*cst.Node); ok && n.Kind() == cst.InterfaceMember {
+					member = n
+				}
+			}
+			if member == nil {
+				t.Fatalf("no interface member found in %q", tc.src)
+			}
+			got := subNodeKinds(member)
+			if len(got) != len(tc.want) {
+				t.Fatalf("member sub-nodes = %v, want %v", got, tc.want)
+			}
+			for i := range got {
+				if got[i] != tc.want[i] {
+					t.Fatalf("member sub-nodes = %v, want %v", got, tc.want)
+				}
+			}
+		})
+	}
+}
+
+// TestParseImplInterfaceTag checks that the optional interface name after impl
+// lands as a TypeName child of the impl block, before its brace, while a bare
+// impl carries no such tag.
+func TestParseImplInterfaceTag(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+		want []cst.Kind // the impl block's direct child node kinds
+	}{
+		{"tagged", "type Bag<T> = list<T> impl foldable<int, T> {\n  fold<A>(init: A): A {\n    return init\n  }\n}\n",
+			[]cst.Kind{cst.TypeName, cst.MethodDecl}},
+		{"bare", "type L = int8 impl {\n  inc(): self {\n    return self\n  }\n}\n",
+			[]cst.Kind{cst.MethodDecl}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			root, diags := Parse([]byte(tc.src))
+			if len(diags) != 0 {
+				t.Fatalf("unexpected diagnostics: %v", diags)
+			}
+			decl := root.Children()[0].(*cst.Node)
+			var impl *cst.Node
+			for _, c := range decl.Children() {
+				if n, ok := c.(*cst.Node); ok && n.Kind() == cst.ImplBlock {
+					impl = n
+				}
+			}
+			if impl == nil {
+				t.Fatalf("no impl block found in %q", tc.src)
+			}
+			got := subNodeKinds(impl)
+			if len(got) != len(tc.want) {
+				t.Fatalf("impl child nodes = %v, want %v", got, tc.want)
+			}
+			for i := range got {
+				if got[i] != tc.want[i] {
+					t.Fatalf("impl child nodes = %v, want %v", got, tc.want)
+				}
+			}
+		})
+	}
+}
+
 // TestParseWhereClauseDiagnostics checks local recovery for malformed
 // where-clauses.
 func TestParseWhereClauseDiagnostics(t *testing.T) {

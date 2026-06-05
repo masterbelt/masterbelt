@@ -93,6 +93,18 @@ func dumpTypeDef(b *strings.Builder, t *TypeDef) {
 			fmt.Fprintf(b, "    member %q = %s\n", m.Name, m.Value.String())
 		}
 	}
+	if t.Interface != nil {
+		b.WriteString("    interface\n")
+		for _, name := range t.Interface.Required {
+			fmt.Fprintf(b, "    required %q\n", name)
+		}
+		for _, name := range t.Interface.Provided {
+			fmt.Fprintf(b, "    provided %q\n", name)
+		}
+	}
+	for _, i := range t.Impls {
+		fmt.Fprintf(b, "    impl %s\n", typeString(i))
+	}
 	if t.Body != nil {
 		fmt.Fprintf(b, "    body %s\n", t.Body)
 	}

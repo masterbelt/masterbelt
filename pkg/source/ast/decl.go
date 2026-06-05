@@ -6,13 +6,14 @@ import "github.com/masterbelt/masterbelt/pkg/source/cst"
 // declarations in source order. Trivia and any unparsable regions present in
 // the CST are dropped here.
 type File struct {
-	Uses    []*UseDecl
-	Decls   []*ConstDecl
-	Types   []*TypeDecl
-	Enums   []*EnumDecl
-	Funcs   []*FuncDecl
-	Asserts []*AssertDecl
-	syntax  *cst.Node
+	Uses       []*UseDecl
+	Decls      []*ConstDecl
+	Types      []*TypeDecl
+	Enums      []*EnumDecl
+	Interfaces []*InterfaceDecl
+	Funcs      []*FuncDecl
+	Asserts    []*AssertDecl
+	syntax     *cst.Node
 }
 
 func (f *File) Syntax() *cst.Node { return f.syntax }
@@ -20,8 +21,8 @@ func (f *File) node()             {}
 
 // NewFile builds a File node. The constructors keep each node's syntax backlink
 // unexported while package parser/abstract populates it.
-func NewFile(uses []*UseDecl, decls []*ConstDecl, types []*TypeDecl, enums []*EnumDecl, funcs []*FuncDecl, asserts []*AssertDecl, syntax *cst.Node) *File {
-	return &File{Uses: uses, Decls: decls, Types: types, Enums: enums, Funcs: funcs, Asserts: asserts, syntax: syntax}
+func NewFile(uses []*UseDecl, decls []*ConstDecl, types []*TypeDecl, enums []*EnumDecl, interfaces []*InterfaceDecl, funcs []*FuncDecl, asserts []*AssertDecl, syntax *cst.Node) *File {
+	return &File{Uses: uses, Decls: decls, Types: types, Enums: enums, Interfaces: interfaces, Funcs: funcs, Asserts: asserts, syntax: syntax}
 }
 
 // UseDecl is a cross-file import: an optional pub modifier (re-export the
@@ -111,6 +112,58 @@ func (d *FuncDecl) node()             {}
 // NewFuncDecl builds a FuncDecl node.
 func NewFuncDecl(doc []string, public, extern bool, effects []string, name string, params []*ParamDef, result TypeExpr, body []Stmt, syntax *cst.Node) *FuncDecl {
 	return &FuncDecl{Doc: doc, Public: public, Extern: extern, Effects: effects, Name: name, Params: params, Result: result, Body: body, syntax: syntax}
+}
+
+// InterfaceDecl is an interface declaration: a nominal behaviour a type opts
+// into at its definition site (impl <interface>). It carries an optional run of
+// doc-comment lines, an optional pub modifier, the declared Name, its generic
+// Params, and its Members — the required methods (no body, which an implementor
+// must supply) and the provided methods (with a body, the default an
+// implementor gets for free). Required and provided members are distinguished
+// by whether their Body is nil.
+type InterfaceDecl struct {
+	Doc     []string
+	Public  bool
+	Name    string       // the declared identifier, or "" if missing
+	Params  []*TypeParam // generic parameters, in declaration order
+	Members []*InterfaceMember
+	syntax  *cst.Node
+}
+
+func (d *InterfaceDecl) Syntax() *cst.Node { return d.syntax }
+func (d *InterfaceDecl) node()             {}
+
+// NewInterfaceDecl builds an InterfaceDecl node.
+func NewInterfaceDecl(doc []string, public bool, name string, params []*TypeParam, members []*InterfaceMember, syntax *cst.Node) *InterfaceDecl {
+	return &InterfaceDecl{Doc: doc, Public: public, Name: name, Params: params, Members: members, syntax: syntax}
+}
+
+// InterfaceMember is one member of an interface: a method signature and, for a
+// provided method, the default Body computed on top of the required methods. A
+// required method has Body nil; a provided method carries a Body the implementor
+// inherits unless it declares the method directly. TypeParams holds the
+// member's own explicit type variables (the A in fold<A>).
+type InterfaceMember struct {
+	Doc        []string
+	Public     bool
+	Name       string
+	TypeParams []*TypeParam // explicit method type variables (the A in fold<A>), or nil
+	Params     []*ParamDef
+	Result     TypeExpr
+	Body       []Stmt // the provided default body, or nil for a required method
+	syntax     *cst.Node
+}
+
+func (m *InterfaceMember) Syntax() *cst.Node { return m.syntax }
+func (m *InterfaceMember) node()             {}
+
+// Provided reports whether the member is a provided method (it carries a default
+// body); a required method has no body.
+func (m *InterfaceMember) Provided() bool { return m.Body != nil }
+
+// NewInterfaceMember builds an InterfaceMember node.
+func NewInterfaceMember(doc []string, public bool, name string, typeParams []*TypeParam, params []*ParamDef, result TypeExpr, body []Stmt, syntax *cst.Node) *InterfaceMember {
+	return &InterfaceMember{Doc: doc, Public: public, Name: name, TypeParams: typeParams, Params: params, Result: result, Body: body, syntax: syntax}
 }
 
 // AssertDecl is a compile-time assertion: an optional run of doc-comment lines
