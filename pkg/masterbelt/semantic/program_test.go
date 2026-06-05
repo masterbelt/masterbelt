@@ -539,3 +539,124 @@ func TestProgramShellsStableAcrossRefresh(t *testing.T) {
 		t.Errorf("Y = %s, want the re-evaluated 2", eval)
 	}
 }
+
+// --- cross-file functions ---------------------------------------------------------
+
+func TestProgramCrossFileFunctionCall(t *testing.T) {
+	p := buildProgram(map[string]string{
+		"math.belt": "pub fn double(x: int): int -> x * 2\nfn hidden(): int -> 0\n",
+		"main.belt": "use { double } from \"math.belt\"\nconst A = double(21)\n",
+	})
+	assertClean(t, p, "math.belt")
+	assertClean(t, p, "main.belt")
+	if typ, eval := constInfo(p, "main.belt", "A"); typ != "int" || eval != "42" {
+		t.Errorf("A = %s / %s, want int / 42", typ, eval)
+	}
+	// The FuncCall targets the very ir.Function the owning module publishes.
+	call, ok := p.Module("main.belt").Consts[0].Value.(*ir.FuncCall)
+	if !ok {
+		t.Fatalf("A lowered to %T, want *ir.FuncCall", p.Module("main.belt").Consts[0].Value)
+	}
+	if call.Target != p.Module("math.belt").Funcs[0] {
+		t.Errorf("call target = %p, want math's double", call.Target)
+	}
+}
+
+func TestProgramWildcardFunctionImport(t *testing.T) {
+	p := buildProgram(map[string]string{
+		"math.belt": "pub fn double(x: int): int -> x * 2\n",
+		"main.belt": "use * from \"math.belt\"\nconst A = double(2)\n",
+	})
+	assertClean(t, p, "main.belt")
+	if _, eval := constInfo(p, "main.belt", "A"); eval != "4" {
+		t.Errorf("A eval = %s, want 4", eval)
+	}
+}
+
+func TestProgramNamespaceFunctionCall(t *testing.T) {
+	p := buildProgram(map[string]string{
+		"math.belt": "pub fn double(x: int): int -> x * 2\n",
+		"main.belt": "use math from \"math.belt\"\nconst A = math.double(21)\n",
+	})
+	assertClean(t, p, "main.belt")
+	if typ, eval := constInfo(p, "main.belt", "A"); typ != "int" || eval != "42" {
+		t.Errorf("A = %s / %s, want int / 42", typ, eval)
+	}
+}
+
+func TestProgramNamespaceFunctionCallInBodies(t *testing.T) {
+	// A namespace function call works inside a method body and a function
+	// body, through the same qualified lookup.
+	p := buildProgram(map[string]string{
+		"math.belt": "pub fn double(x: int): int -> x * 2\n",
+		"main.belt": "use math from \"math.belt\"\n" +
+			"fn quad(x: int): int -> math.double(math.double(x))\n" +
+			"const A = quad(3)\n" +
+			"pub type T = int8 impl {\n  pub f(): int {\n    return math.double(7)\n  }\n}\n",
+	})
+	assertClean(t, p, "main.belt")
+	if _, eval := constInfo(p, "main.belt", "A"); eval != "12" {
+		t.Errorf("A eval = %s, want 12", eval)
+	}
+}
+
+func TestProgramImportedOverloadSet(t *testing.T) {
+	// An imported name carries its whole overload set; the argument selects.
+	p := buildProgram(map[string]string{
+		"math.belt": "pub fn scale(x: int): int -> x * 10\npub fn scale(s: string): string -> s\n",
+		"main.belt": "use { scale } from \"math.belt\"\nconst A = scale(4)\nconst B = scale(\"x\")\n",
+	})
+	assertClean(t, p, "main.belt")
+	if _, eval := constInfo(p, "main.belt", "A"); eval != "40" {
+		t.Errorf("A eval = %s, want 40", eval)
+	}
+	if _, eval := constInfo(p, "main.belt", "B"); eval != "\"x\"" {
+		t.Errorf("B eval = %s, want \"x\"", eval)
+	}
+}
+
+func TestProgramFunctionNotExported(t *testing.T) {
+	// A private function neither imports selectively nor resolves through a
+	// namespace.
+	p := buildProgram(map[string]string{
+		"math.belt": "fn hidden(): int -> 0\n",
+		"main.belt": "use { hidden } from \"math.belt\"\nuse math from \"math.belt\"\nconst A = math.hidden()\n",
+	})
+	findDiag(t, p, "main.belt", CodeNotExported)
+	findDiag(t, p, "main.belt", CodeUnknownMember)
+}
+
+func TestProgramAmbiguousFunctionImport(t *testing.T) {
+	// The same function name from two imports with distinct sets is ambiguous
+	// at the call, like any other doubly-claimed name.
+	p := buildProgram(map[string]string{
+		"a.belt":    "pub fn f(): int -> 1\n",
+		"b.belt":    "pub fn f(): int -> 2\n",
+		"main.belt": "use { f } from \"a.belt\"\nuse { f } from \"b.belt\"\nconst A = f()\n",
+	})
+	findDiag(t, p, "main.belt", CodeAmbiguousImport)
+}
+
+func TestProgramLocalFunctionShadowsImport(t *testing.T) {
+	p := buildProgram(map[string]string{
+		"math.belt": "pub fn f(): int -> 1\n",
+		"main.belt": "use * from \"math.belt\"\nfn f(): int -> 2\nconst A = f()\n",
+	})
+	assertClean(t, p, "main.belt")
+	if _, eval := constInfo(p, "main.belt", "A"); eval != "2" {
+		t.Errorf("A eval = %s, want 2 (the local function shadows the import)", eval)
+	}
+}
+
+func TestProgramFunctionReexport(t *testing.T) {
+	// A pub use re-exports a function through a barrel.
+	p := buildProgram(map[string]string{
+		"math.belt":   "pub fn double(x: int): int -> x * 2\n",
+		"barrel.belt": "pub use * from \"math.belt\"\n",
+		"main.belt":   "use { double } from \"barrel.belt\"\nconst A = double(5)\n",
+	})
+	assertClean(t, p, "main.belt")
+	if _, eval := constInfo(p, "main.belt", "A"); eval != "10" {
+		t.Errorf("A eval = %s, want 10", eval)
+	}
+}

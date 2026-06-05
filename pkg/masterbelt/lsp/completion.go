@@ -44,6 +44,7 @@ func completion(doc view, offset int) *protocol.CompletionList {
 		return &protocol.CompletionList{Items: typeItems(doc)}
 	}
 	items := constantItems(doc)
+	items = append(items, functionItems(doc)...)
 	items = append(items, valueKeywordItems()...)
 	return &protocol.CompletionList{Items: items}
 }
@@ -160,9 +161,18 @@ func callSnippet(m *ir.Method, subst map[string]ir.Type) string {
 	var b strings.Builder
 	b.WriteString(m.Name)
 	b.WriteString("(")
+	appendParamsSnippet(&b, m.Params, subst)
+	b.WriteString(")")
+	return b.String()
+}
+
+// appendParamsSnippet writes the snippet text of a call's arguments — a tab
+// stop per parameter, a function-typed one expanded to a fn literal — shared
+// by the method and function call snippets.
+func appendParamsSnippet(b *strings.Builder, params []ir.Param, subst map[string]ir.Type) {
 	stop := 0
 	nextStop := func() int { stop++; return stop }
-	for i, p := range m.Params {
+	for i, p := range params {
 		if i > 0 {
 			b.WriteString(", ")
 		}
@@ -173,18 +183,16 @@ func callSnippet(m *ir.Method, subst map[string]ir.Type) string {
 				if j > 0 {
 					b.WriteString(", ")
 				}
-				fmt.Fprintf(&b, "${%d:%s}", nextStop(), paramName(j))
+				fmt.Fprintf(b, "${%d:%s}", nextStop(), paramName(j))
 				if isConcrete(ft) {
 					b.WriteString(": " + snippetEscape(ft.String()))
 				}
 			}
-			fmt.Fprintf(&b, ") -> ${%d}", nextStop())
+			fmt.Fprintf(b, ") -> ${%d}", nextStop())
 			continue
 		}
-		fmt.Fprintf(&b, "${%d:%s}", nextStop(), p.Name)
+		fmt.Fprintf(b, "${%d:%s}", nextStop(), p.Name)
 	}
-	b.WriteString(")")
-	return b.String()
 }
 
 // paramName names the j-th generated fn-literal parameter: x, y, z, then x3…

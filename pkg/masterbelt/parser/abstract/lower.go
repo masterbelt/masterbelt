@@ -42,6 +42,7 @@ func lowerFile(root cst.Tree, buf source.Buffer) *ast.File {
 	var uses []*ast.UseDecl
 	var decls []*ast.ConstDecl
 	var types []*ast.TypeDecl
+	var funcs []*ast.FuncDecl
 	var asserts []*ast.AssertDecl
 	foreachDecl(root, func(child cst.Tree, green *cst.Node) {
 		switch green.Kind() {
@@ -51,18 +52,20 @@ func lowerFile(root cst.Tree, buf source.Buffer) *ast.File {
 			decls = append(decls, lowerConstDecl(child, buf))
 		case cst.TypeDecl:
 			types = append(types, lowerTypeDecl(child, buf))
+		case cst.FuncDecl:
+			funcs = append(funcs, lowerFuncDecl(child, buf))
 		case cst.AssertDecl:
 			asserts = append(asserts, lowerAssertDecl(child, buf))
 		}
 	})
-	return ast.NewFile(uses, decls, types, asserts, rootNode)
+	return ast.NewFile(uses, decls, types, funcs, asserts, rootNode)
 }
 
 // foreachDecl calls fn for each top-level declaration child of root (a
-// UseDecl, ConstDecl, TypeDecl, or AssertDecl), in source order, passing the
-// positioned child and its green node. Trivia tokens, the EOF leaf, and
-// unparsable Error regions are skipped: they have no place in the abstract
-// tree.
+// UseDecl, ConstDecl, TypeDecl, FuncDecl, or AssertDecl), in source order,
+// passing the positioned child and its green node. Trivia tokens, the EOF
+// leaf, and unparsable Error regions are skipped: they have no place in the
+// abstract tree.
 func foreachDecl(root cst.Tree, fn func(child cst.Tree, green *cst.Node)) {
 	for _, child := range root.Children() {
 		node, ok := child.Node()
@@ -70,7 +73,7 @@ func foreachDecl(root cst.Tree, fn func(child cst.Tree, green *cst.Node)) {
 			continue
 		}
 		switch node.Kind() {
-		case cst.UseDecl, cst.ConstDecl, cst.TypeDecl, cst.AssertDecl:
+		case cst.UseDecl, cst.ConstDecl, cst.TypeDecl, cst.FuncDecl, cst.AssertDecl:
 			fn(child, node)
 		}
 	}
@@ -190,6 +193,52 @@ func lowerAssertDecl(t cst.Tree, buf source.Buffer) *ast.AssertDecl {
 		}
 	}
 	return ast.NewAssertDecl(doc, cond, green)
+}
+
+// lowerFuncDecl lowers a positioned FuncDecl CST node into an ast.FuncDecl:
+// its modifiers, name, parameters, result type, and body. The two body forms
+// normalize here — and only here — exactly as a function literal's do: an
+// arrow body ("->" Expr) becomes a single implicit return, so inference,
+// lowering, and evaluation see one body shape. The kinds keep the children
+// apart: the result type is a type-expression node, the arrow body an
+// expression node.
+func lowerFuncDecl(t cst.Tree, buf source.Buffer) *ast.FuncDecl {
+	green, _ := t.Node()
+	var (
+		doc    []string
+		public bool
+		name   string
+		params []*ast.ParamDef
+		result ast.TypeExpr
+		body   []ast.Stmt
+	)
+	for _, child := range t.Children() {
+		if tok, ok := child.Token(); ok {
+			switch tok.Kind() {
+			case token.Pub:
+				public = true
+			case token.DocComment:
+				doc = append(doc, docText(child.Text(buf)))
+			case token.Ident:
+				// The only direct Ident child is the declared name; the
+				// parameter and type names are nested in their own nodes.
+				name = child.Text(buf)
+			}
+			continue
+		}
+		node, _ := child.Node()
+		switch {
+		case node.Kind() == cst.ParamList:
+			params = lowerParamList(child, buf)
+		case node.Kind() == cst.Block:
+			body = lowerBlock(child, buf)
+		case isTypeExprKind(node.Kind()):
+			result = lowerTypeExpr(child, buf)
+		case isExprKind(node.Kind()):
+			body = []ast.Stmt{ast.NewReturnStmt(lowerExpr(child, buf), node)}
+		}
+	}
+	return ast.NewFuncDecl(doc, public, name, params, result, body, green)
 }
 
 // lowerTypeClause lowers a ": Type" clause to its type expression, or nil when

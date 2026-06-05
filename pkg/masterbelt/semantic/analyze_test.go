@@ -935,11 +935,13 @@ func TestAssertNotConstant(t *testing.T) {
 }
 
 func TestAssertSelfNotConstant(t *testing.T) {
-	// self has no referent at the top level; no other pass reports it, so the
-	// assertion is reported as unverifiable rather than passing silently.
+	// self has no referent at the top level: each occurrence is reported as
+	// self_outside_method, which also explains why the assertion cannot fold —
+	// so the generic assertion_not_constant stays suppressed.
 	_, diags := analyze("assert self == self\n")
-	if got := codes(diags); len(got) != 1 || got[0] != CodeAssertionNotConstant {
-		t.Fatalf("codes = %v, want [assertion_not_constant]", got)
+	got := codes(diags)
+	if len(got) != 2 || got[0] != CodeSelfOutsideMethod || got[1] != CodeSelfOutsideMethod {
+		t.Fatalf("codes = %v, want two self_outside_method", got)
 	}
 }
 
@@ -1168,5 +1170,303 @@ func TestRecordLiteralStructuralAnnotation(t *testing.T) {
 	}
 	if got := m.Consts[0].Eval.String(); got != "{ x: 1, y: 2 }" {
 		t.Errorf("P eval = %s", got)
+	}
+}
+
+// --- top-level functions --------------------------------------------------------
+
+func TestFuncDeclAndCall(t *testing.T) {
+	m, diags := analyze("pub fn double(x: int): int -> x * 2\nconst A = double(21)\n")
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if len(m.Funcs) != 1 || m.Funcs[0].Name != "double" || !m.Funcs[0].Public {
+		t.Fatalf("funcs = %v, want [pub double]", m.Funcs)
+	}
+	if m.Funcs[0].Result.String() != "int" || len(m.Funcs[0].Params) != 1 {
+		t.Errorf("double signature = %v -> %v, want (x: int): int", m.Funcs[0].Params, m.Funcs[0].Result)
+	}
+	if m.Consts[0].Type.String() != "int" {
+		t.Errorf("A type = %s, want int", m.Consts[0].Type)
+	}
+	if ev := m.Consts[0].Eval; ev == nil || ev.Kind != ir.ConstInt || ev.Int.Int64() != 42 {
+		t.Errorf("A eval = %v, want 42", ev)
+	}
+	call, ok := m.Consts[0].Value.(*ir.FuncCall)
+	if !ok || call.Target != m.Funcs[0] {
+		t.Errorf("A value = %v, want FuncCall -> double", m.Consts[0].Value)
+	}
+}
+
+func TestFuncDiagnostics(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+		want diagnostic.Code
+	}{
+		{"result mismatch", "fn f(): int { return \"x\" }\n", CodeTypeMismatch},
+		{"arity", "fn f(x: int): int -> x\nconst A = f(1, 2)\n", CodeArityMismatch},
+		{"undefined", "const X = unknownFn(1)\n", CodeUndefinedName},
+		{"missing return", "fn g(x: int): int { }\n", CodeMissingReturn},
+		{"unknown param type", "fn f(x: Bogus): int -> 1\n", CodeUnknownType},
+		{"duplicate signature", "fn f(): int -> 1\nfn f(): int -> 2\n", CodeDuplicateFuncOverload},
+		{"argument mismatch", "fn f(x: int): int -> x\nconst A = f(\"a\")\n", CodeTypeMismatch},
+		{"function is not a value", "fn f(): int -> 1\nconst A = f\n", CodeUndefinedName},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, diags := analyze(tc.src)
+			if got := codes(diags); len(got) != 1 || got[0] != tc.want {
+				t.Fatalf("codes = %v, want [%s]", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestFuncArgumentOverflow(t *testing.T) {
+	// The out-of-range argument reports at both boundaries it crosses: the
+	// argument against the parameter's int8, and the folded result against
+	// the call's int8 type.
+	_, diags := analyze("fn f(x: int8): int8 -> x\nconst A = f(1000)\n")
+	got := codes(diags)
+	if len(got) != 2 || got[0] != CodeConstantOverflow || got[1] != CodeConstantOverflow {
+		t.Fatalf("codes = %v, want two constant_overflow", got)
+	}
+}
+
+func TestFuncMissingReturnNotForArrowOrMissingBody(t *testing.T) {
+	// An arrow body always returns; a missing body is the parser's report,
+	// not a missing return on top.
+	_, diags := analyze("fn f(): int -> 1\n")
+	if len(diags) != 0 {
+		t.Fatalf("arrow body: unexpected diagnostics: %v", diags)
+	}
+	m, diags := analyze("fn f(): int\n")
+	_ = m
+	for _, d := range diags {
+		if d.Code == CodeMissingReturn {
+			t.Fatalf("missing body reported missing_return on top of the parse error: %v", diags)
+		}
+	}
+}
+
+func TestFuncRecursionGuard(t *testing.T) {
+	// Infinite recursion folds to nothing — the depth guard, not a stack
+	// overflow — and is not a type error (the result type is declared).
+	m, diags := analyze("fn loop(x: int): int -> loop(x)\nconst X = loop(1)\n")
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if m.Consts[0].Type.String() != "int" {
+		t.Errorf("X type = %s, want int", m.Consts[0].Type)
+	}
+	if m.Consts[0].Eval != nil {
+		t.Errorf("X eval = %v, want unevaluated", m.Consts[0].Eval)
+	}
+}
+
+func TestFuncCalledFromMethodBody(t *testing.T) {
+	src := "fn double(x: int): int -> x * 2\n" +
+		"pub type T = int8 impl {\n  pub f(): int {\n    return double(3)\n  }\n}\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	// The method body's call lowers to a FuncCall bound to the module's
+	// function shell.
+	ret, ok := m.Types[0].Methods[0].Body[0].(*ir.Return)
+	if !ok {
+		t.Fatalf("method body = %v, want a return", m.Types[0].Methods[0].Body)
+	}
+	call, ok := ret.Value.(*ir.FuncCall)
+	if !ok || call.Target != m.Funcs[0] {
+		t.Errorf("method return = %v, want FuncCall -> double", ret.Value)
+	}
+}
+
+func TestFuncCalledFromLambda(t *testing.T) {
+	m, diags := analyze("fn double(x: int): int -> x * 2\nconst D = [1, 2].map(fn(x) -> double(x))\n")
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if got := m.Consts[0].Eval.String(); got != "[2, 4]" {
+		t.Errorf("D eval = %s, want [2, 4]", got)
+	}
+}
+
+func TestLambdaParamShadowsFunc(t *testing.T) {
+	// A literal's parameter named like a function shadows it: the body's f is
+	// the int element, not the function.
+	m, diags := analyze("fn f(x: int): int -> x\nconst A = [1].map(fn(f) -> f + 1)\n")
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if got := m.Consts[0].Eval.String(); got != "[2]" {
+		t.Errorf("A eval = %s, want [2]", got)
+	}
+}
+
+func TestFuncMutualRecursionGuard(t *testing.T) {
+	// Mutual recursion through two functions bottoms out at the depth guard.
+	src := "fn a(x: int): int -> b(x)\nfn b(x: int): int -> a(x)\nconst X = a(1)\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if m.Consts[0].Eval != nil {
+		t.Errorf("X eval = %v, want unevaluated", m.Consts[0].Eval)
+	}
+}
+
+func TestFuncInAssert(t *testing.T) {
+	m, diags := analyze("fn area(w: int, h: int): int -> w * h\nassert area(3, 4) == 12\n")
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if len(m.Asserts) != 1 || !m.Asserts[0].Held() {
+		t.Fatalf("assert = %v, want held", m.Asserts)
+	}
+}
+
+func TestSelfOutsideMethod(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+	}{
+		{"function arrow body", "fn f(): int -> self + 1\n"},
+		{"function block body", "fn f(): int { return self }\n"},
+		{"lambda in function body", "fn f(): list<int> -> [1].map(fn(x) -> self)\n"},
+		{"const initializer", "const A = self\n"},
+		{"lambda in const initializer", "const A = [1].map(fn(x) -> self)\n"},
+		{"assert condition", "assert self == 1\n"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, diags := analyze(tc.src)
+			found := false
+			for _, d := range diags {
+				if d.Code == CodeSelfOutsideMethod {
+					found = true
+				}
+			}
+			if !found {
+				t.Fatalf("codes = %v, want self_outside_method", codes(diags))
+			}
+		})
+	}
+}
+
+func TestSelfAllowedInMethodAndWhere(t *testing.T) {
+	// A method body and a where clause have a receiver: self stays legal.
+	src := "type Port = int32 where self >= 1\n" +
+		"pub type L = int8 impl {\n  pub double(): int8 {\n    return self * 2\n  }\n}\n"
+	_, diags := analyze(src)
+	for _, d := range diags {
+		if d.Code == CodeSelfOutsideMethod {
+			t.Fatalf("self_outside_method fired in a legal position: %v", diags)
+		}
+	}
+}
+
+// --- function overloads ---------------------------------------------------------
+
+func TestFuncOverloadSelection(t *testing.T) {
+	// Same name, different parameter kinds: the argument type selects the
+	// overload, in typing and in folding.
+	src := "fn f(x: int): int -> 1\nfn f(x: string): int -> 2\n" +
+		"const A = f(9)\nconst B = f(\"a\")\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if got := m.Consts[0].Eval.String(); got != "1" {
+		t.Errorf("A eval = %s, want 1 (the int overload)", got)
+	}
+	if got := m.Consts[1].Eval.String(); got != "2" {
+		t.Errorf("B eval = %s, want 2 (the string overload)", got)
+	}
+	if len(m.Funcs) != 2 {
+		t.Errorf("module funcs = %d, want both overloads", len(m.Funcs))
+	}
+}
+
+func TestFuncOverloadByArity(t *testing.T) {
+	src := "fn f(): int -> 0\nfn f(x: int): int -> x\nconst A = f()\nconst B = f(7)\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if a, b := m.Consts[0].Eval.String(), m.Consts[1].Eval.String(); a != "0" || b != "7" {
+		t.Errorf("evals = %s, %s, want 0 and 7", a, b)
+	}
+}
+
+func TestFuncOverloadDiagnostics(t *testing.T) {
+	overloads := "fn f(x: int): int -> 1\nfn f(x: string): int -> 2\n"
+	cases := []struct {
+		name string
+		src  string
+		want diagnostic.Code
+	}{
+		{"no match", overloads + "const A = f(true)\n", CodeNoMatchingFuncOverload},
+		{"no match by arity", overloads + "const A = f(1, 2)\n", CodeNoMatchingFuncOverload},
+		{"ambiguous", "fn g(x: int8): int -> 1\nfn g(x: int32): int -> 2\nconst A = g(1)\n", CodeAmbiguousFuncOverload},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, diags := analyze(tc.src)
+			if got := codes(diags); len(got) != 1 || got[0] != tc.want {
+				t.Fatalf("codes = %v, want [%s]", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestFuncOverloadAnnotatedArgSelects(t *testing.T) {
+	// A concretely typed argument disambiguates same-kind overloads in
+	// typing; the type-blind fold stays conservative and does not pick.
+	src := "fn g(x: int8): int -> 1\nfn g(x: int32): int -> 2\n" +
+		"const B: int8 = 1\nconst A = g(B)\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if m.Consts[1].Type.String() != "int" {
+		t.Errorf("A type = %s, want int", m.Consts[1].Type)
+	}
+	if m.Consts[1].Eval != nil {
+		t.Errorf("A eval = %v, want unevaluated (kind-blind fold stays conservative)", m.Consts[1].Eval)
+	}
+}
+
+func TestFuncOverloadDuplicateStillCallable(t *testing.T) {
+	// A repeated signature reports at its declaration and is dropped: the
+	// first declaration keeps working, the call stays unambiguous.
+	src := "fn f(): int -> 1\nfn f(): int -> 2\nconst A = f()\n"
+	m, diags := analyze(src)
+	if got := codes(diags); len(got) != 1 || got[0] != CodeDuplicateFuncOverload {
+		t.Fatalf("codes = %v, want [duplicate_func_overload]", got)
+	}
+	if len(m.Funcs) != 1 {
+		t.Errorf("module funcs = %d, want the duplicate dropped", len(m.Funcs))
+	}
+	if m.Consts[0].Type.String() != "int" {
+		t.Errorf("A type = %s, want int (the first overload)", m.Consts[0].Type)
+	}
+}
+
+func TestFuncOverloadRecordArgDefers(t *testing.T) {
+	// An inferred record literal cannot select an overload; a typed one and
+	// the other arguments do, and the winner's parameter reaches into it.
+	src := "pub type Point = { x: int, y: int }\n" +
+		"fn f(p: Point, tag: int): int -> tag\n" +
+		"fn f(p: Point, tag: string): int -> 9\n" +
+		"const A = f({ x: 1, y: 2 }, 5)\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if got := m.Consts[0].Eval.String(); got != "5" {
+		t.Errorf("A eval = %s, want 5", got)
 	}
 }

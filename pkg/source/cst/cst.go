@@ -73,6 +73,9 @@ const (
 	Block      // "{" Stmt* "}"
 	ReturnStmt // return Expr
 
+	// Top-level functions.
+	FuncDecl // [doc] [pub] fn Ident ParamList ":" TypeExpr ( Block | "->" Expr )
+
 	// Cross-file imports.
 	UseDecl // [pub] use ( Ident | UseList | "*" ) from String
 	UseList // "{" Ident ("," Ident)* "}"  (the selective-import list)
@@ -119,6 +122,7 @@ var kindNames = [...]string{
 	Param:         "Param",
 	Block:         "Block",
 	ReturnStmt:    "ReturnStmt",
+	FuncDecl:      "FuncDecl",
 	UseDecl:       "UseDecl",
 	UseList:       "UseList",
 	AssertDecl:    "AssertDecl",

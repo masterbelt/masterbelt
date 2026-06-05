@@ -37,6 +37,12 @@ masterbelt.semantic.not_a_record,{typ} はレコード型ではありません
 masterbelt.semantic.uninferable_result,この関数リテラルの結果型を推論できません。注釈を付けるか値を返してください
 masterbelt.semantic.uninferable_parameter,パラメータ {name} の型を推論できません。型注釈を付けてください
 masterbelt.semantic.lambda_arity_mismatch,関数リテラルのパラメータが {actual} 個ありますが、{expected} 個が必要です
+masterbelt.semantic.arity_mismatch,関数 {name} は引数を {expected} 個取りますが、{actual} 個が渡されています
+masterbelt.semantic.missing_return,関数 {name} が値を返しません
+masterbelt.semantic.no_matching_func_overload,関数 {name} のどのオーバーロードも {types} に適合しません
+masterbelt.semantic.ambiguous_func_overload,関数 {name} の呼び出しが曖昧です: {types} に複数のオーバーロードが適合します
+masterbelt.semantic.duplicate_func_overload,関数 {name} が同じ引数型 ({types}) で再宣言されています
+masterbelt.semantic.self_outside_method,self はメソッド本体の中でのみ使えます
 masterbelt.semantic.use_not_found,インポートするファイルが見つかりません: {path}
 masterbelt.semantic.not_exported,{path} は {name} を公開していません
 masterbelt.semantic.unknown_member,{namespace} に公開メンバ {name} はありません

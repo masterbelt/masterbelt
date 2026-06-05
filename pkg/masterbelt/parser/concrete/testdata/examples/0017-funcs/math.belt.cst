@@ -1,0 +1,231 @@
+# tree
+File
+  FuncDecl
+    LineComment "// The exporter: public functions, including an overloaded name."
+    Newline "\n"
+    Newline "\n"
+    DocComment "/// Doubles x."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Fn "fn"
+    Whitespace " "
+    Ident "double"
+    ParamList
+      LParen "("
+      Param
+        Ident "x"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "int"
+      RParen ")"
+    Colon ":"
+    Whitespace " "
+    TypeName
+      Ident "int"
+    Whitespace " "
+    Arrow "->"
+    Whitespace " "
+    BinaryExpr
+      NameRef
+        Ident "x"
+      Whitespace " "
+      Star "*"
+      Whitespace " "
+      Literal
+        Int "2"
+  FuncDecl
+    Newline "\n"
+    Newline "\n"
+    DocComment "/// The area of a w-by-h rectangle."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Fn "fn"
+    Whitespace " "
+    Ident "area"
+    ParamList
+      LParen "("
+      Param
+        Ident "w"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "int"
+      Comma ","
+      Whitespace " "
+      Param
+        Ident "h"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "int"
+      RParen ")"
+    Colon ":"
+    Whitespace " "
+    TypeName
+      Ident "int"
+    Whitespace " "
+    Arrow "->"
+    Whitespace " "
+    BinaryExpr
+      NameRef
+        Ident "w"
+      Whitespace " "
+      Star "*"
+      Whitespace " "
+      NameRef
+        Ident "h"
+  FuncDecl
+    Newline "\n"
+    Newline "\n"
+    DocComment "/// Greets by name."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Fn "fn"
+    Whitespace " "
+    Ident "greet"
+    ParamList
+      LParen "("
+      Param
+        Ident "name"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "string"
+      RParen ")"
+    Colon ":"
+    Whitespace " "
+    TypeName
+      Ident "string"
+    Whitespace " "
+    Arrow "->"
+    Whitespace " "
+    BinaryExpr
+      Literal
+        String "\"Hello, \""
+      Whitespace " "
+      Plus "+"
+      Whitespace " "
+      NameRef
+        Ident "name"
+  FuncDecl
+    Newline "\n"
+    Newline "\n"
+    DocComment "/// Scales an int."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Fn "fn"
+    Whitespace " "
+    Ident "scale"
+    ParamList
+      LParen "("
+      Param
+        Ident "x"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "int"
+      RParen ")"
+    Colon ":"
+    Whitespace " "
+    TypeName
+      Ident "int"
+    Whitespace " "
+    Arrow "->"
+    Whitespace " "
+    BinaryExpr
+      NameRef
+        Ident "x"
+      Whitespace " "
+      Star "*"
+      Whitespace " "
+      Literal
+        Int "10"
+  FuncDecl
+    Newline "\n"
+    DocComment "/// Scales every element of a list."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Fn "fn"
+    Whitespace " "
+    Ident "scale"
+    ParamList
+      LParen "("
+      Param
+        Ident "xs"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "list"
+          GenericArgs
+            Lt "<"
+            TypeName
+              Ident "int"
+            Gt ">"
+      RParen ")"
+    Colon ":"
+    Whitespace " "
+    TypeName
+      Ident "list"
+      GenericArgs
+        Lt "<"
+        TypeName
+          Ident "int"
+        Gt ">"
+    Whitespace " "
+    Arrow "->"
+    Whitespace " "
+    CallExpr
+      MemberExpr
+        NameRef
+          Ident "xs"
+        Dot "."
+        Ident "map"
+      LParen "("
+      FuncLit
+        Fn "fn"
+        ParamList
+          LParen "("
+          Param
+            Ident "x"
+          RParen ")"
+        Whitespace " "
+        Arrow "->"
+        Whitespace " "
+        BinaryExpr
+          NameRef
+            Ident "x"
+          Whitespace " "
+          Star "*"
+          Whitespace " "
+          Literal
+            Int "10"
+      RParen ")"
+  FuncDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// A private helper does not export."
+    Newline "\n"
+    Fn "fn"
+    Whitespace " "
+    Ident "hidden"
+    ParamList
+      LParen "("
+      RParen ")"
+    Colon ":"
+    Whitespace " "
+    TypeName
+      Ident "int"
+    Whitespace " "
+    Arrow "->"
+    Whitespace " "
+    Literal
+      Int "0"
+  Newline "\n"
+  EOF ""
+# diagnostics

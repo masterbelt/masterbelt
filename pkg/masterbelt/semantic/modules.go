@@ -2,6 +2,7 @@ package semantic
 
 import (
 	"maps"
+	"slices"
 
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
@@ -33,12 +34,14 @@ type typeDefs struct {
 	universe map[string]*ir.TypeDef
 }
 
-// exports is the value of an exports query: a file's public surface, values
-// and types by name. Per name the file's own pub declaration wins; pub use
+// exports is the value of an exports query: a file's public surface — values,
+// types, and functions by name (a function name carrying its whole public
+// overload set). Per name the file's own pub declaration wins; pub use
 // re-exports merge behind it in source order, first claim winning.
 type exports struct {
 	consts map[string]*ast.ConstDecl
 	types  map[string]*ir.TypeDef
+	funcs  map[string][]*ast.FuncDecl
 }
 
 // binding is one imported name: its target, and whether two or more imports
@@ -49,13 +52,22 @@ type binding[T comparable] struct {
 	ambiguous bool
 }
 
+// funcBinding is one imported function name: its overload set, and whether
+// two or more imports claimed the name with distinct sets (the same set
+// arriving twice is not a conflict).
+type funcBinding struct {
+	targets   []*ast.FuncDecl
+	ambiguous bool
+}
+
 // importTable is the value of an imports query: the names a file's use
 // declarations bind locally. Selective and wildcard imports land in
-// values/types; namespace imports in namespaces (first declaration of a
+// values/types/funcs; namespace imports in namespaces (first declaration of a
 // namespace name wins).
 type importTable struct {
 	values     map[string]binding[*ast.ConstDecl]
 	types      map[string]binding[*ir.TypeDef]
+	funcs      map[string]funcBinding
 	namespaces map[string]FileID
 }
 
@@ -70,6 +82,19 @@ func addBinding[T comparable](m map[string]binding[T], name string, target T) {
 		return
 	}
 	m[name] = binding[T]{target: target}
+}
+
+// addFuncBinding is addBinding for overload sets: a different set claiming
+// the same name marks it ambiguous.
+func addFuncBinding(m map[string]funcBinding, name string, targets []*ast.FuncDecl) {
+	if b, ok := m[name]; ok {
+		if !slices.Equal(b.targets, targets) {
+			b.ambiguous = true
+			m[name] = b
+		}
+		return
+	}
+	m[name] = funcBinding{targets: targets}
 }
 
 // qualifiedFrom builds the namespace-qualified type lookup (geo.Point) over an
@@ -105,6 +130,38 @@ func resolveMemberThrough(q queries, file FileID, m *ast.MemberExpr) *ast.ConstD
 	return q.exportsOf(target).consts[m.Member.Name]
 }
 
+// resolveFuncMemberThrough is resolveMemberThrough for a namespace function
+// call (geo.area(...)): the member resolves to the target's exported overload
+// set of that name.
+func resolveFuncMemberThrough(q queries, file FileID, m *ast.MemberExpr) []*ast.FuncDecl {
+	recv, ok := m.Receiver.(*ast.Identifier)
+	if !ok {
+		return nil
+	}
+	if q.resolve(file, recv) != nil {
+		return nil // a value binding shadows the namespace
+	}
+	target, ok := q.importsOf(file).namespaces[recv.Name]
+	if !ok {
+		return nil
+	}
+	return q.exportsOf(target).funcs[m.Member.Name]
+}
+
+// qualifiedFuncsFrom builds the namespace-qualified function lookup over an
+// import table, for the body scopes (where no value bindings can shadow a
+// namespace). Reads go through q, so the engine tracks the target's exports
+// as a dependency.
+func qualifiedFuncsFrom(q queries, imp importTable) func(namespace, name string) []*ast.FuncDecl {
+	return func(namespace, name string) []*ast.FuncDecl {
+		target, ok := imp.namespaces[namespace]
+		if !ok {
+			return nil
+		}
+		return q.exportsOf(target).funcs[name]
+	}
+}
+
 // buildImports builds a file's import table from its use declarations and the
 // exports of their targets, read through q so both query implementations (the
 // engine, which tracks the reads as dependencies, and the direct oracle) share
@@ -113,6 +170,7 @@ func buildImports(q queries, file *ast.File, uses map[*ast.UseDecl]FileID) impor
 	t := importTable{
 		values:     map[string]binding[*ast.ConstDecl]{},
 		types:      map[string]binding[*ir.TypeDef]{},
+		funcs:      map[string]funcBinding{},
 		namespaces: map[string]FileID{},
 	}
 	if file == nil {
@@ -136,6 +194,9 @@ func buildImports(q queries, file *ast.File, uses map[*ast.UseDecl]FileID) impor
 			for name, def := range exp.types {
 				addBinding(t.types, name, def)
 			}
+			for name, fds := range exp.funcs {
+				addFuncBinding(t.funcs, name, fds)
+			}
 		default:
 			exp := q.exportsOf(target)
 			for _, name := range u.Names {
@@ -145,7 +206,10 @@ func buildImports(q queries, file *ast.File, uses map[*ast.UseDecl]FileID) impor
 				if def, ok := exp.types[name]; ok {
 					addBinding(t.types, name, def)
 				}
-				// A name in neither table: assemble reports not_exported.
+				if fds, ok := exp.funcs[name]; ok {
+					addFuncBinding(t.funcs, name, fds)
+				}
+				// A name in no table: assemble reports not_exported.
 			}
 		}
 	}
@@ -157,7 +221,7 @@ func buildImports(q queries, file *ast.File, uses map[*ast.UseDecl]FileID) impor
 // in source order. A pub namespace import re-exports nothing — a namespace
 // binding is file-local.
 func buildExports(q queries, file *ast.File, uses map[*ast.UseDecl]FileID, ownTypes map[string]*ir.TypeDef) exports {
-	out := exports{consts: map[string]*ast.ConstDecl{}, types: map[string]*ir.TypeDef{}}
+	out := exports{consts: map[string]*ast.ConstDecl{}, types: map[string]*ir.TypeDef{}, funcs: map[string][]*ast.FuncDecl{}}
 	if file == nil {
 		return out
 	}
@@ -172,6 +236,12 @@ func buildExports(q queries, file *ast.File, uses map[*ast.UseDecl]FileID, ownTy
 	for name, def := range ownTypes {
 		if def.Public {
 			out.types[name] = def
+		}
+	}
+	// A function name exports its whole public overload set, in source order.
+	for _, fd := range file.Funcs {
+		if fd.Public && fd.Name != "" {
+			out.funcs[fd.Name] = append(out.funcs[fd.Name], fd)
 		}
 	}
 
@@ -195,15 +265,23 @@ func buildExports(q queries, file *ast.File, uses map[*ast.UseDecl]FileID, ownTy
 					out.types[name] = def
 				}
 			}
+			if fds, ok := exp.funcs[name]; ok {
+				if _, taken := out.funcs[name]; !taken {
+					out.funcs[name] = fds
+				}
+			}
 		}
 		if u.Star {
-			// A barrel: the target's whole surface re-exports. Iterating two
+			// A barrel: the target's whole surface re-exports. Iterating the
 			// maps is order-free because reexport is first-claim per name and
 			// a name cannot collide with itself within one target.
 			for name := range exp.consts {
 				reexport(name)
 			}
 			for name := range exp.types {
+				reexport(name)
+			}
+			for name := range exp.funcs {
 				reexport(name)
 			}
 		} else {
@@ -219,14 +297,15 @@ func buildExports(q queries, file *ast.File, uses map[*ast.UseDecl]FileID, ownTy
 // names and the prelude surface in scope (its own declarations shadow both)
 // and its namespace-qualified names resolvable through q, and assembles the
 // annotation universe from the same definitions. imp must be the file's
-// import table.
-func buildTypeDefs(q queries, file *ast.File, imp importTable) typeDefs {
+// import table, and fns its function shells by name (so method bodies lower
+// calls of top-level functions).
+func buildTypeDefs(q queries, file *ast.File, imp importTable, fns bodyFuncs) typeDefs {
 	td := typeDefs{byName: map[string]*ir.TypeDef{}, universe: map[string]*ir.TypeDef{}}
 	if file == nil {
 		return td
 	}
 	extern := outerTypes(q, imp)
-	td.list = resolveTypes(file, nil, nil, q.registry(), extern, qualifiedFrom(q, imp))
+	td.list = resolveTypes(file, nil, nil, q.registry(), extern, qualifiedFrom(q, imp), fns)
 	for _, def := range td.list {
 		if def.Name != "" {
 			if _, ok := td.byName[def.Name]; !ok {
@@ -272,5 +351,7 @@ func (db *database) computeExports(f FileID) exports {
 func (db *database) computeTypeDefs(f FileID) typeDefs {
 	in, _ := db.read(inputKey(f)).(fileInput)
 	imp, _ := db.read(importsKey(f)).(importTable)
-	return buildTypeDefs(engineQueries{db}, in.file, imp)
+	q := engineQueries{db}
+	fns := bodyFuncs{local: funcShellsByName(in.file, db.fnShells), qualified: qualifiedFuncsFrom(q, imp), shells: db.fnShells}
+	return buildTypeDefs(q, in.file, imp, fns)
 }

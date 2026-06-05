@@ -41,6 +41,9 @@ func hover(doc view, offset int) *protocol.Hover {
 	if h := methodParamHover(doc, offset, trees); h != nil {
 		return h
 	}
+	if h := funcHover(doc, offset, trees); h != nil {
+		return h
+	}
 	if h := recordFieldHover(doc, offset); h != nil {
 		return h
 	}
@@ -144,6 +147,17 @@ func definition(doc view, offset int) []protocol.Location {
 	}
 	if t, _, ok := typeAt(doc, offset); ok && t.Syntax != nil {
 		return declLocation(doc.viewOfType(t))(t.Syntax.Syntax())
+	}
+	if fns, _, ok := funcAt(doc, offset); ok {
+		// Every overload is a target, in its own file — an imported callee
+		// jumps to the exporter.
+		var locs []protocol.Location
+		for _, f := range fns {
+			if f.Syntax != nil {
+				locs = append(locs, declLocation(doc.viewOfFunc(f.Syntax))(f.Syntax.Syntax())...)
+			}
+		}
+		return locs
 	}
 	return nil
 }

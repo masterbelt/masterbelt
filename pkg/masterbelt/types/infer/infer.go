@@ -41,6 +41,14 @@ type Env interface {
 	// (geo.Origin) refers to, or nil when the receiver names no namespace or
 	// the member is not among the namespace's exported values.
 	ResolveMember(m *ast.MemberExpr) *ast.ConstDecl
+	// ResolveFunc returns the overload set a call's callee name refers to —
+	// every same-name function declaration, in source order — or nil if no
+	// function has that name.
+	ResolveFunc(id *ast.Identifier) []*ast.FuncDecl
+	// ResolveFuncMember returns the overload set a namespace function call
+	// (geo.area(...)) refers to: the namespace target's exported functions of
+	// that name, or nil.
+	ResolveFuncMember(m *ast.MemberExpr) []*ast.FuncDecl
 	// TypeOf returns a declaration's type (ir.Invalid when undeterminable).
 	TypeOf(decl *ast.ConstDecl) ir.Type
 	// Universe returns the named type definitions annotations resolve in: the
@@ -69,6 +77,15 @@ type scope interface {
 	// name, self, a field access, a conversion, the null literal — returning
 	// ir.Invalid when the form is not meaningful in this scope.
 	leaf(e ast.Expr) ir.Type
+	// fn resolves a call's callee name to the overload set of the top-level
+	// function it names, or nil when nothing of that name is callable here —
+	// a parameter shadows a same-named function, and in a method body a type
+	// name (a conversion) wins over one.
+	fn(id *ast.Identifier) []*ast.FuncDecl
+	// fnMember resolves a call's member-access callee (geo.area) to the
+	// overload set the namespace's target exports, or nil when the receiver
+	// names no namespace (a value's method call).
+	fnMember(m *ast.MemberExpr) []*ast.FuncDecl
 }
 
 // Decl is the type rule for a declaration: an annotation gives a concrete type,
@@ -230,6 +247,22 @@ func (s funcScope) leaf(e ast.Expr) ir.Type {
 	return s.outer.leaf(e)
 }
 
+func (s funcScope) fn(id *ast.Identifier) []*ast.FuncDecl {
+	if _, ok := s.params[id.Name]; ok {
+		return nil // a parameter shadows a same-named function
+	}
+	return s.outer.fn(id)
+}
+
+func (s funcScope) fnMember(m *ast.MemberExpr) []*ast.FuncDecl {
+	if recv, ok := m.Receiver.(*ast.Identifier); ok {
+		if _, isParam := s.params[recv.Name]; isParam {
+			return nil // a parameter shadows a same-named namespace
+		}
+	}
+	return s.outer.fnMember(m)
+}
+
 // collectionType infers a collection literal's type: list<E> from the unified
 // element type, or map<K, V> from the unified key and value types. An empty
 // literal has no entries to infer from, so its type comes from the annotation,
@@ -306,9 +339,16 @@ func (s constScope) leaf(e ast.Expr) ir.Type {
 	return ir.Invalid
 }
 
-// BodyScope types a method body: the receiver type (Self), the parameter types
-// (Params), and the type universe (Universe) a conversion resolves against,
-// alongside the registry.
+func (s constScope) fn(id *ast.Identifier) []*ast.FuncDecl { return s.env.ResolveFunc(id) }
+
+func (s constScope) fnMember(m *ast.MemberExpr) []*ast.FuncDecl {
+	return s.env.ResolveFuncMember(m)
+}
+
+// BodyScope types a method or function body: the receiver type (Self —
+// ir.Invalid in a function, which has none), the parameter types (Params),
+// the type universe (Universe) a conversion resolves against, and the
+// top-level functions callable from the body (Funcs), alongside the registry.
 type BodyScope struct {
 	Reg      *builtin.Registry
 	Universe map[string]*ir.TypeDef
@@ -317,6 +357,14 @@ type BodyScope struct {
 	Qualified func(namespace, name string) *ir.TypeDef
 	Self      ir.Type
 	Params    map[string]ir.Type
+	// Funcs is the file's top-level functions by name — each name carrying
+	// its overload set in source order — or nil when none are in scope (a
+	// refinement predicate).
+	Funcs map[string][]*ast.FuncDecl
+	// QualifiedFuncs is the namespace-qualified function lookup
+	// (geo.area -> the target's exported overload set), or nil when no
+	// namespaces are in scope.
+	QualifiedFuncs func(namespace, name string) []*ast.FuncDecl
 }
 
 // Body infers the type of a method-body expression: self, a parameter, a
@@ -329,6 +377,27 @@ func (s BodyScope) registry() *builtin.Registry { return s.Reg }
 func (s BodyScope) universe() map[string]*ir.TypeDef { return s.Universe }
 
 func (s BodyScope) qualified() func(namespace, name string) *ir.TypeDef { return s.Qualified }
+
+func (s BodyScope) fn(id *ast.Identifier) []*ast.FuncDecl {
+	if _, isParam := s.Params[id.Name]; isParam {
+		return nil // a parameter shadows a same-named function
+	}
+	if _, isType := s.Universe[id.Name]; isType {
+		return nil // a type name is a conversion, which wins in a body
+	}
+	return s.Funcs[id.Name]
+}
+
+func (s BodyScope) fnMember(m *ast.MemberExpr) []*ast.FuncDecl {
+	recv, ok := m.Receiver.(*ast.Identifier)
+	if !ok || s.QualifiedFuncs == nil {
+		return nil
+	}
+	if _, isParam := s.Params[recv.Name]; isParam {
+		return nil // a parameter shadows a same-named namespace
+	}
+	return s.QualifiedFuncs(recv.Name, m.Member.Name)
+}
 
 func (s BodyScope) leaf(e ast.Expr) ir.Type {
 	switch e := e.(type) {
@@ -425,6 +494,16 @@ type Sink struct {
 	// ArityMismatch fires at a function literal whose parameter count differs
 	// from the expected function type's.
 	ArityMismatch func(lit *ast.FuncLit, got, want int)
+	// CallArityMismatch fires at a call of a top-level function (with a
+	// single signature) with the wrong number of arguments.
+	CallArityMismatch func(call *ast.CallExpr, name string, got, want int)
+	// NoMatchingFuncOverload fires at a call of an overloaded function none
+	// of whose signatures the argument types fit.
+	NoMatchingFuncOverload func(call *ast.CallExpr, name, types string)
+	// AmbiguousFuncOverload fires at a call whose argument types fit two or
+	// more signatures of the function — resolved by annotating an argument,
+	// never by an implicit priority.
+	AmbiguousFuncOverload func(call *ast.CallExpr, name, types string)
 	// UninferableParam fires at a function-literal parameter that neither has
 	// an annotation nor receives a concrete type from the checking context.
 	UninferableParam func(p *ast.ParamDef)
@@ -483,9 +562,27 @@ func (s *Sink) checked(e ast.Expr, want ir.Type) {
 	}
 }
 
-func (s *Sink) arityMismatch(lit *ast.FuncLit, got, want int) {
+func (s *Sink) arityMismatchLit(lit *ast.FuncLit, got, want int) {
 	if s != nil && s.ArityMismatch != nil {
 		s.ArityMismatch(lit, got, want)
+	}
+}
+
+func (s *Sink) arityMismatch(call *ast.CallExpr, name string, got, want int) {
+	if s != nil && s.CallArityMismatch != nil {
+		s.CallArityMismatch(call, name, got, want)
+	}
+}
+
+func (s *Sink) noMatchingFuncOverload(call *ast.CallExpr, name, types string) {
+	if s != nil && s.NoMatchingFuncOverload != nil {
+		s.NoMatchingFuncOverload(call, name, types)
+	}
+}
+
+func (s *Sink) ambiguousFuncOverload(call *ast.CallExpr, name, types string) {
+	if s != nil && s.AmbiguousFuncOverload != nil {
+		s.AmbiguousFuncOverload(call, name, types)
 	}
 }
 
@@ -780,7 +877,7 @@ func collectionApp(t ir.Type) (*ir.App, bool) {
 func checkFuncLitAgainst(lit *ast.FuncLit, want *ir.Func, s scope, subst map[string]ir.Type, sink *Sink) ir.Type {
 	reg := s.registry()
 	if len(lit.Params) != len(want.Params) {
-		sink.arityMismatch(lit, len(lit.Params), len(want.Params))
+		sink.arityMismatchLit(lit, len(lit.Params), len(want.Params))
 		return ir.Invalid
 	}
 	r := &TypeResolver{Defs: s.universe(), Qualified: s.qualified()}
@@ -1000,7 +1097,20 @@ func check(e ast.Expr, s scope, sink *Sink) ir.Type {
 func callType(e *ast.CallExpr, s scope, sink *Sink) ir.Type {
 	member, ok := e.Callee.(*ast.MemberExpr)
 	if !ok {
+		// A call whose callee names a top-level function is a function call;
+		// any other callee is a context-specific form (a conversion in a
+		// method body, otherwise nothing).
+		if id, isIdent := e.Callee.(*ast.Identifier); isIdent {
+			if cands := s.fn(id); len(cands) > 0 {
+				return funcCallType(e, id.Name, cands, s, sink)
+			}
+		}
 		return s.leaf(e)
+	}
+	// A member-access callee whose receiver names a namespace is a call of an
+	// imported function (geo.area(...)), never a method call.
+	if cands := s.fnMember(member); len(cands) > 0 {
+		return funcCallType(e, member.Member.Name, cands, s, sink)
 	}
 	reg := s.registry()
 	recv := check(member.Receiver, s, sink)
@@ -1096,6 +1206,178 @@ func callType(e *ast.CallExpr, s scope, sink *Sink) ir.Type {
 	return result
 }
 
+// funcSig is one resolved candidate of a function call: its declaration and
+// its parameter/result types.
+type funcSig struct {
+	fd     *ast.FuncDecl
+	params []ir.Type
+	result ir.Type
+}
+
+// funcCallType is the type rule for a call of a top-level function. A single
+// signature checks each argument against the parameter's annotated type — so
+// the expectation reaches into literal arguments, exactly as a method call's
+// parameter patterns do — and reports a wrong argument count as
+// arity_mismatch. An overloaded name selects the one signature the argument
+// types fit, mirroring the method rules: the non-deferred arguments are
+// synthesized first, the overload settles, and the deferred arguments (a
+// function literal, an inferred record literal — the forms whose meaning needs
+// an expectation) are then checked against the winner's parameter types. The
+// signatures resolve in the scope's universe, the same one the declaration's
+// own reporting pass resolves them in; an unresolved annotation was reported
+// there, so an Invalid parameter or result type stays silent here.
+func funcCallType(e *ast.CallExpr, name string, cands []*ast.FuncDecl, s scope, sink *Sink) ir.Type {
+	r := &TypeResolver{Defs: s.universe(), Qualified: s.qualified()}
+
+	// Resolve every candidate's signature, dropping a later one that repeats
+	// an earlier signature — the declaration pass reports the duplicate, and
+	// dropping it here keeps the first one callable instead of permanently
+	// ambiguous (mirroring how a duplicate method overload is dropped).
+	sigs := make([]funcSig, 0, len(cands))
+	seen := make(map[string]bool, len(cands))
+	for _, fd := range cands {
+		params := make([]ir.Type, len(fd.Params))
+		key := ""
+		for i, p := range fd.Params {
+			params[i] = r.ResolveType(p.Type, nil)
+			key += typeKey(params[i]) + ","
+		}
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		sigs = append(sigs, funcSig{fd: fd, params: params, result: r.ResolveType(fd.Result, nil)})
+	}
+
+	if len(sigs) == 1 {
+		sg := sigs[0]
+		if len(e.Arguments) != len(sg.params) {
+			// The arguments still check bare for their own diagnostics.
+			for _, a := range e.Arguments {
+				check(a, s, sink)
+			}
+			sink.arityMismatch(e, name, len(e.Arguments), len(sg.params))
+			return ir.Invalid
+		}
+		subst := map[string]ir.Type{}
+		for i, a := range e.Arguments {
+			checkType(a, sg.params[i], s, subst, sink)
+		}
+		return sg.result
+	}
+
+	// Pass 1 — synthesize the non-deferred arguments, left to right. The
+	// deferred forms stay nil — they fit any parameter during selection — so
+	// the overload settles before any of them is checked. An Invalid argument
+	// (its cause reported at its own node) also selects as fits-anything.
+	args := make([]ir.Type, len(e.Arguments))
+	known := make([]ir.Type, len(e.Arguments))
+	bad := false
+	for i, a := range e.Arguments {
+		if deferredArg(a) {
+			continue
+		}
+		args[i] = check(a, s, sink)
+		if args[i] == ir.Invalid {
+			bad = true
+			continue
+		}
+		known[i] = args[i]
+	}
+
+	var matches []funcSig
+	for _, sg := range sigs {
+		if len(sg.params) != len(e.Arguments) {
+			continue
+		}
+		fits := true
+		for i, kt := range known {
+			if kt == nil {
+				continue
+			}
+			if !types.Match(s.registry(), sg.params[i], kt, map[string]ir.Type{}) {
+				fits = false
+				break
+			}
+		}
+		if fits {
+			matches = append(matches, sg)
+		}
+	}
+
+	if len(matches) != 1 {
+		// No fitting signature, or several: check the deferred arguments bare
+		// for their own diagnostics, then report the call — unless an operand
+		// already carried its own report.
+		for i, a := range e.Arguments {
+			if deferredArg(a) {
+				args[i] = check(a, s, sink)
+			}
+		}
+		if !bad {
+			if len(matches) > 1 {
+				sink.ambiguousFuncOverload(e, name, argTypesList(args))
+			} else {
+				sink.noMatchingFuncOverload(e, name, argTypesList(args))
+			}
+		}
+		return ir.Invalid
+	}
+
+	// Pass 2 — the deferred arguments, each checked against the winner's
+	// parameter type. A finding inside one fails the call without a generic
+	// report, exactly as a method call's literal arguments do.
+	win := matches[0]
+	subst := map[string]ir.Type{}
+	for i, a := range e.Arguments {
+		if !deferredArg(a) {
+			continue
+		}
+		argFailed := false
+		args[i] = checkType(a, win.params[i], s, subst, observe(sink, &argFailed))
+		if argFailed || ir.HasInvalid(args[i]) {
+			bad = true
+		}
+	}
+	if bad {
+		return ir.Invalid
+	}
+	return win.result
+}
+
+// deferredArg reports whether an argument's typing needs the parameter's
+// expectation — a function literal, or an inferred-form record literal — so
+// overload selection must not synthesize it.
+func deferredArg(a ast.Expr) bool {
+	switch a := a.(type) {
+	case *ast.FuncLit:
+		return true
+	case *ast.RecordLit:
+		return a.TypeName == ""
+	default:
+		return false
+	}
+}
+
+// typeKey renders a parameter type for the duplicate-signature key; nil-safe
+// for a recovered annotation.
+func typeKey(t ir.Type) string {
+	if t == nil {
+		return "<nil>"
+	}
+	return t.String()
+}
+
+// argTypesList renders the argument types as "a, b" for the overload
+// diagnostics.
+func argTypesList(args []ir.Type) string {
+	parts := make([]string, len(args))
+	for i, a := range args {
+		parts[i] = typeKey(a)
+	}
+	return strings.Join(parts, ", ")
+}
+
 // observe wraps sink so the caller learns whether the wrapped walk reported a
 // finding (Checked is a stream, not a finding). The wrapper stays valid for a
 // nil sink, which is what lets the silent walk share the call rule.
@@ -1122,7 +1404,19 @@ func observe(sink *Sink, fired *bool) *Sink {
 		},
 		ArityMismatch: func(lit *ast.FuncLit, got, want int) {
 			*fired = true
-			sink.arityMismatch(lit, got, want)
+			sink.arityMismatchLit(lit, got, want)
+		},
+		CallArityMismatch: func(call *ast.CallExpr, name string, got, want int) {
+			*fired = true
+			sink.arityMismatch(call, name, got, want)
+		},
+		NoMatchingFuncOverload: func(call *ast.CallExpr, name, types string) {
+			*fired = true
+			sink.noMatchingFuncOverload(call, name, types)
+		},
+		AmbiguousFuncOverload: func(call *ast.CallExpr, name, types string) {
+			*fired = true
+			sink.ambiguousFuncOverload(call, name, types)
 		},
 		UninferableParam: func(p *ast.ParamDef) {
 			*fired = true

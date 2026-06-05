@@ -20,10 +20,35 @@ func Dump(m *Module) string {
 	for _, t := range m.Types {
 		dumpTypeDef(&b, t)
 	}
+	for _, f := range m.Funcs {
+		dumpFunction(&b, f)
+	}
 	for _, a := range m.Asserts {
 		dumpAssert(&b, a)
 	}
 	return b.String()
+}
+
+// dumpFunction renders one top-level function: its signature and lowered body,
+// in the same shape a method dumps under its type.
+func dumpFunction(b *strings.Builder, f *Function) {
+	mod := ""
+	if f.Public {
+		mod = " pub"
+	}
+	fmt.Fprintf(b, "  Func %q%s\n", f.Name, mod)
+	for _, doc := range f.Doc {
+		fmt.Fprintf(b, "    doc %q\n", doc)
+	}
+	for _, p := range f.Params {
+		fmt.Fprintf(b, "    param %s: %s\n", p.Name, typeString(p.Type))
+	}
+	if f.Result != nil {
+		fmt.Fprintf(b, "    result %s\n", f.Result)
+	}
+	for _, s := range f.Body {
+		dumpStmt(b, s)
+	}
 }
 
 // dumpAssert renders one assertion's outcome: its canonical condition, its
@@ -173,6 +198,16 @@ func dumpValue(v Value) string {
 			args[i] = dumpValue(a)
 		}
 		return fmt.Sprintf("%s.%s(%s)", dumpValue(x.Receiver), x.Method, strings.Join(args, ", "))
+	case *FuncCall:
+		name := "<unresolved>"
+		if x.Target != nil {
+			name = x.Target.Name
+		}
+		args := make([]string, len(x.Args))
+		for i, a := range x.Args {
+			args[i] = dumpValue(a)
+		}
+		return fmt.Sprintf("%s(%s)", name, strings.Join(args, ", "))
 	case *FuncLiteral:
 		parts := []string{"fn(" + strings.Join(x.Params, ", ") + ")"}
 		for _, s := range x.Body {

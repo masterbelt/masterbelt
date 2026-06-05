@@ -62,8 +62,13 @@ func Value(e ast.Expr, b Binder) ir.Value {
 		}
 		return &ir.RecordValue{TypeName: e.TypeName, Fields: fields}
 	case *ast.CallExpr:
-		// A call through a member access is a method call; any other callee is a
-		// context-specific form (a conversion in a method body, otherwise nothing).
+		// The binder claims the context-specific call forms first — a call of
+		// a top-level function (by name, or through a namespace import), a
+		// conversion. What remains of the member-callee form is a method call;
+		// any other callee lowers to nothing.
+		if v := b.Leaf(e, sub(b)); v != nil {
+			return v
+		}
 		if member, ok := e.Callee.(*ast.MemberExpr); ok {
 			args := make([]ir.Value, len(e.Arguments))
 			for i, a := range e.Arguments {
@@ -71,7 +76,7 @@ func Value(e ast.Expr, b Binder) ir.Value {
 			}
 			return &ir.Call{Receiver: Value(member.Receiver, b), Method: member.Member.Name, Args: args}
 		}
-		return b.Leaf(e, sub(b))
+		return nil
 	case *ast.FuncLit:
 		// The body lowers in a binder that binds the literal's parameters; its
 		// own parameter values are supplied at evaluation, not here.

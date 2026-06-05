@@ -1,0 +1,29 @@
+// Top-level functions: pure, compile-time callables — methods without a
+// receiver. The body is a block or an arrow expression, and a call site
+// folds at compile time.
+
+pub fn double(x: int): int -> x * 2
+
+pub fn area(w: int, h: int): int {
+  return w * h
+}
+
+// Functions compose.
+pub fn perimeter(w: int, h: int): int -> double(w) + double(h)
+
+const A = area(3, 4)
+const B = double(21)
+const C = perimeter(2, 3)
+
+// A function called from a lambda.
+const D = [1, 2, 3].map(fn(x) -> double(x))
+
+// Strings and records work like any other value.
+fn greet(name: string): string -> "Hello, " + name
+const E = greet("belt")
+
+pub type Point = { x: int, y: int }
+pub fn origin(): Point -> Point{ x: 0, y: 0 }
+const O = origin()
+
+assert area(3, 4) == 12

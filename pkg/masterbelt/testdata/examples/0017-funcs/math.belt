@@ -1,0 +1,18 @@
+// The exporter: public functions, including an overloaded name.
+
+/// Doubles x.
+pub fn double(x: int): int -> x * 2
+
+/// The area of a w-by-h rectangle.
+pub fn area(w: int, h: int): int -> w * h
+
+/// Greets by name.
+pub fn greet(name: string): string -> "Hello, " + name
+
+/// Scales an int.
+pub fn scale(x: int): int -> x * 10
+/// Scales every element of a list.
+pub fn scale(xs: list<int>): list<int> -> xs.map(fn(x) -> x * 10)
+
+// A private helper does not export.
+fn hidden(): int -> 0

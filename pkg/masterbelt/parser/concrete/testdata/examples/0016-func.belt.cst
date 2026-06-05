@@ -1,0 +1,397 @@
+# tree
+File
+  FuncDecl
+    LineComment "// Top-level functions: pure, compile-time callables — methods without a"
+    Newline "\n"
+    LineComment "// receiver. The body is a block or an arrow expression, and a call site"
+    Newline "\n"
+    LineComment "// folds at compile time."
+    Newline "\n"
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Fn "fn"
+    Whitespace " "
+    Ident "double"
+    ParamList
+      LParen "("
+      Param
+        Ident "x"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "int"
+      RParen ")"
+    Colon ":"
+    Whitespace " "
+    TypeName
+      Ident "int"
+    Whitespace " "
+    Arrow "->"
+    Whitespace " "
+    BinaryExpr
+      NameRef
+        Ident "x"
+      Whitespace " "
+      Star "*"
+      Whitespace " "
+      Literal
+        Int "2"
+  FuncDecl
+    Newline "\n"
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Fn "fn"
+    Whitespace " "
+    Ident "area"
+    ParamList
+      LParen "("
+      Param
+        Ident "w"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "int"
+      Comma ","
+      Whitespace " "
+      Param
+        Ident "h"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "int"
+      RParen ")"
+    Colon ":"
+    Whitespace " "
+    TypeName
+      Ident "int"
+    Whitespace " "
+    Block
+      LBrace "{"
+      Newline "\n"
+      Whitespace "  "
+      ReturnStmt
+        Return "return"
+        Whitespace " "
+        BinaryExpr
+          NameRef
+            Ident "w"
+          Whitespace " "
+          Star "*"
+          Whitespace " "
+          NameRef
+            Ident "h"
+      Newline "\n"
+      RBrace "}"
+  FuncDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// Functions compose."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Fn "fn"
+    Whitespace " "
+    Ident "perimeter"
+    ParamList
+      LParen "("
+      Param
+        Ident "w"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "int"
+      Comma ","
+      Whitespace " "
+      Param
+        Ident "h"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "int"
+      RParen ")"
+    Colon ":"
+    Whitespace " "
+    TypeName
+      Ident "int"
+    Whitespace " "
+    Arrow "->"
+    Whitespace " "
+    BinaryExpr
+      CallExpr
+        NameRef
+          Ident "double"
+        LParen "("
+        NameRef
+          Ident "w"
+        RParen ")"
+      Whitespace " "
+      Plus "+"
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "double"
+        LParen "("
+        NameRef
+          Ident "h"
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "A"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "area"
+        LParen "("
+        Literal
+          Int "3"
+        Comma ","
+        Whitespace " "
+        Literal
+          Int "4"
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "B"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "double"
+        LParen "("
+        Literal
+          Int "21"
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "C"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "perimeter"
+        LParen "("
+        Literal
+          Int "2"
+        Comma ","
+        Whitespace " "
+        Literal
+          Int "3"
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// A function called from a lambda."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "D"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        MemberExpr
+          CollectionLit
+            LBracket "["
+            Literal
+              Int "1"
+            Comma ","
+            Whitespace " "
+            Literal
+              Int "2"
+            Comma ","
+            Whitespace " "
+            Literal
+              Int "3"
+            RBracket "]"
+          Dot "."
+          Ident "map"
+        LParen "("
+        FuncLit
+          Fn "fn"
+          ParamList
+            LParen "("
+            Param
+              Ident "x"
+            RParen ")"
+          Whitespace " "
+          Arrow "->"
+          Whitespace " "
+          CallExpr
+            NameRef
+              Ident "double"
+            LParen "("
+            NameRef
+              Ident "x"
+            RParen ")"
+        RParen ")"
+  FuncDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// Strings and records work like any other value."
+    Newline "\n"
+    Fn "fn"
+    Whitespace " "
+    Ident "greet"
+    ParamList
+      LParen "("
+      Param
+        Ident "name"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "string"
+      RParen ")"
+    Colon ":"
+    Whitespace " "
+    TypeName
+      Ident "string"
+    Whitespace " "
+    Arrow "->"
+    Whitespace " "
+    BinaryExpr
+      Literal
+        String "\"Hello, \""
+      Whitespace " "
+      Plus "+"
+      Whitespace " "
+      NameRef
+        Ident "name"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "E"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "greet"
+        LParen "("
+        Literal
+          String "\"belt\""
+        RParen ")"
+  TypeDecl
+    Newline "\n"
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Type "type"
+    Whitespace " "
+    Ident "Point"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    RecordType
+      LBrace "{"
+      Whitespace " "
+      Field
+        Ident "x"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "int"
+      Comma ","
+      Whitespace " "
+      Field
+        Ident "y"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "int"
+      Whitespace " "
+      RBrace "}"
+  FuncDecl
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Fn "fn"
+    Whitespace " "
+    Ident "origin"
+    ParamList
+      LParen "("
+      RParen ")"
+    Colon ":"
+    Whitespace " "
+    TypeName
+      Ident "Point"
+    Whitespace " "
+    Arrow "->"
+    Whitespace " "
+    RecordLit
+      Ident "Point"
+      LBrace "{"
+      Whitespace " "
+      RecordField
+        Ident "x"
+        Colon ":"
+        Whitespace " "
+        Literal
+          Int "0"
+      Comma ","
+      Whitespace " "
+      RecordField
+        Ident "y"
+        Colon ":"
+        Whitespace " "
+        Literal
+          Int "0"
+      Whitespace " "
+      RBrace "}"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "O"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "origin"
+        LParen "("
+        RParen ")"
+  AssertDecl
+    Newline "\n"
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      CallExpr
+        NameRef
+          Ident "area"
+        LParen "("
+        Literal
+          Int "3"
+        Comma ","
+        Whitespace " "
+        Literal
+          Int "4"
+        RParen ")"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "12"
+  Newline "\n"
+  EOF ""
+# diagnostics

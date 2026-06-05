@@ -1,0 +1,15 @@
+// The importer: selective and namespace imports of functions.
+use { double, area, scale } from "math.belt"
+use math from "math.belt"
+
+const A = double(21)
+const B = area(3, 4)
+
+// The overload set imports as one name; the argument selects.
+const C = scale(4)
+const D = scale([1, 2])
+
+// A namespace import calls through the qualifier.
+const E = math.greet("belt")
+
+assert math.double(2) == double(2)

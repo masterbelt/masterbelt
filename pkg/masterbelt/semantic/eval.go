@@ -20,6 +20,12 @@ func (e evalEnv) Resolve(id *ast.Identifier) *ast.ConstDecl { return e.q.resolve
 func (e evalEnv) ResolveMember(m *ast.MemberExpr) *ast.ConstDecl {
 	return e.q.resolveMember(e.file, m)
 }
+func (e evalEnv) ResolveFunc(id *ast.Identifier) []*ast.FuncDecl {
+	return e.q.resolveFunc(e.file, id)
+}
+func (e evalEnv) ResolveFuncMember(m *ast.MemberExpr) []*ast.FuncDecl {
+	return e.q.resolveFuncMember(e.file, m)
+}
 func (e evalEnv) ValueOf(decl *ast.ConstDecl) *ir.Constant { return e.q.valueOf(decl) }
 func (e evalEnv) Registry() *builtin.Registry              { return e.q.registry() }
 

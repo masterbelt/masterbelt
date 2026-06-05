@@ -57,6 +57,15 @@ type queries interface {
 	// (geo.Origin) refers to, or nil when the receiver names no namespace or
 	// the member is not among the target's exported values.
 	resolveMember(file FileID, m *ast.MemberExpr) *ast.ConstDecl
+	// resolveFunc returns the overload set a call's callee name refers to —
+	// the file's own same-name declarations in source order, or the set an
+	// unambiguous import binds — or nil if none has that name. Like resolve
+	// it is keyed on the identifier, keeping early cutoff sharp.
+	resolveFunc(file FileID, id *ast.Identifier) []*ast.FuncDecl
+	// resolveFuncMember returns the overload set a namespace function call
+	// (geo.area(...)) refers to: the target's exported functions of that
+	// name, or nil.
+	resolveFuncMember(file FileID, m *ast.MemberExpr) []*ast.FuncDecl
 	// typeOf returns a constant's type (ir.Invalid when undeterminable).
 	typeOf(decl *ast.ConstDecl) ir.Type
 	// valueOf returns a constant's evaluated value, or nil when it cannot be
@@ -104,6 +113,12 @@ func (e typeEnv) Resolve(id *ast.Identifier) *ast.ConstDecl { return e.q.resolve
 func (e typeEnv) ResolveMember(m *ast.MemberExpr) *ast.ConstDecl {
 	return e.q.resolveMember(e.file, m)
 }
+func (e typeEnv) ResolveFunc(id *ast.Identifier) []*ast.FuncDecl {
+	return e.q.resolveFunc(e.file, id)
+}
+func (e typeEnv) ResolveFuncMember(m *ast.MemberExpr) []*ast.FuncDecl {
+	return e.q.resolveFuncMember(e.file, m)
+}
 func (e typeEnv) TypeOf(decl *ast.ConstDecl) ir.Type { return e.q.typeOf(decl) }
 func (e typeEnv) Universe() map[string]*ir.TypeDef   { return e.q.universe(e.file) }
 func (e typeEnv) QualifiedType(namespace, name string) *ir.TypeDef {
@@ -135,6 +150,18 @@ func exprSink(at func(ast.Node) span, diags *diagnostic.List) *infer.Sink {
 		ArityMismatch: func(lit *ast.FuncLit, got, want int) {
 			s := at(lit)
 			diags.Add(newLambdaArityMismatchDiagnostic(s.offset, s.width, got, want))
+		},
+		CallArityMismatch: func(call *ast.CallExpr, name string, got, want int) {
+			s := at(call)
+			diags.Add(newArityMismatchDiagnostic(s.offset, s.width, name, got, want))
+		},
+		NoMatchingFuncOverload: func(call *ast.CallExpr, name, types string) {
+			s := at(call)
+			diags.Add(newNoMatchingFuncOverloadDiagnostic(s.offset, s.width, name, types))
+		},
+		AmbiguousFuncOverload: func(call *ast.CallExpr, name, types string) {
+			s := at(call)
+			diags.Add(newAmbiguousFuncOverloadDiagnostic(s.offset, s.width, name, types))
 		},
 		UninferableParam: func(p *ast.ParamDef) {
 			s := at(p)
@@ -175,7 +202,7 @@ func Analyze(doc *abstract.Document) (*ir.Module, []diagnostic.Diagnostic) {
 	file := doc.File()
 	files := map[FileID]*ast.File{soleFileID: file}
 	q := newDirectQueries(files, nil, universe())
-	return assemble(soleFileID, file, positionsOf(doc.Concrete().Tree()), q, constShells(files))
+	return assemble(soleFileID, file, positionsOf(doc.Concrete().Tree()), q, constShells(files), q.fnShells)
 }
 
 // AnalyzeProgram resolves and types a whole program from scratch: every file
@@ -193,7 +220,7 @@ func AnalyzeProgram(docs map[FileID]*abstract.Document, uses map[FileID]map[*ast
 	modules := make(map[FileID]*ir.Module, len(docs))
 	diags := make(map[FileID][]diagnostic.Diagnostic, len(docs))
 	for id, doc := range docs {
-		modules[id], diags[id] = assemble(id, doc.File(), positionsOf(doc.Concrete().Tree()), q, shells)
+		modules[id], diags[id] = assemble(id, doc.File(), positionsOf(doc.Concrete().Tree()), q, shells, q.fnShells)
 	}
 	return modules, diags
 }
@@ -214,12 +241,45 @@ func constShells(files map[FileID]*ast.File) map[*ast.ConstDecl]*ir.Const {
 	return shells
 }
 
+// funcShells creates the identity ir.Function for every function declaration
+// across the program, exactly as constShells does for constants: FuncCall
+// values bind to the same objects the owning module publishes.
+func funcShells(files map[FileID]*ast.File) map[*ast.FuncDecl]*ir.Function {
+	shells := map[*ast.FuncDecl]*ir.Function{}
+	for _, f := range files {
+		if f == nil {
+			continue
+		}
+		for _, fd := range f.Funcs {
+			shells[fd] = &ir.Function{Name: fd.Name, Public: fd.Public, Doc: fd.Doc, Syntax: fd}
+		}
+	}
+	return shells
+}
+
+// buildFuncSymbols maps each declared function name to its overload set: every
+// same-name declaration, in source order. A nil file (an input never set) has
+// no functions.
+func buildFuncSymbols(file *ast.File) map[string][]*ast.FuncDecl {
+	syms := map[string][]*ast.FuncDecl{}
+	if file == nil {
+		return syms
+	}
+	for _, fd := range file.Funcs {
+		if fd.Name != "" {
+			syms[fd.Name] = append(syms[fd.Name], fd)
+		}
+	}
+	return syms
+}
+
 // assemble builds one file's IR module and semantic diagnostics from its AST,
 // using q for the resolution and typing facts; fileID names the file within
-// the program, scoping its identifier resolution, and shells holds the
-// program-wide IR constants (this file's and every importable file's). It is
-// shared by the reference and incremental analyzers, so they cannot diverge.
-func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q queries, shells map[*ast.ConstDecl]*ir.Const) (*ir.Module, []diagnostic.Diagnostic) {
+// the program, scoping its identifier resolution, and shells/fnShells hold the
+// program-wide IR constants and functions (this file's and every importable
+// file's). It is shared by the reference and incremental analyzers, so they
+// cannot diverge.
+func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q queries, shells map[*ast.ConstDecl]*ir.Const, fnShells map[*ast.FuncDecl]*ir.Function) (*ir.Module, []diagnostic.Diagnostic) {
 	diags := &diagnostic.List{}
 	at := func(n ast.Node) span { return spanOf(positions, n) }
 	env := typeEnv{q: q, file: fileID}
@@ -235,7 +295,9 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 	// selective names the target does not export, and module cycles.
 	checkUses(fileID, file, q, at, diags)
 
-	// Redeclarations of the same name.
+	// Redeclarations of the same name — constants and functions each within
+	// their own namespace (a call form looks up functions, a bare name
+	// constants, so the two tables never collide).
 	seen := map[string]bool{}
 	for _, decl := range file.Decls {
 		if decl.Name == "" {
@@ -247,12 +309,11 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 		}
 		seen[decl.Name] = true
 	}
-
 	cyclic := cyclicDecls(fileID, file, q)
 
 	for _, decl := range file.Decls {
 		c := shells[decl]
-		c.Value = lower.Value(decl.Value, constBinder{q: q, file: fileID, irOf: shells})
+		c.Value = lower.Value(decl.Value, constBinder{q: q, file: fileID, irOf: shells, fnOf: fnShells})
 		c.Type = q.typeOf(decl)
 		c.Eval = q.valueOf(decl)
 
@@ -336,6 +397,12 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 				s := at(node)
 				diags.Add(newDivisionByZeroDiagnostic(s.offset, s.width))
 			})
+			// A constant has no receiver: self has no meaning in its
+			// initializer (nor inside a literal nested in it).
+			checkNoSelf(decl.Value, func(node ast.Node) {
+				s := at(node)
+				diags.Add(newSelfOutsideMethodDiagnostic(s.offset, s.width))
+			})
 		}
 
 		if cyclic[decl] {
@@ -414,12 +481,16 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 				}
 			})
 
-		// Operator type errors and zero divisors, through the same checking
-		// walks the const path uses.
+		// Operator type errors, zero divisors, and stray selfs, through the
+		// same checking walks the const path uses.
 		condType := infer.Check(a.Cond, env, exprSink(at, diags))
 		checkDivByZero(a.Cond, evalEnv{q: q, file: fileID}, func(node ast.Node) {
 			s := at(node)
 			diags.Add(newDivisionByZeroDiagnostic(s.offset, s.width))
+		})
+		checkNoSelf(a.Cond, func(node ast.Node) {
+			s := at(node)
+			diags.Add(newSelfOutsideMethodDiagnostic(s.offset, s.width))
 		})
 
 		// The outcome — the folded condition and its power-assert diagram —
@@ -474,8 +545,17 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 	// pass re-resolves the declarations fresh and discards the definitions.
 	module.Types = q.typeDefs(fileID)
 	imp := q.importsOf(fileID)
-	resolveTypes(file, at, diags, reg, outerTypes(q, imp), qualifiedFrom(q, imp))
-	checkMethodBodies(reg, module.Types, q.universe(fileID), qualifiedFrom(q, imp), exprSink(at, diags))
+	bfns := bodyFuncs{local: funcShellsByName(file, fnShells), qualified: qualifiedFuncsFrom(q, imp), shells: fnShells}
+	resolveTypes(file, at, diags, reg, outerTypes(q, imp), qualifiedFrom(q, imp), bfns)
+
+	// The module's functions are this file's shells, their signatures and
+	// bodies (re)resolved here with reporting; their bodies type-check the
+	// same way method bodies do.
+	funcs := buildFuncSymbols(file)
+	qfns := qualifiedFuncsFrom(q, imp)
+	module.Funcs = resolveFuncs(file, at, diags, q.universe(fileID), qualifiedFrom(q, imp), qfns, fnShells)
+	checkMethodBodies(reg, module.Types, q.universe(fileID), qualifiedFrom(q, imp), funcs, qfns, exprSink(at, diags))
+	checkFuncBodies(reg, file, q.universe(fileID), qualifiedFrom(q, imp), funcs, qfns, at, diags)
 
 	items := diags.Items()
 	sort.SliceStable(items, func(i, j int) bool { return items[i].Offset < items[j].Offset })
@@ -628,6 +708,9 @@ func checkUses(fileID FileID, file *ast.File, q queries, at func(ast.Node) span,
 			if _, isType := exp.types[name]; isType {
 				continue
 			}
+			if _, isFunc := exp.funcs[name]; isFunc {
+				continue
+			}
 			diags.Add(newNotExportedDiagnostic(s.offset, s.width, name, u.Path))
 		}
 		if q.reachableFrom(target)[fileID] {
@@ -660,16 +743,36 @@ func computeReachable(q queries, from FileID) map[FileID]bool {
 // walkRefs visits the value references of an expression: every value-position
 // identifier through onIdent, except that a namespace member access
 // (geo.Origin) is one unit visited through onMember — its receiver names a
-// namespace, not a value, and is skipped. The namespace decision layers on
-// the shared ast.WalkExprs traversal, so the skeleton lives in one place.
+// namespace, not a value, and is skipped — and a call's callee that names a
+// top-level function is skipped too: it refers to the function, not to a
+// value declaration. The walk is pre-order, so a call marks its callee before
+// the callee itself is visited. The decisions layer on the shared
+// ast.WalkExprs traversal, so the skeleton lives in one place.
 func walkRefs(fileID FileID, e ast.Expr, q queries, onIdent func(*ast.Identifier), onMember func(*ast.MemberExpr)) {
+	funcCallee := map[*ast.Identifier]bool{}
+	funcMemberCallee := map[*ast.MemberExpr]bool{}
 	ast.WalkExprs(e, func(e ast.Expr) bool {
 		switch e := e.(type) {
+		case *ast.CallExpr:
+			switch callee := e.Callee.(type) {
+			case *ast.Identifier:
+				if len(q.resolveFunc(fileID, callee)) > 0 {
+					funcCallee[callee] = true
+				}
+			case *ast.MemberExpr:
+				if len(q.resolveFuncMember(fileID, callee)) > 0 {
+					funcMemberCallee[callee] = true
+				}
+			}
 		case *ast.Identifier:
-			onIdent(e)
+			if !funcCallee[e] {
+				onIdent(e)
+			}
 		case *ast.MemberExpr:
 			if recv, ok := e.Receiver.(*ast.Identifier); ok && isNamespace(fileID, recv, q) {
-				onMember(e)
+				if !funcMemberCallee[e] {
+					onMember(e)
+				}
 				return false
 			}
 		}
@@ -700,11 +803,13 @@ type directQueries struct {
 	declFile map[*ast.ConstDecl]FileID
 	reg      *builtin.Registry
 	prelude  map[string]*ir.TypeDef
+	fnShells map[*ast.FuncDecl]*ir.Function
 
-	syms map[FileID]map[string]*ast.ConstDecl
-	imps map[FileID]importTable
-	exps map[FileID]exports
-	defs map[FileID]typeDefs
+	syms   map[FileID]map[string]*ast.ConstDecl
+	fnSyms map[FileID]map[string][]*ast.FuncDecl
+	imps   map[FileID]importTable
+	exps   map[FileID]exports
+	defs   map[FileID]typeDefs
 
 	importing map[FileID]bool
 	exporting map[FileID]bool
@@ -725,7 +830,9 @@ func newDirectQueries(files map[FileID]*ast.File, uses map[FileID]map[*ast.UseDe
 		declFile:  map[*ast.ConstDecl]FileID{},
 		reg:       u.reg,
 		prelude:   u.prelude,
+		fnShells:  funcShells(files),
 		syms:      map[FileID]map[string]*ast.ConstDecl{},
+		fnSyms:    map[FileID]map[string][]*ast.FuncDecl{},
 		imps:      map[FileID]importTable{},
 		exps:      map[FileID]exports{},
 		defs:      map[FileID]typeDefs{},
@@ -790,11 +897,40 @@ func (d *directQueries) resolve(f FileID, id *ast.Identifier) *ast.ConstDecl {
 	return nil
 }
 
+func (d *directQueries) funcSymbols(f FileID) map[string][]*ast.FuncDecl {
+	if s, ok := d.fnSyms[f]; ok {
+		return s
+	}
+	s := buildFuncSymbols(d.files[f])
+	d.fnSyms[f] = s
+	return s
+}
+
+func (d *directQueries) resolveFunc(f FileID, id *ast.Identifier) []*ast.FuncDecl {
+	if fds := d.funcSymbols(f)[id.Name]; len(fds) > 0 {
+		return fds
+	}
+	if b, ok := d.importsOf(f).funcs[id.Name]; ok && !b.ambiguous {
+		return b.targets
+	}
+	return nil
+}
+
+func (d *directQueries) resolveFuncMember(f FileID, m *ast.MemberExpr) []*ast.FuncDecl {
+	return resolveFuncMemberThrough(d, f, m)
+}
+
 func (d *directQueries) ambiguousImport(f FileID, id *ast.Identifier) bool {
 	if d.symbols(f)[id.Name] != nil {
 		return false
 	}
-	b, ok := d.importsOf(f).values[id.Name]
+	if b, ok := d.importsOf(f).values[id.Name]; ok && b.ambiguous {
+		return true
+	}
+	if len(d.funcSymbols(f)[id.Name]) > 0 {
+		return false
+	}
+	b, ok := d.importsOf(f).funcs[id.Name]
 	return ok && b.ambiguous
 }
 
@@ -828,7 +964,9 @@ func (d *directQueries) exportsOf(f FileID) exports {
 
 func (d *directQueries) typeDefsOf(f FileID) typeDefs {
 	return memoize(d.defs, d.resolving, f, typeDefs{}, func() typeDefs {
-		return buildTypeDefs(d, d.files[f], d.importsOf(f))
+		imp := d.importsOf(f)
+		fns := bodyFuncs{local: funcShellsByName(d.files[f], d.fnShells), qualified: qualifiedFuncsFrom(d, imp), shells: d.fnShells}
+		return buildTypeDefs(d, d.files[f], imp, fns)
 	})
 }
 

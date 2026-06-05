@@ -363,6 +363,130 @@ func TestParseCollectionLiteral(t *testing.T) {
 	}
 }
 
+// TestParseFuncDecl checks the top-level function declaration: both body
+// forms, the pub modifier, and the file-level dispatch on fn followed by a
+// name.
+func TestParseFuncDecl(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+		want []cst.Kind
+	}{
+		{"block body", "fn area(w: int, h: int): int {\n  return w * h\n}\n", []cst.Kind{cst.ParamList, cst.TypeName, cst.Block}},
+		{"arrow body", "fn double(x: int): int -> x * 2\n", []cst.Kind{cst.ParamList, cst.TypeName, cst.BinaryExpr}},
+		{"pub", "pub fn zero(): int -> 0\n", []cst.Kind{cst.ParamList, cst.TypeName, cst.Literal}},
+		{"record result", "pub fn origin(): Point -> Point{ x: 0 }\n", []cst.Kind{cst.ParamList, cst.TypeName, cst.RecordLit}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			root, diags := Parse([]byte(tc.src))
+			if len(diags) != 0 {
+				t.Fatalf("unexpected diagnostics: %v", diags)
+			}
+			assertLossless(t, tc.src)
+			decl := root.Children()[0].(*cst.Node)
+			if decl.Kind() != cst.FuncDecl {
+				t.Fatalf("first child kind = %s, want FuncDecl", decl.Kind())
+			}
+			got := subNodeKinds(decl)
+			if len(got) != len(tc.want) {
+				t.Fatalf("sub-nodes = %v, want %v", got, tc.want)
+			}
+			for i := range got {
+				if got[i] != tc.want[i] {
+					t.Fatalf("sub-nodes = %v, want %v", got, tc.want)
+				}
+			}
+		})
+	}
+}
+
+// TestParseFnThreeUses pins the three uses of fn apart: a function type (type
+// position), a function literal (value position, no name), and a function
+// declaration (top level, a name follows) — all in one file, parse-clean.
+func TestParseFnThreeUses(t *testing.T) {
+	src := "type F = fn(x: int): int\nconst g = fn(x) -> x\nfn h(x: int): int -> x\n"
+	root, diags := Parse([]byte(src))
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	assertLossless(t, src)
+	got := declKinds(root)
+	want := []string{"TypeDecl", "ConstDecl", "FuncDecl", "<Newline>", "<EOF>"}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("file children = %v, want %v", got, want)
+	}
+}
+
+// TestParseFuncDeclRecovery checks the malformed declaration forms: a pub fn
+// missing its name still parses as a (reported) declaration, a bare nameless
+// fn is a stray expression, and an error run stops before a following
+// function declaration.
+func TestParseFuncDeclRecovery(t *testing.T) {
+	t.Run("pub fn without a name is a reported FuncDecl", func(t *testing.T) {
+		src := "pub fn(x: int): int -> x\n"
+		root, diags := Parse([]byte(src))
+		if len(diags) == 0 {
+			t.Fatal("want a diagnostic for the missing name")
+		}
+		assertLossless(t, src)
+		decl := root.Children()[0].(*cst.Node)
+		if decl.Kind() != cst.FuncDecl {
+			t.Fatalf("first child kind = %s, want FuncDecl", decl.Kind())
+		}
+	})
+	t.Run("bare nameless fn is an error run", func(t *testing.T) {
+		src := "fn(x: int): int -> x\n"
+		root, diags := Parse([]byte(src))
+		if len(diags) == 0 {
+			t.Fatal("want a diagnostic for the stray literal")
+		}
+		assertLossless(t, src)
+		decl := root.Children()[0].(*cst.Node)
+		if decl.Kind() != cst.Error {
+			t.Fatalf("first child kind = %s, want Error", decl.Kind())
+		}
+	})
+	t.Run("an error run stops before a fn declaration", func(t *testing.T) {
+		src := "1 + 2\nfn h(): int -> 0\n"
+		root, diags := Parse([]byte(src))
+		if len(diags) == 0 {
+			t.Fatal("want a diagnostic for the stray expression")
+		}
+		assertLossless(t, src)
+		got := declKinds(root)
+		want := []string{"Error", "FuncDecl", "<Newline>", "<EOF>"}
+		if strings.Join(got, ",") != strings.Join(want, ",") {
+			t.Fatalf("file children = %v, want %v", got, want)
+		}
+	})
+	t.Run("missing body is reported", func(t *testing.T) {
+		_, diags := Parse([]byte("fn h(): int\n"))
+		found := false
+		for _, d := range diags {
+			if d.Code == CodeExpectedFuncBody {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatalf("want expected_func_body, got %v", diags)
+		}
+		assertLossless(t, "fn h(): int\n")
+	})
+	t.Run("arrow block body is reported", func(t *testing.T) {
+		_, diags := Parse([]byte("fn h(): int -> { return 1 }\n"))
+		found := false
+		for _, d := range diags {
+			if d.Code == CodeArrowBlockBody {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatalf("want arrow_block_body, got %v", diags)
+		}
+	})
+}
+
 // TestParseRecordLiteral checks both record-literal forms — typed (Point{...})
 // and inferred ({...}) — across the separator styles, nesting, and the empty
 // literal. The child kinds skip the brace/comma leaves and trivia, so a typed

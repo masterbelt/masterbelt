@@ -3,11 +3,12 @@
 //
 // The grammar is small and recursive-descent:
 //
-//	File          := ( ConstDecl | TypeDecl | UseDecl | AssertDecl | Error )*
+//	File          := ( ConstDecl | TypeDecl | UseDecl | AssertDecl | FuncDecl | Error )*
 //	ConstDecl     := [pub] const Ident [TypeClause] [Initializer]
 //	TypeDecl      := [pub] type Ident [GenericParams] "=" TypeExpr [WhereClause] [ImplBlock]
 //	UseDecl       := [pub] use UseTarget from String
 //	AssertDecl    := assert Expr
+//	FuncDecl      := [pub] fn Ident ParamList ":" TypeExpr ( Block | "->" Expr )
 //	UseTarget     := Ident | UseList | "*"
 //	UseList       := "{" Ident ( "," Ident )* "}"
 //	GenericParams := "<" GenericParam ( "," GenericParam )* ">"
@@ -197,14 +198,44 @@ func (p *parser) nextChildren() (batch []cst.Green, done bool) {
 			return []cst.Green{p.parseTypeDecl(lead)}, false
 		case token.Use:
 			return []cst.Green{p.parseUseDecl(lead)}, false
+		case token.Fn:
+			// pub fn — declaration intent even when the name is missing; the
+			// function parser reports the absent name.
+			return []cst.Green{p.parseFuncDecl(lead)}, false
 		default:
 			return []cst.Green{p.parseConstDecl(lead)}, false
 		}
+	case p.kind() == token.Fn:
+		if p.fnBeginsDecl(p.pos) {
+			return []cst.Green{p.parseFuncDecl(lead)}, false
+		}
+		// A bare fn with no name is a stray function literal, not a declaration.
+		return []cst.Green{p.parseError(lead)}, false
 	case p.kind() == token.Assert:
 		return []cst.Green{p.parseAssertDecl(lead)}, false
 	default:
 		return []cst.Green{p.parseError(lead)}, false
 	}
+}
+
+// fnBeginsDecl reports whether the fn keyword at token index i begins a
+// function declaration — i.e. an identifier follows it (fn name(...)). A bare
+// fn begins a function literal or a function type, never a declaration.
+func (p *parser) fnBeginsDecl(i int) bool {
+	i++
+	for isTrivia(p.toks[i].Kind) {
+		i++
+	}
+	return p.toks[i].Kind == token.Ident
+}
+
+// nextSignificantIndex returns the index of the next non-trivia token at or
+// after i.
+func (p *parser) nextSignificantIndex(i int) int {
+	for isTrivia(p.toks[i].Kind) {
+		i++
+	}
+	return i
 }
 
 // declKind reports which declaration keyword begins the construct at the cursor
@@ -227,9 +258,10 @@ func (p *parser) declKind() token.Kind {
 
 // parseError consumes a run of significant tokens that begin no declaration,
 // folding in the interleaving trivia, until the next declaration starter
-// (pub/const/type/use/assert) or EOF. The trivia that precedes that stopping
-// token is left behind to become the next construct's leading trivia. A single
-// diagnostic is reported at the first offending token.
+// (pub/const/type/use/assert, or fn followed by a name) or EOF. The trivia
+// that precedes that stopping token is left behind to become the next
+// construct's leading trivia. A single diagnostic is reported at the first
+// offending token.
 func (p *parser) parseError(lead []cst.Green) *cst.Node {
 	children := lead
 	reported := false
@@ -237,6 +269,12 @@ func (p *parser) parseError(lead []cst.Green) *cst.Node {
 		switch p.peekSignificant() {
 		case token.EOF, token.Pub, token.Const, token.Type, token.Use, token.Assert:
 			return cst.NewNode(cst.Error, children)
+		case token.Fn:
+			// fn stops the error run only as a declaration (fn name); a bare
+			// fn is part of the stray expression being skipped.
+			if p.fnBeginsDecl(p.nextSignificantIndex(p.pos)) {
+				return cst.NewNode(cst.Error, children)
+			}
 		}
 		p.skipTrivia(&children)
 		if !reported {

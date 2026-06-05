@@ -103,6 +103,13 @@ func (p *Program) Resolve(file FileID, id *ast.Identifier) *ir.Const {
 
 // ResolveMember returns the constant a namespace member access (geo.Origin) in
 // file refers to, or nil.
+// ResolveFunc resolves a call's callee identifier to the overload set of the
+// function it names in file — every same-name declaration, in source order —
+// or nil when no function has that name.
+func (p *Program) ResolveFunc(file FileID, id *ast.Identifier) []*ast.FuncDecl {
+	return engineQueries{p.db}.resolveFunc(file, id)
+}
+
 func (p *Program) ResolveMember(file FileID, m *ast.MemberExpr) *ir.Const {
 	q := engineQueries{p.db}
 	return p.db.shells[q.resolveMember(file, m)]
@@ -175,6 +182,59 @@ func (p *Program) FileOfType(t *ir.TypeDef) (FileID, bool) {
 	return id, ok
 }
 
+// ResolveFuncMember resolves a namespace function call's callee (geo.area) in
+// file to the overload set the namespace's target exports, or nil.
+func (p *Program) ResolveFuncMember(file FileID, m *ast.MemberExpr) []*ast.FuncDecl {
+	return engineQueries{p.db}.resolveFuncMember(file, m)
+}
+
+// FunctionOf returns the resolved ir.Function of a declaration — the very
+// shell every module and FuncCall publishes — or nil for a declaration
+// outside the program.
+func (p *Program) FunctionOf(fd *ast.FuncDecl) *ir.Function {
+	return p.db.fnShells[fd]
+}
+
+// FileOfFunc returns the file a function declaration sits in.
+func (p *Program) FileOfFunc(fd *ast.FuncDecl) (FileID, bool) {
+	for id, in := range p.db.files {
+		if in.file == nil {
+			continue
+		}
+		for _, f := range in.file.Funcs {
+			if f == fd {
+				return id, true
+			}
+		}
+	}
+	return "", false
+}
+
+// FunctionsInScope returns the functions callable by bare name in file: its
+// own declarations, then the imported names no local declaration shadows —
+// what value-position completion offers.
+func (p *Program) FunctionsInScope(id FileID) []*ir.Function {
+	q := engineQueries{p.db}
+	out := slices.Clone(p.Module(id).Funcs)
+	local := map[string]bool{}
+	for _, f := range out {
+		local[f.Name] = true
+	}
+	imp := q.importsOf(id)
+	for _, name := range slices.Sorted(maps.Keys(imp.funcs)) {
+		b := imp.funcs[name]
+		if b.ambiguous || local[name] {
+			continue
+		}
+		for _, fd := range b.targets {
+			if f := p.db.fnShells[fd]; f != nil {
+				out = append(out, f)
+			}
+		}
+	}
+	return out
+}
+
 // FuncLitTypes returns the settled signature of every function literal in
 // file, exactly as the checking walk settles them — what the editor reads to
 // hover a lambda parameter or render its inlay hint.
@@ -221,7 +281,7 @@ func funcLitTypesOf(db *database, fileID FileID, file *ast.File) map[*ast.FuncLi
 			infer.Check(a.Cond, env, sink)
 		}
 	}
-	checkMethodBodies(reg, q.typeDefs(fileID), q.universe(fileID), qualified, sink)
+	checkMethodBodies(reg, q.typeDefs(fileID), q.universe(fileID), qualified, buildFuncSymbols(file), qualifiedFuncsFrom(q, q.importsOf(fileID)), sink)
 	return out
 }
 

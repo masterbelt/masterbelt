@@ -1,0 +1,26 @@
+File
+  UseDecl
+    name "double"
+    name "area"
+    name "scale"
+    from "math.belt"
+  UseDecl
+    namespace "math"
+    from "math.belt"
+  ConstDecl
+    name "A"
+    value (call Identifier "double" IntLit "21")
+  ConstDecl
+    name "B"
+    value (call Identifier "area" IntLit "3" IntLit "4")
+  ConstDecl
+    name "C"
+    value (call Identifier "scale" IntLit "4")
+  ConstDecl
+    name "D"
+    value (call Identifier "scale" (list IntLit "1" IntLit "2"))
+  ConstDecl
+    name "E"
+    value (call (. Identifier "math" greet) StringLit "belt")
+  AssertDecl
+    cond (call (. (call (. Identifier "math" double) IntLit "2") eql) (call Identifier "double" IntLit "2"))

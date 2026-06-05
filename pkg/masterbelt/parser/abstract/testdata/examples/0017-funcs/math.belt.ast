@@ -1,0 +1,41 @@
+File
+  FuncDecl
+    doc "Doubles x."
+    pub
+    name "double"
+    param x: int
+    result int
+      return (call (. Identifier "x" mul) IntLit "2")
+  FuncDecl
+    doc "The area of a w-by-h rectangle."
+    pub
+    name "area"
+    param w: int
+    param h: int
+    result int
+      return (call (. Identifier "w" mul) Identifier "h")
+  FuncDecl
+    doc "Greets by name."
+    pub
+    name "greet"
+    param name: string
+    result string
+      return (call (. StringLit "Hello, " add) Identifier "name")
+  FuncDecl
+    doc "Scales an int."
+    pub
+    name "scale"
+    param x: int
+    result int
+      return (call (. Identifier "x" mul) IntLit "10")
+  FuncDecl
+    doc "Scales every element of a list."
+    pub
+    name "scale"
+    param xs: list<int>
+    result list<int>
+      return (call (. Identifier "xs" map) (fn(x: <missing>): <missing> (return (call (. Identifier "x" mul) IntLit "10"))))
+  FuncDecl
+    name "hidden"
+    result int
+      return IntLit "0"
