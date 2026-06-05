@@ -1,0 +1,49 @@
+Module
+  Const "Picked"
+    type int
+    value pick(BoolLiteral true)
+  Const "Stepped"
+    type int
+    value step(IntLiteral "41")
+  Func "pick" pub
+    param flag: bool
+    result int
+      expr <none>
+      expr IntLiteral "10"
+      expr <none>
+      expr <none>
+      expr <none>
+      if ParamRef "flag"
+          expr <none>
+          expr <none>.mul(IntLiteral "2")
+      return <none>
+  Func "step" pub
+    param n: int
+    result int
+      expr <none>
+      expr <none>
+      expr <none>
+      expr ParamRef "n"
+      expr <none>
+      expr <none>.add(IntLiteral "1")
+      return <none>
+  Func "shadow" pub
+    param flag: bool
+    result int
+      expr <none>
+      expr <none>
+      expr IntLiteral "1"
+      if ParamRef "flag"
+          expr <none>
+          expr <none>
+          expr IntLiteral "2"
+          expr <none>
+          expr <none>.add(IntLiteral "10")
+          return <none>
+      return <none>
+  Assert "pick(false) == 10"
+    eval <unevaluated>
+      pick(false) == 10
+  Assert "step(41) == 42"
+    eval <unevaluated>
+      step(41) == 42

@@ -1,0 +1,348 @@
+# tree
+File
+  FuncDecl
+    LineComment "// let introduces a mutable block-local: a value a later statement may reassign."
+    Newline "\n"
+    LineComment "// It is the procedural-inside, pure-outside complement of const — const stays"
+    Newline "\n"
+    LineComment "// immutable, while let names a slot the body recomputes. Assignment is a"
+    Newline "\n"
+    LineComment "// statement, not an expression, so it cannot slip into a pure value position"
+    Newline "\n"
+    LineComment "// (a const initializer, a where clause); only a let local is a valid target."
+    Newline "\n"
+    Newline "\n"
+    LineComment "// A let with an inferred type and a reassignment that keeps that type. Folding"
+    Newline "\n"
+    LineComment "// runs the body with a mutable local, so the function still collapses to a"
+    Newline "\n"
+    LineComment "// constant — a local mutation is not an effect, and the function stays pure."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Fn "fn"
+    Whitespace " "
+    Ident "pick"
+    ParamList
+      LParen "("
+      Param
+        Ident "flag"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "bool"
+      RParen ")"
+    Colon ":"
+    Whitespace " "
+    TypeName
+      Ident "int"
+    Whitespace " "
+    Block
+      LBrace "{"
+      Newline "\n"
+      Whitespace "  "
+      Const "const"
+      Whitespace " "
+      NameRef
+        Ident "base"
+      Whitespace " "
+      Assign "="
+      Whitespace " "
+      Literal
+        Int "10"
+      Newline "\n"
+      Whitespace "  "
+      NameRef
+        Ident "let"
+      Whitespace " "
+      NameRef
+        Ident "result"
+      Whitespace " "
+      Assign "="
+      Whitespace " "
+      NameRef
+        Ident "base"
+      Newline "\n"
+      Whitespace "  "
+      IfStmt
+        If "if"
+        Whitespace " "
+        NameRef
+          Ident "flag"
+        Whitespace " "
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          NameRef
+            Ident "result"
+          Whitespace " "
+          Assign "="
+          Whitespace " "
+          BinaryExpr
+            NameRef
+              Ident "base"
+            Whitespace " "
+            Star "*"
+            Whitespace " "
+            Literal
+              Int "2"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
+      Newline "\n"
+      Whitespace "  "
+      ReturnStmt
+        Return "return"
+        Whitespace " "
+        NameRef
+          Ident "result"
+      Newline "\n"
+      RBrace "}"
+  FuncDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// A let with an explicit type annotation. The annotation fixes the slot's type;"
+    Newline "\n"
+    LineComment "// a reassignment must stay assignable to it."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Fn "fn"
+    Whitespace " "
+    Ident "step"
+    ParamList
+      LParen "("
+      Param
+        Ident "n"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "int"
+      RParen ")"
+    Colon ":"
+    Whitespace " "
+    TypeName
+      Ident "int"
+    Whitespace " "
+    Block
+      LBrace "{"
+      Newline "\n"
+      Whitespace "  "
+      NameRef
+        Ident "let"
+      Whitespace " "
+      NameRef
+        Ident "acc"
+      Colon ":"
+      Whitespace " "
+      NameRef
+        Ident "int"
+      Whitespace " "
+      Assign "="
+      Whitespace " "
+      NameRef
+        Ident "n"
+      Newline "\n"
+      Whitespace "  "
+      NameRef
+        Ident "acc"
+      Whitespace " "
+      Assign "="
+      Whitespace " "
+      BinaryExpr
+        NameRef
+          Ident "acc"
+        Whitespace " "
+        Plus "+"
+        Whitespace " "
+        Literal
+          Int "1"
+      Newline "\n"
+      Whitespace "  "
+      ReturnStmt
+        Return "return"
+        Whitespace " "
+        NameRef
+          Ident "acc"
+      Newline "\n"
+      RBrace "}"
+  FuncDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// An inner block's let shadows the outer one: the inner result is a new binding,"
+    Newline "\n"
+    LineComment "// so the assignment inside the if updates the inner slot and the outer result"
+    Newline "\n"
+    LineComment "// is untouched."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Fn "fn"
+    Whitespace " "
+    Ident "shadow"
+    ParamList
+      LParen "("
+      Param
+        Ident "flag"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "bool"
+      RParen ")"
+    Colon ":"
+    Whitespace " "
+    TypeName
+      Ident "int"
+    Whitespace " "
+    Block
+      LBrace "{"
+      Newline "\n"
+      Whitespace "  "
+      NameRef
+        Ident "let"
+      Whitespace " "
+      NameRef
+        Ident "result"
+      Whitespace " "
+      Assign "="
+      Whitespace " "
+      Literal
+        Int "1"
+      Newline "\n"
+      Whitespace "  "
+      IfStmt
+        If "if"
+        Whitespace " "
+        NameRef
+          Ident "flag"
+        Whitespace " "
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          NameRef
+            Ident "let"
+          Whitespace " "
+          NameRef
+            Ident "result"
+          Whitespace " "
+          Assign "="
+          Whitespace " "
+          Literal
+            Int "2"
+          Newline "\n"
+          Whitespace "    "
+          NameRef
+            Ident "result"
+          Whitespace " "
+          Assign "="
+          Whitespace " "
+          BinaryExpr
+            NameRef
+              Ident "result"
+            Whitespace " "
+            Plus "+"
+            Whitespace " "
+            Literal
+              Int "10"
+          Newline "\n"
+          Whitespace "    "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            NameRef
+              Ident "result"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
+      Newline "\n"
+      Whitespace "  "
+      ReturnStmt
+        Return "return"
+        Whitespace " "
+        NameRef
+          Ident "result"
+      Newline "\n"
+      RBrace "}"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Picked"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "pick"
+        LParen "("
+        Literal
+          True "true"
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Stepped"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "step"
+        LParen "("
+        Literal
+          Int "41"
+        RParen ")"
+  AssertDecl
+    Newline "\n"
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      CallExpr
+        NameRef
+          Ident "pick"
+        LParen "("
+        Literal
+          False "false"
+        RParen ")"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "10"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      CallExpr
+        NameRef
+          Ident "step"
+        LParen "("
+        Literal
+          Int "41"
+        RParen ")"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "42"
+  Newline "\n"
+  EOF ""
+# diagnostics
+error[masterbelt.parser.concrete.unexpected_token] 11:3 unexpected token: Const
+error[masterbelt.parser.concrete.unexpected_token] 11:14 unexpected token: Assign
+error[masterbelt.parser.concrete.unexpected_token] 12:14 unexpected token: Assign
+error[masterbelt.parser.concrete.unexpected_token] 14:12 unexpected token: Assign
+error[masterbelt.parser.concrete.unexpected_token] 22:10 unexpected token: Colon
+error[masterbelt.parser.concrete.unexpected_token] 22:16 unexpected token: Assign
+error[masterbelt.parser.concrete.unexpected_token] 23:7 unexpected token: Assign
+error[masterbelt.parser.concrete.unexpected_token] 31:14 unexpected token: Assign
+error[masterbelt.parser.concrete.unexpected_token] 33:16 unexpected token: Assign
+error[masterbelt.parser.concrete.unexpected_token] 34:12 unexpected token: Assign

@@ -1,0 +1,44 @@
+// let introduces a mutable block-local: a value a later statement may reassign.
+// It is the procedural-inside, pure-outside complement of const — const stays
+// immutable, while let names a slot the body recomputes. Assignment is a
+// statement, not an expression, so it cannot slip into a pure value position
+// (a const initializer, a where clause); only a let local is a valid target.
+
+// A let with an inferred type and a reassignment that keeps that type. Folding
+// runs the body with a mutable local, so the function still collapses to a
+// constant — a local mutation is not an effect, and the function stays pure.
+pub fn pick(flag: bool): int {
+  const base = 10
+  let result = base
+  if flag {
+    result = base * 2
+  }
+  return result
+}
+
+// A let with an explicit type annotation. The annotation fixes the slot's type;
+// a reassignment must stay assignable to it.
+pub fn step(n: int): int {
+  let acc: int = n
+  acc = acc + 1
+  return acc
+}
+
+// An inner block's let shadows the outer one: the inner result is a new binding,
+// so the assignment inside the if updates the inner slot and the outer result
+// is untouched.
+pub fn shadow(flag: bool): int {
+  let result = 1
+  if flag {
+    let result = 2
+    result = result + 10
+    return result
+  }
+  return result
+}
+
+const Picked = pick(true)
+const Stepped = step(41)
+
+assert pick(false) == 10
+assert step(41) == 42
