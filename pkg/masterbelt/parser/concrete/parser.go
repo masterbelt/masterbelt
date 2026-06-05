@@ -32,7 +32,9 @@
 //	ParamList     := "(" [ Param ( "," Param )* ] ")"
 //	Param         := Ident ":" TypeExpr
 //	Block         := "{" Stmt* "}"
-//	Stmt          := ReturnStmt | SwitchStmt | IfStmt | Expr
+//	Stmt          := LetStmt | ReturnStmt | SwitchStmt | IfStmt | AssignStmt | Expr
+//	LetStmt       := let Ident [TypeClause] "=" Expr
+//	AssignStmt    := Expr "=" Expr
 //	ReturnStmt    := return Expr
 //	SwitchStmt    := switch Expr "{" ( SwitchArm ( ("," | NL) SwitchArm )* )? "}"
 //	SwitchArm     := ( Expr ( "," Expr )* | "_" ) "->" ( Stmt | Block )

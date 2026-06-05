@@ -8,7 +8,7 @@
 // runs the body with a mutable local, so the function still collapses to a
 // constant — a local mutation is not an effect, and the function stays pure.
 pub fn pick(flag: bool): int {
-  const base = 10
+  let base = 10
   let result = base
   if flag {
     result = base * 2

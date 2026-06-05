@@ -10,37 +10,20 @@ File
     name "pick"
     param flag: bool
     result int
-      expr Identifier "base"
-      expr IntLit "10"
-      expr Identifier "result"
-      expr Identifier "base"
       if Identifier "flag"
-          expr Identifier "result"
-          expr (call (. Identifier "base" mul) IntLit "2")
       return Identifier "result"
   FuncDecl
     pub
     name "step"
     param n: int
     result int
-      expr Identifier "acc"
-      expr Identifier "int"
-      expr Identifier "n"
-      expr Identifier "acc"
-      expr (call (. Identifier "acc" add) IntLit "1")
       return Identifier "acc"
   FuncDecl
     pub
     name "shadow"
     param flag: bool
     result int
-      expr Identifier "result"
-      expr IntLit "1"
       if Identifier "flag"
-          expr Identifier "result"
-          expr IntLit "2"
-          expr Identifier "result"
-          expr (call (. Identifier "result" add) IntLit "10")
           return Identifier "result"
       return Identifier "result"
   AssertDecl

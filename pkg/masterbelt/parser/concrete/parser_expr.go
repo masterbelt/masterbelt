@@ -24,11 +24,20 @@ func (p *parser) parseBlock() *cst.Node {
 	}
 }
 
-// parseStmt parses a single statement: a return statement, a switch statement,
-// an if statement, or a bare expression statement. The cursor sits on the
-// statement's first significant token.
+// parseStmt parses a single statement: a let declaration, a return statement, a
+// switch statement, an if statement, an assignment, or a bare expression
+// statement. The cursor sits on the statement's first significant token.
+//
+// An assignment and a bare expression statement share a first token (both can
+// begin with an identifier), so they are told apart after the fact: the leading
+// expression is parsed, and a following "=" turns it into an assignment whose
+// target is that expression. Keeping assignment a statement here — never a level
+// of parseExpr — is what keeps "=" out of pure value positions (a const
+// initializer, a where clause), where only "==" may appear.
 func (p *parser) parseStmt() cst.Green {
 	switch {
+	case p.kind() == token.Let:
+		return p.parseLetStmt()
 	case p.kind() == token.Return:
 		return p.parseReturnStmt()
 	case p.kind() == token.Switch:
@@ -36,11 +45,62 @@ func (p *parser) parseStmt() cst.Green {
 	case p.kind() == token.If:
 		return p.parseIfStmt()
 	case startsExpr(p.kind()):
-		return p.parseExpr()
+		target := p.parseExpr()
+		if p.peekSignificant() == token.Assign {
+			return p.parseAssignTail(target)
+		}
+		return target
 	default:
 		p.report(newUnexpectedTokenDiagnostic(p.cur().Offset, p.cur().Width, p.kind().String()))
 		return p.bump()
 	}
+}
+
+// parseLetStmt parses a mutable block-local binding:
+//
+//	LetStmt := let Ident [TypeClause] "=" Expr
+//
+// The binding is initialized in place (no "let x: T" without a value), so the
+// "=" and its expression are required; a missing one is reported and left out,
+// keeping recovery local. The optional type annotation reuses the constant's
+// type clause (": TypeExpr"). The cursor sits on "let".
+func (p *parser) parseLetStmt() *cst.Node {
+	children := []cst.Green{p.bump()} // "let"
+	if p.peekSignificant() == token.Ident {
+		p.skipTrivia(&children)
+		children = append(children, p.bump()) // the bound name
+	} else {
+		p.report(newExpectedIdentifierDiagnostic(p.lastStart, 0))
+	}
+	if p.peekSignificant() == token.Colon {
+		p.skipTrivia(&children)
+		children = append(children, p.parseTypeClause())
+	}
+	if p.peekSignificant() == token.Assign {
+		p.skipTrivia(&children)
+		children = append(children, p.parseInitializer())
+	} else {
+		p.report(newExpectedAssignDiagnostic(p.lastStart, 0))
+	}
+	return cst.NewNode(cst.LetStmt, children)
+}
+
+// parseAssignTail completes an assignment from its already-parsed target — the
+// leading expression a "=" follows: it consumes the "=" and parses the
+// right-hand expression. The cursor sits on "=". The target's validity (a let
+// local, not a const, a parameter, or immutable data) is left to the semantic
+// layer; the parser accepts any expression target and round-trips it.
+func (p *parser) parseAssignTail(target cst.Green) *cst.Node {
+	children := []cst.Green{target}
+	p.skipTrivia(&children)
+	children = append(children, p.bump()) // "="
+	if startsExpr(p.peekSignificant()) {
+		p.skipTrivia(&children)
+		children = append(children, p.parseExpr())
+	} else {
+		p.report(newExpectedExpressionDiagnostic(p.lastStart, 0))
+	}
+	return cst.NewNode(cst.AssignStmt, children)
 }
 
 // parseIfStmt parses an if statement:
@@ -186,10 +246,10 @@ func (p *parser) parseSwitchArm() *cst.Node {
 	return cst.NewNode(cst.SwitchArm, children)
 }
 
-// startsStmt reports whether kind can begin a statement: a return, a switch, an
-// if, or any expression.
+// startsStmt reports whether kind can begin a statement: a let, a return, a
+// switch, an if, or any expression (which may continue into an assignment).
 func startsStmt(kind token.Kind) bool {
-	return kind == token.Return || kind == token.Switch || kind == token.If || startsExpr(kind)
+	return kind == token.Let || kind == token.Return || kind == token.Switch || kind == token.If || startsExpr(kind)
 }
 
 // parseReturnStmt parses "return Expr". The cursor sits on "return".
