@@ -153,6 +153,63 @@ func TestGenericFuncUnknownBound(t *testing.T) {
 	}
 }
 
+// TestGenericFuncOverloadResultSubstitution checks that when an overload set
+// includes a generic function and the call selects it, the solved type
+// parameters are substituted into the result — the overloaded path must finish
+// like the single-signature one, not leave the variable in the result type.
+func TestGenericFuncOverloadResultSubstitution(t *testing.T) {
+	// wrap is overloaded: a non-generic string form (arity 1) and a generic form
+	// (arity 2). wrap(7, 9) selects the generic one, solves T = int, and the
+	// result T must substitute to int (and the call fold to 7).
+	src := "pub fn wrap(s: string): string { return s }\n" +
+		"pub fn wrap<T>(a: T, b: T): T { return a }\n" +
+		"const R = wrap(7, 9)\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", codes(diags))
+	}
+	r := constOf(m, "R")
+	if r == nil || r.Type.String() != "int" {
+		t.Fatalf("R type = %v, want int (the result type variable must be substituted)", r)
+	}
+	if r.Eval == nil || r.Eval.String() != "7" {
+		t.Errorf("R eval = %v, want 7 (the selected generic overload folds)", r.Eval)
+	}
+}
+
+// TestGenericFuncOverloadBoundNotSatisfied checks the bound check runs on the
+// overloaded path too: selecting a bounded generic overload with an argument
+// that does not implement the bound is reported.
+func TestGenericFuncOverloadBoundNotSatisfied(t *testing.T) {
+	// use1 is overloaded: a non-generic string form (arity 1) and a bounded
+	// generic form (arity 2). use1(1, 2) selects the generic one, solves T = int,
+	// and int does not implement foldable<int, int>.
+	src := genericFoldableSrc +
+		"pub fn use1(s: string): int { return 0 }\n" +
+		"pub fn use1<T: foldable<int, int>>(c: T, d: T): int { return 0 }\n" +
+		"const X = use1(1, 2)\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeBoundNotSatisfied) {
+		t.Fatalf("want bound_not_satisfied on the overloaded path, got %v", codes(diags))
+	}
+}
+
+// TestGenericFuncOverloadUninferable checks the uninferable check runs on the
+// overloaded path too: a type parameter no argument pins (it appears only in the
+// result) is reported when the overloaded generic candidate is selected.
+func TestGenericFuncOverloadUninferable(t *testing.T) {
+	// make is overloaded: a non-generic string form (arity 1) and a generic form
+	// whose T appears only in the result (arity 2). make(1, 2) selects the
+	// generic one; nothing pins T.
+	src := "pub fn make(s: string): string { return s }\n" +
+		"pub fn make<T>(a: int, b: int): T { return make(\"x\") }\n" +
+		"const Y = make(1, 2)\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeUninferableTypeParam) {
+		t.Fatalf("want uninferable_type_param on the overloaded path, got %v", codes(diags))
+	}
+}
+
 // funcOf returns the resolved function of the given name in the module, or nil.
 func funcOf(m *ir.Module, name string) *ir.Function {
 	for _, f := range m.Funcs {

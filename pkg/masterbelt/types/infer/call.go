@@ -295,9 +295,17 @@ func funcCallType(e *ast.CallExpr, name string, cands []*ast.FuncDecl, s scope, 
 
 	// Pass 2 — the deferred arguments, each checked against the winner's
 	// parameter type. A finding inside one fails the call without a generic
-	// report, exactly as a method call's literal arguments do.
+	// report, exactly as a method call's literal arguments do. The shared subst
+	// is seeded with what the non-deferred arguments already pinned (Pass 1
+	// synthesized them without it), so a generic parameter solved by a plain
+	// argument reaches the result and the bound check.
 	win := matches[0]
 	subst := map[string]ir.Type{}
+	for i, kt := range known {
+		if kt != nil {
+			types.Match(s.registry(), win.params[i], kt, subst)
+		}
+	}
 	for i, a := range e.Arguments {
 		if !deferredArg(a) {
 			continue
@@ -311,7 +319,9 @@ func funcCallType(e *ast.CallExpr, name string, cands []*ast.FuncDecl, s scope, 
 	if bad {
 		return ir.Invalid
 	}
-	return win.result
+	// Substitute the solved type parameters into the result and run the bound and
+	// uninferable checks, exactly as the single-signature path does.
+	return resolveFuncResult(e, win, subst, s, sink)
 }
 
 // checkFuncCall types a call of a single-signature function, generic or not.
@@ -335,13 +345,21 @@ func checkFuncCall(e *ast.CallExpr, name string, sg funcSig, s scope, sink *Sink
 	for i, a := range e.Arguments {
 		checkType(a, sg.params[i], s, subst, sink)
 	}
-	// A non-generic function is done: its result carries no type parameters.
+	return resolveFuncResult(e, sg, subst, s, sink)
+}
+
+// resolveFuncResult finishes a generic function call after its arguments have
+// solved the type parameters into subst: each parameter must have been pinned by
+// an argument (else uninferable_type_param) and its solved concrete type must
+// satisfy the parameter's bound (else bound_not_satisfied), and the result is
+// the declared result with the solved type parameters substituted in. A
+// non-generic signature returns its result unchanged. A finding returns Invalid
+// so the result never flows on with an unsolved variable. Both the
+// single-signature and the overloaded paths end here, so they cannot diverge.
+func resolveFuncResult(e *ast.CallExpr, sg funcSig, subst map[string]ir.Type, s scope, sink *Sink) ir.Type {
 	if len(sg.typeParams) == 0 {
 		return sg.result
 	}
-	// Each type parameter must have been pinned by an argument, and its solved
-	// concrete type must satisfy the bound. A finding here returns Invalid so
-	// the result does not flow on with an unsolved variable.
 	ok := true
 	for _, tp := range sg.typeParams {
 		solved, found := subst[tp.Name]
