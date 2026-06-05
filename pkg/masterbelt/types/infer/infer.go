@@ -329,6 +329,32 @@ func enumMemberType(universe map[string]*ir.TypeDef, m *ast.MemberExpr) ir.Type 
 	return ir.Invalid
 }
 
+// assocConstType types a member access whose receiver names a type and whose
+// member names one of that type's associated constants (int8.Max, Level.Max):
+// the constant's resolved type. It returns ir.Invalid when the receiver names
+// no known type or the type has no such associated constant — the same fall-
+// through enumMemberType gives, so the two share the one Type.Name path. A type
+// access wins over a record-field reading, exactly as an enum member does.
+func assocConstType(universe map[string]*ir.TypeDef, m *ast.MemberExpr) ir.Type {
+	recv, ok := m.Receiver.(*ast.Identifier)
+	if !ok {
+		return ir.Invalid
+	}
+	def, ok := universe[recv.Name]
+	if !ok {
+		return ir.Invalid
+	}
+	for _, c := range def.Consts {
+		if c.Name == m.Member.Name {
+			if c.Type == nil {
+				return ir.Invalid
+			}
+			return c.Type
+		}
+	}
+	return ir.Invalid
+}
+
 // enumMemberIndex returns the index of the named member of an enum definition,
 // or -1 when def is not an enum or has no such member.
 func enumMemberIndex(def *ir.TypeDef, name string) int {

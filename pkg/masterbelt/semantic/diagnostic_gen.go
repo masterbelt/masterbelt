@@ -34,6 +34,7 @@ const (
 	CodeMissingEffect          diagnostic.Code = "masterbelt.semantic.missing_effect"
 	CodeMissingField           diagnostic.Code = "masterbelt.semantic.missing_field"
 	CodeMissingReturn          diagnostic.Code = "masterbelt.semantic.missing_return"
+	CodeNoBound                diagnostic.Code = "masterbelt.semantic.no_bound"
 	CodeNoMatchingFuncOverload diagnostic.Code = "masterbelt.semantic.no_matching_func_overload"
 	CodeNoMatchingOverload     diagnostic.Code = "masterbelt.semantic.no_matching_overload"
 	CodeNonExhaustiveSwitch    diagnostic.Code = "masterbelt.semantic.non_exhaustive_switch"
@@ -49,6 +50,7 @@ const (
 	CodeUninferableParameter   diagnostic.Code = "masterbelt.semantic.uninferable_parameter"
 	CodeUninferableRecord      diagnostic.Code = "masterbelt.semantic.uninferable_record"
 	CodeUninferableResult      diagnostic.Code = "masterbelt.semantic.uninferable_result"
+	CodeUnknownAssociatedConst diagnostic.Code = "masterbelt.semantic.unknown_associated_const"
 	CodeUnknownEnumMember      diagnostic.Code = "masterbelt.semantic.unknown_enum_member"
 	CodeUnknownField           diagnostic.Code = "masterbelt.semantic.unknown_field"
 	CodeUnknownMember          diagnostic.Code = "masterbelt.semantic.unknown_member"
@@ -418,6 +420,21 @@ func newMissingReturnDiagnostic(offset int, width int, name string) diagnostic.D
 	}
 }
 
+func newNoBoundDiagnostic(offset int, width int, typ string, name string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"typ":  diagnostic.Str(typ),
+		"name": diagnostic.Str(name),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeNoBound,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeNoBound, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
 func newNoMatchingFuncOverloadDiagnostic(offset int, width int, name string, types string) diagnostic.Diagnostic {
 	fields := map[string]fmt.Stringer{
 		"name":  diagnostic.Str(name),
@@ -616,6 +633,21 @@ func newUninferableResultDiagnostic(offset int, width int) diagnostic.Diagnostic
 		Code:     CodeUninferableResult,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeUninferableResult, nil),
 		Fields:   nil,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newUnknownAssociatedConstDiagnostic(offset int, width int, typ string, name string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"typ":  diagnostic.Str(typ),
+		"name": diagnostic.Str(name),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeUnknownAssociatedConst,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeUnknownAssociatedConst, fields),
+		Fields:   fields,
 		Offset:   offset,
 		Width:    width,
 	}

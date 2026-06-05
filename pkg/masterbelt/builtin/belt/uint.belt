@@ -36,6 +36,11 @@ pub type uint = builtin impl {
 
 /// An unsigned 8-bit integer (0 to 255).
 pub type uint8 = builtin impl {
+  /// The largest representable value (255).
+  pub const Max = builtin
+  /// The smallest representable value (0).
+  pub const Min = builtin
+
   /// The unary + operator: the value unchanged.
   pub extern fn pos(): self
 
@@ -67,6 +72,11 @@ pub type uint8 = builtin impl {
 
 /// An unsigned 16-bit integer (0 to 65535).
 pub type uint16 = builtin impl {
+  /// The largest representable value (65535).
+  pub const Max = builtin
+  /// The smallest representable value (0).
+  pub const Min = builtin
+
   /// The unary + operator: the value unchanged.
   pub extern fn pos(): self
 
@@ -98,6 +108,11 @@ pub type uint16 = builtin impl {
 
 /// An unsigned 32-bit integer (0 to 4294967295).
 pub type uint32 = builtin impl {
+  /// The largest representable value (4294967295).
+  pub const Max = builtin
+  /// The smallest representable value (0).
+  pub const Min = builtin
+
   /// The unary + operator: the value unchanged.
   pub extern fn pos(): self
 
@@ -129,6 +144,11 @@ pub type uint32 = builtin impl {
 
 /// An unsigned 64-bit integer (0 to 18446744073709551615).
 pub type uint64 = builtin impl {
+  /// The largest representable value (18446744073709551615).
+  pub const Max = builtin
+  /// The smallest representable value (0).
+  pub const Min = builtin
+
   /// The unary + operator: the value unchanged.
   pub extern fn pos(): self
 

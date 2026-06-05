@@ -101,8 +101,33 @@ func dumpTypeDef(b *strings.Builder, t *TypeDef) {
 		// desugaring), so the snapshot reads like the declaration.
 		fmt.Fprintf(b, "    where %s\n", ast.Render(t.Where))
 	}
+	for _, c := range t.Consts {
+		dumpAssocConst(b, c)
+	}
 	for _, m := range t.Methods {
 		dumpMethod(b, m)
+	}
+}
+
+// dumpAssocConst renders one associated constant of a type: its name, modifiers,
+// resolved type, and folded value (the builtin marker for a registry-supplied
+// one). The value is the proof the snapshot carries — it is what TypeName.Name
+// folds to.
+func dumpAssocConst(b *strings.Builder, c *AssocConst) {
+	mod := ""
+	if c.Public {
+		mod = " pub"
+	}
+	if c.Builtin {
+		mod += " builtin"
+	}
+	fmt.Fprintf(b, "    const %q%s\n", c.Name, mod)
+	for _, doc := range c.Doc {
+		fmt.Fprintf(b, "      doc %q\n", doc)
+	}
+	fmt.Fprintf(b, "      type %s\n", typeString(c.Type))
+	if c.Value != nil {
+		fmt.Fprintf(b, "      value %s\n", c.Value)
 	}
 }
 
@@ -293,6 +318,15 @@ func dumpValue(v Value) string {
 			name = x.Def.Name
 			if x.Def.Enum != nil && x.Index >= 0 && x.Index < len(x.Def.Enum.Members) {
 				name += "." + x.Def.Enum.Members[x.Index].Name
+			}
+		}
+		return name
+	case *AssocConstValue:
+		name := "<unresolved>"
+		if x.Def != nil {
+			name = x.Def.Name
+			if x.Index >= 0 && x.Index < len(x.Def.Consts) {
+				name += "." + x.Def.Consts[x.Index].Name
 			}
 		}
 		return name

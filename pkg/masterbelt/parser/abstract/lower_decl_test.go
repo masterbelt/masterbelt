@@ -251,6 +251,77 @@ func TestLowerMethodDoc(t *testing.T) {
 	}
 }
 
+func TestLowerImplConst(t *testing.T) {
+	// An impl block's const items lower to the type's Consts, alongside its
+	// Methods. A typed const keeps its annotation; a method beside them is
+	// unaffected.
+	src := "type L = int8 impl {\n  /// the cap\n  pub const Max = 100\n  const Width: int32 = 32\n  pub inc(): self {\n    return self + 1\n  }\n}\n"
+	file, diags := Lower([]byte(src))
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	d := file.Types[0]
+	if len(d.Consts) != 2 {
+		t.Fatalf("got %d consts, want 2", len(d.Consts))
+	}
+	if len(d.Methods) != 1 || d.Methods[0].Name != "inc" {
+		t.Fatalf("methods = %+v, want one inc method", d.Methods)
+	}
+	max := d.Consts[0]
+	if !max.Public || max.Name != "Max" || max.Builtin {
+		t.Errorf("Max const = %+v, want pub non-builtin Max", max)
+	}
+	if len(max.Doc) != 1 || max.Doc[0] != "the cap" {
+		t.Errorf("Max doc = %q, want [the cap]", max.Doc)
+	}
+	width := d.Consts[1]
+	if width.Public || width.Name != "Width" || width.Type == nil {
+		t.Errorf("Width const = %+v, want a typed bare const", width)
+	}
+	if got := ast.Dump(file); !strings.Contains(got, "const \"Max\"") || !strings.Contains(got, "const \"Width\"") {
+		t.Errorf("dump = %s, want it to contain the consts", got)
+	}
+}
+
+func TestLowerImplConstBuiltin(t *testing.T) {
+	// A `= builtin` associated constant lowers to a Builtin-marked const with no
+	// Value — its value comes from the registry, not an initializer.
+	src := "type I8 = builtin impl {\n  pub const Max = builtin\n  pub const Min = builtin\n}\n"
+	file, diags := Lower([]byte(src))
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	d := file.Types[0]
+	if len(d.Consts) != 2 {
+		t.Fatalf("got %d consts, want 2", len(d.Consts))
+	}
+	for _, c := range d.Consts {
+		if !c.Builtin {
+			t.Errorf("const %q: want Builtin set", c.Name)
+		}
+		if c.Value != nil {
+			t.Errorf("const %q: want no Value, got %v", c.Name, c.Value)
+		}
+	}
+	if got := ast.Dump(file); !strings.Contains(got, "builtin") {
+		t.Errorf("dump = %s, want it to contain builtin", got)
+	}
+}
+
+func TestLowerEnumImplConst(t *testing.T) {
+	// An enum's impl block carries associated constants too, the same mechanism
+	// a type declaration's does.
+	src := "enum Color {\n  Red, Green, Blue\n} impl {\n  pub const Count = 3\n}\n"
+	file, diags := Lower([]byte(src))
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	d := file.Enums[0]
+	if len(d.Consts) != 1 || d.Consts[0].Name != "Count" {
+		t.Fatalf("enum consts = %+v, want one Count const", d.Consts)
+	}
+}
+
 func TestLowerEnumDecl(t *testing.T) {
 	src := "/// rarity tier\npub enum Rarity: uint8 {\n  Common = 1\n  Rare = 2\n  Legend = 10\n}\n"
 	file, diags := Lower([]byte(src))

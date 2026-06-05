@@ -84,9 +84,10 @@ func memberItems(doc view, offset int) ([]protocol.CompletionItem, bool) {
 	if !ok {
 		return nil, false
 	}
-	// A member access whose receiver names an enum type (Rarity.) offers the
-	// enum's members, each labelled with its value.
-	if items, ok := enumMemberItems(doc, member); ok {
+	// A member access whose receiver names a type (Rarity., int8., Level.)
+	// offers the type's members — enum members and associated constants — each
+	// labelled with its value.
+	if items, ok := typeMemberItems(doc, member); ok {
 		return items, true
 	}
 	recv := receiverTypeOf(doc, member.Receiver, doc.Trees(), offset)
@@ -128,32 +129,48 @@ func memberItems(doc view, offset int) ([]protocol.CompletionItem, bool) {
 	return items, true
 }
 
-// enumMemberItems returns the completion items for an enum member access
-// (Rarity.): one item per member, labelled with its base value, and reports
-// whether the receiver names an enum (so the caller offers members only). A
-// receiver that is not an enum type is left to the value-method path.
-func enumMemberItems(doc view, member *ast.MemberExpr) ([]protocol.CompletionItem, bool) {
+// typeMemberItems returns the completion items for a type member access
+// (Rarity., int8., Level.): one item per enum member (labelled with its base
+// value) and one per associated constant (labelled with its value), and reports
+// whether the receiver names a type (so the caller offers members only). A
+// receiver that is not a type — a value, or an unknown name — is left to the
+// value-method path.
+func typeMemberItems(doc view, member *ast.MemberExpr) ([]protocol.CompletionItem, bool) {
 	recv, ok := member.Receiver.(*ast.Identifier)
 	if !ok {
 		return nil, false
 	}
-	// A local value shadowing the type name means this is a value access, not
-	// an enum-type access.
+	// A local value shadowing the type name means this is a value access, not a
+	// type access.
 	if doc.Resolve(recv) != nil {
 		return nil, false
 	}
-	def := lookupEnumType(doc, recv.Name)
-	if def == nil {
+	def := lookupTypeName(doc, recv.Name)
+	if def == nil || (def.Enum == nil && len(def.Consts) == 0) {
 		return nil, false
 	}
-	kind := protocol.CompletionItemKindEnumMember
-	items := make([]protocol.CompletionItem, 0, len(def.Enum.Members))
-	for _, m := range def.Enum.Members {
-		items = append(items, protocol.CompletionItem{
-			Label:  m.Name,
-			Kind:   &kind,
-			Detail: "= " + m.Value.String(),
-		})
+	var items []protocol.CompletionItem
+	if def.Enum != nil {
+		kind := protocol.CompletionItemKindEnumMember
+		for _, m := range def.Enum.Members {
+			items = append(items, protocol.CompletionItem{
+				Label:  m.Name,
+				Kind:   &kind,
+				Detail: "= " + m.Value.String(),
+			})
+		}
+	}
+	kind := protocol.CompletionItemKindConstant
+	for _, c := range def.Consts {
+		detail := ": " + c.Type.String()
+		if c.Value != nil {
+			detail = "= " + c.Value.String()
+		}
+		item := protocol.CompletionItem{Label: c.Name, Kind: &kind, Detail: detail}
+		if len(c.Doc) > 0 {
+			item.Documentation = &protocol.MarkupContent{Kind: protocol.Markdown, Value: strings.Join(c.Doc, "\n")}
+		}
+		items = append(items, item)
 	}
 	return items, true
 }
@@ -161,8 +178,19 @@ func enumMemberItems(doc view, member *ast.MemberExpr) ([]protocol.CompletionIte
 // lookupEnumType returns the enum definition named name in the document's type
 // scope, or nil when no enum has that name.
 func lookupEnumType(doc view, name string) *ir.TypeDef {
+	def := lookupTypeName(doc, name)
+	if def == nil || def.Enum == nil {
+		return nil
+	}
+	return def
+}
+
+// lookupTypeName returns the type definition named name in the document's type
+// scope, or nil when no type has that name. It covers any type, so an
+// associated-const owner (int8, Level) is found, not just enums.
+func lookupTypeName(doc view, name string) *ir.TypeDef {
 	for _, def := range doc.TypeNames() {
-		if def.Name == name && def.Enum != nil {
+		if def.Name == name {
 			return def
 		}
 	}

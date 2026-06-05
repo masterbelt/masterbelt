@@ -1,0 +1,54 @@
+File
+  ConstDecl
+    name "Hi"
+    value (. Identifier "int8" Max)
+  ConstDecl
+    name "Lo"
+    value (. Identifier "int8" Min)
+  ConstDecl
+    name "Top"
+    type Level
+    value (. Identifier "Level" Max)
+  ConstDecl
+    name "Bottom"
+    type Level
+    value (. Identifier "Level" Min)
+  ConstDecl
+    name "W"
+    value (. Identifier "Bits" Width)
+  ConstDecl
+    name "ServerPort"
+    type Port
+    value IntLit "8080"
+  TypeDecl
+    doc "A character level, capped at 100."
+    pub
+    name "Level"
+    body int8
+    const "Max"
+      doc "The highest level."
+      pub
+      value IntLit "100"
+    const "Min"
+      doc "The lowest level."
+      pub
+      value IntLit "0"
+    method "increment"
+      doc "The next level."
+      pub
+      result self
+      return (call (. self add) IntLit "1")
+  TypeDecl
+    pub
+    name "Bits"
+    body int32
+    const "Width"
+      doc "The width in bits."
+      pub
+      type int32
+      value IntLit "32"
+  TypeDecl
+    pub
+    name "Port"
+    body int32
+    where (call (. (call (. self gteq) IntLit "1") anan) (call (. self lteq) (. Identifier "int16" Max)))

@@ -473,8 +473,10 @@ func (p *parser) parseFuncDecl(lead []cst.Green) *cst.Node {
 
 // --- implementations and method bodies --------------------------------------
 
-// parseImplBlock parses an implementation block: impl "{" MethodDecl* "}". The
-// cursor sits on "impl".
+// parseImplBlock parses an implementation block: impl "{" (MethodDecl |
+// ConstDecl)* "}". An item beginning with const — optionally after pub — is an
+// associated constant (TypeName.Name); anything else that begins a method is a
+// method. The cursor sits on "impl".
 func (p *parser) parseImplBlock() *cst.Node {
 	children := []cst.Green{p.bump()} // "impl"
 	if p.peekSignificant() == token.LBrace {
@@ -492,6 +494,12 @@ func (p *parser) parseImplBlock() *cst.Node {
 			return cst.NewNode(cst.ImplBlock, children)
 		case p.peekSignificant() == token.EOF:
 			return cst.NewNode(cst.ImplBlock, children)
+		case p.implItemBeginsConst():
+			// An associated constant. Its leading trivia (its doc comment most of
+			// all) belongs to it, exactly as a method's or a top-level decl's does.
+			var lead []cst.Green
+			p.skipTrivia(&lead)
+			children = append(children, p.parseImplConst(lead))
 		case startsMethod(p.peekSignificant()):
 			// The leading trivia belongs to the method (its doc comment most
 			// of all), exactly as a top-level declaration's does.
@@ -504,6 +512,77 @@ func (p *parser) parseImplBlock() *cst.Node {
 			children = append(children, p.bump())
 		}
 	}
+}
+
+// implItemBeginsConst reports whether the impl item at the cursor is an
+// associated constant — const, optionally after a leading pub — rather than a
+// method. The lookahead past pub mirrors declKind's at the file level.
+func (p *parser) implItemBeginsConst() bool {
+	i := p.nextSignificantIndex(p.pos)
+	if p.toks[i].Kind == token.Pub {
+		i = p.nextSignificantIndex(i + 1)
+	}
+	return p.toks[i].Kind == token.Const
+}
+
+// parseImplConst parses an associated constant inside an impl block, prepending
+// the already-collected leading trivia:
+//
+//	[doc] [pub] const Name [TypeClause] "=" ( Expr | "builtin" )
+//
+// It reuses the ConstDecl node a top-level constant uses, so the AST lowering
+// is shared. The one extra form is "= builtin", which marks a constant whose
+// value comes from the builtin registry (the integer bounds int8.Max/Min),
+// mirroring a primitive type's "= builtin" body. The cursor sits on pub or
+// const.
+func (p *parser) parseImplConst(lead []cst.Green) *cst.Node {
+	children := lead
+
+	if p.kind() == token.Pub {
+		children = append(children, p.bump())
+	}
+	p.skipTrivia(&children)
+	children = append(children, p.bump()) // "const" (guaranteed by the dispatcher)
+
+	if p.peekSignificant() == token.Ident {
+		p.skipTrivia(&children)
+		children = append(children, p.bump()) // the declared name
+	} else {
+		p.report(newExpectedIdentifierDiagnostic(p.lastStart, 0))
+	}
+
+	if p.peekSignificant() == token.Colon {
+		p.skipTrivia(&children)
+		children = append(children, p.parseTypeClause())
+	}
+
+	if p.peekSignificant() == token.Assign {
+		p.skipTrivia(&children)
+		children = append(children, p.parseImplConstInitializer())
+	} else {
+		p.report(newExpectedAssignDiagnostic(p.lastStart, 0))
+	}
+
+	return cst.NewNode(cst.ConstDecl, children)
+}
+
+// parseImplConstInitializer parses an associated constant's "= Expr" or
+// "= builtin". The cursor sits on the equals sign. A "builtin" body is the
+// marker for a registry-supplied value (the integer bounds); any other form is
+// an ordinary expression, exactly as a top-level constant's initializer.
+func (p *parser) parseImplConstInitializer() *cst.Node {
+	children := []cst.Green{p.bump()} // "="
+	switch {
+	case p.peekSignificant() == token.Builtin:
+		p.skipTrivia(&children)
+		children = append(children, p.parseBuiltinType())
+	case startsExpr(p.peekSignificant()):
+		p.skipTrivia(&children)
+		children = append(children, p.parseExpr(precLowest))
+	default:
+		p.report(newExpectedExpressionDiagnostic(p.lastStart, 0))
+	}
+	return cst.NewNode(cst.Initializer, children)
 }
 
 // parseMethodDecl parses a method inside an impl block, prepending the

@@ -57,6 +57,19 @@ func (n *NativeType) IsBoolean() bool { return n.Bool }
 // IsString reports whether the primitive is the string type.
 func (n *NativeType) IsString() bool { return n.Str }
 
+// Bounds returns the inclusive value range of an integer primitive: the lowest
+// and highest representable value, with a nil bound meaning "unbounded on that
+// side" (the arbitrary-precision signed int has neither; the arbitrary-
+// precision unsigned int has only the lower bound of zero). A non-integer
+// primitive has no range — both bounds are nil. It is the source the builtin
+// associated constants Max/Min draw their value from.
+func (n *NativeType) Bounds() (min, max *big.Int) {
+	if n.Int == nil {
+		return nil, nil
+	}
+	return n.Int.bounds()
+}
+
 // Fits reports whether v is within the primitive's value range. A non-integer
 // primitive (or an arbitrary-precision integer) accepts any value within its
 // (possibly half-open) range.

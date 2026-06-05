@@ -90,6 +90,12 @@ func (s constScope) leaf(e ast.Expr) ir.Type {
 		if t := enumMemberType(s.universe(), e); t != ir.Invalid {
 			return t
 		}
+		// A member access whose receiver names a type and whose member names one
+		// of its associated constants (int8.Max, Level.Max) is that constant's
+		// value — the same Type.Name path an enum member takes.
+		if t := assocConstType(s.universe(), e); t != ir.Invalid {
+			return t
+		}
 	}
 	return ir.Invalid
 }
@@ -180,12 +186,16 @@ func (s BodyScope) leaf(e ast.Expr) ir.Type {
 		}
 		return ir.Invalid
 	case *ast.MemberExpr:
-		// A member access whose receiver names an enum type (Element.Fire) is a
-		// value of that enum; a parameter shadowing the type name takes the
+		// A member access whose receiver names a type — an enum member
+		// (Element.Fire) or an associated constant (int8.Max, Level.Max) — is a
+		// value of that type; a parameter shadowing the type name takes the
 		// record-field reading instead.
 		if recv, ok := e.Receiver.(*ast.Identifier); ok {
 			if _, isParam := s.Params[recv.Name]; !isParam {
 				if t := enumMemberType(s.Universe, e); t != ir.Invalid {
+					return t
+				}
+				if t := assocConstType(s.Universe, e); t != ir.Invalid {
 					return t
 				}
 			}

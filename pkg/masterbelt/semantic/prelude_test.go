@@ -63,6 +63,55 @@ func TestLoadPrelude(t *testing.T) {
 	}
 }
 
+// TestPreludeBoundsMatchRegistry checks that the `= builtin` associated
+// constants the prelude declares — the integer bounds Max/Min — fold to exactly
+// the registry's value range, so the in-language declaration and the native
+// descriptor cannot drift. Each sized integer carries both; the arbitrary-
+// precision int/uint declare none (they have no fixed range).
+func TestPreludeBoundsMatchRegistry(t *testing.T) {
+	reg := builtin.Default()
+	_, defs, err := LoadPrelude(reg)
+	if err != nil {
+		t.Fatalf("LoadPrelude: %v", err)
+	}
+	byName := make(map[string]*ir.TypeDef, len(defs))
+	for _, d := range defs {
+		byName[d.Name] = d
+	}
+
+	sized := []string{"int8", "int16", "int32", "int64", "uint8", "uint16", "uint32", "uint64"}
+	for _, name := range sized {
+		d := byName[name]
+		if d == nil {
+			t.Errorf("prelude is missing %q", name)
+			continue
+		}
+		native, _ := reg.Native(name)
+		min, max := native.Bounds()
+		got := map[string]*ir.Constant{}
+		for _, c := range d.Consts {
+			if !c.Builtin {
+				t.Errorf("%s.%s: a bound should be a `= builtin` const", name, c.Name)
+			}
+			got[c.Name] = c.Value
+		}
+		if v := got["Max"]; v == nil || v.Kind != ir.ConstInt || v.Int.Cmp(max) != 0 {
+			t.Errorf("%s.Max = %v, want %v", name, v, max)
+		}
+		if v := got["Min"]; v == nil || v.Kind != ir.ConstInt || v.Int.Cmp(min) != 0 {
+			t.Errorf("%s.Min = %v, want %v", name, v, min)
+		}
+	}
+
+	// The arbitrary-precision integers have no fixed range, so they declare no
+	// bounds (int.Max would be a no_bound error were it written).
+	for _, name := range []string{"int", "uint"} {
+		if d := byName[name]; d != nil && len(d.Consts) != 0 {
+			t.Errorf("%s should declare no associated constants, has %d", name, len(d.Consts))
+		}
+	}
+}
+
 // TestPreludeIsTheMethodSource checks that, once the prelude is installed, a
 // primitive's methods come from the prelude — not from the bootstrap registry —
 // so uint (declared without neg, being unsigned) has no neg method even though

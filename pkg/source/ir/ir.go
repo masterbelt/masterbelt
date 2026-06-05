@@ -242,3 +242,15 @@ type EnumMemberValue struct {
 }
 
 func (*EnumMemberValue) value() {}
+
+// AssocConstValue is a resolved reference to a type's associated constant,
+// written TypeName.Name (int8.Max, Level.Max). Def is the owning type and Index
+// the constant's position in Def.Consts; the name, type, and folded value are
+// read from Def.Consts[Index]. The evaluated value lives on Const.Eval, as for
+// every other value form.
+type AssocConstValue struct {
+	Def   *TypeDef
+	Index int
+}
+
+func (*AssocConstValue) value() {}

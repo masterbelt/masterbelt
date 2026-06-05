@@ -44,6 +44,11 @@ func (b constBinder) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
 		if def, idx := enumMemberAccess(b.q.universe(b.file), e); idx >= 0 {
 			return &ir.EnumMemberValue{Def: def, Index: idx}
 		}
+		// A member access whose receiver names a type and whose member names one
+		// of its associated constants (int8.Max, Level.Max).
+		if def, idx := assocConstAccess(b.q.universe(b.file), e); idx >= 0 {
+			return &ir.AssocConstValue{Def: def, Index: idx}
+		}
 	case *ast.CallExpr:
 		switch callee := e.Callee.(type) {
 		case *ast.Identifier:
@@ -120,6 +125,36 @@ func enumMemberAccess(universe map[string]*ir.TypeDef, m *ast.MemberExpr) (*ir.T
 		return nil, -1
 	}
 	return def, enumIndex(def, m.Member.Name)
+}
+
+// assocConstAccess resolves a member access whose receiver names a type and
+// whose member names one of its associated constants (int8.Max, Level.Max): the
+// owning definition and the constant's index, or (nil, -1) when the receiver
+// names no type or has no such constant.
+func assocConstAccess(universe map[string]*ir.TypeDef, m *ast.MemberExpr) (*ir.TypeDef, int) {
+	recv, ok := m.Receiver.(*ast.Identifier)
+	if !ok {
+		return nil, -1
+	}
+	def, ok := universe[recv.Name]
+	if !ok {
+		return nil, -1
+	}
+	return def, assocConstIndex(def, m.Member.Name)
+}
+
+// assocConstIndex returns the index of the named associated constant of a type
+// definition, or -1 when it has no such constant.
+func assocConstIndex(def *ir.TypeDef, name string) int {
+	if def == nil {
+		return -1
+	}
+	for i, c := range def.Consts {
+		if c.Name == name {
+			return i
+		}
+	}
+	return -1
 }
 
 // bodyFuncs is what a body binder needs to lower function calls: the file's
@@ -210,13 +245,19 @@ func (b bodyBinder) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
 		}
 		return nil
 	case *ast.MemberExpr:
-		// A member access whose receiver names an enum type (Element.Fire) is an
-		// enum-member value; a parameter shadowing the type name takes the
-		// record-field reading instead.
+		// A member access whose receiver names a type — an enum member
+		// (Element.Fire) or an associated constant (int8.Max) — is that type's
+		// value; a parameter shadowing the type name takes the record-field
+		// reading instead.
 		if recv, ok := e.Receiver.(*ast.Identifier); ok && !b.params[recv.Name] {
-			if def := b.r.Defs[recv.Name]; def != nil && def.Enum != nil {
-				if idx := enumIndex(def, e.Member.Name); idx >= 0 {
-					return &ir.EnumMemberValue{Def: def, Index: idx}
+			if def := b.r.Defs[recv.Name]; def != nil {
+				if def.Enum != nil {
+					if idx := enumIndex(def, e.Member.Name); idx >= 0 {
+						return &ir.EnumMemberValue{Def: def, Index: idx}
+					}
+				}
+				if idx := assocConstIndex(def, e.Member.Name); idx >= 0 {
+					return &ir.AssocConstValue{Def: def, Index: idx}
 				}
 			}
 		}

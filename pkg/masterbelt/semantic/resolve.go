@@ -90,7 +90,7 @@ func resolveTypes(env eval.Env, file *ast.File, at func(ast.Node) span, diags *d
 	// reporting any unknown type names.
 	r := &infer.TypeResolver{Defs: defs, Qualified: qualified, Report: unknownTypeReporter(at, diags)}
 	for i, td := range file.Types {
-		resolveDecl(r, reg, td, out[i], at, diags, fns)
+		resolveDecl(env, r, reg, td, out[i], at, diags, fns)
 	}
 	for i, ed := range file.Enums {
 		resolveEnumDecl(env, r, reg, ed, enumOut[i], at, diags, fns)
@@ -100,8 +100,10 @@ func resolveTypes(env eval.Env, file *ast.File, at func(ast.Node) span, diags *d
 
 // resolveDecl fills in def from the declaration: its generic parameters (whose
 // names are in scope for the bounds, body, and methods), the body type, the
-// method signatures, and the refinement predicate.
-func resolveDecl(r *infer.TypeResolver, reg *builtin.Registry, td *ast.TypeDecl, def *ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List, fns bodyFuncs) {
+// associated constants, the refinement predicate, and the method signatures.
+// env folds the associated-constant initializers (it is nil in callers that do
+// not evaluate).
+func resolveDecl(env eval.Env, r *infer.TypeResolver, reg *builtin.Registry, td *ast.TypeDecl, def *ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List, fns bodyFuncs) {
 	scope := make(map[string]bool, len(td.Params))
 	for _, p := range td.Params {
 		scope[p.Name] = true
@@ -121,6 +123,9 @@ func resolveDecl(r *infer.TypeResolver, reg *builtin.Registry, td *ast.TypeDecl,
 	} else {
 		def.Body = r.ResolveType(td.Body, scope)
 	}
+	// The associated constants are resolved before the where-clause, so a
+	// self-referential predicate (`where self <= Percent.Max`) can read them.
+	resolveAssocConsts(env, r, reg, td, def, scope, at, diags)
 	resolveWhere(r, reg, td, def, at, diags)
 	// Same-name methods are overloads — legal as long as their parameter
 	// types differ. A signature that repeats an earlier one (the same name
@@ -142,6 +147,147 @@ func resolveDecl(r *infer.TypeResolver, reg *builtin.Registry, td *ast.TypeDecl,
 		}
 		seen[key] = true
 		def.Methods = append(def.Methods, rm)
+	}
+}
+
+// resolveAssocConsts resolves a type's associated constants — the impl block's
+// `const` items, read as TypeName.Name — into ir.AssocConsts, in source order.
+// Each carries its resolved type (the annotation when present, else the kind of
+// its folded value) and its folded value (env folds the initializer; nil when
+// no evaluator is supplied). A `= builtin` constant takes its value from the
+// registry's value range — int8.Max/Min — and is rejected (no_bound) on a type
+// with no bound on that side (the arbitrary-precision int). A duplicate name
+// keeps the first and is reported. tscope holds the type's generic-parameter
+// names, so an annotation may mention them.
+func resolveAssocConsts(env eval.Env, r *infer.TypeResolver, reg *builtin.Registry, td *ast.TypeDecl, def *ir.TypeDef, tscope map[string]bool, at func(ast.Node) span, diags *diagnostic.List) {
+	def.Consts = resolveAssocConstList(env, r, reg, def, td.Consts, tscope, at, diags)
+}
+
+// resolveAssocConstList is the shared resolution of a list of associated
+// constants — used for both a type declaration's and an enum's impl block.
+func resolveAssocConstList(env eval.Env, r *infer.TypeResolver, reg *builtin.Registry, def *ir.TypeDef, decls []*ast.ConstDecl, tscope map[string]bool, at func(ast.Node) span, diags *diagnostic.List) []*ir.AssocConst {
+	if len(decls) == 0 {
+		return nil
+	}
+	out := make([]*ir.AssocConst, 0, len(decls))
+	seen := make(map[string]bool, len(decls))
+	for _, c := range decls {
+		if c.Name != "" {
+			if seen[c.Name] {
+				if at != nil && diags != nil {
+					s := at(c)
+					diags.Add(newDuplicateDeclarationDiagnostic(s.offset, s.width, c.Name))
+				}
+				continue
+			}
+			seen[c.Name] = true
+		}
+
+		ac := &ir.AssocConst{Name: c.Name, Public: c.Public, Doc: c.Doc, Builtin: c.Builtin, Syntax: c}
+
+		// The annotation, when written, gives the constant's type directly.
+		var annType ir.Type
+		if c.Type != nil {
+			annType = r.ResolveType(c.Type, tscope)
+		}
+
+		if c.Builtin {
+			// A `= builtin` constant takes its value from the type's native value
+			// range — Max/Min. A type with no bound on that side has no such
+			// constant (the arbitrary-precision int): report no_bound.
+			value, ok := builtinBound(reg, def.Name, c.Name)
+			if !ok {
+				if at != nil && diags != nil {
+					s := at(c)
+					diags.Add(newNoBoundDiagnostic(s.offset, s.width, def.Name, c.Name))
+				}
+				ac.Type = ir.Invalid
+				out = append(out, ac)
+				continue
+			}
+			ac.Value = value
+			// A builtin bound is typed as the arbitrary-precision int (the type of
+			// an integer literal), not the concrete sized type: int8.Max is the
+			// value 127, and like the literal 127 it adapts to whatever sized
+			// integer it is compared or assigned to (self <= int16.Max in an int32
+			// refinement). An explicit annotation overrides this.
+			if annType != nil {
+				ac.Type = annType
+			} else {
+				ac.Type = &ir.Builtin{Name: "int"}
+			}
+			out = append(out, ac)
+			continue
+		}
+
+		// An ordinary associated constant folds its initializer (when an
+		// evaluator is supplied) and types as its annotation, or — without one —
+		// as the kind of its folded value.
+		if env != nil {
+			ac.Value = eval.Decl(c, env)
+		}
+		switch {
+		case annType != nil:
+			ac.Type = annType
+		case ac.Value != nil:
+			ac.Type = constantType(ac.Value)
+		default:
+			ac.Type = ir.Invalid
+		}
+		out = append(out, ac)
+	}
+	return out
+}
+
+// builtinBound returns the value of a builtin associated constant — the named
+// bound (Max or Min) of the named primitive's value range — and whether the
+// primitive has that bound. A non-integer primitive, an unknown bound name, or
+// an unbounded side (the arbitrary-precision int, or uint's missing upper
+// bound) yields ok == false.
+func builtinBound(reg *builtin.Registry, typeName, bound string) (*ir.Constant, bool) {
+	native, ok := reg.Native(typeName)
+	if !ok || !native.IsInteger() {
+		return nil, false
+	}
+	min, max := native.Bounds()
+	switch bound {
+	case "Max":
+		if max == nil {
+			return nil, false
+		}
+		return ir.IntConstant(max), true
+	case "Min":
+		if min == nil {
+			return nil, false
+		}
+		return ir.IntConstant(min), true
+	default:
+		return nil, false
+	}
+}
+
+// constantType is the type an un-annotated associated constant takes from its
+// folded value's kind — the same reading an un-annotated top-level constant
+// gets. An enum value keeps its enum type; an unsupported kind has no type.
+func constantType(v *ir.Constant) ir.Type {
+	switch v.Kind {
+	case ir.ConstInt:
+		return &ir.Builtin{Name: "int"}
+	case ir.ConstBool:
+		return &ir.Builtin{Name: "bool"}
+	case ir.ConstString:
+		return &ir.Builtin{Name: "string"}
+	case ir.ConstDatetime:
+		return &ir.Builtin{Name: "datetime"}
+	case ir.ConstDuration:
+		return &ir.Builtin{Name: "duration"}
+	case ir.ConstEnum:
+		if v.EnumDef != nil {
+			return &ir.Named{Def: v.EnumDef}
+		}
+		return ir.Invalid
+	default:
+		return ir.Invalid
 	}
 }
 
@@ -225,6 +371,10 @@ func resolveEnumDecl(env eval.Env, r *infer.TypeResolver, reg *builtin.Registry,
 	// settled values coincide — explicit or defaulted — are an error, reported
 	// at the second.
 	checkDuplicateEnumValues(def, ed, at, diags)
+
+	// The impl block's associated constants (read as EnumName.Name), the same
+	// mechanism a type declaration's impl carries.
+	def.Consts = resolveAssocConstList(env, r, reg, def, ed.Consts, nil, at, diags)
 
 	// The operator methods: the six comparisons every enum carries, then the
 	// impl block's own methods (which may shadow a comparison or add new ones).

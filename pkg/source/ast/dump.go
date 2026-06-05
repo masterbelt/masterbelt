@@ -209,8 +209,33 @@ func dumpTypeDecl(b *strings.Builder, d *TypeDecl) {
 	if d.Where != nil {
 		fmt.Fprintf(b, "    where %s\n", dumpExpr(d.Where))
 	}
+	for _, c := range d.Consts {
+		dumpAssocConst(b, c)
+	}
 	for _, m := range d.Methods {
 		dumpMethod(b, m)
+	}
+}
+
+// dumpAssocConst renders one associated constant of an impl block: its name, an
+// optional type annotation and value, and the builtin marker when the value
+// comes from the registry (`= builtin`).
+func dumpAssocConst(b *strings.Builder, c *ConstDecl) {
+	fmt.Fprintf(b, "    const %q\n", c.Name)
+	for _, doc := range c.Doc {
+		fmt.Fprintf(b, "      doc %q\n", doc)
+	}
+	if c.Public {
+		b.WriteString("      pub\n")
+	}
+	if c.Type != nil {
+		fmt.Fprintf(b, "      type %s\n", dumpType(c.Type))
+	}
+	if c.Builtin {
+		b.WriteString("      builtin\n")
+	}
+	if c.Value != nil {
+		fmt.Fprintf(b, "      value %s\n", dumpExpr(c.Value))
 	}
 }
 
@@ -232,6 +257,9 @@ func dumpEnumDecl(b *strings.Builder, d *EnumDecl) {
 		} else {
 			fmt.Fprintf(b, "    member %q\n", m.Name)
 		}
+	}
+	for _, c := range d.Consts {
+		dumpAssocConst(b, c)
 	}
 	for _, m := range d.Methods {
 		dumpMethod(b, m)

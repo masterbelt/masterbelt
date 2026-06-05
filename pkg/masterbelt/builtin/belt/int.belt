@@ -38,6 +38,11 @@ pub type int = builtin impl {
 
 /// A signed 8-bit integer (-128 to 127).
 pub type int8 = builtin impl {
+  /// The largest representable value (127).
+  pub const Max = builtin
+  /// The smallest representable value (-128).
+  pub const Min = builtin
+
   /// The unary + operator: the value unchanged.
   pub extern fn pos(): self
   /// The unary - operator: the negation.
@@ -71,6 +76,11 @@ pub type int8 = builtin impl {
 
 /// A signed 16-bit integer (-32768 to 32767).
 pub type int16 = builtin impl {
+  /// The largest representable value (32767).
+  pub const Max = builtin
+  /// The smallest representable value (-32768).
+  pub const Min = builtin
+
   /// The unary + operator: the value unchanged.
   pub extern fn pos(): self
   /// The unary - operator: the negation.
@@ -104,6 +114,11 @@ pub type int16 = builtin impl {
 
 /// A signed 32-bit integer (-2147483648 to 2147483647).
 pub type int32 = builtin impl {
+  /// The largest representable value (2147483647).
+  pub const Max = builtin
+  /// The smallest representable value (-2147483648).
+  pub const Min = builtin
+
   /// The unary + operator: the value unchanged.
   pub extern fn pos(): self
   /// The unary - operator: the negation.
@@ -137,6 +152,11 @@ pub type int32 = builtin impl {
 
 /// A signed 64-bit integer (-9223372036854775808 to 9223372036854775807).
 pub type int64 = builtin impl {
+  /// The largest representable value (9223372036854775807).
+  pub const Max = builtin
+  /// The smallest representable value (-9223372036854775808).
+  pub const Min = builtin
+
   /// The unary + operator: the value unchanged.
   pub extern fn pos(): self
   /// The unary - operator: the negation.

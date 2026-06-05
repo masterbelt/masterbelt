@@ -213,6 +213,7 @@ func lowerTypeDecl(t cst.Tree, buf source.Buffer) *ast.TypeDecl {
 		body    ast.TypeExpr
 		where   ast.Expr
 		methods []*ast.MethodDecl
+		consts  []*ast.ConstDecl
 	)
 	for _, child := range t.Children() {
 		if tok, ok := child.Token(); ok {
@@ -236,12 +237,12 @@ func lowerTypeDecl(t cst.Tree, buf source.Buffer) *ast.TypeDecl {
 		case node.Kind() == cst.WhereClause:
 			where = lowerWhereClause(child, buf)
 		case node.Kind() == cst.ImplBlock:
-			methods = lowerImpl(child, buf)
+			methods, consts = lowerImpl(child, buf)
 		case isTypeExprKind(node.Kind()):
 			body = lowerTypeExpr(child, buf)
 		}
 	}
-	return ast.NewTypeDecl(doc, public, name, params, body, where, methods, green)
+	return ast.NewTypeDecl(doc, public, name, params, body, where, methods, consts, green)
 }
 
 // lowerEnumDecl lowers a positioned EnumDecl CST node into an ast.EnumDecl: its
@@ -259,6 +260,7 @@ func lowerEnumDecl(t cst.Tree, buf source.Buffer) *ast.EnumDecl {
 		base    ast.TypeExpr
 		members []*ast.EnumMember
 		methods []*ast.MethodDecl
+		consts  []*ast.ConstDecl
 	)
 	for _, child := range t.Children() {
 		if tok, ok := child.Token(); ok {
@@ -282,10 +284,10 @@ func lowerEnumDecl(t cst.Tree, buf source.Buffer) *ast.EnumDecl {
 		case cst.EnumMember:
 			members = append(members, lowerEnumMember(child, buf))
 		case cst.ImplBlock:
-			methods = lowerImpl(child, buf)
+			methods, consts = lowerImpl(child, buf)
 		}
 	}
-	return ast.NewEnumDecl(doc, public, name, base, members, methods, green)
+	return ast.NewEnumDecl(doc, public, name, base, members, methods, consts, green)
 }
 
 // lowerEnumMember lowers one EnumMember node: its name and the optional "=
@@ -319,15 +321,82 @@ func lowerWhereClause(t cst.Tree, buf source.Buffer) ast.Expr {
 	return nil
 }
 
-// lowerImpl lowers an ImplBlock node to its method declarations.
-func lowerImpl(t cst.Tree, buf source.Buffer) []*ast.MethodDecl {
+// lowerImpl lowers an ImplBlock node to its method declarations and its
+// associated constants (the ConstDecl items), each in source order. The two
+// share the block but separate here, since the later layers treat a method and
+// a type-scoped constant differently.
+func lowerImpl(t cst.Tree, buf source.Buffer) ([]*ast.MethodDecl, []*ast.ConstDecl) {
 	var methods []*ast.MethodDecl
+	var consts []*ast.ConstDecl
 	for _, child := range t.Children() {
-		if n, ok := child.Node(); ok && n.Kind() == cst.MethodDecl {
+		n, ok := child.Node()
+		if !ok {
+			continue
+		}
+		switch n.Kind() {
+		case cst.MethodDecl:
 			methods = append(methods, lowerMethod(child, buf))
+		case cst.ConstDecl:
+			consts = append(consts, lowerImplConst(child, buf))
 		}
 	}
-	return methods
+	return methods, consts
+}
+
+// lowerImplConst lowers an associated-constant ConstDecl node inside an impl
+// block. It mirrors lowerConstDecl, with the one extra form a top-level const
+// cannot have: a `= builtin` initializer, whose Initializer wraps a BuiltinType
+// rather than an expression. Such a constant carries no Value — its value comes
+// from the builtin registry — and is marked Builtin.
+func lowerImplConst(t cst.Tree, buf source.Buffer) *ast.ConstDecl {
+	green, _ := t.Node()
+
+	var (
+		doc     []string
+		public  bool
+		name    string
+		typ     ast.TypeExpr
+		value   ast.Expr
+		builtin bool
+	)
+
+	for _, child := range t.Children() {
+		if tok, ok := child.Token(); ok {
+			switch tok.Kind() {
+			case token.Pub:
+				public = true
+			case token.DocComment:
+				doc = append(doc, docText(child.Text(buf)))
+			case token.Ident:
+				name = child.Text(buf)
+			}
+			continue
+		}
+		node, _ := child.Node()
+		switch node.Kind() {
+		case cst.TypeClause:
+			typ = lowerTypeClause(child, buf)
+		case cst.Initializer:
+			if initializerIsBuiltin(child) {
+				builtin = true
+			} else {
+				value = lowerInitializer(child, buf)
+			}
+		}
+	}
+
+	return ast.NewAssocConstDecl(doc, public, name, typ, value, builtin, green)
+}
+
+// initializerIsBuiltin reports whether an Initializer node is the `= builtin`
+// form: it wraps a BuiltinType rather than an expression.
+func initializerIsBuiltin(t cst.Tree) bool {
+	for _, child := range t.Children() {
+		if node, ok := child.Node(); ok && node.Kind() == cst.BuiltinType {
+			return true
+		}
+	}
+	return false
 }
 
 // lowerMethod lowers a MethodDecl node: its modifiers, effects, name,
