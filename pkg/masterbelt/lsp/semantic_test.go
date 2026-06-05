@@ -130,6 +130,47 @@ func TestSemanticTokensWhereClause(t *testing.T) {
 	}
 }
 
+func TestSemanticTokensSwitch(t *testing.T) {
+	// switch colours as a keyword like return; the arrow is an operator, the
+	// scrutinee and an arm's bare value read as read-only variables, and the
+	// wildcard "_" is just such an identifier.
+	doc := abstract.NewDocument([]byte("pub fn c(r: R): string {\n  switch r {\n    A -> return \"a\"\n    _ -> return \"b\"\n  }\n}\n"))
+	got := decode(semanticTokens(doc).Data)
+
+	want := []decodedToken{
+		{1, 2, 6, stKeyword, 0},           // switch
+		{1, 9, 1, stVariable, smReadonly}, // r (scrutinee)
+		{2, 4, 1, stVariable, smReadonly}, // A (arm value)
+		{2, 6, 2, stOperator, 0},          // ->
+		{2, 9, 6, stKeyword, 0},           // return
+		{2, 16, 3, stString, 0},           // "a"
+		{3, 4, 1, stVariable, smReadonly}, // _ (wildcard)
+		{3, 6, 2, stOperator, 0},          // ->
+		{3, 9, 6, stKeyword, 0},           // return
+		{3, 16, 3, stString, 0},           // "b"
+	}
+
+	// The first eight tokens (through the function header) are checked by the
+	// other tests; assert on the switch's body tokens, found by skipping to the
+	// switch keyword.
+	start := 0
+	for i, tk := range got {
+		if tk == want[0] {
+			start = i
+			break
+		}
+	}
+	body := got[start:]
+	if len(body) < len(want) {
+		t.Fatalf("got %d body tokens, want at least %d:\n%+v", len(body), len(want), body)
+	}
+	for i := range want {
+		if body[i] != want[i] {
+			t.Errorf("token[%d] = %+v, want %+v", i, body[i], want[i])
+		}
+	}
+}
+
 func TestSemanticTokensStringLiteral(t *testing.T) {
 	doc := abstract.NewDocument([]byte("const X = \"label\"\n"))
 	got := decode(semanticTokens(doc).Data)
