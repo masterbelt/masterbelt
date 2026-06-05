@@ -23,23 +23,25 @@ File
     Initializer
       Assign "="
       Whitespace " "
-      BinaryExpr
-        Literal
-          Int "3"
+      TernaryExpr
+        BinaryExpr
+          Literal
+            Int "3"
+          Whitespace " "
+          Gt ">"
+          Whitespace " "
+          Literal
+            Int "2"
         Whitespace " "
-        Gt ">"
+        Question "?"
         Whitespace " "
         Literal
-          Int "2"
-  Error
-    Whitespace " "
-    Question "?"
-    Whitespace " "
-    Int "10"
-    Whitespace " "
-    Colon ":"
-    Whitespace " "
-    Int "20"
+          Int "10"
+        Whitespace " "
+        Colon ":"
+        Whitespace " "
+        Literal
+          Int "20"
   ConstDecl
     Newline "\n"
     Const "const"
@@ -49,23 +51,25 @@ File
     Initializer
       Assign "="
       Whitespace " "
-      BinaryExpr
-        Literal
-          Int "7"
+      TernaryExpr
+        BinaryExpr
+          Literal
+            Int "7"
+          Whitespace " "
+          Gt ">"
+          Whitespace " "
+          Literal
+            Int "100"
         Whitespace " "
-        Gt ">"
+        Question "?"
         Whitespace " "
         Literal
-          Int "100"
-  Error
-    Whitespace " "
-    Question "?"
-    Whitespace " "
-    String "\"high\""
-    Whitespace " "
-    Colon ":"
-    Whitespace " "
-    String "\"low\""
+          String "\"high\""
+        Whitespace " "
+        Colon ":"
+        Whitespace " "
+        Literal
+          String "\"low\""
   TypeDecl
     Newline "\n"
     Newline "\n"
@@ -118,28 +122,31 @@ File
     Initializer
       Assign "="
       Whitespace " "
-      BinaryExpr
+      TernaryExpr
+        BinaryExpr
+          MemberExpr
+            NameRef
+              Ident "Level"
+            Dot "."
+            Ident "Max"
+          Whitespace " "
+          Gt ">"
+          Whitespace " "
+          Literal
+            Int "50"
+        Whitespace " "
+        Question "?"
+        Whitespace " "
         MemberExpr
           NameRef
             Ident "Level"
           Dot "."
           Ident "Max"
         Whitespace " "
-        Gt ">"
+        Colon ":"
         Whitespace " "
         Literal
-          Int "50"
-  Error
-    Whitespace " "
-    Question "?"
-    Whitespace " "
-    Ident "Level"
-    Dot "."
-    Ident "Max"
-    Whitespace " "
-    Colon ":"
-    Whitespace " "
-    Int "0"
+          Int "0"
   ConstDecl
     Newline "\n"
     Newline "\n"
@@ -156,37 +163,45 @@ File
     Initializer
       Assign "="
       Whitespace " "
-      BinaryExpr
-        Literal
-          Int "150"
+      TernaryExpr
+        BinaryExpr
+          Literal
+            Int "150"
+          Whitespace " "
+          Lt "<"
+          Whitespace " "
+          Literal
+            Int "0"
         Whitespace " "
-        Lt "<"
+        Question "?"
         Whitespace " "
         Literal
           Int "0"
-  Error
-    Whitespace " "
-    Question "?"
-    Whitespace " "
-    Int "0"
-    Whitespace " "
-    Colon ":"
-    Whitespace " "
-    LParen "("
-    Int "150"
-    Whitespace " "
-    Gt ">"
-    Whitespace " "
-    Int "100"
-    Whitespace " "
-    Question "?"
-    Whitespace " "
-    Int "100"
-    Whitespace " "
-    Colon ":"
-    Whitespace " "
-    Int "150"
-    RParen ")"
+        Whitespace " "
+        Colon ":"
+        Whitespace " "
+        ParenExpr
+          LParen "("
+          TernaryExpr
+            BinaryExpr
+              Literal
+                Int "150"
+              Whitespace " "
+              Gt ">"
+              Whitespace " "
+              Literal
+                Int "100"
+            Whitespace " "
+            Question "?"
+            Whitespace " "
+            Literal
+              Int "100"
+            Whitespace " "
+            Colon ":"
+            Whitespace " "
+            Literal
+              Int "150"
+          RParen ")"
   ConstDecl
     Newline "\n"
     Newline "\n"
@@ -201,30 +216,34 @@ File
     Initializer
       Assign "="
       Whitespace " "
-      ParenExpr
-        LParen "("
-        BinaryExpr
-          Literal
-            Int "3"
-          Whitespace " "
-          Gt ">"
-          Whitespace " "
-          Literal
-            Int "2"
-  Error
-    Whitespace " "
-    Question "?"
-    Whitespace " "
-    Int "1"
-    Whitespace " "
-    Colon ":"
-    Whitespace " "
-    Int "0"
-    RParen ")"
-    Whitespace " "
-    Plus "+"
-    Whitespace " "
-    Int "5"
+      BinaryExpr
+        ParenExpr
+          LParen "("
+          TernaryExpr
+            BinaryExpr
+              Literal
+                Int "3"
+              Whitespace " "
+              Gt ">"
+              Whitespace " "
+              Literal
+                Int "2"
+            Whitespace " "
+            Question "?"
+            Whitespace " "
+            Literal
+              Int "1"
+            Whitespace " "
+            Colon ":"
+            Whitespace " "
+            Literal
+              Int "0"
+          RParen ")"
+        Whitespace " "
+        Plus "+"
+        Whitespace " "
+        Literal
+          Int "5"
   TypeDecl
     Newline "\n"
     Newline "\n"
@@ -271,45 +290,47 @@ File
           ReturnStmt
             Return "return"
             Whitespace " "
-            BinaryExpr
-              SelfExpr
-                Self "self"
+            TernaryExpr
+              BinaryExpr
+                SelfExpr
+                  Self "self"
+                Whitespace " "
+                Gt ">"
+                Whitespace " "
+                Literal
+                  Int "0"
               Whitespace " "
-              Gt ">"
-              Whitespace " "
-              Literal
-                Int "0"
-          Whitespace " "
-          Question "?"
-          Whitespace " "
-          Literal
-            Int "1"
-          Whitespace " "
-          Colon ":"
-          Whitespace " "
-          ParenExpr
-            LParen "("
-            BinaryExpr
-              SelfExpr
-                Self "self"
-              Whitespace " "
-              Lt "<"
+              Question "?"
               Whitespace " "
               Literal
-                Int "0"
-          Whitespace " "
-          Question "?"
-          Whitespace " "
-          UnaryExpr
-            Minus "-"
-            Literal
-              Int "1"
-          Whitespace " "
-          Colon ":"
-          Whitespace " "
-          Literal
-            Int "0"
-          RParen ")"
+                Int "1"
+              Whitespace " "
+              Colon ":"
+              Whitespace " "
+              ParenExpr
+                LParen "("
+                TernaryExpr
+                  BinaryExpr
+                    SelfExpr
+                      Self "self"
+                    Whitespace " "
+                    Lt "<"
+                    Whitespace " "
+                    Literal
+                      Int "0"
+                  Whitespace " "
+                  Question "?"
+                  Whitespace " "
+                  UnaryExpr
+                    Minus "-"
+                    Literal
+                      Int "1"
+                  Whitespace " "
+                  Colon ":"
+                  Whitespace " "
+                  Literal
+                    Int "0"
+                RParen ")"
           Newline "\n"
           Whitespace "  "
           RBrace "}"
@@ -318,15 +339,3 @@ File
   Newline "\n"
   EOF ""
 # diagnostics
-error[masterbelt.parser.concrete.unexpected_token] 9:22 unexpected token: Question
-error[masterbelt.parser.concrete.unexpected_token] 10:24 unexpected token: Question
-error[masterbelt.parser.concrete.unexpected_token] 17:38 unexpected token: Question
-error[masterbelt.parser.concrete.unexpected_token] 22:23 unexpected token: Question
-error[masterbelt.parser.concrete.unexpected_token] 26:21 unexpected token: Whitespace
-error[masterbelt.parser.concrete.unexpected_token] 26:22 unexpected token: Question
-error[masterbelt.parser.concrete.unexpected_token] 33:21 unexpected token: Question
-error[masterbelt.parser.concrete.unexpected_token] 33:25 unexpected token: Colon
-error[masterbelt.parser.concrete.unexpected_token] 33:36 unexpected token: Whitespace
-error[masterbelt.parser.concrete.unexpected_token] 33:37 unexpected token: Question
-error[masterbelt.parser.concrete.unexpected_token] 33:42 unexpected token: Colon
-error[masterbelt.parser.concrete.unexpected_token] 33:45 unexpected token: RParen

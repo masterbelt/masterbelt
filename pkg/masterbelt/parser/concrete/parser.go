@@ -37,7 +37,8 @@
 //	SwitchStmt    := switch Expr "{" ( SwitchArm ( ("," | NL) SwitchArm )* )? "}"
 //	SwitchArm     := ( Expr ( "," Expr )* | "_" ) "->" ( Stmt | Block )
 //	IfStmt        := if Expr Block [ else ( IfStmt | Block ) ]
-//	Expr          := OrExpr
+//	Expr          := TernaryExpr
+//	TernaryExpr   := OrExpr [ "?" Expr ":" Expr ]
 //	OrExpr        := AndExpr ( "||" AndExpr )*
 //	AndExpr       := CmpExpr ( "&&" CmpExpr )*
 //	CmpExpr       := AddExpr ( ( "==" | "!=" | "<" | "<=" | ">" | ">=" ) AddExpr )*
@@ -62,6 +63,10 @@
 // function per level; the binaryPrec table is the single source of operator
 // precedence. Comparisons are left-associative here (Go forbids chaining them),
 // which keeps the parser uniform and defers "bool < int" to the type checker.
+// The ternary "?:" is the one operator looser than them all and the only
+// right-associative one: parseExpr reads it after the binary climb, and only at
+// the outermost (lowest-precedence) call, so a > b ? a : b groups as
+// (a > b) ? a : b and a ? b : c ? d : e as a ? b : (c ? d : e).
 //
 // Two properties make the parser usable as the front half of an incremental
 // pipeline (see Document):

@@ -1,24 +1,19 @@
 Module
   Const "Bigger"
-    type bool
-    value IntLiteral "3".gt(IntLiteral "2")
-    eval true
+    type invalid
+    value <none>
   Const "Label"
-    type bool
-    value IntLiteral "7".gt(IntLiteral "100")
-    eval false
+    type invalid
+    value <none>
   Const "Capped"
     type Level
-    value Level.Max.gt(IntLiteral "50")
-    eval true
+    value <none>
   Const "Clamp"
-    type bool
-    value IntLiteral "150".lt(IntLiteral "0")
-    eval false
+    type invalid
+    value <none>
   Const "Score"
-    type bool
-    value IntLiteral "3".gt(IntLiteral "2")
-    eval true
+    type invalid
+    value <none>.add(IntLiteral "5")
   TypeDef "Level" pub
     body int8
     const "Max" pub
@@ -29,8 +24,4 @@ Module
     method "sign" pub
       doc "-1, 0, or 1 by sign."
       result int32
-      return self.gt(IntLiteral "0")
-      expr IntLiteral "1"
-      expr self.lt(IntLiteral "0")
-      expr IntLiteral "1".neg()
-      expr IntLiteral "0"
+      return <none>

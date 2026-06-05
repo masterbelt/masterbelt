@@ -64,7 +64,7 @@ func (p *parser) parseInitializer() *cst.Node {
 	children := []cst.Green{p.bump()} // "="
 	if startsExpr(p.peekSignificant()) {
 		p.skipTrivia(&children)
-		children = append(children, p.parseExpr(precLowest))
+		children = append(children, p.parseExpr())
 	} else {
 		p.report(newExpectedExpressionDiagnostic(p.lastStart, 0))
 	}
@@ -231,7 +231,7 @@ func (p *parser) parseWhereClause() *cst.Node {
 	children := []cst.Green{p.bump()} // "where"
 	if startsExpr(p.peekSignificant()) {
 		p.skipTrivia(&children)
-		children = append(children, p.parseExpr(precLowest))
+		children = append(children, p.parseExpr())
 	} else {
 		p.report(newExpectedExpressionDiagnostic(p.lastStart, 0))
 	}
@@ -376,7 +376,7 @@ func (p *parser) parseAssertDecl(lead []cst.Green) *cst.Node {
 
 	if startsExpr(p.peekSignificant()) {
 		p.skipTrivia(&children)
-		children = append(children, p.parseExpr(precLowest))
+		children = append(children, p.parseExpr())
 	} else {
 		p.report(newExpectedExpressionDiagnostic(p.lastStart, 0))
 	}
@@ -455,7 +455,7 @@ func (p *parser) parseFuncDecl(lead []cst.Green) *cst.Node {
 			children = append(children, p.parseBlock())
 		case startsExpr(p.peekSignificant()):
 			p.skipTrivia(&children)
-			children = append(children, p.parseExpr(precLowest))
+			children = append(children, p.parseExpr())
 		default:
 			p.report(newExpectedExpressionDiagnostic(p.lastStart, 0))
 		}
@@ -578,7 +578,7 @@ func (p *parser) parseImplConstInitializer() *cst.Node {
 		children = append(children, p.parseBuiltinType())
 	case startsExpr(p.peekSignificant()):
 		p.skipTrivia(&children)
-		children = append(children, p.parseExpr(precLowest))
+		children = append(children, p.parseExpr())
 	default:
 		p.report(newExpectedExpressionDiagnostic(p.lastStart, 0))
 	}

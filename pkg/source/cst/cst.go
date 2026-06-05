@@ -41,6 +41,7 @@ const (
 	NameRef                   // an identifier used as a value
 	Literal                   // a literal value: an integer, a string, a datetime, a duration, a boolean (true/false), or null
 	BinaryExpr                // a binary operation: Expr Op Expr
+	TernaryExpr               // a conditional value: Expr "?" Expr ":" Expr
 	UnaryExpr                 // a prefix operation: Op Expr
 	CallExpr                  // a call: Callee "(" [Expr ("," Expr)*] ")"
 	MemberExpr                // a member access: Receiver "." Ident
@@ -105,6 +106,7 @@ var kindNames = [...]string{
 	NameRef:       "NameRef",
 	Literal:       "Literal",
 	BinaryExpr:    "BinaryExpr",
+	TernaryExpr:   "TernaryExpr",
 	UnaryExpr:     "UnaryExpr",
 	CallExpr:      "CallExpr",
 	MemberExpr:    "MemberExpr",
