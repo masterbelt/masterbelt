@@ -50,22 +50,22 @@ func checkDivByZero(e ast.Expr, env evalEnv, report func(node ast.Node)) {
 
 // checkMethodBodies type-checks each method body's returned value against the
 // method's declared result type, reporting through sink. It runs after
-// resolveTypes, so defs are in file.Types order and each method lines up with
-// its resolved signature. The walk is the same checking walk the const path
-// uses (infer.CheckBody), so the declared result type reaches into a returned
-// function or collection literal. universe is the file's annotation universe —
-// its own definitions shadowing its imported ones — and qualified its
-// namespace-qualified lookup, so a type in a body resolves exactly as an
-// annotation does.
-func checkMethodBodies(file *ast.File, reg *builtin.Registry, defs []*ir.TypeDef, universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, sink *infer.Sink) {
-	for i, td := range file.Types {
-		def := defs[i]
+// resolveTypes; each resolved method carries the declaration it came from
+// (ir.Method.Syntax), which is the pairing — a dropped duplicate overload
+// never shifts a neighbour onto the wrong signature. The walk is the same
+// checking walk the const path uses (infer.CheckBody), so the declared result
+// type reaches into a returned function or collection literal. universe is
+// the file's annotation universe — its own definitions shadowing its imported
+// ones — and qualified its namespace-qualified lookup, so a type in a body
+// resolves exactly as an annotation does.
+func checkMethodBodies(reg *builtin.Registry, defs []*ir.TypeDef, universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, sink *infer.Sink) {
+	for _, def := range defs {
 		self := &ir.Named{Def: def}
-		for j, m := range td.Methods {
-			if len(m.Body) == 0 || j >= len(def.Methods) {
+		for _, irm := range def.Methods {
+			m := irm.Syntax
+			if m == nil || len(m.Body) == 0 {
 				continue // an extern or empty body has nothing to check
 			}
-			irm := def.Methods[j]
 			params := make(map[string]ir.Type, len(irm.Params))
 			for _, p := range irm.Params {
 				params[p.Name] = substSelf(p.Type, self)

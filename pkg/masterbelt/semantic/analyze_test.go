@@ -484,6 +484,28 @@ const X = Base.merge(5)
 	}
 }
 
+func TestDuplicateOverloadKeepsBodiesAligned(t *testing.T) {
+	// Dropping the duplicate must not shift the pairing of the remaining
+	// declarations with their resolved signatures: flag's body still checks
+	// against flag's bool result, not against a neighbour's.
+	src := `pub type T = int32 impl {
+  pub fn a(x: self): self {
+    return self + x
+  }
+  pub fn a(y: self): self {
+    return self
+  }
+  pub fn flag(): bool {
+    return self > 0
+  }
+}
+`
+	_, diags := analyze(src)
+	if got := codes(diags); len(got) != 1 || got[0] != CodeDuplicateOverload {
+		t.Fatalf("codes = %v, want [duplicate_overload] alone", got)
+	}
+}
+
 func TestAnnotatedFuncLit(t *testing.T) {
 	// The annotation is a checking context: it supplies the literal's omitted
 	// parameter and result types.

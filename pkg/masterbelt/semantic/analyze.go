@@ -448,7 +448,7 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 	module.Types = q.typeDefs(fileID)
 	imp := q.importsOf(fileID)
 	resolveTypes(file, at, diags, reg, outerTypes(q, imp), qualifiedFrom(q, imp))
-	checkMethodBodies(file, reg, module.Types, q.universe(fileID), qualifiedFrom(q, imp), exprSink(at, diags))
+	checkMethodBodies(reg, module.Types, q.universe(fileID), qualifiedFrom(q, imp), exprSink(at, diags))
 
 	items := diags.Items()
 	sort.SliceStable(items, func(i, j int) bool { return items[i].Offset < items[j].Offset })

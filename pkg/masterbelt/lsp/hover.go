@@ -45,9 +45,11 @@ func hover(doc view, offset int) *protocol.Hover {
 
 // methodParamHover describes the method parameter denoted at offset: its name
 // in the signature's parameter list, or a reference to it inside the method's
-// body. The type comes from the module's resolved signature, so it renders as
-// the checker sees it. Function literals nest inside method bodies and their
-// parameters shadow the method's — lambdaParamHover runs first.
+// body. The type comes from the module's resolved signature — each resolved
+// method carries its declaration (ir.Method.Syntax), so the pairing holds
+// across overloads — and renders as the checker sees it. Function literals
+// nest inside method bodies and their parameters shadow the method's —
+// lambdaParamHover runs first.
 func methodParamHover(doc view, offset int, trees map[cst.Green]cst.Tree) *protocol.Hover {
 	buf := doc.Buffer()
 	tok, name, ok := identAt(doc.AST().Concrete().Tree(), buf, offset)
@@ -55,18 +57,16 @@ func methodParamHover(doc view, offset int, trees map[cst.Green]cst.Tree) *proto
 		return nil
 	}
 
-	file := doc.AST().File()
-	module := doc.Module()
-	for i, td := range file.Types {
-		if i >= len(module.Types) {
-			break
-		}
-		for j, m := range td.Methods {
-			mt, found := trees[m.Syntax()]
-			if !found || !within(mt, offset) || j >= len(module.Types[i].Methods) {
+	for _, def := range doc.Module().Types {
+		for _, irm := range def.Methods {
+			if irm.Syntax == nil {
 				continue
 			}
-			for _, p := range module.Types[i].Methods[j].Params {
+			mt, found := trees[irm.Syntax.Syntax()]
+			if !found || !within(mt, offset) {
+				continue
+			}
+			for _, p := range irm.Params {
 				if p.Name != name || p.Type == nil || p.Type == ir.Invalid {
 					continue
 				}
@@ -427,23 +427,21 @@ func paramTypeAt(doc view, name string, trees map[cst.Green]cst.Tree, offset int
 		}
 	}
 
-	file := doc.AST().File()
-	module := doc.Module()
-	for i, td := range file.Types {
-		if i >= len(module.Types) {
-			break
-		}
-		for j, m := range td.Methods {
-			mt, ok := trees[m.Syntax()]
-			if !ok || !within(mt, offset) || j >= len(module.Types[i].Methods) {
+	for _, def := range doc.Module().Types {
+		for _, irm := range def.Methods {
+			if irm.Syntax == nil {
 				continue
 			}
-			for _, p := range module.Types[i].Methods[j].Params {
+			mt, ok := trees[irm.Syntax.Syntax()]
+			if !ok || !within(mt, offset) {
+				continue
+			}
+			for _, p := range irm.Params {
 				if p.Name != name || p.Type == nil || p.Type == ir.Invalid {
 					continue
 				}
 				if _, isSelf := p.Type.(*ir.SelfType); isSelf {
-					return &ir.Named{Def: module.Types[i]}
+					return &ir.Named{Def: def}
 				}
 				return p.Type
 			}
@@ -484,18 +482,15 @@ func methodDeclHover(doc view, offset int, trees map[cst.Green]cst.Tree) *protoc
 		return nil
 	}
 
-	file := doc.AST().File()
-	module := doc.Module()
-	for i, td := range file.Types {
-		if i >= len(module.Types) {
-			break
-		}
-		for j, m := range td.Methods {
-			mt, found := trees[m.Syntax()]
-			if !found || !within(mt, offset) || j >= len(module.Types[i].Methods) {
+	for _, def := range doc.Module().Types {
+		for _, irm := range def.Methods {
+			if irm.Syntax == nil {
 				continue
 			}
-			irm := module.Types[i].Methods[j]
+			mt, found := trees[irm.Syntax.Syntax()]
+			if !found || !within(mt, offset) {
+				continue
+			}
 			var b strings.Builder
 			b.WriteString("```masterbelt\n")
 			b.WriteString(methodSignature(irm))

@@ -229,6 +229,12 @@ type Method struct {
 	Params []Param
 	Result Type
 	Body   []Stmt // the resolved body, or nil for an extern method
+	// Syntax is the declaration this method resolved from, or nil for the
+	// registry's bootstrap methods. With overloading a name no longer pairs a
+	// declaration with its resolution — and a dropped duplicate shifts the
+	// indexes — so the identity link is what the body checker and the editor
+	// navigate by.
+	Syntax *ast.MethodDecl
 }
 
 // Stmt is a statement in a method body. It is a sealed interface; the only
