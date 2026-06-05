@@ -122,7 +122,9 @@ func (p *parser) parseTypeDecl(lead []cst.Green) *cst.Node {
 		children = append(children, p.parseWhereClause())
 	}
 
-	if p.peekSignificant() == token.Impl {
+	// A type may carry several impl blocks: an inherent one and one per
+	// interface it implements (each tagged with its interface name).
+	for p.peekSignificant() == token.Impl {
 		p.skipTrivia(&children)
 		children = append(children, p.parseImplBlock())
 	}
@@ -203,7 +205,7 @@ func (p *parser) parseEnumDecl(lead []cst.Green) *cst.Node {
 	}
 afterMembers:
 
-	if p.peekSignificant() == token.Impl {
+	for p.peekSignificant() == token.Impl {
 		p.skipTrivia(&children)
 		children = append(children, p.parseImplBlock())
 	}
@@ -223,6 +225,125 @@ func (p *parser) parseEnumMember(lead []cst.Green) *cst.Node {
 		children = append(children, p.parseInitializer())
 	}
 	return cst.NewNode(cst.EnumMember, children)
+}
+
+// --- interface declarations -------------------------------------------------
+
+// parseInterfaceDecl parses an interface declaration, prepending the
+// already-collected leading trivia:
+//
+//	[pub] interface Name [GenericParams] "{" ( InterfaceMember ( ("," | NL) InterfaceMember )* )? "}"
+//
+// An interface is a nominal behaviour: its members are required methods (no
+// body, which an implementor must supply) and provided methods (with a body,
+// the default an implementor gets for free). Members are separated by a comma
+// or a newline, exactly as enum members are. As elsewhere every expected
+// element is optional in the parse: a missing one records a diagnostic and is
+// simply absent from the tree while losslessness is preserved. The cursor sits
+// on pub or interface.
+func (p *parser) parseInterfaceDecl(lead []cst.Green) *cst.Node {
+	children := lead
+
+	if p.kind() == token.Pub {
+		children = append(children, p.bump())
+	}
+	p.skipTrivia(&children)
+	children = append(children, p.bump()) // "interface" (guaranteed by the dispatcher)
+
+	if p.peekSignificant() == token.Ident {
+		p.skipTrivia(&children)
+		children = append(children, p.bump()) // the declared name
+	} else {
+		p.report(newExpectedIdentifierDiagnostic(p.lastStart, 0))
+	}
+
+	if p.peekSignificant() == token.Lt {
+		p.skipTrivia(&children)
+		children = append(children, p.parseGenericParams())
+	}
+
+	if p.peekSignificant() == token.LBrace {
+		p.skipTrivia(&children)
+		children = append(children, p.bump()) // "{"
+	} else {
+		p.report(newUnexpectedTokenDiagnostic(p.cur().Offset, p.cur().Width, p.kind().String()))
+		return cst.NewNode(cst.InterfaceDecl, children)
+	}
+
+	// The members. A comma between two members is optional (a newline serves
+	// as well); a member begins with pub or an identifier (its name).
+	for {
+		switch {
+		case p.peekSignificant() == token.RBrace:
+			p.skipTrivia(&children)
+			children = append(children, p.bump()) // "}"
+			return cst.NewNode(cst.InterfaceDecl, children)
+		case p.peekSignificant() == token.EOF:
+			return cst.NewNode(cst.InterfaceDecl, children)
+		case p.peekSignificant() == token.Pub || p.peekSignificant() == token.Ident:
+			var lead []cst.Green
+			p.skipTrivia(&lead)
+			children = append(children, p.parseInterfaceMember(lead))
+			if p.peekSignificant() == token.Comma {
+				p.skipTrivia(&children)
+				children = append(children, p.bump()) // ","
+			}
+		default:
+			p.skipTrivia(&children)
+			p.report(newUnexpectedTokenDiagnostic(p.cur().Offset, p.cur().Width, p.kind().String()))
+			children = append(children, p.bump())
+		}
+	}
+}
+
+// parseInterfaceMember parses one member of an interface, prepending the
+// already-collected leading trivia:
+//
+//	[pub] Name [GenericParams] ParamList ":" TypeExpr [Block]
+//
+// A member without a body is a required method (the implementor supplies it); a
+// member with a body Block is a provided method (the default). The result type
+// is required, mirroring a top-level function. The optional GenericParams give
+// a member its own type variables (the A in fold<A>). The cursor sits on pub or
+// the member's name.
+func (p *parser) parseInterfaceMember(lead []cst.Green) *cst.Node {
+	children := lead
+	if p.kind() == token.Pub {
+		children = append(children, p.bump())
+	}
+	if p.peekSignificant() == token.Ident {
+		p.skipTrivia(&children)
+		children = append(children, p.bump()) // the member name
+	} else {
+		p.report(newExpectedIdentifierDiagnostic(p.lastStart, 0))
+	}
+	if p.peekSignificant() == token.Lt {
+		p.skipTrivia(&children)
+		children = append(children, p.parseGenericParams())
+	}
+	if p.peekSignificant() == token.LParen {
+		p.skipTrivia(&children)
+		children = append(children, p.parseParamList(true))
+	} else {
+		p.report(newUnexpectedTokenDiagnostic(p.cur().Offset, p.cur().Width, p.kind().String()))
+	}
+	if p.peekSignificant() == token.Colon {
+		p.skipTrivia(&children)
+		children = append(children, p.bump()) // ":"
+		if startsType(p.peekSignificant()) {
+			p.skipTrivia(&children)
+			children = append(children, p.parseTypeExpr())
+		} else {
+			p.report(newExpectedTypeDiagnostic(p.lastStart, 0))
+		}
+	} else {
+		p.report(newExpectedTypeDiagnostic(p.lastStart, 0))
+	}
+	if p.peekSignificant() == token.LBrace {
+		p.skipTrivia(&children)
+		children = append(children, p.parseBlock())
+	}
+	return cst.NewNode(cst.InterfaceMember, children)
 }
 
 // parseWhereClause parses the refinement predicate of a type declaration:
@@ -473,12 +594,20 @@ func (p *parser) parseFuncDecl(lead []cst.Green) *cst.Node {
 
 // --- implementations and method bodies --------------------------------------
 
-// parseImplBlock parses an implementation block: impl "{" (MethodDecl |
+// parseImplBlock parses an implementation block: impl [TypeName] "{" (MethodDecl |
 // ConstDecl)* "}". An item beginning with const — optionally after pub — is an
 // associated constant (TypeName.Name); anything else that begins a method is a
-// method. The cursor sits on "impl".
+// method. The optional TypeName after impl tags the interface this block
+// implements (impl foldable<int> { ... }); without it the block is an inherent
+// impl. The cursor sits on "impl".
 func (p *parser) parseImplBlock() *cst.Node {
 	children := []cst.Green{p.bump()} // "impl"
+	// An interface-tagged impl names the interface before the brace
+	// (impl foldable<int> { ... }); a bare impl goes straight to "{".
+	if p.peekSignificant() == token.Ident {
+		p.skipTrivia(&children)
+		children = append(children, p.parsePrimaryType())
+	}
 	if p.peekSignificant() == token.LBrace {
 		p.skipTrivia(&children)
 		children = append(children, p.bump()) // "{"
@@ -588,10 +717,12 @@ func (p *parser) parseImplConstInitializer() *cst.Node {
 // parseMethodDecl parses a method inside an impl block, prepending the
 // already-collected leading trivia:
 //
-//	[doc] [pub] [extern] [fn] Effect* Ident ParamList ":" TypeExpr [Block]
+//	[doc] [pub] [extern] [fn] Effect* Ident [GenericParams] ParamList ":" TypeExpr [Block]
 //
 // fn is optional (some methods omit it), the effect list (io, async, nondet)
-// sits before the name, and the body Block is absent for an extern method.
+// sits before the name, the optional GenericParams declare the method's own
+// type variables (the A in fold<A>), and the body Block is absent for an extern
+// method.
 // The cursor sits on the first of pub/extern/fn/an effect/Ident.
 func (p *parser) parseMethodDecl(lead []cst.Green) *cst.Node {
 	children := lead
@@ -615,6 +746,12 @@ func (p *parser) parseMethodDecl(lead []cst.Green) *cst.Node {
 		children = append(children, p.bump()) // the method name
 	} else {
 		p.report(newExpectedIdentifierDiagnostic(p.lastStart, 0))
+	}
+	// Optional method type parameters: the A in fold<A>(...). They join the
+	// signature's scope alongside the implicit free-variable resolution.
+	if p.peekSignificant() == token.Lt {
+		p.skipTrivia(&children)
+		children = append(children, p.parseGenericParams())
 	}
 	if p.peekSignificant() == token.LParen {
 		p.skipTrivia(&children)
