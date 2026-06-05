@@ -394,6 +394,12 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 				s := at(node)
 				diags.Add(newDivisionByZeroDiagnostic(s.offset, s.width))
 			})
+			// A constant has no receiver: self has no meaning in its
+			// initializer (nor inside a literal nested in it).
+			checkNoSelf(decl.Value, func(node ast.Node) {
+				s := at(node)
+				diags.Add(newSelfOutsideMethodDiagnostic(s.offset, s.width))
+			})
 		}
 
 		if cyclic[decl] {
@@ -472,12 +478,16 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 				}
 			})
 
-		// Operator type errors and zero divisors, through the same checking
-		// walks the const path uses.
+		// Operator type errors, zero divisors, and stray selfs, through the
+		// same checking walks the const path uses.
 		condType := infer.Check(a.Cond, env, exprSink(at, diags))
 		checkDivByZero(a.Cond, evalEnv{q: q, file: fileID}, func(node ast.Node) {
 			s := at(node)
 			diags.Add(newDivisionByZeroDiagnostic(s.offset, s.width))
+		})
+		checkNoSelf(a.Cond, func(node ast.Node) {
+			s := at(node)
+			diags.Add(newSelfOutsideMethodDiagnostic(s.offset, s.width))
 		})
 
 		// The outcome — the folded condition and its power-assert diagram —

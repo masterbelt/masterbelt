@@ -335,6 +335,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "value " + f["value"].String() + " does not satisfy " + f["typ"].String() + ": " + f["predicate"].String() + f["diagram"].String()
 		}
 	},
+	"masterbelt.semantic.self_outside_method": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "self はメソッド本体の中でのみ使えます"
+		default:
+			return "self is only available inside a method body"
+		}
+	},
 	"masterbelt.semantic.type_mismatch": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":

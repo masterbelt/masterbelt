@@ -39,6 +39,7 @@ masterbelt.semantic.uninferable_parameter,パラメータ {name} の型を推論
 masterbelt.semantic.lambda_arity_mismatch,関数リテラルのパラメータが {actual} 個ありますが、{expected} 個が必要です
 masterbelt.semantic.arity_mismatch,関数 {name} は引数を {expected} 個取りますが、{actual} 個が渡されています
 masterbelt.semantic.missing_return,関数 {name} が値を返しません
+masterbelt.semantic.self_outside_method,self はメソッド本体の中でのみ使えます
 masterbelt.semantic.use_not_found,インポートするファイルが見つかりません: {path}
 masterbelt.semantic.not_exported,{path} は {name} を公開していません
 masterbelt.semantic.unknown_member,{namespace} に公開メンバ {name} はありません

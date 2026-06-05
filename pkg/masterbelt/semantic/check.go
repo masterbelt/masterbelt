@@ -48,6 +48,29 @@ func checkDivByZero(e ast.Expr, env evalEnv, report func(node ast.Node)) {
 	}
 }
 
+// checkNoSelf reports each self expression in e — descending into nested
+// function-literal bodies, which inherit the enclosing context's receiver (or
+// its absence). A constant initializer, an assert condition, and a function
+// body have no receiver, so self has no meaning anywhere inside them.
+func checkNoSelf(e ast.Expr, report func(node ast.Node)) {
+	ast.WalkExprs(e, func(x ast.Expr) bool {
+		switch x := x.(type) {
+		case *ast.SelfExpr:
+			report(x)
+		case *ast.FuncLit:
+			for _, stmt := range x.Body {
+				switch s := stmt.(type) {
+				case *ast.ReturnStmt:
+					checkNoSelf(s.Value, report)
+				case *ast.ExprStmt:
+					checkNoSelf(s.X, report)
+				}
+			}
+		}
+		return true
+	})
+}
+
 // --- method bodies ----------------------------------------------------------
 
 // checkMethodBodies type-checks each method body's returned value against the
@@ -94,6 +117,10 @@ func checkMethodBodies(reg *builtin.Registry, defs []*ir.TypeDef, universe map[s
 func checkFuncBodies(reg *builtin.Registry, file *ast.File, universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, funcs map[string]*ast.FuncDecl, at func(ast.Node) span, diags *diagnostic.List) {
 	sink := exprSink(at, diags)
 	r := &infer.TypeResolver{Defs: universe, Qualified: qualified}
+	noSelf := func(node ast.Node) {
+		s := at(node)
+		diags.Add(newSelfOutsideMethodDiagnostic(s.offset, s.width))
+	}
 	for _, fd := range file.Funcs {
 		params := make(map[string]ir.Type, len(fd.Params))
 		for _, p := range fd.Params {
@@ -103,12 +130,17 @@ func checkFuncBodies(reg *builtin.Registry, file *ast.File, universe map[string]
 		bs := infer.BodyScope{Reg: reg, Universe: universe, Qualified: qualified, Self: ir.Invalid, Params: params, Funcs: funcs}
 		returned := false
 		for _, stmt := range fd.Body {
-			ret, ok := stmt.(*ast.ReturnStmt)
-			if !ok || ret.Value == nil {
-				continue
+			switch stmt := stmt.(type) {
+			case *ast.ReturnStmt:
+				if stmt.Value == nil {
+					continue
+				}
+				returned = true
+				checkNoSelf(stmt.Value, noSelf)
+				infer.CheckBody(stmt.Value, want, bs, sink)
+			case *ast.ExprStmt:
+				checkNoSelf(stmt.X, noSelf)
 			}
-			returned = true
-			infer.CheckBody(ret.Value, want, bs, sink)
 		}
 		if !returned && hasBlockBody(fd) {
 			s := at(fd)

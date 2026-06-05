@@ -935,11 +935,13 @@ func TestAssertNotConstant(t *testing.T) {
 }
 
 func TestAssertSelfNotConstant(t *testing.T) {
-	// self has no referent at the top level; no other pass reports it, so the
-	// assertion is reported as unverifiable rather than passing silently.
+	// self has no referent at the top level: each occurrence is reported as
+	// self_outside_method, which also explains why the assertion cannot fold —
+	// so the generic assertion_not_constant stays suppressed.
 	_, diags := analyze("assert self == self\n")
-	if got := codes(diags); len(got) != 1 || got[0] != CodeAssertionNotConstant {
-		t.Fatalf("codes = %v, want [assertion_not_constant]", got)
+	got := codes(diags)
+	if len(got) != 2 || got[0] != CodeSelfOutsideMethod || got[1] != CodeSelfOutsideMethod {
+		t.Fatalf("codes = %v, want two self_outside_method", got)
 	}
 }
 
@@ -1323,5 +1325,45 @@ func TestFuncInAssert(t *testing.T) {
 	}
 	if len(m.Asserts) != 1 || !m.Asserts[0].Held() {
 		t.Fatalf("assert = %v, want held", m.Asserts)
+	}
+}
+
+func TestSelfOutsideMethod(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+	}{
+		{"function arrow body", "fn f(): int -> self + 1\n"},
+		{"function block body", "fn f(): int { return self }\n"},
+		{"lambda in function body", "fn f(): list<int> -> [1].map(fn(x) -> self)\n"},
+		{"const initializer", "const A = self\n"},
+		{"lambda in const initializer", "const A = [1].map(fn(x) -> self)\n"},
+		{"assert condition", "assert self == 1\n"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, diags := analyze(tc.src)
+			found := false
+			for _, d := range diags {
+				if d.Code == CodeSelfOutsideMethod {
+					found = true
+				}
+			}
+			if !found {
+				t.Fatalf("codes = %v, want self_outside_method", codes(diags))
+			}
+		})
+	}
+}
+
+func TestSelfAllowedInMethodAndWhere(t *testing.T) {
+	// A method body and a where clause have a receiver: self stays legal.
+	src := "type Port = int32 where self >= 1\n" +
+		"pub type L = int8 impl {\n  pub double(): int8 {\n    return self * 2\n  }\n}\n"
+	_, diags := analyze(src)
+	for _, d := range diags {
+		if d.Code == CodeSelfOutsideMethod {
+			t.Fatalf("self_outside_method fired in a legal position: %v", diags)
+		}
 	}
 }

@@ -31,6 +31,7 @@ const (
 	CodeRefinementNotBool     diagnostic.Code = "masterbelt.semantic.refinement_not_bool"
 	CodeRefinementNotConstant diagnostic.Code = "masterbelt.semantic.refinement_not_constant"
 	CodeRefinementViolation   diagnostic.Code = "masterbelt.semantic.refinement_violation"
+	CodeSelfOutsideMethod     diagnostic.Code = "masterbelt.semantic.self_outside_method"
 	CodeTypeMismatch          diagnostic.Code = "masterbelt.semantic.type_mismatch"
 	CodeUndefinedName         diagnostic.Code = "masterbelt.semantic.undefined_name"
 	CodeUninferableCollection diagnostic.Code = "masterbelt.semantic.uninferable_collection"
@@ -352,6 +353,17 @@ func newRefinementViolationDiagnostic(offset int, width int, value string, typ s
 		Code:     CodeRefinementViolation,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeRefinementViolation, fields),
 		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newSelfOutsideMethodDiagnostic(offset int, width int) diagnostic.Diagnostic {
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeSelfOutsideMethod,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeSelfOutsideMethod, nil),
+		Fields:   nil,
 		Offset:   offset,
 		Width:    width,
 	}
