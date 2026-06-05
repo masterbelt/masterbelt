@@ -104,6 +104,33 @@ func TestSemanticTokensArrowLambda(t *testing.T) {
 	}
 }
 
+func TestSemanticTokensTernary(t *testing.T) {
+	// The ternary "?" and ":" colour as operators, like = and ->; the condition
+	// and branches read through the existing variable rules.
+	doc := abstract.NewDocument([]byte("const M = a ? b : c\n"))
+	got := decode(semanticTokens(doc).Data)
+
+	want := []decodedToken{
+		{0, 0, 5, stKeyword, 0},                           // const
+		{0, 6, 1, stVariable, smDeclaration | smReadonly}, // M (declared name)
+		{0, 8, 1, stOperator, 0},                          // =
+		{0, 10, 1, stVariable, smReadonly},                // a (condition)
+		{0, 12, 1, stOperator, 0},                         // ?
+		{0, 14, 1, stVariable, smReadonly},                // b (then-branch)
+		{0, 16, 1, stOperator, 0},                         // :
+		{0, 18, 1, stVariable, smReadonly},                // c (else-branch)
+	}
+
+	if len(got) != len(want) {
+		t.Fatalf("got %d tokens, want %d:\n got:  %+v\n want: %+v", len(got), len(want), got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("token[%d] = %+v, want %+v", i, got[i], want[i])
+		}
+	}
+}
+
 func TestSemanticTokensWhereClause(t *testing.T) {
 	// where colours as a keyword like the rest of the declaration; the
 	// comparison operator carries no semantic token (the grammar colours it).

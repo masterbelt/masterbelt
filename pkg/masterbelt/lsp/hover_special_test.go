@@ -50,6 +50,33 @@ func TestHoverInExpression(t *testing.T) {
 	}
 }
 
+func TestHoverInTernaryBranch(t *testing.T) {
+	// A reference in either branch of a ternary keeps its const hover, reached
+	// through the same expression walk every other operand uses.
+	src := "const A = 1\nconst B = 2\nconst C = true ? A : B\n"
+	doc := testView(src)
+
+	t.Run("then-branch reference", func(t *testing.T) {
+		h := hover(doc, strings.Index(src, "? A")+2) // inside the "A" reference
+		if h == nil {
+			t.Fatal("no hover on the then-branch reference")
+		}
+		if !strings.Contains(h.Contents.Value, "const A") {
+			t.Errorf("hover = %q, want it to describe A", h.Contents.Value)
+		}
+	})
+
+	t.Run("else-branch reference", func(t *testing.T) {
+		h := hover(doc, strings.Index(src, ": B")+2) // inside the "B" reference
+		if h == nil {
+			t.Fatal("no hover on the else-branch reference")
+		}
+		if !strings.Contains(h.Contents.Value, "const B") {
+			t.Errorf("hover = %q, want it to describe B", h.Contents.Value)
+		}
+	})
+}
+
 func TestAssertHover(t *testing.T) {
 	src := "const Max = 100\nconst Min = 0\nassert Max > Min\n"
 	doc := testView(src)
