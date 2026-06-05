@@ -1,3 +1,6 @@
+use { bool } from "./bool.belt"
+use { int } from "./int.belt"
+
 /// An ordered sequence of T values, written [a, b, c].
 pub type list<T> = builtin<T> impl {
   /// The number of elements.

@@ -1,3 +1,5 @@
+use { bool } from "./bool.belt"
+
 /// The signed integer types as one union: a generic constraint for any signed integer.
 pub type snumeric = int | int8 | int16 | int32 | int64
 

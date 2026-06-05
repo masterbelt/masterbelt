@@ -1,6 +1,5 @@
 pub use * from "./bool.belt"
 pub use * from "./datetime.belt"
-pub use * from "./duration.belt"
 pub use * from "./error.belt"
 pub use * from "./int.belt"
 pub use * from "./list.belt"

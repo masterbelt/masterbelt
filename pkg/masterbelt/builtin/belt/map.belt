@@ -1,3 +1,6 @@
+use { bool } from "./bool.belt"
+use { int } from "./int.belt"
+
 /// A key-value mapping, written [k: v, ...].
 pub type map<K, V> = builtin<K, V> impl {
   /// The number of entries.

@@ -1,3 +1,5 @@
+use { bool } from "./bool.belt"
+
 /// The unsigned integer types as one union: a generic constraint for any unsigned integer.
 pub type unumeric = uint | uint8 | uint16 | uint32 | uint64
 

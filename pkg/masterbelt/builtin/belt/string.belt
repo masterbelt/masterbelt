@@ -1,3 +1,5 @@
+use { bool } from "./bool.belt"
+
 /// An immutable UTF-8 string, written "...".
 pub type string = builtin impl {
   /// The == operator.
