@@ -188,6 +188,37 @@ func dumpStmtAt(b *strings.Builder, s Stmt, indent string) {
 				dumpStmtAt(b, bs, indent+"    ")
 			}
 		}
+	case *If:
+		dumpIfAt(b, s, indent)
+	}
+}
+
+// dumpIfAt renders a resolved if and its else-if chain at the given indent. The
+// then body and each else branch nest one level deeper, and the chain renders
+// flat as a ladder ("if cond", "else if cond", "else"), mirroring the control
+// structure the analyzer resolved.
+func dumpIfAt(b *strings.Builder, s *If, indent string) {
+	fmt.Fprintf(b, "%sif %s\n", indent, dumpValue(s.Cond))
+	for _, bs := range s.Then {
+		dumpStmtAt(b, bs, indent+"    ")
+	}
+	for cur := s; ; {
+		switch {
+		case cur.ElseIf != nil:
+			cur = cur.ElseIf
+			fmt.Fprintf(b, "%selse if %s\n", indent, dumpValue(cur.Cond))
+			for _, bs := range cur.Then {
+				dumpStmtAt(b, bs, indent+"    ")
+			}
+		case cur.Else != nil:
+			fmt.Fprintf(b, "%selse\n", indent)
+			for _, bs := range cur.Else {
+				dumpStmtAt(b, bs, indent+"    ")
+			}
+			return
+		default:
+			return
+		}
 	}
 }
 
@@ -219,6 +250,33 @@ func dumpStmtInline(s Stmt) string {
 				body[i] = dumpStmtInline(bs)
 			}
 			parts = append(parts, "(else "+strings.Join(body, " ")+")")
+		}
+		return "(" + strings.Join(parts, " ") + ")"
+	case *If:
+		parts := []string{"if " + dumpValue(s.Cond)}
+		then := make([]string, len(s.Then))
+		for i, bs := range s.Then {
+			then[i] = dumpStmtInline(bs)
+		}
+		parts = append(parts, "(then "+strings.Join(then, " ")+")")
+		for cur := s; ; {
+			if cur.ElseIf != nil {
+				cur = cur.ElseIf
+				inner := make([]string, len(cur.Then))
+				for i, bs := range cur.Then {
+					inner[i] = dumpStmtInline(bs)
+				}
+				parts = append(parts, "(elseif "+dumpValue(cur.Cond)+" "+strings.Join(inner, " ")+")")
+				continue
+			}
+			if cur.Else != nil {
+				body := make([]string, len(cur.Else))
+				for i, bs := range cur.Else {
+					body[i] = dumpStmtInline(bs)
+				}
+				parts = append(parts, "(else "+strings.Join(body, " ")+")")
+			}
+			break
 		}
 		return "(" + strings.Join(parts, " ") + ")"
 	default:

@@ -67,6 +67,7 @@ masterbelt.semantic.non_exhaustive_switch,{typ} の switch が網羅的ではあ
 masterbelt.semantic.duplicate_switch_arm,switch の arm が重複しています: {value}
 masterbelt.semantic.arm_value_type_mismatch,{actual} を {expected} の switch 値として使用できません
 masterbelt.semantic.unreachable_arm,到達不能な arm です。先行する arm かワイルドカードがすべての値に一致します
+masterbelt.semantic.condition_not_bool,if の条件は bool でなければなりません({typ})
 project.config.missing,masterbelt.toml がこのディレクトリにも親ディレクトリにも見つかりません
 project.config.invalid,不正な masterbelt.toml: {detail}
 project.config.missing_entry,masterbelt.toml に entry が指定されていません

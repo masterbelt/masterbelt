@@ -67,6 +67,7 @@ masterbelt.semantic.non_exhaustive_switch,error,typ:string missing:string
 masterbelt.semantic.duplicate_switch_arm,error,value:string
 masterbelt.semantic.arm_value_type_mismatch,error,actual:string expected:string
 masterbelt.semantic.unreachable_arm,error,
+masterbelt.semantic.condition_not_bool,error,typ:string
 project.config.missing,error,
 project.config.invalid,error,detail:string
 project.config.missing_entry,error,

@@ -288,7 +288,7 @@ type AssocConst struct {
 }
 
 // Stmt is a statement in a method body. It is a sealed interface; the only
-// implementations are Return, ExprStmt, and Switch.
+// implementations are Return, ExprStmt, Switch, and If.
 type Stmt interface {
 	stmt()
 }
@@ -325,6 +325,19 @@ type SwitchArm struct {
 	Values []Value
 	Body   []Stmt
 }
+
+// If is a resolved boolean control statement: it runs Then when Cond holds,
+// otherwise its else branch. ElseIf (an else-if) and Else (a plain else body)
+// are mutually exclusive, and both nil means the if had no else. An if yields no
+// value — each branch drives control flow by returning.
+type If struct {
+	Cond   Value
+	Then   []Stmt
+	ElseIf *If    // the chained "else if", or nil
+	Else   []Stmt // the "else" body, or nil when there is no plain else
+}
+
+func (*If) stmt() {}
 
 // Param is one method parameter: a name and its type.
 type Param struct {

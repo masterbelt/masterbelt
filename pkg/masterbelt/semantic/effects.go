@@ -102,8 +102,22 @@ func collectBodyEffectUses(body []ast.Stmt, bs infer.BodyScope, use func(effect 
 				}
 				collectBodyEffectUses(arm.Body, bs, use)
 			}
+		case *ast.IfStmt:
+			collectIfEffectUses(stmt, bs, use)
 		}
 	}
+}
+
+// collectIfEffectUses descends through an if's condition, then body, else-if
+// chain, and else body, so an effectful call anywhere in the control flow counts
+// toward the enclosing declaration's used effects.
+func collectIfEffectUses(s *ast.IfStmt, bs infer.BodyScope, use func(effect string, node ast.Node)) {
+	collectEffectUses(s.Cond, bs, use)
+	collectBodyEffectUses(s.Then, bs, use)
+	if s.ElseIf != nil {
+		collectIfEffectUses(s.ElseIf, bs, use)
+	}
+	collectBodyEffectUses(s.Else, bs, use)
 }
 
 // collectEffectUses walks an expression collecting the effects it uses: an

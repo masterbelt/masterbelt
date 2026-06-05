@@ -590,10 +590,12 @@ func apply(ctx evalCtx, fn *ir.Constant, args []*ir.Constant) *ir.Constant {
 
 // evalBody runs a statement body to its returned value, or nil when no path
 // reaches a return. It executes a switch by folding the scrutinee and running
-// the first arm whose value patterns it equals (the wildcard last); a bare
-// expression statement has no value and is skipped. It is the compile-time
-// execution model the const folder shares with a function application, kept in
-// step with the runtime's first-match dispatch.
+// the first arm whose value patterns it equals (the wildcard last), and an if by
+// folding the condition and running the taken branch — a guard whose condition
+// is false falls through to the next statement. A bare expression statement has
+// no value and is skipped. It is the compile-time execution model the const
+// folder shares with a function application, kept in step with the runtime's
+// first-match dispatch.
 func evalBody(body []ast.Stmt, ctx evalCtx) *ir.Constant {
 	for _, stmt := range body {
 		switch stmt := stmt.(type) {
@@ -611,9 +613,84 @@ func evalBody(body []ast.Stmt, ctx evalCtx) *ir.Constant {
 			// nothing after a guaranteed-return switch is reachable, and a
 			// partial switch cannot fold.
 			return nil
+		case *ast.IfStmt:
+			v, out := evalIf(stmt, ctx)
+			if out == ifFellThrough {
+				continue // the taken branch (or no branch) ran without returning
+			}
+			// ifReturned yields the branch's value; ifUnknown (an unfoldable
+			// condition or branch) leaves v nil, which stops folding here.
+			return v
 		}
 	}
 	return nil
+}
+
+// ifOutcome is the result of folding an if statement at compile time.
+type ifOutcome int
+
+const (
+	ifUnknown     ifOutcome = iota // the condition or the taken branch could not be folded
+	ifReturned                     // the taken branch returned a value
+	ifFellThrough                  // no branch returned; execution continues after the if
+)
+
+// evalIf folds an if statement: it evaluates the condition, runs the matching
+// branch (the then body when the condition is true, otherwise the else-if chain
+// or the else body), and reports whether that branch returned a value, fell
+// through, or could not be determined. A branch with no return falls through to
+// the statement after the if, exactly as it does at runtime.
+func evalIf(s *ast.IfStmt, ctx evalCtx) (*ir.Constant, ifOutcome) {
+	cond := evalExpr(s.Cond, ctx)
+	if cond == nil || cond.Kind != ir.ConstBool {
+		return nil, ifUnknown // an unfoldable (or non-bool) condition: cannot dispatch
+	}
+	if cond.Bool {
+		return branchOutcome(s.Then, ctx)
+	}
+	switch {
+	case s.ElseIf != nil:
+		return evalIf(s.ElseIf, ctx)
+	case s.Else != nil:
+		return branchOutcome(s.Else, ctx)
+	default:
+		return nil, ifFellThrough // a false guard with no else: continue past it
+	}
+}
+
+// branchOutcome runs a taken branch body and classifies how it ended: a return
+// of a folded value (ifReturned), a fall-through to after the if (ifFellThrough
+// when no statement returned), or an unfoldable return (ifUnknown). It mirrors
+// evalBody but distinguishes "ran to the end without returning" from "could not
+// fold", which the if needs to decide whether to continue the outer body.
+func branchOutcome(body []ast.Stmt, ctx evalCtx) (*ir.Constant, ifOutcome) {
+	for _, stmt := range body {
+		switch stmt := stmt.(type) {
+		case *ast.ReturnStmt:
+			if stmt.Value == nil {
+				return nil, ifUnknown
+			}
+			if v := evalExpr(stmt.Value, ctx); v != nil {
+				return v, ifReturned
+			}
+			return nil, ifUnknown
+		case *ast.SwitchStmt:
+			if v := evalSwitch(stmt, ctx); v != nil {
+				return v, ifReturned
+			}
+			return nil, ifUnknown
+		case *ast.IfStmt:
+			v, out := evalIf(stmt, ctx)
+			if out == ifFellThrough {
+				continue
+			}
+			if out == ifReturned {
+				return v, ifReturned
+			}
+			return nil, ifUnknown
+		}
+	}
+	return nil, ifFellThrough // the branch ran to its end without returning
 }
 
 // evalSwitch selects and runs the matching arm of a switch: it folds the

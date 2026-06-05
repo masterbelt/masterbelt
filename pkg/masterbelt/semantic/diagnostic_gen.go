@@ -17,6 +17,7 @@ const (
 	CodeAssertionFailed        diagnostic.Code = "masterbelt.semantic.assertion_failed"
 	CodeAssertionNotBool       diagnostic.Code = "masterbelt.semantic.assertion_not_bool"
 	CodeAssertionNotConstant   diagnostic.Code = "masterbelt.semantic.assertion_not_constant"
+	CodeConditionNotBool       diagnostic.Code = "masterbelt.semantic.condition_not_bool"
 	CodeConstantOverflow       diagnostic.Code = "masterbelt.semantic.constant_overflow"
 	CodeCyclicModule           diagnostic.Code = "masterbelt.semantic.cyclic_module"
 	CodeCyclicReference        diagnostic.Code = "masterbelt.semantic.cyclic_reference"
@@ -171,6 +172,20 @@ func newAssertionNotConstantDiagnostic(offset int, width int) diagnostic.Diagnos
 		Code:     CodeAssertionNotConstant,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeAssertionNotConstant, nil),
 		Fields:   nil,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newConditionNotBoolDiagnostic(offset int, width int, typ string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"typ": diagnostic.Str(typ),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeConditionNotBool,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeConditionNotBool, fields),
+		Fields:   fields,
 		Offset:   offset,
 		Width:    width,
 	}

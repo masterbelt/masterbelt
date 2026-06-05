@@ -123,9 +123,25 @@ func Body(body []ast.Stmt, b Binder) []ir.Stmt {
 			stmts = append(stmts, &ir.ExprStmt{Value: Value(s.X, b)})
 		case *ast.SwitchStmt:
 			stmts = append(stmts, switchStmt(s, b))
+		case *ast.IfStmt:
+			stmts = append(stmts, ifStmt(s, b))
 		}
 	}
 	return stmts
+}
+
+// ifStmt lowers an if statement: its condition, its then body, and its else
+// branch — an else-if chain into a nested ir.If, a plain else into the Else
+// body. An if yields no value, so only its condition and branch bodies lower.
+func ifStmt(s *ast.IfStmt, b Binder) *ir.If {
+	out := &ir.If{Cond: Value(s.Cond, b), Then: Body(s.Then, b)}
+	if s.ElseIf != nil {
+		out.ElseIf = ifStmt(s.ElseIf, b)
+	}
+	if s.Else != nil {
+		out.Else = Body(s.Else, b)
+	}
+	return out
 }
 
 // switchStmt lowers a switch statement: its scrutinee, each arm's value
