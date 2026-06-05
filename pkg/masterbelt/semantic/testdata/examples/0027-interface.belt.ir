@@ -1,5 +1,5 @@
 Module
-  Const "interface" pub
+  Const "" pub
     doc "A behaviour over a keyed collection: implement the required fold and the"
     doc "provided methods (count, map, filter, ...) come for free, defined on top of"
     doc "it. iterability is foldable."

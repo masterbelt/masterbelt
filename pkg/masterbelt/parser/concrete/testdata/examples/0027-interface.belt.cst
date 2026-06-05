@@ -19,9 +19,9 @@ File
     DocComment "/// it. iterability is foldable."
     Newline "\n"
     Pub "pub"
-    Whitespace " "
-    Ident "interface"
   Error
+    Whitespace " "
+    Interface "interface"
     Whitespace " "
     Ident "foldable"
     Lt "<"
@@ -384,8 +384,9 @@ File
   EOF ""
 # diagnostics
 error[masterbelt.parser.concrete.expected_const] 10:1 expected 'const'
-error[masterbelt.parser.concrete.expected_assign] 10:5 expected '='
-error[masterbelt.parser.concrete.unexpected_token] 10:15 unexpected token: Ident
+error[masterbelt.parser.concrete.expected_identifier] 10:1 expected identifier
+error[masterbelt.parser.concrete.expected_assign] 10:1 expected '='
+error[masterbelt.parser.concrete.unexpected_token] 10:5 unexpected token: Interface
 error[masterbelt.parser.concrete.expected_const] 16:3 expected 'const'
 error[masterbelt.parser.concrete.expected_assign] 16:7 expected '='
 error[masterbelt.parser.concrete.unexpected_token] 16:12 unexpected token: LParen

@@ -4,7 +4,7 @@ File
     doc "provided methods (count, map, filter, ...) come for free, defined on top of"
     doc "it. iterability is foldable."
     pub
-    name "interface"
+    name ""
   ConstDecl
     doc "Provided: the number of elements, folded from the primitive."
     pub

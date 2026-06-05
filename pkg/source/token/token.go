@@ -30,31 +30,32 @@ const (
 	DurationLit // duration literal, e.g. 3w4d5h6m7s8ms
 
 	// Keywords.
-	Const   // const
-	Pub     // pub
-	True    // true
-	False   // false
-	Type    // type
-	Enum    // enum
-	Impl    // impl
-	Fn      // fn
-	Return  // return
-	Self    // self
-	Null    // null
-	Extern  // extern
-	Builtin // builtin
-	Use     // use
-	From    // from
-	Assert  // assert
-	Where   // where
-	Io      // io (effect: touches the world)
-	Async   // async (effect: has suspension points)
-	Nondet  // nondet (effect: does not reproduce)
-	Await   // await (consumes async at a call site)
-	Switch  // switch (value-dispatch control statement)
-	If      // if (boolean control statement)
-	Else    // else (the alternative branch of an if)
-	Let     // let (mutable block-local binding)
+	Const     // const
+	Pub       // pub
+	True      // true
+	False     // false
+	Type      // type
+	Enum      // enum
+	Interface // interface
+	Impl      // impl
+	Fn        // fn
+	Return    // return
+	Self      // self
+	Null      // null
+	Extern    // extern
+	Builtin   // builtin
+	Use       // use
+	From      // from
+	Assert    // assert
+	Where     // where
+	Io        // io (effect: touches the world)
+	Async     // async (effect: has suspension points)
+	Nondet    // nondet (effect: does not reproduce)
+	Await     // await (consumes async at a call site)
+	Switch    // switch (value-dispatch control statement)
+	If        // if (boolean control statement)
+	Else      // else (the alternative branch of an if)
+	Let       // let (mutable block-local binding)
 
 	// Operators and punctuation.
 	Colon    // :
@@ -109,6 +110,7 @@ var kindNames = [...]string{
 	False:        "False",
 	Type:         "Type",
 	Enum:         "Enum",
+	Interface:    "Interface",
 	Impl:         "Impl",
 	Fn:           "Fn",
 	Return:       "Return",
@@ -211,31 +213,32 @@ func (k Kind) Symbol() string {
 
 // keywords maps reserved identifiers to their keyword Kind.
 var keywords = map[string]Kind{
-	"const":   Const,
-	"pub":     Pub,
-	"true":    True,
-	"false":   False,
-	"type":    Type,
-	"enum":    Enum,
-	"impl":    Impl,
-	"fn":      Fn,
-	"return":  Return,
-	"self":    Self,
-	"null":    Null,
-	"extern":  Extern,
-	"builtin": Builtin,
-	"use":     Use,
-	"from":    From,
-	"assert":  Assert,
-	"where":   Where,
-	"io":      Io,
-	"async":   Async,
-	"nondet":  Nondet,
-	"await":   Await,
-	"switch":  Switch,
-	"if":      If,
-	"else":    Else,
-	"let":     Let,
+	"const":     Const,
+	"pub":       Pub,
+	"true":      True,
+	"false":     False,
+	"type":      Type,
+	"enum":      Enum,
+	"interface": Interface,
+	"impl":      Impl,
+	"fn":        Fn,
+	"return":    Return,
+	"self":      Self,
+	"null":      Null,
+	"extern":    Extern,
+	"builtin":   Builtin,
+	"use":       Use,
+	"from":      From,
+	"assert":    Assert,
+	"where":     Where,
+	"io":        Io,
+	"async":     Async,
+	"nondet":    Nondet,
+	"await":     Await,
+	"switch":    Switch,
+	"if":        If,
+	"else":      Else,
+	"let":       Let,
 }
 
 // Effect reports whether the kind is an effect keyword — the declarations a
