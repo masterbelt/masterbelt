@@ -289,6 +289,77 @@ func (p *parser) parseAssertDecl(lead []cst.Green) *cst.Node {
 	return cst.NewNode(cst.AssertDecl, children)
 }
 
+// --- top-level functions ------------------------------------------------------
+
+// parseFuncDecl parses a top-level function declaration, prepending the
+// already-collected leading trivia:
+//
+//	[pub] fn Ident ParamList ":" TypeExpr ( Block | "->" Expr )
+//
+// A function is a method without a receiver: the same header (the result type
+// is required at the top level), with the function literal's two body forms —
+// a statement block, or "->" followed by a single expression (an implicit
+// return). An arrow followed by "{" is rejected with a pointer to drop the
+// arrow, exactly as in a function literal. As elsewhere every expected element
+// is optional in the parse: a missing one records a diagnostic and is simply
+// absent from the tree. The cursor sits on pub or fn.
+func (p *parser) parseFuncDecl(lead []cst.Green) *cst.Node {
+	children := lead
+	if p.kind() == token.Pub {
+		children = append(children, p.bump())
+	}
+	p.skipTrivia(&children)
+	children = append(children, p.bump()) // "fn" (guaranteed by the dispatcher)
+	if p.peekSignificant() == token.Ident {
+		p.skipTrivia(&children)
+		children = append(children, p.bump()) // the declared name
+	} else {
+		p.report(newExpectedIdentifierDiagnostic(p.lastStart, 0))
+	}
+	if p.peekSignificant() == token.LParen {
+		p.skipTrivia(&children)
+		children = append(children, p.parseParamList(true))
+	} else {
+		p.report(newExpectedParamListDiagnostic(p.cur().Offset, p.cur().Width))
+	}
+	if p.peekSignificant() == token.Colon {
+		p.skipTrivia(&children)
+		children = append(children, p.bump()) // ":"
+		if startsType(p.peekSignificant()) {
+			p.skipTrivia(&children)
+			children = append(children, p.parseTypeExpr())
+		} else {
+			p.report(newExpectedTypeDiagnostic(p.lastStart, 0))
+		}
+	} else {
+		p.report(newExpectedTypeDiagnostic(p.lastStart, 0))
+	}
+	switch p.peekSignificant() {
+	case token.Arrow:
+		p.skipTrivia(&children)
+		children = append(children, p.bump()) // "->"
+		switch {
+		case p.peekSignificant() == token.LBrace:
+			// "-> { ... }": an arrow body must be an expression. Report it,
+			// then parse the block anyway so recovery stays local.
+			p.skipTrivia(&children)
+			p.report(newArrowBlockBodyDiagnostic(p.cur().Offset, p.cur().Width))
+			children = append(children, p.parseBlock())
+		case startsExpr(p.peekSignificant()):
+			p.skipTrivia(&children)
+			children = append(children, p.parseExpr(precLowest))
+		default:
+			p.report(newExpectedExpressionDiagnostic(p.lastStart, 0))
+		}
+	case token.LBrace:
+		p.skipTrivia(&children)
+		children = append(children, p.parseBlock())
+	default:
+		p.report(newExpectedFuncBodyDiagnostic(p.cur().Offset, p.cur().Width))
+	}
+	return cst.NewNode(cst.FuncDecl, children)
+}
+
 // --- implementations and method bodies --------------------------------------
 
 // parseImplBlock parses an implementation block: impl "{" MethodDecl* "}". The

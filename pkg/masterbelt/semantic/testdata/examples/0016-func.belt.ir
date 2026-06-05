@@ -1,13 +1,4 @@
 Module
-  Const "" pub
-    type invalid
-    value <none>
-  Const "" pub
-    type invalid
-    value <none>
-  Const "" pub
-    type invalid
-    value <none>
   Const "A"
     type invalid
     value <none>
@@ -21,9 +12,6 @@ Module
     type invalid
     value [IntLiteral "1", IntLiteral "2", IntLiteral "3"].map((fn(x) (return <none>)))
   Const "E"
-    type invalid
-    value <none>
-  Const "" pub
     type invalid
     value <none>
   Const "O"

@@ -1,14 +1,5 @@
 File
   ConstDecl
-    pub
-    name ""
-  ConstDecl
-    pub
-    name ""
-  ConstDecl
-    pub
-    name ""
-  ConstDecl
     name "A"
     value (call Identifier "area" IntLit "3" IntLit "4")
   ConstDecl
@@ -23,9 +14,6 @@ File
   ConstDecl
     name "E"
     value (call Identifier "greet" StringLit "belt")
-  ConstDecl
-    pub
-    name ""
   ConstDecl
     name "O"
     value (call Identifier "origin")
