@@ -569,3 +569,48 @@ func TestErrorConversionHover(t *testing.T) {
 		}
 	})
 }
+
+func TestEffectfulFunctionHover(t *testing.T) {
+	src := "extern fn io async fetch(url: string): string\n" +
+		"pub fn io async page(url: string): string {\n" +
+		"  return await fetch(url)\n" +
+		"}\n"
+	doc := testView(src)
+
+	t.Run("extern root shows its effects", func(t *testing.T) {
+		h := hover(doc, strings.Index(src, "fetch")+2)
+		if h == nil {
+			t.Fatal("no hover on the extern declaration name")
+		}
+		if !strings.Contains(h.Contents.Value, "extern fn io async fetch(url: string): string") {
+			t.Errorf("hover = %q, want the effectful extern signature", h.Contents.Value)
+		}
+	})
+
+	t.Run("callee shows the declared effects", func(t *testing.T) {
+		h := hover(doc, strings.Index(src, "await fetch")+8)
+		if h == nil {
+			t.Fatal("no hover on the callee")
+		}
+		if !strings.Contains(h.Contents.Value, "extern fn io async fetch") {
+			t.Errorf("hover = %q, want the effectful signature", h.Contents.Value)
+		}
+	})
+}
+
+func TestEffectfulMethodHover(t *testing.T) {
+	src := "extern fn io async fetch(url: string): string\n" +
+		"pub type Client = { base: string } impl {\n" +
+		"  pub fn io async get(path: string): string {\n" +
+		"    return await fetch(self.base + path)\n" +
+		"  }\n" +
+		"}\n"
+	doc := testView(src)
+	h := hover(doc, strings.Index(src, "get(path")+1)
+	if h == nil {
+		t.Fatal("no hover on the method name")
+	}
+	if !strings.Contains(h.Contents.Value, "io async get(path: string): string") {
+		t.Errorf("hover = %q, want the effectful method signature", h.Contents.Value)
+	}
+}

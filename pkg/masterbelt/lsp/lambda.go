@@ -125,8 +125,9 @@ func forEachFuncLit(doc view, fn func(*ast.FuncLit)) {
 }
 
 // forEachExpr visits every expression of a file — constant initializers,
-// assert conditions, and method bodies, descending into function-literal
-// bodies — an enclosing expression before the ones nested in it.
+// assert conditions, and method and function bodies, descending into
+// function-literal bodies — an enclosing expression before the ones nested
+// in it.
 func forEachExpr(file *ast.File, fn func(ast.Expr)) {
 	var walkExpr func(e ast.Expr)
 	walkStmts := func(stmts []ast.Stmt) {
@@ -149,6 +150,8 @@ func forEachExpr(file *ast.File, fn func(ast.Expr)) {
 		switch e := e.(type) {
 		case *ast.FuncLit:
 			walkStmts(e.Body)
+		case *ast.AwaitExpr:
+			walkExpr(e.Value)
 		case *ast.CallExpr:
 			walkExpr(e.Callee)
 			for _, a := range e.Arguments {
@@ -188,6 +191,9 @@ func forEachExpr(file *ast.File, fn func(ast.Expr)) {
 		for _, m := range td.Methods {
 			walkStmts(m.Body)
 		}
+	}
+	for _, fd := range file.Funcs {
+		walkStmts(fd.Body)
 	}
 }
 

@@ -363,6 +363,9 @@ func methodSignatureSubst(m *ir.Method, subst map[string]ir.Type) string {
 	if m.Extern {
 		b.WriteString("extern ")
 	}
+	for _, eff := range m.Effects {
+		b.WriteString(eff + " ")
+	}
 	b.WriteString(m.Name)
 	b.WriteString("(")
 	for i, p := range m.Params {

@@ -292,3 +292,39 @@ func TestMemberCompletionOnError(t *testing.T) {
 		t.Errorf("member completion on an error value missing message, got %v", items)
 	}
 }
+
+func TestCompletionEffectfulContext(t *testing.T) {
+	src := "extern fn io async fetch(url: string): string\n" +
+		"fn pure(): int -> 1\n" +
+		"pub fn io async page(url: string): string {\n" +
+		"  return await fetch(url)\n" +
+		"}\n" +
+		"const A = pure()\n"
+	doc := testView(src)
+
+	// Inside a function body, effectful functions and await are offered.
+	offset := strings.Index(src, "await fetch") + 2
+	got := byLabel(completion(doc, offset).Items)
+	for _, want := range []string{"fetch", "pure", "await"} {
+		if _, ok := got[want]; !ok {
+			t.Errorf("body completion missing %q", want)
+		}
+	}
+	if d := got["fetch"].Detail; !strings.Contains(d, "extern fn io async fetch") {
+		t.Errorf("fetch detail = %q, want the effectful signature", d)
+	}
+
+	// A constant initializer is a pure position: the effectful function and
+	// await are suppressed, the pure one stays.
+	offset = strings.Index(src, "pure()\n") + 2
+	got = byLabel(completion(doc, offset).Items)
+	if _, ok := got["fetch"]; ok {
+		t.Errorf("pure position offers the effectful fetch")
+	}
+	if _, ok := got["await"]; ok {
+		t.Errorf("pure position offers await")
+	}
+	if _, ok := got["pure"]; !ok {
+		t.Errorf("pure position missing the pure function")
+	}
+}

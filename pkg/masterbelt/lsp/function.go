@@ -17,7 +17,7 @@ import (
 // functionItems is one completion item per declared function, labelled with
 // the name, detailed with the signature, documented with the doc comment, and
 // inserted as a call snippet with a tab stop per argument.
-func functionItems(doc view) []protocol.CompletionItem {
+func functionItems(doc view, effectful bool) []protocol.CompletionItem {
 	kind := protocol.CompletionItemKindFunction
 	snippet := protocol.InsertTextFormatSnippet
 	var items []protocol.CompletionItem
@@ -27,6 +27,9 @@ func functionItems(doc view) []protocol.CompletionItem {
 			continue
 		}
 		seen[f] = true
+		if !effectful && len(f.Effects) > 0 {
+			continue // a pure position cannot call an effectful function
+		}
 
 		item := protocol.CompletionItem{Label: f.Name, Kind: &kind, Detail: funcSignature(f)}
 		if len(f.Doc) > 0 {
@@ -61,7 +64,13 @@ func funcSignature(f *ir.Function) string {
 	if f.Public {
 		b.WriteString("pub ")
 	}
+	if f.Extern {
+		b.WriteString("extern ")
+	}
 	b.WriteString("fn ")
+	for _, eff := range f.Effects {
+		b.WriteString(eff + " ")
+	}
 	b.WriteString(f.Name)
 	b.WriteString("(")
 	for i, p := range f.Params {

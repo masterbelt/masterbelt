@@ -333,3 +333,43 @@ func TestSemanticTokensErrorConversion(t *testing.T) {
 		}
 	}
 }
+
+func TestSemanticTokensEffects(t *testing.T) {
+	// The effect keywords and await colour as keywords, uniformly with the
+	// cold-start grammar.
+	src := "extern fn io async fetch(url: string): string\n" +
+		"pub fn io async page(url: string): string {\n" +
+		"  return await fetch(url)\n" +
+		"}\n"
+	doc := abstract.NewDocument([]byte(src))
+	got := decode(semanticTokens(doc).Data)
+
+	find := func(line, char int) (decodedToken, bool) {
+		for _, tok := range got {
+			if tok.line == line && tok.char == char {
+				return tok, true
+			}
+		}
+		return decodedToken{}, false
+	}
+	cases := []struct {
+		name       string
+		line, char int
+	}{
+		{"extern io", 0, 10},
+		{"extern async", 0, 13},
+		{"fn io", 1, 7},
+		{"fn async", 1, 10},
+		{"await", 2, 9},
+	}
+	for _, tc := range cases {
+		tok, ok := find(tc.line, tc.char)
+		if !ok {
+			t.Errorf("%s: no token at %d:%d (got %+v)", tc.name, tc.line, tc.char, got)
+			continue
+		}
+		if tok.tokenType != stKeyword {
+			t.Errorf("%s = %+v, want keyword", tc.name, tok)
+		}
+	}
+}

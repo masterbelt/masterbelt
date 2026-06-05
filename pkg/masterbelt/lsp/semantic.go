@@ -182,7 +182,8 @@ func classifyToken(kind token.Kind, parent cst.Kind, calleeMember bool) (tokenTy
 	switch kind {
 	case token.Const, token.Pub, token.Assert, token.Where, token.Type, token.Impl,
 		token.Fn, token.Return, token.Self, token.Null, token.Extern, token.Builtin,
-		token.Use, token.From, token.True, token.False:
+		token.Use, token.From, token.True, token.False,
+		token.Io, token.Async, token.Nondet, token.Await:
 		// Every keyword, uniformly — the cold-start grammar colours the same
 		// set keyword.control, so the two layers cannot drift apart per word.
 		return stKeyword, 0, true

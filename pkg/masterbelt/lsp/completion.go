@@ -43,11 +43,34 @@ func completion(doc view, offset int) *protocol.CompletionList {
 	if typeContextAt(root, offset) {
 		return &protocol.CompletionList{Items: typeItems(doc)}
 	}
+	effectful := effectfulContextAt(root, offset)
 	items := constantItems(doc)
-	items = append(items, functionItems(doc)...)
+	items = append(items, functionItems(doc, effectful)...)
 	items = append(items, constructorItems(doc)...)
-	items = append(items, valueKeywordItems()...)
+	items = append(items, valueKeywordItems(effectful)...)
 	return &protocol.CompletionList{Items: items}
+}
+
+// effectfulContextAt reports whether offset sits inside a function or method
+// declaration's body — the positions whose declared effects admit effectful
+// calls. Everywhere else (a constant initializer, an assert condition, a
+// where clause) is evaluated at compile time and must be pure, so effectful
+// completions are suppressed there.
+func effectfulContextAt(root cst.Tree, offset int) bool {
+	t := root
+	for {
+		if node, ok := t.Node(); ok {
+			switch node.Kind() {
+			case cst.FuncDecl, cst.MethodDecl:
+				return true
+			}
+		}
+		child, ok := childContaining(t, offset)
+		if !ok {
+			return false
+		}
+		t = child
+	}
 }
 
 // memberItems returns the candidates of a member access at offset — the
@@ -387,11 +410,17 @@ func constructorItems(doc view) []protocol.CompletionItem {
 
 // valueKeywordItems is the keywords that may begin a value: the literals
 // true/false/null, and fn, which starts a function literal (the value form of a
-// function type, e.g. the argument to list.map).
-func valueKeywordItems() []protocol.CompletionItem {
+// function type, e.g. the argument to list.map). In an effectful context — a
+// function or method body — await is offered too; a pure position cannot
+// suspend, so it is suppressed there.
+func valueKeywordItems(effectful bool) []protocol.CompletionItem {
 	kind := protocol.CompletionItemKindKeyword
-	items := make([]protocol.CompletionItem, 0, 4)
-	for _, w := range []string{"false", "fn", "null", "true"} {
+	words := []string{"false", "fn", "null", "true"}
+	if effectful {
+		words = append(words, "await")
+	}
+	items := make([]protocol.CompletionItem, 0, len(words))
+	for _, w := range words {
 		items = append(items, protocol.CompletionItem{Label: w, Kind: &kind})
 	}
 	return items
