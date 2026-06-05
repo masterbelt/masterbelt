@@ -306,6 +306,43 @@ func recordOf(t ir.Type) *ir.Record {
 	return nil
 }
 
+// enumMemberType types a member access whose receiver names an enum: the enum's
+// Named type when the receiver resolves to an enum definition in universe that
+// declares the member, ir.Invalid otherwise (an unknown enum, a non-enum
+// receiver, or an unknown member). A member access that is not an enum access
+// falls through to the scope's other readings (a namespace import, a record
+// field).
+func enumMemberType(universe map[string]*ir.TypeDef, m *ast.MemberExpr) ir.Type {
+	recv, ok := m.Receiver.(*ast.Identifier)
+	if !ok {
+		return ir.Invalid
+	}
+	def, ok := universe[recv.Name]
+	if !ok || def.Enum == nil {
+		return ir.Invalid
+	}
+	for _, member := range def.Enum.Members {
+		if member.Name == m.Member.Name {
+			return &ir.Named{Def: def}
+		}
+	}
+	return ir.Invalid
+}
+
+// enumMemberIndex returns the index of the named member of an enum definition,
+// or -1 when def is not an enum or has no such member.
+func enumMemberIndex(def *ir.TypeDef, name string) int {
+	if def == nil || def.Enum == nil {
+		return -1
+	}
+	for i, m := range def.Enum.Members {
+		if m.Name == name {
+			return i
+		}
+	}
+	return -1
+}
+
 // hasTypeVar reports whether t still contains a type variable — i.e. the
 // checking context has not pinned every generic part to a concrete type.
 func hasTypeVar(t ir.Type) bool {

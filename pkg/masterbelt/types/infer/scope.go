@@ -85,6 +85,11 @@ func (s constScope) leaf(e ast.Expr) ir.Type {
 		if target := s.env.ResolveMember(e); target != nil {
 			return s.env.TypeOf(target)
 		}
+		// A member access whose receiver names an enum type (Rarity.Common) is
+		// a value of that enum.
+		if t := enumMemberType(s.universe(), e); t != ir.Invalid {
+			return t
+		}
 	}
 	return ir.Invalid
 }
@@ -175,6 +180,16 @@ func (s BodyScope) leaf(e ast.Expr) ir.Type {
 		}
 		return ir.Invalid
 	case *ast.MemberExpr:
+		// A member access whose receiver names an enum type (Element.Fire) is a
+		// value of that enum; a parameter shadowing the type name takes the
+		// record-field reading instead.
+		if recv, ok := e.Receiver.(*ast.Identifier); ok {
+			if _, isParam := s.Params[recv.Name]; !isParam {
+				if t := enumMemberType(s.Universe, e); t != ir.Invalid {
+					return t
+				}
+			}
+		}
 		// A member access used as a value is a record field access.
 		return fieldType(exprType(e.Receiver, s), e.Member.Name)
 	default:

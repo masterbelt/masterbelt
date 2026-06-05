@@ -23,6 +23,7 @@ const (
 	ConstDuration                    // a span of time in milliseconds (Constant.Millis)
 	ConstRecord                      // a record value (Constant.Fields)
 	ConstError                       // an error value carrying its message (Constant.Str)
+	ConstEnum                        // an enum member value (Constant.EnumDef / Constant.EnumIndex)
 )
 
 // Constant is the evaluated value of a constant expression: an arbitrary-
@@ -43,6 +44,13 @@ type Constant struct {
 	// captured from its enclosing scope (the closure environment).
 	Fn       *ast.FuncLit
 	Captured map[string]*Constant
+
+	// valid when Kind == ConstEnum: the enum definition and the index of the
+	// member within it. Name and the base value are read from
+	// EnumDef.Enum.Members[EnumIndex]; the design forbids duplicate values, so
+	// the index uniquely identifies the member.
+	EnumDef   *TypeDef
+	EnumIndex int
 }
 
 // ConstEntry is one entry of a folded collection constant: a Value, and for a
@@ -102,6 +110,36 @@ func FuncConstant(fn *ast.FuncLit, captured map[string]*Constant) *Constant {
 	return &Constant{Kind: ConstFunc, Fn: fn, Captured: captured}
 }
 
+// EnumConstant builds an enum member value from its definition and the member's
+// index within it.
+func EnumConstant(def *TypeDef, index int) *Constant {
+	return &Constant{Kind: ConstEnum, EnumDef: def, EnumIndex: index}
+}
+
+// EnumName returns the name of the member an enum constant denotes, or "" when
+// the constant is not an enum or its index is out of range.
+func (c *Constant) EnumName() string {
+	if c == nil || c.Kind != ConstEnum || c.EnumDef == nil || c.EnumDef.Enum == nil {
+		return ""
+	}
+	if c.EnumIndex < 0 || c.EnumIndex >= len(c.EnumDef.Enum.Members) {
+		return ""
+	}
+	return c.EnumDef.Enum.Members[c.EnumIndex].Name
+}
+
+// EnumValue returns the base-type value of the member an enum constant denotes,
+// or nil when it is unavailable.
+func (c *Constant) EnumValue() *Constant {
+	if c == nil || c.Kind != ConstEnum || c.EnumDef == nil || c.EnumDef.Enum == nil {
+		return nil
+	}
+	if c.EnumIndex < 0 || c.EnumIndex >= len(c.EnumDef.Enum.Members) {
+		return nil
+	}
+	return c.EnumDef.Enum.Members[c.EnumIndex].Value
+}
+
 // DatetimeConstant builds a datetime constant from a UTC instant in epoch
 // milliseconds.
 func DatetimeConstant(millis int64) *Constant {
@@ -151,6 +189,12 @@ func (c *Constant) String() string {
 		return "{ " + strings.Join(parts, ", ") + " }"
 	case ConstError:
 		return "error(" + strconv.Quote(c.Str) + ")"
+	case ConstEnum:
+		name := c.EnumName()
+		if c.EnumDef == nil {
+			return name
+		}
+		return c.EnumDef.Name + "." + name
 	case ConstDatetime:
 		return "D" + time.UnixMilli(c.Millis).UTC().Format("2006-01-02T15:04:05.000Z07:00")
 	case ConstDuration:

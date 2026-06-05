@@ -14,6 +14,7 @@ package eval
 import (
 	"maps"
 	"math/big"
+	"strings"
 
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
@@ -57,10 +58,20 @@ type Env interface {
 // precision int; the range check happens where the constant's concrete type is
 // known.
 func Decl(decl *ast.ConstDecl, env Env) *ir.Constant {
+	return DeclExpecting(decl, nil, env)
+}
+
+// DeclExpecting folds a declaration's value with an expected enum in scope, so
+// a bare member (const Top: Rarity = Legend) resolves through it. expected is
+// the enum definition the annotation named, or nil when there is none; it is
+// pre-resolved by the caller (the value query must not call the type query, so
+// the caller resolves the annotation's type expression directly). A nil value
+// yields nil.
+func DeclExpecting(decl *ast.ConstDecl, expected *ir.TypeDef, env Env) *ir.Constant {
 	if decl.Value == nil {
 		return nil
 	}
-	return Expr(decl.Value, env)
+	return evalExpr(decl.Value, evalCtx{env: env, expected: expected})
 }
 
 // Expr folds an expression to its constant value, or nil when it cannot be
@@ -68,6 +79,24 @@ func Decl(decl *ast.ConstDecl, env Env) *ir.Constant {
 // and reuse its cycle guard.
 func Expr(e ast.Expr, env Env) *ir.Constant {
 	return evalExpr(e, evalCtx{env: env})
+}
+
+// ExprExpecting folds an expression with an expected enum in scope, so a bare
+// member resolves through it. want is the expected type; when it is an enum's
+// named type the bare-member rule applies, otherwise it is ignored. It is how
+// an enum member's initializer (typed against the enum's own base) and a const
+// initializer pass their expectation to the folder.
+func ExprExpecting(e ast.Expr, want ir.Type, env Env) *ir.Constant {
+	return evalExpr(e, evalCtx{env: env, expected: expectedEnum(want)})
+}
+
+// expectedEnum returns the enum definition a type names, or nil when it is not
+// an enum's named type.
+func expectedEnum(want ir.Type) *ir.TypeDef {
+	if n, ok := want.(*ir.Named); ok && n.Def != nil && n.Def.Enum != nil {
+		return n.Def
+	}
+	return nil
 }
 
 // Predicate folds a refinement predicate with the self keyword bound to self.
@@ -87,6 +116,10 @@ type evalCtx struct {
 	locals map[string]*ir.Constant
 	self   *ir.Constant
 	depth  int
+	// expected is the enum a bare member resolves through (the const's
+	// annotation), or nil. It reaches only the immediate expression — it does
+	// not propagate into nested sub-expressions, which set their own context.
+	expected *ir.TypeDef
 }
 
 // maxApplyDepth caps function-application recursion: a recursive fold that has
@@ -94,9 +127,30 @@ type evalCtx struct {
 // verdict an engine-level value cycle gets — instead of overflowing the stack.
 const maxApplyDepth = 256
 
+// enumMember returns the value of the named member of def (an enum), or nil
+// when def is not an enum or has no such member.
+func enumMember(def *ir.TypeDef, name string) *ir.Constant {
+	if def == nil || def.Enum == nil {
+		return nil
+	}
+	for i, m := range def.Enum.Members {
+		if m.Name == name {
+			return ir.EnumConstant(def, i)
+		}
+	}
+	return nil
+}
+
 // evalExpr folds an expression, resolving an identifier first against the
-// context's locals and then against the environment's declarations.
+// context's locals and then against the environment's declarations. The
+// expected-enum context reaches only the immediate expression — every recursive
+// descent drops it, since a bare member is meaningful only as a const's whole
+// value, not nested inside a larger expression.
 func evalExpr(e ast.Expr, ctx evalCtx) *ir.Constant {
+	// The expectation is consumed at this level; sub-expressions evaluate in
+	// their own (expectation-free) context.
+	sub := ctx
+	sub.expected = nil
 	switch e := e.(type) {
 	case *ast.IntLit:
 		n, ok := new(big.Int).SetString(e.Text, 10)
@@ -127,9 +181,9 @@ func evalExpr(e ast.Expr, ctx evalCtx) *ir.Constant {
 		// body is not folded here yet).
 		return ctx.self
 	case *ast.CollectionLit:
-		return collection(e, ctx)
+		return collection(e, sub)
 	case *ast.RecordLit:
-		return record(e, ctx)
+		return record(e, sub)
 	case *ast.FuncLit:
 		// A function literal folds to a closure over the bindings in scope, so it
 		// can be applied later (by list.map) or stored in a constant.
@@ -141,12 +195,27 @@ func evalExpr(e ast.Expr, ctx evalCtx) *ir.Constant {
 		if target := ctx.env.Resolve(e); target != nil {
 			return ctx.env.ValueOf(target)
 		}
+		// A bare member resolves through the expected enum (const Top: Rarity =
+		// Legend): a name that is a member of the annotation's enum folds to that
+		// member's value. A name not in scope and not a member is unevaluable.
+		if v := enumMember(ctx.expected, e.Name); v != nil {
+			return v
+		}
 		return nil
 	case *ast.MemberExpr:
 		// A member access on a namespace import (geo.Origin) folds to the
 		// referenced declaration's value.
 		if target := ctx.env.ResolveMember(e); target != nil {
 			return ctx.env.ValueOf(target)
+		}
+		// A member access whose receiver names an enum type (Rarity.Common)
+		// folds to that member's value. A local binding shadows the type name.
+		if recv, ok := e.Receiver.(*ast.Identifier); ok {
+			if _, isLocal := ctx.locals[recv.Name]; !isLocal {
+				if def := ctx.env.LookupType(recv.Name); def != nil && def.Enum != nil {
+					return enumMember(def, e.Member.Name)
+				}
+			}
 		}
 		return nil
 	case *ast.CallExpr:
@@ -159,10 +228,10 @@ func evalExpr(e ast.Expr, ctx evalCtx) *ir.Constant {
 			if id, isIdent := e.Callee.(*ast.Identifier); isIdent {
 				if _, isLocal := ctx.locals[id.Name]; !isLocal {
 					if def := ctx.env.LookupType(id.Name); def != nil {
-						return convert(def, e.Arguments, ctx)
+						return convert(def, e.Arguments, sub)
 					}
 					if cands := ctx.env.ResolveFunc(id); len(cands) > 0 {
-						return applyFunc(cands, e.Arguments, ctx)
+						return applyFunc(cands, e.Arguments, sub)
 					}
 				}
 			}
@@ -173,16 +242,16 @@ func evalExpr(e ast.Expr, ctx evalCtx) *ir.Constant {
 		if recv, isIdent := member.Receiver.(*ast.Identifier); isIdent {
 			if _, isLocal := ctx.locals[recv.Name]; !isLocal {
 				if cands := ctx.env.ResolveFuncMember(member); len(cands) > 0 {
-					return applyFunc(cands, e.Arguments, ctx)
+					return applyFunc(cands, e.Arguments, sub)
 				}
 			}
 		}
-		recv := evalExpr(member.Receiver, ctx)
+		recv := evalExpr(member.Receiver, sub)
 		args := make([]*ir.Constant, len(e.Arguments))
 		for i, a := range e.Arguments {
-			args[i] = evalExpr(a, ctx)
+			args[i] = evalExpr(a, sub)
 		}
-		return call(ctx, recv, member.Member.Name, args)
+		return call(sub, recv, member.Member.Name, args)
 	default:
 		return nil
 	}
@@ -378,6 +447,9 @@ func call(ctx evalCtx, recv *ir.Constant, name string, args []*ir.Constant) *ir.
 	if recv.Kind == ir.ConstCollection {
 		return collectionMethod(ctx, recv, name, args)
 	}
+	if recv.Kind == ir.ConstEnum {
+		return enumComparison(recv, name, args)
+	}
 	var typeName string
 	switch recv.Kind {
 	case ir.ConstInt:
@@ -400,6 +472,63 @@ func call(ctx evalCtx, recv *ir.Constant, name string, args []*ir.Constant) *ir.
 		return nil
 	}
 	return fn(recv, args)
+}
+
+// enumComparison folds one of an enum value's six comparison methods. Equality
+// (eql/neq) compares member identity — the enum definition and the member index
+// — which the no-duplicate-value rule makes equivalent to comparing the base
+// values. Ordering (lt/lteq/gt/gteq) compares the base values: an integer base
+// numerically, a string base lexicographically. The argument must be the same
+// enum (the type checker has already required it); a mismatch or an unevaluable
+// base value folds to nothing.
+func enumComparison(recv *ir.Constant, name string, args []*ir.Constant) *ir.Constant {
+	if len(args) != 1 {
+		return nil
+	}
+	other := args[0]
+	if other.Kind != ir.ConstEnum || other.EnumDef != recv.EnumDef {
+		return nil
+	}
+	switch name {
+	case "eql":
+		return ir.BoolConstant(recv.EnumIndex == other.EnumIndex)
+	case "neq":
+		return ir.BoolConstant(recv.EnumIndex != other.EnumIndex)
+	}
+	// The ordering comparisons read the members' base values.
+	cmp, ok := compareEnumValues(recv.EnumValue(), other.EnumValue())
+	if !ok {
+		return nil
+	}
+	switch name {
+	case "lt":
+		return ir.BoolConstant(cmp < 0)
+	case "lteq":
+		return ir.BoolConstant(cmp <= 0)
+	case "gt":
+		return ir.BoolConstant(cmp > 0)
+	case "gteq":
+		return ir.BoolConstant(cmp >= 0)
+	}
+	return nil
+}
+
+// compareEnumValues compares two enum members' base values, returning the sign
+// of the comparison and whether it could be made: integers compare numerically,
+// strings lexicographically. Two values of differing or unsupported kinds (or a
+// nil value) cannot be compared.
+func compareEnumValues(a, b *ir.Constant) (int, bool) {
+	if a == nil || b == nil || a.Kind != b.Kind {
+		return 0, false
+	}
+	switch a.Kind {
+	case ir.ConstInt:
+		return a.Int.Cmp(b.Int), true
+	case ir.ConstString:
+		return strings.Compare(a.Str, b.Str), true
+	default:
+		return 0, false
+	}
 }
 
 // collectionMethod folds a method on a list/map constant. The list collections

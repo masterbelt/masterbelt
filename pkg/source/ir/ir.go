@@ -230,3 +230,15 @@ func (*Await) value() {}
 type NullValue struct{}
 
 func (*NullValue) value() {}
+
+// EnumMemberValue is a resolved reference to an enum member, whether written
+// qualified (Rarity.Common) or bare (Common, under an enum expectation). Def is
+// the enum definition and Index the member's position within it; the name and
+// the base value are read from Def.Enum.Members[Index]. The evaluated value
+// (an EnumConstant) lives on Const.Eval, as for every other value form.
+type EnumMemberValue struct {
+	Def   *TypeDef
+	Index int
+}
+
+func (*EnumMemberValue) value() {}

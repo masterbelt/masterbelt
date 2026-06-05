@@ -31,7 +31,9 @@ func (e evalEnv) LookupType(name string) *ir.TypeDef       { return e.q.universe
 func (e evalEnv) Registry() *builtin.Registry              { return e.q.registry() }
 
 // computeValue is the evaluation rule, shared by both query implementations.
-// The file is the one decl sits in.
+// The file is the one decl sits in. A bare member in the initializer folds
+// through the annotation's enum, resolved here by a pure universe lookup (not
+// the type query) so the value query stays independent of typeOf.
 func computeValue(file FileID, decl *ast.ConstDecl, q queries) *ir.Constant {
-	return eval.Decl(decl, evalEnv{q: q, file: file})
+	return eval.DeclExpecting(decl, annotationEnum(q, file, decl), evalEnv{q: q, file: file})
 }

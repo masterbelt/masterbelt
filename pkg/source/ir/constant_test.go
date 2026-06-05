@@ -2,6 +2,7 @@ package ir
 
 import (
 	"math"
+	"math/big"
 	"testing"
 )
 
@@ -27,5 +28,35 @@ func TestConstantString(t *testing.T) {
 		if got := tc.c.String(); got != tc.want {
 			t.Errorf("String() = %q, want %q", got, tc.want)
 		}
+	}
+}
+
+// TestEnumConstant pins the enum value form: its rendering (Type.Member) and
+// the name/value accessors over the member table.
+func TestEnumConstant(t *testing.T) {
+	def := &TypeDef{
+		Name: "Rarity",
+		Enum: &EnumDef{
+			Base: "uint8",
+			Members: []EnumMember{
+				{Name: "Common", Value: IntConstant(big.NewInt(1))},
+				{Name: "Legend", Value: IntConstant(big.NewInt(10))},
+			},
+		},
+	}
+	legend := EnumConstant(def, 1)
+	if got := legend.String(); got != "Rarity.Legend" {
+		t.Errorf("String() = %q, want Rarity.Legend", got)
+	}
+	if got := legend.EnumName(); got != "Legend" {
+		t.Errorf("EnumName() = %q, want Legend", got)
+	}
+	if v := legend.EnumValue(); v == nil || v.String() != "10" {
+		t.Errorf("EnumValue() = %v, want 10", v)
+	}
+	// An out-of-range index has no name or value, rather than panicking.
+	bad := EnumConstant(def, 9)
+	if bad.EnumName() != "" || bad.EnumValue() != nil {
+		t.Errorf("out-of-range member: want empty name and nil value, got %q / %v", bad.EnumName(), bad.EnumValue())
 	}
 }

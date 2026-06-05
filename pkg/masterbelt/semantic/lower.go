@@ -18,6 +18,10 @@ type constBinder struct {
 	file FileID
 	irOf map[*ast.ConstDecl]*ir.Const
 	fnOf map[*ast.FuncDecl]*ir.Function
+	// expected is the enum a bare member lowers through (the const's
+	// annotation), or nil when there is none. It reaches only the initializer's
+	// top leaf — a bare member is meaningful only as the const's whole value.
+	expected *ir.TypeDef
 }
 
 func (b constBinder) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
@@ -26,9 +30,19 @@ func (b constBinder) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
 		if target := b.q.resolve(b.file, e); target != nil {
 			return &ir.Reference{Target: b.irOf[target]}
 		}
+		// A bare member resolves through the expected enum (const Top: Rarity =
+		// Legend). The expectation is the const's own annotation, so it only
+		// reaches a bare name that is the whole initializer.
+		if idx := enumIndex(b.expected, e.Name); idx >= 0 {
+			return &ir.EnumMemberValue{Def: b.expected, Index: idx}
+		}
 	case *ast.MemberExpr:
 		if target := b.q.resolveMember(b.file, e); target != nil {
 			return &ir.Reference{Target: b.irOf[target]}
+		}
+		// A member access whose receiver names an enum type (Rarity.Common).
+		if def, idx := enumMemberAccess(b.q.universe(b.file), e); idx >= 0 {
+			return &ir.EnumMemberValue{Def: def, Index: idx}
 		}
 	case *ast.CallExpr:
 		switch callee := e.Callee.(type) {
@@ -79,6 +93,35 @@ func pickOverload(cands []*ast.FuncDecl, arity int) *ast.FuncDecl {
 
 func (b constBinder) EnterFunc(params []*ast.ParamDef) lower.Binder { return enterFunc(b, params) }
 
+// enumIndex returns the index of the named member of an enum definition, or -1
+// when def is not an enum or has no such member.
+func enumIndex(def *ir.TypeDef, name string) int {
+	if def == nil || def.Enum == nil {
+		return -1
+	}
+	for i, m := range def.Enum.Members {
+		if m.Name == name {
+			return i
+		}
+	}
+	return -1
+}
+
+// enumMemberAccess resolves a member access whose receiver names an enum type
+// (Rarity.Common): the enum definition and the member's index, or (nil, -1)
+// when the receiver is not an enum or the member is unknown.
+func enumMemberAccess(universe map[string]*ir.TypeDef, m *ast.MemberExpr) (*ir.TypeDef, int) {
+	recv, ok := m.Receiver.(*ast.Identifier)
+	if !ok {
+		return nil, -1
+	}
+	def, ok := universe[recv.Name]
+	if !ok || def.Enum == nil {
+		return nil, -1
+	}
+	return def, enumIndex(def, m.Member.Name)
+}
+
 // bodyFuncs is what a body binder needs to lower function calls: the file's
 // own shells by name, the namespace-qualified declaration lookup (nil when no
 // namespaces are in scope), and the program-wide shell table mapping a
@@ -121,6 +164,16 @@ func (b bodyBinder) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
 		}
 		return nil
 	case *ast.MemberExpr:
+		// A member access whose receiver names an enum type (Element.Fire) is an
+		// enum-member value; a parameter shadowing the type name takes the
+		// record-field reading instead.
+		if recv, ok := e.Receiver.(*ast.Identifier); ok && !b.params[recv.Name] {
+			if def := b.r.Defs[recv.Name]; def != nil && def.Enum != nil {
+				if idx := enumIndex(def, e.Member.Name); idx >= 0 {
+					return &ir.EnumMemberValue{Def: def, Index: idx}
+				}
+			}
+		}
 		// A member access used as a value is a record field access.
 		return &ir.FieldAccess{Receiver: sub(e.Receiver), Field: e.Member.Name}
 	case *ast.CallExpr:
