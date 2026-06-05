@@ -29,6 +29,7 @@ const (
 	stProperty
 	stMethod
 	stParameter
+	stFunction
 )
 
 // Semantic token modifier bits, matching the legend's TokenModifiers order.
@@ -42,7 +43,7 @@ const (
 var semanticLegend = protocol.SemanticTokensLegend{
 	TokenTypes: []string{
 		"keyword", "comment", "type", "variable", "number", "string", "operator",
-		"namespace", "property", "method", "parameter",
+		"namespace", "property", "method", "parameter", "function",
 	},
 	TokenModifiers: []string{"declaration", "readonly"},
 }
@@ -57,29 +58,40 @@ type rawSemanticToken struct {
 // tokens in the LSP's relative-encoded form, lexically — the server passes the
 // program's resolution through semanticTokensIn.
 func semanticTokens(doc *abstract.Document) *protocol.SemanticTokens {
-	return semanticTokensWith(doc, nil)
+	return semanticTokensWith(doc, nil, nil)
 }
 
 // semanticTokensIn classifies with the program's resolution layered over the
 // lexical pass: a member access that names an imported constant (geo.Origin)
-// renders as the constant it is, not as a property.
+// renders as the constant it is, not as a property, and a call's callee that
+// names a top-level function renders as the function it calls, not as a value
+// reference.
 func semanticTokensIn(v view) *protocol.SemanticTokens {
 	members := map[*cst.Node]*ast.MemberExpr{}
+	funcCallees := map[*cst.Node]bool{}
 	forEachExpr(v.AST().File(), func(e ast.Expr) {
-		if m, ok := e.(*ast.MemberExpr); ok {
-			members[m.Syntax()] = m
+		switch e := e.(type) {
+		case *ast.MemberExpr:
+			members[e.Syntax()] = e
+		case *ast.CallExpr:
+			if id, ok := e.Callee.(*ast.Identifier); ok && v.ResolveFunc(id) != nil {
+				funcCallees[id.Syntax()] = true
+			}
 		}
 	})
 	return semanticTokensWith(v.AST(), func(green *cst.Node) bool {
 		m, ok := members[green]
 		return ok && v.ResolveMember(m) != nil
+	}, func(green *cst.Node) bool {
+		return funcCallees[green]
 	})
 }
 
-// semanticTokensWith is the classification walk. isImportedConst, when set,
-// reports whether a member-access node resolves to an imported constant —
-// the one classification a lexical pass cannot make.
-func semanticTokensWith(doc *abstract.Document, isImportedConst func(*cst.Node) bool) *protocol.SemanticTokens {
+// semanticTokensWith is the classification walk. isImportedConst and
+// isFuncCallee, when set, are the classifications a lexical pass cannot make:
+// whether a member-access node resolves to an imported constant, and whether
+// a name-reference node is a call's callee resolving to a function.
+func semanticTokensWith(doc *abstract.Document, isImportedConst, isFuncCallee func(*cst.Node) bool) *protocol.SemanticTokens {
 	buf := doc.Buffer()
 
 	var raws []rawSemanticToken
@@ -96,6 +108,9 @@ func semanticTokensWith(doc *abstract.Document, isImportedConst func(*cst.Node) 
 			}
 			if leaf.Kind() == token.Ident && parent == cst.MemberExpr && isImportedConst != nil && isImportedConst(parentGreen) {
 				tokenType, mods = stVariable, smReadonly
+			}
+			if leaf.Kind() == token.Ident && parent == cst.NameRef && isFuncCallee != nil && isFuncCallee(parentGreen) {
+				tokenType, mods = stFunction, 0
 			}
 			startLine, startChar := buf.LineColumn(t.Offset(), source.UTF16Encoding)
 			endLine, endChar := buf.LineColumn(t.End(), source.UTF16Encoding)
@@ -193,6 +208,9 @@ func classifyToken(kind token.Kind, parent cst.Kind, calleeMember bool) (tokenTy
 		case cst.MethodDecl:
 			// A method's declared name inside an impl block.
 			return stMethod, smDeclaration, true
+		case cst.FuncDecl:
+			// A top-level function's declared name.
+			return stFunction, smDeclaration, true
 		case cst.Param:
 			// A declared parameter — a method's, a function type's, or a
 			// function literal's.

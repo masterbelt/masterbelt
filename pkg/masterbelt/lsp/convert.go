@@ -73,22 +73,20 @@ func toSeverity(s diagnostic.Severity) protocol.DiagnosticSeverity {
 	}
 }
 
-// documentSymbols turns the program's constants into an LSP outline. Each
-// constant becomes a symbol whose Detail is its inferred type, whose Range
-// covers the whole declaration, and whose SelectionRange covers just the name —
-// the part an editor highlights when you pick the symbol.
+// documentSymbols turns the program's constants and functions into an LSP
+// outline. Each declaration becomes a symbol whose Detail is its inferred type
+// (or signature), whose Range covers the whole declaration, and whose
+// SelectionRange covers just the name — the part an editor highlights when you
+// pick the symbol.
 func documentSymbols(doc view) []protocol.DocumentSymbol {
 	buf := doc.Buffer()
 	trees := doc.Trees()
 
-	var symbols []protocol.DocumentSymbol
-	for _, c := range doc.Module().Consts {
-		declTree, ok := trees[c.Syntax.Syntax()]
+	symbol := func(green *cst.Node, name, detail string, kind protocol.SymbolKind) (protocol.DocumentSymbol, bool) {
+		declTree, ok := trees[green]
 		if !ok {
-			continue
+			return protocol.DocumentSymbol{}, false
 		}
-
-		name := c.Name
 		if name == "" {
 			name = "<anonymous>"
 		}
@@ -96,18 +94,32 @@ func documentSymbols(doc view) []protocol.DocumentSymbol {
 		if nameTok, ok := nameToken(declTree); ok {
 			selection = toRange(buf, nameTok.Offset(), nameTok.End())
 		}
+		return protocol.DocumentSymbol{
+			Name:           name,
+			Detail:         detail,
+			Kind:           kind,
+			Range:          toRange(buf, declTree.Offset(), declTree.End()),
+			SelectionRange: selection,
+		}, true
+	}
+
+	var symbols []protocol.DocumentSymbol
+	for _, c := range doc.Module().Consts {
 		detail := ""
 		if c.Type != ir.Invalid {
 			detail = ": " + c.Type.String()
 		}
-
-		symbols = append(symbols, protocol.DocumentSymbol{
-			Name:           name,
-			Detail:         detail,
-			Kind:           protocol.SymbolKindConstant,
-			Range:          toRange(buf, declTree.Offset(), declTree.End()),
-			SelectionRange: selection,
-		})
+		if s, ok := symbol(c.Syntax.Syntax(), c.Name, detail, protocol.SymbolKindConstant); ok {
+			symbols = append(symbols, s)
+		}
+	}
+	for _, f := range doc.Module().Funcs {
+		if f.Syntax == nil {
+			continue
+		}
+		if s, ok := symbol(f.Syntax.Syntax(), f.Name, funcSignature(f), protocol.SymbolKindFunction); ok {
+			symbols = append(symbols, s)
+		}
 	}
 	return symbols
 }

@@ -41,6 +41,9 @@ func hover(doc view, offset int) *protocol.Hover {
 	if h := methodParamHover(doc, offset, trees); h != nil {
 		return h
 	}
+	if h := funcHover(doc, offset, trees); h != nil {
+		return h
+	}
 	if h := recordFieldHover(doc, offset); h != nil {
 		return h
 	}
@@ -144,6 +147,10 @@ func definition(doc view, offset int) []protocol.Location {
 	}
 	if t, _, ok := typeAt(doc, offset); ok && t.Syntax != nil {
 		return declLocation(doc.viewOfType(t))(t.Syntax.Syntax())
+	}
+	if f, _, ok := funcAt(doc, offset); ok && f.Syntax != nil {
+		// Function resolution is file-local, so the declaration is in doc.
+		return declLocation(doc, true)(f.Syntax.Syntax())
 	}
 	return nil
 }

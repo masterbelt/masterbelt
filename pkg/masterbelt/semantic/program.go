@@ -103,6 +103,12 @@ func (p *Program) Resolve(file FileID, id *ast.Identifier) *ir.Const {
 
 // ResolveMember returns the constant a namespace member access (geo.Origin) in
 // file refers to, or nil.
+// ResolveFunc resolves a call's callee identifier to the function declaration
+// it names in file, or nil when no function has that name.
+func (p *Program) ResolveFunc(file FileID, id *ast.Identifier) *ast.FuncDecl {
+	return engineQueries{p.db}.resolveFunc(file, id)
+}
+
 func (p *Program) ResolveMember(file FileID, m *ast.MemberExpr) *ir.Const {
 	q := engineQueries{p.db}
 	return p.db.shells[q.resolveMember(file, m)]

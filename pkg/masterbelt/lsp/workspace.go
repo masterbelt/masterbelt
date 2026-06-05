@@ -74,6 +74,10 @@ func (v view) ResolveMember(m *ast.MemberExpr) *ir.Const {
 	return v.ws.prog.ResolveMember(v.id, m)
 }
 
+func (v view) ResolveFunc(id *ast.Identifier) *ast.FuncDecl {
+	return v.ws.prog.ResolveFunc(v.id, id)
+}
+
 func (v view) ResolveUseName(u *ast.UseDecl, name string) *ir.Const {
 	return v.ws.prog.ResolveUseName(v.id, u, name)
 }
