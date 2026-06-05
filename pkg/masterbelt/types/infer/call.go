@@ -398,6 +398,23 @@ func ResolveFuncTypeParams(r *TypeResolver, params []*ast.TypeParam, scope map[s
 	return out
 }
 
+// BindTypeParamBounds is the substitution that replaces each bare type-parameter
+// variable with its bounded form: a name resolved in a type-parameter scope is
+// an unbounded TypeVar, so a function body that types `c: T` (where T has a
+// bound) must rebind T to the bounded TypeVar to see the bound interface's
+// methods. The result maps each name to a TypeVar carrying its bound; apply it
+// with types.Substitute over the resolved parameter and result types.
+func BindTypeParamBounds(typeParams []*ir.TypeParam) map[string]ir.Type {
+	if len(typeParams) == 0 {
+		return nil
+	}
+	subst := make(map[string]ir.Type, len(typeParams))
+	for _, tp := range typeParams {
+		subst[tp.Name] = &ir.TypeVar{Name: tp.Name, Bound: tp.Bound}
+	}
+	return subst
+}
+
 // deferredArg reports whether an argument's typing needs the parameter's
 // expectation — a function literal, or an inferred-form record literal — so
 // overload selection must not synthesize it.

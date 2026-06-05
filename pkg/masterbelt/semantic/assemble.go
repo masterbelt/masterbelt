@@ -93,6 +93,18 @@ func exprSink(at func(ast.Node) span, diags *diagnostic.List) *infer.Sink {
 			s := at(lit)
 			diags.Add(newNotARecordDiagnostic(s.offset, s.width, typ.String()))
 		},
+		BoundNotSatisfied: func(call *ast.CallExpr, typ, bound ir.Type) {
+			s := at(call)
+			diags.Add(newBoundNotSatisfiedDiagnostic(s.offset, s.width, typ.String(), bound.String()))
+		},
+		UninferableTypeParam: func(call *ast.CallExpr, name string) {
+			s := at(call)
+			diags.Add(newUninferableTypeParamDiagnostic(s.offset, s.width, name))
+		},
+		NoMethodOnUnboundedTypeVar: func(node ast.Node, method string) {
+			s := at(node)
+			diags.Add(newNoMethodOnUnboundedTypevarDiagnostic(s.offset, s.width, method))
+		},
 	}
 }
 
