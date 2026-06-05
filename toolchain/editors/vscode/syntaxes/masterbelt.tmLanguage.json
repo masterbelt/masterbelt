@@ -63,7 +63,7 @@
       "patterns": [
         {
           "name": "keyword.control.masterbelt",
-          "match": "\\b(assert|async|await|builtin|const|extern|false|fn|from|impl|io|nondet|null|pub|return|self|true|type|use|where)\\b"
+          "match": "\\b(assert|async|await|builtin|const|enum|extern|false|fn|from|impl|io|nondet|null|pub|return|self|true|type|use|where)\\b"
         }
       ]
     },

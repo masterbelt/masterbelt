@@ -1,0 +1,115 @@
+Module
+  Const "Top"
+    type Rarity
+    value Rarity.Legend
+    eval Rarity.Legend
+  Const "Bare"
+    type Rarity
+    value Rarity.Common
+    eval Rarity.Common
+  TypeDef "Rarity" pub
+    doc "A card's rarity tier."
+    enum uint8
+    member "Common" = 1
+    member "Rare" = 2
+    member "Legend" = 10
+    method "eql" pub extern
+      param other: self
+      result bool
+    method "neq" pub extern
+      param other: self
+      result bool
+    method "lt" pub extern
+      param other: self
+      result bool
+    method "lteq" pub extern
+      param other: self
+      result bool
+    method "gt" pub extern
+      param other: self
+      result bool
+    method "gteq" pub extern
+      param other: self
+      result bool
+  TypeDef "Element" pub
+    doc "An elemental affinity."
+    enum int
+    member "Fire" = 0
+    member "Water" = 1
+    member "Wind" = 2
+    method "eql" pub extern
+      param other: self
+      result bool
+    method "neq" pub extern
+      param other: self
+      result bool
+    method "lt" pub extern
+      param other: self
+      result bool
+    method "lteq" pub extern
+      param other: self
+      result bool
+    method "gt" pub extern
+      param other: self
+      result bool
+    method "gteq" pub extern
+      param other: self
+      result bool
+    method "isFire" pub
+      doc "Whether this element is Fire."
+      result bool
+      return self.eql(Element.Fire)
+  TypeDef "Locale" pub
+    doc "A supported display locale."
+    enum string
+    member "Ja" = "Ja"
+    member "En" = "en-US"
+    method "eql" pub extern
+      param other: self
+      result bool
+    method "neq" pub extern
+      param other: self
+      result bool
+    method "lt" pub extern
+      param other: self
+      result bool
+    method "lteq" pub extern
+      param other: self
+      result bool
+    method "gt" pub extern
+      param other: self
+      result bool
+    method "gteq" pub extern
+      param other: self
+      result bool
+  Assert "Rarity.Common != Rarity.Legend"
+    eval true
+      Rarity.Common != Rarity.Legend
+             ^      ^         ^
+             |      true      Rarity.Legend
+             Rarity.Common
+  Assert "Rarity.Common < Rarity.Legend"
+    eval true
+      Rarity.Common < Rarity.Legend
+             ^      ^        ^
+             |      true     Rarity.Legend
+             Rarity.Common
+  Assert "Rarity.Legend == Top"
+    eval true
+      Rarity.Legend == Top
+             ^      ^  ^
+             |      |  Rarity.Legend
+             |      true
+             Rarity.Legend
+  Assert "Bare == Rarity.Common"
+    eval true
+      Bare == Rarity.Common
+      ^    ^         ^
+      |    true      Rarity.Common
+      Rarity.Common
+  Assert "Locale.Ja < Locale.En"
+    eval true
+      Locale.Ja < Locale.En
+             ^  ^        ^
+             |  true     Locale.En
+             Locale.Ja

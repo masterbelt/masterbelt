@@ -84,6 +84,11 @@ func memberItems(doc view, offset int) ([]protocol.CompletionItem, bool) {
 	if !ok {
 		return nil, false
 	}
+	// A member access whose receiver names an enum type (Rarity.) offers the
+	// enum's members, each labelled with its value.
+	if items, ok := enumMemberItems(doc, member); ok {
+		return items, true
+	}
 	recv := receiverTypeOf(doc, member.Receiver, doc.Trees(), offset)
 	if recv == nil || recv == ir.Invalid {
 		return nil, true
@@ -121,6 +126,47 @@ func memberItems(doc view, offset int) ([]protocol.CompletionItem, bool) {
 		}
 	}
 	return items, true
+}
+
+// enumMemberItems returns the completion items for an enum member access
+// (Rarity.): one item per member, labelled with its base value, and reports
+// whether the receiver names an enum (so the caller offers members only). A
+// receiver that is not an enum type is left to the value-method path.
+func enumMemberItems(doc view, member *ast.MemberExpr) ([]protocol.CompletionItem, bool) {
+	recv, ok := member.Receiver.(*ast.Identifier)
+	if !ok {
+		return nil, false
+	}
+	// A local value shadowing the type name means this is a value access, not
+	// an enum-type access.
+	if doc.Resolve(recv) != nil {
+		return nil, false
+	}
+	def := lookupEnumType(doc, recv.Name)
+	if def == nil {
+		return nil, false
+	}
+	kind := protocol.CompletionItemKindEnumMember
+	items := make([]protocol.CompletionItem, 0, len(def.Enum.Members))
+	for _, m := range def.Enum.Members {
+		items = append(items, protocol.CompletionItem{
+			Label:  m.Name,
+			Kind:   &kind,
+			Detail: "= " + m.Value.String(),
+		})
+	}
+	return items, true
+}
+
+// lookupEnumType returns the enum definition named name in the document's type
+// scope, or nil when no enum has that name.
+func lookupEnumType(doc view, name string) *ir.TypeDef {
+	for _, def := range doc.TypeNames() {
+		if def.Name == name && def.Enum != nil {
+			return def
+		}
+	}
+	return nil
 }
 
 // memberAccessAt finds the member access whose dot or member name the cursor

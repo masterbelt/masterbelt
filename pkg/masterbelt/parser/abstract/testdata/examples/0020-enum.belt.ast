@@ -1,0 +1,46 @@
+File
+  ConstDecl
+    name "Top"
+    type Rarity
+    value (. Identifier "Rarity" Legend)
+  ConstDecl
+    name "Bare"
+    type Rarity
+    value Identifier "Common"
+  EnumDecl
+    doc "A card's rarity tier."
+    pub
+    name "Rarity"
+    base uint8
+    member "Common" = IntLit "1"
+    member "Rare" = IntLit "2"
+    member "Legend" = IntLit "10"
+  EnumDecl
+    doc "An elemental affinity."
+    pub
+    name "Element"
+    member "Fire"
+    member "Water"
+    member "Wind"
+    method "isFire"
+      doc "Whether this element is Fire."
+      pub
+      result bool
+      return (call (. self eql) (. Identifier "Element" Fire))
+  EnumDecl
+    doc "A supported display locale."
+    pub
+    name "Locale"
+    base string
+    member "Ja"
+    member "En" = StringLit "en-US"
+  AssertDecl
+    cond (call (. (. Identifier "Rarity" Common) neq) (. Identifier "Rarity" Legend))
+  AssertDecl
+    cond (call (. (. Identifier "Rarity" Common) lt) (. Identifier "Rarity" Legend))
+  AssertDecl
+    cond (call (. (. Identifier "Rarity" Legend) eql) Identifier "Top")
+  AssertDecl
+    cond (call (. Identifier "Bare" eql) (. Identifier "Rarity" Common))
+  AssertDecl
+    cond (call (. (. Identifier "Locale" Ja) lt) (. Identifier "Locale" En))

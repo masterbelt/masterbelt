@@ -41,6 +41,7 @@ func lowerFile(root cst.Tree, buf source.Buffer) *ast.File {
 	var uses []*ast.UseDecl
 	var decls []*ast.ConstDecl
 	var types []*ast.TypeDecl
+	var enums []*ast.EnumDecl
 	var funcs []*ast.FuncDecl
 	var asserts []*ast.AssertDecl
 	foreachDecl(root, func(child cst.Tree, green *cst.Node) {
@@ -51,13 +52,15 @@ func lowerFile(root cst.Tree, buf source.Buffer) *ast.File {
 			decls = append(decls, lowerConstDecl(child, buf))
 		case cst.TypeDecl:
 			types = append(types, lowerTypeDecl(child, buf))
+		case cst.EnumDecl:
+			enums = append(enums, lowerEnumDecl(child, buf))
 		case cst.FuncDecl:
 			funcs = append(funcs, lowerFuncDecl(child, buf))
 		case cst.AssertDecl:
 			asserts = append(asserts, lowerAssertDecl(child, buf))
 		}
 	})
-	return ast.NewFile(uses, decls, types, funcs, asserts, rootNode)
+	return ast.NewFile(uses, decls, types, enums, funcs, asserts, rootNode)
 }
 
 // foreachDecl calls fn for each top-level declaration child of root (a
@@ -72,7 +75,7 @@ func foreachDecl(root cst.Tree, fn func(child cst.Tree, green *cst.Node)) {
 			continue
 		}
 		switch node.Kind() {
-		case cst.UseDecl, cst.ConstDecl, cst.TypeDecl, cst.FuncDecl, cst.AssertDecl:
+		case cst.UseDecl, cst.ConstDecl, cst.TypeDecl, cst.EnumDecl, cst.FuncDecl, cst.AssertDecl:
 			fn(child, node)
 		}
 	}

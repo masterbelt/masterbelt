@@ -309,7 +309,7 @@ func (d *directQueries) typeDefsOf(f FileID) typeDefs {
 	return memoize(d.defs, d.resolving, f, typeDefs{}, func() typeDefs {
 		imp := d.importsOf(f)
 		fns := bodyFuncs{local: funcShellsByName(d.files[f], d.fnShells), qualified: qualifiedFuncsFrom(d, imp), shells: d.fnShells}
-		return buildTypeDefs(d, d.files[f], imp, fns)
+		return buildTypeDefs(d, f, d.files[f], imp, fns)
 	})
 }
 

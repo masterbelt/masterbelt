@@ -21,9 +21,12 @@ const (
 	CodeCyclicReference        diagnostic.Code = "masterbelt.semantic.cyclic_reference"
 	CodeDivisionByZero         diagnostic.Code = "masterbelt.semantic.division_by_zero"
 	CodeDuplicateDeclaration   diagnostic.Code = "masterbelt.semantic.duplicate_declaration"
+	CodeDuplicateEnumMember    diagnostic.Code = "masterbelt.semantic.duplicate_enum_member"
+	CodeDuplicateEnumValue     diagnostic.Code = "masterbelt.semantic.duplicate_enum_value"
 	CodeDuplicateFuncOverload  diagnostic.Code = "masterbelt.semantic.duplicate_func_overload"
 	CodeDuplicateOverload      diagnostic.Code = "masterbelt.semantic.duplicate_overload"
 	CodeEffectInPureContext    diagnostic.Code = "masterbelt.semantic.effect_in_pure_context"
+	CodeInvalidEnumBaseType    diagnostic.Code = "masterbelt.semantic.invalid_enum_base_type"
 	CodeInvalidOperation       diagnostic.Code = "masterbelt.semantic.invalid_operation"
 	CodeLambdaArityMismatch    diagnostic.Code = "masterbelt.semantic.lambda_arity_mismatch"
 	CodeMissingEffect          diagnostic.Code = "masterbelt.semantic.missing_effect"
@@ -43,6 +46,7 @@ const (
 	CodeUninferableParameter   diagnostic.Code = "masterbelt.semantic.uninferable_parameter"
 	CodeUninferableRecord      diagnostic.Code = "masterbelt.semantic.uninferable_record"
 	CodeUninferableResult      diagnostic.Code = "masterbelt.semantic.uninferable_result"
+	CodeUnknownEnumMember      diagnostic.Code = "masterbelt.semantic.unknown_enum_member"
 	CodeUnknownField           diagnostic.Code = "masterbelt.semantic.unknown_field"
 	CodeUnknownMember          diagnostic.Code = "masterbelt.semantic.unknown_member"
 	CodeUnknownType            diagnostic.Code = "masterbelt.semantic.unknown_type"
@@ -219,6 +223,35 @@ func newDuplicateDeclarationDiagnostic(offset int, width int, name string) diagn
 	}
 }
 
+func newDuplicateEnumMemberDiagnostic(offset int, width int, name string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"name": diagnostic.Str(name),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeDuplicateEnumMember,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeDuplicateEnumMember, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newDuplicateEnumValueDiagnostic(offset int, width int, name string, value string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"name":  diagnostic.Str(name),
+		"value": diagnostic.Str(value),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeDuplicateEnumValue,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeDuplicateEnumValue, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
 func newDuplicateFuncOverloadDiagnostic(offset int, width int, name string, types string) diagnostic.Diagnostic {
 	fields := map[string]fmt.Stringer{
 		"name":  diagnostic.Str(name),
@@ -258,6 +291,20 @@ func newEffectInPureContextDiagnostic(offset int, width int, effect string, cont
 		Severity: diagnostic.Error,
 		Code:     CodeEffectInPureContext,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeEffectInPureContext, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newInvalidEnumBaseTypeDiagnostic(offset int, width int, typ string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"typ": diagnostic.Str(typ),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeInvalidEnumBaseType,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeInvalidEnumBaseType, fields),
 		Fields:   fields,
 		Offset:   offset,
 		Width:    width,
@@ -521,6 +568,21 @@ func newUninferableResultDiagnostic(offset int, width int) diagnostic.Diagnostic
 		Code:     CodeUninferableResult,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeUninferableResult, nil),
 		Fields:   nil,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newUnknownEnumMemberDiagnostic(offset int, width int, enum string, member string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"enum":   diagnostic.Str(enum),
+		"member": diagnostic.Str(member),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeUnknownEnumMember,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeUnknownEnumMember, fields),
+		Fields:   fields,
 		Offset:   offset,
 		Width:    width,
 	}

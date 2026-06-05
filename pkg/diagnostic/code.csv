@@ -51,6 +51,10 @@ masterbelt.semantic.cyclic_module,error,path:string
 masterbelt.semantic.assertion_failed,error,cond:string doc:string diagram:string
 masterbelt.semantic.assertion_not_bool,error,typ:string
 masterbelt.semantic.assertion_not_constant,error,
+masterbelt.semantic.duplicate_enum_member,error,name:string
+masterbelt.semantic.unknown_enum_member,error,enum:string member:string
+masterbelt.semantic.invalid_enum_base_type,error,typ:string
+masterbelt.semantic.duplicate_enum_value,error,name:string value:string
 masterbelt.semantic.refinement_violation,error,value:string typ:string predicate:string diagram:string
 masterbelt.semantic.refinement_not_bool,error,typ:string
 masterbelt.semantic.refinement_not_constant,error,

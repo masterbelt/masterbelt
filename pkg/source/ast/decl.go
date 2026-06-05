@@ -9,6 +9,7 @@ type File struct {
 	Uses    []*UseDecl
 	Decls   []*ConstDecl
 	Types   []*TypeDecl
+	Enums   []*EnumDecl
 	Funcs   []*FuncDecl
 	Asserts []*AssertDecl
 	syntax  *cst.Node
@@ -19,8 +20,8 @@ func (f *File) node()             {}
 
 // NewFile builds a File node. The constructors keep each node's syntax backlink
 // unexported while package parser/abstract populates it.
-func NewFile(uses []*UseDecl, decls []*ConstDecl, types []*TypeDecl, funcs []*FuncDecl, asserts []*AssertDecl, syntax *cst.Node) *File {
-	return &File{Uses: uses, Decls: decls, Types: types, Funcs: funcs, Asserts: asserts, syntax: syntax}
+func NewFile(uses []*UseDecl, decls []*ConstDecl, types []*TypeDecl, enums []*EnumDecl, funcs []*FuncDecl, asserts []*AssertDecl, syntax *cst.Node) *File {
+	return &File{Uses: uses, Decls: decls, Types: types, Enums: enums, Funcs: funcs, Asserts: asserts, syntax: syntax}
 }
 
 // UseDecl is a cross-file import: an optional pub modifier (re-export the

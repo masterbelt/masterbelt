@@ -128,7 +128,11 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 
 	for _, decl := range file.Decls {
 		c := shells[decl]
-		c.Value = lower.Value(decl.Value, constBinder{q: q, file: fileID, irOf: shells, fnOf: fnShells})
+		// A bare member in the initializer (const Top: Rarity = Legend) lowers
+		// through the annotation's enum, so resolve it first. The annotation is
+		// resolved against the universe — a pure name lookup, not the type query
+		// — so the value lowering stays independent of typeOf.
+		c.Value = lower.Value(decl.Value, constBinder{q: q, file: fileID, irOf: shells, fnOf: fnShells, expected: annotationEnum(q, fileID, decl)})
 		c.Type = q.typeOf(decl)
 		c.Eval = q.valueOf(decl)
 
@@ -154,28 +158,7 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 		// skips them, and it treats a namespace access as one unit, so its
 		// receiver is never reported as an undefined value.
 		if decl.Value != nil {
-			walkRefs(fileID, decl.Value, q,
-				func(id *ast.Identifier) {
-					if id.Name == "" || q.resolve(fileID, id) != nil {
-						return
-					}
-					s := at(id)
-					if q.ambiguousImport(fileID, id) {
-						diags.Add(newAmbiguousImportDiagnostic(s.offset, s.width, id.Name))
-						return
-					}
-					diags.Add(newUndefinedNameDiagnostic(s.offset, s.width, id.Name))
-				},
-				func(m *ast.MemberExpr) {
-					if m.Member.Name == "" {
-						return // a recovered `ns.` — already a parse diagnostic
-					}
-					if q.resolveMember(fileID, m) == nil {
-						s := at(m)
-						ns, _ := m.Receiver.(*ast.Identifier)
-						diags.Add(newUnknownMemberDiagnostic(s.offset, s.width, m.Member.Name, ns.Name))
-					}
-				})
+			reportRefIssues(fileID, decl.Value, q, at, diags, annotationEnum(q, fileID, decl))
 			// One checking walk reports the expression diagnostics: operator
 			// type errors, type mismatches (against the annotation when there
 			// is one, and inside function-literal bodies), and literals whose
@@ -272,29 +255,9 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 		before := diags.Len()
 
 		// Undefined references and unknown namespace members, exactly as for a
-		// const's initializer.
-		walkRefs(fileID, a.Cond, q,
-			func(id *ast.Identifier) {
-				if id.Name == "" || q.resolve(fileID, id) != nil {
-					return
-				}
-				s := at(id)
-				if q.ambiguousImport(fileID, id) {
-					diags.Add(newAmbiguousImportDiagnostic(s.offset, s.width, id.Name))
-					return
-				}
-				diags.Add(newUndefinedNameDiagnostic(s.offset, s.width, id.Name))
-			},
-			func(m *ast.MemberExpr) {
-				if m.Member.Name == "" {
-					return // a recovered `ns.` — already a parse diagnostic
-				}
-				if q.resolveMember(fileID, m) == nil {
-					s := at(m)
-					ns, _ := m.Receiver.(*ast.Identifier)
-					diags.Add(newUnknownMemberDiagnostic(s.offset, s.width, m.Member.Name, ns.Name))
-				}
-			})
+		// const's initializer. An assert condition has no annotation, so a bare
+		// member is not in scope (nil expected enum).
+		reportRefIssues(fileID, a.Cond, q, at, diags, nil)
 
 		// Operator type errors, zero divisors, and stray selfs, through the
 		// same checking walks the const path uses.
@@ -361,7 +324,7 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 	module.Types = q.typeDefs(fileID)
 	imp := q.importsOf(fileID)
 	bfns := bodyFuncs{local: funcShellsByName(file, fnShells), qualified: qualifiedFuncsFrom(q, imp), shells: fnShells}
-	resolveTypes(file, at, diags, reg, outerTypes(q, imp), qualifiedFrom(q, imp), bfns)
+	resolveTypes(evalEnv{q: q, file: fileID}, file, at, diags, reg, outerTypes(q, imp), qualifiedFrom(q, imp), bfns)
 
 	// The module's functions are this file's shells, their signatures and
 	// bodies (re)resolved here with reporting; their bodies type-check the
@@ -391,6 +354,77 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 	items := diags.Items()
 	sort.SliceStable(items, func(i, j int) bool { return items[i].Offset < items[j].Offset })
 	return module, items
+}
+
+// reportRefIssues reports the reference problems of a constant initializer or
+// assert condition: undefined names (distinguishing an ambiguous import),
+// namespace members the target does not export (unknown_member), and enum
+// members the enum does not declare (unknown_enum_member). expectedEnum is the
+// enum a bare member resolves through (a const's annotation; nil for an assert,
+// which has none), so a bare member of it is not reported as undefined.
+func reportRefIssues(fileID FileID, e ast.Expr, q queries, at func(ast.Node) span, diags *diagnostic.List, expectedEnum *ir.TypeDef) {
+	walkRefsEnum(fileID, e, q,
+		func(id *ast.Identifier) {
+			if id.Name == "" || q.resolve(fileID, id) != nil {
+				return
+			}
+			// A bare member of the expected enum is a resolved reference, not an
+			// undefined name.
+			if expectedEnum != nil && enumIndex(expectedEnum, id.Name) >= 0 {
+				return
+			}
+			s := at(id)
+			if q.ambiguousImport(fileID, id) {
+				diags.Add(newAmbiguousImportDiagnostic(s.offset, s.width, id.Name))
+				return
+			}
+			// A bare name under an enum expectation that is not a member of it is
+			// an unknown enum member, not a bare undefined name — the author
+			// reached for a member that does not exist.
+			if expectedEnum != nil {
+				diags.Add(newUnknownEnumMemberDiagnostic(s.offset, s.width, expectedEnum.Name, id.Name))
+				return
+			}
+			diags.Add(newUndefinedNameDiagnostic(s.offset, s.width, id.Name))
+		},
+		func(m *ast.MemberExpr) {
+			if m.Member.Name == "" {
+				return // a recovered `ns.` — already a parse diagnostic
+			}
+			if q.resolveMember(fileID, m) == nil {
+				s := at(m)
+				ns, _ := m.Receiver.(*ast.Identifier)
+				diags.Add(newUnknownMemberDiagnostic(s.offset, s.width, m.Member.Name, ns.Name))
+			}
+		},
+		func(m *ast.MemberExpr) {
+			// A qualified enum member access (Rarity.Bogus): the receiver names an
+			// enum, so the member must be one of its own.
+			if m.Member.Name == "" {
+				return // a recovered `Rarity.` — already a parse diagnostic
+			}
+			recv := m.Receiver.(*ast.Identifier)
+			def := q.universe(fileID)[recv.Name]
+			if enumIndex(def, m.Member.Name) < 0 {
+				s := at(m)
+				diags.Add(newUnknownEnumMemberDiagnostic(s.offset, s.width, recv.Name, m.Member.Name))
+			}
+		})
+}
+
+// annotationEnum resolves a constant's type annotation to the enum it names, or
+// nil when the constant has no annotation or it does not name an enum. It is a
+// pure name lookup in the file's universe — it does not call typeOf — so the
+// value lowering it feeds stays independent of the type query.
+func annotationEnum(q queries, fileID FileID, decl *ast.ConstDecl) *ir.TypeDef {
+	if decl.Type == nil {
+		return nil
+	}
+	r := &infer.TypeResolver{Defs: q.universe(fileID), Qualified: qualifiedFrom(q, q.importsOf(fileID))}
+	if n, ok := r.ResolveType(decl.Type, nil).(*ir.Named); ok && n.Def != nil && n.Def.Enum != nil {
+		return n.Def
+	}
+	return nil
 }
 
 // refinedDef returns the definition behind a nominal (or applied) annotation

@@ -87,6 +87,12 @@ func dumpTypeDef(b *strings.Builder, t *TypeDef) {
 			fmt.Fprintf(b, "    param %q\n", p.Name)
 		}
 	}
+	if t.Enum != nil {
+		fmt.Fprintf(b, "    enum %s\n", t.Enum.Base)
+		for _, m := range t.Enum.Members {
+			fmt.Fprintf(b, "    member %q = %s\n", m.Name, m.Value.String())
+		}
+	}
 	if t.Body != nil {
 		fmt.Fprintf(b, "    body %s\n", t.Body)
 	}
@@ -235,6 +241,15 @@ func dumpValue(v Value) string {
 		return "await " + dumpValue(x.Value)
 	case *NullValue:
 		return "null"
+	case *EnumMemberValue:
+		name := "<unresolved>"
+		if x.Def != nil {
+			name = x.Def.Name
+			if x.Def.Enum != nil && x.Index >= 0 && x.Index < len(x.Def.Enum.Members) {
+				name += "." + x.Def.Enum.Members[x.Index].Name
+			}
+		}
+		return name
 	default:
 		return "<none>"
 	}

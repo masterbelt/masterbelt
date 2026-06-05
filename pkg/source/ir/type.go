@@ -201,13 +201,40 @@ type TypeDef struct {
 	Body    Type         // the defined type (nil if missing/invalid)
 	Methods []*Method
 	Builtin bool // declared as `= builtin`: its semantics come from the registry
+	// Enum is the enum description when this definition is an enum (`enum Name
+	// {...}`), or nil for every other kind of type. An enum is a nominal type
+	// whose value set is fixed: it does not derive its base type's operator
+	// methods (it carries only the six comparison methods plus its impl), and
+	// it is not assignable to or from its base. Body therefore stays nil for an
+	// enum — the base lives in Enum.Base — so the type algebra treats it as a
+	// leaf, exactly as it treats a primitive.
+	Enum *EnumDef
 	// Where is the refinement predicate over self, kept in its evaluable AST
 	// form so the predicate can fold per constant (self bound to each value).
 	// It is set only when the predicate type-checks to a foldable bool; an
 	// unusable predicate is reported at the declaration and stays nil, so the
 	// per-constant check never fires for it.
-	Where  ast.Expr
-	Syntax *ast.TypeDecl // the declaration this was resolved from
+	Where      ast.Expr
+	Syntax     *ast.TypeDecl // the type declaration this was resolved from, or nil
+	EnumSyntax *ast.EnumDecl // the enum declaration this was resolved from, or nil
+}
+
+// EnumDef is the description of an enum type: the name of its base type (an
+// integer-family primitive or string) and its members in declaration order.
+// Each member's value is the resolved base-type constant (a ConstInt for an
+// integer base, a ConstString for a string base); the design forbids duplicate
+// values, so a member is uniquely identified by either its name or its value.
+type EnumDef struct {
+	Base    string
+	Members []EnumMember
+}
+
+// EnumMember is one member of an enum: its name and its resolved base-type
+// value (nil when the value could not be determined, e.g. an unfoldable
+// initializer).
+type EnumMember struct {
+	Name  string
+	Value *Constant
 }
 
 // TypeParam is one generic parameter of a TypeDef: a name and an optional

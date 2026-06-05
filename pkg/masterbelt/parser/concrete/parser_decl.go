@@ -130,6 +130,101 @@ func (p *parser) parseTypeDecl(lead []cst.Green) *cst.Node {
 	return cst.NewNode(cst.TypeDecl, children)
 }
 
+// --- enum declarations ------------------------------------------------------
+
+// parseEnumDecl parses an enum declaration, prepending the already-collected
+// leading trivia:
+//
+//	[pub] enum Name [":" TypeExpr] "{" ( EnumMember ( ("," | NL) EnumMember )* )? "}" [ImplBlock]
+//
+// The optional ": TypeExpr" names the base type (a plain type reference; the
+// allowed set — the integer family and string — is checked in semantic). The
+// members are separated by a comma or a newline (newlines are trivia, so a
+// member simply follows another), each an identifier with an optional
+// "= ConstExpr" initializer. An enum may carry a trailing impl block, exactly
+// as a nominal type can. As elsewhere every expected element is optional in the
+// parse: a missing one records a diagnostic and is simply absent from the tree
+// while losslessness is preserved. The cursor sits on pub or enum.
+func (p *parser) parseEnumDecl(lead []cst.Green) *cst.Node {
+	children := lead
+
+	if p.kind() == token.Pub {
+		children = append(children, p.bump())
+	}
+	p.skipTrivia(&children)
+	children = append(children, p.bump()) // "enum" (guaranteed by the dispatcher)
+
+	if p.peekSignificant() == token.Ident {
+		p.skipTrivia(&children)
+		children = append(children, p.bump()) // the declared name
+	} else {
+		p.report(newExpectedIdentifierDiagnostic(p.lastStart, 0))
+	}
+
+	// The optional base-type annotation, written exactly like a const's: a
+	// ":" introducing a full type expression.
+	if p.peekSignificant() == token.Colon {
+		p.skipTrivia(&children)
+		children = append(children, p.parseTypeClause())
+	}
+
+	if p.peekSignificant() == token.LBrace {
+		p.skipTrivia(&children)
+		children = append(children, p.bump()) // "{"
+	} else {
+		p.report(newUnexpectedTokenDiagnostic(p.cur().Offset, p.cur().Width, p.kind().String()))
+		return cst.NewNode(cst.EnumDecl, children)
+	}
+
+	// The members. A comma between two members is optional (a newline serves
+	// as well), and a trailing comma is tolerated — the loop re-checks for an
+	// identifier rather than promising one after a comma.
+	for {
+		switch p.peekSignificant() {
+		case token.RBrace:
+			p.skipTrivia(&children)
+			children = append(children, p.bump()) // "}"
+			goto afterMembers
+		case token.EOF:
+			goto afterMembers
+		case token.Ident:
+			var lead []cst.Green
+			p.skipTrivia(&lead)
+			children = append(children, p.parseEnumMember(lead))
+			if p.peekSignificant() == token.Comma {
+				p.skipTrivia(&children)
+				children = append(children, p.bump()) // ","
+			}
+		default:
+			p.skipTrivia(&children)
+			p.report(newUnexpectedTokenDiagnostic(p.cur().Offset, p.cur().Width, p.kind().String()))
+			children = append(children, p.bump())
+		}
+	}
+afterMembers:
+
+	if p.peekSignificant() == token.Impl {
+		p.skipTrivia(&children)
+		children = append(children, p.parseImplBlock())
+	}
+
+	return cst.NewNode(cst.EnumDecl, children)
+}
+
+// parseEnumMember parses one enum member, prepending the already-collected
+// leading trivia: Ident [Initializer]. The optional "= ConstExpr" gives the
+// member its value (the same Initializer node a const uses). The cursor sits on
+// the member's identifier.
+func (p *parser) parseEnumMember(lead []cst.Green) *cst.Node {
+	children := lead
+	children = append(children, p.bump()) // the member name (guaranteed an Ident)
+	if p.peekSignificant() == token.Assign {
+		p.skipTrivia(&children)
+		children = append(children, p.parseInitializer())
+	}
+	return cst.NewNode(cst.EnumMember, children)
+}
+
 // parseWhereClause parses the refinement predicate of a type declaration:
 // where Expr. The cursor sits on "where".
 func (p *parser) parseWhereClause() *cst.Node {

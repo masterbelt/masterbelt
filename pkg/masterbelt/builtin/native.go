@@ -188,6 +188,19 @@ func durationMethods() []*ir.Method {
 	)
 }
 
+// EnumComparisonMethods is the operator-method signature set every enum
+// carries: equality and the ordering comparisons, each against self and
+// returning bool. An enum is a nominal value set — it does not inherit its
+// base type's arithmetic — so these six are the only operators it has beyond
+// its own impl. The result and self operands let the bidirectional checker
+// require both sides be the same enum (Match against self unifies the
+// receiver), so a comparison across two enums or against the base type is a
+// type error. The evaluator implements them directly on the enum value rather
+// than through the registry, since enums are user-defined.
+func EnumComparisonMethods() []*ir.Method {
+	return comparisonMethods()
+}
+
 // errorMethods is the method signature set of the error primitive: message
 // reads back the message the error was constructed with. It mirrors the
 // prelude's error.belt.

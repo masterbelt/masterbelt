@@ -255,6 +255,22 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "duplicate declaration of " + f["name"].String()
 		}
 	},
+	"masterbelt.semantic.duplicate_enum_member": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "enum メンバ " + f["name"].String() + " が重複しています"
+		default:
+			return "duplicate enum member " + f["name"].String()
+		}
+	},
+	"masterbelt.semantic.duplicate_enum_value": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "enum メンバ " + f["name"].String() + " は値 " + f["value"].String() + " を重複させています"
+		default:
+			return "enum member " + f["name"].String() + " duplicates the value " + f["value"].String()
+		}
+	},
 	"masterbelt.semantic.duplicate_func_overload": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
@@ -277,6 +293,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return f["context"].String() + " はコンパイル時に評価されるため pure である必要があります。effect " + f["effect"].String() + " は使用できません"
 		default:
 			return "a " + f["context"].String() + " is evaluated at compile time and must be pure; effect " + f["effect"].String() + " is not allowed"
+		}
+	},
+	"masterbelt.semantic.invalid_enum_base_type": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return f["typ"].String() + " は enum の基底型に使えません(整数型か string を指定してください)"
+		default:
+			return f["typ"].String() + " is not a valid enum base type (use an integer type or string)"
 		}
 	},
 	"masterbelt.semantic.invalid_operation": func(loc Locale, f map[string]fmt.Stringer) string {
@@ -429,6 +453,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "この関数リテラルの結果型を推論できません。注釈を付けるか値を返してください"
 		default:
 			return "cannot infer this function literal's result type; annotate it or return a value"
+		}
+	},
+	"masterbelt.semantic.unknown_enum_member": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return f["enum"].String() + " にメンバ " + f["member"].String() + " はありません"
+		default:
+			return f["enum"].String() + " has no member " + f["member"].String()
 		}
 	},
 	"masterbelt.semantic.unknown_field": func(loc Locale, f map[string]fmt.Stringer) string {

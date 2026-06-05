@@ -299,13 +299,16 @@ func buildExports(q queries, file *ast.File, uses map[*ast.UseDecl]FileID, ownTy
 // annotation universe from the same definitions. imp must be the file's
 // import table, and fns its function shells by name (so method bodies lower
 // calls of top-level functions).
-func buildTypeDefs(q queries, file *ast.File, imp importTable, fns bodyFuncs) typeDefs {
+func buildTypeDefs(q queries, fileID FileID, file *ast.File, imp importTable, fns bodyFuncs) typeDefs {
 	td := typeDefs{byName: map[string]*ir.TypeDef{}, universe: map[string]*ir.TypeDef{}}
 	if file == nil {
 		return td
 	}
 	extern := outerTypes(q, imp)
-	td.list = resolveTypes(file, nil, nil, q.registry(), extern, qualifiedFrom(q, imp), fns)
+	// Enum member initializers fold through the file's evaluator (which the
+	// memoizing engine tracks and cycle-guards); a const reference in an enum
+	// value resolves like any other.
+	td.list = resolveTypes(evalEnv{q: q, file: fileID}, file, nil, nil, q.registry(), extern, qualifiedFrom(q, imp), fns)
 	for _, def := range td.list {
 		if def.Name != "" {
 			if _, ok := td.byName[def.Name]; !ok {
@@ -353,5 +356,5 @@ func (db *database) computeTypeDefs(f FileID) typeDefs {
 	imp, _ := db.read(importsKey(f)).(importTable)
 	q := engineQueries{db}
 	fns := bodyFuncs{local: funcShellsByName(in.file, db.fnShells), qualified: qualifiedFuncsFrom(q, imp), shells: db.fnShells}
-	return buildTypeDefs(q, in.file, imp, fns)
+	return buildTypeDefs(q, f, in.file, imp, fns)
 }

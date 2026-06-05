@@ -1,0 +1,294 @@
+# tree
+File
+  EnumDecl
+    LineComment "// Enum with an explicit integer base type and explicit member values."
+    Newline "\n"
+    DocComment "/// A card's rarity tier."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Enum "enum"
+    Whitespace " "
+    Ident "Rarity"
+    TypeClause
+      Colon ":"
+      Whitespace " "
+      TypeName
+        Ident "uint8"
+    Whitespace " "
+    LBrace "{"
+    EnumMember
+      Newline "\n"
+      Whitespace "  "
+      Ident "Common"
+      Whitespace " "
+      Initializer
+        Assign "="
+        Whitespace " "
+        Literal
+          Int "1"
+    EnumMember
+      Newline "\n"
+      Whitespace "  "
+      Ident "Rare"
+      Whitespace "   "
+      Initializer
+        Assign "="
+        Whitespace " "
+        Literal
+          Int "2"
+    EnumMember
+      Newline "\n"
+      Whitespace "  "
+      Ident "Legend"
+      Whitespace " "
+      Initializer
+        Assign "="
+        Whitespace " "
+        Literal
+          Int "10"
+    Newline "\n"
+    RBrace "}"
+  EnumDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// Enum with no base type (int by default) and auto-numbered members; it also"
+    Newline "\n"
+    LineComment "// carries an impl block, exactly as a nominal type can."
+    Newline "\n"
+    DocComment "/// An elemental affinity."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Enum "enum"
+    Whitespace " "
+    Ident "Element"
+    Whitespace " "
+    LBrace "{"
+    EnumMember
+      Newline "\n"
+      Whitespace "  "
+      Ident "Fire"
+    Comma ","
+    EnumMember
+      Whitespace " "
+      Ident "Water"
+    Comma ","
+    EnumMember
+      Whitespace " "
+      Ident "Wind"
+    Newline "\n"
+    RBrace "}"
+    Whitespace " "
+    ImplBlock
+      Impl "impl"
+      Whitespace " "
+      LBrace "{"
+      MethodDecl
+        Newline "\n"
+        Whitespace "  "
+        DocComment "/// Whether this element is Fire."
+        Newline "\n"
+        Whitespace "  "
+        Pub "pub"
+        Whitespace " "
+        Ident "isFire"
+        ParamList
+          LParen "("
+          RParen ")"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "bool"
+        Whitespace " "
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            BinaryExpr
+              SelfExpr
+                Self "self"
+              Whitespace " "
+              EqEq "=="
+              Whitespace " "
+              MemberExpr
+                NameRef
+                  Ident "Element"
+                Dot "."
+                Ident "Fire"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
+      Newline "\n"
+      RBrace "}"
+  EnumDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// Enum with a string base type: a member with no initializer takes its own"
+    Newline "\n"
+    LineComment "// name as its value, an explicit initializer overrides it."
+    Newline "\n"
+    DocComment "/// A supported display locale."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Enum "enum"
+    Whitespace " "
+    Ident "Locale"
+    TypeClause
+      Colon ":"
+      Whitespace " "
+      TypeName
+        Ident "string"
+    Whitespace " "
+    LBrace "{"
+    EnumMember
+      Newline "\n"
+      Whitespace "  "
+      Ident "Ja"
+    EnumMember
+      Newline "\n"
+      Whitespace "  "
+      Ident "En"
+      Whitespace " "
+      Initializer
+        Assign "="
+        Whitespace " "
+        Literal
+          String "\"en-US\""
+    Newline "\n"
+    RBrace "}"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// Qualified member access is canonical."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Top"
+    TypeClause
+      Colon ":"
+      Whitespace " "
+      TypeName
+        Ident "Rarity"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      MemberExpr
+        NameRef
+          Ident "Rarity"
+        Dot "."
+        Ident "Legend"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// A bare member resolves through the expected type (bidirectional inference)."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Bare"
+    TypeClause
+      Colon ":"
+      Whitespace " "
+      TypeName
+        Ident "Rarity"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      NameRef
+        Ident "Common"
+  AssertDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// Equality compares the member identity; ordering compares the base value."
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      MemberExpr
+        NameRef
+          Ident "Rarity"
+        Dot "."
+        Ident "Common"
+      Whitespace " "
+      BangEq "!="
+      Whitespace " "
+      MemberExpr
+        NameRef
+          Ident "Rarity"
+        Dot "."
+        Ident "Legend"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      MemberExpr
+        NameRef
+          Ident "Rarity"
+        Dot "."
+        Ident "Common"
+      Whitespace " "
+      Lt "<"
+      Whitespace " "
+      MemberExpr
+        NameRef
+          Ident "Rarity"
+        Dot "."
+        Ident "Legend"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      MemberExpr
+        NameRef
+          Ident "Rarity"
+        Dot "."
+        Ident "Legend"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      NameRef
+        Ident "Top"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      NameRef
+        Ident "Bare"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      MemberExpr
+        NameRef
+          Ident "Rarity"
+        Dot "."
+        Ident "Common"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      MemberExpr
+        NameRef
+          Ident "Locale"
+        Dot "."
+        Ident "Ja"
+      Whitespace " "
+      Lt "<"
+      Whitespace " "
+      MemberExpr
+        NameRef
+          Ident "Locale"
+        Dot "."
+        Ident "En"
+  Newline "\n"
+  EOF ""
+# diagnostics

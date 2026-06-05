@@ -244,6 +244,70 @@ func lowerTypeDecl(t cst.Tree, buf source.Buffer) *ast.TypeDecl {
 	return ast.NewTypeDecl(doc, public, name, params, body, where, methods, green)
 }
 
+// lowerEnumDecl lowers a positioned EnumDecl CST node into an ast.EnumDecl: its
+// modifiers, name, optional base-type annotation (a TypeClause, lowered the
+// same way a const's is), members in declaration order, and the methods of its
+// impl block. The base is the only direct type-expression child; the member
+// values live inside their EnumMember nodes.
+func lowerEnumDecl(t cst.Tree, buf source.Buffer) *ast.EnumDecl {
+	green, _ := t.Node()
+
+	var (
+		doc     []string
+		public  bool
+		name    string
+		base    ast.TypeExpr
+		members []*ast.EnumMember
+		methods []*ast.MethodDecl
+	)
+	for _, child := range t.Children() {
+		if tok, ok := child.Token(); ok {
+			switch tok.Kind() {
+			case token.Pub:
+				public = true
+			case token.DocComment:
+				doc = append(doc, docText(child.Text(buf)))
+			case token.Ident:
+				// The only direct Ident child of an EnumDecl is the declared
+				// name; the base type sits in a TypeClause and the member names
+				// in their EnumMember nodes.
+				name = child.Text(buf)
+			}
+			continue
+		}
+		node, _ := child.Node()
+		switch node.Kind() {
+		case cst.TypeClause:
+			base = lowerTypeClause(child, buf)
+		case cst.EnumMember:
+			members = append(members, lowerEnumMember(child, buf))
+		case cst.ImplBlock:
+			methods = lowerImpl(child, buf)
+		}
+	}
+	return ast.NewEnumDecl(doc, public, name, base, members, methods, green)
+}
+
+// lowerEnumMember lowers one EnumMember node: its name and the optional "=
+// ConstExpr" value (nil when the initializer is omitted).
+func lowerEnumMember(t cst.Tree, buf source.Buffer) *ast.EnumMember {
+	green, _ := t.Node()
+	var name string
+	var value ast.Expr
+	for _, child := range t.Children() {
+		if tok, ok := child.Token(); ok {
+			if tok.Kind() == token.Ident && name == "" {
+				name = child.Text(buf)
+			}
+			continue
+		}
+		if node, _ := child.Node(); node.Kind() == cst.Initializer {
+			value = lowerInitializer(child, buf)
+		}
+	}
+	return ast.NewEnumMember(name, value, green)
+}
+
 // lowerWhereClause lowers a "where Expr" clause to its predicate expression, or
 // nil when the predicate is missing (a recovered "type T = int8 where").
 func lowerWhereClause(t cst.Tree, buf source.Buffer) ast.Expr {

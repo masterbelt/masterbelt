@@ -35,6 +35,7 @@ const (
 	True    // true
 	False   // false
 	Type    // type
+	Enum    // enum
 	Impl    // impl
 	Fn      // fn
 	Return  // return
@@ -102,6 +103,7 @@ var kindNames = [...]string{
 	True:         "True",
 	False:        "False",
 	Type:         "Type",
+	Enum:         "Enum",
 	Impl:         "Impl",
 	Fn:           "Fn",
 	Return:       "Return",
@@ -203,6 +205,7 @@ var keywords = map[string]Kind{
 	"true":    True,
 	"false":   False,
 	"type":    Type,
+	"enum":    Enum,
 	"impl":    Impl,
 	"fn":      Fn,
 	"return":  Return,

@@ -66,6 +66,10 @@ const (
 	BuiltinType   // builtin [GenericArgs] — a primitive whose semantics come from the registry
 	WhereClause   // where Expr — the refinement predicate of a nominal type
 
+	// Enum declarations.
+	EnumDecl   // [doc] [pub] enum Name [":" TypeExpr] "{" EnumMember ( ("," | NL) EnumMember )* "}" [ImplBlock]
+	EnumMember // Ident [Initializer]  (one named member, with an optional "= ConstExpr" value)
+
 	// Implementations and method bodies.
 	ImplBlock  // impl "{" MethodDecl* "}"
 	MethodDecl // [pub] [extern] [fn] Ident ParamList ":" TypeExpr [Block]
@@ -118,6 +122,8 @@ var kindNames = [...]string{
 	FuncType:      "FuncType",
 	BuiltinType:   "BuiltinType",
 	WhereClause:   "WhereClause",
+	EnumDecl:      "EnumDecl",
+	EnumMember:    "EnumMember",
 	ImplBlock:     "ImplBlock",
 	MethodDecl:    "MethodDecl",
 	ParamList:     "ParamList",

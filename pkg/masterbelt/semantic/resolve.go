@@ -2,10 +2,13 @@ package semantic
 
 import (
 	"maps"
+	"math/big"
 
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/eval"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/lower"
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/types"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/types/infer"
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
@@ -37,19 +40,34 @@ func unknownTypeReporter(at func(ast.Node) span, diags *diagnostic.List) func(as
 // bounds, the defined body type, each method's signature, and the where-clause
 // predicate. Method bodies are lowered to IR here (lower.Body) but not
 // type-checked.
-func resolveTypes(file *ast.File, at func(ast.Node) span, diags *diagnostic.List, reg *builtin.Registry, extern map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, fns bodyFuncs) []*ir.TypeDef {
-	if len(file.Types) == 0 {
+func resolveTypes(env eval.Env, file *ast.File, at func(ast.Node) span, diags *diagnostic.List, reg *builtin.Registry, extern map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, fns bodyFuncs) []*ir.TypeDef {
+	if len(file.Types) == 0 && len(file.Enums) == 0 {
 		return nil
 	}
 
 	// First pass: a definition per declaration, by name, so references (including
 	// forward ones) bind before any body is resolved. A redeclared name keeps the
 	// first definition and is reported; shadowing an imported name is not a
-	// redeclaration.
-	defs := make(map[string]*ir.TypeDef, len(file.Types)+len(extern))
+	// redeclaration. Types and enums share one name space, so a name collision
+	// across the two kinds is a redeclaration too.
+	defs := make(map[string]*ir.TypeDef, len(file.Types)+len(file.Enums)+len(extern))
 	maps.Copy(defs, extern)
-	own := make(map[string]bool, len(file.Types))
+	own := make(map[string]bool, len(file.Types)+len(file.Enums))
 	out := make([]*ir.TypeDef, len(file.Types))
+	claim := func(name string, def *ir.TypeDef, anchor ast.Node) {
+		if name == "" {
+			return
+		}
+		if own[name] {
+			if at != nil && diags != nil {
+				s := at(anchor)
+				diags.Add(newDuplicateDeclarationDiagnostic(s.offset, s.width, name))
+			}
+			return
+		}
+		own[name] = true
+		defs[name] = def
+	}
 	for i, td := range file.Types {
 		def := &ir.TypeDef{Name: td.Name, Public: td.Public, Doc: td.Doc, Syntax: td}
 		// The builtin mark is syntactic (`= builtin`), so set it here: a forward
@@ -59,27 +77,25 @@ func resolveTypes(file *ast.File, at func(ast.Node) span, diags *diagnostic.List
 			def.Builtin = true
 		}
 		out[i] = def
-		if td.Name == "" {
-			continue
-		}
-		if own[td.Name] {
-			if at != nil && diags != nil {
-				s := at(td)
-				diags.Add(newDuplicateDeclarationDiagnostic(s.offset, s.width, td.Name))
-			}
-		} else {
-			own[td.Name] = true
-			defs[td.Name] = def
-		}
+		claim(td.Name, def, td)
+	}
+	enumOut := make([]*ir.TypeDef, len(file.Enums))
+	for i, ed := range file.Enums {
+		def := &ir.TypeDef{Name: ed.Name, Public: ed.Public, Doc: ed.Doc, Enum: &ir.EnumDef{}, EnumSyntax: ed}
+		enumOut[i] = def
+		claim(ed.Name, def, ed)
 	}
 
-	// Second pass: resolve parameters, body, and method signatures, reporting any
-	// unknown type names.
+	// Second pass: resolve parameters, body, method signatures, and enum bodies,
+	// reporting any unknown type names.
 	r := &infer.TypeResolver{Defs: defs, Qualified: qualified, Report: unknownTypeReporter(at, diags)}
 	for i, td := range file.Types {
 		resolveDecl(r, reg, td, out[i], at, diags, fns)
 	}
-	return out
+	for i, ed := range file.Enums {
+		resolveEnumDecl(env, r, reg, ed, enumOut[i], at, diags, fns)
+	}
+	return append(out, enumOut...)
 }
 
 // resolveDecl fills in def from the declaration: its generic parameters (whose
@@ -126,6 +142,242 @@ func resolveDecl(r *infer.TypeResolver, reg *builtin.Registry, td *ast.TypeDecl,
 		}
 		seen[key] = true
 		def.Methods = append(def.Methods, rm)
+	}
+}
+
+// resolveEnumDecl fills in an enum definition from its declaration: the base
+// type (the integer family or string; the default int when omitted), the member
+// values determined by the §3.5 rules, and the operator methods (the six
+// comparisons every enum has, plus the impl block's). Diagnostics — an invalid
+// base type, an out-of-range or duplicate value, a duplicate member name — are
+// reported through diags (nil in the silent memoized pass). env folds the
+// member initializers (a constant expression may reference a top-level const);
+// it is nil in callers that do not evaluate.
+func resolveEnumDecl(env eval.Env, r *infer.TypeResolver, reg *builtin.Registry, ed *ast.EnumDecl, def *ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List, fns bodyFuncs) {
+	// The base type: the annotation when present, else the default int. It must
+	// resolve to an integer-family or string primitive — anything else (bool, a
+	// user type, a composite) is rejected, and the enum falls back to int so the
+	// rest of resolution stays well-formed.
+	base := "int"
+	baseType := ir.Type(&ir.Builtin{Name: "int"})
+	if ed.Base != nil {
+		bt := r.ResolveType(ed.Base, nil)
+		if name, ok := integerOrStringBase(reg, bt); ok {
+			base = name
+			baseType = bt
+		} else if at != nil && diags != nil {
+			s := at(ed.Base)
+			diags.Add(newInvalidEnumBaseTypeDiagnostic(s.offset, s.width, typeNameOf(bt)))
+		}
+	}
+	def.Enum.Base = base
+
+	native, _ := reg.Native(base)
+	isString := native != nil && native.IsString()
+
+	// Member values, determined in declaration order (§3.5): an explicit
+	// initializer folds against the base type; an omitted one takes the previous
+	// integer value plus one (zero for the first), or, for a string base, the
+	// member's own name. The values are settled for the whole enum before
+	// duplicate detection, so a diagnostic never leaves the value table in a
+	// half-built state.
+	def.Enum.Members = make([]ir.EnumMember, len(ed.Members))
+	memberSeen := map[string]bool{}
+	var prevInt *big.Int
+	for i, m := range ed.Members {
+		def.Enum.Members[i] = ir.EnumMember{Name: m.Name}
+
+		// A duplicate member name is reported once, at the repeat.
+		if m.Name != "" {
+			if memberSeen[m.Name] {
+				if at != nil && diags != nil {
+					s := at(m)
+					diags.Add(newDuplicateEnumMemberDiagnostic(s.offset, s.width, m.Name))
+				}
+			}
+			memberSeen[m.Name] = true
+		}
+
+		value, nextInt := enumMemberValue(env, m, isString, baseType, prevInt)
+		prevInt = nextInt
+		def.Enum.Members[i].Value = value
+
+		// The folded value must fit the base type's range; an integer base with a
+		// fixed width rejects an out-of-range value (constant_overflow), reusing
+		// the same diagnostic an over-large const gets.
+		if value != nil && value.Kind == ir.ConstInt && !types.Fits(reg, baseType, value.Int) {
+			if at != nil && diags != nil {
+				s := enumValueSpan(at, m)
+				diags.Add(newConstantOverflowDiagnostic(s.offset, s.width, value.String(), base))
+			}
+		}
+		// A written initializer that does not type as the base (an int base given
+		// a string, say) is a type mismatch, reported the same way a const's is.
+		if m.Value != nil && value != nil && !valueFitsBaseKind(value, isString) {
+			if at != nil && diags != nil {
+				s := enumValueSpan(at, m)
+				diags.Add(newTypeMismatchDiagnostic(s.offset, s.width, kindName(value.Kind), base))
+			}
+		}
+	}
+
+	// Duplicate values are forbidden outright (§3.5-5): two members whose
+	// settled values coincide — explicit or defaulted — are an error, reported
+	// at the second.
+	checkDuplicateEnumValues(def, ed, at, diags)
+
+	// The operator methods: the six comparisons every enum carries, then the
+	// impl block's own methods (which may shadow a comparison or add new ones).
+	def.Methods = append(def.Methods, builtin.EnumComparisonMethods()...)
+	scope := map[string]bool{}
+	seen := make(map[string]bool, len(ed.Methods))
+	for _, m := range ed.Methods {
+		rm := resolveMethod(r, m, scope, fns)
+		key := rm.Name + signatureKey(def, rm)
+		if m.Name != "" && seen[key] {
+			if at != nil && diags != nil {
+				s := at(m)
+				diags.Add(newDuplicateOverloadDiagnostic(s.offset, s.width, rm.Name, paramTypes(rm)))
+			}
+			continue
+		}
+		seen[key] = true
+		def.Methods = append(def.Methods, rm)
+	}
+}
+
+// enumMemberValue determines one member's value and the running integer counter
+// for the next member. An explicit initializer folds through env (nil when no
+// evaluator is supplied); an omitted one is the member's own name for a string
+// base, or the previous integer plus one (zero for the first) for an integer
+// base. nextInt is the counter the following member continues from — the folded
+// value when it is an integer, else prev+1 so auto-numbering survives an
+// unevaluable explicit value.
+func enumMemberValue(env eval.Env, m *ast.EnumMember, isString bool, baseType ir.Type, prevInt *big.Int) (value *ir.Constant, nextInt *big.Int) {
+	if m.Value != nil {
+		if env != nil {
+			value = eval.ExprExpecting(m.Value, baseType, env)
+		}
+		if value != nil && value.Kind == ir.ConstInt {
+			return value, new(big.Int).Add(value.Int, big.NewInt(1))
+		}
+		return value, nextIntCounter(prevInt)
+	}
+	if isString {
+		// A string base defaults a member to its own name.
+		if m.Name == "" {
+			return nil, prevInt
+		}
+		return ir.StringConstant(m.Name), prevInt
+	}
+	// An integer base auto-numbers: zero for the first member, the previous
+	// value plus one thereafter.
+	n := nextIntCounter(prevInt)
+	return ir.IntConstant(n), new(big.Int).Add(n, big.NewInt(1))
+}
+
+// nextIntCounter returns the next auto-numbering value: zero when there is no
+// previous value, the previous plus one otherwise.
+func nextIntCounter(prev *big.Int) *big.Int {
+	if prev == nil {
+		return big.NewInt(0)
+	}
+	return new(big.Int).Set(prev)
+}
+
+// checkDuplicateEnumValues reports a duplicate_enum_value for any member whose
+// settled value coincides with an earlier member's — the no-alias rule (§3.5-5),
+// which keeps Name and Value in bijection. A member with no settled value (an
+// unevaluable initializer) is skipped: its duplication cannot be decided.
+func checkDuplicateEnumValues(def *ir.TypeDef, ed *ast.EnumDecl, at func(ast.Node) span, diags *diagnostic.List) {
+	if at == nil || diags == nil {
+		return
+	}
+	seen := map[string]int{}
+	for i, m := range def.Enum.Members {
+		if m.Value == nil {
+			continue
+		}
+		key := enumValueKey(m.Value)
+		if key == "" {
+			continue
+		}
+		if _, dup := seen[key]; dup {
+			s := enumValueSpan(at, ed.Members[i])
+			diags.Add(newDuplicateEnumValueDiagnostic(s.offset, s.width, m.Name, m.Value.String()))
+			continue
+		}
+		seen[key] = i
+	}
+}
+
+// enumValueKey is a comparison key for an enum member's value: its kind and
+// canonical string, so two integer values compare numerically and two strings
+// by content. An unsupported kind has no key.
+func enumValueKey(v *ir.Constant) string {
+	switch v.Kind {
+	case ir.ConstInt:
+		return "i:" + v.Int.String()
+	case ir.ConstString:
+		return "s:" + v.Str
+	default:
+		return ""
+	}
+}
+
+// enumValueSpan anchors a member-value diagnostic at the member's value
+// expression when it has one, else at the member itself.
+func enumValueSpan(at func(ast.Node) span, m *ast.EnumMember) span {
+	if m.Value != nil {
+		return at(m.Value)
+	}
+	return at(m)
+}
+
+// integerOrStringBase reports whether t is a usable enum base type — an
+// integer-family or string primitive — and returns its name.
+func integerOrStringBase(reg *builtin.Registry, t ir.Type) (string, bool) {
+	b, ok := t.(*ir.Builtin)
+	if !ok {
+		return "", false
+	}
+	n, ok := reg.Native(b.Name)
+	if !ok || (!n.IsInteger() && !n.IsString()) {
+		return "", false
+	}
+	return b.Name, true
+}
+
+// valueFitsBaseKind reports whether a folded initializer value matches the
+// base's value kind — an integer for an integer base, a string for a string
+// base. A value of any other kind is a type mismatch.
+func valueFitsBaseKind(v *ir.Constant, isString bool) bool {
+	if isString {
+		return v.Kind == ir.ConstString
+	}
+	return v.Kind == ir.ConstInt
+}
+
+// typeNameOf renders a type for the invalid-base diagnostic, falling back to a
+// readable form for the composite types an enum base may never be.
+func typeNameOf(t ir.Type) string {
+	if t == nil || t == ir.Invalid {
+		return "invalid"
+	}
+	return t.String()
+}
+
+// kindName renders a constant kind for the type-mismatch diagnostic.
+func kindName(k ir.ConstKind) string {
+	switch k {
+	case ir.ConstString:
+		return "string"
+	case ir.ConstBool:
+		return "bool"
+	case ir.ConstInt:
+		return "int"
+	default:
+		return "value"
 	}
 }
 

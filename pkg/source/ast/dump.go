@@ -21,6 +21,9 @@ func Dump(f *File) string {
 	for _, d := range f.Types {
 		dumpTypeDecl(&b, d)
 	}
+	for _, d := range f.Enums {
+		dumpEnumDecl(&b, d)
+	}
 	for _, d := range f.Funcs {
 		dumpFuncDecl(&b, d)
 	}
@@ -205,6 +208,30 @@ func dumpTypeDecl(b *strings.Builder, d *TypeDecl) {
 	}
 	if d.Where != nil {
 		fmt.Fprintf(b, "    where %s\n", dumpExpr(d.Where))
+	}
+	for _, m := range d.Methods {
+		dumpMethod(b, m)
+	}
+}
+
+func dumpEnumDecl(b *strings.Builder, d *EnumDecl) {
+	b.WriteString("  EnumDecl\n")
+	for _, doc := range d.Doc {
+		fmt.Fprintf(b, "    doc %q\n", doc)
+	}
+	if d.Public {
+		b.WriteString("    pub\n")
+	}
+	fmt.Fprintf(b, "    name %q\n", d.Name)
+	if d.Base != nil {
+		fmt.Fprintf(b, "    base %s\n", dumpType(d.Base))
+	}
+	for _, m := range d.Members {
+		if m.Value != nil {
+			fmt.Fprintf(b, "    member %q = %s\n", m.Name, dumpExpr(m.Value))
+		} else {
+			fmt.Fprintf(b, "    member %q\n", m.Name)
+		}
 	}
 	for _, m := range d.Methods {
 		dumpMethod(b, m)
