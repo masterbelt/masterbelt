@@ -76,6 +76,9 @@ masterbelt.semantic.assign_type_mismatch,error,name:string actual:string expecte
 masterbelt.semantic.immutable_data,error,
 masterbelt.semantic.missing_initializer,error,name:string
 masterbelt.semantic.index_out_of_range,error,index:string length:string
+masterbelt.semantic.missing_required_method,error,typ:string iface:string method:string
+masterbelt.semantic.orphan_impl,error,iface:string
+masterbelt.semantic.not_an_interface,error,name:string
 project.config.missing,error,
 project.config.invalid,error,detail:string
 project.config.missing_entry,error,

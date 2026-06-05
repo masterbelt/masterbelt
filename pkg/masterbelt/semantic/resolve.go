@@ -41,18 +41,18 @@ func unknownTypeReporter(at func(ast.Node) span, diags *diagnostic.List) func(as
 // predicate. Method bodies are lowered to IR here (lower.Body) but not
 // type-checked.
 func resolveTypes(env eval.Env, file *ast.File, at func(ast.Node) span, diags *diagnostic.List, reg *builtin.Registry, extern map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, fns bodyFuncs) []*ir.TypeDef {
-	if len(file.Types) == 0 && len(file.Enums) == 0 {
+	if len(file.Types) == 0 && len(file.Enums) == 0 && len(file.Interfaces) == 0 {
 		return nil
 	}
 
 	// First pass: a definition per declaration, by name, so references (including
 	// forward ones) bind before any body is resolved. A redeclared name keeps the
 	// first definition and is reported; shadowing an imported name is not a
-	// redeclaration. Types and enums share one name space, so a name collision
-	// across the two kinds is a redeclaration too.
-	defs := make(map[string]*ir.TypeDef, len(file.Types)+len(file.Enums)+len(extern))
+	// redeclaration. Types, enums, and interfaces share one name space, so a name
+	// collision across the kinds is a redeclaration too.
+	defs := make(map[string]*ir.TypeDef, len(file.Types)+len(file.Enums)+len(file.Interfaces)+len(extern))
 	maps.Copy(defs, extern)
-	own := make(map[string]bool, len(file.Types)+len(file.Enums))
+	own := make(map[string]bool, len(file.Types)+len(file.Enums)+len(file.Interfaces))
 	out := make([]*ir.TypeDef, len(file.Types))
 	claim := func(name string, def *ir.TypeDef, anchor ast.Node) {
 		if name == "" {
@@ -85,17 +85,188 @@ func resolveTypes(env eval.Env, file *ast.File, at func(ast.Node) span, diags *d
 		enumOut[i] = def
 		claim(ed.Name, def, ed)
 	}
+	ifaceOut := make([]*ir.TypeDef, len(file.Interfaces))
+	for i, id := range file.Interfaces {
+		def := &ir.TypeDef{Name: id.Name, Public: id.Public, Doc: id.Doc, Interface: &ir.InterfaceDef{}, InterfaceSyntax: id}
+		ifaceOut[i] = def
+		claim(id.Name, def, id)
+	}
 
-	// Second pass: resolve parameters, body, method signatures, and enum bodies,
-	// reporting any unknown type names.
+	// Second pass: resolve parameters, body, method signatures, enum bodies, and
+	// interface members, reporting any unknown type names.
 	r := &infer.TypeResolver{Defs: defs, Qualified: qualified, Report: unknownTypeReporter(at, diags)}
+	for i, id := range file.Interfaces {
+		resolveInterfaceDecl(r, reg, id, ifaceOut[i], fns)
+	}
 	for i, td := range file.Types {
 		resolveDecl(env, r, reg, td, out[i], at, diags, fns)
 	}
 	for i, ed := range file.Enums {
 		resolveEnumDecl(env, r, reg, ed, enumOut[i], at, diags, fns)
 	}
-	return append(out, enumOut...)
+
+	// Third pass: resolve each type's and enum's declared interface impls and,
+	// when reporting, check conformance (every required method present) and the
+	// orphan rule (the interface is implemented at the type's own definition
+	// site, which it always is here — a third-party file cannot reach a type's
+	// impl list). The interface applications are resolved against the same
+	// universe the bodies were.
+	for i, td := range file.Types {
+		resolveImpls(r, td.Impls, out[i], at, diags)
+	}
+	for i, ed := range file.Enums {
+		resolveImpls(r, ed.Impls, enumOut[i], at, diags)
+	}
+
+	out = append(out, enumOut...)
+	return append(out, ifaceOut...)
+}
+
+// resolveInterfaceDecl fills in an interface definition: its generic parameters
+// (whose names are in scope for the member signatures) and its members,
+// resolved into ir.Methods on the definition (required and provided alike, so a
+// value typed as the interface resolves them through the same overload path a
+// concrete type's methods take). Interface.Required and Interface.Provided
+// record which names are required versus provided, for the conformance check.
+func resolveInterfaceDecl(r *infer.TypeResolver, reg *builtin.Registry, id *ast.InterfaceDecl, def *ir.TypeDef, fns bodyFuncs) {
+	scope := make(map[string]bool, len(id.Params))
+	for _, p := range id.Params {
+		scope[p.Name] = true
+	}
+	for _, p := range id.Params {
+		var bound ir.Type
+		if p.Constraint != nil {
+			bound = r.ResolveType(p.Constraint, scope)
+		}
+		def.Params = append(def.Params, &ir.TypeParam{Name: p.Name, Bound: bound})
+	}
+	for _, m := range id.Members {
+		method := resolveInterfaceMember(r, reg, &ir.Named{Def: def}, m, scope, fns)
+		def.Methods = append(def.Methods, method)
+		if m.Provided() {
+			def.Interface.Provided = append(def.Interface.Provided, m.Name)
+		} else {
+			def.Interface.Required = append(def.Interface.Required, m.Name)
+		}
+	}
+}
+
+// resolveInterfaceMember resolves one interface member into an ir.Method,
+// mirroring resolveMethod: its explicit type variables (the A in fold<A>) and
+// the implicit ones (free names in a parameter position) join the signature's
+// scope, the parameters and result resolve against it, and a provided member's
+// default body lowers to IR. A required member has no body.
+func resolveInterfaceMember(r *infer.TypeResolver, reg *builtin.Registry, self ir.Type, m *ast.InterfaceMember, scope map[string]bool, fns bodyFuncs) *ir.Method {
+	method := &ir.Method{Name: m.Name, Public: m.Public, Doc: m.Doc}
+
+	// The member's own type variables join a fresh scope: the explicit ones
+	// (the A in fold<A>) and the implicit free names appearing in a parameter
+	// type (the R in map's fn(T): R), neither bound by the interface nor naming
+	// a known type. A member with no own variables reuses the interface scope.
+	mscope := scope
+	var extra []string
+	for _, tp := range m.TypeParams {
+		extra = append(extra, tp.Name)
+	}
+	paramTypes := make([]ast.TypeExpr, 0, len(m.Params))
+	for _, p := range m.Params {
+		paramTypes = append(paramTypes, p.Type)
+	}
+	if free := r.FreeTypeVars(scope, paramTypes...); len(free) > 0 {
+		extra = append(extra, free...)
+	}
+	if len(extra) > 0 {
+		mscope = make(map[string]bool, len(scope)+len(extra))
+		for k := range scope {
+			mscope[k] = true
+		}
+		for _, n := range extra {
+			mscope[n] = true
+		}
+	}
+
+	params := make(map[string]bool, len(m.Params))
+	resolvedParams := make(map[string]ir.Type, len(m.Params))
+	for _, p := range m.Params {
+		t := r.ResolveType(p.Type, mscope)
+		method.Params = append(method.Params, ir.Param{Name: p.Name, Type: t})
+		params[p.Name] = true
+		resolvedParams[p.Name] = t
+	}
+	method.Result = r.ResolveType(m.Result, mscope)
+	if m.Body != nil {
+		method.Body = lower.Body(m.Body, bodyBinder{r: r, reg: reg, params: params, paramTypes: resolvedParams, selfType: self, tscope: mscope, funcs: fns, self: true})
+	}
+	return method
+}
+
+// resolveImpls resolves a type's interface-tag impls (impl foldable<int, T>)
+// into the definition's Impls and, when reporting, checks each implemented
+// interface for conformance. An impl whose tag does not name an interface is
+// reported (not_an_interface); a conforming type must declare every required
+// method of the interface itself (missing_required_method). The orphan rule is
+// satisfied structurally: a type's impl list is reachable only at its own
+// definition site, so any impl recorded here is non-orphan by construction.
+func resolveImpls(r *infer.TypeResolver, impls []ast.TypeExpr, def *ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List) {
+	scope := make(map[string]bool, len(def.Params))
+	for _, p := range def.Params {
+		scope[p.Name] = true
+	}
+	for _, impl := range impls {
+		t := r.ResolveType(impl, scope)
+		idef := interfaceDefOf(t)
+		if idef == nil {
+			// The tag resolved to a non-interface (or failed to resolve). An
+			// unknown name is already reported by the resolver; a known
+			// non-interface is reported here.
+			if at != nil && diags != nil && t != ir.Invalid {
+				s := at(impl)
+				diags.Add(newNotAnInterfaceDiagnostic(s.offset, s.width, t.String()))
+			}
+			continue
+		}
+		def.Impls = append(def.Impls, t)
+		if at == nil || diags == nil {
+			continue
+		}
+		// Conformance: every required method must be declared directly on the
+		// type. Provided methods need not be — the interface supplies them.
+		for _, name := range idef.Interface.Required {
+			if !declaresMethod(def, name) {
+				s := at(impl)
+				diags.Add(newMissingRequiredMethodDiagnostic(s.offset, s.width, def.Name, idef.Name, name))
+			}
+		}
+	}
+}
+
+// interfaceDefOf returns the interface definition an impl tag resolved to, or
+// nil when the tag is not an interface. An interface used with type arguments is
+// an App; a bare one is a Named.
+func interfaceDefOf(t ir.Type) *ir.TypeDef {
+	switch t := t.(type) {
+	case *ir.App:
+		if t.Def != nil && t.Def.Interface != nil {
+			return t.Def
+		}
+	case *ir.Named:
+		if t.Def != nil && t.Def.Interface != nil {
+			return t.Def
+		}
+	}
+	return nil
+}
+
+// declaresMethod reports whether the definition declares a method of the given
+// name directly (not through an interface or an underlying type) — what
+// conformance demands for a required method.
+func declaresMethod(def *ir.TypeDef, name string) bool {
+	for _, m := range def.Methods {
+		if m.Name == name {
+			return true
+		}
+	}
+	return false
 }
 
 // resolveDecl fills in def from the declaration: its generic parameters (whose

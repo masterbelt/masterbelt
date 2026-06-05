@@ -306,8 +306,7 @@ func ReceiverMethods(reg *builtin.Registry, recv ir.Type) ([]*ir.Method, map[str
 	var out []*ir.Method
 	seenDefs := map[*ir.TypeDef]bool{}
 	seenNames := map[string]bool{}
-	for d := def; d != nil && !seenDefs[d]; {
-		seenDefs[d] = true
+	collect := func(d *ir.TypeDef) {
 		level := map[string]bool{} // the names this definition declares itself
 		for _, m := range d.Methods {
 			if !seenNames[m.Name] {
@@ -317,6 +316,18 @@ func ReceiverMethods(reg *builtin.Registry, recv ir.Type) ([]*ir.Method, map[str
 		}
 		for name := range level {
 			seenNames[name] = true
+		}
+	}
+	for d := def; d != nil && !seenDefs[d]; {
+		seenDefs[d] = true
+		collect(d)
+		// The provided methods of each interface the type opts into, unless a
+		// nearer declaration already shadows the name.
+		for _, impl := range d.Impls {
+			if idef := defOf(reg, impl); idef != nil && idef.Interface != nil && !seenDefs[idef] {
+				seenDefs[idef] = true
+				collect(idef)
+			}
 		}
 		// Derive from the underlying type, exactly as findMethods does.
 		if d.Builtin {
@@ -444,6 +455,23 @@ func findMethods(reg *builtin.Registry, def *ir.TypeDef, name string, seen map[*
 	for _, m := range def.Methods {
 		if m.Name == name {
 			out = append(out, m)
+		}
+	}
+	if len(out) > 0 {
+		return out
+	}
+	// An interface the type opts into supplies its provided methods: a type that
+	// declares the name directly (above) overrides them, but otherwise the
+	// interface's default is the method. The required methods are also on the
+	// interface def, but the implementing type always declares them itself
+	// (conformance demands it), so they are shadowed above; only the provided
+	// ones reach here. The interface's own def carries the method signatures and
+	// bodies, so they resolve through the same overload path.
+	for _, impl := range def.Impls {
+		if idef := defOf(reg, impl); idef != nil && idef.Interface != nil {
+			if ms := findMethods(reg, idef, name, seen); len(ms) > 0 {
+				out = append(out, ms...)
+			}
 		}
 	}
 	if len(out) > 0 {

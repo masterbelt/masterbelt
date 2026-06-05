@@ -206,6 +206,20 @@ type TypeDef struct {
 	// the type, so they are reached only through the type, never as a bare name.
 	Consts  []*AssocConst
 	Builtin bool // declared as `= builtin`: its semantics come from the registry
+	// Interface is the interface description when this definition is an interface
+	// (`interface Name {...}`), or nil for every other kind of type. An interface
+	// is a nominal behaviour: its required and provided methods are carried in
+	// Methods (so a value typed as the interface resolves them through the same
+	// path a concrete type's methods take), and Interface records which of them
+	// are required, for the nominal-satisfaction check. Body stays nil for an
+	// interface — it is a leaf in the type algebra, like a primitive or an enum.
+	Interface *InterfaceDef
+	// Impls are the interfaces this type opts into: the resolved interface
+	// applications (foldable<int, T>) of its interface-tagged impl blocks. It is
+	// empty for a type that implements no interface. The conformance check reads
+	// it to verify the type supplies every required method; method resolution
+	// reads it to surface the interfaces' provided methods on the type.
+	Impls []Type
 	// Enum is the enum description when this definition is an enum (`enum Name
 	// {...}`), or nil for every other kind of type. An enum is a nominal type
 	// whose value set is fixed: it does not derive its base type's operator
@@ -219,9 +233,10 @@ type TypeDef struct {
 	// It is set only when the predicate type-checks to a foldable bool; an
 	// unusable predicate is reported at the declaration and stays nil, so the
 	// per-constant check never fires for it.
-	Where      ast.Expr
-	Syntax     *ast.TypeDecl // the type declaration this was resolved from, or nil
-	EnumSyntax *ast.EnumDecl // the enum declaration this was resolved from, or nil
+	Where           ast.Expr
+	Syntax          *ast.TypeDecl      // the type declaration this was resolved from, or nil
+	EnumSyntax      *ast.EnumDecl      // the enum declaration this was resolved from, or nil
+	InterfaceSyntax *ast.InterfaceDecl // the interface declaration this was resolved from, or nil
 }
 
 // EnumDef is the description of an enum type: the name of its base type (an
@@ -240,6 +255,18 @@ type EnumDef struct {
 type EnumMember struct {
 	Name  string
 	Value *Constant
+}
+
+// InterfaceDef is the description of an interface type: the names of its
+// required methods (the ones an implementor must supply) and its provided
+// methods (the defaults an implementor inherits). The method signatures and
+// bodies themselves live in the owning TypeDef's Methods — required and provided
+// alike — so a value typed as the interface resolves them through the same path
+// a concrete type's methods take; this struct records only which names are
+// required, which is what the conformance check needs.
+type InterfaceDef struct {
+	Required []string // the names of the required methods, in declaration order
+	Provided []string // the names of the provided (default) methods, in declaration order
 }
 
 // TypeParam is one generic parameter of a TypeDef: a name and an optional
