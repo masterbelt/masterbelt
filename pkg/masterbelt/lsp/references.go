@@ -159,7 +159,7 @@ func isIdentifier(s string) bool {
 		c := s[i]
 		letter := c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
 		digit := c >= '0' && c <= '9'
-		if (i == 0 && !letter) || !(letter || digit) {
+		if (i == 0 && !letter) || (!letter && !digit) {
 			return false
 		}
 	}

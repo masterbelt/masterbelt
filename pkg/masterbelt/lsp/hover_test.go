@@ -152,7 +152,7 @@ func TestTypeHoverMethods(t *testing.T) {
 	sig := strings.Index(val, "type Level")
 	docAt := strings.Index(val, "a level")
 	methods := strings.Index(val, "pub increment")
-	if !(sig < docAt && docAt < methods) {
+	if sig >= docAt || docAt >= methods {
 		t.Errorf("hover sections out of order: sig %d, doc %d, methods %d", sig, docAt, methods)
 	}
 

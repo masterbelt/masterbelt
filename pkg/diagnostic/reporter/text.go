@@ -32,7 +32,7 @@ func NewText(w io.Writer, locale diagnostic.Locale) *Text {
 func (t *Text) Report(file *source.File, diags []diagnostic.Diagnostic) {
 	for _, d := range byOffset(diags) {
 		pos := file.Position(d.Offset)
-		fmt.Fprintf(t.w, "%s:%d:%d: %s[%s]: %s\n", file.Name(), pos.Line, pos.Column, d.Severity, d.Code, message(d, t.locale))
+		_, _ = fmt.Fprintf(t.w, "%s:%d:%d: %s[%s]: %s\n", file.Name(), pos.Line, pos.Column, d.Severity, d.Code, message(d, t.locale))
 	}
 	t.errors.add(diags)
 }
@@ -41,7 +41,7 @@ func (t *Text) Report(file *source.File, diags []diagnostic.Diagnostic) {
 // "severity[code]: message".
 func (t *Text) ReportBare(diags []diagnostic.Diagnostic) {
 	for _, d := range diags {
-		fmt.Fprintf(t.w, "%s[%s]: %s\n", d.Severity, d.Code, message(d, t.locale))
+		_, _ = fmt.Fprintf(t.w, "%s[%s]: %s\n", d.Severity, d.Code, message(d, t.locale))
 	}
 	t.errors.add(diags)
 }

@@ -193,12 +193,12 @@ func (l *Lexer) scanIdent(start int) token.Token {
 // invalid_datetime, as is a well-shaped instant whose fields are out of range
 // (month 13, hour 99, February 30th).
 func (l *Lexer) scanDatetime(start int) (token.Token, bool) {
-	if !(l.peekDigits(1, 4) && l.peek(5) == '-' && l.peekDigits(6, 2) && l.peek(8) == '-' && l.peekDigits(9, 2) && l.peek(11) == 'T') {
+	if !l.peekDigits(1, 4) || l.peek(5) != '-' || !l.peekDigits(6, 2) || l.peek(8) != '-' || !l.peekDigits(9, 2) || l.peek(11) != 'T' {
 		return token.Token{}, false
 	}
 	l.offset += 12 // D dddd - dd - dd T
 
-	if !(l.scanClock() && l.scanZone()) {
+	if !l.scanClock() || !l.scanZone() {
 		// Malformed past the commit point: consume the datetime-shaped run
 		// (digits, colons, dots, and a closing Z) so the broken literal stays
 		// one token, and report it. The signs are left alone — they are more
@@ -221,7 +221,7 @@ func (l *Lexer) scanDatetime(start int) (token.Token, bool) {
 // scanClock consumes the hh:mm:ss[.sss] half of a committed datetime literal,
 // reporting whether the shape held (the cursor stops at the first mismatch).
 func (l *Lexer) scanClock() bool {
-	if !(l.peekDigits(0, 2) && l.peek(2) == ':' && l.peekDigits(3, 2) && l.peek(5) == ':' && l.peekDigits(6, 2)) {
+	if !l.peekDigits(0, 2) || l.peek(2) != ':' || !l.peekDigits(3, 2) || l.peek(5) != ':' || !l.peekDigits(6, 2) {
 		return false
 	}
 	l.offset += 8 // dd : dd : dd
@@ -242,7 +242,7 @@ func (l *Lexer) scanZone() bool {
 		l.offset++
 		return true
 	case '+', '-':
-		if !(l.peekDigits(1, 2) && l.peek(3) == ':' && l.peekDigits(4, 2)) {
+		if !l.peekDigits(1, 2) || l.peek(3) != ':' || !l.peekDigits(4, 2) {
 			return false
 		}
 		l.offset += 6 // ± dd : dd
@@ -423,5 +423,5 @@ func validCodePoint(digits []byte) bool {
 	if err != nil {
 		return false
 	}
-	return v <= 0x10FFFF && !(0xD800 <= v && v <= 0xDFFF)
+	return v <= 0x10FFFF && (v < 0xD800 || v > 0xDFFF)
 }
