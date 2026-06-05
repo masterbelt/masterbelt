@@ -39,6 +39,9 @@ masterbelt.semantic.uninferable_parameter,error,name:string
 masterbelt.semantic.lambda_arity_mismatch,error,actual:int expected:int
 masterbelt.semantic.arity_mismatch,error,name:string actual:int expected:int
 masterbelt.semantic.missing_return,error,name:string
+masterbelt.semantic.no_matching_func_overload,error,name:string types:string
+masterbelt.semantic.ambiguous_func_overload,error,name:string types:string
+masterbelt.semantic.duplicate_func_overload,error,name:string types:string
 masterbelt.semantic.self_outside_method,error,
 masterbelt.semantic.use_not_found,error,path:string
 masterbelt.semantic.not_exported,error,name:string path:string

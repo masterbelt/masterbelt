@@ -33,9 +33,10 @@ type Env interface {
 	// (geo.Origin) refers to, or nil when the receiver names no namespace or
 	// the member is not among the namespace's exported values.
 	ResolveMember(m *ast.MemberExpr) *ast.ConstDecl
-	// ResolveFunc returns the function declaration a call's callee name
-	// refers to, or nil if no function has that name.
-	ResolveFunc(id *ast.Identifier) *ast.FuncDecl
+	// ResolveFunc returns the overload set a call's callee name refers to —
+	// every same-name function declaration, in source order — or nil if no
+	// function has that name.
+	ResolveFunc(id *ast.Identifier) []*ast.FuncDecl
 	// ValueOf returns a declaration's evaluated value, or nil when it cannot be
 	// evaluated.
 	ValueOf(decl *ast.ConstDecl) *ir.Constant
@@ -148,8 +149,8 @@ func evalExpr(e ast.Expr, ctx evalCtx) *ir.Constant {
 			// local is not foldable here).
 			if id, isIdent := e.Callee.(*ast.Identifier); isIdent {
 				if _, isLocal := ctx.locals[id.Name]; !isLocal {
-					if fd := ctx.env.ResolveFunc(id); fd != nil {
-						return applyFunc(fd, e.Arguments, ctx)
+					if cands := ctx.env.ResolveFunc(id); len(cands) > 0 {
+						return applyFunc(cands, e.Arguments, ctx)
 					}
 				}
 			}
@@ -167,21 +168,51 @@ func evalExpr(e ast.Expr, ctx evalCtx) *ir.Constant {
 }
 
 // applyFunc folds a call of a top-level function: the arguments fold in the
-// caller's context, bind to the parameter names, and the body's return folds
-// with only those bindings in scope (a function body sees its parameters and
-// the other declarations through env, never the caller's locals). The depth
-// guard turns runaway recursion into an unevaluated value.
-func applyFunc(fd *ast.FuncDecl, args []ast.Expr, ctx evalCtx) *ir.Constant {
-	if len(args) != len(fd.Params) || ctx.depth >= maxApplyDepth {
+// caller's context, the overload whose parameters accept their value kinds is
+// selected, and its body's return folds with only the parameter bindings in
+// scope (a function body sees its parameters and the other declarations
+// through env, never the caller's locals). Evaluation is type-blind, so the
+// selection is by value kind and conservative: when more than one candidate
+// could plausibly accept the arguments — same-kind overloads like int8/int32,
+// or a parameter type it cannot decide — the call simply does not fold, so a
+// wrong overload's body is never applied. The depth guard turns runaway
+// recursion into an unevaluated value.
+func applyFunc(cands []*ast.FuncDecl, args []ast.Expr, ctx evalCtx) *ir.Constant {
+	if ctx.depth >= maxApplyDepth {
 		return nil
 	}
-	locals := make(map[string]*ir.Constant, len(fd.Params))
-	for i, p := range fd.Params {
-		v := evalExpr(args[i], ctx)
-		if v == nil {
+	vals := make([]*ir.Constant, len(args))
+	for i, a := range args {
+		if vals[i] = evalExpr(a, ctx); vals[i] == nil {
 			return nil
 		}
-		locals[p.Name] = v
+	}
+
+	var fd *ast.FuncDecl
+	n := 0
+	for _, cand := range cands {
+		if len(cand.Params) != len(args) {
+			continue
+		}
+		fits := true
+		for i, p := range cand.Params {
+			if !kindAccepts(p.Type, vals[i].Kind) {
+				fits = false
+				break
+			}
+		}
+		if fits {
+			fd = cand
+			n++
+		}
+	}
+	if n != 1 {
+		return nil
+	}
+
+	locals := make(map[string]*ir.Constant, len(fd.Params))
+	for i, p := range fd.Params {
+		locals[p.Name] = vals[i]
 	}
 	for _, stmt := range fd.Body {
 		if ret, ok := stmt.(*ast.ReturnStmt); ok {
@@ -192,6 +223,46 @@ func applyFunc(fd *ast.FuncDecl, args []ast.Expr, ctx evalCtx) *ir.Constant {
 		}
 	}
 	return nil
+}
+
+// kindAccepts reports whether a parameter's written type can hold a constant
+// of the given kind. It decides by spelling for the prelude's primitive names
+// and the structural type forms, and answers true for anything it cannot
+// decide (a named alias, a union, a qualified name) — so a wrong overload is
+// never ruled in, only an undecidable set kept from folding.
+func kindAccepts(t ast.TypeExpr, k ir.ConstKind) bool {
+	switch t := t.(type) {
+	case *ast.NamedType:
+		if t.Namespace != "" {
+			return true // a qualified name resolves elsewhere; undecidable here
+		}
+		if len(t.Args) > 0 {
+			if t.Name == "list" || t.Name == "map" {
+				return k == ir.ConstCollection
+			}
+			return true
+		}
+		switch t.Name {
+		case "int", "int8", "int16", "int32", "int64",
+			"uint8", "uint16", "uint32", "uint64":
+			return k == ir.ConstInt
+		case "bool":
+			return k == ir.ConstBool
+		case "string":
+			return k == ir.ConstString
+		case "datetime":
+			return k == ir.ConstDatetime
+		case "duration":
+			return k == ir.ConstDuration
+		}
+		return true
+	case *ast.RecordType:
+		return k == ir.ConstRecord
+	case *ast.FuncType:
+		return k == ir.ConstFunc
+	default:
+		return true
+	}
 }
 
 // collection folds a collection literal: each entry's value (and key, for a map)

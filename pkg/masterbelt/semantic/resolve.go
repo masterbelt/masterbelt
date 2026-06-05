@@ -41,7 +41,7 @@ func unknownTypeReporter(at func(ast.Node) span, diags *diagnostic.List) func(as
 // bounds, the defined body type, each method's signature, and the where-clause
 // predicate. Method bodies are lowered to IR here (lower.Body) but not
 // type-checked.
-func resolveTypes(file *ast.File, at func(ast.Node) span, diags *diagnostic.List, reg *builtin.Registry, extern map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, fns map[string]*ir.Function) []*ir.TypeDef {
+func resolveTypes(file *ast.File, at func(ast.Node) span, diags *diagnostic.List, reg *builtin.Registry, extern map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, fns map[string][]*ir.Function) []*ir.TypeDef {
 	if len(file.Types) == 0 {
 		return nil
 	}
@@ -85,7 +85,7 @@ func resolveTypes(file *ast.File, at func(ast.Node) span, diags *diagnostic.List
 // resolveDecl fills in def from the declaration: its generic parameters (whose
 // names are in scope for the bounds, body, and methods), the body type, the
 // method signatures, and the refinement predicate.
-func resolveDecl(r *infer.TypeResolver, reg *builtin.Registry, td *ast.TypeDecl, def *ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List, fns map[string]*ir.Function) {
+func resolveDecl(r *infer.TypeResolver, reg *builtin.Registry, td *ast.TypeDecl, def *ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List, fns map[string][]*ir.Function) {
 	scope := make(map[string]bool, len(td.Params))
 	for _, p := range td.Params {
 		scope[p.Name] = true
@@ -286,14 +286,14 @@ type predicateEnv struct{ reg *builtin.Registry }
 
 func (e predicateEnv) Resolve(*ast.Identifier) *ast.ConstDecl       { return nil }
 func (e predicateEnv) ResolveMember(*ast.MemberExpr) *ast.ConstDecl { return nil }
-func (e predicateEnv) ResolveFunc(*ast.Identifier) *ast.FuncDecl    { return nil }
+func (e predicateEnv) ResolveFunc(*ast.Identifier) []*ast.FuncDecl  { return nil }
 func (e predicateEnv) ValueOf(*ast.ConstDecl) *ir.Constant          { return nil }
 func (e predicateEnv) Registry() *builtin.Registry                  { return e.reg }
 
 // resolveMethod resolves a method's signature (parameter types and result type)
 // and lowers its body to IR; fns is the file's function shells by name, so a
 // body may call a top-level function. The body is not yet type-checked.
-func resolveMethod(r *infer.TypeResolver, m *ast.MethodDecl, scope map[string]bool, fns map[string]*ir.Function) *ir.Method {
+func resolveMethod(r *infer.TypeResolver, m *ast.MethodDecl, scope map[string]bool, fns map[string][]*ir.Function) *ir.Method {
 	method := &ir.Method{Name: m.Name, Public: m.Public, Extern: m.Extern, Doc: m.Doc, Syntax: m}
 
 	// Method-introduced type variables: free type names appearing in a parameter
@@ -331,19 +331,22 @@ func resolveMethod(r *infer.TypeResolver, m *ast.MethodDecl, scope map[string]bo
 // resolveFuncs resolves the file's function declarations into their identity
 // shells, in source order: each signature's parameter and result types (with
 // unknown type names reported through the resolver) and the lowered body — a
-// method's resolution, minus the receiver. The shells are filled in place;
-// FuncCall values across the program point at them, exactly as References
-// point at the constant shells.
+// method's resolution, minus the receiver. Same-name functions are overloads,
+// legal as long as their parameter types differ; a signature that repeats an
+// earlier one is reported (duplicate_func_overload) and dropped from the
+// module, the first winning, exactly as a duplicate method overload is. The
+// shells are filled in place; FuncCall values across the program point at
+// them, exactly as References point at the constant shells.
 func resolveFuncs(file *ast.File, at func(ast.Node) span, diags *diagnostic.List, universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, shells map[*ast.FuncDecl]*ir.Function) []*ir.Function {
 	if len(file.Funcs) == 0 {
 		return nil
 	}
 	r := &infer.TypeResolver{Defs: universe, Qualified: qualified, Report: unknownTypeReporter(at, diags)}
 	fns := funcShellsByName(file, shells)
-	out := make([]*ir.Function, len(file.Funcs))
-	for i, fd := range file.Funcs {
+	out := make([]*ir.Function, 0, len(file.Funcs))
+	seen := make(map[string]bool, len(file.Funcs))
+	for _, fd := range file.Funcs {
 		fn := shells[fd]
-		out[i] = fn
 		params := make(map[string]bool, len(fd.Params))
 		fn.Params = make([]ir.Param, 0, len(fd.Params))
 		for _, p := range fd.Params {
@@ -352,23 +355,59 @@ func resolveFuncs(file *ast.File, at func(ast.Node) span, diags *diagnostic.List
 		}
 		fn.Result = r.ResolveType(fd.Result, nil)
 		fn.Body = lower.Body(fd.Body, bodyBinder{r: r, params: params, funcs: fns})
+
+		key := fn.Name + funcSignatureKey(fn)
+		if fn.Name != "" && seen[key] {
+			if at != nil && diags != nil {
+				s := at(fd)
+				diags.Add(newDuplicateFuncOverloadDiagnostic(s.offset, s.width, fn.Name, paramTypesOf(fn.Params)))
+			}
+			continue
+		}
+		seen[key] = true
+		out = append(out, fn)
 	}
 	return out
 }
 
-// funcShellsByName indexes a file's function shells by name — the first
-// declaration of a name winning, as everywhere — for the binders that lower
+// funcSignatureKey renders a function's parameter-type list as the duplicate-
+// detection key: two same-name functions collide exactly when their resolved
+// parameter types denote the same signature. Functions bind no receiver and no
+// type variables, so the key is the normalized type list directly.
+func funcSignatureKey(fn *ir.Function) string {
+	vars := map[string]int{}
+	parts := make([]string, len(fn.Params))
+	for i, p := range fn.Params {
+		parts[i] = normalizeKeyType(nil, p.Type, nil, vars)
+	}
+	return "(" + strings.Join(parts, ", ") + ")"
+}
+
+// paramTypesOf renders a parameter list's types as "a, b" for the
+// duplicate-overload diagnostic.
+func paramTypesOf(params []ir.Param) string {
+	parts := make([]string, len(params))
+	for i, p := range params {
+		if p.Type == nil {
+			parts[i] = "<nil>"
+			continue
+		}
+		parts[i] = p.Type.String()
+	}
+	return strings.Join(parts, ", ")
+}
+
+// funcShellsByName indexes a file's function shells by name — each name
+// carrying its overload set in source order — for the binders that lower
 // calls.
-func funcShellsByName(file *ast.File, shells map[*ast.FuncDecl]*ir.Function) map[string]*ir.Function {
+func funcShellsByName(file *ast.File, shells map[*ast.FuncDecl]*ir.Function) map[string][]*ir.Function {
 	if file == nil || len(file.Funcs) == 0 {
 		return nil
 	}
-	fns := make(map[string]*ir.Function, len(file.Funcs))
+	fns := make(map[string][]*ir.Function, len(file.Funcs))
 	for _, fd := range file.Funcs {
 		if fd.Name != "" {
-			if _, ok := fns[fd.Name]; !ok {
-				fns[fd.Name] = shells[fd]
-			}
+			fns[fd.Name] = append(fns[fd.Name], shells[fd])
 		}
 	}
 	return fns

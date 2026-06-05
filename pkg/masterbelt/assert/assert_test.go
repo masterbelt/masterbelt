@@ -28,7 +28,7 @@ func (e fileEnv) Resolve(id *ast.Identifier) *ast.ConstDecl {
 	return nil
 }
 func (e fileEnv) ResolveMember(m *ast.MemberExpr) *ast.ConstDecl { return nil }
-func (e fileEnv) ResolveFunc(id *ast.Identifier) *ast.FuncDecl   { return nil }
+func (e fileEnv) ResolveFunc(id *ast.Identifier) []*ast.FuncDecl { return nil }
 func (e fileEnv) ValueOf(decl *ast.ConstDecl) *ir.Constant       { return eval.Decl(decl, e) }
 func (e fileEnv) Registry() *builtin.Registry                    { return e.reg }
 

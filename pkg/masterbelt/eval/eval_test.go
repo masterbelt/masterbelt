@@ -28,7 +28,7 @@ type stubEnv struct{ reg *builtin.Registry }
 
 func (e stubEnv) Resolve(*ast.Identifier) *ast.ConstDecl       { return nil }
 func (e stubEnv) ResolveMember(*ast.MemberExpr) *ast.ConstDecl { return nil }
-func (e stubEnv) ResolveFunc(*ast.Identifier) *ast.FuncDecl    { return nil }
+func (e stubEnv) ResolveFunc(*ast.Identifier) []*ast.FuncDecl  { return nil }
 func (e stubEnv) ValueOf(*ast.ConstDecl) *ir.Constant          { return nil }
 func (e stubEnv) Registry() *builtin.Registry                  { return e.reg }
 

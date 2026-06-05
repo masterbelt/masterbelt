@@ -20,7 +20,7 @@ func (e evalEnv) Resolve(id *ast.Identifier) *ast.ConstDecl { return e.q.resolve
 func (e evalEnv) ResolveMember(m *ast.MemberExpr) *ast.ConstDecl {
 	return e.q.resolveMember(e.file, m)
 }
-func (e evalEnv) ResolveFunc(id *ast.Identifier) *ast.FuncDecl {
+func (e evalEnv) ResolveFunc(id *ast.Identifier) []*ast.FuncDecl {
 	return e.q.resolveFunc(e.file, id)
 }
 func (e evalEnv) ValueOf(decl *ast.ConstDecl) *ir.Constant { return e.q.valueOf(decl) }

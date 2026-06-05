@@ -57,10 +57,11 @@ type queries interface {
 	// (geo.Origin) refers to, or nil when the receiver names no namespace or
 	// the member is not among the target's exported values.
 	resolveMember(file FileID, m *ast.MemberExpr) *ast.ConstDecl
-	// resolveFunc returns the function declaration a call's callee name
-	// refers to, or nil if no function in the file has that name. Like
-	// resolve it is keyed on the identifier, keeping early cutoff sharp.
-	resolveFunc(file FileID, id *ast.Identifier) *ast.FuncDecl
+	// resolveFunc returns the overload set a call's callee name refers to —
+	// every same-name function declaration in the file, in source order — or
+	// nil if none has that name. Like resolve it is keyed on the identifier,
+	// keeping early cutoff sharp.
+	resolveFunc(file FileID, id *ast.Identifier) []*ast.FuncDecl
 	// typeOf returns a constant's type (ir.Invalid when undeterminable).
 	typeOf(decl *ast.ConstDecl) ir.Type
 	// valueOf returns a constant's evaluated value, or nil when it cannot be
@@ -108,7 +109,7 @@ func (e typeEnv) Resolve(id *ast.Identifier) *ast.ConstDecl { return e.q.resolve
 func (e typeEnv) ResolveMember(m *ast.MemberExpr) *ast.ConstDecl {
 	return e.q.resolveMember(e.file, m)
 }
-func (e typeEnv) ResolveFunc(id *ast.Identifier) *ast.FuncDecl {
+func (e typeEnv) ResolveFunc(id *ast.Identifier) []*ast.FuncDecl {
 	return e.q.resolveFunc(e.file, id)
 }
 func (e typeEnv) TypeOf(decl *ast.ConstDecl) ir.Type { return e.q.typeOf(decl) }
@@ -146,6 +147,14 @@ func exprSink(at func(ast.Node) span, diags *diagnostic.List) *infer.Sink {
 		CallArityMismatch: func(call *ast.CallExpr, name string, got, want int) {
 			s := at(call)
 			diags.Add(newArityMismatchDiagnostic(s.offset, s.width, name, got, want))
+		},
+		NoMatchingFuncOverload: func(call *ast.CallExpr, name, types string) {
+			s := at(call)
+			diags.Add(newNoMatchingFuncOverloadDiagnostic(s.offset, s.width, name, types))
+		},
+		AmbiguousFuncOverload: func(call *ast.CallExpr, name, types string) {
+			s := at(call)
+			diags.Add(newAmbiguousFuncOverloadDiagnostic(s.offset, s.width, name, types))
 		},
 		UninferableParam: func(p *ast.ParamDef) {
 			s := at(p)
@@ -241,18 +250,17 @@ func funcShells(files map[FileID]*ast.File) map[*ast.FuncDecl]*ir.Function {
 	return shells
 }
 
-// buildFuncSymbols maps each declared function name to its first declaration.
-// A nil file (an input never set) has no functions.
-func buildFuncSymbols(file *ast.File) map[string]*ast.FuncDecl {
-	syms := map[string]*ast.FuncDecl{}
+// buildFuncSymbols maps each declared function name to its overload set: every
+// same-name declaration, in source order. A nil file (an input never set) has
+// no functions.
+func buildFuncSymbols(file *ast.File) map[string][]*ast.FuncDecl {
+	syms := map[string][]*ast.FuncDecl{}
 	if file == nil {
 		return syms
 	}
 	for _, fd := range file.Funcs {
 		if fd.Name != "" {
-			if _, exists := syms[fd.Name]; !exists {
-				syms[fd.Name] = fd
-			}
+			syms[fd.Name] = append(syms[fd.Name], fd)
 		}
 	}
 	return syms
@@ -294,18 +302,6 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 		}
 		seen[decl.Name] = true
 	}
-	seenFn := map[string]bool{}
-	for _, fd := range file.Funcs {
-		if fd.Name == "" {
-			continue // already a parse diagnostic
-		}
-		if seenFn[fd.Name] {
-			s := at(fd)
-			diags.Add(newDuplicateDeclarationDiagnostic(s.offset, s.width, fd.Name))
-		}
-		seenFn[fd.Name] = true
-	}
-
 	cyclic := cyclicDecls(fileID, file, q)
 
 	for _, decl := range file.Decls {
@@ -745,7 +741,7 @@ func walkRefs(fileID FileID, e ast.Expr, q queries, onIdent func(*ast.Identifier
 	ast.WalkExprs(e, func(e ast.Expr) bool {
 		switch e := e.(type) {
 		case *ast.CallExpr:
-			if id, ok := e.Callee.(*ast.Identifier); ok && q.resolveFunc(fileID, id) != nil {
+			if id, ok := e.Callee.(*ast.Identifier); ok && len(q.resolveFunc(fileID, id)) > 0 {
 				funcCallee[id] = true
 			}
 		case *ast.Identifier:
@@ -788,7 +784,7 @@ type directQueries struct {
 	fnShells map[*ast.FuncDecl]*ir.Function
 
 	syms   map[FileID]map[string]*ast.ConstDecl
-	fnSyms map[FileID]map[string]*ast.FuncDecl
+	fnSyms map[FileID]map[string][]*ast.FuncDecl
 	imps   map[FileID]importTable
 	exps   map[FileID]exports
 	defs   map[FileID]typeDefs
@@ -814,7 +810,7 @@ func newDirectQueries(files map[FileID]*ast.File, uses map[FileID]map[*ast.UseDe
 		prelude:   u.prelude,
 		fnShells:  funcShells(files),
 		syms:      map[FileID]map[string]*ast.ConstDecl{},
-		fnSyms:    map[FileID]map[string]*ast.FuncDecl{},
+		fnSyms:    map[FileID]map[string][]*ast.FuncDecl{},
 		imps:      map[FileID]importTable{},
 		exps:      map[FileID]exports{},
 		defs:      map[FileID]typeDefs{},
@@ -879,7 +875,7 @@ func (d *directQueries) resolve(f FileID, id *ast.Identifier) *ast.ConstDecl {
 	return nil
 }
 
-func (d *directQueries) funcSymbols(f FileID) map[string]*ast.FuncDecl {
+func (d *directQueries) funcSymbols(f FileID) map[string][]*ast.FuncDecl {
 	if s, ok := d.fnSyms[f]; ok {
 		return s
 	}
@@ -888,7 +884,7 @@ func (d *directQueries) funcSymbols(f FileID) map[string]*ast.FuncDecl {
 	return s
 }
 
-func (d *directQueries) resolveFunc(f FileID, id *ast.Identifier) *ast.FuncDecl {
+func (d *directQueries) resolveFunc(f FileID, id *ast.Identifier) []*ast.FuncDecl {
 	return d.funcSymbols(f)[id.Name]
 }
 

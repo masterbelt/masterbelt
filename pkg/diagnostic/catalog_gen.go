@@ -159,6 +159,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "unexpected token: " + f["kind"].String()
 		}
 	},
+	"masterbelt.semantic.ambiguous_func_overload": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "関数 " + f["name"].String() + " の呼び出しが曖昧です: " + f["types"].String() + " に複数のオーバーロードが適合します"
+		default:
+			return "ambiguous call: more than one overload of function " + f["name"].String() + " accepts " + f["types"].String()
+		}
+	},
 	"masterbelt.semantic.ambiguous_import": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
@@ -247,6 +255,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "duplicate declaration of " + f["name"].String()
 		}
 	},
+	"masterbelt.semantic.duplicate_func_overload": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "関数 " + f["name"].String() + " が同じ引数型 (" + f["types"].String() + ") で再宣言されています"
+		default:
+			return "function " + f["name"].String() + " redeclares the parameter types (" + f["types"].String() + ")"
+		}
+	},
 	"masterbelt.semantic.duplicate_overload": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
@@ -285,6 +301,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "関数 " + f["name"].String() + " が値を返しません"
 		default:
 			return "function " + f["name"].String() + " never returns a value"
+		}
+	},
+	"masterbelt.semantic.no_matching_func_overload": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "関数 " + f["name"].String() + " のどのオーバーロードも " + f["types"].String() + " に適合しません"
+		default:
+			return "no overload of function " + f["name"].String() + " accepts " + f["types"].String()
 		}
 	},
 	"masterbelt.semantic.no_matching_overload": func(loc Locale, f map[string]fmt.Stringer) string {

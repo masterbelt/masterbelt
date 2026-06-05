@@ -221,7 +221,7 @@ func buildExports(q queries, file *ast.File, uses map[*ast.UseDecl]FileID, ownTy
 // annotation universe from the same definitions. imp must be the file's
 // import table, and fns its function shells by name (so method bodies lower
 // calls of top-level functions).
-func buildTypeDefs(q queries, file *ast.File, imp importTable, fns map[string]*ir.Function) typeDefs {
+func buildTypeDefs(q queries, file *ast.File, imp importTable, fns map[string][]*ir.Function) typeDefs {
 	td := typeDefs{byName: map[string]*ir.TypeDef{}, universe: map[string]*ir.TypeDef{}}
 	if file == nil {
 		return td

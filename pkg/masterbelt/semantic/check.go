@@ -83,7 +83,7 @@ func checkNoSelf(e ast.Expr, report func(node ast.Node)) {
 // the file's annotation universe — its own definitions shadowing its imported
 // ones — and qualified its namespace-qualified lookup, so a type in a body
 // resolves exactly as an annotation does.
-func checkMethodBodies(reg *builtin.Registry, defs []*ir.TypeDef, universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, funcs map[string]*ast.FuncDecl, sink *infer.Sink) {
+func checkMethodBodies(reg *builtin.Registry, defs []*ir.TypeDef, universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, funcs map[string][]*ast.FuncDecl, sink *infer.Sink) {
 	for _, def := range defs {
 		self := &ir.Named{Def: def}
 		for _, irm := range def.Methods {
@@ -114,7 +114,7 @@ func checkMethodBodies(reg *builtin.Registry, defs []*ir.TypeDef, universe map[s
 // value (missing_return): with no control flow yet, a function produces its
 // declared result exactly when some return carries a value. A declaration
 // whose body is missing altogether is a parse error, not a missing return.
-func checkFuncBodies(reg *builtin.Registry, file *ast.File, universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, funcs map[string]*ast.FuncDecl, at func(ast.Node) span, diags *diagnostic.List) {
+func checkFuncBodies(reg *builtin.Registry, file *ast.File, universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, funcs map[string][]*ast.FuncDecl, at func(ast.Node) span, diags *diagnostic.List) {
 	sink := exprSink(at, diags)
 	r := &infer.TypeResolver{Defs: universe, Qualified: qualified}
 	noSelf := func(node ast.Node) {

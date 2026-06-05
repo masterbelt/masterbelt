@@ -1209,7 +1209,7 @@ func TestFuncDiagnostics(t *testing.T) {
 		{"undefined", "const X = unknownFn(1)\n", CodeUndefinedName},
 		{"missing return", "fn g(x: int): int { }\n", CodeMissingReturn},
 		{"unknown param type", "fn f(x: Bogus): int -> 1\n", CodeUnknownType},
-		{"duplicate", "fn f(): int -> 1\nfn f(): int -> 2\n", CodeDuplicateDeclaration},
+		{"duplicate signature", "fn f(): int -> 1\nfn f(): int -> 2\n", CodeDuplicateFuncOverload},
 		{"argument mismatch", "fn f(x: int): int -> x\nconst A = f(\"a\")\n", CodeTypeMismatch},
 		{"function is not a value", "fn f(): int -> 1\nconst A = f\n", CodeUndefinedName},
 	}
@@ -1365,5 +1365,108 @@ func TestSelfAllowedInMethodAndWhere(t *testing.T) {
 		if d.Code == CodeSelfOutsideMethod {
 			t.Fatalf("self_outside_method fired in a legal position: %v", diags)
 		}
+	}
+}
+
+// --- function overloads ---------------------------------------------------------
+
+func TestFuncOverloadSelection(t *testing.T) {
+	// Same name, different parameter kinds: the argument type selects the
+	// overload, in typing and in folding.
+	src := "fn f(x: int): int -> 1\nfn f(x: string): int -> 2\n" +
+		"const A = f(9)\nconst B = f(\"a\")\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if got := m.Consts[0].Eval.String(); got != "1" {
+		t.Errorf("A eval = %s, want 1 (the int overload)", got)
+	}
+	if got := m.Consts[1].Eval.String(); got != "2" {
+		t.Errorf("B eval = %s, want 2 (the string overload)", got)
+	}
+	if len(m.Funcs) != 2 {
+		t.Errorf("module funcs = %d, want both overloads", len(m.Funcs))
+	}
+}
+
+func TestFuncOverloadByArity(t *testing.T) {
+	src := "fn f(): int -> 0\nfn f(x: int): int -> x\nconst A = f()\nconst B = f(7)\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if a, b := m.Consts[0].Eval.String(), m.Consts[1].Eval.String(); a != "0" || b != "7" {
+		t.Errorf("evals = %s, %s, want 0 and 7", a, b)
+	}
+}
+
+func TestFuncOverloadDiagnostics(t *testing.T) {
+	overloads := "fn f(x: int): int -> 1\nfn f(x: string): int -> 2\n"
+	cases := []struct {
+		name string
+		src  string
+		want diagnostic.Code
+	}{
+		{"no match", overloads + "const A = f(true)\n", CodeNoMatchingFuncOverload},
+		{"no match by arity", overloads + "const A = f(1, 2)\n", CodeNoMatchingFuncOverload},
+		{"ambiguous", "fn g(x: int8): int -> 1\nfn g(x: int32): int -> 2\nconst A = g(1)\n", CodeAmbiguousFuncOverload},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, diags := analyze(tc.src)
+			if got := codes(diags); len(got) != 1 || got[0] != tc.want {
+				t.Fatalf("codes = %v, want [%s]", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestFuncOverloadAnnotatedArgSelects(t *testing.T) {
+	// A concretely typed argument disambiguates same-kind overloads in
+	// typing; the type-blind fold stays conservative and does not pick.
+	src := "fn g(x: int8): int -> 1\nfn g(x: int32): int -> 2\n" +
+		"const B: int8 = 1\nconst A = g(B)\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if m.Consts[1].Type.String() != "int" {
+		t.Errorf("A type = %s, want int", m.Consts[1].Type)
+	}
+	if m.Consts[1].Eval != nil {
+		t.Errorf("A eval = %v, want unevaluated (kind-blind fold stays conservative)", m.Consts[1].Eval)
+	}
+}
+
+func TestFuncOverloadDuplicateStillCallable(t *testing.T) {
+	// A repeated signature reports at its declaration and is dropped: the
+	// first declaration keeps working, the call stays unambiguous.
+	src := "fn f(): int -> 1\nfn f(): int -> 2\nconst A = f()\n"
+	m, diags := analyze(src)
+	if got := codes(diags); len(got) != 1 || got[0] != CodeDuplicateFuncOverload {
+		t.Fatalf("codes = %v, want [duplicate_func_overload]", got)
+	}
+	if len(m.Funcs) != 1 {
+		t.Errorf("module funcs = %d, want the duplicate dropped", len(m.Funcs))
+	}
+	if m.Consts[0].Type.String() != "int" {
+		t.Errorf("A type = %s, want int (the first overload)", m.Consts[0].Type)
+	}
+}
+
+func TestFuncOverloadRecordArgDefers(t *testing.T) {
+	// An inferred record literal cannot select an overload; a typed one and
+	// the other arguments do, and the winner's parameter reaches into it.
+	src := "pub type Point = { x: int, y: int }\n" +
+		"fn f(p: Point, tag: int): int -> tag\n" +
+		"fn f(p: Point, tag: string): int -> 9\n" +
+		"const A = f({ x: 1, y: 2 }, 5)\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if got := m.Consts[0].Eval.String(); got != "5" {
+		t.Errorf("A eval = %s, want 5", got)
 	}
 }

@@ -32,12 +32,31 @@ func (b constBinder) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
 		}
 	case *ast.CallExpr:
 		if id, ok := e.Callee.(*ast.Identifier); ok {
-			if target := b.q.resolveFunc(b.file, id); target != nil {
-				return funcCall(b.fnOf[target], e.Arguments, sub)
+			if cands := b.q.resolveFunc(b.file, id); len(cands) > 0 {
+				return funcCall(b.fnOf[pickOverload(cands, len(e.Arguments))], e.Arguments, sub)
 			}
 		}
 	}
 	return nil
+}
+
+// pickOverload narrows an overload set to the call's target for the untyped
+// value graph: the sole candidate whose arity matches, or — when the argument
+// types are needed to decide — the set's first declaration as the
+// representative (the set shares the name; a typed consumer re-selects).
+func pickOverload(cands []*ast.FuncDecl, arity int) *ast.FuncDecl {
+	var match *ast.FuncDecl
+	n := 0
+	for _, fd := range cands {
+		if len(fd.Params) == arity {
+			match = fd
+			n++
+		}
+	}
+	if n == 1 {
+		return match
+	}
+	return cands[0]
 }
 
 func (b constBinder) EnterFunc(params []*ast.ParamDef) lower.Binder { return enterFunc(b, params) }
@@ -53,7 +72,7 @@ type bodyBinder struct {
 	r      *infer.TypeResolver
 	params map[string]bool
 	tscope map[string]bool
-	funcs  map[string]*ir.Function
+	funcs  map[string][]*ir.Function
 	self   bool // whether self has a value here (a method body; never a function's)
 }
 
@@ -87,14 +106,32 @@ func (b bodyBinder) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
 				}
 				return &ir.Conversion{Type: t, Value: arg}
 			}
-			if target, ok := b.funcs[id.Name]; ok {
-				return funcCall(target, e.Arguments, sub)
+			if cands := b.funcs[id.Name]; len(cands) > 0 {
+				return funcCall(pickShellOverload(cands, len(e.Arguments)), e.Arguments, sub)
 			}
 		}
 		return nil
 	default:
 		return nil
 	}
+}
+
+// pickShellOverload is pickOverload over function shells: the arity reads off
+// the declaration syntax, since a shell's signature may not be resolved yet
+// when a method body lowers.
+func pickShellOverload(cands []*ir.Function, arity int) *ir.Function {
+	var match *ir.Function
+	n := 0
+	for _, f := range cands {
+		if f.Syntax != nil && len(f.Syntax.Params) == arity {
+			match = f
+			n++
+		}
+	}
+	if n == 1 {
+		return match
+	}
+	return cands[0]
 }
 
 // funcCall lowers a resolved function call: the target and its lowered

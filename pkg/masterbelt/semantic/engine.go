@@ -288,11 +288,14 @@ func equalValue(kind queryKind, old, new any) bool {
 	case qResolve:
 		return old == new // resolution is comparable
 	case qFuncSymbols:
-		a, _ := old.(map[string]*ast.FuncDecl)
-		b, _ := new.(map[string]*ast.FuncDecl)
-		return maps.Equal(a, b)
+		a, _ := old.(map[string][]*ast.FuncDecl)
+		b, _ := new.(map[string][]*ast.FuncDecl)
+		return maps.EqualFunc(a, b, slices.Equal)
 	case qResolveFunc:
-		return old == new // the referent declaration pointer is the fact
+		// The overload set: the declaration pointers are the fact.
+		a, _ := old.([]*ast.FuncDecl)
+		b, _ := new.([]*ast.FuncDecl)
+		return slices.Equal(a, b)
 	case qImports:
 		a, _ := old.(importTable)
 		b, _ := new.(importTable)
@@ -505,7 +508,7 @@ func (db *database) compute(key queryKey) any {
 		in, _ := db.read(inputKey(key.file)).(fileInput)
 		return buildFuncSymbols(in.file)
 	case qResolveFunc:
-		syms := db.read(funcSymbolsKey(key.file)).(map[string]*ast.FuncDecl)
+		syms := db.read(funcSymbolsKey(key.file)).(map[string][]*ast.FuncDecl)
 		return syms[key.id.Name]
 	case qTypeOf:
 		return infer.Decl(key.decl, typeEnv{q: engineQueries{db}, file: db.declFile[key.decl]})
@@ -550,9 +553,9 @@ func cycleValue(key queryKey) any {
 	case qResolve:
 		return resolution{}
 	case qFuncSymbols:
-		return map[string]*ast.FuncDecl{}
+		return map[string][]*ast.FuncDecl{}
 	case qResolveFunc:
-		return (*ast.FuncDecl)(nil)
+		return ([]*ast.FuncDecl)(nil)
 	case qTypeDefs:
 		return typeDefs{}
 	case qExports:
@@ -591,9 +594,9 @@ func (e engineQueries) resolveMember(file FileID, m *ast.MemberExpr) *ast.ConstD
 	return resolveMemberThrough(e, file, m)
 }
 
-func (e engineQueries) resolveFunc(file FileID, id *ast.Identifier) *ast.FuncDecl {
-	fd, _ := e.db.read(resolveFuncKey(file, id)).(*ast.FuncDecl)
-	return fd
+func (e engineQueries) resolveFunc(file FileID, id *ast.Identifier) []*ast.FuncDecl {
+	fds, _ := e.db.read(resolveFuncKey(file, id)).([]*ast.FuncDecl)
+	return fds
 }
 
 func (e engineQueries) typeOf(decl *ast.ConstDecl) ir.Type {

@@ -148,9 +148,16 @@ func definition(doc view, offset int) []protocol.Location {
 	if t, _, ok := typeAt(doc, offset); ok && t.Syntax != nil {
 		return declLocation(doc.viewOfType(t))(t.Syntax.Syntax())
 	}
-	if f, _, ok := funcAt(doc, offset); ok && f.Syntax != nil {
-		// Function resolution is file-local, so the declaration is in doc.
-		return declLocation(doc, true)(f.Syntax.Syntax())
+	if fns, _, ok := funcAt(doc, offset); ok {
+		// Every overload is a target; function resolution is file-local, so
+		// the declarations are in doc.
+		var locs []protocol.Location
+		for _, f := range fns {
+			if f.Syntax != nil {
+				locs = append(locs, declLocation(doc, true)(f.Syntax.Syntax())...)
+			}
+		}
+		return locs
 	}
 	return nil
 }

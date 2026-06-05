@@ -9,40 +9,58 @@ import (
 )
 
 const (
-	CodeAmbiguousImport       diagnostic.Code = "masterbelt.semantic.ambiguous_import"
-	CodeAmbiguousOverload     diagnostic.Code = "masterbelt.semantic.ambiguous_overload"
-	CodeArityMismatch         diagnostic.Code = "masterbelt.semantic.arity_mismatch"
-	CodeAssertionFailed       diagnostic.Code = "masterbelt.semantic.assertion_failed"
-	CodeAssertionNotBool      diagnostic.Code = "masterbelt.semantic.assertion_not_bool"
-	CodeAssertionNotConstant  diagnostic.Code = "masterbelt.semantic.assertion_not_constant"
-	CodeConstantOverflow      diagnostic.Code = "masterbelt.semantic.constant_overflow"
-	CodeCyclicModule          diagnostic.Code = "masterbelt.semantic.cyclic_module"
-	CodeCyclicReference       diagnostic.Code = "masterbelt.semantic.cyclic_reference"
-	CodeDivisionByZero        diagnostic.Code = "masterbelt.semantic.division_by_zero"
-	CodeDuplicateDeclaration  diagnostic.Code = "masterbelt.semantic.duplicate_declaration"
-	CodeDuplicateOverload     diagnostic.Code = "masterbelt.semantic.duplicate_overload"
-	CodeInvalidOperation      diagnostic.Code = "masterbelt.semantic.invalid_operation"
-	CodeLambdaArityMismatch   diagnostic.Code = "masterbelt.semantic.lambda_arity_mismatch"
-	CodeMissingField          diagnostic.Code = "masterbelt.semantic.missing_field"
-	CodeMissingReturn         diagnostic.Code = "masterbelt.semantic.missing_return"
-	CodeNoMatchingOverload    diagnostic.Code = "masterbelt.semantic.no_matching_overload"
-	CodeNotARecord            diagnostic.Code = "masterbelt.semantic.not_a_record"
-	CodeNotExported           diagnostic.Code = "masterbelt.semantic.not_exported"
-	CodeRefinementNotBool     diagnostic.Code = "masterbelt.semantic.refinement_not_bool"
-	CodeRefinementNotConstant diagnostic.Code = "masterbelt.semantic.refinement_not_constant"
-	CodeRefinementViolation   diagnostic.Code = "masterbelt.semantic.refinement_violation"
-	CodeSelfOutsideMethod     diagnostic.Code = "masterbelt.semantic.self_outside_method"
-	CodeTypeMismatch          diagnostic.Code = "masterbelt.semantic.type_mismatch"
-	CodeUndefinedName         diagnostic.Code = "masterbelt.semantic.undefined_name"
-	CodeUninferableCollection diagnostic.Code = "masterbelt.semantic.uninferable_collection"
-	CodeUninferableParameter  diagnostic.Code = "masterbelt.semantic.uninferable_parameter"
-	CodeUninferableRecord     diagnostic.Code = "masterbelt.semantic.uninferable_record"
-	CodeUninferableResult     diagnostic.Code = "masterbelt.semantic.uninferable_result"
-	CodeUnknownField          diagnostic.Code = "masterbelt.semantic.unknown_field"
-	CodeUnknownMember         diagnostic.Code = "masterbelt.semantic.unknown_member"
-	CodeUnknownType           diagnostic.Code = "masterbelt.semantic.unknown_type"
-	CodeUseNotFound           diagnostic.Code = "masterbelt.semantic.use_not_found"
+	CodeAmbiguousFuncOverload  diagnostic.Code = "masterbelt.semantic.ambiguous_func_overload"
+	CodeAmbiguousImport        diagnostic.Code = "masterbelt.semantic.ambiguous_import"
+	CodeAmbiguousOverload      diagnostic.Code = "masterbelt.semantic.ambiguous_overload"
+	CodeArityMismatch          diagnostic.Code = "masterbelt.semantic.arity_mismatch"
+	CodeAssertionFailed        diagnostic.Code = "masterbelt.semantic.assertion_failed"
+	CodeAssertionNotBool       diagnostic.Code = "masterbelt.semantic.assertion_not_bool"
+	CodeAssertionNotConstant   diagnostic.Code = "masterbelt.semantic.assertion_not_constant"
+	CodeConstantOverflow       diagnostic.Code = "masterbelt.semantic.constant_overflow"
+	CodeCyclicModule           diagnostic.Code = "masterbelt.semantic.cyclic_module"
+	CodeCyclicReference        diagnostic.Code = "masterbelt.semantic.cyclic_reference"
+	CodeDivisionByZero         diagnostic.Code = "masterbelt.semantic.division_by_zero"
+	CodeDuplicateDeclaration   diagnostic.Code = "masterbelt.semantic.duplicate_declaration"
+	CodeDuplicateFuncOverload  diagnostic.Code = "masterbelt.semantic.duplicate_func_overload"
+	CodeDuplicateOverload      diagnostic.Code = "masterbelt.semantic.duplicate_overload"
+	CodeInvalidOperation       diagnostic.Code = "masterbelt.semantic.invalid_operation"
+	CodeLambdaArityMismatch    diagnostic.Code = "masterbelt.semantic.lambda_arity_mismatch"
+	CodeMissingField           diagnostic.Code = "masterbelt.semantic.missing_field"
+	CodeMissingReturn          diagnostic.Code = "masterbelt.semantic.missing_return"
+	CodeNoMatchingFuncOverload diagnostic.Code = "masterbelt.semantic.no_matching_func_overload"
+	CodeNoMatchingOverload     diagnostic.Code = "masterbelt.semantic.no_matching_overload"
+	CodeNotARecord             diagnostic.Code = "masterbelt.semantic.not_a_record"
+	CodeNotExported            diagnostic.Code = "masterbelt.semantic.not_exported"
+	CodeRefinementNotBool      diagnostic.Code = "masterbelt.semantic.refinement_not_bool"
+	CodeRefinementNotConstant  diagnostic.Code = "masterbelt.semantic.refinement_not_constant"
+	CodeRefinementViolation    diagnostic.Code = "masterbelt.semantic.refinement_violation"
+	CodeSelfOutsideMethod      diagnostic.Code = "masterbelt.semantic.self_outside_method"
+	CodeTypeMismatch           diagnostic.Code = "masterbelt.semantic.type_mismatch"
+	CodeUndefinedName          diagnostic.Code = "masterbelt.semantic.undefined_name"
+	CodeUninferableCollection  diagnostic.Code = "masterbelt.semantic.uninferable_collection"
+	CodeUninferableParameter   diagnostic.Code = "masterbelt.semantic.uninferable_parameter"
+	CodeUninferableRecord      diagnostic.Code = "masterbelt.semantic.uninferable_record"
+	CodeUninferableResult      diagnostic.Code = "masterbelt.semantic.uninferable_result"
+	CodeUnknownField           diagnostic.Code = "masterbelt.semantic.unknown_field"
+	CodeUnknownMember          diagnostic.Code = "masterbelt.semantic.unknown_member"
+	CodeUnknownType            diagnostic.Code = "masterbelt.semantic.unknown_type"
+	CodeUseNotFound            diagnostic.Code = "masterbelt.semantic.use_not_found"
 )
+
+func newAmbiguousFuncOverloadDiagnostic(offset int, width int, name string, types string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"name":  diagnostic.Str(name),
+		"types": diagnostic.Str(types),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeAmbiguousFuncOverload,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeAmbiguousFuncOverload, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
 
 func newAmbiguousImportDiagnostic(offset int, width int, name string) diagnostic.Diagnostic {
 	fields := map[string]fmt.Stringer{
@@ -198,6 +216,21 @@ func newDuplicateDeclarationDiagnostic(offset int, width int, name string) diagn
 	}
 }
 
+func newDuplicateFuncOverloadDiagnostic(offset int, width int, name string, types string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"name":  diagnostic.Str(name),
+		"types": diagnostic.Str(types),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeDuplicateFuncOverload,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeDuplicateFuncOverload, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
 func newDuplicateOverloadDiagnostic(offset int, width int, method string, types string) diagnostic.Diagnostic {
 	fields := map[string]fmt.Stringer{
 		"method": diagnostic.Str(method),
@@ -266,6 +299,21 @@ func newMissingReturnDiagnostic(offset int, width int, name string) diagnostic.D
 		Severity: diagnostic.Error,
 		Code:     CodeMissingReturn,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeMissingReturn, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newNoMatchingFuncOverloadDiagnostic(offset int, width int, name string, types string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"name":  diagnostic.Str(name),
+		"types": diagnostic.Str(types),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeNoMatchingFuncOverload,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeNoMatchingFuncOverload, fields),
 		Fields:   fields,
 		Offset:   offset,
 		Width:    width,

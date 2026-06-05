@@ -80,10 +80,10 @@ func funcSignature(f *ir.Function) string {
 	return b.String()
 }
 
-// funcAt resolves the function denoted at offset: the declared name in a
-// FuncDecl header, or a call's callee identifier that names a function. It
-// returns the module's resolved function.
-func funcAt(doc view, offset int) (*ir.Function, cst.Tree, bool) {
+// funcAt resolves the functions denoted at offset: the declared name in a
+// FuncDecl header (that one declaration), or a call's callee identifier (the
+// whole overload set it names). It returns the module's resolved functions.
+func funcAt(doc view, offset int) ([]*ir.Function, cst.Tree, bool) {
 	leaf, parent, ok := leafAt(doc.AST().Concrete().Tree(), offset)
 	if !ok {
 		return nil, cst.Tree{}, false
@@ -102,13 +102,13 @@ func funcAt(doc view, offset int) (*ir.Function, cst.Tree, bool) {
 		// The declaration's own name: the function backed by this very node.
 		for _, f := range doc.Module().Funcs {
 			if f.Syntax != nil && f.Syntax.Syntax() == parentNode {
-				return f, leaf, true
+				return []*ir.Function{f}, leaf, true
 			}
 		}
 	case cst.NameRef:
 		// A callee: the identifier backed by this NameRef, resolved to the
-		// function it calls. Operators never desugar through a NameRef callee,
-		// so only a written call matches.
+		// overload set it calls. Operators never desugar through a NameRef
+		// callee, so only a written call matches.
 		var id *ast.Identifier
 		forEachExpr(doc.AST().File(), func(e ast.Expr) {
 			if c, ok := e.(*ast.CallExpr); ok {
@@ -120,32 +120,54 @@ func funcAt(doc view, offset int) (*ir.Function, cst.Tree, bool) {
 		if id == nil {
 			return nil, cst.Tree{}, false
 		}
-		fd := doc.ResolveFunc(id)
-		if fd == nil {
+		cands := doc.ResolveFunc(id)
+		if len(cands) == 0 {
 			return nil, cst.Tree{}, false
 		}
+		inSet := make(map[*ast.FuncDecl]bool, len(cands))
+		for _, fd := range cands {
+			inSet[fd] = true
+		}
+		var fns []*ir.Function
 		for _, f := range doc.Module().Funcs {
-			if f.Syntax == fd {
-				return f, leaf, true
+			if inSet[f.Syntax] {
+				fns = append(fns, f)
 			}
+		}
+		if len(fns) > 0 {
+			return fns, leaf, true
 		}
 	}
 	return nil, cst.Tree{}, false
 }
 
-// funcHover describes the function denoted at offset — its declared name or a
-// call site — as its signature and doc; or, with the cursor on a parameter of
-// a function declaration, the parameter's name and type.
+// funcHover describes the functions denoted at offset — a declared name or a
+// call site, every overload listed under its own doc, the card an overloaded
+// method shows — or, with the cursor on a parameter of a function declaration,
+// the parameter's name and type.
 func funcHover(doc view, offset int, trees map[cst.Green]cst.Tree) *protocol.Hover {
 	buf := doc.Buffer()
-	if f, leaf, ok := funcAt(doc, offset); ok {
+	if fns, leaf, ok := funcAt(doc, offset); ok {
 		var b strings.Builder
 		b.WriteString("```masterbelt\n")
-		b.WriteString(funcSignature(f))
-		b.WriteString("\n```")
-		if len(f.Doc) > 0 {
-			b.WriteString("\n\n")
-			b.WriteString(strings.Join(f.Doc, "\n"))
+		for i, f := range fns {
+			if i > 0 && len(f.Doc) > 0 {
+				b.WriteString("\n")
+			}
+			for _, doc := range f.Doc {
+				b.WriteString("/// " + doc + "\n")
+			}
+			b.WriteString(funcSignature(f))
+			b.WriteString("\n")
+		}
+		b.WriteString("```")
+		if len(fns) == 1 && len(fns[0].Doc) > 0 {
+			// The common single-signature card keeps its doc below the code.
+			b.Reset()
+			b.WriteString("```masterbelt\n")
+			b.WriteString(funcSignature(fns[0]))
+			b.WriteString("\n```\n\n")
+			b.WriteString(strings.Join(fns[0].Doc, "\n"))
 		}
 		r := toRange(buf, leaf.Offset(), leaf.End())
 		return &protocol.Hover{
