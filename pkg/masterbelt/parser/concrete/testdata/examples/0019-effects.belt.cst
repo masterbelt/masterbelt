@@ -1,0 +1,311 @@
+# tree
+File
+  Error
+    LineComment "// Effects declare a function's interaction with the world, in its signature:"
+    Newline "\n"
+    LineComment "// io touches it, async suspends (consumed explicitly with await), nondet does"
+    Newline "\n"
+    LineComment "// not reproduce. No declaration means pure — evaluated at compile time and"
+    Newline "\n"
+    LineComment "// folded to a value, as every belt expression has been. An effectful function"
+    Newline "\n"
+    LineComment "// is never folded; it compiles to runtime code for a target."
+    Newline "\n"
+    Newline "\n"
+    LineComment "// The roots of effects are extern declarations: natives a target supplies."
+    Newline "\n"
+    Extern "extern"
+  FuncDecl
+    Whitespace " "
+    Fn "fn"
+    Whitespace " "
+    Ident "io"
+  Error
+    Whitespace " "
+    Ident "async"
+    Whitespace " "
+    Ident "fetch"
+    LParen "("
+    Ident "url"
+    Colon ":"
+    Whitespace " "
+    Ident "string"
+    RParen ")"
+    Colon ":"
+    Whitespace " "
+    Ident "string"
+    Whitespace " "
+    Pipe "|"
+    Whitespace " "
+    Ident "error"
+    Newline "\n"
+    Extern "extern"
+  FuncDecl
+    Whitespace " "
+    Fn "fn"
+    Whitespace " "
+    Ident "nondet"
+  Error
+    Whitespace " "
+    Ident "now"
+    LParen "("
+    RParen ")"
+    Colon ":"
+    Whitespace " "
+    Ident "datetime"
+  FuncDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// Effects propagate by declaration, never by silent inference: pageTitle"
+    Newline "\n"
+    LineComment "// calls fetch, so it must declare io async itself — and the suspension point"
+    Newline "\n"
+    LineComment "// is written out with await."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Fn "fn"
+    Whitespace " "
+    Ident "io"
+  Error
+    Whitespace " "
+    Ident "async"
+    Whitespace " "
+    Ident "pageTitle"
+    LParen "("
+    Ident "url"
+    Colon ":"
+    Whitespace " "
+    Ident "string"
+    RParen ")"
+    Colon ":"
+    Whitespace " "
+    Ident "string"
+    Whitespace " "
+    Pipe "|"
+    Whitespace " "
+    Ident "error"
+    Whitespace " "
+    LBrace "{"
+    Newline "\n"
+    Whitespace "  "
+    Return "return"
+    Whitespace " "
+    Ident "await"
+    Whitespace " "
+    Ident "fetch"
+    LParen "("
+    Ident "url"
+    RParen ")"
+    Newline "\n"
+    RBrace "}"
+  TypeDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// A method declares its effects the same way."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Type "type"
+    Whitespace " "
+    Ident "Client"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    RecordType
+      LBrace "{"
+      Whitespace " "
+      Field
+        Ident "base"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "string"
+      Whitespace " "
+      RBrace "}"
+    Whitespace " "
+    ImplBlock
+      Impl "impl"
+      Whitespace " "
+      LBrace "{"
+      MethodDecl
+        Newline "\n"
+        Whitespace "  "
+        Pub "pub"
+        Whitespace " "
+        Fn "fn"
+        Whitespace " "
+        Ident "io"
+      MethodDecl
+        Whitespace " "
+        Ident "async"
+      MethodDecl
+        Whitespace " "
+        Ident "get"
+        ParamList
+          LParen "("
+          Param
+            Ident "path"
+            Colon ":"
+            Whitespace " "
+            TypeName
+              Ident "string"
+          RParen ")"
+        Colon ":"
+        Whitespace " "
+        UnionType
+          TypeName
+            Ident "string"
+          Whitespace " "
+          Pipe "|"
+          Whitespace " "
+          TypeName
+            Ident "error"
+        Whitespace " "
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            NameRef
+              Ident "await"
+          Whitespace " "
+          CallExpr
+            NameRef
+              Ident "fetch"
+            LParen "("
+            BinaryExpr
+              MemberExpr
+                SelfExpr
+                  Self "self"
+                Dot "."
+                Ident "base"
+              Whitespace " "
+              Plus "+"
+              Whitespace " "
+              NameRef
+                Ident "path"
+            RParen ")"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
+      Newline "\n"
+      RBrace "}"
+  FuncDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// A nondet wrapper stays nondet: the timestamp must not fold into a value."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Fn "fn"
+    Whitespace " "
+    Ident "nondet"
+  Error
+    Whitespace " "
+    Ident "stamp"
+    LParen "("
+    RParen ")"
+    Colon ":"
+    Whitespace " "
+    Ident "datetime"
+    Whitespace " "
+    Arrow "->"
+    Whitespace " "
+    Ident "now"
+    LParen "("
+    RParen ")"
+  FuncDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// Undeclared effects mean pure: folded at compile time, as ever."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Fn "fn"
+    Whitespace " "
+    Ident "double"
+    ParamList
+      LParen "("
+      Param
+        Ident "x"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "int"
+      RParen ")"
+    Colon ":"
+    Whitespace " "
+    TypeName
+      Ident "int"
+    Whitespace " "
+    Arrow "->"
+    Whitespace " "
+    BinaryExpr
+      NameRef
+        Ident "x"
+      Whitespace " "
+      Star "*"
+      Whitespace " "
+      Literal
+        Int "2"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "A"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "double"
+        LParen "("
+        Literal
+          Int "21"
+        RParen ")"
+  AssertDecl
+    Newline "\n"
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      CallExpr
+        NameRef
+          Ident "double"
+        LParen "("
+        Literal
+          Int "2"
+        RParen ")"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "4"
+  Newline "\n"
+  EOF ""
+# diagnostics
+error[masterbelt.parser.concrete.unexpected_token] 8:1 unexpected token: Extern
+error[masterbelt.parser.concrete.expected_param_list] 8:13 expected '('
+error[masterbelt.parser.concrete.expected_type] 8:11 expected type
+error[masterbelt.parser.concrete.expected_func_body] 8:13 expected '->' or '{'
+error[masterbelt.parser.concrete.unexpected_token] 8:14 unexpected token: Ident
+error[masterbelt.parser.concrete.expected_param_list] 9:17 expected '('
+error[masterbelt.parser.concrete.expected_type] 9:11 expected type
+error[masterbelt.parser.concrete.expected_func_body] 9:17 expected '->' or '{'
+error[masterbelt.parser.concrete.unexpected_token] 9:18 unexpected token: Ident
+error[masterbelt.parser.concrete.expected_param_list] 14:10 expected '('
+error[masterbelt.parser.concrete.expected_type] 14:8 expected type
+error[masterbelt.parser.concrete.expected_func_body] 14:10 expected '->' or '{'
+error[masterbelt.parser.concrete.unexpected_token] 14:11 unexpected token: Ident
+error[masterbelt.parser.concrete.unexpected_token] 20:12 unexpected token: Whitespace
+error[masterbelt.parser.concrete.expected_type] 20:10 expected type
+error[masterbelt.parser.concrete.unexpected_token] 20:18 unexpected token: Whitespace
+error[masterbelt.parser.concrete.expected_type] 20:13 expected type
+error[masterbelt.parser.concrete.expected_param_list] 26:14 expected '('
+error[masterbelt.parser.concrete.expected_type] 26:8 expected type
+error[masterbelt.parser.concrete.expected_func_body] 26:14 expected '->' or '{'
+error[masterbelt.parser.concrete.unexpected_token] 26:15 unexpected token: Ident

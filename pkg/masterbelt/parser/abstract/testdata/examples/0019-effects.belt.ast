@@ -1,0 +1,34 @@
+File
+  ConstDecl
+    name "A"
+    value (call Identifier "double" IntLit "21")
+  TypeDecl
+    pub
+    name "Client"
+    body { base: string }
+    method "io"
+      pub
+    method "async"
+    method "get"
+      param path: string
+      result string | error
+      return Identifier "await"
+      expr (call Identifier "fetch" (call (. (. self base) add) Identifier "path"))
+  FuncDecl
+    name "io"
+  FuncDecl
+    name "nondet"
+  FuncDecl
+    pub
+    name "io"
+  FuncDecl
+    pub
+    name "nondet"
+  FuncDecl
+    pub
+    name "double"
+    param x: int
+    result int
+      return (call (. Identifier "x" mul) IntLit "2")
+  AssertDecl
+    cond (call (. (call Identifier "double" IntLit "2") eql) IntLit "4")

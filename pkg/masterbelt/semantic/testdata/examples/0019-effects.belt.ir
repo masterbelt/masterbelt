@@ -1,0 +1,29 @@
+Module
+  Const "A"
+    type int
+    value double(IntLiteral "21")
+    eval 42
+  TypeDef "Client" pub
+    body { base: string }
+    method "io" pub
+      result invalid
+    method "async"
+      result invalid
+    method "get"
+      param path: string
+      result string | error
+      return <none>
+      expr <none>
+  Func "io"
+    result invalid
+  Func "nondet"
+    result invalid
+  Func "double" pub
+    param x: int
+    result int
+      return ParamRef "x".mul(IntLiteral "2")
+  Assert "double(2) == 4"
+    eval true
+      double(2) == 4
+      ^         ^
+      4         true

@@ -1,0 +1,32 @@
+// Effects declare a function's interaction with the world, in its signature:
+// io touches it, async suspends (consumed explicitly with await), nondet does
+// not reproduce. No declaration means pure — evaluated at compile time and
+// folded to a value, as every belt expression has been. An effectful function
+// is never folded; it compiles to runtime code for a target.
+
+// The roots of effects are extern declarations: natives a target supplies.
+extern fn io async fetch(url: string): string | error
+extern fn nondet now(): datetime
+
+// Effects propagate by declaration, never by silent inference: pageTitle
+// calls fetch, so it must declare io async itself — and the suspension point
+// is written out with await.
+pub fn io async pageTitle(url: string): string | error {
+  return await fetch(url)
+}
+
+// A method declares its effects the same way.
+pub type Client = { base: string } impl {
+  pub fn io async get(path: string): string | error {
+    return await fetch(self.base + path)
+  }
+}
+
+// A nondet wrapper stays nondet: the timestamp must not fold into a value.
+pub fn nondet stamp(): datetime -> now()
+
+// Undeclared effects mean pure: folded at compile time, as ever.
+pub fn double(x: int): int -> x * 2
+const A = double(21)
+
+assert double(2) == 4
