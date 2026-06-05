@@ -1,0 +1,32 @@
+File
+  ConstDecl
+    name "Origin"
+    value Identifier "Point"
+  ConstDecl
+    name "P"
+    type Point
+  ConstDecl
+    name "Q"
+    value Identifier "Point"
+  ConstDecl
+    name "Sword"
+    value Identifier "Item"
+  ConstDecl
+    name "Path"
+    type list<Point>
+    value (collection)
+  ConstDecl
+    name "U"
+    type Unit
+  TypeDecl
+    pub
+    name "Point"
+    body { x: int, y: int }
+  TypeDecl
+    pub
+    name "Item"
+    body { id: int, name: string, pos: Point }
+  TypeDecl
+    pub
+    name "Unit"
+    body {  }

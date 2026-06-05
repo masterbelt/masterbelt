@@ -1,0 +1,26 @@
+Module
+  Const "Origin"
+    type invalid
+    value <none>
+  Const "P"
+    type Point
+    value <none>
+  Const "Q"
+    type invalid
+    value <none>
+  Const "Sword"
+    type invalid
+    value <none>
+  Const "Path"
+    type list<Point>
+    value []
+    eval []
+  Const "U"
+    type Unit
+    value <none>
+  TypeDef "Point" pub
+    body { x: int, y: int }
+  TypeDef "Item" pub
+    body { id: int, name: string, pos: Point }
+  TypeDef "Unit" pub
+    body {  }
