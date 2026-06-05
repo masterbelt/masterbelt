@@ -143,6 +143,10 @@ func exprType(e ast.Expr, s scope) ir.Type {
 			return ir.Invalid
 		}
 		return exprType(e.Value, s)
+	case *ast.TernaryExpr:
+		// The ternary's type is its two branches' unified type; the silent walk
+		// reports nothing (the checking twin does), so it only synthesizes.
+		return ternaryType(e, s)
 	case *ast.CallExpr:
 		// A call through a member access is a method call; any other callee is a
 		// context-specific form (a conversion in a method body, otherwise nothing).
@@ -150,6 +154,22 @@ func exprType(e ast.Expr, s scope) ir.Type {
 	default:
 		return s.leaf(e)
 	}
+}
+
+// ternaryType is the silent type of a conditional value: the unified type of its
+// two branches. The condition's type and a branch mismatch are the checking
+// twin's to report; here a branch that is Invalid or a non-unifying pair yields
+// ir.Invalid, exactly as a collection literal's element merge does.
+func ternaryType(e *ast.TernaryExpr, s scope) ir.Type {
+	if e.Then == nil || e.Else == nil {
+		return ir.Invalid
+	}
+	then := exprType(e.Then, s)
+	els := exprType(e.Else, s)
+	if then == ir.Invalid || els == ir.Invalid {
+		return ir.Invalid
+	}
+	return types.Unify(s.registry(), then, els)
 }
 
 // recordLitType is the silent type of a record literal: the named record type

@@ -226,6 +226,18 @@ type Await struct {
 
 func (*Await) value() {}
 
+// Ternary is a resolved conditional value, cond ? then : else: it yields Then
+// when Cond holds and Else otherwise. It is the value form of a two-way choice
+// (the if statement's expression counterpart); only the taken branch is
+// evaluated, so it keeps its own node rather than lowering to a call.
+type Ternary struct {
+	Cond Value
+	Then Value
+	Else Value
+}
+
+func (*Ternary) value() {}
+
 // NullValue is the null literal.
 type NullValue struct{}
 

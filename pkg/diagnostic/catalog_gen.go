@@ -447,6 +447,22 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "self is only available inside a method body"
 		}
 	},
+	"masterbelt.semantic.ternary_branch_mismatch": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "三項演算子の両枝の型が一致しません: " + f["then"].String() + " と " + f["els"].String()
+		default:
+			return "ternary branches have mismatched types: " + f["then"].String() + " and " + f["els"].String()
+		}
+	},
+	"masterbelt.semantic.ternary_condition_not_bool": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "三項演算子の条件は bool でなければなりません(" + f["typ"].String() + ")"
+		default:
+			return "ternary condition must be a bool; got " + f["typ"].String()
+		}
+	},
 	"masterbelt.semantic.type_mismatch": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":

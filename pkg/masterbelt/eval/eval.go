@@ -200,6 +200,8 @@ func evalExpr(e ast.Expr, ctx evalCtx) *ir.Constant {
 		return collection(e, sub)
 	case *ast.RecordLit:
 		return record(e, sub)
+	case *ast.TernaryExpr:
+		return ternary(e, sub)
 	case *ast.FuncLit:
 		// A function literal folds to a closure over the bindings in scope, so it
 		// can be applied later (by list.map) or stored in a constant.
@@ -397,6 +399,22 @@ func kindAccepts(t ast.TypeExpr, k ir.ConstKind) bool {
 	default:
 		return true
 	}
+}
+
+// ternary folds a conditional value cond ? then : else: it folds the condition
+// and, when it is a bool constant, folds and returns only the taken branch — the
+// untaken one is never evaluated, exactly as the runtime (and a switch arm)
+// only runs the selected path. An unfoldable or non-bool condition leaves the
+// whole expression unevaluated (nil), since the dispatch is undetermined.
+func ternary(e *ast.TernaryExpr, ctx evalCtx) *ir.Constant {
+	cond := evalExpr(e.Cond, ctx)
+	if cond == nil || cond.Kind != ir.ConstBool {
+		return nil
+	}
+	if cond.Bool {
+		return evalExpr(e.Then, ctx)
+	}
+	return evalExpr(e.Else, ctx)
 }
 
 // collection folds a collection literal: each entry's value (and key, for a map)

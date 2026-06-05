@@ -91,6 +91,11 @@ func checkType(e ast.Expr, want ir.Type, s scope, subst map[string]ir.Type, sink
 		return checkCollectionAgainst(e, want, s, subst, sink)
 	case *ast.RecordLit:
 		return checkRecordAgainst(e, want, s, subst, sink)
+	case *ast.TernaryExpr:
+		// The expectation reaches into both branches, so an annotated ternary's
+		// branches are checked against it (which is how an empty collection or
+		// inferred record in a branch gets its type), and the result is want.
+		return checkTernary(e, want, s, subst, sink)
 	default:
 		// Synthesis plus subsumption: any other form's type is its own; it
 		// must merely satisfy want (binding any type variable want still has).
@@ -439,11 +444,60 @@ func check(e ast.Expr, s scope, sink *Sink) ir.Type {
 			return ir.Invalid
 		}
 		return check(e.Value, s, sink)
+	case *ast.TernaryExpr:
+		return checkTernary(e, ir.Invalid, s, map[string]ir.Type{}, sink)
 	case *ast.CallExpr:
 		return callType(e, s, sink)
 	default:
 		return s.leaf(e)
 	}
+}
+
+// checkTernary checks a conditional value cond ? then : else and returns its
+// type. The condition is checked for its own operator errors and required to be
+// a bool (ternary_condition_not_bool). Each branch is checked against want when
+// the context supplies one — so an annotation reaches into both branches, the
+// way it reaches into a collection's elements — and against nothing otherwise;
+// the two branch types must then unify (ternary_branch_mismatch), and that
+// unified type (or want, when it drove the branches) is the ternary's type. An
+// already-Invalid branch propagates without a second report.
+func checkTernary(e *ast.TernaryExpr, want ir.Type, s scope, subst map[string]ir.Type, sink *Sink) ir.Type {
+	if e.Cond != nil {
+		condT := check(e.Cond, s, sink)
+		if condT != ir.Invalid && !types.IsBoolean(s.registry(), condT) {
+			sink.ternaryCondNotBool(e.Cond, condT)
+		}
+	}
+	var then, els ir.Type
+	if want != ir.Invalid {
+		then = checkType(e.Then, want, s, subst, sink)
+		els = checkType(e.Else, want, s, subst, sink)
+	} else {
+		then = checkOrInvalid(e.Then, s, sink)
+		els = checkOrInvalid(e.Else, s, sink)
+	}
+	if then == ir.Invalid || els == ir.Invalid {
+		// A branch was omitted or reported elsewhere; the result has no type, but
+		// an explicit expectation still stands as the ternary's type.
+		if want != ir.Invalid {
+			return want
+		}
+		return ir.Invalid
+	}
+	unified := types.Unify(s.registry(), then, els)
+	if unified == ir.Invalid {
+		sink.ternaryBranchMismatch(e, then, els)
+	}
+	return unified
+}
+
+// checkOrInvalid checks a possibly-nil sub-expression, returning ir.Invalid for
+// a missing one (a recovered branch) so the caller need not special-case nil.
+func checkOrInvalid(e ast.Expr, s scope, sink *Sink) ir.Type {
+	if e == nil {
+		return ir.Invalid
+	}
+	return check(e, s, sink)
 }
 
 // checkFuncLit checks a function literal with no expected type: its body is
