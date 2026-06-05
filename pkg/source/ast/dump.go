@@ -264,11 +264,46 @@ func dumpMethod(b *strings.Builder, m *MethodDecl) {
 }
 
 func dumpStmt(b *strings.Builder, s Stmt) {
+	dumpStmtAt(b, s, "      ")
+}
+
+// dumpStmtAt renders one statement at the given indent. A switch's arm bodies
+// nest one level deeper, so the indent threads through rather than being fixed,
+// keeping the dump a faithful, diffable picture of the control structure.
+func dumpStmtAt(b *strings.Builder, s Stmt, indent string) {
 	switch s := s.(type) {
 	case *ReturnStmt:
-		fmt.Fprintf(b, "      return %s\n", dumpExpr(s.Value))
+		fmt.Fprintf(b, "%sreturn %s\n", indent, dumpExpr(s.Value))
 	case *ExprStmt:
-		fmt.Fprintf(b, "      expr %s\n", dumpExpr(s.X))
+		fmt.Fprintf(b, "%sexpr %s\n", indent, dumpExpr(s.X))
+	case *SwitchStmt:
+		fmt.Fprintf(b, "%sswitch %s\n", indent, dumpExpr(s.Scrutinee))
+		for _, arm := range s.Arms {
+			values := make([]string, len(arm.Values))
+			for i, v := range arm.Values {
+				values[i] = dumpExpr(v)
+			}
+			fmt.Fprintf(b, "%s  arm %s\n", indent, strings.Join(values, ", "))
+			for _, bs := range arm.Body {
+				dumpStmtAt(b, bs, indent+"    ")
+			}
+		}
+		if s.Else != nil {
+			fmt.Fprintf(b, "%s  else\n", indent)
+			for _, bs := range s.Else {
+				dumpStmtAt(b, bs, indent+"    ")
+			}
+		}
+		for _, arm := range s.AfterElse {
+			values := make([]string, len(arm.Values))
+			for i, v := range arm.Values {
+				values[i] = dumpExpr(v)
+			}
+			fmt.Fprintf(b, "%s  unreachable-arm %s\n", indent, strings.Join(values, ", "))
+			for _, bs := range arm.Body {
+				dumpStmtAt(b, bs, indent+"    ")
+			}
+		}
 	}
 }
 

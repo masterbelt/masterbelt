@@ -1,0 +1,45 @@
+Module
+  TypeDef "Rarity" pub
+    doc "A card's rarity tier."
+    enum int
+    member "Common" = 0
+    member "Rare" = 1
+    member "Legend" = 2
+    method "eql" pub extern
+      param other: self
+      result bool
+    method "neq" pub extern
+      param other: self
+      result bool
+    method "lt" pub extern
+      param other: self
+      result bool
+    method "lteq" pub extern
+      param other: self
+      result bool
+    method "gt" pub extern
+      param other: self
+      result bool
+    method "gteq" pub extern
+      param other: self
+      result bool
+  Func "color" pub
+    param r: Rarity
+    result string
+      switch ParamRef "r"
+        arm Rarity.Common
+          return StringLiteral "white"
+        arm Rarity.Rare
+          return StringLiteral "blue"
+        arm Rarity.Legend
+          return StringLiteral "gold"
+  Func "grade" pub
+    param n: int
+    result string
+      switch ParamRef "n"
+        arm IntLiteral "0"
+          return StringLiteral "zero"
+        arm IntLiteral "1", IntLiteral "2", IntLiteral "3"
+          return StringLiteral "low"
+        else
+          return StringLiteral "high"

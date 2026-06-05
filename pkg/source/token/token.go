@@ -51,6 +51,7 @@ const (
 	Async   // async (effect: has suspension points)
 	Nondet  // nondet (effect: does not reproduce)
 	Await   // await (consumes async at a call site)
+	Switch  // switch (value-dispatch control statement)
 
 	// Operators and punctuation.
 	Colon    // :
@@ -119,6 +120,7 @@ var kindNames = [...]string{
 	Async:        "Async",
 	Nondet:       "Nondet",
 	Await:        "Await",
+	Switch:       "Switch",
 	Colon:        "Colon",
 	Assign:       "Assign",
 	Plus:         "Plus",
@@ -221,6 +223,7 @@ var keywords = map[string]Kind{
 	"async":   Async,
 	"nondet":  Nondet,
 	"await":   Await,
+	"switch":  Switch,
 }
 
 // Effect reports whether the kind is an effect keyword — the declarations a

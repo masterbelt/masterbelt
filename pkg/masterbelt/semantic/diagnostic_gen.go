@@ -13,6 +13,7 @@ const (
 	CodeAmbiguousImport        diagnostic.Code = "masterbelt.semantic.ambiguous_import"
 	CodeAmbiguousOverload      diagnostic.Code = "masterbelt.semantic.ambiguous_overload"
 	CodeArityMismatch          diagnostic.Code = "masterbelt.semantic.arity_mismatch"
+	CodeArmValueTypeMismatch   diagnostic.Code = "masterbelt.semantic.arm_value_type_mismatch"
 	CodeAssertionFailed        diagnostic.Code = "masterbelt.semantic.assertion_failed"
 	CodeAssertionNotBool       diagnostic.Code = "masterbelt.semantic.assertion_not_bool"
 	CodeAssertionNotConstant   diagnostic.Code = "masterbelt.semantic.assertion_not_constant"
@@ -25,6 +26,7 @@ const (
 	CodeDuplicateEnumValue     diagnostic.Code = "masterbelt.semantic.duplicate_enum_value"
 	CodeDuplicateFuncOverload  diagnostic.Code = "masterbelt.semantic.duplicate_func_overload"
 	CodeDuplicateOverload      diagnostic.Code = "masterbelt.semantic.duplicate_overload"
+	CodeDuplicateSwitchArm     diagnostic.Code = "masterbelt.semantic.duplicate_switch_arm"
 	CodeEffectInPureContext    diagnostic.Code = "masterbelt.semantic.effect_in_pure_context"
 	CodeInvalidEnumBaseType    diagnostic.Code = "masterbelt.semantic.invalid_enum_base_type"
 	CodeInvalidOperation       diagnostic.Code = "masterbelt.semantic.invalid_operation"
@@ -34,6 +36,7 @@ const (
 	CodeMissingReturn          diagnostic.Code = "masterbelt.semantic.missing_return"
 	CodeNoMatchingFuncOverload diagnostic.Code = "masterbelt.semantic.no_matching_func_overload"
 	CodeNoMatchingOverload     diagnostic.Code = "masterbelt.semantic.no_matching_overload"
+	CodeNonExhaustiveSwitch    diagnostic.Code = "masterbelt.semantic.non_exhaustive_switch"
 	CodeNotARecord             diagnostic.Code = "masterbelt.semantic.not_a_record"
 	CodeNotExported            diagnostic.Code = "masterbelt.semantic.not_exported"
 	CodeRefinementNotBool      diagnostic.Code = "masterbelt.semantic.refinement_not_bool"
@@ -50,6 +53,7 @@ const (
 	CodeUnknownField           diagnostic.Code = "masterbelt.semantic.unknown_field"
 	CodeUnknownMember          diagnostic.Code = "masterbelt.semantic.unknown_member"
 	CodeUnknownType            diagnostic.Code = "masterbelt.semantic.unknown_type"
+	CodeUnreachableArm         diagnostic.Code = "masterbelt.semantic.unreachable_arm"
 	CodeUnusedEffect           diagnostic.Code = "masterbelt.semantic.unused_effect"
 	CodeUseNotFound            diagnostic.Code = "masterbelt.semantic.use_not_found"
 )
@@ -108,6 +112,21 @@ func newArityMismatchDiagnostic(offset int, width int, name string, actual int, 
 		Severity: diagnostic.Error,
 		Code:     CodeArityMismatch,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeArityMismatch, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newArmValueTypeMismatchDiagnostic(offset int, width int, actual string, expected string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"actual":   diagnostic.Str(actual),
+		"expected": diagnostic.Str(expected),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeArmValueTypeMismatch,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeArmValueTypeMismatch, fields),
 		Fields:   fields,
 		Offset:   offset,
 		Width:    width,
@@ -282,6 +301,20 @@ func newDuplicateOverloadDiagnostic(offset int, width int, method string, types 
 	}
 }
 
+func newDuplicateSwitchArmDiagnostic(offset int, width int, value string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"value": diagnostic.Str(value),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeDuplicateSwitchArm,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeDuplicateSwitchArm, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
 func newEffectInPureContextDiagnostic(offset int, width int, effect string, context string) diagnostic.Diagnostic {
 	fields := map[string]fmt.Stringer{
 		"effect":  diagnostic.Str(effect),
@@ -409,6 +442,21 @@ func newNoMatchingOverloadDiagnostic(offset int, width int, method string, types
 		Severity: diagnostic.Error,
 		Code:     CodeNoMatchingOverload,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeNoMatchingOverload, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newNonExhaustiveSwitchDiagnostic(offset int, width int, typ string, missing string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"typ":     diagnostic.Str(typ),
+		"missing": diagnostic.Str(missing),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeNonExhaustiveSwitch,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeNonExhaustiveSwitch, fields),
 		Fields:   fields,
 		Offset:   offset,
 		Width:    width,
@@ -627,6 +675,17 @@ func newUnknownTypeDiagnostic(offset int, width int, name string) diagnostic.Dia
 		Code:     CodeUnknownType,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeUnknownType, fields),
 		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newUnreachableArmDiagnostic(offset int, width int) diagnostic.Diagnostic {
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeUnreachableArm,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeUnreachableArm, nil),
+		Fields:   nil,
 		Offset:   offset,
 		Width:    width,
 	}

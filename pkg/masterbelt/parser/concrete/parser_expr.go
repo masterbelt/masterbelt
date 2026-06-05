@@ -24,18 +24,125 @@ func (p *parser) parseBlock() *cst.Node {
 	}
 }
 
-// parseStmt parses a single statement: a return statement or a bare expression
-// statement. The cursor sits on the statement's first significant token.
+// parseStmt parses a single statement: a return statement, a switch statement,
+// or a bare expression statement. The cursor sits on the statement's first
+// significant token.
 func (p *parser) parseStmt() cst.Green {
 	switch {
 	case p.kind() == token.Return:
 		return p.parseReturnStmt()
+	case p.kind() == token.Switch:
+		return p.parseSwitchStmt()
 	case startsExpr(p.kind()):
 		return p.parseExpr(precLowest)
 	default:
 		p.report(newUnexpectedTokenDiagnostic(p.cur().Offset, p.cur().Width, p.kind().String()))
 		return p.bump()
 	}
+}
+
+// parseSwitchStmt parses a switch statement:
+//
+//	SwitchStmt := switch Expr "{" ( SwitchArm ( ("," | NL) SwitchArm )* )? "}"
+//
+// The scrutinee is an ordinary expression; the arms follow in a brace block,
+// separated by commas and/or newlines (a newline is trivia, so the comma is
+// optional, mirroring the enum-member and record-literal lists). The cursor
+// sits on "switch".
+func (p *parser) parseSwitchStmt() *cst.Node {
+	children := []cst.Green{p.bump()} // "switch"
+	if startsExpr(p.peekSignificant()) {
+		p.skipTrivia(&children)
+		// The scrutinee's "{" opens the arm block, not a record literal: parse
+		// it with the record-literal reading suppressed (a parenthesized
+		// scrutinee re-enables it inside the parens).
+		p.noRecordLit = true
+		children = append(children, p.parseExpr(precLowest))
+		p.noRecordLit = false
+	} else {
+		p.report(newExpectedExpressionDiagnostic(p.lastStart, 0))
+	}
+	if p.peekSignificant() != token.LBrace {
+		p.report(newUnexpectedTokenDiagnostic(p.cur().Offset, p.cur().Width, p.kind().String()))
+		return cst.NewNode(cst.SwitchStmt, children)
+	}
+	p.skipTrivia(&children)
+	children = append(children, p.bump()) // "{"
+	for {
+		switch p.peekSignificant() {
+		case token.RBrace:
+			p.skipTrivia(&children)
+			children = append(children, p.bump()) // "}"
+			return cst.NewNode(cst.SwitchStmt, children)
+		case token.EOF, token.Pub, token.Const, token.Type, token.Enum, token.Use, token.Assert:
+			// Unterminated: report the missing "}" and stop before the next
+			// declaration so recovery stays local, exactly as the record literal
+			// does.
+			p.report(newUnexpectedTokenDiagnostic(p.lastStart, 0, p.peekSignificant().String()))
+			return cst.NewNode(cst.SwitchStmt, children)
+		default:
+			p.skipTrivia(&children)
+			children = append(children, p.parseSwitchArm())
+			if p.peekSignificant() == token.Comma {
+				p.skipTrivia(&children)
+				children = append(children, p.bump()) // ","
+			}
+		}
+	}
+}
+
+// parseSwitchArm parses one arm of a switch:
+//
+//	SwitchArm := ( Expr ( "," Expr )* | "_" ) "->" ( Stmt | Block )
+//
+// The value patterns are ordinary expressions (the wildcard "_" is a NameRef
+// the later layers special-case), one or more separated by commas, and the
+// body after "->" is a single statement or a brace block — the same two body
+// forms a function literal's arrow accepts. The cursor sits on the arm's first
+// significant token.
+func (p *parser) parseSwitchArm() *cst.Node {
+	var children []cst.Green
+	if !startsExpr(p.peekSignificant()) {
+		p.report(newExpectedExpressionDiagnostic(p.cur().Offset, 0))
+		return cst.NewNode(cst.SwitchArm, []cst.Green{p.bump()})
+	}
+	children = append(children, p.parseExpr(precLowest))
+	// Comma-separated value patterns. Every comma before "->" is a value
+	// separator: the arm-separator comma only appears after the body. A comma
+	// not followed by another expression is recovery (a trailing one), so the
+	// loop stops and the missing "->" is reported below.
+	for p.peekSignificant() == token.Comma {
+		p.skipTrivia(&children)
+		children = append(children, p.bump()) // ","
+		if !startsExpr(p.peekSignificant()) {
+			break
+		}
+		p.skipTrivia(&children)
+		children = append(children, p.parseExpr(precLowest))
+	}
+	if p.peekSignificant() != token.Arrow {
+		p.report(newUnexpectedTokenDiagnostic(p.cur().Offset, p.cur().Width, p.kind().String()))
+		return cst.NewNode(cst.SwitchArm, children)
+	}
+	p.skipTrivia(&children)
+	children = append(children, p.bump()) // "->"
+	switch {
+	case p.peekSignificant() == token.LBrace:
+		p.skipTrivia(&children)
+		children = append(children, p.parseBlock())
+	case startsStmt(p.peekSignificant()):
+		p.skipTrivia(&children)
+		children = append(children, p.parseStmt())
+	default:
+		p.report(newExpectedExpressionDiagnostic(p.lastStart, 0))
+	}
+	return cst.NewNode(cst.SwitchArm, children)
+}
+
+// startsStmt reports whether kind can begin a statement: a return, a switch, or
+// any expression.
+func startsStmt(kind token.Kind) bool {
+	return kind == token.Return || kind == token.Switch || startsExpr(kind)
 }
 
 // parseReturnStmt parses "return Expr". The cursor sits on "return".
@@ -165,16 +272,27 @@ func (p *parser) parseCallArgs(children *[]cst.Green) {
 // the operand token — startsExpr gates every call site, so the default arm is
 // defensive and consumes nothing.
 func (p *parser) parseOperand() cst.Green {
+	// The record-literal restriction applies only to this operand decision (the
+	// scrutinee's leftmost atom); clear it so nested expressions — call
+	// arguments, parenthesized groups — read "{" normally again.
+	noRecordLit := p.noRecordLit
+	p.noRecordLit = false
 	switch p.kind() {
 	case token.Int, token.String, token.DatetimeLit, token.DurationLit, token.True, token.False, token.Null:
 		return cst.NewNode(cst.Literal, []cst.Green{p.bump()})
 	case token.LBracket:
 		return p.parseCollectionLiteral()
 	case token.LBrace:
+		if noRecordLit {
+			// The "{" opens a switch's arm block, not an inferred record literal:
+			// stop here so the switch parser takes it.
+			p.report(newExpectedExpressionDiagnostic(p.lastStart, 0))
+			return cst.NewNode(cst.Error, nil)
+		}
 		return p.parseRecordLit(nil) // the inferred form: "{" with no type name
 	case token.Ident:
 		name := p.bump()
-		if p.peekSignificant() == token.LBrace {
+		if !noRecordLit && p.peekSignificant() == token.LBrace {
 			return p.parseRecordLit([]cst.Green{name}) // the typed form: Name "{"
 		}
 		return cst.NewNode(cst.NameRef, []cst.Green{name})

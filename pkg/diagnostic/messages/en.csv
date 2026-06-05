@@ -61,6 +61,10 @@ masterbelt.semantic.refinement_not_constant,where clause is not a compile-time p
 masterbelt.semantic.missing_effect,function {fn} uses effect {effect} without declaring it
 masterbelt.semantic.unused_effect,function {fn} declares effect {effect} but never uses it
 masterbelt.semantic.effect_in_pure_context,a {context} is evaluated at compile time and must be pure; effect {effect} is not allowed
+masterbelt.semantic.non_exhaustive_switch,switch on {typ} is not exhaustive: {missing}
+masterbelt.semantic.duplicate_switch_arm,duplicate switch arm for {value}
+masterbelt.semantic.arm_value_type_mismatch,cannot use {actual} as a {expected} switch value
+masterbelt.semantic.unreachable_arm,unreachable arm: a previous arm or the wildcard already matches every value
 project.config.missing,masterbelt.toml not found in this directory or any parent
 project.config.invalid,invalid masterbelt.toml: {detail}
 project.config.missing_entry,masterbelt.toml does not set entry

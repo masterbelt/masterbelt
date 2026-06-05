@@ -246,8 +246,8 @@ func NewMethodDecl(doc []string, public, extern bool, effects []string, name str
 	return &MethodDecl{Doc: doc, Public: public, Extern: extern, Effects: effects, Name: name, Params: params, Result: result, Body: body, syntax: syntax}
 }
 
-// Stmt is a statement inside a method body: a return (ReturnStmt) or a bare
-// expression statement (ExprStmt).
+// Stmt is a statement inside a method body: a return (ReturnStmt), a switch
+// (SwitchStmt), or a bare expression statement (ExprStmt).
 type Stmt interface {
 	Node
 	stmt()
@@ -282,4 +282,49 @@ func (s *ExprStmt) stmt()             {}
 // NewExprStmt builds an ExprStmt node.
 func NewExprStmt(x Expr, syntax *cst.Node) *ExprStmt {
 	return &ExprStmt{X: x, syntax: syntax}
+}
+
+// SwitchStmt is a value-dispatch statement: it runs the body of the first arm
+// whose value patterns match the Scrutinee (by equality), or — when no arm
+// matches — the wildcard Else body. The wildcard arm ("_") is lifted out of the
+// Arms list into Else, so the arms carry only value patterns; Else is nil when
+// the switch had no wildcard. Each arm body is its own statement list, so a
+// switch nests control flow.
+type SwitchStmt struct {
+	Scrutinee Expr         // the value branched on (nil if recovered away)
+	Arms      []*SwitchArm // the value-pattern arms before the wildcard, in source order
+	Else      []Stmt       // the wildcard "_" arm's body, or nil if none
+	// AfterElse holds any value-pattern arms written after the wildcard. The
+	// wildcard already matches every remaining value, so these can never run;
+	// they are kept out of the live Arms (and so out of the IR and evaluation)
+	// and reported as unreachable.
+	AfterElse []*SwitchArm
+	syntax    *cst.Node
+}
+
+func (s *SwitchStmt) Syntax() *cst.Node { return s.syntax }
+func (s *SwitchStmt) node()             {}
+func (s *SwitchStmt) stmt()             {}
+
+// NewSwitchStmt builds a SwitchStmt node.
+func NewSwitchStmt(scrutinee Expr, arms []*SwitchArm, els []Stmt, afterElse []*SwitchArm, syntax *cst.Node) *SwitchStmt {
+	return &SwitchStmt{Scrutinee: scrutinee, Arms: arms, Else: els, AfterElse: afterElse, syntax: syntax}
+}
+
+// SwitchArm is one non-wildcard arm of a switch: one or more compile-time value
+// patterns (Values) and the Body to run when the scrutinee equals any of them.
+// A bare enum member in a value position is an ordinary Identifier here; the
+// semantic layer resolves it against the scrutinee's enum.
+type SwitchArm struct {
+	Values []Expr // the value patterns this arm matches, in source order
+	Body   []Stmt // the statements to run when the arm matches
+	syntax *cst.Node
+}
+
+func (a *SwitchArm) Syntax() *cst.Node { return a.syntax }
+func (a *SwitchArm) node()             {}
+
+// NewSwitchArm builds a SwitchArm node.
+func NewSwitchArm(values []Expr, body []Stmt, syntax *cst.Node) *SwitchArm {
+	return &SwitchArm{Values: values, Body: body, syntax: syntax}
 }

@@ -267,7 +267,7 @@ type Method struct {
 }
 
 // Stmt is a statement in a method body. It is a sealed interface; the only
-// implementations are Return and ExprStmt.
+// implementations are Return, ExprStmt, and Switch.
 type Stmt interface {
 	stmt()
 }
@@ -285,6 +285,25 @@ type ExprStmt struct {
 }
 
 func (*ExprStmt) stmt() {}
+
+// Switch is a resolved value-dispatch statement: it runs the body of the first
+// arm whose patterns the Scrutinee equals, or the Else body when none match.
+// The wildcard "_" arm has been lifted into Else (nil when the switch had no
+// wildcard), so the arms carry only value patterns.
+type Switch struct {
+	Scrutinee Value
+	Arms      []SwitchArm
+	Else      []Stmt // the wildcard body, or nil if the switch had no wildcard
+}
+
+func (*Switch) stmt() {}
+
+// SwitchArm is one resolved arm of a Switch: the values it matches and the body
+// it runs.
+type SwitchArm struct {
+	Values []Value
+	Body   []Stmt
+}
 
 // Param is one method parameter: a name and its type.
 type Param struct {

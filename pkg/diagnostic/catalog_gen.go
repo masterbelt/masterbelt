@@ -191,6 +191,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "function " + f["name"].String() + " takes " + f["expected"].String() + " argument(s); " + f["actual"].String() + " given"
 		}
 	},
+	"masterbelt.semantic.arm_value_type_mismatch": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return f["actual"].String() + " を " + f["expected"].String() + " の switch 値として使用できません"
+		default:
+			return "cannot use " + f["actual"].String() + " as a " + f["expected"].String() + " switch value"
+		}
+	},
 	"masterbelt.semantic.assertion_failed": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
@@ -287,6 +295,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "method " + f["method"].String() + " redeclares the parameter types (" + f["types"].String() + ")"
 		}
 	},
+	"masterbelt.semantic.duplicate_switch_arm": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "switch の arm が重複しています: " + f["value"].String()
+		default:
+			return "duplicate switch arm for " + f["value"].String()
+		}
+	},
 	"masterbelt.semantic.effect_in_pure_context": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
@@ -357,6 +373,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "メソッド " + f["method"].String() + " のどのオーバーロードも " + f["types"].String() + " に適合しません"
 		default:
 			return "no overload of method " + f["method"].String() + " accepts " + f["types"].String()
+		}
+	},
+	"masterbelt.semantic.non_exhaustive_switch": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return f["typ"].String() + " の switch が網羅的ではありません: " + f["missing"].String()
+		default:
+			return "switch on " + f["typ"].String() + " is not exhaustive: " + f["missing"].String()
 		}
 	},
 	"masterbelt.semantic.not_a_record": func(loc Locale, f map[string]fmt.Stringer) string {
@@ -485,6 +509,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "未知の型: " + f["name"].String()
 		default:
 			return "unknown type: " + f["name"].String()
+		}
+	},
+	"masterbelt.semantic.unreachable_arm": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "到達不能な arm です。先行する arm かワイルドカードがすべての値に一致します"
+		default:
+			return "unreachable arm: a previous arm or the wildcard already matches every value"
 		}
 	},
 	"masterbelt.semantic.unused_effect": func(loc Locale, f map[string]fmt.Stringer) string {

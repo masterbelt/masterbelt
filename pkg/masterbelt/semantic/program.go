@@ -281,7 +281,10 @@ func funcLitTypesOf(db *database, fileID FileID, file *ast.File) map[*ast.FuncLi
 			infer.Check(a.Cond, env, sink)
 		}
 	}
-	checkMethodBodies(reg, q.typeDefs(fileID), q.universe(fileID), qualified, buildFuncSymbols(file), qualifiedFuncsFrom(q, q.importsOf(fileID)), sink)
+	// Diagnostics are not wanted here — only the SolvedFuncLit sink — so the
+	// switch checks are suppressed by a nil diagnostic list; the body walk still
+	// reaches every function literal, including those in a switch arm.
+	checkMethodBodies(reg, q.typeDefs(fileID), q.universe(fileID), qualified, buildFuncSymbols(file), qualifiedFuncsFrom(q, q.importsOf(fileID)), nil, sink, nil, nil)
 	return out
 }
 

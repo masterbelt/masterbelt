@@ -1,0 +1,32 @@
+File
+  EnumDecl
+    doc "A card's rarity tier."
+    pub
+    name "Rarity"
+    member "Common"
+    member "Rare"
+    member "Legend"
+  FuncDecl
+    pub
+    name "color"
+    param r: Rarity
+    result string
+      switch Identifier "r"
+        arm Identifier "Common"
+          return StringLit "white"
+        arm Identifier "Rare"
+          return StringLit "blue"
+        arm Identifier "Legend"
+          return StringLit "gold"
+  FuncDecl
+    pub
+    name "grade"
+    param n: int
+    result string
+      switch Identifier "n"
+        arm IntLit "0"
+          return StringLit "zero"
+        arm IntLit "1", IntLit "2", IntLit "3"
+          return StringLit "low"
+        else
+          return StringLit "high"

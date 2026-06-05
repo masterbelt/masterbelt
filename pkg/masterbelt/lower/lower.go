@@ -31,6 +31,23 @@ type Binder interface {
 	EnterFunc(params []*ast.ParamDef) Binder
 }
 
+// EnumExpecter is the optional capability a Binder advertises to lower a
+// switch's bare-member arms (Common, rather than Rarity.Common): it reports the
+// enum definition the scrutinee's static type names, which becomes the expected
+// type the arm-value identifiers resolve through. A binder that cannot answer
+// (no scrutinee enum) returns nil, leaving the bare members unresolved.
+type EnumExpecter interface {
+	ExpectedEnum(scrutinee ast.Expr) *ir.TypeDef
+}
+
+// EnumMemberResolver resolves a bare member name against an enum definition to
+// its IR value — the same resolution a const initializer's bare member uses.
+// The lower package has no enum machinery of its own, so the semantic layer
+// supplies this when it constructs a body binder.
+type EnumMemberResolver interface {
+	EnumMember(def *ir.TypeDef, name string) ir.Value
+}
+
 // Value lowers an expression to its resolved IR value. The shared forms are
 // lowered here; the context-specific leaves go through b.Leaf.
 func Value(e ast.Expr, b Binder) ir.Value {
@@ -104,9 +121,67 @@ func Body(body []ast.Stmt, b Binder) []ir.Stmt {
 			stmts = append(stmts, &ir.Return{Value: Value(s.Value, b)})
 		case *ast.ExprStmt:
 			stmts = append(stmts, &ir.ExprStmt{Value: Value(s.X, b)})
+		case *ast.SwitchStmt:
+			stmts = append(stmts, switchStmt(s, b))
 		}
 	}
 	return stmts
+}
+
+// switchStmt lowers a switch statement: its scrutinee, each arm's value
+// patterns and body, and the wildcard Else body. An arm value lowers as an
+// ordinary expression, with the scrutinee's enum (when the binder can name one)
+// reached so a bare member resolves — the same path a const initializer's bare
+// member takes.
+func switchStmt(s *ast.SwitchStmt, b Binder) *ir.Switch {
+	sw := &ir.Switch{Scrutinee: Value(s.Scrutinee, b)}
+	armValue := b
+	if exp, ok := b.(EnumExpecter); ok {
+		if def := exp.ExpectedEnum(s.Scrutinee); def != nil {
+			if res, ok := b.(EnumMemberResolver); ok {
+				armValue = expectingEnum{Binder: b, def: def, res: res}
+			}
+		}
+	}
+	for _, arm := range s.Arms {
+		values := make([]ir.Value, len(arm.Values))
+		for i, v := range arm.Values {
+			values[i] = Value(v, armValue)
+		}
+		sw.Arms = append(sw.Arms, ir.SwitchArm{Values: values, Body: Body(arm.Body, b)})
+	}
+	if s.Else != nil {
+		// An empty wildcard body still distinguishes a switch with a catch-all
+		// from one without, so the Else slice is non-nil even when empty.
+		if body := Body(s.Else, b); body != nil {
+			sw.Else = body
+		} else {
+			sw.Else = []ir.Stmt{}
+		}
+	}
+	return sw
+}
+
+// expectingEnum wraps a Binder so a bare identifier that names a member of def
+// lowers to that member's value, while every other leaf falls through to the
+// wrapped binder. It is the body counterpart of the const binder's expected-enum
+// rule, used only for a switch arm's value patterns.
+type expectingEnum struct {
+	Binder
+	def *ir.TypeDef
+	res EnumMemberResolver
+}
+
+func (b expectingEnum) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
+	if v := b.Binder.Leaf(e, sub); v != nil {
+		return v
+	}
+	if id, ok := e.(*ast.Identifier); ok {
+		if v := b.res.EnumMember(b.def, id.Name); v != nil {
+			return v
+		}
+	}
+	return nil
 }
 
 // sub returns the sub-expression lowering a Binder.Leaf recurses through: Value

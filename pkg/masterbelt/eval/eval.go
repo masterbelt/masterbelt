@@ -330,15 +330,7 @@ func applyFunc(cands []*ast.FuncDecl, args []ast.Expr, ctx evalCtx) *ir.Constant
 	for i, p := range fd.Params {
 		locals[p.Name] = vals[i]
 	}
-	for _, stmt := range fd.Body {
-		if ret, ok := stmt.(*ast.ReturnStmt); ok {
-			if ret.Value == nil {
-				return nil
-			}
-			return evalExpr(ret.Value, evalCtx{env: ctx.env, locals: locals, depth: ctx.depth + 1})
-		}
-	}
-	return nil
+	return evalBody(fd.Body, evalCtx{env: ctx.env, locals: locals, depth: ctx.depth + 1})
 }
 
 // kindAccepts reports whether a parameter's written type can hold a constant
@@ -567,15 +559,96 @@ func apply(ctx evalCtx, fn *ir.Constant, args []*ir.Constant) *ir.Constant {
 	for i, p := range fn.Fn.Params {
 		locals[p.Name] = args[i]
 	}
-	for _, stmt := range fn.Fn.Body {
-		if ret, ok := stmt.(*ast.ReturnStmt); ok {
-			if ret.Value == nil {
+	// A function body sees its parameters and captures, never an outer self: a
+	// literal has no receiver.
+	return evalBody(fn.Fn.Body, evalCtx{env: ctx.env, locals: locals, depth: ctx.depth + 1})
+}
+
+// evalBody runs a statement body to its returned value, or nil when no path
+// reaches a return. It executes a switch by folding the scrutinee and running
+// the first arm whose value patterns it equals (the wildcard last); a bare
+// expression statement has no value and is skipped. It is the compile-time
+// execution model the const folder shares with a function application, kept in
+// step with the runtime's first-match dispatch.
+func evalBody(body []ast.Stmt, ctx evalCtx) *ir.Constant {
+	for _, stmt := range body {
+		switch stmt := stmt.(type) {
+		case *ast.ReturnStmt:
+			if stmt.Value == nil {
 				return nil
 			}
-			// A function body sees its parameters and captures, never an outer
-			// self: a literal has no receiver.
-			return evalExpr(ret.Value, evalCtx{env: ctx.env, locals: locals, depth: ctx.depth + 1})
+			return evalExpr(stmt.Value, ctx)
+		case *ast.SwitchStmt:
+			if v := evalSwitch(stmt, ctx); v != nil {
+				return v
+			}
+			// A switch whose scrutinee or arms cannot be folded — or that
+			// selected an arm with no return — leaves the body unevaluated:
+			// nothing after a guaranteed-return switch is reachable, and a
+			// partial switch cannot fold.
+			return nil
 		}
 	}
 	return nil
+}
+
+// evalSwitch selects and runs the matching arm of a switch: it folds the
+// scrutinee, compares it for equality against each arm's folded value patterns
+// in order, and runs the first matching arm's body — the wildcard arm last. It
+// returns nil when the scrutinee or a needed pattern cannot be folded, or when
+// no arm (and no wildcard) matches, so a switch only folds when its dispatch is
+// fully determined.
+func evalSwitch(sw *ast.SwitchStmt, ctx evalCtx) *ir.Constant {
+	scrut := evalExpr(sw.Scrutinee, ctx)
+	if scrut == nil {
+		return nil
+	}
+	for _, arm := range sw.Arms {
+		for _, v := range arm.Values {
+			cv := evalExpr(v, expectingScrutinee(ctx, scrut))
+			if cv == nil {
+				return nil // an unfoldable pattern: the dispatch is undetermined
+			}
+			if constEqual(scrut, cv) {
+				return evalBody(arm.Body, ctx)
+			}
+		}
+	}
+	if sw.Else != nil {
+		return evalBody(sw.Else, ctx)
+	}
+	return nil
+}
+
+// expectingScrutinee folds an arm value with the scrutinee's enum in scope, so
+// a bare member (Common) folds to that member — the value rule a switch shares
+// with a const initializer's bare member.
+func expectingScrutinee(ctx evalCtx, scrut *ir.Constant) evalCtx {
+	if scrut.Kind == ir.ConstEnum {
+		ctx.expected = scrut.EnumDef
+	}
+	return ctx
+}
+
+// constEqual reports whether two folded constants are equal for switch
+// dispatch: enum members compare by identity (definition and index), and the
+// scalar kinds by their value. Differing kinds are never equal.
+func constEqual(a, b *ir.Constant) bool {
+	if a == nil || b == nil || a.Kind != b.Kind {
+		return false
+	}
+	switch a.Kind {
+	case ir.ConstInt:
+		return a.Int.Cmp(b.Int) == 0
+	case ir.ConstBool:
+		return a.Bool == b.Bool
+	case ir.ConstString:
+		return a.Str == b.Str
+	case ir.ConstEnum:
+		return a.EnumDef == b.EnumDef && a.EnumIndex == b.EnumIndex
+	case ir.ConstDatetime, ir.ConstDuration:
+		return a.Millis == b.Millis
+	default:
+		return false
+	}
 }

@@ -133,11 +133,36 @@ func dumpMethod(b *strings.Builder, m *Method) {
 }
 
 func dumpStmt(b *strings.Builder, s Stmt) {
+	dumpStmtAt(b, s, "      ")
+}
+
+// dumpStmtAt renders one resolved statement at the given indent. A switch's arm
+// bodies nest one level deeper, so the indent threads through rather than being
+// fixed — the dump mirrors the control structure the analyzer resolved.
+func dumpStmtAt(b *strings.Builder, s Stmt, indent string) {
 	switch s := s.(type) {
 	case *Return:
-		fmt.Fprintf(b, "      return %s\n", dumpValue(s.Value))
+		fmt.Fprintf(b, "%sreturn %s\n", indent, dumpValue(s.Value))
 	case *ExprStmt:
-		fmt.Fprintf(b, "      expr %s\n", dumpValue(s.Value))
+		fmt.Fprintf(b, "%sexpr %s\n", indent, dumpValue(s.Value))
+	case *Switch:
+		fmt.Fprintf(b, "%sswitch %s\n", indent, dumpValue(s.Scrutinee))
+		for _, arm := range s.Arms {
+			values := make([]string, len(arm.Values))
+			for i, v := range arm.Values {
+				values[i] = dumpValue(v)
+			}
+			fmt.Fprintf(b, "%s  arm %s\n", indent, strings.Join(values, ", "))
+			for _, bs := range arm.Body {
+				dumpStmtAt(b, bs, indent+"    ")
+			}
+		}
+		if s.Else != nil {
+			fmt.Fprintf(b, "%s  else\n", indent)
+			for _, bs := range s.Else {
+				dumpStmtAt(b, bs, indent+"    ")
+			}
+		}
 	}
 }
 
@@ -150,6 +175,27 @@ func dumpStmtInline(s Stmt) string {
 		return "(return " + dumpValue(s.Value) + ")"
 	case *ExprStmt:
 		return "(expr " + dumpValue(s.Value) + ")"
+	case *Switch:
+		parts := []string{"switch " + dumpValue(s.Scrutinee)}
+		for _, arm := range s.Arms {
+			values := make([]string, len(arm.Values))
+			for i, v := range arm.Values {
+				values[i] = dumpValue(v)
+			}
+			body := make([]string, len(arm.Body))
+			for i, bs := range arm.Body {
+				body[i] = dumpStmtInline(bs)
+			}
+			parts = append(parts, "(arm "+strings.Join(values, ", ")+" "+strings.Join(body, " ")+")")
+		}
+		if s.Else != nil {
+			body := make([]string, len(s.Else))
+			for i, bs := range s.Else {
+				body[i] = dumpStmtInline(bs)
+			}
+			parts = append(parts, "(else "+strings.Join(body, " ")+")")
+		}
+		return "(" + strings.Join(parts, " ") + ")"
 	default:
 		return ""
 	}

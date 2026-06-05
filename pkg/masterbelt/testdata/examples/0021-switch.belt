@@ -1,0 +1,32 @@
+// switch is the value-dispatch control statement: it branches on the equality
+// of a scrutinee against compile-time constant values. Each arm's body is a
+// statement (an early return) or a block, so a switch dispatches a value by
+// returning from the matching arm.
+
+/// A card's rarity tier.
+pub enum Rarity {
+  Common, Rare, Legend
+}
+
+// An enum switch covering every member needs no wildcard: the arms are
+// exhaustive, and because every arm returns the function always returns.
+pub fn color(r: Rarity): string {
+  switch r {
+    Common -> return "white"
+    Rare   -> return "blue"
+    Legend -> return "gold"
+  }
+}
+
+// A scalar switch is over an unbounded domain, so it must carry a "_" wildcard
+// for the values no arm names. One arm may list several values, and an arm body
+// may be a block of several statements.
+pub fn grade(n: int): string {
+  switch n {
+    0       -> return "zero"
+    1, 2, 3 -> return "low"
+    _       -> {
+      return "high"
+    }
+  }
+}
