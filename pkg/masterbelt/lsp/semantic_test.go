@@ -157,6 +157,32 @@ func TestSemanticTokensWhereClause(t *testing.T) {
 	}
 }
 
+func TestSemanticTokensInterface(t *testing.T) {
+	// interface colours as a keyword like type/enum; the interface's own name
+	// and its generic parameter read as types; a member name reads as a method.
+	doc := abstract.NewDocument([]byte("pub interface foldable<V> {\n  count(): int\n}\n"))
+	got := decode(semanticTokens(doc).Data)
+
+	want := []decodedToken{
+		{0, 0, 3, stKeyword, 0},            // pub
+		{0, 4, 9, stKeyword, 0},            // interface
+		{0, 14, 8, stType, smDeclaration},  // foldable (declared name)
+		{0, 23, 1, stType, smDeclaration},  // V (generic param)
+		{1, 2, 5, stMethod, smDeclaration}, // count (member name)
+		{1, 9, 1, stOperator, 0},           // : (result-type colon)
+		{1, 11, 3, stType, 0},              // int (result type)
+	}
+
+	if len(got) != len(want) {
+		t.Fatalf("got %d tokens, want %d:\n got:  %+v\n want: %+v", len(got), len(want), got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("token[%d] = %+v, want %+v", i, got[i], want[i])
+		}
+	}
+}
+
 func TestSemanticTokensSwitch(t *testing.T) {
 	// switch colours as a keyword like return; the arrow is an operator, the
 	// scrutinee and an arm's bare value read as read-only variables, and the

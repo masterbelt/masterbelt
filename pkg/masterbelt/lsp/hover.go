@@ -125,10 +125,10 @@ func typeAt(doc view, offset int) (*ir.TypeDef, cst.Tree, bool) {
 	name := leaf.Text(buf)
 
 	switch kind {
-	case cst.TypeDecl:
-		// The declaration's own name. The file's own definitions lead
-		// TypeNames, so the name finds the local declaration, not an import
-		// it shadows.
+	case cst.TypeDecl, cst.InterfaceDecl:
+		// The declaration's own name — a type or an interface. The file's own
+		// definitions lead TypeNames, so the name finds the local declaration,
+		// not an import it shadows.
 		if t := findTypeDef(doc.TypeNames(), name); t != nil {
 			return t, leaf, true
 		}
@@ -212,7 +212,13 @@ func typeHover(t *ir.TypeDef, buf source.Buffer, rng cst.Tree) *protocol.Hover {
 	if t.Public {
 		b.WriteString("pub ")
 	}
-	b.WriteString("type ")
+	// An interface declares a behaviour rather than aliasing a type, so it leads
+	// with the interface keyword and shows no body.
+	if t.Interface != nil {
+		b.WriteString("interface ")
+	} else {
+		b.WriteString("type ")
+	}
 	b.WriteString(t.Name)
 	if len(t.Params) > 0 {
 		parts := make([]string, len(t.Params))
@@ -224,16 +230,22 @@ func typeHover(t *ir.TypeDef, buf source.Buffer, rng cst.Tree) *protocol.Hover {
 		}
 		b.WriteString("<" + strings.Join(parts, ", ") + ">")
 	}
-	switch {
-	case t.Builtin:
-		b.WriteString(" = builtin")
-	case t.Body != nil:
-		b.WriteString(" = " + t.Body.String())
+	if t.Interface == nil {
+		switch {
+		case t.Builtin:
+			b.WriteString(" = builtin")
+		case t.Body != nil:
+			b.WriteString(" = " + t.Body.String())
+		}
 	}
 	if t.Where != nil {
 		// The refinement predicate in its canonical surface form — the values
 		// the type admits, right on the signature.
 		b.WriteString(" where " + ast.Render(t.Where))
+	}
+	// The interfaces the type implements, right on the signature card.
+	for _, impl := range t.Impls {
+		b.WriteString(" impl " + impl.String())
 	}
 	b.WriteString("\n```")
 	if len(t.Doc) > 0 {

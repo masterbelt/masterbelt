@@ -137,6 +137,26 @@ func documentSymbols(doc view) []protocol.DocumentSymbol {
 		}
 		symbols = append(symbols, s)
 	}
+	for _, t := range doc.Module().Types {
+		if t.Interface == nil || t.InterfaceSyntax == nil {
+			continue // interfaces carry a member outline; other types are omitted here
+		}
+		s, ok := symbol(t.InterfaceSyntax.Syntax(), t.Name, "", protocol.SymbolKindInterface)
+		if !ok {
+			continue
+		}
+		// Each member is a child method symbol; the InterfaceDecl's members and
+		// the def's methods are in the same order.
+		for i, m := range t.Methods {
+			if i >= len(t.InterfaceSyntax.Members) {
+				break
+			}
+			if ms, ok := symbol(t.InterfaceSyntax.Members[i].Syntax(), m.Name, methodSignature(m), protocol.SymbolKindMethod); ok {
+				s.Children = append(s.Children, ms)
+			}
+		}
+		symbols = append(symbols, s)
+	}
 	for _, f := range doc.Module().Funcs {
 		if f.Syntax == nil {
 			continue
