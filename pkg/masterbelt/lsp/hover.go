@@ -27,6 +27,9 @@ func hover(doc view, offset int) *protocol.Hover {
 	if t, leaf, ok := typeAt(doc, offset); ok {
 		return typeHover(t, doc.Buffer(), leaf)
 	}
+	if h := enumMemberHover(doc, offset); h != nil {
+		return h
+	}
 	if h := memberHover(doc, offset, trees); h != nil {
 		return h
 	}

@@ -334,3 +334,52 @@ func methodDeclHover(doc view, offset int, trees map[cst.Green]cst.Tree) *protoc
 	}
 	return nil
 }
+
+// enumMemberHover describes an enum member access at offset (Rarity.Common):
+// the qualified member name and its base value, rendered as
+// `Rarity.Common = 1` with the member's doc comments beneath. It returns nil
+// when offset is not on an enum member access (the other hover paths handle
+// methods, fields, and values).
+func enumMemberHover(doc view, offset int) *protocol.Hover {
+	member, ok := memberAccessAt(doc, offset)
+	if !ok {
+		return nil
+	}
+	recv, ok := member.Receiver.(*ast.Identifier)
+	if !ok || doc.Resolve(recv) != nil {
+		return nil // a value shadowing the type name is a value access
+	}
+	def := lookupEnumType(doc, recv.Name)
+	if def == nil {
+		return nil
+	}
+	idx := -1
+	for i, m := range def.Enum.Members {
+		if m.Name == member.Member.Name {
+			idx = i
+			break
+		}
+	}
+	if idx < 0 {
+		return nil
+	}
+	m := def.Enum.Members[idx]
+	var b strings.Builder
+	b.WriteString("```masterbelt\n")
+	b.WriteString(def.Name)
+	b.WriteString(".")
+	b.WriteString(m.Name)
+	if m.Value != nil {
+		b.WriteString(" = ")
+		b.WriteString(m.Value.String())
+	}
+	b.WriteString("\n```")
+
+	node, _ := memberNodeAt(doc, offset)
+	rng := cst.Root(node)
+	r := toRange(doc.Buffer(), rng.Offset(), rng.End())
+	return &protocol.Hover{
+		Contents: protocol.MarkupContent{Kind: protocol.Markdown, Value: b.String()},
+		Range:    &r,
+	}
+}

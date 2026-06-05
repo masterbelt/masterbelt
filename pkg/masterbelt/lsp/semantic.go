@@ -30,6 +30,7 @@ const (
 	stMethod
 	stParameter
 	stFunction
+	stEnumMember
 )
 
 // Semantic token modifier bits, matching the legend's TokenModifiers order.
@@ -43,7 +44,7 @@ const (
 var semanticLegend = protocol.SemanticTokensLegend{
 	TokenTypes: []string{
 		"keyword", "comment", "type", "variable", "number", "string", "operator",
-		"namespace", "property", "method", "parameter", "function",
+		"namespace", "property", "method", "parameter", "function", "enumMember",
 	},
 	TokenModifiers: []string{"declaration", "readonly"},
 }
@@ -180,7 +181,7 @@ func semanticTokensWith(doc *abstract.Document, isImportedConst, isFuncCallee, i
 // carry no colour (whitespace, newlines, EOF, illegal bytes).
 func classifyToken(kind token.Kind, parent cst.Kind, calleeMember bool) (tokenType, mods int, ok bool) {
 	switch kind {
-	case token.Const, token.Pub, token.Assert, token.Where, token.Type, token.Impl,
+	case token.Const, token.Pub, token.Assert, token.Where, token.Type, token.Enum, token.Impl,
 		token.Fn, token.Return, token.Self, token.Null, token.Extern, token.Builtin,
 		token.Use, token.From, token.True, token.False,
 		token.Io, token.Async, token.Nondet, token.Await:
@@ -206,6 +207,13 @@ func classifyToken(kind token.Kind, parent cst.Kind, calleeMember bool) (tokenTy
 		case cst.TypeDecl:
 			// The declared type's own name.
 			return stType, smDeclaration, true
+		case cst.EnumDecl:
+			// The declared enum's own name — a nominal type.
+			return stType, smDeclaration, true
+		case cst.EnumMember:
+			// A member's declared name (Common, Rare) reads as an enum member, a
+			// read-only named value.
+			return stEnumMember, smDeclaration | smReadonly, true
 		case cst.GenericParam:
 			// A declared type parameter — its uses in the body sit in
 			// TypeName nodes and classify as types, so the declaration

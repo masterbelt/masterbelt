@@ -113,6 +113,30 @@ func documentSymbols(doc view) []protocol.DocumentSymbol {
 			symbols = append(symbols, s)
 		}
 	}
+	for _, t := range doc.Module().Types {
+		if t.Enum == nil || t.EnumSyntax == nil {
+			continue // only enums carry a member outline; plain types are omitted here
+		}
+		detail := ": " + t.Enum.Base
+		s, ok := symbol(t.EnumSyntax.Syntax(), t.Name, detail, protocol.SymbolKindEnum)
+		if !ok {
+			continue
+		}
+		// Each member is a child symbol, detailed with its value.
+		for i, m := range t.Enum.Members {
+			if i >= len(t.EnumSyntax.Members) {
+				break
+			}
+			memberDetail := ""
+			if m.Value != nil {
+				memberDetail = "= " + m.Value.String()
+			}
+			if ms, ok := symbol(t.EnumSyntax.Members[i].Syntax(), m.Name, memberDetail, protocol.SymbolKindEnumMember); ok {
+				s.Children = append(s.Children, ms)
+			}
+		}
+		symbols = append(symbols, s)
+	}
 	for _, f := range doc.Module().Funcs {
 		if f.Syntax == nil {
 			continue
