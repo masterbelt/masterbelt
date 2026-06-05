@@ -246,6 +246,33 @@ func TestSemanticTokensStringLiteral(t *testing.T) {
 	}
 }
 
+// TestSemanticTokensIndexExpr checks the colouring of an index access. A
+// subscript desugars to a method call, so the brackets carry no semantic colour
+// (exactly as the call parentheses and the binary operators do not), and the
+// receiver and the index read through the existing variable rules — there is no
+// index-specific token type to maintain.
+func TestSemanticTokensIndexExpr(t *testing.T) {
+	doc := abstract.NewDocument([]byte("const Y = xs[i]\n"))
+	got := decode(semanticTokens(doc).Data)
+
+	want := []decodedToken{
+		{0, 0, 5, stKeyword, 0},                           // const
+		{0, 6, 1, stVariable, smDeclaration | smReadonly}, // Y (declared name)
+		{0, 8, 1, stOperator, 0},                          // =
+		{0, 10, 2, stVariable, smReadonly},                // xs (receiver reference)
+		{0, 13, 1, stVariable, smReadonly},                // i  (index reference)
+	}
+
+	if len(got) != len(want) {
+		t.Fatalf("got %d tokens, want %d:\n got:  %+v\n want: %+v", len(got), len(want), got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("token[%d] = %+v, want %+v", i, got[i], want[i])
+		}
+	}
+}
+
 func TestSemanticTokensNameRefIsReadonlyVariable(t *testing.T) {
 	doc := abstract.NewDocument([]byte("const Alias = MaxLevel\n"))
 	got := decode(semanticTokens(doc).Data)
