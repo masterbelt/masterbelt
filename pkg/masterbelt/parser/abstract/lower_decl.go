@@ -214,6 +214,7 @@ func lowerTypeDecl(t cst.Tree, buf source.Buffer) *ast.TypeDecl {
 		where   ast.Expr
 		methods []*ast.MethodDecl
 		consts  []*ast.ConstDecl
+		impls   []ast.TypeExpr
 	)
 	for _, child := range t.Children() {
 		if tok, ok := child.Token(); ok {
@@ -237,12 +238,20 @@ func lowerTypeDecl(t cst.Tree, buf source.Buffer) *ast.TypeDecl {
 		case node.Kind() == cst.WhereClause:
 			where = lowerWhereClause(child, buf)
 		case node.Kind() == cst.ImplBlock:
-			methods, consts = lowerImpl(child, buf)
+			// A type may carry several impl blocks (an inherent one and one per
+			// interface). Their methods and consts flatten together; each tagged
+			// block's interface name joins Impls.
+			ms, cs, iface := lowerImpl(child, buf)
+			methods = append(methods, ms...)
+			consts = append(consts, cs...)
+			if iface != nil {
+				impls = append(impls, iface)
+			}
 		case isTypeExprKind(node.Kind()):
 			body = lowerTypeExpr(child, buf)
 		}
 	}
-	return ast.NewTypeDecl(doc, public, name, params, body, where, methods, consts, green)
+	return ast.NewTypeDecl(doc, public, name, params, body, where, methods, consts, impls, green)
 }
 
 // lowerEnumDecl lowers a positioned EnumDecl CST node into an ast.EnumDecl: its
@@ -261,6 +270,7 @@ func lowerEnumDecl(t cst.Tree, buf source.Buffer) *ast.EnumDecl {
 		members []*ast.EnumMember
 		methods []*ast.MethodDecl
 		consts  []*ast.ConstDecl
+		impls   []ast.TypeExpr
 	)
 	for _, child := range t.Children() {
 		if tok, ok := child.Token(); ok {
@@ -284,10 +294,15 @@ func lowerEnumDecl(t cst.Tree, buf source.Buffer) *ast.EnumDecl {
 		case cst.EnumMember:
 			members = append(members, lowerEnumMember(child, buf))
 		case cst.ImplBlock:
-			methods, consts = lowerImpl(child, buf)
+			ms, cs, iface := lowerImpl(child, buf)
+			methods = append(methods, ms...)
+			consts = append(consts, cs...)
+			if iface != nil {
+				impls = append(impls, iface)
+			}
 		}
 	}
-	return ast.NewEnumDecl(doc, public, name, base, members, methods, consts, green)
+	return ast.NewEnumDecl(doc, public, name, base, members, methods, consts, impls, green)
 }
 
 // lowerEnumMember lowers one EnumMember node: its name and the optional "=
@@ -321,26 +336,31 @@ func lowerWhereClause(t cst.Tree, buf source.Buffer) ast.Expr {
 	return nil
 }
 
-// lowerImpl lowers an ImplBlock node to its method declarations and its
-// associated constants (the ConstDecl items), each in source order. The two
-// share the block but separate here, since the later layers treat a method and
-// a type-scoped constant differently.
-func lowerImpl(t cst.Tree, buf source.Buffer) ([]*ast.MethodDecl, []*ast.ConstDecl) {
-	var methods []*ast.MethodDecl
-	var consts []*ast.ConstDecl
+// lowerImpl lowers an ImplBlock node to its method declarations, its associated
+// constants (the ConstDecl items), and its optional interface tag — the
+// TypeName after impl that names the interface this block implements (impl
+// foldable<int> { ... }), or nil for a bare inherent impl. The methods and
+// consts separate here since the later layers treat a method and a type-scoped
+// constant differently; the interface tag is collected on the type so the
+// nominal-satisfaction check can read which interfaces the type opts into.
+func lowerImpl(t cst.Tree, buf source.Buffer) (methods []*ast.MethodDecl, consts []*ast.ConstDecl, iface ast.TypeExpr) {
 	for _, child := range t.Children() {
 		n, ok := child.Node()
 		if !ok {
 			continue
 		}
-		switch n.Kind() {
-		case cst.MethodDecl:
+		switch {
+		case n.Kind() == cst.MethodDecl:
 			methods = append(methods, lowerMethod(child, buf))
-		case cst.ConstDecl:
+		case n.Kind() == cst.ConstDecl:
 			consts = append(consts, lowerImplConst(child, buf))
+		case isTypeExprKind(n.Kind()):
+			// The only type-expression child of an impl block is its interface
+			// tag (the TypeName after impl).
+			iface = lowerTypeExpr(child, buf)
 		}
 	}
-	return methods, consts
+	return methods, consts, iface
 }
 
 // lowerImplConst lowers an associated-constant ConstDecl node inside an impl
@@ -404,14 +424,15 @@ func initializerIsBuiltin(t cst.Tree) bool {
 func lowerMethod(t cst.Tree, buf source.Buffer) *ast.MethodDecl {
 	green, _ := t.Node()
 	var (
-		doc     []string
-		public  bool
-		extern  bool
-		effects []string
-		name    string
-		params  []*ast.ParamDef
-		result  ast.TypeExpr
-		body    []ast.Stmt
+		doc        []string
+		public     bool
+		extern     bool
+		effects    []string
+		name       string
+		typeParams []*ast.TypeParam
+		params     []*ast.ParamDef
+		result     ast.TypeExpr
+		body       []ast.Stmt
 	)
 	for _, child := range t.Children() {
 		if tok, ok := child.Token(); ok {
@@ -433,6 +454,8 @@ func lowerMethod(t cst.Tree, buf source.Buffer) *ast.MethodDecl {
 		}
 		node, _ := child.Node()
 		switch {
+		case node.Kind() == cst.GenericParams:
+			typeParams = lowerGenericParams(child, buf)
 		case node.Kind() == cst.ParamList:
 			params = lowerParamList(child, buf)
 		case node.Kind() == cst.Block:
@@ -441,5 +464,85 @@ func lowerMethod(t cst.Tree, buf source.Buffer) *ast.MethodDecl {
 			result = lowerTypeExpr(child, buf)
 		}
 	}
-	return ast.NewMethodDecl(doc, public, extern, effects, name, params, result, body, green)
+	return ast.NewMethodDecl(doc, public, extern, effects, name, typeParams, params, result, body, green)
+}
+
+// lowerInterfaceDecl lowers a positioned InterfaceDecl CST node into an
+// ast.InterfaceDecl: its modifiers, name, generic parameters, and members.
+func lowerInterfaceDecl(t cst.Tree, buf source.Buffer) *ast.InterfaceDecl {
+	green, _ := t.Node()
+	var (
+		doc     []string
+		public  bool
+		name    string
+		params  []*ast.TypeParam
+		members []*ast.InterfaceMember
+	)
+	for _, child := range t.Children() {
+		if tok, ok := child.Token(); ok {
+			switch tok.Kind() {
+			case token.Pub:
+				public = true
+			case token.DocComment:
+				doc = append(doc, docText(child.Text(buf)))
+			case token.Ident:
+				// The only direct Ident child is the declared name; the generic
+				// parameters and member names are nested in their own nodes.
+				name = child.Text(buf)
+			}
+			continue
+		}
+		node, _ := child.Node()
+		switch node.Kind() {
+		case cst.GenericParams:
+			params = lowerGenericParams(child, buf)
+		case cst.InterfaceMember:
+			members = append(members, lowerInterfaceMember(child, buf))
+		}
+	}
+	return ast.NewInterfaceDecl(doc, public, name, params, members, green)
+}
+
+// lowerInterfaceMember lowers one InterfaceMember node: its modifiers, name,
+// explicit type variables, parameters, result type, and optional default body.
+// A member with a Block is a provided method (its body the default); one without
+// is a required method.
+func lowerInterfaceMember(t cst.Tree, buf source.Buffer) *ast.InterfaceMember {
+	green, _ := t.Node()
+	var (
+		doc        []string
+		public     bool
+		name       string
+		typeParams []*ast.TypeParam
+		params     []*ast.ParamDef
+		result     ast.TypeExpr
+		body       []ast.Stmt
+	)
+	for _, child := range t.Children() {
+		if tok, ok := child.Token(); ok {
+			switch tok.Kind() {
+			case token.Pub:
+				public = true
+			case token.DocComment:
+				doc = append(doc, docText(child.Text(buf)))
+			case token.Ident:
+				if name == "" {
+					name = child.Text(buf)
+				}
+			}
+			continue
+		}
+		node, _ := child.Node()
+		switch {
+		case node.Kind() == cst.GenericParams:
+			typeParams = lowerGenericParams(child, buf)
+		case node.Kind() == cst.ParamList:
+			params = lowerParamList(child, buf)
+		case node.Kind() == cst.Block:
+			body = lowerBlock(child, buf)
+		case isTypeExprKind(node.Kind()):
+			result = lowerTypeExpr(child, buf)
+		}
+	}
+	return ast.NewInterfaceMember(doc, public, name, typeParams, params, result, body, green)
 }

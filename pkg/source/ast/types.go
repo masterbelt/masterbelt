@@ -23,15 +23,22 @@ type TypeDecl struct {
 	Where   Expr         // the refinement predicate over self, or nil if none
 	Methods []*MethodDecl
 	Consts  []*ConstDecl // the impl block's associated constants, in source order
-	syntax  *cst.Node
+	// Impls names the interfaces this type opts into: the interface tag of each
+	// interface-tagged impl block written at this definition site (impl
+	// foldable<int> { ... }). A bare inherent impl contributes no entry. The
+	// methods of every block, tagged or not, are flattened into Methods; Impls
+	// records only which interfaces the type declares conformance to, for the
+	// nominal-satisfaction check.
+	Impls  []TypeExpr
+	syntax *cst.Node
 }
 
 func (d *TypeDecl) Syntax() *cst.Node { return d.syntax }
 func (d *TypeDecl) node()             {}
 
 // NewTypeDecl builds a TypeDecl node.
-func NewTypeDecl(doc []string, public bool, name string, params []*TypeParam, body TypeExpr, where Expr, methods []*MethodDecl, consts []*ConstDecl, syntax *cst.Node) *TypeDecl {
-	return &TypeDecl{Doc: doc, Public: public, Name: name, Params: params, Body: body, Where: where, Methods: methods, Consts: consts, syntax: syntax}
+func NewTypeDecl(doc []string, public bool, name string, params []*TypeParam, body TypeExpr, where Expr, methods []*MethodDecl, consts []*ConstDecl, impls []TypeExpr, syntax *cst.Node) *TypeDecl {
+	return &TypeDecl{Doc: doc, Public: public, Name: name, Params: params, Body: body, Where: where, Methods: methods, Consts: consts, Impls: impls, syntax: syntax}
 }
 
 // TypeParam is one generic parameter of a TypeDecl: a name and an optional
@@ -66,6 +73,7 @@ type EnumDecl struct {
 	Members []*EnumMember
 	Methods []*MethodDecl
 	Consts  []*ConstDecl // the impl block's associated constants, in source order
+	Impls   []TypeExpr   // the interfaces this enum opts into (see TypeDecl.Impls)
 	syntax  *cst.Node
 }
 
@@ -73,8 +81,8 @@ func (d *EnumDecl) Syntax() *cst.Node { return d.syntax }
 func (d *EnumDecl) node()             {}
 
 // NewEnumDecl builds an EnumDecl node.
-func NewEnumDecl(doc []string, public bool, name string, base TypeExpr, members []*EnumMember, methods []*MethodDecl, consts []*ConstDecl, syntax *cst.Node) *EnumDecl {
-	return &EnumDecl{Doc: doc, Public: public, Name: name, Base: base, Members: members, Methods: methods, Consts: consts, syntax: syntax}
+func NewEnumDecl(doc []string, public bool, name string, base TypeExpr, members []*EnumMember, methods []*MethodDecl, consts []*ConstDecl, impls []TypeExpr, syntax *cst.Node) *EnumDecl {
+	return &EnumDecl{Doc: doc, Public: public, Name: name, Base: base, Members: members, Methods: methods, Consts: consts, Impls: impls, syntax: syntax}
 }
 
 // EnumMember is one member of an enum: its Name and an optional Value
@@ -230,23 +238,24 @@ func NewParamDef(name string, typ TypeExpr, syntax *cst.Node) *ParamDef {
 // nondet) declares the method's interaction with the world; an empty list
 // means pure.
 type MethodDecl struct {
-	Doc     []string
-	Public  bool
-	Extern  bool
-	Effects []string // the declared effects in source order, or nil for pure
-	Name    string
-	Params  []*ParamDef
-	Result  TypeExpr
-	Body    []Stmt // the statement body, or nil for an extern method
-	syntax  *cst.Node
+	Doc        []string
+	Public     bool
+	Extern     bool
+	Effects    []string // the declared effects in source order, or nil for pure
+	Name       string
+	TypeParams []*TypeParam // explicit method type variables (the A in fold<A>), or nil
+	Params     []*ParamDef
+	Result     TypeExpr
+	Body       []Stmt // the statement body, or nil for an extern method
+	syntax     *cst.Node
 }
 
 func (m *MethodDecl) Syntax() *cst.Node { return m.syntax }
 func (m *MethodDecl) node()             {}
 
 // NewMethodDecl builds a MethodDecl node.
-func NewMethodDecl(doc []string, public, extern bool, effects []string, name string, params []*ParamDef, result TypeExpr, body []Stmt, syntax *cst.Node) *MethodDecl {
-	return &MethodDecl{Doc: doc, Public: public, Extern: extern, Effects: effects, Name: name, Params: params, Result: result, Body: body, syntax: syntax}
+func NewMethodDecl(doc []string, public, extern bool, effects []string, name string, typeParams []*TypeParam, params []*ParamDef, result TypeExpr, body []Stmt, syntax *cst.Node) *MethodDecl {
+	return &MethodDecl{Doc: doc, Public: public, Extern: extern, Effects: effects, Name: name, TypeParams: typeParams, Params: params, Result: result, Body: body, syntax: syntax}
 }
 
 // Stmt is a statement inside a method body: a return (ReturnStmt), a mutable

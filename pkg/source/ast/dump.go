@@ -24,6 +24,9 @@ func Dump(f *File) string {
 	for _, d := range f.Enums {
 		dumpEnumDecl(&b, d)
 	}
+	for _, d := range f.Interfaces {
+		dumpInterfaceDecl(&b, d)
+	}
 	for _, d := range f.Funcs {
 		dumpFuncDecl(&b, d)
 	}
@@ -218,6 +221,9 @@ func dumpTypeDecl(b *strings.Builder, d *TypeDecl) {
 	if d.Where != nil {
 		fmt.Fprintf(b, "    where %s\n", dumpExpr(d.Where))
 	}
+	for _, i := range d.Impls {
+		fmt.Fprintf(b, "    impl %s\n", dumpType(i))
+	}
 	for _, c := range d.Consts {
 		dumpAssocConst(b, c)
 	}
@@ -267,11 +273,67 @@ func dumpEnumDecl(b *strings.Builder, d *EnumDecl) {
 			fmt.Fprintf(b, "    member %q\n", m.Name)
 		}
 	}
+	for _, i := range d.Impls {
+		fmt.Fprintf(b, "    impl %s\n", dumpType(i))
+	}
 	for _, c := range d.Consts {
 		dumpAssocConst(b, c)
 	}
 	for _, m := range d.Methods {
 		dumpMethod(b, m)
+	}
+}
+
+// dumpInterfaceDecl renders one interface declaration: its modifiers, name,
+// generic parameters, and members (required and provided, distinguished by
+// whether the member carries a default body).
+func dumpInterfaceDecl(b *strings.Builder, d *InterfaceDecl) {
+	b.WriteString("  InterfaceDecl\n")
+	for _, doc := range d.Doc {
+		fmt.Fprintf(b, "    doc %q\n", doc)
+	}
+	if d.Public {
+		b.WriteString("    pub\n")
+	}
+	fmt.Fprintf(b, "    name %q\n", d.Name)
+	for _, p := range d.Params {
+		if p.Constraint != nil {
+			fmt.Fprintf(b, "    param %s: %s\n", p.Name, dumpType(p.Constraint))
+		} else {
+			fmt.Fprintf(b, "    param %s\n", p.Name)
+		}
+	}
+	for _, m := range d.Members {
+		dumpInterfaceMember(b, m)
+	}
+}
+
+// dumpInterfaceMember renders one interface member: required or provided (the
+// keyword reflects whether it carries a default body), then its signature and,
+// for a provided member, its body.
+func dumpInterfaceMember(b *strings.Builder, m *InterfaceMember) {
+	kind := "required"
+	if m.Provided() {
+		kind = "provided"
+	}
+	fmt.Fprintf(b, "    %s %q\n", kind, m.Name)
+	for _, doc := range m.Doc {
+		fmt.Fprintf(b, "      doc %q\n", doc)
+	}
+	if m.Public {
+		b.WriteString("      pub\n")
+	}
+	for _, p := range m.TypeParams {
+		fmt.Fprintf(b, "      typeparam %s\n", p.Name)
+	}
+	for _, p := range m.Params {
+		fmt.Fprintf(b, "      param %s: %s\n", p.Name, dumpType(p.Type))
+	}
+	if m.Result != nil {
+		fmt.Fprintf(b, "      result %s\n", dumpType(m.Result))
+	}
+	for _, s := range m.Body {
+		dumpStmt(b, s)
 	}
 }
 
@@ -288,6 +350,9 @@ func dumpMethod(b *strings.Builder, m *MethodDecl) {
 	}
 	if len(m.Effects) > 0 {
 		fmt.Fprintf(b, "      effects %s\n", strings.Join(m.Effects, " "))
+	}
+	for _, p := range m.TypeParams {
+		fmt.Fprintf(b, "      typeparam %s\n", p.Name)
 	}
 	for _, p := range m.Params {
 		fmt.Fprintf(b, "      param %s: %s\n", p.Name, dumpType(p.Type))

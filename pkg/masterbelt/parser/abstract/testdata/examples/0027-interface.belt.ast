@@ -1,18 +1,4 @@
 File
-  ConstDecl
-    doc "A behaviour over a keyed collection: implement the required fold and the"
-    doc "provided methods (count, map, filter, ...) come for free, defined on top of"
-    doc "it. iterability is foldable."
-    pub
-    name ""
-  ConstDecl
-    doc "Provided: the number of elements, folded from the primitive."
-    pub
-    name "count"
-  ConstDecl
-    doc "Provided: whether any element satisfies the predicate."
-    pub
-    name "any"
   TypeDecl
     doc "A small bag of T values that folds over its contents. The `impl foldable<int, T>`"
     doc "tag is what gives Bag the count/any methods — written here, at Bag's own"
@@ -21,6 +7,38 @@ File
     name "Bag"
     param T
     body list<T>
+    impl foldable<int, T>
+    method "fold"
+      doc "The required primitive: fold the underlying list."
+      typeparam A
+      param init: A
+      param step: fn(acc: A, key: int, value: T): A
+      result A
+      return Identifier "init"
+  InterfaceDecl
+    doc "A behaviour over a keyed collection: implement the required fold and the"
+    doc "provided methods (count, map, filter, ...) come for free, defined on top of"
+    doc "it. iterability is foldable."
+    pub
+    name "foldable"
+    param K
+    param V
+    required "fold"
+      typeparam A
+      param init: A
+      param step: fn(acc: A, key: K, value: V): A
+      result A
+    provided "count"
+      doc "Provided: the number of elements, folded from the primitive."
+      pub
+      result int
+      return (call Identifier "fold" IntLit "0" (fn(acc: <missing>, key: <missing>, value: <missing>): <missing> (return (call (. Identifier "acc" add) IntLit "1"))))
+    provided "any"
+      doc "Provided: whether any element satisfies the predicate."
+      pub
+      param pred: fn(value: V): bool
+      result bool
+      return (call Identifier "fold" BoolLit false (fn(acc: <missing>, key: <missing>, value: <missing>): <missing> (return (call (. Identifier "acc" oror) (call Identifier "pred" Identifier "value")))))
   FuncDecl
     doc "The total of a collection of ints, folded with addition."
     pub

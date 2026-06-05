@@ -20,27 +20,29 @@ import (
 // The File is always identical to lowering the current concrete tree from
 // scratch.
 type Document struct {
-	cst         *concrete.Document
-	file        *ast.File
-	cache       map[*cst.Node]*ast.ConstDecl
-	typeCache   map[*cst.Node]*ast.TypeDecl
-	enumCache   map[*cst.Node]*ast.EnumDecl
-	funcCache   map[*cst.Node]*ast.FuncDecl
-	useCache    map[*cst.Node]*ast.UseDecl
-	assertCache map[*cst.Node]*ast.AssertDecl
+	cst            *concrete.Document
+	file           *ast.File
+	cache          map[*cst.Node]*ast.ConstDecl
+	typeCache      map[*cst.Node]*ast.TypeDecl
+	enumCache      map[*cst.Node]*ast.EnumDecl
+	interfaceCache map[*cst.Node]*ast.InterfaceDecl
+	funcCache      map[*cst.Node]*ast.FuncDecl
+	useCache       map[*cst.Node]*ast.UseDecl
+	assertCache    map[*cst.Node]*ast.AssertDecl
 }
 
 // NewDocument lexes, parses, and lowers src, then keeps the AST up to date
 // across Edits.
 func NewDocument(src []byte) *Document {
 	d := &Document{
-		cst:         concrete.NewDocument(src),
-		cache:       map[*cst.Node]*ast.ConstDecl{},
-		typeCache:   map[*cst.Node]*ast.TypeDecl{},
-		enumCache:   map[*cst.Node]*ast.EnumDecl{},
-		funcCache:   map[*cst.Node]*ast.FuncDecl{},
-		useCache:    map[*cst.Node]*ast.UseDecl{},
-		assertCache: map[*cst.Node]*ast.AssertDecl{},
+		cst:            concrete.NewDocument(src),
+		cache:          map[*cst.Node]*ast.ConstDecl{},
+		typeCache:      map[*cst.Node]*ast.TypeDecl{},
+		enumCache:      map[*cst.Node]*ast.EnumDecl{},
+		interfaceCache: map[*cst.Node]*ast.InterfaceDecl{},
+		funcCache:      map[*cst.Node]*ast.FuncDecl{},
+		useCache:       map[*cst.Node]*ast.UseDecl{},
+		assertCache:    map[*cst.Node]*ast.AssertDecl{},
 	}
 	d.rebuild()
 	return d
@@ -78,6 +80,7 @@ func (d *Document) rebuild() {
 	next := make(map[*cst.Node]*ast.ConstDecl, len(d.cache))
 	nextTypes := make(map[*cst.Node]*ast.TypeDecl, len(d.typeCache))
 	nextEnums := make(map[*cst.Node]*ast.EnumDecl, len(d.enumCache))
+	nextInterfaces := make(map[*cst.Node]*ast.InterfaceDecl, len(d.interfaceCache))
 	nextFuncs := make(map[*cst.Node]*ast.FuncDecl, len(d.funcCache))
 	nextUses := make(map[*cst.Node]*ast.UseDecl, len(d.useCache))
 	nextAsserts := make(map[*cst.Node]*ast.AssertDecl, len(d.assertCache))
@@ -85,6 +88,7 @@ func (d *Document) rebuild() {
 	var decls []*ast.ConstDecl
 	var types []*ast.TypeDecl
 	var enums []*ast.EnumDecl
+	var interfaces []*ast.InterfaceDecl
 	var funcs []*ast.FuncDecl
 	var asserts []*ast.AssertDecl
 	foreachDecl(root, func(child cst.Tree, green *cst.Node) {
@@ -117,6 +121,13 @@ func (d *Document) rebuild() {
 			}
 			nextEnums[green] = ed
 			enums = append(enums, ed)
+		case cst.InterfaceDecl:
+			id, ok := d.interfaceCache[green]
+			if !ok {
+				id = lowerInterfaceDecl(child, buf)
+			}
+			nextInterfaces[green] = id
+			interfaces = append(interfaces, id)
 		case cst.FuncDecl:
 			fd, ok := d.funcCache[green]
 			if !ok {
@@ -137,8 +148,9 @@ func (d *Document) rebuild() {
 	d.cache = next
 	d.typeCache = nextTypes
 	d.enumCache = nextEnums
+	d.interfaceCache = nextInterfaces
 	d.funcCache = nextFuncs
 	d.useCache = nextUses
 	d.assertCache = nextAsserts
-	d.file = ast.NewFile(uses, decls, types, enums, funcs, asserts, rootNode)
+	d.file = ast.NewFile(uses, decls, types, enums, interfaces, funcs, asserts, rootNode)
 }

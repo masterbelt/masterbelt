@@ -1,24 +1,16 @@
 Module
-  Const "" pub
-    doc "A behaviour over a keyed collection: implement the required fold and the"
-    doc "provided methods (count, map, filter, ...) come for free, defined on top of"
-    doc "it. iterability is foldable."
-    type invalid
-    value <none>
-  Const "count" pub
-    doc "Provided: the number of elements, folded from the primitive."
-    type invalid
-    value <none>
-  Const "any" pub
-    doc "Provided: whether any element satisfies the predicate."
-    type invalid
-    value <none>
   TypeDef "Bag" pub
     doc "A small bag of T values that folds over its contents. The `impl foldable<int, T>`"
     doc "tag is what gives Bag the count/any methods — written here, at Bag's own"
     doc "definition site."
     param "T"
     body list<T>
+    method "fold"
+      doc "The required primitive: fold the underlying list."
+      param init: A
+      param step: fn(A, int, T): A
+      result A
+      return ParamRef "init"
   Func "total" pub
     doc "The total of a collection of ints, folded with addition."
     param c: invalid
