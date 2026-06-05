@@ -1,0 +1,36 @@
+Module
+  Const "Bigger"
+    type bool
+    value IntLiteral "3".gt(IntLiteral "2")
+    eval true
+  Const "Label"
+    type bool
+    value IntLiteral "7".gt(IntLiteral "100")
+    eval false
+  Const "Capped"
+    type Level
+    value Level.Max.gt(IntLiteral "50")
+    eval true
+  Const "Clamp"
+    type bool
+    value IntLiteral "150".lt(IntLiteral "0")
+    eval false
+  Const "Score"
+    type bool
+    value IntLiteral "3".gt(IntLiteral "2")
+    eval true
+  TypeDef "Level" pub
+    body int8
+    const "Max" pub
+      type int
+      value 100
+  TypeDef "Temp" pub
+    body int32
+    method "sign" pub
+      doc "-1, 0, or 1 by sign."
+      result int32
+      return self.gt(IntLiteral "0")
+      expr IntLiteral "1"
+      expr self.lt(IntLiteral "0")
+      expr IntLiteral "1".neg()
+      expr IntLiteral "0"

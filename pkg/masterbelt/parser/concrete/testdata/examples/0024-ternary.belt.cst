@@ -1,0 +1,332 @@
+# tree
+File
+  ConstDecl
+    LineComment "// The ternary \"?:\" is the value form of a two-way choice: cond ? a : b folds to"
+    Newline "\n"
+    LineComment "// a when the condition holds and to b otherwise. Unlike if (E-9, a statement that"
+    Newline "\n"
+    LineComment "// drives control flow by returning), the ternary is an expression — it yields a"
+    Newline "\n"
+    LineComment "// value, so it appears wherever a value is wanted (a const initializer, a method"
+    Newline "\n"
+    LineComment "// body's return). The condition must be a bool and the two branches must share a"
+    Newline "\n"
+    LineComment "// type; the result is that shared type."
+    Newline "\n"
+    Newline "\n"
+    LineComment "// The condition is an ordinary boolean expression; the branches are values."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Bigger"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      BinaryExpr
+        Literal
+          Int "3"
+        Whitespace " "
+        Gt ">"
+        Whitespace " "
+        Literal
+          Int "2"
+  Error
+    Whitespace " "
+    Illegal "?"
+    Whitespace " "
+    Int "10"
+    Whitespace " "
+    Colon ":"
+    Whitespace " "
+    Int "20"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Label"
+    Whitespace "  "
+    Initializer
+      Assign "="
+      Whitespace " "
+      BinaryExpr
+        Literal
+          Int "7"
+        Whitespace " "
+        Gt ">"
+        Whitespace " "
+        Literal
+          Int "100"
+  Error
+    Whitespace " "
+    Illegal "?"
+    Whitespace " "
+    String "\"high\""
+    Whitespace " "
+    Colon ":"
+    Whitespace " "
+    String "\"low\""
+  TypeDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// The branches unify the way a collection's elements do — an int branch beside a"
+    Newline "\n"
+    LineComment "// default-int literal stays int."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Type "type"
+    Whitespace " "
+    Ident "Level"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    TypeName
+      Ident "int8"
+    Whitespace " "
+    ImplBlock
+      Impl "impl"
+      Whitespace " "
+      LBrace "{"
+      ConstDecl
+        Newline "\n"
+        Whitespace "  "
+        Pub "pub"
+        Whitespace " "
+        Const "const"
+        Whitespace " "
+        Ident "Max"
+        Whitespace " "
+        Initializer
+          Assign "="
+          Whitespace " "
+          Literal
+            Int "100"
+      Newline "\n"
+      RBrace "}"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Capped"
+    TypeClause
+      Colon ":"
+      Whitespace " "
+      TypeName
+        Ident "Level"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      BinaryExpr
+        MemberExpr
+          NameRef
+            Ident "Level"
+          Dot "."
+          Ident "Max"
+        Whitespace " "
+        Gt ">"
+        Whitespace " "
+        Literal
+          Int "50"
+  Error
+    Whitespace " "
+    Illegal "?"
+    Whitespace " "
+    Ident "Level"
+    Dot "."
+    Ident "Max"
+    Whitespace " "
+    Colon ":"
+    Whitespace " "
+    Int "0"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// The ternary nests right: a ? b : c ? d : e parses as a ? b : (c ? d : e), so a"
+    Newline "\n"
+    LineComment "// clamp reads as a chain of two-way choices. Parentheses are unnecessary but make"
+    Newline "\n"
+    LineComment "// the grouping explicit."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Clamp"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      BinaryExpr
+        Literal
+          Int "150"
+        Whitespace " "
+        Lt "<"
+        Whitespace " "
+        Literal
+          Int "0"
+  Error
+    Whitespace " "
+    Illegal "?"
+    Whitespace " "
+    Int "0"
+    Whitespace " "
+    Colon ":"
+    Whitespace " "
+    LParen "("
+    Int "150"
+    Whitespace " "
+    Gt ">"
+    Whitespace " "
+    Int "100"
+    Whitespace " "
+    Illegal "?"
+    Whitespace " "
+    Int "100"
+    Whitespace " "
+    Colon ":"
+    Whitespace " "
+    Int "150"
+    RParen ")"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// A ternary is a value, so it composes with the operators around it: the whole"
+    Newline "\n"
+    LineComment "// choice is one operand of the addition."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Score"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      ParenExpr
+        LParen "("
+        BinaryExpr
+          Literal
+            Int "3"
+          Whitespace " "
+          Gt ">"
+          Whitespace " "
+          Literal
+            Int "2"
+  Error
+    Whitespace " "
+    Illegal "?"
+    Whitespace " "
+    Int "1"
+    Whitespace " "
+    Colon ":"
+    Whitespace " "
+    Int "0"
+    RParen ")"
+    Whitespace " "
+    Plus "+"
+    Whitespace " "
+    Int "5"
+  TypeDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// In a method body the ternary returns its value directly — the value form of the"
+    Newline "\n"
+    LineComment "// if/else a sign check would otherwise need."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Type "type"
+    Whitespace " "
+    Ident "Temp"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    TypeName
+      Ident "int32"
+    Whitespace " "
+    ImplBlock
+      Impl "impl"
+      Whitespace " "
+      LBrace "{"
+      MethodDecl
+        Newline "\n"
+        Whitespace "  "
+        DocComment "/// -1, 0, or 1 by sign."
+        Newline "\n"
+        Whitespace "  "
+        Pub "pub"
+        Whitespace " "
+        Ident "sign"
+        ParamList
+          LParen "("
+          RParen ")"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "int32"
+        Whitespace " "
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            BinaryExpr
+              SelfExpr
+                Self "self"
+              Whitespace " "
+              Gt ">"
+              Whitespace " "
+              Literal
+                Int "0"
+          Whitespace " "
+          Illegal "?"
+          Whitespace " "
+          Literal
+            Int "1"
+          Whitespace " "
+          Colon ":"
+          Whitespace " "
+          ParenExpr
+            LParen "("
+            BinaryExpr
+              SelfExpr
+                Self "self"
+              Whitespace " "
+              Lt "<"
+              Whitespace " "
+              Literal
+                Int "0"
+          Whitespace " "
+          Illegal "?"
+          Whitespace " "
+          UnaryExpr
+            Minus "-"
+            Literal
+              Int "1"
+          Whitespace " "
+          Colon ":"
+          Whitespace " "
+          Literal
+            Int "0"
+          RParen ")"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
+      Newline "\n"
+      RBrace "}"
+  Newline "\n"
+  EOF ""
+# diagnostics
+error[masterbelt.parser.concrete.unexpected_token] 9:22 unexpected token: Illegal
+error[masterbelt.parser.concrete.unexpected_token] 10:24 unexpected token: Illegal
+error[masterbelt.parser.concrete.unexpected_token] 17:38 unexpected token: Illegal
+error[masterbelt.parser.concrete.unexpected_token] 22:23 unexpected token: Illegal
+error[masterbelt.parser.concrete.unexpected_token] 26:21 unexpected token: Whitespace
+error[masterbelt.parser.concrete.unexpected_token] 26:22 unexpected token: Illegal
+error[masterbelt.parser.concrete.unexpected_token] 33:21 unexpected token: Illegal
+error[masterbelt.parser.concrete.unexpected_token] 33:25 unexpected token: Colon
+error[masterbelt.parser.concrete.unexpected_token] 33:36 unexpected token: Whitespace
+error[masterbelt.parser.concrete.unexpected_token] 33:37 unexpected token: Illegal
+error[masterbelt.parser.concrete.unexpected_token] 33:42 unexpected token: Colon
+error[masterbelt.parser.concrete.unexpected_token] 33:45 unexpected token: RParen

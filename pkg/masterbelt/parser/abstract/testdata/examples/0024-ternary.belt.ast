@@ -1,0 +1,37 @@
+File
+  ConstDecl
+    name "Bigger"
+    value (call (. IntLit "3" gt) IntLit "2")
+  ConstDecl
+    name "Label"
+    value (call (. IntLit "7" gt) IntLit "100")
+  ConstDecl
+    name "Capped"
+    type Level
+    value (call (. (. Identifier "Level" Max) gt) IntLit "50")
+  ConstDecl
+    name "Clamp"
+    value (call (. IntLit "150" lt) IntLit "0")
+  ConstDecl
+    name "Score"
+    value (call (. IntLit "3" gt) IntLit "2")
+  TypeDecl
+    pub
+    name "Level"
+    body int8
+    const "Max"
+      pub
+      value IntLit "100"
+  TypeDecl
+    pub
+    name "Temp"
+    body int32
+    method "sign"
+      doc "-1, 0, or 1 by sign."
+      pub
+      result int32
+      return (call (. self gt) IntLit "0")
+      expr IntLit "1"
+      expr (call (. self lt) IntLit "0")
+      expr (call (. IntLit "1" neg))
+      expr IntLit "0"
