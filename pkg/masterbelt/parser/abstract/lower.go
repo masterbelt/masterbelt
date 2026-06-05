@@ -185,7 +185,16 @@ func lowerLetStmt(t cst.Tree, buf source.Buffer, node *cst.Node) ast.Stmt {
 // lowerAssignStmt lowers an AssignStmt node: its target expression (the first
 // expression child, before the "=") and its value (the second). Either is nil
 // when the source omitted it, which the semantic layer reports.
+//
+// An index target, coll[i] = v, is desugared here to a rebind of the collection:
+// coll = coll.set(i, v). set returns a new collection (self), so the assignment
+// stays a plain rebind of the let local — the same shape the E-15 assignment
+// already checks and folds — and data stays immutable (a new collection, not an
+// in-place write). The receiver of the rebind is the index's own receiver
+// (coll), which the checker validates as a let local exactly as a bare name
+// target.
 func lowerAssignStmt(t cst.Tree, buf source.Buffer, node *cst.Node) ast.Stmt {
+	var targetTree cst.Tree
 	var target, value ast.Expr
 	for _, child := range t.Children() {
 		n, ok := child.Node()
@@ -193,12 +202,36 @@ func lowerAssignStmt(t cst.Tree, buf source.Buffer, node *cst.Node) ast.Stmt {
 			continue
 		}
 		if target == nil {
+			targetTree = child
 			target = lowerExpr(child, buf)
 		} else {
 			value = lowerExpr(child, buf)
 		}
 	}
+	if tn, ok := targetTree.Node(); ok && tn.Kind() == cst.IndexExpr {
+		return lowerIndexAssign(targetTree, buf, value, node)
+	}
 	return ast.NewAssignStmt(target, value, node)
+}
+
+// lowerIndexAssign lowers an index assignment coll[i] = v to a rebind of the
+// collection, coll = coll.set(i, v). The target tree is the IndexExpr (coll[i]);
+// its receiver and index are the set call's receiver and first argument, and the
+// assigned value is its second. The receiver expression is the AssignStmt's new
+// target, so the checker sees the same let-local rebind a bare-name assignment
+// produces. A missing receiver, index, or value lowers to a nil hole the
+// semantic layer reports, mirroring a recovered ordinary assignment.
+func lowerIndexAssign(target cst.Tree, buf source.Buffer, value ast.Expr, node *cst.Node) ast.Stmt {
+	recv, index := twoOperands(target, buf)
+	var args []ast.Expr
+	if index != nil {
+		args = append(args, index)
+	}
+	if value != nil {
+		args = append(args, value)
+	}
+	set := desugarCall(recv, "set", args, node)
+	return ast.NewAssignStmt(recv, set, node)
 }
 
 // lowerIfStmt lowers an IfStmt node: its condition (the first expression child),
@@ -341,8 +374,9 @@ func firstOperand(t cst.Tree, buf source.Buffer) ast.Expr {
 	return nil
 }
 
-// twoOperands lowers the left and right operand nodes of a BinaryExpr. Either is
-// nil when the source omitted it (a recovered "1 +").
+// twoOperands lowers the first two operand nodes of a node, in source order: a
+// BinaryExpr's left and right, or an IndexExpr's receiver and index. Either is
+// nil when the source omitted it (a recovered "1 +" or "xs[").
 func twoOperands(t cst.Tree, buf source.Buffer) (x, y ast.Expr) {
 	var operands []ast.Expr
 	for _, c := range t.Children() {

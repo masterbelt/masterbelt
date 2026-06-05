@@ -1,0 +1,423 @@
+# tree
+File
+  ConstDecl
+    LineComment "// Index access reads and writes a collection by subscript. A read coll[i]"
+    Newline "\n"
+    LineComment "// desugars to coll.get(i), a write coll[i] = v to coll = coll.set(i, v) — the"
+    Newline "\n"
+    LineComment "// same desugaring-to-a-method strategy operators use (1 + 2 is 1.add(2)). No"
+    Newline "\n"
+    LineComment "// new value form reaches the type checker or the folder: a subscript is a call."
+    Newline "\n"
+    LineComment "//"
+    Newline "\n"
+    LineComment "// A read can miss — an index out of range, a key not present — so it yields a"
+    Newline "\n"
+    LineComment "// result union (V | error), the same shape a fallible function returns. A write"
+    Newline "\n"
+    LineComment "// returns the new collection (self): data stays immutable, and the let local is"
+    Newline "\n"
+    LineComment "// rebound to it. A map write is an upsert and always succeeds; a list write past"
+    Newline "\n"
+    LineComment "// the end is a bug caught at compile time (index_out_of_range), not a value."
+    Newline "\n"
+    Newline "\n"
+    LineComment "// Reading a list element. The static type is int | error — the read may be out"
+    Newline "\n"
+    LineComment "// of range — even when the index is a constant the folder can resolve."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Xs"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CollectionLit
+        LBracket "["
+        Literal
+          Int "10"
+        Comma ","
+        Whitespace " "
+        Literal
+          Int "20"
+        Comma ","
+        Whitespace " "
+        Literal
+          Int "30"
+        RBracket "]"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "First"
+    TypeClause
+      Colon ":"
+      Whitespace " "
+      UnionType
+        TypeName
+          Ident "int"
+        Whitespace " "
+        Pipe "|"
+        Whitespace " "
+        TypeName
+          Ident "error"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      IndexExpr
+        NameRef
+          Ident "Xs"
+        LBracket "["
+        Literal
+          Int "0"
+        RBracket "]"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Third"
+    TypeClause
+      Colon ":"
+      Whitespace " "
+      UnionType
+        TypeName
+          Ident "int"
+        Whitespace " "
+        Pipe "|"
+        Whitespace " "
+        TypeName
+          Ident "error"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      IndexExpr
+        NameRef
+          Ident "Xs"
+        LBracket "["
+        Literal
+          Int "2"
+        RBracket "]"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// Reading a map value by key. Missing keys make this fallible too."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Tbl"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CollectionLit
+        LBracket "["
+        MapEntry
+          Literal
+            String "\"sword\""
+          Colon ":"
+          Whitespace " "
+          Literal
+            Int "100"
+        Comma ","
+        Whitespace " "
+        MapEntry
+          Literal
+            String "\"shield\""
+          Colon ":"
+          Whitespace " "
+          Literal
+            Int "50"
+        RBracket "]"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Sword"
+    TypeClause
+      Colon ":"
+      Whitespace " "
+      UnionType
+        TypeName
+          Ident "int"
+        Whitespace " "
+        Pipe "|"
+        Whitespace " "
+        TypeName
+          Ident "error"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      IndexExpr
+        NameRef
+          Ident "Tbl"
+        LBracket "["
+        Literal
+          String "\"sword\""
+        RBracket "]"
+  FuncDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// A dynamic index reads the same way: the desugared get carries the union."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Fn "fn"
+    Whitespace " "
+    Ident "at"
+    ParamList
+      LParen "("
+      Param
+        Ident "xs"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "list"
+          GenericArgs
+            Lt "<"
+            TypeName
+              Ident "int"
+            Gt ">"
+      Comma ","
+      Whitespace " "
+      Param
+        Ident "i"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "int"
+      RParen ")"
+    Colon ":"
+    Whitespace " "
+    UnionType
+      TypeName
+        Ident "int"
+      Whitespace " "
+      Pipe "|"
+      Whitespace " "
+      TypeName
+        Ident "error"
+    Whitespace " "
+    Block
+      LBrace "{"
+      Newline "\n"
+      Whitespace "  "
+      ReturnStmt
+        Return "return"
+        Whitespace " "
+        IndexExpr
+          NameRef
+            Ident "xs"
+          LBracket "["
+          NameRef
+            Ident "i"
+          RBracket "]"
+      Newline "\n"
+      RBrace "}"
+  FuncDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// Writing a list element rebinds the let local to a new list (set returns self)."
+    Newline "\n"
+    LineComment "// The data is not mutated in place; the binding is."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Fn "fn"
+    Whitespace " "
+    Ident "bumpFirst"
+    ParamList
+      LParen "("
+      RParen ")"
+    Colon ":"
+    Whitespace " "
+    TypeName
+      Ident "list"
+      GenericArgs
+        Lt "<"
+        TypeName
+          Ident "int"
+        Gt ">"
+    Whitespace " "
+    Block
+      LBrace "{"
+      Newline "\n"
+      Whitespace "  "
+      LetStmt
+        Let "let"
+        Whitespace " "
+        Ident "xs"
+        Whitespace " "
+        Initializer
+          Assign "="
+          Whitespace " "
+          CollectionLit
+            LBracket "["
+            Literal
+              Int "1"
+            Comma ","
+            Whitespace " "
+            Literal
+              Int "2"
+            Comma ","
+            Whitespace " "
+            Literal
+              Int "3"
+            RBracket "]"
+      Newline "\n"
+      Whitespace "  "
+      AssignStmt
+        IndexExpr
+          NameRef
+            Ident "xs"
+          LBracket "["
+          Literal
+            Int "0"
+          RBracket "]"
+        Whitespace " "
+        Assign "="
+        Whitespace " "
+        Literal
+          Int "99"
+      Newline "\n"
+      Whitespace "  "
+      ReturnStmt
+        Return "return"
+        Whitespace " "
+        NameRef
+          Ident "xs"
+      Newline "\n"
+      RBrace "}"
+  FuncDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// A map write upserts: an existing key is updated, a new key is added. Both"
+    Newline "\n"
+    LineComment "// always succeed, so a map write needs no error."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Fn "fn"
+    Whitespace " "
+    Ident "put"
+    ParamList
+      LParen "("
+      RParen ")"
+    Colon ":"
+    Whitespace " "
+    TypeName
+      Ident "map"
+      GenericArgs
+        Lt "<"
+        TypeName
+          Ident "string"
+        Comma ","
+        Whitespace " "
+        TypeName
+          Ident "int"
+        Gt ">"
+    Whitespace " "
+    Block
+      LBrace "{"
+      Newline "\n"
+      Whitespace "  "
+      LetStmt
+        Let "let"
+        Whitespace " "
+        Ident "m"
+        Whitespace " "
+        Initializer
+          Assign "="
+          Whitespace " "
+          CollectionLit
+            LBracket "["
+            MapEntry
+              Literal
+                String "\"a\""
+              Colon ":"
+              Whitespace " "
+              Literal
+                Int "1"
+            RBracket "]"
+      Newline "\n"
+      Whitespace "  "
+      AssignStmt
+        IndexExpr
+          NameRef
+            Ident "m"
+          LBracket "["
+          Literal
+            String "\"a\""
+          RBracket "]"
+        Whitespace " "
+        Assign "="
+        Whitespace " "
+        Literal
+          Int "10"
+      Newline "\n"
+      Whitespace "  "
+      AssignStmt
+        IndexExpr
+          NameRef
+            Ident "m"
+          LBracket "["
+          Literal
+            String "\"b\""
+          RBracket "]"
+        Whitespace " "
+        Assign "="
+        Whitespace " "
+        Literal
+          Int "2"
+      Newline "\n"
+      Whitespace "  "
+      ReturnStmt
+        Return "return"
+        Whitespace " "
+        NameRef
+          Ident "m"
+      Newline "\n"
+      RBrace "}"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// The writes fold end to end: calling the writers produces the new collections,"
+    Newline "\n"
+    LineComment "// so the rebind and the set folding are visible in the constants."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Bumped"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "bumpFirst"
+        LParen "("
+        RParen ")"
+  ConstDecl
+    Whitespace "        "
+    LineComment "// [99, 2, 3]"
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Put"
+    Whitespace "    "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "put"
+        LParen "("
+        RParen ")"
+  Whitespace "              "
+  LineComment "// [\"a\": 10, \"b\": 2]"
+  Newline "\n"
+  EOF ""
+# diagnostics

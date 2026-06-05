@@ -1,6 +1,8 @@
 package semantic
 
 import (
+	"strconv"
+
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/eval"
@@ -39,6 +41,119 @@ func checkDivByZero(e ast.Expr, env evalEnv, report func(node ast.Node)) {
 	for _, a := range call.Arguments {
 		checkDivByZero(a, env, report)
 	}
+}
+
+// checkIndexWrites reports a list index write past the end (index_out_of_range).
+// A write coll[i] = v desugared to coll = coll.set(i, v); when the collection
+// folds to a list of known length and the index folds to a constant out of that
+// range, the write is a compile-time bug — a list write cannot grow the list, so
+// it has nowhere to land (a map write upserts and is never out of range). The
+// folding tracks the body's let locals so a write to a let-bound list is reached;
+// a receiver or index that does not fold (a parameter, a dynamic index) is left
+// to the runtime, exactly as the plan scopes it.
+//
+// The walk mirrors eval's body execution for the bindings it needs: a let adds a
+// local, an assignment updates one, and a nested block (an if/switch branch) gets
+// a copy so its bindings do not leak out. Only foldable bindings are tracked;
+// the check is a best-effort static catch, not a guarantee.
+func checkIndexWrites(body []ast.Stmt, env eval.Env, at func(ast.Node) span, diags *diagnostic.List) {
+	locals := map[string]*ir.Constant{}
+	checkIndexWritesIn(body, locals, env, at, diags)
+}
+
+// checkIndexWritesIn walks a statement body with the running local environment
+// locals, reporting out-of-range list writes and threading the bindings each
+// statement introduces. A nested block is walked with a copy of locals so its
+// lets stay block-scoped, while an assignment to an outer local persists.
+func checkIndexWritesIn(body []ast.Stmt, locals map[string]*ir.Constant, env eval.Env, at func(ast.Node) span, diags *diagnostic.List) {
+	for _, stmt := range body {
+		switch s := stmt.(type) {
+		case *ast.LetStmt:
+			if s.Name != "" && s.Value != nil {
+				if v := eval.ExprIn(s.Value, locals, env); v != nil {
+					locals[s.Name] = v
+				} else {
+					delete(locals, s.Name) // an unfoldable rebind: stop tracking it
+				}
+			}
+		case *ast.AssignStmt:
+			reportIndexWrite(s, locals, env, at, diags)
+			if id, ok := s.Target.(*ast.Identifier); ok && s.Value != nil {
+				if v := eval.ExprIn(s.Value, locals, env); v != nil {
+					locals[id.Name] = v
+				} else {
+					delete(locals, id.Name)
+				}
+			}
+		case *ast.IfStmt:
+			checkIndexWritesIn(s.Then, copyLocals(locals), env, at, diags)
+			if s.ElseIf != nil {
+				checkIndexWritesIn([]ast.Stmt{s.ElseIf}, copyLocals(locals), env, at, diags)
+			}
+			checkIndexWritesIn(s.Else, copyLocals(locals), env, at, diags)
+		case *ast.SwitchStmt:
+			for _, arm := range s.Arms {
+				checkIndexWritesIn(arm.Body, copyLocals(locals), env, at, diags)
+			}
+			checkIndexWritesIn(s.Else, copyLocals(locals), env, at, diags)
+			for _, arm := range s.AfterElse {
+				checkIndexWritesIn(arm.Body, copyLocals(locals), env, at, diags)
+			}
+		}
+	}
+}
+
+// reportIndexWrite reports an out-of-range list write for an assignment whose
+// value is a set call on a foldable list. The set call carries the index and the
+// new value (a desugared coll[i] = v, or a hand-written coll = coll.set(i, v));
+// when the receiver folds to a list and the index to a constant outside it, the
+// write is reported at the index expression. A map receiver (keyed entries) is an
+// upsert and never out of range.
+func reportIndexWrite(s *ast.AssignStmt, locals map[string]*ir.Constant, env eval.Env, at func(ast.Node) span, diags *diagnostic.List) {
+	call, ok := s.Value.(*ast.CallExpr)
+	if !ok {
+		return
+	}
+	member, ok := call.Callee.(*ast.MemberExpr)
+	if !ok || member.Member.Name != "set" || len(call.Arguments) != 2 {
+		return
+	}
+	recv := eval.ExprIn(member.Receiver, locals, env)
+	if recv == nil || recv.Kind != ir.ConstCollection || isMapConst(recv) {
+		return
+	}
+	idx := eval.ExprIn(call.Arguments[0], locals, env)
+	if idx == nil || idx.Kind != ir.ConstInt {
+		return
+	}
+	n := len(recv.Coll)
+	if idx.Int.IsInt64() && idx.Int.Int64() >= 0 && idx.Int.Int64() < int64(n) {
+		return // in range
+	}
+	c := at(call.Arguments[0])
+	diags.Add(newIndexOutOfRangeDiagnostic(c.offset, c.width, idx.Int.String(), strconv.Itoa(n)))
+}
+
+// isMapConst reports whether a folded collection constant is a map — its entries
+// carry keys. An empty collection has no key, so it reads as a list (the
+// conservative default eval uses for the same ambiguity).
+func isMapConst(c *ir.Constant) bool {
+	for _, e := range c.Coll {
+		if e.Key != nil {
+			return true
+		}
+	}
+	return false
+}
+
+// copyLocals returns a shallow copy of a local environment, so a nested block's
+// bindings do not leak back to the enclosing one.
+func copyLocals(locals map[string]*ir.Constant) map[string]*ir.Constant {
+	out := make(map[string]*ir.Constant, len(locals))
+	for k, v := range locals {
+		out[k] = v
+	}
+	return out
 }
 
 // checkNoSelf reports each self expression in e — descending into nested
@@ -148,6 +263,7 @@ func checkMethodBodies(reg *builtin.Registry, defs []*ir.TypeDef, universe map[s
 			want := substSelf(irm.Result, self)
 			bs := infer.BodyScope{Reg: reg, Universe: universe, Qualified: qualified, Self: self, Params: params, Funcs: funcs, QualifiedFuncs: qualifiedFuncs}
 			checkStmts(m.Body, want, bs, env, nil, sink, at, diags)
+			checkIndexWrites(m.Body, env, at, diags)
 		}
 	}
 }
@@ -174,6 +290,7 @@ func checkFuncBodies(reg *builtin.Registry, file *ast.File, universe map[string]
 		want := r.ResolveType(fd.Result, nil)
 		bs := infer.BodyScope{Reg: reg, Universe: universe, Qualified: qualified, Self: ir.Invalid, Params: params, Funcs: funcs, QualifiedFuncs: qualifiedFuncs}
 		checkStmts(fd.Body, want, bs, env, noSelf, sink, at, diags)
+		checkIndexWrites(fd.Body, env, at, diags)
 		if hasBlockBody(fd) && !bodyReturns(fd.Body, scrutEnumOf(bs)) {
 			s := at(fd)
 			diags.Add(newMissingReturnDiagnostic(s.offset, s.width, fd.Name))

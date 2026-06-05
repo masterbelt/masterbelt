@@ -81,6 +81,15 @@ func Expr(e ast.Expr, env Env) *ir.Constant {
 	return evalExpr(e, evalCtx{env: env})
 }
 
+// ExprIn folds an expression with a set of local bindings in scope, so a
+// reference to a body-local (a let, a parameter the caller has a value for)
+// folds to its value. It is how a body-position check folds an expression the
+// query engine cannot reach on its own — the local environment a function body
+// carries is not in env. A nil locals behaves exactly like Expr.
+func ExprIn(e ast.Expr, locals map[string]*ir.Constant, env Env) *ir.Constant {
+	return evalExpr(e, evalCtx{env: env, locals: locals})
+}
+
 // ExprExpecting folds an expression with an expected enum in scope, so a bare
 // member resolves through it. want is the expected type; when it is an enum's
 // named type the bare-member rule applies, otherwise it is ignored. It is how
@@ -569,11 +578,31 @@ func compareEnumValues(a, b *ir.Constant) (int, bool) {
 
 // collectionMethod folds a method on a list/map constant. The list collections
 // are not natively backed in the registry, so their methods have no intrinsic;
-// the one with a foldable value is list.map, which applies its function argument
-// to each element and collects the results into a new list. Anything else (a map
-// receiver, or a list method other than map) has no constant value here.
+// the foldable ones are map (over a list), get (a subscript read), and set (a
+// subscript write). Anything else has no constant value here.
+//
+// A list and a map are told apart by their entries: a map's carry a key, a
+// list's do not. An empty collection has no key to read, so it reads as a list —
+// which is harmless for the only ambiguous case, set, where an empty map upsert
+// simply does not fold (nil) rather than folding wrong.
 func collectionMethod(ctx evalCtx, recv *ir.Constant, name string, args []*ir.Constant) *ir.Constant {
-	if name != "map" || len(args) != 1 || args[0].Kind != ir.ConstFunc {
+	switch name {
+	case "map":
+		return collectionMap(ctx, recv, args)
+	case "get":
+		return collectionGet(recv, args)
+	case "set":
+		return collectionSet(recv, args)
+	default:
+		return nil
+	}
+}
+
+// collectionMap folds list.map: it applies the function argument to each element
+// and collects the results into a new list. A map receiver (keyed entries) is
+// not foldable.
+func collectionMap(ctx evalCtx, recv *ir.Constant, args []*ir.Constant) *ir.Constant {
+	if len(args) != 1 || args[0].Kind != ir.ConstFunc {
 		return nil
 	}
 	out := make([]ir.ConstEntry, len(recv.Coll))
@@ -588,6 +617,99 @@ func collectionMethod(ctx evalCtx, recv *ir.Constant, name string, args []*ir.Co
 		out[i] = ir.ConstEntry{Value: v}
 	}
 	return ir.CollectionConstant(out)
+}
+
+// collectionGet folds a subscript read coll.get(i). A read can miss — a list
+// index out of range, a map key not present — and a miss is a value, an error
+// constant, not an unfoldable result: the read folds to that error so a caller
+// can branch on it. A list is read by integer index, a map by key equality
+// (the same constant equality a switch dispatches on); an empty collection has
+// no element either way, so the read is always a miss.
+func collectionGet(recv *ir.Constant, args []*ir.Constant) *ir.Constant {
+	if len(args) != 1 {
+		return nil
+	}
+	key := args[0]
+	if isMapColl(recv) {
+		for _, entry := range recv.Coll {
+			if entry.Key != nil && constEqual(entry.Key, key) {
+				return entry.Value
+			}
+		}
+		return ir.ErrorConstant("key not found")
+	}
+	i, ok := intIndex(key)
+	if !ok {
+		return nil // a non-integer index on a list is a type error the checker reports
+	}
+	if i < 0 || i >= int64(len(recv.Coll)) {
+		return ir.ErrorConstant("index out of range")
+	}
+	return recv.Coll[int(i)].Value
+}
+
+// collectionSet folds a subscript write coll.set(i, v) to the new collection it
+// returns, leaving the receiver unchanged (data is immutable). A map write is an
+// upsert: an existing key's value is replaced, a new key is appended — it always
+// succeeds. A list write replaces the element at an in-range index; an index out
+// of range does not fold (nil), since the compile-time write past the end is a
+// bug the semantic layer reports as index_out_of_range rather than a value.
+func collectionSet(recv *ir.Constant, args []*ir.Constant) *ir.Constant {
+	if len(args) != 2 {
+		return nil
+	}
+	value := args[1]
+	if isMapColl(recv) {
+		key := args[0]
+		out := make([]ir.ConstEntry, len(recv.Coll))
+		replaced := false
+		for i, entry := range recv.Coll {
+			if entry.Key != nil && constEqual(entry.Key, key) {
+				out[i] = ir.ConstEntry{Key: entry.Key, Value: value}
+				replaced = true
+				continue
+			}
+			out[i] = entry
+		}
+		if !replaced {
+			out = append(out, ir.ConstEntry{Key: key, Value: value})
+		}
+		return ir.CollectionConstant(out)
+	}
+	i, ok := intIndex(args[0])
+	if !ok {
+		return nil
+	}
+	if i < 0 || i >= int64(len(recv.Coll)) {
+		return nil // out of range: a compile-time error, reported as index_out_of_range
+	}
+	out := make([]ir.ConstEntry, len(recv.Coll))
+	copy(out, recv.Coll)
+	out[int(i)] = ir.ConstEntry{Value: value}
+	return ir.CollectionConstant(out)
+}
+
+// isMapColl reports whether a folded collection is a map: a map's entries carry
+// a key, a list's do not. An empty collection has no entries, so it reads as a
+// list (the conservative default; see collectionMethod).
+func isMapColl(recv *ir.Constant) bool {
+	for _, entry := range recv.Coll {
+		if entry.Key != nil {
+			return true
+		}
+	}
+	return false
+}
+
+// intIndex reads an integer constant as a list index, reporting whether it is an
+// integer that fits an int64. A negative or oversized index is out of range,
+// which the caller turns into a miss (for a read) or an unfoldable write — both
+// compared against the collection's length as an int64.
+func intIndex(c *ir.Constant) (int64, bool) {
+	if c == nil || c.Kind != ir.ConstInt || !c.Int.IsInt64() {
+		return 0, false
+	}
+	return c.Int.Int64(), true
 }
 
 // apply folds a function-value constant against the given arguments: it binds the

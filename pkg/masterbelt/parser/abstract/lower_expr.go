@@ -17,7 +17,7 @@ import (
 // isExprKind reports whether a CST node kind is an expression node.
 func isExprKind(k cst.Kind) bool {
 	switch k {
-	case cst.Literal, cst.NameRef, cst.SelfExpr, cst.UnaryExpr, cst.BinaryExpr, cst.TernaryExpr, cst.CallExpr, cst.MemberExpr, cst.CollectionLit, cst.RecordLit, cst.FuncLit, cst.ParenExpr, cst.AwaitExpr:
+	case cst.Literal, cst.NameRef, cst.SelfExpr, cst.UnaryExpr, cst.BinaryExpr, cst.TernaryExpr, cst.CallExpr, cst.MemberExpr, cst.IndexExpr, cst.CollectionLit, cst.RecordLit, cst.FuncLit, cst.ParenExpr, cst.AwaitExpr:
 		return true
 	default:
 		return false
@@ -47,6 +47,17 @@ func lowerExpr(t cst.Tree, buf source.Buffer) ast.Expr {
 		return lowerMemberExpr(t, buf, node)
 	case cst.CallExpr:
 		return lowerCallExpr(t, buf, node)
+	case cst.IndexExpr:
+		// coll[i] desugars to coll.get(i): the receiver is the collection, the
+		// index the single argument. A read may miss (out of range, key absent),
+		// so get's result is a union (V | error) — but that is the type rule's
+		// concern; here it is just a method call, the same shape an operator takes.
+		recv, index := twoOperands(t, buf)
+		var args []ast.Expr
+		if index != nil {
+			args = append(args, index)
+		}
+		return desugarCall(recv, "get", args, node)
 	case cst.FuncLit:
 		return lowerFuncLit(t, buf, node)
 	case cst.ParenExpr:

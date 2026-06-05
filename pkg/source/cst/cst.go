@@ -45,6 +45,7 @@ const (
 	UnaryExpr                 // a prefix operation: Op Expr
 	CallExpr                  // a call: Callee "(" [Expr ("," Expr)*] ")"
 	MemberExpr                // a member access: Receiver "." Ident
+	IndexExpr                 // an index access: Receiver "[" Expr "]"
 	SelfExpr                  // the "self" receiver inside a method body
 	CollectionLit             // a list or map literal: "[" ( Expr | MapEntry )* "]"
 	MapEntry                  // one map-literal entry: Expr ":" Expr
@@ -112,6 +113,7 @@ var kindNames = [...]string{
 	UnaryExpr:     "UnaryExpr",
 	CallExpr:      "CallExpr",
 	MemberExpr:    "MemberExpr",
+	IndexExpr:     "IndexExpr",
 	SelfExpr:      "SelfExpr",
 	CollectionLit: "CollectionLit",
 	MapEntry:      "MapEntry",

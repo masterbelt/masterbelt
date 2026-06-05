@@ -351,6 +351,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "cannot assign to a field or element: data is immutable; build a new value instead"
 		}
 	},
+	"masterbelt.semantic.index_out_of_range": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "インデックス " + f["index"].String() + " は長さ " + f["length"].String() + " のリストの範囲外です"
+		default:
+			return "index " + f["index"].String() + " is out of range for a list of length " + f["length"].String()
+		}
+	},
 	"masterbelt.semantic.invalid_enum_base_type": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":

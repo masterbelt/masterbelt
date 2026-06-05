@@ -1,0 +1,47 @@
+File
+  ConstDecl
+    name "Xs"
+    value (list IntLit "10" IntLit "20" IntLit "30")
+  ConstDecl
+    name "First"
+    type int | error
+    value (call (. Identifier "Xs" get) IntLit "0")
+  ConstDecl
+    name "Third"
+    type int | error
+    value (call (. Identifier "Xs" get) IntLit "2")
+  ConstDecl
+    name "Tbl"
+    value (map StringLit "sword": IntLit "100" StringLit "shield": IntLit "50")
+  ConstDecl
+    name "Sword"
+    type int | error
+    value (call (. Identifier "Tbl" get) StringLit "sword")
+  ConstDecl
+    name "Bumped"
+    value (call Identifier "bumpFirst")
+  ConstDecl
+    name "Put"
+    value (call Identifier "put")
+  FuncDecl
+    pub
+    name "at"
+    param xs: list<int>
+    param i: int
+    result int | error
+      return (call (. Identifier "xs" get) Identifier "i")
+  FuncDecl
+    pub
+    name "bumpFirst"
+    result list<int>
+      let "xs" = (list IntLit "1" IntLit "2" IntLit "3")
+      assign Identifier "xs" = (call (. Identifier "xs" set) IntLit "0" IntLit "99")
+      return Identifier "xs"
+  FuncDecl
+    pub
+    name "put"
+    result map<string, int>
+      let "m" = (map StringLit "a": IntLit "1")
+      assign Identifier "m" = (call (. Identifier "m" set) StringLit "a" IntLit "10")
+      assign Identifier "m" = (call (. Identifier "m" set) StringLit "b" IntLit "2")
+      return Identifier "m"

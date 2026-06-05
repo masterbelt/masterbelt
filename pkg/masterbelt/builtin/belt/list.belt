@@ -1,5 +1,6 @@
 use { bool } from "./bool.belt"
 use { int } from "./int.belt"
+use { error } from "./error.belt"
 
 /// An ordered sequence of T values, written [a, b, c].
 pub type list<T> = builtin<T> impl {
@@ -8,6 +9,14 @@ pub type list<T> = builtin<T> impl {
 
   /// A new list: func applied to each element, in order.
   pub extern fn map(func: fn(item: T): R): list<R>
+
+  /// The element at index, or an error when the index is out of range. The
+  /// result is a union (T | error) because a read can miss; handle the error.
+  pub extern fn get(index: int): T | error
+
+  /// A new list with index replaced by value, leaving this one unchanged. An
+  /// index past the end is a compile-time error (index_out_of_range).
+  pub extern fn set(index: int, value: T): self
 
   /// The + operator: the concatenation.
   pub extern fn add(other: self): self

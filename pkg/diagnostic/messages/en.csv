@@ -75,6 +75,7 @@ masterbelt.semantic.assign_to_undefined,cannot assign to {name}: no let binding 
 masterbelt.semantic.assign_type_mismatch,cannot assign {actual} to {name}: its type is fixed to {expected}
 masterbelt.semantic.immutable_data,cannot assign to a field or element: data is immutable; build a new value instead
 masterbelt.semantic.missing_initializer,let {name} must be initialized: write let {name} = value
+masterbelt.semantic.index_out_of_range,index {index} is out of range for a list of length {length}
 project.config.missing,masterbelt.toml not found in this directory or any parent
 project.config.invalid,invalid masterbelt.toml: {detail}
 project.config.missing_entry,masterbelt.toml does not set entry

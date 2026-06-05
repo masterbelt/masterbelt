@@ -510,6 +510,66 @@ func TestParseCollectionLiteral(t *testing.T) {
 	}
 }
 
+// TestParseIndexExpr checks the postfix index access: it forms a left-leaning
+// IndexExpr after any operand, chains with the other postfixes (a call, a member
+// access, another index), and binds tighter than every binary operator. The
+// leading "[" of a collection literal stays an operand, so a subscript and a
+// literal never collide.
+func TestParseIndexExpr(t *testing.T) {
+	cases := []struct{ src, want string }{
+		// A bare list/map subscript.
+		{"const x = xs[0]\n", "(xs [ 0 ])"},
+		{"const x = m[\"k\"]\n", `(m [ "k" ])`},
+		// The index is a full expression.
+		{"const x = xs[i + 1]\n", "(xs [ (i + 1) ])"},
+		// Chains, left to right: a call then an index, and an index then an index.
+		{"const x = f()[0]\n", "((f ( )) [ 0 ])"},
+		{"const x = xs[0][1]\n", "((xs [ 0 ]) [ 1 ])"},
+		// A member access composes with an index either way.
+		{"const x = a.b[0]\n", "((a . b) [ 0 ])"},
+		{"const x = xs[0].b\n", "((xs [ 0 ]) . b)"},
+		// Tighter than a binary operator: the subscript binds before "+".
+		{"const x = a + xs[i]\n", "(a + (xs [ i ]))"},
+		// A collection literal can itself be indexed: the first "[" is the literal
+		// (an operand), the second "[" is the subscript.
+		{"const x = [1, 2][0]\n", "(([ 1 , 2 ]) [ 0 ])"},
+	}
+	for _, tc := range cases {
+		buf, e := initExpr(t, tc.src)
+		if got := exprSexpr(buf, e); got != tc.want {
+			t.Errorf("%q: shape = %s, want %s", tc.src, got, tc.want)
+		}
+		if _, diags := Parse([]byte(tc.src)); len(diags) != 0 {
+			t.Errorf("%q: unexpected diagnostics: %v", tc.src, diags)
+		}
+		assertLossless(t, tc.src)
+	}
+
+	// The outermost subscript is an IndexExpr node, and a leading collection
+	// literal stays a CollectionLit — the two are distinct kinds.
+	t.Run("kinds", func(t *testing.T) {
+		_, e := initExpr(t, "const x = xs[0]\n")
+		if k, ok := e.Kind(); !ok || k != cst.IndexExpr {
+			t.Fatalf("initializer kind = %v, want IndexExpr", k)
+		}
+		_, lit := initExpr(t, "const x = [1, 2]\n")
+		if k, ok := lit.Kind(); !ok || k != cst.CollectionLit {
+			t.Fatalf("literal kind = %v, want CollectionLit", k)
+		}
+	})
+
+	// A missing index expression and a missing "]" are reported, and the source
+	// still round-trips losslessly.
+	t.Run("diagnostics", func(t *testing.T) {
+		for _, src := range []string{"const x = xs[]\n", "const x = xs[0\n"} {
+			if _, diags := Parse([]byte(src)); len(diags) == 0 {
+				t.Errorf("%q: expected a diagnostic", src)
+			}
+			assertLossless(t, src)
+		}
+	})
+}
+
 // TestParseFuncDecl checks the top-level function declaration: both body
 // forms, the pub modifier, and the file-level dispatch on fn followed by a
 // name.

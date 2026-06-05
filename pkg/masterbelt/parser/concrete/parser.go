@@ -48,7 +48,7 @@
 //	MulExpr       := Unary ( ( "*" | "/" | "%" ) Unary )*
 //	Unary         := ( "+" | "-" | "!" ) Unary | AwaitExpr | Postfix
 //	AwaitExpr     := await Unary
-//	Postfix       := Operand ( "." Ident | "(" [ Expr ( "," Expr )* ] ")" )*
+//	Postfix       := Operand ( "." Ident | "(" [ Expr ( "," Expr )* ] ")" | "[" Expr "]" )*
 //	Operand       := Literal | CollectionLit | RecordLit | NameRef | "self" | FuncLit | ParenExpr
 //	ParenExpr     := "(" Expr ")"
 //	FuncLit       := fn LitParamList [":" TypeExpr] ( "->" Expr | Block )

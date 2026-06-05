@@ -68,6 +68,16 @@ func TestLowerExpressions(t *testing.T) {
 		// grouping unwraps, leaving the ternary as the receiver of .add.
 		{"const x = (a ? b : c) + 1\n", `(call (. (? Identifier "a" Identifier "b" Identifier "c") add) IntLit "1")`},
 		{"const x = a ? b\n", `(? Identifier "a" Identifier "b" <missing>)`}, // recovered: else absent
+		// Index reads desugar to a get call: xs[0] is xs.get(0), with the receiver
+		// the collection and the index the single argument — the same call shape an
+		// operator takes. Chains and operators compose around it like any postfix.
+		{"const x = xs[0]\n", `(call (. Identifier "xs" get) IntLit "0")`},
+		{"const x = m[\"k\"]\n", `(call (. Identifier "m" get) StringLit "k")`},
+		{"const x = xs[i + 1]\n", `(call (. Identifier "xs" get) (call (. Identifier "i" add) IntLit "1"))`},
+		{"const x = xs[0][1]\n", `(call (. (call (. Identifier "xs" get) IntLit "0") get) IntLit "1")`},
+		{"const x = a + xs[i]\n", `(call (. Identifier "a" add) (call (. Identifier "xs" get) Identifier "i"))`},
+		{"const x = [1, 2][0]\n", `(call (. (list IntLit "1" IntLit "2") get) IntLit "0")`},
+		{"const x = xs[]\n", `(call (. Identifier "xs" get))`}, // recovered: index absent
 	}
 	for _, tc := range cases {
 		if got := valueLine(t, tc.src); got != tc.want {
