@@ -21,5 +21,35 @@ File
     pub
     name "Point"
     body { x: int, y: int }
+  FuncDecl
+    pub
+    name "double"
+    param x: int
+    result int
+      return (call (. Identifier "x" mul) IntLit "2")
+  FuncDecl
+    pub
+    name "area"
+    param w: int
+    param h: int
+    result int
+      return (call (. Identifier "w" mul) Identifier "h")
+  FuncDecl
+    pub
+    name "perimeter"
+    param w: int
+    param h: int
+    result int
+      return (call (. (call Identifier "double" Identifier "w") add) (call Identifier "double" Identifier "h"))
+  FuncDecl
+    name "greet"
+    param name: string
+    result string
+      return (call (. StringLit "Hello, " add) Identifier "name")
+  FuncDecl
+    pub
+    name "origin"
+    result Point
+      return (record Point x: IntLit "0" y: IntLit "0")
   AssertDecl
     cond (call (. (call Identifier "area" IntLit "3" IntLit "4") eql) IntLit "12")

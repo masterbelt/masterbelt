@@ -2,13 +2,14 @@ package ast
 
 import "github.com/masterbelt/masterbelt/pkg/source/cst"
 
-// File is a whole source file: its use, constant, type, and assert
+// File is a whole source file: its use, constant, type, function, and assert
 // declarations in source order. Trivia and any unparsable regions present in
 // the CST are dropped here.
 type File struct {
 	Uses    []*UseDecl
 	Decls   []*ConstDecl
 	Types   []*TypeDecl
+	Funcs   []*FuncDecl
 	Asserts []*AssertDecl
 	syntax  *cst.Node
 }
@@ -18,8 +19,8 @@ func (f *File) node()             {}
 
 // NewFile builds a File node. The constructors keep each node's syntax backlink
 // unexported while package parser/abstract populates it.
-func NewFile(uses []*UseDecl, decls []*ConstDecl, types []*TypeDecl, asserts []*AssertDecl, syntax *cst.Node) *File {
-	return &File{Uses: uses, Decls: decls, Types: types, Asserts: asserts, syntax: syntax}
+func NewFile(uses []*UseDecl, decls []*ConstDecl, types []*TypeDecl, funcs []*FuncDecl, asserts []*AssertDecl, syntax *cst.Node) *File {
+	return &File{Uses: uses, Decls: decls, Types: types, Funcs: funcs, Asserts: asserts, syntax: syntax}
 }
 
 // UseDecl is a cross-file import: an optional pub modifier (re-export the
@@ -67,6 +68,29 @@ func (d *ConstDecl) node()             {}
 // NewConstDecl builds a ConstDecl node.
 func NewConstDecl(doc []string, public bool, name string, typ TypeExpr, value Expr, syntax *cst.Node) *ConstDecl {
 	return &ConstDecl{Doc: doc, Public: public, Name: name, Type: typ, Value: value, syntax: syntax}
+}
+
+// FuncDecl is a top-level function declaration: a method without a receiver.
+// Its parameters, result type, and statement body reuse the nodes a method
+// declaration is built from; an arrow body (-> Expr) is normalized at lowering
+// to a single implicit return, exactly as a function literal's is, so every
+// later layer sees one body shape.
+type FuncDecl struct {
+	Doc    []string    // doc-comment lines ("///"), stripped of the marker
+	Public bool        // whether the declaration is marked pub
+	Name   string      // the declared identifier, or "" if missing
+	Params []*ParamDef // the parameters, each with its required annotation
+	Result TypeExpr    // the declared result type, or nil if missing
+	Body   []Stmt      // the statement body (an arrow body is one return)
+	syntax *cst.Node
+}
+
+func (d *FuncDecl) Syntax() *cst.Node { return d.syntax }
+func (d *FuncDecl) node()             {}
+
+// NewFuncDecl builds a FuncDecl node.
+func NewFuncDecl(doc []string, public bool, name string, params []*ParamDef, result TypeExpr, body []Stmt, syntax *cst.Node) *FuncDecl {
+	return &FuncDecl{Doc: doc, Public: public, Name: name, Params: params, Result: result, Body: body, syntax: syntax}
 }
 
 // AssertDecl is a compile-time assertion: an optional run of doc-comment lines

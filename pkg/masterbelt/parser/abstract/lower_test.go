@@ -186,6 +186,49 @@ func TestLowerArrowFuncLit(t *testing.T) {
 	}
 }
 
+// TestLowerFuncDecl checks the function-declaration lowering: modifiers, doc,
+// name, annotated parameters, the required result type, and both body forms —
+// the arrow body normalized to a single implicit return.
+func TestLowerFuncDecl(t *testing.T) {
+	src := "/// doubles x\npub fn double(x: int): int -> x * 2\nfn area(w: int, h: int): int {\n  return w * h\n}\n"
+	file, diags := Lower([]byte(src))
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if len(file.Funcs) != 2 {
+		t.Fatalf("got %d funcs, want 2", len(file.Funcs))
+	}
+
+	d := file.Funcs[0]
+	if !d.Public || d.Name != "double" {
+		t.Errorf("func 0 = pub %v name %q, want pub double", d.Public, d.Name)
+	}
+	if len(d.Doc) != 1 || d.Doc[0] != "doubles x" {
+		t.Errorf("func 0 doc = %v, want [doubles x]", d.Doc)
+	}
+	if len(d.Params) != 1 || d.Params[0].Name != "x" {
+		t.Fatalf("func 0 params = %v, want [x]", d.Params)
+	}
+	if nt, ok := d.Params[0].Type.(*ast.NamedType); !ok || nt.Name != "int" {
+		t.Errorf("func 0 param type = %+v, want int", d.Params[0].Type)
+	}
+	if nt, ok := d.Result.(*ast.NamedType); !ok || nt.Name != "int" {
+		t.Errorf("func 0 result = %+v, want int", d.Result)
+	}
+	// The arrow body is one implicit return.
+	if len(d.Body) != 1 {
+		t.Fatalf("func 0 body = %v, want one return", d.Body)
+	}
+	if _, ok := d.Body[0].(*ast.ReturnStmt); !ok {
+		t.Errorf("func 0 body stmt = %T, want ReturnStmt", d.Body[0])
+	}
+
+	a := file.Funcs[1]
+	if a.Public || a.Name != "area" || len(a.Params) != 2 || len(a.Body) != 1 {
+		t.Errorf("func 1 = %+v, want area(w, h) with one return", a)
+	}
+}
+
 func TestLowerUseDecl(t *testing.T) {
 	cases := []struct {
 		name string
