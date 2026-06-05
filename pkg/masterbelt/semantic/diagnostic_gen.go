@@ -11,6 +11,7 @@ import (
 const (
 	CodeAmbiguousImport       diagnostic.Code = "masterbelt.semantic.ambiguous_import"
 	CodeAmbiguousOverload     diagnostic.Code = "masterbelt.semantic.ambiguous_overload"
+	CodeArityMismatch         diagnostic.Code = "masterbelt.semantic.arity_mismatch"
 	CodeAssertionFailed       diagnostic.Code = "masterbelt.semantic.assertion_failed"
 	CodeAssertionNotBool      diagnostic.Code = "masterbelt.semantic.assertion_not_bool"
 	CodeAssertionNotConstant  diagnostic.Code = "masterbelt.semantic.assertion_not_constant"
@@ -23,6 +24,7 @@ const (
 	CodeInvalidOperation      diagnostic.Code = "masterbelt.semantic.invalid_operation"
 	CodeLambdaArityMismatch   diagnostic.Code = "masterbelt.semantic.lambda_arity_mismatch"
 	CodeMissingField          diagnostic.Code = "masterbelt.semantic.missing_field"
+	CodeMissingReturn         diagnostic.Code = "masterbelt.semantic.missing_return"
 	CodeNoMatchingOverload    diagnostic.Code = "masterbelt.semantic.no_matching_overload"
 	CodeNotARecord            diagnostic.Code = "masterbelt.semantic.not_a_record"
 	CodeNotExported           diagnostic.Code = "masterbelt.semantic.not_exported"
@@ -64,6 +66,22 @@ func newAmbiguousOverloadDiagnostic(offset int, width int, method string, types 
 		Severity: diagnostic.Error,
 		Code:     CodeAmbiguousOverload,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeAmbiguousOverload, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newArityMismatchDiagnostic(offset int, width int, name string, actual int, expected int) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"name":     diagnostic.Str(name),
+		"actual":   diagnostic.Int(actual),
+		"expected": diagnostic.Int(expected),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeArityMismatch,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeArityMismatch, fields),
 		Fields:   fields,
 		Offset:   offset,
 		Width:    width,
@@ -233,6 +251,20 @@ func newMissingFieldDiagnostic(offset int, width int, field string, typ string) 
 		Severity: diagnostic.Error,
 		Code:     CodeMissingField,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeMissingField, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newMissingReturnDiagnostic(offset int, width int, name string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"name": diagnostic.Str(name),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeMissingReturn,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeMissingReturn, fields),
 		Fields:   fields,
 		Offset:   offset,
 		Width:    width,

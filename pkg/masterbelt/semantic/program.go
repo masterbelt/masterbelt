@@ -221,7 +221,7 @@ func funcLitTypesOf(db *database, fileID FileID, file *ast.File) map[*ast.FuncLi
 			infer.Check(a.Cond, env, sink)
 		}
 	}
-	checkMethodBodies(reg, q.typeDefs(fileID), q.universe(fileID), qualified, sink)
+	checkMethodBodies(reg, q.typeDefs(fileID), q.universe(fileID), qualified, buildFuncSymbols(file), sink)
 	return out
 }
 

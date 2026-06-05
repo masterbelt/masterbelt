@@ -175,6 +175,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "ambiguous call: more than one overload of method " + f["method"].String() + " accepts " + f["types"].String()
 		}
 	},
+	"masterbelt.semantic.arity_mismatch": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "関数 " + f["name"].String() + " は引数を " + f["expected"].String() + " 個取りますが、" + f["actual"].String() + " 個が渡されています"
+		default:
+			return "function " + f["name"].String() + " takes " + f["expected"].String() + " argument(s); " + f["actual"].String() + " given"
+		}
+	},
 	"masterbelt.semantic.assertion_failed": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
@@ -269,6 +277,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return f["typ"].String() + " のレコードリテラルにフィールド " + f["field"].String() + " がありません"
 		default:
 			return "record literal of " + f["typ"].String() + " is missing field " + f["field"].String()
+		}
+	},
+	"masterbelt.semantic.missing_return": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "関数 " + f["name"].String() + " が値を返しません"
+		default:
+			return "function " + f["name"].String() + " never returns a value"
 		}
 	},
 	"masterbelt.semantic.no_matching_overload": func(loc Locale, f map[string]fmt.Stringer) string {

@@ -1170,3 +1170,158 @@ func TestRecordLiteralStructuralAnnotation(t *testing.T) {
 		t.Errorf("P eval = %s", got)
 	}
 }
+
+// --- top-level functions --------------------------------------------------------
+
+func TestFuncDeclAndCall(t *testing.T) {
+	m, diags := analyze("pub fn double(x: int): int -> x * 2\nconst A = double(21)\n")
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if len(m.Funcs) != 1 || m.Funcs[0].Name != "double" || !m.Funcs[0].Public {
+		t.Fatalf("funcs = %v, want [pub double]", m.Funcs)
+	}
+	if m.Funcs[0].Result.String() != "int" || len(m.Funcs[0].Params) != 1 {
+		t.Errorf("double signature = %v -> %v, want (x: int): int", m.Funcs[0].Params, m.Funcs[0].Result)
+	}
+	if m.Consts[0].Type.String() != "int" {
+		t.Errorf("A type = %s, want int", m.Consts[0].Type)
+	}
+	if ev := m.Consts[0].Eval; ev == nil || ev.Kind != ir.ConstInt || ev.Int.Int64() != 42 {
+		t.Errorf("A eval = %v, want 42", ev)
+	}
+	call, ok := m.Consts[0].Value.(*ir.FuncCall)
+	if !ok || call.Target != m.Funcs[0] {
+		t.Errorf("A value = %v, want FuncCall -> double", m.Consts[0].Value)
+	}
+}
+
+func TestFuncDiagnostics(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+		want diagnostic.Code
+	}{
+		{"result mismatch", "fn f(): int { return \"x\" }\n", CodeTypeMismatch},
+		{"arity", "fn f(x: int): int -> x\nconst A = f(1, 2)\n", CodeArityMismatch},
+		{"undefined", "const X = unknownFn(1)\n", CodeUndefinedName},
+		{"missing return", "fn g(x: int): int { }\n", CodeMissingReturn},
+		{"unknown param type", "fn f(x: Bogus): int -> 1\n", CodeUnknownType},
+		{"duplicate", "fn f(): int -> 1\nfn f(): int -> 2\n", CodeDuplicateDeclaration},
+		{"argument mismatch", "fn f(x: int): int -> x\nconst A = f(\"a\")\n", CodeTypeMismatch},
+		{"function is not a value", "fn f(): int -> 1\nconst A = f\n", CodeUndefinedName},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, diags := analyze(tc.src)
+			if got := codes(diags); len(got) != 1 || got[0] != tc.want {
+				t.Fatalf("codes = %v, want [%s]", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestFuncArgumentOverflow(t *testing.T) {
+	// The out-of-range argument reports at both boundaries it crosses: the
+	// argument against the parameter's int8, and the folded result against
+	// the call's int8 type.
+	_, diags := analyze("fn f(x: int8): int8 -> x\nconst A = f(1000)\n")
+	got := codes(diags)
+	if len(got) != 2 || got[0] != CodeConstantOverflow || got[1] != CodeConstantOverflow {
+		t.Fatalf("codes = %v, want two constant_overflow", got)
+	}
+}
+
+func TestFuncMissingReturnNotForArrowOrMissingBody(t *testing.T) {
+	// An arrow body always returns; a missing body is the parser's report,
+	// not a missing return on top.
+	_, diags := analyze("fn f(): int -> 1\n")
+	if len(diags) != 0 {
+		t.Fatalf("arrow body: unexpected diagnostics: %v", diags)
+	}
+	m, diags := analyze("fn f(): int\n")
+	_ = m
+	for _, d := range diags {
+		if d.Code == CodeMissingReturn {
+			t.Fatalf("missing body reported missing_return on top of the parse error: %v", diags)
+		}
+	}
+}
+
+func TestFuncRecursionGuard(t *testing.T) {
+	// Infinite recursion folds to nothing — the depth guard, not a stack
+	// overflow — and is not a type error (the result type is declared).
+	m, diags := analyze("fn loop(x: int): int -> loop(x)\nconst X = loop(1)\n")
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if m.Consts[0].Type.String() != "int" {
+		t.Errorf("X type = %s, want int", m.Consts[0].Type)
+	}
+	if m.Consts[0].Eval != nil {
+		t.Errorf("X eval = %v, want unevaluated", m.Consts[0].Eval)
+	}
+}
+
+func TestFuncCalledFromMethodBody(t *testing.T) {
+	src := "fn double(x: int): int -> x * 2\n" +
+		"pub type T = int8 impl {\n  pub f(): int {\n    return double(3)\n  }\n}\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	// The method body's call lowers to a FuncCall bound to the module's
+	// function shell.
+	ret, ok := m.Types[0].Methods[0].Body[0].(*ir.Return)
+	if !ok {
+		t.Fatalf("method body = %v, want a return", m.Types[0].Methods[0].Body)
+	}
+	call, ok := ret.Value.(*ir.FuncCall)
+	if !ok || call.Target != m.Funcs[0] {
+		t.Errorf("method return = %v, want FuncCall -> double", ret.Value)
+	}
+}
+
+func TestFuncCalledFromLambda(t *testing.T) {
+	m, diags := analyze("fn double(x: int): int -> x * 2\nconst D = [1, 2].map(fn(x) -> double(x))\n")
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if got := m.Consts[0].Eval.String(); got != "[2, 4]" {
+		t.Errorf("D eval = %s, want [2, 4]", got)
+	}
+}
+
+func TestLambdaParamShadowsFunc(t *testing.T) {
+	// A literal's parameter named like a function shadows it: the body's f is
+	// the int element, not the function.
+	m, diags := analyze("fn f(x: int): int -> x\nconst A = [1].map(fn(f) -> f + 1)\n")
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if got := m.Consts[0].Eval.String(); got != "[2]" {
+		t.Errorf("A eval = %s, want [2]", got)
+	}
+}
+
+func TestFuncMutualRecursionGuard(t *testing.T) {
+	// Mutual recursion through two functions bottoms out at the depth guard.
+	src := "fn a(x: int): int -> b(x)\nfn b(x: int): int -> a(x)\nconst X = a(1)\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if m.Consts[0].Eval != nil {
+		t.Errorf("X eval = %v, want unevaluated", m.Consts[0].Eval)
+	}
+}
+
+func TestFuncInAssert(t *testing.T) {
+	m, diags := analyze("fn area(w: int, h: int): int -> w * h\nassert area(3, 4) == 12\n")
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if len(m.Asserts) != 1 || !m.Asserts[0].Held() {
+		t.Fatalf("assert = %v, want held", m.Asserts)
+	}
+}

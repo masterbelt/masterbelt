@@ -18,12 +18,27 @@ import (
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
 )
 
-// Module is a resolved program: its constants, type definitions, and
-// compile-time assertions in source order.
+// Module is a resolved program: its constants, type definitions, functions,
+// and compile-time assertions in source order.
 type Module struct {
 	Consts  []*Const
 	Types   []*TypeDef
+	Funcs   []*Function
 	Asserts []*Assert
+}
+
+// Function is a resolved top-level function declaration: a method without a
+// receiver. Like a Method it carries its signature and lowered body; FuncCall
+// points at it the way Reference points at a *Const, so calls form the same
+// pointer graph values do.
+type Function struct {
+	Name   string
+	Public bool
+	Doc    []string
+	Params []Param
+	Result Type
+	Body   []Stmt
+	Syntax *ast.FuncDecl // the declaration this was resolved from
 }
 
 // Assert is one compile-time assertion's outcome: the condition in canonical
@@ -147,6 +162,15 @@ type Call struct {
 }
 
 func (*Call) value() {}
+
+// FuncCall is a resolved call of a top-level function: the function it
+// resolves to and the argument values.
+type FuncCall struct {
+	Target *Function
+	Args   []Value
+}
+
+func (*FuncCall) value() {}
 
 // FuncLiteral is a function-literal value: its parameter names and its lowered
 // statement body. Like the rest of the value graph it is untyped — the

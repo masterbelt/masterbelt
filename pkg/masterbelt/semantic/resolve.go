@@ -41,7 +41,7 @@ func unknownTypeReporter(at func(ast.Node) span, diags *diagnostic.List) func(as
 // bounds, the defined body type, each method's signature, and the where-clause
 // predicate. Method bodies are lowered to IR here (lower.Body) but not
 // type-checked.
-func resolveTypes(file *ast.File, at func(ast.Node) span, diags *diagnostic.List, reg *builtin.Registry, extern map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef) []*ir.TypeDef {
+func resolveTypes(file *ast.File, at func(ast.Node) span, diags *diagnostic.List, reg *builtin.Registry, extern map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, fns map[string]*ir.Function) []*ir.TypeDef {
 	if len(file.Types) == 0 {
 		return nil
 	}
@@ -77,7 +77,7 @@ func resolveTypes(file *ast.File, at func(ast.Node) span, diags *diagnostic.List
 	// unknown type names.
 	r := &infer.TypeResolver{Defs: defs, Qualified: qualified, Report: unknownTypeReporter(at, diags)}
 	for i, td := range file.Types {
-		resolveDecl(r, reg, td, out[i], at, diags)
+		resolveDecl(r, reg, td, out[i], at, diags, fns)
 	}
 	return out
 }
@@ -85,7 +85,7 @@ func resolveTypes(file *ast.File, at func(ast.Node) span, diags *diagnostic.List
 // resolveDecl fills in def from the declaration: its generic parameters (whose
 // names are in scope for the bounds, body, and methods), the body type, the
 // method signatures, and the refinement predicate.
-func resolveDecl(r *infer.TypeResolver, reg *builtin.Registry, td *ast.TypeDecl, def *ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List) {
+func resolveDecl(r *infer.TypeResolver, reg *builtin.Registry, td *ast.TypeDecl, def *ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List, fns map[string]*ir.Function) {
 	scope := make(map[string]bool, len(td.Params))
 	for _, p := range td.Params {
 		scope[p.Name] = true
@@ -115,7 +115,7 @@ func resolveDecl(r *infer.TypeResolver, reg *builtin.Registry, td *ast.TypeDecl,
 	// the reporting one) drop identically.
 	seen := make(map[string]bool, len(td.Methods))
 	for _, m := range td.Methods {
-		rm := resolveMethod(r, m, scope)
+		rm := resolveMethod(r, m, scope, fns)
 		key := rm.Name + signatureKey(def, rm)
 		if m.Name != "" && seen[key] {
 			if at != nil && diags != nil {
@@ -286,12 +286,14 @@ type predicateEnv struct{ reg *builtin.Registry }
 
 func (e predicateEnv) Resolve(*ast.Identifier) *ast.ConstDecl       { return nil }
 func (e predicateEnv) ResolveMember(*ast.MemberExpr) *ast.ConstDecl { return nil }
+func (e predicateEnv) ResolveFunc(*ast.Identifier) *ast.FuncDecl    { return nil }
 func (e predicateEnv) ValueOf(*ast.ConstDecl) *ir.Constant          { return nil }
 func (e predicateEnv) Registry() *builtin.Registry                  { return e.reg }
 
 // resolveMethod resolves a method's signature (parameter types and result type)
-// and lowers its body to IR. The body is not yet type-checked.
-func resolveMethod(r *infer.TypeResolver, m *ast.MethodDecl, scope map[string]bool) *ir.Method {
+// and lowers its body to IR; fns is the file's function shells by name, so a
+// body may call a top-level function. The body is not yet type-checked.
+func resolveMethod(r *infer.TypeResolver, m *ast.MethodDecl, scope map[string]bool, fns map[string]*ir.Function) *ir.Method {
 	method := &ir.Method{Name: m.Name, Public: m.Public, Extern: m.Extern, Doc: m.Doc, Syntax: m}
 
 	// Method-introduced type variables: free type names appearing in a parameter
@@ -322,6 +324,52 @@ func resolveMethod(r *infer.TypeResolver, m *ast.MethodDecl, scope map[string]bo
 		params[p.Name] = true
 	}
 	method.Result = r.ResolveType(m.Result, mscope)
-	method.Body = lower.Body(m.Body, bodyBinder{r: r, params: params, tscope: mscope})
+	method.Body = lower.Body(m.Body, bodyBinder{r: r, params: params, tscope: mscope, funcs: fns, self: true})
 	return method
+}
+
+// resolveFuncs resolves the file's function declarations into their identity
+// shells, in source order: each signature's parameter and result types (with
+// unknown type names reported through the resolver) and the lowered body — a
+// method's resolution, minus the receiver. The shells are filled in place;
+// FuncCall values across the program point at them, exactly as References
+// point at the constant shells.
+func resolveFuncs(file *ast.File, at func(ast.Node) span, diags *diagnostic.List, universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, shells map[*ast.FuncDecl]*ir.Function) []*ir.Function {
+	if len(file.Funcs) == 0 {
+		return nil
+	}
+	r := &infer.TypeResolver{Defs: universe, Qualified: qualified, Report: unknownTypeReporter(at, diags)}
+	fns := funcShellsByName(file, shells)
+	out := make([]*ir.Function, len(file.Funcs))
+	for i, fd := range file.Funcs {
+		fn := shells[fd]
+		out[i] = fn
+		params := make(map[string]bool, len(fd.Params))
+		fn.Params = make([]ir.Param, 0, len(fd.Params))
+		for _, p := range fd.Params {
+			fn.Params = append(fn.Params, ir.Param{Name: p.Name, Type: r.ResolveType(p.Type, nil)})
+			params[p.Name] = true
+		}
+		fn.Result = r.ResolveType(fd.Result, nil)
+		fn.Body = lower.Body(fd.Body, bodyBinder{r: r, params: params, funcs: fns})
+	}
+	return out
+}
+
+// funcShellsByName indexes a file's function shells by name — the first
+// declaration of a name winning, as everywhere — for the binders that lower
+// calls.
+func funcShellsByName(file *ast.File, shells map[*ast.FuncDecl]*ir.Function) map[string]*ir.Function {
+	if file == nil || len(file.Funcs) == 0 {
+		return nil
+	}
+	fns := make(map[string]*ir.Function, len(file.Funcs))
+	for _, fd := range file.Funcs {
+		if fd.Name != "" {
+			if _, ok := fns[fd.Name]; !ok {
+				fns[fd.Name] = shells[fd]
+			}
+		}
+	}
+	return fns
 }

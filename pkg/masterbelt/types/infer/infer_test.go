@@ -39,6 +39,7 @@ type stubEnv struct {
 
 func (e stubEnv) Resolve(id *ast.Identifier) *ast.ConstDecl      { return e.res[id] }
 func (e stubEnv) ResolveMember(m *ast.MemberExpr) *ast.ConstDecl { return nil }
+func (e stubEnv) ResolveFunc(id *ast.Identifier) *ast.FuncDecl   { return nil }
 func (e stubEnv) TypeOf(decl *ast.ConstDecl) ir.Type             { return e.typ[decl] }
 
 // Universe mirrors what the semantic layer feeds the resolver: the prelude

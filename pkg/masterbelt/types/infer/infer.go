@@ -41,6 +41,9 @@ type Env interface {
 	// (geo.Origin) refers to, or nil when the receiver names no namespace or
 	// the member is not among the namespace's exported values.
 	ResolveMember(m *ast.MemberExpr) *ast.ConstDecl
+	// ResolveFunc returns the function declaration a call's callee name
+	// refers to, or nil if no function has that name.
+	ResolveFunc(id *ast.Identifier) *ast.FuncDecl
 	// TypeOf returns a declaration's type (ir.Invalid when undeterminable).
 	TypeOf(decl *ast.ConstDecl) ir.Type
 	// Universe returns the named type definitions annotations resolve in: the
@@ -69,6 +72,11 @@ type scope interface {
 	// name, self, a field access, a conversion, the null literal — returning
 	// ir.Invalid when the form is not meaningful in this scope.
 	leaf(e ast.Expr) ir.Type
+	// fn resolves a call's callee name to the top-level function it names, or
+	// nil when nothing of that name is callable here — a parameter shadows a
+	// same-named function, and in a method body a type name (a conversion)
+	// wins over one.
+	fn(id *ast.Identifier) *ast.FuncDecl
 }
 
 // Decl is the type rule for a declaration: an annotation gives a concrete type,
@@ -230,6 +238,13 @@ func (s funcScope) leaf(e ast.Expr) ir.Type {
 	return s.outer.leaf(e)
 }
 
+func (s funcScope) fn(id *ast.Identifier) *ast.FuncDecl {
+	if _, ok := s.params[id.Name]; ok {
+		return nil // a parameter shadows a same-named function
+	}
+	return s.outer.fn(id)
+}
+
 // collectionType infers a collection literal's type: list<E> from the unified
 // element type, or map<K, V> from the unified key and value types. An empty
 // literal has no entries to infer from, so its type comes from the annotation,
@@ -306,9 +321,12 @@ func (s constScope) leaf(e ast.Expr) ir.Type {
 	return ir.Invalid
 }
 
-// BodyScope types a method body: the receiver type (Self), the parameter types
-// (Params), and the type universe (Universe) a conversion resolves against,
-// alongside the registry.
+func (s constScope) fn(id *ast.Identifier) *ast.FuncDecl { return s.env.ResolveFunc(id) }
+
+// BodyScope types a method or function body: the receiver type (Self —
+// ir.Invalid in a function, which has none), the parameter types (Params),
+// the type universe (Universe) a conversion resolves against, and the
+// top-level functions callable from the body (Funcs), alongside the registry.
 type BodyScope struct {
 	Reg      *builtin.Registry
 	Universe map[string]*ir.TypeDef
@@ -317,6 +335,9 @@ type BodyScope struct {
 	Qualified func(namespace, name string) *ir.TypeDef
 	Self      ir.Type
 	Params    map[string]ir.Type
+	// Funcs is the file's top-level functions by name, or nil when none are
+	// in scope (a refinement predicate).
+	Funcs map[string]*ast.FuncDecl
 }
 
 // Body infers the type of a method-body expression: self, a parameter, a
@@ -329,6 +350,16 @@ func (s BodyScope) registry() *builtin.Registry { return s.Reg }
 func (s BodyScope) universe() map[string]*ir.TypeDef { return s.Universe }
 
 func (s BodyScope) qualified() func(namespace, name string) *ir.TypeDef { return s.Qualified }
+
+func (s BodyScope) fn(id *ast.Identifier) *ast.FuncDecl {
+	if _, isParam := s.Params[id.Name]; isParam {
+		return nil // a parameter shadows a same-named function
+	}
+	if _, isType := s.Universe[id.Name]; isType {
+		return nil // a type name is a conversion, which wins in a body
+	}
+	return s.Funcs[id.Name]
+}
 
 func (s BodyScope) leaf(e ast.Expr) ir.Type {
 	switch e := e.(type) {
@@ -425,6 +456,9 @@ type Sink struct {
 	// ArityMismatch fires at a function literal whose parameter count differs
 	// from the expected function type's.
 	ArityMismatch func(lit *ast.FuncLit, got, want int)
+	// CallArityMismatch fires at a call of a top-level function with the
+	// wrong number of arguments.
+	CallArityMismatch func(call *ast.CallExpr, name string, got, want int)
 	// UninferableParam fires at a function-literal parameter that neither has
 	// an annotation nor receives a concrete type from the checking context.
 	UninferableParam func(p *ast.ParamDef)
@@ -483,9 +517,15 @@ func (s *Sink) checked(e ast.Expr, want ir.Type) {
 	}
 }
 
-func (s *Sink) arityMismatch(lit *ast.FuncLit, got, want int) {
+func (s *Sink) arityMismatchLit(lit *ast.FuncLit, got, want int) {
 	if s != nil && s.ArityMismatch != nil {
 		s.ArityMismatch(lit, got, want)
+	}
+}
+
+func (s *Sink) arityMismatch(call *ast.CallExpr, name string, got, want int) {
+	if s != nil && s.CallArityMismatch != nil {
+		s.CallArityMismatch(call, name, got, want)
 	}
 }
 
@@ -780,7 +820,7 @@ func collectionApp(t ir.Type) (*ir.App, bool) {
 func checkFuncLitAgainst(lit *ast.FuncLit, want *ir.Func, s scope, subst map[string]ir.Type, sink *Sink) ir.Type {
 	reg := s.registry()
 	if len(lit.Params) != len(want.Params) {
-		sink.arityMismatch(lit, len(lit.Params), len(want.Params))
+		sink.arityMismatchLit(lit, len(lit.Params), len(want.Params))
 		return ir.Invalid
 	}
 	r := &TypeResolver{Defs: s.universe(), Qualified: s.qualified()}
@@ -1000,6 +1040,14 @@ func check(e ast.Expr, s scope, sink *Sink) ir.Type {
 func callType(e *ast.CallExpr, s scope, sink *Sink) ir.Type {
 	member, ok := e.Callee.(*ast.MemberExpr)
 	if !ok {
+		// A call whose callee names a top-level function is a function call;
+		// any other callee is a context-specific form (a conversion in a
+		// method body, otherwise nothing).
+		if id, isIdent := e.Callee.(*ast.Identifier); isIdent {
+			if fd := s.fn(id); fd != nil {
+				return funcCallType(e, fd, s, sink)
+			}
+		}
 		return s.leaf(e)
 	}
 	reg := s.registry()
@@ -1096,6 +1144,30 @@ func callType(e *ast.CallExpr, s scope, sink *Sink) ir.Type {
 	return result
 }
 
+// funcCallType is the type rule for a call of a top-level function: each
+// argument is checked against the parameter's annotated type — so the
+// expectation reaches into literal arguments, exactly as a method call's
+// parameter patterns do — and the call's type is the declared result. The
+// signature resolves in the scope's universe, the same one the declaration's
+// own reporting pass resolves it in; an unresolved annotation was reported
+// there, so an Invalid parameter or result type stays silent here.
+func funcCallType(e *ast.CallExpr, fd *ast.FuncDecl, s scope, sink *Sink) ir.Type {
+	r := &TypeResolver{Defs: s.universe(), Qualified: s.qualified()}
+	if len(e.Arguments) != len(fd.Params) {
+		// The arguments still check bare for their own diagnostics.
+		for _, a := range e.Arguments {
+			check(a, s, sink)
+		}
+		sink.arityMismatch(e, fd.Name, len(e.Arguments), len(fd.Params))
+		return ir.Invalid
+	}
+	subst := map[string]ir.Type{}
+	for i, a := range e.Arguments {
+		checkType(a, r.ResolveType(fd.Params[i].Type, nil), s, subst, sink)
+	}
+	return r.ResolveType(fd.Result, nil)
+}
+
 // observe wraps sink so the caller learns whether the wrapped walk reported a
 // finding (Checked is a stream, not a finding). The wrapper stays valid for a
 // nil sink, which is what lets the silent walk share the call rule.
@@ -1122,7 +1194,11 @@ func observe(sink *Sink, fired *bool) *Sink {
 		},
 		ArityMismatch: func(lit *ast.FuncLit, got, want int) {
 			*fired = true
-			sink.arityMismatch(lit, got, want)
+			sink.arityMismatchLit(lit, got, want)
+		},
+		CallArityMismatch: func(call *ast.CallExpr, name string, got, want int) {
+			*fired = true
+			sink.arityMismatch(call, name, got, want)
 		},
 		UninferableParam: func(p *ast.ParamDef) {
 			*fired = true

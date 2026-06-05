@@ -33,6 +33,9 @@ type Env interface {
 	// (geo.Origin) refers to, or nil when the receiver names no namespace or
 	// the member is not among the namespace's exported values.
 	ResolveMember(m *ast.MemberExpr) *ast.ConstDecl
+	// ResolveFunc returns the function declaration a call's callee name
+	// refers to, or nil if no function has that name.
+	ResolveFunc(id *ast.Identifier) *ast.FuncDecl
 	// ValueOf returns a declaration's evaluated value, or nil when it cannot be
 	// evaluated.
 	ValueOf(decl *ast.ConstDecl) *ir.Constant
@@ -67,13 +70,20 @@ func Predicate(pred ast.Expr, self *ir.Constant, env Env) *ir.Constant {
 
 // evalCtx carries the evaluation context through the recursive fold: the
 // driver's environment, the local bindings of the enclosing function literals
-// (nil at the top level), and the value the self keyword folds to (refinement
-// predicates; nil where self has no value).
+// or applied function (nil at the top level), the value the self keyword folds
+// to (refinement predicates; nil where self has no value), and the
+// function-application depth the recursion guard counts.
 type evalCtx struct {
 	env    Env
 	locals map[string]*ir.Constant
 	self   *ir.Constant
+	depth  int
 }
+
+// maxApplyDepth caps function-application recursion: a recursive fold that has
+// not bottomed out by this depth is treated as unevaluable (nil) — the same
+// verdict an engine-level value cycle gets — instead of overflowing the stack.
+const maxApplyDepth = 256
 
 // evalExpr folds an expression, resolving an identifier first against the
 // context's locals and then against the environment's declarations.
@@ -133,6 +143,16 @@ func evalExpr(e ast.Expr, ctx evalCtx) *ir.Constant {
 	case *ast.CallExpr:
 		member, ok := e.Callee.(*ast.MemberExpr)
 		if !ok {
+			// A call whose callee names a top-level function applies its body;
+			// a local binding shadows a same-named function (and a call of a
+			// local is not foldable here).
+			if id, isIdent := e.Callee.(*ast.Identifier); isIdent {
+				if _, isLocal := ctx.locals[id.Name]; !isLocal {
+					if fd := ctx.env.ResolveFunc(id); fd != nil {
+						return applyFunc(fd, e.Arguments, ctx)
+					}
+				}
+			}
 			return nil
 		}
 		recv := evalExpr(member.Receiver, ctx)
@@ -140,10 +160,38 @@ func evalExpr(e ast.Expr, ctx evalCtx) *ir.Constant {
 		for i, a := range e.Arguments {
 			args[i] = evalExpr(a, ctx)
 		}
-		return call(ctx.env, recv, member.Member.Name, args)
+		return call(ctx, recv, member.Member.Name, args)
 	default:
 		return nil
 	}
+}
+
+// applyFunc folds a call of a top-level function: the arguments fold in the
+// caller's context, bind to the parameter names, and the body's return folds
+// with only those bindings in scope (a function body sees its parameters and
+// the other declarations through env, never the caller's locals). The depth
+// guard turns runaway recursion into an unevaluated value.
+func applyFunc(fd *ast.FuncDecl, args []ast.Expr, ctx evalCtx) *ir.Constant {
+	if len(args) != len(fd.Params) || ctx.depth >= maxApplyDepth {
+		return nil
+	}
+	locals := make(map[string]*ir.Constant, len(fd.Params))
+	for i, p := range fd.Params {
+		v := evalExpr(args[i], ctx)
+		if v == nil {
+			return nil
+		}
+		locals[p.Name] = v
+	}
+	for _, stmt := range fd.Body {
+		if ret, ok := stmt.(*ast.ReturnStmt); ok {
+			if ret.Value == nil {
+				return nil
+			}
+			return evalExpr(ret.Value, evalCtx{env: ctx.env, locals: locals, depth: ctx.depth + 1})
+		}
+	}
+	return nil
 }
 
 // collection folds a collection literal: each entry's value (and key, for a map)
@@ -194,8 +242,9 @@ func record(e *ast.RecordLit, ctx evalCtx) *ir.Constant {
 // several signatures) evaluates through the same implementation the type rules
 // selected. It returns nil when an operand is unevaluated, the method has no
 // value for the receiver (only reachable for a type-incorrect program), or the
-// intrinsic itself has no value (a division by zero).
-func call(env Env, recv *ir.Constant, name string, args []*ir.Constant) *ir.Constant {
+// intrinsic itself has no value (a division by zero). The context threads the
+// application depth through, so recursion through list.map is guarded too.
+func call(ctx evalCtx, recv *ir.Constant, name string, args []*ir.Constant) *ir.Constant {
 	if recv == nil {
 		return nil
 	}
@@ -207,7 +256,7 @@ func call(env Env, recv *ir.Constant, name string, args []*ir.Constant) *ir.Cons
 		kinds[i] = a.Kind
 	}
 	if recv.Kind == ir.ConstCollection {
-		return collectionMethod(env, recv, name, args)
+		return collectionMethod(ctx, recv, name, args)
 	}
 	var typeName string
 	switch recv.Kind {
@@ -224,7 +273,7 @@ func call(env Env, recv *ir.Constant, name string, args []*ir.Constant) *ir.Cons
 	default:
 		return nil
 	}
-	fn, ok := env.Registry().Intrinsic(typeName, name, kinds)
+	fn, ok := ctx.env.Registry().Intrinsic(typeName, name, kinds)
 	if !ok {
 		return nil
 	}
@@ -236,7 +285,7 @@ func call(env Env, recv *ir.Constant, name string, args []*ir.Constant) *ir.Cons
 // the one with a foldable value is list.map, which applies its function argument
 // to each element and collects the results into a new list. Anything else (a map
 // receiver, or a list method other than map) has no constant value here.
-func collectionMethod(env Env, recv *ir.Constant, name string, args []*ir.Constant) *ir.Constant {
+func collectionMethod(ctx evalCtx, recv *ir.Constant, name string, args []*ir.Constant) *ir.Constant {
 	if name != "map" || len(args) != 1 || args[0].Kind != ir.ConstFunc {
 		return nil
 	}
@@ -245,7 +294,7 @@ func collectionMethod(env Env, recv *ir.Constant, name string, args []*ir.Consta
 		if entry.Key != nil {
 			return nil // map.map (keyed entries) is not foldable
 		}
-		v := apply(env, args[0], []*ir.Constant{entry.Value})
+		v := apply(ctx, args[0], []*ir.Constant{entry.Value})
 		if v == nil {
 			return nil
 		}
@@ -256,10 +305,10 @@ func collectionMethod(env Env, recv *ir.Constant, name string, args []*ir.Consta
 
 // apply folds a function-value constant against the given arguments: it binds the
 // parameters to the arguments over the closure's captured environment and folds
-// the body's return statement. A body with no return, a wrong argument count, or
-// an unfoldable return yields nil.
-func apply(env Env, fn *ir.Constant, args []*ir.Constant) *ir.Constant {
-	if fn.Fn == nil || len(args) != len(fn.Fn.Params) {
+// the body's return statement. A body with no return, a wrong argument count, an
+// unfoldable return, or an application past the recursion guard yields nil.
+func apply(ctx evalCtx, fn *ir.Constant, args []*ir.Constant) *ir.Constant {
+	if fn.Fn == nil || len(args) != len(fn.Fn.Params) || ctx.depth >= maxApplyDepth {
 		return nil
 	}
 	locals := make(map[string]*ir.Constant, len(fn.Captured)+len(args))
@@ -274,7 +323,7 @@ func apply(env Env, fn *ir.Constant, args []*ir.Constant) *ir.Constant {
 			}
 			// A function body sees its parameters and captures, never an outer
 			// self: a literal has no receiver.
-			return evalExpr(ret.Value, evalCtx{env: env, locals: locals})
+			return evalExpr(ret.Value, evalCtx{env: ctx.env, locals: locals, depth: ctx.depth + 1})
 		}
 	}
 	return nil

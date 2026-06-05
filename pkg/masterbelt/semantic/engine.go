@@ -41,16 +41,18 @@ const soleFileID FileID = ""
 type queryKind int
 
 const (
-	qInput     queryKind = iota // a file's AST + resolved use targets (the engine's only inputs)
-	qSymbols                    // a file's name -> declaration table
-	qResolve                    // *ast.Identifier -> referent declaration
-	qTypeOf                     // *ast.ConstDecl -> ir.Type
-	qValue                      // *ast.ConstDecl -> *ir.Constant
-	qTypeDefs                   // a file's resolved type definitions (and its annotation universe)
-	qExports                    // a file's public surface: pub decls + pub use re-exports
-	qImports                    // a file's import bindings: selective/wildcard names + namespaces
-	qReachable                  // the files a file's use graph reaches (itself included)
-	qModule                     // a file's assembled IR module and diagnostics
+	qInput       queryKind = iota // a file's AST + resolved use targets (the engine's only inputs)
+	qSymbols                      // a file's name -> declaration table
+	qResolve                      // *ast.Identifier -> referent declaration
+	qFuncSymbols                  // a file's name -> function declaration table
+	qResolveFunc                  // *ast.Identifier -> referent function declaration (a call's callee)
+	qTypeOf                       // *ast.ConstDecl -> ir.Type
+	qValue                        // *ast.ConstDecl -> *ir.Constant
+	qTypeDefs                     // a file's resolved type definitions (and its annotation universe)
+	qExports                      // a file's public surface: pub decls + pub use re-exports
+	qImports                      // a file's import bindings: selective/wildcard names + namespaces
+	qReachable                    // the files a file's use graph reaches (itself included)
+	qModule                       // a file's assembled IR module and diagnostics
 )
 
 // queryKey identifies a memoized computation. The per-declaration queries
@@ -66,16 +68,21 @@ type queryKey struct {
 	id   *ast.Identifier
 }
 
-func inputKey(file FileID) queryKey     { return queryKey{kind: qInput, file: file} }
-func symbolsKey(file FileID) queryKey   { return queryKey{kind: qSymbols, file: file} }
-func typeDefsKey(file FileID) queryKey  { return queryKey{kind: qTypeDefs, file: file} }
-func exportsKey(file FileID) queryKey   { return queryKey{kind: qExports, file: file} }
-func importsKey(file FileID) queryKey   { return queryKey{kind: qImports, file: file} }
-func reachableKey(file FileID) queryKey { return queryKey{kind: qReachable, file: file} }
-func moduleKey(file FileID) queryKey    { return queryKey{kind: qModule, file: file} }
+func inputKey(file FileID) queryKey       { return queryKey{kind: qInput, file: file} }
+func symbolsKey(file FileID) queryKey     { return queryKey{kind: qSymbols, file: file} }
+func funcSymbolsKey(file FileID) queryKey { return queryKey{kind: qFuncSymbols, file: file} }
+func typeDefsKey(file FileID) queryKey    { return queryKey{kind: qTypeDefs, file: file} }
+func exportsKey(file FileID) queryKey     { return queryKey{kind: qExports, file: file} }
+func importsKey(file FileID) queryKey     { return queryKey{kind: qImports, file: file} }
+func reachableKey(file FileID) queryKey   { return queryKey{kind: qReachable, file: file} }
+func moduleKey(file FileID) queryKey      { return queryKey{kind: qModule, file: file} }
 
 func resolveKey(file FileID, id *ast.Identifier) queryKey {
 	return queryKey{kind: qResolve, file: file, id: id}
+}
+
+func resolveFuncKey(file FileID, id *ast.Identifier) queryKey {
+	return queryKey{kind: qResolveFunc, file: file, id: id}
 }
 func typeOfKey(decl *ast.ConstDecl) queryKey { return queryKey{kind: qTypeOf, decl: decl} }
 func valueKey(decl *ast.ConstDecl) queryKey  { return queryKey{kind: qValue, decl: decl} }
@@ -118,9 +125,10 @@ type assembly struct {
 type database struct {
 	revision       int
 	files          map[FileID]fileInput
-	declFile       map[*ast.ConstDecl]FileID    // which file each declaration sits in
-	typeFile       map[*ast.TypeDecl]FileID     // which file each type declaration sits in
-	shells         map[*ast.ConstDecl]*ir.Const // the identity ir.Const of every declaration
+	declFile       map[*ast.ConstDecl]FileID      // which file each declaration sits in
+	typeFile       map[*ast.TypeDecl]FileID       // which file each type declaration sits in
+	shells         map[*ast.ConstDecl]*ir.Const   // the identity ir.Const of every declaration
+	fnShells       map[*ast.FuncDecl]*ir.Function // the identity ir.Function of every function
 	reg            *builtin.Registry
 	prelude        map[string]*ir.TypeDef // the implicit base tier: the prelude barrel's exported types
 	inputChangedAt map[FileID]int
@@ -138,6 +146,7 @@ func newDatabase(u builtins) *database {
 		declFile:       map[*ast.ConstDecl]FileID{},
 		typeFile:       map[*ast.TypeDecl]FileID{},
 		shells:         map[*ast.ConstDecl]*ir.Const{},
+		fnShells:       map[*ast.FuncDecl]*ir.Function{},
 		inputChangedAt: map[FileID]int{},
 		memos:          map[queryKey]*memo{},
 		running:        map[queryKey]bool{},
@@ -184,6 +193,7 @@ func (db *database) dropInput(id FileID) {
 func (db *database) rebindDecls(id FileID, old, new *ast.File) {
 	keep := map[*ast.ConstDecl]bool{}
 	keepTypes := map[*ast.TypeDecl]bool{}
+	keepFuncs := map[*ast.FuncDecl]bool{}
 	if new != nil {
 		for _, d := range new.Decls {
 			keep[d] = true
@@ -196,6 +206,12 @@ func (db *database) rebindDecls(id FileID, old, new *ast.File) {
 			keepTypes[t] = true
 			db.typeFile[t] = id
 		}
+		for _, fd := range new.Funcs {
+			keepFuncs[fd] = true
+			if db.fnShells[fd] == nil {
+				db.fnShells[fd] = &ir.Function{Name: fd.Name, Public: fd.Public, Doc: fd.Doc, Syntax: fd}
+			}
+		}
 	}
 	if old != nil {
 		for _, d := range old.Decls {
@@ -207,6 +223,11 @@ func (db *database) rebindDecls(id FileID, old, new *ast.File) {
 		for _, t := range old.Types {
 			if !keepTypes[t] {
 				delete(db.typeFile, t)
+			}
+		}
+		for _, fd := range old.Funcs {
+			if !keepFuncs[fd] {
+				delete(db.fnShells, fd)
 			}
 		}
 	}
@@ -266,6 +287,12 @@ func equalValue(kind queryKind, old, new any) bool {
 		return maps.Equal(a, b)
 	case qResolve:
 		return old == new // resolution is comparable
+	case qFuncSymbols:
+		a, _ := old.(map[string]*ast.FuncDecl)
+		b, _ := new.(map[string]*ast.FuncDecl)
+		return maps.Equal(a, b)
+	case qResolveFunc:
+		return old == new // the referent declaration pointer is the fact
 	case qImports:
 		a, _ := old.(importTable)
 		b, _ := new.(importTable)
@@ -474,6 +501,12 @@ func (db *database) compute(key queryKey) any {
 			return resolution{decl: b.target}
 		}
 		return resolution{}
+	case qFuncSymbols:
+		in, _ := db.read(inputKey(key.file)).(fileInput)
+		return buildFuncSymbols(in.file)
+	case qResolveFunc:
+		syms := db.read(funcSymbolsKey(key.file)).(map[string]*ast.FuncDecl)
+		return syms[key.id.Name]
 	case qTypeOf:
 		return infer.Decl(key.decl, typeEnv{q: engineQueries{db}, file: db.declFile[key.decl]})
 	case qValue:
@@ -497,7 +530,7 @@ func (db *database) compute(key queryKey) any {
 		// computation, so the memo's dependencies are exactly what the
 		// module was built from; positions derive from the file's own tree,
 		// which the input read above covers.
-		module, diags := assemble(key.file, in.file, positionsOf(cst.Root(in.file.Syntax())), engineQueries{db}, db.shells)
+		module, diags := assemble(key.file, in.file, positionsOf(cst.Root(in.file.Syntax())), engineQueries{db}, db.shells, db.fnShells)
 		return assembly{module: module, diags: diags}
 	default:
 		return nil
@@ -516,6 +549,10 @@ func cycleValue(key queryKey) any {
 		return (*ir.Constant)(nil)
 	case qResolve:
 		return resolution{}
+	case qFuncSymbols:
+		return map[string]*ast.FuncDecl{}
+	case qResolveFunc:
+		return (*ast.FuncDecl)(nil)
 	case qTypeDefs:
 		return typeDefs{}
 	case qExports:
@@ -552,6 +589,11 @@ func (e engineQueries) ambiguousImport(file FileID, id *ast.Identifier) bool {
 
 func (e engineQueries) resolveMember(file FileID, m *ast.MemberExpr) *ast.ConstDecl {
 	return resolveMemberThrough(e, file, m)
+}
+
+func (e engineQueries) resolveFunc(file FileID, id *ast.Identifier) *ast.FuncDecl {
+	fd, _ := e.db.read(resolveFuncKey(file, id)).(*ast.FuncDecl)
+	return fd
 }
 
 func (e engineQueries) typeOf(decl *ast.ConstDecl) ir.Type {

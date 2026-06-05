@@ -1,10 +1,12 @@
 package semantic
 
 import (
+	"github.com/masterbelt/masterbelt/pkg/diagnostic"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/eval"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/types/infer"
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
+	"github.com/masterbelt/masterbelt/pkg/source/cst"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
 )
 
@@ -58,7 +60,7 @@ func checkDivByZero(e ast.Expr, env evalEnv, report func(node ast.Node)) {
 // the file's annotation universe — its own definitions shadowing its imported
 // ones — and qualified its namespace-qualified lookup, so a type in a body
 // resolves exactly as an annotation does.
-func checkMethodBodies(reg *builtin.Registry, defs []*ir.TypeDef, universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, sink *infer.Sink) {
+func checkMethodBodies(reg *builtin.Registry, defs []*ir.TypeDef, universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, funcs map[string]*ast.FuncDecl, sink *infer.Sink) {
 	for _, def := range defs {
 		self := &ir.Named{Def: def}
 		for _, irm := range def.Methods {
@@ -71,7 +73,7 @@ func checkMethodBodies(reg *builtin.Registry, defs []*ir.TypeDef, universe map[s
 				params[p.Name] = substSelf(p.Type, self)
 			}
 			want := substSelf(irm.Result, self)
-			bs := infer.BodyScope{Reg: reg, Universe: universe, Qualified: qualified, Self: self, Params: params}
+			bs := infer.BodyScope{Reg: reg, Universe: universe, Qualified: qualified, Self: self, Params: params, Funcs: funcs}
 			for _, stmt := range m.Body {
 				ret, ok := stmt.(*ast.ReturnStmt)
 				if !ok || ret.Value == nil {
@@ -81,6 +83,51 @@ func checkMethodBodies(reg *builtin.Registry, defs []*ir.TypeDef, universe map[s
 			}
 		}
 	}
+}
+
+// checkFuncBodies type-checks each function body's returned value against the
+// declared result type — the same checking walk a method body uses, with no
+// receiver (self is ir.Invalid) — and reports a body that never returns a
+// value (missing_return): with no control flow yet, a function produces its
+// declared result exactly when some return carries a value. A declaration
+// whose body is missing altogether is a parse error, not a missing return.
+func checkFuncBodies(reg *builtin.Registry, file *ast.File, universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, funcs map[string]*ast.FuncDecl, at func(ast.Node) span, diags *diagnostic.List) {
+	sink := exprSink(at, diags)
+	r := &infer.TypeResolver{Defs: universe, Qualified: qualified}
+	for _, fd := range file.Funcs {
+		params := make(map[string]ir.Type, len(fd.Params))
+		for _, p := range fd.Params {
+			params[p.Name] = r.ResolveType(p.Type, nil)
+		}
+		want := r.ResolveType(fd.Result, nil)
+		bs := infer.BodyScope{Reg: reg, Universe: universe, Qualified: qualified, Self: ir.Invalid, Params: params, Funcs: funcs}
+		returned := false
+		for _, stmt := range fd.Body {
+			ret, ok := stmt.(*ast.ReturnStmt)
+			if !ok || ret.Value == nil {
+				continue
+			}
+			returned = true
+			infer.CheckBody(ret.Value, want, bs, sink)
+		}
+		if !returned && hasBlockBody(fd) {
+			s := at(fd)
+			diags.Add(newMissingReturnDiagnostic(s.offset, s.width, fd.Name))
+		}
+	}
+}
+
+// hasBlockBody reports whether the declaration carries a block body in the
+// source — the form that can fail to return. An arrow body always returns its
+// expression, and a declaration with no body at all was reported by the
+// parser; the AST drops an empty block, so the distinction reads off the CST.
+func hasBlockBody(fd *ast.FuncDecl) bool {
+	for _, c := range fd.Syntax().Children() {
+		if n, ok := c.(*cst.Node); ok && n.Kind() == cst.Block {
+			return true
+		}
+	}
+	return false
 }
 
 // substSelf substitutes the self type for ir.SelfType.

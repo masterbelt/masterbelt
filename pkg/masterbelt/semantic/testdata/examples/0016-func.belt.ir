@@ -1,24 +1,53 @@
 Module
   Const "A"
-    type invalid
-    value <none>
+    type int
+    value area(IntLiteral "3", IntLiteral "4")
+    eval 12
   Const "B"
-    type invalid
-    value <none>
+    type int
+    value double(IntLiteral "21")
+    eval 42
   Const "C"
-    type invalid
-    value <none>
+    type int
+    value perimeter(IntLiteral "2", IntLiteral "3")
+    eval 10
   Const "D"
-    type invalid
-    value [IntLiteral "1", IntLiteral "2", IntLiteral "3"].map((fn(x) (return <none>)))
+    type list<int>
+    value [IntLiteral "1", IntLiteral "2", IntLiteral "3"].map((fn(x) (return double(ParamRef "x"))))
+    eval [2, 4, 6]
   Const "E"
-    type invalid
-    value <none>
+    type string
+    value greet(StringLiteral "belt")
+    eval "Hello, belt"
   Const "O"
-    type invalid
-    value <none>
+    type Point
+    value origin()
+    eval { x: 0, y: 0 }
   TypeDef "Point" pub
     body { x: int, y: int }
+  Func "double" pub
+    param x: int
+    result int
+      return ParamRef "x".mul(IntLiteral "2")
+  Func "area" pub
+    param w: int
+    param h: int
+    result int
+      return ParamRef "w".mul(ParamRef "h")
+  Func "perimeter" pub
+    param w: int
+    param h: int
+    result int
+      return double(ParamRef "w").add(double(ParamRef "h"))
+  Func "greet"
+    param name: string
+    result string
+      return StringLiteral "Hello, ".add(ParamRef "name")
+  Func "origin" pub
+    result Point
+      return Point{x: IntLiteral "0", y: IntLiteral "0"}
   Assert "area(3, 4) == 12"
-    eval <unevaluated>
+    eval true
       area(3, 4) == 12
+      ^          ^
+      12         true

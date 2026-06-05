@@ -219,14 +219,15 @@ func buildExports(q queries, file *ast.File, uses map[*ast.UseDecl]FileID, ownTy
 // names and the prelude surface in scope (its own declarations shadow both)
 // and its namespace-qualified names resolvable through q, and assembles the
 // annotation universe from the same definitions. imp must be the file's
-// import table.
-func buildTypeDefs(q queries, file *ast.File, imp importTable) typeDefs {
+// import table, and fns its function shells by name (so method bodies lower
+// calls of top-level functions).
+func buildTypeDefs(q queries, file *ast.File, imp importTable, fns map[string]*ir.Function) typeDefs {
 	td := typeDefs{byName: map[string]*ir.TypeDef{}, universe: map[string]*ir.TypeDef{}}
 	if file == nil {
 		return td
 	}
 	extern := outerTypes(q, imp)
-	td.list = resolveTypes(file, nil, nil, q.registry(), extern, qualifiedFrom(q, imp))
+	td.list = resolveTypes(file, nil, nil, q.registry(), extern, qualifiedFrom(q, imp), fns)
 	for _, def := range td.list {
 		if def.Name != "" {
 			if _, ok := td.byName[def.Name]; !ok {
@@ -272,5 +273,5 @@ func (db *database) computeExports(f FileID) exports {
 func (db *database) computeTypeDefs(f FileID) typeDefs {
 	in, _ := db.read(inputKey(f)).(fileInput)
 	imp, _ := db.read(importsKey(f)).(importTable)
-	return buildTypeDefs(engineQueries{db}, in.file, imp)
+	return buildTypeDefs(engineQueries{db}, in.file, imp, funcShellsByName(in.file, db.fnShells))
 }
