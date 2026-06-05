@@ -200,6 +200,11 @@ type TypeDef struct {
 	Params  []*TypeParam // generic parameters, in declaration order
 	Body    Type         // the defined type (nil if missing/invalid)
 	Methods []*Method
+	// Consts are the type's associated constants — the impl block's `const`
+	// items, read as TypeName.Name (the same Type.Name path enum members take).
+	// Each carries its resolved type and folded value; the design scopes them to
+	// the type, so they are reached only through the type, never as a bare name.
+	Consts  []*AssocConst
 	Builtin bool // declared as `= builtin`: its semantics come from the registry
 	// Enum is the enum description when this definition is an enum (`enum Name
 	// {...}`), or nil for every other kind of type. An enum is a nominal type
@@ -264,6 +269,22 @@ type Method struct {
 	// indexes — so the identity link is what the body checker and the editor
 	// navigate by.
 	Syntax *ast.MethodDecl
+}
+
+// AssocConst is one associated constant of a type: a constant scoped to the
+// type, declared in its impl block and read as TypeName.Name. It carries its
+// resolved Type and folded Value (the value is computed at type resolution,
+// exactly as an enum member's is). Builtin marks a `= builtin` constant whose
+// value comes from the registry (the integer bounds Max/Min): such a constant
+// has no source initializer, and the builtin layer fills in its value and type.
+type AssocConst struct {
+	Name    string
+	Public  bool
+	Doc     []string
+	Type    Type           // the resolved type of the constant's value
+	Value   *Constant      // the folded value, or nil when it could not be folded
+	Builtin bool           // value supplied by the registry (`= builtin`)
+	Syntax  *ast.ConstDecl // the declaration this was resolved from, or nil
 }
 
 // Stmt is a statement in a method body. It is a sealed interface; the only

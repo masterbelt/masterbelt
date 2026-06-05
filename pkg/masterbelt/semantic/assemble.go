@@ -399,16 +399,24 @@ func reportRefIssues(fileID FileID, e ast.Expr, q queries, at func(ast.Node) spa
 			}
 		},
 		func(m *ast.MemberExpr) {
-			// A qualified enum member access (Rarity.Bogus): the receiver names an
-			// enum, so the member must be one of its own.
+			// A qualified type-member access: the receiver names a type, so the
+			// member must be one of its own — an enum member (Rarity.Bogus) or an
+			// associated constant (int8.Bogus, Level.Bogus).
 			if m.Member.Name == "" {
 				return // a recovered `Rarity.` — already a parse diagnostic
 			}
 			recv := m.Receiver.(*ast.Identifier)
 			def := q.universe(fileID)[recv.Name]
-			if enumIndex(def, m.Member.Name) < 0 {
+			if def != nil && def.Enum != nil {
+				if enumIndex(def, m.Member.Name) < 0 {
+					s := at(m)
+					diags.Add(newUnknownEnumMemberDiagnostic(s.offset, s.width, recv.Name, m.Member.Name))
+				}
+				return
+			}
+			if assocConstIndex(def, m.Member.Name) < 0 {
 				s := at(m)
-				diags.Add(newUnknownEnumMemberDiagnostic(s.offset, s.width, recv.Name, m.Member.Name))
+				diags.Add(newUnknownAssociatedConstDiagnostic(s.offset, s.width, recv.Name, m.Member.Name))
 			}
 		})
 }

@@ -7,13 +7,16 @@ Module
     value <none>
   Const "Top"
     type Level
-    value <none>
+    value Level.Max
+    eval 100
   Const "Bottom"
     type Level
-    value <none>
+    value Level.Min
+    eval 0
   Const "W"
-    type invalid
-    value <none>
+    type int32
+    value Bits.Width
+    eval 32
   Const "ServerPort"
     type Port
     value IntLiteral "8080"
@@ -21,11 +24,23 @@ Module
   TypeDef "Level" pub
     doc "A character level, capped at 100."
     body int8
+    const "Max" pub
+      doc "The highest level."
+      type int
+      value 100
+    const "Min" pub
+      doc "The lowest level."
+      type int
+      value 0
     method "increment" pub
       doc "The next level."
       result self
       return self.add(IntLiteral "1")
   TypeDef "Bits" pub
     body int32
+    const "Width" pub
+      doc "The width in bits."
+      type int32
+      value 32
   TypeDef "Port" pub
     body int32

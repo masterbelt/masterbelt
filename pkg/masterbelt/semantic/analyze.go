@@ -221,16 +221,16 @@ func computeReachable(q queries, from FileID) map[FileID]bool {
 // walkRefsEnum visits the value references of an expression: every
 // value-position identifier through onIdent, except that a namespace member
 // access (geo.Origin) is one unit visited through onMember — its receiver names
-// a namespace, not a value, and is skipped — an enum member access
-// (Rarity.Common) is one unit visited through onEnumMember — its receiver names
-// an enum type, not a value — and a call's callee that names a type (a
+// a namespace, not a value, and is skipped — a type member access
+// (Rarity.Common, int8.Max) is one unit visited through onTypeMember — its
+// receiver names a type, not a value — and a call's callee that names a type (a
 // conversion) or a top-level function is skipped too: it refers to the type or
 // function, not to a value declaration. The walk is pre-order, so a call marks
-// its callee before the callee itself is visited. A nil onEnumMember disables
-// the enum-member reading (the receiver would then be visited as an ordinary
+// its callee before the callee itself is visited. A nil onTypeMember disables
+// the type-member reading (the receiver would then be visited as an ordinary
 // name). The decisions layer on the shared ast.WalkExprs traversal, so the
 // skeleton lives in one place.
-func walkRefsEnum(fileID FileID, e ast.Expr, q queries, onIdent func(*ast.Identifier), onMember func(*ast.MemberExpr), onEnumMember func(*ast.MemberExpr)) {
+func walkRefsEnum(fileID FileID, e ast.Expr, q queries, onIdent func(*ast.Identifier), onMember func(*ast.MemberExpr), onTypeMember func(*ast.MemberExpr)) {
 	funcCallee := map[*ast.Identifier]bool{}
 	funcMemberCallee := map[*ast.MemberExpr]bool{}
 	ast.WalkExprs(e, func(e ast.Expr) bool {
@@ -257,11 +257,12 @@ func walkRefsEnum(fileID FileID, e ast.Expr, q queries, onIdent func(*ast.Identi
 			if !ok {
 				return true
 			}
-			// An access whose receiver names an enum type is an enum-member
-			// reference, not a namespace access nor a field read: the receiver is
-			// the type, so it is consumed as one unit.
-			if onEnumMember != nil && isEnumType(fileID, recv, q) {
-				onEnumMember(e)
+			// An access whose receiver names a type is a type-member reference —
+			// an enum member or an associated constant — not a namespace access
+			// nor a field read: the receiver is the type, so it is consumed as one
+			// unit.
+			if onTypeMember != nil && isTypeName(fileID, recv, q) {
+				onTypeMember(e)
 				return false
 			}
 			if isNamespace(fileID, recv, q) {
@@ -275,15 +276,16 @@ func walkRefsEnum(fileID FileID, e ast.Expr, q queries, onIdent func(*ast.Identi
 	})
 }
 
-// isEnumType reports whether an identifier names an enum type in its file — and
-// no value, since a local or imported value shadows a type name in value
-// position.
-func isEnumType(fileID FileID, id *ast.Identifier, q queries) bool {
+// isTypeName reports whether an identifier names a type in its file — and no
+// value, since a local or imported value shadows a type name in value position.
+// It covers both an enum (its members) and any other type (its associated
+// constants).
+func isTypeName(fileID FileID, id *ast.Identifier, q queries) bool {
 	if q.resolve(fileID, id) != nil {
 		return false
 	}
-	def, ok := q.universe(fileID)[id.Name]
-	return ok && def.Enum != nil
+	_, ok := q.universe(fileID)[id.Name]
+	return ok
 }
 
 // isNamespace reports whether an identifier names a namespace import in its

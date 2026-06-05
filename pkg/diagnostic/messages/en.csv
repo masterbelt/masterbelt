@@ -55,6 +55,8 @@ masterbelt.semantic.duplicate_enum_member,duplicate enum member {name}
 masterbelt.semantic.unknown_enum_member,{enum} has no member {member}
 masterbelt.semantic.invalid_enum_base_type,{typ} is not a valid enum base type (use an integer type or string)
 masterbelt.semantic.duplicate_enum_value,enum member {name} duplicates the value {value}
+masterbelt.semantic.unknown_associated_const,{typ} has no associated constant {name}
+masterbelt.semantic.no_bound,{typ} has no bound and so no {name}
 masterbelt.semantic.refinement_violation,value {value} does not satisfy {typ}: {predicate}{diagram}
 masterbelt.semantic.refinement_not_bool,where clause must be a bool; got {typ}
 masterbelt.semantic.refinement_not_constant,where clause is not a compile-time predicate

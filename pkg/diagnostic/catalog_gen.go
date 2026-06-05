@@ -359,6 +359,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "function " + f["name"].String() + " never returns a value"
 		}
 	},
+	"masterbelt.semantic.no_bound": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return f["typ"].String() + " は範囲を持たないため " + f["name"].String() + " はありません"
+		default:
+			return f["typ"].String() + " has no bound and so no " + f["name"].String()
+		}
+	},
 	"masterbelt.semantic.no_matching_func_overload": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
@@ -477,6 +485,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "この関数リテラルの結果型を推論できません。注釈を付けるか値を返してください"
 		default:
 			return "cannot infer this function literal's result type; annotate it or return a value"
+		}
+	},
+	"masterbelt.semantic.unknown_associated_const": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return f["typ"].String() + " に関連定数 " + f["name"].String() + " はありません"
+		default:
+			return f["typ"].String() + " has no associated constant " + f["name"].String()
 		}
 	},
 	"masterbelt.semantic.unknown_enum_member": func(loc Locale, f map[string]fmt.Stringer) string {

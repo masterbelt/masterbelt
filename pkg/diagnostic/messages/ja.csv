@@ -55,6 +55,8 @@ masterbelt.semantic.duplicate_enum_member,enum メンバ {name} が重複して�
 masterbelt.semantic.unknown_enum_member,{enum} にメンバ {member} はありません
 masterbelt.semantic.invalid_enum_base_type,{typ} は enum の基底型に使えません(整数型か string を指定してください)
 masterbelt.semantic.duplicate_enum_value,enum メンバ {name} は値 {value} を重複させています
+masterbelt.semantic.unknown_associated_const,{typ} に関連定数 {name} はありません
+masterbelt.semantic.no_bound,{typ} は範囲を持たないため {name} はありません
 masterbelt.semantic.refinement_violation,値 {value} は {typ} の制約を満たしません: {predicate}{diagram}
 masterbelt.semantic.refinement_not_bool,where 節は bool でなければなりません({typ})
 masterbelt.semantic.refinement_not_constant,where 節はコンパイル時に評価できる述語ではありません

@@ -141,6 +141,22 @@ func enumMember(def *ir.TypeDef, name string) *ir.Constant {
 	return nil
 }
 
+// assocConst returns the folded value of a type's named associated constant
+// (int8.Max, Level.Max), or nil when the type has no such constant. The value
+// was settled at type resolution and stored on the definition, so reading it
+// here keeps eval a pure function of the resolved IR.
+func assocConst(def *ir.TypeDef, name string) *ir.Constant {
+	if def == nil {
+		return nil
+	}
+	for _, c := range def.Consts {
+		if c.Name == name {
+			return c.Value
+		}
+	}
+	return nil
+}
+
 // evalExpr folds an expression, resolving an identifier first against the
 // context's locals and then against the environment's declarations. The
 // expected-enum context reaches only the immediate expression — every recursive
@@ -208,12 +224,20 @@ func evalExpr(e ast.Expr, ctx evalCtx) *ir.Constant {
 		if target := ctx.env.ResolveMember(e); target != nil {
 			return ctx.env.ValueOf(target)
 		}
-		// A member access whose receiver names an enum type (Rarity.Common)
-		// folds to that member's value. A local binding shadows the type name.
+		// A member access whose receiver names a type folds to a type member's
+		// value — an enum member (Rarity.Common) or an associated constant
+		// (int8.Max, Level.Max). A local binding shadows the type name.
 		if recv, ok := e.Receiver.(*ast.Identifier); ok {
 			if _, isLocal := ctx.locals[recv.Name]; !isLocal {
-				if def := ctx.env.LookupType(recv.Name); def != nil && def.Enum != nil {
-					return enumMember(def, e.Member.Name)
+				if def := ctx.env.LookupType(recv.Name); def != nil {
+					if def.Enum != nil {
+						if v := enumMember(def, e.Member.Name); v != nil {
+							return v
+						}
+					}
+					if v := assocConst(def, e.Member.Name); v != nil {
+						return v
+					}
 				}
 			}
 		}
