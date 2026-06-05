@@ -73,3 +73,42 @@ func TestLowerAssign(t *testing.T) {
 		t.Fatalf("assign value is %T, want a desugared call (x + 1)", s.Value)
 	}
 }
+
+// TestLowerIndexAssign checks an index write: xs[i] = v desugars to a rebind of
+// the collection, xs = xs.set(i, v). The target becomes the bare collection
+// identifier (the same let-local target a plain assignment has), and the value
+// is a set call carrying the index and the new value as its two arguments.
+func TestLowerIndexAssign(t *testing.T) {
+	body := bodyOf(t, "pub fn f(): list<int> {\n  let xs = [1, 2, 3]\n  xs[0] = 99\n  return xs\n}\n")
+	s, ok := body[1].(*ast.AssignStmt)
+	if !ok {
+		t.Fatalf("second statement is %T, want *ast.AssignStmt", body[1])
+	}
+	// The rebind target is the collection name, not the index expression.
+	id, ok := s.Target.(*ast.Identifier)
+	if !ok || id.Name != "xs" {
+		t.Fatalf("assign target = %v, want identifier xs", s.Target)
+	}
+	// The value is xs.set(0, 99): a call of set on the collection with the index
+	// and the assigned value as arguments.
+	call, ok := s.Value.(*ast.CallExpr)
+	if !ok {
+		t.Fatalf("assign value is %T, want a set call", s.Value)
+	}
+	member, ok := call.Callee.(*ast.MemberExpr)
+	if !ok || member.Member.Name != "set" {
+		t.Fatalf("assign value callee = %v, want a .set member access", call.Callee)
+	}
+	if recv, ok := member.Receiver.(*ast.Identifier); !ok || recv.Name != "xs" {
+		t.Fatalf("set receiver = %v, want identifier xs", member.Receiver)
+	}
+	if len(call.Arguments) != 2 {
+		t.Fatalf("set has %d arguments, want 2 (index, value)", len(call.Arguments))
+	}
+	if idx, ok := call.Arguments[0].(*ast.IntLit); !ok || idx.Text != "0" {
+		t.Errorf("set arg 0 = %v, want IntLit 0 (the index)", call.Arguments[0])
+	}
+	if v, ok := call.Arguments[1].(*ast.IntLit); !ok || v.Text != "99" {
+		t.Errorf("set arg 1 = %v, want IntLit 99 (the value)", call.Arguments[1])
+	}
+}

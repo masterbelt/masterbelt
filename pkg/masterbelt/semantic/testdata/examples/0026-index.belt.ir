@@ -5,37 +5,37 @@ Module
     eval [10, 20, 30]
   Const "First"
     type int | error
-    value <none>
+    value Reference -> "Xs".get(IntLiteral "0")
   Const "Third"
     type int | error
-    value <none>
+    value Reference -> "Xs".get(IntLiteral "2")
   Const "Tbl"
     type map<string, int>
     value [StringLiteral "sword": IntLiteral "100", StringLiteral "shield": IntLiteral "50"]
     eval ["sword": 100, "shield": 50]
   Const "Sword"
     type int | error
-    value <none>
+    value Reference -> "Tbl".get(StringLiteral "sword")
   Func "at" pub
     param xs: list<int>
     param i: int
     result int | error
-      return <none>
+      return ParamRef "xs".get(ParamRef "i")
   Func "bumpFirst" pub
     result list<int>
       let "xs": list<int> = [IntLiteral "1", IntLiteral "2", IntLiteral "3"]
-      assign "" = <none>
+      assign "xs" = LocalRef "xs".set(IntLiteral "0", IntLiteral "99")
       return LocalRef "xs"
   Func "put" pub
     result map<string, int>
       let "m": map<string, int> = [StringLiteral "a": IntLiteral "1"]
-      assign "" = <none>
-      assign "" = <none>
+      assign "m" = LocalRef "m".set(StringLiteral "a", IntLiteral "10")
+      assign "m" = LocalRef "m".set(StringLiteral "b", IntLiteral "2")
       return LocalRef "m"
   Func "stillThree" pub
     result bool
       let "xs": list<int> = [IntLiteral "1", IntLiteral "2", IntLiteral "3"]
-      assign "" = <none>
+      assign "xs" = LocalRef "xs".set(IntLiteral "1", IntLiteral "99")
       return LocalRef "xs".len().eql(IntLiteral "3")
   Assert "stillThree() == true"
     eval <unevaluated>
