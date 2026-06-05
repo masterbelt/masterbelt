@@ -1,0 +1,81 @@
+version: "2"
+
+# Linters that pass today are enabled; the rest are commented out with the
+# issue counts measured on 2026-06-05 so enabling them is a sized, deliberate
+# step rather than a surprise. Counts come from:
+#   golangci-lint run ./... --max-issues-per-linter 0 --max-same-issues 0
+#
+# NOTE: golangci-lint 2.12.2 was observed to DROP findings between runs here
+# (scheduling-dependent): a probe run missed gocyclo on assemble=50 and all 5
+# predeclared issues, and with many linters enabled staticcheck sometimes
+# reports ~46 extra SA5011 (deref before nil check) spots in _test.go files.
+# Treat single-run counts below as lower bounds and re-measure when enabling.
+
+linters:
+  default: standard # errcheck, govet, ineffassign, staticcheck, unused
+  enable:
+    - copyloopvar
+    - durationcheck
+    - errorlint
+    - gocyclo # see settings: ceiling at 55, TODO ratchet down to 30
+    - maintidx # see settings: floor at 10, TODO ratchet up to the default 20
+    - misspell
+    - nolintlint
+    - unconvert
+    - unparam
+    - usestdlibvars
+    - wastedassign
+
+    # --- quick wins: a handful of issues each, enable after a small sweep ---
+    # - gocritic # 2 issues
+    # - intrange # 5 issues (for i := 0; i < n; i++ → for i := range n)
+    # - perfsprint # 1 issue
+    # - thelper # 2 issues (missing t.Helper() in crossfile_test/function_test)
+    # - predeclared # 5 issues: min/new/int8 shadowing predeclared identifiers
+    #               # (builtin/native.go, semantic/engine.go, ast/render.go,
+    #               # prelude_test.go) — needs small renames first
+    # - nilerr # 3 issues, all pkg/project/project.go:306-329 — REVIEW: errors
+    #          # checked then nil returned; either intentional skips or real
+    #          # swallowed failures. Decide before enabling.
+
+    # --- medium: needs a real pass or tuned settings ---
+    # - prealloc # 17 issues (append loops without preallocation)
+    # - exhaustive # 51 issues; 18 with default-signifies-exhaustive: true
+    # - revive # 91 issues: exported 58 / package-comments 16 /
+    #          # unused-parameter 9 / redefines-builtin-id 7 / unreachable-code 1
+    # - goconst # 136 issues (mostly repeated literals in tests)
+
+    # --- TODO(complexity): measured 2026-06-05, decide thresholds and refactor ---
+    # - funlen # at a lax 70 lines / 70 statements still 10 issues — worst
+    #          # TestLexerDiagnostics=124 lines, assemble=106 statements,
+    #          # TestParseFuncLit=106, funcCallType=101, callType=91. The
+    #          # defaults (60/40) flag substantially more.
+    # - gocognit # 18 funcs over the default 30. Worst: semantic/assemble.go
+    #            # assemble=99, semantic/effects.go collectEffectUses=76,
+    #            # lsp/record.go recordTypes=71, lexer TestLexerDiagnostics=59.
+    #            # The top three are genuine refactor candidates.
+    # - nestif # 8 spots over the default 5 (worst 9)
+    # - cyclop # 87 funcs over the default 10 — threshold likely too strict for
+    #          # a compiler (big dispatch switches); gocyclo above covers the
+    #          # same ground with a saner ceiling.
+  settings:
+    gocyclo:
+      # Ceiling that passes today. TODO: ratchet down to the default 30 —
+      # 2 offenders as of 2026-06-05: semantic assemble=50, lexer.Next=33
+      # (the dispatch switch). assemble is also the gocognit worst (99).
+      min-complexity: 55
+    maintidx:
+      # Floor that passes today. TODO: ratchet up to the default 20 —
+      # 1 offender as of 2026-06-05: semantic assemble, maintainability
+      # index 11. Every complexity metric (gocognit 99, gocyclo 50,
+      # 106 statements, MI 11) converges on assemble: refactor it first.
+      under: 10
+
+formatters:
+  enable:
+    - gofmt
+    # - goimports # would regroup imports in 24 files; adopt in one sweep
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/masterbelt/masterbelt

@@ -1,5 +1,6 @@
-GO      ?= go
-BIN_DIR := bin
+GO            ?= go
+GOLANGCI_LINT ?= golangci-lint
+BIN_DIR       := bin
 
 .DEFAULT_GOAL := build
 
@@ -33,7 +34,9 @@ generate:
 fmt:
 	$(GO) fmt ./...
 
-# vet runs go vet over the module.
+# vet runs go vet and golangci-lint (configured by .golangci.yml) over the
+# module.
 .PHONY: vet
 vet:
 	$(GO) vet ./...
+	$(GOLANGCI_LINT) run ./...
