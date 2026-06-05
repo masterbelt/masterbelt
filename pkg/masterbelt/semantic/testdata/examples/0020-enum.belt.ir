@@ -1,9 +1,9 @@
 Module
-  Const "enum" pub
+  Const "" pub
     doc "A card's rarity tier."
     type invalid
     value <none>
-  Const "enum" pub
+  Const "" pub
     doc "An elemental affinity."
     type invalid
     value <none>
@@ -11,7 +11,7 @@ Module
     doc "Whether this element is Fire."
     type invalid
     value <none>
-  Const "enum" pub
+  Const "" pub
     doc "A supported display locale."
     type invalid
     value <none>

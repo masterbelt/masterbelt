@@ -2,11 +2,11 @@ File
   ConstDecl
     doc "A card's rarity tier."
     pub
-    name "enum"
+    name ""
   ConstDecl
     doc "An elemental affinity."
     pub
-    name "enum"
+    name ""
   ConstDecl
     doc "Whether this element is Fire."
     pub
@@ -14,7 +14,7 @@ File
   ConstDecl
     doc "A supported display locale."
     pub
-    name "enum"
+    name ""
   ConstDecl
     name "Top"
     type Rarity
