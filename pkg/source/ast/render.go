@@ -158,6 +158,18 @@ func (r *renderer) expr(e Expr, min int) {
 		r.str(x.Member.Name)
 	case *CallExpr:
 		r.call(x, min)
+	case *AwaitExpr:
+		// await binds like a prefix operator over its operand's postfix chain.
+		paren := precUnary < min
+		if paren {
+			r.str("(")
+		}
+		r.anchor(x)
+		r.str("await ")
+		r.expr(x.Value, precUnary)
+		if paren {
+			r.str(")")
+		}
 	case *FuncLit:
 		r.funcLit(x)
 	default:

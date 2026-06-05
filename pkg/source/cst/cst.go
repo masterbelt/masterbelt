@@ -51,6 +51,7 @@ const (
 	RecordField               // one record-literal field initializer: Ident ":" Expr
 	FuncLit                   // a function literal: fn ParamList ":" TypeExpr Block
 	ParenExpr                 // a parenthesized grouping: "(" Expr ")"
+	AwaitExpr                 // an await expression: await Expr (the explicit suspension point)
 
 	// Type declarations and the type-expression grammar.
 	TypeDecl      // [doc] [pub] type Name [GenericParams] "=" TypeExpr [WhereClause] [ImplBlock]
@@ -105,6 +106,7 @@ var kindNames = [...]string{
 	RecordField:   "RecordField",
 	FuncLit:       "FuncLit",
 	ParenExpr:     "ParenExpr",
+	AwaitExpr:     "AwaitExpr",
 	TypeDecl:      "TypeDecl",
 	GenericParams: "GenericParams",
 	GenericParam:  "GenericParam",

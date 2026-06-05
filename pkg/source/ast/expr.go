@@ -247,6 +247,23 @@ func NewCallExpr(callee Expr, arguments []Expr, syntax *cst.Node) *CallExpr {
 	return &CallExpr{Callee: callee, Arguments: arguments, syntax: syntax}
 }
 
+// AwaitExpr is an await expression: the explicit suspension point that
+// consumes the async effect at a call site (await fetch(url)). It carries the
+// awaited value and adds nothing to its type.
+type AwaitExpr struct {
+	Value  Expr // the awaited expression (nil if recovered away)
+	syntax *cst.Node
+}
+
+func (a *AwaitExpr) Syntax() *cst.Node { return a.syntax }
+func (a *AwaitExpr) node()             {}
+func (a *AwaitExpr) expr()             {}
+
+// NewAwaitExpr builds an AwaitExpr node.
+func NewAwaitExpr(value Expr, syntax *cst.Node) *AwaitExpr {
+	return &AwaitExpr{Value: value, syntax: syntax}
+}
+
 // FuncLit is a function-literal expression: fn(Params): Result { Body }. It is
 // the value form of a FuncType (it carries a statement body) and the only way to
 // construct a value of a function type. Its Params, Result, and Body reuse the
@@ -289,6 +306,8 @@ func WalkExprs(e Expr, fn func(Expr) bool) {
 		for _, a := range e.Arguments {
 			WalkExprs(a, fn)
 		}
+	case *AwaitExpr:
+		WalkExprs(e.Value, fn)
 	case *CollectionLit:
 		for _, entry := range e.Entries {
 			if entry.Key != nil {

@@ -1,6 +1,6 @@
 # tree
 File
-  Error
+  FuncDecl
     LineComment "// Effects declare a function's interaction with the world, in its signature:"
     Newline "\n"
     LineComment "// io touches it, async suspends (consumed explicitly with await), nondet does"
@@ -23,19 +23,26 @@ File
     Async "async"
     Whitespace " "
     Ident "fetch"
-    LParen "("
-    Ident "url"
+    ParamList
+      LParen "("
+      Param
+        Ident "url"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "string"
+      RParen ")"
     Colon ":"
     Whitespace " "
-    Ident "string"
-    RParen ")"
-    Colon ":"
-    Whitespace " "
-    Ident "string"
-    Whitespace " "
-    Pipe "|"
-    Whitespace " "
-    Ident "error"
+    UnionType
+      TypeName
+        Ident "string"
+      Whitespace " "
+      Pipe "|"
+      Whitespace " "
+      TypeName
+        Ident "error"
+  FuncDecl
     Newline "\n"
     Extern "extern"
     Whitespace " "
@@ -44,11 +51,13 @@ File
     Nondet "nondet"
     Whitespace " "
     Ident "now"
-    LParen "("
-    RParen ")"
+    ParamList
+      LParen "("
+      RParen ")"
     Colon ":"
     Whitespace " "
-    Ident "datetime"
+    TypeName
+      Ident "datetime"
   FuncDecl
     Newline "\n"
     Newline "\n"
@@ -61,40 +70,51 @@ File
     Pub "pub"
     Whitespace " "
     Fn "fn"
-  Error
     Whitespace " "
     Io "io"
     Whitespace " "
     Async "async"
     Whitespace " "
     Ident "pageTitle"
-    LParen "("
-    Ident "url"
+    ParamList
+      LParen "("
+      Param
+        Ident "url"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "string"
+      RParen ")"
     Colon ":"
     Whitespace " "
-    Ident "string"
-    RParen ")"
-    Colon ":"
+    UnionType
+      TypeName
+        Ident "string"
+      Whitespace " "
+      Pipe "|"
+      Whitespace " "
+      TypeName
+        Ident "error"
     Whitespace " "
-    Ident "string"
-    Whitespace " "
-    Pipe "|"
-    Whitespace " "
-    Ident "error"
-    Whitespace " "
-    LBrace "{"
-    Newline "\n"
-    Whitespace "  "
-    Return "return"
-    Whitespace " "
-    Await "await"
-    Whitespace " "
-    Ident "fetch"
-    LParen "("
-    Ident "url"
-    RParen ")"
-    Newline "\n"
-    RBrace "}"
+    Block
+      LBrace "{"
+      Newline "\n"
+      Whitespace "  "
+      ReturnStmt
+        Return "return"
+        Whitespace " "
+        AwaitExpr
+          Await "await"
+          Whitespace " "
+          CallExpr
+            NameRef
+              Ident "fetch"
+            LParen "("
+            NameRef
+              Ident "url"
+            RParen ")"
+      Newline "\n"
+      RBrace "}"
   TypeDecl
     Newline "\n"
     Newline "\n"
@@ -130,11 +150,10 @@ File
         Pub "pub"
         Whitespace " "
         Fn "fn"
-      Whitespace " "
-      Io "io"
-      Whitespace " "
-      Async "async"
-      MethodDecl
+        Whitespace " "
+        Io "io"
+        Whitespace " "
+        Async "async"
         Whitespace " "
         Ident "get"
         ParamList
@@ -163,25 +182,26 @@ File
           Whitespace "    "
           ReturnStmt
             Return "return"
-          Whitespace " "
-          Await "await"
-          Whitespace " "
-          CallExpr
-            NameRef
-              Ident "fetch"
-            LParen "("
-            BinaryExpr
-              MemberExpr
-                SelfExpr
-                  Self "self"
-                Dot "."
-                Ident "base"
+            Whitespace " "
+            AwaitExpr
+              Await "await"
               Whitespace " "
-              Plus "+"
-              Whitespace " "
-              NameRef
-                Ident "path"
-            RParen ")"
+              CallExpr
+                NameRef
+                  Ident "fetch"
+                LParen "("
+                BinaryExpr
+                  MemberExpr
+                    SelfExpr
+                      Self "self"
+                    Dot "."
+                    Ident "base"
+                  Whitespace " "
+                  Plus "+"
+                  Whitespace " "
+                  NameRef
+                    Ident "path"
+                RParen ")"
           Newline "\n"
           Whitespace "  "
           RBrace "}"
@@ -195,22 +215,25 @@ File
     Pub "pub"
     Whitespace " "
     Fn "fn"
-  Error
     Whitespace " "
     Nondet "nondet"
     Whitespace " "
     Ident "stamp"
-    LParen "("
-    RParen ")"
+    ParamList
+      LParen "("
+      RParen ")"
     Colon ":"
     Whitespace " "
-    Ident "datetime"
+    TypeName
+      Ident "datetime"
     Whitespace " "
     Arrow "->"
     Whitespace " "
-    Ident "now"
-    LParen "("
-    RParen ")"
+    CallExpr
+      NameRef
+        Ident "now"
+      LParen "("
+      RParen ")"
   FuncDecl
     Newline "\n"
     Newline "\n"
@@ -282,21 +305,3 @@ File
   Newline "\n"
   EOF ""
 # diagnostics
-error[masterbelt.parser.concrete.unexpected_token] 8:1 unexpected token: Extern
-error[masterbelt.parser.concrete.expected_identifier] 14:5 expected identifier
-error[masterbelt.parser.concrete.expected_param_list] 14:7 expected '('
-error[masterbelt.parser.concrete.expected_type] 14:5 expected type
-error[masterbelt.parser.concrete.expected_func_body] 14:7 expected '->' or '{'
-error[masterbelt.parser.concrete.unexpected_token] 14:8 unexpected token: Io
-error[masterbelt.parser.concrete.expected_identifier] 20:7 expected identifier
-error[masterbelt.parser.concrete.unexpected_token] 20:9 unexpected token: Whitespace
-error[masterbelt.parser.concrete.expected_type] 20:7 expected type
-error[masterbelt.parser.concrete.unexpected_token] 20:10 unexpected token: Io
-error[masterbelt.parser.concrete.unexpected_token] 20:13 unexpected token: Async
-error[masterbelt.parser.concrete.expected_expression] 21:5 expected expression
-error[masterbelt.parser.concrete.unexpected_token] 21:12 unexpected token: Await
-error[masterbelt.parser.concrete.expected_identifier] 26:5 expected identifier
-error[masterbelt.parser.concrete.expected_param_list] 26:7 expected '('
-error[masterbelt.parser.concrete.expected_type] 26:5 expected type
-error[masterbelt.parser.concrete.expected_func_body] 26:7 expected '->' or '{'
-error[masterbelt.parser.concrete.unexpected_token] 26:8 unexpected token: Nondet

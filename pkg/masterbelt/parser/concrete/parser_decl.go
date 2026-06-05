@@ -294,22 +294,35 @@ func (p *parser) parseAssertDecl(lead []cst.Green) *cst.Node {
 // parseFuncDecl parses a top-level function declaration, prepending the
 // already-collected leading trivia:
 //
-//	[pub] fn Ident ParamList ":" TypeExpr ( Block | "->" Expr )
+//	[pub] [extern] fn Effect* Ident ParamList ":" TypeExpr ( Block | "->" Expr )
 //
 // A function is a method without a receiver: the same header (the result type
 // is required at the top level), with the function literal's two body forms —
 // a statement block, or "->" followed by a single expression (an implicit
-// return). An arrow followed by "{" is rejected with a pointer to drop the
-// arrow, exactly as in a function literal. As elsewhere every expected element
-// is optional in the parse: a missing one records a diagnostic and is simply
-// absent from the tree. The cursor sits on pub or fn.
+// return). The effect list (io, async, nondet) sits between fn and the name.
+// An extern function declares a native a target supplies — the root of an
+// effect — and carries no body. An arrow followed by "{" is rejected with a
+// pointer to drop the arrow, exactly as in a function literal. As elsewhere
+// every expected element is optional in the parse: a missing one records a
+// diagnostic and is simply absent from the tree. The cursor sits on pub,
+// extern, or fn.
 func (p *parser) parseFuncDecl(lead []cst.Green) *cst.Node {
 	children := lead
 	if p.kind() == token.Pub {
 		children = append(children, p.bump())
 	}
+	extern := false
+	if p.peekSignificant() == token.Extern {
+		p.skipTrivia(&children)
+		children = append(children, p.bump())
+		extern = true
+	}
 	p.skipTrivia(&children)
 	children = append(children, p.bump()) // "fn" (guaranteed by the dispatcher)
+	for p.peekSignificant().Effect() {
+		p.skipTrivia(&children)
+		children = append(children, p.bump()) // an effect keyword
+	}
 	if p.peekSignificant() == token.Ident {
 		p.skipTrivia(&children)
 		children = append(children, p.bump()) // the declared name
@@ -355,7 +368,10 @@ func (p *parser) parseFuncDecl(lead []cst.Green) *cst.Node {
 		p.skipTrivia(&children)
 		children = append(children, p.parseBlock())
 	default:
-		p.report(newExpectedFuncBodyDiagnostic(p.cur().Offset, p.cur().Width))
+		// An extern function has no body: its implementation is the target's.
+		if !extern {
+			p.report(newExpectedFuncBodyDiagnostic(p.cur().Offset, p.cur().Width))
+		}
 	}
 	return cst.NewNode(cst.FuncDecl, children)
 }
@@ -398,10 +414,11 @@ func (p *parser) parseImplBlock() *cst.Node {
 // parseMethodDecl parses a method inside an impl block, prepending the
 // already-collected leading trivia:
 //
-//	[doc] [pub] [extern] [fn] Ident ParamList ":" TypeExpr [Block]
+//	[doc] [pub] [extern] [fn] Effect* Ident ParamList ":" TypeExpr [Block]
 //
-// fn is optional (some methods omit it) and the body Block is absent for an
-// extern method. The cursor sits on the first of pub/extern/fn/Ident.
+// fn is optional (some methods omit it), the effect list (io, async, nondet)
+// sits before the name, and the body Block is absent for an extern method.
+// The cursor sits on the first of pub/extern/fn/an effect/Ident.
 func (p *parser) parseMethodDecl(lead []cst.Green) *cst.Node {
 	children := lead
 	if p.kind() == token.Pub {
@@ -414,6 +431,10 @@ func (p *parser) parseMethodDecl(lead []cst.Green) *cst.Node {
 	if p.peekSignificant() == token.Fn {
 		p.skipTrivia(&children)
 		children = append(children, p.bump())
+	}
+	for p.peekSignificant().Effect() {
+		p.skipTrivia(&children)
+		children = append(children, p.bump()) // an effect keyword
 	}
 	if p.peekSignificant() == token.Ident {
 		p.skipTrivia(&children)
@@ -508,6 +529,6 @@ func startsMethod(kind token.Kind) bool {
 	case token.Pub, token.Extern, token.Fn, token.Ident:
 		return true
 	default:
-		return false
+		return kind.Effect() // a method may begin with its effect list
 	}
 }

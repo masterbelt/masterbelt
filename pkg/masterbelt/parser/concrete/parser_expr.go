@@ -78,6 +78,19 @@ func (p *parser) parseExpr(minPrec int) cst.Green {
 // parseUnary parses a chain of prefix operators ending in a postfix expression,
 // or a bare postfix expression. The cursor sits on the first significant token.
 func (p *parser) parseUnary() cst.Green {
+	if p.kind() == token.Await {
+		// await Expr: the explicit suspension point. It binds like a prefix
+		// operator — over the whole postfix chain — but keeps its own node:
+		// it marks a suspension rather than desugaring to a method call.
+		children := []cst.Green{p.bump()} // "await"
+		if startsExpr(p.peekSignificant()) {
+			p.skipTrivia(&children)
+			children = append(children, p.parseUnary())
+		} else {
+			p.report(newExpectedOperandDiagnostic(p.lastStart, 0, "await"))
+		}
+		return cst.NewNode(cst.AwaitExpr, children)
+	}
 	if !unaryOps[p.kind()] {
 		return p.parsePostfix()
 	}
@@ -444,7 +457,7 @@ func startsExpr(kind token.Kind) bool {
 	case token.Int, token.String, token.DatetimeLit, token.DurationLit,
 		token.Ident, token.True, token.False, token.Null, token.Self,
 		token.LBracket, token.LBrace, token.Plus, token.Minus, token.Bang,
-		token.Fn, token.LParen:
+		token.Fn, token.LParen, token.Await:
 		return true
 	default:
 		return false

@@ -1136,3 +1136,65 @@ func TestParseQualifiedTypeNameRecovery(t *testing.T) {
 		t.Fatalf("sub-nodes = %v, want %v (recovery must keep the initializer)", got, want)
 	}
 }
+
+func TestParseEffects(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+		want []cst.Kind
+	}{
+		{"effects on fn", "pub fn io async get(url: string): string {\n  return url\n}\n", []cst.Kind{cst.ParamList, cst.TypeName, cst.Block}},
+		{"extern fn", "extern fn io async fetch(url: string): string\n", []cst.Kind{cst.ParamList, cst.TypeName}},
+		{"pub extern fn", "pub extern fn nondet now(): int\n", []cst.Kind{cst.ParamList, cst.TypeName}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			root, diags := Parse([]byte(tc.src))
+			if len(diags) != 0 {
+				t.Fatalf("unexpected diagnostics: %v", diags)
+			}
+			assertLossless(t, tc.src)
+			decl := root.Children()[0].(*cst.Node)
+			if decl.Kind() != cst.FuncDecl {
+				t.Fatalf("first child kind = %s, want FuncDecl", decl.Kind())
+			}
+			got := subNodeKinds(decl)
+			if len(got) != len(tc.want) {
+				t.Fatalf("sub-nodes = %v, want %v", got, tc.want)
+			}
+		})
+	}
+
+	// A non-extern function still requires a body.
+	if _, diags := Parse([]byte("fn io f(): int\n")); len(diags) == 0 {
+		t.Errorf("fn without body: want a diagnostic")
+	}
+	// A method may carry effects, with or without fn.
+	for _, src := range []string{
+		"type C = { u: string } impl {\n  pub fn io async get(): string {\n    return self.u\n  }\n}\n",
+		"type C = { u: string } impl {\n  io get(): string {\n    return self.u\n  }\n}\n",
+	} {
+		if _, diags := Parse([]byte(src)); len(diags) != 0 {
+			t.Errorf("%q: unexpected diagnostics: %v", src, diags)
+		}
+		assertLossless(t, src)
+	}
+}
+
+func TestParseAwaitExpr(t *testing.T) {
+	src := "fn io async f(u: string): string {\n  return await g(u).trim()\n}\n"
+	root, diags := Parse([]byte(src))
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	assertLossless(t, src)
+	tree := cst.Sprint(source.NewFile("", []byte(src)), root)
+	if !strings.Contains(tree, "AwaitExpr") {
+		t.Errorf("tree = %s, want an AwaitExpr node", tree)
+	}
+
+	// A dangling await reports a missing operand.
+	if _, diags := Parse([]byte("const x = await\n")); len(diags) == 0 {
+		t.Errorf("dangling await: want a diagnostic")
+	}
+}

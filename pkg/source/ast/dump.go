@@ -73,6 +73,12 @@ func dumpFuncDecl(b *strings.Builder, d *FuncDecl) {
 	if d.Public {
 		b.WriteString("    pub\n")
 	}
+	if d.Extern {
+		b.WriteString("    extern\n")
+	}
+	if len(d.Effects) > 0 {
+		fmt.Fprintf(b, "    effects %s\n", strings.Join(d.Effects, " "))
+	}
 	fmt.Fprintf(b, "    name %q\n", d.Name)
 	for _, p := range d.Params {
 		fmt.Fprintf(b, "    param %s: %s\n", p.Name, dumpType(p.Type))
@@ -147,6 +153,8 @@ func dumpExpr(e Expr) string {
 			parts = append(parts, dumpExpr(a))
 		}
 		return "(" + strings.Join(parts, " ") + ")"
+	case *AwaitExpr:
+		return "(await " + dumpExpr(x.Value) + ")"
 	case *FuncLit:
 		params := make([]string, len(x.Params))
 		for i, p := range x.Params {
@@ -213,6 +221,9 @@ func dumpMethod(b *strings.Builder, m *MethodDecl) {
 	}
 	if m.Extern {
 		b.WriteString("      extern\n")
+	}
+	if len(m.Effects) > 0 {
+		fmt.Fprintf(b, "      effects %s\n", strings.Join(m.Effects, " "))
 	}
 	for _, p := range m.Params {
 		fmt.Fprintf(b, "      param %s: %s\n", p.Name, dumpType(p.Type))

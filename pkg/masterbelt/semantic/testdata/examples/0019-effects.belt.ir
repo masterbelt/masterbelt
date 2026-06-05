@@ -5,17 +5,22 @@ Module
     eval 42
   TypeDef "Client" pub
     body { base: string }
-    method "" pub
-      result invalid
-    method "get"
+    method "get" pub
       param path: string
       result string | error
       return <none>
-      expr <none>
-  Func "" pub
-    result invalid
-  Func "" pub
-    result invalid
+  Func "fetch"
+    param url: string
+    result string | error
+  Func "now"
+    result datetime
+  Func "pageTitle" pub
+    param url: string
+    result string | error
+      return <none>
+  Func "stamp" pub
+    result datetime
+      return now()
   Func "double" pub
     param x: int
     result int

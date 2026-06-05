@@ -205,18 +205,24 @@ func lowerAssertDecl(t cst.Tree, buf source.Buffer) *ast.AssertDecl {
 func lowerFuncDecl(t cst.Tree, buf source.Buffer) *ast.FuncDecl {
 	green, _ := t.Node()
 	var (
-		doc    []string
-		public bool
-		name   string
-		params []*ast.ParamDef
-		result ast.TypeExpr
-		body   []ast.Stmt
+		doc     []string
+		public  bool
+		extern  bool
+		effects []string
+		name    string
+		params  []*ast.ParamDef
+		result  ast.TypeExpr
+		body    []ast.Stmt
 	)
 	for _, child := range t.Children() {
 		if tok, ok := child.Token(); ok {
 			switch tok.Kind() {
 			case token.Pub:
 				public = true
+			case token.Extern:
+				extern = true
+			case token.Io, token.Async, token.Nondet:
+				effects = append(effects, child.Text(buf))
 			case token.DocComment:
 				doc = append(doc, docText(child.Text(buf)))
 			case token.Ident:
@@ -238,7 +244,7 @@ func lowerFuncDecl(t cst.Tree, buf source.Buffer) *ast.FuncDecl {
 			body = []ast.Stmt{ast.NewReturnStmt(lowerExpr(child, buf), node)}
 		}
 	}
-	return ast.NewFuncDecl(doc, public, name, params, result, body, green)
+	return ast.NewFuncDecl(doc, public, extern, effects, name, params, result, body, green)
 }
 
 // lowerTypeClause lowers a ": Type" clause to its type expression, or nil when
@@ -267,7 +273,7 @@ func lowerInitializer(t cst.Tree, buf source.Buffer) ast.Expr {
 // isExprKind reports whether a CST node kind is an expression node.
 func isExprKind(k cst.Kind) bool {
 	switch k {
-	case cst.Literal, cst.NameRef, cst.SelfExpr, cst.UnaryExpr, cst.BinaryExpr, cst.CallExpr, cst.MemberExpr, cst.CollectionLit, cst.RecordLit, cst.FuncLit, cst.ParenExpr:
+	case cst.Literal, cst.NameRef, cst.SelfExpr, cst.UnaryExpr, cst.BinaryExpr, cst.CallExpr, cst.MemberExpr, cst.CollectionLit, cst.RecordLit, cst.FuncLit, cst.ParenExpr, cst.AwaitExpr:
 		return true
 	default:
 		return false
@@ -303,6 +309,10 @@ func lowerExpr(t cst.Tree, buf source.Buffer) ast.Expr {
 		// The parentheses exist only to override precedence, which the tree
 		// shape already encodes; the grouping unwraps to its inner expression.
 		return firstOperand(t, buf)
+	case cst.AwaitExpr:
+		// await marks the suspension point; it wraps its operand rather than
+		// desugaring to a method call.
+		return ast.NewAwaitExpr(firstOperand(t, buf), node)
 	case cst.UnaryExpr:
 		// -x desugars to x.neg(): the operand is the receiver, no arguments.
 		return desugarCall(firstOperand(t, buf), unaryMethod(operatorKind(t)), nil, node)
@@ -864,18 +874,19 @@ func lowerImpl(t cst.Tree, buf source.Buffer) []*ast.MethodDecl {
 	return methods
 }
 
-// lowerMethod lowers a MethodDecl node: its modifiers, name, parameters, result
-// type, and statement body.
+// lowerMethod lowers a MethodDecl node: its modifiers, effects, name,
+// parameters, result type, and statement body.
 func lowerMethod(t cst.Tree, buf source.Buffer) *ast.MethodDecl {
 	green, _ := t.Node()
 	var (
-		doc    []string
-		public bool
-		extern bool
-		name   string
-		params []*ast.ParamDef
-		result ast.TypeExpr
-		body   []ast.Stmt
+		doc     []string
+		public  bool
+		extern  bool
+		effects []string
+		name    string
+		params  []*ast.ParamDef
+		result  ast.TypeExpr
+		body    []ast.Stmt
 	)
 	for _, child := range t.Children() {
 		if tok, ok := child.Token(); ok {
@@ -884,6 +895,8 @@ func lowerMethod(t cst.Tree, buf source.Buffer) *ast.MethodDecl {
 				public = true
 			case token.Extern:
 				extern = true
+			case token.Io, token.Async, token.Nondet:
+				effects = append(effects, child.Text(buf))
 			case token.DocComment:
 				doc = append(doc, docText(child.Text(buf)))
 			case token.Ident:
@@ -903,7 +916,7 @@ func lowerMethod(t cst.Tree, buf source.Buffer) *ast.MethodDecl {
 			result = lowerTypeExpr(child, buf)
 		}
 	}
-	return ast.NewMethodDecl(doc, public, extern, name, params, result, body, green)
+	return ast.NewMethodDecl(doc, public, extern, effects, name, params, result, body, green)
 }
 
 // lowerBlock lowers a Block node to its statements.

@@ -74,23 +74,28 @@ func NewConstDecl(doc []string, public bool, name string, typ TypeExpr, value Ex
 // Its parameters, result type, and statement body reuse the nodes a method
 // declaration is built from; an arrow body (-> Expr) is normalized at lowering
 // to a single implicit return, exactly as a function literal's is, so every
-// later layer sees one body shape.
+// later layer sees one body shape. An extern function declares a native a
+// target supplies — the root of an effect — and has no body. The effect list
+// (io, async, nondet) declares the function's interaction with the world; an
+// empty list means pure.
 type FuncDecl struct {
-	Doc    []string    // doc-comment lines ("///"), stripped of the marker
-	Public bool        // whether the declaration is marked pub
-	Name   string      // the declared identifier, or "" if missing
-	Params []*ParamDef // the parameters, each with its required annotation
-	Result TypeExpr    // the declared result type, or nil if missing
-	Body   []Stmt      // the statement body (an arrow body is one return)
-	syntax *cst.Node
+	Doc     []string    // doc-comment lines ("///"), stripped of the marker
+	Public  bool        // whether the declaration is marked pub
+	Extern  bool        // whether the declaration is marked extern (no body)
+	Effects []string    // the declared effects in source order, or nil for pure
+	Name    string      // the declared identifier, or "" if missing
+	Params  []*ParamDef // the parameters, each with its required annotation
+	Result  TypeExpr    // the declared result type, or nil if missing
+	Body    []Stmt      // the statement body (an arrow body is one return)
+	syntax  *cst.Node
 }
 
 func (d *FuncDecl) Syntax() *cst.Node { return d.syntax }
 func (d *FuncDecl) node()             {}
 
 // NewFuncDecl builds a FuncDecl node.
-func NewFuncDecl(doc []string, public bool, name string, params []*ParamDef, result TypeExpr, body []Stmt, syntax *cst.Node) *FuncDecl {
-	return &FuncDecl{Doc: doc, Public: public, Name: name, Params: params, Result: result, Body: body, syntax: syntax}
+func NewFuncDecl(doc []string, public, extern bool, effects []string, name string, params []*ParamDef, result TypeExpr, body []Stmt, syntax *cst.Node) *FuncDecl {
+	return &FuncDecl{Doc: doc, Public: public, Extern: extern, Effects: effects, Name: name, Params: params, Result: result, Body: body, syntax: syntax}
 }
 
 // AssertDecl is a compile-time assertion: an optional run of doc-comment lines

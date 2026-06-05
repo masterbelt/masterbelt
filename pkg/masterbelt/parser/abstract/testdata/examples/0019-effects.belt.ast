@@ -6,19 +6,36 @@ File
     pub
     name "Client"
     body { base: string }
-    method ""
-      pub
     method "get"
+      pub
+      effects io async
       param path: string
       result string | error
-      return <missing>
-      expr (call Identifier "fetch" (call (. (. self base) add) Identifier "path"))
+      return (await (call Identifier "fetch" (call (. (. self base) add) Identifier "path")))
+  FuncDecl
+    extern
+    effects io async
+    name "fetch"
+    param url: string
+    result string | error
+  FuncDecl
+    extern
+    effects nondet
+    name "now"
+    result datetime
   FuncDecl
     pub
-    name ""
+    effects io async
+    name "pageTitle"
+    param url: string
+    result string | error
+      return (await (call Identifier "fetch" Identifier "url"))
   FuncDecl
     pub
-    name ""
+    effects nondet
+    name "stamp"
+    result datetime
+      return (call Identifier "now")
   FuncDecl
     pub
     name "double"

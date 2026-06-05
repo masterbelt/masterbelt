@@ -8,7 +8,8 @@
 //	TypeDecl      := [pub] type Ident [GenericParams] "=" TypeExpr [WhereClause] [ImplBlock]
 //	UseDecl       := [pub] use UseTarget from String
 //	AssertDecl    := assert Expr
-//	FuncDecl      := [pub] fn Ident ParamList ":" TypeExpr ( Block | "->" Expr )
+//	FuncDecl      := [pub] [extern] fn Effect* Ident ParamList ":" TypeExpr ( Block | "->" Expr )
+//	Effect        := io | async | nondet
 //	UseTarget     := Ident | UseList | "*"
 //	UseList       := "{" Ident ( "," Ident )* "}"
 //	GenericParams := "<" GenericParam ( "," GenericParam )* ">"
@@ -24,7 +25,7 @@
 //	Field         := Ident ":" TypeExpr
 //	FuncType      := fn ParamList ":" TypeExpr
 //	ImplBlock     := impl "{" MethodDecl* "}"
-//	MethodDecl    := [pub] [extern] [fn] Ident ParamList ":" TypeExpr [Block]
+//	MethodDecl    := [pub] [extern] [fn] Effect* Ident ParamList ":" TypeExpr [Block]
 //	ParamList     := "(" [ Param ( "," Param )* ] ")"
 //	Param         := Ident ":" TypeExpr
 //	Block         := "{" Stmt* "}"
@@ -36,7 +37,8 @@
 //	CmpExpr       := AddExpr ( ( "==" | "!=" | "<" | "<=" | ">" | ">=" ) AddExpr )*
 //	AddExpr       := MulExpr ( ( "+" | "-" ) MulExpr )*
 //	MulExpr       := Unary ( ( "*" | "/" | "%" ) Unary )*
-//	Unary         := ( "+" | "-" | "!" ) Unary | Postfix
+//	Unary         := ( "+" | "-" | "!" ) Unary | AwaitExpr | Postfix
+//	AwaitExpr     := await Unary
 //	Postfix       := Operand ( "." Ident | "(" [ Expr ( "," Expr )* ] ")" )*
 //	Operand       := Literal | CollectionLit | RecordLit | NameRef | "self" | FuncLit | ParenExpr
 //	ParenExpr     := "(" Expr ")"
@@ -192,7 +194,7 @@ func (p *parser) nextChildren() (batch []cst.Green, done bool) {
 	case p.atEOF():
 		lead = append(lead, p.bump()) // the EOF leaf
 		return lead, true
-	case p.kind() == token.Pub || p.kind() == token.Const || p.kind() == token.Type || p.kind() == token.Use:
+	case p.kind() == token.Pub || p.kind() == token.Const || p.kind() == token.Type || p.kind() == token.Use || p.kind() == token.Extern:
 		switch p.declKind() {
 		case token.Type:
 			return []cst.Green{p.parseTypeDecl(lead)}, false
@@ -202,6 +204,13 @@ func (p *parser) nextChildren() (batch []cst.Green, done bool) {
 			// pub fn — declaration intent even when the name is missing; the
 			// function parser reports the absent name.
 			return []cst.Green{p.parseFuncDecl(lead)}, false
+		case token.Extern:
+			// extern declares a function only when fn follows; anything else
+			// is a stray run the error node captures losslessly.
+			if p.externBeginsFunc() {
+				return []cst.Green{p.parseFuncDecl(lead)}, false
+			}
+			return []cst.Green{p.parseError(lead)}, false
 		default:
 			return []cst.Green{p.parseConstDecl(lead)}, false
 		}
@@ -219,14 +228,29 @@ func (p *parser) nextChildren() (batch []cst.Green, done bool) {
 }
 
 // fnBeginsDecl reports whether the fn keyword at token index i begins a
-// function declaration — i.e. an identifier follows it (fn name(...)). A bare
-// fn begins a function literal or a function type, never a declaration.
+// function declaration — i.e. an identifier follows it (fn name(...)),
+// possibly after an effect list (fn io async name(...)). A bare fn begins a
+// function literal or a function type, never a declaration.
 func (p *parser) fnBeginsDecl(i int) bool {
 	i++
-	for isTrivia(p.toks[i].Kind) {
+	for isTrivia(p.toks[i].Kind) || p.toks[i].Kind.Effect() {
 		i++
 	}
 	return p.toks[i].Kind == token.Ident
+}
+
+// externBeginsFunc reports whether the construct at the cursor — an optional
+// pub, then extern — is followed by fn, i.e. begins an extern function
+// declaration.
+func (p *parser) externBeginsFunc() bool {
+	i := p.nextSignificantIndex(p.pos)
+	if p.toks[i].Kind == token.Pub {
+		i = p.nextSignificantIndex(i + 1)
+	}
+	if p.toks[i].Kind != token.Extern {
+		return false
+	}
+	return p.toks[p.nextSignificantIndex(i+1)].Kind == token.Fn
 }
 
 // nextSignificantIndex returns the index of the next non-trivia token at or
@@ -267,7 +291,7 @@ func (p *parser) parseError(lead []cst.Green) *cst.Node {
 	reported := false
 	for {
 		switch p.peekSignificant() {
-		case token.EOF, token.Pub, token.Const, token.Type, token.Use, token.Assert:
+		case token.EOF, token.Pub, token.Const, token.Type, token.Use, token.Assert, token.Extern:
 			return cst.NewNode(cst.Error, children)
 		case token.Fn:
 			// fn stops the error run only as a declaration (fn name); a bare

@@ -176,26 +176,29 @@ func NewParamDef(name string, typ TypeExpr, syntax *cst.Node) *ParamDef {
 
 // --- methods and statements -------------------------------------------------
 
-// MethodDecl is a method of an impl block: its modifiers, name, parameters,
-// result type, and body. An extern method has no body (Body is nil); its
-// implementation is a native intrinsic.
+// MethodDecl is a method of an impl block: its modifiers, effects, name,
+// parameters, result type, and body. An extern method has no body (Body is
+// nil); its implementation is a native intrinsic. The effect list (io, async,
+// nondet) declares the method's interaction with the world; an empty list
+// means pure.
 type MethodDecl struct {
-	Doc    []string
-	Public bool
-	Extern bool
-	Name   string
-	Params []*ParamDef
-	Result TypeExpr
-	Body   []Stmt // the statement body, or nil for an extern method
-	syntax *cst.Node
+	Doc     []string
+	Public  bool
+	Extern  bool
+	Effects []string // the declared effects in source order, or nil for pure
+	Name    string
+	Params  []*ParamDef
+	Result  TypeExpr
+	Body    []Stmt // the statement body, or nil for an extern method
+	syntax  *cst.Node
 }
 
 func (m *MethodDecl) Syntax() *cst.Node { return m.syntax }
 func (m *MethodDecl) node()             {}
 
 // NewMethodDecl builds a MethodDecl node.
-func NewMethodDecl(doc []string, public, extern bool, name string, params []*ParamDef, result TypeExpr, body []Stmt, syntax *cst.Node) *MethodDecl {
-	return &MethodDecl{Doc: doc, Public: public, Extern: extern, Name: name, Params: params, Result: result, Body: body, syntax: syntax}
+func NewMethodDecl(doc []string, public, extern bool, effects []string, name string, params []*ParamDef, result TypeExpr, body []Stmt, syntax *cst.Node) *MethodDecl {
+	return &MethodDecl{Doc: doc, Public: public, Extern: extern, Effects: effects, Name: name, Params: params, Result: result, Body: body, syntax: syntax}
 }
 
 // Stmt is a statement inside a method body: a return (ReturnStmt) or a bare
