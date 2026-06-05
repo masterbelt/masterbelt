@@ -1,0 +1,35 @@
+// The ternary "?:" is the value form of a two-way choice: cond ? a : b folds to
+// a when the condition holds and to b otherwise. Unlike if (E-9, a statement that
+// drives control flow by returning), the ternary is an expression — it yields a
+// value, so it appears wherever a value is wanted (a const initializer, a method
+// body's return). The condition must be a bool and the two branches must share a
+// type; the result is that shared type.
+
+// The condition is an ordinary boolean expression; the branches are values.
+const Bigger = 3 > 2 ? 10 : 20
+const Label  = 7 > 100 ? "high" : "low"
+
+// The branches unify the way a collection's elements do — an int branch beside a
+// default-int literal stays int.
+pub type Level = int8 impl {
+  pub const Max = 100
+}
+const Capped: Level = Level.Max > 50 ? Level.Max : 0
+
+// The ternary nests right: a ? b : c ? d : e parses as a ? b : (c ? d : e), so a
+// clamp reads as a chain of two-way choices. Parentheses are unnecessary but make
+// the grouping explicit.
+const Clamp = 150 < 0 ? 0 : (150 > 100 ? 100 : 150)
+
+// A ternary is a value, so it composes with the operators around it: the whole
+// choice is one operand of the addition.
+const Score = (3 > 2 ? 1 : 0) + 5
+
+// In a method body the ternary returns its value directly — the value form of the
+// if/else a sign check would otherwise need.
+pub type Temp = int32 impl {
+  /// -1, 0, or 1 by sign.
+  pub sign(): int32 {
+    return self > 0 ? 1 : (self < 0 ? -1 : 0)
+  }
+}

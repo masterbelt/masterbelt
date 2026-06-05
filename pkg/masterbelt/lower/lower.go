@@ -98,6 +98,11 @@ func Value(e ast.Expr, b Binder) ir.Value {
 		// await wraps its operand: it marks the suspension point, adding
 		// nothing to the value.
 		return &ir.Await{Value: Value(e.Value, b)}
+	case *ast.TernaryExpr:
+		// cond ? then : else: the three operands lower as ordinary values; the
+		// choice between the branches is the runtime's (and the folder's), so the
+		// node carries both.
+		return &ir.Ternary{Cond: Value(e.Cond, b), Then: Value(e.Then, b), Else: Value(e.Else, b)}
 	case *ast.FuncLit:
 		// The body lowers in a binder that binds the literal's parameters; its
 		// own parameter values are supplied at evaluation, not here.

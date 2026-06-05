@@ -36,7 +36,7 @@ func (p *parser) parseStmt() cst.Green {
 	case p.kind() == token.If:
 		return p.parseIfStmt()
 	case startsExpr(p.kind()):
-		return p.parseExpr(precLowest)
+		return p.parseExpr()
 	default:
 		p.report(newUnexpectedTokenDiagnostic(p.cur().Offset, p.cur().Width, p.kind().String()))
 		return p.bump()
@@ -59,7 +59,7 @@ func (p *parser) parseIfStmt() *cst.Node {
 		// it with the record-literal reading suppressed, exactly as a switch's
 		// scrutinee does (the restriction Rust and Go put on an if condition).
 		p.noRecordLit = true
-		children = append(children, p.parseExpr(precLowest))
+		children = append(children, p.parseExpr())
 		p.noRecordLit = false
 	} else {
 		p.report(newExpectedExpressionDiagnostic(p.lastStart, 0))
@@ -104,7 +104,7 @@ func (p *parser) parseSwitchStmt() *cst.Node {
 		// it with the record-literal reading suppressed (a parenthesized
 		// scrutinee re-enables it inside the parens).
 		p.noRecordLit = true
-		children = append(children, p.parseExpr(precLowest))
+		children = append(children, p.parseExpr())
 		p.noRecordLit = false
 	} else {
 		p.report(newExpectedExpressionDiagnostic(p.lastStart, 0))
@@ -153,7 +153,7 @@ func (p *parser) parseSwitchArm() *cst.Node {
 		p.report(newExpectedExpressionDiagnostic(p.cur().Offset, 0))
 		return cst.NewNode(cst.SwitchArm, []cst.Green{p.bump()})
 	}
-	children = append(children, p.parseExpr(precLowest))
+	children = append(children, p.parseExpr())
 	// Comma-separated value patterns. Every comma before "->" is a value
 	// separator: the arm-separator comma only appears after the body. A comma
 	// not followed by another expression is recovery (a trailing one), so the
@@ -165,7 +165,7 @@ func (p *parser) parseSwitchArm() *cst.Node {
 			break
 		}
 		p.skipTrivia(&children)
-		children = append(children, p.parseExpr(precLowest))
+		children = append(children, p.parseExpr())
 	}
 	if p.peekSignificant() != token.Arrow {
 		p.report(newUnexpectedTokenDiagnostic(p.cur().Offset, p.cur().Width, p.kind().String()))
@@ -197,18 +197,37 @@ func (p *parser) parseReturnStmt() *cst.Node {
 	children := []cst.Green{p.bump()} // "return"
 	if startsExpr(p.peekSignificant()) {
 		p.skipTrivia(&children)
-		children = append(children, p.parseExpr(precLowest))
+		children = append(children, p.parseExpr())
 	} else {
 		p.report(newExpectedExpressionDiagnostic(p.lastStart, 0))
 	}
 	return cst.NewNode(cst.ReturnStmt, children)
 }
 
-// parseExpr parses an expression whose operators bind at least as tightly as
-// minPrec, by precedence climbing. The cursor sits on the first significant
+// parseExpr parses a whole expression. The cursor sits on the first significant
 // token of the expression. It returns the single green node for the whole
-// expression — a Literal/NameRef for an atom, or a BinaryExpr/UnaryExpr tree.
-func (p *parser) parseExpr(minPrec int) cst.Green {
+// expression — a Literal/NameRef for an atom, or a BinaryExpr/UnaryExpr/
+// TernaryExpr tree.
+//
+// The ternary "?:" binds looser than every binary operator, so it is read here,
+// after the binary climb: a "?" following the binary expression opens the
+// conditional, whose then/else are themselves full expressions — which makes it
+// right-associative (a ? b : c ? d : e groups as a ? b : (c ? d : e)). A "?"
+// that surfaces inside the binary climb (the right operand of "+", say) is left
+// for this level, so a > b ? a : b is (a > b) ? a : b.
+func (p *parser) parseExpr() cst.Green {
+	left := p.parseBinary(precLowest)
+	if p.peekSignificant() == token.Question {
+		return p.parseTernaryTail(left)
+	}
+	return left
+}
+
+// parseBinary parses the binary-operator layer by precedence climbing: an
+// operand (parseUnary) followed by any run of operators binding at least as
+// tightly as minPrec. It is the core parseExpr drives, leaving the looser
+// ternary to its caller.
+func (p *parser) parseBinary(minPrec int) cst.Green {
 	left := p.parseUnary()
 	for {
 		prec, ok := binaryPrec[p.peekSignificant()]
@@ -221,12 +240,42 @@ func (p *parser) parseExpr(minPrec int) cst.Green {
 		children = append(children, p.bump())
 		if startsExpr(p.peekSignificant()) {
 			p.skipTrivia(&children)
-			children = append(children, p.parseExpr(prec+1)) // prec+1 ⇒ left-associative
+			children = append(children, p.parseBinary(prec+1)) // prec+1 ⇒ left-associative
 		} else {
 			p.report(newExpectedOperandDiagnostic(p.lastStart, 0, op.Kind.Symbol()))
 		}
 		left = cst.NewNode(cst.BinaryExpr, children)
 	}
+}
+
+// parseTernaryTail completes a ternary from its already-parsed condition: it
+// consumes "?", parses the then-branch, expects ":", and parses the else-branch.
+// Both branches are full expressions (parseExpr), so a chained ternary nests on
+// the right. The cursor sits on "?". A missing branch or ":" is reported,
+// leaving the node with what was parsed so recovery stays local.
+func (p *parser) parseTernaryTail(cond cst.Green) cst.Green {
+	children := []cst.Green{cond}
+	p.skipTrivia(&children)
+	children = append(children, p.bump()) // "?"
+	if startsExpr(p.peekSignificant()) {
+		p.skipTrivia(&children)
+		children = append(children, p.parseExpr()) // the then-branch
+	} else {
+		p.report(newExpectedExpressionDiagnostic(p.lastStart, 0))
+	}
+	if p.peekSignificant() != token.Colon {
+		p.report(newUnexpectedTokenDiagnostic(p.cur().Offset, p.cur().Width, p.kind().String()))
+		return cst.NewNode(cst.TernaryExpr, children)
+	}
+	p.skipTrivia(&children)
+	children = append(children, p.bump()) // ":"
+	if startsExpr(p.peekSignificant()) {
+		p.skipTrivia(&children)
+		children = append(children, p.parseExpr()) // the else-branch (right-associative)
+	} else {
+		p.report(newExpectedExpressionDiagnostic(p.lastStart, 0))
+	}
+	return cst.NewNode(cst.TernaryExpr, children)
 }
 
 // parseUnary parses a chain of prefix operators ending in a postfix expression,
@@ -297,7 +346,7 @@ func (p *parser) parseCallArgs(children *[]cst.Green) {
 		if startsExpr(p.peekSignificant()) {
 			for {
 				p.skipTrivia(children)
-				*children = append(*children, p.parseExpr(precLowest))
+				*children = append(*children, p.parseExpr())
 				if p.peekSignificant() == token.Comma {
 					p.skipTrivia(children)
 					*children = append(*children, p.bump()) // ","
@@ -423,7 +472,7 @@ func (p *parser) parseRecordField() *cst.Node {
 	children = append(children, p.bump()) // ":"
 	if startsExpr(p.peekSignificant()) {
 		p.skipTrivia(&children)
-		children = append(children, p.parseExpr(precLowest))
+		children = append(children, p.parseExpr())
 	} else {
 		p.report(newExpectedExpressionDiagnostic(p.lastStart, 0))
 	}
@@ -438,7 +487,7 @@ func (p *parser) parseParenExpr() *cst.Node {
 	p.bracketed(func() {
 		if startsExpr(p.peekSignificant()) {
 			p.skipTrivia(&children)
-			children = append(children, p.parseExpr(precLowest))
+			children = append(children, p.parseExpr())
 		} else {
 			p.report(newExpectedExpressionDiagnostic(p.lastStart, 0))
 		}
@@ -494,7 +543,7 @@ func (p *parser) parseFuncLit() *cst.Node {
 			children = append(children, p.parseBlock())
 		case startsExpr(p.peekSignificant()):
 			p.skipTrivia(&children)
-			children = append(children, p.parseExpr(precLowest))
+			children = append(children, p.parseExpr())
 		default:
 			p.report(newExpectedExpressionDiagnostic(p.lastStart, 0))
 		}
@@ -526,7 +575,7 @@ func (p *parser) parseCollectionLiteral() *cst.Node {
 			return
 		}
 		p.skipTrivia(&children)
-		first := p.parseExpr(precLowest)
+		first := p.parseExpr()
 		if p.peekSignificant() == token.Colon {
 			node = p.parseMapRest(children, first)
 			return
@@ -547,7 +596,7 @@ func (p *parser) parseListRest(children []cst.Green, first cst.Green) *cst.Node 
 			break // a trailing comma, or recovery
 		}
 		p.skipTrivia(&children)
-		children = append(children, p.parseExpr(precLowest))
+		children = append(children, p.parseExpr())
 	}
 	p.closeBracket(&children)
 	return cst.NewNode(cst.CollectionLit, children)
@@ -565,7 +614,7 @@ func (p *parser) parseMapRest(children []cst.Green, firstKey cst.Green) *cst.Nod
 			break // a trailing comma, or recovery
 		}
 		p.skipTrivia(&children)
-		children = append(children, p.finishMapEntry(p.parseExpr(precLowest)))
+		children = append(children, p.finishMapEntry(p.parseExpr()))
 	}
 	p.closeBracket(&children)
 	return cst.NewNode(cst.CollectionLit, children)
@@ -586,7 +635,7 @@ func (p *parser) finishMapEntry(key cst.Green) *cst.Node {
 	entry = append(entry, p.bump()) // ":"
 	if startsExpr(p.peekSignificant()) {
 		p.skipTrivia(&entry)
-		entry = append(entry, p.parseExpr(precLowest))
+		entry = append(entry, p.parseExpr())
 	} else {
 		p.report(newExpectedExpressionDiagnostic(p.lastStart, 0))
 	}

@@ -57,6 +57,7 @@ const (
 
 	// Operators and punctuation.
 	Colon    // :
+	Question // ?
 	Assign   // =
 	Plus     // +
 	Minus    // -
@@ -126,6 +127,7 @@ var kindNames = [...]string{
 	If:           "If",
 	Else:         "Else",
 	Colon:        "Colon",
+	Question:     "Question",
 	Assign:       "Assign",
 	Plus:         "Plus",
 	Minus:        "Minus",
@@ -170,6 +172,7 @@ func (k Kind) String() string {
 // available to tooling such as the editor grammar generator.
 var spelling = map[Kind]string{
 	Colon:    ":",
+	Question: "?",
 	Assign:   "=",
 	Plus:     "+",
 	Minus:    "-",

@@ -29,6 +29,12 @@ type Sink struct {
 	// node is the offending expression — or, for a function-literal parameter
 	// whose annotation conflicts with the pushed-down type, the parameter.
 	Mismatch func(node ast.Node, got, want ir.Type)
+	// TernaryCondNotBool fires at a ternary whose condition does not type as a
+	// bool, with the condition's type.
+	TernaryCondNotBool func(cond ast.Expr, got ir.Type)
+	// TernaryBranchMismatch fires at a ternary whose two branches have types that
+	// do not unify, with the two branch types. The node is the ternary.
+	TernaryBranchMismatch func(node ast.Node, then, els ir.Type)
 	// Checked fires for every (expression, expected-type) pair the checking
 	// walk visits, so the semantic layer can hook value-range (Fits) checks
 	// without this package depending on eval.
@@ -95,6 +101,18 @@ func (s *Sink) ambiguousOverload(node ast.Node, method, operands string) {
 func (s *Sink) mismatch(node ast.Node, got, want ir.Type) {
 	if s != nil && s.Mismatch != nil {
 		s.Mismatch(node, got, want)
+	}
+}
+
+func (s *Sink) ternaryCondNotBool(cond ast.Expr, got ir.Type) {
+	if s != nil && s.TernaryCondNotBool != nil {
+		s.TernaryCondNotBool(cond, got)
+	}
+}
+
+func (s *Sink) ternaryBranchMismatch(node ast.Node, then, els ir.Type) {
+	if s != nil && s.TernaryBranchMismatch != nil {
+		s.TernaryBranchMismatch(node, then, els)
 	}
 }
 

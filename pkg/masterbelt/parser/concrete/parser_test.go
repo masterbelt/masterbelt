@@ -415,6 +415,54 @@ func TestParseExpressionShape(t *testing.T) {
 	}
 }
 
+// TestParseTernary checks the conditional value expression: its low precedence
+// (binds looser than every binary operator), its right-associative nesting, and
+// that the ":" in a map entry is not mistaken for a ternary branch separator.
+func TestParseTernary(t *testing.T) {
+	cases := []struct{ src, want string }{
+		// The condition is a full binary expression; the ternary wraps it.
+		{"const x = a ? b : c\n", "(a ? b : c)"},
+		{"const x = a > b ? a : b\n", "((a > b) ? a : b)"}, // ?: binds looser than >
+		{"const x = a + b ? c : d\n", "((a + b) ? c : d)"}, // looser than + too
+		// Right-associative: the else-branch is itself a ternary.
+		{"const x = a ? b : c ? d : e\n", "(a ? b : (c ? d : e))"},
+		// The branches are full expressions, operators and all.
+		{"const x = a ? b + 1 : c * 2\n", "(a ? (b + 1) : (c * 2))"},
+	}
+	for _, tc := range cases {
+		buf, e := initExpr(t, tc.src)
+		if got := exprSexpr(buf, e); got != tc.want {
+			t.Errorf("%q: shape = %s, want %s", tc.src, got, tc.want)
+		}
+		if _, diags := Parse([]byte(tc.src)); len(diags) != 0 {
+			t.Errorf("%q: unexpected diagnostics: %v", tc.src, diags)
+		}
+	}
+
+	// The ":" inside a list still separates a map key from its value, even when a
+	// branch of the entry is a ternary: a ternary consumes its own ":", so the
+	// remaining top-level ":" is the map separator.
+	t.Run("map entry beside a ternary value", func(t *testing.T) {
+		_, e := initExpr(t, "const x = [\"k\": a ? b : c]\n")
+		if k, ok := e.Kind(); !ok || k != cst.CollectionLit {
+			t.Fatalf("initializer kind = %v, want CollectionLit", k)
+		}
+		got := collectionChildKinds(e)
+		if len(got) != 1 || got[0] != cst.MapEntry {
+			t.Fatalf("child nodes = %v, want [MapEntry]", got)
+		}
+	})
+
+	// A missing else-branch is reported but the node still round-trips losslessly.
+	t.Run("missing else branch", func(t *testing.T) {
+		_, diags := Parse([]byte("const x = a ? b\n"))
+		if len(diags) == 0 {
+			t.Fatal("expected a diagnostic for the missing : branch")
+		}
+		assertLossless(t, "const x = a ? b\n")
+	})
+}
+
 // collectionChildKinds returns the kinds of a CollectionLit's direct child
 // nodes (skipping the bracket/comma/colon leaves and trivia).
 func collectionChildKinds(t cst.Tree) []cst.Kind {

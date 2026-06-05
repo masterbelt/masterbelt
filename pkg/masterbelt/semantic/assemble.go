@@ -41,6 +41,14 @@ func exprSink(at func(ast.Node) span, diags *diagnostic.List) *infer.Sink {
 			s := at(node)
 			diags.Add(newTypeMismatchDiagnostic(s.offset, s.width, got.String(), want.String()))
 		},
+		TernaryCondNotBool: func(cond ast.Expr, got ir.Type) {
+			s := at(cond)
+			diags.Add(newTernaryConditionNotBoolDiagnostic(s.offset, s.width, got.String()))
+		},
+		TernaryBranchMismatch: func(node ast.Node, then, els ir.Type) {
+			s := at(node)
+			diags.Add(newTernaryBranchMismatchDiagnostic(s.offset, s.width, then.String(), els.String()))
+		},
 		ArityMismatch: func(lit *ast.FuncLit, got, want int) {
 			s := at(lit)
 			diags.Add(newLambdaArityMismatchDiagnostic(s.offset, s.width, got, want))

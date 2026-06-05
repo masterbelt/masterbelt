@@ -78,6 +78,8 @@ func (l *Lexer) Next() token.Token {
 		return l.scanString(start)
 	case c == ':':
 		return l.scanFixed(start, 1, token.Colon)
+	case c == '?':
+		return l.scanFixed(start, 1, token.Question)
 	case c == '(':
 		return l.scanFixed(start, 1, token.LParen)
 	case c == ')':

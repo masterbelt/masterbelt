@@ -17,7 +17,7 @@ import (
 // isExprKind reports whether a CST node kind is an expression node.
 func isExprKind(k cst.Kind) bool {
 	switch k {
-	case cst.Literal, cst.NameRef, cst.SelfExpr, cst.UnaryExpr, cst.BinaryExpr, cst.CallExpr, cst.MemberExpr, cst.CollectionLit, cst.RecordLit, cst.FuncLit, cst.ParenExpr, cst.AwaitExpr:
+	case cst.Literal, cst.NameRef, cst.SelfExpr, cst.UnaryExpr, cst.BinaryExpr, cst.TernaryExpr, cst.CallExpr, cst.MemberExpr, cst.CollectionLit, cst.RecordLit, cst.FuncLit, cst.ParenExpr, cst.AwaitExpr:
 		return true
 	default:
 		return false
@@ -57,6 +57,13 @@ func lowerExpr(t cst.Tree, buf source.Buffer) ast.Expr {
 		// await marks the suspension point; it wraps its operand rather than
 		// desugaring to a method call.
 		return ast.NewAwaitExpr(firstOperand(t, buf), node)
+	case cst.TernaryExpr:
+		// cond ? then : else keeps its own node rather than desugaring: only the
+		// taken branch is evaluated, which a uniform call could not express. The
+		// three expression children are the condition, then-branch, and
+		// else-branch in order; any is nil when the source omitted it.
+		cond, then, els := threeOperands(t, buf)
+		return ast.NewTernaryExpr(cond, then, els, node)
 	case cst.UnaryExpr:
 		// -x desugars to x.neg(): the operand is the receiver, no arguments.
 		return desugarCall(firstOperand(t, buf), unaryMethod(operatorKind(t)), nil, node)

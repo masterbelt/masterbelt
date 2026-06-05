@@ -264,6 +264,29 @@ func NewAwaitExpr(value Expr, syntax *cst.Node) *AwaitExpr {
 	return &AwaitExpr{Value: value, syntax: syntax}
 }
 
+// TernaryExpr is a conditional value expression, cond ? then : else: it yields
+// Then when Cond holds and Else otherwise. Unlike an if (a statement, which
+// drives control flow by returning), the ternary is an expression — it produces
+// a value, so it appears wherever a value is wanted. It is kept as its own node
+// rather than desugared to a method call: only the taken branch is evaluated, a
+// laziness a uniform call could not express. Any of the three is nil when the
+// source omitted it and the parser recovered.
+type TernaryExpr struct {
+	Cond   Expr // the boolean condition
+	Then   Expr // the value when the condition holds
+	Else   Expr // the value otherwise
+	syntax *cst.Node
+}
+
+func (t *TernaryExpr) Syntax() *cst.Node { return t.syntax }
+func (t *TernaryExpr) node()             {}
+func (t *TernaryExpr) expr()             {}
+
+// NewTernaryExpr builds a TernaryExpr node.
+func NewTernaryExpr(cond, then, els Expr, syntax *cst.Node) *TernaryExpr {
+	return &TernaryExpr{Cond: cond, Then: then, Else: els, syntax: syntax}
+}
+
 // FuncLit is a function-literal expression: fn(Params): Result { Body }. It is
 // the value form of a FuncType (it carries a statement body) and the only way to
 // construct a value of a function type. Its Params, Result, and Body reuse the
@@ -308,6 +331,10 @@ func WalkExprs(e Expr, fn func(Expr) bool) {
 		}
 	case *AwaitExpr:
 		WalkExprs(e.Value, fn)
+	case *TernaryExpr:
+		WalkExprs(e.Cond, fn)
+		WalkExprs(e.Then, fn)
+		WalkExprs(e.Else, fn)
 	case *CollectionLit:
 		for _, entry := range e.Entries {
 			if entry.Key != nil {

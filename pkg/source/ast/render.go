@@ -66,10 +66,13 @@ var binaryOps = map[string]struct {
 // unaryOps maps each prefix operator method to its surface spelling.
 var unaryOps = map[string]string{"pos": "+", "neg": "-", "not": "!"}
 
-// A prefix operator binds tighter than any binary operator, and a postfix
-// member access or call tighter still — an operator-formed receiver needs the
-// grouping parentheses there.
+// The ternary "?:" binds looser than every binary operator (precedence 0,
+// below "||"'s 1), so it parenthesizes when it sits inside any of them. A prefix
+// operator binds tighter than any binary operator, and a postfix member access
+// or call tighter still — an operator-formed receiver needs the grouping
+// parentheses there.
 const (
+	precTernary = 0
 	precUnary   = 6
 	precPostfix = 7
 )
@@ -167,6 +170,25 @@ func (r *renderer) expr(e Expr, min int) {
 		r.anchor(x)
 		r.str("await ")
 		r.expr(x.Value, precUnary)
+		if paren {
+			r.str(")")
+		}
+	case *TernaryExpr:
+		// The ternary binds loosest and nests on the right: the condition and the
+		// then-branch render one level tighter (so a nested ternary there is
+		// parenthesized), while the else-branch renders at the ternary level — a
+		// chained a ? b : c ? d : e needs no parentheses around its tail.
+		paren := precTernary < min
+		if paren {
+			r.str("(")
+		}
+		r.expr(x.Cond, precTernary+1)
+		r.str(" ")
+		r.anchor(x)
+		r.str("? ")
+		r.expr(x.Then, precTernary+1)
+		r.str(" : ")
+		r.expr(x.Else, precTernary)
 		if paren {
 			r.str(")")
 		}

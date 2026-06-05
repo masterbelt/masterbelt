@@ -196,7 +196,9 @@ func classifyToken(kind token.Kind, parent cst.Kind, calleeMember bool) (tokenTy
 		return stNumber, 0, true
 	case token.String:
 		return stString, 0, true
-	case token.Colon, token.Assign, token.Arrow:
+	case token.Colon, token.Assign, token.Arrow, token.Question:
+		// The ternary "?" colours as an operator; its ":" is the same Colon token
+		// a type clause uses, already covered above.
 		return stOperator, 0, true
 	case token.Ident:
 		switch parent {

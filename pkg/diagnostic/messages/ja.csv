@@ -68,6 +68,8 @@ masterbelt.semantic.duplicate_switch_arm,switch の arm が重複しています
 masterbelt.semantic.arm_value_type_mismatch,{actual} を {expected} の switch 値として使用できません
 masterbelt.semantic.unreachable_arm,到達不能な arm です。先行する arm かワイルドカードがすべての値に一致します
 masterbelt.semantic.condition_not_bool,if の条件は bool でなければなりません({typ})
+masterbelt.semantic.ternary_condition_not_bool,三項演算子の条件は bool でなければなりません({typ})
+masterbelt.semantic.ternary_branch_mismatch,三項演算子の両枝の型が一致しません: {then} と {els}
 project.config.missing,masterbelt.toml がこのディレクトリにも親ディレクトリにも見つかりません
 project.config.invalid,不正な masterbelt.toml: {detail}
 project.config.missing_entry,masterbelt.toml に entry が指定されていません

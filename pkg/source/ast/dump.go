@@ -158,6 +158,8 @@ func dumpExpr(e Expr) string {
 		return "(" + strings.Join(parts, " ") + ")"
 	case *AwaitExpr:
 		return "(await " + dumpExpr(x.Value) + ")"
+	case *TernaryExpr:
+		return "(? " + dumpExpr(x.Cond) + " " + dumpExpr(x.Then) + " " + dumpExpr(x.Else) + ")"
 	case *FuncLit:
 		params := make([]string, len(x.Params))
 		for i, p := range x.Params {

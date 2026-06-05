@@ -9,56 +9,58 @@ import (
 )
 
 const (
-	CodeAmbiguousFuncOverload  diagnostic.Code = "masterbelt.semantic.ambiguous_func_overload"
-	CodeAmbiguousImport        diagnostic.Code = "masterbelt.semantic.ambiguous_import"
-	CodeAmbiguousOverload      diagnostic.Code = "masterbelt.semantic.ambiguous_overload"
-	CodeArityMismatch          diagnostic.Code = "masterbelt.semantic.arity_mismatch"
-	CodeArmValueTypeMismatch   diagnostic.Code = "masterbelt.semantic.arm_value_type_mismatch"
-	CodeAssertionFailed        diagnostic.Code = "masterbelt.semantic.assertion_failed"
-	CodeAssertionNotBool       diagnostic.Code = "masterbelt.semantic.assertion_not_bool"
-	CodeAssertionNotConstant   diagnostic.Code = "masterbelt.semantic.assertion_not_constant"
-	CodeConditionNotBool       diagnostic.Code = "masterbelt.semantic.condition_not_bool"
-	CodeConstantOverflow       diagnostic.Code = "masterbelt.semantic.constant_overflow"
-	CodeCyclicModule           diagnostic.Code = "masterbelt.semantic.cyclic_module"
-	CodeCyclicReference        diagnostic.Code = "masterbelt.semantic.cyclic_reference"
-	CodeDivisionByZero         diagnostic.Code = "masterbelt.semantic.division_by_zero"
-	CodeDuplicateDeclaration   diagnostic.Code = "masterbelt.semantic.duplicate_declaration"
-	CodeDuplicateEnumMember    diagnostic.Code = "masterbelt.semantic.duplicate_enum_member"
-	CodeDuplicateEnumValue     diagnostic.Code = "masterbelt.semantic.duplicate_enum_value"
-	CodeDuplicateFuncOverload  diagnostic.Code = "masterbelt.semantic.duplicate_func_overload"
-	CodeDuplicateOverload      diagnostic.Code = "masterbelt.semantic.duplicate_overload"
-	CodeDuplicateSwitchArm     diagnostic.Code = "masterbelt.semantic.duplicate_switch_arm"
-	CodeEffectInPureContext    diagnostic.Code = "masterbelt.semantic.effect_in_pure_context"
-	CodeInvalidEnumBaseType    diagnostic.Code = "masterbelt.semantic.invalid_enum_base_type"
-	CodeInvalidOperation       diagnostic.Code = "masterbelt.semantic.invalid_operation"
-	CodeLambdaArityMismatch    diagnostic.Code = "masterbelt.semantic.lambda_arity_mismatch"
-	CodeMissingEffect          diagnostic.Code = "masterbelt.semantic.missing_effect"
-	CodeMissingField           diagnostic.Code = "masterbelt.semantic.missing_field"
-	CodeMissingReturn          diagnostic.Code = "masterbelt.semantic.missing_return"
-	CodeNoBound                diagnostic.Code = "masterbelt.semantic.no_bound"
-	CodeNoMatchingFuncOverload diagnostic.Code = "masterbelt.semantic.no_matching_func_overload"
-	CodeNoMatchingOverload     diagnostic.Code = "masterbelt.semantic.no_matching_overload"
-	CodeNonExhaustiveSwitch    diagnostic.Code = "masterbelt.semantic.non_exhaustive_switch"
-	CodeNotARecord             diagnostic.Code = "masterbelt.semantic.not_a_record"
-	CodeNotExported            diagnostic.Code = "masterbelt.semantic.not_exported"
-	CodeRefinementNotBool      diagnostic.Code = "masterbelt.semantic.refinement_not_bool"
-	CodeRefinementNotConstant  diagnostic.Code = "masterbelt.semantic.refinement_not_constant"
-	CodeRefinementViolation    diagnostic.Code = "masterbelt.semantic.refinement_violation"
-	CodeSelfOutsideMethod      diagnostic.Code = "masterbelt.semantic.self_outside_method"
-	CodeTypeMismatch           diagnostic.Code = "masterbelt.semantic.type_mismatch"
-	CodeUndefinedName          diagnostic.Code = "masterbelt.semantic.undefined_name"
-	CodeUninferableCollection  diagnostic.Code = "masterbelt.semantic.uninferable_collection"
-	CodeUninferableParameter   diagnostic.Code = "masterbelt.semantic.uninferable_parameter"
-	CodeUninferableRecord      diagnostic.Code = "masterbelt.semantic.uninferable_record"
-	CodeUninferableResult      diagnostic.Code = "masterbelt.semantic.uninferable_result"
-	CodeUnknownAssociatedConst diagnostic.Code = "masterbelt.semantic.unknown_associated_const"
-	CodeUnknownEnumMember      diagnostic.Code = "masterbelt.semantic.unknown_enum_member"
-	CodeUnknownField           diagnostic.Code = "masterbelt.semantic.unknown_field"
-	CodeUnknownMember          diagnostic.Code = "masterbelt.semantic.unknown_member"
-	CodeUnknownType            diagnostic.Code = "masterbelt.semantic.unknown_type"
-	CodeUnreachableArm         diagnostic.Code = "masterbelt.semantic.unreachable_arm"
-	CodeUnusedEffect           diagnostic.Code = "masterbelt.semantic.unused_effect"
-	CodeUseNotFound            diagnostic.Code = "masterbelt.semantic.use_not_found"
+	CodeAmbiguousFuncOverload   diagnostic.Code = "masterbelt.semantic.ambiguous_func_overload"
+	CodeAmbiguousImport         diagnostic.Code = "masterbelt.semantic.ambiguous_import"
+	CodeAmbiguousOverload       diagnostic.Code = "masterbelt.semantic.ambiguous_overload"
+	CodeArityMismatch           diagnostic.Code = "masterbelt.semantic.arity_mismatch"
+	CodeArmValueTypeMismatch    diagnostic.Code = "masterbelt.semantic.arm_value_type_mismatch"
+	CodeAssertionFailed         diagnostic.Code = "masterbelt.semantic.assertion_failed"
+	CodeAssertionNotBool        diagnostic.Code = "masterbelt.semantic.assertion_not_bool"
+	CodeAssertionNotConstant    diagnostic.Code = "masterbelt.semantic.assertion_not_constant"
+	CodeConditionNotBool        diagnostic.Code = "masterbelt.semantic.condition_not_bool"
+	CodeConstantOverflow        diagnostic.Code = "masterbelt.semantic.constant_overflow"
+	CodeCyclicModule            diagnostic.Code = "masterbelt.semantic.cyclic_module"
+	CodeCyclicReference         diagnostic.Code = "masterbelt.semantic.cyclic_reference"
+	CodeDivisionByZero          diagnostic.Code = "masterbelt.semantic.division_by_zero"
+	CodeDuplicateDeclaration    diagnostic.Code = "masterbelt.semantic.duplicate_declaration"
+	CodeDuplicateEnumMember     diagnostic.Code = "masterbelt.semantic.duplicate_enum_member"
+	CodeDuplicateEnumValue      diagnostic.Code = "masterbelt.semantic.duplicate_enum_value"
+	CodeDuplicateFuncOverload   diagnostic.Code = "masterbelt.semantic.duplicate_func_overload"
+	CodeDuplicateOverload       diagnostic.Code = "masterbelt.semantic.duplicate_overload"
+	CodeDuplicateSwitchArm      diagnostic.Code = "masterbelt.semantic.duplicate_switch_arm"
+	CodeEffectInPureContext     diagnostic.Code = "masterbelt.semantic.effect_in_pure_context"
+	CodeInvalidEnumBaseType     diagnostic.Code = "masterbelt.semantic.invalid_enum_base_type"
+	CodeInvalidOperation        diagnostic.Code = "masterbelt.semantic.invalid_operation"
+	CodeLambdaArityMismatch     diagnostic.Code = "masterbelt.semantic.lambda_arity_mismatch"
+	CodeMissingEffect           diagnostic.Code = "masterbelt.semantic.missing_effect"
+	CodeMissingField            diagnostic.Code = "masterbelt.semantic.missing_field"
+	CodeMissingReturn           diagnostic.Code = "masterbelt.semantic.missing_return"
+	CodeNoBound                 diagnostic.Code = "masterbelt.semantic.no_bound"
+	CodeNoMatchingFuncOverload  diagnostic.Code = "masterbelt.semantic.no_matching_func_overload"
+	CodeNoMatchingOverload      diagnostic.Code = "masterbelt.semantic.no_matching_overload"
+	CodeNonExhaustiveSwitch     diagnostic.Code = "masterbelt.semantic.non_exhaustive_switch"
+	CodeNotARecord              diagnostic.Code = "masterbelt.semantic.not_a_record"
+	CodeNotExported             diagnostic.Code = "masterbelt.semantic.not_exported"
+	CodeRefinementNotBool       diagnostic.Code = "masterbelt.semantic.refinement_not_bool"
+	CodeRefinementNotConstant   diagnostic.Code = "masterbelt.semantic.refinement_not_constant"
+	CodeRefinementViolation     diagnostic.Code = "masterbelt.semantic.refinement_violation"
+	CodeSelfOutsideMethod       diagnostic.Code = "masterbelt.semantic.self_outside_method"
+	CodeTernaryBranchMismatch   diagnostic.Code = "masterbelt.semantic.ternary_branch_mismatch"
+	CodeTernaryConditionNotBool diagnostic.Code = "masterbelt.semantic.ternary_condition_not_bool"
+	CodeTypeMismatch            diagnostic.Code = "masterbelt.semantic.type_mismatch"
+	CodeUndefinedName           diagnostic.Code = "masterbelt.semantic.undefined_name"
+	CodeUninferableCollection   diagnostic.Code = "masterbelt.semantic.uninferable_collection"
+	CodeUninferableParameter    diagnostic.Code = "masterbelt.semantic.uninferable_parameter"
+	CodeUninferableRecord       diagnostic.Code = "masterbelt.semantic.uninferable_record"
+	CodeUninferableResult       diagnostic.Code = "masterbelt.semantic.uninferable_result"
+	CodeUnknownAssociatedConst  diagnostic.Code = "masterbelt.semantic.unknown_associated_const"
+	CodeUnknownEnumMember       diagnostic.Code = "masterbelt.semantic.unknown_enum_member"
+	CodeUnknownField            diagnostic.Code = "masterbelt.semantic.unknown_field"
+	CodeUnknownMember           diagnostic.Code = "masterbelt.semantic.unknown_member"
+	CodeUnknownType             diagnostic.Code = "masterbelt.semantic.unknown_type"
+	CodeUnreachableArm          diagnostic.Code = "masterbelt.semantic.unreachable_arm"
+	CodeUnusedEffect            diagnostic.Code = "masterbelt.semantic.unused_effect"
+	CodeUseNotFound             diagnostic.Code = "masterbelt.semantic.use_not_found"
 )
 
 func newAmbiguousFuncOverloadDiagnostic(offset int, width int, name string, types string) diagnostic.Diagnostic {
@@ -572,6 +574,35 @@ func newSelfOutsideMethodDiagnostic(offset int, width int) diagnostic.Diagnostic
 		Code:     CodeSelfOutsideMethod,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeSelfOutsideMethod, nil),
 		Fields:   nil,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newTernaryBranchMismatchDiagnostic(offset int, width int, then string, els string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"then": diagnostic.Str(then),
+		"els":  diagnostic.Str(els),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeTernaryBranchMismatch,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeTernaryBranchMismatch, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newTernaryConditionNotBoolDiagnostic(offset int, width int, typ string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"typ": diagnostic.Str(typ),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeTernaryConditionNotBool,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeTernaryConditionNotBool, fields),
+		Fields:   fields,
 		Offset:   offset,
 		Width:    width,
 	}
