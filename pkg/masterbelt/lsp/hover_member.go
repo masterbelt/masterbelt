@@ -1,0 +1,336 @@
+package lsp
+
+import (
+	"strings"
+
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/types"
+	"github.com/masterbelt/masterbelt/pkg/source/ast"
+	"github.com/masterbelt/masterbelt/pkg/source/cst"
+	"github.com/masterbelt/masterbelt/pkg/source/ir"
+	"github.com/masterbelt/masterbelt/pkg/source/token"
+	protocol "github.com/owenrumney/go-lsp/lsp"
+)
+
+// Hover cards for the members of a type: a method access or declaration, a
+// method parameter, and the record field a receiver reads. Resolving the
+// receiver's type (receiverTypeOf, paramTypeAt, fieldOf) and rendering a
+// method's signature (methodSignature, methodSignatureSubst) live here too.
+
+// methodParamHover describes the method parameter denoted at offset: its name
+// in the signature's parameter list, or a reference to it inside the method's
+// body. The type comes from the module's resolved signature — each resolved
+// method carries its declaration (ir.Method.Syntax), so the pairing holds
+// across overloads — and renders as the checker sees it. Function literals
+// nest inside method bodies and their parameters shadow the method's —
+// lambdaParamHover runs first.
+func methodParamHover(doc view, offset int, trees map[cst.Green]cst.Tree) *protocol.Hover {
+	buf := doc.Buffer()
+	tok, name, ok := identAt(doc.AST().Concrete().Tree(), buf, offset)
+	if !ok {
+		return nil
+	}
+
+	for _, def := range doc.Module().Types {
+		for _, irm := range def.Methods {
+			if irm.Syntax == nil {
+				continue
+			}
+			mt, found := trees[irm.Syntax.Syntax()]
+			if !found || !within(mt, offset) {
+				continue
+			}
+			for _, p := range irm.Params {
+				if p.Name != name || p.Type == nil || p.Type == ir.Invalid {
+					continue
+				}
+				r := toRange(buf, tok.Offset(), tok.End())
+				return &protocol.Hover{
+					Contents: protocol.MarkupContent{
+						Kind:  protocol.Markdown,
+						Value: "```masterbelt\n" + name + ": " + p.Type.String() + "\n```",
+					},
+					Range: &r,
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// methodSignature renders one method as it is declared: modifiers, name,
+// parameters, and result, in source syntax.
+func methodSignature(m *ir.Method) string {
+	return methodSignatureSubst(m, nil)
+}
+
+// methodSignatureSubst is methodSignature with the receiver's solved type
+// arguments substituted in, so list<int8>.map shows fn(item: int8).
+func methodSignatureSubst(m *ir.Method, subst map[string]ir.Type) string {
+	render := func(t ir.Type) string {
+		if t == nil {
+			return ""
+		}
+		if len(subst) > 0 {
+			t = types.Substitute(t, subst)
+		}
+		return t.String()
+	}
+	var b strings.Builder
+	if m.Public {
+		b.WriteString("pub ")
+	}
+	if m.Extern {
+		b.WriteString("extern ")
+	}
+	for _, eff := range m.Effects {
+		b.WriteString(eff + " ")
+	}
+	b.WriteString(m.Name)
+	b.WriteString("(")
+	for i, p := range m.Params {
+		if i > 0 {
+			b.WriteString(", ")
+		}
+		b.WriteString(p.Name)
+		if p.Type != nil {
+			b.WriteString(": " + render(p.Type))
+		}
+	}
+	b.WriteString(")")
+	if m.Result != nil {
+		b.WriteString(": " + render(m.Result))
+	}
+	return b.String()
+}
+
+// memberHover describes the member access at offset: the method the
+// receiver's type binds for the name — its signature with the receiver's
+// generic arguments substituted in, and its doc — or the record field it
+// reads, with its type.
+func memberHover(doc view, offset int, trees map[cst.Green]cst.Tree) *protocol.Hover {
+	leaf, parent, ok := leafAt(doc.AST().Concrete().Tree(), offset)
+	if !ok {
+		return nil
+	}
+	if k, isTok := leaf.TokenKind(); !isTok || k != token.Ident {
+		return nil
+	}
+	if pk, isNode := parent.Kind(); !isNode || pk != cst.MemberExpr {
+		return nil
+	}
+	parentNode, _ := parent.Node()
+
+	// The AST member access backing this node. Operators desugar to synthetic
+	// member accesses, but those share their operator's CST node, never a
+	// MemberExpr node — only an access written in the source matches here.
+	var member *ast.MemberExpr
+	forEachExpr(doc.AST().File(), func(e ast.Expr) {
+		if m, ok := e.(*ast.MemberExpr); ok && m.Syntax() == parentNode {
+			member = m
+		}
+	})
+	if member == nil {
+		return nil
+	}
+
+	recv := receiverTypeOf(doc, member.Receiver, trees, offset)
+	if recv == nil || recv == ir.Invalid {
+		return nil
+	}
+	name := member.Member.Name
+	r := toRange(doc.Buffer(), leaf.Offset(), leaf.End())
+
+	if ms, subst, ok := doc.MethodCandidates(recv, name); ok {
+		var b strings.Builder
+		if len(ms) == 1 {
+			// The common single-signature card: the signature, its doc below.
+			b.WriteString("```masterbelt\n")
+			b.WriteString(methodSignatureSubst(ms[0], subst))
+			b.WriteString("\n```")
+			if len(ms[0].Doc) > 0 {
+				b.WriteString("\n\n")
+				b.WriteString(strings.Join(ms[0].Doc, "\n"))
+			}
+		} else {
+			// An overloaded name lists every signature, each under its own doc
+			// comment — the card reads like the impl block itself.
+			b.WriteString("```masterbelt\n")
+			for i, m := range ms {
+				if i > 0 {
+					b.WriteString("\n")
+				}
+				for _, doc := range m.Doc {
+					b.WriteString("/// " + doc + "\n")
+				}
+				b.WriteString(methodSignatureSubst(m, subst))
+				b.WriteString("\n")
+			}
+			b.WriteString("```")
+		}
+		return &protocol.Hover{
+			Contents: protocol.MarkupContent{Kind: protocol.Markdown, Value: b.String()},
+			Range:    &r,
+		}
+	}
+	if f, ok := fieldOf(recv, name); ok {
+		return &protocol.Hover{
+			Contents: protocol.MarkupContent{
+				Kind:  protocol.Markdown,
+				Value: "```masterbelt\n" + f.Name + ": " + f.Type.String() + "\n```",
+			},
+			Range: &r,
+		}
+	}
+	return nil
+}
+
+// receiverTypeOf resolves the type a member access's receiver has: self is
+// the enclosing impl's type, an identifier is the constant it names or the
+// parameter it denotes, a namespace member is the constant it imports, and a
+// chained access is the field's type on the inner receiver. Anything else —
+// a collection literal, an operator chain — goes through the real inference
+// in the file's top-level scope.
+func receiverTypeOf(doc view, e ast.Expr, trees map[cst.Green]cst.Tree, offset int) ir.Type {
+	switch e := e.(type) {
+	case *ast.SelfExpr:
+		file := doc.AST().File()
+		module := doc.Module()
+		for i, td := range file.Types {
+			if i >= len(module.Types) {
+				break
+			}
+			for _, m := range td.Methods {
+				if t, ok := trees[m.Syntax()]; ok && within(t, offset) {
+					return &ir.Named{Def: module.Types[i]}
+				}
+			}
+		}
+		return nil
+	case *ast.Identifier:
+		if c := doc.Resolve(e); c != nil {
+			return c.Type
+		}
+		return paramTypeAt(doc, e.Name, trees, offset)
+	case *ast.MemberExpr:
+		if c := doc.ResolveMember(e); c != nil {
+			return c.Type
+		}
+		if inner := receiverTypeOf(doc, e.Receiver, trees, offset); inner != nil {
+			if f, ok := fieldOf(inner, e.Member.Name); ok {
+				return f.Type
+			}
+		}
+		return nil
+	}
+	if t := doc.TypeOfExpr(e); t != ir.Invalid {
+		return t
+	}
+	return nil
+}
+
+// paramTypeAt resolves name as a parameter of what encloses offset: the
+// innermost function literal first (its parameters shadow the method's),
+// then the method's signature. A self-typed parameter resolves to the
+// enclosing impl's type, so its methods bind through it.
+func paramTypeAt(doc view, name string, trees map[cst.Green]cst.Tree, offset int) ir.Type {
+	types := doc.FuncLitTypes()
+	var enclosing []*ast.FuncLit
+	forEachFuncLit(doc, func(lit *ast.FuncLit) {
+		if t, ok := trees[lit.Syntax()]; ok && within(t, offset) {
+			enclosing = append(enclosing, lit)
+		}
+	})
+	for i := len(enclosing) - 1; i >= 0; i-- {
+		lit := enclosing[i]
+		ft := types[lit]
+		if ft == nil {
+			continue
+		}
+		for j, p := range lit.Params {
+			if p.Name == name && j < len(ft.Params) && ft.Params[j] != ir.Invalid {
+				return ft.Params[j]
+			}
+		}
+	}
+
+	for _, def := range doc.Module().Types {
+		for _, irm := range def.Methods {
+			if irm.Syntax == nil {
+				continue
+			}
+			mt, ok := trees[irm.Syntax.Syntax()]
+			if !ok || !within(mt, offset) {
+				continue
+			}
+			for _, p := range irm.Params {
+				if p.Name != name || p.Type == nil || p.Type == ir.Invalid {
+					continue
+				}
+				if _, isSelf := p.Type.(*ir.SelfType); isSelf {
+					return &ir.Named{Def: def}
+				}
+				return p.Type
+			}
+		}
+	}
+	return nil
+}
+
+// fieldOf returns the record field a type carries under name — directly, or
+// through a named type's record body.
+func fieldOf(t ir.Type, name string) (ir.Field, bool) {
+	switch t := t.(type) {
+	case *ir.Record:
+		for _, f := range t.Fields {
+			if f.Name == name {
+				return f, true
+			}
+		}
+	case *ir.Named:
+		if t.Def != nil {
+			return fieldOf(t.Def.Body, name)
+		}
+	}
+	return ir.Field{}, false
+}
+
+// methodDeclHover describes the method declared at offset — the cursor on its
+// name in an impl block — as its resolved signature and doc.
+func methodDeclHover(doc view, offset int, trees map[cst.Green]cst.Tree) *protocol.Hover {
+	leaf, parent, ok := leafAt(doc.AST().Concrete().Tree(), offset)
+	if !ok {
+		return nil
+	}
+	if k, isTok := leaf.TokenKind(); !isTok || k != token.Ident {
+		return nil
+	}
+	if pk, isNode := parent.Kind(); !isNode || pk != cst.MethodDecl {
+		return nil
+	}
+
+	for _, def := range doc.Module().Types {
+		for _, irm := range def.Methods {
+			if irm.Syntax == nil {
+				continue
+			}
+			mt, found := trees[irm.Syntax.Syntax()]
+			if !found || !within(mt, offset) {
+				continue
+			}
+			var b strings.Builder
+			b.WriteString("```masterbelt\n")
+			b.WriteString(methodSignature(irm))
+			b.WriteString("\n```")
+			if len(irm.Doc) > 0 {
+				b.WriteString("\n\n")
+				b.WriteString(strings.Join(irm.Doc, "\n"))
+			}
+			r := toRange(doc.Buffer(), leaf.Offset(), leaf.End())
+			return &protocol.Hover{
+				Contents: protocol.MarkupContent{Kind: protocol.Markdown, Value: b.String()},
+				Range:    &r,
+			}
+		}
+	}
+	return nil
+}
