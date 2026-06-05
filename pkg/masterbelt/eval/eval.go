@@ -249,6 +249,13 @@ func applyFunc(cands []*ast.FuncDecl, args []ast.Expr, ctx evalCtx) *ir.Constant
 	if n != 1 {
 		return nil
 	}
+	if fd.Extern || len(fd.Effects) > 0 {
+		// Only a pure function folds. An effectful one compiles to runtime
+		// code for a target — the pure-context check upstream keeps it out of
+		// every compile-time position, and this guard keeps eval pure even if
+		// one slips through.
+		return nil
+	}
 
 	locals := make(map[string]*ir.Constant, len(fd.Params))
 	for i, p := range fd.Params {

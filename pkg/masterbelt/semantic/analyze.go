@@ -558,6 +558,21 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 	checkFuncBodies(reg, file, q.universe(fileID), qualifiedFrom(q, imp), funcs, qfns, at, diags)
 	checkEffects(reg, file, module.Types, q.universe(fileID), qualifiedFrom(q, imp), funcs, qfns, at, diags)
 
+	// Compile-time positions must be pure: a constant initializer and an
+	// assert condition fold to values, so an effectful call cannot appear in
+	// them at all — pure folds, effectful cannot even be written.
+	pureScope := infer.BodyScope{Reg: reg, Universe: q.universe(fileID), Qualified: qualifiedFrom(q, imp), Self: ir.Invalid, Funcs: funcs, QualifiedFuncs: qfns}
+	for _, decl := range file.Decls {
+		if decl.Value != nil {
+			checkPureContext(decl.Value, "constant initializer", pureScope, at, diags)
+		}
+	}
+	for _, a := range file.Asserts {
+		if a.Cond != nil {
+			checkPureContext(a.Cond, "assert condition", pureScope, at, diags)
+		}
+	}
+
 	items := diags.Items()
 	sort.SliceStable(items, func(i, j int) bool { return items[i].Offset < items[j].Offset })
 	return module, items

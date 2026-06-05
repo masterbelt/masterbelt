@@ -187,3 +187,20 @@ func declaredEffects(fds []*ast.FuncDecl) []string {
 	}
 	return out
 }
+
+// checkPureContext reports every effect used in a compile-time-evaluated
+// expression. These positions — a constant initializer, an assert condition —
+// fold to values, so an effectful call cannot appear in them at all: pure
+// folds, effectful cannot even be written. Each effect is reported once, at
+// the first site that uses it.
+func checkPureContext(e ast.Expr, context string, bs infer.BodyScope, at func(ast.Node) span, diags *diagnostic.List) {
+	reported := map[string]bool{}
+	collectEffectUses(e, bs, func(effect string, node ast.Node) {
+		if reported[effect] {
+			return
+		}
+		reported[effect] = true
+		s := at(node)
+		diags.Add(newEffectInPureContextDiagnostic(s.offset, s.width, effect, context))
+	})
+}

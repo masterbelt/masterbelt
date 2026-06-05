@@ -271,6 +271,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "method " + f["method"].String() + " redeclares the parameter types (" + f["types"].String() + ")"
 		}
 	},
+	"masterbelt.semantic.effect_in_pure_context": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return f["context"].String() + " はコンパイル時に評価されるため pure である必要があります。effect " + f["effect"].String() + " は使用できません"
+		default:
+			return "a " + f["context"].String() + " is evaluated at compile time and must be pure; effect " + f["effect"].String() + " is not allowed"
+		}
+	},
 	"masterbelt.semantic.invalid_operation": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":

@@ -56,6 +56,7 @@ masterbelt.semantic.refinement_not_bool,where 節は bool でなければなり�
 masterbelt.semantic.refinement_not_constant,where 節はコンパイル時に評価できる述語ではありません
 masterbelt.semantic.missing_effect,関数 {fn} は effect {effect} を宣言せずに使用しています
 masterbelt.semantic.unused_effect,関数 {fn} は effect {effect} を宣言していますが使用していません
+masterbelt.semantic.effect_in_pure_context,{context} はコンパイル時に評価されるため pure である必要があります。effect {effect} は使用できません
 project.config.missing,masterbelt.toml がこのディレクトリにも親ディレクトリにも見つかりません
 project.config.invalid,不正な masterbelt.toml: {detail}
 project.config.missing_entry,masterbelt.toml に entry が指定されていません

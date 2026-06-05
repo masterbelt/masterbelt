@@ -1600,3 +1600,42 @@ func TestEffectPropagatesThroughLambda(t *testing.T) {
 		t.Errorf("want missing_effect through the lambda, got %v", codes(diags))
 	}
 }
+
+func TestEffectInPureContext(t *testing.T) {
+	// A compile-time position — a constant initializer, an assert condition —
+	// must be pure: an effectful call (or an await) cannot appear in it.
+	roots := "extern fn nondet roll(): int\nextern fn io async fetch(url: string): string\n"
+	for _, src := range []string{
+		roots + "const T = roll()\n",
+		roots + "const U = roll() + 1\n",
+		roots + "const F = await fetch(\"u\")\n",
+		roots + "assert roll() == 1\n",
+	} {
+		if _, diags := analyze(src); !hasCode(diags, CodeEffectInPureContext) {
+			t.Errorf("%q: want effect_in_pure_context, got %v", src, codes(diags))
+		}
+	}
+	// A pure call stays allowed.
+	if _, diags := analyze("fn one(): int -> 1\nconst A = one()\n"); hasCode(diags, CodeEffectInPureContext) {
+		t.Errorf("pure call flagged: %v", codes(diags))
+	}
+}
+
+func TestEffectfulFunctionNeverFolds(t *testing.T) {
+	// Only a pure function folds to a value; an effectful one compiles to
+	// runtime code, so a const referencing it gets no value (and the pure
+	// check reports the position).
+	src := "pub fn nondet f(): int -> 1\nconst A = f()\n"
+	m, diags := analyze(src)
+	if !hasCode(diags, CodeEffectInPureContext) {
+		t.Fatalf("want effect_in_pure_context, got %v", codes(diags))
+	}
+	if m.Consts[0].Eval != nil {
+		t.Errorf("A eval = %s, want unevaluated", m.Consts[0].Eval)
+	}
+	// The pure twin folds as ever.
+	m, _ = analyze("pub fn g(): int -> 1\nconst A = g()\n")
+	if m.Consts[0].Eval.String() != "1" {
+		t.Errorf("pure call eval = %s, want 1", m.Consts[0].Eval)
+	}
+}

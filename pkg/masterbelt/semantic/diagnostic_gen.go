@@ -23,6 +23,7 @@ const (
 	CodeDuplicateDeclaration   diagnostic.Code = "masterbelt.semantic.duplicate_declaration"
 	CodeDuplicateFuncOverload  diagnostic.Code = "masterbelt.semantic.duplicate_func_overload"
 	CodeDuplicateOverload      diagnostic.Code = "masterbelt.semantic.duplicate_overload"
+	CodeEffectInPureContext    diagnostic.Code = "masterbelt.semantic.effect_in_pure_context"
 	CodeInvalidOperation       diagnostic.Code = "masterbelt.semantic.invalid_operation"
 	CodeLambdaArityMismatch    diagnostic.Code = "masterbelt.semantic.lambda_arity_mismatch"
 	CodeMissingEffect          diagnostic.Code = "masterbelt.semantic.missing_effect"
@@ -242,6 +243,21 @@ func newDuplicateOverloadDiagnostic(offset int, width int, method string, types 
 		Severity: diagnostic.Error,
 		Code:     CodeDuplicateOverload,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeDuplicateOverload, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newEffectInPureContextDiagnostic(offset int, width int, effect string, context string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"effect":  diagnostic.Str(effect),
+		"context": diagnostic.Str(context),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeEffectInPureContext,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeEffectInPureContext, fields),
 		Fields:   fields,
 		Offset:   offset,
 		Width:    width,

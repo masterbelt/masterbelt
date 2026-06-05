@@ -56,6 +56,7 @@ masterbelt.semantic.refinement_not_bool,error,typ:string
 masterbelt.semantic.refinement_not_constant,error,
 masterbelt.semantic.missing_effect,error,fn:string effect:string
 masterbelt.semantic.unused_effect,warning,fn:string effect:string
+masterbelt.semantic.effect_in_pure_context,error,effect:string context:string
 project.config.missing,error,
 project.config.invalid,error,detail:string
 project.config.missing_entry,error,
