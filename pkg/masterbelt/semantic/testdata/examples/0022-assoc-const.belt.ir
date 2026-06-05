@@ -1,10 +1,12 @@
 Module
   Const "Hi"
-    type invalid
-    value <none>
+    type int
+    value int8.Max
+    eval 127
   Const "Lo"
-    type invalid
-    value <none>
+    type int
+    value int8.Min
+    eval -128
   Const "Top"
     type Level
     value Level.Max
@@ -44,3 +46,4 @@ Module
       value 32
   TypeDef "Port" pub
     body int32
+    where self >= 1 && self <= int16.Max
