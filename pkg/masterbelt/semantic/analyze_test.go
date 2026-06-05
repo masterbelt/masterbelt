@@ -546,6 +546,42 @@ func TestDatetimeDurationDiagnostics(t *testing.T) {
 	}
 }
 
+func TestDuplicateOverloadNormalizesSpellings(t *testing.T) {
+	// self and the type's own name denote the same type inside the impl, so
+	// an overload differing only in that spelling is a redeclaration — were
+	// both kept, every call would fit both and be permanently ambiguous.
+	src := `pub type Score = int32 impl {
+  pub fn merge(points: self): self {
+    return self + points
+  }
+  pub fn merge(points: Score): self {
+    return self
+  }
+}
+const Base: Score = 100
+const X = Base.merge(Base)
+`
+	m, diags := analyze(src)
+	if got := codes(diags); len(got) != 1 || got[0] != CodeDuplicateOverload {
+		t.Fatalf("self vs named: codes = %v, want [duplicate_overload]", got)
+	}
+	if got := m.Consts[1].Type.String(); got != "Score" {
+		t.Errorf("X type = %s, want Score (resolved through the first declaration)", got)
+	}
+
+	// Two method-introduced type variables are the same universal signature
+	// whatever they are named.
+	src = `pub type Box = int32 impl {
+  pub extern fn wrap(value: T): bool
+  pub extern fn wrap(value: U): bool
+}
+`
+	_, diags = analyze(src)
+	if got := codes(diags); len(got) != 1 || got[0] != CodeDuplicateOverload {
+		t.Fatalf("alpha-equivalent vars: codes = %v, want [duplicate_overload]", got)
+	}
+}
+
 func TestDuplicateOverloadKeepsBodiesAligned(t *testing.T) {
 	// Dropping the duplicate must not shift the pairing of the remaining
 	// declarations with their resolved signatures: flag's body still checks
