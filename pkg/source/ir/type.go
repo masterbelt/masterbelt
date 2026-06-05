@@ -1,6 +1,7 @@
 package ir
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
@@ -52,34 +53,16 @@ var Invalid Type = &invalid{}
 func HasInvalid(t Type) bool {
 	switch t := t.(type) {
 	case *App:
-		for _, a := range t.Args {
-			if HasInvalid(a) {
-				return true
-			}
-		}
+		return slices.ContainsFunc(t.Args, HasInvalid)
 	case *Func:
-		for _, p := range t.Params {
-			if HasInvalid(p) {
-				return true
-			}
-		}
-		return HasInvalid(t.Result)
+		return slices.ContainsFunc(t.Params, HasInvalid) || HasInvalid(t.Result)
 	case *Union:
-		for _, m := range t.Members {
-			if HasInvalid(m) {
-				return true
-			}
-		}
+		return slices.ContainsFunc(t.Members, HasInvalid)
 	case *Record:
-		for _, f := range t.Fields {
-			if HasInvalid(f.Type) {
-				return true
-			}
-		}
+		return slices.ContainsFunc(t.Fields, func(f Field) bool { return HasInvalid(f.Type) })
 	default:
 		return t == Invalid
 	}
-	return false
 }
 
 // --- declared and composite types -------------------------------------------

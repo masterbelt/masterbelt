@@ -73,7 +73,7 @@ func dumpAssert(b *strings.Builder, a *Assert) {
 		fmt.Fprintf(b, "    doc %q\n", doc)
 	}
 	fmt.Fprintf(b, "    eval %s\n", a.Eval)
-	for _, line := range strings.Split(a.Diagram, "\n") {
+	for line := range strings.SplitSeq(a.Diagram, "\n") {
 		fmt.Fprintf(b, "      %s\n", line)
 	}
 }
