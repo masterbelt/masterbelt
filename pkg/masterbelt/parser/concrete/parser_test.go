@@ -1198,3 +1198,158 @@ func TestParseAwaitExpr(t *testing.T) {
 		t.Errorf("dangling await: want a diagnostic")
 	}
 }
+
+// enumMemberNames returns the identifier text of an enum's members, in source
+// order, and the count of members that carry an initializer. It reads through
+// the positioned tree so the member text resolves to its source bytes.
+func enumMemberNames(buf source.Buffer, decl *cst.Node) (names []string, withValue int) {
+	tree := cst.Root(decl)
+	for _, c := range tree.Children() {
+		if k, ok := c.Kind(); !ok || k != cst.EnumMember {
+			continue
+		}
+		gotName := false
+		for _, mc := range c.Children() {
+			if tk, ok := mc.TokenKind(); ok && tk == token.Ident && !gotName {
+				names = append(names, strings.TrimSpace(mc.Text(buf)))
+				gotName = true
+			}
+			if k, ok := mc.Kind(); ok && k == cst.Initializer {
+				withValue++
+			}
+		}
+	}
+	return names, withValue
+}
+
+// TestParseEnumDeclFileShape checks that enum declarations are recognised at
+// the file level, the enum/const/type choice made by looking past pub.
+func TestParseEnumDeclFileShape(t *testing.T) {
+	root, diags := Parse([]byte("const X = 1\npub enum Rarity: uint8 {\n  A = 1\n}\nenum E {\n  B\n}\n"))
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	got := declKinds(root)
+	want := []string{"ConstDecl", "EnumDecl", "EnumDecl", "<Newline>", "<EOF>"}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("file children = %v, want %v", got, want)
+	}
+}
+
+func TestParseEnumDeclChildren(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+		want []cst.Kind
+	}{
+		{"base type", "enum R: uint8 {\n  A = 1\n}\n", []cst.Kind{cst.TypeClause, cst.EnumMember}},
+		{"no base", "enum E {\n  A\n}\n", []cst.Kind{cst.EnumMember}},
+		{"comma separated", "enum E {\n  A, B, C\n}\n", []cst.Kind{cst.EnumMember, cst.EnumMember, cst.EnumMember}},
+		{"newline separated", "enum E {\n  A\n  B\n}\n", []cst.Kind{cst.EnumMember, cst.EnumMember}},
+		{"trailing comma", "enum E {\n  A, B,\n}\n", []cst.Kind{cst.EnumMember, cst.EnumMember}},
+		{"impl", "enum E {\n  A\n} impl {\n  f(): self {\n    return self\n  }\n}\n", []cst.Kind{cst.EnumMember, cst.ImplBlock}},
+		{"base and impl", "enum E: int8 {\n  A = 1\n} impl {\n  f(): self {\n    return self\n  }\n}\n", []cst.Kind{cst.TypeClause, cst.EnumMember, cst.ImplBlock}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			root, diags := Parse([]byte(tc.src))
+			if len(diags) != 0 {
+				t.Fatalf("unexpected diagnostics: %v", diags)
+			}
+			decl := root.Children()[0].(*cst.Node)
+			if decl.Kind() != cst.EnumDecl {
+				t.Fatalf("first child kind = %s, want EnumDecl", decl.Kind())
+			}
+			got := subNodeKinds(decl)
+			if len(got) != len(tc.want) {
+				t.Fatalf("sub-nodes = %v, want %v", got, tc.want)
+			}
+			for i := range got {
+				if got[i] != tc.want[i] {
+					t.Fatalf("sub-nodes = %v, want %v", got, tc.want)
+				}
+			}
+			assertLossless(t, tc.src)
+		})
+	}
+}
+
+func TestParseEnumMembers(t *testing.T) {
+	src := "enum R: uint8 {\n  Common = 1\n  Rare = 2\n  Legend = 10\n}\n"
+	root, diags := Parse([]byte(src))
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	decl := root.Children()[0].(*cst.Node)
+	names, withValue := enumMemberNames(source.NewFile("", []byte(src)), decl)
+	if strings.Join(names, ",") != "Common,Rare,Legend" {
+		t.Fatalf("member names = %v, want [Common Rare Legend]", names)
+	}
+	if withValue != 3 {
+		t.Fatalf("members with initializer = %d, want 3", withValue)
+	}
+}
+
+func TestParseEnumMixedSeparators(t *testing.T) {
+	// Comma and newline separators may be mixed, and a member without an
+	// initializer sits beside one with it.
+	src := "enum E {\n  Fire, Water\n  Wind = 7\n}\n"
+	root, diags := Parse([]byte(src))
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	decl := root.Children()[0].(*cst.Node)
+	names, withValue := enumMemberNames(source.NewFile("", []byte(src)), decl)
+	if strings.Join(names, ",") != "Fire,Water,Wind" {
+		t.Fatalf("member names = %v, want [Fire Water Wind]", names)
+	}
+	if withValue != 1 {
+		t.Fatalf("members with initializer = %d, want 1", withValue)
+	}
+}
+
+func TestParseEnumDeclDiagnostics(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+		code diagnostic.Code
+	}{
+		{"missing name", "enum {\n  A\n}\n", CodeExpectedIdentifier},
+		{"missing base type", "enum E: {\n  A\n}\n", CodeExpectedType},
+		{"missing initializer value", "enum E {\n  A =\n}\n", CodeExpectedExpression},
+		{"missing brace", "enum E\n", CodeUnexpectedToken},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, diags := Parse([]byte(tc.src))
+			found := false
+			for _, d := range diags {
+				if d.Code == tc.code {
+					found = true
+				}
+			}
+			if !found {
+				t.Fatalf("src %q: want diagnostic %s, got %v", tc.src, tc.code, diags)
+			}
+			assertLossless(t, tc.src)
+		})
+	}
+}
+
+// TestParseEnumEmpty checks that an empty enum body parses losslessly (the
+// "no members" rule is a semantic concern, not a parse error).
+func TestParseEnumEmpty(t *testing.T) {
+	src := "enum E {\n}\n"
+	root, diags := Parse([]byte(src))
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	decl := root.Children()[0].(*cst.Node)
+	if decl.Kind() != cst.EnumDecl {
+		t.Fatalf("first child kind = %s, want EnumDecl", decl.Kind())
+	}
+	if got := subNodeKinds(decl); len(got) != 0 {
+		t.Fatalf("empty enum sub-nodes = %v, want none", got)
+	}
+	assertLossless(t, src)
+}

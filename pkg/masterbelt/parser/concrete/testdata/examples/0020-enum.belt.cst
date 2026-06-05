@@ -1,45 +1,55 @@
 # tree
 File
-  ConstDecl
+  EnumDecl
     LineComment "// Enum with an explicit integer base type and explicit member values."
     Newline "\n"
     DocComment "/// A card's rarity tier."
     Newline "\n"
     Pub "pub"
-  Error
     Whitespace " "
     Enum "enum"
     Whitespace " "
     Ident "Rarity"
-    Colon ":"
-    Whitespace " "
-    Ident "uint8"
+    TypeClause
+      Colon ":"
+      Whitespace " "
+      TypeName
+        Ident "uint8"
     Whitespace " "
     LBrace "{"
-    Newline "\n"
-    Whitespace "  "
-    Ident "Common"
-    Whitespace " "
-    Assign "="
-    Whitespace " "
-    Int "1"
-    Newline "\n"
-    Whitespace "  "
-    Ident "Rare"
-    Whitespace "   "
-    Assign "="
-    Whitespace " "
-    Int "2"
-    Newline "\n"
-    Whitespace "  "
-    Ident "Legend"
-    Whitespace " "
-    Assign "="
-    Whitespace " "
-    Int "10"
+    EnumMember
+      Newline "\n"
+      Whitespace "  "
+      Ident "Common"
+      Whitespace " "
+      Initializer
+        Assign "="
+        Whitespace " "
+        Literal
+          Int "1"
+    EnumMember
+      Newline "\n"
+      Whitespace "  "
+      Ident "Rare"
+      Whitespace "   "
+      Initializer
+        Assign "="
+        Whitespace " "
+        Literal
+          Int "2"
+    EnumMember
+      Newline "\n"
+      Whitespace "  "
+      Ident "Legend"
+      Whitespace " "
+      Initializer
+        Assign "="
+        Whitespace " "
+        Literal
+          Int "10"
     Newline "\n"
     RBrace "}"
-  ConstDecl
+  EnumDecl
     Newline "\n"
     Newline "\n"
     LineComment "// Enum with no base type (int by default) and auto-numbered members; it also"
@@ -49,62 +59,72 @@ File
     DocComment "/// An elemental affinity."
     Newline "\n"
     Pub "pub"
-  Error
     Whitespace " "
     Enum "enum"
     Whitespace " "
     Ident "Element"
     Whitespace " "
     LBrace "{"
-    Newline "\n"
-    Whitespace "  "
-    Ident "Fire"
+    EnumMember
+      Newline "\n"
+      Whitespace "  "
+      Ident "Fire"
     Comma ","
-    Whitespace " "
-    Ident "Water"
+    EnumMember
+      Whitespace " "
+      Ident "Water"
     Comma ","
-    Whitespace " "
-    Ident "Wind"
+    EnumMember
+      Whitespace " "
+      Ident "Wind"
     Newline "\n"
     RBrace "}"
     Whitespace " "
-    Impl "impl"
-    Whitespace " "
-    LBrace "{"
-  ConstDecl
-    Newline "\n"
-    Whitespace "  "
-    DocComment "/// Whether this element is Fire."
-    Newline "\n"
-    Whitespace "  "
-    Pub "pub"
-    Whitespace " "
-    Ident "isFire"
-  Error
-    LParen "("
-    RParen ")"
-    Colon ":"
-    Whitespace " "
-    Ident "bool"
-    Whitespace " "
-    LBrace "{"
-    Newline "\n"
-    Whitespace "    "
-    Return "return"
-    Whitespace " "
-    Self "self"
-    Whitespace " "
-    EqEq "=="
-    Whitespace " "
-    Ident "Element"
-    Dot "."
-    Ident "Fire"
-    Newline "\n"
-    Whitespace "  "
-    RBrace "}"
-    Newline "\n"
-    RBrace "}"
-  ConstDecl
+    ImplBlock
+      Impl "impl"
+      Whitespace " "
+      LBrace "{"
+      MethodDecl
+        Newline "\n"
+        Whitespace "  "
+        DocComment "/// Whether this element is Fire."
+        Newline "\n"
+        Whitespace "  "
+        Pub "pub"
+        Whitespace " "
+        Ident "isFire"
+        ParamList
+          LParen "("
+          RParen ")"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "bool"
+        Whitespace " "
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            BinaryExpr
+              SelfExpr
+                Self "self"
+              Whitespace " "
+              EqEq "=="
+              Whitespace " "
+              MemberExpr
+                NameRef
+                  Ident "Element"
+                Dot "."
+                Ident "Fire"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
+      Newline "\n"
+      RBrace "}"
+  EnumDecl
     Newline "\n"
     Newline "\n"
     LineComment "// Enum with a string base type: a member with no initializer takes its own"
@@ -114,26 +134,31 @@ File
     DocComment "/// A supported display locale."
     Newline "\n"
     Pub "pub"
-  Error
     Whitespace " "
     Enum "enum"
     Whitespace " "
     Ident "Locale"
-    Colon ":"
-    Whitespace " "
-    Ident "string"
+    TypeClause
+      Colon ":"
+      Whitespace " "
+      TypeName
+        Ident "string"
     Whitespace " "
     LBrace "{"
-    Newline "\n"
-    Whitespace "  "
-    Ident "Ja"
-    Newline "\n"
-    Whitespace "  "
-    Ident "En"
-    Whitespace " "
-    Assign "="
-    Whitespace " "
-    String "\"en-US\""
+    EnumMember
+      Newline "\n"
+      Whitespace "  "
+      Ident "Ja"
+    EnumMember
+      Newline "\n"
+      Whitespace "  "
+      Ident "En"
+      Whitespace " "
+      Initializer
+        Assign "="
+        Whitespace " "
+        Literal
+          String "\"en-US\""
     Newline "\n"
     RBrace "}"
   ConstDecl
@@ -267,18 +292,3 @@ File
   Newline "\n"
   EOF ""
 # diagnostics
-error[masterbelt.parser.concrete.expected_const] 3:1 expected 'const'
-error[masterbelt.parser.concrete.expected_identifier] 3:1 expected identifier
-error[masterbelt.parser.concrete.expected_assign] 3:1 expected '='
-error[masterbelt.parser.concrete.unexpected_token] 3:5 unexpected token: Enum
-error[masterbelt.parser.concrete.expected_const] 12:1 expected 'const'
-error[masterbelt.parser.concrete.expected_identifier] 12:1 expected identifier
-error[masterbelt.parser.concrete.expected_assign] 12:1 expected '='
-error[masterbelt.parser.concrete.unexpected_token] 12:5 unexpected token: Enum
-error[masterbelt.parser.concrete.expected_const] 16:3 expected 'const'
-error[masterbelt.parser.concrete.expected_assign] 16:7 expected '='
-error[masterbelt.parser.concrete.unexpected_token] 16:13 unexpected token: LParen
-error[masterbelt.parser.concrete.expected_const] 24:1 expected 'const'
-error[masterbelt.parser.concrete.expected_identifier] 24:1 expected identifier
-error[masterbelt.parser.concrete.expected_assign] 24:1 expected '='
-error[masterbelt.parser.concrete.unexpected_token] 24:5 unexpected token: Enum

@@ -1,20 +1,4 @@
 Module
-  Const "" pub
-    doc "A card's rarity tier."
-    type invalid
-    value <none>
-  Const "" pub
-    doc "An elemental affinity."
-    type invalid
-    value <none>
-  Const "isFire" pub
-    doc "Whether this element is Fire."
-    type invalid
-    value <none>
-  Const "" pub
-    doc "A supported display locale."
-    type invalid
-    value <none>
   Const "Top"
     type invalid
     value <none>
