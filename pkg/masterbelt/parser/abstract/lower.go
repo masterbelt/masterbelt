@@ -124,10 +124,11 @@ func lowerBlock(t cst.Tree, buf source.Buffer) []ast.Stmt {
 	return stmts
 }
 
-// lowerStmt lowers a statement node: a return statement, or a bare expression
-// statement.
+// lowerStmt lowers a statement node: a return statement, a switch statement, or
+// a bare expression statement.
 func lowerStmt(t cst.Tree, buf source.Buffer, node *cst.Node) ast.Stmt {
-	if node.Kind() == cst.ReturnStmt {
+	switch {
+	case node.Kind() == cst.ReturnStmt:
 		var value ast.Expr
 		for _, child := range t.Children() {
 			if n, ok := child.Node(); ok && isExprKind(n.Kind()) {
@@ -135,11 +136,98 @@ func lowerStmt(t cst.Tree, buf source.Buffer, node *cst.Node) ast.Stmt {
 			}
 		}
 		return ast.NewReturnStmt(value, node)
-	}
-	if isExprKind(node.Kind()) {
+	case node.Kind() == cst.SwitchStmt:
+		return lowerSwitchStmt(t, buf, node)
+	case isExprKind(node.Kind()):
 		return ast.NewExprStmt(lowerExpr(t, buf), node)
+	default:
+		return nil
 	}
-	return nil
+}
+
+// lowerSwitchStmt lowers a SwitchStmt node: its scrutinee (the first expression
+// child), its value-pattern arms, and the wildcard "_" arm lifted out into the
+// Else body. An arm whose sole value pattern is the bare identifier "_" is the
+// wildcard; the rest carry their value patterns. A second wildcard (malformed)
+// keeps the first as Else and drops the rest, which the semantic layer would
+// already flag as unreachable.
+func lowerSwitchStmt(t cst.Tree, buf source.Buffer, node *cst.Node) ast.Stmt {
+	var scrutinee ast.Expr
+	var arms []*ast.SwitchArm
+	var els []ast.Stmt
+	for _, child := range t.Children() {
+		n, ok := child.Node()
+		if !ok {
+			continue
+		}
+		switch {
+		case n.Kind() == cst.SwitchArm:
+			values, body := lowerSwitchArm(child, buf)
+			if isWildcardArm(values) {
+				if els == nil {
+					els = body
+					if els == nil {
+						// A wildcard with an empty body still marks the switch as
+						// having a catch-all; an empty slice distinguishes it from
+						// "no wildcard at all".
+						els = []ast.Stmt{}
+					}
+				}
+				continue
+			}
+			arms = append(arms, ast.NewSwitchArm(values, body, n))
+		case scrutinee == nil && isExprKind(n.Kind()):
+			scrutinee = lowerExpr(child, buf)
+		}
+	}
+	return ast.NewSwitchStmt(scrutinee, arms, els, node)
+}
+
+// lowerSwitchArm lowers a SwitchArm node to its value patterns and its body. The
+// "->" token splits the arm: every expression child before it is a value
+// pattern, and what follows is the body — a Block (lowered to its statements) or
+// a single inline statement (a return, a nested switch, or a bare expression).
+func lowerSwitchArm(t cst.Tree, buf source.Buffer) (values []ast.Expr, body []ast.Stmt) {
+	seenArrow := false
+	for _, child := range t.Children() {
+		if tok, ok := child.Token(); ok {
+			if tok.Kind() == token.Arrow {
+				seenArrow = true
+			}
+			continue
+		}
+		n, ok := child.Node()
+		if !ok {
+			continue
+		}
+		if !seenArrow {
+			if isExprKind(n.Kind()) {
+				values = append(values, lowerExpr(child, buf))
+			}
+			continue
+		}
+		switch {
+		case n.Kind() == cst.Block:
+			body = lowerBlock(child, buf)
+		case isExprKind(n.Kind()):
+			body = []ast.Stmt{ast.NewExprStmt(lowerExpr(child, buf), n)}
+		default:
+			if s := lowerStmt(child, buf, n); s != nil {
+				body = []ast.Stmt{s}
+			}
+		}
+	}
+	return values, body
+}
+
+// isWildcardArm reports whether an arm's value patterns are the single bare
+// identifier "_", the switch's catch-all.
+func isWildcardArm(values []ast.Expr) bool {
+	if len(values) != 1 {
+		return false
+	}
+	id, ok := values[0].(*ast.Identifier)
+	return ok && id.Name == "_"
 }
 
 // firstOperand lowers the single operand node of a UnaryExpr (nil if absent).
