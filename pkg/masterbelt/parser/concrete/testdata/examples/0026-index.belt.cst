@@ -381,103 +381,43 @@ File
           Ident "m"
       Newline "\n"
       RBrace "}"
-  FuncDecl
+  ConstDecl
     Newline "\n"
     Newline "\n"
-    LineComment "// A write keeps the collection's element count where the index is in range, so a"
+    LineComment "// The writes fold end to end: calling the writers produces the new collections,"
     Newline "\n"
-    LineComment "// length read after it folds to a bool an assertion can check."
+    LineComment "// so the rebind and the set folding are visible in the constants."
     Newline "\n"
-    Pub "pub"
+    Const "const"
     Whitespace " "
-    Fn "fn"
+    Ident "Bumped"
     Whitespace " "
-    Ident "stillThree"
-    ParamList
-      LParen "("
-      RParen ")"
-    Colon ":"
-    Whitespace " "
-    TypeName
-      Ident "bool"
-    Whitespace " "
-    Block
-      LBrace "{"
-      Newline "\n"
-      Whitespace "  "
-      LetStmt
-        Let "let"
-        Whitespace " "
-        Ident "xs"
-        Whitespace " "
-        Initializer
-          Assign "="
-          Whitespace " "
-          CollectionLit
-            LBracket "["
-            Literal
-              Int "1"
-            Comma ","
-            Whitespace " "
-            Literal
-              Int "2"
-            Comma ","
-            Whitespace " "
-            Literal
-              Int "3"
-            RBracket "]"
-      Newline "\n"
-      Whitespace "  "
-      AssignStmt
-        IndexExpr
-          NameRef
-            Ident "xs"
-          LBracket "["
-          Literal
-            Int "1"
-          RBracket "]"
-        Whitespace " "
-        Assign "="
-        Whitespace " "
-        Literal
-          Int "99"
-      Newline "\n"
-      Whitespace "  "
-      ReturnStmt
-        Return "return"
-        Whitespace " "
-        BinaryExpr
-          CallExpr
-            MemberExpr
-              NameRef
-                Ident "xs"
-              Dot "."
-              Ident "len"
-            LParen "("
-            RParen ")"
-          Whitespace " "
-          EqEq "=="
-          Whitespace " "
-          Literal
-            Int "3"
-      Newline "\n"
-      RBrace "}"
-  AssertDecl
-    Newline "\n"
-    Newline "\n"
-    Assert "assert"
-    Whitespace " "
-    BinaryExpr
+    Initializer
+      Assign "="
+      Whitespace " "
       CallExpr
         NameRef
-          Ident "stillThree"
+          Ident "bumpFirst"
         LParen "("
         RParen ")"
+  ConstDecl
+    Whitespace "        "
+    LineComment "// [99, 2, 3]"
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Put"
+    Whitespace "    "
+    Initializer
+      Assign "="
       Whitespace " "
-      EqEq "=="
-      Whitespace " "
-      Literal
-        True "true"
+      CallExpr
+        NameRef
+          Ident "put"
+        LParen "("
+        RParen ")"
+  Whitespace "              "
+  LineComment "// [\"a\": 10, \"b\": 2]"
   Newline "\n"
   EOF ""
 # diagnostics

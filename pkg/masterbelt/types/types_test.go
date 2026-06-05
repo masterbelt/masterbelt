@@ -175,6 +175,56 @@ func TestGenericMethodResult(t *testing.T) {
 	}
 }
 
+// TestIndexMethodResult checks that the index methods' result types substitute
+// the receiver's type variable inside a union and through self: get's T | error
+// becomes int | error on a list<int> (the element variable is bound under the
+// union member), and set's self becomes the receiver type. This is the rule the
+// desugared coll[i] / coll[i] = v rely on — a subscript is just a method call.
+func TestIndexMethodResult(t *testing.T) {
+	reg := builtin.Default()
+
+	tvar := func(name string) ir.Type { return &ir.TypeVar{Name: name} }
+	union := func(members ...ir.Type) ir.Type { return &ir.Union{Members: members} }
+	errType := bt("error")
+
+	// A synthetic list<T> and map<K, V> carrying the prelude's index methods, built
+	// by hand (the prelude is not available to this package).
+	listDef := &ir.TypeDef{Name: "list", Builtin: true, Params: []*ir.TypeParam{{Name: "T"}}}
+	listDef.Methods = []*ir.Method{
+		{Name: "get", Params: []ir.Param{{Name: "index", Type: bt("int")}}, Result: union(tvar("T"), errType)},
+		{Name: "set", Params: []ir.Param{{Name: "index", Type: bt("int")}, {Name: "value", Type: tvar("T")}}, Result: &ir.SelfType{}},
+	}
+	listOf := func(arg ir.Type) ir.Type { return &ir.App{Def: listDef, Args: []ir.Type{arg}} }
+
+	mapDef := &ir.TypeDef{Name: "map", Builtin: true, Params: []*ir.TypeParam{{Name: "K"}, {Name: "V"}}}
+	mapDef.Methods = []*ir.Method{
+		{Name: "get", Params: []ir.Param{{Name: "key", Type: tvar("K")}}, Result: union(tvar("V"), errType)},
+		{Name: "set", Params: []ir.Param{{Name: "key", Type: tvar("K")}, {Name: "value", Type: tvar("V")}}, Result: &ir.SelfType{}},
+	}
+	mapOf := func(k, v ir.Type) ir.Type { return &ir.App{Def: mapDef, Args: []ir.Type{k, v}} }
+
+	cases := []struct {
+		name   string
+		recv   ir.Type
+		method string
+		args   []ir.Type
+		want   string
+	}{
+		// get substitutes the element variable inside the union: T | error becomes
+		// int | error on a list<int>, V | error becomes int | error on a map.
+		{"list get", listOf(bt("int")), "get", []ir.Type{bt("int")}, "int | error"},
+		{"map get", mapOf(bt("string"), bt("int")), "get", []ir.Type{bt("string")}, "int | error"},
+		// set returns self — the receiver type, with its arguments bound.
+		{"list set", listOf(bt("int")), "set", []ir.Type{bt("int"), bt("int")}, "list<int>"},
+		{"map set", mapOf(bt("string"), bt("int")), "set", []ir.Type{bt("string"), bt("int")}, "map<string, int>"},
+	}
+	for _, tc := range cases {
+		if got := MethodResult(reg, tc.recv, tc.method, tc.args).String(); got != tc.want {
+			t.Errorf("%s: MethodResult(%s, %q, ...) = %s, want %s", tc.name, tc.recv, tc.method, got, tc.want)
+		}
+	}
+}
+
 // TestBindReceiver checks the carved-out first half of the method rule: the
 // lookup and the receiver-argument bindings, with the per-method variables
 // left for the caller to solve.

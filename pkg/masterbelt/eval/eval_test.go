@@ -135,6 +135,126 @@ func TestRecordFold(t *testing.T) {
 	}
 }
 
+// strLit builds a string literal expression.
+func strLit(value string) *ast.StringLit { return ast.NewStringLit(value, nil) }
+
+// listLit builds a list literal expression from its element expressions.
+func listLit(elems ...ast.Expr) *ast.CollectionLit {
+	entries := make([]*ast.CollectionEntry, len(elems))
+	for i, e := range elems {
+		entries[i] = &ast.CollectionEntry{Value: e}
+	}
+	return ast.NewCollectionLit(entries, nil)
+}
+
+// mapLit builds a map literal expression from alternating key, value expressions.
+func mapLit(kv ...ast.Expr) *ast.CollectionLit {
+	var entries []*ast.CollectionEntry
+	for i := 0; i+1 < len(kv); i += 2 {
+		entries = append(entries, &ast.CollectionEntry{Key: kv[i], Value: kv[i+1]})
+	}
+	return ast.NewCollectionLit(entries, nil)
+}
+
+// indexGet builds the desugared form of a read coll[i]: coll.get(i).
+func indexGet(coll, index ast.Expr) *ast.CallExpr {
+	m := ast.NewMemberExpr(coll, ast.NewIdentifier("get", nil), nil)
+	return ast.NewCallExpr(m, []ast.Expr{index}, nil)
+}
+
+// indexSet builds the desugared form of a write coll[i] = v: coll.set(i, v).
+func indexSet(coll, index, value ast.Expr) *ast.CallExpr {
+	m := ast.NewMemberExpr(coll, ast.NewIdentifier("set", nil), nil)
+	return ast.NewCallExpr(m, []ast.Expr{index, value}, nil)
+}
+
+// TestIndexGetFold covers the subscript read fold: an in-range list index and a
+// present map key fold to the element, an out-of-range index or an absent key
+// fold to an error value (a miss is a value, not an unfoldable result), and a
+// non-integer list index does not fold.
+func TestIndexGetFold(t *testing.T) {
+	env := stubEnv{reg: builtin.Default()}
+	list := listLit(intLit("10"), intLit("20"), intLit("30"))
+	m := mapLit(strLit("a"), intLit("1"), strLit("b"), intLit("2"))
+
+	cases := []struct {
+		name string
+		expr ast.Expr
+		want string // the folded constant's String(), or "" for "does not fold"
+	}{
+		{"list in range first", indexGet(list, intLit("0")), "10"},
+		{"list in range last", indexGet(list, intLit("2")), "30"},
+		{"list out of range high", indexGet(list, intLit("5")), `error("index out of range")`},
+		{"list out of range negative", indexGet(list, intLit("-1")), `error("index out of range")`},
+		{"empty list", indexGet(listLit(), intLit("0")), `error("index out of range")`},
+		{"map key present", indexGet(m, strLit("a")), "1"},
+		{"map key present other", indexGet(m, strLit("b")), "2"},
+		{"map key absent", indexGet(m, strLit("z")), `error("key not found")`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			v := Expr(tc.expr, env)
+			if tc.want == "" {
+				if v != nil {
+					t.Fatalf("Expr = %v, want nil (does not fold)", v)
+				}
+				return
+			}
+			if v == nil {
+				t.Fatalf("Expr = nil, want %s", tc.want)
+			}
+			if got := v.String(); got != tc.want {
+				t.Errorf("Expr = %s, want %s", got, tc.want)
+			}
+		})
+	}
+}
+
+// TestIndexSetFold covers the subscript write fold: it returns the new
+// collection, leaving the receiver unchanged. A list write replaces the element
+// at an in-range index and does not fold past the end; a map write upserts —
+// updating an existing key, appending a new one.
+func TestIndexSetFold(t *testing.T) {
+	env := stubEnv{reg: builtin.Default()}
+
+	t.Run("list replace in range", func(t *testing.T) {
+		v := Expr(indexSet(listLit(intLit("1"), intLit("2"), intLit("3")), intLit("0"), intLit("99")), env)
+		if v == nil || v.String() != "[99, 2, 3]" {
+			t.Fatalf("set = %v, want [99, 2, 3]", v)
+		}
+	})
+
+	t.Run("list out of range does not fold", func(t *testing.T) {
+		if v := Expr(indexSet(listLit(intLit("1")), intLit("9"), intLit("0")), env); v != nil {
+			t.Errorf("set = %v, want nil (out of range is reported as index_out_of_range)", v)
+		}
+	})
+
+	t.Run("map update existing key", func(t *testing.T) {
+		v := Expr(indexSet(mapLit(strLit("a"), intLit("1")), strLit("a"), intLit("10")), env)
+		if v == nil || v.String() != `["a": 10]` {
+			t.Fatalf("set = %v, want [\"a\": 10]", v)
+		}
+	})
+
+	t.Run("map add new key", func(t *testing.T) {
+		v := Expr(indexSet(mapLit(strLit("a"), intLit("1")), strLit("b"), intLit("2")), env)
+		if v == nil || v.String() != `["a": 1, "b": 2]` {
+			t.Fatalf("set = %v, want [\"a\": 1, \"b\": 2]", v)
+		}
+	})
+
+	t.Run("receiver unchanged", func(t *testing.T) {
+		// The receiver literal folds the same before and after a set on it: the
+		// write builds a new collection rather than mutating the original.
+		recv := listLit(intLit("1"), intLit("2"))
+		_ = Expr(indexSet(recv, intLit("0"), intLit("99")), env)
+		if got := Expr(recv, env).String(); got != "[1, 2]" {
+			t.Errorf("receiver = %s, want [1, 2] (a set does not mutate it)", got)
+		}
+	})
+}
+
 // TestDatetimeMillis covers the datetime literal normalization: ISO instants
 // (with and without milliseconds) to UTC epoch milliseconds, offsets
 // normalized away, and malformed text folding to nothing.

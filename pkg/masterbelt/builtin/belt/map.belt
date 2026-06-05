@@ -1,10 +1,19 @@
 use { bool } from "./bool.belt"
 use { int } from "./int.belt"
+use { error } from "./error.belt"
 
 /// A key-value mapping, written [k: v, ...].
 pub type map<K, V> = builtin<K, V> impl {
   /// The number of entries.
   pub extern fn len(): int
+
+  /// The value for key, or an error when the key is not present. The result is
+  /// a union (V | error) because a lookup can miss; handle the error.
+  pub extern fn get(key: K): V | error
+
+  /// A new map with key set to value — an upsert that updates an existing key
+  /// or adds a new one — leaving this one unchanged. A map write always succeeds.
+  pub extern fn set(key: K, value: V): self
 
   /// The + operator: the merge of the two maps.
   pub extern fn add(other: self): self

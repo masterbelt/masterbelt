@@ -6,9 +6,11 @@ Module
   Const "First"
     type int | error
     value Reference -> "Xs".get(IntLiteral "0")
+    eval 10
   Const "Third"
     type int | error
     value Reference -> "Xs".get(IntLiteral "2")
+    eval 30
   Const "Tbl"
     type map<string, int>
     value [StringLiteral "sword": IntLiteral "100", StringLiteral "shield": IntLiteral "50"]
@@ -16,6 +18,15 @@ Module
   Const "Sword"
     type int | error
     value Reference -> "Tbl".get(StringLiteral "sword")
+    eval 100
+  Const "Bumped"
+    type list<int>
+    value bumpFirst()
+    eval [99, 2, 3]
+  Const "Put"
+    type map<string, int>
+    value put()
+    eval ["a": 10, "b": 2]
   Func "at" pub
     param xs: list<int>
     param i: int
@@ -32,11 +43,3 @@ Module
       assign "m" = LocalRef "m".set(StringLiteral "a", IntLiteral "10")
       assign "m" = LocalRef "m".set(StringLiteral "b", IntLiteral "2")
       return LocalRef "m"
-  Func "stillThree" pub
-    result bool
-      let "xs": list<int> = [IntLiteral "1", IntLiteral "2", IntLiteral "3"]
-      assign "xs" = LocalRef "xs".set(IntLiteral "1", IntLiteral "99")
-      return LocalRef "xs".len().eql(IntLiteral "3")
-  Assert "stillThree() == true"
-    eval <unevaluated>
-      stillThree() == true

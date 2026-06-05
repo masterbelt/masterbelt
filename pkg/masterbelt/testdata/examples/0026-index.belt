@@ -41,12 +41,7 @@ pub fn put(): map<string, int> {
   return m
 }
 
-// A write keeps the collection's element count where the index is in range, so a
-// length read after it folds to a bool an assertion can check.
-pub fn stillThree(): bool {
-  let xs = [1, 2, 3]
-  xs[1] = 99
-  return xs.len() == 3
-}
-
-assert stillThree() == true
+// The writes fold end to end: calling the writers produces the new collections,
+// so the rebind and the set folding are visible in the constants.
+const Bumped = bumpFirst()        // [99, 2, 3]
+const Put    = put()              // ["a": 10, "b": 2]
