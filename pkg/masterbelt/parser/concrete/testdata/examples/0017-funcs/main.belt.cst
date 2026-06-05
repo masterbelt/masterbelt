@@ -1,0 +1,162 @@
+# tree
+File
+  UseDecl
+    LineComment "// The importer: selective and namespace imports of functions."
+    Newline "\n"
+    Use "use"
+    Whitespace " "
+    UseList
+      LBrace "{"
+      Whitespace " "
+      Ident "double"
+      Comma ","
+      Whitespace " "
+      Ident "area"
+      Comma ","
+      Whitespace " "
+      Ident "scale"
+      Whitespace " "
+      RBrace "}"
+    Whitespace " "
+    From "from"
+    Whitespace " "
+    String "\"math.belt\""
+  UseDecl
+    Newline "\n"
+    Use "use"
+    Whitespace " "
+    Ident "math"
+    Whitespace " "
+    From "from"
+    Whitespace " "
+    String "\"math.belt\""
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "A"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "double"
+        LParen "("
+        Literal
+          Int "21"
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "B"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "area"
+        LParen "("
+        Literal
+          Int "3"
+        Comma ","
+        Whitespace " "
+        Literal
+          Int "4"
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// The overload set imports as one name; the argument selects."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "C"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "scale"
+        LParen "("
+        Literal
+          Int "4"
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "D"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "scale"
+        LParen "("
+        CollectionLit
+          LBracket "["
+          Literal
+            Int "1"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "2"
+          RBracket "]"
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// A namespace import calls through the qualifier."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "E"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        MemberExpr
+          NameRef
+            Ident "math"
+          Dot "."
+          Ident "greet"
+        LParen "("
+        Literal
+          String "\"belt\""
+        RParen ")"
+  AssertDecl
+    Newline "\n"
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      CallExpr
+        MemberExpr
+          NameRef
+            Ident "math"
+          Dot "."
+          Ident "double"
+        LParen "("
+        Literal
+          Int "2"
+        RParen ")"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "double"
+        LParen "("
+        Literal
+          Int "2"
+        RParen ")"
+  Newline "\n"
+  EOF ""
+# diagnostics

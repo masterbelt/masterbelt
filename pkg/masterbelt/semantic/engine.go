@@ -299,11 +299,13 @@ func equalValue(kind queryKind, old, new any) bool {
 	case qImports:
 		a, _ := old.(importTable)
 		b, _ := new.(importTable)
-		return maps.Equal(a.values, b.values) && maps.Equal(a.types, b.types) && maps.Equal(a.namespaces, b.namespaces)
+		return maps.Equal(a.values, b.values) && maps.Equal(a.types, b.types) &&
+			maps.EqualFunc(a.funcs, b.funcs, equalFuncBindings) && maps.Equal(a.namespaces, b.namespaces)
 	case qExports:
 		a, _ := old.(exports)
 		b, _ := new.(exports)
-		return maps.Equal(a.consts, b.consts) && maps.Equal(a.types, b.types)
+		return maps.Equal(a.consts, b.consts) && maps.Equal(a.types, b.types) &&
+			maps.EqualFunc(a.funcs, b.funcs, slices.Equal)
 	case qReachable:
 		a, _ := old.(map[FileID]bool)
 		b, _ := new.(map[FileID]bool)
@@ -328,6 +330,12 @@ func equalValue(kind queryKind, old, new any) bool {
 	default:
 		return reflect.DeepEqual(old, new)
 	}
+}
+
+// equalFuncBindings is funcBinding equality for the cutoff: the overload set's
+// declaration pointers and the ambiguity verdict are the facts.
+func equalFuncBindings(a, b funcBinding) bool {
+	return a.ambiguous == b.ambiguous && slices.Equal(a.targets, b.targets)
 }
 
 // equalConstants is constant equality for the cutoff: structural for the data
@@ -508,8 +516,16 @@ func (db *database) compute(key queryKey) any {
 		in, _ := db.read(inputKey(key.file)).(fileInput)
 		return buildFuncSymbols(in.file)
 	case qResolveFunc:
+		// Local functions shadow imports, exactly as values do.
 		syms := db.read(funcSymbolsKey(key.file)).(map[string][]*ast.FuncDecl)
-		return syms[key.id.Name]
+		if fds := syms[key.id.Name]; len(fds) > 0 {
+			return fds
+		}
+		imp, _ := db.read(importsKey(key.file)).(importTable)
+		if b, ok := imp.funcs[key.id.Name]; ok && !b.ambiguous {
+			return b.targets
+		}
+		return ([]*ast.FuncDecl)(nil)
 	case qTypeOf:
 		return infer.Decl(key.decl, typeEnv{q: engineQueries{db}, file: db.declFile[key.decl]})
 	case qValue:
@@ -587,7 +603,18 @@ func (e engineQueries) resolve(file FileID, id *ast.Identifier) *ast.ConstDecl {
 
 func (e engineQueries) ambiguousImport(file FileID, id *ast.Identifier) bool {
 	r, _ := e.db.read(resolveKey(file, id)).(resolution)
-	return r.ambiguous
+	if r.ambiguous {
+		return true
+	}
+	// A function name two or more imports claimed is just as ambiguous —
+	// unless a local function shadows the imports.
+	syms, _ := e.db.read(funcSymbolsKey(file)).(map[string][]*ast.FuncDecl)
+	if len(syms[id.Name]) > 0 {
+		return false
+	}
+	imp, _ := e.db.read(importsKey(file)).(importTable)
+	b, ok := imp.funcs[id.Name]
+	return ok && b.ambiguous
 }
 
 func (e engineQueries) resolveMember(file FileID, m *ast.MemberExpr) *ast.ConstDecl {
@@ -597,6 +624,10 @@ func (e engineQueries) resolveMember(file FileID, m *ast.MemberExpr) *ast.ConstD
 func (e engineQueries) resolveFunc(file FileID, id *ast.Identifier) []*ast.FuncDecl {
 	fds, _ := e.db.read(resolveFuncKey(file, id)).([]*ast.FuncDecl)
 	return fds
+}
+
+func (e engineQueries) resolveFuncMember(file FileID, m *ast.MemberExpr) []*ast.FuncDecl {
+	return resolveFuncMemberThrough(e, file, m)
 }
 
 func (e engineQueries) typeOf(decl *ast.ConstDecl) ir.Type {

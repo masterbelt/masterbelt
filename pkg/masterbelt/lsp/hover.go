@@ -149,12 +149,12 @@ func definition(doc view, offset int) []protocol.Location {
 		return declLocation(doc.viewOfType(t))(t.Syntax.Syntax())
 	}
 	if fns, _, ok := funcAt(doc, offset); ok {
-		// Every overload is a target; function resolution is file-local, so
-		// the declarations are in doc.
+		// Every overload is a target, in its own file — an imported callee
+		// jumps to the exporter.
 		var locs []protocol.Location
 		for _, f := range fns {
 			if f.Syntax != nil {
-				locs = append(locs, declLocation(doc, true)(f.Syntax.Syntax())...)
+				locs = append(locs, declLocation(doc.viewOfFunc(f.Syntax))(f.Syntax.Syntax())...)
 			}
 		}
 		return locs

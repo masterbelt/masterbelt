@@ -78,6 +78,26 @@ func (v view) ResolveFunc(id *ast.Identifier) []*ast.FuncDecl {
 	return v.ws.prog.ResolveFunc(v.id, id)
 }
 
+func (v view) ResolveFuncMember(m *ast.MemberExpr) []*ast.FuncDecl {
+	return v.ws.prog.ResolveFuncMember(v.id, m)
+}
+
+func (v view) FunctionOf(fd *ast.FuncDecl) *ir.Function { return v.ws.prog.FunctionOf(fd) }
+
+func (v view) FunctionsInScope() []*ir.Function { return v.ws.prog.FunctionsInScope(v.id) }
+
+// viewOfFunc is viewOf for a function declaration.
+func (v view) viewOfFunc(fd *ast.FuncDecl) (view, bool) {
+	id, ok := v.ws.prog.FileOfFunc(fd)
+	if !ok {
+		return view{}, false
+	}
+	if id == v.id {
+		return v, true
+	}
+	return view{ws: v.ws, id: id, uri: v.ws.uriFor(id)}, true
+}
+
 func (v view) ResolveUseName(u *ast.UseDecl, name string) *ir.Const {
 	return v.ws.prog.ResolveUseName(v.id, u, name)
 }

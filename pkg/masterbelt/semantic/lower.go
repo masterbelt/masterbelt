@@ -31,8 +31,13 @@ func (b constBinder) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
 			return &ir.Reference{Target: b.irOf[target]}
 		}
 	case *ast.CallExpr:
-		if id, ok := e.Callee.(*ast.Identifier); ok {
-			if cands := b.q.resolveFunc(b.file, id); len(cands) > 0 {
+		switch callee := e.Callee.(type) {
+		case *ast.Identifier:
+			if cands := b.q.resolveFunc(b.file, callee); len(cands) > 0 {
+				return funcCall(b.fnOf[pickOverload(cands, len(e.Arguments))], e.Arguments, sub)
+			}
+		case *ast.MemberExpr:
+			if cands := b.q.resolveFuncMember(b.file, callee); len(cands) > 0 {
 				return funcCall(b.fnOf[pickOverload(cands, len(e.Arguments))], e.Arguments, sub)
 			}
 		}
@@ -61,18 +66,28 @@ func pickOverload(cands []*ast.FuncDecl, arity int) *ast.FuncDecl {
 
 func (b constBinder) EnterFunc(params []*ast.ParamDef) lower.Binder { return enterFunc(b, params) }
 
+// bodyFuncs is what a body binder needs to lower function calls: the file's
+// own shells by name, the namespace-qualified declaration lookup (nil when no
+// namespaces are in scope), and the program-wide shell table mapping a
+// resolved declaration to its shell.
+type bodyFuncs struct {
+	local     map[string][]*ir.Function
+	qualified func(namespace, name string) []*ast.FuncDecl
+	shells    map[*ast.FuncDecl]*ir.Function
+}
+
 // bodyBinder lowers the leaves of a method or function body: self (methods
 // only), a parameter reference, a record field access (recv.field), a type
 // conversion (T(x), when the callee names a type), a call of a top-level
-// function, or nothing. The type-name resolution for a conversion is the
-// resolver's; params and tscope are the parameter and generic-parameter names
-// in scope, and funcs the file's functions by name (nil when none are in
-// scope).
+// function (by name or through a namespace import), or nothing. The type-name
+// resolution for a conversion is the resolver's; params and tscope are the
+// parameter and generic-parameter names in scope, and funcs the function
+// surface callable from the body.
 type bodyBinder struct {
 	r      *infer.TypeResolver
 	params map[string]bool
 	tscope map[string]bool
-	funcs  map[string][]*ir.Function
+	funcs  bodyFuncs
 	self   bool // whether self has a value here (a method body; never a function's)
 }
 
@@ -97,17 +112,30 @@ func (b bodyBinder) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
 		return &ir.FieldAccess{Receiver: sub(e.Receiver), Field: e.Member.Name}
 	case *ast.CallExpr:
 		// A call whose callee names a type is a conversion T(x); one that
-		// names a top-level function is a function call.
-		if id, ok := e.Callee.(*ast.Identifier); ok && !b.params[id.Name] {
-			if t := b.r.ResolveName(id.Name, b.tscope); t != ir.Invalid {
+		// names a top-level function — by name, or through a namespace import
+		// (geo.area(...)) — is a function call.
+		switch callee := e.Callee.(type) {
+		case *ast.Identifier:
+			if b.params[callee.Name] {
+				return nil
+			}
+			if t := b.r.ResolveName(callee.Name, b.tscope); t != ir.Invalid {
 				var arg ir.Value
 				if len(e.Arguments) > 0 {
 					arg = sub(e.Arguments[0])
 				}
 				return &ir.Conversion{Type: t, Value: arg}
 			}
-			if cands := b.funcs[id.Name]; len(cands) > 0 {
+			if cands := b.funcs.local[callee.Name]; len(cands) > 0 {
 				return funcCall(pickShellOverload(cands, len(e.Arguments)), e.Arguments, sub)
+			}
+		case *ast.MemberExpr:
+			recv, ok := callee.Receiver.(*ast.Identifier)
+			if !ok || b.params[recv.Name] || b.funcs.qualified == nil {
+				return nil
+			}
+			if cands := b.funcs.qualified(recv.Name, callee.Member.Name); len(cands) > 0 {
+				return funcCall(b.funcs.shells[pickOverload(cands, len(e.Arguments))], e.Arguments, sub)
 			}
 		}
 		return nil

@@ -37,6 +37,10 @@ type Env interface {
 	// every same-name function declaration, in source order — or nil if no
 	// function has that name.
 	ResolveFunc(id *ast.Identifier) []*ast.FuncDecl
+	// ResolveFuncMember returns the overload set a namespace function call
+	// (geo.area(...)) refers to: the namespace target's exported functions of
+	// that name, or nil.
+	ResolveFuncMember(m *ast.MemberExpr) []*ast.FuncDecl
 	// ValueOf returns a declaration's evaluated value, or nil when it cannot be
 	// evaluated.
 	ValueOf(decl *ast.ConstDecl) *ir.Constant
@@ -155,6 +159,15 @@ func evalExpr(e ast.Expr, ctx evalCtx) *ir.Constant {
 				}
 			}
 			return nil
+		}
+		// A member-access callee whose receiver names a namespace applies the
+		// imported function; a local binding shadows the namespace.
+		if recv, isIdent := member.Receiver.(*ast.Identifier); isIdent {
+			if _, isLocal := ctx.locals[recv.Name]; !isLocal {
+				if cands := ctx.env.ResolveFuncMember(member); len(cands) > 0 {
+					return applyFunc(cands, e.Arguments, ctx)
+				}
+			}
 		}
 		recv := evalExpr(member.Receiver, ctx)
 		args := make([]*ir.Constant, len(e.Arguments))

@@ -58,10 +58,14 @@ type queries interface {
 	// the member is not among the target's exported values.
 	resolveMember(file FileID, m *ast.MemberExpr) *ast.ConstDecl
 	// resolveFunc returns the overload set a call's callee name refers to —
-	// every same-name function declaration in the file, in source order — or
-	// nil if none has that name. Like resolve it is keyed on the identifier,
-	// keeping early cutoff sharp.
+	// the file's own same-name declarations in source order, or the set an
+	// unambiguous import binds — or nil if none has that name. Like resolve
+	// it is keyed on the identifier, keeping early cutoff sharp.
 	resolveFunc(file FileID, id *ast.Identifier) []*ast.FuncDecl
+	// resolveFuncMember returns the overload set a namespace function call
+	// (geo.area(...)) refers to: the target's exported functions of that
+	// name, or nil.
+	resolveFuncMember(file FileID, m *ast.MemberExpr) []*ast.FuncDecl
 	// typeOf returns a constant's type (ir.Invalid when undeterminable).
 	typeOf(decl *ast.ConstDecl) ir.Type
 	// valueOf returns a constant's evaluated value, or nil when it cannot be
@@ -111,6 +115,9 @@ func (e typeEnv) ResolveMember(m *ast.MemberExpr) *ast.ConstDecl {
 }
 func (e typeEnv) ResolveFunc(id *ast.Identifier) []*ast.FuncDecl {
 	return e.q.resolveFunc(e.file, id)
+}
+func (e typeEnv) ResolveFuncMember(m *ast.MemberExpr) []*ast.FuncDecl {
+	return e.q.resolveFuncMember(e.file, m)
 }
 func (e typeEnv) TypeOf(decl *ast.ConstDecl) ir.Type { return e.q.typeOf(decl) }
 func (e typeEnv) Universe() map[string]*ir.TypeDef   { return e.q.universe(e.file) }
@@ -538,15 +545,17 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 	// pass re-resolves the declarations fresh and discards the definitions.
 	module.Types = q.typeDefs(fileID)
 	imp := q.importsOf(fileID)
-	resolveTypes(file, at, diags, reg, outerTypes(q, imp), qualifiedFrom(q, imp), funcShellsByName(file, fnShells))
+	bfns := bodyFuncs{local: funcShellsByName(file, fnShells), qualified: qualifiedFuncsFrom(q, imp), shells: fnShells}
+	resolveTypes(file, at, diags, reg, outerTypes(q, imp), qualifiedFrom(q, imp), bfns)
 
 	// The module's functions are this file's shells, their signatures and
 	// bodies (re)resolved here with reporting; their bodies type-check the
 	// same way method bodies do.
 	funcs := buildFuncSymbols(file)
-	module.Funcs = resolveFuncs(file, at, diags, q.universe(fileID), qualifiedFrom(q, imp), fnShells)
-	checkMethodBodies(reg, module.Types, q.universe(fileID), qualifiedFrom(q, imp), funcs, exprSink(at, diags))
-	checkFuncBodies(reg, file, q.universe(fileID), qualifiedFrom(q, imp), funcs, at, diags)
+	qfns := qualifiedFuncsFrom(q, imp)
+	module.Funcs = resolveFuncs(file, at, diags, q.universe(fileID), qualifiedFrom(q, imp), qfns, fnShells)
+	checkMethodBodies(reg, module.Types, q.universe(fileID), qualifiedFrom(q, imp), funcs, qfns, exprSink(at, diags))
+	checkFuncBodies(reg, file, q.universe(fileID), qualifiedFrom(q, imp), funcs, qfns, at, diags)
 
 	items := diags.Items()
 	sort.SliceStable(items, func(i, j int) bool { return items[i].Offset < items[j].Offset })
@@ -699,6 +708,9 @@ func checkUses(fileID FileID, file *ast.File, q queries, at func(ast.Node) span,
 			if _, isType := exp.types[name]; isType {
 				continue
 			}
+			if _, isFunc := exp.funcs[name]; isFunc {
+				continue
+			}
 			diags.Add(newNotExportedDiagnostic(s.offset, s.width, name, u.Path))
 		}
 		if q.reachableFrom(target)[fileID] {
@@ -738,11 +750,19 @@ func computeReachable(q queries, from FileID) map[FileID]bool {
 // ast.WalkExprs traversal, so the skeleton lives in one place.
 func walkRefs(fileID FileID, e ast.Expr, q queries, onIdent func(*ast.Identifier), onMember func(*ast.MemberExpr)) {
 	funcCallee := map[*ast.Identifier]bool{}
+	funcMemberCallee := map[*ast.MemberExpr]bool{}
 	ast.WalkExprs(e, func(e ast.Expr) bool {
 		switch e := e.(type) {
 		case *ast.CallExpr:
-			if id, ok := e.Callee.(*ast.Identifier); ok && len(q.resolveFunc(fileID, id)) > 0 {
-				funcCallee[id] = true
+			switch callee := e.Callee.(type) {
+			case *ast.Identifier:
+				if len(q.resolveFunc(fileID, callee)) > 0 {
+					funcCallee[callee] = true
+				}
+			case *ast.MemberExpr:
+				if len(q.resolveFuncMember(fileID, callee)) > 0 {
+					funcMemberCallee[callee] = true
+				}
 			}
 		case *ast.Identifier:
 			if !funcCallee[e] {
@@ -750,7 +770,9 @@ func walkRefs(fileID FileID, e ast.Expr, q queries, onIdent func(*ast.Identifier
 			}
 		case *ast.MemberExpr:
 			if recv, ok := e.Receiver.(*ast.Identifier); ok && isNamespace(fileID, recv, q) {
-				onMember(e)
+				if !funcMemberCallee[e] {
+					onMember(e)
+				}
 				return false
 			}
 		}
@@ -885,14 +907,30 @@ func (d *directQueries) funcSymbols(f FileID) map[string][]*ast.FuncDecl {
 }
 
 func (d *directQueries) resolveFunc(f FileID, id *ast.Identifier) []*ast.FuncDecl {
-	return d.funcSymbols(f)[id.Name]
+	if fds := d.funcSymbols(f)[id.Name]; len(fds) > 0 {
+		return fds
+	}
+	if b, ok := d.importsOf(f).funcs[id.Name]; ok && !b.ambiguous {
+		return b.targets
+	}
+	return nil
+}
+
+func (d *directQueries) resolveFuncMember(f FileID, m *ast.MemberExpr) []*ast.FuncDecl {
+	return resolveFuncMemberThrough(d, f, m)
 }
 
 func (d *directQueries) ambiguousImport(f FileID, id *ast.Identifier) bool {
 	if d.symbols(f)[id.Name] != nil {
 		return false
 	}
-	b, ok := d.importsOf(f).values[id.Name]
+	if b, ok := d.importsOf(f).values[id.Name]; ok && b.ambiguous {
+		return true
+	}
+	if len(d.funcSymbols(f)[id.Name]) > 0 {
+		return false
+	}
+	b, ok := d.importsOf(f).funcs[id.Name]
 	return ok && b.ambiguous
 }
 
@@ -926,7 +964,9 @@ func (d *directQueries) exportsOf(f FileID) exports {
 
 func (d *directQueries) typeDefsOf(f FileID) typeDefs {
 	return memoize(d.defs, d.resolving, f, typeDefs{}, func() typeDefs {
-		return buildTypeDefs(d, d.files[f], d.importsOf(f), funcShellsByName(d.files[f], d.fnShells))
+		imp := d.importsOf(f)
+		fns := bodyFuncs{local: funcShellsByName(d.files[f], d.fnShells), qualified: qualifiedFuncsFrom(d, imp), shells: d.fnShells}
+		return buildTypeDefs(d, d.files[f], imp, fns)
 	})
 }
 

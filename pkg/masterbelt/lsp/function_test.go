@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/masterbelt/masterbelt/internal/belttest"
 	protocol "github.com/owenrumney/go-lsp/lsp"
 )
 
@@ -132,5 +133,104 @@ func TestDocumentSymbolsIncludeFunctions(t *testing.T) {
 	}
 	if fn.Detail != "pub fn double(x: int): int" {
 		t.Errorf("double detail = %q, want the signature", fn.Detail)
+	}
+}
+
+// --- cross-file functions ---------------------------------------------------------
+
+const funcMainSrc = "use { double } from \"math.belt\"\nuse math from \"math.belt\"\nconst A = double(21)\nconst B = math.greet(\"belt\")\n"
+
+func funcProject(t *testing.T) (root string) {
+	return belttest.WriteFiles(t, map[string]string{
+		"masterbelt.toml": "entry = \"main.belt\"\n",
+		"main.belt":       funcMainSrc,
+		"math.belt":       "/// doubles x\npub fn double(x: int): int -> x * 2\n/// greets\npub fn greet(name: string): string -> name\n",
+	})
+}
+
+// TestCrossFileFunctionHover: hovering an imported callee and a namespace
+// callee shows the exporter's signature and doc.
+func TestCrossFileFunctionHover(t *testing.T) {
+	root := funcProject(t)
+	s := NewServer()
+	uri := openOnDisk(t, s, root, "main.belt")
+	v := s.open[uri]
+
+	if diags := v.Diagnostics(); len(diags) != 0 {
+		t.Fatalf("diagnostics = %v, want none", diags)
+	}
+
+	h := hover(v, strings.Index(funcMainSrc, "double(21)"))
+	if h == nil {
+		t.Fatal("no hover on the imported callee")
+	}
+	if !strings.Contains(h.Contents.Value, "pub fn double(x: int): int") || !strings.Contains(h.Contents.Value, "doubles x") {
+		t.Errorf("hover = %q, want the exporter's signature and doc", h.Contents.Value)
+	}
+
+	h = hover(v, strings.Index(funcMainSrc, "greet(\"belt\")"))
+	if h == nil {
+		t.Fatal("no hover on the namespace callee")
+	}
+	if !strings.Contains(h.Contents.Value, "pub fn greet(name: string): string") {
+		t.Errorf("hover = %q, want the exporter's signature", h.Contents.Value)
+	}
+}
+
+// TestCrossFileFunctionDefinition: go-to-definition on an imported callee and
+// a namespace callee jumps into the exporting file.
+func TestCrossFileFunctionDefinition(t *testing.T) {
+	root := funcProject(t)
+	s := NewServer()
+	uri := openOnDisk(t, s, root, "main.belt")
+	v := s.open[uri]
+
+	cases := []struct {
+		name   string
+		offset int
+		// math.belt line 1: "pub fn double(x: int): int -> x * 2"
+		//           line 3: "pub fn greet(name: string): string -> name"
+		wantLine, wantStart, wantEnd int
+	}{
+		{"imported callee", strings.Index(funcMainSrc, "double(21)"), 1, 7, 13},
+		{"namespace callee", strings.Index(funcMainSrc, "greet(\"belt\")"), 3, 7, 12},
+	}
+	mathURI := fileURI(root, "math.belt")
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			locs := definition(v, tc.offset)
+			if len(locs) != 1 {
+				t.Fatalf("got %d locations, want 1", len(locs))
+			}
+			if locs[0].URI != mathURI {
+				t.Errorf("URI = %q, want %q", locs[0].URI, mathURI)
+			}
+			r := locs[0].Range
+			if r.Start.Line != tc.wantLine || r.Start.Character != tc.wantStart || r.End.Character != tc.wantEnd {
+				t.Errorf("range = %+v, want line %d cols %d..%d", r, tc.wantLine, tc.wantStart, tc.wantEnd)
+			}
+		})
+	}
+}
+
+// TestCompletionOffersImportedFunctions: an imported function appears in
+// value-position completion alongside the local names.
+func TestCompletionOffersImportedFunctions(t *testing.T) {
+	root := funcProject(t)
+	s := NewServer()
+	uri := openOnDisk(t, s, root, "main.belt")
+	v := s.open[uri]
+
+	offset := strings.Index(funcMainSrc, "double(21)") + 3
+	got := byLabel(completion(v, offset).Items)
+	if _, ok := got["double"]; !ok {
+		t.Fatalf("completion missing the imported function double")
+	}
+	if d := got["double"].Detail; d != "pub fn double(x: int): int" {
+		t.Errorf("double detail = %q, want the signature", d)
+	}
+	// greet arrives only through the namespace import, not by bare name.
+	if _, ok := got["greet"]; ok {
+		t.Error("completion offered greet, which no selective import binds")
 	}
 }

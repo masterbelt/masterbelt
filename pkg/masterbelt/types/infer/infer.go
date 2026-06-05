@@ -45,6 +45,10 @@ type Env interface {
 	// every same-name function declaration, in source order — or nil if no
 	// function has that name.
 	ResolveFunc(id *ast.Identifier) []*ast.FuncDecl
+	// ResolveFuncMember returns the overload set a namespace function call
+	// (geo.area(...)) refers to: the namespace target's exported functions of
+	// that name, or nil.
+	ResolveFuncMember(m *ast.MemberExpr) []*ast.FuncDecl
 	// TypeOf returns a declaration's type (ir.Invalid when undeterminable).
 	TypeOf(decl *ast.ConstDecl) ir.Type
 	// Universe returns the named type definitions annotations resolve in: the
@@ -78,6 +82,10 @@ type scope interface {
 	// a parameter shadows a same-named function, and in a method body a type
 	// name (a conversion) wins over one.
 	fn(id *ast.Identifier) []*ast.FuncDecl
+	// fnMember resolves a call's member-access callee (geo.area) to the
+	// overload set the namespace's target exports, or nil when the receiver
+	// names no namespace (a value's method call).
+	fnMember(m *ast.MemberExpr) []*ast.FuncDecl
 }
 
 // Decl is the type rule for a declaration: an annotation gives a concrete type,
@@ -246,6 +254,15 @@ func (s funcScope) fn(id *ast.Identifier) []*ast.FuncDecl {
 	return s.outer.fn(id)
 }
 
+func (s funcScope) fnMember(m *ast.MemberExpr) []*ast.FuncDecl {
+	if recv, ok := m.Receiver.(*ast.Identifier); ok {
+		if _, isParam := s.params[recv.Name]; isParam {
+			return nil // a parameter shadows a same-named namespace
+		}
+	}
+	return s.outer.fnMember(m)
+}
+
 // collectionType infers a collection literal's type: list<E> from the unified
 // element type, or map<K, V> from the unified key and value types. An empty
 // literal has no entries to infer from, so its type comes from the annotation,
@@ -324,6 +341,10 @@ func (s constScope) leaf(e ast.Expr) ir.Type {
 
 func (s constScope) fn(id *ast.Identifier) []*ast.FuncDecl { return s.env.ResolveFunc(id) }
 
+func (s constScope) fnMember(m *ast.MemberExpr) []*ast.FuncDecl {
+	return s.env.ResolveFuncMember(m)
+}
+
 // BodyScope types a method or function body: the receiver type (Self —
 // ir.Invalid in a function, which has none), the parameter types (Params),
 // the type universe (Universe) a conversion resolves against, and the
@@ -340,6 +361,10 @@ type BodyScope struct {
 	// its overload set in source order — or nil when none are in scope (a
 	// refinement predicate).
 	Funcs map[string][]*ast.FuncDecl
+	// QualifiedFuncs is the namespace-qualified function lookup
+	// (geo.area -> the target's exported overload set), or nil when no
+	// namespaces are in scope.
+	QualifiedFuncs func(namespace, name string) []*ast.FuncDecl
 }
 
 // Body infers the type of a method-body expression: self, a parameter, a
@@ -361,6 +386,17 @@ func (s BodyScope) fn(id *ast.Identifier) []*ast.FuncDecl {
 		return nil // a type name is a conversion, which wins in a body
 	}
 	return s.Funcs[id.Name]
+}
+
+func (s BodyScope) fnMember(m *ast.MemberExpr) []*ast.FuncDecl {
+	recv, ok := m.Receiver.(*ast.Identifier)
+	if !ok || s.QualifiedFuncs == nil {
+		return nil
+	}
+	if _, isParam := s.Params[recv.Name]; isParam {
+		return nil // a parameter shadows a same-named namespace
+	}
+	return s.QualifiedFuncs(recv.Name, m.Member.Name)
 }
 
 func (s BodyScope) leaf(e ast.Expr) ir.Type {
@@ -1070,6 +1106,11 @@ func callType(e *ast.CallExpr, s scope, sink *Sink) ir.Type {
 			}
 		}
 		return s.leaf(e)
+	}
+	// A member-access callee whose receiver names a namespace is a call of an
+	// imported function (geo.area(...)), never a method call.
+	if cands := s.fnMember(member); len(cands) > 0 {
+		return funcCallType(e, member.Member.Name, cands, s, sink)
 	}
 	reg := s.registry()
 	recv := check(member.Receiver, s, sink)

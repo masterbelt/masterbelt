@@ -21,12 +21,12 @@ func functionItems(doc view) []protocol.CompletionItem {
 	kind := protocol.CompletionItemKindFunction
 	snippet := protocol.InsertTextFormatSnippet
 	var items []protocol.CompletionItem
-	seen := map[string]bool{}
-	for _, f := range doc.Module().Funcs {
-		if f.Name == "" || seen[f.Name] {
+	seen := map[*ir.Function]bool{}
+	for _, f := range doc.FunctionsInScope() {
+		if f.Name == "" || seen[f] {
 			continue
 		}
-		seen[f.Name] = true
+		seen[f] = true
 
 		item := protocol.CompletionItem{Label: f.Name, Kind: &kind, Detail: funcSignature(f)}
 		if len(f.Doc) > 0 {
@@ -81,8 +81,10 @@ func funcSignature(f *ir.Function) string {
 }
 
 // funcAt resolves the functions denoted at offset: the declared name in a
-// FuncDecl header (that one declaration), or a call's callee identifier (the
-// whole overload set it names). It returns the module's resolved functions.
+// FuncDecl header (that one declaration), a call's callee identifier (the
+// whole overload set it names, local or imported), or the member name of a
+// namespace function call (geo.area). It returns the program's resolved
+// functions — the very shells the owning modules publish.
 func funcAt(doc view, offset int) ([]*ir.Function, cst.Tree, bool) {
 	leaf, parent, ok := leafAt(doc.AST().Concrete().Tree(), offset)
 	if !ok {
@@ -96,6 +98,16 @@ func funcAt(doc view, offset int) ([]*ir.Function, cst.Tree, bool) {
 		return nil, cst.Tree{}, false
 	}
 	parentNode, _ := parent.Node()
+
+	shellsOf := func(cands []*ast.FuncDecl) []*ir.Function {
+		var fns []*ir.Function
+		for _, fd := range cands {
+			if f := doc.FunctionOf(fd); f != nil {
+				fns = append(fns, f)
+			}
+		}
+		return fns
+	}
 
 	switch pk {
 	case cst.FuncDecl:
@@ -120,21 +132,29 @@ func funcAt(doc view, offset int) ([]*ir.Function, cst.Tree, bool) {
 		if id == nil {
 			return nil, cst.Tree{}, false
 		}
-		cands := doc.ResolveFunc(id)
-		if len(cands) == 0 {
+		if fns := shellsOf(doc.ResolveFunc(id)); len(fns) > 0 {
+			return fns, leaf, true
+		}
+	case cst.MemberExpr:
+		// A namespace function call's member name (the area of geo.area(...)),
+		// when the member access is a call's callee. The receiver's qualifier
+		// hovers as a namespace elsewhere; only the member denotes functions.
+		var member *ast.MemberExpr
+		forEachExpr(doc.AST().File(), func(e ast.Expr) {
+			if c, ok := e.(*ast.CallExpr); ok {
+				if m, ok := c.Callee.(*ast.MemberExpr); ok && m.Syntax() == parentNode {
+					member = m
+				}
+			}
+		})
+		if member == nil {
 			return nil, cst.Tree{}, false
 		}
-		inSet := make(map[*ast.FuncDecl]bool, len(cands))
-		for _, fd := range cands {
-			inSet[fd] = true
+		// Only the member-name token denotes the function, not the qualifier.
+		if recv, ok := member.Receiver.(*ast.Identifier); ok && leaf.Text(doc.Buffer()) == recv.Name {
+			return nil, cst.Tree{}, false
 		}
-		var fns []*ir.Function
-		for _, f := range doc.Module().Funcs {
-			if inSet[f.Syntax] {
-				fns = append(fns, f)
-			}
-		}
-		if len(fns) > 0 {
+		if fns := shellsOf(doc.ResolveFuncMember(member)); len(fns) > 0 {
 			return fns, leaf, true
 		}
 	}
