@@ -1,6 +1,8 @@
 package semantic
 
 import (
+	"maps"
+
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/lower"
@@ -45,13 +47,17 @@ func resolveTypes(file *ast.File, at func(ast.Node) span, diags *diagnostic.List
 	// first definition and is reported; shadowing an imported name is not a
 	// redeclaration.
 	defs := make(map[string]*ir.TypeDef, len(file.Types)+len(extern))
-	for name, def := range extern {
-		defs[name] = def
-	}
+	maps.Copy(defs, extern)
 	own := make(map[string]bool, len(file.Types))
 	out := make([]*ir.TypeDef, len(file.Types))
 	for i, td := range file.Types {
 		def := &ir.TypeDef{Name: td.Name, Public: td.Public, Doc: td.Doc, Syntax: td}
+		// The builtin mark is syntactic (`= builtin`), so set it here: a forward
+		// reference to a same-file primitive must already resolve as ir.Builtin
+		// (the spelling literals produce), not as a Named of an unmarked shell.
+		if _, ok := td.Body.(*ast.BuiltinType); ok {
+			def.Builtin = true
+		}
 		out[i] = def
 		if td.Name == "" {
 			continue
