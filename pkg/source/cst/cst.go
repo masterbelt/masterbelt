@@ -70,8 +70,10 @@ const (
 	EnumDecl   // [doc] [pub] enum Name [":" TypeExpr] "{" EnumMember ( ("," | NL) EnumMember )* "}" [ImplBlock]
 	EnumMember // Ident [Initializer]  (one named member, with an optional "= ConstExpr" value)
 
-	// Implementations and method bodies.
-	ImplBlock  // impl "{" MethodDecl* "}"
+	// Implementations and method bodies. An impl item is a MethodDecl or a
+	// ConstDecl (an associated constant, read as TypeName.Name); the latter
+	// reuses the same node a top-level constant uses.
+	ImplBlock  // impl "{" (MethodDecl | ConstDecl)* "}"
 	MethodDecl // [pub] [extern] [fn] Ident ParamList ":" TypeExpr [Block]
 	ParamList  // "(" [Param ("," Param)*] ")"
 	Param      // Ident ":" TypeExpr

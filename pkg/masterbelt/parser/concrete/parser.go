@@ -26,7 +26,8 @@
 //	RecordType    := "{" ( Field [","] )* "}"
 //	Field         := Ident ":" TypeExpr
 //	FuncType      := fn ParamList ":" TypeExpr
-//	ImplBlock     := impl "{" MethodDecl* "}"
+//	ImplBlock     := impl "{" ( MethodDecl | AssocConst )* "}"
+//	AssocConst    := [pub] const Ident [TypeClause] "=" ( Expr | "builtin" )
 //	MethodDecl    := [pub] [extern] [fn] Effect* Ident ParamList ":" TypeExpr [Block]
 //	ParamList     := "(" [ Param ( "," Param )* ] ")"
 //	Param         := Ident ":" TypeExpr

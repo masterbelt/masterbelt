@@ -65,6 +65,12 @@ func TestParseLossless(t *testing.T) {
 		"type Num<T: int8 | int16> = T\n",
 		"type Rec = {\n  a: int8\n  b: Level\n}\n",
 		"type Lvl = int8 impl {\n  pub increment(): self {\n    return self + 1\n  }\n}\n",
+		// Associated constants in an impl block (const items, mixed with methods).
+		"type Lvl = int8 impl {\n  pub const Max = 100\n  const Min = 0\n}\n",
+		"type Lvl = int8 impl {\n  const Max = 100\n  pub inc(): self {\n    return self\n  }\n}\n",
+		"type Bits = int32 impl {\n  pub const Width: int32 = 32\n}\n",
+		"type I8 = builtin impl {\n  pub const Max = builtin\n}\n",
+		"type Bad = int8 impl {\n  const = 1\n  const X\n}\n", // malformed impl consts stay lossless
 		"type Mapper<T, R> = fn(src: T): R\n",
 		"const x = 1\ntype T = int8\npub const y = 2\n", // const/type interleaved
 		"type Bad =\ntype Worse <\n",                    // malformed type decls stay lossless
@@ -214,6 +220,99 @@ func TestParseTypeDeclChildren(t *testing.T) {
 			for i := range got {
 				if got[i] != tc.want[i] {
 					t.Fatalf("sub-nodes = %v, want %v", got, tc.want)
+				}
+			}
+		})
+	}
+}
+
+// TestParseImplConst checks that an impl block's associated-constant items are
+// recognised as ConstDecl nodes (the same node a top-level constant uses),
+// alongside its methods, and that the const/method choice looks past pub.
+func TestParseImplConst(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+		want []cst.Kind // the impl block's direct child node kinds
+	}{
+		{"pub const and bare const", "type L = int8 impl {\n  pub const Max = 100\n  const Min = 0\n}\n",
+			[]cst.Kind{cst.ConstDecl, cst.ConstDecl}},
+		{"const then method", "type L = int8 impl {\n  const Max = 100\n  pub inc(): self {\n    return self\n  }\n}\n",
+			[]cst.Kind{cst.ConstDecl, cst.MethodDecl}},
+		{"typed const", "type B = int32 impl {\n  pub const Width: int32 = 32\n}\n",
+			[]cst.Kind{cst.ConstDecl}},
+		{"builtin const", "type I8 = builtin impl {\n  pub const Max = builtin\n}\n",
+			[]cst.Kind{cst.ConstDecl}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			root, diags := Parse([]byte(tc.src))
+			if len(diags) != 0 {
+				t.Fatalf("unexpected diagnostics: %v", diags)
+			}
+			decl := root.Children()[0].(*cst.Node)
+			var impl *cst.Node
+			for _, c := range decl.Children() {
+				if n, ok := c.(*cst.Node); ok && n.Kind() == cst.ImplBlock {
+					impl = n
+				}
+			}
+			if impl == nil {
+				t.Fatalf("no impl block found in %q", tc.src)
+			}
+			got := subNodeKinds(impl)
+			if len(got) != len(tc.want) {
+				t.Fatalf("impl child nodes = %v, want %v", got, tc.want)
+			}
+			for i := range got {
+				if got[i] != tc.want[i] {
+					t.Fatalf("impl child nodes = %v, want %v", got, tc.want)
+				}
+			}
+		})
+	}
+}
+
+// TestParseImplConstChildren checks the sub-node shape of an associated
+// constant: a typed one carries a TypeClause then an Initializer; an untyped
+// one only an Initializer; and a "= builtin" one an Initializer wrapping a
+// BuiltinType.
+func TestParseImplConstChildren(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+		want []cst.Kind
+	}{
+		{"untyped", "type L = int8 impl {\n  const Max = 100\n}\n", []cst.Kind{cst.Initializer}},
+		{"typed", "type B = int32 impl {\n  const Width: int32 = 32\n}\n", []cst.Kind{cst.TypeClause, cst.Initializer}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			root, diags := Parse([]byte(tc.src))
+			if len(diags) != 0 {
+				t.Fatalf("unexpected diagnostics: %v", diags)
+			}
+			decl := root.Children()[0].(*cst.Node)
+			var c *cst.Node
+			for _, child := range decl.Children() {
+				if n, ok := child.(*cst.Node); ok && n.Kind() == cst.ImplBlock {
+					for _, ic := range n.Children() {
+						if cn, ok := ic.(*cst.Node); ok && cn.Kind() == cst.ConstDecl {
+							c = cn
+						}
+					}
+				}
+			}
+			if c == nil {
+				t.Fatalf("no impl ConstDecl found in %q", tc.src)
+			}
+			got := subNodeKinds(c)
+			if len(got) != len(tc.want) {
+				t.Fatalf("const sub-nodes = %v, want %v", got, tc.want)
+			}
+			for i := range got {
+				if got[i] != tc.want[i] {
+					t.Fatalf("const sub-nodes = %v, want %v", got, tc.want)
 				}
 			}
 		})

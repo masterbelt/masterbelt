@@ -25,14 +25,6 @@ File
     pub
     name "Level"
     body int8
-    method ""
-      doc "The highest level."
-      pub
-    method "Max"
-    method ""
-      doc "The lowest level."
-      pub
-    method "Min"
     method "increment"
       doc "The next level."
       pub
@@ -42,11 +34,6 @@ File
     pub
     name "Bits"
     body int32
-    method ""
-      doc "The width in bits."
-      pub
-    method "Width"
-      result int32
   TypeDecl
     pub
     name "Port"

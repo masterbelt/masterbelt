@@ -21,26 +21,11 @@ Module
   TypeDef "Level" pub
     doc "A character level, capped at 100."
     body int8
-    method "" pub
-      doc "The highest level."
-      result invalid
-    method "Max"
-      result invalid
-    method "" pub
-      doc "The lowest level."
-      result invalid
-    method "Min"
-      result invalid
     method "increment" pub
       doc "The next level."
       result self
       return self.add(IntLiteral "1")
   TypeDef "Bits" pub
     body int32
-    method "" pub
-      doc "The width in bits."
-      result invalid
-    method "Width"
-      result int32
   TypeDef "Port" pub
     body int32
