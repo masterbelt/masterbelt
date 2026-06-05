@@ -1,0 +1,30 @@
+File
+  ConstDecl
+    doc "A behaviour over a keyed collection: implement the required fold and the"
+    doc "provided methods (count, map, filter, ...) come for free, defined on top of"
+    doc "it. iterability is foldable."
+    pub
+    name "interface"
+  ConstDecl
+    doc "Provided: the number of elements, folded from the primitive."
+    pub
+    name "count"
+  ConstDecl
+    doc "Provided: whether any element satisfies the predicate."
+    pub
+    name "any"
+  TypeDecl
+    doc "A small bag of T values that folds over its contents. The `impl foldable<int, T>`"
+    doc "tag is what gives Bag the count/any methods — written here, at Bag's own"
+    doc "definition site."
+    pub
+    name "Bag"
+    param T
+    body list<T>
+  FuncDecl
+    doc "The total of a collection of ints, folded with addition."
+    pub
+    name "total"
+    param c: foldable<int, int>
+    result int
+      return (call (. Identifier "c" fold) IntLit "0" (fn(acc: <missing>, key: <missing>, value: <missing>): <missing> (return (call (. Identifier "acc" add) Identifier "value"))))

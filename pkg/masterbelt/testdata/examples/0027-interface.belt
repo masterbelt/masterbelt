@@ -1,0 +1,41 @@
+// An interface (E-16): a nominal, explicit-impl behaviour. A type gains the
+// interface's methods only by writing `impl <interface>` at its definition site
+// (no structural auto-fit, no orphan impls), and an interface may be written in
+// a type-requirement position, where the value's usable methods are fixed to the
+// interface's own.
+
+/// A behaviour over a keyed collection: implement the required fold and the
+/// provided methods (count, map, filter, ...) come for free, defined on top of
+/// it. iterability is foldable.
+pub interface foldable<K, V> {
+  // Required: the one primitive an implementor must supply. Everything else is
+  // derived from it.
+  fold<A>(init: A, step: fn(acc: A, key: K, value: V): A): A
+
+  /// Provided: the number of elements, folded from the primitive.
+  pub count(): int {
+    return fold(0, fn(acc, key, value) -> acc + 1)
+  }
+
+  /// Provided: whether any element satisfies the predicate.
+  pub any(pred: fn(value: V): bool): bool {
+    return fold(false, fn(acc, key, value) -> acc || pred(value))
+  }
+}
+
+/// A small bag of T values that folds over its contents. The `impl foldable<int, T>`
+/// tag is what gives Bag the count/any methods — written here, at Bag's own
+/// definition site.
+pub type Bag<T> = list<T> impl foldable<int, T> {
+  /// The required primitive: fold the underlying list.
+  fold<A>(init: A, step: fn(acc: A, key: int, value: T): A): A {
+    return init
+  }
+}
+
+// An interface written in a type-requirement position: c may be called only
+// through foldable's methods, fixed at this signature.
+/// The total of a collection of ints, folded with addition.
+pub fn total(c: foldable<int, int>): int {
+  return c.fold(0, fn(acc, key, value) -> acc + value)
+}
