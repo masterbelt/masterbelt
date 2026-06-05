@@ -250,7 +250,7 @@ func NewMethodDecl(doc []string, public, extern bool, effects []string, name str
 }
 
 // Stmt is a statement inside a method body: a return (ReturnStmt), a switch
-// (SwitchStmt), or a bare expression statement (ExprStmt).
+// (SwitchStmt), an if (IfStmt), or a bare expression statement (ExprStmt).
 type Stmt interface {
 	Node
 	stmt()
@@ -330,4 +330,29 @@ func (a *SwitchArm) node()             {}
 // NewSwitchArm builds a SwitchArm node.
 func NewSwitchArm(values []Expr, body []Stmt, syntax *cst.Node) *SwitchArm {
 	return &SwitchArm{Values: values, Body: body, syntax: syntax}
+}
+
+// IfStmt is a boolean control statement: it runs the Then body when Cond holds,
+// otherwise the Else branch. An if yields no value — it drives control flow, so
+// each branch returns rather than producing a result; the value form of a
+// two-way choice is the ternary, not if. Cond must be a bool. Else is the
+// else-if chain or the else block: a non-nil ElseIf is another IfStmt (else if),
+// a non-nil Else is the else block's body, and both nil means the if had no else
+// at all.
+type IfStmt struct {
+	Cond   Expr    // the boolean condition (nil if recovered away)
+	Then   []Stmt  // the body run when the condition holds
+	ElseIf *IfStmt // the "else if" branch, or nil
+	Else   []Stmt  // the "else" block's body, or nil when there is no plain else
+	syntax *cst.Node
+}
+
+func (s *IfStmt) Syntax() *cst.Node { return s.syntax }
+func (s *IfStmt) node()             {}
+func (s *IfStmt) stmt()             {}
+
+// NewIfStmt builds an IfStmt node. At most one of elseIf and els is non-nil: an
+// else branch is either another if (the chain) or a block, never both.
+func NewIfStmt(cond Expr, then []Stmt, elseIf *IfStmt, els []Stmt, syntax *cst.Node) *IfStmt {
+	return &IfStmt{Cond: cond, Then: then, ElseIf: elseIf, Else: els, syntax: syntax}
 }

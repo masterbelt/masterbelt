@@ -124,8 +124,8 @@ func lowerBlock(t cst.Tree, buf source.Buffer) []ast.Stmt {
 	return stmts
 }
 
-// lowerStmt lowers a statement node: a return statement, a switch statement, or
-// a bare expression statement.
+// lowerStmt lowers a statement node: a return statement, a switch statement, an
+// if statement, or a bare expression statement.
 func lowerStmt(t cst.Tree, buf source.Buffer, node *cst.Node) ast.Stmt {
 	switch {
 	case node.Kind() == cst.ReturnStmt:
@@ -138,11 +138,49 @@ func lowerStmt(t cst.Tree, buf source.Buffer, node *cst.Node) ast.Stmt {
 		return ast.NewReturnStmt(value, node)
 	case node.Kind() == cst.SwitchStmt:
 		return lowerSwitchStmt(t, buf, node)
+	case node.Kind() == cst.IfStmt:
+		return lowerIfStmt(t, buf, node)
 	case isExprKind(node.Kind()):
 		return ast.NewExprStmt(lowerExpr(t, buf), node)
 	default:
 		return nil
 	}
+}
+
+// lowerIfStmt lowers an IfStmt node: its condition (the first expression child),
+// its then-block (the first Block), and its optional else branch. The else
+// branch follows the "else" token: a nested IfStmt is the else-if chain (lowered
+// recursively into ElseIf), and a second Block is the plain else body. The two
+// block children are distinguished by order — the first Block is always the
+// then-block — so an else block is the one that appears after the condition's
+// then-block.
+func lowerIfStmt(t cst.Tree, buf source.Buffer, node *cst.Node) ast.Stmt {
+	var cond ast.Expr
+	var then, els []ast.Stmt
+	var elseIf *ast.IfStmt
+	seenThen := false
+	for _, child := range t.Children() {
+		n, ok := child.Node()
+		if !ok {
+			continue
+		}
+		switch {
+		case cond == nil && isExprKind(n.Kind()):
+			cond = lowerExpr(child, buf)
+		case n.Kind() == cst.Block && !seenThen:
+			then = lowerBlock(child, buf)
+			seenThen = true
+		case n.Kind() == cst.Block:
+			els = lowerBlock(child, buf)
+		case n.Kind() == cst.IfStmt:
+			// The else-if branch: an if after the then-block is the chain, lowered
+			// to its own IfStmt so the else-if ladder nests faithfully.
+			if s, ok := lowerIfStmt(child, buf, n).(*ast.IfStmt); ok {
+				elseIf = s
+			}
+		}
+	}
+	return ast.NewIfStmt(cond, then, elseIf, els, node)
 }
 
 // lowerSwitchStmt lowers a SwitchStmt node: its scrutinee (the first expression

@@ -332,6 +332,54 @@ func dumpStmtAt(b *strings.Builder, s Stmt, indent string) {
 				dumpStmtAt(b, bs, indent+"    ")
 			}
 		}
+	case *IfStmt:
+		dumpIfAt(b, s, indent)
+	}
+}
+
+// dumpIfAt renders an if statement and its else-if chain at the given indent.
+// The then body and each else branch nest one level deeper, so the dump mirrors
+// the control structure: "if cond" then its body, "else if cond" for a chained
+// if (rendered flat, not re-indented, to read as a chain), and "else" for a
+// plain else block.
+func dumpIfAt(b *strings.Builder, s *IfStmt, indent string) {
+	fmt.Fprintf(b, "%sif %s\n", indent, dumpExpr(s.Cond))
+	for _, bs := range s.Then {
+		dumpStmtAt(b, bs, indent+"    ")
+	}
+	switch {
+	case s.ElseIf != nil:
+		fmt.Fprintf(b, "%selse if %s\n", indent, dumpExpr(s.ElseIf.Cond))
+		for _, bs := range s.ElseIf.Then {
+			dumpStmtAt(b, bs, indent+"    ")
+		}
+		// Continue the chain in place: the nested if's own else renders at the
+		// same indent, so an else-if chain reads as a flat ladder.
+		dumpIfChainTail(b, s.ElseIf, indent)
+	case s.Else != nil:
+		fmt.Fprintf(b, "%selse\n", indent)
+		for _, bs := range s.Else {
+			dumpStmtAt(b, bs, indent+"    ")
+		}
+	}
+}
+
+// dumpIfChainTail renders the else branch of a chained if (the "else if" or
+// "else" that follows an already-rendered "else if cond" head and body),
+// keeping the whole chain at one indent.
+func dumpIfChainTail(b *strings.Builder, s *IfStmt, indent string) {
+	switch {
+	case s.ElseIf != nil:
+		fmt.Fprintf(b, "%selse if %s\n", indent, dumpExpr(s.ElseIf.Cond))
+		for _, bs := range s.ElseIf.Then {
+			dumpStmtAt(b, bs, indent+"    ")
+		}
+		dumpIfChainTail(b, s.ElseIf, indent)
+	case s.Else != nil:
+		fmt.Fprintf(b, "%selse\n", indent)
+		for _, bs := range s.Else {
+			dumpStmtAt(b, bs, indent+"    ")
+		}
 	}
 }
 
