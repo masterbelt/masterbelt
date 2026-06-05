@@ -77,10 +77,13 @@ type scope interface {
 	// name, self, a field access, a conversion, the null literal — returning
 	// ir.Invalid when the form is not meaningful in this scope.
 	leaf(e ast.Expr) ir.Type
+	// conv resolves a call's callee name to the type a conversion T(x) names,
+	// or ir.Invalid when the name is not a type in this scope (a parameter
+	// shadows a same-named type). A type name wins over a same-named function.
+	conv(id *ast.Identifier) ir.Type
 	// fn resolves a call's callee name to the overload set of the top-level
 	// function it names, or nil when nothing of that name is callable here —
-	// a parameter shadows a same-named function, and in a method body a type
-	// name (a conversion) wins over one.
+	// a parameter shadows a same-named function.
 	fn(id *ast.Identifier) []*ast.FuncDecl
 	// fnMember resolves a call's member-access callee (geo.area) to the
 	// overload set the namespace's target exports, or nil when the receiver
@@ -247,6 +250,13 @@ func (s funcScope) leaf(e ast.Expr) ir.Type {
 	return s.outer.leaf(e)
 }
 
+func (s funcScope) conv(id *ast.Identifier) ir.Type {
+	if _, ok := s.params[id.Name]; ok {
+		return ir.Invalid // a parameter shadows a same-named type
+	}
+	return s.outer.conv(id)
+}
+
 func (s funcScope) fn(id *ast.Identifier) []*ast.FuncDecl {
 	if _, ok := s.params[id.Name]; ok {
 		return nil // a parameter shadows a same-named function
@@ -311,10 +321,10 @@ func collectionType(e *ast.CollectionLit, s scope) ir.Type {
 	return &ir.App{Def: def, Args: []ir.Type{elemT}}
 }
 
-// constScope types a constant initializer: the only context-specific form is a
-// value reference, whose type is its referent's. Self, field access, a
-// conversion, and the null literal are not meaningful in a constant, so they are
-// ir.Invalid.
+// constScope types a constant initializer: the context-specific forms are a
+// value reference, whose type is its referent's, and a conversion, whose type
+// is the type it names. Self, field access, and the null literal are not
+// meaningful in a constant, so they are ir.Invalid.
 type constScope struct{ env Env }
 
 func (s constScope) registry() *builtin.Registry { return s.env.Registry() }
@@ -335,6 +345,16 @@ func (s constScope) leaf(e ast.Expr) ir.Type {
 		if target := s.env.ResolveMember(e); target != nil {
 			return s.env.TypeOf(target)
 		}
+	}
+	return ir.Invalid
+}
+
+func (s constScope) conv(id *ast.Identifier) ir.Type {
+	if d, ok := s.env.Universe()[id.Name]; ok {
+		if d.Builtin {
+			return &ir.Builtin{Name: id.Name}
+		}
+		return &ir.Named{Def: d}
 	}
 	return ir.Invalid
 }
@@ -378,12 +398,16 @@ func (s BodyScope) universe() map[string]*ir.TypeDef { return s.Universe }
 
 func (s BodyScope) qualified() func(namespace, name string) *ir.TypeDef { return s.Qualified }
 
+func (s BodyScope) conv(id *ast.Identifier) ir.Type {
+	if _, isParam := s.Params[id.Name]; isParam {
+		return ir.Invalid // a parameter shadows a same-named type
+	}
+	return s.lookupType(id.Name)
+}
+
 func (s BodyScope) fn(id *ast.Identifier) []*ast.FuncDecl {
 	if _, isParam := s.Params[id.Name]; isParam {
 		return nil // a parameter shadows a same-named function
-	}
-	if _, isType := s.Universe[id.Name]; isType {
-		return nil // a type name is a conversion, which wins in a body
 	}
 	return s.Funcs[id.Name]
 }
@@ -413,16 +437,6 @@ func (s BodyScope) leaf(e ast.Expr) ir.Type {
 	case *ast.MemberExpr:
 		// A member access used as a value is a record field access.
 		return fieldType(exprType(e.Receiver, s), e.Member.Name)
-	case *ast.CallExpr:
-		// A non-method call whose callee names a type is a conversion T(x).
-		if id, ok := e.Callee.(*ast.Identifier); ok {
-			if _, isParam := s.Params[id.Name]; !isParam {
-				if t := s.lookupType(id.Name); t != ir.Invalid {
-					return t
-				}
-			}
-		}
-		return ir.Invalid
 	default:
 		return ir.Invalid
 	}
@@ -1097,10 +1111,13 @@ func check(e ast.Expr, s scope, sink *Sink) ir.Type {
 func callType(e *ast.CallExpr, s scope, sink *Sink) ir.Type {
 	member, ok := e.Callee.(*ast.MemberExpr)
 	if !ok {
-		// A call whose callee names a top-level function is a function call;
-		// any other callee is a context-specific form (a conversion in a
-		// method body, otherwise nothing).
+		// A call whose callee names a type is a conversion T(x) — the type
+		// wins over a same-named function — and one that names a top-level
+		// function is a function call; any other callee is nothing.
 		if id, isIdent := e.Callee.(*ast.Identifier); isIdent {
+			if t := s.conv(id); t != ir.Invalid {
+				return convCallType(e, id.Name, t, s, sink)
+			}
 			if cands := s.fn(id); len(cands) > 0 {
 				return funcCallType(e, id.Name, cands, s, sink)
 			}
@@ -1204,6 +1221,33 @@ func callType(e *ast.CallExpr, s scope, sink *Sink) ir.Type {
 		return ir.Invalid
 	}
 	return result
+}
+
+// convCallType is the type rule for a conversion T(x): the expression's type
+// is the type the callee names, whatever its argument. The error type — the
+// one natively-backed conversion with value semantics today — constructs from
+// exactly one string argument, so its argument count is enforced and the
+// argument checked against string (a non-string is the familiar
+// type_mismatch); any other conversion's arguments are checked bare for their
+// own findings.
+func convCallType(e *ast.CallExpr, name string, t ir.Type, s scope, sink *Sink) ir.Type {
+	if b, ok := t.(*ir.Builtin); ok {
+		if n, found := s.registry().Native(b.Name); found && n.Err {
+			if len(e.Arguments) != 1 {
+				for _, a := range e.Arguments {
+					check(a, s, sink)
+				}
+				sink.arityMismatch(e, name, len(e.Arguments), 1)
+				return t
+			}
+			checkType(e.Arguments[0], &ir.Builtin{Name: "string"}, s, map[string]ir.Type{}, sink)
+			return t
+		}
+	}
+	for _, a := range e.Arguments {
+		check(a, s, sink)
+	}
+	return t
 }
 
 // funcSig is one resolved candidate of a function call: its declaration and

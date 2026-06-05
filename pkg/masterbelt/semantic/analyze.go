@@ -744,10 +744,11 @@ func computeReachable(q queries, from FileID) map[FileID]bool {
 // identifier through onIdent, except that a namespace member access
 // (geo.Origin) is one unit visited through onMember — its receiver names a
 // namespace, not a value, and is skipped — and a call's callee that names a
-// top-level function is skipped too: it refers to the function, not to a
-// value declaration. The walk is pre-order, so a call marks its callee before
-// the callee itself is visited. The decisions layer on the shared
-// ast.WalkExprs traversal, so the skeleton lives in one place.
+// type (a conversion) or a top-level function is skipped too: it refers to
+// the type or function, not to a value declaration. The walk is pre-order, so
+// a call marks its callee before the callee itself is visited. The decisions
+// layer on the shared ast.WalkExprs traversal, so the skeleton lives in one
+// place.
 func walkRefs(fileID FileID, e ast.Expr, q queries, onIdent func(*ast.Identifier), onMember func(*ast.MemberExpr)) {
 	funcCallee := map[*ast.Identifier]bool{}
 	funcMemberCallee := map[*ast.MemberExpr]bool{}
@@ -756,7 +757,9 @@ func walkRefs(fileID FileID, e ast.Expr, q queries, onIdent func(*ast.Identifier
 		case *ast.CallExpr:
 			switch callee := e.Callee.(type) {
 			case *ast.Identifier:
-				if len(q.resolveFunc(fileID, callee)) > 0 {
+				if _, isType := q.universe(fileID)[callee.Name]; isType {
+					funcCallee[callee] = true // a conversion's callee names a type
+				} else if len(q.resolveFunc(fileID, callee)) > 0 {
 					funcCallee[callee] = true
 				}
 			case *ast.MemberExpr:

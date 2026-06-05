@@ -515,3 +515,42 @@ func TestNominalDerivation(t *testing.T) {
 		t.Errorf("int should be assignable to the nominal integer Level")
 	}
 }
+
+func TestAssignableUnion(t *testing.T) {
+	reg := builtin.Default()
+	union := &ir.Union{Members: []ir.Type{bt("int8"), bt("error")}}
+
+	// A union accepts a value of any of its member types.
+	if !Assignable(reg, bt("error"), union) {
+		t.Errorf("error should be assignable to int8 | error")
+	}
+	if !Assignable(reg, bt("int8"), union) {
+		t.Errorf("int8 should be assignable to int8 | error")
+	}
+	// The default integer adapts to a union's integer member.
+	if !Assignable(reg, bt("int"), union) {
+		t.Errorf("int should be assignable to int8 | error")
+	}
+	// A non-member does not flow in.
+	if Assignable(reg, bt("string"), union) {
+		t.Errorf("string should not be assignable to int8 | error")
+	}
+
+	// A union-typed value flows into a union that accepts every member it
+	// may hold — including itself, reordered — and not into a narrower one.
+	same := &ir.Union{Members: []ir.Type{bt("error"), bt("int8")}}
+	if !Assignable(reg, union, same) {
+		t.Errorf("int8 | error should be assignable to error | int8")
+	}
+	wider := &ir.Union{Members: []ir.Type{bt("int8"), bt("string"), bt("error")}}
+	if !Assignable(reg, union, wider) {
+		t.Errorf("int8 | error should be assignable to int8 | string | error")
+	}
+	if Assignable(reg, wider, union) {
+		t.Errorf("int8 | string | error should not be assignable to int8 | error")
+	}
+	// A union does not flow into one of its members.
+	if Assignable(reg, union, bt("error")) {
+		t.Errorf("int8 | error should not be assignable to error")
+	}
+}

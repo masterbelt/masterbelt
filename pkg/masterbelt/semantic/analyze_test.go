@@ -1470,3 +1470,56 @@ func TestFuncOverloadRecordArgDefers(t *testing.T) {
 		t.Errorf("A eval = %s, want 5", got)
 	}
 }
+
+func TestErrorConstruction(t *testing.T) {
+	// error("msg") is a conversion: it types as error, folds to an error
+	// value, and message() reads the message back — all at compile time.
+	m, diags := analyze("const E = error(\"boom\")\nconst M = E.message()\n")
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if got := m.Consts[0].Type.String(); got != "error" {
+		t.Errorf("E type = %s, want error", got)
+	}
+	if got := m.Consts[0].Eval.String(); got != "error(\"boom\")" {
+		t.Errorf("E eval = %s, want error(\"boom\")", got)
+	}
+	if got := m.Consts[1].Type.String(); got != "string" {
+		t.Errorf("M type = %s, want string", got)
+	}
+	if got := m.Consts[1].Eval.String(); got != "\"boom\"" {
+		t.Errorf("M eval = %s, want \"boom\"", got)
+	}
+}
+
+func TestErrorConversionTypeChecks(t *testing.T) {
+	// error constructs from exactly one string: a non-string argument is the
+	// familiar type_mismatch, a wrong count an arity_mismatch.
+	if _, diags := analyze("const E = error(123)\n"); !hasCode(diags, CodeTypeMismatch) {
+		t.Errorf("error(123): want type_mismatch, got %v", codes(diags))
+	}
+	if _, diags := analyze("const E = error()\n"); !hasCode(diags, CodeArityMismatch) {
+		t.Errorf("error(): want arity_mismatch, got %v", codes(diags))
+	}
+	if _, diags := analyze("const E = error(\"a\", \"b\")\n"); !hasCode(diags, CodeArityMismatch) {
+		t.Errorf("error(\"a\", \"b\"): want arity_mismatch, got %v", codes(diags))
+	}
+}
+
+func TestErrorFlowsIntoUnion(t *testing.T) {
+	// A fallible function returns its failure as a union member, and the
+	// union-typed result flows into a matching annotation.
+	src := "pub fn parse(s: string): int8 | error -> error(s)\n" +
+		"const P: int8 | error = parse(\"no\")\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if got := m.Consts[0].Eval.String(); got != "error(\"no\")" {
+		t.Errorf("P eval = %s, want error(\"no\")", got)
+	}
+	// A non-member initializer still mismatches.
+	if _, diags := analyze("const X: int8 | error = \"no\"\n"); !hasCode(diags, CodeTypeMismatch) {
+		t.Errorf("string into int8 | error: want type_mismatch, got %v", codes(diags))
+	}
+}

@@ -1,10 +1,10 @@
 Module
   Const "E"
-    type invalid
+    type error
     value error(StringLiteral "boom")
     eval error("boom")
   Const "M"
-    type invalid
+    type string
     value Reference -> "E".message()
     eval "boom"
   Const "P"

@@ -118,15 +118,33 @@ func Fits(reg *builtin.Registry, t ir.Type, v *big.Int) bool {
 }
 
 // Assignable reports whether a value of type from may be used where type to is
-// expected: the same type, or the default integer flowing into any other
-// integer type (range-checked at the boundary, so an overflow is reported
-// separately).
+// expected: the same type, the default integer flowing into any other integer
+// type (range-checked at the boundary, so an overflow is reported separately),
+// or a member value flowing into a union that carries it.
 func Assignable(reg *builtin.Registry, from, to ir.Type) bool {
 	if from == to {
 		return true
 	}
 	if isDefaultInt(from) && IsInteger(reg, to) {
 		return true
+	}
+	if u, ok := to.(*ir.Union); ok {
+		// A union accepts a value of any of its member types; a union-typed
+		// value flows in when every member it may hold is accepted.
+		if fu, ok := from.(*ir.Union); ok {
+			for _, m := range fu.Members {
+				if !Assignable(reg, m, u) {
+					return false
+				}
+			}
+			return true
+		}
+		for _, m := range u.Members {
+			if Assignable(reg, from, m) {
+				return true
+			}
+		}
+		return false
 	}
 	if x, y, ok := sameAppShape(from, to); ok {
 		// list<A> is assignable to list<B> when A is assignable to B (the same,
