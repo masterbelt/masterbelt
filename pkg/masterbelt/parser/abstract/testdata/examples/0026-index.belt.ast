@@ -1,0 +1,55 @@
+File
+  ConstDecl
+    name "Xs"
+    value (list IntLit "10" IntLit "20" IntLit "30")
+  ConstDecl
+    name "First"
+    type int | error
+    value Identifier "Xs"
+  ConstDecl
+    name "Third"
+    type int | error
+    value Identifier "Xs"
+  ConstDecl
+    name "Tbl"
+    value (map StringLit "sword": IntLit "100" StringLit "shield": IntLit "50")
+  ConstDecl
+    name "Sword"
+    type int | error
+    value Identifier "Tbl"
+  FuncDecl
+    pub
+    name "at"
+    param xs: list<int>
+    param i: int
+    result int | error
+      return Identifier "xs"
+      expr (list Identifier "i")
+  FuncDecl
+    pub
+    name "bumpFirst"
+    result list<int>
+      let "xs" = (list IntLit "1" IntLit "2" IntLit "3")
+      expr Identifier "xs"
+      assign (list IntLit "0") = IntLit "99"
+      return Identifier "xs"
+  FuncDecl
+    pub
+    name "put"
+    result map<string, int>
+      let "m" = (map StringLit "a": IntLit "1")
+      expr Identifier "m"
+      assign (list StringLit "a") = IntLit "10"
+      expr Identifier "m"
+      assign (list StringLit "b") = IntLit "2"
+      return Identifier "m"
+  FuncDecl
+    pub
+    name "stillThree"
+    result bool
+      let "xs" = (list IntLit "1" IntLit "2" IntLit "3")
+      expr Identifier "xs"
+      assign (list IntLit "1") = IntLit "99"
+      return (call (. (call (. Identifier "xs" len)) eql) IntLit "3")
+  AssertDecl
+    cond (call (. (call Identifier "stillThree") eql) BoolLit true)

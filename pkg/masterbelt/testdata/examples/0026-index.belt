@@ -1,0 +1,52 @@
+// Index access reads and writes a collection by subscript. A read coll[i]
+// desugars to coll.get(i), a write coll[i] = v to coll = coll.set(i, v) — the
+// same desugaring-to-a-method strategy operators use (1 + 2 is 1.add(2)). No
+// new value form reaches the type checker or the folder: a subscript is a call.
+//
+// A read can miss — an index out of range, a key not present — so it yields a
+// result union (V | error), the same shape a fallible function returns. A write
+// returns the new collection (self): data stays immutable, and the let local is
+// rebound to it. A map write is an upsert and always succeeds; a list write past
+// the end is a bug caught at compile time (index_out_of_range), not a value.
+
+// Reading a list element. The static type is int | error — the read may be out
+// of range — even when the index is a constant the folder can resolve.
+const Xs = [10, 20, 30]
+const First: int | error = Xs[0]
+const Third: int | error = Xs[2]
+
+// Reading a map value by key. Missing keys make this fallible too.
+const Tbl = ["sword": 100, "shield": 50]
+const Sword: int | error = Tbl["sword"]
+
+// A dynamic index reads the same way: the desugared get carries the union.
+pub fn at(xs: list<int>, i: int): int | error {
+  return xs[i]
+}
+
+// Writing a list element rebinds the let local to a new list (set returns self).
+// The data is not mutated in place; the binding is.
+pub fn bumpFirst(): list<int> {
+  let xs = [1, 2, 3]
+  xs[0] = 99
+  return xs
+}
+
+// A map write upserts: an existing key is updated, a new key is added. Both
+// always succeed, so a map write needs no error.
+pub fn put(): map<string, int> {
+  let m = ["a": 1]
+  m["a"] = 10
+  m["b"] = 2
+  return m
+}
+
+// A write keeps the collection's element count where the index is in range, so a
+// length read after it folds to a bool an assertion can check.
+pub fn stillThree(): bool {
+  let xs = [1, 2, 3]
+  xs[1] = 99
+  return xs.len() == 3
+}
+
+assert stillThree() == true
