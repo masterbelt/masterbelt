@@ -1,0 +1,39 @@
+File
+  ConstDecl
+    name "Epoch"
+    value (call (. (call (. Identifier "D1970" sub) IntLit "01") sub) IntLit "01")
+  ConstDecl
+    name "Release"
+    value (call (. (call (. Identifier "D2009" sub) IntLit "03") sub) IntLit "31")
+  ConstDecl
+    name "Launch"
+    value (call (. (call (. Identifier "D2026" sub) IntLit "06") sub) IntLit "05")
+  ConstDecl
+    name "Cooldown"
+    value IntLit "5"
+  ConstDecl
+    name "Complex"
+    value IntLit "3"
+  ConstDecl
+    name "Deadline"
+    value (call (. Identifier "Release" add) IntLit "7")
+  ConstDecl
+    name "Span"
+    value (call (. Identifier "Release" sub) Identifier "Epoch")
+  ConstDecl
+    name "Shift"
+    value (call (. Identifier "Release" sub) IntLit "1")
+  ConstDecl
+    name "TwoH"
+    value IntLit "1"
+  ConstDecl
+    name "Triple"
+    value IntLit "5"
+  TypeDecl
+    pub
+    name "Event"
+    body { id: int, starts_at: datetime, cooldown: duration }
+  AssertDecl
+    cond (call (. Identifier "Release" gt) Identifier "Epoch")
+  AssertDecl
+    cond IntLit "1"

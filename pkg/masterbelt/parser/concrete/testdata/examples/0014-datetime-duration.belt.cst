@@ -1,0 +1,299 @@
+# tree
+File
+  ConstDecl
+    LineComment "// Datetime and duration literals: a D-prefixed ISO-8601 instant,"
+    Newline "\n"
+    LineComment "// normalized to UTC milliseconds, and digit+unit runs totalled in"
+    Newline "\n"
+    LineComment "// milliseconds. The two interoperate: dt ± dr, dt - dt, dr * int."
+    Newline "\n"
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Epoch"
+    Whitespace "   "
+    Initializer
+      Assign "="
+      Whitespace " "
+      BinaryExpr
+        BinaryExpr
+          NameRef
+            Ident "D1970"
+          Minus "-"
+          Literal
+            Int "01"
+        Minus "-"
+        Literal
+          Int "01"
+  Error
+    Ident "T00"
+    Colon ":"
+    Int "00"
+    Colon ":"
+    Int "00"
+    Dot "."
+    Int "000"
+    Ident "Z"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Release"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      BinaryExpr
+        BinaryExpr
+          NameRef
+            Ident "D2009"
+          Minus "-"
+          Literal
+            Int "03"
+        Minus "-"
+        Literal
+          Int "31"
+  Error
+    Ident "T23"
+    Colon ":"
+    Int "59"
+    Colon ":"
+    Int "59"
+    Dot "."
+    Int "000"
+    Ident "Z"
+  ConstDecl
+    Newline "\n"
+    LineComment "// An offset input normalizes to the same UTC instant."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Launch"
+    Whitespace "  "
+    Initializer
+      Assign "="
+      Whitespace " "
+      BinaryExpr
+        BinaryExpr
+          NameRef
+            Ident "D2026"
+          Minus "-"
+          Literal
+            Int "06"
+        Minus "-"
+        Literal
+          Int "05"
+  Error
+    Ident "T09"
+    Colon ":"
+    Int "00"
+    Colon ":"
+    Int "00"
+    Dot "."
+    Int "000"
+    Plus "+"
+    Int "09"
+    Colon ":"
+    Int "00"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Cooldown"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      Literal
+        Int "5"
+  Error
+    Ident "s"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Complex"
+    Whitespace "  "
+    Initializer
+      Assign "="
+      Whitespace " "
+      Literal
+        Int "3"
+  Error
+    Ident "w4d5h6m7s8ms"
+  AssertDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// Comparison works within each type."
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      NameRef
+        Ident "Release"
+      Whitespace " "
+      Gt ">"
+      Whitespace " "
+      NameRef
+        Ident "Epoch"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    Literal
+      Int "1"
+  Error
+    Ident "h"
+    Whitespace " "
+    Gt ">"
+    Whitespace " "
+    Int "59"
+    Ident "m"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// Mixed arithmetic resolves per argument type (overloading)."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Deadline"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      BinaryExpr
+        NameRef
+          Ident "Release"
+        Whitespace " "
+        Plus "+"
+        Whitespace " "
+        Literal
+          Int "7"
+  Error
+    Ident "d"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Span"
+    Whitespace "     "
+    Initializer
+      Assign "="
+      Whitespace " "
+      BinaryExpr
+        NameRef
+          Ident "Release"
+        Whitespace " "
+        Minus "-"
+        Whitespace " "
+        NameRef
+          Ident "Epoch"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Shift"
+    Whitespace "    "
+    Initializer
+      Assign "="
+      Whitespace " "
+      BinaryExpr
+        NameRef
+          Ident "Release"
+        Whitespace " "
+        Minus "-"
+        Whitespace " "
+        Literal
+          Int "1"
+  Error
+    Ident "h"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "TwoH"
+    Whitespace "     "
+    Initializer
+      Assign "="
+      Whitespace " "
+      Literal
+        Int "1"
+  Error
+    Ident "h"
+    Whitespace " "
+    Plus "+"
+    Whitespace " "
+    Int "1"
+    Ident "h"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Triple"
+    Whitespace "   "
+    Initializer
+      Assign "="
+      Whitespace " "
+      Literal
+        Int "5"
+  Error
+    Ident "m"
+    Whitespace " "
+    Star "*"
+    Whitespace " "
+    Int "3"
+  TypeDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// Master data columns carry instants and periods."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Type "type"
+    Whitespace " "
+    Ident "Event"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    RecordType
+      LBrace "{"
+      Newline "\n"
+      Whitespace "  "
+      Field
+        Ident "id"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "int"
+      Newline "\n"
+      Whitespace "  "
+      Field
+        Ident "starts_at"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "datetime"
+      Newline "\n"
+      Whitespace "  "
+      Field
+        Ident "cooldown"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "duration"
+      Newline "\n"
+      RBrace "}"
+  Newline "\n"
+  EOF ""
+# diagnostics
+error[masterbelt.parser.concrete.unexpected_token] 5:28 unexpected token: Ident
+error[masterbelt.parser.concrete.unexpected_token] 6:28 unexpected token: Ident
+error[masterbelt.parser.concrete.unexpected_token] 8:28 unexpected token: Ident
+error[masterbelt.parser.concrete.unexpected_token] 10:19 unexpected token: Ident
+error[masterbelt.parser.concrete.unexpected_token] 11:19 unexpected token: Ident
+error[masterbelt.parser.concrete.unexpected_token] 15:9 unexpected token: Ident
+error[masterbelt.parser.concrete.unexpected_token] 18:29 unexpected token: Ident
+error[masterbelt.parser.concrete.unexpected_token] 20:29 unexpected token: Ident
+error[masterbelt.parser.concrete.unexpected_token] 21:19 unexpected token: Ident
+error[masterbelt.parser.concrete.unexpected_token] 22:19 unexpected token: Ident
