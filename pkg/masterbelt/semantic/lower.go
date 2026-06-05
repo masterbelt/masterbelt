@@ -1,6 +1,7 @@
 package semantic
 
 import (
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/lower"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/types/infer"
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
@@ -167,6 +168,29 @@ type bodyFuncs struct {
 	shells    map[*ast.FuncDecl]*ir.Function
 }
 
+// astByName projects the local shells back to their declarations by name, the
+// form a typing scope wants (BodyScope.Funcs) — so inferring an inferred let's
+// value (let x = f(1)) sees the file's functions exactly as the checking walk
+// does. A shell with no syntax (only the prelude has none) is skipped.
+func (f bodyFuncs) astByName() map[string][]*ast.FuncDecl {
+	if len(f.local) == 0 {
+		return nil
+	}
+	out := make(map[string][]*ast.FuncDecl, len(f.local))
+	for name, shells := range f.local {
+		decls := make([]*ast.FuncDecl, 0, len(shells))
+		for _, s := range shells {
+			if s.Syntax != nil {
+				decls = append(decls, s.Syntax)
+			}
+		}
+		if len(decls) > 0 {
+			out[name] = decls
+		}
+	}
+	return out
+}
+
 // bodyBinder lowers the leaves of a method or function body: self (methods
 // only), a parameter reference, a record field access (recv.field), a type
 // conversion (T(x), when the callee names a type), a call of a top-level
@@ -176,6 +200,7 @@ type bodyFuncs struct {
 // surface callable from the body.
 type bodyBinder struct {
 	r      *infer.TypeResolver
+	reg    *builtin.Registry
 	params map[string]bool
 	// paramTypes maps each parameter to its resolved type, so a switch can read
 	// the scrutinee's enum (the expected type its bare-member arms resolve
@@ -186,9 +211,62 @@ type bodyBinder struct {
 	tscope     map[string]bool
 	funcs      bodyFuncs
 	self       bool // whether self has a value here (a method body; never a function's)
+	// locals maps each let-bound block-local in scope to its settled type. A
+	// reference to one lowers to an ir.LocalRef (shadowing a same-named parameter
+	// or type), and its type is read here when inferring a later let's value. It
+	// grows as a block's lets are lowered (LetLocal) and is the body counterpart
+	// of paramTypes for mutable locals.
+	locals map[string]ir.Type
 }
 
 func (b bodyBinder) EnterFunc(params []*ast.ParamDef) lower.Binder { return enterFunc(b, params) }
+
+// LetLocal records a let-bound local on top of this binder's scope and returns
+// the extended binder and the binding's settled type: the annotation when one is
+// written, otherwise the value's type inferred against the locals (and params)
+// already in scope. The locals map is copied so the extension reaches only the
+// statements after the let, leaving an outer block's binder untouched — which is
+// what gives let block scoping and lets an inner let shadow an outer one.
+func (b bodyBinder) LetLocal(name string, annotation ast.TypeExpr, value ast.Expr) (lower.Binder, ir.Type) {
+	var typ ir.Type
+	switch {
+	case annotation != nil:
+		typ = b.r.ResolveType(annotation, b.tscope)
+	case value != nil:
+		typ = infer.Body(value, b.bodyScope())
+	default:
+		typ = ir.Invalid
+	}
+	next := b
+	next.locals = make(map[string]ir.Type, len(b.locals)+1)
+	for k, v := range b.locals {
+		next.locals[k] = v
+	}
+	next.locals[name] = typ
+	return next, typ
+}
+
+// bodyScope builds the typing scope an inferred let's value is typed against:
+// the binder's params and the locals already in scope, with self and the
+// function surface, so the inference matches the checking walk. It carries no
+// diagnostic sink — the checking pass reports the value's errors; this is only
+// to settle the binding's type for the IR.
+func (b bodyBinder) bodyScope() infer.BodyScope {
+	self := ir.Invalid
+	if b.self {
+		self = b.selfType
+	}
+	return infer.BodyScope{
+		Reg:            b.reg,
+		Universe:       b.r.Defs,
+		Qualified:      b.r.Qualified,
+		Self:           self,
+		Params:         b.paramTypes,
+		Locals:         b.locals,
+		Funcs:          b.funcs.astByName(),
+		QualifiedFuncs: b.funcs.qualified,
+	}
+}
 
 // ExpectedEnum returns the enum definition a switch scrutinee's static type
 // names, so its bare-member arms (Common rather than Rarity.Common) lower to
@@ -230,6 +308,15 @@ func enumDefOf(t ir.Type) *ir.TypeDef {
 	return nil
 }
 
+// shadows reports whether name is bound by a let local or a parameter, either of
+// which shadows a same-named type or top-level function in value position.
+func (b bodyBinder) shadows(name string) bool {
+	if _, ok := b.locals[name]; ok {
+		return true
+	}
+	return b.params[name]
+}
+
 func (b bodyBinder) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
 	switch e := e.(type) {
 	case *ast.SelfExpr:
@@ -240,6 +327,11 @@ func (b bodyBinder) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
 	case *ast.NullLit:
 		return &ir.NullValue{}
 	case *ast.Identifier:
+		// A let-bound local shadows a same-named parameter or type, so it is
+		// resolved first.
+		if _, ok := b.locals[e.Name]; ok {
+			return &ir.LocalRef{Name: e.Name}
+		}
 		if b.params[e.Name] {
 			return &ir.ParamRef{Name: e.Name}
 		}
@@ -249,7 +341,7 @@ func (b bodyBinder) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
 		// (Element.Fire) or an associated constant (int8.Max) — is that type's
 		// value; a parameter shadowing the type name takes the record-field
 		// reading instead.
-		if recv, ok := e.Receiver.(*ast.Identifier); ok && !b.params[recv.Name] {
+		if recv, ok := e.Receiver.(*ast.Identifier); ok && !b.shadows(recv.Name) {
 			if def := b.r.Defs[recv.Name]; def != nil {
 				if def.Enum != nil {
 					if idx := enumIndex(def, e.Member.Name); idx >= 0 {
@@ -269,7 +361,7 @@ func (b bodyBinder) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
 		// (geo.area(...)) — is a function call.
 		switch callee := e.Callee.(type) {
 		case *ast.Identifier:
-			if b.params[callee.Name] {
+			if b.shadows(callee.Name) {
 				return nil
 			}
 			if t := b.r.ResolveName(callee.Name, b.tscope); t != ir.Invalid {
@@ -284,7 +376,7 @@ func (b bodyBinder) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
 			}
 		case *ast.MemberExpr:
 			recv, ok := callee.Receiver.(*ast.Identifier)
-			if !ok || b.params[recv.Name] || b.funcs.qualified == nil {
+			if !ok || b.shadows(recv.Name) || b.funcs.qualified == nil {
 				return nil
 			}
 			if cands := b.funcs.qualified(recv.Name, callee.Member.Name); len(cands) > 0 {

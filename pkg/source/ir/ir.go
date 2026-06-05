@@ -200,6 +200,16 @@ type ParamRef struct {
 
 func (*ParamRef) value() {}
 
+// LocalRef is a use of a let-bound block-local, by name. It is the value form a
+// reference to a mutable local takes — distinct from a ParamRef (an immutable
+// parameter) and a Reference (a top-level constant) — so the evaluator reads it
+// from the body's mutable environment.
+type LocalRef struct {
+	Name string
+}
+
+func (*LocalRef) value() {}
+
 // FieldAccess is a record field access: Receiver.Field.
 type FieldAccess struct {
 	Receiver Value

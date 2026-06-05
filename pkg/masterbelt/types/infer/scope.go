@@ -128,6 +128,11 @@ type BodyScope struct {
 	Qualified func(namespace, name string) *ir.TypeDef
 	Self      ir.Type
 	Params    map[string]ir.Type
+	// Locals maps each let-bound block-local in scope to its settled type. A
+	// reference to one resolves to that type, shadowing a same-named parameter or
+	// type; it is nil in a body with no lets (and in a refinement predicate, which
+	// has none). The checking walk grows it as it descends a block's lets.
+	Locals map[string]ir.Type
 	// Funcs is the file's top-level functions by name — each name carrying
 	// its overload set in source order — or nil when none are in scope (a
 	// refinement predicate).
@@ -149,16 +154,26 @@ func (s BodyScope) universe() map[string]*ir.TypeDef { return s.Universe }
 
 func (s BodyScope) qualified() func(namespace, name string) *ir.TypeDef { return s.Qualified }
 
+// shadows reports whether name is bound by a let local or a parameter — either
+// shadows a same-named type or top-level function in value position.
+func (s BodyScope) shadows(name string) bool {
+	if _, ok := s.Locals[name]; ok {
+		return true
+	}
+	_, isParam := s.Params[name]
+	return isParam
+}
+
 func (s BodyScope) conv(id *ast.Identifier) ir.Type {
-	if _, isParam := s.Params[id.Name]; isParam {
-		return ir.Invalid // a parameter shadows a same-named type
+	if s.shadows(id.Name) {
+		return ir.Invalid // a local or parameter shadows a same-named type
 	}
 	return s.lookupType(id.Name)
 }
 
 func (s BodyScope) fn(id *ast.Identifier) []*ast.FuncDecl {
-	if _, isParam := s.Params[id.Name]; isParam {
-		return nil // a parameter shadows a same-named function
+	if s.shadows(id.Name) {
+		return nil // a local or parameter shadows a same-named function
 	}
 	return s.Funcs[id.Name]
 }
@@ -168,8 +183,8 @@ func (s BodyScope) fnMember(m *ast.MemberExpr) []*ast.FuncDecl {
 	if !ok || s.QualifiedFuncs == nil {
 		return nil
 	}
-	if _, isParam := s.Params[recv.Name]; isParam {
-		return nil // a parameter shadows a same-named namespace
+	if s.shadows(recv.Name) {
+		return nil // a local or parameter shadows a same-named namespace
 	}
 	return s.QualifiedFuncs(recv.Name, m.Member.Name)
 }
@@ -181,6 +196,10 @@ func (s BodyScope) leaf(e ast.Expr) ir.Type {
 	case *ast.NullLit:
 		return &ir.Builtin{Name: "null"}
 	case *ast.Identifier:
+		// A let-bound local shadows a same-named parameter, so it is read first.
+		if t, ok := s.Locals[e.Name]; ok {
+			return t
+		}
 		if t, ok := s.Params[e.Name]; ok {
 			return t
 		}
@@ -188,10 +207,10 @@ func (s BodyScope) leaf(e ast.Expr) ir.Type {
 	case *ast.MemberExpr:
 		// A member access whose receiver names a type — an enum member
 		// (Element.Fire) or an associated constant (int8.Max, Level.Max) — is a
-		// value of that type; a parameter shadowing the type name takes the
-		// record-field reading instead.
+		// value of that type; a local or parameter shadowing the type name takes
+		// the record-field reading instead.
 		if recv, ok := e.Receiver.(*ast.Identifier); ok {
-			if _, isParam := s.Params[recv.Name]; !isParam {
+			if !s.shadows(recv.Name) {
 				if t := enumMemberType(s.Universe, e); t != ir.Invalid {
 					return t
 				}

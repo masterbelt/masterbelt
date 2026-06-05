@@ -136,7 +136,7 @@ func resolveDecl(env eval.Env, r *infer.TypeResolver, reg *builtin.Registry, td 
 	// the reporting one) drop identically.
 	seen := make(map[string]bool, len(td.Methods))
 	for _, m := range td.Methods {
-		rm := resolveMethod(r, m, scope, fns)
+		rm := resolveMethod(r, reg, &ir.Named{Def: def}, m, scope, fns)
 		key := rm.Name + signatureKey(def, rm)
 		if m.Name != "" && seen[key] {
 			if at != nil && diags != nil {
@@ -382,7 +382,7 @@ func resolveEnumDecl(env eval.Env, r *infer.TypeResolver, reg *builtin.Registry,
 	scope := map[string]bool{}
 	seen := make(map[string]bool, len(ed.Methods))
 	for _, m := range ed.Methods {
-		rm := resolveMethod(r, m, scope, fns)
+		rm := resolveMethod(r, reg, &ir.Named{Def: def}, m, scope, fns)
 		key := rm.Name + signatureKey(def, rm)
 		if m.Name != "" && seen[key] {
 			if at != nil && diags != nil {
@@ -533,8 +533,10 @@ func kindName(k ir.ConstKind) string {
 
 // resolveMethod resolves a method's signature (parameter types and result type)
 // and lowers its body to IR; fns is the file's function shells by name, so a
-// body may call a top-level function. The body is not yet type-checked.
-func resolveMethod(r *infer.TypeResolver, m *ast.MethodDecl, scope map[string]bool, fns bodyFuncs) *ir.Method {
+// body may call a top-level function. reg and self (the receiver type) let the
+// body binder infer an inferred let's value type. The body is not yet
+// type-checked.
+func resolveMethod(r *infer.TypeResolver, reg *builtin.Registry, self ir.Type, m *ast.MethodDecl, scope map[string]bool, fns bodyFuncs) *ir.Method {
 	method := &ir.Method{Name: m.Name, Public: m.Public, Extern: m.Extern, Effects: m.Effects, Doc: m.Doc, Syntax: m}
 
 	// Method-introduced type variables: free type names appearing in a parameter
@@ -568,7 +570,7 @@ func resolveMethod(r *infer.TypeResolver, m *ast.MethodDecl, scope map[string]bo
 		resolvedParams[p.Name] = t
 	}
 	method.Result = r.ResolveType(m.Result, mscope)
-	method.Body = lower.Body(m.Body, bodyBinder{r: r, params: params, paramTypes: resolvedParams, tscope: mscope, funcs: fns, self: true})
+	method.Body = lower.Body(m.Body, bodyBinder{r: r, reg: reg, params: params, paramTypes: resolvedParams, selfType: self, tscope: mscope, funcs: fns, self: true})
 	return method
 }
 
@@ -581,7 +583,7 @@ func resolveMethod(r *infer.TypeResolver, m *ast.MethodDecl, scope map[string]bo
 // module, the first winning, exactly as a duplicate method overload is. The
 // shells are filled in place; FuncCall values across the program point at
 // them, exactly as References point at the constant shells.
-func resolveFuncs(file *ast.File, at func(ast.Node) span, diags *diagnostic.List, universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, qualifiedFuncs func(namespace, name string) []*ast.FuncDecl, shells map[*ast.FuncDecl]*ir.Function) []*ir.Function {
+func resolveFuncs(file *ast.File, at func(ast.Node) span, diags *diagnostic.List, reg *builtin.Registry, universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, qualifiedFuncs func(namespace, name string) []*ast.FuncDecl, shells map[*ast.FuncDecl]*ir.Function) []*ir.Function {
 	if len(file.Funcs) == 0 {
 		return nil
 	}
@@ -603,7 +605,7 @@ func resolveFuncs(file *ast.File, at func(ast.Node) span, diags *diagnostic.List
 			paramTypes[p.Name] = t
 		}
 		fn.Result = r.ResolveType(fd.Result, nil)
-		fn.Body = lower.Body(fd.Body, bodyBinder{r: r, params: params, paramTypes: paramTypes, funcs: fns})
+		fn.Body = lower.Body(fd.Body, bodyBinder{r: r, reg: reg, params: params, paramTypes: paramTypes, funcs: fns})
 
 		key := fn.Name + funcSignatureKey(fn)
 		if fn.Name != "" && seen[key] {

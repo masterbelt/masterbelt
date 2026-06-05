@@ -170,6 +170,10 @@ func dumpStmtAt(b *strings.Builder, s Stmt, indent string) {
 		fmt.Fprintf(b, "%sreturn %s\n", indent, dumpValue(s.Value))
 	case *ExprStmt:
 		fmt.Fprintf(b, "%sexpr %s\n", indent, dumpValue(s.Value))
+	case *Let:
+		fmt.Fprintf(b, "%slet %q: %s = %s\n", indent, s.Name, s.Type, dumpValue(s.Value))
+	case *Assign:
+		fmt.Fprintf(b, "%sassign %q = %s\n", indent, s.Name, dumpValue(s.Value))
 	case *Switch:
 		fmt.Fprintf(b, "%sswitch %s\n", indent, dumpValue(s.Scrutinee))
 		for _, arm := range s.Arms {
@@ -231,6 +235,10 @@ func dumpStmtInline(s Stmt) string {
 		return "(return " + dumpValue(s.Value) + ")"
 	case *ExprStmt:
 		return "(expr " + dumpValue(s.Value) + ")"
+	case *Let:
+		return fmt.Sprintf("(let %s: %s = %s)", s.Name, s.Type, dumpValue(s.Value))
+	case *Assign:
+		return fmt.Sprintf("(assign %s = %s)", s.Name, dumpValue(s.Value))
 	case *Switch:
 		parts := []string{"switch " + dumpValue(s.Scrutinee)}
 		for _, arm := range s.Arms {
@@ -362,6 +370,8 @@ func dumpValue(v Value) string {
 		return "self"
 	case *ParamRef:
 		return fmt.Sprintf("ParamRef %q", x.Name)
+	case *LocalRef:
+		return fmt.Sprintf("LocalRef %q", x.Name)
 	case *FieldAccess:
 		return fmt.Sprintf("%s.%s", dumpValue(x.Receiver), x.Field)
 	case *Conversion:

@@ -70,6 +70,11 @@ masterbelt.semantic.unreachable_arm,error,
 masterbelt.semantic.condition_not_bool,error,typ:string
 masterbelt.semantic.ternary_condition_not_bool,error,typ:string
 masterbelt.semantic.ternary_branch_mismatch,error,then:string els:string
+masterbelt.semantic.assign_to_const,error,name:string
+masterbelt.semantic.assign_to_undefined,error,name:string
+masterbelt.semantic.assign_type_mismatch,error,name:string actual:string expected:string
+masterbelt.semantic.immutable_data,error,
+masterbelt.semantic.missing_initializer,error,name:string
 project.config.missing,error,
 project.config.invalid,error,detail:string
 project.config.missing_entry,error,

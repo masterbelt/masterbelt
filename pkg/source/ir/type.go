@@ -288,7 +288,7 @@ type AssocConst struct {
 }
 
 // Stmt is a statement in a method body. It is a sealed interface; the only
-// implementations are Return, ExprStmt, Switch, and If.
+// implementations are Return, ExprStmt, Let, Assign, Switch, and If.
 type Stmt interface {
 	stmt()
 }
@@ -306,6 +306,28 @@ type ExprStmt struct {
 }
 
 func (*ExprStmt) stmt() {}
+
+// Let is a resolved mutable block-local binding: "let Name = Value". The slot is
+// referenced by a LocalRef and updated by an Assign. Type is the binding's
+// settled type — the annotation when written, otherwise the value's inferred
+// type — carried here because the value graph is otherwise untyped.
+type Let struct {
+	Name  string
+	Type  Type
+	Value Value
+}
+
+func (*Let) stmt() {}
+
+// Assign is a resolved reassignment of a let local: "Name = Value". Name is the
+// target local's name (the parser's target expression, validated to be a let
+// local by the semantic layer); Value is the new value.
+type Assign struct {
+	Name  string
+	Value Value
+}
+
+func (*Assign) stmt() {}
 
 // Switch is a resolved value-dispatch statement: it runs the body of the first
 // arm whose patterns the Scrutinee equals, or the Else body when none match.

@@ -76,11 +76,12 @@ func (p *parser) parseLetStmt() *cst.Node {
 		p.skipTrivia(&children)
 		children = append(children, p.parseTypeClause())
 	}
+	// A missing "= value" is reported by the semantic layer as missing_initializer
+	// (let is initialized in place), not here — that diagnostic names the binding
+	// and suggests the fix, so the parser leaves the value absent and recovers.
 	if p.peekSignificant() == token.Assign {
 		p.skipTrivia(&children)
 		children = append(children, p.parseInitializer())
-	} else {
-		p.report(newExpectedAssignDiagnostic(p.lastStart, 0))
 	}
 	return cst.NewNode(cst.LetStmt, children)
 }

@@ -223,6 +223,30 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "assertion is not a compile-time constant"
 		}
 	},
+	"masterbelt.semantic.assign_to_const": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return f["name"].String() + " には代入できません。const は不変です。可変なローカルには let を使ってください"
+		default:
+			return "cannot assign to " + f["name"].String() + ": a const is immutable; use let for a mutable local"
+		}
+	},
+	"masterbelt.semantic.assign_to_undefined": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return f["name"].String() + " には代入できません。その名前の let 束縛がスコープにありません"
+		default:
+			return "cannot assign to " + f["name"].String() + ": no let binding with that name is in scope"
+		}
+	},
+	"masterbelt.semantic.assign_type_mismatch": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return f["name"].String() + " に " + f["actual"].String() + " を代入できません。型は " + f["expected"].String() + " に固定されています"
+		default:
+			return "cannot assign " + f["actual"].String() + " to " + f["name"].String() + ": its type is fixed to " + f["expected"].String()
+		}
+	},
 	"masterbelt.semantic.condition_not_bool": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
@@ -319,6 +343,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "a " + f["context"].String() + " is evaluated at compile time and must be pure; effect " + f["effect"].String() + " is not allowed"
 		}
 	},
+	"masterbelt.semantic.immutable_data": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "フィールドや要素には代入できません。データは不変です。新しい値を作ってください"
+		default:
+			return "cannot assign to a field or element: data is immutable; build a new value instead"
+		}
+	},
 	"masterbelt.semantic.invalid_enum_base_type": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
@@ -357,6 +389,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return f["typ"].String() + " のレコードリテラルにフィールド " + f["field"].String() + " がありません"
 		default:
 			return "record literal of " + f["typ"].String() + " is missing field " + f["field"].String()
+		}
+	},
+	"masterbelt.semantic.missing_initializer": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "let " + f["name"].String() + " は初期化が必要です。let " + f["name"].String() + " = 値 と書いてください"
+		default:
+			return "let " + f["name"].String() + " must be initialized: write let " + f["name"].String() + " = value"
 		}
 	},
 	"masterbelt.semantic.missing_return": func(loc Locale, f map[string]fmt.Stringer) string {

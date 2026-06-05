@@ -70,6 +70,11 @@ masterbelt.semantic.unreachable_arm,unreachable arm: a previous arm or the wildc
 masterbelt.semantic.condition_not_bool,if condition must be a bool; got {typ}
 masterbelt.semantic.ternary_condition_not_bool,ternary condition must be a bool; got {typ}
 masterbelt.semantic.ternary_branch_mismatch,ternary branches have mismatched types: {then} and {els}
+masterbelt.semantic.assign_to_const,cannot assign to {name}: a const is immutable; use let for a mutable local
+masterbelt.semantic.assign_to_undefined,cannot assign to {name}: no let binding with that name is in scope
+masterbelt.semantic.assign_type_mismatch,cannot assign {actual} to {name}: its type is fixed to {expected}
+masterbelt.semantic.immutable_data,cannot assign to a field or element: data is immutable; build a new value instead
+masterbelt.semantic.missing_initializer,let {name} must be initialized: write let {name} = value
 project.config.missing,masterbelt.toml not found in this directory or any parent
 project.config.invalid,invalid masterbelt.toml: {detail}
 project.config.missing_entry,masterbelt.toml does not set entry

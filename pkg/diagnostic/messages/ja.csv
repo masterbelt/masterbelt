@@ -70,6 +70,11 @@ masterbelt.semantic.unreachable_arm,到達不能な arm です。先行する ar
 masterbelt.semantic.condition_not_bool,if の条件は bool でなければなりません({typ})
 masterbelt.semantic.ternary_condition_not_bool,三項演算子の条件は bool でなければなりません({typ})
 masterbelt.semantic.ternary_branch_mismatch,三項演算子の両枝の型が一致しません: {then} と {els}
+masterbelt.semantic.assign_to_const,{name} には代入できません。const は不変です。可変なローカルには let を使ってください
+masterbelt.semantic.assign_to_undefined,{name} には代入できません。その名前の let 束縛がスコープにありません
+masterbelt.semantic.assign_type_mismatch,{name} に {actual} を代入できません。型は {expected} に固定されています
+masterbelt.semantic.immutable_data,フィールドや要素には代入できません。データは不変です。新しい値を作ってください
+masterbelt.semantic.missing_initializer,let {name} は初期化が必要です。let {name} = 値 と書いてください
 project.config.missing,masterbelt.toml がこのディレクトリにも親ディレクトリにも見つかりません
 project.config.invalid,不正な masterbelt.toml: {detail}
 project.config.missing_entry,masterbelt.toml に entry が指定されていません
