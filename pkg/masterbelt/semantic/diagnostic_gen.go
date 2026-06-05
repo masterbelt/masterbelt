@@ -33,6 +33,7 @@ const (
 	CodeDuplicateSwitchArm      diagnostic.Code = "masterbelt.semantic.duplicate_switch_arm"
 	CodeEffectInPureContext     diagnostic.Code = "masterbelt.semantic.effect_in_pure_context"
 	CodeImmutableData           diagnostic.Code = "masterbelt.semantic.immutable_data"
+	CodeIndexOutOfRange         diagnostic.Code = "masterbelt.semantic.index_out_of_range"
 	CodeInvalidEnumBaseType     diagnostic.Code = "masterbelt.semantic.invalid_enum_base_type"
 	CodeInvalidOperation        diagnostic.Code = "masterbelt.semantic.invalid_operation"
 	CodeLambdaArityMismatch     diagnostic.Code = "masterbelt.semantic.lambda_arity_mismatch"
@@ -404,6 +405,21 @@ func newImmutableDataDiagnostic(offset int, width int) diagnostic.Diagnostic {
 		Code:     CodeImmutableData,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeImmutableData, nil),
 		Fields:   nil,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newIndexOutOfRangeDiagnostic(offset int, width int, index string, length string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"index":  diagnostic.Str(index),
+		"length": diagnostic.Str(length),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeIndexOutOfRange,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeIndexOutOfRange, fields),
+		Fields:   fields,
 		Offset:   offset,
 		Width:    width,
 	}

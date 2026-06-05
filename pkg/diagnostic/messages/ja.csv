@@ -75,6 +75,7 @@ masterbelt.semantic.assign_to_undefined,{name} には代入できません。そ
 masterbelt.semantic.assign_type_mismatch,{name} に {actual} を代入できません。型は {expected} に固定されています
 masterbelt.semantic.immutable_data,フィールドや要素には代入できません。データは不変です。新しい値を作ってください
 masterbelt.semantic.missing_initializer,let {name} は初期化が必要です。let {name} = 値 と書いてください
+masterbelt.semantic.index_out_of_range,インデックス {index} は長さ {length} のリストの範囲外です
 project.config.missing,masterbelt.toml がこのディレクトリにも親ディレクトリにも見つかりません
 project.config.invalid,不正な masterbelt.toml: {detail}
 project.config.missing_entry,masterbelt.toml に entry が指定されていません

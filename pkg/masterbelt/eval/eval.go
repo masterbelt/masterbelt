@@ -81,6 +81,15 @@ func Expr(e ast.Expr, env Env) *ir.Constant {
 	return evalExpr(e, evalCtx{env: env})
 }
 
+// ExprIn folds an expression with a set of local bindings in scope, so a
+// reference to a body-local (a let, a parameter the caller has a value for)
+// folds to its value. It is how a body-position check folds an expression the
+// query engine cannot reach on its own — the local environment a function body
+// carries is not in env. A nil locals behaves exactly like Expr.
+func ExprIn(e ast.Expr, locals map[string]*ir.Constant, env Env) *ir.Constant {
+	return evalExpr(e, evalCtx{env: env, locals: locals})
+}
+
 // ExprExpecting folds an expression with an expected enum in scope, so a bare
 // member resolves through it. want is the expected type; when it is an enum's
 // named type the bare-member rule applies, otherwise it is ignored. It is how

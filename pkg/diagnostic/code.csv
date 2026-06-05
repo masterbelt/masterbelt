@@ -75,6 +75,7 @@ masterbelt.semantic.assign_to_undefined,error,name:string
 masterbelt.semantic.assign_type_mismatch,error,name:string actual:string expected:string
 masterbelt.semantic.immutable_data,error,
 masterbelt.semantic.missing_initializer,error,name:string
+masterbelt.semantic.index_out_of_range,error,index:string length:string
 project.config.missing,error,
 project.config.invalid,error,detail:string
 project.config.missing_entry,error,
