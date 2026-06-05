@@ -1,15 +1,9 @@
 package semantic
 
 import (
-	"math/big"
-	"strconv"
-	"strings"
-
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/eval"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/lower"
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/types"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/types/infer"
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
@@ -129,172 +123,6 @@ func resolveDecl(r *infer.TypeResolver, reg *builtin.Registry, td *ast.TypeDecl,
 	}
 }
 
-// signatureKey renders a method's parameter-type list as the duplicate-
-// detection key: two same-name methods collide exactly when their resolved
-// parameter types denote the same signature. Spellings of the same type are
-// normalized — the enclosing type's own name reads as self (inside the impl
-// they are the same type, and would otherwise both fit every call, making it
-// permanently ambiguous), and the method's own type variables read by binding
-// position (foo(a: T) and foo(a: U) are the same universal signature). The
-// enclosing type's generic parameters keep their names: they are bound by the
-// receiver, so distinct parameters are distinct types.
-func signatureKey(def *ir.TypeDef, m *ir.Method) string {
-	bound := make(map[string]bool, len(def.Params))
-	for _, p := range def.Params {
-		bound[p.Name] = true
-	}
-	vars := map[string]int{}
-	parts := make([]string, len(m.Params))
-	for i, p := range m.Params {
-		parts[i] = normalizeKeyType(def, p.Type, bound, vars)
-	}
-	return "(" + strings.Join(parts, ", ") + ")"
-}
-
-// normalizeKeyType renders one parameter type for signatureKey, recursing
-// through the composites so a nested self or type variable normalizes too.
-func normalizeKeyType(def *ir.TypeDef, t ir.Type, bound map[string]bool, vars map[string]int) string {
-	switch t := t.(type) {
-	case nil:
-		return "<nil>"
-	case *ir.SelfType:
-		return "self"
-	case *ir.Named:
-		if t.Def == def {
-			return "self"
-		}
-		return t.String()
-	case *ir.TypeVar:
-		if bound[t.Name] {
-			return t.Name
-		}
-		n, ok := vars[t.Name]
-		if !ok {
-			n = len(vars)
-			vars[t.Name] = n
-		}
-		return "%" + strconv.Itoa(n)
-	case *ir.App:
-		name := ""
-		if t.Def != nil {
-			name = t.Def.Name
-		}
-		args := make([]string, len(t.Args))
-		for i, a := range t.Args {
-			args[i] = normalizeKeyType(def, a, bound, vars)
-		}
-		return name + "<" + strings.Join(args, ", ") + ">"
-	case *ir.Func:
-		params := make([]string, len(t.Params))
-		for i, p := range t.Params {
-			params[i] = normalizeKeyType(def, p, bound, vars)
-		}
-		return "fn(" + strings.Join(params, ", ") + "): " + normalizeKeyType(def, t.Result, bound, vars)
-	case *ir.Union:
-		members := make([]string, len(t.Members))
-		for i, m := range t.Members {
-			members[i] = normalizeKeyType(def, m, bound, vars)
-		}
-		return strings.Join(members, " | ")
-	case *ir.Record:
-		fields := make([]string, len(t.Fields))
-		for i, f := range t.Fields {
-			fields[i] = f.Name + ": " + normalizeKeyType(def, f.Type, bound, vars)
-		}
-		return "{ " + strings.Join(fields, ", ") + " }"
-	default:
-		return t.String()
-	}
-}
-
-// paramTypes renders a method's parameter types as "a, b" for the
-// duplicate-overload diagnostic.
-func paramTypes(m *ir.Method) string {
-	parts := make([]string, len(m.Params))
-	for i, p := range m.Params {
-		parts[i] = p.Type.String()
-	}
-	return strings.Join(parts, ", ")
-}
-
-// resolveWhere type-checks the declaration's refinement predicate — self is the
-// underlying body type, so the comparisons type against the body's operators —
-// and keeps it on the definition only when it is a usable compile-time
-// predicate: a bool that folds. An unusable predicate is reported here, once,
-// at the declaration; the definition's Where stays nil so the per-constant
-// check never fires for it (the ir.Invalid style of suppression). The silent
-// pass (nil at/diags) decides usability identically and just skips the
-// reporting, so the memoized definitions and the diagnostics never disagree.
-func resolveWhere(r *infer.TypeResolver, reg *builtin.Registry, td *ast.TypeDecl, def *ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List) {
-	if td.Where == nil || def.Body == nil || ir.HasInvalid(def.Body) {
-		return
-	}
-	report := at != nil && diags != nil
-	var sink *infer.Sink
-	if report {
-		sink = exprSink(at, diags)
-	}
-	// The predicate types in a body scope with no parameters: self and literals
-	// only, which is exactly what the evaluator can fold (a reference to a
-	// constant would need a value the declaration does not have).
-	bs := infer.BodyScope{Reg: reg, Universe: r.Defs, Qualified: r.Qualified, Self: def.Body}
-	t := infer.CheckPredicate(td.Where, bs, sink)
-	if t == ir.Invalid {
-		return // the operator error was reported by the sink
-	}
-	if !types.IsBoolean(reg, t) {
-		if report {
-			s := at(td.Where)
-			diags.Add(newRefinementNotBoolDiagnostic(s.offset, s.width, t.String()))
-		}
-		return
-	}
-	// The predicate must fold. A witness value of the body type stands in for
-	// self — the fold is value-independent for everything the type rules let
-	// through (intrinsic-backed methods over self and literals), so a witness
-	// that folds proves every constant's check will.
-	if v := eval.Predicate(td.Where, witness(reg, def.Body), predicateEnv{reg}); v == nil || v.Kind != ir.ConstBool {
-		if report {
-			s := at(td.Where)
-			diags.Add(newRefinementNotConstantDiagnostic(s.offset, s.width))
-		}
-		return
-	}
-	def.Where = td.Where
-}
-
-// witness is a representative constant of t for the declaration-time probe
-// fold: 1 for an integer (avoiding a divide-by-self zero), true for a boolean,
-// the empty string for a string, nil — never foldable — for anything else.
-func witness(reg *builtin.Registry, t ir.Type) *ir.Constant {
-	switch {
-	case types.IsInteger(reg, t):
-		return ir.IntConstant(big.NewInt(1))
-	case types.IsBoolean(reg, t):
-		return ir.BoolConstant(true)
-	case types.IsString(reg, t):
-		return ir.StringConstant("")
-	default:
-		return nil
-	}
-}
-
-// predicateEnv is the eval environment of a refinement predicate: just the
-// registry. The type rules guarantee a usable predicate references nothing but
-// self and literals, so resolution never happens.
-type predicateEnv struct{ reg *builtin.Registry }
-
-func (e predicateEnv) Resolve(*ast.Identifier) *ast.ConstDecl            { return nil }
-func (e predicateEnv) ResolveMember(*ast.MemberExpr) *ast.ConstDecl      { return nil }
-func (e predicateEnv) ResolveFunc(*ast.Identifier) []*ast.FuncDecl       { return nil }
-func (e predicateEnv) ResolveFuncMember(*ast.MemberExpr) []*ast.FuncDecl { return nil }
-func (e predicateEnv) ValueOf(*ast.ConstDecl) *ir.Constant               { return nil }
-func (e predicateEnv) LookupType(name string) *ir.TypeDef {
-	d, _ := e.reg.Lookup(name)
-	return d
-}
-func (e predicateEnv) Registry() *builtin.Registry { return e.reg }
-
 // resolveMethod resolves a method's signature (parameter types and result type)
 // and lowers its body to IR; fns is the file's function shells by name, so a
 // body may call a top-level function. The body is not yet type-checked.
@@ -375,33 +203,6 @@ func resolveFuncs(file *ast.File, at func(ast.Node) span, diags *diagnostic.List
 		out = append(out, fn)
 	}
 	return out
-}
-
-// funcSignatureKey renders a function's parameter-type list as the duplicate-
-// detection key: two same-name functions collide exactly when their resolved
-// parameter types denote the same signature. Functions bind no receiver and no
-// type variables, so the key is the normalized type list directly.
-func funcSignatureKey(fn *ir.Function) string {
-	vars := map[string]int{}
-	parts := make([]string, len(fn.Params))
-	for i, p := range fn.Params {
-		parts[i] = normalizeKeyType(nil, p.Type, nil, vars)
-	}
-	return "(" + strings.Join(parts, ", ") + ")"
-}
-
-// paramTypesOf renders a parameter list's types as "a, b" for the
-// duplicate-overload diagnostic.
-func paramTypesOf(params []ir.Param) string {
-	parts := make([]string, len(params))
-	for i, p := range params {
-		if p.Type == nil {
-			parts[i] = "<nil>"
-			continue
-		}
-		parts[i] = p.Type.String()
-	}
-	return strings.Join(parts, ", ")
 }
 
 // funcShellsByName indexes a file's function shells by name — each name

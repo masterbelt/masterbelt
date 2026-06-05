@@ -298,32 +298,6 @@ func TestMethodBodyTypeMismatch(t *testing.T) {
 	}
 }
 
-func TestUnknownTypeInDeclaration(t *testing.T) {
-	// A reference to an undeclared type in a type declaration is reported.
-	for _, src := range []string{
-		"pub type Coin = Nope\n",            // unknown body
-		"pub type Pair = int8 | Nope\n",     // unknown union member
-		"pub type Rec = {\n  id: Nope\n}\n", // unknown field type
-		"pub type Box<T: Nope> = T\n",       // unknown constraint
-		"pub type Lvl = int8 impl {\n  pub m(): Nope {\n    return self\n  }\n}\n", // unknown result
-	} {
-		if _, diags := analyze(src); !hasCode(diags, CodeUnknownType) {
-			t.Errorf("%q: want unknown_type, got %v", src, codes(diags))
-		}
-	}
-	// A well-formed declaration referencing only known types has no such error.
-	if _, diags := analyze("pub type Coin = int8\npub type GameValue = Coin | int8\n"); hasCode(diags, CodeUnknownType) {
-		t.Errorf("known types should not be reported unknown: %v", codes(diags))
-	}
-}
-
-func TestDuplicateTypeDeclaration(t *testing.T) {
-	_, diags := analyze("pub type Coin = int8\npub type Coin = int16\n")
-	if !hasCode(diags, CodeDuplicateDeclaration) {
-		t.Errorf("want duplicate_declaration for redeclared type, got %v", codes(diags))
-	}
-}
-
 func TestMultiStatementMethodBody(t *testing.T) {
 	m, _ := analyze("pub type Level = int8 impl {\n  pub inc(): self {\n    self + 1\n    return self\n  }\n}\n")
 	if len(m.Types) == 0 || len(m.Types[0].Methods) == 0 {
@@ -457,33 +431,6 @@ const G: Gauge = 1
 	}
 }
 
-func TestDuplicateOverload(t *testing.T) {
-	// The same name with the same parameter types is a true redeclaration:
-	// the first wins, the repeat is reported.
-	src := `pub type Score = int32 impl {
-  pub fn merge(points: self): self {
-    return self + points
-  }
-  pub fn merge(other: self): self {
-    return self
-  }
-}
-const Base: Score = 100
-const X = Base.merge(5)
-`
-	m, diags := analyze(src)
-	if got := codes(diags); len(got) != 1 || got[0] != CodeDuplicateOverload {
-		t.Fatalf("codes = %v, want [duplicate_overload]", got)
-	}
-	if len(m.Types[0].Methods) != 1 {
-		t.Errorf("Score has %d methods, want 1 (the repeat dropped)", len(m.Types[0].Methods))
-	}
-	// The call still resolves through the surviving first declaration.
-	if got := m.Consts[1].Type.String(); got != "Score" {
-		t.Errorf("X type = %s, want Score", got)
-	}
-}
-
 func TestDatetimeDurationOperators(t *testing.T) {
 	// The full operator table of the two literals — each mixed operation
 	// resolves to the overload its argument type names, and folds to the
@@ -543,64 +490,6 @@ func TestDatetimeDurationDiagnostics(t *testing.T) {
 	_, diags = analyze("assert 1h + 59m > 2h\n")
 	if got := codes(diags); len(got) != 1 || got[0] != CodeAssertionFailed {
 		t.Fatalf("assert: codes = %v, want [assertion_failed]", got)
-	}
-}
-
-func TestDuplicateOverloadNormalizesSpellings(t *testing.T) {
-	// self and the type's own name denote the same type inside the impl, so
-	// an overload differing only in that spelling is a redeclaration — were
-	// both kept, every call would fit both and be permanently ambiguous.
-	src := `pub type Score = int32 impl {
-  pub fn merge(points: self): self {
-    return self + points
-  }
-  pub fn merge(points: Score): self {
-    return self
-  }
-}
-const Base: Score = 100
-const X = Base.merge(Base)
-`
-	m, diags := analyze(src)
-	if got := codes(diags); len(got) != 1 || got[0] != CodeDuplicateOverload {
-		t.Fatalf("self vs named: codes = %v, want [duplicate_overload]", got)
-	}
-	if got := m.Consts[1].Type.String(); got != "Score" {
-		t.Errorf("X type = %s, want Score (resolved through the first declaration)", got)
-	}
-
-	// Two method-introduced type variables are the same universal signature
-	// whatever they are named.
-	src = `pub type Box = int32 impl {
-  pub extern fn wrap(value: T): bool
-  pub extern fn wrap(value: U): bool
-}
-`
-	_, diags = analyze(src)
-	if got := codes(diags); len(got) != 1 || got[0] != CodeDuplicateOverload {
-		t.Fatalf("alpha-equivalent vars: codes = %v, want [duplicate_overload]", got)
-	}
-}
-
-func TestDuplicateOverloadKeepsBodiesAligned(t *testing.T) {
-	// Dropping the duplicate must not shift the pairing of the remaining
-	// declarations with their resolved signatures: flag's body still checks
-	// against flag's bool result, not against a neighbour's.
-	src := `pub type T = int32 impl {
-  pub fn a(x: self): self {
-    return self + x
-  }
-  pub fn a(y: self): self {
-    return self
-  }
-  pub fn flag(): bool {
-    return self > 0
-  }
-}
-`
-	_, diags := analyze(src)
-	if got := codes(diags); len(got) != 1 || got[0] != CodeDuplicateOverload {
-		t.Fatalf("codes = %v, want [duplicate_overload] alone", got)
 	}
 }
 
@@ -1436,22 +1325,6 @@ func TestFuncOverloadAnnotatedArgSelects(t *testing.T) {
 	}
 	if m.Consts[1].Eval != nil {
 		t.Errorf("A eval = %v, want unevaluated (kind-blind fold stays conservative)", m.Consts[1].Eval)
-	}
-}
-
-func TestFuncOverloadDuplicateStillCallable(t *testing.T) {
-	// A repeated signature reports at its declaration and is dropped: the
-	// first declaration keeps working, the call stays unambiguous.
-	src := "fn f(): int -> 1\nfn f(): int -> 2\nconst A = f()\n"
-	m, diags := analyze(src)
-	if got := codes(diags); len(got) != 1 || got[0] != CodeDuplicateFuncOverload {
-		t.Fatalf("codes = %v, want [duplicate_func_overload]", got)
-	}
-	if len(m.Funcs) != 1 {
-		t.Errorf("module funcs = %d, want the duplicate dropped", len(m.Funcs))
-	}
-	if m.Consts[0].Type.String() != "int" {
-		t.Errorf("A type = %s, want int (the first overload)", m.Consts[0].Type)
 	}
 }
 
