@@ -31,7 +31,11 @@ func (e fileEnv) ResolveMember(m *ast.MemberExpr) *ast.ConstDecl      { return n
 func (e fileEnv) ResolveFunc(id *ast.Identifier) []*ast.FuncDecl      { return nil }
 func (e fileEnv) ResolveFuncMember(m *ast.MemberExpr) []*ast.FuncDecl { return nil }
 func (e fileEnv) ValueOf(decl *ast.ConstDecl) *ir.Constant            { return eval.Decl(decl, e) }
-func (e fileEnv) Registry() *builtin.Registry                         { return e.reg }
+func (e fileEnv) LookupType(name string) *ir.TypeDef {
+	d, _ := e.reg.Lookup(name)
+	return d
+}
+func (e fileEnv) Registry() *builtin.Registry { return e.reg }
 
 // diagram lowers src (consts plus exactly one assert) and renders the
 // assert's diagram.

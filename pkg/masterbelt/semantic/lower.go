@@ -33,6 +33,19 @@ func (b constBinder) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
 	case *ast.CallExpr:
 		switch callee := e.Callee.(type) {
 		case *ast.Identifier:
+			// A call whose callee names a type is a conversion T(x) — the type
+			// wins over a same-named function, exactly as in a body.
+			if def, ok := b.q.universe(b.file)[callee.Name]; ok {
+				var arg ir.Value
+				if len(e.Arguments) > 0 {
+					arg = sub(e.Arguments[0])
+				}
+				t := ir.Type(&ir.Named{Def: def})
+				if def.Builtin {
+					t = &ir.Builtin{Name: def.Name}
+				}
+				return &ir.Conversion{Type: t, Value: arg}
+			}
 			if cands := b.q.resolveFunc(b.file, callee); len(cands) > 0 {
 				return funcCall(b.fnOf[pickOverload(cands, len(e.Arguments))], e.Arguments, sub)
 			}

@@ -27,6 +27,7 @@ func (e evalEnv) ResolveFuncMember(m *ast.MemberExpr) []*ast.FuncDecl {
 	return e.q.resolveFuncMember(e.file, m)
 }
 func (e evalEnv) ValueOf(decl *ast.ConstDecl) *ir.Constant { return e.q.valueOf(decl) }
+func (e evalEnv) LookupType(name string) *ir.TypeDef       { return e.q.universe(e.file)[name] }
 func (e evalEnv) Registry() *builtin.Registry              { return e.q.registry() }
 
 // computeValue is the evaluation rule, shared by both query implementations.

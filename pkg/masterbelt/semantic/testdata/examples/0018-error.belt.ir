@@ -1,23 +1,34 @@
 Module
   Const "E"
     type invalid
-    value <none>
+    value error(StringLiteral "boom")
+    eval error("boom")
   Const "M"
     type invalid
     value Reference -> "E".message()
+    eval "boom"
   Const "P"
     type int | error
     value parseLevel(StringLiteral "99")
+    eval error("invalid level: 99")
   Func "parseLevel" pub
     param s: string
     result int | error
       return error(StringLiteral "invalid level: ".add(ParamRef "s"))
   Assert "error(\"x\").message() == \"x\""
-    eval <unevaluated>
+    eval true
       error("x").message() == "x"
+      ^          ^         ^
+      error("x") "x"       true
   Assert "E.message() == \"boom\""
-    eval <unevaluated>
+    eval true
       E.message() == "boom"
+      ^ ^         ^
+      | "boom"    true
+      error("boom")
   Assert "M == \"boom\""
-    eval <unevaluated>
+    eval true
       M == "boom"
+      ^ ^
+      | true
+      "boom"

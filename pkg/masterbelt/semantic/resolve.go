@@ -289,7 +289,11 @@ func (e predicateEnv) ResolveMember(*ast.MemberExpr) *ast.ConstDecl      { retur
 func (e predicateEnv) ResolveFunc(*ast.Identifier) []*ast.FuncDecl       { return nil }
 func (e predicateEnv) ResolveFuncMember(*ast.MemberExpr) []*ast.FuncDecl { return nil }
 func (e predicateEnv) ValueOf(*ast.ConstDecl) *ir.Constant               { return nil }
-func (e predicateEnv) Registry() *builtin.Registry                       { return e.reg }
+func (e predicateEnv) LookupType(name string) *ir.TypeDef {
+	d, _ := e.reg.Lookup(name)
+	return d
+}
+func (e predicateEnv) Registry() *builtin.Registry { return e.reg }
 
 // resolveMethod resolves a method's signature (parameter types and result type)
 // and lowers its body to IR; fns is the file's function shells by name, so a

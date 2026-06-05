@@ -44,6 +44,10 @@ type Env interface {
 	// ValueOf returns a declaration's evaluated value, or nil when it cannot be
 	// evaluated.
 	ValueOf(decl *ast.ConstDecl) *ir.Constant
+	// LookupType resolves a type name in the scope's annotation universe —
+	// the file's own and imported type declarations over the prelude — or nil
+	// when the name names no type. A conversion (T(x)) folds through it.
+	LookupType(name string) *ir.TypeDef
 	// Registry returns the builtin registry the program evaluates against.
 	Registry() *builtin.Registry
 }
@@ -148,11 +152,15 @@ func evalExpr(e ast.Expr, ctx evalCtx) *ir.Constant {
 	case *ast.CallExpr:
 		member, ok := e.Callee.(*ast.MemberExpr)
 		if !ok {
-			// A call whose callee names a top-level function applies its body;
-			// a local binding shadows a same-named function (and a call of a
-			// local is not foldable here).
+			// A call whose callee names a type is a conversion (the type wins
+			// over a same-named function, as in the type rules); one that names
+			// a top-level function applies its body. A local binding shadows
+			// both (and a call of a local is not foldable here).
 			if id, isIdent := e.Callee.(*ast.Identifier); isIdent {
 				if _, isLocal := ctx.locals[id.Name]; !isLocal {
+					if def := ctx.env.LookupType(id.Name); def != nil {
+						return convert(def, e.Arguments, ctx)
+					}
 					if cands := ctx.env.ResolveFunc(id); len(cands) > 0 {
 						return applyFunc(cands, e.Arguments, ctx)
 					}
@@ -178,6 +186,22 @@ func evalExpr(e ast.Expr, ctx evalCtx) *ir.Constant {
 	default:
 		return nil
 	}
+}
+
+// convert folds a conversion T(x). The one conversion with a constant value
+// today is error("msg") — the error type's constructor — which folds to an
+// error constant carrying the message; any other conversion has no constant
+// value here.
+func convert(def *ir.TypeDef, args []ast.Expr, ctx evalCtx) *ir.Constant {
+	n, ok := ctx.env.Registry().Native(def.Name)
+	if !ok || !n.Err || len(args) != 1 {
+		return nil
+	}
+	v := evalExpr(args[0], ctx)
+	if v == nil || v.Kind != ir.ConstString {
+		return nil
+	}
+	return ir.ErrorConstant(v.Str)
 }
 
 // applyFunc folds a call of a top-level function: the arguments fold in the
@@ -267,6 +291,8 @@ func kindAccepts(t ast.TypeExpr, k ir.ConstKind) bool {
 			return k == ir.ConstDatetime
 		case "duration":
 			return k == ir.ConstDuration
+		case "error":
+			return k == ir.ConstError
 		}
 		return true
 	case *ast.RecordType:
@@ -354,6 +380,8 @@ func call(ctx evalCtx, recv *ir.Constant, name string, args []*ir.Constant) *ir.
 		typeName = "datetime"
 	case ir.ConstDuration:
 		typeName = "duration"
+	case ir.ConstError:
+		typeName = "error"
 	default:
 		return nil
 	}

@@ -31,7 +31,11 @@ func (e stubEnv) ResolveMember(*ast.MemberExpr) *ast.ConstDecl      { return nil
 func (e stubEnv) ResolveFunc(*ast.Identifier) []*ast.FuncDecl       { return nil }
 func (e stubEnv) ResolveFuncMember(*ast.MemberExpr) []*ast.FuncDecl { return nil }
 func (e stubEnv) ValueOf(*ast.ConstDecl) *ir.Constant               { return nil }
-func (e stubEnv) Registry() *builtin.Registry                       { return e.reg }
+func (e stubEnv) LookupType(name string) *ir.TypeDef {
+	d, _ := e.reg.Lookup(name)
+	return d
+}
+func (e stubEnv) Registry() *builtin.Registry { return e.reg }
 
 // portPredicate is the desugared form of: self >= 1 && self <= 65535.
 func portPredicate() ast.Expr {
