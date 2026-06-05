@@ -289,62 +289,85 @@ File
     Fn "fn"
     Whitespace " "
     Ident "total"
-  Error
-    Lt "<"
-    Ident "T"
+    GenericParams
+      Lt "<"
+      GenericParam
+        Ident "T"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "foldable"
+          GenericArgs
+            Lt "<"
+            TypeName
+              Ident "int"
+            Comma ","
+            Whitespace " "
+            TypeName
+              Ident "int"
+            Gt ">"
+      Gt ">"
+    ParamList
+      LParen "("
+      Param
+        Ident "c"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "T"
+      RParen ")"
     Colon ":"
     Whitespace " "
-    Ident "foldable"
-    Lt "<"
-    Ident "int"
-    Comma ","
+    TypeName
+      Ident "int"
     Whitespace " "
-    Ident "int"
-    Gt ">"
-    Gt ">"
-    LParen "("
-    Ident "c"
-    Colon ":"
-    Whitespace " "
-    Ident "T"
-    RParen ")"
-    Colon ":"
-    Whitespace " "
-    Ident "int"
-    Whitespace " "
-    LBrace "{"
-    Newline "\n"
-    Whitespace "  "
-    Return "return"
-    Whitespace " "
-    Ident "c"
-    Dot "."
-    Ident "fold"
-    LParen "("
-    Int "0"
-    Comma ","
-    Whitespace " "
-    Fn "fn"
-    LParen "("
-    Ident "acc"
-    Comma ","
-    Whitespace " "
-    Ident "key"
-    Comma ","
-    Whitespace " "
-    Ident "value"
-    RParen ")"
-    Whitespace " "
-    Arrow "->"
-    Whitespace " "
-    Ident "acc"
-    Whitespace " "
-    Plus "+"
-    Whitespace " "
-    Ident "value"
-    RParen ")"
-    Newline "\n"
-    RBrace "}"
+    Block
+      LBrace "{"
+      Newline "\n"
+      Whitespace "  "
+      ReturnStmt
+        Return "return"
+        Whitespace " "
+        CallExpr
+          MemberExpr
+            NameRef
+              Ident "c"
+            Dot "."
+            Ident "fold"
+          LParen "("
+          Literal
+            Int "0"
+          Comma ","
+          Whitespace " "
+          FuncLit
+            Fn "fn"
+            ParamList
+              LParen "("
+              Param
+                Ident "acc"
+              Comma ","
+              Whitespace " "
+              Param
+                Ident "key"
+              Comma ","
+              Whitespace " "
+              Param
+                Ident "value"
+              RParen ")"
+            Whitespace " "
+            Arrow "->"
+            Whitespace " "
+            BinaryExpr
+              NameRef
+                Ident "acc"
+              Whitespace " "
+              Plus "+"
+              Whitespace " "
+              NameRef
+                Ident "value"
+          RParen ")"
+      Newline "\n"
+      RBrace "}"
   FuncDecl
     Newline "\n"
     Newline "\n"
@@ -359,28 +382,36 @@ File
     Fn "fn"
     Whitespace " "
     Ident "identity"
-  Error
-    Lt "<"
-    Ident "T"
-    Gt ">"
-    LParen "("
-    Ident "x"
+    GenericParams
+      Lt "<"
+      GenericParam
+        Ident "T"
+      Gt ">"
+    ParamList
+      LParen "("
+      Param
+        Ident "x"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "T"
+      RParen ")"
     Colon ":"
     Whitespace " "
-    Ident "T"
-    RParen ")"
-    Colon ":"
+    TypeName
+      Ident "T"
     Whitespace " "
-    Ident "T"
-    Whitespace " "
-    LBrace "{"
-    Newline "\n"
-    Whitespace "  "
-    Return "return"
-    Whitespace " "
-    Ident "x"
-    Newline "\n"
-    RBrace "}"
+    Block
+      LBrace "{"
+      Newline "\n"
+      Whitespace "  "
+      ReturnStmt
+        Return "return"
+        Whitespace " "
+        NameRef
+          Ident "x"
+      Newline "\n"
+      RBrace "}"
   FuncDecl
     Newline "\n"
     Newline "\n"
@@ -395,34 +426,44 @@ File
     Fn "fn"
     Whitespace " "
     Ident "firstOf"
-  Error
-    Lt "<"
-    Ident "T"
-    Gt ">"
-    LParen "("
-    Ident "a"
+    GenericParams
+      Lt "<"
+      GenericParam
+        Ident "T"
+      Gt ">"
+    ParamList
+      LParen "("
+      Param
+        Ident "a"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "T"
+      Comma ","
+      Whitespace " "
+      Param
+        Ident "b"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "T"
+      RParen ")"
     Colon ":"
     Whitespace " "
-    Ident "T"
-    Comma ","
+    TypeName
+      Ident "T"
     Whitespace " "
-    Ident "b"
-    Colon ":"
-    Whitespace " "
-    Ident "T"
-    RParen ")"
-    Colon ":"
-    Whitespace " "
-    Ident "T"
-    Whitespace " "
-    LBrace "{"
-    Newline "\n"
-    Whitespace "  "
-    Return "return"
-    Whitespace " "
-    Ident "a"
-    Newline "\n"
-    RBrace "}"
+    Block
+      LBrace "{"
+      Newline "\n"
+      Whitespace "  "
+      ReturnStmt
+        Return "return"
+        Whitespace " "
+        NameRef
+          Ident "a"
+      Newline "\n"
+      RBrace "}"
   ConstDecl
     Newline "\n"
     Newline "\n"
@@ -467,15 +508,3 @@ File
   Newline "\n"
   EOF ""
 # diagnostics
-error[masterbelt.parser.concrete.expected_param_list] 32:13 expected '('
-error[masterbelt.parser.concrete.expected_type] 32:8 expected type
-error[masterbelt.parser.concrete.expected_func_body] 32:13 expected '->' or '{'
-error[masterbelt.parser.concrete.unexpected_token] 32:13 unexpected token: Lt
-error[masterbelt.parser.concrete.expected_param_list] 39:16 expected '('
-error[masterbelt.parser.concrete.expected_type] 39:8 expected type
-error[masterbelt.parser.concrete.expected_func_body] 39:16 expected '->' or '{'
-error[masterbelt.parser.concrete.unexpected_token] 39:16 unexpected token: Lt
-error[masterbelt.parser.concrete.expected_param_list] 46:15 expected '('
-error[masterbelt.parser.concrete.expected_type] 46:8 expected type
-error[masterbelt.parser.concrete.expected_func_body] 46:15 expected '->' or '{'
-error[masterbelt.parser.concrete.unexpected_token] 46:15 unexpected token: Lt

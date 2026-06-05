@@ -510,7 +510,11 @@ func (p *parser) parseAssertDecl(lead []cst.Green) *cst.Node {
 // parseFuncDecl parses a top-level function declaration, prepending the
 // already-collected leading trivia:
 //
-//	[pub] [extern] fn Effect* Ident ParamList ":" TypeExpr ( Block | "->" Expr )
+//	[pub] [extern] fn Effect* Ident [GenericParams] ParamList ":" TypeExpr ( Block | "->" Expr )
+//
+// The optional GenericParams give the function its own type variables, each
+// with an optional interface bound (the T in fn f<T: foldable<int>>(...)) — the
+// same "<...>" list a type declaration and an interface member carry.
 //
 // A function is a method without a receiver: the same header (the result type
 // is required at the top level), with the function literal's two body forms —
@@ -544,6 +548,10 @@ func (p *parser) parseFuncDecl(lead []cst.Green) *cst.Node {
 		children = append(children, p.bump()) // the declared name
 	} else {
 		p.report(newExpectedIdentifierDiagnostic(p.lastStart, 0))
+	}
+	if p.peekSignificant() == token.Lt {
+		p.skipTrivia(&children)
+		children = append(children, p.parseGenericParams())
 	}
 	if p.peekSignificant() == token.LParen {
 		p.skipTrivia(&children)

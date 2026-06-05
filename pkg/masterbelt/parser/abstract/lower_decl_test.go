@@ -95,6 +95,58 @@ func TestLowerFuncDecl(t *testing.T) {
 	}
 }
 
+// TestLowerFuncTypeParams checks a generic function's type-parameter list lowers
+// to FuncDecl.TypeParams, separate from its value parameters: an unbounded
+// parameter, a single bound, several parameters, and a parameterized bound.
+func TestLowerFuncTypeParams(t *testing.T) {
+	src := "fn id<T>(x: T): T { return x }\n" +
+		"fn total<T: foldable<int, int>>(c: T): int { return c }\n" +
+		"fn pair<T, U>(a: T, b: U): T { return a }\n" +
+		"fn first<T: foldable<U>, U>(c: T): U { return c }\n"
+	file, diags := Lower([]byte(src))
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if len(file.Funcs) != 4 {
+		t.Fatalf("got %d funcs, want 4", len(file.Funcs))
+	}
+
+	// fn id<T>: one unbounded parameter, separate from the value parameter x.
+	id := file.Funcs[0]
+	if len(id.TypeParams) != 1 || id.TypeParams[0].Name != "T" || id.TypeParams[0].Constraint != nil {
+		t.Fatalf("id type params = %+v, want [T] unbounded", id.TypeParams)
+	}
+	if len(id.Params) != 1 || id.Params[0].Name != "x" {
+		t.Fatalf("id value params = %+v, want [x]", id.Params)
+	}
+
+	// fn total<T: foldable<int, int>>: a single parameterized interface bound.
+	total := file.Funcs[1]
+	if len(total.TypeParams) != 1 || total.TypeParams[0].Name != "T" {
+		t.Fatalf("total type params = %+v, want [T]", total.TypeParams)
+	}
+	bound, ok := total.TypeParams[0].Constraint.(*ast.NamedType)
+	if !ok || bound.Name != "foldable" || len(bound.Args) != 2 {
+		t.Fatalf("total bound = %+v, want foldable<int, int>", total.TypeParams[0].Constraint)
+	}
+
+	// fn pair<T, U>: several unbounded parameters in order.
+	pair := file.Funcs[2]
+	if len(pair.TypeParams) != 2 || pair.TypeParams[0].Name != "T" || pair.TypeParams[1].Name != "U" {
+		t.Fatalf("pair type params = %+v, want [T U]", pair.TypeParams)
+	}
+
+	// fn first<T: foldable<U>, U>: a bound that itself mentions a later parameter.
+	first := file.Funcs[3]
+	if len(first.TypeParams) != 2 || first.TypeParams[0].Name != "T" || first.TypeParams[1].Name != "U" {
+		t.Fatalf("first type params = %+v, want [T U]", first.TypeParams)
+	}
+	fb, ok := first.TypeParams[0].Constraint.(*ast.NamedType)
+	if !ok || fb.Name != "foldable" || len(fb.Args) != 1 {
+		t.Fatalf("first bound = %+v, want foldable<U>", first.TypeParams[0].Constraint)
+	}
+}
+
 func TestLowerUseDecl(t *testing.T) {
 	cases := []struct {
 		name string

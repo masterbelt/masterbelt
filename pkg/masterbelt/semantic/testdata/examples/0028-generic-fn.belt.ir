@@ -2,9 +2,11 @@ Module
   Const "N"
     type invalid
     value identity(IntLiteral "42")
+    eval 42
   Const "P"
     type invalid
     value firstOf(IntLiteral "7", IntLiteral "9")
+    eval 7
   TypeDef "Bag" pub
     doc "A small bag of ints that folds over its contents — an opt-in implementor of"
     doc "foldable, so it satisfies a `T: foldable<int, int>` bound."
@@ -33,10 +35,17 @@ Module
       return self.fold(IntLiteral "0", (fn(acc, key, value) (return ParamRef "acc".add(IntLiteral "1"))))
   Func "total" pub
     doc "The total of any foldable collection of ints, folded with addition."
-    result invalid
+    param c: invalid
+    result int
+      return ParamRef "c".fold(IntLiteral "0", (fn(acc, key, value) (return ParamRef "acc".add(ParamRef "value"))))
   Func "identity" pub
     doc "The argument, unchanged. Works for any type because it touches nothing."
+    param x: invalid
     result invalid
+      return ParamRef "x"
   Func "firstOf" pub
     doc "The first of two values of the same type."
+    param a: invalid
+    param b: invalid
     result invalid
+      return ParamRef "a"

@@ -39,11 +39,24 @@ File
     doc "The total of any foldable collection of ints, folded with addition."
     pub
     name "total"
+    typeparam T: foldable<int, int>
+    param c: T
+    result int
+      return (call (. Identifier "c" fold) IntLit "0" (fn(acc: <missing>, key: <missing>, value: <missing>): <missing> (return (call (. Identifier "acc" add) Identifier "value"))))
   FuncDecl
     doc "The argument, unchanged. Works for any type because it touches nothing."
     pub
     name "identity"
+    typeparam T
+    param x: T
+    result T
+      return Identifier "x"
   FuncDecl
     doc "The first of two values of the same type."
     pub
     name "firstOf"
+    typeparam T
+    param a: T
+    param b: T
+    result T
+      return Identifier "a"

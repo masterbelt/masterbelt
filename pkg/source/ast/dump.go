@@ -86,6 +86,13 @@ func dumpFuncDecl(b *strings.Builder, d *FuncDecl) {
 		fmt.Fprintf(b, "    effects %s\n", strings.Join(d.Effects, " "))
 	}
 	fmt.Fprintf(b, "    name %q\n", d.Name)
+	for _, p := range d.TypeParams {
+		if p.Constraint != nil {
+			fmt.Fprintf(b, "    typeparam %s: %s\n", p.Name, dumpType(p.Constraint))
+		} else {
+			fmt.Fprintf(b, "    typeparam %s\n", p.Name)
+		}
+	}
 	for _, p := range d.Params {
 		fmt.Fprintf(b, "    param %s: %s\n", p.Name, dumpType(p.Type))
 	}
