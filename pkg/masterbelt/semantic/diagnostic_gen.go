@@ -17,6 +17,9 @@ const (
 	CodeAssertionFailed         diagnostic.Code = "masterbelt.semantic.assertion_failed"
 	CodeAssertionNotBool        diagnostic.Code = "masterbelt.semantic.assertion_not_bool"
 	CodeAssertionNotConstant    diagnostic.Code = "masterbelt.semantic.assertion_not_constant"
+	CodeAssignToConst           diagnostic.Code = "masterbelt.semantic.assign_to_const"
+	CodeAssignToUndefined       diagnostic.Code = "masterbelt.semantic.assign_to_undefined"
+	CodeAssignTypeMismatch      diagnostic.Code = "masterbelt.semantic.assign_type_mismatch"
 	CodeConditionNotBool        diagnostic.Code = "masterbelt.semantic.condition_not_bool"
 	CodeConstantOverflow        diagnostic.Code = "masterbelt.semantic.constant_overflow"
 	CodeCyclicModule            diagnostic.Code = "masterbelt.semantic.cyclic_module"
@@ -29,11 +32,13 @@ const (
 	CodeDuplicateOverload       diagnostic.Code = "masterbelt.semantic.duplicate_overload"
 	CodeDuplicateSwitchArm      diagnostic.Code = "masterbelt.semantic.duplicate_switch_arm"
 	CodeEffectInPureContext     diagnostic.Code = "masterbelt.semantic.effect_in_pure_context"
+	CodeImmutableData           diagnostic.Code = "masterbelt.semantic.immutable_data"
 	CodeInvalidEnumBaseType     diagnostic.Code = "masterbelt.semantic.invalid_enum_base_type"
 	CodeInvalidOperation        diagnostic.Code = "masterbelt.semantic.invalid_operation"
 	CodeLambdaArityMismatch     diagnostic.Code = "masterbelt.semantic.lambda_arity_mismatch"
 	CodeMissingEffect           diagnostic.Code = "masterbelt.semantic.missing_effect"
 	CodeMissingField            diagnostic.Code = "masterbelt.semantic.missing_field"
+	CodeMissingInitializer      diagnostic.Code = "masterbelt.semantic.missing_initializer"
 	CodeMissingReturn           diagnostic.Code = "masterbelt.semantic.missing_return"
 	CodeNoBound                 diagnostic.Code = "masterbelt.semantic.no_bound"
 	CodeNoMatchingFuncOverload  diagnostic.Code = "masterbelt.semantic.no_matching_func_overload"
@@ -174,6 +179,50 @@ func newAssertionNotConstantDiagnostic(offset int, width int) diagnostic.Diagnos
 		Code:     CodeAssertionNotConstant,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeAssertionNotConstant, nil),
 		Fields:   nil,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newAssignToConstDiagnostic(offset int, width int, name string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"name": diagnostic.Str(name),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeAssignToConst,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeAssignToConst, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newAssignToUndefinedDiagnostic(offset int, width int, name string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"name": diagnostic.Str(name),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeAssignToUndefined,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeAssignToUndefined, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newAssignTypeMismatchDiagnostic(offset int, width int, name string, actual string, expected string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"name":     diagnostic.Str(name),
+		"actual":   diagnostic.Str(actual),
+		"expected": diagnostic.Str(expected),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeAssignTypeMismatch,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeAssignTypeMismatch, fields),
+		Fields:   fields,
 		Offset:   offset,
 		Width:    width,
 	}
@@ -349,6 +398,17 @@ func newEffectInPureContextDiagnostic(offset int, width int, effect string, cont
 	}
 }
 
+func newImmutableDataDiagnostic(offset int, width int) diagnostic.Diagnostic {
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeImmutableData,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeImmutableData, nil),
+		Fields:   nil,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
 func newInvalidEnumBaseTypeDiagnostic(offset int, width int, typ string) diagnostic.Diagnostic {
 	fields := map[string]fmt.Stringer{
 		"typ": diagnostic.Str(typ),
@@ -417,6 +477,20 @@ func newMissingFieldDiagnostic(offset int, width int, field string, typ string) 
 		Severity: diagnostic.Error,
 		Code:     CodeMissingField,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeMissingField, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newMissingInitializerDiagnostic(offset int, width int, name string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"name": diagnostic.Str(name),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeMissingInitializer,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeMissingInitializer, fields),
 		Fields:   fields,
 		Offset:   offset,
 		Width:    width,

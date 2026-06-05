@@ -1,0 +1,42 @@
+Module
+  Const "Picked"
+    type int
+    value pick(BoolLiteral true)
+    eval 20
+  Const "Stepped"
+    type int
+    value step(IntLiteral "41")
+    eval 42
+  Func "pick" pub
+    param flag: bool
+    result int
+      let "base": int = IntLiteral "10"
+      let "result": int = LocalRef "base"
+      if ParamRef "flag"
+          assign "result" = LocalRef "base".mul(IntLiteral "2")
+      return LocalRef "result"
+  Func "step" pub
+    param n: int
+    result int
+      let "acc": int = ParamRef "n"
+      assign "acc" = LocalRef "acc".add(IntLiteral "1")
+      return LocalRef "acc"
+  Func "shadow" pub
+    param flag: bool
+    result int
+      let "result": int = IntLiteral "1"
+      if ParamRef "flag"
+          let "result": int = IntLiteral "2"
+          assign "result" = LocalRef "result".add(IntLiteral "10")
+          return LocalRef "result"
+      return LocalRef "result"
+  Assert "pick(false) == 10"
+    eval true
+      pick(false) == 10
+      ^           ^
+      10          true
+  Assert "step(41) == 42"
+    eval true
+      step(41) == 42
+      ^        ^
+      42       true

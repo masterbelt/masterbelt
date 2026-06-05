@@ -87,6 +87,10 @@ func collectBodyEffectUses(body []ast.Stmt, bs infer.BodyScope, use func(effect 
 			collectEffectUses(stmt.Value, bs, use)
 		case *ast.ExprStmt:
 			collectEffectUses(stmt.X, bs, use)
+		case *ast.LetStmt:
+			collectEffectUses(stmt.Value, bs, use)
+		case *ast.AssignStmt:
+			collectEffectUses(stmt.Value, bs, use)
 		case *ast.SwitchStmt:
 			collectEffectUses(stmt.Scrutinee, bs, use)
 			for _, arm := range stmt.Arms {

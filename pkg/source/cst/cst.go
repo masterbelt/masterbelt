@@ -80,6 +80,8 @@ const (
 	Param      // Ident ":" TypeExpr
 	Block      // "{" Stmt* "}"
 	ReturnStmt // return Expr
+	LetStmt    // let Ident [TypeClause] "=" Expr  (a mutable block-local binding)
+	AssignStmt // Target "=" Expr  (a reassignment statement; Target is a value expression)
 	SwitchStmt // switch Expr "{" ( SwitchArm ( ("," | NL) SwitchArm )* )? "}"
 	SwitchArm  // ( Expr ( "," Expr )* | "_" ) "->" ( Stmt | Block )
 	IfStmt     // if Expr Block [ else ( IfStmt | Block ) ]
@@ -137,6 +139,8 @@ var kindNames = [...]string{
 	Param:         "Param",
 	Block:         "Block",
 	ReturnStmt:    "ReturnStmt",
+	LetStmt:       "LetStmt",
+	AssignStmt:    "AssignStmt",
 	SwitchStmt:    "SwitchStmt",
 	SwitchArm:     "SwitchArm",
 	IfStmt:        "IfStmt",

@@ -1762,3 +1762,114 @@ func TestParseIfLossless(t *testing.T) {
 		assertLossless(t, src)
 	}
 }
+
+// TestParseLetStmt checks the shape of a parsed let: an inferred-type binding
+// (let x = e) carries an Initializer, and an annotated one (let x: T = e) carries
+// a TypeClause before it — exactly the optional clauses a constant declaration's
+// body uses.
+func TestParseLetStmt(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+		// sub is the kinds of the LetStmt's direct sub-nodes, in order.
+		sub []cst.Kind
+	}{
+		{
+			"inferred type",
+			"pub fn f(n: int): int {\n  let x = n\n  return x\n}\n",
+			[]cst.Kind{cst.Initializer},
+		},
+		{
+			"explicit annotation",
+			"pub fn f(n: int): int {\n  let x: int = n\n  return x\n}\n",
+			[]cst.Kind{cst.TypeClause, cst.Initializer},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			root, diags := Parse([]byte(tc.src))
+			if len(diags) != 0 {
+				t.Fatalf("unexpected diagnostics: %v", diags)
+			}
+			s := findFirst(root, cst.LetStmt)
+			if s == nil {
+				t.Fatal("no LetStmt parsed")
+			}
+			got := subNodeKinds(s)
+			if strings.Join(kindStrings(got), ",") != strings.Join(kindStrings(tc.sub), ",") {
+				t.Fatalf("let sub-nodes = %v, want %v", got, tc.sub)
+			}
+			assertLossless(t, tc.src)
+		})
+	}
+}
+
+// TestParseAssignStmt checks that an identifier (or a member access) followed by
+// "=" parses as an AssignStmt whose first sub-node is the target expression — the
+// distinction from a bare expression statement, decided after the leading
+// expression by the trailing "=".
+func TestParseAssignStmt(t *testing.T) {
+	cases := []struct {
+		name   string
+		src    string
+		target cst.Kind // the assignment target node's kind
+	}{
+		{
+			"name target",
+			"pub fn f(n: int): int {\n  let x = n\n  x = n\n  return x\n}\n",
+			cst.NameRef,
+		},
+		{
+			"member target",
+			"pub fn f(n: int): int {\n  let x = n\n  x.field = n\n  return x\n}\n",
+			cst.MemberExpr,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			root, diags := Parse([]byte(tc.src))
+			if len(diags) != 0 {
+				t.Fatalf("unexpected diagnostics: %v", diags)
+			}
+			s := findFirst(root, cst.AssignStmt)
+			if s == nil {
+				t.Fatal("no AssignStmt parsed")
+			}
+			got := subNodeKinds(s)
+			if len(got) != 2 || got[0] != tc.target {
+				t.Fatalf("assign sub-nodes = %v, want [%v Expr]", got, tc.target)
+			}
+			assertLossless(t, tc.src)
+		})
+	}
+}
+
+// TestParseAssignNotExpression checks that assignment is a statement, not an
+// expression: a "=" in a value position (a constant initializer) does not parse
+// as a nested assignment — only "==" is the comparison, so a single "=" there is
+// a parse error. This is the footgun guard that keeps assignment out of pure
+// positions.
+func TestParseAssignNotExpression(t *testing.T) {
+	_, diags := Parse([]byte("const m = (a = b)\n"))
+	if len(diags) == 0 {
+		t.Fatal("expected a parse error for assignment in expression position, got none")
+	}
+}
+
+// TestParseLetAssignLossless checks that malformed and well-formed lets and
+// assignments alike round-trip to the source byte for byte.
+func TestParseLetAssignLossless(t *testing.T) {
+	cases := []string{
+		"pub fn f(n: int): int {\n  let x = n\n  return x\n}\n",
+		"pub fn f(n: int): int {\n  let x: int = n\n  x = x + 1\n  return x\n}\n",
+		"pub fn f(n: int): int {\n  let\n}\n",        // missing name, clause, value
+		"pub fn f(n: int): int {\n  let x\n}\n",      // missing "=" and value
+		"pub fn f(n: int): int {\n  let x =\n}\n",    // missing value
+		"pub fn f(n: int): int {\n  let x: int\n}\n", // annotation but no value
+		"pub fn f(n: int): int {\n  x =\n}\n",        // assignment missing value
+		"pub fn f(n: int): int {\n  if n > 0 {\n    let y = n\n    y = y + 1\n    return y\n  }\n  return n\n}\n",
+	}
+	for _, src := range cases {
+		assertLossless(t, src)
+	}
+}

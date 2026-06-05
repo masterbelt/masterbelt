@@ -251,8 +251,11 @@ func litParams(lit cst.Tree) ([]cst.Tree, int) {
 }
 
 // identAt returns the positioned identifier token at offset whose parent is a
-// name reference or a parameter — the two positions where an identifier
-// denotes a value — together with its text.
+// name reference, a parameter, or a let binding — the positions where an
+// identifier denotes a value — together with its text. A let's bound name is the
+// bare identifier directly under the LetStmt (its type and value nest in their
+// own clauses), so matching the direct Ident child reaches the declaration
+// without the reference forms.
 func identAt(root cst.Tree, buf source.Buffer, offset int) (cst.Tree, string, bool) {
 	var found cst.Tree
 	var ok bool
@@ -261,7 +264,7 @@ func identAt(root cst.Tree, buf source.Buffer, offset int) (cst.Tree, string, bo
 		if ok || !within(t, offset) {
 			return
 		}
-		if k, isNode := t.Kind(); isNode && (k == cst.NameRef || k == cst.Param) {
+		if k, isNode := t.Kind(); isNode && (k == cst.NameRef || k == cst.Param || k == cst.LetStmt) {
 			for _, c := range t.Children() {
 				if tok, isTok := c.Token(); isTok && tok.Kind() == token.Ident && within(c, offset) {
 					found, ok = c, true

@@ -290,6 +290,18 @@ func (r *renderer) funcLit(x *FuncLit) {
 		case *ExprStmt:
 			r.str(" ")
 			r.expr(s.X, 0)
+		case *LetStmt:
+			r.str(" let " + s.Name)
+			if s.Type != nil {
+				r.str(": " + dumpType(s.Type))
+			}
+			r.str(" = ")
+			r.expr(s.Value, 0)
+		case *AssignStmt:
+			r.str(" ")
+			r.expr(s.Target, 0)
+			r.str(" = ")
+			r.expr(s.Value, 0)
 		}
 	}
 	r.str(" }")

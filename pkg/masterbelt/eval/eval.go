@@ -204,8 +204,10 @@ func evalExpr(e ast.Expr, ctx evalCtx) *ir.Constant {
 		return ternary(e, sub)
 	case *ast.FuncLit:
 		// A function literal folds to a closure over the bindings in scope, so it
-		// can be applied later (by list.map) or stored in a constant.
-		return ir.FuncConstant(e, ctx.locals)
+		// can be applied later (by list.map) or stored in a constant. The capture
+		// is a snapshot: a let or assignment that mutates the body's environment
+		// after the closure is built must not reach back into it.
+		return ir.FuncConstant(e, maps.Clone(ctx.locals))
 	case *ast.Identifier:
 		if v, ok := ctx.locals[e.Name]; ok {
 			return v
@@ -610,11 +612,19 @@ func apply(ctx evalCtx, fn *ir.Constant, args []*ir.Constant) *ir.Constant {
 // reaches a return. It executes a switch by folding the scrutinee and running
 // the first arm whose value patterns it equals (the wildcard last), and an if by
 // folding the condition and running the taken branch — a guard whose condition
-// is false falls through to the next statement. A bare expression statement has
-// no value and is skipped. It is the compile-time execution model the const
-// folder shares with a function application, kept in step with the runtime's
-// first-match dispatch.
+// is false falls through to the next statement. A let introduces a mutable
+// block-local and an assignment updates one, both folding in the body's local
+// environment; a bare expression statement has no value and is skipped. It is
+// the compile-time execution model the const folder shares with a function
+// application, kept in step with the runtime's first-match dispatch.
+//
+// The local environment (ctx.locals) is mutated in place, so a nested block's
+// assignment reaches an outer local. Block scoping is restored on return: a
+// shadowing let in this block is undone (blockScope), so its binding does not
+// leak to the caller — while an assignment to an outer local persists.
 func evalBody(body []ast.Stmt, ctx evalCtx) *ir.Constant {
+	scope := newBlockScope(ctx.locals)
+	defer scope.restore()
 	for _, stmt := range body {
 		switch stmt := stmt.(type) {
 		case *ast.ReturnStmt:
@@ -622,6 +632,14 @@ func evalBody(body []ast.Stmt, ctx evalCtx) *ir.Constant {
 				return nil
 			}
 			return evalExpr(stmt.Value, ctx)
+		case *ast.LetStmt:
+			if !evalLet(stmt, ctx, scope) {
+				return nil // an unfoldable initializer: the body cannot fold past it
+			}
+		case *ast.AssignStmt:
+			if !evalAssign(stmt, ctx) {
+				return nil // an unfoldable value (or invalid target): cannot fold on
+			}
 		case *ast.SwitchStmt:
 			if v := evalSwitch(stmt, ctx); v != nil {
 				return v
@@ -642,6 +660,110 @@ func evalBody(body []ast.Stmt, ctx evalCtx) *ir.Constant {
 		}
 	}
 	return nil
+}
+
+// blockScope records the let bindings a block introduces so they can be undone
+// when the block ends, restoring any outer binding they shadowed. Assignments to
+// an outer local are not recorded — they mutate the shared environment and
+// persist past the block, exactly as at runtime.
+type blockScope struct {
+	locals  map[string]*ir.Constant
+	shadows map[string]*ir.Constant // the prior value of each name a let shadows
+	added   map[string]bool         // names this block's lets introduced fresh
+}
+
+// newBlockScope begins tracking a block's let bindings over locals. A nil locals
+// (a body with no environment) still yields a usable scope whose restore is a
+// no-op, since no let can run without an environment to bind into.
+func newBlockScope(locals map[string]*ir.Constant) *blockScope {
+	return &blockScope{locals: locals}
+}
+
+// bind records a let of name and writes its value into the environment, saving
+// what it shadows so restore can put it back. The environment must be non-nil
+// (a function or method body always has one); a nil one means a let appeared
+// where it cannot bind, which bind reports by returning false.
+//
+// Only the first let of a name in this block records what it shadows: a later
+// rebind (two lets of the same name, illegal but tolerated) overwrites the
+// value, and restore still returns the binding the block inherited.
+func (s *blockScope) bind(name string, v *ir.Constant) bool {
+	if s.locals == nil {
+		return false
+	}
+	if !s.recorded(name) {
+		if prior, ok := s.locals[name]; ok {
+			if s.shadows == nil {
+				s.shadows = map[string]*ir.Constant{}
+			}
+			s.shadows[name] = prior
+		} else {
+			if s.added == nil {
+				s.added = map[string]bool{}
+			}
+			s.added[name] = true
+		}
+	}
+	s.locals[name] = v
+	return true
+}
+
+// recorded reports whether this block already saved what a let of name shadows
+// (or noted it as freshly added), so a rebind does not overwrite that record.
+func (s *blockScope) recorded(name string) bool {
+	if _, ok := s.shadows[name]; ok {
+		return true
+	}
+	return s.added[name]
+}
+
+// restore undoes this block's let bindings: a shadowed outer binding is put
+// back, and a freshly added one is removed, leaving the environment as the
+// caller had it (save for assignments to outer locals, which persist).
+func (s *blockScope) restore() {
+	for name, prior := range s.shadows {
+		s.locals[name] = prior
+	}
+	for name := range s.added {
+		delete(s.locals, name)
+	}
+}
+
+// evalLet folds a let's initializer and binds the local. It returns false when
+// the initializer cannot be folded (so the body cannot fold past the let) or
+// when there is no environment to bind into.
+func evalLet(s *ast.LetStmt, ctx evalCtx, scope *blockScope) bool {
+	if s.Value == nil {
+		return false
+	}
+	v := evalExpr(s.Value, ctx)
+	if v == nil {
+		return false
+	}
+	return scope.bind(s.Name, v)
+}
+
+// evalAssign folds an assignment's value and updates the target local in place,
+// so a later read (and an outer block) sees the new value. It returns false when
+// the target is not a plain local name (an immutable-data error the checker
+// already reported), the local is not in scope, or the value cannot be folded.
+func evalAssign(s *ast.AssignStmt, ctx evalCtx) bool {
+	id, ok := s.Target.(*ast.Identifier)
+	if !ok || ctx.locals == nil {
+		return false
+	}
+	if _, inScope := ctx.locals[id.Name]; !inScope {
+		return false
+	}
+	if s.Value == nil {
+		return false
+	}
+	v := evalExpr(s.Value, ctx)
+	if v == nil {
+		return false
+	}
+	ctx.locals[id.Name] = v
+	return true
 }
 
 // ifOutcome is the result of folding an if statement at compile time.
@@ -680,8 +802,12 @@ func evalIf(s *ast.IfStmt, ctx evalCtx) (*ir.Constant, ifOutcome) {
 // of a folded value (ifReturned), a fall-through to after the if (ifFellThrough
 // when no statement returned), or an unfoldable return (ifUnknown). It mirrors
 // evalBody but distinguishes "ran to the end without returning" from "could not
-// fold", which the if needs to decide whether to continue the outer body.
+// fold", which the if needs to decide whether to continue the outer body. A let
+// in the branch is block-scoped to it (and undone on exit); an assignment to an
+// outer local persists, so a guarded reassignment is visible after the if.
 func branchOutcome(body []ast.Stmt, ctx evalCtx) (*ir.Constant, ifOutcome) {
+	scope := newBlockScope(ctx.locals)
+	defer scope.restore()
 	for _, stmt := range body {
 		switch stmt := stmt.(type) {
 		case *ast.ReturnStmt:
@@ -692,6 +818,14 @@ func branchOutcome(body []ast.Stmt, ctx evalCtx) (*ir.Constant, ifOutcome) {
 				return v, ifReturned
 			}
 			return nil, ifUnknown
+		case *ast.LetStmt:
+			if !evalLet(stmt, ctx, scope) {
+				return nil, ifUnknown
+			}
+		case *ast.AssignStmt:
+			if !evalAssign(stmt, ctx) {
+				return nil, ifUnknown
+			}
 		case *ast.SwitchStmt:
 			if v := evalSwitch(stmt, ctx); v != nil {
 				return v, ifReturned

@@ -249,8 +249,9 @@ func NewMethodDecl(doc []string, public, extern bool, effects []string, name str
 	return &MethodDecl{Doc: doc, Public: public, Extern: extern, Effects: effects, Name: name, Params: params, Result: result, Body: body, syntax: syntax}
 }
 
-// Stmt is a statement inside a method body: a return (ReturnStmt), a switch
-// (SwitchStmt), an if (IfStmt), or a bare expression statement (ExprStmt).
+// Stmt is a statement inside a method body: a return (ReturnStmt), a mutable
+// local binding (LetStmt), a reassignment (AssignStmt), a switch (SwitchStmt),
+// an if (IfStmt), or a bare expression statement (ExprStmt).
 type Stmt interface {
 	Node
 	stmt()
@@ -285,6 +286,47 @@ func (s *ExprStmt) stmt()             {}
 // NewExprStmt builds an ExprStmt node.
 func NewExprStmt(x Expr, syntax *cst.Node) *ExprStmt {
 	return &ExprStmt{X: x, syntax: syntax}
+}
+
+// LetStmt is a "let Name [: Type] = Value" statement: a mutable block-local
+// binding. Unlike a constant it may be reassigned (by an AssignStmt) later in
+// the same scope, but it is still local to a body — there is no top-level let.
+// Type is the optional annotation (nil for an inferred binding); Value is the
+// required initializer (nil only when the source omitted it).
+type LetStmt struct {
+	Name   string
+	Type   TypeExpr // the annotation, or nil for an inferred type
+	Value  Expr     // the initializer (let is initialized in place)
+	syntax *cst.Node
+}
+
+func (s *LetStmt) Syntax() *cst.Node { return s.syntax }
+func (s *LetStmt) node()             {}
+func (s *LetStmt) stmt()             {}
+
+// NewLetStmt builds a LetStmt node.
+func NewLetStmt(name string, typ TypeExpr, value Expr, syntax *cst.Node) *LetStmt {
+	return &LetStmt{Name: name, Type: typ, Value: value, syntax: syntax}
+}
+
+// AssignStmt is a "Target = Value" statement: a reassignment of an existing
+// binding. Target is the assignment target expression — an Identifier for a let
+// local (the only valid target), and any other expression (a field access, say)
+// is accepted by the parser and rejected by the semantic layer. Value is the
+// new value (nil only when the source omitted it).
+type AssignStmt struct {
+	Target Expr // the assignment target (an Identifier for a let local)
+	Value  Expr // the new value
+	syntax *cst.Node
+}
+
+func (s *AssignStmt) Syntax() *cst.Node { return s.syntax }
+func (s *AssignStmt) node()             {}
+func (s *AssignStmt) stmt()             {}
+
+// NewAssignStmt builds an AssignStmt node.
+func NewAssignStmt(target, value Expr, syntax *cst.Node) *AssignStmt {
+	return &AssignStmt{Target: target, Value: value, syntax: syntax}
 }
 
 // SwitchStmt is a value-dispatch statement: it runs the body of the first arm

@@ -21,6 +21,13 @@ import (
 // claims) shows its power-assert diagram.
 func hover(doc view, offset int) *protocol.Hover {
 	trees := doc.Trees()
+	// A let-bound local is checked first: inside a body it shadows a same-named
+	// top-level constant, so its type wins over the constant's card. Outside any
+	// body (and for a name no let binds), the lookup yields nothing and the chain
+	// falls through to the constant and the other hovers.
+	if h := letHover(doc, offset, trees); h != nil {
+		return h
+	}
 	if occ, ok := occurrenceAt(doc, offset, trees); ok {
 		return constHover(occ.target, doc.Buffer(), occ.token)
 	}

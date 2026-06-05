@@ -40,6 +40,21 @@ type EnumExpecter interface {
 	ExpectedEnum(scrutinee ast.Expr) *ir.TypeDef
 }
 
+// LocalBinder is the optional capability a body binder advertises to lower the
+// mutable block-locals a let introduces. A binder without it lowers a body that
+// has no lets (a const initializer, a refinement predicate), so the let and
+// assignment statements simply do not appear.
+//
+// LetLocal records name as a let local on top of this binder's scope and returns
+// the extended binder (used for the statements that follow the let, within the
+// same block) along with the binding's settled type — the annotation when one is
+// written, otherwise the value's inferred type. Block scoping falls out of the
+// recursion: a nested block lowers through Body with the binder in force at its
+// "{", and the extension never escapes back to the enclosing block's loop.
+type LocalBinder interface {
+	LetLocal(name string, annotation ast.TypeExpr, value ast.Expr) (Binder, ir.Type)
+}
+
 // EnumMemberResolver resolves a bare member name against an enum definition to
 // its IR value — the same resolution a const initializer's bare member uses.
 // The lower package has no enum machinery of its own, so the semantic layer
@@ -118,6 +133,13 @@ func Value(e ast.Expr, b Binder) ir.Value {
 
 // Body lowers a method body to its IR statements (nil for an extern or empty
 // body), lowering each statement's expression through b.
+//
+// A let extends the binder for the statements that follow it in the same block
+// (so a later reference to the local lowers to an ir.LocalRef), threading the
+// extended binder forward — block scoping then falls out of the recursion: a
+// nested if/switch lowers through Body with the binder in force at its block, and
+// the extension does not leak back here. A binder that is not a LocalBinder (a
+// const initializer) cannot carry lets, so its let/assign statements are skipped.
 func Body(body []ast.Stmt, b Binder) []ir.Stmt {
 	var stmts []ir.Stmt
 	for _, s := range body {
@@ -126,6 +148,20 @@ func Body(body []ast.Stmt, b Binder) []ir.Stmt {
 			stmts = append(stmts, &ir.Return{Value: Value(s.Value, b)})
 		case *ast.ExprStmt:
 			stmts = append(stmts, &ir.ExprStmt{Value: Value(s.X, b)})
+		case *ast.LetStmt:
+			lb, ok := b.(LocalBinder)
+			if !ok {
+				continue // a context that cannot carry lets (a const initializer)
+			}
+			value := Value(s.Value, b) // the initializer sees the scope before the let
+			next, typ := lb.LetLocal(s.Name, s.Type, s.Value)
+			stmts = append(stmts, &ir.Let{Name: s.Name, Type: typ, Value: value})
+			b = next
+		case *ast.AssignStmt:
+			if _, ok := b.(LocalBinder); !ok {
+				continue
+			}
+			stmts = append(stmts, assignStmt(s, b))
 		case *ast.SwitchStmt:
 			stmts = append(stmts, switchStmt(s, b))
 		case *ast.IfStmt:
@@ -133,6 +169,19 @@ func Body(body []ast.Stmt, b Binder) []ir.Stmt {
 		}
 	}
 	return stmts
+}
+
+// assignStmt lowers a reassignment: the target's name (an identifier names the
+// let local being updated) and the new value. A non-identifier target — a field
+// access, say — has no local name; it lowers with an empty name, which the
+// semantic layer has already reported as immutable-data, so the IR carries the
+// (unreachable-at-runtime) value without a target.
+func assignStmt(s *ast.AssignStmt, b Binder) *ir.Assign {
+	name := ""
+	if id, ok := s.Target.(*ast.Identifier); ok {
+		name = id.Name
+	}
+	return &ir.Assign{Name: name, Value: Value(s.Value, b)}
 }
 
 // ifStmt lowers an if statement: its condition, its then body, and its else

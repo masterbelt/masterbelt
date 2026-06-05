@@ -74,6 +74,14 @@ func forEachBodyExpr(body []ast.Stmt, fn func(ast.Expr)) {
 			if stmt.X != nil {
 				fn(stmt.X)
 			}
+		case *ast.LetStmt:
+			if stmt.Value != nil {
+				fn(stmt.Value)
+			}
+		case *ast.AssignStmt:
+			if stmt.Value != nil {
+				fn(stmt.Value)
+			}
 		case *ast.SwitchStmt:
 			if stmt.Scrutinee != nil {
 				fn(stmt.Scrutinee)
@@ -180,6 +188,11 @@ func checkFuncBodies(reg *builtin.Registry, file *ast.File, universe map[string]
 // when non-nil (a function body), reports a self expression in any statement;
 // a method body passes nil, since self is bound there.
 func checkStmts(stmts []ast.Stmt, want ir.Type, bs infer.BodyScope, env eval.Env, noSelf func(ast.Node), sink *infer.Sink, at func(ast.Node) span, diags *diagnostic.List) {
+	// A let introduces a block-local that the statements after it (within this
+	// block) see, so bs is rebound with the new local as the walk descends — a
+	// fresh BodyScope per let, leaving the caller's scope untouched. A nested
+	// if/switch is checked with the scope in force at its block, so an inner let
+	// shadows an outer one and a block-local does not leak out.
 	for _, stmt := range stmts {
 		switch stmt := stmt.(type) {
 		case *ast.ReturnStmt:
@@ -190,6 +203,10 @@ func checkStmts(stmts []ast.Stmt, want ir.Type, bs infer.BodyScope, env eval.Env
 				checkNoSelf(stmt.Value, noSelf)
 			}
 			infer.CheckBody(stmt.Value, want, bs, sink)
+		case *ast.LetStmt:
+			bs = checkLet(stmt, bs, noSelf, sink, at, diags)
+		case *ast.AssignStmt:
+			checkAssign(stmt, bs, env, noSelf, sink, at, diags)
 		case *ast.ExprStmt:
 			if noSelf != nil {
 				checkNoSelf(stmt.X, noSelf)

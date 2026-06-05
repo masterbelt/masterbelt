@@ -184,6 +184,13 @@ func dumpStmtInline(s Stmt) string {
 		return "(return " + dumpExpr(s.Value) + ")"
 	case *ExprStmt:
 		return "(expr " + dumpExpr(s.X) + ")"
+	case *LetStmt:
+		if s.Type != nil {
+			return "(let " + s.Name + ": " + dumpType(s.Type) + " = " + dumpExpr(s.Value) + ")"
+		}
+		return "(let " + s.Name + " = " + dumpExpr(s.Value) + ")"
+	case *AssignStmt:
+		return "(assign " + dumpExpr(s.Target) + " = " + dumpExpr(s.Value) + ")"
 	default:
 		return ""
 	}
@@ -306,6 +313,14 @@ func dumpStmtAt(b *strings.Builder, s Stmt, indent string) {
 		fmt.Fprintf(b, "%sreturn %s\n", indent, dumpExpr(s.Value))
 	case *ExprStmt:
 		fmt.Fprintf(b, "%sexpr %s\n", indent, dumpExpr(s.X))
+	case *LetStmt:
+		if s.Type != nil {
+			fmt.Fprintf(b, "%slet %q: %s = %s\n", indent, s.Name, dumpType(s.Type), dumpExpr(s.Value))
+		} else {
+			fmt.Fprintf(b, "%slet %q = %s\n", indent, s.Name, dumpExpr(s.Value))
+		}
+	case *AssignStmt:
+		fmt.Fprintf(b, "%sassign %s = %s\n", indent, dumpExpr(s.Target), dumpExpr(s.Value))
 	case *SwitchStmt:
 		fmt.Fprintf(b, "%sswitch %s\n", indent, dumpExpr(s.Scrutinee))
 		for _, arm := range s.Arms {
