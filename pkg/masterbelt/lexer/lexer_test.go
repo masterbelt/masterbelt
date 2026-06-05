@@ -233,6 +233,7 @@ func TestLexerOperators(t *testing.T) {
 		{"{", token.LBrace}, {"}", token.RBrace},
 		{"[", token.LBracket}, {"]", token.RBracket},
 		{",", token.Comma}, {".", token.Dot},
+		{":", token.Colon}, {"?", token.Question},
 		{"true", token.True}, {"false", token.False},
 	}
 	for _, c := range cases {

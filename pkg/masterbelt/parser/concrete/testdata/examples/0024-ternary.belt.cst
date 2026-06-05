@@ -33,7 +33,7 @@ File
           Int "2"
   Error
     Whitespace " "
-    Illegal "?"
+    Question "?"
     Whitespace " "
     Int "10"
     Whitespace " "
@@ -59,7 +59,7 @@ File
           Int "100"
   Error
     Whitespace " "
-    Illegal "?"
+    Question "?"
     Whitespace " "
     String "\"high\""
     Whitespace " "
@@ -131,7 +131,7 @@ File
           Int "50"
   Error
     Whitespace " "
-    Illegal "?"
+    Question "?"
     Whitespace " "
     Ident "Level"
     Dot "."
@@ -166,7 +166,7 @@ File
           Int "0"
   Error
     Whitespace " "
-    Illegal "?"
+    Question "?"
     Whitespace " "
     Int "0"
     Whitespace " "
@@ -179,7 +179,7 @@ File
     Whitespace " "
     Int "100"
     Whitespace " "
-    Illegal "?"
+    Question "?"
     Whitespace " "
     Int "100"
     Whitespace " "
@@ -213,7 +213,7 @@ File
             Int "2"
   Error
     Whitespace " "
-    Illegal "?"
+    Question "?"
     Whitespace " "
     Int "1"
     Whitespace " "
@@ -280,7 +280,7 @@ File
               Literal
                 Int "0"
           Whitespace " "
-          Illegal "?"
+          Question "?"
           Whitespace " "
           Literal
             Int "1"
@@ -298,7 +298,7 @@ File
               Literal
                 Int "0"
           Whitespace " "
-          Illegal "?"
+          Question "?"
           Whitespace " "
           UnaryExpr
             Minus "-"
@@ -318,15 +318,15 @@ File
   Newline "\n"
   EOF ""
 # diagnostics
-error[masterbelt.parser.concrete.unexpected_token] 9:22 unexpected token: Illegal
-error[masterbelt.parser.concrete.unexpected_token] 10:24 unexpected token: Illegal
-error[masterbelt.parser.concrete.unexpected_token] 17:38 unexpected token: Illegal
-error[masterbelt.parser.concrete.unexpected_token] 22:23 unexpected token: Illegal
+error[masterbelt.parser.concrete.unexpected_token] 9:22 unexpected token: Question
+error[masterbelt.parser.concrete.unexpected_token] 10:24 unexpected token: Question
+error[masterbelt.parser.concrete.unexpected_token] 17:38 unexpected token: Question
+error[masterbelt.parser.concrete.unexpected_token] 22:23 unexpected token: Question
 error[masterbelt.parser.concrete.unexpected_token] 26:21 unexpected token: Whitespace
-error[masterbelt.parser.concrete.unexpected_token] 26:22 unexpected token: Illegal
-error[masterbelt.parser.concrete.unexpected_token] 33:21 unexpected token: Illegal
+error[masterbelt.parser.concrete.unexpected_token] 26:22 unexpected token: Question
+error[masterbelt.parser.concrete.unexpected_token] 33:21 unexpected token: Question
 error[masterbelt.parser.concrete.unexpected_token] 33:25 unexpected token: Colon
 error[masterbelt.parser.concrete.unexpected_token] 33:36 unexpected token: Whitespace
-error[masterbelt.parser.concrete.unexpected_token] 33:37 unexpected token: Illegal
+error[masterbelt.parser.concrete.unexpected_token] 33:37 unexpected token: Question
 error[masterbelt.parser.concrete.unexpected_token] 33:42 unexpected token: Colon
 error[masterbelt.parser.concrete.unexpected_token] 33:45 unexpected token: RParen
