@@ -57,51 +57,57 @@ File
       LBrace "{"
       Newline "\n"
       Whitespace "  "
-      If "if"
-      Whitespace " "
-      BinaryExpr
-        NameRef
-          Ident "x"
+      IfStmt
+        If "if"
         Whitespace " "
-        Lt "<"
-        Whitespace " "
-        RecordLit
-          Ident "lo"
+        BinaryExpr
+          NameRef
+            Ident "x"
           Whitespace " "
-          LBrace "{"
-          Newline "\n"
-          Whitespace "    "
-          Return "return"
+          Lt "<"
           Whitespace " "
-          RecordField
+          NameRef
             Ident "lo"
-          Newline "\n"
-          Whitespace "  "
-          RBrace "}"
-      Whitespace " "
-      Else "else"
-      Whitespace " "
-      If "if"
-      Whitespace " "
-      BinaryExpr
-        NameRef
-          Ident "x"
         Whitespace " "
-        Gt ">"
-        Whitespace " "
-        RecordLit
-          Ident "hi"
-          Whitespace " "
+        Block
           LBrace "{"
           Newline "\n"
           Whitespace "    "
-          Return "return"
-          Whitespace " "
-          RecordField
-            Ident "hi"
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            NameRef
+              Ident "lo"
           Newline "\n"
           Whitespace "  "
           RBrace "}"
+        Whitespace " "
+        Else "else"
+        Whitespace " "
+        IfStmt
+          If "if"
+          Whitespace " "
+          BinaryExpr
+            NameRef
+              Ident "x"
+            Whitespace " "
+            Gt ">"
+            Whitespace " "
+            NameRef
+              Ident "hi"
+          Whitespace " "
+          Block
+            LBrace "{"
+            Newline "\n"
+            Whitespace "    "
+            ReturnStmt
+              Return "return"
+              Whitespace " "
+              NameRef
+                Ident "hi"
+            Newline "\n"
+            Whitespace "  "
+            RBrace "}"
       Newline "\n"
       Whitespace "  "
       ReturnStmt
@@ -141,27 +147,30 @@ File
       LBrace "{"
       Newline "\n"
       Whitespace "  "
-      If "if"
-      Whitespace " "
-      BinaryExpr
-        NameRef
-          Ident "n"
+      IfStmt
+        If "if"
         Whitespace " "
-        Gt ">"
+        BinaryExpr
+          NameRef
+            Ident "n"
+          Whitespace " "
+          Gt ">"
+          Whitespace " "
+          Literal
+            Int "100"
         Whitespace " "
-        Literal
-          Int "100"
-      Whitespace " "
-      RecordLit
-        LBrace "{"
-        Newline "\n"
-        Whitespace "    "
-        Return "return"
-        Whitespace " "
-        Int "0"
-        Newline "\n"
-        Whitespace "  "
-        RBrace "}"
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            Literal
+              Int "0"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
       Newline "\n"
       Whitespace "  "
       ReturnStmt
@@ -201,87 +210,73 @@ File
       LBrace "{"
       Newline "\n"
       Whitespace "  "
-      If "if"
-      Whitespace " "
-      BinaryExpr
-        NameRef
-          Ident "n"
-        Whitespace " "
-        Gt ">"
-        Whitespace " "
-        Literal
-          Int "0"
-      Whitespace " "
-      RecordLit
-        LBrace "{"
-        Newline "\n"
-        Whitespace "    "
-        Return "return"
-        Whitespace " "
-        String "\"positive\""
-        Newline "\n"
-        Whitespace "  "
-        RBrace "}"
-      Whitespace " "
-      Else "else"
-      Whitespace " "
-      RecordLit
-        LBrace "{"
-        Newline "\n"
-        Whitespace "    "
+      IfStmt
         If "if"
         Whitespace " "
-        RecordField
-          Ident "n"
+        BinaryExpr
+          NameRef
+            Ident "n"
+          Whitespace " "
+          Gt ">"
+          Whitespace " "
+          Literal
+            Int "0"
         Whitespace " "
-        Lt "<"
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            Literal
+              String "\"positive\""
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
         Whitespace " "
-        Int "0"
+        Else "else"
         Whitespace " "
-        LBrace "{"
-        Newline "\n"
-        Whitespace "      "
-        Return "return"
-        Whitespace " "
-        String "\"negative\""
-        Newline "\n"
-        Whitespace "    "
-        RBrace "}"
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          IfStmt
+            If "if"
+            Whitespace " "
+            BinaryExpr
+              NameRef
+                Ident "n"
+              Whitespace " "
+              Lt "<"
+              Whitespace " "
+              Literal
+                Int "0"
+            Whitespace " "
+            Block
+              LBrace "{"
+              Newline "\n"
+              Whitespace "      "
+              ReturnStmt
+                Return "return"
+                Whitespace " "
+                Literal
+                  String "\"negative\""
+              Newline "\n"
+              Whitespace "    "
+              RBrace "}"
+          Newline "\n"
+          Whitespace "    "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            Literal
+              String "\"zero\""
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
       Newline "\n"
-      Whitespace "    "
-      ReturnStmt
-        Return "return"
-        Whitespace " "
-        Literal
-          String "\"zero\""
-      Newline "\n"
-      Whitespace "  "
       RBrace "}"
-  Error
-    Newline "\n"
-    RBrace "}"
   Newline "\n"
   EOF ""
 # diagnostics
-error[masterbelt.parser.concrete.unexpected_token] 11:3 unexpected token: If
-error[masterbelt.parser.concrete.unexpected_token] 12:5 unexpected token: Return
-error[masterbelt.parser.concrete.unexpected_token] 12:14 unexpected token: Newline
-error[masterbelt.parser.concrete.unexpected_token] 13:5 unexpected token: Else
-error[masterbelt.parser.concrete.unexpected_token] 13:10 unexpected token: If
-error[masterbelt.parser.concrete.unexpected_token] 14:5 unexpected token: Return
-error[masterbelt.parser.concrete.unexpected_token] 14:14 unexpected token: Newline
-error[masterbelt.parser.concrete.unexpected_token] 22:3 unexpected token: If
-error[masterbelt.parser.concrete.unexpected_token] 23:5 unexpected token: Return
-error[masterbelt.parser.concrete.unexpected_token] 23:12 unexpected token: Int
-error[masterbelt.parser.concrete.unexpected_token] 31:3 unexpected token: If
-error[masterbelt.parser.concrete.unexpected_token] 32:5 unexpected token: Return
-error[masterbelt.parser.concrete.unexpected_token] 32:12 unexpected token: String
-error[masterbelt.parser.concrete.unexpected_token] 33:5 unexpected token: Else
-error[masterbelt.parser.concrete.unexpected_token] 34:5 unexpected token: If
-error[masterbelt.parser.concrete.unexpected_token] 34:9 unexpected token: Whitespace
-error[masterbelt.parser.concrete.unexpected_token] 34:10 unexpected token: Lt
-error[masterbelt.parser.concrete.unexpected_token] 34:12 unexpected token: Int
-error[masterbelt.parser.concrete.unexpected_token] 34:14 unexpected token: LBrace
-error[masterbelt.parser.concrete.unexpected_token] 35:7 unexpected token: Return
-error[masterbelt.parser.concrete.unexpected_token] 35:14 unexpected token: String
-error[masterbelt.parser.concrete.unexpected_token] 39:1 unexpected token: RBrace

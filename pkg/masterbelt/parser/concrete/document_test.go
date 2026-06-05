@@ -71,6 +71,9 @@ func TestDocumentScriptedEdits(t *testing.T) {
 		{"introduce a syntax error", "const x = 1\n", source.Edit{Start: 8, End: 9, NewText: nil}}, // remove '='
 		{"open block comment swallowing decls", "const x = 1\nconst y = 2\n", source.Edit{Start: 0, End: 0, NewText: []byte("/*")}},
 		{"stray operator line", "const x = 1\n", source.Edit{Start: 0, End: 0, NewText: []byte("= =\n")}},
+		{"edit an if condition", "pub fn f(n: int): int {\n  if n > 0 {\n    return 1\n  }\n  return 0\n}\n", source.Edit{Start: 33, End: 34, NewText: []byte("<")}}, // ">" -> "<"
+		{"add an else branch to an if", "pub fn f(n: int): int {\n  if n > 0 {\n    return 1\n  }\n  return 0\n}\n", source.Edit{Start: 49, End: 49, NewText: []byte(" else {\n    return 2\n  }")}},
+		{"turn an if into an else-if chain", "pub fn f(n: int): int {\n  if n > 0 {\n    return 1\n  } else {\n    return 0\n  }\n}\n", source.Edit{Start: 54, End: 54, NewText: []byte("if n < 0 ")}},
 	}
 
 	for _, tc := range cases {

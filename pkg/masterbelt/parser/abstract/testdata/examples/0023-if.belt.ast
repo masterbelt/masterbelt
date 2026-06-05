@@ -6,23 +6,15 @@ File
     param lo: int
     param hi: int
     result int
-      expr (call (. Identifier "x" lt) (record lo lo: <missing>))
-      expr (call (. Identifier "x" gt) (record hi hi: <missing>))
       return Identifier "x"
   FuncDecl
     pub
     name "warn"
     param n: int
     result int
-      expr (call (. Identifier "n" gt) IntLit "100")
-      expr (record)
       return Identifier "n"
   FuncDecl
     pub
     name "sign"
     param n: int
     result string
-      expr (call (. Identifier "n" gt) IntLit "0")
-      expr (record)
-      expr (record n: <missing>)
-      return StringLit "zero"
