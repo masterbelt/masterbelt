@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/lexer"
+	"github.com/masterbelt/masterbelt/pkg/source"
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
 )
@@ -150,6 +152,39 @@ func TestDurationMillis(t *testing.T) {
 		got, ok := DurationMillis(c.text)
 		if got != c.want || ok != c.ok {
 			t.Errorf("durationMillis(%q) = (%d, %v), want (%d, %v)", c.text, got, ok, c.want, c.ok)
+		}
+	}
+}
+
+// TestDatetimeLexEvalParity pins the two layers' datetime validation
+// together: the lexer diagnoses a literal exactly when the fold rejects it,
+// so a diagnosed literal never silently evaluates and an accepted one never
+// silently fails to. The lexer's verdict is read off its diagnostics.
+func TestDatetimeLexEvalParity(t *testing.T) {
+	cases := []string{
+		// Accepted by both.
+		"D2009-03-31T23:59:59.000Z",
+		"D1970-01-01T00:00:00Z",
+		"D2026-06-05T09:00:00.000+09:00",
+		"D2026-06-05T09:00:00.000-23:59",
+		"D2026-06-05T09:00:00.000+23:59",
+		// Rejected by both — including the offsets time.Parse alone would let
+		// through (+24:00, +12:60).
+		"D2026-06-05T00:00:00.000+24:00",
+		"D2026-06-05T00:00:00.000+12:60",
+		"D2026-06-05T00:00:00.000-24:00",
+		"D2009-13-40T99:99:99.000Z",
+		"D2009-02-30T00:00:00.000Z",
+		"D2009-03-31T23:59:59.00Z",
+	}
+	for _, src := range cases {
+		file := source.NewFile("p.belt", []byte(src))
+		lex := lexer.New(file)
+		lex.Tokens()
+		lexerAccepts := len(lex.Diagnostics()) == 0
+		_, evalAccepts := DatetimeMillis(src)
+		if lexerAccepts != evalAccepts {
+			t.Errorf("%q: lexer accepts %v, eval accepts %v — the layers disagree", src, lexerAccepts, evalAccepts)
 		}
 	}
 }
