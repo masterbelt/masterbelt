@@ -6,10 +6,7 @@ File
     param lo: int
     param hi: int
     result int
-      expr Identifier "if"
       expr (call (. Identifier "x" lt) (record lo lo: <missing>))
-      expr Identifier "else"
-      expr Identifier "if"
       expr (call (. Identifier "x" gt) (record hi hi: <missing>))
       return Identifier "x"
   FuncDecl
@@ -17,7 +14,6 @@ File
     name "warn"
     param n: int
     result int
-      expr Identifier "if"
       expr (call (. Identifier "n" gt) IntLit "100")
       expr (record)
       return Identifier "n"
@@ -26,8 +22,7 @@ File
     name "sign"
     param n: int
     result string
-      expr Identifier "if"
       expr (call (. Identifier "n" gt) IntLit "0")
       expr (record)
-      expr (record else if: <missing> n: <missing>)
+      expr (record n: <missing>)
       return StringLit "zero"

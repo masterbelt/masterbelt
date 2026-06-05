@@ -57,8 +57,7 @@ File
       LBrace "{"
       Newline "\n"
       Whitespace "  "
-      NameRef
-        Ident "if"
+      If "if"
       Whitespace " "
       BinaryExpr
         NameRef
@@ -80,11 +79,9 @@ File
           Whitespace "  "
           RBrace "}"
       Whitespace " "
-      NameRef
-        Ident "else"
+      Else "else"
       Whitespace " "
-      NameRef
-        Ident "if"
+      If "if"
       Whitespace " "
       BinaryExpr
         NameRef
@@ -144,8 +141,7 @@ File
       LBrace "{"
       Newline "\n"
       Whitespace "  "
-      NameRef
-        Ident "if"
+      If "if"
       Whitespace " "
       BinaryExpr
         NameRef
@@ -205,8 +201,7 @@ File
       LBrace "{"
       Newline "\n"
       Whitespace "  "
-      NameRef
-        Ident "if"
+      If "if"
       Whitespace " "
       BinaryExpr
         NameRef
@@ -228,14 +223,13 @@ File
         Whitespace "  "
         RBrace "}"
       Whitespace " "
+      Else "else"
+      Whitespace " "
       RecordLit
-        Ident "else"
-        Whitespace " "
         LBrace "{"
         Newline "\n"
         Whitespace "    "
-        RecordField
-          Ident "if"
+        If "if"
         Whitespace " "
         RecordField
           Ident "n"
@@ -269,15 +263,21 @@ File
   Newline "\n"
   EOF ""
 # diagnostics
+error[masterbelt.parser.concrete.unexpected_token] 11:3 unexpected token: If
 error[masterbelt.parser.concrete.unexpected_token] 12:5 unexpected token: Return
 error[masterbelt.parser.concrete.unexpected_token] 12:14 unexpected token: Newline
+error[masterbelt.parser.concrete.unexpected_token] 13:5 unexpected token: Else
+error[masterbelt.parser.concrete.unexpected_token] 13:10 unexpected token: If
 error[masterbelt.parser.concrete.unexpected_token] 14:5 unexpected token: Return
 error[masterbelt.parser.concrete.unexpected_token] 14:14 unexpected token: Newline
+error[masterbelt.parser.concrete.unexpected_token] 22:3 unexpected token: If
 error[masterbelt.parser.concrete.unexpected_token] 23:5 unexpected token: Return
 error[masterbelt.parser.concrete.unexpected_token] 23:12 unexpected token: Int
+error[masterbelt.parser.concrete.unexpected_token] 31:3 unexpected token: If
 error[masterbelt.parser.concrete.unexpected_token] 32:5 unexpected token: Return
 error[masterbelt.parser.concrete.unexpected_token] 32:12 unexpected token: String
-error[masterbelt.parser.concrete.unexpected_token] 34:7 unexpected token: Whitespace
+error[masterbelt.parser.concrete.unexpected_token] 33:5 unexpected token: Else
+error[masterbelt.parser.concrete.unexpected_token] 34:5 unexpected token: If
 error[masterbelt.parser.concrete.unexpected_token] 34:9 unexpected token: Whitespace
 error[masterbelt.parser.concrete.unexpected_token] 34:10 unexpected token: Lt
 error[masterbelt.parser.concrete.unexpected_token] 34:12 unexpected token: Int

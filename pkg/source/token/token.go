@@ -52,6 +52,8 @@ const (
 	Nondet  // nondet (effect: does not reproduce)
 	Await   // await (consumes async at a call site)
 	Switch  // switch (value-dispatch control statement)
+	If      // if (boolean control statement)
+	Else    // else (the alternative branch of an if)
 
 	// Operators and punctuation.
 	Colon    // :
@@ -121,6 +123,8 @@ var kindNames = [...]string{
 	Nondet:       "Nondet",
 	Await:        "Await",
 	Switch:       "Switch",
+	If:           "If",
+	Else:         "Else",
 	Colon:        "Colon",
 	Assign:       "Assign",
 	Plus:         "Plus",
@@ -224,6 +228,8 @@ var keywords = map[string]Kind{
 	"nondet":  Nondet,
 	"await":   Await,
 	"switch":  Switch,
+	"if":      If,
+	"else":    Else,
 }
 
 // Effect reports whether the kind is an effect keyword — the declarations a

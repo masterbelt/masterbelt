@@ -4,24 +4,19 @@ Module
     param lo: int
     param hi: int
     result int
-      expr <none>
       expr ParamRef "x".lt(lo{lo: <none>})
-      expr <none>
-      expr <none>
       expr ParamRef "x".gt(hi{hi: <none>})
       return ParamRef "x"
   Func "warn" pub
     param n: int
     result int
-      expr <none>
       expr ParamRef "n".gt(IntLiteral "100")
       expr {}
       return ParamRef "n"
   Func "sign" pub
     param n: int
     result string
-      expr <none>
       expr ParamRef "n".gt(IntLiteral "0")
       expr {}
-      expr else{if: <none>, n: <none>}
+      expr {n: <none>}
       return StringLiteral "zero"
