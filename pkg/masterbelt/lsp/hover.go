@@ -30,6 +30,9 @@ func hover(doc view, offset int) *protocol.Hover {
 	if h := enumMemberHover(doc, offset); h != nil {
 		return h
 	}
+	if h := assocConstHover(doc, offset); h != nil {
+		return h
+	}
 	if h := memberHover(doc, offset, trees); h != nil {
 		return h
 	}

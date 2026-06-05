@@ -383,3 +383,59 @@ func enumMemberHover(doc view, offset int) *protocol.Hover {
 		Range:    &r,
 	}
 }
+
+// assocConstHover describes an associated-constant access at offset (int8.Max,
+// Level.Max): the qualified name with its type, its folded value, and the
+// constant's doc comments beneath — rendered as `int8.Max: int = 127`. It
+// returns nil when offset is not on an associated-constant access (the enum and
+// value hover paths claim their own forms first).
+func assocConstHover(doc view, offset int) *protocol.Hover {
+	member, ok := memberAccessAt(doc, offset)
+	if !ok {
+		return nil
+	}
+	recv, ok := member.Receiver.(*ast.Identifier)
+	if !ok || doc.Resolve(recv) != nil {
+		return nil // a value shadowing the type name is a value access
+	}
+	def := lookupTypeName(doc, recv.Name)
+	if def == nil {
+		return nil
+	}
+	var c *ir.AssocConst
+	for _, ac := range def.Consts {
+		if ac.Name == member.Member.Name {
+			c = ac
+			break
+		}
+	}
+	if c == nil {
+		return nil
+	}
+	var b strings.Builder
+	b.WriteString("```masterbelt\n")
+	b.WriteString(def.Name)
+	b.WriteString(".")
+	b.WriteString(c.Name)
+	if c.Type != nil && c.Type != ir.Invalid {
+		b.WriteString(": ")
+		b.WriteString(c.Type.String())
+	}
+	if c.Value != nil {
+		b.WriteString(" = ")
+		b.WriteString(c.Value.String())
+	}
+	b.WriteString("\n```")
+	if len(c.Doc) > 0 {
+		b.WriteString("\n\n")
+		b.WriteString(strings.Join(c.Doc, "\n"))
+	}
+
+	node, _ := memberNodeAt(doc, offset)
+	rng := cst.Root(node)
+	r := toRange(doc.Buffer(), rng.Offset(), rng.End())
+	return &protocol.Hover{
+		Contents: protocol.MarkupContent{Kind: protocol.Markdown, Value: b.String()},
+		Range:    &r,
+	}
+}
