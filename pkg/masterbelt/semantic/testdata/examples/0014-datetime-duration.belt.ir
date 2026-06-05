@@ -25,12 +25,15 @@ Module
     value Reference -> "Release".sub()
   Const "TwoH"
     type invalid
-    value <none>
+    value <none>.add()
   Const "Triple"
     type invalid
-    value <none>
+    value <none>.mul(IntLiteral "3")
   TypeDef "Event" pub
     body { id: int, starts_at: invalid, cooldown: invalid }
   Assert "Release > Epoch"
     eval <unevaluated>
       Release > Epoch
+  Assert "<missing>.gt()"
+    eval <unevaluated>
+      <missing>.gt()

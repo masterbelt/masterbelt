@@ -45,7 +45,7 @@
 //	CollectionLit := "[" [ Element ( "," Element )* [","] ] "]"
 //	Element       := Expr [ ":" Expr ]
 //	NameRef       := Ident
-//	Literal       := Int | String | "true" | "false" | "null"
+//	Literal       := Int | String | DatetimeLit | DurationLit | "true" | "false" | "null"
 //
 // The binary levels are parsed by precedence climbing (parseExpr) rather than a
 // function per level; the binaryPrec table is the single source of operator

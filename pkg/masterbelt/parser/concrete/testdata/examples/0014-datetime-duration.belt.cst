@@ -14,9 +14,9 @@ File
     Whitespace "   "
     Initializer
       Assign "="
-  Error
-    Whitespace " "
-    DatetimeLit "D1970-01-01T00:00:00.000Z"
+      Whitespace " "
+      Literal
+        DatetimeLit "D1970-01-01T00:00:00.000Z"
   ConstDecl
     Newline "\n"
     Const "const"
@@ -25,9 +25,9 @@ File
     Whitespace " "
     Initializer
       Assign "="
-  Error
-    Whitespace " "
-    DatetimeLit "D2009-03-31T23:59:59.000Z"
+      Whitespace " "
+      Literal
+        DatetimeLit "D2009-03-31T23:59:59.000Z"
   ConstDecl
     Newline "\n"
     LineComment "// An offset input normalizes to the same UTC instant."
@@ -38,9 +38,9 @@ File
     Whitespace "  "
     Initializer
       Assign "="
-  Error
-    Whitespace " "
-    DatetimeLit "D2026-06-05T09:00:00.000+09:00"
+      Whitespace " "
+      Literal
+        DatetimeLit "D2026-06-05T09:00:00.000+09:00"
   ConstDecl
     Newline "\n"
     Newline "\n"
@@ -50,9 +50,9 @@ File
     Whitespace " "
     Initializer
       Assign "="
-  Error
-    Whitespace " "
-    DurationLit "5s"
+      Whitespace " "
+      Literal
+        DurationLit "5s"
   ConstDecl
     Newline "\n"
     Const "const"
@@ -61,9 +61,9 @@ File
     Whitespace "  "
     Initializer
       Assign "="
-  Error
-    Whitespace " "
-    DurationLit "3w4d5h6m7s8ms"
+      Whitespace " "
+      Literal
+        DurationLit "3w4d5h6m7s8ms"
   AssertDecl
     Newline "\n"
     Newline "\n"
@@ -82,13 +82,15 @@ File
   AssertDecl
     Newline "\n"
     Assert "assert"
-  Error
     Whitespace " "
-    DurationLit "1h"
-    Whitespace " "
-    Gt ">"
-    Whitespace " "
-    DurationLit "59m"
+    BinaryExpr
+      Literal
+        DurationLit "1h"
+      Whitespace " "
+      Gt ">"
+      Whitespace " "
+      Literal
+        DurationLit "59m"
   ConstDecl
     Newline "\n"
     Newline "\n"
@@ -106,9 +108,9 @@ File
           Ident "Release"
         Whitespace " "
         Plus "+"
-  Error
-    Whitespace " "
-    DurationLit "7d"
+        Whitespace " "
+        Literal
+          DurationLit "7d"
   ConstDecl
     Newline "\n"
     Const "const"
@@ -140,9 +142,9 @@ File
           Ident "Release"
         Whitespace " "
         Minus "-"
-  Error
-    Whitespace " "
-    DurationLit "1h"
+        Whitespace " "
+        Literal
+          DurationLit "1h"
   ConstDecl
     Newline "\n"
     Const "const"
@@ -151,13 +153,15 @@ File
     Whitespace "     "
     Initializer
       Assign "="
-  Error
-    Whitespace " "
-    DurationLit "1h"
-    Whitespace " "
-    Plus "+"
-    Whitespace " "
-    DurationLit "1h"
+      Whitespace " "
+      BinaryExpr
+        Literal
+          DurationLit "1h"
+        Whitespace " "
+        Plus "+"
+        Whitespace " "
+        Literal
+          DurationLit "1h"
   ConstDecl
     Newline "\n"
     Const "const"
@@ -166,13 +170,15 @@ File
     Whitespace "   "
     Initializer
       Assign "="
-  Error
-    Whitespace " "
-    DurationLit "5m"
-    Whitespace " "
-    Star "*"
-    Whitespace " "
-    Int "3"
+      Whitespace " "
+      BinaryExpr
+        Literal
+          DurationLit "5m"
+        Whitespace " "
+        Star "*"
+        Whitespace " "
+        Literal
+          Int "3"
   TypeDecl
     Newline "\n"
     Newline "\n"
@@ -217,23 +223,3 @@ File
   Newline "\n"
   EOF ""
 # diagnostics
-error[masterbelt.parser.concrete.expected_expression] 5:15 expected expression
-error[masterbelt.parser.concrete.unexpected_token] 5:17 unexpected token: DatetimeLit
-error[masterbelt.parser.concrete.expected_expression] 6:15 expected expression
-error[masterbelt.parser.concrete.unexpected_token] 6:17 unexpected token: DatetimeLit
-error[masterbelt.parser.concrete.expected_expression] 8:15 expected expression
-error[masterbelt.parser.concrete.unexpected_token] 8:17 unexpected token: DatetimeLit
-error[masterbelt.parser.concrete.expected_expression] 10:16 expected expression
-error[masterbelt.parser.concrete.unexpected_token] 10:18 unexpected token: DurationLit
-error[masterbelt.parser.concrete.expected_expression] 11:16 expected expression
-error[masterbelt.parser.concrete.unexpected_token] 11:18 unexpected token: DurationLit
-error[masterbelt.parser.concrete.expected_expression] 15:1 expected expression
-error[masterbelt.parser.concrete.unexpected_token] 15:8 unexpected token: DurationLit
-error[masterbelt.parser.concrete.expected_operand] 18:26 expected operand after '+'
-error[masterbelt.parser.concrete.unexpected_token] 18:28 unexpected token: DurationLit
-error[masterbelt.parser.concrete.expected_operand] 20:26 expected operand after '-'
-error[masterbelt.parser.concrete.unexpected_token] 20:28 unexpected token: DurationLit
-error[masterbelt.parser.concrete.expected_expression] 21:16 expected expression
-error[masterbelt.parser.concrete.unexpected_token] 21:18 unexpected token: DurationLit
-error[masterbelt.parser.concrete.expected_expression] 22:16 expected expression
-error[masterbelt.parser.concrete.unexpected_token] 22:18 unexpected token: DurationLit

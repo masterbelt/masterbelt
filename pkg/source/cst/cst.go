@@ -39,7 +39,7 @@ const (
 	TypeClause                // ": TypeExpr"
 	Initializer               // "= Expr"
 	NameRef                   // an identifier used as a value
-	Literal                   // a literal value: an integer, a string, a boolean (true/false), or null
+	Literal                   // a literal value: an integer, a string, a datetime, a duration, a boolean (true/false), or null
 	BinaryExpr                // a binary operation: Expr Op Expr
 	UnaryExpr                 // a prefix operation: Op Expr
 	CallExpr                  // a call: Callee "(" [Expr ("," Expr)*] ")"

@@ -20,8 +20,10 @@ File
     value (call (. Identifier "Release" sub))
   ConstDecl
     name "TwoH"
+    value (call (. <missing> add))
   ConstDecl
     name "Triple"
+    value (call (. <missing> mul) IntLit "3")
   TypeDecl
     pub
     name "Event"
@@ -29,4 +31,4 @@ File
   AssertDecl
     cond (call (. Identifier "Release" gt) Identifier "Epoch")
   AssertDecl
-    cond <missing>
+    cond (call (. <missing> gt))

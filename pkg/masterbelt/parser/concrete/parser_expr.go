@@ -152,7 +152,7 @@ func (p *parser) parseCallArgs(children *[]cst.Green) {
 // site, so the default arm is defensive and consumes nothing.
 func (p *parser) parseOperand() cst.Green {
 	switch p.kind() {
-	case token.Int, token.String, token.True, token.False, token.Null:
+	case token.Int, token.String, token.DatetimeLit, token.DurationLit, token.True, token.False, token.Null:
 		return cst.NewNode(cst.Literal, []cst.Green{p.bump()})
 	case token.LBracket:
 		return p.parseCollectionLiteral()
@@ -372,7 +372,8 @@ var unaryOps = map[token.Kind]bool{
 // trailing trivia for the next construct) rather than mis-parsed.
 func startsExpr(kind token.Kind) bool {
 	switch kind {
-	case token.Int, token.String, token.Ident, token.True, token.False, token.Null, token.Self,
+	case token.Int, token.String, token.DatetimeLit, token.DurationLit,
+		token.Ident, token.True, token.False, token.Null, token.Self,
 		token.LBracket, token.Plus, token.Minus, token.Bang, token.Fn, token.LParen:
 		return true
 	default:
