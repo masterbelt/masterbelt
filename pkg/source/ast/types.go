@@ -48,6 +48,51 @@ func NewTypeParam(name string, constraint TypeExpr, syntax *cst.Node) *TypeParam
 	return &TypeParam{Name: name, Constraint: constraint, syntax: syntax}
 }
 
+// --- enum declarations ------------------------------------------------------
+
+// EnumDecl is an enum declaration: a fixed set of named members belonging to
+// one nominal type. It carries an optional run of doc-comment lines, an
+// optional pub modifier, the declared Name, the optional Base type annotation
+// (the integer family or string; nil means the default int), its Members in
+// declaration order, and the methods of its impl block (the same mechanism a
+// type declaration's impl uses).
+type EnumDecl struct {
+	Doc     []string
+	Public  bool
+	Name    string   // the declared identifier, or "" if missing
+	Base    TypeExpr // the base-type annotation, or nil if omitted (defaults to int)
+	Members []*EnumMember
+	Methods []*MethodDecl
+	syntax  *cst.Node
+}
+
+func (d *EnumDecl) Syntax() *cst.Node { return d.syntax }
+func (d *EnumDecl) node()             {}
+
+// NewEnumDecl builds an EnumDecl node.
+func NewEnumDecl(doc []string, public bool, name string, base TypeExpr, members []*EnumMember, methods []*MethodDecl, syntax *cst.Node) *EnumDecl {
+	return &EnumDecl{Doc: doc, Public: public, Name: name, Base: base, Members: members, Methods: methods, syntax: syntax}
+}
+
+// EnumMember is one member of an enum: its Name and an optional Value
+// expression (a constant expression). Value is nil when the source omitted the
+// "= ConstExpr" initializer, in which case the member's value is determined by
+// the default rules (auto-numbering for an integer base, the member name for a
+// string base).
+type EnumMember struct {
+	Name   string // the member identifier, or "" if missing
+	Value  Expr   // the initializer expression, or nil if omitted
+	syntax *cst.Node
+}
+
+func (m *EnumMember) Syntax() *cst.Node { return m.syntax }
+func (m *EnumMember) node()             {}
+
+// NewEnumMember builds an EnumMember node.
+func NewEnumMember(name string, value Expr, syntax *cst.Node) *EnumMember {
+	return &EnumMember{Name: name, Value: value, syntax: syntax}
+}
+
 // --- type expressions -------------------------------------------------------
 
 // TypeExpr is a type expression: a named type (NamedType, also used for the self

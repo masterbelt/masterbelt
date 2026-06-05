@@ -250,3 +250,94 @@ func TestLowerMethodDoc(t *testing.T) {
 		t.Fatalf("method Doc = %q, want [bumps the level]", m.Doc)
 	}
 }
+
+func TestLowerEnumDecl(t *testing.T) {
+	src := "/// rarity tier\npub enum Rarity: uint8 {\n  Common = 1\n  Rare = 2\n  Legend = 10\n}\n"
+	file, diags := Lower([]byte(src))
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if len(file.Enums) != 1 {
+		t.Fatalf("got %d enums, want 1", len(file.Enums))
+	}
+	d := file.Enums[0]
+	if !d.Public || d.Name != "Rarity" {
+		t.Errorf("enum = %+v, want pub Rarity", d)
+	}
+	if len(d.Doc) != 1 || d.Doc[0] != "rarity tier" {
+		t.Errorf("doc = %q, want [rarity tier]", d.Doc)
+	}
+	if got := ast.Dump(file); !strings.Contains(got, "base uint8") {
+		t.Errorf("dump = %s, want it to contain base uint8", got)
+	}
+	if len(d.Members) != 3 {
+		t.Fatalf("got %d members, want 3", len(d.Members))
+	}
+	names := []string{}
+	for _, m := range d.Members {
+		names = append(names, m.Name)
+		if m.Value == nil {
+			t.Errorf("member %q: want an initializer value", m.Name)
+		}
+	}
+	if strings.Join(names, ",") != "Common,Rare,Legend" {
+		t.Errorf("member names = %v, want [Common Rare Legend]", names)
+	}
+}
+
+func TestLowerEnumNoBaseWithImpl(t *testing.T) {
+	src := "enum Element {\n  Fire, Water, Wind\n} impl {\n  isFire(): bool {\n    return self == Element.Fire\n  }\n}\n"
+	file, diags := Lower([]byte(src))
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	d := file.Enums[0]
+	if d.Base != nil {
+		t.Errorf("base = %+v, want nil (default int)", d.Base)
+	}
+	if len(d.Members) != 3 {
+		t.Fatalf("got %d members, want 3", len(d.Members))
+	}
+	for _, m := range d.Members {
+		if m.Value != nil {
+			t.Errorf("member %q: want no initializer (auto-numbered)", m.Name)
+		}
+	}
+	if len(d.Methods) != 1 || d.Methods[0].Name != "isFire" {
+		t.Fatalf("methods = %+v, want one isFire method", d.Methods)
+	}
+}
+
+func TestLowerEnumStringBase(t *testing.T) {
+	src := "enum Locale: string {\n  Ja\n  En = \"en-US\"\n}\n"
+	file, diags := Lower([]byte(src))
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	d := file.Enums[0]
+	if got := ast.Dump(file); !strings.Contains(got, "base string") {
+		t.Errorf("dump = %s, want it to contain base string", got)
+	}
+	if d.Members[0].Value != nil {
+		t.Errorf("Ja: want no initializer (name-defaulted)")
+	}
+	lit, ok := d.Members[1].Value.(*ast.StringLit)
+	if !ok || lit.Value != "en-US" {
+		t.Errorf("En value = %+v, want StringLit en-US", d.Members[1].Value)
+	}
+}
+
+func TestLowerEnumMalformedRecovers(t *testing.T) {
+	// A missing member value lowers to a nil Value, not a panic; the member is
+	// still present so the semantic layer can anchor diagnostics to it.
+	file, diags := Lower([]byte("enum E {\n  A =\n}\n"))
+	if len(diags) == 0 {
+		t.Fatal("expected a diagnostic for the missing member value")
+	}
+	if len(file.Enums) != 1 || len(file.Enums[0].Members) != 1 {
+		t.Fatalf("enums = %+v, want one enum with one member", file.Enums)
+	}
+	if m := file.Enums[0].Members[0]; m.Name != "A" || m.Value != nil {
+		t.Errorf("member = %+v, want name A with nil Value", m)
+	}
+}
