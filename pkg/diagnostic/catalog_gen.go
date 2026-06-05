@@ -408,7 +408,12 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 		}
 	},
 	"masterbelt.semantic.missing_required_method": func(loc Locale, f map[string]fmt.Stringer) string {
-		return f["typ"].String() + " does not implement " + f["iface"].String() + ": missing required method " + f["method"].String()
+		switch loc {
+		case "ja":
+			return f["typ"].String() + " は " + f["iface"].String() + " を実装していません: 必須メソッド " + f["method"].String() + " がありません"
+		default:
+			return f["typ"].String() + " does not implement " + f["iface"].String() + ": missing required method " + f["method"].String()
+		}
 	},
 	"masterbelt.semantic.missing_return": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
@@ -459,7 +464,12 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 		}
 	},
 	"masterbelt.semantic.not_an_interface": func(loc Locale, f map[string]fmt.Stringer) string {
-		return f["name"].String() + " is not an interface"
+		switch loc {
+		case "ja":
+			return f["name"].String() + " は interface ではありません"
+		default:
+			return f["name"].String() + " is not an interface"
+		}
 	},
 	"masterbelt.semantic.not_exported": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
@@ -470,7 +480,12 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 		}
 	},
 	"masterbelt.semantic.orphan_impl": func(loc Locale, f map[string]fmt.Stringer) string {
-		return f["iface"].String() + " can only be implemented at the definition site of the type"
+		switch loc {
+		case "ja":
+			return f["iface"].String() + " は型の定義サイトでのみ実装できます"
+		default:
+			return f["iface"].String() + " can only be implemented at the definition site of the type"
+		}
 	},
 	"masterbelt.semantic.refinement_not_bool": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {

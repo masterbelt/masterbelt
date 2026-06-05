@@ -76,6 +76,9 @@ masterbelt.semantic.assign_type_mismatch,{name} に {actual} を代入できま�
 masterbelt.semantic.immutable_data,フィールドや要素には代入できません。データは不変です。新しい値を作ってください
 masterbelt.semantic.missing_initializer,let {name} は初期化が必要です。let {name} = 値 と書いてください
 masterbelt.semantic.index_out_of_range,インデックス {index} は長さ {length} のリストの範囲外です
+masterbelt.semantic.missing_required_method,{typ} は {iface} を実装していません: 必須メソッド {method} がありません
+masterbelt.semantic.orphan_impl,{iface} は型の定義サイトでのみ実装できます
+masterbelt.semantic.not_an_interface,{name} は interface ではありません
 project.config.missing,masterbelt.toml がこのディレクトリにも親ディレクトリにも見つかりません
 project.config.invalid,不正な masterbelt.toml: {detail}
 project.config.missing_entry,masterbelt.toml に entry が指定されていません
