@@ -37,6 +37,9 @@ func completion(doc view, offset int) *protocol.CompletionList {
 	if items, ok := memberItems(doc, offset); ok {
 		return &protocol.CompletionList{Items: items}
 	}
+	if items, ok := recordFieldItems(doc, offset); ok {
+		return &protocol.CompletionList{Items: items}
+	}
 	if typeContextAt(root, offset) {
 		return &protocol.CompletionList{Items: typeItems(doc)}
 	}
@@ -419,7 +422,9 @@ func contextKind(t cst.Tree) (isType, set bool) {
 		return true, true
 	case cst.Initializer, cst.BinaryExpr, cst.UnaryExpr, cst.MemberExpr, cst.CallExpr,
 		cst.NameRef, cst.Literal, cst.SelfExpr, cst.CollectionLit, cst.MapEntry, cst.ReturnStmt,
-		cst.ParenExpr, cst.AssertDecl, cst.WhereClause:
+		cst.RecordLit, cst.RecordField, cst.ParenExpr, cst.AssertDecl, cst.WhereClause:
+		// A record literal is a value context; its field-name positions are
+		// claimed by recordFieldItems before classification matters.
 		return false, true
 	default:
 		return false, false
