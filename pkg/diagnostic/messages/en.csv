@@ -79,6 +79,9 @@ masterbelt.semantic.index_out_of_range,index {index} is out of range for a list 
 masterbelt.semantic.missing_required_method,{typ} does not implement {iface}: missing required method {method}
 masterbelt.semantic.orphan_impl,{iface} can only be implemented at the definition site of the type
 masterbelt.semantic.not_an_interface,{name} is not an interface
+masterbelt.semantic.bound_not_satisfied,{typ} does not satisfy the bound {bound}: it does not implement that interface
+masterbelt.semantic.uninferable_type_param,cannot infer the type parameter {name} from the arguments; no argument pins it
+masterbelt.semantic.no_method_on_unbounded_typevar,cannot call {method} on an unbounded type parameter: add an interface bound to call its methods
 project.config.missing,masterbelt.toml not found in this directory or any parent
 project.config.invalid,invalid masterbelt.toml: {detail}
 project.config.missing_entry,masterbelt.toml does not set entry

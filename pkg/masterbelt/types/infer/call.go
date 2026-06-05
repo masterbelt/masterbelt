@@ -63,7 +63,16 @@ func callType(e *ast.CallExpr, s scope, sink *Sink) ir.Type {
 			bad = bad || args[i] == ir.Invalid
 		}
 		if !bad {
-			sink.invalidOp(e, member.Member.Name, typesList(recv, args))
+			// A method call on an unbounded type parameter is the distinct
+			// E-17 error: nothing is known about the type, so it has no methods
+			// (only pass-through is allowed). A bounded parameter resolves its
+			// interface's methods, so an unknown method on it is an ordinary
+			// invalid_operation.
+			if v, ok := recv.(*ir.TypeVar); ok && v.Bound == nil {
+				sink.noMethodOnUnboundedTypeVar(e, member.Member.Name)
+			} else {
+				sink.invalidOp(e, member.Member.Name, typesList(recv, args))
+			}
 		}
 		return ir.Invalid
 	}
@@ -170,12 +179,16 @@ func convCallType(e *ast.CallExpr, name string, t ir.Type, s scope, sink *Sink) 
 	return t
 }
 
-// funcSig is one resolved candidate of a function call: its declaration and
-// its parameter/result types.
+// funcSig is one resolved candidate of a function call: its declaration, its
+// parameter/result types, and — for a generic function — its type parameters
+// (each a TypeVar name with an optional bound). A type parameter appears as a
+// TypeVar in params/result; the call solves it from the argument types (Match)
+// and substitutes it into the result.
 type funcSig struct {
-	fd     *ast.FuncDecl
-	params []ir.Type
-	result ir.Type
+	fd         *ast.FuncDecl
+	typeParams []*ir.TypeParam
+	params     []ir.Type
+	result     ir.Type
 }
 
 // funcCallType is the type rule for a call of a top-level function. A single
@@ -196,38 +209,30 @@ func funcCallType(e *ast.CallExpr, name string, cands []*ast.FuncDecl, s scope, 
 	// Resolve every candidate's signature, dropping a later one that repeats
 	// an earlier signature — the declaration pass reports the duplicate, and
 	// dropping it here keeps the first one callable instead of permanently
-	// ambiguous (mirroring how a duplicate method overload is dropped).
+	// ambiguous (mirroring how a duplicate method overload is dropped). A
+	// generic function's type parameters are in scope for its parameter and
+	// result types, so a `T` resolves to a TypeVar the call solves rather than
+	// to an unknown type.
 	sigs := make([]funcSig, 0, len(cands))
 	seen := make(map[string]bool, len(cands))
 	for _, fd := range cands {
+		tscope := FuncTypeParamScope(fd.TypeParams)
+		typeParams := ResolveFuncTypeParams(r, fd.TypeParams, tscope)
 		params := make([]ir.Type, len(fd.Params))
 		key := ""
 		for i, p := range fd.Params {
-			params[i] = r.ResolveType(p.Type, nil)
+			params[i] = r.ResolveType(p.Type, tscope)
 			key += typeKey(params[i]) + ","
 		}
 		if seen[key] {
 			continue
 		}
 		seen[key] = true
-		sigs = append(sigs, funcSig{fd: fd, params: params, result: r.ResolveType(fd.Result, nil)})
+		sigs = append(sigs, funcSig{fd: fd, typeParams: typeParams, params: params, result: r.ResolveType(fd.Result, tscope)})
 	}
 
 	if len(sigs) == 1 {
-		sg := sigs[0]
-		if len(e.Arguments) != len(sg.params) {
-			// The arguments still check bare for their own diagnostics.
-			for _, a := range e.Arguments {
-				check(a, s, sink)
-			}
-			sink.arityMismatch(e, name, len(e.Arguments), len(sg.params))
-			return ir.Invalid
-		}
-		subst := map[string]ir.Type{}
-		for i, a := range e.Arguments {
-			checkType(a, sg.params[i], s, subst, sink)
-		}
-		return sg.result
+		return checkFuncCall(e, name, sigs[0], s, sink)
 	}
 
 	// Pass 1 — synthesize the non-deferred arguments, left to right. The
@@ -290,9 +295,17 @@ func funcCallType(e *ast.CallExpr, name string, cands []*ast.FuncDecl, s scope, 
 
 	// Pass 2 — the deferred arguments, each checked against the winner's
 	// parameter type. A finding inside one fails the call without a generic
-	// report, exactly as a method call's literal arguments do.
+	// report, exactly as a method call's literal arguments do. The shared subst
+	// is seeded with what the non-deferred arguments already pinned (Pass 1
+	// synthesized them without it), so a generic parameter solved by a plain
+	// argument reaches the result and the bound check.
 	win := matches[0]
 	subst := map[string]ir.Type{}
+	for i, kt := range known {
+		if kt != nil {
+			types.Match(s.registry(), win.params[i], kt, subst)
+		}
+	}
 	for i, a := range e.Arguments {
 		if !deferredArg(a) {
 			continue
@@ -306,7 +319,118 @@ func funcCallType(e *ast.CallExpr, name string, cands []*ast.FuncDecl, s scope, 
 	if bad {
 		return ir.Invalid
 	}
-	return win.result
+	// Substitute the solved type parameters into the result and run the bound and
+	// uninferable checks, exactly as the single-signature path does.
+	return resolveFuncResult(e, win, subst, s, sink)
+}
+
+// checkFuncCall types a call of a single-signature function, generic or not.
+// The arity is checked first; then each argument is checked against its
+// parameter type with a shared substitution, which both pushes the expectation
+// into a function-literal argument and solves the function's type parameters
+// (Match, the same mechanism list.map's element type uses). After the arguments
+// settle, each type parameter must be solved (else uninferable_type_param) and
+// its solved concrete type must satisfy the parameter's bound (else
+// bound_not_satisfied). The result is the declared result with the solved type
+// parameters substituted in.
+func checkFuncCall(e *ast.CallExpr, name string, sg funcSig, s scope, sink *Sink) ir.Type {
+	if len(e.Arguments) != len(sg.params) {
+		for _, a := range e.Arguments {
+			check(a, s, sink) // the arguments still check bare for their own diagnostics
+		}
+		sink.arityMismatch(e, name, len(e.Arguments), len(sg.params))
+		return ir.Invalid
+	}
+	subst := map[string]ir.Type{}
+	for i, a := range e.Arguments {
+		checkType(a, sg.params[i], s, subst, sink)
+	}
+	return resolveFuncResult(e, sg, subst, s, sink)
+}
+
+// resolveFuncResult finishes a generic function call after its arguments have
+// solved the type parameters into subst: each parameter must have been pinned by
+// an argument (else uninferable_type_param) and its solved concrete type must
+// satisfy the parameter's bound (else bound_not_satisfied), and the result is
+// the declared result with the solved type parameters substituted in. A
+// non-generic signature returns its result unchanged. A finding returns Invalid
+// so the result never flows on with an unsolved variable. Both the
+// single-signature and the overloaded paths end here, so they cannot diverge.
+func resolveFuncResult(e *ast.CallExpr, sg funcSig, subst map[string]ir.Type, s scope, sink *Sink) ir.Type {
+	if len(sg.typeParams) == 0 {
+		return sg.result
+	}
+	ok := true
+	for _, tp := range sg.typeParams {
+		solved, found := subst[tp.Name]
+		if !found || hasTypeVar(solved) {
+			sink.uninferableTypeParam(e, tp.Name)
+			ok = false
+			continue
+		}
+		if tp.Bound != nil && !types.Satisfies(s.registry(), solved, tp.Bound) {
+			sink.boundNotSatisfied(e, solved, tp.Bound)
+			ok = false
+		}
+	}
+	if !ok {
+		return ir.Invalid
+	}
+	return types.Substitute(sg.result, subst)
+}
+
+// FuncTypeParamScope is the set of a function's generic-parameter names, in
+// scope for its bounds, parameters, result, and body — a name appearing in a
+// type position there resolves to a TypeVar rather than an unknown type. The
+// semantic resolver and the call site share it, so a call types a signature
+// exactly as its declaration was resolved.
+func FuncTypeParamScope(params []*ast.TypeParam) map[string]bool {
+	if len(params) == 0 {
+		return nil
+	}
+	scope := make(map[string]bool, len(params))
+	for _, p := range params {
+		if p.Name != "" {
+			scope[p.Name] = true
+		}
+	}
+	return scope
+}
+
+// ResolveFuncTypeParams resolves a function's generic type parameters into
+// ir.TypeParams (name plus optional resolved bound), each bound resolved in the
+// full type-parameter scope so it may name a later parameter (the U in
+// fn first<T: foldable<U>, U>).
+func ResolveFuncTypeParams(r *TypeResolver, params []*ast.TypeParam, scope map[string]bool) []*ir.TypeParam {
+	if len(params) == 0 {
+		return nil
+	}
+	out := make([]*ir.TypeParam, 0, len(params))
+	for _, p := range params {
+		var bound ir.Type
+		if p.Constraint != nil {
+			bound = r.ResolveType(p.Constraint, scope)
+		}
+		out = append(out, &ir.TypeParam{Name: p.Name, Bound: bound})
+	}
+	return out
+}
+
+// BindTypeParamBounds is the substitution that replaces each bare type-parameter
+// variable with its bounded form: a name resolved in a type-parameter scope is
+// an unbounded TypeVar, so a function body that types `c: T` (where T has a
+// bound) must rebind T to the bounded TypeVar to see the bound interface's
+// methods. The result maps each name to a TypeVar carrying its bound; apply it
+// with types.Substitute over the resolved parameter and result types.
+func BindTypeParamBounds(typeParams []*ir.TypeParam) map[string]ir.Type {
+	if len(typeParams) == 0 {
+		return nil
+	}
+	subst := make(map[string]ir.Type, len(typeParams))
+	for _, tp := range typeParams {
+		subst[tp.Name] = &ir.TypeVar{Name: tp.Name, Bound: tp.Bound}
+	}
+	return subst
 }
 
 // deferredArg reports whether an argument's typing needs the parameter's

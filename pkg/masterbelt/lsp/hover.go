@@ -220,16 +220,7 @@ func typeHover(t *ir.TypeDef, buf source.Buffer, rng cst.Tree) *protocol.Hover {
 		b.WriteString("type ")
 	}
 	b.WriteString(t.Name)
-	if len(t.Params) > 0 {
-		parts := make([]string, len(t.Params))
-		for i, p := range t.Params {
-			parts[i] = p.Name
-			if p.Bound != nil {
-				parts[i] += ": " + p.Bound.String()
-			}
-		}
-		b.WriteString("<" + strings.Join(parts, ", ") + ">")
-	}
+	b.WriteString(typeParamList(t.Params))
 	if t.Interface == nil {
 		switch {
 		case t.Builtin:

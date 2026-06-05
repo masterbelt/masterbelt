@@ -136,14 +136,15 @@ func lowerAssertDecl(t cst.Tree, buf source.Buffer) *ast.AssertDecl {
 func lowerFuncDecl(t cst.Tree, buf source.Buffer) *ast.FuncDecl {
 	green, _ := t.Node()
 	var (
-		doc     []string
-		public  bool
-		extern  bool
-		effects []string
-		name    string
-		params  []*ast.ParamDef
-		result  ast.TypeExpr
-		body    []ast.Stmt
+		doc        []string
+		public     bool
+		extern     bool
+		effects    []string
+		name       string
+		typeParams []*ast.TypeParam
+		params     []*ast.ParamDef
+		result     ast.TypeExpr
+		body       []ast.Stmt
 	)
 	for _, child := range t.Children() {
 		if tok, ok := child.Token(); ok {
@@ -165,6 +166,8 @@ func lowerFuncDecl(t cst.Tree, buf source.Buffer) *ast.FuncDecl {
 		}
 		node, _ := child.Node()
 		switch {
+		case node.Kind() == cst.GenericParams:
+			typeParams = lowerGenericParams(child, buf)
 		case node.Kind() == cst.ParamList:
 			params = lowerParamList(child, buf)
 		case node.Kind() == cst.Block:
@@ -175,7 +178,7 @@ func lowerFuncDecl(t cst.Tree, buf source.Buffer) *ast.FuncDecl {
 			body = []ast.Stmt{ast.NewReturnStmt(lowerExpr(child, buf), node)}
 		}
 	}
-	return ast.NewFuncDecl(doc, public, extern, effects, name, params, result, body, green)
+	return ast.NewFuncDecl(doc, public, extern, effects, name, typeParams, params, result, body, green)
 }
 
 // lowerTypeClause lowers a ": Type" clause to its type expression, or nil when

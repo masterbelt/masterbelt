@@ -40,10 +40,16 @@ type Function struct {
 	Extern  bool     // declared extern: a native the target supplies, no body
 	Effects []string // the declared effects in source order, or nil for pure
 	Doc     []string
-	Params  []Param
-	Result  Type
-	Body    []Stmt
-	Syntax  *ast.FuncDecl // the declaration this was resolved from
+	// TypeParams are the function's generic type parameters (the T in
+	// f<T: foldable<int>>), each a name with an optional resolved interface
+	// bound. A parameter or the result whose type names one of them is a
+	// TypeVar; a call resolves each from the argument types and folds with the
+	// concrete type. Empty for a non-generic function.
+	TypeParams []*TypeParam
+	Params     []Param
+	Result     Type
+	Body       []Stmt
+	Syntax     *ast.FuncDecl // the declaration this was resolved from
 }
 
 // Assert is one compile-time assertion's outcome: the condition in canonical

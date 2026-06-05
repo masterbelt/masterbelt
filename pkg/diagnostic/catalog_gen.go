@@ -247,6 +247,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "cannot assign " + f["actual"].String() + " to " + f["name"].String() + ": its type is fixed to " + f["expected"].String()
 		}
 	},
+	"masterbelt.semantic.bound_not_satisfied": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return f["typ"].String() + " は境界 " + f["bound"].String() + " を満たしません: その interface を実装していません"
+		default:
+			return f["typ"].String() + " does not satisfy the bound " + f["bound"].String() + ": it does not implement that interface"
+		}
+	},
 	"masterbelt.semantic.condition_not_bool": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
@@ -447,6 +455,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "no overload of method " + f["method"].String() + " accepts " + f["types"].String()
 		}
 	},
+	"masterbelt.semantic.no_method_on_unbounded_typevar": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "無境界の型パラメータに対して " + f["method"].String() + " は呼べません。メソッドを使うには interface 境界を付けてください"
+		default:
+			return "cannot call " + f["method"].String() + " on an unbounded type parameter: add an interface bound to call its methods"
+		}
+	},
 	"masterbelt.semantic.non_exhaustive_switch": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
@@ -581,6 +597,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "この関数リテラルの結果型を推論できません。注釈を付けるか値を返してください"
 		default:
 			return "cannot infer this function literal's result type; annotate it or return a value"
+		}
+	},
+	"masterbelt.semantic.uninferable_type_param": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "型パラメータ " + f["name"].String() + " を引数から推論できません。引数で決まるようにしてください"
+		default:
+			return "cannot infer the type parameter " + f["name"].String() + " from the arguments; no argument pins it"
 		}
 	},
 	"masterbelt.semantic.unknown_associated_const": func(loc Locale, f map[string]fmt.Stringer) string {

@@ -723,6 +723,10 @@ func TestParseFuncDecl(t *testing.T) {
 		{"arrow body", "fn double(x: int): int -> x * 2\n", []cst.Kind{cst.ParamList, cst.TypeName, cst.BinaryExpr}},
 		{"pub", "pub fn zero(): int -> 0\n", []cst.Kind{cst.ParamList, cst.TypeName, cst.Literal}},
 		{"record result", "pub fn origin(): Point -> Point{ x: 0 }\n", []cst.Kind{cst.ParamList, cst.TypeName, cst.RecordLit}},
+		{"unbounded type param", "fn id<T>(x: T): int -> 0\n", []cst.Kind{cst.GenericParams, cst.ParamList, cst.TypeName, cst.Literal}},
+		{"bounded type param", "fn total<T: foldable<int, int>>(c: T): int -> 0\n", []cst.Kind{cst.GenericParams, cst.ParamList, cst.TypeName, cst.Literal}},
+		{"several type params", "fn pair<T, U>(a: T, b: U): int -> 0\n", []cst.Kind{cst.GenericParams, cst.ParamList, cst.TypeName, cst.Literal}},
+		{"parameterized bound", "fn first<T: foldable<U>, U>(c: T): int -> 0\n", []cst.Kind{cst.GenericParams, cst.ParamList, cst.TypeName, cst.Literal}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

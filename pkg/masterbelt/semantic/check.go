@@ -6,6 +6,7 @@ import (
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/eval"
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/types"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/types/infer"
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/source/cst"
@@ -283,11 +284,20 @@ func checkFuncBodies(reg *builtin.Registry, file *ast.File, universe map[string]
 		diags.Add(newSelfOutsideMethodDiagnostic(s.offset, s.width))
 	}
 	for _, fd := range file.Funcs {
+		// The function's generic type parameters are in scope for its parameter
+		// and result annotations, so a `c: T` where `T: foldable<int>` resolves
+		// to a TypeVar. Resolving a name in scope yields a bare (unbounded)
+		// TypeVar, so the bounds are rebound onto it (BindTypeParamBounds) — the
+		// body may then call the bound interface's methods on the parameter, and
+		// nothing else.
+		tscope := infer.FuncTypeParamScope(fd.TypeParams)
+		typeParams := infer.ResolveFuncTypeParams(r, fd.TypeParams, tscope)
+		bindBounds := infer.BindTypeParamBounds(typeParams)
 		params := make(map[string]ir.Type, len(fd.Params))
 		for _, p := range fd.Params {
-			params[p.Name] = r.ResolveType(p.Type, nil)
+			params[p.Name] = types.Substitute(r.ResolveType(p.Type, tscope), bindBounds)
 		}
-		want := r.ResolveType(fd.Result, nil)
+		want := types.Substitute(r.ResolveType(fd.Result, tscope), bindBounds)
 		bs := infer.BodyScope{Reg: reg, Universe: universe, Qualified: qualified, Self: ir.Invalid, Params: params, Funcs: funcs, QualifiedFuncs: qualifiedFuncs}
 		checkStmts(fd.Body, want, bs, env, noSelf, sink, at, diags)
 		checkIndexWrites(fd.Body, env, at, diags)

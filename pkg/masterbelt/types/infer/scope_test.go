@@ -8,6 +8,7 @@ package infer
 import (
 	"testing"
 
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
 )
@@ -53,5 +54,50 @@ func TestFuncLitParamShadowsOuter(t *testing.T) {
 	lit := funcLit([]*ast.ParamDef{param("x", namedType("int"))}, nil, ret(id))
 	if got := Expr(lit, env).String(); got != "fn(int): int" {
 		t.Errorf("Expr = %s, want fn(int): int (the parameter shadows the const)", got)
+	}
+}
+
+// TestBoundedTypeVarMethods checks that in a function body a parameter typed as
+// a bounded type variable resolves its bound interface's methods, while an
+// unbounded one has none and a method call on it is reported as the distinct
+// no_method_on_unbounded_typevar (E-17).
+func TestBoundedTypeVarMethods(t *testing.T) {
+	reg := builtin.Default()
+	foldable := &ir.TypeDef{
+		Name:      "foldable",
+		Interface: &ir.InterfaceDef{Required: []string{"fold"}},
+		Params:    []*ir.TypeParam{{Name: "K"}, {Name: "V"}},
+		Methods:   []*ir.Method{{Name: "fold", Result: &ir.TypeVar{Name: "V"}}},
+	}
+	reg.Install([]*ir.TypeDef{foldable})
+	bound := &ir.App{Def: foldable, Args: []ir.Type{&ir.Builtin{Name: "int"}, &ir.Builtin{Name: "int"}}}
+
+	universe := map[string]*ir.TypeDef{"foldable": foldable}
+
+	// A bounded parameter: c.fold() resolves through the bound, V = int.
+	bs := BodyScope{Reg: reg, Universe: universe, Self: ir.Invalid,
+		Params: map[string]ir.Type{"c": &ir.TypeVar{Name: "T", Bound: bound}}}
+	foldCall := ast.NewCallExpr(ast.NewMemberExpr(ident("c"), ast.NewIdentifier("fold", nil), nil), nil, nil)
+	var r report
+	if got := CheckBody(foldCall, ir.Invalid, bs, r.sink()).String(); got != "int" {
+		t.Errorf("c.fold() on c: T (T: foldable<int, int>) = %s, want int", got)
+	}
+	if len(r.unboundedMethods) != 0 || len(r.methods) != 0 {
+		t.Errorf("a bounded parameter has its interface methods; unexpected reports: %+v", r)
+	}
+
+	// An unbounded parameter: x.foo() is the distinct error, not invalid_op.
+	bs2 := BodyScope{Reg: reg, Universe: universe, Self: ir.Invalid,
+		Params: map[string]ir.Type{"x": &ir.TypeVar{Name: "T"}}}
+	fooCall := ast.NewCallExpr(ast.NewMemberExpr(ident("x"), ast.NewIdentifier("foo", nil), nil), nil, nil)
+	var r2 report
+	if got := CheckBody(fooCall, ir.Invalid, bs2, r2.sink()); got != ir.Invalid {
+		t.Errorf("x.foo() on unbounded x: T = %s, want invalid", got)
+	}
+	if len(r2.unboundedMethods) != 1 || r2.unboundedMethods[0] != "foo" {
+		t.Errorf("want one no_method_on_unbounded_typevar for foo, got %+v", r2.unboundedMethods)
+	}
+	if len(r2.methods) != 0 {
+		t.Errorf("an unbounded-typevar method call must not also fire invalid_operation: %+v", r2.methods)
 	}
 }
