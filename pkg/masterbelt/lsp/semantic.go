@@ -58,24 +58,36 @@ type rawSemanticToken struct {
 // tokens in the LSP's relative-encoded form, lexically — the server passes the
 // program's resolution through semanticTokensIn.
 func semanticTokens(doc *abstract.Document) *protocol.SemanticTokens {
-	return semanticTokensWith(doc, nil, nil)
+	return semanticTokensWith(doc, nil, nil, nil)
 }
 
 // semanticTokensIn classifies with the program's resolution layered over the
 // lexical pass: a member access that names an imported constant (geo.Origin)
-// renders as the constant it is, not as a property, and a call's callee that
-// names a top-level function renders as the function it calls, not as a value
-// reference.
+// renders as the constant it is, not as a property, a call's callee that
+// names a type renders as the type the conversion constructs (error("msg")),
+// and one that names a top-level function renders as the function it calls,
+// not as a value reference.
 func semanticTokensIn(v view) *protocol.SemanticTokens {
+	typeNames := map[string]bool{}
+	for _, t := range v.TypeNames() {
+		typeNames[t.Name] = true
+	}
 	members := map[*cst.Node]*ast.MemberExpr{}
 	funcCallees := map[*cst.Node]bool{}
+	typeCallees := map[*cst.Node]bool{}
 	forEachExpr(v.AST().File(), func(e ast.Expr) {
 		switch e := e.(type) {
 		case *ast.MemberExpr:
 			members[e.Syntax()] = e
 		case *ast.CallExpr:
-			if id, ok := e.Callee.(*ast.Identifier); ok && v.ResolveFunc(id) != nil {
-				funcCallees[id.Syntax()] = true
+			// A type name wins over a same-named function, as in the type rules.
+			if id, ok := e.Callee.(*ast.Identifier); ok {
+				switch {
+				case typeNames[id.Name]:
+					typeCallees[id.Syntax()] = true
+				case v.ResolveFunc(id) != nil:
+					funcCallees[id.Syntax()] = true
+				}
 			}
 		}
 	})
@@ -84,14 +96,17 @@ func semanticTokensIn(v view) *protocol.SemanticTokens {
 		return ok && v.ResolveMember(m) != nil
 	}, func(green *cst.Node) bool {
 		return funcCallees[green]
+	}, func(green *cst.Node) bool {
+		return typeCallees[green]
 	})
 }
 
-// semanticTokensWith is the classification walk. isImportedConst and
-// isFuncCallee, when set, are the classifications a lexical pass cannot make:
-// whether a member-access node resolves to an imported constant, and whether
-// a name-reference node is a call's callee resolving to a function.
-func semanticTokensWith(doc *abstract.Document, isImportedConst, isFuncCallee func(*cst.Node) bool) *protocol.SemanticTokens {
+// semanticTokensWith is the classification walk. isImportedConst,
+// isFuncCallee, and isTypeCallee, when set, are the classifications a lexical
+// pass cannot make: whether a member-access node resolves to an imported
+// constant, and whether a name-reference node is a call's callee resolving to
+// a function or to a type (a conversion).
+func semanticTokensWith(doc *abstract.Document, isImportedConst, isFuncCallee, isTypeCallee func(*cst.Node) bool) *protocol.SemanticTokens {
 	buf := doc.Buffer()
 
 	var raws []rawSemanticToken
@@ -111,6 +126,9 @@ func semanticTokensWith(doc *abstract.Document, isImportedConst, isFuncCallee fu
 			}
 			if leaf.Kind() == token.Ident && parent == cst.NameRef && isFuncCallee != nil && isFuncCallee(parentGreen) {
 				tokenType, mods = stFunction, 0
+			}
+			if leaf.Kind() == token.Ident && parent == cst.NameRef && isTypeCallee != nil && isTypeCallee(parentGreen) {
+				tokenType, mods = stType, 0
 			}
 			startLine, startChar := buf.LineColumn(t.Offset(), source.UTF16Encoding)
 			endLine, endChar := buf.LineColumn(t.End(), source.UTF16Encoding)

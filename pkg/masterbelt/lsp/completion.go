@@ -45,6 +45,7 @@ func completion(doc view, offset int) *protocol.CompletionList {
 	}
 	items := constantItems(doc)
 	items = append(items, functionItems(doc)...)
+	items = append(items, constructorItems(doc)...)
 	items = append(items, valueKeywordItems()...)
 	return &protocol.CompletionList{Items: items}
 }
@@ -353,6 +354,32 @@ func constantItems(doc view) []protocol.CompletionItem {
 				Value: strings.Join(c.Doc, "\n"),
 			}
 		}
+		items = append(items, item)
+	}
+	return items
+}
+
+// constructorItems is one completion item per type in scope whose conversion
+// form constructs a value (today the error type): a call snippet with the
+// message ready to fill in.
+func constructorItems(doc view) []protocol.CompletionItem {
+	kind := protocol.CompletionItemKindConstructor
+	snippet := protocol.InsertTextFormatSnippet
+	var items []protocol.CompletionItem
+	for _, t := range doc.Constructors() {
+		item := protocol.CompletionItem{
+			Label:  t.Name,
+			Kind:   &kind,
+			Detail: t.Name + "(message: string)",
+		}
+		if len(t.Doc) > 0 {
+			item.Documentation = &protocol.MarkupContent{
+				Kind:  protocol.Markdown,
+				Value: strings.Join(t.Doc, "\n"),
+			}
+		}
+		item.InsertText = t.Name + "(\"${1:message}\")"
+		item.InsertTextFormat = &snippet
 		items = append(items, item)
 	}
 	return items

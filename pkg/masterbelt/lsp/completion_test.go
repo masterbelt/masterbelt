@@ -249,3 +249,46 @@ func TestMemberCompletionFields(t *testing.T) {
 		t.Error("member completion missing the method get")
 	}
 }
+
+func TestCompletionOffersErrorConstructor(t *testing.T) {
+	doc := testView(completionSrc)
+
+	// A value position offers the error constructor as a fill-in snippet.
+	offset := strings.Index(completionSrc, "= Max") + 3
+	got := byLabel(completion(doc, offset).Items)
+	item, ok := got["error"]
+	if !ok {
+		t.Fatalf("value completion missing the error constructor")
+	}
+	if item.Kind == nil || *item.Kind != protocol.CompletionItemKindConstructor {
+		t.Errorf("error kind = %v, want Constructor", item.Kind)
+	}
+	if item.InsertText != "error(\"${1:message}\")" {
+		t.Errorf("error insert = %q, want the call snippet", item.InsertText)
+	}
+	if item.Detail != "error(message: string)" {
+		t.Errorf("error detail = %q, want the constructor signature", item.Detail)
+	}
+
+	// A type position offers the error type itself.
+	typeOffset := strings.Index(completionSrc, "int64") + 2
+	types := byLabel(completion(doc, typeOffset).Items)
+	if _, ok := types["error"]; !ok {
+		t.Errorf("type completion missing error")
+	}
+}
+
+func TestMemberCompletionOnError(t *testing.T) {
+	src := "const E = error(\"boom\")\nconst M = E.message()\n"
+	doc := testView(src)
+
+	offset := strings.Index(src, "E.") + 2
+	items, ok := memberItems(doc, offset)
+	if !ok {
+		t.Fatal("not recognized as a member position")
+	}
+	got := byLabel(items)
+	if _, ok := got["message"]; !ok {
+		t.Errorf("member completion on an error value missing message, got %v", items)
+	}
+}

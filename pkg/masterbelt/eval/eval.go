@@ -193,6 +193,9 @@ func evalExpr(e ast.Expr, ctx evalCtx) *ir.Constant {
 // error constant carrying the message; any other conversion has no constant
 // value here.
 func convert(def *ir.TypeDef, args []ast.Expr, ctx evalCtx) *ir.Constant {
+	if !def.Builtin {
+		return nil // a user type shadowing a native name has no native conversion
+	}
 	n, ok := ctx.env.Registry().Native(def.Name)
 	if !ok || !n.Err || len(args) != 1 {
 		return nil

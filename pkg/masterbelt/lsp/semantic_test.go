@@ -296,3 +296,40 @@ func TestSemanticTokensMembers(t *testing.T) {
 		}
 	}
 }
+
+func TestSemanticTokensErrorConversion(t *testing.T) {
+	// A conversion's callee names a type — a resolution fact — and colours
+	// as the type it constructs through the program-aware pass.
+	doc := testView("const E = error(\"boom\")\nconst M = E.message()\n")
+	got := decode(semanticTokensIn(doc).Data)
+
+	find := func(line, char int) (decodedToken, bool) {
+		for _, tok := range got {
+			if tok.line == line && tok.char == char {
+				return tok, true
+			}
+		}
+		return decodedToken{}, false
+	}
+	cases := []struct {
+		name       string
+		line, char int
+		tokenType  int
+		mods       int
+	}{
+		{"conversion callee", 0, 10, stType, 0},      // error
+		{"message", 0, 16, stString, 0},              // "boom"
+		{"reference", 1, 10, stVariable, smReadonly}, // E
+		{"method call", 1, 12, stMethod, 0},          // message (the callee)
+	}
+	for _, tc := range cases {
+		tok, ok := find(tc.line, tc.char)
+		if !ok {
+			t.Errorf("%s: no token at %d:%d (got %+v)", tc.name, tc.line, tc.char, got)
+			continue
+		}
+		if tok.tokenType != tc.tokenType || tok.mods != tc.mods {
+			t.Errorf("%s = %+v, want type %d mods %d", tc.name, tok, tc.tokenType, tc.mods)
+		}
+	}
+}

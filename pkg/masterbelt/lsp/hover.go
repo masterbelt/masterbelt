@@ -225,6 +225,27 @@ func typeAt(doc view, offset int) (*ir.TypeDef, cst.Tree, bool) {
 		if t := findTypeDef(doc.TypeNames(), name); t != nil {
 			return t, leaf, true
 		}
+	case cst.NameRef:
+		// A conversion's callee (error("msg")): a call's callee that names a
+		// type hovers as the type it constructs. The type rules give the type
+		// the same priority over a same-named function.
+		parentNode, isNode := parent.Node()
+		if !isNode {
+			return nil, cst.Tree{}, false
+		}
+		isCallee := false
+		forEachExpr(doc.AST().File(), func(e ast.Expr) {
+			if c, ok := e.(*ast.CallExpr); ok {
+				if i, ok := c.Callee.(*ast.Identifier); ok && i.Syntax() == parentNode {
+					isCallee = true
+				}
+			}
+		})
+		if isCallee {
+			if t := findTypeDef(doc.TypeNames(), name); t != nil {
+				return t, leaf, true
+			}
+		}
 	}
 	return nil, cst.Tree{}, false
 }

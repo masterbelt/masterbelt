@@ -331,3 +331,22 @@ func (p *Program) TypeNames(id FileID) []*ir.TypeDef {
 	}
 	return out
 }
+
+// Constructors returns the types in scope in file whose conversion form T(x)
+// constructs a value — what an editor offers in a value position alongside
+// the constants and functions. Today that is the error type (error("msg")); a
+// user type shadowing the name is not a native conversion and is excluded.
+func (p *Program) Constructors(id FileID) []*ir.TypeDef {
+	q := engineQueries{p.db}
+	reg := q.registry()
+	var out []*ir.TypeDef
+	for _, t := range p.TypeNames(id) {
+		if !t.Builtin {
+			continue
+		}
+		if n, ok := reg.Native(t.Name); ok && n.Err {
+			out = append(out, t)
+		}
+	}
+	return out
+}

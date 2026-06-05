@@ -122,6 +122,8 @@ func (v view) Diagnostics() []diagnostic.Diagnostic { return v.ws.prog.Diagnosti
 
 func (v view) TypeNames() []*ir.TypeDef { return v.ws.prog.TypeNames(v.id) }
 
+func (v view) Constructors() []*ir.TypeDef { return v.ws.prog.Constructors(v.id) }
+
 func (v view) QualifiedTypeNames() map[string][]*ir.TypeDef {
 	return v.ws.prog.QualifiedTypeNames(v.id)
 }

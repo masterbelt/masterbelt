@@ -541,3 +541,31 @@ func TestMethodHoverParamReceiver(t *testing.T) {
 		}
 	})
 }
+
+func TestErrorConversionHover(t *testing.T) {
+	src := "const E = error(\"boom\")\nconst M = E.message()\n"
+	doc := testView(src)
+
+	t.Run("conversion callee describes the error type", func(t *testing.T) {
+		h := hover(doc, strings.Index(src, "error(")+2)
+		if h == nil {
+			t.Fatal("no hover on the conversion callee")
+		}
+		if !strings.Contains(h.Contents.Value, "pub type error = builtin") {
+			t.Errorf("hover = %q, want the error type signature", h.Contents.Value)
+		}
+		if !strings.Contains(h.Contents.Value, "recoverable failure") {
+			t.Errorf("hover = %q, want the prelude doc", h.Contents.Value)
+		}
+	})
+
+	t.Run("message resolves as the error method", func(t *testing.T) {
+		h := hover(doc, strings.Index(src, ".message")+3)
+		if h == nil {
+			t.Fatal("no hover on message")
+		}
+		if !strings.Contains(h.Contents.Value, "message(): string") {
+			t.Errorf("hover = %q, want the message signature", h.Contents.Value)
+		}
+	})
+}
