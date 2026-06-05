@@ -132,21 +132,24 @@ var durationUnits = [...]struct {
 
 // formatDuration renders a duration's total milliseconds in canonical form:
 // largest units first, zero components omitted, the zero duration as 0ms, and
-// a computed negative span (an earlier instant minus a later one) signed.
+// a computed negative span (an earlier instant minus a later one) signed. The
+// magnitude decomposes as a uint64 because the most negative int64 has no
+// int64 negation — two's complement gives its exact magnitude instead.
 func formatDuration(millis int64) string {
 	if millis == 0 {
 		return "0ms"
 	}
 	var b strings.Builder
+	mag := uint64(millis)
 	if millis < 0 {
 		b.WriteString("-")
-		millis = -millis
+		mag = -mag
 	}
 	for _, u := range durationUnits {
-		if n := millis / u.millis; n > 0 {
-			b.WriteString(strconv.FormatInt(n, 10))
+		if n := mag / uint64(u.millis); n > 0 {
+			b.WriteString(strconv.FormatUint(n, 10))
 			b.WriteString(u.suffix)
-			millis -= n * u.millis
+			mag -= n * uint64(u.millis)
 		}
 	}
 	return b.String()
