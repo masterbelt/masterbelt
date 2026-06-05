@@ -26,10 +26,8 @@ Module
   Func "color" pub
     param r: Rarity
     result string
-      expr <none>
       expr r{Common: <none>, Rare: <none>, Legend: <none>}
   Func "grade" pub
     param n: int
     result string
-      expr <none>
       expr n{_: <none>}
