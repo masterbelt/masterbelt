@@ -6,24 +6,19 @@ File
     pub
     name "Client"
     body { base: string }
-    method "io"
+    method ""
       pub
-    method "async"
     method "get"
       param path: string
       result string | error
-      return Identifier "await"
+      return <missing>
       expr (call Identifier "fetch" (call (. (. self base) add) Identifier "path"))
   FuncDecl
-    name "io"
-  FuncDecl
-    name "nondet"
+    pub
+    name ""
   FuncDecl
     pub
-    name "io"
-  FuncDecl
-    pub
-    name "nondet"
+    name ""
   FuncDecl
     pub
     name "double"

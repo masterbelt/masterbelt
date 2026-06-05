@@ -5,18 +5,16 @@ Module
     eval 42
   TypeDef "Client" pub
     body { base: string }
-    method "io" pub
-      result invalid
-    method "async"
+    method "" pub
       result invalid
     method "get"
       param path: string
       result string | error
       return <none>
       expr <none>
-  Func "io"
+  Func "" pub
     result invalid
-  Func "nondet"
+  Func "" pub
     result invalid
   Func "double" pub
     param x: int

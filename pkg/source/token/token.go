@@ -46,6 +46,10 @@ const (
 	From    // from
 	Assert  // assert
 	Where   // where
+	Io      // io (effect: touches the world)
+	Async   // async (effect: has suspension points)
+	Nondet  // nondet (effect: does not reproduce)
+	Await   // await (consumes async at a call site)
 
 	// Operators and punctuation.
 	Colon    // :
@@ -109,6 +113,10 @@ var kindNames = [...]string{
 	From:         "From",
 	Assert:       "Assert",
 	Where:        "Where",
+	Io:           "Io",
+	Async:        "Async",
+	Nondet:       "Nondet",
+	Await:        "Await",
 	Colon:        "Colon",
 	Assign:       "Assign",
 	Plus:         "Plus",
@@ -206,6 +214,16 @@ var keywords = map[string]Kind{
 	"from":    From,
 	"assert":  Assert,
 	"where":   Where,
+	"io":      Io,
+	"async":   Async,
+	"nondet":  Nondet,
+	"await":   Await,
+}
+
+// Effect reports whether the kind is an effect keyword — the declarations a
+// function signature may carry between fn and its name.
+func (k Kind) Effect() bool {
+	return k == Io || k == Async || k == Nondet
 }
 
 // Lookup returns the keyword Kind for ident, or Ident if it is not a

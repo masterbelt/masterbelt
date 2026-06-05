@@ -15,14 +15,12 @@ File
     LineComment "// The roots of effects are extern declarations: natives a target supplies."
     Newline "\n"
     Extern "extern"
-  FuncDecl
     Whitespace " "
     Fn "fn"
     Whitespace " "
-    Ident "io"
-  Error
+    Io "io"
     Whitespace " "
-    Ident "async"
+    Async "async"
     Whitespace " "
     Ident "fetch"
     LParen "("
@@ -40,12 +38,10 @@ File
     Ident "error"
     Newline "\n"
     Extern "extern"
-  FuncDecl
     Whitespace " "
     Fn "fn"
     Whitespace " "
-    Ident "nondet"
-  Error
+    Nondet "nondet"
     Whitespace " "
     Ident "now"
     LParen "("
@@ -65,11 +61,11 @@ File
     Pub "pub"
     Whitespace " "
     Fn "fn"
-    Whitespace " "
-    Ident "io"
   Error
     Whitespace " "
-    Ident "async"
+    Io "io"
+    Whitespace " "
+    Async "async"
     Whitespace " "
     Ident "pageTitle"
     LParen "("
@@ -91,7 +87,7 @@ File
     Whitespace "  "
     Return "return"
     Whitespace " "
-    Ident "await"
+    Await "await"
     Whitespace " "
     Ident "fetch"
     LParen "("
@@ -134,11 +130,10 @@ File
         Pub "pub"
         Whitespace " "
         Fn "fn"
-        Whitespace " "
-        Ident "io"
-      MethodDecl
-        Whitespace " "
-        Ident "async"
+      Whitespace " "
+      Io "io"
+      Whitespace " "
+      Async "async"
       MethodDecl
         Whitespace " "
         Ident "get"
@@ -168,9 +163,8 @@ File
           Whitespace "    "
           ReturnStmt
             Return "return"
-            Whitespace " "
-            NameRef
-              Ident "await"
+          Whitespace " "
+          Await "await"
           Whitespace " "
           CallExpr
             NameRef
@@ -201,9 +195,9 @@ File
     Pub "pub"
     Whitespace " "
     Fn "fn"
-    Whitespace " "
-    Ident "nondet"
   Error
+    Whitespace " "
+    Nondet "nondet"
     Whitespace " "
     Ident "stamp"
     LParen "("
@@ -289,23 +283,20 @@ File
   EOF ""
 # diagnostics
 error[masterbelt.parser.concrete.unexpected_token] 8:1 unexpected token: Extern
-error[masterbelt.parser.concrete.expected_param_list] 8:13 expected '('
-error[masterbelt.parser.concrete.expected_type] 8:11 expected type
-error[masterbelt.parser.concrete.expected_func_body] 8:13 expected '->' or '{'
-error[masterbelt.parser.concrete.unexpected_token] 8:14 unexpected token: Ident
-error[masterbelt.parser.concrete.expected_param_list] 9:17 expected '('
-error[masterbelt.parser.concrete.expected_type] 9:11 expected type
-error[masterbelt.parser.concrete.expected_func_body] 9:17 expected '->' or '{'
-error[masterbelt.parser.concrete.unexpected_token] 9:18 unexpected token: Ident
-error[masterbelt.parser.concrete.expected_param_list] 14:10 expected '('
-error[masterbelt.parser.concrete.expected_type] 14:8 expected type
-error[masterbelt.parser.concrete.expected_func_body] 14:10 expected '->' or '{'
-error[masterbelt.parser.concrete.unexpected_token] 14:11 unexpected token: Ident
-error[masterbelt.parser.concrete.unexpected_token] 20:12 unexpected token: Whitespace
-error[masterbelt.parser.concrete.expected_type] 20:10 expected type
-error[masterbelt.parser.concrete.unexpected_token] 20:18 unexpected token: Whitespace
-error[masterbelt.parser.concrete.expected_type] 20:13 expected type
-error[masterbelt.parser.concrete.expected_param_list] 26:14 expected '('
-error[masterbelt.parser.concrete.expected_type] 26:8 expected type
-error[masterbelt.parser.concrete.expected_func_body] 26:14 expected '->' or '{'
-error[masterbelt.parser.concrete.unexpected_token] 26:15 unexpected token: Ident
+error[masterbelt.parser.concrete.expected_identifier] 14:5 expected identifier
+error[masterbelt.parser.concrete.expected_param_list] 14:7 expected '('
+error[masterbelt.parser.concrete.expected_type] 14:5 expected type
+error[masterbelt.parser.concrete.expected_func_body] 14:7 expected '->' or '{'
+error[masterbelt.parser.concrete.unexpected_token] 14:8 unexpected token: Io
+error[masterbelt.parser.concrete.expected_identifier] 20:7 expected identifier
+error[masterbelt.parser.concrete.unexpected_token] 20:9 unexpected token: Whitespace
+error[masterbelt.parser.concrete.expected_type] 20:7 expected type
+error[masterbelt.parser.concrete.unexpected_token] 20:10 unexpected token: Io
+error[masterbelt.parser.concrete.unexpected_token] 20:13 unexpected token: Async
+error[masterbelt.parser.concrete.expected_expression] 21:5 expected expression
+error[masterbelt.parser.concrete.unexpected_token] 21:12 unexpected token: Await
+error[masterbelt.parser.concrete.expected_identifier] 26:5 expected identifier
+error[masterbelt.parser.concrete.expected_param_list] 26:7 expected '('
+error[masterbelt.parser.concrete.expected_type] 26:5 expected type
+error[masterbelt.parser.concrete.expected_func_body] 26:7 expected '->' or '{'
+error[masterbelt.parser.concrete.unexpected_token] 26:8 unexpected token: Nondet
