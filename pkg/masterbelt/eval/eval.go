@@ -89,6 +89,20 @@ func evalExpr(e ast.Expr, ctx evalCtx) *ir.Constant {
 		return ir.StringConstant(e.Value)
 	case *ast.BoolLit:
 		return ir.BoolConstant(e.Value)
+	case *ast.DatetimeLit:
+		// The literal normalizes to a UTC instant here; a malformed one (the
+		// lexer diagnosed it) folds to nothing.
+		if ms, ok := datetimeMillis(e.Text); ok {
+			return ir.DatetimeConstant(ms)
+		}
+		return nil
+	case *ast.DurationLit:
+		// The groups total into milliseconds here; a malformed or overflowing
+		// literal folds to nothing.
+		if ms, ok := durationMillis(e.Text); ok {
+			return ir.DurationConstant(ms)
+		}
+		return nil
 	case *ast.SelfExpr:
 		// The bound self value, or nil outside a self-binding context (a method
 		// body is not folded here yet).
@@ -182,6 +196,10 @@ func call(env Env, recv *ir.Constant, name string, args []*ir.Constant) *ir.Cons
 		typeName = "bool"
 	case ir.ConstString:
 		typeName = "string"
+	case ir.ConstDatetime:
+		typeName = "datetime"
+	case ir.ConstDuration:
+		typeName = "duration"
 	default:
 		return nil
 	}

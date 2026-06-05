@@ -1,0 +1,23 @@
+/// An instant in time: a D-prefixed ISO-8601 literal (D2009-03-31T23:59:59.000Z, offsets allowed), normalized to UTC with millisecond precision.
+pub type datetime = builtin impl {
+  /// The == operator.
+  pub extern fn eql(other: self): bool
+  /// The != operator.
+  pub extern fn neq(other: self): bool
+
+  /// The < operator: whether this instant is earlier.
+  pub extern fn lt(other: self): bool
+  /// The <= operator.
+  pub extern fn lteq(other: self): bool
+  /// The > operator: whether this instant is later.
+  pub extern fn gt(other: self): bool
+  /// The >= operator.
+  pub extern fn gteq(other: self): bool
+
+  /// The + operator: the instant a duration later.
+  pub extern fn add(amount: duration): self
+  /// The - operator: the span from another instant to this one.
+  pub extern fn sub(other: self): duration
+  /// The - operator: the instant a duration earlier.
+  pub extern fn sub(amount: duration): self
+}

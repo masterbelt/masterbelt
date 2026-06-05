@@ -484,6 +484,68 @@ const X = Base.merge(5)
 	}
 }
 
+func TestDatetimeDurationOperators(t *testing.T) {
+	// The full operator table of the two literals — each mixed operation
+	// resolves to the overload its argument type names, and folds to the
+	// canonical value (UTC instants; largest-units-first durations).
+	src := `const Release = D2009-03-31T23:59:59.000Z
+const Epoch = D1970-01-01T00:00:00.000Z
+const Deadline = Release + 7d
+const Span = Release - Epoch
+const Shift = Release - 1h
+const TwoH = 1h + 1h
+const Less = 90m - 1h
+const Triple = 5m * 3
+const Sooner = 1h + Release
+const Backwards = Epoch - Release
+`
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	want := []struct{ typ, eval string }{
+		{"datetime", "D2009-03-31T23:59:59.000Z"},
+		{"datetime", "D1970-01-01T00:00:00.000Z"},
+		{"datetime", "D2009-04-07T23:59:59.000Z"}, // dt + dr
+		{"duration", "2047w5d23h59m59s"},          // dt - dt
+		{"datetime", "D2009-03-31T22:59:59.000Z"}, // dt - dr
+		{"duration", "2h"},                        // dr + dr
+		{"duration", "30m"},                       // canonical: 90m - 1h
+		{"duration", "15m"},                       // dr * int
+		{"datetime", "D2009-04-01T00:59:59.000Z"}, // dr + dt
+		{"duration", "-2047w5d23h59m59s"},         // a negative computed span
+	}
+	for i, w := range want {
+		c := m.Consts[i]
+		if c.Type.String() != w.typ || c.Eval.String() != w.eval {
+			t.Errorf("%s: (%s, %s), want (%s, %s)", c.Name, c.Type, c.Eval, w.typ, w.eval)
+		}
+	}
+}
+
+func TestDatetimeDurationDiagnostics(t *testing.T) {
+	// An argument fitting no overload of an overloaded name reports
+	// no_matching_overload; a single-signature misfit stays invalid_operation.
+	_, diags := analyze("const X = 5s + 1\n")
+	if got := codes(diags); len(got) != 1 || got[0] != CodeNoMatchingOverload {
+		t.Fatalf("5s + 1: codes = %v, want [no_matching_overload]", got)
+	}
+	_, diags = analyze("const X = D2009-03-31T23:59:59.000Z * 2\n")
+	if got := codes(diags); len(got) != 1 || got[0] != CodeInvalidOperation {
+		t.Fatalf("dt * 2: codes = %v, want [invalid_operation]", got)
+	}
+	_, diags = analyze("const X = 1h > D2009-03-31T23:59:59.000Z\n")
+	if got := codes(diags); len(got) != 1 || got[0] != CodeInvalidOperation {
+		t.Fatalf("dr > dt: codes = %v, want [invalid_operation]", got)
+	}
+	// A datetime/duration assertion folds like any other constant condition:
+	// 1h59m is not more than 2h, and the failure proves the fold ran.
+	_, diags = analyze("assert 1h + 59m > 2h\n")
+	if got := codes(diags); len(got) != 1 || got[0] != CodeAssertionFailed {
+		t.Fatalf("assert: codes = %v, want [assertion_failed]", got)
+	}
+}
+
 func TestDuplicateOverloadKeepsBodiesAligned(t *testing.T) {
 	// Dropping the duplicate must not shift the pairing of the remaining
 	// declarations with their resolved signatures: flag's body still checks

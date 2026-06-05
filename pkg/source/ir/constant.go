@@ -4,6 +4,7 @@ import (
 	"math/big"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
 )
@@ -17,18 +18,22 @@ const (
 	ConstString                      // a string (Constant.Str)
 	ConstCollection                  // a list or map (Constant.Coll)
 	ConstFunc                        // a function value (Constant.Fn / Constant.Captured)
+	ConstDatetime                    // a UTC instant in epoch milliseconds (Constant.Millis)
+	ConstDuration                    // a span of time in milliseconds (Constant.Millis)
 )
 
 // Constant is the evaluated value of a constant expression: an arbitrary-
-// precision integer, a boolean, a string, or a collection (list/map). A nil
-// *Constant means "could not be evaluated" — a missing initializer, an undefined
-// reference, a cycle, a type error, or a division by zero.
+// precision integer, a boolean, a string, a collection (list/map), a datetime,
+// or a duration. A nil *Constant means "could not be evaluated" — a missing
+// initializer, an undefined reference, a cycle, a type error, or a division by
+// zero.
 type Constant struct {
-	Kind ConstKind
-	Int  *big.Int     // valid when Kind == ConstInt
-	Bool bool         // valid when Kind == ConstBool
-	Str  string       // valid when Kind == ConstString
-	Coll []ConstEntry // valid when Kind == ConstCollection
+	Kind   ConstKind
+	Int    *big.Int     // valid when Kind == ConstInt
+	Bool   bool         // valid when Kind == ConstBool
+	Str    string       // valid when Kind == ConstString
+	Coll   []ConstEntry // valid when Kind == ConstCollection
+	Millis int64        // valid when Kind == ConstDatetime (UTC epoch) or ConstDuration (total)
 
 	// valid when Kind == ConstFunc: the function literal and the values it
 	// captured from its enclosing scope (the closure environment).
@@ -65,8 +70,22 @@ func FuncConstant(fn *ast.FuncLit, captured map[string]*Constant) *Constant {
 	return &Constant{Kind: ConstFunc, Fn: fn, Captured: captured}
 }
 
+// DatetimeConstant builds a datetime constant from a UTC instant in epoch
+// milliseconds.
+func DatetimeConstant(millis int64) *Constant {
+	return &Constant{Kind: ConstDatetime, Millis: millis}
+}
+
+// DurationConstant builds a duration constant from a total in milliseconds.
+func DurationConstant(millis int64) *Constant {
+	return &Constant{Kind: ConstDuration, Millis: millis}
+}
+
 // String renders the constant's value: the integer, "true"/"false", the quoted
-// string, or the bracketed collection ([a, b] for a list, ["k": v] for a map).
+// string, the bracketed collection ([a, b] for a list, ["k": v] for a map), or
+// the canonical datetime/duration form — the UTC instant regardless of the
+// offset written, and the largest-units-first decomposition regardless of the
+// groups written (90m evaluates as 1h30m).
 func (c *Constant) String() string {
 	if c == nil {
 		return "<unevaluated>"
@@ -88,7 +107,47 @@ func (c *Constant) String() string {
 			}
 		}
 		return "[" + strings.Join(parts, ", ") + "]"
+	case ConstDatetime:
+		return "D" + time.UnixMilli(c.Millis).UTC().Format("2006-01-02T15:04:05.000Z07:00")
+	case ConstDuration:
+		return formatDuration(c.Millis)
 	default:
 		return c.Int.String()
 	}
+}
+
+// durationUnits is the canonical decomposition order of a duration, largest
+// first: weeks, days, hours, minutes, seconds, milliseconds.
+var durationUnits = [...]struct {
+	suffix string
+	millis int64
+}{
+	{"w", 7 * 24 * 60 * 60 * 1000},
+	{"d", 24 * 60 * 60 * 1000},
+	{"h", 60 * 60 * 1000},
+	{"m", 60 * 1000},
+	{"s", 1000},
+	{"ms", 1},
+}
+
+// formatDuration renders a duration's total milliseconds in canonical form:
+// largest units first, zero components omitted, the zero duration as 0ms, and
+// a computed negative span (an earlier instant minus a later one) signed.
+func formatDuration(millis int64) string {
+	if millis == 0 {
+		return "0ms"
+	}
+	var b strings.Builder
+	if millis < 0 {
+		b.WriteString("-")
+		millis = -millis
+	}
+	for _, u := range durationUnits {
+		if n := millis / u.millis; n > 0 {
+			b.WriteString(strconv.FormatInt(n, 10))
+			b.WriteString(u.suffix)
+			millis -= n * u.millis
+		}
+	}
+	return b.String()
 }

@@ -81,6 +81,22 @@ type BoolLiteral struct {
 
 func (*BoolLiteral) value() {}
 
+// DatetimeLiteral is a datetime literal. Its Text is the literal as written;
+// the normalized UTC instant lives on Const.Eval.
+type DatetimeLiteral struct {
+	Text string
+}
+
+func (*DatetimeLiteral) value() {}
+
+// DurationLiteral is a duration literal. Its Text is the literal as written;
+// the totalled milliseconds live on Const.Eval.
+type DurationLiteral struct {
+	Text string
+}
+
+func (*DurationLiteral) value() {}
+
 // CollectionLiteral is a list or map literal. A list's entries each carry only a
 // Value; a map's entries each carry a Key and a Value. An empty literal has no
 // entries; its kind comes from the constant's type.

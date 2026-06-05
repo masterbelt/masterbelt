@@ -107,6 +107,10 @@ func exprType(e ast.Expr, s scope) ir.Type {
 		return &ir.Builtin{Name: "string"}
 	case *ast.BoolLit:
 		return &ir.Builtin{Name: "bool"}
+	case *ast.DatetimeLit:
+		return &ir.Builtin{Name: "datetime"}
+	case *ast.DurationLit:
+		return &ir.Builtin{Name: "duration"}
 	case *ast.CollectionLit:
 		return collectionType(e, s)
 	case *ast.FuncLit:
@@ -756,6 +760,10 @@ func check(e ast.Expr, s scope, sink *Sink) ir.Type {
 		return &ir.Builtin{Name: "string"}
 	case *ast.BoolLit:
 		return &ir.Builtin{Name: "bool"}
+	case *ast.DatetimeLit:
+		return &ir.Builtin{Name: "datetime"}
+	case *ast.DurationLit:
+		return &ir.Builtin{Name: "duration"}
 	case *ast.CollectionLit:
 		// Surface any operator error inside an entry; the element-type and range
 		// checks against the (possibly annotated) element type are the caller's.

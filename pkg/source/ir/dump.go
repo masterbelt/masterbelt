@@ -139,6 +139,10 @@ func dumpValue(v Value) string {
 		return fmt.Sprintf("StringLiteral %q", x.Value)
 	case *BoolLiteral:
 		return fmt.Sprintf("BoolLiteral %v", x.Value)
+	case *DatetimeLiteral:
+		return fmt.Sprintf("DatetimeLiteral %q", x.Text)
+	case *DurationLiteral:
+		return fmt.Sprintf("DurationLiteral %q", x.Text)
 	case *CollectionLiteral:
 		parts := make([]string, len(x.Entries))
 		for i, e := range x.Entries {

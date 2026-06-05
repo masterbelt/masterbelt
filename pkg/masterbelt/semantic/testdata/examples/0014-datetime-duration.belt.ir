@@ -1,39 +1,55 @@
 Module
   Const "Epoch"
-    type invalid
-    value <none>
+    type datetime
+    value DatetimeLiteral "D1970-01-01T00:00:00.000Z"
+    eval D1970-01-01T00:00:00.000Z
   Const "Release"
-    type invalid
-    value <none>
+    type datetime
+    value DatetimeLiteral "D2009-03-31T23:59:59.000Z"
+    eval D2009-03-31T23:59:59.000Z
   Const "Launch"
-    type invalid
-    value <none>
+    type datetime
+    value DatetimeLiteral "D2026-06-05T09:00:00.000+09:00"
+    eval D2026-06-05T00:00:00.000Z
   Const "Cooldown"
-    type invalid
-    value <none>
+    type duration
+    value DurationLiteral "5s"
+    eval 5s
   Const "Complex"
-    type invalid
-    value <none>
+    type duration
+    value DurationLiteral "3w4d5h6m7s8ms"
+    eval 3w4d5h6m7s8ms
   Const "Deadline"
-    type invalid
-    value Reference -> "Release".add(<none>)
+    type datetime
+    value Reference -> "Release".add(DurationLiteral "7d")
+    eval D2009-04-07T23:59:59.000Z
   Const "Span"
-    type invalid
+    type duration
     value Reference -> "Release".sub(Reference -> "Epoch")
+    eval 2047w5d23h59m59s
   Const "Shift"
-    type invalid
-    value Reference -> "Release".sub(<none>)
+    type datetime
+    value Reference -> "Release".sub(DurationLiteral "1h")
+    eval D2009-03-31T22:59:59.000Z
   Const "TwoH"
-    type invalid
-    value <none>.add(<none>)
+    type duration
+    value DurationLiteral "1h".add(DurationLiteral "1h")
+    eval 2h
   Const "Triple"
-    type invalid
-    value <none>.mul(IntLiteral "3")
+    type duration
+    value DurationLiteral "5m".mul(IntLiteral "3")
+    eval 15m
   TypeDef "Event" pub
-    body { id: int, starts_at: invalid, cooldown: invalid }
+    body { id: int, starts_at: datetime, cooldown: duration }
   Assert "Release > Epoch"
-    eval <unevaluated>
+    eval true
       Release > Epoch
+      ^       ^ ^
+      |       | D1970-01-01T00:00:00.000Z
+      |       true
+      D2009-03-31T23:59:59.000Z
   Assert "1h > 59m"
-    eval <unevaluated>
+    eval true
       1h > 59m
+         ^
+         true

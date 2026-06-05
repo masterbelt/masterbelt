@@ -17,6 +17,7 @@
 package builtin
 
 import (
+	"math"
 	"math/big"
 	"sort"
 
@@ -49,13 +50,16 @@ func (k IntKind) bounds() (min, max *big.Int) {
 }
 
 // NativeType is the native description of a primitive: its numeric kind (for an
-// integer), or a flag marking the boolean, string, or null type.
+// integer), or a flag marking the boolean, string, null, datetime, or duration
+// type.
 type NativeType struct {
-	Name string
-	Int  *IntKind // non-nil for an integer primitive
-	Bool bool     // the boolean type
-	Str  bool     // the string type
-	Null bool     // the null type
+	Name     string
+	Int      *IntKind // non-nil for an integer primitive
+	Bool     bool     // the boolean type
+	Str      bool     // the string type
+	Null     bool     // the null type
+	Datetime bool     // the datetime type (a UTC instant in epoch milliseconds)
+	Duration bool     // the duration type (a span in milliseconds)
 }
 
 // IsInteger reports whether the primitive is an integer type.
@@ -261,6 +265,52 @@ func stringMethods() []*ir.Method {
 	}
 }
 
+// datetimeType and durationType are the cross-referenced builtin types in the
+// datetime/duration operator signatures: the two interoperate (dt ± dr,
+// dt - dt, dr + dt), so each names the other in its overloads.
+var (
+	datetimeType ir.Type = &ir.Builtin{Name: "datetime"}
+	durationType ir.Type = &ir.Builtin{Name: "duration"}
+	intType      ir.Type = &ir.Builtin{Name: "int"}
+)
+
+// comparisonMethods is the equality and ordering signature set shared by the
+// datetime and duration primitives: both compare against self and return bool.
+func comparisonMethods() []*ir.Method {
+	return []*ir.Method{
+		externMethod("eql", boolType, self()),
+		externMethod("neq", boolType, self()),
+		externMethod("lt", boolType, self()),
+		externMethod("lteq", boolType, self()),
+		externMethod("gt", boolType, self()),
+		externMethod("gteq", boolType, self()),
+	}
+}
+
+// datetimeMethods is the operator-method signature set of the datetime
+// primitive. sub is overloaded by argument type: another instant yields the
+// span between them, a duration yields the earlier instant. It mirrors the
+// prelude's datetime.belt.
+func datetimeMethods() []*ir.Method {
+	return append(comparisonMethods(),
+		externMethod("add", self(), durationType),
+		externMethod("sub", durationType, self()),
+		externMethod("sub", self(), durationType),
+	)
+}
+
+// durationMethods is the operator-method signature set of the duration
+// primitive. add is overloaded by argument type: another span sums, a datetime
+// yields the instant the span after it. It mirrors the prelude's duration.belt.
+func durationMethods() []*ir.Method {
+	return append(comparisonMethods(),
+		externMethod("add", self(), self()),
+		externMethod("add", datetimeType, datetimeType),
+		externMethod("sub", self(), self()),
+		externMethod("mul", self(), intType),
+	)
+}
+
 // --- intrinsics -------------------------------------------------------------
 
 // unaryInt is a nullary-argument integer intrinsic (pos, neg).
@@ -362,6 +412,83 @@ func stringIntrinsics() map[string]Intrinsic {
 	}
 }
 
+// binaryMillis is a one-argument intrinsic over two millisecond-carrying
+// operands of the given kinds — the building block of the datetime/duration
+// operators, whose overloads differ exactly in the argument's kind.
+func binaryMillis(recvKind, argKind ir.ConstKind, f func(a, b int64) *ir.Constant) Intrinsic {
+	return func(r *ir.Constant, args []*ir.Constant) *ir.Constant {
+		if len(args) != 1 || r.Kind != recvKind || args[0].Kind != argKind {
+			return nil
+		}
+		return f(r.Millis, args[0].Millis)
+	}
+}
+
+// addMillis sums two millisecond values, reporting false on int64 overflow —
+// the operation then has no value, like a division by zero.
+func addMillis(a, b int64) (int64, bool) {
+	c := a + b
+	if (b > 0 && c < a) || (b < 0 && c > a) {
+		return 0, false
+	}
+	return c, true
+}
+
+// subMillis subtracts two millisecond values, reporting false on overflow.
+func subMillis(a, b int64) (int64, bool) {
+	c := a - b
+	if (b < 0 && c < a) || (b > 0 && c > a) {
+		return 0, false
+	}
+	return c, true
+}
+
+// checkedMillis composes an overflow-checked millisecond operation with the
+// constructor of its result kind: the intrinsic body of every datetime and
+// duration arithmetic overload.
+func checkedMillis(op func(a, b int64) (int64, bool), build func(int64) *ir.Constant) func(a, b int64) *ir.Constant {
+	return func(a, b int64) *ir.Constant {
+		v, ok := op(a, b)
+		if !ok {
+			return nil
+		}
+		return build(v)
+	}
+}
+
+// millisComparisons are the comparison intrinsics shared by datetime and
+// duration: both order by their millisecond value.
+func millisComparisons(kind ir.ConstKind) map[string]Intrinsic {
+	return map[string]Intrinsic{
+		"eql":  binaryMillis(kind, kind, func(a, b int64) *ir.Constant { return ir.BoolConstant(a == b) }),
+		"neq":  binaryMillis(kind, kind, func(a, b int64) *ir.Constant { return ir.BoolConstant(a != b) }),
+		"lt":   binaryMillis(kind, kind, func(a, b int64) *ir.Constant { return ir.BoolConstant(a < b) }),
+		"lteq": binaryMillis(kind, kind, func(a, b int64) *ir.Constant { return ir.BoolConstant(a <= b) }),
+		"gt":   binaryMillis(kind, kind, func(a, b int64) *ir.Constant { return ir.BoolConstant(a > b) }),
+		"gteq": binaryMillis(kind, kind, func(a, b int64) *ir.Constant { return ir.BoolConstant(a >= b) }),
+	}
+}
+
+// mulDuration scales a duration by an integer constant. A factor outside
+// int64, or a product that overflows, has no value.
+func mulDuration(r *ir.Constant, args []*ir.Constant) *ir.Constant {
+	if len(args) != 1 || r.Kind != ir.ConstDuration || args[0].Kind != ir.ConstInt {
+		return nil
+	}
+	if !args[0].Int.IsInt64() {
+		return nil
+	}
+	n := args[0].Int.Int64()
+	if n != 0 && (r.Millis == math.MinInt64 && n == -1 || n == math.MinInt64 && r.Millis == -1) {
+		return nil // the one product the division check below cannot probe
+	}
+	product := r.Millis * n
+	if n != 0 && product/n != r.Millis {
+		return nil
+	}
+	return ir.DurationConstant(product)
+}
+
 // --- the standard registry --------------------------------------------------
 
 var integerSpecs = []struct {
@@ -395,6 +522,28 @@ func Default() *Registry {
 	r.register("bool", &NativeType{Name: "bool", Bool: true}, booleanMethods(), booleanIntrinsics())
 	r.register("string", &NativeType{Name: "string", Str: true}, stringMethods(), stringIntrinsics())
 	r.register("null", &NativeType{Name: "null", Null: true}, nil, nil)
+
+	// datetime: the comparisons and the single-signature add are kind-
+	// agnostic; sub is overloaded by the argument's kind — another instant
+	// yields the span between them, a duration the earlier instant.
+	dtI := millisComparisons(ir.ConstDatetime)
+	dtI["add"] = binaryMillis(ir.ConstDatetime, ir.ConstDuration, checkedMillis(addMillis, ir.DatetimeConstant))
+	r.register("datetime", &NativeType{Name: "datetime", Datetime: true}, datetimeMethods(), dtI)
+	r.registerIntrinsic("datetime", "sub", []ir.ConstKind{ir.ConstDatetime},
+		binaryMillis(ir.ConstDatetime, ir.ConstDatetime, checkedMillis(subMillis, ir.DurationConstant)))
+	r.registerIntrinsic("datetime", "sub", []ir.ConstKind{ir.ConstDuration},
+		binaryMillis(ir.ConstDatetime, ir.ConstDuration, checkedMillis(subMillis, ir.DatetimeConstant)))
+
+	// duration: add is overloaded by the argument's kind — another span sums,
+	// a datetime yields the instant the span after it.
+	drI := millisComparisons(ir.ConstDuration)
+	drI["sub"] = binaryMillis(ir.ConstDuration, ir.ConstDuration, checkedMillis(subMillis, ir.DurationConstant))
+	drI["mul"] = mulDuration
+	r.register("duration", &NativeType{Name: "duration", Duration: true}, durationMethods(), drI)
+	r.registerIntrinsic("duration", "add", []ir.ConstKind{ir.ConstDuration},
+		binaryMillis(ir.ConstDuration, ir.ConstDuration, checkedMillis(addMillis, ir.DurationConstant)))
+	r.registerIntrinsic("duration", "add", []ir.ConstKind{ir.ConstDatetime},
+		binaryMillis(ir.ConstDuration, ir.ConstDatetime, checkedMillis(addMillis, ir.DatetimeConstant)))
 	return r
 }
 

@@ -41,6 +41,10 @@ func Value(e ast.Expr, b Binder) ir.Value {
 		return &ir.StringLiteral{Value: e.Value}
 	case *ast.BoolLit:
 		return &ir.BoolLiteral{Value: e.Value}
+	case *ast.DatetimeLit:
+		return &ir.DatetimeLiteral{Text: e.Text}
+	case *ast.DurationLit:
+		return &ir.DurationLiteral{Text: e.Text}
 	case *ast.CollectionLit:
 		entries := make([]ir.CollectionEntry, len(e.Entries))
 		for i, entry := range e.Entries {
