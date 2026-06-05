@@ -113,6 +113,8 @@ func exprType(e ast.Expr, s scope) ir.Type {
 		return &ir.Builtin{Name: "duration"}
 	case *ast.CollectionLit:
 		return collectionType(e, s)
+	case *ast.RecordLit:
+		return recordLitType(e, s)
 	case *ast.FuncLit:
 		return funcLitType(e, s)
 	case *ast.CallExpr:
@@ -122,6 +124,39 @@ func exprType(e ast.Expr, s scope) ir.Type {
 	default:
 		return s.leaf(e)
 	}
+}
+
+// recordLitType is the silent type of a record literal: the named record type
+// of the typed form (Point{...}). The inferred form ({...}) has no type of its
+// own — only a checking context can supply one — and a name that is unknown or
+// not a record carries none either, so all three are ir.Invalid here; the
+// checking twin (checkRecordLit) reports each cause.
+func recordLitType(e *ast.RecordLit, s scope) ir.Type {
+	if e.TypeName == "" {
+		return ir.Invalid
+	}
+	typ, rec := namedRecord(e.TypeName, s)
+	if rec == nil {
+		return ir.Invalid
+	}
+	return typ
+}
+
+// namedRecord resolves a record literal's type name in the scope's universe:
+// the type it names (nil when the name is unknown) and its underlying record
+// (nil when the type is not a record).
+func namedRecord(name string, s scope) (ir.Type, *ir.Record) {
+	def, ok := s.universe()[name]
+	if !ok {
+		return nil, nil
+	}
+	var t ir.Type
+	if def.Builtin {
+		t = &ir.Builtin{Name: def.Name}
+	} else {
+		t = &ir.Named{Def: def}
+	}
+	return t, recordOf(t)
 }
 
 // funcLitType is the type of a function-literal expression: the Func type built
@@ -396,6 +431,21 @@ type Sink struct {
 	// UninferableResult fires at a function literal that neither annotates its
 	// result type nor returns a value to infer it from.
 	UninferableResult func(lit *ast.FuncLit)
+	// MissingField fires at a record literal that leaves a field of its record
+	// type typ uninitialized.
+	MissingField func(lit *ast.RecordLit, field string, typ ir.Type)
+	// UnknownField fires at a field initializer whose name the record type typ
+	// does not declare.
+	UnknownField func(field *ast.FieldInit, name string, typ ir.Type)
+	// UninferableRecord fires at an inferred-form record literal ({...}) that
+	// no checking context supplies a type to.
+	UninferableRecord func(lit *ast.RecordLit)
+	// UnknownRecordType fires at a typed record literal whose type name
+	// resolves to no definition.
+	UnknownRecordType func(lit *ast.RecordLit, name string)
+	// NotARecord fires at a typed record literal whose type name resolves to a
+	// type that is not a record.
+	NotARecord func(lit *ast.RecordLit, typ ir.Type)
 	// SolvedFuncLit fires for every function literal the walk types, with its
 	// settled signature — annotations, pushed-down expectations, and inferred
 	// parts combined. It is informational (the editor's hover and inlay hints
@@ -448,6 +498,36 @@ func (s *Sink) uninferableParam(p *ast.ParamDef) {
 func (s *Sink) uninferableResult(lit *ast.FuncLit) {
 	if s != nil && s.UninferableResult != nil {
 		s.UninferableResult(lit)
+	}
+}
+
+func (s *Sink) missingField(lit *ast.RecordLit, field string, typ ir.Type) {
+	if s != nil && s.MissingField != nil {
+		s.MissingField(lit, field, typ)
+	}
+}
+
+func (s *Sink) unknownField(field *ast.FieldInit, name string, typ ir.Type) {
+	if s != nil && s.UnknownField != nil {
+		s.UnknownField(field, name, typ)
+	}
+}
+
+func (s *Sink) uninferableRecord(lit *ast.RecordLit) {
+	if s != nil && s.UninferableRecord != nil {
+		s.UninferableRecord(lit)
+	}
+}
+
+func (s *Sink) unknownRecordType(lit *ast.RecordLit, name string) {
+	if s != nil && s.UnknownRecordType != nil {
+		s.UnknownRecordType(lit, name)
+	}
+}
+
+func (s *Sink) notARecord(lit *ast.RecordLit, typ ir.Type) {
+	if s != nil && s.NotARecord != nil {
+		s.NotARecord(lit, typ)
 	}
 }
 
@@ -518,6 +598,8 @@ func checkType(e ast.Expr, want ir.Type, s scope, subst map[string]ir.Type, sink
 		return checkFuncLitAgainst(e, fw, s, subst, sink)
 	case *ast.CollectionLit:
 		return checkCollectionAgainst(e, want, s, subst, sink)
+	case *ast.RecordLit:
+		return checkRecordAgainst(e, want, s, subst, sink)
 	default:
 		// Synthesis plus subsumption: any other form's type is its own; it
 		// must merely satisfy want (binding any type variable want still has).
@@ -527,6 +609,121 @@ func checkType(e ast.Expr, want ir.Type, s scope, subst map[string]ir.Type, sink
 		}
 		return got
 	}
+}
+
+// checkRecordAgainst checks a record literal against an expected type. The
+// inferred form takes the expectation outright: want must be a record (or a
+// named record), whose declared fields reach into the field values — which is
+// how an empty {} gets a type at all, exactly as an empty collection does. The
+// typed form carries its own type: its fields check against its own record,
+// and the type must then satisfy want like any synthesized form.
+func checkRecordAgainst(e *ast.RecordLit, want ir.Type, s scope, subst map[string]ir.Type, sink *Sink) ir.Type {
+	if e.TypeName != "" {
+		got := checkRecordLit(e, s, sink)
+		if got != ir.Invalid && !types.Match(s.registry(), want, got, subst) {
+			sink.mismatch(e, got, want)
+		}
+		return got
+	}
+	rec := recordOf(want)
+	if rec == nil {
+		// Not a record expectation: the field values are checked bare for
+		// their own errors, and the literal reports with its structural shape.
+		checkRecordFieldsBare(e, s, sink)
+		sink.mismatch(e, structuralRecord(e, s), want)
+		return ir.Invalid
+	}
+	checkRecordFields(e, rec, want, s, subst, sink)
+	return want
+}
+
+// checkRecordLit checks a record literal with no expected type. The typed form
+// carries its own type — the named record — and its fields are checked against
+// that record's field types. The inferred form has nothing to check against:
+// it is reported as uninferable, after its field values are checked bare for
+// their own errors.
+func checkRecordLit(e *ast.RecordLit, s scope, sink *Sink) ir.Type {
+	if e.TypeName == "" {
+		checkRecordFieldsBare(e, s, sink)
+		sink.uninferableRecord(e)
+		return ir.Invalid
+	}
+	typ, rec := namedRecord(e.TypeName, s)
+	if typ == nil {
+		checkRecordFieldsBare(e, s, sink)
+		sink.unknownRecordType(e, e.TypeName)
+		return ir.Invalid
+	}
+	if rec == nil {
+		checkRecordFieldsBare(e, s, sink)
+		sink.notARecord(e, typ)
+		return ir.Invalid
+	}
+	checkRecordFields(e, rec, typ, s, map[string]ir.Type{}, sink)
+	return typ
+}
+
+// checkRecordFields checks a record literal's fields against the record rec
+// (displayed as typ in diagnostics): every initializer must name a declared
+// field — its value checked against the field's type, so the expectation
+// reaches into nested literals — every declared field must be initialized
+// (missing_field), and an undeclared one is rejected (unknown_field).
+func checkRecordFields(lit *ast.RecordLit, rec *ir.Record, typ ir.Type, s scope, subst map[string]ir.Type, sink *Sink) {
+	declared := make(map[string]ir.Type, len(rec.Fields))
+	for _, f := range rec.Fields {
+		declared[f.Name] = f.Type
+	}
+	seen := make(map[string]bool, len(lit.Fields))
+	for _, f := range lit.Fields {
+		if f.Name == "" {
+			continue // recovered away; already a parse diagnostic
+		}
+		ft, ok := declared[f.Name]
+		if !ok {
+			sink.unknownField(f, f.Name, typ)
+			if f.Value != nil {
+				check(f.Value, s, sink) // its own errors still surface
+			}
+			continue
+		}
+		seen[f.Name] = true
+		if f.Value != nil {
+			checkType(f.Value, ft, s, subst, sink)
+		}
+	}
+	for _, f := range rec.Fields {
+		if !seen[f.Name] {
+			sink.missingField(lit, f.Name, typ)
+		}
+	}
+}
+
+// checkRecordFieldsBare checks each field value for its own errors when there
+// is no field type to check against — the literal's own problem (an unknown
+// type, no expectation) is reported by the caller.
+func checkRecordFieldsBare(e *ast.RecordLit, s scope, sink *Sink) {
+	for _, f := range e.Fields {
+		if f.Value != nil {
+			check(f.Value, s, sink)
+		}
+	}
+}
+
+// structuralRecord renders an inferred record literal's shape for a mismatch
+// message: the structural record of its field value types.
+func structuralRecord(e *ast.RecordLit, s scope) ir.Type {
+	fields := make([]ir.Field, 0, len(e.Fields))
+	for _, f := range e.Fields {
+		if f.Name == "" {
+			continue
+		}
+		t := ir.Invalid
+		if f.Value != nil {
+			t = exprType(f.Value, s)
+		}
+		fields = append(fields, ir.Field{Name: f.Name, Type: t})
+	}
+	return &ir.Record{Fields: fields}
 }
 
 // checkCollectionAgainst checks a collection literal against an expected list
@@ -776,6 +973,8 @@ func check(e ast.Expr, s scope, sink *Sink) ir.Type {
 			}
 		}
 		return collectionType(e, s)
+	case *ast.RecordLit:
+		return checkRecordLit(e, s, sink)
 	case *ast.FuncLit:
 		return checkFuncLit(e, s, sink)
 	case *ast.CallExpr:
@@ -932,6 +1131,26 @@ func observe(sink *Sink, fired *bool) *Sink {
 		UninferableResult: func(lit *ast.FuncLit) {
 			*fired = true
 			sink.uninferableResult(lit)
+		},
+		MissingField: func(lit *ast.RecordLit, field string, typ ir.Type) {
+			*fired = true
+			sink.missingField(lit, field, typ)
+		},
+		UnknownField: func(field *ast.FieldInit, name string, typ ir.Type) {
+			*fired = true
+			sink.unknownField(field, name, typ)
+		},
+		UninferableRecord: func(lit *ast.RecordLit) {
+			*fired = true
+			sink.uninferableRecord(lit)
+		},
+		UnknownRecordType: func(lit *ast.RecordLit, name string) {
+			*fired = true
+			sink.unknownRecordType(lit, name)
+		},
+		NotARecord: func(lit *ast.RecordLit, typ ir.Type) {
+			*fired = true
+			sink.notARecord(lit, typ)
 		},
 		SolvedFuncLit: func(lit *ast.FuncLit, t *ir.Func) {
 			sink.solvedFuncLit(lit, t)

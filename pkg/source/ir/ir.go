@@ -113,6 +113,22 @@ type CollectionEntry struct {
 	Value Value
 }
 
+// RecordValue is a record literal: its named type ("" for the inferred form,
+// whose type comes from the constant's Type) and its field values in source
+// order. The evaluated, canonically ordered value lives on Const.Eval.
+type RecordValue struct {
+	TypeName string
+	Fields   []RecordField
+}
+
+func (*RecordValue) value() {}
+
+// RecordField is one field initializer of a RecordValue: a name and its value.
+type RecordField struct {
+	Name  string
+	Value Value
+}
+
 // Reference is a use of another constant, resolved to its declaration.
 type Reference struct {
 	Target *Const

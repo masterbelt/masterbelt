@@ -30,6 +30,10 @@ masterbelt.semantic.duplicate_overload,メソッド {method} が同じ引数型 
 masterbelt.semantic.division_by_zero,ゼロ除算です
 masterbelt.semantic.type_mismatch,{actual} を {expected} として使えません
 masterbelt.semantic.uninferable_collection,このコレクションリテラルの型を推論できません。型注釈を付けてください
+masterbelt.semantic.missing_field,{typ} のレコードリテラルにフィールド {field} がありません
+masterbelt.semantic.unknown_field,{typ} にフィールド {field} はありません
+masterbelt.semantic.uninferable_record,このレコードリテラルの型を推論できません。型名を付けるか型注釈を付けてください
+masterbelt.semantic.not_a_record,{typ} はレコード型ではありません
 masterbelt.semantic.uninferable_result,この関数リテラルの結果型を推論できません。注釈を付けるか値を返してください
 masterbelt.semantic.uninferable_parameter,パラメータ {name} の型を推論できません。型注釈を付けてください
 masterbelt.semantic.lambda_arity_mismatch,関数リテラルのパラメータが {actual} 個ありますが、{expected} 個が必要です

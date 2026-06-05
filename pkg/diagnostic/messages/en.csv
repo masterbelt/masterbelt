@@ -30,6 +30,10 @@ masterbelt.semantic.duplicate_overload,method {method} redeclares the parameter 
 masterbelt.semantic.division_by_zero,division by zero
 masterbelt.semantic.type_mismatch,cannot use {actual} as {expected}
 masterbelt.semantic.uninferable_collection,cannot infer the type of this collection literal; annotate it
+masterbelt.semantic.missing_field,record literal of {typ} is missing field {field}
+masterbelt.semantic.unknown_field,{typ} has no field {field}
+masterbelt.semantic.uninferable_record,cannot infer the type of this record literal; name its type or annotate it
+masterbelt.semantic.not_a_record,{typ} is not a record type
 masterbelt.semantic.uninferable_result,cannot infer this function literal's result type; annotate it or return a value
 masterbelt.semantic.uninferable_parameter,cannot infer the type of parameter {name}; annotate it
 masterbelt.semantic.lambda_arity_mismatch,function literal has {actual} parameters; {expected} expected

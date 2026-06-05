@@ -144,6 +144,26 @@ func exprSink(at func(ast.Node) span, diags *diagnostic.List) *infer.Sink {
 			s := at(lit)
 			diags.Add(newUninferableResultDiagnostic(s.offset, s.width))
 		},
+		MissingField: func(lit *ast.RecordLit, field string, typ ir.Type) {
+			s := at(lit)
+			diags.Add(newMissingFieldDiagnostic(s.offset, s.width, field, typ.String()))
+		},
+		UnknownField: func(field *ast.FieldInit, name string, typ ir.Type) {
+			s := at(field)
+			diags.Add(newUnknownFieldDiagnostic(s.offset, s.width, name, typ.String()))
+		},
+		UninferableRecord: func(lit *ast.RecordLit) {
+			s := at(lit)
+			diags.Add(newUninferableRecordDiagnostic(s.offset, s.width))
+		},
+		UnknownRecordType: func(lit *ast.RecordLit, name string) {
+			s := at(lit)
+			diags.Add(newUnknownTypeDiagnostic(s.offset, s.width, name))
+		},
+		NotARecord: func(lit *ast.RecordLit, typ ir.Type) {
+			s := at(lit)
+			diags.Add(newNotARecordDiagnostic(s.offset, s.width, typ.String()))
+		},
 	}
 }
 
@@ -283,25 +303,32 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 			// One checking walk reports the expression diagnostics: operator
 			// type errors, type mismatches (against the annotation when there
 			// is one, and inside function-literal bodies), and literals whose
-			// parameter or result types cannot be inferred.
+			// parameter or result types cannot be inferred. Value-range checks
+			// hook the walk's Checked stream so infer stays eval-free; the
+			// top-level value is range-checked against c.Type below, so only
+			// the inner expressions (collection entries, record fields,
+			// returns) are checked here — a typed record literal pushes its
+			// field types even without an annotation.
 			sink := exprSink(at, diags)
-			if annType != ir.Invalid {
-				// The annotation is pushed into the value. Value-range checks
-				// hook the walk's Checked stream so infer stays eval-free; the
-				// top-level value is range-checked against c.Type below, so
-				// only the inner expressions (collection entries, returns)
-				// are checked here.
-				sink.Checked = func(e ast.Expr, want ir.Type) {
-					if e == decl.Value {
-						return
-					}
-					if v := eval.Expr(e, evalEnv{q: q, file: fileID}); v != nil && v.Kind == ir.ConstInt && !types.Fits(reg, want, v.Int) {
-						s := at(e)
-						diags.Add(newConstantOverflowDiagnostic(s.offset, s.width, v.String(), want.String()))
-					}
+			sink.Checked = func(e ast.Expr, want ir.Type) {
+				if e == decl.Value {
+					return
 				}
+				if v := eval.Expr(e, evalEnv{q: q, file: fileID}); v != nil && v.Kind == ir.ConstInt && !types.Fits(reg, want, v.Int) {
+					s := at(e)
+					diags.Add(newConstantOverflowDiagnostic(s.offset, s.width, v.String(), want.String()))
+				}
+			}
+			if annType != ir.Invalid {
+				// The annotation is pushed into the value.
 				infer.CheckAgainst(decl.Value, annType, env, sink)
 			} else {
+				if decl.Type != nil {
+					// The annotation failed to resolve and was reported at its
+					// own node; had it resolved, it would have supplied the
+					// inferred record form its type — don't pile on.
+					sink.UninferableRecord = nil
+				}
 				infer.Check(decl.Value, env, sink)
 			}
 			// Division or remainder by a zero divisor.

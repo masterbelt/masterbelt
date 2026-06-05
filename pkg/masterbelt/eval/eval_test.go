@@ -94,6 +94,41 @@ func TestPredicateNonBool(t *testing.T) {
 	}
 }
 
+// TestRecordFold covers the record literal fold: fields normalize to the
+// canonical (name) order, a duplicate initializer keeps the last value, and an
+// unfoldable field keeps the whole record from folding to a partial value.
+func TestRecordFold(t *testing.T) {
+	env := stubEnv{reg: builtin.Default()}
+	field := func(name, value string) *ast.FieldInit { return ast.NewFieldInit(name, intLit(value), nil) }
+	rec := func(fields ...*ast.FieldInit) *ast.RecordLit { return ast.NewRecordLit("Point", fields, nil) }
+
+	v := Expr(rec(field("y", "2"), field("x", "1")), env)
+	if v == nil || v.Kind != ir.ConstRecord {
+		t.Fatalf("Expr = %v, want a record constant", v)
+	}
+	if got := v.String(); got != "{ x: 1, y: 2 }" {
+		t.Errorf("record = %s, want { x: 1, y: 2 } (canonical order)", got)
+	}
+
+	if got := Expr(rec(field("x", "1"), field("x", "9")), env).String(); got != "{ x: 9 }" {
+		t.Errorf("duplicate field = %s, want { x: 9 } (the last value wins)", got)
+	}
+
+	if got := Expr(rec(), env).String(); got != "{}" {
+		t.Errorf("empty record = %s, want {}", got)
+	}
+
+	unresolved := ast.NewFieldInit("x", ast.NewIdentifier("Missing", nil), nil)
+	if v := Expr(rec(unresolved), env); v != nil {
+		t.Errorf("Expr = %v, want nil for an unfoldable field", v)
+	}
+
+	nested := rec(field("x", "1"), ast.NewFieldInit("pos", rec(field("y", "2")), nil))
+	if got := Expr(nested, env).String(); got != "{ pos: { y: 2 }, x: 1 }" {
+		t.Errorf("nested record = %s, want { pos: { y: 2 }, x: 1 }", got)
+	}
+}
+
 // TestDatetimeMillis covers the datetime literal normalization: ISO instants
 // (with and without milliseconds) to UTC epoch milliseconds, offsets
 // normalized away, and malformed text folding to nothing.
