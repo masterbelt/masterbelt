@@ -1,0 +1,373 @@
+# tree
+File
+  ConstDecl
+    LineComment "// Top-level functions: pure, compile-time callables — methods without a"
+    Newline "\n"
+    LineComment "// receiver. The body is a block or an arrow expression, and a call site"
+    Newline "\n"
+    LineComment "// folds at compile time."
+    Newline "\n"
+    Newline "\n"
+    Pub "pub"
+  Error
+    Whitespace " "
+    Fn "fn"
+    Whitespace " "
+    Ident "double"
+    LParen "("
+    Ident "x"
+    Colon ":"
+    Whitespace " "
+    Ident "int"
+    RParen ")"
+    Colon ":"
+    Whitespace " "
+    Ident "int"
+    Whitespace " "
+    Arrow "->"
+    Whitespace " "
+    Ident "x"
+    Whitespace " "
+    Star "*"
+    Whitespace " "
+    Int "2"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    Pub "pub"
+  Error
+    Whitespace " "
+    Fn "fn"
+    Whitespace " "
+    Ident "area"
+    LParen "("
+    Ident "w"
+    Colon ":"
+    Whitespace " "
+    Ident "int"
+    Comma ","
+    Whitespace " "
+    Ident "h"
+    Colon ":"
+    Whitespace " "
+    Ident "int"
+    RParen ")"
+    Colon ":"
+    Whitespace " "
+    Ident "int"
+    Whitespace " "
+    LBrace "{"
+    Newline "\n"
+    Whitespace "  "
+    Return "return"
+    Whitespace " "
+    Ident "w"
+    Whitespace " "
+    Star "*"
+    Whitespace " "
+    Ident "h"
+    Newline "\n"
+    RBrace "}"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// Functions compose."
+    Newline "\n"
+    Pub "pub"
+  Error
+    Whitespace " "
+    Fn "fn"
+    Whitespace " "
+    Ident "perimeter"
+    LParen "("
+    Ident "w"
+    Colon ":"
+    Whitespace " "
+    Ident "int"
+    Comma ","
+    Whitespace " "
+    Ident "h"
+    Colon ":"
+    Whitespace " "
+    Ident "int"
+    RParen ")"
+    Colon ":"
+    Whitespace " "
+    Ident "int"
+    Whitespace " "
+    Arrow "->"
+    Whitespace " "
+    Ident "double"
+    LParen "("
+    Ident "w"
+    RParen ")"
+    Whitespace " "
+    Plus "+"
+    Whitespace " "
+    Ident "double"
+    LParen "("
+    Ident "h"
+    RParen ")"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "A"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "area"
+        LParen "("
+        Literal
+          Int "3"
+        Comma ","
+        Whitespace " "
+        Literal
+          Int "4"
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "B"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "double"
+        LParen "("
+        Literal
+          Int "21"
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "C"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "perimeter"
+        LParen "("
+        Literal
+          Int "2"
+        Comma ","
+        Whitespace " "
+        Literal
+          Int "3"
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// A function called from a lambda."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "D"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        MemberExpr
+          CollectionLit
+            LBracket "["
+            Literal
+              Int "1"
+            Comma ","
+            Whitespace " "
+            Literal
+              Int "2"
+            Comma ","
+            Whitespace " "
+            Literal
+              Int "3"
+            RBracket "]"
+          Dot "."
+          Ident "map"
+        LParen "("
+        FuncLit
+          Fn "fn"
+          ParamList
+            LParen "("
+            Param
+              Ident "x"
+            RParen ")"
+          Whitespace " "
+          Arrow "->"
+          Whitespace " "
+          CallExpr
+            NameRef
+              Ident "double"
+            LParen "("
+            NameRef
+              Ident "x"
+            RParen ")"
+        RParen ")"
+  Error
+    Newline "\n"
+    Newline "\n"
+    LineComment "// Strings and records work like any other value."
+    Newline "\n"
+    Fn "fn"
+    Whitespace " "
+    Ident "greet"
+    LParen "("
+    Ident "name"
+    Colon ":"
+    Whitespace " "
+    Ident "string"
+    RParen ")"
+    Colon ":"
+    Whitespace " "
+    Ident "string"
+    Whitespace " "
+    Arrow "->"
+    Whitespace " "
+    String "\"Hello, \""
+    Whitespace " "
+    Plus "+"
+    Whitespace " "
+    Ident "name"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "E"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "greet"
+        LParen "("
+        Literal
+          String "\"belt\""
+        RParen ")"
+  TypeDecl
+    Newline "\n"
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Type "type"
+    Whitespace " "
+    Ident "Point"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    RecordType
+      LBrace "{"
+      Whitespace " "
+      Field
+        Ident "x"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "int"
+      Comma ","
+      Whitespace " "
+      Field
+        Ident "y"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "int"
+      Whitespace " "
+      RBrace "}"
+  ConstDecl
+    Newline "\n"
+    Pub "pub"
+  Error
+    Whitespace " "
+    Fn "fn"
+    Whitespace " "
+    Ident "origin"
+    LParen "("
+    RParen ")"
+    Colon ":"
+    Whitespace " "
+    Ident "Point"
+    Whitespace " "
+    Arrow "->"
+    Whitespace " "
+    Ident "Point"
+    LBrace "{"
+    Whitespace " "
+    Ident "x"
+    Colon ":"
+    Whitespace " "
+    Int "0"
+    Comma ","
+    Whitespace " "
+    Ident "y"
+    Colon ":"
+    Whitespace " "
+    Int "0"
+    Whitespace " "
+    RBrace "}"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "O"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "origin"
+        LParen "("
+        RParen ")"
+  AssertDecl
+    Newline "\n"
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      CallExpr
+        NameRef
+          Ident "area"
+        LParen "("
+        Literal
+          Int "3"
+        Comma ","
+        Whitespace " "
+        Literal
+          Int "4"
+        RParen ")"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "12"
+  Newline "\n"
+  EOF ""
+# diagnostics
+error[masterbelt.parser.concrete.expected_const] 5:1 expected 'const'
+error[masterbelt.parser.concrete.expected_identifier] 5:1 expected identifier
+error[masterbelt.parser.concrete.expected_assign] 5:1 expected '='
+error[masterbelt.parser.concrete.unexpected_token] 5:5 unexpected token: Fn
+error[masterbelt.parser.concrete.expected_const] 7:1 expected 'const'
+error[masterbelt.parser.concrete.expected_identifier] 7:1 expected identifier
+error[masterbelt.parser.concrete.expected_assign] 7:1 expected '='
+error[masterbelt.parser.concrete.unexpected_token] 7:5 unexpected token: Fn
+error[masterbelt.parser.concrete.expected_const] 12:1 expected 'const'
+error[masterbelt.parser.concrete.expected_identifier] 12:1 expected identifier
+error[masterbelt.parser.concrete.expected_assign] 12:1 expected '='
+error[masterbelt.parser.concrete.unexpected_token] 12:5 unexpected token: Fn
+error[masterbelt.parser.concrete.unexpected_token] 22:1 unexpected token: Fn
+error[masterbelt.parser.concrete.expected_const] 26:1 expected 'const'
+error[masterbelt.parser.concrete.expected_identifier] 26:1 expected identifier
+error[masterbelt.parser.concrete.expected_assign] 26:1 expected '='
+error[masterbelt.parser.concrete.unexpected_token] 26:5 unexpected token: Fn

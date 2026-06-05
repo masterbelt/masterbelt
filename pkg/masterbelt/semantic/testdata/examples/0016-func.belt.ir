@@ -1,0 +1,36 @@
+Module
+  Const "" pub
+    type invalid
+    value <none>
+  Const "" pub
+    type invalid
+    value <none>
+  Const "" pub
+    type invalid
+    value <none>
+  Const "A"
+    type invalid
+    value <none>
+  Const "B"
+    type invalid
+    value <none>
+  Const "C"
+    type invalid
+    value <none>
+  Const "D"
+    type invalid
+    value [IntLiteral "1", IntLiteral "2", IntLiteral "3"].map((fn(x) (return <none>)))
+  Const "E"
+    type invalid
+    value <none>
+  Const "" pub
+    type invalid
+    value <none>
+  Const "O"
+    type invalid
+    value <none>
+  TypeDef "Point" pub
+    body { x: int, y: int }
+  Assert "area(3, 4) == 12"
+    eval <unevaluated>
+      area(3, 4) == 12
