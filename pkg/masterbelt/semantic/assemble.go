@@ -332,8 +332,9 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 	funcs := buildFuncSymbols(file)
 	qfns := qualifiedFuncsFrom(q, imp)
 	module.Funcs = resolveFuncs(file, at, diags, q.universe(fileID), qualifiedFrom(q, imp), qfns, fnShells)
-	checkMethodBodies(reg, module.Types, q.universe(fileID), qualifiedFrom(q, imp), funcs, qfns, exprSink(at, diags))
-	checkFuncBodies(reg, file, q.universe(fileID), qualifiedFrom(q, imp), funcs, qfns, at, diags)
+	bodyEnv := evalEnv{q: q, file: fileID}
+	checkMethodBodies(reg, module.Types, q.universe(fileID), qualifiedFrom(q, imp), funcs, qfns, bodyEnv, exprSink(at, diags), at, diags)
+	checkFuncBodies(reg, file, q.universe(fileID), qualifiedFrom(q, imp), funcs, qfns, bodyEnv, at, diags)
 	checkEffects(reg, file, module.Types, q.universe(fileID), qualifiedFrom(q, imp), funcs, qfns, at, diags)
 
 	// Compile-time positions must be pure: a constant initializer and an

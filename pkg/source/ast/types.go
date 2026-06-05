@@ -292,8 +292,13 @@ func NewExprStmt(x Expr, syntax *cst.Node) *ExprStmt {
 // switch nests control flow.
 type SwitchStmt struct {
 	Scrutinee Expr         // the value branched on (nil if recovered away)
-	Arms      []*SwitchArm // the value-pattern arms, in source order
+	Arms      []*SwitchArm // the value-pattern arms before the wildcard, in source order
 	Else      []Stmt       // the wildcard "_" arm's body, or nil if none
+	// AfterElse holds any value-pattern arms written after the wildcard. The
+	// wildcard already matches every remaining value, so these can never run;
+	// they are kept out of the live Arms (and so out of the IR and evaluation)
+	// and reported as unreachable.
+	AfterElse []*SwitchArm
 	syntax    *cst.Node
 }
 
@@ -302,8 +307,8 @@ func (s *SwitchStmt) node()             {}
 func (s *SwitchStmt) stmt()             {}
 
 // NewSwitchStmt builds a SwitchStmt node.
-func NewSwitchStmt(scrutinee Expr, arms []*SwitchArm, els []Stmt, syntax *cst.Node) *SwitchStmt {
-	return &SwitchStmt{Scrutinee: scrutinee, Arms: arms, Else: els, syntax: syntax}
+func NewSwitchStmt(scrutinee Expr, arms []*SwitchArm, els []Stmt, afterElse []*SwitchArm, syntax *cst.Node) *SwitchStmt {
+	return &SwitchStmt{Scrutinee: scrutinee, Arms: arms, Else: els, AfterElse: afterElse, syntax: syntax}
 }
 
 // SwitchArm is one non-wildcard arm of a switch: one or more compile-time value

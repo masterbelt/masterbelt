@@ -153,8 +153,9 @@ func lowerStmt(t cst.Tree, buf source.Buffer, node *cst.Node) ast.Stmt {
 // already flag as unreachable.
 func lowerSwitchStmt(t cst.Tree, buf source.Buffer, node *cst.Node) ast.Stmt {
 	var scrutinee ast.Expr
-	var arms []*ast.SwitchArm
+	var arms, afterElse []*ast.SwitchArm
 	var els []ast.Stmt
+	seenWildcard := false
 	for _, child := range t.Children() {
 		n, ok := child.Node()
 		if !ok {
@@ -164,7 +165,8 @@ func lowerSwitchStmt(t cst.Tree, buf source.Buffer, node *cst.Node) ast.Stmt {
 		case n.Kind() == cst.SwitchArm:
 			values, body := lowerSwitchArm(child, buf)
 			if isWildcardArm(values) {
-				if els == nil {
+				if !seenWildcard {
+					seenWildcard = true
 					els = body
 					if els == nil {
 						// A wildcard with an empty body still marks the switch as
@@ -175,12 +177,19 @@ func lowerSwitchStmt(t cst.Tree, buf source.Buffer, node *cst.Node) ast.Stmt {
 				}
 				continue
 			}
-			arms = append(arms, ast.NewSwitchArm(values, body, n))
+			arm := ast.NewSwitchArm(values, body, n)
+			if seenWildcard {
+				// The wildcard already matches every remaining value, so an arm
+				// after it is unreachable: kept apart from the live arms.
+				afterElse = append(afterElse, arm)
+			} else {
+				arms = append(arms, arm)
+			}
 		case scrutinee == nil && isExprKind(n.Kind()):
 			scrutinee = lowerExpr(child, buf)
 		}
 	}
-	return ast.NewSwitchStmt(scrutinee, arms, els, node)
+	return ast.NewSwitchStmt(scrutinee, arms, els, afterElse, node)
 }
 
 // lowerSwitchArm lowers a SwitchArm node to its value patterns and its body. The

@@ -294,6 +294,16 @@ func dumpStmtAt(b *strings.Builder, s Stmt, indent string) {
 				dumpStmtAt(b, bs, indent+"    ")
 			}
 		}
+		for _, arm := range s.AfterElse {
+			values := make([]string, len(arm.Values))
+			for i, v := range arm.Values {
+				values[i] = dumpExpr(v)
+			}
+			fmt.Fprintf(b, "%s  unreachable-arm %s\n", indent, strings.Join(values, ", "))
+			for _, bs := range arm.Body {
+				dumpStmtAt(b, bs, indent+"    ")
+			}
+		}
 	}
 }
 

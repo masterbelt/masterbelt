@@ -410,12 +410,15 @@ func resolveMethod(r *infer.TypeResolver, m *ast.MethodDecl, scope map[string]bo
 	}
 
 	params := make(map[string]bool, len(m.Params))
+	resolvedParams := make(map[string]ir.Type, len(m.Params))
 	for _, p := range m.Params {
-		method.Params = append(method.Params, ir.Param{Name: p.Name, Type: r.ResolveType(p.Type, mscope)})
+		t := r.ResolveType(p.Type, mscope)
+		method.Params = append(method.Params, ir.Param{Name: p.Name, Type: t})
 		params[p.Name] = true
+		resolvedParams[p.Name] = t
 	}
 	method.Result = r.ResolveType(m.Result, mscope)
-	method.Body = lower.Body(m.Body, bodyBinder{r: r, params: params, tscope: mscope, funcs: fns, self: true})
+	method.Body = lower.Body(m.Body, bodyBinder{r: r, params: params, paramTypes: resolvedParams, tscope: mscope, funcs: fns, self: true})
 	return method
 }
 
@@ -441,13 +444,16 @@ func resolveFuncs(file *ast.File, at func(ast.Node) span, diags *diagnostic.List
 		fn.Extern = fd.Extern
 		fn.Effects = fd.Effects
 		params := make(map[string]bool, len(fd.Params))
+		paramTypes := make(map[string]ir.Type, len(fd.Params))
 		fn.Params = make([]ir.Param, 0, len(fd.Params))
 		for _, p := range fd.Params {
-			fn.Params = append(fn.Params, ir.Param{Name: p.Name, Type: r.ResolveType(p.Type, nil)})
+			t := r.ResolveType(p.Type, nil)
+			fn.Params = append(fn.Params, ir.Param{Name: p.Name, Type: t})
 			params[p.Name] = true
+			paramTypes[p.Name] = t
 		}
 		fn.Result = r.ResolveType(fd.Result, nil)
-		fn.Body = lower.Body(fd.Body, bodyBinder{r: r, params: params, funcs: fns})
+		fn.Body = lower.Body(fd.Body, bodyBinder{r: r, params: params, paramTypes: paramTypes, funcs: fns})
 
 		key := fn.Name + funcSignatureKey(fn)
 		if fn.Name != "" && seen[key] {

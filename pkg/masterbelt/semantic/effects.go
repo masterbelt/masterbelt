@@ -68,18 +68,40 @@ func checkDeclEffects(name string, declared []string, decl ast.Node, body []ast.
 		}
 		used[effect] = true
 	}
+	collectBodyEffectUses(body, bs, use)
+	for _, eff := range declared {
+		if !used[eff] {
+			s := at(decl)
+			diags.Add(newUnusedEffectDiagnostic(s.offset, s.width, name, eff))
+		}
+	}
+}
+
+// collectBodyEffectUses walks a statement body collecting its effect uses,
+// descending through a switch's scrutinee, arm value patterns, arm bodies, and
+// wildcard body so an effectful call anywhere in a switch counts.
+func collectBodyEffectUses(body []ast.Stmt, bs infer.BodyScope, use func(effect string, node ast.Node)) {
 	for _, stmt := range body {
 		switch stmt := stmt.(type) {
 		case *ast.ReturnStmt:
 			collectEffectUses(stmt.Value, bs, use)
 		case *ast.ExprStmt:
 			collectEffectUses(stmt.X, bs, use)
-		}
-	}
-	for _, eff := range declared {
-		if !used[eff] {
-			s := at(decl)
-			diags.Add(newUnusedEffectDiagnostic(s.offset, s.width, name, eff))
+		case *ast.SwitchStmt:
+			collectEffectUses(stmt.Scrutinee, bs, use)
+			for _, arm := range stmt.Arms {
+				for _, v := range arm.Values {
+					collectEffectUses(v, bs, use)
+				}
+				collectBodyEffectUses(arm.Body, bs, use)
+			}
+			collectBodyEffectUses(stmt.Else, bs, use)
+			for _, arm := range stmt.AfterElse {
+				for _, v := range arm.Values {
+					collectEffectUses(v, bs, use)
+				}
+				collectBodyEffectUses(arm.Body, bs, use)
+			}
 		}
 	}
 }
@@ -107,14 +129,7 @@ func collectEffectUses(e ast.Expr, bs infer.BodyScope, use func(effect string, n
 		for _, p := range e.Params {
 			inner.Params[p.Name] = ir.Invalid
 		}
-		for _, stmt := range e.Body {
-			switch stmt := stmt.(type) {
-			case *ast.ReturnStmt:
-				collectEffectUses(stmt.Value, inner, use)
-			case *ast.ExprStmt:
-				collectEffectUses(stmt.X, inner, use)
-			}
-		}
+		collectBodyEffectUses(e.Body, inner, use)
 	case *ast.CollectionLit:
 		for _, entry := range e.Entries {
 			collectEffectUses(entry.Key, bs, use)

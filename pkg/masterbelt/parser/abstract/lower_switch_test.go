@@ -96,6 +96,21 @@ func TestLowerSwitchExprBody(t *testing.T) {
 	}
 }
 
+// TestLowerSwitchAfterWildcard checks that an arm written after the wildcard is
+// lifted out of the live arms into AfterElse (it can never run).
+func TestLowerSwitchAfterWildcard(t *testing.T) {
+	sw := switchOf(t, "pub fn g(n: int): string {\n  switch n {\n    0 -> return \"z\"\n    _ -> return \"h\"\n    1 -> return \"o\"\n  }\n}\n")
+	if len(sw.Arms) != 1 {
+		t.Fatalf("live arms = %d, want 1 (the 0 arm)", len(sw.Arms))
+	}
+	if sw.Else == nil {
+		t.Fatal("Else is nil, want the wildcard body")
+	}
+	if len(sw.AfterElse) != 1 {
+		t.Fatalf("AfterElse = %d, want the 1 arm written after the wildcard", len(sw.AfterElse))
+	}
+}
+
 // TestLowerSwitchNested checks that a switch arm body may itself be a switch, so
 // control flow nests.
 func TestLowerSwitchNested(t *testing.T) {

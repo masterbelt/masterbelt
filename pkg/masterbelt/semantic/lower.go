@@ -142,12 +142,58 @@ type bodyFuncs struct {
 type bodyBinder struct {
 	r      *infer.TypeResolver
 	params map[string]bool
-	tscope map[string]bool
-	funcs  bodyFuncs
-	self   bool // whether self has a value here (a method body; never a function's)
+	// paramTypes maps each parameter to its resolved type, so a switch can read
+	// the scrutinee's enum (the expected type its bare-member arms resolve
+	// through) without consulting the type query. selfType is the receiver's
+	// type (a method body), used the same way for a "switch self".
+	paramTypes map[string]ir.Type
+	selfType   ir.Type
+	tscope     map[string]bool
+	funcs      bodyFuncs
+	self       bool // whether self has a value here (a method body; never a function's)
 }
 
 func (b bodyBinder) EnterFunc(params []*ast.ParamDef) lower.Binder { return enterFunc(b, params) }
+
+// ExpectedEnum returns the enum definition a switch scrutinee's static type
+// names, so its bare-member arms (Common rather than Rarity.Common) lower to
+// enum-member values. It reads the type syntactically from the binder's scope
+// — a parameter's resolved type, the receiver's type for self — without the
+// type query, keeping value lowering independent of typing. A scrutinee whose
+// enum cannot be read this way yields nil, and its bare members stay
+// unresolved (the qualified form always works).
+func (b bodyBinder) ExpectedEnum(scrutinee ast.Expr) *ir.TypeDef {
+	switch e := scrutinee.(type) {
+	case *ast.Identifier:
+		if t, ok := b.paramTypes[e.Name]; ok {
+			return enumDefOf(t)
+		}
+	case *ast.SelfExpr:
+		if b.self {
+			return enumDefOf(b.selfType)
+		}
+	}
+	return nil
+}
+
+// EnumMember resolves a bare member name against an enum definition to its
+// enum-member value, or nil when def has no such member — the bare-member rule
+// a switch arm shares with a const initializer.
+func (b bodyBinder) EnumMember(def *ir.TypeDef, name string) ir.Value {
+	if idx := enumIndex(def, name); idx >= 0 {
+		return &ir.EnumMemberValue{Def: def, Index: idx}
+	}
+	return nil
+}
+
+// enumDefOf returns the enum definition a type names, or nil when it is not a
+// nominal enum.
+func enumDefOf(t ir.Type) *ir.TypeDef {
+	if n, ok := t.(*ir.Named); ok && n.Def != nil && n.Def.Enum != nil {
+		return n.Def
+	}
+	return nil
+}
 
 func (b bodyBinder) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
 	switch e := e.(type) {

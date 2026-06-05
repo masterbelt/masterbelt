@@ -61,6 +61,10 @@ masterbelt.semantic.refinement_not_constant,error,
 masterbelt.semantic.missing_effect,error,fn:string effect:string
 masterbelt.semantic.unused_effect,warning,fn:string effect:string
 masterbelt.semantic.effect_in_pure_context,error,effect:string context:string
+masterbelt.semantic.non_exhaustive_switch,error,typ:string missing:string
+masterbelt.semantic.duplicate_switch_arm,error,value:string
+masterbelt.semantic.arm_value_type_mismatch,error,actual:string expected:string
+masterbelt.semantic.unreachable_arm,error,
 project.config.missing,error,
 project.config.invalid,error,detail:string
 project.config.missing_entry,error,
