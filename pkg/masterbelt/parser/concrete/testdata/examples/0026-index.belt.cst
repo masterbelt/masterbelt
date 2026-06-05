@@ -66,12 +66,13 @@ File
     Initializer
       Assign "="
       Whitespace " "
-      NameRef
-        Ident "Xs"
-  Error
-    LBracket "["
-    Int "0"
-    RBracket "]"
+      IndexExpr
+        NameRef
+          Ident "Xs"
+        LBracket "["
+        Literal
+          Int "0"
+        RBracket "]"
   ConstDecl
     Newline "\n"
     Const "const"
@@ -92,12 +93,13 @@ File
     Initializer
       Assign "="
       Whitespace " "
-      NameRef
-        Ident "Xs"
-  Error
-    LBracket "["
-    Int "2"
-    RBracket "]"
+      IndexExpr
+        NameRef
+          Ident "Xs"
+        LBracket "["
+        Literal
+          Int "2"
+        RBracket "]"
   ConstDecl
     Newline "\n"
     Newline "\n"
@@ -149,12 +151,13 @@ File
     Initializer
       Assign "="
       Whitespace " "
-      NameRef
-        Ident "Tbl"
-  Error
-    LBracket "["
-    String "\"sword\""
-    RBracket "]"
+      IndexExpr
+        NameRef
+          Ident "Tbl"
+        LBracket "["
+        Literal
+          String "\"sword\""
+        RBracket "]"
   FuncDecl
     Newline "\n"
     Newline "\n"
@@ -205,13 +208,13 @@ File
       ReturnStmt
         Return "return"
         Whitespace " "
-        NameRef
-          Ident "xs"
-      CollectionLit
-        LBracket "["
-        NameRef
-          Ident "i"
-        RBracket "]"
+        IndexExpr
+          NameRef
+            Ident "xs"
+          LBracket "["
+          NameRef
+            Ident "i"
+          RBracket "]"
       Newline "\n"
       RBrace "}"
   FuncDecl
@@ -266,10 +269,10 @@ File
             RBracket "]"
       Newline "\n"
       Whitespace "  "
-      NameRef
-        Ident "xs"
       AssignStmt
-        CollectionLit
+        IndexExpr
+          NameRef
+            Ident "xs"
           LBracket "["
           Literal
             Int "0"
@@ -341,10 +344,10 @@ File
             RBracket "]"
       Newline "\n"
       Whitespace "  "
-      NameRef
-        Ident "m"
       AssignStmt
-        CollectionLit
+        IndexExpr
+          NameRef
+            Ident "m"
           LBracket "["
           Literal
             String "\"a\""
@@ -356,10 +359,10 @@ File
           Int "10"
       Newline "\n"
       Whitespace "  "
-      NameRef
-        Ident "m"
       AssignStmt
-        CollectionLit
+        IndexExpr
+          NameRef
+            Ident "m"
           LBracket "["
           Literal
             String "\"b\""
@@ -425,10 +428,10 @@ File
             RBracket "]"
       Newline "\n"
       Whitespace "  "
-      NameRef
-        Ident "xs"
       AssignStmt
-        CollectionLit
+        IndexExpr
+          NameRef
+            Ident "xs"
           LBracket "["
           Literal
             Int "1"
@@ -478,6 +481,3 @@ File
   Newline "\n"
   EOF ""
 # diagnostics
-error[masterbelt.parser.concrete.unexpected_token] 15:30 unexpected token: LBracket
-error[masterbelt.parser.concrete.unexpected_token] 16:30 unexpected token: LBracket
-error[masterbelt.parser.concrete.unexpected_token] 20:31 unexpected token: LBracket

@@ -369,9 +369,12 @@ func (p *parser) parseUnary() cst.Green {
 	return cst.NewNode(cst.UnaryExpr, children)
 }
 
-// parsePostfix parses an operand followed by any chain of member accesses and
-// calls — receiver.member and callee(args) — applied left to right, so self.id
-// and int32(self.id) form left-leaning MemberExpr/CallExpr trees.
+// parsePostfix parses an operand followed by any chain of member accesses,
+// calls, and index accesses — receiver.member, callee(args), and receiver[i] —
+// applied left to right, so self.id, int32(self.id), and xs[0][1] form
+// left-leaning MemberExpr/CallExpr/IndexExpr trees. An index "[" is read only
+// here, after an operand: the leading "[" of a collection literal is an operand
+// (parseOperand), so the two never collide.
 func (p *parser) parsePostfix() cst.Green {
 	left := p.parseOperand()
 	for {
@@ -393,10 +396,33 @@ func (p *parser) parsePostfix() cst.Green {
 			children = append(children, p.bump()) // "("
 			p.parseCallArgs(&children)
 			left = cst.NewNode(cst.CallExpr, children)
+		case token.LBracket:
+			left = p.parseIndexTail(left)
 		default:
 			return left
 		}
 	}
+}
+
+// parseIndexTail completes an index access from its already-parsed receiver: it
+// consumes "[", parses the index expression, and expects "]". The "[" opens a
+// bracketed context, so the record-literal restriction an if condition or switch
+// scrutinee carries is lifted for the index (a record-keyed lookup parses), then
+// restored for the postfix continuation. The cursor sits on "[".
+func (p *parser) parseIndexTail(receiver cst.Green) *cst.Node {
+	children := []cst.Green{receiver}
+	p.skipTrivia(&children)
+	children = append(children, p.bump()) // "["
+	p.bracketed(func() {
+		if startsExpr(p.peekSignificant()) {
+			p.skipTrivia(&children)
+			children = append(children, p.parseExpr())
+		} else {
+			p.report(newExpectedExpressionDiagnostic(p.lastStart, 0))
+		}
+	})
+	p.closeBracket(&children)
+	return cst.NewNode(cst.IndexExpr, children)
 }
 
 // parseCallArgs parses a call's argument list up to and including the closing
