@@ -220,15 +220,17 @@ type TypeParam struct {
 // Method is one method declared in a type's impl block: its signature and, for a
 // non-extern method, the statement body that computes its result. Extern methods
 // have no body — their implementation is a native intrinsic in the builtin
-// registry.
+// registry. The effect list declares the method's interaction with the world;
+// an empty list means pure.
 type Method struct {
-	Name   string
-	Public bool
-	Extern bool
-	Doc    []string
-	Params []Param
-	Result Type
-	Body   []Stmt // the resolved body, or nil for an extern method
+	Name    string
+	Public  bool
+	Extern  bool
+	Effects []string // the declared effects in source order, or nil for pure
+	Doc     []string
+	Params  []Param
+	Result  Type
+	Body    []Stmt // the resolved body, or nil for an extern method
 	// Syntax is the declaration this method resolved from, or nil for the
 	// registry's bootstrap methods. With overloading a name no longer pairs a
 	// declaration with its resolution — and a dropped duplicate shifts the

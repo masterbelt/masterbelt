@@ -30,15 +30,20 @@ type Module struct {
 // Function is a resolved top-level function declaration: a method without a
 // receiver. Like a Method it carries its signature and lowered body; FuncCall
 // points at it the way Reference points at a *Const, so calls form the same
-// pointer graph values do.
+// pointer graph values do. An extern function is a native a target supplies —
+// the root of an effect — and has no body. The effect list declares the
+// function's interaction with the world; an empty list means pure (foldable
+// at compile time).
 type Function struct {
-	Name   string
-	Public bool
-	Doc    []string
-	Params []Param
-	Result Type
-	Body   []Stmt
-	Syntax *ast.FuncDecl // the declaration this was resolved from
+	Name    string
+	Public  bool
+	Extern  bool     // declared extern: a native the target supplies, no body
+	Effects []string // the declared effects in source order, or nil for pure
+	Doc     []string
+	Params  []Param
+	Result  Type
+	Body    []Stmt
+	Syntax  *ast.FuncDecl // the declaration this was resolved from
 }
 
 // Assert is one compile-time assertion's outcome: the condition in canonical
@@ -211,6 +216,15 @@ type Conversion struct {
 }
 
 func (*Conversion) value() {}
+
+// Await is an await expression: the explicit suspension point that consumes
+// the async effect at a call site. It wraps the awaited value and adds
+// nothing to its type.
+type Await struct {
+	Value Value
+}
+
+func (*Await) value() {}
 
 // NullValue is the null literal.
 type NullValue struct{}

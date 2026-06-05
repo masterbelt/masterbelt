@@ -1523,3 +1523,80 @@ func TestErrorFlowsIntoUnion(t *testing.T) {
 		t.Errorf("string into int8 | error: want type_mismatch, got %v", codes(diags))
 	}
 }
+
+func TestEffectDeclarationsPropagate(t *testing.T) {
+	// A function calling an effectful one must declare the effects itself;
+	// declaring them silences the check, and awaiting consumes async.
+	src := "extern fn io async fetch(url: string): string\n" +
+		"pub fn io async page(url: string): string {\n" +
+		"  return await fetch(url)\n" +
+		"}\n"
+	if _, diags := analyze(src); len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+}
+
+func TestMissingEffect(t *testing.T) {
+	// Each undeclared-but-used effect is reported once, at the first site.
+	src := "extern fn io async fetch(url: string): string\n" +
+		"pub fn page(url: string): string {\n" +
+		"  return fetch(url)\n" +
+		"}\n"
+	_, diags := analyze(src)
+	n := 0
+	for _, d := range diags {
+		if d.Code == CodeMissingEffect {
+			n++
+		}
+	}
+	if n != 2 { // io and async, both undeclared
+		t.Fatalf("missing_effect count = %d, want 2 (got %v)", n, codes(diags))
+	}
+
+	// await outside an async declaration is itself a missing async.
+	src = "extern fn nondet roll(): int\n" +
+		"pub fn nondet f(): int {\n" +
+		"  return await roll()\n" +
+		"}\n"
+	if _, diags := analyze(src); !hasCode(diags, CodeMissingEffect) {
+		t.Errorf("await without async: want missing_effect, got %v", codes(diags))
+	}
+}
+
+func TestMissingEffectOnMethod(t *testing.T) {
+	src := "extern fn io async fetch(url: string): string\n" +
+		"pub type Client = { base: string } impl {\n" +
+		"  pub fn get(path: string): string {\n" +
+		"    return await fetch(self.base + path)\n" +
+		"  }\n" +
+		"}\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeMissingEffect) {
+		t.Fatalf("want missing_effect on the method, got %v", codes(diags))
+	}
+}
+
+func TestUnusedEffect(t *testing.T) {
+	// A declared effect the body never uses is a warning; an extern's
+	// effects are roots and never flagged.
+	_, diags := analyze("pub fn io f(): int -> 1\n")
+	if !hasCode(diags, CodeUnusedEffect) {
+		t.Fatalf("want unused_effect, got %v", codes(diags))
+	}
+	if _, diags := analyze("extern fn io async fetch(url: string): string\n"); len(diags) != 0 {
+		t.Errorf("extern roots should not be checked, got %v", codes(diags))
+	}
+}
+
+func TestEffectPropagatesThroughLambda(t *testing.T) {
+	// A literal's body executes where it is applied, so its effect uses
+	// count toward the enclosing declaration.
+	src := "extern fn nondet roll(): int\n" +
+		"pub fn f(): int {\n" +
+		"  return [1].map(fn(x) -> x + roll()).count()\n" +
+		"}\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeMissingEffect) {
+		t.Errorf("want missing_effect through the lambda, got %v", codes(diags))
+	}
+}

@@ -77,6 +77,10 @@ func Value(e ast.Expr, b Binder) ir.Value {
 			return &ir.Call{Receiver: Value(member.Receiver, b), Method: member.Member.Name, Args: args}
 		}
 		return nil
+	case *ast.AwaitExpr:
+		// await wraps its operand: it marks the suspension point, adding
+		// nothing to the value.
+		return &ir.Await{Value: Value(e.Value, b)}
 	case *ast.FuncLit:
 		// The body lowers in a binder that binds the literal's parameters; its
 		// own parameter values are supplied at evaluation, not here.

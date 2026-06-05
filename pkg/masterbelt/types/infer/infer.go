@@ -137,6 +137,12 @@ func exprType(e ast.Expr, s scope) ir.Type {
 		return recordLitType(e, s)
 	case *ast.FuncLit:
 		return funcLitType(e, s)
+	case *ast.AwaitExpr:
+		// await marks the suspension point and adds nothing to the type.
+		if e.Value == nil {
+			return ir.Invalid
+		}
+		return exprType(e.Value, s)
 	case *ast.CallExpr:
 		// A call through a member access is a method call; any other callee is a
 		// context-specific form (a conversion in a method body, otherwise nothing).
@@ -699,6 +705,9 @@ func checkType(e ast.Expr, want ir.Type, s scope, subst map[string]ir.Type, sink
 	want = types.Substitute(want, subst) // pin what the context already solved
 	sink.checked(e, want)
 	switch e := e.(type) {
+	case *ast.AwaitExpr:
+		// The expectation reaches through await into the awaited value.
+		return checkType(e.Value, want, s, subst, sink)
 	case *ast.FuncLit:
 		fw, ok := want.(*ir.Func)
 		if !ok {
@@ -1088,6 +1097,12 @@ func check(e ast.Expr, s scope, sink *Sink) ir.Type {
 		return checkRecordLit(e, s, sink)
 	case *ast.FuncLit:
 		return checkFuncLit(e, s, sink)
+	case *ast.AwaitExpr:
+		// await marks the suspension point and adds nothing to the type.
+		if e.Value == nil {
+			return ir.Invalid
+		}
+		return check(e.Value, s, sink)
 	case *ast.CallExpr:
 		return callType(e, s, sink)
 	default:

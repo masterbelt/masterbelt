@@ -6,19 +6,24 @@ Module
   TypeDef "Client" pub
     body { base: string }
     method "get" pub
+      effects io async
       param path: string
       result string | error
-      return <none>
-  Func "fetch"
+      return await fetch(self.base.add(ParamRef "path"))
+  Func "fetch" extern
+    effects io async
     param url: string
     result string | error
-  Func "now"
+  Func "now" extern
+    effects nondet
     result datetime
   Func "pageTitle" pub
+    effects io async
     param url: string
     result string | error
-      return <none>
+      return await fetch(ParamRef "url")
   Func "stamp" pub
+    effects nondet
     result datetime
       return now()
   Func "double" pub

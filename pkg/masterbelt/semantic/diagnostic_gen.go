@@ -25,6 +25,7 @@ const (
 	CodeDuplicateOverload      diagnostic.Code = "masterbelt.semantic.duplicate_overload"
 	CodeInvalidOperation       diagnostic.Code = "masterbelt.semantic.invalid_operation"
 	CodeLambdaArityMismatch    diagnostic.Code = "masterbelt.semantic.lambda_arity_mismatch"
+	CodeMissingEffect          diagnostic.Code = "masterbelt.semantic.missing_effect"
 	CodeMissingField           diagnostic.Code = "masterbelt.semantic.missing_field"
 	CodeMissingReturn          diagnostic.Code = "masterbelt.semantic.missing_return"
 	CodeNoMatchingFuncOverload diagnostic.Code = "masterbelt.semantic.no_matching_func_overload"
@@ -44,6 +45,7 @@ const (
 	CodeUnknownField           diagnostic.Code = "masterbelt.semantic.unknown_field"
 	CodeUnknownMember          diagnostic.Code = "masterbelt.semantic.unknown_member"
 	CodeUnknownType            diagnostic.Code = "masterbelt.semantic.unknown_type"
+	CodeUnusedEffect           diagnostic.Code = "masterbelt.semantic.unused_effect"
 	CodeUseNotFound            diagnostic.Code = "masterbelt.semantic.use_not_found"
 )
 
@@ -270,6 +272,21 @@ func newLambdaArityMismatchDiagnostic(offset int, width int, actual int, expecte
 		Severity: diagnostic.Error,
 		Code:     CodeLambdaArityMismatch,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeLambdaArityMismatch, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newMissingEffectDiagnostic(offset int, width int, fn string, effect string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"fn":     diagnostic.Str(fn),
+		"effect": diagnostic.Str(effect),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeMissingEffect,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeMissingEffect, fields),
 		Fields:   fields,
 		Offset:   offset,
 		Width:    width,
@@ -531,6 +548,21 @@ func newUnknownTypeDiagnostic(offset int, width int, name string) diagnostic.Dia
 		Severity: diagnostic.Error,
 		Code:     CodeUnknownType,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeUnknownType, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newUnusedEffectDiagnostic(offset int, width int, fn string, effect string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"fn":     diagnostic.Str(fn),
+		"effect": diagnostic.Str(effect),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Warning,
+		Code:     CodeUnusedEffect,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeUnusedEffect, fields),
 		Fields:   fields,
 		Offset:   offset,
 		Width:    width,

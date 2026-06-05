@@ -34,11 +34,17 @@ func Dump(m *Module) string {
 func dumpFunction(b *strings.Builder, f *Function) {
 	mod := ""
 	if f.Public {
-		mod = " pub"
+		mod += " pub"
+	}
+	if f.Extern {
+		mod += " extern"
 	}
 	fmt.Fprintf(b, "  Func %q%s\n", f.Name, mod)
 	for _, doc := range f.Doc {
 		fmt.Fprintf(b, "    doc %q\n", doc)
+	}
+	if len(f.Effects) > 0 {
+		fmt.Fprintf(b, "    effects %s\n", strings.Join(f.Effects, " "))
 	}
 	for _, p := range f.Params {
 		fmt.Fprintf(b, "    param %s: %s\n", p.Name, typeString(p.Type))
@@ -105,6 +111,9 @@ func dumpMethod(b *strings.Builder, m *Method) {
 	fmt.Fprintf(b, "    method %q%s\n", m.Name, mod)
 	for _, doc := range m.Doc {
 		fmt.Fprintf(b, "      doc %q\n", doc)
+	}
+	if len(m.Effects) > 0 {
+		fmt.Fprintf(b, "      effects %s\n", strings.Join(m.Effects, " "))
 	}
 	for _, p := range m.Params {
 		fmt.Fprintf(b, "      param %s: %s\n", p.Name, typeString(p.Type))
@@ -222,6 +231,8 @@ func dumpValue(v Value) string {
 		return fmt.Sprintf("%s.%s", dumpValue(x.Receiver), x.Field)
 	case *Conversion:
 		return fmt.Sprintf("%s(%s)", x.Type, dumpValue(x.Value))
+	case *Await:
+		return "await " + dumpValue(x.Value)
 	case *NullValue:
 		return "null"
 	default:

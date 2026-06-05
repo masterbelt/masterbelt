@@ -556,6 +556,7 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 	module.Funcs = resolveFuncs(file, at, diags, q.universe(fileID), qualifiedFrom(q, imp), qfns, fnShells)
 	checkMethodBodies(reg, module.Types, q.universe(fileID), qualifiedFrom(q, imp), funcs, qfns, exprSink(at, diags))
 	checkFuncBodies(reg, file, q.universe(fileID), qualifiedFrom(q, imp), funcs, qfns, at, diags)
+	checkEffects(reg, file, module.Types, q.universe(fileID), qualifiedFrom(q, imp), funcs, qfns, at, diags)
 
 	items := diags.Items()
 	sort.SliceStable(items, func(i, j int) bool { return items[i].Offset < items[j].Offset })

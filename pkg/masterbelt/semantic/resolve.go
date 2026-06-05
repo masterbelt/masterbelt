@@ -299,7 +299,7 @@ func (e predicateEnv) Registry() *builtin.Registry { return e.reg }
 // and lowers its body to IR; fns is the file's function shells by name, so a
 // body may call a top-level function. The body is not yet type-checked.
 func resolveMethod(r *infer.TypeResolver, m *ast.MethodDecl, scope map[string]bool, fns bodyFuncs) *ir.Method {
-	method := &ir.Method{Name: m.Name, Public: m.Public, Extern: m.Extern, Doc: m.Doc, Syntax: m}
+	method := &ir.Method{Name: m.Name, Public: m.Public, Extern: m.Extern, Effects: m.Effects, Doc: m.Doc, Syntax: m}
 
 	// Method-introduced type variables: free type names appearing in a parameter
 	// type that the enclosing type does not bind and that name no known type — the
@@ -352,6 +352,8 @@ func resolveFuncs(file *ast.File, at func(ast.Node) span, diags *diagnostic.List
 	seen := make(map[string]bool, len(file.Funcs))
 	for _, fd := range file.Funcs {
 		fn := shells[fd]
+		fn.Extern = fd.Extern
+		fn.Effects = fd.Effects
 		params := make(map[string]bool, len(fd.Params))
 		fn.Params = make([]ir.Param, 0, len(fd.Params))
 		for _, p := range fd.Params {

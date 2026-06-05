@@ -54,6 +54,8 @@ masterbelt.semantic.assertion_not_constant,assertion is not a compile-time const
 masterbelt.semantic.refinement_violation,value {value} does not satisfy {typ}: {predicate}{diagram}
 masterbelt.semantic.refinement_not_bool,where clause must be a bool; got {typ}
 masterbelt.semantic.refinement_not_constant,where clause is not a compile-time predicate
+masterbelt.semantic.missing_effect,function {fn} uses effect {effect} without declaring it
+masterbelt.semantic.unused_effect,function {fn} declares effect {effect} but never uses it
 project.config.missing,masterbelt.toml not found in this directory or any parent
 project.config.invalid,invalid masterbelt.toml: {detail}
 project.config.missing_entry,masterbelt.toml does not set entry

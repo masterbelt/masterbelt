@@ -287,6 +287,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "function literal has " + f["actual"].String() + " parameters; " + f["expected"].String() + " expected"
 		}
 	},
+	"masterbelt.semantic.missing_effect": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "関数 " + f["fn"].String() + " は effect " + f["effect"].String() + " を宣言せずに使用しています"
+		default:
+			return "function " + f["fn"].String() + " uses effect " + f["effect"].String() + " without declaring it"
+		}
+	},
 	"masterbelt.semantic.missing_field": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
@@ -437,6 +445,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "未知の型: " + f["name"].String()
 		default:
 			return "unknown type: " + f["name"].String()
+		}
+	},
+	"masterbelt.semantic.unused_effect": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "関数 " + f["fn"].String() + " は effect " + f["effect"].String() + " を宣言していますが使用していません"
+		default:
+			return "function " + f["fn"].String() + " declares effect " + f["effect"].String() + " but never uses it"
 		}
 	},
 	"masterbelt.semantic.use_not_found": func(loc Locale, f map[string]fmt.Stringer) string {
