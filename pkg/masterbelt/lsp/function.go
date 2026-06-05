@@ -72,6 +72,7 @@ func funcSignature(f *ir.Function) string {
 		b.WriteString(eff + " ")
 	}
 	b.WriteString(f.Name)
+	b.WriteString(typeParamList(f.TypeParams))
 	b.WriteString("(")
 	for i, p := range f.Params {
 		if i > 0 {
@@ -87,6 +88,24 @@ func funcSignature(f *ir.Function) string {
 		b.WriteString(": " + f.Result.String())
 	}
 	return b.String()
+}
+
+// typeParamList renders a generic parameter list as it is declared — "<T>",
+// "<T: foldable<int>>", "<T, U>" — or "" when there are none. It is shared by a
+// function's and a type's signature card, so a bound shows the interface the
+// parameter is fixed to.
+func typeParamList(params []*ir.TypeParam) string {
+	if len(params) == 0 {
+		return ""
+	}
+	parts := make([]string, len(params))
+	for i, p := range params {
+		parts[i] = p.Name
+		if p.Bound != nil {
+			parts[i] += ": " + p.Bound.String()
+		}
+	}
+	return "<" + strings.Join(parts, ", ") + ">"
 }
 
 // funcAt resolves the functions denoted at offset: the declared name in a

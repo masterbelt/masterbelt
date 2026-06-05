@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/types"
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/types/infer"
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/source/cst"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
@@ -233,7 +234,7 @@ func receiverTypeOf(doc view, e ast.Expr, trees map[cst.Green]cst.Tree, offset i
 // then the method's signature. A self-typed parameter resolves to the
 // enclosing impl's type, so its methods bind through it.
 func paramTypeAt(doc view, name string, trees map[cst.Green]cst.Tree, offset int) ir.Type {
-	types := doc.FuncLitTypes()
+	litTypes := doc.FuncLitTypes()
 	var enclosing []*ast.FuncLit
 	forEachFuncLit(doc, func(lit *ast.FuncLit) {
 		if t, ok := trees[lit.Syntax()]; ok && within(t, offset) {
@@ -242,7 +243,7 @@ func paramTypeAt(doc view, name string, trees map[cst.Green]cst.Tree, offset int
 	})
 	for i := len(enclosing) - 1; i >= 0; i-- {
 		lit := enclosing[i]
-		ft := types[lit]
+		ft := litTypes[lit]
 		if ft == nil {
 			continue
 		}
@@ -271,6 +272,27 @@ func paramTypeAt(doc view, name string, trees map[cst.Green]cst.Tree, offset int
 				}
 				return p.Type
 			}
+		}
+	}
+
+	// A parameter of a top-level function body. A generic function's parameter
+	// is a bare TypeVar in the resolved signature, so the type-parameter bounds
+	// are rebound onto it (BindTypeParamBounds) — a `c: T` where T: foldable
+	// then surfaces the bound interface's methods on c.
+	for _, f := range doc.Module().Funcs {
+		if f.Syntax == nil {
+			continue
+		}
+		ft, ok := trees[f.Syntax.Syntax()]
+		if !ok || !within(ft, offset) {
+			continue
+		}
+		bindBounds := infer.BindTypeParamBounds(f.TypeParams)
+		for _, p := range f.Params {
+			if p.Name != name || p.Type == nil || p.Type == ir.Invalid {
+				continue
+			}
+			return types.Substitute(p.Type, bindBounds)
 		}
 	}
 	return nil
