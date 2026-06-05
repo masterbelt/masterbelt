@@ -141,12 +141,13 @@ func (p *Program) TypeOfExpr(file FileID, e ast.Expr) ir.Type {
 	return infer.Expr(e, typeEnv{q: engineQueries{p.db}, file: file})
 }
 
-// BindMethod returns the method recv binds for name — through a named type,
-// a builtin, or a generic application — together with the substitution the
-// binding solved (a list<int> receiver pins the element parameter), or false
-// when the receiver has no such method.
-func (p *Program) BindMethod(recv ir.Type, name string) (*ir.Method, map[string]ir.Type, bool) {
-	return types.BindReceiver(p.db.reg, recv, name)
+// MethodCandidates returns the overload set recv binds for name — through a
+// named type, a builtin, or a generic application — together with the
+// substitution the receiver's type arguments pin (a list<int> receiver pins
+// the element parameter), or false when the receiver has no such method. An
+// un-overloaded name is a one-element set.
+func (p *Program) MethodCandidates(recv ir.Type, name string) ([]*ir.Method, map[string]ir.Type, bool) {
+	return types.Candidates(p.db.reg, recv, name)
 }
 
 // ReceiverMethods returns every method recv binds, with the substitution its

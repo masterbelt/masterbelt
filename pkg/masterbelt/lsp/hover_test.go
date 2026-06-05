@@ -376,6 +376,35 @@ func TestMethodHover(t *testing.T) {
 	})
 }
 
+func TestMethodHoverOverloads(t *testing.T) {
+	// An overloaded name hovers as the whole overload set: every signature,
+	// each under its own doc comment.
+	src := "pub type Score = int32 impl {\n" +
+		"  /// Merge points in.\n" +
+		"  pub fn merge(points: self): self {\n    return self + points\n  }\n" +
+		"  /// Whether an active run counts.\n" +
+		"  pub fn merge(active: bool): bool {\n    return active && self > 0\n  }\n" +
+		"}\n" +
+		"const Base: Score = 100\n" +
+		"const Bumped = Base.merge(50)\n"
+	doc := testView(src)
+
+	h := hover(doc, strings.Index(src, "Base.merge(50)")+7)
+	if h == nil {
+		t.Fatal("no hover on the overloaded call site")
+	}
+	for _, want := range []string{
+		"pub merge(points: self): self",
+		"pub merge(active: bool): bool",
+		"/// Merge points in.",
+		"/// Whether an active run counts.",
+	} {
+		if !strings.Contains(h.Contents.Value, want) {
+			t.Errorf("hover = %q, want it to contain %q", h.Contents.Value, want)
+		}
+	}
+}
+
 func TestMethodHoverPrelude(t *testing.T) {
 	// A prelude method resolves through the builtin's definition, doc and all.
 	src := "const a = 1\nconst b = a.add(2)\n"

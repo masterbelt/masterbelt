@@ -332,14 +332,32 @@ func memberHover(doc view, offset int, trees map[cst.Green]cst.Tree) *protocol.H
 	name := member.Member.Name
 	r := toRange(doc.Buffer(), leaf.Offset(), leaf.End())
 
-	if m, subst, ok := doc.BindMethod(recv, name); ok {
+	if ms, subst, ok := doc.MethodCandidates(recv, name); ok {
 		var b strings.Builder
-		b.WriteString("```masterbelt\n")
-		b.WriteString(methodSignatureSubst(m, subst))
-		b.WriteString("\n```")
-		if len(m.Doc) > 0 {
-			b.WriteString("\n\n")
-			b.WriteString(strings.Join(m.Doc, "\n"))
+		if len(ms) == 1 {
+			// The common single-signature card: the signature, its doc below.
+			b.WriteString("```masterbelt\n")
+			b.WriteString(methodSignatureSubst(ms[0], subst))
+			b.WriteString("\n```")
+			if len(ms[0].Doc) > 0 {
+				b.WriteString("\n\n")
+				b.WriteString(strings.Join(ms[0].Doc, "\n"))
+			}
+		} else {
+			// An overloaded name lists every signature, each under its own doc
+			// comment — the card reads like the impl block itself.
+			b.WriteString("```masterbelt\n")
+			for i, m := range ms {
+				if i > 0 {
+					b.WriteString("\n")
+				}
+				for _, doc := range m.Doc {
+					b.WriteString("/// " + doc + "\n")
+				}
+				b.WriteString(methodSignatureSubst(m, subst))
+				b.WriteString("\n")
+			}
+			b.WriteString("```")
 		}
 		return &protocol.Hover{
 			Contents: protocol.MarkupContent{Kind: protocol.Markdown, Value: b.String()},

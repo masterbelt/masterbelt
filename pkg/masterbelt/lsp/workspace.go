@@ -82,8 +82,8 @@ func (v view) ResolveUseType(u *ast.UseDecl, name string) *ir.TypeDef {
 	return v.ws.prog.ResolveUseType(v.id, u, name)
 }
 
-func (v view) BindMethod(recv ir.Type, name string) (*ir.Method, map[string]ir.Type, bool) {
-	return v.ws.prog.BindMethod(recv, name)
+func (v view) MethodCandidates(recv ir.Type, name string) ([]*ir.Method, map[string]ir.Type, bool) {
+	return v.ws.prog.MethodCandidates(recv, name)
 }
 
 func (v view) TypeOfExpr(e ast.Expr) ir.Type { return v.ws.prog.TypeOfExpr(v.id, e) }

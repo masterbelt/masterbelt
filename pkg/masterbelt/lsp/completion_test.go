@@ -183,6 +183,39 @@ func TestMemberCompletion(t *testing.T) {
 	}
 }
 
+func TestMemberCompletionOverloads(t *testing.T) {
+	// An overloaded name completes once per signature, so the editor's list
+	// shows what each call shape would mean.
+	src := "pub type Score = int32 impl {\n" +
+		"  pub fn merge(points: self): self {\n    return self + points\n  }\n" +
+		"  pub fn merge(active: bool): bool {\n    return active && self > 0\n  }\n" +
+		"}\n" +
+		"const Base: Score = 100\n" +
+		"const Bumped = Base.merge(50)\n"
+	doc := testView(src)
+
+	items := completion(doc, strings.Index(src, "Base.merge(50)")+7).Items
+	var details []string
+	for _, item := range items {
+		if item.Label == "merge" {
+			details = append(details, item.Detail)
+		}
+	}
+	if len(details) != 2 {
+		t.Fatalf("merge completes %d times, want 2: %v", len(details), details)
+	}
+	want := map[string]bool{
+		"pub merge(points: self): self": true,
+		"pub merge(active: bool): bool": true,
+	}
+	for _, d := range details {
+		if !want[d] {
+			t.Errorf("unexpected merge signature %q", d)
+		}
+		delete(want, d)
+	}
+}
+
 func TestMemberCompletionAfterBareDot(t *testing.T) {
 	// The moment after typing the dot: the parse recovered a member access
 	// with its name missing, and completion already knows the receiver.
