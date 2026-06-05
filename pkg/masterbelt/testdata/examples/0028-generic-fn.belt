@@ -1,0 +1,53 @@
+// A generic function (E-17): a top-level function with named type parameters,
+// each optionally bounded by an interface (E-16). A bound names the methods the
+// parameter's type may call in the body; an unbounded parameter is pass-through
+// only — it may be received, stored, and returned, but its methods are unknown.
+// A call resolves each type variable from the argument types (the same Match
+// that solves list.map's element type) and folds at compile time with the
+// concrete type, so there is no runtime dispatch.
+
+/// A behaviour over a keyed collection: the required fold, plus the provided
+/// count derived from it. The same prelude-style interface a bound refers to.
+pub interface foldable<K, V> {
+  fold<A>(init: A, step: fn(acc: A, key: K, value: V): A): A
+
+  /// Provided: the number of elements, folded from the primitive.
+  pub count(): int {
+    return fold(0, fn(acc, key, value) -> acc + 1)
+  }
+}
+
+/// A small bag of ints that folds over its contents — an opt-in implementor of
+/// foldable, so it satisfies a `T: foldable<int, int>` bound.
+pub type Bag = list<int> impl foldable<int, int> {
+  fold<A>(init: A, step: fn(acc: A, key: int, value: int): A): A {
+    return init
+  }
+}
+
+// A bounded type parameter: T is fixed to foldable's own methods in the body
+// (the bound is the only thing known about T), and the result names a concrete
+// type the caller solves — here the same int the collection folds to.
+/// The total of any foldable collection of ints, folded with addition.
+pub fn total<T: foldable<int, int>>(c: T): int {
+  return c.fold(0, fn(acc, key, value) -> acc + value)
+}
+
+// An unbounded type parameter: identity receives and returns a T without
+// calling any method on it — the pass-through case the bound is not needed for.
+/// The argument, unchanged. Works for any type because it touches nothing.
+pub fn identity<T>(x: T): T {
+  return x
+}
+
+// Several parameters share one type variable, tying the arguments and the
+// result to one concrete type the call resolves.
+/// The first of two values of the same type.
+pub fn firstOf<T>(a: T, b: T): T {
+  return a
+}
+
+// The calls resolve each type variable from the arguments and fold with the
+// concrete type: identity<int>, firstOf<int>.
+const N = identity(42)
+const P = firstOf(7, 9)

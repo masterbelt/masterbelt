@@ -1,0 +1,42 @@
+Module
+  Const "N"
+    type invalid
+    value identity(IntLiteral "42")
+  Const "P"
+    type invalid
+    value firstOf(IntLiteral "7", IntLiteral "9")
+  TypeDef "Bag" pub
+    doc "A small bag of ints that folds over its contents — an opt-in implementor of"
+    doc "foldable, so it satisfies a `T: foldable<int, int>` bound."
+    impl foldable<int, int>
+    body list<int>
+    method "fold"
+      param init: A
+      param step: fn(A, int, int): A
+      result A
+      return ParamRef "init"
+  TypeDef "foldable" pub
+    doc "A behaviour over a keyed collection: the required fold, plus the provided"
+    doc "count derived from it. The same prelude-style interface a bound refers to."
+    param "K"
+    param "V"
+    interface
+    required "fold"
+    provided "count"
+    method "fold"
+      param init: A
+      param step: fn(A, K, V): A
+      result A
+    method "count" pub
+      doc "Provided: the number of elements, folded from the primitive."
+      result int
+      return self.fold(IntLiteral "0", (fn(acc, key, value) (return ParamRef "acc".add(IntLiteral "1"))))
+  Func "total" pub
+    doc "The total of any foldable collection of ints, folded with addition."
+    result invalid
+  Func "identity" pub
+    doc "The argument, unchanged. Works for any type because it touches nothing."
+    result invalid
+  Func "firstOf" pub
+    doc "The first of two values of the same type."
+    result invalid
