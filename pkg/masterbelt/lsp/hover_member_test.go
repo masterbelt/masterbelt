@@ -184,6 +184,22 @@ func TestMethodHoverGenericSubstitution(t *testing.T) {
 	}
 }
 
+// TestFieldHoverInsideIf checks that a field access in an if condition is
+// hoverable — the body-expression walk descends through an if's control flow.
+func TestFieldHoverInsideIf(t *testing.T) {
+	src := "type Rec = {\n  id: int8\n} impl {\n" +
+		"  describe(): string {\n    if self.id > 0 {\n      return \"p\"\n    }\n    return \"z\"\n  }\n" +
+		"}\n"
+	doc := testView(src)
+	h := hover(doc, strings.Index(src, "self.id > 0")+5) // the id member of self.id
+	if h == nil {
+		t.Fatal("no hover on the field access in the if condition")
+	}
+	if !strings.Contains(h.Contents.Value, "id: int8") {
+		t.Errorf("hover = %q, want id: int8", h.Contents.Value)
+	}
+}
+
 func TestFieldHover(t *testing.T) {
 	src := "type Rec = {\n  id: int8\n  level: int16\n} impl {\n" +
 		"  get(): int8 {\n    return self.id\n  }\n" +

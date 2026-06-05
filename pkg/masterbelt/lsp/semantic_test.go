@@ -171,6 +171,43 @@ func TestSemanticTokensSwitch(t *testing.T) {
 	}
 }
 
+func TestSemanticTokensIf(t *testing.T) {
+	// if and else colour as keywords like return; the condition's operator and
+	// the branch bodies read through the existing operator and keyword rules.
+	doc := abstract.NewDocument([]byte("pub fn f(n: int): int {\n  if n > 0 {\n    return 1\n  } else {\n    return 0\n  }\n}\n"))
+	got := decode(semanticTokens(doc).Data)
+
+	want := []decodedToken{
+		{1, 2, 2, stKeyword, 0},           // if
+		{1, 5, 1, stVariable, smReadonly}, // n (condition); ">" carries no token
+		{1, 9, 1, stNumber, 0},            // 0
+		{2, 4, 6, stKeyword, 0},           // return
+		{2, 11, 1, stNumber, 0},           // 1
+		{3, 4, 4, stKeyword, 0},           // else
+		{4, 4, 6, stKeyword, 0},           // return
+		{4, 11, 1, stNumber, 0},           // 0
+	}
+
+	// The function header is checked by the other tests; assert on the if's
+	// tokens, found by skipping to the if keyword.
+	start := 0
+	for i, tk := range got {
+		if tk == want[0] {
+			start = i
+			break
+		}
+	}
+	body := got[start:]
+	if len(body) < len(want) {
+		t.Fatalf("got %d body tokens, want at least %d:\n%+v", len(body), len(want), body)
+	}
+	for i := range want {
+		if body[i] != want[i] {
+			t.Errorf("token[%d] = %+v, want %+v", i, body[i], want[i])
+		}
+	}
+}
+
 func TestSemanticTokensStringLiteral(t *testing.T) {
 	doc := abstract.NewDocument([]byte("const X = \"label\"\n"))
 	got := decode(semanticTokens(doc).Data)

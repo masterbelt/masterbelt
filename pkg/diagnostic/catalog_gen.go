@@ -223,6 +223,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "assertion is not a compile-time constant"
 		}
 	},
+	"masterbelt.semantic.condition_not_bool": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "if の条件は bool でなければなりません(" + f["typ"].String() + ")"
+		default:
+			return "if condition must be a bool; got " + f["typ"].String()
+		}
+	},
 	"masterbelt.semantic.constant_overflow": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":

@@ -1,0 +1,282 @@
+# tree
+File
+  FuncDecl
+    LineComment "// if is the boolean control statement: it runs a block when its condition holds,"
+    Newline "\n"
+    LineComment "// otherwise the else branch (another if, for an else-if chain, or a block). An if"
+    Newline "\n"
+    LineComment "// is a statement, not an expression — it yields no value, so each branch drives"
+    Newline "\n"
+    LineComment "// control flow by returning. The value form of a two-way choice is the ternary"
+    Newline "\n"
+    LineComment "// \"?:\" (E-13), not if."
+    Newline "\n"
+    Newline "\n"
+    LineComment "// An else-if chain: the first condition that holds wins, and the trailing return"
+    Newline "\n"
+    LineComment "// covers the values no branch named. else is optional, so a lone guarded return"
+    Newline "\n"
+    LineComment "// needs no else at all."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Fn "fn"
+    Whitespace " "
+    Ident "clamp"
+    ParamList
+      LParen "("
+      Param
+        Ident "x"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "int"
+      Comma ","
+      Whitespace " "
+      Param
+        Ident "lo"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "int"
+      Comma ","
+      Whitespace " "
+      Param
+        Ident "hi"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "int"
+      RParen ")"
+    Colon ":"
+    Whitespace " "
+    TypeName
+      Ident "int"
+    Whitespace " "
+    Block
+      LBrace "{"
+      Newline "\n"
+      Whitespace "  "
+      IfStmt
+        If "if"
+        Whitespace " "
+        BinaryExpr
+          NameRef
+            Ident "x"
+          Whitespace " "
+          Lt "<"
+          Whitespace " "
+          NameRef
+            Ident "lo"
+        Whitespace " "
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            NameRef
+              Ident "lo"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
+        Whitespace " "
+        Else "else"
+        Whitespace " "
+        IfStmt
+          If "if"
+          Whitespace " "
+          BinaryExpr
+            NameRef
+              Ident "x"
+            Whitespace " "
+            Gt ">"
+            Whitespace " "
+            NameRef
+              Ident "hi"
+          Whitespace " "
+          Block
+            LBrace "{"
+            Newline "\n"
+            Whitespace "    "
+            ReturnStmt
+              Return "return"
+              Whitespace " "
+              NameRef
+                Ident "hi"
+            Newline "\n"
+            Whitespace "  "
+            RBrace "}"
+      Newline "\n"
+      Whitespace "  "
+      ReturnStmt
+        Return "return"
+        Whitespace " "
+        NameRef
+          Ident "x"
+      Newline "\n"
+      RBrace "}"
+  FuncDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// A bare guard with no else: the if returns for one case and falls through to the"
+    Newline "\n"
+    LineComment "// trailing return for the rest."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Fn "fn"
+    Whitespace " "
+    Ident "warn"
+    ParamList
+      LParen "("
+      Param
+        Ident "n"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "int"
+      RParen ")"
+    Colon ":"
+    Whitespace " "
+    TypeName
+      Ident "int"
+    Whitespace " "
+    Block
+      LBrace "{"
+      Newline "\n"
+      Whitespace "  "
+      IfStmt
+        If "if"
+        Whitespace " "
+        BinaryExpr
+          NameRef
+            Ident "n"
+          Whitespace " "
+          Gt ">"
+          Whitespace " "
+          Literal
+            Int "100"
+        Whitespace " "
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            Literal
+              Int "0"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
+      Newline "\n"
+      Whitespace "  "
+      ReturnStmt
+        Return "return"
+        Whitespace " "
+        NameRef
+          Ident "n"
+      Newline "\n"
+      RBrace "}"
+  FuncDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// if nests, and a branch body may itself be a switch (or any statement block) —"
+    Newline "\n"
+    LineComment "// the branches share the body executor with switch and the function body."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Fn "fn"
+    Whitespace " "
+    Ident "sign"
+    ParamList
+      LParen "("
+      Param
+        Ident "n"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "int"
+      RParen ")"
+    Colon ":"
+    Whitespace " "
+    TypeName
+      Ident "string"
+    Whitespace " "
+    Block
+      LBrace "{"
+      Newline "\n"
+      Whitespace "  "
+      IfStmt
+        If "if"
+        Whitespace " "
+        BinaryExpr
+          NameRef
+            Ident "n"
+          Whitespace " "
+          Gt ">"
+          Whitespace " "
+          Literal
+            Int "0"
+        Whitespace " "
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            Literal
+              String "\"positive\""
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
+        Whitespace " "
+        Else "else"
+        Whitespace " "
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          IfStmt
+            If "if"
+            Whitespace " "
+            BinaryExpr
+              NameRef
+                Ident "n"
+              Whitespace " "
+              Lt "<"
+              Whitespace " "
+              Literal
+                Int "0"
+            Whitespace " "
+            Block
+              LBrace "{"
+              Newline "\n"
+              Whitespace "      "
+              ReturnStmt
+                Return "return"
+                Whitespace " "
+                Literal
+                  String "\"negative\""
+              Newline "\n"
+              Whitespace "    "
+              RBrace "}"
+          Newline "\n"
+          Whitespace "    "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            Literal
+              String "\"zero\""
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
+      Newline "\n"
+      RBrace "}"
+  Newline "\n"
+  EOF ""
+# diagnostics

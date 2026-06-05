@@ -1,0 +1,26 @@
+Module
+  Func "clamp" pub
+    param x: int
+    param lo: int
+    param hi: int
+    result int
+      if ParamRef "x".lt(ParamRef "lo")
+          return ParamRef "lo"
+      else if ParamRef "x".gt(ParamRef "hi")
+          return ParamRef "hi"
+      return ParamRef "x"
+  Func "warn" pub
+    param n: int
+    result int
+      if ParamRef "n".gt(IntLiteral "100")
+          return IntLiteral "0"
+      return ParamRef "n"
+  Func "sign" pub
+    param n: int
+    result string
+      if ParamRef "n".gt(IntLiteral "0")
+          return StringLiteral "positive"
+      else
+          if ParamRef "n".lt(IntLiteral "0")
+              return StringLiteral "negative"
+          return StringLiteral "zero"

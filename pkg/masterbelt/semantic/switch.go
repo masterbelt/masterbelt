@@ -199,6 +199,8 @@ func stmtReturns(s ast.Stmt, scrutEnum func(ast.Expr) *ir.TypeDef) bool {
 		return s.Value != nil
 	case *ast.SwitchStmt:
 		return switchReturns(s, scrutEnum)
+	case *ast.IfStmt:
+		return ifReturns(s, scrutEnum)
 	default:
 		return false
 	}

@@ -67,6 +67,7 @@ masterbelt.semantic.non_exhaustive_switch,switch on {typ} is not exhaustive: {mi
 masterbelt.semantic.duplicate_switch_arm,duplicate switch arm for {value}
 masterbelt.semantic.arm_value_type_mismatch,cannot use {actual} as a {expected} switch value
 masterbelt.semantic.unreachable_arm,unreachable arm: a previous arm or the wildcard already matches every value
+masterbelt.semantic.condition_not_bool,if condition must be a bool; got {typ}
 project.config.missing,masterbelt.toml not found in this directory or any parent
 project.config.invalid,invalid masterbelt.toml: {detail}
 project.config.missing_entry,masterbelt.toml does not set entry

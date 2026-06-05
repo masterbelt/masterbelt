@@ -25,20 +25,67 @@ func (p *parser) parseBlock() *cst.Node {
 }
 
 // parseStmt parses a single statement: a return statement, a switch statement,
-// or a bare expression statement. The cursor sits on the statement's first
-// significant token.
+// an if statement, or a bare expression statement. The cursor sits on the
+// statement's first significant token.
 func (p *parser) parseStmt() cst.Green {
 	switch {
 	case p.kind() == token.Return:
 		return p.parseReturnStmt()
 	case p.kind() == token.Switch:
 		return p.parseSwitchStmt()
+	case p.kind() == token.If:
+		return p.parseIfStmt()
 	case startsExpr(p.kind()):
 		return p.parseExpr(precLowest)
 	default:
 		p.report(newUnexpectedTokenDiagnostic(p.cur().Offset, p.cur().Width, p.kind().String()))
 		return p.bump()
 	}
+}
+
+// parseIfStmt parses an if statement:
+//
+//	IfStmt := if Expr Block [ else ( IfStmt | Block ) ]
+//
+// The condition is an ordinary expression followed by a mandatory brace block,
+// and an optional else branch is either another if (the else-if chain) or a
+// block. if is a control statement, not an expression: it yields no value, so it
+// never appears in expression position. The cursor sits on "if".
+func (p *parser) parseIfStmt() *cst.Node {
+	children := []cst.Green{p.bump()} // "if"
+	if startsExpr(p.peekSignificant()) {
+		p.skipTrivia(&children)
+		// The condition's "{" opens the then-block, not a record literal: parse
+		// it with the record-literal reading suppressed, exactly as a switch's
+		// scrutinee does (the restriction Rust and Go put on an if condition).
+		p.noRecordLit = true
+		children = append(children, p.parseExpr(precLowest))
+		p.noRecordLit = false
+	} else {
+		p.report(newExpectedExpressionDiagnostic(p.lastStart, 0))
+	}
+	if p.peekSignificant() != token.LBrace {
+		p.report(newUnexpectedTokenDiagnostic(p.cur().Offset, p.cur().Width, p.kind().String()))
+		return cst.NewNode(cst.IfStmt, children)
+	}
+	p.skipTrivia(&children)
+	children = append(children, p.parseBlock()) // the then-block
+	if p.peekSignificant() != token.Else {
+		return cst.NewNode(cst.IfStmt, children)
+	}
+	p.skipTrivia(&children)
+	children = append(children, p.bump()) // "else"
+	switch p.peekSignificant() {
+	case token.If:
+		p.skipTrivia(&children)
+		children = append(children, p.parseIfStmt()) // else-if chain
+	case token.LBrace:
+		p.skipTrivia(&children)
+		children = append(children, p.parseBlock())
+	default:
+		p.report(newUnexpectedTokenDiagnostic(p.cur().Offset, p.cur().Width, p.kind().String()))
+	}
+	return cst.NewNode(cst.IfStmt, children)
 }
 
 // parseSwitchStmt parses a switch statement:
@@ -139,10 +186,10 @@ func (p *parser) parseSwitchArm() *cst.Node {
 	return cst.NewNode(cst.SwitchArm, children)
 }
 
-// startsStmt reports whether kind can begin a statement: a return, a switch, or
-// any expression.
+// startsStmt reports whether kind can begin a statement: a return, a switch, an
+// if, or any expression.
 func startsStmt(kind token.Kind) bool {
-	return kind == token.Return || kind == token.Switch || startsExpr(kind)
+	return kind == token.Return || kind == token.Switch || kind == token.If || startsExpr(kind)
 }
 
 // parseReturnStmt parses "return Expr". The cursor sits on "return".
@@ -246,18 +293,20 @@ func (p *parser) parsePostfix() cst.Green {
 // ")", appending the argument expressions and punctuation to *children. The
 // cursor sits just past the opening "(".
 func (p *parser) parseCallArgs(children *[]cst.Green) {
-	if startsExpr(p.peekSignificant()) {
-		for {
-			p.skipTrivia(children)
-			*children = append(*children, p.parseExpr(precLowest))
-			if p.peekSignificant() == token.Comma {
+	p.bracketed(func() {
+		if startsExpr(p.peekSignificant()) {
+			for {
 				p.skipTrivia(children)
-				*children = append(*children, p.bump()) // ","
-				continue
+				*children = append(*children, p.parseExpr(precLowest))
+				if p.peekSignificant() == token.Comma {
+					p.skipTrivia(children)
+					*children = append(*children, p.bump()) // ","
+					continue
+				}
+				break
 			}
-			break
 		}
-	}
+	})
 	if p.peekSignificant() == token.RParen {
 		p.skipTrivia(children)
 		*children = append(*children, p.bump()) // ")"
@@ -272,11 +321,13 @@ func (p *parser) parseCallArgs(children *[]cst.Green) {
 // the operand token — startsExpr gates every call site, so the default arm is
 // defensive and consumes nothing.
 func (p *parser) parseOperand() cst.Green {
-	// The record-literal restriction applies only to this operand decision (the
-	// scrutinee's leftmost atom); clear it so nested expressions — call
-	// arguments, parenthesized groups — read "{" normally again.
+	// The record-literal restriction holds for the whole top-level expression
+	// (the if condition / switch scrutinee), so a "{" that follows any operand of
+	// it — not only the leftmost — opens the control block rather than a record
+	// literal. It is re-enabled the moment a bracketed context (parens, call
+	// arguments, a collection, a record's field values) makes "{" unambiguous
+	// again; those contexts clear the flag as they recurse.
 	noRecordLit := p.noRecordLit
-	p.noRecordLit = false
 	switch p.kind() {
 	case token.Int, token.String, token.DatetimeLit, token.DurationLit, token.True, token.False, token.Null:
 		return cst.NewNode(cst.Literal, []cst.Green{p.bump()})
@@ -322,32 +373,41 @@ func (p *parser) parseOperand() cst.Green {
 func (p *parser) parseRecordLit(children []cst.Green) *cst.Node {
 	p.skipTrivia(&children)
 	children = append(children, p.bump()) // "{"
-	for {
-		switch p.peekSignificant() {
-		case token.RBrace:
-			p.skipTrivia(&children)
-			children = append(children, p.bump()) // "}"
-			return cst.NewNode(cst.RecordLit, children)
-		case token.EOF, token.Pub, token.Const, token.Type, token.Use, token.Assert:
-			// Unterminated: report the missing "}" and stop before the next
-			// declaration so recovery stays local. The diagnostic anchors at the
-			// last consumed token to stay inside this construct (see lastStart);
-			// the leaves are still lossless.
-			p.report(newUnexpectedTokenDiagnostic(p.lastStart, 0, p.peekSignificant().String()))
-			return cst.NewNode(cst.RecordLit, children)
-		case token.Ident:
-			p.skipTrivia(&children)
-			children = append(children, p.parseRecordField())
-			if p.peekSignificant() == token.Comma {
+	var node *cst.Node
+	// The field values are inside the braces, so a "{" there is again a record
+	// literal, not a control block: the head-expression restriction is lifted for
+	// the body and restored on return.
+	p.bracketed(func() {
+		for {
+			switch p.peekSignificant() {
+			case token.RBrace:
 				p.skipTrivia(&children)
-				children = append(children, p.bump()) // ","
+				children = append(children, p.bump()) // "}"
+				node = cst.NewNode(cst.RecordLit, children)
+				return
+			case token.EOF, token.Pub, token.Const, token.Type, token.Use, token.Assert:
+				// Unterminated: report the missing "}" and stop before the next
+				// declaration so recovery stays local. The diagnostic anchors at the
+				// last consumed token to stay inside this construct (see lastStart);
+				// the leaves are still lossless.
+				p.report(newUnexpectedTokenDiagnostic(p.lastStart, 0, p.peekSignificant().String()))
+				node = cst.NewNode(cst.RecordLit, children)
+				return
+			case token.Ident:
+				p.skipTrivia(&children)
+				children = append(children, p.parseRecordField())
+				if p.peekSignificant() == token.Comma {
+					p.skipTrivia(&children)
+					children = append(children, p.bump()) // ","
+				}
+			default:
+				p.skipTrivia(&children)
+				p.report(newUnexpectedTokenDiagnostic(p.cur().Offset, p.cur().Width, p.kind().String()))
+				children = append(children, p.bump())
 			}
-		default:
-			p.skipTrivia(&children)
-			p.report(newUnexpectedTokenDiagnostic(p.cur().Offset, p.cur().Width, p.kind().String()))
-			children = append(children, p.bump())
 		}
-	}
+	})
+	return node
 }
 
 // parseRecordField parses one field initializer: Ident ":" Expr. A missing ":"
@@ -375,12 +435,14 @@ func (p *parser) parseRecordField() *cst.Node {
 // expression. The cursor sits on "(".
 func (p *parser) parseParenExpr() *cst.Node {
 	children := []cst.Green{p.bump()} // "("
-	if startsExpr(p.peekSignificant()) {
-		p.skipTrivia(&children)
-		children = append(children, p.parseExpr(precLowest))
-	} else {
-		p.report(newExpectedExpressionDiagnostic(p.lastStart, 0))
-	}
+	p.bracketed(func() {
+		if startsExpr(p.peekSignificant()) {
+			p.skipTrivia(&children)
+			children = append(children, p.parseExpr(precLowest))
+		} else {
+			p.report(newExpectedExpressionDiagnostic(p.lastStart, 0))
+		}
+	})
 	if p.peekSignificant() == token.RParen {
 		p.skipTrivia(&children)
 		children = append(children, p.bump()) // ")"
@@ -456,17 +518,22 @@ func (p *parser) parseFuncLit() *cst.Node {
 // type checker, which resolves it from the annotation. The cursor sits on "[".
 func (p *parser) parseCollectionLiteral() *cst.Node {
 	children := []cst.Green{p.bump()} // "["
-	if !startsExpr(p.peekSignificant()) {
-		p.closeBracket(&children)
-		return cst.NewNode(cst.CollectionLit, children)
-	}
-
-	p.skipTrivia(&children)
-	first := p.parseExpr(precLowest)
-	if p.peekSignificant() == token.Colon {
-		return p.parseMapRest(children, first)
-	}
-	return p.parseListRest(children, first)
+	var node *cst.Node
+	p.bracketed(func() {
+		if !startsExpr(p.peekSignificant()) {
+			p.closeBracket(&children)
+			node = cst.NewNode(cst.CollectionLit, children)
+			return
+		}
+		p.skipTrivia(&children)
+		first := p.parseExpr(precLowest)
+		if p.peekSignificant() == token.Colon {
+			node = p.parseMapRest(children, first)
+			return
+		}
+		node = p.parseListRest(children, first)
+	})
+	return node
 }
 
 // parseListRest parses the remaining list elements after the first, then the

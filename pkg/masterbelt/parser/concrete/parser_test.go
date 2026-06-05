@@ -1608,3 +1608,109 @@ func TestParseSwitchLossless(t *testing.T) {
 		assertLossless(t, src)
 	}
 }
+
+// branchNodes returns the direct sub-nodes of an IfStmt: the condition, the
+// then-block, and the optional else branch (a Block or a nested IfStmt).
+func branchNodes(s *cst.Node) []*cst.Node {
+	var out []*cst.Node
+	for _, c := range s.Children() {
+		if n, ok := c.(*cst.Node); ok {
+			out = append(out, n)
+		}
+	}
+	return out
+}
+
+// TestParseIfStmt checks the shape of a parsed if: its condition (suppressing
+// the record-literal reading even after a binary condition), its mandatory
+// then-block, and the else-omitted, else-block, and else-if chain forms.
+func TestParseIfStmt(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+		// sub is the kinds of the IfStmt's direct sub-nodes, in order.
+		sub []cst.Kind
+	}{
+		{
+			"binary condition, no else",
+			"pub fn f(n: int): int {\n  if n > 0 {\n    return 1\n  }\n  return 0\n}\n",
+			[]cst.Kind{cst.BinaryExpr, cst.Block},
+		},
+		{
+			"name condition, else block",
+			"pub fn f(b: bool): int {\n  if b {\n    return 1\n  } else {\n    return 0\n  }\n}\n",
+			[]cst.Kind{cst.NameRef, cst.Block, cst.Block},
+		},
+		{
+			"else-if chain",
+			"pub fn f(n: int): int {\n  if n < 0 {\n    return -1\n  } else if n > 0 {\n    return 1\n  } else {\n    return 0\n  }\n}\n",
+			[]cst.Kind{cst.BinaryExpr, cst.Block, cst.IfStmt},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			root, diags := Parse([]byte(tc.src))
+			if len(diags) != 0 {
+				t.Fatalf("unexpected diagnostics: %v", diags)
+			}
+			s := findFirst(root, cst.IfStmt)
+			if s == nil {
+				t.Fatal("no IfStmt parsed")
+			}
+			got := subNodeKinds(s)
+			if strings.Join(kindStrings(got), ",") != strings.Join(kindStrings(tc.sub), ",") {
+				t.Fatalf("if sub-nodes = %v, want %v", got, tc.sub)
+			}
+			assertLossless(t, tc.src)
+		})
+	}
+}
+
+// TestParseIfNested checks that an if branch body may hold further statements,
+// including a nested if (the else block of sign), so control flow composes.
+func TestParseIfNested(t *testing.T) {
+	src := "pub fn f(n: int): int {\n  if n > 0 {\n    return 1\n  } else {\n    if n < 0 {\n      return -1\n    }\n    return 0\n  }\n}\n"
+	root, diags := Parse([]byte(src))
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	outer := findFirst(root, cst.IfStmt)
+	if outer == nil {
+		t.Fatal("no outer IfStmt")
+	}
+	branches := branchNodes(outer)
+	if len(branches) != 3 || branches[2].Kind() != cst.Block {
+		t.Fatalf("outer branches = %v, want condition, then-block, else-block", subNodeKinds(outer))
+	}
+	if inner := findFirst(branches[2], cst.IfStmt); inner == nil {
+		t.Fatal("else block does not hold a nested IfStmt")
+	}
+	assertLossless(t, src)
+}
+
+// TestParseIfNotExpression checks that if is a statement, not an expression: a
+// constant initializer that tries to use if as a value is a parse error (the
+// value form of a two-way choice is the ternary, not if).
+func TestParseIfNotExpression(t *testing.T) {
+	_, diags := Parse([]byte("const m = if a > b { a } else { b }\n"))
+	if len(diags) == 0 {
+		t.Fatal("expected a parse error for if in expression position, got none")
+	}
+}
+
+// TestParseIfLossless checks that malformed and well-formed ifs alike round-trip
+// to the source byte for byte (the incremental pipeline's invariant).
+func TestParseIfLossless(t *testing.T) {
+	cases := []string{
+		"pub fn f(n: int): int {\n  if n > 0 {\n    return 1\n  }\n  return 0\n}\n",
+		"pub fn f(b: bool): int {\n  if b {\n    return 1\n  } else {\n    return 0\n  }\n}\n",
+		"pub fn f(n: int): int {\n  if n < 0 {\n    return -1\n  } else if n > 0 {\n    return 1\n  }\n  return 0\n}\n",
+		"pub fn f(n: int): int {\n  if\n}\n",            // missing condition and block
+		"pub fn f(n: int): int {\n  if n > 0\n}\n",      // missing then-block
+		"pub fn f(n: int): int {\n  if n > 0 {\n}\n}\n", // empty then-block
+		"pub fn f(n: int): int {\n  if n > 0 {} else\n}\n",
+	}
+	for _, src := range cases {
+		assertLossless(t, src)
+	}
+}

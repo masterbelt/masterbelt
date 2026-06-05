@@ -32,10 +32,11 @@
 //	ParamList     := "(" [ Param ( "," Param )* ] ")"
 //	Param         := Ident ":" TypeExpr
 //	Block         := "{" Stmt* "}"
-//	Stmt          := ReturnStmt | SwitchStmt | Expr
+//	Stmt          := ReturnStmt | SwitchStmt | IfStmt | Expr
 //	ReturnStmt    := return Expr
 //	SwitchStmt    := switch Expr "{" ( SwitchArm ( ("," | NL) SwitchArm )* )? "}"
 //	SwitchArm     := ( Expr ( "," Expr )* | "_" ) "->" ( Stmt | Block )
+//	IfStmt        := if Expr Block [ else ( IfStmt | Block ) ]
 //	Expr          := OrExpr
 //	OrExpr        := AndExpr ( "||" AndExpr )*
 //	AndExpr       := CmpExpr ( "&&" CmpExpr )*
@@ -115,12 +116,14 @@ type parser struct {
 	diags *diagnostic.List
 
 	// noRecordLit suppresses the "Ident {" / "{" record-literal reading of an
-	// operand, so the "{" that opens a switch's arm block is not mistaken for a
-	// record literal on the scrutinee (the same restriction Rust/Go put on the
-	// condition of if/switch). It is set only while parsing the scrutinee's
-	// outermost expression and cleared the moment a bracketed context — parens,
-	// call arguments, a collection, a record's field values — makes "{"
-	// unambiguous again.
+	// operand, so the "{" that opens a switch's arm block or an if's then-block is
+	// not mistaken for a record literal on the scrutinee or condition (the same
+	// restriction Rust/Go put on the head expression of an if/switch). It is set
+	// while parsing that head expression and holds across all of its operands, so
+	// the "{" after a binary condition (if x < lo { ... }) is recognized too. A
+	// bracketed context — parens, call arguments, a collection, a record's field
+	// values — clears it for its inner expressions through bracketed, since a "{"
+	// is unambiguous again inside brackets, and restores it on the way out.
 	noRecordLit bool
 
 	// lastStart is the start offset of the most recently consumed token. A
@@ -174,6 +177,20 @@ func (p *parser) peekSignificant() token.Kind {
 			return p.toks[i].Kind
 		}
 	}
+}
+
+// bracketed runs fn — the parse of a bracketed context's inner content (a
+// parenthesized group, a collection, a call's arguments, a record's field
+// values) — with the noRecordLit restriction lifted, then restores it. Inside
+// brackets a "{" can only be a record literal, never a control block, so the
+// restriction that an if condition or a switch scrutinee carries does not reach
+// the nested expressions; restoring it keeps the restriction in force for the
+// postfix continuation back at the head-expression level.
+func (p *parser) bracketed(fn func()) {
+	saved := p.noRecordLit
+	p.noRecordLit = false
+	fn()
+	p.noRecordLit = saved
 }
 
 // parseFile parses the whole token slice into a File node.

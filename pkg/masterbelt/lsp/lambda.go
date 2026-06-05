@@ -130,7 +130,9 @@ func forEachFuncLit(doc view, fn func(*ast.FuncLit)) {
 // in it.
 func forEachExpr(file *ast.File, fn func(ast.Expr)) {
 	var walkExpr func(e ast.Expr)
-	walkStmts := func(stmts []ast.Stmt) {
+	var walkStmts func(stmts []ast.Stmt)
+	var walkIf func(s *ast.IfStmt)
+	walkStmts = func(stmts []ast.Stmt) {
 		for _, stmt := range stmts {
 			switch stmt := stmt.(type) {
 			case *ast.ReturnStmt:
@@ -139,8 +141,41 @@ func forEachExpr(file *ast.File, fn func(ast.Expr)) {
 				}
 			case *ast.ExprStmt:
 				walkExpr(stmt.X)
+			case *ast.SwitchStmt:
+				// Descend through a switch's scrutinee, arm values, and branch
+				// bodies so an expression anywhere in the control flow is hoverable.
+				if stmt.Scrutinee != nil {
+					walkExpr(stmt.Scrutinee)
+				}
+				for _, arm := range stmt.Arms {
+					for _, v := range arm.Values {
+						walkExpr(v)
+					}
+					walkStmts(arm.Body)
+				}
+				walkStmts(stmt.Else)
+				for _, arm := range stmt.AfterElse {
+					for _, v := range arm.Values {
+						walkExpr(v)
+					}
+					walkStmts(arm.Body)
+				}
+			case *ast.IfStmt:
+				walkIf(stmt)
 			}
 		}
+	}
+	walkIf = func(s *ast.IfStmt) {
+		// The condition and each branch body, recursively through the else-if
+		// chain, so an if condition's type is hoverable.
+		if s.Cond != nil {
+			walkExpr(s.Cond)
+		}
+		walkStmts(s.Then)
+		if s.ElseIf != nil {
+			walkIf(s.ElseIf)
+		}
+		walkStmts(s.Else)
 	}
 	walkExpr = func(e ast.Expr) {
 		if e == nil {

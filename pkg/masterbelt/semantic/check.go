@@ -91,8 +91,25 @@ func forEachBodyExpr(body []ast.Stmt, fn func(ast.Expr)) {
 				}
 				forEachBodyExpr(arm.Body, fn)
 			}
+		case *ast.IfStmt:
+			forEachIfExpr(stmt, fn)
 		}
 	}
+}
+
+// forEachIfExpr calls fn for every top expression of an if statement — its
+// condition and (recursively) the top expressions of its then body, its else-if
+// chain, and its else body — so an expression walk over a body reaches into the
+// control flow an if introduces.
+func forEachIfExpr(s *ast.IfStmt, fn func(ast.Expr)) {
+	if s.Cond != nil {
+		fn(s.Cond)
+	}
+	forEachBodyExpr(s.Then, fn)
+	if s.ElseIf != nil {
+		forEachIfExpr(s.ElseIf, fn)
+	}
+	forEachBodyExpr(s.Else, fn)
 }
 
 // --- method bodies ----------------------------------------------------------
@@ -196,6 +213,8 @@ func checkStmts(stmts []ast.Stmt, want ir.Type, bs infer.BodyScope, env eval.Env
 			for _, arm := range stmt.AfterElse {
 				checkStmts(arm.Body, want, bs, env, noSelf, sink, at, diags)
 			}
+		case *ast.IfStmt:
+			checkIf(stmt, want, bs, env, noSelf, sink, at, diags)
 		}
 	}
 }

@@ -81,6 +81,7 @@ const (
 	ReturnStmt // return Expr
 	SwitchStmt // switch Expr "{" ( SwitchArm ( ("," | NL) SwitchArm )* )? "}"
 	SwitchArm  // ( Expr ( "," Expr )* | "_" ) "->" ( Stmt | Block )
+	IfStmt     // if Expr Block [ else ( IfStmt | Block ) ]
 
 	// Top-level functions.
 	FuncDecl // [doc] [pub] fn Ident ParamList ":" TypeExpr ( Block | "->" Expr )
@@ -136,6 +137,7 @@ var kindNames = [...]string{
 	ReturnStmt:    "ReturnStmt",
 	SwitchStmt:    "SwitchStmt",
 	SwitchArm:     "SwitchArm",
+	IfStmt:        "IfStmt",
 	FuncDecl:      "FuncDecl",
 	UseDecl:       "UseDecl",
 	UseList:       "UseList",

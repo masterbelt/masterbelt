@@ -1,0 +1,32 @@
+File
+  FuncDecl
+    pub
+    name "clamp"
+    param x: int
+    param lo: int
+    param hi: int
+    result int
+      if (call (. Identifier "x" lt) Identifier "lo")
+          return Identifier "lo"
+      else if (call (. Identifier "x" gt) Identifier "hi")
+          return Identifier "hi"
+      return Identifier "x"
+  FuncDecl
+    pub
+    name "warn"
+    param n: int
+    result int
+      if (call (. Identifier "n" gt) IntLit "100")
+          return IntLit "0"
+      return Identifier "n"
+  FuncDecl
+    pub
+    name "sign"
+    param n: int
+    result string
+      if (call (. Identifier "n" gt) IntLit "0")
+          return StringLit "positive"
+      else
+          if (call (. Identifier "n" lt) IntLit "0")
+              return StringLit "negative"
+          return StringLit "zero"
