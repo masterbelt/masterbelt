@@ -126,7 +126,7 @@ func (p *parser) parseIfStmt() *cst.Node {
 		p.report(newExpectedExpressionDiagnostic(p.lastStart, 0))
 	}
 	if p.peekSignificant() != token.LBrace {
-		p.report(newUnexpectedTokenDiagnostic(p.cur().Offset, p.cur().Width, p.kind().String()))
+		p.reportUnexpected()
 		return cst.NewNode(cst.IfStmt, children)
 	}
 	p.skipTrivia(&children)
@@ -144,7 +144,7 @@ func (p *parser) parseIfStmt() *cst.Node {
 		p.skipTrivia(&children)
 		children = append(children, p.parseBlock())
 	default:
-		p.report(newUnexpectedTokenDiagnostic(p.cur().Offset, p.cur().Width, p.kind().String()))
+		p.reportUnexpected()
 	}
 	return cst.NewNode(cst.IfStmt, children)
 }
@@ -171,7 +171,7 @@ func (p *parser) parseSwitchStmt() *cst.Node {
 		p.report(newExpectedExpressionDiagnostic(p.lastStart, 0))
 	}
 	if p.peekSignificant() != token.LBrace {
-		p.report(newUnexpectedTokenDiagnostic(p.cur().Offset, p.cur().Width, p.kind().String()))
+		p.reportUnexpected()
 		return cst.NewNode(cst.SwitchStmt, children)
 	}
 	p.skipTrivia(&children)
@@ -229,7 +229,7 @@ func (p *parser) parseSwitchArm() *cst.Node {
 		children = append(children, p.parseExpr())
 	}
 	if p.peekSignificant() != token.Arrow {
-		p.report(newUnexpectedTokenDiagnostic(p.cur().Offset, p.cur().Width, p.kind().String()))
+		p.reportUnexpected()
 		return cst.NewNode(cst.SwitchArm, children)
 	}
 	p.skipTrivia(&children)
@@ -325,7 +325,7 @@ func (p *parser) parseTernaryTail(cond cst.Green) cst.Green {
 		p.report(newExpectedExpressionDiagnostic(p.lastStart, 0))
 	}
 	if p.peekSignificant() != token.Colon {
-		p.report(newUnexpectedTokenDiagnostic(p.cur().Offset, p.cur().Width, p.kind().String()))
+		p.reportUnexpected()
 		return cst.NewNode(cst.TernaryExpr, children)
 	}
 	p.skipTrivia(&children)
@@ -447,7 +447,7 @@ func (p *parser) parseCallArgs(children *[]cst.Green) {
 		p.skipTrivia(children)
 		*children = append(*children, p.bump()) // ")"
 	} else {
-		p.report(newUnexpectedTokenDiagnostic(p.cur().Offset, p.cur().Width, p.kind().String()))
+		p.reportUnexpected()
 	}
 }
 
@@ -552,7 +552,7 @@ func (p *parser) parseRecordLit(children []cst.Green) *cst.Node {
 func (p *parser) parseRecordField() *cst.Node {
 	children := []cst.Green{p.bump()} // the field name
 	if p.peekSignificant() != token.Colon {
-		p.report(newUnexpectedTokenDiagnostic(p.cur().Offset, p.cur().Width, p.kind().String()))
+		p.reportUnexpected()
 		return cst.NewNode(cst.RecordField, children)
 	}
 	p.skipTrivia(&children)
@@ -583,7 +583,7 @@ func (p *parser) parseParenExpr() *cst.Node {
 		p.skipTrivia(&children)
 		children = append(children, p.bump()) // ")"
 	} else {
-		p.report(newUnexpectedTokenDiagnostic(p.cur().Offset, p.cur().Width, p.kind().String()))
+		p.reportUnexpected()
 	}
 	return cst.NewNode(cst.ParenExpr, children)
 }
@@ -604,7 +604,7 @@ func (p *parser) parseFuncLit() *cst.Node {
 		p.skipTrivia(&children)
 		children = append(children, p.parseParamList(false))
 	} else {
-		p.report(newExpectedParamListDiagnostic(p.cur().Offset, p.cur().Width))
+		p.report(newExpectedParamListDiagnostic(p.lastStart, 0))
 	}
 	if p.peekSignificant() == token.Colon {
 		p.skipTrivia(&children)
@@ -638,7 +638,7 @@ func (p *parser) parseFuncLit() *cst.Node {
 		p.skipTrivia(&children)
 		children = append(children, p.parseBlock())
 	default:
-		p.report(newExpectedFuncBodyDiagnostic(p.cur().Offset, p.cur().Width))
+		p.report(newExpectedFuncBodyDiagnostic(p.lastStart, 0))
 	}
 	return cst.NewNode(cst.FuncLit, children)
 }
@@ -715,7 +715,7 @@ func (p *parser) parseMapRest(children []cst.Green, firstKey cst.Green) *cst.Nod
 func (p *parser) finishMapEntry(key cst.Green) *cst.Node {
 	entry := []cst.Green{key}
 	if p.peekSignificant() != token.Colon {
-		p.report(newUnexpectedTokenDiagnostic(p.cur().Offset, p.cur().Width, p.kind().String()))
+		p.reportUnexpected()
 		return cst.NewNode(cst.MapEntry, entry)
 	}
 	p.skipTrivia(&entry)
@@ -736,7 +736,7 @@ func (p *parser) closeBracket(children *[]cst.Green) {
 		p.skipTrivia(children)
 		*children = append(*children, p.bump()) // "]"
 	} else {
-		p.report(newUnexpectedTokenDiagnostic(p.cur().Offset, p.cur().Width, p.kind().String()))
+		p.reportUnexpected()
 	}
 }
 

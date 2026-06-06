@@ -155,7 +155,7 @@ func (p *parser) parseFuncType() *cst.Node {
 		p.skipTrivia(&children)
 		children = append(children, p.parseParamList(true))
 	} else {
-		p.report(newUnexpectedTokenDiagnostic(p.cur().Offset, p.cur().Width, p.kind().String()))
+		p.reportUnexpected()
 	}
 	if p.peekSignificant() == token.Colon {
 		p.skipTrivia(&children)

@@ -358,6 +358,27 @@ func (p *parser) report(d diagnostic.Diagnostic) {
 	p.diags.Add(d)
 }
 
+// reportUnexpected reports that the next significant token was unexpected,
+// anchoring the diagnostic at the last consumed token (p.lastStart) rather than
+// at the offending token itself.
+//
+// It is used by the recovery paths that give up at an unexpected token and leave
+// it unconsumed for an enclosing construct (or the File-level loop) to handle —
+// the missing "{" of an enum/interface/impl block, the missing ")" of an
+// argument list, the missing ":" of a record field or map entry, and so on. The
+// offending token they stop at can be the start of the next File child (a
+// declaration keyword, or any token an Error node captures, or EOF). Anchoring
+// the diagnostic there would place it exactly on a File-child boundary, where it
+// is indistinguishable from a diagnostic the following child produces at its own
+// start. That ambiguity breaks the incremental diagnostic splice (see Document),
+// which partitions diagnostics by offset across reused/reparsed regions and would
+// double-count — or drop — a boundary-anchored one. Anchoring strictly inside the
+// construct keeps every diagnostic attributable to exactly one File child, the
+// invariant spliceDiags relies on.
+func (p *parser) reportUnexpected() {
+	p.report(newUnexpectedTokenDiagnostic(p.lastStart, 0, p.peekSignificant().String()))
+}
+
 // isTrivia reports whether k is a trivia kind — one the grammar skips over but
 // the tree still retains for losslessness.
 func isTrivia(k token.Kind) bool {

@@ -86,6 +86,64 @@ func TestDocumentScriptedEdits(t *testing.T) {
 	}
 }
 
+// TestDocumentMalformedRecoveryBoundary covers a class of incremental divergence
+// where a malformed declaration's recovery anchored a diagnostic exactly on its
+// own right boundary — the start of the next File child. When an edit made the
+// reparse realign at that boundary (reusing the following declaration verbatim),
+// the diagnostic splice counted that boundary diagnostic twice, so the
+// incrementally maintained diagnostics no longer matched a full parse.
+//
+// Each case is a malformed declaration whose recovery once anchored on its right
+// edge — an unterminated record/collection/paren literal, a record-field or
+// map-entry missing its ":", an else/ternary missing its branch, an impl block or
+// control statement missing its "{", a function missing its body — followed by a
+// reusable declaration. The edit is a no-op-sized splice at the document start, so
+// the whole prefix is reparsed and realigns at the malformed declaration's right
+// boundary, exercising the splice exactly where the boundary diagnostic sat. The
+// oracle is a full parse of the same bytes.
+func TestDocumentMalformedRecoveryBoundary(t *testing.T) {
+	cases := []struct {
+		name    string
+		initial string
+	}{
+		{"unterminated record literal", "pub = {Z\nconst y = 1\n"},
+		{"record field missing colon", "const c = {a b}\nconst y = 1\n"},
+		{"impl block missing brace", "type T impl >\nconst y = 1\n"},
+		{"unterminated collection", "const c = [1\nconst y = 1\n"},
+		{"unterminated paren", "const c = (1\nconst y = 1\n"},
+		{"map entry missing colon", "const c = {1:2, 3\nconst y = 1\n"},
+		{"ternary missing colon", "const c = a ? b\nconst y = 1\n"},
+		{"func decl missing body", "fn f()\nconst y = 1\n"},
+		{"func decl missing param list", "fn f\nconst y = 1\n"},
+		{"enum missing brace", "enum E >\nconst y = 1\n"},
+		{"interface missing brace", "interface I >\nconst y = 1\n"},
+		{"use list missing brace", "use {a from \"m\"\nconst y = 1\n"},
+	}
+
+	// The realigning edits: a true no-op at the start, a single-byte insert at the
+	// start (shifts every offset, so a stale absolute-offset diagnostic shows), and
+	// a delete-then-retype of the leading byte.
+	edits := []struct {
+		name string
+		edit source.Edit
+	}{
+		{"noop at start", source.Edit{Start: 0, End: 0, NewText: nil}},
+		{"insert at start", source.Edit{Start: 1, End: 1, NewText: []byte("9")}},
+		{"delete leading byte", source.Edit{Start: 0, End: 1, NewText: nil}},
+	}
+
+	for _, tc := range cases {
+		for _, e := range edits {
+			t.Run(tc.name+"/"+e.name, func(t *testing.T) {
+				doc := NewDocument([]byte(tc.initial))
+				content := naiveSplice([]byte(tc.initial), e.edit.Start, e.edit.End, e.edit.NewText)
+				doc.Edit(e.edit)
+				assertMatchesFullParse(t, doc, content)
+			})
+		}
+	}
+}
+
 func TestDocumentSequentialEdits(t *testing.T) {
 	// Type a declaration one character at a time, then delete it from the front.
 	doc := NewDocument(nil)

@@ -174,7 +174,7 @@ func (p *parser) parseEnumDecl(lead []cst.Green) *cst.Node {
 		p.skipTrivia(&children)
 		children = append(children, p.bump()) // "{"
 	} else {
-		p.report(newUnexpectedTokenDiagnostic(p.cur().Offset, p.cur().Width, p.kind().String()))
+		p.reportUnexpected()
 		return cst.NewNode(cst.EnumDecl, children)
 	}
 
@@ -266,7 +266,7 @@ func (p *parser) parseInterfaceDecl(lead []cst.Green) *cst.Node {
 		p.skipTrivia(&children)
 		children = append(children, p.bump()) // "{"
 	} else {
-		p.report(newUnexpectedTokenDiagnostic(p.cur().Offset, p.cur().Width, p.kind().String()))
+		p.reportUnexpected()
 		return cst.NewNode(cst.InterfaceDecl, children)
 	}
 
@@ -325,7 +325,7 @@ func (p *parser) parseInterfaceMember(lead []cst.Green) *cst.Node {
 		p.skipTrivia(&children)
 		children = append(children, p.parseParamList(true))
 	} else {
-		p.report(newUnexpectedTokenDiagnostic(p.cur().Offset, p.cur().Width, p.kind().String()))
+		p.reportUnexpected()
 	}
 	if p.peekSignificant() == token.Colon {
 		p.skipTrivia(&children)
@@ -476,7 +476,7 @@ func (p *parser) parseUseList() *cst.Node {
 		p.skipTrivia(&children)
 		children = append(children, p.bump()) // "}"
 	} else {
-		p.report(newUnexpectedTokenDiagnostic(p.cur().Offset, p.cur().Width, p.kind().String()))
+		p.reportUnexpected()
 	}
 	return cst.NewNode(cst.UseList, children)
 }
@@ -557,7 +557,7 @@ func (p *parser) parseFuncDecl(lead []cst.Green) *cst.Node {
 		p.skipTrivia(&children)
 		children = append(children, p.parseParamList(true))
 	} else {
-		p.report(newExpectedParamListDiagnostic(p.cur().Offset, p.cur().Width))
+		p.report(newExpectedParamListDiagnostic(p.lastStart, 0))
 	}
 	if p.peekSignificant() == token.Colon {
 		p.skipTrivia(&children)
@@ -593,8 +593,12 @@ func (p *parser) parseFuncDecl(lead []cst.Green) *cst.Node {
 		children = append(children, p.parseBlock())
 	default:
 		// An extern function has no body: its implementation is the target's.
+		// The body is missing: anchor at the last consumed token rather than the
+		// token that should have opened it, which — when this declaration is
+		// otherwise empty-bodied at end of input or before the next declaration —
+		// is the start of the following File child (see reportUnexpected).
 		if !extern {
-			p.report(newExpectedFuncBodyDiagnostic(p.cur().Offset, p.cur().Width))
+			p.report(newExpectedFuncBodyDiagnostic(p.lastStart, 0))
 		}
 	}
 	return cst.NewNode(cst.FuncDecl, children)
@@ -620,7 +624,7 @@ func (p *parser) parseImplBlock() *cst.Node {
 		p.skipTrivia(&children)
 		children = append(children, p.bump()) // "{"
 	} else {
-		p.report(newUnexpectedTokenDiagnostic(p.cur().Offset, p.cur().Width, p.kind().String()))
+		p.reportUnexpected()
 		return cst.NewNode(cst.ImplBlock, children)
 	}
 	for {
@@ -765,7 +769,7 @@ func (p *parser) parseMethodDecl(lead []cst.Green) *cst.Node {
 		p.skipTrivia(&children)
 		children = append(children, p.parseParamList(true))
 	} else {
-		p.report(newUnexpectedTokenDiagnostic(p.cur().Offset, p.cur().Width, p.kind().String()))
+		p.reportUnexpected()
 	}
 	if p.peekSignificant() == token.Colon {
 		p.skipTrivia(&children)
@@ -816,7 +820,7 @@ func (p *parser) parseParamList(requireType bool) *cst.Node {
 		p.skipTrivia(&children)
 		children = append(children, p.bump()) // ")"
 	} else {
-		p.report(newUnexpectedTokenDiagnostic(p.cur().Offset, p.cur().Width, p.kind().String()))
+		p.reportUnexpected()
 	}
 	return cst.NewNode(cst.ParamList, children)
 }
