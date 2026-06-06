@@ -67,6 +67,7 @@ masterbelt.semantic.non_exhaustive_switch,switch on {typ} is not exhaustive: {mi
 masterbelt.semantic.duplicate_switch_arm,duplicate switch arm for {value}
 masterbelt.semantic.arm_value_type_mismatch,cannot use {actual} as a {expected} switch value
 masterbelt.semantic.unreachable_arm,unreachable arm: a previous arm or the wildcard already matches every value
+masterbelt.semantic.scrutinee_not_comparable,switch needs a comparable scrutinee ({typ}); use match to branch on a record or union type
 masterbelt.semantic.non_exhaustive_match,match on {typ} is not exhaustive: {missing}
 masterbelt.semantic.arm_type_not_in_union,{arm} is not a member of {typ}
 masterbelt.semantic.duplicate_match_arm,duplicate match arm for {arm}

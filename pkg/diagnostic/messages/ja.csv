@@ -67,6 +67,7 @@ masterbelt.semantic.non_exhaustive_switch,{typ} の switch が網羅的ではあ
 masterbelt.semantic.duplicate_switch_arm,switch の arm が重複しています: {value}
 masterbelt.semantic.arm_value_type_mismatch,{actual} を {expected} の switch 値として使用できません
 masterbelt.semantic.unreachable_arm,到達不能な arm です。先行する arm かワイルドカードがすべての値に一致します
+masterbelt.semantic.scrutinee_not_comparable,switch の対象は comparable が必要です ({typ})。record や union を型で分岐するには match を使ってください
 masterbelt.semantic.non_exhaustive_match,{typ} の match が網羅的ではありません: {missing}
 masterbelt.semantic.arm_type_not_in_union,{arm} は {typ} のメンバではありません
 masterbelt.semantic.duplicate_match_arm,match の arm が重複しています: {arm}
