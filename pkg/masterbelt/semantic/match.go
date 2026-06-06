@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/types"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/types/infer"
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
@@ -100,12 +101,14 @@ func checkMatch(m *ast.MatchStmt, bs infer.BodyScope, at func(ast.Node) span, di
 // each member's rendered type — the keying every membership and exhaustiveness
 // check in this file uses, so an arm type matches a member exactly when their
 // rendered forms agree. A nominal alias of a union (type GameValue = Coin | Level)
-// is unwrapped to its underlying union, so a match over the alias dispatches on
-// its members. A non-union type yields the empty set (a match needs a union to
-// dispatch on), so its arms are reported and it is never exhaustive.
+// or a generic union alias (optional<int> = int | null) is unwrapped to its
+// underlying union — through types.UnionType, the same expansion assignability
+// rides on — so a match over the alias dispatches on its members. A non-union
+// type yields the empty set (a match needs a union to dispatch on), so its arms
+// are reported and it is never exhaustive.
 func unionMembers(t ir.Type) map[string]bool {
-	u, ok := underlyingUnion(t).(*ir.Union)
-	if !ok {
+	u := types.UnionType(t)
+	if u == nil {
 		return map[string]bool{}
 	}
 	out := make(map[string]bool, len(u.Members))
@@ -113,23 +116,6 @@ func unionMembers(t ir.Type) map[string]bool {
 		out[m.String()] = true
 	}
 	return out
-}
-
-// underlyingUnion unwraps a nominal alias to the type it is defined as, so a
-// match scrutinee whose type is a named union (type GameValue = Coin | Level)
-// reaches the union it stands for. A self-referential alias is made finite by the
-// visited set; a non-alias (a bare union, a record, a primitive) is returned
-// unchanged.
-func underlyingUnion(t ir.Type) ir.Type {
-	seen := map[*ir.TypeDef]bool{}
-	for {
-		named, ok := t.(*ir.Named)
-		if !ok || named.Def == nil || named.Def.Body == nil || seen[named.Def] {
-			return t
-		}
-		seen[named.Def] = true
-		t = named.Def.Body
-	}
 }
 
 // armNarrowedScope returns the body scope a match arm is checked in: the arm's
