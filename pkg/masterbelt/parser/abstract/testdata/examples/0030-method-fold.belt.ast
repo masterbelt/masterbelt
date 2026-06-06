@@ -25,6 +25,20 @@ File
   ConstDecl
     name "Three"
     value (call (. (call (. (call Identifier "base") increment)) increment))
+  ConstDecl
+    name "Hero"
+    type Character
+    value (record lv: (call Identifier "Level" IntLit "5"))
+  ConstDecl
+    name "Promoted"
+    value (call (. (. Identifier "Hero" lv) increment))
+  ConstDecl
+    name "Squad"
+    type Party
+    value (record leader: (record lv: (call Identifier "Level" IntLit "8")))
+  ConstDecl
+    name "LeaderUp"
+    value (call (. (. (. Identifier "Squad" leader) lv) increment))
   TypeDecl
     doc "A character level, with methods over its underlying int8."
     pub
@@ -41,6 +55,16 @@ File
       param steps: int8
       result self
       return (call (. self add) Identifier "steps")
+  TypeDecl
+    doc "A character with a level field."
+    pub
+    name "Character"
+    body { lv: Level }
+  TypeDecl
+    doc "A party wrapping a character, to exercise a nested field path."
+    pub
+    name "Party"
+    body { leader: Character }
   EnumDecl
     doc "An elemental affinity, with methods that fold over a constant member."
     pub
@@ -84,3 +108,7 @@ File
     cond (call (. (call (. Identifier "Start" increment)) eql) IntLit "11")
   AssertDecl
     cond (call (. (call (. (call Identifier "base") plus) IntLit "4") eql) IntLit "5")
+  AssertDecl
+    cond (call (. (call (. (. Identifier "Hero" lv) increment)) eql) IntLit "6")
+  AssertDecl
+    cond (call (. (call (. (call (. (. (. Identifier "Squad" leader) lv) increment)) increment)) eql) IntLit "10")

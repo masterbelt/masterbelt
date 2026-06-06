@@ -878,12 +878,25 @@ func TestAssertOperatorTypeError(t *testing.T) {
 }
 
 func TestAssertNotConstant(t *testing.T) {
-	// list.len() is an extern method with no compile-time intrinsic: the
-	// condition types as bool but cannot fold, which is itself the error —
-	// an assertion the compiler cannot verify must not pass silently.
-	_, diags := analyze("assert [1, 2, 3].len() == 3\n")
+	// A genuinely unfoldable assertion condition is the error — an assertion the
+	// compiler cannot verify must not pass silently. A pure but unboundedly
+	// recursive call types as bool yet the folder bottoms out at the depth guard,
+	// so it never reaches a value.
+	src := "fn loopy(n: int): bool {\n  return loopy(n)\n}\nassert loopy(1)\n"
+	_, diags := analyze(src)
 	if got := codes(diags); len(got) != 1 || got[0] != CodeAssertionNotConstant {
 		t.Fatalf("codes = %v, want [assertion_not_constant]", got)
+	}
+}
+
+func TestAssertListLenFolds(t *testing.T) {
+	// list.len() now has a compile-time intrinsic (the foldable-completeness
+	// work): the condition folds to true, so the assertion verifies clean. The
+	// map.len() companion folds the same way.
+	for _, src := range []string{"assert [1, 2, 3].len() == 3\n", "assert [\"a\": 1].len() == 1\n"} {
+		if _, diags := analyze(src); len(codes(diags)) != 0 {
+			t.Fatalf("%q: codes = %v, want no diagnostics (len folds)", src, codes(diags))
+		}
 	}
 }
 

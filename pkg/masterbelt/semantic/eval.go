@@ -46,6 +46,19 @@ func (e evalEnv) TypeExprDef(t ast.TypeExpr) *ir.TypeDef {
 	return nominalDefOf(r.ResolveType(t, nil))
 }
 
+// TypeExprType resolves a written annotation to its full type — a record
+// annotation yielding an *ir.Record — through the same universe resolution
+// TypeExprDef uses, minus the nominal-only filter. It is the channel a record
+// field receiver's static type folds through; like TypeExprDef it is a pure
+// universe lookup, never the typeOf query. It satisfies eval.ReceiverTyper.
+func (e evalEnv) TypeExprType(t ast.TypeExpr) ir.Type {
+	if t == nil {
+		return nil
+	}
+	r := &infer.TypeResolver{Defs: e.q.universe(e.file), Qualified: qualifiedFrom(e.q, e.q.importsOf(e.file))}
+	return r.ResolveType(t, nil)
+}
+
 // nominalDefOf returns the definition behind a nominal (or applied generic)
 // type, or nil for any other type form. It is the def a method table is read
 // from — a Named or an App carries one; a union, record, function, primitive, or

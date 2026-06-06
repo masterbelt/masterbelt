@@ -1,0 +1,965 @@
+# tree
+File
+  ConstDecl
+    LineComment "// The collection primitives fold at compile time: list.len and map.len count"
+    Newline "\n"
+    LineComment "// entries, the native fold threads an accumulator over the entries (a list's key"
+    Newline "\n"
+    LineComment "// is the element index, a map's the entry key), and the foldable provided"
+    Newline "\n"
+    LineComment "// methods — count, any, all, map, filter, keys, values — fold through it. The"
+    Newline "\n"
+    LineComment "// folder reaches the provided method bodies through the collection's foldable"
+    Newline "\n"
+    LineComment "// impl without a type query, evaluating each body with self bound to the"
+    Newline "\n"
+    LineComment "// collection, exactly as it folds a concrete method."
+    Newline "\n"
+    Newline "\n"
+    LineComment "// len counts the entries of a list and a map alike."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "ListLen"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        MemberExpr
+          CollectionLit
+            LBracket "["
+            Literal
+              Int "1"
+            Comma ","
+            Whitespace " "
+            Literal
+              Int "2"
+            Comma ","
+            Whitespace " "
+            Literal
+              Int "3"
+            RBracket "]"
+          Dot "."
+          Ident "len"
+        LParen "("
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "MapLen"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        MemberExpr
+          CollectionLit
+            LBracket "["
+            MapEntry
+              Literal
+                String "\"a\""
+              Colon ":"
+              Whitespace " "
+              Literal
+                Int "1"
+            Comma ","
+            Whitespace " "
+            MapEntry
+              Literal
+                String "\"b\""
+              Colon ":"
+              Whitespace " "
+              Literal
+                Int "2"
+            RBracket "]"
+          Dot "."
+          Ident "len"
+        LParen "("
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// The native fold threads an accumulator. Over a list the step sees the element"
+    Newline "\n"
+    LineComment "// index as its key; summing the values, then the indices, folds to a value."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Sum"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        MemberExpr
+          CollectionLit
+            LBracket "["
+            Literal
+              Int "1"
+            Comma ","
+            Whitespace " "
+            Literal
+              Int "2"
+            Comma ","
+            Whitespace " "
+            Literal
+              Int "3"
+            RBracket "]"
+          Dot "."
+          Ident "fold"
+        LParen "("
+        Literal
+          Int "0"
+        Comma ","
+        Whitespace " "
+        FuncLit
+          Fn "fn"
+          ParamList
+            LParen "("
+            Param
+              Ident "acc"
+              Colon ":"
+              Whitespace " "
+              TypeName
+                Ident "int"
+            Comma ","
+            Whitespace " "
+            Param
+              Ident "i"
+              Colon ":"
+              Whitespace " "
+              TypeName
+                Ident "int"
+            Comma ","
+            Whitespace " "
+            Param
+              Ident "v"
+              Colon ":"
+              Whitespace " "
+              TypeName
+                Ident "int"
+            RParen ")"
+          Colon ":"
+          Whitespace " "
+          TypeName
+            Ident "int"
+          Whitespace " "
+          Arrow "->"
+          Whitespace " "
+          BinaryExpr
+            NameRef
+              Ident "acc"
+            Whitespace " "
+            Plus "+"
+            Whitespace " "
+            NameRef
+              Ident "v"
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "IndexSum"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        MemberExpr
+          CollectionLit
+            LBracket "["
+            Literal
+              Int "10"
+            Comma ","
+            Whitespace " "
+            Literal
+              Int "20"
+            Comma ","
+            Whitespace " "
+            Literal
+              Int "30"
+            RBracket "]"
+          Dot "."
+          Ident "fold"
+        LParen "("
+        Literal
+          Int "0"
+        Comma ","
+        Whitespace " "
+        FuncLit
+          Fn "fn"
+          ParamList
+            LParen "("
+            Param
+              Ident "acc"
+              Colon ":"
+              Whitespace " "
+              TypeName
+                Ident "int"
+            Comma ","
+            Whitespace " "
+            Param
+              Ident "i"
+              Colon ":"
+              Whitespace " "
+              TypeName
+                Ident "int"
+            Comma ","
+            Whitespace " "
+            Param
+              Ident "v"
+              Colon ":"
+              Whitespace " "
+              TypeName
+                Ident "int"
+            RParen ")"
+          Colon ":"
+          Whitespace " "
+          TypeName
+            Ident "int"
+          Whitespace " "
+          Arrow "->"
+          Whitespace " "
+          BinaryExpr
+            NameRef
+              Ident "acc"
+            Whitespace " "
+            Plus "+"
+            Whitespace " "
+            NameRef
+              Ident "i"
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// Over a map the step sees the entry key."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "MapSum"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        MemberExpr
+          CollectionLit
+            LBracket "["
+            MapEntry
+              Literal
+                String "\"a\""
+              Colon ":"
+              Whitespace " "
+              Literal
+                Int "1"
+            Comma ","
+            Whitespace " "
+            MapEntry
+              Literal
+                String "\"b\""
+              Colon ":"
+              Whitespace " "
+              Literal
+                Int "2"
+            Comma ","
+            Whitespace " "
+            MapEntry
+              Literal
+                String "\"c\""
+              Colon ":"
+              Whitespace " "
+              Literal
+                Int "3"
+            RBracket "]"
+          Dot "."
+          Ident "fold"
+        LParen "("
+        Literal
+          Int "0"
+        Comma ","
+        Whitespace " "
+        FuncLit
+          Fn "fn"
+          ParamList
+            LParen "("
+            Param
+              Ident "acc"
+              Colon ":"
+              Whitespace " "
+              TypeName
+                Ident "int"
+            Comma ","
+            Whitespace " "
+            Param
+              Ident "k"
+              Colon ":"
+              Whitespace " "
+              TypeName
+                Ident "string"
+            Comma ","
+            Whitespace " "
+            Param
+              Ident "v"
+              Colon ":"
+              Whitespace " "
+              TypeName
+                Ident "int"
+            RParen ")"
+          Colon ":"
+          Whitespace " "
+          TypeName
+            Ident "int"
+          Whitespace " "
+          Arrow "->"
+          Whitespace " "
+          BinaryExpr
+            NameRef
+              Ident "acc"
+            Whitespace " "
+            Plus "+"
+            Whitespace " "
+            NameRef
+              Ident "v"
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// count is the provided method defined on top of fold."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Count"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        MemberExpr
+          CollectionLit
+            LBracket "["
+            Literal
+              Int "1"
+            Comma ","
+            Whitespace " "
+            Literal
+              Int "2"
+            Comma ","
+            Whitespace " "
+            Literal
+              Int "3"
+            Comma ","
+            Whitespace " "
+            Literal
+              Int "4"
+            RBracket "]"
+          Dot "."
+          Ident "count"
+        LParen "("
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// any and all fold to bools."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "AnyBig"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        MemberExpr
+          CollectionLit
+            LBracket "["
+            Literal
+              Int "1"
+            Comma ","
+            Whitespace " "
+            Literal
+              Int "2"
+            Comma ","
+            Whitespace " "
+            Literal
+              Int "3"
+            RBracket "]"
+          Dot "."
+          Ident "any"
+        LParen "("
+        FuncLit
+          Fn "fn"
+          ParamList
+            LParen "("
+            Param
+              Ident "v"
+              Colon ":"
+              Whitespace " "
+              TypeName
+                Ident "int"
+            RParen ")"
+          Colon ":"
+          Whitespace " "
+          TypeName
+            Ident "bool"
+          Whitespace " "
+          Arrow "->"
+          Whitespace " "
+          BinaryExpr
+            NameRef
+              Ident "v"
+            Whitespace " "
+            Gt ">"
+            Whitespace " "
+            Literal
+              Int "2"
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "AllPositive"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        MemberExpr
+          CollectionLit
+            LBracket "["
+            Literal
+              Int "1"
+            Comma ","
+            Whitespace " "
+            Literal
+              Int "2"
+            Comma ","
+            Whitespace " "
+            Literal
+              Int "3"
+            RBracket "]"
+          Dot "."
+          Ident "all"
+        LParen "("
+        FuncLit
+          Fn "fn"
+          ParamList
+            LParen "("
+            Param
+              Ident "v"
+              Colon ":"
+              Whitespace " "
+              TypeName
+                Ident "int"
+            RParen ")"
+          Colon ":"
+          Whitespace " "
+          TypeName
+            Ident "bool"
+          Whitespace " "
+          Arrow "->"
+          Whitespace " "
+          BinaryExpr
+            NameRef
+              Ident "v"
+            Whitespace " "
+            Gt ">"
+            Whitespace " "
+            Literal
+              Int "0"
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// The list-returning provided methods fold to lists. map applies a function to"
+    Newline "\n"
+    LineComment "// each value, filter keeps the values satisfying a predicate."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Doubled"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        MemberExpr
+          CollectionLit
+            LBracket "["
+            Literal
+              Int "1"
+            Comma ","
+            Whitespace " "
+            Literal
+              Int "2"
+            Comma ","
+            Whitespace " "
+            Literal
+              Int "3"
+            RBracket "]"
+          Dot "."
+          Ident "map"
+        LParen "("
+        FuncLit
+          Fn "fn"
+          ParamList
+            LParen "("
+            Param
+              Ident "v"
+              Colon ":"
+              Whitespace " "
+              TypeName
+                Ident "int"
+            RParen ")"
+          Colon ":"
+          Whitespace " "
+          TypeName
+            Ident "int"
+          Whitespace " "
+          Arrow "->"
+          Whitespace " "
+          BinaryExpr
+            NameRef
+              Ident "v"
+            Whitespace " "
+            Star "*"
+            Whitespace " "
+            Literal
+              Int "2"
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Big"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        MemberExpr
+          CollectionLit
+            LBracket "["
+            Literal
+              Int "1"
+            Comma ","
+            Whitespace " "
+            Literal
+              Int "2"
+            Comma ","
+            Whitespace " "
+            Literal
+              Int "3"
+            Comma ","
+            Whitespace " "
+            Literal
+              Int "4"
+            RBracket "]"
+          Dot "."
+          Ident "filter"
+        LParen "("
+        FuncLit
+          Fn "fn"
+          ParamList
+            LParen "("
+            Param
+              Ident "v"
+              Colon ":"
+              Whitespace " "
+              TypeName
+                Ident "int"
+            RParen ")"
+          Colon ":"
+          Whitespace " "
+          TypeName
+            Ident "bool"
+          Whitespace " "
+          Arrow "->"
+          Whitespace " "
+          BinaryExpr
+            NameRef
+              Ident "v"
+            Whitespace " "
+            Gt ">"
+            Whitespace " "
+            Literal
+              Int "2"
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// keys and values read a map's entries in fold order; values on a list yields"
+    Newline "\n"
+    LineComment "// the elements."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Keys"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        MemberExpr
+          CollectionLit
+            LBracket "["
+            MapEntry
+              Literal
+                String "\"x\""
+              Colon ":"
+              Whitespace " "
+              Literal
+                Int "1"
+            Comma ","
+            Whitespace " "
+            MapEntry
+              Literal
+                String "\"y\""
+              Colon ":"
+              Whitespace " "
+              Literal
+                Int "2"
+            RBracket "]"
+          Dot "."
+          Ident "keys"
+        LParen "("
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Values"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        MemberExpr
+          CollectionLit
+            LBracket "["
+            MapEntry
+              Literal
+                String "\"x\""
+              Colon ":"
+              Whitespace " "
+              Literal
+                Int "1"
+            Comma ","
+            Whitespace " "
+            MapEntry
+              Literal
+                String "\"y\""
+              Colon ":"
+              Whitespace " "
+              Literal
+                Int "2"
+            RBracket "]"
+          Dot "."
+          Ident "values"
+        LParen "("
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "ListValues"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        MemberExpr
+          CollectionLit
+            LBracket "["
+            Literal
+              Int "7"
+            Comma ","
+            Whitespace " "
+            Literal
+              Int "8"
+            Comma ","
+            Whitespace " "
+            Literal
+              Int "9"
+            RBracket "]"
+          Dot "."
+          Ident "values"
+        LParen "("
+        RParen ")"
+  AssertDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// Every folded result verifies in an assertion at compile time."
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      CallExpr
+        MemberExpr
+          CollectionLit
+            LBracket "["
+            Literal
+              Int "1"
+            Comma ","
+            Whitespace " "
+            Literal
+              Int "2"
+            Comma ","
+            Whitespace " "
+            Literal
+              Int "3"
+            RBracket "]"
+          Dot "."
+          Ident "len"
+        LParen "("
+        RParen ")"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "3"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      CallExpr
+        MemberExpr
+          CollectionLit
+            LBracket "["
+            MapEntry
+              Literal
+                String "\"a\""
+              Colon ":"
+              Whitespace " "
+              Literal
+                Int "1"
+            Comma ","
+            Whitespace " "
+            MapEntry
+              Literal
+                String "\"b\""
+              Colon ":"
+              Whitespace " "
+              Literal
+                Int "2"
+            RBracket "]"
+          Dot "."
+          Ident "len"
+        LParen "("
+        RParen ")"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "2"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      CallExpr
+        MemberExpr
+          CollectionLit
+            LBracket "["
+            Literal
+              Int "1"
+            Comma ","
+            Whitespace " "
+            Literal
+              Int "2"
+            Comma ","
+            Whitespace " "
+            Literal
+              Int "3"
+            RBracket "]"
+          Dot "."
+          Ident "fold"
+        LParen "("
+        Literal
+          Int "0"
+        Comma ","
+        Whitespace " "
+        FuncLit
+          Fn "fn"
+          ParamList
+            LParen "("
+            Param
+              Ident "acc"
+              Colon ":"
+              Whitespace " "
+              TypeName
+                Ident "int"
+            Comma ","
+            Whitespace " "
+            Param
+              Ident "i"
+              Colon ":"
+              Whitespace " "
+              TypeName
+                Ident "int"
+            Comma ","
+            Whitespace " "
+            Param
+              Ident "v"
+              Colon ":"
+              Whitespace " "
+              TypeName
+                Ident "int"
+            RParen ")"
+          Colon ":"
+          Whitespace " "
+          TypeName
+            Ident "int"
+          Whitespace " "
+          Arrow "->"
+          Whitespace " "
+          BinaryExpr
+            NameRef
+              Ident "acc"
+            Whitespace " "
+            Plus "+"
+            Whitespace " "
+            NameRef
+              Ident "v"
+        RParen ")"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "6"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      CallExpr
+        MemberExpr
+          CollectionLit
+            LBracket "["
+            Literal
+              Int "1"
+            Comma ","
+            Whitespace " "
+            Literal
+              Int "2"
+            Comma ","
+            Whitespace " "
+            Literal
+              Int "3"
+            Comma ","
+            Whitespace " "
+            Literal
+              Int "4"
+            RBracket "]"
+          Dot "."
+          Ident "count"
+        LParen "("
+        RParen ")"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "4"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    CallExpr
+      MemberExpr
+        CollectionLit
+          LBracket "["
+          Literal
+            Int "1"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "2"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "3"
+          RBracket "]"
+        Dot "."
+        Ident "any"
+      LParen "("
+      FuncLit
+        Fn "fn"
+        ParamList
+          LParen "("
+          Param
+            Ident "v"
+            Colon ":"
+            Whitespace " "
+            TypeName
+              Ident "int"
+          RParen ")"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "bool"
+        Whitespace " "
+        Arrow "->"
+        Whitespace " "
+        BinaryExpr
+          NameRef
+            Ident "v"
+          Whitespace " "
+          Gt ">"
+          Whitespace " "
+          Literal
+            Int "2"
+      RParen ")"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    CallExpr
+      MemberExpr
+        CollectionLit
+          LBracket "["
+          Literal
+            Int "1"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "2"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "3"
+          RBracket "]"
+        Dot "."
+        Ident "all"
+      LParen "("
+      FuncLit
+        Fn "fn"
+        ParamList
+          LParen "("
+          Param
+            Ident "v"
+            Colon ":"
+            Whitespace " "
+            TypeName
+              Ident "int"
+          RParen ")"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "bool"
+        Whitespace " "
+        Arrow "->"
+        Whitespace " "
+        BinaryExpr
+          NameRef
+            Ident "v"
+          Whitespace " "
+          Gt ">"
+          Whitespace " "
+          Literal
+            Int "0"
+      RParen ")"
+  Newline "\n"
+  EOF ""
+# diagnostics

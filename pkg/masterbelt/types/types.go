@@ -216,7 +216,7 @@ func Candidates(reg *builtin.Registry, recv ir.Type, method string) ([]*ir.Metho
 	if len(ms) == 0 {
 		return nil, nil, false
 	}
-	return ms, receiverSubst(recv), true
+	return ms, receiverSubst(reg, recv), true
 }
 
 // receiverSubst is the substitution a receiver's type arguments pin: a
@@ -224,17 +224,59 @@ func Candidates(reg *builtin.Registry, recv ir.Type, method string) ([]*ir.Metho
 // type parameter pins the bound interface's parameters from the bound's
 // arguments — a receiver typed T where T: foldable<int, int> binds the
 // interface's K = int, V = int, so fold's signature reads against them.
-func receiverSubst(recv ir.Type) map[string]ir.Type {
+//
+// A receiver that opts into an interface also binds that interface's own
+// parameters from its impl tag: a list<int> with impl foldable<int, T> binds
+// the foldable parameters K = int and V = int (T pinned to int by the receiver),
+// so a provided method whose signature reads against K or V — keys(): list<K>,
+// values(): list<V> — instantiates to the receiver's element type rather than
+// leaving K/V free.
+func receiverSubst(reg *builtin.Registry, recv ir.Type) map[string]ir.Type {
 	if v, ok := recv.(*ir.TypeVar); ok && v.Bound != nil {
-		return receiverSubst(v.Bound)
+		return receiverSubst(reg, v.Bound)
 	}
 	subst := map[string]ir.Type{}
-	if app, ok := recv.(*ir.App); ok && app.Def != nil && len(app.Args) == len(app.Def.Params) {
-		for i, p := range app.Def.Params {
+	def := defOf(reg, recv)
+	if app, ok := recv.(*ir.App); ok && def != nil && len(app.Args) == len(def.Params) {
+		for i, p := range def.Params {
 			subst[p.Name] = app.Args[i]
 		}
 	}
+	addImplSubst(reg, def, subst, map[*ir.TypeDef]bool{})
 	return subst
+}
+
+// addImplSubst records, into subst, the interface parameters each impl the
+// definition opts into binds — composing with what subst already binds, so an
+// impl tag foldable<int, T> over a receiver that pinned T = int binds V = int.
+// It walks the underlying type as well (a nominal type inherits its base's
+// impls), with seen guarding a cyclic definition. An interface parameter only
+// appears in a provided method's signature, so adding these bindings never
+// disturbs a name the receiver's own parameters already pinned.
+func addImplSubst(reg *builtin.Registry, def *ir.TypeDef, subst map[string]ir.Type, seen map[*ir.TypeDef]bool) {
+	if def == nil || seen[def] {
+		return
+	}
+	seen[def] = true
+	for _, impl := range def.Impls {
+		idef := defOf(reg, impl)
+		if idef == nil || idef.Interface == nil {
+			continue
+		}
+		app, ok := impl.(*ir.App)
+		if !ok || len(app.Args) != len(idef.Params) {
+			continue
+		}
+		for i, p := range idef.Params {
+			if _, pinned := subst[p.Name]; pinned {
+				continue // a nearer binding wins; do not overwrite it
+			}
+			subst[p.Name] = Substitute(app.Args[i], subst)
+		}
+	}
+	if !def.Builtin {
+		addImplSubst(reg, defOf(reg, def.Body), subst, seen)
+	}
 }
 
 // Overload is one resolution of an overloaded method call: the selected
@@ -341,7 +383,7 @@ func ReceiverMethods(reg *builtin.Registry, recv ir.Type) ([]*ir.Method, map[str
 		}
 		d = defOf(reg, d.Body)
 	}
-	return out, receiverSubst(recv), true
+	return out, receiverSubst(reg, recv), true
 }
 
 // Substitute replaces every bound type variable in t with its binding from

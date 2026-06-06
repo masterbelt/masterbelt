@@ -73,6 +73,22 @@ const Thirteen = Start.plus(3)
 // self-returning methods keeps the type: base() is a Level, so each step folds.
 const Three = base().increment().increment()
 
-// The nominal methods fold in assertions too.
+// A record field's static type is read from the record type's field annotation
+// (channel 6): Hero.lv is a Level, so a method call on it folds — and a nested
+// path or a chain resolves the same way, each step reading the next field
+// annotation.
+/// A character with a level field.
+pub type Character = { lv: Level }
+/// A party wrapping a character, to exercise a nested field path.
+pub type Party = { leader: Character }
+
+const Hero: Character = { lv: Level(5) }
+const Promoted = Hero.lv.increment()
+const Squad: Party = { leader: { lv: Level(8) } }
+const LeaderUp = Squad.leader.lv.increment()
+
+// The nominal methods fold in assertions too, including off a record field.
 assert Start.increment() == 11
 assert base().plus(4) == 5
+assert Hero.lv.increment() == 6
+assert Squad.leader.lv.increment().increment() == 10

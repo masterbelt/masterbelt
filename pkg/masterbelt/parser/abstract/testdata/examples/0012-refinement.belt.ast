@@ -16,6 +16,10 @@ File
     type Level
     value IntLit "100"
   ConstDecl
+    name "ValidScore"
+    type Score
+    value IntLit "75"
+  ConstDecl
     name "Unrefined"
     value IntLit "70000"
   TypeDecl
@@ -41,3 +45,14 @@ File
       pub
       result self
       return (call (. self add) IntLit "1")
+  TypeDecl
+    doc "A score that is valid only when it lies in the 0..100 band."
+    pub
+    name "Score"
+    body int32
+    where (call (. self inBand))
+    method "inBand"
+      doc "Whether the score is within the valid band."
+      pub
+      result bool
+      return (call (. (call (. self gteq) IntLit "0") anan) (call (. self lteq) IntLit "100"))

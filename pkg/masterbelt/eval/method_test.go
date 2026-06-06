@@ -135,6 +135,16 @@ func (e typeEnv) TypeExprDef(t ast.TypeExpr) *ir.TypeDef {
 	return e.LookupType(n.Name)
 }
 
+// TypeExprType resolves a written annotation to its type: a nominal name to its
+// Named type, otherwise nil (these tests use only nominal annotations). It
+// satisfies eval.ReceiverTyper.
+func (e typeEnv) TypeExprType(t ast.TypeExpr) ir.Type {
+	if def := e.TypeExprDef(t); def != nil {
+		return &ir.Named{Def: def}
+	}
+	return nil
+}
+
 // fn builds a non-extern, pure top-level function declaration.
 func fn(name string, params []*ast.ParamDef, result ast.TypeExpr, body ...ast.Stmt) *ast.FuncDecl {
 	return ast.NewFuncDecl(nil, true, false, nil, name, nil, params, result, body, nil)

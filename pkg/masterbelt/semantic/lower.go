@@ -51,6 +51,10 @@ func (b constBinder) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
 		if def, idx := assocConstAccess(b.q.universe(b.file), e); idx >= 0 {
 			return &ir.AssocConstValue{Def: def, Index: idx}
 		}
+		// Otherwise the receiver is a value: a field access on a record-typed
+		// constant (Hero.lv), reading the field — the same value form a method body
+		// lowers, so a const initializer reading a record field has a value graph.
+		return &ir.FieldAccess{Receiver: sub(e.Receiver), Field: e.Member.Name}
 	case *ast.CallExpr:
 		switch callee := e.Callee.(type) {
 		case *ast.Identifier:

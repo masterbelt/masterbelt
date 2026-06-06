@@ -196,6 +196,12 @@ func resolveInterfaceMember(r *infer.TypeResolver, reg *builtin.Registry, self i
 	method.Result = r.ResolveType(m.Result, mscope)
 	if m.Body != nil {
 		method.Body = lower.Body(m.Body, bodyBinder{r: r, reg: reg, params: params, paramTypes: resolvedParams, selfType: self, tscope: mscope, funcs: fns, self: true})
+		// A provided member carries an AST syntax link, the way a concrete method
+		// does, so the constant folder reaches its body: it folds a provided method
+		// call (a list's count/keys/...) by evaluating this body with self bound to
+		// the receiver, exactly as it folds a concrete method. A required member
+		// (no body) keeps a nil Syntax — its implementation is the implementor's.
+		method.Syntax = ast.NewMethodDecl(m.Doc, m.Public, false, nil, m.Name, m.TypeParams, m.Params, m.Result, m.Body, nil)
 	}
 	return method
 }
@@ -297,7 +303,6 @@ func resolveDecl(env eval.Env, r *infer.TypeResolver, reg *builtin.Registry, td 
 	// The associated constants are resolved before the where-clause, so a
 	// self-referential predicate (`where self <= Percent.Max`) can read them.
 	resolveAssocConsts(env, r, reg, td, def, scope, at, diags)
-	resolveWhere(r, reg, td, def, at, diags)
 	// Same-name methods are overloads — legal as long as their parameter
 	// types differ. A signature that repeats an earlier one (the same name
 	// and the same parameter-type list) is a true redeclaration: the first
@@ -319,6 +324,10 @@ func resolveDecl(env eval.Env, r *infer.TypeResolver, reg *builtin.Registry, td 
 		seen[key] = true
 		def.Methods = append(def.Methods, rm)
 	}
+	// The where-clause is resolved last, after the methods, so a predicate that
+	// calls a method of the type (`where self.isValid()`) can resolve it — self
+	// is the nominal type, and its impl methods are now on the definition.
+	resolveWhere(r, reg, td, def, at, diags)
 }
 
 // resolveAssocConsts resolves a type's associated constants — the impl block's

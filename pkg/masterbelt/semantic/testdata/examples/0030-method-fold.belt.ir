@@ -31,6 +31,22 @@ Module
     type Level
     value base().increment().increment()
     eval 3
+  Const "Hero"
+    type Character
+    value {lv: Level(IntLiteral "5")}
+    eval { lv: 5 }
+  Const "Promoted"
+    type Level
+    value Reference -> "Hero".lv.increment()
+    eval 6
+  Const "Squad"
+    type Party
+    value {leader: {lv: Level(IntLiteral "8")}}
+    eval { leader: { lv: 8 } }
+  Const "LeaderUp"
+    type Level
+    value Reference -> "Squad".leader.lv.increment()
+    eval 9
   TypeDef "Level" pub
     doc "A character level, with methods over its underlying int8."
     body int8
@@ -43,6 +59,12 @@ Module
       param steps: int8
       result self
       return self.add(ParamRef "steps")
+  TypeDef "Character" pub
+    doc "A character with a level field."
+    body { lv: Level }
+  TypeDef "Party" pub
+    doc "A party wrapping a character, to exercise a nested field path."
+    body { leader: Character }
   TypeDef "Element" pub
     doc "An elemental affinity, with methods that fold over a constant member."
     enum int
@@ -120,3 +142,16 @@ Module
       base().plus(4) == 5
       ^      ^       ^
       1      5       true
+  Assert "Hero.lv.increment() == 6"
+    eval true
+      Hero.lv.increment() == 6
+      ^    ^  ^           ^
+      |    5  6           true
+      { lv: 5 }
+  Assert "Squad.leader.lv.increment().increment() == 10"
+    eval true
+      Squad.leader.lv.increment().increment() == 10
+      ^     ^      ^  ^           ^           ^
+      |     |      8  9           10          true
+      |     { lv: 8 }
+      { leader: { lv: 8 } }

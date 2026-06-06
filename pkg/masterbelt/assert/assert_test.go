@@ -120,7 +120,7 @@ func TestDiagramSelf(t *testing.T) {
 		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
 	pred := file.Types[0].Where
-	got := assert.DiagramSelf(pred, ir.IntConstant(big.NewInt(70000)), fileEnv{file: file, reg: builtin.Default()})
+	got := assert.DiagramSelf(pred, ir.IntConstant(big.NewInt(70000)), nil, fileEnv{file: file, reg: builtin.Default()})
 	want := "self >= 1 && self <= 65535\n" +
 		"^    ^    ^  ^    ^\n" +
 		"|    true |  |    false\n" +
