@@ -290,6 +290,83 @@ func TestGenericFuncSolvesThroughRecordParam(t *testing.T) {
 	}
 }
 
+// TestGenericFuncOperatorBoundOverBuiltins checks the operator contracts the
+// prelude declares — comparable, orderable, numeric — work as generic bounds over
+// the builtin types that opt into them. A bounded parameter calls the bound
+// interface's operator method in the body (the bounded-TypeVar method resolution),
+// and a call with a conforming builtin argument is accepted while a non-conforming
+// one is reported. These pin the operator-interface payoff: write the bound, not
+// the type.
+func TestGenericFuncOperatorBoundOverBuiltins(t *testing.T) {
+	// orderable: max calls a.gteq(b) on the bounded parameter; int and string
+	// both impl orderable, so both calls type-check and bind T.
+	t.Run("orderable", func(t *testing.T) {
+		src := "pub fn max<T: orderable>(a: T, b: T): T {\n" +
+			"  return a.gteq(b) ? a : b\n" +
+			"}\n" +
+			"const I = max(3, 7)\n" +
+			"const S = max(\"a\", \"b\")\n"
+		m, diags := analyze(src)
+		if len(diags) != 0 {
+			t.Fatalf("max over orderable builtins should be clean; got %v", codes(diags))
+		}
+		if i := constOf(m, "I"); i == nil || i.Type.String() != "nint" {
+			t.Errorf("I type = %v, want nint", i)
+		}
+		if s := constOf(m, "S"); s == nil || s.Type.String() != "string" {
+			t.Errorf("S type = %v, want string", s)
+		}
+	})
+
+	// comparable: same calls a.eql(b) on the bounded parameter; bool and int
+	// both impl comparable.
+	t.Run("comparable", func(t *testing.T) {
+		src := "pub fn same<T: comparable>(a: T, b: T): bool {\n" +
+			"  return a.eql(b)\n" +
+			"}\n" +
+			"const A = same(1, 1)\n" +
+			"const B = same(true, false)\n"
+		m, diags := analyze(src)
+		if len(diags) != 0 {
+			t.Fatalf("same over comparable builtins should be clean; got %v", codes(diags))
+		}
+		if a := constOf(m, "A"); a == nil || a.Type.String() != "bool" {
+			t.Errorf("A type = %v, want bool", a)
+		}
+		if b := constOf(m, "B"); b == nil || b.Type.String() != "bool" {
+			t.Errorf("B type = %v, want bool", b)
+		}
+	})
+
+	// numeric: twice calls a.add(a) on the bounded parameter; int impls numeric.
+	t.Run("numeric", func(t *testing.T) {
+		src := "pub fn twice<T: numeric>(a: T): T {\n" +
+			"  return a.add(a)\n" +
+			"}\n" +
+			"const N = twice(21)\n"
+		m, diags := analyze(src)
+		if len(diags) != 0 {
+			t.Fatalf("twice over a numeric builtin should be clean; got %v", codes(diags))
+		}
+		if n := constOf(m, "N"); n == nil || n.Type.String() != "nint" {
+			t.Errorf("N type = %v, want nint", n)
+		}
+	})
+
+	// A type that does not opt into the bound is reported. string impls
+	// comparable and orderable but not numeric, so twice("x") fails the bound.
+	t.Run("not satisfied", func(t *testing.T) {
+		src := "pub fn twice<T: numeric>(a: T): T {\n" +
+			"  return a.add(a)\n" +
+			"}\n" +
+			"const Bad = twice(\"x\")\n"
+		_, diags := analyze(src)
+		if !hasCode(diags, CodeBoundNotSatisfied) {
+			t.Fatalf("string does not impl numeric; want bound_not_satisfied, got %v", codes(diags))
+		}
+	})
+}
+
 // funcOf returns the resolved function of the given name in the module, or nil.
 func funcOf(m *ir.Module, name string) *ir.Function {
 	for _, f := range m.Funcs {
