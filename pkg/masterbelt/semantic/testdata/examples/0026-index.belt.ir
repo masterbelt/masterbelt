@@ -6,11 +6,11 @@ Module
   Const "First"
     type nint | error
     value Reference -> "Xs".get(IntLiteral "0")
-    eval 10
+    eval (nint) 10
   Const "Third"
     type nint | error
     value Reference -> "Xs".get(IntLiteral "2")
-    eval 30
+    eval (nint) 30
   Const "Tbl"
     type map<string, nint>
     value [StringLiteral "sword": IntLiteral "100", StringLiteral "shield": IntLiteral "50"]
@@ -18,7 +18,7 @@ Module
   Const "Sword"
     type nint | error
     value Reference -> "Tbl".get(StringLiteral "sword")
-    eval 100
+    eval (nint) 100
   Const "Bumped"
     type list<nint>
     value bumpFirst()

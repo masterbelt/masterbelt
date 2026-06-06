@@ -2,11 +2,11 @@ Module
   Const "Present"
     type optional<nint>
     value IntLiteral "5"
-    eval 5
+    eval (nint) 5
   Const "Absent"
     type optional<nint>
     value <none>
-    eval null
+    eval (null) null
   Const "FromPresent"
     type nint
     value orZero(IntLiteral "5")
