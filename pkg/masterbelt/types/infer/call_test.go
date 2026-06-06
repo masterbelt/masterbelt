@@ -196,6 +196,42 @@ func TestFuncCallUninferableTypeParam(t *testing.T) {
 	}
 }
 
+// TestFuncCallOverloadCrossArgConsistency checks the overloaded generic path
+// enforces cross-argument type-variable consistency: pair is overloaded with a
+// non-generic arity-1 form and a generic pair<T>(a: T, b: T) form, and
+// pair(7, "x") binds T to int then string — which must be reported, not
+// silently accepted. Before the fix, each argument matched against a fresh
+// substitution, so the inconsistency was invisible and the call typed as int.
+func TestFuncCallOverloadCrossArgConsistency(t *testing.T) {
+	env := emptyEnv()
+	wrapStr := ast.NewFuncDecl(nil, true, false, nil, "pair", nil,
+		[]*ast.ParamDef{param("s", namedType("string"))}, namedType("string"),
+		[]ast.Stmt{ret(ident("s"))}, nil)
+	wrapGen := ast.NewFuncDecl(nil, true, false, nil, "pair",
+		[]*ast.TypeParam{ast.NewTypeParam("T", nil, nil)},
+		[]*ast.ParamDef{param("a", namedType("T")), param("b", namedType("T"))}, namedType("T"),
+		[]ast.Stmt{ret(ident("a"))}, nil)
+	env.fns = map[string][]*ast.FuncDecl{"pair": {wrapStr, wrapGen}}
+
+	var r report
+	got := Check(fnCall("pair", intLit("7"), stringLit("x")), env, r.sink())
+	if got != ir.Invalid {
+		t.Errorf("pair(7, \"x\") = %s, want invalid (T cannot be both int and string)", got)
+	}
+	if len(r.mismatches) != 1 || r.mismatches[0] != "string -> int" {
+		t.Errorf("want one mismatch [string -> int], got %+v", r.mismatches)
+	}
+
+	// The consistent call still types as the substituted result.
+	var r2 report
+	if got := Check(fnCall("pair", intLit("7"), intLit("9")), env, r2.sink()).String(); got != "int" {
+		t.Errorf("pair(7, 9) = %s, want int", got)
+	}
+	if len(r2.mismatches)+len(r2.noMatchingFunc) != 0 {
+		t.Errorf("a consistent call must not report: %+v", r2)
+	}
+}
+
 func TestCallTypeLambdaFailures(t *testing.T) {
 	env := genericListEnv()
 
