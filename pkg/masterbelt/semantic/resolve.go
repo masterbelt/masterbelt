@@ -196,6 +196,12 @@ func resolveInterfaceMember(r *infer.TypeResolver, reg *builtin.Registry, self i
 	method.Result = r.ResolveType(m.Result, mscope)
 	if m.Body != nil {
 		method.Body = lower.Body(m.Body, bodyBinder{r: r, reg: reg, params: params, paramTypes: resolvedParams, selfType: self, tscope: mscope, funcs: fns, self: true})
+		// A provided member carries an AST syntax link, the way a concrete method
+		// does, so the constant folder reaches its body: it folds a provided method
+		// call (a list's count/keys/...) by evaluating this body with self bound to
+		// the receiver, exactly as it folds a concrete method. A required member
+		// (no body) keeps a nil Syntax — its implementation is the implementor's.
+		method.Syntax = ast.NewMethodDecl(m.Doc, m.Public, false, nil, m.Name, m.TypeParams, m.Params, m.Result, m.Body, nil)
 	}
 	return method
 }

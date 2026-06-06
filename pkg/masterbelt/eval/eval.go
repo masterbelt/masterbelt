@@ -309,13 +309,29 @@ func evalExpr(e ast.Expr, ctx evalCtx) *ir.Constant {
 			// a top-level function applies its body. A local binding shadows
 			// both (and a call of a local is not foldable here).
 			if id, isIdent := e.Callee.(*ast.Identifier); isIdent {
-				if _, isLocal := ctx.locals[id.Name]; !isLocal {
-					if def := ctx.env.LookupType(id.Name); def != nil {
-						return convert(def, e.Arguments, sub)
+				// A local bound to a function value is applied — a higher-order
+				// parameter (a foldable's pred/f) called by name inside the body. It
+				// shadows a type or function of the same name, exactly as the type
+				// rules read the local.
+				if v, isLocal := ctx.locals[id.Name]; isLocal {
+					if v != nil && v.Kind == ir.ConstFunc {
+						return applyLocalFunc(sub, v, e.Arguments)
 					}
-					if cands := ctx.env.ResolveFunc(id); len(cands) > 0 {
-						return applyFunc(cands, e.Arguments, sub)
-					}
+					return nil // a call of a non-function local does not fold
+				}
+				if def := ctx.env.LookupType(id.Name); def != nil {
+					return convert(def, e.Arguments, sub)
+				}
+				if cands := ctx.env.ResolveFunc(id); len(cands) > 0 {
+					return applyFunc(cands, e.Arguments, sub)
+				}
+				// A bare call inside a method body whose name is a method of self
+				// is an implicit self-call (the self omitted) — the form an
+				// interface's provided method uses to call the required fold. It
+				// dispatches exactly as a written self.name(...) would, through
+				// the self value and its owning definition.
+				if v, ok := selfCall(ctx, sub, id.Name, e.Arguments); ok {
+					return v
 				}
 			}
 			return nil
@@ -347,6 +363,38 @@ func evalExpr(e ast.Expr, ctx evalCtx) *ir.Constant {
 	default:
 		return nil
 	}
+}
+
+// applyLocalFunc folds a call of a function-valued local fn(args): the arguments
+// fold in the caller's context, then the closure applies over its captured
+// environment. It is how a higher-order parameter — a foldable's pred or f,
+// called by name inside the provided method's fold step — folds.
+func applyLocalFunc(ctx evalCtx, fn *ir.Constant, argExprs []ast.Expr) *ir.Constant {
+	args := make([]*ir.Constant, len(argExprs))
+	for i, a := range argExprs {
+		if args[i] = evalExpr(a, ctx); args[i] == nil {
+			return nil
+		}
+	}
+	return apply(ctx, fn, args)
+}
+
+// selfCall folds an implicit self-call name(args) inside a method body: a bare
+// call whose name resolves to a method of self's owning type, dispatched the way
+// a written self.name(args) is. It reports whether it handled the call — false
+// when there is no self in scope, leaving the bare-call path's normal failure.
+// The receiver expression is the synthetic self, so the call's receiver-def
+// channel resolves to ctx.selfDef exactly as self.name(...) does, and a
+// collection self (a foldable provided method calling fold) resolves by value.
+func selfCall(ctx, sub evalCtx, name string, argExprs []ast.Expr) (*ir.Constant, bool) {
+	if ctx.self == nil {
+		return nil, false
+	}
+	args := make([]*ir.Constant, len(argExprs))
+	for i, a := range argExprs {
+		args[i] = evalExpr(a, sub)
+	}
+	return call(sub, &ast.SelfExpr{}, ctx.self, name, args), true
 }
 
 // shortCircuit folds a boolean connective whose receiver already decides the
@@ -738,17 +786,12 @@ func applyUserMethod(ctx evalCtx, recvExpr ast.Expr, recv *ir.Constant, name str
 	}
 	var sel *ast.MethodDecl
 	n := 0
-	for _, m := range def.Methods {
-		// A method's AST declaration carries its body; an extern method (no
-		// Syntax, or no body) is left to the intrinsic path.
-		if m.Name != name || m.Syntax == nil || len(m.Syntax.Body) == 0 {
-			continue
-		}
+	for _, m := range methodSyntaxes(ctx.env.Registry(), def, name) {
 		// The receiver's value kind decides a self-typed parameter, so an
 		// operator-style overload (merge(points: self) vs merge(active: bool))
 		// resolves the way the type checker did.
-		if fitsWithSelf(m.Syntax.Params, args, recv.Kind) {
-			sel = m.Syntax
+		if fitsWithSelf(m.Params, args, recv.Kind) {
+			sel = m
 			n++
 		}
 	}
@@ -762,6 +805,76 @@ func applyUserMethod(ctx evalCtx, recvExpr ast.Expr, recv *ir.Constant, name str
 		return nil, true // ambiguous: do not fold, but the method is user-defined
 	}
 	return applyBody(methodCallable(sel, def), recv, args, ctx), true
+}
+
+// methodSyntaxes collects the body-bearing AST declarations of the named method
+// the definition binds: its own declarations, and — when it declares the name
+// nowhere — the provided defaults of each interface it opts into (a list's
+// count/any/all/map/filter/keys/values reached through impl foldable). It
+// mirrors the type system's findMethods shadowing — a definition that declares
+// the name at all shadows the interface's provided one (a body or an extern
+// alike) — and derives from the underlying type, so the rule the folder uses to
+// reach a method is the rule the type checker used to resolve it. A method with
+// no AST syntax or an empty body (an extern operator, the native fold/len) is
+// left to the intrinsic path.
+func methodSyntaxes(reg *builtin.Registry, def *ir.TypeDef, name string) []*ast.MethodDecl {
+	return collectMethodSyntaxes(reg, def, name, map[*ir.TypeDef]bool{})
+}
+
+func collectMethodSyntaxes(reg *builtin.Registry, def *ir.TypeDef, name string, seen map[*ir.TypeDef]bool) []*ast.MethodDecl {
+	if def == nil || seen[def] {
+		return nil
+	}
+	seen[def] = true
+	// A definition that declares the name itself shadows everything it would
+	// derive, exactly as findMethods does. The shadow is by name, so an extern
+	// declaration (no body) of the name still suppresses an interface's provided
+	// default — the inherent list.map shadows foldable's provided map.
+	declares := false
+	var out []*ast.MethodDecl
+	for _, m := range def.Methods {
+		if m.Name != name {
+			continue
+		}
+		declares = true
+		if m.Syntax != nil && len(m.Syntax.Body) > 0 {
+			out = append(out, m.Syntax)
+		}
+	}
+	if declares {
+		return out
+	}
+	for _, impl := range def.Impls {
+		if idef := methodTableDef(reg, impl); idef != nil && idef.Interface != nil {
+			if ms := collectMethodSyntaxes(reg, idef, name, seen); len(ms) > 0 {
+				out = append(out, ms...)
+			}
+		}
+	}
+	if len(out) > 0 {
+		return out
+	}
+	if !def.Builtin {
+		return collectMethodSyntaxes(reg, methodTableDef(reg, def.Body), name, seen)
+	}
+	return out
+}
+
+// methodTableDef returns the definition behind a Named or App type — the def a
+// method table is read from — resolving a Builtin name through the registry so a
+// prelude collection (list, map) reached as a Builtin body still yields its def.
+// Any other type form (a union, record, function, type variable) has no def.
+func methodTableDef(reg *builtin.Registry, t ir.Type) *ir.TypeDef {
+	switch t := t.(type) {
+	case *ir.Named:
+		return t.Def
+	case *ir.App:
+		return t.Def
+	case *ir.Builtin:
+		d, _ := reg.Lookup(t.Name)
+		return d
+	}
+	return nil
 }
 
 // receiverDef determines the static type definition of a method call's receiver:
@@ -778,11 +891,29 @@ func receiverDef(ctx evalCtx, recvExpr ast.Expr, recv *ir.Constant) *ir.TypeDef 
 	if recv.Kind == ir.ConstEnum {
 		return recv.EnumDef
 	}
+	// A collection value names its type by shape: a keyed value is a map, an
+	// unkeyed (or empty) one a list. The def is a universe lookup — never the type
+	// query — so a foldable's provided method (count, keys, ...) reaches its body
+	// through the collection's impl while eval stays value-blind. The provided
+	// bodies are shape-agnostic (they fold over the same entries either way), so
+	// the empty-collection-reads-as-list default folds correctly.
+	if recv.Kind == ir.ConstCollection {
+		return ctx.env.LookupType(collectionTypeName(recv))
+	}
 	def := syntacticDef(ctx, recvExpr)
 	if def == nil || !defBacksKind(ctx.env.Registry(), def, recv.Kind) {
 		return nil
 	}
 	return def
+}
+
+// collectionTypeName is the prelude type name a folded collection binds its
+// methods through: a keyed value is a map, an unkeyed (or empty) one a list.
+func collectionTypeName(recv *ir.Constant) string {
+	if isMapColl(recv) {
+		return "map"
+	}
+	return "list"
 }
 
 // syntacticDef resolves a receiver expression to the type definition its
@@ -1034,6 +1165,12 @@ func compareEnumValues(a, b *ir.Constant) (int, bool) {
 // simply does not fold (nil) rather than folding wrong.
 func collectionMethod(ctx evalCtx, recv *ir.Constant, name string, args []*ir.Constant) *ir.Constant {
 	switch name {
+	case "len":
+		return collectionLen(recv, args)
+	case "fold":
+		return collectionFold(ctx, recv, args)
+	case "append":
+		return collectionAppend(recv, args)
 	case "map":
 		return collectionMap(ctx, recv, args)
 	case "get":
@@ -1043,6 +1180,57 @@ func collectionMethod(ctx evalCtx, recv *ir.Constant, name string, args []*ir.Co
 	default:
 		return nil
 	}
+}
+
+// collectionAppend folds list.append(v) to a new list with the value at the end,
+// leaving the receiver unchanged (data is immutable). It is the builder the
+// list-returning provided methods (map, filter, keys, values) accumulate
+// through, so the fold of those methods bottoms out in a real list constant. A
+// map has no append, so a keyed receiver does not fold.
+func collectionAppend(recv *ir.Constant, args []*ir.Constant) *ir.Constant {
+	if len(args) != 1 || isMapColl(recv) {
+		return nil
+	}
+	out := make([]ir.ConstEntry, len(recv.Coll), len(recv.Coll)+1)
+	copy(out, recv.Coll)
+	out = append(out, ir.ConstEntry{Value: args[0]})
+	return ir.CollectionConstant(out)
+}
+
+// collectionLen folds list.len() and map.len() to the element/entry count. It is
+// the intrinsic E-18 supplied for neither list nor map; the count is the same
+// for both — the number of entries the folded collection carries.
+func collectionLen(recv *ir.Constant, args []*ir.Constant) *ir.Constant {
+	if len(args) != 0 {
+		return nil
+	}
+	return ir.IntConstant(big.NewInt(int64(len(recv.Coll))))
+}
+
+// collectionFold folds the native fold — the foldable primitive every provided
+// method (count, any, all, map, filter, keys, values) is built on. It threads an
+// accumulator from init through the step function, visiting every entry in fold
+// order: the step sees (acc, key, value), where a map's key is the entry's key
+// and a list's is the element index. An unfoldable step application (a non-
+// function step, a body that does not fold, or the recursion guard) leaves the
+// whole fold unevaluated.
+func collectionFold(ctx evalCtx, recv *ir.Constant, args []*ir.Constant) *ir.Constant {
+	if len(args) != 2 || args[1].Kind != ir.ConstFunc {
+		return nil
+	}
+	acc := args[0]
+	step := args[1]
+	for i, entry := range recv.Coll {
+		key := entry.Key
+		if key == nil {
+			key = ir.IntConstant(big.NewInt(int64(i))) // a list's key is the index
+		}
+		acc = apply(ctx, step, []*ir.Constant{acc, key, entry.Value})
+		if acc == nil {
+			return nil
+		}
+	}
+	return acc
 }
 
 // collectionMap folds list.map: it applies the function argument to each element
