@@ -5,11 +5,17 @@ File
     Newline "\n"
     LineComment "// evaluated with self bound to the receiver, exactly as a top-level function"
     Newline "\n"
-    LineComment "// call is. The receiver must carry its type for the value-blind folder to reach"
+    LineComment "// call is. The folder reaches the method table without a type query — the"
     Newline "\n"
-    LineComment "// the method table — an enum constant does (it carries its definition), so an"
+    LineComment "// receiver's type comes either from the value (an enum constant carries its"
     Newline "\n"
-    LineComment "// enum's methods fold in const initializers, asserts, and other pure positions."
+    LineComment "// definition) or syntactically from the declared annotation in scope (a nominal"
+    Newline "\n"
+    LineComment "// type over a primitive: a conversion's type name, a constant's annotation, a"
+    Newline "\n"
+    LineComment "// method's result), so methods fold in const initializers, asserts, and other"
+    Newline "\n"
+    LineComment "// pure positions."
     Newline "\n"
     Newline "\n"
     DocComment "/// An elemental affinity, with methods that fold over a constant member."
@@ -324,6 +330,302 @@ File
       Whitespace " "
       Literal
         Int "0"
+  TypeDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// A nominal type over a primitive: its value (an int8) carries no definition, so"
+    Newline "\n"
+    LineComment "// the receiver's static type is read from the declared annotation in scope."
+    Newline "\n"
+    DocComment "/// A character level, with methods over its underlying int8."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Type "type"
+    Whitespace " "
+    Ident "Level"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    TypeName
+      Ident "int8"
+    Whitespace " "
+    ImplBlock
+      Impl "impl"
+      Whitespace " "
+      LBrace "{"
+      MethodDecl
+        Newline "\n"
+        Whitespace "  "
+        DocComment "/// The next level up — a self-returning method, so a chain keeps the type."
+        Newline "\n"
+        Whitespace "  "
+        Pub "pub"
+        Whitespace " "
+        Ident "increment"
+        ParamList
+          LParen "("
+          RParen ")"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Self "self"
+        Whitespace " "
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            BinaryExpr
+              SelfExpr
+                Self "self"
+              Whitespace " "
+              Plus "+"
+              Whitespace " "
+              Literal
+                Int "1"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
+      MethodDecl
+        Newline "\n"
+        Whitespace "  "
+        DocComment "/// This level a number of steps up."
+        Newline "\n"
+        Whitespace "  "
+        Pub "pub"
+        Whitespace " "
+        Ident "plus"
+        ParamList
+          LParen "("
+          Param
+            Ident "steps"
+            Colon ":"
+            Whitespace " "
+            TypeName
+              Ident "int8"
+          RParen ")"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Self "self"
+        Whitespace " "
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            BinaryExpr
+              SelfExpr
+                Self "self"
+              Whitespace " "
+              Plus "+"
+              Whitespace " "
+              NameRef
+                Ident "steps"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
+      Newline "\n"
+      RBrace "}"
+  FuncDecl
+    Newline "\n"
+    Newline "\n"
+    DocComment "/// A function whose declared result type names Level — the chain channel."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Fn "fn"
+    Whitespace " "
+    Ident "base"
+    ParamList
+      LParen "("
+      RParen ")"
+    Colon ":"
+    Whitespace " "
+    TypeName
+      Ident "Level"
+    Whitespace " "
+    Block
+      LBrace "{"
+      Newline "\n"
+      Whitespace "  "
+      ReturnStmt
+        Return "return"
+        Whitespace " "
+        CallExpr
+          NameRef
+            Ident "Level"
+          LParen "("
+          Literal
+            Int "1"
+          RParen ")"
+      Newline "\n"
+      RBrace "}"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// A conversion names its type directly (channel 1): Level(5).increment() folds."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Six"
+    TypeClause
+      Colon ":"
+      Whitespace " "
+      TypeName
+        Ident "Level"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        MemberExpr
+          CallExpr
+            NameRef
+              Ident "Level"
+            LParen "("
+            Literal
+              Int "5"
+            RParen ")"
+          Dot "."
+          Ident "increment"
+        LParen "("
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// A constant reference reads its annotation (channel 2): Start is a Level."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Start"
+    TypeClause
+      Colon ":"
+      Whitespace " "
+      TypeName
+        Ident "Level"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      Literal
+        Int "10"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Eleven"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        MemberExpr
+          NameRef
+            Ident "Start"
+          Dot "."
+          Ident "increment"
+        LParen "("
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Thirteen"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        MemberExpr
+          NameRef
+            Ident "Start"
+          Dot "."
+          Ident "plus"
+        LParen "("
+        Literal
+          Int "3"
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// A call result reads the callee's result annotation (channel 5), and a chain of"
+    Newline "\n"
+    LineComment "// self-returning methods keeps the type: base() is a Level, so each step folds."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Three"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        MemberExpr
+          CallExpr
+            MemberExpr
+              CallExpr
+                NameRef
+                  Ident "base"
+                LParen "("
+                RParen ")"
+              Dot "."
+              Ident "increment"
+            LParen "("
+            RParen ")"
+          Dot "."
+          Ident "increment"
+        LParen "("
+        RParen ")"
+  AssertDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// The nominal methods fold in assertions too."
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      CallExpr
+        MemberExpr
+          NameRef
+            Ident "Start"
+          Dot "."
+          Ident "increment"
+        LParen "("
+        RParen ")"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "11"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      CallExpr
+        MemberExpr
+          CallExpr
+            NameRef
+              Ident "base"
+            LParen "("
+            RParen ")"
+          Dot "."
+          Ident "plus"
+        LParen "("
+        Literal
+          Int "4"
+        RParen ")"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "5"
   Newline "\n"
   EOF ""
 # diagnostics

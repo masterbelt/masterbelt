@@ -11,6 +11,38 @@ Module
     type int
     value Element.Water.label()
     eval 0
+  Const "Six"
+    type Level
+    value Level(IntLiteral "5").increment()
+    eval 6
+  Const "Start"
+    type Level
+    value IntLiteral "10"
+    eval 10
+  Const "Eleven"
+    type Level
+    value Reference -> "Start".increment()
+    eval 11
+  Const "Thirteen"
+    type Level
+    value Reference -> "Start".plus(IntLiteral "3")
+    eval 13
+  Const "Three"
+    type Level
+    value base().increment().increment()
+    eval 3
+  TypeDef "Level" pub
+    doc "A character level, with methods over its underlying int8."
+    body int8
+    method "increment" pub
+      doc "The next level up — a self-returning method, so a chain keeps the type."
+      result self
+      return self.add(IntLiteral "1")
+    method "plus" pub
+      doc "This level a number of steps up."
+      param steps: int8
+      result self
+      return self.add(ParamRef "steps")
   TypeDef "Element" pub
     doc "An elemental affinity, with methods that fold over a constant member."
     enum int
@@ -50,6 +82,10 @@ Module
       if LocalRef "fire"
           return IntLiteral "1"
       return IntLiteral "0"
+  Func "base" pub
+    doc "A function whose declared result type names Level — the chain channel."
+    result Level
+      return Level(IntLiteral "1")
   Assert "Element.Fire.isFire()"
     eval true
       Element.Fire.isFire()
@@ -74,3 +110,13 @@ Module
               ^    ^       ^
               |    0       true
               Element.Wind
+  Assert "Start.increment() == 11"
+    eval true
+      Start.increment() == 11
+      ^     ^           ^
+      10    11          true
+  Assert "base().plus(4) == 5"
+    eval true
+      base().plus(4) == 5
+      ^      ^       ^
+      1      5       true

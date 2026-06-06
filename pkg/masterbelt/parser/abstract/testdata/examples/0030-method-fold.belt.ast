@@ -8,6 +8,39 @@ File
   ConstDecl
     name "WaterLabel"
     value (call (. (. Identifier "Element" Water) label))
+  ConstDecl
+    name "Six"
+    type Level
+    value (call (. (call Identifier "Level" IntLit "5") increment))
+  ConstDecl
+    name "Start"
+    type Level
+    value IntLit "10"
+  ConstDecl
+    name "Eleven"
+    value (call (. Identifier "Start" increment))
+  ConstDecl
+    name "Thirteen"
+    value (call (. Identifier "Start" plus) IntLit "3")
+  ConstDecl
+    name "Three"
+    value (call (. (call (. (call Identifier "base") increment)) increment))
+  TypeDecl
+    doc "A character level, with methods over its underlying int8."
+    pub
+    name "Level"
+    body int8
+    method "increment"
+      doc "The next level up — a self-returning method, so a chain keeps the type."
+      pub
+      result self
+      return (call (. self add) IntLit "1")
+    method "plus"
+      doc "This level a number of steps up."
+      pub
+      param steps: int8
+      result self
+      return (call (. self add) Identifier "steps")
   EnumDecl
     doc "An elemental affinity, with methods that fold over a constant member."
     pub
@@ -33,6 +66,12 @@ File
       if Identifier "fire"
           return IntLit "1"
       return IntLit "0"
+  FuncDecl
+    doc "A function whose declared result type names Level — the chain channel."
+    pub
+    name "base"
+    result Level
+      return (call Identifier "Level" IntLit "1")
   AssertDecl
     cond (call (. (. Identifier "Element" Fire) isFire))
   AssertDecl
@@ -41,3 +80,7 @@ File
     cond (call (. (call (. (. Identifier "Element" Fire) label)) eql) IntLit "1")
   AssertDecl
     cond (call (. (call (. (. Identifier "Element" Wind) label)) eql) IntLit "0")
+  AssertDecl
+    cond (call (. (call (. Identifier "Start" increment)) eql) IntLit "11")
+  AssertDecl
+    cond (call (. (call (. (call Identifier "base") plus) IntLit "4") eql) IntLit "5")
