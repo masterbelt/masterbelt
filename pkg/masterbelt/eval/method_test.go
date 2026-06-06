@@ -68,9 +68,12 @@ func memberExpr(typeName, member string) *ast.MemberExpr {
 // method body all resolve. Everything else resolves to nothing — these tests
 // reference only self, literals, members, methods, and named functions.
 type typeEnv struct {
-	reg   *builtin.Registry
-	types map[string]*ir.TypeDef
-	funcs map[string][]*ast.FuncDecl
+	reg     *builtin.Registry
+	types   map[string]*ir.TypeDef
+	funcs   map[string][]*ast.FuncDecl
+	consts  map[string]*ast.ConstDecl
+	values  map[*ast.ConstDecl]*ir.Constant
+	resolve map[string]*ast.ConstDecl // identifier name -> its declaration
 }
 
 func newTypeEnv(defs ...*ir.TypeDef) typeEnv {
@@ -78,7 +81,13 @@ func newTypeEnv(defs ...*ir.TypeDef) typeEnv {
 	for _, d := range defs {
 		m[d.Name] = d
 	}
-	return typeEnv{reg: builtin.Default(), types: m, funcs: map[string][]*ast.FuncDecl{}}
+	return typeEnv{
+		reg: builtin.Default(), types: m,
+		funcs:   map[string][]*ast.FuncDecl{},
+		consts:  map[string]*ast.ConstDecl{},
+		values:  map[*ast.ConstDecl]*ir.Constant{},
+		resolve: map[string]*ast.ConstDecl{},
+	}
 }
 
 // withFuncs adds named top-level functions the env's ResolveFunc returns.
@@ -89,13 +98,24 @@ func (e typeEnv) withFuncs(fds ...*ast.FuncDecl) typeEnv {
 	return e
 }
 
-func (e typeEnv) Resolve(*ast.Identifier) *ast.ConstDecl       { return nil }
+// withConst registers a top-level const of the given annotation type and value,
+// so a reference to it folds (ValueOf) and resolves its static def from the
+// annotation (the channel-2 receiver case). typeName is the annotation's type.
+func (e typeEnv) withConst(name, typeName string, value *ir.Constant) typeEnv {
+	decl := ast.NewConstDecl(nil, true, name, ast.NewNamedType("", typeName, nil, nil), nil, nil)
+	e.consts[name] = decl
+	e.resolve[name] = decl
+	e.values[decl] = value
+	return e
+}
+
+func (e typeEnv) Resolve(id *ast.Identifier) *ast.ConstDecl    { return e.resolve[id.Name] }
 func (e typeEnv) ResolveMember(*ast.MemberExpr) *ast.ConstDecl { return nil }
 func (e typeEnv) ResolveFunc(id *ast.Identifier) []*ast.FuncDecl {
 	return e.funcs[id.Name]
 }
 func (e typeEnv) ResolveFuncMember(*ast.MemberExpr) []*ast.FuncDecl { return nil }
-func (e typeEnv) ValueOf(*ast.ConstDecl) *ir.Constant               { return nil }
+func (e typeEnv) ValueOf(decl *ast.ConstDecl) *ir.Constant          { return e.values[decl] }
 func (e typeEnv) LookupType(name string) *ir.TypeDef {
 	if d, ok := e.types[name]; ok {
 		return d
@@ -104,6 +124,16 @@ func (e typeEnv) LookupType(name string) *ir.TypeDef {
 	return d
 }
 func (e typeEnv) Registry() *builtin.Registry { return e.reg }
+
+// TypeExprDef resolves a written annotation to its def by name, the syntactic
+// type channel a nominal receiver folds through. It satisfies eval.ReceiverTyper.
+func (e typeEnv) TypeExprDef(t ast.TypeExpr) *ir.TypeDef {
+	n, ok := t.(*ast.NamedType)
+	if !ok || n.Namespace != "" {
+		return nil
+	}
+	return e.LookupType(n.Name)
+}
 
 // fn builds a non-extern, pure top-level function declaration.
 func fn(name string, params []*ast.ParamDef, result ast.TypeExpr, body ...ast.Stmt) *ast.FuncDecl {
@@ -365,4 +395,198 @@ func TestMethodAritySkipped(t *testing.T) {
 	def.Methods = append(def.Methods, methodIR(f))
 	env := newTypeEnv(def)
 	wantNil(t, memberCall(memberExpr("Color", "Red"), "f"), env)
+}
+
+// --- nominal type (over a primitive) method folding --------------------------
+
+// nominalDef builds a nominal type def over a primitive (type Name = prim) with
+// the given methods.
+func nominalDef(name, prim string, methods ...*ir.Method) *ir.TypeDef {
+	def := &ir.TypeDef{Name: name, Body: &ir.Builtin{Name: prim}}
+	def.Methods = append(def.Methods, methods...)
+	return def
+}
+
+func intConst(n int64) *ir.Constant { return ir.IntConstant(big.NewInt(n)) }
+
+// wantInt folds e and asserts it is the given integer.
+func wantInt(t *testing.T, e ast.Expr, env Env, want int64) {
+	t.Helper()
+	v := Expr(e, env)
+	if v == nil || v.Kind != ir.ConstInt {
+		t.Fatalf("fold = %v, want an int constant", v)
+	}
+	if v.Int.Int64() != want {
+		t.Errorf("fold = %s, want %d", v.Int, want)
+	}
+}
+
+// levelDef is the running example: type Level = int8 with increment(): self
+// returning self + 1.
+func levelDef() *ir.TypeDef {
+	inc := method("increment", nil, selfType(), ret(memberCall(selfExpr(), "add", intLit("1"))))
+	return nominalDef("Level", "int8", methodIR(inc))
+}
+
+// TestNominalConversionFold covers channel 1, a conversion call: Level(5)
+// names its type directly, so increment() folds on it.
+func TestNominalConversionFold(t *testing.T) {
+	def := levelDef()
+	env := newTypeEnv(def)
+	// Level(5).increment() — the conversion's receiver type is Level.
+	conv := ast.NewCallExpr(id("Level"), []ast.Expr{intLit("5")}, nil)
+	wantInt(t, memberCall(conv, "increment"), env, 6)
+}
+
+// TestNominalConstRefFold covers channel 2, a top-level const reference:
+// const base: Level = 5; base.increment() reads base's annotation for the def.
+func TestNominalConstRefFold(t *testing.T) {
+	def := levelDef()
+	env := newTypeEnv(def).withConst("base", "Level", intConst(5))
+	wantInt(t, memberCall(id("base"), "increment"), env, 6)
+}
+
+// TestNominalSelfFold covers channel 3, self inside a method body: a helper
+// method calls another method on self, the receiver def being the owning type.
+func TestNominalSelfFold(t *testing.T) {
+	inc := method("increment", nil, selfType(), ret(memberCall(selfExpr(), "add", intLit("1"))))
+	// twice(): return self.increment().increment()
+	twice := method("twice", nil, selfType(),
+		ret(memberCall(memberCall(selfExpr(), "increment"), "increment")))
+	def := nominalDef("Level", "int8", methodIR(inc), methodIR(twice))
+	env := newTypeEnv(def).withConst("base", "Level", intConst(5))
+	wantInt(t, memberCall(id("base"), "twice"), env, 7)
+}
+
+// TestNominalParamFold covers channel 4 via a parameter: a top-level function
+// takes a Level parameter and calls increment() on it inside its body.
+func TestNominalParamFold(t *testing.T) {
+	def := levelDef()
+	// bump(l: Level): Level { return l.increment() }
+	bump := fn("bump", []*ast.ParamDef{param("l", ast.NewNamedType("", "Level", nil, nil))},
+		ast.NewNamedType("", "Level", nil, nil),
+		ret(memberCall(id("l"), "increment")))
+	env := newTypeEnv(def).withFuncs(bump).withConst("base", "Level", intConst(5))
+	wantInt(t, callFn("bump", id("base")), env, 6)
+}
+
+// TestNominalLetFold covers channel 4 via a let: a method body binds a let of an
+// annotated nominal type and calls a method on it.
+func TestNominalLetFold(t *testing.T) {
+	inc := method("increment", nil, selfType(), ret(memberCall(selfExpr(), "add", intLit("1"))))
+	// step(): let next: Level = self.increment(); return next.increment()
+	step := method("step", nil, selfType(),
+		ast.NewLetStmt("next", ast.NewNamedType("", "Level", nil, nil), memberCall(selfExpr(), "increment"), nil),
+		ret(memberCall(id("next"), "increment")))
+	def := nominalDef("Level", "int8", methodIR(inc), methodIR(step))
+	env := newTypeEnv(def).withConst("base", "Level", intConst(5))
+	wantInt(t, memberCall(id("base"), "step"), env, 7)
+}
+
+// TestNominalChainFold covers channel 5, a call result chain:
+// getLevel().increment().increment() resolves each result type from the callee's
+// declared result annotation (a self result keeps the type).
+func TestNominalChainFold(t *testing.T) {
+	def := levelDef()
+	// getLevel(): Level { return Level(5) }  — result type Level
+	getLevel := fn("getLevel", nil, ast.NewNamedType("", "Level", nil, nil),
+		ret(ast.NewCallExpr(id("Level"), []ast.Expr{intLit("5")}, nil)))
+	env := newTypeEnv(def).withFuncs(getLevel)
+	chain := memberCall(memberCall(callFn("getLevel"), "increment"), "increment")
+	wantInt(t, chain, env, 7)
+}
+
+// TestNominalOverload covers overload selection on a nominal type (E-6): merge
+// has a self-typed and a bool-typed overload; the argument kind picks the
+// right one, with the receiver kind deciding the self-typed parameter.
+func TestNominalOverload(t *testing.T) {
+	// merge(points: self): self { return self + points }
+	mergeInt := method("merge", []*ast.ParamDef{param("points", selfType())}, selfType(),
+		ret(memberCall(selfExpr(), "add", id("points"))))
+	// merge(active: bool): bool { return active && self > 0 }
+	mergeBool := method("merge", []*ast.ParamDef{param("active", boolType())}, boolType(),
+		ret(memberCall(id("active"), "anan", memberCall(selfExpr(), "gt", intLit("0")))))
+	def := nominalDef("Score", "int32", methodIR(mergeInt), methodIR(mergeBool))
+	env := newTypeEnv(def).withConst("base", "Score", intConst(100))
+
+	wantInt(t, memberCall(id("base"), "merge", intLit("50")), env, 150)
+	wantBool(t, memberCall(id("base"), "merge", boolLit(true)), env, true)
+}
+
+// TestNominalWhereTypeMethod covers a method on a refinement (where-clause) type:
+// the where-clause does not change method folding — the def's underlying
+// primitive still backs the value, so the method folds.
+func TestNominalWhereTypeMethod(t *testing.T) {
+	inc := method("increment", nil, selfType(), ret(memberCall(selfExpr(), "add", intLit("1"))))
+	def := nominalDef("Percent", "int8", methodIR(inc))
+	def.Where = memberCall(selfExpr(), "gteq", intLit("0")) // self >= 0 (a usable predicate)
+	env := newTypeEnv(def).withConst("p", "Percent", intConst(50))
+	wantInt(t, memberCall(id("p"), "increment"), env, 51)
+}
+
+// TestNominalKindMismatchSafe covers the value/def integration guard: a def read
+// from an annotation whose underlying primitive does not back the receiver's
+// value kind is rejected, so a method is never applied to a wrong-kind value.
+// (This only arises in a malformed program; a well-typed one never mismatches.)
+func TestNominalKindMismatchSafe(t *testing.T) {
+	// A string-based def with a method, but the const's value is an int.
+	greet := method("greet", nil, boolType(), ret(boolLit(true)))
+	def := nominalDef("Name", "string", methodIR(greet))
+	env := newTypeEnv(def).withConst("x", "Name", intConst(5)) // value kind is int, def is string-based
+	wantNil(t, memberCall(id("x"), "greet"), env)
+}
+
+// TestNominalNoTyperFallsBack covers an Env without ReceiverTyper: a nominal
+// receiver cannot be resolved syntactically, so the call does not fold (the
+// enum-only behavior). The stubEnv (from eval_test.go) implements no typer.
+func TestNominalNoTyperFallsBack(t *testing.T) {
+	// stubEnv resolves nothing and has no TypeExprDef; an int receiver with a
+	// "bogus" method folds to nil regardless.
+	env := stubEnv{reg: builtin.Default()}
+	wantNil(t, memberCall(intLit("5"), "increment"), env)
+}
+
+// TestNominalUnresolvedReceiverSafe covers a receiver whose static type cannot be
+// read through any channel (a plain int literal with no annotation): the method
+// does not fold, the conservative failure.
+func TestNominalUnresolvedReceiverSafe(t *testing.T) {
+	def := levelDef()
+	env := newTypeEnv(def)
+	// 5.increment() — a bare literal names no type; increment does not fold.
+	wantNil(t, memberCall(intLit("5"), "increment"), env)
+}
+
+// TestNominalRecursionGuarded covers the depth guard on a self-recursive nominal
+// method: loop() calls self.loop() forever (self resolves through the owning
+// def), so the fold bottoms out at the cap and yields nil — no hang.
+func TestNominalRecursionGuarded(t *testing.T) {
+	loop := method("loop", nil, ast.NewNamedType("", "int8", nil, nil), ret(memberCall(selfExpr(), "loop")))
+	def := nominalDef("Level", "int8", methodIR(loop))
+	env := newTypeEnv(def).withConst("base", "Level", intConst(1))
+	wantNil(t, memberCall(id("base"), "loop"), env)
+}
+
+// TestNominalLetBlockScoping covers that a let's static def is block-scoped: a
+// let of a nominal type inside a taken if-branch does not leak its def to a
+// later same-named binding in the outer scope. The method folds correctly
+// because each binding reads its own annotation.
+func TestNominalLetBlockScoping(t *testing.T) {
+	inc := method("increment", nil, selfType(), ret(memberCall(selfExpr(), "add", intLit("1"))))
+	// shadow(): {
+	//   let x: Level = self.increment()   // x is a Level (outer)
+	//   if true { let x: Other = ... }     // inner x shadows, a different def
+	//   return x.increment()               // reads the outer Level def, folds
+	// }
+	other := nominalDef("Other", "int8") // a def with no increment method
+	shadow := method("shadow", nil, selfType(),
+		ast.NewLetStmt("x", ast.NewNamedType("", "Level", nil, nil), memberCall(selfExpr(), "increment"), nil),
+		ast.NewIfStmt(boolLit(true),
+			[]ast.Stmt{ast.NewLetStmt("x", ast.NewNamedType("", "Other", nil, nil), intLit("99"), nil)},
+			nil, nil, nil),
+		ret(memberCall(id("x"), "increment")))
+	def := nominalDef("Level", "int8", methodIR(inc), methodIR(shadow))
+	env := newTypeEnv(def, other).withConst("base", "Level", intConst(5))
+	// self=5 -> x=6 (outer Level) -> the inner block shadows x then restores it
+	// -> x.increment() reads the outer Level def -> 7.
+	wantInt(t, memberCall(id("base"), "shadow"), env, 7)
 }
