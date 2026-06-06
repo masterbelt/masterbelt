@@ -114,3 +114,65 @@ func compareSnapshot(t *testing.T, name, got string) {
 		t.Errorf("snapshot mismatch for %s\n--- got ---\n%s--- want ---\n%s", name, got, want)
 	}
 }
+
+// TestExamplesAnalyzeClean pins that every shared example is diagnostic-free
+// across all layers — lexing, parsing, and semantic analysis. The .ir
+// snapshots alone cannot catch a type error (evaluation folds by value kind
+// regardless of typing), so a broken example would otherwise stay green in
+// tests while showing an error in the editor — exactly how a Level-plus-int8
+// operand mistake in 0030 once slipped through.
+func TestExamplesAnalyzeClean(t *testing.T) {
+	entries, err := os.ReadDir(sharedExamples)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	reportLayers := func(t *testing.T, label string, doc *abstract.Document) {
+		t.Helper()
+		for _, d := range doc.Concrete().LexDiagnostics() {
+			t.Errorf("%s: lex diagnostic: %s @%d: %s", label, d.Code, d.Offset, d.Message)
+		}
+		for _, d := range doc.Diagnostics() {
+			t.Errorf("%s: parse diagnostic: %s @%d: %s", label, d.Code, d.Offset, d.Message)
+		}
+	}
+
+	for _, entry := range entries {
+		name := entry.Name()
+		switch {
+		case entry.IsDir():
+			t.Run(name, func(t *testing.T) {
+				proj, pdiags := project.Open(filepath.Join(sharedExamples, name))
+				if pdiags.Len() > 0 {
+					t.Fatalf("project diagnostics: %v", pdiags.Items())
+				}
+				docs := map[FileID]*abstract.Document{}
+				uses := map[FileID]map[*ast.UseDecl]FileID{}
+				for _, f := range proj.Files() {
+					reportLayers(t, string(f.ID), f.AST)
+					docs[FileID(f.ID)] = f.AST
+					uses[FileID(f.ID)] = UsesOf(f.Uses)
+				}
+				_, diags := AnalyzeProgram(docs, uses)
+				for id, ds := range diags {
+					for _, d := range ds {
+						t.Errorf("%s: semantic diagnostic: %s @%d: %s", id, d.Code, d.Offset, d.Message)
+					}
+				}
+			})
+		case strings.HasSuffix(name, ".belt"):
+			t.Run(name, func(t *testing.T) {
+				src, err := os.ReadFile(filepath.Join(sharedExamples, name))
+				if err != nil {
+					t.Fatal(err)
+				}
+				doc := abstract.NewDocument(src)
+				reportLayers(t, name, doc)
+				_, diags := Analyze(doc)
+				for _, d := range diags {
+					t.Errorf("%s: semantic diagnostic: %s @%d: %s", name, d.Code, d.Offset, d.Message)
+				}
+			})
+		}
+	}
+}
