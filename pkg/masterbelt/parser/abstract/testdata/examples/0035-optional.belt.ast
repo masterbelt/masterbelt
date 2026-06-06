@@ -1,0 +1,47 @@
+File
+  ConstDecl
+    name "Present"
+    type optional<int>
+    value IntLit "5"
+  ConstDecl
+    name "Absent"
+    type optional<int>
+    value NullLit
+  ConstDecl
+    name "FromPresent"
+    value (call Identifier "orZero" IntLit "5")
+  ConstDecl
+    name "FromAbsent"
+    value (call Identifier "orZero" NullLit)
+  ConstDecl
+    name "WithFallback"
+    value (call Identifier "orFallback" NullLit IntLit "99")
+  FuncDecl
+    pub
+    name "orZero"
+    param v: optional<int>
+    result int
+      match Identifier "v"
+        arm int n
+          return Identifier "n"
+        arm null
+          return IntLit "0"
+  FuncDecl
+    pub
+    name "orFallback"
+    param v: optional<int>
+    param fallback: int
+    result int
+      match Identifier "v"
+        arm int n
+          return Identifier "n"
+        else
+          return Identifier "fallback"
+  AssertDecl
+    cond (call (. (call Identifier "orZero" IntLit "5") eql) IntLit "5")
+  AssertDecl
+    cond (call (. (call Identifier "orZero" NullLit) eql) IntLit "0")
+  AssertDecl
+    cond (call (. (call Identifier "orFallback" IntLit "7" IntLit "99") eql) IntLit "7")
+  AssertDecl
+    cond (call (. (call Identifier "orFallback" NullLit IntLit "99") eql) IntLit "99")

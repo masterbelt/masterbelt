@@ -1,0 +1,58 @@
+Module
+  Const "Present"
+    type optional<int>
+    value IntLiteral "5"
+    eval 5
+  Const "Absent"
+    type optional<int>
+    value <none>
+    eval null
+  Const "FromPresent"
+    type int
+    value orZero(IntLiteral "5")
+    eval 5
+  Const "FromAbsent"
+    type int
+    value orZero(<none>)
+    eval 0
+  Const "WithFallback"
+    type int
+    value orFallback(<none>, IntLiteral "99")
+    eval 99
+  Func "orZero" pub
+    param v: optional<int>
+    result int
+      match ParamRef "v"
+        arm int n
+          return LocalRef "n"
+        arm null
+          return IntLiteral "0"
+  Func "orFallback" pub
+    param v: optional<int>
+    param fallback: int
+    result int
+      match ParamRef "v"
+        arm int n
+          return LocalRef "n"
+        else
+          return ParamRef "fallback"
+  Assert "orZero(5) == 5"
+    eval true
+      orZero(5) == 5
+      ^         ^
+      5         true
+  Assert "orZero(null) == 0"
+    eval true
+      orZero(null) == 0
+      ^            ^
+      0            true
+  Assert "orFallback(7, 99) == 7"
+    eval true
+      orFallback(7, 99) == 7
+      ^                 ^
+      7                 true
+  Assert "orFallback(null, 99) == 99"
+    eval true
+      orFallback(null, 99) == 99
+      ^                    ^
+      99                   true
