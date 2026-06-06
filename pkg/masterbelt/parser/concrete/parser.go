@@ -211,8 +211,25 @@ func (p *parser) parseFile() *cst.Node {
 		if done {
 			break
 		}
+		if batchWidth(batch) == 0 {
+			// Progress guard: a zero-width non-final batch (a recovery bug in
+			// some declaration parser — see beginsDeclaration) must not spin
+			// this loop. Take one token as a raw leaf so the parse advances;
+			// Document.Edit applies the same guard, so the incremental tree
+			// stays identical to a full parse.
+			children = append(children, p.bump())
+		}
 	}
 	return cst.NewNode(cst.File, children)
+}
+
+// batchWidth sums the widths of a nextChildren batch.
+func batchWidth(batch []cst.Green) int {
+	w := 0
+	for _, g := range batch {
+		w += g.Width()
+	}
+	return w
 }
 
 // nextChildren parses the next File-level batch at the cursor and reports
@@ -324,25 +341,44 @@ func (p *parser) declKind() token.Kind {
 	return p.toks[i].Kind
 }
 
+// beginsDeclaration reports whether the significant token at the cursor begins
+// a construct nextChildren parses as a declaration — one that must end an error
+// run. It mirrors nextChildren's dispatch exactly: const/type/enum/interface/
+// use/assert always do; fn only as a declaration (fn name, not a stray
+// literal); extern only as [pub] extern fn; and pub always, except the one
+// shape the dispatcher itself routes back to the error parser — pub extern
+// without fn. Keeping this predicate in lockstep with the dispatch is what
+// guarantees parseError consumes at least one token (nextChildren only calls it
+// on a token this predicate rejects), so the File-level loops always progress.
+func (p *parser) beginsDeclaration() bool {
+	switch p.peekSignificant() {
+	case token.Const, token.Type, token.Enum, token.Interface, token.Use, token.Assert:
+		return true
+	case token.Fn:
+		return p.fnBeginsDecl(p.nextSignificantIndex(p.pos))
+	case token.Extern:
+		return p.externBeginsFunc()
+	case token.Pub:
+		if p.declKind() == token.Extern {
+			return p.externBeginsFunc()
+		}
+		return true
+	default:
+		return false
+	}
+}
+
 // parseError consumes a run of significant tokens that begin no declaration,
 // folding in the interleaving trivia, until the next declaration starter
-// (pub/const/type/use/assert, or fn followed by a name) or EOF. The trivia
-// that precedes that stopping token is left behind to become the next
-// construct's leading trivia. A single diagnostic is reported at the first
-// offending token.
+// (beginsDeclaration) or EOF. The trivia that precedes that stopping token is
+// left behind to become the next construct's leading trivia. A single
+// diagnostic is reported at the first offending token.
 func (p *parser) parseError(lead []cst.Green) *cst.Node {
 	children := lead
 	reported := false
 	for {
-		switch p.peekSignificant() {
-		case token.EOF, token.Pub, token.Const, token.Type, token.Enum, token.Interface, token.Use, token.Assert, token.Extern:
+		if p.peekSignificant() == token.EOF || p.beginsDeclaration() {
 			return cst.NewNode(cst.Error, children)
-		case token.Fn:
-			// fn stops the error run only as a declaration (fn name); a bare
-			// fn is part of the stray expression being skipped.
-			if p.fnBeginsDecl(p.nextSignificantIndex(p.pos)) {
-				return cst.NewNode(cst.Error, children)
-			}
 		}
 		p.skipTrivia(&children)
 		if !reported {
@@ -356,6 +392,27 @@ func (p *parser) parseError(lead []cst.Green) *cst.Node {
 // report records a parse diagnostic.
 func (p *parser) report(d diagnostic.Diagnostic) {
 	p.diags.Add(d)
+}
+
+// reportUnexpected reports that the next significant token was unexpected,
+// anchoring the diagnostic at the last consumed token (p.lastStart) rather than
+// at the offending token itself.
+//
+// It is used by the recovery paths that give up at an unexpected token and leave
+// it unconsumed for an enclosing construct (or the File-level loop) to handle —
+// the missing "{" of an enum/interface/impl block, the missing ")" of an
+// argument list, the missing ":" of a record field or map entry, and so on. The
+// offending token they stop at can be the start of the next File child (a
+// declaration keyword, or any token an Error node captures, or EOF). Anchoring
+// the diagnostic there would place it exactly on a File-child boundary, where it
+// is indistinguishable from a diagnostic the following child produces at its own
+// start. That ambiguity breaks the incremental diagnostic splice (see Document),
+// which partitions diagnostics by offset across reused/reparsed regions and would
+// double-count — or drop — a boundary-anchored one. Anchoring strictly inside the
+// construct keeps every diagnostic attributable to exactly one File child, the
+// invariant spliceDiags relies on.
+func (p *parser) reportUnexpected() {
+	p.report(newUnexpectedTokenDiagnostic(p.lastStart, 0, p.peekSignificant().String()))
 }
 
 // isTrivia reports whether k is a trivia kind — one the grammar skips over but

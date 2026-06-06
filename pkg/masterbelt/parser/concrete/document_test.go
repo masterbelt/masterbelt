@@ -86,6 +86,155 @@ func TestDocumentScriptedEdits(t *testing.T) {
 	}
 }
 
+// TestReparseBacksOffLookaheadChain pins reparseStart's anchor rule: a
+// File-child boundary can hinge on a lookahead across pub/extern/fn and the
+// effect keywords (an error run stops at fn only when a declaring name
+// follows), so an edit to the token after such a run must reparse from before
+// the run. Before the fix the incremental parse kept the preceding error node's
+// stale right edge and a divergence from the full parse resulted.
+func TestReparseBacksOffLookaheadChain(t *testing.T) {
+	cases := []struct {
+		name    string
+		initial string
+		edit    source.Edit
+	}{
+		// "fn i" is a declaration; the edit turns the name into "type", so fn
+		// must fold back into the preceding error run.
+		{"fn loses its name", "+ 2fn i\n", source.Edit{Start: 6, End: 7, NewText: []byte("type ")}},
+		// The same, across an effect list (fn io async i).
+		{"fn loses its name across effects", "+ 2fn io async i\n", source.Edit{Start: 15, End: 16, NewText: []byte("type ")}},
+		// "extern fn" is a declaration; the edit removes the fn, so extern must
+		// fold back into the preceding error run.
+		{"extern loses its fn", "+ 2extern fn f(): int { return 1 }\n", source.Edit{Start: 10, End: 12, NewText: []byte("zz")}},
+		// "pub extern fn" likewise, with the chain crossing two tokens.
+		{"pub extern loses its fn", "+ 2pub extern fn f(): int { return 1 }\n", source.Edit{Start: 14, End: 16, NewText: []byte("zz")}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			doc := NewDocument([]byte(tc.initial))
+			content := naiveSplice([]byte(tc.initial), tc.edit.Start, tc.edit.End, tc.edit.NewText)
+			doc.Edit(tc.edit)
+			assertMatchesFullParse(t, doc, content)
+		})
+	}
+}
+
+// TestErrorRunMirrorsDispatch pins parseError's stop predicate to
+// nextChildren's dispatch. A token the dispatcher routes back to the error
+// parser — extern (or pub extern) without fn — must not stop the error run:
+// before the fix parseError returned a zero-width Error node for it, which the
+// File-level loops re-encountered forever, allocating an unbounded tree. The
+// well-formed declaration after the stray run also pins that the run still
+// stops where a real declaration starts.
+func TestErrorRunMirrorsDispatch(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+	}{
+		{"extern without fn", "extern !=!t0]\nconst y = 1\n"},
+		{"pub extern without fn", "pub extern 1 + 2\nconst y = 1\n"},
+		{"extern at EOF", "9 extern"},
+		{"extern fn still a declaration", "* extern fn f(): int { return 1 }\n"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			doc := NewDocument([]byte(tc.src))
+			assertMatchesFullParse(t, doc, []byte(tc.src))
+			// An edit at the start forces the incremental path through the
+			// stray run as well.
+			content := naiveSplice([]byte(tc.src), 0, 0, []byte("9"))
+			doc.Edit(source.Edit{Start: 0, End: 0, NewText: []byte("9")})
+			assertMatchesFullParse(t, doc, content)
+		})
+	}
+}
+
+// TestBlockClearsHeadRestriction pins the fix for a parser hang: a function
+// literal in an if condition or switch scrutinee parses its body while the
+// head's record-literal restriction (noRecordLit) is in force, and parseBlock
+// must lift that restriction for the body's statements. Before the fix a "{"
+// statement inside such a body parsed as a zero-width error expression that the
+// statement loop re-encountered forever, allocating an unbounded tree. The
+// inputs here are well-formed, so the assertion that there are no diagnostics
+// also catches a regression that survives only via the loop's progress guard.
+func TestBlockClearsHeadRestriction(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+	}{
+		{"record literal stmt in lambda body in if head", "fn f(): int { if fn() { {} } { return 1 }\nreturn 0 }\n"},
+		{"field record literal in lambda body in if head", "fn f(): int { if fn() { {a: 1} } { return 1 }\nreturn 0 }\n"},
+		{"record literal stmt in lambda body in switch head", "fn f(): int { switch fn() { {} } {}\nreturn 0 }\n"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			doc := NewDocument([]byte(tc.src))
+			assertMatchesFullParse(t, doc, []byte(tc.src))
+			if diags := doc.Diagnostics(); len(diags) != 0 {
+				t.Fatalf("unexpected diagnostics for %q: %v", tc.src, diags)
+			}
+		})
+	}
+}
+
+// TestDocumentMalformedRecoveryBoundary covers a class of incremental divergence
+// where a malformed declaration's recovery anchored a diagnostic exactly on its
+// own right boundary — the start of the next File child. When an edit made the
+// reparse realign at that boundary (reusing the following declaration verbatim),
+// the diagnostic splice counted that boundary diagnostic twice, so the
+// incrementally maintained diagnostics no longer matched a full parse.
+//
+// Each case is a malformed declaration whose recovery once anchored on its right
+// edge — an unterminated record/collection/paren literal, a record-field or
+// map-entry missing its ":", an else/ternary missing its branch, an impl block or
+// control statement missing its "{", a function missing its body — followed by a
+// reusable declaration. The edit is a no-op-sized splice at the document start, so
+// the whole prefix is reparsed and realigns at the malformed declaration's right
+// boundary, exercising the splice exactly where the boundary diagnostic sat. The
+// oracle is a full parse of the same bytes.
+func TestDocumentMalformedRecoveryBoundary(t *testing.T) {
+	cases := []struct {
+		name    string
+		initial string
+	}{
+		{"unterminated record literal", "pub = {Z\nconst y = 1\n"},
+		{"record field missing colon", "const c = {a b}\nconst y = 1\n"},
+		{"impl block missing brace", "type T impl >\nconst y = 1\n"},
+		{"unterminated collection", "const c = [1\nconst y = 1\n"},
+		{"unterminated paren", "const c = (1\nconst y = 1\n"},
+		{"map entry missing colon", "const c = {1:2, 3\nconst y = 1\n"},
+		{"ternary missing colon", "const c = a ? b\nconst y = 1\n"},
+		{"func decl missing body", "fn f()\nconst y = 1\n"},
+		{"func decl missing param list", "fn f\nconst y = 1\n"},
+		{"enum missing brace", "enum E >\nconst y = 1\n"},
+		{"interface missing brace", "interface I >\nconst y = 1\n"},
+		{"use list missing brace", "use {a from \"m\"\nconst y = 1\n"},
+	}
+
+	// The realigning edits: a true no-op at the start, a single-byte insert at the
+	// start (shifts every offset, so a stale absolute-offset diagnostic shows), and
+	// a delete-then-retype of the leading byte.
+	edits := []struct {
+		name string
+		edit source.Edit
+	}{
+		{"noop at start", source.Edit{Start: 0, End: 0, NewText: nil}},
+		{"insert at start", source.Edit{Start: 1, End: 1, NewText: []byte("9")}},
+		{"delete leading byte", source.Edit{Start: 0, End: 1, NewText: nil}},
+	}
+
+	for _, tc := range cases {
+		for _, e := range edits {
+			t.Run(tc.name+"/"+e.name, func(t *testing.T) {
+				doc := NewDocument([]byte(tc.initial))
+				content := naiveSplice([]byte(tc.initial), e.edit.Start, e.edit.End, e.edit.NewText)
+				doc.Edit(e.edit)
+				assertMatchesFullParse(t, doc, content)
+			})
+		}
+	}
+}
+
 func TestDocumentSequentialEdits(t *testing.T) {
 	// Type a declaration one character at a time, then delete it from the front.
 	doc := NewDocument(nil)
@@ -130,6 +279,15 @@ func TestDocumentFuzz(t *testing.T) {
 		// oracle covers binary/unary expressions and the maximal-munch edits.
 		"+", "-", "%", "!", "<", ">", "&&", "||", "==", "!=", "<=", ">=",
 		"true", "false", "1 + 2", "a && b", "-x", "!true",
+		// Declaration and statement keywords with their brackets, so the walk
+		// reaches the malformed-recovery paths whose diagnostics once anchored on
+		// a declaration's right boundary: enum/interface/impl/control blocks
+		// missing "{", a function missing its body, an unterminated record /
+		// collection / paren / map literal, and the if/else and ternary branches.
+		"{", "}", "(", ")", "[", "]", "?", "->", ".", ",",
+		"fn ", "fn", "type ", "enum ", "interface ", "impl ", "use ", "from ",
+		"assert ", "extern ", "if ", "else ", "switch ", "let ", "return ",
+		"where ", "builtin", "self", "null", "io ", "Point {", "{ a: 1 }",
 	}
 
 	start := "const x = 0\n"

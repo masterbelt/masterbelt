@@ -81,15 +81,16 @@ func (d *Document) Edit(e source.Edit) {
 	//     would relex from the start of the first token reaching the edit, so we
 	//     never start right of that point — a boundary the relexer preserves.
 	//
-	//   - Forward lookahead. A declaration's right edge can depend on the token
-	//     that follows it: an Error node runs until the next pub/const, and an
-	//     incomplete declaration peeks for an optional ":"/"=". That lookahead
-	//     skips trivia, so it can reach well past the immediately following child
-	//     (an Error node at end of file scans across its trailing comments to
-	//     EOF). A construct never looks past its first following significant
-	//     token, though, so reparsing from the boundary at/before the last
-	//     significant token that ends before the edit re-derives every affected
-	//     right edge.
+	//   - Forward lookahead. A declaration's right edge can depend on the tokens
+	//     that follow it: an Error node runs until the next declaration starter,
+	//     and an incomplete declaration peeks for an optional ":"/"=". That
+	//     lookahead skips trivia, so it can reach well past the immediately
+	//     following child (an Error node at end of file scans across its trailing
+	//     comments to EOF). It can even cross significant tokens: whether a run
+	//     stops at fn ([pub] extern) hinges on the name (fn) that follows it,
+	//     across an effect list (see beginsDeclaration). reparseStart re-derives
+	//     every affected right edge by anchoring at/before the last significant
+	//     token before the edit that no such lookahead can see past.
 	winStart, iStart := reparseStart(oldTokens, oldOffsets, len(oldChildren), e.Start)
 	prefix := oldChildren[:iStart]
 
@@ -112,9 +113,17 @@ func (d *Document) Edit(e source.Edit) {
 
 		// A non-final batch is exactly one declaration/error node.
 		fresh = append(fresh, batch...)
-		for _, g := range batch {
-			freshEnd += g.Width()
+		w := batchWidth(batch)
+		if w == 0 {
+			// Progress guard — mirror parseFile: a zero-width batch must not
+			// spin this loop. Take one token as a raw leaf so the reparse
+			// advances; the full parse applies the same guard, so the trees
+			// stay identical.
+			leaf := p.bump()
+			fresh = append(fresh, leaf)
+			w = leaf.Width()
 		}
+		freshEnd += w
 
 		// Realign only once we are past the changed region: then the bytes from
 		// here on are unchanged, so a matching old boundary makes the old tail
@@ -194,26 +203,46 @@ func lexSafePoint(oldTokens []token.Token, eStart int) int {
 // eStart, and that child's index. It anchors on the last significant token that
 // ends at or before the lexer's safe relex point — the furthest right a token
 // can be while staying unchanged — and snaps to the start of the child holding
-// it. Because no construct looks past its first following significant token, the
-// declaration ending at that boundary parses identically in the new tree, so it
-// (and everything before it) is reusable while the boundary itself stays valid.
+// it.
+//
+// The anchor additionally backs off past any trailing run of lookaheadChain
+// tokens (pub/extern/fn and the effect keywords). A File-child boundary can
+// hinge on a multi-token lookahead across exactly such a run — an error run
+// stops at fn only when a name follows ([pub] extern only when fn follows), and
+// fn skips an effect list to find its name — so a construct whose right edge
+// was decided by looking across that run must be reparsed when the tokens after
+// the run change. Once the anchor is a token no decision can see past, the
+// declaration ending at that boundary parses identically in the new stream, so
+// it (and everything before it) is reusable while the boundary stays valid.
 func reparseStart(oldTokens []token.Token, oldOffsets []int, n, eStart int) (winStart, iStart int) {
 	safe := lexSafePoint(oldTokens, eStart)
 
-	anchor, found := 0, false
-	for _, t := range oldTokens {
+	last := -1
+	for i, t := range oldTokens {
 		if t.End() > safe {
 			break
 		}
-		if !isTrivia(t.Kind) {
-			anchor, found = t.Offset, true
-		}
+		last = i
 	}
-	if !found {
+	j := last
+	for j >= 0 && (isTrivia(oldTokens[j].Kind) || lookaheadChain(oldTokens[j].Kind)) {
+		j--
+	}
+	if j < 0 {
 		return 0, 0
 	}
-	iStart = childContaining(oldOffsets, n, anchor)
+	iStart = childContaining(oldOffsets, n, oldTokens[j].Offset)
 	return oldOffsets[iStart], iStart
+}
+
+// lookaheadChain reports whether kind can sit inside a boundary decision's
+// lookahead window: pub and extern are examined on the way to the fn of an
+// extern-function declaration, fn looks past the effect keywords for its
+// declaring name, and any of them can itself be the decision token. A child
+// boundary anchored on such a token can change meaning when the tokens after it
+// change, so reparseStart refuses to anchor on one.
+func lookaheadChain(k token.Kind) bool {
+	return k == token.Pub || k == token.Extern || k == token.Fn || k.Effect()
 }
 
 // tokenIndexAt returns the index of the token starting exactly at off. The
