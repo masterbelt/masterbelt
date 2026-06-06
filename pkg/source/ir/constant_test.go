@@ -128,7 +128,9 @@ func TestCollectionMapness(t *testing.T) {
 func TestUnionTagEquality(t *testing.T) {
 	coin := &TypeDef{Name: "Coin", Body: &Record{Fields: []Field{{Name: "amount", Type: &Builtin{Name: "nint"}}}}}
 	level := &TypeDef{Name: "Level", Body: &Record{Fields: []Field{{Name: "rank", Type: &Builtin{Name: "nint"}}}}}
-	rec := func() *Constant { return RecordConstant([]ConstField{{Name: "amount", Value: IntConstant(big.NewInt(7))}}) }
+	rec := func() *Constant {
+		return RecordConstant([]ConstField{{Name: "amount", Value: IntConstant(big.NewInt(7))}})
+	}
 
 	asCoin := Tagged(rec(), &Named{Def: coin})
 	asLevel := Tagged(rec(), &Named{Def: level})

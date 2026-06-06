@@ -114,7 +114,7 @@ func SelectUnionMember(reg *builtin.Registry, from, to ir.Type) (UnionSelection,
 	// type pins it. This is what keeps an nint literal into nint | error on nint
 	// and an explicit conversion (short(1)) on short.
 	for _, m := range u.Members {
-		if sameType(reg, from, m) {
+		if sameType(from, m) {
 			return UnionUnique, m
 		}
 	}
@@ -145,7 +145,7 @@ func SelectUnionMember(reg *builtin.Registry, from, to ir.Type) (UnionSelection,
 // value still selects int8 by exactness, while a bare literal that fits both is
 // ambiguous). An nint member against an nint value is exact through sameBuiltin
 // directly, which is what keeps nint | error and optional<T> tagging by exactness.
-func sameType(reg *builtin.Registry, a, b ir.Type) bool {
+func sameType(a, b ir.Type) bool {
 	if a == b {
 		return true
 	}
@@ -154,7 +154,7 @@ func sameType(reg *builtin.Registry, a, b ir.Type) bool {
 	}
 	if x, y, ok := sameAppShape(a, b); ok {
 		for i := range x.Args {
-			if !sameType(reg, x.Args[i], y.Args[i]) {
+			if !sameType(x.Args[i], y.Args[i]) {
 				return false
 			}
 		}
@@ -165,7 +165,7 @@ func sameType(reg *builtin.Registry, a, b ir.Type) bool {
 			return false
 		}
 		for i := range ua.Members {
-			if !sameType(reg, ua.Members[i], ub.Members[i]) {
+			if !sameType(ua.Members[i], ub.Members[i]) {
 				return false
 			}
 		}
