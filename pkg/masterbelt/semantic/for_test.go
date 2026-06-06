@@ -139,3 +139,88 @@ func TestForOKNoDiagnostics(t *testing.T) {
 		t.Fatalf("unexpected diagnostics: %v", codes(diags))
 	}
 }
+
+// forInterfaceSrc declares a foldable interface used by the abstract-foldable for
+// tests below. It mirrors the prelude's foldable so a for over an interface-typed
+// value, a bounded type parameter, or a user type that opts in is exercised
+// without depending on the prelude collection types.
+const forInterfaceSrc = "" +
+	"pub interface foldable<K, V> {\n" +
+	"  fold<A>(init: A, step: fn(acc: A, key: K, value: V): A): A\n" +
+	"}\n"
+
+// TestForOverInterfaceParam checks that a for over a value typed as the foldable
+// interface in requirement position (c: foldable<int, int>) is iterable: the
+// loop variable types at the interface's V for of (and K for in), and the
+// function type-checks with no not_iterable. The same value's c.fold(...) call is
+// accepted, so for must be too (plan §3.1).
+func TestForOverInterfaceParam(t *testing.T) {
+	src := forInterfaceSrc +
+		"pub fn total(c: foldable<int, int>): int {\n" +
+		"  let sum = 0\n" +
+		"  for x of c {\n" +
+		"    sum = sum + x\n" +
+		"  }\n" +
+		"  return sum\n" +
+		"}\n"
+	_, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", codes(diags))
+	}
+}
+
+// TestForOverInterfaceParamIn checks the in-loop over an interface-typed value
+// binds the interface's K.
+func TestForOverInterfaceParamIn(t *testing.T) {
+	src := forInterfaceSrc +
+		"pub fn keys(c: foldable<string, int>): string {\n" +
+		"  let out = \"\"\n" +
+		"  for k in c {\n" +
+		"    out = out + k\n" +
+		"  }\n" +
+		"  return out\n" +
+		"}\n"
+	_, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", codes(diags))
+	}
+}
+
+// TestForOverBoundedTypeParam checks that a for over a bounded generic type
+// parameter (T: foldable<int, int>) is iterable — the loop variable types through
+// the bound's interface, exactly as a method call on the parameter resolves.
+func TestForOverBoundedTypeParam(t *testing.T) {
+	src := forInterfaceSrc +
+		"pub fn total<T: foldable<int, int>>(c: T): int {\n" +
+		"  let sum = 0\n" +
+		"  for x of c {\n" +
+		"    sum = sum + x\n" +
+		"  }\n" +
+		"  return sum\n" +
+		"}\n"
+	_, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", codes(diags))
+	}
+}
+
+// TestForOverUserFoldableConcrete checks that a for over a concrete user type that
+// opts into foldable (Bag = list<int> impl foldable<int, int>) is iterable, types
+// the loop variable at the impl's element type, and folds: the underlying list
+// value drives the iteration, so the accumulation collapses to a constant.
+func TestForOverUserFoldableConcrete(t *testing.T) {
+	src := "pub type Bag = list<int> impl foldable<int, int> {\n" +
+		"  pub extern fn fold(init: A, step: fn(acc: A, key: int, value: int): A): A\n" +
+		"}\n" +
+		"pub fn sum(b: Bag): int {\n" +
+		"  let total = 0\n" +
+		"  for x of b {\n" +
+		"    total = total + x\n" +
+		"  }\n" +
+		"  return total\n" +
+		"}\n" +
+		"const S = sum(Bag([1, 2, 3, 4]))\n"
+	if got := evalOf(t, src, "S").Int.Int64(); got != 10 {
+		t.Errorf("S = %d, want 10", got)
+	}
+}

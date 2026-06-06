@@ -645,6 +645,63 @@ func TestSatisfies(t *testing.T) {
 	}
 }
 
+// TestForElement checks the loop-variable type a for reads from each foldable
+// shape: a type that opts in at its definition site (a user Bag), the foldable
+// interface written in a requirement position, and a bounded type parameter whose
+// bound is the interface. of reads the value type V, in the key type K; a
+// non-foldable type is not iterable. (The prelude list/map opt-in path is covered
+// end to end by the semantic for tests.)
+func TestForElement(t *testing.T) {
+	reg := builtin.Default()
+
+	foldable := &ir.TypeDef{
+		Name:      "foldable",
+		Interface: &ir.InterfaceDef{Required: []string{"fold"}},
+		Params:    []*ir.TypeParam{{Name: "K"}, {Name: "V"}},
+	}
+	// Bag = list<int> opts into foldable<int, string> (arbitrary distinct K/V so the
+	// of/in distinction is visible).
+	bagImpl := &ir.App{Def: foldable, Args: []ir.Type{bt("int"), bt("string")}}
+	bag := &ir.TypeDef{Name: "Bag", Body: bt("int"), Impls: []ir.Type{bagImpl}}
+
+	cases := []struct {
+		name string
+		typ  ir.Type
+		of   bool
+		want string // the element type, or "" when not iterable
+	}{
+		// A user type that opts in: of reads V, in reads K.
+		{"user opt-in of", &ir.Named{Def: bag}, true, "string"},
+		{"user opt-in in", &ir.Named{Def: bag}, false, "int"},
+		// The interface in a requirement position (c: foldable<int, string>).
+		{"interface of", &ir.App{Def: foldable, Args: []ir.Type{bt("int"), bt("string")}}, true, "string"},
+		{"interface in", &ir.App{Def: foldable, Args: []ir.Type{bt("int"), bt("string")}}, false, "int"},
+		// A bounded type parameter whose bound is the interface.
+		{"bounded typevar of", &ir.TypeVar{Name: "T", Bound: &ir.App{Def: foldable, Args: []ir.Type{bt("int"), bt("string")}}}, true, "string"},
+		{"bounded typevar in", &ir.TypeVar{Name: "T", Bound: &ir.App{Def: foldable, Args: []ir.Type{bt("int"), bt("string")}}}, false, "int"},
+		// A non-foldable type is not iterable.
+		{"non-foldable", bt("int"), true, ""},
+		{"unbounded typevar", &ir.TypeVar{Name: "T"}, true, ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			elem, ok := ForElement(reg, tc.typ, tc.of)
+			if tc.want == "" {
+				if ok {
+					t.Errorf("ForElement(%s) = (%s, true), want not iterable", tc.typ, elem)
+				}
+				return
+			}
+			if !ok {
+				t.Fatalf("ForElement(%s) not iterable, want %s", tc.typ, tc.want)
+			}
+			if got := elem.String(); got != tc.want {
+				t.Errorf("ForElement(%s) = %s, want %s", tc.typ, got, tc.want)
+			}
+		})
+	}
+}
+
 // TestNominalDerivation checks that a nominal type (type Level = int8) is
 // integer-like, derives its underlying type's operator methods, and keeps its
 // own identity in the result.

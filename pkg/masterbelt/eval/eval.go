@@ -476,14 +476,24 @@ func convert(def *ir.TypeDef, args []ast.Expr, ctx evalCtx) *ir.Constant {
 		}
 		return ir.ErrorConstant(v.Str)
 	}
-	// A nominal type over a primitive: the value is the argument's, unchanged,
-	// when its kind matches the underlying primitive. A conversion to a composite
-	// (a record, a union) has no constant identity value here.
+	// A nominal type over a primitive (or a list/map): the value is the argument's,
+	// unchanged, when its kind matches the underlying type — a Level is its integer,
+	// a Bag (= list<int>) is its collection — so the conversion passes the folded
+	// value through, which gives the value an identity and lets a method (and a
+	// for) fold on it. A conversion to a composite (a record, a union) has no
+	// constant identity value here.
 	v := evalExpr(args[0], ctx)
-	if v == nil || !defBacksKind(ctx.env.Registry(), def, v.Kind) {
+	if v == nil {
 		return nil
 	}
-	return v
+	reg := ctx.env.Registry()
+	if defBacksKind(reg, def, v.Kind) {
+		return v
+	}
+	if v.Kind == ir.ConstCollection && defBacksKindCollection(def) {
+		return v
+	}
+	return nil
 }
 
 // callable is the body-bearing shape applyBody folds: a pure (non-extern,
@@ -1219,6 +1229,36 @@ func defBacksKind(reg *builtin.Registry, def *ir.TypeDef, kind ir.ConstKind) boo
 		return n.Null
 	default:
 		return false
+	}
+}
+
+// defBacksKind, for a collection: a nominal type whose underlying is a list or a
+// map (a Bag = list<int>) backs a ConstCollection. A scalar def is handled by the
+// primitive path above; this is the collection arm, so a conversion to such a
+// type (Bag([...])) passes the folded collection through, exactly as Level(5)
+// passes its integer through — which lets a method, and a for, fold on the value.
+func defBacksKindCollection(def *ir.TypeDef) bool {
+	return underlyingCollectionDef(def, map[*ir.TypeDef]bool{}) != nil
+}
+
+// underlyingCollectionDef returns the list/map definition a nominal type bottoms
+// out at — a Bag (= list<int>) yields the list def — by following the chain of
+// Named/App bodies. It reports nil for a type with no collection underlying.
+func underlyingCollectionDef(def *ir.TypeDef, seen map[*ir.TypeDef]bool) *ir.TypeDef {
+	if def == nil || seen[def] {
+		return nil
+	}
+	seen[def] = true
+	switch body := def.Body.(type) {
+	case *ir.App:
+		if body.Def != nil && (body.Def.Name == "list" || body.Def.Name == "map") {
+			return body.Def
+		}
+		return underlyingCollectionDef(body.Def, seen)
+	case *ir.Named:
+		return underlyingCollectionDef(body.Def, seen)
+	default:
+		return nil
 	}
 }
 

@@ -658,38 +658,45 @@ func Satisfies(reg *builtin.Registry, typ, bound ir.Type) bool {
 const foldableInterfaceName = "foldable"
 
 // ForElement reports the type a for binds to its loop variable when iterating
-// typ, and whether typ is iterable at all. Iterability is foldable: typ must opt
-// into the prelude foldable<K, V> interface (directly or through a nominal type's
-// underlying type). An of-loop binds the value type V, an in-loop the key type K
-// — a list<T> binds T for of and int (the index) for in, a map<K, V> binds V for
-// of and K for in. The element type is the impl's K/V with the receiver's own
-// type arguments substituted, so list<int> binds int. ok is false when typ is not
-// foldable (the for's not_iterable diagnostic); the element type is ir.Invalid
-// then. It shares the impl-walk and receiver substitution Satisfies and
-// receiverSubst use, so it agrees with conformance on which types are foldable.
+// typ, and whether typ is iterable at all. Iterability is foldable, and a value
+// is foldable two ways, both of which for accepts (mirroring how a method call
+// reaches the value's fold):
+//
+//   - typ *is* the foldable interface — written in a type-requirement position
+//     (c: foldable<int, V>) or reached through a bounded generic type parameter
+//     (the T of fn f<T: foldable<int, V>>, whose bound is the interface). The
+//     loop variable's type is read straight from the interface application's
+//     arguments, the same arguments the bound fixes the methods against.
+//   - typ *opts into* foldable at its definition site — a list<T>, a map<K, V>,
+//     or a user type with impl foldable<K, V> (directly or through a nominal
+//     type's underlying type). The loop variable's type is the impl's K/V with
+//     the receiver's own type arguments substituted (list<int> binds int).
+//
+// An of-loop binds the value type V, an in-loop the key type K — a list<T> binds
+// T for of and int (the index) for in, a map<K, V> binds V for of and K for in.
+// ok is false when typ is not foldable (the for's not_iterable diagnostic); the
+// element type is ir.Invalid then. It shares the interface-application reading
+// Satisfies uses and the impl walk plus receiver substitution receiverSubst uses,
+// so it agrees with conformance and method resolution on which types are foldable.
 func ForElement(reg *builtin.Registry, typ ir.Type, of bool) (ir.Type, bool) {
+	// typ itself is the foldable interface (a requirement-position interface, or a
+	// bounded type parameter whose bound is one): take K/V from its arguments.
+	if app, ok := foldableApp(typ); ok {
+		return foldableArg(app, of), true
+	}
+	// typ opts into foldable at its definition site: take K/V from the impl, with
+	// the receiver's type arguments substituted.
 	subst := receiverSubst(reg, typ)
 	seen := map[*ir.TypeDef]bool{}
 	for def := defOf(reg, typ); def != nil && !seen[def]; {
 		seen[def] = true
 		for _, impl := range def.Impls {
-			idef := interfaceDefOf(impl)
-			if idef == nil || idef.Name != foldableInterfaceName {
-				continue
+			if app, ok := foldableApp(impl); ok {
+				// The impl's argument carries the receiver's type variables (list<T>
+				// impls foldable<int, T>), so substitute the receiver's bindings to
+				// reach the concrete element type.
+				return Substitute(foldableArg(app, of), subst), true
 			}
-			app, ok := impl.(*ir.App)
-			if !ok || len(app.Args) != 2 {
-				continue
-			}
-			// foldable<K, V>: of binds V (the value), in binds K (the key). The
-			// impl's argument carries the receiver's type variables (list<T> impls
-			// foldable<int, T>), so substitute the receiver's bindings to reach the
-			// concrete element type.
-			arg := app.Args[0] // K
-			if of {
-				arg = app.Args[1] // V
-			}
-			return Substitute(arg, subst), true
 		}
 		if def.Builtin {
 			break
@@ -697,6 +704,36 @@ func ForElement(reg *builtin.Registry, typ ir.Type, of bool) (ir.Type, bool) {
 		def = defOf(reg, def.Body)
 	}
 	return ir.Invalid, false
+}
+
+// foldableApp returns the foldable<K, V> application t denotes — t itself when it
+// is one, the bound's when t is a type parameter bounded by one — and whether t is
+// foldable that way. It is the reading the requirement-position and bounded
+// type-parameter forms share, the foldable twin of receiverSubst looking through a
+// TypeVar's bound.
+func foldableApp(t ir.Type) (*ir.App, bool) {
+	if v, ok := t.(*ir.TypeVar); ok && v.Bound != nil {
+		return foldableApp(v.Bound)
+	}
+	app, ok := t.(*ir.App)
+	if !ok || len(app.Args) != 2 {
+		return nil, false
+	}
+	idef := interfaceDefOf(app)
+	if idef == nil || idef.Name != foldableInterfaceName {
+		return nil, false
+	}
+	return app, true
+}
+
+// foldableArg picks the loop variable's type from a foldable<K, V> application:
+// the value type V (Args[1]) for an of-loop, the key type K (Args[0]) for an
+// in-loop.
+func foldableArg(app *ir.App, of bool) ir.Type {
+	if of {
+		return app.Args[1] // V (the value)
+	}
+	return app.Args[0] // K (the key)
 }
 
 // implMatches reports whether an opt-in impl (foldable<int, T>) is the interface
