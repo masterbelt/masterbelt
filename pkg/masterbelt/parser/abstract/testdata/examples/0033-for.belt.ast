@@ -26,8 +26,6 @@ File
     param xs: list<int>
     result int
       let "total" = IntLit "0"
-      expr Identifier "x"
-      expr (record xs total: <missing> total: <missing> x: <missing>)
       return Identifier "total"
   FuncDecl
     pub
@@ -35,8 +33,6 @@ File
     param m: map<string, int>
     result string
       let "out" = StringLit ""
-      expr Identifier "k"
-      expr (record m out: <missing> out: <missing> k: <missing>)
       return Identifier "out"
   FuncDecl
     pub
@@ -44,8 +40,6 @@ File
     param m: map<string, int>
     result int
       let "total" = IntLit "0"
-      expr Identifier "v"
-      expr (record m total: <missing> total: <missing> v: <missing>)
       return Identifier "total"
   FuncDecl
     pub
@@ -53,8 +47,6 @@ File
     param xs: list<int>
     result int
       let "total" = IntLit "0"
-      expr Identifier "i"
-      expr (record xs total: <missing> total: <missing> i: <missing>)
       return Identifier "total"
   FuncDecl
     pub
@@ -62,8 +54,7 @@ File
     param xs: list<int>
     result int
       let "total" = IntLit "0"
-      expr Identifier "x"
-      expr (record xs x: <missing> total: <missing> total: <missing> x: <missing>)
+      return Identifier "total"
   FuncDecl
     pub
     name "pairCount"
@@ -71,16 +62,13 @@ File
     param ys: list<int>
     result int
       let "count" = IntLit "0"
-      expr Identifier "x"
-      expr (record xs y: <missing> ys: <missing> count: <missing> count: <missing>)
+      return Identifier "count"
   FuncDecl
     pub
     name "product"
     param xs: list<int>
     result int
       let "acc" = IntLit "1"
-      expr Identifier "x"
-      expr (record xs acc: <missing> acc: <missing> x: <missing>)
       return Identifier "acc"
   AssertDecl
     cond (call (. (call Identifier "sum" (list IntLit "1" IntLit "2" IntLit "3" IntLit "4")) eql) IntLit "10")

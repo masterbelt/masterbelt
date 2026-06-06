@@ -18,9 +18,11 @@ Module
   Const "EvenSum"
     type int
     value sumEven([IntLiteral "1", IntLiteral "2", IntLiteral "3", IntLiteral "4", IntLiteral "5", IntLiteral "6"])
+    eval 0
   Const "Pairs"
     type int
     value pairCount([IntLiteral "1", IntLiteral "2"], [IntLiteral "1", IntLiteral "2", IntLiteral "3"])
+    eval 0
   Const "Product"
     type int
     value product([IntLiteral "1", IntLiteral "2", IntLiteral "3", IntLiteral "4"])
@@ -29,49 +31,37 @@ Module
     param xs: list<int>
     result int
       let "total": int = IntLiteral "0"
-      expr <none>
-      expr xs{total: <none>, total: <none>, x: <none>}
       return LocalRef "total"
   Func "keysJoined" pub
     param m: map<string, int>
     result string
       let "out": string = StringLiteral ""
-      expr <none>
-      expr m{out: <none>, out: <none>, k: <none>}
       return LocalRef "out"
   Func "valueSum" pub
     param m: map<string, int>
     result int
       let "total": int = IntLiteral "0"
-      expr <none>
-      expr m{total: <none>, total: <none>, v: <none>}
       return LocalRef "total"
   Func "indexSum" pub
     param xs: list<int>
     result int
       let "total": int = IntLiteral "0"
-      expr <none>
-      expr xs{total: <none>, total: <none>, i: <none>}
       return LocalRef "total"
   Func "sumEven" pub
     param xs: list<int>
     result int
       let "total": int = IntLiteral "0"
-      expr <none>
-      expr xs{x: <none>, total: <none>, total: <none>, x: <none>}
+      return LocalRef "total"
   Func "pairCount" pub
     param xs: list<int>
     param ys: list<int>
     result int
       let "count": int = IntLiteral "0"
-      expr <none>
-      expr xs{y: <none>, ys: <none>, count: <none>, count: <none>}
+      return LocalRef "count"
   Func "product" pub
     param xs: list<int>
     result int
       let "acc": int = IntLiteral "1"
-      expr <none>
-      expr xs{acc: <none>, acc: <none>, x: <none>}
       return LocalRef "acc"
   Assert "sum([1, 2, 3, 4]) == 10"
     eval false
@@ -94,11 +84,15 @@ Module
       ^                      ^
       0                      false
   Assert "sumEven([1, 2, 3, 4, 5, 6]) == 12"
-    eval <unevaluated>
+    eval false
       sumEven([1, 2, 3, 4, 5, 6]) == 12
+      ^                           ^
+      0                           false
   Assert "pairCount([1, 2], [1, 2, 3]) == 6"
-    eval <unevaluated>
+    eval false
       pairCount([1, 2], [1, 2, 3]) == 6
+      ^                            ^
+      0                            false
   Assert "product([1, 2, 3, 4]) == 24"
     eval false
       product([1, 2, 3, 4]) == 24

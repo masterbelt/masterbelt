@@ -375,6 +375,14 @@ func TestWellFormedProgramsParseClean(t *testing.T) {
 		// A record-literal scrutinee written explicitly must parse as the
 		// scrutinee, with the noRecordLit restriction not leaking past the parens.
 		{"match scrutinee in parens with record", "fn f(): int { match (P{a: 1}) {\n    P p -> return 1\n  }\n  return 0\n}\n"},
+		// for statements: an "of" loop with a let accumulator, an "in" loop over a
+		// map, a nested for, and a for whose iterated expression is a call (the
+		// bracketed argument re-enables record literals the head suppressed) — the
+		// class the loop-variable parse and the noRecordLit-headed body cover.
+		{"for of with let accumulator", "fn f(xs: list<int>): int {\n  let total = 0\n  for x of xs {\n    total = total + x\n  }\n  return total\n}\n"},
+		{"for in over a map", "fn f(m: map<string, int>): string {\n  let out = \"\"\n  for k in m {\n    out = out + k\n  }\n  return out\n}\n"},
+		{"nested for", "fn f(xs: list<int>, ys: list<int>): int {\n  let n = 0\n  for x of xs {\n    for y of ys {\n      n = n + 1\n    }\n  }\n  return n\n}\n"},
+		{"for over a call with a record arg", "fn f(): int {\n  let n = 0\n  for x of g(P{a: 1}) {\n    n = n + 1\n  }\n  return n\n}\n"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -410,6 +418,7 @@ func TestDocumentFuzz(t *testing.T) {
 		"{", "}", "(", ")", "[", "]", "?", "->", ".", ",",
 		"fn ", "fn", "type ", "enum ", "interface ", "impl ", "use ", "from ",
 		"assert ", "extern ", "if ", "else ", "switch ", "match ", "let ", "return ",
+		"for ", "of ", "in ",
 		"where ", "builtin", "self", "null", "io ", "Point {", "{ a: 1 }",
 		// match-arm fragments: a type pattern with a binding, the wildcard, and
 		// the arrow, so the random walk reaches the type-pattern parse and the

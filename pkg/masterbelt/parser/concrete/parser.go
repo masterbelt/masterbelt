@@ -34,7 +34,7 @@
 //	ParamList     := "(" [ Param ( "," Param )* ] ")"
 //	Param         := Ident ":" TypeExpr
 //	Block         := "{" Stmt* "}"
-//	Stmt          := LetStmt | ReturnStmt | SwitchStmt | MatchStmt | IfStmt | AssignStmt | Expr
+//	Stmt          := LetStmt | ReturnStmt | SwitchStmt | MatchStmt | IfStmt | ForStmt | AssignStmt | Expr
 //	LetStmt       := let Ident [TypeClause] "=" Expr
 //	AssignStmt    := Expr "=" Expr
 //	ReturnStmt    := return Expr
@@ -44,6 +44,7 @@
 //	MatchArm      := MatchPattern "->" ( Stmt | Block )
 //	MatchPattern  := ( PrimaryType [Ident] ) | "_"
 //	IfStmt        := if Expr Block [ else ( IfStmt | Block ) ]
+//	ForStmt       := for Ident ( "of" | "in" ) Expr Block
 //	Expr          := TernaryExpr
 //	TernaryExpr   := OrExpr [ "?" Expr ":" Expr ]
 //	OrExpr        := AndExpr ( "||" AndExpr )*

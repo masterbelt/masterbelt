@@ -44,8 +44,9 @@ func (p *parser) parseBlock() *cst.Node {
 }
 
 // parseStmt parses a single statement: a let declaration, a return statement, a
-// switch statement, an if statement, an assignment, or a bare expression
-// statement. The cursor sits on the statement's first significant token.
+// switch statement, a match statement, an if statement, a for statement, an
+// assignment, or a bare expression statement. The cursor sits on the statement's
+// first significant token.
 //
 // An assignment and a bare expression statement share a first token (both can
 // begin with an identifier), so they are told apart after the fact: the leading
@@ -65,6 +66,8 @@ func (p *parser) parseStmt() cst.Green {
 		return p.parseMatchStmt()
 	case p.kind() == token.If:
 		return p.parseIfStmt()
+	case p.kind() == token.For:
+		return p.parseForStmt()
 	case startsExpr(p.kind()):
 		target := p.parseExpr()
 		if p.peekSignificant() == token.Assign {
@@ -168,6 +171,52 @@ func (p *parser) parseIfStmt() *cst.Node {
 		p.reportUnexpected()
 	}
 	return cst.NewNode(cst.IfStmt, children)
+}
+
+// parseForStmt parses a collection-iteration statement:
+//
+//	ForStmt := for Ident ( "of" | "in" ) Expr Block
+//
+// The loop variable is a plain identifier; "of" binds the value, "in" the key.
+// The iterated expression is an ordinary expression followed by a mandatory
+// brace block. As with an if condition or a switch scrutinee, the expression's
+// "{" opens the loop body, not a record literal, so it is parsed with the
+// record-literal reading suppressed. for is a control statement, not an
+// expression: it yields no value. The cursor sits on "for".
+func (p *parser) parseForStmt() *cst.Node {
+	children := []cst.Green{p.bump()} // "for"
+	if p.peekSignificant() == token.Ident {
+		p.skipTrivia(&children)
+		children = append(children, p.bump()) // the loop variable
+	} else {
+		p.report(newExpectedIdentifierDiagnostic(p.lastStart, 0))
+	}
+	switch p.peekSignificant() {
+	case token.Of, token.In:
+		p.skipTrivia(&children)
+		children = append(children, p.bump()) // "of" or "in"
+	default:
+		p.reportUnexpected()
+		return cst.NewNode(cst.ForStmt, children)
+	}
+	if startsExpr(p.peekSignificant()) {
+		p.skipTrivia(&children)
+		// The iterated expression's "{" opens the loop body, not a record
+		// literal: parse it with the record-literal reading suppressed, exactly
+		// as an if condition and a switch scrutinee do.
+		p.noRecordLit = true
+		children = append(children, p.parseExpr())
+		p.noRecordLit = false
+	} else {
+		p.report(newExpectedExpressionDiagnostic(p.lastStart, 0))
+	}
+	if p.peekSignificant() != token.LBrace {
+		p.reportUnexpected()
+		return cst.NewNode(cst.ForStmt, children)
+	}
+	p.skipTrivia(&children)
+	children = append(children, p.parseBlock()) // the loop body
+	return cst.NewNode(cst.ForStmt, children)
 }
 
 // parseSwitchStmt parses a switch statement:

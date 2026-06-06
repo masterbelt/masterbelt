@@ -66,34 +66,37 @@ File
             Int "0"
       Newline "\n"
       Whitespace "  "
-      For "for"
-      Whitespace " "
-      NameRef
+      ForStmt
+        For "for"
+        Whitespace " "
         Ident "x"
-      Whitespace " "
-      Of "of"
-      Whitespace " "
-      RecordLit
-        Ident "xs"
         Whitespace " "
-        LBrace "{"
-        Newline "\n"
-        Whitespace "    "
-        RecordField
-          Ident "total"
+        Of "of"
         Whitespace " "
-        Assign "="
+        NameRef
+          Ident "xs"
         Whitespace " "
-        RecordField
-          Ident "total"
-        Whitespace " "
-        Plus "+"
-        Whitespace " "
-        RecordField
-          Ident "x"
-        Newline "\n"
-        Whitespace "  "
-        RBrace "}"
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          AssignStmt
+            NameRef
+              Ident "total"
+            Whitespace " "
+            Assign "="
+            Whitespace " "
+            BinaryExpr
+              NameRef
+                Ident "total"
+              Whitespace " "
+              Plus "+"
+              Whitespace " "
+              NameRef
+                Ident "x"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
       Newline "\n"
       Whitespace "  "
       ReturnStmt
@@ -154,34 +157,37 @@ File
             String "\"\""
       Newline "\n"
       Whitespace "  "
-      For "for"
-      Whitespace " "
-      NameRef
+      ForStmt
+        For "for"
+        Whitespace " "
         Ident "k"
-      Whitespace " "
-      In "in"
-      Whitespace " "
-      RecordLit
-        Ident "m"
         Whitespace " "
-        LBrace "{"
-        Newline "\n"
-        Whitespace "    "
-        RecordField
-          Ident "out"
+        In "in"
         Whitespace " "
-        Assign "="
+        NameRef
+          Ident "m"
         Whitespace " "
-        RecordField
-          Ident "out"
-        Whitespace " "
-        Plus "+"
-        Whitespace " "
-        RecordField
-          Ident "k"
-        Newline "\n"
-        Whitespace "  "
-        RBrace "}"
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          AssignStmt
+            NameRef
+              Ident "out"
+            Whitespace " "
+            Assign "="
+            Whitespace " "
+            BinaryExpr
+              NameRef
+                Ident "out"
+              Whitespace " "
+              Plus "+"
+              Whitespace " "
+              NameRef
+                Ident "k"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
       Newline "\n"
       Whitespace "  "
       ReturnStmt
@@ -240,34 +246,37 @@ File
             Int "0"
       Newline "\n"
       Whitespace "  "
-      For "for"
-      Whitespace " "
-      NameRef
+      ForStmt
+        For "for"
+        Whitespace " "
         Ident "v"
-      Whitespace " "
-      Of "of"
-      Whitespace " "
-      RecordLit
-        Ident "m"
         Whitespace " "
-        LBrace "{"
-        Newline "\n"
-        Whitespace "    "
-        RecordField
-          Ident "total"
+        Of "of"
         Whitespace " "
-        Assign "="
+        NameRef
+          Ident "m"
         Whitespace " "
-        RecordField
-          Ident "total"
-        Whitespace " "
-        Plus "+"
-        Whitespace " "
-        RecordField
-          Ident "v"
-        Newline "\n"
-        Whitespace "  "
-        RBrace "}"
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          AssignStmt
+            NameRef
+              Ident "total"
+            Whitespace " "
+            Assign "="
+            Whitespace " "
+            BinaryExpr
+              NameRef
+                Ident "total"
+              Whitespace " "
+              Plus "+"
+              Whitespace " "
+              NameRef
+                Ident "v"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
       Newline "\n"
       Whitespace "  "
       ReturnStmt
@@ -324,34 +333,37 @@ File
             Int "0"
       Newline "\n"
       Whitespace "  "
-      For "for"
-      Whitespace " "
-      NameRef
+      ForStmt
+        For "for"
+        Whitespace " "
         Ident "i"
-      Whitespace " "
-      In "in"
-      Whitespace " "
-      RecordLit
-        Ident "xs"
         Whitespace " "
-        LBrace "{"
-        Newline "\n"
-        Whitespace "    "
-        RecordField
-          Ident "total"
+        In "in"
         Whitespace " "
-        Assign "="
+        NameRef
+          Ident "xs"
         Whitespace " "
-        RecordField
-          Ident "total"
-        Whitespace " "
-        Plus "+"
-        Whitespace " "
-        RecordField
-          Ident "i"
-        Newline "\n"
-        Whitespace "  "
-        RBrace "}"
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          AssignStmt
+            NameRef
+              Ident "total"
+            Whitespace " "
+            Assign "="
+            Whitespace " "
+            BinaryExpr
+              NameRef
+                Ident "total"
+              Whitespace " "
+              Plus "+"
+              Whitespace " "
+              NameRef
+                Ident "i"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
       Newline "\n"
       Whitespace "  "
       ReturnStmt
@@ -410,61 +422,71 @@ File
             Int "0"
       Newline "\n"
       Whitespace "  "
-      For "for"
-      Whitespace " "
-      NameRef
+      ForStmt
+        For "for"
+        Whitespace " "
         Ident "x"
-      Whitespace " "
-      Of "of"
-      Whitespace " "
-      RecordLit
-        Ident "xs"
         Whitespace " "
-        LBrace "{"
-        Newline "\n"
-        Whitespace "    "
-        If "if"
+        Of "of"
         Whitespace " "
-        RecordField
-          Ident "x"
+        NameRef
+          Ident "xs"
         Whitespace " "
-        Percent "%"
-        Whitespace " "
-        Int "2"
-        Whitespace " "
-        EqEq "=="
-        Whitespace " "
-        Int "0"
-        Whitespace " "
-        LBrace "{"
-        Newline "\n"
-        Whitespace "      "
-        RecordField
-          Ident "total"
-        Whitespace " "
-        Assign "="
-        Whitespace " "
-        RecordField
-          Ident "total"
-        Whitespace " "
-        Plus "+"
-        Whitespace " "
-        RecordField
-          Ident "x"
-        Newline "\n"
-        Whitespace "    "
-        RBrace "}"
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          IfStmt
+            If "if"
+            Whitespace " "
+            BinaryExpr
+              BinaryExpr
+                NameRef
+                  Ident "x"
+                Whitespace " "
+                Percent "%"
+                Whitespace " "
+                Literal
+                  Int "2"
+              Whitespace " "
+              EqEq "=="
+              Whitespace " "
+              Literal
+                Int "0"
+            Whitespace " "
+            Block
+              LBrace "{"
+              Newline "\n"
+              Whitespace "      "
+              AssignStmt
+                NameRef
+                  Ident "total"
+                Whitespace " "
+                Assign "="
+                Whitespace " "
+                BinaryExpr
+                  NameRef
+                    Ident "total"
+                  Whitespace " "
+                  Plus "+"
+                  Whitespace " "
+                  NameRef
+                    Ident "x"
+              Newline "\n"
+              Whitespace "    "
+              RBrace "}"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
       Newline "\n"
       Whitespace "  "
+      ReturnStmt
+        Return "return"
+        Whitespace " "
+        NameRef
+          Ident "total"
+      Newline "\n"
       RBrace "}"
-  Error
-    Newline "\n"
-    Whitespace "  "
-    Return "return"
-    Whitespace " "
-    Ident "total"
-    Newline "\n"
-    RBrace "}"
   FuncDecl
     Newline "\n"
     Newline "\n"
@@ -525,57 +547,63 @@ File
             Int "0"
       Newline "\n"
       Whitespace "  "
-      For "for"
-      Whitespace " "
-      NameRef
-        Ident "x"
-      Whitespace " "
-      Of "of"
-      Whitespace " "
-      RecordLit
-        Ident "xs"
-        Whitespace " "
-        LBrace "{"
-        Newline "\n"
-        Whitespace "    "
+      ForStmt
         For "for"
         Whitespace " "
-        RecordField
-          Ident "y"
+        Ident "x"
         Whitespace " "
         Of "of"
         Whitespace " "
-        RecordField
-          Ident "ys"
+        NameRef
+          Ident "xs"
         Whitespace " "
-        LBrace "{"
-        Newline "\n"
-        Whitespace "      "
-        RecordField
-          Ident "count"
-        Whitespace " "
-        Assign "="
-        Whitespace " "
-        RecordField
-          Ident "count"
-        Whitespace " "
-        Plus "+"
-        Whitespace " "
-        Int "1"
-        Newline "\n"
-        Whitespace "    "
-        RBrace "}"
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          ForStmt
+            For "for"
+            Whitespace " "
+            Ident "y"
+            Whitespace " "
+            Of "of"
+            Whitespace " "
+            NameRef
+              Ident "ys"
+            Whitespace " "
+            Block
+              LBrace "{"
+              Newline "\n"
+              Whitespace "      "
+              AssignStmt
+                NameRef
+                  Ident "count"
+                Whitespace " "
+                Assign "="
+                Whitespace " "
+                BinaryExpr
+                  NameRef
+                    Ident "count"
+                  Whitespace " "
+                  Plus "+"
+                  Whitespace " "
+                  Literal
+                    Int "1"
+              Newline "\n"
+              Whitespace "    "
+              RBrace "}"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
       Newline "\n"
       Whitespace "  "
+      ReturnStmt
+        Return "return"
+        Whitespace " "
+        NameRef
+          Ident "count"
+      Newline "\n"
       RBrace "}"
-  Error
-    Newline "\n"
-    Whitespace "  "
-    Return "return"
-    Whitespace " "
-    Ident "count"
-    Newline "\n"
-    RBrace "}"
   FuncDecl
     Newline "\n"
     Newline "\n"
@@ -627,34 +655,37 @@ File
             Int "1"
       Newline "\n"
       Whitespace "  "
-      For "for"
-      Whitespace " "
-      NameRef
+      ForStmt
+        For "for"
+        Whitespace " "
         Ident "x"
-      Whitespace " "
-      Of "of"
-      Whitespace " "
-      RecordLit
-        Ident "xs"
         Whitespace " "
-        LBrace "{"
-        Newline "\n"
-        Whitespace "    "
-        RecordField
-          Ident "acc"
+        Of "of"
         Whitespace " "
-        Assign "="
+        NameRef
+          Ident "xs"
         Whitespace " "
-        RecordField
-          Ident "acc"
-        Whitespace " "
-        Star "*"
-        Whitespace " "
-        RecordField
-          Ident "x"
-        Newline "\n"
-        Whitespace "  "
-        RBrace "}"
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          AssignStmt
+            NameRef
+              Ident "acc"
+            Whitespace " "
+            Assign "="
+            Whitespace " "
+            BinaryExpr
+              NameRef
+                Ident "acc"
+              Whitespace " "
+              Star "*"
+              Whitespace " "
+              NameRef
+                Ident "x"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
       Newline "\n"
       Whitespace "  "
       ReturnStmt
@@ -1198,66 +1229,3 @@ File
   Newline "\n"
   EOF ""
 # diagnostics
-error[masterbelt.parser.concrete.unexpected_token] 16:3 unexpected token: For
-error[masterbelt.parser.concrete.unexpected_token] 16:9 unexpected token: Of
-error[masterbelt.parser.concrete.unexpected_token] 17:5 unexpected token: Assign
-error[masterbelt.parser.concrete.unexpected_token] 17:11 unexpected token: Assign
-error[masterbelt.parser.concrete.unexpected_token] 17:13 unexpected token: Plus
-error[masterbelt.parser.concrete.unexpected_token] 17:19 unexpected token: Plus
-error[masterbelt.parser.concrete.unexpected_token] 17:21 unexpected token: RBrace
-error[masterbelt.parser.concrete.unexpected_token] 26:3 unexpected token: For
-error[masterbelt.parser.concrete.unexpected_token] 26:9 unexpected token: In
-error[masterbelt.parser.concrete.unexpected_token] 27:5 unexpected token: Assign
-error[masterbelt.parser.concrete.unexpected_token] 27:9 unexpected token: Assign
-error[masterbelt.parser.concrete.unexpected_token] 27:11 unexpected token: Plus
-error[masterbelt.parser.concrete.unexpected_token] 27:15 unexpected token: Plus
-error[masterbelt.parser.concrete.unexpected_token] 27:17 unexpected token: RBrace
-error[masterbelt.parser.concrete.unexpected_token] 35:3 unexpected token: For
-error[masterbelt.parser.concrete.unexpected_token] 35:9 unexpected token: Of
-error[masterbelt.parser.concrete.unexpected_token] 36:5 unexpected token: Assign
-error[masterbelt.parser.concrete.unexpected_token] 36:11 unexpected token: Assign
-error[masterbelt.parser.concrete.unexpected_token] 36:13 unexpected token: Plus
-error[masterbelt.parser.concrete.unexpected_token] 36:19 unexpected token: Plus
-error[masterbelt.parser.concrete.unexpected_token] 36:21 unexpected token: RBrace
-error[masterbelt.parser.concrete.unexpected_token] 45:3 unexpected token: For
-error[masterbelt.parser.concrete.unexpected_token] 45:9 unexpected token: In
-error[masterbelt.parser.concrete.unexpected_token] 46:5 unexpected token: Assign
-error[masterbelt.parser.concrete.unexpected_token] 46:11 unexpected token: Assign
-error[masterbelt.parser.concrete.unexpected_token] 46:13 unexpected token: Plus
-error[masterbelt.parser.concrete.unexpected_token] 46:19 unexpected token: Plus
-error[masterbelt.parser.concrete.unexpected_token] 46:21 unexpected token: RBrace
-error[masterbelt.parser.concrete.unexpected_token] 56:3 unexpected token: For
-error[masterbelt.parser.concrete.unexpected_token] 56:9 unexpected token: Of
-error[masterbelt.parser.concrete.unexpected_token] 57:5 unexpected token: If
-error[masterbelt.parser.concrete.unexpected_token] 57:8 unexpected token: Percent
-error[masterbelt.parser.concrete.unexpected_token] 57:10 unexpected token: Percent
-error[masterbelt.parser.concrete.unexpected_token] 57:12 unexpected token: Int
-error[masterbelt.parser.concrete.unexpected_token] 57:14 unexpected token: EqEq
-error[masterbelt.parser.concrete.unexpected_token] 57:17 unexpected token: Int
-error[masterbelt.parser.concrete.unexpected_token] 57:19 unexpected token: LBrace
-error[masterbelt.parser.concrete.unexpected_token] 58:7 unexpected token: Assign
-error[masterbelt.parser.concrete.unexpected_token] 58:13 unexpected token: Assign
-error[masterbelt.parser.concrete.unexpected_token] 58:15 unexpected token: Plus
-error[masterbelt.parser.concrete.unexpected_token] 58:21 unexpected token: Plus
-error[masterbelt.parser.concrete.unexpected_token] 58:23 unexpected token: RBrace
-error[masterbelt.parser.concrete.unexpected_token] 61:3 unexpected token: Return
-error[masterbelt.parser.concrete.unexpected_token] 68:3 unexpected token: For
-error[masterbelt.parser.concrete.unexpected_token] 68:9 unexpected token: Of
-error[masterbelt.parser.concrete.unexpected_token] 69:5 unexpected token: For
-error[masterbelt.parser.concrete.unexpected_token] 69:9 unexpected token: Of
-error[masterbelt.parser.concrete.unexpected_token] 69:11 unexpected token: Of
-error[masterbelt.parser.concrete.unexpected_token] 69:14 unexpected token: LBrace
-error[masterbelt.parser.concrete.unexpected_token] 69:17 unexpected token: LBrace
-error[masterbelt.parser.concrete.unexpected_token] 70:7 unexpected token: Assign
-error[masterbelt.parser.concrete.unexpected_token] 70:13 unexpected token: Assign
-error[masterbelt.parser.concrete.unexpected_token] 70:15 unexpected token: Plus
-error[masterbelt.parser.concrete.unexpected_token] 70:21 unexpected token: Plus
-error[masterbelt.parser.concrete.unexpected_token] 70:23 unexpected token: Int
-error[masterbelt.parser.concrete.unexpected_token] 73:3 unexpected token: Return
-error[masterbelt.parser.concrete.unexpected_token] 82:3 unexpected token: For
-error[masterbelt.parser.concrete.unexpected_token] 82:9 unexpected token: Of
-error[masterbelt.parser.concrete.unexpected_token] 83:5 unexpected token: Assign
-error[masterbelt.parser.concrete.unexpected_token] 83:9 unexpected token: Assign
-error[masterbelt.parser.concrete.unexpected_token] 83:11 unexpected token: Star
-error[masterbelt.parser.concrete.unexpected_token] 83:15 unexpected token: Star
-error[masterbelt.parser.concrete.unexpected_token] 83:17 unexpected token: RBrace

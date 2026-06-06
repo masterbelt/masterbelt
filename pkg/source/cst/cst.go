@@ -96,6 +96,7 @@ const (
 	MatchStmt    // match Expr "{" ( MatchArm ( ("," | NL) MatchArm )* )? "}"
 	MatchArm     // MatchPattern "->" ( Stmt | Block )
 	MatchPattern // ( PrimaryType [Ident] ) | "_"  (a member type with an optional binding, or the wildcard)
+	ForStmt      // for Ident ( "of" | "in" ) Expr Block  (a collection-iteration statement)
 
 	// Top-level functions.
 	FuncDecl // [doc] [pub] fn Ident ParamList ":" TypeExpr ( Block | "->" Expr )
@@ -163,6 +164,7 @@ var kindNames = [...]string{
 	MatchStmt:       "MatchStmt",
 	MatchArm:        "MatchArm",
 	MatchPattern:    "MatchPattern",
+	ForStmt:         "ForStmt",
 	FuncDecl:        "FuncDecl",
 	UseDecl:         "UseDecl",
 	UseList:         "UseList",
