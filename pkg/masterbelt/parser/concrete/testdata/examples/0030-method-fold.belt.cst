@@ -392,7 +392,16 @@ File
       MethodDecl
         Newline "\n"
         Whitespace "  "
-        DocComment "/// This level a number of steps up."
+        DocComment "/// This level a number of steps up. The base value lifts into the nominal"
+        Newline "\n"
+        Whitespace "  "
+        DocComment "/// type through the conversion: a Level derives int8's operators, but their"
+        Newline "\n"
+        Whitespace "  "
+        DocComment "/// self-typed operands stay nominal, so mixing in a bare int8 is a type"
+        Newline "\n"
+        Whitespace "  "
+        DocComment "/// error — Level(steps) is the explicit lift."
         Newline "\n"
         Whitespace "  "
         Pub "pub"
@@ -425,8 +434,13 @@ File
               Whitespace " "
               Plus "+"
               Whitespace " "
-              NameRef
-                Ident "steps"
+              CallExpr
+                NameRef
+                  Ident "Level"
+                LParen "("
+                NameRef
+                  Ident "steps"
+                RParen ")"
           Newline "\n"
           Whitespace "  "
           RBrace "}"
