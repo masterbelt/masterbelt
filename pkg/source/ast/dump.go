@@ -388,8 +388,8 @@ func dumpEnumDecl(b *strings.Builder, d *EnumDecl) {
 }
 
 // dumpInterfaceDecl renders one interface declaration: its modifiers, name,
-// generic parameters, and members (required and provided, distinguished by
-// whether the member carries a default body).
+// generic parameters, parents (supertraits), and members (required and
+// provided, distinguished by whether the member carries a default body).
 func dumpInterfaceDecl(b *strings.Builder, d *InterfaceDecl) {
 	b.WriteString("  InterfaceDecl\n")
 	for _, doc := range d.Doc {
@@ -405,6 +405,9 @@ func dumpInterfaceDecl(b *strings.Builder, d *InterfaceDecl) {
 		} else {
 			fmt.Fprintf(b, "    param %s\n", p.Name)
 		}
+	}
+	for _, parent := range d.Parents {
+		fmt.Fprintf(b, "    parent %s\n", dumpType(parent))
 	}
 	for _, m := range d.Members {
 		dumpInterfaceMember(b, m)
