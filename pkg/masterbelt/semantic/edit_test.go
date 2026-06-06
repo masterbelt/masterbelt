@@ -146,13 +146,16 @@ func TestEditFuzz(t *testing.T) {
 	}
 }
 
-// TestFuncLitTypes checks the editor-facing query over all three paths the
+// TestFuncLitTypes checks the editor-facing query over every path the
 // assembler distinguishes: a call-typed literal (un-annotated const), an
-// annotation-typed literal, and one typed by a method's declared result.
+// annotation-typed literal, one typed by a method's declared result, and one
+// nested in a top-level function body — so the editor surfaces a lambda's
+// signature wherever it sits, not only in a const, annotation, or method body.
 func TestFuncLitTypes(t *testing.T) {
 	src := "const Doubled = [1, 2].map(fn(x) { return x * 2 })\n" +
 		"const Twice: fn(x: int): int = fn(x) { return x * 2 }\n" +
-		"pub type T = int8 impl {\n  pub f(): fn(x: bool): bool {\n    return fn(b) { return b }\n  }\n}\n"
+		"pub type T = int8 impl {\n  pub f(): fn(x: bool): bool {\n    return fn(b) { return b }\n  }\n}\n" +
+		"pub fn g(): int {\n  return [1, 2].map(fn(y) { return y + 1 }).count()\n}\n"
 	e := newEditable([]byte(src))
 
 	var got []string
@@ -160,7 +163,8 @@ func TestFuncLitTypes(t *testing.T) {
 		got = append(got, ft.String())
 	}
 	sort.Strings(got)
-	want := "fn(bool): bool|fn(int): int|fn(int): int"
+	// The fn-body lambda fn(y) { return y + 1 } settles to fn(int): int.
+	want := "fn(bool): bool|fn(int): int|fn(int): int|fn(int): int"
 	if strings.Join(got, "|") != want {
 		t.Fatalf("FuncLitTypes = %v, want %s", got, want)
 	}
