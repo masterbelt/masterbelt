@@ -172,6 +172,79 @@ func TestOverflowThroughReference(t *testing.T) {
 	}
 }
 
+// TestScalarConversionOverflow pins the conversion-site range check: a sized
+// integer conversion whose argument is out of range is a constant_overflow,
+// reported at the conversion. It fires for the direct case (const A: short =
+// short(70000), whose folded value is now nil so the const-level check no longer
+// catches it) and — the gap tagged unions opened — the union-annotation case
+// (short(70000) into short | error, where the const's own type is the union and
+// its Fits passes through). A nominal type over a sized integer (Lv = short) and
+// the unsigned lower bound (uint(-1)) are covered the same way. Exactly one
+// diagnostic fires in each, and the overflowing value does not fold.
+func TestScalarConversionOverflow(t *testing.T) {
+	cases := map[string]string{
+		"direct builtin":   "const A: short = short(70000)\n",
+		"union builtin":    "pub type n = short | error\nconst A: n = short(70000)\n",
+		"nominal in union": "pub type Lv = short\npub type n = Lv | error\nconst A: n = Lv(70000)\n",
+		"unsigned lower":   "const A: uint = uint(-1)\n",
+	}
+	for name, src := range cases {
+		t.Run(name, func(t *testing.T) {
+			m, diags := analyze(src)
+			n := 0
+			for _, d := range diags {
+				if d.Code == CodeConstantOverflow {
+					n++
+				}
+			}
+			if n != 1 {
+				t.Errorf("got %d constant_overflow, want exactly 1 (%v)", n, codes(diags))
+			}
+			// The out-of-range value must not fold — no wrong constant reaches the
+			// match dispatch (the soundness the eval refusal guarantees).
+			for _, c := range m.Consts {
+				if c.Name == "A" && c.Eval != nil {
+					t.Errorf("an overflowing conversion must not fold, got %q", c.Eval.String())
+				}
+			}
+		})
+	}
+}
+
+// TestScalarConversionInRangeFolds checks the conversion check does not over-fire:
+// an in-range sized conversion folds as before and, into a union, carries its
+// member tag. A bool conversion (no range) is untouched.
+func TestScalarConversionInRangeFolds(t *testing.T) {
+	cases := []struct {
+		name, src, want string
+		tagged          bool
+	}{
+		{"direct short(20)", "const A: short = short(20)\n", "20", false},
+		{"short(20) into union", "pub type n = short | error\nconst A: n = short(20)\n", "20", true},
+		{"bool conversion", "const A: bool = bool(true)\n", "true", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			m, diags := analyze(tc.src)
+			if len(diags) != 0 {
+				t.Fatalf("unexpected diagnostics: %v", codes(diags))
+			}
+			var got *ir.Constant
+			for _, c := range m.Consts {
+				if c.Name == "A" {
+					got = c.Eval
+				}
+			}
+			if got == nil || got.String() != tc.want {
+				t.Fatalf("A = %v, want %q", got, tc.want)
+			}
+			if (got.UnionTag != nil) != tc.tagged {
+				t.Errorf("A tag = %v, want tagged=%v", got.UnionTag, tc.tagged)
+			}
+		})
+	}
+}
+
 func TestDatetimeDurationOperators(t *testing.T) {
 	// The full operator table of the two literals — each mixed operation
 	// resolves to the overload its argument type names, and folds to the

@@ -628,10 +628,18 @@ func convert(def *ir.TypeDef, args []ast.Expr, ctx evalCtx) *ir.Constant {
 			}
 			return ir.ErrorConstant(v.Str)
 		}
-		if builtinBacksKind(n, v.Kind) {
-			return v
+		if !builtinBacksKind(n, v.Kind) {
+			return nil
 		}
-		return nil
+		// An integer outside the target's range does not fold: short(70000) has no
+		// representable value, so producing the out-of-range integer would be a
+		// wrong constant the match dispatch (and the union overflow check) could not
+		// catch. Leaving it unfolded keeps a bad value from ever existing — the
+		// type-layer conversion check reports the overflow at the same site.
+		if v.Kind == ir.ConstInt && !n.Fits(v.Int) {
+			return nil
+		}
+		return v
 	}
 	// A nominal type over a primitive (or a list/map): the value is the argument's,
 	// unchanged, when its kind matches the underlying type — a Level is its integer,
@@ -645,6 +653,15 @@ func convert(def *ir.TypeDef, args []ast.Expr, ctx evalCtx) *ir.Constant {
 	}
 	reg := ctx.env.Registry()
 	if defBacksKind(reg, def, v.Kind) {
+		// A nominal type over a sized integer (Level = short) range-checks the same
+		// way the builtin path does: Level(70000) has no representable value, so it
+		// does not fold — keeping a wrong constant out of a union the const-level
+		// overflow check cannot see through.
+		if v.Kind == ir.ConstInt {
+			if n := underlyingPrimitive(reg, def, map[*ir.TypeDef]bool{}); n != nil && !n.Fits(v.Int) {
+				return nil
+			}
+		}
 		return v
 	}
 	if v.Kind == ir.ConstCollection && defBacksKindCollection(def) {
