@@ -208,13 +208,25 @@ func hasFreeVar(t ir.Type, subst map[string]ir.Type) bool {
 	return false
 }
 
-// Satisfies reports whether the concrete type typ satisfies the interface bound
-// — the nominal-satisfaction rule of E-16/E-17: typ's definition must opt into
-// the bound's interface at its own definition site (an entry in its Impls), and
-// the impl's type arguments must agree with the bound's. A bound that is not an
-// interface, or a type with no matching impl, does not satisfy. The check looks
-// through a nominal type to its underlying definition's impls, so an alias of a
-// foldable type is itself foldable.
+// Satisfies reports whether the type typ satisfies the interface bound — the
+// nominal-satisfaction rule of E-16/E-17, generalized over interface
+// inheritance:
+//
+//   - a concrete type satisfies a bound its definition opts into at its own
+//     definition site (an entry in its Impls) with agreeing type arguments. The
+//     materialize pass records a type's inherited interfaces on its Impls too, so
+//     a type that impls only a child satisfies the child's ancestors here with no
+//     extra walk;
+//   - an interface (or a type parameter bounded by one) satisfies a bound that is
+//     the interface itself or any of its ancestors — the contract implication
+//     (orderable means comparable), reached by walking the interface's parent
+//     closure. This is the path the TypeVar-bounded forms (T: orderable) take,
+//     where there is no concrete Impls list to read.
+//
+// A bound that is not an interface, or a type with no matching impl or ancestor,
+// does not satisfy. The check looks through a nominal type to its underlying
+// definition's impls, so an alias of a foldable type is itself foldable; the
+// seen set guards a cyclic definition or inheritance graph.
 func Satisfies(reg *builtin.Registry, typ, bound ir.Type) bool {
 	idef := interfaceDefOf(bound)
 	if idef == nil {
@@ -223,6 +235,18 @@ func Satisfies(reg *builtin.Registry, typ, bound ir.Type) bool {
 	var bArgs []ir.Type
 	if app, ok := bound.(*ir.App); ok {
 		bArgs = app.Args
+	}
+	// An interface type (directly, or as a type parameter's bound) satisfies a
+	// bound it is or inherits: walk its parent closure. defOf maps a TypeVar to
+	// its bound's interface, so T: orderable reaches orderable here.
+	if def := defOf(reg, typ); def != nil && def.Interface != nil {
+		ifaceType := typ
+		if v, ok := typ.(*ir.TypeVar); ok {
+			ifaceType = v.Bound
+		}
+		if interfaceInherits(ifaceType, idef, bArgs, reg, map[*ir.TypeDef]bool{}) {
+			return true
+		}
 	}
 	seen := map[*ir.TypeDef]bool{}
 	for def := defOf(reg, typ); def != nil && !seen[def]; {
@@ -238,4 +262,44 @@ func Satisfies(reg *builtin.Registry, typ, bound ir.Type) bool {
 		def = defOf(reg, def.Body)
 	}
 	return false
+}
+
+// interfaceInherits reports whether the interface application iface is, or
+// inherits, the interface idef applied to bArgs: iface itself matches, or some
+// ancestor reached by walking iface's parents (with iface's arguments
+// substituted into a generic parent) matches. It is the contract-implication
+// walk — orderable inherits comparable — the bound-satisfaction and switch
+// checks share. The seen set guards a cyclic inheritance graph.
+func interfaceInherits(iface ir.Type, idef *ir.TypeDef, bArgs []ir.Type, reg *builtin.Registry, seen map[*ir.TypeDef]bool) bool {
+	def := interfaceDefOf(iface)
+	if def == nil || seen[def] {
+		return false
+	}
+	seen[def] = true
+	if implMatches(reg, iface, idef, bArgs) {
+		return true
+	}
+	subst := interfaceParamSubst(iface, def)
+	for _, parent := range def.Interface.Parents {
+		if interfaceInherits(Substitute(parent, subst), idef, bArgs, reg, seen) {
+			return true
+		}
+	}
+	return false
+}
+
+// interfaceParamSubst maps an interface definition's parameters to an
+// application's type arguments, so a generic parent reached through the
+// application is read with the application's bindings. A bare interface (a Named,
+// or an argument-count mismatch) substitutes nothing.
+func interfaceParamSubst(iface ir.Type, def *ir.TypeDef) map[string]ir.Type {
+	app, ok := iface.(*ir.App)
+	if !ok || len(app.Args) != len(def.Params) {
+		return nil
+	}
+	subst := make(map[string]ir.Type, len(def.Params))
+	for i, p := range def.Params {
+		subst[p.Name] = app.Args[i]
+	}
+	return subst
 }

@@ -2,6 +2,9 @@ Module
   TypeDef "Tag" pub
     doc "A small ordered, printable, rankable tag value."
     impl ordered
+    impl printable
+    impl comparable
+    impl rankable
     body nint
     method "show"
       doc "Render the tag."
@@ -20,15 +23,32 @@ Module
     doc "A behaviour layered on a parent: a printable value is comparable, so it"
     doc "carries eql/neq (from comparable) on top of its own show."
     interface
+    parent comparable
+    required "show"
+    method "show"
+      doc "Render the value as a string."
+      result string
   TypeDef "rankable" pub
     doc "A diamond: ordered inherits comparable through two distinct parents"
     doc "(printable and rankable, each comparable). The shared ancestor is deduped by"
     doc "definition identity, so ordered's contract carries comparable's members once."
     interface
+    parent comparable
+    required "rank"
+    method "rank"
+      doc "The value's rank."
+      result nint
   TypeDef "ordered" pub
     doc "The join of two comparable-derived parents: a single shared comparable"
     doc "ancestor, reached two ways — the diamond closes cleanly."
     interface
+    parent printable
+    parent rankable
+    required "before"
+    method "before"
+      doc "The < operator."
+      param other: self
+      result bool
   Func "equal" pub
     doc "Whether two ordered values are equal, via comparable inherited by ordered."
     typeparam "T": ordered

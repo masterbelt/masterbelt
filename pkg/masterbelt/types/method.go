@@ -315,6 +315,22 @@ func findMethods(reg *builtin.Registry, def *ir.TypeDef, name string, seen map[*
 			}
 		}
 	}
+	// An interface inherits its parents' members — required and provided alike —
+	// so a method named on an ancestor resolves through the child too. This is
+	// the contract-implication path for a type parameter bounded by a child
+	// interface (T: orderable reaching comparable's eql): the bound's def carries
+	// only orderable's own members, and its parents carry the rest. A child that
+	// redeclared the name is rejected elsewhere (interface_member_override), so
+	// the walk does not have to choose between a child and an ancestor signature.
+	if def.Interface != nil {
+		for _, parent := range def.Interface.Parents {
+			if pdef := interfaceDefOf(parent); pdef != nil {
+				if ms := findMethods(reg, pdef, name, seen); len(ms) > 0 {
+					out = append(out, ms...)
+				}
+			}
+		}
+	}
 	if len(out) > 0 {
 		return out
 	}

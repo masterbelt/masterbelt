@@ -383,6 +383,22 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "index " + f["index"].String() + " is out of range for a list of length " + f["length"].String()
 		}
 	},
+	"masterbelt.semantic.interface_member_conflict": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return f["child"].String() + " は無関係な 2 つの interface (" + f["first"].String() + " と " + f["second"].String() + ") から " + f["method"].String() + " を継承しています"
+		default:
+			return f["child"].String() + " inherits " + f["method"].String() + " from two unrelated interfaces (" + f["first"].String() + " and " + f["second"].String() + ")"
+		}
+	},
+	"masterbelt.semantic.interface_member_override": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return f["child"].String() + " は " + f["method"].String() + " を再宣言できません: すでに " + f["ancestor"].String() + " から継承しています"
+		default:
+			return f["child"].String() + " cannot redeclare " + f["method"].String() + ": it is already inherited from " + f["ancestor"].String()
+		}
+	},
 	"masterbelt.semantic.invalid_enum_base_type": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":

@@ -37,6 +37,8 @@ const (
 	CodeEffectInPureContext        diagnostic.Code = "masterbelt.semantic.effect_in_pure_context"
 	CodeImmutableData              diagnostic.Code = "masterbelt.semantic.immutable_data"
 	CodeIndexOutOfRange            diagnostic.Code = "masterbelt.semantic.index_out_of_range"
+	CodeInterfaceMemberConflict    diagnostic.Code = "masterbelt.semantic.interface_member_conflict"
+	CodeInterfaceMemberOverride    diagnostic.Code = "masterbelt.semantic.interface_member_override"
 	CodeInvalidEnumBaseType        diagnostic.Code = "masterbelt.semantic.invalid_enum_base_type"
 	CodeInvalidOperation           diagnostic.Code = "masterbelt.semantic.invalid_operation"
 	CodeLambdaArityMismatch        diagnostic.Code = "masterbelt.semantic.lambda_arity_mismatch"
@@ -474,6 +476,39 @@ func newIndexOutOfRangeDiagnostic(offset int, width int, index string, length st
 		Severity: diagnostic.Error,
 		Code:     CodeIndexOutOfRange,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeIndexOutOfRange, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newInterfaceMemberConflictDiagnostic(offset int, width int, child string, method string, first string, second string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"child":  diagnostic.Str(child),
+		"method": diagnostic.Str(method),
+		"first":  diagnostic.Str(first),
+		"second": diagnostic.Str(second),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeInterfaceMemberConflict,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeInterfaceMemberConflict, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newInterfaceMemberOverrideDiagnostic(offset int, width int, child string, method string, ancestor string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"child":    diagnostic.Str(child),
+		"method":   diagnostic.Str(method),
+		"ancestor": diagnostic.Str(ancestor),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeInterfaceMemberOverride,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeInterfaceMemberOverride, fields),
 		Fields:   fields,
 		Offset:   offset,
 		Width:    width,

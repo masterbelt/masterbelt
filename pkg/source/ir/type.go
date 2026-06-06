@@ -241,15 +241,23 @@ type EnumMember struct {
 }
 
 // InterfaceDef is the description of an interface type: the names of its
-// required methods (the ones an implementor must supply) and its provided
-// methods (the defaults an implementor inherits). The method signatures and
-// bodies themselves live in the owning TypeDef's Methods — required and provided
-// alike — so a value typed as the interface resolves them through the same path
-// a concrete type's methods take; this struct records only which names are
-// required, which is what the conformance check needs.
+// required methods (the ones an implementor must supply), its provided methods
+// (the defaults an implementor inherits), and its parents (the supertraits it
+// inherits from). The method signatures and bodies themselves live in the
+// owning TypeDef's Methods — required and provided alike — so a value typed as
+// the interface resolves them through the same path a concrete type's methods
+// take; this struct records only which names are required, which is what the
+// conformance check needs.
 type InterfaceDef struct {
 	Required []string // the names of the required methods, in declaration order
 	Provided []string // the names of the provided (default) methods, in declaration order
+	// Parents are the supertraits this interface inherits from: the resolved
+	// parent-interface applications (a bare comparable is a Named, a generic
+	// foldable<nint, T> an App). A child inherits the whole contract of every
+	// parent — required and provided members alike. The conformance closure and
+	// the bound-implication walk read Parents to reach an ancestor's contract
+	// through the child; it is empty for an interface with no parents.
+	Parents []Type
 }
 
 // TypeParam is one generic parameter of a TypeDef: a name and an optional
