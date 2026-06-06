@@ -74,6 +74,13 @@ type ReceiverTyper interface {
 	// composite like a union or record, a primitive). It is a universe lookup,
 	// not a type query.
 	TypeExprDef(t ast.TypeExpr) *ir.TypeDef
+	// TypeExprType resolves a written type annotation to its full resolved type —
+	// a record annotation yielding an *ir.Record, so a field's static type is
+	// readable for a field-receiver method call (p.lv.increment()). It is the
+	// same universe resolution TypeExprDef runs, minus the nominal-only filter,
+	// so it is never the type query. It returns nil for a nil or unresolvable
+	// annotation.
+	TypeExprType(t ast.TypeExpr) ir.Type
 }
 
 // Decl folds a declaration's value, or nil when it has no initializer. Overflow
@@ -215,6 +222,18 @@ func assocConst(def *ir.TypeDef, name string) *ir.Constant {
 	return nil
 }
 
+// recordField returns the value of a record constant's named field, or nil when
+// the record has no such field (a malformed program the checker reports). It is
+// how a field access (p.lv) reads its value once the record has folded.
+func recordField(recv *ir.Constant, name string) *ir.Constant {
+	for _, f := range recv.Fields {
+		if f.Name == name {
+			return f.Value
+		}
+	}
+	return nil
+}
+
 // evalExpr folds an expression, resolving an identifier first against the
 // context's locals and then against the environment's declarations. The
 // expected-enum context reaches only the immediate expression — every recursive
@@ -303,6 +322,13 @@ func evalExpr(e ast.Expr, ctx evalCtx) *ir.Constant {
 					}
 				}
 			}
+		}
+		// A member access whose receiver folds to a record value reads the named
+		// field (p.lv), so a field's value participates in folding and a method
+		// call on it has a receiver. It is the last branch — the type-member and
+		// namespace forms above resolve by name, this one by value.
+		if recv := evalExpr(e.Receiver, sub); recv != nil && recv.Kind == ir.ConstRecord {
+			return recordField(recv, e.Member.Name)
 		}
 		return nil
 	case *ast.CallExpr:
@@ -949,11 +975,121 @@ func syntacticDef(ctx evalCtx, recvExpr ast.Expr) *ir.TypeDef {
 			return annotationDef(ctx.env, decl.Type)
 		}
 		return nil
+	case *ast.MemberExpr:
+		// A record field access (p.lv): the field's static type is read from the
+		// base receiver's record type, which is itself resolved through the same
+		// channels. A nested path (a.b.c) recurses, each step reading the next
+		// record's field annotation, never the type query.
+		return fieldDef(ctx, e)
 	case *ast.CallExpr:
 		return callResultDef(ctx, e)
 	default:
 		return nil
 	}
+}
+
+// fieldDef resolves a record field access (p.lv) to the field's static type
+// definition: it reads the base receiver's record type, finds the named field,
+// and returns the def its annotation names. It returns nil when the base is not
+// a record, the field is absent, or the field's type names no nominal def — the
+// conservative failure that leaves a method call on the field unfolded.
+func fieldDef(ctx evalCtx, e *ast.MemberExpr) *ir.TypeDef {
+	rec := recordOf(recvType(ctx, e.Receiver))
+	if rec == nil {
+		return nil
+	}
+	for _, f := range rec.Fields {
+		if f.Name == e.Member.Name {
+			return methodTableDef(ctx.env.Registry(), f.Type)
+		}
+	}
+	return nil
+}
+
+// recvType resolves a receiver expression to its static type — the full resolved
+// type, so a record annotation yields an *ir.Record whose fields a field access
+// reads. It is the type companion of syntacticDef, sharing its channels: self's
+// owning type, a local's or constant's annotation, a field of a record, or a
+// call's result. It returns nil when no channel applies. The env's universe
+// resolution (TypeExprType) is a pure lookup, never the type query.
+func recvType(ctx evalCtx, recvExpr ast.Expr) ir.Type {
+	switch e := recvExpr.(type) {
+	case *ast.SelfExpr:
+		return namedOf(ctx.selfDef)
+	case *ast.Identifier:
+		if _, isLocal := ctx.locals[e.Name]; isLocal {
+			return namedOf(ctx.localDefs[e.Name])
+		}
+		if decl := ctx.env.Resolve(e); decl != nil {
+			return annotationType(ctx.env, decl.Type)
+		}
+		return nil
+	case *ast.MemberExpr:
+		rec := recordOf(recvType(ctx, e.Receiver))
+		if rec == nil {
+			return nil
+		}
+		for _, f := range rec.Fields {
+			if f.Name == e.Member.Name {
+				return f.Type
+			}
+		}
+		return nil
+	case *ast.CallExpr:
+		return namedOf(callResultDef(ctx, e))
+	default:
+		return nil
+	}
+}
+
+// recordOf unwraps a static type to the record it ultimately is: a record type
+// directly, or a nominal type (or applied generic) whose definition's body is a
+// record. It returns nil for any non-record type. A seen-free single-step unwrap
+// suffices — a record annotation is at most one Named deep here (a field's type
+// is its resolved annotation, and a nominal record def's body is the record).
+func recordOf(t ir.Type) *ir.Record {
+	switch t := t.(type) {
+	case *ir.Record:
+		return t
+	case *ir.Named:
+		if t.Def != nil {
+			if r, ok := t.Def.Body.(*ir.Record); ok {
+				return r
+			}
+		}
+	case *ir.App:
+		if t.Def != nil {
+			if r, ok := t.Def.Body.(*ir.Record); ok {
+				return r
+			}
+		}
+	}
+	return nil
+}
+
+// namedOf wraps a definition as its nominal type, or nil for a nil def — the
+// bridge from the def channels (which return *ir.TypeDef) to the type recvType
+// threads.
+func namedOf(def *ir.TypeDef) ir.Type {
+	if def == nil {
+		return nil
+	}
+	return &ir.Named{Def: def}
+}
+
+// annotationType resolves a written annotation to its full type through the
+// Env's ReceiverTyper, or nil when the Env supplies none or the annotation is
+// absent. It is annotationDef's type-returning companion, used where a record
+// annotation's structure (not just a nominal def) is needed.
+func annotationType(env Env, t ast.TypeExpr) ir.Type {
+	if t == nil {
+		return nil
+	}
+	rt, ok := env.(ReceiverTyper)
+	if !ok {
+		return nil
+	}
+	return rt.TypeExprType(t)
 }
 
 // callResultDef resolves the type definition of a call expression's result,

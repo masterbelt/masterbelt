@@ -582,10 +582,178 @@ File
           Ident "increment"
         LParen "("
         RParen ")"
+  TypeDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// A record field's static type is read from the record type's field annotation"
+    Newline "\n"
+    LineComment "// (channel 6): Hero.lv is a Level, so a method call on it folds — and a nested"
+    Newline "\n"
+    LineComment "// path or a chain resolves the same way, each step reading the next field"
+    Newline "\n"
+    LineComment "// annotation."
+    Newline "\n"
+    DocComment "/// A character with a level field."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Type "type"
+    Whitespace " "
+    Ident "Character"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    RecordType
+      LBrace "{"
+      Whitespace " "
+      Field
+        Ident "lv"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "Level"
+      Whitespace " "
+      RBrace "}"
+  TypeDecl
+    Newline "\n"
+    DocComment "/// A party wrapping a character, to exercise a nested field path."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Type "type"
+    Whitespace " "
+    Ident "Party"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    RecordType
+      LBrace "{"
+      Whitespace " "
+      Field
+        Ident "leader"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "Character"
+      Whitespace " "
+      RBrace "}"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Hero"
+    TypeClause
+      Colon ":"
+      Whitespace " "
+      TypeName
+        Ident "Character"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      RecordLit
+        LBrace "{"
+        Whitespace " "
+        RecordField
+          Ident "lv"
+          Colon ":"
+          Whitespace " "
+          CallExpr
+            NameRef
+              Ident "Level"
+            LParen "("
+            Literal
+              Int "5"
+            RParen ")"
+        Whitespace " "
+        RBrace "}"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Promoted"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        MemberExpr
+          MemberExpr
+            NameRef
+              Ident "Hero"
+            Dot "."
+            Ident "lv"
+          Dot "."
+          Ident "increment"
+        LParen "("
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Squad"
+    TypeClause
+      Colon ":"
+      Whitespace " "
+      TypeName
+        Ident "Party"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      RecordLit
+        LBrace "{"
+        Whitespace " "
+        RecordField
+          Ident "leader"
+          Colon ":"
+          Whitespace " "
+          RecordLit
+            LBrace "{"
+            Whitespace " "
+            RecordField
+              Ident "lv"
+              Colon ":"
+              Whitespace " "
+              CallExpr
+                NameRef
+                  Ident "Level"
+                LParen "("
+                Literal
+                  Int "8"
+                RParen ")"
+            Whitespace " "
+            RBrace "}"
+        Whitespace " "
+        RBrace "}"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "LeaderUp"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        MemberExpr
+          MemberExpr
+            MemberExpr
+              NameRef
+                Ident "Squad"
+              Dot "."
+              Ident "leader"
+            Dot "."
+            Ident "lv"
+          Dot "."
+          Ident "increment"
+        LParen "("
+        RParen ")"
   AssertDecl
     Newline "\n"
     Newline "\n"
-    LineComment "// The nominal methods fold in assertions too."
+    LineComment "// The nominal methods fold in assertions too, including off a record field."
     Newline "\n"
     Assert "assert"
     Whitespace " "
@@ -626,6 +794,57 @@ File
       Whitespace " "
       Literal
         Int "5"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      CallExpr
+        MemberExpr
+          MemberExpr
+            NameRef
+              Ident "Hero"
+            Dot "."
+            Ident "lv"
+          Dot "."
+          Ident "increment"
+        LParen "("
+        RParen ")"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "6"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      CallExpr
+        MemberExpr
+          CallExpr
+            MemberExpr
+              MemberExpr
+                MemberExpr
+                  NameRef
+                    Ident "Squad"
+                  Dot "."
+                  Ident "leader"
+                Dot "."
+                Ident "lv"
+              Dot "."
+              Ident "increment"
+            LParen "("
+            RParen ")"
+          Dot "."
+          Ident "increment"
+        LParen "("
+        RParen ")"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "10"
   Newline "\n"
   EOF ""
 # diagnostics

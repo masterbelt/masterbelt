@@ -99,8 +99,9 @@ func (s funcScope) fnMember(m *ast.MemberExpr) []*ast.FuncDecl {
 
 // constScope types a constant initializer: the context-specific forms are a
 // value reference, whose type is its referent's, and a conversion, whose type
-// is the type it names. Self, field access, and the null literal are not
-// meaningful in a constant, so they are ir.Invalid.
+// is the type it names. A field access reads a record-typed constant's field
+// (Hero.lv); self and the null literal are not meaningful in a constant, so they
+// are ir.Invalid.
 type constScope struct{ env Env }
 
 func (s constScope) registry() *builtin.Registry { return s.env.Registry() }
@@ -132,6 +133,11 @@ func (s constScope) leaf(e ast.Expr) ir.Type {
 		if t := assocConstType(s.universe(), e); t != ir.Invalid {
 			return t
 		}
+		// Otherwise the receiver is a value: a field access on a record-typed
+		// constant (Hero.lv, and a nested path a.b.c), reading the field's type
+		// from the record. The receiver types through the same const scope, so it
+		// reaches another constant's record value (or this one's, recursively).
+		return fieldType(exprType(e.Receiver, s), e.Member.Name)
 	}
 	return ir.Invalid
 }

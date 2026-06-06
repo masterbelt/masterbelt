@@ -142,3 +142,14 @@ func (e predicateEnv) TypeExprDef(t ast.TypeExpr) *ir.TypeDef {
 	r := &infer.TypeResolver{Defs: e.universe, Qualified: e.qualified}
 	return nominalDefOf(r.ResolveType(t, nil))
 }
+
+// TypeExprType resolves a written annotation to its full type, the way
+// TypeExprDef resolves it to a def — a pure universe lookup for a record field
+// receiver in a self method's signature. It satisfies eval.ReceiverTyper.
+func (e predicateEnv) TypeExprType(t ast.TypeExpr) ir.Type {
+	if t == nil {
+		return nil
+	}
+	r := &infer.TypeResolver{Defs: e.universe, Qualified: e.qualified}
+	return r.ResolveType(t, nil)
+}
