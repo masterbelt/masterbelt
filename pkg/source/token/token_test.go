@@ -1,6 +1,7 @@
 package token
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/masterbelt/masterbelt/pkg/source"
@@ -12,6 +13,85 @@ func TestKindString(t *testing.T) {
 	}
 	if got := Kind(999).String(); got != "Kind(999)" {
 		t.Errorf("Kind(999).String() = %q, want %q", got, "Kind(999)")
+	}
+}
+
+// TestKindNamesComplete binds the Kind const block to the hand-maintained
+// kindNames table: every kind must have a non-empty name, and String() must
+// never fall back to "Kind(N)" for a real kind. Without it, a Kind added to the
+// enum but forgotten in kindNames renders silently as "Kind(63)" in token dumps
+// and diagnostics. numKinds makes the bound automatic.
+func TestKindNamesComplete(t *testing.T) {
+	for k := Kind(0); k < numKinds; k++ {
+		name := k.String()
+		if name == "" {
+			t.Errorf("Kind(%d) has an empty name", int(k))
+		}
+		if strings.HasPrefix(name, "Kind(") {
+			t.Errorf("Kind(%d) has no kindNames entry; String() fell back to %q", int(k), name)
+		}
+	}
+}
+
+// TestKindNamesUnique guards against a copy-paste slip duplicating a name.
+func TestKindNamesUnique(t *testing.T) {
+	seen := map[string]Kind{}
+	for k := Kind(0); k < numKinds; k++ {
+		name := k.String()
+		if prev, dup := seen[name]; dup {
+			t.Errorf("Kind name %q is shared by Kind(%d) and Kind(%d)", name, int(prev), int(k))
+		}
+		seen[name] = k
+	}
+}
+
+// TestKeywordKindsMapped binds the keyword Kind run to the keywords map: every
+// kind from firstKeyword to lastKeyword must appear as a value there. A keyword
+// Kind missing from the map is treated as a plain identifier by the lexer
+// (silent wrong behavior) and is absent from the generated editor grammar, with
+// nothing else failing. The reverse — every map entry naming a kind in the
+// keyword run — guards against a stray non-keyword slipping in.
+func TestKeywordKindsMapped(t *testing.T) {
+	mapped := map[Kind]string{}
+	for spelling, k := range keywords {
+		if prev, dup := mapped[k]; dup {
+			t.Errorf("keyword kind %s is mapped by both %q and %q", k, prev, spelling)
+		}
+		mapped[k] = spelling
+		if k < firstKeyword || k > lastKeyword {
+			t.Errorf("keywords[%q] = %s, which is outside the keyword Kind run [%s..%s]", spelling, k, firstKeyword, lastKeyword)
+		}
+	}
+	for k := firstKeyword; k <= lastKeyword; k++ {
+		spelling, ok := mapped[k]
+		if !ok {
+			t.Errorf("keyword kind %s has no entry in the keywords map; the lexer would treat its word as an identifier", k)
+			continue
+		}
+		// The mapping must round-trip through Lookup, the lexer's actual path.
+		if got := Lookup(spelling); got != k {
+			t.Errorf("Lookup(%q) = %s, want %s", spelling, got, k)
+		}
+	}
+}
+
+// TestOperatorKindsHaveSpelling binds the operator/punctuation Kind run to the
+// spelling map: every kind from firstOperator to lastOperator must have a
+// non-empty spelling, since that map is the source of truth for naming operators
+// in diagnostics and feeds the editor grammar. A new operator added without a
+// spelling entry would render as "" in those places.
+func TestOperatorKindsHaveSpelling(t *testing.T) {
+	for k := firstOperator; k <= lastOperator; k++ {
+		if s := k.Symbol(); s == "" {
+			t.Errorf("operator kind %s has no spelling entry", k)
+		}
+	}
+	// Nothing outside the operator run claims a spelling (which would mean a
+	// keyword or literal kind wandered into the operator map).
+	for k, s := range spelling {
+		if k < firstOperator || k > lastOperator {
+			t.Errorf("spelling[%s] = %q, outside the operator Kind run [%s..%s]", k, s, firstOperator, lastOperator)
+		}
 	}
 }
 
