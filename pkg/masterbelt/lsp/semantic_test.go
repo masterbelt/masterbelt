@@ -492,6 +492,28 @@ func TestSemanticTokensErrorConversion(t *testing.T) {
 	}
 }
 
+func TestSemanticTokensRangeConstructor(t *testing.T) {
+	// The range constructor's callee names a type — a resolution fact — and
+	// colours as the type it constructs, exactly as the error conversion does,
+	// through the program-aware pass that knows range is in scope.
+	doc := testView("const C = range(0, 10).count()\n")
+	got := decode(semanticTokensIn(doc).Data)
+
+	// range begins at column 10 (after "const C = ").
+	var found bool
+	for _, tok := range got {
+		if tok.line == 0 && tok.char == 10 {
+			found = true
+			if tok.tokenType != stType {
+				t.Errorf("range callee = type %d, want %d (a type)", tok.tokenType, stType)
+			}
+		}
+	}
+	if !found {
+		t.Errorf("no token at the range callee (got %+v)", got)
+	}
+}
+
 func TestSemanticTokensValueMembers(t *testing.T) {
 	// A member access in value position carries a resolution fact the lexical
 	// pass cannot: Rarity.Common names an enum member (matching its declaration

@@ -152,13 +152,13 @@ func callType(e *ast.CallExpr, s scope, sink *Sink) ir.Type {
 	return result
 }
 
-// convCallType is the type rule for a conversion T(x): the expression's type
-// is the type the callee names, whatever its argument. The error type — the
-// one natively-backed conversion with value semantics today — constructs from
-// exactly one string argument, so its argument count is enforced and the
-// argument checked against string (a non-string is the familiar
-// type_mismatch); any other conversion's arguments are checked bare for their
-// own findings.
+// convCallType is the type rule for a conversion or constructor T(x): the
+// expression's type is the type the callee names, whatever its arguments. Two
+// builtin types construct from arguments with value semantics: error("msg")
+// from one string, and range(start, end) from two ints — each enforces its
+// argument count (an arity_mismatch otherwise) and checks its arguments against
+// the expected types (a mismatch is the familiar type_mismatch). Any other
+// conversion's arguments are checked bare for their own findings.
 func convCallType(e *ast.CallExpr, name string, t ir.Type, s scope, sink *Sink) ir.Type {
 	if b, ok := t.(*ir.Builtin); ok {
 		if n, found := s.registry().Native(b.Name); found && n.Err {
@@ -170,6 +170,23 @@ func convCallType(e *ast.CallExpr, name string, t ir.Type, s scope, sink *Sink) 
 				return t
 			}
 			checkType(e.Arguments[0], &ir.Builtin{Name: "string"}, s, map[string]ir.Type{}, sink)
+			return t
+		}
+		if b.Name == "range" {
+			// range(start, end): the half-open integer sequence. A future step
+			// variant (range(start, end, step)) would add a third arm here rather
+			// than reject a third argument, so the design does not close the door
+			// on it; today exactly two int arguments construct one.
+			if len(e.Arguments) != 2 {
+				for _, a := range e.Arguments {
+					check(a, s, sink)
+				}
+				sink.arityMismatch(e, name, len(e.Arguments), 2)
+				return t
+			}
+			for _, a := range e.Arguments {
+				checkType(a, &ir.Builtin{Name: "int"}, s, map[string]ir.Type{}, sink)
+			}
 			return t
 		}
 	}

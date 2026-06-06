@@ -77,3 +77,24 @@ func TestNullConstant(t *testing.T) {
 		t.Error("null must not equal an integer")
 	}
 }
+
+// TestRangeConstant pins the range value: it renders as range(start, end) (the
+// String default would dereference a nil Int and panic without an explicit
+// case), equality is by the bounds, and a range never equals a value of another
+// kind — the contract ConstantsEqual's panic guard forces the new kind to honor.
+func TestRangeConstant(t *testing.T) {
+	r := RangeConstant(big.NewInt(0), big.NewInt(10))
+	if got := r.String(); got != "range(0, 10)" {
+		t.Errorf("String() = %q, want range(0, 10)", got)
+	}
+	if !ConstantsEqual(r, RangeConstant(big.NewInt(0), big.NewInt(10))) {
+		t.Error("two ranges with the same bounds should be equal")
+	}
+	if ConstantsEqual(r, RangeConstant(big.NewInt(0), big.NewInt(9))) {
+		t.Error("ranges with different bounds must not be equal")
+	}
+	// Differing kinds are never equal — a range against the integer it counts to.
+	if ConstantsEqual(r, IntConstant(big.NewInt(10))) {
+		t.Error("a range must not equal an integer")
+	}
+}

@@ -491,17 +491,20 @@ func constantItems(doc view) []protocol.CompletionItem {
 }
 
 // constructorItems is one completion item per type in scope whose conversion
-// form constructs a value (today the error type): a call snippet with the
-// message ready to fill in.
+// form constructs a value (the error and range types): a call snippet with the
+// arguments ready to fill in. Each constructor carries its own signature and
+// snippet — error("message"), range(start, end) — so the completion offers the
+// right shape per type rather than the error form for all.
 func constructorItems(doc view) []protocol.CompletionItem {
 	kind := protocol.CompletionItemKindConstructor
 	snippet := protocol.InsertTextFormatSnippet
 	var items []protocol.CompletionItem
 	for _, t := range doc.Constructors() {
+		detail, insert := constructorSignature(t.Name)
 		item := protocol.CompletionItem{
 			Label:  t.Name,
 			Kind:   &kind,
-			Detail: t.Name + "(message: string)",
+			Detail: detail,
 		}
 		if len(t.Doc) > 0 {
 			item.Documentation = &protocol.MarkupContent{
@@ -509,11 +512,27 @@ func constructorItems(doc view) []protocol.CompletionItem {
 				Value: strings.Join(t.Doc, "\n"),
 			}
 		}
-		item.InsertText = t.Name + "(\"${1:message}\")"
+		item.InsertText = insert
 		item.InsertTextFormat = &snippet
 		items = append(items, item)
 	}
 	return items
+}
+
+// constructorSignature returns the detail label and the snippet insert text for
+// a value-constructing builtin: error("message") takes one string, range(start,
+// end) two ints. An unrecognized constructor falls back to a bare call snippet
+// with one placeholder, so a future constructor still completes sensibly until
+// it is given its own shape here.
+func constructorSignature(name string) (detail, insert string) {
+	switch name {
+	case "range":
+		return "range(start: int, end: int)", "range(${1:start}, ${2:end})"
+	case "error":
+		return "error(message: string)", "error(\"${1:message}\")"
+	default:
+		return name + "(value)", name + "(${1:value})"
+	}
 }
 
 // valueKeywordItems is the keywords that may begin a value: the literals

@@ -25,13 +25,14 @@ const (
 	ConstError                       // an error value carrying its message (Constant.Str)
 	ConstEnum                        // an enum member value (Constant.EnumDef / Constant.EnumIndex)
 	ConstNull                        // the null value (no payload — the single inhabitant of the null type)
+	ConstRange                       // a half-open integer range (Constant.Start / Constant.End)
 )
 
 // Constant is the evaluated value of a constant expression: an arbitrary-
 // precision integer, a boolean, a string, a collection (list/map), a datetime,
-// or a duration. A nil *Constant means "could not be evaluated" — a missing
-// initializer, an undefined reference, a cycle, a type error, or a division by
-// zero.
+// a duration, or a half-open integer range. A nil *Constant means "could not be
+// evaluated" — a missing initializer, an undefined reference, a cycle, a type
+// error, or a division by zero.
 type Constant struct {
 	Kind   ConstKind
 	Int    *big.Int     // valid when Kind == ConstInt
@@ -52,6 +53,14 @@ type Constant struct {
 	// the index uniquely identifies the member.
 	EnumDef   *TypeDef
 	EnumIndex int
+
+	// valid when Kind == ConstRange: the half-open integer interval [Start, End).
+	// The elements are Start, Start+1, ..., End-1; an End at or below Start is the
+	// empty range. The bounds are kept lazily (the sequence is never materialized
+	// here), so a wide range is a small value — the evaluator bounds the walk it
+	// makes over one.
+	Start *big.Int
+	End   *big.Int
 }
 
 // ConstantsEqual reports whether two folded constants are structurally equal —
@@ -60,10 +69,11 @@ type Constant struct {
 // value on both sides) are equal; a nil against a non-nil is not. Differing
 // kinds are never equal. The scalar kinds compare by value, an error by its
 // message, an enum member by identity (definition pointer and member index), a
-// datetime/duration by its milliseconds, and the composite kinds recursively: a
-// collection by length and entrywise key/value equality, a record by its
-// canonical (name-sorted) fields. A function value compares by the identity of
-// its literal (the AST pointer) and the equality of its captured environment —
+// datetime/duration by its milliseconds, a range by its bounds, and the
+// composite kinds recursively: a collection by length and entrywise key/value
+// equality, a record by its canonical (name-sorted) fields. A function value
+// compares by the identity of its literal (the AST pointer) and the equality of
+// its captured environment —
 // a re-parsed but textually identical literal is a different fact, so it is not
 // equal to the original.
 //
@@ -94,6 +104,13 @@ func ConstantsEqual(a, b *Constant) bool {
 		return true
 	case ConstDatetime, ConstDuration:
 		return a.Millis == b.Millis
+	case ConstRange:
+		// Two ranges are equal when their bounds are equal — a range carries no
+		// other identity. An empty range still compares by its written bounds
+		// (range(10, 10) is not range(5, 5)), which is conservative and matches the
+		// String() rendering; nothing relies on every empty range being one value.
+		return a.Start != nil && b.Start != nil && a.End != nil && b.End != nil &&
+			a.Start.Cmp(b.Start) == 0 && a.End.Cmp(b.End) == 0
 	case ConstCollection:
 		if len(a.Coll) != len(b.Coll) {
 			return false
@@ -169,6 +186,14 @@ func ErrorConstant(message string) *Constant { return &Constant{Kind: ConstError
 // NullConstant builds the null value — the single inhabitant of the null type,
 // carrying no payload.
 func NullConstant() *Constant { return &Constant{Kind: ConstNull} }
+
+// RangeConstant builds a half-open integer range [start, end): the elements
+// start, start+1, ..., end-1, with an end at or below start being the empty
+// range. The bounds are held lazily; the sequence is materialized only when a
+// fold or a for walks it, under the evaluator's iteration bound.
+func RangeConstant(start, end *big.Int) *Constant {
+	return &Constant{Kind: ConstRange, Start: start, End: end}
+}
 
 // CollectionConstant builds a collection constant from its entries. An empty
 // slice is the empty list/map; a list's entries have a nil Key.
@@ -283,6 +308,8 @@ func (c *Constant) String() string {
 		return "error(" + strconv.Quote(c.Str) + ")"
 	case ConstNull:
 		return "null"
+	case ConstRange:
+		return "range(" + c.Start.String() + ", " + c.End.String() + ")"
 	case ConstEnum:
 		name := c.EnumName()
 		if c.EnumDef == nil {

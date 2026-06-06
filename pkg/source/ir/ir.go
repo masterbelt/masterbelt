@@ -224,11 +224,24 @@ type FieldAccess struct {
 
 func (*FieldAccess) value() {}
 
-// Conversion is a type conversion T(Value), as written T(x) — the form a builtin
-// type name takes when applied to a value.
+// Conversion is a type conversion or constructor T(Args...), as written T(x) —
+// the form a builtin type name takes when applied to its arguments. Most
+// conversions take one argument (Level(5), error("msg")); a constructor takes
+// several (range(start, end)), so the arguments are a slice. Value returns the
+// sole argument for the common single-argument form.
 type Conversion struct {
-	Type  Type
-	Value Value
+	Type Type
+	Args []Value
+}
+
+// Value returns a single-argument conversion's argument — the common form
+// (Level(5), error("msg")) — or nil when the conversion has no arguments or more
+// than one. A multi-argument constructor reads Args directly.
+func (c *Conversion) Value() Value {
+	if len(c.Args) == 1 {
+		return c.Args[0]
+	}
+	return nil
 }
 
 func (*Conversion) value() {}
