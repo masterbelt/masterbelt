@@ -35,7 +35,7 @@ func TestDocumentScriptedEdits(t *testing.T) {
 	}{
 		{"rename in value", "const x = 1\n", source.Edit{Start: 10, End: 11, NewText: []byte("9")}},
 		{"add pub", "const x = 1\nconst y = 2\n", source.Edit{Start: 12, End: 12, NewText: []byte("pub ")}},
-		{"add type annotation", "const x = 1\n", source.Edit{Start: 7, End: 7, NewText: []byte(": int64")}},
+		{"add type annotation", "const x = 1\n", source.Edit{Start: 7, End: 7, NewText: []byte(": long")}},
 		{"insert a decl", "const x = 1\nconst z = 3\n", source.Edit{Start: 12, End: 12, NewText: []byte("const y = 2\n")}},
 		{"add doc comment", "const x = 1\n", source.Edit{Start: 0, End: 0, NewText: []byte("/// hi\n")}},
 		{"change value to name ref", "const x = 1\n", source.Edit{Start: 10, End: 11, NewText: []byte("y")}},
@@ -93,7 +93,7 @@ func TestDocumentSequentialEdits(t *testing.T) {
 	d := NewDocument(nil)
 	var content []byte
 
-	typed := "/// doc\npub const Answer: int64 = 42\nconst Mirror = Answer\n"
+	typed := "/// doc\npub const Answer: long = 42\nconst Mirror = Answer\n"
 	for i := 0; i < len(typed); i++ {
 		e := source.Edit{Start: len(content), End: len(content), NewText: []byte{typed[i]}}
 		content = naiveSplice(content, e.Start, e.End, e.NewText)
@@ -106,7 +106,7 @@ func TestDocumentFuzz(t *testing.T) {
 	r := rand.New(rand.NewSource(0xA57))
 	alphabet := []string{
 		"a", "Z", "x", "0", "9", " ", "\n", ":", "=", "あ",
-		"const ", "pub ", "/// d\n", "// c\n", "int64", "MaxLevel",
+		"const ", "pub ", "/// d\n", "// c\n", "long", "MaxLevel",
 		// Operators, booleans, and expression fragments so the oracle checks
 		// that incremental lowering of expressions matches a full lowering.
 		"+", "-", "*", "%", "!", "<", ">", "&&", "||", "==", "<=",

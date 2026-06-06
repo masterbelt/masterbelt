@@ -30,7 +30,7 @@ func TestDocumentHighlights(t *testing.T) {
 
 func TestInlayHints(t *testing.T) {
 	// A is un-annotated (gets a hint); B is annotated (gets none).
-	doc := testView("const A = 1\nconst B: int64 = 2\n")
+	doc := testView("const A = 1\nconst B: long = 2\n")
 	buf := doc.Buffer()
 	hints := inlayHints(doc, 0, buf.Len())
 
@@ -41,15 +41,15 @@ func TestInlayHints(t *testing.T) {
 	if err := json.Unmarshal(hints[0].Label, &label); err != nil {
 		t.Fatalf("hint label is not a JSON string: %v", err)
 	}
-	if label != ": int" {
-		t.Errorf("hint label = %q, want %q", label, ": int")
+	if label != ": nint" {
+		t.Errorf("hint label = %q, want %q", label, ": nint")
 	}
 	// The hint sits just after A's name (offset 7) and carries the same edit.
 	if hints[0].Position.Line != 0 || hints[0].Position.Character != 7 {
 		t.Errorf("hint position = %+v, want line 0 char 7", hints[0].Position)
 	}
-	if len(hints[0].TextEdits) != 1 || hints[0].TextEdits[0].NewText != ": int" {
-		t.Errorf("hint edit = %+v, want one inserting %q", hints[0].TextEdits, ": int")
+	if len(hints[0].TextEdits) != 1 || hints[0].TextEdits[0].NewText != ": nint" {
+		t.Errorf("hint edit = %+v, want one inserting %q", hints[0].TextEdits, ": nint")
 	}
 }
 
@@ -73,7 +73,7 @@ func TestLambdaInlayHints(t *testing.T) {
 	hints := inlayHints(doc, 0, doc.Buffer().Len())
 
 	labels := hintLabels(t, hints)
-	want := []string{": list<int>", ": int", ": int"} // Doubled, x, the result
+	want := []string{": list<nint>", ": nint", ": nint"} // Doubled, x, the result
 	if strings.Join(labels, "|") != strings.Join(want, "|") {
 		t.Fatalf("hint labels = %v, want %v", labels, want)
 	}
@@ -91,16 +91,16 @@ func TestLambdaInlayHints(t *testing.T) {
 func TestLambdaInlayHintsSkipWritten(t *testing.T) {
 	// Written annotations already show themselves: only the inferred result
 	// gets a hint here.
-	src := "const Tripled = [1, 2].map(fn(x: int) { return x * 3 })\n"
+	src := "const Tripled = [1, 2].map(fn(x: nint) { return x * 3 })\n"
 	doc := testView(src)
 	labels := hintLabels(t, inlayHints(doc, 0, doc.Buffer().Len()))
-	want := []string{": list<int>", ": int"} // Tripled and the result; x is written
+	want := []string{": list<nint>", ": nint"} // Tripled and the result; x is written
 	if strings.Join(labels, "|") != strings.Join(want, "|") {
 		t.Fatalf("hint labels = %v, want %v", labels, want)
 	}
 
 	// A fully annotated literal needs no lambda hints at all.
-	src = "const Twice: fn(x: int): int = fn(x: int): int { return x * 2 }\n"
+	src = "const Twice: fn(x: nint): nint = fn(x: nint): nint { return x * 2 }\n"
 	doc = testView(src)
 	if hints := inlayHints(doc, 0, doc.Buffer().Len()); len(hints) != 0 {
 		t.Fatalf("got %d hints, want none (everything is written)", len(hints))
@@ -110,10 +110,10 @@ func TestLambdaInlayHintsSkipWritten(t *testing.T) {
 func TestLambdaInlayHintsInMethodBody(t *testing.T) {
 	// The method's declared result type reaches the returned literal, so its
 	// parameter and result infer and get hints.
-	src := "pub type T = int8 impl {\n  pub f(): fn(x: int): int {\n    return fn(x) { return x }\n  }\n}\n"
+	src := "pub type T = sbyte impl {\n  pub f(): fn(x: nint): nint {\n    return fn(x) { return x }\n  }\n}\n"
 	doc := testView(src)
 	labels := hintLabels(t, inlayHints(doc, 0, doc.Buffer().Len()))
-	want := []string{": int", ": int"} // the literal's x and result
+	want := []string{": nint", ": nint"} // the literal's x and result
 	if strings.Join(labels, "|") != strings.Join(want, "|") {
 		t.Fatalf("hint labels = %v, want %v", labels, want)
 	}
@@ -137,17 +137,17 @@ func TestCodeActionAddsTypeAnnotation(t *testing.T) {
 		t.Fatalf("got %d code actions, want 1", len(actions))
 	}
 	a := actions[0]
-	if !strings.Contains(a.Title, "int") {
+	if !strings.Contains(a.Title, "nint") {
 		t.Errorf("action title = %q, want it to mention the inferred type", a.Title)
 	}
-	if a.Edit == nil || len(a.Edit.Changes[uri]) != 1 || a.Edit.Changes[uri][0].NewText != ": int" {
-		t.Errorf("action edit = %+v, want one inserting %q", a.Edit, ": int")
+	if a.Edit == nil || len(a.Edit.Changes[uri]) != 1 || a.Edit.Changes[uri][0].NewText != ": nint" {
+		t.Errorf("action edit = %+v, want one inserting %q", a.Edit, ": nint")
 	}
 }
 
 func TestCodeActionSkipsAnnotated(t *testing.T) {
 	// An already-annotated constant offers no add-annotation action.
-	doc := testView("const A: int64 = 1\n")
+	doc := testView("const A: long = 1\n")
 	if actions := codeActions(doc, 0, 18); len(actions) != 0 {
 		t.Errorf("got %d code actions for an annotated const, want 0", len(actions))
 	}

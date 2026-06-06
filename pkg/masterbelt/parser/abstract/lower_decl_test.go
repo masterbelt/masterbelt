@@ -12,7 +12,7 @@ import (
 )
 
 func TestLowerConstDecl(t *testing.T) {
-	file, diags := Lower([]byte("/// the max\n/// second line\npub const MaxLevel: int64 = 100\n"))
+	file, diags := Lower([]byte("/// the max\n/// second line\npub const MaxLevel: long = 100\n"))
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
@@ -26,8 +26,8 @@ func TestLowerConstDecl(t *testing.T) {
 	if d.Name != "MaxLevel" {
 		t.Errorf("Name = %q, want MaxLevel", d.Name)
 	}
-	if nt, ok := d.Type.(*ast.NamedType); !ok || nt.Name != "int64" {
-		t.Errorf("Type = %+v, want NamedType int64", d.Type)
+	if nt, ok := d.Type.(*ast.NamedType); !ok || nt.Name != "long" {
+		t.Errorf("Type = %+v, want NamedType long", d.Type)
 	}
 	lit, ok := d.Value.(*ast.IntLit)
 	if !ok || lit.Text != "100" {
@@ -56,7 +56,7 @@ func TestLowerInference(t *testing.T) {
 // name, annotated parameters, the required result type, and both body forms —
 // the arrow body normalized to a single implicit return.
 func TestLowerFuncDecl(t *testing.T) {
-	src := "/// doubles x\npub fn double(x: int): int -> x * 2\nfn area(w: int, h: int): int {\n  return w * h\n}\n"
+	src := "/// doubles x\npub fn double(x: nint): nint -> x * 2\nfn area(w: nint, h: nint): nint {\n  return w * h\n}\n"
 	file, diags := Lower([]byte(src))
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", diags)
@@ -75,11 +75,11 @@ func TestLowerFuncDecl(t *testing.T) {
 	if len(d.Params) != 1 || d.Params[0].Name != "x" {
 		t.Fatalf("func 0 params = %v, want [x]", d.Params)
 	}
-	if nt, ok := d.Params[0].Type.(*ast.NamedType); !ok || nt.Name != "int" {
-		t.Errorf("func 0 param type = %+v, want int", d.Params[0].Type)
+	if nt, ok := d.Params[0].Type.(*ast.NamedType); !ok || nt.Name != "nint" {
+		t.Errorf("func 0 param type = %+v, want nint", d.Params[0].Type)
 	}
-	if nt, ok := d.Result.(*ast.NamedType); !ok || nt.Name != "int" {
-		t.Errorf("func 0 result = %+v, want int", d.Result)
+	if nt, ok := d.Result.(*ast.NamedType); !ok || nt.Name != "nint" {
+		t.Errorf("func 0 result = %+v, want nint", d.Result)
 	}
 	// The arrow body is one implicit return.
 	if len(d.Body) != 1 {
@@ -100,7 +100,7 @@ func TestLowerFuncDecl(t *testing.T) {
 // parameter, a single bound, several parameters, and a parameterized bound.
 func TestLowerFuncTypeParams(t *testing.T) {
 	src := "fn id<T>(x: T): T { return x }\n" +
-		"fn total<T: foldable<int, int>>(c: T): int { return c }\n" +
+		"fn total<T: foldable<nint, nint>>(c: T): nint { return c }\n" +
 		"fn pair<T, U>(a: T, b: U): T { return a }\n" +
 		"fn first<T: foldable<U>, U>(c: T): U { return c }\n"
 	file, diags := Lower([]byte(src))
@@ -127,7 +127,7 @@ func TestLowerFuncTypeParams(t *testing.T) {
 	}
 	bound, ok := total.TypeParams[0].Constraint.(*ast.NamedType)
 	if !ok || bound.Name != "foldable" || len(bound.Args) != 2 {
-		t.Fatalf("total bound = %+v, want foldable<int, int>", total.TypeParams[0].Constraint)
+		t.Fatalf("total bound = %+v, want foldable<nint, nint>", total.TypeParams[0].Constraint)
 	}
 
 	// fn pair<T, U>: several unbounded parameters in order.
@@ -240,7 +240,7 @@ func TestLowerAssertDeclMalformed(t *testing.T) {
 }
 
 func TestLowerTypeDeclWhere(t *testing.T) {
-	file, diags := Lower([]byte("pub type Port = int32 where self >= 1 && self <= 65535\n"))
+	file, diags := Lower([]byte("pub type Port = int where self >= 1 && self <= 65535\n"))
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
@@ -258,7 +258,7 @@ func TestLowerTypeDeclWhere(t *testing.T) {
 func TestLowerTypeDeclWhereMalformed(t *testing.T) {
 	// A missing predicate lowers to a nil Where, not a panic; the decl is still
 	// present so the semantic layer can anchor diagnostics to it.
-	file, diags := Lower([]byte("type Bad = int8 where\n"))
+	file, diags := Lower([]byte("type Bad = sbyte where\n"))
 	if len(diags) == 0 {
 		t.Fatal("expected a diagnostic for the missing predicate")
 	}
@@ -293,7 +293,7 @@ func TestLowerMalformedRecovers(t *testing.T) {
 func TestLowerMethodDoc(t *testing.T) {
 	// A doc comment before a method attaches to the method, not to the
 	// surrounding impl block.
-	file, diags := Lower([]byte("type L = int8 impl {\n  /// bumps the level\n  inc(): self {\n    return self\n  }\n}\n"))
+	file, diags := Lower([]byte("type L = sbyte impl {\n  /// bumps the level\n  inc(): self {\n    return self\n  }\n}\n"))
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
@@ -306,7 +306,7 @@ func TestLowerMethodDoc(t *testing.T) {
 func TestLowerInterfaceDecl(t *testing.T) {
 	// An interface lowers to File.Interfaces, with required members (no body)
 	// and provided members (a default body) distinguished by Provided.
-	src := "pub interface foldable<K, V> {\n  fold<A>(init: A, step: fn(acc: A, key: K, value: V): A): A\n  pub count(): int {\n    return 0\n  }\n}\n"
+	src := "pub interface foldable<K, V> {\n  fold<A>(init: A, step: fn(acc: A, key: K, value: V): A): A\n  pub count(): nint {\n    return 0\n  }\n}\n"
 	file, diags := Lower([]byte(src))
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", diags)
@@ -340,7 +340,7 @@ func TestLowerInterfaceDecl(t *testing.T) {
 func TestLowerImplInterfaceTag(t *testing.T) {
 	// A type's interface-tagged impl block records the interface in Impls while
 	// its methods flatten into Methods alongside any inherent impl's.
-	src := "pub type Bag<T> = list<T> impl foldable<int, T> {\n  fold<A>(init: A): A {\n    return init\n  }\n} impl {\n  pub size(): int {\n    return 0\n  }\n}\n"
+	src := "pub type Bag<T> = list<T> impl foldable<nint, T> {\n  fold<A>(init: A): A {\n    return init\n  }\n} impl {\n  pub size(): nint {\n    return 0\n  }\n}\n"
 	file, diags := Lower([]byte(src))
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", diags)
@@ -349,7 +349,7 @@ func TestLowerImplInterfaceTag(t *testing.T) {
 	if len(td.Impls) != 1 {
 		t.Fatalf("got %d impls, want 1 (the tagged one)", len(td.Impls))
 	}
-	if got := ast.Dump(file); !strings.Contains(got, "impl foldable<int, T>") {
+	if got := ast.Dump(file); !strings.Contains(got, "impl foldable<nint, T>") {
 		t.Errorf("dump = %s, want it to contain the interface tag", got)
 	}
 	// Both the tagged block's fold and the inherent block's size are flattened.
@@ -365,7 +365,7 @@ func TestLowerImplInterfaceTag(t *testing.T) {
 func TestLowerMethodTypeParam(t *testing.T) {
 	// A method's explicit type parameter (the A in fold<A>) lowers to its
 	// TypeParams, separate from its value parameters.
-	src := "type Bag = list<int> impl {\n  fold<A>(init: A): A {\n    return init\n  }\n}\n"
+	src := "type Bag = list<nint> impl {\n  fold<A>(init: A): A {\n    return init\n  }\n}\n"
 	file, diags := Lower([]byte(src))
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", diags)
@@ -383,7 +383,7 @@ func TestLowerImplConst(t *testing.T) {
 	// An impl block's const items lower to the type's Consts, alongside its
 	// Methods. A typed const keeps its annotation; a method beside them is
 	// unaffected.
-	src := "type L = int8 impl {\n  /// the cap\n  pub const Max = 100\n  const Width: int32 = 32\n  pub inc(): self {\n    return self + 1\n  }\n}\n"
+	src := "type L = sbyte impl {\n  /// the cap\n  pub const Max = 100\n  const Width: int = 32\n  pub inc(): self {\n    return self + 1\n  }\n}\n"
 	file, diags := Lower([]byte(src))
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", diags)
@@ -451,7 +451,7 @@ func TestLowerEnumImplConst(t *testing.T) {
 }
 
 func TestLowerEnumDecl(t *testing.T) {
-	src := "/// rarity tier\npub enum Rarity: uint8 {\n  Common = 1\n  Rare = 2\n  Legend = 10\n}\n"
+	src := "/// rarity tier\npub enum Rarity: byte {\n  Common = 1\n  Rare = 2\n  Legend = 10\n}\n"
 	file, diags := Lower([]byte(src))
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", diags)
@@ -466,8 +466,8 @@ func TestLowerEnumDecl(t *testing.T) {
 	if len(d.Doc) != 1 || d.Doc[0] != "rarity tier" {
 		t.Errorf("doc = %q, want [rarity tier]", d.Doc)
 	}
-	if got := ast.Dump(file); !strings.Contains(got, "base uint8") {
-		t.Errorf("dump = %s, want it to contain base uint8", got)
+	if got := ast.Dump(file); !strings.Contains(got, "base byte") {
+		t.Errorf("dump = %s, want it to contain base byte", got)
 	}
 	if len(d.Members) != 3 {
 		t.Fatalf("got %d members, want 3", len(d.Members))
@@ -492,7 +492,7 @@ func TestLowerEnumNoBaseWithImpl(t *testing.T) {
 	}
 	d := file.Enums[0]
 	if d.Base != nil {
-		t.Errorf("base = %+v, want nil (default int)", d.Base)
+		t.Errorf("base = %+v, want nil (default nint)", d.Base)
 	}
 	if len(d.Members) != 3 {
 		t.Fatalf("got %d members, want 3", len(d.Members))

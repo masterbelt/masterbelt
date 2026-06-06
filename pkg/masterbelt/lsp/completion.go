@@ -425,8 +425,8 @@ func typeItems(doc view) []protocol.CompletionItem {
 // analyzer accepts (invalid_enum_base_type rejects anything else), kept here so
 // completion never offers a base type the analyzer would reject.
 var enumBaseTypeNames = []string{
-	"int", "int8", "int16", "int32", "int64",
-	"uint", "uint8", "uint16", "uint32", "uint64",
+	"nint", "sbyte", "short", "int", "long",
+	"nuint", "byte", "ushort", "uint", "ulong",
 	"string",
 }
 
@@ -533,7 +533,7 @@ func constructorItems(doc view) []protocol.CompletionItem {
 func constructorSignature(name string) (detail, insert string) {
 	switch name {
 	case "range":
-		return "range(start: int, end: int)", "range(${1:start}, ${2:end})"
+		return "range(start: nint, end: nint)", "range(${1:start}, ${2:end})"
 	case "error":
 		return "error(message: string)", "error(\"${1:message}\")"
 	default:

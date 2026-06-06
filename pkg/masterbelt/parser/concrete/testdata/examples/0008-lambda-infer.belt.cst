@@ -3,9 +3,9 @@ File
   ConstDecl
     LineComment "// Parameter and result types flow in from list<T>.map's signature:"
     Newline "\n"
-    LineComment "// T = int binds from the receiver, x: int is pushed into the lambda,"
+    LineComment "// T = nint binds from the receiver, x: nint is pushed into the lambda,"
     Newline "\n"
-    LineComment "// and R = int is solved from the body's return type."
+    LineComment "// and R = nint is solved from the body's return type."
     Newline "\n"
     Const "const"
     Whitespace " "
@@ -151,7 +151,7 @@ File
               Colon ":"
               Whitespace " "
               TypeName
-                Ident "int"
+                Ident "nint"
             RParen ")"
           Whitespace " "
           Arrow "->"
@@ -185,12 +185,12 @@ File
             Colon ":"
             Whitespace " "
             TypeName
-              Ident "int"
+              Ident "nint"
           RParen ")"
         Colon ":"
         Whitespace " "
         TypeName
-          Ident "int"
+          Ident "nint"
     Whitespace " "
     Initializer
       Assign "="
@@ -284,7 +284,7 @@ File
         GenericArgs
           Lt "<"
           TypeName
-            Ident "int8"
+            Ident "sbyte"
           Gt ">"
     Whitespace " "
     Initializer
@@ -316,7 +316,7 @@ File
         GenericArgs
           Lt "<"
           TypeName
-            Ident "int"
+            Ident "nint"
           Gt ">"
     Whitespace " "
     Initializer

@@ -228,7 +228,7 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 			diags.Add(newCyclicReferenceDiagnostic(s.offset, s.width, decl.Name))
 		}
 		// An integer value outside its concrete type's range overflows. The
-		// arbitrary-precision int has no fixed range (Fits accepts any value),
+		// arbitrary-precision nint has no fixed range (Fits accepts any value),
 		// and booleans never overflow.
 		overflow := c.Eval != nil && c.Eval.Kind == ir.ConstInt && !types.Fits(reg, c.Type, c.Eval.Int)
 		if overflow {

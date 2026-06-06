@@ -115,7 +115,7 @@ File
       Colon ":"
       Whitespace " "
       TypeName
-        Ident "int"
+        Ident "nint"
       Whitespace " "
       Block
         LBrace "{"
@@ -254,7 +254,7 @@ File
   TypeDecl
     Newline "\n"
     Newline "\n"
-    DocComment "/// A small bag of T values that folds over its contents. The `impl foldable<int, T>`"
+    DocComment "/// A small bag of T values that folds over its contents. The `impl foldable<nint, T>`"
     Newline "\n"
     DocComment "/// tag is what gives Bag the count/any methods — written here, at Bag's own"
     Newline "\n"
@@ -289,7 +289,7 @@ File
         GenericArgs
           Lt "<"
           TypeName
-            Ident "int"
+            Ident "nint"
           Comma ","
           Whitespace " "
           TypeName
@@ -340,7 +340,7 @@ File
                   Colon ":"
                   Whitespace " "
                   TypeName
-                    Ident "int"
+                    Ident "nint"
                 Comma ","
                 Whitespace " "
                 Param
@@ -399,17 +399,17 @@ File
           GenericArgs
             Lt "<"
             TypeName
-              Ident "int"
+              Ident "nint"
             Comma ","
             Whitespace " "
             TypeName
-              Ident "int"
+              Ident "nint"
             Gt ">"
       RParen ")"
     Colon ":"
     Whitespace " "
     TypeName
-      Ident "int"
+      Ident "nint"
     Whitespace " "
     Block
       LBrace "{"

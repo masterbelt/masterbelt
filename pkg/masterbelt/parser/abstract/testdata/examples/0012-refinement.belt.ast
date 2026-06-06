@@ -26,19 +26,19 @@ File
     doc "A character level between 0 and 100."
     pub
     name "Level"
-    body int8
+    body sbyte
     where (call (. (call (. self gteq) IntLit "0") anan) (call (. self lteq) IntLit "100"))
   TypeDecl
     doc "A TCP port number."
     pub
     name "Port"
-    body int32
+    body int
     where (call (. (call (. self gteq) IntLit "1") anan) (call (. self lteq) IntLit "65535"))
   TypeDecl
     doc "A percentage from 0 to 100."
     pub
     name "Percent"
-    body int8
+    body sbyte
     where (call (. (call (. self gteq) IntLit "0") anan) (call (. self lteq) IntLit "100"))
     method "increment"
       doc "The next percentage point."
@@ -49,7 +49,7 @@ File
     doc "A score that is valid only when it lies in the 0..100 band."
     pub
     name "Score"
-    body int32
+    body int
     where (call (. self inBand))
     method "inBand"
       doc "Whether the score is within the valid band."

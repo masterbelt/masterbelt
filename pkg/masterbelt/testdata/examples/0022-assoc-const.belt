@@ -3,13 +3,13 @@
 // resolution path with enum members — the left side names a type, not a value.
 
 // The builtin integer bounds are first-class associated constants: the registry
-// value range, exposed as `int8.Max` / `int8.Min`.
-const Hi = int8.Max
-const Lo = int8.Min
+// value range, exposed as `sbyte.Max` / `sbyte.Min`.
+const Hi = sbyte.Max
+const Lo = sbyte.Min
 
 // A user type's associated constants live in its impl block, alongside methods.
 /// A character level, capped at 100.
-pub type Level = int8 impl {
+pub type Level = sbyte impl {
   /// The highest level.
   pub const Max = 100
   /// The lowest level.
@@ -27,14 +27,14 @@ const Top: Level = Level.Max
 const Bottom: Level = Level.Min
 
 // An associated constant carries its own type annotation when written.
-pub type Bits = int32 impl {
+pub type Bits = int impl {
   /// The width in bits.
-  pub const Width: int32 = 32
+  pub const Width: int = 32
 }
 
 const W = Bits.Width
 
 // The builtin bounds kill the magic numbers in a refinement: a port is between 1
 // and the 16-bit ceiling.
-pub type Port = int32 where self >= 1 && self <= int16.Max
+pub type Port = int where self >= 1 && self <= short.Max
 const ServerPort: Port = 8080

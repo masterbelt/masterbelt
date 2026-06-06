@@ -7,28 +7,28 @@ File
     value (call (. (map StringLit "a": IntLit "1" StringLit "b": IntLit "2") len))
   ConstDecl
     name "Sum"
-    value (call (. (list IntLit "1" IntLit "2" IntLit "3") fold) IntLit "0" (fn(acc: int, i: int, v: int): int (return (call (. Identifier "acc" add) Identifier "v"))))
+    value (call (. (list IntLit "1" IntLit "2" IntLit "3") fold) IntLit "0" (fn(acc: nint, i: nint, v: nint): nint (return (call (. Identifier "acc" add) Identifier "v"))))
   ConstDecl
     name "IndexSum"
-    value (call (. (list IntLit "10" IntLit "20" IntLit "30") fold) IntLit "0" (fn(acc: int, i: int, v: int): int (return (call (. Identifier "acc" add) Identifier "i"))))
+    value (call (. (list IntLit "10" IntLit "20" IntLit "30") fold) IntLit "0" (fn(acc: nint, i: nint, v: nint): nint (return (call (. Identifier "acc" add) Identifier "i"))))
   ConstDecl
     name "MapSum"
-    value (call (. (map StringLit "a": IntLit "1" StringLit "b": IntLit "2" StringLit "c": IntLit "3") fold) IntLit "0" (fn(acc: int, k: string, v: int): int (return (call (. Identifier "acc" add) Identifier "v"))))
+    value (call (. (map StringLit "a": IntLit "1" StringLit "b": IntLit "2" StringLit "c": IntLit "3") fold) IntLit "0" (fn(acc: nint, k: string, v: nint): nint (return (call (. Identifier "acc" add) Identifier "v"))))
   ConstDecl
     name "Count"
     value (call (. (list IntLit "1" IntLit "2" IntLit "3" IntLit "4") count))
   ConstDecl
     name "AnyBig"
-    value (call (. (list IntLit "1" IntLit "2" IntLit "3") any) (fn(v: int): bool (return (call (. Identifier "v" gt) IntLit "2"))))
+    value (call (. (list IntLit "1" IntLit "2" IntLit "3") any) (fn(v: nint): bool (return (call (. Identifier "v" gt) IntLit "2"))))
   ConstDecl
     name "AllPositive"
-    value (call (. (list IntLit "1" IntLit "2" IntLit "3") all) (fn(v: int): bool (return (call (. Identifier "v" gt) IntLit "0"))))
+    value (call (. (list IntLit "1" IntLit "2" IntLit "3") all) (fn(v: nint): bool (return (call (. Identifier "v" gt) IntLit "0"))))
   ConstDecl
     name "Doubled"
-    value (call (. (list IntLit "1" IntLit "2" IntLit "3") map) (fn(v: int): int (return (call (. Identifier "v" mul) IntLit "2"))))
+    value (call (. (list IntLit "1" IntLit "2" IntLit "3") map) (fn(v: nint): nint (return (call (. Identifier "v" mul) IntLit "2"))))
   ConstDecl
     name "Big"
-    value (call (. (list IntLit "1" IntLit "2" IntLit "3" IntLit "4") filter) (fn(v: int): bool (return (call (. Identifier "v" gt) IntLit "2"))))
+    value (call (. (list IntLit "1" IntLit "2" IntLit "3" IntLit "4") filter) (fn(v: nint): bool (return (call (. Identifier "v" gt) IntLit "2"))))
   ConstDecl
     name "Keys"
     value (call (. (map StringLit "x": IntLit "1" StringLit "y": IntLit "2") keys))
@@ -43,10 +43,10 @@ File
   AssertDecl
     cond (call (. (call (. (map StringLit "a": IntLit "1" StringLit "b": IntLit "2") len)) eql) IntLit "2")
   AssertDecl
-    cond (call (. (call (. (list IntLit "1" IntLit "2" IntLit "3") fold) IntLit "0" (fn(acc: int, i: int, v: int): int (return (call (. Identifier "acc" add) Identifier "v")))) eql) IntLit "6")
+    cond (call (. (call (. (list IntLit "1" IntLit "2" IntLit "3") fold) IntLit "0" (fn(acc: nint, i: nint, v: nint): nint (return (call (. Identifier "acc" add) Identifier "v")))) eql) IntLit "6")
   AssertDecl
     cond (call (. (call (. (list IntLit "1" IntLit "2" IntLit "3" IntLit "4") count)) eql) IntLit "4")
   AssertDecl
-    cond (call (. (list IntLit "1" IntLit "2" IntLit "3") any) (fn(v: int): bool (return (call (. Identifier "v" gt) IntLit "2"))))
+    cond (call (. (list IntLit "1" IntLit "2" IntLit "3") any) (fn(v: nint): bool (return (call (. Identifier "v" gt) IntLit "2"))))
   AssertDecl
-    cond (call (. (list IntLit "1" IntLit "2" IntLit "3") all) (fn(v: int): bool (return (call (. Identifier "v" gt) IntLit "0"))))
+    cond (call (. (list IntLit "1" IntLit "2" IntLit "3") all) (fn(v: nint): bool (return (call (. Identifier "v" gt) IntLit "0"))))

@@ -584,7 +584,7 @@ func forScope(s funcScope, stmt *ast.ForStmt) funcScope {
 func check(e ast.Expr, s scope, sink *Sink) ir.Type {
 	switch e := e.(type) {
 	case *ast.IntLit:
-		return &ir.Builtin{Name: "int"}
+		return &ir.Builtin{Name: "nint"}
 	case *ast.StringLit:
 		return &ir.Builtin{Name: "string"}
 	case *ast.BoolLit:

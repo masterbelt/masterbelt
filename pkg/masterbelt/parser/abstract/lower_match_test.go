@@ -73,7 +73,7 @@ func TestLowerMatchUnion(t *testing.T) {
 // TestLowerMatchNullAndBlock checks an optional match: a bound member arm, a
 // null arm with no binding, and a block body lowered to its statements.
 func TestLowerMatchNullAndBlock(t *testing.T) {
-	m := matchOf(t, "pub fn a(v: Coin | null): int {\n  match v {\n    Coin c -> return c.n\n    null   -> {\n      return 0\n    }\n  }\n}\n")
+	m := matchOf(t, "pub fn a(v: Coin | null): nint {\n  match v {\n    Coin c -> return c.n\n    null   -> {\n      return 0\n    }\n  }\n}\n")
 	if len(m.Arms) != 2 {
 		t.Fatalf("got %d arms, want 2", len(m.Arms))
 	}
@@ -87,7 +87,7 @@ func TestLowerMatchNullAndBlock(t *testing.T) {
 // TestLowerMatchWildcard checks that the wildcard "_" arm is lifted into Else and
 // binds nothing.
 func TestLowerMatchWildcard(t *testing.T) {
-	m := matchOf(t, "pub fn c(v: V): int {\n  match v {\n    Coin c -> return 1\n    _      -> return 0\n  }\n}\n")
+	m := matchOf(t, "pub fn c(v: V): nint {\n  match v {\n    Coin c -> return 1\n    _      -> return 0\n  }\n}\n")
 	if len(m.Arms) != 1 {
 		t.Fatalf("got %d live arms, want 1 (the wildcard is Else)", len(m.Arms))
 	}
@@ -102,7 +102,7 @@ func TestLowerMatchWildcard(t *testing.T) {
 // TestLowerMatchAfterWildcard checks that an arm written after the wildcard is
 // lifted out of the live arms into AfterElse (it can never run).
 func TestLowerMatchAfterWildcard(t *testing.T) {
-	m := matchOf(t, "pub fn c(v: V): int {\n  match v {\n    Coin c -> return 1\n    _      -> return 0\n    Level l -> return 2\n  }\n}\n")
+	m := matchOf(t, "pub fn c(v: V): nint {\n  match v {\n    Coin c -> return 1\n    _      -> return 0\n    Level l -> return 2\n  }\n}\n")
 	if len(m.Arms) != 1 {
 		t.Fatalf("live arms = %d, want 1 (the Coin arm)", len(m.Arms))
 	}
@@ -118,11 +118,11 @@ func TestLowerMatchAfterWildcard(t *testing.T) {
 // TestLowerMatchIndexScrutinee checks the E-18 use case: an index read scrutinee
 // desugars to a get call and the error/value arms lower as type patterns.
 func TestLowerMatchIndexScrutinee(t *testing.T) {
-	m := matchOf(t, "pub fn f(xs: list<int>): int {\n  match xs[0] {\n    int v   -> return v\n    error e -> return 0\n  }\n}\n")
+	m := matchOf(t, "pub fn f(xs: list<nint>): nint {\n  match xs[0] {\n    nint v   -> return v\n    error e -> return 0\n  }\n}\n")
 	if _, ok := m.Scrutinee.(*ast.CallExpr); !ok {
 		t.Fatalf("scrutinee is %T, want the desugared get call", m.Scrutinee)
 	}
-	namedArm(t, m.Arms[0], "int", "v")
+	namedArm(t, m.Arms[0], "nint", "v")
 	namedArm(t, m.Arms[1], "error", "e")
 }
 

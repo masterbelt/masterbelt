@@ -1,16 +1,16 @@
 Module
   Const "MaxLevel"
     doc "DocComment for MaxLevel"
-    type int64
+    type long
     value IntLiteral "100"
     eval 100
   Const "MinLevel"
     doc "DocComment for MinLevel"
     doc "with multiline."
-    type int
+    type nint
     value IntLiteral "0"
     eval 0
   Const "PublishedMaxLevel" pub
-    type int64
+    type long
     value Reference -> "MaxLevel"
     eval 100

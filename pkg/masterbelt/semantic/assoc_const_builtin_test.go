@@ -11,13 +11,13 @@ func TestAssocConstBuiltinBounds(t *testing.T) {
 		name string
 		want string
 	}{
-		{"const X = int8.Max\n", "X", "127"},
-		{"const X = int8.Min\n", "X", "-128"},
-		{"const X = uint8.Max\n", "X", "255"},
-		{"const X = uint8.Min\n", "X", "0"},
-		{"const X = int16.Max\n", "X", "32767"},
-		{"const X = int32.Max\n", "X", "2147483647"},
-		{"const X: int32 = int16.Max\n", "X", "32767"}, // the bound adapts to int32
+		{"const X = sbyte.Max\n", "X", "127"},
+		{"const X = sbyte.Min\n", "X", "-128"},
+		{"const X = byte.Max\n", "X", "255"},
+		{"const X = byte.Min\n", "X", "0"},
+		{"const X = short.Max\n", "X", "32767"},
+		{"const X = int.Max\n", "X", "2147483647"},
+		{"const X: int = short.Max\n", "X", "32767"}, // the bound adapts to int32
 	}
 	for _, tc := range cases {
 		t.Run(tc.want, func(t *testing.T) {
@@ -40,12 +40,12 @@ func TestAssocConstBuiltinBounds(t *testing.T) {
 // bounds enable: a refinement may name a builtin bound, and the per-constant
 // check uses its folded value.
 func TestAssocConstInRefinement(t *testing.T) {
-	src := "pub type Port = int32 where self >= 1 && self <= int16.Max\n"
+	src := "pub type Port = int where self >= 1 && self <= short.Max\n"
 	if _, diags := analyze(src + "const Good: Port = 8080\n"); len(diags) != 0 {
-		t.Errorf("8080 within int16.Max: unexpected diagnostics %v", codes(diags))
+		t.Errorf("8080 within short.Max: unexpected diagnostics %v", codes(diags))
 	}
 	if _, diags := analyze(src + "const Bad: Port = 40000\n"); !hasCode(diags, CodeRefinementViolation) {
-		t.Errorf("40000 exceeds int16.Max: want a refinement violation, got %v", codes(diags))
+		t.Errorf("40000 exceeds short.Max: want a refinement violation, got %v", codes(diags))
 	}
 }
 
@@ -53,7 +53,7 @@ func TestAssocConstInRefinement(t *testing.T) {
 // expose no bound: int.Max is an unknown associated constant, since int declares
 // none (it has no fixed range).
 func TestAssocConstIntHasNoBound(t *testing.T) {
-	if _, diags := analyze("const X = int.Max\n"); !hasCode(diags, CodeUnknownAssociatedConst) {
-		t.Errorf("int.Max: want unknown_associated_const, got %v", codes(diags))
+	if _, diags := analyze("const X = nint.Max\n"); !hasCode(diags, CodeUnknownAssociatedConst) {
+		t.Errorf("nint.Max: want unknown_associated_const, got %v", codes(diags))
 	}
 }

@@ -90,7 +90,7 @@ func TestLowerExpressions(t *testing.T) {
 // nil — the checker later fills them in from the expected type — while written
 // annotations survive as type expressions.
 func TestLowerFuncLit(t *testing.T) {
-	file, diags := Lower([]byte("const f = fn(x: int, y): int { return y }\nconst g = fn(x) { return x }\n"))
+	file, diags := Lower([]byte("const f = fn(x: nint, y): nint { return y }\nconst g = fn(x) { return x }\n"))
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
@@ -105,14 +105,14 @@ func TestLowerFuncLit(t *testing.T) {
 	if len(f.Params) != 2 {
 		t.Fatalf("f has %d params, want 2", len(f.Params))
 	}
-	if nt, ok := f.Params[0].Type.(*ast.NamedType); !ok || nt.Name != "int" {
-		t.Errorf("f param 0 Type = %+v, want NamedType int", f.Params[0].Type)
+	if nt, ok := f.Params[0].Type.(*ast.NamedType); !ok || nt.Name != "nint" {
+		t.Errorf("f param 0 Type = %+v, want NamedType nint", f.Params[0].Type)
 	}
 	if f.Params[1].Type != nil {
 		t.Errorf("f param 1 Type = %+v, want nil (omitted)", f.Params[1].Type)
 	}
-	if nt, ok := f.Result.(*ast.NamedType); !ok || nt.Name != "int" {
-		t.Errorf("f Result = %+v, want NamedType int", f.Result)
+	if nt, ok := f.Result.(*ast.NamedType); !ok || nt.Name != "nint" {
+		t.Errorf("f Result = %+v, want NamedType nint", f.Result)
 	}
 
 	g, ok := file.Decls[1].Value.(*ast.FuncLit)
@@ -141,8 +141,8 @@ func TestLowerArrowFuncLit(t *testing.T) {
 	}
 
 	// A result annotation survives alongside the arrow body.
-	annotated := valueLine(t, "const f = fn(x): int -> x\n")
-	if want := `(fn(x: <missing>): int (return Identifier "x"))`; annotated != want {
+	annotated := valueLine(t, "const f = fn(x): nint -> x\n")
+	if want := `(fn(x: <missing>): nint (return Identifier "x"))`; annotated != want {
 		t.Errorf("annotated arrow = %s, want %s", annotated, want)
 	}
 
@@ -174,7 +174,7 @@ func TestRenderRoundTrip(t *testing.T) {
 		"[\"a\": 1, \"b\": 2]",
 		"\"hi\" == \"yo\"",
 		"100 % 7 - -1",
-		"fn(x: int): int { return x }",
+		"fn(x: nint): nint { return x }",
 		"self",
 		"null",
 		"Point{ x: 1, y: 2 }",

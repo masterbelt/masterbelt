@@ -123,7 +123,7 @@ File
               Colon ":"
               Whitespace " "
               TypeName
-                Ident "int"
+                Ident "nint"
             Comma ","
             Whitespace " "
             Param
@@ -131,7 +131,7 @@ File
               Colon ":"
               Whitespace " "
               TypeName
-                Ident "int"
+                Ident "nint"
             Comma ","
             Whitespace " "
             Param
@@ -139,12 +139,12 @@ File
               Colon ":"
               Whitespace " "
               TypeName
-                Ident "int"
+                Ident "nint"
             RParen ")"
           Colon ":"
           Whitespace " "
           TypeName
-            Ident "int"
+            Ident "nint"
           Whitespace " "
           Arrow "->"
           Whitespace " "
@@ -197,7 +197,7 @@ File
               Colon ":"
               Whitespace " "
               TypeName
-                Ident "int"
+                Ident "nint"
             Comma ","
             Whitespace " "
             Param
@@ -205,7 +205,7 @@ File
               Colon ":"
               Whitespace " "
               TypeName
-                Ident "int"
+                Ident "nint"
             Comma ","
             Whitespace " "
             Param
@@ -213,12 +213,12 @@ File
               Colon ":"
               Whitespace " "
               TypeName
-                Ident "int"
+                Ident "nint"
             RParen ")"
           Colon ":"
           Whitespace " "
           TypeName
-            Ident "int"
+            Ident "nint"
           Whitespace " "
           Arrow "->"
           Whitespace " "
@@ -289,7 +289,7 @@ File
               Colon ":"
               Whitespace " "
               TypeName
-                Ident "int"
+                Ident "nint"
             Comma ","
             Whitespace " "
             Param
@@ -305,12 +305,12 @@ File
               Colon ":"
               Whitespace " "
               TypeName
-                Ident "int"
+                Ident "nint"
             RParen ")"
           Colon ":"
           Whitespace " "
           TypeName
-            Ident "int"
+            Ident "nint"
           Whitespace " "
           Arrow "->"
           Whitespace " "
@@ -397,7 +397,7 @@ File
               Colon ":"
               Whitespace " "
               TypeName
-                Ident "int"
+                Ident "nint"
             RParen ")"
           Colon ":"
           Whitespace " "
@@ -451,7 +451,7 @@ File
               Colon ":"
               Whitespace " "
               TypeName
-                Ident "int"
+                Ident "nint"
             RParen ")"
           Colon ":"
           Whitespace " "
@@ -510,12 +510,12 @@ File
               Colon ":"
               Whitespace " "
               TypeName
-                Ident "int"
+                Ident "nint"
             RParen ")"
           Colon ":"
           Whitespace " "
           TypeName
-            Ident "int"
+            Ident "nint"
           Whitespace " "
           Arrow "->"
           Whitespace " "
@@ -568,7 +568,7 @@ File
               Colon ":"
               Whitespace " "
               TypeName
-                Ident "int"
+                Ident "nint"
             RParen ")"
           Colon ":"
           Whitespace " "
@@ -790,7 +790,7 @@ File
               Colon ":"
               Whitespace " "
               TypeName
-                Ident "int"
+                Ident "nint"
             Comma ","
             Whitespace " "
             Param
@@ -798,7 +798,7 @@ File
               Colon ":"
               Whitespace " "
               TypeName
-                Ident "int"
+                Ident "nint"
             Comma ","
             Whitespace " "
             Param
@@ -806,12 +806,12 @@ File
               Colon ":"
               Whitespace " "
               TypeName
-                Ident "int"
+                Ident "nint"
             RParen ")"
           Colon ":"
           Whitespace " "
           TypeName
-            Ident "int"
+            Ident "nint"
           Whitespace " "
           Arrow "->"
           Whitespace " "
@@ -893,7 +893,7 @@ File
             Colon ":"
             Whitespace " "
             TypeName
-              Ident "int"
+              Ident "nint"
           RParen ")"
         Colon ":"
         Whitespace " "
@@ -942,7 +942,7 @@ File
             Colon ":"
             Whitespace " "
             TypeName
-              Ident "int"
+              Ident "nint"
           RParen ")"
         Colon ":"
         Whitespace " "

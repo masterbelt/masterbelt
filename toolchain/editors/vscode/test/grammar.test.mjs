@@ -61,7 +61,7 @@ test('grammar assigns the expected scopes', async () => {
   const grammar = await loadGrammar();
   const source = [
     '/// docs',
-    'pub const MyConst: int64 = 100 // trailing',
+    'pub const MyConst: long = 100 // trailing',
     'const Twice = fn(x) -> x',
     'const Release = D2009-03-31T23:59:59.000Z',
     'const Cooldown = 3w4d5h6m7s8ms',
@@ -95,7 +95,7 @@ test('grammar assigns the expected scopes', async () => {
 
   // Identifiers carry no grammar scope of their own: whether one is a type,
   // a reference, or a declaration name is not a lexical fact.
-  for (const substr of ['MyConst', 'int64']) {
+  for (const substr of ['MyConst', 'long']) {
     const scopes = scopesOf(lines, substr);
     assert.deepEqual(
       scopes,

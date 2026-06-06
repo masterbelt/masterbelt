@@ -10,7 +10,7 @@ import (
 //	line 0: "/// docs"                              (doc comment)
 //	line 1: "const MaxLevel: int64 = 100"           name [15,23)
 //	line 2: "const Alias = MaxLevel"                reference [51,59)
-const hoverSrc = "/// docs\nconst MaxLevel: int64 = 100\nconst Alias = MaxLevel\n"
+const hoverSrc = "/// docs\nconst MaxLevel: long = 100\nconst Alias = MaxLevel\n"
 
 func TestDefinition(t *testing.T) {
 	doc := testView(hoverSrc)
@@ -44,7 +44,7 @@ func TestDefinitionInExpression(t *testing.T) {
 }
 
 func TestTypeHover(t *testing.T) {
-	src := "/// a coin\npub type Coin = int8\nconst c: Coin = 1\n"
+	src := "/// a coin\npub type Coin = sbyte\nconst c: Coin = 1\n"
 	doc := testView(src)
 
 	t.Run("annotation reference describes the type", func(t *testing.T) {
@@ -52,7 +52,7 @@ func TestTypeHover(t *testing.T) {
 		if h == nil {
 			t.Fatal("no hover on the type reference")
 		}
-		if !strings.Contains(h.Contents.Value, "pub type Coin = int8") {
+		if !strings.Contains(h.Contents.Value, "pub type Coin = sbyte") {
 			t.Errorf("hover = %q, want the type signature", h.Contents.Value)
 		}
 		if !strings.Contains(h.Contents.Value, "a coin") {
@@ -65,23 +65,23 @@ func TestTypeHover(t *testing.T) {
 		if h == nil {
 			t.Fatal("no hover on the declaration name")
 		}
-		if !strings.Contains(h.Contents.Value, "pub type Coin = int8") {
+		if !strings.Contains(h.Contents.Value, "pub type Coin = sbyte") {
 			t.Errorf("hover = %q, want the type signature", h.Contents.Value)
 		}
 	})
 
 	t.Run("a builtin from the prelude describes itself", func(t *testing.T) {
-		h := hover(doc, strings.Index(src, "= int8")+3)
+		h := hover(doc, strings.Index(src, "= sbyte")+3)
 		if h == nil {
-			t.Fatal("no hover on int8")
+			t.Fatal("no hover on sbyte")
 		}
-		if !strings.Contains(h.Contents.Value, "type int8 = builtin") {
+		if !strings.Contains(h.Contents.Value, "type sbyte = builtin") {
 			t.Errorf("hover = %q, want the builtin signature", h.Contents.Value)
 		}
 	})
 
 	t.Run("the range builtin describes itself", func(t *testing.T) {
-		rsrc := "pub fn f(r: range): int -> r.count()\n"
+		rsrc := "pub fn f(r: range): nint -> r.count()\n"
 		rdoc := testView(rsrc)
 		h := hover(rdoc, strings.Index(rsrc, ": range")+3)
 		if h == nil {
@@ -97,8 +97,8 @@ func TestTypeHover(t *testing.T) {
 }
 
 func TestInterfaceHover(t *testing.T) {
-	src := "/// a behaviour\npub interface foldable<V> {\n  count(): int\n}\n" +
-		"pub type Bag = list<int> impl foldable<int> {\n  count(): int {\n    return 0\n  }\n}\n"
+	src := "/// a behaviour\npub interface foldable<V> {\n  count(): nint\n}\n" +
+		"pub type Bag = list<nint> impl foldable<nint> {\n  count(): nint {\n    return 0\n  }\n}\n"
 	doc := testView(src)
 
 	t.Run("the interface declaration describes itself", func(t *testing.T) {
@@ -119,7 +119,7 @@ func TestInterfaceHover(t *testing.T) {
 		if h == nil {
 			t.Fatal("no hover on Bag")
 		}
-		if !strings.Contains(h.Contents.Value, "impl foldable<int>") {
+		if !strings.Contains(h.Contents.Value, "impl foldable<nint>") {
 			t.Errorf("hover = %q, want the impl'd interface on the card", h.Contents.Value)
 		}
 	})
@@ -128,20 +128,20 @@ func TestInterfaceHover(t *testing.T) {
 func TestTypeHoverWhere(t *testing.T) {
 	// The refinement predicate is part of the signature: hovering the type
 	// shows the values it admits, in canonical surface form.
-	src := "pub type Port = int32 where self >= 1 && self <= 65535\nconst p: Port = 8080\n"
+	src := "pub type Port = int where self >= 1 && self <= 65535\nconst p: Port = 8080\n"
 	doc := testView(src)
 
 	h := hover(doc, strings.Index(src, ": Port")+3)
 	if h == nil {
 		t.Fatal("no hover on the refined type reference")
 	}
-	if !strings.Contains(h.Contents.Value, "pub type Port = int32 where self >= 1 && self <= 65535") {
+	if !strings.Contains(h.Contents.Value, "pub type Port = int where self >= 1 && self <= 65535") {
 		t.Errorf("hover = %q, want the signature with the where clause", h.Contents.Value)
 	}
 }
 
 func TestTypeHoverGenericParams(t *testing.T) {
-	src := "type Opt<T> = T | null\nconst o: Opt<int8> = 1\n"
+	src := "type Opt<T> = T | null\nconst o: Opt<sbyte> = 1\n"
 	doc := testView(src)
 
 	h := hover(doc, strings.Index(src, ": Opt")+3)
@@ -154,7 +154,7 @@ func TestTypeHoverGenericParams(t *testing.T) {
 }
 
 func TestTypeDefinition(t *testing.T) {
-	src := "pub type Coin = int8\nconst c: Coin = 1\n"
+	src := "pub type Coin = sbyte\nconst c: Coin = 1\n"
 	doc := testView(src)
 
 	locs := definition(doc, strings.Index(src, ": Coin")+3)
@@ -168,17 +168,17 @@ func TestTypeDefinition(t *testing.T) {
 	}
 
 	// A prelude builtin is declared in no workspace file: no jump, no panic.
-	if locs := definition(doc, strings.Index(src, "= int8")+3); locs != nil {
-		t.Errorf("definition(int8) = %v, want nil for a prelude type", locs)
+	if locs := definition(doc, strings.Index(src, "= sbyte")+3); locs != nil {
+		t.Errorf("definition(sbyte) = %v, want nil for a prelude type", locs)
 	}
 }
 
 func TestTypeHoverMethods(t *testing.T) {
 	// The type hover reads like a card: the signature, the doc, then every
 	// method's signature — what the type can do, at a glance.
-	src := "/// a level\ntype Level = int8 impl {\n" +
+	src := "/// a level\ntype Level = sbyte impl {\n" +
 		"  pub increment(): self {\n    return self + 1\n  }\n" +
-		"  extern shift(by: int8): self\n" +
+		"  extern shift(by: sbyte): self\n" +
 		"}\nconst l: Level = 1\n"
 	doc := testView(src)
 
@@ -187,7 +187,7 @@ func TestTypeHoverMethods(t *testing.T) {
 		t.Fatal("no hover on the type reference")
 	}
 	val := h.Contents.Value
-	for _, want := range []string{"type Level = int8", "a level", "pub increment(): self", "extern shift(by: int8): self"} {
+	for _, want := range []string{"type Level = sbyte", "a level", "pub increment(): self", "extern shift(by: sbyte): self"} {
 		if !strings.Contains(val, want) {
 			t.Errorf("hover = %q, want it to contain %q", val, want)
 		}
@@ -202,16 +202,16 @@ func TestTypeHoverMethods(t *testing.T) {
 
 	// A prelude builtin lists its operator methods the same way, each under
 	// its doc comment, with the type's own doc up top.
-	h = hover(doc, strings.Index(src, "= int8")+3)
+	h = hover(doc, strings.Index(src, "= sbyte")+3)
 	if h == nil {
-		t.Fatal("no hover on int8")
+		t.Fatal("no hover on sbyte")
 	}
 	for _, want := range []string{
 		"A signed 8-bit integer (-128 to 127).",
 		"/// The + operator: the sum.\npub extern add(other: self): self",
 	} {
 		if !strings.Contains(h.Contents.Value, want) {
-			t.Errorf("int8 hover = %q, want it to contain %q", h.Contents.Value, want)
+			t.Errorf("sbyte hover = %q, want it to contain %q", h.Contents.Value, want)
 		}
 	}
 }

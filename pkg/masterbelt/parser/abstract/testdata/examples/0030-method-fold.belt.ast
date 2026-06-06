@@ -40,10 +40,10 @@ File
     name "LeaderUp"
     value (call (. (. (. Identifier "Squad" leader) lv) increment))
   TypeDecl
-    doc "A character level, with methods over its underlying int8."
+    doc "A character level, with methods over its underlying sbyte."
     pub
     name "Level"
-    body int8
+    body sbyte
     method "increment"
       doc "The next level up — a self-returning method, so a chain keeps the type."
       pub
@@ -51,11 +51,11 @@ File
       return (call (. self add) IntLit "1")
     method "plus"
       doc "This level a number of steps up. The base value lifts into the nominal"
-      doc "type through the conversion: a Level derives int8's operators, but their"
-      doc "self-typed operands stay nominal, so mixing in a bare int8 is a type"
+      doc "type through the conversion: a Level derives sbyte's operators, but their"
+      doc "self-typed operands stay nominal, so mixing in a bare sbyte is a type"
       doc "error — Level(steps) is the explicit lift."
       pub
-      param steps: int8
+      param steps: sbyte
       result self
       return (call (. self add) (call Identifier "Level" Identifier "steps"))
   TypeDecl
@@ -88,7 +88,7 @@ File
     method "label"
       doc "A let- and if-bearing body, to exercise the full statement walker."
       pub
-      result int
+      result nint
       let "fire" = (call (. self isFire))
       if Identifier "fire"
           return IntLit "1"

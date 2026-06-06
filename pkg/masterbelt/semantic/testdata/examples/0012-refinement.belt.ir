@@ -20,20 +20,20 @@ Module
     value IntLiteral "75"
     eval 75
   Const "Unrefined"
-    type int
+    type nint
     value IntLiteral "70000"
     eval 70000
   TypeDef "Level" pub
     doc "A character level between 0 and 100."
-    body int8
+    body sbyte
     where self >= 0 && self <= 100
   TypeDef "Port" pub
     doc "A TCP port number."
-    body int32
+    body int
     where self >= 1 && self <= 65535
   TypeDef "Percent" pub
     doc "A percentage from 0 to 100."
-    body int8
+    body sbyte
     where self >= 0 && self <= 100
     method "increment" pub
       doc "The next percentage point."
@@ -41,7 +41,7 @@ Module
       return self.add(IntLiteral "1")
   TypeDef "Score" pub
     doc "A score that is valid only when it lies in the 0..100 band."
-    body int32
+    body int
     where self.inBand()
     method "inBand" pub
       doc "Whether the score is within the valid band."

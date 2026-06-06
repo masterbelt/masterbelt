@@ -7,15 +7,15 @@ File
     value (call Identifier "firstOf" IntLit "7" IntLit "9")
   TypeDecl
     doc "A small bag of ints that folds over its contents — an opt-in implementor of"
-    doc "foldable, so it satisfies a `T: foldable<int, int>` bound."
+    doc "foldable, so it satisfies a `T: foldable<nint, nint>` bound."
     pub
     name "Bag"
-    body list<int>
-    impl foldable<int, int>
+    body list<nint>
+    impl foldable<nint, nint>
     method "fold"
       typeparam A
       param init: A
-      param step: fn(acc: A, key: int, value: int): A
+      param step: fn(acc: A, key: nint, value: nint): A
       result A
       return Identifier "init"
   InterfaceDecl
@@ -33,15 +33,15 @@ File
     provided "count"
       doc "Provided: the number of elements, folded from the primitive."
       pub
-      result int
+      result nint
       return (call Identifier "fold" IntLit "0" (fn(acc: <missing>, key: <missing>, value: <missing>): <missing> (return (call (. Identifier "acc" add) IntLit "1"))))
   FuncDecl
     doc "The total of any foldable collection of ints, folded with addition."
     pub
     name "total"
-    typeparam T: foldable<int, int>
+    typeparam T: foldable<nint, nint>
     param c: T
-    result int
+    result nint
       return (call (. Identifier "c" fold) IntLit "0" (fn(acc: <missing>, key: <missing>, value: <missing>): <missing> (return (call (. Identifier "acc" add) Identifier "value"))))
   FuncDecl
     doc "The argument, unchanged. Works for any type because it touches nothing."

@@ -8,7 +8,7 @@ import "testing"
 // syntactic channel, never the type query — so the method on the field's nominal
 // type resolves and its body folds.
 
-const levelPoint = "pub type Level = int8 impl {\n" +
+const levelPoint = "pub type Level = sbyte impl {\n" +
 	"  pub increment(): self {\n    return self + 1\n  }\n" +
 	"}\n" +
 	"pub type Point = { lv: Level }\n"
@@ -37,7 +37,7 @@ func TestRecordFieldMethodInAssert(t *testing.T) {
 // TestNestedRecordFieldMethodFolds covers a nested field path a.b.c.method():
 // each field access resolves the next record's field annotation.
 func TestNestedRecordFieldMethodFolds(t *testing.T) {
-	src := "pub type Level = int8 impl {\n" +
+	src := "pub type Level = sbyte impl {\n" +
 		"  pub increment(): self {\n    return self + 1\n  }\n" +
 		"}\n" +
 		"pub type Inner = { lv: Level }\n" +
@@ -64,7 +64,7 @@ func TestRecordFieldMethodChain(t *testing.T) {
 // TestRecordFieldAnonymousType covers an inline (anonymous) record annotation on
 // the const itself: the field's type still resolves from the annotation.
 func TestRecordFieldAnonymousType(t *testing.T) {
-	src := "pub type Level = int8 impl {\n" +
+	src := "pub type Level = sbyte impl {\n" +
 		"  pub increment(): self {\n    return self + 1\n  }\n" +
 		"}\n" +
 		"const P: { lv: Level } = {lv: Level(5)}\n" +
@@ -79,7 +79,7 @@ func TestRecordFieldAnonymousType(t *testing.T) {
 // primitive's own operators still do — and a missing method is a type error, not
 // a silent wrong fold. Here the field is a plain int, and add (an operator) folds.
 func TestRecordFieldPrimitiveOperatorFolds(t *testing.T) {
-	src := "pub type Box = { n: int }\n" +
+	src := "pub type Box = { n: nint }\n" +
 		"const B: Box = {n: 5}\n" +
 		"const Six = B.n + 1\n"
 	if got := evalOf(t, src, "Six").Int.Int64(); got != 6 {

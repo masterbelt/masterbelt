@@ -9,24 +9,24 @@
 // rebound to it. A map write is an upsert and always succeeds; a list write past
 // the end is a bug caught at compile time (index_out_of_range), not a value.
 
-// Reading a list element. The static type is int | error — the read may be out
+// Reading a list element. The static type is nint | error — the read may be out
 // of range — even when the index is a constant the folder can resolve.
 const Xs = [10, 20, 30]
-const First: int | error = Xs[0]
-const Third: int | error = Xs[2]
+const First: nint | error = Xs[0]
+const Third: nint | error = Xs[2]
 
 // Reading a map value by key. Missing keys make this fallible too.
 const Tbl = ["sword": 100, "shield": 50]
-const Sword: int | error = Tbl["sword"]
+const Sword: nint | error = Tbl["sword"]
 
 // A dynamic index reads the same way: the desugared get carries the union.
-pub fn at(xs: list<int>, i: int): int | error {
+pub fn at(xs: list<nint>, i: nint): nint | error {
   return xs[i]
 }
 
 // Writing a list element rebinds the let local to a new list (set returns self).
 // The data is not mutated in place; the binding is.
-pub fn bumpFirst(): list<int> {
+pub fn bumpFirst(): list<nint> {
   let xs = [1, 2, 3]
   xs[0] = 99
   return xs
@@ -34,7 +34,7 @@ pub fn bumpFirst(): list<int> {
 
 // A map write upserts: an existing key is updated, a new key is added. Both
 // always succeed, so a map write needs no error.
-pub fn put(): map<string, int> {
+pub fn put(): map<string, nint> {
   let m = ["a": 1]
   m["a"] = 10
   m["b"] = 2

@@ -44,7 +44,7 @@ func TestTernaryBranchesUnify(t *testing.T) {
 // int for two ints, string for two strings, bool for two bools.
 func TestTernaryType(t *testing.T) {
 	for _, tc := range []struct{ src, name, want string }{
-		{"const X = true ? 1 : 2\n", "X", "int"},
+		{"const X = true ? 1 : 2\n", "X", "nint"},
 		{"const Y = true ? \"a\" : \"b\"\n", "Y", "string"},
 		{"const Z = true ? false : true\n", "Z", "bool"},
 	} {
@@ -105,11 +105,11 @@ func TestTernaryEvalNested(t *testing.T) {
 // way it does in a const initializer: a non-bool condition is still reported,
 // and a bool one analyzes and folds cleanly.
 func TestTernaryInMethodBody(t *testing.T) {
-	clean := "pub type Temp = int32 impl {\n  pub sign(): int32 {\n    return self > 0 ? 1 : (self < 0 ? -1 : 0)\n  }\n}\n"
+	clean := "pub type Temp = int impl {\n  pub sign(): int {\n    return self > 0 ? 1 : (self < 0 ? -1 : 0)\n  }\n}\n"
 	if _, diags := analyze(clean); len(diags) != 0 {
 		t.Fatalf("clean method ternary: unexpected diagnostics: %v", codes(diags))
 	}
-	bad := "pub type Temp = int32 impl {\n  pub label(): int32 {\n    return self ? 1 : 0\n  }\n}\n"
+	bad := "pub type Temp = int impl {\n  pub label(): int {\n    return self ? 1 : 0\n  }\n}\n"
 	if _, diags := analyze(bad); !hasCodeSwitch(diags, CodeTernaryConditionNotBool) {
 		t.Fatalf("non-bool method ternary: want ternary_condition_not_bool, got %v", codes(diags))
 	}

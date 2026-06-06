@@ -1,10 +1,10 @@
 Module
   Const "MaxLevel"
-    type int
+    type nint
     value IntLiteral "100"
     eval 100
   Const "MinLevel"
-    type int
+    type nint
     value IntLiteral "0"
     eval 0
   Const "Enabled"

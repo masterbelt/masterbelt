@@ -115,7 +115,7 @@ func TestDiagram(t *testing.T) {
 func TestDiagramSelf(t *testing.T) {
 	// A refinement predicate folds with self bound to the violating value, so
 	// the diagram shows which comparison rejected it.
-	file, diags := abstract.Lower([]byte("type Port = int32 where self >= 1 && self <= 65535\n"))
+	file, diags := abstract.Lower([]byte("type Port = int where self >= 1 && self <= 65535\n"))
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
@@ -134,7 +134,7 @@ func TestDiagramSelf(t *testing.T) {
 func TestDiagramSelfUnbound(t *testing.T) {
 	// Diagram (no self binding) leaves a predicate's self rows out: nothing
 	// folds, so only the condition line renders.
-	file, diags := abstract.Lower([]byte("type Port = int32 where self >= 1\n"))
+	file, diags := abstract.Lower([]byte("type Port = int where self >= 1\n"))
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", diags)
 	}

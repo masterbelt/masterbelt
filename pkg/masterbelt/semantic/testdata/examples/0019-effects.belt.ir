@@ -1,6 +1,6 @@
 Module
   Const "A"
-    type int
+    type nint
     value double(IntLiteral "21")
     eval 42
   TypeDef "Client" pub
@@ -27,8 +27,8 @@ Module
     result datetime
       return now()
   Func "double" pub
-    param x: int
-    result int
+    param x: nint
+    result nint
       return ParamRef "x".mul(IntLiteral "2")
   Assert "double(2) == 4"
     eval true

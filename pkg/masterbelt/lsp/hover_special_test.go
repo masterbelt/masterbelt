@@ -18,8 +18,8 @@ func TestHover(t *testing.T) {
 			t.Fatal("no hover on declaration name")
 		}
 		val := h.Contents.Value
-		if !strings.Contains(val, "const MaxLevel: int64") {
-			t.Errorf("hover = %q, want a const MaxLevel: int64 signature", val)
+		if !strings.Contains(val, "const MaxLevel: long") {
+			t.Errorf("hover = %q, want a const MaxLevel: long signature", val)
 		}
 		if !strings.Contains(val, "docs") {
 			t.Errorf("hover = %q, want the doc comment", val)
@@ -31,7 +31,7 @@ func TestHover(t *testing.T) {
 		if h == nil {
 			t.Fatal("no hover on reference")
 		}
-		if !strings.Contains(h.Contents.Value, "const MaxLevel: int64") {
+		if !strings.Contains(h.Contents.Value, "const MaxLevel: long") {
 			t.Errorf("reference hover = %q, want it to describe MaxLevel", h.Contents.Value)
 		}
 	})

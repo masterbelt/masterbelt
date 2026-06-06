@@ -32,7 +32,7 @@ File
   TypeDecl
     pub
     name "Event"
-    body { id: int, starts_at: datetime, cooldown: duration }
+    body { id: nint, starts_at: datetime, cooldown: duration }
   AssertDecl
     cond (call (. Identifier "Release" gt) Identifier "Epoch")
   AssertDecl

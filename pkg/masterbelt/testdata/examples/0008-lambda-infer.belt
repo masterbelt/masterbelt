@@ -1,6 +1,6 @@
 // Parameter and result types flow in from list<T>.map's signature:
-// T = int binds from the receiver, x: int is pushed into the lambda,
-// and R = int is solved from the body's return type.
+// T = nint binds from the receiver, x: nint is pushed into the lambda,
+// and R = nint is solved from the body's return type.
 const Doubled = [1, 2, 3].map(fn(x) -> x * 2)
 
 // R = bool, solved from the body.
@@ -8,14 +8,14 @@ const Evens = [1, 2, 3, 4].map(fn(x) -> x % 2 == 0)
 
 // A partially annotated literal: the annotation must agree with the
 // pushed-down type, and still wins for the body scope.
-const Tripled = [1, 2, 3].map(fn(x: int) -> x * 3)
+const Tripled = [1, 2, 3].map(fn(x: nint) -> x * 3)
 
 // An annotated function-typed constant: the annotation checks the literal.
-const Twice: fn(x: int): int = fn(x) -> x * 2
+const Twice: fn(x: nint): nint = fn(x) -> x * 2
 
 // A block body still works: same inference path, explicit return.
 const Stepped = [1, 2, 3].map(fn(x) { return x + 1 })
 
 // Checking mode subsumes the collection special cases that exist today.
-const Bytes: list<int8> = [1, 2, 3]
-const Empty: list<int> = []
+const Bytes: list<sbyte> = [1, 2, 3]
+const Empty: list<nint> = []

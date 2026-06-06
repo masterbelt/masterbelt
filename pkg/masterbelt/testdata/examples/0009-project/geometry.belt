@@ -3,7 +3,7 @@
 /// The zero point every path starts from.
 pub const Origin = 0
 /// A 1-D coordinate.
-pub type Point = int32
+pub type Point = int
 
 // Not exported — main.belt must not be able to use this.
 const hidden = 1

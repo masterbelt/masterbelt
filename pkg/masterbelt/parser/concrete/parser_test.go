@@ -45,7 +45,7 @@ func TestParseLossless(t *testing.T) {
 		"",
 		"\n\n  \t\n",
 		"const x = 1",
-		"const MaxLevel: int64 = 100\n",
+		"const MaxLevel: long = 100\n",
 		"pub const X = Y\n",
 		"const A = 1\nconst B = 2\n",
 		"/// doc\nconst X = 1\n",
@@ -59,47 +59,47 @@ func TestParseLossless(t *testing.T) {
 		"const w = - - 1\n",
 		"const e = 1 +\n", // missing right operand stays lossless
 		// Type declarations.
-		"pub type Coin = int8\n",
+		"pub type Coin = sbyte\n",
 		"type Pair = A | B\n",
 		"type Opt<T> = T | null\n",
-		"type Num<T: int8 | int16> = T\n",
-		"type Rec = {\n  a: int8\n  b: Level\n}\n",
-		"type Lvl = int8 impl {\n  pub increment(): self {\n    return self + 1\n  }\n}\n",
+		"type Num<T: sbyte | short> = T\n",
+		"type Rec = {\n  a: sbyte\n  b: Level\n}\n",
+		"type Lvl = sbyte impl {\n  pub increment(): self {\n    return self + 1\n  }\n}\n",
 		// Associated constants in an impl block (const items, mixed with methods).
-		"type Lvl = int8 impl {\n  pub const Max = 100\n  const Min = 0\n}\n",
-		"type Lvl = int8 impl {\n  const Max = 100\n  pub inc(): self {\n    return self\n  }\n}\n",
-		"type Bits = int32 impl {\n  pub const Width: int32 = 32\n}\n",
+		"type Lvl = sbyte impl {\n  pub const Max = 100\n  const Min = 0\n}\n",
+		"type Lvl = sbyte impl {\n  const Max = 100\n  pub inc(): self {\n    return self\n  }\n}\n",
+		"type Bits = int impl {\n  pub const Width: int = 32\n}\n",
 		"type I8 = builtin impl {\n  pub const Max = builtin\n}\n",
-		"type Bad = int8 impl {\n  const = 1\n  const X\n}\n", // malformed impl consts stay lossless
+		"type Bad = sbyte impl {\n  const = 1\n  const X\n}\n", // malformed impl consts stay lossless
 		"type Mapper<T, R> = fn(src: T): R\n",
-		"const x = 1\ntype T = int8\npub const y = 2\n", // const/type interleaved
-		"type Bad =\ntype Worse <\n",                    // malformed type decls stay lossless
+		"const x = 1\ntype T = sbyte\npub const y = 2\n", // const/type interleaved
+		"type Bad =\ntype Worse <\n",                     // malformed type decls stay lossless
 		// Where clauses (refinement predicates).
-		"type Port = int32 where self >= 1 && self <= 65535\n",
-		"type Pct = int8 where self >= 0 impl {\n  inc(): self {\n    return self\n  }\n}\n",
-		"type Bad = int8 where\n",      // missing predicate stays lossless
-		"type Bad = int8 where impl\n", // a keyword starts no expression (must not consume it)
+		"type Port = int where self >= 1 && self <= 65535\n",
+		"type Pct = sbyte where self >= 0 impl {\n  inc(): self {\n    return self\n  }\n}\n",
+		"type Bad = sbyte where\n",      // missing predicate stays lossless
+		"type Bad = sbyte where impl\n", // a keyword starts no expression (must not consume it)
 		// Function literals: annotations are optional in every position.
-		"const f = fn(x: int): int { return x }\n",
+		"const f = fn(x: nint): nint { return x }\n",
 		"const f = fn(x) { return x }\n",
-		"const f = fn(x: int, y) { return x }\n",
+		"const f = fn(x: nint, y) { return x }\n",
 		"const f = fn() {}\n",
-		"const f = fn(x",      // truncated literal stays lossless
-		"const f = fn(x,",     // truncated after a comma (must not panic)
-		"const f = fn(x,)",    // trailing comma is not part of the grammar
-		"type F = fn(x: int,", // truncated func type param list
+		"const f = fn(x",       // truncated literal stays lossless
+		"const f = fn(x,",      // truncated after a comma (must not panic)
+		"const f = fn(x,)",     // trailing comma is not part of the grammar
+		"type F = fn(x: nint,", // truncated func type param list
 		// Arrow bodies: a single expression after "->".
 		"const f = fn(x) -> x * 2\n",
-		"const f = fn(x: int): int -> x\n",
+		"const f = fn(x: nint): nint -> x\n",
 		"const f = fn() -> 1\n",
 		"const f = fn(x) ->",                // missing arrow body stays lossless
 		"const f = fn(x) -> { return 1 }\n", // block after arrow is an error, stays lossless
 		"const f = fn(x) => x\n",            // a fat arrow is no body starter
-		"type L = int8 impl {\nm(x,",        // truncated method param list
+		"type L = sbyte impl {\nm(x,",       // truncated method param list
 		// Assert declarations.
 		"assert Max > Min\n",
 		"/// doc\nassert Max > Min\n",
-		"const X = 1\nassert X == 1\ntype T = int8\n", // interleaved with other decls
+		"const X = 1\nassert X == 1\ntype T = sbyte\n", // interleaved with other decls
 		"assert\n",        // missing expression stays lossless
 		"assert 1 >\n",    // missing right operand stays lossless
 		"assert assert\n", // a keyword starts no expression (must not consume it)
@@ -132,7 +132,7 @@ func declKinds(root *cst.Node) []string {
 }
 
 func TestParseFileShape(t *testing.T) {
-	root, diags := Parse([]byte("const X = 1\npub const Y: int = 2\n"))
+	root, diags := Parse([]byte("const X = 1\npub const Y: nint = 2\n"))
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
@@ -144,7 +144,7 @@ func TestParseFileShape(t *testing.T) {
 }
 
 func TestParseConstDeclChildren(t *testing.T) {
-	root, _ := Parse([]byte("const Max: int64 = 100"))
+	root, _ := Parse([]byte("const Max: long = 100"))
 	decl := root.Children()[0].(*cst.Node)
 	if decl.Kind() != cst.ConstDecl {
 		t.Fatalf("first child kind = %s, want ConstDecl", decl.Kind())
@@ -175,7 +175,7 @@ func subNodeKinds(n *cst.Node) []cst.Kind {
 // TestParseTypeDeclFileShape checks that type declarations are recognised at the
 // file level and that the const/type choice is made by looking past pub.
 func TestParseTypeDeclFileShape(t *testing.T) {
-	root, diags := Parse([]byte("const X = 1\npub type Coin = int8\ntype Pair = A | B\n"))
+	root, diags := Parse([]byte("const X = 1\npub type Coin = sbyte\ntype Pair = A | B\n"))
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
@@ -192,16 +192,16 @@ func TestParseTypeDeclChildren(t *testing.T) {
 		src  string
 		want []cst.Kind
 	}{
-		{"nominal", "type Coin = int8\n", []cst.Kind{cst.TypeName}},
+		{"nominal", "type Coin = sbyte\n", []cst.Kind{cst.TypeName}},
 		{"union", "type Pair = A | B\n", []cst.Kind{cst.UnionType}},
 		{"generic union", "pub type Opt<T> = T | null\n", []cst.Kind{cst.GenericParams, cst.UnionType}},
-		{"constrained generic", "type Num<T: int8 | int16> = T\n", []cst.Kind{cst.GenericParams, cst.TypeName}},
-		{"record", "type Rec = {\n  a: int8\n}\n", []cst.Kind{cst.RecordType}},
+		{"constrained generic", "type Num<T: sbyte | short> = T\n", []cst.Kind{cst.GenericParams, cst.TypeName}},
+		{"record", "type Rec = {\n  a: sbyte\n}\n", []cst.Kind{cst.RecordType}},
 		{"func type", "type M<T, R> = fn(src: T): R\n", []cst.Kind{cst.GenericParams, cst.FuncType}},
-		{"impl", "type Lvl = int8 impl {\n  pub inc(): self {\n    return self\n  }\n}\n", []cst.Kind{cst.TypeName, cst.ImplBlock}},
+		{"impl", "type Lvl = sbyte impl {\n  pub inc(): self {\n    return self\n  }\n}\n", []cst.Kind{cst.TypeName, cst.ImplBlock}},
 		{"null name", "pub type null = builtin\n", []cst.Kind{cst.BuiltinType}}, // null may be declared
-		{"where", "type Port = int32 where self <= 65535\n", []cst.Kind{cst.TypeName, cst.WhereClause}},
-		{"where impl", "type Pct = int8 where self >= 0 impl {\n  inc(): self {\n    return self\n  }\n}\n", []cst.Kind{cst.TypeName, cst.WhereClause, cst.ImplBlock}},
+		{"where", "type Port = int where self <= 65535\n", []cst.Kind{cst.TypeName, cst.WhereClause}},
+		{"where impl", "type Pct = sbyte where self >= 0 impl {\n  inc(): self {\n    return self\n  }\n}\n", []cst.Kind{cst.TypeName, cst.WhereClause, cst.ImplBlock}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -235,11 +235,11 @@ func TestParseImplConst(t *testing.T) {
 		src  string
 		want []cst.Kind // the impl block's direct child node kinds
 	}{
-		{"pub const and bare const", "type L = int8 impl {\n  pub const Max = 100\n  const Min = 0\n}\n",
+		{"pub const and bare const", "type L = sbyte impl {\n  pub const Max = 100\n  const Min = 0\n}\n",
 			[]cst.Kind{cst.ConstDecl, cst.ConstDecl}},
-		{"const then method", "type L = int8 impl {\n  const Max = 100\n  pub inc(): self {\n    return self\n  }\n}\n",
+		{"const then method", "type L = sbyte impl {\n  const Max = 100\n  pub inc(): self {\n    return self\n  }\n}\n",
 			[]cst.Kind{cst.ConstDecl, cst.MethodDecl}},
-		{"typed const", "type B = int32 impl {\n  pub const Width: int32 = 32\n}\n",
+		{"typed const", "type B = int impl {\n  pub const Width: int = 32\n}\n",
 			[]cst.Kind{cst.ConstDecl}},
 		{"builtin const", "type I8 = builtin impl {\n  pub const Max = builtin\n}\n",
 			[]cst.Kind{cst.ConstDecl}},
@@ -283,8 +283,8 @@ func TestParseImplConstChildren(t *testing.T) {
 		src  string
 		want []cst.Kind
 	}{
-		{"untyped", "type L = int8 impl {\n  const Max = 100\n}\n", []cst.Kind{cst.Initializer}},
-		{"typed", "type B = int32 impl {\n  const Width: int32 = 32\n}\n", []cst.Kind{cst.TypeClause, cst.Initializer}},
+		{"untyped", "type L = sbyte impl {\n  const Max = 100\n}\n", []cst.Kind{cst.Initializer}},
+		{"typed", "type B = int impl {\n  const Width: int = 32\n}\n", []cst.Kind{cst.TypeClause, cst.Initializer}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -344,7 +344,7 @@ func TestParseInterfaceDeclChildren(t *testing.T) {
 	}{
 		{"required only", "interface eq {\n  eql(other: self): bool\n}\n",
 			[]cst.Kind{cst.InterfaceMember}},
-		{"generic with provided", "pub interface foldable<K, V> {\n  fold<A>(init: A): A\n  pub count(): int {\n    return 0\n  }\n}\n",
+		{"generic with provided", "pub interface foldable<K, V> {\n  fold<A>(init: A): A\n  pub count(): nint {\n    return 0\n  }\n}\n",
 			[]cst.Kind{cst.GenericParams, cst.InterfaceMember, cst.InterfaceMember}},
 		{"empty", "interface marker {\n}\n", nil},
 	}
@@ -380,9 +380,9 @@ func TestParseInterfaceMemberChildren(t *testing.T) {
 		src  string
 		want []cst.Kind
 	}{
-		{"required", "interface i {\n  m(x: int): int\n}\n",
+		{"required", "interface i {\n  m(x: nint): nint\n}\n",
 			[]cst.Kind{cst.ParamList, cst.TypeName}},
-		{"provided", "interface i {\n  m(x: int): int {\n    return x\n  }\n}\n",
+		{"provided", "interface i {\n  m(x: nint): nint {\n    return x\n  }\n}\n",
 			[]cst.Kind{cst.ParamList, cst.TypeName, cst.Block}},
 		{"generic required", "interface i {\n  fold<A>(init: A): A\n}\n",
 			[]cst.Kind{cst.GenericParams, cst.ParamList, cst.TypeName}},
@@ -425,9 +425,9 @@ func TestParseImplInterfaceTag(t *testing.T) {
 		src  string
 		want []cst.Kind // the impl block's direct child node kinds
 	}{
-		{"tagged", "type Bag<T> = list<T> impl foldable<int, T> {\n  fold<A>(init: A): A {\n    return init\n  }\n}\n",
+		{"tagged", "type Bag<T> = list<T> impl foldable<nint, T> {\n  fold<A>(init: A): A {\n    return init\n  }\n}\n",
 			[]cst.Kind{cst.TypeName, cst.MethodDecl}},
-		{"bare", "type L = int8 impl {\n  inc(): self {\n    return self\n  }\n}\n",
+		{"bare", "type L = sbyte impl {\n  inc(): self {\n    return self\n  }\n}\n",
 			[]cst.Kind{cst.MethodDecl}},
 	}
 	for _, tc := range cases {
@@ -467,8 +467,8 @@ func TestParseWhereClauseDiagnostics(t *testing.T) {
 		src  string
 		code diagnostic.Code
 	}{
-		{"missing predicate", "type Bad = int8 where\n", CodeExpectedExpression},
-		{"keyword predicate", "type Bad = int8 where impl {}\n", CodeExpectedExpression},
+		{"missing predicate", "type Bad = sbyte where\n", CodeExpectedExpression},
+		{"keyword predicate", "type Bad = sbyte where impl {}\n", CodeExpectedExpression},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -719,14 +719,14 @@ func TestParseFuncDecl(t *testing.T) {
 		src  string
 		want []cst.Kind
 	}{
-		{"block body", "fn area(w: int, h: int): int {\n  return w * h\n}\n", []cst.Kind{cst.ParamList, cst.TypeName, cst.Block}},
-		{"arrow body", "fn double(x: int): int -> x * 2\n", []cst.Kind{cst.ParamList, cst.TypeName, cst.BinaryExpr}},
-		{"pub", "pub fn zero(): int -> 0\n", []cst.Kind{cst.ParamList, cst.TypeName, cst.Literal}},
+		{"block body", "fn area(w: nint, h: nint): nint {\n  return w * h\n}\n", []cst.Kind{cst.ParamList, cst.TypeName, cst.Block}},
+		{"arrow body", "fn double(x: nint): nint -> x * 2\n", []cst.Kind{cst.ParamList, cst.TypeName, cst.BinaryExpr}},
+		{"pub", "pub fn zero(): nint -> 0\n", []cst.Kind{cst.ParamList, cst.TypeName, cst.Literal}},
 		{"record result", "pub fn origin(): Point -> Point{ x: 0 }\n", []cst.Kind{cst.ParamList, cst.TypeName, cst.RecordLit}},
-		{"unbounded type param", "fn id<T>(x: T): int -> 0\n", []cst.Kind{cst.GenericParams, cst.ParamList, cst.TypeName, cst.Literal}},
-		{"bounded type param", "fn total<T: foldable<int, int>>(c: T): int -> 0\n", []cst.Kind{cst.GenericParams, cst.ParamList, cst.TypeName, cst.Literal}},
-		{"several type params", "fn pair<T, U>(a: T, b: U): int -> 0\n", []cst.Kind{cst.GenericParams, cst.ParamList, cst.TypeName, cst.Literal}},
-		{"parameterized bound", "fn first<T: foldable<U>, U>(c: T): int -> 0\n", []cst.Kind{cst.GenericParams, cst.ParamList, cst.TypeName, cst.Literal}},
+		{"unbounded type param", "fn id<T>(x: T): nint -> 0\n", []cst.Kind{cst.GenericParams, cst.ParamList, cst.TypeName, cst.Literal}},
+		{"bounded type param", "fn total<T: foldable<nint, nint>>(c: T): nint -> 0\n", []cst.Kind{cst.GenericParams, cst.ParamList, cst.TypeName, cst.Literal}},
+		{"several type params", "fn pair<T, U>(a: T, b: U): nint -> 0\n", []cst.Kind{cst.GenericParams, cst.ParamList, cst.TypeName, cst.Literal}},
+		{"parameterized bound", "fn first<T: foldable<U>, U>(c: T): nint -> 0\n", []cst.Kind{cst.GenericParams, cst.ParamList, cst.TypeName, cst.Literal}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -756,7 +756,7 @@ func TestParseFuncDecl(t *testing.T) {
 // position), a function literal (value position, no name), and a function
 // declaration (top level, a name follows) — all in one file, parse-clean.
 func TestParseFnThreeUses(t *testing.T) {
-	src := "type F = fn(x: int): int\nconst g = fn(x) -> x\nfn h(x: int): int -> x\n"
+	src := "type F = fn(x: nint): nint\nconst g = fn(x) -> x\nfn h(x: nint): nint -> x\n"
 	root, diags := Parse([]byte(src))
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", diags)
@@ -775,7 +775,7 @@ func TestParseFnThreeUses(t *testing.T) {
 // function declaration.
 func TestParseFuncDeclRecovery(t *testing.T) {
 	t.Run("pub fn without a name is a reported FuncDecl", func(t *testing.T) {
-		src := "pub fn(x: int): int -> x\n"
+		src := "pub fn(x: nint): nint -> x\n"
 		root, diags := Parse([]byte(src))
 		if len(diags) == 0 {
 			t.Fatal("want a diagnostic for the missing name")
@@ -787,7 +787,7 @@ func TestParseFuncDeclRecovery(t *testing.T) {
 		}
 	})
 	t.Run("bare nameless fn is an error run", func(t *testing.T) {
-		src := "fn(x: int): int -> x\n"
+		src := "fn(x: nint): nint -> x\n"
 		root, diags := Parse([]byte(src))
 		if len(diags) == 0 {
 			t.Fatal("want a diagnostic for the stray literal")
@@ -799,7 +799,7 @@ func TestParseFuncDeclRecovery(t *testing.T) {
 		}
 	})
 	t.Run("an error run stops before a fn declaration", func(t *testing.T) {
-		src := "1 + 2\nfn h(): int -> 0\n"
+		src := "1 + 2\nfn h(): nint -> 0\n"
 		root, diags := Parse([]byte(src))
 		if len(diags) == 0 {
 			t.Fatal("want a diagnostic for the stray expression")
@@ -812,7 +812,7 @@ func TestParseFuncDeclRecovery(t *testing.T) {
 		}
 	})
 	t.Run("missing body is reported", func(t *testing.T) {
-		_, diags := Parse([]byte("fn h(): int\n"))
+		_, diags := Parse([]byte("fn h(): nint\n"))
 		found := false
 		for _, d := range diags {
 			if d.Code == CodeExpectedFuncBody {
@@ -822,10 +822,10 @@ func TestParseFuncDeclRecovery(t *testing.T) {
 		if !found {
 			t.Fatalf("want expected_func_body, got %v", diags)
 		}
-		assertLossless(t, "fn h(): int\n")
+		assertLossless(t, "fn h(): nint\n")
 	})
 	t.Run("arrow block body is reported", func(t *testing.T) {
-		_, diags := Parse([]byte("fn h(): int -> { return 1 }\n"))
+		_, diags := Parse([]byte("fn h(): nint -> { return 1 }\n"))
 		found := false
 		for _, d := range diags {
 			if d.Code == CodeArrowBlockBody {
@@ -911,9 +911,9 @@ func TestParseRecordLiteralVsMap(t *testing.T) {
 // separators alongside newlines, matching the literal's separator rule.
 func TestParseRecordTypeSeparators(t *testing.T) {
 	cases := []string{
-		"type Point = { x: int, y: int }\n",
-		"type Point = { x: int, y: int, }\n",
-		"type Point = {\n  x: int\n  y: int\n}\n",
+		"type Point = { x: nint, y: nint }\n",
+		"type Point = { x: nint, y: nint, }\n",
+		"type Point = {\n  x: nint\n  y: nint\n}\n",
 	}
 	for _, src := range cases {
 		root, diags := Parse([]byte(src))
@@ -971,12 +971,12 @@ func TestParseFuncLit(t *testing.T) {
 		prm  [][]cst.Kind // each Param's sub-nodes (annotation present or not)
 	}{
 		{
-			"fully annotated", "const f = fn(x: int): int { return x }\n",
+			"fully annotated", "const f = fn(x: nint): nint { return x }\n",
 			[]cst.Kind{cst.ParamList, cst.TypeName, cst.Block},
 			[][]cst.Kind{{cst.TypeName}},
 		},
 		{
-			"no result", "const f = fn(x: int) { return x }\n",
+			"no result", "const f = fn(x: nint) { return x }\n",
 			[]cst.Kind{cst.ParamList, cst.Block},
 			[][]cst.Kind{{cst.TypeName}},
 		},
@@ -986,12 +986,12 @@ func TestParseFuncLit(t *testing.T) {
 			[][]cst.Kind{nil},
 		},
 		{
-			"partially annotated", "const f = fn(x: int, y) { return x }\n",
+			"partially annotated", "const f = fn(x: nint, y) { return x }\n",
 			[]cst.Kind{cst.ParamList, cst.Block},
 			[][]cst.Kind{{cst.TypeName}, nil},
 		},
 		{
-			"result only", "const f = fn(x): int { return x }\n",
+			"result only", "const f = fn(x): nint { return x }\n",
 			[]cst.Kind{cst.ParamList, cst.TypeName, cst.Block},
 			[][]cst.Kind{nil},
 		},
@@ -1012,7 +1012,7 @@ func TestParseFuncLit(t *testing.T) {
 			[][]cst.Kind{nil},
 		},
 		{
-			"arrow annotated param", "const f = fn(x: int) -> x * 3\n",
+			"arrow annotated param", "const f = fn(x: nint) -> x * 3\n",
 			[]cst.Kind{cst.ParamList, cst.BinaryExpr},
 			[][]cst.Kind{{cst.TypeName}},
 		},
@@ -1027,7 +1027,7 @@ func TestParseFuncLit(t *testing.T) {
 			nil,
 		},
 		{
-			"arrow with result", "const f = fn(x): int -> x\n",
+			"arrow with result", "const f = fn(x): nint -> x\n",
 			[]cst.Kind{cst.ParamList, cst.TypeName, cst.NameRef},
 			[][]cst.Kind{nil},
 		},
@@ -1093,8 +1093,8 @@ func TestParamAnnotationStillRequired(t *testing.T) {
 		name string
 		src  string
 	}{
-		{"method param", "type L = int8 impl {\n  m(x): self {\n    return self\n  }\n}\n"},
-		{"func type param", "type F = fn(x): int\n"},
+		{"method param", "type L = sbyte impl {\n  m(x): self {\n    return self\n  }\n}\n"},
+		{"func type param", "type F = fn(x): nint\n"},
 		{"dangling colon in func lit", "const f = fn(x:) { return x }\n"},
 		{"dangling result colon in func lit", "const f = fn(x): { return x }\n"},
 	}
@@ -1118,7 +1118,7 @@ func TestParamAnnotationStillRequired(t *testing.T) {
 // TestParseGenericConstAnnotation checks that a constant's type annotation is a
 // full type expression, so generic types like list<int> are accepted.
 func TestParseGenericConstAnnotation(t *testing.T) {
-	root, diags := Parse([]byte("const x: list<int> = [1]\n"))
+	root, diags := Parse([]byte("const x: list<nint> = [1]\n"))
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
@@ -1291,7 +1291,7 @@ func TestParseAssertDeclForms(t *testing.T) {
 // TestParseAssertDeclFileShape checks assertions are recognised at the file
 // level and interleave with the other declaration forms.
 func TestParseAssertDeclFileShape(t *testing.T) {
-	root, diags := Parse([]byte("const X = 1\nassert X > 0\ntype Coin = int8\n"))
+	root, diags := Parse([]byte("const X = 1\nassert X > 0\ntype Coin = sbyte\n"))
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
@@ -1439,7 +1439,7 @@ func TestParseQualifiedTypeName(t *testing.T) {
 		{"union member", "type P = geo.Point | null\n"},
 		{"record field", "type R = {\n  p: geo.Point\n}\n"},
 		{"func type", "type F = fn(p: geo.Point): geo.Point\n"},
-		{"applied", "const a: geo.Box<int> = 1\n"},
+		{"applied", "const a: geo.Box<nint> = 1\n"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -1496,7 +1496,7 @@ func TestParseEffects(t *testing.T) {
 	}{
 		{"effects on fn", "pub fn io async get(url: string): string {\n  return url\n}\n", []cst.Kind{cst.ParamList, cst.TypeName, cst.Block}},
 		{"extern fn", "extern fn io async fetch(url: string): string\n", []cst.Kind{cst.ParamList, cst.TypeName}},
-		{"pub extern fn", "pub extern fn nondet now(): int\n", []cst.Kind{cst.ParamList, cst.TypeName}},
+		{"pub extern fn", "pub extern fn nondet now(): nint\n", []cst.Kind{cst.ParamList, cst.TypeName}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -1517,7 +1517,7 @@ func TestParseEffects(t *testing.T) {
 	}
 
 	// A non-extern function still requires a body.
-	if _, diags := Parse([]byte("fn io f(): int\n")); len(diags) == 0 {
+	if _, diags := Parse([]byte("fn io f(): nint\n")); len(diags) == 0 {
 		t.Errorf("fn without body: want a diagnostic")
 	}
 	// A method may carry effects, with or without fn.
@@ -1576,7 +1576,7 @@ func enumMemberNames(buf source.Buffer, decl *cst.Node) (names []string, withVal
 // TestParseEnumDeclFileShape checks that enum declarations are recognised at
 // the file level, the enum/const/type choice made by looking past pub.
 func TestParseEnumDeclFileShape(t *testing.T) {
-	root, diags := Parse([]byte("const X = 1\npub enum Rarity: uint8 {\n  A = 1\n}\nenum E {\n  B\n}\n"))
+	root, diags := Parse([]byte("const X = 1\npub enum Rarity: byte {\n  A = 1\n}\nenum E {\n  B\n}\n"))
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
@@ -1593,13 +1593,13 @@ func TestParseEnumDeclChildren(t *testing.T) {
 		src  string
 		want []cst.Kind
 	}{
-		{"base type", "enum R: uint8 {\n  A = 1\n}\n", []cst.Kind{cst.TypeClause, cst.EnumMember}},
+		{"base type", "enum R: byte {\n  A = 1\n}\n", []cst.Kind{cst.TypeClause, cst.EnumMember}},
 		{"no base", "enum E {\n  A\n}\n", []cst.Kind{cst.EnumMember}},
 		{"comma separated", "enum E {\n  A, B, C\n}\n", []cst.Kind{cst.EnumMember, cst.EnumMember, cst.EnumMember}},
 		{"newline separated", "enum E {\n  A\n  B\n}\n", []cst.Kind{cst.EnumMember, cst.EnumMember}},
 		{"trailing comma", "enum E {\n  A, B,\n}\n", []cst.Kind{cst.EnumMember, cst.EnumMember}},
 		{"impl", "enum E {\n  A\n} impl {\n  f(): self {\n    return self\n  }\n}\n", []cst.Kind{cst.EnumMember, cst.ImplBlock}},
-		{"base and impl", "enum E: int8 {\n  A = 1\n} impl {\n  f(): self {\n    return self\n  }\n}\n", []cst.Kind{cst.TypeClause, cst.EnumMember, cst.ImplBlock}},
+		{"base and impl", "enum E: sbyte {\n  A = 1\n} impl {\n  f(): self {\n    return self\n  }\n}\n", []cst.Kind{cst.TypeClause, cst.EnumMember, cst.ImplBlock}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -1626,7 +1626,7 @@ func TestParseEnumDeclChildren(t *testing.T) {
 }
 
 func TestParseEnumMembers(t *testing.T) {
-	src := "enum R: uint8 {\n  Common = 1\n  Rare = 2\n  Legend = 10\n}\n"
+	src := "enum R: byte {\n  Common = 1\n  Rare = 2\n  Legend = 10\n}\n"
 	root, diags := Parse([]byte(src))
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", diags)
@@ -1757,7 +1757,7 @@ func TestParseSwitchStmt(t *testing.T) {
 		},
 		{
 			"multi-value arm and wildcard with a block body",
-			"pub fn g(n: int): string {\n  switch n {\n    0 -> return \"z\"\n    1, 2, 3 -> return \"l\"\n    _ -> {\n      return \"h\"\n    }\n  }\n}\n",
+			"pub fn g(n: nint): string {\n  switch n {\n    0 -> return \"z\"\n    1, 2, 3 -> return \"l\"\n    _ -> {\n      return \"h\"\n    }\n  }\n}\n",
 			cst.NameRef,
 			[][]cst.Kind{
 				{cst.Literal, cst.ReturnStmt},
@@ -1848,7 +1848,7 @@ func TestParseSwitchLossless(t *testing.T) {
 	cases := []string{
 		"pub fn c(r: R): string {\n  switch r {\n    A -> return \"a\"\n  }\n}\n",
 		"pub fn c(r: R): string {\n  switch r { A -> return \"a\", B -> return \"b\" }\n}\n",
-		"pub fn g(n: int): string {\n  switch n {\n    1, 2, 3 -> return \"l\"\n    _ -> return \"h\"\n  }\n}\n",
+		"pub fn g(n: nint): string {\n  switch n {\n    1, 2, 3 -> return \"l\"\n    _ -> return \"h\"\n  }\n}\n",
 		"pub fn c(r: R): string {\n  switch r {\n    A -> {\n      return \"a\"\n    }\n  }\n}\n",
 		"pub fn c(r: R): string {\n  switch\n}\n",                                   // missing scrutinee and body
 		"pub fn c(r: R): string {\n  switch r\n}\n",                                 // missing arm block
@@ -1885,17 +1885,17 @@ func TestParseIfStmt(t *testing.T) {
 	}{
 		{
 			"binary condition, no else",
-			"pub fn f(n: int): int {\n  if n > 0 {\n    return 1\n  }\n  return 0\n}\n",
+			"pub fn f(n: nint): nint {\n  if n > 0 {\n    return 1\n  }\n  return 0\n}\n",
 			[]cst.Kind{cst.BinaryExpr, cst.Block},
 		},
 		{
 			"name condition, else block",
-			"pub fn f(b: bool): int {\n  if b {\n    return 1\n  } else {\n    return 0\n  }\n}\n",
+			"pub fn f(b: bool): nint {\n  if b {\n    return 1\n  } else {\n    return 0\n  }\n}\n",
 			[]cst.Kind{cst.NameRef, cst.Block, cst.Block},
 		},
 		{
 			"else-if chain",
-			"pub fn f(n: int): int {\n  if n < 0 {\n    return -1\n  } else if n > 0 {\n    return 1\n  } else {\n    return 0\n  }\n}\n",
+			"pub fn f(n: nint): nint {\n  if n < 0 {\n    return -1\n  } else if n > 0 {\n    return 1\n  } else {\n    return 0\n  }\n}\n",
 			[]cst.Kind{cst.BinaryExpr, cst.Block, cst.IfStmt},
 		},
 	}
@@ -1921,7 +1921,7 @@ func TestParseIfStmt(t *testing.T) {
 // TestParseIfNested checks that an if branch body may hold further statements,
 // including a nested if (the else block of sign), so control flow composes.
 func TestParseIfNested(t *testing.T) {
-	src := "pub fn f(n: int): int {\n  if n > 0 {\n    return 1\n  } else {\n    if n < 0 {\n      return -1\n    }\n    return 0\n  }\n}\n"
+	src := "pub fn f(n: nint): nint {\n  if n > 0 {\n    return 1\n  } else {\n    if n < 0 {\n      return -1\n    }\n    return 0\n  }\n}\n"
 	root, diags := Parse([]byte(src))
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", diags)
@@ -1954,13 +1954,13 @@ func TestParseIfNotExpression(t *testing.T) {
 // to the source byte for byte (the incremental pipeline's invariant).
 func TestParseIfLossless(t *testing.T) {
 	cases := []string{
-		"pub fn f(n: int): int {\n  if n > 0 {\n    return 1\n  }\n  return 0\n}\n",
-		"pub fn f(b: bool): int {\n  if b {\n    return 1\n  } else {\n    return 0\n  }\n}\n",
-		"pub fn f(n: int): int {\n  if n < 0 {\n    return -1\n  } else if n > 0 {\n    return 1\n  }\n  return 0\n}\n",
-		"pub fn f(n: int): int {\n  if\n}\n",            // missing condition and block
-		"pub fn f(n: int): int {\n  if n > 0\n}\n",      // missing then-block
-		"pub fn f(n: int): int {\n  if n > 0 {\n}\n}\n", // empty then-block
-		"pub fn f(n: int): int {\n  if n > 0 {} else\n}\n",
+		"pub fn f(n: nint): nint {\n  if n > 0 {\n    return 1\n  }\n  return 0\n}\n",
+		"pub fn f(b: bool): nint {\n  if b {\n    return 1\n  } else {\n    return 0\n  }\n}\n",
+		"pub fn f(n: nint): nint {\n  if n < 0 {\n    return -1\n  } else if n > 0 {\n    return 1\n  }\n  return 0\n}\n",
+		"pub fn f(n: nint): nint {\n  if\n}\n",            // missing condition and block
+		"pub fn f(n: nint): nint {\n  if n > 0\n}\n",      // missing then-block
+		"pub fn f(n: nint): nint {\n  if n > 0 {\n}\n}\n", // empty then-block
+		"pub fn f(n: nint): nint {\n  if n > 0 {} else\n}\n",
 	}
 	for _, src := range cases {
 		assertLossless(t, src)
@@ -1980,12 +1980,12 @@ func TestParseLetStmt(t *testing.T) {
 	}{
 		{
 			"inferred type",
-			"pub fn f(n: int): int {\n  let x = n\n  return x\n}\n",
+			"pub fn f(n: nint): nint {\n  let x = n\n  return x\n}\n",
 			[]cst.Kind{cst.Initializer},
 		},
 		{
 			"explicit annotation",
-			"pub fn f(n: int): int {\n  let x: int = n\n  return x\n}\n",
+			"pub fn f(n: nint): nint {\n  let x: nint = n\n  return x\n}\n",
 			[]cst.Kind{cst.TypeClause, cst.Initializer},
 		},
 	}
@@ -2020,12 +2020,12 @@ func TestParseAssignStmt(t *testing.T) {
 	}{
 		{
 			"name target",
-			"pub fn f(n: int): int {\n  let x = n\n  x = n\n  return x\n}\n",
+			"pub fn f(n: nint): nint {\n  let x = n\n  x = n\n  return x\n}\n",
 			cst.NameRef,
 		},
 		{
 			"member target",
-			"pub fn f(n: int): int {\n  let x = n\n  x.field = n\n  return x\n}\n",
+			"pub fn f(n: nint): nint {\n  let x = n\n  x.field = n\n  return x\n}\n",
 			cst.MemberExpr,
 		},
 	}
@@ -2064,14 +2064,14 @@ func TestParseAssignNotExpression(t *testing.T) {
 // assignments alike round-trip to the source byte for byte.
 func TestParseLetAssignLossless(t *testing.T) {
 	cases := []string{
-		"pub fn f(n: int): int {\n  let x = n\n  return x\n}\n",
-		"pub fn f(n: int): int {\n  let x: int = n\n  x = x + 1\n  return x\n}\n",
-		"pub fn f(n: int): int {\n  let\n}\n",        // missing name, clause, value
-		"pub fn f(n: int): int {\n  let x\n}\n",      // missing "=" and value
-		"pub fn f(n: int): int {\n  let x =\n}\n",    // missing value
-		"pub fn f(n: int): int {\n  let x: int\n}\n", // annotation but no value
-		"pub fn f(n: int): int {\n  x =\n}\n",        // assignment missing value
-		"pub fn f(n: int): int {\n  if n > 0 {\n    let y = n\n    y = y + 1\n    return y\n  }\n  return n\n}\n",
+		"pub fn f(n: nint): nint {\n  let x = n\n  return x\n}\n",
+		"pub fn f(n: nint): nint {\n  let x: nint = n\n  x = x + 1\n  return x\n}\n",
+		"pub fn f(n: nint): nint {\n  let\n}\n",         // missing name, clause, value
+		"pub fn f(n: nint): nint {\n  let x\n}\n",       // missing "=" and value
+		"pub fn f(n: nint): nint {\n  let x =\n}\n",     // missing value
+		"pub fn f(n: nint): nint {\n  let x: nint\n}\n", // annotation but no value
+		"pub fn f(n: nint): nint {\n  x =\n}\n",         // assignment missing value
+		"pub fn f(n: nint): nint {\n  if n > 0 {\n    let y = n\n    y = y + 1\n    return y\n  }\n  return n\n}\n",
 	}
 	for _, src := range cases {
 		assertLossless(t, src)

@@ -1,10 +1,10 @@
 // Nominal type
 /// A coin denomination.
-pub type Coin = int8
+pub type Coin = sbyte
 
 // Nominal type with methods
 /// A character level.
-pub type Level = int8 impl {
+pub type Level = sbyte impl {
   /// The next level up.
   pub increment(): self {
     return self + 1
@@ -21,17 +21,17 @@ pub type Optional<T> = T | null
 
 // Generics with type constraint
 /// A small integer, or nothing.
-pub type OptionalNumeric<T: int8 | int16> = T | null
+pub type OptionalNumeric<T: sbyte | short> = T | null
 
 // Product type
 /// One saved character: an id and its level.
 pub type Record = {
-  id: int8
+  id: sbyte
   level: Level
 } impl {
   /// The record's id widened into the game's id space.
-  pub fn game_id(): int32 {
-    return int32(self.id) * 1000
+  pub fn game_id(): int {
+    return int(self.id) * 1000
   }
 }
 

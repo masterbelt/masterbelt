@@ -138,7 +138,7 @@ File
         Colon ":"
         Whitespace " "
         TypeName
-          Ident "int"
+          Ident "nint"
         Whitespace " "
         Block
           LBrace "{"
@@ -333,11 +333,11 @@ File
   TypeDecl
     Newline "\n"
     Newline "\n"
-    LineComment "// A nominal type over a primitive: its value (an int8) carries no definition, so"
+    LineComment "// A nominal type over a primitive: its value (an sbyte) carries no definition, so"
     Newline "\n"
     LineComment "// the receiver's static type is read from the declared annotation in scope."
     Newline "\n"
-    DocComment "/// A character level, with methods over its underlying int8."
+    DocComment "/// A character level, with methods over its underlying sbyte."
     Newline "\n"
     Pub "pub"
     Whitespace " "
@@ -348,7 +348,7 @@ File
     Assign "="
     Whitespace " "
     TypeName
-      Ident "int8"
+      Ident "sbyte"
     Whitespace " "
     ImplBlock
       Impl "impl"
@@ -395,10 +395,10 @@ File
         DocComment "/// This level a number of steps up. The base value lifts into the nominal"
         Newline "\n"
         Whitespace "  "
-        DocComment "/// type through the conversion: a Level derives int8's operators, but their"
+        DocComment "/// type through the conversion: a Level derives sbyte's operators, but their"
         Newline "\n"
         Whitespace "  "
-        DocComment "/// self-typed operands stay nominal, so mixing in a bare int8 is a type"
+        DocComment "/// self-typed operands stay nominal, so mixing in a bare sbyte is a type"
         Newline "\n"
         Whitespace "  "
         DocComment "/// error — Level(steps) is the explicit lift."
@@ -414,7 +414,7 @@ File
             Colon ":"
             Whitespace " "
             TypeName
-              Ident "int8"
+              Ident "sbyte"
           RParen ")"
         Colon ":"
         Whitespace " "

@@ -63,7 +63,7 @@ func TestLowerSwitchEnum(t *testing.T) {
 // TestLowerSwitchScalar checks a scalar switch with a multi-value arm and a "_"
 // wildcard whose block body is lifted into Else.
 func TestLowerSwitchScalar(t *testing.T) {
-	sw := switchOf(t, "pub fn g(n: int): string {\n  switch n {\n    0 -> return \"z\"\n    1, 2, 3 -> return \"l\"\n    _ -> {\n      return \"h\"\n    }\n  }\n}\n")
+	sw := switchOf(t, "pub fn g(n: nint): string {\n  switch n {\n    0 -> return \"z\"\n    1, 2, 3 -> return \"l\"\n    _ -> {\n      return \"h\"\n    }\n  }\n}\n")
 	if len(sw.Arms) != 2 {
 		t.Fatalf("got %d arms, want 2 (the wildcard is Else)", len(sw.Arms))
 	}
@@ -99,7 +99,7 @@ func TestLowerSwitchExprBody(t *testing.T) {
 // TestLowerSwitchAfterWildcard checks that an arm written after the wildcard is
 // lifted out of the live arms into AfterElse (it can never run).
 func TestLowerSwitchAfterWildcard(t *testing.T) {
-	sw := switchOf(t, "pub fn g(n: int): string {\n  switch n {\n    0 -> return \"z\"\n    _ -> return \"h\"\n    1 -> return \"o\"\n  }\n}\n")
+	sw := switchOf(t, "pub fn g(n: nint): string {\n  switch n {\n    0 -> return \"z\"\n    _ -> return \"h\"\n    1 -> return \"o\"\n  }\n}\n")
 	if len(sw.Arms) != 1 {
 		t.Fatalf("live arms = %d, want 1 (the 0 arm)", len(sw.Arms))
 	}

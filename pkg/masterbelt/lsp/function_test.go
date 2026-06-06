@@ -9,7 +9,7 @@ import (
 )
 
 // funcSrc declares a documented function and a call site.
-const funcSrc = "/// doubles x\npub fn double(x: int): int -> x * 2\nconst A = double(21)\n"
+const funcSrc = "/// doubles x\npub fn double(x: nint): nint -> x * 2\nconst A = double(21)\n"
 
 func TestCompletionOffersFunctions(t *testing.T) {
 	doc := testView(funcSrc)
@@ -25,7 +25,7 @@ func TestCompletionOffersFunctions(t *testing.T) {
 	if k := item.Kind; k == nil || *k != protocol.CompletionItemKindFunction {
 		t.Errorf("double kind = %v, want Function", k)
 	}
-	if item.Detail != "pub fn double(x: int): int" {
+	if item.Detail != "pub fn double(x: nint): nint" {
 		t.Errorf("double detail = %q, want the signature", item.Detail)
 	}
 	if item.InsertText != "double(${1:x})" {
@@ -44,7 +44,7 @@ func TestHoverFunction(t *testing.T) {
 		if h == nil {
 			t.Fatal("no hover on the declared function name")
 		}
-		if !strings.Contains(h.Contents.Value, "pub fn double(x: int): int") {
+		if !strings.Contains(h.Contents.Value, "pub fn double(x: nint): nint") {
 			t.Errorf("hover = %q, want the signature", h.Contents.Value)
 		}
 		if !strings.Contains(h.Contents.Value, "doubles x") {
@@ -57,7 +57,7 @@ func TestHoverFunction(t *testing.T) {
 		if h == nil {
 			t.Fatal("no hover on the call site")
 		}
-		if !strings.Contains(h.Contents.Value, "pub fn double(x: int): int") {
+		if !strings.Contains(h.Contents.Value, "pub fn double(x: nint): nint") {
 			t.Errorf("hover = %q, want the signature", h.Contents.Value)
 		}
 	})
@@ -67,8 +67,8 @@ func TestHoverFunction(t *testing.T) {
 		if h == nil {
 			t.Fatal("no hover on the parameter use")
 		}
-		if !strings.Contains(h.Contents.Value, "x: int") {
-			t.Errorf("hover = %q, want x: int", h.Contents.Value)
+		if !strings.Contains(h.Contents.Value, "x: nint") {
+			t.Errorf("hover = %q, want x: nint", h.Contents.Value)
 		}
 	})
 }
@@ -90,16 +90,16 @@ func TestDefinitionFunction(t *testing.T) {
 func TestSemanticTokensFunction(t *testing.T) {
 	// The declared name colours as a function (declaration); the callee — a
 	// resolution fact — colours as a function through the program-aware pass.
-	doc := testView("fn f(): int -> 1\nconst A = f()\n")
+	doc := testView("fn f(): nint -> 1\nconst A = f()\n")
 	got := decode(semanticTokensIn(doc).Data)
 
 	want := []decodedToken{
 		{0, 0, 2, stKeyword, 0},                           // fn
 		{0, 3, 1, stFunction, smDeclaration},              // f (declared)
 		{0, 6, 1, stOperator, 0},                          // :
-		{0, 8, 3, stType, 0},                              // int
-		{0, 12, 2, stOperator, 0},                         // ->
-		{0, 15, 1, stNumber, 0},                           // 1
+		{0, 8, 4, stType, 0},                              // nint
+		{0, 13, 2, stOperator, 0},                         // ->
+		{0, 16, 1, stNumber, 0},                           // 1
 		{1, 0, 5, stKeyword, 0},                           // const
 		{1, 6, 1, stVariable, smDeclaration | smReadonly}, // A
 		{1, 8, 1, stOperator, 0},                          // =
@@ -131,7 +131,7 @@ func TestDocumentSymbolsIncludeFunctions(t *testing.T) {
 	if fn.Kind != protocol.SymbolKindFunction {
 		t.Errorf("double kind = %v, want Function", fn.Kind)
 	}
-	if fn.Detail != "pub fn double(x: int): int" {
+	if fn.Detail != "pub fn double(x: nint): nint" {
 		t.Errorf("double detail = %q, want the signature", fn.Detail)
 	}
 }
@@ -144,7 +144,7 @@ func funcProject(t *testing.T) (root string) {
 	return belttest.WriteFiles(t, map[string]string{
 		"masterbelt.toml": "entry = \"main.belt\"\n",
 		"main.belt":       funcMainSrc,
-		"math.belt":       "/// doubles x\npub fn double(x: int): int -> x * 2\n/// greets\npub fn greet(name: string): string -> name\n",
+		"math.belt":       "/// doubles x\npub fn double(x: nint): nint -> x * 2\n/// greets\npub fn greet(name: string): string -> name\n",
 	})
 }
 
@@ -164,7 +164,7 @@ func TestCrossFileFunctionHover(t *testing.T) {
 	if h == nil {
 		t.Fatal("no hover on the imported callee")
 	}
-	if !strings.Contains(h.Contents.Value, "pub fn double(x: int): int") || !strings.Contains(h.Contents.Value, "doubles x") {
+	if !strings.Contains(h.Contents.Value, "pub fn double(x: nint): nint") || !strings.Contains(h.Contents.Value, "doubles x") {
 		t.Errorf("hover = %q, want the exporter's signature and doc", h.Contents.Value)
 	}
 
@@ -226,7 +226,7 @@ func TestCompletionOffersImportedFunctions(t *testing.T) {
 	if _, ok := got["double"]; !ok {
 		t.Fatalf("completion missing the imported function double")
 	}
-	if d := got["double"].Detail; d != "pub fn double(x: int): int" {
+	if d := got["double"].Detail; d != "pub fn double(x: nint): nint" {
 		t.Errorf("double detail = %q, want the signature", d)
 	}
 	// greet arrives only through the namespace import, not by bare name.

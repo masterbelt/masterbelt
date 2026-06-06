@@ -20,11 +20,11 @@ func TestFuncLitBodySeesOuterScope(t *testing.T) {
 	decl := ast.NewConstDecl(nil, false, "A", nil, intLit("1"), nil)
 	id := ident("A")
 	env.res[id] = decl
-	env.typ[decl] = &ir.Builtin{Name: "int32"}
+	env.typ[decl] = &ir.Builtin{Name: "int"}
 
 	lit := funcLit(nil, nil, ret(id))
-	if got := Expr(lit, env).String(); got != "fn(): int32" {
-		t.Errorf("Expr = %s, want fn(): int32", got)
+	if got := Expr(lit, env).String(); got != "fn(): int" {
+		t.Errorf("Expr = %s, want fn(): int", got)
 	}
 }
 
@@ -33,13 +33,13 @@ func TestFuncLitNestedScopes(t *testing.T) {
 	// literal's parameters through the chained scope.
 	env := emptyEnv()
 	inner := funcLit(
-		[]*ast.ParamDef{param("y", namedType("int8"))},
+		[]*ast.ParamDef{param("y", namedType("sbyte"))},
 		nil,
 		ret(binary(ident("y"), "add", ident("x"))), // y: int8, x: the outer int
 	)
-	outer := funcLit([]*ast.ParamDef{param("x", namedType("int"))}, nil, ret(inner))
-	if got := Expr(outer, env).String(); got != "fn(int): fn(int8): int8" {
-		t.Errorf("Expr = %s, want fn(int): fn(int8): int8", got)
+	outer := funcLit([]*ast.ParamDef{param("x", namedType("nint"))}, nil, ret(inner))
+	if got := Expr(outer, env).String(); got != "fn(nint): fn(sbyte): sbyte" {
+		t.Errorf("Expr = %s, want fn(nint): fn(sbyte): sbyte", got)
 	}
 }
 
@@ -51,9 +51,9 @@ func TestFuncLitParamShadowsOuter(t *testing.T) {
 	env.res[id] = decl
 	env.typ[decl] = &ir.Builtin{Name: "bool"}
 
-	lit := funcLit([]*ast.ParamDef{param("x", namedType("int"))}, nil, ret(id))
-	if got := Expr(lit, env).String(); got != "fn(int): int" {
-		t.Errorf("Expr = %s, want fn(int): int (the parameter shadows the const)", got)
+	lit := funcLit([]*ast.ParamDef{param("x", namedType("nint"))}, nil, ret(id))
+	if got := Expr(lit, env).String(); got != "fn(nint): nint" {
+		t.Errorf("Expr = %s, want fn(nint): nint (the parameter shadows the const)", got)
 	}
 }
 
@@ -70,7 +70,7 @@ func TestBoundedTypeVarMethods(t *testing.T) {
 		Methods:   []*ir.Method{{Name: "fold", Result: &ir.TypeVar{Name: "V"}}},
 	}
 	reg.Install([]*ir.TypeDef{foldable})
-	bound := &ir.App{Def: foldable, Args: []ir.Type{&ir.Builtin{Name: "int"}, &ir.Builtin{Name: "int"}}}
+	bound := &ir.App{Def: foldable, Args: []ir.Type{&ir.Builtin{Name: "nint"}, &ir.Builtin{Name: "nint"}}}
 
 	universe := map[string]*ir.TypeDef{"foldable": foldable}
 
@@ -79,8 +79,8 @@ func TestBoundedTypeVarMethods(t *testing.T) {
 		Params: map[string]ir.Type{"c": &ir.TypeVar{Name: "T", Bound: bound}}}
 	foldCall := ast.NewCallExpr(ast.NewMemberExpr(ident("c"), ast.NewIdentifier("fold", nil), nil), nil, nil)
 	var r report
-	if got := CheckBody(foldCall, ir.Invalid, bs, r.sink()).String(); got != "int" {
-		t.Errorf("c.fold() on c: T (T: foldable<int, int>) = %s, want int", got)
+	if got := CheckBody(foldCall, ir.Invalid, bs, r.sink()).String(); got != "nint" {
+		t.Errorf("c.fold() on c: T (T: foldable<nint, nint>) = %s, want nint", got)
 	}
 	if len(r.unboundedMethods) != 0 || len(r.methods) != 0 {
 		t.Errorf("a bounded parameter has its interface methods; unexpected reports: %+v", r)

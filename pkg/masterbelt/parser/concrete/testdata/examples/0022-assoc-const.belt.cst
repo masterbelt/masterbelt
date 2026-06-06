@@ -10,7 +10,7 @@ File
     Newline "\n"
     LineComment "// The builtin integer bounds are first-class associated constants: the registry"
     Newline "\n"
-    LineComment "// value range, exposed as `int8.Max` / `int8.Min`."
+    LineComment "// value range, exposed as `sbyte.Max` / `sbyte.Min`."
     Newline "\n"
     Const "const"
     Whitespace " "
@@ -21,7 +21,7 @@ File
       Whitespace " "
       MemberExpr
         NameRef
-          Ident "int8"
+          Ident "sbyte"
         Dot "."
         Ident "Max"
   ConstDecl
@@ -35,7 +35,7 @@ File
       Whitespace " "
       MemberExpr
         NameRef
-          Ident "int8"
+          Ident "sbyte"
         Dot "."
         Ident "Min"
   TypeDecl
@@ -54,7 +54,7 @@ File
     Assign "="
     Whitespace " "
     TypeName
-      Ident "int8"
+      Ident "sbyte"
     Whitespace " "
     ImplBlock
       Impl "impl"
@@ -189,7 +189,7 @@ File
     Assign "="
     Whitespace " "
     TypeName
-      Ident "int32"
+      Ident "int"
     Whitespace " "
     ImplBlock
       Impl "impl"
@@ -210,7 +210,7 @@ File
           Colon ":"
           Whitespace " "
           TypeName
-            Ident "int32"
+            Ident "int"
         Whitespace " "
         Initializer
           Assign "="
@@ -250,7 +250,7 @@ File
     Assign "="
     Whitespace " "
     TypeName
-      Ident "int32"
+      Ident "int"
     Whitespace " "
     WhereClause
       Where "where"
@@ -275,7 +275,7 @@ File
           Whitespace " "
           MemberExpr
             NameRef
-              Ident "int16"
+              Ident "short"
             Dot "."
             Ident "Max"
   ConstDecl

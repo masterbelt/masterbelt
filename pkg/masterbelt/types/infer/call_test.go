@@ -52,8 +52,8 @@ func TestCallTypeSolvesLambda(t *testing.T) {
 	var r report
 	got := Check(mapCall("map", funcLit([]*ast.ParamDef{param("x", nil)}, nil,
 		ret(binary(ident("x"), "mul", intLit("2"))))), env, r.sink())
-	if got.String() != "list<int>" {
-		t.Errorf("map(fn(x) { return x * 2 }) = %s, want list<int>", got)
+	if got.String() != "list<nint>" {
+		t.Errorf("map(fn(x) { return x * 2 }) = %s, want list<nint>", got)
 	}
 	if len(r.methods)+len(r.mismatches)+len(r.uninferableParams)+r.uninferables != 0 {
 		t.Errorf("unexpected reports: %+v", r)
@@ -77,8 +77,8 @@ func TestCallTypeTwoPasses(t *testing.T) {
 	got := Check(mapCall("fold", intLit("0"),
 		funcLit([]*ast.ParamDef{param("acc", nil), param("x", nil)}, nil,
 			ret(binary(ident("acc"), "add", ident("x"))))), env, r.sink())
-	if got.String() != "int" {
-		t.Errorf("fold = %s, want int", got)
+	if got.String() != "nint" {
+		t.Errorf("fold = %s, want nint", got)
 	}
 	if len(r.methods)+len(r.mismatches)+len(r.uninferableParams)+r.uninferables != 0 {
 		t.Errorf("unexpected reports: %+v", r)
@@ -99,15 +99,15 @@ func genericFnEnv() stubEnv {
 		Params:    []*ir.TypeParam{{Name: "K"}, {Name: "V"}},
 		Methods:   []*ir.Method{{Name: "fold", Result: &ir.TypeVar{Name: "V"}}},
 	}
-	bound := &ir.App{Def: foldable, Args: []ir.Type{&ir.Builtin{Name: "int"}, &ir.Builtin{Name: "int"}}}
-	bag := &ir.TypeDef{Name: "Bag", Body: &ir.Builtin{Name: "int"}, Impls: []ir.Type{bound}}
+	bound := &ir.App{Def: foldable, Args: []ir.Type{&ir.Builtin{Name: "nint"}, &ir.Builtin{Name: "nint"}}}
+	bag := &ir.TypeDef{Name: "Bag", Body: &ir.Builtin{Name: "nint"}, Impls: []ir.Type{bound}}
 	env.reg.Install([]*ir.TypeDef{foldable, bag})
 
 	// foldable<int, int> as a type expression for the bound.
-	foldableBound := ast.NewNamedType("", "foldable", []ast.TypeExpr{namedType("int"), namedType("int")}, nil)
+	foldableBound := ast.NewNamedType("", "foldable", []ast.TypeExpr{namedType("nint"), namedType("nint")}, nil)
 	total := ast.NewFuncDecl(nil, true, false, nil, "total",
 		[]*ast.TypeParam{ast.NewTypeParam("T", foldableBound, nil)},
-		[]*ast.ParamDef{param("c", namedType("T"))}, namedType("int"),
+		[]*ast.ParamDef{param("c", namedType("T"))}, namedType("nint"),
 		[]ast.Stmt{ret(intLit("0"))}, nil)
 	identity := ast.NewFuncDecl(nil, true, false, nil, "identity",
 		[]*ast.TypeParam{ast.NewTypeParam("T", nil, nil)},
@@ -137,16 +137,16 @@ func TestFuncCallSolvesTypeParam(t *testing.T) {
 
 	// identity(42): T = int, result T -> int.
 	var r report
-	if got := Check(fnCall("identity", intLit("42")), env, r.sink()).String(); got != "int" {
-		t.Errorf("identity(42) = %s, want int", got)
+	if got := Check(fnCall("identity", intLit("42")), env, r.sink()).String(); got != "nint" {
+		t.Errorf("identity(42) = %s, want nint", got)
 	}
 	if len(r.boundsNotSatisfied)+len(r.uninferableTypeVar)+len(r.methods) != 0 {
 		t.Errorf("unexpected reports: %+v", r)
 	}
 
 	// The silent walk agrees (purity).
-	if got := Expr(fnCall("identity", intLit("42")), env).String(); got != "int" {
-		t.Errorf("Expr(identity(42)) = %s, want int", got)
+	if got := Expr(fnCall("identity", intLit("42")), env).String(); got != "nint" {
+		t.Errorf("Expr(identity(42)) = %s, want nint", got)
 	}
 }
 
@@ -166,11 +166,11 @@ func TestFuncCallBoundSatisfied(t *testing.T) {
 	env.res[id] = decl
 	env.typ[decl] = bagType
 	var r report
-	if got := Check(fnCall("total", id), env, r.sink()).String(); got != "int" {
-		t.Errorf("total(Bag) = %s, want int", got)
+	if got := Check(fnCall("total", id), env, r.sink()).String(); got != "nint" {
+		t.Errorf("total(Bag) = %s, want nint", got)
 	}
 	if len(r.boundsNotSatisfied) != 0 {
-		t.Errorf("Bag satisfies foldable<int, int>; unexpected bound reports: %+v", r.boundsNotSatisfied)
+		t.Errorf("Bag satisfies foldable<nint, nint>; unexpected bound reports: %+v", r.boundsNotSatisfied)
 	}
 
 	// A plain int does not opt into foldable: bound_not_satisfied.
@@ -178,8 +178,8 @@ func TestFuncCallBoundSatisfied(t *testing.T) {
 	if got := Check(fnCall("total", intLit("1")), env, r2.sink()); got != ir.Invalid {
 		t.Errorf("total(1) = %s, want invalid", got)
 	}
-	if len(r2.boundsNotSatisfied) != 1 || r2.boundsNotSatisfied[0] != "int -> foldable<int, int>" {
-		t.Errorf("want [int -> foldable<int, int>], got %+v", r2.boundsNotSatisfied)
+	if len(r2.boundsNotSatisfied) != 1 || r2.boundsNotSatisfied[0] != "nint -> foldable<nint, nint>" {
+		t.Errorf("want [nint -> foldable<nint, nint>], got %+v", r2.boundsNotSatisfied)
 	}
 }
 
@@ -216,16 +216,16 @@ func TestFuncCallOverloadCrossArgConsistency(t *testing.T) {
 	var r report
 	got := Check(fnCall("pair", intLit("7"), stringLit("x")), env, r.sink())
 	if got != ir.Invalid {
-		t.Errorf("pair(7, \"x\") = %s, want invalid (T cannot be both int and string)", got)
+		t.Errorf("pair(7, \"x\") = %s, want invalid (T cannot be both nint and string)", got)
 	}
-	if len(r.mismatches) != 1 || r.mismatches[0] != "string -> int" {
-		t.Errorf("want one mismatch [string -> int], got %+v", r.mismatches)
+	if len(r.mismatches) != 1 || r.mismatches[0] != "string -> nint" {
+		t.Errorf("want one mismatch [string -> nint], got %+v", r.mismatches)
 	}
 
 	// The consistent call still types as the substituted result.
 	var r2 report
-	if got := Check(fnCall("pair", intLit("7"), intLit("9")), env, r2.sink()).String(); got != "int" {
-		t.Errorf("pair(7, 9) = %s, want int", got)
+	if got := Check(fnCall("pair", intLit("7"), intLit("9")), env, r2.sink()).String(); got != "nint" {
+		t.Errorf("pair(7, 9) = %s, want nint", got)
 	}
 	if len(r2.mismatches)+len(r2.noMatchingFunc) != 0 {
 		t.Errorf("a consistent call must not report: %+v", r2)
@@ -262,8 +262,8 @@ func TestCallTypeLambdaFailures(t *testing.T) {
 	if got != ir.Invalid {
 		t.Errorf("map(fn(x: string)) = %s, want invalid", got)
 	}
-	if len(r3.mismatches) != 1 || r3.mismatches[0] != "string -> int" || len(r3.methods) != 0 {
-		t.Errorf("want [string -> int] and no invalid_operation, got %+v", r3)
+	if len(r3.mismatches) != 1 || r3.mismatches[0] != "string -> nint" || len(r3.methods) != 0 {
+		t.Errorf("want [string -> nint] and no invalid_operation, got %+v", r3)
 	}
 
 	// A non-lambda argument that does not fit still reports the call itself.

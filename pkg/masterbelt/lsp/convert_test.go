@@ -70,7 +70,7 @@ func TestToDiagnosticsEmptyIsNonNil(t *testing.T) {
 
 func TestDocumentSymbols(t *testing.T) {
 	// The assert contributes no symbol: it has no name to outline.
-	doc := testView("const MaxLevel: int64 = 100\nconst Min = 0\nassert MaxLevel > Min\n")
+	doc := testView("const MaxLevel: long = 100\nconst Min = 0\nassert MaxLevel > Min\n")
 	syms := documentSymbols(doc)
 	if len(syms) != 2 {
 		t.Fatalf("got %d symbols, want 2", len(syms))
@@ -79,8 +79,8 @@ func TestDocumentSymbols(t *testing.T) {
 	if syms[0].Name != "MaxLevel" || syms[0].Kind != protocol.SymbolKindConstant {
 		t.Errorf("symbol 0 = %+v", syms[0])
 	}
-	if syms[0].Detail != ": int64" {
-		t.Errorf("symbol 0 detail = %q, want %q", syms[0].Detail, ": int64")
+	if syms[0].Detail != ": long" {
+		t.Errorf("symbol 0 detail = %q, want %q", syms[0].Detail, ": long")
 	}
 	// SelectionRange must cover just the name "MaxLevel" (columns 6..14).
 	sel := syms[0].SelectionRange
@@ -88,8 +88,8 @@ func TestDocumentSymbols(t *testing.T) {
 		t.Errorf("symbol 0 selection range = %+v, want cols 6..14 on line 0", sel)
 	}
 
-	if syms[1].Name != "Min" || syms[1].Detail != ": int" {
-		t.Errorf("symbol 1 = %+v, want Min: int", syms[1])
+	if syms[1].Name != "Min" || syms[1].Detail != ": nint" {
+		t.Errorf("symbol 1 = %+v, want Min: nint", syms[1])
 	}
 }
 

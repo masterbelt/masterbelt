@@ -37,7 +37,7 @@ func TestEnumConstant(t *testing.T) {
 	def := &TypeDef{
 		Name: "Rarity",
 		Enum: &EnumDef{
-			Base: "uint8",
+			Base: "byte",
 			Members: []EnumMember{
 				{Name: "Common", Value: IntConstant(big.NewInt(1))},
 				{Name: "Legend", Value: IntConstant(big.NewInt(10))},

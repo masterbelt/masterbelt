@@ -28,7 +28,7 @@ func decode(data []int) []decodedToken {
 }
 
 func TestSemanticTokens(t *testing.T) {
-	doc := abstract.NewDocument([]byte("pub const X: int64 = 100\n"))
+	doc := abstract.NewDocument([]byte("pub const X: long = 100\n"))
 	got := decode(semanticTokens(doc).Data)
 
 	want := []decodedToken{
@@ -36,9 +36,9 @@ func TestSemanticTokens(t *testing.T) {
 		{0, 4, 5, stKeyword, 0},                            // const
 		{0, 10, 1, stVariable, smDeclaration | smReadonly}, // X (declared name)
 		{0, 11, 1, stOperator, 0},                          // :
-		{0, 13, 5, stType, 0},                              // int64
-		{0, 19, 1, stOperator, 0},                          // =
-		{0, 21, 3, stNumber, 0},                            // 100
+		{0, 13, 4, stType, 0},                              // long
+		{0, 18, 1, stOperator, 0},                          // =
+		{0, 20, 3, stNumber, 0},                            // 100
 	}
 
 	if len(got) != len(want) {
@@ -134,17 +134,17 @@ func TestSemanticTokensTernary(t *testing.T) {
 func TestSemanticTokensWhereClause(t *testing.T) {
 	// where colours as a keyword like the rest of the declaration; the
 	// comparison operator carries no semantic token (the grammar colours it).
-	doc := abstract.NewDocument([]byte("type Port = int32 where self >= 1\n"))
+	doc := abstract.NewDocument([]byte("type Port = int where self >= 1\n"))
 	got := decode(semanticTokens(doc).Data)
 
 	want := []decodedToken{
 		{0, 0, 4, stKeyword, 0},          // type
 		{0, 5, 4, stType, smDeclaration}, // Port (declared name)
 		{0, 10, 1, stOperator, 0},        // =
-		{0, 12, 5, stType, 0},            // int32
-		{0, 18, 5, stKeyword, 0},         // where
-		{0, 24, 4, stKeyword, 0},         // self
-		{0, 32, 1, stNumber, 0},          // 1
+		{0, 12, 3, stType, 0},            // int
+		{0, 16, 5, stKeyword, 0},         // where
+		{0, 22, 4, stKeyword, 0},         // self
+		{0, 30, 1, stNumber, 0},          // 1
 	}
 
 	if len(got) != len(want) {
@@ -160,7 +160,7 @@ func TestSemanticTokensWhereClause(t *testing.T) {
 func TestSemanticTokensInterface(t *testing.T) {
 	// interface colours as a keyword like type/enum; the interface's own name
 	// and its generic parameter read as types; a member name reads as a method.
-	doc := abstract.NewDocument([]byte("pub interface foldable<V> {\n  count(): int\n}\n"))
+	doc := abstract.NewDocument([]byte("pub interface foldable<V> {\n  count(): nint\n}\n"))
 	got := decode(semanticTokens(doc).Data)
 
 	want := []decodedToken{
@@ -170,7 +170,7 @@ func TestSemanticTokensInterface(t *testing.T) {
 		{0, 23, 1, stType, smDeclaration},  // V (generic param)
 		{1, 2, 5, stMethod, smDeclaration}, // count (member name)
 		{1, 9, 1, stOperator, 0},           // : (result-type colon)
-		{1, 11, 3, stType, 0},              // int (result type)
+		{1, 11, 4, stType, 0},              // nint (result type)
 	}
 
 	if len(got) != len(want) {
@@ -227,7 +227,7 @@ func TestSemanticTokensSwitch(t *testing.T) {
 func TestSemanticTokensIf(t *testing.T) {
 	// if and else colour as keywords like return; the condition's operator and
 	// the branch bodies read through the existing operator and keyword rules.
-	doc := abstract.NewDocument([]byte("pub fn f(n: int): int {\n  if n > 0 {\n    return 1\n  } else {\n    return 0\n  }\n}\n"))
+	doc := abstract.NewDocument([]byte("pub fn f(n: nint): nint {\n  if n > 0 {\n    return 1\n  } else {\n    return 0\n  }\n}\n"))
 	got := decode(semanticTokens(doc).Data)
 
 	want := []decodedToken{
@@ -408,13 +408,13 @@ func TestSemanticTokensMembers(t *testing.T) {
 	// Record fields, method names, parameters, and member accesses each get
 	// their own classification; a reference in a body stays a variable.
 	src := "type Rec = {\n" +
-		"  id: int8\n" +
+		"  id: sbyte\n" +
 		"}\n" +
-		"type Lvl = int8 impl {\n" +
-		"  pub inc(x: int8): self {\n" +
+		"type Lvl = sbyte impl {\n" +
+		"  pub inc(x: sbyte): self {\n" +
 		"    return self.bump(x)\n" +
 		"  }\n" +
-		"  get(): int8 {\n" +
+		"  get(): sbyte {\n" +
 		"    return self.id\n" +
 		"  }\n" +
 		"}\n"
@@ -520,11 +520,11 @@ func TestSemanticTokensValueMembers(t *testing.T) {
 	// site, not a property), and int8.Max names an associated constant (a
 	// read-only value, like an imported constant). The receiver of each — the
 	// type name — reads through the existing value rules.
-	src := "enum Rarity: int8 {\n" +
+	src := "enum Rarity: sbyte {\n" +
 		"  Common = 0\n" +
 		"}\n" +
 		"const C = Rarity.Common\n" +
-		"const M = int8.Max\n"
+		"const M = sbyte.Max\n"
 	doc := testView(src)
 	got := decode(semanticTokensIn(doc).Data)
 
@@ -543,7 +543,7 @@ func TestSemanticTokensValueMembers(t *testing.T) {
 		mods       int
 	}{
 		{"enum member value", 3, 17, stEnumMember, smReadonly}, // Common in Rarity.Common
-		{"assoc const value", 4, 15, stVariable, smReadonly},   // Max in int8.Max
+		{"assoc const value", 4, 16, stVariable, smReadonly},   // Max in sbyte.Max
 	}
 	for _, tc := range cases {
 		tok, ok := find(tc.line, tc.char)

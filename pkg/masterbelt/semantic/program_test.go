@@ -82,11 +82,11 @@ func TestProgramCrossFileValues(t *testing.T) {
 	assertClean(t, p, "main.belt")
 	assertClean(t, p, "geometry.belt")
 
-	if typ, eval := constInfo(p, "main.belt", "start"); typ != "int" || eval != "0" {
-		t.Errorf("start = %s / %s, want int / 0", typ, eval)
+	if typ, eval := constInfo(p, "main.belt", "start"); typ != "nint" || eval != "0" {
+		t.Errorf("start = %s / %s, want nint / 0", typ, eval)
 	}
-	if typ, eval := constInfo(p, "main.belt", "base"); typ != "int" || eval != "1" {
-		t.Errorf("base = %s / %s, want int / 1", typ, eval)
+	if typ, eval := constInfo(p, "main.belt", "base"); typ != "nint" || eval != "1" {
+		t.Errorf("base = %s / %s, want nint / 1", typ, eval)
 	}
 }
 
@@ -112,7 +112,7 @@ func TestProgramCrossFileTypeAnnotation(t *testing.T) {
 	// An imported type works in a const annotation; the exporter's settled
 	// type and value cross with it.
 	p := buildProgram(map[string]string{
-		"geometry.belt": "pub type Point = int32\npub const Origin: Point = 0\n",
+		"geometry.belt": "pub type Point = int\npub const Origin: Point = 0\n",
 		"main.belt":     "use geo from \"geometry.belt\"\nuse { Point } from \"geometry.belt\"\nconst start: Point = geo.Origin\n",
 	})
 	assertClean(t, p, "geometry.belt")
@@ -127,8 +127,8 @@ func TestProgramWildcardImport(t *testing.T) {
 		"geometry.belt": "pub const Origin = 0\npub const Unit = 1\nconst hidden = 2\n",
 		"main.belt":     "use * from \"geometry.belt\"\nconst a = Origin.add(Unit)\nconst b = hidden\n",
 	})
-	if typ, eval := constInfo(p, "main.belt", "a"); typ != "int" || eval != "1" {
-		t.Errorf("a = %s / %s, want int / 1", typ, eval)
+	if typ, eval := constInfo(p, "main.belt", "a"); typ != "nint" || eval != "1" {
+		t.Errorf("a = %s / %s, want nint / 1", typ, eval)
 	}
 	// hidden is not pub: the wildcard does not bring it in.
 	d := findDiag(t, p, "main.belt", CodeUndefinedName)
@@ -141,7 +141,7 @@ func TestProgramBarrelReexport(t *testing.T) {
 	// barrel re-exports palette's whole surface; main reaches it selectively
 	// and through a wildcard of the barrel (transitively).
 	p := buildProgram(map[string]string{
-		"palette.belt": "pub const C = 2\npub type Shade = int8\n",
+		"palette.belt": "pub const C = 2\npub type Shade = sbyte\n",
 		"barrel.belt":  "pub use * from \"palette.belt\"\npub const Own = 1\n",
 		"main.belt":    "use { C, Own } from \"barrel.belt\"\nuse * from \"barrel.belt\"\nconst x: Shade = C.add(Own)\n",
 	})
@@ -158,8 +158,8 @@ func TestProgramSelectiveReexport(t *testing.T) {
 		"main.belt":    "use { C } from \"barrel.belt\"\nuse { D } from \"barrel.belt\"\nconst x = C\n",
 	})
 	// C re-exports; D does not (the barrel re-exported only C).
-	if typ, eval := constInfo(p, "main.belt", "x"); typ != "int" || eval != "2" {
-		t.Errorf("x = %s / %s, want int / 2", typ, eval)
+	if typ, eval := constInfo(p, "main.belt", "x"); typ != "nint" || eval != "2" {
+		t.Errorf("x = %s / %s, want nint / 2", typ, eval)
 	}
 	d := findDiag(t, p, "main.belt", CodeNotExported)
 	if !strings.Contains(d.Message, "D") {
@@ -222,8 +222,8 @@ func TestProgramAmbiguousImport(t *testing.T) {
 	if !strings.Contains(d.Message, "X") {
 		t.Errorf("Message = %q, want it to name X", d.Message)
 	}
-	if typ, eval := constInfo(p, "main.belt", "ok"); typ != "int" || eval != "10" {
-		t.Errorf("ok = %s / %s, want int / 10", typ, eval)
+	if typ, eval := constInfo(p, "main.belt", "ok"); typ != "nint" || eval != "10" {
+		t.Errorf("ok = %s / %s, want nint / 10", typ, eval)
 	}
 
 	// Unused, the collision is harmless.
@@ -304,8 +304,8 @@ func TestProgramImportedTypeInMethodBody(t *testing.T) {
 	// same way an annotation does — int32-typed Meters(1) cannot be returned
 	// as int8.
 	p := buildProgram(map[string]string{
-		"geometry.belt": "pub type Meters = int32\n",
-		"main.belt":     "use { Meters } from \"geometry.belt\"\npub type T = int8 impl {\n  pub f(): int8 {\n    return Meters(1)\n  }\n}\n",
+		"geometry.belt": "pub type Meters = int\n",
+		"main.belt":     "use { Meters } from \"geometry.belt\"\npub type T = sbyte impl {\n  pub f(): sbyte {\n    return Meters(1)\n  }\n}\n",
 	})
 	findDiag(t, p, "main.belt", CodeTypeMismatch)
 }
@@ -346,12 +346,12 @@ func TestProgramValueCutoffKeepsFnIdentity(t *testing.T) {
 	// — a structurally identical function from a re-parsed file is a new fact,
 	// and keeping the old one would leave g holding a detached tree.
 	srcs := map[string]string{
-		"a.belt":    "pub const f = fn(x: int): int { return x }\n",
+		"a.belt":    "pub const f = fn(x: nint): nint { return x }\n",
 		"main.belt": "use { f } from \"a.belt\"\nconst g = f\n",
 	}
 	p := buildProgram(srcs)
 
-	doc := abstract.NewDocument([]byte("pub const f = fn(x: int): int { return x }\n"))
+	doc := abstract.NewDocument([]byte("pub const f = fn(x: nint): nint { return x }\n"))
 	p.SetFile("a.belt", doc, nil)
 	p.Refresh()
 
@@ -379,11 +379,11 @@ func TestProgramQualifiedTypes(t *testing.T) {
 	// body, and a function-literal signature — and names the same definition
 	// the selective import binds, so the two forms are one type.
 	srcs := map[string]string{
-		"geometry.belt": "pub type Point = int32\npub type Opt<T> = T | null\npub const Origin = 0\n",
+		"geometry.belt": "pub type Point = int\npub type Opt<T> = T | null\npub const Origin = 0\n",
 		"main.belt": "use geo from \"geometry.belt\"\nuse { Point } from \"geometry.belt\"\n" +
 			"const start: geo.Point = geo.Origin\n" +
 			"const same: Point = start\n" +
-			"type MyOpt = geo.Opt<int8>\n" +
+			"type MyOpt = geo.Opt<sbyte>\n" +
 			"const f = fn(p: geo.Point): geo.Point { return p }\n",
 	}
 	p := buildProgram(srcs)
@@ -400,7 +400,7 @@ func TestProgramQualifiedTypeUnknown(t *testing.T) {
 	// A qualified name the target does not export — and a qualifier that
 	// names no namespace — both report unknown_type with the full form.
 	srcs := map[string]string{
-		"geometry.belt": "pub type Point = int32\n",
+		"geometry.belt": "pub type Point = int\n",
 		"main.belt":     "use geo from \"geometry.belt\"\nconst a: geo.Bogus = 1\nconst b: bogus.Point = 2\n",
 	}
 	p := buildProgram(srcs)
@@ -419,21 +419,21 @@ func TestProgramQualifiedTypeInMethodSignature(t *testing.T) {
 	// Qualified names resolve in method signatures, and an unknown one in a
 	// parameter is reported rather than becoming a silent type variable.
 	srcs := map[string]string{
-		"geometry.belt": "pub type Point = int32\n",
+		"geometry.belt": "pub type Point = int\n",
 		"main.belt": "use geo from \"geometry.belt\"\n" +
-			"pub type W = int8 impl {\n  pub f(p: geo.Point): geo.Point {\n    return p\n  }\n}\n",
+			"pub type W = sbyte impl {\n  pub f(p: geo.Point): geo.Point {\n    return p\n  }\n}\n",
 	}
 	assertClean(t, buildProgram(srcs), "main.belt")
 
 	srcs["main.belt"] = "use geo from \"geometry.belt\"\n" +
-		"pub type W = int8 impl {\n  pub f(p: geo.Bogus): int8 {\n    return 1\n  }\n}\n"
+		"pub type W = sbyte impl {\n  pub f(p: geo.Bogus): sbyte {\n    return 1\n  }\n}\n"
 	findDiag(t, buildProgram(srcs), "main.belt", CodeUnknownType)
 }
 
 func TestProgramQualifiedTypeDanglingQualifier(t *testing.T) {
 	// `geo.` is already a parse diagnostic; the semantic layer stays silent.
 	srcs := map[string]string{
-		"geometry.belt": "pub type Point = int32\n",
+		"geometry.belt": "pub type Point = int\n",
 		"main.belt":     "use geo from \"geometry.belt\"\nconst a: geo. = 1\n",
 	}
 	assertClean(t, buildProgram(srcs), "main.belt")
@@ -443,7 +443,7 @@ func TestProgramQualifiedTypeThroughReexport(t *testing.T) {
 	// A namespace surfaces its target's re-exports: geo.Color reaches through
 	// geometry's pub use into palette.
 	srcs := map[string]string{
-		"palette.belt":  "pub type Color = int8\n",
+		"palette.belt":  "pub type Color = sbyte\n",
 		"geometry.belt": "pub use { Color } from \"palette.belt\"\n",
 		"main.belt":     "use geo from \"geometry.belt\"\nconst c: geo.Color = 1\n",
 	}
@@ -544,13 +544,13 @@ func TestProgramShellsStableAcrossRefresh(t *testing.T) {
 
 func TestProgramCrossFileFunctionCall(t *testing.T) {
 	p := buildProgram(map[string]string{
-		"math.belt": "pub fn double(x: int): int -> x * 2\nfn hidden(): int -> 0\n",
+		"math.belt": "pub fn double(x: nint): nint -> x * 2\nfn hidden(): nint -> 0\n",
 		"main.belt": "use { double } from \"math.belt\"\nconst A = double(21)\n",
 	})
 	assertClean(t, p, "math.belt")
 	assertClean(t, p, "main.belt")
-	if typ, eval := constInfo(p, "main.belt", "A"); typ != "int" || eval != "42" {
-		t.Errorf("A = %s / %s, want int / 42", typ, eval)
+	if typ, eval := constInfo(p, "main.belt", "A"); typ != "nint" || eval != "42" {
+		t.Errorf("A = %s / %s, want nint / 42", typ, eval)
 	}
 	// The FuncCall targets the very ir.Function the owning module publishes.
 	call, ok := p.Module("main.belt").Consts[0].Value.(*ir.FuncCall)
@@ -564,7 +564,7 @@ func TestProgramCrossFileFunctionCall(t *testing.T) {
 
 func TestProgramWildcardFunctionImport(t *testing.T) {
 	p := buildProgram(map[string]string{
-		"math.belt": "pub fn double(x: int): int -> x * 2\n",
+		"math.belt": "pub fn double(x: nint): nint -> x * 2\n",
 		"main.belt": "use * from \"math.belt\"\nconst A = double(2)\n",
 	})
 	assertClean(t, p, "main.belt")
@@ -575,12 +575,12 @@ func TestProgramWildcardFunctionImport(t *testing.T) {
 
 func TestProgramNamespaceFunctionCall(t *testing.T) {
 	p := buildProgram(map[string]string{
-		"math.belt": "pub fn double(x: int): int -> x * 2\n",
+		"math.belt": "pub fn double(x: nint): nint -> x * 2\n",
 		"main.belt": "use math from \"math.belt\"\nconst A = math.double(21)\n",
 	})
 	assertClean(t, p, "main.belt")
-	if typ, eval := constInfo(p, "main.belt", "A"); typ != "int" || eval != "42" {
-		t.Errorf("A = %s / %s, want int / 42", typ, eval)
+	if typ, eval := constInfo(p, "main.belt", "A"); typ != "nint" || eval != "42" {
+		t.Errorf("A = %s / %s, want nint / 42", typ, eval)
 	}
 }
 
@@ -588,11 +588,11 @@ func TestProgramNamespaceFunctionCallInBodies(t *testing.T) {
 	// A namespace function call works inside a method body and a function
 	// body, through the same qualified lookup.
 	p := buildProgram(map[string]string{
-		"math.belt": "pub fn double(x: int): int -> x * 2\n",
+		"math.belt": "pub fn double(x: nint): nint -> x * 2\n",
 		"main.belt": "use math from \"math.belt\"\n" +
-			"fn quad(x: int): int -> math.double(math.double(x))\n" +
+			"fn quad(x: nint): nint -> math.double(math.double(x))\n" +
 			"const A = quad(3)\n" +
-			"pub type T = int8 impl {\n  pub f(): int {\n    return math.double(7)\n  }\n}\n",
+			"pub type T = sbyte impl {\n  pub f(): nint {\n    return math.double(7)\n  }\n}\n",
 	})
 	assertClean(t, p, "main.belt")
 	if _, eval := constInfo(p, "main.belt", "A"); eval != "12" {
@@ -603,7 +603,7 @@ func TestProgramNamespaceFunctionCallInBodies(t *testing.T) {
 func TestProgramImportedOverloadSet(t *testing.T) {
 	// An imported name carries its whole overload set; the argument selects.
 	p := buildProgram(map[string]string{
-		"math.belt": "pub fn scale(x: int): int -> x * 10\npub fn scale(s: string): string -> s\n",
+		"math.belt": "pub fn scale(x: nint): nint -> x * 10\npub fn scale(s: string): string -> s\n",
 		"main.belt": "use { scale } from \"math.belt\"\nconst A = scale(4)\nconst B = scale(\"x\")\n",
 	})
 	assertClean(t, p, "main.belt")
@@ -619,7 +619,7 @@ func TestProgramFunctionNotExported(t *testing.T) {
 	// A private function neither imports selectively nor resolves through a
 	// namespace.
 	p := buildProgram(map[string]string{
-		"math.belt": "fn hidden(): int -> 0\n",
+		"math.belt": "fn hidden(): nint -> 0\n",
 		"main.belt": "use { hidden } from \"math.belt\"\nuse math from \"math.belt\"\nconst A = math.hidden()\n",
 	})
 	findDiag(t, p, "main.belt", CodeNotExported)
@@ -630,8 +630,8 @@ func TestProgramAmbiguousFunctionImport(t *testing.T) {
 	// The same function name from two imports with distinct sets is ambiguous
 	// at the call, like any other doubly-claimed name.
 	p := buildProgram(map[string]string{
-		"a.belt":    "pub fn f(): int -> 1\n",
-		"b.belt":    "pub fn f(): int -> 2\n",
+		"a.belt":    "pub fn f(): nint -> 1\n",
+		"b.belt":    "pub fn f(): nint -> 2\n",
 		"main.belt": "use { f } from \"a.belt\"\nuse { f } from \"b.belt\"\nconst A = f()\n",
 	})
 	findDiag(t, p, "main.belt", CodeAmbiguousImport)
@@ -639,8 +639,8 @@ func TestProgramAmbiguousFunctionImport(t *testing.T) {
 
 func TestProgramLocalFunctionShadowsImport(t *testing.T) {
 	p := buildProgram(map[string]string{
-		"math.belt": "pub fn f(): int -> 1\n",
-		"main.belt": "use * from \"math.belt\"\nfn f(): int -> 2\nconst A = f()\n",
+		"math.belt": "pub fn f(): nint -> 1\n",
+		"main.belt": "use * from \"math.belt\"\nfn f(): nint -> 2\nconst A = f()\n",
 	})
 	assertClean(t, p, "main.belt")
 	if _, eval := constInfo(p, "main.belt", "A"); eval != "2" {
@@ -651,7 +651,7 @@ func TestProgramLocalFunctionShadowsImport(t *testing.T) {
 func TestProgramFunctionReexport(t *testing.T) {
 	// A pub use re-exports a function through a barrel.
 	p := buildProgram(map[string]string{
-		"math.belt":   "pub fn double(x: int): int -> x * 2\n",
+		"math.belt":   "pub fn double(x: nint): nint -> x * 2\n",
 		"barrel.belt": "pub use * from \"math.belt\"\n",
 		"main.belt":   "use { double } from \"barrel.belt\"\nconst A = double(5)\n",
 	})

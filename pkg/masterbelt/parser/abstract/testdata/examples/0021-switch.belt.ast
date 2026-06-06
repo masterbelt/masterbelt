@@ -21,7 +21,7 @@ File
   FuncDecl
     pub
     name "grade"
-    param n: int
+    param n: nint
     result string
       switch Identifier "n"
         arm IntLit "0"

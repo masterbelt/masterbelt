@@ -8,7 +8,7 @@ import (
 // the loop accumulates each value into a let, and the function collapses to the
 // sum.
 func TestForOfListSum(t *testing.T) {
-	src := "pub fn sum(xs: list<int>): int {\n  let total = 0\n  for x of xs {\n    total = total + x\n  }\n  return total\n}\nconst S = sum([1, 2, 3, 4])\n"
+	src := "pub fn sum(xs: list<nint>): nint {\n  let total = 0\n  for x of xs {\n    total = total + x\n  }\n  return total\n}\nconst S = sum([1, 2, 3, 4])\n"
 	if got := evalOf(t, src, "S").Int.Int64(); got != 10 {
 		t.Errorf("S = %d, want 10", got)
 	}
@@ -16,7 +16,7 @@ func TestForOfListSum(t *testing.T) {
 
 // TestForInMapKeys checks that a for-in loop over a map binds each entry key.
 func TestForInMapKeys(t *testing.T) {
-	src := "pub fn j(m: map<string, int>): string {\n  let out = \"\"\n  for k in m {\n    out = out + k\n  }\n  return out\n}\nconst J = j([\"a\": 1, \"b\": 2, \"c\": 3])\n"
+	src := "pub fn j(m: map<string, nint>): string {\n  let out = \"\"\n  for k in m {\n    out = out + k\n  }\n  return out\n}\nconst J = j([\"a\": 1, \"b\": 2, \"c\": 3])\n"
 	if got := evalOf(t, src, "J").Str; got != "abc" {
 		t.Errorf("J = %q, want \"abc\"", got)
 	}
@@ -25,7 +25,7 @@ func TestForInMapKeys(t *testing.T) {
 // TestForOfMapValues checks that a for-of loop over a map binds the value (not
 // the key), so it sums the map's values.
 func TestForOfMapValues(t *testing.T) {
-	src := "pub fn vs(m: map<string, int>): int {\n  let total = 0\n  for v of m {\n    total = total + v\n  }\n  return total\n}\nconst V = vs([\"a\": 1, \"b\": 2, \"c\": 3])\n"
+	src := "pub fn vs(m: map<string, nint>): nint {\n  let total = 0\n  for v of m {\n    total = total + v\n  }\n  return total\n}\nconst V = vs([\"a\": 1, \"b\": 2, \"c\": 3])\n"
 	if got := evalOf(t, src, "V").Int.Int64(); got != 6 {
 		t.Errorf("V = %d, want 6", got)
 	}
@@ -34,7 +34,7 @@ func TestForOfMapValues(t *testing.T) {
 // TestForInListIndex checks that a for-in loop over a list binds the element
 // index, so summing the indices of a three-element list is 0 + 1 + 2.
 func TestForInListIndex(t *testing.T) {
-	src := "pub fn idx(xs: list<int>): int {\n  let total = 0\n  for i in xs {\n    total = total + i\n  }\n  return total\n}\nconst I = idx([10, 20, 30])\n"
+	src := "pub fn idx(xs: list<nint>): nint {\n  let total = 0\n  for i in xs {\n    total = total + i\n  }\n  return total\n}\nconst I = idx([10, 20, 30])\n"
 	if got := evalOf(t, src, "I").Int.Int64(); got != 3 {
 		t.Errorf("I = %d, want 3", got)
 	}
@@ -43,7 +43,7 @@ func TestForInListIndex(t *testing.T) {
 // TestForNested checks that a nested for folds: the inner loop runs in full for
 // each element of the outer, so the count is the product of the two lengths.
 func TestForNested(t *testing.T) {
-	src := "pub fn pc(xs: list<int>, ys: list<int>): int {\n  let n = 0\n  for x of xs {\n    for y of ys {\n      n = n + 1\n    }\n  }\n  return n\n}\nconst P = pc([1, 2], [1, 2, 3])\n"
+	src := "pub fn pc(xs: list<nint>, ys: list<nint>): nint {\n  let n = 0\n  for x of xs {\n    for y of ys {\n      n = n + 1\n    }\n  }\n  return n\n}\nconst P = pc([1, 2], [1, 2, 3])\n"
 	if got := evalOf(t, src, "P").Int.Int64(); got != 6 {
 		t.Errorf("P = %d, want 6", got)
 	}
@@ -52,7 +52,7 @@ func TestForNested(t *testing.T) {
 // TestForBodyWithIf checks that a for body nesting an if folds — only the even
 // elements are accumulated.
 func TestForBodyWithIf(t *testing.T) {
-	src := "pub fn se(xs: list<int>): int {\n  let total = 0\n  for x of xs {\n    if x % 2 == 0 {\n      total = total + x\n    }\n  }\n  return total\n}\nconst E = se([1, 2, 3, 4, 5, 6])\n"
+	src := "pub fn se(xs: list<nint>): nint {\n  let total = 0\n  for x of xs {\n    if x % 2 == 0 {\n      total = total + x\n    }\n  }\n  return total\n}\nconst E = se([1, 2, 3, 4, 5, 6])\n"
 	if got := evalOf(t, src, "E").Int.Int64(); got != 12 {
 		t.Errorf("E = %d, want 12", got)
 	}
@@ -61,7 +61,7 @@ func TestForBodyWithIf(t *testing.T) {
 // TestForEmptyCollection checks that a for over an empty collection skips the
 // body entirely, so the accumulator keeps its initial value.
 func TestForEmptyCollection(t *testing.T) {
-	src := "pub fn sum(xs: list<int>): int {\n  let total = 0\n  for x of xs {\n    total = total + x\n  }\n  return total\n}\nconst S = sum([])\n"
+	src := "pub fn sum(xs: list<nint>): nint {\n  let total = 0\n  for x of xs {\n    total = total + x\n  }\n  return total\n}\nconst S = sum([])\n"
 	if got := evalOf(t, src, "S").Int.Int64(); got != 0 {
 		t.Errorf("S = %d, want 0", got)
 	}
@@ -70,8 +70,8 @@ func TestForEmptyCollection(t *testing.T) {
 // TestForEqualsFold checks the plan's headline invariant: a for loop and the
 // equivalent fold yield the same result.
 func TestForEqualsFold(t *testing.T) {
-	src := "pub fn byFor(xs: list<int>): int {\n  let total = 0\n  for x of xs {\n    total = total + x\n  }\n  return total\n}\n" +
-		"pub fn byFold(xs: list<int>): int {\n  return xs.fold(0, fn(acc: int, i: int, v: int): int -> acc + v)\n}\n" +
+	src := "pub fn byFor(xs: list<nint>): nint {\n  let total = 0\n  for x of xs {\n    total = total + x\n  }\n  return total\n}\n" +
+		"pub fn byFold(xs: list<nint>): nint {\n  return xs.fold(0, fn(acc: nint, i: nint, v: nint): nint -> acc + v)\n}\n" +
 		"const F = byFor([1, 2, 3, 4, 5])\nconst D = byFold([1, 2, 3, 4, 5])\n"
 	f := evalOf(t, src, "F").Int.Int64()
 	d := evalOf(t, src, "D").Int.Int64()
@@ -84,7 +84,7 @@ func TestForEqualsFold(t *testing.T) {
 // function with that value — and, because the body is not guaranteed to run, the
 // trailing return after the loop is not dead (no missing_return).
 func TestForEarlyReturn(t *testing.T) {
-	src := "pub fn firstOver(xs: list<int>): int {\n  for x of xs {\n    if x > 2 {\n      return x\n    }\n  }\n  return 0\n}\nconst R = firstOver([1, 2, 3, 4])\n"
+	src := "pub fn firstOver(xs: list<nint>): nint {\n  for x of xs {\n    if x > 2 {\n      return x\n    }\n  }\n  return 0\n}\nconst R = firstOver([1, 2, 3, 4])\n"
 	if got := evalOf(t, src, "R").Int.Int64(); got != 3 {
 		t.Errorf("R = %d, want 3", got)
 	}
@@ -93,7 +93,7 @@ func TestForEarlyReturn(t *testing.T) {
 // TestForNotIterable checks that a for over a non-foldable value (an int) is
 // reported as not_iterable, naming the offending type.
 func TestForNotIterable(t *testing.T) {
-	src := "pub fn f(n: int): int {\n  let total = 0\n  for x of n {\n    total = total + 1\n  }\n  return total\n}\n"
+	src := "pub fn f(n: nint): nint {\n  let total = 0\n  for x of n {\n    total = total + 1\n  }\n  return total\n}\n"
 	_, diags := analyze(src)
 	if !hasCode(diags, CodeNotIterable) {
 		t.Fatalf("want not_iterable, got %v", codes(diags))
@@ -103,7 +103,7 @@ func TestForNotIterable(t *testing.T) {
 // TestForLoopVarImmutable checks that reassigning the loop variable is reported
 // as loop_var_immutable — the loop variable is an immutable per-iteration binding.
 func TestForLoopVarImmutable(t *testing.T) {
-	src := "pub fn f(xs: list<int>): int {\n  for x of xs {\n    x = 1\n  }\n  return 0\n}\n"
+	src := "pub fn f(xs: list<nint>): nint {\n  for x of xs {\n    x = 1\n  }\n  return 0\n}\n"
 	_, diags := analyze(src)
 	if !hasCode(diags, CodeLoopVarImmutable) {
 		t.Fatalf("want loop_var_immutable, got %v", codes(diags))
@@ -113,7 +113,7 @@ func TestForLoopVarImmutable(t *testing.T) {
 // TestForLoopVarImmutableNested checks that a reassignment buried in an if inside
 // the loop body is still caught.
 func TestForLoopVarImmutableNested(t *testing.T) {
-	src := "pub fn f(xs: list<int>): int {\n  for x of xs {\n    if true {\n      x = 1\n    }\n  }\n  return 0\n}\n"
+	src := "pub fn f(xs: list<nint>): nint {\n  for x of xs {\n    if true {\n      x = 1\n    }\n  }\n  return 0\n}\n"
 	_, diags := analyze(src)
 	if !hasCode(diags, CodeLoopVarImmutable) {
 		t.Fatalf("want loop_var_immutable, got %v", codes(diags))
@@ -124,7 +124,7 @@ func TestForLoopVarImmutableNested(t *testing.T) {
 // inside the body: an of-loop over list<int> binds x as int, so an int method on
 // x type-checks and the function folds.
 func TestForLoopVarTyped(t *testing.T) {
-	src := "pub fn f(xs: list<int>): int {\n  let total = 0\n  for x of xs {\n    total = total + x * 2\n  }\n  return total\n}\nconst T = f([1, 2, 3])\n"
+	src := "pub fn f(xs: list<nint>): nint {\n  let total = 0\n  for x of xs {\n    total = total + x * 2\n  }\n  return total\n}\nconst T = f([1, 2, 3])\n"
 	if got := evalOf(t, src, "T").Int.Int64(); got != 12 {
 		t.Errorf("T = %d, want 12", got)
 	}
@@ -133,7 +133,7 @@ func TestForLoopVarTyped(t *testing.T) {
 // TestForOKNoDiagnostics checks that a well-formed for produces no diagnostics —
 // in particular, a body that reads (but does not write) the loop variable is fine.
 func TestForOKNoDiagnostics(t *testing.T) {
-	src := "pub fn f(xs: list<int>): int {\n  let total = 0\n  for x of xs {\n    total = total + x\n  }\n  return total\n}\n"
+	src := "pub fn f(xs: list<nint>): nint {\n  let total = 0\n  for x of xs {\n    total = total + x\n  }\n  return total\n}\n"
 	_, diags := analyze(src)
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", codes(diags))
@@ -156,7 +156,7 @@ const forInterfaceSrc = "" +
 // accepted, so for must be too (plan §3.1).
 func TestForOverInterfaceParam(t *testing.T) {
 	src := forInterfaceSrc +
-		"pub fn total(c: foldable<int, int>): int {\n" +
+		"pub fn total(c: foldable<nint, nint>): nint {\n" +
 		"  let sum = 0\n" +
 		"  for x of c {\n" +
 		"    sum = sum + x\n" +
@@ -173,7 +173,7 @@ func TestForOverInterfaceParam(t *testing.T) {
 // binds the interface's K.
 func TestForOverInterfaceParamIn(t *testing.T) {
 	src := forInterfaceSrc +
-		"pub fn keys(c: foldable<string, int>): string {\n" +
+		"pub fn keys(c: foldable<string, nint>): string {\n" +
 		"  let out = \"\"\n" +
 		"  for k in c {\n" +
 		"    out = out + k\n" +
@@ -191,7 +191,7 @@ func TestForOverInterfaceParamIn(t *testing.T) {
 // the bound's interface, exactly as a method call on the parameter resolves.
 func TestForOverBoundedTypeParam(t *testing.T) {
 	src := forInterfaceSrc +
-		"pub fn total<T: foldable<int, int>>(c: T): int {\n" +
+		"pub fn total<T: foldable<nint, nint>>(c: T): nint {\n" +
 		"  let sum = 0\n" +
 		"  for x of c {\n" +
 		"    sum = sum + x\n" +
@@ -209,10 +209,10 @@ func TestForOverBoundedTypeParam(t *testing.T) {
 // the loop variable at the impl's element type, and folds: the underlying list
 // value drives the iteration, so the accumulation collapses to a constant.
 func TestForOverUserFoldableConcrete(t *testing.T) {
-	src := "pub type Bag = list<int> impl foldable<int, int> {\n" +
-		"  pub extern fn fold(init: A, step: fn(acc: A, key: int, value: int): A): A\n" +
+	src := "pub type Bag = list<nint> impl foldable<nint, nint> {\n" +
+		"  pub extern fn fold(init: A, step: fn(acc: A, key: nint, value: nint): A): A\n" +
 		"}\n" +
-		"pub fn sum(b: Bag): int {\n" +
+		"pub fn sum(b: Bag): nint {\n" +
 		"  let total = 0\n" +
 		"  for x of b {\n" +
 		"    total = total + x\n" +

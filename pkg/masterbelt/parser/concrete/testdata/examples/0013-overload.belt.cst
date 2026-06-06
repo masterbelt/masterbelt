@@ -19,7 +19,7 @@ File
     Assign "="
     Whitespace " "
     TypeName
-      Ident "int32"
+      Ident "int"
     Whitespace " "
     ImplBlock
       Impl "impl"
@@ -133,7 +133,7 @@ File
     Assign "="
     Whitespace " "
     TypeName
-      Ident "int8"
+      Ident "sbyte"
     Whitespace " "
     ImplBlock
       Impl "impl"

@@ -13,8 +13,8 @@ const genericFoldableSrc = "" +
 	"pub interface foldable<K, V> {\n" +
 	"  fold<A>(init: A, step: fn(acc: A, key: K, value: V): A): A\n" +
 	"}\n" +
-	"pub type Bag = list<int> impl foldable<int, int> {\n" +
-	"  fold<A>(init: A, step: fn(acc: A, key: int, value: int): A): A {\n" +
+	"pub type Bag = list<nint> impl foldable<nint, nint> {\n" +
+	"  fold<A>(init: A, step: fn(acc: A, key: nint, value: nint): A): A {\n" +
 	"    return init\n" +
 	"  }\n" +
 	"}\n"
@@ -25,7 +25,7 @@ const genericFoldableSrc = "" +
 func TestGenericFuncResolvesTypeParams(t *testing.T) {
 	src := "pub fn id<T>(x: T): T { return x }\n" +
 		genericFoldableSrc +
-		"pub fn total<T: foldable<int, int>>(c: T): int {\n" +
+		"pub fn total<T: foldable<nint, nint>>(c: T): nint {\n" +
 		"  return c.fold(0, fn(acc, key, value) -> acc + value)\n" +
 		"}\n"
 	m, diags := analyze(src)
@@ -45,11 +45,11 @@ func TestGenericFuncResolvesTypeParams(t *testing.T) {
 	if total == nil || len(total.TypeParams) != 1 || total.TypeParams[0].Bound == nil {
 		t.Fatalf("total type params = %+v, want one bounded T", total)
 	}
-	if total.TypeParams[0].Bound.String() != "foldable<int, int>" {
-		t.Errorf("total bound = %s, want foldable<int, int>", total.TypeParams[0].Bound)
+	if total.TypeParams[0].Bound.String() != "foldable<nint, nint>" {
+		t.Errorf("total bound = %s, want foldable<nint, nint>", total.TypeParams[0].Bound)
 	}
-	if total.Params[0].Type.String() != "T" || total.Result.String() != "int" {
-		t.Errorf("total signature = (%s): %s, want (T): int", total.Params[0].Type, total.Result)
+	if total.Params[0].Type.String() != "T" || total.Result.String() != "nint" {
+		t.Errorf("total signature = (%s): %s, want (T): nint", total.Params[0].Type, total.Result)
 	}
 }
 
@@ -65,15 +65,15 @@ func TestGenericFuncCallSolvesAndFolds(t *testing.T) {
 		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
 	n := constOf(m, "N")
-	if n == nil || n.Type.String() != "int" {
-		t.Fatalf("N type = %v, want int", n)
+	if n == nil || n.Type.String() != "nint" {
+		t.Fatalf("N type = %v, want nint", n)
 	}
 	if n.Eval == nil || n.Eval.String() != "42" {
-		t.Errorf("N eval = %v, want 42 (the call folds with T = int)", n.Eval)
+		t.Errorf("N eval = %v, want 42 (the call folds with T = nint)", n.Eval)
 	}
 	p := constOf(m, "P")
-	if p == nil || p.Type.String() != "int" || p.Eval == nil || p.Eval.String() != "7" {
-		t.Errorf("P = %+v, want int folding to 7", p)
+	if p == nil || p.Type.String() != "nint" || p.Eval == nil || p.Eval.String() != "7" {
+		t.Errorf("P = %+v, want nint folding to 7", p)
 	}
 }
 
@@ -81,7 +81,7 @@ func TestGenericFuncCallSolvesAndFolds(t *testing.T) {
 // that does not implement the bound is reported.
 func TestGenericFuncBoundNotSatisfied(t *testing.T) {
 	src := genericFoldableSrc +
-		"pub fn total<T: foldable<int, int>>(c: T): int {\n" +
+		"pub fn total<T: foldable<nint, nint>>(c: T): nint {\n" +
 		"  return c.fold(0, fn(acc, key, value) -> acc + value)\n" +
 		"}\n" +
 		"const Bad = total(42)\n" // int does not implement foldable<int, int>
@@ -95,14 +95,14 @@ func TestGenericFuncBoundNotSatisfied(t *testing.T) {
 // that does implement the bound is accepted.
 func TestGenericFuncBoundSatisfied(t *testing.T) {
 	src := genericFoldableSrc +
-		"pub fn total<T: foldable<int, int>>(c: T): int {\n" +
+		"pub fn total<T: foldable<nint, nint>>(c: T): nint {\n" +
 		"  return c.fold(0, fn(acc, key, value) -> acc + value)\n" +
 		"}\n" +
 		"const B: Bag = [1, 2, 3]\n" +
 		"const Sum = total(B)\n"
 	_, diags := analyze(src)
 	if hasCode(diags, CodeBoundNotSatisfied) {
-		t.Fatalf("Bag implements foldable<int, int>; unexpected bound_not_satisfied: %v", codes(diags))
+		t.Fatalf("Bag implements foldable<nint, nint>; unexpected bound_not_satisfied: %v", codes(diags))
 	}
 }
 
@@ -120,7 +120,7 @@ func TestGenericFuncUninferableTypeParam(t *testing.T) {
 // TestGenericFuncUnboundedMethodBan checks calling a method on an unbounded type
 // parameter in the body is the distinct error, not invalid_operation.
 func TestGenericFuncUnboundedMethodBan(t *testing.T) {
-	src := "pub fn f<T>(x: T): int { return x.foo() }\n"
+	src := "pub fn f<T>(x: T): nint { return x.foo() }\n"
 	_, diags := analyze(src)
 	if !hasCode(diags, CodeNoMethodOnUnboundedTypevar) {
 		t.Fatalf("want no_method_on_unbounded_typevar, got %v", codes(diags))
@@ -134,7 +134,7 @@ func TestGenericFuncUnboundedMethodBan(t *testing.T) {
 // bound interface's methods in the body without an error.
 func TestGenericFuncBoundedMethodAllowed(t *testing.T) {
 	src := genericFoldableSrc +
-		"pub fn total<T: foldable<int, int>>(c: T): int {\n" +
+		"pub fn total<T: foldable<nint, nint>>(c: T): nint {\n" +
 		"  return c.fold(0, fn(acc, key, value) -> acc + value)\n" +
 		"}\n"
 	_, diags := analyze(src)
@@ -146,7 +146,7 @@ func TestGenericFuncBoundedMethodAllowed(t *testing.T) {
 // TestGenericFuncUnknownBound checks an unknown interface in a bound is reported
 // as an unknown type.
 func TestGenericFuncUnknownBound(t *testing.T) {
-	src := "pub fn f<T: bogus>(x: T): int { return 0 }\n"
+	src := "pub fn f<T: bogus>(x: T): nint { return 0 }\n"
 	_, diags := analyze(src)
 	if !hasCode(diags, CodeUnknownType) {
 		t.Fatalf("want unknown_type for the undefined bound, got %v", codes(diags))
@@ -169,8 +169,8 @@ func TestGenericFuncOverloadResultSubstitution(t *testing.T) {
 		t.Fatalf("unexpected diagnostics: %v", codes(diags))
 	}
 	r := constOf(m, "R")
-	if r == nil || r.Type.String() != "int" {
-		t.Fatalf("R type = %v, want int (the result type variable must be substituted)", r)
+	if r == nil || r.Type.String() != "nint" {
+		t.Fatalf("R type = %v, want nint (the result type variable must be substituted)", r)
 	}
 	if r.Eval == nil || r.Eval.String() != "7" {
 		t.Errorf("R eval = %v, want 7 (the selected generic overload folds)", r.Eval)
@@ -185,8 +185,8 @@ func TestGenericFuncOverloadBoundNotSatisfied(t *testing.T) {
 	// generic form (arity 2). use1(1, 2) selects the generic one, solves T = int,
 	// and int does not implement foldable<int, int>.
 	src := genericFoldableSrc +
-		"pub fn use1(s: string): int { return 0 }\n" +
-		"pub fn use1<T: foldable<int, int>>(c: T, d: T): int { return 0 }\n" +
+		"pub fn use1(s: string): nint { return 0 }\n" +
+		"pub fn use1<T: foldable<nint, nint>>(c: T, d: T): nint { return 0 }\n" +
 		"const X = use1(1, 2)\n"
 	_, diags := analyze(src)
 	if !hasCode(diags, CodeBoundNotSatisfied) {
@@ -202,7 +202,7 @@ func TestGenericFuncOverloadUninferable(t *testing.T) {
 	// whose T appears only in the result (arity 2). make(1, 2) selects the
 	// generic one; nothing pins T.
 	src := "pub fn make(s: string): string { return s }\n" +
-		"pub fn make<T>(a: int, b: int): T { return make(\"x\") }\n" +
+		"pub fn make<T>(a: nint, b: nint): T { return make(\"x\") }\n" +
 		"const Y = make(1, 2)\n"
 	_, diags := analyze(src)
 	if !hasCode(diags, CodeUninferableTypeParam) {
@@ -243,18 +243,18 @@ func TestGenericFuncOverloadCrossArgumentConsistency(t *testing.T) {
 // so the value itself carries no diagnostic).
 func TestGenericFuncOverloadBoundCheckOrderIndependent(t *testing.T) {
 	prelude := genericFoldableSrc +
-		"pub fn pair(s: string): int { return 0 }\n" +
-		"pub fn pair<T: foldable<int, int>>(a: T, b: T): int { return 0 }\n" +
+		"pub fn pair(s: string): nint { return 0 }\n" +
+		"pub fn pair<T: foldable<nint, nint>>(a: T, b: T): nint { return 0 }\n" +
 		"const B = Bag([1, 2, 3])\n"
 
 	good := prelude + "const X = pair(B, 1)\n"
 	if _, diags := analyze(good); !hasCode(diags, CodeTypeMismatch) && !hasCode(diags, CodeBoundNotSatisfied) {
-		t.Fatalf("pair(B, 1): want a diagnostic (Bag/int disagree), got %v", codes(diags))
+		t.Fatalf("pair(B, 1): want a diagnostic (Bag/nint disagree), got %v", codes(diags))
 	}
 
 	rev := prelude + "const Y = pair(1, B)\n"
 	if _, diags := analyze(rev); !hasCode(diags, CodeTypeMismatch) && !hasCode(diags, CodeBoundNotSatisfied) {
-		t.Fatalf("pair(1, B): want a diagnostic (int/Bag disagree), got %v", codes(diags))
+		t.Fatalf("pair(1, B): want a diagnostic (nint/Bag disagree), got %v", codes(diags))
 	}
 }
 
@@ -266,27 +266,27 @@ func TestGenericFuncSolvesThroughUnionParam(t *testing.T) {
 		"const R = unwrap(1)\n"
 	m, diags := analyze(src)
 	if len(diags) != 0 {
-		t.Fatalf("unwrap(1) should solve T = int; got %v", codes(diags))
+		t.Fatalf("unwrap(1) should solve T = nint; got %v", codes(diags))
 	}
 	r := constOf(m, "R")
-	if r == nil || r.Type.String() != "int" {
-		t.Fatalf("R type = %v, want int (T solved through the union)", r)
+	if r == nil || r.Type.String() != "nint" {
+		t.Fatalf("R type = %v, want nint (T solved through the union)", r)
 	}
 }
 
 // TestGenericFuncSolvesThroughRecordParam checks a type parameter nested inside
 // a record parameter ({ v: T }) is solved from the argument's same-named field.
 func TestGenericFuncSolvesThroughRecordParam(t *testing.T) {
-	src := "pub type Box = { v: int }\n" +
+	src := "pub type Box = { v: nint }\n" +
 		"pub fn first<T>(p: { v: T }): T { return p.v }\n" +
 		"const R = first(Box{ v: 1 })\n"
 	m, diags := analyze(src)
 	if len(diags) != 0 {
-		t.Fatalf("first(Box{ v: 1 }) should solve T = int; got %v", codes(diags))
+		t.Fatalf("first(Box{ v: 1 }) should solve T = nint; got %v", codes(diags))
 	}
 	r := constOf(m, "R")
-	if r == nil || r.Type.String() != "int" {
-		t.Fatalf("R type = %v, want int (T solved through the record field)", r)
+	if r == nil || r.Type.String() != "nint" {
+		t.Fatalf("R type = %v, want nint (T solved through the record field)", r)
 	}
 }
 

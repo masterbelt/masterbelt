@@ -24,7 +24,7 @@ File
         Colon ":"
         Whitespace " "
         TypeName
-          Ident "int"
+          Ident "nint"
       Comma ","
       Whitespace " "
       Field
@@ -32,7 +32,7 @@ File
         Colon ":"
         Whitespace " "
         TypeName
-          Ident "int"
+          Ident "nint"
       Whitespace " "
       RBrace "}"
   ConstDecl
@@ -157,7 +157,7 @@ File
         Colon ":"
         Whitespace " "
         TypeName
-          Ident "int"
+          Ident "nint"
       Comma ","
       Whitespace " "
       Field

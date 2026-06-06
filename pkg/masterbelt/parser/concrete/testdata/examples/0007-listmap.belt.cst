@@ -4,7 +4,7 @@ File
     LineComment "// list<T>.map applies a function to every element, yielding a list<R>."
     Newline "\n"
     Newline "\n"
-    LineComment "// Same element type: int -> int, written as an arrow lambda."
+    LineComment "// Same element type: nint -> nint, written as an arrow lambda."
     Newline "\n"
     Const "const"
     Whitespace " "
@@ -40,12 +40,12 @@ File
               Colon ":"
               Whitespace " "
               TypeName
-                Ident "int"
+                Ident "nint"
             RParen ")"
           Colon ":"
           Whitespace " "
           TypeName
-            Ident "int"
+            Ident "nint"
           Whitespace " "
           Arrow "->"
           Whitespace " "
@@ -61,7 +61,7 @@ File
   ConstDecl
     Newline "\n"
     Newline "\n"
-    LineComment "// Changing element type: int -> bool exercises the method type variable R,"
+    LineComment "// Changing element type: nint -> bool exercises the method type variable R,"
     Newline "\n"
     LineComment "// which is introduced by map and is not a parameter of list<T>."
     Newline "\n"
@@ -103,7 +103,7 @@ File
               Colon ":"
               Whitespace " "
               TypeName
-                Ident "int"
+                Ident "nint"
             RParen ")"
           Colon ":"
           Whitespace " "

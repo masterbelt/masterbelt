@@ -66,7 +66,7 @@ func TestServerEndToEnd(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	const src = "const MaxLevel: int64 = 100\nconst Min = 0\n"
+	const src = "const MaxLevel: long = 100\nconst Min = 0\n"
 	if err := h.DidOpen(uri, "masterbelt", src); err != nil {
 		t.Fatal(err)
 	}
@@ -131,7 +131,7 @@ func TestServerSemanticFeatures(t *testing.T) {
 	//	line 1: const MaxLevel: int64 = 100
 	//	line 2: const Alias = MaxLevel
 	//	line 3: const Bad = Missing
-	src := "/// docs\nconst MaxLevel: int64 = 100\nconst Alias = MaxLevel\nconst Bad = Missing\n"
+	src := "/// docs\nconst MaxLevel: long = 100\nconst Alias = MaxLevel\nconst Bad = Missing\n"
 	if err := h.DidOpen(uri, "masterbelt", src); err != nil {
 		t.Fatal(err)
 	}
@@ -156,8 +156,8 @@ func TestServerSemanticFeatures(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if hov == nil || !strings.Contains(hov.Contents.Value, "int64") {
-		t.Fatalf("hover = %+v, want MaxLevel's int64 type", hov)
+	if hov == nil || !strings.Contains(hov.Contents.Value, "long") {
+		t.Fatalf("hover = %+v, want MaxLevel's long type", hov)
 	}
 
 	// Go-to-definition from the Alias reference jumps to MaxLevel's declaration.

@@ -1,5 +1,5 @@
 use { bool } from "./bool.belt"
-use { int } from "./int.belt"
+use { nint } from "./signed.belt"
 use { error } from "./error.belt"
 
 // foldable, list, and map live together in this one file because they refer to
@@ -15,7 +15,7 @@ use { error } from "./error.belt"
 /// free, each defined on top of fold. iterability is foldable. A type opts in by
 /// writing `impl foldable<K, V>` at its own definition site (no structural
 /// auto-fit, no orphan impls); an interface may also be written in a type-
-/// requirement position (c: foldable<int, V>), where the value's usable methods
+/// requirement position (c: foldable<nint, V>), where the value's usable methods
 /// are fixed to these.
 pub interface foldable<K, V> {
   /// The fold: visit every element in order, threading an accumulator from init
@@ -24,7 +24,7 @@ pub interface foldable<K, V> {
   fold<A>(init: A, step: fn(acc: A, key: K, value: V): A): A
 
   /// The number of elements.
-  pub count(): int {
+  pub count(): nint {
     return fold(0, fn(acc, key, value) -> acc + 1)
   }
 
@@ -62,7 +62,7 @@ pub interface foldable<K, V> {
 /// An ordered sequence of T values, written [a, b, c].
 pub type list<T> = builtin<T> impl {
   /// The number of elements.
-  pub extern fn len(): int
+  pub extern fn len(): nint
 
   /// A new list: func applied to each element, in order.
   pub extern fn map(func: fn(item: T): R): list<R>
@@ -72,11 +72,11 @@ pub type list<T> = builtin<T> impl {
 
   /// The element at index, or an error when the index is out of range. The
   /// result is a union (T | error) because a read can miss; handle the error.
-  pub extern fn get(index: int): T | error
+  pub extern fn get(index: nint): T | error
 
   /// A new list with index replaced by value, leaving this one unchanged. An
   /// index past the end is a compile-time error (index_out_of_range).
-  pub extern fn set(index: int, value: T): self
+  pub extern fn set(index: nint, value: T): self
 
   /// The + operator: the concatenation.
   pub extern fn add(other: self): self
@@ -85,17 +85,17 @@ pub type list<T> = builtin<T> impl {
   pub extern fn eql(other: self): bool
   /// The != operator.
   pub extern fn neq(other: self): bool
-} impl foldable<int, T> {
+} impl foldable<nint, T> {
   /// The required primitive: visit each element with its index as the key,
   /// threading the accumulator. The provided count/any/all/map/filter/... are
   /// defined on top of this.
-  pub extern fn fold(init: A, step: fn(acc: A, key: int, value: T): A): A
+  pub extern fn fold(init: A, step: fn(acc: A, key: nint, value: T): A): A
 }
 
 /// A key-value mapping, written [k: v, ...].
 pub type map<K, V> = builtin<K, V> impl {
   /// The number of entries.
-  pub extern fn len(): int
+  pub extern fn len(): nint
 
   /// The value for key, or an error when the key is not present. The result is
   /// a union (V | error) because a lookup can miss; handle the error.

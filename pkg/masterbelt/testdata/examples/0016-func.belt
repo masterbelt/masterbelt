@@ -2,14 +2,14 @@
 // receiver. The body is a block or an arrow expression, and a call site
 // folds at compile time.
 
-pub fn double(x: int): int -> x * 2
+pub fn double(x: nint): nint -> x * 2
 
-pub fn area(w: int, h: int): int {
+pub fn area(w: nint, h: nint): nint {
   return w * h
 }
 
 // Functions compose.
-pub fn perimeter(w: int, h: int): int -> double(w) + double(h)
+pub fn perimeter(w: nint, h: nint): nint -> double(w) + double(h)
 
 const A = area(3, 4)
 const B = double(21)
@@ -22,7 +22,7 @@ const D = [1, 2, 3].map(fn(x) -> double(x))
 fn greet(name: string): string -> "Hello, " + name
 const E = greet("belt")
 
-pub type Point = { x: int, y: int }
+pub type Point = { x: nint, y: nint }
 pub fn origin(): Point -> Point{ x: 0, y: 0 }
 const O = origin()
 

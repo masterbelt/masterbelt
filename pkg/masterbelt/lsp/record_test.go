@@ -11,7 +11,7 @@ import (
 // recordSrc declares a record type and both literal forms. The typed literal
 // initializes x only (y is the candidate the completion should offer); the
 // inferred literal is typed by its annotation.
-const recordSrc = "pub type Point = { x: int, y: int }\n" +
+const recordSrc = "pub type Point = { x: nint, y: nint }\n" +
 	"const O = Point{ x: 1 }\n" +
 	"const P: Point = { x: 2, y: 3 }\n"
 
@@ -26,8 +26,8 @@ func TestCompletionRecordFieldsTypedForm(t *testing.T) {
 	if _, ok := got["y"]; !ok {
 		t.Fatalf("field completion missing y: %v", got)
 	}
-	if d := got["y"].Detail; d != ": int" {
-		t.Errorf("y detail = %q, want %q", d, ": int")
+	if d := got["y"].Detail; d != ": nint" {
+		t.Errorf("y detail = %q, want %q", d, ": nint")
 	}
 	if k := got["y"].Kind; k == nil || *k != protocol.CompletionItemKindField {
 		t.Errorf("y kind = %v, want Field", k)
@@ -42,9 +42,9 @@ func TestCompletionRecordFieldsTypedForm(t *testing.T) {
 }
 
 func TestCompletionRecordFieldsInferredForm(t *testing.T) {
-	doc := testView("pub type Point = { x: int, y: int }\nconst P: Point = { }\n")
+	doc := testView("pub type Point = { x: nint, y: nint }\nconst P: Point = { }\n")
 
-	offset := strings.Index("pub type Point = { x: int, y: int }\nconst P: Point = { }\n", "= { }") + 4
+	offset := strings.Index("pub type Point = { x: nint, y: nint }\nconst P: Point = { }\n", "= { }") + 4
 	got := byLabel(completion(doc, offset).Items)
 
 	for _, want := range []string{"x", "y"} {
@@ -57,7 +57,7 @@ func TestCompletionRecordFieldsInferredForm(t *testing.T) {
 func TestCompletionRecordFieldPartialName(t *testing.T) {
 	// The partial field name being typed is itself offered (not counted as
 	// already written).
-	src := "pub type Point = { x: int, yy: int }\nconst O = Point{ x: 1, y }\n"
+	src := "pub type Point = { x: nint, yy: nint }\nconst O = Point{ x: 1, y }\n"
 	doc := testView(src)
 	offset := strings.Index(src, ", y }") + len(", y")
 	got := byLabel(completion(doc, offset).Items)
@@ -69,7 +69,7 @@ func TestCompletionRecordFieldPartialName(t *testing.T) {
 func TestCompletionRecordFieldValueIsValuePosition(t *testing.T) {
 	// Past the colon the field's value is a plain value position: constants
 	// are offered, field names are not.
-	src := "pub type Point = { x: int, y: int }\nconst Max = 9\nconst O = Point{ x: Max, y: 1 }\n"
+	src := "pub type Point = { x: nint, y: nint }\nconst Max = 9\nconst O = Point{ x: Max, y: 1 }\n"
 	doc := testView(src)
 	offset := strings.Index(src, "x: Max") + len("x: Ma")
 	got := byLabel(completion(doc, offset).Items)
@@ -84,8 +84,8 @@ func TestCompletionRecordFieldValueIsValuePosition(t *testing.T) {
 func TestCompletionRecordFieldsNested(t *testing.T) {
 	// The expected type reaches a nested inferred literal through the outer
 	// literal's field type.
-	src := "pub type Point = { x: int, y: int }\n" +
-		"pub type Item = { id: int, pos: Point }\n" +
+	src := "pub type Point = { x: nint, y: nint }\n" +
+		"pub type Item = { id: nint, pos: Point }\n" +
 		"const Sword = Item{ id: 1, pos: { } }\n"
 	doc := testView(src)
 	offset := strings.Index(src, "pos: { }") + len("pos: { ")
@@ -109,8 +109,8 @@ func TestHoverRecordField(t *testing.T) {
 		if h == nil {
 			t.Fatal("no hover on the field initializer's name")
 		}
-		if !strings.Contains(h.Contents.Value, "x: int") {
-			t.Errorf("hover = %q, want x: int", h.Contents.Value)
+		if !strings.Contains(h.Contents.Value, "x: nint") {
+			t.Errorf("hover = %q, want x: nint", h.Contents.Value)
 		}
 	})
 
@@ -120,8 +120,8 @@ func TestHoverRecordField(t *testing.T) {
 		if h == nil {
 			t.Fatal("no hover on the inferred literal's field name")
 		}
-		if !strings.Contains(h.Contents.Value, "y: int") {
-			t.Errorf("hover = %q, want y: int", h.Contents.Value)
+		if !strings.Contains(h.Contents.Value, "y: nint") {
+			t.Errorf("hover = %q, want y: nint", h.Contents.Value)
 		}
 	})
 
@@ -131,7 +131,7 @@ func TestHoverRecordField(t *testing.T) {
 		if h == nil {
 			t.Fatal("no hover on the literal's type name")
 		}
-		if !strings.Contains(h.Contents.Value, "type Point = { x: int, y: int }") {
+		if !strings.Contains(h.Contents.Value, "type Point = { x: nint, y: nint }") {
 			t.Errorf("hover = %q, want the Point type card", h.Contents.Value)
 		}
 	})

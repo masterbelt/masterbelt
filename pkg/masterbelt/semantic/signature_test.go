@@ -12,7 +12,7 @@ import (
 func TestDuplicateOverload(t *testing.T) {
 	// The same name with the same parameter types is a true redeclaration:
 	// the first wins, the repeat is reported.
-	src := `pub type Score = int32 impl {
+	src := `pub type Score = int impl {
   pub fn merge(points: self): self {
     return self + points
   }
@@ -40,7 +40,7 @@ func TestDuplicateOverloadNormalizesSpellings(t *testing.T) {
 	// self and the type's own name denote the same type inside the impl, so
 	// an overload differing only in that spelling is a redeclaration — were
 	// both kept, every call would fit both and be permanently ambiguous.
-	src := `pub type Score = int32 impl {
+	src := `pub type Score = int impl {
   pub fn merge(points: self): self {
     return self + points
   }
@@ -61,7 +61,7 @@ const X = Base.merge(Base)
 
 	// Two method-introduced type variables are the same universal signature
 	// whatever they are named.
-	src = `pub type Box = int32 impl {
+	src = `pub type Box = int impl {
   pub extern fn wrap(value: T): bool
   pub extern fn wrap(value: U): bool
 }
@@ -76,7 +76,7 @@ func TestDuplicateOverloadKeepsBodiesAligned(t *testing.T) {
 	// Dropping the duplicate must not shift the pairing of the remaining
 	// declarations with their resolved signatures: flag's body still checks
 	// against flag's bool result, not against a neighbour's.
-	src := `pub type T = int32 impl {
+	src := `pub type T = int impl {
   pub fn a(x: self): self {
     return self + x
   }
@@ -97,7 +97,7 @@ func TestDuplicateOverloadKeepsBodiesAligned(t *testing.T) {
 func TestFuncOverloadDuplicateStillCallable(t *testing.T) {
 	// A repeated signature reports at its declaration and is dropped: the
 	// first declaration keeps working, the call stays unambiguous.
-	src := "fn f(): int -> 1\nfn f(): int -> 2\nconst A = f()\n"
+	src := "fn f(): nint -> 1\nfn f(): nint -> 2\nconst A = f()\n"
 	m, diags := analyze(src)
 	if got := codes(diags); len(got) != 1 || got[0] != CodeDuplicateFuncOverload {
 		t.Fatalf("codes = %v, want [duplicate_func_overload]", got)
@@ -105,7 +105,7 @@ func TestFuncOverloadDuplicateStillCallable(t *testing.T) {
 	if len(m.Funcs) != 1 {
 		t.Errorf("module funcs = %d, want the duplicate dropped", len(m.Funcs))
 	}
-	if m.Consts[0].Type.String() != "int" {
-		t.Errorf("A type = %s, want int (the first overload)", m.Consts[0].Type)
+	if m.Consts[0].Type.String() != "nint" {
+		t.Errorf("A type = %s, want nint (the first overload)", m.Consts[0].Type)
 	}
 }

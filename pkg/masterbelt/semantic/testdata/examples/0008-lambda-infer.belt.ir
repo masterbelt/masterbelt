@@ -1,6 +1,6 @@
 Module
   Const "Doubled"
-    type list<int>
+    type list<nint>
     value [IntLiteral "1", IntLiteral "2", IntLiteral "3"].map((fn(x) (return ParamRef "x".mul(IntLiteral "2"))))
     eval [2, 4, 6]
   Const "Evens"
@@ -8,22 +8,22 @@ Module
     value [IntLiteral "1", IntLiteral "2", IntLiteral "3", IntLiteral "4"].map((fn(x) (return ParamRef "x".rem(IntLiteral "2").eql(IntLiteral "0"))))
     eval [false, true, false, true]
   Const "Tripled"
-    type list<int>
+    type list<nint>
     value [IntLiteral "1", IntLiteral "2", IntLiteral "3"].map((fn(x) (return ParamRef "x".mul(IntLiteral "3"))))
     eval [3, 6, 9]
   Const "Twice"
-    type fn(int): int
+    type fn(nint): nint
     value (fn(x) (return ParamRef "x".mul(IntLiteral "2")))
     eval <func>
   Const "Stepped"
-    type list<int>
+    type list<nint>
     value [IntLiteral "1", IntLiteral "2", IntLiteral "3"].map((fn(x) (return ParamRef "x".add(IntLiteral "1"))))
     eval [2, 3, 4]
   Const "Bytes"
-    type list<int8>
+    type list<sbyte>
     value [IntLiteral "1", IntLiteral "2", IntLiteral "3"]
     eval [1, 2, 3]
   Const "Empty"
-    type list<int>
+    type list<nint>
     value []
     eval []

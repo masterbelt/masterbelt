@@ -3,7 +3,7 @@
 // signature its arguments fit.
 
 /// A game score in points.
-pub type Score = int32 impl {
+pub type Score = int impl {
   /// The score with points merged in.
   pub fn merge(points: self): self {
     return self + points
@@ -15,7 +15,7 @@ pub type Score = int32 impl {
 }
 
 /// A character level.
-pub type Level = int8 impl {
+pub type Level = sbyte impl {
   /// The next level.
   pub fn next(): self {
     return self + 1

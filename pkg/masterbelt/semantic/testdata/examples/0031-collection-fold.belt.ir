@@ -1,26 +1,26 @@
 Module
   Const "ListLen"
-    type int
+    type nint
     value [IntLiteral "1", IntLiteral "2", IntLiteral "3"].len()
     eval 3
   Const "MapLen"
-    type int
+    type nint
     value [StringLiteral "a": IntLiteral "1", StringLiteral "b": IntLiteral "2"].len()
     eval 2
   Const "Sum"
-    type int
+    type nint
     value [IntLiteral "1", IntLiteral "2", IntLiteral "3"].fold(IntLiteral "0", (fn(acc, i, v) (return ParamRef "acc".add(ParamRef "v"))))
     eval 6
   Const "IndexSum"
-    type int
+    type nint
     value [IntLiteral "10", IntLiteral "20", IntLiteral "30"].fold(IntLiteral "0", (fn(acc, i, v) (return ParamRef "acc".add(ParamRef "i"))))
     eval 3
   Const "MapSum"
-    type int
+    type nint
     value [StringLiteral "a": IntLiteral "1", StringLiteral "b": IntLiteral "2", StringLiteral "c": IntLiteral "3"].fold(IntLiteral "0", (fn(acc, k, v) (return ParamRef "acc".add(ParamRef "v"))))
     eval 6
   Const "Count"
-    type int
+    type nint
     value [IntLiteral "1", IntLiteral "2", IntLiteral "3", IntLiteral "4"].count()
     eval 4
   Const "AnyBig"
@@ -32,11 +32,11 @@ Module
     value [IntLiteral "1", IntLiteral "2", IntLiteral "3"].all((fn(v) (return ParamRef "v".gt(IntLiteral "0"))))
     eval true
   Const "Doubled"
-    type list<int>
+    type list<nint>
     value [IntLiteral "1", IntLiteral "2", IntLiteral "3"].map((fn(v) (return ParamRef "v".mul(IntLiteral "2"))))
     eval [2, 4, 6]
   Const "Big"
-    type list<int>
+    type list<nint>
     value [IntLiteral "1", IntLiteral "2", IntLiteral "3", IntLiteral "4"].filter((fn(v) (return ParamRef "v".gt(IntLiteral "2"))))
     eval [3, 4]
   Const "Keys"
@@ -44,11 +44,11 @@ Module
     value [StringLiteral "x": IntLiteral "1", StringLiteral "y": IntLiteral "2"].keys()
     eval ["x", "y"]
   Const "Values"
-    type list<int>
+    type list<nint>
     value [StringLiteral "x": IntLiteral "1", StringLiteral "y": IntLiteral "2"].values()
     eval [1, 2]
   Const "ListValues"
-    type list<int>
+    type list<nint>
     value [IntLiteral "7", IntLiteral "8", IntLiteral "9"].values()
     eval [7, 8, 9]
   Assert "[1, 2, 3].len() == 3"
@@ -61,23 +61,23 @@ Module
       ["a": 1, "b": 2].len() == 2
                        ^     ^
                        2     true
-  Assert "[1, 2, 3].fold(0, fn(acc: int, i: int, v: int): int { return acc + v }) == 6"
+  Assert "[1, 2, 3].fold(0, fn(acc: nint, i: nint, v: nint): nint { return acc + v }) == 6"
     eval true
-      [1, 2, 3].fold(0, fn(acc: int, i: int, v: int): int { return acc + v }) == 6
-                ^                                                             ^
-                6                                                             true
+      [1, 2, 3].fold(0, fn(acc: nint, i: nint, v: nint): nint { return acc + v }) == 6
+                ^                                                                 ^
+                6                                                                 true
   Assert "[1, 2, 3, 4].count() == 4"
     eval true
       [1, 2, 3, 4].count() == 4
                    ^       ^
                    4       true
-  Assert "[1, 2, 3].any(fn(v: int): bool { return v > 2 })"
+  Assert "[1, 2, 3].any(fn(v: nint): bool { return v > 2 })"
     eval true
-      [1, 2, 3].any(fn(v: int): bool { return v > 2 })
+      [1, 2, 3].any(fn(v: nint): bool { return v > 2 })
                 ^
                 true
-  Assert "[1, 2, 3].all(fn(v: int): bool { return v > 0 })"
+  Assert "[1, 2, 3].all(fn(v: nint): bool { return v > 0 })"
     eval true
-      [1, 2, 3].all(fn(v: int): bool { return v > 0 })
+      [1, 2, 3].all(fn(v: nint): bool { return v > 0 })
                 ^
                 true

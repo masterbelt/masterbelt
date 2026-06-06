@@ -13,7 +13,7 @@ Module
     eval Rarity.Legend
   TypeDef "Rarity" pub
     doc "A card's rarity tier."
-    enum uint8
+    enum byte
     member "Common" = 1
     member "Rare" = 2
     member "Legend" = 10
@@ -37,7 +37,7 @@ Module
       result bool
   TypeDef "Element" pub
     doc "An elemental affinity."
-    enum int
+    enum nint
     member "Fire" = 0
     member "Water" = 1
     member "Wind" = 2

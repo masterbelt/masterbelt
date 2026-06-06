@@ -1,22 +1,22 @@
 Module
   Const "add"
-    type int
+    type nint
     value IntLiteral "1".add(IntLiteral "2")
     eval 3
   Const "sub"
-    type int
+    type nint
     value IntLiteral "1".sub(IntLiteral "2")
     eval -1
   Const "mul"
-    type int
+    type nint
     value IntLiteral "1".mul(IntLiteral "2")
     eval 2
   Const "div"
-    type int
+    type nint
     value IntLiteral "1".div(IntLiteral "2")
     eval 0
   Const "rem"
-    type int
+    type nint
     value IntLiteral "1".rem(IntLiteral "2")
     eval 1
   Const "eql"
@@ -52,11 +52,11 @@ Module
     value BoolLiteral false.oror(BoolLiteral true)
     eval true
   Const "pos"
-    type int
+    type nint
     value IntLiteral "1".pos()
     eval 1
   Const "neg"
-    type int
+    type nint
     value IntLiteral "1".neg()
     eval -1
   Const "not"
@@ -64,7 +64,7 @@ Module
     value BoolLiteral false.not()
     eval true
   Const "grouped"
-    type int
+    type nint
     value IntLiteral "1".add(IntLiteral "2").mul(IntLiteral "3")
     eval 9
   Const "nested"

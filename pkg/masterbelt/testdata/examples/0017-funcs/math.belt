@@ -1,18 +1,18 @@
 // The exporter: public functions, including an overloaded name.
 
 /// Doubles x.
-pub fn double(x: int): int -> x * 2
+pub fn double(x: nint): nint -> x * 2
 
 /// The area of a w-by-h rectangle.
-pub fn area(w: int, h: int): int -> w * h
+pub fn area(w: nint, h: nint): nint -> w * h
 
 /// Greets by name.
 pub fn greet(name: string): string -> "Hello, " + name
 
-/// Scales an int.
-pub fn scale(x: int): int -> x * 10
+/// Scales an nint.
+pub fn scale(x: nint): nint -> x * 10
 /// Scales every element of a list.
-pub fn scale(xs: list<int>): list<int> -> xs.map(fn(x) -> x * 10)
+pub fn scale(xs: list<nint>): list<nint> -> xs.map(fn(x) -> x * 10)
 
 // A private helper does not export.
-fn hidden(): int -> 0
+fn hidden(): nint -> 0

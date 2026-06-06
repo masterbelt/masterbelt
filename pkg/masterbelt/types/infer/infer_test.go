@@ -66,8 +66,8 @@ func emptyEnv() stubEnv {
 
 func TestExprLiterals(t *testing.T) {
 	env := emptyEnv()
-	if got := Expr(intLit("1"), env).String(); got != "int" {
-		t.Errorf("Expr(int literal) = %s, want int", got)
+	if got := Expr(intLit("1"), env).String(); got != "nint" {
+		t.Errorf("Expr(nint literal) = %s, want nint", got)
 	}
 	if got := Expr(boolLit(true), env).String(); got != "bool" {
 		t.Errorf("Expr(bool literal) = %s, want bool", got)
@@ -78,13 +78,13 @@ func TestExprReference(t *testing.T) {
 	env := emptyEnv()
 	decl := ast.NewConstDecl(nil, false, "A", nil, intLit("1"), nil)
 	id := ident("A")
-	int32Type := &ir.Builtin{Name: "int32"}
+	int32Type := &ir.Builtin{Name: "int"}
 	env.res[id] = decl
 	env.typ[decl] = int32Type
 
 	// A reference inherits its referent's type.
 	if got := Expr(id, env); got != int32Type {
-		t.Errorf("Expr(ref to int32) = %s, want int32", got)
+		t.Errorf("Expr(ref to int) = %s, want int", got)
 	}
 	// An unresolved reference is Invalid.
 	if got := Expr(ident("Missing"), env); got != ir.Invalid {
@@ -99,10 +99,10 @@ func TestExprCalls(t *testing.T) {
 		expr ast.Expr
 		want string
 	}{
-		{"add int literals", binary(intLit("1"), "add", intLit("2")), "int"},
+		{"add nint literals", binary(intLit("1"), "add", intLit("2")), "nint"},
 		{"lt yields bool", binary(intLit("1"), "lt", intLit("2")), "bool"},
 		{"and yields bool", binary(boolLit(true), "anan", boolLit(false)), "bool"},
-		{"neg preserves type", unary(intLit("1"), "neg"), "int"},
+		{"neg preserves type", unary(intLit("1"), "neg"), "nint"},
 		{"arith on bool is invalid", binary(boolLit(true), "add", intLit("1")), "invalid"},
 		{"nested propagates invalid", binary(binary(boolLit(true), "add", intLit("1")), "add", intLit("2")), "invalid"},
 		{"callee not a member", ast.NewCallExpr(intLit("1"), nil, nil), "invalid"},
@@ -121,9 +121,9 @@ func TestDecl(t *testing.T) {
 		decl *ast.ConstDecl
 		want string
 	}{
-		{"annotation wins", ast.NewConstDecl(nil, false, "X", ast.NewNamedType("", "int32", nil, nil), intLit("1"), nil), "int32"},
+		{"annotation wins", ast.NewConstDecl(nil, false, "X", ast.NewNamedType("", "int", nil, nil), intLit("1"), nil), "int"},
 		{"unknown annotation", ast.NewConstDecl(nil, false, "X", ast.NewNamedType("", "notatype", nil, nil), intLit("1"), nil), "invalid"},
-		{"inferred from value", ast.NewConstDecl(nil, false, "X", nil, intLit("1"), nil), "int"},
+		{"inferred from value", ast.NewConstDecl(nil, false, "X", nil, intLit("1"), nil), "nint"},
 		{"no type, no value", ast.NewConstDecl(nil, false, "X", nil, nil, nil), "invalid"},
 	}
 	for _, tc := range cases {
@@ -160,7 +160,7 @@ func funcLit(params []*ast.ParamDef, result ast.TypeExpr, body ...ast.Stmt) *ast
 
 func TestFuncLitResultSynthesis(t *testing.T) {
 	env := emptyEnv()
-	x := param("x", namedType("int"))
+	x := param("x", namedType("nint"))
 	cases := []struct {
 		name string
 		lit  *ast.FuncLit
@@ -168,38 +168,38 @@ func TestFuncLitResultSynthesis(t *testing.T) {
 	}{
 		{
 			"declared result wins",
-			funcLit([]*ast.ParamDef{x}, namedType("int"), ret(ident("x"))),
-			"fn(int): int",
+			funcLit([]*ast.ParamDef{x}, namedType("nint"), ret(ident("x"))),
+			"fn(nint): nint",
 		},
 		{
 			"result from the body",
 			funcLit([]*ast.ParamDef{x}, nil, ret(binary(ident("x"), "mul", intLit("2")))),
-			"fn(int): int",
+			"fn(nint): nint",
 		},
 		{
 			"bool result from a comparison",
 			funcLit([]*ast.ParamDef{x}, nil, ret(binary(ident("x"), "lt", intLit("0")))),
-			"fn(int): bool",
+			"fn(nint): bool",
 		},
 		{
 			"two agreeing returns unify",
 			funcLit([]*ast.ParamDef{x}, nil, ret(intLit("1")), ret(ident("x"))),
-			"fn(int): int",
+			"fn(nint): nint",
 		},
 		{
 			"no return, no annotation",
 			funcLit([]*ast.ParamDef{x}, nil),
-			"fn(int): invalid",
+			"fn(nint): invalid",
 		},
 		{
 			"conflicting returns",
 			funcLit([]*ast.ParamDef{x}, nil, ret(intLit("1")), ret(boolLit(true))),
-			"fn(int): invalid",
+			"fn(nint): invalid",
 		},
 		{
 			"unannotated parameter stays invalid",
 			funcLit([]*ast.ParamDef{param("x", nil)}, nil, ret(intLit("1"))),
-			"fn(invalid): int",
+			"fn(invalid): nint",
 		},
 	}
 	for _, tc := range cases {

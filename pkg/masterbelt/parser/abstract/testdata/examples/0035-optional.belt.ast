@@ -1,11 +1,11 @@
 File
   ConstDecl
     name "Present"
-    type optional<int>
+    type optional<nint>
     value IntLit "5"
   ConstDecl
     name "Absent"
-    type optional<int>
+    type optional<nint>
     value NullLit
   ConstDecl
     name "FromPresent"
@@ -19,21 +19,21 @@ File
   FuncDecl
     pub
     name "orZero"
-    param v: optional<int>
-    result int
+    param v: optional<nint>
+    result nint
       match Identifier "v"
-        arm int n
+        arm nint n
           return Identifier "n"
         arm null
           return IntLit "0"
   FuncDecl
     pub
     name "orFallback"
-    param v: optional<int>
-    param fallback: int
-    result int
+    param v: optional<nint>
+    param fallback: nint
+    result nint
       match Identifier "v"
-        arm int n
+        arm nint n
           return Identifier "n"
         else
           return Identifier "fallback"

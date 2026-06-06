@@ -1,13 +1,13 @@
-const ExampleList: list<int> = [1, 2, 3]
+const ExampleList: list<nint> = [1, 2, 3]
 
-const ExampleMap: map<string, int> = ["key": 100]
+const ExampleMap: map<string, nint> = ["key": 100]
 
 // Element types are inferred when there is no annotation.
 const Inferred = [10, 20, 30]
 
 // The integer elements adapt to the annotation's element type.
-const Bytes: list<int8> = [1, 2, 3]
+const Bytes: list<sbyte> = [1, 2, 3]
 
 // Empty collections take their type from the annotation.
-const EmptyList: list<int> = []
-const EmptyMap: map<string, int> = []
+const EmptyList: list<nint> = []
+const EmptyMap: map<string, nint> = []

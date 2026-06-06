@@ -21,7 +21,7 @@ pub fn color(r: Rarity): string {
 // A scalar switch is over an unbounded domain, so it must carry a "_" wildcard
 // for the values no arm names. One arm may list several values, and an arm body
 // may be a block of several statements.
-pub fn grade(n: int): string {
+pub fn grade(n: nint): string {
   switch n {
     0       -> return "zero"
     1, 2, 3 -> return "low"

@@ -13,7 +13,7 @@ File
       Colon ":"
       Whitespace " "
       TypeName
-        Ident "int64"
+        Ident "long"
     Whitespace " "
     Initializer
       Assign "="

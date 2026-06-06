@@ -38,28 +38,21 @@ func TestLoadPrelude(t *testing.T) {
 	}
 
 	// int8 carries its operator methods (add, declared extern).
-	if int8 := byName["int8"]; int8 == nil || len(int8.Methods) == 0 {
-		t.Fatalf("int8 has no methods: %+v", int8)
+	if int8 := byName["sbyte"]; int8 == nil || len(int8.Methods) == 0 {
+		t.Fatalf("sbyte has no methods: %+v", int8)
 	} else {
 		var hasAdd bool
 		for _, m := range int8.Methods {
 			if m.Name == "add" {
 				hasAdd = true
 				if !m.Extern {
-					t.Errorf("int8.add should be extern")
+					t.Errorf("sbyte.add should be extern")
 				}
 			}
 		}
 		if !hasAdd {
-			t.Errorf("int8 has no add method")
+			t.Errorf("sbyte has no add method")
 		}
-	}
-
-	// snumeric is a union alias, not a builtin.
-	if sn, ok := byName["snumeric"]; !ok {
-		t.Errorf("snumeric alias not loaded")
-	} else if sn.Builtin {
-		t.Errorf("snumeric should be a union alias, not a builtin")
 	}
 }
 
@@ -79,7 +72,7 @@ func TestPreludeBoundsMatchRegistry(t *testing.T) {
 		byName[d.Name] = d
 	}
 
-	sized := []string{"int8", "int16", "int32", "int64", "uint8", "uint16", "uint32", "uint64"}
+	sized := []string{"sbyte", "short", "int", "long", "byte", "ushort", "uint", "ulong"}
 	for _, name := range sized {
 		d := byName[name]
 		if d == nil {
@@ -105,7 +98,7 @@ func TestPreludeBoundsMatchRegistry(t *testing.T) {
 
 	// The arbitrary-precision integers have no fixed range, so they declare no
 	// bounds (int.Max would be a no_bound error were it written).
-	for _, name := range []string{"int", "uint"} {
+	for _, name := range []string{"nint", "nuint"} {
 		if d := byName[name]; d != nil && len(d.Consts) != 0 {
 			t.Errorf("%s should declare no associated constants, has %d", name, len(d.Consts))
 		}
@@ -118,18 +111,18 @@ func TestPreludeBoundsMatchRegistry(t *testing.T) {
 // the bootstrap registry shares one integer method set.
 func TestPreludeIsTheMethodSource(t *testing.T) {
 	reg := universe().reg
-	uintT := &ir.Builtin{Name: "uint"}
+	uintT := &ir.Builtin{Name: "nuint"}
 
 	if got := types.MethodResult(reg, uintT, "neg", nil); got != ir.Invalid {
-		t.Errorf("uint.neg = %s, want invalid (the prelude's uint has no neg)", got)
+		t.Errorf("nuint.neg = %s, want invalid (the prelude's nuint has no neg)", got)
 	}
-	if got := types.MethodResult(reg, uintT, "add", []ir.Type{uintT}).String(); got != "uint" {
-		t.Errorf("uint.add(uint) = %s, want uint", got)
+	if got := types.MethodResult(reg, uintT, "add", []ir.Type{uintT}).String(); got != "nuint" {
+		t.Errorf("nuint.add(nuint) = %s, want nuint", got)
 	}
 	// The bootstrap registry, with no prelude installed, still has neg — so the
 	// difference is the prelude's doing.
-	if got := types.MethodResult(builtin.Default(), uintT, "neg", nil).String(); got != "uint" {
-		t.Errorf("bootstrap uint.neg = %s, want uint", got)
+	if got := types.MethodResult(builtin.Default(), uintT, "neg", nil).String(); got != "nuint" {
+		t.Errorf("bootstrap nuint.neg = %s, want nuint", got)
 	}
 }
 
@@ -138,7 +131,7 @@ func TestPreludeIsTheMethodSource(t *testing.T) {
 func TestPreludeValidationCatchesMissingIntrinsic(t *testing.T) {
 	reg := builtin.Default()
 	bogus := &ir.TypeDef{
-		Name:    "int8",
+		Name:    "sbyte",
 		Builtin: true,
 		Methods: []*ir.Method{{Name: "frobnicate", Extern: true}},
 	}
@@ -171,7 +164,7 @@ func TestPreludeValidationCatchesMissingOverloadIntrinsic(t *testing.T) {
 		Methods: []*ir.Method{{
 			Name:   "add",
 			Extern: true,
-			Params: []ir.Param{{Name: "n", Type: &ir.Builtin{Name: "int"}}},
+			Params: []ir.Param{{Name: "n", Type: &ir.Builtin{Name: "nint"}}},
 		}},
 	}
 	if err := validatePrelude(reg, withDuration(bogus)); err == nil {
@@ -225,13 +218,13 @@ func TestPreludeSurfaceIsTheBarrel(t *testing.T) {
 // import to be in scope.
 func TestPreludeIsTheUniverseBase(t *testing.T) {
 	p := buildProgram(map[string]string{
-		"main.belt": "const a: int64 = 1\n",
+		"main.belt": "const a: long = 1\n",
 	})
 	assertClean(t, p, "main.belt")
 
 	// A file's own type declaration shadows the prelude's.
 	p = buildProgram(map[string]string{
-		"main.belt": "type int64 = { v: int32 }\nconst a: int64 = 1\n",
+		"main.belt": "type long = { v: int }\nconst a: long = 1\n",
 	})
 	findDiag(t, p, "main.belt", CodeTypeMismatch) // 1 is no record: the local int64 won
 }
@@ -241,8 +234,8 @@ func TestPreludeIsTheUniverseBase(t *testing.T) {
 // builtin one.
 func TestImportShadowsPrelude(t *testing.T) {
 	p := buildProgram(map[string]string{
-		"shadow.belt": "pub type int64 = { v: int32 }\n",
-		"main.belt":   "use { int64 } from \"shadow.belt\"\nconst a: int64 = 1\n",
+		"shadow.belt": "pub type long = { v: int }\n",
+		"main.belt":   "use { long } from \"shadow.belt\"\nconst a: long = 1\n",
 	})
 	findDiag(t, p, "main.belt", CodeTypeMismatch) // 1 is no record: the import won
 }

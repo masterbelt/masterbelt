@@ -22,7 +22,7 @@ pub enum Element {
   }
 
   /// A let- and if-bearing body, to exercise the full statement walker.
-  pub label(): int {
+  pub label(): nint {
     let fire = self.isFire()
     if fire {
       return 1
@@ -42,19 +42,19 @@ assert Element.Water.notFire()
 assert Element.Fire.label() == 1
 assert Element.Wind.label() == 0
 
-// A nominal type over a primitive: its value (an int8) carries no definition, so
+// A nominal type over a primitive: its value (an sbyte) carries no definition, so
 // the receiver's static type is read from the declared annotation in scope.
-/// A character level, with methods over its underlying int8.
-pub type Level = int8 impl {
+/// A character level, with methods over its underlying sbyte.
+pub type Level = sbyte impl {
   /// The next level up — a self-returning method, so a chain keeps the type.
   pub increment(): self {
     return self + 1
   }
   /// This level a number of steps up. The base value lifts into the nominal
-  /// type through the conversion: a Level derives int8's operators, but their
-  /// self-typed operands stay nominal, so mixing in a bare int8 is a type
+  /// type through the conversion: a Level derives sbyte's operators, but their
+  /// self-typed operands stay nominal, so mixing in a bare sbyte is a type
   /// error — Level(steps) is the explicit lift.
-  pub plus(steps: int8): self {
+  pub plus(steps: sbyte): self {
     return self + Level(steps)
   }
 }

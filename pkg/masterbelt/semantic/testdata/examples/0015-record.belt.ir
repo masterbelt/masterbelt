@@ -24,8 +24,8 @@ Module
     value {}
     eval {}
   TypeDef "Point" pub
-    body { x: int, y: int }
+    body { x: nint, y: nint }
   TypeDef "Item" pub
-    body { id: int, name: string, pos: Point }
+    body { id: nint, name: string, pos: Point }
   TypeDef "Unit" pub
     body {  }

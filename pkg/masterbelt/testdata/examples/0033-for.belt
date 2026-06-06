@@ -11,7 +11,7 @@
 // the body reassigns each iteration, and the function folds to the total. This
 // is the headline accumulation pattern — the same result fold gives, written as
 // a loop for readability.
-pub fn sum(xs: list<int>): int {
+pub fn sum(xs: list<nint>): nint {
   let total = 0
   for x of xs {
     total = total + x
@@ -21,7 +21,7 @@ pub fn sum(xs: list<int>): int {
 
 // for over a map with "in" binds each entry's key. Joining the keys folds to the
 // concatenation, in fold order.
-pub fn keysJoined(m: map<string, int>): string {
+pub fn keysJoined(m: map<string, nint>): string {
   let out = ""
   for k in m {
     out = out + k
@@ -30,7 +30,7 @@ pub fn keysJoined(m: map<string, int>): string {
 }
 
 // "of" over a map binds the value, not the key: this sums a map's values.
-pub fn valueSum(m: map<string, int>): int {
+pub fn valueSum(m: map<string, nint>): nint {
   let total = 0
   for v of m {
     total = total + v
@@ -40,7 +40,7 @@ pub fn valueSum(m: map<string, int>): int {
 
 // "in" over a list binds the index. Summing the indices of a three-element list
 // folds to 0 + 1 + 2.
-pub fn indexSum(xs: list<int>): int {
+pub fn indexSum(xs: list<nint>): nint {
   let total = 0
   for i in xs {
     total = total + i
@@ -51,7 +51,7 @@ pub fn indexSum(xs: list<int>): int {
 // The loop body is a full statement block: it nests an if (only even elements
 // are added), so a for combines with the other control statements through the
 // shared body executor.
-pub fn sumEven(xs: list<int>): int {
+pub fn sumEven(xs: list<nint>): nint {
   let total = 0
   for x of xs {
     if x % 2 == 0 {
@@ -63,7 +63,7 @@ pub fn sumEven(xs: list<int>): int {
 
 // for nests: the inner loop runs in full for each element of the outer, so this
 // counts every pair — the product of the two lengths.
-pub fn pairCount(xs: list<int>, ys: list<int>): int {
+pub fn pairCount(xs: list<nint>, ys: list<nint>): nint {
   let count = 0
   for x of xs {
     for y of ys {
@@ -77,7 +77,7 @@ pub fn pairCount(xs: list<int>, ys: list<int>): int {
 // return, so the let it accumulates into is read after the loop ends. The body
 // is not guaranteed to run (an empty collection skips it), so a return inside it
 // does not make the function's trailing return dead.
-pub fn product(xs: list<int>): int {
+pub fn product(xs: list<nint>): nint {
   let acc = 1
   for x of xs {
     acc = acc * x

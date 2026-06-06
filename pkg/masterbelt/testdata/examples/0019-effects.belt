@@ -26,7 +26,7 @@ pub type Client = { base: string } impl {
 pub fn nondet stamp(): datetime -> now()
 
 // Undeclared effects mean pure: folded at compile time, as ever.
-pub fn double(x: int): int -> x * 2
+pub fn double(x: nint): nint -> x * 2
 const A = double(21)
 
 assert double(2) == 4

@@ -55,9 +55,9 @@ func TestDocumentScriptedEdits(t *testing.T) {
 		edit    source.Edit
 	}{
 		{"insert inside identifier", "const MaxLevel = 1", source.Edit{Start: 9, End: 9, NewText: []byte("X")}},
-		{"append digit merging int", "const x = 1", source.Edit{Start: 11, End: 11, NewText: []byte("2")}},
+		{"append digit merging nint", "const x = 1", source.Edit{Start: 11, End: 11, NewText: []byte("2")}},
 		{"delete the initializer value", "const x = 100", source.Edit{Start: 10, End: 13, NewText: nil}},
-		{"add a type annotation", "const x = 1", source.Edit{Start: 7, End: 7, NewText: []byte(": int64")}},
+		{"add a type annotation", "const x = 1", source.Edit{Start: 7, End: 7, NewText: []byte(": long")}},
 		{"make a decl public", "const x = 1\nconst y = 2\n", source.Edit{Start: 12, End: 12, NewText: []byte("pub ")}},
 		{"insert a whole decl between", "const x = 1\nconst y = 2\n", source.Edit{Start: 12, End: 12, NewText: []byte("const z = 3\n")}},
 		{"join two decls by deleting newline", "const x = 1\nconst y = 2\n", source.Edit{Start: 11, End: 12, NewText: nil}},
@@ -71,9 +71,9 @@ func TestDocumentScriptedEdits(t *testing.T) {
 		{"introduce a syntax error", "const x = 1\n", source.Edit{Start: 8, End: 9, NewText: nil}}, // remove '='
 		{"open block comment swallowing decls", "const x = 1\nconst y = 2\n", source.Edit{Start: 0, End: 0, NewText: []byte("/*")}},
 		{"stray operator line", "const x = 1\n", source.Edit{Start: 0, End: 0, NewText: []byte("= =\n")}},
-		{"edit an if condition", "pub fn f(n: int): int {\n  if n > 0 {\n    return 1\n  }\n  return 0\n}\n", source.Edit{Start: 33, End: 34, NewText: []byte("<")}}, // ">" -> "<"
-		{"add an else branch to an if", "pub fn f(n: int): int {\n  if n > 0 {\n    return 1\n  }\n  return 0\n}\n", source.Edit{Start: 49, End: 49, NewText: []byte(" else {\n    return 2\n  }")}},
-		{"turn an if into an else-if chain", "pub fn f(n: int): int {\n  if n > 0 {\n    return 1\n  } else {\n    return 0\n  }\n}\n", source.Edit{Start: 54, End: 54, NewText: []byte("if n < 0 ")}},
+		{"edit an if condition", "pub fn f(n: nint): nint {\n  if n > 0 {\n    return 1\n  }\n  return 0\n}\n", source.Edit{Start: 33, End: 34, NewText: []byte("<")}}, // ">" -> "<"
+		{"add an else branch to an if", "pub fn f(n: nint): nint {\n  if n > 0 {\n    return 1\n  }\n  return 0\n}\n", source.Edit{Start: 49, End: 49, NewText: []byte(" else {\n    return 2\n  }")}},
+		{"turn an if into an else-if chain", "pub fn f(n: nint): nint {\n  if n > 0 {\n    return 1\n  } else {\n    return 0\n  }\n}\n", source.Edit{Start: 54, End: 54, NewText: []byte("if n < 0 ")}},
 	}
 
 	for _, tc := range cases {
@@ -105,9 +105,9 @@ func TestReparseBacksOffLookaheadChain(t *testing.T) {
 		{"fn loses its name across effects", "+ 2fn io async i\n", source.Edit{Start: 15, End: 16, NewText: []byte("type ")}},
 		// "extern fn" is a declaration; the edit removes the fn, so extern must
 		// fold back into the preceding error run.
-		{"extern loses its fn", "+ 2extern fn f(): int { return 1 }\n", source.Edit{Start: 10, End: 12, NewText: []byte("zz")}},
+		{"extern loses its fn", "+ 2extern fn f(): nint { return 1 }\n", source.Edit{Start: 10, End: 12, NewText: []byte("zz")}},
 		// "pub extern fn" likewise, with the chain crossing two tokens.
-		{"pub extern loses its fn", "+ 2pub extern fn f(): int { return 1 }\n", source.Edit{Start: 14, End: 16, NewText: []byte("zz")}},
+		{"pub extern loses its fn", "+ 2pub extern fn f(): nint { return 1 }\n", source.Edit{Start: 14, End: 16, NewText: []byte("zz")}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -134,7 +134,7 @@ func TestErrorRunMirrorsDispatch(t *testing.T) {
 		{"extern without fn", "extern !=!t0]\nconst y = 1\n"},
 		{"pub extern without fn", "pub extern 1 + 2\nconst y = 1\n"},
 		{"extern at EOF", "9 extern"},
-		{"extern fn still a declaration", "* extern fn f(): int { return 1 }\n"},
+		{"extern fn still a declaration", "* extern fn f(): nint { return 1 }\n"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -162,19 +162,19 @@ func TestBlockClearsHeadRestriction(t *testing.T) {
 		name string
 		src  string
 	}{
-		{"record literal stmt in lambda body in if head", "fn f(): int { if fn() { {} } { return 1 }\nreturn 0 }\n"},
-		{"field record literal in lambda body in if head", "fn f(): int { if fn() { {a: 1} } { return 1 }\nreturn 0 }\n"},
-		{"record literal stmt in lambda body in switch head", "fn f(): int { switch fn() { {} } {}\nreturn 0 }\n"},
+		{"record literal stmt in lambda body in if head", "fn f(): nint { if fn() { {} } { return 1 }\nreturn 0 }\n"},
+		{"field record literal in lambda body in if head", "fn f(): nint { if fn() { {a: 1} } { return 1 }\nreturn 0 }\n"},
+		{"record literal stmt in lambda body in switch head", "fn f(): nint { switch fn() { {} } {}\nreturn 0 }\n"},
 		// The arrow body of a lambda in a head context is the same fresh,
 		// brace-delimited context as the block body: a typed record literal there
 		// must parse as a record literal, not leak the head's noRecordLit
 		// restriction. (A bare "-> {" is a separate, pre-existing arrow-block-body
 		// recovery and is unaffected either way.)
-		{"typed record literal in arrow lambda body in if head", "fn f(): int { if fn() -> P{a: 1} { return 1 }\nreturn 0 }\n"},
-		{"typed record literal in arrow lambda body in switch head", "fn f(): int { switch fn() -> P{a: 1} {}\nreturn 0 }\n"},
+		{"typed record literal in arrow lambda body in if head", "fn f(): nint { if fn() -> P{a: 1} { return 1 }\nreturn 0 }\n"},
+		{"typed record literal in arrow lambda body in switch head", "fn f(): nint { switch fn() -> P{a: 1} {}\nreturn 0 }\n"},
 		// A record literal further into the arrow body (after a binary operator),
 		// where the leak also surfaces because noRecordLit spans the whole head.
-		{"non-leading record literal in arrow lambda body in if head", "fn f(): int { if fn() -> n + P{a: 1} { return 1 }\nreturn 0 }\n"},
+		{"non-leading record literal in arrow lambda body in if head", "fn f(): nint { if fn() -> n + P{a: 1} { return 1 }\nreturn 0 }\n"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -213,9 +213,9 @@ func TestDocumentMalformedRecoveryBoundary(t *testing.T) {
 		// omitted enum/interface/fn/extern and swallowed the whole following
 		// declaration token-by-token.
 		{"unterminated record literal before enum", "const c = {a: 1\nenum E { A }\n"},
-		{"unterminated record literal before interface", "const c = {a: 1\ninterface I { f(): int }\n"},
-		{"unterminated record literal before fn decl", "const c = {a: 1\nfn g(): int { return 1 }\n"},
-		{"unterminated record literal before extern fn", "const c = {a: 1\nextern fn g(): int\n"},
+		{"unterminated record literal before interface", "const c = {a: 1\ninterface I { f(): nint }\n"},
+		{"unterminated record literal before fn decl", "const c = {a: 1\nfn g(): nint { return 1 }\n"},
+		{"unterminated record literal before extern fn", "const c = {a: 1\nextern fn g(): nint\n"},
 		{"record field missing colon", "const c = {a b}\nconst y = 1\n"},
 		{"impl block missing brace", "type T impl >\nconst y = 1\n"},
 		{"unterminated collection", "const c = [1\nconst y = 1\n"},
@@ -270,11 +270,11 @@ func TestUnterminatedRecordLitStopsAtDeclaration(t *testing.T) {
 		declKind cst.Kind // the kind the recovered-to declaration must parse as
 	}{
 		{"before enum", "const c = {a: 1\nenum E { A }\n", cst.EnumDecl},
-		{"before interface", "const c = {a: 1\ninterface I { f(): int }\n", cst.InterfaceDecl},
-		{"before fn decl", "const c = {a: 1\nfn g(): int { return 1 }\n", cst.FuncDecl},
-		{"before extern fn", "const c = {a: 1\nextern fn g(): int\n", cst.FuncDecl},
+		{"before interface", "const c = {a: 1\ninterface I { f(): nint }\n", cst.InterfaceDecl},
+		{"before fn decl", "const c = {a: 1\nfn g(): nint { return 1 }\n", cst.FuncDecl},
+		{"before extern fn", "const c = {a: 1\nextern fn g(): nint\n", cst.FuncDecl},
 		{"before const", "const c = {a: 1\nconst y = 1\n", cst.ConstDecl},
-		{"before type", "const c = {a: 1\ntype T = int\n", cst.TypeDecl},
+		{"before type", "const c = {a: 1\ntype T = nint\n", cst.TypeDecl},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -303,7 +303,7 @@ func TestDocumentSequentialEdits(t *testing.T) {
 	doc := NewDocument(nil)
 	var content []byte
 
-	typed := "/// doc\npub const Answer: int64 = 42\n"
+	typed := "/// doc\npub const Answer: long = 42\n"
 	for i := 0; i < len(typed); i++ {
 		e := source.Edit{Start: len(content), End: len(content), NewText: []byte{typed[i]}}
 		content = naiveSplice(content, e.Start, e.End, e.NewText)
@@ -350,10 +350,10 @@ func TestWellFormedProgramsParseClean(t *testing.T) {
 		// Head-context lambdas in both body forms: the class the arrow-body
 		// noRecordLit leak lived in. A typed record literal in the body must parse
 		// as a record literal, not be read as the if/switch control block.
-		{"block-body lambda record in if head", "fn f(): int { if fn() { return P{a: 1} } { return 1 }\nreturn 0 }\n"},
-		{"arrow-body lambda record in if head", "fn f(): int { if fn() -> P{a: 1} { return 1 }\nreturn 0 }\n"},
-		{"arrow-body lambda record in switch head", "fn f(): int { switch fn() -> P{a: 1} {}\nreturn 0 }\n"},
-		{"arrow-body lambda record after operator in if head", "fn f(): int { if n + fn() -> P{a: 1} { return 1 }\nreturn 0 }\n"},
+		{"block-body lambda record in if head", "fn f(): nint { if fn() { return P{a: 1} } { return 1 }\nreturn 0 }\n"},
+		{"arrow-body lambda record in if head", "fn f(): nint { if fn() -> P{a: 1} { return 1 }\nreturn 0 }\n"},
+		{"arrow-body lambda record in switch head", "fn f(): nint { switch fn() -> P{a: 1} {}\nreturn 0 }\n"},
+		{"arrow-body lambda record after operator in if head", "fn f(): nint { if n + fn() -> P{a: 1} { return 1 }\nreturn 0 }\n"},
 		// Literal classes whose multi-token scans (datetime, duration, string) the
 		// fuzz alphabet only sampled coarsely.
 		{"datetime literal", "const t = D2009-03-31T23:59:59.000Z\n"},
@@ -362,27 +362,27 @@ func TestWellFormedProgramsParseClean(t *testing.T) {
 		{"datetime/duration arithmetic", "const x = D1970-01-01T00:00:00.000Z + 7d\n"},
 		// await over a postfix chain, with a record literal as the awaited operand's
 		// argument (the bracketed context must re-enable record literals).
-		{"await postfix chain", "fn f(): int { let x = await g(P{a: 1})\nreturn 0 }\n"},
+		{"await postfix chain", "fn f(): nint { let x = await g(P{a: 1})\nreturn 0 }\n"},
 		// A record literal in a bracketed context inside a head expression: the
 		// bracketed helper must re-enable the record reading there.
-		{"record literal in call arg in if head", "fn f(): int { if g(P{a: 1}) { return 1 }\nreturn 0 }\n"},
+		{"record literal in call arg in if head", "fn f(): nint { if g(P{a: 1}) { return 1 }\nreturn 0 }\n"},
 		// match arms: a type pattern with a binding, the wildcard, a null arm, an
 		// inline-statement and a block body, and an index-read scrutinee — the
 		// class the type-pattern parse and the match body's separator rule cover.
-		{"match with binding and wildcard arms", "fn f(v: T): int {\n  match v {\n    Coin c -> return c.n\n    _      -> return 0\n  }\n}\n"},
-		{"match with null arm and block body", "fn f(v: T): int {\n  match v {\n    Coin c -> return 1\n    null   -> {\n      return 0\n    }\n  }\n}\n"},
-		{"match over an index read", "fn f(xs: list<int>): int {\n  match xs[0] {\n    int v   -> return v\n    error e -> return 0\n  }\n}\n"},
+		{"match with binding and wildcard arms", "fn f(v: T): nint {\n  match v {\n    Coin c -> return c.n\n    _      -> return 0\n  }\n}\n"},
+		{"match with null arm and block body", "fn f(v: T): nint {\n  match v {\n    Coin c -> return 1\n    null   -> {\n      return 0\n    }\n  }\n}\n"},
+		{"match over an index read", "fn f(xs: list<nint>): nint {\n  match xs[0] {\n    nint v   -> return v\n    error e -> return 0\n  }\n}\n"},
 		// A record-literal scrutinee written explicitly must parse as the
 		// scrutinee, with the noRecordLit restriction not leaking past the parens.
-		{"match scrutinee in parens with record", "fn f(): int { match (P{a: 1}) {\n    P p -> return 1\n  }\n  return 0\n}\n"},
+		{"match scrutinee in parens with record", "fn f(): nint { match (P{a: 1}) {\n    P p -> return 1\n  }\n  return 0\n}\n"},
 		// for statements: an "of" loop with a let accumulator, an "in" loop over a
 		// map, a nested for, and a for whose iterated expression is a call (the
 		// bracketed argument re-enables record literals the head suppressed) — the
 		// class the loop-variable parse and the noRecordLit-headed body cover.
-		{"for of with let accumulator", "fn f(xs: list<int>): int {\n  let total = 0\n  for x of xs {\n    total = total + x\n  }\n  return total\n}\n"},
-		{"for in over a map", "fn f(m: map<string, int>): string {\n  let out = \"\"\n  for k in m {\n    out = out + k\n  }\n  return out\n}\n"},
-		{"nested for", "fn f(xs: list<int>, ys: list<int>): int {\n  let n = 0\n  for x of xs {\n    for y of ys {\n      n = n + 1\n    }\n  }\n  return n\n}\n"},
-		{"for over a call with a record arg", "fn f(): int {\n  let n = 0\n  for x of g(P{a: 1}) {\n    n = n + 1\n  }\n  return n\n}\n"},
+		{"for of with let accumulator", "fn f(xs: list<nint>): nint {\n  let total = 0\n  for x of xs {\n    total = total + x\n  }\n  return total\n}\n"},
+		{"for in over a map", "fn f(m: map<string, nint>): string {\n  let out = \"\"\n  for k in m {\n    out = out + k\n  }\n  return out\n}\n"},
+		{"nested for", "fn f(xs: list<nint>, ys: list<nint>): nint {\n  let n = 0\n  for x of xs {\n    for y of ys {\n      n = n + 1\n    }\n  }\n  return n\n}\n"},
+		{"for over a call with a record arg", "fn f(): nint {\n  let n = 0\n  for x of g(P{a: 1}) {\n    n = n + 1\n  }\n  return n\n}\n"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -405,7 +405,7 @@ func TestDocumentFuzz(t *testing.T) {
 	r := rand.New(rand.NewSource(0xB317))
 	alphabet := []string{
 		"a", "Z", "x", "0", "9", " ", "\n", "/", "*", ":", "=", "あ",
-		"const ", "pub ", "// c\n", "/* b */", "int64",
+		"const ", "pub ", "// c\n", "/* b */", "long",
 		// Operators, booleans, and a few expression fragments so the reparse
 		// oracle covers binary/unary expressions and the maximal-munch edits.
 		"+", "-", "%", "!", "<", ">", "&&", "||", "==", "!=", "<=", ">=",
@@ -423,7 +423,7 @@ func TestDocumentFuzz(t *testing.T) {
 		// match-arm fragments: a type pattern with a binding, the wildcard, and
 		// the arrow, so the random walk reaches the type-pattern parse and the
 		// match body's unterminated-construct recovery.
-		"Coin c", "_", "int v", "error e",
+		"Coin c", "_", "nint v", "error e",
 		// Literal and keyword classes the E-series and earlier work added that the
 		// walk above never reaches: a datetime literal and a duration run (so the
 		// multi-token leftward-fusion scanDatetime/scanNumber paths are stressed), a

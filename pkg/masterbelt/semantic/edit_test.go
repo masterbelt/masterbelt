@@ -70,13 +70,13 @@ func TestScriptedEdits(t *testing.T) {
 		initial string
 		edit    source.Edit
 	}{
-		{"value change keeps type", "const A: int64 = 1\nconst B = A\n", source.Edit{Start: 17, End: 18, NewText: []byte("2")}},
+		{"value change keeps type", "const A: long = 1\nconst B = A\n", source.Edit{Start: 16, End: 17, NewText: []byte("2")}},
 		{"append a declaration", "const A = 1\n", source.Edit{Start: 11, End: 11, NewText: []byte("const B = A\n")}},
 		{"introduce undefined name", "const A = B\n", source.Edit{Start: 10, End: 11, NewText: []byte("C")}},
 		{"resolve an undefined name", "const A = B\nconst C = 1\n", source.Edit{Start: 10, End: 11, NewText: []byte("C")}},
 		{"introduce a cycle", "const A = 1\nconst B = A\n", source.Edit{Start: 9, End: 10, NewText: []byte("B")}},
-		{"change annotation", "const A: int64 = 1\n", source.Edit{Start: 9, End: 14, NewText: []byte("int32")}},
-		{"unknown type", "const A: int64 = 1\n", source.Edit{Start: 9, End: 14, NewText: []byte("nope")}},
+		{"change annotation", "const A: long = 1\n", source.Edit{Start: 9, End: 13, NewText: []byte("int")}},
+		{"unknown type", "const A: long = 1\n", source.Edit{Start: 9, End: 13, NewText: []byte("nope")}},
 		{"add pub", "const A = 1\n", source.Edit{Start: 0, End: 0, NewText: []byte("pub ")}},
 		{"duplicate name", "const A = 1\nconst B = 2\n", source.Edit{Start: 18, End: 19, NewText: []byte("A")}},
 		{"delete a declaration", "const A = 1\nconst B = A\n", source.Edit{Start: 0, End: 12, NewText: nil}},
@@ -100,12 +100,12 @@ func TestScriptedEdits(t *testing.T) {
 // value without changing its type does not ripple through to a constant two
 // references away — the change is cut off once a type comes out unchanged.
 func TestEarlyCutoff(t *testing.T) {
-	e := newEditable([]byte("const A: int64 = 1\nconst B = A\nconst C = B\n"))
+	e := newEditable([]byte("const A: long = 1\nconst B = A\nconst C = B\n"))
 	cDecl := e.doc.File().Decls[2] // unchanged by the edit below
 
-	// Change A's value 1 -> 2; A stays int64, so B's type is unchanged.
-	e.edit(source.Edit{Start: 17, End: 18, NewText: []byte("2")})
-	assertMatchesReference(t, e, []byte("const A: int64 = 2\nconst B = A\nconst C = B\n"))
+	// Change A's value 1 -> 2; A stays long, so B's type is unchanged.
+	e.edit(source.Edit{Start: 16, End: 17, NewText: []byte("2")})
+	assertMatchesReference(t, e, []byte("const A: long = 2\nconst B = A\nconst C = B\n"))
 
 	if e.prog.db.computed[typeOfKey(cDecl)] {
 		t.Error("typeOf(C) was recomputed; early cutoff should have stopped the change at B")
@@ -115,7 +115,7 @@ func TestEarlyCutoff(t *testing.T) {
 func TestEditFuzz(t *testing.T) {
 	r := rand.New(rand.NewSource(0x5E3A))
 	alphabet := []string{
-		"const ", "pub ", "A", "B", "C", "Name", " = ", " : ", "int64", "int32",
+		"const ", "pub ", "A", "B", "C", "Name", " = ", " : ", "long", "int",
 		"nope", "0", "1", "42", " ", "\n", "=", ":",
 		// Operators, booleans, and the bool type so the oracle checks that
 		// incremental typing and evaluation of expressions match a full
@@ -153,9 +153,9 @@ func TestEditFuzz(t *testing.T) {
 // signature wherever it sits, not only in a const, annotation, or method body.
 func TestFuncLitTypes(t *testing.T) {
 	src := "const Doubled = [1, 2].map(fn(x) { return x * 2 })\n" +
-		"const Twice: fn(x: int): int = fn(x) { return x * 2 }\n" +
-		"pub type T = int8 impl {\n  pub f(): fn(x: bool): bool {\n    return fn(b) { return b }\n  }\n}\n" +
-		"pub fn g(): int {\n  return [1, 2].map(fn(y) { return y + 1 }).count()\n}\n"
+		"const Twice: fn(x: nint): nint = fn(x) { return x * 2 }\n" +
+		"pub type T = sbyte impl {\n  pub f(): fn(x: bool): bool {\n    return fn(b) { return b }\n  }\n}\n" +
+		"pub fn g(): nint {\n  return [1, 2].map(fn(y) { return y + 1 }).count()\n}\n"
 	e := newEditable([]byte(src))
 
 	var got []string
@@ -164,7 +164,7 @@ func TestFuncLitTypes(t *testing.T) {
 	}
 	sort.Strings(got)
 	// The fn-body lambda fn(y) { return y + 1 } settles to fn(int): int.
-	want := "fn(bool): bool|fn(int): int|fn(int): int|fn(int): int"
+	want := "fn(bool): bool|fn(nint): nint|fn(nint): nint|fn(nint): nint"
 	if strings.Join(got, "|") != want {
 		t.Fatalf("FuncLitTypes = %v, want %s", got, want)
 	}
@@ -192,7 +192,7 @@ func TestEarlyCutoffLambdaBody(t *testing.T) {
 // re-checks the assertion (its diagnostic flips) but recomputes neither the
 // type nor the value of the constants it reads.
 func TestEarlyCutoffAssert(t *testing.T) {
-	src := "const A: int64 = 1\nconst B = A\nassert B > 0\n"
+	src := "const A: long = 1\nconst B = A\nassert B > 0\n"
 	e := newEditable([]byte(src))
 	bDecl := e.doc.File().Decls[1]
 
@@ -210,12 +210,12 @@ func TestEarlyCutoffAssert(t *testing.T) {
 // constant's annotation (not its value) must not re-evaluate a constant two
 // references away.
 func TestEarlyCutoffValue(t *testing.T) {
-	e := newEditable([]byte("const A: int64 = 1\nconst B = A\nconst C = B\n"))
+	e := newEditable([]byte("const A: long = 1\nconst B = A\nconst C = B\n"))
 	cDecl := e.doc.File().Decls[2]
 
-	// Change A's annotation int64 -> int32; A's value (1) is unchanged.
-	e.edit(source.Edit{Start: 9, End: 14, NewText: []byte("int32")})
-	assertMatchesReference(t, e, []byte("const A: int32 = 1\nconst B = A\nconst C = B\n"))
+	// Change A's annotation long -> int; A's value (1) is unchanged.
+	e.edit(source.Edit{Start: 9, End: 13, NewText: []byte("int")})
+	assertMatchesReference(t, e, []byte("const A: int = 1\nconst B = A\nconst C = B\n"))
 
 	if e.prog.db.computed[valueKey(cDecl)] {
 		t.Error("valueOf(C) was recomputed; an annotation change should not affect values")

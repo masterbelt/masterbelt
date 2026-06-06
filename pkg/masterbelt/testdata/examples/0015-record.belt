@@ -2,7 +2,7 @@
 // form takes it from the expected type. Fields separate with commas
 // and/or newlines.
 
-pub type Point = { x: int, y: int }
+pub type Point = { x: nint, y: nint }
 
 // Typed (single line, commas).
 const Origin = Point{ x: 0, y: 0 }
@@ -17,7 +17,7 @@ const Q = Point{
 }
 
 // Nested records compose with other literals.
-pub type Item = { id: int, name: string, pos: Point }
+pub type Item = { id: nint, name: string, pos: Point }
 const Sword = Item{ id: 1, name: "Sword", pos: Point{ x: 0, y: 0 } }
 
 // The expected type pushes down into collection elements.

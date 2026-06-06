@@ -23,8 +23,8 @@ File
   FuncDecl
     pub
     name "sum"
-    param xs: list<int>
-    result int
+    param xs: list<nint>
+    result nint
       let "total" = IntLit "0"
       for x of Identifier "xs"
           assign Identifier "total" = (call (. Identifier "total" add) Identifier "x")
@@ -32,7 +32,7 @@ File
   FuncDecl
     pub
     name "keysJoined"
-    param m: map<string, int>
+    param m: map<string, nint>
     result string
       let "out" = StringLit ""
       for k in Identifier "m"
@@ -41,8 +41,8 @@ File
   FuncDecl
     pub
     name "valueSum"
-    param m: map<string, int>
-    result int
+    param m: map<string, nint>
+    result nint
       let "total" = IntLit "0"
       for v of Identifier "m"
           assign Identifier "total" = (call (. Identifier "total" add) Identifier "v")
@@ -50,8 +50,8 @@ File
   FuncDecl
     pub
     name "indexSum"
-    param xs: list<int>
-    result int
+    param xs: list<nint>
+    result nint
       let "total" = IntLit "0"
       for i in Identifier "xs"
           assign Identifier "total" = (call (. Identifier "total" add) Identifier "i")
@@ -59,8 +59,8 @@ File
   FuncDecl
     pub
     name "sumEven"
-    param xs: list<int>
-    result int
+    param xs: list<nint>
+    result nint
       let "total" = IntLit "0"
       for x of Identifier "xs"
           if (call (. (call (. Identifier "x" rem) IntLit "2") eql) IntLit "0")
@@ -69,9 +69,9 @@ File
   FuncDecl
     pub
     name "pairCount"
-    param xs: list<int>
-    param ys: list<int>
-    result int
+    param xs: list<nint>
+    param ys: list<nint>
+    result nint
       let "count" = IntLit "0"
       for x of Identifier "xs"
           for y of Identifier "ys"
@@ -80,8 +80,8 @@ File
   FuncDecl
     pub
     name "product"
-    param xs: list<int>
-    result int
+    param xs: list<nint>
+    result nint
       let "acc" = IntLit "1"
       for x of Identifier "xs"
           assign Identifier "acc" = (call (. Identifier "acc" mul) Identifier "x")

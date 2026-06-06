@@ -5,7 +5,7 @@ File
     Newline "\n"
     LineComment "// normalized to UTC milliseconds, and digit+unit runs totalled in"
     Newline "\n"
-    LineComment "// milliseconds. The two interoperate: dt ± dr, dt - dt, dr * int."
+    LineComment "// milliseconds. The two interoperate: dt ± dr, dt - dt, dr * nint."
     Newline "\n"
     Newline "\n"
     Const "const"
@@ -201,7 +201,7 @@ File
         Colon ":"
         Whitespace " "
         TypeName
-          Ident "int"
+          Ident "nint"
       Newline "\n"
       Whitespace "  "
       Field

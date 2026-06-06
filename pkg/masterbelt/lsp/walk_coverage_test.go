@@ -37,7 +37,7 @@ func TestForEachExprEnumMethodBody(t *testing.T) {
 // default body is reached by the occurrence engines only if the walk descends
 // file.Interfaces members' bodies; before the fix the body was inert.
 func TestForEachExprInterfaceDefaultBody(t *testing.T) {
-	src := "const Zero = 0\npub interface foldable<K, V> {\n  fold<A>(init: A, step: fn(acc: A, key: K, value: V): A): A\n  pub count(): int {\n    return fold(Zero, fn(acc, key, value) -> acc + 1)\n  }\n}\n"
+	src := "const Zero = 0\npub interface foldable<K, V> {\n  fold<A>(init: A, step: fn(acc: A, key: K, value: V): A): A\n  pub count(): nint {\n    return fold(Zero, fn(acc, key, value) -> acc + 1)\n  }\n}\n"
 	doc := testView(src)
 
 	// From the declaration: decl + the reference inside the interface default.
@@ -63,7 +63,7 @@ func TestForEachExprInterfaceDefaultBody(t *testing.T) {
 // let's value was invisible. A lambda parameter inside a let-bound lambda
 // hovers, and the walk reaches the FuncLit nested in the let RHS.
 func TestForEachExprLetInitializer(t *testing.T) {
-	src := "pub fn g(): int {\n  let h = fn(x: int): int { return x.add(1) }\n  return h(2)\n}\n"
+	src := "pub fn g(): nint {\n  let h = fn(x: nint): nint { return x.add(1) }\n  return h(2)\n}\n"
 	doc := testView(src)
 
 	off := strings.Index(src, "return x.add") + len("return ")
@@ -71,8 +71,8 @@ func TestForEachExprLetInitializer(t *testing.T) {
 	if h == nil {
 		t.Fatal("no hover on the parameter use inside a let-bound lambda")
 	}
-	if !strings.Contains(h.Contents.Value, "x: int") {
-		t.Errorf("hover = %q, want x: int", h.Contents.Value)
+	if !strings.Contains(h.Contents.Value, "x: nint") {
+		t.Errorf("hover = %q, want x: nint", h.Contents.Value)
 	}
 
 	var sawLitInLet bool
@@ -89,7 +89,7 @@ func TestForEachExprLetInitializer(t *testing.T) {
 // TestForEachExprAssignRHS pins that the RHS (and target) of an assignment is
 // walked: the AssignStmt case for walkStmts was missing.
 func TestForEachExprAssignRHS(t *testing.T) {
-	src := "pub fn f(): int {\n  let acc = 0\n  acc = fn(x: int): int { return x }(3)\n  return acc\n}\n"
+	src := "pub fn f(): nint {\n  let acc = 0\n  acc = fn(x: nint): nint { return x }(3)\n  return acc\n}\n"
 	doc := testView(src)
 
 	var sawLitInAssign bool
@@ -122,7 +122,7 @@ func TestForEachExprTernaryBranch(t *testing.T) {
 	}
 
 	// A FuncLit nested in a ternary branch is reached by the expression walk.
-	fsrc := "pub fn g(flag: bool): int {\n  return flag ? fn(x: int): int { return x }(1) : 0\n}\n"
+	fsrc := "pub fn g(flag: bool): nint {\n  return flag ? fn(x: nint): nint { return x }(1) : 0\n}\n"
 	fdoc := testView(fsrc)
 	var sawLitInTernary bool
 	forEachExpr(fdoc.AST().File(), func(e ast.Expr) {
@@ -139,7 +139,7 @@ func TestForEachExprTernaryBranch(t *testing.T) {
 // function body is found by references and rewritten by rename — the occurrence
 // engines walked only const initializers and assert conditions before.
 func TestReferencesInFunctionBody(t *testing.T) {
-	src := "const Max = 10\npub fn f(): int {\n  return Max + 1\n}\n"
+	src := "const Max = 10\npub fn f(): nint {\n  return Max + 1\n}\n"
 	doc := testView(src)
 
 	// From the declaration: decl + the body reference.
@@ -164,7 +164,7 @@ func TestReferencesInFunctionBody(t *testing.T) {
 // TestReferencesInMethodBody pins the same for a reference inside a method body
 // (under file.Types), including one nested in a let initializer.
 func TestReferencesInMethodBody(t *testing.T) {
-	src := "const Step = 2\ntype Lvl = int8 impl {\n  bump(): int8 {\n    let s = Step\n    return s\n  }\n}\n"
+	src := "const Step = 2\ntype Lvl = sbyte impl {\n  bump(): sbyte {\n    let s = Step\n    return s\n  }\n}\n"
 	doc := testView(src)
 
 	if got := references(doc, strings.Index(src, "const Step")+6, true); len(got) != 2 {
@@ -177,7 +177,7 @@ func TestReferencesInMethodBody(t *testing.T) {
 // recordTypes pushed the type only through a top-level ReturnStmt before, so a
 // let-bound literal received no expected type.
 func TestRecordFieldCompletionInLetBinding(t *testing.T) {
-	src := "type Point = { x: int, y: int }\npub fn f(): int {\n  let p: Point = {  }\n  return p.x\n}\n"
+	src := "type Point = { x: nint, y: nint }\npub fn f(): nint {\n  let p: Point = {  }\n  return p.x\n}\n"
 	doc := testView(src)
 
 	// Inside the empty braces of the let-bound record literal.
@@ -194,7 +194,7 @@ func TestRecordFieldCompletionInLetBinding(t *testing.T) {
 // returned from inside an if branch gets field completion: recordTypes scanned
 // only the top-level statements of a body for a ReturnStmt before.
 func TestRecordFieldCompletionInBranchReturn(t *testing.T) {
-	src := "type Point = { x: int, y: int }\npub fn f(flag: bool): Point {\n  if flag {\n    return {  }\n  }\n  return { x: 0, y: 0 }\n}\n"
+	src := "type Point = { x: nint, y: nint }\npub fn f(flag: bool): Point {\n  if flag {\n    return {  }\n  }\n  return { x: 0, y: 0 }\n}\n"
 	doc := testView(src)
 
 	offset := strings.Index(src, "return {  }") + len("return { ")

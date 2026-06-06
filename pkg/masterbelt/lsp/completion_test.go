@@ -9,7 +9,7 @@ import (
 
 // completionSrc has a documented, annotated constant and a second constant whose
 // initializer is a value position; "int64" is the only type position.
-const completionSrc = "/// the maximum\nconst Max: int64 = 100\nconst Cur = Max\n"
+const completionSrc = "/// the maximum\nconst Max: long = 100\nconst Cur = Max\n"
 
 func byLabel(items []protocol.CompletionItem) map[string]protocol.CompletionItem {
 	out := map[string]protocol.CompletionItem{}
@@ -39,8 +39,8 @@ func TestCompletionInValuePosition(t *testing.T) {
 	}
 
 	// A constant carries its inferred type as detail and its doc comment.
-	if d := got["Max"].Detail; d != ": int64" {
-		t.Errorf("Max detail = %q, want %q", d, ": int64")
+	if d := got["Max"].Detail; d != ": long" {
+		t.Errorf("Max detail = %q, want %q", d, ": long")
 	}
 	if doc := got["Max"].Documentation; doc == nil || !strings.Contains(doc.Value, "maximum") {
 		t.Errorf("Max documentation = %v, want the doc comment", got["Max"].Documentation)
@@ -55,10 +55,10 @@ func TestCompletionInTypePosition(t *testing.T) {
 
 	// Inside the "int64" annotation — a type position. Type names are offered,
 	// constant names are not.
-	offset := strings.Index(completionSrc, "int64") + 2
+	offset := strings.Index(completionSrc, "long") + 2
 	got := byLabel(completion(doc, offset).Items)
 
-	for _, want := range []string{"int64", "bool", "string"} {
+	for _, want := range []string{"long", "bool", "string"} {
 		if _, ok := got[want]; !ok {
 			t.Errorf("type completion missing builtin %q", want)
 		}
@@ -66,14 +66,14 @@ func TestCompletionInTypePosition(t *testing.T) {
 	if _, ok := got["Max"]; ok {
 		t.Error("type completion offered the constant Max")
 	}
-	if k := got["int64"].Kind; k == nil || *k != protocol.CompletionItemKindStruct {
-		t.Errorf("int64 kind = %v, want Struct (a builtin)", k)
+	if k := got["long"].Kind; k == nil || *k != protocol.CompletionItemKindStruct {
+		t.Errorf("long kind = %v, want Struct (a builtin)", k)
 	}
 }
 
 func TestCompletionOffersDeclaredTypes(t *testing.T) {
 	// A user-declared type is offered in a type position, as a Class.
-	src := "pub type Level = int8\nconst x: Level = 1\n"
+	src := "pub type Level = sbyte\nconst x: Level = 1\n"
 	doc := testView(src)
 	offset := strings.Index(src, ": Level") + 3 // inside "Level" annotation
 	got := byLabel(completion(doc, offset).Items)
@@ -104,13 +104,13 @@ func TestCompletionInEnumBaseType(t *testing.T) {
 	// An enum's base-type position offers only the legal base types — the
 	// integer family and string — matching the semantic analyzer's set, not the
 	// general type completion (which would offer bool, datetime, and user types).
-	src := "type Level = int8\nenum Rarity: int8 {\n  Common\n}\n"
+	src := "type Level = sbyte\nenum Rarity: sbyte {\n  Common\n}\n"
 	doc := testView(src)
 
-	offset := strings.Index(src, "Rarity: int8") + len("Rarity: in")
+	offset := strings.Index(src, "Rarity: sbyte") + len("Rarity: in")
 	got := byLabel(completion(doc, offset).Items)
 
-	for _, want := range []string{"int", "int8", "int64", "uint", "uint64", "string"} {
+	for _, want := range []string{"nint", "sbyte", "long", "nuint", "ulong", "string"} {
 		if _, ok := got[want]; !ok {
 			t.Errorf("enum base completion missing %q", want)
 		}
@@ -125,7 +125,7 @@ func TestCompletionInEnumBaseType(t *testing.T) {
 func TestCompletionInAssertCondition(t *testing.T) {
 	// An assert's condition is a value position: constants and the value
 	// keywords are offered, type names are not the candidates.
-	src := "/// the maximum\nconst Max: int64 = 100\nassert Max > 0\n"
+	src := "/// the maximum\nconst Max: long = 100\nassert Max > 0\n"
 	doc := testView(src)
 
 	offset := strings.Index(src, "assert Max") + len("assert Ma")
@@ -136,15 +136,15 @@ func TestCompletionInAssertCondition(t *testing.T) {
 			t.Errorf("assert-condition completion missing %q", want)
 		}
 	}
-	if d := got["Max"].Detail; d != ": int64" {
-		t.Errorf("Max detail = %q, want %q", d, ": int64")
+	if d := got["Max"].Detail; d != ": long" {
+		t.Errorf("Max detail = %q, want %q", d, ": long")
 	}
 }
 
 func TestCompletionInWhereClause(t *testing.T) {
 	// A where-clause predicate is a value position: the value keywords are
 	// offered, not the type names the declaration's body position would be.
-	src := "type Port = int32 where self >= 1\n"
+	src := "type Port = int where self >= 1\n"
 	doc := testView(src)
 
 	offset := strings.Index(src, "self >=") + len("se")
@@ -155,13 +155,13 @@ func TestCompletionInWhereClause(t *testing.T) {
 			t.Errorf("where-clause completion missing %q", want)
 		}
 	}
-	if _, ok := got["int32"]; ok {
+	if _, ok := got["int"]; ok {
 		t.Error("where-clause completion offered a type name")
 	}
 }
 
 func TestMemberCompletion(t *testing.T) {
-	src := "const xs: list<int8> = [1]\nconst ys = xs.map(fn(x: int8): int8 { return x })\n"
+	src := "const xs: list<sbyte> = [1]\nconst ys = xs.map(fn(x: sbyte): sbyte { return x })\n"
 	doc := testView(src)
 
 	got := byLabel(completion(doc, strings.Index(src, "xs.map")+4).Items)
@@ -181,12 +181,12 @@ func TestMemberCompletion(t *testing.T) {
 	if m.Kind == nil || *m.Kind != protocol.CompletionItemKindMethod {
 		t.Errorf("map kind = %v, want Method", m.Kind)
 	}
-	if want := "pub extern map(func: fn(int8): R): list<R>"; m.Detail != want {
+	if want := "pub extern map(func: fn(sbyte): R): list<R>"; m.Detail != want {
 		t.Errorf("map detail = %q, want %q", m.Detail, want)
 	}
 	// The function parameter expands to an arrow-bodied fn literal, the solved
 	// element type annotated, the unsolved result left to inference.
-	if want := "map(fn(${1:x}: int8) -> ${2})"; m.InsertText != want {
+	if want := "map(fn(${1:x}: sbyte) -> ${2})"; m.InsertText != want {
 		t.Errorf("map snippet = %q, want %q", m.InsertText, want)
 	}
 	if m.InsertTextFormat == nil || *m.InsertTextFormat != protocol.InsertTextFormatSnippet {
@@ -208,7 +208,7 @@ func TestMemberCompletion(t *testing.T) {
 func TestMemberCompletionOverloads(t *testing.T) {
 	// An overloaded name completes once per signature, so the editor's list
 	// shows what each call shape would mean.
-	src := "pub type Score = int32 impl {\n" +
+	src := "pub type Score = int impl {\n" +
 		"  pub fn merge(points: self): self {\n    return self + points\n  }\n" +
 		"  pub fn merge(active: bool): bool {\n    return active && self > 0\n  }\n" +
 		"}\n" +
@@ -241,7 +241,7 @@ func TestMemberCompletionOverloads(t *testing.T) {
 func TestMemberCompletionAfterBareDot(t *testing.T) {
 	// The moment after typing the dot: the parse recovered a member access
 	// with its name missing, and completion already knows the receiver.
-	src := "const xs: list<int8> = [1]\nconst ys = xs.\n"
+	src := "const xs: list<sbyte> = [1]\nconst ys = xs.\n"
 	doc := testView(src)
 
 	got := byLabel(completion(doc, strings.Index(src, "xs.")+3).Items)
@@ -253,7 +253,7 @@ func TestMemberCompletionAfterBareDot(t *testing.T) {
 }
 
 func TestMemberCompletionFields(t *testing.T) {
-	src := "type Rec = {\n  id: int8\n  level: int16\n} impl {\n  get(): int8 {\n    return self.id\n  }\n}\n"
+	src := "type Rec = {\n  id: sbyte\n  level: short\n} impl {\n  get(): sbyte {\n    return self.id\n  }\n}\n"
 	doc := testView(src)
 
 	got := byLabel(completion(doc, strings.Index(src, "self.id")+6).Items)
@@ -261,8 +261,8 @@ func TestMemberCompletionFields(t *testing.T) {
 	if !ok {
 		t.Fatalf("member completion missing the field id; got %v", got)
 	}
-	if id.Kind == nil || *id.Kind != protocol.CompletionItemKindField || id.Detail != ": int8" {
-		t.Errorf("id item = %+v, want a Field: int8", id)
+	if id.Kind == nil || *id.Kind != protocol.CompletionItemKindField || id.Detail != ": sbyte" {
+		t.Errorf("id item = %+v, want a Field: sbyte", id)
 	}
 	if _, ok := got["level"]; !ok {
 		t.Error("member completion missing the field level")
@@ -293,7 +293,7 @@ func TestCompletionOffersErrorConstructor(t *testing.T) {
 	}
 
 	// A type position offers the error type itself.
-	typeOffset := strings.Index(completionSrc, "int64") + 2
+	typeOffset := strings.Index(completionSrc, "long") + 2
 	types := byLabel(completion(doc, typeOffset).Items)
 	if _, ok := types["error"]; !ok {
 		t.Errorf("type completion missing error")
@@ -319,7 +319,7 @@ func TestCompletionOffersRangeConstructor(t *testing.T) {
 	if item.InsertText != "range(${1:start}, ${2:end})" {
 		t.Errorf("range insert = %q, want the two-argument call snippet", item.InsertText)
 	}
-	if item.Detail != "range(start: int, end: int)" {
+	if item.Detail != "range(start: nint, end: nint)" {
 		t.Errorf("range detail = %q, want the constructor signature", item.Detail)
 	}
 	if item.Documentation == nil || !strings.Contains(item.Documentation.Value, "half-open") {
@@ -327,7 +327,7 @@ func TestCompletionOffersRangeConstructor(t *testing.T) {
 	}
 
 	// A type position offers the range type itself.
-	typeOffset := strings.Index(completionSrc, "int64") + 2
+	typeOffset := strings.Index(completionSrc, "long") + 2
 	types := byLabel(completion(doc, typeOffset).Items)
 	if _, ok := types["range"]; !ok {
 		t.Errorf("type completion missing range")
@@ -351,7 +351,7 @@ func TestMemberCompletionOnError(t *testing.T) {
 
 func TestCompletionEffectfulContext(t *testing.T) {
 	src := "extern fn io async fetch(url: string): string\n" +
-		"fn pure(): int -> 1\n" +
+		"fn pure(): nint -> 1\n" +
 		"pub fn io async page(url: string): string {\n" +
 		"  return await fetch(url)\n" +
 		"}\n" +

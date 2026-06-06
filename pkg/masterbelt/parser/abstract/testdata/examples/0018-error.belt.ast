@@ -7,13 +7,13 @@ File
     value (call (. Identifier "E" message))
   ConstDecl
     name "P"
-    type int | error
+    type nint | error
     value (call Identifier "parseLevel" StringLit "99")
   FuncDecl
     pub
     name "parseLevel"
     param s: string
-    result int | error
+    result nint | error
       return (call Identifier "error" (call (. StringLit "invalid level: " add) Identifier "s"))
   AssertDecl
     cond (call (. (call (. (call Identifier "error" StringLit "x") message)) eql) StringLit "x")

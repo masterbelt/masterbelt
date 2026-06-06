@@ -14,9 +14,9 @@ import "testing"
 // method resolves and its union result is well-typed.
 func TestIndexReadOK(t *testing.T) {
 	cases := []string{
-		"const Xs = [10, 20, 30]\nconst A: int | error = Xs[0]\n",
-		"const Tbl = [\"k\": 1]\nconst B: int | error = Tbl[\"k\"]\n",
-		"pub fn at(xs: list<int>, i: int): int | error {\n  return xs[i]\n}\n",
+		"const Xs = [10, 20, 30]\nconst A: nint | error = Xs[0]\n",
+		"const Tbl = [\"k\": 1]\nconst B: nint | error = Tbl[\"k\"]\n",
+		"pub fn at(xs: list<nint>, i: nint): nint | error {\n  return xs[i]\n}\n",
 	}
 	for _, src := range cases {
 		_, diags := analyze(src)
@@ -32,7 +32,7 @@ func TestIndexReadOK(t *testing.T) {
 // intermediate error must be handled first. This is the result-union cost the
 // plan accepts until in-range narrowing lands.
 func TestChainedIndexNeedsUnwrap(t *testing.T) {
-	_, diags := analyze("pub fn nested(m: list<list<int>>): int | error {\n  return m[0][1]\n}\n")
+	_, diags := analyze("pub fn nested(m: list<list<nint>>): nint | error {\n  return m[0][1]\n}\n")
 	if !hasCode(diags, CodeInvalidOperation) {
 		t.Errorf("want invalid_operation for a subscript on a union, got %v", codes(diags))
 	}
@@ -43,9 +43,9 @@ func TestChainedIndexNeedsUnwrap(t *testing.T) {
 // is never out of range.
 func TestIndexWriteOK(t *testing.T) {
 	cases := []string{
-		"pub fn f(): list<int> {\n  let xs = [1, 2, 3]\n  xs[0] = 9\n  return xs\n}\n",
-		"pub fn f(): list<int> {\n  let xs = [1, 2, 3]\n  xs[2] = 9\n  return xs\n}\n",
-		"pub fn f(): map<string, int> {\n  let m = [\"a\": 1]\n  m[\"a\"] = 9\n  m[\"b\"] = 2\n  return m\n}\n",
+		"pub fn f(): list<nint> {\n  let xs = [1, 2, 3]\n  xs[0] = 9\n  return xs\n}\n",
+		"pub fn f(): list<nint> {\n  let xs = [1, 2, 3]\n  xs[2] = 9\n  return xs\n}\n",
+		"pub fn f(): map<string, nint> {\n  let m = [\"a\": 1]\n  m[\"a\"] = 9\n  m[\"b\"] = 2\n  return m\n}\n",
 	}
 	for _, src := range cases {
 		_, diags := analyze(src)
@@ -60,10 +60,10 @@ func TestIndexWriteOK(t *testing.T) {
 // is statically known. A map write is an upsert and is never out of range.
 func TestIndexOutOfRange(t *testing.T) {
 	bad := []string{
-		"pub fn f(): list<int> {\n  let xs = [1, 2, 3]\n  xs[9] = 0\n  return xs\n}\n",
-		"pub fn f(): list<int> {\n  let xs = [1, 2, 3]\n  xs[3] = 0\n  return xs\n}\n", // one past the end
-		"pub fn f(): list<int> {\n  let xs = [1, 2, 3]\n  xs[-1] = 0\n  return xs\n}\n",
-		"pub fn f(): list<int> {\n  let xs: list<int> = []\n  xs[0] = 0\n  return xs\n}\n", // empty list
+		"pub fn f(): list<nint> {\n  let xs = [1, 2, 3]\n  xs[9] = 0\n  return xs\n}\n",
+		"pub fn f(): list<nint> {\n  let xs = [1, 2, 3]\n  xs[3] = 0\n  return xs\n}\n", // one past the end
+		"pub fn f(): list<nint> {\n  let xs = [1, 2, 3]\n  xs[-1] = 0\n  return xs\n}\n",
+		"pub fn f(): list<nint> {\n  let xs: list<nint> = []\n  xs[0] = 0\n  return xs\n}\n", // empty list
 	}
 	for _, src := range bad {
 		_, diags := analyze(src)
@@ -73,8 +73,8 @@ func TestIndexOutOfRange(t *testing.T) {
 	}
 
 	ok := []string{
-		"pub fn f(): map<string, int> {\n  let m = [\"a\": 1]\n  m[\"z\"] = 0\n  return m\n}\n",
-		"pub fn f(): list<int> {\n  let xs = [1, 2, 3]\n  xs[2] = 0\n  return xs\n}\n",
+		"pub fn f(): map<string, nint> {\n  let m = [\"a\": 1]\n  m[\"z\"] = 0\n  return m\n}\n",
+		"pub fn f(): list<nint> {\n  let xs = [1, 2, 3]\n  xs[2] = 0\n  return xs\n}\n",
 	}
 	for _, src := range ok {
 		_, diags := analyze(src)
@@ -88,7 +88,7 @@ func TestIndexOutOfRange(t *testing.T) {
 // assign_to_const (a const is immutable), the E-15 rule, rather than as an
 // out-of-range write: the immutable target is caught before the bounds.
 func TestIndexWriteToConst(t *testing.T) {
-	_, diags := analyze("const Ys = [1, 2, 3]\npub fn f(): int {\n  Ys[0] = 9\n  return 0\n}\n")
+	_, diags := analyze("const Ys = [1, 2, 3]\npub fn f(): nint {\n  Ys[0] = 9\n  return 0\n}\n")
 	if !hasCode(diags, CodeAssignToConst) {
 		t.Errorf("want assign_to_const, got %v", codes(diags))
 	}
@@ -98,7 +98,7 @@ func TestIndexWriteToConst(t *testing.T) {
 // statically foldable — a parameter index — is not reported: an unknowable index
 // is the runtime's concern, not a compile-time error.
 func TestIndexWriteDynamic(t *testing.T) {
-	_, diags := analyze("pub fn f(i: int): list<int> {\n  let xs = [1, 2, 3]\n  xs[i] = 0\n  return xs\n}\n")
+	_, diags := analyze("pub fn f(i: nint): list<nint> {\n  let xs = [1, 2, 3]\n  xs[i] = 0\n  return xs\n}\n")
 	if hasCode(diags, CodeIndexOutOfRange) {
 		t.Errorf("a dynamic index must not be reported: %v", codes(diags))
 	}
@@ -117,10 +117,10 @@ func TestIndexWriteDynamic(t *testing.T) {
 // list (its set at index 0 does not fold, an out-of-range write). The empty map
 // renders [:], the empty list [].
 func TestEmptyMapConstUpsertFolds(t *testing.T) {
-	src := "const EM: map<string, int> = []\n" +
+	src := "const EM: map<string, nint> = []\n" +
 		"const EM1 = EM.set(\"a\", 1)\n" +
 		"const EM2 = EM.set(\"a\", 1).set(\"b\", 2)\n" +
-		"const EL: list<int> = []\n"
+		"const EL: list<nint> = []\n"
 	m, diags := analyze(src)
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", codes(diags))
@@ -146,7 +146,7 @@ func TestEmptyMapConstUpsertFolds(t *testing.T) {
 // false positive the old entry-scanning isMapConst would have produced for an
 // int-keyed empty map.
 func TestEmptyMapLetUpsertNoOOB(t *testing.T) {
-	src := "pub fn f(): map<int, int> {\n  let m: map<int, int> = []\n  m[0] = 1\n  return m\n}\n"
+	src := "pub fn f(): map<nint, nint> {\n  let m: map<nint, nint> = []\n  m[0] = 1\n  return m\n}\n"
 	_, diags := analyze(src)
 	if hasCode(diags, CodeIndexOutOfRange) {
 		t.Errorf("an empty-map upsert must not be reported out of range: %v", codes(diags))
@@ -154,7 +154,7 @@ func TestEmptyMapLetUpsertNoOOB(t *testing.T) {
 }
 
 func TestCompositeMapKeyFold(t *testing.T) {
-	src := "const M: map<list<int>, string> = [[1, 2]: \"a\"]\n" +
+	src := "const M: map<list<nint>, string> = [[1, 2]: \"a\"]\n" +
 		"const V = M[[1, 2]]\n" +
 		"const M2 = M.set([1, 2], \"b\")\n"
 	m, diags := analyze(src)

@@ -126,16 +126,16 @@ var integerSpecs = []struct {
 	name string
 	kind IntKind
 }{
-	{"int", IntKind{Signed: true, Bits: 0}},
-	{"int8", IntKind{Signed: true, Bits: 8}},
-	{"int16", IntKind{Signed: true, Bits: 16}},
-	{"int32", IntKind{Signed: true, Bits: 32}},
-	{"int64", IntKind{Signed: true, Bits: 64}},
-	{"uint", IntKind{Signed: false, Bits: 0}},
-	{"uint8", IntKind{Signed: false, Bits: 8}},
-	{"uint16", IntKind{Signed: false, Bits: 16}},
-	{"uint32", IntKind{Signed: false, Bits: 32}},
-	{"uint64", IntKind{Signed: false, Bits: 64}},
+	{"nint", IntKind{Signed: true, Bits: 0}},
+	{"sbyte", IntKind{Signed: true, Bits: 8}},
+	{"short", IntKind{Signed: true, Bits: 16}},
+	{"int", IntKind{Signed: true, Bits: 32}},
+	{"long", IntKind{Signed: true, Bits: 64}},
+	{"nuint", IntKind{Signed: false, Bits: 0}},
+	{"byte", IntKind{Signed: false, Bits: 8}},
+	{"ushort", IntKind{Signed: false, Bits: 16}},
+	{"uint", IntKind{Signed: false, Bits: 32}},
+	{"ulong", IntKind{Signed: false, Bits: 64}},
 }
 
 // Default returns the standard registry: the integer family, bool, string, and

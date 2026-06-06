@@ -41,7 +41,7 @@ func externMethodIR(name string) *ir.Method {
 // 0..n-1) and the six native (body-less) comparison methods. A test appends its
 // own user methods to def.Methods after the call.
 func enumDef(name string, members []string) *ir.TypeDef {
-	def := &ir.TypeDef{Name: name, Enum: &ir.EnumDef{Base: "int"}}
+	def := &ir.TypeDef{Name: name, Enum: &ir.EnumDef{Base: "nint"}}
 	for i, m := range members {
 		def.Enum.Members = append(def.Enum.Members, ir.EnumMember{Name: m, Value: ir.IntConstant(big.NewInt(int64(i)))})
 	}
@@ -193,7 +193,7 @@ func TestEnumMethodFold(t *testing.T) {
 }
 
 func boolLit(b bool) ast.Expr { return ast.NewBoolLit(b, nil) }
-func intType() ast.TypeExpr   { return ast.NewNamedType("", "int", nil, nil) }
+func intType() ast.TypeExpr   { return ast.NewNamedType("", "nint", nil, nil) }
 
 // wantBool folds e and asserts it is the given bool.
 func wantBool(t *testing.T, e ast.Expr, env Env, want bool) {
@@ -424,7 +424,7 @@ func wantInt(t *testing.T, e ast.Expr, env Env, want int64) {
 	t.Helper()
 	v := Expr(e, env)
 	if v == nil || v.Kind != ir.ConstInt {
-		t.Fatalf("fold = %v, want an int constant", v)
+		t.Fatalf("fold = %v, want an nint constant", v)
 	}
 	if v.Int.Int64() != want {
 		t.Errorf("fold = %s, want %d", v.Int, want)
@@ -435,7 +435,7 @@ func wantInt(t *testing.T, e ast.Expr, env Env, want int64) {
 // returning self + 1.
 func levelDef() *ir.TypeDef {
 	inc := method("increment", nil, selfType(), ret(memberCall(selfExpr(), "add", intLit("1"))))
-	return nominalDef("Level", "int8", methodIR(inc))
+	return nominalDef("Level", "sbyte", methodIR(inc))
 }
 
 // TestNominalConversionFold covers channel 1, a conversion call: Level(5)
@@ -463,7 +463,7 @@ func TestNominalSelfFold(t *testing.T) {
 	// twice(): return self.increment().increment()
 	twice := method("twice", nil, selfType(),
 		ret(memberCall(memberCall(selfExpr(), "increment"), "increment")))
-	def := nominalDef("Level", "int8", methodIR(inc), methodIR(twice))
+	def := nominalDef("Level", "sbyte", methodIR(inc), methodIR(twice))
 	env := newTypeEnv(def).withConst("base", "Level", intConst(5))
 	wantInt(t, memberCall(id("base"), "twice"), env, 7)
 }
@@ -488,7 +488,7 @@ func TestNominalLetFold(t *testing.T) {
 	step := method("step", nil, selfType(),
 		ast.NewLetStmt("next", ast.NewNamedType("", "Level", nil, nil), memberCall(selfExpr(), "increment"), nil),
 		ret(memberCall(id("next"), "increment")))
-	def := nominalDef("Level", "int8", methodIR(inc), methodIR(step))
+	def := nominalDef("Level", "sbyte", methodIR(inc), methodIR(step))
 	env := newTypeEnv(def).withConst("base", "Level", intConst(5))
 	wantInt(t, memberCall(id("base"), "step"), env, 7)
 }
@@ -516,7 +516,7 @@ func TestNominalOverload(t *testing.T) {
 	// merge(active: bool): bool { return active && self > 0 }
 	mergeBool := method("merge", []*ast.ParamDef{param("active", boolType())}, boolType(),
 		ret(memberCall(id("active"), "anan", memberCall(selfExpr(), "gt", intLit("0")))))
-	def := nominalDef("Score", "int32", methodIR(mergeInt), methodIR(mergeBool))
+	def := nominalDef("Score", "int", methodIR(mergeInt), methodIR(mergeBool))
 	env := newTypeEnv(def).withConst("base", "Score", intConst(100))
 
 	wantInt(t, memberCall(id("base"), "merge", intLit("50")), env, 150)
@@ -528,7 +528,7 @@ func TestNominalOverload(t *testing.T) {
 // primitive still backs the value, so the method folds.
 func TestNominalWhereTypeMethod(t *testing.T) {
 	inc := method("increment", nil, selfType(), ret(memberCall(selfExpr(), "add", intLit("1"))))
-	def := nominalDef("Percent", "int8", methodIR(inc))
+	def := nominalDef("Percent", "sbyte", methodIR(inc))
 	def.Where = memberCall(selfExpr(), "gteq", intLit("0")) // self >= 0 (a usable predicate)
 	env := newTypeEnv(def).withConst("p", "Percent", intConst(50))
 	wantInt(t, memberCall(id("p"), "increment"), env, 51)
@@ -570,8 +570,8 @@ func TestNominalUnresolvedReceiverSafe(t *testing.T) {
 // method: loop() calls self.loop() forever (self resolves through the owning
 // def), so the fold bottoms out at the cap and yields nil — no hang.
 func TestNominalRecursionGuarded(t *testing.T) {
-	loop := method("loop", nil, ast.NewNamedType("", "int8", nil, nil), ret(memberCall(selfExpr(), "loop")))
-	def := nominalDef("Level", "int8", methodIR(loop))
+	loop := method("loop", nil, ast.NewNamedType("", "sbyte", nil, nil), ret(memberCall(selfExpr(), "loop")))
+	def := nominalDef("Level", "sbyte", methodIR(loop))
 	env := newTypeEnv(def).withConst("base", "Level", intConst(1))
 	wantNil(t, memberCall(id("base"), "loop"), env)
 }
@@ -587,14 +587,14 @@ func TestNominalLetBlockScoping(t *testing.T) {
 	//   if true { let x: Other = ... }     // inner x shadows, a different def
 	//   return x.increment()               // reads the outer Level def, folds
 	// }
-	other := nominalDef("Other", "int8") // a def with no increment method
+	other := nominalDef("Other", "sbyte") // a def with no increment method
 	shadow := method("shadow", nil, selfType(),
 		ast.NewLetStmt("x", ast.NewNamedType("", "Level", nil, nil), memberCall(selfExpr(), "increment"), nil),
 		ast.NewIfStmt(boolLit(true),
 			[]ast.Stmt{ast.NewLetStmt("x", ast.NewNamedType("", "Other", nil, nil), intLit("99"), nil)},
 			nil, nil, nil),
 		ret(memberCall(id("x"), "increment")))
-	def := nominalDef("Level", "int8", methodIR(inc), methodIR(shadow))
+	def := nominalDef("Level", "sbyte", methodIR(inc), methodIR(shadow))
 	env := newTypeEnv(def, other).withConst("base", "Level", intConst(5))
 	// self=5 -> x=6 (outer Level) -> the inner block shadows x then restores it
 	// -> x.increment() reads the outer Level def -> 7.

@@ -47,7 +47,7 @@ func TestLexerLossless(t *testing.T) {
 // position service to accurate 1-based line/column locations, and that a
 // token's width matches both its text and its resolved span length.
 func TestLexerSpans(t *testing.T) {
-	src := []byte("const MaxLevel: int64 = 100\n")
+	src := []byte("const MaxLevel: long = 100\n")
 	file := source.NewFile("inline.belt", src)
 	tokens := New(file).Tokens()
 
@@ -61,7 +61,7 @@ func TestLexerSpans(t *testing.T) {
 	if hundred.Kind != token.Int {
 		t.Fatalf("did not find the Int token")
 	}
-	if got, want := hundred.Span(file).Start, (source.Position{ByteOffset: 24, Line: 1, Column: 25}); got != want {
+	if got, want := hundred.Span(file).Start, (source.Position{ByteOffset: 23, Line: 1, Column: 24}); got != want {
 		t.Errorf("100 start = %+v, want %+v", got, want)
 	}
 

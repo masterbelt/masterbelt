@@ -30,7 +30,7 @@ File
         Colon ":"
         Whitespace " "
         TypeName
-          Ident "int"
+          Ident "nint"
       Whitespace " "
       RBrace "}"
   TypeDecl
@@ -51,7 +51,7 @@ File
         Colon ":"
         Whitespace " "
         TypeName
-          Ident "int"
+          Ident "nint"
       Whitespace " "
       RBrace "}"
   TypeDecl
@@ -173,7 +173,7 @@ File
     Colon ":"
     Whitespace " "
     TypeName
-      Ident "int"
+      Ident "nint"
     Whitespace " "
     Block
       LBrace "{"
@@ -315,12 +315,12 @@ File
         Colon ":"
         Whitespace " "
         TypeName
-          Ident "int"
+          Ident "nint"
       RParen ")"
     Colon ":"
     Whitespace " "
     TypeName
-      Ident "int"
+      Ident "nint"
     Whitespace " "
     Block
       LBrace "{"
@@ -404,7 +404,7 @@ File
     Colon ":"
     Whitespace " "
     TypeName
-      Ident "int"
+      Ident "nint"
     Whitespace " "
     Block
       LBrace "{"
@@ -480,7 +480,7 @@ File
           GenericArgs
             Lt "<"
             TypeName
-              Ident "int"
+              Ident "nint"
             Gt ">"
       Comma ","
       Whitespace " "
@@ -489,12 +489,12 @@ File
         Colon ":"
         Whitespace " "
         TypeName
-          Ident "int"
+          Ident "nint"
       RParen ")"
     Colon ":"
     Whitespace " "
     TypeName
-      Ident "int"
+      Ident "nint"
     Whitespace " "
     Block
       LBrace "{"
@@ -517,7 +517,7 @@ File
         MatchArm
           MatchPattern
             TypeName
-              Ident "int"
+              Ident "nint"
             Whitespace " "
             Ident "v"
           Whitespace "   "

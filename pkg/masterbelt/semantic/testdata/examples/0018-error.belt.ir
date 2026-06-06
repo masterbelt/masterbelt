@@ -8,12 +8,12 @@ Module
     value Reference -> "E".message()
     eval "boom"
   Const "P"
-    type int | error
+    type nint | error
     value parseLevel(StringLiteral "99")
     eval error("invalid level: 99")
   Func "parseLevel" pub
     param s: string
-    result int | error
+    result nint | error
       return error(StringLiteral "invalid level: ".add(ParamRef "s"))
   Assert "error(\"x\").message() == \"x\""
     eval true

@@ -2,7 +2,7 @@ File
   ConstDecl
     doc "DocComment for MaxLevel"
     name "MaxLevel"
-    type int64
+    type long
     value IntLit "100"
   ConstDecl
     doc "DocComment for MinLevel"

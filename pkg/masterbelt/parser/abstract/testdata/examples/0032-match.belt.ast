@@ -9,11 +9,11 @@ File
   TypeDecl
     pub
     name "Coin"
-    body { amount: int }
+    body { amount: nint }
   TypeDecl
     pub
     name "Level"
-    body { rank: int }
+    body { rank: nint }
   TypeDecl
     pub
     name "GameValue"
@@ -32,7 +32,7 @@ File
     pub
     name "worth"
     param v: GameValue
-    result int
+    result nint
       match Identifier "v"
         arm Coin c
           return (. Identifier "c" amount)
@@ -42,8 +42,8 @@ File
     pub
     name "amountOr"
     param v: Coin | null
-    param fallback: int
-    result int
+    param fallback: nint
+    result nint
       match Identifier "v"
         arm Coin c
           return (. Identifier "c" amount)
@@ -53,7 +53,7 @@ File
     pub
     name "coinAmount"
     param v: GameValue
-    result int
+    result nint
       match Identifier "v"
         arm Coin c
           return (. Identifier "c" amount)
@@ -62,11 +62,11 @@ File
   FuncDecl
     pub
     name "firstOr"
-    param xs: list<int>
-    param fallback: int
-    result int
+    param xs: list<nint>
+    param fallback: nint
+    result nint
       match (call (. Identifier "xs" get) IntLit "0")
-        arm int v
+        arm nint v
           return Identifier "v"
         arm error e
           return Identifier "fallback"
