@@ -654,8 +654,16 @@ func (p *parser) parseFuncLit() *cst.Node {
 			p.report(newArrowBlockBodyDiagnostic(p.cur().Offset, p.cur().Width))
 			children = append(children, p.parseBlock())
 		case startsExpr(p.peekSignificant()):
+			// The arrow body is a fresh expression context, not part of the
+			// enclosing if condition / switch scrutinee: a record literal here is
+			// unambiguous, so lift the head's noRecordLit restriction for it (the
+			// block body does the same through parseBlock). Without this a typed
+			// record literal in the body of a lambda used in an if/switch head
+			// mis-parses — the "{" is read as the control block instead.
 			p.skipTrivia(&children)
-			children = append(children, p.parseExpr())
+			p.bracketed(func() {
+				children = append(children, p.parseExpr())
+			})
 		default:
 			p.report(newExpectedExpressionDiagnostic(p.lastStart, 0))
 		}

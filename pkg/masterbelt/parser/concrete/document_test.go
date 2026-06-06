@@ -165,6 +165,16 @@ func TestBlockClearsHeadRestriction(t *testing.T) {
 		{"record literal stmt in lambda body in if head", "fn f(): int { if fn() { {} } { return 1 }\nreturn 0 }\n"},
 		{"field record literal in lambda body in if head", "fn f(): int { if fn() { {a: 1} } { return 1 }\nreturn 0 }\n"},
 		{"record literal stmt in lambda body in switch head", "fn f(): int { switch fn() { {} } {}\nreturn 0 }\n"},
+		// The arrow body of a lambda in a head context is the same fresh,
+		// brace-delimited context as the block body: a typed record literal there
+		// must parse as a record literal, not leak the head's noRecordLit
+		// restriction. (A bare "-> {" is a separate, pre-existing arrow-block-body
+		// recovery and is unaffected either way.)
+		{"typed record literal in arrow lambda body in if head", "fn f(): int { if fn() -> P{a: 1} { return 1 }\nreturn 0 }\n"},
+		{"typed record literal in arrow lambda body in switch head", "fn f(): int { switch fn() -> P{a: 1} {}\nreturn 0 }\n"},
+		// A record literal further into the arrow body (after a binary operator),
+		// where the leak also surfaces because noRecordLit spans the whole head.
+		{"non-leading record literal in arrow lambda body in if head", "fn f(): int { if fn() -> n + P{a: 1} { return 1 }\nreturn 0 }\n"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
