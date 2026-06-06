@@ -77,7 +77,67 @@ func occurrenceAt(doc view, offset int, trees map[cst.Green]cst.Tree) (occurrenc
 			return occ, true
 		}
 	}
+
+	// A reference inside a method or function body — a return value, a let
+	// initializer, an assignment, or anywhere in a switch/if's control flow —
+	// resolves exactly as one in an initializer does, so find-references and
+	// rename reach a constant used from a body.
+	var occ occurrence
+	var found bool
+	forEachBodyExpr(doc.AST().File(), func(e ast.Expr) {
+		if found {
+			return
+		}
+		if o, hit, _ := exprOccurrenceAt(doc, e, offset, trees); hit {
+			occ, found = o, true
+		}
+	})
+	if found {
+		return occ, true
+	}
 	return occurrence{}, false
+}
+
+// forEachBodyExpr calls fn for every top-level expression of every method,
+// enum-method, interface-default, and function body in the file — the shared
+// statement walk over each body, descending into a function literal's own body
+// — so the occurrence engines reach a reference living in a body (or in a
+// lambda nested in one) the same way they reach those in a const initializer.
+func forEachBodyExpr(file *ast.File, fn func(ast.Expr)) {
+	var walk func(body []ast.Stmt)
+	walk = func(body []ast.Stmt) {
+		ast.WalkBodyExprs(body, func(e ast.Expr) {
+			fn(e)
+			// A function literal is its own scope, so WalkExprs (which the
+			// callers run on each yielded expression) stops at its boundary;
+			// descend into its body here so references inside a lambda are
+			// reached too.
+			ast.WalkExprs(e, func(inner ast.Expr) bool {
+				if lit, ok := inner.(*ast.FuncLit); ok {
+					walk(lit.Body)
+				}
+				return true
+			})
+		})
+	}
+	for _, td := range file.Types {
+		for _, m := range td.Methods {
+			walk(m.Body)
+		}
+	}
+	for _, ed := range file.Enums {
+		for _, m := range ed.Methods {
+			walk(m.Body)
+		}
+	}
+	for _, id := range file.Interfaces {
+		for _, m := range id.Members {
+			walk(m.Body)
+		}
+	}
+	for _, fd := range file.Funcs {
+		walk(fd.Body)
+	}
 }
 
 // exprOccurrenceAt finds the value-position identifier or namespace member
@@ -176,6 +236,12 @@ func occurrencesOf(doc view, target *ir.Const, trees map[cst.Green]cst.Tree, inc
 		}
 		tokens = append(tokens, exprOccurrencesOf(doc, a.Syntax.Cond, target, trees)...)
 	}
+	// Every reference inside a method or function body, so a rename rewrites a
+	// constant used from a body too (and find-references reports it) — without
+	// this the WorkspaceEdit would silently leave a dangling reference.
+	forEachBodyExpr(doc.AST().File(), func(e ast.Expr) {
+		tokens = append(tokens, exprOccurrencesOf(doc, e, target, trees)...)
+	})
 	return tokens
 }
 

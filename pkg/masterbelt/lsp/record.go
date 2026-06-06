@@ -69,6 +69,40 @@ func recordTypes(doc view) map[*ast.RecordLit]ir.Type {
 			}
 		}
 	}
+	// pushBody pushes the expected types through a method or function body: the
+	// declared result type to every return value (reached through the if/switch
+	// control flow, not only the top level), and a let's annotated record type
+	// to its initializer — so an inferred record literal returned from inside a
+	// branch, or bound by `let p: Point = { ... }`, gets its field typing the
+	// same way a top-level return does.
+	var pushBody func(body []ast.Stmt, result ir.Type)
+	pushBody = func(body []ast.Stmt, result ir.Type) {
+		for _, stmt := range body {
+			switch stmt := stmt.(type) {
+			case *ast.ReturnStmt:
+				if stmt.Value != nil {
+					push(stmt.Value, result)
+				}
+			case *ast.LetStmt:
+				if stmt.Value != nil && stmt.Type != nil {
+					if t := annotationType(doc, stmt.Type); t != nil {
+						push(stmt.Value, t)
+					}
+				}
+			case *ast.SwitchStmt:
+				for _, arm := range stmt.Arms {
+					pushBody(arm.Body, result)
+				}
+				pushBody(stmt.Else, result)
+				for _, arm := range stmt.AfterElse {
+					pushBody(arm.Body, result)
+				}
+			case *ast.IfStmt:
+				pushIfBody(stmt, result, pushBody)
+			}
+		}
+	}
+
 	for _, c := range doc.Module().Consts {
 		if c.Syntax == nil || c.Syntax.Value == nil {
 			continue
@@ -85,14 +119,48 @@ func recordTypes(doc view) map[*ast.RecordLit]ir.Type {
 			if _, isSelf := want.(*ir.SelfType); isSelf {
 				want = self
 			}
-			for _, stmt := range m.Syntax.Body {
-				if ret, ok := stmt.(*ast.ReturnStmt); ok && ret.Value != nil {
-					push(ret.Value, want)
-				}
-			}
+			pushBody(m.Syntax.Body, want)
 		}
 	}
+	for _, fn := range doc.Module().Funcs {
+		if fn.Syntax == nil {
+			continue
+		}
+		pushBody(fn.Syntax.Body, fn.Result)
+	}
 	return out
+}
+
+// pushIfBody descends an if's then body, its else-if chain, and its else body,
+// pushing the result type through each — the statement-body twin of letTypeOfIf.
+func pushIfBody(s *ast.IfStmt, result ir.Type, pushBody func([]ast.Stmt, ir.Type)) {
+	pushBody(s.Then, result)
+	if s.ElseIf != nil {
+		pushIfBody(s.ElseIf, result, pushBody)
+	}
+	pushBody(s.Else, result)
+}
+
+// annotationType resolves a let binding's record-relevant type annotation to a
+// resolved type: a plain (or namespace-qualified) name of a non-builtin record
+// type. It is deliberately narrow — only the form a record literal can fill —
+// so a let with an annotated record type pushes its field typing down, without
+// reimplementing the checker's full annotation resolution.
+func annotationType(doc view, te ast.TypeExpr) ir.Type {
+	named, ok := te.(*ast.NamedType)
+	if !ok || named.Name == "" || len(named.Args) > 0 {
+		return nil
+	}
+	var def *ir.TypeDef
+	if named.Namespace != "" {
+		def = findTypeDef(doc.QualifiedTypeNames()[named.Namespace], named.Name)
+	} else {
+		def = findTypeDef(doc.TypeNames(), named.Name)
+	}
+	if def == nil || def.Builtin {
+		return nil
+	}
+	return &ir.Named{Def: def}
 }
 
 // recordLitOf returns the AST record literal backing a RecordLit CST node.

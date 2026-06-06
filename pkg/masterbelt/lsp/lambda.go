@@ -125,92 +125,37 @@ func forEachFuncLit(doc view, fn func(*ast.FuncLit)) {
 }
 
 // forEachExpr visits every expression of a file — constant initializers,
-// assert conditions, and method and function bodies, descending into
-// function-literal bodies — an enclosing expression before the ones nested
-// in it.
+// assert conditions, and the bodies of every kind of method and function
+// (a type's and an enum's impl methods, an interface's provided defaults, and
+// top-level functions), descending into a statement body's full control flow
+// and into function-literal bodies — an enclosing expression before the ones
+// nested in it.
+//
+// The statement-level walk delegates to the shared ast.WalkBodyExprs so the
+// editor reaches every expression a let initializer, an assignment, a switch
+// arm, or an if branch holds; the expression-level recursion delegates to
+// ast.WalkExprs so a new operand position (a ternary's branches, say) is wired
+// in once, in the AST package, for every walk that layers on it.
 func forEachExpr(file *ast.File, fn func(ast.Expr)) {
 	var walkExpr func(e ast.Expr)
-	var walkStmts func(stmts []ast.Stmt)
-	var walkIf func(s *ast.IfStmt)
-	walkStmts = func(stmts []ast.Stmt) {
-		for _, stmt := range stmts {
-			switch stmt := stmt.(type) {
-			case *ast.ReturnStmt:
-				if stmt.Value != nil {
-					walkExpr(stmt.Value)
-				}
-			case *ast.ExprStmt:
-				walkExpr(stmt.X)
-			case *ast.SwitchStmt:
-				// Descend through a switch's scrutinee, arm values, and branch
-				// bodies so an expression anywhere in the control flow is hoverable.
-				if stmt.Scrutinee != nil {
-					walkExpr(stmt.Scrutinee)
-				}
-				for _, arm := range stmt.Arms {
-					for _, v := range arm.Values {
-						walkExpr(v)
-					}
-					walkStmts(arm.Body)
-				}
-				walkStmts(stmt.Else)
-				for _, arm := range stmt.AfterElse {
-					for _, v := range arm.Values {
-						walkExpr(v)
-					}
-					walkStmts(arm.Body)
-				}
-			case *ast.IfStmt:
-				walkIf(stmt)
-			}
-		}
-	}
-	walkIf = func(s *ast.IfStmt) {
-		// The condition and each branch body, recursively through the else-if
-		// chain, so an if condition's type is hoverable.
-		if s.Cond != nil {
-			walkExpr(s.Cond)
-		}
-		walkStmts(s.Then)
-		if s.ElseIf != nil {
-			walkIf(s.ElseIf)
-		}
-		walkStmts(s.Else)
-	}
 	walkExpr = func(e ast.Expr) {
 		if e == nil {
 			return
 		}
-		fn(e)
-		switch e := e.(type) {
-		case *ast.FuncLit:
-			walkStmts(e.Body)
-		case *ast.AwaitExpr:
-			walkExpr(e.Value)
-		case *ast.CallExpr:
-			walkExpr(e.Callee)
-			for _, a := range e.Arguments {
-				walkExpr(a)
+		// WalkExprs reports e and descends its operands (a member's receiver, a
+		// call's callee and arguments, a ternary's branches, a collection's and
+		// a record's values) — but, by design, not a function literal's body,
+		// which is its own scope. Drive into that body here with the shared
+		// statement walk, so a call or member nested in a lambda is reached too.
+		ast.WalkExprs(e, func(inner ast.Expr) bool {
+			fn(inner)
+			if lit, ok := inner.(*ast.FuncLit); ok {
+				ast.WalkBodyExprs(lit.Body, walkExpr)
 			}
-		case *ast.MemberExpr:
-			walkExpr(e.Receiver)
-		case *ast.CollectionLit:
-			for _, entry := range e.Entries {
-				if entry.Key != nil {
-					walkExpr(entry.Key)
-				}
-				if entry.Value != nil {
-					walkExpr(entry.Value)
-				}
-			}
-		case *ast.RecordLit:
-			for _, f := range e.Fields {
-				if f.Value != nil {
-					walkExpr(f.Value)
-				}
-			}
-		}
+			return true
+		})
 	}
+	walkBody := func(body []ast.Stmt) { ast.WalkBodyExprs(body, walkExpr) }
 
 	for _, decl := range file.Decls {
 		if decl.Value != nil {
@@ -224,11 +169,21 @@ func forEachExpr(file *ast.File, fn func(ast.Expr)) {
 	}
 	for _, td := range file.Types {
 		for _, m := range td.Methods {
-			walkStmts(m.Body)
+			walkBody(m.Body)
+		}
+	}
+	for _, ed := range file.Enums {
+		for _, m := range ed.Methods {
+			walkBody(m.Body)
+		}
+	}
+	for _, id := range file.Interfaces {
+		for _, m := range id.Members {
+			walkBody(m.Body)
 		}
 	}
 	for _, fd := range file.Funcs {
-		walkStmts(fd.Body)
+		walkBody(fd.Body)
 	}
 }
 
