@@ -1,15 +1,17 @@
+use { comparable } from "./operators.belt"
+
 /// A boolean truth value: true or false.
 pub type bool = builtin impl {
   /// The ! operator: the logical negation.
   pub extern fn not(): self
 
-  /// The == operator.
-  pub extern fn eql(other: self): self
-  /// The != operator.
-  pub extern fn neq(other: self): self
-
   /// The && operator: the logical and.
   pub extern fn anan(other: self): self
   /// The || operator: the logical or.
   pub extern fn oror(other: self): self
+} impl comparable {
+  /// The == operator.
+  pub extern fn eql(other: self): self
+  /// The != operator.
+  pub extern fn neq(other: self): self
 }

@@ -1,0 +1,47 @@
+// The operator contracts: the named interfaces a type opts into to carry the
+// comparison and arithmetic operators. They are gathered here, apart from any one
+// type, because they cut across the whole numeric and ordered family — bool,
+// the integers, string, datetime, duration — and a generic bound (T: orderable)
+// reads better naming the contract than naming a type that happens to have the
+// methods. Each member is an operator's method; a type writes `impl orderable`
+// at its own definition site and declares the members there.
+
+/// Equality: the == and != operators. Every value that can be compared for
+/// sameness conforms.
+pub interface comparable {
+  /// The == operator.
+  eql(other: self): bool
+  /// The != operator.
+  neq(other: self): bool
+}
+
+/// A total order: the <, <=, >, >= operators, layered on comparable's equality.
+pub interface orderable {
+  /// The < operator.
+  lt(other: self): bool
+  /// The <= operator.
+  lteq(other: self): bool
+  /// The > operator.
+  gt(other: self): bool
+  /// The >= operator.
+  gteq(other: self): bool
+}
+
+/// Arithmetic: the unary + and the binary +, -, *, /, % operators. The unary -
+/// (neg) is deliberately absent — an unsigned integer has no negation, so it sits
+/// on the signed types' own impl blocks rather than in this shared contract.
+pub interface numeric {
+  /// The unary + operator: the value unchanged.
+  pos(): self
+
+  /// The + operator: the sum.
+  add(other: self): self
+  /// The - operator: the difference.
+  sub(other: self): self
+  /// The * operator: the product.
+  mul(other: self): self
+  /// The / operator: the quotient. A zero divisor is a compile-time error.
+  div(other: self): self
+  /// The % operator: the remainder. A zero divisor is a compile-time error.
+  rem(other: self): self
+}
