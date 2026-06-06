@@ -1,0 +1,91 @@
+Module
+  Const "Sum"
+    type int
+    value total()
+  Const "PositionSum"
+    type int
+    value positionSum()
+  Const "EmptySum"
+    type int
+    value emptySum()
+  Const "Count"
+    type invalid
+    value <none>.count()
+  Const "EmptyCount"
+    type invalid
+    value <none>.count()
+  Const "AnyBig"
+    type invalid
+    value <none>.any((fn(v) (return ParamRef "v".gt(IntLiteral "8"))))
+  Const "AllNonNeg"
+    type invalid
+    value <none>.all((fn(v) (return ParamRef "v".gteq(IntLiteral "0"))))
+  Const "Doubled"
+    type invalid
+    value <none>.map((fn(v) (return ParamRef "v".mul(IntLiteral "2"))))
+  Const "Evens"
+    type invalid
+    value <none>.filter((fn(v) (return ParamRef "v".rem(IntLiteral "2").eql(IntLiteral "0"))))
+  Const "Values"
+    type invalid
+    value <none>.values()
+  Const "Keys"
+    type invalid
+    value <none>.keys()
+  Const "Folded"
+    type invalid
+    value <none>.fold(IntLiteral "0", (fn(acc, k, v) (return ParamRef "acc".add(ParamRef "v"))))
+  Func "total" pub
+    result int
+      let "t": int = IntLiteral "0"
+      for i of invalid <none>
+          assign "t" = LocalRef "t".add(LocalRef "i")
+      return LocalRef "t"
+  Func "positionSum" pub
+    result int
+      let "t": int = IntLiteral "0"
+      for i in invalid <none>
+          assign "t" = LocalRef "t".add(LocalRef "i")
+      return LocalRef "t"
+  Func "emptySum" pub
+    result int
+      let "t": int = IntLiteral "100"
+      for i of invalid <none>
+          assign "t" = LocalRef "t".add(LocalRef "i")
+      return LocalRef "t"
+  Assert "total() == 45"
+    eval <unevaluated>
+      total() == 45
+  Assert "positionSum() == 35"
+    eval <unevaluated>
+      positionSum() == 35
+  Assert "emptySum() == 100"
+    eval <unevaluated>
+      emptySum() == 100
+  Assert "range(0, 10).count() == 10"
+    eval <unevaluated>
+      range(0, 10).count() == 10
+  Assert "range(5, 5).count() == 0"
+    eval <unevaluated>
+      range(5, 5).count() == 0
+  Assert "range(0, 10).any(fn(v: int): bool { return v > 8 })"
+    eval <unevaluated>
+      range(0, 10).any(fn(v: int): bool { return v > 8 })
+  Assert "range(0, 10).all(fn(v: int): bool { return v >= 0 })"
+    eval <unevaluated>
+      range(0, 10).all(fn(v: int): bool { return v >= 0 })
+  Assert "range(0, 5).map(fn(v: int): int { return v * 2 }) == [0, 2, 4, 6, 8]"
+    eval <unevaluated>
+      range(0, 5).map(fn(v: int): int { return v * 2 }) == [0, 2, 4, 6, 8]
+  Assert "range(0, 10).filter(fn(v: int): bool { return v % 2 == 0 }) == [0, 2, 4, 6, 8]"
+    eval <unevaluated>
+      range(0, 10).filter(fn(v: int): bool { return v % 2 == 0 }) == [0, 2, 4, 6, 8]
+  Assert "range(3, 7).values() == [3, 4, 5, 6]"
+    eval <unevaluated>
+      range(3, 7).values() == [3, 4, 5, 6]
+  Assert "range(3, 7).keys() == [0, 1, 2, 3]"
+    eval <unevaluated>
+      range(3, 7).keys() == [0, 1, 2, 3]
+  Assert "range(0, 4).fold(0, fn(acc: int, k: int, v: int): int { return acc + v }) == 6"
+    eval <unevaluated>
+      range(0, 4).fold(0, fn(acc: int, k: int, v: int): int { return acc + v }) == 6

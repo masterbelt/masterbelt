@@ -1,0 +1,85 @@
+File
+  ConstDecl
+    name "Sum"
+    value (call Identifier "total")
+  ConstDecl
+    name "PositionSum"
+    value (call Identifier "positionSum")
+  ConstDecl
+    name "EmptySum"
+    value (call Identifier "emptySum")
+  ConstDecl
+    name "Count"
+    value (call (. (call Identifier "range" IntLit "0" IntLit "10") count))
+  ConstDecl
+    name "EmptyCount"
+    value (call (. (call Identifier "range" IntLit "5" IntLit "5") count))
+  ConstDecl
+    name "AnyBig"
+    value (call (. (call Identifier "range" IntLit "0" IntLit "10") any) (fn(v: int): bool (return (call (. Identifier "v" gt) IntLit "8"))))
+  ConstDecl
+    name "AllNonNeg"
+    value (call (. (call Identifier "range" IntLit "0" IntLit "10") all) (fn(v: int): bool (return (call (. Identifier "v" gteq) IntLit "0"))))
+  ConstDecl
+    name "Doubled"
+    value (call (. (call Identifier "range" IntLit "0" IntLit "5") map) (fn(v: int): int (return (call (. Identifier "v" mul) IntLit "2"))))
+  ConstDecl
+    name "Evens"
+    value (call (. (call Identifier "range" IntLit "0" IntLit "10") filter) (fn(v: int): bool (return (call (. (call (. Identifier "v" rem) IntLit "2") eql) IntLit "0"))))
+  ConstDecl
+    name "Values"
+    value (call (. (call Identifier "range" IntLit "3" IntLit "7") values))
+  ConstDecl
+    name "Keys"
+    value (call (. (call Identifier "range" IntLit "3" IntLit "7") keys))
+  ConstDecl
+    name "Folded"
+    value (call (. (call Identifier "range" IntLit "0" IntLit "4") fold) IntLit "0" (fn(acc: int, k: int, v: int): int (return (call (. Identifier "acc" add) Identifier "v"))))
+  FuncDecl
+    pub
+    name "total"
+    result int
+      let "t" = IntLit "0"
+      for i of (call Identifier "range" IntLit "0" IntLit "10")
+          assign Identifier "t" = (call (. Identifier "t" add) Identifier "i")
+      return Identifier "t"
+  FuncDecl
+    pub
+    name "positionSum"
+    result int
+      let "t" = IntLit "0"
+      for i in (call Identifier "range" IntLit "5" IntLit "10")
+          assign Identifier "t" = (call (. Identifier "t" add) Identifier "i")
+      return Identifier "t"
+  FuncDecl
+    pub
+    name "emptySum"
+    result int
+      let "t" = IntLit "100"
+      for i of (call Identifier "range" IntLit "10" IntLit "10")
+          assign Identifier "t" = (call (. Identifier "t" add) Identifier "i")
+      return Identifier "t"
+  AssertDecl
+    cond (call (. (call Identifier "total") eql) IntLit "45")
+  AssertDecl
+    cond (call (. (call Identifier "positionSum") eql) IntLit "35")
+  AssertDecl
+    cond (call (. (call Identifier "emptySum") eql) IntLit "100")
+  AssertDecl
+    cond (call (. (call (. (call Identifier "range" IntLit "0" IntLit "10") count)) eql) IntLit "10")
+  AssertDecl
+    cond (call (. (call (. (call Identifier "range" IntLit "5" IntLit "5") count)) eql) IntLit "0")
+  AssertDecl
+    cond (call (. (call Identifier "range" IntLit "0" IntLit "10") any) (fn(v: int): bool (return (call (. Identifier "v" gt) IntLit "8"))))
+  AssertDecl
+    cond (call (. (call Identifier "range" IntLit "0" IntLit "10") all) (fn(v: int): bool (return (call (. Identifier "v" gteq) IntLit "0"))))
+  AssertDecl
+    cond (call (. (call (. (call Identifier "range" IntLit "0" IntLit "5") map) (fn(v: int): int (return (call (. Identifier "v" mul) IntLit "2")))) eql) (list IntLit "0" IntLit "2" IntLit "4" IntLit "6" IntLit "8"))
+  AssertDecl
+    cond (call (. (call (. (call Identifier "range" IntLit "0" IntLit "10") filter) (fn(v: int): bool (return (call (. (call (. Identifier "v" rem) IntLit "2") eql) IntLit "0")))) eql) (list IntLit "0" IntLit "2" IntLit "4" IntLit "6" IntLit "8"))
+  AssertDecl
+    cond (call (. (call (. (call Identifier "range" IntLit "3" IntLit "7") values)) eql) (list IntLit "3" IntLit "4" IntLit "5" IntLit "6"))
+  AssertDecl
+    cond (call (. (call (. (call Identifier "range" IntLit "3" IntLit "7") keys)) eql) (list IntLit "0" IntLit "1" IntLit "2" IntLit "3"))
+  AssertDecl
+    cond (call (. (call (. (call Identifier "range" IntLit "0" IntLit "4") fold) IntLit "0" (fn(acc: int, k: int, v: int): int (return (call (. Identifier "acc" add) Identifier "v")))) eql) IntLit "6")
