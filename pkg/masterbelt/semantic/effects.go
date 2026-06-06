@@ -157,6 +157,13 @@ func collectEffectUses(e ast.Expr, bs infer.BodyScope, use func(effect string, n
 		for _, f := range e.Fields {
 			collectEffectUses(f.Value, bs, use)
 		}
+	case *ast.TernaryExpr:
+		// A ternary's condition and both branches run (one at compile time, but
+		// the type and effect surface spans both), so an effect anywhere in it
+		// counts — mirroring ast.WalkExprs, which descends all three operands.
+		collectEffectUses(e.Cond, bs, use)
+		collectEffectUses(e.Then, bs, use)
+		collectEffectUses(e.Else, bs, use)
 	case *ast.MemberExpr:
 		collectEffectUses(e.Receiver, bs, use)
 	case *ast.CallExpr:

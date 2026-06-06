@@ -25,6 +25,27 @@ func checkDivByZero(e ast.Expr, env evalEnv, report func(node ast.Node)) {
 		})
 		return
 	}
+	if tern, ok := e.(*ast.TernaryExpr); ok {
+		// A ternary folds and runs only the selected branch, so the div-by-zero
+		// catch follows the same dispatch: the condition is always evaluated
+		// (and walked), and only the statically-taken branch is descended into —
+		// a div-by-zero on the guaranteed-taken path is reported, one on a
+		// provably-untaken path stays silent, matching eval's short-circuit. An
+		// unfoldable condition walks both branches conservatively (either could
+		// run), so a definite div-by-zero on every path is still caught.
+		checkDivByZero(tern.Cond, env, report)
+		cond := eval.Expr(tern.Cond, env)
+		switch {
+		case cond != nil && cond.Kind == ir.ConstBool && cond.Bool:
+			checkDivByZero(tern.Then, env, report)
+		case cond != nil && cond.Kind == ir.ConstBool && !cond.Bool:
+			checkDivByZero(tern.Else, env, report)
+		default:
+			checkDivByZero(tern.Then, env, report)
+			checkDivByZero(tern.Else, env, report)
+		}
+		return
+	}
 	call, ok := e.(*ast.CallExpr)
 	if !ok {
 		return
