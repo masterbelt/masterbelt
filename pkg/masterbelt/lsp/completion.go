@@ -47,7 +47,13 @@ func completion(doc view, offset int) *protocol.CompletionList {
 		return &protocol.CompletionList{Items: typeItems(doc)}
 	}
 	effectful := effectfulContextAt(root, offset)
-	items := constantItems(doc)
+	// A value position whose expected type is an enum offers that enum's bare
+	// members alongside the value namespace — the position admits a constant or a
+	// call too, so the members are added, not offered exclusively (unlike the
+	// member-after-dot completion, which claims its position). They lead so they
+	// sort first.
+	items := expectedEnumItems(doc, root, offset)
+	items = append(items, constantItems(doc)...)
 	items = append(items, functionItems(doc, effectful)...)
 	items = append(items, constructorItems(doc)...)
 	items = append(items, valueKeywordItems(effectful)...)

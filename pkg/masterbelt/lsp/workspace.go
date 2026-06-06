@@ -112,6 +112,12 @@ func (v view) MethodCandidates(recv ir.Type, name string) ([]*ir.Method, map[str
 
 func (v view) TypeOfExpr(e ast.Expr) ir.Type { return v.ws.prog.TypeOfExpr(v.id, e) }
 
+func (v view) EnumOfAnnotation(t ast.TypeExpr) *ir.TypeDef {
+	return v.ws.prog.EnumOfAnnotation(v.id, t)
+}
+
+func (v view) EnumOf(t ir.Type) *ir.TypeDef { return v.ws.prog.EnumOf(t) }
+
 func (v view) ReceiverMethods(recv ir.Type) ([]*ir.Method, map[string]ir.Type, bool) {
 	return v.ws.prog.ReceiverMethods(recv)
 }

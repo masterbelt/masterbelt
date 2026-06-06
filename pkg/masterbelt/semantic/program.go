@@ -149,6 +149,28 @@ func (p *Program) TypeOfExpr(file FileID, e ast.Expr) ir.Type {
 	return infer.Expr(e, typeEnv{q: engineQueries{p.db}, file: file})
 }
 
+// EnumOfAnnotation resolves a written type annotation to the enum a bare member
+// in the annotated value position would fold through — a bare enum, or a union
+// carrying one (R | error) — or nil for any other annotation. It shares the
+// exact resolution the const initializer's value lowering uses (a pure universe
+// name lookup, never the type query), so the editor's expected-enum completion
+// offers exactly the members the lowering would resolve and never one it would
+// leave undefined. It is how the editor completes a bare member at an annotated
+// const or let initializer.
+func (p *Program) EnumOfAnnotation(file FileID, t ast.TypeExpr) *ir.TypeDef {
+	return typeExprEnum(engineQueries{p.db}, file, t)
+}
+
+// EnumOf returns the enum a type names for the purpose of bare-member resolution
+// — a nominal enum, or a union carrying one — or nil otherwise. It is the same
+// rule EnumOfAnnotation applies to a resolved annotation, exposed for the static
+// type the editor reads from a switch scrutinee (a parameter, self, or a let
+// local) so that the arm completes bare members exactly as the const annotation
+// path does.
+func (p *Program) EnumOf(t ir.Type) *ir.TypeDef {
+	return enumDefOf(t)
+}
+
 // MethodCandidates returns the overload set recv binds for name — through a
 // named type, a builtin, or a generic application — together with the
 // substitution the receiver's type arguments pin (a list<int> receiver pins

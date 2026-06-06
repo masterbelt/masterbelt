@@ -451,8 +451,22 @@ func annotationEnum(q queries, fileID FileID, decl *ast.ConstDecl) *ir.TypeDef {
 	if decl.Type == nil {
 		return nil
 	}
+	return typeExprEnum(q, fileID, decl.Type)
+}
+
+// typeExprEnum resolves a written type annotation to the enum it names, sharing
+// the resolution annotationEnum feeds the value lowering: a bare enum, or a
+// union carrying one (R | error), through a pure universe name lookup (never the
+// type query). An App or named alias of a union does not unwrap here — the bare
+// member it carries is the same set the lowering leaves unresolved, so the two
+// agree. It is the channel the editor's expected-enum completion reads, so the
+// candidates it offers are exactly the members the lowering would resolve.
+func typeExprEnum(q queries, fileID FileID, t ast.TypeExpr) *ir.TypeDef {
+	if t == nil {
+		return nil
+	}
 	r := &infer.TypeResolver{Defs: q.universe(fileID), Qualified: qualifiedFrom(q, q.importsOf(fileID))}
-	return enumDefOf(r.ResolveType(decl.Type, nil))
+	return enumDefOf(r.ResolveType(t, nil))
 }
 
 // refinedDef returns the definition behind a nominal (or applied) annotation
