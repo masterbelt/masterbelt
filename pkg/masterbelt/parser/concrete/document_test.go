@@ -86,6 +86,39 @@ func TestDocumentScriptedEdits(t *testing.T) {
 	}
 }
 
+// TestReparseBacksOffLookaheadChain pins reparseStart's anchor rule: a
+// File-child boundary can hinge on a lookahead across pub/extern/fn and the
+// effect keywords (an error run stops at fn only when a declaring name
+// follows), so an edit to the token after such a run must reparse from before
+// the run. Before the fix the incremental parse kept the preceding error node's
+// stale right edge and a divergence from the full parse resulted.
+func TestReparseBacksOffLookaheadChain(t *testing.T) {
+	cases := []struct {
+		name    string
+		initial string
+		edit    source.Edit
+	}{
+		// "fn i" is a declaration; the edit turns the name into "type", so fn
+		// must fold back into the preceding error run.
+		{"fn loses its name", "+ 2fn i\n", source.Edit{Start: 6, End: 7, NewText: []byte("type ")}},
+		// The same, across an effect list (fn io async i).
+		{"fn loses its name across effects", "+ 2fn io async i\n", source.Edit{Start: 15, End: 16, NewText: []byte("type ")}},
+		// "extern fn" is a declaration; the edit removes the fn, so extern must
+		// fold back into the preceding error run.
+		{"extern loses its fn", "+ 2extern fn f(): int { return 1 }\n", source.Edit{Start: 10, End: 12, NewText: []byte("zz")}},
+		// "pub extern fn" likewise, with the chain crossing two tokens.
+		{"pub extern loses its fn", "+ 2pub extern fn f(): int { return 1 }\n", source.Edit{Start: 14, End: 16, NewText: []byte("zz")}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			doc := NewDocument([]byte(tc.initial))
+			content := naiveSplice([]byte(tc.initial), tc.edit.Start, tc.edit.End, tc.edit.NewText)
+			doc.Edit(tc.edit)
+			assertMatchesFullParse(t, doc, content)
+		})
+	}
+}
+
 // TestErrorRunMirrorsDispatch pins parseError's stop predicate to
 // nextChildren's dispatch. A token the dispatcher routes back to the error
 // parser — extern (or pub extern) without fn — must not stop the error run:
@@ -246,6 +279,15 @@ func TestDocumentFuzz(t *testing.T) {
 		// oracle covers binary/unary expressions and the maximal-munch edits.
 		"+", "-", "%", "!", "<", ">", "&&", "||", "==", "!=", "<=", ">=",
 		"true", "false", "1 + 2", "a && b", "-x", "!true",
+		// Declaration and statement keywords with their brackets, so the walk
+		// reaches the malformed-recovery paths whose diagnostics once anchored on
+		// a declaration's right boundary: enum/interface/impl/control blocks
+		// missing "{", a function missing its body, an unterminated record /
+		// collection / paren / map literal, and the if/else and ternary branches.
+		"{", "}", "(", ")", "[", "]", "?", "->", ".", ",",
+		"fn ", "fn", "type ", "enum ", "interface ", "impl ", "use ", "from ",
+		"assert ", "extern ", "if ", "else ", "switch ", "let ", "return ",
+		"where ", "builtin", "self", "null", "io ", "Point {", "{ a: 1 }",
 	}
 
 	start := "const x = 0\n"
