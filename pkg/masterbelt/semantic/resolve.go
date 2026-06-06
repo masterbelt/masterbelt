@@ -402,9 +402,12 @@ func resolveAssocConstList(env eval.Env, r *infer.TypeResolver, reg *builtin.Reg
 
 		// An ordinary associated constant folds its initializer (when an
 		// evaluator is supplied) and types as its annotation, or — without one —
-		// as the kind of its folded value.
+		// as the kind of its folded value. A bare member in the initializer folds
+		// through the annotation's enum (const Fav: Rarity = Legend), the assoc-const
+		// twin of a top-level const's rule — annotationEnum read here directly off the
+		// resolved type, never the type query, so the value lowering stays independent.
 		if env != nil {
-			ac.Value = eval.Decl(c, env)
+			ac.Value = eval.DeclExpecting(c, enumDefOf(annType), eval.CollKindOf(annType), env)
 		}
 		switch {
 		case annType != nil:

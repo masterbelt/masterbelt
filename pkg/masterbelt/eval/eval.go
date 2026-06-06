@@ -19,6 +19,7 @@ import (
 	"strings"
 
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/types"
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
 )
@@ -140,24 +141,13 @@ func ExprExpecting(e ast.Expr, want ir.Type, env Env) *ir.Constant {
 	return evalExpr(e, evalCtx{env: env, expected: expectedEnum(want)})
 }
 
-// expectedEnum returns the enum definition a type names, or nil when it is not
-// an enum's named type. A union carrying an enum (R | error) resolves to that
-// enum, so a bare member folds under a union-of-enum expectation exactly as
-// under the bare enum.
+// expectedEnum returns the enum definition a type carries, or nil when it
+// carries none — the folder's name for types.EnumDef. A union carrying an enum
+// (R | error), and — unwrapped through the union helper — a named or generic
+// union alias of one (optional<Rarity>) all resolve, so a bare member folds under
+// an alias expectation exactly as under the bare enum.
 func expectedEnum(want ir.Type) *ir.TypeDef {
-	switch w := want.(type) {
-	case *ir.Named:
-		if w.Def != nil && w.Def.Enum != nil {
-			return w.Def
-		}
-	case *ir.Union:
-		for _, m := range w.Members {
-			if n, ok := m.(*ir.Named); ok && n.Def != nil && n.Def.Enum != nil {
-				return n.Def
-			}
-		}
-	}
-	return nil
+	return types.EnumDef(want)
 }
 
 // CollKindOf returns the mapness a resolved type names — CollMap for a map<K,V>
@@ -478,9 +468,17 @@ func evalExpr(e ast.Expr, ctx evalCtx) *ir.Constant {
 		if v, ok := shortCircuit(recv, member.Member.Name, e.Arguments); ok {
 			return v
 		}
+		// A bare member as an operator/method argument folds through the receiver's
+		// static enum (rarity == Legend, desugared to rarity.eql(Legend)): the
+		// enum is read syntactically from the receiver's annotation (recvType, never
+		// the type query), so a comparison whose argument is a bare member folds.
+		// The expectation reaches only the immediate argument, like every other
+		// expected-enum channel; a non-enum receiver yields nil and changes nothing.
+		argCtx := sub
+		argCtx.expected = expectedEnum(recvType(sub, member.Receiver))
 		args := make([]*ir.Constant, len(e.Arguments))
 		for i, a := range e.Arguments {
-			args[i] = evalExpr(a, sub)
+			args[i] = evalExpr(a, argCtx)
 		}
 		return call(sub, member.Receiver, recv, member.Member.Name, args)
 	default:
@@ -1960,11 +1958,16 @@ func evalLet(s *ast.LetStmt, ctx evalCtx, scope *blockScope) bool {
 		return false
 	}
 	// A let annotation is the collection-mapness channel for the initializer, so
-	// let m: map<K,V> = [] folds to an empty map exactly as the const form does.
-	// Set on a copy of ctx: evalExpr consumes (and clears) it for the immediate
-	// literal, and ctx's other fields are unaffected for the bind below.
+	// let m: map<K,V> = [] folds to an empty map exactly as the const form does,
+	// and the expected-enum channel, so let r: Rarity = Legend folds the bare
+	// member — the body twin of a const initializer's rule. Both are read from the
+	// annotation (annotationType, never the type query). Set on a copy of ctx:
+	// evalExpr consumes (and clears) them for the immediate value, and ctx's other
+	// fields are unaffected for the bind below.
 	letCtx := ctx
-	letCtx.expectedColl = CollKindOf(annotationType(ctx.env, s.Type))
+	annType := annotationType(ctx.env, s.Type)
+	letCtx.expectedColl = CollKindOf(annType)
+	letCtx.expected = expectedEnum(annType)
 	v := evalExpr(s.Value, letCtx)
 	if v == nil {
 		return false
@@ -1987,7 +1990,13 @@ func evalAssign(s *ast.AssignStmt, ctx evalCtx) bool {
 	if s.Value == nil {
 		return false
 	}
-	v := evalExpr(s.Value, ctx)
+	// A bare member on the right folds through the target local's static enum (r =
+	// Common, where r is a Rarity let), read syntactically from the local's
+	// annotation (recvType, never the type query) — the assignment twin of the
+	// let-initializer rule. The expectation reaches only the immediate value.
+	assignCtx := ctx
+	assignCtx.expected = expectedEnum(recvType(ctx, s.Target))
+	v := evalExpr(s.Value, assignCtx)
 	if v == nil {
 		return false
 	}

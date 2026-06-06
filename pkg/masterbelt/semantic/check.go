@@ -233,6 +233,96 @@ func copyLocals(locals map[string]*ir.Constant) map[string]*ir.Constant {
 	return out
 }
 
+// checkBareEnumArgs reports a bare member in an operator/method argument whose
+// receiver is an enum but which names no member of it (rarity == Bogus, desugared
+// to rarity.eql(Bogus)) as unknown_enum_member — the argument twin of the const
+// path's finding for a bare member of a const annotation. It is a best-effort
+// guardrail, fired only where the receiver's static type names an enum and the
+// argument is a bare name resolving to nothing else; the bare members it leaves
+// alone (a member, a local, a parameter, a constant) all resolve in the lowering.
+//
+// The walk threads bs through a block's lets exactly as the checking walk does
+// (a fresh scope per let, a copy per nested block), so a comparison against a
+// let-bound enum local resolves its receiver from the local in scope.
+func checkBareEnumArgs(body []ast.Stmt, bs infer.BodyScope, env eval.Env, at func(ast.Node) span, diags *diagnostic.List) {
+	for _, stmt := range body {
+		switch s := stmt.(type) {
+		case *ast.LetStmt:
+			reportBareEnumArgsIn(s.Value, bs, env, at, diags)
+			bs = bindReturnLocal(s, bs)
+		case *ast.AssignStmt:
+			reportBareEnumArgsIn(s.Value, bs, env, at, diags)
+		case *ast.ExprStmt:
+			reportBareEnumArgsIn(s.X, bs, env, at, diags)
+		case *ast.ReturnStmt:
+			reportBareEnumArgsIn(s.Value, bs, env, at, diags)
+		case *ast.IfStmt:
+			reportBareEnumArgsIn(s.Cond, bs, env, at, diags)
+			checkBareEnumArgs(s.Then, bs, env, at, diags)
+			if s.ElseIf != nil {
+				checkBareEnumArgs([]ast.Stmt{s.ElseIf}, bs, env, at, diags)
+			}
+			checkBareEnumArgs(s.Else, bs, env, at, diags)
+		case *ast.SwitchStmt:
+			reportBareEnumArgsIn(s.Scrutinee, bs, env, at, diags)
+			checkBareEnumArgsArms(s.Arms, bs, env, at, diags)
+			checkBareEnumArgs(s.Else, bs, env, at, diags)
+			checkBareEnumArgsArms(s.AfterElse, bs, env, at, diags)
+		case *ast.MatchStmt:
+			reportBareEnumArgsIn(s.Scrutinee, bs, env, at, diags)
+			for _, arm := range s.Arms {
+				checkBareEnumArgs(arm.Body, armNarrowedScope(bs, arm), env, at, diags)
+			}
+			checkBareEnumArgs(s.Else, bs, env, at, diags)
+			for _, arm := range s.AfterElse {
+				checkBareEnumArgs(arm.Body, armNarrowedScope(bs, arm), env, at, diags)
+			}
+		case *ast.ForStmt:
+			reportBareEnumArgsIn(s.Iter, bs, env, at, diags)
+			checkBareEnumArgs(s.Body, forNarrowedScope(bs, s), env, at, diags)
+		default:
+			panic(ast.UnhandledStmt(stmt))
+		}
+	}
+}
+
+// checkBareEnumArgsArms walks each switch arm's value patterns and body.
+func checkBareEnumArgsArms(arms []*ast.SwitchArm, bs infer.BodyScope, env eval.Env, at func(ast.Node) span, diags *diagnostic.List) {
+	for _, arm := range arms {
+		for _, v := range arm.Values {
+			reportBareEnumArgsIn(v, bs, env, at, diags)
+		}
+		checkBareEnumArgs(arm.Body, bs, env, at, diags)
+	}
+}
+
+// reportBareEnumArgsIn walks an expression and reports a bare non-member
+// argument of every method call whose receiver's static type names an enum. The
+// receiver type is read through the type query (infer.Body) — this is the
+// reporting pass, which the value query never feeds, so the early-cutoff
+// invariant (value-blind folding) is untouched.
+func reportBareEnumArgsIn(e ast.Expr, bs infer.BodyScope, env eval.Env, at func(ast.Node) span, diags *diagnostic.List) {
+	if e == nil {
+		return
+	}
+	ast.WalkExprs(e, func(x ast.Expr) bool {
+		call, ok := x.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		member, ok := call.Callee.(*ast.MemberExpr)
+		if !ok {
+			return true
+		}
+		if enumDef := enumDefOf(infer.Body(member.Receiver, bs)); enumDef != nil {
+			for _, a := range call.Arguments {
+				reportBareEnumMember(a, enumDef, bs, env, at, diags)
+			}
+		}
+		return true
+	})
+}
+
 // checkNoSelf reports each self expression in e — descending into nested
 // function-literal bodies, which inherit the enclosing context's receiver (or
 // its absence). A constant initializer, an assert condition, and a function
@@ -288,6 +378,7 @@ func checkMethodBodies(reg *builtin.Registry, defs []*ir.TypeDef, universe map[s
 			bs := infer.BodyScope{Reg: reg, Universe: universe, Qualified: qualified, Self: self, Params: params, Funcs: funcs, QualifiedFuncs: qualifiedFuncs}
 			checkStmts(m.Body, want, bs, env, nil, sink, at, diags)
 			checkIndexWrites(m.Body, env, at, diags)
+			checkBareEnumArgs(m.Body, bs, env, at, diags)
 		}
 	}
 }
@@ -336,6 +427,7 @@ func checkFuncBodies(reg *builtin.Registry, file *ast.File, universe map[string]
 			continue // the sink-only walk wants no further diagnostics
 		}
 		checkIndexWrites(fd.Body, env, at, diags)
+		checkBareEnumArgs(fd.Body, bs, env, at, diags)
 		if hasBlockBody(fd) && !bodyReturns(fd.Body, bs) {
 			s := at(fd)
 			diags.Add(newMissingReturnDiagnostic(s.offset, s.width, fd.Name))
@@ -366,7 +458,7 @@ func checkStmts(stmts []ast.Stmt, want ir.Type, bs infer.BodyScope, env eval.Env
 			}
 			infer.CheckBody(stmt.Value, want, bs, sink)
 		case *ast.LetStmt:
-			bs = checkLet(stmt, bs, noSelf, sink, at, diags)
+			bs = checkLet(stmt, bs, env, noSelf, sink, at, diags)
 		case *ast.AssignStmt:
 			checkAssign(stmt, bs, env, noSelf, sink, at, diags)
 		case *ast.ExprStmt:

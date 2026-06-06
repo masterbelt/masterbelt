@@ -7,6 +7,9 @@ File
     name "Bare"
     type Rarity
     value Identifier "Common"
+  ConstDecl
+    name "Highest"
+    value (call Identifier "highestSeen" (. Identifier "Rarity" Legend))
   EnumDecl
     doc "A card's rarity tier."
     pub
@@ -34,6 +37,15 @@ File
     base string
     member "Ja"
     member "En" = StringLit "en-US"
+  FuncDecl
+    pub
+    name "highestSeen"
+    param starting: Rarity
+    result Rarity
+      let "best": Rarity = Identifier "Common"
+      if (call (. Identifier "starting" eql) Identifier "Legend")
+          assign Identifier "best" = Identifier "Legend"
+      return Identifier "best"
   AssertDecl
     cond (call (. (. Identifier "Rarity" Common) neq) (. Identifier "Rarity" Legend))
   AssertDecl
@@ -42,5 +54,9 @@ File
     cond (call (. (. Identifier "Rarity" Legend) eql) Identifier "Top")
   AssertDecl
     cond (call (. Identifier "Bare" eql) (. Identifier "Rarity" Common))
+  AssertDecl
+    cond (call (. (call Identifier "highestSeen" (. Identifier "Rarity" Legend)) eql) (. Identifier "Rarity" Legend))
+  AssertDecl
+    cond (call (. (call Identifier "highestSeen" (. Identifier "Rarity" Common)) eql) (. Identifier "Rarity" Common))
   AssertDecl
     cond (call (. (. Identifier "Locale" Ja) lt) (. Identifier "Locale" En))

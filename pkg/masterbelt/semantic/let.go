@@ -31,7 +31,7 @@ import (
 // assignment's type check — resolves through it. A nil diagnostic list (the
 // func-literal-types walk) still extends the scope and types the value through
 // the sink, but reports no let-specific diagnostics.
-func checkLet(s *ast.LetStmt, bs infer.BodyScope, noSelf func(ast.Node), sink *infer.Sink, at func(ast.Node) span, diags *diagnostic.List) infer.BodyScope {
+func checkLet(s *ast.LetStmt, bs infer.BodyScope, env eval.Env, noSelf func(ast.Node), sink *infer.Sink, at func(ast.Node) span, diags *diagnostic.List) infer.BodyScope {
 	if s.Value != nil && noSelf != nil {
 		checkNoSelf(s.Value, noSelf)
 	}
@@ -40,9 +40,13 @@ func checkLet(s *ast.LetStmt, bs infer.BodyScope, noSelf func(ast.Node), sink *i
 	switch {
 	case s.Type != nil:
 		// An annotated let fixes its type; the value is checked against it, so a
-		// value that does not fit is reported as an ordinary type mismatch.
+		// value that does not fit is reported as an ordinary type mismatch. A bare
+		// member of the annotation's enum (let r: Rarity = Legend) resolves through
+		// the checking walk; a name that is not a member is the unknown_enum_member
+		// the const path reports, not a bare type mismatch.
 		typ = resolveBodyType(bs, s.Type)
 		if s.Value != nil {
+			reportBareEnumMember(s.Value, enumDefOf(typ), bs, env, at, diags)
 			infer.CheckBody(s.Value, typ, bs, sink)
 		}
 	case s.Value != nil:
@@ -126,11 +130,57 @@ func checkAssign(s *ast.AssignStmt, bs infer.BodyScope, env eval.Env, noSelf fun
 	if s.Value == nil {
 		return
 	}
+	// A bare member of the target's enum (r = Common, where r is a Rarity let)
+	// resolves through the local's static type; a name that is not a member is the
+	// unknown_enum_member the const path reports. A genuine member of the enum is a
+	// resolved value, so the synthesis below would otherwise call it an unknown
+	// name — resolve it here first.
+	if enumDef := enumDefOf(want); enumDef != nil {
+		reportBareEnumMember(s.Value, enumDef, bs, env, at, diags)
+		if id, ok := s.Value.(*ast.Identifier); ok && enumIndex(enumDef, id.Name) >= 0 {
+			return // a bare member assigns at the enum's type; no mismatch
+		}
+	}
 	got := infer.CheckBody(s.Value, ir.Invalid, bs, sink)
 	if want != ir.Invalid && got != ir.Invalid && !types.Assignable(bs.Reg, got, want) {
 		c := at(s.Value)
 		diags.Add(newAssignTypeMismatchDiagnostic(c.offset, c.width, id.Name, got.String(), want.String()))
 	}
+}
+
+// reportBareEnumMember reports a bare identifier under an enum expectation that
+// names no member of the enum as unknown_enum_member — the same finding the const
+// path's reportRefIssues gives a bare member of a const's annotation. It fires
+// only when enumDef is non-nil (the position names an enum) and the value is a
+// bare name that resolves to nothing else in scope: a real member resolves, and a
+// name that is a parameter, a let local, a top-level function, or a constant is a
+// legitimate reference (its own type rules apply), not a mistyped member. A nil
+// diagnostic list (the func-literal-types walk) reports nothing.
+func reportBareEnumMember(value ast.Expr, enumDef *ir.TypeDef, bs infer.BodyScope, env eval.Env, at func(ast.Node) span, diags *diagnostic.List) {
+	if diags == nil || enumDef == nil {
+		return
+	}
+	id, ok := value.(*ast.Identifier)
+	if !ok || id.Name == "" {
+		return
+	}
+	if enumIndex(enumDef, id.Name) >= 0 {
+		return // a real member: a resolved value, not an unknown one
+	}
+	if _, isParam := bs.Params[id.Name]; isParam {
+		return
+	}
+	if _, isLocal := bs.Locals[id.Name]; isLocal {
+		return
+	}
+	if _, isFunc := bs.Funcs[id.Name]; isFunc {
+		return
+	}
+	if env != nil && env.Resolve(id) != nil {
+		return // a top-level constant: a legitimate reference
+	}
+	s := at(id)
+	diags.Add(newUnknownEnumMemberDiagnostic(s.offset, s.width, enumDef.Name, id.Name))
 }
 
 // withLocal returns a copy of bs whose Locals carries name bound to typ on top

@@ -624,6 +624,33 @@ func UnionType(t ir.Type) *ir.Union {
 	}
 }
 
+// EnumDef returns the enum definition a type carries, or nil when it carries
+// none. A nominal enum (Rarity) gives its own definition; any other type is read
+// through UnionType, so a union carrying an enum (Rarity | error), a named union
+// alias of one, and a generic union alias (optional<Rarity>) all resolve to the
+// enum exactly as a bare union does — a member of it being accepted where the
+// type is expected. A union with several enums takes the first (a name no enum
+// declares stays unresolved at the use site).
+//
+// It is the single channel a bare enum member resolves through wherever an
+// annotation or syntactic static type is the expectation: the const/let/assoc
+// initializer, the assignment target, the operator argument, the switch
+// scrutinee. It reads only the resolved type — never a folded value — so the
+// value query that feeds it stays independent of the type query.
+func EnumDef(t ir.Type) *ir.TypeDef {
+	if n, ok := t.(*ir.Named); ok && n.Def != nil && n.Def.Enum != nil {
+		return n.Def
+	}
+	if u := UnionType(t); u != nil {
+		for _, m := range u.Members {
+			if n, ok := m.(*ir.Named); ok && n.Def != nil && n.Def.Enum != nil {
+				return n.Def
+			}
+		}
+	}
+	return nil
+}
+
 // hasFreeVar reports whether t still contains a type variable not yet bound in
 // subst — the part Match could still solve. It guides a union pattern to try its
 // solvable members before its concrete ones.

@@ -32,9 +32,25 @@ const Top: Rarity = Rarity.Legend
 // A bare member resolves through the expected type (bidirectional inference).
 const Bare: Rarity = Common
 
+// The same bidirectional channel reaches into a function body: a bare member
+// resolves through a let's annotation, an assignment's target type, and a
+// comparison's receiver enum (the desugared operator argument) — the master-data
+// `rarity == Legend` E-2 motivates.
+pub fn highestSeen(starting: Rarity): Rarity {
+  let best: Rarity = Common
+  if starting == Legend {
+    best = Legend
+  }
+  return best
+}
+
+const Highest = highestSeen(Rarity.Legend)
+
 // Equality compares the member identity; ordering compares the base value.
 assert Rarity.Common != Rarity.Legend
 assert Rarity.Common < Rarity.Legend
 assert Rarity.Legend == Top
 assert Bare == Rarity.Common
+assert highestSeen(Rarity.Legend) == Rarity.Legend
+assert highestSeen(Rarity.Common) == Rarity.Common
 assert Locale.Ja < Locale.En
