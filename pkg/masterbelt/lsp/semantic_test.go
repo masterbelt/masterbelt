@@ -492,6 +492,49 @@ func TestSemanticTokensErrorConversion(t *testing.T) {
 	}
 }
 
+func TestSemanticTokensValueMembers(t *testing.T) {
+	// A member access in value position carries a resolution fact the lexical
+	// pass cannot: Rarity.Common names an enum member (matching its declaration
+	// site, not a property), and int8.Max names an associated constant (a
+	// read-only value, like an imported constant). The receiver of each — the
+	// type name — reads through the existing value rules.
+	src := "enum Rarity: int8 {\n" +
+		"  Common = 0\n" +
+		"}\n" +
+		"const C = Rarity.Common\n" +
+		"const M = int8.Max\n"
+	doc := testView(src)
+	got := decode(semanticTokensIn(doc).Data)
+
+	find := func(line, char int) (decodedToken, bool) {
+		for _, tok := range got {
+			if tok.line == line && tok.char == char {
+				return tok, true
+			}
+		}
+		return decodedToken{}, false
+	}
+	cases := []struct {
+		name       string
+		line, char int
+		tokenType  int
+		mods       int
+	}{
+		{"enum member value", 3, 17, stEnumMember, smReadonly}, // Common in Rarity.Common
+		{"assoc const value", 4, 15, stVariable, smReadonly},   // Max in int8.Max
+	}
+	for _, tc := range cases {
+		tok, ok := find(tc.line, tc.char)
+		if !ok {
+			t.Errorf("%s: no token at %d:%d (got %+v)", tc.name, tc.line, tc.char, got)
+			continue
+		}
+		if tok.tokenType != tc.tokenType || tok.mods != tc.mods {
+			t.Errorf("%s = %+v, want type %d mods %d", tc.name, tok, tc.tokenType, tc.mods)
+		}
+	}
+}
+
 func TestSemanticTokensEffects(t *testing.T) {
 	// The effect keywords and await colour as keywords, uniformly with the
 	// cold-start grammar.
