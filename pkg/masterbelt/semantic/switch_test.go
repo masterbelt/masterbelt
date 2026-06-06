@@ -163,3 +163,32 @@ func TestSwitchEvalEnumDispatch(t *testing.T) {
 		t.Errorf("E = %q, want white", got)
 	}
 }
+
+// TestSwitchEvalFallThrough checks that a switch whose taken arm runs without
+// returning falls through to the code after it, exactly as the runtime does:
+// the arm's assignment to an outer local persists, and a trailing return folds
+// against it. Before the switch carried a fall-through outcome it collapsed to
+// nil, halting the fold of everything after the switch.
+func TestSwitchEvalFallThrough(t *testing.T) {
+	src := "fn f(): int {\n  let n = 0\n  switch 1 {\n    1 -> { n = 10 }\n    _ -> { n = 20 }\n  }\n  return n\n}\nconst R = f()\n" +
+		"fn g(): int {\n  let n = 0\n  switch 2 {\n    1 -> { n = 10 }\n    _ -> { n = 20 }\n  }\n  return n\n}\nconst S = g()\n"
+	if got := evalOf(t, src, "R").Int.Int64(); got != 10 {
+		t.Errorf("R = %d, want 10 (matched arm fell through, trailing return sees n = 10)", got)
+	}
+	if got := evalOf(t, src, "S").Int.Int64(); got != 20 {
+		t.Errorf("S = %d, want 20 (wildcard arm fell through, trailing return sees n = 20)", got)
+	}
+}
+
+// TestSwitchEvalFallThroughChained checks that folding continues past a
+// fall-through switch into a second one: both arms' assignments accumulate, so
+// the trailing return sees the composed result rather than nil.
+func TestSwitchEvalFallThroughChained(t *testing.T) {
+	src := "fn f(): int {\n  let n = 0\n" +
+		"  switch 1 {\n    1 -> { n = n.add(1) }\n    _ -> { n = n.add(2) }\n  }\n" +
+		"  switch 2 {\n    1 -> { n = n.add(10) }\n    _ -> { n = n.add(20) }\n  }\n" +
+		"  return n\n}\nconst R = f()\n"
+	if got := evalOf(t, src, "R").Int.Int64(); got != 21 {
+		t.Errorf("R = %d, want 21 (first arm +1, second wildcard +20)", got)
+	}
+}

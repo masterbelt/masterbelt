@@ -774,14 +774,14 @@ func evalBody(body []ast.Stmt, ctx evalCtx) *ir.Constant {
 				return nil // an unfoldable value (or invalid target): cannot fold on
 			}
 		case *ast.SwitchStmt:
-			if v := evalSwitch(stmt, ctx); v != nil {
-				return v
+			v, out := evalSwitch(stmt, ctx)
+			if out == switchFellThrough {
+				continue // the selected arm ran without returning; carry on
 			}
-			// A switch whose scrutinee or arms cannot be folded — or that
-			// selected an arm with no return — leaves the body unevaluated:
-			// nothing after a guaranteed-return switch is reachable, and a
-			// partial switch cannot fold.
-			return nil
+			// switchReturned yields the arm's value; switchUnknown (an
+			// unfoldable scrutinee/pattern, or no arm matched) leaves v nil,
+			// which stops folding here.
+			return v
 		case *ast.IfStmt:
 			v, out := evalIf(stmt, ctx)
 			if out == ifFellThrough {
@@ -960,10 +960,15 @@ func branchOutcome(body []ast.Stmt, ctx evalCtx) (*ir.Constant, ifOutcome) {
 				return nil, ifUnknown
 			}
 		case *ast.SwitchStmt:
-			if v := evalSwitch(stmt, ctx); v != nil {
+			v, sout := evalSwitch(stmt, ctx)
+			switch sout {
+			case switchFellThrough:
+				continue
+			case switchReturned:
 				return v, ifReturned
+			default:
+				return nil, ifUnknown
 			}
-			return nil, ifUnknown
 		case *ast.IfStmt:
 			v, out := evalIf(stmt, ctx)
 			if out == ifFellThrough {
@@ -978,32 +983,59 @@ func branchOutcome(body []ast.Stmt, ctx evalCtx) (*ir.Constant, ifOutcome) {
 	return nil, ifFellThrough // the branch ran to its end without returning
 }
 
+// switchOutcome mirrors ifOutcome for a switch: the same three cases the body
+// walk threads to decide whether to continue past the statement or stop.
+type switchOutcome int
+
+const (
+	switchUnknown     switchOutcome = iota // scrutinee/pattern unfoldable, or no arm matched
+	switchReturned                         // the selected arm returned a value
+	switchFellThrough                      // the selected arm ran to its end without returning
+)
+
 // evalSwitch selects and runs the matching arm of a switch: it folds the
 // scrutinee, compares it for equality against each arm's folded value patterns
 // in order, and runs the first matching arm's body — the wildcard arm last. It
-// returns nil when the scrutinee or a needed pattern cannot be folded, or when
-// no arm (and no wildcard) matches, so a switch only folds when its dispatch is
-// fully determined.
-func evalSwitch(sw *ast.SwitchStmt, ctx evalCtx) *ir.Constant {
+// classifies how the selected arm ended (switchReturned / switchFellThrough)
+// like an if, so a fall-through arm continues the outer body carrying any
+// assignment it made to an outer local. It is switchUnknown when the scrutinee
+// or a needed pattern cannot be folded, or when no arm (and no wildcard)
+// matches, so a switch only folds when its dispatch is fully determined.
+func evalSwitch(sw *ast.SwitchStmt, ctx evalCtx) (*ir.Constant, switchOutcome) {
 	scrut := evalExpr(sw.Scrutinee, ctx)
 	if scrut == nil {
-		return nil
+		return nil, switchUnknown
 	}
 	for _, arm := range sw.Arms {
 		for _, v := range arm.Values {
 			cv := evalExpr(v, expectingScrutinee(ctx, scrut))
 			if cv == nil {
-				return nil // an unfoldable pattern: the dispatch is undetermined
+				return nil, switchUnknown // an unfoldable pattern: undetermined
 			}
 			if constEqual(scrut, cv) {
-				return evalBody(arm.Body, ctx)
+				return switchArmOutcome(branchOutcome(arm.Body, ctx))
 			}
 		}
 	}
 	if sw.Else != nil {
-		return evalBody(sw.Else, ctx)
+		return switchArmOutcome(branchOutcome(sw.Else, ctx))
 	}
-	return nil
+	return nil, switchUnknown
+}
+
+// switchArmOutcome translates an arm body's ifOutcome — branchOutcome is the
+// shared block runner — into the switch's own outcome: a return yields its
+// value, a fall-through continues the outer body, and an unfoldable branch is
+// undetermined.
+func switchArmOutcome(v *ir.Constant, out ifOutcome) (*ir.Constant, switchOutcome) {
+	switch out {
+	case ifReturned:
+		return v, switchReturned
+	case ifFellThrough:
+		return nil, switchFellThrough
+	default:
+		return nil, switchUnknown
+	}
 }
 
 // expectingScrutinee folds an arm value with the scrutinee's enum in scope, so
