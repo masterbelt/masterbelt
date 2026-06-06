@@ -471,7 +471,8 @@ func lowerMethod(t cst.Tree, buf source.Buffer) *ast.MethodDecl {
 }
 
 // lowerInterfaceDecl lowers a positioned InterfaceDecl CST node into an
-// ast.InterfaceDecl: its modifiers, name, generic parameters, and members.
+// ast.InterfaceDecl: its modifiers, name, generic parameters, parents
+// (supertraits), and members.
 func lowerInterfaceDecl(t cst.Tree, buf source.Buffer) *ast.InterfaceDecl {
 	green, _ := t.Node()
 	var (
@@ -479,6 +480,7 @@ func lowerInterfaceDecl(t cst.Tree, buf source.Buffer) *ast.InterfaceDecl {
 		public  bool
 		name    string
 		params  []*ast.TypeParam
+		parents []ast.TypeExpr
 		members []*ast.InterfaceMember
 	)
 	for _, child := range t.Children() {
@@ -490,7 +492,7 @@ func lowerInterfaceDecl(t cst.Tree, buf source.Buffer) *ast.InterfaceDecl {
 				doc = append(doc, docText(child.Text(buf)))
 			case token.Ident:
 				// The only direct Ident child is the declared name; the generic
-				// parameters and member names are nested in their own nodes.
+				// parameters, parents, and member names are nested in their own nodes.
 				name = child.Text(buf)
 			}
 			continue
@@ -499,11 +501,26 @@ func lowerInterfaceDecl(t cst.Tree, buf source.Buffer) *ast.InterfaceDecl {
 		switch node.Kind() {
 		case cst.GenericParams:
 			params = lowerGenericParams(child, buf)
+		case cst.InterfaceParents:
+			parents = lowerInterfaceParents(child, buf)
 		case cst.InterfaceMember:
 			members = append(members, lowerInterfaceMember(child, buf))
 		}
 	}
-	return ast.NewInterfaceDecl(doc, public, name, params, members, green)
+	return ast.NewInterfaceDecl(doc, public, name, params, parents, members, green)
+}
+
+// lowerInterfaceParents lowers an InterfaceParents node into its parent type
+// expressions: each TypeName child (a named interface, possibly applied) is one
+// parent, in declaration order. The colon and commas are trivia to the lowering.
+func lowerInterfaceParents(t cst.Tree, buf source.Buffer) []ast.TypeExpr {
+	var parents []ast.TypeExpr
+	for _, child := range t.Children() {
+		if node, ok := child.Node(); ok && isTypeExprKind(node.Kind()) {
+			parents = append(parents, lowerTypeExpr(child, buf))
+		}
+	}
+	return parents
 }
 
 // lowerInterfaceMember lowers one InterfaceMember node: its modifiers, name,

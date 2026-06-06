@@ -102,6 +102,9 @@ func dumpTypeDef(b *strings.Builder, t *TypeDef) {
 	}
 	if t.Interface != nil {
 		b.WriteString("    interface\n")
+		for _, parent := range t.Interface.Parents {
+			fmt.Fprintf(b, "    parent %s\n", typeString(parent))
+		}
 		for _, name := range t.Interface.Required {
 			fmt.Fprintf(b, "    required %q\n", name)
 		}

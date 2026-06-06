@@ -82,6 +82,8 @@ masterbelt.semantic.missing_initializer,error,name:string
 masterbelt.semantic.index_out_of_range,error,index:string length:string
 masterbelt.semantic.missing_required_method,error,typ:string iface:string method:string
 masterbelt.semantic.not_an_interface,error,name:string
+masterbelt.semantic.interface_member_override,error,child:string method:string ancestor:string
+masterbelt.semantic.interface_member_conflict,error,child:string method:string first:string second:string
 masterbelt.semantic.bound_not_satisfied,error,typ:string bound:string
 masterbelt.semantic.uninferable_type_param,error,name:string
 masterbelt.semantic.no_method_on_unbounded_typevar,error,method:string

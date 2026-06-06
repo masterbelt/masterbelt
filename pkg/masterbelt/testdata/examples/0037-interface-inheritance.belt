@@ -1,0 +1,59 @@
+// Interface inheritance (supertraits): an interface may list one or more parent
+// interfaces after a colon, and a child inherits their whole contract — every
+// required and provided member. Inheritance carries requirements only; there is
+// no state and no implementation hierarchy (a child cannot exist), so a child is
+// simply the union of its own members and its ancestors'. A type that opts into
+// the child opts into every ancestor too: writing `impl <child>` materializes
+// the ancestors onto the type, so a bound or switch reading the parent contract
+// is satisfied through the child alone.
+
+/// A behaviour layered on a parent: a printable value is comparable, so it
+/// carries eql/neq (from comparable) on top of its own show.
+pub interface printable: comparable {
+  /// Render the value as a string.
+  show(): string
+}
+
+/// A diamond: ordered inherits comparable through two distinct parents
+/// (printable and rankable, each comparable). The shared ancestor is deduped by
+/// definition identity, so ordered's contract carries comparable's members once.
+pub interface rankable: comparable {
+  /// The value's rank.
+  rank(): nint
+}
+
+/// The join of two comparable-derived parents: a single shared comparable
+/// ancestor, reached two ways — the diamond closes cleanly.
+pub interface ordered: printable, rankable {
+  /// The < operator.
+  before(other: self): bool
+}
+
+// A nominal type whose underlying int supplies eql/neq (comparable), so the one
+// impl tag opts Tag into ordered and, automatically, into all of ordered's
+// ancestors: printable, rankable, comparable. show/rank/before are the members
+// ordered's own contract adds, declared here at Tag's definition site.
+/// A small ordered, printable, rankable tag value.
+pub type Tag = nint impl ordered {
+  /// Render the tag.
+  show(): string {
+    return "tag"
+  }
+  /// The tag's rank.
+  rank(): nint {
+    return 1
+  }
+  /// Order tags by value.
+  before(other: self): bool {
+    return self.lt(other)
+  }
+}
+
+// A generic bound by the child interface: a value bounded by ordered carries the
+// inherited comparable members too, so eql resolves through the inheritance
+// chain even though the bound names only ordered. The contract implication —
+// ordered means comparable — is what makes this call legal.
+/// Whether two ordered values are equal, via comparable inherited by ordered.
+pub fn equal<T: ordered>(a: T, b: T): bool {
+  return a.eql(b)
+}

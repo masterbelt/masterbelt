@@ -117,8 +117,13 @@ func resolveTypes(env eval.Env, file *ast.File, at func(ast.Node) span, diags *d
 		BoundViolation: boundViolationReporter(at, diags),
 	}
 	for i, id := range file.Interfaces {
-		resolveInterfaceDecl(r, reg, id, ifaceOut[i], fns)
+		resolveInterfaceDecl(r, reg, id, ifaceOut[i], at, diags, fns)
 	}
+	// With every interface's parents resolved, check the inheritance graph: a
+	// cycle (A: B, B: A), a child re-declaring an ancestor's member (override),
+	// and a name two unrelated ancestors both contribute (conflict). These read
+	// the whole graph, so they run once all parents are populated.
+	checkInterfaceInheritance(file.Interfaces, ifaceOut, at, diags)
 	for i, td := range file.Types {
 		resolveDecl(env, r, reg, td, out[i], at, diags, fns)
 	}
@@ -151,12 +156,14 @@ func resolveTypes(env eval.Env, file *ast.File, at func(ast.Node) span, diags *d
 }
 
 // resolveInterfaceDecl fills in an interface definition: its generic parameters
-// (whose names are in scope for the member signatures) and its members,
-// resolved into ir.Methods on the definition (required and provided alike, so a
-// value typed as the interface resolves them through the same overload path a
-// concrete type's methods take). Interface.Required and Interface.Provided
-// record which names are required versus provided, for the conformance check.
-func resolveInterfaceDecl(r *infer.TypeResolver, reg *builtin.Registry, id *ast.InterfaceDecl, def *ir.TypeDef, fns bodyFuncs) {
+// (whose names are in scope for the member signatures), its parents (the
+// supertraits it inherits from), and its members, resolved into ir.Methods on
+// the definition (required and provided alike, so a value typed as the interface
+// resolves them through the same overload path a concrete type's methods take).
+// Interface.Required and Interface.Provided record which names are required
+// versus provided, for the conformance check; Interface.Parents records the
+// resolved parent applications, for the inheritance closure.
+func resolveInterfaceDecl(r *infer.TypeResolver, reg *builtin.Registry, id *ast.InterfaceDecl, def *ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List, fns bodyFuncs) {
 	scope := make(map[string]bool, len(id.Params))
 	for _, p := range id.Params {
 		scope[p.Name] = true
@@ -168,6 +175,23 @@ func resolveInterfaceDecl(r *infer.TypeResolver, reg *builtin.Registry, id *ast.
 		}
 		def.Params = append(def.Params, &ir.TypeParam{Name: p.Name, Bound: bound})
 	}
+	// The parents (supertraits): each must resolve to an interface, the way an
+	// impl tag must. A parent that is not an interface is reported here
+	// (not_an_interface), exactly as a non-interface impl tag is; an unknown name
+	// is already reported by the resolver. The resolved applications carry the
+	// child's own type variables, so a generic parent (foldable<nint, T>) keeps
+	// them for the closure to substitute.
+	for _, p := range id.Parents {
+		t := r.ResolveType(p, scope)
+		if interfaceDefOf(t) == nil {
+			if at != nil && diags != nil && t != ir.Invalid {
+				s := at(p)
+				diags.Add(newNotAnInterfaceDiagnostic(s.offset, s.width, t.String()))
+			}
+			continue
+		}
+		def.Interface.Parents = append(def.Interface.Parents, t)
+	}
 	for _, m := range id.Members {
 		method := resolveInterfaceMember(r, reg, &ir.Named{Def: def}, m, scope, fns)
 		def.Methods = append(def.Methods, method)
@@ -177,6 +201,133 @@ func resolveInterfaceDecl(r *infer.TypeResolver, reg *builtin.Registry, id *ast.
 			def.Interface.Required = append(def.Interface.Required, m.Name)
 		}
 	}
+}
+
+// checkInterfaceInheritance validates the interface inheritance graph once every
+// interface's parents are resolved. It reports three problems, each anchored at
+// the offending site:
+//
+//   - a cycle in the parent graph (A: B, B: A) — cyclic_reference at the
+//     interface declaration, reusing the existing code the type/const cycle uses
+//     (an interface is a nominal type, so a self-involving parent chain is the
+//     same kind of fault);
+//   - a child re-declaring a member an ancestor already carries (required or
+//     provided) — interface_member_override at the child's member, since
+//     inheritance carries the contract whole and a child may only add to it; and
+//   - a member name two unrelated ancestors both contribute — a name reached
+//     through a single shared ancestor is deduped by definition identity (the
+//     diamond), but the same name declared independently by two distinct
+//     ancestors is ambiguous and is reported as interface_member_conflict at the
+//     child declaration.
+func checkInterfaceInheritance(decls []*ast.InterfaceDecl, defs []*ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List) {
+	if at == nil || diags == nil {
+		return
+	}
+	for i, def := range defs {
+		if def.Interface == nil {
+			continue
+		}
+		decl := decls[i]
+		// A cycle: the interface reaches itself through its parents. Reported once,
+		// at the declaration; the override and conflict checks below walk the same
+		// graph, so they short-circuit a cyclic chain through interfaceClosure's
+		// own seen set rather than looping.
+		if interfaceHasCycle(def) {
+			s := at(decl)
+			diags.Add(newCyclicReferenceDiagnostic(s.offset, s.width, def.Name))
+			continue
+		}
+
+		// The ancestors' contributed members: for each member name an ancestor
+		// declares, the distinct ancestor definitions that declare it. A name from
+		// a single shared ancestor lands once (the closure dedups by identity); a
+		// name from two unrelated ancestors lands twice.
+		contributors := map[string][]*ir.TypeDef{}
+		for _, parent := range def.Interface.Parents {
+			for _, anc := range interfaceClosure(parent) {
+				adef := interfaceDefOf(anc)
+				if adef == nil {
+					continue
+				}
+				for _, name := range interfaceMemberNames(adef) {
+					contributors[name] = appendDistinct(contributors[name], adef)
+				}
+			}
+		}
+
+		// Override: a child member whose name an ancestor already carries.
+		for _, m := range decl.Members {
+			if anc := contributors[m.Name]; len(anc) > 0 {
+				s := at(m)
+				diags.Add(newInterfaceMemberOverrideDiagnostic(s.offset, s.width, def.Name, m.Name, anc[0].Name))
+			}
+		}
+
+		// Conflict: a name two unrelated ancestors both declare, which the child
+		// does not itself redeclare (an override is reported above instead).
+		own := map[string]bool{}
+		for _, m := range decl.Members {
+			own[m.Name] = true
+		}
+		for _, name := range interfaceMemberNames(def) {
+			own[name] = true // the IR member names agree with the decl's; belt and braces
+		}
+		for name, anc := range contributors {
+			if len(anc) >= 2 && !own[name] {
+				s := at(decl)
+				diags.Add(newInterfaceMemberConflictDiagnostic(s.offset, s.width, def.Name, name, anc[0].Name, anc[1].Name))
+			}
+		}
+	}
+}
+
+// interfaceHasCycle reports whether the interface reaches itself through its
+// parent graph. It is a depth-first walk from the interface's own definition; a
+// back edge to the start (or, conservatively, to any node already on the active
+// path) is a cycle.
+func interfaceHasCycle(def *ir.TypeDef) bool {
+	onPath := map[*ir.TypeDef]bool{}
+	var walk func(d *ir.TypeDef) bool
+	walk = func(d *ir.TypeDef) bool {
+		if d == nil || d.Interface == nil {
+			return false
+		}
+		if onPath[d] {
+			return true
+		}
+		onPath[d] = true
+		for _, parent := range d.Interface.Parents {
+			if walk(interfaceDefOf(parent)) {
+				return true
+			}
+		}
+		onPath[d] = false
+		return false
+	}
+	return walk(def)
+}
+
+// interfaceMemberNames returns the names of an interface's own members (required
+// and provided), in a stable order, for the override and conflict checks.
+func interfaceMemberNames(def *ir.TypeDef) []string {
+	if def.Interface == nil {
+		return nil
+	}
+	names := make([]string, 0, len(def.Interface.Required)+len(def.Interface.Provided))
+	names = append(names, def.Interface.Required...)
+	names = append(names, def.Interface.Provided...)
+	return names
+}
+
+// appendDistinct appends def to defs unless it is already present, so a single
+// ancestor reached two ways (a diamond) counts once.
+func appendDistinct(defs []*ir.TypeDef, def *ir.TypeDef) []*ir.TypeDef {
+	for _, d := range defs {
+		if d == def {
+			return defs
+		}
+	}
+	return append(defs, def)
 }
 
 // resolveInterfaceMember resolves one interface member into an ir.Method,
@@ -238,9 +389,17 @@ func resolveInterfaceMember(r *infer.TypeResolver, reg *builtin.Registry, self i
 // into the definition's Impls and, when reporting, checks each implemented
 // interface for conformance. An impl whose tag does not name an interface is
 // reported (not_an_interface); a conforming type must declare every required
-// method of the interface itself (missing_required_method). The orphan rule is
-// satisfied structurally: a type's impl list is reachable only at its own
-// definition site, so any impl recorded here is non-orphan by construction.
+// method of the interface and of every ancestor it inherits
+// (missing_required_method). The orphan rule is satisfied structurally: a
+// type's impl list is reachable only at its own definition site, so any impl
+// recorded here is non-orphan by construction.
+//
+// Opting into an interface opts into all its ancestors: each impl's ancestor
+// closure (with the impl's type arguments substituted into a generic parent) is
+// materialized onto Impls too, deduped by interface identity. This is what lets
+// every path that reads Impls — Satisfies, the switch and map-key checks, the
+// hover card — see the inherited contracts through the child alone, with no
+// special-casing for inheritance.
 func resolveImpls(r *infer.TypeResolver, reg *builtin.Registry, impls []ast.TypeExpr, def *ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List) {
 	scope := make(map[string]bool, len(def.Params))
 	for _, p := range def.Params {
@@ -259,22 +418,99 @@ func resolveImpls(r *infer.TypeResolver, reg *builtin.Registry, impls []ast.Type
 			}
 			continue
 		}
-		def.Impls = append(def.Impls, t)
+		// Materialize the impl and its whole ancestor closure: the author may have
+		// written some ancestors explicitly, so each is added only if its interface
+		// is not already present.
+		for _, anc := range interfaceClosure(t) {
+			addImpl(def, anc)
+		}
 		if at == nil || diags == nil {
 			continue
 		}
-		// Conformance: every required method must be supplied by the type — its
-		// own declaration, or one derived from its underlying type. A nominal
-		// type (type Level = int impl comparable {}) inherits its base's
-		// comparison methods, so an empty impl tag opts it in. Provided methods
-		// need not be supplied — the interface itself carries them.
-		for _, name := range idef.Interface.Required {
-			if !suppliesMethod(reg, def, name, map[*ir.TypeDef]bool{}) {
-				s := at(impl)
-				diags.Add(newMissingRequiredMethodDiagnostic(s.offset, s.width, def.Name, idef.Name, name))
+		// Conformance over the closure: every required method of the interface and
+		// of every ancestor it inherits must be supplied by the type — its own
+		// declaration, or one derived from its underlying type. A nominal type
+		// (type Level = int impl comparable {}) inherits its base's comparison
+		// methods, so an empty impl tag opts it in. Provided methods need not be
+		// supplied — the interface itself carries them. The diagnostic anchors at
+		// the declared impl tag, naming the interface whose contract is unmet.
+		for _, anc := range interfaceClosure(t) {
+			adef := interfaceDefOf(anc)
+			if adef == nil {
+				continue
+			}
+			for _, name := range adef.Interface.Required {
+				if !suppliesMethod(reg, def, name, map[*ir.TypeDef]bool{}) {
+					s := at(impl)
+					diags.Add(newMissingRequiredMethodDiagnostic(s.offset, s.width, def.Name, adef.Name, name))
+				}
 			}
 		}
 	}
+}
+
+// addImpl records an interface application on the definition's Impls unless an
+// application of the same interface is already present. Identity is the
+// interface definition (not the full application), so an author-written tag and
+// a materialized ancestor of the same interface are not both kept, and a diamond
+// shares its common ancestor once.
+func addImpl(def *ir.TypeDef, impl ir.Type) {
+	idef := interfaceDefOf(impl)
+	if idef == nil {
+		return
+	}
+	for _, existing := range def.Impls {
+		if interfaceDefOf(existing) == idef {
+			return
+		}
+	}
+	def.Impls = append(def.Impls, impl)
+}
+
+// interfaceClosure returns the interface application iface together with every
+// ancestor it inherits, deduped by interface identity, in a stable order (the
+// interface itself first, then its parents' closures left to right). A generic
+// parent carries the child's type variables, so the parent application is
+// substituted with the child application's arguments — foldable<nint, T> reached
+// through a child applied to int yields foldable<nint, int>. It guards a cycle
+// in the inheritance graph with the seen set, so a malformed A: B, B: A graph
+// terminates rather than looping.
+func interfaceClosure(iface ir.Type) []ir.Type {
+	var out []ir.Type
+	seen := map[*ir.TypeDef]bool{}
+	var walk func(t ir.Type)
+	walk = func(t ir.Type) {
+		idef := interfaceDefOf(t)
+		if idef == nil || seen[idef] {
+			return
+		}
+		seen[idef] = true
+		out = append(out, t)
+		// A generic interface binds its parents against its own arguments, so
+		// substitute the application's arguments into each parent before recursing.
+		subst := interfaceSubst(t, idef)
+		for _, parent := range idef.Interface.Parents {
+			walk(types.Substitute(parent, subst))
+		}
+	}
+	walk(iface)
+	return out
+}
+
+// interfaceSubst builds the substitution from an interface definition's
+// parameters to an application's arguments, so a generic parent reached through
+// the application is read with the application's bindings. A bare interface (a
+// Named, or an App with a mismatched argument count) substitutes nothing.
+func interfaceSubst(t ir.Type, idef *ir.TypeDef) map[string]ir.Type {
+	app, ok := t.(*ir.App)
+	if !ok || len(app.Args) != len(idef.Params) {
+		return nil
+	}
+	subst := make(map[string]ir.Type, len(idef.Params))
+	for i, p := range idef.Params {
+		subst[p.Name] = app.Args[i]
+	}
+	return subst
 }
 
 // enumContractNames are the operator contracts every enum opts into: an enum
@@ -286,30 +522,20 @@ var enumContractNames = []string{"comparable", "orderable"}
 // the enum already lists (the author wrote the tag) is left alone, so it is
 // never duplicated, and a contract name that does not resolve to an interface
 // (a degraded universe where the prelude failed to load) is skipped rather than
-// recorded as a non-interface. The impls are the bare interface (a Named), the
+// recorded as a non-interface. Each contract's ancestor closure is materialized
+// too, deduped by interface identity, so orderable pulling in comparable does
+// not record comparable twice. The impls are the bare interface (a Named), the
 // no-argument form the conformance and Satisfies checks expect.
 func addEnumContracts(r *infer.TypeResolver, def *ir.TypeDef) {
 	for _, name := range enumContractNames {
-		if enumDeclaresContract(def, name) {
-			continue
-		}
 		t := r.ResolveName(name, nil)
 		if interfaceDefOf(t) == nil {
 			continue
 		}
-		def.Impls = append(def.Impls, t)
-	}
-}
-
-// enumDeclaresContract reports whether the enum's impls already name the
-// interface, so the automatic opt-in does not duplicate an author-written tag.
-func enumDeclaresContract(def *ir.TypeDef, name string) bool {
-	for _, impl := range def.Impls {
-		if idef := interfaceDefOf(impl); idef != nil && idef.Name == name {
-			return true
+		for _, anc := range interfaceClosure(t) {
+			addImpl(def, anc)
 		}
 	}
-	return false
 }
 
 // interfaceDefOf returns the interface definition an impl tag resolved to, or

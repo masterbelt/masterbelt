@@ -125,6 +125,44 @@ func TestInterfaceHover(t *testing.T) {
 	})
 }
 
+// TestInterfaceInheritanceHover checks that a child interface's hover shows its
+// parents on the signature (interface ordered: printable, rankable), and that a
+// type opting into a child shows the whole materialized ancestor closure on its
+// card.
+func TestInterfaceInheritanceHover(t *testing.T) {
+	src := "pub interface printable: comparable {\n  show(): string\n}\n" +
+		"pub interface rankable: comparable {\n  rank(): nint\n}\n" +
+		"pub interface ordered: printable, rankable {\n  before(other: self): bool\n}\n" +
+		"pub type Tag = nint impl ordered {\n" +
+		"  show(): string {\n    return \"t\"\n  }\n" +
+		"  rank(): nint {\n    return 1\n  }\n" +
+		"  before(other: self): bool {\n    return self.lt(other)\n  }\n" +
+		"}\n"
+	doc := testView(src)
+
+	t.Run("a child interface shows its parents on the signature", func(t *testing.T) {
+		h := hover(doc, strings.Index(src, "interface ordered")+11)
+		if h == nil {
+			t.Fatal("no hover on the child interface name")
+		}
+		if !strings.Contains(h.Contents.Value, "interface ordered: printable, rankable") {
+			t.Errorf("hover = %q, want the parents on the signature", h.Contents.Value)
+		}
+	})
+
+	t.Run("a type opting into a child shows the materialized ancestors", func(t *testing.T) {
+		h := hover(doc, strings.Index(src, "type Tag")+6)
+		if h == nil {
+			t.Fatal("no hover on Tag")
+		}
+		for _, want := range []string{"impl ordered", "impl printable", "impl rankable", "impl comparable"} {
+			if !strings.Contains(h.Contents.Value, want) {
+				t.Errorf("hover = %q, want it to contain %q (materialized closure)", h.Contents.Value, want)
+			}
+		}
+	})
+}
+
 func TestTypeHoverWhere(t *testing.T) {
 	// The refinement predicate is part of the signature: hovering the type
 	// shows the values it admits, in canonical surface form.

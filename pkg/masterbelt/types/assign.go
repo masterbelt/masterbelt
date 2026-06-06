@@ -52,6 +52,20 @@ func Assignable(reg *builtin.Registry, from, to ir.Type) bool {
 		}
 		return true
 	}
+	// An interface value flows to an ancestor interface: width subtyping along
+	// the inheritance chain (an ordered value is usable where a comparable is
+	// expected). Only the declared parent chain is walked — no other variance —
+	// so a value typed as an interface keeps exactly the methods the target
+	// interface fixes. A non-interface from or to leaves this untouched.
+	if tdef := interfaceDefOf(to); tdef != nil && interfaceDefOf(from) != nil {
+		var tArgs []ir.Type
+		if app, ok := to.(*ir.App); ok {
+			tArgs = app.Args
+		}
+		if interfaceInherits(from, tdef, tArgs, reg, map[*ir.TypeDef]bool{}) {
+			return true
+		}
+	}
 	return sameBuiltin(from, to) || sameNamed(from, to)
 }
 

@@ -337,6 +337,23 @@ func TestLowerInterfaceDecl(t *testing.T) {
 	}
 }
 
+func TestLowerInterfaceParents(t *testing.T) {
+	// A child interface lowers its parents (supertraits) into Parents, in
+	// declaration order, each a type expression (a bare or applied interface).
+	src := "pub interface ordered: printable, foldable<nint, T> {\n  before(other: self): bool\n}\n"
+	file, diags := Lower([]byte(src))
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	iface := file.Interfaces[0]
+	if len(iface.Parents) != 2 {
+		t.Fatalf("got %d parents, want 2", len(iface.Parents))
+	}
+	if got := ast.Dump(file); !strings.Contains(got, "parent printable") || !strings.Contains(got, "parent foldable<nint, T>") {
+		t.Errorf("dump = %s, want it to contain both parents", got)
+	}
+}
+
 func TestLowerImplInterfaceTag(t *testing.T) {
 	// A type's interface-tagged impl block records the interface in Impls while
 	// its methods flatten into Methods alongside any inherent impl's.

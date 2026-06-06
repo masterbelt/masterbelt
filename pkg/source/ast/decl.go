@@ -121,15 +121,17 @@ func NewFuncDecl(doc []string, public, extern bool, effects []string, name strin
 // InterfaceDecl is an interface declaration: a nominal behaviour a type opts
 // into at its definition site (impl <interface>). It carries an optional run of
 // doc-comment lines, an optional pub modifier, the declared Name, its generic
-// Params, and its Members — the required methods (no body, which an implementor
-// must supply) and the provided methods (with a body, the default an
-// implementor gets for free). Required and provided members are distinguished
-// by whether their Body is nil.
+// Params, its Parents — the supertraits whose whole contract the child inherits
+// — and its Members — the required methods (no body, which an implementor must
+// supply) and the provided methods (with a body, the default an implementor
+// gets for free). Required and provided members are distinguished by whether
+// their Body is nil.
 type InterfaceDecl struct {
 	Doc     []string
 	Public  bool
 	Name    string       // the declared identifier, or "" if missing
 	Params  []*TypeParam // generic parameters, in declaration order
+	Parents []TypeExpr   // the parent interfaces (supertraits), in declaration order
 	Members []*InterfaceMember
 	syntax  *cst.Node
 }
@@ -138,8 +140,8 @@ func (d *InterfaceDecl) Syntax() *cst.Node { return d.syntax }
 func (d *InterfaceDecl) node()             {}
 
 // NewInterfaceDecl builds an InterfaceDecl node.
-func NewInterfaceDecl(doc []string, public bool, name string, params []*TypeParam, members []*InterfaceMember, syntax *cst.Node) *InterfaceDecl {
-	return &InterfaceDecl{Doc: doc, Public: public, Name: name, Params: params, Members: members, syntax: syntax}
+func NewInterfaceDecl(doc []string, public bool, name string, params []*TypeParam, parents []TypeExpr, members []*InterfaceMember, syntax *cst.Node) *InterfaceDecl {
+	return &InterfaceDecl{Doc: doc, Public: public, Name: name, Params: params, Parents: parents, Members: members, syntax: syntax}
 }
 
 // InterfaceMember is one member of an interface: a method signature and, for a

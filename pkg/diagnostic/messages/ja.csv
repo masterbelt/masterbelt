@@ -82,6 +82,8 @@ masterbelt.semantic.missing_initializer,let {name} は初期化が必要です�
 masterbelt.semantic.index_out_of_range,インデックス {index} は長さ {length} のリストの範囲外です
 masterbelt.semantic.missing_required_method,{typ} は {iface} を実装していません: 必須メソッド {method} がありません
 masterbelt.semantic.not_an_interface,{name} は interface ではありません
+masterbelt.semantic.interface_member_override,{child} は {method} を再宣言できません: すでに {ancestor} から継承しています
+masterbelt.semantic.interface_member_conflict,{child} は無関係な 2 つの interface ({first} と {second}) から {method} を継承しています
 masterbelt.semantic.bound_not_satisfied,{typ} は境界 {bound} を満たしません: その interface を実装していません
 masterbelt.semantic.uninferable_type_param,型パラメータ {name} を引数から推論できません。引数で決まるようにしてください
 masterbelt.semantic.no_method_on_unbounded_typevar,無境界の型パラメータに対して {method} は呼べません。メソッドを使うには interface 境界を付けてください
