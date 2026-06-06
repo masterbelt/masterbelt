@@ -208,6 +208,14 @@ func TestDocumentMalformedRecoveryBoundary(t *testing.T) {
 		initial string
 	}{
 		{"unterminated record literal", "pub = {Z\nconst y = 1\n"},
+		// An unterminated record literal must recover at every File-level
+		// declaration starter, not only const/type/use — the stop list once
+		// omitted enum/interface/fn/extern and swallowed the whole following
+		// declaration token-by-token.
+		{"unterminated record literal before enum", "const c = {a: 1\nenum E { A }\n"},
+		{"unterminated record literal before interface", "const c = {a: 1\ninterface I { f(): int }\n"},
+		{"unterminated record literal before fn decl", "const c = {a: 1\nfn g(): int { return 1 }\n"},
+		{"unterminated record literal before extern fn", "const c = {a: 1\nextern fn g(): int\n"},
 		{"record field missing colon", "const c = {a b}\nconst y = 1\n"},
 		{"impl block missing brace", "type T impl >\nconst y = 1\n"},
 		{"unterminated collection", "const c = [1\nconst y = 1\n"},
@@ -242,6 +250,51 @@ func TestDocumentMalformedRecoveryBoundary(t *testing.T) {
 				assertMatchesFullParse(t, doc, content)
 			})
 		}
+	}
+}
+
+// TestUnterminatedRecordLitStopsAtDeclaration pins the unterminated-record-
+// literal recovery boundary to the File-level declaration-starter set
+// (beginsDeclaration, via atUnterminatedConstructStop). The stop list once
+// omitted enum/interface/fn/extern, so an unterminated record literal followed
+// by such a declaration absorbed the whole declaration token-by-token — one
+// unexpected_token per token — instead of recovering at the boundary. After the
+// fix the recovery stops at the declaration keyword: that declaration parses as
+// its own File child and a single boundary diagnostic is emitted. The
+// conditional starters must stay conditional — a bare `fn` literal or an
+// expression-level `extern` is not a declaration and must not stop the loop.
+func TestUnterminatedRecordLitStopsAtDeclaration(t *testing.T) {
+	cases := []struct {
+		name     string
+		src      string
+		declKind cst.Kind // the kind the recovered-to declaration must parse as
+	}{
+		{"before enum", "const c = {a: 1\nenum E { A }\n", cst.EnumDecl},
+		{"before interface", "const c = {a: 1\ninterface I { f(): int }\n", cst.InterfaceDecl},
+		{"before fn decl", "const c = {a: 1\nfn g(): int { return 1 }\n", cst.FuncDecl},
+		{"before extern fn", "const c = {a: 1\nextern fn g(): int\n", cst.FuncDecl},
+		{"before const", "const c = {a: 1\nconst y = 1\n", cst.ConstDecl},
+		{"before type", "const c = {a: 1\ntype T = int\n", cst.TypeDecl},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			root, diags := Parse([]byte(tc.src))
+			if len(diags) != 1 {
+				t.Fatalf("diagnostics = %d, want 1 (the missing-brace boundary): %v", len(diags), diags)
+			}
+			// The trailing declaration must have recovered into its own File child,
+			// not been swallowed by the unterminated record literal.
+			var found bool
+			for _, child := range root.Children() {
+				if n, ok := child.(*cst.Node); ok && n.Kind() == tc.declKind {
+					found = true
+				}
+			}
+			if !found {
+				t.Fatalf("declaration %v was swallowed, not recovered as a File child\n%s",
+					tc.declKind, cst.Sprint(source.NewFile("", []byte(tc.src)), root))
+			}
+		})
 	}
 }
 

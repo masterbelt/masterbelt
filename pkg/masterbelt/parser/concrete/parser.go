@@ -368,6 +368,19 @@ func (p *parser) beginsDeclaration() bool {
 	}
 }
 
+// atUnterminatedConstructStop reports whether the parser sits at a point where
+// an unterminated brace construct (a record literal, a switch body) must stop
+// its recovery loop: EOF, or the start of a File-level declaration. It reuses
+// beginsDeclaration — the same predicate parseError and the File loop use — so
+// the recovery boundary always matches where a real declaration can begin,
+// rather than a hand-maintained keyword list that drifts out of sync. Routing
+// the conditional starters (fn only as a declaration, extern only as extern fn)
+// through beginsDeclaration is what keeps a `fn` literal or an expression-level
+// extern from falsely stopping the loop.
+func (p *parser) atUnterminatedConstructStop() bool {
+	return p.peekSignificant() == token.EOF || p.beginsDeclaration()
+}
+
 // parseError consumes a run of significant tokens that begin no declaration,
 // folding in the interleaving trivia, until the next declaration starter
 // (beginsDeclaration) or EOF. The trivia that precedes that stopping token is
