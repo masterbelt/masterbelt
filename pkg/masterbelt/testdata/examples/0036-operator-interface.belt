@@ -1,0 +1,36 @@
+// The operator contracts (E-16/E-17): the prelude gathers the comparison and
+// arithmetic operators into named interfaces — comparable (== !=), orderable
+// (< <= > >=), and numeric (unary +, and + - * / %) — that the builtin types opt
+// into at their own definition sites. A generic function can then bound a type
+// parameter by the contract rather than by a concrete type, so one definition
+// works over every builtin that carries those operators: the bound names the
+// methods, and the call folds with the concrete type, no runtime dispatch.
+
+// orderable is a bound: max may call a.gteq(b) because every type satisfying the
+// bound carries the >= operator. int and string both impl orderable.
+/// The larger of two orderable values.
+pub fn max<T: orderable>(a: T, b: T): T {
+  return a.gteq(b) ? a : b
+}
+
+// comparable is a bound: same may call a.eql(b). bool and int both impl it.
+/// Whether two comparable values are equal.
+pub fn same<T: comparable>(a: T, b: T): bool {
+  return a.eql(b)
+}
+
+// numeric is a bound: twice may call a.add(a). The integers impl numeric;
+// string, which has only concatenation, does not — so twice would reject a
+// string argument, the contract doing exactly the work a concrete-type signature
+// could not.
+/// A numeric value added to itself.
+pub fn twice<T: numeric>(a: T): T {
+  return a.add(a)
+}
+
+// Each call resolves the type variable from the argument and folds with the
+// concrete builtin: max<nint>, max<string>, same<bool>, twice<nint>.
+const Bigger = max(3, 7)
+const Later = max("a", "b")
+const Equal = same(true, false)
+const Double = twice(21)

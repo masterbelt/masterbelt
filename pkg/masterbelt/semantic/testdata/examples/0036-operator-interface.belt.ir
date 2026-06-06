@@ -1,0 +1,37 @@
+Module
+  Const "Bigger"
+    type nint
+    value max(IntLiteral "3", IntLiteral "7")
+    eval 7
+  Const "Later"
+    type string
+    value max(StringLiteral "a", StringLiteral "b")
+    eval "b"
+  Const "Equal"
+    type bool
+    value same(BoolLiteral true, BoolLiteral false)
+    eval false
+  Const "Double"
+    type nint
+    value twice(IntLiteral "21")
+    eval 42
+  Func "max" pub
+    doc "The larger of two orderable values."
+    typeparam "T": orderable
+    param a: T
+    param b: T
+    result T
+      return (ParamRef "a".gteq(ParamRef "b") ? ParamRef "a" : ParamRef "b")
+  Func "same" pub
+    doc "Whether two comparable values are equal."
+    typeparam "T": comparable
+    param a: T
+    param b: T
+    result bool
+      return ParamRef "a".eql(ParamRef "b")
+  Func "twice" pub
+    doc "A numeric value added to itself."
+    typeparam "T": numeric
+    param a: T
+    result T
+      return ParamRef "a".add(ParamRef "a")

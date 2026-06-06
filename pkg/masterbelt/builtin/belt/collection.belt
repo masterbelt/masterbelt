@@ -1,6 +1,7 @@
 use { bool } from "./bool.belt"
 use { nint } from "./signed.belt"
 use { error } from "./error.belt"
+use { comparable } from "./operators.belt"
 
 // foldable, list, and map live together in this one file because they refer to
 // one another: foldable's provided methods return list (map/filter/keys/values),
@@ -80,7 +81,7 @@ pub type list<T> = builtin<T> impl {
 
   /// The + operator: the concatenation.
   pub extern fn add(other: self): self
-
+} impl comparable {
   /// The == operator: element-wise equality.
   pub extern fn eql(other: self): bool
   /// The != operator.
@@ -107,7 +108,7 @@ pub type map<K, V> = builtin<K, V> impl {
 
   /// The + operator: the merge of the two maps.
   pub extern fn add(other: self): self
-
+} impl comparable {
   /// The == operator: entry-wise equality.
   pub extern fn eql(other: self): bool
   /// The != operator.
