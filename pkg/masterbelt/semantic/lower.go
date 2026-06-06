@@ -61,15 +61,11 @@ func (b constBinder) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
 			// A call whose callee names a type is a conversion T(x) — the type
 			// wins over a same-named function, exactly as in a body.
 			if def, ok := b.q.universe(b.file)[callee.Name]; ok {
-				var arg ir.Value
-				if len(e.Arguments) > 0 {
-					arg = sub(e.Arguments[0])
-				}
 				t := ir.Type(&ir.Named{Def: def})
 				if def.Builtin {
 					t = &ir.Builtin{Name: def.Name}
 				}
-				return &ir.Conversion{Type: t, Value: arg}
+				return &ir.Conversion{Type: t, Args: convArgs(e.Arguments, sub)}
 			}
 			if cands := b.q.resolveFunc(b.file, callee); len(cands) > 0 {
 				return funcCall(b.fnOf[pickOverload(cands, len(e.Arguments))], e.Arguments, sub)
@@ -436,11 +432,7 @@ func (b bodyBinder) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
 				return nil
 			}
 			if t := b.r.ResolveName(callee.Name, b.tscope); t != ir.Invalid {
-				var arg ir.Value
-				if len(e.Arguments) > 0 {
-					arg = sub(e.Arguments[0])
-				}
-				return &ir.Conversion{Type: t, Value: arg}
+				return &ir.Conversion{Type: t, Args: convArgs(e.Arguments, sub)}
 			}
 			if cands := b.funcs.local[callee.Name]; len(cands) > 0 {
 				return funcCall(pickShellOverload(cands, len(e.Arguments)), e.Arguments, sub)
@@ -492,11 +484,22 @@ func pickShellOverload(cands []*ir.Function, arity int) *ir.Function {
 // funcCall lowers a resolved function call: the target and its lowered
 // arguments.
 func funcCall(target *ir.Function, args []ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
+	return &ir.FuncCall{Target: target, Args: convArgs(args, sub)}
+}
+
+// convArgs lowers a conversion or constructor's argument expressions to their IR
+// values, preserving their order — one for the common conversion form (Level(5),
+// error("msg")), two for a constructor (range(start, end)). An empty argument
+// list (a recovered conversion) lowers to no arguments.
+func convArgs(args []ast.Expr, sub func(ast.Expr) ir.Value) []ir.Value {
+	if len(args) == 0 {
+		return nil
+	}
 	out := make([]ir.Value, len(args))
 	for i, a := range args {
 		out[i] = sub(a)
 	}
-	return &ir.FuncCall{Target: target, Args: out}
+	return out
 }
 
 // funcBinder lowers the body of a function literal. Its own parameters lower to

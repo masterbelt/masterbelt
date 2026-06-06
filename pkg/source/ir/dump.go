@@ -470,7 +470,11 @@ func dumpValue(v Value) string {
 	case *FieldAccess:
 		return fmt.Sprintf("%s.%s", dumpValue(x.Receiver), x.Field)
 	case *Conversion:
-		return fmt.Sprintf("%s(%s)", x.Type, dumpValue(x.Value))
+		parts := make([]string, len(x.Args))
+		for i, a := range x.Args {
+			parts[i] = dumpValue(a)
+		}
+		return fmt.Sprintf("%s(%s)", x.Type, strings.Join(parts, ", "))
 	case *Await:
 		return "await " + dumpValue(x.Value)
 	case *Ternary:
