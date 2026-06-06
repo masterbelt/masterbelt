@@ -369,6 +369,15 @@ func checkStmts(stmts []ast.Stmt, want ir.Type, bs infer.BodyScope, env eval.Env
 			if noSelf != nil {
 				checkNoSelf(stmt.X, noSelf)
 			}
+			// An expression statement discards its value, so it is checked with
+			// no expected type — synthesis alone, surfacing the operator and
+			// method-call errors a discarded call would otherwise hide (an
+			// undefined method, a type-mismatched argument). This mirrors the
+			// lambda-body walk (infer.walkBody), which checks its expression
+			// statements the same way.
+			if stmt.X != nil {
+				infer.CheckPredicate(stmt.X, bs, sink)
+			}
 		case *ast.SwitchStmt:
 			if noSelf != nil && stmt.Scrutinee != nil {
 				checkNoSelf(stmt.Scrutinee, noSelf)

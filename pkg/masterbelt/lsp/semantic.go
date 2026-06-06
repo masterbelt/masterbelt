@@ -59,15 +59,17 @@ type rawSemanticToken struct {
 // tokens in the LSP's relative-encoded form, lexically — the server passes the
 // program's resolution through semanticTokensIn.
 func semanticTokens(doc *abstract.Document) *protocol.SemanticTokens {
-	return semanticTokensWith(doc, nil, nil, nil)
+	return semanticTokensWith(doc, nil, nil, nil, nil)
 }
 
 // semanticTokensIn classifies with the program's resolution layered over the
 // lexical pass: a member access that names an imported constant (geo.Origin)
-// renders as the constant it is, not as a property, a call's callee that
-// names a type renders as the type the conversion constructs (error("msg")),
-// and one that names a top-level function renders as the function it calls,
-// not as a value reference.
+// or an associated constant (int8.Max) renders as the read-only value it is,
+// not as a property; one that names an enum member (Rarity.Common) renders as
+// an enum member, matching the declaration site; a call's callee that names a
+// type renders as the type the conversion constructs (error("msg")); and one
+// that names a top-level function renders as the function it calls, not as a
+// value reference.
 func semanticTokensIn(v view) *protocol.SemanticTokens {
 	typeNames := map[string]bool{}
 	for _, t := range v.TypeNames() {
@@ -76,10 +78,18 @@ func semanticTokensIn(v view) *protocol.SemanticTokens {
 	members := map[*cst.Node]*ast.MemberExpr{}
 	funcCallees := map[*cst.Node]bool{}
 	typeCallees := map[*cst.Node]bool{}
+	enumMembers := map[*cst.Node]bool{}
+	assocConsts := map[*cst.Node]bool{}
 	forEachExpr(v.AST().File(), func(e ast.Expr) {
 		switch e := e.(type) {
 		case *ast.MemberExpr:
 			members[e.Syntax()] = e
+			switch memberValueKind(v, e) {
+			case memberEnumMember:
+				enumMembers[e.Syntax()] = true
+			case memberAssocConst:
+				assocConsts[e.Syntax()] = true
+			}
 		case *ast.CallExpr:
 			// A type name wins over a same-named function, as in the type rules.
 			if id, ok := e.Callee.(*ast.Identifier); ok {
@@ -93,21 +103,63 @@ func semanticTokensIn(v view) *protocol.SemanticTokens {
 		}
 	})
 	return semanticTokensWith(v.AST(), func(green *cst.Node) bool {
+		if assocConsts[green] {
+			return true
+		}
 		m, ok := members[green]
 		return ok && v.ResolveMember(m) != nil
 	}, func(green *cst.Node) bool {
 		return funcCallees[green]
 	}, func(green *cst.Node) bool {
 		return typeCallees[green]
+	}, func(green *cst.Node) bool {
+		return enumMembers[green]
 	})
 }
 
-// semanticTokensWith is the classification walk. isImportedConst,
-// isFuncCallee, and isTypeCallee, when set, are the classifications a lexical
-// pass cannot make: whether a member-access node resolves to an imported
-// constant, and whether a name-reference node is a call's callee resolving to
-// a function or to a type (a conversion).
-func semanticTokensWith(doc *abstract.Document, isImportedConst, isFuncCallee, isTypeCallee func(*cst.Node) bool) *protocol.SemanticTokens {
+// memberValueKind classifies a member access whose receiver names a type:
+// Rarity.Common is an enum member, int8.Max an associated constant. A receiver
+// that is shadowed by a value binding, or names no type, or whose member is
+// neither, is none — the lexical property classification stands.
+type memberKind int
+
+const (
+	memberNone memberKind = iota
+	memberEnumMember
+	memberAssocConst
+)
+
+func memberValueKind(v view, m *ast.MemberExpr) memberKind {
+	recv, ok := m.Receiver.(*ast.Identifier)
+	if !ok || v.Resolve(recv) != nil {
+		return memberNone // a value shadowing the type name is a value access
+	}
+	def := lookupTypeName(v, recv.Name)
+	if def == nil {
+		return memberNone
+	}
+	if def.Enum != nil {
+		for _, em := range def.Enum.Members {
+			if em.Name == m.Member.Name {
+				return memberEnumMember
+			}
+		}
+	}
+	for _, ac := range def.Consts {
+		if ac.Name == m.Member.Name {
+			return memberAssocConst
+		}
+	}
+	return memberNone
+}
+
+// semanticTokensWith is the classification walk. isReadonlyConst,
+// isFuncCallee, isTypeCallee, and isEnumMember, when set, are the
+// classifications a lexical pass cannot make: whether a member-access node
+// resolves to a read-only constant (an imported or associated constant) or to
+// an enum member, and whether a name-reference node is a call's callee
+// resolving to a function or to a type (a conversion).
+func semanticTokensWith(doc *abstract.Document, isReadonlyConst, isFuncCallee, isTypeCallee, isEnumMember func(*cst.Node) bool) *protocol.SemanticTokens {
 	buf := doc.Buffer()
 
 	var raws []rawSemanticToken
@@ -122,8 +174,11 @@ func semanticTokensWith(doc *abstract.Document, isImportedConst, isFuncCallee, i
 			if !ok {
 				return
 			}
-			if leaf.Kind() == token.Ident && parent == cst.MemberExpr && isImportedConst != nil && isImportedConst(parentGreen) {
+			if leaf.Kind() == token.Ident && parent == cst.MemberExpr && isReadonlyConst != nil && isReadonlyConst(parentGreen) {
 				tokenType, mods = stVariable, smReadonly
+			}
+			if leaf.Kind() == token.Ident && parent == cst.MemberExpr && isEnumMember != nil && isEnumMember(parentGreen) {
+				tokenType, mods = stEnumMember, smReadonly
 			}
 			if leaf.Kind() == token.Ident && parent == cst.NameRef && isFuncCallee != nil && isFuncCallee(parentGreen) {
 				tokenType, mods = stFunction, 0

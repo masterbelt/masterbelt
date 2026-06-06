@@ -40,6 +40,9 @@ func completion(doc view, offset int) *protocol.CompletionList {
 	if items, ok := recordFieldItems(doc, offset); ok {
 		return &protocol.CompletionList{Items: items}
 	}
+	if enumBaseTypeAt(root, offset) {
+		return &protocol.CompletionList{Items: enumBaseTypeItems(doc)}
+	}
 	if typeContextAt(root, offset) {
 		return &protocol.CompletionList{Items: typeItems(doc)}
 	}
@@ -411,6 +414,37 @@ func typeItems(doc view) []protocol.CompletionItem {
 	return items
 }
 
+// enumBaseTypeNames is the set of types an enum may use as its base — the
+// integer-family primitives and string. It is the same set the semantic
+// analyzer accepts (invalid_enum_base_type rejects anything else), kept here so
+// completion never offers a base type the analyzer would reject.
+var enumBaseTypeNames = []string{
+	"int", "int8", "int16", "int32", "int64",
+	"uint", "uint8", "uint16", "uint32", "uint64",
+	"string",
+}
+
+// enumBaseTypeItems is the completion items for an enum's base-type position:
+// one item per legal base type (the integer family and string), drawn from the
+// document's type scope so each carries its real definition's doc and kind. A
+// base name absent from scope — impossible for the always-present builtins —
+// is simply skipped.
+func enumBaseTypeItems(doc view) []protocol.CompletionItem {
+	byName := map[string]*ir.TypeDef{}
+	for _, t := range doc.TypeNames() {
+		if _, seen := byName[t.Name]; !seen {
+			byName[t.Name] = t
+		}
+	}
+	items := make([]protocol.CompletionItem, 0, len(enumBaseTypeNames))
+	for _, name := range enumBaseTypeNames {
+		if t, ok := byName[name]; ok {
+			items = append(items, typeItem(name, t))
+		}
+	}
+	return items
+}
+
 // typeItem renders one type definition as a completion item under the given
 // label (its plain or namespace-qualified name).
 func typeItem(label string, t *ir.TypeDef) protocol.CompletionItem {
@@ -517,6 +551,40 @@ func typeContextAt(root cst.Tree, offset int) bool {
 		}
 	}
 	return false
+}
+
+// enumBaseTypeAt reports whether offset sits in an enum's base-type position
+// (enum E: <here> { ... }) — the type clause that immediately follows the enum
+// name. Like typeContextAt it probes one byte back as well, since the cursor
+// usually sits just past the partial word being typed. An enum base may only be
+// an integer-family or string primitive, so this position offers a restricted
+// type set, not the general one.
+func enumBaseTypeAt(root cst.Tree, offset int) bool {
+	if inEnumBaseType(root, offset) {
+		return true
+	}
+	return offset > 0 && inEnumBaseType(root, offset-1)
+}
+
+// inEnumBaseType descends to the leaf at offset and reports whether the path
+// passes through a TypeClause whose parent is an EnumDecl — the enum's
+// base-type annotation, the one type clause an enum carries.
+func inEnumBaseType(root cst.Tree, offset int) bool {
+	node := root
+	parentKind := cst.File
+	for {
+		if kind, ok := node.Kind(); ok && kind == cst.TypeClause && parentKind == cst.EnumDecl {
+			return true
+		}
+		child, found := childContaining(node, offset)
+		if !found {
+			return false
+		}
+		if kind, ok := node.Kind(); ok {
+			parentKind = kind
+		}
+		node = child
+	}
 }
 
 // classifyContext descends from root into the child spanning offset, returning
