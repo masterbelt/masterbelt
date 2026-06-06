@@ -363,7 +363,7 @@ func checkFuncBodies(reg *builtin.Registry, file *ast.File, universe map[string]
 			continue // the sink-only walk wants no further diagnostics
 		}
 		checkIndexWrites(fd.Body, env, at, diags)
-		if hasBlockBody(fd) && !bodyReturns(fd.Body, scrutEnumOf(bs)) {
+		if hasBlockBody(fd) && !bodyReturns(fd.Body, bs) {
 			s := at(fd)
 			diags.Add(newMissingReturnDiagnostic(s.offset, s.width, fd.Name))
 		}
@@ -426,13 +426,18 @@ func checkStmts(stmts []ast.Stmt, want ir.Type, bs infer.BodyScope, env eval.Env
 }
 
 // scrutEnumOf builds the scrutinee-enum resolver return analysis uses: it reads
-// the enum a scrutinee's static type names from the body scope — a parameter's
-// type, the receiver's type for self — without the type query, exactly as the
-// body binder does when lowering a switch's bare-member arms.
+// the enum a scrutinee's static type names from the body scope — a let-bound
+// local (which shadows a same-named parameter), a parameter's type, or the
+// receiver's type for self — without the type query, exactly as checkSwitch and
+// the body binder resolve the scrutinee. The walk grows bs.Locals as it descends
+// a block's lets, so the local in scope at the switch is the one read here.
 func scrutEnumOf(bs infer.BodyScope) func(ast.Expr) *ir.TypeDef {
 	return func(scrutinee ast.Expr) *ir.TypeDef {
 		switch e := scrutinee.(type) {
 		case *ast.Identifier:
+			if t, ok := bs.Locals[e.Name]; ok {
+				return enumDefOf(t)
+			}
 			if t, ok := bs.Params[e.Name]; ok {
 				return enumDefOf(t)
 			}

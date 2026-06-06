@@ -192,3 +192,62 @@ func TestSwitchEvalFallThroughChained(t *testing.T) {
 		t.Errorf("R = %d, want 21 (first arm +1, second wildcard +20)", got)
 	}
 }
+
+// TestSwitchExhaustiveLetBoundEnumReturns checks that an exhaustive switch over
+// a let-bound enum local is recognized as always returning — no false
+// missing_return. Return analysis previously read the scrutinee's enum only
+// from parameters and self, never from let locals, so a switch over `let x = c`
+// looked non-exhaustive even though checkSwitch (which sees the local) accepted
+// it.
+func TestSwitchExhaustiveLetBoundEnumReturns(t *testing.T) {
+	src := rarityEnum + "pub fn pick(c: Rarity): int {\n" +
+		"  let x = c\n" +
+		"  switch x {\n    Common -> return 1\n    Rare -> return 2\n    Legend -> return 3\n  }\n" +
+		"}\n"
+	if _, diags := analyze(src); len(diags) != 0 {
+		t.Fatalf("exhaustive switch over a let-bound enum: unexpected diagnostics: %v", codes(diags))
+	}
+
+	// An annotated let-bound enum local resolves the same way: the annotation
+	// fixes the enum, so the exhaustive switch over it returns.
+	annotated := rarityEnum + "pub fn pick(c: Rarity): int {\n" +
+		"  let x: Rarity = c\n" +
+		"  switch x {\n    Common -> return 1\n    Rare -> return 2\n    Legend -> return 3\n  }\n" +
+		"}\n"
+	if _, diags := analyze(annotated); len(diags) != 0 {
+		t.Fatalf("exhaustive switch over an annotated let-bound enum: unexpected diagnostics: %v", codes(diags))
+	}
+}
+
+// TestSwitchNonExhaustiveLetBoundEnumStillReported checks the converse: a switch
+// over a let-bound enum that misses a member must still trip missing_return, so
+// the locals fix does not mask a genuinely incomplete switch.
+func TestSwitchNonExhaustiveLetBoundEnumStillReported(t *testing.T) {
+	src := rarityEnum + "pub fn pick(c: Rarity): int {\n" +
+		"  let x = c\n" +
+		"  switch x {\n    Common -> return 1\n    Rare -> return 2\n  }\n" +
+		"}\n"
+	_, diags := analyze(src)
+	if !hasCodeSwitch(diags, CodeMissingReturn) {
+		t.Fatalf("non-exhaustive switch over a let-bound enum: want missing_return, got %v", codes(diags))
+	}
+}
+
+// TestSwitchBareMemberResolvesLetBound checks that bare-member arms of a switch
+// over a let-bound enum local lower to enum-member values (Rarity.Common), not
+// unresolved names: the lowering binder reads the local's enum the same way it
+// reads a parameter's.
+func TestSwitchBareMemberResolvesLetBound(t *testing.T) {
+	src := rarityEnum + "pub fn color(c: Rarity): string {\n" +
+		"  let x = c\n" +
+		"  switch x {\n    Common -> return \"w\"\n    Rare -> return \"b\"\n    Legend -> return \"g\"\n  }\n" +
+		"}\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", codes(diags))
+	}
+	dump := ir.Dump(m)
+	if !strings.Contains(dump, "arm Rarity.Common") {
+		t.Errorf("bare member Common over a let-bound enum should lower to Rarity.Common:\n%s", dump)
+	}
+}
