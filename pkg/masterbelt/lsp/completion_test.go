@@ -100,6 +100,28 @@ func TestCompletionDedupesNames(t *testing.T) {
 	}
 }
 
+func TestCompletionInEnumBaseType(t *testing.T) {
+	// An enum's base-type position offers only the legal base types — the
+	// integer family and string — matching the semantic analyzer's set, not the
+	// general type completion (which would offer bool, datetime, and user types).
+	src := "type Level = int8\nenum Rarity: int8 {\n  Common\n}\n"
+	doc := testView(src)
+
+	offset := strings.Index(src, "Rarity: int8") + len("Rarity: in")
+	got := byLabel(completion(doc, offset).Items)
+
+	for _, want := range []string{"int", "int8", "int64", "uint", "uint64", "string"} {
+		if _, ok := got[want]; !ok {
+			t.Errorf("enum base completion missing %q", want)
+		}
+	}
+	for _, unwanted := range []string{"bool", "datetime", "duration", "null", "error", "Level"} {
+		if _, ok := got[unwanted]; ok {
+			t.Errorf("enum base completion offered non-base type %q", unwanted)
+		}
+	}
+}
+
 func TestCompletionInAssertCondition(t *testing.T) {
 	// An assert's condition is a value position: constants and the value
 	// keywords are offered, type names are not the candidates.
