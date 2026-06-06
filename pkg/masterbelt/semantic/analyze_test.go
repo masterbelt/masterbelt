@@ -360,6 +360,33 @@ func TestOperatorErrorReportedOnce(t *testing.T) {
 	}
 }
 
+// TestExprStmtIsTypeChecked checks that an expression statement — a call whose
+// value is discarded — is type-checked in a method and a function body, so an
+// undefined method or a bad operand surfaces rather than being silently
+// dropped. A valid discarded call draws no diagnostic.
+func TestExprStmtIsTypeChecked(t *testing.T) {
+	// A discarded call to an undefined method in a function body, before a valid
+	// return: the bad statement is reported, the return is fine.
+	fnBad := "pub fn f(n: int8): int8 {\n  n.nonexistent()\n  return n\n}\n"
+	if _, diags := analyze(fnBad); !hasCode(diags, CodeInvalidOperation) {
+		t.Errorf("function expr-stmt: want invalid_operation for n.nonexistent(), got %v", codes(diags))
+	}
+
+	// The same in a method body, where self is bound.
+	methodBad := "pub type Lvl = int8 impl {\n  pub fn touch(): self {\n    self.nope()\n    return self\n  }\n}\n"
+	if _, diags := analyze(methodBad); !hasCode(diags, CodeInvalidOperation) {
+		t.Errorf("method expr-stmt: want invalid_operation for self.nope(), got %v", codes(diags))
+	}
+
+	// A valid discarded call (add is defined on the integer family) before a
+	// valid return draws no diagnostic — the expression statement type-checks
+	// clean.
+	fnOK := "pub fn g(n: int8): int8 {\n  n.add(1)\n  return n\n}\n"
+	if _, diags := analyze(fnOK); len(diags) != 0 {
+		t.Errorf("valid expr-stmt: unexpected diagnostics %v", codes(diags))
+	}
+}
+
 // overloadSrc declares a type with merge overloaded by parameter type — the
 // 0013-overload example's Score — for the overload diagnostics tests.
 const overloadSrc = `pub type Score = int32 impl {
