@@ -219,7 +219,7 @@ func identAt(root cst.Tree, buf source.Buffer, offset int) (cst.Tree, string, bo
 		if ok || !within(t, offset) {
 			return
 		}
-		if k, isNode := t.Kind(); isNode && (k == cst.NameRef || k == cst.Param || k == cst.LetStmt || k == cst.MatchPattern) {
+		if k, isNode := t.Kind(); isNode && (k == cst.NameRef || k == cst.Param || k == cst.LetStmt || k == cst.MatchPattern || k == cst.ForStmt) {
 			for _, c := range t.Children() {
 				if tok, isTok := c.Token(); isTok && tok.Kind() == token.Ident && within(c, offset) {
 					found, ok = c, true

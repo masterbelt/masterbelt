@@ -107,6 +107,11 @@ func recordTypes(doc view) map[*ast.RecordLit]ir.Type {
 				}
 			case *ast.IfStmt:
 				pushIfBody(stmt, result, pushBody)
+			case *ast.ForStmt:
+				// A return inside the loop body still yields the function's result,
+				// so a record literal returned from a for needs its field typing the
+				// same way a returned-from-a-branch one does.
+				pushBody(stmt.Body, result)
 			case *ast.ExprStmt, *ast.AssignStmt:
 				// Neither carries a result-typed slot for a record literal: a
 				// bare expression has no expected type to push, and an
