@@ -1,3 +1,9 @@
 /// The absence of a value: the null literal's type, usually one member of a
 /// union (T | null).
 pub type null = builtin
+
+/// A value that may be absent: the named form of T | null. It is an alias, not
+/// a wrapper — optional<optional<T>> collapses to T | null, so a present-null
+/// cannot be told from an absent value; model that case with a dedicated enum
+/// or error instead. match narrows it exactly as the bare union.
+pub type optional<T> = T | null
