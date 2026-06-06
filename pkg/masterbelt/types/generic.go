@@ -1,0 +1,241 @@
+// This file is the generic half of the type algebra: Substitute applies a
+// type-variable solution, Match solves variables by structural matching, and
+// Satisfies (with hasFreeVar) checks a type against an interface bound.
+package types
+
+import (
+	"maps"
+
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
+	"github.com/masterbelt/masterbelt/pkg/source/ir"
+)
+
+// Substitute replaces every bound type variable in t with its binding from
+// subst, recursing through the composite types. An unbound variable is left as
+// is, so a concrete type (no variables) is returned unchanged.
+func Substitute(t ir.Type, subst map[string]ir.Type) ir.Type {
+	if len(subst) == 0 {
+		return t
+	}
+	switch t := t.(type) {
+	case *ir.TypeVar:
+		if b, ok := subst[t.Name]; ok {
+			return b
+		}
+		return t
+	case *ir.App:
+		args := make([]ir.Type, len(t.Args))
+		for i, a := range t.Args {
+			args[i] = Substitute(a, subst)
+		}
+		return &ir.App{Def: t.Def, Args: args}
+	case *ir.Func:
+		params := make([]ir.Type, len(t.Params))
+		for i, p := range t.Params {
+			params[i] = Substitute(p, subst)
+		}
+		return &ir.Func{Params: params, Result: Substitute(t.Result, subst)}
+	case *ir.Union:
+		members := make([]ir.Type, len(t.Members))
+		for i, m := range t.Members {
+			members[i] = Substitute(m, subst)
+		}
+		return &ir.Union{Members: members}
+	case *ir.Record:
+		fields := make([]ir.Field, len(t.Fields))
+		for i, f := range t.Fields {
+			fields[i] = ir.Field{Name: f.Name, Type: Substitute(f.Type, subst)}
+		}
+		return &ir.Record{Fields: fields}
+	default:
+		return t
+	}
+}
+
+// Match matches a parameter pattern — which may contain still-unbound method
+// type variables — against a concrete argument type, recording each variable it
+// solves in subst. A bare variable binds to the argument (and, if already bound,
+// must agree); a function or generic-application pattern matches structurally;
+// anything else falls back to assignability, the same rule a non-generic
+// parameter used before.
+func Match(reg *builtin.Registry, pattern, arg ir.Type, subst map[string]ir.Type) bool {
+	if v, ok := pattern.(*ir.TypeVar); ok {
+		if bound, ok := subst[v.Name]; ok {
+			return arg == bound || Assignable(reg, arg, bound)
+		}
+		subst[v.Name] = arg
+		return true
+	}
+	switch p := pattern.(type) {
+	case *ir.Func:
+		a, ok := arg.(*ir.Func)
+		if !ok || len(a.Params) != len(p.Params) {
+			return false
+		}
+		for i := range p.Params {
+			if !Match(reg, p.Params[i], a.Params[i], subst) {
+				return false
+			}
+		}
+		return Match(reg, p.Result, a.Result, subst)
+	case *ir.App:
+		// Two applications of the same constructor match argument-wise — list<T>
+		// against list<int> binds T = int — the structural rule that also solves a
+		// generic collection parameter.
+		if a, ok := arg.(*ir.App); ok && a.Def == p.Def && len(a.Args) == len(p.Args) {
+			for i := range p.Args {
+				if !Match(reg, p.Args[i], a.Args[i], subst) {
+					return false
+				}
+			}
+			return true
+		}
+		// A generic union alias (optional<T> = T | null) matches through its
+		// expansion: the application's arguments are substituted into the
+		// definition's body, and the resulting union solves the same way a bare
+		// union pattern does — a member value flowing in (5 into optional<int>)
+		// binds the alias' parameter (T = int). A non-union application (list<int>)
+		// has no union body, so UnionType returns nil and the match fails, leaving
+		// the collection path unchanged.
+		if u := UnionType(p); u != nil {
+			return Match(reg, u, arg, subst)
+		}
+		return false
+	case *ir.Record:
+		// A concrete record pattern (no variable to solve) keeps the old
+		// assignability rule, so nothing about the non-generic path changes; a
+		// pattern carrying a variable ({ v: T }) is matched field-by-field by
+		// name, each pattern field's pattern against the argument's same-named
+		// field — mirroring Substitute's field-wise recursion, so a variable
+		// introduced inside a record parameter is also solved from the argument.
+		// The argument may be a nominal record, looked through to its fields.
+		if !hasFreeVar(p, subst) {
+			return Assignable(reg, arg, pattern)
+		}
+		a := recordType(arg)
+		if a == nil {
+			return false
+		}
+		fields := make(map[string]ir.Type, len(a.Fields))
+		for _, f := range a.Fields {
+			fields[f.Name] = f.Type
+		}
+		for _, pf := range p.Fields {
+			af, ok := fields[pf.Name]
+			if !ok || !Match(reg, pf.Type, af, subst) {
+				return false
+			}
+		}
+		return true
+	case *ir.Union:
+		// A concrete union pattern (no variable to solve) keeps the old
+		// assignability rule — which already accepts a member value, a reordered
+		// union, or a narrower union — so the non-generic path is unchanged. A
+		// pattern carrying a variable (T | error — the central unwrap use-case)
+		// solves it: a same-arity union argument pairs positionally (int | error
+		// binds T = int), and any other argument is one member's value flowing in,
+		// matched against the members concrete-first so an error matches the error
+		// member without binding T while an int binds T = int.
+		if !hasFreeVar(p, subst) {
+			return Assignable(reg, arg, pattern)
+		}
+		if a, ok := arg.(*ir.Union); ok && len(a.Members) == len(p.Members) {
+			trial := maps.Clone(subst)
+			paired := true
+			for i := range p.Members {
+				if !Match(reg, p.Members[i], a.Members[i], trial) {
+					paired = false
+					break
+				}
+			}
+			if paired {
+				maps.Copy(subst, trial)
+				return true
+			}
+		}
+		for _, free := range []bool{false, true} {
+			for _, m := range p.Members {
+				if hasFreeVar(m, subst) != free {
+					continue
+				}
+				trial := maps.Clone(subst)
+				if Match(reg, m, arg, trial) {
+					maps.Copy(subst, trial)
+					return true
+				}
+			}
+		}
+		return false
+	default:
+		return Assignable(reg, arg, pattern)
+	}
+}
+
+// hasFreeVar reports whether t still contains a type variable not yet bound in
+// subst — the part Match could still solve. It guides a union pattern to try its
+// solvable members before its concrete ones.
+func hasFreeVar(t ir.Type, subst map[string]ir.Type) bool {
+	switch t := t.(type) {
+	case *ir.TypeVar:
+		_, bound := subst[t.Name]
+		return !bound
+	case *ir.App:
+		for _, a := range t.Args {
+			if hasFreeVar(a, subst) {
+				return true
+			}
+		}
+	case *ir.Func:
+		for _, p := range t.Params {
+			if hasFreeVar(p, subst) {
+				return true
+			}
+		}
+		return hasFreeVar(t.Result, subst)
+	case *ir.Union:
+		for _, m := range t.Members {
+			if hasFreeVar(m, subst) {
+				return true
+			}
+		}
+	case *ir.Record:
+		for _, f := range t.Fields {
+			if hasFreeVar(f.Type, subst) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// Satisfies reports whether the concrete type typ satisfies the interface bound
+// — the nominal-satisfaction rule of E-16/E-17: typ's definition must opt into
+// the bound's interface at its own definition site (an entry in its Impls), and
+// the impl's type arguments must agree with the bound's. A bound that is not an
+// interface, or a type with no matching impl, does not satisfy. The check looks
+// through a nominal type to its underlying definition's impls, so an alias of a
+// foldable type is itself foldable.
+func Satisfies(reg *builtin.Registry, typ, bound ir.Type) bool {
+	idef := interfaceDefOf(bound)
+	if idef == nil {
+		return false
+	}
+	var bArgs []ir.Type
+	if app, ok := bound.(*ir.App); ok {
+		bArgs = app.Args
+	}
+	seen := map[*ir.TypeDef]bool{}
+	for def := defOf(reg, typ); def != nil && !seen[def]; {
+		seen[def] = true
+		for _, impl := range def.Impls {
+			if implMatches(reg, impl, idef, bArgs) {
+				return true
+			}
+		}
+		if def.Builtin {
+			break
+		}
+		def = defOf(reg, def.Body)
+	}
+	return false
+}
