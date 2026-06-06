@@ -61,6 +61,8 @@ func (p *parser) parseStmt() cst.Green {
 		return p.parseReturnStmt()
 	case p.kind() == token.Switch:
 		return p.parseSwitchStmt()
+	case p.kind() == token.Match:
+		return p.parseMatchStmt()
 	case p.kind() == token.If:
 		return p.parseIfStmt()
 	case startsExpr(p.kind()):
@@ -274,10 +276,129 @@ func (p *parser) parseSwitchArm() *cst.Node {
 	return cst.NewNode(cst.SwitchArm, children)
 }
 
+// parseMatchStmt parses a match statement:
+//
+//	MatchStmt := match Expr "{" ( MatchArm ( ("," | NL) MatchArm )* )? "}"
+//
+// The scrutinee is an ordinary expression; the type-pattern arms follow in a
+// brace block, separated by commas and/or newlines (a newline is trivia, so the
+// comma is optional, the same separator rule the switch arms use). The cursor
+// sits on "match". Its driving loop mirrors parseSwitchStmt — the only
+// difference is the arm grammar (a type pattern, not value patterns).
+func (p *parser) parseMatchStmt() *cst.Node {
+	children := []cst.Green{p.bump()} // "match"
+	if startsExpr(p.peekSignificant()) {
+		p.skipTrivia(&children)
+		// The scrutinee's "{" opens the arm block, not a record literal: parse
+		// it with the record-literal reading suppressed, exactly as a switch's
+		// scrutinee does.
+		p.noRecordLit = true
+		children = append(children, p.parseExpr())
+		p.noRecordLit = false
+	} else {
+		p.report(newExpectedExpressionDiagnostic(p.lastStart, 0))
+	}
+	if p.peekSignificant() != token.LBrace {
+		p.reportUnexpected()
+		return cst.NewNode(cst.MatchStmt, children)
+	}
+	p.skipTrivia(&children)
+	children = append(children, p.bump()) // "{"
+	for {
+		switch {
+		case p.peekSignificant() == token.RBrace:
+			p.skipTrivia(&children)
+			children = append(children, p.bump()) // "}"
+			return cst.NewNode(cst.MatchStmt, children)
+		case p.atUnterminatedConstructStop():
+			// Unterminated: report the missing "}" and stop at EOF or before the
+			// next File-level declaration so recovery stays local, exactly as the
+			// switch body does.
+			p.report(newUnexpectedTokenDiagnostic(p.lastStart, 0, p.peekSignificant().String()))
+			return cst.NewNode(cst.MatchStmt, children)
+		default:
+			p.skipTrivia(&children)
+			before := p.pos
+			children = append(children, p.parseMatchArm())
+			if p.pos == before {
+				// Progress guard — see parseBlock: an arm parse that consumed no
+				// token must not spin this loop.
+				children = append(children, p.bump())
+			}
+			if p.peekSignificant() == token.Comma {
+				p.skipTrivia(&children)
+				children = append(children, p.bump()) // ","
+			}
+		}
+	}
+}
+
+// parseMatchArm parses one arm of a match:
+//
+//	MatchArm := MatchPattern "->" ( Stmt | Block )
+//
+// The pattern is a member type with an optional binding name (or the wildcard
+// "_"), and the body after "->" is a single statement or a brace block — the
+// same two body forms the switch arm and a function literal's arrow accept. The
+// cursor sits on the arm's first significant token.
+func (p *parser) parseMatchArm() *cst.Node {
+	if !startsMatchPattern(p.peekSignificant()) {
+		p.report(newExpectedTypeDiagnostic(p.cur().Offset, 0))
+		return cst.NewNode(cst.MatchArm, []cst.Green{p.bump()})
+	}
+	children := []cst.Green{p.parseMatchPattern()}
+	if p.peekSignificant() != token.Arrow {
+		p.reportUnexpected()
+		return cst.NewNode(cst.MatchArm, children)
+	}
+	p.skipTrivia(&children)
+	children = append(children, p.bump()) // "->"
+	switch {
+	case p.peekSignificant() == token.LBrace:
+		p.skipTrivia(&children)
+		children = append(children, p.parseBlock())
+	case startsStmt(p.peekSignificant()):
+		p.skipTrivia(&children)
+		children = append(children, p.parseStmt())
+	default:
+		p.report(newExpectedExpressionDiagnostic(p.lastStart, 0))
+	}
+	return cst.NewNode(cst.MatchArm, children)
+}
+
+// parseMatchPattern parses one arm's type pattern:
+//
+//	MatchPattern := ( PrimaryType [Ident] ) | "_"
+//
+// A pattern is a single (non-union) member type with an optional binding name —
+// Coin c, null, int v, error e — or the wildcard "_", which is a bare
+// identifier the later layers special-case (mirroring the switch wildcard). The
+// type is a primary type (parsePrimaryType), so a union written in an arm parses
+// only its first member here and the stray "|" is reported by the arrow check.
+// The cursor sits on the pattern's first significant token.
+func (p *parser) parseMatchPattern() *cst.Node {
+	children := []cst.Green{p.parsePrimaryType()}
+	// An optional binding name follows the type, unless the next token is the
+	// "->" that ends the pattern (a bare type / the wildcard binds nothing).
+	if p.peekSignificant() == token.Ident {
+		p.skipTrivia(&children)
+		children = append(children, p.bump()) // the binding name
+	}
+	return cst.NewNode(cst.MatchPattern, children)
+}
+
+// startsMatchPattern reports whether kind can begin a match arm's type pattern —
+// the same set a primary type begins with (a named type, self/null, a record or
+// function type, builtin), which also admits the wildcard "_" (an Ident).
+func startsMatchPattern(kind token.Kind) bool {
+	return startsType(kind)
+}
+
 // startsStmt reports whether kind can begin a statement: a let, a return, a
-// switch, an if, or any expression (which may continue into an assignment).
+// switch, a match, an if, or any expression (which may continue into an
+// assignment).
 func startsStmt(kind token.Kind) bool {
-	return kind == token.Let || kind == token.Return || kind == token.Switch || kind == token.If || startsExpr(kind)
+	return kind == token.Let || kind == token.Return || kind == token.Switch || kind == token.Match || kind == token.If || startsExpr(kind)
 }
 
 // parseReturnStmt parses "return Expr". The cursor sits on "return".

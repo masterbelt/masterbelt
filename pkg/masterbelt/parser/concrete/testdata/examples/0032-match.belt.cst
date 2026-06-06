@@ -103,41 +103,47 @@ File
       LBrace "{"
       Newline "\n"
       Whitespace "  "
-      NameRef
-        Ident "match"
-      Whitespace " "
-      RecordLit
-        Ident "v"
+      MatchStmt
+        Match "match"
+        Whitespace " "
+        NameRef
+          Ident "v"
         Whitespace " "
         LBrace "{"
         Newline "\n"
         Whitespace "    "
-        RecordField
-          Ident "Coin"
-        Whitespace " "
-        RecordField
-          Ident "c"
-        Whitespace "  "
-        Arrow "->"
-        Whitespace " "
-        Return "return"
-        Whitespace " "
-        String "\"coin\""
+        MatchArm
+          MatchPattern
+            TypeName
+              Ident "Coin"
+            Whitespace " "
+            Ident "c"
+          Whitespace "  "
+          Arrow "->"
+          Whitespace " "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            Literal
+              String "\"coin\""
         Whitespace "        "
         LineComment "// c is narrowed to Coin inside the arm"
         Newline "\n"
         Whitespace "    "
-        RecordField
-          Ident "Level"
-        Whitespace " "
-        RecordField
-          Ident "l"
-        Whitespace " "
-        Arrow "->"
-        Whitespace " "
-        Return "return"
-        Whitespace " "
-        String "\"level\""
+        MatchArm
+          MatchPattern
+            TypeName
+              Ident "Level"
+            Whitespace " "
+            Ident "l"
+          Whitespace " "
+          Arrow "->"
+          Whitespace " "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            Literal
+              String "\"level\""
         Newline "\n"
         Whitespace "  "
         RBrace "}"
@@ -173,47 +179,51 @@ File
       LBrace "{"
       Newline "\n"
       Whitespace "  "
-      NameRef
-        Ident "match"
-      Whitespace " "
-      RecordLit
-        Ident "v"
+      MatchStmt
+        Match "match"
+        Whitespace " "
+        NameRef
+          Ident "v"
         Whitespace " "
         LBrace "{"
         Newline "\n"
         Whitespace "    "
-        RecordField
-          Ident "Coin"
-        Whitespace " "
-        RecordField
-          Ident "c"
-        Whitespace "  "
-        Arrow "->"
-        Whitespace " "
-        Return "return"
-        Whitespace " "
-        RecordField
-          Ident "c"
-        Dot "."
-        RecordField
-          Ident "amount"
+        MatchArm
+          MatchPattern
+            TypeName
+              Ident "Coin"
+            Whitespace " "
+            Ident "c"
+          Whitespace "  "
+          Arrow "->"
+          Whitespace " "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            MemberExpr
+              NameRef
+                Ident "c"
+              Dot "."
+              Ident "amount"
         Newline "\n"
         Whitespace "    "
-        RecordField
-          Ident "Level"
-        Whitespace " "
-        RecordField
-          Ident "l"
-        Whitespace " "
-        Arrow "->"
-        Whitespace " "
-        Return "return"
-        Whitespace " "
-        RecordField
-          Ident "l"
-        Dot "."
-        RecordField
-          Ident "rank"
+        MatchArm
+          MatchPattern
+            TypeName
+              Ident "Level"
+            Whitespace " "
+            Ident "l"
+          Whitespace " "
+          Arrow "->"
+          Whitespace " "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            MemberExpr
+              NameRef
+                Ident "l"
+              Dot "."
+              Ident "rank"
         Newline "\n"
         Whitespace "  "
         RBrace "}"
@@ -265,52 +275,58 @@ File
       LBrace "{"
       Newline "\n"
       Whitespace "  "
-      NameRef
-        Ident "match"
-      Whitespace " "
-      RecordLit
-        Ident "v"
+      MatchStmt
+        Match "match"
+        Whitespace " "
+        NameRef
+          Ident "v"
         Whitespace " "
         LBrace "{"
         Newline "\n"
         Whitespace "    "
-        RecordField
-          Ident "Coin"
-        Whitespace " "
-        RecordField
-          Ident "c"
-        Whitespace " "
-        Arrow "->"
-        Whitespace " "
-        Return "return"
-        Whitespace " "
-        RecordField
-          Ident "c"
-        Dot "."
-        RecordField
-          Ident "amount"
+        MatchArm
+          MatchPattern
+            TypeName
+              Ident "Coin"
+            Whitespace " "
+            Ident "c"
+          Whitespace " "
+          Arrow "->"
+          Whitespace " "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            MemberExpr
+              NameRef
+                Ident "c"
+              Dot "."
+              Ident "amount"
         Newline "\n"
         Whitespace "    "
-        Null "null"
-        Whitespace "   "
-        Arrow "->"
-        Whitespace " "
-        LBrace "{"
+        MatchArm
+          MatchPattern
+            TypeName
+              Null "null"
+          Whitespace "   "
+          Arrow "->"
+          Whitespace " "
+          Block
+            LBrace "{"
+            Newline "\n"
+            Whitespace "      "
+            ReturnStmt
+              Return "return"
+              Whitespace " "
+              NameRef
+                Ident "fallback"
+            Newline "\n"
+            Whitespace "    "
+            RBrace "}"
         Newline "\n"
-        Whitespace "      "
-        Return "return"
-        Whitespace " "
-        RecordField
-          Ident "fallback"
-        Newline "\n"
-        Whitespace "    "
+        Whitespace "  "
         RBrace "}"
       Newline "\n"
-      Whitespace "  "
       RBrace "}"
-  Error
-    Newline "\n"
-    RBrace "}"
   FuncDecl
     Newline "\n"
     Newline "\n"
@@ -343,40 +359,46 @@ File
       LBrace "{"
       Newline "\n"
       Whitespace "  "
-      NameRef
-        Ident "match"
-      Whitespace " "
-      RecordLit
-        Ident "v"
+      MatchStmt
+        Match "match"
+        Whitespace " "
+        NameRef
+          Ident "v"
         Whitespace " "
         LBrace "{"
         Newline "\n"
         Whitespace "    "
-        RecordField
-          Ident "Coin"
-        Whitespace " "
-        RecordField
-          Ident "c"
-        Whitespace " "
-        Arrow "->"
-        Whitespace " "
-        Return "return"
-        Whitespace " "
-        RecordField
-          Ident "c"
-        Dot "."
-        RecordField
-          Ident "amount"
+        MatchArm
+          MatchPattern
+            TypeName
+              Ident "Coin"
+            Whitespace " "
+            Ident "c"
+          Whitespace " "
+          Arrow "->"
+          Whitespace " "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            MemberExpr
+              NameRef
+                Ident "c"
+              Dot "."
+              Ident "amount"
         Newline "\n"
         Whitespace "    "
-        RecordField
-          Ident "_"
-        Whitespace "      "
-        Arrow "->"
-        Whitespace " "
-        Return "return"
-        Whitespace " "
-        Int "0"
+        MatchArm
+          MatchPattern
+            TypeName
+              Ident "_"
+          Whitespace "      "
+          Arrow "->"
+          Whitespace " "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            Literal
+              Int "0"
         Newline "\n"
         Whitespace "  "
         RBrace "}"
@@ -427,47 +449,50 @@ File
       LBrace "{"
       Newline "\n"
       Whitespace "  "
-      NameRef
-        Ident "match"
-      Whitespace " "
-      IndexExpr
-        NameRef
-          Ident "xs"
-        LBracket "["
-        Literal
-          Int "0"
-        RBracket "]"
-      Whitespace " "
-      RecordLit
+      MatchStmt
+        Match "match"
+        Whitespace " "
+        IndexExpr
+          NameRef
+            Ident "xs"
+          LBracket "["
+          Literal
+            Int "0"
+          RBracket "]"
+        Whitespace " "
         LBrace "{"
         Newline "\n"
         Whitespace "    "
-        RecordField
-          Ident "int"
-        Whitespace " "
-        RecordField
-          Ident "v"
-        Whitespace "   "
-        Arrow "->"
-        Whitespace " "
-        Return "return"
-        Whitespace " "
-        RecordField
-          Ident "v"
+        MatchArm
+          MatchPattern
+            TypeName
+              Ident "int"
+            Whitespace " "
+            Ident "v"
+          Whitespace "   "
+          Arrow "->"
+          Whitespace " "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            NameRef
+              Ident "v"
         Newline "\n"
         Whitespace "    "
-        RecordField
-          Ident "error"
-        Whitespace " "
-        RecordField
-          Ident "e"
-        Whitespace " "
-        Arrow "->"
-        Whitespace " "
-        Return "return"
-        Whitespace " "
-        RecordField
-          Ident "fallback"
+        MatchArm
+          MatchPattern
+            TypeName
+              Ident "error"
+            Whitespace " "
+            Ident "e"
+          Whitespace " "
+          Arrow "->"
+          Whitespace " "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            NameRef
+              Ident "fallback"
         Newline "\n"
         Whitespace "  "
         RBrace "}"
@@ -515,178 +540,109 @@ File
       LBrace "{"
       Newline "\n"
       Whitespace "  "
-      NameRef
-        Ident "match"
-      Whitespace " "
-      RecordLit
-        Ident "v"
+      MatchStmt
+        Match "match"
+        Whitespace " "
+        NameRef
+          Ident "v"
         Whitespace " "
         LBrace "{"
         Newline "\n"
         Whitespace "    "
-        RecordField
-          Ident "Coin"
-        Whitespace " "
-        RecordField
-          Ident "c"
-        Whitespace " "
-        Arrow "->"
-        Whitespace " "
-        LBrace "{"
+        MatchArm
+          MatchPattern
+            TypeName
+              Ident "Coin"
+            Whitespace " "
+            Ident "c"
+          Whitespace " "
+          Arrow "->"
+          Whitespace " "
+          Block
+            LBrace "{"
+            Newline "\n"
+            Whitespace "      "
+            LetStmt
+              Let "let"
+              Whitespace " "
+              Ident "n"
+              Whitespace " "
+              Initializer
+                Assign "="
+                Whitespace " "
+                MemberExpr
+                  NameRef
+                    Ident "c"
+                  Dot "."
+                  Ident "amount"
+            Newline "\n"
+            Whitespace "      "
+            MatchStmt
+              Match "match"
+              Whitespace " "
+              NameRef
+                Ident "other"
+              Whitespace " "
+              LBrace "{"
+              Newline "\n"
+              Whitespace "        "
+              MatchArm
+                MatchPattern
+                  TypeName
+                    Ident "Coin"
+                  Whitespace " "
+                  Ident "c2"
+                Whitespace " "
+                Arrow "->"
+                Whitespace " "
+                ReturnStmt
+                  Return "return"
+                  Whitespace " "
+                  Literal
+                    String "\"coin/coin\""
+              Newline "\n"
+              Whitespace "        "
+              MatchArm
+                MatchPattern
+                  TypeName
+                    Ident "Level"
+                  Whitespace " "
+                  Ident "l"
+                Whitespace " "
+                Arrow "->"
+                Whitespace " "
+                ReturnStmt
+                  Return "return"
+                  Whitespace " "
+                  Literal
+                    String "\"coin/level\""
+              Newline "\n"
+              Whitespace "      "
+              RBrace "}"
+            Newline "\n"
+            Whitespace "    "
+            RBrace "}"
         Newline "\n"
-        Whitespace "      "
-        Let "let"
-        Whitespace " "
-        RecordField
-          Ident "n"
-        Whitespace " "
-        Assign "="
-        Whitespace " "
-        RecordField
-          Ident "c"
-        Dot "."
-        RecordField
-          Ident "amount"
+        Whitespace "    "
+        MatchArm
+          MatchPattern
+            TypeName
+              Ident "Level"
+            Whitespace " "
+            Ident "l"
+          Whitespace " "
+          Arrow "->"
+          Whitespace " "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            Literal
+              String "\"level\""
         Newline "\n"
-        Whitespace "      "
-        RecordField
-          Ident "match"
-        Whitespace " "
-        RecordField
-          Ident "other"
-        Whitespace " "
-        LBrace "{"
-        Newline "\n"
-        Whitespace "        "
-        RecordField
-          Ident "Coin"
-        Whitespace " "
-        RecordField
-          Ident "c2"
-        Whitespace " "
-        Arrow "->"
-        Whitespace " "
-        Return "return"
-        Whitespace " "
-        String "\"coin/coin\""
-        Newline "\n"
-        Whitespace "        "
-        RecordField
-          Ident "Level"
-        Whitespace " "
-        RecordField
-          Ident "l"
-        Whitespace " "
-        Arrow "->"
-        Whitespace " "
-        Return "return"
-        Whitespace " "
-        String "\"coin/level\""
-        Newline "\n"
-        Whitespace "      "
+        Whitespace "  "
         RBrace "}"
       Newline "\n"
-      Whitespace "    "
       RBrace "}"
-  Error
-    Newline "\n"
-    Whitespace "    "
-    Ident "Level"
-    Whitespace " "
-    Ident "l"
-    Whitespace " "
-    Arrow "->"
-    Whitespace " "
-    Return "return"
-    Whitespace " "
-    String "\"level\""
-    Newline "\n"
-    Whitespace "  "
-    RBrace "}"
-    Newline "\n"
-    RBrace "}"
   Newline "\n"
   EOF ""
 # diagnostics
-error[masterbelt.parser.concrete.unexpected_token] 17:5 unexpected token: Ident
-error[masterbelt.parser.concrete.unexpected_token] 17:10 unexpected token: Arrow
-error[masterbelt.parser.concrete.unexpected_token] 17:13 unexpected token: Arrow
-error[masterbelt.parser.concrete.unexpected_token] 17:16 unexpected token: Return
-error[masterbelt.parser.concrete.unexpected_token] 17:23 unexpected token: String
-error[masterbelt.parser.concrete.unexpected_token] 18:5 unexpected token: Ident
-error[masterbelt.parser.concrete.unexpected_token] 18:11 unexpected token: Arrow
-error[masterbelt.parser.concrete.unexpected_token] 18:13 unexpected token: Arrow
-error[masterbelt.parser.concrete.unexpected_token] 18:16 unexpected token: Return
-error[masterbelt.parser.concrete.unexpected_token] 18:23 unexpected token: String
-error[masterbelt.parser.concrete.unexpected_token] 26:5 unexpected token: Ident
-error[masterbelt.parser.concrete.unexpected_token] 26:10 unexpected token: Arrow
-error[masterbelt.parser.concrete.unexpected_token] 26:13 unexpected token: Arrow
-error[masterbelt.parser.concrete.unexpected_token] 26:16 unexpected token: Return
-error[masterbelt.parser.concrete.unexpected_token] 26:23 unexpected token: Dot
-error[masterbelt.parser.concrete.unexpected_token] 26:24 unexpected token: Dot
-error[masterbelt.parser.concrete.unexpected_token] 26:25 unexpected token: Ident
-error[masterbelt.parser.concrete.unexpected_token] 27:5 unexpected token: Ident
-error[masterbelt.parser.concrete.unexpected_token] 27:11 unexpected token: Arrow
-error[masterbelt.parser.concrete.unexpected_token] 27:13 unexpected token: Arrow
-error[masterbelt.parser.concrete.unexpected_token] 27:16 unexpected token: Return
-error[masterbelt.parser.concrete.unexpected_token] 27:23 unexpected token: Dot
-error[masterbelt.parser.concrete.unexpected_token] 27:24 unexpected token: Dot
-error[masterbelt.parser.concrete.unexpected_token] 27:25 unexpected token: RBrace
-error[masterbelt.parser.concrete.unexpected_token] 36:5 unexpected token: Ident
-error[masterbelt.parser.concrete.unexpected_token] 36:10 unexpected token: Arrow
-error[masterbelt.parser.concrete.unexpected_token] 36:12 unexpected token: Arrow
-error[masterbelt.parser.concrete.unexpected_token] 36:15 unexpected token: Return
-error[masterbelt.parser.concrete.unexpected_token] 36:22 unexpected token: Dot
-error[masterbelt.parser.concrete.unexpected_token] 36:23 unexpected token: Dot
-error[masterbelt.parser.concrete.unexpected_token] 36:24 unexpected token: Null
-error[masterbelt.parser.concrete.unexpected_token] 37:5 unexpected token: Null
-error[masterbelt.parser.concrete.unexpected_token] 37:12 unexpected token: Arrow
-error[masterbelt.parser.concrete.unexpected_token] 37:15 unexpected token: LBrace
-error[masterbelt.parser.concrete.unexpected_token] 38:7 unexpected token: Return
-error[masterbelt.parser.concrete.unexpected_token] 38:14 unexpected token: RBrace
-error[masterbelt.parser.concrete.unexpected_token] 41:1 unexpected token: RBrace
-error[masterbelt.parser.concrete.unexpected_token] 48:5 unexpected token: Ident
-error[masterbelt.parser.concrete.unexpected_token] 48:10 unexpected token: Arrow
-error[masterbelt.parser.concrete.unexpected_token] 48:12 unexpected token: Arrow
-error[masterbelt.parser.concrete.unexpected_token] 48:15 unexpected token: Return
-error[masterbelt.parser.concrete.unexpected_token] 48:22 unexpected token: Dot
-error[masterbelt.parser.concrete.unexpected_token] 48:23 unexpected token: Dot
-error[masterbelt.parser.concrete.unexpected_token] 48:24 unexpected token: Ident
-error[masterbelt.parser.concrete.unexpected_token] 49:5 unexpected token: Arrow
-error[masterbelt.parser.concrete.unexpected_token] 49:12 unexpected token: Arrow
-error[masterbelt.parser.concrete.unexpected_token] 49:15 unexpected token: Return
-error[masterbelt.parser.concrete.unexpected_token] 49:22 unexpected token: Int
-error[masterbelt.parser.concrete.unexpected_token] 58:5 unexpected token: Ident
-error[masterbelt.parser.concrete.unexpected_token] 58:9 unexpected token: Arrow
-error[masterbelt.parser.concrete.unexpected_token] 58:13 unexpected token: Arrow
-error[masterbelt.parser.concrete.unexpected_token] 58:16 unexpected token: Return
-error[masterbelt.parser.concrete.unexpected_token] 58:23 unexpected token: Ident
-error[masterbelt.parser.concrete.unexpected_token] 59:5 unexpected token: Ident
-error[masterbelt.parser.concrete.unexpected_token] 59:11 unexpected token: Arrow
-error[masterbelt.parser.concrete.unexpected_token] 59:13 unexpected token: Arrow
-error[masterbelt.parser.concrete.unexpected_token] 59:16 unexpected token: Return
-error[masterbelt.parser.concrete.unexpected_token] 59:23 unexpected token: RBrace
-error[masterbelt.parser.concrete.unexpected_token] 69:5 unexpected token: Ident
-error[masterbelt.parser.concrete.unexpected_token] 69:10 unexpected token: Arrow
-error[masterbelt.parser.concrete.unexpected_token] 69:12 unexpected token: Arrow
-error[masterbelt.parser.concrete.unexpected_token] 69:15 unexpected token: LBrace
-error[masterbelt.parser.concrete.unexpected_token] 70:7 unexpected token: Let
-error[masterbelt.parser.concrete.unexpected_token] 70:11 unexpected token: Assign
-error[masterbelt.parser.concrete.unexpected_token] 70:13 unexpected token: Assign
-error[masterbelt.parser.concrete.unexpected_token] 70:15 unexpected token: Dot
-error[masterbelt.parser.concrete.unexpected_token] 70:16 unexpected token: Dot
-error[masterbelt.parser.concrete.unexpected_token] 70:17 unexpected token: Ident
-error[masterbelt.parser.concrete.unexpected_token] 71:7 unexpected token: Ident
-error[masterbelt.parser.concrete.unexpected_token] 71:13 unexpected token: LBrace
-error[masterbelt.parser.concrete.unexpected_token] 71:19 unexpected token: LBrace
-error[masterbelt.parser.concrete.unexpected_token] 72:9 unexpected token: Ident
-error[masterbelt.parser.concrete.unexpected_token] 72:14 unexpected token: Arrow
-error[masterbelt.parser.concrete.unexpected_token] 72:17 unexpected token: Arrow
-error[masterbelt.parser.concrete.unexpected_token] 72:20 unexpected token: Return
-error[masterbelt.parser.concrete.unexpected_token] 72:27 unexpected token: String
-error[masterbelt.parser.concrete.unexpected_token] 73:9 unexpected token: Ident
-error[masterbelt.parser.concrete.unexpected_token] 73:15 unexpected token: Arrow
-error[masterbelt.parser.concrete.unexpected_token] 73:17 unexpected token: Arrow
-error[masterbelt.parser.concrete.unexpected_token] 73:20 unexpected token: Return
-error[masterbelt.parser.concrete.unexpected_token] 73:27 unexpected token: String
-error[masterbelt.parser.concrete.unexpected_token] 76:5 unexpected token: Ident

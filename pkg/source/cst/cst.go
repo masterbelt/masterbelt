@@ -82,17 +82,20 @@ const (
 	// Implementations and method bodies. An impl item is a MethodDecl or a
 	// ConstDecl (an associated constant, read as TypeName.Name); the latter
 	// reuses the same node a top-level constant uses.
-	ImplBlock  // impl [TypeName] "{" (MethodDecl | ConstDecl)* "}"  (the optional TypeName tags the interface this block implements)
-	MethodDecl // [pub] [extern] [fn] Ident ParamList ":" TypeExpr [Block]
-	ParamList  // "(" [Param ("," Param)*] ")"
-	Param      // Ident ":" TypeExpr
-	Block      // "{" Stmt* "}"
-	ReturnStmt // return Expr
-	LetStmt    // let Ident [TypeClause] "=" Expr  (a mutable block-local binding)
-	AssignStmt // Target "=" Expr  (a reassignment statement; Target is a value expression)
-	SwitchStmt // switch Expr "{" ( SwitchArm ( ("," | NL) SwitchArm )* )? "}"
-	SwitchArm  // ( Expr ( "," Expr )* | "_" ) "->" ( Stmt | Block )
-	IfStmt     // if Expr Block [ else ( IfStmt | Block ) ]
+	ImplBlock    // impl [TypeName] "{" (MethodDecl | ConstDecl)* "}"  (the optional TypeName tags the interface this block implements)
+	MethodDecl   // [pub] [extern] [fn] Ident ParamList ":" TypeExpr [Block]
+	ParamList    // "(" [Param ("," Param)*] ")"
+	Param        // Ident ":" TypeExpr
+	Block        // "{" Stmt* "}"
+	ReturnStmt   // return Expr
+	LetStmt      // let Ident [TypeClause] "=" Expr  (a mutable block-local binding)
+	AssignStmt   // Target "=" Expr  (a reassignment statement; Target is a value expression)
+	SwitchStmt   // switch Expr "{" ( SwitchArm ( ("," | NL) SwitchArm )* )? "}"
+	SwitchArm    // ( Expr ( "," Expr )* | "_" ) "->" ( Stmt | Block )
+	IfStmt       // if Expr Block [ else ( IfStmt | Block ) ]
+	MatchStmt    // match Expr "{" ( MatchArm ( ("," | NL) MatchArm )* )? "}"
+	MatchArm     // MatchPattern "->" ( Stmt | Block )
+	MatchPattern // ( PrimaryType [Ident] ) | "_"  (a member type with an optional binding, or the wildcard)
 
 	// Top-level functions.
 	FuncDecl // [doc] [pub] fn Ident ParamList ":" TypeExpr ( Block | "->" Expr )
@@ -157,6 +160,9 @@ var kindNames = [...]string{
 	SwitchStmt:      "SwitchStmt",
 	SwitchArm:       "SwitchArm",
 	IfStmt:          "IfStmt",
+	MatchStmt:       "MatchStmt",
+	MatchArm:        "MatchArm",
+	MatchPattern:    "MatchPattern",
 	FuncDecl:        "FuncDecl",
 	UseDecl:         "UseDecl",
 	UseList:         "UseList",
