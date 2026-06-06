@@ -221,3 +221,87 @@ func TestEarlyCutoffValue(t *testing.T) {
 		t.Error("valueOf(C) was recomputed; an annotation change should not affect values")
 	}
 }
+
+// TestEarlyCutoffNonScalarValue guards the value-side early cutoff for the
+// constant kinds beyond int/bool/string: datetime, duration, record, and error.
+// Each case declares a base const V, an intermediate X that folds V into the
+// kind under test, and two pure consumers (Y = X, Z = Y). The edit rewrites V's
+// initializer to a different but equal-valued, equal-length expression, so V is
+// re-evaluated to a byte-identical value and X re-folds to a structurally equal
+// constant — the cutoff must therefore stop at X and not re-evaluate Z.
+//
+// Before the cutoff equality covered these kinds (its switch defaulted to "not
+// equal"), every recompute of X compared unequal to its prior value and the
+// change rippled to Y and Z, defeating early cutoff for the whole dependency
+// cone. These cases turn that silent over-invalidation into a hard failure: a
+// new ConstKind left out of ir.ConstantsEqual now panics there rather than
+// regressing the cutoff unnoticed. (Enum is intentionally omitted: an enum
+// const carries the enum's *TypeDef pointer, which the type-defs table rebuilds
+// on any edit, so its invalidation is governed by type identity — a separate,
+// correct mechanism — not by this value equality.)
+//
+// The edits are length-preserving so the downstream consts' decl nodes and byte
+// offsets stay put; only V's value query is forced to recompute.
+func TestEarlyCutoffNonScalarValue(t *testing.T) {
+	cases := []struct {
+		name     string
+		src      string
+		old, new string // an equal-valued, equal-length rewrite of V's initializer
+	}{
+		{
+			// X = epoch + V, a datetime. V is a duration; 60s and 1m are the same
+			// span, so X folds to the same UTC instant. The trailing space keeps
+			// the line width so nothing downstream shifts.
+			name: "datetime",
+			src:  "const V = 60s\nconst X = D1970-01-01T00:00:00.000Z + V\nconst Y = X\nconst Z = Y\n",
+			old:  "= 60s\n",
+			new:  "= 1m \n",
+		},
+		{
+			// X = V * 2, a duration. 60s and 1m are the same span; the trailing
+			// space keeps the line width so nothing downstream shifts.
+			name: "duration",
+			src:  "const V = 60s\nconst X = V * 2\nconst Y = X\nconst Z = Y\n",
+			old:  "= 60s\n",
+			new:  "= 1m \n",
+		},
+		{
+			// X = { a: V }, a record. 2 + 0 and 0 + 2 both fold to the integer 2,
+			// so X's field a folds to the same value.
+			name: "record",
+			src:  "const V = 2 + 0\nconst X = { a: V }\nconst Y = X\nconst Z = Y\n",
+			old:  "2 + 0",
+			new:  "0 + 2",
+		},
+		{
+			// X = error(V), an error. "ab" + "" and "" + "ab" both fold to "ab",
+			// so X's error message folds to the same string.
+			name: "error",
+			src:  "const V = \"ab\" + \"\"\nconst X = error(V)\nconst Y = X\nconst Z = Y\n",
+			old:  "\"ab\" + \"\"",
+			new:  "\"\" + \"ab\"",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if len(tc.old) != len(tc.new) {
+				t.Fatalf("setup: edit is not length-preserving (%d vs %d)", len(tc.old), len(tc.new))
+			}
+			e := newEditable([]byte(tc.src))
+			decls := e.doc.File().Decls
+			zDecl := decls[len(decls)-1] // the far consumer, const Z = Y
+
+			i := strings.Index(tc.src, tc.old)
+			if i < 0 {
+				t.Fatalf("setup: %q not found in src", tc.old)
+			}
+			e.edit(source.Edit{Start: i, End: i + len(tc.old), NewText: []byte(tc.new)})
+			assertMatchesReference(t, e, []byte(strings.Replace(tc.src, tc.old, tc.new, 1)))
+
+			if e.prog.db.computed[valueKey(zDecl)] {
+				t.Errorf("valueOf(Z) was recomputed; X's %s value was unchanged, so the cutoff should have stopped at X", tc.name)
+			}
+		})
+	}
+}

@@ -166,6 +166,8 @@ func Body(body []ast.Stmt, b Binder) []ir.Stmt {
 			stmts = append(stmts, switchStmt(s, b))
 		case *ast.IfStmt:
 			stmts = append(stmts, ifStmt(s, b))
+		default:
+			panic(ast.UnhandledStmt(s))
 		}
 	}
 	return stmts

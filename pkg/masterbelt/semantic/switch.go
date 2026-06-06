@@ -232,8 +232,15 @@ func stmtReturns(s ast.Stmt, bs infer.BodyScope) bool {
 		return switchReturns(s, bs)
 	case *ast.IfStmt:
 		return ifReturns(s, bs)
-	default:
+	case *ast.LetStmt, *ast.AssignStmt, *ast.ExprStmt:
+		// None of these guarantees a return: control falls through to the next
+		// statement. Listed explicitly rather than folded into a `default:
+		// return false` so a statement kind added later (one that might end a
+		// path, e.g. a throw) forces a decision here instead of being silently
+		// assumed not to return.
 		return false
+	default:
+		panic(ast.UnhandledStmt(s))
 	}
 }
 

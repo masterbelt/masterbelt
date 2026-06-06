@@ -342,45 +342,13 @@ func equalFuncBindings(a, b funcBinding) bool {
 // kinds, but a function value compares its literal by pointer — Constant.Fn is
 // an AST node, and like every other AST pointer in the engine the pointer is
 // the fact, so a structurally identical literal from a re-parsed file must
-// propagate rather than leave consumers holding a detached tree.
+// propagate rather than leave consumers holding a detached tree. It is
+// ir.ConstantsEqual, the single shared definition the evaluator also folds on,
+// so every ConstKind — enum, datetime, duration, record, error included — is
+// covered; a kind added later without a case there panics rather than silently
+// defeating the cutoff for that kind's whole dependency cone.
 func equalConstants(a, b *ir.Constant) bool {
-	if a == b {
-		return true
-	}
-	if a == nil || b == nil || a.Kind != b.Kind {
-		return false
-	}
-	switch a.Kind {
-	case ir.ConstInt:
-		return a.Int != nil && b.Int != nil && a.Int.Cmp(b.Int) == 0
-	case ir.ConstBool:
-		return a.Bool == b.Bool
-	case ir.ConstString:
-		return a.Str == b.Str
-	case ir.ConstCollection:
-		if len(a.Coll) != len(b.Coll) {
-			return false
-		}
-		for i := range a.Coll {
-			if !equalConstants(a.Coll[i].Key, b.Coll[i].Key) || !equalConstants(a.Coll[i].Value, b.Coll[i].Value) {
-				return false
-			}
-		}
-		return true
-	case ir.ConstFunc:
-		if a.Fn != b.Fn || len(a.Captured) != len(b.Captured) {
-			return false
-		}
-		for name, v := range a.Captured {
-			w, ok := b.Captured[name]
-			if !ok || !equalConstants(v, w) {
-				return false
-			}
-		}
-		return true
-	default:
-		return false
-	}
+	return ir.ConstantsEqual(a, b)
 }
 
 // equalTypes is type equality for the cutoff: named types by their definition

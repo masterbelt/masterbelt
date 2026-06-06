@@ -81,47 +81,17 @@ func checkDeclEffects(name string, declared []string, decl ast.Node, body []ast.
 // descending through a switch's scrutinee, arm value patterns, arm bodies, and
 // wildcard body so an effectful call anywhere in a switch counts.
 func collectBodyEffectUses(body []ast.Stmt, bs infer.BodyScope, use func(effect string, node ast.Node)) {
-	for _, stmt := range body {
-		switch stmt := stmt.(type) {
-		case *ast.ReturnStmt:
-			collectEffectUses(stmt.Value, bs, use)
-		case *ast.ExprStmt:
-			collectEffectUses(stmt.X, bs, use)
-		case *ast.LetStmt:
-			collectEffectUses(stmt.Value, bs, use)
-		case *ast.AssignStmt:
-			collectEffectUses(stmt.Value, bs, use)
-		case *ast.SwitchStmt:
-			collectEffectUses(stmt.Scrutinee, bs, use)
-			for _, arm := range stmt.Arms {
-				for _, v := range arm.Values {
-					collectEffectUses(v, bs, use)
-				}
-				collectBodyEffectUses(arm.Body, bs, use)
-			}
-			collectBodyEffectUses(stmt.Else, bs, use)
-			for _, arm := range stmt.AfterElse {
-				for _, v := range arm.Values {
-					collectEffectUses(v, bs, use)
-				}
-				collectBodyEffectUses(arm.Body, bs, use)
-			}
-		case *ast.IfStmt:
-			collectIfEffectUses(stmt, bs, use)
-		}
-	}
-}
-
-// collectIfEffectUses descends through an if's condition, then body, else-if
-// chain, and else body, so an effectful call anywhere in the control flow counts
-// toward the enclosing declaration's used effects.
-func collectIfEffectUses(s *ast.IfStmt, bs infer.BodyScope, use func(effect string, node ast.Node)) {
-	collectEffectUses(s.Cond, bs, use)
-	collectBodyEffectUses(s.Then, bs, use)
-	if s.ElseIf != nil {
-		collectIfEffectUses(s.ElseIf, bs, use)
-	}
-	collectBodyEffectUses(s.Else, bs, use)
+	// The body walk is the shared ast.WalkBodyExprs skeleton — the one place a
+	// new statement form is wired in — so effect collection cannot drift out of
+	// sync with it or silently skip a kind. WalkBodyExprs yields the top
+	// expression of every statement (a return value, a let initializer, an
+	// assignment's target and value, a switch's scrutinee and arm patterns, an
+	// if's condition) across the nested control flow; collectEffectUses gathers
+	// the effects of each. (It also yields an assignment's target — an
+	// identifier — which collectEffectUses treats as a no-op, exactly right.)
+	ast.WalkBodyExprs(body, func(e ast.Expr) {
+		collectEffectUses(e, bs, use)
+	})
 }
 
 // collectEffectUses walks an expression collecting the effects it uses: an

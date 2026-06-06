@@ -90,6 +90,25 @@ const (
 	// the source exactly (needed by formatters and faithful round-tripping).
 	Whitespace // a run of spaces, tabs, and carriage returns
 	Newline    // \n
+
+	numKinds // sentinel: the count of Kind values; not a real kind
+)
+
+// firstKeyword and lastKeyword bound the contiguous run of keyword kinds in the
+// const block, so a test can require every kind in the range to appear in the
+// keywords map (and nothing outside it to). They must stay pinned to the first
+// and last keyword declared above.
+const (
+	firstKeyword = Const
+	lastKeyword  = Let
+)
+
+// firstOperator and lastOperator bound the contiguous run of operator and
+// punctuation kinds, so a test can require every kind in the range to have a
+// spelling entry. They must stay pinned to the first and last operator above.
+const (
+	firstOperator = Colon
+	lastOperator  = Arrow
 )
 
 // kindNames maps each Kind to its name, indexed by Kind value.

@@ -423,6 +423,11 @@ func WalkBodyExprs(body []Stmt, fn func(Expr)) {
 			}
 		case *IfStmt:
 			walkIfExprs(stmt, fn)
+		default:
+			// Every Stmt implementer must have a case above. A new statement
+			// form reaches here and panics rather than being silently dropped
+			// from this shared skeleton (and so from every walk layered on it).
+			panic(unhandledStmt(stmt))
 		}
 	}
 }

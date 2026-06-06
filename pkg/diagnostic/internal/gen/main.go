@@ -212,27 +212,42 @@ func readLocales(dir string) (map[string]map[string]string, error) {
 
 var placeholderRE = regexp.MustCompile(`\{([a-zA-Z_][a-zA-Z0-9_]*)\}`)
 
-// validate guards that codes and messages line up: the default locale covers
-// every code, no locale references an unknown code, and every message
-// interpolates precisely the fields declared for its code — no missing, no
-// extras — so all locales stay consistent.
+// validate guards that codes and messages line up: every locale (not only the
+// default) covers every code, no locale references an unknown code, and every
+// message interpolates precisely the fields declared for its code — no missing,
+// no extras — so all locales stay consistent. The completeness check is applied
+// to every locale uniformly, so dropping a row from a non-default catalog (the
+// E-16 ja regression: a message silently falling back to English) fails the
+// build rather than slipping through.
 func validate(codes []codeDef, locales map[string]map[string]string) error {
 	declared := map[string]codeDef{}
 	for _, c := range codes {
 		declared[c.code] = c
 	}
 
-	def, ok := locales[defaultLocale]
-	if !ok {
+	if _, ok := locales[defaultLocale]; !ok {
 		return fmt.Errorf("missing default locale catalog messages/%s.csv", defaultLocale)
 	}
-	for _, c := range codes {
-		if _, ok := def[c.code]; !ok {
-			return fmt.Errorf("code %q has no message in %s.csv", c.code, defaultLocale)
-		}
-	}
 
-	for locale, msgs := range locales {
+	// Iterate locale names in a stable order so a failure is deterministic.
+	localeNames := make([]string, 0, len(locales))
+	for locale := range locales {
+		localeNames = append(localeNames, locale)
+	}
+	sort.Strings(localeNames)
+
+	for _, locale := range localeNames {
+		msgs := locales[locale]
+		// Every declared code must have a message in this locale: a code present
+		// in code.csv but missing from a locale catalog would render in the
+		// default language with no signal.
+		for _, c := range codes {
+			if _, ok := msgs[c.code]; !ok {
+				return fmt.Errorf("code %q has no message in %s.csv", c.code, locale)
+			}
+		}
+		// No locale may reference a code that code.csv does not declare, and
+		// every message must interpolate exactly its code's declared fields.
 		for code, msg := range msgs {
 			c, ok := declared[code]
 			if !ok {

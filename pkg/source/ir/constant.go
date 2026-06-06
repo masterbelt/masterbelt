@@ -53,6 +53,89 @@ type Constant struct {
 	EnumIndex int
 }
 
+// ConstantsEqual reports whether two folded constants are structurally equal —
+// the single equality the evaluator's map-key/switch matching and the semantic
+// engine's early cutoff both dispatch on. Two nil constants (an unevaluated
+// value on both sides) are equal; a nil against a non-nil is not. Differing
+// kinds are never equal. The scalar kinds compare by value, an error by its
+// message, an enum member by identity (definition pointer and member index), a
+// datetime/duration by its milliseconds, and the composite kinds recursively: a
+// collection by length and entrywise key/value equality, a record by its
+// canonical (name-sorted) fields. A function value compares by the identity of
+// its literal (the AST pointer) and the equality of its captured environment —
+// a re-parsed but textually identical literal is a different fact, so it is not
+// equal to the original.
+//
+// Every ConstKind is handled explicitly; a kind added later that is not listed
+// here makes this function panic rather than silently report "not equal", so
+// the new kind forces an update of both call sites it serves.
+func ConstantsEqual(a, b *Constant) bool {
+	if a == b {
+		return true // identical pointers, including both nil
+	}
+	if a == nil || b == nil || a.Kind != b.Kind {
+		return false
+	}
+	switch a.Kind {
+	case ConstInt:
+		return a.Int != nil && b.Int != nil && a.Int.Cmp(b.Int) == 0
+	case ConstBool:
+		return a.Bool == b.Bool
+	case ConstString:
+		return a.Str == b.Str
+	case ConstError:
+		return a.Str == b.Str
+	case ConstEnum:
+		return a.EnumDef == b.EnumDef && a.EnumIndex == b.EnumIndex
+	case ConstDatetime, ConstDuration:
+		return a.Millis == b.Millis
+	case ConstCollection:
+		if len(a.Coll) != len(b.Coll) {
+			return false
+		}
+		for i := range a.Coll {
+			// A list entry has a nil key on both sides; a map entry's keys
+			// must match too. A key present on one side but not the other (a
+			// list against a map of the same length) is unequal.
+			if (a.Coll[i].Key == nil) != (b.Coll[i].Key == nil) {
+				return false
+			}
+			if a.Coll[i].Key != nil && !ConstantsEqual(a.Coll[i].Key, b.Coll[i].Key) {
+				return false
+			}
+			if !ConstantsEqual(a.Coll[i].Value, b.Coll[i].Value) {
+				return false
+			}
+		}
+		return true
+	case ConstRecord:
+		// RecordConstant normalizes fields to canonical name order, so equal
+		// records have identically ordered fields: a positional walk suffices.
+		if len(a.Fields) != len(b.Fields) {
+			return false
+		}
+		for i := range a.Fields {
+			if a.Fields[i].Name != b.Fields[i].Name || !ConstantsEqual(a.Fields[i].Value, b.Fields[i].Value) {
+				return false
+			}
+		}
+		return true
+	case ConstFunc:
+		if a.Fn != b.Fn || len(a.Captured) != len(b.Captured) {
+			return false
+		}
+		for name, v := range a.Captured {
+			w, ok := b.Captured[name]
+			if !ok || !ConstantsEqual(v, w) {
+				return false
+			}
+		}
+		return true
+	default:
+		panic("ir.ConstantsEqual: unhandled ConstKind " + strconv.Itoa(int(a.Kind)))
+	}
+}
+
 // ConstEntry is one entry of a folded collection constant: a Value, and for a
 // map entry a Key (nil for a list element).
 type ConstEntry struct {

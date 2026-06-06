@@ -105,6 +105,8 @@ const (
 	AssertDecl // [doc] assert Expr
 
 	Error // a run of tokens that did not fit the grammar
+
+	numKinds // sentinel: the count of Kind values; not a real kind
 )
 
 // kindNames maps each Kind to its name, indexed by Kind value.

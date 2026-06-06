@@ -213,6 +213,10 @@ func dumpStmtAt(b *strings.Builder, s Stmt, indent string) {
 		}
 	case *If:
 		dumpIfAt(b, s, indent)
+	default:
+		// The snapshot oracle must render every lowered statement kind; a new
+		// one panics here rather than dumping as nothing.
+		panic(unhandledStmt(s))
 	}
 }
 
@@ -307,7 +311,10 @@ func dumpStmtInline(s Stmt) string {
 		}
 		return "(" + strings.Join(parts, " ") + ")"
 	default:
-		return ""
+		// Every ir.Stmt has an inline form above; a kind added later panics
+		// rather than rendering as the empty string and vanishing from the
+		// snapshot oracle.
+		panic(unhandledStmt(s))
 	}
 }
 
