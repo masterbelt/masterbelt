@@ -25,7 +25,7 @@ Module
     eval 5
   TypeDef "Score" pub
     doc "A game score in points."
-    body int32
+    body int
     method "merge" pub
       doc "The score with points merged in."
       param points: self
@@ -38,7 +38,7 @@ Module
       return ParamRef "active".anan(self.gt(IntLiteral "0"))
   TypeDef "Level" pub
     doc "A character level."
-    body int8
+    body sbyte
     method "next" pub
       doc "The next level."
       result self

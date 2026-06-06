@@ -6,24 +6,24 @@ import "testing"
 // value and the null literal — the named-union assignability the alias rides
 // on — and rejects a non-member.
 func TestOptionalAssign(t *testing.T) {
-	if got := evalOf(t, "const A: optional<int> = 5\n", "A").String(); got != "5" {
+	if got := evalOf(t, "const A: optional<nint> = 5\n", "A").String(); got != "5" {
 		t.Fatalf("A folded to %q, want 5", got)
 	}
-	if got := evalOf(t, "const B: optional<int> = null\n", "B").String(); got != "null" {
+	if got := evalOf(t, "const B: optional<nint> = null\n", "B").String(); got != "null" {
 		t.Fatalf("B folded to %q, want null", got)
 	}
-	_, diags := analyze("const C: optional<int> = \"s\"\n")
+	_, diags := analyze("const C: optional<nint> = \"s\"\n")
 	if len(diags) == 0 {
-		t.Fatal("expected a diagnostic assigning a string to optional<int>")
+		t.Fatal("expected a diagnostic assigning a string to optional<nint>")
 	}
 }
 
 // TestOptionalMatch pins that match narrows the alias exactly as the bare
 // union: both arms fold, and the alias is exhaustive with int + null.
 func TestOptionalMatch(t *testing.T) {
-	src := `pub fn orZero(v: optional<int>): int {
+	src := `pub fn orZero(v: optional<nint>): nint {
   match v {
-    int n -> return n
+    nint n -> return n
     _ -> return 0
   }
 }
@@ -43,9 +43,9 @@ assert orZero(null) == 0
 // TestOptionalNonExhaustiveMatch pins that exhaustiveness checking sees
 // through the alias: a match missing the null arm is reported.
 func TestOptionalNonExhaustiveMatch(t *testing.T) {
-	src := `pub fn bad(v: optional<int>): int {
+	src := `pub fn bad(v: optional<nint>): nint {
   match v {
-    int n -> return n
+    nint n -> return n
   }
   return 0
 }

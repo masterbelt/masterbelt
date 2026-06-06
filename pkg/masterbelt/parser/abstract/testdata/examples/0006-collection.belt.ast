@@ -1,24 +1,24 @@
 File
   ConstDecl
     name "ExampleList"
-    type list<int>
+    type list<nint>
     value (list IntLit "1" IntLit "2" IntLit "3")
   ConstDecl
     name "ExampleMap"
-    type map<string, int>
+    type map<string, nint>
     value (map StringLit "key": IntLit "100")
   ConstDecl
     name "Inferred"
     value (list IntLit "10" IntLit "20" IntLit "30")
   ConstDecl
     name "Bytes"
-    type list<int8>
+    type list<sbyte>
     value (list IntLit "1" IntLit "2" IntLit "3")
   ConstDecl
     name "EmptyList"
-    type list<int>
+    type list<nint>
     value (collection)
   ConstDecl
     name "EmptyMap"
-    type map<string, int>
+    type map<string, nint>
     value (collection)

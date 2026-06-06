@@ -185,7 +185,7 @@ func convCallType(e *ast.CallExpr, name string, t ir.Type, s scope, sink *Sink) 
 				return t
 			}
 			for _, a := range e.Arguments {
-				checkType(a, &ir.Builtin{Name: "int"}, s, map[string]ir.Type{}, sink)
+				checkType(a, &ir.Builtin{Name: "nint"}, s, map[string]ir.Type{}, sink)
 			}
 			return t
 		}

@@ -9,7 +9,7 @@ import (
 	protocol "github.com/owenrumney/go-lsp/lsp"
 )
 
-const enumSrc = "/// rarity tier\npub enum Rarity: uint8 {\n  Common = 1\n  Rare = 2\n  Legend = 10\n}\nconst Top: Rarity = Rarity.Legend\n"
+const enumSrc = "/// rarity tier\npub enum Rarity: byte {\n  Common = 1\n  Rare = 2\n  Legend = 10\n}\nconst Top: Rarity = Rarity.Legend\n"
 
 func TestEnumMemberCompletion(t *testing.T) {
 	doc := testView(enumSrc)

@@ -126,7 +126,7 @@ func TestReferencesInAssertCondition(t *testing.T) {
 }
 
 func TestTypeReferences(t *testing.T) {
-	src := "pub type Coin = int8\nconst a: Coin = 1\nconst b: list<Coin> = [2]\n"
+	src := "pub type Coin = sbyte\nconst a: Coin = 1\nconst b: list<Coin> = [2]\n"
 	doc := testView(src)
 
 	// From the annotation: the declaration + 2 references (one nested in a
@@ -143,19 +143,19 @@ func TestTypeReferences(t *testing.T) {
 func TestTypeRenamePreludeRefused(t *testing.T) {
 	// A prelude type is declared outside the workspace: renaming it would
 	// orphan every other program, so the rename (and its prepare) refuse.
-	src := "const a: int8 = 1\n"
+	src := "const a: sbyte = 1\n"
 	doc := testView(src)
-	offset := strings.Index(src, "int8")
+	offset := strings.Index(src, "sbyte")
 	if edit := rename(doc, offset, "tiny"); edit != nil {
-		t.Errorf("rename(int8) = %+v, want nil", edit)
+		t.Errorf("rename(sbyte) = %+v, want nil", edit)
 	}
 	if pr := prepareRename(doc, offset); pr != nil {
-		t.Errorf("prepareRename(int8) = %+v, want nil", pr)
+		t.Errorf("prepareRename(sbyte) = %+v, want nil", pr)
 	}
 }
 
 func TestTypeDocumentHighlights(t *testing.T) {
-	src := "pub type Coin = int8\nconst a: Coin = 1\n"
+	src := "pub type Coin = sbyte\nconst a: Coin = 1\n"
 	doc := testView(src)
 	got := documentHighlights(doc, strings.Index(src, ": Coin")+3)
 	// The declaration (write) and the annotation reference (read).

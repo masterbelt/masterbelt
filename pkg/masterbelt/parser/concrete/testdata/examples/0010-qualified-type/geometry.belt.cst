@@ -15,7 +15,7 @@ File
     Assign "="
     Whitespace " "
     TypeName
-      Ident "int32"
+      Ident "int"
   ConstDecl
     Newline "\n"
     DocComment "/// The zero point every path starts from."

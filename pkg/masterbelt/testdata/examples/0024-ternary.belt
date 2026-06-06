@@ -9,9 +9,9 @@
 const Bigger = 3 > 2 ? 10 : 20
 const Label  = 7 > 100 ? "high" : "low"
 
-// The branches unify the way a collection's elements do — an int branch beside a
-// default-int literal stays int.
-pub type Level = int8 impl {
+// The branches unify the way a collection's elements do — an nint branch beside a
+// default-nint literal stays nint.
+pub type Level = sbyte impl {
   pub const Max = 100
 }
 const Capped: Level = Level.Max > 50 ? Level.Max : 0
@@ -27,9 +27,9 @@ const Score = (3 > 2 ? 1 : 0) + 5
 
 // In a method body the ternary returns its value directly — the value form of the
 // if/else a sign check would otherwise need.
-pub type Temp = int32 impl {
+pub type Temp = int impl {
   /// -1, 0, or 1 by sign.
-  pub sign(): int32 {
+  pub sign(): int {
     return self > 0 ? 1 : (self < 0 ? -1 : 0)
   }
 }

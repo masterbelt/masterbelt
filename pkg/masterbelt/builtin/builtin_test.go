@@ -21,19 +21,19 @@ func TestIntrinsicKindDispatch(t *testing.T) {
 	}
 	// An overloaded method: one implementation per argument-kind signature,
 	// the way datetime/duration registers add and sub.
-	r.registerIntrinsic("int", "overloaded", []ir.ConstKind{ir.ConstInt}, mark("int"))
-	r.registerIntrinsic("int", "overloaded", []ir.ConstKind{ir.ConstBool}, mark("bool"))
+	r.registerIntrinsic("nint", "overloaded", []ir.ConstKind{ir.ConstInt}, mark("nint"))
+	r.registerIntrinsic("nint", "overloaded", []ir.ConstKind{ir.ConstBool}, mark("bool"))
 
 	cases := []struct {
 		name  string
 		kinds []ir.ConstKind
 		want  string
 	}{
-		{"int signature", []ir.ConstKind{ir.ConstInt}, "int"},
+		{"nint signature", []ir.ConstKind{ir.ConstInt}, "nint"},
 		{"bool signature", []ir.ConstKind{ir.ConstBool}, "bool"},
 	}
 	for _, tc := range cases {
-		fn, ok := r.Intrinsic("int", "overloaded", tc.kinds)
+		fn, ok := r.Intrinsic("nint", "overloaded", tc.kinds)
 		if !ok {
 			t.Fatalf("%s: Intrinsic not found", tc.name)
 		}
@@ -43,17 +43,17 @@ func TestIntrinsicKindDispatch(t *testing.T) {
 	}
 
 	// Kinds no signature claims: not found (no kind-agnostic fallback here).
-	if _, ok := r.Intrinsic("int", "overloaded", []ir.ConstKind{ir.ConstString}); ok {
+	if _, ok := r.Intrinsic("nint", "overloaded", []ir.ConstKind{ir.ConstString}); ok {
 		t.Error("unclaimed kinds resolved an exact-signature method")
 	}
-	if _, ok := r.Intrinsic("int", "overloaded", nil); ok {
+	if _, ok := r.Intrinsic("nint", "overloaded", nil); ok {
 		t.Error("an empty signature resolved an exact-signature method")
 	}
 
 	// A kind-agnostic implementation joins the set as the fallback for
 	// whatever the exact signatures do not claim.
-	r.registerIntrinsic("int", "overloaded", nil, mark("any"))
-	fn, ok := r.Intrinsic("int", "overloaded", []ir.ConstKind{ir.ConstString})
+	r.registerIntrinsic("nint", "overloaded", nil, mark("any"))
+	fn, ok := r.Intrinsic("nint", "overloaded", []ir.ConstKind{ir.ConstString})
 	if !ok {
 		t.Fatal("fallback: Intrinsic not found")
 	}
@@ -61,7 +61,7 @@ func TestIntrinsicKindDispatch(t *testing.T) {
 		t.Errorf("fallback: dispatched to %q, want any", got.Str)
 	}
 	// The exact signatures still win over the fallback.
-	if fn, _ := r.Intrinsic("int", "overloaded", []ir.ConstKind{ir.ConstBool}); fn(one, nil).Str != "bool" {
+	if fn, _ := r.Intrinsic("nint", "overloaded", []ir.ConstKind{ir.ConstBool}); fn(one, nil).Str != "bool" {
 		t.Error("an exact signature lost to the fallback")
 	}
 }
@@ -72,29 +72,29 @@ func TestIntrinsicKindDispatch(t *testing.T) {
 func TestIntrinsicSingleImplementation(t *testing.T) {
 	r := Default()
 
-	fn, ok := r.Intrinsic("int", "add", []ir.ConstKind{ir.ConstInt})
+	fn, ok := r.Intrinsic("nint", "add", []ir.ConstKind{ir.ConstInt})
 	if !ok {
-		t.Fatal("int.add not found")
+		t.Fatal("nint.add not found")
 	}
 	a, b := ir.IntConstant(big.NewInt(2)), ir.IntConstant(big.NewInt(3))
 	if got := fn(a, []*ir.Constant{b}); got == nil || got.Int.Int64() != 5 {
-		t.Errorf("int.add(2, 3) = %v, want 5", got)
+		t.Errorf("nint.add(2, 3) = %v, want 5", got)
 	}
 
 	// The same implementation answers mismatched kinds (and declines inside,
 	// returning no value) — the type rules already rejected such a program.
-	fn, ok = r.Intrinsic("int", "add", []ir.ConstKind{ir.ConstBool})
+	fn, ok = r.Intrinsic("nint", "add", []ir.ConstKind{ir.ConstBool})
 	if !ok {
-		t.Fatal("int.add with a bool argument must still dispatch")
+		t.Fatal("nint.add with a bool argument must still dispatch")
 	}
 	if got := fn(a, []*ir.Constant{ir.BoolConstant(true)}); got != nil {
-		t.Errorf("int.add(2, true) = %v, want nil", got)
+		t.Errorf("nint.add(2, true) = %v, want nil", got)
 	}
 
-	if !r.HasIntrinsic("int", "add") {
-		t.Error("HasIntrinsic(int, add) = false, want true")
+	if !r.HasIntrinsic("nint", "add") {
+		t.Error("HasIntrinsic(nint, add) = false, want true")
 	}
-	if r.HasIntrinsic("int", "frobnicate") {
-		t.Error("HasIntrinsic(int, frobnicate) = true, want false")
+	if r.HasIntrinsic("nint", "frobnicate") {
+		t.Error("HasIntrinsic(nint, frobnicate) = true, want false")
 	}
 }

@@ -2,10 +2,10 @@ File
   FuncDecl
     pub
     name "clamp"
-    param x: int
-    param lo: int
-    param hi: int
-    result int
+    param x: nint
+    param lo: nint
+    param hi: nint
+    result nint
       if (call (. Identifier "x" lt) Identifier "lo")
           return Identifier "lo"
       else if (call (. Identifier "x" gt) Identifier "hi")
@@ -14,15 +14,15 @@ File
   FuncDecl
     pub
     name "warn"
-    param n: int
-    result int
+    param n: nint
+    result nint
       if (call (. Identifier "n" gt) IntLit "100")
           return IntLit "0"
       return Identifier "n"
   FuncDecl
     pub
     name "sign"
-    param n: int
+    param n: nint
     result string
       if (call (. Identifier "n" gt) IntLit "0")
           return StringLit "positive"

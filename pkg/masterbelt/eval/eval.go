@@ -779,8 +779,8 @@ func kindAccepts(t ast.TypeExpr, k ir.ConstKind) bool {
 			return true
 		}
 		switch t.Name {
-		case "int", "int8", "int16", "int32", "int64",
-			"uint8", "uint16", "uint32", "uint64":
+		case "nint", "sbyte", "short", "int", "long",
+			"byte", "ushort", "uint", "ulong":
 			return k == ir.ConstInt
 		case "bool":
 			return k == ir.ConstBool
@@ -916,7 +916,7 @@ func call(ctx evalCtx, recvExpr ast.Expr, recv *ir.Constant, name string, args [
 	var typeName string
 	switch recv.Kind {
 	case ir.ConstInt:
-		typeName = "int"
+		typeName = "nint"
 	case ir.ConstBool:
 		typeName = "bool"
 	case ir.ConstString:

@@ -111,7 +111,7 @@ File
       Colon ":"
       Whitespace " "
       TypeName
-        Ident "int"
+        Ident "nint"
       Whitespace " "
       Block
         LBrace "{"
@@ -165,7 +165,7 @@ File
     Newline "\n"
     DocComment "/// A small bag of ints that folds over its contents — an opt-in implementor of"
     Newline "\n"
-    DocComment "/// foldable, so it satisfies a `T: foldable<int, int>` bound."
+    DocComment "/// foldable, so it satisfies a `T: foldable<nint, nint>` bound."
     Newline "\n"
     Pub "pub"
     Whitespace " "
@@ -180,7 +180,7 @@ File
       GenericArgs
         Lt "<"
         TypeName
-          Ident "int"
+          Ident "nint"
         Gt ">"
     Whitespace " "
     ImplBlock
@@ -191,11 +191,11 @@ File
         GenericArgs
           Lt "<"
           TypeName
-            Ident "int"
+            Ident "nint"
           Comma ","
           Whitespace " "
           TypeName
-            Ident "int"
+            Ident "nint"
           Gt ">"
       Whitespace " "
       LBrace "{"
@@ -239,7 +239,7 @@ File
                   Colon ":"
                   Whitespace " "
                   TypeName
-                    Ident "int"
+                    Ident "nint"
                 Comma ","
                 Whitespace " "
                 Param
@@ -247,7 +247,7 @@ File
                   Colon ":"
                   Whitespace " "
                   TypeName
-                    Ident "int"
+                    Ident "nint"
                 RParen ")"
               Colon ":"
               Whitespace " "
@@ -280,7 +280,7 @@ File
     Newline "\n"
     LineComment "// (the bound is the only thing known about T), and the result names a concrete"
     Newline "\n"
-    LineComment "// type the caller solves — here the same int the collection folds to."
+    LineComment "// type the caller solves — here the same nint the collection folds to."
     Newline "\n"
     DocComment "/// The total of any foldable collection of ints, folded with addition."
     Newline "\n"
@@ -300,11 +300,11 @@ File
           GenericArgs
             Lt "<"
             TypeName
-              Ident "int"
+              Ident "nint"
             Comma ","
             Whitespace " "
             TypeName
-              Ident "int"
+              Ident "nint"
             Gt ">"
       Gt ">"
     ParamList
@@ -319,7 +319,7 @@ File
     Colon ":"
     Whitespace " "
     TypeName
-      Ident "int"
+      Ident "nint"
     Whitespace " "
     Block
       LBrace "{"
@@ -469,7 +469,7 @@ File
     Newline "\n"
     LineComment "// The calls resolve each type variable from the arguments and fold with the"
     Newline "\n"
-    LineComment "// concrete type: identity<int>, firstOf<int>."
+    LineComment "// concrete type: identity<nint>, firstOf<nint>."
     Newline "\n"
     Const "const"
     Whitespace " "

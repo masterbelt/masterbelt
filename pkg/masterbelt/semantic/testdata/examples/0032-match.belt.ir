@@ -4,12 +4,12 @@ Module
     value Coin{amount: IntLiteral "7"}
     eval { amount: 7 }
   Const "Total"
-    type int
+    type nint
     value worth(Reference -> "Held")
   TypeDef "Coin" pub
-    body { amount: int }
+    body { amount: nint }
   TypeDef "Level" pub
-    body { rank: int }
+    body { rank: nint }
   TypeDef "GameValue" pub
     body Coin | Level
   Func "describe" pub
@@ -22,7 +22,7 @@ Module
           return StringLiteral "level"
   Func "worth" pub
     param v: GameValue
-    result int
+    result nint
       match ParamRef "v"
         arm Coin c
           return LocalRef "c".amount
@@ -30,8 +30,8 @@ Module
           return LocalRef "l".rank
   Func "amountOr" pub
     param v: Coin | null
-    param fallback: int
-    result int
+    param fallback: nint
+    result nint
       match ParamRef "v"
         arm Coin c
           return LocalRef "c".amount
@@ -39,18 +39,18 @@ Module
           return ParamRef "fallback"
   Func "coinAmount" pub
     param v: GameValue
-    result int
+    result nint
       match ParamRef "v"
         arm Coin c
           return LocalRef "c".amount
         else
           return IntLiteral "0"
   Func "firstOr" pub
-    param xs: list<int>
-    param fallback: int
-    result int
+    param xs: list<nint>
+    param fallback: nint
+    result nint
       match ParamRef "xs".get(IntLiteral "0")
-        arm int v
+        arm nint v
           return LocalRef "v"
         arm error e
           return ParamRef "fallback"
@@ -60,7 +60,7 @@ Module
     result string
       match ParamRef "v"
         arm Coin c
-          let "n": int = LocalRef "c".amount
+          let "n": nint = LocalRef "c".amount
           match ParamRef "other"
             arm Coin c2
               return StringLiteral "coin/coin"

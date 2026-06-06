@@ -14,7 +14,7 @@ File
     Assign "="
     Whitespace " "
     TypeName
-      Ident "int8"
+      Ident "sbyte"
   TypeDecl
     Newline "\n"
     Newline "\n"
@@ -31,7 +31,7 @@ File
     Assign "="
     Whitespace " "
     TypeName
-      Ident "int8"
+      Ident "sbyte"
     Whitespace " "
     ImplBlock
       Impl "impl"
@@ -145,12 +145,12 @@ File
         Whitespace " "
         UnionType
           TypeName
-            Ident "int8"
+            Ident "sbyte"
           Whitespace " "
           Pipe "|"
           Whitespace " "
           TypeName
-            Ident "int16"
+            Ident "short"
       Gt ">"
     Whitespace " "
     Assign "="
@@ -187,7 +187,7 @@ File
         Colon ":"
         Whitespace " "
         TypeName
-          Ident "int8"
+          Ident "sbyte"
       Newline "\n"
       Whitespace "  "
       Field
@@ -220,7 +220,7 @@ File
         Colon ":"
         Whitespace " "
         TypeName
-          Ident "int32"
+          Ident "int"
         Whitespace " "
         Block
           LBrace "{"
@@ -232,7 +232,7 @@ File
             BinaryExpr
               CallExpr
                 NameRef
-                  Ident "int32"
+                  Ident "int"
                 LParen "("
                 MemberExpr
                   SelfExpr

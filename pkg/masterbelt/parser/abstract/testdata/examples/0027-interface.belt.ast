@@ -1,18 +1,18 @@
 File
   TypeDecl
-    doc "A small bag of T values that folds over its contents. The `impl foldable<int, T>`"
+    doc "A small bag of T values that folds over its contents. The `impl foldable<nint, T>`"
     doc "tag is what gives Bag the count/any methods — written here, at Bag's own"
     doc "definition site."
     pub
     name "Bag"
     param T
     body list<T>
-    impl foldable<int, T>
+    impl foldable<nint, T>
     method "fold"
       doc "The required primitive: fold the underlying list."
       typeparam A
       param init: A
-      param step: fn(acc: A, key: int, value: T): A
+      param step: fn(acc: A, key: nint, value: T): A
       result A
       return Identifier "init"
   InterfaceDecl
@@ -31,7 +31,7 @@ File
     provided "count"
       doc "Provided: the number of elements, folded from the primitive."
       pub
-      result int
+      result nint
       return (call Identifier "fold" IntLit "0" (fn(acc: <missing>, key: <missing>, value: <missing>): <missing> (return (call (. Identifier "acc" add) IntLit "1"))))
     provided "any"
       doc "Provided: whether any element satisfies the predicate."
@@ -43,6 +43,6 @@ File
     doc "The total of a collection of ints, folded with addition."
     pub
     name "total"
-    param c: foldable<int, int>
-    result int
+    param c: foldable<nint, nint>
+    result nint
       return (call (. Identifier "c" fold) IntLit "0" (fn(acc: <missing>, key: <missing>, value: <missing>): <missing> (return (call (. Identifier "acc" add) Identifier "value"))))

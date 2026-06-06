@@ -3,34 +3,34 @@
 // no tag of its own, so it behaves in every respect exactly like the bare union
 // T | null it stands for. A member value and the null literal both assign to it,
 // match narrows it, and exhaustiveness sees through it. This example folds that
-// flow end to end over optional<int>.
+// flow end to end over optional<nint>.
 
 // A member value flows into the alias the way it flows into the bare union: the
-// annotation optional<int> accepts an int, and the const folds to that int.
-const Present: optional<int> = 5
+// annotation optional<nint> accepts an nint, and the const folds to that nint.
+const Present: optional<nint> = 5
 
 // The null literal is the alias' other member, so it assigns too.
-const Absent: optional<int> = null
+const Absent: optional<nint> = null
 
-// match dispatches the alias by runtime type, narrowing the int arm's binding to
-// int and handling the absent case with the null member. The function is
-// exhaustive over int | null with no wildcard, so it always returns.
-pub fn orZero(v: optional<int>): int {
+// match dispatches the alias by runtime type, narrowing the nint arm's binding to
+// nint and handling the absent case with the null member. The function is
+// exhaustive over nint | null with no wildcard, so it always returns.
+pub fn orZero(v: optional<nint>): nint {
   match v {
-    int n -> return n
+    nint n -> return n
     null  -> return 0
   }
 }
 
-// Both paths fold: a present value recovers its int, an absent one the fallback.
+// Both paths fold: a present value recovers its nint, an absent one the fallback.
 const FromPresent = orZero(5)
 const FromAbsent = orZero(null)
 
 // The wildcard "_" form is the catch-all the bare union also takes: it covers the
-// null member, so the match is exhaustive with the single int arm plus "_".
-pub fn orFallback(v: optional<int>, fallback: int): int {
+// null member, so the match is exhaustive with the single nint arm plus "_".
+pub fn orFallback(v: optional<nint>, fallback: nint): nint {
   match v {
-    int n -> return n
+    nint n -> return n
     _     -> return fallback
   }
 }

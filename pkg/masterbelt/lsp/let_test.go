@@ -11,7 +11,7 @@ import (
 // binding name and at a reference in the body, with the type inferred from the
 // initializer.
 func TestLetHover(t *testing.T) {
-	src := "pub fn f(n: int): int {\n  let total = n\n  total = total + 1\n  return total\n}\n"
+	src := "pub fn f(n: nint): nint {\n  let total = n\n  total = total + 1\n  return total\n}\n"
 	doc := testView(src)
 
 	t.Run("at the binding", func(t *testing.T) {
@@ -19,8 +19,8 @@ func TestLetHover(t *testing.T) {
 		if h == nil {
 			t.Fatal("no hover on the let binding")
 		}
-		if !strings.Contains(h.Contents.Value, "total: int") {
-			t.Errorf("hover = %q, want total: int", h.Contents.Value)
+		if !strings.Contains(h.Contents.Value, "total: nint") {
+			t.Errorf("hover = %q, want total: nint", h.Contents.Value)
 		}
 	})
 
@@ -29,8 +29,8 @@ func TestLetHover(t *testing.T) {
 		if h == nil {
 			t.Fatal("no hover on the let reference")
 		}
-		if !strings.Contains(h.Contents.Value, "total: int") {
-			t.Errorf("hover = %q, want total: int", h.Contents.Value)
+		if !strings.Contains(h.Contents.Value, "total: nint") {
+			t.Errorf("hover = %q, want total: nint", h.Contents.Value)
 		}
 	})
 }
@@ -38,14 +38,14 @@ func TestLetHover(t *testing.T) {
 // TestLetHoverAnnotated checks that an annotated let hovers with the annotated
 // type.
 func TestLetHoverAnnotated(t *testing.T) {
-	src := "pub fn f(n: int): int {\n  let acc: int = n\n  return acc\n}\n"
+	src := "pub fn f(n: nint): nint {\n  let acc: nint = n\n  return acc\n}\n"
 	doc := testView(src)
 	h := hover(doc, strings.Index(src, "let acc")+5)
 	if h == nil {
 		t.Fatal("no hover on the annotated let")
 	}
-	if !strings.Contains(h.Contents.Value, "acc: int") {
-		t.Errorf("hover = %q, want acc: int", h.Contents.Value)
+	if !strings.Contains(h.Contents.Value, "acc: nint") {
+		t.Errorf("hover = %q, want acc: nint", h.Contents.Value)
 	}
 }
 
@@ -53,7 +53,7 @@ func TestLetHoverAnnotated(t *testing.T) {
 // is a keyword, its bound name a variable declaration (not readonly — a let is
 // mutable), and the initializer reads as usual.
 func TestSemanticTokensLet(t *testing.T) {
-	doc := abstract.NewDocument([]byte("pub fn f(n: int): int {\n  let x = n\n  return x\n}\n"))
+	doc := abstract.NewDocument([]byte("pub fn f(n: nint): nint {\n  let x = n\n  return x\n}\n"))
 	got := decode(semanticTokens(doc).Data)
 
 	var sawLetKeyword, sawLetName bool

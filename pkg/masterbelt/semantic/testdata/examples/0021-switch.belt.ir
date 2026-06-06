@@ -1,7 +1,7 @@
 Module
   TypeDef "Rarity" pub
     doc "A card's rarity tier."
-    enum int
+    enum nint
     member "Common" = 0
     member "Rare" = 1
     member "Legend" = 2
@@ -34,7 +34,7 @@ Module
         arm Rarity.Legend
           return StringLiteral "gold"
   Func "grade" pub
-    param n: int
+    param n: nint
     result string
       switch ParamRef "n"
         arm IntLiteral "0"

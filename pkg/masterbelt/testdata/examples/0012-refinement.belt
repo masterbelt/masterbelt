@@ -3,14 +3,14 @@
 // time with self bound to each annotated constant's value.
 
 /// A character level between 0 and 100.
-pub type Level = int8 where self >= 0 && self <= 100
+pub type Level = sbyte where self >= 0 && self <= 100
 
 /// A TCP port number.
-pub type Port = int32 where self >= 1 && self <= 65535
+pub type Port = int where self >= 1 && self <= 65535
 
 // A where-clause composes with an impl block.
 /// A percentage from 0 to 100.
-pub type Percent = int8 where self >= 0 && self <= 100 impl {
+pub type Percent = sbyte where self >= 0 && self <= 100 impl {
   /// The next percentage point.
   pub increment(): self {
     return self + 1
@@ -21,7 +21,7 @@ pub type Percent = int8 where self >= 0 && self <= 100 impl {
 // type, so its own methods resolve, and the predicate folds through the method
 // body at compile time.
 /// A score that is valid only when it lies in the 0..100 band.
-pub type Score = int32 where self.inBand() impl {
+pub type Score = int where self.inBand() impl {
   /// Whether the score is within the valid band.
   pub inBand(): bool {
     return self >= 0 && self <= 100
@@ -38,5 +38,5 @@ const FullLevel: Level = 100
 // satisfies inBand(), so it passes.
 const ValidScore: Score = 75
 
-// An unannotated constant is a plain int: no refinement applies.
+// An unannotated constant is a plain nint: no refinement applies.
 const Unrefined = 70000

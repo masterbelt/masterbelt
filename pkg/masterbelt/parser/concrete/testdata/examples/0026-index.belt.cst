@@ -22,7 +22,7 @@ File
     LineComment "// the end is a bug caught at compile time (index_out_of_range), not a value."
     Newline "\n"
     Newline "\n"
-    LineComment "// Reading a list element. The static type is int | error — the read may be out"
+    LineComment "// Reading a list element. The static type is nint | error — the read may be out"
     Newline "\n"
     LineComment "// of range — even when the index is a constant the folder can resolve."
     Newline "\n"
@@ -56,7 +56,7 @@ File
       Whitespace " "
       UnionType
         TypeName
-          Ident "int"
+          Ident "nint"
         Whitespace " "
         Pipe "|"
         Whitespace " "
@@ -83,7 +83,7 @@ File
       Whitespace " "
       UnionType
         TypeName
-          Ident "int"
+          Ident "nint"
         Whitespace " "
         Pipe "|"
         Whitespace " "
@@ -141,7 +141,7 @@ File
       Whitespace " "
       UnionType
         TypeName
-          Ident "int"
+          Ident "nint"
         Whitespace " "
         Pipe "|"
         Whitespace " "
@@ -179,7 +179,7 @@ File
           GenericArgs
             Lt "<"
             TypeName
-              Ident "int"
+              Ident "nint"
             Gt ">"
       Comma ","
       Whitespace " "
@@ -188,13 +188,13 @@ File
         Colon ":"
         Whitespace " "
         TypeName
-          Ident "int"
+          Ident "nint"
       RParen ")"
     Colon ":"
     Whitespace " "
     UnionType
       TypeName
-        Ident "int"
+        Ident "nint"
       Whitespace " "
       Pipe "|"
       Whitespace " "
@@ -239,7 +239,7 @@ File
       GenericArgs
         Lt "<"
         TypeName
-          Ident "int"
+          Ident "nint"
         Gt ">"
     Whitespace " "
     Block
@@ -317,7 +317,7 @@ File
         Comma ","
         Whitespace " "
         TypeName
-          Ident "int"
+          Ident "nint"
         Gt ">"
     Whitespace " "
     Block

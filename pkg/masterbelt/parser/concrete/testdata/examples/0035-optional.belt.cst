@@ -11,12 +11,12 @@ File
     Newline "\n"
     LineComment "// match narrows it, and exhaustiveness sees through it. This example folds that"
     Newline "\n"
-    LineComment "// flow end to end over optional<int>."
+    LineComment "// flow end to end over optional<nint>."
     Newline "\n"
     Newline "\n"
     LineComment "// A member value flows into the alias the way it flows into the bare union: the"
     Newline "\n"
-    LineComment "// annotation optional<int> accepts an int, and the const folds to that int."
+    LineComment "// annotation optional<nint> accepts an nint, and the const folds to that nint."
     Newline "\n"
     Const "const"
     Whitespace " "
@@ -29,7 +29,7 @@ File
         GenericArgs
           Lt "<"
           TypeName
-            Ident "int"
+            Ident "nint"
           Gt ">"
     Whitespace " "
     Initializer
@@ -53,7 +53,7 @@ File
         GenericArgs
           Lt "<"
           TypeName
-            Ident "int"
+            Ident "nint"
           Gt ">"
     Whitespace " "
     Initializer
@@ -64,11 +64,11 @@ File
   FuncDecl
     Newline "\n"
     Newline "\n"
-    LineComment "// match dispatches the alias by runtime type, narrowing the int arm's binding to"
+    LineComment "// match dispatches the alias by runtime type, narrowing the nint arm's binding to"
     Newline "\n"
-    LineComment "// int and handling the absent case with the null member. The function is"
+    LineComment "// nint and handling the absent case with the null member. The function is"
     Newline "\n"
-    LineComment "// exhaustive over int | null with no wildcard, so it always returns."
+    LineComment "// exhaustive over nint | null with no wildcard, so it always returns."
     Newline "\n"
     Pub "pub"
     Whitespace " "
@@ -86,13 +86,13 @@ File
           GenericArgs
             Lt "<"
             TypeName
-              Ident "int"
+              Ident "nint"
             Gt ">"
       RParen ")"
     Colon ":"
     Whitespace " "
     TypeName
-      Ident "int"
+      Ident "nint"
     Whitespace " "
     Block
       LBrace "{"
@@ -110,7 +110,7 @@ File
         MatchArm
           MatchPattern
             TypeName
-              Ident "int"
+              Ident "nint"
             Whitespace " "
             Ident "n"
           Whitespace " "
@@ -143,7 +143,7 @@ File
   ConstDecl
     Newline "\n"
     Newline "\n"
-    LineComment "// Both paths fold: a present value recovers its int, an absent one the fallback."
+    LineComment "// Both paths fold: a present value recovers its nint, an absent one the fallback."
     Newline "\n"
     Const "const"
     Whitespace " "
@@ -180,7 +180,7 @@ File
     Newline "\n"
     LineComment "// The wildcard \"_\" form is the catch-all the bare union also takes: it covers the"
     Newline "\n"
-    LineComment "// null member, so the match is exhaustive with the single int arm plus \"_\"."
+    LineComment "// null member, so the match is exhaustive with the single nint arm plus \"_\"."
     Newline "\n"
     Pub "pub"
     Whitespace " "
@@ -198,7 +198,7 @@ File
           GenericArgs
             Lt "<"
             TypeName
-              Ident "int"
+              Ident "nint"
             Gt ">"
       Comma ","
       Whitespace " "
@@ -207,12 +207,12 @@ File
         Colon ":"
         Whitespace " "
         TypeName
-          Ident "int"
+          Ident "nint"
       RParen ")"
     Colon ":"
     Whitespace " "
     TypeName
-      Ident "int"
+      Ident "nint"
     Whitespace " "
     Block
       LBrace "{"
@@ -230,7 +230,7 @@ File
         MatchArm
           MatchPattern
             TypeName
-              Ident "int"
+              Ident "nint"
             Whitespace " "
             Ident "n"
           Whitespace " "

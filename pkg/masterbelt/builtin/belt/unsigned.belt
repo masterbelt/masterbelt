@@ -1,14 +1,9 @@
 use { bool } from "./bool.belt"
 
-/// The signed integer types as one union: a generic constraint for any signed integer.
-pub type snumeric = int | int8 | int16 | int32 | int64
-
-/// The arbitrary-precision integer: the type of an un-annotated integer literal. It has no fixed range and fits wherever a sized integer is expected.
-pub type int = builtin impl {
+/// The arbitrary-precision unsigned integer: non-negative, with no fixed upper bound.
+pub type nuint = builtin impl {
   /// The unary + operator: the value unchanged.
   pub extern fn pos(): self
-  /// The unary - operator: the negation.
-  pub extern fn neg(): self
 
   /// The == operator.
   pub extern fn eql(other: self): bool
@@ -36,17 +31,15 @@ pub type int = builtin impl {
   pub extern fn rem(other: self): self
 }
 
-/// A signed 8-bit integer (-128 to 127).
-pub type int8 = builtin impl {
-  /// The largest representable value (127).
+/// An unsigned 8-bit integer (0 to 255).
+pub type byte = builtin impl {
+  /// The largest representable value (255).
   pub const Max = builtin
-  /// The smallest representable value (-128).
+  /// The smallest representable value (0).
   pub const Min = builtin
 
   /// The unary + operator: the value unchanged.
   pub extern fn pos(): self
-  /// The unary - operator: the negation.
-  pub extern fn neg(): self
 
   /// The == operator.
   pub extern fn eql(other: self): bool
@@ -74,17 +67,15 @@ pub type int8 = builtin impl {
   pub extern fn rem(other: self): self
 }
 
-/// A signed 16-bit integer (-32768 to 32767).
-pub type int16 = builtin impl {
-  /// The largest representable value (32767).
+/// An unsigned 16-bit integer (0 to 65535).
+pub type ushort = builtin impl {
+  /// The largest representable value (65535).
   pub const Max = builtin
-  /// The smallest representable value (-32768).
+  /// The smallest representable value (0).
   pub const Min = builtin
 
   /// The unary + operator: the value unchanged.
   pub extern fn pos(): self
-  /// The unary - operator: the negation.
-  pub extern fn neg(): self
 
   /// The == operator.
   pub extern fn eql(other: self): bool
@@ -112,17 +103,15 @@ pub type int16 = builtin impl {
   pub extern fn rem(other: self): self
 }
 
-/// A signed 32-bit integer (-2147483648 to 2147483647).
-pub type int32 = builtin impl {
-  /// The largest representable value (2147483647).
+/// An unsigned 32-bit integer (0 to 4294967295).
+pub type uint = builtin impl {
+  /// The largest representable value (4294967295).
   pub const Max = builtin
-  /// The smallest representable value (-2147483648).
+  /// The smallest representable value (0).
   pub const Min = builtin
 
   /// The unary + operator: the value unchanged.
   pub extern fn pos(): self
-  /// The unary - operator: the negation.
-  pub extern fn neg(): self
 
   /// The == operator.
   pub extern fn eql(other: self): bool
@@ -150,17 +139,15 @@ pub type int32 = builtin impl {
   pub extern fn rem(other: self): self
 }
 
-/// A signed 64-bit integer (-9223372036854775808 to 9223372036854775807).
-pub type int64 = builtin impl {
-  /// The largest representable value (9223372036854775807).
+/// An unsigned 64-bit integer (0 to 18446744073709551615).
+pub type ulong = builtin impl {
+  /// The largest representable value (18446744073709551615).
   pub const Max = builtin
-  /// The smallest representable value (-9223372036854775808).
+  /// The smallest representable value (0).
   pub const Min = builtin
 
   /// The unary + operator: the value unchanged.
   pub extern fn pos(): self
-  /// The unary - operator: the negation.
-  pub extern fn neg(): self
 
   /// The == operator.
   pub extern fn eql(other: self): bool

@@ -1,10 +1,10 @@
 File
   ConstDecl
     name "Hi"
-    value (. Identifier "int8" Max)
+    value (. Identifier "sbyte" Max)
   ConstDecl
     name "Lo"
-    value (. Identifier "int8" Min)
+    value (. Identifier "sbyte" Min)
   ConstDecl
     name "Top"
     type Level
@@ -24,7 +24,7 @@ File
     doc "A character level, capped at 100."
     pub
     name "Level"
-    body int8
+    body sbyte
     const "Max"
       doc "The highest level."
       pub
@@ -41,14 +41,14 @@ File
   TypeDecl
     pub
     name "Bits"
-    body int32
+    body int
     const "Width"
       doc "The width in bits."
       pub
-      type int32
+      type int
       value IntLit "32"
   TypeDecl
     pub
     name "Port"
-    body int32
-    where (call (. (call (. self gteq) IntLit "1") anan) (call (. self lteq) (. Identifier "int16" Max)))
+    body int
+    where (call (. (call (. self gteq) IntLit "1") anan) (call (. self lteq) (. Identifier "short" Max)))

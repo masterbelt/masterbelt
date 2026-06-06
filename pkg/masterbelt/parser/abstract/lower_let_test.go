@@ -23,7 +23,7 @@ func bodyOf(t *testing.T, src string) []ast.Stmt {
 // TestLowerLetInferred checks an inferred-type let: the bound name and value are
 // lowered and there is no annotation.
 func TestLowerLetInferred(t *testing.T) {
-	body := bodyOf(t, "pub fn f(n: int): int {\n  let x = n\n  return x\n}\n")
+	body := bodyOf(t, "pub fn f(n: nint): nint {\n  let x = n\n  return x\n}\n")
 	s, ok := body[0].(*ast.LetStmt)
 	if !ok {
 		t.Fatalf("first statement is %T, want *ast.LetStmt", body[0])
@@ -42,17 +42,17 @@ func TestLowerLetInferred(t *testing.T) {
 // TestLowerLetAnnotated checks an annotated let: the type expression is lowered
 // alongside the name and value.
 func TestLowerLetAnnotated(t *testing.T) {
-	body := bodyOf(t, "pub fn f(n: int): int {\n  let x: int = n\n  return x\n}\n")
+	body := bodyOf(t, "pub fn f(n: nint): nint {\n  let x: nint = n\n  return x\n}\n")
 	s, ok := body[0].(*ast.LetStmt)
 	if !ok {
 		t.Fatalf("first statement is %T, want *ast.LetStmt", body[0])
 	}
 	if s.Type == nil {
-		t.Fatal("annotated let has no type, want int")
+		t.Fatal("annotated let has no type, want nint")
 	}
 	named, ok := s.Type.(*ast.NamedType)
-	if !ok || named.Name != "int" {
-		t.Fatalf("let type = %v, want int", s.Type)
+	if !ok || named.Name != "nint" {
+		t.Fatalf("let type = %v, want nint", s.Type)
 	}
 }
 
@@ -60,7 +60,7 @@ func TestLowerLetAnnotated(t *testing.T) {
 // are lowered, and the value is desugared like any other expression (x + 1
 // becomes a method call).
 func TestLowerAssign(t *testing.T) {
-	body := bodyOf(t, "pub fn f(n: int): int {\n  let x = n\n  x = x + 1\n  return x\n}\n")
+	body := bodyOf(t, "pub fn f(n: nint): nint {\n  let x = n\n  x = x + 1\n  return x\n}\n")
 	s, ok := body[1].(*ast.AssignStmt)
 	if !ok {
 		t.Fatalf("second statement is %T, want *ast.AssignStmt", body[1])
@@ -79,7 +79,7 @@ func TestLowerAssign(t *testing.T) {
 // identifier (the same let-local target a plain assignment has), and the value
 // is a set call carrying the index and the new value as its two arguments.
 func TestLowerIndexAssign(t *testing.T) {
-	body := bodyOf(t, "pub fn f(): list<int> {\n  let xs = [1, 2, 3]\n  xs[0] = 99\n  return xs\n}\n")
+	body := bodyOf(t, "pub fn f(): list<nint> {\n  let xs = [1, 2, 3]\n  xs[0] = 99\n  return xs\n}\n")
 	s, ok := body[1].(*ast.AssignStmt)
 	if !ok {
 		t.Fatalf("second statement is %T, want *ast.AssignStmt", body[1])

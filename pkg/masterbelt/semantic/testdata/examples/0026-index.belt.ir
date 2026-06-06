@@ -1,45 +1,45 @@
 Module
   Const "Xs"
-    type list<int>
+    type list<nint>
     value [IntLiteral "10", IntLiteral "20", IntLiteral "30"]
     eval [10, 20, 30]
   Const "First"
-    type int | error
+    type nint | error
     value Reference -> "Xs".get(IntLiteral "0")
     eval 10
   Const "Third"
-    type int | error
+    type nint | error
     value Reference -> "Xs".get(IntLiteral "2")
     eval 30
   Const "Tbl"
-    type map<string, int>
+    type map<string, nint>
     value [StringLiteral "sword": IntLiteral "100", StringLiteral "shield": IntLiteral "50"]
     eval ["sword": 100, "shield": 50]
   Const "Sword"
-    type int | error
+    type nint | error
     value Reference -> "Tbl".get(StringLiteral "sword")
     eval 100
   Const "Bumped"
-    type list<int>
+    type list<nint>
     value bumpFirst()
     eval [99, 2, 3]
   Const "Put"
-    type map<string, int>
+    type map<string, nint>
     value put()
     eval ["a": 10, "b": 2]
   Func "at" pub
-    param xs: list<int>
-    param i: int
-    result int | error
+    param xs: list<nint>
+    param i: nint
+    result nint | error
       return ParamRef "xs".get(ParamRef "i")
   Func "bumpFirst" pub
-    result list<int>
-      let "xs": list<int> = [IntLiteral "1", IntLiteral "2", IntLiteral "3"]
+    result list<nint>
+      let "xs": list<nint> = [IntLiteral "1", IntLiteral "2", IntLiteral "3"]
       assign "xs" = LocalRef "xs".set(IntLiteral "0", IntLiteral "99")
       return LocalRef "xs"
   Func "put" pub
-    result map<string, int>
-      let "m": map<string, int> = [StringLiteral "a": IntLiteral "1"]
+    result map<string, nint>
+      let "m": map<string, nint> = [StringLiteral "a": IntLiteral "1"]
       assign "m" = LocalRef "m".set(StringLiteral "a", IntLiteral "10")
       assign "m" = LocalRef "m".set(StringLiteral "b", IntLiteral "2")
       return LocalRef "m"

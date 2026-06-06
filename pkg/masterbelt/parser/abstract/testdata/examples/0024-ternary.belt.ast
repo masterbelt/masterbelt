@@ -18,16 +18,16 @@ File
   TypeDecl
     pub
     name "Level"
-    body int8
+    body sbyte
     const "Max"
       pub
       value IntLit "100"
   TypeDecl
     pub
     name "Temp"
-    body int32
+    body int
     method "sign"
       doc "-1, 0, or 1 by sign."
       pub
-      result int32
+      result int
       return (? (call (. self gt) IntLit "0") IntLit "1" (? (call (. self lt) IntLit "0") (call (. IntLit "1" neg)) IntLit "0"))

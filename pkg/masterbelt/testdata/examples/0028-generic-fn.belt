@@ -12,24 +12,24 @@ pub interface foldable<K, V> {
   fold<A>(init: A, step: fn(acc: A, key: K, value: V): A): A
 
   /// Provided: the number of elements, folded from the primitive.
-  pub count(): int {
+  pub count(): nint {
     return fold(0, fn(acc, key, value) -> acc + 1)
   }
 }
 
 /// A small bag of ints that folds over its contents — an opt-in implementor of
-/// foldable, so it satisfies a `T: foldable<int, int>` bound.
-pub type Bag = list<int> impl foldable<int, int> {
-  fold<A>(init: A, step: fn(acc: A, key: int, value: int): A): A {
+/// foldable, so it satisfies a `T: foldable<nint, nint>` bound.
+pub type Bag = list<nint> impl foldable<nint, nint> {
+  fold<A>(init: A, step: fn(acc: A, key: nint, value: nint): A): A {
     return init
   }
 }
 
 // A bounded type parameter: T is fixed to foldable's own methods in the body
 // (the bound is the only thing known about T), and the result names a concrete
-// type the caller solves — here the same int the collection folds to.
+// type the caller solves — here the same nint the collection folds to.
 /// The total of any foldable collection of ints, folded with addition.
-pub fn total<T: foldable<int, int>>(c: T): int {
+pub fn total<T: foldable<nint, nint>>(c: T): nint {
   return c.fold(0, fn(acc, key, value) -> acc + value)
 }
 
@@ -48,6 +48,6 @@ pub fn firstOf<T>(a: T, b: T): T {
 }
 
 // The calls resolve each type variable from the arguments and fold with the
-// concrete type: identity<int>, firstOf<int>.
+// concrete type: identity<nint>, firstOf<nint>.
 const N = identity(42)
 const P = firstOf(7, 9)

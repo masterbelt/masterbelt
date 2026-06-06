@@ -161,7 +161,7 @@ func stringMethods() []*ir.Method {
 var (
 	datetimeType ir.Type = &ir.Builtin{Name: "datetime"}
 	durationType ir.Type = &ir.Builtin{Name: "duration"}
-	intType      ir.Type = &ir.Builtin{Name: "int"}
+	intType      ir.Type = &ir.Builtin{Name: "nint"}
 )
 
 // comparisonMethods is the equality and ordering signature set shared by the

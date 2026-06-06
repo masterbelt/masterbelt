@@ -65,7 +65,7 @@ func TestRecordFieldUnknownFieldSafe(t *testing.T) {
 // "field" does not fold.
 func TestRecordFieldNonRecordBaseSafe(t *testing.T) {
 	level := levelDef()
-	env := newTypeEnv(level).withConst("n", "int", intConst(5))
+	env := newTypeEnv(level).withConst("n", "nint", intConst(5))
 	// n.lv.increment() — n is an int, not a record; nothing folds.
 	wantNil(t, memberCall(memberField(id("n"), "lv"), "increment"), env)
 }

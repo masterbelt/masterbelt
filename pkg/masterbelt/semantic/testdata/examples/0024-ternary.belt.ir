@@ -1,6 +1,6 @@
 Module
   Const "Bigger"
-    type int
+    type nint
     value (IntLiteral "3".gt(IntLiteral "2") ? IntLiteral "10" : IntLiteral "20")
     eval 10
   Const "Label"
@@ -12,21 +12,21 @@ Module
     value (Level.Max.gt(IntLiteral "50") ? Level.Max : IntLiteral "0")
     eval 100
   Const "Clamp"
-    type int
+    type nint
     value (IntLiteral "150".lt(IntLiteral "0") ? IntLiteral "0" : (IntLiteral "150".gt(IntLiteral "100") ? IntLiteral "100" : IntLiteral "150"))
     eval 100
   Const "Score"
-    type int
+    type nint
     value (IntLiteral "3".gt(IntLiteral "2") ? IntLiteral "1" : IntLiteral "0").add(IntLiteral "5")
     eval 6
   TypeDef "Level" pub
-    body int8
+    body sbyte
     const "Max" pub
-      type int
+      type nint
       value 100
   TypeDef "Temp" pub
-    body int32
+    body int
     method "sign" pub
       doc "-1, 0, or 1 by sign."
-      result int32
+      result int
       return (self.gt(IntLiteral "0") ? IntLiteral "1" : (self.lt(IntLiteral "0") ? IntLiteral "1".neg() : IntLiteral "0"))

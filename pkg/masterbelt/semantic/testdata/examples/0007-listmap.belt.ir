@@ -1,6 +1,6 @@
 Module
   Const "Doubled"
-    type list<int>
+    type list<nint>
     value [IntLiteral "1", IntLiteral "2", IntLiteral "3"].map((fn(x) (return ParamRef "x".mul(IntLiteral "2"))))
     eval [2, 4, 6]
   Const "Evens"

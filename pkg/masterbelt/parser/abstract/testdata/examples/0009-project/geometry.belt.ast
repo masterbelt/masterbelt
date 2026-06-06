@@ -11,4 +11,4 @@ File
     doc "A 1-D coordinate."
     pub
     name "Point"
-    body int32
+    body int

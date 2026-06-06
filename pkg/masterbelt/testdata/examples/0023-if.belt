@@ -7,7 +7,7 @@
 // An else-if chain: the first condition that holds wins, and the trailing return
 // covers the values no branch named. else is optional, so a lone guarded return
 // needs no else at all.
-pub fn clamp(x: int, lo: int, hi: int): int {
+pub fn clamp(x: nint, lo: nint, hi: nint): nint {
   if x < lo {
     return lo
   } else if x > hi {
@@ -18,7 +18,7 @@ pub fn clamp(x: int, lo: int, hi: int): int {
 
 // A bare guard with no else: the if returns for one case and falls through to the
 // trailing return for the rest.
-pub fn warn(n: int): int {
+pub fn warn(n: nint): nint {
   if n > 100 {
     return 0
   }
@@ -27,7 +27,7 @@ pub fn warn(n: int): int {
 
 // if nests, and a branch body may itself be a switch (or any statement block) —
 // the branches share the body executor with switch and the function body.
-pub fn sign(n: int): string {
+pub fn sign(n: nint): string {
   if n > 0 {
     return "positive"
   } else {

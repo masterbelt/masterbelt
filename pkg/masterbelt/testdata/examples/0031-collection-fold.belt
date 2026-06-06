@@ -12,23 +12,23 @@ const MapLen = ["a": 1, "b": 2].len()
 
 // The native fold threads an accumulator. Over a list the step sees the element
 // index as its key; summing the values, then the indices, folds to a value.
-const Sum = [1, 2, 3].fold(0, fn(acc: int, i: int, v: int): int -> acc + v)
-const IndexSum = [10, 20, 30].fold(0, fn(acc: int, i: int, v: int): int -> acc + i)
+const Sum = [1, 2, 3].fold(0, fn(acc: nint, i: nint, v: nint): nint -> acc + v)
+const IndexSum = [10, 20, 30].fold(0, fn(acc: nint, i: nint, v: nint): nint -> acc + i)
 
 // Over a map the step sees the entry key.
-const MapSum = ["a": 1, "b": 2, "c": 3].fold(0, fn(acc: int, k: string, v: int): int -> acc + v)
+const MapSum = ["a": 1, "b": 2, "c": 3].fold(0, fn(acc: nint, k: string, v: nint): nint -> acc + v)
 
 // count is the provided method defined on top of fold.
 const Count = [1, 2, 3, 4].count()
 
 // any and all fold to bools.
-const AnyBig = [1, 2, 3].any(fn(v: int): bool -> v > 2)
-const AllPositive = [1, 2, 3].all(fn(v: int): bool -> v > 0)
+const AnyBig = [1, 2, 3].any(fn(v: nint): bool -> v > 2)
+const AllPositive = [1, 2, 3].all(fn(v: nint): bool -> v > 0)
 
 // The list-returning provided methods fold to lists. map applies a function to
 // each value, filter keeps the values satisfying a predicate.
-const Doubled = [1, 2, 3].map(fn(v: int): int -> v * 2)
-const Big = [1, 2, 3, 4].filter(fn(v: int): bool -> v > 2)
+const Doubled = [1, 2, 3].map(fn(v: nint): nint -> v * 2)
+const Big = [1, 2, 3, 4].filter(fn(v: nint): bool -> v > 2)
 
 // keys and values read a map's entries in fold order; values on a list yields
 // the elements.
@@ -39,7 +39,7 @@ const ListValues = [7, 8, 9].values()
 // Every folded result verifies in an assertion at compile time.
 assert [1, 2, 3].len() == 3
 assert ["a": 1, "b": 2].len() == 2
-assert [1, 2, 3].fold(0, fn(acc: int, i: int, v: int): int -> acc + v) == 6
+assert [1, 2, 3].fold(0, fn(acc: nint, i: nint, v: nint): nint -> acc + v) == 6
 assert [1, 2, 3, 4].count() == 4
-assert [1, 2, 3].any(fn(v: int): bool -> v > 2)
-assert [1, 2, 3].all(fn(v: int): bool -> v > 0)
+assert [1, 2, 3].any(fn(v: nint): bool -> v > 2)
+assert [1, 2, 3].all(fn(v: nint): bool -> v > 0)

@@ -1,18 +1,18 @@
 Module
   Const "A"
-    type int
+    type nint
     value area(IntLiteral "3", IntLiteral "4")
     eval 12
   Const "B"
-    type int
+    type nint
     value double(IntLiteral "21")
     eval 42
   Const "C"
-    type int
+    type nint
     value perimeter(IntLiteral "2", IntLiteral "3")
     eval 10
   Const "D"
-    type list<int>
+    type list<nint>
     value [IntLiteral "1", IntLiteral "2", IntLiteral "3"].map((fn(x) (return double(ParamRef "x"))))
     eval [2, 4, 6]
   Const "E"
@@ -24,20 +24,20 @@ Module
     value origin()
     eval { x: 0, y: 0 }
   TypeDef "Point" pub
-    body { x: int, y: int }
+    body { x: nint, y: nint }
   Func "double" pub
-    param x: int
-    result int
+    param x: nint
+    result nint
       return ParamRef "x".mul(IntLiteral "2")
   Func "area" pub
-    param w: int
-    param h: int
-    result int
+    param w: nint
+    param h: nint
+    result nint
       return ParamRef "w".mul(ParamRef "h")
   Func "perimeter" pub
-    param w: int
-    param h: int
-    result int
+    param w: nint
+    param h: nint
+    result nint
       return double(ParamRef "w").add(double(ParamRef "h"))
   Func "greet"
     param name: string

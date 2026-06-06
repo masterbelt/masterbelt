@@ -11,7 +11,7 @@ const Bumped = [1, 2, 3].map(fn(x) {
 })
 
 // A return nested inside an if drives the result inference — the lambda's only
-// nested return is guarded, yet the result is still int (it was a false
+// nested return is guarded, yet the result is still nint (it was a false
 // uninferable_result before), and the call folds.
 const Clamped = [-1, 0, 5].map(fn(x) {
   if x < 0 {

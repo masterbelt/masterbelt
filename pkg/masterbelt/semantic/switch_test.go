@@ -52,7 +52,7 @@ func TestSwitchNonExhaustiveEnum(t *testing.T) {
 // TestSwitchScalarRequiresWildcard checks that a scalar switch without a "_"
 // arm is non-exhaustive (its domain is unbounded).
 func TestSwitchScalarRequiresWildcard(t *testing.T) {
-	_, diags := analyze("pub fn g(n: int): string {\n  switch n {\n    0 -> return \"z\"\n  }\n}\n")
+	_, diags := analyze("pub fn g(n: nint): string {\n  switch n {\n    0 -> return \"z\"\n  }\n}\n")
 	if !hasCodeSwitch(diags, CodeNonExhaustiveSwitch) {
 		t.Fatalf("want non_exhaustive_switch for a wildcard-less scalar switch, got %v", codes(diags))
 	}
@@ -61,7 +61,7 @@ func TestSwitchScalarRequiresWildcard(t *testing.T) {
 // TestSwitchScalarWithWildcardOK checks that a scalar switch with a "_" arm is
 // exhaustive and returns.
 func TestSwitchScalarWithWildcardOK(t *testing.T) {
-	_, diags := analyze("pub fn g(n: int): string {\n  switch n {\n    0 -> return \"z\"\n    1, 2, 3 -> return \"l\"\n    _ -> return \"h\"\n  }\n}\n")
+	_, diags := analyze("pub fn g(n: nint): string {\n  switch n {\n    0 -> return \"z\"\n    1, 2, 3 -> return \"l\"\n    _ -> return \"h\"\n  }\n}\n")
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", codes(diags))
 	}
@@ -92,7 +92,7 @@ func TestSwitchArmValueTypeMismatch(t *testing.T) {
 // TestSwitchUnreachableAfterWildcard checks that an arm written after the
 // wildcard is reported unreachable.
 func TestSwitchUnreachableAfterWildcard(t *testing.T) {
-	_, diags := analyze("pub fn g(n: int): string {\n  switch n {\n    0 -> return \"z\"\n    _ -> return \"h\"\n    1 -> return \"o\"\n  }\n}\n")
+	_, diags := analyze("pub fn g(n: nint): string {\n  switch n {\n    0 -> return \"z\"\n    _ -> return \"h\"\n    1 -> return \"o\"\n  }\n}\n")
 	if !hasCodeSwitch(diags, CodeUnreachableArm) {
 		t.Fatalf("want unreachable_arm, got %v", codes(diags))
 	}
@@ -144,7 +144,7 @@ func evalOf(t *testing.T, src, name string) *ir.Constant {
 // compile time by running the arm the scrutinee selects — the first match, with
 // the multi-value arm and the wildcard both exercised.
 func TestSwitchEvalScalarDispatch(t *testing.T) {
-	src := "fn grade(n: int): string {\n  switch n {\n    0 -> return \"zero\"\n    1, 2, 3 -> return \"low\"\n    _ -> return \"high\"\n  }\n}\nconst A = grade(0)\nconst B = grade(2)\nconst C = grade(99)\n"
+	src := "fn grade(n: nint): string {\n  switch n {\n    0 -> return \"zero\"\n    1, 2, 3 -> return \"low\"\n    _ -> return \"high\"\n  }\n}\nconst A = grade(0)\nconst B = grade(2)\nconst C = grade(99)\n"
 	for _, tc := range []struct{ name, want string }{{"A", "zero"}, {"B", "low"}, {"C", "high"}} {
 		if got := evalOf(t, src, tc.name).Str; got != tc.want {
 			t.Errorf("%s = %q, want %q", tc.name, got, tc.want)
@@ -170,8 +170,8 @@ func TestSwitchEvalEnumDispatch(t *testing.T) {
 // against it. Before the switch carried a fall-through outcome it collapsed to
 // nil, halting the fold of everything after the switch.
 func TestSwitchEvalFallThrough(t *testing.T) {
-	src := "fn f(): int {\n  let n = 0\n  switch 1 {\n    1 -> { n = 10 }\n    _ -> { n = 20 }\n  }\n  return n\n}\nconst R = f()\n" +
-		"fn g(): int {\n  let n = 0\n  switch 2 {\n    1 -> { n = 10 }\n    _ -> { n = 20 }\n  }\n  return n\n}\nconst S = g()\n"
+	src := "fn f(): nint {\n  let n = 0\n  switch 1 {\n    1 -> { n = 10 }\n    _ -> { n = 20 }\n  }\n  return n\n}\nconst R = f()\n" +
+		"fn g(): nint {\n  let n = 0\n  switch 2 {\n    1 -> { n = 10 }\n    _ -> { n = 20 }\n  }\n  return n\n}\nconst S = g()\n"
 	if got := evalOf(t, src, "R").Int.Int64(); got != 10 {
 		t.Errorf("R = %d, want 10 (matched arm fell through, trailing return sees n = 10)", got)
 	}
@@ -184,7 +184,7 @@ func TestSwitchEvalFallThrough(t *testing.T) {
 // fall-through switch into a second one: both arms' assignments accumulate, so
 // the trailing return sees the composed result rather than nil.
 func TestSwitchEvalFallThroughChained(t *testing.T) {
-	src := "fn f(): int {\n  let n = 0\n" +
+	src := "fn f(): nint {\n  let n = 0\n" +
 		"  switch 1 {\n    1 -> { n = n.add(1) }\n    _ -> { n = n.add(2) }\n  }\n" +
 		"  switch 2 {\n    1 -> { n = n.add(10) }\n    _ -> { n = n.add(20) }\n  }\n" +
 		"  return n\n}\nconst R = f()\n"
@@ -200,7 +200,7 @@ func TestSwitchEvalFallThroughChained(t *testing.T) {
 // looked non-exhaustive even though checkSwitch (which sees the local) accepted
 // it.
 func TestSwitchExhaustiveLetBoundEnumReturns(t *testing.T) {
-	src := rarityEnum + "pub fn pick(c: Rarity): int {\n" +
+	src := rarityEnum + "pub fn pick(c: Rarity): nint {\n" +
 		"  let x = c\n" +
 		"  switch x {\n    Common -> return 1\n    Rare -> return 2\n    Legend -> return 3\n  }\n" +
 		"}\n"
@@ -210,7 +210,7 @@ func TestSwitchExhaustiveLetBoundEnumReturns(t *testing.T) {
 
 	// An annotated let-bound enum local resolves the same way: the annotation
 	// fixes the enum, so the exhaustive switch over it returns.
-	annotated := rarityEnum + "pub fn pick(c: Rarity): int {\n" +
+	annotated := rarityEnum + "pub fn pick(c: Rarity): nint {\n" +
 		"  let x: Rarity = c\n" +
 		"  switch x {\n    Common -> return 1\n    Rare -> return 2\n    Legend -> return 3\n  }\n" +
 		"}\n"
@@ -223,7 +223,7 @@ func TestSwitchExhaustiveLetBoundEnumReturns(t *testing.T) {
 // over a let-bound enum that misses a member must still trip missing_return, so
 // the locals fix does not mask a genuinely incomplete switch.
 func TestSwitchNonExhaustiveLetBoundEnumStillReported(t *testing.T) {
-	src := rarityEnum + "pub fn pick(c: Rarity): int {\n" +
+	src := rarityEnum + "pub fn pick(c: Rarity): nint {\n" +
 		"  let x = c\n" +
 		"  switch x {\n    Common -> return 1\n    Rare -> return 2\n  }\n" +
 		"}\n"

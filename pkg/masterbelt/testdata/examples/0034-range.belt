@@ -2,7 +2,7 @@
 // range(start, end) — the values start, start+1, ..., end-1 (an end at or below
 // start is the empty range). It is constructed by the two-argument form the way
 // error("msg") is by the one-argument form: a native conversion that builds the
-// value. range impls foldable<int, int>, so it iterates with for and carries the
+// value. range impls foldable<nint, nint>, so it iterates with for and carries the
 // whole provided method set (count, any, all, map, filter, keys, values) for
 // free — its key is the 0-based position (like a list's index) and its value is
 // the element, so for...of binds the element and for...in binds the position.
@@ -10,7 +10,7 @@
 // for over a range with "of" sums its elements: range(0, 10) is 0..9, so the
 // let total the body reassigns folds to 0 + 1 + ... + 9 = 45. This is the
 // headline example — a counted loop, written without materializing a list.
-pub fn total(): int {
+pub fn total(): nint {
   let t = 0
   for i of range(0, 10) {
     t = t + i
@@ -23,7 +23,7 @@ const Sum = total()
 // "in" over a range binds the 0-based position — the same key a list's index is
 // — not the element, so summing the positions of the five-element range(5, 10)
 // folds to 0 + 1 + 2 + 3 + 4 = 10 (the positions), not the elements 5..9.
-pub fn positionSum(): int {
+pub fn positionSum(): nint {
   let t = 0
   for i in range(5, 10) {
     t = t + i
@@ -35,7 +35,7 @@ const PositionSum = positionSum()
 
 // An end at or below the start is the empty range: the body never runs, so the
 // accumulator keeps its initial value.
-pub fn emptySum(): int {
+pub fn emptySum(): nint {
   let t = 100
   for i of range(10, 10) {
     t = t + i
@@ -51,20 +51,20 @@ const Count = range(0, 10).count()
 const EmptyCount = range(5, 5).count()
 
 // any and all fold to bools over the elements.
-const AnyBig = range(0, 10).any(fn(v: int): bool -> v > 8)
-const AllNonNeg = range(0, 10).all(fn(v: int): bool -> v >= 0)
+const AnyBig = range(0, 10).any(fn(v: nint): bool -> v > 8)
+const AllNonNeg = range(0, 10).all(fn(v: nint): bool -> v >= 0)
 
 // The list-returning provided methods fold to lists: map applies a function to
 // each element, filter keeps the elements satisfying a predicate, and values
 // materializes the sequence. keys yields the 0-based positions.
-const Doubled = range(0, 5).map(fn(v: int): int -> v * 2)
-const Evens = range(0, 10).filter(fn(v: int): bool -> v % 2 == 0)
+const Doubled = range(0, 5).map(fn(v: nint): nint -> v * 2)
+const Evens = range(0, 10).filter(fn(v: nint): bool -> v % 2 == 0)
 const Values = range(3, 7).values()
 const Keys = range(3, 7).keys()
 
 // fold is the native primitive the provided methods are built on: it threads an
 // accumulator over the elements, the step seeing the position as its key.
-const Folded = range(0, 4).fold(0, fn(acc: int, k: int, v: int): int -> acc + v)
+const Folded = range(0, 4).fold(0, fn(acc: nint, k: nint, v: nint): nint -> acc + v)
 
 // Every folded result verifies in an assertion at compile time.
 assert total() == 45
@@ -72,15 +72,15 @@ assert positionSum() == 10
 assert emptySum() == 100
 assert range(0, 10).count() == 10
 assert range(5, 5).count() == 0
-assert range(0, 10).any(fn(v: int): bool -> v > 8)
-assert range(0, 10).all(fn(v: int): bool -> v >= 0)
+assert range(0, 10).any(fn(v: nint): bool -> v > 8)
+assert range(0, 10).all(fn(v: nint): bool -> v >= 0)
 // The list-returning methods are verified through the foldable scalars a list
 // folds to — len counts the elements, the native fold sums them — since a whole-
 // list == does not fold to a constant.
-assert range(0, 5).map(fn(v: int): int -> v * 2).len() == 5
-assert range(0, 5).map(fn(v: int): int -> v * 2).fold(0, fn(acc: int, k: int, v: int): int -> acc + v) == 20
-assert range(0, 10).filter(fn(v: int): bool -> v % 2 == 0).len() == 5
+assert range(0, 5).map(fn(v: nint): nint -> v * 2).len() == 5
+assert range(0, 5).map(fn(v: nint): nint -> v * 2).fold(0, fn(acc: nint, k: nint, v: nint): nint -> acc + v) == 20
+assert range(0, 10).filter(fn(v: nint): bool -> v % 2 == 0).len() == 5
 assert range(3, 7).values().len() == 4
-assert range(3, 7).values().fold(0, fn(acc: int, k: int, v: int): int -> acc + v) == 18
-assert range(3, 7).keys().fold(0, fn(acc: int, k: int, v: int): int -> acc + v) == 6
-assert range(0, 4).fold(0, fn(acc: int, k: int, v: int): int -> acc + v) == 6
+assert range(3, 7).values().fold(0, fn(acc: nint, k: nint, v: nint): nint -> acc + v) == 18
+assert range(3, 7).keys().fold(0, fn(acc: nint, k: nint, v: nint): nint -> acc + v) == 6
+assert range(0, 4).fold(0, fn(acc: nint, k: nint, v: nint): nint -> acc + v) == 6

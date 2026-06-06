@@ -31,7 +31,7 @@ func ifOf(t *testing.T, src string) *ast.IfStmt {
 // TestLowerIfNoElse checks a bare guard: the condition, a one-statement then
 // body, and no else branch at all (both ElseIf and Else nil).
 func TestLowerIfNoElse(t *testing.T) {
-	s := ifOf(t, "pub fn f(n: int): int {\n  if n > 0 {\n    return 1\n  }\n  return 0\n}\n")
+	s := ifOf(t, "pub fn f(n: nint): nint {\n  if n > 0 {\n    return 1\n  }\n  return 0\n}\n")
 	if s.Cond == nil {
 		t.Fatal("condition is nil")
 	}
@@ -49,7 +49,7 @@ func TestLowerIfNoElse(t *testing.T) {
 // TestLowerIfElseBlock checks an if with a plain else block: the then and else
 // bodies are separate statement lists and there is no else-if chain.
 func TestLowerIfElseBlock(t *testing.T) {
-	s := ifOf(t, "pub fn f(b: bool): int {\n  if b {\n    return 1\n  } else {\n    return 0\n  }\n}\n")
+	s := ifOf(t, "pub fn f(b: bool): nint {\n  if b {\n    return 1\n  } else {\n    return 0\n  }\n}\n")
 	if len(s.Then) != 1 {
 		t.Fatalf("then body has %d statements, want 1", len(s.Then))
 	}
@@ -67,7 +67,7 @@ func TestLowerIfElseBlock(t *testing.T) {
 // TestLowerIfElseChain checks an else-if chain: the head if's else branch is a
 // nested IfStmt (ElseIf), whose own else is the final block (Else).
 func TestLowerIfElseChain(t *testing.T) {
-	s := ifOf(t, "pub fn f(n: int): int {\n  if n < 0 {\n    return -1\n  } else if n > 0 {\n    return 1\n  } else {\n    return 0\n  }\n}\n")
+	s := ifOf(t, "pub fn f(n: nint): nint {\n  if n < 0 {\n    return -1\n  } else if n > 0 {\n    return 1\n  } else {\n    return 0\n  }\n}\n")
 	if s.ElseIf == nil {
 		t.Fatal("ElseIf is nil, want the chained if")
 	}
@@ -89,7 +89,7 @@ func TestLowerIfElseChain(t *testing.T) {
 // TestLowerIfNested checks that an else branch may hold further statements,
 // including a nested if, so control flow composes.
 func TestLowerIfNested(t *testing.T) {
-	s := ifOf(t, "pub fn f(n: int): string {\n  if n > 0 {\n    return \"p\"\n  } else {\n    if n < 0 {\n      return \"n\"\n    }\n    return \"z\"\n  }\n}\n")
+	s := ifOf(t, "pub fn f(n: nint): string {\n  if n > 0 {\n    return \"p\"\n  } else {\n    if n < 0 {\n      return \"n\"\n    }\n    return \"z\"\n  }\n}\n")
 	if len(s.Else) != 2 {
 		t.Fatalf("else body has %d statements, want 2 (a nested if and a return)", len(s.Else))
 	}
@@ -105,7 +105,7 @@ func TestLowerIfNested(t *testing.T) {
 // statement set: a bare expression statement and a return both lower inside the
 // then body.
 func TestLowerIfBodyStatements(t *testing.T) {
-	s := ifOf(t, "pub fn f(n: int): int {\n  if n > 0 {\n    log(n)\n    return 1\n  }\n  return 0\n}\n")
+	s := ifOf(t, "pub fn f(n: nint): nint {\n  if n > 0 {\n    log(n)\n    return 1\n  }\n  return 0\n}\n")
 	if len(s.Then) != 2 {
 		t.Fatalf("then body has %d statements, want 2", len(s.Then))
 	}

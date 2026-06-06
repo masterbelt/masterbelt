@@ -7,19 +7,19 @@ File
     value (call (. (list IntLit "1" IntLit "2" IntLit "3" IntLit "4") map) (fn(x: <missing>): <missing> (return (call (. (call (. Identifier "x" rem) IntLit "2") eql) IntLit "0"))))
   ConstDecl
     name "Tripled"
-    value (call (. (list IntLit "1" IntLit "2" IntLit "3") map) (fn(x: int): <missing> (return (call (. Identifier "x" mul) IntLit "3"))))
+    value (call (. (list IntLit "1" IntLit "2" IntLit "3") map) (fn(x: nint): <missing> (return (call (. Identifier "x" mul) IntLit "3"))))
   ConstDecl
     name "Twice"
-    type fn(x: int): int
+    type fn(x: nint): nint
     value (fn(x: <missing>): <missing> (return (call (. Identifier "x" mul) IntLit "2")))
   ConstDecl
     name "Stepped"
     value (call (. (list IntLit "1" IntLit "2" IntLit "3") map) (fn(x: <missing>): <missing> (return (call (. Identifier "x" add) IntLit "1"))))
   ConstDecl
     name "Bytes"
-    type list<int8>
+    type list<sbyte>
     value (list IntLit "1" IntLit "2" IntLit "3")
   ConstDecl
     name "Empty"
-    type list<int>
+    type list<nint>
     value (collection)

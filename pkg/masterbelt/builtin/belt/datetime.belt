@@ -1,5 +1,5 @@
 use { bool } from "./bool.belt"
-use { int } from "./int.belt"
+use { nint } from "./signed.belt"
 
 /// An instant in time: a D-prefixed ISO-8601 literal (D2009-03-31T23:59:59.000Z, offsets allowed), normalized to UTC with millisecond precision.
 pub type datetime = builtin impl {
@@ -48,5 +48,5 @@ pub type duration = builtin impl {
   /// The - operator: the difference of two spans.
   pub extern fn sub(other: self): self
   /// The * operator: the span repeated a whole number of times.
-  pub extern fn mul(factor: int): self
+  pub extern fn mul(factor: nint): self
 }

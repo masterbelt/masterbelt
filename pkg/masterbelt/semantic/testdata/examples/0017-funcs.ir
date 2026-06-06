@@ -1,19 +1,19 @@
 # main.belt
 Module
   Const "A"
-    type int
+    type nint
     value double(IntLiteral "21")
     eval 42
   Const "B"
-    type int
+    type nint
     value area(IntLiteral "3", IntLiteral "4")
     eval 12
   Const "C"
-    type int
+    type nint
     value scale(IntLiteral "4")
     eval 40
   Const "D"
-    type list<int>
+    type list<nint>
     value scale([IntLiteral "1", IntLiteral "2"])
     eval [10, 20]
   Const "E"
@@ -30,14 +30,14 @@ Module
 Module
   Func "double" pub
     doc "Doubles x."
-    param x: int
-    result int
+    param x: nint
+    result nint
       return ParamRef "x".mul(IntLiteral "2")
   Func "area" pub
     doc "The area of a w-by-h rectangle."
-    param w: int
-    param h: int
-    result int
+    param w: nint
+    param h: nint
+    result nint
       return ParamRef "w".mul(ParamRef "h")
   Func "greet" pub
     doc "Greets by name."
@@ -45,15 +45,15 @@ Module
     result string
       return StringLiteral "Hello, ".add(ParamRef "name")
   Func "scale" pub
-    doc "Scales an int."
-    param x: int
-    result int
+    doc "Scales an nint."
+    param x: nint
+    result nint
       return ParamRef "x".mul(IntLiteral "10")
   Func "scale" pub
     doc "Scales every element of a list."
-    param xs: list<int>
-    result list<int>
+    param xs: list<nint>
+    result list<nint>
       return ParamRef "xs".map((fn(x) (return ParamRef "x".mul(IntLiteral "10"))))
   Func "hidden"
-    result int
+    result nint
       return IntLiteral "0"

@@ -1,6 +1,6 @@
 Module
   Const "Summed"
-    type int
+    type nint
     value sum([IntLiteral "1", IntLiteral "2", IntLiteral "3", IntLiteral "4"])
     eval 10
   Const "Joined"
@@ -8,75 +8,75 @@ Module
     value keysJoined([StringLiteral "a": IntLiteral "1", StringLiteral "b": IntLiteral "2", StringLiteral "c": IntLiteral "3"])
     eval "abc"
   Const "ValueSummed"
-    type int
+    type nint
     value valueSum([StringLiteral "a": IntLiteral "1", StringLiteral "b": IntLiteral "2", StringLiteral "c": IntLiteral "3"])
     eval 6
   Const "IndexSummed"
-    type int
+    type nint
     value indexSum([IntLiteral "10", IntLiteral "20", IntLiteral "30"])
     eval 3
   Const "EvenSum"
-    type int
+    type nint
     value sumEven([IntLiteral "1", IntLiteral "2", IntLiteral "3", IntLiteral "4", IntLiteral "5", IntLiteral "6"])
     eval 12
   Const "Pairs"
-    type int
+    type nint
     value pairCount([IntLiteral "1", IntLiteral "2"], [IntLiteral "1", IntLiteral "2", IntLiteral "3"])
     eval 6
   Const "Product"
-    type int
+    type nint
     value product([IntLiteral "1", IntLiteral "2", IntLiteral "3", IntLiteral "4"])
     eval 24
   Func "sum" pub
-    param xs: list<int>
-    result int
-      let "total": int = IntLiteral "0"
-      for x of int ParamRef "xs"
+    param xs: list<nint>
+    result nint
+      let "total": nint = IntLiteral "0"
+      for x of nint ParamRef "xs"
           assign "total" = LocalRef "total".add(LocalRef "x")
       return LocalRef "total"
   Func "keysJoined" pub
-    param m: map<string, int>
+    param m: map<string, nint>
     result string
       let "out": string = StringLiteral ""
       for k in string ParamRef "m"
           assign "out" = LocalRef "out".add(LocalRef "k")
       return LocalRef "out"
   Func "valueSum" pub
-    param m: map<string, int>
-    result int
-      let "total": int = IntLiteral "0"
-      for v of int ParamRef "m"
+    param m: map<string, nint>
+    result nint
+      let "total": nint = IntLiteral "0"
+      for v of nint ParamRef "m"
           assign "total" = LocalRef "total".add(LocalRef "v")
       return LocalRef "total"
   Func "indexSum" pub
-    param xs: list<int>
-    result int
-      let "total": int = IntLiteral "0"
-      for i in int ParamRef "xs"
+    param xs: list<nint>
+    result nint
+      let "total": nint = IntLiteral "0"
+      for i in nint ParamRef "xs"
           assign "total" = LocalRef "total".add(LocalRef "i")
       return LocalRef "total"
   Func "sumEven" pub
-    param xs: list<int>
-    result int
-      let "total": int = IntLiteral "0"
-      for x of int ParamRef "xs"
+    param xs: list<nint>
+    result nint
+      let "total": nint = IntLiteral "0"
+      for x of nint ParamRef "xs"
           if LocalRef "x".rem(IntLiteral "2").eql(IntLiteral "0")
               assign "total" = LocalRef "total".add(LocalRef "x")
       return LocalRef "total"
   Func "pairCount" pub
-    param xs: list<int>
-    param ys: list<int>
-    result int
-      let "count": int = IntLiteral "0"
-      for x of int ParamRef "xs"
-          for y of int ParamRef "ys"
+    param xs: list<nint>
+    param ys: list<nint>
+    result nint
+      let "count": nint = IntLiteral "0"
+      for x of nint ParamRef "xs"
+          for y of nint ParamRef "ys"
               assign "count" = LocalRef "count".add(IntLiteral "1")
       return LocalRef "count"
   Func "product" pub
-    param xs: list<int>
-    result int
-      let "acc": int = IntLiteral "1"
-      for x of int ParamRef "xs"
+    param xs: list<nint>
+    result nint
+      let "acc": nint = IntLiteral "1"
+      for x of nint ParamRef "xs"
           assign "acc" = LocalRef "acc".mul(LocalRef "x")
       return LocalRef "acc"
   Assert "sum([1, 2, 3, 4]) == 10"

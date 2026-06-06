@@ -82,7 +82,7 @@ File
     Newline "\n"
     LineComment "// A return nested inside an if drives the result inference — the lambda's only"
     Newline "\n"
-    LineComment "// nested return is guarded, yet the result is still int (it was a false"
+    LineComment "// nested return is guarded, yet the result is still nint (it was a false"
     Newline "\n"
     LineComment "// uninferable_result before), and the call folds."
     Newline "\n"

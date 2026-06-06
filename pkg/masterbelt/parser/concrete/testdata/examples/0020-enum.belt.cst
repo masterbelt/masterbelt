@@ -14,7 +14,7 @@ File
       Colon ":"
       Whitespace " "
       TypeName
-        Ident "uint8"
+        Ident "byte"
     Whitespace " "
     LBrace "{"
     EnumMember
@@ -52,7 +52,7 @@ File
   EnumDecl
     Newline "\n"
     Newline "\n"
-    LineComment "// Enum with no base type (int by default) and auto-numbered members; it also"
+    LineComment "// Enum with no base type (nint by default) and auto-numbered members; it also"
     Newline "\n"
     LineComment "// carries an impl block, exactly as a nominal type can."
     Newline "\n"

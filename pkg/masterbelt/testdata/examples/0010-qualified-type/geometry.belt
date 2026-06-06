@@ -1,7 +1,7 @@
 // The exporter: a public type and two public constants.
 
 /// A 1-D coordinate.
-pub type Point = int32
+pub type Point = int
 /// The zero point every path starts from.
 pub const Origin = 0
 /// One step along the axis.

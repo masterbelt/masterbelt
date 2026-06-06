@@ -1,15 +1,15 @@
 Module
   TypeDef "Bag" pub
-    doc "A small bag of T values that folds over its contents. The `impl foldable<int, T>`"
+    doc "A small bag of T values that folds over its contents. The `impl foldable<nint, T>`"
     doc "tag is what gives Bag the count/any methods — written here, at Bag's own"
     doc "definition site."
     param "T"
-    impl foldable<int, T>
+    impl foldable<nint, T>
     body list<T>
     method "fold"
       doc "The required primitive: fold the underlying list."
       param init: A
-      param step: fn(A, int, T): A
+      param step: fn(A, nint, T): A
       result A
       return ParamRef "init"
   TypeDef "foldable" pub
@@ -28,7 +28,7 @@ Module
       result A
     method "count" pub
       doc "Provided: the number of elements, folded from the primitive."
-      result int
+      result nint
       return self.fold(IntLiteral "0", (fn(acc, key, value) (return ParamRef "acc".add(IntLiteral "1"))))
     method "any" pub
       doc "Provided: whether any element satisfies the predicate."
@@ -37,6 +37,6 @@ Module
       return self.fold(BoolLiteral false, (fn(acc, key, value) (return ParamRef "acc".oror(<none>))))
   Func "total" pub
     doc "The total of a collection of ints, folded with addition."
-    param c: foldable<int, int>
-    result int
+    param c: foldable<nint, nint>
+    result nint
       return ParamRef "c".fold(IntLiteral "0", (fn(acc, key, value) (return ParamRef "acc".add(ParamRef "value"))))

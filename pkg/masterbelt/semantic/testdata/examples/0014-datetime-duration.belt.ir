@@ -40,7 +40,7 @@ Module
     value DurationLiteral "5m".mul(IntLiteral "3")
     eval 15m
   TypeDef "Event" pub
-    body { id: int, starts_at: datetime, cooldown: duration }
+    body { id: nint, starts_at: datetime, cooldown: duration }
   Assert "Release > Epoch"
     eval true
       Release > Epoch

@@ -14,7 +14,7 @@ import (
 // lowering, fold). These tests pin each context to its lowered value and to the
 // unknown_enum_member diagnostic a non-member earns.
 
-const bareMemberPrelude = "pub enum Rarity: uint8 {\n  Common = 1\n  Rare = 2\n  Legend = 10\n}\n"
+const bareMemberPrelude = "pub enum Rarity: byte {\n  Common = 1\n  Rare = 2\n  Legend = 10\n}\n"
 
 // containsLine reports whether the IR dump has a line whose trimmed text equals
 // want — a tighter check than a substring, so "<none>" cannot hide inside a
@@ -82,7 +82,7 @@ func TestBareMemberCompareArg(t *testing.T) {
 
 func TestBareMemberCompareArgSelf(t *testing.T) {
 	// The same channel through a self receiver inside a method body.
-	src := "pub enum Rarity: uint8 {\n  Common = 1\n  Legend = 10\n} impl {\n  pub isTop(): bool {\n    return self == Legend\n  }\n}\n"
+	src := "pub enum Rarity: byte {\n  Common = 1\n  Legend = 10\n} impl {\n  pub isTop(): bool {\n    return self == Legend\n  }\n}\n"
 	m, diags := analyze(src)
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", codes(diags))
@@ -104,7 +104,7 @@ func TestBareMemberCompareArgUnknown(t *testing.T) {
 func TestBareMemberCompareArgNonEnumReceiver(t *testing.T) {
 	// A non-enum receiver must not invent an enum expectation: a bare name there
 	// stays an ordinary unresolved reference, not a member of some enum.
-	src := bareMemberPrelude + "pub fn f(n: int): bool {\n  return n == Legend\n}\n"
+	src := bareMemberPrelude + "pub fn f(n: nint): bool {\n  return n == Legend\n}\n"
 	_, diags := analyze(src)
 	if hasCode(diags, CodeUnknownEnumMember) {
 		t.Errorf("non-enum receiver: want no unknown_enum_member, got %v", codes(diags))
@@ -144,7 +144,7 @@ func TestBareMemberUnionAliasConst(t *testing.T) {
 // another enum's member does not fold for the bare form any more than for the
 // qualified one — a separate, pre-existing assoc-const ordering limitation.)
 func TestBareMemberAssocConstInit(t *testing.T) {
-	src := "pub enum Rarity: uint8 {\n  Common = 1\n  Legend = 10\n} impl {\n  pub const Top: Rarity = Legend\n}\n"
+	src := "pub enum Rarity: byte {\n  Common = 1\n  Legend = 10\n} impl {\n  pub const Top: Rarity = Legend\n}\n"
 	m, diags := analyze(src)
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", codes(diags))

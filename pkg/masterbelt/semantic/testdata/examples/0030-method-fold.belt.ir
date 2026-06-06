@@ -4,11 +4,11 @@ Module
     value Element.Fire.isFire()
     eval true
   Const "FireLabel"
-    type int
+    type nint
     value Element.Fire.label()
     eval 1
   Const "WaterLabel"
-    type int
+    type nint
     value Element.Water.label()
     eval 0
   Const "Six"
@@ -48,18 +48,18 @@ Module
     value Reference -> "Squad".leader.lv.increment()
     eval 9
   TypeDef "Level" pub
-    doc "A character level, with methods over its underlying int8."
-    body int8
+    doc "A character level, with methods over its underlying sbyte."
+    body sbyte
     method "increment" pub
       doc "The next level up — a self-returning method, so a chain keeps the type."
       result self
       return self.add(IntLiteral "1")
     method "plus" pub
       doc "This level a number of steps up. The base value lifts into the nominal"
-      doc "type through the conversion: a Level derives int8's operators, but their"
-      doc "self-typed operands stay nominal, so mixing in a bare int8 is a type"
+      doc "type through the conversion: a Level derives sbyte's operators, but their"
+      doc "self-typed operands stay nominal, so mixing in a bare sbyte is a type"
       doc "error — Level(steps) is the explicit lift."
-      param steps: int8
+      param steps: sbyte
       result self
       return self.add(Level(ParamRef "steps"))
   TypeDef "Character" pub
@@ -70,7 +70,7 @@ Module
     body { leader: Character }
   TypeDef "Element" pub
     doc "An elemental affinity, with methods that fold over a constant member."
-    enum int
+    enum nint
     member "Fire" = 0
     member "Water" = 1
     member "Wind" = 2
@@ -102,7 +102,7 @@ Module
       return self.isFire().not()
     method "label" pub
       doc "A let- and if-bearing body, to exercise the full statement walker."
-      result int
+      result nint
       let "fire": bool = self.isFire()
       if LocalRef "fire"
           return IntLiteral "1"

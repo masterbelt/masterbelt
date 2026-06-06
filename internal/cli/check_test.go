@@ -35,7 +35,7 @@ func execCheck(t *testing.T, args ...string) (string, error) {
 func TestCheckProject(t *testing.T) {
 	root := t.TempDir()
 	belttest.WriteFile(t, root, "masterbelt.toml", "entry = \"src/main.belt\"\n")
-	belttest.WriteFile(t, root, "src/main.belt", "const MaxLevel: int64 = 100\n")
+	belttest.WriteFile(t, root, "src/main.belt", "const MaxLevel: long = 100\n")
 
 	out, err := execCheck(t, root)
 	if err != nil {

@@ -21,34 +21,34 @@ func codes(diags []diagnostic.Diagnostic) []diagnostic.Code {
 }
 
 func TestAnnotatedAndInferred(t *testing.T) {
-	m, diags := analyze("const A: int32 = 1\nconst B = 0\n")
+	m, diags := analyze("const A: int = 1\nconst B = 0\n")
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
-	if m.Consts[0].Type.String() != "int32" {
-		t.Errorf("A type = %s, want int32", m.Consts[0].Type)
+	if m.Consts[0].Type.String() != "int" {
+		t.Errorf("A type = %s, want int", m.Consts[0].Type)
 	}
-	if m.Consts[1].Type.String() != "int" {
-		t.Errorf("B type = %s, want int", m.Consts[1].Type)
+	if m.Consts[1].Type.String() != "nint" {
+		t.Errorf("B type = %s, want nint", m.Consts[1].Type)
 	}
 }
 
 func TestReferenceResolutionAndTypeInheritance(t *testing.T) {
-	m, diags := analyze("const A: int8 = 1\nconst B = A\nconst C = 0\nconst D = C\n")
+	m, diags := analyze("const A: sbyte = 1\nconst B = A\nconst C = 0\nconst D = C\n")
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
 	// B = A inherits A's concrete int8.
-	if m.Consts[1].Type.String() != "int8" {
-		t.Errorf("B type = %s, want int8", m.Consts[1].Type)
+	if m.Consts[1].Type.String() != "sbyte" {
+		t.Errorf("B type = %s, want sbyte", m.Consts[1].Type)
 	}
 	ref, ok := m.Consts[1].Value.(*ir.Reference)
 	if !ok || ref.Target != m.Consts[0] {
 		t.Errorf("B value = %v, want Reference -> A", m.Consts[1].Value)
 	}
 	// D = C inherits C's int.
-	if m.Consts[3].Type.String() != "int" {
-		t.Errorf("D type = %s, want int", m.Consts[3].Type)
+	if m.Consts[3].Type.String() != "nint" {
+		t.Errorf("D type = %s, want nint", m.Consts[3].Type)
 	}
 }
 
@@ -73,7 +73,7 @@ func TestLocalTypeAnnotation(t *testing.T) {
 	// A file's own type declarations are visible to its const annotations —
 	// the same universe imported types join (P-2). The annotated constant's
 	// Named type points at the very TypeDef the module publishes.
-	m, diags := analyze("pub type Coin = int8\nconst c: Coin = 1\n")
+	m, diags := analyze("pub type Coin = sbyte\nconst c: Coin = 1\n")
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
@@ -88,7 +88,7 @@ func TestLocalTypeAnnotation(t *testing.T) {
 
 func TestLocalTypeAnnotationRangeChecked(t *testing.T) {
 	// The named type's underlying range still applies.
-	_, diags := analyze("pub type Coin = int8\nconst c: Coin = 1000\n")
+	_, diags := analyze("pub type Coin = sbyte\nconst c: Coin = 1000\n")
 	if got := codes(diags); len(got) != 1 || got[0] != CodeConstantOverflow {
 		t.Fatalf("codes = %v, want [constant_overflow]", got)
 	}
@@ -117,7 +117,7 @@ func TestCyclicReference(t *testing.T) {
 }
 
 func TestValueEvaluation(t *testing.T) {
-	m, diags := analyze("const A = 100\nconst B = A\nconst C: int64 = B\n")
+	m, diags := analyze("const A = 100\nconst B = A\nconst C: long = B\n")
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
@@ -177,32 +177,32 @@ func TestStringOperationsFold(t *testing.T) {
 }
 
 func TestCollectionLiteral(t *testing.T) {
-	m, diags := analyze("const L: list<int> = [1, 2, 3]\nconst M: map<string, int> = [\"k\": 1]\nconst I = [10, 20]\nconst E: list<int> = []\n")
+	m, diags := analyze("const L: list<nint> = [1, 2, 3]\nconst M: map<string, nint> = [\"k\": 1]\nconst I = [10, 20]\nconst E: list<nint> = []\n")
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
-	if m.Consts[0].Type.String() != "list<int>" {
-		t.Errorf("L type = %s, want list<int>", m.Consts[0].Type)
+	if m.Consts[0].Type.String() != "list<nint>" {
+		t.Errorf("L type = %s, want list<nint>", m.Consts[0].Type)
 	}
 	// The list folds to a collection constant of its elements.
 	if ev := m.Consts[0].Eval; ev == nil || ev.Kind != ir.ConstCollection || len(ev.Coll) != 3 ||
 		ev.Coll[0].Key != nil || ev.Coll[0].Value.Int.Int64() != 1 {
 		t.Errorf("L eval = %v, want collection [1 2 3]", m.Consts[0].Eval)
 	}
-	if m.Consts[1].Type.String() != "map<string, int>" {
-		t.Errorf("M type = %s, want map<string, int>", m.Consts[1].Type)
+	if m.Consts[1].Type.String() != "map<string, nint>" {
+		t.Errorf("M type = %s, want map<string, nint>", m.Consts[1].Type)
 	}
 	if ev := m.Consts[1].Eval; ev == nil || ev.Kind != ir.ConstCollection || len(ev.Coll) != 1 ||
 		ev.Coll[0].Key == nil || ev.Coll[0].Key.Str != "k" || ev.Coll[0].Value.Int.Int64() != 1 {
 		t.Errorf("M eval = %v, want collection [k: 1]", m.Consts[1].Eval)
 	}
 	// An un-annotated list infers its element type.
-	if m.Consts[2].Type.String() != "list<int>" {
-		t.Errorf("I type = %s, want list<int>", m.Consts[2].Type)
+	if m.Consts[2].Type.String() != "list<nint>" {
+		t.Errorf("I type = %s, want list<nint>", m.Consts[2].Type)
 	}
 	// An empty list takes its type from the annotation and folds to [].
-	if m.Consts[3].Type.String() != "list<int>" {
-		t.Errorf("E type = %s, want list<int>", m.Consts[3].Type)
+	if m.Consts[3].Type.String() != "list<nint>" {
+		t.Errorf("E type = %s, want list<nint>", m.Consts[3].Type)
 	}
 	if ev := m.Consts[3].Eval; ev == nil || ev.Kind != ir.ConstCollection || len(ev.Coll) != 0 {
 		t.Errorf("E eval = %v, want empty collection", m.Consts[3].Eval)
@@ -211,13 +211,13 @@ func TestCollectionLiteral(t *testing.T) {
 
 func TestCollectionElementAdaptsAndChecks(t *testing.T) {
 	// Integer elements adapt to the annotation's element type, range-checked.
-	if _, diags := analyze("const X: list<int8> = [1, 2, 3]\n"); len(diags) != 0 {
-		t.Errorf("list<int8> = [1,2,3] should be fine, got %v", codes(diags))
+	if _, diags := analyze("const X: list<sbyte> = [1, 2, 3]\n"); len(diags) != 0 {
+		t.Errorf("list<sbyte> = [1,2,3] should be fine, got %v", codes(diags))
 	}
-	if m, diags := analyze("const X: map<string, int> = [\"a\": 1, \"b\": 2]\n"); len(diags) != 0 {
+	if m, diags := analyze("const X: map<string, nint> = [\"a\": 1, \"b\": 2]\n"); len(diags) != 0 {
 		t.Errorf("map literal should be fine, got %v", codes(diags))
-	} else if m.Consts[0].Type.String() != "map<string, int>" {
-		t.Errorf("type = %s, want map<string, int>", m.Consts[0].Type)
+	} else if m.Consts[0].Type.String() != "map<string, nint>" {
+		t.Errorf("type = %s, want map<string, nint>", m.Consts[0].Type)
 	}
 }
 
@@ -226,13 +226,13 @@ func TestCollectionDiagnostics(t *testing.T) {
 		src  string
 		code diagnostic.Code
 	}{
-		{"const X: list<int8> = [1, 999]\n", CodeConstantOverflow}, // element out of range
-		{"const X: list<int> = [\"a\"]\n", CodeTypeMismatch},       // wrong element type
-		{"const X = []\n", CodeUninferableCollection},              // empty, no annotation
-		{"const X = [1, \"a\"]\n", CodeUninferableCollection},      // heterogeneous, no annotation
-		{"const X: int = [1]\n", CodeTypeMismatch},                 // collection under scalar annotation
-		{"const X: list<int> = [\"k\": 1]\n", CodeTypeMismatch},    // map literal, list annotation
-		{"const X: map<string, int> = [1, 2]\n", CodeTypeMismatch}, // list literal, map annotation
+		{"const X: list<sbyte> = [1, 999]\n", CodeConstantOverflow}, // element out of range
+		{"const X: list<nint> = [\"a\"]\n", CodeTypeMismatch},       // wrong element type
+		{"const X = []\n", CodeUninferableCollection},               // empty, no annotation
+		{"const X = [1, \"a\"]\n", CodeUninferableCollection},       // heterogeneous, no annotation
+		{"const X: nint = [1]\n", CodeTypeMismatch},                 // collection under scalar annotation
+		{"const X: list<nint> = [\"k\": 1]\n", CodeTypeMismatch},    // map literal, list annotation
+		{"const X: map<string, nint> = [1, 2]\n", CodeTypeMismatch}, // list literal, map annotation
 	}
 	for _, tc := range cases {
 		_, diags := analyze(tc.src)
@@ -246,7 +246,7 @@ func TestStringAnnotationMismatch(t *testing.T) {
 	// A string initializer under a non-string annotation (and vice versa) is a
 	// type mismatch; a string under a string annotation is fine.
 	for _, src := range []string{
-		"const x: int8 = \"no\"\n",
+		"const x: sbyte = \"no\"\n",
 		"const x: string = 1\n",
 		"const x: bool = \"no\"\n",
 	} {
@@ -260,7 +260,7 @@ func TestStringAnnotationMismatch(t *testing.T) {
 }
 
 func TestConstantOverflow(t *testing.T) {
-	_, diags := analyze("const X: int8 = 1000\n")
+	_, diags := analyze("const X: sbyte = 1000\n")
 	if got := codes(diags); len(got) != 1 || got[0] != CodeConstantOverflow {
 		t.Fatalf("codes = %v, want [constant_overflow]", got)
 	}
@@ -271,12 +271,12 @@ func TestIntLiteralDoesNotOverflow(t *testing.T) {
 	// sized concrete type triggers the range check.
 	_, diags := analyze("const X = 99999999999999999999999999\n")
 	if len(diags) != 0 {
-		t.Fatalf("an int literal should not overflow: %v", diags)
+		t.Fatalf("an nint literal should not overflow: %v", diags)
 	}
 }
 
 func TestOverflowThroughReference(t *testing.T) {
-	_, diags := analyze("const A = 1000\nconst B: int8 = A\n")
+	_, diags := analyze("const A = 1000\nconst B: sbyte = A\n")
 	if got := codes(diags); len(got) != 1 || got[0] != CodeConstantOverflow {
 		t.Fatalf("codes = %v, want [constant_overflow]", got)
 	}
@@ -285,21 +285,21 @@ func TestOverflowThroughReference(t *testing.T) {
 func TestMethodBodyTypeChecks(t *testing.T) {
 	// self + 1 on a nominal integer derives int8's add and returns the nominal
 	// type, which matches the declared result `self` — no diagnostic.
-	if _, diags := analyze("pub type Level = int8 impl {\n  pub inc(): self {\n    return self + 1\n  }\n}\n"); len(diags) != 0 {
+	if _, diags := analyze("pub type Level = sbyte impl {\n  pub inc(): self {\n    return self + 1\n  }\n}\n"); len(diags) != 0 {
 		t.Errorf("well-typed method body should have no diagnostics, got %v", codes(diags))
 	}
 }
 
 func TestMethodBodyTypeMismatch(t *testing.T) {
 	// A body returning self (an integer) where bool is declared is a mismatch.
-	_, diags := analyze("pub type Bad = int8 impl {\n  pub wrong(): bool {\n    return self\n  }\n}\n")
+	_, diags := analyze("pub type Bad = sbyte impl {\n  pub wrong(): bool {\n    return self\n  }\n}\n")
 	if !hasCode(diags, CodeTypeMismatch) {
 		t.Errorf("want type_mismatch for a bad method body, got %v", codes(diags))
 	}
 }
 
 func TestMultiStatementMethodBody(t *testing.T) {
-	m, _ := analyze("pub type Level = int8 impl {\n  pub inc(): self {\n    self + 1\n    return self\n  }\n}\n")
+	m, _ := analyze("pub type Level = sbyte impl {\n  pub inc(): self {\n    self + 1\n    return self\n  }\n}\n")
 	if len(m.Types) == 0 || len(m.Types[0].Methods) == 0 {
 		t.Fatalf("Level.inc not resolved: %+v", m.Types)
 	}
@@ -367,13 +367,13 @@ func TestOperatorErrorReportedOnce(t *testing.T) {
 func TestExprStmtIsTypeChecked(t *testing.T) {
 	// A discarded call to an undefined method in a function body, before a valid
 	// return: the bad statement is reported, the return is fine.
-	fnBad := "pub fn f(n: int8): int8 {\n  n.nonexistent()\n  return n\n}\n"
+	fnBad := "pub fn f(n: sbyte): sbyte {\n  n.nonexistent()\n  return n\n}\n"
 	if _, diags := analyze(fnBad); !hasCode(diags, CodeInvalidOperation) {
 		t.Errorf("function expr-stmt: want invalid_operation for n.nonexistent(), got %v", codes(diags))
 	}
 
 	// The same in a method body, where self is bound.
-	methodBad := "pub type Lvl = int8 impl {\n  pub fn touch(): self {\n    self.nope()\n    return self\n  }\n}\n"
+	methodBad := "pub type Lvl = sbyte impl {\n  pub fn touch(): self {\n    self.nope()\n    return self\n  }\n}\n"
 	if _, diags := analyze(methodBad); !hasCode(diags, CodeInvalidOperation) {
 		t.Errorf("method expr-stmt: want invalid_operation for self.nope(), got %v", codes(diags))
 	}
@@ -381,7 +381,7 @@ func TestExprStmtIsTypeChecked(t *testing.T) {
 	// A valid discarded call (add is defined on the integer family) before a
 	// valid return draws no diagnostic — the expression statement type-checks
 	// clean.
-	fnOK := "pub fn g(n: int8): int8 {\n  n.add(1)\n  return n\n}\n"
+	fnOK := "pub fn g(n: sbyte): sbyte {\n  n.add(1)\n  return n\n}\n"
 	if _, diags := analyze(fnOK); len(diags) != 0 {
 		t.Errorf("valid expr-stmt: unexpected diagnostics %v", codes(diags))
 	}
@@ -389,7 +389,7 @@ func TestExprStmtIsTypeChecked(t *testing.T) {
 
 // overloadSrc declares a type with merge overloaded by parameter type — the
 // 0013-overload example's Score — for the overload diagnostics tests.
-const overloadSrc = `pub type Score = int32 impl {
+const overloadSrc = `pub type Score = int impl {
   pub fn merge(points: self): self {
     return self + points
   }
@@ -434,11 +434,11 @@ func TestNoMatchingOverload(t *testing.T) {
 func TestAmbiguousOverload(t *testing.T) {
 	// The default integer fits both sized overloads at once; the resolution
 	// is an annotated operand, never an implicit priority.
-	src := `pub type Gauge = int32 impl {
-  pub fn set(v: int8): bool {
+	src := `pub type Gauge = int impl {
+  pub fn set(v: sbyte): bool {
     return v > 0
   }
-  pub fn set(v: int16): bool {
+  pub fn set(v: short): bool {
     return v > 0
   }
 }
@@ -449,7 +449,7 @@ const G: Gauge = 1
 		t.Fatalf("codes = %v, want [ambiguous_overload]", got)
 	}
 	// An annotated argument is exact: unambiguous.
-	m, diags := analyze(src + "const V: int16 = 5\nconst X = G.set(V)\n")
+	m, diags := analyze(src + "const V: short = 5\nconst X = G.set(V)\n")
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
@@ -523,17 +523,17 @@ func TestDatetimeDurationDiagnostics(t *testing.T) {
 func TestAnnotatedFuncLit(t *testing.T) {
 	// The annotation is a checking context: it supplies the literal's omitted
 	// parameter and result types.
-	m, diags := analyze("const Twice: fn(x: int): int = fn(x) { return x * 2 }\n")
+	m, diags := analyze("const Twice: fn(x: nint): nint = fn(x) { return x * 2 }\n")
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
-	if got := m.Consts[0].Type.String(); got != "fn(int): int" {
-		t.Errorf("Twice type = %s, want fn(int): int", got)
+	if got := m.Consts[0].Type.String(); got != "fn(nint): nint" {
+		t.Errorf("Twice type = %s, want fn(nint): nint", got)
 	}
 	// A fully annotated literal under a matching annotation is fine too (this
 	// used to false-positive through types.Compatible, which had no function
 	// rule).
-	if _, diags := analyze("const Twice: fn(x: int): int = fn(x: int): int { return x * 2 }\n"); len(diags) != 0 {
+	if _, diags := analyze("const Twice: fn(x: nint): nint = fn(x: nint): nint { return x * 2 }\n"); len(diags) != 0 {
 		t.Errorf("fully annotated literal: unexpected diagnostics %v", diags)
 	}
 }
@@ -544,19 +544,19 @@ func TestAnnotatedFuncLitDiagnostics(t *testing.T) {
 		code diagnostic.Code
 	}{
 		// Parameter-count mismatch against the annotation.
-		{"const B: fn(x: int): int = fn(x, y) { return x }\n", CodeLambdaArityMismatch},
+		{"const B: fn(x: nint): nint = fn(x, y) { return x }\n", CodeLambdaArityMismatch},
 		// A written parameter annotation must agree with the expectation.
-		{"const C: fn(x: int): int = fn(x: string) { return \"\" }\n", CodeTypeMismatch},
+		{"const C: fn(x: nint): nint = fn(x: string) { return \"\" }\n", CodeTypeMismatch},
 		// A written result annotation must agree too.
-		{"const R: fn(x: int): int = fn(x): string { return \"\" }\n", CodeTypeMismatch},
+		{"const R: fn(x: nint): nint = fn(x): string { return \"\" }\n", CodeTypeMismatch},
 		// A return that does not satisfy the pushed-down result type.
-		{"const S: fn(x: int): int = fn(x) { return x == 0 }\n", CodeTypeMismatch},
+		{"const S: fn(x: nint): nint = fn(x) { return x == 0 }\n", CodeTypeMismatch},
 		// A literal under a non-function annotation.
-		{"const N: int = fn() { return 1 }\n", CodeTypeMismatch},
+		{"const N: nint = fn() { return 1 }\n", CodeTypeMismatch},
 		// An operator error inside a context-typed body still surfaces.
-		{"const O: fn(x: int): int = fn(x) { return x && x }\n", CodeInvalidOperation},
+		{"const O: fn(x: nint): nint = fn(x) { return x && x }\n", CodeInvalidOperation},
 		// A literal value out of the pushed-down range.
-		{"const V: fn(): int8 = fn() { return 1000 }\n", CodeConstantOverflow},
+		{"const V: fn(): sbyte = fn() { return 1000 }\n", CodeConstantOverflow},
 	}
 	for _, tc := range cases {
 		_, diags := analyze(tc.src)
@@ -574,8 +574,8 @@ func TestBidirectionalCall(t *testing.T) {
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
-	if got := m.Consts[0].Type.String(); got != "list<int>" {
-		t.Errorf("Doubled type = %s, want list<int>", got)
+	if got := m.Consts[0].Type.String(); got != "list<nint>" {
+		t.Errorf("Doubled type = %s, want list<nint>", got)
 	}
 	if got := m.Consts[0].Eval.String(); got != "[2, 4, 6]" {
 		t.Errorf("Doubled eval = %s, want [2, 4, 6]", got)
@@ -593,22 +593,22 @@ func TestBidirectionalCall(t *testing.T) {
 // compile-time evaluation all behave exactly as the block form does, because
 // the arrow normalized to a single return during AST lowering.
 func TestArrowFuncLit(t *testing.T) {
-	m, diags := analyze("const Doubled = [1, 2, 3].map(fn(x) -> x * 2)\nconst Twice: fn(x: int): int = fn(x) -> x * 2\n")
+	m, diags := analyze("const Doubled = [1, 2, 3].map(fn(x) -> x * 2)\nconst Twice: fn(x: nint): nint = fn(x) -> x * 2\n")
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
-	if got := m.Consts[0].Type.String(); got != "list<int>" {
-		t.Errorf("Doubled type = %s, want list<int>", got)
+	if got := m.Consts[0].Type.String(); got != "list<nint>" {
+		t.Errorf("Doubled type = %s, want list<nint>", got)
 	}
 	if got := m.Consts[0].Eval.String(); got != "[2, 4, 6]" {
 		t.Errorf("Doubled eval = %s, want [2, 4, 6]", got)
 	}
-	if got := m.Consts[1].Type.String(); got != "fn(int): int" {
-		t.Errorf("Twice type = %s, want fn(int): int", got)
+	if got := m.Consts[1].Type.String(); got != "fn(nint): nint" {
+		t.Errorf("Twice type = %s, want fn(nint): nint", got)
 	}
 
 	// Body-type errors surface through the arrow form too.
-	if _, diags := analyze("const S: fn(x: int): int = fn(x) -> x == 0\n"); !hasCode(diags, CodeTypeMismatch) {
+	if _, diags := analyze("const S: fn(x: nint): nint = fn(x) -> x == 0\n"); !hasCode(diags, CodeTypeMismatch) {
 		t.Errorf("want type_mismatch, got %v", codes(diags))
 	}
 }
@@ -634,7 +634,7 @@ func TestUninferableParameter(t *testing.T) {
 		t.Errorf("want uninferable_parameter, got %v", codes(diags))
 	}
 	// An annotation that pins it reports nothing.
-	if _, diags := analyze("const A: fn(x: int): int = fn(x) { return x }\n"); len(diags) != 0 {
+	if _, diags := analyze("const A: fn(x: nint): nint = fn(x) { return x }\n"); len(diags) != 0 {
 		t.Errorf("pinned parameter: unexpected diagnostics %v", diags)
 	}
 }
@@ -643,8 +643,8 @@ func TestAnnotatedEmptyCollection(t *testing.T) {
 	// Checking mode gives an empty literal its annotation's type, so it is not
 	// uninferable.
 	for _, src := range []string{
-		"const Empty: list<int> = []\n",
-		"const Empty: map<string, int> = []\n",
+		"const Empty: list<nint> = []\n",
+		"const Empty: map<string, nint> = []\n",
 	} {
 		if _, diags := analyze(src); len(diags) != 0 {
 			t.Errorf("%q: unexpected diagnostics %v", src, diags)
@@ -655,12 +655,12 @@ func TestAnnotatedEmptyCollection(t *testing.T) {
 func TestMethodResultTypeReachesLiteral(t *testing.T) {
 	// The method's declared result type checks a returned literal, so its
 	// lambda parameters infer.
-	src := "pub type T = int8 impl {\n  pub f(): fn(x: int): int {\n    return fn(x) { return x }\n  }\n}\n"
+	src := "pub type T = sbyte impl {\n  pub f(): fn(x: nint): nint {\n    return fn(x) { return x }\n  }\n}\n"
 	if _, diags := analyze(src); len(diags) != 0 {
 		t.Errorf("unexpected diagnostics: %v", diags)
 	}
 	// And a literal that does not satisfy it is reported.
-	bad := "pub type T = int8 impl {\n  pub f(): fn(x: int): int {\n    return fn(x, y) { return x }\n  }\n}\n"
+	bad := "pub type T = sbyte impl {\n  pub f(): fn(x: nint): nint {\n    return fn(x, y) { return x }\n  }\n}\n"
 	if _, diags := analyze(bad); !hasCode(diags, CodeLambdaArityMismatch) {
 		t.Errorf("want lambda_arity_mismatch, got %v", codes(diags))
 	}
@@ -669,12 +669,12 @@ func TestMethodResultTypeReachesLiteral(t *testing.T) {
 func TestFuncLitResultInference(t *testing.T) {
 	// An omitted result type is synthesized from the body's returns; declared
 	// parameter types carry into the body scope.
-	m, diags := analyze("const F = fn(x: int) { return x * 2 }\n")
+	m, diags := analyze("const F = fn(x: nint) { return x * 2 }\n")
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
-	if got := m.Consts[0].Type.String(); got != "fn(int): int" {
-		t.Errorf("F type = %s, want fn(int): int", got)
+	if got := m.Consts[0].Type.String(); got != "fn(nint): nint" {
+		t.Errorf("F type = %s, want fn(nint): nint", got)
 	}
 }
 
@@ -685,15 +685,15 @@ func TestFuncLitBodyDiagnostics(t *testing.T) {
 	}{
 		// An operator error inside the body is reported now that the checking
 		// walk descends into the literal.
-		{"const F = fn(x: int): int { return x && x }\n", CodeInvalidOperation},
+		{"const F = fn(x: nint): nint { return x && x }\n", CodeInvalidOperation},
 		// A return that does not satisfy the declared result type.
-		{"const F = fn(x: int): bool { return x }\n", CodeTypeMismatch},
+		{"const F = fn(x: nint): bool { return x }\n", CodeTypeMismatch},
 		// Conflicting unannotated returns cannot unify.
-		{"const F = fn(x: int) { return 1\n  return true }\n", CodeTypeMismatch},
+		{"const F = fn(x: nint) { return 1\n  return true }\n", CodeTypeMismatch},
 		// No result annotation and no return to infer one from.
 		{"const F = fn() {}\n", CodeUninferableResult},
 		// A division by zero inside the body.
-		{"const F = fn(x: int): int { return x / 0 }\n", CodeDivisionByZero},
+		{"const F = fn(x: nint): nint { return x / 0 }\n", CodeDivisionByZero},
 	}
 	for _, tc := range cases {
 		_, diags := analyze(tc.src)
@@ -704,9 +704,9 @@ func TestFuncLitBodyDiagnostics(t *testing.T) {
 	// A healthy annotated literal — and one whose result is inferred — report
 	// nothing.
 	for _, src := range []string{
-		"const F = fn(x: int): int { return x * 2 }\n",
-		"const F = fn(x: int) { return x % 2 == 0 }\n",
-		"const F = fn(): int {}\n", // the signature is complete without a return
+		"const F = fn(x: nint): nint { return x * 2 }\n",
+		"const F = fn(x: nint) { return x % 2 == 0 }\n",
+		"const F = fn(): nint {}\n", // the signature is complete without a return
 	} {
 		if _, diags := analyze(src); len(diags) != 0 {
 			t.Errorf("%q: unexpected diagnostics %v", src, diags)
@@ -799,7 +799,7 @@ func TestShortCircuitBoolConnectives(t *testing.T) {
 
 func TestAnnotationMismatch(t *testing.T) {
 	for _, src := range []string{
-		"const x: int8 = true\n",
+		"const x: sbyte = true\n",
 		"const x: bool = 1\n",
 		"const x: bool = 1 + 2\n",
 	} {
@@ -809,7 +809,7 @@ func TestAnnotationMismatch(t *testing.T) {
 		}
 	}
 	for _, src := range []string{
-		"const x: int8 = 1 + 2\n",
+		"const x: sbyte = 1 + 2\n",
 		"const x: bool = true && false\n",
 		"const x: bool = 1 < 2\n",
 	} {
@@ -821,9 +821,9 @@ func TestAnnotationMismatch(t *testing.T) {
 
 func TestDiagnosticMessages(t *testing.T) {
 	cases := []struct{ src, code, message string }{
-		{"const x = 1 && 2\n", string(CodeInvalidOperation), "cannot apply method anan to int, int"},
+		{"const x = 1 && 2\n", string(CodeInvalidOperation), "cannot apply method anan to nint, nint"},
 		{"const x = 1 / 0\n", string(CodeDivisionByZero), "division by zero"},
-		{"const x: int8 = true\n", string(CodeTypeMismatch), "cannot use bool as int8"},
+		{"const x: sbyte = true\n", string(CodeTypeMismatch), "cannot use bool as sbyte"},
 	}
 	for _, tc := range cases {
 		_, diags := analyze(tc.src)
@@ -876,7 +876,7 @@ func TestAssertNotBool(t *testing.T) {
 	if got := codes(diags); len(got) != 1 || got[0] != CodeAssertionNotBool {
 		t.Fatalf("codes = %v, want [assertion_not_bool]", got)
 	}
-	if want := "assertion must be a bool; got int"; diags[0].Message != want {
+	if want := "assertion must be a bool; got nint"; diags[0].Message != want {
 		t.Errorf("message = %q, want %q", diags[0].Message, want)
 	}
 }
@@ -909,7 +909,7 @@ func TestAssertNotConstant(t *testing.T) {
 	// compiler cannot verify must not pass silently. A pure but unboundedly
 	// recursive call types as bool yet the folder bottoms out at the depth guard,
 	// so it never reaches a value.
-	src := "fn loopy(n: int): bool {\n  return loopy(n)\n}\nassert loopy(1)\n"
+	src := "fn loopy(n: nint): bool {\n  return loopy(n)\n}\nassert loopy(1)\n"
 	_, diags := analyze(src)
 	if got := codes(diags); len(got) != 1 || got[0] != CodeAssertionNotConstant {
 		t.Fatalf("codes = %v, want [assertion_not_constant]", got)
@@ -931,7 +931,7 @@ func TestAssertNominalMethodFolds(t *testing.T) {
 	// A user-defined method on a nominal type over a primitive folds: the
 	// receiver's static type is read from the constant's annotation (Level), the
 	// method body is evaluated with self bound, and the assertion verifies clean.
-	src := "type Level = int8 impl {\n  increment(): self {\n    return self + 1\n  }\n}\n" +
+	src := "type Level = sbyte impl {\n  increment(): self {\n    return self + 1\n  }\n}\n" +
 		"const L: Level = 50\n" +
 		"assert L.increment() == 51\n"
 	_, diags := analyze(src)
@@ -1004,7 +1004,7 @@ func TestAssertFailedWithDoc(t *testing.T) {
 
 // --- record literals ----------------------------------------------------------
 
-const pointDecl = "pub type Point = { x: int, y: int }\n"
+const pointDecl = "pub type Point = { x: nint, y: nint }\n"
 
 func TestRecordLiteralTypedForm(t *testing.T) {
 	m, diags := analyze(pointDecl + "const O = Point{ x: 1, y: 2 }\n")
@@ -1062,7 +1062,7 @@ func TestRecordLiteralNormalizesFieldOrder(t *testing.T) {
 
 func TestRecordLiteralNested(t *testing.T) {
 	m, diags := analyze(pointDecl +
-		"pub type Item = { id: int, name: string, pos: Point }\n" +
+		"pub type Item = { id: nint, name: string, pos: Point }\n" +
 		"const Sword = Item{ id: 1, name: \"Sword\", pos: { x: 0, y: 0 } }\n")
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", diags)
@@ -1094,8 +1094,8 @@ func TestRecordLiteralDiagnostics(t *testing.T) {
 		{"missing field through annotation", pointDecl + "const C: Point = { x: 1 }\n", CodeMissingField},
 		{"no expectation", "const D = { x: 1, y: 2 }\n", CodeUninferableRecord},
 		{"unknown type name", "const E = Bogus{ x: 1 }\n", CodeUnknownType},
-		{"not a record", "pub type Coin = int8\nconst F = Coin{ x: 1 }\n", CodeNotARecord},
-		{"non-record expectation", "const G: int = { x: 1 }\n", CodeTypeMismatch},
+		{"not a record", "pub type Coin = sbyte\nconst F = Coin{ x: 1 }\n", CodeNotARecord},
+		{"non-record expectation", "const G: nint = { x: 1 }\n", CodeTypeMismatch},
 		{"wrong record type", pointDecl + "pub type Unit = {}\nconst H: Unit = Point{ x: 1, y: 2 }\n", CodeTypeMismatch},
 	}
 	for _, tc := range cases {
@@ -1120,8 +1120,8 @@ func TestRecordFieldRangeChecked(t *testing.T) {
 	// A field value adapts to the field's declared type and is range-checked
 	// against it — with and without an annotation on the constant.
 	for _, src := range []string{
-		"pub type B = { v: int8 }\nconst X = B{ v: 1000 }\n",
-		"pub type B = { v: int8 }\nconst X: B = { v: 1000 }\n",
+		"pub type B = { v: sbyte }\nconst X = B{ v: 1000 }\n",
+		"pub type B = { v: sbyte }\nconst X: B = { v: 1000 }\n",
 	} {
 		_, diags := analyze(src)
 		if got := codes(diags); len(got) != 1 || got[0] != CodeConstantOverflow {
@@ -1161,7 +1161,7 @@ func TestRecordAnnotationFailureSuppressesUninferable(t *testing.T) {
 func TestRecordLiteralInMethodBodyReturn(t *testing.T) {
 	// The method's declared result type reaches an inferred record literal in
 	// a return, through the same checking walk the const path uses.
-	_, diags := analyze("pub type Point = { x: int, y: int } impl {\n" +
+	_, diags := analyze("pub type Point = { x: nint, y: nint } impl {\n" +
 		"  pub origin(): Point {\n    return { x: 0, y: 0 }\n  }\n}\n")
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", diags)
@@ -1170,7 +1170,7 @@ func TestRecordLiteralInMethodBodyReturn(t *testing.T) {
 
 func TestRecordLiteralStructuralAnnotation(t *testing.T) {
 	// A structural record annotation works exactly like a named one.
-	m, diags := analyze("const P: { x: int, y: int } = { x: 1, y: 2 }\n")
+	m, diags := analyze("const P: { x: nint, y: nint } = { x: 1, y: 2 }\n")
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
@@ -1182,18 +1182,18 @@ func TestRecordLiteralStructuralAnnotation(t *testing.T) {
 // --- top-level functions --------------------------------------------------------
 
 func TestFuncDeclAndCall(t *testing.T) {
-	m, diags := analyze("pub fn double(x: int): int -> x * 2\nconst A = double(21)\n")
+	m, diags := analyze("pub fn double(x: nint): nint -> x * 2\nconst A = double(21)\n")
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
 	if len(m.Funcs) != 1 || m.Funcs[0].Name != "double" || !m.Funcs[0].Public {
 		t.Fatalf("funcs = %v, want [pub double]", m.Funcs)
 	}
-	if m.Funcs[0].Result.String() != "int" || len(m.Funcs[0].Params) != 1 {
-		t.Errorf("double signature = %v -> %v, want (x: int): int", m.Funcs[0].Params, m.Funcs[0].Result)
+	if m.Funcs[0].Result.String() != "nint" || len(m.Funcs[0].Params) != 1 {
+		t.Errorf("double signature = %v -> %v, want (x: nint): nint", m.Funcs[0].Params, m.Funcs[0].Result)
 	}
-	if m.Consts[0].Type.String() != "int" {
-		t.Errorf("A type = %s, want int", m.Consts[0].Type)
+	if m.Consts[0].Type.String() != "nint" {
+		t.Errorf("A type = %s, want nint", m.Consts[0].Type)
 	}
 	if ev := m.Consts[0].Eval; ev == nil || ev.Kind != ir.ConstInt || ev.Int.Int64() != 42 {
 		t.Errorf("A eval = %v, want 42", ev)
@@ -1210,14 +1210,14 @@ func TestFuncDiagnostics(t *testing.T) {
 		src  string
 		want diagnostic.Code
 	}{
-		{"result mismatch", "fn f(): int { return \"x\" }\n", CodeTypeMismatch},
-		{"arity", "fn f(x: int): int -> x\nconst A = f(1, 2)\n", CodeArityMismatch},
+		{"result mismatch", "fn f(): nint { return \"x\" }\n", CodeTypeMismatch},
+		{"arity", "fn f(x: nint): nint -> x\nconst A = f(1, 2)\n", CodeArityMismatch},
 		{"undefined", "const X = unknownFn(1)\n", CodeUndefinedName},
-		{"missing return", "fn g(x: int): int { }\n", CodeMissingReturn},
-		{"unknown param type", "fn f(x: Bogus): int -> 1\n", CodeUnknownType},
-		{"duplicate signature", "fn f(): int -> 1\nfn f(): int -> 2\n", CodeDuplicateFuncOverload},
-		{"argument mismatch", "fn f(x: int): int -> x\nconst A = f(\"a\")\n", CodeTypeMismatch},
-		{"function is not a value", "fn f(): int -> 1\nconst A = f\n", CodeUndefinedName},
+		{"missing return", "fn g(x: nint): nint { }\n", CodeMissingReturn},
+		{"unknown param type", "fn f(x: Bogus): nint -> 1\n", CodeUnknownType},
+		{"duplicate signature", "fn f(): nint -> 1\nfn f(): nint -> 2\n", CodeDuplicateFuncOverload},
+		{"argument mismatch", "fn f(x: nint): nint -> x\nconst A = f(\"a\")\n", CodeTypeMismatch},
+		{"function is not a value", "fn f(): nint -> 1\nconst A = f\n", CodeUndefinedName},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -1233,7 +1233,7 @@ func TestFuncArgumentOverflow(t *testing.T) {
 	// The out-of-range argument reports at both boundaries it crosses: the
 	// argument against the parameter's int8, and the folded result against
 	// the call's int8 type.
-	_, diags := analyze("fn f(x: int8): int8 -> x\nconst A = f(1000)\n")
+	_, diags := analyze("fn f(x: sbyte): sbyte -> x\nconst A = f(1000)\n")
 	got := codes(diags)
 	if len(got) != 2 || got[0] != CodeConstantOverflow || got[1] != CodeConstantOverflow {
 		t.Fatalf("codes = %v, want two constant_overflow", got)
@@ -1243,11 +1243,11 @@ func TestFuncArgumentOverflow(t *testing.T) {
 func TestFuncMissingReturnNotForArrowOrMissingBody(t *testing.T) {
 	// An arrow body always returns; a missing body is the parser's report,
 	// not a missing return on top.
-	_, diags := analyze("fn f(): int -> 1\n")
+	_, diags := analyze("fn f(): nint -> 1\n")
 	if len(diags) != 0 {
 		t.Fatalf("arrow body: unexpected diagnostics: %v", diags)
 	}
-	m, diags := analyze("fn f(): int\n")
+	m, diags := analyze("fn f(): nint\n")
 	_ = m
 	for _, d := range diags {
 		if d.Code == CodeMissingReturn {
@@ -1259,12 +1259,12 @@ func TestFuncMissingReturnNotForArrowOrMissingBody(t *testing.T) {
 func TestFuncRecursionGuard(t *testing.T) {
 	// Infinite recursion folds to nothing — the depth guard, not a stack
 	// overflow — and is not a type error (the result type is declared).
-	m, diags := analyze("fn loop(x: int): int -> loop(x)\nconst X = loop(1)\n")
+	m, diags := analyze("fn loop(x: nint): nint -> loop(x)\nconst X = loop(1)\n")
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
-	if m.Consts[0].Type.String() != "int" {
-		t.Errorf("X type = %s, want int", m.Consts[0].Type)
+	if m.Consts[0].Type.String() != "nint" {
+		t.Errorf("X type = %s, want nint", m.Consts[0].Type)
 	}
 	if m.Consts[0].Eval != nil {
 		t.Errorf("X eval = %v, want unevaluated", m.Consts[0].Eval)
@@ -1272,8 +1272,8 @@ func TestFuncRecursionGuard(t *testing.T) {
 }
 
 func TestFuncCalledFromMethodBody(t *testing.T) {
-	src := "fn double(x: int): int -> x * 2\n" +
-		"pub type T = int8 impl {\n  pub f(): int {\n    return double(3)\n  }\n}\n"
+	src := "fn double(x: nint): nint -> x * 2\n" +
+		"pub type T = sbyte impl {\n  pub f(): nint {\n    return double(3)\n  }\n}\n"
 	m, diags := analyze(src)
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", diags)
@@ -1291,7 +1291,7 @@ func TestFuncCalledFromMethodBody(t *testing.T) {
 }
 
 func TestFuncCalledFromLambda(t *testing.T) {
-	m, diags := analyze("fn double(x: int): int -> x * 2\nconst D = [1, 2].map(fn(x) -> double(x))\n")
+	m, diags := analyze("fn double(x: nint): nint -> x * 2\nconst D = [1, 2].map(fn(x) -> double(x))\n")
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
@@ -1303,7 +1303,7 @@ func TestFuncCalledFromLambda(t *testing.T) {
 func TestLambdaParamShadowsFunc(t *testing.T) {
 	// A literal's parameter named like a function shadows it: the body's f is
 	// the int element, not the function.
-	m, diags := analyze("fn f(x: int): int -> x\nconst A = [1].map(fn(f) -> f + 1)\n")
+	m, diags := analyze("fn f(x: nint): nint -> x\nconst A = [1].map(fn(f) -> f + 1)\n")
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
@@ -1314,7 +1314,7 @@ func TestLambdaParamShadowsFunc(t *testing.T) {
 
 func TestFuncMutualRecursionGuard(t *testing.T) {
 	// Mutual recursion through two functions bottoms out at the depth guard.
-	src := "fn a(x: int): int -> b(x)\nfn b(x: int): int -> a(x)\nconst X = a(1)\n"
+	src := "fn a(x: nint): nint -> b(x)\nfn b(x: nint): nint -> a(x)\nconst X = a(1)\n"
 	m, diags := analyze(src)
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", diags)
@@ -1325,7 +1325,7 @@ func TestFuncMutualRecursionGuard(t *testing.T) {
 }
 
 func TestFuncInAssert(t *testing.T) {
-	m, diags := analyze("fn area(w: int, h: int): int -> w * h\nassert area(3, 4) == 12\n")
+	m, diags := analyze("fn area(w: nint, h: nint): nint -> w * h\nassert area(3, 4) == 12\n")
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
@@ -1339,9 +1339,9 @@ func TestSelfOutsideMethod(t *testing.T) {
 		name string
 		src  string
 	}{
-		{"function arrow body", "fn f(): int -> self + 1\n"},
-		{"function block body", "fn f(): int { return self }\n"},
-		{"lambda in function body", "fn f(): list<int> -> [1].map(fn(x) -> self)\n"},
+		{"function arrow body", "fn f(): nint -> self + 1\n"},
+		{"function block body", "fn f(): nint { return self }\n"},
+		{"lambda in function body", "fn f(): list<nint> -> [1].map(fn(x) -> self)\n"},
 		{"const initializer", "const A = self\n"},
 		{"lambda in const initializer", "const A = [1].map(fn(x) -> self)\n"},
 		{"assert condition", "assert self == 1\n"},
@@ -1364,8 +1364,8 @@ func TestSelfOutsideMethod(t *testing.T) {
 
 func TestSelfAllowedInMethodAndWhere(t *testing.T) {
 	// A method body and a where clause have a receiver: self stays legal.
-	src := "type Port = int32 where self >= 1\n" +
-		"pub type L = int8 impl {\n  pub double(): int8 {\n    return self * 2\n  }\n}\n"
+	src := "type Port = int where self >= 1\n" +
+		"pub type L = sbyte impl {\n  pub double(): sbyte {\n    return self * 2\n  }\n}\n"
 	_, diags := analyze(src)
 	for _, d := range diags {
 		if d.Code == CodeSelfOutsideMethod {
@@ -1379,14 +1379,14 @@ func TestSelfAllowedInMethodAndWhere(t *testing.T) {
 func TestFuncOverloadSelection(t *testing.T) {
 	// Same name, different parameter kinds: the argument type selects the
 	// overload, in typing and in folding.
-	src := "fn f(x: int): int -> 1\nfn f(x: string): int -> 2\n" +
+	src := "fn f(x: nint): nint -> 1\nfn f(x: string): nint -> 2\n" +
 		"const A = f(9)\nconst B = f(\"a\")\n"
 	m, diags := analyze(src)
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
 	if got := m.Consts[0].Eval.String(); got != "1" {
-		t.Errorf("A eval = %s, want 1 (the int overload)", got)
+		t.Errorf("A eval = %s, want 1 (the nint overload)", got)
 	}
 	if got := m.Consts[1].Eval.String(); got != "2" {
 		t.Errorf("B eval = %s, want 2 (the string overload)", got)
@@ -1397,7 +1397,7 @@ func TestFuncOverloadSelection(t *testing.T) {
 }
 
 func TestFuncOverloadByArity(t *testing.T) {
-	src := "fn f(): int -> 0\nfn f(x: int): int -> x\nconst A = f()\nconst B = f(7)\n"
+	src := "fn f(): nint -> 0\nfn f(x: nint): nint -> x\nconst A = f()\nconst B = f(7)\n"
 	m, diags := analyze(src)
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", diags)
@@ -1408,7 +1408,7 @@ func TestFuncOverloadByArity(t *testing.T) {
 }
 
 func TestFuncOverloadDiagnostics(t *testing.T) {
-	overloads := "fn f(x: int): int -> 1\nfn f(x: string): int -> 2\n"
+	overloads := "fn f(x: nint): nint -> 1\nfn f(x: string): nint -> 2\n"
 	cases := []struct {
 		name string
 		src  string
@@ -1416,7 +1416,7 @@ func TestFuncOverloadDiagnostics(t *testing.T) {
 	}{
 		{"no match", overloads + "const A = f(true)\n", CodeNoMatchingFuncOverload},
 		{"no match by arity", overloads + "const A = f(1, 2)\n", CodeNoMatchingFuncOverload},
-		{"ambiguous", "fn g(x: int8): int -> 1\nfn g(x: int32): int -> 2\nconst A = g(1)\n", CodeAmbiguousFuncOverload},
+		{"ambiguous", "fn g(x: sbyte): nint -> 1\nfn g(x: int): nint -> 2\nconst A = g(1)\n", CodeAmbiguousFuncOverload},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -1431,14 +1431,14 @@ func TestFuncOverloadDiagnostics(t *testing.T) {
 func TestFuncOverloadAnnotatedArgSelects(t *testing.T) {
 	// A concretely typed argument disambiguates same-kind overloads in
 	// typing; the type-blind fold stays conservative and does not pick.
-	src := "fn g(x: int8): int -> 1\nfn g(x: int32): int -> 2\n" +
-		"const B: int8 = 1\nconst A = g(B)\n"
+	src := "fn g(x: sbyte): nint -> 1\nfn g(x: int): nint -> 2\n" +
+		"const B: sbyte = 1\nconst A = g(B)\n"
 	m, diags := analyze(src)
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
-	if m.Consts[1].Type.String() != "int" {
-		t.Errorf("A type = %s, want int", m.Consts[1].Type)
+	if m.Consts[1].Type.String() != "nint" {
+		t.Errorf("A type = %s, want nint", m.Consts[1].Type)
 	}
 	if m.Consts[1].Eval != nil {
 		t.Errorf("A eval = %v, want unevaluated (kind-blind fold stays conservative)", m.Consts[1].Eval)
@@ -1448,9 +1448,9 @@ func TestFuncOverloadAnnotatedArgSelects(t *testing.T) {
 func TestFuncOverloadRecordArgDefers(t *testing.T) {
 	// An inferred record literal cannot select an overload; a typed one and
 	// the other arguments do, and the winner's parameter reaches into it.
-	src := "pub type Point = { x: int, y: int }\n" +
-		"fn f(p: Point, tag: int): int -> tag\n" +
-		"fn f(p: Point, tag: string): int -> 9\n" +
+	src := "pub type Point = { x: nint, y: nint }\n" +
+		"fn f(p: Point, tag: nint): nint -> tag\n" +
+		"fn f(p: Point, tag: string): nint -> 9\n" +
 		"const A = f({ x: 1, y: 2 }, 5)\n"
 	m, diags := analyze(src)
 	if len(diags) != 0 {
@@ -1499,8 +1499,8 @@ func TestErrorConversionTypeChecks(t *testing.T) {
 func TestErrorFlowsIntoUnion(t *testing.T) {
 	// A fallible function returns its failure as a union member, and the
 	// union-typed result flows into a matching annotation.
-	src := "pub fn parse(s: string): int8 | error -> error(s)\n" +
-		"const P: int8 | error = parse(\"no\")\n"
+	src := "pub fn parse(s: string): sbyte | error -> error(s)\n" +
+		"const P: sbyte | error = parse(\"no\")\n"
 	m, diags := analyze(src)
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", diags)
@@ -1509,8 +1509,8 @@ func TestErrorFlowsIntoUnion(t *testing.T) {
 		t.Errorf("P eval = %s, want error(\"no\")", got)
 	}
 	// A non-member initializer still mismatches.
-	if _, diags := analyze("const X: int8 | error = \"no\"\n"); !hasCode(diags, CodeTypeMismatch) {
-		t.Errorf("string into int8 | error: want type_mismatch, got %v", codes(diags))
+	if _, diags := analyze("const X: sbyte | error = \"no\"\n"); !hasCode(diags, CodeTypeMismatch) {
+		t.Errorf("string into sbyte | error: want type_mismatch, got %v", codes(diags))
 	}
 }
 
@@ -1544,8 +1544,8 @@ func TestMissingEffect(t *testing.T) {
 	}
 
 	// await outside an async declaration is itself a missing async.
-	src = "extern fn nondet roll(): int\n" +
-		"pub fn nondet f(): int {\n" +
+	src = "extern fn nondet roll(): nint\n" +
+		"pub fn nondet f(): nint {\n" +
 		"  return await roll()\n" +
 		"}\n"
 	if _, diags := analyze(src); !hasCode(diags, CodeMissingEffect) {
@@ -1569,7 +1569,7 @@ func TestMissingEffectOnMethod(t *testing.T) {
 func TestUnusedEffect(t *testing.T) {
 	// A declared effect the body never uses is a warning; an extern's
 	// effects are roots and never flagged.
-	_, diags := analyze("pub fn io f(): int -> 1\n")
+	_, diags := analyze("pub fn io f(): nint -> 1\n")
 	if !hasCode(diags, CodeUnusedEffect) {
 		t.Fatalf("want unused_effect, got %v", codes(diags))
 	}
@@ -1581,8 +1581,8 @@ func TestUnusedEffect(t *testing.T) {
 func TestEffectPropagatesThroughLambda(t *testing.T) {
 	// A literal's body executes where it is applied, so its effect uses
 	// count toward the enclosing declaration.
-	src := "extern fn nondet roll(): int\n" +
-		"pub fn f(): int {\n" +
+	src := "extern fn nondet roll(): nint\n" +
+		"pub fn f(): nint {\n" +
 		"  return [1].map(fn(x) -> x + roll()).count()\n" +
 		"}\n"
 	_, diags := analyze(src)
@@ -1594,7 +1594,7 @@ func TestEffectPropagatesThroughLambda(t *testing.T) {
 func TestEffectInPureContext(t *testing.T) {
 	// A compile-time position — a constant initializer, an assert condition —
 	// must be pure: an effectful call (or an await) cannot appear in it.
-	roots := "extern fn nondet roll(): int\nextern fn io async fetch(url: string): string\n"
+	roots := "extern fn nondet roll(): nint\nextern fn io async fetch(url: string): string\n"
 	for _, src := range []string{
 		roots + "const T = roll()\n",
 		roots + "const U = roll() + 1\n",
@@ -1606,7 +1606,7 @@ func TestEffectInPureContext(t *testing.T) {
 		}
 	}
 	// A pure call stays allowed.
-	if _, diags := analyze("fn one(): int -> 1\nconst A = one()\n"); hasCode(diags, CodeEffectInPureContext) {
+	if _, diags := analyze("fn one(): nint -> 1\nconst A = one()\n"); hasCode(diags, CodeEffectInPureContext) {
 		t.Errorf("pure call flagged: %v", codes(diags))
 	}
 }
@@ -1617,7 +1617,7 @@ func TestEffectInTernaryBranch(t *testing.T) {
 	// declaration's effects, exactly as one in a return value does. Before
 	// collectEffectUses handled TernaryExpr, the branch was never visited, so
 	// the effect slipped past both completeness checks.
-	roots := "extern fn nondet roll(): int\n"
+	roots := "extern fn nondet roll(): nint\n"
 
 	// missing_effect: an undeclared effect in a ternary branch of a function body.
 	for _, body := range []string{
@@ -1625,7 +1625,7 @@ func TestEffectInTernaryBranch(t *testing.T) {
 		"return flag ? 0 : roll()",
 		"return (roll() == 1) ? 0 : 0", // the condition counts too
 	} {
-		src := roots + "pub fn f(flag: bool): int {\n  " + body + "\n}\n"
+		src := roots + "pub fn f(flag: bool): nint {\n  " + body + "\n}\n"
 		if _, diags := analyze(src); !hasCode(diags, CodeMissingEffect) {
 			t.Errorf("%q: want missing_effect for an effect in a ternary, got %v", body, codes(diags))
 		}
@@ -1648,7 +1648,7 @@ func TestEffectfulFunctionNeverFolds(t *testing.T) {
 	// Only a pure function folds to a value; an effectful one compiles to
 	// runtime code, so a const referencing it gets no value (and the pure
 	// check reports the position).
-	src := "pub fn nondet f(): int -> 1\nconst A = f()\n"
+	src := "pub fn nondet f(): nint -> 1\nconst A = f()\n"
 	m, diags := analyze(src)
 	if !hasCode(diags, CodeEffectInPureContext) {
 		t.Fatalf("want effect_in_pure_context, got %v", codes(diags))
@@ -1657,7 +1657,7 @@ func TestEffectfulFunctionNeverFolds(t *testing.T) {
 		t.Errorf("A eval = %s, want unevaluated", m.Consts[0].Eval)
 	}
 	// The pure twin folds as ever.
-	m, _ = analyze("pub fn g(): int -> 1\nconst A = g()\n")
+	m, _ = analyze("pub fn g(): nint -> 1\nconst A = g()\n")
 	if m.Consts[0].Eval.String() != "1" {
 		t.Errorf("pure call eval = %s, want 1", m.Consts[0].Eval)
 	}

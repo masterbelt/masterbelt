@@ -1,4 +1,4 @@
-use { int } from "./int.belt"
+use { nint } from "./signed.belt"
 use { foldable } from "./collection.belt"
 
 /// A half-open sequence of integers, constructed with range(start, end): the
@@ -8,14 +8,14 @@ use { foldable } from "./collection.belt"
 /// the value — and is not a stored collection: its bounds are kept lazily, so a
 /// wide range costs nothing until it is walked.
 ///
-/// range impls foldable<int, int>, so it iterates with for and carries the whole
+/// range impls foldable<nint, nint>, so it iterates with for and carries the whole
 /// provided method set (count, any, all, map, filter, keys, values) for free.
 /// Its key is the 0-based position — like a list's index — and its value is the
 /// element, so for...of binds the element and for...in binds the position; the
 /// K/V semantics are list's exactly.
-pub type range = builtin impl foldable<int, int> {
+pub type range = builtin impl foldable<nint, nint> {
   /// The required primitive: visit each element in order with its 0-based
   /// position as the key, threading the accumulator. The provided
   /// count/any/all/map/filter/keys/values are defined on top of this.
-  pub extern fn fold(init: A, step: fn(acc: A, key: int, value: int): A): A
+  pub extern fn fold(init: A, step: fn(acc: A, key: nint, value: nint): A): A
 }

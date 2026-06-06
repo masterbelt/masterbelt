@@ -13,7 +13,7 @@ import (
 
 func TestCheckFuncLitBody(t *testing.T) {
 	env := emptyEnv()
-	x := param("x", namedType("int"))
+	x := param("x", namedType("nint"))
 
 	// An operator error inside the body is reported.
 	var r1 report
@@ -25,15 +25,15 @@ func TestCheckFuncLitBody(t *testing.T) {
 	// A return that does not satisfy the declared result is a mismatch.
 	var r2 report
 	Check(funcLit([]*ast.ParamDef{x}, namedType("bool"), ret(ident("x"))), env, r2.sink())
-	if len(r2.mismatches) != 1 || r2.mismatches[0] != "int -> bool" {
-		t.Errorf("return mismatch: %v, want [int -> bool]", r2.mismatches)
+	if len(r2.mismatches) != 1 || r2.mismatches[0] != "nint -> bool" {
+		t.Errorf("return mismatch: %v, want [nint -> bool]", r2.mismatches)
 	}
 
 	// Conflicting unannotated returns are reported at the later return.
 	var r3 report
 	Check(funcLit([]*ast.ParamDef{x}, nil, ret(intLit("1")), ret(boolLit(true))), env, r3.sink())
-	if len(r3.mismatches) != 1 || r3.mismatches[0] != "bool -> int" {
-		t.Errorf("conflicting returns: %v, want [bool -> int]", r3.mismatches)
+	if len(r3.mismatches) != 1 || r3.mismatches[0] != "bool -> nint" {
+		t.Errorf("conflicting returns: %v, want [bool -> nint]", r3.mismatches)
 	}
 
 	// No annotation and no return: the result is uninferable.
@@ -46,8 +46,8 @@ func TestCheckFuncLitBody(t *testing.T) {
 	// A declared result with no return is not uninferable (the signature is
 	// complete), and a healthy body reports nothing at all.
 	var r5 report
-	Check(funcLit([]*ast.ParamDef{x}, namedType("int")), env, r5.sink())
-	Check(funcLit([]*ast.ParamDef{x}, namedType("int"), ret(ident("x"))), env, r5.sink())
+	Check(funcLit([]*ast.ParamDef{x}, namedType("nint")), env, r5.sink())
+	Check(funcLit([]*ast.ParamDef{x}, namedType("nint"), ret(ident("x"))), env, r5.sink())
 	if r5.uninferables != 0 || len(r5.mismatches) != 0 || len(r5.methods) != 0 {
 		t.Errorf("healthy literals reported %v %v %d", r5.methods, r5.mismatches, r5.uninferables)
 	}
@@ -55,14 +55,14 @@ func TestCheckFuncLitBody(t *testing.T) {
 	// An invalid return value (an unresolved name) is not re-reported as a
 	// mismatch — the undefined reference is some other check's finding.
 	var r6 report
-	Check(funcLit([]*ast.ParamDef{x}, namedType("int"), ret(ident("missing"))), env, r6.sink())
+	Check(funcLit([]*ast.ParamDef{x}, namedType("nint"), ret(ident("missing"))), env, r6.sink())
 	if len(r6.mismatches) != 0 {
 		t.Errorf("invalid return re-reported: %v", r6.mismatches)
 	}
 
 	// A bare expression statement's operator error is reported too.
 	var r7 report
-	Check(funcLit([]*ast.ParamDef{x}, namedType("int"),
+	Check(funcLit([]*ast.ParamDef{x}, namedType("nint"),
 		ast.NewExprStmt(binary(ident("x"), "anan", ident("x")), nil),
 		ret(ident("x")),
 	), env, r7.sink())
@@ -73,7 +73,7 @@ func TestCheckFuncLitBody(t *testing.T) {
 	// An error inside a nested literal's body surfaces through the outer walk,
 	// and only once.
 	var r8 report
-	inner := funcLit([]*ast.ParamDef{param("y", namedType("int"))}, nil,
+	inner := funcLit([]*ast.ParamDef{param("y", namedType("nint"))}, nil,
 		ret(binary(ident("y"), "anan", intLit("1"))))
 	Check(funcLit([]*ast.ParamDef{x}, nil, ret(inner)), env, r8.sink())
 	if len(r8.methods) != 1 || r8.methods[0] != "anan" {
@@ -93,8 +93,8 @@ func TestCheckFuncLitStatementBody(t *testing.T) {
 
 	// 1. A type error in a let initializer inside a lambda body is reported.
 	var r1 report
-	lit1 := funcLit([]*ast.ParamDef{param("acc", namedType("int")), param("value", namedType("int"))},
-		namedType("int"),
+	lit1 := funcLit([]*ast.ParamDef{param("acc", namedType("nint")), param("value", namedType("nint"))},
+		namedType("nint"),
 		letStmt("bump", nil, binary(stringLit("str"), "add", intLit("1"))),
 		ret(binary(ident("acc"), "add", ident("value"))),
 	)
@@ -106,12 +106,12 @@ func TestCheckFuncLitStatementBody(t *testing.T) {
 	// 2. A let local is in scope for the statements after it; a return that uses
 	// it is checked against the result, and unifies for synthesis.
 	var r2 report
-	lit2 := funcLit([]*ast.ParamDef{param("value", namedType("int"))}, nil,
+	lit2 := funcLit([]*ast.ParamDef{param("value", namedType("nint"))}, nil,
 		letStmt("bump", nil, binary(ident("value"), "add", intLit("1"))),
 		ret(ident("bump")),
 	)
-	if got := Check(lit2, env, r2.sink()).String(); got != "fn(int): int" {
-		t.Errorf("let local in scope: Check = %s, want fn(int): int", got)
+	if got := Check(lit2, env, r2.sink()).String(); got != "fn(nint): nint" {
+		t.Errorf("let local in scope: Check = %s, want fn(nint): nint", got)
 	}
 	if r2.uninferables != 0 || len(r2.methods) != 0 || len(r2.mismatches) != 0 {
 		t.Errorf("healthy let body reported %v %v %d", r2.methods, r2.mismatches, r2.uninferables)
@@ -120,12 +120,12 @@ func TestCheckFuncLitStatementBody(t *testing.T) {
 	// 3. A return nested inside an if drives result synthesis: it must not be
 	// reported as uninferable, and its type is the lambda's result.
 	var r3 report
-	lit3 := funcLit([]*ast.ParamDef{param("v", namedType("int"))}, nil,
+	lit3 := funcLit([]*ast.ParamDef{param("v", namedType("nint"))}, nil,
 		ifStmt(binary(ident("v"), "gt", intLit("0")),
 			[]ast.Stmt{ret(binary(ident("v"), "add", intLit("1")))}, nil, nil),
 	)
-	if got := Check(lit3, env, r3.sink()).String(); got != "fn(int): int" {
-		t.Errorf("nested return synthesis: Check = %s, want fn(int): int", got)
+	if got := Check(lit3, env, r3.sink()).String(); got != "fn(nint): nint" {
+		t.Errorf("nested return synthesis: Check = %s, want fn(nint): nint", got)
 	}
 	if r3.uninferables != 0 {
 		t.Errorf("nested return falsely uninferable %d times", r3.uninferables)
@@ -133,19 +133,19 @@ func TestCheckFuncLitStatementBody(t *testing.T) {
 
 	// 4. A return nested inside an if is checked against the declared result.
 	var r4 report
-	lit4 := funcLit([]*ast.ParamDef{param("v", namedType("int"))}, namedType("int"),
+	lit4 := funcLit([]*ast.ParamDef{param("v", namedType("nint"))}, namedType("nint"),
 		ifStmt(binary(ident("v"), "gt", intLit("0")),
 			[]ast.Stmt{ret(stringLit("oops"))}, nil, nil),
 		ret(ident("v")),
 	)
 	Check(lit4, env, r4.sink())
-	if len(r4.mismatches) != 1 || r4.mismatches[0] != "string -> int" {
-		t.Errorf("nested return mismatch: %v, want [string -> int]", r4.mismatches)
+	if len(r4.mismatches) != 1 || r4.mismatches[0] != "string -> nint" {
+		t.Errorf("nested return mismatch: %v, want [string -> nint]", r4.mismatches)
 	}
 
 	// 5. An operator error in an if condition is reported.
 	var r5 report
-	lit5 := funcLit([]*ast.ParamDef{param("v", namedType("int"))}, namedType("int"),
+	lit5 := funcLit([]*ast.ParamDef{param("v", namedType("nint"))}, namedType("nint"),
 		ifStmt(binary(ident("v"), "anan", intLit("1")),
 			[]ast.Stmt{ret(ident("v"))}, nil, nil),
 		ret(ident("v")),
@@ -158,7 +158,7 @@ func TestCheckFuncLitStatementBody(t *testing.T) {
 	// 6. An assignment value's error is reported, and an assignment to a let
 	// local does not disturb result inference.
 	var r6 report
-	lit6 := funcLit([]*ast.ParamDef{param("v", namedType("int"))}, namedType("int"),
+	lit6 := funcLit([]*ast.ParamDef{param("v", namedType("nint"))}, namedType("nint"),
 		letStmt("acc", nil, intLit("0")),
 		assignStmtT(ident("acc"), binary(stringLit("x"), "add", intLit("1"))),
 		ret(ident("v")),
@@ -184,51 +184,51 @@ func TestCheckAgainst(t *testing.T) {
 		mismatches []string // expected Mismatch reports, "got -> want"
 	}{
 		// Synthesis + subsumption.
-		{"int adapts", intLit("1"), builtinT("int8"), "int", nil},
+		{"nint adapts", intLit("1"), builtinT("sbyte"), "nint", nil},
 		{"same type", boolLit(true), builtinT("bool"), "bool", nil},
-		{"scalar mismatch", intLit("1"), builtinT("bool"), "int", []string{"int -> bool"}},
+		{"scalar mismatch", intLit("1"), builtinT("bool"), "nint", []string{"nint -> bool"}},
 		// Collection literals: the annotation reaches each entry.
-		{"list adapts", listLit(intLit("1"), intLit("2")), nil, "list<int8>", nil},
-		{"list entry mismatch", listLit(intLit("1"), boolLit(true)), nil, "list<int8>", []string{"bool -> int8"}},
-		{"empty list takes want", listLit(), nil, "list<int8>", nil},
-		{"non-collection want", listLit(intLit("1")), builtinT("int"), "list<int>", []string{"list<int> -> int"}},
+		{"list adapts", listLit(intLit("1"), intLit("2")), nil, "list<sbyte>", nil},
+		{"list entry mismatch", listLit(intLit("1"), boolLit(true)), nil, "list<sbyte>", []string{"bool -> sbyte"}},
+		{"empty list takes want", listLit(), nil, "list<sbyte>", nil},
+		{"non-collection want", listLit(intLit("1")), builtinT("nint"), "list<nint>", []string{"list<nint> -> nint"}},
 		// Function literals: the expectation fills in what the literal omits.
 		{
 			"params and result pushed",
 			funcLit([]*ast.ParamDef{param("x", nil)}, nil, ret(binary(ident("x"), "mul", intLit("2")))),
-			fnT(builtinT("int"), builtinT("int")),
-			"fn(int): int", nil,
+			fnT(builtinT("nint"), builtinT("nint")),
+			"fn(nint): nint", nil,
 		},
 		{
 			"annotation agrees and wins",
-			funcLit([]*ast.ParamDef{param("x", namedType("int"))}, nil, ret(binary(ident("x"), "mul", intLit("3")))),
-			fnT(builtinT("int"), builtinT("int")),
-			"fn(int): int", nil,
+			funcLit([]*ast.ParamDef{param("x", namedType("nint"))}, nil, ret(binary(ident("x"), "mul", intLit("3")))),
+			fnT(builtinT("nint"), builtinT("nint")),
+			"fn(nint): nint", nil,
 		},
 		{
 			"annotation conflicts",
 			funcLit([]*ast.ParamDef{param("x", namedType("string"))}, nil, ret(ident("x"))),
-			fnT(builtinT("int"), builtinT("int")),
-			"fn(string): int", []string{"string -> int", "string -> int"}, // the parameter and its return
+			fnT(builtinT("nint"), builtinT("nint")),
+			"fn(string): nint", []string{"string -> nint", "string -> nint"}, // the parameter and its return
 		},
 		{
 			"result annotation conflicts",
-			funcLit([]*ast.ParamDef{param("x", namedType("int"))}, namedType("string"), ret(stringLit("s"))),
-			fnT(builtinT("int"), builtinT("int")),
-			"fn(int): string", []string{"string -> int"},
+			funcLit([]*ast.ParamDef{param("x", namedType("nint"))}, namedType("string"), ret(stringLit("s"))),
+			fnT(builtinT("nint"), builtinT("nint")),
+			"fn(nint): string", []string{"string -> nint"},
 		},
 		{
 			"non-function want",
-			funcLit(nil, namedType("int"), ret(intLit("1"))),
-			builtinT("int"),
-			"fn(): int", []string{"fn(): int -> int"},
+			funcLit(nil, namedType("nint"), ret(intLit("1"))),
+			builtinT("nint"),
+			"fn(): nint", []string{"fn(): nint -> nint"},
 		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			want := tc.want
 			if want == nil {
-				want = listT(t, env, builtinT("int8"))
+				want = listT(t, env, builtinT("sbyte"))
 			}
 			var r report
 			got := CheckAgainst(tc.expr, want, env, r.sink())
@@ -249,32 +249,32 @@ func TestCheckAgainst(t *testing.T) {
 
 func TestCheckAgainstMapLiteral(t *testing.T) {
 	env := collectionEnv()
-	want := mapT(t, env, builtinT("string"), builtinT("int8"))
+	want := mapT(t, env, builtinT("string"), builtinT("sbyte"))
 
 	var r report
 	got := CheckAgainst(mapLit([2]ast.Expr{stringLit("a"), intLit("1")}), want, env, r.sink())
-	if got.String() != "map<string, int8>" || len(r.mismatches) != 0 {
-		t.Errorf("map literal = %s (mismatches %v), want map<string, int8>", got, r.mismatches)
+	if got.String() != "map<string, sbyte>" || len(r.mismatches) != 0 {
+		t.Errorf("map literal = %s (mismatches %v), want map<string, sbyte>", got, r.mismatches)
 	}
 
 	// A key of the wrong type is reported at the key.
 	var r2 report
 	CheckAgainst(mapLit([2]ast.Expr{intLit("1"), intLit("2")}), want, env, r2.sink())
-	if len(r2.mismatches) != 1 || r2.mismatches[0] != "int -> string" {
-		t.Errorf("map key mismatch = %v, want [int -> string]", r2.mismatches)
+	if len(r2.mismatches) != 1 || r2.mismatches[0] != "nint -> string" {
+		t.Errorf("map key mismatch = %v, want [nint -> string]", r2.mismatches)
 	}
 
 	// A map literal under a list expectation is a shape mismatch.
 	var r3 report
-	CheckAgainst(mapLit([2]ast.Expr{stringLit("a"), intLit("1")}), listT(t, env, builtinT("int")), env, r3.sink())
-	if len(r3.mismatches) != 1 || r3.mismatches[0] != "map<string, int> -> list<int>" {
+	CheckAgainst(mapLit([2]ast.Expr{stringLit("a"), intLit("1")}), listT(t, env, builtinT("nint")), env, r3.sink())
+	if len(r3.mismatches) != 1 || r3.mismatches[0] != "map<string, nint> -> list<nint>" {
 		t.Errorf("shape mismatch = %v", r3.mismatches)
 	}
 }
 
 func TestCheckAgainstArityAndInference(t *testing.T) {
 	env := emptyEnv()
-	intT := builtinT("int")
+	intT := builtinT("nint")
 
 	// Too many parameters: reported, the type is Invalid.
 	var r report
@@ -293,8 +293,8 @@ func TestCheckAgainstArityAndInference(t *testing.T) {
 	got = CheckAgainst(
 		funcLit([]*ast.ParamDef{param("x", nil)}, nil, ret(ident("x"))),
 		fnT(intT, &ir.TypeVar{Name: "T"}), env, r2.sink())
-	if got.String() != "fn(invalid): int" {
-		t.Errorf("uninferable parameter type = %s, want fn(invalid): int", got)
+	if got.String() != "fn(invalid): nint" {
+		t.Errorf("uninferable parameter type = %s, want fn(invalid): nint", got)
 	}
 	if len(r2.uninferableParams) != 1 || r2.uninferableParams[0] != "x" {
 		t.Errorf("uninferable params = %v, want [x]", r2.uninferableParams)
@@ -306,8 +306,8 @@ func TestCheckAgainstArityAndInference(t *testing.T) {
 	got = checkType(
 		funcLit([]*ast.ParamDef{param("x", nil)}, nil, ret(binary(ident("x"), "lt", intLit("0")))),
 		fnT(&ir.TypeVar{Name: "R"}, intT), constScope{env}, subst, r3.sink())
-	if got.String() != "fn(int): bool" {
-		t.Errorf("solved literal = %s, want fn(int): bool", got)
+	if got.String() != "fn(nint): bool" {
+		t.Errorf("solved literal = %s, want fn(nint): bool", got)
 	}
 	if subst["R"] == nil || subst["R"].String() != "bool" {
 		t.Errorf("subst[R] = %v, want bool", subst["R"])
@@ -321,8 +321,8 @@ func TestCheckAgainstArityAndInference(t *testing.T) {
 	got = checkType(
 		funcLit([]*ast.ParamDef{param("x", nil)}, nil),
 		fnT(&ir.TypeVar{Name: "R"}, intT), constScope{env}, map[string]ir.Type{}, r4.sink())
-	if got.String() != "fn(int): invalid" {
-		t.Errorf("unsolved literal = %s, want fn(int): invalid", got)
+	if got.String() != "fn(nint): invalid" {
+		t.Errorf("unsolved literal = %s, want fn(nint): invalid", got)
 	}
 	if r4.uninferables != 1 {
 		t.Errorf("uninferable result reported %d times, want 1", r4.uninferables)
@@ -331,13 +331,13 @@ func TestCheckAgainstArityAndInference(t *testing.T) {
 
 func TestCheckAgainstNested(t *testing.T) {
 	env := collectionEnv()
-	intT := builtinT("int")
+	intT := builtinT("nint")
 
 	// The expectation reaches a literal nested in a collection...
 	var r report
 	want := listT(t, env, fnT(intT, intT))
 	got := CheckAgainst(listLit(funcLit([]*ast.ParamDef{param("x", nil)}, nil, ret(ident("x")))), want, env, r.sink())
-	if got.String() != "list<fn(int): int>" || len(r.mismatches) != 0 {
+	if got.String() != "list<fn(nint): nint>" || len(r.mismatches) != 0 {
 		t.Errorf("nested in list = %s (mismatches %v)", got, r.mismatches)
 	}
 
@@ -345,7 +345,7 @@ func TestCheckAgainstNested(t *testing.T) {
 	var r2 report
 	outer := funcLit(nil, nil, ret(funcLit([]*ast.ParamDef{param("x", nil)}, nil, ret(ident("x")))))
 	got = CheckAgainst(outer, fnT(fnT(intT, intT)), env, r2.sink())
-	if got.String() != "fn(): fn(int): int" || len(r2.mismatches) != 0 {
+	if got.String() != "fn(): fn(nint): nint" || len(r2.mismatches) != 0 {
 		t.Errorf("nested in literal = %s (mismatches %v)", got, r2.mismatches)
 	}
 }
@@ -354,8 +354,8 @@ func TestCheckValid(t *testing.T) {
 	env := emptyEnv()
 	var r report
 	got := Check(binary(intLit("1"), "add", intLit("2")), env, r.sink())
-	if got.String() != "int" {
-		t.Errorf("Check(1.add(2)) = %s, want int", got)
+	if got.String() != "nint" {
+		t.Errorf("Check(1.add(2)) = %s, want nint", got)
 	}
 	if len(r.methods) != 0 {
 		t.Errorf("valid expression reported %v, want no reports", r.methods)
@@ -373,8 +373,8 @@ func TestCheckReportsInvalid(t *testing.T) {
 	if len(r.methods) != 1 || r.methods[0] != "anan" {
 		t.Fatalf("methods = %v, want [anan]", r.methods)
 	}
-	if r.operands[0] != "int, int" {
-		t.Errorf("operands = %q, want %q", r.operands[0], "int, int")
+	if r.operands[0] != "nint, nint" {
+		t.Errorf("operands = %q, want %q", r.operands[0], "nint, nint")
 	}
 }
 

@@ -39,8 +39,8 @@ File
   FuncDecl
     pub
     name "double"
-    param x: int
-    result int
+    param x: nint
+    result nint
       return (call (. Identifier "x" mul) IntLit "2")
   AssertDecl
     cond (call (. (call Identifier "double" IntLit "2") eql) IntLit "4")

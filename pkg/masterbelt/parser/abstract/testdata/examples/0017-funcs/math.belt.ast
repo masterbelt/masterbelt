@@ -3,16 +3,16 @@ File
     doc "Doubles x."
     pub
     name "double"
-    param x: int
-    result int
+    param x: nint
+    result nint
       return (call (. Identifier "x" mul) IntLit "2")
   FuncDecl
     doc "The area of a w-by-h rectangle."
     pub
     name "area"
-    param w: int
-    param h: int
-    result int
+    param w: nint
+    param h: nint
+    result nint
       return (call (. Identifier "w" mul) Identifier "h")
   FuncDecl
     doc "Greets by name."
@@ -22,20 +22,20 @@ File
     result string
       return (call (. StringLit "Hello, " add) Identifier "name")
   FuncDecl
-    doc "Scales an int."
+    doc "Scales an nint."
     pub
     name "scale"
-    param x: int
-    result int
+    param x: nint
+    result nint
       return (call (. Identifier "x" mul) IntLit "10")
   FuncDecl
     doc "Scales every element of a list."
     pub
     name "scale"
-    param xs: list<int>
-    result list<int>
+    param xs: list<nint>
+    result list<nint>
       return (call (. Identifier "xs" map) (fn(x: <missing>): <missing> (return (call (. Identifier "x" mul) IntLit "10"))))
   FuncDecl
     name "hidden"
-    result int
+    result nint
       return IntLit "0"

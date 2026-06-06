@@ -18,8 +18,8 @@ func TestLambdaParamHover(t *testing.T) {
 		if h == nil {
 			t.Fatal("no hover on the lambda parameter")
 		}
-		if !strings.Contains(h.Contents.Value, "x: int") {
-			t.Errorf("hover = %q, want the inferred x: int", h.Contents.Value)
+		if !strings.Contains(h.Contents.Value, "x: nint") {
+			t.Errorf("hover = %q, want the inferred x: nint", h.Contents.Value)
 		}
 	})
 
@@ -28,15 +28,15 @@ func TestLambdaParamHover(t *testing.T) {
 		if h == nil {
 			t.Fatal("no hover on the parameter use")
 		}
-		if !strings.Contains(h.Contents.Value, "x: int") {
-			t.Errorf("hover = %q, want the inferred x: int", h.Contents.Value)
+		if !strings.Contains(h.Contents.Value, "x: nint") {
+			t.Errorf("hover = %q, want the inferred x: nint", h.Contents.Value)
 		}
 	})
 
 	t.Run("nested literal shadows", func(t *testing.T) {
 		// The outer x is int, the inner x is bool (pushed in from the
 		// annotation); the innermost scope wins for the body use.
-		nested := "const F: fn(x: int): fn(x: bool): bool = fn(x) { return fn(x) { return x } }\n"
+		nested := "const F: fn(x: nint): fn(x: bool): bool = fn(x) { return fn(x) { return x } }\n"
 		ndoc := testView(nested)
 		h := hover(ndoc, strings.LastIndex(nested, "x }")) // the inner return x
 		if h == nil {
@@ -49,7 +49,7 @@ func TestLambdaParamHover(t *testing.T) {
 }
 
 func TestMethodParamHover(t *testing.T) {
-	src := "type Lvl = int8 impl {\n  inc(amount: int8): self {\n    return self + amount\n  }\n}\n"
+	src := "type Lvl = sbyte impl {\n  inc(amount: sbyte): self {\n    return self + amount\n  }\n}\n"
 	doc := testView(src)
 
 	t.Run("declaration in the signature", func(t *testing.T) {
@@ -57,8 +57,8 @@ func TestMethodParamHover(t *testing.T) {
 		if h == nil {
 			t.Fatal("no hover on the parameter declaration")
 		}
-		if !strings.Contains(h.Contents.Value, "amount: int8") {
-			t.Errorf("hover = %q, want amount: int8", h.Contents.Value)
+		if !strings.Contains(h.Contents.Value, "amount: sbyte") {
+			t.Errorf("hover = %q, want amount: sbyte", h.Contents.Value)
 		}
 	})
 
@@ -67,8 +67,8 @@ func TestMethodParamHover(t *testing.T) {
 		if h == nil {
 			t.Fatal("no hover on the body reference")
 		}
-		if !strings.Contains(h.Contents.Value, "amount: int8") {
-			t.Errorf("hover = %q, want amount: int8", h.Contents.Value)
+		if !strings.Contains(h.Contents.Value, "amount: sbyte") {
+			t.Errorf("hover = %q, want amount: sbyte", h.Contents.Value)
 		}
 	})
 }
@@ -83,13 +83,13 @@ func TestLambdaParamHoverInAssert(t *testing.T) {
 	if h == nil {
 		t.Fatal("no hover on the lambda parameter in an assert")
 	}
-	if !strings.Contains(h.Contents.Value, "v: int") {
-		t.Errorf("hover = %q, want v: int", h.Contents.Value)
+	if !strings.Contains(h.Contents.Value, "v: nint") {
+		t.Errorf("hover = %q, want v: nint", h.Contents.Value)
 	}
 }
 
 func TestMethodHover(t *testing.T) {
-	src := "type Level = int8 impl {\n" +
+	src := "type Level = sbyte impl {\n" +
 		"  /// the next level up\n" +
 		"  pub increment(): self {\n    return self\n  }\n" +
 		"}\n" +
@@ -125,7 +125,7 @@ func TestMethodHover(t *testing.T) {
 func TestMethodHoverOverloads(t *testing.T) {
 	// An overloaded name hovers as the whole overload set: every signature,
 	// each under its own doc comment.
-	src := "pub type Score = int32 impl {\n" +
+	src := "pub type Score = int impl {\n" +
 		"  /// Merge points in.\n" +
 		"  pub fn merge(points: self): self {\n    return self + points\n  }\n" +
 		"  /// Whether an active run counts.\n" +
@@ -170,7 +170,7 @@ func TestMethodHoverPrelude(t *testing.T) {
 func TestMethodHoverGenericSubstitution(t *testing.T) {
 	// The receiver's type arguments substitute into the signature: map on a
 	// list<int8> takes an int8 item.
-	src := "const xs: list<int8> = [1]\nconst ys = xs.map(fn(x) { return x })\n"
+	src := "const xs: list<sbyte> = [1]\nconst ys = xs.map(fn(x) { return x })\n"
 	doc := testView(src)
 
 	h := hover(doc, strings.Index(src, "xs.map")+4)
@@ -179,7 +179,7 @@ func TestMethodHoverGenericSubstitution(t *testing.T) {
 	}
 	// The function type renders from the type algebra, which carries no
 	// parameter names: fn(int8), with the receiver's element substituted.
-	if !strings.Contains(h.Contents.Value, "map(func: fn(int8): R): list<R>") {
+	if !strings.Contains(h.Contents.Value, "map(func: fn(sbyte): R): list<R>") {
 		t.Errorf("hover = %q, want the substituted signature", h.Contents.Value)
 	}
 }
@@ -187,7 +187,7 @@ func TestMethodHoverGenericSubstitution(t *testing.T) {
 // TestFieldHoverInsideIf checks that a field access in an if condition is
 // hoverable — the body-expression walk descends through an if's control flow.
 func TestFieldHoverInsideIf(t *testing.T) {
-	src := "type Rec = {\n  id: int8\n} impl {\n" +
+	src := "type Rec = {\n  id: sbyte\n} impl {\n" +
 		"  describe(): string {\n    if self.id > 0 {\n      return \"p\"\n    }\n    return \"z\"\n  }\n" +
 		"}\n"
 	doc := testView(src)
@@ -195,14 +195,14 @@ func TestFieldHoverInsideIf(t *testing.T) {
 	if h == nil {
 		t.Fatal("no hover on the field access in the if condition")
 	}
-	if !strings.Contains(h.Contents.Value, "id: int8") {
-		t.Errorf("hover = %q, want id: int8", h.Contents.Value)
+	if !strings.Contains(h.Contents.Value, "id: sbyte") {
+		t.Errorf("hover = %q, want id: sbyte", h.Contents.Value)
 	}
 }
 
 func TestFieldHover(t *testing.T) {
-	src := "type Rec = {\n  id: int8\n  level: int16\n} impl {\n" +
-		"  get(): int8 {\n    return self.id\n  }\n" +
+	src := "type Rec = {\n  id: sbyte\n  level: short\n} impl {\n" +
+		"  get(): sbyte {\n    return self.id\n  }\n" +
 		"}\n" +
 		"const r: Rec = 0\nconst sum = r.id\n"
 	doc := testView(src)
@@ -212,8 +212,8 @@ func TestFieldHover(t *testing.T) {
 		if h == nil {
 			t.Fatal("no hover on the field access")
 		}
-		if !strings.Contains(h.Contents.Value, "id: int8") {
-			t.Errorf("hover = %q, want id: int8", h.Contents.Value)
+		if !strings.Contains(h.Contents.Value, "id: sbyte") {
+			t.Errorf("hover = %q, want id: sbyte", h.Contents.Value)
 		}
 	})
 
@@ -222,8 +222,8 @@ func TestFieldHover(t *testing.T) {
 		if h == nil {
 			t.Fatal("no hover on the field access")
 		}
-		if !strings.Contains(h.Contents.Value, "id: int8") {
-			t.Errorf("hover = %q, want id: int8", h.Contents.Value)
+		if !strings.Contains(h.Contents.Value, "id: sbyte") {
+			t.Errorf("hover = %q, want id: sbyte", h.Contents.Value)
 		}
 	})
 }
@@ -231,14 +231,14 @@ func TestFieldHover(t *testing.T) {
 func TestMethodHoverLiteralReceiver(t *testing.T) {
 	// The receiver of 0007-listmap's shape: a collection literal, typed by
 	// the real inference rather than name resolution.
-	src := "const Doubled = [1, 2, 3].map(fn(x: int): int { return x * 2 })\n"
+	src := "const Doubled = [1, 2, 3].map(fn(x: nint): nint { return x * 2 })\n"
 	doc := testView(src)
 
 	h := hover(doc, strings.Index(src, ".map")+2)
 	if h == nil {
 		t.Fatal("no hover on map with a literal receiver")
 	}
-	for _, want := range []string{"map(func: fn(int): R): list<R>", "A new list: func applied to each element, in order."} {
+	for _, want := range []string{"map(func: fn(nint): R): list<R>", "A new list: func applied to each element, in order."} {
 		if !strings.Contains(h.Contents.Value, want) {
 			t.Errorf("hover = %q, want it to contain %q", h.Contents.Value, want)
 		}
@@ -247,19 +247,19 @@ func TestMethodHoverLiteralReceiver(t *testing.T) {
 
 func TestMethodHoverParamReceiver(t *testing.T) {
 	t.Run("lambda parameter", func(t *testing.T) {
-		src := "const ys = [1, 2].map(fn(x: int): int { return x.add(1) })\n"
+		src := "const ys = [1, 2].map(fn(x: nint): nint { return x.add(1) })\n"
 		doc := testView(src)
 		h := hover(doc, strings.Index(src, "x.add")+3)
 		if h == nil {
 			t.Fatal("no hover on a method through a lambda parameter")
 		}
 		if !strings.Contains(h.Contents.Value, "The + operator: the sum.") {
-			t.Errorf("hover = %q, want int's add doc", h.Contents.Value)
+			t.Errorf("hover = %q, want nint's add doc", h.Contents.Value)
 		}
 	})
 
 	t.Run("self-typed method parameter", func(t *testing.T) {
-		src := "type Lvl = int8 impl {\n  /// the larger of the two\n  max(other: self): self {\n    return other\n  }\n" +
+		src := "type Lvl = sbyte impl {\n  /// the larger of the two\n  max(other: self): self {\n    return other\n  }\n" +
 			"  pick(other: self): self {\n    return other.max(self)\n  }\n}\n"
 		doc := testView(src)
 		h := hover(doc, strings.Index(src, "other.max")+7)

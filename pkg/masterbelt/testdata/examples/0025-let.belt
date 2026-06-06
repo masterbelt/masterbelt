@@ -7,7 +7,7 @@
 // A let with an inferred type and a reassignment that keeps that type. Folding
 // runs the body with a mutable local, so the function still collapses to a
 // constant — a local mutation is not an effect, and the function stays pure.
-pub fn pick(flag: bool): int {
+pub fn pick(flag: bool): nint {
   let base = 10
   let result = base
   if flag {
@@ -18,8 +18,8 @@ pub fn pick(flag: bool): int {
 
 // A let with an explicit type annotation. The annotation fixes the slot's type;
 // a reassignment must stay assignable to it.
-pub fn step(n: int): int {
-  let acc: int = n
+pub fn step(n: nint): nint {
+  let acc: nint = n
   acc = acc + 1
   return acc
 }
@@ -27,7 +27,7 @@ pub fn step(n: int): int {
 // An inner block's let shadows the outer one: the inner result is a new binding,
 // so the assignment inside the if updates the inner slot and the outer result
 // is untouched.
-pub fn shadow(flag: bool): int {
+pub fn shadow(flag: bool): nint {
   let result = 1
   if flag {
     let result = 2

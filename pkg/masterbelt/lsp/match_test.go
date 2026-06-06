@@ -8,8 +8,8 @@ import (
 )
 
 // matchSrc is the shared fixture: a union and a match that narrows its binding.
-const matchSrc = "pub type Coin = { amount: int }\npub type Level = { rank: int }\npub type GameValue = Coin | Level\n" +
-	"pub fn worth(v: GameValue): int {\n  match v {\n    Coin c -> return c.amount\n    Level l -> return l.rank\n  }\n}\n"
+const matchSrc = "pub type Coin = { amount: nint }\npub type Level = { rank: nint }\npub type GameValue = Coin | Level\n" +
+	"pub fn worth(v: GameValue): nint {\n  match v {\n    Coin c -> return c.amount\n    Level l -> return l.rank\n  }\n}\n"
 
 // TestMatchBindingHover checks that a match arm's narrowed binding hovers with
 // its member type — at the binding name in the pattern and at a reference to it
@@ -53,7 +53,7 @@ func TestMatchBindingHover(t *testing.T) {
 // TestSemanticTokensMatch checks that the match keyword colours as a keyword,
 // the same way switch and if do.
 func TestSemanticTokensMatch(t *testing.T) {
-	src := "pub fn worth(v: GameValue): int {\n  match v {\n    Coin c -> return c.amount\n  }\n}\n"
+	src := "pub fn worth(v: GameValue): nint {\n  match v {\n    Coin c -> return c.amount\n  }\n}\n"
 	doc := abstract.NewDocument([]byte(src))
 	got := decode(semanticTokens(doc).Data)
 

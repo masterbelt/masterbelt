@@ -3,12 +3,12 @@ File
     doc "A coin denomination."
     pub
     name "Coin"
-    body int8
+    body sbyte
   TypeDecl
     doc "A character level."
     pub
     name "Level"
-    body int8
+    body sbyte
     method "increment"
       doc "The next level up."
       pub
@@ -29,18 +29,18 @@ File
     doc "A small integer, or nothing."
     pub
     name "OptionalNumeric"
-    param T: int8 | int16
+    param T: sbyte | short
     body T | null
   TypeDecl
     doc "One saved character: an id and its level."
     pub
     name "Record"
-    body { id: int8, level: Level }
+    body { id: sbyte, level: Level }
     method "game_id"
       doc "The record's id widened into the game's id space."
       pub
-      result int32
-      return (call (. (call Identifier "int32" (. self id)) mul) IntLit "1000")
+      result int
+      return (call (. (call Identifier "int" (. self id)) mul) IntLit "1000")
   TypeDecl
     doc "A mapping from T to R."
     pub

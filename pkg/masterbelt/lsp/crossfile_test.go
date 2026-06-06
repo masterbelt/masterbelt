@@ -485,7 +485,7 @@ func TestQualifiedTypeCompletion(t *testing.T) {
 	root := belttest.WriteFiles(t, map[string]string{
 		"masterbelt.toml": "entry = \"main.belt\"\n",
 		"main.belt":       src,
-		"geometry.belt":   "pub type Point = int32\npub const Origin = 0\n",
+		"geometry.belt":   "pub type Point = int\npub const Origin = 0\n",
 	})
 	s := NewServer()
 	uri := openOnDisk(t, s, root, "main.belt")
@@ -505,7 +505,7 @@ func TestQualifiedTypeCompletion(t *testing.T) {
 	for _, item := range list.Items {
 		labels[item.Label] = true
 	}
-	for _, want := range []string{"geo.Point", "int32"} {
+	for _, want := range []string{"geo.Point", "int"} {
 		if !labels[want] {
 			t.Errorf("type completion misses %q (got %d items)", want, len(list.Items))
 		}
@@ -519,7 +519,7 @@ func TestCrossFileTypeDefinition(t *testing.T) {
 	root := belttest.WriteFiles(t, map[string]string{
 		"masterbelt.toml": "entry = \"main.belt\"\n",
 		"main.belt":       mainSrc,
-		"geometry.belt":   "/// a 1D point\npub type Point = int8\n",
+		"geometry.belt":   "/// a 1D point\npub type Point = sbyte\n",
 	})
 	s := NewServer()
 	uri := openOnDisk(t, s, root, "main.belt")
@@ -543,7 +543,7 @@ func TestCrossFileTypeDefinition(t *testing.T) {
 	if h == nil {
 		t.Fatal("no hover on the qualified type name")
 	}
-	if !strings.Contains(h.Contents.Value, "pub type Point = int8") {
+	if !strings.Contains(h.Contents.Value, "pub type Point = sbyte") {
 		t.Errorf("hover = %q, want the type signature", h.Contents.Value)
 	}
 	if !strings.Contains(h.Contents.Value, "a 1D point") {
@@ -585,7 +585,7 @@ func TestCrossFileTypeRename(t *testing.T) {
 	root := belttest.WriteFiles(t, map[string]string{
 		"masterbelt.toml": "entry = \"main.belt\"\n",
 		"main.belt":       mainSrc,
-		"geometry.belt":   "pub type Point = int8\nconst origin: Point = 0\n",
+		"geometry.belt":   "pub type Point = sbyte\nconst origin: Point = 0\n",
 	})
 	s := NewServer()
 	uri := openOnDisk(t, s, root, "main.belt")

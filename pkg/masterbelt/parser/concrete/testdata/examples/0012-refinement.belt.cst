@@ -19,7 +19,7 @@ File
     Assign "="
     Whitespace " "
     TypeName
-      Ident "int8"
+      Ident "sbyte"
     Whitespace " "
     WhereClause
       Where "where"
@@ -58,7 +58,7 @@ File
     Assign "="
     Whitespace " "
     TypeName
-      Ident "int32"
+      Ident "int"
     Whitespace " "
     WhereClause
       Where "where"
@@ -99,7 +99,7 @@ File
     Assign "="
     Whitespace " "
     TypeName
-      Ident "int8"
+      Ident "sbyte"
     Whitespace " "
     WhereClause
       Where "where"
@@ -186,7 +186,7 @@ File
     Assign "="
     Whitespace " "
     TypeName
-      Ident "int32"
+      Ident "int"
     Whitespace " "
     WhereClause
       Where "where"
@@ -344,7 +344,7 @@ File
   ConstDecl
     Newline "\n"
     Newline "\n"
-    LineComment "// An unannotated constant is a plain int: no refinement applies."
+    LineComment "// An unannotated constant is a plain nint: no refinement applies."
     Newline "\n"
     Const "const"
     Whitespace " "

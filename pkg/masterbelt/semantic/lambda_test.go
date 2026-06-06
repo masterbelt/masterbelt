@@ -172,8 +172,8 @@ func TestLambdaBodyTypeChecksNestedReturn(t *testing.T) {
 	}
 	for _, c := range m.Consts {
 		if c.Name == "r" {
-			if c.Type.String() != "list<int>" {
-				t.Errorf("r type = %s, want list<int>", c.Type)
+			if c.Type.String() != "list<nint>" {
+				t.Errorf("r type = %s, want list<nint>", c.Type)
 			}
 			if c.Eval == nil || c.Eval.String() != "[2, 3, 4]" {
 				t.Errorf("r eval = %v, want [2, 3, 4] (type/value divergence)", c.Eval)
@@ -185,7 +185,7 @@ func TestLambdaBodyTypeChecksNestedReturn(t *testing.T) {
 // TestLambdaBodyTypeChecksNestedReturnMismatch checks that a return nested in an
 // if inside a lambda body is checked against the declared result type.
 func TestLambdaBodyTypeChecksNestedReturnMismatch(t *testing.T) {
-	src := "const f: fn(v: int): int = fn(v) {\n" +
+	src := "const f: fn(v: nint): nint = fn(v) {\n" +
 		"  if v > 0 {\n" +
 		"    return \"oops\"\n" +
 		"  }\n" +
@@ -193,7 +193,7 @@ func TestLambdaBodyTypeChecksNestedReturnMismatch(t *testing.T) {
 		"}\n"
 	_, diags := analyze(src)
 	if !hasCode(diags, CodeTypeMismatch) {
-		t.Fatalf("want type_mismatch for a string return where int is declared, got %v", codes(diags))
+		t.Fatalf("want type_mismatch for a string return where nint is declared, got %v", codes(diags))
 	}
 }
 

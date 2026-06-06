@@ -1,12 +1,12 @@
 // Enum with an explicit integer base type and explicit member values.
 /// A card's rarity tier.
-pub enum Rarity: uint8 {
+pub enum Rarity: byte {
   Common = 1
   Rare   = 2
   Legend = 10
 }
 
-// Enum with no base type (int by default) and auto-numbered members; it also
+// Enum with no base type (nint by default) and auto-numbered members; it also
 // carries an impl block, exactly as a nominal type can.
 /// An elemental affinity.
 pub enum Element {

@@ -95,7 +95,7 @@ func TestPredicateNonBool(t *testing.T) {
 	pred := binary(selfExpr(), "add", intLit("1"))
 	v := Predicate(pred, ir.IntConstant(big.NewInt(1)), nil, stubEnv{reg: builtin.Default()})
 	if v == nil || v.Kind != ir.ConstInt {
-		t.Fatalf("Predicate = %v, want an int constant", v)
+		t.Fatalf("Predicate = %v, want an nint constant", v)
 	}
 	if v.Int.Int64() != 2 {
 		t.Errorf("Predicate = %v, want 2", v.Int)
@@ -348,7 +348,7 @@ func TestConstEqual(t *testing.T) {
 		t.Error("differing error messages should be unequal")
 	}
 	if constEqual(fold(list(intLit("1"))), ir.IntConstant(big.NewInt(1))) {
-		t.Error("a list and an int are never equal")
+		t.Error("a list and an nint are never equal")
 	}
 }
 

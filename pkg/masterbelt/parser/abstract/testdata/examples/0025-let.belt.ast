@@ -9,7 +9,7 @@ File
     pub
     name "pick"
     param flag: bool
-    result int
+    result nint
       let "base" = IntLit "10"
       let "result" = Identifier "base"
       if Identifier "flag"
@@ -18,16 +18,16 @@ File
   FuncDecl
     pub
     name "step"
-    param n: int
-    result int
-      let "acc": int = Identifier "n"
+    param n: nint
+    result nint
+      let "acc": nint = Identifier "n"
       assign Identifier "acc" = (call (. Identifier "acc" add) IntLit "1")
       return Identifier "acc"
   FuncDecl
     pub
     name "shadow"
     param flag: bool
-    result int
+    result nint
       let "result" = IntLit "1"
       if Identifier "flag"
           let "result" = IntLit "2"

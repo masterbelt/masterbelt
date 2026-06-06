@@ -8,7 +8,7 @@ import (
 // TestRangeForOfSum checks the headline example: a for-of loop over a range sums
 // its elements (range(0, 10) is 0..9), folding to 45 at compile time.
 func TestRangeForOfSum(t *testing.T) {
-	src := "pub fn total(): int {\n  let t = 0\n  for i of range(0, 10) {\n    t = t + i\n  }\n  return t\n}\nconst S = total()\n"
+	src := "pub fn total(): nint {\n  let t = 0\n  for i of range(0, 10) {\n    t = t + i\n  }\n  return t\n}\nconst S = total()\n"
 	if got := evalOf(t, src, "S").Int.Int64(); got != 45 {
 		t.Errorf("S = %d, want 45", got)
 	}
@@ -18,7 +18,7 @@ func TestRangeForOfSum(t *testing.T) {
 // position (the key, like a list's index), not the element: the positions of
 // range(5, 10) are 0..4, summing to 10.
 func TestRangeForInPosition(t *testing.T) {
-	src := "pub fn ps(): int {\n  let t = 0\n  for i in range(5, 10) {\n    t = t + i\n  }\n  return t\n}\nconst P = ps()\n"
+	src := "pub fn ps(): nint {\n  let t = 0\n  for i in range(5, 10) {\n    t = t + i\n  }\n  return t\n}\nconst P = ps()\n"
 	if got := evalOf(t, src, "P").Int.Int64(); got != 10 {
 		t.Errorf("P = %d, want 10", got)
 	}
@@ -27,7 +27,7 @@ func TestRangeForInPosition(t *testing.T) {
 // TestRangeEmpty checks that an end at or below the start is the empty range: the
 // for body never runs, so the accumulator keeps its initial value.
 func TestRangeEmpty(t *testing.T) {
-	src := "pub fn e(): int {\n  let t = 100\n  for i of range(10, 10) {\n    t = t + i\n  }\n  return t\n}\nconst E = e()\n"
+	src := "pub fn e(): nint {\n  let t = 100\n  for i of range(10, 10) {\n    t = t + i\n  }\n  return t\n}\nconst E = e()\n"
 	if got := evalOf(t, src, "E").Int.Int64(); got != 100 {
 		t.Errorf("E = %d, want 100", got)
 	}
@@ -37,8 +37,8 @@ func TestRangeEmpty(t *testing.T) {
 // elements, the step seeing the 0-based position as its key. Summing the values
 // of range(0, 4) is 0 + 1 + 2 + 3 = 6; summing the keys is the same here.
 func TestRangeFold(t *testing.T) {
-	src := "const F = range(0, 4).fold(0, fn(acc: int, k: int, v: int): int -> acc + v)\n" +
-		"const K = range(0, 4).fold(0, fn(acc: int, k: int, v: int): int -> acc + k)\n"
+	src := "const F = range(0, 4).fold(0, fn(acc: nint, k: nint, v: nint): nint -> acc + v)\n" +
+		"const K = range(0, 4).fold(0, fn(acc: nint, k: nint, v: nint): nint -> acc + k)\n"
 	if got := evalOf(t, src, "F").Int.Int64(); got != 6 {
 		t.Errorf("F = %d, want 6", got)
 	}
@@ -53,12 +53,12 @@ func TestRangeFold(t *testing.T) {
 func TestRangeProvidedMethods(t *testing.T) {
 	src := "const C = range(0, 10).count()\n" +
 		"const EC = range(5, 5).count()\n" +
-		"const A = range(0, 10).any(fn(v: int): bool -> v > 8)\n" +
-		"const L = range(0, 10).all(fn(v: int): bool -> v >= 0)\n" +
-		"const ML = range(0, 5).map(fn(v: int): int -> v * 2).len()\n" +
-		"const FL = range(0, 10).filter(fn(v: int): bool -> v % 2 == 0).len()\n" +
-		"const VS = range(3, 7).values().fold(0, fn(acc: int, k: int, v: int): int -> acc + v)\n" +
-		"const KS = range(3, 7).keys().fold(0, fn(acc: int, k: int, v: int): int -> acc + v)\n"
+		"const A = range(0, 10).any(fn(v: nint): bool -> v > 8)\n" +
+		"const L = range(0, 10).all(fn(v: nint): bool -> v >= 0)\n" +
+		"const ML = range(0, 5).map(fn(v: nint): nint -> v * 2).len()\n" +
+		"const FL = range(0, 10).filter(fn(v: nint): bool -> v % 2 == 0).len()\n" +
+		"const VS = range(3, 7).values().fold(0, fn(acc: nint, k: nint, v: nint): nint -> acc + v)\n" +
+		"const KS = range(3, 7).keys().fold(0, fn(acc: nint, k: nint, v: nint): nint -> acc + v)\n"
 	if got := evalOf(t, src, "C").Int.Int64(); got != 10 {
 		t.Errorf("count = %d, want 10", got)
 	}
@@ -121,9 +121,9 @@ func TestRangeNonIntArg(t *testing.T) {
 // not fold — proving the limit is the count, not the bound magnitudes.
 func TestRangeHugeIsSafe(t *testing.T) {
 	// A billion-element fold and for: a naive eager walk would hang or OOM.
-	src := "pub fn big(): int {\n  let t = 0\n  for i of range(0, 1000000000) {\n    t = t + i\n  }\n  return t\n}\n" +
+	src := "pub fn big(): nint {\n  let t = 0\n  for i of range(0, 1000000000) {\n    t = t + i\n  }\n  return t\n}\n" +
 		"const Forl = big()\n" +
-		"const Foldl = range(0, 1000000000).fold(0, fn(acc: int, k: int, v: int): int -> acc + v)\n" +
+		"const Foldl = range(0, 1000000000).fold(0, fn(acc: nint, k: nint, v: nint): nint -> acc + v)\n" +
 		"const Counted = range(0, 1000000000).count()\n"
 
 	done := make(chan struct{})

@@ -19,9 +19,9 @@ func TestClassification(t *testing.T) {
 		boolean bool
 	}{
 		{ir.Invalid, false, false},
-		{bt("int"), true, false},
-		{bt("int8"), true, false},
-		{bt("uint64"), true, false},
+		{bt("nint"), true, false},
+		{bt("sbyte"), true, false},
+		{bt("ulong"), true, false},
 		{bt("bool"), false, true},
 	}
 	for _, tc := range cases {
@@ -36,7 +36,7 @@ func TestClassification(t *testing.T) {
 
 func TestLookup(t *testing.T) {
 	reg := builtin.Default()
-	for _, name := range []string{"int", "int8", "int16", "int32", "int64", "uint", "uint8", "uint16", "uint32", "uint64", "bool"} {
+	for _, name := range []string{"nint", "sbyte", "short", "int", "long", "nuint", "byte", "ushort", "uint", "ulong", "bool"} {
 		if got, ok := Lookup(reg, name); !ok || got.String() != name {
 			t.Errorf("Lookup(%q) = (%s, %v), want (%s, true)", name, got, ok, name)
 		}
@@ -60,22 +60,22 @@ func TestFits(t *testing.T) {
 		v    *big.Int
 		want bool
 	}{
-		{bt("int8"), n("127"), true},
-		{bt("int8"), n("128"), false},
-		{bt("int8"), n("-128"), true},
-		{bt("int8"), n("-129"), false},
-		{bt("uint8"), n("0"), true},
-		{bt("uint8"), n("255"), true},
-		{bt("uint8"), n("256"), false},
-		{bt("uint8"), n("-1"), false},
-		{bt("int64"), n("9223372036854775807"), true},
-		{bt("int64"), n("9223372036854775808"), false},
+		{bt("sbyte"), n("127"), true},
+		{bt("sbyte"), n("128"), false},
+		{bt("sbyte"), n("-128"), true},
+		{bt("sbyte"), n("-129"), false},
+		{bt("byte"), n("0"), true},
+		{bt("byte"), n("255"), true},
+		{bt("byte"), n("256"), false},
+		{bt("byte"), n("-1"), false},
+		{bt("long"), n("9223372036854775807"), true},
+		{bt("long"), n("9223372036854775808"), false},
 		// Arbitrary-precision and non-integer types accept any value.
-		{bt("int"), n("99999999999999999999999999"), true},
+		{bt("nint"), n("99999999999999999999999999"), true},
 		{bt("bool"), n("5"), true},
 		{ir.Invalid, n("5"), true},
 		// An unsigned arbitrary integer still rejects negatives.
-		{bt("uint"), n("-1"), false},
+		{bt("nuint"), n("-1"), false},
 	}
 	for _, tc := range cases {
 		if got := Fits(reg, tc.t, tc.v); got != tc.want {
@@ -95,33 +95,33 @@ func TestMethodResult(t *testing.T) {
 	}{
 		// Arithmetic unifies the operand types and returns self; the default
 		// integer adapts to a sized operand.
-		{"add int+int", bt("int"), "add", []ir.Type{bt("int")}, "int"},
-		{"add concrete+int", bt("int32"), "add", []ir.Type{bt("int")}, "int32"},
-		{"add int+concrete", bt("int"), "add", []ir.Type{bt("int32")}, "int32"},
-		{"add same concrete", bt("int32"), "add", []ir.Type{bt("int32")}, "int32"},
-		{"add mixed concrete", bt("int32"), "add", []ir.Type{bt("int8")}, "invalid"},
-		{"add on bool", bt("bool"), "add", []ir.Type{bt("int32")}, "invalid"},
-		{"add wrong arity", bt("int"), "add", nil, "invalid"},
+		{"add nint+nint", bt("nint"), "add", []ir.Type{bt("nint")}, "nint"},
+		{"add concrete+nint", bt("int"), "add", []ir.Type{bt("nint")}, "int"},
+		{"add nint+concrete", bt("nint"), "add", []ir.Type{bt("int")}, "int"},
+		{"add same concrete", bt("int"), "add", []ir.Type{bt("int")}, "int"},
+		{"add mixed concrete", bt("int"), "add", []ir.Type{bt("sbyte")}, "invalid"},
+		{"add on bool", bt("bool"), "add", []ir.Type{bt("int")}, "invalid"},
+		{"add wrong arity", bt("nint"), "add", nil, "invalid"},
 		// Comparisons require integers and return bool.
-		{"lt int", bt("int32"), "lt", []ir.Type{bt("int")}, "bool"},
-		{"lt bool operand", bt("int32"), "lt", []ir.Type{bt("bool")}, "invalid"},
+		{"lt nint", bt("int"), "lt", []ir.Type{bt("nint")}, "bool"},
+		{"lt bool operand", bt("int"), "lt", []ir.Type{bt("bool")}, "invalid"},
 		// Equality is defined per kind; mixing kinds does not unify.
-		{"eql int", bt("int"), "eql", []ir.Type{bt("int8")}, "bool"},
+		{"eql nint", bt("nint"), "eql", []ir.Type{bt("sbyte")}, "bool"},
 		{"eql bool", bt("bool"), "eql", []ir.Type{bt("bool")}, "bool"},
-		{"eql mixed kinds", bt("int8"), "eql", []ir.Type{bt("bool")}, "invalid"},
+		{"eql mixed kinds", bt("sbyte"), "eql", []ir.Type{bt("bool")}, "invalid"},
 		// Logical operators are defined on bool and return self.
 		{"anan bool", bt("bool"), "anan", []ir.Type{bt("bool")}, "bool"},
-		{"anan int", bt("int"), "anan", []ir.Type{bt("int")}, "invalid"},
+		{"anan nint", bt("nint"), "anan", []ir.Type{bt("nint")}, "invalid"},
 		// Unary sign preserves an integer operand.
-		{"neg int", bt("int8"), "neg", nil, "int8"},
+		{"neg nint", bt("sbyte"), "neg", nil, "sbyte"},
 		{"neg bool", bt("bool"), "neg", nil, "invalid"},
-		{"neg with arg", bt("int8"), "neg", []ir.Type{bt("int8")}, "invalid"},
+		{"neg with arg", bt("sbyte"), "neg", []ir.Type{bt("sbyte")}, "invalid"},
 		// not requires a boolean and returns self.
 		{"not bool", bt("bool"), "not", nil, "bool"},
-		{"not int", bt("int8"), "not", nil, "invalid"},
+		{"not nint", bt("sbyte"), "not", nil, "invalid"},
 		{"not with arg", bt("bool"), "not", []ir.Type{bt("bool")}, "invalid"},
 		// Unknown methods do not apply to anything.
-		{"unknown method", bt("int8"), "frobnicate", []ir.Type{bt("int8")}, "invalid"},
+		{"unknown method", bt("sbyte"), "frobnicate", []ir.Type{bt("sbyte")}, "invalid"},
 	}
 	for _, tc := range cases {
 		if got := MethodResult(reg, tc.recv, tc.method, tc.args).String(); got != tc.want {
@@ -143,7 +143,7 @@ func TestGenericMethodResult(t *testing.T) {
 	listDef := &ir.TypeDef{Name: "list", Builtin: true, Params: []*ir.TypeParam{{Name: "T"}}}
 	listOf := func(arg ir.Type) ir.Type { return &ir.App{Def: listDef, Args: []ir.Type{arg}} }
 	listDef.Methods = []*ir.Method{
-		{Name: "len", Result: bt("int")},
+		{Name: "len", Result: bt("nint")},
 		{Name: "map", Params: []ir.Param{{Name: "func", Type: &ir.Func{Params: []ir.Type{tvar("T")}, Result: tvar("R")}}}, Result: listOf(tvar("R"))},
 		{Name: "add", Params: []ir.Param{{Name: "other", Type: &ir.SelfType{}}}, Result: &ir.SelfType{}},
 	}
@@ -157,16 +157,16 @@ func TestGenericMethodResult(t *testing.T) {
 		want   string
 	}{
 		// map binds T from the receiver and R from the function's result type.
-		{"map int->int", listOf(bt("int")), "map", []ir.Type{fn(bt("int"), bt("int"))}, "list<int>"},
-		{"map int->bool", listOf(bt("int")), "map", []ir.Type{fn(bt("int"), bt("bool"))}, "list<bool>"},
+		{"map nint->nint", listOf(bt("nint")), "map", []ir.Type{fn(bt("nint"), bt("nint"))}, "list<nint>"},
+		{"map nint->bool", listOf(bt("nint")), "map", []ir.Type{fn(bt("nint"), bt("bool"))}, "list<bool>"},
 		// The function's parameter type must accept the element type.
-		{"map wrong elem", listOf(bt("int")), "map", []ir.Type{fn(bt("int8"), bt("bool"))}, "invalid"},
-		{"map non-function arg", listOf(bt("int")), "map", []ir.Type{bt("int")}, "invalid"},
+		{"map wrong elem", listOf(bt("nint")), "map", []ir.Type{fn(bt("sbyte"), bt("bool"))}, "invalid"},
+		{"map non-function arg", listOf(bt("nint")), "map", []ir.Type{bt("nint")}, "invalid"},
 		// A non-generic method on a generic receiver still resolves (App was not
 		// understood before): len returns int, and the self-typed add returns the
 		// receiver.
-		{"len on list", listOf(bt("int")), "len", nil, "int"},
-		{"add on list", listOf(bt("int")), "add", []ir.Type{listOf(bt("int"))}, "list<int>"},
+		{"len on list", listOf(bt("nint")), "len", nil, "nint"},
+		{"add on list", listOf(bt("nint")), "add", []ir.Type{listOf(bt("nint"))}, "list<nint>"},
 	}
 	for _, tc := range cases {
 		if got := MethodResult(reg, tc.recv, tc.method, tc.args).String(); got != tc.want {
@@ -191,8 +191,8 @@ func TestIndexMethodResult(t *testing.T) {
 	// by hand (the prelude is not available to this package).
 	listDef := &ir.TypeDef{Name: "list", Builtin: true, Params: []*ir.TypeParam{{Name: "T"}}}
 	listDef.Methods = []*ir.Method{
-		{Name: "get", Params: []ir.Param{{Name: "index", Type: bt("int")}}, Result: union(tvar("T"), errType)},
-		{Name: "set", Params: []ir.Param{{Name: "index", Type: bt("int")}, {Name: "value", Type: tvar("T")}}, Result: &ir.SelfType{}},
+		{Name: "get", Params: []ir.Param{{Name: "index", Type: bt("nint")}}, Result: union(tvar("T"), errType)},
+		{Name: "set", Params: []ir.Param{{Name: "index", Type: bt("nint")}, {Name: "value", Type: tvar("T")}}, Result: &ir.SelfType{}},
 	}
 	listOf := func(arg ir.Type) ir.Type { return &ir.App{Def: listDef, Args: []ir.Type{arg}} }
 
@@ -212,11 +212,11 @@ func TestIndexMethodResult(t *testing.T) {
 	}{
 		// get substitutes the element variable inside the union: T | error becomes
 		// int | error on a list<int>, V | error becomes int | error on a map.
-		{"list get", listOf(bt("int")), "get", []ir.Type{bt("int")}, "int | error"},
-		{"map get", mapOf(bt("string"), bt("int")), "get", []ir.Type{bt("string")}, "int | error"},
+		{"list get", listOf(bt("nint")), "get", []ir.Type{bt("nint")}, "nint | error"},
+		{"map get", mapOf(bt("string"), bt("nint")), "get", []ir.Type{bt("string")}, "nint | error"},
 		// set returns self — the receiver type, with its arguments bound.
-		{"list set", listOf(bt("int")), "set", []ir.Type{bt("int"), bt("int")}, "list<int>"},
-		{"map set", mapOf(bt("string"), bt("int")), "set", []ir.Type{bt("string"), bt("int")}, "map<string, int>"},
+		{"list set", listOf(bt("nint")), "set", []ir.Type{bt("nint"), bt("nint")}, "list<nint>"},
+		{"map set", mapOf(bt("string"), bt("nint")), "set", []ir.Type{bt("string"), bt("nint")}, "map<string, nint>"},
 	}
 	for _, tc := range cases {
 		if got := MethodResult(reg, tc.recv, tc.method, tc.args).String(); got != tc.want {
@@ -234,15 +234,15 @@ func TestBindReceiver(t *testing.T) {
 	listDef.Methods = []*ir.Method{
 		{Name: "map", Params: []ir.Param{{Name: "func", Type: &ir.Func{Params: []ir.Type{&ir.TypeVar{Name: "T"}}, Result: &ir.TypeVar{Name: "R"}}}}, Result: &ir.App{Def: listDef, Args: []ir.Type{&ir.TypeVar{Name: "R"}}}},
 	}
-	recv := &ir.App{Def: listDef, Args: []ir.Type{bt("int")}}
+	recv := &ir.App{Def: listDef, Args: []ir.Type{bt("nint")}}
 
 	m, subst, ok := BindReceiver(reg, recv, "map")
 	if !ok || m == nil || m.Name != "map" {
-		t.Fatalf("BindReceiver(list<int>, map) = %v, %v, %v", m, subst, ok)
+		t.Fatalf("BindReceiver(list<nint>, map) = %v, %v, %v", m, subst, ok)
 	}
 	// T is bound from the receiver; R stays unbound for Match to solve.
-	if got := subst["T"]; got == nil || got.String() != "int" {
-		t.Errorf("subst[T] = %v, want int", got)
+	if got := subst["T"]; got == nil || got.String() != "nint" {
+		t.Errorf("subst[T] = %v, want nint", got)
 	}
 	if _, bound := subst["R"]; bound {
 		t.Errorf("R must stay unbound, got %v", subst["R"])
@@ -262,7 +262,7 @@ func TestBindReceiver(t *testing.T) {
 func overloadedScore() *ir.Named {
 	return &ir.Named{Def: &ir.TypeDef{
 		Name: "Score",
-		Body: bt("int32"),
+		Body: bt("int"),
 		Methods: []*ir.Method{
 			{Name: "merge", Params: []ir.Param{{Name: "points", Type: &ir.SelfType{}}}, Result: &ir.SelfType{}},
 			{Name: "merge", Params: []ir.Param{{Name: "active", Type: bt("bool")}}, Result: bt("bool")},
@@ -279,12 +279,12 @@ func TestSelectOverload(t *testing.T) {
 
 	// A self-typed argument picks the points signature; the default integer
 	// adapts to the receiver.
-	matches, found := SelectOverload(reg, score, "merge", []ir.Type{bt("int")})
+	matches, found := SelectOverload(reg, score, "merge", []ir.Type{bt("nint")})
 	if !found || len(matches) != 1 {
-		t.Fatalf("merge(int): matches = %d, found = %v, want 1, true", len(matches), found)
+		t.Fatalf("merge(nint): matches = %d, found = %v, want 1, true", len(matches), found)
 	}
 	if got := matches[0].Operand.String(); got != "Score" {
-		t.Errorf("merge(int): operand = %s, want Score", got)
+		t.Errorf("merge(nint): operand = %s, want Score", got)
 	}
 
 	// A boolean argument picks the flag signature.
@@ -308,7 +308,7 @@ func TestSelectOverload(t *testing.T) {
 	// Arity selects among same-name signatures: next() vs next(steps: self).
 	level := &ir.Named{Def: &ir.TypeDef{
 		Name: "Level",
-		Body: bt("int8"),
+		Body: bt("sbyte"),
 		Methods: []*ir.Method{
 			{Name: "next", Result: &ir.SelfType{}},
 			{Name: "next", Params: []ir.Param{{Name: "steps", Type: &ir.SelfType{}}}, Result: &ir.SelfType{}},
@@ -317,26 +317,26 @@ func TestSelectOverload(t *testing.T) {
 	if matches, _ := SelectOverload(reg, level, "next", nil); len(matches) != 1 || len(matches[0].Method.Params) != 0 {
 		t.Errorf("next(): want the zero-parameter overload")
 	}
-	if matches, _ := SelectOverload(reg, level, "next", []ir.Type{bt("int")}); len(matches) != 1 || len(matches[0].Method.Params) != 1 {
-		t.Errorf("next(int): want the stepping overload")
+	if matches, _ := SelectOverload(reg, level, "next", []ir.Type{bt("nint")}); len(matches) != 1 || len(matches[0].Method.Params) != 1 {
+		t.Errorf("next(nint): want the stepping overload")
 	}
 
 	// The default integer fits both sized-integer overloads at once: ambiguous,
 	// resolved by an annotation at the call site, never an implicit priority.
 	gauge := &ir.Named{Def: &ir.TypeDef{
 		Name: "Gauge",
-		Body: bt("int32"),
+		Body: bt("int"),
 		Methods: []*ir.Method{
-			{Name: "set", Params: []ir.Param{{Name: "v", Type: bt("int8")}}, Result: bt("bool")},
-			{Name: "set", Params: []ir.Param{{Name: "v", Type: bt("int16")}}, Result: bt("bool")},
+			{Name: "set", Params: []ir.Param{{Name: "v", Type: bt("sbyte")}}, Result: bt("bool")},
+			{Name: "set", Params: []ir.Param{{Name: "v", Type: bt("short")}}, Result: bt("bool")},
 		},
 	}}
-	if matches, _ := SelectOverload(reg, gauge, "set", []ir.Type{bt("int")}); len(matches) != 2 {
-		t.Errorf("set(int): matches = %d, want 2 (ambiguous)", len(matches))
+	if matches, _ := SelectOverload(reg, gauge, "set", []ir.Type{bt("nint")}); len(matches) != 2 {
+		t.Errorf("set(nint): matches = %d, want 2 (ambiguous)", len(matches))
 	}
 	// A sized argument is exact: unambiguous.
-	if matches, _ := SelectOverload(reg, gauge, "set", []ir.Type{bt("int16")}); len(matches) != 1 || matches[0].Method.Params[0].Type.String() != "int16" {
-		t.Errorf("set(int16): want the int16 overload alone")
+	if matches, _ := SelectOverload(reg, gauge, "set", []ir.Type{bt("short")}); len(matches) != 1 || matches[0].Method.Params[0].Type.String() != "short" {
+		t.Errorf("set(short): want the short overload alone")
 	}
 
 	// A nil argument type (a function literal checked after selection) fits
@@ -353,8 +353,8 @@ func TestSelectOverload(t *testing.T) {
 	listDef.Methods = []*ir.Method{
 		{Name: "map", Params: []ir.Param{{Name: "func", Type: &ir.Func{Params: []ir.Type{tvar("T")}, Result: tvar("R")}}}, Result: &ir.App{Def: listDef, Args: []ir.Type{tvar("R")}}},
 	}
-	recv := &ir.App{Def: listDef, Args: []ir.Type{bt("int")}}
-	fn := &ir.Func{Params: []ir.Type{bt("int")}, Result: bt("bool")}
+	recv := &ir.App{Def: listDef, Args: []ir.Type{bt("nint")}}
+	fn := &ir.Func{Params: []ir.Type{bt("nint")}, Result: bt("bool")}
 	matches, _ = SelectOverload(reg, recv, "map", []ir.Type{fn})
 	if len(matches) != 1 {
 		t.Fatalf("map(fn): matches = %d, want 1", len(matches))
@@ -374,7 +374,7 @@ func TestSelectOverloadSubstIsolation(t *testing.T) {
 	// generic arm and a self arm.
 	def := &ir.TypeDef{
 		Name: "Chooser",
-		Body: bt("int32"),
+		Body: bt("int"),
 		Methods: []*ir.Method{
 			{Name: "pick", Params: []ir.Param{{Name: "f", Type: &ir.Func{Params: []ir.Type{tvar("T")}, Result: tvar("R")}}}, Result: tvar("R")},
 			{Name: "pick", Params: []ir.Param{{Name: "other", Type: &ir.SelfType{}}}, Result: &ir.SelfType{}},
@@ -384,7 +384,7 @@ func TestSelectOverloadSubstIsolation(t *testing.T) {
 
 	// The function argument fits only the generic arm, solving T and R in its
 	// own substitution.
-	fn := &ir.Func{Params: []ir.Type{bt("int")}, Result: bt("bool")}
+	fn := &ir.Func{Params: []ir.Type{bt("nint")}, Result: bt("bool")}
 	matches, _ := SelectOverload(reg, chooser, "pick", []ir.Type{fn})
 	if len(matches) != 1 || len(matches[0].Method.Params) != 1 {
 		t.Fatalf("pick(fn): matches = %d, want the generic arm alone", len(matches))
@@ -417,7 +417,7 @@ func TestOverloadedMethodResult(t *testing.T) {
 		args []ir.Type
 		want string
 	}{
-		{"int picks points", []ir.Type{bt("int")}, "Score"},
+		{"nint picks points", []ir.Type{bt("nint")}, "Score"},
 		{"Score picks points", []ir.Type{score}, "Score"},
 		{"bool picks flag", []ir.Type{bt("bool")}, "bool"},
 		{"string fits neither", []ir.Type{bt("string")}, "invalid"},
@@ -438,7 +438,7 @@ func TestOverloadShadowing(t *testing.T) {
 	// Tally redeclares add(bool) over int8: the derived add(self) is shadowed.
 	tally := &ir.Named{Def: &ir.TypeDef{
 		Name: "Tally",
-		Body: bt("int8"),
+		Body: bt("sbyte"),
 		Methods: []*ir.Method{
 			{Name: "add", Params: []ir.Param{{Name: "flag", Type: bt("bool")}}, Result: &ir.SelfType{}},
 		},
@@ -490,9 +490,9 @@ func TestSubstituteAndMatch(t *testing.T) {
 	fn := func(param, result ir.Type) ir.Type { return &ir.Func{Params: []ir.Type{param}, Result: result} }
 
 	// Substitute reaches into a function type and leaves unbound variables.
-	subst := map[string]ir.Type{"T": bt("int")}
-	if got := Substitute(fn(tvar("T"), tvar("R")), subst).String(); got != "fn(int): R" {
-		t.Errorf("Substitute = %s, want fn(int): R", got)
+	subst := map[string]ir.Type{"T": bt("nint")}
+	if got := Substitute(fn(tvar("T"), tvar("R")), subst).String(); got != "fn(nint): R" {
+		t.Errorf("Substitute = %s, want fn(nint): R", got)
 	}
 	// An empty substitution returns the type unchanged.
 	pattern := fn(tvar("T"), tvar("R"))
@@ -502,23 +502,23 @@ func TestSubstituteAndMatch(t *testing.T) {
 
 	// Match binds the pattern's variables structurally...
 	subst = map[string]ir.Type{}
-	if !Match(reg, fn(tvar("T"), tvar("R")), fn(bt("int"), bt("bool")), subst) {
-		t.Fatal("Match(fn(T): R, fn(int): bool) failed")
+	if !Match(reg, fn(tvar("T"), tvar("R")), fn(bt("nint"), bt("bool")), subst) {
+		t.Fatal("Match(fn(T): R, fn(nint): bool) failed")
 	}
-	if subst["T"].String() != "int" || subst["R"].String() != "bool" {
-		t.Errorf("subst = %v, want T=int R=bool", subst)
+	if subst["T"].String() != "nint" || subst["R"].String() != "bool" {
+		t.Errorf("subst = %v, want T=nint R=bool", subst)
 	}
 	// ...requires an already-bound variable to agree...
 	if Match(reg, tvar("T"), bt("bool"), subst) {
-		t.Error("Match rebound T=int to bool")
+		t.Error("Match rebound T=nint to bool")
 	}
 	// ...and falls back to assignability for concrete patterns, so the
 	// default int adapts.
-	if !Match(reg, bt("int8"), bt("int"), map[string]ir.Type{}) {
-		t.Error("Match(int8, int) must allow the default-int adaption")
+	if !Match(reg, bt("sbyte"), bt("nint"), map[string]ir.Type{}) {
+		t.Error("Match(sbyte, nint) must allow the default-nint adaption")
 	}
-	if Match(reg, bt("int8"), bt("bool"), map[string]ir.Type{}) {
-		t.Error("Match(int8, bool) must fail")
+	if Match(reg, bt("sbyte"), bt("bool"), map[string]ir.Type{}) {
+		t.Error("Match(sbyte, bool) must fail")
 	}
 }
 
@@ -535,11 +535,11 @@ func TestMatchUnionAndRecord(t *testing.T) {
 
 	// A value flowing into a `T | error` pattern binds T to the value's type.
 	subst := map[string]ir.Type{}
-	if !Match(reg, union(tvar("T"), bt("error")), bt("int"), subst) {
-		t.Fatal("Match(T | error, int) failed")
+	if !Match(reg, union(tvar("T"), bt("error")), bt("nint"), subst) {
+		t.Fatal("Match(T | error, nint) failed")
 	}
-	if got := subst["T"]; got == nil || got.String() != "int" {
-		t.Errorf("subst[T] = %v, want int", got)
+	if got := subst["T"]; got == nil || got.String() != "nint" {
+		t.Errorf("subst[T] = %v, want nint", got)
 	}
 
 	// The concrete member is preferred only when no variable member solves it:
@@ -554,22 +554,22 @@ func TestMatchUnionAndRecord(t *testing.T) {
 
 	// Two unions of the same arity pair positionally.
 	subst = map[string]ir.Type{}
-	if !Match(reg, union(tvar("T"), bt("error")), union(bt("int"), bt("error")), subst) {
-		t.Fatal("Match(T | error, int | error) failed")
+	if !Match(reg, union(tvar("T"), bt("error")), union(bt("nint"), bt("error")), subst) {
+		t.Fatal("Match(T | error, nint | error) failed")
 	}
-	if got := subst["T"]; got == nil || got.String() != "int" {
-		t.Errorf("subst[T] = %v, want int", got)
+	if got := subst["T"]; got == nil || got.String() != "nint" {
+		t.Errorf("subst[T] = %v, want nint", got)
 	}
 
 	// A record pattern { v: T } solves T from the argument's same-named field,
 	// looking through a nominal record.
-	box := &ir.Named{Def: &ir.TypeDef{Name: "Box", Body: record(field("v", bt("int")))}}
+	box := &ir.Named{Def: &ir.TypeDef{Name: "Box", Body: record(field("v", bt("nint")))}}
 	subst = map[string]ir.Type{}
 	if !Match(reg, record(field("v", tvar("T"))), box, subst) {
-		t.Fatal("Match({ v: T }, Box{ v: int }) failed")
+		t.Fatal("Match({ v: T }, Box{ v: nint }) failed")
 	}
-	if got := subst["T"]; got == nil || got.String() != "int" {
-		t.Errorf("subst[T] = %v, want int", got)
+	if got := subst["T"]; got == nil || got.String() != "nint" {
+		t.Errorf("subst[T] = %v, want nint", got)
 	}
 
 	// A field the argument lacks (or a non-record argument) does not match.
@@ -577,21 +577,21 @@ func TestMatchUnionAndRecord(t *testing.T) {
 	if Match(reg, record(field("missing", tvar("T"))), box, subst) {
 		t.Error("Match({ missing: T }, Box) must fail")
 	}
-	if Match(reg, record(field("v", tvar("T"))), bt("int"), map[string]ir.Type{}) {
-		t.Error("Match({ v: T }, int) must fail (int is no record)")
+	if Match(reg, record(field("v", tvar("T"))), bt("nint"), map[string]ir.Type{}) {
+		t.Error("Match({ v: T }, nint) must fail (nint is no record)")
 	}
 
 	// A concrete union pattern (no variable) keeps the old assignability rule,
 	// which accepts a member value, a reordered union, and a narrower union —
 	// the recursion must not narrow the non-generic path.
-	if !Match(reg, union(bt("int"), bt("error")), bt("error"), map[string]ir.Type{}) {
-		t.Error("Match(int | error, error) must accept the member value")
+	if !Match(reg, union(bt("nint"), bt("error")), bt("error"), map[string]ir.Type{}) {
+		t.Error("Match(nint | error, error) must accept the member value")
 	}
-	if !Match(reg, union(bt("int"), bt("error")), union(bt("error"), bt("int")), map[string]ir.Type{}) {
-		t.Error("Match(int | error, error | int) must accept the reordered union")
+	if !Match(reg, union(bt("nint"), bt("error")), union(bt("error"), bt("nint")), map[string]ir.Type{}) {
+		t.Error("Match(nint | error, error | nint) must accept the reordered union")
 	}
-	if !Match(reg, union(bt("int"), bt("error"), bt("string")), union(bt("int"), bt("error")), map[string]ir.Type{}) {
-		t.Error("Match(int | error | string, int | error) must accept the narrower union")
+	if !Match(reg, union(bt("nint"), bt("error"), bt("string")), union(bt("nint"), bt("error")), map[string]ir.Type{}) {
+		t.Error("Match(nint | error | string, nint | error) must accept the narrower union")
 	}
 }
 
@@ -612,31 +612,31 @@ func TestSatisfies(t *testing.T) {
 			{Name: "fold", Result: &ir.TypeVar{Name: "V"}},
 		},
 	}
-	bound := &ir.App{Def: foldable, Args: []ir.Type{bt("int"), bt("int")}}
-	bag := &ir.TypeDef{Name: "Bag", Body: bt("int"), Impls: []ir.Type{bound}}
+	bound := &ir.App{Def: foldable, Args: []ir.Type{bt("nint"), bt("nint")}}
+	bag := &ir.TypeDef{Name: "Bag", Body: bt("nint"), Impls: []ir.Type{bound}}
 
 	if !Satisfies(reg, &ir.Named{Def: bag}, bound) {
-		t.Error("Satisfies(Bag, foldable<int, int>) = false, want true (Bag opts in)")
+		t.Error("Satisfies(Bag, foldable<nint, nint>) = false, want true (Bag opts in)")
 	}
 	// A type with no impl does not satisfy.
-	plain := &ir.TypeDef{Name: "Plain", Body: bt("int")}
+	plain := &ir.TypeDef{Name: "Plain", Body: bt("nint")}
 	if Satisfies(reg, &ir.Named{Def: plain}, bound) {
-		t.Error("Satisfies(Plain, foldable<int, int>) = true, want false (no impl)")
+		t.Error("Satisfies(Plain, foldable<nint, nint>) = true, want false (no impl)")
 	}
 	// A bare builtin does not satisfy a bound it never opts into.
-	if Satisfies(reg, bt("int"), bound) {
-		t.Error("Satisfies(int, foldable<int, int>) = true, want false")
+	if Satisfies(reg, bt("nint"), bound) {
+		t.Error("Satisfies(nint, foldable<nint, nint>) = true, want false")
 	}
 	// A non-interface bound never satisfies.
-	if Satisfies(reg, &ir.Named{Def: bag}, bt("int")) {
-		t.Error("Satisfies(Bag, int) = true, want false (int is not an interface)")
+	if Satisfies(reg, &ir.Named{Def: bag}, bt("nint")) {
+		t.Error("Satisfies(Bag, nint) = true, want false (nint is not an interface)")
 	}
 
 	// A bounded type parameter resolves its bound interface's methods: a value
 	// typed T where T: foldable<int, int> can call fold, whose V reads as int.
 	tvarBounded := &ir.TypeVar{Name: "T", Bound: bound}
-	if got := MethodResult(reg, tvarBounded, "fold", nil).String(); got != "int" {
-		t.Errorf("MethodResult(T: foldable<int, int>, fold) = %s, want int", got)
+	if got := MethodResult(reg, tvarBounded, "fold", nil).String(); got != "nint" {
+		t.Errorf("MethodResult(T: foldable<nint, nint>, fold) = %s, want nint", got)
 	}
 	// An unbounded type parameter has no methods.
 	tvarBare := &ir.TypeVar{Name: "T"}
@@ -661,8 +661,8 @@ func TestForElement(t *testing.T) {
 	}
 	// Bag = list<int> opts into foldable<int, string> (arbitrary distinct K/V so the
 	// of/in distinction is visible).
-	bagImpl := &ir.App{Def: foldable, Args: []ir.Type{bt("int"), bt("string")}}
-	bag := &ir.TypeDef{Name: "Bag", Body: bt("int"), Impls: []ir.Type{bagImpl}}
+	bagImpl := &ir.App{Def: foldable, Args: []ir.Type{bt("nint"), bt("string")}}
+	bag := &ir.TypeDef{Name: "Bag", Body: bt("nint"), Impls: []ir.Type{bagImpl}}
 
 	cases := []struct {
 		name string
@@ -672,15 +672,15 @@ func TestForElement(t *testing.T) {
 	}{
 		// A user type that opts in: of reads V, in reads K.
 		{"user opt-in of", &ir.Named{Def: bag}, true, "string"},
-		{"user opt-in in", &ir.Named{Def: bag}, false, "int"},
+		{"user opt-in in", &ir.Named{Def: bag}, false, "nint"},
 		// The interface in a requirement position (c: foldable<int, string>).
-		{"interface of", &ir.App{Def: foldable, Args: []ir.Type{bt("int"), bt("string")}}, true, "string"},
-		{"interface in", &ir.App{Def: foldable, Args: []ir.Type{bt("int"), bt("string")}}, false, "int"},
+		{"interface of", &ir.App{Def: foldable, Args: []ir.Type{bt("nint"), bt("string")}}, true, "string"},
+		{"interface in", &ir.App{Def: foldable, Args: []ir.Type{bt("nint"), bt("string")}}, false, "nint"},
 		// A bounded type parameter whose bound is the interface.
-		{"bounded typevar of", &ir.TypeVar{Name: "T", Bound: &ir.App{Def: foldable, Args: []ir.Type{bt("int"), bt("string")}}}, true, "string"},
-		{"bounded typevar in", &ir.TypeVar{Name: "T", Bound: &ir.App{Def: foldable, Args: []ir.Type{bt("int"), bt("string")}}}, false, "int"},
+		{"bounded typevar of", &ir.TypeVar{Name: "T", Bound: &ir.App{Def: foldable, Args: []ir.Type{bt("nint"), bt("string")}}}, true, "string"},
+		{"bounded typevar in", &ir.TypeVar{Name: "T", Bound: &ir.App{Def: foldable, Args: []ir.Type{bt("nint"), bt("string")}}}, false, "nint"},
 		// A non-foldable type is not iterable.
-		{"non-foldable", bt("int"), true, ""},
+		{"non-foldable", bt("nint"), true, ""},
 		{"unbounded typevar", &ir.TypeVar{Name: "T"}, true, ""},
 	}
 	for _, tc := range cases {
@@ -709,79 +709,79 @@ func TestNominalDerivation(t *testing.T) {
 	reg := builtin.Default()
 	level := &ir.Named{Def: &ir.TypeDef{
 		Name: "Level",
-		Body: bt("int8"),
+		Body: bt("sbyte"),
 		Methods: []*ir.Method{
 			{Name: "increment", Result: &ir.SelfType{}},
 		},
 	}}
 
 	if !IsInteger(reg, level) {
-		t.Errorf("IsInteger(Level) = false, want true (underlying int8)")
+		t.Errorf("IsInteger(Level) = false, want true (underlying sbyte)")
 	}
 
 	// add is not declared on Level; it is derived from int8 and returns self,
 	// which is Level. The default integer literal adapts to Level.
-	if got := MethodResult(reg, level, "add", []ir.Type{bt("int")}).String(); got != "Level" {
-		t.Errorf("MethodResult(Level, add, int) = %s, want Level", got)
+	if got := MethodResult(reg, level, "add", []ir.Type{bt("nint")}).String(); got != "Level" {
+		t.Errorf("MethodResult(Level, add, nint) = %s, want Level", got)
 	}
 	// Level + Level is Level.
 	if got := MethodResult(reg, level, "add", []ir.Type{level}).String(); got != "Level" {
 		t.Errorf("MethodResult(Level, add, Level) = %s, want Level", got)
 	}
 	// A comparison derived from int8 returns bool.
-	if got := MethodResult(reg, level, "lt", []ir.Type{bt("int")}).String(); got != "bool" {
-		t.Errorf("MethodResult(Level, lt, int) = %s, want bool", got)
+	if got := MethodResult(reg, level, "lt", []ir.Type{bt("nint")}).String(); got != "bool" {
+		t.Errorf("MethodResult(Level, lt, nint) = %s, want bool", got)
 	}
 	// Level's own method is found directly.
 	if got := MethodResult(reg, level, "increment", nil).String(); got != "Level" {
 		t.Errorf("MethodResult(Level, increment) = %s, want Level", got)
 	}
 	// Level does not implicitly convert to its underlying int8.
-	if Assignable(reg, level, bt("int8")) {
-		t.Errorf("Level should not be assignable to int8")
+	if Assignable(reg, level, bt("sbyte")) {
+		t.Errorf("Level should not be assignable to sbyte")
 	}
 	// The default integer adapts to Level.
-	if !Assignable(reg, bt("int"), level) {
-		t.Errorf("int should be assignable to the nominal integer Level")
+	if !Assignable(reg, bt("nint"), level) {
+		t.Errorf("nint should be assignable to the nominal integer Level")
 	}
 }
 
 func TestAssignableUnion(t *testing.T) {
 	reg := builtin.Default()
-	union := &ir.Union{Members: []ir.Type{bt("int8"), bt("error")}}
+	union := &ir.Union{Members: []ir.Type{bt("sbyte"), bt("error")}}
 
 	// A union accepts a value of any of its member types.
 	if !Assignable(reg, bt("error"), union) {
-		t.Errorf("error should be assignable to int8 | error")
+		t.Errorf("error should be assignable to sbyte | error")
 	}
-	if !Assignable(reg, bt("int8"), union) {
-		t.Errorf("int8 should be assignable to int8 | error")
+	if !Assignable(reg, bt("sbyte"), union) {
+		t.Errorf("sbyte should be assignable to sbyte | error")
 	}
 	// The default integer adapts to a union's integer member.
-	if !Assignable(reg, bt("int"), union) {
-		t.Errorf("int should be assignable to int8 | error")
+	if !Assignable(reg, bt("nint"), union) {
+		t.Errorf("nint should be assignable to sbyte | error")
 	}
 	// A non-member does not flow in.
 	if Assignable(reg, bt("string"), union) {
-		t.Errorf("string should not be assignable to int8 | error")
+		t.Errorf("string should not be assignable to sbyte | error")
 	}
 
 	// A union-typed value flows into a union that accepts every member it
 	// may hold — including itself, reordered — and not into a narrower one.
-	same := &ir.Union{Members: []ir.Type{bt("error"), bt("int8")}}
+	same := &ir.Union{Members: []ir.Type{bt("error"), bt("sbyte")}}
 	if !Assignable(reg, union, same) {
-		t.Errorf("int8 | error should be assignable to error | int8")
+		t.Errorf("sbyte | error should be assignable to error | sbyte")
 	}
-	wider := &ir.Union{Members: []ir.Type{bt("int8"), bt("string"), bt("error")}}
+	wider := &ir.Union{Members: []ir.Type{bt("sbyte"), bt("string"), bt("error")}}
 	if !Assignable(reg, union, wider) {
-		t.Errorf("int8 | error should be assignable to int8 | string | error")
+		t.Errorf("sbyte | error should be assignable to sbyte | string | error")
 	}
 	if Assignable(reg, wider, union) {
-		t.Errorf("int8 | string | error should not be assignable to int8 | error")
+		t.Errorf("sbyte | string | error should not be assignable to sbyte | error")
 	}
 	// A union does not flow into one of its members.
 	if Assignable(reg, union, bt("error")) {
-		t.Errorf("int8 | error should not be assignable to error")
+		t.Errorf("sbyte | error should not be assignable to error")
 	}
 }
 
@@ -792,9 +792,9 @@ func TestAssignableUnion(t *testing.T) {
 // match relies on.
 func TestAssignableNamedUnion(t *testing.T) {
 	reg := builtin.Default()
-	coin := &ir.Named{Def: &ir.TypeDef{Name: "Coin", Body: &ir.Record{Fields: []ir.Field{{Name: "amount", Type: bt("int")}}}}}
-	level := &ir.Named{Def: &ir.TypeDef{Name: "Level", Body: &ir.Record{Fields: []ir.Field{{Name: "rank", Type: bt("int")}}}}}
-	gem := &ir.Named{Def: &ir.TypeDef{Name: "Gem", Body: &ir.Record{Fields: []ir.Field{{Name: "color", Type: bt("int")}}}}}
+	coin := &ir.Named{Def: &ir.TypeDef{Name: "Coin", Body: &ir.Record{Fields: []ir.Field{{Name: "amount", Type: bt("nint")}}}}}
+	level := &ir.Named{Def: &ir.TypeDef{Name: "Level", Body: &ir.Record{Fields: []ir.Field{{Name: "rank", Type: bt("nint")}}}}}
+	gem := &ir.Named{Def: &ir.TypeDef{Name: "Gem", Body: &ir.Record{Fields: []ir.Field{{Name: "color", Type: bt("nint")}}}}}
 	bare := &ir.Union{Members: []ir.Type{coin, level}}
 	named := &ir.Named{Def: &ir.TypeDef{Name: "GameValue", Body: bare}}
 

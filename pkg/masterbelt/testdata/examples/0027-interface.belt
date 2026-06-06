@@ -13,7 +13,7 @@ pub interface foldable<K, V> {
   fold<A>(init: A, step: fn(acc: A, key: K, value: V): A): A
 
   /// Provided: the number of elements, folded from the primitive.
-  pub count(): int {
+  pub count(): nint {
     return fold(0, fn(acc, key, value) -> acc + 1)
   }
 
@@ -23,12 +23,12 @@ pub interface foldable<K, V> {
   }
 }
 
-/// A small bag of T values that folds over its contents. The `impl foldable<int, T>`
+/// A small bag of T values that folds over its contents. The `impl foldable<nint, T>`
 /// tag is what gives Bag the count/any methods — written here, at Bag's own
 /// definition site.
-pub type Bag<T> = list<T> impl foldable<int, T> {
+pub type Bag<T> = list<T> impl foldable<nint, T> {
   /// The required primitive: fold the underlying list.
-  fold<A>(init: A, step: fn(acc: A, key: int, value: T): A): A {
+  fold<A>(init: A, step: fn(acc: A, key: nint, value: T): A): A {
     return init
   }
 }
@@ -36,6 +36,6 @@ pub type Bag<T> = list<T> impl foldable<int, T> {
 // An interface written in a type-requirement position: c may be called only
 // through foldable's methods, fixed at this signature.
 /// The total of a collection of ints, folded with addition.
-pub fn total(c: foldable<int, int>): int {
+pub fn total(c: foldable<nint, nint>): nint {
   return c.fold(0, fn(acc, key, value) -> acc + value)
 }

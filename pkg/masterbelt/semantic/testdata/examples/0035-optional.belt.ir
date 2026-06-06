@@ -1,38 +1,38 @@
 Module
   Const "Present"
-    type optional<int>
+    type optional<nint>
     value IntLiteral "5"
     eval 5
   Const "Absent"
-    type optional<int>
+    type optional<nint>
     value <none>
     eval null
   Const "FromPresent"
-    type int
+    type nint
     value orZero(IntLiteral "5")
     eval 5
   Const "FromAbsent"
-    type int
+    type nint
     value orZero(<none>)
     eval 0
   Const "WithFallback"
-    type int
+    type nint
     value orFallback(<none>, IntLiteral "99")
     eval 99
   Func "orZero" pub
-    param v: optional<int>
-    result int
+    param v: optional<nint>
+    result nint
       match ParamRef "v"
-        arm int n
+        arm nint n
           return LocalRef "n"
         arm null
           return IntLiteral "0"
   Func "orFallback" pub
-    param v: optional<int>
-    param fallback: int
-    result int
+    param v: optional<nint>
+    param fallback: nint
+    result nint
       match ParamRef "v"
-        arm int n
+        arm nint n
           return LocalRef "n"
         else
           return ParamRef "fallback"

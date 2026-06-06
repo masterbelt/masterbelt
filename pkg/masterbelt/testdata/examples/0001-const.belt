@@ -1,7 +1,7 @@
 /* this is comment block here */
 
 /// DocComment for MaxLevel
-const MaxLevel: int64 = 100
+const MaxLevel: long = 100
 
 /// DocComment for MinLevel
 /// with multiline.

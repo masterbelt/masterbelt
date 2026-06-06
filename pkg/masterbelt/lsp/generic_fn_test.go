@@ -12,13 +12,13 @@ const genericFnLSPSrc = "" +
 	"pub interface foldable<K, V> {\n" +
 	"  fold<A>(init: A, step: fn(acc: A, key: K, value: V): A): A\n" +
 	"}\n" +
-	"pub type Bag = list<int> impl foldable<int, int> {\n" +
-	"  fold<A>(init: A, step: fn(acc: A, key: int, value: int): A): A {\n" +
+	"pub type Bag = list<nint> impl foldable<nint, nint> {\n" +
+	"  fold<A>(init: A, step: fn(acc: A, key: nint, value: nint): A): A {\n" +
 	"    return init\n" +
 	"  }\n" +
 	"}\n" +
 	"/// total of a foldable collection\n" +
-	"pub fn total<T: foldable<int, int>>(c: T): int {\n" +
+	"pub fn total<T: foldable<nint, nint>>(c: T): nint {\n" +
 	"  return c.fold(0, fn(acc, key, value) -> acc + value)\n" +
 	"}\n" +
 	"pub fn identity<T>(x: T): T {\n" +
@@ -35,7 +35,7 @@ func TestHoverGenericFunctionSignature(t *testing.T) {
 		if h == nil {
 			t.Fatal("no hover on the declared function name")
 		}
-		if !strings.Contains(h.Contents.Value, "pub fn total<T: foldable<int, int>>(c: T): int") {
+		if !strings.Contains(h.Contents.Value, "pub fn total<T: foldable<nint, nint>>(c: T): nint") {
 			t.Errorf("hover = %q, want the generic signature with the bound", h.Contents.Value)
 		}
 	})
@@ -62,6 +62,6 @@ func TestCompletionBoundedParamMethods(t *testing.T) {
 	got := byLabel(completion(doc, offset).Items)
 
 	if _, ok := got["fold"]; !ok {
-		t.Fatalf("member completion on c: T (T: foldable<int, int>) missing fold; got %v", got)
+		t.Fatalf("member completion on c: T (T: foldable<nint, nint>) missing fold; got %v", got)
 	}
 }

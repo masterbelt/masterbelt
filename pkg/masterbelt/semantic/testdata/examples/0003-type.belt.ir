@@ -1,10 +1,10 @@
 Module
   TypeDef "Coin" pub
     doc "A coin denomination."
-    body int8
+    body sbyte
   TypeDef "Level" pub
     doc "A character level."
-    body int8
+    body sbyte
     method "increment" pub
       doc "The next level up."
       result self
@@ -18,15 +18,15 @@ Module
     body T | null
   TypeDef "OptionalNumeric" pub
     doc "A small integer, or nothing."
-    param "T": int8 | int16
+    param "T": sbyte | short
     body T | null
   TypeDef "Record" pub
     doc "One saved character: an id and its level."
-    body { id: int8, level: Level }
+    body { id: sbyte, level: Level }
     method "game_id" pub
       doc "The record's id widened into the game's id space."
-      result int32
-      return int32(self.id).mul(IntLiteral "1000")
+      result int
+      return int(self.id).mul(IntLiteral "1000")
   TypeDef "Mapper" pub
     doc "A mapping from T to R."
     param "T"

@@ -23,7 +23,7 @@ File
     doc "A game score in points."
     pub
     name "Score"
-    body int32
+    body int
     method "merge"
       doc "The score with points merged in."
       pub
@@ -40,7 +40,7 @@ File
     doc "A character level."
     pub
     name "Level"
-    body int8
+    body sbyte
     method "next"
       doc "The next level."
       pub

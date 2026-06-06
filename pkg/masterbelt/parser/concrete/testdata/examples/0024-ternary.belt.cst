@@ -73,9 +73,9 @@ File
   TypeDecl
     Newline "\n"
     Newline "\n"
-    LineComment "// The branches unify the way a collection's elements do — an int branch beside a"
+    LineComment "// The branches unify the way a collection's elements do — an nint branch beside a"
     Newline "\n"
-    LineComment "// default-int literal stays int."
+    LineComment "// default-nint literal stays nint."
     Newline "\n"
     Pub "pub"
     Whitespace " "
@@ -86,7 +86,7 @@ File
     Assign "="
     Whitespace " "
     TypeName
-      Ident "int8"
+      Ident "sbyte"
     Whitespace " "
     ImplBlock
       Impl "impl"
@@ -260,7 +260,7 @@ File
     Assign "="
     Whitespace " "
     TypeName
-      Ident "int32"
+      Ident "int"
     Whitespace " "
     ImplBlock
       Impl "impl"
@@ -281,7 +281,7 @@ File
         Colon ":"
         Whitespace " "
         TypeName
-          Ident "int32"
+          Ident "int"
         Whitespace " "
         Block
           LBrace "{"

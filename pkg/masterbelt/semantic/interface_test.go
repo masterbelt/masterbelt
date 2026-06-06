@@ -22,7 +22,7 @@ func typeDef(m *ir.Module, name string) *ir.TypeDef {
 const foldableSrc = "" +
 	"pub interface foldable<K, V> {\n" +
 	"  fold<A>(init: A, step: fn(acc: A, key: K, value: V): A): A\n" +
-	"  pub count(): int {\n" +
+	"  pub count(): nint {\n" +
 	"    return fold(0, fn(acc, key, value) -> acc + 1)\n" +
 	"  }\n" +
 	"}\n"
@@ -56,8 +56,8 @@ func TestInterfaceResolvesAsTypeDef(t *testing.T) {
 // interface it impls produces no diagnostic, and records the impl.
 func TestConformingImplOK(t *testing.T) {
 	src := foldableSrc +
-		"pub type Bag<T> = list<T> impl foldable<int, T> {\n" +
-		"  fold<A>(init: A, step: fn(acc: A, key: int, value: T): A): A {\n" +
+		"pub type Bag<T> = list<T> impl foldable<nint, T> {\n" +
+		"  fold<A>(init: A, step: fn(acc: A, key: nint, value: T): A): A {\n" +
 		"    return init\n" +
 		"  }\n" +
 		"}\n"
@@ -75,8 +75,8 @@ func TestConformingImplOK(t *testing.T) {
 // not declare its required method is reported.
 func TestMissingRequiredMethod(t *testing.T) {
 	src := foldableSrc +
-		"pub type Bag<T> = list<T> impl foldable<int, T> {\n" +
-		"  pub size(): int {\n" +
+		"pub type Bag<T> = list<T> impl foldable<nint, T> {\n" +
+		"  pub size(): nint {\n" +
 		"    return 0\n" +
 		"  }\n" +
 		"}\n"
@@ -92,8 +92,8 @@ func TestMissingRequiredMethod(t *testing.T) {
 // directly; the provided one is reached through the impl'd interface.
 func TestProvidedMethodOnImplementor(t *testing.T) {
 	src := foldableSrc +
-		"pub type Bag<T> = list<T> impl foldable<int, T> {\n" +
-		"  fold<A>(init: A, step: fn(acc: A, key: int, value: T): A): A {\n" +
+		"pub type Bag<T> = list<T> impl foldable<nint, T> {\n" +
+		"  fold<A>(init: A, step: fn(acc: A, key: nint, value: T): A): A {\n" +
 		"    return init\n" +
 		"  }\n" +
 		"}\n"
@@ -106,7 +106,7 @@ func TestProvidedMethodOnImplementor(t *testing.T) {
 		t.Fatal("Bag not resolved")
 	}
 	reg := builtin.Default()
-	recv := &ir.App{Def: bag, Args: []ir.Type{&ir.Builtin{Name: "int"}}}
+	recv := &ir.App{Def: bag, Args: []ir.Type{&ir.Builtin{Name: "nint"}}}
 	if _, _, ok := types.Candidates(reg, recv, "fold"); !ok {
 		t.Error("fold (required, declared directly) does not resolve on Bag")
 	}
@@ -120,7 +120,7 @@ func TestProvidedMethodOnImplementor(t *testing.T) {
 // method on it resolves.
 func TestInterfaceAsParamType(t *testing.T) {
 	src := foldableSrc +
-		"pub fn total(c: foldable<int, int>): int {\n" +
+		"pub fn total(c: foldable<nint, nint>): nint {\n" +
 		"  return c.fold(0, fn(acc, key, value) -> acc + value)\n" +
 		"}\n"
 	m, diags := analyze(src)
@@ -136,8 +136,8 @@ func TestInterfaceAsParamType(t *testing.T) {
 	if total == nil || len(total.Params) != 1 {
 		t.Fatalf("total not resolved: %+v", m.Funcs)
 	}
-	if got := total.Params[0].Type.String(); got != "foldable<int, int>" {
-		t.Errorf("param type = %s, want foldable<int, int>", got)
+	if got := total.Params[0].Type.String(); got != "foldable<nint, nint>" {
+		t.Errorf("param type = %s, want foldable<nint, nint>", got)
 	}
 }
 
@@ -160,21 +160,21 @@ func TestPreludeFoldable(t *testing.T) {
 	if listDef == nil {
 		t.Fatal("list not on the surface")
 	}
-	listOfInt := &ir.App{Def: listDef, Args: []ir.Type{&ir.Builtin{Name: "int"}}}
+	listOfInt := &ir.App{Def: listDef, Args: []ir.Type{&ir.Builtin{Name: "nint"}}}
 	// fold is the required method list declares; count/any/all are foldable's
 	// provided methods reached through the impl; map is list's own inherent
 	// method (it shadows nothing here).
 	for _, name := range []string{"fold", "count", "any", "all", "map"} {
 		if _, _, ok := types.Candidates(reg, listOfInt, name); !ok {
-			t.Errorf("list<int> does not resolve %q (fold + provided foldable methods)", name)
+			t.Errorf("list<nint> does not resolve %q (fold + provided foldable methods)", name)
 		}
 	}
 
 	mapDef := surface["map"]
-	mapOfStrInt := &ir.App{Def: mapDef, Args: []ir.Type{&ir.Builtin{Name: "string"}, &ir.Builtin{Name: "int"}}}
+	mapOfStrInt := &ir.App{Def: mapDef, Args: []ir.Type{&ir.Builtin{Name: "string"}, &ir.Builtin{Name: "nint"}}}
 	for _, name := range []string{"fold", "count", "any", "all"} {
 		if _, _, ok := types.Candidates(reg, mapOfStrInt, name); !ok {
-			t.Errorf("map<string, int> does not resolve %q", name)
+			t.Errorf("map<string, nint> does not resolve %q", name)
 		}
 	}
 }
@@ -193,7 +193,7 @@ func TestPreludeFoldableListReturning(t *testing.T) {
 	}
 	reg.Install(defs)
 
-	intT := &ir.Builtin{Name: "int"}
+	intT := &ir.Builtin{Name: "nint"}
 	strT := &ir.Builtin{Name: "string"}
 	boolT := &ir.Builtin{Name: "bool"}
 
@@ -206,13 +206,13 @@ func TestPreludeFoldableListReturning(t *testing.T) {
 		want   string
 	}{
 		{"keys", nil, "list<string>"},
-		{"values", nil, "list<int>"},
-		{"filter", []ir.Type{&ir.Func{Params: []ir.Type{intT}, Result: boolT}}, "list<int>"},
+		{"values", nil, "list<nint>"},
+		{"filter", []ir.Type{&ir.Func{Params: []ir.Type{intT}, Result: boolT}}, "list<nint>"},
 		{"map", []ir.Type{&ir.Func{Params: []ir.Type{intT}, Result: boolT}}, "list<bool>"},
 	}
 	for _, c := range cases {
 		if got := types.MethodResult(reg, mapOfStrInt, c.method, c.args).String(); got != c.want {
-			t.Errorf("map<string, int>.%s = %s, want %s", c.method, got, c.want)
+			t.Errorf("map<string, nint>.%s = %s, want %s", c.method, got, c.want)
 		}
 	}
 }
@@ -220,9 +220,9 @@ func TestPreludeFoldableListReturning(t *testing.T) {
 // TestNotAnInterfaceTag checks that an impl tag naming a non-interface type is
 // reported.
 func TestNotAnInterfaceTag(t *testing.T) {
-	src := "pub type Pair = int8\n" +
-		"pub type Bag = list<int> impl Pair {\n" +
-		"  pub size(): int {\n" +
+	src := "pub type Pair = sbyte\n" +
+		"pub type Bag = list<nint> impl Pair {\n" +
+		"  pub size(): nint {\n" +
 		"    return 0\n" +
 		"  }\n" +
 		"}\n"

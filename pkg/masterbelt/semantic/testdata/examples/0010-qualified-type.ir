@@ -2,17 +2,17 @@
 Module
   Const "Origin" pub
     doc "The zero point every path starts from."
-    type int
+    type nint
     value IntLiteral "0"
     eval 0
   Const "Unit" pub
     doc "One step along the axis."
-    type int
+    type nint
     value IntLiteral "1"
     eval 1
   TypeDef "Point" pub
     doc "A 1-D coordinate."
-    body int32
+    body int
 # main.belt
 Module
   Const "start"

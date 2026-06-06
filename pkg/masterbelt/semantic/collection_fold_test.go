@@ -27,7 +27,7 @@ func TestMapLenFolds(t *testing.T) {
 // TestListFoldFolds checks the native list fold: the step sees (acc, index,
 // value), threaded from the init.
 func TestListFoldFolds(t *testing.T) {
-	src := "const S = [1, 2, 3].fold(0, fn(a: int, k: int, v: int): int -> a + v)\n"
+	src := "const S = [1, 2, 3].fold(0, fn(a: nint, k: nint, v: nint): nint -> a + v)\n"
 	if got := evalOf(t, src, "S").Int.Int64(); got != 6 {
 		t.Errorf("sum fold = %d, want 6", got)
 	}
@@ -36,7 +36,7 @@ func TestListFoldFolds(t *testing.T) {
 // TestListFoldUsesIndex checks that the list fold's key is the element index, in
 // order: summing the indices of a 3-element list is 0+1+2 = 3.
 func TestListFoldUsesIndex(t *testing.T) {
-	src := "const S = [10, 20, 30].fold(0, fn(a: int, k: int, v: int): int -> a + k)\n"
+	src := "const S = [10, 20, 30].fold(0, fn(a: nint, k: nint, v: nint): nint -> a + k)\n"
 	if got := evalOf(t, src, "S").Int.Int64(); got != 3 {
 		t.Errorf("index fold = %d, want 3 (0+1+2)", got)
 	}
@@ -44,7 +44,7 @@ func TestListFoldUsesIndex(t *testing.T) {
 
 // TestMapFoldFolds checks the native map fold: the step sees (acc, key, value).
 func TestMapFoldFolds(t *testing.T) {
-	src := "const S = [\"a\": 1, \"b\": 2, \"c\": 3].fold(0, fn(a: int, k: string, v: int): int -> a + v)\n"
+	src := "const S = [\"a\": 1, \"b\": 2, \"c\": 3].fold(0, fn(a: nint, k: string, v: nint): nint -> a + v)\n"
 	if got := evalOf(t, src, "S").Int.Int64(); got != 6 {
 		t.Errorf("map value fold = %d, want 6", got)
 	}
@@ -69,7 +69,7 @@ func TestMapCountFolds(t *testing.T) {
 // TestListMapProvidedFolds checks the foldable map (distinct from list's own
 // inherent map): map(fn(v) -> v * 2) over a list folds to the doubled list.
 func TestListMapProvidedFolds(t *testing.T) {
-	src := "const Xs = [1, 2, 3].map(fn(v: int): int -> v * 2)\n"
+	src := "const Xs = [1, 2, 3].map(fn(v: nint): nint -> v * 2)\n"
 	v := evalOf(t, src, "Xs")
 	if got := v.String(); got != "[2, 4, 6]" {
 		t.Errorf("map = %s, want [2, 4, 6]", got)
@@ -78,7 +78,7 @@ func TestListMapProvidedFolds(t *testing.T) {
 
 // TestListFilterFolds checks filter keeps the values satisfying the predicate.
 func TestListFilterFolds(t *testing.T) {
-	src := "const Xs = [1, 2, 3, 4].filter(fn(v: int): bool -> v > 2)\n"
+	src := "const Xs = [1, 2, 3, 4].filter(fn(v: nint): bool -> v > 2)\n"
 	v := evalOf(t, src, "Xs")
 	if got := v.String(); got != "[3, 4]" {
 		t.Errorf("filter = %s, want [3, 4]", got)
@@ -87,15 +87,15 @@ func TestListFilterFolds(t *testing.T) {
 
 // TestListAnyAllFold checks any and all fold to bools.
 func TestListAnyAllFold(t *testing.T) {
-	any := "const B = [1, 2, 3].any(fn(v: int): bool -> v > 2)\n"
+	any := "const B = [1, 2, 3].any(fn(v: nint): bool -> v > 2)\n"
 	if !evalOf(t, any, "B").Bool {
 		t.Errorf("any(>2) = false, want true")
 	}
-	all := "const B = [1, 2, 3].all(fn(v: int): bool -> v > 2)\n"
+	all := "const B = [1, 2, 3].all(fn(v: nint): bool -> v > 2)\n"
 	if evalOf(t, all, "B").Bool {
 		t.Errorf("all(>2) = true, want false")
 	}
-	allTrue := "const B = [1, 2, 3].all(fn(v: int): bool -> v > 0)\n"
+	allTrue := "const B = [1, 2, 3].all(fn(v: nint): bool -> v > 0)\n"
 	if !evalOf(t, allTrue, "B").Bool {
 		t.Errorf("all(>0) = false, want true")
 	}

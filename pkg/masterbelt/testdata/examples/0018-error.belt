@@ -1,6 +1,6 @@
 // The builtin error type: a recoverable failure as a value (belt has no
 // exceptions). error("msg") constructs one — the conversion form, like
-// int8(5) — and .message() reads the message back. A fallible function
+// sbyte(5) — and .message() reads the message back. A fallible function
 // declares failure in its result type as a union (T | error), never as a
 // thrown exception.
 
@@ -9,12 +9,12 @@ const E = error("boom")
 const M = E.message()
 
 // A fallible pure function: failure is a value in the result union.
-pub fn parseLevel(s: string): int | error {
+pub fn parseLevel(s: string): nint | error {
   return error("invalid level: " + s)
 }
 
 // The failure value flows into a union-typed constant.
-const P: int | error = parseLevel("99")
+const P: nint | error = parseLevel("99")
 
 assert error("x").message() == "x"
 assert E.message() == "boom"

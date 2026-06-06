@@ -108,7 +108,7 @@ func TestLookup(t *testing.T) {
 		"extern":  Extern,
 		"builtin": Builtin,
 		"let":     Let,
-		"int64":   Ident, // a type name is an ordinary identifier, not a keyword
+		"long":    Ident, // a type name is an ordinary identifier, not a keyword
 		"x":       Ident,
 	}
 	for ident, want := range cases {

@@ -20,26 +20,26 @@ File
   TypeDecl
     pub
     name "Point"
-    body { x: int, y: int }
+    body { x: nint, y: nint }
   FuncDecl
     pub
     name "double"
-    param x: int
-    result int
+    param x: nint
+    result nint
       return (call (. Identifier "x" mul) IntLit "2")
   FuncDecl
     pub
     name "area"
-    param w: int
-    param h: int
-    result int
+    param w: nint
+    param h: nint
+    result nint
       return (call (. Identifier "w" mul) Identifier "h")
   FuncDecl
     pub
     name "perimeter"
-    param w: int
-    param h: int
-    result int
+    param w: nint
+    param h: nint
+    result nint
       return (call (. (call Identifier "double" Identifier "w") add) (call Identifier "double" Identifier "h"))
   FuncDecl
     name "greet"

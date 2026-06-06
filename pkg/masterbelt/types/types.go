@@ -69,7 +69,7 @@ func IsString(reg *builtin.Registry, t ir.Type) bool {
 
 // defaultInt is the type of an integer literal: the arbitrary-precision integer
 // that adapts to any sized integer type.
-const defaultInt = "int"
+const defaultInt = "nint"
 
 // isDefaultInt reports whether t is the literal/default integer type, which
 // adapts to any other integer type.

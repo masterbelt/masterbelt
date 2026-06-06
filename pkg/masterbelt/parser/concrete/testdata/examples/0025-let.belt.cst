@@ -35,7 +35,7 @@ File
     Colon ":"
     Whitespace " "
     TypeName
-      Ident "int"
+      Ident "nint"
     Whitespace " "
     Block
       LBrace "{"
@@ -120,12 +120,12 @@ File
         Colon ":"
         Whitespace " "
         TypeName
-          Ident "int"
+          Ident "nint"
       RParen ")"
     Colon ":"
     Whitespace " "
     TypeName
-      Ident "int"
+      Ident "nint"
     Whitespace " "
     Block
       LBrace "{"
@@ -139,7 +139,7 @@ File
           Colon ":"
           Whitespace " "
           TypeName
-            Ident "int"
+            Ident "nint"
         Whitespace " "
         Initializer
           Assign "="
@@ -197,7 +197,7 @@ File
     Colon ":"
     Whitespace " "
     TypeName
-      Ident "int"
+      Ident "nint"
     Whitespace " "
     Block
       LBrace "{"

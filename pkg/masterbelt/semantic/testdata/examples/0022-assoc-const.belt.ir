@@ -1,11 +1,11 @@
 Module
   Const "Hi"
-    type int
-    value int8.Max
+    type nint
+    value sbyte.Max
     eval 127
   Const "Lo"
-    type int
-    value int8.Min
+    type nint
+    value sbyte.Min
     eval -128
   Const "Top"
     type Level
@@ -16,7 +16,7 @@ Module
     value Level.Min
     eval 0
   Const "W"
-    type int32
+    type int
     value Bits.Width
     eval 32
   Const "ServerPort"
@@ -25,25 +25,25 @@ Module
     eval 8080
   TypeDef "Level" pub
     doc "A character level, capped at 100."
-    body int8
+    body sbyte
     const "Max" pub
       doc "The highest level."
-      type int
+      type nint
       value 100
     const "Min" pub
       doc "The lowest level."
-      type int
+      type nint
       value 0
     method "increment" pub
       doc "The next level."
       result self
       return self.add(IntLiteral "1")
   TypeDef "Bits" pub
-    body int32
+    body int
     const "Width" pub
       doc "The width in bits."
-      type int32
+      type int
       value 32
   TypeDef "Port" pub
-    body int32
-    where self >= 1 && self <= int16.Max
+    body int
+    where self >= 1 && self <= short.Max

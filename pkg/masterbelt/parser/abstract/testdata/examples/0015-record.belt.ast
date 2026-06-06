@@ -23,11 +23,11 @@ File
   TypeDecl
     pub
     name "Point"
-    body { x: int, y: int }
+    body { x: nint, y: nint }
   TypeDecl
     pub
     name "Item"
-    body { id: int, name: string, pos: Point }
+    body { id: nint, name: string, pos: Point }
   TypeDecl
     pub
     name "Unit"

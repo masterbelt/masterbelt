@@ -7,7 +7,7 @@ import (
 	protocol "github.com/owenrumney/go-lsp/lsp"
 )
 
-const assocConstSrc = "/// a capped level\npub type Level = int8 impl {\n  /// the highest level\n  pub const Max = 100\n  pub const Min = 0\n}\nconst Top: Level = Level.Max\n"
+const assocConstSrc = "/// a capped level\npub type Level = sbyte impl {\n  /// the highest level\n  pub const Max = 100\n  pub const Min = 0\n}\nconst Top: Level = Level.Max\n"
 
 // TestAssocConstCompletion checks that a type member access offers the type's
 // associated constants, labelled with their value.
@@ -37,16 +37,16 @@ func TestAssocConstCompletion(t *testing.T) {
 // TestAssocConstBuiltinCompletion checks that a builtin primitive offers its
 // bounds (int8.Max / int8.Min) as constant completions.
 func TestAssocConstBuiltinCompletion(t *testing.T) {
-	src := "const X = int8.\n"
+	src := "const X = sbyte.\n"
 	doc := testView(src)
-	got := byLabel(completion(doc, strings.Index(src, "int8.")+len("int8.")).Items)
+	got := byLabel(completion(doc, strings.Index(src, "sbyte.")+len("sbyte.")).Items)
 	for _, name := range []string{"Max", "Min"} {
 		if _, ok := got[name]; !ok {
-			t.Errorf("int8 bound completion missing %q; got %v", name, got)
+			t.Errorf("sbyte bound completion missing %q; got %v", name, got)
 		}
 	}
 	if got["Max"].Detail != "= 127" {
-		t.Errorf("int8.Max detail = %q, want = 127", got["Max"].Detail)
+		t.Errorf("sbyte.Max detail = %q, want = 127", got["Max"].Detail)
 	}
 }
 
@@ -70,13 +70,13 @@ func TestAssocConstHover(t *testing.T) {
 // TestAssocConstBuiltinHover checks the hover for a builtin bound: int8.Max with
 // its value 127.
 func TestAssocConstBuiltinHover(t *testing.T) {
-	src := "const X = int8.Max\n"
+	src := "const X = sbyte.Max\n"
 	doc := testView(src)
-	h := hover(doc, strings.Index(src, "int8.Max")+len("int8."))
+	h := hover(doc, strings.Index(src, "sbyte.Max")+len("sbyte."))
 	if h == nil {
-		t.Fatal("no hover for int8.Max")
+		t.Fatal("no hover for sbyte.Max")
 	}
-	if !strings.Contains(h.Contents.Value, "int8.Max") || !strings.Contains(h.Contents.Value, "127") {
-		t.Errorf("hover = %q, want int8.Max ... 127", h.Contents.Value)
+	if !strings.Contains(h.Contents.Value, "sbyte.Max") || !strings.Contains(h.Contents.Value, "127") {
+		t.Errorf("hover = %q, want sbyte.Max ... 127", h.Contents.Value)
 	}
 }

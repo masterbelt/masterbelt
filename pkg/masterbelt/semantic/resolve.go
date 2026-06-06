@@ -335,8 +335,8 @@ func resolveDecl(env eval.Env, r *infer.TypeResolver, reg *builtin.Registry, td 
 // Each carries its resolved type (the annotation when present, else the kind of
 // its folded value) and its folded value (env folds the initializer; nil when
 // no evaluator is supplied). A `= builtin` constant takes its value from the
-// registry's value range — int8.Max/Min — and is rejected (no_bound) on a type
-// with no bound on that side (the arbitrary-precision int). A duplicate name
+// registry's value range — sbyte.Max/Min — and is rejected (no_bound) on a type
+// with no bound on that side (the arbitrary-precision nint). A duplicate name
 // keeps the first and is reported. tscope holds the type's generic-parameter
 // names, so an annotation may mention them.
 func resolveAssocConsts(env eval.Env, r *infer.TypeResolver, reg *builtin.Registry, td *ast.TypeDecl, def *ir.TypeDef, tscope map[string]bool, at func(ast.Node) span, diags *diagnostic.List) {
@@ -374,7 +374,7 @@ func resolveAssocConstList(env eval.Env, r *infer.TypeResolver, reg *builtin.Reg
 		if c.Builtin {
 			// A `= builtin` constant takes its value from the type's native value
 			// range — Max/Min. A type with no bound on that side has no such
-			// constant (the arbitrary-precision int): report no_bound.
+			// constant (the arbitrary-precision nint): report no_bound.
 			value, ok := builtinBound(reg, def.Name, c.Name)
 			if !ok {
 				if at != nil && diags != nil {
@@ -386,15 +386,15 @@ func resolveAssocConstList(env eval.Env, r *infer.TypeResolver, reg *builtin.Reg
 				continue
 			}
 			ac.Value = value
-			// A builtin bound is typed as the arbitrary-precision int (the type of
-			// an integer literal), not the concrete sized type: int8.Max is the
+			// A builtin bound is typed as the arbitrary-precision nint (the type of
+			// an integer literal), not the concrete sized type: sbyte.Max is the
 			// value 127, and like the literal 127 it adapts to whatever sized
-			// integer it is compared or assigned to (self <= int16.Max in an int32
+			// integer it is compared or assigned to (self <= short.Max in an int
 			// refinement). An explicit annotation overrides this.
 			if annType != nil {
 				ac.Type = annType
 			} else {
-				ac.Type = &ir.Builtin{Name: "int"}
+				ac.Type = &ir.Builtin{Name: "nint"}
 			}
 			out = append(out, ac)
 			continue
@@ -425,7 +425,7 @@ func resolveAssocConstList(env eval.Env, r *infer.TypeResolver, reg *builtin.Reg
 // builtinBound returns the value of a builtin associated constant — the named
 // bound (Max or Min) of the named primitive's value range — and whether the
 // primitive has that bound. A non-integer primitive, an unknown bound name, or
-// an unbounded side (the arbitrary-precision int, or uint's missing upper
+// an unbounded side (the arbitrary-precision nint, or nuint's missing upper
 // bound) yields ok == false.
 func builtinBound(reg *builtin.Registry, typeName, bound string) (*ir.Constant, bool) {
 	native, ok := reg.Native(typeName)
@@ -455,7 +455,7 @@ func builtinBound(reg *builtin.Registry, typeName, bound string) (*ir.Constant, 
 func constantType(v *ir.Constant) ir.Type {
 	switch v.Kind {
 	case ir.ConstInt:
-		return &ir.Builtin{Name: "int"}
+		return &ir.Builtin{Name: "nint"}
 	case ir.ConstBool:
 		return &ir.Builtin{Name: "bool"}
 	case ir.ConstString:
@@ -475,7 +475,7 @@ func constantType(v *ir.Constant) ir.Type {
 }
 
 // resolveEnumDecl fills in an enum definition from its declaration: the base
-// type (the integer family or string; the default int when omitted), the member
+// type (the integer family or string; the default nint when omitted), the member
 // values determined by the §3.5 rules, and the operator methods (the six
 // comparisons every enum has, plus the impl block's). Diagnostics — an invalid
 // base type, an out-of-range or duplicate value, a duplicate member name — are
@@ -483,12 +483,12 @@ func constantType(v *ir.Constant) ir.Type {
 // member initializers (a constant expression may reference a top-level const);
 // it is nil in callers that do not evaluate.
 func resolveEnumDecl(env eval.Env, r *infer.TypeResolver, reg *builtin.Registry, ed *ast.EnumDecl, def *ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List, fns bodyFuncs) {
-	// The base type: the annotation when present, else the default int. It must
+	// The base type: the annotation when present, else the default nint. It must
 	// resolve to an integer-family or string primitive — anything else (bool, a
-	// user type, a composite) is rejected, and the enum falls back to int so the
+	// user type, a composite) is rejected, and the enum falls back to nint so the
 	// rest of resolution stays well-formed.
-	base := "int"
-	baseType := ir.Type(&ir.Builtin{Name: "int"})
+	base := "nint"
+	baseType := ir.Type(&ir.Builtin{Name: "nint"})
 	if ed.Base != nil {
 		bt := r.ResolveType(ed.Base, nil)
 		if name, ok := integerOrStringBase(reg, bt); ok {
@@ -708,7 +708,7 @@ func kindName(k ir.ConstKind) string {
 	case ir.ConstBool:
 		return "bool"
 	case ir.ConstInt:
-		return "int"
+		return "nint"
 	default:
 		return "value"
 	}
