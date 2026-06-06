@@ -25,6 +25,27 @@ func checkDivByZero(e ast.Expr, env evalEnv, report func(node ast.Node)) {
 		})
 		return
 	}
+	if tern, ok := e.(*ast.TernaryExpr); ok {
+		// A ternary folds and runs only the selected branch, so the div-by-zero
+		// catch follows the same dispatch: the condition is always evaluated
+		// (and walked), and only the statically-taken branch is descended into —
+		// a div-by-zero on the guaranteed-taken path is reported, one on a
+		// provably-untaken path stays silent, matching eval's short-circuit. An
+		// unfoldable condition walks both branches conservatively (either could
+		// run), so a definite div-by-zero on every path is still caught.
+		checkDivByZero(tern.Cond, env, report)
+		cond := eval.Expr(tern.Cond, env)
+		switch {
+		case cond != nil && cond.Kind == ir.ConstBool && cond.Bool:
+			checkDivByZero(tern.Then, env, report)
+		case cond != nil && cond.Kind == ir.ConstBool && !cond.Bool:
+			checkDivByZero(tern.Else, env, report)
+		default:
+			checkDivByZero(tern.Then, env, report)
+			checkDivByZero(tern.Else, env, report)
+		}
+		return
+	}
 	call, ok := e.(*ast.CallExpr)
 	if !ok {
 		return
@@ -39,9 +60,38 @@ func checkDivByZero(e ast.Expr, env evalEnv, report func(node ast.Node)) {
 		}
 	}
 	checkDivByZero(member.Receiver, env, report)
+	if shortCircuits(member, call.Arguments, env) {
+		// A short-circuited && / || never evaluates its right operand, so a
+		// div-by-zero there is unreachable — matching eval, which folds the
+		// connective without touching the dead side. The receiver is still
+		// walked above; the argument is skipped.
+		return
+	}
 	for _, a := range call.Arguments {
 		checkDivByZero(a, env, report)
 	}
+}
+
+// shortCircuits reports whether a boolean connective call (&& desugared to anan,
+// || to oror) short-circuits — its receiver folds to a bool that already decides
+// the result (false && _, true || _) — so its right operand is dead. A receiver
+// that does not fold, or the non-deciding bool, returns false: the argument is
+// live and must be walked.
+func shortCircuits(member *ast.MemberExpr, args []ast.Expr, env evalEnv) bool {
+	if len(args) != 1 {
+		return false
+	}
+	recv := eval.Expr(member.Receiver, env)
+	if recv == nil || recv.Kind != ir.ConstBool {
+		return false
+	}
+	switch member.Member.Name {
+	case "anan":
+		return !recv.Bool
+	case "oror":
+		return recv.Bool
+	}
+	return false
 }
 
 // checkIndexWrites reports a list index write past the end (index_out_of_range).
@@ -313,7 +363,7 @@ func checkFuncBodies(reg *builtin.Registry, file *ast.File, universe map[string]
 			continue // the sink-only walk wants no further diagnostics
 		}
 		checkIndexWrites(fd.Body, env, at, diags)
-		if hasBlockBody(fd) && !bodyReturns(fd.Body, scrutEnumOf(bs)) {
+		if hasBlockBody(fd) && !bodyReturns(fd.Body, bs) {
 			s := at(fd)
 			diags.Add(newMissingReturnDiagnostic(s.offset, s.width, fd.Name))
 		}
@@ -376,13 +426,18 @@ func checkStmts(stmts []ast.Stmt, want ir.Type, bs infer.BodyScope, env eval.Env
 }
 
 // scrutEnumOf builds the scrutinee-enum resolver return analysis uses: it reads
-// the enum a scrutinee's static type names from the body scope — a parameter's
-// type, the receiver's type for self — without the type query, exactly as the
-// body binder does when lowering a switch's bare-member arms.
+// the enum a scrutinee's static type names from the body scope — a let-bound
+// local (which shadows a same-named parameter), a parameter's type, or the
+// receiver's type for self — without the type query, exactly as checkSwitch and
+// the body binder resolve the scrutinee. The walk grows bs.Locals as it descends
+// a block's lets, so the local in scope at the switch is the one read here.
 func scrutEnumOf(bs infer.BodyScope) func(ast.Expr) *ir.TypeDef {
 	return func(scrutinee ast.Expr) *ir.TypeDef {
 		switch e := scrutinee.(type) {
 		case *ast.Identifier:
+			if t, ok := bs.Locals[e.Name]; ok {
+				return enumDefOf(t)
+			}
 			if t, ok := bs.Params[e.Name]; ok {
 				return enumDefOf(t)
 			}

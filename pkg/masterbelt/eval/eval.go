@@ -295,6 +295,15 @@ func evalExpr(e ast.Expr, ctx evalCtx) *ir.Constant {
 			}
 		}
 		recv := evalExpr(member.Receiver, sub)
+		// The boolean connectives short-circuit: && (anan) with a false receiver
+		// is false and || (oror) with a true receiver is true, without ever
+		// folding the right operand — exactly as the runtime (and a ternary)
+		// never evaluates the untaken side. This both matches the dynamic
+		// semantics and keeps an unfoldable (or would-not-fold) dead operand from
+		// blocking the fold.
+		if v, ok := shortCircuit(recv, member.Member.Name, e.Arguments); ok {
+			return v
+		}
 		args := make([]*ir.Constant, len(e.Arguments))
 		for i, a := range e.Arguments {
 			args[i] = evalExpr(a, sub)
@@ -303,6 +312,29 @@ func evalExpr(e ast.Expr, ctx evalCtx) *ir.Constant {
 	default:
 		return nil
 	}
+}
+
+// shortCircuit folds a boolean connective whose receiver already decides the
+// result: false && _ is false, true || _ is true. It reports whether it handled
+// the call — true with the folded value when the receiver short-circuits, false
+// when it does not (a non-bool/unfoldable receiver, the non-deciding side, or a
+// method that is not a connective), leaving the normal eager path to fold the
+// argument and dispatch.
+func shortCircuit(recv *ir.Constant, name string, args []ast.Expr) (*ir.Constant, bool) {
+	if recv == nil || recv.Kind != ir.ConstBool || len(args) != 1 {
+		return nil, false
+	}
+	switch name {
+	case "anan":
+		if !recv.Bool {
+			return ir.BoolConstant(false), true
+		}
+	case "oror":
+		if recv.Bool {
+			return ir.BoolConstant(true), true
+		}
+	}
+	return nil, false
 }
 
 // convert folds a conversion T(x). The one conversion with a constant value
@@ -774,14 +806,14 @@ func evalBody(body []ast.Stmt, ctx evalCtx) *ir.Constant {
 				return nil // an unfoldable value (or invalid target): cannot fold on
 			}
 		case *ast.SwitchStmt:
-			if v := evalSwitch(stmt, ctx); v != nil {
-				return v
+			v, out := evalSwitch(stmt, ctx)
+			if out == switchFellThrough {
+				continue // the selected arm ran without returning; carry on
 			}
-			// A switch whose scrutinee or arms cannot be folded — or that
-			// selected an arm with no return — leaves the body unevaluated:
-			// nothing after a guaranteed-return switch is reachable, and a
-			// partial switch cannot fold.
-			return nil
+			// switchReturned yields the arm's value; switchUnknown (an
+			// unfoldable scrutinee/pattern, or no arm matched) leaves v nil,
+			// which stops folding here.
+			return v
 		case *ast.IfStmt:
 			v, out := evalIf(stmt, ctx)
 			if out == ifFellThrough {
@@ -960,10 +992,15 @@ func branchOutcome(body []ast.Stmt, ctx evalCtx) (*ir.Constant, ifOutcome) {
 				return nil, ifUnknown
 			}
 		case *ast.SwitchStmt:
-			if v := evalSwitch(stmt, ctx); v != nil {
+			v, sout := evalSwitch(stmt, ctx)
+			switch sout {
+			case switchFellThrough:
+				continue
+			case switchReturned:
 				return v, ifReturned
+			default:
+				return nil, ifUnknown
 			}
-			return nil, ifUnknown
 		case *ast.IfStmt:
 			v, out := evalIf(stmt, ctx)
 			if out == ifFellThrough {
@@ -978,32 +1015,59 @@ func branchOutcome(body []ast.Stmt, ctx evalCtx) (*ir.Constant, ifOutcome) {
 	return nil, ifFellThrough // the branch ran to its end without returning
 }
 
+// switchOutcome mirrors ifOutcome for a switch: the same three cases the body
+// walk threads to decide whether to continue past the statement or stop.
+type switchOutcome int
+
+const (
+	switchUnknown     switchOutcome = iota // scrutinee/pattern unfoldable, or no arm matched
+	switchReturned                         // the selected arm returned a value
+	switchFellThrough                      // the selected arm ran to its end without returning
+)
+
 // evalSwitch selects and runs the matching arm of a switch: it folds the
 // scrutinee, compares it for equality against each arm's folded value patterns
 // in order, and runs the first matching arm's body — the wildcard arm last. It
-// returns nil when the scrutinee or a needed pattern cannot be folded, or when
-// no arm (and no wildcard) matches, so a switch only folds when its dispatch is
-// fully determined.
-func evalSwitch(sw *ast.SwitchStmt, ctx evalCtx) *ir.Constant {
+// classifies how the selected arm ended (switchReturned / switchFellThrough)
+// like an if, so a fall-through arm continues the outer body carrying any
+// assignment it made to an outer local. It is switchUnknown when the scrutinee
+// or a needed pattern cannot be folded, or when no arm (and no wildcard)
+// matches, so a switch only folds when its dispatch is fully determined.
+func evalSwitch(sw *ast.SwitchStmt, ctx evalCtx) (*ir.Constant, switchOutcome) {
 	scrut := evalExpr(sw.Scrutinee, ctx)
 	if scrut == nil {
-		return nil
+		return nil, switchUnknown
 	}
 	for _, arm := range sw.Arms {
 		for _, v := range arm.Values {
 			cv := evalExpr(v, expectingScrutinee(ctx, scrut))
 			if cv == nil {
-				return nil // an unfoldable pattern: the dispatch is undetermined
+				return nil, switchUnknown // an unfoldable pattern: undetermined
 			}
 			if constEqual(scrut, cv) {
-				return evalBody(arm.Body, ctx)
+				return switchArmOutcome(branchOutcome(arm.Body, ctx))
 			}
 		}
 	}
 	if sw.Else != nil {
-		return evalBody(sw.Else, ctx)
+		return switchArmOutcome(branchOutcome(sw.Else, ctx))
 	}
-	return nil
+	return nil, switchUnknown
+}
+
+// switchArmOutcome translates an arm body's ifOutcome — branchOutcome is the
+// shared block runner — into the switch's own outcome: a return yields its
+// value, a fall-through continues the outer body, and an unfoldable branch is
+// undetermined.
+func switchArmOutcome(v *ir.Constant, out ifOutcome) (*ir.Constant, switchOutcome) {
+	switch out {
+	case ifReturned:
+		return v, switchReturned
+	case ifFellThrough:
+		return nil, switchFellThrough
+	default:
+		return nil, switchUnknown
+	}
 }
 
 // expectingScrutinee folds an arm value with the scrutinee's enum in scope, so
@@ -1016,9 +1080,13 @@ func expectingScrutinee(ctx evalCtx, scrut *ir.Constant) evalCtx {
 	return ctx
 }
 
-// constEqual reports whether two folded constants are equal for switch
-// dispatch: enum members compare by identity (definition and index), and the
-// scalar kinds by their value. Differing kinds are never equal.
+// constEqual reports whether two folded constants are structurally equal — the
+// equality a switch dispatches on and a map keys by. Enum members compare by
+// identity (definition and index), the scalar kinds by their value, an error by
+// its message, and the composite kinds recursively: a collection by length and
+// entrywise key/value equality, a record by its canonical (name-sorted) fields.
+// Differing kinds are never equal. A function value has no structural identity,
+// so two of them are never equal.
 func constEqual(a, b *ir.Constant) bool {
 	if a == nil || b == nil || a.Kind != b.Kind {
 		return false
@@ -1030,10 +1098,43 @@ func constEqual(a, b *ir.Constant) bool {
 		return a.Bool == b.Bool
 	case ir.ConstString:
 		return a.Str == b.Str
+	case ir.ConstError:
+		return a.Str == b.Str
 	case ir.ConstEnum:
 		return a.EnumDef == b.EnumDef && a.EnumIndex == b.EnumIndex
 	case ir.ConstDatetime, ir.ConstDuration:
 		return a.Millis == b.Millis
+	case ir.ConstCollection:
+		if len(a.Coll) != len(b.Coll) {
+			return false
+		}
+		for i := range a.Coll {
+			// A list entry has a nil key on both sides; a map entry's keys must
+			// match too. A key present on one side but not the other (a list
+			// against a map of the same length) is unequal.
+			if (a.Coll[i].Key == nil) != (b.Coll[i].Key == nil) {
+				return false
+			}
+			if a.Coll[i].Key != nil && !constEqual(a.Coll[i].Key, b.Coll[i].Key) {
+				return false
+			}
+			if !constEqual(a.Coll[i].Value, b.Coll[i].Value) {
+				return false
+			}
+		}
+		return true
+	case ir.ConstRecord:
+		// RecordConstant normalizes fields to canonical name order, so equal
+		// records have identically ordered fields: a positional walk suffices.
+		if len(a.Fields) != len(b.Fields) {
+			return false
+		}
+		for i := range a.Fields {
+			if a.Fields[i].Name != b.Fields[i].Name || !constEqual(a.Fields[i].Value, b.Fields[i].Value) {
+				return false
+			}
+		}
+		return true
 	default:
 		return false
 	}

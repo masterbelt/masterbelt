@@ -272,13 +272,17 @@ func (b bodyBinder) bodyScope() infer.BodyScope {
 // ExpectedEnum returns the enum definition a switch scrutinee's static type
 // names, so its bare-member arms (Common rather than Rarity.Common) lower to
 // enum-member values. It reads the type syntactically from the binder's scope
-// — a parameter's resolved type, the receiver's type for self — without the
-// type query, keeping value lowering independent of typing. A scrutinee whose
-// enum cannot be read this way yields nil, and its bare members stay
-// unresolved (the qualified form always works).
+// — a let-bound local (which shadows a same-named parameter), a parameter's
+// resolved type, the receiver's type for self — without the type query, keeping
+// value lowering independent of typing. A scrutinee whose enum cannot be read
+// this way yields nil, and its bare members stay unresolved (the qualified form
+// always works).
 func (b bodyBinder) ExpectedEnum(scrutinee ast.Expr) *ir.TypeDef {
 	switch e := scrutinee.(type) {
 	case *ast.Identifier:
+		if t, ok := b.locals[e.Name]; ok {
+			return enumDefOf(t)
+		}
 		if t, ok := b.paramTypes[e.Name]; ok {
 			return enumDefOf(t)
 		}

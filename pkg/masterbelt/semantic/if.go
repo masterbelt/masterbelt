@@ -51,15 +51,15 @@ func checkIf(s *ast.IfStmt, want ir.Type, bs infer.BodyScope, env eval.Env, noSe
 // its then body must return, and it must have an else branch — a chained else-if
 // (itself returning on every path) or a plain else body that returns. An if with
 // no else cannot guarantee a return, since the condition may be false.
-func ifReturns(s *ast.IfStmt, scrutEnum func(ast.Expr) *ir.TypeDef) bool {
-	if !bodyReturns(s.Then, scrutEnum) {
+func ifReturns(s *ast.IfStmt, bs infer.BodyScope) bool {
+	if !bodyReturns(s.Then, bs) {
 		return false
 	}
 	switch {
 	case s.ElseIf != nil:
-		return ifReturns(s.ElseIf, scrutEnum)
+		return ifReturns(s.ElseIf, bs)
 	case s.Else != nil:
-		return bodyReturns(s.Else, scrutEnum)
+		return bodyReturns(s.Else, bs)
 	default:
 		return false // no else: the false path falls through without returning
 	}

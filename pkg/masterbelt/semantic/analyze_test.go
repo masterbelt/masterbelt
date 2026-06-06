@@ -703,6 +703,73 @@ func TestDivisionByZero(t *testing.T) {
 	}
 }
 
+// TestDivisionByZeroInTernary checks that checkDivByZero descends into a
+// ternary the same way eval does: the condition is always walked, and only the
+// statically-selected branch — so a div-by-zero on the guaranteed-taken path is
+// reported, while one on the provably-untaken path stays silent. Before
+// checkDivByZero handled TernaryExpr, none of these were reported.
+func TestDivisionByZeroInTernary(t *testing.T) {
+	reported := []string{
+		"const X = true ? 1 / 0 : 5\n",              // taken then-branch
+		"const Y = false ? 5 : 1 / 0\n",             // taken else-branch
+		"const Z = (1 > 2) ? 5 : 10 / 0\n",          // else taken (1>2 is false)
+		"const W = (1 / 0 == 0) ? 1 : 2\n",          // the condition itself
+		"const V = true ? (true ? 1 / 0 : 1) : 2\n", // nested, taken
+		"assert (true ? 1 / 0 : 5) == 0\n",          // an assert condition
+	}
+	for _, src := range reported {
+		if _, diags := analyze(src); !hasCode(diags, CodeDivisionByZero) {
+			t.Errorf("%q: want division_by_zero on the taken branch, got %v", src, codes(diags))
+		}
+	}
+	silent := []string{
+		"const X = true ? 1 : 1 / 0\n",     // untaken else
+		"const Y = false ? 1 / 0 : 1\n",    // untaken then
+		"const Z = (1 < 2) ? 5 : 10 / 0\n", // then taken, else (10/0) untaken
+	}
+	for _, src := range silent {
+		if _, diags := analyze(src); hasCode(diags, CodeDivisionByZero) {
+			t.Errorf("%q: a provably-untaken div-by-zero must stay silent, got %v", src, codes(diags))
+		}
+	}
+}
+
+// TestShortCircuitBoolConnectives checks the boolean connectives' short-circuit
+// end to end: a false && or a true || folds to a bool without evaluating its
+// dead right operand, and checkDivByZero does not flag a div-by-zero in that
+// dead operand — it is never evaluated, matching eval and the runtime.
+func TestShortCircuitBoolConnectives(t *testing.T) {
+	// The dead operand carries a division by zero, which must not be reported.
+	for _, tc := range []struct{ src, want string }{
+		{"const Y: bool = false && (1 / 0 == 0)\n", "false"},
+		{"const Y: bool = true || (1 / 0 == 0)\n", "true"},
+	} {
+		m, diags := analyze(tc.src)
+		if hasCode(diags, CodeDivisionByZero) {
+			t.Errorf("%q: a short-circuited div-by-zero must not be reported: %v", tc.src, codes(diags))
+		}
+		if len(diags) != 0 {
+			t.Errorf("%q: unexpected diagnostics: %v", tc.src, codes(diags))
+		}
+		for _, c := range m.Consts {
+			if c.Name == "Y" && (c.Eval == nil || c.Eval.String() != tc.want) {
+				t.Errorf("%q: Y = %v, want %s", tc.src, c.Eval, tc.want)
+			}
+		}
+	}
+
+	// The live operand still carries its div-by-zero: a true && (...) needs the
+	// right, so a div-by-zero there is real and reported.
+	for _, src := range []string{
+		"const Y: bool = true && (1 / 0 == 0)\n",
+		"const Y: bool = false || (1 / 0 == 0)\n",
+	} {
+		if _, diags := analyze(src); !hasCode(diags, CodeDivisionByZero) {
+			t.Errorf("%q: a live operand's div-by-zero must be reported, got %v", src, codes(diags))
+		}
+	}
+}
+
 func TestAnnotationMismatch(t *testing.T) {
 	for _, src := range []string{
 		"const x: int8 = true\n",
@@ -1491,6 +1558,39 @@ func TestEffectInPureContext(t *testing.T) {
 	// A pure call stays allowed.
 	if _, diags := analyze("fn one(): int -> 1\nconst A = one()\n"); hasCode(diags, CodeEffectInPureContext) {
 		t.Errorf("pure call flagged: %v", codes(diags))
+	}
+}
+
+func TestEffectInTernaryBranch(t *testing.T) {
+	// A ternary's branches are part of the body the effect walker must pierce:
+	// an effectful call in the then or else branch counts toward the enclosing
+	// declaration's effects, exactly as one in a return value does. Before
+	// collectEffectUses handled TernaryExpr, the branch was never visited, so
+	// the effect slipped past both completeness checks.
+	roots := "extern fn nondet roll(): int\n"
+
+	// missing_effect: an undeclared effect in a ternary branch of a function body.
+	for _, body := range []string{
+		"return flag ? roll() : 0",
+		"return flag ? 0 : roll()",
+		"return (roll() == 1) ? 0 : 0", // the condition counts too
+	} {
+		src := roots + "pub fn f(flag: bool): int {\n  " + body + "\n}\n"
+		if _, diags := analyze(src); !hasCode(diags, CodeMissingEffect) {
+			t.Errorf("%q: want missing_effect for an effect in a ternary, got %v", body, codes(diags))
+		}
+	}
+
+	// effect_in_pure_context: an effectful call in a ternary branch of a const
+	// initializer (and an assert condition) is the harder soundness hole.
+	for _, src := range []string{
+		roots + "const A = true ? roll() : 0\n",
+		roots + "const B = false ? 0 : roll()\n",
+		roots + "assert (true ? roll() : 0) == 1\n",
+	} {
+		if _, diags := analyze(src); !hasCode(diags, CodeEffectInPureContext) {
+			t.Errorf("%q: want effect_in_pure_context for an effect in a ternary, got %v", src, codes(diags))
+		}
 	}
 }
 

@@ -183,24 +183,55 @@ func enumValueIndex(v ast.Expr, enumDef *ir.TypeDef, env eval.Env) int {
 // it is exhaustive — it has a wildcard, or its arm values cover an enum — and
 // every arm body (and the wildcard body) itself returns. This is the return
 // analysis that keeps an exhaustive switch from tripping missing_return.
-func bodyReturns(body []ast.Stmt, scrutEnum func(ast.Expr) *ir.TypeDef) bool {
+//
+// bs is the body scope in force at the start of the body: it grows as the walk
+// descends a block's lets, so a switch over a let-bound enum local resolves its
+// scrutinee enum from the local in scope, exactly as checkSwitch does. The
+// growth is block-local — a copy per let — so an inner let does not leak to a
+// sibling statement's resolution.
+func bodyReturns(body []ast.Stmt, bs infer.BodyScope) bool {
 	for _, s := range body {
-		if stmtReturns(s, scrutEnum) {
+		if l, ok := s.(*ast.LetStmt); ok {
+			// A let in this block binds a local the statements after it (and the
+			// switches among them) can switch over; carry its settled type forward.
+			bs = bindReturnLocal(l, bs)
+			continue
+		}
+		if stmtReturns(s, bs) {
 			return true
 		}
 	}
 	return false
 }
 
+// bindReturnLocal grows bs with a let's settled type so a later switch over the
+// local resolves its scrutinee enum. The type is inferred the eval-free way
+// (infer.Body sees the params and locals already in scope), mirroring the
+// checking walk's checkLet without re-reporting; a nameless or unfoldable let
+// extends nothing meaningful (ir.Invalid is not an enum).
+func bindReturnLocal(s *ast.LetStmt, bs infer.BodyScope) infer.BodyScope {
+	if s.Name == "" {
+		return bs
+	}
+	typ := ir.Invalid
+	switch {
+	case s.Type != nil:
+		typ = resolveBodyType(bs, s.Type)
+	case s.Value != nil:
+		typ = infer.Body(s.Value, bs)
+	}
+	return withLocal(bs, s.Name, typ)
+}
+
 // stmtReturns reports whether one statement guarantees a return on every path.
-func stmtReturns(s ast.Stmt, scrutEnum func(ast.Expr) *ir.TypeDef) bool {
+func stmtReturns(s ast.Stmt, bs infer.BodyScope) bool {
 	switch s := s.(type) {
 	case *ast.ReturnStmt:
 		return s.Value != nil
 	case *ast.SwitchStmt:
-		return switchReturns(s, scrutEnum)
+		return switchReturns(s, bs)
 	case *ast.IfStmt:
-		return ifReturns(s, scrutEnum)
+		return ifReturns(s, bs)
 	default:
 		return false
 	}
@@ -209,18 +240,18 @@ func stmtReturns(s ast.Stmt, scrutEnum func(ast.Expr) *ir.TypeDef) bool {
 // switchReturns reports whether a switch always returns: it must be exhaustive
 // (a wildcard, or an enum scrutinee every member of which an arm names) and
 // every arm body — and the wildcard body — must itself return.
-func switchReturns(sw *ast.SwitchStmt, scrutEnum func(ast.Expr) *ir.TypeDef) bool {
+func switchReturns(sw *ast.SwitchStmt, bs infer.BodyScope) bool {
 	for _, arm := range sw.Arms {
-		if !bodyReturns(arm.Body, scrutEnum) {
+		if !bodyReturns(arm.Body, bs) {
 			return false
 		}
 	}
 	if sw.Else != nil {
-		return bodyReturns(sw.Else, scrutEnum)
+		return bodyReturns(sw.Else, bs)
 	}
 	// No wildcard: the switch returns only if it is exhaustive over an enum
 	// (every member named) — a scalar without a wildcard never is.
-	enumDef := scrutEnum(sw.Scrutinee)
+	enumDef := scrutEnumOf(bs)(sw.Scrutinee)
 	if enumDef == nil {
 		return false
 	}
