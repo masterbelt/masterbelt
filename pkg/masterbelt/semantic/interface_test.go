@@ -179,6 +179,44 @@ func TestPreludeFoldable(t *testing.T) {
 	}
 }
 
+// TestPreludeFoldableListReturning checks that foldable's list-returning provided
+// methods — map, filter, keys, values — resolve to the right list<...> type on an
+// implementor, instantiating both the receiver's K/V and the method's own U. The
+// methods' bodies type-check during LoadPrelude (a body that did not would fail
+// the load), so reaching this far already exercises the implementation; here we
+// pin the result types the caller sees.
+func TestPreludeFoldableListReturning(t *testing.T) {
+	reg := builtin.Default()
+	surface, defs, err := LoadPrelude(reg)
+	if err != nil {
+		t.Fatalf("LoadPrelude: %v", err)
+	}
+	reg.Install(defs)
+
+	intT := &ir.Builtin{Name: "int"}
+	strT := &ir.Builtin{Name: "string"}
+	boolT := &ir.Builtin{Name: "bool"}
+
+	mapOfStrInt := &ir.App{Def: surface["map"], Args: []ir.Type{strT, intT}}
+	// keys/values draw on the receiver's K and V; filter on V; map on its own U
+	// (bound here from f: fn(value: int): bool).
+	cases := []struct {
+		method string
+		args   []ir.Type
+		want   string
+	}{
+		{"keys", nil, "list<string>"},
+		{"values", nil, "list<int>"},
+		{"filter", []ir.Type{&ir.Func{Params: []ir.Type{intT}, Result: boolT}}, "list<int>"},
+		{"map", []ir.Type{&ir.Func{Params: []ir.Type{intT}, Result: boolT}}, "list<bool>"},
+	}
+	for _, c := range cases {
+		if got := types.MethodResult(reg, mapOfStrInt, c.method, c.args).String(); got != c.want {
+			t.Errorf("map<string, int>.%s = %s, want %s", c.method, got, c.want)
+		}
+	}
+}
+
 // TestNotAnInterfaceTag checks that an impl tag naming a non-interface type is
 // reported.
 func TestNotAnInterfaceTag(t *testing.T) {
