@@ -258,6 +258,38 @@ func TestGenericFuncOverloadBoundCheckOrderIndependent(t *testing.T) {
 	}
 }
 
+// TestGenericFuncSolvesThroughUnionParam checks a type parameter nested inside a
+// union parameter (T | error — the central unwrap use-case) is solved from the
+// argument and substituted into the result.
+func TestGenericFuncSolvesThroughUnionParam(t *testing.T) {
+	src := "pub fn unwrap<T>(x: T | error): T { return x }\n" +
+		"const R = unwrap(1)\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("unwrap(1) should solve T = int; got %v", codes(diags))
+	}
+	r := constOf(m, "R")
+	if r == nil || r.Type.String() != "int" {
+		t.Fatalf("R type = %v, want int (T solved through the union)", r)
+	}
+}
+
+// TestGenericFuncSolvesThroughRecordParam checks a type parameter nested inside
+// a record parameter ({ v: T }) is solved from the argument's same-named field.
+func TestGenericFuncSolvesThroughRecordParam(t *testing.T) {
+	src := "pub type Box = { v: int }\n" +
+		"pub fn first<T>(p: { v: T }): T { return p.v }\n" +
+		"const R = first(Box{ v: 1 })\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("first(Box{ v: 1 }) should solve T = int; got %v", codes(diags))
+	}
+	r := constOf(m, "R")
+	if r == nil || r.Type.String() != "int" {
+		t.Fatalf("R type = %v, want int (T solved through the record field)", r)
+	}
+}
+
 // funcOf returns the resolved function of the given name in the module, or nil.
 func funcOf(m *ir.Module, name string) *ir.Function {
 	for _, f := range m.Funcs {

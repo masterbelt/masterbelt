@@ -522,6 +522,79 @@ func TestSubstituteAndMatch(t *testing.T) {
 	}
 }
 
+// TestMatchUnionAndRecord checks Match recurses into a union or record pattern
+// and solves the type variables nested in it, the way Substitute and
+// FreeTypeVars already reach into them — so a generic helper whose parameter is
+// `T | error` or `{ v: T }` solves T from its argument.
+func TestMatchUnionAndRecord(t *testing.T) {
+	reg := builtin.Default()
+	tvar := func(name string) ir.Type { return &ir.TypeVar{Name: name} }
+	union := func(ms ...ir.Type) ir.Type { return &ir.Union{Members: ms} }
+	record := func(fs ...ir.Field) ir.Type { return &ir.Record{Fields: fs} }
+	field := func(name string, t ir.Type) ir.Field { return ir.Field{Name: name, Type: t} }
+
+	// A value flowing into a `T | error` pattern binds T to the value's type.
+	subst := map[string]ir.Type{}
+	if !Match(reg, union(tvar("T"), bt("error")), bt("int"), subst) {
+		t.Fatal("Match(T | error, int) failed")
+	}
+	if got := subst["T"]; got == nil || got.String() != "int" {
+		t.Errorf("subst[T] = %v, want int", got)
+	}
+
+	// The concrete member is preferred only when no variable member solves it:
+	// an error argument matches the error member without binding T.
+	subst = map[string]ir.Type{}
+	if !Match(reg, union(tvar("T"), bt("error")), bt("error"), subst) {
+		t.Fatal("Match(T | error, error) failed")
+	}
+	if _, bound := subst["T"]; bound {
+		t.Errorf("error should match the error member, leaving T unbound; subst = %v", subst)
+	}
+
+	// Two unions of the same arity pair positionally.
+	subst = map[string]ir.Type{}
+	if !Match(reg, union(tvar("T"), bt("error")), union(bt("int"), bt("error")), subst) {
+		t.Fatal("Match(T | error, int | error) failed")
+	}
+	if got := subst["T"]; got == nil || got.String() != "int" {
+		t.Errorf("subst[T] = %v, want int", got)
+	}
+
+	// A record pattern { v: T } solves T from the argument's same-named field,
+	// looking through a nominal record.
+	box := &ir.Named{Def: &ir.TypeDef{Name: "Box", Body: record(field("v", bt("int")))}}
+	subst = map[string]ir.Type{}
+	if !Match(reg, record(field("v", tvar("T"))), box, subst) {
+		t.Fatal("Match({ v: T }, Box{ v: int }) failed")
+	}
+	if got := subst["T"]; got == nil || got.String() != "int" {
+		t.Errorf("subst[T] = %v, want int", got)
+	}
+
+	// A field the argument lacks (or a non-record argument) does not match.
+	subst = map[string]ir.Type{}
+	if Match(reg, record(field("missing", tvar("T"))), box, subst) {
+		t.Error("Match({ missing: T }, Box) must fail")
+	}
+	if Match(reg, record(field("v", tvar("T"))), bt("int"), map[string]ir.Type{}) {
+		t.Error("Match({ v: T }, int) must fail (int is no record)")
+	}
+
+	// A concrete union pattern (no variable) keeps the old assignability rule,
+	// which accepts a member value, a reordered union, and a narrower union —
+	// the recursion must not narrow the non-generic path.
+	if !Match(reg, union(bt("int"), bt("error")), bt("error"), map[string]ir.Type{}) {
+		t.Error("Match(int | error, error) must accept the member value")
+	}
+	if !Match(reg, union(bt("int"), bt("error")), union(bt("error"), bt("int")), map[string]ir.Type{}) {
+		t.Error("Match(int | error, error | int) must accept the reordered union")
+	}
+	if !Match(reg, union(bt("int"), bt("error"), bt("string")), union(bt("int"), bt("error")), map[string]ir.Type{}) {
+		t.Error("Match(int | error | string, int | error) must accept the narrower union")
+	}
+}
+
 // TestSatisfies checks the nominal-satisfaction rule a generic-function bound
 // uses (E-17): a type satisfies an interface bound only when it opts into the
 // interface (an entry in its Impls) with matching arguments, and a bounded type
