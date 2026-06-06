@@ -192,6 +192,18 @@ type evalCtx struct {
 // verdict an engine-level value cycle gets — instead of overflowing the stack.
 const maxApplyDepth = 256
 
+// maxRangeIterations caps the number of elements a range fold or for visits at
+// compile time. A range is constructed lazily from its bounds, so range(0,
+// 1_000_000_000) is a small value; only walking it would materialize the
+// sequence. Folding or iterating a range wider than this bound is treated as
+// unevaluable (nil / undecided) — the same conservative verdict the depth guard
+// gives — so a wide range neither hangs the folder nor exhausts memory. It is a
+// compile-time evaluation limit, not a language limit: a range of any width is a
+// valid value; it simply does not fold past this many steps. The list-folding
+// path needs no such cap because a list is already materialized — its length is
+// its memory — whereas a range's width is unbounded by its representation.
+const maxRangeIterations = 1 << 20
+
 // enumMember returns the value of the named member of def (an enum), or nil
 // when def is not an enum or has no such member.
 func enumMember(def *ir.TypeDef, name string) *ir.Constant {
@@ -454,14 +466,22 @@ func shortCircuit(recv *ir.Constant, name string, args []ast.Expr) (*ir.Constant
 	return nil, false
 }
 
-// convert folds a conversion T(x). A nominal conversion over a primitive
-// (Level(5), where Level = int8) is the identity on the value — a Level is
-// represented as its underlying integer — so the argument's folded value passes
-// through when its kind backs the type, which both gives Level(5) a value and
-// lets a method fold on it. The error constructor error("msg") folds to an error
-// constant carrying the message. Any other conversion has no constant value
-// here.
+// convert folds a conversion or constructor T(x). A nominal conversion over a
+// primitive (Level(5), where Level = int8) is the identity on the value — a
+// Level is represented as its underlying integer — so the argument's folded
+// value passes through when its kind backs the type, which both gives Level(5) a
+// value and lets a method fold on it. The error constructor error("msg") folds
+// to an error constant carrying the message; the range constructor range(start,
+// end) folds to a range value over the two folded bounds. Any other conversion
+// has no constant value here.
 func convert(def *ir.TypeDef, args []ast.Expr, ctx evalCtx) *ir.Constant {
+	// range(start, end) is the one two-argument constructor: it folds to a range
+	// value when both bounds fold to integers. It is a builtin the registry does
+	// not natively back (like list/map), so it is handled here by name rather than
+	// through a native descriptor.
+	if def.Builtin && def.Name == "range" {
+		return convertRange(args, ctx)
+	}
 	if len(args) != 1 {
 		return nil
 	}
@@ -494,6 +514,25 @@ func convert(def *ir.TypeDef, args []ast.Expr, ctx evalCtx) *ir.Constant {
 		return v
 	}
 	return nil
+}
+
+// convertRange folds the range constructor range(start, end): both bounds must
+// fold to integers, and the result is a range value over them — the half-open
+// sequence start..end-1 (an end at or below start being the empty range). The
+// sequence is not materialized here; the bounds are kept lazily so a wide range
+// is a small value, and the fold/for walk over it is bounded separately. A
+// non-two argument list (a recovered or step-form call) or an unfoldable or
+// non-integer bound does not fold.
+func convertRange(args []ast.Expr, ctx evalCtx) *ir.Constant {
+	if len(args) != 2 {
+		return nil
+	}
+	start := evalExpr(args[0], ctx)
+	end := evalExpr(args[1], ctx)
+	if start == nil || end == nil || start.Kind != ir.ConstInt || end.Kind != ir.ConstInt {
+		return nil
+	}
+	return ir.RangeConstant(start.Int, end.Int)
 }
 
 // callable is the body-bearing shape applyBody folds: a pure (non-extern,
@@ -781,6 +820,9 @@ func call(ctx evalCtx, recvExpr ast.Expr, recv *ir.Constant, name string, args [
 	if recv.Kind == ir.ConstCollection {
 		return collectionMethod(ctx, recv, name, args)
 	}
+	if recv.Kind == ir.ConstRange {
+		return rangeMethod(ctx, recv, name, args)
+	}
 	if recv.Kind == ir.ConstEnum {
 		return enumComparison(recv, name, args)
 	}
@@ -943,6 +985,13 @@ func receiverDef(ctx evalCtx, recvExpr ast.Expr, recv *ir.Constant) *ir.TypeDef 
 	// the empty-collection-reads-as-list default folds correctly.
 	if recv.Kind == ir.ConstCollection {
 		return ctx.env.LookupType(collectionTypeName(recv))
+	}
+	// A range value names its own type directly — it is the sole inhabitant kind of
+	// the range builtin — so its foldable provided methods (count, any, map, ...)
+	// reach their bodies through range's impl by a universe lookup, the same
+	// value-named channel a collection uses, without needing a receiver annotation.
+	if recv.Kind == ir.ConstRange {
+		return ctx.env.LookupType("range")
 	}
 	def := syntacticDef(ctx, recvExpr)
 	if def == nil || !defBacksKind(ctx.env.Registry(), def, recv.Kind) {
@@ -1419,6 +1468,60 @@ func collectionFold(ctx evalCtx, recv *ir.Constant, args []*ir.Constant) *ir.Con
 	return acc
 }
 
+// rangeMethod folds a method on a range constant. range is not natively backed
+// in the registry, so its only native method is the foldable primitive fold —
+// the same model list/map follow, where the provided methods (count, any, all,
+// map, filter, keys, values) reach the body through the foldable impl and bottom
+// out in this fold. Anything else has no constant value here.
+func rangeMethod(ctx evalCtx, recv *ir.Constant, name string, args []*ir.Constant) *ir.Constant {
+	if name == "fold" {
+		return rangeFold(ctx, recv, args)
+	}
+	return nil
+}
+
+// rangeFold folds range.fold — the foldable primitive every provided method is
+// built on. It threads an accumulator over the half-open sequence start..end-1,
+// the step seeing (acc, key, value) where the key is the element's 0-based
+// position (a range's key is its index, like a list's) and the value is the
+// element. An end at or below start is the empty range, which folds to the
+// initial accumulator. The walk is bounded by maxRangeIterations: a range wider
+// than the cap does not fold (nil), so a wide range never hangs the folder or
+// exhausts memory. An unfoldable step application (a non-function step, a body
+// that does not fold, or the recursion guard) also leaves the fold unevaluated.
+func rangeFold(ctx evalCtx, recv *ir.Constant, args []*ir.Constant) *ir.Constant {
+	if len(args) != 2 || args[1].Kind != ir.ConstFunc {
+		return nil
+	}
+	if recv.Start == nil || recv.End == nil {
+		return nil
+	}
+	// The element count is end - start, clamped at zero. A count past the cap does
+	// not fold — checked on the big.Int before any iteration, so a wide range is
+	// rejected in O(1) rather than walked.
+	count := new(big.Int).Sub(recv.End, recv.Start)
+	if count.Sign() <= 0 {
+		return args[0] // the empty range folds to the initial accumulator
+	}
+	if count.Cmp(big.NewInt(maxRangeIterations)) > 0 {
+		return nil // wider than the compile-time iteration bound: do not fold
+	}
+	acc := args[0]
+	step := args[1]
+	cur := new(big.Int).Set(recv.Start)
+	one := big.NewInt(1)
+	for i := int64(0); cur.Cmp(recv.End) < 0; i++ {
+		key := ir.IntConstant(big.NewInt(i))           // the 0-based position
+		value := ir.IntConstant(new(big.Int).Set(cur)) // the element
+		acc = apply(ctx, step, []*ir.Constant{acc, key, value})
+		if acc == nil {
+			return nil
+		}
+		cur.Add(cur, one)
+	}
+	return acc
+}
+
 // collectionMap folds list.map: it applies the function argument to each element
 // and collects the results into a new list. A map receiver (keyed entries) is
 // not foldable.
@@ -1803,17 +1906,18 @@ func evalIf(s *ast.IfStmt, ctx evalCtx) (*ir.Constant, ifOutcome) {
 	}
 }
 
-// evalFor folds a for statement: it folds the iterated expression to a
-// collection constant and runs the body once per element in fold order, binding
-// the loop variable to each element (the value for an of-loop, the key — a map's
-// entry key, a list's index — for an in-loop) as a fresh per-iteration local. The
-// iteration is bounded by the folded collection's element count, so it always
-// terminates; this is the same finite walk collectionFold makes. An iteration
-// whose body returns ends the for with that value (ifReturned); a body that runs
-// to its end falls through to the next element, and once every element is
-// visited the for falls through to the statement after it (ifFellThrough). An
-// unfoldable iter, an unfoldable body, or a non-collection value leaves the for
-// undecided (ifUnknown), which stops the enclosing fold.
+// evalFor folds a for statement: it folds the iterated expression and runs the
+// body once per element in fold order, binding the loop variable to each element
+// (the value for an of-loop, the key — a map's entry key, a list's or a range's
+// index — for an in-loop) as a fresh per-iteration local. It iterates a folded
+// collection or a folded range; the walk is bounded by the element count (a
+// range's is capped by maxRangeIterations), so it always terminates — the same
+// finite walks collectionFold and rangeFold make. An iteration whose body
+// returns ends the for with that value (ifReturned); a body that runs to its end
+// falls through to the next element, and once every element is visited the for
+// falls through to the statement after it (ifFellThrough). An unfoldable iter, an
+// unfoldable body, or a value of no iterable kind leaves the for undecided
+// (ifUnknown), which stops the enclosing fold.
 //
 // The loop variable is block-scoped to each iteration (bound and undone per
 // element), so it does not leak past the loop, while an assignment the body makes
@@ -1823,11 +1927,26 @@ func evalFor(s *ast.ForStmt, ctx evalCtx) (*ir.Constant, ifOutcome) {
 	if s.Iter == nil {
 		return nil, ifUnknown
 	}
-	coll := evalExpr(s.Iter, ctx)
-	if coll == nil || coll.Kind != ir.ConstCollection {
-		return nil, ifUnknown // an unfoldable or non-collection iter: cannot iterate
+	iter := evalExpr(s.Iter, ctx)
+	if iter == nil {
+		return nil, ifUnknown // an unfoldable iter: cannot iterate
 	}
 	of := s.Kind == ast.ForOf
+	switch iter.Kind {
+	case ir.ConstCollection:
+		return evalForCollection(s, iter, of, ctx)
+	case ir.ConstRange:
+		return evalForRange(s, iter, of, ctx)
+	default:
+		return nil, ifUnknown // a value of no iterable kind
+	}
+}
+
+// evalForCollection runs a for over a folded list/map: each entry binds the loop
+// variable (the value for of, the key — a list's index, a map's entry key — for
+// in) and runs the body. It is the collection arm of evalFor; see it for the
+// outcome semantics.
+func evalForCollection(s *ast.ForStmt, coll *ir.Constant, of bool, ctx evalCtx) (*ir.Constant, ifOutcome) {
 	for i, entry := range coll.Coll {
 		// The loop variable: the value for of, the key for in. A list entry has no
 		// key, so its key is the element index — the same rule collectionFold uses.
@@ -1841,6 +1960,48 @@ func evalFor(s *ast.ForStmt, ctx evalCtx) (*ir.Constant, ifOutcome) {
 		v, out := iterationOutcome(s, elem, ctx)
 		switch out {
 		case ifFellThrough:
+			continue // the body ran without returning; on to the next element
+		case ifReturned:
+			return v, ifReturned // an early return ends the whole loop
+		default:
+			return nil, ifUnknown // an unfoldable body stops the fold
+		}
+	}
+	return nil, ifFellThrough // every element visited without returning
+}
+
+// evalForRange runs a for over a folded range: each element of the half-open
+// sequence start..end-1 binds the loop variable (the element for of, its 0-based
+// position for in — the same key rangeFold threads) and runs the body. The walk
+// is bounded by maxRangeIterations: a range wider than the cap leaves the for
+// undecided (ifUnknown) rather than iterating, so a wide range never hangs the
+// folder — the same verdict rangeFold gives. An empty range (end at or below
+// start) falls through without running the body. The outcome semantics match the
+// collection arm.
+func evalForRange(s *ast.ForStmt, rng *ir.Constant, of bool, ctx evalCtx) (*ir.Constant, ifOutcome) {
+	if rng.Start == nil || rng.End == nil {
+		return nil, ifUnknown
+	}
+	count := new(big.Int).Sub(rng.End, rng.Start)
+	if count.Sign() <= 0 {
+		return nil, ifFellThrough // the empty range: the body never runs
+	}
+	if count.Cmp(big.NewInt(maxRangeIterations)) > 0 {
+		return nil, ifUnknown // wider than the compile-time iteration bound
+	}
+	cur := new(big.Int).Set(rng.Start)
+	one := big.NewInt(1)
+	for i := int64(0); cur.Cmp(rng.End) < 0; i++ {
+		// The loop variable: the element for of, its 0-based position for in — the
+		// same key rangeFold threads.
+		elem := ir.IntConstant(new(big.Int).Set(cur))
+		if !of {
+			elem = ir.IntConstant(big.NewInt(i))
+		}
+		v, out := iterationOutcome(s, elem, ctx)
+		switch out {
+		case ifFellThrough:
+			cur.Add(cur, one)
 			continue // the body ran without returning; on to the next element
 		case ifReturned:
 			return v, ifReturned // an early return ends the whole loop
