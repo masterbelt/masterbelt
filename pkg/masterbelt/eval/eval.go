@@ -88,22 +88,35 @@ type ReceiverTyper interface {
 // precision int; the range check happens where the constant's concrete type is
 // known.
 func Decl(decl *ast.ConstDecl, env Env) *ir.Constant {
-	return DeclExpecting(decl, nil, ir.CollUnknown, env)
+	return DeclExpecting(decl, nil, env)
 }
 
-// DeclExpecting folds a declaration's value with an expected enum and an expected
-// collection mapness in scope, both from the const's annotation. expected is the
-// enum definition the annotation named (a bare member const Top: Rarity = Legend
-// resolves through it), or nil; coll is the mapness an empty collection literal
-// settles to (an empty const m: map<K,V> = [] folding to an empty map), or
-// ir.CollUnknown. Both are pre-resolved by the caller — the value query must not
-// call the type query, so the caller resolves the annotation directly. A nil
-// value yields nil.
-func DeclExpecting(decl *ast.ConstDecl, expected *ir.TypeDef, coll ir.CollKind, env Env) *ir.Constant {
+// DeclExpecting folds a declaration's value against its resolved annotation type
+// want, the channel that supplies the immediate value's expectations: the enum a
+// bare member resolves through (const Top: Rarity = Legend), the mapness an empty
+// collection literal settles to (const m: map<K,V> = []), and the union a value
+// is tagged with its member of (const Held: GameValue = Coin{...}). want is
+// pre-resolved by the caller through a pure universe lookup — the value query must
+// not call the type query — and is nil for an unannotated const. A nil value
+// yields nil.
+func DeclExpecting(decl *ast.ConstDecl, want ir.Type, env Env) *ir.Constant {
 	if decl.Value == nil {
 		return nil
 	}
-	return evalExpr(decl.Value, evalCtx{env: env, expected: expected, expectedColl: coll})
+	return evalExpr(decl.Value, expectingType(evalCtx{env: env}, want))
+}
+
+// expectingType sets the immediate-expression expectation channels a resolved
+// annotation type supplies — the enum (bare member), the collection mapness
+// (empty literal), and the union (member tag) — on a copy of ctx. It is the one
+// place the three channels are derived from an annotation, so every tagging site
+// (const/let/param/return/field/argument) seeds them the same way. A nil want
+// leaves the channels clear.
+func expectingType(ctx evalCtx, want ir.Type) evalCtx {
+	ctx.expected = expectedEnum(want)
+	ctx.expectedColl = CollKindOf(want)
+	ctx.expectedType = want
+	return ctx
 }
 
 // Expr folds an expression to its constant value, or nil when it cannot be
@@ -122,22 +135,24 @@ func ExprIn(e ast.Expr, locals map[string]*ir.Constant, env Env) *ir.Constant {
 	return evalExpr(e, evalCtx{env: env, locals: locals})
 }
 
-// ExprInExpecting is ExprIn with the collection-mapness channel set, so an empty
-// collection literal a let annotation typed (let m: map<K,V> = []) folds to the
-// settled empty collection a body-position check needs to tell a map upsert from
-// a list write. coll is ir.CollUnknown for a non-collection (or unannotated)
-// binding, which then behaves exactly like ExprIn.
-func ExprInExpecting(e ast.Expr, locals map[string]*ir.Constant, coll ir.CollKind, env Env) *ir.Constant {
-	return evalExpr(e, evalCtx{env: env, locals: locals, expectedColl: coll})
+// ExprInExpecting is ExprIn with the annotation-type channel set, so a let's
+// declared type reaches its initializer: an empty collection literal (let m:
+// map<K,V> = []) folds to the settled empty collection a body-position check
+// needs to tell a map upsert from a list write, a bare member (let r: Rarity =
+// Legend) resolves, and a member value (let v: GameValue = Coin{...}) is tagged.
+// want is nil for an unannotated binding, which then behaves exactly like ExprIn.
+func ExprInExpecting(e ast.Expr, locals map[string]*ir.Constant, want ir.Type, env Env) *ir.Constant {
+	return evalExpr(e, expectingType(evalCtx{env: env, locals: locals}, want))
 }
 
-// ExprExpecting folds an expression with an expected enum in scope, so a bare
-// member resolves through it. want is the expected type; when it is an enum's
-// named type the bare-member rule applies, otherwise it is ignored. It is how
-// an enum member's initializer (typed against the enum's own base) and a const
-// initializer pass their expectation to the folder.
+// ExprExpecting folds an expression against its expected type in scope, so a bare
+// member resolves through the type's enum, an empty collection settles its
+// mapness, and a member value is tagged with its union member. want is the
+// expected type (nil for none). It is how an enum member's initializer (typed
+// against the enum's own base) and a const initializer pass their expectation to
+// the folder.
 func ExprExpecting(e ast.Expr, want ir.Type, env Env) *ir.Constant {
-	return evalExpr(e, evalCtx{env: env, expected: expectedEnum(want)})
+	return evalExpr(e, expectingType(evalCtx{env: env}, want))
 }
 
 // expectedEnum returns the enum definition a type carries, or nil when it
@@ -226,12 +241,27 @@ type evalCtx struct {
 	// ir.CollUnknown when there is no channel (a bare []). Like expected it reaches
 	// only the immediate expression; a nested literal sets its own.
 	expectedColl ir.CollKind
+	// expectedType is the resolved annotation type the immediate expression's
+	// value flows into — a const/let/param/result/field/argument union channel. It
+	// is the tagging channel: when it is a union (read through types.UnionType, so
+	// a nominal or generic alias unwraps) and the value can be assigned to exactly
+	// one member, the folded value is tagged with that member, the basis for a
+	// confident match dispatch. It is nil outside such a channel. Like the other
+	// expectation channels it reaches only the immediate expression; evalExpr
+	// consumes and clears it for sub-expressions.
+	expectedType ir.Type
 	// resultColl is the mapness a return's empty collection settles to — the
 	// declared result type of the function or method whose body is being folded,
 	// or ir.CollUnknown outside one (or for a non-collection result). It is the
 	// result-type channel, threaded through the body so a `return []` reaches it;
 	// evalBody hands it to the return expression's expectedColl.
 	resultColl ir.CollKind
+	// resultType is the declared result type of the function or method whose body
+	// is being folded, or nil outside one. It is the return value's tagging
+	// channel: a `return v` whose result type is a union tags the returned value
+	// with its member, so a tagged value flows back out of the routine. evalReturn
+	// hands it to the return expression's expectedType.
+	resultType ir.Type
 	// selfDef is the type definition the self keyword has inside an applied
 	// method body — the method's owning type — or nil outside one. It is the
 	// syntactic type channel for a self-receiver method call (self.increment()).
@@ -304,19 +334,38 @@ func recordField(recv *ir.Constant, name string) *ir.Constant {
 	return nil
 }
 
-// evalExpr folds an expression, resolving an identifier first against the
+// evalExpr folds an expression and tags the result with the union member it
+// flowed in as, when the immediate context is a union channel (ctx.expectedType
+// a union): a value that settles on exactly one member carries that member as its
+// tag, the basis for a confident match dispatch. An untagged result (no union
+// channel, or no uniquely selectable member) is the bare fold, unchanged. The
+// tagging channel reaches only this expression — like the enum and collection
+// channels — so a nested sub-expression sets its own.
+func evalExpr(e ast.Expr, ctx evalCtx) *ir.Constant {
+	v := evalExprRaw(e, ctx)
+	if v == nil || ctx.expectedType == nil {
+		return v
+	}
+	if tag := unionMemberTag(ctx, e, v, ctx.expectedType); tag != nil {
+		return ir.Tagged(v, tag)
+	}
+	return v
+}
+
+// evalExprRaw folds an expression, resolving an identifier first against the
 // context's locals and then against the environment's declarations. The
 // expected-enum context reaches only the immediate expression — every recursive
 // descent drops it, since a bare member is meaningful only as a const's whole
 // value, not nested inside a larger expression.
-func evalExpr(e ast.Expr, ctx evalCtx) *ir.Constant {
+func evalExprRaw(e ast.Expr, ctx evalCtx) *ir.Constant {
 	// The expectation is consumed at this level; sub-expressions evaluate in
 	// their own (expectation-free) context. The collection-mapness channel is
 	// consumed the same way — an empty literal reads it here, a nested literal
-	// does not inherit it.
+	// does not inherit it. The union tagging channel is consumed the same way.
 	sub := ctx
 	sub.expected = nil
 	sub.expectedColl = ir.CollUnknown
+	sub.expectedType = nil
 	switch e := e.(type) {
 	case *ast.IntLit:
 		n, ok := new(big.Int).SetString(e.Text, 10)
@@ -561,14 +610,36 @@ func convert(def *ir.TypeDef, args []ast.Expr, ctx evalCtx) *ir.Constant {
 	}
 	if def.Builtin {
 		n, ok := ctx.env.Registry().Native(def.Name)
-		if !ok || !n.Err {
-			return nil // only error has a constant-valued native conversion
-		}
-		v := evalExpr(args[0], ctx)
-		if v == nil || v.Kind != ir.ConstString {
+		if !ok {
 			return nil
 		}
-		return ir.ErrorConstant(v.Str)
+		// error("msg") is the one builtin conversion that builds a new value; the
+		// scalar primitives (short(20), bool(b)) are the identity on the value when
+		// its kind backs the type — the same pass-through a nominal conversion makes
+		// (Level(5)), so a sized-integer conversion folds to its integer. This both
+		// gives short(20) a value and lets it tag a sized-integer union member.
+		v := evalExpr(args[0], ctx)
+		if v == nil {
+			return nil
+		}
+		if n.Err {
+			if v.Kind != ir.ConstString {
+				return nil
+			}
+			return ir.ErrorConstant(v.Str)
+		}
+		if !builtinBacksKind(n, v.Kind) {
+			return nil
+		}
+		// An integer outside the target's range does not fold: short(70000) has no
+		// representable value, so producing the out-of-range integer would be a
+		// wrong constant the match dispatch (and the union overflow check) could not
+		// catch. Leaving it unfolded keeps a bad value from ever existing — the
+		// type-layer conversion check reports the overflow at the same site.
+		if v.Kind == ir.ConstInt && !n.Fits(v.Int) {
+			return nil
+		}
+		return v
 	}
 	// A nominal type over a primitive (or a list/map): the value is the argument's,
 	// unchanged, when its kind matches the underlying type — a Level is its integer,
@@ -582,6 +653,15 @@ func convert(def *ir.TypeDef, args []ast.Expr, ctx evalCtx) *ir.Constant {
 	}
 	reg := ctx.env.Registry()
 	if defBacksKind(reg, def, v.Kind) {
+		// A nominal type over a sized integer (Level = short) range-checks the same
+		// way the builtin path does: Level(70000) has no representable value, so it
+		// does not fold — keeping a wrong constant out of a union the const-level
+		// overflow check cannot see through.
+		if v.Kind == ir.ConstInt {
+			if n := underlyingPrimitive(reg, def, map[*ir.TypeDef]bool{}); n != nil && !n.Fits(v.Int) {
+				return nil
+			}
+		}
 		return v
 	}
 	if v.Kind == ir.ConstCollection && defBacksKindCollection(def) {
@@ -656,18 +736,194 @@ func collection(e *ast.CollectionLit, ctx evalCtx) *ir.Constant {
 // record folds a record literal: each field's value is folded in source order,
 // and the constant normalizes the fields to their canonical (name) order. It
 // returns nil if any field is malformed or unevaluated, so a record with an
-// unfoldable field does not fold to a partial value.
+// unfoldable field does not fold to a partial value. A named record's declared
+// field types are the tagging channel for the field values: a field typed as a
+// union tags its value with the member it holds (a { v: GameValue } field's Coin
+// value), so a tagged value can live inside a record.
 func record(e *ast.RecordLit, ctx evalCtx) *ir.Constant {
+	fieldTypes := recordFieldTypes(ctx, e.TypeName)
 	fields := make([]ir.ConstField, 0, len(e.Fields))
 	for _, f := range e.Fields {
 		if f.Name == "" {
 			return nil // recovered away; already a parse diagnostic
 		}
-		v := evalExpr(f.Value, ctx)
+		fieldCtx := ctx
+		fieldCtx.expectedType = fieldTypes[f.Name]
+		v := evalExpr(f.Value, fieldCtx)
 		if v == nil {
 			return nil
 		}
 		fields = append(fields, ir.ConstField{Name: f.Name, Value: v})
 	}
 	return ir.RecordConstant(fields)
+}
+
+// recordFieldTypes resolves a named record type's field types — the channel a
+// record literal's field values are tagged through — by a pure universe lookup,
+// never the type query. It returns nil for an inferred record ({...}, no name) or
+// a name that resolves to no record, so a field with no declared type is folded
+// without a union channel, exactly as before.
+func recordFieldTypes(ctx evalCtx, typeName string) map[string]ir.Type {
+	if typeName == "" {
+		return nil
+	}
+	rec := recordOf(namedOf(ctx.env.LookupType(typeName)))
+	if rec == nil {
+		return nil
+	}
+	out := make(map[string]ir.Type, len(rec.Fields))
+	for _, f := range rec.Fields {
+		out[f.Name] = f.Type
+	}
+	return out
+}
+
+// unionMemberTag returns the union member a folded value flows in as — the tag
+// that lets a later match dispatch it — or nil when the value carries no union
+// channel, the channel is not a union, or the member cannot be settled uniquely.
+// It is the value half of the tagged-union rule, settling the same member the
+// type layer's SelectUnionMember would but from what a value can know (it carries
+// no static type):
+//
+//   - a value that already carries a tag keeps it: it flowed through a union
+//     before, and the tag points at the member, so it stays valid as the value
+//     moves between a bare union and an alias of it;
+//   - a value whose source expression has a syntactic static type (a record
+//     literal's TypeName, a conversion's type, a reference's annotation) selects
+//     its member by the same exact→unique rule the type layer uses; and
+//   - a bare literal (no static type) selects by kind backing: the union member
+//     whose underlying primitive backs the value's kind, tagged only when exactly
+//     one does — so nint | error tags an integer literal nint and an error error,
+//     but short | byte stays untagged (two integer members) and does not fold,
+//     exactly the case the type layer reports as ambiguous_union_member.
+//
+// Tagging only on a unique member keeps the fold from ever choosing a wrong arm:
+// an undecidable flow leaves the value untagged, and the match folder then falls
+// back to its conservative kind-counting rule.
+func unionMemberTag(ctx evalCtx, e ast.Expr, v *ir.Constant, want ir.Type) ir.Type {
+	u := types.UnionType(want)
+	if u == nil {
+		return nil
+	}
+	// An already-tagged value keeps its member: it flowed through a union earlier,
+	// and the member is still meaningful under this (possibly aliased) union.
+	if v.UnionTag != nil {
+		return v.UnionTag
+	}
+	// A syntactic static type settles the member by the type layer's exact→unique
+	// rule — the record literal, conversion, and reference channels.
+	if st := valueStaticType(ctx, e); st != nil {
+		if sel, m := types.SelectUnionMember(ctx.env.Registry(), st, want); sel == types.UnionUnique {
+			return m
+		}
+		return nil
+	}
+	// A bare literal has no static type: select by kind backing, uniquely.
+	return uniqueKindMember(ctx, u, v.Kind)
+}
+
+// unionMemberTagValue is unionMemberTag without an expression to read a static
+// type from — the param-binding site, which sees only the folded value. It keeps
+// a value's existing tag (it flowed through a union before) and otherwise selects
+// by unique kind backing; it cannot do the exact→static-type selection the
+// call-site form does, so an argument needing that is tagged where it is folded
+// (tagArguments), and this is the value-only catch-all for the rest.
+func unionMemberTagValue(ctx evalCtx, v *ir.Constant, want ir.Type) ir.Type {
+	u := types.UnionType(want)
+	if u == nil {
+		return nil
+	}
+	if v.UnionTag != nil {
+		return v.UnionTag
+	}
+	return uniqueKindMember(ctx, u, v.Kind)
+}
+
+// valueStaticType resolves the syntactic static type of a value expression for
+// union tagging — a pure universe lookup, never the type query, the value folder's
+// discipline. A record literal's named form gives its nominal type, a conversion
+// or reference resolves through recvType's channels (a call result, an
+// annotation), and a bare literal (an int, a string) has none, so it returns nil
+// and the kind-backing fallback decides. It deliberately does not type a bare
+// integer literal as nint here: an exact nint member is matched by the kind
+// fallback, and keeping literals out of the static path keeps the exact→unique
+// rule from treating an adaptable literal as a fixed width.
+func valueStaticType(ctx evalCtx, e ast.Expr) ir.Type {
+	if rec, ok := e.(*ast.RecordLit); ok {
+		if rec.TypeName == "" {
+			return nil
+		}
+		return defType(ctx.env.LookupType(rec.TypeName))
+	}
+	switch e.(type) {
+	case *ast.Identifier, *ast.MemberExpr, *ast.CallExpr, *ast.SelfExpr:
+		// recvType wraps a def as a Named; a builtin member of a union is a Builtin,
+		// so normalize a nominal type over a builtin def (short(20)'s result) to the
+		// builtin form member selection compares against.
+		return normalizeBuiltin(recvType(ctx, e))
+	}
+	return nil
+}
+
+// defType returns the type a definition denotes for member selection — a Builtin
+// for a builtin primitive (so it compares against a union's builtin member), a
+// Named for any other definition, and nil for a nil def.
+func defType(def *ir.TypeDef) ir.Type {
+	if def == nil {
+		return nil
+	}
+	if def.Builtin {
+		return &ir.Builtin{Name: def.Name}
+	}
+	return &ir.Named{Def: def}
+}
+
+// normalizeBuiltin rewrites a Named over a builtin definition to the Builtin form,
+// leaving every other type unchanged — so a conversion result resolved as a
+// nominal type (recvType always wraps a def as Named) compares against a union's
+// builtin member.
+func normalizeBuiltin(t ir.Type) ir.Type {
+	if n, ok := t.(*ir.Named); ok && n.Def != nil && n.Def.Builtin {
+		return &ir.Builtin{Name: n.Def.Name}
+	}
+	return t
+}
+
+// uniqueKindMember returns the one union member whose underlying primitive backs
+// the value kind, or nil when zero or several do. It is the value-side twin of
+// the type layer's unique-assignable rule for a bare literal: an integer literal
+// into nint | error backs only nint, a null into Coin | null only null. Two
+// members of the same kind (short | byte over an integer) leave it nil — the
+// value stays untagged and the match does not fold, the ambiguity the type layer
+// reports.
+func uniqueKindMember(ctx evalCtx, u *ir.Union, kind ir.ConstKind) ir.Type {
+	reg := ctx.env.Registry()
+	var chosen ir.Type
+	n := 0
+	for _, m := range u.Members {
+		if memberBacksKind(reg, m, kind) {
+			chosen = m
+			n++
+		}
+	}
+	if n == 1 {
+		return chosen
+	}
+	return nil
+}
+
+// memberBacksKind reports whether a union member type can hold a value of the
+// given kind: a builtin by its native descriptor, a nominal type by its
+// underlying primitive (a Level over an integer). A composite member (a record,
+// a union, a function) backs no scalar kind here — a record value reaches its
+// member through valueStaticType's nominal channel, not this kind fallback.
+func memberBacksKind(reg *builtin.Registry, m ir.Type, kind ir.ConstKind) bool {
+	switch m := m.(type) {
+	case *ir.Builtin:
+		return scalarMatchesBuiltin(reg, &ir.Constant{Kind: kind}, m.Name)
+	case *ir.Named:
+		return m.Def != nil && defBacksKind(reg, m.Def, kind)
+	default:
+		return false
+	}
 }

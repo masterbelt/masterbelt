@@ -735,7 +735,7 @@ func resolveAssocConstList(env eval.Env, r *infer.TypeResolver, reg *builtin.Reg
 		// twin of a top-level const's rule — annotationEnum read here directly off the
 		// resolved type, never the type query, so the value lowering stays independent.
 		if env != nil {
-			ac.Value = eval.DeclExpecting(c, enumDefOf(annType), eval.CollKindOf(annType), env)
+			ac.Value = eval.DeclExpecting(c, annType, env)
 		}
 		switch {
 		case annType != nil:

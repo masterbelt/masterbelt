@@ -119,6 +119,67 @@ func TestCollectionMapness(t *testing.T) {
 	}
 }
 
+// TestUnionTagEquality pins the tagged-union identity rule of ConstantsEqual: the
+// member tag is part of a value's identity, so two values with the same payload
+// but different (or one-sided) tags are unequal, and same-tag (or both-untagged)
+// values fall through to their payload equality. Tagged/Untagged are pure copies
+// that never mutate the original, and re-tagging with the same member is the
+// identity.
+func TestUnionTagEquality(t *testing.T) {
+	coin := &TypeDef{Name: "Coin", Body: &Record{Fields: []Field{{Name: "amount", Type: &Builtin{Name: "nint"}}}}}
+	level := &TypeDef{Name: "Level", Body: &Record{Fields: []Field{{Name: "rank", Type: &Builtin{Name: "nint"}}}}}
+	rec := func() *Constant {
+		return RecordConstant([]ConstField{{Name: "amount", Value: IntConstant(big.NewInt(7))}})
+	}
+
+	asCoin := Tagged(rec(), &Named{Def: coin})
+	asLevel := Tagged(rec(), &Named{Def: level})
+	untagged := rec()
+
+	// Tagged is a pure copy: the original keeps no tag.
+	if untagged.UnionTag != nil {
+		t.Error("Tagged must not mutate the original value")
+	}
+	if asCoin.UnionTag == nil {
+		t.Fatal("Tagged value should carry its tag")
+	}
+
+	// The same payload under different member tags is unequal.
+	if ConstantsEqual(asCoin, asLevel) {
+		t.Error("same payload, different tags must be unequal")
+	}
+	// A tag on one side only is unequal (the early-cutoff-safe side).
+	if ConstantsEqual(asCoin, untagged) {
+		t.Error("a tagged value must not equal the same payload untagged")
+	}
+	// Same member tag and same payload are equal.
+	if !ConstantsEqual(asCoin, Tagged(rec(), &Named{Def: coin})) {
+		t.Error("same tag and payload should be equal")
+	}
+	// A builtin-member tag compares by name.
+	taggedErrA := Tagged(ErrorConstant("boom"), &Builtin{Name: "error"})
+	taggedErrB := Tagged(ErrorConstant("boom"), &Builtin{Name: "error"})
+	if !ConstantsEqual(taggedErrA, taggedErrB) {
+		t.Error("two error values tagged error should be equal")
+	}
+
+	// Untagged drops the tag back to the bare payload; re-tagging the same member
+	// is the identity (an equal value).
+	if bare := Untagged(asCoin); bare.UnionTag != nil || !ConstantsEqual(bare, untagged) {
+		t.Errorf("Untagged should yield the bare payload, got tag %v", bare.UnionTag)
+	}
+	if !ConstantsEqual(Tagged(asCoin, &Named{Def: coin}), asCoin) {
+		t.Error("re-tagging the same member should be the identity")
+	}
+	// A nil tag or nil constant is a no-op.
+	if Tagged(untagged, nil) != untagged {
+		t.Error("Tagged with a nil tag should return the value unchanged")
+	}
+	if Tagged(nil, &Named{Def: coin}) != nil {
+		t.Error("Tagged of a nil constant should stay nil")
+	}
+}
+
 // TestNullConstant pins the null value: it renders as "null" (the String default
 // would dereference a nil Int and panic without an explicit case), and two null
 // values are equal — the single-inhabitant rule ConstantsEqual relies on so the

@@ -2,10 +2,11 @@ Module
   Const "Held"
     type GameValue
     value Coin{amount: IntLiteral "7"}
-    eval { amount: 7 }
+    eval (Coin) { amount: 7 }
   Const "Total"
     type nint
     value worth(Reference -> "Held")
+    eval 7
   TypeDef "Coin" pub
     body { amount: nint }
   TypeDef "Level" pub

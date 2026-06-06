@@ -193,6 +193,17 @@ func convCallType(e *ast.CallExpr, name string, t ir.Type, s scope, sink *Sink) 
 	for _, a := range e.Arguments {
 		check(a, s, sink)
 	}
+	// A one-argument conversion to a sized integer (a builtin like short, or a
+	// nominal type over one like Level) range-checks its argument: a constant
+	// outside the target's value range is a constant_overflow at the conversion
+	// site. The fold is the caller's (the type layer does not evaluate), so this
+	// only flags the conversion for the deferred check; a non-constant argument is
+	// then ignored there. Without this a value flowing into a union annotation
+	// (short(70000) into short | error) would escape the const-level range check,
+	// whose Fits over the union type passes through.
+	if len(e.Arguments) == 1 && types.IsInteger(s.registry(), t) {
+		sink.scalarConversion(e, t)
+	}
 	return t
 }
 

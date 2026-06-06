@@ -14,22 +14,22 @@ import (
 // collection-typed const carries the settled mapness. It is the eval-layer stand
 // in for the semantic engine's evalEnv, scoped to what these tests reference.
 type collEnv struct {
-	reg      *builtin.Registry
-	mapDef   *ir.TypeDef
-	listDef  *ir.TypeDef
-	consts   map[string]*ast.ConstDecl
-	funcs    map[string][]*ast.FuncDecl
-	collKind map[*ast.ConstDecl]ir.CollKind // each const's annotation mapness
+	reg     *builtin.Registry
+	mapDef  *ir.TypeDef
+	listDef *ir.TypeDef
+	consts  map[string]*ast.ConstDecl
+	funcs   map[string][]*ast.FuncDecl
+	annType map[*ast.ConstDecl]ir.Type // each const's resolved annotation type
 }
 
 func newCollEnv() *collEnv {
 	return &collEnv{
-		reg:      builtin.Default(),
-		mapDef:   &ir.TypeDef{Name: "map"},
-		listDef:  &ir.TypeDef{Name: "list"},
-		consts:   map[string]*ast.ConstDecl{},
-		funcs:    map[string][]*ast.FuncDecl{},
-		collKind: map[*ast.ConstDecl]ir.CollKind{},
+		reg:     builtin.Default(),
+		mapDef:  &ir.TypeDef{Name: "map"},
+		listDef: &ir.TypeDef{Name: "list"},
+		consts:  map[string]*ast.ConstDecl{},
+		funcs:   map[string][]*ast.FuncDecl{},
+		annType: map[*ast.ConstDecl]ir.Type{},
 	}
 }
 
@@ -53,7 +53,7 @@ func listAnno() ast.TypeExpr {
 func (e *collEnv) withCollConst(name string, anno ast.TypeExpr, value ast.Expr) *collEnv {
 	decl := ast.NewConstDecl(nil, true, name, anno, value, nil)
 	e.consts[name] = decl
-	e.collKind[decl] = CollKindOf(e.TypeExprType(anno))
+	e.annType[decl] = e.TypeExprType(anno)
 	return e
 }
 
@@ -64,7 +64,7 @@ func (e *collEnv) ResolveMember(*ast.MemberExpr) *ast.ConstDecl {
 func (e *collEnv) ResolveFunc(id *ast.Identifier) []*ast.FuncDecl    { return e.funcs[id.Name] }
 func (e *collEnv) ResolveFuncMember(*ast.MemberExpr) []*ast.FuncDecl { return nil }
 func (e *collEnv) ValueOf(decl *ast.ConstDecl) *ir.Constant {
-	return DeclExpecting(decl, nil, e.collKind[decl], e)
+	return DeclExpecting(decl, e.annType[decl], e)
 }
 func (e *collEnv) LookupType(name string) *ir.TypeDef {
 	switch name {

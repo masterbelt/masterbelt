@@ -215,29 +215,47 @@ func evalOrNil(t *testing.T, src, name string) *ir.Constant {
 	return nil
 }
 
-// TestMatchSameKindMembersNotFolded is the soundness guard for the union-member
-// ambiguity: when two arms can back the scrutinee value's kind (two nominal
-// int types, Small | Big), a folded value carries no member tag, so the fold
-// cannot tell which arm runs — it must not guess. Before the fix the loop chose
-// the first kind-matching arm and folded classify(Big(20)) to "small", a wrong
-// value with no diagnostic. The fold must leave it undetermined instead.
-func TestMatchSameKindMembersNotFolded(t *testing.T) {
+// TestMatchSameKindMembersFold is the tagged-union completeness case: two arms
+// back the scrutinee value's kind (two nominal int types, Small | Big), but the
+// value flows in as Big — an explicit conversion that tags it — so the match
+// dispatches confidently to the Big arm. Before tagged unions the fold left this
+// undetermined for soundness; the tag now lets it fold to the right arm.
+func TestMatchSameKindMembersFold(t *testing.T) {
 	src := "pub type Small = nint\npub type Big = nint\n" +
 		"pub fn classify(v: Small | Big): string {\n  match v {\n    Small s -> return \"small\"\n    Big b -> return \"big\"\n  }\n}\n" +
 		"const R = classify(Big(20))\n"
-	if v := evalOrNil(t, src, "R"); v != nil {
-		t.Errorf("classify(Big(20)) folded to %q; an ambiguous same-kind union must not fold", v.String())
+	v := evalOrNil(t, src, "R")
+	if v == nil || v.String() != "\"big\"" {
+		t.Errorf("classify(Big(20)) = %v, want \"big\" (the tag selects the Big arm)", v)
 	}
 }
 
-// TestMatchSameKindBuiltinMembersNotFolded is the builtin counterpart: int8 and
-// int16 both back a ConstInt, so a match over an int8 | int16 cannot decide its
-// arm from the value's kind alone and must not fold.
-func TestMatchSameKindBuiltinMembersNotFolded(t *testing.T) {
+// TestMatchSameKindBuiltinMembersFold is the builtin counterpart: sbyte and short
+// both back a ConstInt, but short(20) tags the value short, so the match folds to
+// the short arm — the same-kind union the tag disambiguates.
+func TestMatchSameKindBuiltinMembersFold(t *testing.T) {
 	src := "pub fn classify(v: sbyte | short): string {\n  match v {\n    sbyte a  -> return \"a\"\n    short b -> return \"b\"\n  }\n}\n" +
 		"const R = classify(short(20))\n"
-	if v := evalOrNil(t, src, "R"); v != nil {
-		t.Errorf("classify(short(20)) folded to %q; an ambiguous same-kind union must not fold", v.String())
+	v := evalOrNil(t, src, "R")
+	if v == nil || v.String() != "\"b\"" {
+		t.Errorf("classify(short(20)) = %v, want \"b\" (the tag selects the short arm)", v)
+	}
+}
+
+// TestMatchUntaggedSameKindNotFolded is the remaining soundness guard: when a
+// same-kind value reaches the match *without* a tag — a function passes its
+// own un-narrowed parameter straight through, so no conversion tags it — the fold
+// still cannot tell which arm runs and must leave it undetermined. (g's parameter
+// w is a bare Small | Big; classify(w) folds inside g only if w carries a tag,
+// and a plain forwarded parameter does not.)
+func TestMatchUntaggedSameKindNotFolded(t *testing.T) {
+	src := "pub type Small = nint\npub type Big = nint\n" +
+		"pub fn classify(v: Small | Big): string {\n  match v {\n    Small s -> return \"small\"\n    Big b -> return \"big\"\n  }\n}\n" +
+		"pub fn forward(w: Small | Big): string { return classify(w) }\n"
+	// forward is not called with a tagging argument here; analyzing it must not
+	// crash or mis-fold, and there is no const to over-fold.
+	if _, diags := analyze(src); len(diags) != 0 {
+		t.Errorf("unexpected diagnostics: %v", codes(diags))
 	}
 }
 
@@ -250,6 +268,83 @@ func TestMatchDistinctKindMembersStillFold(t *testing.T) {
 	v := evalOrNil(t, src, "A")
 	if v == nil || v.String() != "\"nint\"" {
 		t.Errorf("pick(7) = %v, want \"nint\"", v)
+	}
+}
+
+// TestAmbiguousUnionMember is the tagged-union ambiguity diagnostic: an nint
+// literal flowing into short | byte matches two integer members with no exact
+// tie-break, so which member it tags cannot be told and the program must pin it.
+// An explicit conversion (short(1)) makes the member exact and clears the error.
+func TestAmbiguousUnionMember(t *testing.T) {
+	src := "pub type n = short | byte\nconst a: n = 1\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeAmbiguousUnionMember) {
+		t.Fatalf("want ambiguous_union_member for an nint literal into short | byte, got %v", codes(diags))
+	}
+	// A conversion that pins the member resolves it.
+	fixed := "pub type n = short | byte\nconst a: n = short(1)\n"
+	if _, diags := analyze(fixed); len(diags) != 0 {
+		t.Errorf("short(1) should resolve the ambiguity, got %v", codes(diags))
+	}
+}
+
+// TestExactUnionMemberNotAmbiguous checks the exact-match tie-break does not
+// over-fire: a value type-identical to a member is chosen even when another
+// member would also accept it. nint | error with an nint literal, and an
+// int8-typed value into int8 | int16, both tag by exactness with no diagnostic.
+func TestExactUnionMemberNotAmbiguous(t *testing.T) {
+	cases := map[string]string{
+		"nint literal into nint | error": "pub type n = nint | error\nconst a: n = 1\n",
+		"int8 value into int8 | int16":   "pub type n = sbyte | short\npub fn f(v: sbyte): n { return v }\n",
+	}
+	for name, src := range cases {
+		t.Run(name, func(t *testing.T) {
+			if _, diags := analyze(src); hasCode(diags, CodeAmbiguousUnionMember) {
+				t.Errorf("exact member should not be ambiguous, got %v", codes(diags))
+			}
+		})
+	}
+}
+
+// TestMatchNarrowingStripsTag checks the arm narrowing drops the union tag: a
+// record union value tagged Coin, dispatched to the Coin arm, narrows its binding
+// to the bare Coin, so a field read and arithmetic on the payload fold without the
+// tag interfering. worth(Coin{amount: 7}) returns the amount (7) plus one (8).
+func TestMatchNarrowingStripsTag(t *testing.T) {
+	src := gameUnion +
+		"pub fn bump(v: GameValue): nint {\n  match v {\n    Coin c  -> return c.amount.add(1)\n    Level l -> return l.rank\n  }\n}\n" +
+		"const R = bump(Coin{ amount: 7 })\n"
+	v := evalOrNil(t, src, "R")
+	if v == nil || v.String() != "8" {
+		t.Errorf("bump(Coin{amount: 7}) = %v, want 8 (narrowed Coin payload + 1)", v)
+	}
+}
+
+// TestMatchTagFlowsThroughChain checks a tag survives a function hop: a tagged
+// member value passed through an identity-typed forwarder reaches the match still
+// tagged, so the dispatch folds at the far end of the chain. id returns its
+// GameValue argument; worth(id(Coin{...})) folds to the Coin amount.
+func TestMatchTagFlowsThroughChain(t *testing.T) {
+	src := gameUnion +
+		"pub fn worth(v: GameValue): nint {\n  match v {\n    Coin c  -> return c.amount\n    Level l -> return l.rank\n  }\n}\n" +
+		"pub fn id(v: GameValue): GameValue { return v }\n" +
+		"const R = worth(id(Coin{ amount: 42 }))\n"
+	v := evalOrNil(t, src, "R")
+	if v == nil || v.String() != "42" {
+		t.Errorf("worth(id(Coin{amount: 42})) = %v, want 42 (tag flows through id)", v)
+	}
+}
+
+// TestMatchTagThroughLet checks a tag survives a let binding: a member value
+// bound to a union-typed let carries its tag into a match on the let. The whole
+// flow folds inside a single body.
+func TestMatchTagThroughLet(t *testing.T) {
+	src := gameUnion +
+		"pub fn pick(): nint {\n  let v: GameValue = Coin{ amount: 9 }\n  match v {\n    Coin c  -> return c.amount\n    Level l -> return l.rank\n  }\n}\n" +
+		"const R = pick()\n"
+	v := evalOrNil(t, src, "R")
+	if v == nil || v.String() != "9" {
+		t.Errorf("pick() with a let-bound tagged Coin = %v, want 9", v)
 	}
 }
 

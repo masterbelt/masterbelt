@@ -101,6 +101,18 @@ func checkType(e ast.Expr, want ir.Type, s scope, subst map[string]ir.Type, sink
 		got := check(e, s, sink)
 		if got != ir.Invalid && !types.Match(s.registry(), want, got, subst) {
 			sink.mismatch(e, got, want)
+			return got
+		}
+		// A value that flows into a union must settle which member it tags. Two
+		// or more members accepting it with no exact tie-break (short | byte and
+		// an nint literal) is ambiguous_union_member — the fold cannot tell which
+		// arm a later match would run, so the program must pin the member with an
+		// explicit conversion. An exact or single-member flow is unambiguous and
+		// reports nothing.
+		if got != ir.Invalid {
+			if sel, _ := types.SelectUnionMember(s.registry(), got, want); sel == types.UnionAmbiguous {
+				sink.ambiguousUnionMember(e, got, want)
+			}
 		}
 		return got
 	}

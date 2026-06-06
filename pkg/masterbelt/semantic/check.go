@@ -121,10 +121,11 @@ func checkIndexWritesIn(body []ast.Stmt, locals map[string]*ir.Constant, env eva
 		switch s := stmt.(type) {
 		case *ast.LetStmt:
 			if s.Name != "" && s.Value != nil {
-				// The let annotation is the collection-mapness channel, so an empty
-				// map/list literal folds to the settled empty collection the write
-				// check needs to tell an upsert from a list write.
-				if v := eval.ExprInExpecting(s.Value, locals, annotationCollKindOf(env, s.Type), env); v != nil {
+				// The let annotation is the value folder's expectation channel: an
+				// empty map/list literal folds to the settled empty collection the
+				// write check needs to tell an upsert from a list write, and a member
+				// value is tagged with its union member.
+				if v := eval.ExprInExpecting(s.Value, locals, annotationTypeOf(env, s.Type), env); v != nil {
 					locals[s.Name] = v
 				} else {
 					delete(locals, s.Name) // an unfoldable rebind: stop tracking it
@@ -211,16 +212,16 @@ func reportIndexWrite(s *ast.AssignStmt, locals map[string]*ir.Constant, env eva
 	diags.Add(newIndexOutOfRangeDiagnostic(c.offset, c.width, idx.Int.String(), strconv.Itoa(n)))
 }
 
-// annotationCollKindOf resolves a let's type annotation to the collection mapness
-// it names — CollMap for a map<K,V>, CollList for a list<T>, CollUnknown for
-// anything else (or an Env that supplies no type resolution). It is the channel
-// the write check threads so an empty collection let folds to a settled value.
-func annotationCollKindOf(env eval.Env, t ast.TypeExpr) ir.CollKind {
+// annotationTypeOf resolves a let's type annotation to its full type through a
+// pure universe lookup, or nil for no annotation (or an Env that supplies no type
+// resolution). It is the channel the write check threads so an empty collection
+// let folds to a settled value and a member let is tagged with its union member.
+func annotationTypeOf(env eval.Env, t ast.TypeExpr) ir.Type {
 	rt, ok := env.(eval.ReceiverTyper)
 	if !ok || t == nil {
-		return ir.CollUnknown
+		return nil
 	}
-	return eval.CollKindOf(rt.TypeExprType(t))
+	return rt.TypeExprType(t)
 }
 
 // copyLocals returns a shallow copy of a local environment, so a nested block's

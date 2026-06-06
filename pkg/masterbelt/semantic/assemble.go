@@ -41,6 +41,10 @@ func exprSink(at func(ast.Node) span, diags *diagnostic.List) *infer.Sink {
 			s := at(node)
 			diags.Add(newTypeMismatchDiagnostic(s.offset, s.width, got.String(), want.String()))
 		},
+		AmbiguousUnionMember: func(node ast.Node, got, want ir.Type) {
+			s := at(node)
+			diags.Add(newAmbiguousUnionMemberDiagnostic(s.offset, s.width, got.String(), want.String()))
+		},
 		TernaryCondNotBool: func(cond ast.Expr, got ir.Type) {
 			s := at(cond)
 			diags.Add(newTernaryConditionNotBoolDiagnostic(s.offset, s.width, got.String()))
@@ -202,6 +206,26 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 				if v := eval.Expr(e, evalEnv{q: q, file: fileID}); v != nil && v.Kind == ir.ConstInt && !types.Fits(reg, want, v.Int) {
 					s := at(e)
 					diags.Add(newConstantOverflowDiagnostic(s.offset, s.width, v.String(), want.String()))
+				}
+			}
+			// A conversion to a sized integer (short(70000), Level(70000)) range-
+			// checks its argument against the target — the diagnostic the const-level
+			// check cannot make when the constant's own type is a union the value
+			// flows into (the union's Fits passes through), and also the one for the
+			// direct case (const A: short = short(70000)), whose folded value is now
+			// nil (eval refuses the out-of-range conversion), so the const-level check
+			// no longer sees it. An overflowing conversion folds to nil, so it never
+			// also trips the const-level report — the two are mutually exclusive. The
+			// argument is folded here (the type layer flagged the conversion through
+			// ScalarConversion); a non-constant argument does not fold and is left to
+			// the runtime.
+			sink.ScalarConversion = func(call *ast.CallExpr, target ir.Type) {
+				if len(call.Arguments) != 1 {
+					return
+				}
+				if v := eval.Expr(call.Arguments[0], evalEnv{q: q, file: fileID}); v != nil && v.Kind == ir.ConstInt && !types.Fits(reg, target, v.Int) {
+					s := at(call)
+					diags.Add(newConstantOverflowDiagnostic(s.offset, s.width, v.String(), target.String()))
 				}
 			}
 			if annType != ir.Invalid {

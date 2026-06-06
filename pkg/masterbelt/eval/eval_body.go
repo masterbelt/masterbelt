@@ -226,6 +226,7 @@ func (s *blockScope) restore() {
 // evalExpr consumes for an empty literal exactly as the const/let channels are.
 func evalReturn(value ast.Expr, ctx evalCtx) *ir.Constant {
 	ctx.expectedColl = ctx.resultColl
+	ctx.expectedType = ctx.resultType
 	return evalExpr(value, ctx)
 }
 
@@ -233,17 +234,14 @@ func evalLet(s *ast.LetStmt, ctx evalCtx, scope *blockScope) bool {
 	if s.Value == nil {
 		return false
 	}
-	// A let annotation is the collection-mapness channel for the initializer, so
-	// let m: map<K,V> = [] folds to an empty map exactly as the const form does,
-	// and the expected-enum channel, so let r: Rarity = Legend folds the bare
-	// member — the body twin of a const initializer's rule. Both are read from the
-	// annotation (annotationType, never the type query). Set on a copy of ctx:
-	// evalExpr consumes (and clears) them for the immediate value, and ctx's other
-	// fields are unaffected for the bind below.
-	letCtx := ctx
-	annType := annotationType(ctx.env, s.Type)
-	letCtx.expectedColl = CollKindOf(annType)
-	letCtx.expected = expectedEnum(annType)
+	// A let annotation is the initializer's expectation channel — its collection
+	// mapness (let m: map<K,V> = [] folds to an empty map), its enum (let r: Rarity
+	// = Legend folds the bare member), and its union (let v: GameValue = Coin{...}
+	// tags the value Coin) — the body twin of a const initializer's rule. It is read
+	// from the annotation (annotationType, never the type query). Set on a copy of
+	// ctx: evalExpr consumes (and clears) the channels for the immediate value, and
+	// ctx's other fields are unaffected for the bind below.
+	letCtx := expectingType(ctx, annotationType(ctx.env, s.Type))
 	v := evalExpr(s.Value, letCtx)
 	if v == nil {
 		return false
@@ -266,12 +264,13 @@ func evalAssign(s *ast.AssignStmt, ctx evalCtx) bool {
 	if s.Value == nil {
 		return false
 	}
-	// A bare member on the right folds through the target local's static enum (r =
-	// Common, where r is a Rarity let), read syntactically from the local's
-	// annotation (recvType, never the type query) — the assignment twin of the
-	// let-initializer rule. The expectation reaches only the immediate value.
-	assignCtx := ctx
-	assignCtx.expected = expectedEnum(recvType(ctx, s.Target))
+	// The right side folds against the target local's static type, read
+	// syntactically from the local's annotation (recvType, never the type query) —
+	// the assignment twin of the let-initializer rule. That settles a bare member
+	// (r = Common, where r is a Rarity let) through its enum and tags a member value
+	// (v = Coin{...}, where v is a GameValue let) with its union member. The
+	// expectation reaches only the immediate value.
+	assignCtx := expectingType(ctx, recvType(ctx, s.Target))
 	v := evalExpr(s.Value, assignCtx)
 	if v == nil {
 		return false
@@ -594,25 +593,32 @@ const (
 // narrowing). It classifies how the selected arm ended (matchReturned /
 // matchFellThrough) like a switch.
 //
-// Soundness over completeness: the dispatch folds only when exactly one arm can
-// hold the value. A union value carries no member tag, so when two arms could
-// back the value's kind — two nominal-over-int members (Small | Big), or two
-// int-family builtins (int8 | int16) over a folded integer — the fold cannot tell
-// which arm the runtime would run, and leaves the result matchUnknown rather than
-// guessing. A scrutinee that does not fold, or an arm whose match cannot be
-// decided syntactically (a nominal record value, which carries no member tag), is
-// undetermined the same way — the discipline the switch and index folders use.
-// The arm types are read through the Env's ReceiverTyper (a universe lookup), so
-// the value query stays independent of the type query.
+// A tagged scrutinee dispatches confidently: the runtime arm is the one whose
+// member type equals the value's tag, so a record union (Coin | Level) and a
+// same-kind union (Small | Big) both fold — the completeness the tag restores.
+// An untagged value falls back to soundness over completeness: the dispatch folds
+// only when exactly one arm can hold the value. A bare union value carries no
+// member tag, so when two arms could back the value's kind — two nominal-over-int
+// members, or two int-family builtins over a folded integer — the fold cannot
+// tell which arm the runtime would run, and leaves the result matchUnknown rather
+// than guessing. A scrutinee that does not fold, or an untagged arm whose match
+// cannot be decided syntactically (a nominal record value), is undetermined the
+// same way. The arm types are read through the Env's ReceiverTyper (a universe
+// lookup), so the value query stays independent of the type query. The selected
+// arm's binding is narrowed to the bare member (the tag is dropped — inside the
+// arm the value is the member, not the union).
 func evalMatch(m *ast.MatchStmt, ctx evalCtx) (*ir.Constant, matchOutcome) {
 	scrut := evalExpr(m.Scrutinee, ctx)
 	if scrut == nil {
 		return nil, matchUnknown
 	}
-	// Scan every arm first: a fold is sound only when exactly one arm can hold the
-	// value (a union value has no tag to break a tie). An undecidable arm (a
-	// record member, an unresolvable type) makes the whole dispatch undetermined,
-	// since it might be the runtime's chosen arm.
+	if scrut.UnionTag != nil {
+		return taggedMatch(m, scrut, ctx)
+	}
+	// Scan every arm first: an untagged fold is sound only when exactly one arm
+	// can hold the value (no tag to break a tie). An undecidable arm (a record
+	// member, an unresolvable type) makes the whole dispatch undetermined, since it
+	// might be the runtime's chosen arm.
 	selected := -1
 	for i, arm := range m.Arms {
 		matched, certain := constMatchesArm(ctx, scrut, arm.Type)
@@ -634,6 +640,49 @@ func evalMatch(m *ast.MatchStmt, ctx evalCtx) (*ir.Constant, matchOutcome) {
 		return matchArmOutcome(branchOutcome(m.Else, ctx))
 	}
 	return nil, matchUnknown
+}
+
+// taggedMatch dispatches a tagged scrutinee: it runs the arm whose member type is
+// the value's tag, the confident dispatch a record or same-kind union folds
+// through. The arm type is resolved through the Env's universe lookup and
+// compared to the tag by member identity (a Named by definition, a Builtin by
+// name); the first arm that matches wins, exactly the runtime's first-match
+// order. When no typed arm carries the tag the wildcard else runs (an optional's
+// catch-all); with neither the match is undetermined. The arm binding narrows to
+// the bare member — the tag is dropped, so a field read inside the arm sees the
+// member value, not the union.
+func taggedMatch(m *ast.MatchStmt, scrut *ir.Constant, ctx evalCtx) (*ir.Constant, matchOutcome) {
+	for _, arm := range m.Arms {
+		t := annotationType(ctx.env, arm.Type)
+		if t == nil {
+			return nil, matchUnknown // an unresolvable arm type: cannot decide order
+		}
+		if tagMatchesType(scrut.UnionTag, t) {
+			return matchArmOutcome(branchOutcome(arm.Body, narrowMatchBinding(ctx, arm.Bind, ir.Untagged(scrut))))
+		}
+	}
+	if m.Else != nil {
+		return matchArmOutcome(branchOutcome(m.Else, ctx))
+	}
+	return nil, matchUnknown
+}
+
+// tagMatchesType reports whether a value's union tag denotes the same member as a
+// resolved arm type — member identity: a nominal type by its definition, a
+// builtin by its name, an enum arm by the same definition. It is the confident
+// dispatch's decision, the value-side twin of the type layer's sameType narrowed
+// to the two forms a tag ever takes.
+func tagMatchesType(tag, arm ir.Type) bool {
+	switch tag := tag.(type) {
+	case *ir.Named:
+		a, ok := arm.(*ir.Named)
+		return ok && a.Def == tag.Def
+	case *ir.Builtin:
+		a, ok := arm.(*ir.Builtin)
+		return ok && a.Name == tag.Name
+	default:
+		return false
+	}
 }
 
 // matchArmOutcome translates an arm body's ifOutcome — branchOutcome is the
@@ -716,10 +765,15 @@ func constMatchesArm(ctx evalCtx, scrut *ir.Constant, armType ast.TypeExpr) (mat
 // so a new primitive added to the registry is matched without a hardcoded list.
 func scalarMatchesBuiltin(reg *builtin.Registry, scrut *ir.Constant, name string) bool {
 	n, ok := reg.Native(name)
-	if !ok {
-		return false
-	}
-	switch scrut.Kind {
+	return ok && builtinBacksKind(n, scrut.Kind)
+}
+
+// builtinBacksKind reports whether a builtin's native descriptor can hold a value
+// of the given kind — the scalar classification a conversion's pass-through and a
+// match's scalar arm both read, keyed on the registry rather than a hardcoded
+// list of primitive names.
+func builtinBacksKind(n *builtin.NativeType, kind ir.ConstKind) bool {
+	switch kind {
 	case ir.ConstInt:
 		return n.IsInteger()
 	case ir.ConstBool:

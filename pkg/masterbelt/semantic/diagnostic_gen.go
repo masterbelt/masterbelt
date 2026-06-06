@@ -12,6 +12,7 @@ const (
 	CodeAmbiguousFuncOverload      diagnostic.Code = "masterbelt.semantic.ambiguous_func_overload"
 	CodeAmbiguousImport            diagnostic.Code = "masterbelt.semantic.ambiguous_import"
 	CodeAmbiguousOverload          diagnostic.Code = "masterbelt.semantic.ambiguous_overload"
+	CodeAmbiguousUnionMember       diagnostic.Code = "masterbelt.semantic.ambiguous_union_member"
 	CodeArityMismatch              diagnostic.Code = "masterbelt.semantic.arity_mismatch"
 	CodeArmTypeNotInUnion          diagnostic.Code = "masterbelt.semantic.arm_type_not_in_union"
 	CodeArmValueTypeMismatch       diagnostic.Code = "masterbelt.semantic.arm_value_type_mismatch"
@@ -120,6 +121,21 @@ func newAmbiguousOverloadDiagnostic(offset int, width int, method string, types 
 		Severity: diagnostic.Error,
 		Code:     CodeAmbiguousOverload,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeAmbiguousOverload, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newAmbiguousUnionMemberDiagnostic(offset int, width int, actual string, typ string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"actual": diagnostic.Str(actual),
+		"typ":    diagnostic.Str(typ),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeAmbiguousUnionMember,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeAmbiguousUnionMember, fields),
 		Fields:   fields,
 		Offset:   offset,
 		Width:    width,

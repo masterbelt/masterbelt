@@ -183,6 +183,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "ambiguous call: more than one overload of method " + f["method"].String() + " accepts " + f["types"].String()
 		}
 	},
+	"masterbelt.semantic.ambiguous_union_member": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return f["actual"].String() + " が " + f["typ"].String() + " のどのメンバとして流入するか確定できません。short(1) のような明示変換で確定させてください"
+		default:
+			return "cannot tell which member of " + f["typ"].String() + " " + f["actual"].String() + " flows in as; pin it with an explicit conversion (e.g. short(1))"
+		}
+	},
 	"masterbelt.semantic.arity_mismatch": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":

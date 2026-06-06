@@ -85,3 +85,56 @@ func TestAssignableNamedUnion(t *testing.T) {
 		t.Errorf("GameValue should be assignable to GV2 (same members)")
 	}
 }
+
+// TestSelectUnionMember pins the tagged-union member-selection rule: an exact
+// member wins outright (even when others would also accept), a single assignable
+// member is chosen, no member is UnionNoMember, and two assignable members with
+// no exact tie-break are UnionAmbiguous — the ambiguous_union_member case an
+// explicit conversion resolves. A non-union target is UnionNotAUnion.
+func TestSelectUnionMember(t *testing.T) {
+	reg := builtin.Default()
+
+	// nint | error: an nint literal is exact on nint, an error value exact on
+	// error — the V | error / optional path that already type-checks.
+	nintErr := &ir.Union{Members: []ir.Type{bt("nint"), bt("error")}}
+	if sel, m := SelectUnionMember(reg, bt("nint"), nintErr); sel != UnionUnique || m != nintErr.Members[0] {
+		t.Errorf("nint into nint | error: sel=%d member=%v, want unique nint", sel, m)
+	}
+	if sel, m := SelectUnionMember(reg, bt("error"), nintErr); sel != UnionUnique || m != nintErr.Members[1] {
+		t.Errorf("error into nint | error: sel=%d member=%v, want unique error", sel, m)
+	}
+
+	// short | error: a default-int literal has one integer member — a single
+	// assignable member chosen by exactness (nint adapts to short).
+	shortErr := &ir.Union{Members: []ir.Type{bt("short"), bt("error")}}
+	if sel, m := SelectUnionMember(reg, bt("nint"), shortErr); sel != UnionUnique || m != shortErr.Members[0] {
+		t.Errorf("nint into short | error: sel=%d member=%v, want unique short", sel, m)
+	}
+
+	// short | byte and a default-int literal: two integer members, neither exact
+	// — ambiguous. An explicit conversion to short makes short exact.
+	shortByte := &ir.Union{Members: []ir.Type{bt("short"), bt("byte")}}
+	if sel, _ := SelectUnionMember(reg, bt("nint"), shortByte); sel != UnionAmbiguous {
+		t.Errorf("nint into short | byte: sel=%d, want ambiguous", sel)
+	}
+	if sel, m := SelectUnionMember(reg, bt("short"), shortByte); sel != UnionUnique || m != shortByte.Members[0] {
+		t.Errorf("short into short | byte: sel=%d member=%v, want unique short", sel, m)
+	}
+
+	// A non-member is UnionNoMember; a non-union target is UnionNotAUnion.
+	if sel, _ := SelectUnionMember(reg, bt("string"), shortByte); sel != UnionNoMember {
+		t.Errorf("string into short | byte: sel=%d, want no member", sel)
+	}
+	if sel, _ := SelectUnionMember(reg, bt("nint"), bt("error")); sel != UnionNotAUnion {
+		t.Errorf("nint into error (not a union): sel=%d, want not-a-union", sel)
+	}
+
+	// A record union: a record member is exact by its nominal identity, so a
+	// Coin-typed value tags Coin even though Level shares its kind.
+	coin := &ir.Named{Def: &ir.TypeDef{Name: "Coin", Body: &ir.Record{Fields: []ir.Field{{Name: "amount", Type: bt("nint")}}}}}
+	level := &ir.Named{Def: &ir.TypeDef{Name: "Level", Body: &ir.Record{Fields: []ir.Field{{Name: "rank", Type: bt("nint")}}}}}
+	gameValue := &ir.Named{Def: &ir.TypeDef{Name: "GameValue", Body: &ir.Union{Members: []ir.Type{coin, level}}}}
+	if sel, m := SelectUnionMember(reg, coin, gameValue); sel != UnionUnique || m != coin {
+		t.Errorf("Coin into GameValue: sel=%d member=%v, want unique Coin", sel, m)
+	}
+}

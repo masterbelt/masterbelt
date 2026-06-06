@@ -10,7 +10,7 @@ Module
   Const "P"
     type nint | error
     value parseLevel(StringLiteral "99")
-    eval error("invalid level: 99")
+    eval (error) error("invalid level: 99")
   Func "parseLevel" pub
     param s: string
     result nint | error

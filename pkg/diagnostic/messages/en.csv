@@ -70,6 +70,7 @@ masterbelt.semantic.unreachable_arm,unreachable arm: a previous arm or the wildc
 masterbelt.semantic.scrutinee_not_comparable,switch needs a comparable scrutinee ({typ}); use match to branch on a record or union type
 masterbelt.semantic.non_exhaustive_match,match on {typ} is not exhaustive: {missing}
 masterbelt.semantic.arm_type_not_in_union,{arm} is not a member of {typ}
+masterbelt.semantic.ambiguous_union_member,cannot tell which member of {typ} {actual} flows in as; pin it with an explicit conversion (e.g. short(1))
 masterbelt.semantic.duplicate_match_arm,duplicate match arm for {arm}
 masterbelt.semantic.condition_not_bool,if condition must be a bool; got {typ}
 masterbelt.semantic.ternary_condition_not_bool,ternary condition must be a bool; got {typ}

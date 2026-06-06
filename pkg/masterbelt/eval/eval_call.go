@@ -64,7 +64,18 @@ func applyBody(c callable, self *ir.Constant, vals []*ir.Constant, ctx evalCtx) 
 	locals := make(map[string]*ir.Constant, len(c.params))
 	var localDefs map[string]*ir.TypeDef
 	for i, p := range c.params {
-		locals[p.Name] = vals[i]
+		val := vals[i]
+		// A parameter whose annotation is a union tags its bound value with the
+		// member it flows in as, so a match on the parameter inside the body
+		// dispatches confidently. The call site tags by the argument's static type
+		// (tagArguments); this is the value-only catch-all — it keeps an already
+		// tagged value and otherwise settles by unique kind backing.
+		if want := annotationType(ctx.env, p.Type); want != nil {
+			if tag := unionMemberTagValue(ctx, val, want); tag != nil {
+				val = ir.Tagged(val, tag)
+			}
+		}
+		locals[p.Name] = val
 		if def := annotationDef(ctx.env, p.Type); def != nil {
 			if localDefs == nil {
 				localDefs = make(map[string]*ir.TypeDef, len(c.params))
@@ -72,13 +83,16 @@ func applyBody(c callable, self *ir.Constant, vals []*ir.Constant, ctx evalCtx) 
 			localDefs[p.Name] = def
 		}
 	}
+	resultType := annotationType(ctx.env, c.result)
 	return evalBody(c.body, evalCtx{
 		env: ctx.env, locals: locals, self: self,
 		selfDef: c.selfDef, localDefs: localDefs, depth: ctx.depth + 1,
-		// The declared result type is the collection-mapness channel for the body's
-		// returns: a `return []` in a map<K,V>-returning routine folds to an empty
-		// map. It is resolved through the same universe lookup the other channels use.
-		resultColl: CollKindOf(annotationType(ctx.env, c.result)),
+		// The declared result type is the body's return channel: its collection
+		// mapness settles a `return []` in a map<K,V>-returning routine to an empty
+		// map, and its union tags a returned member value. It is resolved once here
+		// through the same universe lookup the other channels use.
+		resultColl: CollKindOf(resultType),
+		resultType: resultType,
 	})
 }
 
@@ -128,7 +142,42 @@ func applyFunc(cands []*ast.FuncDecl, args []ast.Expr, ctx evalCtx) *ir.Constant
 	if n != 1 {
 		return nil
 	}
-	return applyBody(funcCallable(fd), nil, vals, ctx)
+	// The selected overload's parameter annotations are the argument tagging
+	// channel: an argument flowing into a union-typed parameter is tagged with its
+	// member, read from the argument's own static type (Big(20) into Small | Big
+	// tags Big), in the caller's context. Tagging here, before binding, is what
+	// lets a value reach a match inside the body already tagged.
+	return applyBody(funcCallable(fd), nil, tagArguments(ctx, fd.Params, args, vals), ctx)
+}
+
+// tagArguments tags each folded argument with the union member it flows into its
+// parameter as — the call-site half of the tagged-union rule. A parameter whose
+// resolved annotation is a union and whose argument settles on one member tags
+// that value; everything else passes the value through unchanged. The member is
+// settled by unionMemberTag in the caller's context, so the argument's static
+// type (a conversion, a reference) resolves through the caller's channels. It
+// returns a fresh slice when any value is tagged, sharing the originals
+// otherwise, so an all-untagged call allocates nothing new.
+func tagArguments(ctx evalCtx, params []*ast.ParamDef, argExprs []ast.Expr, vals []*ir.Constant) []*ir.Constant {
+	if len(params) != len(vals) || len(argExprs) != len(vals) {
+		return vals // arity mismatch (recovered): leave untouched
+	}
+	out := vals
+	copied := false
+	for i, p := range params {
+		want := annotationType(ctx.env, p.Type)
+		if want == nil {
+			continue
+		}
+		if tag := unionMemberTag(ctx, argExprs[i], vals[i], want); tag != nil {
+			if !copied {
+				out = append([]*ir.Constant(nil), vals...)
+				copied = true
+			}
+			out[i] = ir.Tagged(vals[i], tag)
+		}
+	}
+	return out
 }
 
 // fits reports whether a top-level function's parameter list could accept the

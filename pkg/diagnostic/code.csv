@@ -70,6 +70,7 @@ masterbelt.semantic.unreachable_arm,error,
 masterbelt.semantic.scrutinee_not_comparable,error,typ:string
 masterbelt.semantic.non_exhaustive_match,error,typ:string missing:string
 masterbelt.semantic.arm_type_not_in_union,error,arm:string typ:string
+masterbelt.semantic.ambiguous_union_member,error,actual:string typ:string
 masterbelt.semantic.duplicate_match_arm,error,arm:string
 masterbelt.semantic.condition_not_bool,error,typ:string
 masterbelt.semantic.ternary_condition_not_bool,error,typ:string

@@ -448,6 +448,27 @@ func TestNominalConversionFold(t *testing.T) {
 	wantInt(t, memberCall(conv, "increment"), env, 6)
 }
 
+// TestConversionRangeCheck pins the eval-side soundness fix: a sized-integer
+// conversion whose argument is out of the target's range does not fold (nil), so
+// no out-of-range constant is ever built — the value a tagged-union match would
+// otherwise dispatch on wrongly. An in-range conversion still folds to its value.
+// It covers the builtin path (short) and the nominal-over-integer path (Level =
+// sbyte, range -128..127).
+func TestConversionRangeCheck(t *testing.T) {
+	env := newTypeEnv(levelDef())
+	conv := func(typ, lit string) ast.Expr {
+		return ast.NewCallExpr(id(typ), []ast.Expr{intLit(lit)}, nil)
+	}
+	// Out of range: no representable value, so the conversion does not fold.
+	wantNil(t, conv("short", "70000"), env) // short max is 32767
+	wantNil(t, conv("uint", "-1"), env)     // unsigned lower bound is 0
+	wantNil(t, conv("Level", "70000"), env) // sbyte max is 127
+	// In range: the conversion is the identity on the value.
+	wantInt(t, conv("short", "20"), env, 20)
+	wantInt(t, conv("Level", "5"), env, 5)
+	wantInt(t, conv("sbyte", "127"), env, 127) // the inclusive boundary folds
+}
+
 // TestNominalConstRefFold covers channel 2, a top-level const reference:
 // const base: Level = 5; base.increment() reads base's annotation for the def.
 func TestNominalConstRefFold(t *testing.T) {
