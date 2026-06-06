@@ -86,6 +86,64 @@ func TestDocumentScriptedEdits(t *testing.T) {
 	}
 }
 
+// TestErrorRunMirrorsDispatch pins parseError's stop predicate to
+// nextChildren's dispatch. A token the dispatcher routes back to the error
+// parser — extern (or pub extern) without fn — must not stop the error run:
+// before the fix parseError returned a zero-width Error node for it, which the
+// File-level loops re-encountered forever, allocating an unbounded tree. The
+// well-formed declaration after the stray run also pins that the run still
+// stops where a real declaration starts.
+func TestErrorRunMirrorsDispatch(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+	}{
+		{"extern without fn", "extern !=!t0]\nconst y = 1\n"},
+		{"pub extern without fn", "pub extern 1 + 2\nconst y = 1\n"},
+		{"extern at EOF", "9 extern"},
+		{"extern fn still a declaration", "* extern fn f(): int { return 1 }\n"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			doc := NewDocument([]byte(tc.src))
+			assertMatchesFullParse(t, doc, []byte(tc.src))
+			// An edit at the start forces the incremental path through the
+			// stray run as well.
+			content := naiveSplice([]byte(tc.src), 0, 0, []byte("9"))
+			doc.Edit(source.Edit{Start: 0, End: 0, NewText: []byte("9")})
+			assertMatchesFullParse(t, doc, content)
+		})
+	}
+}
+
+// TestBlockClearsHeadRestriction pins the fix for a parser hang: a function
+// literal in an if condition or switch scrutinee parses its body while the
+// head's record-literal restriction (noRecordLit) is in force, and parseBlock
+// must lift that restriction for the body's statements. Before the fix a "{"
+// statement inside such a body parsed as a zero-width error expression that the
+// statement loop re-encountered forever, allocating an unbounded tree. The
+// inputs here are well-formed, so the assertion that there are no diagnostics
+// also catches a regression that survives only via the loop's progress guard.
+func TestBlockClearsHeadRestriction(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+	}{
+		{"record literal stmt in lambda body in if head", "fn f(): int { if fn() { {} } { return 1 }\nreturn 0 }\n"},
+		{"field record literal in lambda body in if head", "fn f(): int { if fn() { {a: 1} } { return 1 }\nreturn 0 }\n"},
+		{"record literal stmt in lambda body in switch head", "fn f(): int { switch fn() { {} } {}\nreturn 0 }\n"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			doc := NewDocument([]byte(tc.src))
+			assertMatchesFullParse(t, doc, []byte(tc.src))
+			if diags := doc.Diagnostics(); len(diags) != 0 {
+				t.Fatalf("unexpected diagnostics for %q: %v", tc.src, diags)
+			}
+		})
+	}
+}
+
 // TestDocumentMalformedRecoveryBoundary covers a class of incremental divergence
 // where a malformed declaration's recovery anchored a diagnostic exactly on its
 // own right boundary — the start of the next File child. When an edit made the

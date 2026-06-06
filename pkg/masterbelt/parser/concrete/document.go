@@ -112,9 +112,17 @@ func (d *Document) Edit(e source.Edit) {
 
 		// A non-final batch is exactly one declaration/error node.
 		fresh = append(fresh, batch...)
-		for _, g := range batch {
-			freshEnd += g.Width()
+		w := batchWidth(batch)
+		if w == 0 {
+			// Progress guard — mirror parseFile: a zero-width batch must not
+			// spin this loop. Take one token as a raw leaf so the reparse
+			// advances; the full parse applies the same guard, so the trees
+			// stay identical.
+			leaf := p.bump()
+			fresh = append(fresh, leaf)
+			w = leaf.Width()
 		}
+		freshEnd += w
 
 		// Realign only once we are past the changed region: then the bytes from
 		// here on are unchanged, so a matching old boundary makes the old tail

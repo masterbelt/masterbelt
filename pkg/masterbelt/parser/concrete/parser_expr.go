@@ -7,21 +7,40 @@ import (
 
 // parseBlock parses a brace-delimited statement block: "{" Stmt* "}". The cursor
 // sits on "{".
+//
+// The body is a fresh statement context, so the record-literal restriction an
+// enclosing if condition or switch scrutinee carries (noRecordLit) is lifted for
+// its statements — a function literal inside such a head parses its body right
+// here, and without the reset a "{" statement in that body would parse as a
+// zero-width error expression, which the statement loop would re-encounter
+// forever. bracketed restores the restriction for the head's continuation after
+// the closing "}".
 func (p *parser) parseBlock() *cst.Node {
 	children := []cst.Green{p.bump()} // "{"
-	for {
-		switch p.peekSignificant() {
-		case token.RBrace:
-			p.skipTrivia(&children)
-			children = append(children, p.bump()) // "}"
-			return cst.NewNode(cst.Block, children)
-		case token.EOF:
-			return cst.NewNode(cst.Block, children)
-		default:
-			p.skipTrivia(&children)
-			children = append(children, p.parseStmt())
+	p.bracketed(func() {
+		for {
+			switch p.peekSignificant() {
+			case token.RBrace:
+				p.skipTrivia(&children)
+				children = append(children, p.bump()) // "}"
+				return
+			case token.EOF:
+				return
+			default:
+				p.skipTrivia(&children)
+				before := p.pos
+				children = append(children, p.parseStmt())
+				if p.pos == before {
+					// Progress guard: a statement parse that consumed no token
+					// (a defensive recovery path) must not spin this loop — take
+					// the offending token as a raw leaf and move on. Losslessness
+					// holds either way.
+					children = append(children, p.bump())
+				}
+			}
 		}
-	}
+	})
+	return cst.NewNode(cst.Block, children)
 }
 
 // parseStmt parses a single statement: a let declaration, a return statement, a
@@ -190,7 +209,13 @@ func (p *parser) parseSwitchStmt() *cst.Node {
 			return cst.NewNode(cst.SwitchStmt, children)
 		default:
 			p.skipTrivia(&children)
+			before := p.pos
 			children = append(children, p.parseSwitchArm())
+			if p.pos == before {
+				// Progress guard — see parseBlock: an arm parse that consumed no
+				// token must not spin this loop.
+				children = append(children, p.bump())
+			}
 			if p.peekSignificant() == token.Comma {
 				p.skipTrivia(&children)
 				children = append(children, p.bump()) // ","
