@@ -535,14 +535,6 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "for can only iterate a foldable collection; " + f["typ"].String() + " is not foldable"
 		}
 	},
-	"masterbelt.semantic.orphan_impl": func(loc Locale, f map[string]fmt.Stringer) string {
-		switch loc {
-		case "ja":
-			return f["iface"].String() + " は型の定義サイトでのみ実装できます"
-		default:
-			return f["iface"].String() + " can only be implemented at the definition site of the type"
-		}
-	},
 	"masterbelt.semantic.refinement_not_bool": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":

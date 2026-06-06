@@ -80,7 +80,6 @@ masterbelt.semantic.immutable_data,フィールドや要素には代入できま
 masterbelt.semantic.missing_initializer,let {name} は初期化が必要です。let {name} = 値 と書いてください
 masterbelt.semantic.index_out_of_range,インデックス {index} は長さ {length} のリストの範囲外です
 masterbelt.semantic.missing_required_method,{typ} は {iface} を実装していません: 必須メソッド {method} がありません
-masterbelt.semantic.orphan_impl,{iface} は型の定義サイトでのみ実装できます
 masterbelt.semantic.not_an_interface,{name} は interface ではありません
 masterbelt.semantic.bound_not_satisfied,{typ} は境界 {bound} を満たしません: その interface を実装していません
 masterbelt.semantic.uninferable_type_param,型パラメータ {name} を引数から推論できません。引数で決まるようにしてください
