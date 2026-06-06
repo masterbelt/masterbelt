@@ -18,9 +18,30 @@ import (
 // delegated to the enclosing scope — mirroring how funcBinder chains the
 // lowering scopes for the same body. A nested literal just wraps another
 // funcScope around this one.
+//
+// A lambda block body may also introduce let-bound block-locals; locals carries
+// each one in scope to its settled type, read before a parameter (a let shadows
+// a same-named parameter) and the body counterpart of params. It is nil in a
+// body with no lets — the common arrow/return form — and grows as the body walk
+// descends a block's lets, exactly as BodyScope.Locals does for a method body.
 type funcScope struct {
 	outer  scope
 	params map[string]ir.Type
+	locals map[string]ir.Type
+}
+
+// withLocal returns a copy of the scope with name bound to typ on top of its
+// locals — used as a body walk descends past a let, so the statements after it
+// (within the same block) resolve the new local. The map is copied so the
+// binding never escapes back to an enclosing block.
+func (s funcScope) withLocal(name string, typ ir.Type) funcScope {
+	locals := make(map[string]ir.Type, len(s.locals)+1)
+	for k, v := range s.locals {
+		locals[k] = v
+	}
+	locals[name] = typ
+	s.locals = locals
+	return s
 }
 
 func (s funcScope) registry() *builtin.Registry { return s.outer.registry() }
@@ -29,8 +50,23 @@ func (s funcScope) universe() map[string]*ir.TypeDef { return s.outer.universe()
 
 func (s funcScope) qualified() func(namespace, name string) *ir.TypeDef { return s.outer.qualified() }
 
+// shadows reports whether name is bound by a let local or a parameter of this
+// literal — either shadows a same-named type or top-level function (and so a
+// conversion or function call) reached through the enclosing scope.
+func (s funcScope) shadows(name string) bool {
+	if _, ok := s.locals[name]; ok {
+		return true
+	}
+	_, ok := s.params[name]
+	return ok
+}
+
 func (s funcScope) leaf(e ast.Expr) ir.Type {
 	if id, ok := e.(*ast.Identifier); ok {
+		// A let-bound local shadows a same-named parameter, so it is read first.
+		if t, ok := s.locals[id.Name]; ok {
+			return t
+		}
 		if t, ok := s.params[id.Name]; ok {
 			return t
 		}
@@ -39,23 +75,23 @@ func (s funcScope) leaf(e ast.Expr) ir.Type {
 }
 
 func (s funcScope) conv(id *ast.Identifier) ir.Type {
-	if _, ok := s.params[id.Name]; ok {
-		return ir.Invalid // a parameter shadows a same-named type
+	if s.shadows(id.Name) {
+		return ir.Invalid // a local or parameter shadows a same-named type
 	}
 	return s.outer.conv(id)
 }
 
 func (s funcScope) fn(id *ast.Identifier) []*ast.FuncDecl {
-	if _, ok := s.params[id.Name]; ok {
-		return nil // a parameter shadows a same-named function
+	if s.shadows(id.Name) {
+		return nil // a local or parameter shadows a same-named function
 	}
 	return s.outer.fn(id)
 }
 
 func (s funcScope) fnMember(m *ast.MemberExpr) []*ast.FuncDecl {
 	if recv, ok := m.Receiver.(*ast.Identifier); ok {
-		if _, isParam := s.params[recv.Name]; isParam {
-			return nil // a parameter shadows a same-named namespace
+		if s.shadows(recv.Name) {
+			return nil // a local or parameter shadows a same-named namespace
 		}
 	}
 	return s.outer.fnMember(m)

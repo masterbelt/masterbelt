@@ -276,12 +276,21 @@ func checkMethodBodies(reg *builtin.Registry, defs []*ir.TypeDef, universe map[s
 // returns on every path: a trailing return, or an exhaustive switch all of
 // whose arms return. A declaration whose body is missing altogether is a parse
 // error, not a missing return.
-func checkFuncBodies(reg *builtin.Registry, file *ast.File, universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, funcs map[string][]*ast.FuncDecl, qualifiedFuncs func(namespace, name string) []*ast.FuncDecl, env eval.Env, at func(ast.Node) span, diags *diagnostic.List) {
-	sink := exprSink(at, diags)
+//
+// sink receives the body's typing facts (operator errors, mismatches, and each
+// function literal's solved signature); diags receives the func-body
+// diagnostics. A nil diagnostic list runs the walk for the sink alone — the
+// func-literal-types path settles the signatures of the lambdas inside a
+// function body without reporting (the self and missing-return diagnostics, and
+// the index-write check, are suppressed) — mirroring checkMethodBodies.
+func checkFuncBodies(reg *builtin.Registry, file *ast.File, universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, funcs map[string][]*ast.FuncDecl, qualifiedFuncs func(namespace, name string) []*ast.FuncDecl, env eval.Env, sink *infer.Sink, at func(ast.Node) span, diags *diagnostic.List) {
 	r := &infer.TypeResolver{Defs: universe, Qualified: qualified}
-	noSelf := func(node ast.Node) {
-		s := at(node)
-		diags.Add(newSelfOutsideMethodDiagnostic(s.offset, s.width))
+	var noSelf func(node ast.Node)
+	if diags != nil {
+		noSelf = func(node ast.Node) {
+			s := at(node)
+			diags.Add(newSelfOutsideMethodDiagnostic(s.offset, s.width))
+		}
 	}
 	for _, fd := range file.Funcs {
 		// The function's generic type parameters are in scope for its parameter
@@ -300,6 +309,9 @@ func checkFuncBodies(reg *builtin.Registry, file *ast.File, universe map[string]
 		want := types.Substitute(r.ResolveType(fd.Result, tscope), bindBounds)
 		bs := infer.BodyScope{Reg: reg, Universe: universe, Qualified: qualified, Self: ir.Invalid, Params: params, Funcs: funcs, QualifiedFuncs: qualifiedFuncs}
 		checkStmts(fd.Body, want, bs, env, noSelf, sink, at, diags)
+		if diags == nil {
+			continue // the sink-only walk wants no further diagnostics
+		}
 		checkIndexWrites(fd.Body, env, at, diags)
 		if hasBlockBody(fd) && !bodyReturns(fd.Body, scrutEnumOf(bs)) {
 			s := at(fd)

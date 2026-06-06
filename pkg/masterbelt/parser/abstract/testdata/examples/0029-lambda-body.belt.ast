@@ -1,0 +1,10 @@
+File
+  ConstDecl
+    name "Bumped"
+    value (call (. (list IntLit "1" IntLit "2" IntLit "3") map) (fn(x: <missing>): <missing> (let step = IntLit "1") (return (call (. Identifier "x" add) Identifier "step"))))
+  ConstDecl
+    name "Clamped"
+    value (call (. (list (call (. IntLit "1" neg)) IntLit "0" IntLit "5") map) (fn(x: <missing>): <missing>  (return Identifier "x")))
+  ConstDecl
+    name "Labeled"
+    value (call (. (list IntLit "0" IntLit "1" IntLit "2") map) (fn(x: <missing>): <missing> ))

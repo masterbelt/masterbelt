@@ -229,26 +229,101 @@ func funcLitType(e *ast.FuncLit, s scope) ir.Type {
 }
 
 // returnedType synthesizes a function body's result type: the unified type of
-// every returned value. A body that returns nothing — or whose returns do not
-// unify — has no synthesizable result and is ir.Invalid.
-func returnedType(body []ast.Stmt, s scope) ir.Type {
+// every returned value. It descends the full statement grammar — through an
+// if's branches and a switch's arm bodies — so a return nested in control flow
+// participates, and threads the let locals a block introduces so a return of a
+// let local resolves it. This is the silent twin of synthesizeReturns; the two
+// must agree, so funcLitType (the IR signature) matches checkFuncLit's. A body
+// that returns nothing — or whose returns do not unify — has no synthesizable
+// result and is ir.Invalid.
+func returnedType(body []ast.Stmt, s funcScope) ir.Type {
+	result := returnedTypeIn(body, s)
+	if result == nil {
+		return ir.Invalid
+	}
+	return result
+}
+
+// returnedTypeIn walks a statement body, unifying the type of every return it
+// reaches (nil when there is no return, ir.Invalid when the returns conflict)
+// and threading the let locals each block introduces. A nested block walks a
+// copy of the scope, so a branch's let does not leak out.
+func returnedTypeIn(body []ast.Stmt, s funcScope) ir.Type {
 	var result ir.Type
-	for _, stmt := range body {
-		ret, ok := stmt.(*ast.ReturnStmt)
-		if !ok || ret.Value == nil {
-			continue
+	merge := func(t ir.Type) {
+		if t == nil {
+			return
 		}
-		t := exprType(ret.Value, s)
 		if result == nil {
 			result = t
 		} else {
 			result = types.Unify(s.registry(), result, t)
 		}
 	}
-	if result == nil {
-		return ir.Invalid
+	for _, stmt := range body {
+		switch stmt := stmt.(type) {
+		case *ast.ReturnStmt:
+			if stmt.Value != nil {
+				merge(exprType(stmt.Value, s))
+			}
+		case *ast.LetStmt:
+			s = letScope(stmt, s)
+		case *ast.IfStmt:
+			merge(returnedTypeInIf(stmt, s))
+		case *ast.SwitchStmt:
+			for _, arm := range stmt.Arms {
+				merge(returnedTypeIn(arm.Body, s))
+			}
+			merge(returnedTypeIn(stmt.Else, s))
+			for _, arm := range stmt.AfterElse {
+				merge(returnedTypeIn(arm.Body, s))
+			}
+		}
 	}
 	return result
+}
+
+// returnedTypeInIf unifies the return types reached through an if's then body,
+// its else-if chain, and its else body.
+func returnedTypeInIf(stmt *ast.IfStmt, s funcScope) ir.Type {
+	var result ir.Type
+	merge := func(t ir.Type) {
+		if t == nil {
+			return
+		}
+		if result == nil {
+			result = t
+		} else {
+			result = types.Unify(s.registry(), result, t)
+		}
+	}
+	merge(returnedTypeIn(stmt.Then, s))
+	if stmt.ElseIf != nil {
+		merge(returnedTypeInIf(stmt.ElseIf, s))
+	}
+	merge(returnedTypeIn(stmt.Else, s))
+	return result
+}
+
+// letScope returns the scope extended with a let's local at its settled type —
+// the annotation when written, otherwise the value's inferred type — the silent
+// counterpart of walkLet, so the silent and reporting walks bind a local the
+// same way.
+func letScope(stmt *ast.LetStmt, s funcScope) funcScope {
+	if stmt.Name == "" {
+		return s
+	}
+	var typ ir.Type
+	switch {
+	case stmt.Type != nil:
+		r := &TypeResolver{Defs: s.universe(), Qualified: s.qualified()}
+		typ = r.ResolveType(stmt.Type, nil)
+	case stmt.Value != nil:
+		typ = exprType(stmt.Value, s)
+	default:
+		typ = ir.Invalid
+	}
+	return s.withLocal(stmt.Name, typ)
 }
 
 // collectionType infers a collection literal's type: list<E> from the unified

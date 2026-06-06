@@ -283,8 +283,17 @@ func funcLitTypesOf(db *database, fileID FileID, file *ast.File) map[*ast.FuncLi
 	}
 	// Diagnostics are not wanted here — only the SolvedFuncLit sink — so the
 	// switch checks are suppressed by a nil diagnostic list; the body walk still
-	// reaches every function literal, including those in a switch arm.
-	checkMethodBodies(reg, q.typeDefs(fileID), q.universe(fileID), qualified, buildFuncSymbols(file), qualifiedFuncsFrom(q, q.importsOf(fileID)), nil, sink, nil, nil)
+	// reaches every function literal, including those in a switch arm. Both
+	// method and function bodies are walked, exactly as assemble does, so a
+	// lambda nested in a top-level fn body settles its signature for the editor
+	// the same way one inside a method body or a const initializer does.
+	funcs := buildFuncSymbols(file)
+	qualifiedFuncs := qualifiedFuncsFrom(q, q.importsOf(fileID))
+	// A nil diagnostic list (the sink-only walks) folds nothing, so the eval
+	// environment is unused and stays nil, exactly as the method-body walk here
+	// always has.
+	checkMethodBodies(reg, q.typeDefs(fileID), q.universe(fileID), qualified, funcs, qualifiedFuncs, nil, sink, nil, nil)
+	checkFuncBodies(reg, file, q.universe(fileID), qualified, funcs, qualifiedFuncs, nil, sink, nil, nil)
 	return out
 }
 
