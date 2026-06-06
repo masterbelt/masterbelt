@@ -141,6 +141,18 @@ func param(name string, typ ast.TypeExpr) *ast.ParamDef {
 }
 func ret(value ast.Expr) ast.Stmt { return ast.NewReturnStmt(value, nil) }
 
+// letStmt, assignStmtT, and ifStmt build the statement forms a lambda block
+// body may carry beyond return/expr, with nil syntax.
+func letStmt(name string, typ ast.TypeExpr, value ast.Expr) ast.Stmt {
+	return ast.NewLetStmt(name, typ, value, nil)
+}
+func assignStmtT(target, value ast.Expr) ast.Stmt {
+	return ast.NewAssignStmt(target, value, nil)
+}
+func ifStmt(cond ast.Expr, then []ast.Stmt, elseIf *ast.IfStmt, els []ast.Stmt) ast.Stmt {
+	return ast.NewIfStmt(cond, then, elseIf, els, nil)
+}
+
 // funcLit builds fn(params...) [: result] { body... } with a nil syntax node.
 func funcLit(params []*ast.ParamDef, result ast.TypeExpr, body ...ast.Stmt) *ast.FuncLit {
 	return ast.NewFuncLit(params, result, body, nil)

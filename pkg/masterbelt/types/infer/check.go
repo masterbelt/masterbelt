@@ -359,53 +359,158 @@ func conflicts(reg *builtin.Registry, annotation, want ir.Type, subst map[string
 }
 
 // checkReturns walks a literal's body with a known result type: every return
-// value is checked against it (pushing it into nested literals), and bare
-// expression statements are checked for their own errors.
+// value is checked against it (pushing it into nested literals), and the other
+// statement forms a block body may carry — let, assign, if, switch — are
+// type-checked too. A lambda body is the same statement grammar a method body
+// is (it is lowered by the same lowerBlock), so the walk descends an if's
+// branches and a switch's arm bodies to reach every return and checks the value
+// of every let and assignment, threading the let locals it introduces so a
+// later statement resolves them.
 func checkReturns(lit *ast.FuncLit, want ir.Type, body funcScope, subst map[string]ir.Type, sink *Sink) {
-	for _, stmt := range lit.Body {
-		switch stmt := stmt.(type) {
-		case *ast.ReturnStmt:
-			if stmt.Value != nil {
-				checkType(stmt.Value, want, body, subst, sink)
-			}
-		case *ast.ExprStmt:
-			check(stmt.X, body, sink)
+	walkBody(lit.Body, body, sink, func(stmt *ast.ReturnStmt, s funcScope) {
+		if stmt.Value != nil {
+			checkType(stmt.Value, want, s, subst, sink)
 		}
-	}
+	})
 }
 
 // synthesizeReturns walks a literal's body in synthesis mode, unifying the
 // returned types the way checkFuncLit does: the unified type (Invalid when a
-// return is Invalid or the returns conflict, reported at the later return)
-// and whether any return carried a value.
+// return is Invalid or the returns conflict, reported at the later return) and
+// whether any return carried a value. It descends the full statement grammar,
+// so a return nested in an if or switch arm participates in the inference —
+// otherwise a lambda whose sole return is inside an if would be falsely
+// uninferable, and the const would type as invalid while eval folds the value.
 func synthesizeReturns(lit *ast.FuncLit, body funcScope, sink *Sink) (unified ir.Type, sawReturn bool) {
 	reg := body.registry()
-	for _, stmt := range lit.Body {
+	walkBody(lit.Body, body, sink, func(stmt *ast.ReturnStmt, s funcScope) {
+		if stmt.Value == nil {
+			return
+		}
+		sawReturn = true
+		got := check(stmt.Value, s, sink)
+		switch {
+		case unified == nil:
+			unified = got
+		case unified == ir.Invalid || got == ir.Invalid:
+			unified = ir.Invalid
+		default:
+			if u := types.Unify(reg, unified, got); u == ir.Invalid {
+				sink.mismatch(stmt.Value, got, unified)
+				unified = ir.Invalid
+			} else {
+				unified = u
+			}
+		}
+	})
+	return unified, sawReturn
+}
+
+// walkBody is the shared statement walk over a function-literal block body: it
+// visits every statement in source order, type-checking the value of each let,
+// assignment, if condition, and switch scrutinee/arm pattern for its own errors
+// (through the sink), recursing into if branches and switch arm bodies, and
+// threading the let locals each block introduces so a later statement resolves
+// them. onReturn handles each return statement in the scope in force where it
+// sits — the one decision (check against a result, or synthesize and unify) that
+// differs between the checking and synthesis walks.
+//
+// A let extends the scope for the statements that follow it within this block,
+// and the extension does not leak to an enclosing block (each nested block walks
+// a copy), which gives the same block scoping the method-body walk and lowering
+// already use. This mirrors semantic/check.go's checkStmts, so a lambda body is
+// checked by the same statement grammar a method body is.
+func walkBody(body []ast.Stmt, s funcScope, sink *Sink, onReturn func(*ast.ReturnStmt, funcScope)) {
+	for _, stmt := range body {
 		switch stmt := stmt.(type) {
 		case *ast.ReturnStmt:
-			if stmt.Value == nil {
-				continue
-			}
-			sawReturn = true
-			got := check(stmt.Value, body, sink)
-			switch {
-			case unified == nil:
-				unified = got
-			case unified == ir.Invalid || got == ir.Invalid:
-				unified = ir.Invalid
-			default:
-				if u := types.Unify(reg, unified, got); u == ir.Invalid {
-					sink.mismatch(stmt.Value, got, unified)
-					unified = ir.Invalid
-				} else {
-					unified = u
-				}
-			}
+			onReturn(stmt, s)
 		case *ast.ExprStmt:
-			check(stmt.X, body, sink)
+			if stmt.X != nil {
+				check(stmt.X, s, sink)
+			}
+		case *ast.LetStmt:
+			s = walkLet(stmt, s, sink)
+		case *ast.AssignStmt:
+			if stmt.Value != nil {
+				check(stmt.Value, s, sink)
+			}
+		case *ast.IfStmt:
+			walkIf(stmt, s, sink, onReturn)
+		case *ast.SwitchStmt:
+			walkSwitch(stmt, s, sink, onReturn)
 		}
 	}
-	return unified, sawReturn
+}
+
+// walkLet type-checks a let's value and returns the scope extended with the new
+// local. An annotated let fixes its type from the annotation (its value checked
+// against it), an inferred let takes the value's synthesized type — the same
+// rule checkLet uses in a method body — so a later statement resolves the local
+// at the right type. A nameless let (recovered away) binds nothing.
+func walkLet(stmt *ast.LetStmt, s funcScope, sink *Sink) funcScope {
+	var typ ir.Type
+	switch {
+	case stmt.Type != nil:
+		r := &TypeResolver{Defs: s.universe(), Qualified: s.qualified()}
+		typ = r.ResolveType(stmt.Type, nil)
+		if stmt.Value != nil {
+			checkType(stmt.Value, typ, s, map[string]ir.Type{}, sink)
+		}
+	case stmt.Value != nil:
+		typ = check(stmt.Value, s, sink)
+	default:
+		typ = ir.Invalid
+	}
+	if stmt.Name == "" {
+		return s
+	}
+	return s.withLocal(stmt.Name, typ)
+}
+
+// walkIf type-checks an if condition and recurses into its then body, its
+// else-if chain, and its else body, each with a copy of the scope so a let in a
+// branch does not leak out. The condition's own operator errors surface; the
+// bool requirement is the method-body checker's diagnostic, not a type rule
+// here.
+func walkIf(stmt *ast.IfStmt, s funcScope, sink *Sink, onReturn func(*ast.ReturnStmt, funcScope)) {
+	if stmt.Cond != nil {
+		check(stmt.Cond, s, sink)
+	}
+	walkBody(stmt.Then, s, sink, onReturn)
+	if stmt.ElseIf != nil {
+		walkIf(stmt.ElseIf, s, sink, onReturn)
+	}
+	walkBody(stmt.Else, s, sink, onReturn)
+}
+
+// walkSwitch type-checks a switch scrutinee and arm value patterns and recurses
+// into each arm body (and the wildcard, and the unreachable after-else arms),
+// each with a copy of the scope. Arm values are checked for their own errors; a
+// bare enum-member pattern resolves through the scrutinee's enum the way the
+// method-body checker handles it, so a name that is not a member is reported by
+// neither walk here (its diagnostic is the switch checker's).
+func walkSwitch(stmt *ast.SwitchStmt, s funcScope, sink *Sink, onReturn func(*ast.ReturnStmt, funcScope)) {
+	if stmt.Scrutinee != nil {
+		check(stmt.Scrutinee, s, sink)
+	}
+	for _, arm := range stmt.Arms {
+		walkArm(arm, s, sink, onReturn)
+	}
+	walkBody(stmt.Else, s, sink, onReturn)
+	for _, arm := range stmt.AfterElse {
+		walkArm(arm, s, sink, onReturn)
+	}
+}
+
+// walkArm type-checks a switch arm's value patterns and recurses into its body.
+func walkArm(arm *ast.SwitchArm, s funcScope, sink *Sink, onReturn func(*ast.ReturnStmt, funcScope)) {
+	for _, v := range arm.Values {
+		if v != nil {
+			check(v, s, sink)
+		}
+	}
+	walkBody(arm.Body, s, sink, onReturn)
 }
 
 // check is the checking walk behind Check, parameterized over the scope so a

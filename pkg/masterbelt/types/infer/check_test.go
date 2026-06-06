@@ -84,6 +84,91 @@ func TestCheckFuncLitBody(t *testing.T) {
 	}
 }
 
+// TestCheckFuncLitStatementBody covers the statement forms a lambda block body
+// may carry beyond return/expr — let, assign, if, switch — which the body
+// walkers must descend into so a nested return drives result inference and an
+// error in a skipped statement is reported.
+func TestCheckFuncLitStatementBody(t *testing.T) {
+	env := emptyEnv()
+
+	// 1. A type error in a let initializer inside a lambda body is reported.
+	var r1 report
+	lit1 := funcLit([]*ast.ParamDef{param("acc", namedType("int")), param("value", namedType("int"))},
+		namedType("int"),
+		letStmt("bump", nil, binary(stringLit("str"), "add", intLit("1"))),
+		ret(binary(ident("acc"), "add", ident("value"))),
+	)
+	Check(lit1, env, r1.sink())
+	if len(r1.methods) != 1 || r1.methods[0] != "add" {
+		t.Errorf("let-initializer error: methods = %v, want [add]", r1.methods)
+	}
+
+	// 2. A let local is in scope for the statements after it; a return that uses
+	// it is checked against the result, and unifies for synthesis.
+	var r2 report
+	lit2 := funcLit([]*ast.ParamDef{param("value", namedType("int"))}, nil,
+		letStmt("bump", nil, binary(ident("value"), "add", intLit("1"))),
+		ret(ident("bump")),
+	)
+	if got := Check(lit2, env, r2.sink()).String(); got != "fn(int): int" {
+		t.Errorf("let local in scope: Check = %s, want fn(int): int", got)
+	}
+	if r2.uninferables != 0 || len(r2.methods) != 0 || len(r2.mismatches) != 0 {
+		t.Errorf("healthy let body reported %v %v %d", r2.methods, r2.mismatches, r2.uninferables)
+	}
+
+	// 3. A return nested inside an if drives result synthesis: it must not be
+	// reported as uninferable, and its type is the lambda's result.
+	var r3 report
+	lit3 := funcLit([]*ast.ParamDef{param("v", namedType("int"))}, nil,
+		ifStmt(binary(ident("v"), "gt", intLit("0")),
+			[]ast.Stmt{ret(binary(ident("v"), "add", intLit("1")))}, nil, nil),
+	)
+	if got := Check(lit3, env, r3.sink()).String(); got != "fn(int): int" {
+		t.Errorf("nested return synthesis: Check = %s, want fn(int): int", got)
+	}
+	if r3.uninferables != 0 {
+		t.Errorf("nested return falsely uninferable %d times", r3.uninferables)
+	}
+
+	// 4. A return nested inside an if is checked against the declared result.
+	var r4 report
+	lit4 := funcLit([]*ast.ParamDef{param("v", namedType("int"))}, namedType("int"),
+		ifStmt(binary(ident("v"), "gt", intLit("0")),
+			[]ast.Stmt{ret(stringLit("oops"))}, nil, nil),
+		ret(ident("v")),
+	)
+	Check(lit4, env, r4.sink())
+	if len(r4.mismatches) != 1 || r4.mismatches[0] != "string -> int" {
+		t.Errorf("nested return mismatch: %v, want [string -> int]", r4.mismatches)
+	}
+
+	// 5. An operator error in an if condition is reported.
+	var r5 report
+	lit5 := funcLit([]*ast.ParamDef{param("v", namedType("int"))}, namedType("int"),
+		ifStmt(binary(ident("v"), "anan", intLit("1")),
+			[]ast.Stmt{ret(ident("v"))}, nil, nil),
+		ret(ident("v")),
+	)
+	Check(lit5, env, r5.sink())
+	if len(r5.methods) != 1 || r5.methods[0] != "anan" {
+		t.Errorf("if-condition error: methods = %v, want [anan]", r5.methods)
+	}
+
+	// 6. An assignment value's error is reported, and an assignment to a let
+	// local does not disturb result inference.
+	var r6 report
+	lit6 := funcLit([]*ast.ParamDef{param("v", namedType("int"))}, namedType("int"),
+		letStmt("acc", nil, intLit("0")),
+		assignStmtT(ident("acc"), binary(stringLit("x"), "add", intLit("1"))),
+		ret(ident("v")),
+	)
+	Check(lit6, env, r6.sink())
+	if len(r6.methods) != 1 || r6.methods[0] != "add" {
+		t.Errorf("assign-value error: methods = %v, want [add]", r6.methods)
+	}
+}
+
 // --- checking mode (CheckAgainst) --------------------------------------------
 
 // TestCheckAgainst covers the checking rules (form × want): push-down into
