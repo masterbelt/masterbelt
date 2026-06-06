@@ -252,3 +252,20 @@ func TestMatchDistinctKindMembersStillFold(t *testing.T) {
 		t.Errorf("pick(7) = %v, want \"int\"", v)
 	}
 }
+
+// TestMatchNullArmFolds checks that the null arm of an optional folds: calling
+// amountOr with null selects the null arm and returns the fallback, and calling
+// it with a value selects the member arm. The null value folds to a ConstNull
+// that backs only the null arm, so the dispatch is unambiguous.
+func TestMatchNullArmFolds(t *testing.T) {
+	src := "pub type Coin = { amount: int }\n" +
+		"pub fn nameOr(v: int | null, fb: int): int {\n  match v {\n    int n -> return n\n    null  -> return fb\n  }\n}\n" +
+		"const Absent = nameOr(null, 7)\n" +
+		"const Present = nameOr(5, 7)\n"
+	if v := evalOrNil(t, src, "Absent"); v == nil || v.String() != "7" {
+		t.Errorf("nameOr(null, 7) = %v, want 7", v)
+	}
+	if v := evalOrNil(t, src, "Present"); v == nil || v.String() != "5" {
+		t.Errorf("nameOr(5, 7) = %v, want 5", v)
+	}
+}

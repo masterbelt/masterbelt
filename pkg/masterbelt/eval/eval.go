@@ -255,6 +255,10 @@ func evalExpr(e ast.Expr, ctx evalCtx) *ir.Constant {
 		return ir.StringConstant(e.Value)
 	case *ast.BoolLit:
 		return ir.BoolConstant(e.Value)
+	case *ast.NullLit:
+		// The null literal folds to the null value, so an optional's null arm and a
+		// null-valued binding fold like any other literal.
+		return ir.NullConstant()
 	case *ast.DatetimeLit:
 		// The literal normalizes to a UTC instant here; a malformed one (the
 		// lexer diagnosed it) folds to nothing.
@@ -1211,6 +1215,8 @@ func defBacksKind(reg *builtin.Registry, def *ir.TypeDef, kind ir.ConstKind) boo
 		return n.Duration
 	case ir.ConstError:
 		return n.Err
+	case ir.ConstNull:
+		return n.Null
 	default:
 		return false
 	}
@@ -2037,6 +2043,8 @@ func scalarMatchesBuiltin(reg *builtin.Registry, scrut *ir.Constant, name string
 		return n.Duration
 	case ir.ConstError:
 		return n.Err
+	case ir.ConstNull:
+		return n.Null
 	default:
 		return false
 	}
