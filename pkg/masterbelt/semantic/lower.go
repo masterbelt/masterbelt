@@ -331,6 +331,20 @@ func (b bodyBinder) NarrowLocal(name string, typ ir.Type) lower.Binder {
 	return next
 }
 
+// ForLocal resolves a for loop's variable type from the iterated expression —
+// the foldable's value type for an of-loop, its key type for an in-loop — and
+// binds the variable at that type for the loop body, returning the extended
+// binder. The iter type is inferred against the binder's scope (no type query),
+// and ForElement reads the element type from its foldable impl; an unfoldable
+// iter binds ir.Invalid (the semantic layer reports not_iterable). It reuses
+// NarrowLocal for the block-scoped binding, so the loop body sees the variable
+// exactly as a match arm sees its narrowed binding. It satisfies lower.ForBinder.
+func (b bodyBinder) ForLocal(name string, iter ast.Expr, of bool) (lower.Binder, ir.Type) {
+	iterT := infer.Body(iter, b.bodyScope())
+	elem, _ := types.ForElement(b.reg, iterT, of)
+	return b.NarrowLocal(name, elem), elem
+}
+
 // selfHasMethod reports whether the receiver type binds a method of the given
 // name — what an implicit self-call (a bare call inside a method body) needs to
 // distinguish a self-method from an unresolved name. It uses the same overload
@@ -636,4 +650,13 @@ func (b funcBinder) ArmType(t ast.TypeExpr) ir.Type {
 func (b funcBinder) NarrowLocal(name string, typ ir.Type) lower.Binder {
 	b.scope = b.scope.NarrowLocal(name, typ).(bodyBinder)
 	return b
+}
+
+// ForLocal binds a for loop's variable at its settled element type on the
+// lambda's scope and returns the extended binder, so a reference to it inside the
+// loop body lowers to an ir.LocalRef — the lambda twin of bodyBinder.ForLocal.
+func (b funcBinder) ForLocal(name string, iter ast.Expr, of bool) (lower.Binder, ir.Type) {
+	next, typ := b.scope.ForLocal(name, iter, of)
+	b.scope = next.(bodyBinder)
+	return b, typ
 }

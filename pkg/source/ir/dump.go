@@ -227,11 +227,24 @@ func dumpStmtAt(b *strings.Builder, s Stmt, indent string) {
 		}
 	case *If:
 		dumpIfAt(b, s, indent)
+	case *For:
+		fmt.Fprintf(b, "%sfor %s %s %s %s\n", indent, s.Var, forKeyword(s.Of), typeStringOrMissing(s.VarType), dumpValue(s.Iter))
+		for _, bs := range s.Body {
+			dumpStmtAt(b, bs, indent+"    ")
+		}
 	default:
 		// The snapshot oracle must render every lowered statement kind; a new
 		// one panics here rather than dumping as nothing.
 		panic(unhandledStmt(s))
 	}
+}
+
+// forKeyword renders a for's iteration kind: "of" binds the value, "in" the key.
+func forKeyword(of bool) string {
+	if of {
+		return "of"
+	}
+	return "in"
 }
 
 // dumpMatchPattern renders a resolved match arm's type pattern: its member type
@@ -360,6 +373,12 @@ func dumpStmtInline(s Stmt) string {
 			break
 		}
 		return "(" + strings.Join(parts, " ") + ")"
+	case *For:
+		body := make([]string, len(s.Body))
+		for i, bs := range s.Body {
+			body[i] = dumpStmtInline(bs)
+		}
+		return fmt.Sprintf("(for %s %s %s %s (body %s))", s.Var, forKeyword(s.Of), typeStringOrMissing(s.VarType), dumpValue(s.Iter), strings.Join(body, " "))
 	default:
 		// Every ir.Stmt has an inline form above; a kind added later panics
 		// rather than rendering as the empty string and vanishing from the

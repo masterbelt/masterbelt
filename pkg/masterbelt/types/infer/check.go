@@ -440,6 +440,8 @@ func walkBody(body []ast.Stmt, s funcScope, sink *Sink, onReturn func(*ast.Retur
 			walkSwitch(stmt, s, sink, onReturn)
 		case *ast.MatchStmt:
 			walkMatch(stmt, s, sink, onReturn)
+		case *ast.ForStmt:
+			walkFor(stmt, s, sink, onReturn)
 		default:
 			panic(ast.UnhandledStmt(stmt))
 		}
@@ -551,6 +553,30 @@ func narrowArmScope(s funcScope, arm *ast.MatchArm) funcScope {
 	}
 	r := &TypeResolver{Defs: s.universe(), Qualified: s.qualified()}
 	return s.withLocal(arm.Bind, r.ResolveType(arm.Type, nil))
+}
+
+// walkFor type-checks a for's iterated expression and recurses into its body in a
+// scope where the loop variable is bound to its element type — the value type for
+// an of-loop, the key type for an in-loop — so a reference to it inside the body
+// resolves at that type, the type rule the IR lowering's ForLocal mirrors. The
+// iter's iterability (not_iterable) is the for checker's diagnostic, not a type
+// error here.
+func walkFor(stmt *ast.ForStmt, s funcScope, sink *Sink, onReturn func(*ast.ReturnStmt, funcScope)) {
+	if stmt.Iter != nil {
+		check(stmt.Iter, s, sink)
+	}
+	walkBody(stmt.Body, forScope(s, stmt), sink, onReturn)
+}
+
+// forScope returns the scope a for loop body resolves in: the loop variable bound
+// to the iter's element type. A nameless loop variable or a non-foldable iter
+// binds nothing usable (ir.Invalid).
+func forScope(s funcScope, stmt *ast.ForStmt) funcScope {
+	if stmt.Var == "" {
+		return s
+	}
+	elem, _ := types.ForElement(s.registry(), exprType(stmt.Iter, s), stmt.Kind == ast.ForOf)
+	return s.withLocal(stmt.Var, elem)
 }
 
 // check is the checking walk behind Check, parameterized over the scope so a

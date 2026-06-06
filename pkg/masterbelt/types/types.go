@@ -653,6 +653,52 @@ func Satisfies(reg *builtin.Registry, typ, bound ir.Type) bool {
 	return false
 }
 
+// foldableInterfaceName is the prelude interface whose fold every for iterates
+// over. A type is iterable exactly when it opts into it.
+const foldableInterfaceName = "foldable"
+
+// ForElement reports the type a for binds to its loop variable when iterating
+// typ, and whether typ is iterable at all. Iterability is foldable: typ must opt
+// into the prelude foldable<K, V> interface (directly or through a nominal type's
+// underlying type). An of-loop binds the value type V, an in-loop the key type K
+// — a list<T> binds T for of and int (the index) for in, a map<K, V> binds V for
+// of and K for in. The element type is the impl's K/V with the receiver's own
+// type arguments substituted, so list<int> binds int. ok is false when typ is not
+// foldable (the for's not_iterable diagnostic); the element type is ir.Invalid
+// then. It shares the impl-walk and receiver substitution Satisfies and
+// receiverSubst use, so it agrees with conformance on which types are foldable.
+func ForElement(reg *builtin.Registry, typ ir.Type, of bool) (ir.Type, bool) {
+	subst := receiverSubst(reg, typ)
+	seen := map[*ir.TypeDef]bool{}
+	for def := defOf(reg, typ); def != nil && !seen[def]; {
+		seen[def] = true
+		for _, impl := range def.Impls {
+			idef := interfaceDefOf(impl)
+			if idef == nil || idef.Name != foldableInterfaceName {
+				continue
+			}
+			app, ok := impl.(*ir.App)
+			if !ok || len(app.Args) != 2 {
+				continue
+			}
+			// foldable<K, V>: of binds V (the value), in binds K (the key). The
+			// impl's argument carries the receiver's type variables (list<T> impls
+			// foldable<int, T>), so substitute the receiver's bindings to reach the
+			// concrete element type.
+			arg := app.Args[0] // K
+			if of {
+				arg = app.Args[1] // V
+			}
+			return Substitute(arg, subst), true
+		}
+		if def.Builtin {
+			break
+		}
+		def = defOf(reg, def.Body)
+	}
+	return ir.Invalid, false
+}
+
 // implMatches reports whether an opt-in impl (foldable<int, T>) is the interface
 // idef applied to the bound's arguments. The interface must be the same
 // definition, and each of the bound's arguments must agree with the impl's

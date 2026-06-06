@@ -1570,6 +1570,14 @@ func evalBody(body []ast.Stmt, ctx evalCtx) *ir.Constant {
 			// ifReturned yields the branch's value; ifUnknown (an unfoldable
 			// condition or branch) leaves v nil, which stops folding here.
 			return v
+		case *ast.ForStmt:
+			v, out := evalFor(stmt, ctx)
+			if out == ifFellThrough {
+				continue // the loop ran every element without returning; carry on
+			}
+			// ifReturned yields an early return's value; ifUnknown (an unfoldable
+			// iter or body) leaves v nil, which stops folding here.
+			return v
 		case *ast.ExprStmt:
 			// A bare expression yields no binding and cannot return, so folding
 			// the body steps over it. Listed so a new statement kind hits the
@@ -1755,6 +1763,71 @@ func evalIf(s *ast.IfStmt, ctx evalCtx) (*ir.Constant, ifOutcome) {
 	}
 }
 
+// evalFor folds a for statement: it folds the iterated expression to a
+// collection constant and runs the body once per element in fold order, binding
+// the loop variable to each element (the value for an of-loop, the key — a map's
+// entry key, a list's index — for an in-loop) as a fresh per-iteration local. The
+// iteration is bounded by the folded collection's element count, so it always
+// terminates; this is the same finite walk collectionFold makes. An iteration
+// whose body returns ends the for with that value (ifReturned); a body that runs
+// to its end falls through to the next element, and once every element is
+// visited the for falls through to the statement after it (ifFellThrough). An
+// unfoldable iter, an unfoldable body, or a non-collection value leaves the for
+// undecided (ifUnknown), which stops the enclosing fold.
+//
+// The loop variable is block-scoped to each iteration (bound and undone per
+// element), so it does not leak past the loop, while an assignment the body makes
+// to an outer let local persists across iterations — which is what lets a for
+// accumulate into a let, exactly as it does at runtime.
+func evalFor(s *ast.ForStmt, ctx evalCtx) (*ir.Constant, ifOutcome) {
+	if s.Iter == nil {
+		return nil, ifUnknown
+	}
+	coll := evalExpr(s.Iter, ctx)
+	if coll == nil || coll.Kind != ir.ConstCollection {
+		return nil, ifUnknown // an unfoldable or non-collection iter: cannot iterate
+	}
+	of := s.Kind == ast.ForOf
+	for i, entry := range coll.Coll {
+		// The loop variable: the value for of, the key for in. A list entry has no
+		// key, so its key is the element index — the same rule collectionFold uses.
+		elem := entry.Value
+		if !of {
+			elem = entry.Key
+			if elem == nil {
+				elem = ir.IntConstant(big.NewInt(int64(i)))
+			}
+		}
+		v, out := iterationOutcome(s, elem, ctx)
+		switch out {
+		case ifFellThrough:
+			continue // the body ran without returning; on to the next element
+		case ifReturned:
+			return v, ifReturned // an early return ends the whole loop
+		default:
+			return nil, ifUnknown // an unfoldable body stops the fold
+		}
+	}
+	return nil, ifFellThrough // every element visited without returning
+}
+
+// iterationOutcome runs one for-iteration: it binds the loop variable for this
+// element in a fresh block scope and runs the body through branchOutcome, the
+// shared body executor. The binding is block-scoped to the iteration (restored on
+// return), so it does not leak to the next element or past the loop, while an
+// assignment the body makes to an outer local persists through ctx.locals. A
+// loop with no variable name (recovered away) or no environment to bind into
+// runs the body unbound.
+func iterationOutcome(s *ast.ForStmt, elem *ir.Constant, ctx evalCtx) (*ir.Constant, ifOutcome) {
+	scope := newBlockScope(ctx.locals, ctx.localDefs)
+	ctx.localDefs = scope.localDefs
+	defer scope.restore()
+	if s.Var != "" && elem != nil {
+		scope.bind(s.Var, elem, nil)
+	}
+	return branchOutcome(s.Body, ctx)
+}
+
 // branchOutcome runs a taken branch body and classifies how it ended: a return
 // of a folded value (ifReturned), a fall-through to after the if (ifFellThrough
 // when no statement returned), or an unfoldable return (ifUnknown). It mirrors
@@ -1806,6 +1879,15 @@ func branchOutcome(body []ast.Stmt, ctx evalCtx) (*ir.Constant, ifOutcome) {
 			}
 		case *ast.IfStmt:
 			v, out := evalIf(stmt, ctx)
+			if out == ifFellThrough {
+				continue
+			}
+			if out == ifReturned {
+				return v, ifReturned
+			}
+			return nil, ifUnknown
+		case *ast.ForStmt:
+			v, out := evalFor(stmt, ctx)
 			if out == ifFellThrough {
 				continue
 			}

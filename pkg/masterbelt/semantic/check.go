@@ -161,6 +161,11 @@ func checkIndexWritesIn(body []ast.Stmt, locals map[string]*ir.Constant, env eva
 			for _, arm := range s.AfterElse {
 				checkIndexWritesIn(arm.Body, copyLocals(locals), env, at, diags)
 			}
+		case *ast.ForStmt:
+			// The loop variable is bound per iteration, not to a foldable list
+			// constant the write check tracks, so the body is walked with a copy of
+			// the locals exactly as a switch's arms are.
+			checkIndexWritesIn(s.Body, copyLocals(locals), env, at, diags)
 		case *ast.ReturnStmt, *ast.ExprStmt:
 			// Neither binds or reassigns a local, so neither can carry an index
 			// write or change which list a later write targets: nothing to do.
@@ -407,6 +412,19 @@ func checkStmts(stmts []ast.Stmt, want ir.Type, bs infer.BodyScope, env eval.Env
 			}
 		case *ast.IfStmt:
 			checkIf(stmt, want, bs, env, noSelf, sink, at, diags)
+		case *ast.ForStmt:
+			if noSelf != nil && stmt.Iter != nil {
+				checkNoSelf(stmt.Iter, noSelf)
+			}
+			// A nil diagnostic list suppresses the for diagnostics (the
+			// func-literal-types walk wants only the checking sink); the body walk
+			// still reaches every nested statement.
+			if diags != nil {
+				checkFor(stmt, bs, at, diags)
+			}
+			// The body is checked in the scope where the loop variable is bound to
+			// its element type, so a reference to it resolves at that type.
+			checkStmts(stmt.Body, want, forNarrowedScope(bs, stmt), env, noSelf, sink, at, diags)
 		default:
 			panic(ast.UnhandledStmt(stmt))
 		}

@@ -40,6 +40,7 @@ const (
 	CodeInvalidEnumBaseType        diagnostic.Code = "masterbelt.semantic.invalid_enum_base_type"
 	CodeInvalidOperation           diagnostic.Code = "masterbelt.semantic.invalid_operation"
 	CodeLambdaArityMismatch        diagnostic.Code = "masterbelt.semantic.lambda_arity_mismatch"
+	CodeLoopVarImmutable           diagnostic.Code = "masterbelt.semantic.loop_var_immutable"
 	CodeMissingEffect              diagnostic.Code = "masterbelt.semantic.missing_effect"
 	CodeMissingField               diagnostic.Code = "masterbelt.semantic.missing_field"
 	CodeMissingInitializer         diagnostic.Code = "masterbelt.semantic.missing_initializer"
@@ -54,6 +55,7 @@ const (
 	CodeNotARecord                 diagnostic.Code = "masterbelt.semantic.not_a_record"
 	CodeNotAnInterface             diagnostic.Code = "masterbelt.semantic.not_an_interface"
 	CodeNotExported                diagnostic.Code = "masterbelt.semantic.not_exported"
+	CodeNotIterable                diagnostic.Code = "masterbelt.semantic.not_iterable"
 	CodeOrphanImpl                 diagnostic.Code = "masterbelt.semantic.orphan_impl"
 	CodeRefinementNotBool          diagnostic.Code = "masterbelt.semantic.refinement_not_bool"
 	CodeRefinementNotConstant      diagnostic.Code = "masterbelt.semantic.refinement_not_constant"
@@ -522,6 +524,20 @@ func newLambdaArityMismatchDiagnostic(offset int, width int, actual int, expecte
 	}
 }
 
+func newLoopVarImmutableDiagnostic(offset int, width int, name string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"name": diagnostic.Str(name),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeLoopVarImmutable,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeLoopVarImmutable, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
 func newMissingEffectDiagnostic(offset int, width int, fn string, effect string) diagnostic.Diagnostic {
 	fields := map[string]fmt.Stringer{
 		"fn":     diagnostic.Str(fn),
@@ -722,6 +738,20 @@ func newNotExportedDiagnostic(offset int, width int, name string, path string) d
 		Severity: diagnostic.Error,
 		Code:     CodeNotExported,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeNotExported, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newNotIterableDiagnostic(offset int, width int, typ string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"typ": diagnostic.Str(typ),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeNotIterable,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeNotIterable, fields),
 		Fields:   fields,
 		Offset:   offset,
 		Width:    width,

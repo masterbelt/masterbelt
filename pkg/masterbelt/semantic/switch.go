@@ -234,6 +234,11 @@ func stmtReturns(s ast.Stmt, bs infer.BodyScope) bool {
 		return matchReturns(s, bs)
 	case *ast.IfStmt:
 		return ifReturns(s, bs)
+	case *ast.ForStmt:
+		// A for never guarantees a return: an empty collection skips the body
+		// entirely, so even a body that always returns may not run. Control falls
+		// through to the statement after the loop.
+		return false
 	case *ast.LetStmt, *ast.AssignStmt, *ast.ExprStmt:
 		// None of these guarantees a return: control falls through to the next
 		// statement. Listed explicitly rather than folded into a `default:

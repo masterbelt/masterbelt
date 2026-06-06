@@ -82,6 +82,24 @@ type MatchBinder interface {
 	NarrowLocal(name string, typ ir.Type) Binder
 }
 
+// ForBinder is the optional capability a body binder advertises to lower a for
+// loop's variable: it resolves the loop variable's settled type from the iterated
+// expression (the foldable's value type for an of-loop, its key type for an
+// in-loop) and binds the name at that type for the loop body, so a reference to
+// it inside the body lowers to an ir.LocalRef. The lower package has no foldable
+// machinery of its own, so the semantic layer supplies this — the same way it
+// supplies the let, enum, and match capabilities. A binder without it lowers a
+// loop body in which the variable stays unresolved (a context that never carries
+// a for in practice, e.g. a const initializer).
+type ForBinder interface {
+	// ForLocal records name as the loop variable on top of this binder's scope and
+	// returns the extended binder (used for the loop body) along with the
+	// variable's settled type — the value type when of is true, otherwise the key
+	// type. An unfoldable iter yields ir.Invalid (the semantic layer reports
+	// not_iterable).
+	ForLocal(name string, iter ast.Expr, of bool) (Binder, ir.Type)
+}
+
 // Value lowers an expression to its resolved IR value. The shared forms are
 // lowered here; the context-specific leaves go through b.Leaf.
 func Value(e ast.Expr, b Binder) ir.Value {
@@ -187,6 +205,8 @@ func Body(body []ast.Stmt, b Binder) []ir.Stmt {
 			stmts = append(stmts, matchStmt(s, b))
 		case *ast.IfStmt:
 			stmts = append(stmts, ifStmt(s, b))
+		case *ast.ForStmt:
+			stmts = append(stmts, forStmt(s, b))
 		default:
 			panic(ast.UnhandledStmt(s))
 		}
@@ -218,6 +238,25 @@ func ifStmt(s *ast.IfStmt, b Binder) *ir.If {
 	if s.Else != nil {
 		out.Else = Body(s.Else, b)
 	}
+	return out
+}
+
+// forStmt lowers a for statement: its iterated collection, its loop variable
+// (bound at its settled element type through the binder's ForBinder capability,
+// so a reference to it inside the body lowers to an ir.LocalRef), and its body
+// lowered in that extended scope. A binder without the capability (no for scope)
+// lowers the body with the variable unresolved — a context that never carries a
+// for in practice. A for yields no value, so only its iter and body lower.
+func forStmt(s *ast.ForStmt, b Binder) *ir.For {
+	of := s.Kind == ast.ForOf
+	out := &ir.For{Var: s.Var, Of: of, Iter: Value(s.Iter, b)}
+	bodyBinder := b
+	if fb, ok := b.(ForBinder); ok && s.Var != "" {
+		next, typ := fb.ForLocal(s.Var, s.Iter, of)
+		out.VarType = typ
+		bodyBinder = next
+	}
+	out.Body = Body(s.Body, bodyBinder)
 	return out
 }
 

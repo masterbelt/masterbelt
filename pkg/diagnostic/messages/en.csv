@@ -85,6 +85,8 @@ masterbelt.semantic.not_an_interface,{name} is not an interface
 masterbelt.semantic.bound_not_satisfied,{typ} does not satisfy the bound {bound}: it does not implement that interface
 masterbelt.semantic.uninferable_type_param,cannot infer the type parameter {name} from the arguments; no argument pins it
 masterbelt.semantic.no_method_on_unbounded_typevar,cannot call {method} on an unbounded type parameter: add an interface bound to call its methods
+masterbelt.semantic.not_iterable,for can only iterate a foldable collection; {typ} is not foldable
+masterbelt.semantic.loop_var_immutable,cannot assign to the loop variable {name}: it is immutable; accumulate into a let
 project.config.missing,masterbelt.toml not found in this directory or any parent
 project.config.invalid,invalid masterbelt.toml: {detail}
 project.config.missing_entry,masterbelt.toml does not set entry

@@ -290,6 +290,11 @@ func returnedTypeIn(body []ast.Stmt, s funcScope) ir.Type {
 			for _, arm := range stmt.AfterElse {
 				merge(returnedTypeIn(arm.Body, narrowArmScope(s, arm)))
 			}
+		case *ast.ForStmt:
+			// The loop body is walked in the scope where the loop variable is bound
+			// to the iter's element type, so a return that reads the variable
+			// synthesizes against it — the same scope walkFor and the IR lowering use.
+			merge(returnedTypeIn(stmt.Body, forScope(s, stmt)))
 		case *ast.ExprStmt, *ast.AssignStmt:
 			// Neither yields a return nor binds a new local that a later return
 			// reads, so neither changes the inferred result. Listed so a new
