@@ -6,9 +6,11 @@ Module
   Const "Bumped"
     type Score
     value Reference -> "Base".merge(IntLiteral "50")
+    eval 150
   Const "Counted"
     type bool
     value Reference -> "Base".merge(BoolLiteral true)
+    eval true
   Const "Start"
     type Level
     value IntLiteral "1"
@@ -16,9 +18,11 @@ Module
   Const "Second"
     type Level
     value Reference -> "Start".next()
+    eval 2
   Const "Fifth"
     type Level
     value Reference -> "Start".next(IntLiteral "4")
+    eval 5
   TypeDef "Score" pub
     doc "A game score in points."
     body int32
