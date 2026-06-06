@@ -187,7 +187,10 @@ func dumpExpr(e Expr) string {
 
 // dumpStmtInline renders a statement compactly on one line, for a function
 // literal dumped as part of an enclosing expression. (dumpStmt is the
-// multi-line, indented form used for a method body.)
+// multi-line, indented form used for a method body.) Every statement kind has
+// an inline form so a control-flow statement carried by a lambda body — an if,
+// a switch — is visible in the snapshot oracle rather than silently dropped; a
+// kind added later panics here, forcing the form to be defined.
 func dumpStmtInline(s Stmt) string {
 	switch s := s.(type) {
 	case *ReturnStmt:
@@ -201,9 +204,63 @@ func dumpStmtInline(s Stmt) string {
 		return "(let " + s.Name + " = " + dumpExpr(s.Value) + ")"
 	case *AssignStmt:
 		return "(assign " + dumpExpr(s.Target) + " = " + dumpExpr(s.Value) + ")"
+	case *SwitchStmt:
+		return dumpSwitchInline(s)
+	case *IfStmt:
+		return dumpIfInline(s)
 	default:
-		return ""
+		panic(unhandledStmt(s))
 	}
+}
+
+// dumpInlineBody renders a statement body as a space-joined run of inline
+// statements, e.g. "(return ...) (let ...)".
+func dumpInlineBody(body []Stmt) string {
+	parts := make([]string, len(body))
+	for i, s := range body {
+		parts[i] = dumpStmtInline(s)
+	}
+	return strings.Join(parts, " ")
+}
+
+// dumpSwitchInline renders a switch compactly: its scrutinee, each arm's value
+// patterns and body, the wildcard else body, and any unreachable arms.
+func dumpSwitchInline(s *SwitchStmt) string {
+	var b strings.Builder
+	b.WriteString("(switch " + dumpExpr(s.Scrutinee))
+	for _, arm := range s.Arms {
+		b.WriteString(" (arm " + dumpArmValues(arm) + " " + dumpInlineBody(arm.Body) + ")")
+	}
+	if s.Else != nil {
+		b.WriteString(" (else " + dumpInlineBody(s.Else) + ")")
+	}
+	for _, arm := range s.AfterElse {
+		b.WriteString(" (unreachable-arm " + dumpArmValues(arm) + " " + dumpInlineBody(arm.Body) + ")")
+	}
+	b.WriteString(")")
+	return b.String()
+}
+
+// dumpArmValues renders a switch arm's value patterns, comma-joined.
+func dumpArmValues(arm *SwitchArm) string {
+	values := make([]string, len(arm.Values))
+	for i, v := range arm.Values {
+		values[i] = dumpExpr(v)
+	}
+	return strings.Join(values, ", ")
+}
+
+// dumpIfInline renders an if compactly: its condition, then body, else-if chain,
+// and else body.
+func dumpIfInline(s *IfStmt) string {
+	out := "(if " + dumpExpr(s.Cond) + " (then " + dumpInlineBody(s.Then) + ")"
+	if s.ElseIf != nil {
+		out += " (else-if " + dumpIfInline(s.ElseIf) + ")"
+	}
+	if s.Else != nil {
+		out += " (else " + dumpInlineBody(s.Else) + ")"
+	}
+	return out + ")"
 }
 
 func dumpTypeDecl(b *strings.Builder, d *TypeDecl) {
@@ -423,6 +480,10 @@ func dumpStmtAt(b *strings.Builder, s Stmt, indent string) {
 		}
 	case *IfStmt:
 		dumpIfAt(b, s, indent)
+	default:
+		// The snapshot oracle must render every statement kind; a new one panics
+		// here rather than dumping as nothing and masking the regression.
+		panic(unhandledStmt(s))
 	}
 }
 

@@ -150,6 +150,12 @@ func checkIndexWritesIn(body []ast.Stmt, locals map[string]*ir.Constant, env eva
 			for _, arm := range s.AfterElse {
 				checkIndexWritesIn(arm.Body, copyLocals(locals), env, at, diags)
 			}
+		case *ast.ReturnStmt, *ast.ExprStmt:
+			// Neither binds or reassigns a local, so neither can carry an index
+			// write or change which list a later write targets: nothing to do.
+			// Listed explicitly so a new statement kind hits the default instead.
+		default:
+			panic(ast.UnhandledStmt(stmt))
 		}
 	}
 }
@@ -368,6 +374,8 @@ func checkStmts(stmts []ast.Stmt, want ir.Type, bs infer.BodyScope, env eval.Env
 			}
 		case *ast.IfStmt:
 			checkIf(stmt, want, bs, env, noSelf, sink, at, diags)
+		default:
+			panic(ast.UnhandledStmt(stmt))
 		}
 	}
 }

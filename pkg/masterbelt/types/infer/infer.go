@@ -278,6 +278,12 @@ func returnedTypeIn(body []ast.Stmt, s funcScope) ir.Type {
 			for _, arm := range stmt.AfterElse {
 				merge(returnedTypeIn(arm.Body, s))
 			}
+		case *ast.ExprStmt, *ast.AssignStmt:
+			// Neither yields a return nor binds a new local that a later return
+			// reads, so neither changes the inferred result. Listed so a new
+			// statement kind hits the default instead of being silently ignored.
+		default:
+			panic(ast.UnhandledStmt(stmt))
 		}
 	}
 	return result

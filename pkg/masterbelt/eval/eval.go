@@ -822,6 +822,13 @@ func evalBody(body []ast.Stmt, ctx evalCtx) *ir.Constant {
 			// ifReturned yields the branch's value; ifUnknown (an unfoldable
 			// condition or branch) leaves v nil, which stops folding here.
 			return v
+		case *ast.ExprStmt:
+			// A bare expression yields no binding and cannot return, so folding
+			// the body steps over it. Listed so a new statement kind hits the
+			// default rather than being silently skipped here too.
+			continue
+		default:
+			panic(ast.UnhandledStmt(stmt))
 		}
 	}
 	return nil
@@ -1010,6 +1017,12 @@ func branchOutcome(body []ast.Stmt, ctx evalCtx) (*ir.Constant, ifOutcome) {
 				return v, ifReturned
 			}
 			return nil, ifUnknown
+		case *ast.ExprStmt:
+			// As in evalBody: a bare expression neither binds nor returns, so the
+			// branch steps over it. Listed so a new kind hits the default.
+			continue
+		default:
+			panic(ast.UnhandledStmt(stmt))
 		}
 	}
 	return nil, ifFellThrough // the branch ran to its end without returning

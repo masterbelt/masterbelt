@@ -99,6 +99,13 @@ func recordTypes(doc view) map[*ast.RecordLit]ir.Type {
 				}
 			case *ast.IfStmt:
 				pushIfBody(stmt, result, pushBody)
+			case *ast.ExprStmt, *ast.AssignStmt:
+				// Neither carries a result-typed slot for a record literal: a
+				// bare expression has no expected type to push, and an
+				// assignment's target is a let local, not a return position.
+				// Listed so a new statement kind hits the default.
+			default:
+				panic(ast.UnhandledStmt(stmt))
 			}
 		}
 	}

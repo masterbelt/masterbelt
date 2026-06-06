@@ -438,6 +438,8 @@ func walkBody(body []ast.Stmt, s funcScope, sink *Sink, onReturn func(*ast.Retur
 			walkIf(stmt, s, sink, onReturn)
 		case *ast.SwitchStmt:
 			walkSwitch(stmt, s, sink, onReturn)
+		default:
+			panic(ast.UnhandledStmt(stmt))
 		}
 	}
 }

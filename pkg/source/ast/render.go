@@ -302,7 +302,19 @@ func (r *renderer) funcLit(x *FuncLit) {
 			r.expr(s.Target, 0)
 			r.str(" = ")
 			r.expr(s.Value, 0)
+		default:
+			// A control-flow statement (switch/if) does not appear in the
+			// expression traces this renderer produces, and a kind added later
+			// must not vanish — render a visible marker instead of nothing.
+			r.str(" " + stmtMarker(s))
 		}
 	}
 	r.str(" }")
+}
+
+// stmtMarker is the placeholder the expression renderer emits for a statement
+// kind it has no inline form for, so an unhandled kind is visible rather than
+// silently absent from the trace.
+func stmtMarker(s Stmt) string {
+	return fmt.Sprintf("<%T>", s)
 }
