@@ -103,3 +103,31 @@ func TestIndexWriteDynamic(t *testing.T) {
 		t.Errorf("a dynamic index must not be reported: %v", codes(diags))
 	}
 }
+
+// TestCompositeMapKeyFold checks that a map keyed by a composite value — a list
+// or a record — folds its get and set correctly: get finds the structurally
+// equal key, and set upserts it rather than appending a duplicate entry. Before
+// constEqual learned the composite kinds, a list/record key always compared
+// unequal, so the read mis-folded to a key-not-found error and the write built a
+// map with two entries for the same key.
+func TestCompositeMapKeyFold(t *testing.T) {
+	src := "const M: map<list<int>, string> = [[1, 2]: \"a\"]\n" +
+		"const V = M[[1, 2]]\n" +
+		"const M2 = M.set([1, 2], \"b\")\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", codes(diags))
+	}
+	for _, c := range m.Consts {
+		switch c.Name {
+		case "V":
+			if c.Eval == nil || c.Eval.Str != "a" {
+				t.Errorf("V = %v, want the present key's value \"a\"", c.Eval)
+			}
+		case "M2":
+			if c.Eval == nil || c.Eval.String() != `[[1, 2]: "b"]` {
+				t.Errorf("M2 = %v, want a single upserted entry [[1, 2]: \"b\"]", c.Eval)
+			}
+		}
+	}
+}

@@ -255,6 +255,101 @@ func TestIndexSetFold(t *testing.T) {
 	})
 }
 
+// TestCollectionKeyEquality covers a map keyed by a composite value (a list or
+// a record): get must find the structurally-equal key, and set must upsert it
+// rather than append a duplicate. The structural equality constEqual now
+// implements for collections and records is what makes the dispatch correct.
+func TestCollectionKeyEquality(t *testing.T) {
+	env := stubEnv{reg: builtin.Default()}
+	listKey := func(a, b string) *ast.CollectionLit { return listLit(intLit(a), intLit(b)) }
+	recKey := func(value string) *ast.RecordLit {
+		return ast.NewRecordLit("P", []*ast.FieldInit{ast.NewFieldInit("x", intLit(value), nil)}, nil)
+	}
+
+	t.Run("list key get present", func(t *testing.T) {
+		m := mapLit(listKey("1", "2"), strLit("a"), listKey("3", "4"), strLit("b"))
+		if got := Expr(indexGet(m, listKey("1", "2")), env); got == nil || got.Str != "a" {
+			t.Errorf("get([1,2]) = %v, want \"a\"", got)
+		}
+		if got := Expr(indexGet(m, listKey("3", "4")), env); got == nil || got.Str != "b" {
+			t.Errorf("get([3,4]) = %v, want \"b\"", got)
+		}
+	})
+
+	t.Run("list key get absent", func(t *testing.T) {
+		m := mapLit(listKey("1", "2"), strLit("a"))
+		if got := Expr(indexGet(m, listKey("9", "9")), env); got == nil || got.Kind != ir.ConstError {
+			t.Errorf("get([9,9]) = %v, want a key-not-found error", got)
+		}
+	})
+
+	t.Run("list key set upserts existing", func(t *testing.T) {
+		m := mapLit(listKey("1", "2"), strLit("a"))
+		got := Expr(indexSet(m, listKey("1", "2"), strLit("b")), env)
+		if got == nil || got.String() != `[[1, 2]: "b"]` {
+			t.Errorf("set([1,2]) = %v, want a single replaced entry [[1, 2]: \"b\"]", got)
+		}
+	})
+
+	t.Run("record key get and set", func(t *testing.T) {
+		m := mapLit(recKey("1"), strLit("a"))
+		if got := Expr(indexGet(m, recKey("1")), env); got == nil || got.Str != "a" {
+			t.Errorf("get({x:1}) = %v, want \"a\"", got)
+		}
+		got := Expr(indexSet(m, recKey("1"), strLit("b")), env)
+		if got == nil || got.String() != `[{ x: 1 }: "b"]` {
+			t.Errorf("set({x:1}) = %v, want a single replaced entry", got)
+		}
+	})
+}
+
+// TestConstEqual covers the structural equality switch dispatch and map keys
+// rely on, across the scalar, composite, and error kinds.
+func TestConstEqual(t *testing.T) {
+	env := stubEnv{reg: builtin.Default()}
+	fold := func(e ast.Expr) *ir.Constant { return Expr(e, env) }
+	list := func(xs ...ast.Expr) ast.Expr { return listLit(xs...) }
+	rec := func(name, value string) ast.Expr {
+		return ast.NewRecordLit("P", []*ast.FieldInit{ast.NewFieldInit(name, intLit(value), nil)}, nil)
+	}
+
+	cases := []struct {
+		name string
+		a, b ast.Expr
+		want bool
+	}{
+		{"equal lists", list(intLit("1"), intLit("2")), list(intLit("1"), intLit("2")), true},
+		{"differing element", list(intLit("1"), intLit("2")), list(intLit("1"), intLit("9")), false},
+		{"differing length", list(intLit("1")), list(intLit("1"), intLit("2")), false},
+		{"nested equal lists", list(list(intLit("1"))), list(list(intLit("1"))), true},
+		{"equal records", rec("x", "1"), rec("x", "1"), true},
+		{"differing record value", rec("x", "1"), rec("x", "2"), false},
+		{"differing record field", rec("x", "1"), rec("y", "1"), false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			a, b := fold(tc.a), fold(tc.b)
+			if a == nil || b == nil {
+				t.Fatalf("operand did not fold: a=%v b=%v", a, b)
+			}
+			if got := constEqual(a, b); got != tc.want {
+				t.Errorf("constEqual = %t, want %t", got, tc.want)
+			}
+		})
+	}
+
+	// An error compares by message, and two differing kinds are never equal.
+	if !constEqual(ir.ErrorConstant("x"), ir.ErrorConstant("x")) {
+		t.Error("equal error messages should be equal")
+	}
+	if constEqual(ir.ErrorConstant("x"), ir.ErrorConstant("y")) {
+		t.Error("differing error messages should be unequal")
+	}
+	if constEqual(fold(list(intLit("1"))), ir.IntConstant(big.NewInt(1))) {
+		t.Error("a list and an int are never equal")
+	}
+}
+
 // TestDatetimeMillis covers the datetime literal normalization: ISO instants
 // (with and without milliseconds) to UTC epoch milliseconds, offsets
 // normalized away, and malformed text folding to nothing.
