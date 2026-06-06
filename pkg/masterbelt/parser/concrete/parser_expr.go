@@ -196,15 +196,17 @@ func (p *parser) parseSwitchStmt() *cst.Node {
 	p.skipTrivia(&children)
 	children = append(children, p.bump()) // "{"
 	for {
-		switch p.peekSignificant() {
-		case token.RBrace:
+		switch {
+		case p.peekSignificant() == token.RBrace:
 			p.skipTrivia(&children)
 			children = append(children, p.bump()) // "}"
 			return cst.NewNode(cst.SwitchStmt, children)
-		case token.EOF, token.Pub, token.Const, token.Type, token.Enum, token.Use, token.Assert:
-			// Unterminated: report the missing "}" and stop before the next
-			// declaration so recovery stays local, exactly as the record literal
-			// does.
+		case p.atUnterminatedConstructStop():
+			// Unterminated: report the missing "}" and stop at EOF or before the
+			// next File-level declaration so recovery stays local, exactly as the
+			// record literal does. atUnterminatedConstructStop mirrors the File
+			// dispatcher's declaration-starter set (beginsDeclaration), so the
+			// boundary always matches where a real declaration can begin.
 			p.report(newUnexpectedTokenDiagnostic(p.lastStart, 0, p.peekSignificant().String()))
 			return cst.NewNode(cst.SwitchStmt, children)
 		default:
@@ -540,21 +542,24 @@ func (p *parser) parseRecordLit(children []cst.Green) *cst.Node {
 	// the body and restored on return.
 	p.bracketed(func() {
 		for {
-			switch p.peekSignificant() {
-			case token.RBrace:
+			switch {
+			case p.peekSignificant() == token.RBrace:
 				p.skipTrivia(&children)
 				children = append(children, p.bump()) // "}"
 				node = cst.NewNode(cst.RecordLit, children)
 				return
-			case token.EOF, token.Pub, token.Const, token.Type, token.Use, token.Assert:
-				// Unterminated: report the missing "}" and stop before the next
-				// declaration so recovery stays local. The diagnostic anchors at the
-				// last consumed token to stay inside this construct (see lastStart);
-				// the leaves are still lossless.
+			case p.atUnterminatedConstructStop():
+				// Unterminated: report the missing "}" and stop at EOF or before the
+				// next File-level declaration so recovery stays local. The boundary
+				// follows beginsDeclaration (see atUnterminatedConstructStop), so a
+				// following enum/interface/fn declaration is not swallowed
+				// token-by-token. The diagnostic anchors at the last consumed token to
+				// stay inside this construct (see lastStart); the leaves are still
+				// lossless.
 				p.report(newUnexpectedTokenDiagnostic(p.lastStart, 0, p.peekSignificant().String()))
 				node = cst.NewNode(cst.RecordLit, children)
 				return
-			case token.Ident:
+			case p.peekSignificant() == token.Ident:
 				p.skipTrivia(&children)
 				children = append(children, p.parseRecordField())
 				if p.peekSignificant() == token.Comma {
@@ -654,8 +659,16 @@ func (p *parser) parseFuncLit() *cst.Node {
 			p.report(newArrowBlockBodyDiagnostic(p.cur().Offset, p.cur().Width))
 			children = append(children, p.parseBlock())
 		case startsExpr(p.peekSignificant()):
+			// The arrow body is a fresh expression context, not part of the
+			// enclosing if condition / switch scrutinee: a record literal here is
+			// unambiguous, so lift the head's noRecordLit restriction for it (the
+			// block body does the same through parseBlock). Without this a typed
+			// record literal in the body of a lambda used in an if/switch head
+			// mis-parses — the "{" is read as the control block instead.
 			p.skipTrivia(&children)
-			children = append(children, p.parseExpr())
+			p.bracketed(func() {
+				children = append(children, p.parseExpr())
+			})
 		default:
 			p.report(newExpectedExpressionDiagnostic(p.lastStart, 0))
 		}
