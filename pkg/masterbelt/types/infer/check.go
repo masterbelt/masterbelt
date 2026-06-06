@@ -65,14 +65,13 @@ func checkType(e ast.Expr, want ir.Type, s scope, subst map[string]ir.Type, sink
 	want = types.Substitute(want, subst) // pin what the context already solved
 	sink.checked(e, want)
 	// A bare member resolves through an enum expectation (const Top: Rarity =
-	// Legend): when want is an enum and e is a bare identifier naming one of its
-	// members, the expression is that enum. A bare name that is not a member
-	// falls through to ordinary identifier resolution (an undefined name).
+	// Legend), including a union that carries the enum (const x: R | error =
+	// Legend): when e is a bare identifier naming a member of the expected enum,
+	// the expression is that enum. A bare name that is not a member falls through
+	// to ordinary identifier resolution (an undefined name).
 	if id, ok := e.(*ast.Identifier); ok {
-		if def, ok := want.(*ir.Named); ok && def.Def != nil && def.Def.Enum != nil {
-			if enumMemberIndex(def.Def, id.Name) >= 0 {
-				return want
-			}
+		if member := enumMemberExpectation(want, id.Name); member != nil {
+			return member
 		}
 	}
 	switch e := e.(type) {

@@ -442,18 +442,17 @@ func reportRefIssues(fileID FileID, e ast.Expr, q queries, at func(ast.Node) spa
 }
 
 // annotationEnum resolves a constant's type annotation to the enum it names, or
-// nil when the constant has no annotation or it does not name an enum. It is a
-// pure name lookup in the file's universe — it does not call typeOf — so the
-// value lowering it feeds stays independent of the type query.
+// nil when the constant has no annotation or it does not name an enum. A union
+// annotation carrying an enum (R | error) resolves to that enum, so a bare
+// member is accepted under it exactly as under the bare enum. It is a pure name
+// lookup in the file's universe — it does not call typeOf — so the value
+// lowering it feeds stays independent of the type query.
 func annotationEnum(q queries, fileID FileID, decl *ast.ConstDecl) *ir.TypeDef {
 	if decl.Type == nil {
 		return nil
 	}
 	r := &infer.TypeResolver{Defs: q.universe(fileID), Qualified: qualifiedFrom(q, q.importsOf(fileID))}
-	if n, ok := r.ResolveType(decl.Type, nil).(*ir.Named); ok && n.Def != nil && n.Def.Enum != nil {
-		return n.Def
-	}
-	return nil
+	return enumDefOf(r.ResolveType(decl.Type, nil))
 }
 
 // refinedDef returns the definition behind a nominal (or applied) annotation
