@@ -22,4 +22,4 @@ Module
   Const "EmptyMap"
     type map<string, int>
     value []
-    eval []
+    eval [:]

@@ -110,6 +110,49 @@ func TestIndexWriteDynamic(t *testing.T) {
 // constEqual learned the composite kinds, a list/record key always compared
 // unequal, so the read mis-folded to a key-not-found error and the write built a
 // map with two entries for the same key.
+// TestEmptyMapConstUpsertFolds is the E-18 follow-up's main case: an empty
+// collection typed as a map (const M: map<string, int> = []) carries the map
+// mapness through its annotation, so a set on it upserts and folds — where the old
+// "empty reads as list" default left the upsert unfolded. The empty list stays a
+// list (its set at index 0 does not fold, an out-of-range write). The empty map
+// renders [:], the empty list [].
+func TestEmptyMapConstUpsertFolds(t *testing.T) {
+	src := "const EM: map<string, int> = []\n" +
+		"const EM1 = EM.set(\"a\", 1)\n" +
+		"const EM2 = EM.set(\"a\", 1).set(\"b\", 2)\n" +
+		"const EL: list<int> = []\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", codes(diags))
+	}
+	want := map[string]string{
+		"EM":  "[:]",
+		"EM1": `["a": 1]`,
+		"EM2": `["a": 1, "b": 2]`,
+		"EL":  "[]",
+	}
+	for _, c := range m.Consts {
+		if w, ok := want[c.Name]; ok {
+			if c.Eval == nil || c.Eval.String() != w {
+				t.Errorf("%s = %v, want %s", c.Name, c.Eval, w)
+			}
+		}
+	}
+}
+
+// TestEmptyMapLetUpsertNoOOB checks the let-annotation channel on the write check:
+// an empty map let (let m: map<int, int> = []) is a settled map, so an int-keyed
+// write is an upsert and must not be reported as index_out_of_range — the
+// false positive the old entry-scanning isMapConst would have produced for an
+// int-keyed empty map.
+func TestEmptyMapLetUpsertNoOOB(t *testing.T) {
+	src := "pub fn f(): map<int, int> {\n  let m: map<int, int> = []\n  m[0] = 1\n  return m\n}\n"
+	_, diags := analyze(src)
+	if hasCode(diags, CodeIndexOutOfRange) {
+		t.Errorf("an empty-map upsert must not be reported out of range: %v", codes(diags))
+	}
+}
+
 func TestCompositeMapKeyFold(t *testing.T) {
 	src := "const M: map<list<int>, string> = [[1, 2]: \"a\"]\n" +
 		"const V = M[[1, 2]]\n" +

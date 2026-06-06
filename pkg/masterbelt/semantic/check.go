@@ -121,7 +121,10 @@ func checkIndexWritesIn(body []ast.Stmt, locals map[string]*ir.Constant, env eva
 		switch s := stmt.(type) {
 		case *ast.LetStmt:
 			if s.Name != "" && s.Value != nil {
-				if v := eval.ExprIn(s.Value, locals, env); v != nil {
+				// The let annotation is the collection-mapness channel, so an empty
+				// map/list literal folds to the settled empty collection the write
+				// check needs to tell an upsert from a list write.
+				if v := eval.ExprInExpecting(s.Value, locals, annotationCollKindOf(env, s.Type), env); v != nil {
 					locals[s.Name] = v
 				} else {
 					delete(locals, s.Name) // an unfoldable rebind: stop tracking it
@@ -179,9 +182,10 @@ func checkIndexWritesIn(body []ast.Stmt, locals map[string]*ir.Constant, env eva
 // reportIndexWrite reports an out-of-range list write for an assignment whose
 // value is a set call on a foldable list. The set call carries the index and the
 // new value (a desugared coll[i] = v, or a hand-written coll = coll.set(i, v));
-// when the receiver folds to a list and the index to a constant outside it, the
-// write is reported at the index expression. A map receiver (keyed entries) is an
-// upsert and never out of range.
+// when the receiver folds to a settled list and the index to a constant outside
+// it, the write is reported at the index expression. A map receiver is an upsert
+// and never out of range, and an unknown empty collection (its mapness unsettled)
+// is ambiguous, so neither is reported — only a settled list is.
 func reportIndexWrite(s *ast.AssignStmt, locals map[string]*ir.Constant, env eval.Env, at func(ast.Node) span, diags *diagnostic.List) {
 	call, ok := s.Value.(*ast.CallExpr)
 	if !ok {
@@ -192,7 +196,7 @@ func reportIndexWrite(s *ast.AssignStmt, locals map[string]*ir.Constant, env eva
 		return
 	}
 	recv := eval.ExprIn(member.Receiver, locals, env)
-	if recv == nil || recv.Kind != ir.ConstCollection || isMapConst(recv) {
+	if recv == nil || recv.Kind != ir.ConstCollection || !recv.IsList() {
 		return
 	}
 	idx := eval.ExprIn(call.Arguments[0], locals, env)
@@ -207,16 +211,16 @@ func reportIndexWrite(s *ast.AssignStmt, locals map[string]*ir.Constant, env eva
 	diags.Add(newIndexOutOfRangeDiagnostic(c.offset, c.width, idx.Int.String(), strconv.Itoa(n)))
 }
 
-// isMapConst reports whether a folded collection constant is a map — its entries
-// carry keys. An empty collection has no key, so it reads as a list (the
-// conservative default eval uses for the same ambiguity).
-func isMapConst(c *ir.Constant) bool {
-	for _, e := range c.Coll {
-		if e.Key != nil {
-			return true
-		}
+// annotationCollKindOf resolves a let's type annotation to the collection mapness
+// it names — CollMap for a map<K,V>, CollList for a list<T>, CollUnknown for
+// anything else (or an Env that supplies no type resolution). It is the channel
+// the write check threads so an empty collection let folds to a settled value.
+func annotationCollKindOf(env eval.Env, t ast.TypeExpr) ir.CollKind {
+	rt, ok := env.(eval.ReceiverTyper)
+	if !ok || t == nil {
+		return ir.CollUnknown
 	}
-	return false
+	return eval.CollKindOf(rt.TypeExprType(t))
 }
 
 // copyLocals returns a shallow copy of a local environment, so a nested block's

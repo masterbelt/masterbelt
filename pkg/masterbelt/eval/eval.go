@@ -88,20 +88,22 @@ type ReceiverTyper interface {
 // precision int; the range check happens where the constant's concrete type is
 // known.
 func Decl(decl *ast.ConstDecl, env Env) *ir.Constant {
-	return DeclExpecting(decl, nil, env)
+	return DeclExpecting(decl, nil, ir.CollUnknown, env)
 }
 
-// DeclExpecting folds a declaration's value with an expected enum in scope, so
-// a bare member (const Top: Rarity = Legend) resolves through it. expected is
-// the enum definition the annotation named, or nil when there is none; it is
-// pre-resolved by the caller (the value query must not call the type query, so
-// the caller resolves the annotation's type expression directly). A nil value
-// yields nil.
-func DeclExpecting(decl *ast.ConstDecl, expected *ir.TypeDef, env Env) *ir.Constant {
+// DeclExpecting folds a declaration's value with an expected enum and an expected
+// collection mapness in scope, both from the const's annotation. expected is the
+// enum definition the annotation named (a bare member const Top: Rarity = Legend
+// resolves through it), or nil; coll is the mapness an empty collection literal
+// settles to (an empty const m: map<K,V> = [] folding to an empty map), or
+// ir.CollUnknown. Both are pre-resolved by the caller — the value query must not
+// call the type query, so the caller resolves the annotation directly. A nil
+// value yields nil.
+func DeclExpecting(decl *ast.ConstDecl, expected *ir.TypeDef, coll ir.CollKind, env Env) *ir.Constant {
 	if decl.Value == nil {
 		return nil
 	}
-	return evalExpr(decl.Value, evalCtx{env: env, expected: expected})
+	return evalExpr(decl.Value, evalCtx{env: env, expected: expected, expectedColl: coll})
 }
 
 // Expr folds an expression to its constant value, or nil when it cannot be
@@ -118,6 +120,15 @@ func Expr(e ast.Expr, env Env) *ir.Constant {
 // carries is not in env. A nil locals behaves exactly like Expr.
 func ExprIn(e ast.Expr, locals map[string]*ir.Constant, env Env) *ir.Constant {
 	return evalExpr(e, evalCtx{env: env, locals: locals})
+}
+
+// ExprInExpecting is ExprIn with the collection-mapness channel set, so an empty
+// collection literal a let annotation typed (let m: map<K,V> = []) folds to the
+// settled empty collection a body-position check needs to tell a map upsert from
+// a list write. coll is ir.CollUnknown for a non-collection (or unannotated)
+// binding, which then behaves exactly like ExprIn.
+func ExprInExpecting(e ast.Expr, locals map[string]*ir.Constant, coll ir.CollKind, env Env) *ir.Constant {
+	return evalExpr(e, evalCtx{env: env, locals: locals, expectedColl: coll})
 }
 
 // ExprExpecting folds an expression with an expected enum in scope, so a bare
@@ -149,6 +160,52 @@ func expectedEnum(want ir.Type) *ir.TypeDef {
 	return nil
 }
 
+// CollKindOf returns the mapness a resolved type names — CollMap for a map<K,V>
+// (or a nominal type whose underlying is a map), CollList for a list<T> (or a
+// nominal list), and CollUnknown for anything else. It is the syntactic channel
+// an empty collection literal settles through, derived from an annotation or
+// result type the type resolver already resolved (a pure universe lookup, never
+// the value-blind type query). A union is deliberately left CollUnknown: a member
+// being a collection does not pin which kind the literal is, so the literal stays
+// undecided rather than being settled wrong. It is exported so the semantic layer
+// can resolve a const annotation's kind and feed it to DeclExpecting, mirroring
+// annotationEnum for the enum channel.
+func CollKindOf(want ir.Type) ir.CollKind {
+	switch w := want.(type) {
+	case *ir.App:
+		if w.Def == nil {
+			return ir.CollUnknown
+		}
+		switch w.Def.Name {
+		case "map":
+			return ir.CollMap
+		case "list":
+			return ir.CollList
+		}
+		return collKindFromDef(w.Def)
+	case *ir.Named:
+		return collKindFromDef(w.Def)
+	}
+	return ir.CollUnknown
+}
+
+// collKindFromDef returns the mapness a nominal type bottoms out at — a Bag (=
+// list<int>) yields CollList — by following its underlying collection definition,
+// or CollUnknown for a type with no list/map underlying.
+func collKindFromDef(def *ir.TypeDef) ir.CollKind {
+	d := underlyingCollectionDef(def, map[*ir.TypeDef]bool{})
+	if d == nil {
+		return ir.CollUnknown
+	}
+	switch d.Name {
+	case "map":
+		return ir.CollMap
+	case "list":
+		return ir.CollList
+	}
+	return ir.CollUnknown
+}
+
 // Predicate folds a refinement predicate with the self keyword bound to self and
 // its static type being selfDef — the type being refined, so a self-method call
 // in the predicate (where self.isValid()) resolves the method on selfDef and
@@ -174,6 +231,18 @@ type evalCtx struct {
 	// annotation), or nil. It reaches only the immediate expression — it does
 	// not propagate into nested sub-expressions, which set their own context.
 	expected *ir.TypeDef
+	// expectedColl is the mapness an empty collection literal settles to — the
+	// list/map distinction a syntactic channel supplies for a literal that has no
+	// key to read (a const/let annotation, a function/method result type). It is
+	// ir.CollUnknown when there is no channel (a bare []). Like expected it reaches
+	// only the immediate expression; a nested literal sets its own.
+	expectedColl ir.CollKind
+	// resultColl is the mapness a return's empty collection settles to — the
+	// declared result type of the function or method whose body is being folded,
+	// or ir.CollUnknown outside one (or for a non-collection result). It is the
+	// result-type channel, threaded through the body so a `return []` reaches it;
+	// evalBody hands it to the return expression's expectedColl.
+	resultColl ir.CollKind
 	// selfDef is the type definition the self keyword has inside an applied
 	// method body — the method's owning type — or nil outside one. It is the
 	// syntactic type channel for a self-receiver method call (self.increment()).
@@ -253,9 +322,12 @@ func recordField(recv *ir.Constant, name string) *ir.Constant {
 // value, not nested inside a larger expression.
 func evalExpr(e ast.Expr, ctx evalCtx) *ir.Constant {
 	// The expectation is consumed at this level; sub-expressions evaluate in
-	// their own (expectation-free) context.
+	// their own (expectation-free) context. The collection-mapness channel is
+	// consumed the same way — an empty literal reads it here, a nested literal
+	// does not inherit it.
 	sub := ctx
 	sub.expected = nil
+	sub.expectedColl = ir.CollUnknown
 	switch e := e.(type) {
 	case *ast.IntLit:
 		n, ok := new(big.Int).SetString(e.Text, 10)
@@ -291,7 +363,12 @@ func evalExpr(e ast.Expr, ctx evalCtx) *ir.Constant {
 		// folded method body (self bound to the receiver).
 		return ctx.self
 	case *ast.CollectionLit:
-		return collection(e, sub)
+		// An empty literal consumes the mapness channel here (off ctx, not the
+		// cleared sub); collection folds its entries through sub-contexts that have
+		// it cleared, so a nested literal sets its own.
+		collCtx := sub
+		collCtx.expectedColl = ctx.expectedColl
+		return collection(e, collCtx)
 	case *ast.RecordLit:
 		return record(e, sub)
 	case *ast.TernaryExpr:
@@ -549,14 +626,15 @@ type callable struct {
 	extern    bool
 	effectful bool
 	selfDef   *ir.TypeDef
+	result    ast.TypeExpr // the declared result type, the collection-mapness channel for a return []
 }
 
 func funcCallable(fd *ast.FuncDecl) callable {
-	return callable{params: fd.Params, body: fd.Body, extern: fd.Extern, effectful: len(fd.Effects) > 0}
+	return callable{params: fd.Params, body: fd.Body, extern: fd.Extern, effectful: len(fd.Effects) > 0, result: fd.Result}
 }
 
 func methodCallable(md *ast.MethodDecl, selfDef *ir.TypeDef) callable {
-	return callable{params: md.Params, body: md.Body, extern: md.Extern, effectful: len(md.Effects) > 0, selfDef: selfDef}
+	return callable{params: md.Params, body: md.Body, extern: md.Extern, effectful: len(md.Effects) > 0, selfDef: selfDef, result: md.Result}
 }
 
 // applyBody folds a pure routine's body against already-folded argument values,
@@ -593,6 +671,10 @@ func applyBody(c callable, self *ir.Constant, vals []*ir.Constant, ctx evalCtx) 
 	return evalBody(c.body, evalCtx{
 		env: ctx.env, locals: locals, self: self,
 		selfDef: c.selfDef, localDefs: localDefs, depth: ctx.depth + 1,
+		// The declared result type is the collection-mapness channel for the body's
+		// returns: a `return []` in a map<K,V>-returning routine folds to an empty
+		// map. It is resolved through the same universe lookup the other channels use.
+		resultColl: CollKindOf(annotationType(ctx.env, c.result)),
 	})
 }
 
@@ -741,7 +823,11 @@ func ternary(e *ast.TernaryExpr, ctx evalCtx) *ir.Constant {
 
 // collection folds a collection literal: each entry's value (and key, for a map)
 // is folded, in order. It returns nil if any element is unevaluated, so a
-// collection with an unfoldable element does not fold to a partial value.
+// collection with an unfoldable element does not fold to a partial value. A
+// non-empty literal settles its mapness from its entries; an empty literal — which
+// has no key to read — takes the mapness the syntactic channel supplied (ctx's
+// expectedColl: a map/list-typed annotation or result type), staying CollUnknown
+// when there is no channel (a bare []).
 func collection(e *ast.CollectionLit, ctx evalCtx) *ir.Constant {
 	entries := make([]ir.ConstEntry, 0, len(e.Entries))
 	for _, entry := range e.Entries {
@@ -756,6 +842,9 @@ func collection(e *ast.CollectionLit, ctx evalCtx) *ir.Constant {
 			return nil
 		}
 		entries = append(entries, ir.ConstEntry{Key: key, Value: val})
+	}
+	if len(entries) == 0 {
+		return ir.CollectionConstantOf(entries, ctx.expectedColl)
 	}
 	return ir.CollectionConstant(entries)
 }
@@ -1001,9 +1090,12 @@ func receiverDef(ctx evalCtx, recvExpr ast.Expr, recv *ir.Constant) *ir.TypeDef 
 }
 
 // collectionTypeName is the prelude type name a folded collection binds its
-// methods through: a keyed value is a map, an unkeyed (or empty) one a list.
+// methods through when no receiver annotation supplies a def: a settled map binds
+// through map, everything else (a list, or an unknown empty collection) through
+// list — the same conservative default that keeps the mapness-independent methods
+// (len, fold, count, ...) folding on an unknown empty collection.
 func collectionTypeName(recv *ir.Constant) string {
-	if isMapColl(recv) {
+	if recv.IsMap() {
 		return "map"
 	}
 	return "list"
@@ -1391,13 +1483,20 @@ func compareEnumValues(a, b *ir.Constant) (int, bool) {
 
 // collectionMethod folds a method on a list/map constant. The list collections
 // are not natively backed in the registry, so their methods have no intrinsic;
-// the foldable ones are map (over a list), get (a subscript read), and set (a
-// subscript write). Anything else has no constant value here.
+// the foldable ones are append, map (over a list), get (a subscript read), set (a
+// subscript write), and the fold primitive. Anything else has no constant value
+// here.
 //
-// A list and a map are told apart by their entries: a map's carry a key, a
-// list's do not. An empty collection has no key to read, so it reads as a list —
-// which is harmless for the only ambiguous case, set, where an empty map upsert
-// simply does not fold (nil) rather than folding wrong.
+// A collection carries an explicit mapness (list/map/unknown), settled from its
+// entries for a non-empty one and from a syntactic channel for an empty one.
+// Each method is classed by whether it depends on that mapness:
+//
+//   - mapness-independent — fold even for an unknown empty collection, since both
+//     a list and a map read the same: len/fold (count/any/all are built on it) and
+//     get (a miss either way on an empty collection).
+//   - mapness-dependent — does not fold for an unknown empty collection, since a
+//     list and a map disagree: set (a list's out-of-range write versus a map's
+//     upsert). A settled map's set is the upsert this fold's main case folds.
 func collectionMethod(ctx evalCtx, recv *ir.Constant, name string, args []*ir.Constant) *ir.Constant {
 	switch name {
 	case "len":
@@ -1419,17 +1518,19 @@ func collectionMethod(ctx evalCtx, recv *ir.Constant, name string, args []*ir.Co
 
 // collectionAppend folds list.append(v) to a new list with the value at the end,
 // leaving the receiver unchanged (data is immutable). It is the builder the
-// list-returning provided methods (map, filter, keys, values) accumulate
-// through, so the fold of those methods bottoms out in a real list constant. A
-// map has no append, so a keyed receiver does not fold.
+// list-returning provided methods (map, filter, keys, values) accumulate through,
+// so the fold of those methods bottoms out in a real list constant. append is a
+// list-only operation — a map has none — so a settled map does not fold; an
+// unknown empty receiver does (appending an element makes the result a list), and
+// the result is always a list.
 func collectionAppend(recv *ir.Constant, args []*ir.Constant) *ir.Constant {
-	if len(args) != 1 || isMapColl(recv) {
+	if len(args) != 1 || recv.IsMap() {
 		return nil
 	}
 	out := make([]ir.ConstEntry, len(recv.Coll), len(recv.Coll)+1)
 	copy(out, recv.Coll)
 	out = append(out, ir.ConstEntry{Value: args[0]})
-	return ir.CollectionConstant(out)
+	return ir.CollectionConstantOf(out, ir.CollList)
 }
 
 // collectionLen folds list.len() and map.len() to the element/entry count. It is
@@ -1523,8 +1624,10 @@ func rangeFold(ctx evalCtx, recv *ir.Constant, args []*ir.Constant) *ir.Constant
 }
 
 // collectionMap folds list.map: it applies the function argument to each element
-// and collects the results into a new list. A map receiver (keyed entries) is
-// not foldable.
+// and collects the results into a new list. A settled map (keyed entries) reaches
+// its provided foldable.map through the def channel instead, so a keyed entry here
+// does not fold; an unknown empty receiver folds to the empty list — map over no
+// elements is the empty list whichever kind it is. The result is always a list.
 func collectionMap(ctx evalCtx, recv *ir.Constant, args []*ir.Constant) *ir.Constant {
 	if len(args) != 1 || args[0].Kind != ir.ConstFunc {
 		return nil
@@ -1540,21 +1643,22 @@ func collectionMap(ctx evalCtx, recv *ir.Constant, args []*ir.Constant) *ir.Cons
 		}
 		out[i] = ir.ConstEntry{Value: v}
 	}
-	return ir.CollectionConstant(out)
+	return ir.CollectionConstantOf(out, ir.CollList)
 }
 
 // collectionGet folds a subscript read coll.get(i). A read can miss — a list
 // index out of range, a map key not present — and a miss is a value, an error
 // constant, not an unfoldable result: the read folds to that error so a caller
-// can branch on it. A list is read by integer index, a map by key equality
-// (the same constant equality a switch dispatches on); an empty collection has
-// no element either way, so the read is always a miss.
+// can branch on it. get is mapness-independent: an empty collection has no element
+// whichever kind it is, so the read always misses and folds — an empty map (or a
+// non-integer index, which only a map accepts) misses by key, anything else by
+// index.
 func collectionGet(recv *ir.Constant, args []*ir.Constant) *ir.Constant {
 	if len(args) != 1 {
 		return nil
 	}
 	key := args[0]
-	if isMapColl(recv) {
+	if recv.IsMap() {
 		for _, entry := range recv.Coll {
 			if entry.Key != nil && constEqual(entry.Key, key) {
 				return entry.Value
@@ -1564,6 +1668,12 @@ func collectionGet(recv *ir.Constant, args []*ir.Constant) *ir.Constant {
 	}
 	i, ok := intIndex(key)
 	if !ok {
+		// A non-integer index reaches here only on an empty unknown collection (a
+		// settled list rejects it as a type error, a map took the branch above): with
+		// no element to read, the miss is a key-not-found, the same error a map gives.
+		if len(recv.Coll) == 0 {
+			return ir.ErrorConstant("key not found")
+		}
 		return nil // a non-integer index on a list is a type error the checker reports
 	}
 	if i < 0 || i >= int64(len(recv.Coll)) {
@@ -1573,17 +1683,21 @@ func collectionGet(recv *ir.Constant, args []*ir.Constant) *ir.Constant {
 }
 
 // collectionSet folds a subscript write coll.set(i, v) to the new collection it
-// returns, leaving the receiver unchanged (data is immutable). A map write is an
-// upsert: an existing key's value is replaced, a new key is appended — it always
-// succeeds. A list write replaces the element at an in-range index; an index out
-// of range does not fold (nil), since the compile-time write past the end is a
-// bug the semantic layer reports as index_out_of_range rather than a value.
+// returns, leaving the receiver unchanged (data is immutable). set is the one
+// mapness-dependent write: a map's set is an upsert (an existing key's value is
+// replaced, a new key appended — it always succeeds, so an empty map's set folds
+// to the single-entry map, the main case this whole change enables), while a
+// list's replaces the element at an in-range index (an out-of-range index does not
+// fold, the compile-time write past the end the semantic layer reports as
+// index_out_of_range). An unknown empty collection — whose mapness no channel
+// settled — does not fold (nil) rather than guess between the two; the result
+// keeps the receiver's mapness.
 func collectionSet(recv *ir.Constant, args []*ir.Constant) *ir.Constant {
 	if len(args) != 2 {
 		return nil
 	}
 	value := args[1]
-	if isMapColl(recv) {
+	if recv.IsMap() {
 		key := args[0]
 		out := make([]ir.ConstEntry, len(recv.Coll))
 		replaced := false
@@ -1598,7 +1712,10 @@ func collectionSet(recv *ir.Constant, args []*ir.Constant) *ir.Constant {
 		if !replaced {
 			out = append(out, ir.ConstEntry{Key: key, Value: value})
 		}
-		return ir.CollectionConstant(out)
+		return ir.CollectionConstantOf(out, ir.CollMap)
+	}
+	if !recv.IsList() {
+		return nil // an unknown empty collection: do not guess list-versus-map
 	}
 	i, ok := intIndex(args[0])
 	if !ok {
@@ -1610,19 +1727,7 @@ func collectionSet(recv *ir.Constant, args []*ir.Constant) *ir.Constant {
 	out := make([]ir.ConstEntry, len(recv.Coll))
 	copy(out, recv.Coll)
 	out[int(i)] = ir.ConstEntry{Value: value}
-	return ir.CollectionConstant(out)
-}
-
-// isMapColl reports whether a folded collection is a map: a map's entries carry
-// a key, a list's do not. An empty collection has no entries, so it reads as a
-// list (the conservative default; see collectionMethod).
-func isMapColl(recv *ir.Constant) bool {
-	for _, entry := range recv.Coll {
-		if entry.Key != nil {
-			return true
-		}
-	}
-	return false
+	return ir.CollectionConstantOf(out, ir.CollList)
 }
 
 // intIndex reads an integer constant as a list index, reporting whether it is an
@@ -1678,7 +1783,7 @@ func evalBody(body []ast.Stmt, ctx evalCtx) *ir.Constant {
 			if stmt.Value == nil {
 				return nil
 			}
-			return evalExpr(stmt.Value, ctx)
+			return evalReturn(stmt.Value, ctx)
 		case *ast.LetStmt:
 			if !evalLet(stmt, ctx, scope) {
 				return nil // an unfoldable initializer: the body cannot fold past it
@@ -1840,11 +1945,27 @@ func (s *blockScope) restore() {
 // def when the let's annotation names a nominal type (so a method call on the
 // let folds). It returns false when the initializer cannot be folded (so the
 // body cannot fold past the let) or when there is no environment to bind into.
+// evalReturn folds a return's value, threading the body's result-type collection
+// channel to the immediate expression so a `return []` in a map<K,V>-returning
+// routine folds to an empty map. The channel is carried on ctx.resultColl (set
+// when the body began) and handed to the expression's expectedColl, which
+// evalExpr consumes for an empty literal exactly as the const/let channels are.
+func evalReturn(value ast.Expr, ctx evalCtx) *ir.Constant {
+	ctx.expectedColl = ctx.resultColl
+	return evalExpr(value, ctx)
+}
+
 func evalLet(s *ast.LetStmt, ctx evalCtx, scope *blockScope) bool {
 	if s.Value == nil {
 		return false
 	}
-	v := evalExpr(s.Value, ctx)
+	// A let annotation is the collection-mapness channel for the initializer, so
+	// let m: map<K,V> = [] folds to an empty map exactly as the const form does.
+	// Set on a copy of ctx: evalExpr consumes (and clears) it for the immediate
+	// literal, and ctx's other fields are unaffected for the bind below.
+	letCtx := ctx
+	letCtx.expectedColl = CollKindOf(annotationType(ctx.env, s.Type))
+	v := evalExpr(s.Value, letCtx)
 	if v == nil {
 		return false
 	}
@@ -2046,7 +2167,7 @@ func branchOutcome(body []ast.Stmt, ctx evalCtx) (*ir.Constant, ifOutcome) {
 			if stmt.Value == nil {
 				return nil, ifUnknown
 			}
-			if v := evalExpr(stmt.Value, ctx); v != nil {
+			if v := evalReturn(stmt.Value, ctx); v != nil {
 				return v, ifReturned
 			}
 			return nil, ifUnknown

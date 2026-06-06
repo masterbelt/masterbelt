@@ -75,8 +75,23 @@ func nominalDefOf(t ir.Type) *ir.TypeDef {
 
 // computeValue is the evaluation rule, shared by both query implementations.
 // The file is the one decl sits in. A bare member in the initializer folds
-// through the annotation's enum, resolved here by a pure universe lookup (not
-// the type query) so the value query stays independent of typeOf.
+// through the annotation's enum, and an empty collection literal settles its
+// mapness through the annotation's collection kind — both resolved here by a pure
+// universe lookup (not the type query) so the value query stays independent of
+// typeOf.
 func computeValue(file FileID, decl *ast.ConstDecl, q queries) *ir.Constant {
-	return eval.DeclExpecting(decl, annotationEnum(q, file, decl), evalEnv{q: q, file: file})
+	return eval.DeclExpecting(decl, annotationEnum(q, file, decl), annotationCollKind(q, file, decl), evalEnv{q: q, file: file})
+}
+
+// annotationCollKind resolves a constant's type annotation to the collection
+// mapness it names — CollMap for a map<K,V> annotation, CollList for a list<T>,
+// CollUnknown for anything else (or no annotation). It is a pure name lookup in
+// the file's universe (the same resolution annotationEnum uses), so the value
+// lowering it feeds stays independent of the type query.
+func annotationCollKind(q queries, fileID FileID, decl *ast.ConstDecl) ir.CollKind {
+	if decl.Type == nil {
+		return ir.CollUnknown
+	}
+	r := &infer.TypeResolver{Defs: q.universe(fileID), Qualified: qualifiedFrom(q, q.importsOf(fileID))}
+	return eval.CollKindOf(r.ResolveType(decl.Type, nil))
 }
