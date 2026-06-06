@@ -31,13 +31,25 @@ type Binder interface {
 	EnterFunc(params []*ast.ParamDef) Binder
 }
 
-// EnumExpecter is the optional capability a Binder advertises to lower a
-// switch's bare-member arms (Common, rather than Rarity.Common): it reports the
-// enum definition the scrutinee's static type names, which becomes the expected
-// type the arm-value identifiers resolve through. A binder that cannot answer
-// (no scrutinee enum) returns nil, leaving the bare members unresolved.
+// EnumExpecter is the optional capability a Binder advertises to lower a bare
+// member (Common, rather than Rarity.Common) wherever the surrounding syntax
+// names the enum it belongs to. It has two readings, both off the binder's
+// syntactic scope (never the type query, so value lowering stays independent of
+// typing):
+//
+//   - ExpectedEnum reports the enum a value expression's static type names — a
+//     let-bound local, a parameter, or self — which becomes the expected type a
+//     bare member resolves through. It serves a switch scrutinee, an assignment
+//     target, and an operator/method receiver alike.
+//   - AnnotationEnum reports the enum a written type annotation names, the
+//     channel a let initializer's bare member resolves through (the let
+//     counterpart of a const's annotationEnum).
+//
+// Either reading returns nil when it cannot name an enum, leaving the bare
+// members unresolved (the qualified form always works).
 type EnumExpecter interface {
 	ExpectedEnum(scrutinee ast.Expr) *ir.TypeDef
+	AnnotationEnum(t ast.TypeExpr) *ir.TypeDef
 }
 
 // LocalBinder is the optional capability a body binder advertises to lower the
@@ -139,9 +151,17 @@ func Value(e ast.Expr, b Binder) ir.Value {
 			return v
 		}
 		if member, ok := e.Callee.(*ast.MemberExpr); ok {
+			// A bare member as an operator/method argument resolves through the
+			// receiver's static enum (rarity == Legend, desugared to
+			// rarity.eql(Legend)): when the receiver syntactically names an enum,
+			// the argument identifiers expect that enum. The enum's comparison
+			// operators all take other: self, so the expectation matches; a
+			// non-member name falls through the wrapper, and a non-enum receiver
+			// invents no expectation.
+			argBinder := expectEnum(b, expectedEnumOf(b, member.Receiver))
 			args := make([]ir.Value, len(e.Arguments))
 			for i, a := range e.Arguments {
-				args[i] = Value(a, b)
+				args[i] = Value(a, argBinder)
 			}
 			return &ir.Call{Receiver: Value(member.Receiver, b), Method: member.Member.Name, Args: args}
 		}
@@ -190,7 +210,10 @@ func Body(body []ast.Stmt, b Binder) []ir.Stmt {
 			if !ok {
 				continue // a context that cannot carry lets (a const initializer)
 			}
-			value := Value(s.Value, b) // the initializer sees the scope before the let
+			// An annotated let resolves a bare member through its annotation's enum
+			// (let r: Rarity = Legend), the body twin of a const initializer's rule.
+			// The initializer sees the scope before the let, expecting that enum.
+			value := Value(s.Value, expectEnum(b, annotationEnumOf(b, s.Type)))
 			next, typ := lb.LetLocal(s.Name, s.Type, s.Value)
 			stmts = append(stmts, &ir.Let{Name: s.Name, Type: typ, Value: value})
 			b = next
@@ -224,7 +247,10 @@ func assignStmt(s *ast.AssignStmt, b Binder) *ir.Assign {
 	if id, ok := s.Target.(*ast.Identifier); ok {
 		name = id.Name
 	}
-	return &ir.Assign{Name: name, Value: Value(s.Value, b)}
+	// A bare member on the right resolves through the target local's enum (r =
+	// Common, where r is a Rarity let), the static type read syntactically from
+	// the binder's scope — the assignment twin of the let-initializer rule.
+	return &ir.Assign{Name: name, Value: Value(s.Value, expectEnum(b, expectedEnumOf(b, s.Target)))}
 }
 
 // ifStmt lowers an if statement: its condition, its then body, and its else
@@ -267,14 +293,7 @@ func forStmt(s *ast.ForStmt, b Binder) *ir.For {
 // member takes.
 func switchStmt(s *ast.SwitchStmt, b Binder) *ir.Switch {
 	sw := &ir.Switch{Scrutinee: Value(s.Scrutinee, b)}
-	armValue := b
-	if exp, ok := b.(EnumExpecter); ok {
-		if def := exp.ExpectedEnum(s.Scrutinee); def != nil {
-			if res, ok := b.(EnumMemberResolver); ok {
-				armValue = expectingEnum{Binder: b, def: def, res: res}
-			}
-		}
-	}
+	armValue := expectEnum(b, expectedEnumOf(b, s.Scrutinee))
 	for _, arm := range s.Arms {
 		values := make([]ir.Value, len(arm.Values))
 		for i, v := range arm.Values {
@@ -327,10 +346,50 @@ func matchStmt(s *ast.MatchStmt, b Binder) *ir.Match {
 	return m
 }
 
+// expectEnum returns the binder a bare member resolves through under a def
+// expectation: b wrapped so a leaf identifier naming a member of def lowers to
+// that member's value, or b unchanged when there is no enum to expect (def is
+// nil) or the binder cannot resolve members (a const initializer with no
+// resolver). It is the one wrapping point the let-initializer, assignment, and
+// operator-argument channels share, with the switch arm.
+func expectEnum(b Binder, def *ir.TypeDef) Binder {
+	if def == nil {
+		return b
+	}
+	res, ok := b.(EnumMemberResolver)
+	if !ok {
+		return b
+	}
+	return expectingEnum{Binder: b, def: def, res: res}
+}
+
+// expectedEnumOf returns the enum a value expression's static type names through
+// the binder's EnumExpecter, or nil when the binder cannot answer (it is not an
+// EnumExpecter, or names no enum for e). It is how the assignment target and the
+// operator/method receiver read their expected enum, the same reading a switch
+// scrutinee uses.
+func expectedEnumOf(b Binder, e ast.Expr) *ir.TypeDef {
+	if exp, ok := b.(EnumExpecter); ok {
+		return exp.ExpectedEnum(e)
+	}
+	return nil
+}
+
+// annotationEnumOf returns the enum a written type annotation names through the
+// binder's EnumExpecter, or nil when the binder cannot answer. It is how a let
+// initializer reads the enum its bare member resolves through.
+func annotationEnumOf(b Binder, t ast.TypeExpr) *ir.TypeDef {
+	if exp, ok := b.(EnumExpecter); ok {
+		return exp.AnnotationEnum(t)
+	}
+	return nil
+}
+
 // expectingEnum wraps a Binder so a bare identifier that names a member of def
 // lowers to that member's value, while every other leaf falls through to the
 // wrapped binder. It is the body counterpart of the const binder's expected-enum
-// rule, used only for a switch arm's value patterns.
+// rule, shared by a switch arm's value patterns, a let initializer, an
+// assignment's right-hand side, and an operator/method argument.
 type expectingEnum struct {
 	Binder
 	def *ir.TypeDef

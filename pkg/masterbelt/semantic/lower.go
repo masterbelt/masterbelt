@@ -294,6 +294,19 @@ func (b bodyBinder) ExpectedEnum(scrutinee ast.Expr) *ir.TypeDef {
 	return nil
 }
 
+// AnnotationEnum resolves a written type annotation to the enum it names — a
+// let initializer's bare member (let r: Rarity = Legend) resolves through it,
+// the body twin of a const's annotationEnum. It is the resolver's universe
+// lookup, the same path a parameter or let annotation takes, never the type
+// query — so the value lowering stays independent of typing. A union, named, or
+// generic alias of an enum unwraps the same way the receiver channel does.
+func (b bodyBinder) AnnotationEnum(t ast.TypeExpr) *ir.TypeDef {
+	if t == nil {
+		return nil
+	}
+	return enumDefOf(b.r.ResolveType(t, b.tscope))
+}
+
 // EnumMember resolves a bare member name against an enum definition to its
 // enum-member value, or nil when def has no such member — the bare-member rule
 // a switch arm shares with a const initializer.
@@ -354,25 +367,14 @@ func (b bodyBinder) selfHasMethod(name string) bool {
 	return ok
 }
 
-// enumDefOf returns the enum definition a type names, or nil when it is not a
-// nominal enum. A union carrying an enum (R | error) resolves to that enum, so a
-// bare member is accepted under a union-of-enum expectation exactly as under the
-// bare enum; a union with several enums takes the first (its members resolve,
-// and a name no enum declares stays unresolved at the use site).
+// enumDefOf returns the enum definition a type names, or nil when it carries
+// none. It is the semantic layer's name for types.EnumDef, the single channel a
+// bare member resolves through: a nominal enum, a union carrying one (R | error),
+// and — unwrapped through types.UnionType — a named or generic union alias of one
+// (optional<Rarity>) all resolve, so the editor completion, the lowering, and the
+// fold agree on the same member set wherever a syntactic enum is expected.
 func enumDefOf(t ir.Type) *ir.TypeDef {
-	switch t := t.(type) {
-	case *ir.Named:
-		if t.Def != nil && t.Def.Enum != nil {
-			return t.Def
-		}
-	case *ir.Union:
-		for _, m := range t.Members {
-			if n, ok := m.(*ir.Named); ok && n.Def != nil && n.Def.Enum != nil {
-				return n.Def
-			}
-		}
-	}
-	return nil
+	return types.EnumDef(t)
 }
 
 // shadows reports whether name is bound by a let local or a parameter, either of
@@ -631,6 +633,14 @@ func (b funcBinder) ExpectedEnum(scrutinee ast.Expr) *ir.TypeDef {
 		}
 	}
 	return b.scope.ExpectedEnum(scrutinee)
+}
+
+// AnnotationEnum resolves a let initializer's annotation enum within the lambda
+// body, delegated to the lambda's scope (the resolver's universe lookup, never
+// the type query) — so a let in a lambda body resolves a bare member exactly as
+// one in a method body does.
+func (b funcBinder) AnnotationEnum(t ast.TypeExpr) *ir.TypeDef {
+	return b.scope.AnnotationEnum(t)
 }
 
 // EnumMember resolves a bare member name against an enum definition to its
