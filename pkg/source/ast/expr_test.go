@@ -63,6 +63,63 @@ func TestWalkExprs(t *testing.T) {
 	}
 }
 
+// TestWalkBodyExprs pins the shared statement walk's contract: it yields the
+// top expression of every statement kind — return, expression, let, assign
+// (target and value), switch (scrutinee, arm values, arm/else/after-else
+// bodies), and if (condition, then/else-if/else bodies) — descending through
+// the statement bodies a switch and an if introduce, in source order.
+func TestWalkBodyExprs(t *testing.T) {
+	body := []Stmt{
+		NewLetStmt("x", nil, NewIdentifier("letv", nil), nil),
+		NewAssignStmt(NewIdentifier("tgt", nil), NewIdentifier("av", nil), nil),
+		NewExprStmt(NewIdentifier("ex", nil), nil),
+		NewSwitchStmt(
+			NewIdentifier("scrut", nil),
+			[]*SwitchArm{
+				NewSwitchArm(
+					[]Expr{NewIdentifier("pat", nil)},
+					[]Stmt{NewExprStmt(NewIdentifier("arm", nil), nil)},
+					nil,
+				),
+			},
+			[]Stmt{NewExprStmt(NewIdentifier("els", nil), nil)},
+			[]*SwitchArm{
+				NewSwitchArm(
+					[]Expr{NewIdentifier("after", nil)},
+					[]Stmt{NewExprStmt(NewIdentifier("afterbody", nil), nil)},
+					nil,
+				),
+			},
+			nil,
+		),
+		NewIfStmt(
+			NewIdentifier("cond", nil),
+			[]Stmt{NewExprStmt(NewIdentifier("then", nil), nil)},
+			NewIfStmt(
+				NewIdentifier("cond2", nil),
+				[]Stmt{NewExprStmt(NewIdentifier("then2", nil), nil)},
+				nil,
+				nil,
+				nil,
+			),
+			[]Stmt{NewExprStmt(NewIdentifier("else", nil), nil)},
+			nil,
+		),
+		NewReturnStmt(NewIdentifier("ret", nil), nil),
+	}
+
+	var order []string
+	WalkBodyExprs(body, func(e Expr) {
+		if id, ok := e.(*Identifier); ok {
+			order = append(order, id.Name)
+		}
+	})
+	want := "letv,tgt,av,ex,scrut,pat,arm,els,after,afterbody,cond,then,cond2,then2,else,ret"
+	if got := strings.Join(order, ","); got != want {
+		t.Errorf("visit order = %s, want %s", got, want)
+	}
+}
+
 // TestWalkExprsTernary pins that the ternary's three operands — condition,
 // then, and else — are walked in source order, so name resolution and the
 // editor's occurrence walks reach every reference inside a conditional value.

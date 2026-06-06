@@ -225,65 +225,12 @@ func checkNoSelf(e ast.Expr, report func(node ast.Node)) {
 	})
 }
 
-// forEachBodyExpr calls fn for every top expression of a statement body — a
-// return value, an expression statement, and a switch's scrutinee, arm value
-// patterns, and (recursively) its arm and wildcard bodies — so an expression
-// walk over a body reaches into the control flow a switch introduces.
+// forEachBodyExpr calls fn for every top expression of a statement body —
+// delegating to the shared ast.WalkBodyExprs so the editor and the semantic
+// layer walk a body's statements (return, expression, let, assign, switch, if)
+// identically and cannot drift as new statement forms are added.
 func forEachBodyExpr(body []ast.Stmt, fn func(ast.Expr)) {
-	for _, stmt := range body {
-		switch stmt := stmt.(type) {
-		case *ast.ReturnStmt:
-			if stmt.Value != nil {
-				fn(stmt.Value)
-			}
-		case *ast.ExprStmt:
-			if stmt.X != nil {
-				fn(stmt.X)
-			}
-		case *ast.LetStmt:
-			if stmt.Value != nil {
-				fn(stmt.Value)
-			}
-		case *ast.AssignStmt:
-			if stmt.Value != nil {
-				fn(stmt.Value)
-			}
-		case *ast.SwitchStmt:
-			if stmt.Scrutinee != nil {
-				fn(stmt.Scrutinee)
-			}
-			for _, arm := range stmt.Arms {
-				for _, v := range arm.Values {
-					fn(v)
-				}
-				forEachBodyExpr(arm.Body, fn)
-			}
-			forEachBodyExpr(stmt.Else, fn)
-			for _, arm := range stmt.AfterElse {
-				for _, v := range arm.Values {
-					fn(v)
-				}
-				forEachBodyExpr(arm.Body, fn)
-			}
-		case *ast.IfStmt:
-			forEachIfExpr(stmt, fn)
-		}
-	}
-}
-
-// forEachIfExpr calls fn for every top expression of an if statement — its
-// condition and (recursively) the top expressions of its then body, its else-if
-// chain, and its else body — so an expression walk over a body reaches into the
-// control flow an if introduces.
-func forEachIfExpr(s *ast.IfStmt, fn func(ast.Expr)) {
-	if s.Cond != nil {
-		fn(s.Cond)
-	}
-	forEachBodyExpr(s.Then, fn)
-	if s.ElseIf != nil {
-		forEachIfExpr(s.ElseIf, fn)
-	}
-	forEachBodyExpr(s.Else, fn)
+	ast.WalkBodyExprs(body, fn)
 }
 
 // --- method bodies ----------------------------------------------------------

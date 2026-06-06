@@ -367,3 +367,76 @@ func WalkValueIdents(e Expr, fn func(*Identifier)) {
 		return true
 	})
 }
+
+// WalkBodyExprs calls fn for every top-level expression of a statement body —
+// a return value, an expression statement, a let initializer, an assignment's
+// target and value, a switch's scrutinee and arm value patterns, and an if's
+// condition — descending (recursively) through the statement bodies a switch
+// and an if introduce, so a walk over a body reaches every expression in its
+// control flow. It yields the top expression of each statement; the caller
+// descends into an expression's operands with WalkExprs (or its own recursion,
+// e.g. one that also enters function-literal bodies).
+//
+// This is the one statement-walk skeleton the editor and the semantic layer
+// share, so a new statement form is wired into every walk by adding its
+// expressions here, exactly once — the companion of WalkExprs for statements.
+func WalkBodyExprs(body []Stmt, fn func(Expr)) {
+	for _, stmt := range body {
+		switch stmt := stmt.(type) {
+		case *ReturnStmt:
+			if stmt.Value != nil {
+				fn(stmt.Value)
+			}
+		case *ExprStmt:
+			if stmt.X != nil {
+				fn(stmt.X)
+			}
+		case *LetStmt:
+			if stmt.Value != nil {
+				fn(stmt.Value)
+			}
+		case *AssignStmt:
+			// The target as well as the value, so a member-access target
+			// (self.x = ...), which the parser accepts, is reached too.
+			if stmt.Target != nil {
+				fn(stmt.Target)
+			}
+			if stmt.Value != nil {
+				fn(stmt.Value)
+			}
+		case *SwitchStmt:
+			if stmt.Scrutinee != nil {
+				fn(stmt.Scrutinee)
+			}
+			for _, arm := range stmt.Arms {
+				for _, v := range arm.Values {
+					fn(v)
+				}
+				WalkBodyExprs(arm.Body, fn)
+			}
+			WalkBodyExprs(stmt.Else, fn)
+			for _, arm := range stmt.AfterElse {
+				for _, v := range arm.Values {
+					fn(v)
+				}
+				WalkBodyExprs(arm.Body, fn)
+			}
+		case *IfStmt:
+			walkIfExprs(stmt, fn)
+		}
+	}
+}
+
+// walkIfExprs calls fn for every top-level expression of an if statement — its
+// condition and (recursively) the top expressions of its then body, its
+// else-if chain, and its else body.
+func walkIfExprs(s *IfStmt, fn func(Expr)) {
+	if s.Cond != nil {
+		fn(s.Cond)
+	}
+	WalkBodyExprs(s.Then, fn)
+	if s.ElseIf != nil {
+		walkIfExprs(s.ElseIf, fn)
+	}
+	WalkBodyExprs(s.Else, fn)
+}
