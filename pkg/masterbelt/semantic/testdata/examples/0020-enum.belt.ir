@@ -17,6 +17,8 @@ Module
     member "Common" = 1
     member "Rare" = 2
     member "Legend" = 10
+    impl comparable
+    impl orderable
     method "eql" pub extern
       param other: self
       result bool
@@ -41,6 +43,8 @@ Module
     member "Fire" = 0
     member "Water" = 1
     member "Wind" = 2
+    impl comparable
+    impl orderable
     method "eql" pub extern
       param other: self
       result bool
@@ -68,6 +72,8 @@ Module
     enum string
     member "Ja" = "Ja"
     member "En" = "en-US"
+    impl comparable
+    impl orderable
     method "eql" pub extern
       param other: self
       result bool

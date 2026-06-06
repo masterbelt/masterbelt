@@ -74,6 +74,8 @@ Module
     member "Fire" = 0
     member "Water" = 1
     member "Wind" = 2
+    impl comparable
+    impl orderable
     method "eql" pub extern
       param other: self
       result bool
