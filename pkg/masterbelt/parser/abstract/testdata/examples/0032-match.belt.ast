@@ -16,44 +16,66 @@ File
     name "describe"
     param v: GameValue
     result string
-      expr Identifier "match"
-      expr (record v Coin: <missing> c: <missing> Level: <missing> l: <missing>)
+      match Identifier "v"
+        arm Coin c
+          return StringLit "coin"
+        arm Level l
+          return StringLit "level"
   FuncDecl
     pub
     name "worth"
     param v: GameValue
     result int
-      expr Identifier "match"
-      expr (record v Coin: <missing> c: <missing> c: <missing> amount: <missing> Level: <missing> l: <missing> l: <missing> rank: <missing>)
+      match Identifier "v"
+        arm Coin c
+          return (. Identifier "c" amount)
+        arm Level l
+          return (. Identifier "l" rank)
   FuncDecl
     pub
     name "amountOr"
     param v: Coin | null
     param fallback: int
     result int
-      expr Identifier "match"
-      expr (record v Coin: <missing> c: <missing> c: <missing> amount: <missing> fallback: <missing>)
+      match Identifier "v"
+        arm Coin c
+          return (. Identifier "c" amount)
+        arm null
+          return Identifier "fallback"
   FuncDecl
     pub
     name "coinAmount"
     param v: GameValue
     result int
-      expr Identifier "match"
-      expr (record v Coin: <missing> c: <missing> c: <missing> amount: <missing> _: <missing>)
+      match Identifier "v"
+        arm Coin c
+          return (. Identifier "c" amount)
+        else
+          return IntLit "0"
   FuncDecl
     pub
     name "firstOr"
     param xs: list<int>
     param fallback: int
     result int
-      expr Identifier "match"
-      expr (call (. Identifier "xs" get) IntLit "0")
-      expr (record int: <missing> v: <missing> v: <missing> error: <missing> e: <missing> fallback: <missing>)
+      match (call (. Identifier "xs" get) IntLit "0")
+        arm int v
+          return Identifier "v"
+        arm error e
+          return Identifier "fallback"
   FuncDecl
     pub
     name "label"
     param v: GameValue
     param other: GameValue
     result string
-      expr Identifier "match"
-      expr (record v Coin: <missing> c: <missing> n: <missing> c: <missing> amount: <missing> match: <missing> other: <missing> Coin: <missing> c2: <missing> Level: <missing> l: <missing>)
+      match Identifier "v"
+        arm Coin c
+          let "n" = (. Identifier "c" amount)
+          match Identifier "other"
+            arm Coin c2
+              return StringLit "coin/coin"
+            arm Level l
+              return StringLit "coin/level"
+        arm Level l
+          return StringLit "level"

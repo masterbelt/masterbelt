@@ -206,6 +206,8 @@ func dumpStmtInline(s Stmt) string {
 		return "(assign " + dumpExpr(s.Target) + " = " + dumpExpr(s.Value) + ")"
 	case *SwitchStmt:
 		return dumpSwitchInline(s)
+	case *MatchStmt:
+		return dumpMatchInline(s)
 	case *IfStmt:
 		return dumpIfInline(s)
 	default:
@@ -239,6 +241,35 @@ func dumpSwitchInline(s *SwitchStmt) string {
 	}
 	b.WriteString(")")
 	return b.String()
+}
+
+// dumpMatchInline renders a match compactly: its scrutinee, each arm's type
+// pattern (with its binding) and body, the wildcard else body, and any
+// unreachable arms.
+func dumpMatchInline(s *MatchStmt) string {
+	var b strings.Builder
+	b.WriteString("(match " + dumpExpr(s.Scrutinee))
+	for _, arm := range s.Arms {
+		b.WriteString(" (arm " + dumpMatchPattern(arm) + " " + dumpInlineBody(arm.Body) + ")")
+	}
+	if s.Else != nil {
+		b.WriteString(" (else " + dumpInlineBody(s.Else) + ")")
+	}
+	for _, arm := range s.AfterElse {
+		b.WriteString(" (unreachable-arm " + dumpMatchPattern(arm) + " " + dumpInlineBody(arm.Body) + ")")
+	}
+	b.WriteString(")")
+	return b.String()
+}
+
+// dumpMatchPattern renders a match arm's type pattern: its member type and, when
+// present, its binding name (Coin c, null, int v).
+func dumpMatchPattern(arm *MatchArm) string {
+	pat := dumpType(arm.Type)
+	if arm.Bind != "" {
+		pat += " " + arm.Bind
+	}
+	return pat
 }
 
 // dumpArmValues renders a switch arm's value patterns, comma-joined.
@@ -474,6 +505,26 @@ func dumpStmtAt(b *strings.Builder, s Stmt, indent string) {
 				values[i] = dumpExpr(v)
 			}
 			fmt.Fprintf(b, "%s  unreachable-arm %s\n", indent, strings.Join(values, ", "))
+			for _, bs := range arm.Body {
+				dumpStmtAt(b, bs, indent+"    ")
+			}
+		}
+	case *MatchStmt:
+		fmt.Fprintf(b, "%smatch %s\n", indent, dumpExpr(s.Scrutinee))
+		for _, arm := range s.Arms {
+			fmt.Fprintf(b, "%s  arm %s\n", indent, dumpMatchPattern(arm))
+			for _, bs := range arm.Body {
+				dumpStmtAt(b, bs, indent+"    ")
+			}
+		}
+		if s.Else != nil {
+			fmt.Fprintf(b, "%s  else\n", indent)
+			for _, bs := range s.Else {
+				dumpStmtAt(b, bs, indent+"    ")
+			}
+		}
+		for _, arm := range s.AfterElse {
+			fmt.Fprintf(b, "%s  unreachable-arm %s\n", indent, dumpMatchPattern(arm))
 			for _, bs := range arm.Body {
 				dumpStmtAt(b, bs, indent+"    ")
 			}
