@@ -1,4 +1,11 @@
 File
+  ConstDecl
+    name "Held"
+    type GameValue
+    value (record Coin amount: IntLit "7")
+  ConstDecl
+    name "Total"
+    value (call Identifier "worth" Identifier "Held")
   TypeDecl
     pub
     name "Coin"

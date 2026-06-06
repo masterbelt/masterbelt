@@ -229,6 +229,57 @@ File
         RBrace "}"
       Newline "\n"
       RBrace "}"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// The define-a-union-then-consume-it flow end to end: a member value flows into"
+    Newline "\n"
+    LineComment "// the named union, and worth consumes it. (worth does not fold over a record"
+    Newline "\n"
+    LineComment "// union — a record value carries no member tag — so Total stays a value the"
+    Newline "\n"
+    LineComment "// runtime computes, not a folded constant.)"
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Held"
+    TypeClause
+      Colon ":"
+      Whitespace " "
+      TypeName
+        Ident "GameValue"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      RecordLit
+        Ident "Coin"
+        LBrace "{"
+        Whitespace " "
+        RecordField
+          Ident "amount"
+          Colon ":"
+          Whitespace " "
+          Literal
+            Int "7"
+        Whitespace " "
+        RBrace "}"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Total"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "worth"
+        LParen "("
+        NameRef
+          Ident "Held"
+        RParen ")"
   FuncDecl
     Newline "\n"
     Newline "\n"

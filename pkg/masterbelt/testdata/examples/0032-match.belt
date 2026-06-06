@@ -28,6 +28,13 @@ pub fn worth(v: GameValue): int {
   }
 }
 
+// The define-a-union-then-consume-it flow end to end: a member value flows into
+// the named union, and worth consumes it. (worth does not fold over a record
+// union — a record value carries no member tag — so Total stays a value the
+// runtime computes, not a folded constant.)
+const Held: GameValue = Coin{ amount: 7 }
+const Total = worth(Held)
+
 // An optional (T | null) is dispatched the same way: the Coin arm narrows the
 // binding to Coin, the null arm handles the absent case. An arm body may be a
 // block of several statements.

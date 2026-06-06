@@ -253,6 +253,36 @@ func TestMatchDistinctKindMembersStillFold(t *testing.T) {
 	}
 }
 
+// TestNamedUnionAssignment checks that a member value flows into a nominal alias
+// of a union (type GameValue = Coin | Level) and the named union flows where its
+// members are expected — the define-a-union-then-consume-it flow match is built
+// for. Before the fix a member assigned to the named union tripped type_mismatch.
+func TestNamedUnionAssignment(t *testing.T) {
+	cases := map[string]string{
+		"member into named-union const":  gameUnion + "const V: GameValue = Coin{ amount: 5 }\n",
+		"member into named-union arg":    gameUnion + "pub fn id(v: GameValue): GameValue { return v }\nconst R = id(Coin{ amount: 5 })\n",
+		"named union into bare union":    gameUnion + "pub fn w(v: GameValue): Coin | Level { return v }\n",
+		"bare union into named union":    gameUnion + "pub fn w(v: Coin | Level): GameValue { return v }\n",
+		"named union returned as itself": gameUnion + "pub fn w(v: GameValue): GameValue { return v }\n",
+	}
+	for name, src := range cases {
+		t.Run(name, func(t *testing.T) {
+			if _, diags := analyze(src); len(diags) != 0 {
+				t.Errorf("unexpected diagnostics: %v", codes(diags))
+			}
+		})
+	}
+}
+
+// TestNonMemberNotAssignableToNamedUnion checks the fix does not over-accept: a
+// type that is not a member of the named union is still rejected.
+func TestNonMemberNotAssignableToNamedUnion(t *testing.T) {
+	src := gameUnion + "pub type Gem = { color: int }\nconst V: GameValue = Gem{ color: 1 }\n"
+	if _, diags := analyze(src); !hasCode(diags, CodeTypeMismatch) {
+		t.Errorf("want type_mismatch for a non-member assigned to the named union, got %v", codes(diags))
+	}
+}
+
 // TestMatchNullArmFolds checks that the null arm of an optional folds: calling
 // amountOr with null selects the null arm and returns the fallback, and calling
 // it with a value selects the member arm. The null value folds to a ConstNull

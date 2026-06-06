@@ -1,4 +1,11 @@
 Module
+  Const "Held"
+    type GameValue
+    value Coin{amount: IntLiteral "7"}
+    eval { amount: 7 }
+  Const "Total"
+    type int
+    value worth(Reference -> "Held")
   TypeDef "Coin" pub
     body { amount: int }
   TypeDef "Level" pub
