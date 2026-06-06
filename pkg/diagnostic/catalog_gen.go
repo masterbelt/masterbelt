@@ -559,6 +559,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "value " + f["value"].String() + " does not satisfy " + f["typ"].String() + ": " + f["predicate"].String() + f["diagram"].String()
 		}
 	},
+	"masterbelt.semantic.scrutinee_not_comparable": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "switch の対象は comparable が必要です (" + f["typ"].String() + ")。record や union を型で分岐するには match を使ってください"
+		default:
+			return "switch needs a comparable scrutinee (" + f["typ"].String() + "); use match to branch on a record or union type"
+		}
+	},
 	"masterbelt.semantic.self_outside_method": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":

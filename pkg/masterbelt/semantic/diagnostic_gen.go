@@ -59,6 +59,7 @@ const (
 	CodeRefinementNotBool          diagnostic.Code = "masterbelt.semantic.refinement_not_bool"
 	CodeRefinementNotConstant      diagnostic.Code = "masterbelt.semantic.refinement_not_constant"
 	CodeRefinementViolation        diagnostic.Code = "masterbelt.semantic.refinement_violation"
+	CodeScrutineeNotComparable     diagnostic.Code = "masterbelt.semantic.scrutinee_not_comparable"
 	CodeSelfOutsideMethod          diagnostic.Code = "masterbelt.semantic.self_outside_method"
 	CodeTernaryBranchMismatch      diagnostic.Code = "masterbelt.semantic.ternary_branch_mismatch"
 	CodeTernaryConditionNotBool    diagnostic.Code = "masterbelt.semantic.ternary_condition_not_bool"
@@ -793,6 +794,20 @@ func newRefinementViolationDiagnostic(offset int, width int, value string, typ s
 		Severity: diagnostic.Error,
 		Code:     CodeRefinementViolation,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeRefinementViolation, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newScrutineeNotComparableDiagnostic(offset int, width int, typ string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"typ": diagnostic.Str(typ),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeScrutineeNotComparable,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeScrutineeNotComparable, fields),
 		Fields:   fields,
 		Offset:   offset,
 		Width:    width,

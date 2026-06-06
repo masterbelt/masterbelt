@@ -4,7 +4,9 @@ import (
 	"strings"
 
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/eval"
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/types"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/types/infer"
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
@@ -33,6 +35,16 @@ func checkSwitch(sw *ast.SwitchStmt, bs infer.BodyScope, env eval.Env, at func(a
 		return
 	}
 	scrutT := infer.Body(sw.Scrutinee, bs)
+	// A switch dispatches on the scrutinee's value equality, so the scrutinee
+	// must be comparable — the same equality-driven discipline a map key obeys.
+	// A record or union does not opt into comparable, so a switch over it is
+	// rejected with a pointer to match (which is what branches on a record or
+	// union type). The check is skipped when the type is already invalid (its
+	// own error is reported elsewhere — no double report).
+	if scrutT != ir.Invalid && !scrutineeComparable(bs.Reg, scrutT) {
+		s := at(sw.Scrutinee)
+		diags.Add(newScrutineeNotComparableDiagnostic(s.offset, s.width, scrutT.String()))
+	}
 	enumDef := enumDefOf(scrutT)
 	armSink := armValueSink(at, diags)
 
@@ -122,6 +134,44 @@ func armValueSink(at func(ast.Node) span, diags *diagnostic.List) *infer.Sink {
 		diags.Add(newArmValueTypeMismatchDiagnostic(s.offset, s.width, got.String(), want.String()))
 	}
 	return sink
+}
+
+// scrutineeComparable reports whether a switch scrutinee's type carries
+// equality — the contract value dispatch requires. A concrete type qualifies
+// when its definition opts into comparable (types.Satisfies, the same nominal
+// rule a map key obeys); an enum and the scalars do so automatically, a nominal
+// type via `impl comparable {}`. A bounded type parameter (T: comparable) is a
+// distinct case: its bound is the comparable interface itself, which no type —
+// not even the interface — lists in its own Impls, so Satisfies would reject
+// it; instead its declared bound is read directly, and a T whose bound is
+// comparable is comparable by construction. comparable is taken from the
+// universe, the same source the map-key and enum-contract checks use.
+func scrutineeComparable(reg *builtin.Registry, typ ir.Type) bool {
+	cmp := universe().prelude["comparable"]
+	if cmp == nil {
+		return true // no comparable in scope: degrade rather than spuriously reject
+	}
+	bound := &ir.Named{Def: cmp}
+	if tv, ok := typ.(*ir.TypeVar); ok {
+		// A type parameter is comparable only when its declared bound is the
+		// comparable interface; an unbounded T (Bound == nil) carries no contract
+		// and is rejected.
+		return boundDefOf(tv.Bound) == cmp
+	}
+	return types.Satisfies(reg, typ, bound)
+}
+
+// boundDefOf returns the interface definition a type-parameter bound resolved
+// to, or nil when the bound is absent or is not an interface. A bare bound
+// (comparable) is a Named; one written with type arguments is an App.
+func boundDefOf(bound ir.Type) *ir.TypeDef {
+	switch b := bound.(type) {
+	case *ir.Named:
+		return b.Def
+	case *ir.App:
+		return b.Def
+	}
+	return nil
 }
 
 // armValueKey returns a stable key identifying an arm value for duplicate
