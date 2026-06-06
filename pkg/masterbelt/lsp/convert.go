@@ -1,7 +1,9 @@
 package lsp
 
 import (
+	"encoding/json"
 	"sort"
+	"strconv"
 
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/parser/abstract"
@@ -53,8 +55,13 @@ func toDiagnostics(doc view) []protocol.Diagnostic {
 		out = append(out, protocol.Diagnostic{
 			Range:    toRange(buf, d.Offset, d.End()),
 			Severity: &severity,
-			Source:   "masterbelt",
-			Message:  d.Message,
+			// The catalog code (masterbelt.semantic.invalid_operation, ...), so
+			// the editor's problems panel identifies the diagnostic beyond its
+			// rendered message. The field is int|string in the protocol; ours is
+			// always the string form.
+			Code:    json.RawMessage(strconv.Quote(string(d.Code))),
+			Source:  "masterbelt",
+			Message: d.Message,
 		})
 	}
 	return out

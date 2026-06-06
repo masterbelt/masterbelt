@@ -49,6 +49,9 @@ func TestToDiagnostics(t *testing.T) {
 	if d.Message != "expected identifier" {
 		t.Errorf("Message = %q, want %q", d.Message, "expected identifier")
 	}
+	if got, want := string(d.Code), `"masterbelt.parser.concrete.expected_identifier"`; got != want {
+		t.Errorf("Code = %s, want %s", got, want)
+	}
 	want := protocol.Range{Start: protocol.Position{Line: 0, Character: 0}, End: protocol.Position{Line: 0, Character: 0}}
 	if d.Range != want {
 		t.Errorf("Range = %+v, want %+v", d.Range, want)
