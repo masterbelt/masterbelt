@@ -29,6 +29,11 @@ type Sink struct {
 	// node is the offending expression — or, for a function-literal parameter
 	// whose annotation conflicts with the pushed-down type, the parameter.
 	Mismatch func(node ast.Node, got, want ir.Type)
+	// AmbiguousUnionMember fires where a value flows into a union but two or
+	// more of its members accept it with no exact tie-break, so which member it
+	// tags cannot be told. got is the value's type, want the union; the fix is an
+	// explicit conversion that pins the member.
+	AmbiguousUnionMember func(node ast.Node, got, want ir.Type)
 	// TernaryCondNotBool fires at a ternary whose condition does not type as a
 	// bool, with the condition's type.
 	TernaryCondNotBool func(cond ast.Expr, got ir.Type)
@@ -119,6 +124,12 @@ func (s *Sink) ambiguousOverload(node ast.Node, method, operands string) {
 func (s *Sink) mismatch(node ast.Node, got, want ir.Type) {
 	if s != nil && s.Mismatch != nil {
 		s.Mismatch(node, got, want)
+	}
+}
+
+func (s *Sink) ambiguousUnionMember(node ast.Node, got, want ir.Type) {
+	if s != nil && s.AmbiguousUnionMember != nil {
+		s.AmbiguousUnionMember(node, got, want)
 	}
 }
 

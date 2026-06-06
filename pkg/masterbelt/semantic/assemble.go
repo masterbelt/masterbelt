@@ -41,6 +41,10 @@ func exprSink(at func(ast.Node) span, diags *diagnostic.List) *infer.Sink {
 			s := at(node)
 			diags.Add(newTypeMismatchDiagnostic(s.offset, s.width, got.String(), want.String()))
 		},
+		AmbiguousUnionMember: func(node ast.Node, got, want ir.Type) {
+			s := at(node)
+			diags.Add(newAmbiguousUnionMemberDiagnostic(s.offset, s.width, got.String(), want.String()))
+		},
 		TernaryCondNotBool: func(cond ast.Expr, got ir.Type) {
 			s := at(cond)
 			diags.Add(newTernaryConditionNotBoolDiagnostic(s.offset, s.width, got.String()))

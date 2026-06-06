@@ -69,6 +69,111 @@ func Assignable(reg *builtin.Registry, from, to ir.Type) bool {
 	return sameBuiltin(from, to) || sameNamed(from, to)
 }
 
+// UnionSelection is the outcome of choosing which member of a union a value
+// flows in as — the member that tags the value, the basis for a match's
+// confident dispatch.
+type UnionSelection int
+
+const (
+	// UnionNotAUnion: the expected type is not a union, so member selection does
+	// not apply (the value flows in by ordinary assignability).
+	UnionNotAUnion UnionSelection = iota
+	// UnionNoMember: the value is a union but matches none of its members — the
+	// type_mismatch case, handled by the caller's existing assignability report.
+	UnionNoMember
+	// UnionUnique: exactly one member accepts the value; Member is it.
+	UnionUnique
+	// UnionAmbiguous: two or more members accept the value with no exact tie-break
+	// — the ambiguous_union_member case, resolved by an explicit conversion.
+	UnionAmbiguous
+)
+
+// SelectUnionMember chooses which member of the union type to a value of static
+// type from flows in as, the member that becomes the value's tag. It is the type
+// layer's half of the tagged-union rule the value folder mirrors:
+//
+//   - an exact match wins outright: a member type-identical to from is the one,
+//     so an nint literal into nint | error tags nint and the V | error /
+//     optional<T> code that already type-checks keeps tagging the same member;
+//   - failing an exact match, a single assignable member is chosen (a default-int
+//     literal into short | error has one integer member);
+//   - no assignable member is UnionNoMember (the caller's type_mismatch);
+//   - two or more assignable members with no exact match is UnionAmbiguous (short
+//     | byte and an nint literal) — the ambiguous_union_member diagnostic, fixed
+//     by an explicit conversion (short(1)) that makes from exact.
+//
+// to that is not a union (read through UnionType, so a nominal or generic alias
+// unwraps) is UnionNotAUnion, leaving the ordinary assignability path in charge.
+func SelectUnionMember(reg *builtin.Registry, from, to ir.Type) (UnionSelection, ir.Type) {
+	u := UnionType(to)
+	if u == nil {
+		return UnionNotAUnion, nil
+	}
+	// An exact (type-identical) member is the unambiguous choice, even when other
+	// members would also accept the value: a member written as the value's own
+	// type pins it. This is what keeps an nint literal into nint | error on nint
+	// and an explicit conversion (short(1)) on short.
+	for _, m := range u.Members {
+		if sameType(reg, from, m) {
+			return UnionUnique, m
+		}
+	}
+	var chosen ir.Type
+	n := 0
+	for _, m := range u.Members {
+		if Assignable(reg, from, m) {
+			chosen = m
+			n++
+		}
+	}
+	switch n {
+	case 0:
+		return UnionNoMember, nil
+	case 1:
+		return UnionUnique, chosen
+	default:
+		return UnionAmbiguous, nil
+	}
+}
+
+// sameType reports whether two types are the same member for tagging purposes:
+// the same builtin (by name), the same nominal type (by definition), the same
+// generic application, or the same union (member-wise). It is structural
+// identity, not assignability — a default-int literal is *not* exact against a
+// sized integer (so short | byte and a bare literal stay ambiguous), and a sized
+// integer is not the same as a wider one (so int8 | int16 with an int8-typed
+// value still selects int8 by exactness, while a bare literal that fits both is
+// ambiguous). An nint member against an nint value is exact through sameBuiltin
+// directly, which is what keeps nint | error and optional<T> tagging by exactness.
+func sameType(reg *builtin.Registry, a, b ir.Type) bool {
+	if a == b {
+		return true
+	}
+	if sameBuiltin(a, b) || sameNamed(a, b) {
+		return true
+	}
+	if x, y, ok := sameAppShape(a, b); ok {
+		for i := range x.Args {
+			if !sameType(reg, x.Args[i], y.Args[i]) {
+				return false
+			}
+		}
+		return true
+	}
+	if ua, ub := UnionType(a), UnionType(b); ua != nil && ub != nil {
+		if len(ua.Members) != len(ub.Members) {
+			return false
+		}
+		for i := range ua.Members {
+			if !sameType(reg, ua.Members[i], ub.Members[i]) {
+				return false
+			}
+		}
+		return true
+	}
+	return false
+}
+
 // recordType returns t as a record — the record itself, or the underlying
 // record of a nominal type — or nil when t is neither. It looks through a
 // nominal type's body once per level, guarding a self-referential definition.

@@ -253,6 +253,41 @@ func TestMatchDistinctKindMembersStillFold(t *testing.T) {
 	}
 }
 
+// TestAmbiguousUnionMember is the tagged-union ambiguity diagnostic: an nint
+// literal flowing into short | byte matches two integer members with no exact
+// tie-break, so which member it tags cannot be told and the program must pin it.
+// An explicit conversion (short(1)) makes the member exact and clears the error.
+func TestAmbiguousUnionMember(t *testing.T) {
+	src := "pub type n = short | byte\nconst a: n = 1\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeAmbiguousUnionMember) {
+		t.Fatalf("want ambiguous_union_member for an nint literal into short | byte, got %v", codes(diags))
+	}
+	// A conversion that pins the member resolves it.
+	fixed := "pub type n = short | byte\nconst a: n = short(1)\n"
+	if _, diags := analyze(fixed); len(diags) != 0 {
+		t.Errorf("short(1) should resolve the ambiguity, got %v", codes(diags))
+	}
+}
+
+// TestExactUnionMemberNotAmbiguous checks the exact-match tie-break does not
+// over-fire: a value type-identical to a member is chosen even when another
+// member would also accept it. nint | error with an nint literal, and an
+// int8-typed value into int8 | int16, both tag by exactness with no diagnostic.
+func TestExactUnionMemberNotAmbiguous(t *testing.T) {
+	cases := map[string]string{
+		"nint literal into nint | error": "pub type n = nint | error\nconst a: n = 1\n",
+		"int8 value into int8 | int16":   "pub type n = sbyte | short\npub fn f(v: sbyte): n { return v }\n",
+	}
+	for name, src := range cases {
+		t.Run(name, func(t *testing.T) {
+			if _, diags := analyze(src); hasCode(diags, CodeAmbiguousUnionMember) {
+				t.Errorf("exact member should not be ambiguous, got %v", codes(diags))
+			}
+		})
+	}
+}
+
 // TestNamedUnionAssignment checks that a member value flows into a nominal alias
 // of a union (type GameValue = Coin | Level) and the named union flows where its
 // members are expected — the define-a-union-then-consume-it flow match is built

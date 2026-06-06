@@ -70,6 +70,7 @@ masterbelt.semantic.unreachable_arm,到達不能な arm です。先行する ar
 masterbelt.semantic.scrutinee_not_comparable,switch の対象は comparable が必要です ({typ})。record や union を型で分岐するには match を使ってください
 masterbelt.semantic.non_exhaustive_match,{typ} の match が網羅的ではありません: {missing}
 masterbelt.semantic.arm_type_not_in_union,{arm} は {typ} のメンバではありません
+masterbelt.semantic.ambiguous_union_member,{actual} が {typ} のどのメンバとして流入するか確定できません。short(1) のような明示変換で確定させてください
 masterbelt.semantic.duplicate_match_arm,match の arm が重複しています: {arm}
 masterbelt.semantic.condition_not_bool,if の条件は bool でなければなりません({typ})
 masterbelt.semantic.ternary_condition_not_bool,三項演算子の条件は bool でなければなりません({typ})
