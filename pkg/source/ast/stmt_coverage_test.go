@@ -4,7 +4,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"io/fs"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -52,29 +52,33 @@ func TestStmtKindsRegistryComplete(t *testing.T) {
 // marker that seals a type into the Stmt interface.
 func stmtImplementersInSource(t *testing.T) map[string]bool {
 	t.Helper()
-	fset := token.NewFileSet()
-	pkgs, err := parser.ParseDir(fset, ".", func(fi fs.FileInfo) bool {
-		return !strings.HasSuffix(fi.Name(), "_test.go")
-	}, 0)
+	entries, err := os.ReadDir(".")
 	if err != nil {
-		t.Fatalf("parse package source: %v", err)
+		t.Fatalf("read package dir: %v", err)
 	}
+	fset := token.NewFileSet()
 	out := map[string]bool{}
-	for _, pkg := range pkgs {
-		for _, file := range pkg.Files {
-			for _, decl := range file.Decls {
-				fn, ok := decl.(*ast.FuncDecl)
-				if !ok || fn.Name.Name != "stmt" || fn.Recv == nil || len(fn.Recv.List) != 1 {
-					continue
-				}
-				// Receiver is *T; record T.
-				star, ok := fn.Recv.List[0].Type.(*ast.StarExpr)
-				if !ok {
-					continue
-				}
-				if id, ok := star.X.(*ast.Ident); ok {
-					out[id.Name] = true
-				}
+	for _, e := range entries {
+		name := e.Name()
+		if e.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
+			continue
+		}
+		file, err := parser.ParseFile(fset, name, nil, 0)
+		if err != nil {
+			t.Fatalf("parse %s: %v", name, err)
+		}
+		for _, decl := range file.Decls {
+			fn, ok := decl.(*ast.FuncDecl)
+			if !ok || fn.Name.Name != "stmt" || fn.Recv == nil || len(fn.Recv.List) != 1 {
+				continue
+			}
+			// Receiver is *T; record T.
+			star, ok := fn.Recv.List[0].Type.(*ast.StarExpr)
+			if !ok {
+				continue
+			}
+			if id, ok := star.X.(*ast.Ident); ok {
+				out[id.Name] = true
 			}
 		}
 	}
