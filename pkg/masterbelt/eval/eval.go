@@ -295,6 +295,15 @@ func evalExpr(e ast.Expr, ctx evalCtx) *ir.Constant {
 			}
 		}
 		recv := evalExpr(member.Receiver, sub)
+		// The boolean connectives short-circuit: && (anan) with a false receiver
+		// is false and || (oror) with a true receiver is true, without ever
+		// folding the right operand — exactly as the runtime (and a ternary)
+		// never evaluates the untaken side. This both matches the dynamic
+		// semantics and keeps an unfoldable (or would-not-fold) dead operand from
+		// blocking the fold.
+		if v, ok := shortCircuit(recv, member.Member.Name, e.Arguments); ok {
+			return v
+		}
 		args := make([]*ir.Constant, len(e.Arguments))
 		for i, a := range e.Arguments {
 			args[i] = evalExpr(a, sub)
@@ -303,6 +312,29 @@ func evalExpr(e ast.Expr, ctx evalCtx) *ir.Constant {
 	default:
 		return nil
 	}
+}
+
+// shortCircuit folds a boolean connective whose receiver already decides the
+// result: false && _ is false, true || _ is true. It reports whether it handled
+// the call — true with the folded value when the receiver short-circuits, false
+// when it does not (a non-bool/unfoldable receiver, the non-deciding side, or a
+// method that is not a connective), leaving the normal eager path to fold the
+// argument and dispatch.
+func shortCircuit(recv *ir.Constant, name string, args []ast.Expr) (*ir.Constant, bool) {
+	if recv == nil || recv.Kind != ir.ConstBool || len(args) != 1 {
+		return nil, false
+	}
+	switch name {
+	case "anan":
+		if !recv.Bool {
+			return ir.BoolConstant(false), true
+		}
+	case "oror":
+		if recv.Bool {
+			return ir.BoolConstant(true), true
+		}
+	}
+	return nil, false
 }
 
 // convert folds a conversion T(x). The one conversion with a constant value

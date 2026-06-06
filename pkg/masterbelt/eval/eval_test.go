@@ -350,6 +350,49 @@ func TestConstEqual(t *testing.T) {
 	}
 }
 
+// TestShortCircuitFold covers the boolean connectives' short-circuit: && with a
+// false left folds to false without evaluating its right, and || with a true
+// left folds to true the same way — so an unfoldable (or would-not-fold) right
+// operand does not block the fold. When the left does not decide the result the
+// right is still folded.
+func TestShortCircuitFold(t *testing.T) {
+	env := stubEnv{reg: builtin.Default()}
+	boolLit := func(b bool) ast.Expr { return ast.NewBoolLit(b, nil) }
+	// 1 / 0 == 0 — a right operand that does not fold on its own (div by zero).
+	deadRHS := binary(binary(intLit("1"), "div", intLit("0")), "eql", intLit("0"))
+
+	cases := []struct {
+		name string
+		expr ast.Expr
+		want string // "" means "does not fold"
+	}{
+		{"false anan dead", binary(boolLit(false), "anan", deadRHS), "false"},
+		{"true oror dead", binary(boolLit(true), "oror", deadRHS), "true"},
+		{"true anan true", binary(boolLit(true), "anan", boolLit(true)), "true"},
+		{"true anan false", binary(boolLit(true), "anan", boolLit(false)), "false"},
+		{"false oror true", binary(boolLit(false), "oror", boolLit(true)), "true"},
+		{"false oror false", binary(boolLit(false), "oror", boolLit(false)), "false"},
+		// The left does not short-circuit: the right is needed and unfoldable, so
+		// the whole expression does not fold.
+		{"true anan dead", binary(boolLit(true), "anan", deadRHS), ""},
+		{"false oror dead", binary(boolLit(false), "oror", deadRHS), ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			v := Expr(tc.expr, env)
+			if tc.want == "" {
+				if v != nil {
+					t.Fatalf("Expr = %v, want nil (does not fold)", v)
+				}
+				return
+			}
+			if v == nil || v.String() != tc.want {
+				t.Fatalf("Expr = %v, want %s", v, tc.want)
+			}
+		})
+	}
+}
+
 // TestDatetimeMillis covers the datetime literal normalization: ISO instants
 // (with and without milliseconds) to UTC epoch milliseconds, offsets
 // normalized away, and malformed text folding to nothing.

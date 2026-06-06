@@ -60,9 +60,38 @@ func checkDivByZero(e ast.Expr, env evalEnv, report func(node ast.Node)) {
 		}
 	}
 	checkDivByZero(member.Receiver, env, report)
+	if shortCircuits(member, call.Arguments, env) {
+		// A short-circuited && / || never evaluates its right operand, so a
+		// div-by-zero there is unreachable — matching eval, which folds the
+		// connective without touching the dead side. The receiver is still
+		// walked above; the argument is skipped.
+		return
+	}
 	for _, a := range call.Arguments {
 		checkDivByZero(a, env, report)
 	}
+}
+
+// shortCircuits reports whether a boolean connective call (&& desugared to anan,
+// || to oror) short-circuits — its receiver folds to a bool that already decides
+// the result (false && _, true || _) — so its right operand is dead. A receiver
+// that does not fold, or the non-deciding bool, returns false: the argument is
+// live and must be walked.
+func shortCircuits(member *ast.MemberExpr, args []ast.Expr, env evalEnv) bool {
+	if len(args) != 1 {
+		return false
+	}
+	recv := eval.Expr(member.Receiver, env)
+	if recv == nil || recv.Kind != ir.ConstBool {
+		return false
+	}
+	switch member.Member.Name {
+	case "anan":
+		return !recv.Bool
+	case "oror":
+		return recv.Bool
+	}
+	return false
 }
 
 // checkIndexWrites reports a list index write past the end (index_out_of_range).

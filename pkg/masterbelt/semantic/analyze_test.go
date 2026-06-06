@@ -734,6 +734,42 @@ func TestDivisionByZeroInTernary(t *testing.T) {
 	}
 }
 
+// TestShortCircuitBoolConnectives checks the boolean connectives' short-circuit
+// end to end: a false && or a true || folds to a bool without evaluating its
+// dead right operand, and checkDivByZero does not flag a div-by-zero in that
+// dead operand — it is never evaluated, matching eval and the runtime.
+func TestShortCircuitBoolConnectives(t *testing.T) {
+	// The dead operand carries a division by zero, which must not be reported.
+	for _, tc := range []struct{ src, want string }{
+		{"const Y: bool = false && (1 / 0 == 0)\n", "false"},
+		{"const Y: bool = true || (1 / 0 == 0)\n", "true"},
+	} {
+		m, diags := analyze(tc.src)
+		if hasCode(diags, CodeDivisionByZero) {
+			t.Errorf("%q: a short-circuited div-by-zero must not be reported: %v", tc.src, codes(diags))
+		}
+		if len(diags) != 0 {
+			t.Errorf("%q: unexpected diagnostics: %v", tc.src, codes(diags))
+		}
+		for _, c := range m.Consts {
+			if c.Name == "Y" && (c.Eval == nil || c.Eval.String() != tc.want) {
+				t.Errorf("%q: Y = %v, want %s", tc.src, c.Eval, tc.want)
+			}
+		}
+	}
+
+	// The live operand still carries its div-by-zero: a true && (...) needs the
+	// right, so a div-by-zero there is real and reported.
+	for _, src := range []string{
+		"const Y: bool = true && (1 / 0 == 0)\n",
+		"const Y: bool = false || (1 / 0 == 0)\n",
+	} {
+		if _, diags := analyze(src); !hasCode(diags, CodeDivisionByZero) {
+			t.Errorf("%q: a live operand's div-by-zero must be reported, got %v", src, codes(diags))
+		}
+	}
+}
+
 func TestAnnotationMismatch(t *testing.T) {
 	for _, src := range []string{
 		"const x: int8 = true\n",
