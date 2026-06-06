@@ -1081,61 +1081,11 @@ func expectingScrutinee(ctx evalCtx, scrut *ir.Constant) evalCtx {
 }
 
 // constEqual reports whether two folded constants are structurally equal — the
-// equality a switch dispatches on and a map keys by. Enum members compare by
-// identity (definition and index), the scalar kinds by their value, an error by
-// its message, and the composite kinds recursively: a collection by length and
-// entrywise key/value equality, a record by its canonical (name-sorted) fields.
-// Differing kinds are never equal. A function value has no structural identity,
-// so two of them are never equal.
+// equality a switch dispatches on and a map keys by. It is ir.ConstantsEqual,
+// the single shared definition the semantic engine's early cutoff also uses;
+// see its doc for the per-kind rules. A nil constant never reaches the map-key
+// and switch-scrutinee comparisons that call this, but ConstantsEqual handles
+// it (two nil constants are equal) so the contract is one consistent equality.
 func constEqual(a, b *ir.Constant) bool {
-	if a == nil || b == nil || a.Kind != b.Kind {
-		return false
-	}
-	switch a.Kind {
-	case ir.ConstInt:
-		return a.Int.Cmp(b.Int) == 0
-	case ir.ConstBool:
-		return a.Bool == b.Bool
-	case ir.ConstString:
-		return a.Str == b.Str
-	case ir.ConstError:
-		return a.Str == b.Str
-	case ir.ConstEnum:
-		return a.EnumDef == b.EnumDef && a.EnumIndex == b.EnumIndex
-	case ir.ConstDatetime, ir.ConstDuration:
-		return a.Millis == b.Millis
-	case ir.ConstCollection:
-		if len(a.Coll) != len(b.Coll) {
-			return false
-		}
-		for i := range a.Coll {
-			// A list entry has a nil key on both sides; a map entry's keys must
-			// match too. A key present on one side but not the other (a list
-			// against a map of the same length) is unequal.
-			if (a.Coll[i].Key == nil) != (b.Coll[i].Key == nil) {
-				return false
-			}
-			if a.Coll[i].Key != nil && !constEqual(a.Coll[i].Key, b.Coll[i].Key) {
-				return false
-			}
-			if !constEqual(a.Coll[i].Value, b.Coll[i].Value) {
-				return false
-			}
-		}
-		return true
-	case ir.ConstRecord:
-		// RecordConstant normalizes fields to canonical name order, so equal
-		// records have identically ordered fields: a positional walk suffices.
-		if len(a.Fields) != len(b.Fields) {
-			return false
-		}
-		for i := range a.Fields {
-			if a.Fields[i].Name != b.Fields[i].Name || !constEqual(a.Fields[i].Value, b.Fields[i].Value) {
-				return false
-			}
-		}
-		return true
-	default:
-		return false
-	}
+	return ir.ConstantsEqual(a, b)
 }
