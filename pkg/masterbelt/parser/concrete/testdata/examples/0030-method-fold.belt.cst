@@ -1,0 +1,329 @@
+# tree
+File
+  EnumDecl
+    LineComment "// User-defined method calls fold at compile time: a method with a body is"
+    Newline "\n"
+    LineComment "// evaluated with self bound to the receiver, exactly as a top-level function"
+    Newline "\n"
+    LineComment "// call is. The receiver must carry its type for the value-blind folder to reach"
+    Newline "\n"
+    LineComment "// the method table — an enum constant does (it carries its definition), so an"
+    Newline "\n"
+    LineComment "// enum's methods fold in const initializers, asserts, and other pure positions."
+    Newline "\n"
+    Newline "\n"
+    DocComment "/// An elemental affinity, with methods that fold over a constant member."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Enum "enum"
+    Whitespace " "
+    Ident "Element"
+    Whitespace " "
+    LBrace "{"
+    EnumMember
+      Newline "\n"
+      Whitespace "  "
+      Ident "Fire"
+    Comma ","
+    EnumMember
+      Whitespace " "
+      Ident "Water"
+    Comma ","
+    EnumMember
+      Whitespace " "
+      Ident "Wind"
+    Newline "\n"
+    RBrace "}"
+    Whitespace " "
+    ImplBlock
+      Impl "impl"
+      Whitespace " "
+      LBrace "{"
+      MethodDecl
+        Newline "\n"
+        Whitespace "  "
+        DocComment "/// Whether this element is Fire — a one-line body that folds to a bool."
+        Newline "\n"
+        Whitespace "  "
+        Pub "pub"
+        Whitespace " "
+        Ident "isFire"
+        ParamList
+          LParen "("
+          RParen ")"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "bool"
+        Whitespace " "
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            BinaryExpr
+              SelfExpr
+                Self "self"
+              Whitespace " "
+              EqEq "=="
+              Whitespace " "
+              MemberExpr
+                NameRef
+                  Ident "Element"
+                Dot "."
+                Ident "Fire"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
+      MethodDecl
+        Newline "\n"
+        Newline "\n"
+        Whitespace "  "
+        DocComment "/// Whether this element is not Fire — a method that calls another method."
+        Newline "\n"
+        Whitespace "  "
+        Pub "pub"
+        Whitespace " "
+        Ident "notFire"
+        ParamList
+          LParen "("
+          RParen ")"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "bool"
+        Whitespace " "
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            UnaryExpr
+              Bang "!"
+              CallExpr
+                MemberExpr
+                  SelfExpr
+                    Self "self"
+                  Dot "."
+                  Ident "isFire"
+                LParen "("
+                RParen ")"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
+      MethodDecl
+        Newline "\n"
+        Newline "\n"
+        Whitespace "  "
+        DocComment "/// A let- and if-bearing body, to exercise the full statement walker."
+        Newline "\n"
+        Whitespace "  "
+        Pub "pub"
+        Whitespace " "
+        Ident "label"
+        ParamList
+          LParen "("
+          RParen ")"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "int"
+        Whitespace " "
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          LetStmt
+            Let "let"
+            Whitespace " "
+            Ident "fire"
+            Whitespace " "
+            Initializer
+              Assign "="
+              Whitespace " "
+              CallExpr
+                MemberExpr
+                  SelfExpr
+                    Self "self"
+                  Dot "."
+                  Ident "isFire"
+                LParen "("
+                RParen ")"
+          Newline "\n"
+          Whitespace "    "
+          IfStmt
+            If "if"
+            Whitespace " "
+            NameRef
+              Ident "fire"
+            Whitespace " "
+            Block
+              LBrace "{"
+              Newline "\n"
+              Whitespace "      "
+              ReturnStmt
+                Return "return"
+                Whitespace " "
+                Literal
+                  Int "1"
+              Newline "\n"
+              Whitespace "    "
+              RBrace "}"
+          Newline "\n"
+          Whitespace "    "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            Literal
+              Int "0"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
+      Newline "\n"
+      RBrace "}"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// A method call folds in a const initializer."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "FireIsFire"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        MemberExpr
+          MemberExpr
+            NameRef
+              Ident "Element"
+            Dot "."
+            Ident "Fire"
+          Dot "."
+          Ident "isFire"
+        LParen "("
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "FireLabel"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        MemberExpr
+          MemberExpr
+            NameRef
+              Ident "Element"
+            Dot "."
+            Ident "Fire"
+          Dot "."
+          Ident "label"
+        LParen "("
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "WaterLabel"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        MemberExpr
+          MemberExpr
+            NameRef
+              Ident "Element"
+            Dot "."
+            Ident "Water"
+          Dot "."
+          Ident "label"
+        LParen "("
+        RParen ")"
+  AssertDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// And in an assertion — the predicate folds to true at compile time."
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    CallExpr
+      MemberExpr
+        MemberExpr
+          NameRef
+            Ident "Element"
+          Dot "."
+          Ident "Fire"
+        Dot "."
+        Ident "isFire"
+      LParen "("
+      RParen ")"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    CallExpr
+      MemberExpr
+        MemberExpr
+          NameRef
+            Ident "Element"
+          Dot "."
+          Ident "Water"
+        Dot "."
+        Ident "notFire"
+      LParen "("
+      RParen ")"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      CallExpr
+        MemberExpr
+          MemberExpr
+            NameRef
+              Ident "Element"
+            Dot "."
+            Ident "Fire"
+          Dot "."
+          Ident "label"
+        LParen "("
+        RParen ")"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "1"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      CallExpr
+        MemberExpr
+          MemberExpr
+            NameRef
+              Ident "Element"
+            Dot "."
+            Ident "Wind"
+          Dot "."
+          Ident "label"
+        LParen "("
+        RParen ")"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "0"
+  Newline "\n"
+  EOF ""
+# diagnostics

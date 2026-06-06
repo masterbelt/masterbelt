@@ -1,0 +1,43 @@
+File
+  ConstDecl
+    name "FireIsFire"
+    value (call (. (. Identifier "Element" Fire) isFire))
+  ConstDecl
+    name "FireLabel"
+    value (call (. (. Identifier "Element" Fire) label))
+  ConstDecl
+    name "WaterLabel"
+    value (call (. (. Identifier "Element" Water) label))
+  EnumDecl
+    doc "An elemental affinity, with methods that fold over a constant member."
+    pub
+    name "Element"
+    member "Fire"
+    member "Water"
+    member "Wind"
+    method "isFire"
+      doc "Whether this element is Fire — a one-line body that folds to a bool."
+      pub
+      result bool
+      return (call (. self eql) (. Identifier "Element" Fire))
+    method "notFire"
+      doc "Whether this element is not Fire — a method that calls another method."
+      pub
+      result bool
+      return (call (. (call (. self isFire)) not))
+    method "label"
+      doc "A let- and if-bearing body, to exercise the full statement walker."
+      pub
+      result int
+      let "fire" = (call (. self isFire))
+      if Identifier "fire"
+          return IntLit "1"
+      return IntLit "0"
+  AssertDecl
+    cond (call (. (. Identifier "Element" Fire) isFire))
+  AssertDecl
+    cond (call (. (. Identifier "Element" Water) notFire))
+  AssertDecl
+    cond (call (. (call (. (. Identifier "Element" Fire) label)) eql) IntLit "1")
+  AssertDecl
+    cond (call (. (call (. (. Identifier "Element" Wind) label)) eql) IntLit "0")

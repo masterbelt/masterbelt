@@ -1,0 +1,40 @@
+// User-defined method calls fold at compile time: a method with a body is
+// evaluated with self bound to the receiver, exactly as a top-level function
+// call is. The receiver must carry its type for the value-blind folder to reach
+// the method table — an enum constant does (it carries its definition), so an
+// enum's methods fold in const initializers, asserts, and other pure positions.
+
+/// An elemental affinity, with methods that fold over a constant member.
+pub enum Element {
+  Fire, Water, Wind
+} impl {
+  /// Whether this element is Fire — a one-line body that folds to a bool.
+  pub isFire(): bool {
+    return self == Element.Fire
+  }
+
+  /// Whether this element is not Fire — a method that calls another method.
+  pub notFire(): bool {
+    return !self.isFire()
+  }
+
+  /// A let- and if-bearing body, to exercise the full statement walker.
+  pub label(): int {
+    let fire = self.isFire()
+    if fire {
+      return 1
+    }
+    return 0
+  }
+}
+
+// A method call folds in a const initializer.
+const FireIsFire = Element.Fire.isFire()
+const FireLabel = Element.Fire.label()
+const WaterLabel = Element.Water.label()
+
+// And in an assertion — the predicate folds to true at compile time.
+assert Element.Fire.isFire()
+assert Element.Water.notFire()
+assert Element.Fire.label() == 1
+assert Element.Wind.label() == 0
