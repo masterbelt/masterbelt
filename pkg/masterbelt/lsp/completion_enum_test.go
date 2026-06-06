@@ -103,15 +103,13 @@ func TestExpectedEnumNotOfferedForUnknownAnnotation(t *testing.T) {
 	}
 }
 
-func TestExpectedEnumNotOfferedForGenericAliasAnnotation(t *testing.T) {
-	// A generic union alias (optional<Rarity>) does not resolve a bare member in
-	// the lowering — the App alias is not unwrapped there — so completion must not
-	// offer one either, matching what the program would accept.
+func TestExpectedEnumOfferedForGenericAliasAnnotation(t *testing.T) {
+	// A generic union alias (optional<Rarity>) now unwraps to its enum the same
+	// way a bare union does (types.EnumDef expands the application), so the const
+	// initializer folds a bare member through it — completion offers the members.
 	src := rarityEnum + "const x: optional<Rarity> = \n"
 	got := completeAt(t, src, "Rarity> = ")
-	if _, ok := got["Common"]; ok {
-		t.Error("generic alias annotation offered a bare member the lowering leaves undefined")
-	}
+	assertBareMembers(t, got, "Common", "Rare", "Legend")
 }
 
 func TestExpectedEnumNotOfferedInAnnotationPosition(t *testing.T) {
@@ -176,36 +174,49 @@ func TestExpectedEnumNotOfferedInArmBody(t *testing.T) {
 	}
 }
 
-func TestExpectedEnumLetInitializerNotOffered(t *testing.T) {
-	// A let initializer in a function body does not fold a bare member through its
-	// annotation (only the top-level const path and the switch arm path do), so
-	// even an enum-annotated let must not be offered one — the candidate would not
-	// resolve.
+func TestExpectedEnumLetInitializerOffered(t *testing.T) {
+	// A let initializer annotated with an enum now folds a bare member through its
+	// annotation — the body twin of the const path — so completion offers the
+	// scrutinee's members there.
 	src := rarityEnum + "pub fn f(): int {\n  let r: Rarity = \n  return 1\n}\n"
 	got := completeAt(t, src, "let r: Rarity = ")
-	if _, ok := got["Common"]; ok {
-		t.Error("a let initializer offered a bare member the lowering leaves undefined")
-	}
+	assertBareMembers(t, got, "Common", "Rare", "Legend")
 }
 
-func TestExpectedEnumAssignmentNotOffered(t *testing.T) {
-	// An assignment's right-hand side does not fold a bare member either, so an
-	// assignment to an enum-typed let must not be offered one.
+func TestExpectedEnumAssignmentOffered(t *testing.T) {
+	// An assignment to an enum-typed let now folds a bare member through the
+	// target local's static type, so completion offers its members.
 	src := rarityEnum + "pub fn f(): Rarity {\n  let r: Rarity = Rarity.Common\n  r = \n  return r\n}\n"
 	got := completeAt(t, src, "Common\n  r = ")
+	assertBareMembers(t, got, "Common", "Rare", "Legend")
+}
+
+func TestExpectedEnumComparisonRHSOffered(t *testing.T) {
+	// A comparison against an enum-typed value now folds a bare member through the
+	// receiver's enum (the desugared operator argument), so completion offers the
+	// members on the comparison's right-hand side.
+	src := rarityEnum + "pub fn f(r: Rarity): bool {\n  return r == \n}\n"
+	got := completeAt(t, src, "r == ")
+	assertBareMembers(t, got, "Common", "Rare", "Legend")
+}
+
+func TestExpectedEnumComparisonRHSNotOfferedForNonEnumReceiver(t *testing.T) {
+	// A comparison against a non-enum receiver invents no enum expectation, so no
+	// bare member is offered on its right-hand side.
+	src := rarityEnum + "pub fn f(n: int): bool {\n  return n == \n}\n"
+	got := completeAt(t, src, "n == ")
 	if _, ok := got["Common"]; ok {
-		t.Error("an assignment offered a bare member the lowering leaves undefined")
+		t.Error("a non-enum comparison offered a bare member")
 	}
 }
 
-func TestExpectedEnumComparisonRHSNotOffered(t *testing.T) {
-	// A comparison's right-hand side does not resolve a bare member (it is a
-	// method-call argument the bidirectional channels do not reach), so it must
-	// not be offered there — the candidate would not resolve.
-	src := rarityEnum + "pub fn f(r: Rarity): bool {\n  return r == \n}\n"
-	got := completeAt(t, src, "r == ")
+func TestExpectedEnumComparisonLHSNotOffered(t *testing.T) {
+	// The left operand of a comparison is the receiver, not an enum-member
+	// position, so no bare member is offered there.
+	src := rarityEnum + "pub fn f(r: Rarity): bool {\n  return  == r\n}\n"
+	got := completeAt(t, src, "return ")
 	if _, ok := got["Common"]; ok {
-		t.Error("a comparison right-hand side offered a bare member that does not resolve")
+		t.Error("a comparison's left operand offered a bare member")
 	}
 }
 

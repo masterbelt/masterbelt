@@ -9,12 +9,13 @@ import (
 )
 
 // expectedEnumItems offers a bare enum member (Common rather than Rarity.Common)
-// at the two value positions masterbelt's lowering resolves one through: a
-// top-level const initializer annotated with an enum (the const binder folds the
-// bare member through the annotation's enum), and a switch arm whose scrutinee is
-// an enum-typed parameter, self, or let (the switch lowers its arm values through
-// the scrutinee's enum). The items the editor offers are exactly the ones the
-// program would accept — never one it would leave undefined.
+// at the value positions masterbelt's lowering resolves one through: a top-level
+// const initializer annotated with an enum, a switch arm whose scrutinee is an
+// enum-typed parameter/self/let, a let initializer annotated with an enum, an
+// assignment to an enum-typed let, and a comparison whose receiver is an
+// enum-typed value (rarity == Common, the desugared operator argument). The items
+// the editor offers are exactly the ones the program would accept — never one it
+// would leave undefined.
 //
 // The items are *added* to the value namespace rather than offered exclusively
 // (unlike the member-after-dot completion, which claims its position): the value
@@ -22,15 +23,12 @@ import (
 // function returning it — so a bare member is one more candidate, not the only
 // one. The caller prepends them so they sort first.
 //
-// Three superficially similar positions are deliberately omitted, because the
+// One superficially similar position is deliberately omitted, because the
 // lowering does not resolve a bare member there (offering one would propose a
-// candidate that stays undefined — the worst outcome):
-//   - a let initializer and an assignment right-hand side, whose values lower
-//     under the plain binder with no expected-enum channel;
-//   - a comparison right-hand side (rarity == Common), whose desugared method-call
-//     argument neither bidirectional channel reaches;
-//   - an associated constant inside an impl block, resolved on a path that does
-//     not supply the annotation's enum.
+// candidate that stays undefined — the worst outcome): an associated constant
+// inside an impl block referencing *another* type's enum, whose eager fold runs
+// before that enum's members are settled (the qualified form does not fold there
+// either — a pre-existing, separate limitation).
 func expectedEnumItems(doc view, root cst.Tree, offset int) []protocol.CompletionItem {
 	def := expectedEnumAt(doc, root, offset)
 	if def == nil {
@@ -109,12 +107,11 @@ func valueAnchor(doc view, offset int) (int, bool) {
 
 // enumContextAt descends the concrete tree to the node at offset, tracking the
 // enclosing switch, and resolves the expected enum of the value position it
-// finds — a top-level const initializer or a switch arm's value pattern. These
-// are the only two positions masterbelt's lowering resolves a bare member
-// through; a let initializer, an assignment, and a comparison are deliberately
-// excluded (their bare members stay undefined), so the editor never offers a
-// candidate the program would not accept. A position in neither (or one whose
-// expected type is not an enum) yields nil.
+// finds — a top-level const initializer, a switch arm's value pattern, a let
+// initializer, an assignment's right-hand side, or a comparison's argument. These
+// are the positions masterbelt's lowering resolves a bare member through; a
+// position in none (or one whose expected type is not an enum) yields nil, so the
+// editor never offers a candidate the program would not accept.
 func enumContextAt(doc view, root cst.Tree, offset int) *ir.TypeDef {
 	node := root
 	var enclosingSwitch cst.Tree
@@ -129,6 +126,26 @@ func enumContextAt(doc view, root cst.Tree, offset int) *ir.TypeDef {
 			case cst.ConstDecl:
 				if inInitializerValue(child, offset) {
 					return constDeclEnum(doc, node)
+				}
+			case cst.LetStmt:
+				// The let's initializer folds a bare member through the let's
+				// annotation enum — the body twin of the const initializer.
+				if inInitializerValue(child, offset) {
+					return letStmtEnum(doc, node, offset)
+				}
+			case cst.AssignStmt:
+				// An assignment's right-hand side folds a bare member through the
+				// target local's enum. The value follows the "=" token; the target
+				// (before it) is an ordinary value position.
+				if offset >= assignStart(node) {
+					return assignStmtEnum(doc, node, offset)
+				}
+			case cst.BinaryExpr:
+				// A comparison's argument (rarity == Common) folds a bare member
+				// through the receiver's enum — the desugared operator argument. The
+				// right operand follows the operator; the left is the receiver.
+				if def := binaryExprEnum(doc, node, offset); def != nil {
+					return def
 				}
 			case cst.SwitchStmt:
 				enclosingSwitch, haveSwitch = node, true
@@ -249,6 +266,122 @@ func constDeclEnum(doc view, node cst.Tree) *ir.TypeDef {
 		return nil
 	}
 	return doc.EnumOfAnnotation(decl.Type)
+}
+
+// letStmtEnum resolves the enum a let statement's annotation names — the channel
+// its initializer's bare member folds through, the body twin of constDeclEnum. It
+// reads the binding's settled type from the enclosing body (the same letTypeOf
+// reading the switch-local path uses), so the members offered are exactly the ones
+// the let initializer's lowering would resolve.
+func letStmtEnum(doc view, node cst.Tree, offset int) *ir.TypeDef {
+	name, ok := letBindingName(doc, node)
+	if !ok {
+		return nil
+	}
+	body, found := enclosingBody(doc, offset, doc.Trees())
+	if !found {
+		return nil
+	}
+	typ, bound := letTypeOf(body, name)
+	if !bound {
+		return nil
+	}
+	return doc.EnumOf(typ)
+}
+
+// assignStmtEnum resolves the enum the target local of an assignment is typed as
+// — the channel its right-hand side's bare member folds through. The target is the
+// assignment's first child (a NameRef naming the let local); its static type is
+// read the same parameter / self / let way a scrutinee's is.
+func assignStmtEnum(doc view, node cst.Tree, offset int) *ir.TypeDef {
+	target, ok := firstValueChild(node)
+	if !ok {
+		return nil
+	}
+	typ, ok := scrutineeType(doc, target, offset)
+	if !ok {
+		return nil
+	}
+	return doc.EnumOf(typ)
+}
+
+// binaryExprEnum resolves the enum a comparison's receiver is typed as, when the
+// cursor sits in the right operand of a comparison operator — the desugared
+// operator argument (rarity == Common becomes rarity.eql(Common)). It returns nil
+// for a non-comparison operator, a cursor in the left operand, or a receiver whose
+// static type names no enum, so a bare member is offered only where the lowering
+// resolves one.
+func binaryExprEnum(doc view, node cst.Tree, offset int) *ir.TypeDef {
+	recv, opStart, ok := comparisonReceiver(node)
+	if !ok || offset < opStart {
+		return nil // not a comparison, or the cursor is in the left operand
+	}
+	typ, ok := scrutineeType(doc, recv, offset)
+	if !ok {
+		return nil
+	}
+	return doc.EnumOf(typ)
+}
+
+// letBindingName returns the name a let statement binds — its first Ident child,
+// after the "let" keyword.
+func letBindingName(doc view, node cst.Tree) (string, bool) {
+	buf := doc.Buffer()
+	for _, c := range node.Children() {
+		if tok, ok := c.Token(); ok && tok.Kind() == token.Ident {
+			return c.Text(buf), true
+		}
+	}
+	return "", false
+}
+
+// firstValueChild returns the first value-expression child of a node — the
+// assignment target (a NameRef or SelfExpr) before the "=".
+func firstValueChild(node cst.Tree) (cst.Tree, bool) {
+	for _, c := range node.Children() {
+		if k, ok := c.Kind(); ok {
+			switch k {
+			case cst.NameRef, cst.SelfExpr:
+				return c, true
+			}
+		}
+		// Stop at the "=" token: the target precedes it.
+		if tok, ok := c.Token(); ok && tok.Kind() == token.Assign {
+			return cst.Tree{}, false
+		}
+	}
+	return cst.Tree{}, false
+}
+
+// comparisonReceiver returns a binary expression's left operand (the receiver an
+// operator desugars its call onto), the start offset of the comparison operator
+// token, and whether the operator is a comparison — the operators whose desugared
+// method takes the receiver's enum (==, !=, <, <=, >, >=). A non-comparison
+// operator (+, &&) reports false: its argument is not an enum member position. The
+// operator's start is the boundary the right operand begins past, so the position
+// just after an "=="  — where an empty value slot's anchor lands — counts as the
+// argument position.
+func comparisonReceiver(node cst.Tree) (recv cst.Tree, opStart int, ok bool) {
+	var left cst.Tree
+	haveLeft := false
+	for _, c := range node.Children() {
+		if !haveLeft {
+			if k, kok := c.Kind(); kok {
+				switch k {
+				case cst.NameRef, cst.SelfExpr:
+					left, haveLeft = c, true
+				}
+			}
+			continue
+		}
+		if tok, tok2 := c.Token(); tok2 {
+			switch tok.Kind() {
+			case token.EqEq, token.BangEq, token.Lt, token.LtEq, token.Gt, token.GtEq:
+				return left, c.Offset(), true
+			}
+		}
+	}
+	return cst.Tree{}, 0, false
 }
 
 // switchArmEnum resolves the enum a switch arm's scrutinee is typed as — the
