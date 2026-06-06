@@ -85,6 +85,8 @@ masterbelt.semantic.not_an_interface,error,name:string
 masterbelt.semantic.bound_not_satisfied,error,typ:string bound:string
 masterbelt.semantic.uninferable_type_param,error,name:string
 masterbelt.semantic.no_method_on_unbounded_typevar,error,method:string
+masterbelt.semantic.not_iterable,error,typ:string
+masterbelt.semantic.loop_var_immutable,error,name:string
 project.config.missing,error,
 project.config.invalid,error,detail:string
 project.config.missing_entry,error,

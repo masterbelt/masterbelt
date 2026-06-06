@@ -108,6 +108,16 @@ func letTypeOf(body []ir.Stmt, name string) (ir.Type, bool) {
 			if t, ok := letTypeOf(s.Else, name); ok {
 				return t, true
 			}
+		case *ir.For:
+			// The loop variable binds name to its element type for the loop body,
+			// so it is reported before descending — a reference to it inside the
+			// body reads that type.
+			if s.Var == name && s.VarType != nil {
+				return s.VarType, true
+			}
+			if t, ok := letTypeOf(s.Body, name); ok {
+				return t, true
+			}
 		}
 	}
 	return nil, false

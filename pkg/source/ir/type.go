@@ -392,6 +392,22 @@ type If struct {
 
 func (*If) stmt() {}
 
+// For is a resolved collection-iteration statement: it visits every element of
+// the foldable Iter in fold order, binding Var (a LocalRef inside Body) to each
+// in turn — the element value when Of, the key when Of is false — and running
+// Body once per element. VarType is the loop variable's settled type (the value
+// type for an of-loop, the key type for an in-loop). A for yields no value; it
+// drives control flow, and the body accumulates into a let it reassigns.
+type For struct {
+	Var     string // the loop variable name
+	VarType Type   // the loop variable's settled type
+	Of      bool   // true for an of-loop (the value), false for an in-loop (the key)
+	Iter    Value
+	Body    []Stmt
+}
+
+func (*For) stmt() {}
+
 // Param is one method parameter: a name and its type.
 type Param struct {
 	Name string

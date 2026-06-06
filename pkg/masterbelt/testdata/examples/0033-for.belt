@@ -1,0 +1,105 @@
+// for is the iteration control statement: it visits every element of a foldable
+// collection in fold order, binding a loop variable to each in turn and running
+// the body once per element. "of" binds the value (a list element, a map value);
+// "in" binds the key (a map key, a list index) — the JS reading. The loop
+// variable is an immutable per-iteration binding; accumulation goes through a
+// let (E-15) the body reassigns, so a for that sums or joins folds to a constant
+// exactly as the equivalent fold does. for is a statement: it yields no value.
+// Iterability is foldable (E-16) — a for runs over anything that impls it.
+
+// for over a list with "of" sums its elements: the let total is the accumulator
+// the body reassigns each iteration, and the function folds to the total. This
+// is the headline accumulation pattern — the same result fold gives, written as
+// a loop for readability.
+pub fn sum(xs: list<int>): int {
+  let total = 0
+  for x of xs {
+    total = total + x
+  }
+  return total
+}
+
+// for over a map with "in" binds each entry's key. Joining the keys folds to the
+// concatenation, in fold order.
+pub fn keysJoined(m: map<string, int>): string {
+  let out = ""
+  for k in m {
+    out = out + k
+  }
+  return out
+}
+
+// "of" over a map binds the value, not the key: this sums a map's values.
+pub fn valueSum(m: map<string, int>): int {
+  let total = 0
+  for v of m {
+    total = total + v
+  }
+  return total
+}
+
+// "in" over a list binds the index. Summing the indices of a three-element list
+// folds to 0 + 1 + 2.
+pub fn indexSum(xs: list<int>): int {
+  let total = 0
+  for i in xs {
+    total = total + i
+  }
+  return total
+}
+
+// The loop body is a full statement block: it nests an if (only even elements
+// are added), so a for combines with the other control statements through the
+// shared body executor.
+pub fn sumEven(xs: list<int>): int {
+  let total = 0
+  for x of xs {
+    if x % 2 == 0 {
+      total = total + x
+    }
+  }
+  return total
+}
+
+// for nests: the inner loop runs in full for each element of the outer, so this
+// counts every pair — the product of the two lengths.
+pub fn pairCount(xs: list<int>, ys: list<int>): int {
+  let count = 0
+  for x of xs {
+    for y of ys {
+      count = count + 1
+    }
+  }
+  return count
+}
+
+// A for body falls through to the statement after the loop when it does not
+// return, so the let it accumulates into is read after the loop ends. The body
+// is not guaranteed to run (an empty collection skips it), so a return inside it
+// does not make the function's trailing return dead.
+pub fn product(xs: list<int>): int {
+  let acc = 1
+  for x of xs {
+    acc = acc * x
+  }
+  return acc
+}
+
+const Summed = sum([1, 2, 3, 4])
+const Joined = keysJoined(["a": 1, "b": 2, "c": 3])
+const ValueSummed = valueSum(["a": 1, "b": 2, "c": 3])
+const IndexSummed = indexSum([10, 20, 30])
+const EvenSum = sumEven([1, 2, 3, 4, 5, 6])
+const Pairs = pairCount([1, 2], [1, 2, 3])
+const Product = product([1, 2, 3, 4])
+
+// Every folded result verifies in an assertion at compile time, and an empty
+// collection folds to the accumulator's initial value (the body never runs).
+assert sum([1, 2, 3, 4]) == 10
+assert keysJoined(["a": 1, "b": 2, "c": 3]) == "abc"
+assert valueSum(["a": 1, "b": 2, "c": 3]) == 6
+assert indexSum([10, 20, 30]) == 3
+assert sumEven([1, 2, 3, 4, 5, 6]) == 12
+assert pairCount([1, 2], [1, 2, 3]) == 6
+assert product([1, 2, 3, 4]) == 24
+assert sum([]) == 0

@@ -260,7 +260,8 @@ func NewMethodDecl(doc []string, public, extern bool, effects []string, name str
 
 // Stmt is a statement inside a method body: a return (ReturnStmt), a mutable
 // local binding (LetStmt), a reassignment (AssignStmt), a switch (SwitchStmt), a
-// match (MatchStmt), an if (IfStmt), or a bare expression statement (ExprStmt).
+// match (MatchStmt), an if (IfStmt), a for (ForStmt), or a bare expression
+// statement (ExprStmt).
 type Stmt interface {
 	Node
 	stmt()
@@ -454,4 +455,43 @@ func (s *IfStmt) stmt()             {}
 // else branch is either another if (the chain) or a block, never both.
 func NewIfStmt(cond Expr, then []Stmt, elseIf *IfStmt, els []Stmt, syntax *cst.Node) *IfStmt {
 	return &IfStmt{Cond: cond, Then: then, ElseIf: elseIf, Else: els, syntax: syntax}
+}
+
+// ForKind distinguishes the two for forms: "of" binds the value (a list element,
+// a map value), "in" binds the key (a map key, a list index).
+type ForKind int
+
+const (
+	ForOf ForKind = iota // for x of c — x is each value
+	ForIn                // for k in c — k is each key
+)
+
+func (k ForKind) String() string {
+	if k == ForIn {
+		return "in"
+	}
+	return "of"
+}
+
+// ForStmt is a collection-iteration control statement: it visits every element
+// of the foldable collection Iter in fold order, binding Var to each in turn (the
+// value for ForOf, the key for ForIn) and running Body once per element. The loop
+// variable is an immutable per-iteration binding; accumulation goes through a let
+// the body reassigns. A for yields no value — it drives control flow; the value
+// form of a collection reduction is fold, not for.
+type ForStmt struct {
+	Var    string  // the loop variable name (empty if the source omitted it)
+	Kind   ForKind // of (value) or in (key)
+	Iter   Expr    // the iterated collection (nil if recovered away)
+	Body   []Stmt  // the loop body, run once per element
+	syntax *cst.Node
+}
+
+func (s *ForStmt) Syntax() *cst.Node { return s.syntax }
+func (s *ForStmt) node()             {}
+func (s *ForStmt) stmt()             {}
+
+// NewForStmt builds a ForStmt node.
+func NewForStmt(name string, kind ForKind, iter Expr, body []Stmt, syntax *cst.Node) *ForStmt {
+	return &ForStmt{Var: name, Kind: kind, Iter: iter, Body: body, syntax: syntax}
 }

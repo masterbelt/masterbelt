@@ -23,6 +23,7 @@ func StmtKinds() []Stmt {
 		&SwitchStmt{},
 		&MatchStmt{},
 		&IfStmt{},
+		&ForStmt{},
 	}
 }
 

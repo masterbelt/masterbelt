@@ -1,0 +1,1231 @@
+# tree
+File
+  FuncDecl
+    LineComment "// for is the iteration control statement: it visits every element of a foldable"
+    Newline "\n"
+    LineComment "// collection in fold order, binding a loop variable to each in turn and running"
+    Newline "\n"
+    LineComment "// the body once per element. \"of\" binds the value (a list element, a map value);"
+    Newline "\n"
+    LineComment "// \"in\" binds the key (a map key, a list index) — the JS reading. The loop"
+    Newline "\n"
+    LineComment "// variable is an immutable per-iteration binding; accumulation goes through a"
+    Newline "\n"
+    LineComment "// let (E-15) the body reassigns, so a for that sums or joins folds to a constant"
+    Newline "\n"
+    LineComment "// exactly as the equivalent fold does. for is a statement: it yields no value."
+    Newline "\n"
+    LineComment "// Iterability is foldable (E-16) — a for runs over anything that impls it."
+    Newline "\n"
+    Newline "\n"
+    LineComment "// for over a list with \"of\" sums its elements: the let total is the accumulator"
+    Newline "\n"
+    LineComment "// the body reassigns each iteration, and the function folds to the total. This"
+    Newline "\n"
+    LineComment "// is the headline accumulation pattern — the same result fold gives, written as"
+    Newline "\n"
+    LineComment "// a loop for readability."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Fn "fn"
+    Whitespace " "
+    Ident "sum"
+    ParamList
+      LParen "("
+      Param
+        Ident "xs"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "list"
+          GenericArgs
+            Lt "<"
+            TypeName
+              Ident "int"
+            Gt ">"
+      RParen ")"
+    Colon ":"
+    Whitespace " "
+    TypeName
+      Ident "int"
+    Whitespace " "
+    Block
+      LBrace "{"
+      Newline "\n"
+      Whitespace "  "
+      LetStmt
+        Let "let"
+        Whitespace " "
+        Ident "total"
+        Whitespace " "
+        Initializer
+          Assign "="
+          Whitespace " "
+          Literal
+            Int "0"
+      Newline "\n"
+      Whitespace "  "
+      ForStmt
+        For "for"
+        Whitespace " "
+        Ident "x"
+        Whitespace " "
+        Of "of"
+        Whitespace " "
+        NameRef
+          Ident "xs"
+        Whitespace " "
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          AssignStmt
+            NameRef
+              Ident "total"
+            Whitespace " "
+            Assign "="
+            Whitespace " "
+            BinaryExpr
+              NameRef
+                Ident "total"
+              Whitespace " "
+              Plus "+"
+              Whitespace " "
+              NameRef
+                Ident "x"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
+      Newline "\n"
+      Whitespace "  "
+      ReturnStmt
+        Return "return"
+        Whitespace " "
+        NameRef
+          Ident "total"
+      Newline "\n"
+      RBrace "}"
+  FuncDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// for over a map with \"in\" binds each entry's key. Joining the keys folds to the"
+    Newline "\n"
+    LineComment "// concatenation, in fold order."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Fn "fn"
+    Whitespace " "
+    Ident "keysJoined"
+    ParamList
+      LParen "("
+      Param
+        Ident "m"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "map"
+          GenericArgs
+            Lt "<"
+            TypeName
+              Ident "string"
+            Comma ","
+            Whitespace " "
+            TypeName
+              Ident "int"
+            Gt ">"
+      RParen ")"
+    Colon ":"
+    Whitespace " "
+    TypeName
+      Ident "string"
+    Whitespace " "
+    Block
+      LBrace "{"
+      Newline "\n"
+      Whitespace "  "
+      LetStmt
+        Let "let"
+        Whitespace " "
+        Ident "out"
+        Whitespace " "
+        Initializer
+          Assign "="
+          Whitespace " "
+          Literal
+            String "\"\""
+      Newline "\n"
+      Whitespace "  "
+      ForStmt
+        For "for"
+        Whitespace " "
+        Ident "k"
+        Whitespace " "
+        In "in"
+        Whitespace " "
+        NameRef
+          Ident "m"
+        Whitespace " "
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          AssignStmt
+            NameRef
+              Ident "out"
+            Whitespace " "
+            Assign "="
+            Whitespace " "
+            BinaryExpr
+              NameRef
+                Ident "out"
+              Whitespace " "
+              Plus "+"
+              Whitespace " "
+              NameRef
+                Ident "k"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
+      Newline "\n"
+      Whitespace "  "
+      ReturnStmt
+        Return "return"
+        Whitespace " "
+        NameRef
+          Ident "out"
+      Newline "\n"
+      RBrace "}"
+  FuncDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// \"of\" over a map binds the value, not the key: this sums a map's values."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Fn "fn"
+    Whitespace " "
+    Ident "valueSum"
+    ParamList
+      LParen "("
+      Param
+        Ident "m"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "map"
+          GenericArgs
+            Lt "<"
+            TypeName
+              Ident "string"
+            Comma ","
+            Whitespace " "
+            TypeName
+              Ident "int"
+            Gt ">"
+      RParen ")"
+    Colon ":"
+    Whitespace " "
+    TypeName
+      Ident "int"
+    Whitespace " "
+    Block
+      LBrace "{"
+      Newline "\n"
+      Whitespace "  "
+      LetStmt
+        Let "let"
+        Whitespace " "
+        Ident "total"
+        Whitespace " "
+        Initializer
+          Assign "="
+          Whitespace " "
+          Literal
+            Int "0"
+      Newline "\n"
+      Whitespace "  "
+      ForStmt
+        For "for"
+        Whitespace " "
+        Ident "v"
+        Whitespace " "
+        Of "of"
+        Whitespace " "
+        NameRef
+          Ident "m"
+        Whitespace " "
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          AssignStmt
+            NameRef
+              Ident "total"
+            Whitespace " "
+            Assign "="
+            Whitespace " "
+            BinaryExpr
+              NameRef
+                Ident "total"
+              Whitespace " "
+              Plus "+"
+              Whitespace " "
+              NameRef
+                Ident "v"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
+      Newline "\n"
+      Whitespace "  "
+      ReturnStmt
+        Return "return"
+        Whitespace " "
+        NameRef
+          Ident "total"
+      Newline "\n"
+      RBrace "}"
+  FuncDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// \"in\" over a list binds the index. Summing the indices of a three-element list"
+    Newline "\n"
+    LineComment "// folds to 0 + 1 + 2."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Fn "fn"
+    Whitespace " "
+    Ident "indexSum"
+    ParamList
+      LParen "("
+      Param
+        Ident "xs"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "list"
+          GenericArgs
+            Lt "<"
+            TypeName
+              Ident "int"
+            Gt ">"
+      RParen ")"
+    Colon ":"
+    Whitespace " "
+    TypeName
+      Ident "int"
+    Whitespace " "
+    Block
+      LBrace "{"
+      Newline "\n"
+      Whitespace "  "
+      LetStmt
+        Let "let"
+        Whitespace " "
+        Ident "total"
+        Whitespace " "
+        Initializer
+          Assign "="
+          Whitespace " "
+          Literal
+            Int "0"
+      Newline "\n"
+      Whitespace "  "
+      ForStmt
+        For "for"
+        Whitespace " "
+        Ident "i"
+        Whitespace " "
+        In "in"
+        Whitespace " "
+        NameRef
+          Ident "xs"
+        Whitespace " "
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          AssignStmt
+            NameRef
+              Ident "total"
+            Whitespace " "
+            Assign "="
+            Whitespace " "
+            BinaryExpr
+              NameRef
+                Ident "total"
+              Whitespace " "
+              Plus "+"
+              Whitespace " "
+              NameRef
+                Ident "i"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
+      Newline "\n"
+      Whitespace "  "
+      ReturnStmt
+        Return "return"
+        Whitespace " "
+        NameRef
+          Ident "total"
+      Newline "\n"
+      RBrace "}"
+  FuncDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// The loop body is a full statement block: it nests an if (only even elements"
+    Newline "\n"
+    LineComment "// are added), so a for combines with the other control statements through the"
+    Newline "\n"
+    LineComment "// shared body executor."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Fn "fn"
+    Whitespace " "
+    Ident "sumEven"
+    ParamList
+      LParen "("
+      Param
+        Ident "xs"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "list"
+          GenericArgs
+            Lt "<"
+            TypeName
+              Ident "int"
+            Gt ">"
+      RParen ")"
+    Colon ":"
+    Whitespace " "
+    TypeName
+      Ident "int"
+    Whitespace " "
+    Block
+      LBrace "{"
+      Newline "\n"
+      Whitespace "  "
+      LetStmt
+        Let "let"
+        Whitespace " "
+        Ident "total"
+        Whitespace " "
+        Initializer
+          Assign "="
+          Whitespace " "
+          Literal
+            Int "0"
+      Newline "\n"
+      Whitespace "  "
+      ForStmt
+        For "for"
+        Whitespace " "
+        Ident "x"
+        Whitespace " "
+        Of "of"
+        Whitespace " "
+        NameRef
+          Ident "xs"
+        Whitespace " "
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          IfStmt
+            If "if"
+            Whitespace " "
+            BinaryExpr
+              BinaryExpr
+                NameRef
+                  Ident "x"
+                Whitespace " "
+                Percent "%"
+                Whitespace " "
+                Literal
+                  Int "2"
+              Whitespace " "
+              EqEq "=="
+              Whitespace " "
+              Literal
+                Int "0"
+            Whitespace " "
+            Block
+              LBrace "{"
+              Newline "\n"
+              Whitespace "      "
+              AssignStmt
+                NameRef
+                  Ident "total"
+                Whitespace " "
+                Assign "="
+                Whitespace " "
+                BinaryExpr
+                  NameRef
+                    Ident "total"
+                  Whitespace " "
+                  Plus "+"
+                  Whitespace " "
+                  NameRef
+                    Ident "x"
+              Newline "\n"
+              Whitespace "    "
+              RBrace "}"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
+      Newline "\n"
+      Whitespace "  "
+      ReturnStmt
+        Return "return"
+        Whitespace " "
+        NameRef
+          Ident "total"
+      Newline "\n"
+      RBrace "}"
+  FuncDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// for nests: the inner loop runs in full for each element of the outer, so this"
+    Newline "\n"
+    LineComment "// counts every pair — the product of the two lengths."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Fn "fn"
+    Whitespace " "
+    Ident "pairCount"
+    ParamList
+      LParen "("
+      Param
+        Ident "xs"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "list"
+          GenericArgs
+            Lt "<"
+            TypeName
+              Ident "int"
+            Gt ">"
+      Comma ","
+      Whitespace " "
+      Param
+        Ident "ys"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "list"
+          GenericArgs
+            Lt "<"
+            TypeName
+              Ident "int"
+            Gt ">"
+      RParen ")"
+    Colon ":"
+    Whitespace " "
+    TypeName
+      Ident "int"
+    Whitespace " "
+    Block
+      LBrace "{"
+      Newline "\n"
+      Whitespace "  "
+      LetStmt
+        Let "let"
+        Whitespace " "
+        Ident "count"
+        Whitespace " "
+        Initializer
+          Assign "="
+          Whitespace " "
+          Literal
+            Int "0"
+      Newline "\n"
+      Whitespace "  "
+      ForStmt
+        For "for"
+        Whitespace " "
+        Ident "x"
+        Whitespace " "
+        Of "of"
+        Whitespace " "
+        NameRef
+          Ident "xs"
+        Whitespace " "
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          ForStmt
+            For "for"
+            Whitespace " "
+            Ident "y"
+            Whitespace " "
+            Of "of"
+            Whitespace " "
+            NameRef
+              Ident "ys"
+            Whitespace " "
+            Block
+              LBrace "{"
+              Newline "\n"
+              Whitespace "      "
+              AssignStmt
+                NameRef
+                  Ident "count"
+                Whitespace " "
+                Assign "="
+                Whitespace " "
+                BinaryExpr
+                  NameRef
+                    Ident "count"
+                  Whitespace " "
+                  Plus "+"
+                  Whitespace " "
+                  Literal
+                    Int "1"
+              Newline "\n"
+              Whitespace "    "
+              RBrace "}"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
+      Newline "\n"
+      Whitespace "  "
+      ReturnStmt
+        Return "return"
+        Whitespace " "
+        NameRef
+          Ident "count"
+      Newline "\n"
+      RBrace "}"
+  FuncDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// A for body falls through to the statement after the loop when it does not"
+    Newline "\n"
+    LineComment "// return, so the let it accumulates into is read after the loop ends. The body"
+    Newline "\n"
+    LineComment "// is not guaranteed to run (an empty collection skips it), so a return inside it"
+    Newline "\n"
+    LineComment "// does not make the function's trailing return dead."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Fn "fn"
+    Whitespace " "
+    Ident "product"
+    ParamList
+      LParen "("
+      Param
+        Ident "xs"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "list"
+          GenericArgs
+            Lt "<"
+            TypeName
+              Ident "int"
+            Gt ">"
+      RParen ")"
+    Colon ":"
+    Whitespace " "
+    TypeName
+      Ident "int"
+    Whitespace " "
+    Block
+      LBrace "{"
+      Newline "\n"
+      Whitespace "  "
+      LetStmt
+        Let "let"
+        Whitespace " "
+        Ident "acc"
+        Whitespace " "
+        Initializer
+          Assign "="
+          Whitespace " "
+          Literal
+            Int "1"
+      Newline "\n"
+      Whitespace "  "
+      ForStmt
+        For "for"
+        Whitespace " "
+        Ident "x"
+        Whitespace " "
+        Of "of"
+        Whitespace " "
+        NameRef
+          Ident "xs"
+        Whitespace " "
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          AssignStmt
+            NameRef
+              Ident "acc"
+            Whitespace " "
+            Assign "="
+            Whitespace " "
+            BinaryExpr
+              NameRef
+                Ident "acc"
+              Whitespace " "
+              Star "*"
+              Whitespace " "
+              NameRef
+                Ident "x"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
+      Newline "\n"
+      Whitespace "  "
+      ReturnStmt
+        Return "return"
+        Whitespace " "
+        NameRef
+          Ident "acc"
+      Newline "\n"
+      RBrace "}"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Summed"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "sum"
+        LParen "("
+        CollectionLit
+          LBracket "["
+          Literal
+            Int "1"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "2"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "3"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "4"
+          RBracket "]"
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Joined"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "keysJoined"
+        LParen "("
+        CollectionLit
+          LBracket "["
+          MapEntry
+            Literal
+              String "\"a\""
+            Colon ":"
+            Whitespace " "
+            Literal
+              Int "1"
+          Comma ","
+          Whitespace " "
+          MapEntry
+            Literal
+              String "\"b\""
+            Colon ":"
+            Whitespace " "
+            Literal
+              Int "2"
+          Comma ","
+          Whitespace " "
+          MapEntry
+            Literal
+              String "\"c\""
+            Colon ":"
+            Whitespace " "
+            Literal
+              Int "3"
+          RBracket "]"
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "ValueSummed"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "valueSum"
+        LParen "("
+        CollectionLit
+          LBracket "["
+          MapEntry
+            Literal
+              String "\"a\""
+            Colon ":"
+            Whitespace " "
+            Literal
+              Int "1"
+          Comma ","
+          Whitespace " "
+          MapEntry
+            Literal
+              String "\"b\""
+            Colon ":"
+            Whitespace " "
+            Literal
+              Int "2"
+          Comma ","
+          Whitespace " "
+          MapEntry
+            Literal
+              String "\"c\""
+            Colon ":"
+            Whitespace " "
+            Literal
+              Int "3"
+          RBracket "]"
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "IndexSummed"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "indexSum"
+        LParen "("
+        CollectionLit
+          LBracket "["
+          Literal
+            Int "10"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "20"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "30"
+          RBracket "]"
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "EvenSum"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "sumEven"
+        LParen "("
+        CollectionLit
+          LBracket "["
+          Literal
+            Int "1"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "2"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "3"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "4"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "5"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "6"
+          RBracket "]"
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Pairs"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "pairCount"
+        LParen "("
+        CollectionLit
+          LBracket "["
+          Literal
+            Int "1"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "2"
+          RBracket "]"
+        Comma ","
+        Whitespace " "
+        CollectionLit
+          LBracket "["
+          Literal
+            Int "1"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "2"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "3"
+          RBracket "]"
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Product"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "product"
+        LParen "("
+        CollectionLit
+          LBracket "["
+          Literal
+            Int "1"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "2"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "3"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "4"
+          RBracket "]"
+        RParen ")"
+  AssertDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// Every folded result verifies in an assertion at compile time, and an empty"
+    Newline "\n"
+    LineComment "// collection folds to the accumulator's initial value (the body never runs)."
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      CallExpr
+        NameRef
+          Ident "sum"
+        LParen "("
+        CollectionLit
+          LBracket "["
+          Literal
+            Int "1"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "2"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "3"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "4"
+          RBracket "]"
+        RParen ")"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "10"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      CallExpr
+        NameRef
+          Ident "keysJoined"
+        LParen "("
+        CollectionLit
+          LBracket "["
+          MapEntry
+            Literal
+              String "\"a\""
+            Colon ":"
+            Whitespace " "
+            Literal
+              Int "1"
+          Comma ","
+          Whitespace " "
+          MapEntry
+            Literal
+              String "\"b\""
+            Colon ":"
+            Whitespace " "
+            Literal
+              Int "2"
+          Comma ","
+          Whitespace " "
+          MapEntry
+            Literal
+              String "\"c\""
+            Colon ":"
+            Whitespace " "
+            Literal
+              Int "3"
+          RBracket "]"
+        RParen ")"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        String "\"abc\""
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      CallExpr
+        NameRef
+          Ident "valueSum"
+        LParen "("
+        CollectionLit
+          LBracket "["
+          MapEntry
+            Literal
+              String "\"a\""
+            Colon ":"
+            Whitespace " "
+            Literal
+              Int "1"
+          Comma ","
+          Whitespace " "
+          MapEntry
+            Literal
+              String "\"b\""
+            Colon ":"
+            Whitespace " "
+            Literal
+              Int "2"
+          Comma ","
+          Whitespace " "
+          MapEntry
+            Literal
+              String "\"c\""
+            Colon ":"
+            Whitespace " "
+            Literal
+              Int "3"
+          RBracket "]"
+        RParen ")"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "6"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      CallExpr
+        NameRef
+          Ident "indexSum"
+        LParen "("
+        CollectionLit
+          LBracket "["
+          Literal
+            Int "10"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "20"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "30"
+          RBracket "]"
+        RParen ")"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "3"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      CallExpr
+        NameRef
+          Ident "sumEven"
+        LParen "("
+        CollectionLit
+          LBracket "["
+          Literal
+            Int "1"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "2"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "3"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "4"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "5"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "6"
+          RBracket "]"
+        RParen ")"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "12"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      CallExpr
+        NameRef
+          Ident "pairCount"
+        LParen "("
+        CollectionLit
+          LBracket "["
+          Literal
+            Int "1"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "2"
+          RBracket "]"
+        Comma ","
+        Whitespace " "
+        CollectionLit
+          LBracket "["
+          Literal
+            Int "1"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "2"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "3"
+          RBracket "]"
+        RParen ")"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "6"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      CallExpr
+        NameRef
+          Ident "product"
+        LParen "("
+        CollectionLit
+          LBracket "["
+          Literal
+            Int "1"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "2"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "3"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "4"
+          RBracket "]"
+        RParen ")"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "24"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      CallExpr
+        NameRef
+          Ident "sum"
+        LParen "("
+        CollectionLit
+          LBracket "["
+          RBracket "]"
+        RParen ")"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "0"
+  Newline "\n"
+  EOF ""
+# diagnostics

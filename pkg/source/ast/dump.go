@@ -210,6 +210,8 @@ func dumpStmtInline(s Stmt) string {
 		return dumpMatchInline(s)
 	case *IfStmt:
 		return dumpIfInline(s)
+	case *ForStmt:
+		return dumpForInline(s)
 	default:
 		panic(unhandledStmt(s))
 	}
@@ -292,6 +294,12 @@ func dumpIfInline(s *IfStmt) string {
 		out += " (else " + dumpInlineBody(s.Else) + ")"
 	}
 	return out + ")"
+}
+
+// dumpForInline renders a for compactly: its loop variable, of/in, the iterated
+// expression, and the loop body.
+func dumpForInline(s *ForStmt) string {
+	return "(for " + s.Var + " " + s.Kind.String() + " " + dumpExpr(s.Iter) + " (body " + dumpInlineBody(s.Body) + "))"
 }
 
 func dumpTypeDecl(b *strings.Builder, d *TypeDecl) {
@@ -531,6 +539,11 @@ func dumpStmtAt(b *strings.Builder, s Stmt, indent string) {
 		}
 	case *IfStmt:
 		dumpIfAt(b, s, indent)
+	case *ForStmt:
+		fmt.Fprintf(b, "%sfor %s %s %s\n", indent, s.Var, s.Kind.String(), dumpExpr(s.Iter))
+		for _, bs := range s.Body {
+			dumpStmtAt(b, bs, indent+"    ")
+		}
 	default:
 		// The snapshot oracle must render every statement kind; a new one panics
 		// here rather than dumping as nothing and masking the regression.

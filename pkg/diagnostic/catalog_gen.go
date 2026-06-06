@@ -407,6 +407,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "function literal has " + f["actual"].String() + " parameters; " + f["expected"].String() + " expected"
 		}
 	},
+	"masterbelt.semantic.loop_var_immutable": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "ループ変数 " + f["name"].String() + " には代入できません。不変です。蓄積には let を使ってください"
+		default:
+			return "cannot assign to the loop variable " + f["name"].String() + ": it is immutable; accumulate into a let"
+		}
+	},
 	"masterbelt.semantic.missing_effect": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
@@ -517,6 +525,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return f["path"].String() + " は " + f["name"].String() + " を公開していません"
 		default:
 			return f["path"].String() + " does not export " + f["name"].String()
+		}
+	},
+	"masterbelt.semantic.not_iterable": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "for で反復できるのは foldable なコレクションだけです。" + f["typ"].String() + " は foldable ではありません"
+		default:
+			return "for can only iterate a foldable collection; " + f["typ"].String() + " is not foldable"
 		}
 	},
 	"masterbelt.semantic.orphan_impl": func(loc Locale, f map[string]fmt.Stringer) string {
