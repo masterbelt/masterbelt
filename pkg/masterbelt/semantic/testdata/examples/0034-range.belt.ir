@@ -2,90 +2,139 @@ Module
   Const "Sum"
     type int
     value total()
+    eval 45
   Const "PositionSum"
     type int
     value positionSum()
+    eval 10
   Const "EmptySum"
     type int
     value emptySum()
+    eval 100
   Const "Count"
-    type invalid
-    value <none>.count()
+    type int
+    value range(IntLiteral "0", IntLiteral "10").count()
+    eval 10
   Const "EmptyCount"
-    type invalid
-    value <none>.count()
+    type int
+    value range(IntLiteral "5", IntLiteral "5").count()
+    eval 0
   Const "AnyBig"
-    type invalid
-    value <none>.any((fn(v) (return ParamRef "v".gt(IntLiteral "8"))))
+    type bool
+    value range(IntLiteral "0", IntLiteral "10").any((fn(v) (return ParamRef "v".gt(IntLiteral "8"))))
+    eval true
   Const "AllNonNeg"
-    type invalid
-    value <none>.all((fn(v) (return ParamRef "v".gteq(IntLiteral "0"))))
+    type bool
+    value range(IntLiteral "0", IntLiteral "10").all((fn(v) (return ParamRef "v".gteq(IntLiteral "0"))))
+    eval true
   Const "Doubled"
-    type invalid
-    value <none>.map((fn(v) (return ParamRef "v".mul(IntLiteral "2"))))
+    type list<int>
+    value range(IntLiteral "0", IntLiteral "5").map((fn(v) (return ParamRef "v".mul(IntLiteral "2"))))
+    eval [0, 2, 4, 6, 8]
   Const "Evens"
-    type invalid
-    value <none>.filter((fn(v) (return ParamRef "v".rem(IntLiteral "2").eql(IntLiteral "0"))))
+    type list<int>
+    value range(IntLiteral "0", IntLiteral "10").filter((fn(v) (return ParamRef "v".rem(IntLiteral "2").eql(IntLiteral "0"))))
+    eval [0, 2, 4, 6, 8]
   Const "Values"
-    type invalid
-    value <none>.values()
+    type list<int>
+    value range(IntLiteral "3", IntLiteral "7").values()
+    eval [3, 4, 5, 6]
   Const "Keys"
-    type invalid
-    value <none>.keys()
+    type list<int>
+    value range(IntLiteral "3", IntLiteral "7").keys()
+    eval [0, 1, 2, 3]
   Const "Folded"
-    type invalid
-    value <none>.fold(IntLiteral "0", (fn(acc, k, v) (return ParamRef "acc".add(ParamRef "v"))))
+    type int
+    value range(IntLiteral "0", IntLiteral "4").fold(IntLiteral "0", (fn(acc, k, v) (return ParamRef "acc".add(ParamRef "v"))))
+    eval 6
   Func "total" pub
     result int
       let "t": int = IntLiteral "0"
-      for i of invalid <none>
+      for i of int range(IntLiteral "0", IntLiteral "10")
           assign "t" = LocalRef "t".add(LocalRef "i")
       return LocalRef "t"
   Func "positionSum" pub
     result int
       let "t": int = IntLiteral "0"
-      for i in invalid <none>
+      for i in int range(IntLiteral "5", IntLiteral "10")
           assign "t" = LocalRef "t".add(LocalRef "i")
       return LocalRef "t"
   Func "emptySum" pub
     result int
       let "t": int = IntLiteral "100"
-      for i of invalid <none>
+      for i of int range(IntLiteral "10", IntLiteral "10")
           assign "t" = LocalRef "t".add(LocalRef "i")
       return LocalRef "t"
   Assert "total() == 45"
-    eval <unevaluated>
+    eval true
       total() == 45
-  Assert "positionSum() == 35"
-    eval <unevaluated>
-      positionSum() == 35
+      ^       ^
+      45      true
+  Assert "positionSum() == 10"
+    eval true
+      positionSum() == 10
+      ^             ^
+      10            true
   Assert "emptySum() == 100"
-    eval <unevaluated>
+    eval true
       emptySum() == 100
+      ^          ^
+      100        true
   Assert "range(0, 10).count() == 10"
-    eval <unevaluated>
+    eval true
       range(0, 10).count() == 10
+      ^            ^       ^
+      range(0, 10) 10      true
   Assert "range(5, 5).count() == 0"
-    eval <unevaluated>
+    eval true
       range(5, 5).count() == 0
+      ^           ^       ^
+      range(5, 5) 0       true
   Assert "range(0, 10).any(fn(v: int): bool { return v > 8 })"
-    eval <unevaluated>
+    eval true
       range(0, 10).any(fn(v: int): bool { return v > 8 })
+      ^            ^
+      range(0, 10) true
   Assert "range(0, 10).all(fn(v: int): bool { return v >= 0 })"
-    eval <unevaluated>
+    eval true
       range(0, 10).all(fn(v: int): bool { return v >= 0 })
-  Assert "range(0, 5).map(fn(v: int): int { return v * 2 }) == [0, 2, 4, 6, 8]"
-    eval <unevaluated>
-      range(0, 5).map(fn(v: int): int { return v * 2 }) == [0, 2, 4, 6, 8]
-  Assert "range(0, 10).filter(fn(v: int): bool { return v % 2 == 0 }) == [0, 2, 4, 6, 8]"
-    eval <unevaluated>
-      range(0, 10).filter(fn(v: int): bool { return v % 2 == 0 }) == [0, 2, 4, 6, 8]
-  Assert "range(3, 7).values() == [3, 4, 5, 6]"
-    eval <unevaluated>
-      range(3, 7).values() == [3, 4, 5, 6]
-  Assert "range(3, 7).keys() == [0, 1, 2, 3]"
-    eval <unevaluated>
-      range(3, 7).keys() == [0, 1, 2, 3]
+      ^            ^
+      range(0, 10) true
+  Assert "range(0, 5).map(fn(v: int): int { return v * 2 }).len() == 5"
+    eval true
+      range(0, 5).map(fn(v: int): int { return v * 2 }).len() == 5
+      ^           ^                                     ^     ^
+      range(0, 5) [0, 2, 4, 6, 8]                       5     true
+  Assert "range(0, 5).map(fn(v: int): int { return v * 2 }).fold(0, fn(acc: int, k: int, v: int): int { return acc + v }) == 20"
+    eval true
+      range(0, 5).map(fn(v: int): int { return v * 2 }).fold(0, fn(acc: int, k: int, v: int): int { return acc + v }) == 20
+      ^           ^                                     ^                                                             ^
+      range(0, 5) [0, 2, 4, 6, 8]                       20                                                            true
+  Assert "range(0, 10).filter(fn(v: int): bool { return v % 2 == 0 }).len() == 5"
+    eval true
+      range(0, 10).filter(fn(v: int): bool { return v % 2 == 0 }).len() == 5
+      ^            ^                                              ^     ^
+      range(0, 10) [0, 2, 4, 6, 8]                                5     true
+  Assert "range(3, 7).values().len() == 4"
+    eval true
+      range(3, 7).values().len() == 4
+      ^           ^        ^     ^
+      range(3, 7) |        4     true
+                  [3, 4, 5, 6]
+  Assert "range(3, 7).values().fold(0, fn(acc: int, k: int, v: int): int { return acc + v }) == 18"
+    eval true
+      range(3, 7).values().fold(0, fn(acc: int, k: int, v: int): int { return acc + v }) == 18
+      ^           ^        ^                                                             ^
+      range(3, 7) |        18                                                            true
+                  [3, 4, 5, 6]
+  Assert "range(3, 7).keys().fold(0, fn(acc: int, k: int, v: int): int { return acc + v }) == 6"
+    eval true
+      range(3, 7).keys().fold(0, fn(acc: int, k: int, v: int): int { return acc + v }) == 6
+      ^           ^      ^                                                             ^
+      range(3, 7) |      6                                                             true
+                  [0, 1, 2, 3]
   Assert "range(0, 4).fold(0, fn(acc: int, k: int, v: int): int { return acc + v }) == 6"
-    eval <unevaluated>
+    eval true
       range(0, 4).fold(0, fn(acc: int, k: int, v: int): int { return acc + v }) == 6
+      ^           ^                                                             ^
+      range(0, 4) 6                                                             true

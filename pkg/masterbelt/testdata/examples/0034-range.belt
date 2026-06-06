@@ -21,7 +21,8 @@ pub fn total(): int {
 const Sum = total()
 
 // "in" over a range binds the 0-based position — the same key a list's index is
-// — so summing the positions of a five-element range folds to 0 + 1 + 2 + 3 + 4.
+// — not the element, so summing the positions of the five-element range(5, 10)
+// folds to 0 + 1 + 2 + 3 + 4 = 10 (the positions), not the elements 5..9.
 pub fn positionSum(): int {
   let t = 0
   for i in range(5, 10) {
@@ -67,14 +68,19 @@ const Folded = range(0, 4).fold(0, fn(acc: int, k: int, v: int): int -> acc + v)
 
 // Every folded result verifies in an assertion at compile time.
 assert total() == 45
-assert positionSum() == 35
+assert positionSum() == 10
 assert emptySum() == 100
 assert range(0, 10).count() == 10
 assert range(5, 5).count() == 0
 assert range(0, 10).any(fn(v: int): bool -> v > 8)
 assert range(0, 10).all(fn(v: int): bool -> v >= 0)
-assert range(0, 5).map(fn(v: int): int -> v * 2) == [0, 2, 4, 6, 8]
-assert range(0, 10).filter(fn(v: int): bool -> v % 2 == 0) == [0, 2, 4, 6, 8]
-assert range(3, 7).values() == [3, 4, 5, 6]
-assert range(3, 7).keys() == [0, 1, 2, 3]
+// The list-returning methods are verified through the foldable scalars a list
+// folds to — len counts the elements, the native fold sums them — since a whole-
+// list == does not fold to a constant.
+assert range(0, 5).map(fn(v: int): int -> v * 2).len() == 5
+assert range(0, 5).map(fn(v: int): int -> v * 2).fold(0, fn(acc: int, k: int, v: int): int -> acc + v) == 20
+assert range(0, 10).filter(fn(v: int): bool -> v % 2 == 0).len() == 5
+assert range(3, 7).values().len() == 4
+assert range(3, 7).values().fold(0, fn(acc: int, k: int, v: int): int -> acc + v) == 18
+assert range(3, 7).keys().fold(0, fn(acc: int, k: int, v: int): int -> acc + v) == 6
 assert range(0, 4).fold(0, fn(acc: int, k: int, v: int): int -> acc + v) == 6

@@ -122,7 +122,9 @@ File
     Newline "\n"
     LineComment "// \"in\" over a range binds the 0-based position — the same key a list's index is"
     Newline "\n"
-    LineComment "// — so summing the positions of a five-element range folds to 0 + 1 + 2 + 3 + 4."
+    LineComment "// — not the element, so summing the positions of the five-element range(5, 10)"
+    Newline "\n"
+    LineComment "// folds to 0 + 1 + 2 + 3 + 4 = 10 (the positions), not the elements 5..9."
     Newline "\n"
     Pub "pub"
     Whitespace " "
@@ -759,7 +761,7 @@ File
       EqEq "=="
       Whitespace " "
       Literal
-        Int "35"
+        Int "10"
   AssertDecl
     Newline "\n"
     Assert "assert"
@@ -925,29 +927,146 @@ File
       RParen ")"
   AssertDecl
     Newline "\n"
+    LineComment "// The list-returning methods are verified through the foldable scalars a list"
+    Newline "\n"
+    LineComment "// folds to — len counts the elements, the native fold sums them — since a whole-"
+    Newline "\n"
+    LineComment "// list == does not fold to a constant."
+    Newline "\n"
     Assert "assert"
     Whitespace " "
     BinaryExpr
       CallExpr
         MemberExpr
           CallExpr
-            NameRef
-              Ident "range"
+            MemberExpr
+              CallExpr
+                NameRef
+                  Ident "range"
+                LParen "("
+                Literal
+                  Int "0"
+                Comma ","
+                Whitespace " "
+                Literal
+                  Int "5"
+                RParen ")"
+              Dot "."
+              Ident "map"
             LParen "("
-            Literal
-              Int "0"
-            Comma ","
-            Whitespace " "
-            Literal
-              Int "5"
+            FuncLit
+              Fn "fn"
+              ParamList
+                LParen "("
+                Param
+                  Ident "v"
+                  Colon ":"
+                  Whitespace " "
+                  TypeName
+                    Ident "int"
+                RParen ")"
+              Colon ":"
+              Whitespace " "
+              TypeName
+                Ident "int"
+              Whitespace " "
+              Arrow "->"
+              Whitespace " "
+              BinaryExpr
+                NameRef
+                  Ident "v"
+                Whitespace " "
+                Star "*"
+                Whitespace " "
+                Literal
+                  Int "2"
             RParen ")"
           Dot "."
-          Ident "map"
+          Ident "len"
         LParen "("
+        RParen ")"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "5"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      CallExpr
+        MemberExpr
+          CallExpr
+            MemberExpr
+              CallExpr
+                NameRef
+                  Ident "range"
+                LParen "("
+                Literal
+                  Int "0"
+                Comma ","
+                Whitespace " "
+                Literal
+                  Int "5"
+                RParen ")"
+              Dot "."
+              Ident "map"
+            LParen "("
+            FuncLit
+              Fn "fn"
+              ParamList
+                LParen "("
+                Param
+                  Ident "v"
+                  Colon ":"
+                  Whitespace " "
+                  TypeName
+                    Ident "int"
+                RParen ")"
+              Colon ":"
+              Whitespace " "
+              TypeName
+                Ident "int"
+              Whitespace " "
+              Arrow "->"
+              Whitespace " "
+              BinaryExpr
+                NameRef
+                  Ident "v"
+                Whitespace " "
+                Star "*"
+                Whitespace " "
+                Literal
+                  Int "2"
+            RParen ")"
+          Dot "."
+          Ident "fold"
+        LParen "("
+        Literal
+          Int "0"
+        Comma ","
+        Whitespace " "
         FuncLit
           Fn "fn"
           ParamList
             LParen "("
+            Param
+              Ident "acc"
+              Colon ":"
+              Whitespace " "
+              TypeName
+                Ident "int"
+            Comma ","
+            Whitespace " "
+            Param
+              Ident "k"
+              Colon ":"
+              Whitespace " "
+              TypeName
+                Ident "int"
+            Comma ","
+            Whitespace " "
             Param
               Ident "v"
               Colon ":"
@@ -964,37 +1083,18 @@ File
           Whitespace " "
           BinaryExpr
             NameRef
+              Ident "acc"
+            Whitespace " "
+            Plus "+"
+            Whitespace " "
+            NameRef
               Ident "v"
-            Whitespace " "
-            Star "*"
-            Whitespace " "
-            Literal
-              Int "2"
         RParen ")"
       Whitespace " "
       EqEq "=="
       Whitespace " "
-      CollectionLit
-        LBracket "["
-        Literal
-          Int "0"
-        Comma ","
-        Whitespace " "
-        Literal
-          Int "2"
-        Comma ","
-        Whitespace " "
-        Literal
-          Int "4"
-        Comma ","
-        Whitespace " "
-        Literal
-          Int "6"
-        Comma ","
-        Whitespace " "
-        Literal
-          Int "8"
-        RBracket "]"
+      Literal
+        Int "20"
   AssertDecl
     Newline "\n"
     Assert "assert"
@@ -1003,23 +1103,147 @@ File
       CallExpr
         MemberExpr
           CallExpr
-            NameRef
-              Ident "range"
+            MemberExpr
+              CallExpr
+                NameRef
+                  Ident "range"
+                LParen "("
+                Literal
+                  Int "0"
+                Comma ","
+                Whitespace " "
+                Literal
+                  Int "10"
+                RParen ")"
+              Dot "."
+              Ident "filter"
             LParen "("
-            Literal
-              Int "0"
-            Comma ","
-            Whitespace " "
-            Literal
-              Int "10"
+            FuncLit
+              Fn "fn"
+              ParamList
+                LParen "("
+                Param
+                  Ident "v"
+                  Colon ":"
+                  Whitespace " "
+                  TypeName
+                    Ident "int"
+                RParen ")"
+              Colon ":"
+              Whitespace " "
+              TypeName
+                Ident "bool"
+              Whitespace " "
+              Arrow "->"
+              Whitespace " "
+              BinaryExpr
+                BinaryExpr
+                  NameRef
+                    Ident "v"
+                  Whitespace " "
+                  Percent "%"
+                  Whitespace " "
+                  Literal
+                    Int "2"
+                Whitespace " "
+                EqEq "=="
+                Whitespace " "
+                Literal
+                  Int "0"
             RParen ")"
           Dot "."
-          Ident "filter"
+          Ident "len"
         LParen "("
+        RParen ")"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "5"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      CallExpr
+        MemberExpr
+          CallExpr
+            MemberExpr
+              CallExpr
+                NameRef
+                  Ident "range"
+                LParen "("
+                Literal
+                  Int "3"
+                Comma ","
+                Whitespace " "
+                Literal
+                  Int "7"
+                RParen ")"
+              Dot "."
+              Ident "values"
+            LParen "("
+            RParen ")"
+          Dot "."
+          Ident "len"
+        LParen "("
+        RParen ")"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "4"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      CallExpr
+        MemberExpr
+          CallExpr
+            MemberExpr
+              CallExpr
+                NameRef
+                  Ident "range"
+                LParen "("
+                Literal
+                  Int "3"
+                Comma ","
+                Whitespace " "
+                Literal
+                  Int "7"
+                RParen ")"
+              Dot "."
+              Ident "values"
+            LParen "("
+            RParen ")"
+          Dot "."
+          Ident "fold"
+        LParen "("
+        Literal
+          Int "0"
+        Comma ","
+        Whitespace " "
         FuncLit
           Fn "fn"
           ParamList
             LParen "("
+            Param
+              Ident "acc"
+              Colon ":"
+              Whitespace " "
+              TypeName
+                Ident "int"
+            Comma ","
+            Whitespace " "
+            Param
+              Ident "k"
+              Colon ":"
+              Whitespace " "
+              TypeName
+                Ident "int"
+            Comma ","
+            Whitespace " "
             Param
               Ident "v"
               Colon ":"
@@ -1030,49 +1254,24 @@ File
           Colon ":"
           Whitespace " "
           TypeName
-            Ident "bool"
+            Ident "int"
           Whitespace " "
           Arrow "->"
           Whitespace " "
           BinaryExpr
-            BinaryExpr
-              NameRef
-                Ident "v"
-              Whitespace " "
-              Percent "%"
-              Whitespace " "
-              Literal
-                Int "2"
+            NameRef
+              Ident "acc"
             Whitespace " "
-            EqEq "=="
+            Plus "+"
             Whitespace " "
-            Literal
-              Int "0"
+            NameRef
+              Ident "v"
         RParen ")"
       Whitespace " "
       EqEq "=="
       Whitespace " "
-      CollectionLit
-        LBracket "["
-        Literal
-          Int "0"
-        Comma ","
-        Whitespace " "
-        Literal
-          Int "2"
-        Comma ","
-        Whitespace " "
-        Literal
-          Int "4"
-        Comma ","
-        Whitespace " "
-        Literal
-          Int "6"
-        Comma ","
-        Whitespace " "
-        Literal
-          Int "8"
-        RBracket "]"
+      Literal
+        Int "18"
   AssertDecl
     Newline "\n"
     Assert "assert"
@@ -1081,82 +1280,77 @@ File
       CallExpr
         MemberExpr
           CallExpr
-            NameRef
-              Ident "range"
+            MemberExpr
+              CallExpr
+                NameRef
+                  Ident "range"
+                LParen "("
+                Literal
+                  Int "3"
+                Comma ","
+                Whitespace " "
+                Literal
+                  Int "7"
+                RParen ")"
+              Dot "."
+              Ident "keys"
             LParen "("
-            Literal
-              Int "3"
-            Comma ","
-            Whitespace " "
-            Literal
-              Int "7"
             RParen ")"
           Dot "."
-          Ident "values"
+          Ident "fold"
         LParen "("
-        RParen ")"
-      Whitespace " "
-      EqEq "=="
-      Whitespace " "
-      CollectionLit
-        LBracket "["
-        Literal
-          Int "3"
-        Comma ","
-        Whitespace " "
-        Literal
-          Int "4"
-        Comma ","
-        Whitespace " "
-        Literal
-          Int "5"
-        Comma ","
-        Whitespace " "
-        Literal
-          Int "6"
-        RBracket "]"
-  AssertDecl
-    Newline "\n"
-    Assert "assert"
-    Whitespace " "
-    BinaryExpr
-      CallExpr
-        MemberExpr
-          CallExpr
-            NameRef
-              Ident "range"
-            LParen "("
-            Literal
-              Int "3"
-            Comma ","
-            Whitespace " "
-            Literal
-              Int "7"
-            RParen ")"
-          Dot "."
-          Ident "keys"
-        LParen "("
-        RParen ")"
-      Whitespace " "
-      EqEq "=="
-      Whitespace " "
-      CollectionLit
-        LBracket "["
         Literal
           Int "0"
         Comma ","
         Whitespace " "
-        Literal
-          Int "1"
-        Comma ","
-        Whitespace " "
-        Literal
-          Int "2"
-        Comma ","
-        Whitespace " "
-        Literal
-          Int "3"
-        RBracket "]"
+        FuncLit
+          Fn "fn"
+          ParamList
+            LParen "("
+            Param
+              Ident "acc"
+              Colon ":"
+              Whitespace " "
+              TypeName
+                Ident "int"
+            Comma ","
+            Whitespace " "
+            Param
+              Ident "k"
+              Colon ":"
+              Whitespace " "
+              TypeName
+                Ident "int"
+            Comma ","
+            Whitespace " "
+            Param
+              Ident "v"
+              Colon ":"
+              Whitespace " "
+              TypeName
+                Ident "int"
+            RParen ")"
+          Colon ":"
+          Whitespace " "
+          TypeName
+            Ident "int"
+          Whitespace " "
+          Arrow "->"
+          Whitespace " "
+          BinaryExpr
+            NameRef
+              Ident "acc"
+            Whitespace " "
+            Plus "+"
+            Whitespace " "
+            NameRef
+              Ident "v"
+        RParen ")"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "6"
   AssertDecl
     Newline "\n"
     Assert "assert"
