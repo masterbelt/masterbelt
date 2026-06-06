@@ -314,10 +314,22 @@ func (b bodyBinder) selfHasMethod(name string) bool {
 }
 
 // enumDefOf returns the enum definition a type names, or nil when it is not a
-// nominal enum.
+// nominal enum. A union carrying an enum (R | error) resolves to that enum, so a
+// bare member is accepted under a union-of-enum expectation exactly as under the
+// bare enum; a union with several enums takes the first (its members resolve,
+// and a name no enum declares stays unresolved at the use site).
 func enumDefOf(t ir.Type) *ir.TypeDef {
-	if n, ok := t.(*ir.Named); ok && n.Def != nil && n.Def.Enum != nil {
-		return n.Def
+	switch t := t.(type) {
+	case *ir.Named:
+		if t.Def != nil && t.Def.Enum != nil {
+			return t.Def
+		}
+	case *ir.Union:
+		for _, m := range t.Members {
+			if n, ok := m.(*ir.Named); ok && n.Def != nil && n.Def.Enum != nil {
+				return n.Def
+			}
+		}
 	}
 	return nil
 }

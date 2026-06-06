@@ -100,10 +100,21 @@ func ExprExpecting(e ast.Expr, want ir.Type, env Env) *ir.Constant {
 }
 
 // expectedEnum returns the enum definition a type names, or nil when it is not
-// an enum's named type.
+// an enum's named type. A union carrying an enum (R | error) resolves to that
+// enum, so a bare member folds under a union-of-enum expectation exactly as
+// under the bare enum.
 func expectedEnum(want ir.Type) *ir.TypeDef {
-	if n, ok := want.(*ir.Named); ok && n.Def != nil && n.Def.Enum != nil {
-		return n.Def
+	switch w := want.(type) {
+	case *ir.Named:
+		if w.Def != nil && w.Def.Enum != nil {
+			return w.Def
+		}
+	case *ir.Union:
+		for _, m := range w.Members {
+			if n, ok := m.(*ir.Named); ok && n.Def != nil && n.Def.Enum != nil {
+				return n.Def
+			}
+		}
 	}
 	return nil
 }

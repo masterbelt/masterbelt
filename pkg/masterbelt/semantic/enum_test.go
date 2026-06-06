@@ -163,3 +163,28 @@ func TestEnumBareMemberNeedsExpectation(t *testing.T) {
 		t.Errorf("unannotated bare member: want undefined_name, got %v", codes(diags))
 	}
 }
+
+// TestEnumBareMemberUnderUnionExpectation checks a bare member resolves under a
+// union annotation that carries the enum (const x: R | error = Legend) exactly
+// as it does under the bare enum — closing the gap where the union case fell to
+// undefined_name. A name no enum in the union declares stays an
+// unknown_enum_member, the same as the direct-enum case.
+func TestEnumBareMemberUnderUnionExpectation(t *testing.T) {
+	src := "enum R {\n  Common\n  Legend\n}\nconst x: R | error = Legend\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("bare member under R | error: unexpected diagnostics %v", codes(diags))
+	}
+	x := constOf(m, "x")
+	if x == nil || x.Type.String() != "R | error" {
+		t.Fatalf("x type = %v, want R | error", x)
+	}
+	if x.Eval == nil || x.Eval.String() != "R.Legend" {
+		t.Errorf("x eval = %v, want R.Legend (the bare member folds)", x.Eval)
+	}
+
+	// A name no enum in the union declares is reported, not silently accepted.
+	if _, diags := analyze("enum R {\n  Common\n}\nconst x: R | error = Nope\n"); !hasCode(diags, CodeUnknownEnumMember) {
+		t.Errorf("non-member under R | error: want unknown_enum_member, got %v", codes(diags))
+	}
+}

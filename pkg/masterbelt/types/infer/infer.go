@@ -464,6 +464,30 @@ func enumMemberIndex(def *ir.TypeDef, name string) int {
 	return -1
 }
 
+// enumMemberExpectation resolves a bare member name against an enum expectation:
+// the enum's own named type when want is directly that enum, or — when want is a
+// union carrying the enum (the R | error annotation a T | error result invites)
+// — the named type of whichever member enum declares the name. It returns nil
+// when no enum in want declares the name, so the caller falls through to
+// ordinary identifier resolution. Keeping the union case here makes a bare
+// member resolve under a union-of-enum expectation exactly as it does under the
+// bare enum.
+func enumMemberExpectation(want ir.Type, name string) ir.Type {
+	switch w := want.(type) {
+	case *ir.Named:
+		if enumMemberIndex(w.Def, name) >= 0 {
+			return w
+		}
+	case *ir.Union:
+		for _, m := range w.Members {
+			if n, ok := m.(*ir.Named); ok && enumMemberIndex(n.Def, name) >= 0 {
+				return n
+			}
+		}
+	}
+	return nil
+}
+
 // hasTypeVar reports whether t still contains a type variable — i.e. the
 // checking context has not pinned every generic part to a concrete type.
 func hasTypeVar(t ir.Type) bool {

@@ -254,17 +254,24 @@ func funcCallType(e *ast.CallExpr, name string, cands []*ast.FuncDecl, s scope, 
 		known[i] = args[i]
 	}
 
-	var matches []funcSig
+	var matches, arity []funcSig
 	for _, sg := range sigs {
 		if len(sg.params) != len(e.Arguments) {
 			continue
 		}
+		arity = append(arity, sg)
+		// One subst threaded across all known arguments — so a type parameter
+		// pinned to int by one argument and string by another drops this
+		// candidate, exactly as types.SelectOverload's per-candidate Clone does
+		// for methods. A fresh map per argument (the old behavior) hid that
+		// cross-argument inconsistency and made the result order-dependent.
+		cand := map[string]ir.Type{}
 		fits := true
 		for i, kt := range known {
 			if kt == nil {
 				continue
 			}
-			if !types.Match(s.registry(), sg.params[i], kt, map[string]ir.Type{}) {
+			if !types.Match(s.registry(), sg.params[i], kt, cand) {
 				fits = false
 				break
 			}
@@ -272,6 +279,16 @@ func funcCallType(e *ast.CallExpr, name string, cands []*ast.FuncDecl, s scope, 
 		if fits {
 			matches = append(matches, sg)
 		}
+	}
+
+	// When exactly one signature has the right arity but the arguments do not
+	// fit it, fall through to that signature and let the shared-subst pass
+	// below report the precise mismatch — the same type_mismatch a
+	// single-signature call gives, rather than the vaguer
+	// no_matching_func_overload (which stays for a genuine ambiguity: several
+	// same-arity signatures, none fitting).
+	if len(matches) == 0 && len(arity) == 1 {
+		matches = arity
 	}
 
 	if len(matches) != 1 {
@@ -293,19 +310,28 @@ func funcCallType(e *ast.CallExpr, name string, cands []*ast.FuncDecl, s scope, 
 		return ir.Invalid
 	}
 
-	// Pass 2 — the deferred arguments, each checked against the winner's
-	// parameter type. A finding inside one fails the call without a generic
-	// report, exactly as a method call's literal arguments do. The shared subst
-	// is seeded with what the non-deferred arguments already pinned (Pass 1
+	// Seed the shared subst with what the non-deferred arguments pinned (Pass 1
 	// synthesized them without it), so a generic parameter solved by a plain
-	// argument reaches the result and the bound check.
+	// argument reaches the result and the bound check — and report a known
+	// argument that does not fit the winner's parameter (a type parameter a
+	// later argument binds to a different type, say) as a mismatch, exactly as
+	// the single-signature checkFuncCall does, rather than discarding the Match
+	// result and resolving the call against whichever binding was written first.
 	win := matches[0]
 	subst := map[string]ir.Type{}
 	for i, kt := range known {
-		if kt != nil {
-			types.Match(s.registry(), win.params[i], kt, subst)
+		if kt == nil {
+			continue
+		}
+		if !types.Match(s.registry(), win.params[i], kt, subst) {
+			sink.mismatch(e.Arguments[i], kt, types.Substitute(win.params[i], subst))
+			bad = true
 		}
 	}
+
+	// Pass 2 — the deferred arguments, each checked against the winner's
+	// parameter type. A finding inside one fails the call without a generic
+	// report, exactly as a method call's literal arguments do.
 	for i, a := range e.Arguments {
 		if !deferredArg(a) {
 			continue

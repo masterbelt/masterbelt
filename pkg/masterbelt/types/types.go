@@ -423,9 +423,132 @@ func Match(reg *builtin.Registry, pattern, arg ir.Type, subst map[string]ir.Type
 			}
 		}
 		return true
+	case *ir.Record:
+		// A concrete record pattern (no variable to solve) keeps the old
+		// assignability rule, so nothing about the non-generic path changes; a
+		// pattern carrying a variable ({ v: T }) is matched field-by-field by
+		// name, each pattern field's pattern against the argument's same-named
+		// field — mirroring Substitute's field-wise recursion, so a variable
+		// introduced inside a record parameter is also solved from the argument.
+		// The argument may be a nominal record, looked through to its fields.
+		if !hasFreeVar(p, subst) {
+			return Assignable(reg, arg, pattern)
+		}
+		a := recordType(arg)
+		if a == nil {
+			return false
+		}
+		fields := make(map[string]ir.Type, len(a.Fields))
+		for _, f := range a.Fields {
+			fields[f.Name] = f.Type
+		}
+		for _, pf := range p.Fields {
+			af, ok := fields[pf.Name]
+			if !ok || !Match(reg, pf.Type, af, subst) {
+				return false
+			}
+		}
+		return true
+	case *ir.Union:
+		// A concrete union pattern (no variable to solve) keeps the old
+		// assignability rule — which already accepts a member value, a reordered
+		// union, or a narrower union — so the non-generic path is unchanged. A
+		// pattern carrying a variable (T | error — the central unwrap use-case)
+		// solves it: a same-arity union argument pairs positionally (int | error
+		// binds T = int), and any other argument is one member's value flowing in,
+		// matched against the members concrete-first so an error matches the error
+		// member without binding T while an int binds T = int.
+		if !hasFreeVar(p, subst) {
+			return Assignable(reg, arg, pattern)
+		}
+		if a, ok := arg.(*ir.Union); ok && len(a.Members) == len(p.Members) {
+			trial := maps.Clone(subst)
+			paired := true
+			for i := range p.Members {
+				if !Match(reg, p.Members[i], a.Members[i], trial) {
+					paired = false
+					break
+				}
+			}
+			if paired {
+				maps.Copy(subst, trial)
+				return true
+			}
+		}
+		for _, free := range []bool{false, true} {
+			for _, m := range p.Members {
+				if hasFreeVar(m, subst) != free {
+					continue
+				}
+				trial := maps.Clone(subst)
+				if Match(reg, m, arg, trial) {
+					maps.Copy(subst, trial)
+					return true
+				}
+			}
+		}
+		return false
 	default:
 		return Assignable(reg, arg, pattern)
 	}
+}
+
+// recordType returns t as a record — the record itself, or the underlying
+// record of a nominal type — or nil when t is neither. It looks through a
+// nominal type's body once per level, guarding a self-referential definition.
+func recordType(t ir.Type) *ir.Record {
+	seen := map[*ir.TypeDef]bool{}
+	for {
+		switch x := t.(type) {
+		case *ir.Record:
+			return x
+		case *ir.Named:
+			if x.Def == nil || x.Def.Body == nil || seen[x.Def] {
+				return nil
+			}
+			seen[x.Def] = true
+			t = x.Def.Body
+		default:
+			return nil
+		}
+	}
+}
+
+// hasFreeVar reports whether t still contains a type variable not yet bound in
+// subst — the part Match could still solve. It guides a union pattern to try its
+// solvable members before its concrete ones.
+func hasFreeVar(t ir.Type, subst map[string]ir.Type) bool {
+	switch t := t.(type) {
+	case *ir.TypeVar:
+		_, bound := subst[t.Name]
+		return !bound
+	case *ir.App:
+		for _, a := range t.Args {
+			if hasFreeVar(a, subst) {
+				return true
+			}
+		}
+	case *ir.Func:
+		for _, p := range t.Params {
+			if hasFreeVar(p, subst) {
+				return true
+			}
+		}
+		return hasFreeVar(t.Result, subst)
+	case *ir.Union:
+		for _, m := range t.Members {
+			if hasFreeVar(m, subst) {
+				return true
+			}
+		}
+	case *ir.Record:
+		for _, f := range t.Fields {
+			if hasFreeVar(f.Type, subst) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // Satisfies reports whether the concrete type typ satisfies the interface bound

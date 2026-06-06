@@ -210,6 +210,86 @@ func TestGenericFuncOverloadUninferable(t *testing.T) {
 	}
 }
 
+// TestGenericFuncOverloadCrossArgumentConsistency checks that when an overload
+// set selects a generic candidate, a single type parameter bound to different
+// concrete types by two arguments is reported — exactly as the single-signature
+// path reports it. The overloaded path must not let arg 0 (T = int) and arg 1
+// (T = string) disagree silently.
+func TestGenericFuncOverloadCrossArgumentConsistency(t *testing.T) {
+	// The single-signature baseline correctly reports the mismatch.
+	base := "pub fn pair<T>(a: T, b: T): T { return a }\n" +
+		"const R = pair(7, \"x\")\n"
+	if _, diags := analyze(base); !hasCode(diags, CodeTypeMismatch) {
+		t.Fatalf("single-signature baseline: want type_mismatch for pair(7, \"x\"), got %v", codes(diags))
+	}
+
+	// The overloaded form must report it too, not accept the ill-typed call.
+	src := "pub fn wrap(s: string): string { return s }\n" +
+		"pub fn wrap<T>(a: T, b: T): T { return a }\n" +
+		"const R = wrap(7, \"x\")\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeTypeMismatch) {
+		t.Fatalf("overloaded path: want type_mismatch for wrap(7, \"x\"), got %v", codes(diags))
+	}
+}
+
+// TestGenericFuncOverloadBoundCheckOrderIndependent checks the overloaded
+// generic path does not depend on argument order: a bounded generic overload
+// selected with a Bag (which satisfies the bound) and a bad int (which neither
+// matches T = Bag nor satisfies the bound) is reported whichever way the two
+// arguments are written. Before the fix, Bag first solved T = Bag and silently
+// dropped the inconsistent int, while int first solved T = int and reported the
+// bound — the result depended on order. B is a clean Bag value (a conversion,
+// so the value itself carries no diagnostic).
+func TestGenericFuncOverloadBoundCheckOrderIndependent(t *testing.T) {
+	prelude := genericFoldableSrc +
+		"pub fn pair(s: string): int { return 0 }\n" +
+		"pub fn pair<T: foldable<int, int>>(a: T, b: T): int { return 0 }\n" +
+		"const B = Bag([1, 2, 3])\n"
+
+	good := prelude + "const X = pair(B, 1)\n"
+	if _, diags := analyze(good); !hasCode(diags, CodeTypeMismatch) && !hasCode(diags, CodeBoundNotSatisfied) {
+		t.Fatalf("pair(B, 1): want a diagnostic (Bag/int disagree), got %v", codes(diags))
+	}
+
+	rev := prelude + "const Y = pair(1, B)\n"
+	if _, diags := analyze(rev); !hasCode(diags, CodeTypeMismatch) && !hasCode(diags, CodeBoundNotSatisfied) {
+		t.Fatalf("pair(1, B): want a diagnostic (int/Bag disagree), got %v", codes(diags))
+	}
+}
+
+// TestGenericFuncSolvesThroughUnionParam checks a type parameter nested inside a
+// union parameter (T | error — the central unwrap use-case) is solved from the
+// argument and substituted into the result.
+func TestGenericFuncSolvesThroughUnionParam(t *testing.T) {
+	src := "pub fn unwrap<T>(x: T | error): T { return x }\n" +
+		"const R = unwrap(1)\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("unwrap(1) should solve T = int; got %v", codes(diags))
+	}
+	r := constOf(m, "R")
+	if r == nil || r.Type.String() != "int" {
+		t.Fatalf("R type = %v, want int (T solved through the union)", r)
+	}
+}
+
+// TestGenericFuncSolvesThroughRecordParam checks a type parameter nested inside
+// a record parameter ({ v: T }) is solved from the argument's same-named field.
+func TestGenericFuncSolvesThroughRecordParam(t *testing.T) {
+	src := "pub type Box = { v: int }\n" +
+		"pub fn first<T>(p: { v: T }): T { return p.v }\n" +
+		"const R = first(Box{ v: 1 })\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("first(Box{ v: 1 }) should solve T = int; got %v", codes(diags))
+	}
+	r := constOf(m, "R")
+	if r == nil || r.Type.String() != "int" {
+		t.Fatalf("R type = %v, want int (T solved through the record field)", r)
+	}
+}
+
 // funcOf returns the resolved function of the given name in the module, or nil.
 func funcOf(m *ir.Module, name string) *ir.Function {
 	for _, f := range m.Funcs {

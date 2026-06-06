@@ -284,6 +284,7 @@ type report struct {
 	boundsNotSatisfied []string // rendered "typ -> bound"
 	uninferableTypeVar []string // type-parameter names
 	unboundedMethods   []string // method names called on an unbounded type var
+	noMatchingFunc     []string // function names with no matching overload
 }
 
 func (r *report) sink() *Sink {
@@ -310,6 +311,9 @@ func (r *report) sink() *Sink {
 		},
 		NoMethodOnUnboundedTypeVar: func(_ ast.Node, method string) {
 			r.unboundedMethods = append(r.unboundedMethods, method)
+		},
+		NoMatchingFuncOverload: func(_ *ast.CallExpr, name, _ string) {
+			r.noMatchingFunc = append(r.noMatchingFunc, name)
 		},
 	}
 }
