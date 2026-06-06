@@ -63,6 +63,25 @@ type EnumMemberResolver interface {
 	EnumMember(def *ir.TypeDef, name string) ir.Value
 }
 
+// MatchBinder is the optional capability a body binder advertises to lower a
+// match arm: it resolves the arm's member type expression and binds the arm's
+// binding name to that (narrowed) type for the arm body. The lower package has
+// no type resolver of its own, so the semantic layer supplies this when it
+// constructs a body binder — the same way it supplies the let and enum
+// capabilities. A binder without it lowers an arm body in which the binding stays
+// unresolved (a context that has no narrowing scope, e.g. a const initializer,
+// which never carries a match).
+type MatchBinder interface {
+	// ArmType resolves a match arm's member type expression to its resolved type,
+	// or ir.Invalid when it names no type. It is the resolver's universe lookup,
+	// the same path an annotation takes.
+	ArmType(t ast.TypeExpr) ir.Type
+	// NarrowLocal records the arm's binding name at the narrowed arm type on top
+	// of this binder's scope and returns the extended binder, so a reference to
+	// the binding inside the arm body lowers to an ir.LocalRef of that type.
+	NarrowLocal(name string, typ ir.Type) Binder
+}
+
 // Value lowers an expression to its resolved IR value. The shared forms are
 // lowered here; the context-specific leaves go through b.Leaf.
 func Value(e ast.Expr, b Binder) ir.Value {
@@ -164,6 +183,8 @@ func Body(body []ast.Stmt, b Binder) []ir.Stmt {
 			stmts = append(stmts, assignStmt(s, b))
 		case *ast.SwitchStmt:
 			stmts = append(stmts, switchStmt(s, b))
+		case *ast.MatchStmt:
+			stmts = append(stmts, matchStmt(s, b))
 		case *ast.IfStmt:
 			stmts = append(stmts, ifStmt(s, b))
 		default:
@@ -232,6 +253,39 @@ func switchStmt(s *ast.SwitchStmt, b Binder) *ir.Switch {
 		}
 	}
 	return sw
+}
+
+// matchStmt lowers a match statement: its scrutinee, each arm's resolved member
+// type, its narrowed binding, and its body, and the wildcard Else body. The arm
+// body is lowered with the binding bound to the narrowed arm type (through the
+// binder's MatchBinder capability), so a reference to it inside the body lowers
+// to an ir.LocalRef the type checker has narrowed. A binder without that
+// capability (no narrowing scope) lowers the arm body unchanged, leaving the
+// binding unresolved — a context that never carries a match in practice.
+func matchStmt(s *ast.MatchStmt, b Binder) *ir.Match {
+	m := &ir.Match{Scrutinee: Value(s.Scrutinee, b)}
+	mb, hasNarrow := b.(MatchBinder)
+	for _, arm := range s.Arms {
+		armType := ir.Invalid
+		armBinder := b
+		if hasNarrow {
+			armType = mb.ArmType(arm.Type)
+			if arm.Bind != "" {
+				armBinder = mb.NarrowLocal(arm.Bind, armType)
+			}
+		}
+		m.Arms = append(m.Arms, ir.MatchArm{Type: armType, Name: arm.Bind, Body: Body(arm.Body, armBinder)})
+	}
+	if s.Else != nil {
+		// An empty wildcard body still distinguishes a match with a catch-all
+		// from one without, so the Else slice is non-nil even when empty.
+		if body := Body(s.Else, b); body != nil {
+			m.Else = body
+		} else {
+			m.Else = []ir.Stmt{}
+		}
+	}
+	return m
 }
 
 // expectingEnum wraps a Binder so a bare identifier that names a member of def

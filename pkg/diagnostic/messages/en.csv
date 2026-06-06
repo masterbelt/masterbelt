@@ -67,6 +67,9 @@ masterbelt.semantic.non_exhaustive_switch,switch on {typ} is not exhaustive: {mi
 masterbelt.semantic.duplicate_switch_arm,duplicate switch arm for {value}
 masterbelt.semantic.arm_value_type_mismatch,cannot use {actual} as a {expected} switch value
 masterbelt.semantic.unreachable_arm,unreachable arm: a previous arm or the wildcard already matches every value
+masterbelt.semantic.non_exhaustive_match,match on {typ} is not exhaustive: {missing}
+masterbelt.semantic.arm_type_not_in_union,{arm} is not a member of {typ}
+masterbelt.semantic.duplicate_match_arm,duplicate match arm for {arm}
 masterbelt.semantic.condition_not_bool,if condition must be a bool; got {typ}
 masterbelt.semantic.ternary_condition_not_bool,ternary condition must be a bool; got {typ}
 masterbelt.semantic.ternary_branch_mismatch,ternary branches have mismatched types: {then} and {els}

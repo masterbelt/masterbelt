@@ -211,6 +211,20 @@ func dumpStmtAt(b *strings.Builder, s Stmt, indent string) {
 				dumpStmtAt(b, bs, indent+"    ")
 			}
 		}
+	case *Match:
+		fmt.Fprintf(b, "%smatch %s\n", indent, dumpValue(s.Scrutinee))
+		for _, arm := range s.Arms {
+			fmt.Fprintf(b, "%s  arm %s\n", indent, dumpMatchPattern(arm))
+			for _, bs := range arm.Body {
+				dumpStmtAt(b, bs, indent+"    ")
+			}
+		}
+		if s.Else != nil {
+			fmt.Fprintf(b, "%s  else\n", indent)
+			for _, bs := range s.Else {
+				dumpStmtAt(b, bs, indent+"    ")
+			}
+		}
 	case *If:
 		dumpIfAt(b, s, indent)
 	default:
@@ -218,6 +232,25 @@ func dumpStmtAt(b *strings.Builder, s Stmt, indent string) {
 		// one panics here rather than dumping as nothing.
 		panic(unhandledStmt(s))
 	}
+}
+
+// dumpMatchPattern renders a resolved match arm's type pattern: its member type
+// and, when present, its narrowed binding name (Coin c, null, int v).
+func dumpMatchPattern(arm MatchArm) string {
+	pat := typeStringOrMissing(arm.Type)
+	if arm.Name != "" {
+		pat += " " + arm.Name
+	}
+	return pat
+}
+
+// typeStringOrMissing renders a resolved type, or "<missing>" for a nil one (an
+// arm whose member type did not resolve), so the dump never panics on a hole.
+func typeStringOrMissing(t Type) string {
+	if t == nil {
+		return "<missing>"
+	}
+	return t.String()
 }
 
 // dumpIfAt renders a resolved if and its else-if chain at the given indent. The
@@ -274,6 +307,23 @@ func dumpStmtInline(s Stmt) string {
 				body[i] = dumpStmtInline(bs)
 			}
 			parts = append(parts, "(arm "+strings.Join(values, ", ")+" "+strings.Join(body, " ")+")")
+		}
+		if s.Else != nil {
+			body := make([]string, len(s.Else))
+			for i, bs := range s.Else {
+				body[i] = dumpStmtInline(bs)
+			}
+			parts = append(parts, "(else "+strings.Join(body, " ")+")")
+		}
+		return "(" + strings.Join(parts, " ") + ")"
+	case *Match:
+		parts := []string{"match " + dumpValue(s.Scrutinee)}
+		for _, arm := range s.Arms {
+			body := make([]string, len(arm.Body))
+			for i, bs := range arm.Body {
+				body[i] = dumpStmtInline(bs)
+			}
+			parts = append(parts, "(arm "+dumpMatchPattern(arm)+" "+strings.Join(body, " ")+")")
 		}
 		if s.Else != nil {
 			body := make([]string, len(s.Else))

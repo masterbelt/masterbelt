@@ -16,6 +16,7 @@ func StmtKinds() []Stmt {
 		&Let{},
 		&Assign{},
 		&Switch{},
+		&Match{},
 		&If{},
 	}
 }

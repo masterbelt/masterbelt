@@ -150,6 +150,17 @@ func checkIndexWritesIn(body []ast.Stmt, locals map[string]*ir.Constant, env eva
 			for _, arm := range s.AfterElse {
 				checkIndexWritesIn(arm.Body, copyLocals(locals), env, at, diags)
 			}
+		case *ast.MatchStmt:
+			// A match arm's narrowed binding is not a foldable list constant the
+			// write check tracks, so the arm bodies are walked with a copy of the
+			// locals exactly as a switch's arms are.
+			for _, arm := range s.Arms {
+				checkIndexWritesIn(arm.Body, copyLocals(locals), env, at, diags)
+			}
+			checkIndexWritesIn(s.Else, copyLocals(locals), env, at, diags)
+			for _, arm := range s.AfterElse {
+				checkIndexWritesIn(arm.Body, copyLocals(locals), env, at, diags)
+			}
 		case *ast.ReturnStmt, *ast.ExprStmt:
 			// Neither binds or reassigns a local, so neither can carry an index
 			// write or change which list a later write targets: nothing to do.
@@ -371,6 +382,28 @@ func checkStmts(stmts []ast.Stmt, want ir.Type, bs infer.BodyScope, env eval.Env
 			// though they can never run.
 			for _, arm := range stmt.AfterElse {
 				checkStmts(arm.Body, want, bs, env, noSelf, sink, at, diags)
+			}
+		case *ast.MatchStmt:
+			if noSelf != nil && stmt.Scrutinee != nil {
+				checkNoSelf(stmt.Scrutinee, noSelf)
+			}
+			// A nil diagnostic list suppresses the match diagnostics (the
+			// func-literal-types walk wants only the checking sink); the body
+			// walk still reaches every nested statement.
+			if diags != nil {
+				checkMatch(stmt, bs, at, diags)
+			}
+			// Each arm body is checked in the scope where its binding is narrowed
+			// to the arm's member type, so a reference to the binding resolves at
+			// the narrowed type.
+			for _, arm := range stmt.Arms {
+				checkStmts(arm.Body, want, armNarrowedScope(bs, arm), env, noSelf, sink, at, diags)
+			}
+			checkStmts(stmt.Else, want, bs, env, noSelf, sink, at, diags)
+			// Unreachable arms still type-check, so their own errors surface even
+			// though they can never run.
+			for _, arm := range stmt.AfterElse {
+				checkStmts(arm.Body, want, armNarrowedScope(bs, arm), env, noSelf, sink, at, diags)
 			}
 		case *ast.IfStmt:
 			checkIf(stmt, want, bs, env, noSelf, sink, at, diags)

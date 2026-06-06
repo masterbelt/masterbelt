@@ -1547,6 +1547,15 @@ func evalBody(body []ast.Stmt, ctx evalCtx) *ir.Constant {
 			// unfoldable scrutinee/pattern, or no arm matched) leaves v nil,
 			// which stops folding here.
 			return v
+		case *ast.MatchStmt:
+			v, out := evalMatch(stmt, ctx)
+			if out == matchFellThrough {
+				continue // the selected arm ran without returning; carry on
+			}
+			// matchReturned yields the arm's value; matchUnknown (an unfoldable
+			// scrutinee, an undecidable arm, or no arm matched) leaves v nil,
+			// which stops folding here.
+			return v
 		case *ast.IfStmt:
 			v, out := evalIf(stmt, ctx)
 			if out == ifFellThrough {
@@ -1779,6 +1788,16 @@ func branchOutcome(body []ast.Stmt, ctx evalCtx) (*ir.Constant, ifOutcome) {
 			default:
 				return nil, ifUnknown
 			}
+		case *ast.MatchStmt:
+			v, mout := evalMatch(stmt, ctx)
+			switch mout {
+			case matchFellThrough:
+				continue
+			case matchReturned:
+				return v, ifReturned
+			default:
+				return nil, ifUnknown
+			}
 		case *ast.IfStmt:
 			v, out := evalIf(stmt, ctx)
 			if out == ifFellThrough {
@@ -1862,6 +1881,150 @@ func expectingScrutinee(ctx evalCtx, scrut *ir.Constant) evalCtx {
 		ctx.expected = scrut.EnumDef
 	}
 	return ctx
+}
+
+// matchOutcome mirrors switchOutcome for a match: the same three cases the body
+// walk threads to decide whether to continue past the statement or stop.
+type matchOutcome int
+
+const (
+	matchUnknown     matchOutcome = iota // scrutinee unfoldable, arm undecidable, or no arm matched
+	matchReturned                        // the selected arm returned a value
+	matchFellThrough                     // the selected arm ran to its end without returning
+)
+
+// evalMatch selects and runs the matching arm of a match: it folds the
+// scrutinee, finds the first arm whose member type the scrutinee's value is, and
+// runs that arm's body with the arm's binding bound to the scrutinee value (the
+// narrowing). It classifies how the selected arm ended (matchReturned /
+// matchFellThrough) like a switch.
+//
+// Soundness over completeness: the dispatch folds only when it is fully
+// determined. A scrutinee that does not fold, or an arm whose match against the
+// scrutinee's value cannot be decided syntactically (a nominal record value,
+// which carries no member tag), leaves the result matchUnknown rather than
+// guessing an arm — the same discipline the switch and index folders use. The
+// arm types are read through the Env's ReceiverTyper (a universe lookup), so the
+// value query stays independent of the type query.
+func evalMatch(m *ast.MatchStmt, ctx evalCtx) (*ir.Constant, matchOutcome) {
+	scrut := evalExpr(m.Scrutinee, ctx)
+	if scrut == nil {
+		return nil, matchUnknown
+	}
+	for _, arm := range m.Arms {
+		matched, certain := constMatchesArm(ctx, scrut, arm.Type)
+		if !certain {
+			return nil, matchUnknown // an undecidable arm: cannot dispatch soundly
+		}
+		if matched {
+			return matchArmOutcome(branchOutcome(arm.Body, narrowMatchBinding(ctx, arm.Bind, scrut)))
+		}
+	}
+	if m.Else != nil {
+		return matchArmOutcome(branchOutcome(m.Else, ctx))
+	}
+	return nil, matchUnknown
+}
+
+// matchArmOutcome translates an arm body's ifOutcome — branchOutcome is the
+// shared block runner — into the match's own outcome, exactly as
+// switchArmOutcome does for a switch.
+func matchArmOutcome(v *ir.Constant, out ifOutcome) (*ir.Constant, matchOutcome) {
+	switch out {
+	case ifReturned:
+		return v, matchReturned
+	case ifFellThrough:
+		return nil, matchFellThrough
+	default:
+		return nil, matchUnknown
+	}
+}
+
+// narrowMatchBinding binds a match arm's binding name to the scrutinee value for
+// the arm body, so a reference to it folds. The narrowed value is the scrutinee
+// itself (narrowing changes the static type, not the runtime value). A nameless
+// arm binds nothing. The locals map is copied so the binding reaches only this
+// arm body, not a sibling arm or the enclosing block.
+func narrowMatchBinding(ctx evalCtx, name string, scrut *ir.Constant) evalCtx {
+	if name == "" {
+		return ctx
+	}
+	locals := make(map[string]*ir.Constant, len(ctx.locals)+1)
+	for k, v := range ctx.locals {
+		locals[k] = v
+	}
+	locals[name] = scrut
+	ctx.locals = locals
+	return ctx
+}
+
+// constMatchesArm reports whether a folded scrutinee value is of a match arm's
+// member type, and whether that could be decided at all. The arm type is
+// resolved through the Env's ReceiverTyper (a universe lookup, never the type
+// query); the value's kind is then tested against it:
+//
+//   - an enum value matches the arm's enum definition by identity;
+//   - a scalar value (int/bool/string/datetime/duration/error) matches a builtin
+//     or nominal-over-primitive arm type whose underlying primitive backs that
+//     kind; and
+//   - a nominal record value carries no member tag, so a record arm type is
+//     undecidable — the second result is false and the match does not fold.
+//
+// A nil or unresolvable arm type is undecidable too. Returning (false, false)
+// keeps the fold from ever choosing the wrong arm.
+func constMatchesArm(ctx evalCtx, scrut *ir.Constant, armType ast.TypeExpr) (matched, certain bool) {
+	t := annotationType(ctx.env, armType)
+	if t == nil {
+		return false, false // no type channel, or an unresolvable arm type
+	}
+	switch t := t.(type) {
+	case *ir.Builtin:
+		return scalarMatchesBuiltin(ctx.env.Registry(), scrut, t.Name), true
+	case *ir.Named:
+		if t.Def == nil {
+			return false, false
+		}
+		if t.Def.Enum != nil {
+			return scrut.Kind == ir.ConstEnum && scrut.EnumDef == t.Def, true
+		}
+		// A nominal type over a primitive (a refinement type) matches by the
+		// underlying kind; a nominal record carries no tag, so it is undecidable.
+		if underlyingPrimitive(ctx.env.Registry(), t.Def, map[*ir.TypeDef]bool{}) != nil {
+			return defBacksKind(ctx.env.Registry(), t.Def, scrut.Kind), true
+		}
+		return false, false
+	default:
+		// A record, function, union, or collection arm type carries no value tag
+		// the fold can test (a record value's nominal identity is unknown), so the
+		// dispatch is left undetermined.
+		return false, false
+	}
+}
+
+// scalarMatchesBuiltin reports whether a folded value is of the builtin type
+// named name — the scalar kinds keyed on the registry's native classification,
+// so a new primitive added to the registry is matched without a hardcoded list.
+func scalarMatchesBuiltin(reg *builtin.Registry, scrut *ir.Constant, name string) bool {
+	n, ok := reg.Native(name)
+	if !ok {
+		return false
+	}
+	switch scrut.Kind {
+	case ir.ConstInt:
+		return n.IsInteger()
+	case ir.ConstBool:
+		return n.Bool
+	case ir.ConstString:
+		return n.Str
+	case ir.ConstDatetime:
+		return n.Datetime
+	case ir.ConstDuration:
+		return n.Duration
+	case ir.ConstError:
+		return n.Err
+	default:
+		return false
+	}
 }
 
 // constEqual reports whether two folded constants are structurally equal — the

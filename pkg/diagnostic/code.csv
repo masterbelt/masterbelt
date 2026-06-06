@@ -67,6 +67,9 @@ masterbelt.semantic.non_exhaustive_switch,error,typ:string missing:string
 masterbelt.semantic.duplicate_switch_arm,error,value:string
 masterbelt.semantic.arm_value_type_mismatch,error,actual:string expected:string
 masterbelt.semantic.unreachable_arm,error,
+masterbelt.semantic.non_exhaustive_match,error,typ:string missing:string
+masterbelt.semantic.arm_type_not_in_union,error,arm:string typ:string
+masterbelt.semantic.duplicate_match_arm,error,arm:string
 masterbelt.semantic.condition_not_bool,error,typ:string
 masterbelt.semantic.ternary_condition_not_bool,error,typ:string
 masterbelt.semantic.ternary_branch_mismatch,error,then:string els:string
