@@ -50,9 +50,12 @@ pub type Level = int8 impl {
   pub increment(): self {
     return self + 1
   }
-  /// This level a number of steps up.
+  /// This level a number of steps up. The base value lifts into the nominal
+  /// type through the conversion: a Level derives int8's operators, but their
+  /// self-typed operands stay nominal, so mixing in a bare int8 is a type
+  /// error — Level(steps) is the explicit lift.
   pub plus(steps: int8): self {
-    return self + steps
+    return self + Level(steps)
   }
 }
 

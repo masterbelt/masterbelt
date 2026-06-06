@@ -55,10 +55,13 @@ Module
       result self
       return self.add(IntLiteral "1")
     method "plus" pub
-      doc "This level a number of steps up."
+      doc "This level a number of steps up. The base value lifts into the nominal"
+      doc "type through the conversion: a Level derives int8's operators, but their"
+      doc "self-typed operands stay nominal, so mixing in a bare int8 is a type"
+      doc "error — Level(steps) is the explicit lift."
       param steps: int8
       result self
-      return self.add(ParamRef "steps")
+      return self.add(Level(ParamRef "steps"))
   TypeDef "Character" pub
     doc "A character with a level field."
     body { lv: Level }
