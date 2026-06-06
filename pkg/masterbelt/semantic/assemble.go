@@ -105,6 +105,10 @@ func exprSink(at func(ast.Node) span, diags *diagnostic.List) *infer.Sink {
 			s := at(node)
 			diags.Add(newNoMethodOnUnboundedTypevarDiagnostic(s.offset, s.width, method))
 		},
+		MapKeyNotComparable: func(lit *ast.CollectionLit, key, bound ir.Type) {
+			s := at(lit)
+			diags.Add(newBoundNotSatisfiedDiagnostic(s.offset, s.width, key.String(), bound.String()))
+		},
 	}
 }
 
@@ -163,9 +167,11 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 		annType := ir.Invalid
 		if decl.Type != nil {
 			r := &infer.TypeResolver{
-				Defs:      q.universe(fileID),
-				Qualified: qualifiedFrom(q, q.importsOf(fileID)),
-				Report:    typeNameReporter(fileID, q, at, diags),
+				Defs:           q.universe(fileID),
+				Qualified:      qualifiedFrom(q, q.importsOf(fileID)),
+				Report:         typeNameReporter(fileID, q, at, diags),
+				Registry:       reg,
+				BoundViolation: boundViolationReporter(at, diags),
 			}
 			annType = r.ResolveType(decl.Type, nil)
 		}

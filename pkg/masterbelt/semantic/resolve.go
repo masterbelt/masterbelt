@@ -28,6 +28,21 @@ func unknownTypeReporter(at func(ast.Node) span, diags *diagnostic.List) func(as
 	}
 }
 
+// boundViolationReporter builds the callback the type resolver reports a
+// type-application bound violation through, anchoring the diagnostic at the
+// offending argument and naming the argument's type and the unsatisfied bound.
+// It returns nil when there is nowhere to report (the prelude, a memoized
+// resolution), so the resolver leaves the check off.
+func boundViolationReporter(at func(ast.Node) span, diags *diagnostic.List) func(ast.TypeExpr, ir.Type, *ir.TypeParam) {
+	if at == nil || diags == nil {
+		return nil
+	}
+	return func(arg ast.TypeExpr, argType ir.Type, param *ir.TypeParam) {
+		s := at(arg)
+		diags.Add(newBoundNotSatisfiedDiagnostic(s.offset, s.width, argType.String(), param.Bound.String()))
+	}
+}
+
 // resolveTypes resolves the file's type declarations into ir.TypeDefs, in source
 // order. A type reference resolves against the other declarations in the file
 // (so a declaration may refer to a type defined later in the file), extern —
@@ -94,7 +109,13 @@ func resolveTypes(env eval.Env, file *ast.File, at func(ast.Node) span, diags *d
 
 	// Second pass: resolve parameters, body, method signatures, enum bodies, and
 	// interface members, reporting any unknown type names.
-	r := &infer.TypeResolver{Defs: defs, Qualified: qualified, Report: unknownTypeReporter(at, diags)}
+	r := &infer.TypeResolver{
+		Defs:           defs,
+		Qualified:      qualified,
+		Report:         unknownTypeReporter(at, diags),
+		Registry:       reg,
+		BoundViolation: boundViolationReporter(at, diags),
+	}
 	for i, id := range file.Interfaces {
 		resolveInterfaceDecl(r, reg, id, ifaceOut[i], fns)
 	}
@@ -112,10 +133,17 @@ func resolveTypes(env eval.Env, file *ast.File, at func(ast.Node) span, diags *d
 	// impl list). The interface applications are resolved against the same
 	// universe the bodies were.
 	for i, td := range file.Types {
-		resolveImpls(r, td.Impls, out[i], at, diags)
+		resolveImpls(r, reg, td.Impls, out[i], at, diags)
 	}
 	for i, ed := range file.Enums {
-		resolveImpls(r, ed.Impls, enumOut[i], at, diags)
+		resolveImpls(r, reg, ed.Impls, enumOut[i], at, diags)
+		// Every enum is comparable and orderable: it carries the six comparison
+		// methods (equality by index, order by base value), so it opts into both
+		// contracts automatically — a generic bound of either is satisfied by an
+		// enum, and the hover impl list shows them. The author may also write the
+		// tag; addEnumContracts skips a contract already present so it is not
+		// duplicated.
+		addEnumContracts(r, enumOut[i])
 	}
 
 	out = append(out, enumOut...)
@@ -213,7 +241,7 @@ func resolveInterfaceMember(r *infer.TypeResolver, reg *builtin.Registry, self i
 // method of the interface itself (missing_required_method). The orphan rule is
 // satisfied structurally: a type's impl list is reachable only at its own
 // definition site, so any impl recorded here is non-orphan by construction.
-func resolveImpls(r *infer.TypeResolver, impls []ast.TypeExpr, def *ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List) {
+func resolveImpls(r *infer.TypeResolver, reg *builtin.Registry, impls []ast.TypeExpr, def *ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List) {
 	scope := make(map[string]bool, len(def.Params))
 	for _, p := range def.Params {
 		scope[p.Name] = true
@@ -235,15 +263,53 @@ func resolveImpls(r *infer.TypeResolver, impls []ast.TypeExpr, def *ir.TypeDef, 
 		if at == nil || diags == nil {
 			continue
 		}
-		// Conformance: every required method must be declared directly on the
-		// type. Provided methods need not be — the interface supplies them.
+		// Conformance: every required method must be supplied by the type — its
+		// own declaration, or one derived from its underlying type. A nominal
+		// type (type Level = int impl comparable {}) inherits its base's
+		// comparison methods, so an empty impl tag opts it in. Provided methods
+		// need not be supplied — the interface itself carries them.
 		for _, name := range idef.Interface.Required {
-			if !declaresMethod(def, name) {
+			if !suppliesMethod(reg, def, name, map[*ir.TypeDef]bool{}) {
 				s := at(impl)
 				diags.Add(newMissingRequiredMethodDiagnostic(s.offset, s.width, def.Name, idef.Name, name))
 			}
 		}
 	}
+}
+
+// enumContractNames are the operator contracts every enum opts into: an enum
+// carries equality (comparable) and a total order (orderable) by construction.
+var enumContractNames = []string{"comparable", "orderable"}
+
+// addEnumContracts records comparable and orderable on an enum's Impls — the
+// automatic opt-in every enum has from its six comparison methods. A contract
+// the enum already lists (the author wrote the tag) is left alone, so it is
+// never duplicated, and a contract name that does not resolve to an interface
+// (a degraded universe where the prelude failed to load) is skipped rather than
+// recorded as a non-interface. The impls are the bare interface (a Named), the
+// no-argument form the conformance and Satisfies checks expect.
+func addEnumContracts(r *infer.TypeResolver, def *ir.TypeDef) {
+	for _, name := range enumContractNames {
+		if enumDeclaresContract(def, name) {
+			continue
+		}
+		t := r.ResolveName(name, nil)
+		if interfaceDefOf(t) == nil {
+			continue
+		}
+		def.Impls = append(def.Impls, t)
+	}
+}
+
+// enumDeclaresContract reports whether the enum's impls already name the
+// interface, so the automatic opt-in does not duplicate an author-written tag.
+func enumDeclaresContract(def *ir.TypeDef, name string) bool {
+	for _, impl := range def.Impls {
+		if idef := interfaceDefOf(impl); idef != nil && idef.Name == name {
+			return true
+		}
+	}
+	return false
 }
 
 // interfaceDefOf returns the interface definition an impl tag resolved to, or
@@ -263,16 +329,52 @@ func interfaceDefOf(t ir.Type) *ir.TypeDef {
 	return nil
 }
 
-// declaresMethod reports whether the definition declares a method of the given
-// name directly (not through an interface or an underlying type) — what
-// conformance demands for a required method.
-func declaresMethod(def *ir.TypeDef, name string) bool {
+// suppliesMethod reports whether the definition supplies a method of the given
+// name — declared directly, or derived from its underlying type — which is what
+// conformance demands for a required method. Walking the underlying type lets a
+// nominal type satisfy an interface through its base's methods (type Level = int
+// impl comparable {} inherits int's eql/neq), so the empty impl tag opts the
+// type in. An interface the type itself opts into is deliberately not consulted:
+// the interface being checked must not satisfy its own requirement, and another
+// interface's provided default is not a real implementation either. The seen set
+// guards a cyclic definition.
+func suppliesMethod(reg *builtin.Registry, def *ir.TypeDef, name string, seen map[*ir.TypeDef]bool) bool {
+	if def == nil || seen[def] {
+		return false
+	}
+	seen[def] = true
 	for _, m := range def.Methods {
 		if m.Name == name {
 			return true
 		}
 	}
+	// A primitive's body is itself; only a nominal type has a distinct
+	// underlying definition to inherit from.
+	if def.Builtin {
+		return false
+	}
+	if ud := bodyDef(reg, def.Body); ud != nil {
+		return suppliesMethod(reg, ud, name, seen)
+	}
 	return false
+}
+
+// bodyDef returns the type definition an underlying-type reference resolves to:
+// the registry definition for a builtin, the referent for a named or applied
+// type. It mirrors the type algebra's defOf for the kinds an underlying body
+// takes, without reaching across to that package's unexported helper.
+func bodyDef(reg *builtin.Registry, t ir.Type) *ir.TypeDef {
+	switch t := t.(type) {
+	case *ir.Builtin:
+		if d, ok := reg.Lookup(t.Name); ok {
+			return d
+		}
+	case *ir.Named:
+		return t.Def
+	case *ir.App:
+		return t.Def
+	}
+	return nil
 }
 
 // resolveDecl fills in def from the declaration: its generic parameters (whose
@@ -770,7 +872,13 @@ func resolveFuncs(file *ast.File, at func(ast.Node) span, diags *diagnostic.List
 	if len(file.Funcs) == 0 {
 		return nil
 	}
-	r := &infer.TypeResolver{Defs: universe, Qualified: qualified, Report: unknownTypeReporter(at, diags)}
+	r := &infer.TypeResolver{
+		Defs:           universe,
+		Qualified:      qualified,
+		Report:         unknownTypeReporter(at, diags),
+		Registry:       reg,
+		BoundViolation: boundViolationReporter(at, diags),
+	}
 	fns := bodyFuncs{local: funcShellsByName(file, shells), qualified: qualifiedFuncs, shells: shells}
 	out := make([]*ir.Function, 0, len(file.Funcs))
 	seen := make(map[string]bool, len(file.Funcs))

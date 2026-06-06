@@ -5,6 +5,8 @@ Module
     member "Common" = 0
     member "Rare" = 1
     member "Legend" = 2
+    impl comparable
+    impl orderable
     method "eql" pub extern
       param other: self
       result bool

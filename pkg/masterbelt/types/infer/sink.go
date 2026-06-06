@@ -90,6 +90,12 @@ type Sink struct {
 	// unbounded type parameter: nothing is known about the type, so it has no
 	// methods — only pass-through (receive, store, return) is allowed.
 	NoMethodOnUnboundedTypeVar func(node ast.Node, method string)
+	// MapKeyNotComparable fires at a map literal whose inferred key type does not
+	// satisfy map's K: comparable bound — a key the language cannot compare
+	// (an anonymous record). The annotation path catches the same violation
+	// through the type resolver; this is the inferred-literal twin, anchored at
+	// the literal so a map written without an annotation is still diagnosed.
+	MapKeyNotComparable func(lit *ast.CollectionLit, key, bound ir.Type)
 }
 
 func (s *Sink) invalidOp(node ast.Node, method, operands string) {
@@ -221,5 +227,11 @@ func (s *Sink) uninferableTypeParam(call *ast.CallExpr, name string) {
 func (s *Sink) noMethodOnUnboundedTypeVar(node ast.Node, method string) {
 	if s != nil && s.NoMethodOnUnboundedTypeVar != nil {
 		s.NoMethodOnUnboundedTypeVar(node, method)
+	}
+}
+
+func (s *Sink) mapKeyNotComparable(lit *ast.CollectionLit, key, bound ir.Type) {
+	if s != nil && s.MapKeyNotComparable != nil {
+		s.MapKeyNotComparable(lit, key, bound)
 	}
 }

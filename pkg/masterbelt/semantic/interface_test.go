@@ -72,10 +72,12 @@ func TestConformingImplOK(t *testing.T) {
 }
 
 // TestMissingRequiredMethod checks that a type that impls an interface but does
-// not declare its required method is reported.
+// not supply its required method — neither directly nor through its underlying
+// type — is reported. The base (nint) has no fold, and Box declares only an
+// unrelated method, so foldable's required fold is genuinely missing.
 func TestMissingRequiredMethod(t *testing.T) {
 	src := foldableSrc +
-		"pub type Bag<T> = list<T> impl foldable<nint, T> {\n" +
+		"pub type Box = nint impl foldable<nint, nint> {\n" +
 		"  pub size(): nint {\n" +
 		"    return 0\n" +
 		"  }\n" +
@@ -83,6 +85,24 @@ func TestMissingRequiredMethod(t *testing.T) {
 	_, diags := analyze(src)
 	if !hasCode(diags, CodeMissingRequiredMethod) {
 		t.Fatalf("want missing_required_method, got %v", codes(diags))
+	}
+}
+
+// TestDerivedRequiredMethodConforms checks that a nominal type satisfies an
+// interface through a required method derived from its underlying type — the
+// conformance check counts the whole method face, not only direct declarations.
+// Bag<T> = list<T> inherits list's fold, so re-impl'ing foldable conforms even
+// without redeclaring fold.
+func TestDerivedRequiredMethodConforms(t *testing.T) {
+	src := foldableSrc +
+		"pub type Bag<T> = list<T> impl foldable<nint, T> {\n" +
+		"  pub size(): nint {\n" +
+		"    return 0\n" +
+		"  }\n" +
+		"}\n"
+	_, diags := analyze(src)
+	if hasCode(diags, CodeMissingRequiredMethod) {
+		t.Fatalf("Bag inherits list's fold; want no missing_required_method, got %v", codes(diags))
 	}
 }
 
