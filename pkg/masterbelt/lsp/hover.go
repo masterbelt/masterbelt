@@ -228,6 +228,15 @@ func typeHover(t *ir.TypeDef, buf source.Buffer, rng cst.Tree) *protocol.Hover {
 		case t.Body != nil:
 			b.WriteString(" = " + t.Body.String())
 		}
+	} else if len(t.Interface.Parents) > 0 {
+		// A child interface shows its supertraits right on the signature, in the
+		// declaration's own form (interface orderable: comparable), so the card
+		// reads like the source.
+		parents := make([]string, len(t.Interface.Parents))
+		for i, p := range t.Interface.Parents {
+			parents[i] = p.String()
+		}
+		b.WriteString(": " + strings.Join(parents, ", "))
 	}
 	if t.Where != nil {
 		// The refinement predicate in its canonical surface form — the values
