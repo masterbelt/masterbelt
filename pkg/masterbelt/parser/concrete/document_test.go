@@ -431,6 +431,10 @@ func TestDocumentFuzz(t *testing.T) {
 		// next to the head contexts (if/switch) so the lambda noRecordLit
 		// interaction is exercised by the random walk too.
 		"D2009-03-31T23:59:59.000Z", "3w4d", "5s", "\"s\\n\"", "await ", "fn() -> ",
+		// An interface parent list (the supertraits): the colon-introduced parent
+		// run between the name and the brace, with a bare and an applied parent, so
+		// the random walk reaches parseInterfaceParents and its recovery.
+		"interface I: a, b { f(): nint }", ": foldable<nint, T>",
 	}
 
 	start := "const x = 0\n"

@@ -8,7 +8,8 @@
 //	TypeDecl      := [pub] type Ident [GenericParams] "=" TypeExpr [WhereClause] [ImplBlock]
 //	EnumDecl      := [pub] enum Ident [":" TypeExpr] "{" ( EnumMember ( ("," | NL) EnumMember )* )? "}" [ImplBlock]
 //	EnumMember    := Ident [Initializer]
-//	InterfaceDecl := [pub] interface Ident [GenericParams] "{" ( InterfaceMember ( ("," | NL) InterfaceMember )* )? "}"
+//	InterfaceDecl := [pub] interface Ident [GenericParams] [InterfaceParents] "{" ( InterfaceMember ( ("," | NL) InterfaceMember )* )? "}"
+//	InterfaceParents := ":" TypeName ( "," TypeName )*
 //	InterfaceMember := [pub] Ident [GenericParams] ParamList ":" TypeExpr [Block]
 //	UseDecl       := [pub] use UseTarget from String
 //	AssertDecl    := assert Expr

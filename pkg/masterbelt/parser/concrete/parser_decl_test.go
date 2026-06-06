@@ -229,6 +229,71 @@ func TestParseInterfaceDeclChildren(t *testing.T) {
 	}
 }
 
+// TestParseInterfaceParents checks the parent-interface list: a single parent,
+// several comma-separated parents, and an applied (generic) parent all land as
+// an InterfaceParents node before the members, after the optional generic
+// parameters.
+func TestParseInterfaceParents(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+		want []cst.Kind
+	}{
+		{"single", "interface a: b {\n}\n",
+			[]cst.Kind{cst.InterfaceParents}},
+		{"multiple", "interface a: b, c {\n}\n",
+			[]cst.Kind{cst.InterfaceParents}},
+		{"generic parent", "interface a: foldable<nint, T> {\n}\n",
+			[]cst.Kind{cst.InterfaceParents}},
+		{"after generic params", "interface a<T>: b {\n}\n",
+			[]cst.Kind{cst.GenericParams, cst.InterfaceParents}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			root, diags := Parse([]byte(tc.src))
+			if len(diags) != 0 {
+				t.Fatalf("unexpected diagnostics: %v", diags)
+			}
+			decl := root.Children()[0].(*cst.Node)
+			if decl.Kind() != cst.InterfaceDecl {
+				t.Fatalf("first child kind = %s, want InterfaceDecl", decl.Kind())
+			}
+			got := subNodeKinds(decl)
+			if len(got) != len(tc.want) {
+				t.Fatalf("sub-nodes = %v, want %v", got, tc.want)
+			}
+			for i := range got {
+				if got[i] != tc.want[i] {
+					t.Fatalf("sub-nodes = %v, want %v", got, tc.want)
+				}
+			}
+		})
+	}
+}
+
+// TestParseInterfaceParentsRecovery checks that a colon with no parent after it
+// records a diagnostic and still produces an InterfaceParents node, keeping the
+// parse lossless and the rest of the declaration intact.
+func TestParseInterfaceParentsRecovery(t *testing.T) {
+	root, diags := Parse([]byte("interface a: {\n}\n"))
+	if len(diags) == 0 {
+		t.Fatalf("expected a diagnostic for the missing parent")
+	}
+	decl := root.Children()[0].(*cst.Node)
+	if decl.Kind() != cst.InterfaceDecl {
+		t.Fatalf("first child kind = %s, want InterfaceDecl", decl.Kind())
+	}
+	var parents *cst.Node
+	for _, c := range decl.Children() {
+		if n, ok := c.(*cst.Node); ok && n.Kind() == cst.InterfaceParents {
+			parents = n
+		}
+	}
+	if parents == nil {
+		t.Fatalf("no InterfaceParents node in %q", "interface a: {\n}\n")
+	}
+}
+
 // TestParseInterfaceMemberChildren checks that a required member carries no
 // Block (only its ParamList and result type) while a provided member carries a
 // Block, and that an explicit member type parameter lands as GenericParams.

@@ -232,15 +232,17 @@ func (p *parser) parseEnumMember(lead []cst.Green) *cst.Node {
 // parseInterfaceDecl parses an interface declaration, prepending the
 // already-collected leading trivia:
 //
-//	[pub] interface Name [GenericParams] "{" ( InterfaceMember ( ("," | NL) InterfaceMember )* )? "}"
+//	[pub] interface Name [GenericParams] [":" TypeName ( "," TypeName )*] "{" ( InterfaceMember ( ("," | NL) InterfaceMember )* )? "}"
 //
 // An interface is a nominal behaviour: its members are required methods (no
 // body, which an implementor must supply) and provided methods (with a body,
 // the default an implementor gets for free). Members are separated by a comma
-// or a newline, exactly as enum members are. As elsewhere every expected
-// element is optional in the parse: a missing one records a diagnostic and is
-// simply absent from the tree while losslessness is preserved. The cursor sits
-// on pub or interface.
+// or a newline, exactly as enum members are. An optional colon after the name
+// (or generic parameters) introduces the parent interfaces — the supertraits —
+// whose whole contract the child inherits. As elsewhere every expected element
+// is optional in the parse: a missing one records a diagnostic and is simply
+// absent from the tree while losslessness is preserved. The cursor sits on pub
+// or interface.
 func (p *parser) parseInterfaceDecl(lead []cst.Green) *cst.Node {
 	children := lead
 
@@ -260,6 +262,14 @@ func (p *parser) parseInterfaceDecl(lead []cst.Green) *cst.Node {
 	if p.peekSignificant() == token.Lt {
 		p.skipTrivia(&children)
 		children = append(children, p.parseGenericParams())
+	}
+
+	// The optional parent list: ":" TypeName ( "," TypeName )*. The supertraits
+	// the child inherits from, gathered into their own node so the AST lowering
+	// reads them apart from the members.
+	if p.peekSignificant() == token.Colon {
+		p.skipTrivia(&children)
+		children = append(children, p.parseInterfaceParents())
 	}
 
 	if p.peekSignificant() == token.LBrace {
@@ -344,6 +354,30 @@ func (p *parser) parseInterfaceMember(lead []cst.Green) *cst.Node {
 		children = append(children, p.parseBlock())
 	}
 	return cst.NewNode(cst.InterfaceMember, children)
+}
+
+// parseInterfaceParents parses the parent-interface list of an interface
+// declaration: ":" TypeName ( "," TypeName )*. Each parent is a primary type
+// (a named interface, possibly applied — foldable<nint, T>), never a union, so
+// it is parsed the way the impl tag's interface name is. As elsewhere a missing
+// parent records a diagnostic and is simply absent. The cursor sits on the ":".
+func (p *parser) parseInterfaceParents() *cst.Node {
+	children := []cst.Green{p.bump()} // ":"
+	if startsType(p.peekSignificant()) {
+		for {
+			p.skipTrivia(&children)
+			children = append(children, p.parsePrimaryType())
+			if p.peekSignificant() == token.Comma {
+				p.skipTrivia(&children)
+				children = append(children, p.bump()) // ","
+				continue
+			}
+			break
+		}
+	} else {
+		p.report(newExpectedTypeDiagnostic(p.lastStart, 0))
+	}
+	return cst.NewNode(cst.InterfaceParents, children)
 }
 
 // parseWhereClause parses the refinement predicate of a type declaration:
