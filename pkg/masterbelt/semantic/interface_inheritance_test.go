@@ -248,3 +248,40 @@ func TestInterfaceValueAssignableToAncestor(t *testing.T) {
 		t.Fatalf("an ordered value is assignable to a comparable parameter; got %v", codes(diags))
 	}
 }
+
+// genericParentSrc declares a generic interface box<T> and a child intBox that
+// inherits its application box<nint>: an intBox value should flow wherever a
+// box<nint> is expected (the generic-parent width-subtyping case).
+const genericParentSrc = "" +
+	"pub interface box<T> {\n  get(): T\n}\n" +
+	"pub interface intBox: box<nint> {\n  label(): string\n}\n"
+
+// TestGenericInterfaceValueAssignableToAncestor checks width subtyping to a
+// generic parent application: an intBox value flows to a box<nint> position
+// through an argument, a return value, and a let binding. These exercise the
+// checkType subsumption path, where a Named child interface meets a generic-App
+// expected type — the case Match must fall back to assignability for.
+func TestGenericInterfaceValueAssignableToAncestor(t *testing.T) {
+	t.Run("argument", func(t *testing.T) {
+		src := genericParentSrc +
+			"pub fn take(b: box<nint>): nint {\n  return b.get()\n}\n" +
+			"pub fn pass(i: intBox): nint {\n  return take(i)\n}\n"
+		if _, diags := analyze(src); len(diags) != 0 {
+			t.Fatalf("an intBox is assignable to a box<nint> argument; got %v", codes(diags))
+		}
+	})
+	t.Run("return value", func(t *testing.T) {
+		src := genericParentSrc +
+			"pub fn widen(i: intBox): box<nint> {\n  return i\n}\n"
+		if _, diags := analyze(src); len(diags) != 0 {
+			t.Fatalf("an intBox is assignable to a box<nint> return; got %v", codes(diags))
+		}
+	})
+	t.Run("let binding", func(t *testing.T) {
+		src := genericParentSrc +
+			"pub fn bind(i: intBox): nint {\n  let b: box<nint> = i\n  return b.get()\n}\n"
+		if _, diags := analyze(src); len(diags) != 0 {
+			t.Fatalf("an intBox is assignable to a box<nint> let; got %v", codes(diags))
+		}
+	})
+}

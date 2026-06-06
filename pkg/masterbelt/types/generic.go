@@ -100,6 +100,19 @@ func Match(reg *builtin.Registry, pattern, arg ir.Type, subst map[string]ir.Type
 		if u := UnionType(p); u != nil {
 			return Match(reg, u, arg, subst)
 		}
+		// The constructor did not match (or the argument is not an application).
+		// When the pattern carries no free variable left to solve, there is
+		// nothing generic to infer here, so fall back to assignability — the same
+		// rule the non-generic path uses. This is what lets a child interface flow
+		// to a generic parent application (an intBox value to a box<nint> position):
+		// the expected box<nint> is a concrete App, the argument intBox a Named, so
+		// the constructor check above misses and assignability's interface
+		// width-subtyping decides it. The no-free-var guard keeps generic inference
+		// untouched — a still-open box<T> never reaches assignability — mirroring
+		// the concrete-pattern guards the record and union cases already use.
+		if !hasFreeVar(p, subst) {
+			return Assignable(reg, arg, pattern)
+		}
 		return false
 	case *ir.Record:
 		// A concrete record pattern (no variable to solve) keeps the old
