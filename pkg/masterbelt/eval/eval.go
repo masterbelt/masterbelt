@@ -1894,31 +1894,46 @@ const (
 )
 
 // evalMatch selects and runs the matching arm of a match: it folds the
-// scrutinee, finds the first arm whose member type the scrutinee's value is, and
-// runs that arm's body with the arm's binding bound to the scrutinee value (the
+// scrutinee, finds the arm whose member type the scrutinee's value is, and runs
+// that arm's body with the arm's binding bound to the scrutinee value (the
 // narrowing). It classifies how the selected arm ended (matchReturned /
 // matchFellThrough) like a switch.
 //
-// Soundness over completeness: the dispatch folds only when it is fully
-// determined. A scrutinee that does not fold, or an arm whose match against the
-// scrutinee's value cannot be decided syntactically (a nominal record value,
-// which carries no member tag), leaves the result matchUnknown rather than
-// guessing an arm — the same discipline the switch and index folders use. The
-// arm types are read through the Env's ReceiverTyper (a universe lookup), so the
-// value query stays independent of the type query.
+// Soundness over completeness: the dispatch folds only when exactly one arm can
+// hold the value. A union value carries no member tag, so when two arms could
+// back the value's kind — two nominal-over-int members (Small | Big), or two
+// int-family builtins (int8 | int16) over a folded integer — the fold cannot tell
+// which arm the runtime would run, and leaves the result matchUnknown rather than
+// guessing. A scrutinee that does not fold, or an arm whose match cannot be
+// decided syntactically (a nominal record value, which carries no member tag), is
+// undetermined the same way — the discipline the switch and index folders use.
+// The arm types are read through the Env's ReceiverTyper (a universe lookup), so
+// the value query stays independent of the type query.
 func evalMatch(m *ast.MatchStmt, ctx evalCtx) (*ir.Constant, matchOutcome) {
 	scrut := evalExpr(m.Scrutinee, ctx)
 	if scrut == nil {
 		return nil, matchUnknown
 	}
-	for _, arm := range m.Arms {
+	// Scan every arm first: a fold is sound only when exactly one arm can hold the
+	// value (a union value has no tag to break a tie). An undecidable arm (a
+	// record member, an unresolvable type) makes the whole dispatch undetermined,
+	// since it might be the runtime's chosen arm.
+	selected := -1
+	for i, arm := range m.Arms {
 		matched, certain := constMatchesArm(ctx, scrut, arm.Type)
 		if !certain {
-			return nil, matchUnknown // an undecidable arm: cannot dispatch soundly
+			return nil, matchUnknown
 		}
 		if matched {
-			return matchArmOutcome(branchOutcome(arm.Body, narrowMatchBinding(ctx, arm.Bind, scrut)))
+			if selected != -1 {
+				return nil, matchUnknown // two arms back this value's kind: ambiguous
+			}
+			selected = i
 		}
+	}
+	if selected != -1 {
+		arm := m.Arms[selected]
+		return matchArmOutcome(branchOutcome(arm.Body, narrowMatchBinding(ctx, arm.Bind, scrut)))
 	}
 	if m.Else != nil {
 		return matchArmOutcome(branchOutcome(m.Else, ctx))

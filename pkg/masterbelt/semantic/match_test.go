@@ -196,3 +196,59 @@ func TestMatchFoldsDispatch(t *testing.T) {
 		}
 	}
 }
+
+// evalOrNil returns the folded value of the named const, or nil when it did not
+// fold (or could not be found) — without failing the test, the unfolded case the
+// soundness guards assert. The program must still analyze cleanly.
+func evalOrNil(t *testing.T, src, name string) *ir.Constant {
+	t.Helper()
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", codes(diags))
+	}
+	for _, c := range m.Consts {
+		if c.Name == name {
+			return c.Eval
+		}
+	}
+	t.Fatalf("const %s not found", name)
+	return nil
+}
+
+// TestMatchSameKindMembersNotFolded is the soundness guard for the union-member
+// ambiguity: when two arms can back the scrutinee value's kind (two nominal
+// int types, Small | Big), a folded value carries no member tag, so the fold
+// cannot tell which arm runs — it must not guess. Before the fix the loop chose
+// the first kind-matching arm and folded classify(Big(20)) to "small", a wrong
+// value with no diagnostic. The fold must leave it undetermined instead.
+func TestMatchSameKindMembersNotFolded(t *testing.T) {
+	src := "pub type Small = int\npub type Big = int\n" +
+		"pub fn classify(v: Small | Big): string {\n  match v {\n    Small s -> return \"small\"\n    Big b -> return \"big\"\n  }\n}\n" +
+		"const R = classify(Big(20))\n"
+	if v := evalOrNil(t, src, "R"); v != nil {
+		t.Errorf("classify(Big(20)) folded to %q; an ambiguous same-kind union must not fold", v.String())
+	}
+}
+
+// TestMatchSameKindBuiltinMembersNotFolded is the builtin counterpart: int8 and
+// int16 both back a ConstInt, so a match over an int8 | int16 cannot decide its
+// arm from the value's kind alone and must not fold.
+func TestMatchSameKindBuiltinMembersNotFolded(t *testing.T) {
+	src := "pub fn classify(v: int8 | int16): string {\n  match v {\n    int8 a  -> return \"a\"\n    int16 b -> return \"b\"\n  }\n}\n" +
+		"const R = classify(int16(20))\n"
+	if v := evalOrNil(t, src, "R"); v != nil {
+		t.Errorf("classify(int16(20)) folded to %q; an ambiguous same-kind union must not fold", v.String())
+	}
+}
+
+// TestMatchDistinctKindMembersStillFold checks the fix does not over-restrict: an
+// int | error union has one arm per kind, so a folded value's kind decides its
+// arm unambiguously and the match still folds.
+func TestMatchDistinctKindMembersStillFold(t *testing.T) {
+	src := "pub fn pick(v: int | error): string {\n  match v {\n    int n   -> return \"int\"\n    error e -> return \"err\"\n  }\n}\n" +
+		"const A = pick(7)\n"
+	v := evalOrNil(t, src, "A")
+	if v == nil || v.String() != "\"int\"" {
+		t.Errorf("pick(7) = %v, want \"int\"", v)
+	}
+}
