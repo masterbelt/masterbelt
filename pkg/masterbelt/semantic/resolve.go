@@ -28,6 +28,21 @@ func unknownTypeReporter(at func(ast.Node) span, diags *diagnostic.List) func(as
 	}
 }
 
+// boundViolationReporter builds the callback the type resolver reports a
+// type-application bound violation through, anchoring the diagnostic at the
+// offending argument and naming the argument's type and the unsatisfied bound.
+// It returns nil when there is nowhere to report (the prelude, a memoized
+// resolution), so the resolver leaves the check off.
+func boundViolationReporter(at func(ast.Node) span, diags *diagnostic.List) func(ast.TypeExpr, ir.Type, *ir.TypeParam) {
+	if at == nil || diags == nil {
+		return nil
+	}
+	return func(arg ast.TypeExpr, argType ir.Type, param *ir.TypeParam) {
+		s := at(arg)
+		diags.Add(newBoundNotSatisfiedDiagnostic(s.offset, s.width, argType.String(), param.Bound.String()))
+	}
+}
+
 // resolveTypes resolves the file's type declarations into ir.TypeDefs, in source
 // order. A type reference resolves against the other declarations in the file
 // (so a declaration may refer to a type defined later in the file), extern —
@@ -94,7 +109,13 @@ func resolveTypes(env eval.Env, file *ast.File, at func(ast.Node) span, diags *d
 
 	// Second pass: resolve parameters, body, method signatures, enum bodies, and
 	// interface members, reporting any unknown type names.
-	r := &infer.TypeResolver{Defs: defs, Qualified: qualified, Report: unknownTypeReporter(at, diags)}
+	r := &infer.TypeResolver{
+		Defs:           defs,
+		Qualified:      qualified,
+		Report:         unknownTypeReporter(at, diags),
+		Registry:       reg,
+		BoundViolation: boundViolationReporter(at, diags),
+	}
 	for i, id := range file.Interfaces {
 		resolveInterfaceDecl(r, reg, id, ifaceOut[i], fns)
 	}
@@ -770,7 +791,13 @@ func resolveFuncs(file *ast.File, at func(ast.Node) span, diags *diagnostic.List
 	if len(file.Funcs) == 0 {
 		return nil
 	}
-	r := &infer.TypeResolver{Defs: universe, Qualified: qualified, Report: unknownTypeReporter(at, diags)}
+	r := &infer.TypeResolver{
+		Defs:           universe,
+		Qualified:      qualified,
+		Report:         unknownTypeReporter(at, diags),
+		Registry:       reg,
+		BoundViolation: boundViolationReporter(at, diags),
+	}
 	fns := bodyFuncs{local: funcShellsByName(file, shells), qualified: qualifiedFuncs, shells: shells}
 	out := make([]*ir.Function, 0, len(file.Funcs))
 	seen := make(map[string]bool, len(file.Funcs))

@@ -1,6 +1,8 @@
 package infer
 
 import (
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/types"
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
 )
@@ -19,6 +21,17 @@ type TypeResolver struct {
 	// qualified name is unknown.
 	Qualified func(namespace, name string) *ir.TypeDef
 	Report    func(node ast.Node, name string)
+	// Registry backs the bound check on a generic type application: a parameter
+	// declared with a bound (map<K: comparable, V>) is satisfied by an argument
+	// only when the argument opts into the bound's interface (types.Satisfies),
+	// which reads the registry's impls. A nil Registry disables the check, so a
+	// silent or pre-registry resolution (the prelude bootstrap) is unaffected.
+	Registry *builtin.Registry
+	// BoundViolation fires when a generic type application's argument does not
+	// satisfy the parameter's declared bound, anchored at the argument's syntax.
+	// It is nil wherever bound violations are not reported (a memoized resolution
+	// without diagnostics); the App is still built so typing proceeds.
+	BoundViolation func(arg ast.TypeExpr, argType ir.Type, param *ir.TypeParam)
 }
 
 func (r *TypeResolver) reportUnknown(node ast.Node, name string) {
@@ -77,11 +90,7 @@ func (r *TypeResolver) resolveNamed(t *ast.NamedType, scope map[string]bool) ir.
 			r.reportUnknown(t, t.Name)
 			return ir.Invalid
 		}
-		args := make([]ir.Type, len(t.Args))
-		for i, a := range t.Args {
-			args[i] = r.ResolveType(a, scope)
-		}
-		return &ir.App{Def: def, Args: args}
+		return r.app(def, t.Args, scope)
 	}
 	def := r.lookup(t.Name)
 	if def == nil {
@@ -113,16 +122,42 @@ func (r *TypeResolver) resolveQualified(t *ast.NamedType, scope map[string]bool)
 		return ir.Invalid
 	}
 	if len(t.Args) > 0 {
-		args := make([]ir.Type, len(t.Args))
-		for i, a := range t.Args {
-			args[i] = r.ResolveType(a, scope)
-		}
-		return &ir.App{Def: def, Args: args}
+		return r.app(def, t.Args, scope)
 	}
 	if def.Builtin {
 		return &ir.Builtin{Name: def.Name}
 	}
 	return &ir.Named{Def: def}
+}
+
+// app builds a generic type application (def<args...>), resolving each argument
+// in scope and — the type-application bound check of E-16/E-17 — verifying it
+// satisfies the matching parameter's declared bound. A parameter with a bound
+// (map<K: comparable, V>) is satisfied only by an argument that opts into the
+// bound's interface; a violation is reported through BoundViolation (when set)
+// against the offending argument's syntax. The check is purely diagnostic: the
+// App is built regardless, so typing proceeds with the written type. It applies
+// uniformly to every declared generic type, not just map.
+func (r *TypeResolver) app(def *ir.TypeDef, argExprs []ast.TypeExpr, scope map[string]bool) ir.Type {
+	args := make([]ir.Type, len(argExprs))
+	for i, a := range argExprs {
+		args[i] = r.ResolveType(a, scope)
+	}
+	if r.Registry != nil && r.BoundViolation != nil {
+		for i := range argExprs {
+			if i >= len(def.Params) {
+				break
+			}
+			p := def.Params[i]
+			if p.Bound == nil || args[i] == ir.Invalid {
+				continue
+			}
+			if !types.Satisfies(r.Registry, args[i], p.Bound) {
+				r.BoundViolation(argExprs[i], args[i], p)
+			}
+		}
+	}
+	return &ir.App{Def: def, Args: args}
 }
 
 // ResolveName resolves a bare type name (a conversion's callee) to its type, or

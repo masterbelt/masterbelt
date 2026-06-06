@@ -163,9 +163,11 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 		annType := ir.Invalid
 		if decl.Type != nil {
 			r := &infer.TypeResolver{
-				Defs:      q.universe(fileID),
-				Qualified: qualifiedFrom(q, q.importsOf(fileID)),
-				Report:    typeNameReporter(fileID, q, at, diags),
+				Defs:           q.universe(fileID),
+				Qualified:      qualifiedFrom(q, q.importsOf(fileID)),
+				Report:         typeNameReporter(fileID, q, at, diags),
+				Registry:       reg,
+				BoundViolation: boundViolationReporter(at, diags),
 			}
 			annType = r.ResolveType(decl.Type, nil)
 		}
