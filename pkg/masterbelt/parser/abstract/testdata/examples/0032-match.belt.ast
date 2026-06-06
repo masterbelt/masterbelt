@@ -1,0 +1,59 @@
+File
+  TypeDecl
+    pub
+    name "Coin"
+    body { amount: int }
+  TypeDecl
+    pub
+    name "Level"
+    body { rank: int }
+  TypeDecl
+    pub
+    name "GameValue"
+    body Coin | Level
+  FuncDecl
+    pub
+    name "describe"
+    param v: GameValue
+    result string
+      expr Identifier "match"
+      expr (record v Coin: <missing> c: <missing> Level: <missing> l: <missing>)
+  FuncDecl
+    pub
+    name "worth"
+    param v: GameValue
+    result int
+      expr Identifier "match"
+      expr (record v Coin: <missing> c: <missing> c: <missing> amount: <missing> Level: <missing> l: <missing> l: <missing> rank: <missing>)
+  FuncDecl
+    pub
+    name "amountOr"
+    param v: Coin | null
+    param fallback: int
+    result int
+      expr Identifier "match"
+      expr (record v Coin: <missing> c: <missing> c: <missing> amount: <missing> fallback: <missing>)
+  FuncDecl
+    pub
+    name "coinAmount"
+    param v: GameValue
+    result int
+      expr Identifier "match"
+      expr (record v Coin: <missing> c: <missing> c: <missing> amount: <missing> _: <missing>)
+  FuncDecl
+    pub
+    name "firstOr"
+    param xs: list<int>
+    param fallback: int
+    result int
+      expr Identifier "match"
+      expr (call (. Identifier "xs" get) IntLit "0")
+      expr (record int: <missing> v: <missing> v: <missing> error: <missing> e: <missing> fallback: <missing>)
+  FuncDecl
+    pub
+    name "label"
+    param v: GameValue
+    param other: GameValue
+    result string
+      expr Identifier "match"
+      expr (record v Coin: <missing> c: <missing> n: <missing> c: <missing> amount: <missing> match: <missing> other: <missing> Coin: <missing> c2: <missing> Level: <missing> l: <missing>)

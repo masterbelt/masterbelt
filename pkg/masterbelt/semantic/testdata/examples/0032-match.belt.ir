@@ -1,0 +1,41 @@
+Module
+  TypeDef "Coin" pub
+    body { amount: int }
+  TypeDef "Level" pub
+    body { rank: int }
+  TypeDef "GameValue" pub
+    body Coin | Level
+  Func "describe" pub
+    param v: GameValue
+    result string
+      expr <none>
+      expr v{Coin: <none>, c: <none>, Level: <none>, l: <none>}
+  Func "worth" pub
+    param v: GameValue
+    result int
+      expr <none>
+      expr v{Coin: <none>, c: <none>, c: <none>, amount: <none>, Level: <none>, l: <none>, l: <none>, rank: <none>}
+  Func "amountOr" pub
+    param v: Coin | null
+    param fallback: int
+    result int
+      expr <none>
+      expr v{Coin: <none>, c: <none>, c: <none>, amount: <none>, fallback: <none>}
+  Func "coinAmount" pub
+    param v: GameValue
+    result int
+      expr <none>
+      expr v{Coin: <none>, c: <none>, c: <none>, amount: <none>, _: <none>}
+  Func "firstOr" pub
+    param xs: list<int>
+    param fallback: int
+    result int
+      expr <none>
+      expr ParamRef "xs".get(IntLiteral "0")
+      expr {int: <none>, v: <none>, v: <none>, error: <none>, e: <none>, fallback: <none>}
+  Func "label" pub
+    param v: GameValue
+    param other: GameValue
+    result string
+      expr <none>
+      expr v{Coin: <none>, c: <none>, n: <none>, c: <none>, amount: <none>, match: <none>, other: <none>, Coin: <none>, c2: <none>, Level: <none>, l: <none>}
