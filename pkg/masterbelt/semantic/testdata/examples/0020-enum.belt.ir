@@ -7,6 +7,10 @@ Module
     type Rarity
     value Rarity.Common
     eval Rarity.Common
+  Const "Highest"
+    type Rarity
+    value highestSeen(Rarity.Legend)
+    eval Rarity.Legend
   TypeDef "Rarity" pub
     doc "A card's rarity tier."
     enum uint8
@@ -82,6 +86,13 @@ Module
     method "gteq" pub extern
       param other: self
       result bool
+  Func "highestSeen" pub
+    param starting: Rarity
+    result Rarity
+      let "best": Rarity = Rarity.Common
+      if ParamRef "starting".eql(Rarity.Legend)
+          assign "best" = Rarity.Legend
+      return LocalRef "best"
   Assert "Rarity.Common != Rarity.Legend"
     eval true
       Rarity.Common != Rarity.Legend
@@ -107,6 +118,18 @@ Module
       ^    ^         ^
       |    true      Rarity.Common
       Rarity.Common
+  Assert "highestSeen(Rarity.Legend) == Rarity.Legend"
+    eval true
+      highestSeen(Rarity.Legend) == Rarity.Legend
+      ^                  ^       ^         ^
+      Rarity.Legend      |       true      Rarity.Legend
+                         Rarity.Legend
+  Assert "highestSeen(Rarity.Common) == Rarity.Common"
+    eval true
+      highestSeen(Rarity.Common) == Rarity.Common
+      ^                  ^       ^         ^
+      Rarity.Common      |       true      Rarity.Common
+                         Rarity.Common
   Assert "Locale.Ja < Locale.En"
     eval true
       Locale.Ja < Locale.En

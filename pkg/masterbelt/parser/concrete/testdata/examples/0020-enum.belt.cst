@@ -202,6 +202,113 @@ File
       Whitespace " "
       NameRef
         Ident "Common"
+  FuncDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// The same bidirectional channel reaches into a function body: a bare member"
+    Newline "\n"
+    LineComment "// resolves through a let's annotation, an assignment's target type, and a"
+    Newline "\n"
+    LineComment "// comparison's receiver enum (the desugared operator argument) — the master-data"
+    Newline "\n"
+    LineComment "// `rarity == Legend` E-2 motivates."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Fn "fn"
+    Whitespace " "
+    Ident "highestSeen"
+    ParamList
+      LParen "("
+      Param
+        Ident "starting"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "Rarity"
+      RParen ")"
+    Colon ":"
+    Whitespace " "
+    TypeName
+      Ident "Rarity"
+    Whitespace " "
+    Block
+      LBrace "{"
+      Newline "\n"
+      Whitespace "  "
+      LetStmt
+        Let "let"
+        Whitespace " "
+        Ident "best"
+        TypeClause
+          Colon ":"
+          Whitespace " "
+          TypeName
+            Ident "Rarity"
+        Whitespace " "
+        Initializer
+          Assign "="
+          Whitespace " "
+          NameRef
+            Ident "Common"
+      Newline "\n"
+      Whitespace "  "
+      IfStmt
+        If "if"
+        Whitespace " "
+        BinaryExpr
+          NameRef
+            Ident "starting"
+          Whitespace " "
+          EqEq "=="
+          Whitespace " "
+          NameRef
+            Ident "Legend"
+        Whitespace " "
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          AssignStmt
+            NameRef
+              Ident "best"
+            Whitespace " "
+            Assign "="
+            Whitespace " "
+            NameRef
+              Ident "Legend"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
+      Newline "\n"
+      Whitespace "  "
+      ReturnStmt
+        Return "return"
+        Whitespace " "
+        NameRef
+          Ident "best"
+      Newline "\n"
+      RBrace "}"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Highest"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "highestSeen"
+        LParen "("
+        MemberExpr
+          NameRef
+            Ident "Rarity"
+          Dot "."
+          Ident "Legend"
+        RParen ")"
   AssertDecl
     Newline "\n"
     Newline "\n"
@@ -263,6 +370,52 @@ File
     BinaryExpr
       NameRef
         Ident "Bare"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      MemberExpr
+        NameRef
+          Ident "Rarity"
+        Dot "."
+        Ident "Common"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      CallExpr
+        NameRef
+          Ident "highestSeen"
+        LParen "("
+        MemberExpr
+          NameRef
+            Ident "Rarity"
+          Dot "."
+          Ident "Legend"
+        RParen ")"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      MemberExpr
+        NameRef
+          Ident "Rarity"
+        Dot "."
+        Ident "Legend"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      CallExpr
+        NameRef
+          Ident "highestSeen"
+        LParen "("
+        MemberExpr
+          NameRef
+            Ident "Rarity"
+          Dot "."
+          Ident "Common"
+        RParen ")"
       Whitespace " "
       EqEq "=="
       Whitespace " "
