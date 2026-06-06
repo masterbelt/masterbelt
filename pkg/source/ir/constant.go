@@ -84,6 +84,20 @@ type Constant struct {
 	// makes over one.
 	Start *big.Int
 	End   *big.Int
+
+	// UnionTag is the union member a value flowed in as — the tag a tagged union
+	// carries. It is nil when the value never passed through a union expectation
+	// (a plain integer, a bare record), and the member *type itself* (a
+	// Named{Coin}, a Builtin{error}) — never the union — when it did, so the tag
+	// stays valid as the value moves between a bare union (Coin | Level) and a
+	// nominal alias (GameValue) of it. The tag is what lets a match dispatch a
+	// value whose kind several members back (a record union Coin | Level, two
+	// nominal-over-int Small | Big): the runtime arm is the one whose member type
+	// equals the tag. It is set on a copy of the value at the tagging sites (a
+	// const/let/param/return/field/argument union channel) and read back by the
+	// match folder and equality; an untagged value is unchanged, so values that
+	// never meet a union are exactly as before.
+	UnionTag Type
 }
 
 // ConstantsEqual reports whether two folded constants are structurally equal —
@@ -108,6 +122,15 @@ func ConstantsEqual(a, b *Constant) bool {
 		return true // identical pointers, including both nil
 	}
 	if a == nil || b == nil || a.Kind != b.Kind {
+		return false
+	}
+	// The union tag is part of a value's identity: a Coin and a Level with the
+	// same fields are different members, and a tagged value is not the same fact
+	// as the same payload untagged (a later channel could tag it differently). A
+	// tag present on one side but not the other is unequal — the safe side for the
+	// engine's early cutoff, which recomputes rather than coalescing two facts a
+	// member tag could tell apart.
+	if !tagsEqual(a.UnionTag, b.UnionTag) {
 		return false
 	}
 	switch a.Kind {
@@ -189,6 +212,59 @@ func ConstantsEqual(a, b *Constant) bool {
 	default:
 		panic("ir.ConstantsEqual: unhandled ConstKind " + strconv.Itoa(int(a.Kind)))
 	}
+}
+
+// tagsEqual reports whether two union tags denote the same member. A tag is the
+// member type a value flowed in as, which is always a nominal type (Named — a
+// record, refinement, or enum member) or a primitive (Builtin — error, nint),
+// so member identity is the Named's definition pointer or the Builtin's name —
+// the same two-form identity the tagging sites and the match folder read. Two nil
+// tags (neither value carries one) are equal; a tag on one side only is not.
+func tagsEqual(a, b Type) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+	switch a := a.(type) {
+	case *Named:
+		b, ok := b.(*Named)
+		return ok && a.Def == b.Def
+	case *Builtin:
+		b, ok := b.(*Builtin)
+		return ok && a.Name == b.Name
+	default:
+		// Any other type form is not a member a value flows in as, so two such
+		// tags are equal only when identical pointers — the conservative default.
+		return a == b
+	}
+}
+
+// Tagged returns a copy of the constant carrying the union member tag, or the
+// constant unchanged when tag is nil (the value did not flow through a union) or
+// the constant is nil (an unfoldable value takes no tag). The copy is shallow —
+// it shares the payload — so tagging a value never mutates the original a caller
+// still holds; the tag is the one field that differs. Re-tagging with the member
+// a value already carries is the identity, so a value moving through a chain of
+// union channels of the same member keeps one stable tag.
+func Tagged(c *Constant, tag Type) *Constant {
+	if c == nil || tag == nil {
+		return c
+	}
+	tagged := *c
+	tagged.UnionTag = tag
+	return &tagged
+}
+
+// Untagged returns a copy of the constant with its union tag cleared, or the
+// constant unchanged when it carries no tag (or is nil). It is how a match arm
+// narrows a value to its member type: inside the arm the value is the member, not
+// the union, so its tag is dropped and the payload reads as the bare member type.
+func Untagged(c *Constant) *Constant {
+	if c == nil || c.UnionTag == nil {
+		return c
+	}
+	bare := *c
+	bare.UnionTag = nil
+	return &bare
 }
 
 // ConstEntry is one entry of a folded collection constant: a Value, and for a

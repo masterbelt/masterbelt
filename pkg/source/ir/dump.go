@@ -149,7 +149,7 @@ func dumpAssocConst(b *strings.Builder, c *AssocConst) {
 	}
 	fmt.Fprintf(b, "      type %s\n", typeString(c.Type))
 	if c.Value != nil {
-		fmt.Fprintf(b, "      value %s\n", c.Value)
+		fmt.Fprintf(b, "      value %s\n", dumpConstant(c.Value))
 	}
 }
 
@@ -402,8 +402,23 @@ func dumpConst(b *strings.Builder, c *Const) {
 	fmt.Fprintf(b, "    type %s\n", c.Type)
 	fmt.Fprintf(b, "    value %s\n", dumpValue(c.Value))
 	if c.Eval != nil {
-		fmt.Fprintf(b, "    eval %s\n", c.Eval)
+		fmt.Fprintf(b, "    eval %s\n", dumpConstant(c.Eval))
 	}
+}
+
+// dumpConstant renders a folded value for the IR dump, prefixing a tagged-union
+// value with the member it flowed in as — eval (Coin) { amount: 7 } — so the
+// snapshot shows which arm a match would dispatch on. An untagged value is the
+// bare String() form, leaving every existing snapshot unchanged. String() itself
+// is left tag-free, so a diagnostic message reads the same with or without a tag.
+func dumpConstant(c *Constant) string {
+	if c == nil {
+		return "<unevaluated>"
+	}
+	if c.UnionTag == nil {
+		return c.String()
+	}
+	return "(" + typeString(c.UnionTag) + ") " + c.String()
 }
 
 func dumpValue(v Value) string {
