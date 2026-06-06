@@ -166,6 +166,93 @@ File
           RBrace "}"
       Newline "\n"
       RBrace "}"
+  TypeDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// A where-clause may call a method of the type it refines: self is the nominal"
+    Newline "\n"
+    LineComment "// type, so its own methods resolve, and the predicate folds through the method"
+    Newline "\n"
+    LineComment "// body at compile time."
+    Newline "\n"
+    DocComment "/// A score that is valid only when it lies in the 0..100 band."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Type "type"
+    Whitespace " "
+    Ident "Score"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    TypeName
+      Ident "int32"
+    Whitespace " "
+    WhereClause
+      Where "where"
+      Whitespace " "
+      CallExpr
+        MemberExpr
+          SelfExpr
+            Self "self"
+          Dot "."
+          Ident "inBand"
+        LParen "("
+        RParen ")"
+    Whitespace " "
+    ImplBlock
+      Impl "impl"
+      Whitespace " "
+      LBrace "{"
+      MethodDecl
+        Newline "\n"
+        Whitespace "  "
+        DocComment "/// Whether the score is within the valid band."
+        Newline "\n"
+        Whitespace "  "
+        Pub "pub"
+        Whitespace " "
+        Ident "inBand"
+        ParamList
+          LParen "("
+          RParen ")"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "bool"
+        Whitespace " "
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            BinaryExpr
+              BinaryExpr
+                SelfExpr
+                  Self "self"
+                Whitespace " "
+                GtEq ">="
+                Whitespace " "
+                Literal
+                  Int "0"
+              Whitespace " "
+              AmpAmp "&&"
+              Whitespace " "
+              BinaryExpr
+                SelfExpr
+                  Self "self"
+                Whitespace " "
+                LtEq "<="
+                Whitespace " "
+                Literal
+                  Int "100"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
+      Newline "\n"
+      RBrace "}"
   ConstDecl
     Newline "\n"
     Newline "\n"
@@ -233,6 +320,27 @@ File
       Whitespace " "
       Literal
         Int "100"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// A self-method predicate gates an annotated constant the same way: ValidScore"
+    Newline "\n"
+    LineComment "// satisfies inBand(), so it passes."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "ValidScore"
+    TypeClause
+      Colon ":"
+      Whitespace " "
+      TypeName
+        Ident "Score"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      Literal
+        Int "75"
   ConstDecl
     Newline "\n"
     Newline "\n"

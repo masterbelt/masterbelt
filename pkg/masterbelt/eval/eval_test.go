@@ -61,7 +61,7 @@ func TestPredicate(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			v := Predicate(portPredicate(), ir.IntConstant(big.NewInt(tc.self)), env)
+			v := Predicate(portPredicate(), ir.IntConstant(big.NewInt(tc.self)), nil, env)
 			if v == nil || v.Kind != ir.ConstBool {
 				t.Fatalf("Predicate = %v, want a bool constant", v)
 			}
@@ -84,7 +84,7 @@ func TestPredicateNotFoldable(t *testing.T) {
 	// non-intrinsic method on it reaches neither a user-method body nor an
 	// intrinsic: the predicate folds to nil.
 	pred := binary(selfExpr(), "bogus", intLit("1"))
-	if v := Predicate(pred, ir.IntConstant(big.NewInt(1)), stubEnv{reg: builtin.Default()}); v != nil {
+	if v := Predicate(pred, ir.IntConstant(big.NewInt(1)), nil, stubEnv{reg: builtin.Default()}); v != nil {
 		t.Errorf("Predicate = %v, want nil for a non-intrinsic method", v)
 	}
 }
@@ -93,7 +93,7 @@ func TestPredicateNonBool(t *testing.T) {
 	// self + 1 folds to an int; deciding what a non-bool predicate means is the
 	// caller's business (the semantic layer reports it on the declaration).
 	pred := binary(selfExpr(), "add", intLit("1"))
-	v := Predicate(pred, ir.IntConstant(big.NewInt(1)), stubEnv{reg: builtin.Default()})
+	v := Predicate(pred, ir.IntConstant(big.NewInt(1)), nil, stubEnv{reg: builtin.Default()})
 	if v == nil || v.Kind != ir.ConstInt {
 		t.Fatalf("Predicate = %v, want an int constant", v)
 	}

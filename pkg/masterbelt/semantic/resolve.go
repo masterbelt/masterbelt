@@ -303,7 +303,6 @@ func resolveDecl(env eval.Env, r *infer.TypeResolver, reg *builtin.Registry, td 
 	// The associated constants are resolved before the where-clause, so a
 	// self-referential predicate (`where self <= Percent.Max`) can read them.
 	resolveAssocConsts(env, r, reg, td, def, scope, at, diags)
-	resolveWhere(r, reg, td, def, at, diags)
 	// Same-name methods are overloads — legal as long as their parameter
 	// types differ. A signature that repeats an earlier one (the same name
 	// and the same parameter-type list) is a true redeclaration: the first
@@ -325,6 +324,10 @@ func resolveDecl(env eval.Env, r *infer.TypeResolver, reg *builtin.Registry, td 
 		seen[key] = true
 		def.Methods = append(def.Methods, rm)
 	}
+	// The where-clause is resolved last, after the methods, so a predicate that
+	// calls a method of the type (`where self.isValid()`) can resolve it — self
+	// is the nominal type, and its impl methods are now on the definition.
+	resolveWhere(r, reg, td, def, at, diags)
 }
 
 // resolveAssocConsts resolves a type's associated constants — the impl block's

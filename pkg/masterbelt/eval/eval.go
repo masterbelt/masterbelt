@@ -142,11 +142,15 @@ func expectedEnum(want ir.Type) *ir.TypeDef {
 	return nil
 }
 
-// Predicate folds a refinement predicate with the self keyword bound to self.
-// The semantic layer uses it to check that a constant's value satisfies its
-// type's where-clause. It returns nil when the predicate cannot be folded.
-func Predicate(pred ast.Expr, self *ir.Constant, env Env) *ir.Constant {
-	return evalExpr(pred, evalCtx{env: env, self: self})
+// Predicate folds a refinement predicate with the self keyword bound to self and
+// its static type being selfDef — the type being refined, so a self-method call
+// in the predicate (where self.isValid()) resolves the method on selfDef and
+// folds its body, the way a method call on a self receiver does inside a method
+// body. selfDef is nil when the refined type is a bare primitive with no
+// definition to read methods from (a predicate using only operators still
+// folds). It returns nil when the predicate cannot be folded.
+func Predicate(pred ast.Expr, self *ir.Constant, selfDef *ir.TypeDef, env Env) *ir.Constant {
+	return evalExpr(pred, evalCtx{env: env, self: self, selfDef: selfDef})
 }
 
 // evalCtx carries the evaluation context through the recursive fold: the

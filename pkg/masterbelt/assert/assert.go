@@ -31,19 +31,21 @@ import (
 // no row; with no foldable sub-expressions at all the diagram is just the
 // condition line.
 func Diagram(cond ast.Expr, env eval.Env) string {
-	return DiagramSelf(cond, nil, env)
+	return DiagramSelf(cond, nil, nil, env)
 }
 
 // DiagramSelf is Diagram with the self keyword bound to self — the refinement
 // form, where a violated predicate's sub-expressions fold against the
-// constant's value and the diagram shows which comparison failed.
-func DiagramSelf(cond ast.Expr, self *ir.Constant, env eval.Env) string {
+// constant's value and the diagram shows which comparison failed. selfDef is the
+// refined type's definition, so a self-method sub-expression (where
+// self.isValid()) folds its body the same way the predicate check does.
+func DiagramSelf(cond ast.Expr, self *ir.Constant, selfDef *ir.TypeDef, env eval.Env) string {
 	text, anchors := ast.RenderTrace(cond)
 
 	markers := make([]marker, 0, len(anchors))
 	seen := map[int]bool{}
 	for _, a := range anchors {
-		v := eval.Predicate(a.Expr, self, env)
+		v := eval.Predicate(a.Expr, self, selfDef, env)
 		if v == nil || v.Kind == ir.ConstFunc || seen[a.Col] {
 			continue
 		}
