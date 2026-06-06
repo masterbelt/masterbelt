@@ -2,8 +2,10 @@
 // constant expression to its value (ir.Constant). It is the evaluation mirror of
 // package types/infer — where infer derives an expression's type, eval derives
 // its value — over the same desugared shape: a literal, a value reference, or a
-// method call, whose value comes from the receiver type's native intrinsic in
-// the builtin registry.
+// method call. A method call's value comes from a user-defined method's body
+// (evaluated with self bound to the receiver, the way a top-level function's
+// body is) when the receiver carries one, or from the receiver type's native
+// intrinsic in the builtin registry otherwise.
 //
 // Evaluation reads name resolution and referenced values through an Env, so it
 // has no dependency on the semantic query engine: the engine supplies a
@@ -213,8 +215,9 @@ func evalExpr(e ast.Expr, ctx evalCtx) *ir.Constant {
 		}
 		return nil
 	case *ast.SelfExpr:
-		// The bound self value, or nil outside a self-binding context (a method
-		// body is not folded here yet).
+		// The bound self value, or nil outside a self-binding context. It is set
+		// by a refinement predicate (self bound to the checked constant) and by a
+		// folded method body (self bound to the receiver).
 		return ctx.self
 	case *ast.CollectionLit:
 		return collection(e, sub)
@@ -356,16 +359,57 @@ func convert(def *ir.TypeDef, args []ast.Expr, ctx evalCtx) *ir.Constant {
 	return ir.ErrorConstant(v.Str)
 }
 
+// callable is the body-bearing shape applyBody folds: a pure (non-extern,
+// effect-free) routine's parameters and statement body. A top-level function
+// and a user-defined method share this — a method is a function with a self
+// receiver — so the parameter-binding, purity, and depth-guard rules live in
+// one place. extern reports an extern declaration (a native intrinsic, no
+// body) and effectful one that interacts with the world; neither folds.
+type callable struct {
+	params    []*ast.ParamDef
+	body      []ast.Stmt
+	extern    bool
+	effectful bool
+}
+
+func funcCallable(fd *ast.FuncDecl) callable {
+	return callable{params: fd.Params, body: fd.Body, extern: fd.Extern, effectful: len(fd.Effects) > 0}
+}
+
+func methodCallable(md *ast.MethodDecl) callable {
+	return callable{params: md.Params, body: md.Body, extern: md.Extern, effectful: len(md.Effects) > 0}
+}
+
+// applyBody folds a pure routine's body against already-folded argument values,
+// with self bound for a method (nil for a top-level function). The body sees
+// only its parameters (and self) — never the caller's locals — exactly as a
+// function or method body sees its parameters and the program's declarations
+// through env. An extern or effectful routine does not fold: only a pure one
+// has a compile-time value, and the upstream pure-context check keeps an
+// effectful one out of every const position; this guard keeps eval pure even if
+// one slips through. The depth guard counts the application, turning runaway
+// recursion (direct or mutual, through functions and methods alike) into an
+// unevaluated value rather than a stack overflow.
+func applyBody(c callable, self *ir.Constant, vals []*ir.Constant, ctx evalCtx) *ir.Constant {
+	if c.extern || c.effectful {
+		return nil
+	}
+	locals := make(map[string]*ir.Constant, len(c.params))
+	for i, p := range c.params {
+		locals[p.Name] = vals[i]
+	}
+	return evalBody(c.body, evalCtx{env: ctx.env, locals: locals, self: self, depth: ctx.depth + 1})
+}
+
 // applyFunc folds a call of a top-level function: the arguments fold in the
 // caller's context, the overload whose parameters accept their value kinds is
 // selected, and its body's return folds with only the parameter bindings in
-// scope (a function body sees its parameters and the other declarations
-// through env, never the caller's locals). Evaluation is type-blind, so the
-// selection is by value kind and conservative: when more than one candidate
-// could plausibly accept the arguments — same-kind overloads like int8/int32,
-// or a parameter type it cannot decide — the call simply does not fold, so a
-// wrong overload's body is never applied. The depth guard turns runaway
-// recursion into an unevaluated value.
+// scope. Evaluation is type-blind, so the selection is by value kind and
+// conservative: when more than one candidate could plausibly accept the
+// arguments — same-kind overloads like int8/int32, or a parameter type it
+// cannot decide — the call simply does not fold, so a wrong overload's body is
+// never applied. The depth guard turns runaway recursion into an unevaluated
+// value.
 func applyFunc(cands []*ast.FuncDecl, args []ast.Expr, ctx evalCtx) *ir.Constant {
 	if ctx.depth >= maxApplyDepth {
 		return nil
@@ -380,17 +424,7 @@ func applyFunc(cands []*ast.FuncDecl, args []ast.Expr, ctx evalCtx) *ir.Constant
 	var fd *ast.FuncDecl
 	n := 0
 	for _, cand := range cands {
-		if len(cand.Params) != len(args) {
-			continue
-		}
-		fits := true
-		for i, p := range cand.Params {
-			if !kindAccepts(p.Type, vals[i].Kind) {
-				fits = false
-				break
-			}
-		}
-		if fits {
+		if fits(cand.Params, vals) {
 			fd = cand
 			n++
 		}
@@ -398,19 +432,25 @@ func applyFunc(cands []*ast.FuncDecl, args []ast.Expr, ctx evalCtx) *ir.Constant
 	if n != 1 {
 		return nil
 	}
-	if fd.Extern || len(fd.Effects) > 0 {
-		// Only a pure function folds. An effectful one compiles to runtime
-		// code for a target — the pure-context check upstream keeps it out of
-		// every compile-time position, and this guard keeps eval pure even if
-		// one slips through.
-		return nil
-	}
+	return applyBody(funcCallable(fd), nil, vals, ctx)
+}
 
-	locals := make(map[string]*ir.Constant, len(fd.Params))
-	for i, p := range fd.Params {
-		locals[p.Name] = vals[i]
+// fits reports whether a parameter list could accept the folded argument
+// values: the arity must agree, and each parameter's written type must accept
+// its argument's value kind. It is the type-blind, conservative selection both
+// the function and the method overload paths share — kindAccepts rules in only
+// the kinds a parameter can hold and answers true for anything it cannot decide,
+// so a wrong overload is never ruled in, only an undecidable one kept out.
+func fits(params []*ast.ParamDef, vals []*ir.Constant) bool {
+	if len(params) != len(vals) {
+		return false
 	}
-	return evalBody(fd.Body, evalCtx{env: ctx.env, locals: locals, depth: ctx.depth + 1})
+	for i, p := range params {
+		if !kindAccepts(p.Type, vals[i].Kind) {
+			return false
+		}
+	}
+	return true
 }
 
 // kindAccepts reports whether a parameter's written type can hold a constant
@@ -532,6 +572,17 @@ func call(ctx evalCtx, recv *ir.Constant, name string, args []*ir.Constant) *ir.
 		}
 		kinds[i] = a.Kind
 	}
+	// A user-defined method with a body folds first — its body is evaluated with
+	// self bound — so a method call (Element.Fire.isFire()) reaches its result
+	// the way a top-level function call does. It is reached only through a value
+	// that carries its type (an enum constant carries its EnumDef), so the
+	// dispatch stays value-blind: no type query. An extern method (the six enum
+	// comparisons, a native intrinsic) has no body and falls through to the
+	// intrinsic path below, preserving the existing resolution order — a
+	// user-defined method only when one exists, the intrinsic otherwise.
+	if v, ok := applyUserMethod(ctx, recv, name, args); ok {
+		return v
+	}
 	if recv.Kind == ir.ConstCollection {
 		return collectionMethod(ctx, recv, name, args)
 	}
@@ -560,6 +611,60 @@ func call(ctx evalCtx, recv *ir.Constant, name string, args []*ir.Constant) *ir.
 		return nil
 	}
 	return fn(recv, args)
+}
+
+// applyUserMethod folds a call of a user-defined method on a value whose type is
+// reachable from the value itself — today an enum constant, which carries its
+// EnumDef. It reports whether it handled the call: true with the folded value (or
+// nil when the body did not fold), false when the receiver carries no type or has
+// no body-bearing method of that name, leaving the caller's intrinsic dispatch to
+// run. The selection mirrors a function overload's: of the methods of that name
+// that have a body, the one whose parameters accept the argument value kinds is
+// chosen, and the call folds only when exactly one fits — an ambiguous or
+// undecidable set does not fold (nil), so a wrong overload's body is never
+// applied. The depth guard (shared with applyFunc through ctx.depth) turns
+// runaway recursion — a method calling itself, or a method/function cycle — into
+// an unevaluated value rather than a stack overflow.
+func applyUserMethod(ctx evalCtx, recv *ir.Constant, name string, args []*ir.Constant) (*ir.Constant, bool) {
+	def := receiverDef(recv)
+	if def == nil {
+		return nil, false
+	}
+	var sel *ast.MethodDecl
+	n := 0
+	for _, m := range def.Methods {
+		// A method's AST declaration carries its body; an extern method (no
+		// Syntax, or no body) is left to the intrinsic path.
+		if m.Name != name || m.Syntax == nil || len(m.Syntax.Body) == 0 {
+			continue
+		}
+		if fits(m.Syntax.Params, args) {
+			sel = m.Syntax
+			n++
+		}
+	}
+	if n == 0 {
+		return nil, false // no body-bearing overload: let the intrinsic path run
+	}
+	if ctx.depth >= maxApplyDepth {
+		return nil, true // the recursion guard fired: a safe, unfoldable result
+	}
+	if n != 1 {
+		return nil, true // ambiguous: do not fold, but the method is user-defined
+	}
+	return applyBody(methodCallable(sel), recv, args, ctx), true
+}
+
+// receiverDef returns the type definition a folded value carries, or nil when
+// the value does not carry one. An enum constant carries its EnumDef; the other
+// kinds (a plain integer, a record) carry no type, so a method declared on a
+// nominal type over a primitive is not reachable from its value here — eval is
+// value-blind, and only an enum value names its type.
+func receiverDef(recv *ir.Constant) *ir.TypeDef {
+	if recv.Kind == ir.ConstEnum {
+		return recv.EnumDef
+	}
+	return nil
 }
 
 // enumComparison folds one of an enum value's six comparison methods. Equality
