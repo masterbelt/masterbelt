@@ -128,8 +128,8 @@ func lowerBlock(t cst.Tree, buf source.Buffer) []ast.Stmt {
 }
 
 // lowerStmt lowers a statement node: a let binding, a return statement, an
-// assignment, a switch statement, an if statement, or a bare expression
-// statement.
+// assignment, a switch statement, a match statement, an if statement, a for
+// statement, or a bare expression statement.
 func lowerStmt(t cst.Tree, buf source.Buffer, node *cst.Node) ast.Stmt {
 	switch {
 	case node.Kind() == cst.ReturnStmt:
@@ -150,6 +150,8 @@ func lowerStmt(t cst.Tree, buf source.Buffer, node *cst.Node) ast.Stmt {
 		return lowerMatchStmt(t, buf, node)
 	case node.Kind() == cst.IfStmt:
 		return lowerIfStmt(t, buf, node)
+	case node.Kind() == cst.ForStmt:
+		return lowerForStmt(t, buf, node)
 	case isExprKind(node.Kind()):
 		return ast.NewExprStmt(lowerExpr(t, buf), node)
 	default:
@@ -273,6 +275,39 @@ func lowerIfStmt(t cst.Tree, buf source.Buffer, node *cst.Node) ast.Stmt {
 		}
 	}
 	return ast.NewIfStmt(cond, then, elseIf, els, node)
+}
+
+// lowerForStmt lowers a ForStmt node: its loop variable (the Ident token after
+// "for"), its iteration kind (the of/in keyword token — ForIn for "in", ForOf
+// otherwise), the iterated expression (the first expression child), and its loop
+// body (the Block). A recovered-away for leaves the missing pieces nil/empty.
+func lowerForStmt(t cst.Tree, buf source.Buffer, node *cst.Node) ast.Stmt {
+	var name string
+	kind := ast.ForOf
+	var iter ast.Expr
+	var body []ast.Stmt
+	for _, child := range t.Children() {
+		if tok, ok := child.Token(); ok {
+			switch {
+			case tok.Kind() == token.Ident && name == "":
+				name = child.Text(buf)
+			case tok.Kind() == token.In:
+				kind = ast.ForIn
+			}
+			continue
+		}
+		n, ok := child.Node()
+		if !ok {
+			continue
+		}
+		switch {
+		case iter == nil && isExprKind(n.Kind()):
+			iter = lowerExpr(child, buf)
+		case n.Kind() == cst.Block:
+			body = lowerBlock(child, buf)
+		}
+	}
+	return ast.NewForStmt(name, kind, iter, body, node)
 }
 
 // lowerSwitchStmt lowers a SwitchStmt node: its scrutinee (the first expression

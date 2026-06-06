@@ -434,6 +434,11 @@ func WalkBodyExprs(body []Stmt, fn func(Expr)) {
 			}
 		case *IfStmt:
 			walkIfExprs(stmt, fn)
+		case *ForStmt:
+			if stmt.Iter != nil {
+				fn(stmt.Iter)
+			}
+			WalkBodyExprs(stmt.Body, fn)
 		default:
 			// Every Stmt implementer must have a case above. A new statement
 			// form reaches here and panics rather than being silently dropped

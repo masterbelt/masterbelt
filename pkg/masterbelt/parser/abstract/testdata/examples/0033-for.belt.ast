@@ -26,6 +26,8 @@ File
     param xs: list<int>
     result int
       let "total" = IntLit "0"
+      for x of Identifier "xs"
+          assign Identifier "total" = (call (. Identifier "total" add) Identifier "x")
       return Identifier "total"
   FuncDecl
     pub
@@ -33,6 +35,8 @@ File
     param m: map<string, int>
     result string
       let "out" = StringLit ""
+      for k in Identifier "m"
+          assign Identifier "out" = (call (. Identifier "out" add) Identifier "k")
       return Identifier "out"
   FuncDecl
     pub
@@ -40,6 +44,8 @@ File
     param m: map<string, int>
     result int
       let "total" = IntLit "0"
+      for v of Identifier "m"
+          assign Identifier "total" = (call (. Identifier "total" add) Identifier "v")
       return Identifier "total"
   FuncDecl
     pub
@@ -47,6 +53,8 @@ File
     param xs: list<int>
     result int
       let "total" = IntLit "0"
+      for i in Identifier "xs"
+          assign Identifier "total" = (call (. Identifier "total" add) Identifier "i")
       return Identifier "total"
   FuncDecl
     pub
@@ -54,6 +62,9 @@ File
     param xs: list<int>
     result int
       let "total" = IntLit "0"
+      for x of Identifier "xs"
+          if (call (. (call (. Identifier "x" rem) IntLit "2") eql) IntLit "0")
+              assign Identifier "total" = (call (. Identifier "total" add) Identifier "x")
       return Identifier "total"
   FuncDecl
     pub
@@ -62,6 +73,9 @@ File
     param ys: list<int>
     result int
       let "count" = IntLit "0"
+      for x of Identifier "xs"
+          for y of Identifier "ys"
+              assign Identifier "count" = (call (. Identifier "count" add) IntLit "1")
       return Identifier "count"
   FuncDecl
     pub
@@ -69,6 +83,8 @@ File
     param xs: list<int>
     result int
       let "acc" = IntLit "1"
+      for x of Identifier "xs"
+          assign Identifier "acc" = (call (. Identifier "acc" mul) Identifier "x")
       return Identifier "acc"
   AssertDecl
     cond (call (. (call Identifier "sum" (list IntLit "1" IntLit "2" IntLit "3" IntLit "4")) eql) IntLit "10")
