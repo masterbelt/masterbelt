@@ -61,6 +61,64 @@ func TestEnumConstant(t *testing.T) {
 	}
 }
 
+// TestCollectionMapness pins the three-valued mapness of a folded collection:
+// a non-empty literal settles it from its entries, an empty literal is
+// CollUnknown unless built with an explicit kind, equality includes the mapness
+// (an empty list, map, and unknown are pairwise unequal), and String renders an
+// empty map as the [:] marker while an empty list and unknown render [].
+func TestCollectionMapness(t *testing.T) {
+	one := IntConstant(big.NewInt(1))
+	key := StringConstant("a")
+
+	// A non-empty literal settles its mapness by its entries.
+	list := CollectionConstant([]ConstEntry{{Value: one}})
+	if !list.IsList() || list.IsMap() {
+		t.Errorf("non-empty bare collection: want list, got mapness %d", list.CollMapness)
+	}
+	m := CollectionConstant([]ConstEntry{{Key: key, Value: one}})
+	if !m.IsMap() || m.IsList() {
+		t.Errorf("non-empty keyed collection: want map, got mapness %d", m.CollMapness)
+	}
+
+	// An empty literal with no channel is CollUnknown — neither list nor map.
+	empty := CollectionConstant(nil)
+	if empty.CollMapness != CollUnknown || empty.IsList() || empty.IsMap() {
+		t.Errorf("empty bare collection: want CollUnknown, got mapness %d", empty.CollMapness)
+	}
+	// An explicit kind settles an empty literal a channel decided.
+	emptyMap := CollectionConstantOf(nil, CollMap)
+	emptyList := CollectionConstantOf(nil, CollList)
+	if !emptyMap.IsMap() || !emptyList.IsList() {
+		t.Errorf("empty typed collections: want map/list, got %d/%d", emptyMap.CollMapness, emptyList.CollMapness)
+	}
+
+	// Equality includes mapness: the three empty kinds are pairwise unequal, and
+	// same-kind empties are equal.
+	if ConstantsEqual(emptyMap, emptyList) {
+		t.Error("an empty map must not equal an empty list")
+	}
+	if ConstantsEqual(emptyMap, empty) || ConstantsEqual(emptyList, empty) {
+		t.Error("a settled empty collection must not equal an unknown one")
+	}
+	if !ConstantsEqual(empty, CollectionConstant(nil)) {
+		t.Error("two unknown empty collections should be equal")
+	}
+	if !ConstantsEqual(emptyMap, CollectionConstantOf(nil, CollMap)) {
+		t.Error("two empty maps should be equal")
+	}
+
+	// String renders an empty map distinctly; an empty list and unknown both [].
+	if got := emptyMap.String(); got != "[:]" {
+		t.Errorf("empty map String() = %q, want [:]", got)
+	}
+	if got := emptyList.String(); got != "[]" {
+		t.Errorf("empty list String() = %q, want []", got)
+	}
+	if got := empty.String(); got != "[]" {
+		t.Errorf("empty unknown String() = %q, want []", got)
+	}
+}
+
 // TestNullConstant pins the null value: it renders as "null" (the String default
 // would dereference a nil Int and panic without an explicit case), and two null
 // values are equal — the single-inhabitant rule ConstantsEqual relies on so the

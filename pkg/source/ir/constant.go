@@ -10,6 +10,23 @@ import (
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
 )
 
+// CollKind is the three-valued list/map distinction (the "mapness") of a folded
+// collection constant. A non-empty literal settles it by syntax — a keyed entry
+// makes it a map, a bare element a list — but an empty literal carries no key to
+// read, so its mapness comes from a syntactic channel (a const/let/param type
+// annotation, a callee's declared result type) when there is one, and stays
+// CollUnknown when there is not. The mapness decides the one operation the two
+// kinds disagree on (set: a list's out-of-range write versus a map's upsert) and
+// the meaning of the key in keys/values/map/filter/for; the operations that read
+// the same for both (len, fold, get, any, all) ignore it.
+type CollKind int
+
+const (
+	CollUnknown CollKind = iota // an empty literal with no settling channel
+	CollList                    // a list (bare elements, or a list-typed channel)
+	CollMap                     // a map (keyed entries, or a map-typed channel)
+)
+
 // ConstKind distinguishes the kinds of evaluated constant value.
 type ConstKind int
 
@@ -40,7 +57,13 @@ type Constant struct {
 	Str    string       // valid when Kind == ConstString (the string) or ConstError (the message)
 	Coll   []ConstEntry // valid when Kind == ConstCollection
 	Fields []ConstField // valid when Kind == ConstRecord, in canonical (name) order
-	Millis int64        // valid when Kind == ConstDatetime (UTC epoch) or ConstDuration (total)
+
+	// CollMapness is the list/map distinction of a collection constant (valid
+	// when Kind == ConstCollection). A non-empty collection always has a settled
+	// mapness from its entries; an empty one is CollUnknown unless a syntactic
+	// channel settled it. See CollKind.
+	CollMapness CollKind
+	Millis      int64 // valid when Kind == ConstDatetime (UTC epoch) or ConstDuration (total)
 
 	// valid when Kind == ConstFunc: the function literal and the values it
 	// captured from its enclosing scope (the closure environment).
@@ -112,6 +135,16 @@ func ConstantsEqual(a, b *Constant) bool {
 		return a.Start != nil && b.Start != nil && a.End != nil && b.End != nil &&
 			a.Start.Cmp(b.Start) == 0 && a.End.Cmp(b.End) == 0
 	case ConstCollection:
+		// The mapness is part of a collection's identity: an empty list is not an
+		// empty map (their set/keys/iteration meanings differ), and an empty
+		// CollUnknown collection — whose mapness a channel has not settled — is
+		// equal only to another CollUnknown, never to a settled empty list or map.
+		// Treating Unknown-versus-settled as unequal is the safe side for the
+		// engine's early cutoff: it triggers a recompute rather than coalescing two
+		// facts a later channel could tell apart.
+		if a.CollMapness != b.CollMapness {
+			return false
+		}
 		if len(a.Coll) != len(b.Coll) {
 			return false
 		}
@@ -195,11 +228,47 @@ func RangeConstant(start, end *big.Int) *Constant {
 	return &Constant{Kind: ConstRange, Start: start, End: end}
 }
 
-// CollectionConstant builds a collection constant from its entries. An empty
-// slice is the empty list/map; a list's entries have a nil Key.
+// CollectionConstant builds a collection constant from its entries, settling its
+// mapness from them: a keyed entry makes it a map, a bare element a list, and an
+// empty slice — which carries no key to read — is the conservative CollUnknown.
+// Use CollectionConstantOf to supply a mapness for an empty literal a syntactic
+// channel settled, or to carry the receiver's mapness through an operation.
 func CollectionConstant(entries []ConstEntry) *Constant {
-	return &Constant{Kind: ConstCollection, Coll: entries}
+	return CollectionConstantOf(entries, collMapnessOf(entries))
 }
+
+// CollectionConstantOf builds a collection constant with an explicit mapness —
+// the form an empty literal a type channel settled (an empty map<K,V> annotation)
+// and an operation that preserves the receiver's mapness (set/map/filter over an
+// empty collection) build through. A non-empty collection's entries already settle
+// its mapness, so kind must agree with them; the caller passes the same mapness
+// collMapnessOf would derive.
+func CollectionConstantOf(entries []ConstEntry, kind CollKind) *Constant {
+	return &Constant{Kind: ConstCollection, Coll: entries, CollMapness: kind}
+}
+
+// collMapnessOf derives the mapness a slice of entries settles by syntax: a keyed
+// entry makes it a map, a bare element a list, and an empty slice is CollUnknown.
+func collMapnessOf(entries []ConstEntry) CollKind {
+	for _, e := range entries {
+		if e.Key != nil {
+			return CollMap
+		}
+	}
+	if len(entries) == 0 {
+		return CollUnknown
+	}
+	return CollList
+}
+
+// IsMap reports whether a collection constant is a map (CollMap) — true only when
+// its mapness is settled to map, so an empty CollUnknown collection is not a map.
+func (c *Constant) IsMap() bool { return c != nil && c.CollMapness == CollMap }
+
+// IsList reports whether a collection constant is a list (CollList) — true only
+// when its mapness is settled to list, so an empty CollUnknown collection is not
+// a list.
+func (c *Constant) IsList() bool { return c != nil && c.CollMapness == CollList }
 
 // RecordConstant builds a record constant from its fields, normalizing to the
 // canonical order — sorted by field name, a duplicate name keeping the last
@@ -269,11 +338,13 @@ func DurationConstant(millis int64) *Constant {
 }
 
 // String renders the constant's value: the integer, "true"/"false", the quoted
-// string, the bracketed collection ([a, b] for a list, ["k": v] for a map),
-// the braced record ({ x: 1, y: 2 }, fields in canonical order), or the
-// canonical datetime/duration form — the UTC instant regardless of the offset
-// written, and the largest-units-first decomposition regardless of the groups
-// written (90m evaluates as 1h30m).
+// string, the bracketed collection ([a, b] for a list, ["k": v] for a map), the
+// braced record ({ x: 1, y: 2 }, fields in canonical order), or the canonical
+// datetime/duration form — the UTC instant regardless of the offset written, and
+// the largest-units-first decomposition regardless of the groups written (90m
+// evaluates as 1h30m). An empty list and an empty CollUnknown both render []; an
+// empty map renders [:] — a diagnostic-only marker (the language has no [:]
+// literal) so a folded empty map is told apart from an empty list in a dump.
 func (c *Constant) String() string {
 	if c == nil {
 		return "<unevaluated>"
@@ -286,6 +357,9 @@ func (c *Constant) String() string {
 	case ConstFunc:
 		return "<func>"
 	case ConstCollection:
+		if len(c.Coll) == 0 && c.CollMapness == CollMap {
+			return "[:]" // an empty map: a marker, since the language has no [:] literal
+		}
 		parts := make([]string, len(c.Coll))
 		for i, e := range c.Coll {
 			if e.Key != nil {
