@@ -2,8 +2,10 @@
 // constant expression to its value (ir.Constant). It is the evaluation mirror of
 // package types/infer — where infer derives an expression's type, eval derives
 // its value — over the same desugared shape: a literal, a value reference, or a
-// method call, whose value comes from the receiver type's native intrinsic in
-// the builtin registry.
+// method call. A method call's value comes from a user-defined method's body
+// (evaluated with self bound to the receiver, the way a top-level function's
+// body is) when the receiver carries one, or from the receiver type's native
+// intrinsic in the builtin registry otherwise.
 //
 // Evaluation reads name resolution and referenced values through an Env, so it
 // has no dependency on the semantic query engine: the engine supplies a
@@ -51,6 +53,27 @@ type Env interface {
 	LookupType(name string) *ir.TypeDef
 	// Registry returns the builtin registry the program evaluates against.
 	Registry() *builtin.Registry
+}
+
+// ReceiverTyper is an optional Env capability: resolving a written type
+// annotation to its definition. It is the syntactic type channel a method call
+// on a nominal type over a primitive folds through — a value of such a type
+// (a plain integer, say) carries no type definition, so the folder reads the
+// receiver's static type from the annotations in scope instead. Every channel
+// is a declared annotation: a conversion's type name (Level(5)), a constant's
+// annotation (const x: Level), a parameter or let's annotation, a method's self
+// receiver, a function or method's result type (getLevel().increment()). The
+// resolution is a pure name lookup in the universe — never the type query — so
+// the value query stays independent of typing, and because every channel is an
+// annotation the source already type-checked against, the def it names is the
+// one the type checker used. An Env that does not implement this resolves only
+// enum receivers (which carry their definition in the value).
+type ReceiverTyper interface {
+	// TypeExprDef resolves a written type annotation to the type definition it
+	// names, or nil when it names no nominal type (an unresolved name, a bare
+	// composite like a union or record, a primitive). It is a universe lookup,
+	// not a type query.
+	TypeExprDef(t ast.TypeExpr) *ir.TypeDef
 }
 
 // Decl folds a declaration's value, or nil when it has no initializer. Overflow
@@ -140,6 +163,17 @@ type evalCtx struct {
 	// annotation), or nil. It reaches only the immediate expression — it does
 	// not propagate into nested sub-expressions, which set their own context.
 	expected *ir.TypeDef
+	// selfDef is the type definition the self keyword has inside an applied
+	// method body — the method's owning type — or nil outside one. It is the
+	// syntactic type channel for a self-receiver method call (self.increment()).
+	selfDef *ir.TypeDef
+	// localDefs records the static type definition of a let-bound or parameter
+	// local whose annotation names a nominal type, so a method call on that local
+	// folds. A local absent from the map has no statically-known definition (its
+	// type is a primitive, a composite, or could not be read syntactically); only
+	// nominal-typed locals appear. It shares the lifetime of locals (the applied
+	// body's environment), and like it is nil at the top level.
+	localDefs map[string]*ir.TypeDef
 }
 
 // maxApplyDepth caps function-application recursion: a recursive fold that has
@@ -213,8 +247,9 @@ func evalExpr(e ast.Expr, ctx evalCtx) *ir.Constant {
 		}
 		return nil
 	case *ast.SelfExpr:
-		// The bound self value, or nil outside a self-binding context (a method
-		// body is not folded here yet).
+		// The bound self value, or nil outside a self-binding context. It is set
+		// by a refinement predicate (self bound to the checked constant) and by a
+		// folded method body (self bound to the receiver).
 		return ctx.self
 	case *ast.CollectionLit:
 		return collection(e, sub)
@@ -308,7 +343,7 @@ func evalExpr(e ast.Expr, ctx evalCtx) *ir.Constant {
 		for i, a := range e.Arguments {
 			args[i] = evalExpr(a, sub)
 		}
-		return call(sub, recv, member.Member.Name, args)
+		return call(sub, member.Receiver, recv, member.Member.Name, args)
 	default:
 		return nil
 	}
@@ -337,35 +372,123 @@ func shortCircuit(recv *ir.Constant, name string, args []ast.Expr) (*ir.Constant
 	return nil, false
 }
 
-// convert folds a conversion T(x). The one conversion with a constant value
-// today is error("msg") — the error type's constructor — which folds to an
-// error constant carrying the message; any other conversion has no constant
-// value here.
+// convert folds a conversion T(x). A nominal conversion over a primitive
+// (Level(5), where Level = int8) is the identity on the value — a Level is
+// represented as its underlying integer — so the argument's folded value passes
+// through when its kind backs the type, which both gives Level(5) a value and
+// lets a method fold on it. The error constructor error("msg") folds to an error
+// constant carrying the message. Any other conversion has no constant value
+// here.
 func convert(def *ir.TypeDef, args []ast.Expr, ctx evalCtx) *ir.Constant {
-	if !def.Builtin {
-		return nil // a user type shadowing a native name has no native conversion
-	}
-	n, ok := ctx.env.Registry().Native(def.Name)
-	if !ok || !n.Err || len(args) != 1 {
+	if len(args) != 1 {
 		return nil
 	}
+	if def.Builtin {
+		n, ok := ctx.env.Registry().Native(def.Name)
+		if !ok || !n.Err {
+			return nil // only error has a constant-valued native conversion
+		}
+		v := evalExpr(args[0], ctx)
+		if v == nil || v.Kind != ir.ConstString {
+			return nil
+		}
+		return ir.ErrorConstant(v.Str)
+	}
+	// A nominal type over a primitive: the value is the argument's, unchanged,
+	// when its kind matches the underlying primitive. A conversion to a composite
+	// (a record, a union) has no constant identity value here.
 	v := evalExpr(args[0], ctx)
-	if v == nil || v.Kind != ir.ConstString {
+	if v == nil || !defBacksKind(ctx.env.Registry(), def, v.Kind) {
 		return nil
 	}
-	return ir.ErrorConstant(v.Str)
+	return v
+}
+
+// callable is the body-bearing shape applyBody folds: a pure (non-extern,
+// effect-free) routine's parameters and statement body. A top-level function
+// and a user-defined method share this — a method is a function with a self
+// receiver — so the parameter-binding, purity, and depth-guard rules live in
+// one place. extern reports an extern declaration (a native intrinsic, no
+// body) and effectful one that interacts with the world; neither folds. selfDef
+// is the method's owning type (the syntactic type of self in the body), nil for
+// a function.
+type callable struct {
+	params    []*ast.ParamDef
+	body      []ast.Stmt
+	extern    bool
+	effectful bool
+	selfDef   *ir.TypeDef
+}
+
+func funcCallable(fd *ast.FuncDecl) callable {
+	return callable{params: fd.Params, body: fd.Body, extern: fd.Extern, effectful: len(fd.Effects) > 0}
+}
+
+func methodCallable(md *ast.MethodDecl, selfDef *ir.TypeDef) callable {
+	return callable{params: md.Params, body: md.Body, extern: md.Extern, effectful: len(md.Effects) > 0, selfDef: selfDef}
+}
+
+// applyBody folds a pure routine's body against already-folded argument values,
+// with self bound for a method (nil for a top-level function). The body sees
+// only its parameters (and self) — never the caller's locals — exactly as a
+// function or method body sees its parameters and the program's declarations
+// through env. An extern or effectful routine does not fold: only a pure one
+// has a compile-time value, and the upstream pure-context check keeps an
+// effectful one out of every const position; this guard keeps eval pure even if
+// one slips through. The depth guard counts the application, turning runaway
+// recursion (direct or mutual, through functions and methods alike) into an
+// unevaluated value rather than a stack overflow.
+//
+// The static type channels are seeded for the body: self's definition (a
+// method's owning type) and each parameter whose annotation names a nominal type
+// — so a method call on self or on a nominal-typed parameter inside the body
+// resolves its receiver's definition syntactically, the way the caller resolved
+// this call's receiver.
+func applyBody(c callable, self *ir.Constant, vals []*ir.Constant, ctx evalCtx) *ir.Constant {
+	if c.extern || c.effectful {
+		return nil
+	}
+	locals := make(map[string]*ir.Constant, len(c.params))
+	var localDefs map[string]*ir.TypeDef
+	for i, p := range c.params {
+		locals[p.Name] = vals[i]
+		if def := annotationDef(ctx.env, p.Type); def != nil {
+			if localDefs == nil {
+				localDefs = make(map[string]*ir.TypeDef, len(c.params))
+			}
+			localDefs[p.Name] = def
+		}
+	}
+	return evalBody(c.body, evalCtx{
+		env: ctx.env, locals: locals, self: self,
+		selfDef: c.selfDef, localDefs: localDefs, depth: ctx.depth + 1,
+	})
+}
+
+// annotationDef resolves a written type annotation to its definition through the
+// Env's optional ReceiverTyper, or nil when the Env does not supply one or the
+// annotation names no nominal type. A nil annotation (an omitted type) resolves
+// to nil.
+func annotationDef(env Env, t ast.TypeExpr) *ir.TypeDef {
+	if t == nil {
+		return nil
+	}
+	rt, ok := env.(ReceiverTyper)
+	if !ok {
+		return nil
+	}
+	return rt.TypeExprDef(t)
 }
 
 // applyFunc folds a call of a top-level function: the arguments fold in the
 // caller's context, the overload whose parameters accept their value kinds is
 // selected, and its body's return folds with only the parameter bindings in
-// scope (a function body sees its parameters and the other declarations
-// through env, never the caller's locals). Evaluation is type-blind, so the
-// selection is by value kind and conservative: when more than one candidate
-// could plausibly accept the arguments — same-kind overloads like int8/int32,
-// or a parameter type it cannot decide — the call simply does not fold, so a
-// wrong overload's body is never applied. The depth guard turns runaway
-// recursion into an unevaluated value.
+// scope. Evaluation is type-blind, so the selection is by value kind and
+// conservative: when more than one candidate could plausibly accept the
+// arguments — same-kind overloads like int8/int32, or a parameter type it
+// cannot decide — the call simply does not fold, so a wrong overload's body is
+// never applied. The depth guard turns runaway recursion into an unevaluated
+// value.
 func applyFunc(cands []*ast.FuncDecl, args []ast.Expr, ctx evalCtx) *ir.Constant {
 	if ctx.depth >= maxApplyDepth {
 		return nil
@@ -380,17 +503,7 @@ func applyFunc(cands []*ast.FuncDecl, args []ast.Expr, ctx evalCtx) *ir.Constant
 	var fd *ast.FuncDecl
 	n := 0
 	for _, cand := range cands {
-		if len(cand.Params) != len(args) {
-			continue
-		}
-		fits := true
-		for i, p := range cand.Params {
-			if !kindAccepts(p.Type, vals[i].Kind) {
-				fits = false
-				break
-			}
-		}
-		if fits {
+		if fits(cand.Params, vals) {
 			fd = cand
 			n++
 		}
@@ -398,26 +511,50 @@ func applyFunc(cands []*ast.FuncDecl, args []ast.Expr, ctx evalCtx) *ir.Constant
 	if n != 1 {
 		return nil
 	}
-	if fd.Extern || len(fd.Effects) > 0 {
-		// Only a pure function folds. An effectful one compiles to runtime
-		// code for a target — the pure-context check upstream keeps it out of
-		// every compile-time position, and this guard keeps eval pure even if
-		// one slips through.
-		return nil
-	}
+	return applyBody(funcCallable(fd), nil, vals, ctx)
+}
 
-	locals := make(map[string]*ir.Constant, len(fd.Params))
-	for i, p := range fd.Params {
-		locals[p.Name] = vals[i]
+// fits reports whether a top-level function's parameter list could accept the
+// folded argument values: the arity must agree, and each parameter's written
+// type must accept its argument's value kind. A function has no self-typed
+// parameter, so the receiver kind is unknown (-1). It is the type-blind,
+// conservative selection both the function and the method overload paths share —
+// kindAccepts rules in only the kinds a parameter can hold and answers true for
+// anything it cannot decide, so a wrong overload is never ruled in, only an
+// undecidable one kept out.
+func fits(params []*ast.ParamDef, vals []*ir.Constant) bool {
+	return fitsWithSelf(params, vals, -1)
+}
+
+// fitsWithSelf is fits with the receiver's value kind known (a method call), so
+// a self-typed parameter — common in operator-style methods (merge(points: self))
+// — accepts only that kind rather than being undecidable. A selfKind of -1 means
+// the receiver kind is unknown (a function, or a method whose receiver kind could
+// not be determined), and a self-typed parameter is then undecidable as before.
+func fitsWithSelf(params []*ast.ParamDef, vals []*ir.Constant, selfKind ir.ConstKind) bool {
+	if len(params) != len(vals) {
+		return false
 	}
-	return evalBody(fd.Body, evalCtx{env: ctx.env, locals: locals, depth: ctx.depth + 1})
+	for i, p := range params {
+		if isSelfType(p.Type) {
+			if selfKind >= 0 && vals[i].Kind != selfKind {
+				return false
+			}
+			continue // an undecidable self (unknown receiver kind): accept
+		}
+		if !kindAccepts(p.Type, vals[i].Kind) {
+			return false
+		}
+	}
+	return true
 }
 
 // kindAccepts reports whether a parameter's written type can hold a constant
 // of the given kind. It decides by spelling for the prelude's primitive names
 // and the structural type forms, and answers true for anything it cannot
 // decide (a named alias, a union, a qualified name) — so a wrong overload is
-// never ruled in, only an undecidable set kept from folding.
+// never ruled in, only an undecidable set kept from folding. A self-typed
+// parameter is handled by fitsWithSelf (which knows the receiver kind), not here.
 func kindAccepts(t ast.TypeExpr, k ir.ConstKind) bool {
 	switch t := t.(type) {
 	case *ast.NamedType:
@@ -521,7 +658,12 @@ func record(e *ast.RecordLit, ctx evalCtx) *ir.Constant {
 // value for the receiver (only reachable for a type-incorrect program), or the
 // intrinsic itself has no value (a division by zero). The context threads the
 // application depth through, so recursion through list.map is guarded too.
-func call(ctx evalCtx, recv *ir.Constant, name string, args []*ir.Constant) *ir.Constant {
+//
+// recvExpr is the receiver's source expression, the syntactic type channel a
+// nominal-typed receiver resolves its definition through (its value carries no
+// type); it is nil for an internally synthesized receiver, which then resolves
+// only by value (an enum).
+func call(ctx evalCtx, recvExpr ast.Expr, recv *ir.Constant, name string, args []*ir.Constant) *ir.Constant {
 	if recv == nil {
 		return nil
 	}
@@ -531,6 +673,18 @@ func call(ctx evalCtx, recv *ir.Constant, name string, args []*ir.Constant) *ir.
 			return nil
 		}
 		kinds[i] = a.Kind
+	}
+	// A user-defined method with a body folds first — its body is evaluated with
+	// self bound — so a method call (Element.Fire.isFire(), Level(5).increment())
+	// reaches its result the way a top-level function call does. The receiver's
+	// type is read either from the value (an enum constant carries its EnumDef) or
+	// syntactically from the declared annotation in scope (a nominal type over a
+	// primitive), never from the type query — so eval stays value-blind. An extern
+	// method (the six enum comparisons, a native intrinsic) has no body and falls
+	// through to the intrinsic path below, preserving the existing resolution
+	// order — a user-defined method only when one exists, the intrinsic otherwise.
+	if v, ok := applyUserMethod(ctx, recvExpr, recv, name, args); ok {
+		return v
 	}
 	if recv.Kind == ir.ConstCollection {
 		return collectionMethod(ctx, recv, name, args)
@@ -560,6 +714,256 @@ func call(ctx evalCtx, recv *ir.Constant, name string, args []*ir.Constant) *ir.
 		return nil
 	}
 	return fn(recv, args)
+}
+
+// applyUserMethod folds a call of a user-defined method. It reports whether it
+// handled the call: true with the folded value (or nil when the body did not
+// fold), false when the receiver's type could not be determined or has no
+// body-bearing method of that name, leaving the caller's intrinsic dispatch to
+// run. The receiver's definition comes from the value (an enum) or, failing
+// that, from the receiver expression's declared annotation (a nominal type); a
+// definition that does not back the receiver's value kind is rejected, so a
+// wrong def (a string-based type over an integer value, say) never applies. The
+// selection mirrors a function overload's: of the methods of that name that have
+// a body, the one whose parameters accept the argument value kinds is chosen,
+// and the call folds only when exactly one fits — an ambiguous or undecidable
+// set does not fold (nil), so a wrong overload's body is never applied. The
+// depth guard (shared with applyFunc through ctx.depth) turns runaway recursion
+// — a method calling itself, or a method/function cycle — into an unevaluated
+// value rather than a stack overflow.
+func applyUserMethod(ctx evalCtx, recvExpr ast.Expr, recv *ir.Constant, name string, args []*ir.Constant) (*ir.Constant, bool) {
+	def := receiverDef(ctx, recvExpr, recv)
+	if def == nil {
+		return nil, false
+	}
+	var sel *ast.MethodDecl
+	n := 0
+	for _, m := range def.Methods {
+		// A method's AST declaration carries its body; an extern method (no
+		// Syntax, or no body) is left to the intrinsic path.
+		if m.Name != name || m.Syntax == nil || len(m.Syntax.Body) == 0 {
+			continue
+		}
+		// The receiver's value kind decides a self-typed parameter, so an
+		// operator-style overload (merge(points: self) vs merge(active: bool))
+		// resolves the way the type checker did.
+		if fitsWithSelf(m.Syntax.Params, args, recv.Kind) {
+			sel = m.Syntax
+			n++
+		}
+	}
+	if n == 0 {
+		return nil, false // no body-bearing overload: let the intrinsic path run
+	}
+	if ctx.depth >= maxApplyDepth {
+		return nil, true // the recursion guard fired: a safe, unfoldable result
+	}
+	if n != 1 {
+		return nil, true // ambiguous: do not fold, but the method is user-defined
+	}
+	return applyBody(methodCallable(sel, def), recv, args, ctx), true
+}
+
+// receiverDef determines the static type definition of a method call's receiver:
+// from the value when it carries one (an enum constant), otherwise from the
+// receiver expression's declared annotation, a syntactic type channel. The
+// syntactic def must back the receiver's value kind — a Level (int8) def over an
+// integer value, never a string-based def over it — so a def read from an
+// annotation that does not match the value is rejected (the value won't type-check
+// against it, so this only fires on a malformed program, but it keeps a wrong def
+// from ever applying). It returns nil when neither channel yields a usable def.
+func receiverDef(ctx evalCtx, recvExpr ast.Expr, recv *ir.Constant) *ir.TypeDef {
+	// The enum channel is highest priority: an enum value names its own type, no
+	// annotation needed.
+	if recv.Kind == ir.ConstEnum {
+		return recv.EnumDef
+	}
+	def := syntacticDef(ctx, recvExpr)
+	if def == nil || !defBacksKind(ctx.env.Registry(), def, recv.Kind) {
+		return nil
+	}
+	return def
+}
+
+// syntacticDef resolves a receiver expression to the type definition its
+// declared static type names, through the annotation channels — never the type
+// query:
+//
+//   - a conversion call Level(5): the callee names the type directly;
+//   - self: the enclosing method's owning type (ctx.selfDef);
+//   - a parameter or let local: its annotation's def (ctx.localDefs), set when
+//     the binding was introduced;
+//   - a top-level constant reference: the constant's annotation;
+//   - a call's result: the callee function or method's declared result type, so a
+//     chain (getLevel().increment()) resolves left to right.
+//
+// It returns nil when no channel applies or the Env supplies no ReceiverTyper —
+// the conservative failure that leaves the call unfolded.
+func syntacticDef(ctx evalCtx, recvExpr ast.Expr) *ir.TypeDef {
+	switch e := recvExpr.(type) {
+	case *ast.SelfExpr:
+		return ctx.selfDef
+	case *ast.Identifier:
+		// A body-local (a let or parameter) shadows a top-level name; its def was
+		// recorded from its annotation when the binding was introduced.
+		if _, isLocal := ctx.locals[e.Name]; isLocal {
+			return ctx.localDefs[e.Name]
+		}
+		// A top-level constant reference resolves through its own annotation.
+		if decl := ctx.env.Resolve(e); decl != nil {
+			return annotationDef(ctx.env, decl.Type)
+		}
+		return nil
+	case *ast.CallExpr:
+		return callResultDef(ctx, e)
+	default:
+		return nil
+	}
+}
+
+// callResultDef resolves the type definition of a call expression's result,
+// through the callee's declared result annotation. A conversion (the callee
+// names a type) resolves to that type itself; a top-level function call resolves
+// to the function's result; a method call resolves to the method's result, the
+// method found on the inner receiver's own (recursively resolved) definition. A
+// local binding shadows a type or function name, exactly as in the value rules.
+// An overload set resolves only when its members agree on a result def, so an
+// undecidable overload does not fold the chain.
+func callResultDef(ctx evalCtx, e *ast.CallExpr) *ir.TypeDef {
+	switch callee := e.Callee.(type) {
+	case *ast.Identifier:
+		if _, isLocal := ctx.locals[callee.Name]; isLocal {
+			return nil
+		}
+		// A conversion's result is the named type itself (Level(5) is a Level).
+		if def := ctx.env.LookupType(callee.Name); def != nil {
+			return def
+		}
+		return funcResultDef(ctx.env, ctx.env.ResolveFunc(callee))
+	case *ast.MemberExpr:
+		if recv, isIdent := callee.Receiver.(*ast.Identifier); isIdent {
+			if _, isLocal := ctx.locals[recv.Name]; !isLocal {
+				if cands := ctx.env.ResolveFuncMember(callee); len(cands) > 0 {
+					return funcResultDef(ctx.env, cands)
+				}
+			}
+		}
+		// A method call: find the method on the inner receiver's definition and
+		// read its declared result.
+		inner := syntacticDef(ctx, callee.Receiver)
+		if inner == nil {
+			return nil
+		}
+		return methodResultDef(ctx.env, inner, callee.Member.Name)
+	default:
+		return nil
+	}
+}
+
+// funcResultDef resolves a function overload set to the type definition its
+// result annotation names, or nil when the set is empty, the overloads disagree
+// on the result def, or the result names no nominal type. Requiring agreement
+// keeps an undecidable overload from resolving the chain to a wrong def.
+func funcResultDef(env Env, cands []*ast.FuncDecl) *ir.TypeDef {
+	var def *ir.TypeDef
+	for i, fd := range cands {
+		d := annotationDef(env, fd.Result)
+		if i == 0 {
+			def = d
+			continue
+		}
+		if d != def {
+			return nil
+		}
+	}
+	return def
+}
+
+// methodResultDef resolves the type definition a method's declared result names,
+// across the body-bearing overloads of that name on def. A result type self is
+// the receiver's own definition (increment(): self returns a Level), so a chain
+// of self-returning methods keeps its type. The overloads must agree, or the
+// chain does not resolve.
+func methodResultDef(env Env, def *ir.TypeDef, name string) *ir.TypeDef {
+	var result *ir.TypeDef
+	found := false
+	for _, m := range def.Methods {
+		if m.Name != name || m.Syntax == nil {
+			continue
+		}
+		var d *ir.TypeDef
+		if isSelfType(m.Syntax.Result) {
+			d = def // a self result keeps the receiver's type
+		} else {
+			d = annotationDef(env, m.Syntax.Result)
+		}
+		if !found {
+			result, found = d, true
+			continue
+		}
+		if d != result {
+			return nil
+		}
+	}
+	return result
+}
+
+// isSelfType reports whether a written type annotation is the self receiver type
+// — the result spelling (increment(): self) a method uses to return its own type.
+func isSelfType(t ast.TypeExpr) bool {
+	n, ok := t.(*ast.NamedType)
+	return ok && n.Namespace == "" && n.Name == "self" && len(n.Args) == 0
+}
+
+// defBacksKind reports whether a type definition's underlying primitive can hold
+// a value of the given kind: a Level (= int8) backs an integer, a Locale (=
+// string) backs a string. It walks the def's body to the underlying primitive
+// and checks its native descriptor against the kind; a def with no underlying
+// primitive (a record, a union, an unresolved body) backs no scalar kind. It is
+// the guard that keeps a def read from an annotation from applying to a value of
+// the wrong kind.
+func defBacksKind(reg *builtin.Registry, def *ir.TypeDef, kind ir.ConstKind) bool {
+	n := underlyingPrimitive(reg, def, map[*ir.TypeDef]bool{})
+	if n == nil {
+		return false
+	}
+	switch kind {
+	case ir.ConstInt:
+		return n.IsInteger()
+	case ir.ConstBool:
+		return n.Bool
+	case ir.ConstString:
+		return n.Str
+	case ir.ConstDatetime:
+		return n.Datetime
+	case ir.ConstDuration:
+		return n.Duration
+	case ir.ConstError:
+		return n.Err
+	default:
+		return false
+	}
+}
+
+// underlyingPrimitive returns the native descriptor of the primitive a nominal
+// type bottoms out at — a Level (= int8) yields the int8 descriptor — by
+// following the chain of Named bodies to a Builtin. It reports nil for a type
+// with no scalar underlying (a record, a union, an enum, an unresolved body) or
+// a cyclic alias chain.
+func underlyingPrimitive(reg *builtin.Registry, def *ir.TypeDef, seen map[*ir.TypeDef]bool) *builtin.NativeType {
+	if def == nil || seen[def] {
+		return nil
+	}
+	seen[def] = true
+	switch body := def.Body.(type) {
+	case *ir.Builtin:
+		n, _ := reg.Native(body.Name)
+		return n
+	case *ir.Named:
+		return underlyingPrimitive(reg, body.Def, seen)
+	default:
+		return nil
+	}
 }
 
 // enumComparison folds one of an enum value's six comparison methods. Equality
@@ -788,7 +1192,8 @@ func apply(ctx evalCtx, fn *ir.Constant, args []*ir.Constant) *ir.Constant {
 // shadowing let in this block is undone (blockScope), so its binding does not
 // leak to the caller — while an assignment to an outer local persists.
 func evalBody(body []ast.Stmt, ctx evalCtx) *ir.Constant {
-	scope := newBlockScope(ctx.locals)
+	scope := newBlockScope(ctx.locals, ctx.localDefs)
+	ctx.localDefs = scope.localDefs // share the scope's def map (it may allocate one)
 	defer scope.restore()
 	for _, stmt := range body {
 		switch stmt := stmt.(type) {
@@ -839,27 +1244,37 @@ func evalBody(body []ast.Stmt, ctx evalCtx) *ir.Constant {
 // an outer local are not recorded — they mutate the shared environment and
 // persist past the block, exactly as at runtime.
 type blockScope struct {
-	locals  map[string]*ir.Constant
-	shadows map[string]*ir.Constant // the prior value of each name a let shadows
-	added   map[string]bool         // names this block's lets introduced fresh
+	locals    map[string]*ir.Constant
+	localDefs map[string]*ir.TypeDef
+	shadows   map[string]*ir.Constant // the prior value of each name a let shadows
+	defShadow map[string]*ir.TypeDef  // the prior static def of each shadowed name
+	added     map[string]bool         // names this block's lets introduced fresh
 }
 
-// newBlockScope begins tracking a block's let bindings over locals. A nil locals
-// (a body with no environment) still yields a usable scope whose restore is a
-// no-op, since no let can run without an environment to bind into.
-func newBlockScope(locals map[string]*ir.Constant) *blockScope {
-	return &blockScope{locals: locals}
+// newBlockScope begins tracking a block's let bindings over the body's locals
+// and their static defs. A nil locals (a body with no environment) still yields
+// a usable scope whose restore is a no-op, since no let can run without an
+// environment to bind into. When locals is non-nil the def map is allocated
+// here if absent — so it is shared with the body ctx in place, the way the
+// locals map is, and a let's def written by bind is visible to the statements
+// that follow.
+func newBlockScope(locals map[string]*ir.Constant, localDefs map[string]*ir.TypeDef) *blockScope {
+	if locals != nil && localDefs == nil {
+		localDefs = map[string]*ir.TypeDef{}
+	}
+	return &blockScope{locals: locals, localDefs: localDefs}
 }
 
-// bind records a let of name and writes its value into the environment, saving
-// what it shadows so restore can put it back. The environment must be non-nil
-// (a function or method body always has one); a nil one means a let appeared
-// where it cannot bind, which bind reports by returning false.
+// bind records a let of name and writes its value (and, when its annotation
+// names a nominal type, its static def) into the environment, saving what it
+// shadows so restore can put it back. The environment must be non-nil (a
+// function or method body always has one); a nil one means a let appeared where
+// it cannot bind, which bind reports by returning false.
 //
 // Only the first let of a name in this block records what it shadows: a later
 // rebind (two lets of the same name, illegal but tolerated) overwrites the
 // value, and restore still returns the binding the block inherited.
-func (s *blockScope) bind(name string, v *ir.Constant) bool {
+func (s *blockScope) bind(name string, v *ir.Constant, def *ir.TypeDef) bool {
 	if s.locals == nil {
 		return false
 	}
@@ -869,6 +1284,10 @@ func (s *blockScope) bind(name string, v *ir.Constant) bool {
 				s.shadows = map[string]*ir.Constant{}
 			}
 			s.shadows[name] = prior
+			if s.defShadow == nil {
+				s.defShadow = map[string]*ir.TypeDef{}
+			}
+			s.defShadow[name] = s.localDefs[name] // nil when the shadowed name had no def
 		} else {
 			if s.added == nil {
 				s.added = map[string]bool{}
@@ -877,7 +1296,22 @@ func (s *blockScope) bind(name string, v *ir.Constant) bool {
 		}
 	}
 	s.locals[name] = v
+	s.setDef(name, def)
 	return true
+}
+
+// setDef records a let's static def into the local-def map, allocating it on
+// first use. A nil def clears any inherited def for the name, so a binding whose
+// annotation names no nominal type does not read an outer name's def.
+func (s *blockScope) setDef(name string, def *ir.TypeDef) {
+	if def == nil {
+		delete(s.localDefs, name)
+		return
+	}
+	if s.localDefs == nil {
+		s.localDefs = map[string]*ir.TypeDef{}
+	}
+	s.localDefs[name] = def
 }
 
 // recorded reports whether this block already saved what a let of name shadows
@@ -889,21 +1323,29 @@ func (s *blockScope) recorded(name string) bool {
 	return s.added[name]
 }
 
-// restore undoes this block's let bindings: a shadowed outer binding is put
-// back, and a freshly added one is removed, leaving the environment as the
-// caller had it (save for assignments to outer locals, which persist).
+// restore undoes this block's let bindings: a shadowed outer binding (value and
+// static def) is put back, and a freshly added one is removed, leaving the
+// environment as the caller had it (save for assignments to outer locals, which
+// persist).
 func (s *blockScope) restore() {
 	for name, prior := range s.shadows {
 		s.locals[name] = prior
+		if def := s.defShadow[name]; def != nil {
+			s.localDefs[name] = def
+		} else {
+			delete(s.localDefs, name)
+		}
 	}
 	for name := range s.added {
 		delete(s.locals, name)
+		delete(s.localDefs, name)
 	}
 }
 
-// evalLet folds a let's initializer and binds the local. It returns false when
-// the initializer cannot be folded (so the body cannot fold past the let) or
-// when there is no environment to bind into.
+// evalLet folds a let's initializer and binds the local, recording its static
+// def when the let's annotation names a nominal type (so a method call on the
+// let folds). It returns false when the initializer cannot be folded (so the
+// body cannot fold past the let) or when there is no environment to bind into.
 func evalLet(s *ast.LetStmt, ctx evalCtx, scope *blockScope) bool {
 	if s.Value == nil {
 		return false
@@ -912,7 +1354,7 @@ func evalLet(s *ast.LetStmt, ctx evalCtx, scope *blockScope) bool {
 	if v == nil {
 		return false
 	}
-	return scope.bind(s.Name, v)
+	return scope.bind(s.Name, v, annotationDef(ctx.env, s.Type))
 }
 
 // evalAssign folds an assignment's value and updates the target local in place,
@@ -978,7 +1420,8 @@ func evalIf(s *ast.IfStmt, ctx evalCtx) (*ir.Constant, ifOutcome) {
 // in the branch is block-scoped to it (and undone on exit); an assignment to an
 // outer local persists, so a guarded reassignment is visible after the if.
 func branchOutcome(body []ast.Stmt, ctx evalCtx) (*ir.Constant, ifOutcome) {
-	scope := newBlockScope(ctx.locals)
+	scope := newBlockScope(ctx.locals, ctx.localDefs)
+	ctx.localDefs = scope.localDefs // share the scope's def map (it may allocate one)
 	defer scope.restore()
 	for _, stmt := range body {
 		switch stmt := stmt.(type) {

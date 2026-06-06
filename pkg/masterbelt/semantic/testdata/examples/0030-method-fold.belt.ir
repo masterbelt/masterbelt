@@ -1,0 +1,122 @@
+Module
+  Const "FireIsFire"
+    type bool
+    value Element.Fire.isFire()
+    eval true
+  Const "FireLabel"
+    type int
+    value Element.Fire.label()
+    eval 1
+  Const "WaterLabel"
+    type int
+    value Element.Water.label()
+    eval 0
+  Const "Six"
+    type Level
+    value Level(IntLiteral "5").increment()
+    eval 6
+  Const "Start"
+    type Level
+    value IntLiteral "10"
+    eval 10
+  Const "Eleven"
+    type Level
+    value Reference -> "Start".increment()
+    eval 11
+  Const "Thirteen"
+    type Level
+    value Reference -> "Start".plus(IntLiteral "3")
+    eval 13
+  Const "Three"
+    type Level
+    value base().increment().increment()
+    eval 3
+  TypeDef "Level" pub
+    doc "A character level, with methods over its underlying int8."
+    body int8
+    method "increment" pub
+      doc "The next level up — a self-returning method, so a chain keeps the type."
+      result self
+      return self.add(IntLiteral "1")
+    method "plus" pub
+      doc "This level a number of steps up."
+      param steps: int8
+      result self
+      return self.add(ParamRef "steps")
+  TypeDef "Element" pub
+    doc "An elemental affinity, with methods that fold over a constant member."
+    enum int
+    member "Fire" = 0
+    member "Water" = 1
+    member "Wind" = 2
+    method "eql" pub extern
+      param other: self
+      result bool
+    method "neq" pub extern
+      param other: self
+      result bool
+    method "lt" pub extern
+      param other: self
+      result bool
+    method "lteq" pub extern
+      param other: self
+      result bool
+    method "gt" pub extern
+      param other: self
+      result bool
+    method "gteq" pub extern
+      param other: self
+      result bool
+    method "isFire" pub
+      doc "Whether this element is Fire — a one-line body that folds to a bool."
+      result bool
+      return self.eql(Element.Fire)
+    method "notFire" pub
+      doc "Whether this element is not Fire — a method that calls another method."
+      result bool
+      return self.isFire().not()
+    method "label" pub
+      doc "A let- and if-bearing body, to exercise the full statement walker."
+      result int
+      let "fire": bool = self.isFire()
+      if LocalRef "fire"
+          return IntLiteral "1"
+      return IntLiteral "0"
+  Func "base" pub
+    doc "A function whose declared result type names Level — the chain channel."
+    result Level
+      return Level(IntLiteral "1")
+  Assert "Element.Fire.isFire()"
+    eval true
+      Element.Fire.isFire()
+              ^    ^
+              |    true
+              Element.Fire
+  Assert "Element.Water.notFire()"
+    eval true
+      Element.Water.notFire()
+              ^     ^
+              |     true
+              Element.Water
+  Assert "Element.Fire.label() == 1"
+    eval true
+      Element.Fire.label() == 1
+              ^    ^       ^
+              |    1       true
+              Element.Fire
+  Assert "Element.Wind.label() == 0"
+    eval true
+      Element.Wind.label() == 0
+              ^    ^       ^
+              |    0       true
+              Element.Wind
+  Assert "Start.increment() == 11"
+    eval true
+      Start.increment() == 11
+      ^     ^           ^
+      10    11          true
+  Assert "base().plus(4) == 5"
+    eval true
+      base().plus(4) == 5
+      ^      ^       ^
+      1      5       true

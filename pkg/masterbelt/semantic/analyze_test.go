@@ -878,15 +878,25 @@ func TestAssertOperatorTypeError(t *testing.T) {
 }
 
 func TestAssertNotConstant(t *testing.T) {
-	// A user-defined method body is beyond the compile-time evaluator: the
+	// list.len() is an extern method with no compile-time intrinsic: the
 	// condition types as bool but cannot fold, which is itself the error —
 	// an assertion the compiler cannot verify must not pass silently.
+	_, diags := analyze("assert [1, 2, 3].len() == 3\n")
+	if got := codes(diags); len(got) != 1 || got[0] != CodeAssertionNotConstant {
+		t.Fatalf("codes = %v, want [assertion_not_constant]", got)
+	}
+}
+
+func TestAssertNominalMethodFolds(t *testing.T) {
+	// A user-defined method on a nominal type over a primitive folds: the
+	// receiver's static type is read from the constant's annotation (Level), the
+	// method body is evaluated with self bound, and the assertion verifies clean.
 	src := "type Level = int8 impl {\n  increment(): self {\n    return self + 1\n  }\n}\n" +
 		"const L: Level = 50\n" +
 		"assert L.increment() == 51\n"
 	_, diags := analyze(src)
-	if got := codes(diags); len(got) != 1 || got[0] != CodeAssertionNotConstant {
-		t.Fatalf("codes = %v, want [assertion_not_constant]", got)
+	if got := codes(diags); len(got) != 0 {
+		t.Fatalf("codes = %v, want no diagnostics (the assertion folds to true)", got)
 	}
 }
 

@@ -80,7 +80,9 @@ func TestPredicateUnboundSelf(t *testing.T) {
 }
 
 func TestPredicateNotFoldable(t *testing.T) {
-	// A user-defined method has no intrinsic: the predicate folds to nil.
+	// An int self carries no type definition (only an enum value does), so a
+	// non-intrinsic method on it reaches neither a user-method body nor an
+	// intrinsic: the predicate folds to nil.
 	pred := binary(selfExpr(), "bogus", intLit("1"))
 	if v := Predicate(pred, ir.IntConstant(big.NewInt(1)), stubEnv{reg: builtin.Default()}); v != nil {
 		t.Errorf("Predicate = %v, want nil for a non-intrinsic method", v)
