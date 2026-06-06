@@ -333,6 +333,57 @@ func TestDocumentReusesUneditedDecls(t *testing.T) {
 	}
 }
 
+// TestWellFormedProgramsParseClean is a correctness oracle independent of
+// incrementality. The fuzz oracle (assertMatchesFullParse) only checks
+// incremental == full parse, so a misparse both paths agree on is invisible to
+// it — the arrow-body noRecordLit leak was exactly such a bug, structurally
+// wrong yet identical across both paths. This table pins a curated set of
+// well-formed, deliberately tricky programs to zero diagnostics, so a structural
+// misparse that both parse paths share is still caught. Each case parses from
+// scratch (the full path) and incrementally after a no-op edit (the reparse
+// path); both must yield zero diagnostics and agree with the full parse.
+func TestWellFormedProgramsParseClean(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+	}{
+		// Head-context lambdas in both body forms: the class the arrow-body
+		// noRecordLit leak lived in. A typed record literal in the body must parse
+		// as a record literal, not be read as the if/switch control block.
+		{"block-body lambda record in if head", "fn f(): int { if fn() { return P{a: 1} } { return 1 }\nreturn 0 }\n"},
+		{"arrow-body lambda record in if head", "fn f(): int { if fn() -> P{a: 1} { return 1 }\nreturn 0 }\n"},
+		{"arrow-body lambda record in switch head", "fn f(): int { switch fn() -> P{a: 1} {}\nreturn 0 }\n"},
+		{"arrow-body lambda record after operator in if head", "fn f(): int { if n + fn() -> P{a: 1} { return 1 }\nreturn 0 }\n"},
+		// Literal classes whose multi-token scans (datetime, duration, string) the
+		// fuzz alphabet only sampled coarsely.
+		{"datetime literal", "const t = D2009-03-31T23:59:59.000Z\n"},
+		{"duration run", "const d = 3w4d5h6m7s8ms\n"},
+		{"string with escapes", "const s = \"a\\tb\\r\\n\\0\\\"q\\\"\"\n"},
+		{"datetime/duration arithmetic", "const x = D1970-01-01T00:00:00.000Z + 7d\n"},
+		// await over a postfix chain, with a record literal as the awaited operand's
+		// argument (the bracketed context must re-enable record literals).
+		{"await postfix chain", "fn f(): int { let x = await g(P{a: 1})\nreturn 0 }\n"},
+		// A record literal in a bracketed context inside a head expression: the
+		// bracketed helper must re-enable the record reading there.
+		{"record literal in call arg in if head", "fn f(): int { if g(P{a: 1}) { return 1 }\nreturn 0 }\n"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, diags := Parse([]byte(tc.src)); len(diags) != 0 {
+				t.Fatalf("full parse of well-formed %q produced diagnostics: %v", tc.src, diags)
+			}
+			// The reparse path must agree (zero diagnostics, identical tree).
+			doc := NewDocument([]byte(tc.src))
+			content := naiveSplice([]byte(tc.src), 0, 0, []byte("\n"))
+			doc.Edit(source.Edit{Start: 0, End: 0, NewText: []byte("\n")})
+			assertMatchesFullParse(t, doc, content)
+			if diags := doc.Diagnostics(); len(diags) != 0 {
+				t.Fatalf("reparse of well-formed %q produced diagnostics: %v", tc.src, diags)
+			}
+		})
+	}
+}
+
 func TestDocumentFuzz(t *testing.T) {
 	r := rand.New(rand.NewSource(0xB317))
 	alphabet := []string{
@@ -351,6 +402,13 @@ func TestDocumentFuzz(t *testing.T) {
 		"fn ", "fn", "type ", "enum ", "interface ", "impl ", "use ", "from ",
 		"assert ", "extern ", "if ", "else ", "switch ", "let ", "return ",
 		"where ", "builtin", "self", "null", "io ", "Point {", "{ a: 1 }",
+		// Literal and keyword classes the E-series and earlier work added that the
+		// walk above never reaches: a datetime literal and a duration run (so the
+		// multi-token leftward-fusion scanDatetime/scanNumber paths are stressed), a
+		// string with an escape, await, and an `fn() -> ` arrow-body fragment placed
+		// next to the head contexts (if/switch) so the lambda noRecordLit
+		// interaction is exercised by the random walk too.
+		"D2009-03-31T23:59:59.000Z", "3w4d", "5s", "\"s\\n\"", "await ", "fn() -> ",
 	}
 
 	start := "const x = 0\n"
