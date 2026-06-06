@@ -442,36 +442,140 @@ func funcCall(target *ir.Function, args []ast.Expr, sub func(ast.Expr) ir.Value)
 	return &ir.FuncCall{Target: target, Args: out}
 }
 
-// funcBinder lowers the body of a function literal: its own parameters lower to
-// ir.ParamRef, and any other leaf is delegated to the enclosing binder — so a
-// reference to an outer constant, a conversion, or self still lowers as it would
-// outside the lambda. Nesting a literal wraps another funcBinder around this one,
-// chaining the parameter scopes.
+// funcBinder lowers the body of a function literal. Its own parameters lower to
+// ir.ParamRef and a let it introduces to an ir.LocalRef; any other leaf is
+// delegated to the enclosing binder — so a reference to an outer constant, a
+// conversion, or self still lowers as it would outside the lambda. Nesting a
+// literal wraps another funcBinder around this one, chaining the parameter and
+// local scopes.
+//
+// scope is a bodyBinder that carries the lambda's own params and lets plus the
+// type-resolution context inherited from the enclosing body (or, in a constant
+// initializer, a context that resolves only annotations). It backs the
+// statement capabilities a block body needs — LocalBinder.LetLocal, and the
+// switch's EnumExpecter/EnumMemberResolver — so a let/assign/if/switch in a
+// lambda body lowers exactly as it does in a method body, rather than being
+// dropped. The lambda's params are recorded in scope so an inferred let that
+// reads one settles at the right type and a switch on one reaches its enum.
 type funcBinder struct {
-	outer  lower.Binder
-	params map[string]bool
+	outer lower.Binder
+	scope bodyBinder
 }
 
 // enterFunc builds the binder for a function literal's body from the enclosing
-// binder and the literal's parameters.
+// binder and the literal's parameters. The lambda's scope extends the enclosing
+// body's type context (funcTypeContext) with the literal's parameters on top of
+// the names already captured — so a let or switch in the body settles and
+// resolves against the same surface a method body does, while the lambda's own
+// params (and the lets it goes on to introduce) shadow same-named outer names. A
+// param with no annotation resolves to ir.Invalid: only the type query could
+// pin it bidirectionally, and the value graph must not depend on it.
 func enterFunc(outer lower.Binder, params []*ast.ParamDef) funcBinder {
-	m := make(map[string]bool, len(params))
+	scope := funcTypeContext(outer)
+	scope.params = copyBoolSet(scope.params, len(params))
+	scope.paramTypes = copyTypeMap(scope.paramTypes, len(params))
 	for _, p := range params {
-		m[p.Name] = true
+		scope.params[p.Name] = true
+		scope.paramTypes[p.Name] = scope.r.ResolveType(p.Type, scope.tscope)
 	}
-	return funcBinder{outer: outer, params: m}
+	return funcBinder{outer: outer, scope: scope}
+}
+
+// funcTypeContext returns the type-resolution context a lambda body settles its
+// lets and resolves its switch scrutinees against, drawn from the enclosing
+// binder. A method or function body supplies its own resolver, registry,
+// function surface, and the params, locals, and self captured at the lambda's
+// definition site (so an inferred let or a switch in the lambda reads them); a
+// lambda nested in another lambda reuses that lambda's scope the same way; a
+// constant initializer supplies a context that resolves annotations through the
+// file's universe — never the type query, so the value graph stays independent
+// of typeOf.
+func funcTypeContext(outer lower.Binder) bodyBinder {
+	switch b := outer.(type) {
+	case bodyBinder:
+		return b
+	case funcBinder:
+		return b.scope
+	case constBinder:
+		return bodyBinder{
+			r:     &infer.TypeResolver{Defs: b.q.universe(b.file), Qualified: qualifiedFrom(b.q, b.q.importsOf(b.file))},
+			reg:   b.q.registry(),
+			funcs: bodyFuncs{qualified: qualifiedFuncsFrom(b.q, b.q.importsOf(b.file))},
+		}
+	default:
+		return bodyBinder{}
+	}
+}
+
+// copyBoolSet returns a copy of m with room for extra more entries (a nil m
+// yields a fresh map), so a lambda's params extend the captured set without
+// mutating it.
+func copyBoolSet(m map[string]bool, extra int) map[string]bool {
+	out := make(map[string]bool, len(m)+extra)
+	for k, v := range m {
+		out[k] = v
+	}
+	return out
+}
+
+// copyTypeMap returns a copy of m with room for extra more entries (a nil m
+// yields a fresh map).
+func copyTypeMap(m map[string]ir.Type, extra int) map[string]ir.Type {
+	out := make(map[string]ir.Type, len(m)+extra)
+	for k, v := range m {
+		out[k] = v
+	}
+	return out
 }
 
 func (b funcBinder) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
-	if id, ok := e.(*ast.Identifier); ok && b.params[id.Name] {
-		return &ir.ParamRef{Name: id.Name}
-	}
-	if c, ok := e.(*ast.CallExpr); ok {
-		if id, ok := c.Callee.(*ast.Identifier); ok && b.params[id.Name] {
-			return nil // a call of a parameter: a literal's parameter shadows a function
+	switch e := e.(type) {
+	case *ast.Identifier:
+		// A let-bound local shadows a same-named parameter, so it is read first.
+		if _, ok := b.scope.locals[e.Name]; ok {
+			return &ir.LocalRef{Name: e.Name}
+		}
+		if b.scope.params[e.Name] {
+			return &ir.ParamRef{Name: e.Name}
+		}
+	case *ast.CallExpr:
+		if id, ok := e.Callee.(*ast.Identifier); ok && b.scope.shadows(id.Name) {
+			return nil // a call of a parameter or local: the literal's binding shadows a function
 		}
 	}
 	return b.outer.Leaf(e, sub)
 }
 
 func (b funcBinder) EnterFunc(params []*ast.ParamDef) lower.Binder { return enterFunc(b, params) }
+
+// LetLocal records a let-bound local on the lambda's scope and returns the
+// extended binder and the binding's settled type — the same rule a method body
+// uses (bodyBinder.LetLocal), so a later reference lowers to an ir.LocalRef and
+// a later switch on the local reaches its enum. The extension is copied so it
+// reaches only the statements after the let within this block.
+func (b funcBinder) LetLocal(name string, annotation ast.TypeExpr, value ast.Expr) (lower.Binder, ir.Type) {
+	next, typ := b.scope.LetLocal(name, annotation, value)
+	b.scope = next.(bodyBinder)
+	return b, typ
+}
+
+// ExpectedEnum reports the enum a switch scrutinee's static type names within
+// the lambda body, so its bare-member arms lower to enum-member values exactly
+// as a method body's switch does. A let-bound local is read first (it shadows a
+// same-named parameter), then the parameter and self readings the lambda's scope
+// already provides.
+func (b funcBinder) ExpectedEnum(scrutinee ast.Expr) *ir.TypeDef {
+	if id, ok := scrutinee.(*ast.Identifier); ok {
+		if t, ok := b.scope.locals[id.Name]; ok {
+			return enumDefOf(t)
+		}
+	}
+	return b.scope.ExpectedEnum(scrutinee)
+}
+
+// EnumMember resolves a bare member name against an enum definition to its
+// enum-member value — the bare-member rule a switch arm shares with a const
+// initializer, delegated to the lambda's scope.
+func (b funcBinder) EnumMember(def *ir.TypeDef, name string) ir.Value {
+	return b.scope.EnumMember(def, name)
+}

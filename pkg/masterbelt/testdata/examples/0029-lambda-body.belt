@@ -1,0 +1,31 @@
+// A function-literal block body is the same statement grammar a method body is
+// (parseFuncLit parses a block, lowered by lowerBlock), so a lambda may carry
+// let, if, and switch — not only return/expr. Each is lowered into the literal's
+// IR and type-checked, and the body folds when the call does.
+
+// A let inside a lambda body, referenced by the return: the let is lowered into
+// the literal (it was dropped before) and the reference resolves to a local.
+const Bumped = [1, 2, 3].map(fn(x) {
+  let step = 1
+  return x + step
+})
+
+// A return nested inside an if drives the result inference — the lambda's only
+// nested return is guarded, yet the result is still int (it was a false
+// uninferable_result before), and the call folds.
+const Clamped = [-1, 0, 5].map(fn(x) {
+  if x < 0 {
+    return 0
+  }
+  return x
+})
+
+// A switch inside a lambda body dispatches on the parameter; every arm returns,
+// so the lambda always returns and the call folds.
+const Labeled = [0, 1, 2].map(fn(x) {
+  switch x {
+    0 -> return 0
+    1 -> return 10
+    _ -> return 100
+  }
+})

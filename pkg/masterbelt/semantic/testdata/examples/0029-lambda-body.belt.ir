@@ -1,0 +1,13 @@
+Module
+  Const "Bumped"
+    type list<int>
+    value [IntLiteral "1", IntLiteral "2", IntLiteral "3"].map((fn(x) (let step: int = IntLiteral "1") (return ParamRef "x".add(LocalRef "step"))))
+    eval [2, 3, 4]
+  Const "Clamped"
+    type list<int>
+    value [IntLiteral "1".neg(), IntLiteral "0", IntLiteral "5"].map((fn(x) (if ParamRef "x".lt(IntLiteral "0") (then (return IntLiteral "0"))) (return ParamRef "x")))
+    eval [0, 0, 5]
+  Const "Labeled"
+    type list<int>
+    value [IntLiteral "0", IntLiteral "1", IntLiteral "2"].map((fn(x) (switch ParamRef "x" (arm IntLiteral "0" (return IntLiteral "0")) (arm IntLiteral "1" (return IntLiteral "10")) (else (return IntLiteral "100")))))
+    eval [0, 10, 100]

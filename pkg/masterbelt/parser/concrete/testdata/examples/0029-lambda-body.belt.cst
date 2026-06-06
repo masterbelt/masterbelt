@@ -1,0 +1,260 @@
+# tree
+File
+  ConstDecl
+    LineComment "// A function-literal block body is the same statement grammar a method body is"
+    Newline "\n"
+    LineComment "// (parseFuncLit parses a block, lowered by lowerBlock), so a lambda may carry"
+    Newline "\n"
+    LineComment "// let, if, and switch — not only return/expr. Each is lowered into the literal's"
+    Newline "\n"
+    LineComment "// IR and type-checked, and the body folds when the call does."
+    Newline "\n"
+    Newline "\n"
+    LineComment "// A let inside a lambda body, referenced by the return: the let is lowered into"
+    Newline "\n"
+    LineComment "// the literal (it was dropped before) and the reference resolves to a local."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Bumped"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        MemberExpr
+          CollectionLit
+            LBracket "["
+            Literal
+              Int "1"
+            Comma ","
+            Whitespace " "
+            Literal
+              Int "2"
+            Comma ","
+            Whitespace " "
+            Literal
+              Int "3"
+            RBracket "]"
+          Dot "."
+          Ident "map"
+        LParen "("
+        FuncLit
+          Fn "fn"
+          ParamList
+            LParen "("
+            Param
+              Ident "x"
+            RParen ")"
+          Whitespace " "
+          Block
+            LBrace "{"
+            Newline "\n"
+            Whitespace "  "
+            LetStmt
+              Let "let"
+              Whitespace " "
+              Ident "step"
+              Whitespace " "
+              Initializer
+                Assign "="
+                Whitespace " "
+                Literal
+                  Int "1"
+            Newline "\n"
+            Whitespace "  "
+            ReturnStmt
+              Return "return"
+              Whitespace " "
+              BinaryExpr
+                NameRef
+                  Ident "x"
+                Whitespace " "
+                Plus "+"
+                Whitespace " "
+                NameRef
+                  Ident "step"
+            Newline "\n"
+            RBrace "}"
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// A return nested inside an if drives the result inference — the lambda's only"
+    Newline "\n"
+    LineComment "// nested return is guarded, yet the result is still int (it was a false"
+    Newline "\n"
+    LineComment "// uninferable_result before), and the call folds."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Clamped"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        MemberExpr
+          CollectionLit
+            LBracket "["
+            UnaryExpr
+              Minus "-"
+              Literal
+                Int "1"
+            Comma ","
+            Whitespace " "
+            Literal
+              Int "0"
+            Comma ","
+            Whitespace " "
+            Literal
+              Int "5"
+            RBracket "]"
+          Dot "."
+          Ident "map"
+        LParen "("
+        FuncLit
+          Fn "fn"
+          ParamList
+            LParen "("
+            Param
+              Ident "x"
+            RParen ")"
+          Whitespace " "
+          Block
+            LBrace "{"
+            Newline "\n"
+            Whitespace "  "
+            IfStmt
+              If "if"
+              Whitespace " "
+              BinaryExpr
+                NameRef
+                  Ident "x"
+                Whitespace " "
+                Lt "<"
+                Whitespace " "
+                Literal
+                  Int "0"
+              Whitespace " "
+              Block
+                LBrace "{"
+                Newline "\n"
+                Whitespace "    "
+                ReturnStmt
+                  Return "return"
+                  Whitespace " "
+                  Literal
+                    Int "0"
+                Newline "\n"
+                Whitespace "  "
+                RBrace "}"
+            Newline "\n"
+            Whitespace "  "
+            ReturnStmt
+              Return "return"
+              Whitespace " "
+              NameRef
+                Ident "x"
+            Newline "\n"
+            RBrace "}"
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// A switch inside a lambda body dispatches on the parameter; every arm returns,"
+    Newline "\n"
+    LineComment "// so the lambda always returns and the call folds."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Labeled"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        MemberExpr
+          CollectionLit
+            LBracket "["
+            Literal
+              Int "0"
+            Comma ","
+            Whitespace " "
+            Literal
+              Int "1"
+            Comma ","
+            Whitespace " "
+            Literal
+              Int "2"
+            RBracket "]"
+          Dot "."
+          Ident "map"
+        LParen "("
+        FuncLit
+          Fn "fn"
+          ParamList
+            LParen "("
+            Param
+              Ident "x"
+            RParen ")"
+          Whitespace " "
+          Block
+            LBrace "{"
+            Newline "\n"
+            Whitespace "  "
+            SwitchStmt
+              Switch "switch"
+              Whitespace " "
+              NameRef
+                Ident "x"
+              Whitespace " "
+              LBrace "{"
+              Newline "\n"
+              Whitespace "    "
+              SwitchArm
+                Literal
+                  Int "0"
+                Whitespace " "
+                Arrow "->"
+                Whitespace " "
+                ReturnStmt
+                  Return "return"
+                  Whitespace " "
+                  Literal
+                    Int "0"
+              Newline "\n"
+              Whitespace "    "
+              SwitchArm
+                Literal
+                  Int "1"
+                Whitespace " "
+                Arrow "->"
+                Whitespace " "
+                ReturnStmt
+                  Return "return"
+                  Whitespace " "
+                  Literal
+                    Int "10"
+              Newline "\n"
+              Whitespace "    "
+              SwitchArm
+                NameRef
+                  Ident "_"
+                Whitespace " "
+                Arrow "->"
+                Whitespace " "
+                ReturnStmt
+                  Return "return"
+                  Whitespace " "
+                  Literal
+                    Int "100"
+              Newline "\n"
+              Whitespace "  "
+              RBrace "}"
+            Newline "\n"
+            RBrace "}"
+        RParen ")"
+  Newline "\n"
+  EOF ""
+# diagnostics
