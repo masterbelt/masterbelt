@@ -13,6 +13,7 @@ const (
 	CodeAmbiguousImport            diagnostic.Code = "masterbelt.semantic.ambiguous_import"
 	CodeAmbiguousOverload          diagnostic.Code = "masterbelt.semantic.ambiguous_overload"
 	CodeArityMismatch              diagnostic.Code = "masterbelt.semantic.arity_mismatch"
+	CodeArmTypeNotInUnion          diagnostic.Code = "masterbelt.semantic.arm_type_not_in_union"
 	CodeArmValueTypeMismatch       diagnostic.Code = "masterbelt.semantic.arm_value_type_mismatch"
 	CodeAssertionFailed            diagnostic.Code = "masterbelt.semantic.assertion_failed"
 	CodeAssertionNotBool           diagnostic.Code = "masterbelt.semantic.assertion_not_bool"
@@ -30,6 +31,7 @@ const (
 	CodeDuplicateEnumMember        diagnostic.Code = "masterbelt.semantic.duplicate_enum_member"
 	CodeDuplicateEnumValue         diagnostic.Code = "masterbelt.semantic.duplicate_enum_value"
 	CodeDuplicateFuncOverload      diagnostic.Code = "masterbelt.semantic.duplicate_func_overload"
+	CodeDuplicateMatchArm          diagnostic.Code = "masterbelt.semantic.duplicate_match_arm"
 	CodeDuplicateOverload          diagnostic.Code = "masterbelt.semantic.duplicate_overload"
 	CodeDuplicateSwitchArm         diagnostic.Code = "masterbelt.semantic.duplicate_switch_arm"
 	CodeEffectInPureContext        diagnostic.Code = "masterbelt.semantic.effect_in_pure_context"
@@ -47,6 +49,7 @@ const (
 	CodeNoMatchingFuncOverload     diagnostic.Code = "masterbelt.semantic.no_matching_func_overload"
 	CodeNoMatchingOverload         diagnostic.Code = "masterbelt.semantic.no_matching_overload"
 	CodeNoMethodOnUnboundedTypevar diagnostic.Code = "masterbelt.semantic.no_method_on_unbounded_typevar"
+	CodeNonExhaustiveMatch         diagnostic.Code = "masterbelt.semantic.non_exhaustive_match"
 	CodeNonExhaustiveSwitch        diagnostic.Code = "masterbelt.semantic.non_exhaustive_switch"
 	CodeNotARecord                 diagnostic.Code = "masterbelt.semantic.not_a_record"
 	CodeNotAnInterface             diagnostic.Code = "masterbelt.semantic.not_an_interface"
@@ -129,6 +132,21 @@ func newArityMismatchDiagnostic(offset int, width int, name string, actual int, 
 		Severity: diagnostic.Error,
 		Code:     CodeArityMismatch,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeArityMismatch, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newArmTypeNotInUnionDiagnostic(offset int, width int, arm string, typ string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"arm": diagnostic.Str(arm),
+		"typ": diagnostic.Str(typ),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeArmTypeNotInUnion,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeArmTypeNotInUnion, fields),
 		Fields:   fields,
 		Offset:   offset,
 		Width:    width,
@@ -376,6 +394,20 @@ func newDuplicateFuncOverloadDiagnostic(offset int, width int, name string, type
 	}
 }
 
+func newDuplicateMatchArmDiagnostic(offset int, width int, arm string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"arm": diagnostic.Str(arm),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeDuplicateMatchArm,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeDuplicateMatchArm, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
 func newDuplicateOverloadDiagnostic(offset int, width int, method string, types string) diagnostic.Diagnostic {
 	fields := map[string]fmt.Stringer{
 		"method": diagnostic.Str(method),
@@ -617,6 +649,21 @@ func newNoMethodOnUnboundedTypevarDiagnostic(offset int, width int, method strin
 		Severity: diagnostic.Error,
 		Code:     CodeNoMethodOnUnboundedTypevar,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeNoMethodOnUnboundedTypevar, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newNonExhaustiveMatchDiagnostic(offset int, width int, typ string, missing string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"typ":     diagnostic.Str(typ),
+		"missing": diagnostic.Str(missing),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeNonExhaustiveMatch,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeNonExhaustiveMatch, fields),
 		Fields:   fields,
 		Offset:   offset,
 		Width:    width,

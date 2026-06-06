@@ -128,10 +128,14 @@ func Assignable(reg *builtin.Registry, from, to ir.Type) bool {
 	if isDefaultInt(from) && IsInteger(reg, to) {
 		return true
 	}
-	if u, ok := to.(*ir.Union); ok {
+	if u := unionType(to); u != nil {
 		// A union accepts a value of any of its member types; a union-typed
-		// value flows in when every member it may hold is accepted.
-		if fu, ok := from.(*ir.Union); ok {
+		// value flows in when every member it may hold is accepted. Both sides are
+		// read through unionType, so a nominal alias of a union (type GameValue =
+		// Coin | Level) behaves exactly like the bare union it stands for — a member
+		// value flows into the named union, and the named union flows where its
+		// members are expected.
+		if fu := unionType(from); fu != nil {
 			for _, m := range fu.Members {
 				if !Assignable(reg, m, u) {
 					return false
@@ -543,6 +547,30 @@ func recordType(t ir.Type) *ir.Record {
 	for {
 		switch x := t.(type) {
 		case *ir.Record:
+			return x
+		case *ir.Named:
+			if x.Def == nil || x.Def.Body == nil || seen[x.Def] {
+				return nil
+			}
+			seen[x.Def] = true
+			t = x.Def.Body
+		default:
+			return nil
+		}
+	}
+}
+
+// unionType returns t as a union — the union itself, or the underlying union of
+// a nominal alias (type GameValue = Coin | Level) — or nil when t is neither. It
+// looks through a nominal type's body once per level, guarding a self-referential
+// definition, the union twin of recordType. This is what lets a member value
+// flow into a *named* union and a named union flow where its members are
+// expected, the same way a bare union already does.
+func unionType(t ir.Type) *ir.Union {
+	seen := map[*ir.TypeDef]bool{}
+	for {
+		switch x := t.(type) {
+		case *ir.Union:
 			return x
 		case *ir.Named:
 			if x.Def == nil || x.Def.Body == nil || seen[x.Def] {

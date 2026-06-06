@@ -298,7 +298,7 @@ type AssocConst struct {
 }
 
 // Stmt is a statement in a method body. It is a sealed interface; the only
-// implementations are Return, ExprStmt, Let, Assign, Switch, and If.
+// implementations are Return, ExprStmt, Let, Assign, Switch, Match, and If.
 type Stmt interface {
 	stmt()
 }
@@ -356,6 +356,27 @@ func (*Switch) stmt() {}
 type SwitchArm struct {
 	Values []Value
 	Body   []Stmt
+}
+
+// Match is a resolved type-dispatch statement: it runs the body of the first arm
+// whose member type the Scrutinee's runtime type is, or the Else body when none
+// match. The wildcard "_" arm has been lifted into Else (nil when the match had
+// no wildcard), so the arms carry only type patterns.
+type Match struct {
+	Scrutinee Value
+	Arms      []MatchArm
+	Else      []Stmt // the wildcard body, or nil if the match had no wildcard
+}
+
+func (*Match) stmt() {}
+
+// MatchArm is one resolved arm of a Match: the member Type it matches, the
+// optional binding Name narrowed to that type inside the arm (empty when the arm
+// binds nothing), and the body it runs.
+type MatchArm struct {
+	Type Type
+	Name string // the narrowed binding, or "" when the arm binds nothing
+	Body []Stmt
 }
 
 // If is a resolved boolean control statement: it runs Then when Cond holds,

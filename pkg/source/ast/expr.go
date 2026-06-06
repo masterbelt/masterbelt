@@ -421,6 +421,17 @@ func WalkBodyExprs(body []Stmt, fn func(Expr)) {
 				}
 				WalkBodyExprs(arm.Body, fn)
 			}
+		case *MatchStmt:
+			if stmt.Scrutinee != nil {
+				fn(stmt.Scrutinee)
+			}
+			for _, arm := range stmt.Arms {
+				WalkBodyExprs(arm.Body, fn)
+			}
+			WalkBodyExprs(stmt.Else, fn)
+			for _, arm := range stmt.AfterElse {
+				WalkBodyExprs(arm.Body, fn)
+			}
 		case *IfStmt:
 			walkIfExprs(stmt, fn)
 		default:

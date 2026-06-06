@@ -308,6 +308,29 @@ func (b bodyBinder) EnumMember(def *ir.TypeDef, name string) ir.Value {
 	return nil
 }
 
+// ArmType resolves a match arm's member type expression to its resolved type —
+// the resolver's universe lookup, the same path an annotation takes, never the
+// type query — so the value lowering stays independent of typing. It satisfies
+// lower.MatchBinder.
+func (b bodyBinder) ArmType(t ast.TypeExpr) ir.Type {
+	return b.r.ResolveType(t, b.tscope)
+}
+
+// NarrowLocal records the arm's binding name at the narrowed arm type on top of
+// this binder's scope and returns the extended binder, so a reference to the
+// binding inside the arm body lowers to an ir.LocalRef. The locals map is copied
+// so the narrowing reaches only that arm body, not a sibling arm or an enclosing
+// block — the same block scoping LetLocal gives. It satisfies lower.MatchBinder.
+func (b bodyBinder) NarrowLocal(name string, typ ir.Type) lower.Binder {
+	next := b
+	next.locals = make(map[string]ir.Type, len(b.locals)+1)
+	for k, v := range b.locals {
+		next.locals[k] = v
+	}
+	next.locals[name] = typ
+	return next
+}
+
 // selfHasMethod reports whether the receiver type binds a method of the given
 // name — what an implicit self-call (a bare call inside a method body) needs to
 // distinguish a self-method from an unresolved name. It uses the same overload
@@ -598,4 +621,19 @@ func (b funcBinder) ExpectedEnum(scrutinee ast.Expr) *ir.TypeDef {
 // initializer, delegated to the lambda's scope.
 func (b funcBinder) EnumMember(def *ir.TypeDef, name string) ir.Value {
 	return b.scope.EnumMember(def, name)
+}
+
+// ArmType resolves a match arm's member type within the lambda body, delegated
+// to the lambda's scope (the resolver's universe lookup, never the type query).
+func (b funcBinder) ArmType(t ast.TypeExpr) ir.Type {
+	return b.scope.ArmType(t)
+}
+
+// NarrowLocal binds a match arm's binding name at the narrowed arm type on the
+// lambda's scope and returns the extended binder, so a reference to the binding
+// inside the arm body lowers to an ir.LocalRef — the lambda twin of
+// bodyBinder.NarrowLocal.
+func (b funcBinder) NarrowLocal(name string, typ ir.Type) lower.Binder {
+	b.scope = b.scope.NarrowLocal(name, typ).(bodyBinder)
+	return b
 }

@@ -24,6 +24,7 @@ const (
 	ConstRecord                      // a record value (Constant.Fields)
 	ConstError                       // an error value carrying its message (Constant.Str)
 	ConstEnum                        // an enum member value (Constant.EnumDef / Constant.EnumIndex)
+	ConstNull                        // the null value (no payload — the single inhabitant of the null type)
 )
 
 // Constant is the evaluated value of a constant expression: an arbitrary-
@@ -87,6 +88,10 @@ func ConstantsEqual(a, b *Constant) bool {
 		return a.Str == b.Str
 	case ConstEnum:
 		return a.EnumDef == b.EnumDef && a.EnumIndex == b.EnumIndex
+	case ConstNull:
+		// null has a single inhabitant: two null values (same kind, already
+		// checked above) are always equal.
+		return true
 	case ConstDatetime, ConstDuration:
 		return a.Millis == b.Millis
 	case ConstCollection:
@@ -160,6 +165,10 @@ func StringConstant(s string) *Constant { return &Constant{Kind: ConstString, St
 
 // ErrorConstant builds an error constant from its message.
 func ErrorConstant(message string) *Constant { return &Constant{Kind: ConstError, Str: message} }
+
+// NullConstant builds the null value — the single inhabitant of the null type,
+// carrying no payload.
+func NullConstant() *Constant { return &Constant{Kind: ConstNull} }
 
 // CollectionConstant builds a collection constant from its entries. An empty
 // slice is the empty list/map; a list's entries have a nil Key.
@@ -272,6 +281,8 @@ func (c *Constant) String() string {
 		return "{ " + strings.Join(parts, ", ") + " }"
 	case ConstError:
 		return "error(" + strconv.Quote(c.Str) + ")"
+	case ConstNull:
+		return "null"
 	case ConstEnum:
 		name := c.EnumName()
 		if c.EnumDef == nil {

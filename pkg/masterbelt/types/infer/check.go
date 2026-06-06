@@ -438,6 +438,8 @@ func walkBody(body []ast.Stmt, s funcScope, sink *Sink, onReturn func(*ast.Retur
 			walkIf(stmt, s, sink, onReturn)
 		case *ast.SwitchStmt:
 			walkSwitch(stmt, s, sink, onReturn)
+		case *ast.MatchStmt:
+			walkMatch(stmt, s, sink, onReturn)
 		default:
 			panic(ast.UnhandledStmt(stmt))
 		}
@@ -512,6 +514,43 @@ func walkArm(arm *ast.SwitchArm, s funcScope, sink *Sink, onReturn func(*ast.Ret
 		}
 	}
 	walkBody(arm.Body, s, sink, onReturn)
+}
+
+// walkMatch type-checks a match scrutinee and recurses into each arm body (and
+// the wildcard, and the unreachable after-else arms), each with a copy of the
+// scope. An arm's binding is narrowed to its member type for its body, so a
+// reference to it inside resolves at the narrowed type — the type rule the IR
+// lowering's NarrowLocal mirrors. The arm's member-type validity (a member of the
+// scrutinee's union, exhaustiveness) is the match checker's diagnostic, not a
+// type error here.
+func walkMatch(stmt *ast.MatchStmt, s funcScope, sink *Sink, onReturn func(*ast.ReturnStmt, funcScope)) {
+	if stmt.Scrutinee != nil {
+		check(stmt.Scrutinee, s, sink)
+	}
+	for _, arm := range stmt.Arms {
+		walkMatchArm(arm, s, sink, onReturn)
+	}
+	walkBody(stmt.Else, s, sink, onReturn)
+	for _, arm := range stmt.AfterElse {
+		walkMatchArm(arm, s, sink, onReturn)
+	}
+}
+
+// walkMatchArm narrows the arm's binding to its member type and recurses into the
+// arm body in that scope.
+func walkMatchArm(arm *ast.MatchArm, s funcScope, sink *Sink, onReturn func(*ast.ReturnStmt, funcScope)) {
+	walkBody(arm.Body, narrowArmScope(s, arm), sink, onReturn)
+}
+
+// narrowArmScope returns the scope a match arm body resolves in: the binding (if
+// any) bound to the arm's resolved member type. A nameless arm or one whose type
+// does not resolve narrows nothing.
+func narrowArmScope(s funcScope, arm *ast.MatchArm) funcScope {
+	if arm.Bind == "" || arm.Type == nil {
+		return s
+	}
+	r := &TypeResolver{Defs: s.universe(), Qualified: s.qualified()}
+	return s.withLocal(arm.Bind, r.ResolveType(arm.Type, nil))
 }
 
 // check is the checking walk behind Check, parameterized over the scope so a

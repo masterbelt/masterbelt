@@ -259,8 +259,8 @@ func NewMethodDecl(doc []string, public, extern bool, effects []string, name str
 }
 
 // Stmt is a statement inside a method body: a return (ReturnStmt), a mutable
-// local binding (LetStmt), a reassignment (AssignStmt), a switch (SwitchStmt),
-// an if (IfStmt), or a bare expression statement (ExprStmt).
+// local binding (LetStmt), a reassignment (AssignStmt), a switch (SwitchStmt), a
+// match (MatchStmt), an if (IfStmt), or a bare expression statement (ExprStmt).
 type Stmt interface {
 	Node
 	stmt()
@@ -381,6 +381,54 @@ func (a *SwitchArm) node()             {}
 // NewSwitchArm builds a SwitchArm node.
 func NewSwitchArm(values []Expr, body []Stmt, syntax *cst.Node) *SwitchArm {
 	return &SwitchArm{Values: values, Body: body, syntax: syntax}
+}
+
+// MatchStmt is a type-dispatch statement: it runs the body of the first arm
+// whose member type the Scrutinee's runtime type is, narrowing the arm's binding
+// to that type inside its body, or — when no typed arm matches — the wildcard
+// Else body. The wildcard arm ("_") is lifted out of the Arms list into Else, so
+// the arms carry only type patterns; Else is nil when the match had no wildcard.
+// Each arm body is its own statement list, so a match nests control flow. A
+// match branches on a value's type (a union or optional member); a switch
+// branches on its value.
+type MatchStmt struct {
+	Scrutinee Expr        // the value branched on (nil if recovered away)
+	Arms      []*MatchArm // the type-pattern arms before the wildcard, in source order
+	Else      []Stmt      // the wildcard "_" arm's body, or nil if none
+	// AfterElse holds any type-pattern arms written after the wildcard. The
+	// wildcard already matches every remaining type, so these can never run;
+	// they are kept out of the live Arms (and so out of the IR and evaluation)
+	// and reported as unreachable.
+	AfterElse []*MatchArm
+	syntax    *cst.Node
+}
+
+func (s *MatchStmt) Syntax() *cst.Node { return s.syntax }
+func (s *MatchStmt) node()             {}
+func (s *MatchStmt) stmt()             {}
+
+// NewMatchStmt builds a MatchStmt node.
+func NewMatchStmt(scrutinee Expr, arms []*MatchArm, els []Stmt, afterElse []*MatchArm, syntax *cst.Node) *MatchStmt {
+	return &MatchStmt{Scrutinee: scrutinee, Arms: arms, Else: els, AfterElse: afterElse, syntax: syntax}
+}
+
+// MatchArm is one type-pattern arm of a match: the member Type it matches, the
+// optional binding name Bind narrowed to that type inside the arm (the empty
+// string when the pattern binds nothing), and the Body to run when the scrutinee
+// has that type.
+type MatchArm struct {
+	Type   TypeExpr // the member type this arm matches (a primary, non-union type)
+	Bind   string   // the binding name narrowed to Type, or "" when the arm binds nothing
+	Body   []Stmt   // the statements to run when the arm matches
+	syntax *cst.Node
+}
+
+func (a *MatchArm) Syntax() *cst.Node { return a.syntax }
+func (a *MatchArm) node()             {}
+
+// NewMatchArm builds a MatchArm node.
+func NewMatchArm(typ TypeExpr, bind string, body []Stmt, syntax *cst.Node) *MatchArm {
+	return &MatchArm{Type: typ, Bind: bind, Body: body, syntax: syntax}
 }
 
 // IfStmt is a boolean control statement: it runs the Then body when Cond holds,

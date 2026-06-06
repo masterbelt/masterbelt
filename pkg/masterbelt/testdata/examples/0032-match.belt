@@ -1,0 +1,85 @@
+// match is the type-dispatch control statement: it branches on the runtime type
+// of a union (or optional) value, narrowing the value to that member type inside
+// the arm. Each arm is a type pattern — a member type with an optional binding
+// name, or the wildcard "_" — and its body is a statement (an early return) or a
+// block, so a match dispatches a value by returning from the matching arm. match
+// branches on a value's *type* (a union); switch (E-11) branches on its *value*.
+
+pub type Coin = { amount: int }
+pub type Level = { rank: int }
+
+// A union of two record members. match covers both members, so it needs no
+// wildcard; because every arm returns, the function always returns.
+pub type GameValue = Coin | Level
+
+pub fn describe(v: GameValue): string {
+  match v {
+    Coin c  -> return "coin"        // c is narrowed to Coin inside the arm
+    Level l -> return "level"
+  }
+}
+
+// The narrowed binding is usable: in the Coin arm c has type Coin, so its
+// amount field reads; in the Level arm l has type Level.
+pub fn worth(v: GameValue): int {
+  match v {
+    Coin c  -> return c.amount
+    Level l -> return l.rank
+  }
+}
+
+// The define-a-union-then-consume-it flow end to end: a member value flows into
+// the named union, and worth consumes it. (worth does not fold over a record
+// union — a record value carries no member tag — so Total stays a value the
+// runtime computes, not a folded constant.)
+const Held: GameValue = Coin{ amount: 7 }
+const Total = worth(Held)
+
+// An optional (T | null) is dispatched the same way: the Coin arm narrows the
+// binding to Coin, the null arm handles the absent case. An arm body may be a
+// block of several statements.
+pub fn amountOr(v: Coin | null, fallback: int): int {
+  match v {
+    Coin c -> return c.amount
+    null   -> {
+      return fallback
+    }
+  }
+}
+
+// The wildcard "_" is the catch-all: it covers every member no arm names, so a
+// match with a "_" arm is always exhaustive. It binds nothing — the original
+// scrutinee variable still holds the value.
+pub fn coinAmount(v: GameValue): int {
+  match v {
+    Coin c -> return c.amount
+    _      -> return 0
+  }
+}
+
+// The headline use case (E-18): an index read yields V | error, and match
+// recovers it — the value arm narrows to the element type, the error arm to the
+// failure. This is the unwrap pattern a fallible read needs.
+pub fn firstOr(xs: list<int>, fallback: int): int {
+  match xs[0] {
+    int v   -> return v
+    error e -> return fallback
+  }
+}
+
+// match nests, and an arm body may itself be a match (or any statement block) —
+// the arms share the body executor with if/switch and the function body. A let
+// in the arm combines with the narrowed binding, and the inner match dispatches
+// the outer scrutinee again.
+pub fn label(v: GameValue, other: GameValue): string {
+  match v {
+    Coin c -> {
+      let n = c.amount
+      match other {
+        Coin c2 -> return "coin/coin"
+        Level l -> return "coin/level"
+      }
+    }
+    Level l -> return "level"
+  }
+}

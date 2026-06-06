@@ -366,6 +366,15 @@ func TestWellFormedProgramsParseClean(t *testing.T) {
 		// A record literal in a bracketed context inside a head expression: the
 		// bracketed helper must re-enable the record reading there.
 		{"record literal in call arg in if head", "fn f(): int { if g(P{a: 1}) { return 1 }\nreturn 0 }\n"},
+		// match arms: a type pattern with a binding, the wildcard, a null arm, an
+		// inline-statement and a block body, and an index-read scrutinee — the
+		// class the type-pattern parse and the match body's separator rule cover.
+		{"match with binding and wildcard arms", "fn f(v: T): int {\n  match v {\n    Coin c -> return c.n\n    _      -> return 0\n  }\n}\n"},
+		{"match with null arm and block body", "fn f(v: T): int {\n  match v {\n    Coin c -> return 1\n    null   -> {\n      return 0\n    }\n  }\n}\n"},
+		{"match over an index read", "fn f(xs: list<int>): int {\n  match xs[0] {\n    int v   -> return v\n    error e -> return 0\n  }\n}\n"},
+		// A record-literal scrutinee written explicitly must parse as the
+		// scrutinee, with the noRecordLit restriction not leaking past the parens.
+		{"match scrutinee in parens with record", "fn f(): int { match (P{a: 1}) {\n    P p -> return 1\n  }\n  return 0\n}\n"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -400,8 +409,12 @@ func TestDocumentFuzz(t *testing.T) {
 		// collection / paren / map literal, and the if/else and ternary branches.
 		"{", "}", "(", ")", "[", "]", "?", "->", ".", ",",
 		"fn ", "fn", "type ", "enum ", "interface ", "impl ", "use ", "from ",
-		"assert ", "extern ", "if ", "else ", "switch ", "let ", "return ",
+		"assert ", "extern ", "if ", "else ", "switch ", "match ", "let ", "return ",
 		"where ", "builtin", "self", "null", "io ", "Point {", "{ a: 1 }",
+		// match-arm fragments: a type pattern with a binding, the wildcard, and
+		// the arrow, so the random walk reaches the type-pattern parse and the
+		// match body's unterminated-construct recovery.
+		"Coin c", "_", "int v", "error e",
 		// Literal and keyword classes the E-series and earlier work added that the
 		// walk above never reaches: a datetime literal and a duration run (so the
 		// multi-token leftward-fusion scanDatetime/scanNumber paths are stressed), a

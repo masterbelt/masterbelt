@@ -97,6 +97,14 @@ func recordTypes(doc view) map[*ast.RecordLit]ir.Type {
 				for _, arm := range stmt.AfterElse {
 					pushBody(arm.Body, result)
 				}
+			case *ast.MatchStmt:
+				for _, arm := range stmt.Arms {
+					pushBody(arm.Body, result)
+				}
+				pushBody(stmt.Else, result)
+				for _, arm := range stmt.AfterElse {
+					pushBody(arm.Body, result)
+				}
 			case *ast.IfStmt:
 				pushIfBody(stmt, result, pushBody)
 			case *ast.ExprStmt, *ast.AssignStmt:

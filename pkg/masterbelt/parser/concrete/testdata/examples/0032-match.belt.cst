@@ -1,0 +1,699 @@
+# tree
+File
+  TypeDecl
+    LineComment "// match is the type-dispatch control statement: it branches on the runtime type"
+    Newline "\n"
+    LineComment "// of a union (or optional) value, narrowing the value to that member type inside"
+    Newline "\n"
+    LineComment "// the arm. Each arm is a type pattern — a member type with an optional binding"
+    Newline "\n"
+    LineComment "// name, or the wildcard \"_\" — and its body is a statement (an early return) or a"
+    Newline "\n"
+    LineComment "// block, so a match dispatches a value by returning from the matching arm. match"
+    Newline "\n"
+    LineComment "// branches on a value's *type* (a union); switch (E-11) branches on its *value*."
+    Newline "\n"
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Type "type"
+    Whitespace " "
+    Ident "Coin"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    RecordType
+      LBrace "{"
+      Whitespace " "
+      Field
+        Ident "amount"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "int"
+      Whitespace " "
+      RBrace "}"
+  TypeDecl
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Type "type"
+    Whitespace " "
+    Ident "Level"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    RecordType
+      LBrace "{"
+      Whitespace " "
+      Field
+        Ident "rank"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "int"
+      Whitespace " "
+      RBrace "}"
+  TypeDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// A union of two record members. match covers both members, so it needs no"
+    Newline "\n"
+    LineComment "// wildcard; because every arm returns, the function always returns."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Type "type"
+    Whitespace " "
+    Ident "GameValue"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    UnionType
+      TypeName
+        Ident "Coin"
+      Whitespace " "
+      Pipe "|"
+      Whitespace " "
+      TypeName
+        Ident "Level"
+  FuncDecl
+    Newline "\n"
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Fn "fn"
+    Whitespace " "
+    Ident "describe"
+    ParamList
+      LParen "("
+      Param
+        Ident "v"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "GameValue"
+      RParen ")"
+    Colon ":"
+    Whitespace " "
+    TypeName
+      Ident "string"
+    Whitespace " "
+    Block
+      LBrace "{"
+      Newline "\n"
+      Whitespace "  "
+      MatchStmt
+        Match "match"
+        Whitespace " "
+        NameRef
+          Ident "v"
+        Whitespace " "
+        LBrace "{"
+        Newline "\n"
+        Whitespace "    "
+        MatchArm
+          MatchPattern
+            TypeName
+              Ident "Coin"
+            Whitespace " "
+            Ident "c"
+          Whitespace "  "
+          Arrow "->"
+          Whitespace " "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            Literal
+              String "\"coin\""
+        Whitespace "        "
+        LineComment "// c is narrowed to Coin inside the arm"
+        Newline "\n"
+        Whitespace "    "
+        MatchArm
+          MatchPattern
+            TypeName
+              Ident "Level"
+            Whitespace " "
+            Ident "l"
+          Whitespace " "
+          Arrow "->"
+          Whitespace " "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            Literal
+              String "\"level\""
+        Newline "\n"
+        Whitespace "  "
+        RBrace "}"
+      Newline "\n"
+      RBrace "}"
+  FuncDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// The narrowed binding is usable: in the Coin arm c has type Coin, so its"
+    Newline "\n"
+    LineComment "// amount field reads; in the Level arm l has type Level."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Fn "fn"
+    Whitespace " "
+    Ident "worth"
+    ParamList
+      LParen "("
+      Param
+        Ident "v"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "GameValue"
+      RParen ")"
+    Colon ":"
+    Whitespace " "
+    TypeName
+      Ident "int"
+    Whitespace " "
+    Block
+      LBrace "{"
+      Newline "\n"
+      Whitespace "  "
+      MatchStmt
+        Match "match"
+        Whitespace " "
+        NameRef
+          Ident "v"
+        Whitespace " "
+        LBrace "{"
+        Newline "\n"
+        Whitespace "    "
+        MatchArm
+          MatchPattern
+            TypeName
+              Ident "Coin"
+            Whitespace " "
+            Ident "c"
+          Whitespace "  "
+          Arrow "->"
+          Whitespace " "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            MemberExpr
+              NameRef
+                Ident "c"
+              Dot "."
+              Ident "amount"
+        Newline "\n"
+        Whitespace "    "
+        MatchArm
+          MatchPattern
+            TypeName
+              Ident "Level"
+            Whitespace " "
+            Ident "l"
+          Whitespace " "
+          Arrow "->"
+          Whitespace " "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            MemberExpr
+              NameRef
+                Ident "l"
+              Dot "."
+              Ident "rank"
+        Newline "\n"
+        Whitespace "  "
+        RBrace "}"
+      Newline "\n"
+      RBrace "}"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// The define-a-union-then-consume-it flow end to end: a member value flows into"
+    Newline "\n"
+    LineComment "// the named union, and worth consumes it. (worth does not fold over a record"
+    Newline "\n"
+    LineComment "// union — a record value carries no member tag — so Total stays a value the"
+    Newline "\n"
+    LineComment "// runtime computes, not a folded constant.)"
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Held"
+    TypeClause
+      Colon ":"
+      Whitespace " "
+      TypeName
+        Ident "GameValue"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      RecordLit
+        Ident "Coin"
+        LBrace "{"
+        Whitespace " "
+        RecordField
+          Ident "amount"
+          Colon ":"
+          Whitespace " "
+          Literal
+            Int "7"
+        Whitespace " "
+        RBrace "}"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Total"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "worth"
+        LParen "("
+        NameRef
+          Ident "Held"
+        RParen ")"
+  FuncDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// An optional (T | null) is dispatched the same way: the Coin arm narrows the"
+    Newline "\n"
+    LineComment "// binding to Coin, the null arm handles the absent case. An arm body may be a"
+    Newline "\n"
+    LineComment "// block of several statements."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Fn "fn"
+    Whitespace " "
+    Ident "amountOr"
+    ParamList
+      LParen "("
+      Param
+        Ident "v"
+        Colon ":"
+        Whitespace " "
+        UnionType
+          TypeName
+            Ident "Coin"
+          Whitespace " "
+          Pipe "|"
+          Whitespace " "
+          TypeName
+            Null "null"
+      Comma ","
+      Whitespace " "
+      Param
+        Ident "fallback"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "int"
+      RParen ")"
+    Colon ":"
+    Whitespace " "
+    TypeName
+      Ident "int"
+    Whitespace " "
+    Block
+      LBrace "{"
+      Newline "\n"
+      Whitespace "  "
+      MatchStmt
+        Match "match"
+        Whitespace " "
+        NameRef
+          Ident "v"
+        Whitespace " "
+        LBrace "{"
+        Newline "\n"
+        Whitespace "    "
+        MatchArm
+          MatchPattern
+            TypeName
+              Ident "Coin"
+            Whitespace " "
+            Ident "c"
+          Whitespace " "
+          Arrow "->"
+          Whitespace " "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            MemberExpr
+              NameRef
+                Ident "c"
+              Dot "."
+              Ident "amount"
+        Newline "\n"
+        Whitespace "    "
+        MatchArm
+          MatchPattern
+            TypeName
+              Null "null"
+          Whitespace "   "
+          Arrow "->"
+          Whitespace " "
+          Block
+            LBrace "{"
+            Newline "\n"
+            Whitespace "      "
+            ReturnStmt
+              Return "return"
+              Whitespace " "
+              NameRef
+                Ident "fallback"
+            Newline "\n"
+            Whitespace "    "
+            RBrace "}"
+        Newline "\n"
+        Whitespace "  "
+        RBrace "}"
+      Newline "\n"
+      RBrace "}"
+  FuncDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// The wildcard \"_\" is the catch-all: it covers every member no arm names, so a"
+    Newline "\n"
+    LineComment "// match with a \"_\" arm is always exhaustive. It binds nothing — the original"
+    Newline "\n"
+    LineComment "// scrutinee variable still holds the value."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Fn "fn"
+    Whitespace " "
+    Ident "coinAmount"
+    ParamList
+      LParen "("
+      Param
+        Ident "v"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "GameValue"
+      RParen ")"
+    Colon ":"
+    Whitespace " "
+    TypeName
+      Ident "int"
+    Whitespace " "
+    Block
+      LBrace "{"
+      Newline "\n"
+      Whitespace "  "
+      MatchStmt
+        Match "match"
+        Whitespace " "
+        NameRef
+          Ident "v"
+        Whitespace " "
+        LBrace "{"
+        Newline "\n"
+        Whitespace "    "
+        MatchArm
+          MatchPattern
+            TypeName
+              Ident "Coin"
+            Whitespace " "
+            Ident "c"
+          Whitespace " "
+          Arrow "->"
+          Whitespace " "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            MemberExpr
+              NameRef
+                Ident "c"
+              Dot "."
+              Ident "amount"
+        Newline "\n"
+        Whitespace "    "
+        MatchArm
+          MatchPattern
+            TypeName
+              Ident "_"
+          Whitespace "      "
+          Arrow "->"
+          Whitespace " "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            Literal
+              Int "0"
+        Newline "\n"
+        Whitespace "  "
+        RBrace "}"
+      Newline "\n"
+      RBrace "}"
+  FuncDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// The headline use case (E-18): an index read yields V | error, and match"
+    Newline "\n"
+    LineComment "// recovers it — the value arm narrows to the element type, the error arm to the"
+    Newline "\n"
+    LineComment "// failure. This is the unwrap pattern a fallible read needs."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Fn "fn"
+    Whitespace " "
+    Ident "firstOr"
+    ParamList
+      LParen "("
+      Param
+        Ident "xs"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "list"
+          GenericArgs
+            Lt "<"
+            TypeName
+              Ident "int"
+            Gt ">"
+      Comma ","
+      Whitespace " "
+      Param
+        Ident "fallback"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "int"
+      RParen ")"
+    Colon ":"
+    Whitespace " "
+    TypeName
+      Ident "int"
+    Whitespace " "
+    Block
+      LBrace "{"
+      Newline "\n"
+      Whitespace "  "
+      MatchStmt
+        Match "match"
+        Whitespace " "
+        IndexExpr
+          NameRef
+            Ident "xs"
+          LBracket "["
+          Literal
+            Int "0"
+          RBracket "]"
+        Whitespace " "
+        LBrace "{"
+        Newline "\n"
+        Whitespace "    "
+        MatchArm
+          MatchPattern
+            TypeName
+              Ident "int"
+            Whitespace " "
+            Ident "v"
+          Whitespace "   "
+          Arrow "->"
+          Whitespace " "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            NameRef
+              Ident "v"
+        Newline "\n"
+        Whitespace "    "
+        MatchArm
+          MatchPattern
+            TypeName
+              Ident "error"
+            Whitespace " "
+            Ident "e"
+          Whitespace " "
+          Arrow "->"
+          Whitespace " "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            NameRef
+              Ident "fallback"
+        Newline "\n"
+        Whitespace "  "
+        RBrace "}"
+      Newline "\n"
+      RBrace "}"
+  FuncDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// match nests, and an arm body may itself be a match (or any statement block) —"
+    Newline "\n"
+    LineComment "// the arms share the body executor with if/switch and the function body. A let"
+    Newline "\n"
+    LineComment "// in the arm combines with the narrowed binding, and the inner match dispatches"
+    Newline "\n"
+    LineComment "// the outer scrutinee again."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Fn "fn"
+    Whitespace " "
+    Ident "label"
+    ParamList
+      LParen "("
+      Param
+        Ident "v"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "GameValue"
+      Comma ","
+      Whitespace " "
+      Param
+        Ident "other"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "GameValue"
+      RParen ")"
+    Colon ":"
+    Whitespace " "
+    TypeName
+      Ident "string"
+    Whitespace " "
+    Block
+      LBrace "{"
+      Newline "\n"
+      Whitespace "  "
+      MatchStmt
+        Match "match"
+        Whitespace " "
+        NameRef
+          Ident "v"
+        Whitespace " "
+        LBrace "{"
+        Newline "\n"
+        Whitespace "    "
+        MatchArm
+          MatchPattern
+            TypeName
+              Ident "Coin"
+            Whitespace " "
+            Ident "c"
+          Whitespace " "
+          Arrow "->"
+          Whitespace " "
+          Block
+            LBrace "{"
+            Newline "\n"
+            Whitespace "      "
+            LetStmt
+              Let "let"
+              Whitespace " "
+              Ident "n"
+              Whitespace " "
+              Initializer
+                Assign "="
+                Whitespace " "
+                MemberExpr
+                  NameRef
+                    Ident "c"
+                  Dot "."
+                  Ident "amount"
+            Newline "\n"
+            Whitespace "      "
+            MatchStmt
+              Match "match"
+              Whitespace " "
+              NameRef
+                Ident "other"
+              Whitespace " "
+              LBrace "{"
+              Newline "\n"
+              Whitespace "        "
+              MatchArm
+                MatchPattern
+                  TypeName
+                    Ident "Coin"
+                  Whitespace " "
+                  Ident "c2"
+                Whitespace " "
+                Arrow "->"
+                Whitespace " "
+                ReturnStmt
+                  Return "return"
+                  Whitespace " "
+                  Literal
+                    String "\"coin/coin\""
+              Newline "\n"
+              Whitespace "        "
+              MatchArm
+                MatchPattern
+                  TypeName
+                    Ident "Level"
+                  Whitespace " "
+                  Ident "l"
+                Whitespace " "
+                Arrow "->"
+                Whitespace " "
+                ReturnStmt
+                  Return "return"
+                  Whitespace " "
+                  Literal
+                    String "\"coin/level\""
+              Newline "\n"
+              Whitespace "      "
+              RBrace "}"
+            Newline "\n"
+            Whitespace "    "
+            RBrace "}"
+        Newline "\n"
+        Whitespace "    "
+        MatchArm
+          MatchPattern
+            TypeName
+              Ident "Level"
+            Whitespace " "
+            Ident "l"
+          Whitespace " "
+          Arrow "->"
+          Whitespace " "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            Literal
+              String "\"level\""
+        Newline "\n"
+        Whitespace "  "
+        RBrace "}"
+      Newline "\n"
+      RBrace "}"
+  Newline "\n"
+  EOF ""
+# diagnostics

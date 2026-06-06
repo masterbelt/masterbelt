@@ -34,12 +34,15 @@
 //	ParamList     := "(" [ Param ( "," Param )* ] ")"
 //	Param         := Ident ":" TypeExpr
 //	Block         := "{" Stmt* "}"
-//	Stmt          := LetStmt | ReturnStmt | SwitchStmt | IfStmt | AssignStmt | Expr
+//	Stmt          := LetStmt | ReturnStmt | SwitchStmt | MatchStmt | IfStmt | AssignStmt | Expr
 //	LetStmt       := let Ident [TypeClause] "=" Expr
 //	AssignStmt    := Expr "=" Expr
 //	ReturnStmt    := return Expr
 //	SwitchStmt    := switch Expr "{" ( SwitchArm ( ("," | NL) SwitchArm )* )? "}"
 //	SwitchArm     := ( Expr ( "," Expr )* | "_" ) "->" ( Stmt | Block )
+//	MatchStmt     := match Expr "{" ( MatchArm ( ("," | NL) MatchArm )* )? "}"
+//	MatchArm      := MatchPattern "->" ( Stmt | Block )
+//	MatchPattern  := ( PrimaryType [Ident] ) | "_"
 //	IfStmt        := if Expr Block [ else ( IfStmt | Block ) ]
 //	Expr          := TernaryExpr
 //	TernaryExpr   := OrExpr [ "?" Expr ":" Expr ]

@@ -230,6 +230,8 @@ func stmtReturns(s ast.Stmt, bs infer.BodyScope) bool {
 		return s.Value != nil
 	case *ast.SwitchStmt:
 		return switchReturns(s, bs)
+	case *ast.MatchStmt:
+		return matchReturns(s, bs)
 	case *ast.IfStmt:
 		return ifReturns(s, bs)
 	case *ast.LetStmt, *ast.AssignStmt, *ast.ExprStmt:

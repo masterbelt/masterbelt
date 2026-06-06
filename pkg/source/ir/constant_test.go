@@ -60,3 +60,20 @@ func TestEnumConstant(t *testing.T) {
 		t.Errorf("out-of-range member: want empty name and nil value, got %q / %v", bad.EnumName(), bad.EnumValue())
 	}
 }
+
+// TestNullConstant pins the null value: it renders as "null" (the String default
+// would dereference a nil Int and panic without an explicit case), and two null
+// values are equal — the single-inhabitant rule ConstantsEqual relies on so the
+// folder and the early-cutoff agree.
+func TestNullConstant(t *testing.T) {
+	n := NullConstant()
+	if got := n.String(); got != "null" {
+		t.Errorf("String() = %q, want null", got)
+	}
+	if !ConstantsEqual(n, NullConstant()) {
+		t.Error("two null constants should be equal")
+	}
+	if ConstantsEqual(n, IntConstant(big.NewInt(0))) {
+		t.Error("null must not equal an integer")
+	}
+}

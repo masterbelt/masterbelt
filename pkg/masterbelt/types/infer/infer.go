@@ -278,6 +278,18 @@ func returnedTypeIn(body []ast.Stmt, s funcScope) ir.Type {
 			for _, arm := range stmt.AfterElse {
 				merge(returnedTypeIn(arm.Body, s))
 			}
+		case *ast.MatchStmt:
+			// Each arm body is walked in the scope where its binding is narrowed
+			// to the arm's member type, so a return that reads the binding
+			// synthesizes against the narrowed type — the same scope walkMatch and
+			// the IR lowering use.
+			for _, arm := range stmt.Arms {
+				merge(returnedTypeIn(arm.Body, narrowArmScope(s, arm)))
+			}
+			merge(returnedTypeIn(stmt.Else, s))
+			for _, arm := range stmt.AfterElse {
+				merge(returnedTypeIn(arm.Body, narrowArmScope(s, arm)))
+			}
 		case *ast.ExprStmt, *ast.AssignStmt:
 			// Neither yields a return nor binds a new local that a later return
 			// reads, so neither changes the inferred result. Listed so a new

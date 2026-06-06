@@ -191,6 +191,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "function " + f["name"].String() + " takes " + f["expected"].String() + " argument(s); " + f["actual"].String() + " given"
 		}
 	},
+	"masterbelt.semantic.arm_type_not_in_union": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return f["arm"].String() + " は " + f["typ"].String() + " のメンバではありません"
+		default:
+			return f["arm"].String() + " is not a member of " + f["typ"].String()
+		}
+	},
 	"masterbelt.semantic.arm_value_type_mismatch": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
@@ -327,6 +335,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "function " + f["name"].String() + " redeclares the parameter types (" + f["types"].String() + ")"
 		}
 	},
+	"masterbelt.semantic.duplicate_match_arm": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "match の arm が重複しています: " + f["arm"].String()
+		default:
+			return "duplicate match arm for " + f["arm"].String()
+		}
+	},
 	"masterbelt.semantic.duplicate_overload": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
@@ -461,6 +477,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "無境界の型パラメータに対して " + f["method"].String() + " は呼べません。メソッドを使うには interface 境界を付けてください"
 		default:
 			return "cannot call " + f["method"].String() + " on an unbounded type parameter: add an interface bound to call its methods"
+		}
+	},
+	"masterbelt.semantic.non_exhaustive_match": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return f["typ"].String() + " の match が網羅的ではありません: " + f["missing"].String()
+		default:
+			return "match on " + f["typ"].String() + " is not exhaustive: " + f["missing"].String()
 		}
 	},
 	"masterbelt.semantic.non_exhaustive_switch": func(loc Locale, f map[string]fmt.Stringer) string {

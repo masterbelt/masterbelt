@@ -146,6 +146,8 @@ func lowerStmt(t cst.Tree, buf source.Buffer, node *cst.Node) ast.Stmt {
 		return lowerAssignStmt(t, buf, node)
 	case node.Kind() == cst.SwitchStmt:
 		return lowerSwitchStmt(t, buf, node)
+	case node.Kind() == cst.MatchStmt:
+		return lowerMatchStmt(t, buf, node)
 	case node.Kind() == cst.IfStmt:
 		return lowerIfStmt(t, buf, node)
 	case isExprKind(node.Kind()):
@@ -365,6 +367,125 @@ func isWildcardArm(values []ast.Expr) bool {
 	}
 	id, ok := values[0].(*ast.Identifier)
 	return ok && id.Name == "_"
+}
+
+// lowerMatchStmt lowers a MatchStmt node: its scrutinee (the first expression
+// child), its type-pattern arms, and the wildcard "_" arm lifted out into the
+// Else body. An arm whose pattern is the bare type name "_" with no binding is
+// the wildcard; the rest carry their member type and optional binding. A second
+// wildcard (malformed) keeps the first as Else and drops the rest, which the
+// semantic layer would already flag as unreachable. The structure mirrors
+// lowerSwitchStmt — the only difference is the arm grammar (a type pattern).
+func lowerMatchStmt(t cst.Tree, buf source.Buffer, node *cst.Node) ast.Stmt {
+	var scrutinee ast.Expr
+	var arms, afterElse []*ast.MatchArm
+	var els []ast.Stmt
+	seenWildcard := false
+	for _, child := range t.Children() {
+		n, ok := child.Node()
+		if !ok {
+			continue
+		}
+		switch {
+		case n.Kind() == cst.MatchArm:
+			arm := lowerMatchArm(child, buf, n)
+			if isWildcardPattern(arm) {
+				if !seenWildcard {
+					seenWildcard = true
+					els = arm.Body
+					if els == nil {
+						// A wildcard with an empty body still marks the match as
+						// having a catch-all; an empty slice distinguishes it from
+						// "no wildcard at all".
+						els = []ast.Stmt{}
+					}
+				}
+				continue
+			}
+			if seenWildcard {
+				// The wildcard already matches every remaining type, so an arm
+				// after it is unreachable: kept apart from the live arms.
+				afterElse = append(afterElse, arm)
+			} else {
+				arms = append(arms, arm)
+			}
+		case scrutinee == nil && isExprKind(n.Kind()):
+			scrutinee = lowerExpr(child, buf)
+		}
+	}
+	return ast.NewMatchStmt(scrutinee, arms, els, afterElse, node)
+}
+
+// lowerMatchArm lowers a MatchArm node to its type pattern (the member type and
+// optional binding name) and its body. The "->" token splits the arm: the
+// MatchPattern child before it carries the type and binding, and what follows is
+// the body — a Block (lowered to its statements) or a single inline statement.
+func lowerMatchArm(t cst.Tree, buf source.Buffer, node *cst.Node) *ast.MatchArm {
+	var typ ast.TypeExpr
+	var bind string
+	var body []ast.Stmt
+	seenArrow := false
+	for _, child := range t.Children() {
+		if tok, ok := child.Token(); ok {
+			if tok.Kind() == token.Arrow {
+				seenArrow = true
+			}
+			continue
+		}
+		n, ok := child.Node()
+		if !ok {
+			continue
+		}
+		switch {
+		case n.Kind() == cst.MatchPattern:
+			typ, bind = lowerMatchPattern(child, buf)
+		case n.Kind() == cst.Block:
+			body = lowerBlock(child, buf)
+		case isExprKind(n.Kind()) && seenArrow:
+			body = []ast.Stmt{ast.NewExprStmt(lowerExpr(child, buf), n)}
+		case seenArrow:
+			if s := lowerStmt(child, buf, n); s != nil {
+				body = []ast.Stmt{s}
+			}
+		}
+	}
+	return ast.NewMatchArm(typ, bind, body, node)
+}
+
+// lowerMatchPattern lowers a MatchPattern node to its member type and optional
+// binding name. The pattern is a primary type followed by an optional binding
+// Ident; the binding is the trailing identifier, while a generic type name's own
+// identifiers are nested inside the type node, so the binding is read as a token
+// child of the pattern itself, never one inside the type.
+func lowerMatchPattern(t cst.Tree, buf source.Buffer) (ast.TypeExpr, string) {
+	var typ ast.TypeExpr
+	var bind string
+	for _, child := range t.Children() {
+		if tok, ok := child.Token(); ok {
+			// The pattern's own Ident child (not one nested in the type) is the
+			// binding name.
+			if tok.Kind() == token.Ident && bind == "" {
+				bind = child.Text(buf)
+			}
+			continue
+		}
+		if n, ok := child.Node(); ok && isTypeExprKind(n.Kind()) {
+			typ = lowerTypeExpr(child, buf)
+		}
+	}
+	return typ, bind
+}
+
+// isWildcardPattern reports whether a match arm is the catch-all "_": its pattern
+// is the bare type name "_" with no binding. The wildcard is written as an
+// otherwise-ordinary type name, so it lowers to a NamedType whose name is "_";
+// the semantic layer treats that as the catch-all rather than a type to resolve.
+func isWildcardPattern(arm *ast.MatchArm) bool {
+	if arm.Bind != "" {
+		return false
+	}
+	named, ok := arm.Type.(*ast.NamedType)
+	return ok && named.Namespace == "" && named.Name == "_"
 }
 
 // firstOperand lowers the single operand node of a UnaryExpr (nil if absent).

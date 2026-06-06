@@ -1,0 +1,70 @@
+Module
+  Const "Held"
+    type GameValue
+    value Coin{amount: IntLiteral "7"}
+    eval { amount: 7 }
+  Const "Total"
+    type int
+    value worth(Reference -> "Held")
+  TypeDef "Coin" pub
+    body { amount: int }
+  TypeDef "Level" pub
+    body { rank: int }
+  TypeDef "GameValue" pub
+    body Coin | Level
+  Func "describe" pub
+    param v: GameValue
+    result string
+      match ParamRef "v"
+        arm Coin c
+          return StringLiteral "coin"
+        arm Level l
+          return StringLiteral "level"
+  Func "worth" pub
+    param v: GameValue
+    result int
+      match ParamRef "v"
+        arm Coin c
+          return LocalRef "c".amount
+        arm Level l
+          return LocalRef "l".rank
+  Func "amountOr" pub
+    param v: Coin | null
+    param fallback: int
+    result int
+      match ParamRef "v"
+        arm Coin c
+          return LocalRef "c".amount
+        arm null
+          return ParamRef "fallback"
+  Func "coinAmount" pub
+    param v: GameValue
+    result int
+      match ParamRef "v"
+        arm Coin c
+          return LocalRef "c".amount
+        else
+          return IntLiteral "0"
+  Func "firstOr" pub
+    param xs: list<int>
+    param fallback: int
+    result int
+      match ParamRef "xs".get(IntLiteral "0")
+        arm int v
+          return LocalRef "v"
+        arm error e
+          return ParamRef "fallback"
+  Func "label" pub
+    param v: GameValue
+    param other: GameValue
+    result string
+      match ParamRef "v"
+        arm Coin c
+          let "n": int = LocalRef "c".amount
+          match ParamRef "other"
+            arm Coin c2
+              return StringLiteral "coin/coin"
+            arm Level l
+              return StringLiteral "coin/level"
+        arm Level l
+          return StringLiteral "level"

@@ -56,6 +56,7 @@ const (
 	If        // if (boolean control statement)
 	Else      // else (the alternative branch of an if)
 	Let       // let (mutable block-local binding)
+	Match     // match (type-dispatch control statement)
 
 	// Operators and punctuation.
 	Colon    // :
@@ -100,7 +101,7 @@ const (
 // and last keyword declared above.
 const (
 	firstKeyword = Const
-	lastKeyword  = Let
+	lastKeyword  = Match
 )
 
 // firstOperator and lastOperator bound the contiguous run of operator and
@@ -149,6 +150,7 @@ var kindNames = [...]string{
 	If:           "If",
 	Else:         "Else",
 	Let:          "Let",
+	Match:        "Match",
 	Colon:        "Colon",
 	Question:     "Question",
 	Assign:       "Assign",
@@ -258,6 +260,7 @@ var keywords = map[string]Kind{
 	"if":        If,
 	"else":      Else,
 	"let":       Let,
+	"match":     Match,
 }
 
 // Effect reports whether the kind is an effect keyword — the declarations a
