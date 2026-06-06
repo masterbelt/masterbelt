@@ -93,8 +93,10 @@ pub type list<T> = builtin<T> impl {
   pub extern fn fold(init: A, step: fn(acc: A, key: nint, value: T): A): A
 }
 
-/// A key-value mapping, written [k: v, ...].
-pub type map<K, V> = builtin<K, V> impl {
+/// A key-value mapping, written [k: v, ...]. The key type must be comparable —
+/// a map decides membership by key equality, so a key the language cannot
+/// compare (an anonymous record) is rejected at the application site.
+pub type map<K: comparable, V> = builtin<K, V> impl {
   /// The number of entries.
   pub extern fn len(): nint
 

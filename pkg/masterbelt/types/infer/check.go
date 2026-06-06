@@ -251,6 +251,31 @@ func checkCollectionAgainst(lit *ast.CollectionLit, want ir.Type, s scope, subst
 	return want
 }
 
+// checkMapKeyComparable reports when a map literal's inferred type carries a key
+// the language cannot compare — the inferred-literal twin of the annotation-site
+// bound check. A map without an annotation infers its type from the entries
+// (collectionType), so the key never passes through the type resolver where the
+// annotated case is caught; this re-applies map's first parameter's bound
+// (K: comparable) to the inferred key. A key already invalid (an uninferable
+// anonymous record) makes the whole type invalid, so nothing fires there — its
+// own diagnostic stands.
+func checkMapKeyComparable(lit *ast.CollectionLit, t ir.Type, s scope, sink *Sink) {
+	app, ok := t.(*ir.App)
+	if !ok || app.Def == nil || app.Def.Name != "map" || len(app.Args) != 2 {
+		return
+	}
+	if len(app.Def.Params) == 0 {
+		return
+	}
+	bound := app.Def.Params[0].Bound
+	if bound == nil || app.Args[0] == ir.Invalid {
+		return
+	}
+	if !types.Satisfies(s.registry(), app.Args[0], bound) {
+		sink.mapKeyNotComparable(lit, app.Args[0], bound)
+	}
+}
+
 // collectionApp returns t as a list or map application, or false if t is not a
 // builtin collection type.
 func collectionApp(t ir.Type) (*ir.App, bool) {
@@ -604,7 +629,9 @@ func check(e ast.Expr, s scope, sink *Sink) ir.Type {
 				check(entry.Value, s, sink)
 			}
 		}
-		return collectionType(e, s)
+		t := collectionType(e, s)
+		checkMapKeyComparable(e, t, s, sink)
+		return t
 	case *ast.RecordLit:
 		return checkRecordLit(e, s, sink)
 	case *ast.FuncLit:
