@@ -1,0 +1,125 @@
+Module
+  Const "Summed"
+    type int
+    value sum([IntLiteral "1", IntLiteral "2", IntLiteral "3", IntLiteral "4"])
+    eval 0
+  Const "Joined"
+    type string
+    value keysJoined([StringLiteral "a": IntLiteral "1", StringLiteral "b": IntLiteral "2", StringLiteral "c": IntLiteral "3"])
+    eval ""
+  Const "ValueSummed"
+    type int
+    value valueSum([StringLiteral "a": IntLiteral "1", StringLiteral "b": IntLiteral "2", StringLiteral "c": IntLiteral "3"])
+    eval 0
+  Const "IndexSummed"
+    type int
+    value indexSum([IntLiteral "10", IntLiteral "20", IntLiteral "30"])
+    eval 0
+  Const "EvenSum"
+    type int
+    value sumEven([IntLiteral "1", IntLiteral "2", IntLiteral "3", IntLiteral "4", IntLiteral "5", IntLiteral "6"])
+  Const "Pairs"
+    type int
+    value pairCount([IntLiteral "1", IntLiteral "2"], [IntLiteral "1", IntLiteral "2", IntLiteral "3"])
+  Const "Product"
+    type int
+    value product([IntLiteral "1", IntLiteral "2", IntLiteral "3", IntLiteral "4"])
+    eval 1
+  Func "sum" pub
+    param xs: list<int>
+    result int
+      let "total": int = IntLiteral "0"
+      expr <none>
+      expr <none>
+      expr <none>
+      expr xs{total: <none>, total: <none>, x: <none>}
+      return LocalRef "total"
+  Func "keysJoined" pub
+    param m: map<string, int>
+    result string
+      let "out": string = StringLiteral ""
+      expr <none>
+      expr <none>
+      expr <none>
+      expr m{out: <none>, out: <none>, k: <none>}
+      return LocalRef "out"
+  Func "valueSum" pub
+    param m: map<string, int>
+    result int
+      let "total": int = IntLiteral "0"
+      expr <none>
+      expr <none>
+      expr <none>
+      expr m{total: <none>, total: <none>, v: <none>}
+      return LocalRef "total"
+  Func "indexSum" pub
+    param xs: list<int>
+    result int
+      let "total": int = IntLiteral "0"
+      expr <none>
+      expr <none>
+      expr <none>
+      expr xs{total: <none>, total: <none>, i: <none>}
+      return LocalRef "total"
+  Func "sumEven" pub
+    param xs: list<int>
+    result int
+      let "total": int = IntLiteral "0"
+      expr <none>
+      expr <none>
+      expr <none>
+      expr xs{x: <none>, total: <none>, total: <none>, x: <none>}
+  Func "pairCount" pub
+    param xs: list<int>
+    param ys: list<int>
+    result int
+      let "count": int = IntLiteral "0"
+      expr <none>
+      expr <none>
+      expr <none>
+      expr xs{for: <none>, y: <none>, of: <none>, ys: <none>, count: <none>, count: <none>}
+  Func "product" pub
+    param xs: list<int>
+    result int
+      let "acc": int = IntLiteral "1"
+      expr <none>
+      expr <none>
+      expr <none>
+      expr xs{acc: <none>, acc: <none>, x: <none>}
+      return LocalRef "acc"
+  Assert "sum([1, 2, 3, 4]) == 10"
+    eval false
+      sum([1, 2, 3, 4]) == 10
+      ^                 ^
+      0                 false
+  Assert "keysJoined([\"a\": 1, \"b\": 2, \"c\": 3]) == \"abc\""
+    eval false
+      keysJoined(["a": 1, "b": 2, "c": 3]) == "abc"
+      ^                                    ^
+      ""                                   false
+  Assert "valueSum([\"a\": 1, \"b\": 2, \"c\": 3]) == 6"
+    eval false
+      valueSum(["a": 1, "b": 2, "c": 3]) == 6
+      ^                                  ^
+      0                                  false
+  Assert "indexSum([10, 20, 30]) == 3"
+    eval false
+      indexSum([10, 20, 30]) == 3
+      ^                      ^
+      0                      false
+  Assert "sumEven([1, 2, 3, 4, 5, 6]) == 12"
+    eval <unevaluated>
+      sumEven([1, 2, 3, 4, 5, 6]) == 12
+  Assert "pairCount([1, 2], [1, 2, 3]) == 6"
+    eval <unevaluated>
+      pairCount([1, 2], [1, 2, 3]) == 6
+  Assert "product([1, 2, 3, 4]) == 24"
+    eval false
+      product([1, 2, 3, 4]) == 24
+      ^                     ^
+      1                     false
+  Assert "sum([]) == 0"
+    eval true
+      sum([]) == 0
+      ^       ^
+      0       true

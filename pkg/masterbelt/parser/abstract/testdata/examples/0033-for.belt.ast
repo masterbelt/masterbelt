@@ -1,0 +1,114 @@
+File
+  ConstDecl
+    name "Summed"
+    value (call Identifier "sum" (list IntLit "1" IntLit "2" IntLit "3" IntLit "4"))
+  ConstDecl
+    name "Joined"
+    value (call Identifier "keysJoined" (map StringLit "a": IntLit "1" StringLit "b": IntLit "2" StringLit "c": IntLit "3"))
+  ConstDecl
+    name "ValueSummed"
+    value (call Identifier "valueSum" (map StringLit "a": IntLit "1" StringLit "b": IntLit "2" StringLit "c": IntLit "3"))
+  ConstDecl
+    name "IndexSummed"
+    value (call Identifier "indexSum" (list IntLit "10" IntLit "20" IntLit "30"))
+  ConstDecl
+    name "EvenSum"
+    value (call Identifier "sumEven" (list IntLit "1" IntLit "2" IntLit "3" IntLit "4" IntLit "5" IntLit "6"))
+  ConstDecl
+    name "Pairs"
+    value (call Identifier "pairCount" (list IntLit "1" IntLit "2") (list IntLit "1" IntLit "2" IntLit "3"))
+  ConstDecl
+    name "Product"
+    value (call Identifier "product" (list IntLit "1" IntLit "2" IntLit "3" IntLit "4"))
+  FuncDecl
+    pub
+    name "sum"
+    param xs: list<int>
+    result int
+      let "total" = IntLit "0"
+      expr Identifier "for"
+      expr Identifier "x"
+      expr Identifier "of"
+      expr (record xs total: <missing> total: <missing> x: <missing>)
+      return Identifier "total"
+  FuncDecl
+    pub
+    name "keysJoined"
+    param m: map<string, int>
+    result string
+      let "out" = StringLit ""
+      expr Identifier "for"
+      expr Identifier "k"
+      expr Identifier "in"
+      expr (record m out: <missing> out: <missing> k: <missing>)
+      return Identifier "out"
+  FuncDecl
+    pub
+    name "valueSum"
+    param m: map<string, int>
+    result int
+      let "total" = IntLit "0"
+      expr Identifier "for"
+      expr Identifier "v"
+      expr Identifier "of"
+      expr (record m total: <missing> total: <missing> v: <missing>)
+      return Identifier "total"
+  FuncDecl
+    pub
+    name "indexSum"
+    param xs: list<int>
+    result int
+      let "total" = IntLit "0"
+      expr Identifier "for"
+      expr Identifier "i"
+      expr Identifier "in"
+      expr (record xs total: <missing> total: <missing> i: <missing>)
+      return Identifier "total"
+  FuncDecl
+    pub
+    name "sumEven"
+    param xs: list<int>
+    result int
+      let "total" = IntLit "0"
+      expr Identifier "for"
+      expr Identifier "x"
+      expr Identifier "of"
+      expr (record xs x: <missing> total: <missing> total: <missing> x: <missing>)
+  FuncDecl
+    pub
+    name "pairCount"
+    param xs: list<int>
+    param ys: list<int>
+    result int
+      let "count" = IntLit "0"
+      expr Identifier "for"
+      expr Identifier "x"
+      expr Identifier "of"
+      expr (record xs for: <missing> y: <missing> of: <missing> ys: <missing> count: <missing> count: <missing>)
+  FuncDecl
+    pub
+    name "product"
+    param xs: list<int>
+    result int
+      let "acc" = IntLit "1"
+      expr Identifier "for"
+      expr Identifier "x"
+      expr Identifier "of"
+      expr (record xs acc: <missing> acc: <missing> x: <missing>)
+      return Identifier "acc"
+  AssertDecl
+    cond (call (. (call Identifier "sum" (list IntLit "1" IntLit "2" IntLit "3" IntLit "4")) eql) IntLit "10")
+  AssertDecl
+    cond (call (. (call Identifier "keysJoined" (map StringLit "a": IntLit "1" StringLit "b": IntLit "2" StringLit "c": IntLit "3")) eql) StringLit "abc")
+  AssertDecl
+    cond (call (. (call Identifier "valueSum" (map StringLit "a": IntLit "1" StringLit "b": IntLit "2" StringLit "c": IntLit "3")) eql) IntLit "6")
+  AssertDecl
+    cond (call (. (call Identifier "indexSum" (list IntLit "10" IntLit "20" IntLit "30")) eql) IntLit "3")
+  AssertDecl
+    cond (call (. (call Identifier "sumEven" (list IntLit "1" IntLit "2" IntLit "3" IntLit "4" IntLit "5" IntLit "6")) eql) IntLit "12")
+  AssertDecl
+    cond (call (. (call Identifier "pairCount" (list IntLit "1" IntLit "2") (list IntLit "1" IntLit "2" IntLit "3")) eql) IntLit "6")
+  AssertDecl
+    cond (call (. (call Identifier "product" (list IntLit "1" IntLit "2" IntLit "3" IntLit "4")) eql) IntLit "24")
+  AssertDecl
+    cond (call (. (call Identifier "sum" (collection)) eql) IntLit "0")

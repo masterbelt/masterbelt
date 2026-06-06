@@ -1,0 +1,1265 @@
+# tree
+File
+  FuncDecl
+    LineComment "// for is the iteration control statement: it visits every element of a foldable"
+    Newline "\n"
+    LineComment "// collection in fold order, binding a loop variable to each in turn and running"
+    Newline "\n"
+    LineComment "// the body once per element. \"of\" binds the value (a list element, a map value);"
+    Newline "\n"
+    LineComment "// \"in\" binds the key (a map key, a list index) — the JS reading. The loop"
+    Newline "\n"
+    LineComment "// variable is an immutable per-iteration binding; accumulation goes through a"
+    Newline "\n"
+    LineComment "// let (E-15) the body reassigns, so a for that sums or joins folds to a constant"
+    Newline "\n"
+    LineComment "// exactly as the equivalent fold does. for is a statement: it yields no value."
+    Newline "\n"
+    LineComment "// Iterability is foldable (E-16) — a for runs over anything that impls it."
+    Newline "\n"
+    Newline "\n"
+    LineComment "// for over a list with \"of\" sums its elements: the let total is the accumulator"
+    Newline "\n"
+    LineComment "// the body reassigns each iteration, and the function folds to the total. This"
+    Newline "\n"
+    LineComment "// is the headline accumulation pattern — the same result fold gives, written as"
+    Newline "\n"
+    LineComment "// a loop for readability."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Fn "fn"
+    Whitespace " "
+    Ident "sum"
+    ParamList
+      LParen "("
+      Param
+        Ident "xs"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "list"
+          GenericArgs
+            Lt "<"
+            TypeName
+              Ident "int"
+            Gt ">"
+      RParen ")"
+    Colon ":"
+    Whitespace " "
+    TypeName
+      Ident "int"
+    Whitespace " "
+    Block
+      LBrace "{"
+      Newline "\n"
+      Whitespace "  "
+      LetStmt
+        Let "let"
+        Whitespace " "
+        Ident "total"
+        Whitespace " "
+        Initializer
+          Assign "="
+          Whitespace " "
+          Literal
+            Int "0"
+      Newline "\n"
+      Whitespace "  "
+      NameRef
+        Ident "for"
+      Whitespace " "
+      NameRef
+        Ident "x"
+      Whitespace " "
+      NameRef
+        Ident "of"
+      Whitespace " "
+      RecordLit
+        Ident "xs"
+        Whitespace " "
+        LBrace "{"
+        Newline "\n"
+        Whitespace "    "
+        RecordField
+          Ident "total"
+        Whitespace " "
+        Assign "="
+        Whitespace " "
+        RecordField
+          Ident "total"
+        Whitespace " "
+        Plus "+"
+        Whitespace " "
+        RecordField
+          Ident "x"
+        Newline "\n"
+        Whitespace "  "
+        RBrace "}"
+      Newline "\n"
+      Whitespace "  "
+      ReturnStmt
+        Return "return"
+        Whitespace " "
+        NameRef
+          Ident "total"
+      Newline "\n"
+      RBrace "}"
+  FuncDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// for over a map with \"in\" binds each entry's key. Joining the keys folds to the"
+    Newline "\n"
+    LineComment "// concatenation, in fold order."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Fn "fn"
+    Whitespace " "
+    Ident "keysJoined"
+    ParamList
+      LParen "("
+      Param
+        Ident "m"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "map"
+          GenericArgs
+            Lt "<"
+            TypeName
+              Ident "string"
+            Comma ","
+            Whitespace " "
+            TypeName
+              Ident "int"
+            Gt ">"
+      RParen ")"
+    Colon ":"
+    Whitespace " "
+    TypeName
+      Ident "string"
+    Whitespace " "
+    Block
+      LBrace "{"
+      Newline "\n"
+      Whitespace "  "
+      LetStmt
+        Let "let"
+        Whitespace " "
+        Ident "out"
+        Whitespace " "
+        Initializer
+          Assign "="
+          Whitespace " "
+          Literal
+            String "\"\""
+      Newline "\n"
+      Whitespace "  "
+      NameRef
+        Ident "for"
+      Whitespace " "
+      NameRef
+        Ident "k"
+      Whitespace " "
+      NameRef
+        Ident "in"
+      Whitespace " "
+      RecordLit
+        Ident "m"
+        Whitespace " "
+        LBrace "{"
+        Newline "\n"
+        Whitespace "    "
+        RecordField
+          Ident "out"
+        Whitespace " "
+        Assign "="
+        Whitespace " "
+        RecordField
+          Ident "out"
+        Whitespace " "
+        Plus "+"
+        Whitespace " "
+        RecordField
+          Ident "k"
+        Newline "\n"
+        Whitespace "  "
+        RBrace "}"
+      Newline "\n"
+      Whitespace "  "
+      ReturnStmt
+        Return "return"
+        Whitespace " "
+        NameRef
+          Ident "out"
+      Newline "\n"
+      RBrace "}"
+  FuncDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// \"of\" over a map binds the value, not the key: this sums a map's values."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Fn "fn"
+    Whitespace " "
+    Ident "valueSum"
+    ParamList
+      LParen "("
+      Param
+        Ident "m"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "map"
+          GenericArgs
+            Lt "<"
+            TypeName
+              Ident "string"
+            Comma ","
+            Whitespace " "
+            TypeName
+              Ident "int"
+            Gt ">"
+      RParen ")"
+    Colon ":"
+    Whitespace " "
+    TypeName
+      Ident "int"
+    Whitespace " "
+    Block
+      LBrace "{"
+      Newline "\n"
+      Whitespace "  "
+      LetStmt
+        Let "let"
+        Whitespace " "
+        Ident "total"
+        Whitespace " "
+        Initializer
+          Assign "="
+          Whitespace " "
+          Literal
+            Int "0"
+      Newline "\n"
+      Whitespace "  "
+      NameRef
+        Ident "for"
+      Whitespace " "
+      NameRef
+        Ident "v"
+      Whitespace " "
+      NameRef
+        Ident "of"
+      Whitespace " "
+      RecordLit
+        Ident "m"
+        Whitespace " "
+        LBrace "{"
+        Newline "\n"
+        Whitespace "    "
+        RecordField
+          Ident "total"
+        Whitespace " "
+        Assign "="
+        Whitespace " "
+        RecordField
+          Ident "total"
+        Whitespace " "
+        Plus "+"
+        Whitespace " "
+        RecordField
+          Ident "v"
+        Newline "\n"
+        Whitespace "  "
+        RBrace "}"
+      Newline "\n"
+      Whitespace "  "
+      ReturnStmt
+        Return "return"
+        Whitespace " "
+        NameRef
+          Ident "total"
+      Newline "\n"
+      RBrace "}"
+  FuncDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// \"in\" over a list binds the index. Summing the indices of a three-element list"
+    Newline "\n"
+    LineComment "// folds to 0 + 1 + 2."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Fn "fn"
+    Whitespace " "
+    Ident "indexSum"
+    ParamList
+      LParen "("
+      Param
+        Ident "xs"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "list"
+          GenericArgs
+            Lt "<"
+            TypeName
+              Ident "int"
+            Gt ">"
+      RParen ")"
+    Colon ":"
+    Whitespace " "
+    TypeName
+      Ident "int"
+    Whitespace " "
+    Block
+      LBrace "{"
+      Newline "\n"
+      Whitespace "  "
+      LetStmt
+        Let "let"
+        Whitespace " "
+        Ident "total"
+        Whitespace " "
+        Initializer
+          Assign "="
+          Whitespace " "
+          Literal
+            Int "0"
+      Newline "\n"
+      Whitespace "  "
+      NameRef
+        Ident "for"
+      Whitespace " "
+      NameRef
+        Ident "i"
+      Whitespace " "
+      NameRef
+        Ident "in"
+      Whitespace " "
+      RecordLit
+        Ident "xs"
+        Whitespace " "
+        LBrace "{"
+        Newline "\n"
+        Whitespace "    "
+        RecordField
+          Ident "total"
+        Whitespace " "
+        Assign "="
+        Whitespace " "
+        RecordField
+          Ident "total"
+        Whitespace " "
+        Plus "+"
+        Whitespace " "
+        RecordField
+          Ident "i"
+        Newline "\n"
+        Whitespace "  "
+        RBrace "}"
+      Newline "\n"
+      Whitespace "  "
+      ReturnStmt
+        Return "return"
+        Whitespace " "
+        NameRef
+          Ident "total"
+      Newline "\n"
+      RBrace "}"
+  FuncDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// The loop body is a full statement block: it nests an if (only even elements"
+    Newline "\n"
+    LineComment "// are added), so a for combines with the other control statements through the"
+    Newline "\n"
+    LineComment "// shared body executor."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Fn "fn"
+    Whitespace " "
+    Ident "sumEven"
+    ParamList
+      LParen "("
+      Param
+        Ident "xs"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "list"
+          GenericArgs
+            Lt "<"
+            TypeName
+              Ident "int"
+            Gt ">"
+      RParen ")"
+    Colon ":"
+    Whitespace " "
+    TypeName
+      Ident "int"
+    Whitespace " "
+    Block
+      LBrace "{"
+      Newline "\n"
+      Whitespace "  "
+      LetStmt
+        Let "let"
+        Whitespace " "
+        Ident "total"
+        Whitespace " "
+        Initializer
+          Assign "="
+          Whitespace " "
+          Literal
+            Int "0"
+      Newline "\n"
+      Whitespace "  "
+      NameRef
+        Ident "for"
+      Whitespace " "
+      NameRef
+        Ident "x"
+      Whitespace " "
+      NameRef
+        Ident "of"
+      Whitespace " "
+      RecordLit
+        Ident "xs"
+        Whitespace " "
+        LBrace "{"
+        Newline "\n"
+        Whitespace "    "
+        If "if"
+        Whitespace " "
+        RecordField
+          Ident "x"
+        Whitespace " "
+        Percent "%"
+        Whitespace " "
+        Int "2"
+        Whitespace " "
+        EqEq "=="
+        Whitespace " "
+        Int "0"
+        Whitespace " "
+        LBrace "{"
+        Newline "\n"
+        Whitespace "      "
+        RecordField
+          Ident "total"
+        Whitespace " "
+        Assign "="
+        Whitespace " "
+        RecordField
+          Ident "total"
+        Whitespace " "
+        Plus "+"
+        Whitespace " "
+        RecordField
+          Ident "x"
+        Newline "\n"
+        Whitespace "    "
+        RBrace "}"
+      Newline "\n"
+      Whitespace "  "
+      RBrace "}"
+  Error
+    Newline "\n"
+    Whitespace "  "
+    Return "return"
+    Whitespace " "
+    Ident "total"
+    Newline "\n"
+    RBrace "}"
+  FuncDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// for nests: the inner loop runs in full for each element of the outer, so this"
+    Newline "\n"
+    LineComment "// counts every pair — the product of the two lengths."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Fn "fn"
+    Whitespace " "
+    Ident "pairCount"
+    ParamList
+      LParen "("
+      Param
+        Ident "xs"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "list"
+          GenericArgs
+            Lt "<"
+            TypeName
+              Ident "int"
+            Gt ">"
+      Comma ","
+      Whitespace " "
+      Param
+        Ident "ys"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "list"
+          GenericArgs
+            Lt "<"
+            TypeName
+              Ident "int"
+            Gt ">"
+      RParen ")"
+    Colon ":"
+    Whitespace " "
+    TypeName
+      Ident "int"
+    Whitespace " "
+    Block
+      LBrace "{"
+      Newline "\n"
+      Whitespace "  "
+      LetStmt
+        Let "let"
+        Whitespace " "
+        Ident "count"
+        Whitespace " "
+        Initializer
+          Assign "="
+          Whitespace " "
+          Literal
+            Int "0"
+      Newline "\n"
+      Whitespace "  "
+      NameRef
+        Ident "for"
+      Whitespace " "
+      NameRef
+        Ident "x"
+      Whitespace " "
+      NameRef
+        Ident "of"
+      Whitespace " "
+      RecordLit
+        Ident "xs"
+        Whitespace " "
+        LBrace "{"
+        Newline "\n"
+        Whitespace "    "
+        RecordField
+          Ident "for"
+        Whitespace " "
+        RecordField
+          Ident "y"
+        Whitespace " "
+        RecordField
+          Ident "of"
+        Whitespace " "
+        RecordField
+          Ident "ys"
+        Whitespace " "
+        LBrace "{"
+        Newline "\n"
+        Whitespace "      "
+        RecordField
+          Ident "count"
+        Whitespace " "
+        Assign "="
+        Whitespace " "
+        RecordField
+          Ident "count"
+        Whitespace " "
+        Plus "+"
+        Whitespace " "
+        Int "1"
+        Newline "\n"
+        Whitespace "    "
+        RBrace "}"
+      Newline "\n"
+      Whitespace "  "
+      RBrace "}"
+  Error
+    Newline "\n"
+    Whitespace "  "
+    Return "return"
+    Whitespace " "
+    Ident "count"
+    Newline "\n"
+    RBrace "}"
+  FuncDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// A for body falls through to the statement after the loop when it does not"
+    Newline "\n"
+    LineComment "// return, so the let it accumulates into is read after the loop ends. The body"
+    Newline "\n"
+    LineComment "// is not guaranteed to run (an empty collection skips it), so a return inside it"
+    Newline "\n"
+    LineComment "// does not make the function's trailing return dead."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Fn "fn"
+    Whitespace " "
+    Ident "product"
+    ParamList
+      LParen "("
+      Param
+        Ident "xs"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "list"
+          GenericArgs
+            Lt "<"
+            TypeName
+              Ident "int"
+            Gt ">"
+      RParen ")"
+    Colon ":"
+    Whitespace " "
+    TypeName
+      Ident "int"
+    Whitespace " "
+    Block
+      LBrace "{"
+      Newline "\n"
+      Whitespace "  "
+      LetStmt
+        Let "let"
+        Whitespace " "
+        Ident "acc"
+        Whitespace " "
+        Initializer
+          Assign "="
+          Whitespace " "
+          Literal
+            Int "1"
+      Newline "\n"
+      Whitespace "  "
+      NameRef
+        Ident "for"
+      Whitespace " "
+      NameRef
+        Ident "x"
+      Whitespace " "
+      NameRef
+        Ident "of"
+      Whitespace " "
+      RecordLit
+        Ident "xs"
+        Whitespace " "
+        LBrace "{"
+        Newline "\n"
+        Whitespace "    "
+        RecordField
+          Ident "acc"
+        Whitespace " "
+        Assign "="
+        Whitespace " "
+        RecordField
+          Ident "acc"
+        Whitespace " "
+        Star "*"
+        Whitespace " "
+        RecordField
+          Ident "x"
+        Newline "\n"
+        Whitespace "  "
+        RBrace "}"
+      Newline "\n"
+      Whitespace "  "
+      ReturnStmt
+        Return "return"
+        Whitespace " "
+        NameRef
+          Ident "acc"
+      Newline "\n"
+      RBrace "}"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Summed"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "sum"
+        LParen "("
+        CollectionLit
+          LBracket "["
+          Literal
+            Int "1"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "2"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "3"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "4"
+          RBracket "]"
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Joined"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "keysJoined"
+        LParen "("
+        CollectionLit
+          LBracket "["
+          MapEntry
+            Literal
+              String "\"a\""
+            Colon ":"
+            Whitespace " "
+            Literal
+              Int "1"
+          Comma ","
+          Whitespace " "
+          MapEntry
+            Literal
+              String "\"b\""
+            Colon ":"
+            Whitespace " "
+            Literal
+              Int "2"
+          Comma ","
+          Whitespace " "
+          MapEntry
+            Literal
+              String "\"c\""
+            Colon ":"
+            Whitespace " "
+            Literal
+              Int "3"
+          RBracket "]"
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "ValueSummed"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "valueSum"
+        LParen "("
+        CollectionLit
+          LBracket "["
+          MapEntry
+            Literal
+              String "\"a\""
+            Colon ":"
+            Whitespace " "
+            Literal
+              Int "1"
+          Comma ","
+          Whitespace " "
+          MapEntry
+            Literal
+              String "\"b\""
+            Colon ":"
+            Whitespace " "
+            Literal
+              Int "2"
+          Comma ","
+          Whitespace " "
+          MapEntry
+            Literal
+              String "\"c\""
+            Colon ":"
+            Whitespace " "
+            Literal
+              Int "3"
+          RBracket "]"
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "IndexSummed"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "indexSum"
+        LParen "("
+        CollectionLit
+          LBracket "["
+          Literal
+            Int "10"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "20"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "30"
+          RBracket "]"
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "EvenSum"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "sumEven"
+        LParen "("
+        CollectionLit
+          LBracket "["
+          Literal
+            Int "1"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "2"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "3"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "4"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "5"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "6"
+          RBracket "]"
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Pairs"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "pairCount"
+        LParen "("
+        CollectionLit
+          LBracket "["
+          Literal
+            Int "1"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "2"
+          RBracket "]"
+        Comma ","
+        Whitespace " "
+        CollectionLit
+          LBracket "["
+          Literal
+            Int "1"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "2"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "3"
+          RBracket "]"
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Product"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "product"
+        LParen "("
+        CollectionLit
+          LBracket "["
+          Literal
+            Int "1"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "2"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "3"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "4"
+          RBracket "]"
+        RParen ")"
+  AssertDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// Every folded result verifies in an assertion at compile time, and an empty"
+    Newline "\n"
+    LineComment "// collection folds to the accumulator's initial value (the body never runs)."
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      CallExpr
+        NameRef
+          Ident "sum"
+        LParen "("
+        CollectionLit
+          LBracket "["
+          Literal
+            Int "1"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "2"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "3"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "4"
+          RBracket "]"
+        RParen ")"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "10"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      CallExpr
+        NameRef
+          Ident "keysJoined"
+        LParen "("
+        CollectionLit
+          LBracket "["
+          MapEntry
+            Literal
+              String "\"a\""
+            Colon ":"
+            Whitespace " "
+            Literal
+              Int "1"
+          Comma ","
+          Whitespace " "
+          MapEntry
+            Literal
+              String "\"b\""
+            Colon ":"
+            Whitespace " "
+            Literal
+              Int "2"
+          Comma ","
+          Whitespace " "
+          MapEntry
+            Literal
+              String "\"c\""
+            Colon ":"
+            Whitespace " "
+            Literal
+              Int "3"
+          RBracket "]"
+        RParen ")"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        String "\"abc\""
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      CallExpr
+        NameRef
+          Ident "valueSum"
+        LParen "("
+        CollectionLit
+          LBracket "["
+          MapEntry
+            Literal
+              String "\"a\""
+            Colon ":"
+            Whitespace " "
+            Literal
+              Int "1"
+          Comma ","
+          Whitespace " "
+          MapEntry
+            Literal
+              String "\"b\""
+            Colon ":"
+            Whitespace " "
+            Literal
+              Int "2"
+          Comma ","
+          Whitespace " "
+          MapEntry
+            Literal
+              String "\"c\""
+            Colon ":"
+            Whitespace " "
+            Literal
+              Int "3"
+          RBracket "]"
+        RParen ")"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "6"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      CallExpr
+        NameRef
+          Ident "indexSum"
+        LParen "("
+        CollectionLit
+          LBracket "["
+          Literal
+            Int "10"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "20"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "30"
+          RBracket "]"
+        RParen ")"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "3"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      CallExpr
+        NameRef
+          Ident "sumEven"
+        LParen "("
+        CollectionLit
+          LBracket "["
+          Literal
+            Int "1"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "2"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "3"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "4"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "5"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "6"
+          RBracket "]"
+        RParen ")"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "12"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      CallExpr
+        NameRef
+          Ident "pairCount"
+        LParen "("
+        CollectionLit
+          LBracket "["
+          Literal
+            Int "1"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "2"
+          RBracket "]"
+        Comma ","
+        Whitespace " "
+        CollectionLit
+          LBracket "["
+          Literal
+            Int "1"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "2"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "3"
+          RBracket "]"
+        RParen ")"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "6"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      CallExpr
+        NameRef
+          Ident "product"
+        LParen "("
+        CollectionLit
+          LBracket "["
+          Literal
+            Int "1"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "2"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "3"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "4"
+          RBracket "]"
+        RParen ")"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "24"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      CallExpr
+        NameRef
+          Ident "sum"
+        LParen "("
+        CollectionLit
+          LBracket "["
+          RBracket "]"
+        RParen ")"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "0"
+  Newline "\n"
+  EOF ""
+# diagnostics
+error[masterbelt.parser.concrete.unexpected_token] 17:5 unexpected token: Assign
+error[masterbelt.parser.concrete.unexpected_token] 17:11 unexpected token: Assign
+error[masterbelt.parser.concrete.unexpected_token] 17:13 unexpected token: Plus
+error[masterbelt.parser.concrete.unexpected_token] 17:19 unexpected token: Plus
+error[masterbelt.parser.concrete.unexpected_token] 17:21 unexpected token: RBrace
+error[masterbelt.parser.concrete.unexpected_token] 27:5 unexpected token: Assign
+error[masterbelt.parser.concrete.unexpected_token] 27:9 unexpected token: Assign
+error[masterbelt.parser.concrete.unexpected_token] 27:11 unexpected token: Plus
+error[masterbelt.parser.concrete.unexpected_token] 27:15 unexpected token: Plus
+error[masterbelt.parser.concrete.unexpected_token] 27:17 unexpected token: RBrace
+error[masterbelt.parser.concrete.unexpected_token] 36:5 unexpected token: Assign
+error[masterbelt.parser.concrete.unexpected_token] 36:11 unexpected token: Assign
+error[masterbelt.parser.concrete.unexpected_token] 36:13 unexpected token: Plus
+error[masterbelt.parser.concrete.unexpected_token] 36:19 unexpected token: Plus
+error[masterbelt.parser.concrete.unexpected_token] 36:21 unexpected token: RBrace
+error[masterbelt.parser.concrete.unexpected_token] 46:5 unexpected token: Assign
+error[masterbelt.parser.concrete.unexpected_token] 46:11 unexpected token: Assign
+error[masterbelt.parser.concrete.unexpected_token] 46:13 unexpected token: Plus
+error[masterbelt.parser.concrete.unexpected_token] 46:19 unexpected token: Plus
+error[masterbelt.parser.concrete.unexpected_token] 46:21 unexpected token: RBrace
+error[masterbelt.parser.concrete.unexpected_token] 57:5 unexpected token: If
+error[masterbelt.parser.concrete.unexpected_token] 57:8 unexpected token: Percent
+error[masterbelt.parser.concrete.unexpected_token] 57:10 unexpected token: Percent
+error[masterbelt.parser.concrete.unexpected_token] 57:12 unexpected token: Int
+error[masterbelt.parser.concrete.unexpected_token] 57:14 unexpected token: EqEq
+error[masterbelt.parser.concrete.unexpected_token] 57:17 unexpected token: Int
+error[masterbelt.parser.concrete.unexpected_token] 57:19 unexpected token: LBrace
+error[masterbelt.parser.concrete.unexpected_token] 58:7 unexpected token: Assign
+error[masterbelt.parser.concrete.unexpected_token] 58:13 unexpected token: Assign
+error[masterbelt.parser.concrete.unexpected_token] 58:15 unexpected token: Plus
+error[masterbelt.parser.concrete.unexpected_token] 58:21 unexpected token: Plus
+error[masterbelt.parser.concrete.unexpected_token] 58:23 unexpected token: RBrace
+error[masterbelt.parser.concrete.unexpected_token] 61:3 unexpected token: Return
+error[masterbelt.parser.concrete.unexpected_token] 69:5 unexpected token: Ident
+error[masterbelt.parser.concrete.unexpected_token] 69:9 unexpected token: Ident
+error[masterbelt.parser.concrete.unexpected_token] 69:11 unexpected token: Ident
+error[masterbelt.parser.concrete.unexpected_token] 69:14 unexpected token: LBrace
+error[masterbelt.parser.concrete.unexpected_token] 69:17 unexpected token: LBrace
+error[masterbelt.parser.concrete.unexpected_token] 70:7 unexpected token: Assign
+error[masterbelt.parser.concrete.unexpected_token] 70:13 unexpected token: Assign
+error[masterbelt.parser.concrete.unexpected_token] 70:15 unexpected token: Plus
+error[masterbelt.parser.concrete.unexpected_token] 70:21 unexpected token: Plus
+error[masterbelt.parser.concrete.unexpected_token] 70:23 unexpected token: Int
+error[masterbelt.parser.concrete.unexpected_token] 73:3 unexpected token: Return
+error[masterbelt.parser.concrete.unexpected_token] 83:5 unexpected token: Assign
+error[masterbelt.parser.concrete.unexpected_token] 83:9 unexpected token: Assign
+error[masterbelt.parser.concrete.unexpected_token] 83:11 unexpected token: Star
+error[masterbelt.parser.concrete.unexpected_token] 83:15 unexpected token: Star
+error[masterbelt.parser.concrete.unexpected_token] 83:17 unexpected token: RBrace
