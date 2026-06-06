@@ -26,9 +26,7 @@ File
     param xs: list<int>
     result int
       let "total" = IntLit "0"
-      expr Identifier "for"
       expr Identifier "x"
-      expr Identifier "of"
       expr (record xs total: <missing> total: <missing> x: <missing>)
       return Identifier "total"
   FuncDecl
@@ -37,9 +35,7 @@ File
     param m: map<string, int>
     result string
       let "out" = StringLit ""
-      expr Identifier "for"
       expr Identifier "k"
-      expr Identifier "in"
       expr (record m out: <missing> out: <missing> k: <missing>)
       return Identifier "out"
   FuncDecl
@@ -48,9 +44,7 @@ File
     param m: map<string, int>
     result int
       let "total" = IntLit "0"
-      expr Identifier "for"
       expr Identifier "v"
-      expr Identifier "of"
       expr (record m total: <missing> total: <missing> v: <missing>)
       return Identifier "total"
   FuncDecl
@@ -59,9 +53,7 @@ File
     param xs: list<int>
     result int
       let "total" = IntLit "0"
-      expr Identifier "for"
       expr Identifier "i"
-      expr Identifier "in"
       expr (record xs total: <missing> total: <missing> i: <missing>)
       return Identifier "total"
   FuncDecl
@@ -70,9 +62,7 @@ File
     param xs: list<int>
     result int
       let "total" = IntLit "0"
-      expr Identifier "for"
       expr Identifier "x"
-      expr Identifier "of"
       expr (record xs x: <missing> total: <missing> total: <missing> x: <missing>)
   FuncDecl
     pub
@@ -81,19 +71,15 @@ File
     param ys: list<int>
     result int
       let "count" = IntLit "0"
-      expr Identifier "for"
       expr Identifier "x"
-      expr Identifier "of"
-      expr (record xs for: <missing> y: <missing> of: <missing> ys: <missing> count: <missing> count: <missing>)
+      expr (record xs y: <missing> ys: <missing> count: <missing> count: <missing>)
   FuncDecl
     pub
     name "product"
     param xs: list<int>
     result int
       let "acc" = IntLit "1"
-      expr Identifier "for"
       expr Identifier "x"
-      expr Identifier "of"
       expr (record xs acc: <missing> acc: <missing> x: <missing>)
       return Identifier "acc"
   AssertDecl

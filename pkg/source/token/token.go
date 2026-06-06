@@ -57,6 +57,9 @@ const (
 	Else      // else (the alternative branch of an if)
 	Let       // let (mutable block-local binding)
 	Match     // match (type-dispatch control statement)
+	For       // for (collection-iteration control statement)
+	Of        // of (for: bind the value — a list element, a map value)
+	In        // in (for: bind the key — a map key, a list index)
 
 	// Operators and punctuation.
 	Colon    // :
@@ -101,7 +104,7 @@ const (
 // and last keyword declared above.
 const (
 	firstKeyword = Const
-	lastKeyword  = Match
+	lastKeyword  = In
 )
 
 // firstOperator and lastOperator bound the contiguous run of operator and
@@ -151,6 +154,9 @@ var kindNames = [...]string{
 	Else:         "Else",
 	Let:          "Let",
 	Match:        "Match",
+	For:          "For",
+	Of:           "Of",
+	In:           "In",
 	Colon:        "Colon",
 	Question:     "Question",
 	Assign:       "Assign",
@@ -261,6 +267,9 @@ var keywords = map[string]Kind{
 	"else":      Else,
 	"let":       Let,
 	"match":     Match,
+	"for":       For,
+	"of":        Of,
+	"in":        In,
 }
 
 // Effect reports whether the kind is an effect keyword — the declarations a
