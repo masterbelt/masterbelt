@@ -300,6 +300,40 @@ func TestCompletionOffersErrorConstructor(t *testing.T) {
 	}
 }
 
+// TestCompletionOffersRangeConstructor checks that the range constructor is
+// offered in a value position with its own two-argument snippet and signature —
+// the same constructor surface error has, but for range(start, end) — and that
+// the range type itself is offered in a type position.
+func TestCompletionOffersRangeConstructor(t *testing.T) {
+	doc := testView(completionSrc)
+
+	offset := strings.Index(completionSrc, "= Max") + 3
+	got := byLabel(completion(doc, offset).Items)
+	item, ok := got["range"]
+	if !ok {
+		t.Fatalf("value completion missing the range constructor")
+	}
+	if item.Kind == nil || *item.Kind != protocol.CompletionItemKindConstructor {
+		t.Errorf("range kind = %v, want Constructor", item.Kind)
+	}
+	if item.InsertText != "range(${1:start}, ${2:end})" {
+		t.Errorf("range insert = %q, want the two-argument call snippet", item.InsertText)
+	}
+	if item.Detail != "range(start: int, end: int)" {
+		t.Errorf("range detail = %q, want the constructor signature", item.Detail)
+	}
+	if item.Documentation == nil || !strings.Contains(item.Documentation.Value, "half-open") {
+		t.Errorf("range documentation = %v, want the doc comment", item.Documentation)
+	}
+
+	// A type position offers the range type itself.
+	typeOffset := strings.Index(completionSrc, "int64") + 2
+	types := byLabel(completion(doc, typeOffset).Items)
+	if _, ok := types["range"]; !ok {
+		t.Errorf("type completion missing range")
+	}
+}
+
 func TestMemberCompletionOnError(t *testing.T) {
 	src := "const E = error(\"boom\")\nconst M = E.message()\n"
 	doc := testView(src)

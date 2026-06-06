@@ -5,6 +5,7 @@ import (
 	"slices"
 
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/parser/abstract"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/types"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/types/infer"
@@ -344,21 +345,33 @@ func (p *Program) TypeNames(id FileID) []*ir.TypeDef {
 	return out
 }
 
-// Constructors returns the types in scope in file whose conversion form T(x)
-// constructs a value — what an editor offers in a value position alongside
-// the constants and functions. Today that is the error type (error("msg")); a
-// user type shadowing the name is not a native conversion and is excluded.
+// Constructors returns the types in scope in file whose conversion form T(...)
+// constructs a value — what an editor offers in a value position alongside the
+// constants and functions. Today that is the error type (error("msg")) and the
+// range type (range(start, end)); a user type shadowing the name is not a native
+// constructor and is excluded.
 func (p *Program) Constructors(id FileID) []*ir.TypeDef {
 	q := engineQueries{p.db}
 	reg := q.registry()
 	var out []*ir.TypeDef
 	for _, t := range p.TypeNames(id) {
-		if !t.Builtin {
-			continue
-		}
-		if n, ok := reg.Native(t.Name); ok && n.Err {
+		if t.Builtin && isConstructorBuiltin(reg, t.Name) {
 			out = append(out, t)
 		}
 	}
 	return out
+}
+
+// isConstructorBuiltin reports whether a builtin type name has a value-
+// constructing conversion form an editor should offer in a value position: the
+// natively-backed error type (error("msg")), or the range type (range(start,
+// end)), which the evaluator constructs directly rather than through a native
+// descriptor. The integer aliases and the collections are conversions whose
+// argument is itself a value, not constructors offered on their own.
+func isConstructorBuiltin(reg *builtin.Registry, name string) bool {
+	if name == "range" {
+		return true
+	}
+	n, ok := reg.Native(name)
+	return ok && n.Err
 }

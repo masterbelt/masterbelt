@@ -79,6 +79,21 @@ func TestTypeHover(t *testing.T) {
 			t.Errorf("hover = %q, want the builtin signature", h.Contents.Value)
 		}
 	})
+
+	t.Run("the range builtin describes itself", func(t *testing.T) {
+		rsrc := "pub fn f(r: range): int -> r.count()\n"
+		rdoc := testView(rsrc)
+		h := hover(rdoc, strings.Index(rsrc, ": range")+3)
+		if h == nil {
+			t.Fatal("no hover on range")
+		}
+		if !strings.Contains(h.Contents.Value, "type range = builtin") {
+			t.Errorf("hover = %q, want the builtin signature", h.Contents.Value)
+		}
+		if !strings.Contains(h.Contents.Value, "half-open") {
+			t.Errorf("hover = %q, want the doc comment", h.Contents.Value)
+		}
+	})
 }
 
 func TestInterfaceHover(t *testing.T) {
