@@ -26,15 +26,15 @@ Module
   TypeDef "Level" pub
     doc "A character level between 0 and 100."
     body sbyte
-    where self >= 0 && self <= 100
+    where (((self : Level).gteq((adapt (IntLiteral "0" : nint) : Level)) : bool).anan(((self : Level).lteq((adapt (IntLiteral "100" : nint) : Level)) : bool)) : bool)
   TypeDef "Port" pub
     doc "A TCP port number."
     body int
-    where self >= 1 && self <= 65535
+    where (((self : Port).gteq((adapt (IntLiteral "1" : nint) : Port)) : bool).anan(((self : Port).lteq((adapt (IntLiteral "65535" : nint) : Port)) : bool)) : bool)
   TypeDef "Percent" pub
     doc "A percentage from 0 to 100."
     body sbyte
-    where self >= 0 && self <= 100
+    where (((self : Percent).gteq((adapt (IntLiteral "0" : nint) : Percent)) : bool).anan(((self : Percent).lteq((adapt (IntLiteral "100" : nint) : Percent)) : bool)) : bool)
     method "increment" pub
       doc "The next percentage point."
       result self
@@ -42,7 +42,7 @@ Module
   TypeDef "Score" pub
     doc "A score that is valid only when it lies in the 0..100 band."
     body int
-    where self.inBand()
+    where ((self : Score).inBand() : bool)
     method "inBand" pub
       doc "Whether the score is within the valid band."
       result bool

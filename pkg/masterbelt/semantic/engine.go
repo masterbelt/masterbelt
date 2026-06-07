@@ -339,10 +339,11 @@ func equalFuncBindings(a, b funcBinding) bool {
 }
 
 // equalConstants is constant equality for the cutoff: structural for the data
-// kinds, but a function value compares its literal by pointer — Constant.Fn is
-// an AST node, and like every other AST pointer in the engine the pointer is
-// the fact, so a structurally identical literal from a re-parsed file must
-// propagate rather than leave consumers holding a detached tree. It is
+// kinds, but a function value compares its literal by identity — the syntax
+// pointer behind Constant.Fn, and like every other AST pointer in the engine
+// the pointer is the fact, so a structurally identical literal from a
+// re-parsed file must propagate rather than leave consumers holding a
+// detached tree. It is
 // ir.ConstantsEqual, the single shared definition the evaluator also folds on,
 // so every ConstKind — enum, datetime, duration, record, error included — is
 // covered; a kind added later without a case there panics rather than silently

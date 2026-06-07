@@ -46,4 +46,4 @@ Module
       value 32
   TypeDef "Port" pub
     body int
-    where self >= 1 && self <= short.Max
+    where (((self : Port).gteq((adapt (IntLiteral "1" : nint) : Port)) : bool).anan(((self : Port).lteq((adapt (short.Max : nint) : Port)) : bool)) : bool)

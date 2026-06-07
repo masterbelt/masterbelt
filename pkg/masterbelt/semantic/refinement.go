@@ -12,6 +12,7 @@ import (
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/eval"
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/lower"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/types"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/types/infer"
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
@@ -26,14 +27,18 @@ import (
 // check never fires for it (the ir.Invalid style of suppression). The silent
 // pass (nil at/diags) decides usability identically and just skips the
 // reporting, so the memoized definitions and the diagnostics never disagree.
-func resolveWhere(r *infer.TypeResolver, reg *builtin.Registry, td *ast.TypeDecl, def *ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List) {
+func resolveWhere(r *infer.TypeResolver, reg *builtin.Registry, td *ast.TypeDecl, def *ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List, res *callResolutions) {
 	if td.Where == nil || def.Body == nil || ir.HasInvalid(def.Body) {
 		return
 	}
 	report := at != nil && diags != nil
 	var sink *infer.Sink
 	if report {
-		sink = exprSink(at, diags, nil)
+		// The checking walk's facts stream into res (when the reporting pass
+		// supplies one), keyed by the predicate's expressions — the same AST
+		// the memoized definition's Where graph anchors to — so the write-back
+		// types and adapts the predicate graph like any body's.
+		sink = exprSink(at, diags, res)
 	}
 	// The predicate types in a body scope with no parameters: self and literals,
 	// plus a method call on self. self is the nominal type being refined (not its
@@ -71,7 +76,11 @@ func resolveWhere(r *infer.TypeResolver, reg *builtin.Registry, td *ast.TypeDecl
 		}
 		return
 	}
-	def.Where = td.Where
+	// The usable predicate is kept as a resolved value graph — self bound to a
+	// SelfValue, a self-method call to an ir.Call — the IR-only form the
+	// per-constant fold will run on (F-3 §2.4). The surface form stays
+	// reachable through WhereSyntax for the transitional AST-driven fold.
+	def.Where = lower.Value(td.Where, bodyBinder{r: r, reg: reg, self: true, selfType: selfType(def)})
 }
 
 // witness is a representative constant of t for the declaration-time probe

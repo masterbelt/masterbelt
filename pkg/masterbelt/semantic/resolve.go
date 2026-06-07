@@ -55,7 +55,7 @@ func boundViolationReporter(at func(ast.Node) span, diags *diagnostic.List) func
 // bounds, the defined body type, each method's signature, and the where-clause
 // predicate. Method bodies are lowered to IR here (lower.Body) but not
 // type-checked.
-func resolveTypes(env eval.Env, file *ast.File, at func(ast.Node) span, diags *diagnostic.List, reg *builtin.Registry, extern map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, fns bodyFuncs) []*ir.TypeDef {
+func resolveTypes(env eval.Env, file *ast.File, at func(ast.Node) span, diags *diagnostic.List, res *callResolutions, reg *builtin.Registry, extern map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, fns bodyFuncs) []*ir.TypeDef {
 	if len(file.Types) == 0 && len(file.Enums) == 0 && len(file.Interfaces) == 0 {
 		return nil
 	}
@@ -125,7 +125,7 @@ func resolveTypes(env eval.Env, file *ast.File, at func(ast.Node) span, diags *d
 	// the whole graph, so they run once all parents are populated.
 	checkInterfaceInheritance(file.Interfaces, ifaceOut, at, diags)
 	for i, td := range file.Types {
-		resolveDecl(env, r, reg, td, out[i], at, diags, fns)
+		resolveDecl(env, r, reg, td, out[i], at, diags, res, fns)
 	}
 	for i, ed := range file.Enums {
 		resolveEnumDecl(env, r, reg, ed, enumOut[i], at, diags, fns)
@@ -712,7 +712,7 @@ func bodyDef(reg *builtin.Registry, t ir.Type) *ir.TypeDef {
 // associated constants, the refinement predicate, and the method signatures.
 // env folds the associated-constant initializers (it is nil in callers that do
 // not evaluate).
-func resolveDecl(env eval.Env, r *infer.TypeResolver, reg *builtin.Registry, td *ast.TypeDecl, def *ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List, fns bodyFuncs) {
+func resolveDecl(env eval.Env, r *infer.TypeResolver, reg *builtin.Registry, td *ast.TypeDecl, def *ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List, res *callResolutions, fns bodyFuncs) {
 	scope := make(infer.TypeScope, len(td.Params))
 	for _, p := range td.Params {
 		scope[p.Name] = nil
@@ -766,7 +766,7 @@ func resolveDecl(env eval.Env, r *infer.TypeResolver, reg *builtin.Registry, td 
 	// The where-clause is resolved last, after the methods, so a predicate that
 	// calls a method of the type (`where self.isValid()`) can resolve it — self
 	// is the nominal type, and its impl methods are now on the definition.
-	resolveWhere(r, reg, td, def, at, diags)
+	resolveWhere(r, reg, td, def, at, diags, res)
 }
 
 // resolveAssocConsts resolves a type's associated constants — the impl block's

@@ -366,7 +366,7 @@ func TestProgramValueCutoffKeepsFnIdentity(t *testing.T) {
 		if c.Eval == nil || c.Eval.Kind != ir.ConstFunc {
 			t.Fatalf("g = %v, want a function constant", c.Eval)
 		}
-		if c.Eval.Fn != want {
+		if c.Eval.Fn == nil || c.Eval.Fn.Syntax != want {
 			t.Error("g's function literal points into the detached old tree")
 		}
 		return

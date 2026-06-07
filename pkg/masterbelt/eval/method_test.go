@@ -478,7 +478,7 @@ func TestConversionRangeCheck(t *testing.T) {
 func TestUnionMemberAdmitsFold(t *testing.T) {
 	// type Port = sbyte where self > 0
 	port := nominalDef("Port", "sbyte")
-	port.Where = memberCall(selfExpr(), "gt", intLit("0")) // self > 0
+	setWhere(port, memberCall(selfExpr(), "gt", intLit("0"))) // self > 0
 	env := newTypeEnv(port)
 
 	// sbyte | error: an integer literal selects the sbyte member by kind backing.
@@ -508,7 +508,7 @@ func TestUnionMemberAdmitsFold(t *testing.T) {
 // returns the type itself, and an unfoldable value falls back to the type.
 func TestMemberForSelection(t *testing.T) {
 	port := nominalDef("Port", "sbyte")
-	port.Where = memberCall(selfExpr(), "gt", intLit("0"))
+	setWhere(port, memberCall(selfExpr(), "gt", intLit("0")))
 	env := newTypeEnv(port)
 	sbyteUnion := &ir.Union{Members: []ir.Type{&ir.Builtin{Name: "sbyte"}, &ir.Builtin{Name: "error"}}}
 
@@ -604,7 +604,7 @@ func TestNominalOverload(t *testing.T) {
 func TestNominalWhereTypeMethod(t *testing.T) {
 	inc := method("increment", nil, selfType(), ret(memberCall(selfExpr(), "add", intLit("1"))))
 	def := nominalDef("Percent", "sbyte", methodIR(inc))
-	def.Where = memberCall(selfExpr(), "gteq", intLit("0")) // self >= 0 (a usable predicate)
+	setWhere(def, memberCall(selfExpr(), "gteq", intLit("0"))) // self >= 0 (a usable predicate)
 	env := newTypeEnv(def).withConst("p", "Percent", intConst(50))
 	wantInt(t, memberCall(id("p"), "increment"), env, 51)
 }
@@ -674,4 +674,14 @@ func TestNominalLetBlockScoping(t *testing.T) {
 	// self=5 -> x=6 (outer Level) -> the inner block shadows x then restores it
 	// -> x.increment() reads the outer Level def -> 7.
 	wantInt(t, memberCall(id("base"), "shadow"), env, 7)
+}
+
+// setWhere arms a test definition with a usable refinement predicate the way
+// the semantic layer does post-F-3: the value-graph gate on def.Where (a
+// hand-built IR mirror of the predicate) and the surface form on the
+// declaration syntax, the channel WhereSyntax serves the AST-driven fold
+// through.
+func setWhere(def *ir.TypeDef, pred ast.Expr) {
+	def.Syntax = &ast.TypeDecl{Name: def.Name, Where: pred}
+	def.Where = &ir.SelfValue{} // any non-nil graph arms the gate; the fold reads WhereSyntax
 }

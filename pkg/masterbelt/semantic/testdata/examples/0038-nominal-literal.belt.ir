@@ -43,7 +43,7 @@ Module
     body string
   TypeDef "Direction" pub
     body string
-    where self == "north" || self == "south"
+    where (((self : Direction).eql((adapt (StringLiteral "north" : string) : Direction)) : bool).oror(((self : Direction).eql((adapt (StringLiteral "south" : string) : Direction)) : bool)) : bool)
   TypeDef "Labeled" pub
     body Tag | error
   Func "label" pub

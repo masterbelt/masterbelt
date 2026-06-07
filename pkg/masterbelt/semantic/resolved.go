@@ -130,6 +130,12 @@ func writeBackResolutions(module *ir.Module, res *callResolutions, fnShells map[
 			}
 			w.stmts(m.Body, bindings{self: mself, params: bindParams(m.Params, self)})
 		}
+		// The refinement predicate is a value graph over self like any method
+		// body — its facts streamed from the declaration's checking walk — so
+		// it types and adapts the same way.
+		if def.Where != nil {
+			def.Where = w.value(def.Where, bindings{self: self})
+		}
 	}
 }
 

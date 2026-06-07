@@ -6,8 +6,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/masterbelt/masterbelt/pkg/source/ast"
 )
 
 // CollKind is the three-valued list/map distinction (the "mapness") of a folded
@@ -65,9 +63,13 @@ type Constant struct {
 	CollMapness CollKind
 	Millis      int64 // valid when Kind == ConstDatetime (UTC epoch) or ConstDuration (total)
 
-	// valid when Kind == ConstFunc: the function literal and the values it
-	// captured from its enclosing scope (the closure environment).
-	Fn       *ast.FuncLit
+	// valid when Kind == ConstFunc: the function-literal value and the values
+	// it captured from its enclosing scope (the closure environment). Fn is
+	// the IR node — the folded value references no syntax (F-3 §2.4); the
+	// literal's surface form stays reachable through Fn.Syntax, the
+	// transitional channel the AST-driven application reads until the folder
+	// interprets the IR body directly (F-3 M5).
+	Fn       *FuncLiteral
 	Captured map[string]*Constant
 
 	// valid when Kind == ConstEnum: the enum definition and the index of the
@@ -214,7 +216,11 @@ func ConstantsEqual(a, b *Constant) bool {
 		}
 		return true
 	case ConstFunc:
-		if a.Fn != b.Fn || len(a.Captured) != len(b.Captured) {
+		// Two function values are the same exactly when they close over the
+		// same literal: the literal's syntax identifies it (the AST pointer is
+		// the engine's fact, surviving the fold rebuilding the IR node), with
+		// the node pointer the fallback for a literal built without syntax.
+		if funcIdentity(a.Fn) != funcIdentity(b.Fn) || len(a.Captured) != len(b.Captured) {
 			return false
 		}
 		for name, v := range a.Captured {
@@ -407,11 +413,24 @@ func RecordConstant(fields []ConstField) *Constant {
 	return &Constant{Kind: ConstRecord, Fields: canon}
 }
 
-// FuncConstant builds a function-value constant from a function literal and the
-// closure environment it captured (the parameter values of any enclosing
-// function literals, nil at the top level).
-func FuncConstant(fn *ast.FuncLit, captured map[string]*Constant) *Constant {
+// FuncConstant builds a function-value constant from a function-literal value
+// and the closure environment it captured (the parameter values of any
+// enclosing function literals, nil at the top level).
+func FuncConstant(fn *FuncLiteral, captured map[string]*Constant) *Constant {
 	return &Constant{Kind: ConstFunc, Fn: fn, Captured: captured}
+}
+
+// funcIdentity is the identity a function value compares by: the literal's
+// syntax pointer when it has one, else the IR node itself. See ConstantsEqual's
+// ConstFunc case.
+func funcIdentity(fn *FuncLiteral) any {
+	if fn == nil {
+		return nil
+	}
+	if fn.Syntax != nil {
+		return fn.Syntax
+	}
+	return fn
 }
 
 // EnumConstant builds an enum member value from its definition and the member's

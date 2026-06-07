@@ -354,7 +354,7 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 	module.Types = q.typeDefs(fileID)
 	imp := q.importsOf(fileID)
 	bfns := bodyFuncs{local: funcShellsByName(file, fnShells), qualified: qualifiedFuncsFrom(q, imp), shells: fnShells}
-	resolveTypes(evalEnv{q: q, file: fileID}, file, at, diags, reg, outerTypes(q, imp), qualifiedFrom(q, imp), bfns)
+	resolveTypes(evalEnv{q: q, file: fileID}, file, at, diags, res, reg, outerTypes(q, imp), qualifiedFrom(q, imp), bfns)
 
 	// The module's functions are this file's shells, their signatures and
 	// bodies (re)resolved here with reporting; their bodies type-check the
@@ -720,13 +720,13 @@ func checkMemberFlow(reg *builtin.Registry, e ast.Expr, want ir.Type, env evalEn
 		return
 	}
 	if def := refinedDef(member); def != nil {
-		p := eval.Predicate(def.Where, v, def, env)
+		p := eval.Predicate(def.WhereSyntax(), v, def, env)
 		if p != nil && p.Kind == ir.ConstBool && !p.Bool {
 			s := at(e)
-			d := assert.DiagramSelf(def.Where, v, def, env)
+			d := assert.DiagramSelf(def.WhereSyntax(), v, def, env)
 			diagram := "\n  " + strings.ReplaceAll(d, "\n", "\n  ")
 			diags.Add(newRefinementViolationDiagnostic(
-				s.offset, s.width, v.String(), member.String(), ast.Render(def.Where), diagram))
+				s.offset, s.width, v.String(), member.String(), ast.Render(def.WhereSyntax()), diagram))
 		}
 	}
 }

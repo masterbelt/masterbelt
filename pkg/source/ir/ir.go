@@ -7,6 +7,12 @@
 // points directly at the *Const it resolves to — so it is the right shape for
 // type checking and, later, evaluation and codegen.
 //
+// The Syntax backpointers the nodes carry (a declaration's, a value node's)
+// are editor and diagnostic anchors — positions, hovers, the write-back's
+// pairing keys — and never carry semantics: everything a consumer of the IR
+// needs to know is on the IR's own fields, so the graph (plus the builtin
+// registry's native table) is a complete input on its own (F-3 §0).
+//
 // The package is split across files: this file holds the IR graph nodes
 // (Module, Const, and the Value forms); type.go holds the type as data (Type and
 // its name); constant.go holds the evaluated constant values (Constant). The

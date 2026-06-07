@@ -5,8 +5,6 @@ import (
 	"maps"
 	"slices"
 	"strings"
-
-	"github.com/masterbelt/masterbelt/pkg/source/ast"
 )
 
 // Dump renders a Module as a stable, diffable text tree. It reads only resolved
@@ -121,9 +119,10 @@ func dumpTypeDef(b *strings.Builder, t *TypeDef) {
 		fmt.Fprintf(b, "    body %s\n", t.Body)
 	}
 	if t.Where != nil {
-		// The canonical surface form (ast.Render inverts the operator
-		// desugaring), so the snapshot reads like the declaration.
-		fmt.Fprintf(b, "    where %s\n", ast.Render(t.Where))
+		// The resolved value graph — self bound to a SelfValue, every node
+		// typed — so the snapshot pins the predicate the per-constant fold
+		// runs, not just its surface spelling.
+		fmt.Fprintf(b, "    where %s\n", dumpValue(t.Where))
 	}
 	for _, c := range t.Consts {
 		dumpAssocConst(b, c)

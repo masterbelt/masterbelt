@@ -20,7 +20,7 @@ import (
 // the body's return statement. A body with no return, a wrong argument count, an
 // unfoldable return, or an application past the recursion guard yields nil.
 func apply(ctx evalCtx, fn *ir.Constant, args []*ir.Constant) *ir.Constant {
-	if fn.Fn == nil || len(args) != len(fn.Fn.Params) {
+	if fn.Fn == nil || fn.Fn.Syntax == nil || len(args) != len(fn.Fn.Params) {
 		return nil
 	}
 	if ctx.depth >= maxApplyDepth {
@@ -30,11 +30,25 @@ func apply(ctx evalCtx, fn *ir.Constant, args []*ir.Constant) *ir.Constant {
 	locals := make(map[string]*ir.Constant, len(fn.Captured)+len(args))
 	maps.Copy(locals, fn.Captured)
 	for i, p := range fn.Fn.Params {
-		locals[p.Name] = args[i]
+		locals[p] = args[i]
 	}
 	// A function body sees its parameters and captures, never an outer self: a
-	// literal has no receiver.
-	return evalBody(fn.Fn.Body, evalCtx{env: ctx.env, locals: locals, depth: ctx.depth + 1, budgetHit: ctx.budgetHit})
+	// literal has no receiver. (The body runs from the literal's surface form
+	// until the folder interprets the IR statements directly — F-3 M5.)
+	return evalBody(fn.Fn.Syntax.Body, evalCtx{env: ctx.env, locals: locals, depth: ctx.depth + 1, budgetHit: ctx.budgetHit})
+}
+
+// funcLiteralValue is the IR function-literal value an AST literal folds to: a
+// transitional bridge while the folder walks syntax — the parameter names
+// projected, the literal riding along as Syntax (the application channel and
+// the identity the engine's cutoff compares by). The IR-driven folder (F-3 M5)
+// will fold the graph's own FuncLiteral node instead.
+func funcLiteralValue(e *ast.FuncLit) *ir.FuncLiteral {
+	names := make([]string, len(e.Params))
+	for i, p := range e.Params {
+		names[i] = p.Name
+	}
+	return &ir.FuncLiteral{Params: names, Syntax: e}
 }
 
 // evalBody runs a statement body to its returned value, or nil when no path

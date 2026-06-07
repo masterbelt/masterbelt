@@ -382,7 +382,7 @@ func memberAdmits(ctx evalCtx, member ir.Type, v *ir.Constant) bool {
 		return false
 	}
 	if def := refinedMemberDef(member); def != nil {
-		p := Predicate(def.Where, v, def, ctx.env)
+		p := Predicate(def.WhereSyntax(), v, def, ctx.env)
 		if p != nil && p.Kind == ir.ConstBool && !p.Bool {
 			return false
 		}
@@ -496,8 +496,11 @@ func evalExprRaw(e ast.Expr, ctx evalCtx) *ir.Constant {
 		// A function literal folds to a closure over the bindings in scope, so it
 		// can be applied later (by list.map) or stored in a constant. The capture
 		// is a snapshot: a let or assignment that mutates the body's environment
-		// after the closure is built must not reach back into it.
-		return ir.FuncConstant(e, maps.Clone(ctx.locals))
+		// after the closure is built must not reach back into it. The value
+		// references the literal as an IR node (its syntax along as the
+		// transitional application channel and the identity the engine's
+		// cutoff compares by).
+		return ir.FuncConstant(funcLiteralValue(e), maps.Clone(ctx.locals))
 	case *ast.Identifier:
 		if v, ok := ctx.locals[e.Name]; ok {
 			return v

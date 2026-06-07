@@ -247,7 +247,7 @@ func typeHover(t *ir.TypeDef, buf source.Buffer, rng cst.Tree) *protocol.Hover {
 	if t.Where != nil {
 		// The refinement predicate in its canonical surface form — the values
 		// the type admits, right on the signature.
-		b.WriteString(" where " + ast.Render(t.Where))
+		b.WriteString(" where " + ast.Render(t.WhereSyntax()))
 	}
 	// The interfaces the type implements, right on the signature card.
 	for _, impl := range t.Impls {
