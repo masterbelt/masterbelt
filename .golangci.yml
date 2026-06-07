@@ -17,6 +17,7 @@ linters:
   default: standard # errcheck, govet, ineffassign, staticcheck, unused
   enable:
     - copyloopvar
+    - dupl
     - durationcheck
     - errorlint
     - exhaustive
@@ -44,7 +45,22 @@ linters:
   # - cyclop: the same metric as gocyclo, and its default 10 mostly punishes
   #   the compiler's dispatch switches; gocyclo carries the per-function
   #   ceiling instead.
+  # - govet's shadow analyzer: measured 23/23 findings were the idiomatic
+  #   `x, err := ...` nested-scope form with zero defects; adopting it would
+  #   force renames that make the code less idiomatic, not safer.
+  # - errcheck's check-blank / check-type-assertions: `v, _ := x.(T)`
+  #   narrowing with a zero fallback is the cutoff layer's documented idiom
+  #   (equalValue), and the single-value assertions are deliberate
+  #   invariant panics (the query layer's per-kind reads) — both flagged
+  #   patterns are this codebase's designed responses, not swallowed
+  #   failures (measured 88 + 39 findings, all of those shapes).
   settings:
+    staticcheck:
+      # The full check set: the style checks (ST*) join the defaults — the
+      # receiver-name consistency they enforce is what keeps the hand-written
+      # codecs reading like their neighbours.
+      checks:
+        - all
     exhaustive:
       # Writing a default arm declares the switch intentionally
       # non-exhaustive; an internal enum switch without one must list every
@@ -64,6 +80,13 @@ linters:
     # goconst would otherwise count a generated file's literals toward a
     # hand-written file's occurrence threshold.
     generated: strict
+    rules:
+      # A test's structural repetition is its own readability business — the
+      # same judgment goconst's ignore-tests records; dupl guards production
+      # duplication (the unified dispatch-statement parser is its yield).
+      - path: _test\.go
+        linters:
+          - dupl
 
 issues:
   # The complexity linters (gocyclo, gocognit, funlen, maintidx, cyclop) all
