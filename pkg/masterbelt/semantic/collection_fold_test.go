@@ -5,7 +5,7 @@ import "testing"
 // These tests pin the collection folding completeness work (stream A): the
 // native list.len and the native fold (list and map), and the foldable provided
 // methods defined on top of fold — count, any, all, map, filter, keys, values —
-// which all fold at compile time through the real prelude (collection.belt).
+// which all fold at compile time through the real prelude (foldable.belt, list.belt, map.belt).
 
 // TestListLenFolds checks that list.len() folds to the element count — the
 // intrinsic E-18 left for map but not list.

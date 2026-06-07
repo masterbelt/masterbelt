@@ -65,7 +65,7 @@ type queries interface {
 	// target's reachable set contains the importer closes a cycle.
 	reachableFrom(file FileID) map[FileID]bool
 	// preludeTypes returns the implicit base tier of every file's universe:
-	// the prelude barrel's exported types, beneath the file's imports — as if
+	// the prelude file's exported types, beneath the file's imports — as if
 	// each file began with `use * from "builtin.belt"`.
 	preludeTypes() map[string]*ir.TypeDef
 	// registry returns the builtin registry the analysis evaluates against —

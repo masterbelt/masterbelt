@@ -1,6 +1,3 @@
-use { bool } from "./bool.belt"
-use { comparable, orderable, numeric } from "./operators.belt"
-
 /// The arbitrary-precision integer: the type of an un-annotated integer literal. It has no fixed range and fits wherever a sized integer is expected.
 pub type nint = builtin impl {
   /// The unary - operator: the negation.

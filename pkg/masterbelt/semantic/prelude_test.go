@@ -1,7 +1,6 @@
 package semantic
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
@@ -184,14 +183,10 @@ func TestPreludeValidationCatchesMissingOverloadIntrinsic(t *testing.T) {
 	}
 }
 
-// TestPreludeSurfaceIsTheBarrel checks the prelude-as-a-project story: the
-// surface every file implicitly imports is exactly what the manifest's entry
-// barrel re-exports, definition objects included.
-func TestPreludeSurfaceIsTheBarrel(t *testing.T) {
-	if !strings.Contains(string(builtin.PreludeManifest()), "entry = \""+builtin.PreludeEntry+"\"") {
-		t.Fatalf("the prelude manifest does not name %s as its entry", builtin.PreludeEntry)
-	}
-
+// TestPreludeSurfaceIsTheExports checks the prelude-as-one-file story: the
+// surface every file implicitly imports is exactly what the prelude file
+// exports, definition objects included.
+func TestPreludeSurfaceIsTheExports(t *testing.T) {
 	reg := builtin.Default()
 	surface, defs, err := LoadPrelude(reg)
 	if err != nil {
@@ -208,7 +203,7 @@ func TestPreludeSurfaceIsTheBarrel(t *testing.T) {
 	}
 	for _, name := range reg.Names() {
 		if _, ok := surface[name]; !ok {
-			t.Errorf("the barrel does not re-export registry primitive %q", name)
+			t.Errorf("the prelude does not export registry primitive %q", name)
 		}
 	}
 }

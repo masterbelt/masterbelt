@@ -130,7 +130,7 @@ type database struct {
 	shells         map[*ast.ConstDecl]*ir.Const   // the identity ir.Const of every declaration
 	fnShells       map[*ast.FuncDecl]*ir.Function // the identity ir.Function of every function
 	reg            *builtin.Registry
-	prelude        map[string]*ir.TypeDef // the implicit base tier: the prelude barrel's exported types
+	prelude        map[string]*ir.TypeDef // the implicit base tier: the prelude file's exported types
 	inputChangedAt map[FileID]int
 	memos          map[queryKey]*memo
 	stack          []*frame // active computations, for dependency capture

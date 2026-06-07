@@ -1,0 +1,25 @@
+/// A span of time: concatenated digit+unit groups (3w4d5h6m7s8ms; w/d/h/m/s/ms), totalled to milliseconds.
+pub type duration = builtin impl {
+  /// The + operator: the sum of two spans.
+  pub extern fn add(other: self): self
+  /// The + operator: the instant a span after a datetime.
+  pub extern fn add(at: datetime): datetime
+  /// The - operator: the difference of two spans.
+  pub extern fn sub(other: self): self
+  /// The * operator: the span repeated a whole number of times.
+  pub extern fn mul(factor: nint): self
+} impl comparable {
+  /// The == operator.
+  pub extern fn eql(other: self): bool
+  /// The != operator.
+  pub extern fn neq(other: self): bool
+} impl orderable {
+  /// The < operator: whether this span is shorter.
+  pub extern fn lt(other: self): bool
+  /// The <= operator.
+  pub extern fn lteq(other: self): bool
+  /// The > operator: whether this span is longer.
+  pub extern fn gt(other: self): bool
+  /// The >= operator.
+  pub extern fn gteq(other: self): bool
+}

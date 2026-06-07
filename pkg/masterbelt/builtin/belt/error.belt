@@ -1,5 +1,3 @@
-use { string } from "./string.belt"
-
 /// A recoverable failure as a value: constructed from its message with
 /// error("msg") — the conversion form, like sbyte(5) — and carried in a result
 /// union (T | error). belt has no exceptions; a fallible function returns an
