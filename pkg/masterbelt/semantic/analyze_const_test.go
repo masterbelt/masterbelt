@@ -83,6 +83,35 @@ func TestStringOperationsFold(t *testing.T) {
 	}
 }
 
+// TestNominalStringOperatorFolds pins the operator path F-1 unblocks end to end:
+// a nominal type over a string base derives the string's operators, so a bare
+// string value as the operand resolves and the comparison folds — `t == "x"` on
+// a Tag = string is bool true, with no invalid_operation (the §0 symptom). The
+// self-returning concatenation keeps the nominal type and folds its string.
+func TestNominalStringOperatorFolds(t *testing.T) {
+	m, diags := analyze("pub type Tag = string\n" +
+		"const t: Tag = \"x\"\n" +
+		"const eq = t == \"x\"\n" +
+		"const ne = t != \"y\"\n" +
+		"const cat: Tag = t + \"!\"\n")
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if ev := m.Consts[1].Eval; ev == nil || ev.Kind != ir.ConstBool || ev.Bool != true {
+		t.Errorf("eq eval = %v, want bool true", ev)
+	}
+	if ev := m.Consts[2].Eval; ev == nil || ev.Kind != ir.ConstBool || ev.Bool != true {
+		t.Errorf("ne eval = %v, want bool true", ev)
+	}
+	// The self-returning operator keeps the nominal type and folds the string.
+	if m.Consts[3].Type.String() != "Tag" {
+		t.Errorf("cat type = %s, want Tag", m.Consts[3].Type)
+	}
+	if ev := m.Consts[3].Eval; ev == nil || ev.Kind != ir.ConstString || ev.Str != "x!" {
+		t.Errorf("cat eval = %v, want string \"x!\"", ev)
+	}
+}
+
 func TestCollectionLiteral(t *testing.T) {
 	m, diags := analyze("const L: list<nint> = [1, 2, 3]\nconst M: map<string, nint> = [\"k\": 1]\nconst I = [10, 20]\nconst E: list<nint> = []\n")
 	if len(diags) != 0 {

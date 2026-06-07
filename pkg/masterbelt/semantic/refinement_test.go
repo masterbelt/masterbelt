@@ -112,6 +112,47 @@ func TestRefinementBadMethod(t *testing.T) {
 	}
 }
 
+// TestStringRefinement is the original motivation of F-1: a string-based
+// refinement (the "literal union" idiom) was impossible because `self == "north"`
+// did not type-check — the self-typed operand never unified with the string
+// literal. Now the predicate validates, a member of the value set passes, and a
+// non-member is a refinement_violation with the value, type, and predicate quoted.
+func TestStringRefinement(t *testing.T) {
+	def := "pub type Direction = string where self == \"north\" || self == \"south\"\n"
+
+	// The predicate validates and rides the definition.
+	m, diags := analyze(def + "const D: Direction = \"north\"\n")
+	if len(diags) != 0 {
+		t.Fatalf("a valid member should pass, got %v", codes(diags))
+	}
+	if m.Types[0].Where == nil {
+		t.Error("Direction.Where = nil, want the validated string predicate")
+	}
+
+	// A value outside the set is a refinement_violation.
+	_, diags = analyze(def + "const W: Direction = \"weast\"\n")
+	if got := codes(diags); len(got) != 1 || got[0] != CodeRefinementViolation {
+		t.Fatalf("\"weast\" should violate the refinement, got %v", got)
+	}
+	for _, want := range []string{"weast", "Direction", "self == \"north\""} {
+		if !strings.Contains(diags[0].Message, want) {
+			t.Errorf("message %q does not mention %q", diags[0].Message, want)
+		}
+	}
+}
+
+// TestBoolRefinement checks a boolean base refines the same way: the predicate
+// folds against the value, the satisfying constant passes, the other violates.
+func TestBoolRefinement(t *testing.T) {
+	def := "pub type Truthy = bool where self == true\n"
+	if _, diags := analyze(def + "const T: Truthy = true\n"); len(diags) != 0 {
+		t.Errorf("true should satisfy self == true, got %v", codes(diags))
+	}
+	if _, diags := analyze(def + "const F: Truthy = false\n"); len(codes(diags)) != 1 || codes(diags)[0] != CodeRefinementViolation {
+		t.Errorf("false should violate self == true, got %v", codes(diags))
+	}
+}
+
 func TestRefinementWithImpl(t *testing.T) {
 	// A where-clause composes with an impl block; the predicate still gates
 	// annotated constants.
