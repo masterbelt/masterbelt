@@ -4,6 +4,7 @@
 package semantic
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
@@ -373,11 +374,16 @@ func TestFuncMissingReturnNotForArrowOrMissingBody(t *testing.T) {
 }
 
 func TestFuncRecursionGuard(t *testing.T) {
-	// Infinite recursion folds to nothing — the depth guard, not a stack
-	// overflow — and is not a type error (the result type is declared).
+	// Infinite recursion bottoms out at the depth guard — not a stack
+	// overflow — and the constant that asked for it is an error: a pure
+	// constant either folds or errors (unfolded_const, reason depth), never
+	// silently lacks a value. The result type stays the declared one.
 	m, diags := analyze("fn loop(x: nint): nint -> loop(x)\nconst X = loop(1)\n")
-	if len(diags) != 0 {
-		t.Fatalf("unexpected diagnostics: %v", diags)
+	if got := codes(diags); len(got) != 1 || got[0] != CodeUnfoldedConst {
+		t.Fatalf("codes = %v, want [unfolded_const]", got)
+	}
+	if !strings.Contains(diags[0].Message, "depth") {
+		t.Errorf("message = %q, want the depth reason", diags[0].Message)
 	}
 	if m.Consts[0].Type.String() != "nint" {
 		t.Errorf("X type = %s, want nint", m.Consts[0].Type)
@@ -429,11 +435,12 @@ func TestLambdaParamShadowsFunc(t *testing.T) {
 }
 
 func TestFuncMutualRecursionGuard(t *testing.T) {
-	// Mutual recursion through two functions bottoms out at the depth guard.
+	// Mutual recursion through two functions bottoms out at the depth guard,
+	// and the constant errs exactly as direct recursion does.
 	src := "fn a(x: nint): nint -> b(x)\nfn b(x: nint): nint -> a(x)\nconst X = a(1)\n"
 	m, diags := analyze(src)
-	if len(diags) != 0 {
-		t.Fatalf("unexpected diagnostics: %v", diags)
+	if got := codes(diags); len(got) != 1 || got[0] != CodeUnfoldedConst {
+		t.Fatalf("codes = %v, want [unfolded_const]", got)
 	}
 	if m.Consts[0].Eval != nil {
 		t.Errorf("X eval = %v, want unevaluated", m.Consts[0].Eval)

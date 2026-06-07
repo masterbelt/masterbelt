@@ -75,6 +75,7 @@ const (
 	CodeTernaryConditionNotBool    diagnostic.Code = "masterbelt.semantic.ternary_condition_not_bool"
 	CodeTypeMismatch               diagnostic.Code = "masterbelt.semantic.type_mismatch"
 	CodeUndefinedName              diagnostic.Code = "masterbelt.semantic.undefined_name"
+	CodeUnfoldedConst              diagnostic.Code = "masterbelt.semantic.unfolded_const"
 	CodeUninferableCollection      diagnostic.Code = "masterbelt.semantic.uninferable_collection"
 	CodeUninferableParameter       diagnostic.Code = "masterbelt.semantic.uninferable_parameter"
 	CodeUninferableRecord          diagnostic.Code = "masterbelt.semantic.uninferable_record"
@@ -1032,6 +1033,21 @@ func newUndefinedNameDiagnostic(offset int, width int, name string) diagnostic.D
 		Severity: diagnostic.Error,
 		Code:     CodeUndefinedName,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeUndefinedName, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newUnfoldedConstDiagnostic(offset int, width int, name string, reason string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"name":   diagnostic.Str(name),
+		"reason": diagnostic.Str(reason),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeUnfoldedConst,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeUnfoldedConst, fields),
 		Fields:   fields,
 		Offset:   offset,
 		Width:    width,

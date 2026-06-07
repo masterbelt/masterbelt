@@ -23,14 +23,13 @@ import (
 
 const foldCorpus = "testdata/fold"
 
-// knownGaps names the corpus cases that are open silent-unfold gaps today —
+// knownGaps names the corpus cases that are open silent-unfold gaps —
 // analysis green, value missing. Each entry is asserted to still be broken,
-// so closing a gap fails the gate until its entry is removed; the milestones
-// empty the list ((a)/(d) in M4, (b) in M5, (c)/extern in M3, depth in M6),
-// and once it is empty the gates enforce the full rule with no exceptions.
-var knownGaps = map[string]string{
-	"gap-depth.belt": "the depth budget refuses the fold with no diagnostic (M6)",
-}
+// so closing a gap fails the gate until its entry is removed. The F-2
+// milestones emptied the list ((c)/extern in M3, (a)/(d) in M4, (b) in M5,
+// depth in M6): the gates now enforce the full rule with no exceptions, and
+// any future entry is a deliberate, reviewed regression allowance.
+var knownGaps = map[string]string{}
 
 // foldExpect is one corpus case's expectation: it folds completely (and is
 // diagnostic-free), or it is diagnosed with at least the listed codes.

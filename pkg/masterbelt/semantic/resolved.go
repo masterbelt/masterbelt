@@ -35,11 +35,28 @@ func newCallResolutions() *callResolutions {
 
 // resolvedEnv arms the collected selections on top of the ordinary evaluation
 // environment, satisfying eval.CallResolver — the channel the late re-fold
-// reads. The embedded evalEnv keeps every other capability (resolution,
-// memoized values, the syntactic ReceiverTyper channels) untouched.
+// reads. The embedded evalEnv keeps every other capability (resolution, the
+// syntactic ReceiverTyper channels) untouched; ValueOf alone is widened: a
+// reference to one of this file's own constants reads through the published
+// Eval when the type-blind value query folds nothing, so a reader of a
+// constant the late re-fold settled folds too (the caller fixpoints the
+// re-fold, so declaration order does not matter). A cross-file constant stays
+// the query's verdict — deterministic whatever order the program's files
+// assemble in.
 type resolvedEnv struct {
 	evalEnv
 	res *callResolutions
+	own map[*ast.ConstDecl]*ir.Const // this file's shells, published Eval included
+}
+
+func (e resolvedEnv) ValueOf(decl *ast.ConstDecl) *ir.Constant {
+	if v := e.q.valueOf(decl); v != nil {
+		return v
+	}
+	if c := e.own[decl]; c != nil {
+		return c.Eval
+	}
+	return nil
 }
 
 func (e resolvedEnv) ResolvedFunc(call *ast.CallExpr) *ast.FuncDecl { return e.res.funcs[call] }

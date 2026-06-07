@@ -1,0 +1,11 @@
+// fold-expect: diagnosed unfolded_const
+// A match whose arm type is the function's type parameter type-checks but the
+// type-blind evaluator cannot dispatch it — an open evaluator gap, kept loud
+// by the totality rule until generic arm dispatch lands.
+pub fn orFallback<T>(v: optional<T>, fb: T): T {
+  match v {
+    T n -> return n
+    _ -> return fb
+  }
+}
+const A = orFallback(5, 0)

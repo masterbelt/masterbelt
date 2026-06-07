@@ -389,17 +389,29 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 	// IR (the doctrine that every reference is bound to its declaration, met
 	// for overloaded calls) and arm them for evaluation.
 	writeBackResolutions(module, res, fnShells)
-	renv := resolvedEnv{evalEnv: evalEnv{q: q, file: fileID}, res: res}
+	ownShells := make(map[*ast.ConstDecl]*ir.Const, len(file.Decls))
+	for _, decl := range file.Decls {
+		ownShells[decl] = shells[decl]
+	}
+	renv := resolvedEnv{evalEnv: evalEnv{q: q, file: fileID}, res: res, own: ownShells}
 
 	// The late re-fold: a constant the type-blind value query left unfolded is
 	// folded once more with the checker's selections armed. The resolutions
 	// only widen the foldable set (a call with no recorded selection folds
 	// exactly as before), so the memoized value query and this pass agree
-	// wherever both fold — the parity the fold gate pins.
-	for _, decl := range file.Decls {
-		c := shells[decl]
-		if c.Eval == nil && decl.Value != nil {
-			c.Eval = eval.DeclExpecting(decl, annotationResolved(q, fileID, decl), renv)
+	// wherever both fold — the parity the fold gate pins. The loop runs to a
+	// fixpoint: renv reads this file's published values, so a reader of a
+	// re-folded constant folds in a later round, whatever the declaration
+	// order.
+	for progress := true; progress; {
+		progress = false
+		for _, decl := range file.Decls {
+			c := shells[decl]
+			if c.Eval == nil && decl.Value != nil {
+				if c.Eval = eval.DeclExpecting(decl, annotationResolved(q, fileID, decl), renv); c.Eval != nil {
+					progress = true
+				}
+			}
 		}
 	}
 
@@ -444,6 +456,17 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 		v := eval.Expr(a.Cond, renv)
 		d := assert.Diagram(a.Cond, renv)
 		cond, _, _ := strings.Cut(d, "\n")
+
+		// A poisoned condition type — the assert's own error, or a broken
+		// dependency's Invalid propagating in — publishes no outcome: the
+		// type-blind fold may well have produced a value, but one that never
+		// passed the type-bound checks must not turn an assertion green (the
+		// soundness half of the publication rule). The cause carries its own
+		// diagnostic at its origin.
+		if condType == ir.Invalid {
+			module.Asserts = append(module.Asserts, &ir.Assert{Cond: cond, Doc: a.Doc, Syntax: a})
+			continue
+		}
 		module.Asserts = append(module.Asserts, &ir.Assert{Cond: cond, Doc: a.Doc, Eval: v, Diagram: d, Syntax: a})
 
 		// The condition must be a bool. An Invalid type was reported above
@@ -482,7 +505,6 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 			diags.Add(newAssertionFailedDiagnostic(s.offset, s.width, cond, doc, diagram))
 		}
 	}
-
 
 	// Compile-time positions must be pure: a constant initializer, an assert
 	// condition, an enum member initializer, an associated constant initializer,
@@ -523,6 +545,12 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 			}
 		}
 	}
+
+	// The publication rule, last — every diagnostic above is in, so both its
+	// directions read the settled facts: a broken declaration's value is
+	// withheld (soundness), and a clean declaration without a value is an
+	// error (totality, unfolded_const).
+	enforceEvalPublication(fileID, file, module, shells, q, renv, at, diags)
 
 	items := diags.Items()
 	sort.SliceStable(items, func(i, j int) bool { return items[i].Offset < items[j].Offset })

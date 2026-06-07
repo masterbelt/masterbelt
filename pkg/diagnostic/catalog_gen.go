@@ -695,6 +695,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "undefined name: " + f["name"].String()
 		}
 	},
+	"masterbelt.semantic.unfolded_const": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "定数 " + f["name"].String() + " はコンパイル時値に畳めませんでした: " + f["reason"].String() + " — depth は評価予算の超過です(計算を浅くするか分割してください)。evaluator gap は masterbelt のバグです(報告してください)"
+		default:
+			return "constant " + f["name"].String() + " has no compile-time value: " + f["reason"].String() + " — depth means the computation exceeded the evaluation budget (make it shallower or split it); evaluator gap means this is a masterbelt bug (please report it)"
+		}
+	},
 	"masterbelt.semantic.uninferable_collection": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":

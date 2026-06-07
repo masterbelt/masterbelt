@@ -151,8 +151,12 @@ func resolvedFuncDecl(env Env, call *ast.CallExpr, cands []*ast.FuncDecl) *ast.F
 
 // resolvedMethod and resolvedStatic name the CallResolver channel a method-form
 // lookup reads, so resolvedMethodDecl serves both name spaces.
-func resolvedMethod(r CallResolver, call *ast.CallExpr) *ast.MethodDecl { return r.ResolvedMethod(call) }
-func resolvedStatic(r CallResolver, call *ast.CallExpr) *ast.MethodDecl { return r.ResolvedStatic(call) }
+func resolvedMethod(r CallResolver, call *ast.CallExpr) *ast.MethodDecl {
+	return r.ResolvedMethod(call)
+}
+func resolvedStatic(r CallResolver, call *ast.CallExpr) *ast.MethodDecl {
+	return r.ResolvedStatic(call)
+}
 
 // resolvedMethodDecl is resolvedFuncDecl for the method-form selections (an
 // instance method, a static fn): the checker-selected declaration when the Env

@@ -58,13 +58,14 @@ func TestOptionalNonExhaustiveMatch(t *testing.T) {
 
 // TestOptionalGenericSolve pins that a generic function solves T through the
 // alias parameter: optional<T> expands to T | null and Match's union recursion
-// binds T from the argument, so the call type-checks with no diagnostic. The
-// fold of a match whose arm type is the function's type parameter (T n -> ...)
-// is a separate capability the type-blind evaluator does not have — it resolves
-// an arm type through a universe lookup, which a generic parameter is not in, so
-// the dispatch is undecided exactly as it is for a bare union (T | null) with
-// the same arm. The constant therefore does not fold; the test asserts the
-// type-level solve and documents the fold as out of scope.
+// binds T from the argument, so the call type-checks. The fold of a match
+// whose arm type is the function's type parameter (T n -> ...) is a capability
+// the type-blind evaluator does not have — it resolves an arm type through a
+// universe lookup, which a generic parameter is not in, so the dispatch is
+// undecided. Under the fold-totality rule that open gap is loud rather than
+// silent: the constant errs with unfolded_const (reason: evaluator gap) until
+// the evaluator learns generic arm dispatch — at which point this pin flips to
+// the folded value below.
 func TestOptionalGenericSolve(t *testing.T) {
 	src := `pub fn orFallback<T>(v: optional<T>, fb: T): T {
   match v {
@@ -75,8 +76,8 @@ func TestOptionalGenericSolve(t *testing.T) {
 const A = orFallback(5, 0)
 `
 	m, diags := analyze(src)
-	if len(diags) != 0 {
-		t.Fatalf("generic solve through the alias should type-check, got %v", codes(diags))
+	if got := codes(diags); len(got) != 1 || got[0] != CodeUnfoldedConst {
+		t.Fatalf("codes = %v, want [unfolded_const] (the generic-arm dispatch gap is loud, not silent)", got)
 	}
 	for _, c := range m.Consts {
 		if c.Name == "A" && c.Eval != nil {

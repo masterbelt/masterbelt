@@ -33,7 +33,7 @@ func callType(e *ast.CallExpr, s scope, sink *Sink) ir.Type {
 	if !ok {
 		// A call whose callee names a type is a conversion T(x) — the type
 		// wins over a same-named function — and one that names a top-level
-		// function is a function call; any other callee is nothing.
+		// function is a function call.
 		if id, isIdent := e.Callee.(*ast.Identifier); isIdent {
 			if t := s.conv(id); t != ir.Invalid {
 				return convCallType(e, id.Name, t, s, sink)
@@ -41,6 +41,26 @@ func callType(e *ast.CallExpr, s scope, sink *Sink) ir.Type {
 			if cands := s.fn(id); len(cands) > 0 {
 				return funcCallType(e, id.Name, cands, s, sink)
 			}
+		}
+		// A callee that itself types as a function value applies — a
+		// function-typed constant (F(2)), a local or parameter bound to one,
+		// an immediately applied literal — mirroring the folder's general
+		// function-value arm: each argument checks against the function
+		// type's parameter, and the call's type is its result. A callee of
+		// any other type falls through to the leaf forms (whose channels
+		// report an unresolved name).
+		if fn, isFn := check(e.Callee, s, sink).(*ir.Func); isFn {
+			if len(e.Arguments) != len(fn.Params) {
+				for _, a := range e.Arguments {
+					check(a, s, sink)
+				}
+				sink.arityMismatch(e, calleeName(e.Callee), len(e.Arguments), len(fn.Params))
+				return ir.Invalid
+			}
+			for i, a := range e.Arguments {
+				checkType(a, fn.Params[i], s, map[string]ir.Type{}, sink)
+			}
+			return fn.Result
 		}
 		return s.leaf(e)
 	}
@@ -357,9 +377,26 @@ func funcCallType(e *ast.CallExpr, name string, cands []*ast.FuncDecl, s scope, 
 	}
 
 	if len(sigs) == 1 {
+		// The overload set collapsed to one signature — duplicates dropped,
+		// the first declaration kept callable. The survivor is still a
+		// selection among several declarations, so it is streamed out: the
+		// folder then applies the declaration the checker chose rather than
+		// refusing the by-value-ambiguous duplicate set.
+		if len(cands) > 1 {
+			sink.resolvedFunc(e, sigs[0].fd)
+		}
 		return checkFuncCall(e, name, sigs[0], s, sink)
 	}
 	return selectFuncOverload(e, name, sigs, s, sink)
+}
+
+// calleeName renders a call's callee for the arity diagnostic: an identifier
+// by its name, any other function-valued expression generically.
+func calleeName(callee ast.Expr) string {
+	if id, ok := callee.(*ast.Identifier); ok {
+		return id.Name
+	}
+	return "function value"
 }
 
 // selectFuncOverload resolves a call against an overload set of two or more
