@@ -65,10 +65,9 @@ type Constant struct {
 
 	// valid when Kind == ConstFunc: the function-literal value and the values
 	// it captured from its enclosing scope (the closure environment). Fn is
-	// the IR node — the folded value references no syntax (F-3 §2.4); the
-	// literal's surface form stays reachable through Fn.Syntax, the
-	// transitional channel the AST-driven application reads until the folder
-	// interprets the IR body directly (F-3 M5).
+	// the IR node — the folded value references no syntax (F-3 §2.4), and an
+	// application interprets its lowered Body; the literal's syntax anchor is
+	// the identity the engine's cutoff compares by.
 	Fn       *FuncLiteral
 	Captured map[string]*Constant
 

@@ -9,7 +9,6 @@ package eval
 
 import (
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/types"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
 )
 
@@ -61,18 +60,13 @@ func graphApplyBody(c graphCallable, self *ir.Constant, vals []*ir.Constant, ctx
 	})
 }
 
-// graphUnionTagValue is unionMemberTagValue for the graph fold: the member a
-// folded value flows into a union-typed position as, from what the value alone
-// can know — its existing tag, or a unique kind backing.
+// graphUnionTagValue is the value-only reading of graphUnionTag: the member a
+// folded value flows into a union-typed position as when there is no source
+// node to read a static type from (a parameter binding) — its existing tag,
+// or a unique kind backing. It delegates with a nil node, whose static type
+// reads as nothing, so the two selections cannot drift.
 func graphUnionTagValue(ctx graphCtx, v *ir.Constant, want ir.Type) ir.Type {
-	u := types.UnionType(want)
-	if u == nil {
-		return nil
-	}
-	if v.UnionTag != nil {
-		return v.UnionTag
-	}
-	return uniqueKindMemberOf(ctx.env.Registry(), u, v.Kind)
+	return graphUnionTag(ctx, nil, v, want)
 }
 
 // graphApplyValue folds a call of a function value fn(args): the argument

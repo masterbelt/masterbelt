@@ -213,12 +213,10 @@ type TypeDef struct {
 	Enum *EnumDef
 	// Where is the refinement predicate over self as a resolved value graph —
 	// self bound to a SelfValue node, every reference resolved, the typed and
-	// adapted IR the per-constant fold runs with self bound to each value. It
-	// is set only when the predicate type-checks to a foldable bool; an
+	// adapted IR every fold of the predicate runs (self bound to each value).
+	// It is set only when the predicate type-checks to a foldable bool; an
 	// unusable predicate is reported at the declaration and stays nil, so the
-	// per-constant check never fires for it. (Until the folder interprets the
-	// IR directly, evaluation reads the surface predicate through
-	// WhereSyntax.)
+	// per-constant check never fires for it.
 	Where           Value
 	Syntax          *ast.TypeDecl      // the type declaration this was resolved from, or nil
 	EnumSyntax      *ast.EnumDecl      // the enum declaration this was resolved from, or nil
@@ -227,10 +225,9 @@ type TypeDef struct {
 
 // WhereSyntax returns the surface form of the refinement predicate — the
 // declaration's where expression — when the definition carries a usable one
-// (Where is its value-graph truth), or nil. It is a transitional channel: the
-// AST-driven folder evaluates the predicate through it until the folder
-// interprets the IR value graph directly (F-3 M5), after which Where alone
-// carries the predicate.
+// (Where is its value-graph truth), or nil. It is a rendering channel only:
+// the violation diagnostic and the editor's hover quote the predicate as
+// written, while every fold runs on the Where graph.
 func (t *TypeDef) WhereSyntax() ast.Expr {
 	if t.Where == nil || t.Syntax == nil {
 		return nil

@@ -316,3 +316,41 @@ func interfaceParamSubst(iface ir.Type, def *ir.TypeDef) map[string]ir.Type {
 	}
 	return subst
 }
+
+// HasTypeVar reports whether t still contains a type variable anywhere in its
+// structure — a generic part no context has pinned to a concrete type. It is
+// the one walk the checker's inference holes and the interpreter's
+// generic-arm refusals both read, so the two cannot drift as composite type
+// forms are added.
+func HasTypeVar(t ir.Type) bool {
+	switch t := t.(type) {
+	case *ir.TypeVar:
+		return true
+	case *ir.App:
+		for _, a := range t.Args {
+			if HasTypeVar(a) {
+				return true
+			}
+		}
+	case *ir.Func:
+		for _, p := range t.Params {
+			if HasTypeVar(p) {
+				return true
+			}
+		}
+		return HasTypeVar(t.Result)
+	case *ir.Union:
+		for _, m := range t.Members {
+			if HasTypeVar(m) {
+				return true
+			}
+		}
+	case *ir.Record:
+		for _, f := range t.Fields {
+			if HasTypeVar(f.Type) {
+				return true
+			}
+		}
+	}
+	return false
+}

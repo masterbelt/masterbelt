@@ -592,38 +592,10 @@ func varsRigid(t ir.Type, s scope) bool {
 }
 
 // hasTypeVar reports whether t still contains a type variable — i.e. the
-// checking context has not pinned every generic part to a concrete type.
+// checking context has not pinned every generic part to a concrete type. It is
+// the shared walk in package types, named locally for the rules here.
 func hasTypeVar(t ir.Type) bool {
-	switch t := t.(type) {
-	case *ir.TypeVar:
-		return true
-	case *ir.App:
-		for _, a := range t.Args {
-			if hasTypeVar(a) {
-				return true
-			}
-		}
-	case *ir.Func:
-		for _, p := range t.Params {
-			if hasTypeVar(p) {
-				return true
-			}
-		}
-		return hasTypeVar(t.Result)
-	case *ir.Union:
-		for _, m := range t.Members {
-			if hasTypeVar(m) {
-				return true
-			}
-		}
-	case *ir.Record:
-		for _, f := range t.Fields {
-			if hasTypeVar(f.Type) {
-				return true
-			}
-		}
-	}
-	return false
+	return types.HasTypeVar(t)
 }
 
 // observe wraps sink so the caller learns whether the wrapped walk reported a

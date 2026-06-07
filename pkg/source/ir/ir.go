@@ -558,122 +558,69 @@ func SyntaxOf(v Value) ast.Expr {
 	case *Adapt:
 		return SyntaxOf(v.Value)
 	case *IntLiteral:
-		if v.Syntax == nil {
-			return nil
-		}
-		return v.Syntax
+		return exprOrNil(v.Syntax)
 	case *StringLiteral:
-		if v.Syntax == nil {
-			return nil
-		}
-		return v.Syntax
+		return exprOrNil(v.Syntax)
 	case *BoolLiteral:
-		if v.Syntax == nil {
-			return nil
-		}
-		return v.Syntax
+		return exprOrNil(v.Syntax)
 	case *DatetimeLiteral:
-		if v.Syntax == nil {
-			return nil
-		}
-		return v.Syntax
+		return exprOrNil(v.Syntax)
 	case *DurationLiteral:
-		if v.Syntax == nil {
-			return nil
-		}
-		return v.Syntax
+		return exprOrNil(v.Syntax)
 	case *CollectionLiteral:
-		if v.Syntax == nil {
-			return nil
-		}
-		return v.Syntax
+		return exprOrNil(v.Syntax)
 	case *RecordValue:
-		if v.Syntax == nil {
-			return nil
-		}
-		return v.Syntax
+		return exprOrNil(v.Syntax)
 	case *Reference:
 		return v.Syntax // already the interface form; nil stays nil
 	case *Call:
-		if v.Syntax == nil {
-			return nil
-		}
-		return v.Syntax
+		return exprOrNil(v.Syntax)
 	case *FuncCall:
-		if v.Syntax == nil {
-			return nil
-		}
-		return v.Syntax
+		return exprOrNil(v.Syntax)
 	case *StaticCall:
-		if v.Syntax == nil {
-			return nil
-		}
-		return v.Syntax
+		return exprOrNil(v.Syntax)
 	case *Apply:
-		if v.Syntax == nil {
-			return nil
-		}
-		return v.Syntax
+		return exprOrNil(v.Syntax)
 	case *FuncLiteral:
-		if v.Syntax == nil {
-			return nil
-		}
-		return v.Syntax
+		return exprOrNil(v.Syntax)
 	case *SelfValue:
-		if v.Syntax == nil {
-			return nil
-		}
-		return v.Syntax
+		return exprOrNil(v.Syntax)
 	case *ParamRef:
-		if v.Syntax == nil {
-			return nil
-		}
-		return v.Syntax
+		return exprOrNil(v.Syntax)
 	case *LocalRef:
-		if v.Syntax == nil {
-			return nil
-		}
-		return v.Syntax
+		return exprOrNil(v.Syntax)
 	case *FieldAccess:
-		if v.Syntax == nil {
-			return nil
-		}
-		return v.Syntax
+		return exprOrNil(v.Syntax)
 	case *Conversion:
-		if v.Syntax == nil {
-			return nil
-		}
-		return v.Syntax
+		return exprOrNil(v.Syntax)
 	case *Await:
-		if v.Syntax == nil {
-			return nil
-		}
-		return v.Syntax
+		return exprOrNil(v.Syntax)
 	case *Ternary:
-		if v.Syntax == nil {
-			return nil
-		}
-		return v.Syntax
+		return exprOrNil(v.Syntax)
 	case *RangeLit:
-		if v.Syntax == nil {
-			return nil
-		}
-		return v.Syntax
+		return exprOrNil(v.Syntax)
 	case *NullValue:
-		if v.Syntax == nil {
-			return nil
-		}
-		return v.Syntax
+		return exprOrNil(v.Syntax)
 	case *EnumMemberValue:
 		return v.Syntax // already the interface form; nil stays nil
 	case *AssocConstValue:
-		if v.Syntax == nil {
-			return nil
-		}
-		return v.Syntax
+		return exprOrNil(v.Syntax)
 	default:
 		panic(fmt.Sprintf("ir: unhandled Value kind %T", v))
 	}
+}
+
+// exprOrNil widens a concrete syntax pointer to ast.Expr, keeping a nil
+// pointer nil — the typed-nil-interface guard every SyntaxOf case needs, kept
+// in one place so a case written without it cannot reintroduce the bug.
+func exprOrNil[E any, P interface {
+	*E
+	ast.Expr
+}](p P) ast.Expr {
+	if p == nil {
+		return nil
+	}
+	return p
 }
 
 // AssocConstValue is a resolved reference to a type's associated constant,

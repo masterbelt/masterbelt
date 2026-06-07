@@ -1,6 +1,9 @@
 package semantic
 
 import (
+	"maps"
+	"slices"
+
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/eval"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/lower"
@@ -99,7 +102,10 @@ func computeValue(file FileID, decl *ast.ConstDecl, q queries) *ir.Constant {
 	if decl.Value == nil {
 		return nil
 	}
-	for f := range q.reachableFrom(file) {
+	// Sorted, so a value↔type cycle broken by the running guard is broken at
+	// the same point whatever map order the reachable set iterates in — the
+	// determinism the full/incremental dump parity rides on.
+	for _, f := range slices.Sorted(maps.Keys(q.reachableFrom(file))) {
 		q.funcsOf(f)
 	}
 	graph := lower.Value(decl.Value, constBinder{

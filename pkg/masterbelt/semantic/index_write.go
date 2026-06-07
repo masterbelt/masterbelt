@@ -10,6 +10,7 @@
 package semantic
 
 import (
+	"maps"
 	"strconv"
 
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
@@ -126,9 +127,5 @@ func reportIndexWriteIR(s *ir.Assign, locals map[string]*ir.Constant, genv graph
 // copyLocals returns a shallow copy of a local environment, so a nested
 // block's bindings do not leak back to the enclosing one.
 func copyLocals(locals map[string]*ir.Constant) map[string]*ir.Constant {
-	out := make(map[string]*ir.Constant, len(locals))
-	for k, v := range locals {
-		out[k] = v
-	}
-	return out
+	return maps.Clone(locals)
 }

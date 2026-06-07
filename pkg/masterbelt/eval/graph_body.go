@@ -12,13 +12,13 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/types"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
 )
 
 // graphApply folds a function-value constant against the given arguments over
-// its lowered IR body — the application path of a closure the graph folder
-// built. (The transitional apply in eval_body.go bridges to this when the
-// closure carries a lowered body.)
+// its lowered IR body — the application path of every closure: the parameters
+// bind over the captured environment, and the body runs to its return.
 func graphApply(ctx graphCtx, fn *ir.Constant, args []*ir.Constant) *ir.Constant {
 	if fn.Fn == nil || len(args) != len(fn.Fn.Params) {
 		return nil
@@ -261,7 +261,7 @@ func graphMatch(m *ir.Match, ctx graphCtx) (*ir.Constant, graphOutcome) {
 	}
 	if scrut.UnionTag != nil {
 		for _, arm := range m.Arms {
-			if arm.Type == nil || arm.Type == ir.Invalid || typeHasVar(arm.Type) {
+			if arm.Type == nil || arm.Type == ir.Invalid || types.HasTypeVar(arm.Type) {
 				// An unresolved arm, or one over a still-generic type (the T
 				// arm of a generic body): which values it matches depends on
 				// the instantiation, so the dispatch order is undecidable —
@@ -298,42 +298,6 @@ func graphMatch(m *ir.Match, ctx graphCtx) (*ir.Constant, graphOutcome) {
 		return graphBranch(m.Else, ctx)
 	}
 	return nil, graphUnknown
-}
-
-// typeHasVar reports whether a resolved type still contains a type variable —
-// a generic body's arm or parameter type, whose concrete meaning depends on
-// the instantiation.
-func typeHasVar(t ir.Type) bool {
-	switch t := t.(type) {
-	case *ir.TypeVar:
-		return true
-	case *ir.App:
-		for _, a := range t.Args {
-			if typeHasVar(a) {
-				return true
-			}
-		}
-	case *ir.Union:
-		for _, m := range t.Members {
-			if typeHasVar(m) {
-				return true
-			}
-		}
-	case *ir.Func:
-		for _, p := range t.Params {
-			if typeHasVar(p) {
-				return true
-			}
-		}
-		return typeHasVar(t.Result)
-	case *ir.Record:
-		for _, f := range t.Fields {
-			if typeHasVar(f.Type) {
-				return true
-			}
-		}
-	}
-	return false
 }
 
 // graphMatchesArm reports whether a folded scrutinee is of a match arm's

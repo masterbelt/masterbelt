@@ -68,23 +68,24 @@ func checkSwitch(sw *ast.SwitchStmt, bs infer.BodyScope, env exprFolder, sink *i
 			if scrutT != ir.Invalid {
 				infer.CheckBody(v, scrutT, bs, armSink)
 			}
-			key, ok := armValueKey(v, enumDef, env)
+			// One fold per arm value: the key, the diagnostic label, and the
+			// enum coverage all read the same folded form.
+			av := foldArmValue(v, enumDef, env)
+			key, ok := av.key(enumDef)
 			if !ok {
 				armReachable = true // an unfoldable value is conservatively live
 				continue
 			}
 			if seen[key] {
 				s := at(v)
-				diags.Add(newDuplicateSwitchArmDiagnostic(s.offset, s.width, armValueLabel(v, enumDef, env)))
+				diags.Add(newDuplicateSwitchArmDiagnostic(s.offset, s.width, av.label(v, enumDef)))
 				dupReported = true
 				continue
 			}
 			seen[key] = true
 			armReachable = true
-			if enumDef != nil {
-				if idx := enumValueIndex(v, enumDef, env); idx >= 0 {
-					covered[idx] = true
-				}
+			if av.enumIndex >= 0 {
+				covered[av.enumIndex] = true
 			}
 		}
 		// An arm none of whose values can match is unreachable — but when that
@@ -181,58 +182,65 @@ func enumWant(def *ir.TypeDef) ir.Type {
 	return &ir.Named{Def: def}
 }
 
-// armValueKey returns a stable key identifying an arm value for duplicate
-// detection, and whether it could be determined. An enum member keys on its
-// index; any other value keys on its folded constant. An unfoldable value has
-// no key (the second result is false), so it is neither a duplicate nor counts
-// toward coverage.
-func armValueKey(v ast.Expr, enumDef *ir.TypeDef, env exprFolder) (string, bool) {
-	if enumDef != nil {
-		if idx := enumValueIndex(v, enumDef, env); idx >= 0 {
-			return "enum:" + enumDef.Name + ":" + itoa(idx), true
-		}
-		return "", false
-	}
-	c := eval.GraphExpecting(lower.Value(v, env.binder(enumDef)), enumWant(enumDef), env.env())
-	if c == nil {
-		return "", false
-	}
-	return "const:" + c.String(), true
+// armValue is one switch arm value's folded reading: its constant (nil when it
+// does not fold) and, under an enum scrutinee, the member index it names (-1
+// otherwise). It is computed once per arm value; the duplicate key, the
+// diagnostic label, and the coverage all read it.
+type armValue struct {
+	c         *ir.Constant
+	enumIndex int
 }
 
-// armValueLabel renders an arm value for a diagnostic: an enum member by its
-// qualified name, any other value by its folded constant or its surface form.
-func armValueLabel(v ast.Expr, enumDef *ir.TypeDef, env exprFolder) string {
+// foldArmValue folds one arm value against the scrutinee's enum expectation —
+// one lowering, one interpretation. Under an enum scrutinee a bare (Common) or
+// qualified (Rarity.Common) member also resolves syntactically, so a member
+// names its index even when something else keeps the fold from settling.
+func foldArmValue(v ast.Expr, enumDef *ir.TypeDef, env exprFolder) armValue {
+	av := armValue{enumIndex: -1}
 	if enumDef != nil {
-		if idx := enumValueIndex(v, enumDef, env); idx >= 0 {
-			return enumDef.Name + "." + enumDef.Enum.Members[idx].Name
+		switch e := v.(type) {
+		case *ast.Identifier:
+			av.enumIndex = enumIndex(enumDef, e.Name)
+		case *ast.MemberExpr:
+			if recv, ok := e.Receiver.(*ast.Identifier); ok && recv.Name == enumDef.Name {
+				av.enumIndex = enumIndex(enumDef, e.Member.Name)
+			}
 		}
 	}
-	if c := eval.GraphExpecting(lower.Value(v, env.binder(enumDef)), enumWant(enumDef), env.env()); c != nil {
-		return c.String()
+	av.c = eval.GraphExpecting(lower.Value(v, env.binder(enumDef)), enumWant(enumDef), env.env())
+	if av.enumIndex < 0 && av.c != nil && av.c.Kind == ir.ConstEnum && av.c.EnumDef == enumDef {
+		av.enumIndex = av.c.EnumIndex
+	}
+	return av
+}
+
+// key returns a stable key identifying the arm value for duplicate detection,
+// and whether it could be determined. An enum member keys on its index; any
+// other value keys on its folded constant. An unfoldable value has no key, so
+// it is neither a duplicate nor counts toward coverage.
+func (av armValue) key(enumDef *ir.TypeDef) (string, bool) {
+	if enumDef != nil {
+		if av.enumIndex >= 0 {
+			return "enum:" + enumDef.Name + ":" + itoa(av.enumIndex), true
+		}
+		return "", false
+	}
+	if av.c == nil {
+		return "", false
+	}
+	return "const:" + av.c.String(), true
+}
+
+// label renders the arm value for a diagnostic: an enum member by its
+// qualified name, any other value by its folded constant or its surface form.
+func (av armValue) label(v ast.Expr, enumDef *ir.TypeDef) string {
+	if enumDef != nil && av.enumIndex >= 0 {
+		return enumDef.Name + "." + enumDef.Enum.Members[av.enumIndex].Name
+	}
+	if av.c != nil {
+		return av.c.String()
 	}
 	return ast.Render(v)
-}
-
-// enumValueIndex returns the member index an arm value names within enumDef, or
-// -1 when the value is not a member of it. It accepts both the bare form
-// (Common) and the qualified form (Rarity.Common).
-func enumValueIndex(v ast.Expr, enumDef *ir.TypeDef, env exprFolder) int {
-	if enumDef == nil {
-		return -1
-	}
-	switch e := v.(type) {
-	case *ast.Identifier:
-		return enumIndex(enumDef, e.Name)
-	case *ast.MemberExpr:
-		if recv, ok := e.Receiver.(*ast.Identifier); ok && recv.Name == enumDef.Name {
-			return enumIndex(enumDef, e.Member.Name)
-		}
-	}
-	if c := eval.GraphExpecting(lower.Value(v, env.binder(enumDef)), enumWant(enumDef), env.env()); c != nil && c.Kind == ir.ConstEnum && c.EnumDef == enumDef {
-		return c.EnumIndex
-	}
-	return -1
 }
 
 // bodyReturns reports whether a statement body is guaranteed to return a value

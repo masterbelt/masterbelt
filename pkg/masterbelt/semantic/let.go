@@ -135,6 +135,16 @@ func checkAssign(s *ast.AssignStmt, bs infer.BodyScope, env exprFolder, noSelf f
 	if s.Value == nil {
 		return
 	}
+	// An empty collection literal has no type of its own — synthesis would
+	// leave it Invalid and the rebinding unfoldable — so the local's fixed
+	// type reaches in, exactly as a let annotation reaches its initializer:
+	// the literal settles (and the typed graph records) the local's mapness,
+	// so a reassignment m = [] of a map local stays a map for the fold and
+	// the index-write check.
+	if lit, ok := s.Value.(*ast.CollectionLit); ok && len(lit.Entries) == 0 && want != ir.Invalid {
+		infer.CheckBody(s.Value, want, bs, sink)
+		return
+	}
 	// A bare member of the target's enum (r = Common, where r is a Rarity let)
 	// resolves through the local's static type; a name that is not a member is the
 	// unknown_enum_member the const path reports. A genuine member of the enum is a

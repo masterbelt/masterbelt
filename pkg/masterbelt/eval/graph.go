@@ -313,6 +313,13 @@ func executeAdapt(a *ir.Adapt, ctx graphCtx) *ir.Constant {
 	if tag == nil {
 		return nil
 	}
+	if types.UnionType(tag) != nil {
+		// A union-typed source pins no member (a value moving into a wider
+		// union, or between aliases): its own tag — carried from the union it
+		// came through — stays the member, the contract UnionTag documents.
+		// Tagging with the union itself would break every later dispatch.
+		return v
+	}
 	if !graphMemberAdmits(ctx, tag, v) {
 		return nil
 	}
