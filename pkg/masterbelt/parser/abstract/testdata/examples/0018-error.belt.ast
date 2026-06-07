@@ -1,23 +1,140 @@
 File
-  ConstDecl
-    name "E"
-    value (call Identifier "error" StringLit "boom")
-  ConstDecl
-    name "M"
-    value (call (. Identifier "E" message))
-  ConstDecl
-    name "P"
-    type nint | error
-    value (call Identifier "parseLevel" StringLit "99")
-  FuncDecl
-    pub
-    name "parseLevel"
-    param s: string
-    result nint | error
-      return (call Identifier "error" (call (. StringLit "invalid level: " add) Identifier "s"))
-  AssertDecl
-    cond (call (. (call (. (call Identifier "error" StringLit "x") message)) eql) StringLit "x")
-  AssertDecl
-    cond (call (. (call (. Identifier "E" message)) eql) StringLit "boom")
-  AssertDecl
-    cond (call (. Identifier "M" eql) StringLit "boom")
+  Uses: ~
+  Decls:
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "E"
+      Type: ~
+      Value: CallExpr
+        Callee: Identifier
+          Name: "error"
+        Arguments:
+          StringLit
+            Value: "boom"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "M"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: Identifier
+            Name: "E"
+          Member: Identifier
+            Name: "message"
+        Arguments: ~
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "P"
+      Type: UnionType
+        Members:
+          NamedType
+            Namespace: ""
+            Name: "nint"
+            Args: ~
+          NamedType
+            Namespace: ""
+            Name: "error"
+            Args: ~
+      Value: CallExpr
+        Callee: Identifier
+          Name: "parseLevel"
+        Arguments:
+          StringLit
+            Value: "99"
+      Builtin: false
+  Types: ~
+  Enums: ~
+  Interfaces: ~
+  Funcs:
+    FuncDecl
+      Doc: ~
+      Public: true
+      Extern: false
+      Effects: ~
+      Name: "parseLevel"
+      TypeParams: ~
+      Params:
+        ParamDef
+          Name: "s"
+          Type: NamedType
+            Namespace: ""
+            Name: "string"
+            Args: ~
+      Result: UnionType
+        Members:
+          NamedType
+            Namespace: ""
+            Name: "nint"
+            Args: ~
+          NamedType
+            Namespace: ""
+            Name: "error"
+            Args: ~
+      Body:
+        ReturnStmt
+          Value: CallExpr
+            Callee: Identifier
+              Name: "error"
+            Arguments:
+              CallExpr
+                Callee: MemberExpr
+                  Receiver: StringLit
+                    Value: "invalid level: "
+                  Member: Identifier
+                    Name: "add"
+                Arguments:
+                  Identifier
+                    Name: "s"
+  Asserts:
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: MemberExpr
+              Receiver: CallExpr
+                Callee: Identifier
+                  Name: "error"
+                Arguments:
+                  StringLit
+                    Value: "x"
+              Member: Identifier
+                Name: "message"
+            Arguments: ~
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          StringLit
+            Value: "x"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: MemberExpr
+              Receiver: Identifier
+                Name: "E"
+              Member: Identifier
+                Name: "message"
+            Arguments: ~
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          StringLit
+            Value: "boom"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: Identifier
+            Name: "M"
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          StringLit
+            Value: "boom"

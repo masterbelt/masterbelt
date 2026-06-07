@@ -1,135 +1,997 @@
 File
-  ConstDecl
-    name "ClosedUp"
-    value (.. IntLit "0" IntLit "9")
-  ConstDecl
-    name "HalfUp"
-    value (... IntLit "0" IntLit "9")
-  ConstDecl
-    name "ClosedDown"
-    value (.. IntLit "9" IntLit "0")
-  ConstDecl
-    name "HalfDown"
-    value (... IntLit "9" IntLit "0")
-  ConstDecl
-    name "ClosedUpEq"
-    value (call Identifier "range" IntLit "0" IntLit "9")
-  ConstDecl
-    name "HalfUpEq"
-    value (call Identifier "range" IntLit "0" IntLit "8")
-  ConstDecl
-    name "ClosedDownEq"
-    value (call Identifier "range" IntLit "9" IntLit "0" (call (. IntLit "1" neg)))
-  ConstDecl
-    name "HalfDownEq"
-    value (call Identifier "range" IntLit "8" IntLit "0" (call (. IntLit "1" neg)))
-  ConstDecl
-    name "Single"
-    value (.. IntLit "5" IntLit "5")
-  ConstDecl
-    name "Empty"
-    value (... IntLit "5" IntLit "5")
-  ConstDecl
-    name "Upto"
-    value (call Identifier "upto" IntLit "4")
-  ConstDecl
-    name "Evens"
-    value (call Identifier "range" IntLit "0" IntLit "10" IntLit "2")
-  ConstDecl
-    name "DownBy2"
-    value (call Identifier "range" IntLit "10" IntLit "0" (call (. IntLit "2" neg)))
-  ConstDecl
-    name "SumUp"
-    value (call Identifier "sumUp")
-  ConstDecl
-    name "SumDown"
-    value (call Identifier "sumDown")
-  ConstDecl
-    name "SumHalf"
-    value (call Identifier "sumHalf")
-  ConstDecl
-    name "SumEvens"
-    value (call Identifier "sumEvens")
-  ConstDecl
-    name "ClosedCount"
-    value (call (. (.. IntLit "0" IntLit "9") count))
-  ConstDecl
-    name "HalfCount"
-    value (call (. (... IntLit "0" IntLit "9") count))
-  ConstDecl
-    name "SteppedCount"
-    value (call (. (call Identifier "range" IntLit "0" IntLit "10" IntLit "2") count))
-  ConstDecl
-    name "ClosedFold"
-    value (call (. (.. IntLit "0" IntLit "4") fold) IntLit "0" (fn(acc: nint, k: nint, v: nint): nint (return (call (. Identifier "acc" add) Identifier "v"))))
-  ConstDecl
-    name "SteppedFold"
-    value (call (. (call Identifier "range" IntLit "0" IntLit "10" IntLit "2") fold) IntLit "0" (fn(acc: nint, k: nint, v: nint): nint (return (call (. Identifier "acc" add) Identifier "v"))))
-  FuncDecl
-    pub
-    name "upto"
-    param n: nint
-    result range
-      return (.. IntLit "0" (call (. Identifier "n" add) IntLit "1"))
-  FuncDecl
-    pub
-    name "sumUp"
-    result nint
-      let "t" = IntLit "0"
-      for i of (.. IntLit "0" IntLit "10")
-          assign Identifier "t" = (call (. Identifier "t" add) Identifier "i")
-      return Identifier "t"
-  FuncDecl
-    pub
-    name "sumDown"
-    result nint
-      let "t" = IntLit "0"
-      for i of (.. IntLit "5" IntLit "1")
-          assign Identifier "t" = (call (. Identifier "t" add) Identifier "i")
-      return Identifier "t"
-  FuncDecl
-    pub
-    name "sumHalf"
-    result nint
-      let "t" = IntLit "0"
-      for i of (... IntLit "0" IntLit "5")
-          assign Identifier "t" = (call (. Identifier "t" add) Identifier "i")
-      return Identifier "t"
-  FuncDecl
-    pub
-    name "sumEvens"
-    result nint
-      let "t" = IntLit "0"
-      for i of (call Identifier "range" IntLit "0" IntLit "10" IntLit "2")
-          assign Identifier "t" = (call (. Identifier "t" add) Identifier "i")
-      return Identifier "t"
-  AssertDecl
-    cond (call (. (.. IntLit "0" IntLit "9") eql) (call Identifier "range" IntLit "0" IntLit "9"))
-  AssertDecl
-    cond (call (. (... IntLit "0" IntLit "9") eql) (call Identifier "range" IntLit "0" IntLit "8"))
-  AssertDecl
-    cond (call (. (.. IntLit "9" IntLit "0") eql) (call Identifier "range" IntLit "9" IntLit "0" (call (. IntLit "1" neg))))
-  AssertDecl
-    cond (call (. (... IntLit "9" IntLit "0") eql) (call Identifier "range" IntLit "8" IntLit "0" (call (. IntLit "1" neg))))
-  AssertDecl
-    cond (call (. (.. IntLit "5" IntLit "5") eql) (call Identifier "range" IntLit "5" IntLit "5"))
-  AssertDecl
-    cond (call (. (call Identifier "sumUp") eql) IntLit "55")
-  AssertDecl
-    cond (call (. (call Identifier "sumDown") eql) IntLit "15")
-  AssertDecl
-    cond (call (. (call Identifier "sumHalf") eql) IntLit "10")
-  AssertDecl
-    cond (call (. (call Identifier "sumEvens") eql) IntLit "30")
-  AssertDecl
-    cond (call (. (call (. (.. IntLit "0" IntLit "9") count)) eql) IntLit "10")
-  AssertDecl
-    cond (call (. (call (. (... IntLit "0" IntLit "9") count)) eql) IntLit "9")
-  AssertDecl
-    cond (call (. (call (. (call Identifier "range" IntLit "0" IntLit "10" IntLit "2") count)) eql) IntLit "6")
-  AssertDecl
-    cond (call (. (call (. (call Identifier "range" IntLit "10" IntLit "0" (call (. IntLit "2" neg))) count)) eql) IntLit "6")
-  AssertDecl
-    cond (call (. (call (. (.. IntLit "0" IntLit "4") fold) IntLit "0" (fn(acc: nint, k: nint, v: nint): nint (return (call (. Identifier "acc" add) Identifier "v")))) eql) IntLit "10")
-  AssertDecl
-    cond (call (. (call (. (call Identifier "range" IntLit "0" IntLit "10" IntLit "2") fold) IntLit "0" (fn(acc: nint, k: nint, v: nint): nint (return (call (. Identifier "acc" add) Identifier "v")))) eql) IntLit "30")
+  Uses: ~
+  Decls:
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "ClosedUp"
+      Type: ~
+      Value: RangeExpr
+        Lower: IntLit
+          Text: "0"
+        Upper: IntLit
+          Text: "9"
+        HalfOpen: false
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "HalfUp"
+      Type: ~
+      Value: RangeExpr
+        Lower: IntLit
+          Text: "0"
+        Upper: IntLit
+          Text: "9"
+        HalfOpen: true
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "ClosedDown"
+      Type: ~
+      Value: RangeExpr
+        Lower: IntLit
+          Text: "9"
+        Upper: IntLit
+          Text: "0"
+        HalfOpen: false
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "HalfDown"
+      Type: ~
+      Value: RangeExpr
+        Lower: IntLit
+          Text: "9"
+        Upper: IntLit
+          Text: "0"
+        HalfOpen: true
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "ClosedUpEq"
+      Type: ~
+      Value: CallExpr
+        Callee: Identifier
+          Name: "range"
+        Arguments:
+          IntLit
+            Text: "0"
+          IntLit
+            Text: "9"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "HalfUpEq"
+      Type: ~
+      Value: CallExpr
+        Callee: Identifier
+          Name: "range"
+        Arguments:
+          IntLit
+            Text: "0"
+          IntLit
+            Text: "8"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "ClosedDownEq"
+      Type: ~
+      Value: CallExpr
+        Callee: Identifier
+          Name: "range"
+        Arguments:
+          IntLit
+            Text: "9"
+          IntLit
+            Text: "0"
+          CallExpr
+            Callee: MemberExpr
+              Receiver: IntLit
+                Text: "1"
+              Member: Identifier
+                Name: "neg"
+            Arguments: ~
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "HalfDownEq"
+      Type: ~
+      Value: CallExpr
+        Callee: Identifier
+          Name: "range"
+        Arguments:
+          IntLit
+            Text: "8"
+          IntLit
+            Text: "0"
+          CallExpr
+            Callee: MemberExpr
+              Receiver: IntLit
+                Text: "1"
+              Member: Identifier
+                Name: "neg"
+            Arguments: ~
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Single"
+      Type: ~
+      Value: RangeExpr
+        Lower: IntLit
+          Text: "5"
+        Upper: IntLit
+          Text: "5"
+        HalfOpen: false
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Empty"
+      Type: ~
+      Value: RangeExpr
+        Lower: IntLit
+          Text: "5"
+        Upper: IntLit
+          Text: "5"
+        HalfOpen: true
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Upto"
+      Type: ~
+      Value: CallExpr
+        Callee: Identifier
+          Name: "upto"
+        Arguments:
+          IntLit
+            Text: "4"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Evens"
+      Type: ~
+      Value: CallExpr
+        Callee: Identifier
+          Name: "range"
+        Arguments:
+          IntLit
+            Text: "0"
+          IntLit
+            Text: "10"
+          IntLit
+            Text: "2"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "DownBy2"
+      Type: ~
+      Value: CallExpr
+        Callee: Identifier
+          Name: "range"
+        Arguments:
+          IntLit
+            Text: "10"
+          IntLit
+            Text: "0"
+          CallExpr
+            Callee: MemberExpr
+              Receiver: IntLit
+                Text: "2"
+              Member: Identifier
+                Name: "neg"
+            Arguments: ~
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "SumUp"
+      Type: ~
+      Value: CallExpr
+        Callee: Identifier
+          Name: "sumUp"
+        Arguments: ~
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "SumDown"
+      Type: ~
+      Value: CallExpr
+        Callee: Identifier
+          Name: "sumDown"
+        Arguments: ~
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "SumHalf"
+      Type: ~
+      Value: CallExpr
+        Callee: Identifier
+          Name: "sumHalf"
+        Arguments: ~
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "SumEvens"
+      Type: ~
+      Value: CallExpr
+        Callee: Identifier
+          Name: "sumEvens"
+        Arguments: ~
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "ClosedCount"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: RangeExpr
+            Lower: IntLit
+              Text: "0"
+            Upper: IntLit
+              Text: "9"
+            HalfOpen: false
+          Member: Identifier
+            Name: "count"
+        Arguments: ~
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "HalfCount"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: RangeExpr
+            Lower: IntLit
+              Text: "0"
+            Upper: IntLit
+              Text: "9"
+            HalfOpen: true
+          Member: Identifier
+            Name: "count"
+        Arguments: ~
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "SteppedCount"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: Identifier
+              Name: "range"
+            Arguments:
+              IntLit
+                Text: "0"
+              IntLit
+                Text: "10"
+              IntLit
+                Text: "2"
+          Member: Identifier
+            Name: "count"
+        Arguments: ~
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "ClosedFold"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: RangeExpr
+            Lower: IntLit
+              Text: "0"
+            Upper: IntLit
+              Text: "4"
+            HalfOpen: false
+          Member: Identifier
+            Name: "fold"
+        Arguments:
+          IntLit
+            Text: "0"
+          FuncLit
+            Params:
+              ParamDef
+                Name: "acc"
+                Type: NamedType
+                  Namespace: ""
+                  Name: "nint"
+                  Args: ~
+              ParamDef
+                Name: "k"
+                Type: NamedType
+                  Namespace: ""
+                  Name: "nint"
+                  Args: ~
+              ParamDef
+                Name: "v"
+                Type: NamedType
+                  Namespace: ""
+                  Name: "nint"
+                  Args: ~
+            Result: NamedType
+              Namespace: ""
+              Name: "nint"
+              Args: ~
+            Body:
+              ReturnStmt
+                Value: CallExpr
+                  Callee: MemberExpr
+                    Receiver: Identifier
+                      Name: "acc"
+                    Member: Identifier
+                      Name: "add"
+                  Arguments:
+                    Identifier
+                      Name: "v"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "SteppedFold"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: Identifier
+              Name: "range"
+            Arguments:
+              IntLit
+                Text: "0"
+              IntLit
+                Text: "10"
+              IntLit
+                Text: "2"
+          Member: Identifier
+            Name: "fold"
+        Arguments:
+          IntLit
+            Text: "0"
+          FuncLit
+            Params:
+              ParamDef
+                Name: "acc"
+                Type: NamedType
+                  Namespace: ""
+                  Name: "nint"
+                  Args: ~
+              ParamDef
+                Name: "k"
+                Type: NamedType
+                  Namespace: ""
+                  Name: "nint"
+                  Args: ~
+              ParamDef
+                Name: "v"
+                Type: NamedType
+                  Namespace: ""
+                  Name: "nint"
+                  Args: ~
+            Result: NamedType
+              Namespace: ""
+              Name: "nint"
+              Args: ~
+            Body:
+              ReturnStmt
+                Value: CallExpr
+                  Callee: MemberExpr
+                    Receiver: Identifier
+                      Name: "acc"
+                    Member: Identifier
+                      Name: "add"
+                  Arguments:
+                    Identifier
+                      Name: "v"
+      Builtin: false
+  Types: ~
+  Enums: ~
+  Interfaces: ~
+  Funcs:
+    FuncDecl
+      Doc: ~
+      Public: true
+      Extern: false
+      Effects: ~
+      Name: "upto"
+      TypeParams: ~
+      Params:
+        ParamDef
+          Name: "n"
+          Type: NamedType
+            Namespace: ""
+            Name: "nint"
+            Args: ~
+      Result: NamedType
+        Namespace: ""
+        Name: "range"
+        Args: ~
+      Body:
+        ReturnStmt
+          Value: RangeExpr
+            Lower: IntLit
+              Text: "0"
+            Upper: CallExpr
+              Callee: MemberExpr
+                Receiver: Identifier
+                  Name: "n"
+                Member: Identifier
+                  Name: "add"
+              Arguments:
+                IntLit
+                  Text: "1"
+            HalfOpen: false
+    FuncDecl
+      Doc: ~
+      Public: true
+      Extern: false
+      Effects: ~
+      Name: "sumUp"
+      TypeParams: ~
+      Params: ~
+      Result: NamedType
+        Namespace: ""
+        Name: "nint"
+        Args: ~
+      Body:
+        LetStmt
+          Name: "t"
+          Type: ~
+          Value: IntLit
+            Text: "0"
+        ForStmt
+          Var: "i"
+          Kind: 0
+          Iter: RangeExpr
+            Lower: IntLit
+              Text: "0"
+            Upper: IntLit
+              Text: "10"
+            HalfOpen: false
+          Body:
+            AssignStmt
+              Target: Identifier
+                Name: "t"
+              Value: CallExpr
+                Callee: MemberExpr
+                  Receiver: Identifier
+                    Name: "t"
+                  Member: Identifier
+                    Name: "add"
+                Arguments:
+                  Identifier
+                    Name: "i"
+        ReturnStmt
+          Value: Identifier
+            Name: "t"
+    FuncDecl
+      Doc: ~
+      Public: true
+      Extern: false
+      Effects: ~
+      Name: "sumDown"
+      TypeParams: ~
+      Params: ~
+      Result: NamedType
+        Namespace: ""
+        Name: "nint"
+        Args: ~
+      Body:
+        LetStmt
+          Name: "t"
+          Type: ~
+          Value: IntLit
+            Text: "0"
+        ForStmt
+          Var: "i"
+          Kind: 0
+          Iter: RangeExpr
+            Lower: IntLit
+              Text: "5"
+            Upper: IntLit
+              Text: "1"
+            HalfOpen: false
+          Body:
+            AssignStmt
+              Target: Identifier
+                Name: "t"
+              Value: CallExpr
+                Callee: MemberExpr
+                  Receiver: Identifier
+                    Name: "t"
+                  Member: Identifier
+                    Name: "add"
+                Arguments:
+                  Identifier
+                    Name: "i"
+        ReturnStmt
+          Value: Identifier
+            Name: "t"
+    FuncDecl
+      Doc: ~
+      Public: true
+      Extern: false
+      Effects: ~
+      Name: "sumHalf"
+      TypeParams: ~
+      Params: ~
+      Result: NamedType
+        Namespace: ""
+        Name: "nint"
+        Args: ~
+      Body:
+        LetStmt
+          Name: "t"
+          Type: ~
+          Value: IntLit
+            Text: "0"
+        ForStmt
+          Var: "i"
+          Kind: 0
+          Iter: RangeExpr
+            Lower: IntLit
+              Text: "0"
+            Upper: IntLit
+              Text: "5"
+            HalfOpen: true
+          Body:
+            AssignStmt
+              Target: Identifier
+                Name: "t"
+              Value: CallExpr
+                Callee: MemberExpr
+                  Receiver: Identifier
+                    Name: "t"
+                  Member: Identifier
+                    Name: "add"
+                Arguments:
+                  Identifier
+                    Name: "i"
+        ReturnStmt
+          Value: Identifier
+            Name: "t"
+    FuncDecl
+      Doc: ~
+      Public: true
+      Extern: false
+      Effects: ~
+      Name: "sumEvens"
+      TypeParams: ~
+      Params: ~
+      Result: NamedType
+        Namespace: ""
+        Name: "nint"
+        Args: ~
+      Body:
+        LetStmt
+          Name: "t"
+          Type: ~
+          Value: IntLit
+            Text: "0"
+        ForStmt
+          Var: "i"
+          Kind: 0
+          Iter: CallExpr
+            Callee: Identifier
+              Name: "range"
+            Arguments:
+              IntLit
+                Text: "0"
+              IntLit
+                Text: "10"
+              IntLit
+                Text: "2"
+          Body:
+            AssignStmt
+              Target: Identifier
+                Name: "t"
+              Value: CallExpr
+                Callee: MemberExpr
+                  Receiver: Identifier
+                    Name: "t"
+                  Member: Identifier
+                    Name: "add"
+                Arguments:
+                  Identifier
+                    Name: "i"
+        ReturnStmt
+          Value: Identifier
+            Name: "t"
+  Asserts:
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: RangeExpr
+            Lower: IntLit
+              Text: "0"
+            Upper: IntLit
+              Text: "9"
+            HalfOpen: false
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          CallExpr
+            Callee: Identifier
+              Name: "range"
+            Arguments:
+              IntLit
+                Text: "0"
+              IntLit
+                Text: "9"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: RangeExpr
+            Lower: IntLit
+              Text: "0"
+            Upper: IntLit
+              Text: "9"
+            HalfOpen: true
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          CallExpr
+            Callee: Identifier
+              Name: "range"
+            Arguments:
+              IntLit
+                Text: "0"
+              IntLit
+                Text: "8"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: RangeExpr
+            Lower: IntLit
+              Text: "9"
+            Upper: IntLit
+              Text: "0"
+            HalfOpen: false
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          CallExpr
+            Callee: Identifier
+              Name: "range"
+            Arguments:
+              IntLit
+                Text: "9"
+              IntLit
+                Text: "0"
+              CallExpr
+                Callee: MemberExpr
+                  Receiver: IntLit
+                    Text: "1"
+                  Member: Identifier
+                    Name: "neg"
+                Arguments: ~
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: RangeExpr
+            Lower: IntLit
+              Text: "9"
+            Upper: IntLit
+              Text: "0"
+            HalfOpen: true
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          CallExpr
+            Callee: Identifier
+              Name: "range"
+            Arguments:
+              IntLit
+                Text: "8"
+              IntLit
+                Text: "0"
+              CallExpr
+                Callee: MemberExpr
+                  Receiver: IntLit
+                    Text: "1"
+                  Member: Identifier
+                    Name: "neg"
+                Arguments: ~
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: RangeExpr
+            Lower: IntLit
+              Text: "5"
+            Upper: IntLit
+              Text: "5"
+            HalfOpen: false
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          CallExpr
+            Callee: Identifier
+              Name: "range"
+            Arguments:
+              IntLit
+                Text: "5"
+              IntLit
+                Text: "5"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: Identifier
+              Name: "sumUp"
+            Arguments: ~
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "55"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: Identifier
+              Name: "sumDown"
+            Arguments: ~
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "15"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: Identifier
+              Name: "sumHalf"
+            Arguments: ~
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "10"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: Identifier
+              Name: "sumEvens"
+            Arguments: ~
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "30"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: MemberExpr
+              Receiver: RangeExpr
+                Lower: IntLit
+                  Text: "0"
+                Upper: IntLit
+                  Text: "9"
+                HalfOpen: false
+              Member: Identifier
+                Name: "count"
+            Arguments: ~
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "10"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: MemberExpr
+              Receiver: RangeExpr
+                Lower: IntLit
+                  Text: "0"
+                Upper: IntLit
+                  Text: "9"
+                HalfOpen: true
+              Member: Identifier
+                Name: "count"
+            Arguments: ~
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "9"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: MemberExpr
+              Receiver: CallExpr
+                Callee: Identifier
+                  Name: "range"
+                Arguments:
+                  IntLit
+                    Text: "0"
+                  IntLit
+                    Text: "10"
+                  IntLit
+                    Text: "2"
+              Member: Identifier
+                Name: "count"
+            Arguments: ~
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "6"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: MemberExpr
+              Receiver: CallExpr
+                Callee: Identifier
+                  Name: "range"
+                Arguments:
+                  IntLit
+                    Text: "10"
+                  IntLit
+                    Text: "0"
+                  CallExpr
+                    Callee: MemberExpr
+                      Receiver: IntLit
+                        Text: "2"
+                      Member: Identifier
+                        Name: "neg"
+                    Arguments: ~
+              Member: Identifier
+                Name: "count"
+            Arguments: ~
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "6"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: MemberExpr
+              Receiver: RangeExpr
+                Lower: IntLit
+                  Text: "0"
+                Upper: IntLit
+                  Text: "4"
+                HalfOpen: false
+              Member: Identifier
+                Name: "fold"
+            Arguments:
+              IntLit
+                Text: "0"
+              FuncLit
+                Params:
+                  ParamDef
+                    Name: "acc"
+                    Type: NamedType
+                      Namespace: ""
+                      Name: "nint"
+                      Args: ~
+                  ParamDef
+                    Name: "k"
+                    Type: NamedType
+                      Namespace: ""
+                      Name: "nint"
+                      Args: ~
+                  ParamDef
+                    Name: "v"
+                    Type: NamedType
+                      Namespace: ""
+                      Name: "nint"
+                      Args: ~
+                Result: NamedType
+                  Namespace: ""
+                  Name: "nint"
+                  Args: ~
+                Body:
+                  ReturnStmt
+                    Value: CallExpr
+                      Callee: MemberExpr
+                        Receiver: Identifier
+                          Name: "acc"
+                        Member: Identifier
+                          Name: "add"
+                      Arguments:
+                        Identifier
+                          Name: "v"
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "10"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: MemberExpr
+              Receiver: CallExpr
+                Callee: Identifier
+                  Name: "range"
+                Arguments:
+                  IntLit
+                    Text: "0"
+                  IntLit
+                    Text: "10"
+                  IntLit
+                    Text: "2"
+              Member: Identifier
+                Name: "fold"
+            Arguments:
+              IntLit
+                Text: "0"
+              FuncLit
+                Params:
+                  ParamDef
+                    Name: "acc"
+                    Type: NamedType
+                      Namespace: ""
+                      Name: "nint"
+                      Args: ~
+                  ParamDef
+                    Name: "k"
+                    Type: NamedType
+                      Namespace: ""
+                      Name: "nint"
+                      Args: ~
+                  ParamDef
+                    Name: "v"
+                    Type: NamedType
+                      Namespace: ""
+                      Name: "nint"
+                      Args: ~
+                Result: NamedType
+                  Namespace: ""
+                  Name: "nint"
+                  Args: ~
+                Body:
+                  ReturnStmt
+                    Value: CallExpr
+                      Callee: MemberExpr
+                        Receiver: Identifier
+                          Name: "acc"
+                        Member: Identifier
+                          Name: "add"
+                      Arguments:
+                        Identifier
+                          Name: "v"
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "30"

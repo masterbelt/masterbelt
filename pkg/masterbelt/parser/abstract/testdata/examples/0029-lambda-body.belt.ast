@@ -1,10 +1,168 @@
 File
-  ConstDecl
-    name "Bumped"
-    value (call (. (list IntLit "1" IntLit "2" IntLit "3") map) (fn(x: <missing>): <missing> (let step = IntLit "1") (return (call (. Identifier "x" add) Identifier "step"))))
-  ConstDecl
-    name "Clamped"
-    value (call (. (list (call (. IntLit "1" neg)) IntLit "0" IntLit "5") map) (fn(x: <missing>): <missing> (if (call (. Identifier "x" lt) IntLit "0") (then (return IntLit "0"))) (return Identifier "x")))
-  ConstDecl
-    name "Labeled"
-    value (call (. (list IntLit "0" IntLit "1" IntLit "2") map) (fn(x: <missing>): <missing> (switch Identifier "x" (arm IntLit "0" (return IntLit "0")) (arm IntLit "1" (return IntLit "10")) (else (return IntLit "100")))))
+  Uses: ~
+  Decls:
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Bumped"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: CollectionLit
+            Entries:
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "1"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "2"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "3"
+          Member: Identifier
+            Name: "map"
+        Arguments:
+          FuncLit
+            Params:
+              ParamDef
+                Name: "x"
+                Type: ~
+            Result: ~
+            Body:
+              LetStmt
+                Name: "step"
+                Type: ~
+                Value: IntLit
+                  Text: "1"
+              ReturnStmt
+                Value: CallExpr
+                  Callee: MemberExpr
+                    Receiver: Identifier
+                      Name: "x"
+                    Member: Identifier
+                      Name: "add"
+                  Arguments:
+                    Identifier
+                      Name: "step"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Clamped"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: CollectionLit
+            Entries:
+              CollectionEntry
+                Key: ~
+                Value: CallExpr
+                  Callee: MemberExpr
+                    Receiver: IntLit
+                      Text: "1"
+                    Member: Identifier
+                      Name: "neg"
+                  Arguments: ~
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "0"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "5"
+          Member: Identifier
+            Name: "map"
+        Arguments:
+          FuncLit
+            Params:
+              ParamDef
+                Name: "x"
+                Type: ~
+            Result: ~
+            Body:
+              IfStmt
+                Cond: CallExpr
+                  Callee: MemberExpr
+                    Receiver: Identifier
+                      Name: "x"
+                    Member: Identifier
+                      Name: "lt"
+                  Arguments:
+                    IntLit
+                      Text: "0"
+                Then:
+                  ReturnStmt
+                    Value: IntLit
+                      Text: "0"
+                ElseIf: ~
+                Else: ~
+              ReturnStmt
+                Value: Identifier
+                  Name: "x"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Labeled"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: CollectionLit
+            Entries:
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "0"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "1"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "2"
+          Member: Identifier
+            Name: "map"
+        Arguments:
+          FuncLit
+            Params:
+              ParamDef
+                Name: "x"
+                Type: ~
+            Result: ~
+            Body:
+              SwitchStmt
+                Scrutinee: Identifier
+                  Name: "x"
+                Arms:
+                  SwitchArm
+                    Values:
+                      IntLit
+                        Text: "0"
+                    Body:
+                      ReturnStmt
+                        Value: IntLit
+                          Text: "0"
+                  SwitchArm
+                    Values:
+                      IntLit
+                        Text: "1"
+                    Body:
+                      ReturnStmt
+                        Value: IntLit
+                          Text: "10"
+                Else:
+                  ReturnStmt
+                    Value: IntLit
+                      Text: "100"
+                AfterElse: ~
+      Builtin: false
+  Types: ~
+  Enums: ~
+  Interfaces: ~
+  Funcs: ~
+  Asserts: ~

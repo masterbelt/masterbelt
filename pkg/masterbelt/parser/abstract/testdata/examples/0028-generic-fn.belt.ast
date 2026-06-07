@@ -1,62 +1,337 @@
 File
-  ConstDecl
-    name "N"
-    value (call Identifier "identity" IntLit "42")
-  ConstDecl
-    name "P"
-    value (call Identifier "firstOf" IntLit "7" IntLit "9")
-  TypeDecl
-    doc "A small bag of ints that folds over its contents — an opt-in implementor of"
-    doc "foldable, so it satisfies a `T: foldable<nint, nint>` bound."
-    pub
-    name "Bag"
-    body list<nint>
-    impl foldable<nint, nint>
-    method "fold"
-      typeparam A
-      param init: A
-      param step: fn(acc: A, key: nint, value: nint): A
-      result A
-      return Identifier "init"
-  InterfaceDecl
-    doc "A behaviour over a keyed collection: the required fold, plus the provided"
-    doc "count derived from it. The same prelude-style interface a bound refers to."
-    pub
-    name "foldable"
-    param K
-    param V
-    required "fold"
-      typeparam A
-      param init: A
-      param step: fn(acc: A, key: K, value: V): A
-      result A
-    provided "count"
-      doc "Provided: the number of elements, folded from the primitive."
-      pub
-      result nint
-      return (call Identifier "fold" IntLit "0" (fn(acc: <missing>, key: <missing>, value: <missing>): <missing> (return (call (. Identifier "acc" add) IntLit "1"))))
-  FuncDecl
-    doc "The total of any foldable collection of ints, folded with addition."
-    pub
-    name "total"
-    typeparam T: foldable<nint, nint>
-    param c: T
-    result nint
-      return (call (. Identifier "c" fold) IntLit "0" (fn(acc: <missing>, key: <missing>, value: <missing>): <missing> (return (call (. Identifier "acc" add) Identifier "value"))))
-  FuncDecl
-    doc "The argument, unchanged. Works for any type because it touches nothing."
-    pub
-    name "identity"
-    typeparam T
-    param x: T
-    result T
-      return Identifier "x"
-  FuncDecl
-    doc "The first of two values of the same type."
-    pub
-    name "firstOf"
-    typeparam T
-    param a: T
-    param b: T
-    result T
-      return Identifier "a"
+  Uses: ~
+  Decls:
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "N"
+      Type: ~
+      Value: CallExpr
+        Callee: Identifier
+          Name: "identity"
+        Arguments:
+          IntLit
+            Text: "42"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "P"
+      Type: ~
+      Value: CallExpr
+        Callee: Identifier
+          Name: "firstOf"
+        Arguments:
+          IntLit
+            Text: "7"
+          IntLit
+            Text: "9"
+      Builtin: false
+  Types:
+    TypeDecl
+      Doc: "A small bag of ints that folds over its contents — an opt-in implementor of" "foldable, so it satisfies a `T: foldable<nint, nint>` bound."
+      Public: true
+      Name: "Bag"
+      Params: ~
+      Body: NamedType
+        Namespace: ""
+        Name: "list"
+        Args:
+          NamedType
+            Namespace: ""
+            Name: "nint"
+            Args: ~
+      Where: ~
+      Methods:
+        MethodDecl
+          Doc: ~
+          Public: false
+          Extern: false
+          Kind: 0
+          Effects: ~
+          Name: "fold"
+          TypeParams:
+            TypeParam
+              Name: "A"
+              Constraint: ~
+          Params:
+            ParamDef
+              Name: "init"
+              Type: NamedType
+                Namespace: ""
+                Name: "A"
+                Args: ~
+            ParamDef
+              Name: "step"
+              Type: FuncType
+                Params:
+                  ParamDef
+                    Name: "acc"
+                    Type: NamedType
+                      Namespace: ""
+                      Name: "A"
+                      Args: ~
+                  ParamDef
+                    Name: "key"
+                    Type: NamedType
+                      Namespace: ""
+                      Name: "nint"
+                      Args: ~
+                  ParamDef
+                    Name: "value"
+                    Type: NamedType
+                      Namespace: ""
+                      Name: "nint"
+                      Args: ~
+                Result: NamedType
+                  Namespace: ""
+                  Name: "A"
+                  Args: ~
+          Result: NamedType
+            Namespace: ""
+            Name: "A"
+            Args: ~
+          Body:
+            ReturnStmt
+              Value: Identifier
+                Name: "init"
+      Consts: ~
+      Impls:
+        NamedType
+          Namespace: ""
+          Name: "foldable"
+          Args:
+            NamedType
+              Namespace: ""
+              Name: "nint"
+              Args: ~
+            NamedType
+              Namespace: ""
+              Name: "nint"
+              Args: ~
+  Enums: ~
+  Interfaces:
+    InterfaceDecl
+      Doc: "A behaviour over a keyed collection: the required fold, plus the provided" "count derived from it. The same prelude-style interface a bound refers to."
+      Public: true
+      Name: "foldable"
+      Params:
+        TypeParam
+          Name: "K"
+          Constraint: ~
+        TypeParam
+          Name: "V"
+          Constraint: ~
+      Parents: ~
+      Members:
+        InterfaceMember
+          Doc: ~
+          Public: false
+          Name: "fold"
+          TypeParams:
+            TypeParam
+              Name: "A"
+              Constraint: ~
+          Params:
+            ParamDef
+              Name: "init"
+              Type: NamedType
+                Namespace: ""
+                Name: "A"
+                Args: ~
+            ParamDef
+              Name: "step"
+              Type: FuncType
+                Params:
+                  ParamDef
+                    Name: "acc"
+                    Type: NamedType
+                      Namespace: ""
+                      Name: "A"
+                      Args: ~
+                  ParamDef
+                    Name: "key"
+                    Type: NamedType
+                      Namespace: ""
+                      Name: "K"
+                      Args: ~
+                  ParamDef
+                    Name: "value"
+                    Type: NamedType
+                      Namespace: ""
+                      Name: "V"
+                      Args: ~
+                Result: NamedType
+                  Namespace: ""
+                  Name: "A"
+                  Args: ~
+          Result: NamedType
+            Namespace: ""
+            Name: "A"
+            Args: ~
+          Body: ~
+        InterfaceMember
+          Doc: "Provided: the number of elements, folded from the primitive."
+          Public: true
+          Name: "count"
+          TypeParams: ~
+          Params: ~
+          Result: NamedType
+            Namespace: ""
+            Name: "nint"
+            Args: ~
+          Body:
+            ReturnStmt
+              Value: CallExpr
+                Callee: Identifier
+                  Name: "fold"
+                Arguments:
+                  IntLit
+                    Text: "0"
+                  FuncLit
+                    Params:
+                      ParamDef
+                        Name: "acc"
+                        Type: ~
+                      ParamDef
+                        Name: "key"
+                        Type: ~
+                      ParamDef
+                        Name: "value"
+                        Type: ~
+                    Result: ~
+                    Body:
+                      ReturnStmt
+                        Value: CallExpr
+                          Callee: MemberExpr
+                            Receiver: Identifier
+                              Name: "acc"
+                            Member: Identifier
+                              Name: "add"
+                          Arguments:
+                            IntLit
+                              Text: "1"
+  Funcs:
+    FuncDecl
+      Doc: "The total of any foldable collection of ints, folded with addition."
+      Public: true
+      Extern: false
+      Effects: ~
+      Name: "total"
+      TypeParams:
+        TypeParam
+          Name: "T"
+          Constraint: NamedType
+            Namespace: ""
+            Name: "foldable"
+            Args:
+              NamedType
+                Namespace: ""
+                Name: "nint"
+                Args: ~
+              NamedType
+                Namespace: ""
+                Name: "nint"
+                Args: ~
+      Params:
+        ParamDef
+          Name: "c"
+          Type: NamedType
+            Namespace: ""
+            Name: "T"
+            Args: ~
+      Result: NamedType
+        Namespace: ""
+        Name: "nint"
+        Args: ~
+      Body:
+        ReturnStmt
+          Value: CallExpr
+            Callee: MemberExpr
+              Receiver: Identifier
+                Name: "c"
+              Member: Identifier
+                Name: "fold"
+            Arguments:
+              IntLit
+                Text: "0"
+              FuncLit
+                Params:
+                  ParamDef
+                    Name: "acc"
+                    Type: ~
+                  ParamDef
+                    Name: "key"
+                    Type: ~
+                  ParamDef
+                    Name: "value"
+                    Type: ~
+                Result: ~
+                Body:
+                  ReturnStmt
+                    Value: CallExpr
+                      Callee: MemberExpr
+                        Receiver: Identifier
+                          Name: "acc"
+                        Member: Identifier
+                          Name: "add"
+                      Arguments:
+                        Identifier
+                          Name: "value"
+    FuncDecl
+      Doc: "The argument, unchanged. Works for any type because it touches nothing."
+      Public: true
+      Extern: false
+      Effects: ~
+      Name: "identity"
+      TypeParams:
+        TypeParam
+          Name: "T"
+          Constraint: ~
+      Params:
+        ParamDef
+          Name: "x"
+          Type: NamedType
+            Namespace: ""
+            Name: "T"
+            Args: ~
+      Result: NamedType
+        Namespace: ""
+        Name: "T"
+        Args: ~
+      Body:
+        ReturnStmt
+          Value: Identifier
+            Name: "x"
+    FuncDecl
+      Doc: "The first of two values of the same type."
+      Public: true
+      Extern: false
+      Effects: ~
+      Name: "firstOf"
+      TypeParams:
+        TypeParam
+          Name: "T"
+          Constraint: ~
+      Params:
+        ParamDef
+          Name: "a"
+          Type: NamedType
+            Namespace: ""
+            Name: "T"
+            Args: ~
+        ParamDef
+          Name: "b"
+          Type: NamedType
+            Namespace: ""
+            Name: "T"
+            Args: ~
+      Result: NamedType
+        Namespace: ""
+        Name: "T"
+        Args: ~
+      Body:
+        ReturnStmt
+          Value: Identifier
+            Name: "a"
+  Asserts: ~

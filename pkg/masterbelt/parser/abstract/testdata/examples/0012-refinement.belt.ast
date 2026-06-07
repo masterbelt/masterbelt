@@ -1,58 +1,247 @@
 File
-  ConstDecl
-    name "ServerPort"
-    type Port
-    value IntLit "8080"
-  ConstDecl
-    name "MinPort"
-    type Port
-    value IntLit "1"
-  ConstDecl
-    name "MaxPort"
-    type Port
-    value IntLit "65535"
-  ConstDecl
-    name "FullLevel"
-    type Level
-    value IntLit "100"
-  ConstDecl
-    name "ValidScore"
-    type Score
-    value IntLit "75"
-  ConstDecl
-    name "Unrefined"
-    value IntLit "70000"
-  TypeDecl
-    doc "A character level between 0 and 100."
-    pub
-    name "Level"
-    body sbyte
-    where (call (. (call (. self gteq) IntLit "0") anan) (call (. self lteq) IntLit "100"))
-  TypeDecl
-    doc "A TCP port number."
-    pub
-    name "Port"
-    body int
-    where (call (. (call (. self gteq) IntLit "1") anan) (call (. self lteq) IntLit "65535"))
-  TypeDecl
-    doc "A percentage from 0 to 100."
-    pub
-    name "Percent"
-    body sbyte
-    where (call (. (call (. self gteq) IntLit "0") anan) (call (. self lteq) IntLit "100"))
-    method "increment"
-      doc "The next percentage point."
-      pub
-      result self
-      return (call (. self add) IntLit "1")
-  TypeDecl
-    doc "A score that is valid only when it lies in the 0..100 band."
-    pub
-    name "Score"
-    body int
-    where (call (. self inBand))
-    method "inBand"
-      doc "Whether the score is within the valid band."
-      pub
-      result bool
-      return (call (. (call (. self gteq) IntLit "0") anan) (call (. self lteq) IntLit "100"))
+  Uses: ~
+  Decls:
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "ServerPort"
+      Type: NamedType
+        Namespace: ""
+        Name: "Port"
+        Args: ~
+      Value: IntLit
+        Text: "8080"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "MinPort"
+      Type: NamedType
+        Namespace: ""
+        Name: "Port"
+        Args: ~
+      Value: IntLit
+        Text: "1"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "MaxPort"
+      Type: NamedType
+        Namespace: ""
+        Name: "Port"
+        Args: ~
+      Value: IntLit
+        Text: "65535"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "FullLevel"
+      Type: NamedType
+        Namespace: ""
+        Name: "Level"
+        Args: ~
+      Value: IntLit
+        Text: "100"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "ValidScore"
+      Type: NamedType
+        Namespace: ""
+        Name: "Score"
+        Args: ~
+      Value: IntLit
+        Text: "75"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Unrefined"
+      Type: ~
+      Value: IntLit
+        Text: "70000"
+      Builtin: false
+  Types:
+    TypeDecl
+      Doc: "A character level between 0 and 100."
+      Public: true
+      Name: "Level"
+      Params: ~
+      Body: NamedType
+        Namespace: ""
+        Name: "sbyte"
+        Args: ~
+      Where: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: MemberExpr
+              Receiver: SelfExpr
+              Member: Identifier
+                Name: "gteq"
+            Arguments:
+              IntLit
+                Text: "0"
+          Member: Identifier
+            Name: "anan"
+        Arguments:
+          CallExpr
+            Callee: MemberExpr
+              Receiver: SelfExpr
+              Member: Identifier
+                Name: "lteq"
+            Arguments:
+              IntLit
+                Text: "100"
+      Methods: ~
+      Consts: ~
+      Impls: ~
+    TypeDecl
+      Doc: "A TCP port number."
+      Public: true
+      Name: "Port"
+      Params: ~
+      Body: NamedType
+        Namespace: ""
+        Name: "int"
+        Args: ~
+      Where: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: MemberExpr
+              Receiver: SelfExpr
+              Member: Identifier
+                Name: "gteq"
+            Arguments:
+              IntLit
+                Text: "1"
+          Member: Identifier
+            Name: "anan"
+        Arguments:
+          CallExpr
+            Callee: MemberExpr
+              Receiver: SelfExpr
+              Member: Identifier
+                Name: "lteq"
+            Arguments:
+              IntLit
+                Text: "65535"
+      Methods: ~
+      Consts: ~
+      Impls: ~
+    TypeDecl
+      Doc: "A percentage from 0 to 100."
+      Public: true
+      Name: "Percent"
+      Params: ~
+      Body: NamedType
+        Namespace: ""
+        Name: "sbyte"
+        Args: ~
+      Where: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: MemberExpr
+              Receiver: SelfExpr
+              Member: Identifier
+                Name: "gteq"
+            Arguments:
+              IntLit
+                Text: "0"
+          Member: Identifier
+            Name: "anan"
+        Arguments:
+          CallExpr
+            Callee: MemberExpr
+              Receiver: SelfExpr
+              Member: Identifier
+                Name: "lteq"
+            Arguments:
+              IntLit
+                Text: "100"
+      Methods:
+        MethodDecl
+          Doc: "The next percentage point."
+          Public: true
+          Extern: false
+          Kind: 0
+          Effects: ~
+          Name: "increment"
+          TypeParams: ~
+          Params: ~
+          Result: NamedType
+            Namespace: ""
+            Name: "self"
+            Args: ~
+          Body:
+            ReturnStmt
+              Value: CallExpr
+                Callee: MemberExpr
+                  Receiver: SelfExpr
+                  Member: Identifier
+                    Name: "add"
+                Arguments:
+                  IntLit
+                    Text: "1"
+      Consts: ~
+      Impls: ~
+    TypeDecl
+      Doc: "A score that is valid only when it lies in the 0..100 band."
+      Public: true
+      Name: "Score"
+      Params: ~
+      Body: NamedType
+        Namespace: ""
+        Name: "int"
+        Args: ~
+      Where: CallExpr
+        Callee: MemberExpr
+          Receiver: SelfExpr
+          Member: Identifier
+            Name: "inBand"
+        Arguments: ~
+      Methods:
+        MethodDecl
+          Doc: "Whether the score is within the valid band."
+          Public: true
+          Extern: false
+          Kind: 0
+          Effects: ~
+          Name: "inBand"
+          TypeParams: ~
+          Params: ~
+          Result: NamedType
+            Namespace: ""
+            Name: "bool"
+            Args: ~
+          Body:
+            ReturnStmt
+              Value: CallExpr
+                Callee: MemberExpr
+                  Receiver: CallExpr
+                    Callee: MemberExpr
+                      Receiver: SelfExpr
+                      Member: Identifier
+                        Name: "gteq"
+                    Arguments:
+                      IntLit
+                        Text: "0"
+                  Member: Identifier
+                    Name: "anan"
+                Arguments:
+                  CallExpr
+                    Callee: MemberExpr
+                      Receiver: SelfExpr
+                      Member: Identifier
+                        Name: "lteq"
+                    Arguments:
+                      IntLit
+                        Text: "100"
+      Consts: ~
+      Impls: ~
+  Enums: ~
+  Interfaces: ~
+  Funcs: ~
+  Asserts: ~

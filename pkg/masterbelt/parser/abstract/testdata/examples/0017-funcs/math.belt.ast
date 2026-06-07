@@ -1,41 +1,198 @@
 File
-  FuncDecl
-    doc "Doubles x."
-    pub
-    name "double"
-    param x: nint
-    result nint
-      return (call (. Identifier "x" mul) IntLit "2")
-  FuncDecl
-    doc "The area of a w-by-h rectangle."
-    pub
-    name "area"
-    param w: nint
-    param h: nint
-    result nint
-      return (call (. Identifier "w" mul) Identifier "h")
-  FuncDecl
-    doc "Greets by name."
-    pub
-    name "greet"
-    param name: string
-    result string
-      return (call (. StringLit "Hello, " add) Identifier "name")
-  FuncDecl
-    doc "Scales an nint."
-    pub
-    name "scale"
-    param x: nint
-    result nint
-      return (call (. Identifier "x" mul) IntLit "10")
-  FuncDecl
-    doc "Scales every element of a list."
-    pub
-    name "scale"
-    param xs: list<nint>
-    result list<nint>
-      return (call (. Identifier "xs" map) (fn(x: <missing>): <missing> (return (call (. Identifier "x" mul) IntLit "10"))))
-  FuncDecl
-    name "hidden"
-    result nint
-      return IntLit "0"
+  Uses: ~
+  Decls: ~
+  Types: ~
+  Enums: ~
+  Interfaces: ~
+  Funcs:
+    FuncDecl
+      Doc: "Doubles x."
+      Public: true
+      Extern: false
+      Effects: ~
+      Name: "double"
+      TypeParams: ~
+      Params:
+        ParamDef
+          Name: "x"
+          Type: NamedType
+            Namespace: ""
+            Name: "nint"
+            Args: ~
+      Result: NamedType
+        Namespace: ""
+        Name: "nint"
+        Args: ~
+      Body:
+        ReturnStmt
+          Value: CallExpr
+            Callee: MemberExpr
+              Receiver: Identifier
+                Name: "x"
+              Member: Identifier
+                Name: "mul"
+            Arguments:
+              IntLit
+                Text: "2"
+    FuncDecl
+      Doc: "The area of a w-by-h rectangle."
+      Public: true
+      Extern: false
+      Effects: ~
+      Name: "area"
+      TypeParams: ~
+      Params:
+        ParamDef
+          Name: "w"
+          Type: NamedType
+            Namespace: ""
+            Name: "nint"
+            Args: ~
+        ParamDef
+          Name: "h"
+          Type: NamedType
+            Namespace: ""
+            Name: "nint"
+            Args: ~
+      Result: NamedType
+        Namespace: ""
+        Name: "nint"
+        Args: ~
+      Body:
+        ReturnStmt
+          Value: CallExpr
+            Callee: MemberExpr
+              Receiver: Identifier
+                Name: "w"
+              Member: Identifier
+                Name: "mul"
+            Arguments:
+              Identifier
+                Name: "h"
+    FuncDecl
+      Doc: "Greets by name."
+      Public: true
+      Extern: false
+      Effects: ~
+      Name: "greet"
+      TypeParams: ~
+      Params:
+        ParamDef
+          Name: "name"
+          Type: NamedType
+            Namespace: ""
+            Name: "string"
+            Args: ~
+      Result: NamedType
+        Namespace: ""
+        Name: "string"
+        Args: ~
+      Body:
+        ReturnStmt
+          Value: CallExpr
+            Callee: MemberExpr
+              Receiver: StringLit
+                Value: "Hello, "
+              Member: Identifier
+                Name: "add"
+            Arguments:
+              Identifier
+                Name: "name"
+    FuncDecl
+      Doc: "Scales an nint."
+      Public: true
+      Extern: false
+      Effects: ~
+      Name: "scale"
+      TypeParams: ~
+      Params:
+        ParamDef
+          Name: "x"
+          Type: NamedType
+            Namespace: ""
+            Name: "nint"
+            Args: ~
+      Result: NamedType
+        Namespace: ""
+        Name: "nint"
+        Args: ~
+      Body:
+        ReturnStmt
+          Value: CallExpr
+            Callee: MemberExpr
+              Receiver: Identifier
+                Name: "x"
+              Member: Identifier
+                Name: "mul"
+            Arguments:
+              IntLit
+                Text: "10"
+    FuncDecl
+      Doc: "Scales every element of a list."
+      Public: true
+      Extern: false
+      Effects: ~
+      Name: "scale"
+      TypeParams: ~
+      Params:
+        ParamDef
+          Name: "xs"
+          Type: NamedType
+            Namespace: ""
+            Name: "list"
+            Args:
+              NamedType
+                Namespace: ""
+                Name: "nint"
+                Args: ~
+      Result: NamedType
+        Namespace: ""
+        Name: "list"
+        Args:
+          NamedType
+            Namespace: ""
+            Name: "nint"
+            Args: ~
+      Body:
+        ReturnStmt
+          Value: CallExpr
+            Callee: MemberExpr
+              Receiver: Identifier
+                Name: "xs"
+              Member: Identifier
+                Name: "map"
+            Arguments:
+              FuncLit
+                Params:
+                  ParamDef
+                    Name: "x"
+                    Type: ~
+                Result: ~
+                Body:
+                  ReturnStmt
+                    Value: CallExpr
+                      Callee: MemberExpr
+                        Receiver: Identifier
+                          Name: "x"
+                        Member: Identifier
+                          Name: "mul"
+                      Arguments:
+                        IntLit
+                          Text: "10"
+    FuncDecl
+      Doc: ~
+      Public: false
+      Extern: false
+      Effects: ~
+      Name: "hidden"
+      TypeParams: ~
+      Params: ~
+      Result: NamedType
+        Namespace: ""
+        Name: "nint"
+        Args: ~
+      Body:
+        ReturnStmt
+          Value: IntLit
+            Text: "0"
+  Asserts: ~

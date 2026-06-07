@@ -1,16 +1,37 @@
 File
-  ConstDecl
-    doc "The zero point every path starts from."
-    pub
-    name "Origin"
-    value IntLit "0"
-  ConstDecl
-    doc "One step along the axis."
-    pub
-    name "Unit"
-    value IntLit "1"
-  TypeDecl
-    doc "A 1-D coordinate."
-    pub
-    name "Point"
-    body int
+  Uses: ~
+  Decls:
+    ConstDecl
+      Doc: "The zero point every path starts from."
+      Public: true
+      Name: "Origin"
+      Type: ~
+      Value: IntLit
+        Text: "0"
+      Builtin: false
+    ConstDecl
+      Doc: "One step along the axis."
+      Public: true
+      Name: "Unit"
+      Type: ~
+      Value: IntLit
+        Text: "1"
+      Builtin: false
+  Types:
+    TypeDecl
+      Doc: "A 1-D coordinate."
+      Public: true
+      Name: "Point"
+      Params: ~
+      Body: NamedType
+        Namespace: ""
+        Name: "int"
+        Args: ~
+      Where: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
+  Enums: ~
+  Interfaces: ~
+  Funcs: ~
+  Asserts: ~

@@ -1,72 +1,304 @@
 File
-  ConstDecl
-    name "Hello"
-    type Tag
-    value StringLit "hello"
-  ConstDecl
-    name "World"
-    value StringLit "world"
-  ConstDecl
-    name "There"
-    type Tag
-    value Identifier "World"
-  ConstDecl
-    name "Greeting"
-    type Tag
-    value (call (. (call (. Identifier "Hello" add) StringLit " ") add) Identifier "There")
-  ConstDecl
-    name "SameTag"
-    value (call (. Identifier "Hello" eql) StringLit "hello")
-  ConstDecl
-    name "OtherTag"
-    value (call (. Identifier "Hello" neq) Identifier "There")
-  ConstDecl
-    name "North"
-    type Direction
-    value StringLit "north"
-  ConstDecl
-    name "South"
-    type Direction
-    value StringLit "south"
-  ConstDecl
-    name "Ok"
-    type Labeled
-    value StringLit "tagged"
-  ConstDecl
-    name "FromOk"
-    value (call Identifier "label" StringLit "done")
-  TypeDecl
-    pub
-    name "Tag"
-    body string
-  TypeDecl
-    pub
-    name "Direction"
-    body string
-    where (call (. (call (. self eql) StringLit "north") oror) (call (. self eql) StringLit "south"))
-  TypeDecl
-    pub
-    name "Labeled"
-    body Tag | error
-  FuncDecl
-    pub
-    name "label"
-    param v: Labeled
-    result Tag
-      match Identifier "v"
-        arm Tag t
-          return Identifier "t"
-        arm error e
-          return StringLit "error"
-  AssertDecl
-    cond (call (. Identifier "Hello" eql) StringLit "hello")
-  AssertDecl
-    cond (call (. Identifier "Greeting" eql) StringLit "hello world")
-  AssertDecl
-    cond Identifier "SameTag"
-  AssertDecl
-    cond Identifier "OtherTag"
-  AssertDecl
-    cond (call (. Identifier "North" neq) Identifier "South")
-  AssertDecl
-    cond (call (. (call Identifier "label" StringLit "done") eql) StringLit "done")
+  Uses: ~
+  Decls:
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Hello"
+      Type: NamedType
+        Namespace: ""
+        Name: "Tag"
+        Args: ~
+      Value: StringLit
+        Value: "hello"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "World"
+      Type: ~
+      Value: StringLit
+        Value: "world"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "There"
+      Type: NamedType
+        Namespace: ""
+        Name: "Tag"
+        Args: ~
+      Value: Identifier
+        Name: "World"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Greeting"
+      Type: NamedType
+        Namespace: ""
+        Name: "Tag"
+        Args: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: MemberExpr
+              Receiver: Identifier
+                Name: "Hello"
+              Member: Identifier
+                Name: "add"
+            Arguments:
+              StringLit
+                Value: " "
+          Member: Identifier
+            Name: "add"
+        Arguments:
+          Identifier
+            Name: "There"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "SameTag"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: Identifier
+            Name: "Hello"
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          StringLit
+            Value: "hello"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "OtherTag"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: Identifier
+            Name: "Hello"
+          Member: Identifier
+            Name: "neq"
+        Arguments:
+          Identifier
+            Name: "There"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "North"
+      Type: NamedType
+        Namespace: ""
+        Name: "Direction"
+        Args: ~
+      Value: StringLit
+        Value: "north"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "South"
+      Type: NamedType
+        Namespace: ""
+        Name: "Direction"
+        Args: ~
+      Value: StringLit
+        Value: "south"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Ok"
+      Type: NamedType
+        Namespace: ""
+        Name: "Labeled"
+        Args: ~
+      Value: StringLit
+        Value: "tagged"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "FromOk"
+      Type: ~
+      Value: CallExpr
+        Callee: Identifier
+          Name: "label"
+        Arguments:
+          StringLit
+            Value: "done"
+      Builtin: false
+  Types:
+    TypeDecl
+      Doc: ~
+      Public: true
+      Name: "Tag"
+      Params: ~
+      Body: NamedType
+        Namespace: ""
+        Name: "string"
+        Args: ~
+      Where: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
+    TypeDecl
+      Doc: ~
+      Public: true
+      Name: "Direction"
+      Params: ~
+      Body: NamedType
+        Namespace: ""
+        Name: "string"
+        Args: ~
+      Where: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: MemberExpr
+              Receiver: SelfExpr
+              Member: Identifier
+                Name: "eql"
+            Arguments:
+              StringLit
+                Value: "north"
+          Member: Identifier
+            Name: "oror"
+        Arguments:
+          CallExpr
+            Callee: MemberExpr
+              Receiver: SelfExpr
+              Member: Identifier
+                Name: "eql"
+            Arguments:
+              StringLit
+                Value: "south"
+      Methods: ~
+      Consts: ~
+      Impls: ~
+    TypeDecl
+      Doc: ~
+      Public: true
+      Name: "Labeled"
+      Params: ~
+      Body: UnionType
+        Members:
+          NamedType
+            Namespace: ""
+            Name: "Tag"
+            Args: ~
+          NamedType
+            Namespace: ""
+            Name: "error"
+            Args: ~
+      Where: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
+  Enums: ~
+  Interfaces: ~
+  Funcs:
+    FuncDecl
+      Doc: ~
+      Public: true
+      Extern: false
+      Effects: ~
+      Name: "label"
+      TypeParams: ~
+      Params:
+        ParamDef
+          Name: "v"
+          Type: NamedType
+            Namespace: ""
+            Name: "Labeled"
+            Args: ~
+      Result: NamedType
+        Namespace: ""
+        Name: "Tag"
+        Args: ~
+      Body:
+        MatchStmt
+          Scrutinee: Identifier
+            Name: "v"
+          Arms:
+            MatchArm
+              Type: NamedType
+                Namespace: ""
+                Name: "Tag"
+                Args: ~
+              Bind: "t"
+              Body:
+                ReturnStmt
+                  Value: Identifier
+                    Name: "t"
+            MatchArm
+              Type: NamedType
+                Namespace: ""
+                Name: "error"
+                Args: ~
+              Bind: "e"
+              Body:
+                ReturnStmt
+                  Value: StringLit
+                    Value: "error"
+          Else: ~
+          AfterElse: ~
+  Asserts:
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: Identifier
+            Name: "Hello"
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          StringLit
+            Value: "hello"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: Identifier
+            Name: "Greeting"
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          StringLit
+            Value: "hello world"
+    AssertDecl
+      Doc: ~
+      Cond: Identifier
+        Name: "SameTag"
+    AssertDecl
+      Doc: ~
+      Cond: Identifier
+        Name: "OtherTag"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: Identifier
+            Name: "North"
+          Member: Identifier
+            Name: "neq"
+        Arguments:
+          Identifier
+            Name: "South"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: Identifier
+              Name: "label"
+            Arguments:
+              StringLit
+                Value: "done"
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          StringLit
+            Value: "done"

@@ -1,59 +1,205 @@
 File
-  TypeDecl
-    doc "A small ordered, printable, rankable tag value."
-    pub
-    name "Tag"
-    body nint
-    impl ordered
-    method "show"
-      doc "Render the tag."
-      result string
-      return StringLit "tag"
-    method "rank"
-      doc "The tag's rank."
-      result nint
-      return IntLit "1"
-    method "before"
-      doc "Order tags by value."
-      param other: self
-      result bool
-      return (call (. self lt) Identifier "other")
-  InterfaceDecl
-    doc "A behaviour layered on a parent: a printable value is comparable, so it"
-    doc "carries eql/neq (from comparable) on top of its own show."
-    pub
-    name "printable"
-    parent comparable
-    required "show"
-      doc "Render the value as a string."
-      result string
-  InterfaceDecl
-    doc "A diamond: ordered inherits comparable through two distinct parents"
-    doc "(printable and rankable, each comparable). The shared ancestor is deduped by"
-    doc "definition identity, so ordered's contract carries comparable's members once."
-    pub
-    name "rankable"
-    parent comparable
-    required "rank"
-      doc "The value's rank."
-      result nint
-  InterfaceDecl
-    doc "The join of two comparable-derived parents: a single shared comparable"
-    doc "ancestor, reached two ways — the diamond closes cleanly."
-    pub
-    name "ordered"
-    parent printable
-    parent rankable
-    required "before"
-      doc "The < operator."
-      param other: self
-      result bool
-  FuncDecl
-    doc "Whether two ordered values are equal, via comparable inherited by ordered."
-    pub
-    name "equal"
-    typeparam T: ordered
-    param a: T
-    param b: T
-    result bool
-      return (call (. Identifier "a" eql) Identifier "b")
+  Uses: ~
+  Decls: ~
+  Types:
+    TypeDecl
+      Doc: "A small ordered, printable, rankable tag value."
+      Public: true
+      Name: "Tag"
+      Params: ~
+      Body: NamedType
+        Namespace: ""
+        Name: "nint"
+        Args: ~
+      Where: ~
+      Methods:
+        MethodDecl
+          Doc: "Render the tag."
+          Public: false
+          Extern: false
+          Kind: 0
+          Effects: ~
+          Name: "show"
+          TypeParams: ~
+          Params: ~
+          Result: NamedType
+            Namespace: ""
+            Name: "string"
+            Args: ~
+          Body:
+            ReturnStmt
+              Value: StringLit
+                Value: "tag"
+        MethodDecl
+          Doc: "The tag's rank."
+          Public: false
+          Extern: false
+          Kind: 0
+          Effects: ~
+          Name: "rank"
+          TypeParams: ~
+          Params: ~
+          Result: NamedType
+            Namespace: ""
+            Name: "nint"
+            Args: ~
+          Body:
+            ReturnStmt
+              Value: IntLit
+                Text: "1"
+        MethodDecl
+          Doc: "Order tags by value."
+          Public: false
+          Extern: false
+          Kind: 0
+          Effects: ~
+          Name: "before"
+          TypeParams: ~
+          Params:
+            ParamDef
+              Name: "other"
+              Type: NamedType
+                Namespace: ""
+                Name: "self"
+                Args: ~
+          Result: NamedType
+            Namespace: ""
+            Name: "bool"
+            Args: ~
+          Body:
+            ReturnStmt
+              Value: CallExpr
+                Callee: MemberExpr
+                  Receiver: SelfExpr
+                  Member: Identifier
+                    Name: "lt"
+                Arguments:
+                  Identifier
+                    Name: "other"
+      Consts: ~
+      Impls:
+        NamedType
+          Namespace: ""
+          Name: "ordered"
+          Args: ~
+  Enums: ~
+  Interfaces:
+    InterfaceDecl
+      Doc: "A behaviour layered on a parent: a printable value is comparable, so it" "carries eql/neq (from comparable) on top of its own show."
+      Public: true
+      Name: "printable"
+      Params: ~
+      Parents:
+        NamedType
+          Namespace: ""
+          Name: "comparable"
+          Args: ~
+      Members:
+        InterfaceMember
+          Doc: "Render the value as a string."
+          Public: false
+          Name: "show"
+          TypeParams: ~
+          Params: ~
+          Result: NamedType
+            Namespace: ""
+            Name: "string"
+            Args: ~
+          Body: ~
+    InterfaceDecl
+      Doc: "A diamond: ordered inherits comparable through two distinct parents" "(printable and rankable, each comparable). The shared ancestor is deduped by" "definition identity, so ordered's contract carries comparable's members once."
+      Public: true
+      Name: "rankable"
+      Params: ~
+      Parents:
+        NamedType
+          Namespace: ""
+          Name: "comparable"
+          Args: ~
+      Members:
+        InterfaceMember
+          Doc: "The value's rank."
+          Public: false
+          Name: "rank"
+          TypeParams: ~
+          Params: ~
+          Result: NamedType
+            Namespace: ""
+            Name: "nint"
+            Args: ~
+          Body: ~
+    InterfaceDecl
+      Doc: "The join of two comparable-derived parents: a single shared comparable" "ancestor, reached two ways — the diamond closes cleanly."
+      Public: true
+      Name: "ordered"
+      Params: ~
+      Parents:
+        NamedType
+          Namespace: ""
+          Name: "printable"
+          Args: ~
+        NamedType
+          Namespace: ""
+          Name: "rankable"
+          Args: ~
+      Members:
+        InterfaceMember
+          Doc: "The < operator."
+          Public: false
+          Name: "before"
+          TypeParams: ~
+          Params:
+            ParamDef
+              Name: "other"
+              Type: NamedType
+                Namespace: ""
+                Name: "self"
+                Args: ~
+          Result: NamedType
+            Namespace: ""
+            Name: "bool"
+            Args: ~
+          Body: ~
+  Funcs:
+    FuncDecl
+      Doc: "Whether two ordered values are equal, via comparable inherited by ordered."
+      Public: true
+      Extern: false
+      Effects: ~
+      Name: "equal"
+      TypeParams:
+        TypeParam
+          Name: "T"
+          Constraint: NamedType
+            Namespace: ""
+            Name: "ordered"
+            Args: ~
+      Params:
+        ParamDef
+          Name: "a"
+          Type: NamedType
+            Namespace: ""
+            Name: "T"
+            Args: ~
+        ParamDef
+          Name: "b"
+          Type: NamedType
+            Namespace: ""
+            Name: "T"
+            Args: ~
+      Result: NamedType
+        Namespace: ""
+        Name: "bool"
+        Args: ~
+      Body:
+        ReturnStmt
+          Value: CallExpr
+            Callee: MemberExpr
+              Receiver: Identifier
+                Name: "a"
+              Member: Identifier
+                Name: "eql"
+            Arguments:
+              Identifier
+                Name: "b"
+  Asserts: ~

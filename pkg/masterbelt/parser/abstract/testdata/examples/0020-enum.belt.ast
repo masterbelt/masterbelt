@@ -1,62 +1,304 @@
 File
-  ConstDecl
-    name "Top"
-    type Rarity
-    value (. Identifier "Rarity" Legend)
-  ConstDecl
-    name "Bare"
-    type Rarity
-    value Identifier "Common"
-  ConstDecl
-    name "Highest"
-    value (call Identifier "highestSeen" (. Identifier "Rarity" Legend))
-  EnumDecl
-    doc "A card's rarity tier."
-    pub
-    name "Rarity"
-    base byte
-    member "Common" = IntLit "1"
-    member "Rare" = IntLit "2"
-    member "Legend" = IntLit "10"
-  EnumDecl
-    doc "An elemental affinity."
-    pub
-    name "Element"
-    member "Fire"
-    member "Water"
-    member "Wind"
-    method "isFire"
-      doc "Whether this element is Fire."
-      pub
-      result bool
-      return (call (. self eql) (. Identifier "Element" Fire))
-  EnumDecl
-    doc "A supported display locale."
-    pub
-    name "Locale"
-    base string
-    member "Ja"
-    member "En" = StringLit "en-US"
-  FuncDecl
-    pub
-    name "highestSeen"
-    param starting: Rarity
-    result Rarity
-      let "best": Rarity = Identifier "Common"
-      if (call (. Identifier "starting" eql) Identifier "Legend")
-          assign Identifier "best" = Identifier "Legend"
-      return Identifier "best"
-  AssertDecl
-    cond (call (. (. Identifier "Rarity" Common) neq) (. Identifier "Rarity" Legend))
-  AssertDecl
-    cond (call (. (. Identifier "Rarity" Common) lt) (. Identifier "Rarity" Legend))
-  AssertDecl
-    cond (call (. (. Identifier "Rarity" Legend) eql) Identifier "Top")
-  AssertDecl
-    cond (call (. Identifier "Bare" eql) (. Identifier "Rarity" Common))
-  AssertDecl
-    cond (call (. (call Identifier "highestSeen" (. Identifier "Rarity" Legend)) eql) (. Identifier "Rarity" Legend))
-  AssertDecl
-    cond (call (. (call Identifier "highestSeen" (. Identifier "Rarity" Common)) eql) (. Identifier "Rarity" Common))
-  AssertDecl
-    cond (call (. (. Identifier "Locale" Ja) lt) (. Identifier "Locale" En))
+  Uses: ~
+  Decls:
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Top"
+      Type: NamedType
+        Namespace: ""
+        Name: "Rarity"
+        Args: ~
+      Value: MemberExpr
+        Receiver: Identifier
+          Name: "Rarity"
+        Member: Identifier
+          Name: "Legend"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Bare"
+      Type: NamedType
+        Namespace: ""
+        Name: "Rarity"
+        Args: ~
+      Value: Identifier
+        Name: "Common"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Highest"
+      Type: ~
+      Value: CallExpr
+        Callee: Identifier
+          Name: "highestSeen"
+        Arguments:
+          MemberExpr
+            Receiver: Identifier
+              Name: "Rarity"
+            Member: Identifier
+              Name: "Legend"
+      Builtin: false
+  Types: ~
+  Enums:
+    EnumDecl
+      Doc: "A card's rarity tier."
+      Public: true
+      Name: "Rarity"
+      Base: NamedType
+        Namespace: ""
+        Name: "byte"
+        Args: ~
+      Members:
+        EnumMember
+          Name: "Common"
+          Value: IntLit
+            Text: "1"
+        EnumMember
+          Name: "Rare"
+          Value: IntLit
+            Text: "2"
+        EnumMember
+          Name: "Legend"
+          Value: IntLit
+            Text: "10"
+      Methods: ~
+      Consts: ~
+      Impls: ~
+    EnumDecl
+      Doc: "An elemental affinity."
+      Public: true
+      Name: "Element"
+      Base: ~
+      Members:
+        EnumMember
+          Name: "Fire"
+          Value: ~
+        EnumMember
+          Name: "Water"
+          Value: ~
+        EnumMember
+          Name: "Wind"
+          Value: ~
+      Methods:
+        MethodDecl
+          Doc: "Whether this element is Fire."
+          Public: true
+          Extern: false
+          Kind: 0
+          Effects: ~
+          Name: "isFire"
+          TypeParams: ~
+          Params: ~
+          Result: NamedType
+            Namespace: ""
+            Name: "bool"
+            Args: ~
+          Body:
+            ReturnStmt
+              Value: CallExpr
+                Callee: MemberExpr
+                  Receiver: SelfExpr
+                  Member: Identifier
+                    Name: "eql"
+                Arguments:
+                  MemberExpr
+                    Receiver: Identifier
+                      Name: "Element"
+                    Member: Identifier
+                      Name: "Fire"
+      Consts: ~
+      Impls: ~
+    EnumDecl
+      Doc: "A supported display locale."
+      Public: true
+      Name: "Locale"
+      Base: NamedType
+        Namespace: ""
+        Name: "string"
+        Args: ~
+      Members:
+        EnumMember
+          Name: "Ja"
+          Value: ~
+        EnumMember
+          Name: "En"
+          Value: StringLit
+            Value: "en-US"
+      Methods: ~
+      Consts: ~
+      Impls: ~
+  Interfaces: ~
+  Funcs:
+    FuncDecl
+      Doc: ~
+      Public: true
+      Extern: false
+      Effects: ~
+      Name: "highestSeen"
+      TypeParams: ~
+      Params:
+        ParamDef
+          Name: "starting"
+          Type: NamedType
+            Namespace: ""
+            Name: "Rarity"
+            Args: ~
+      Result: NamedType
+        Namespace: ""
+        Name: "Rarity"
+        Args: ~
+      Body:
+        LetStmt
+          Name: "best"
+          Type: NamedType
+            Namespace: ""
+            Name: "Rarity"
+            Args: ~
+          Value: Identifier
+            Name: "Common"
+        IfStmt
+          Cond: CallExpr
+            Callee: MemberExpr
+              Receiver: Identifier
+                Name: "starting"
+              Member: Identifier
+                Name: "eql"
+            Arguments:
+              Identifier
+                Name: "Legend"
+          Then:
+            AssignStmt
+              Target: Identifier
+                Name: "best"
+              Value: Identifier
+                Name: "Legend"
+          ElseIf: ~
+          Else: ~
+        ReturnStmt
+          Value: Identifier
+            Name: "best"
+  Asserts:
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: MemberExpr
+            Receiver: Identifier
+              Name: "Rarity"
+            Member: Identifier
+              Name: "Common"
+          Member: Identifier
+            Name: "neq"
+        Arguments:
+          MemberExpr
+            Receiver: Identifier
+              Name: "Rarity"
+            Member: Identifier
+              Name: "Legend"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: MemberExpr
+            Receiver: Identifier
+              Name: "Rarity"
+            Member: Identifier
+              Name: "Common"
+          Member: Identifier
+            Name: "lt"
+        Arguments:
+          MemberExpr
+            Receiver: Identifier
+              Name: "Rarity"
+            Member: Identifier
+              Name: "Legend"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: MemberExpr
+            Receiver: Identifier
+              Name: "Rarity"
+            Member: Identifier
+              Name: "Legend"
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          Identifier
+            Name: "Top"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: Identifier
+            Name: "Bare"
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          MemberExpr
+            Receiver: Identifier
+              Name: "Rarity"
+            Member: Identifier
+              Name: "Common"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: Identifier
+              Name: "highestSeen"
+            Arguments:
+              MemberExpr
+                Receiver: Identifier
+                  Name: "Rarity"
+                Member: Identifier
+                  Name: "Legend"
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          MemberExpr
+            Receiver: Identifier
+              Name: "Rarity"
+            Member: Identifier
+              Name: "Legend"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: Identifier
+              Name: "highestSeen"
+            Arguments:
+              MemberExpr
+                Receiver: Identifier
+                  Name: "Rarity"
+                Member: Identifier
+                  Name: "Common"
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          MemberExpr
+            Receiver: Identifier
+              Name: "Rarity"
+            Member: Identifier
+              Name: "Common"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: MemberExpr
+            Receiver: Identifier
+              Name: "Locale"
+            Member: Identifier
+              Name: "Ja"
+          Member: Identifier
+            Name: "lt"
+        Arguments:
+          MemberExpr
+            Receiver: Identifier
+              Name: "Locale"
+            Member: Identifier
+              Name: "En"

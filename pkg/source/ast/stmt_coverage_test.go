@@ -105,19 +105,6 @@ func TestWalkBodyExprsCoversEveryStmt(t *testing.T) {
 	}
 }
 
-// TestDumpInlineNeverEmpty checks the funcLit snapshot path renders every
-// statement kind as something non-empty, so a kind cannot silently vanish from
-// the .cst/dump oracle (the snapshot-masking failure mode). The four kinds with
-// a dedicated inline form render their own shape; the rest take the visible
-// "(stmt T)" marker.
-func TestDumpInlineNeverEmpty(t *testing.T) {
-	for _, s := range StmtKinds() {
-		if got := dumpStmtInline(s); got == "" {
-			t.Errorf("dumpStmtInline(%T) = %q; a statement must never dump as empty", s, got)
-		}
-	}
-}
-
 // TestUnhandledStmtNamesType pins the panic message to the offending type so a
 // walker failure points straight at the unhandled kind.
 func TestUnhandledStmtNamesType(t *testing.T) {

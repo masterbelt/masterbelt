@@ -1,47 +1,232 @@
 File
-  ConstDecl
-    name "Present"
-    type optional<nint>
-    value IntLit "5"
-  ConstDecl
-    name "Absent"
-    type optional<nint>
-    value NullLit
-  ConstDecl
-    name "FromPresent"
-    value (call Identifier "orZero" IntLit "5")
-  ConstDecl
-    name "FromAbsent"
-    value (call Identifier "orZero" NullLit)
-  ConstDecl
-    name "WithFallback"
-    value (call Identifier "orFallback" NullLit IntLit "99")
-  FuncDecl
-    pub
-    name "orZero"
-    param v: optional<nint>
-    result nint
-      match Identifier "v"
-        arm nint n
-          return Identifier "n"
-        arm null
-          return IntLit "0"
-  FuncDecl
-    pub
-    name "orFallback"
-    param v: optional<nint>
-    param fallback: nint
-    result nint
-      match Identifier "v"
-        arm nint n
-          return Identifier "n"
-        else
-          return Identifier "fallback"
-  AssertDecl
-    cond (call (. (call Identifier "orZero" IntLit "5") eql) IntLit "5")
-  AssertDecl
-    cond (call (. (call Identifier "orZero" NullLit) eql) IntLit "0")
-  AssertDecl
-    cond (call (. (call Identifier "orFallback" IntLit "7" IntLit "99") eql) IntLit "7")
-  AssertDecl
-    cond (call (. (call Identifier "orFallback" NullLit IntLit "99") eql) IntLit "99")
+  Uses: ~
+  Decls:
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Present"
+      Type: NamedType
+        Namespace: ""
+        Name: "optional"
+        Args:
+          NamedType
+            Namespace: ""
+            Name: "nint"
+            Args: ~
+      Value: IntLit
+        Text: "5"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Absent"
+      Type: NamedType
+        Namespace: ""
+        Name: "optional"
+        Args:
+          NamedType
+            Namespace: ""
+            Name: "nint"
+            Args: ~
+      Value: NullLit
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "FromPresent"
+      Type: ~
+      Value: CallExpr
+        Callee: Identifier
+          Name: "orZero"
+        Arguments:
+          IntLit
+            Text: "5"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "FromAbsent"
+      Type: ~
+      Value: CallExpr
+        Callee: Identifier
+          Name: "orZero"
+        Arguments:
+          NullLit
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "WithFallback"
+      Type: ~
+      Value: CallExpr
+        Callee: Identifier
+          Name: "orFallback"
+        Arguments:
+          NullLit
+          IntLit
+            Text: "99"
+      Builtin: false
+  Types: ~
+  Enums: ~
+  Interfaces: ~
+  Funcs:
+    FuncDecl
+      Doc: ~
+      Public: true
+      Extern: false
+      Effects: ~
+      Name: "orZero"
+      TypeParams: ~
+      Params:
+        ParamDef
+          Name: "v"
+          Type: NamedType
+            Namespace: ""
+            Name: "optional"
+            Args:
+              NamedType
+                Namespace: ""
+                Name: "nint"
+                Args: ~
+      Result: NamedType
+        Namespace: ""
+        Name: "nint"
+        Args: ~
+      Body:
+        MatchStmt
+          Scrutinee: Identifier
+            Name: "v"
+          Arms:
+            MatchArm
+              Type: NamedType
+                Namespace: ""
+                Name: "nint"
+                Args: ~
+              Bind: "n"
+              Body:
+                ReturnStmt
+                  Value: Identifier
+                    Name: "n"
+            MatchArm
+              Type: NamedType
+                Namespace: ""
+                Name: "null"
+                Args: ~
+              Bind: ""
+              Body:
+                ReturnStmt
+                  Value: IntLit
+                    Text: "0"
+          Else: ~
+          AfterElse: ~
+    FuncDecl
+      Doc: ~
+      Public: true
+      Extern: false
+      Effects: ~
+      Name: "orFallback"
+      TypeParams: ~
+      Params:
+        ParamDef
+          Name: "v"
+          Type: NamedType
+            Namespace: ""
+            Name: "optional"
+            Args:
+              NamedType
+                Namespace: ""
+                Name: "nint"
+                Args: ~
+        ParamDef
+          Name: "fallback"
+          Type: NamedType
+            Namespace: ""
+            Name: "nint"
+            Args: ~
+      Result: NamedType
+        Namespace: ""
+        Name: "nint"
+        Args: ~
+      Body:
+        MatchStmt
+          Scrutinee: Identifier
+            Name: "v"
+          Arms:
+            MatchArm
+              Type: NamedType
+                Namespace: ""
+                Name: "nint"
+                Args: ~
+              Bind: "n"
+              Body:
+                ReturnStmt
+                  Value: Identifier
+                    Name: "n"
+          Else:
+            ReturnStmt
+              Value: Identifier
+                Name: "fallback"
+          AfterElse: ~
+  Asserts:
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: Identifier
+              Name: "orZero"
+            Arguments:
+              IntLit
+                Text: "5"
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "5"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: Identifier
+              Name: "orZero"
+            Arguments:
+              NullLit
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "0"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: Identifier
+              Name: "orFallback"
+            Arguments:
+              IntLit
+                Text: "7"
+              IntLit
+                Text: "99"
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "7"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: Identifier
+              Name: "orFallback"
+            Arguments:
+              NullLit
+              IntLit
+                Text: "99"
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "99"

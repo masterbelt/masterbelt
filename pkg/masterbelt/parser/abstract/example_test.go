@@ -5,8 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-
-	"github.com/masterbelt/masterbelt/pkg/source/ast"
 )
 
 var update = flag.Bool("update", false, "update the example snapshots in testdata/examples")
@@ -41,7 +39,11 @@ func TestExamples(t *testing.T) {
 			}
 
 			file, _ := Lower(src)
-			got := ast.Dump(file)
+			text, err := file.MarshalText()
+			if err != nil {
+				t.Fatalf("MarshalText: %v", err)
+			}
+			got := string(text)
 
 			snapshot := filepath.Join(snapshotDir, name+".ast")
 			if *update {

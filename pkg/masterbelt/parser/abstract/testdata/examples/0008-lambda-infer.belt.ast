@@ -1,25 +1,266 @@
 File
-  ConstDecl
-    name "Doubled"
-    value (call (. (list IntLit "1" IntLit "2" IntLit "3") map) (fn(x: <missing>): <missing> (return (call (. Identifier "x" mul) IntLit "2"))))
-  ConstDecl
-    name "Evens"
-    value (call (. (list IntLit "1" IntLit "2" IntLit "3" IntLit "4") map) (fn(x: <missing>): <missing> (return (call (. (call (. Identifier "x" rem) IntLit "2") eql) IntLit "0"))))
-  ConstDecl
-    name "Tripled"
-    value (call (. (list IntLit "1" IntLit "2" IntLit "3") map) (fn(x: nint): <missing> (return (call (. Identifier "x" mul) IntLit "3"))))
-  ConstDecl
-    name "Twice"
-    type fn(x: nint): nint
-    value (fn(x: <missing>): <missing> (return (call (. Identifier "x" mul) IntLit "2")))
-  ConstDecl
-    name "Stepped"
-    value (call (. (list IntLit "1" IntLit "2" IntLit "3") map) (fn(x: <missing>): <missing> (return (call (. Identifier "x" add) IntLit "1"))))
-  ConstDecl
-    name "Bytes"
-    type list<sbyte>
-    value (list IntLit "1" IntLit "2" IntLit "3")
-  ConstDecl
-    name "Empty"
-    type list<nint>
-    value (collection)
+  Uses: ~
+  Decls:
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Doubled"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: CollectionLit
+            Entries:
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "1"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "2"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "3"
+          Member: Identifier
+            Name: "map"
+        Arguments:
+          FuncLit
+            Params:
+              ParamDef
+                Name: "x"
+                Type: ~
+            Result: ~
+            Body:
+              ReturnStmt
+                Value: CallExpr
+                  Callee: MemberExpr
+                    Receiver: Identifier
+                      Name: "x"
+                    Member: Identifier
+                      Name: "mul"
+                  Arguments:
+                    IntLit
+                      Text: "2"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Evens"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: CollectionLit
+            Entries:
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "1"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "2"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "3"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "4"
+          Member: Identifier
+            Name: "map"
+        Arguments:
+          FuncLit
+            Params:
+              ParamDef
+                Name: "x"
+                Type: ~
+            Result: ~
+            Body:
+              ReturnStmt
+                Value: CallExpr
+                  Callee: MemberExpr
+                    Receiver: CallExpr
+                      Callee: MemberExpr
+                        Receiver: Identifier
+                          Name: "x"
+                        Member: Identifier
+                          Name: "rem"
+                      Arguments:
+                        IntLit
+                          Text: "2"
+                    Member: Identifier
+                      Name: "eql"
+                  Arguments:
+                    IntLit
+                      Text: "0"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Tripled"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: CollectionLit
+            Entries:
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "1"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "2"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "3"
+          Member: Identifier
+            Name: "map"
+        Arguments:
+          FuncLit
+            Params:
+              ParamDef
+                Name: "x"
+                Type: NamedType
+                  Namespace: ""
+                  Name: "nint"
+                  Args: ~
+            Result: ~
+            Body:
+              ReturnStmt
+                Value: CallExpr
+                  Callee: MemberExpr
+                    Receiver: Identifier
+                      Name: "x"
+                    Member: Identifier
+                      Name: "mul"
+                  Arguments:
+                    IntLit
+                      Text: "3"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Twice"
+      Type: FuncType
+        Params:
+          ParamDef
+            Name: "x"
+            Type: NamedType
+              Namespace: ""
+              Name: "nint"
+              Args: ~
+        Result: NamedType
+          Namespace: ""
+          Name: "nint"
+          Args: ~
+      Value: FuncLit
+        Params:
+          ParamDef
+            Name: "x"
+            Type: ~
+        Result: ~
+        Body:
+          ReturnStmt
+            Value: CallExpr
+              Callee: MemberExpr
+                Receiver: Identifier
+                  Name: "x"
+                Member: Identifier
+                  Name: "mul"
+              Arguments:
+                IntLit
+                  Text: "2"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Stepped"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: CollectionLit
+            Entries:
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "1"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "2"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "3"
+          Member: Identifier
+            Name: "map"
+        Arguments:
+          FuncLit
+            Params:
+              ParamDef
+                Name: "x"
+                Type: ~
+            Result: ~
+            Body:
+              ReturnStmt
+                Value: CallExpr
+                  Callee: MemberExpr
+                    Receiver: Identifier
+                      Name: "x"
+                    Member: Identifier
+                      Name: "add"
+                  Arguments:
+                    IntLit
+                      Text: "1"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Bytes"
+      Type: NamedType
+        Namespace: ""
+        Name: "list"
+        Args:
+          NamedType
+            Namespace: ""
+            Name: "sbyte"
+            Args: ~
+      Value: CollectionLit
+        Entries:
+          CollectionEntry
+            Key: ~
+            Value: IntLit
+              Text: "1"
+          CollectionEntry
+            Key: ~
+            Value: IntLit
+              Text: "2"
+          CollectionEntry
+            Key: ~
+            Value: IntLit
+              Text: "3"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Empty"
+      Type: NamedType
+        Namespace: ""
+        Name: "list"
+        Args:
+          NamedType
+            Namespace: ""
+            Name: "nint"
+            Args: ~
+      Value: CollectionLit
+        Entries: ~
+      Builtin: false
+  Types: ~
+  Enums: ~
+  Interfaces: ~
+  Funcs: ~
+  Asserts: ~

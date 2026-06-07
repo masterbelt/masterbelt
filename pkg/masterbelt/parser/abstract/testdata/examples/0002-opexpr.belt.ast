@@ -1,55 +1,284 @@
 File
-  ConstDecl
-    name "add"
-    value (call (. IntLit "1" add) IntLit "2")
-  ConstDecl
-    name "sub"
-    value (call (. IntLit "1" sub) IntLit "2")
-  ConstDecl
-    name "mul"
-    value (call (. IntLit "1" mul) IntLit "2")
-  ConstDecl
-    name "div"
-    value (call (. IntLit "1" div) IntLit "2")
-  ConstDecl
-    name "rem"
-    value (call (. IntLit "1" rem) IntLit "2")
-  ConstDecl
-    name "eql"
-    value (call (. IntLit "1" eql) IntLit "1")
-  ConstDecl
-    name "neq"
-    value (call (. IntLit "1" neq) IntLit "1")
-  ConstDecl
-    name "lt"
-    value (call (. IntLit "1" lt) IntLit "2")
-  ConstDecl
-    name "lteq"
-    value (call (. IntLit "1" lteq) IntLit "2")
-  ConstDecl
-    name "gt"
-    value (call (. IntLit "1" gt) IntLit "2")
-  ConstDecl
-    name "gteq"
-    value (call (. IntLit "1" gteq) IntLit "2")
-  ConstDecl
-    name "anan"
-    value (call (. BoolLit true anan) BoolLit false)
-  ConstDecl
-    name "oror"
-    value (call (. BoolLit false oror) BoolLit true)
-  ConstDecl
-    name "pos"
-    value (call (. IntLit "1" pos))
-  ConstDecl
-    name "neg"
-    value (call (. IntLit "1" neg))
-  ConstDecl
-    name "not"
-    value (call (. BoolLit false not))
-  ConstDecl
-    name "grouped"
-    value (call (. (call (. IntLit "1" add) IntLit "2") mul) IntLit "3")
-  ConstDecl
-    name "nested"
-    value (call (. (call (. IntLit "1" gt) IntLit "2") not))
+  Uses: ~
+  Decls:
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "add"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: IntLit
+            Text: "1"
+          Member: Identifier
+            Name: "add"
+        Arguments:
+          IntLit
+            Text: "2"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "sub"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: IntLit
+            Text: "1"
+          Member: Identifier
+            Name: "sub"
+        Arguments:
+          IntLit
+            Text: "2"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "mul"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: IntLit
+            Text: "1"
+          Member: Identifier
+            Name: "mul"
+        Arguments:
+          IntLit
+            Text: "2"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "div"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: IntLit
+            Text: "1"
+          Member: Identifier
+            Name: "div"
+        Arguments:
+          IntLit
+            Text: "2"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "rem"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: IntLit
+            Text: "1"
+          Member: Identifier
+            Name: "rem"
+        Arguments:
+          IntLit
+            Text: "2"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "eql"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: IntLit
+            Text: "1"
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "1"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "neq"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: IntLit
+            Text: "1"
+          Member: Identifier
+            Name: "neq"
+        Arguments:
+          IntLit
+            Text: "1"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "lt"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: IntLit
+            Text: "1"
+          Member: Identifier
+            Name: "lt"
+        Arguments:
+          IntLit
+            Text: "2"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "lteq"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: IntLit
+            Text: "1"
+          Member: Identifier
+            Name: "lteq"
+        Arguments:
+          IntLit
+            Text: "2"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "gt"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: IntLit
+            Text: "1"
+          Member: Identifier
+            Name: "gt"
+        Arguments:
+          IntLit
+            Text: "2"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "gteq"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: IntLit
+            Text: "1"
+          Member: Identifier
+            Name: "gteq"
+        Arguments:
+          IntLit
+            Text: "2"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "anan"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: BoolLit
+            Value: true
+          Member: Identifier
+            Name: "anan"
+        Arguments:
+          BoolLit
+            Value: false
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "oror"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: BoolLit
+            Value: false
+          Member: Identifier
+            Name: "oror"
+        Arguments:
+          BoolLit
+            Value: true
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "pos"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: IntLit
+            Text: "1"
+          Member: Identifier
+            Name: "pos"
+        Arguments: ~
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "neg"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: IntLit
+            Text: "1"
+          Member: Identifier
+            Name: "neg"
+        Arguments: ~
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "not"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: BoolLit
+            Value: false
+          Member: Identifier
+            Name: "not"
+        Arguments: ~
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "grouped"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: MemberExpr
+              Receiver: IntLit
+                Text: "1"
+              Member: Identifier
+                Name: "add"
+            Arguments:
+              IntLit
+                Text: "2"
+          Member: Identifier
+            Name: "mul"
+        Arguments:
+          IntLit
+            Text: "3"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "nested"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: MemberExpr
+              Receiver: IntLit
+                Text: "1"
+              Member: Identifier
+                Name: "gt"
+            Arguments:
+              IntLit
+                Text: "2"
+          Member: Identifier
+            Name: "not"
+        Arguments: ~
+      Builtin: false
+  Types: ~
+  Enums: ~
+  Interfaces: ~
+  Funcs: ~
+  Asserts: ~

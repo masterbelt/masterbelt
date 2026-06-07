@@ -1,60 +1,562 @@
 File
-  ConstDecl
-    name "Joined"
-    value (call (. (list IntLit "1" IntLit "2") add) (list IntLit "3" IntLit "4"))
-  ConstDecl
-    name "Added"
-    value (call (. (list IntLit "1" IntLit "2") add) IntLit "3")
-  ConstDecl
-    name "NestedAdd"
-    value (call (. (list (list IntLit "1") (list IntLit "2")) add) (list IntLit "3"))
-  ConstDecl
-    name "Pushed"
-    value (call (. (list IntLit "1" IntLit "2") push) IntLit "3")
-  ConstDecl
-    name "Unshifted"
-    value (call (. (list IntLit "2" IntLit "3") unshift) IntLit "1")
-  ConstDecl
-    name "Empty"
-    type list<nint>
-    value (collection)
-  ConstDecl
-    name "Last"
-    value (call (. (list IntLit "1" IntLit "2" IntLit "3") pop))
-  ConstDecl
-    name "NoLast"
-    value (call (. Identifier "Empty" pop))
-  ConstDecl
-    name "First"
-    value (call (. (list IntLit "1" IntLit "2" IntLit "3") shift))
-  ConstDecl
-    name "NoFirst"
-    value (call (. Identifier "Empty" shift))
-  FuncDecl
-    pub
-    name "orZero"
-    param v: optional<nint>
-    result nint
-      match Identifier "v"
-        arm nint n
-          return Identifier "n"
-        arm null
-          return IntLit "0"
-  AssertDecl
-    cond (call (. (call (. (call (. (list IntLit "1" IntLit "2") add) (list IntLit "3" IntLit "4")) len)) eql) IntLit "4")
-  AssertDecl
-    cond (call (. (call (. (call (. (list IntLit "1" IntLit "2") add) IntLit "3") len)) eql) IntLit "3")
-  AssertDecl
-    cond (call (. (call (. (call (. (list IntLit "1" IntLit "2") push) IntLit "3") len)) eql) IntLit "3")
-  AssertDecl
-    cond (call (. (call (. (call (. (list IntLit "2" IntLit "3") unshift) IntLit "1") len)) eql) IntLit "3")
-  AssertDecl
-    cond (call (. (call (. (call (. (list (list IntLit "1") (list IntLit "2")) add) (list IntLit "3")) len)) eql) IntLit "3")
-  AssertDecl
-    cond (call (. (call Identifier "orZero" (call (. (list IntLit "1" IntLit "2" IntLit "3") pop))) eql) IntLit "3")
-  AssertDecl
-    cond (call (. (call Identifier "orZero" (call (. Identifier "Empty" pop))) eql) IntLit "0")
-  AssertDecl
-    cond (call (. (call Identifier "orZero" (call (. (list IntLit "1" IntLit "2" IntLit "3") shift))) eql) IntLit "1")
-  AssertDecl
-    cond (call (. (call Identifier "orZero" (call (. Identifier "Empty" shift))) eql) IntLit "0")
+  Uses: ~
+  Decls:
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Joined"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: CollectionLit
+            Entries:
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "1"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "2"
+          Member: Identifier
+            Name: "add"
+        Arguments:
+          CollectionLit
+            Entries:
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "3"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "4"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Added"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: CollectionLit
+            Entries:
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "1"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "2"
+          Member: Identifier
+            Name: "add"
+        Arguments:
+          IntLit
+            Text: "3"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "NestedAdd"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: CollectionLit
+            Entries:
+              CollectionEntry
+                Key: ~
+                Value: CollectionLit
+                  Entries:
+                    CollectionEntry
+                      Key: ~
+                      Value: IntLit
+                        Text: "1"
+              CollectionEntry
+                Key: ~
+                Value: CollectionLit
+                  Entries:
+                    CollectionEntry
+                      Key: ~
+                      Value: IntLit
+                        Text: "2"
+          Member: Identifier
+            Name: "add"
+        Arguments:
+          CollectionLit
+            Entries:
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "3"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Pushed"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: CollectionLit
+            Entries:
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "1"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "2"
+          Member: Identifier
+            Name: "push"
+        Arguments:
+          IntLit
+            Text: "3"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Unshifted"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: CollectionLit
+            Entries:
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "2"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "3"
+          Member: Identifier
+            Name: "unshift"
+        Arguments:
+          IntLit
+            Text: "1"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Empty"
+      Type: NamedType
+        Namespace: ""
+        Name: "list"
+        Args:
+          NamedType
+            Namespace: ""
+            Name: "nint"
+            Args: ~
+      Value: CollectionLit
+        Entries: ~
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Last"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: CollectionLit
+            Entries:
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "1"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "2"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "3"
+          Member: Identifier
+            Name: "pop"
+        Arguments: ~
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "NoLast"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: Identifier
+            Name: "Empty"
+          Member: Identifier
+            Name: "pop"
+        Arguments: ~
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "First"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: CollectionLit
+            Entries:
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "1"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "2"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "3"
+          Member: Identifier
+            Name: "shift"
+        Arguments: ~
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "NoFirst"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: Identifier
+            Name: "Empty"
+          Member: Identifier
+            Name: "shift"
+        Arguments: ~
+      Builtin: false
+  Types: ~
+  Enums: ~
+  Interfaces: ~
+  Funcs:
+    FuncDecl
+      Doc: ~
+      Public: true
+      Extern: false
+      Effects: ~
+      Name: "orZero"
+      TypeParams: ~
+      Params:
+        ParamDef
+          Name: "v"
+          Type: NamedType
+            Namespace: ""
+            Name: "optional"
+            Args:
+              NamedType
+                Namespace: ""
+                Name: "nint"
+                Args: ~
+      Result: NamedType
+        Namespace: ""
+        Name: "nint"
+        Args: ~
+      Body:
+        MatchStmt
+          Scrutinee: Identifier
+            Name: "v"
+          Arms:
+            MatchArm
+              Type: NamedType
+                Namespace: ""
+                Name: "nint"
+                Args: ~
+              Bind: "n"
+              Body:
+                ReturnStmt
+                  Value: Identifier
+                    Name: "n"
+            MatchArm
+              Type: NamedType
+                Namespace: ""
+                Name: "null"
+                Args: ~
+              Bind: ""
+              Body:
+                ReturnStmt
+                  Value: IntLit
+                    Text: "0"
+          Else: ~
+          AfterElse: ~
+  Asserts:
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: MemberExpr
+              Receiver: CallExpr
+                Callee: MemberExpr
+                  Receiver: CollectionLit
+                    Entries:
+                      CollectionEntry
+                        Key: ~
+                        Value: IntLit
+                          Text: "1"
+                      CollectionEntry
+                        Key: ~
+                        Value: IntLit
+                          Text: "2"
+                  Member: Identifier
+                    Name: "add"
+                Arguments:
+                  CollectionLit
+                    Entries:
+                      CollectionEntry
+                        Key: ~
+                        Value: IntLit
+                          Text: "3"
+                      CollectionEntry
+                        Key: ~
+                        Value: IntLit
+                          Text: "4"
+              Member: Identifier
+                Name: "len"
+            Arguments: ~
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "4"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: MemberExpr
+              Receiver: CallExpr
+                Callee: MemberExpr
+                  Receiver: CollectionLit
+                    Entries:
+                      CollectionEntry
+                        Key: ~
+                        Value: IntLit
+                          Text: "1"
+                      CollectionEntry
+                        Key: ~
+                        Value: IntLit
+                          Text: "2"
+                  Member: Identifier
+                    Name: "add"
+                Arguments:
+                  IntLit
+                    Text: "3"
+              Member: Identifier
+                Name: "len"
+            Arguments: ~
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "3"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: MemberExpr
+              Receiver: CallExpr
+                Callee: MemberExpr
+                  Receiver: CollectionLit
+                    Entries:
+                      CollectionEntry
+                        Key: ~
+                        Value: IntLit
+                          Text: "1"
+                      CollectionEntry
+                        Key: ~
+                        Value: IntLit
+                          Text: "2"
+                  Member: Identifier
+                    Name: "push"
+                Arguments:
+                  IntLit
+                    Text: "3"
+              Member: Identifier
+                Name: "len"
+            Arguments: ~
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "3"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: MemberExpr
+              Receiver: CallExpr
+                Callee: MemberExpr
+                  Receiver: CollectionLit
+                    Entries:
+                      CollectionEntry
+                        Key: ~
+                        Value: IntLit
+                          Text: "2"
+                      CollectionEntry
+                        Key: ~
+                        Value: IntLit
+                          Text: "3"
+                  Member: Identifier
+                    Name: "unshift"
+                Arguments:
+                  IntLit
+                    Text: "1"
+              Member: Identifier
+                Name: "len"
+            Arguments: ~
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "3"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: MemberExpr
+              Receiver: CallExpr
+                Callee: MemberExpr
+                  Receiver: CollectionLit
+                    Entries:
+                      CollectionEntry
+                        Key: ~
+                        Value: CollectionLit
+                          Entries:
+                            CollectionEntry
+                              Key: ~
+                              Value: IntLit
+                                Text: "1"
+                      CollectionEntry
+                        Key: ~
+                        Value: CollectionLit
+                          Entries:
+                            CollectionEntry
+                              Key: ~
+                              Value: IntLit
+                                Text: "2"
+                  Member: Identifier
+                    Name: "add"
+                Arguments:
+                  CollectionLit
+                    Entries:
+                      CollectionEntry
+                        Key: ~
+                        Value: IntLit
+                          Text: "3"
+              Member: Identifier
+                Name: "len"
+            Arguments: ~
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "3"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: Identifier
+              Name: "orZero"
+            Arguments:
+              CallExpr
+                Callee: MemberExpr
+                  Receiver: CollectionLit
+                    Entries:
+                      CollectionEntry
+                        Key: ~
+                        Value: IntLit
+                          Text: "1"
+                      CollectionEntry
+                        Key: ~
+                        Value: IntLit
+                          Text: "2"
+                      CollectionEntry
+                        Key: ~
+                        Value: IntLit
+                          Text: "3"
+                  Member: Identifier
+                    Name: "pop"
+                Arguments: ~
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "3"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: Identifier
+              Name: "orZero"
+            Arguments:
+              CallExpr
+                Callee: MemberExpr
+                  Receiver: Identifier
+                    Name: "Empty"
+                  Member: Identifier
+                    Name: "pop"
+                Arguments: ~
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "0"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: Identifier
+              Name: "orZero"
+            Arguments:
+              CallExpr
+                Callee: MemberExpr
+                  Receiver: CollectionLit
+                    Entries:
+                      CollectionEntry
+                        Key: ~
+                        Value: IntLit
+                          Text: "1"
+                      CollectionEntry
+                        Key: ~
+                        Value: IntLit
+                          Text: "2"
+                      CollectionEntry
+                        Key: ~
+                        Value: IntLit
+                          Text: "3"
+                  Member: Identifier
+                    Name: "shift"
+                Arguments: ~
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "1"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: Identifier
+              Name: "orZero"
+            Arguments:
+              CallExpr
+                Callee: MemberExpr
+                  Receiver: Identifier
+                    Name: "Empty"
+                  Member: Identifier
+                    Name: "shift"
+                Arguments: ~
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "0"

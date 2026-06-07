@@ -21,7 +21,7 @@ func naiveSplice(src []byte, start, end int, repl []byte) []byte {
 func assertMatchesFreshLower(t *testing.T, d *Document, content []byte) {
 	t.Helper()
 	fresh, _ := Lower(content)
-	got, want := ast.Dump(d.File()), ast.Dump(fresh)
+	got, want := dumpAST(d.File()), dumpAST(fresh)
 	if got != want {
 		t.Fatalf("AST mismatch (content %q)\n--- got ---\n%s--- want ---\n%s", content, got, want)
 	}

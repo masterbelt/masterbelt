@@ -1,40 +1,207 @@
 File
-  ConstDecl
-    name "Picked"
-    value (call Identifier "pick" BoolLit true)
-  ConstDecl
-    name "Stepped"
-    value (call Identifier "step" IntLit "41")
-  FuncDecl
-    pub
-    name "pick"
-    param flag: bool
-    result nint
-      let "base" = IntLit "10"
-      let "result" = Identifier "base"
-      if Identifier "flag"
-          assign Identifier "result" = (call (. Identifier "base" mul) IntLit "2")
-      return Identifier "result"
-  FuncDecl
-    pub
-    name "step"
-    param n: nint
-    result nint
-      let "acc": nint = Identifier "n"
-      assign Identifier "acc" = (call (. Identifier "acc" add) IntLit "1")
-      return Identifier "acc"
-  FuncDecl
-    pub
-    name "shadow"
-    param flag: bool
-    result nint
-      let "result" = IntLit "1"
-      if Identifier "flag"
-          let "result" = IntLit "2"
-          assign Identifier "result" = (call (. Identifier "result" add) IntLit "10")
-          return Identifier "result"
-      return Identifier "result"
-  AssertDecl
-    cond (call (. (call Identifier "pick" BoolLit false) eql) IntLit "10")
-  AssertDecl
-    cond (call (. (call Identifier "step" IntLit "41") eql) IntLit "42")
+  Uses: ~
+  Decls:
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Picked"
+      Type: ~
+      Value: CallExpr
+        Callee: Identifier
+          Name: "pick"
+        Arguments:
+          BoolLit
+            Value: true
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Stepped"
+      Type: ~
+      Value: CallExpr
+        Callee: Identifier
+          Name: "step"
+        Arguments:
+          IntLit
+            Text: "41"
+      Builtin: false
+  Types: ~
+  Enums: ~
+  Interfaces: ~
+  Funcs:
+    FuncDecl
+      Doc: ~
+      Public: true
+      Extern: false
+      Effects: ~
+      Name: "pick"
+      TypeParams: ~
+      Params:
+        ParamDef
+          Name: "flag"
+          Type: NamedType
+            Namespace: ""
+            Name: "bool"
+            Args: ~
+      Result: NamedType
+        Namespace: ""
+        Name: "nint"
+        Args: ~
+      Body:
+        LetStmt
+          Name: "base"
+          Type: ~
+          Value: IntLit
+            Text: "10"
+        LetStmt
+          Name: "result"
+          Type: ~
+          Value: Identifier
+            Name: "base"
+        IfStmt
+          Cond: Identifier
+            Name: "flag"
+          Then:
+            AssignStmt
+              Target: Identifier
+                Name: "result"
+              Value: CallExpr
+                Callee: MemberExpr
+                  Receiver: Identifier
+                    Name: "base"
+                  Member: Identifier
+                    Name: "mul"
+                Arguments:
+                  IntLit
+                    Text: "2"
+          ElseIf: ~
+          Else: ~
+        ReturnStmt
+          Value: Identifier
+            Name: "result"
+    FuncDecl
+      Doc: ~
+      Public: true
+      Extern: false
+      Effects: ~
+      Name: "step"
+      TypeParams: ~
+      Params:
+        ParamDef
+          Name: "n"
+          Type: NamedType
+            Namespace: ""
+            Name: "nint"
+            Args: ~
+      Result: NamedType
+        Namespace: ""
+        Name: "nint"
+        Args: ~
+      Body:
+        LetStmt
+          Name: "acc"
+          Type: NamedType
+            Namespace: ""
+            Name: "nint"
+            Args: ~
+          Value: Identifier
+            Name: "n"
+        AssignStmt
+          Target: Identifier
+            Name: "acc"
+          Value: CallExpr
+            Callee: MemberExpr
+              Receiver: Identifier
+                Name: "acc"
+              Member: Identifier
+                Name: "add"
+            Arguments:
+              IntLit
+                Text: "1"
+        ReturnStmt
+          Value: Identifier
+            Name: "acc"
+    FuncDecl
+      Doc: ~
+      Public: true
+      Extern: false
+      Effects: ~
+      Name: "shadow"
+      TypeParams: ~
+      Params:
+        ParamDef
+          Name: "flag"
+          Type: NamedType
+            Namespace: ""
+            Name: "bool"
+            Args: ~
+      Result: NamedType
+        Namespace: ""
+        Name: "nint"
+        Args: ~
+      Body:
+        LetStmt
+          Name: "result"
+          Type: ~
+          Value: IntLit
+            Text: "1"
+        IfStmt
+          Cond: Identifier
+            Name: "flag"
+          Then:
+            LetStmt
+              Name: "result"
+              Type: ~
+              Value: IntLit
+                Text: "2"
+            AssignStmt
+              Target: Identifier
+                Name: "result"
+              Value: CallExpr
+                Callee: MemberExpr
+                  Receiver: Identifier
+                    Name: "result"
+                  Member: Identifier
+                    Name: "add"
+                Arguments:
+                  IntLit
+                    Text: "10"
+            ReturnStmt
+              Value: Identifier
+                Name: "result"
+          ElseIf: ~
+          Else: ~
+        ReturnStmt
+          Value: Identifier
+            Name: "result"
+  Asserts:
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: Identifier
+              Name: "pick"
+            Arguments:
+              BoolLit
+                Value: false
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "10"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: Identifier
+              Name: "step"
+            Arguments:
+              IntLit
+                Text: "41"
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "42"

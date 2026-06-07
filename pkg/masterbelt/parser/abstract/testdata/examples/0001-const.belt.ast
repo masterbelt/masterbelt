@@ -1,15 +1,35 @@
 File
-  ConstDecl
-    doc "DocComment for MaxLevel"
-    name "MaxLevel"
-    type long
-    value IntLit "100"
-  ConstDecl
-    doc "DocComment for MinLevel"
-    doc "with multiline."
-    name "MinLevel"
-    value IntLit "0"
-  ConstDecl
-    pub
-    name "PublishedMaxLevel"
-    value Identifier "MaxLevel"
+  Uses: ~
+  Decls:
+    ConstDecl
+      Doc: "DocComment for MaxLevel"
+      Public: false
+      Name: "MaxLevel"
+      Type: NamedType
+        Namespace: ""
+        Name: "long"
+        Args: ~
+      Value: IntLit
+        Text: "100"
+      Builtin: false
+    ConstDecl
+      Doc: "DocComment for MinLevel" "with multiline."
+      Public: false
+      Name: "MinLevel"
+      Type: ~
+      Value: IntLit
+        Text: "0"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: true
+      Name: "PublishedMaxLevel"
+      Type: ~
+      Value: Identifier
+        Name: "MaxLevel"
+      Builtin: false
+  Types: ~
+  Enums: ~
+  Interfaces: ~
+  Funcs: ~
+  Asserts: ~

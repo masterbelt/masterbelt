@@ -1,52 +1,780 @@
 File
-  ConstDecl
-    name "ListLen"
-    value (call (. (list IntLit "1" IntLit "2" IntLit "3") len))
-  ConstDecl
-    name "MapLen"
-    value (call (. (map StringLit "a": IntLit "1" StringLit "b": IntLit "2") len))
-  ConstDecl
-    name "Sum"
-    value (call (. (list IntLit "1" IntLit "2" IntLit "3") fold) IntLit "0" (fn(acc: nint, i: nint, v: nint): nint (return (call (. Identifier "acc" add) Identifier "v"))))
-  ConstDecl
-    name "IndexSum"
-    value (call (. (list IntLit "10" IntLit "20" IntLit "30") fold) IntLit "0" (fn(acc: nint, i: nint, v: nint): nint (return (call (. Identifier "acc" add) Identifier "i"))))
-  ConstDecl
-    name "MapSum"
-    value (call (. (map StringLit "a": IntLit "1" StringLit "b": IntLit "2" StringLit "c": IntLit "3") fold) IntLit "0" (fn(acc: nint, k: string, v: nint): nint (return (call (. Identifier "acc" add) Identifier "v"))))
-  ConstDecl
-    name "Count"
-    value (call (. (list IntLit "1" IntLit "2" IntLit "3" IntLit "4") count))
-  ConstDecl
-    name "AnyBig"
-    value (call (. (list IntLit "1" IntLit "2" IntLit "3") any) (fn(v: nint): bool (return (call (. Identifier "v" gt) IntLit "2"))))
-  ConstDecl
-    name "AllPositive"
-    value (call (. (list IntLit "1" IntLit "2" IntLit "3") all) (fn(v: nint): bool (return (call (. Identifier "v" gt) IntLit "0"))))
-  ConstDecl
-    name "Doubled"
-    value (call (. (list IntLit "1" IntLit "2" IntLit "3") map) (fn(v: nint): nint (return (call (. Identifier "v" mul) IntLit "2"))))
-  ConstDecl
-    name "Big"
-    value (call (. (list IntLit "1" IntLit "2" IntLit "3" IntLit "4") filter) (fn(v: nint): bool (return (call (. Identifier "v" gt) IntLit "2"))))
-  ConstDecl
-    name "Keys"
-    value (call (. (map StringLit "x": IntLit "1" StringLit "y": IntLit "2") keys))
-  ConstDecl
-    name "Values"
-    value (call (. (map StringLit "x": IntLit "1" StringLit "y": IntLit "2") values))
-  ConstDecl
-    name "ListValues"
-    value (call (. (list IntLit "7" IntLit "8" IntLit "9") values))
-  AssertDecl
-    cond (call (. (call (. (list IntLit "1" IntLit "2" IntLit "3") len)) eql) IntLit "3")
-  AssertDecl
-    cond (call (. (call (. (map StringLit "a": IntLit "1" StringLit "b": IntLit "2") len)) eql) IntLit "2")
-  AssertDecl
-    cond (call (. (call (. (list IntLit "1" IntLit "2" IntLit "3") fold) IntLit "0" (fn(acc: nint, i: nint, v: nint): nint (return (call (. Identifier "acc" add) Identifier "v")))) eql) IntLit "6")
-  AssertDecl
-    cond (call (. (call (. (list IntLit "1" IntLit "2" IntLit "3" IntLit "4") count)) eql) IntLit "4")
-  AssertDecl
-    cond (call (. (list IntLit "1" IntLit "2" IntLit "3") any) (fn(v: nint): bool (return (call (. Identifier "v" gt) IntLit "2"))))
-  AssertDecl
-    cond (call (. (list IntLit "1" IntLit "2" IntLit "3") all) (fn(v: nint): bool (return (call (. Identifier "v" gt) IntLit "0"))))
+  Uses: ~
+  Decls:
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "ListLen"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: CollectionLit
+            Entries:
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "1"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "2"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "3"
+          Member: Identifier
+            Name: "len"
+        Arguments: ~
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "MapLen"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: CollectionLit
+            Entries:
+              CollectionEntry
+                Key: StringLit
+                  Value: "a"
+                Value: IntLit
+                  Text: "1"
+              CollectionEntry
+                Key: StringLit
+                  Value: "b"
+                Value: IntLit
+                  Text: "2"
+          Member: Identifier
+            Name: "len"
+        Arguments: ~
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Sum"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: CollectionLit
+            Entries:
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "1"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "2"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "3"
+          Member: Identifier
+            Name: "fold"
+        Arguments:
+          IntLit
+            Text: "0"
+          FuncLit
+            Params:
+              ParamDef
+                Name: "acc"
+                Type: NamedType
+                  Namespace: ""
+                  Name: "nint"
+                  Args: ~
+              ParamDef
+                Name: "i"
+                Type: NamedType
+                  Namespace: ""
+                  Name: "nint"
+                  Args: ~
+              ParamDef
+                Name: "v"
+                Type: NamedType
+                  Namespace: ""
+                  Name: "nint"
+                  Args: ~
+            Result: NamedType
+              Namespace: ""
+              Name: "nint"
+              Args: ~
+            Body:
+              ReturnStmt
+                Value: CallExpr
+                  Callee: MemberExpr
+                    Receiver: Identifier
+                      Name: "acc"
+                    Member: Identifier
+                      Name: "add"
+                  Arguments:
+                    Identifier
+                      Name: "v"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "IndexSum"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: CollectionLit
+            Entries:
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "10"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "20"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "30"
+          Member: Identifier
+            Name: "fold"
+        Arguments:
+          IntLit
+            Text: "0"
+          FuncLit
+            Params:
+              ParamDef
+                Name: "acc"
+                Type: NamedType
+                  Namespace: ""
+                  Name: "nint"
+                  Args: ~
+              ParamDef
+                Name: "i"
+                Type: NamedType
+                  Namespace: ""
+                  Name: "nint"
+                  Args: ~
+              ParamDef
+                Name: "v"
+                Type: NamedType
+                  Namespace: ""
+                  Name: "nint"
+                  Args: ~
+            Result: NamedType
+              Namespace: ""
+              Name: "nint"
+              Args: ~
+            Body:
+              ReturnStmt
+                Value: CallExpr
+                  Callee: MemberExpr
+                    Receiver: Identifier
+                      Name: "acc"
+                    Member: Identifier
+                      Name: "add"
+                  Arguments:
+                    Identifier
+                      Name: "i"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "MapSum"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: CollectionLit
+            Entries:
+              CollectionEntry
+                Key: StringLit
+                  Value: "a"
+                Value: IntLit
+                  Text: "1"
+              CollectionEntry
+                Key: StringLit
+                  Value: "b"
+                Value: IntLit
+                  Text: "2"
+              CollectionEntry
+                Key: StringLit
+                  Value: "c"
+                Value: IntLit
+                  Text: "3"
+          Member: Identifier
+            Name: "fold"
+        Arguments:
+          IntLit
+            Text: "0"
+          FuncLit
+            Params:
+              ParamDef
+                Name: "acc"
+                Type: NamedType
+                  Namespace: ""
+                  Name: "nint"
+                  Args: ~
+              ParamDef
+                Name: "k"
+                Type: NamedType
+                  Namespace: ""
+                  Name: "string"
+                  Args: ~
+              ParamDef
+                Name: "v"
+                Type: NamedType
+                  Namespace: ""
+                  Name: "nint"
+                  Args: ~
+            Result: NamedType
+              Namespace: ""
+              Name: "nint"
+              Args: ~
+            Body:
+              ReturnStmt
+                Value: CallExpr
+                  Callee: MemberExpr
+                    Receiver: Identifier
+                      Name: "acc"
+                    Member: Identifier
+                      Name: "add"
+                  Arguments:
+                    Identifier
+                      Name: "v"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Count"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: CollectionLit
+            Entries:
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "1"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "2"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "3"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "4"
+          Member: Identifier
+            Name: "count"
+        Arguments: ~
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "AnyBig"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: CollectionLit
+            Entries:
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "1"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "2"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "3"
+          Member: Identifier
+            Name: "any"
+        Arguments:
+          FuncLit
+            Params:
+              ParamDef
+                Name: "v"
+                Type: NamedType
+                  Namespace: ""
+                  Name: "nint"
+                  Args: ~
+            Result: NamedType
+              Namespace: ""
+              Name: "bool"
+              Args: ~
+            Body:
+              ReturnStmt
+                Value: CallExpr
+                  Callee: MemberExpr
+                    Receiver: Identifier
+                      Name: "v"
+                    Member: Identifier
+                      Name: "gt"
+                  Arguments:
+                    IntLit
+                      Text: "2"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "AllPositive"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: CollectionLit
+            Entries:
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "1"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "2"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "3"
+          Member: Identifier
+            Name: "all"
+        Arguments:
+          FuncLit
+            Params:
+              ParamDef
+                Name: "v"
+                Type: NamedType
+                  Namespace: ""
+                  Name: "nint"
+                  Args: ~
+            Result: NamedType
+              Namespace: ""
+              Name: "bool"
+              Args: ~
+            Body:
+              ReturnStmt
+                Value: CallExpr
+                  Callee: MemberExpr
+                    Receiver: Identifier
+                      Name: "v"
+                    Member: Identifier
+                      Name: "gt"
+                  Arguments:
+                    IntLit
+                      Text: "0"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Doubled"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: CollectionLit
+            Entries:
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "1"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "2"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "3"
+          Member: Identifier
+            Name: "map"
+        Arguments:
+          FuncLit
+            Params:
+              ParamDef
+                Name: "v"
+                Type: NamedType
+                  Namespace: ""
+                  Name: "nint"
+                  Args: ~
+            Result: NamedType
+              Namespace: ""
+              Name: "nint"
+              Args: ~
+            Body:
+              ReturnStmt
+                Value: CallExpr
+                  Callee: MemberExpr
+                    Receiver: Identifier
+                      Name: "v"
+                    Member: Identifier
+                      Name: "mul"
+                  Arguments:
+                    IntLit
+                      Text: "2"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Big"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: CollectionLit
+            Entries:
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "1"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "2"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "3"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "4"
+          Member: Identifier
+            Name: "filter"
+        Arguments:
+          FuncLit
+            Params:
+              ParamDef
+                Name: "v"
+                Type: NamedType
+                  Namespace: ""
+                  Name: "nint"
+                  Args: ~
+            Result: NamedType
+              Namespace: ""
+              Name: "bool"
+              Args: ~
+            Body:
+              ReturnStmt
+                Value: CallExpr
+                  Callee: MemberExpr
+                    Receiver: Identifier
+                      Name: "v"
+                    Member: Identifier
+                      Name: "gt"
+                  Arguments:
+                    IntLit
+                      Text: "2"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Keys"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: CollectionLit
+            Entries:
+              CollectionEntry
+                Key: StringLit
+                  Value: "x"
+                Value: IntLit
+                  Text: "1"
+              CollectionEntry
+                Key: StringLit
+                  Value: "y"
+                Value: IntLit
+                  Text: "2"
+          Member: Identifier
+            Name: "keys"
+        Arguments: ~
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Values"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: CollectionLit
+            Entries:
+              CollectionEntry
+                Key: StringLit
+                  Value: "x"
+                Value: IntLit
+                  Text: "1"
+              CollectionEntry
+                Key: StringLit
+                  Value: "y"
+                Value: IntLit
+                  Text: "2"
+          Member: Identifier
+            Name: "values"
+        Arguments: ~
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "ListValues"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: CollectionLit
+            Entries:
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "7"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "8"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "9"
+          Member: Identifier
+            Name: "values"
+        Arguments: ~
+      Builtin: false
+  Types: ~
+  Enums: ~
+  Interfaces: ~
+  Funcs: ~
+  Asserts:
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: MemberExpr
+              Receiver: CollectionLit
+                Entries:
+                  CollectionEntry
+                    Key: ~
+                    Value: IntLit
+                      Text: "1"
+                  CollectionEntry
+                    Key: ~
+                    Value: IntLit
+                      Text: "2"
+                  CollectionEntry
+                    Key: ~
+                    Value: IntLit
+                      Text: "3"
+              Member: Identifier
+                Name: "len"
+            Arguments: ~
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "3"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: MemberExpr
+              Receiver: CollectionLit
+                Entries:
+                  CollectionEntry
+                    Key: StringLit
+                      Value: "a"
+                    Value: IntLit
+                      Text: "1"
+                  CollectionEntry
+                    Key: StringLit
+                      Value: "b"
+                    Value: IntLit
+                      Text: "2"
+              Member: Identifier
+                Name: "len"
+            Arguments: ~
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "2"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: MemberExpr
+              Receiver: CollectionLit
+                Entries:
+                  CollectionEntry
+                    Key: ~
+                    Value: IntLit
+                      Text: "1"
+                  CollectionEntry
+                    Key: ~
+                    Value: IntLit
+                      Text: "2"
+                  CollectionEntry
+                    Key: ~
+                    Value: IntLit
+                      Text: "3"
+              Member: Identifier
+                Name: "fold"
+            Arguments:
+              IntLit
+                Text: "0"
+              FuncLit
+                Params:
+                  ParamDef
+                    Name: "acc"
+                    Type: NamedType
+                      Namespace: ""
+                      Name: "nint"
+                      Args: ~
+                  ParamDef
+                    Name: "i"
+                    Type: NamedType
+                      Namespace: ""
+                      Name: "nint"
+                      Args: ~
+                  ParamDef
+                    Name: "v"
+                    Type: NamedType
+                      Namespace: ""
+                      Name: "nint"
+                      Args: ~
+                Result: NamedType
+                  Namespace: ""
+                  Name: "nint"
+                  Args: ~
+                Body:
+                  ReturnStmt
+                    Value: CallExpr
+                      Callee: MemberExpr
+                        Receiver: Identifier
+                          Name: "acc"
+                        Member: Identifier
+                          Name: "add"
+                      Arguments:
+                        Identifier
+                          Name: "v"
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "6"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: MemberExpr
+              Receiver: CollectionLit
+                Entries:
+                  CollectionEntry
+                    Key: ~
+                    Value: IntLit
+                      Text: "1"
+                  CollectionEntry
+                    Key: ~
+                    Value: IntLit
+                      Text: "2"
+                  CollectionEntry
+                    Key: ~
+                    Value: IntLit
+                      Text: "3"
+                  CollectionEntry
+                    Key: ~
+                    Value: IntLit
+                      Text: "4"
+              Member: Identifier
+                Name: "count"
+            Arguments: ~
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "4"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CollectionLit
+            Entries:
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "1"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "2"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "3"
+          Member: Identifier
+            Name: "any"
+        Arguments:
+          FuncLit
+            Params:
+              ParamDef
+                Name: "v"
+                Type: NamedType
+                  Namespace: ""
+                  Name: "nint"
+                  Args: ~
+            Result: NamedType
+              Namespace: ""
+              Name: "bool"
+              Args: ~
+            Body:
+              ReturnStmt
+                Value: CallExpr
+                  Callee: MemberExpr
+                    Receiver: Identifier
+                      Name: "v"
+                    Member: Identifier
+                      Name: "gt"
+                  Arguments:
+                    IntLit
+                      Text: "2"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CollectionLit
+            Entries:
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "1"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "2"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "3"
+          Member: Identifier
+            Name: "all"
+        Arguments:
+          FuncLit
+            Params:
+              ParamDef
+                Name: "v"
+                Type: NamedType
+                  Namespace: ""
+                  Name: "nint"
+                  Args: ~
+            Result: NamedType
+              Namespace: ""
+              Name: "bool"
+              Args: ~
+            Body:
+              ReturnStmt
+                Value: CallExpr
+                  Callee: MemberExpr
+                    Receiver: Identifier
+                      Name: "v"
+                    Member: Identifier
+                      Name: "gt"
+                  Arguments:
+                    IntLit
+                      Text: "0"

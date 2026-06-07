@@ -1,39 +1,184 @@
 File
-  ConstDecl
-    name "Bigger"
-    value (call Identifier "max" IntLit "3" IntLit "7")
-  ConstDecl
-    name "Later"
-    value (call Identifier "max" StringLit "a" StringLit "b")
-  ConstDecl
-    name "Equal"
-    value (call Identifier "same" BoolLit true BoolLit false)
-  ConstDecl
-    name "Double"
-    value (call Identifier "twice" IntLit "21")
-  FuncDecl
-    doc "The larger of two orderable values."
-    pub
-    name "max"
-    typeparam T: orderable
-    param a: T
-    param b: T
-    result T
-      return (? (call (. Identifier "a" gteq) Identifier "b") Identifier "a" Identifier "b")
-  FuncDecl
-    doc "Whether two comparable values are equal."
-    pub
-    name "same"
-    typeparam T: comparable
-    param a: T
-    param b: T
-    result bool
-      return (call (. Identifier "a" eql) Identifier "b")
-  FuncDecl
-    doc "A numeric value added to itself."
-    pub
-    name "twice"
-    typeparam T: numeric
-    param a: T
-    result T
-      return (call (. Identifier "a" add) Identifier "a")
+  Uses: ~
+  Decls:
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Bigger"
+      Type: ~
+      Value: CallExpr
+        Callee: Identifier
+          Name: "max"
+        Arguments:
+          IntLit
+            Text: "3"
+          IntLit
+            Text: "7"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Later"
+      Type: ~
+      Value: CallExpr
+        Callee: Identifier
+          Name: "max"
+        Arguments:
+          StringLit
+            Value: "a"
+          StringLit
+            Value: "b"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Equal"
+      Type: ~
+      Value: CallExpr
+        Callee: Identifier
+          Name: "same"
+        Arguments:
+          BoolLit
+            Value: true
+          BoolLit
+            Value: false
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Double"
+      Type: ~
+      Value: CallExpr
+        Callee: Identifier
+          Name: "twice"
+        Arguments:
+          IntLit
+            Text: "21"
+      Builtin: false
+  Types: ~
+  Enums: ~
+  Interfaces: ~
+  Funcs:
+    FuncDecl
+      Doc: "The larger of two orderable values."
+      Public: true
+      Extern: false
+      Effects: ~
+      Name: "max"
+      TypeParams:
+        TypeParam
+          Name: "T"
+          Constraint: NamedType
+            Namespace: ""
+            Name: "orderable"
+            Args: ~
+      Params:
+        ParamDef
+          Name: "a"
+          Type: NamedType
+            Namespace: ""
+            Name: "T"
+            Args: ~
+        ParamDef
+          Name: "b"
+          Type: NamedType
+            Namespace: ""
+            Name: "T"
+            Args: ~
+      Result: NamedType
+        Namespace: ""
+        Name: "T"
+        Args: ~
+      Body:
+        ReturnStmt
+          Value: TernaryExpr
+            Cond: CallExpr
+              Callee: MemberExpr
+                Receiver: Identifier
+                  Name: "a"
+                Member: Identifier
+                  Name: "gteq"
+              Arguments:
+                Identifier
+                  Name: "b"
+            Then: Identifier
+              Name: "a"
+            Else: Identifier
+              Name: "b"
+    FuncDecl
+      Doc: "Whether two comparable values are equal."
+      Public: true
+      Extern: false
+      Effects: ~
+      Name: "same"
+      TypeParams:
+        TypeParam
+          Name: "T"
+          Constraint: NamedType
+            Namespace: ""
+            Name: "comparable"
+            Args: ~
+      Params:
+        ParamDef
+          Name: "a"
+          Type: NamedType
+            Namespace: ""
+            Name: "T"
+            Args: ~
+        ParamDef
+          Name: "b"
+          Type: NamedType
+            Namespace: ""
+            Name: "T"
+            Args: ~
+      Result: NamedType
+        Namespace: ""
+        Name: "bool"
+        Args: ~
+      Body:
+        ReturnStmt
+          Value: CallExpr
+            Callee: MemberExpr
+              Receiver: Identifier
+                Name: "a"
+              Member: Identifier
+                Name: "eql"
+            Arguments:
+              Identifier
+                Name: "b"
+    FuncDecl
+      Doc: "A numeric value added to itself."
+      Public: true
+      Extern: false
+      Effects: ~
+      Name: "twice"
+      TypeParams:
+        TypeParam
+          Name: "T"
+          Constraint: NamedType
+            Namespace: ""
+            Name: "numeric"
+            Args: ~
+      Params:
+        ParamDef
+          Name: "a"
+          Type: NamedType
+            Namespace: ""
+            Name: "T"
+            Args: ~
+      Result: NamedType
+        Namespace: ""
+        Name: "T"
+        Args: ~
+      Body:
+        ReturnStmt
+          Value: CallExpr
+            Callee: MemberExpr
+              Receiver: Identifier
+                Name: "a"
+              Member: Identifier
+                Name: "add"
+            Arguments:
+              Identifier
+                Name: "a"
+  Asserts: ~
