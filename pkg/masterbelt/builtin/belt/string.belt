@@ -1,5 +1,3 @@
-use { comparable, orderable } from "./operators.belt"
-
 /// An immutable UTF-8 string, written "...".
 pub type string = builtin impl {
   /// The + operator: the concatenation.

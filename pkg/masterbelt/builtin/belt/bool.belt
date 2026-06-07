@@ -1,5 +1,3 @@
-use { comparable } from "./operators.belt"
-
 /// A boolean truth value: true or false.
 pub type bool = builtin impl {
   /// The ! operator: the logical negation.

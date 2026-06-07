@@ -1,7 +1,3 @@
-use { nint } from "./signed.belt"
-use { foldable } from "./collection.belt"
-use { comparable } from "./operators.belt"
-
 /// A sequence of integers, constructed with range(start, end) or range(start,
 /// end, step): the values start, start+step, ..., staying on the end side of
 /// step — for the two-argument form (step 1) start, start+1, ..., end, both

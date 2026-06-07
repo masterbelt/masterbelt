@@ -1,15 +1,3 @@
-use { bool } from "./bool.belt"
-use { nint } from "./signed.belt"
-use { error } from "./error.belt"
-use { comparable } from "./operators.belt"
-
-// foldable, list, and map live together in this one file because they refer to
-// one another: foldable's provided methods return list (map/filter/keys/values),
-// while list and map impl foldable. A single file lets the resolver — which runs
-// multiple passes within a file — tie the knot, where splitting them across files
-// would need an import cycle the loader does not resolve. This mirrors how
-// datetime and duration share datetime.belt for their mutual operators.
-
 /// A behaviour over a keyed collection: a type implements the single required
 /// fold (the primitive that visits every element), and the provided methods —
 /// count, any, all, and the list-returning map, filter, keys, values — come for

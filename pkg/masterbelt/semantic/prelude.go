@@ -1,8 +1,8 @@
 package semantic
 
 import (
+	"bytes"
 	"fmt"
-	"path"
 	"sync"
 
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
@@ -14,9 +14,9 @@ import (
 
 // builtins is everything an analysis types against: the registry — the
 // primitives' value ranges and the native implementations of their operator
-// methods — and the prelude surface, the exported types of the prelude
-// project's entry barrel. Every file's universe layers the surface beneath
-// its imports, as if each file began with `use * from "builtin.belt"`.
+// methods — and the prelude surface, the exported types of the prelude file.
+// Every file's universe layers the surface beneath its imports, as if each
+// file began with `use * from "builtin.belt"`.
 type builtins struct {
 	reg     *builtin.Registry
 	prelude map[string]*ir.TypeDef
@@ -58,66 +58,58 @@ func registryTypes(reg *builtin.Registry) map[string]*ir.TypeDef {
 	return out
 }
 
-// LoadPrelude analyzes the embedded prelude as the project it is: each module
-// declares primitives in the language, and the entry barrel (builtin.belt)
-// re-exports them all. Cross-module names bootstrap against the registry's
+// LoadPrelude analyzes the embedded prelude — the one file that declares the
+// primitives in the language. Its names bootstrap against the registry's
 // native definitions; the analysis is validated against the registry, so the
 // in-language declarations and the native descriptors cannot drift.
 //
-// It returns the barrel's exported types — the surface every analyzed file
+// It returns the prelude's exported types — the surface every analyzed file
 // implicitly imports — together with every resolved definition (for
 // installing into the registry, where value ranges and intrinsics live).
 func LoadPrelude(reg *builtin.Registry) (map[string]*ir.TypeDef, []*ir.TypeDef, error) {
-	sources := builtin.PreludeSources()
-	files := make(map[FileID]*ast.File, len(sources))
-	uses := map[FileID]map[*ast.UseDecl]FileID{}
-	ids := make([]FileID, 0, len(sources))
-	for _, src := range sources {
-		doc := abstract.NewDocument(src.Content)
-		var diags []diagnostic.Diagnostic
-		diags = append(diags, doc.Concrete().LexDiagnostics()...)
-		diags = append(diags, doc.Diagnostics()...)
-		if len(diags) > 0 {
-			return nil, nil, fmt.Errorf("prelude %s: %s", src.Name, diags[0].Message)
-		}
-		id := FileID(src.Name)
-		files[id] = doc.File()
-		ids = append(ids, id)
+	src := builtin.PreludeSource()
+	doc := abstract.NewDocument(src)
+	var diags []diagnostic.Diagnostic
+	diags = append(diags, doc.Concrete().LexDiagnostics()...)
+	diags = append(diags, doc.Diagnostics()...)
+	if len(diags) > 0 {
+		// The fragment banners in the concatenated source place the line.
+		return nil, nil, fmt.Errorf("prelude %s:%d: %s", builtin.PreludeEntry, lineOf(src, diags[0].Offset), diags[0].Message)
 	}
 
-	// Wire the use declarations among the embedded files — the project
-	// layer's path rule (relative to the importer), without a disk.
-	for id, f := range files {
-		table := map[*ast.UseDecl]FileID{}
-		for _, u := range f.Uses {
-			target := FileID(path.Join(path.Dir(string(id)), u.Path))
-			if _, ok := files[target]; !ok {
-				return nil, nil, fmt.Errorf("prelude %s: use %q names no prelude file", id, u.Path)
-			}
-			table[u] = target
-		}
-		uses[id] = table
+	// The prelude is one scope: the belt/ fragments concatenate into this one
+	// file, so a use would name a file that does not exist.
+	if f := doc.File(); len(f.Uses) > 0 {
+		return nil, nil, fmt.Errorf("prelude: use %q — the prelude is a single file and imports nothing", f.Uses[0].Path)
 	}
 
+	id := FileID(builtin.PreludeEntry)
+	files := map[FileID]*ast.File{id: doc.File()}
+	uses := map[FileID]map[*ast.UseDecl]FileID{id: {}}
 	q := newDirectQueries(files, uses, builtins{reg: reg, prelude: registryTypes(reg)})
-	var defs []*ir.TypeDef
-	for _, id := range ids {
-		defs = append(defs, q.typeDefs(id)...)
-	}
+	defs := q.typeDefs(id)
 	if err := validatePrelude(reg, defs); err != nil {
 		return nil, nil, err
 	}
 
-	// The surface is what the entry barrel exports; every registry primitive
-	// must be on it, or the implicit import would hide a primitive the
-	// runtime backs.
-	surface := q.exportsOf(FileID(builtin.PreludeEntry)).types
+	// The surface is what the prelude exports; every registry primitive must
+	// be on it, or the implicit import would hide a primitive the runtime
+	// backs.
+	surface := q.exportsOf(id).types
 	for _, name := range reg.Names() {
 		if _, ok := surface[name]; !ok {
-			return nil, nil, fmt.Errorf("prelude: %s does not re-export registry primitive %q", builtin.PreludeEntry, name)
+			return nil, nil, fmt.Errorf("prelude: %s does not export registry primitive %q", builtin.PreludeEntry, name)
 		}
 	}
 	return surface, defs, nil
+}
+
+// lineOf is the 1-based line that a byte offset into src falls on.
+func lineOf(src []byte, offset int) int {
+	if offset > len(src) {
+		offset = len(src)
+	}
+	return 1 + bytes.Count(src[:offset], []byte("\n"))
 }
 
 // validatePrelude checks that the prelude and the registry agree: every registry

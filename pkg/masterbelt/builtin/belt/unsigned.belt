@@ -1,6 +1,3 @@
-use { bool } from "./bool.belt"
-use { comparable, orderable, numeric } from "./operators.belt"
-
 /// The arbitrary-precision unsigned integer: non-negative, with no fixed upper bound.
 pub type nuint = builtin impl comparable {
   /// The == operator.
