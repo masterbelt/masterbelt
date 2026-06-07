@@ -43,38 +43,42 @@ func RenderTrace(e Expr) (string, []Anchor) {
 }
 
 // binaryOps maps each binary operator method to its surface spelling and
-// precedence (higher binds tighter, matching parser/concrete's binaryPrec).
+// precedence (higher binds tighter, matching parser/concrete's binaryPrec, but
+// shifted up by one to leave room for the range operator at precedence 1 between
+// the ternary and "||").
 var binaryOps = map[string]struct {
 	sym  string
 	prec int
 }{
-	"oror": {"||", 1},
-	"anan": {"&&", 2},
-	"eql":  {"==", 3},
-	"neq":  {"!=", 3},
-	"lt":   {"<", 3},
-	"lteq": {"<=", 3},
-	"gt":   {">", 3},
-	"gteq": {">=", 3},
-	"add":  {"+", 4},
-	"sub":  {"-", 4},
-	"mul":  {"*", 5},
-	"div":  {"/", 5},
-	"rem":  {"%", 5},
+	"oror": {"||", 2},
+	"anan": {"&&", 3},
+	"eql":  {"==", 4},
+	"neq":  {"!=", 4},
+	"lt":   {"<", 4},
+	"lteq": {"<=", 4},
+	"gt":   {">", 4},
+	"gteq": {">=", 4},
+	"add":  {"+", 5},
+	"sub":  {"-", 5},
+	"mul":  {"*", 6},
+	"div":  {"/", 6},
+	"rem":  {"%", 6},
 }
 
 // unaryOps maps each prefix operator method to its surface spelling.
 var unaryOps = map[string]string{"pos": "+", "neg": "-", "not": "!"}
 
-// The ternary "?:" binds looser than every binary operator (precedence 0,
-// below "||"'s 1), so it parenthesizes when it sits inside any of them. A prefix
-// operator binds tighter than any binary operator, and a postfix member access
-// or call tighter still — an operator-formed receiver needs the grouping
-// parentheses there.
+// The ternary "?:" binds loosest (precedence 0). The range operator binds one
+// step tighter (precedence 1) — looser than every binary operator, tighter than
+// the ternary — so it parenthesizes inside any binary/unary/postfix context but
+// not as a ternary branch. A prefix operator binds tighter than any binary
+// operator, and a postfix member access or call tighter still — an
+// operator-formed receiver needs the grouping parentheses there.
 const (
 	precTernary = 0
-	precUnary   = 6
-	precPostfix = 7
+	precRange   = 1
+	precUnary   = 7
+	precPostfix = 8
 )
 
 // renderer accumulates the rendered text, tracking the rune column so anchors
@@ -189,6 +193,26 @@ func (r *renderer) expr(e Expr, min int) {
 		r.expr(x.Then, precTernary+1)
 		r.str(" : ")
 		r.expr(x.Else, precTernary)
+		if paren {
+			r.str(")")
+		}
+	case *RangeExpr:
+		// The range binds looser than every binary operator and tighter than the
+		// ternary, and is non-associative: both bounds render one step tighter
+		// (precRange+1), so a range bound that is itself a range or a ternary is
+		// parenthesized, while an arithmetic bound (binding tighter) is not.
+		paren := precRange < min
+		if paren {
+			r.str("(")
+		}
+		r.expr(x.Lower, precRange+1)
+		r.anchor(x)
+		if x.HalfOpen {
+			r.str("...")
+		} else {
+			r.str("..")
+		}
+		r.expr(x.Upper, precRange+1)
 		if paren {
 			r.str(")")
 		}

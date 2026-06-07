@@ -189,6 +189,17 @@ func TestRenderRoundTrip(t *testing.T) {
 		// parenthesized — it would otherwise rebind the surrounding operator.
 		"(a ? b : c) + 1",
 		"a ? (b ? c : d) : e",
+		// Range literals: closed and half-open, an arithmetic bound (which binds
+		// tighter, so no parentheses), and a range as a ternary branch (which
+		// binds tighter than the ternary, so no parentheses).
+		"0..9",
+		"0...9",
+		"0..n + 1",
+		"b ? 0..9 : 1..2",
+		// A range as a binary operand is parenthesized — it binds looser than the
+		// operator, so the grouping is what keeps the operand a whole range.
+		"(0..9).count()",
+		"a || (0..9)",
 	}
 	for _, expr := range cases {
 		src := "const x = " + expr + "\n"

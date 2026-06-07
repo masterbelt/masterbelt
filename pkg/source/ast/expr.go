@@ -287,6 +287,32 @@ func NewTernaryExpr(cond, then, els Expr, syntax *cst.Node) *TernaryExpr {
 	return &TernaryExpr{Cond: cond, Then: then, Else: els, syntax: syntax}
 }
 
+// RangeExpr is a range literal: the surface syntax for the range builtin. Lower
+// and Upper are the two bound expressions as written — any integer expression —
+// and HalfOpen distinguishes the half-open "..." form (the larger end excluded)
+// from the closed ".." form (both ends included). It keeps its own node rather
+// than desugaring to a range(...) call: the direction (ascending or descending)
+// and the half-open trim both depend on the bound *values*, which only the
+// evaluator knows, so the desugaring to range(start, end, step) is deferred to
+// the fold — a literal whose bounds fold matches the range(...) it equals
+// exactly. Either bound is nil when the source omitted it and the parser
+// recovered.
+type RangeExpr struct {
+	Lower    Expr // the bound on the left of the operator
+	Upper    Expr // the bound on the right of the operator
+	HalfOpen bool // the "..." form (max excluded); false for the closed ".." form
+	syntax   *cst.Node
+}
+
+func (r *RangeExpr) Syntax() *cst.Node { return r.syntax }
+func (r *RangeExpr) node()             {}
+func (r *RangeExpr) expr()             {}
+
+// NewRangeExpr builds a RangeExpr node.
+func NewRangeExpr(lower, upper Expr, halfOpen bool, syntax *cst.Node) *RangeExpr {
+	return &RangeExpr{Lower: lower, Upper: upper, HalfOpen: halfOpen, syntax: syntax}
+}
+
 // FuncLit is a function-literal expression: fn(Params): Result { Body }. It is
 // the value form of a FuncType (it carries a statement body) and the only way to
 // construct a value of a function type. Its Params, Result, and Body reuse the
@@ -335,6 +361,9 @@ func WalkExprs(e Expr, fn func(Expr) bool) {
 		WalkExprs(e.Cond, fn)
 		WalkExprs(e.Then, fn)
 		WalkExprs(e.Else, fn)
+	case *RangeExpr:
+		WalkExprs(e.Lower, fn)
+		WalkExprs(e.Upper, fn)
 	case *CollectionLit:
 		for _, entry := range e.Entries {
 			if entry.Key != nil {
