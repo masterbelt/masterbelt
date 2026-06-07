@@ -1,0 +1,119 @@
+// Range literals and the three-argument range constructor. A range literal is
+// the surface syntax for the range builtin (0034): a..b is the closed integer
+// interval, a...b the half-open one (the larger end excluded), iterated from the
+// a side toward the b side, so the direction follows the bounds. Each literal
+// folds to exactly the range(start, end, step) construction it is equivalent to,
+// and range gains a third, step argument: range(start, end, step) walks start,
+// start+step, ..., while the value stays on the end side of the step. The two-
+// argument range (0034) is unchanged — its step is 1.
+
+// The four literal forms, each folding to the range value it equals.
+//  0..9   closed, ascending:  range(0, 9)        — 0,1,...,9
+//  0...9  half-open (max 9 excluded), ascending:  range(0, 8)  — 0,1,...,8
+//  9..0   closed, descending: range(9, 0, -1)    — 9,8,...,0
+//  9...0  half-open (max 9 excluded), descending: range(8, 0, -1) — 8,7,...,0
+const ClosedUp = 0..9
+const HalfUp = 0...9
+const ClosedDown = 9..0
+const HalfDown = 9...0
+
+// A literal folds to the very same value the equivalent range(...) constructs —
+// the dump shows both as the same range value.
+const ClosedUpEq = range(0, 9)
+const HalfUpEq = range(0, 8)
+const ClosedDownEq = range(9, 0, -1)
+const HalfDownEq = range(8, 0, -1)
+
+// A degenerate closed literal a..a is the one-element range [a]; the half-open
+// a...a is empty (the max, which equals the min, is excluded).
+const Single = 5..5
+const Empty = 5...5
+
+// A bound is any integer expression, so an arithmetic bound binds tighter than
+// the range operator: 0..n+1 is 0..(n+1), not (0..n)+1.
+pub fn upto(n: nint): range {
+  return 0..n + 1
+}
+
+const Upto = upto(4)
+
+// The three-argument constructor with a positive step skips: range(0, 10, 2) is
+// 0,2,4,6,8,10, walked while v <= end.
+const Evens = range(0, 10, 2)
+
+// A negative step walks downward while v >= end: range(10, 0, -2) is
+// 10,8,6,4,2,0.
+const DownBy2 = range(10, 0, -2)
+
+// for over a range literal iterates it exactly as for over range(...): the
+// closed ascending literal 0..10 sums to 0+1+...+10 = 55.
+pub fn sumUp(): nint {
+  let t = 0
+  for i of 0..10 {
+    t = t + i
+  }
+  return t
+}
+
+const SumUp = sumUp()
+
+// A descending literal iterates from the larger bound down: 5..1 visits
+// 5,4,3,2,1, summing to 15. "of" binds the element.
+pub fn sumDown(): nint {
+  let t = 0
+  for i of 5..1 {
+    t = t + i
+  }
+  return t
+}
+
+const SumDown = sumDown()
+
+// A half-open literal drops the max end: 0...5 is 0,1,2,3,4, summing to 10.
+pub fn sumHalf(): nint {
+  let t = 0
+  for i of 0...5 {
+    t = t + i
+  }
+  return t
+}
+
+const SumHalf = sumHalf()
+
+// A stepped range iterates by its step: range(0, 10, 2) sums to 0+2+4+6+8+10 = 30.
+pub fn sumEvens(): nint {
+  let t = 0
+  for i of range(0, 10, 2) {
+    t = t + i
+  }
+  return t
+}
+
+const SumEvens = sumEvens()
+
+// The foldable provided methods reach a range literal the same way they reach a
+// range(...) value — count, fold, and the rest carry over.
+const ClosedCount = (0..9).count()
+const HalfCount = (0...9).count()
+const SteppedCount = range(0, 10, 2).count()
+const ClosedFold = (0..4).fold(0, fn(acc: nint, k: nint, v: nint): nint -> acc + v)
+const SteppedFold = range(0, 10, 2).fold(0, fn(acc: nint, k: nint, v: nint): nint -> acc + v)
+
+// Every folded result verifies in an assertion at compile time. A literal equals
+// the range(...) it desugars to (== over two range values folds by their bounds
+// and step), so the equivalence is checked directly.
+assert (0..9) == range(0, 9)
+assert (0...9) == range(0, 8)
+assert (9..0) == range(9, 0, -1)
+assert (9...0) == range(8, 0, -1)
+assert (5..5) == range(5, 5)
+assert sumUp() == 55
+assert sumDown() == 15
+assert sumHalf() == 10
+assert sumEvens() == 30
+assert (0..9).count() == 10
+assert (0...9).count() == 9
+assert range(0, 10, 2).count() == 6
+assert range(10, 0, -2).count() == 6
+assert (0..4).fold(0, fn(acc: nint, k: nint, v: nint): nint -> acc + v) == 10
+assert range(0, 10, 2).fold(0, fn(acc: nint, k: nint, v: nint): nint -> acc + v) == 30

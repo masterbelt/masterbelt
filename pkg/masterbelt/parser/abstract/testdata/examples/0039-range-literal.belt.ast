@@ -1,0 +1,138 @@
+File
+  ConstDecl
+    name "ClosedUp"
+    value (. (. IntLit "0" ) )
+  ConstDecl
+    name "HalfUp"
+    value (. (. (. IntLit "0" ) ) )
+  ConstDecl
+    name "ClosedDown"
+    value (. (. IntLit "9" ) )
+  ConstDecl
+    name "HalfDown"
+    value (. (. (. IntLit "9" ) ) )
+  ConstDecl
+    name "ClosedUpEq"
+    value (call Identifier "range" IntLit "0" IntLit "9")
+  ConstDecl
+    name "HalfUpEq"
+    value (call Identifier "range" IntLit "0" IntLit "8")
+  ConstDecl
+    name "ClosedDownEq"
+    value (call Identifier "range" IntLit "9" IntLit "0" (call (. IntLit "1" neg)))
+  ConstDecl
+    name "HalfDownEq"
+    value (call Identifier "range" IntLit "8" IntLit "0" (call (. IntLit "1" neg)))
+  ConstDecl
+    name "Single"
+    value (. (. IntLit "5" ) )
+  ConstDecl
+    name "Empty"
+    value (. (. (. IntLit "5" ) ) )
+  ConstDecl
+    name "Upto"
+    value (call Identifier "upto" IntLit "4")
+  ConstDecl
+    name "Evens"
+    value (call Identifier "range" IntLit "0" IntLit "10" IntLit "2")
+  ConstDecl
+    name "DownBy2"
+    value (call Identifier "range" IntLit "10" IntLit "0" (call (. IntLit "2" neg)))
+  ConstDecl
+    name "SumUp"
+    value (call Identifier "sumUp")
+  ConstDecl
+    name "SumDown"
+    value (call Identifier "sumDown")
+  ConstDecl
+    name "SumHalf"
+    value (call Identifier "sumHalf")
+  ConstDecl
+    name "SumEvens"
+    value (call Identifier "sumEvens")
+  ConstDecl
+    name "ClosedCount"
+    value (. (. IntLit "0" ) )
+  ConstDecl
+    name "HalfCount"
+    value (. (. (. IntLit "0" ) ) )
+  ConstDecl
+    name "SteppedCount"
+    value (call (. (call Identifier "range" IntLit "0" IntLit "10" IntLit "2") count))
+  ConstDecl
+    name "ClosedFold"
+    value (. (. IntLit "0" ) )
+  ConstDecl
+    name "SteppedFold"
+    value (call (. (call Identifier "range" IntLit "0" IntLit "10" IntLit "2") fold) IntLit "0" (fn(acc: nint, k: nint, v: nint): nint (return (call (. Identifier "acc" add) Identifier "v"))))
+  FuncDecl
+    pub
+    name "upto"
+    param n: nint
+    result range
+      return (call (. (. (. IntLit "0" ) n) add) IntLit "1")
+  FuncDecl
+    pub
+    name "sumUp"
+    result nint
+      let "t" = IntLit "0"
+      for i of (. (. IntLit "0" ) )
+      expr IntLit "10"
+      expr (record t: <missing> t: <missing> i: <missing>)
+      return Identifier "t"
+  FuncDecl
+    pub
+    name "sumDown"
+    result nint
+      let "t" = IntLit "0"
+      for i of (. (. IntLit "5" ) )
+      expr IntLit "1"
+      expr (record t: <missing> t: <missing> i: <missing>)
+      return Identifier "t"
+  FuncDecl
+    pub
+    name "sumHalf"
+    result nint
+      let "t" = IntLit "0"
+      for i of (. (. (. IntLit "0" ) ) )
+      expr IntLit "5"
+      expr (record t: <missing> t: <missing> i: <missing>)
+      return Identifier "t"
+  FuncDecl
+    pub
+    name "sumEvens"
+    result nint
+      let "t" = IntLit "0"
+      for i of (call Identifier "range" IntLit "0" IntLit "10" IntLit "2")
+          assign Identifier "t" = (call (. Identifier "t" add) Identifier "i")
+      return Identifier "t"
+  AssertDecl
+    cond (. (. IntLit "0" ) )
+  AssertDecl
+    cond (. (. (. IntLit "0" ) ) )
+  AssertDecl
+    cond (. (. IntLit "9" ) )
+  AssertDecl
+    cond (. (. (. IntLit "9" ) ) )
+  AssertDecl
+    cond (. (. IntLit "5" ) )
+  AssertDecl
+    cond (call (. (call Identifier "sumUp") eql) IntLit "55")
+  AssertDecl
+    cond (call (. (call Identifier "sumDown") eql) IntLit "15")
+  AssertDecl
+    cond (call (. (call Identifier "sumHalf") eql) IntLit "10")
+  AssertDecl
+    cond (call (. (call Identifier "sumEvens") eql) IntLit "30")
+  AssertDecl
+    cond (. (. IntLit "0" ) )
+  AssertDecl
+    cond (. (. (. IntLit "0" ) ) )
+  AssertDecl
+    cond (call (. (call (. (call Identifier "range" IntLit "0" IntLit "10" IntLit "2") count)) eql) IntLit "6")
+  AssertDecl
+    cond (call (. (call (. (call Identifier "range" IntLit "10" IntLit "0" (call (. IntLit "2" neg))) count)) eql) IntLit "6")
+  AssertDecl
+    cond (. (. IntLit "0" ) )
+  AssertDecl
+    cond (call (. (call (. (call Identifier "range" IntLit "0" IntLit "10" IntLit "2") fold) IntLit "0" (fn(acc: nint, k: nint, v: nint): nint (return (call (. Identifier "acc" add) Identifier "v")))) eql) IntLit "30")

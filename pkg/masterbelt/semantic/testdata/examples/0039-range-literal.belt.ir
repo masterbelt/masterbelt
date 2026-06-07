@@ -1,0 +1,147 @@
+Module
+  Const "ClosedUp"
+    type invalid
+    value IntLiteral "0"..
+  Const "HalfUp"
+    type invalid
+    value IntLiteral "0"...
+  Const "ClosedDown"
+    type invalid
+    value IntLiteral "9"..
+  Const "HalfDown"
+    type invalid
+    value IntLiteral "9"...
+  Const "ClosedUpEq"
+    type range
+    value range(IntLiteral "0", IntLiteral "9")
+    eval range(0, 9)
+  Const "HalfUpEq"
+    type range
+    value range(IntLiteral "0", IntLiteral "8")
+    eval range(0, 8)
+  Const "ClosedDownEq"
+    type range
+    value range(IntLiteral "9", IntLiteral "0", IntLiteral "1".neg())
+  Const "HalfDownEq"
+    type range
+    value range(IntLiteral "8", IntLiteral "0", IntLiteral "1".neg())
+  Const "Single"
+    type invalid
+    value IntLiteral "5"..
+  Const "Empty"
+    type invalid
+    value IntLiteral "5"...
+  Const "Upto"
+    type range
+    value upto(IntLiteral "4")
+  Const "Evens"
+    type range
+    value range(IntLiteral "0", IntLiteral "10", IntLiteral "2")
+  Const "DownBy2"
+    type range
+    value range(IntLiteral "10", IntLiteral "0", IntLiteral "2".neg())
+  Const "SumUp"
+    type nint
+    value sumUp()
+  Const "SumDown"
+    type nint
+    value sumDown()
+  Const "SumHalf"
+    type nint
+    value sumHalf()
+  Const "SumEvens"
+    type nint
+    value sumEvens()
+  Const "ClosedCount"
+    type invalid
+    value IntLiteral "0"..
+  Const "HalfCount"
+    type invalid
+    value IntLiteral "0"...
+  Const "SteppedCount"
+    type nint
+    value range(IntLiteral "0", IntLiteral "10", IntLiteral "2").count()
+  Const "ClosedFold"
+    type invalid
+    value IntLiteral "0"..
+  Const "SteppedFold"
+    type nint
+    value range(IntLiteral "0", IntLiteral "10", IntLiteral "2").fold(IntLiteral "0", (fn(acc, k, v) (return ParamRef "acc".add(ParamRef "v"))))
+  Func "upto" pub
+    param n: nint
+    result range
+      return IntLiteral "0"..n.add(IntLiteral "1")
+  Func "sumUp" pub
+    result nint
+      let "t": nint = IntLiteral "0"
+      for i of invalid IntLiteral "0"..
+      expr IntLiteral "10"
+      expr {t: <none>, t: <none>, i: <none>}
+      return LocalRef "t"
+  Func "sumDown" pub
+    result nint
+      let "t": nint = IntLiteral "0"
+      for i of invalid IntLiteral "5"..
+      expr IntLiteral "1"
+      expr {t: <none>, t: <none>, i: <none>}
+      return LocalRef "t"
+  Func "sumHalf" pub
+    result nint
+      let "t": nint = IntLiteral "0"
+      for i of invalid IntLiteral "0"...
+      expr IntLiteral "5"
+      expr {t: <none>, t: <none>, i: <none>}
+      return LocalRef "t"
+  Func "sumEvens" pub
+    result nint
+      let "t": nint = IntLiteral "0"
+      for i of nint range(IntLiteral "0", IntLiteral "10", IntLiteral "2")
+          assign "t" = LocalRef "t".add(LocalRef "i")
+      return LocalRef "t"
+  Assert "0.."
+    eval <unevaluated>
+      0..
+  Assert "0..."
+    eval <unevaluated>
+      0...
+  Assert "9.."
+    eval <unevaluated>
+      9..
+  Assert "9..."
+    eval <unevaluated>
+      9...
+  Assert "5.."
+    eval <unevaluated>
+      5..
+  Assert "sumUp() == 55"
+    eval <unevaluated>
+      sumUp() == 55
+  Assert "sumDown() == 15"
+    eval <unevaluated>
+      sumDown() == 15
+  Assert "sumHalf() == 10"
+    eval <unevaluated>
+      sumHalf() == 10
+  Assert "sumEvens() == 30"
+    eval <unevaluated>
+      sumEvens() == 30
+  Assert "0.."
+    eval <unevaluated>
+      0..
+  Assert "0..."
+    eval <unevaluated>
+      0...
+  Assert "range(0, 10, 2).count() == 6"
+    eval <unevaluated>
+      range(0, 10, 2).count() == 6
+  Assert "range(10, 0, -2).count() == 6"
+    eval <unevaluated>
+      range(10, 0, -2).count() == 6
+                   ^
+                   -2
+  Assert "0.."
+    eval <unevaluated>
+      0..
+  Assert "range(0, 10, 2).fold(0, fn(acc: nint, k: nint, v: nint): nint { return acc + v }) == 30"
+    eval <unevaluated>
+      range(0, 10, 2).fold(0, fn(acc: nint, k: nint, v: nint): nint { return acc + v }) == 30
