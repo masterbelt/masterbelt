@@ -35,6 +35,7 @@ import (
 // the two kind spaces never overlap.
 type Kind int
 
+// The node kinds, one per grammatical construct; see each kind's comment.
 const (
 	File          Kind = iota // the whole source: a sequence of declarations and trailing trivia
 	ConstDecl                 // [doc] [pub] const Name [TypeClause] [Initializer]
@@ -59,6 +60,7 @@ const (
 	AwaitExpr                 // an await expression: await Expr (the explicit suspension point)
 
 	// Type declarations and the type-expression grammar.
+
 	TypeDecl      // [doc] [pub] type Name [GenericParams] "=" TypeExpr [WhereClause] [ImplBlock]
 	GenericParams // "<" GenericParam ("," GenericParam)* ">"  (declaration side)
 	GenericParam  // Ident [":" TypeExpr]  (a type parameter with an optional constraint)
@@ -72,6 +74,7 @@ const (
 	WhereClause   // where Expr — the refinement predicate of a nominal type
 
 	// Enum declarations.
+
 	EnumDecl   // [doc] [pub] enum Name [":" TypeExpr] "{" EnumMember ( ("," | NL) EnumMember )* "}" [ImplBlock]
 	EnumMember // Ident [Initializer]  (one named member, with an optional "= ConstExpr" value)
 
@@ -81,6 +84,7 @@ const (
 	// interface-tagged impl block at its own definition site. An interface may
 	// list one or more parent interfaces after a colon (the supertraits), whose
 	// whole contract — required and provided members alike — the child inherits.
+
 	InterfaceDecl    // [doc] [pub] interface Name [GenericParams] [InterfaceParents] "{" InterfaceMember* "}"
 	InterfaceParents // ":" TypeName ("," TypeName)*  (the parent interfaces a child inherits from)
 	InterfaceMember  // [pub] Name [GenericParams] ParamList ":" TypeExpr [Block]  (required when no Block, provided otherwise)
@@ -88,6 +92,7 @@ const (
 	// Implementations and method bodies. An impl item is a MethodDecl or a
 	// ConstDecl (an associated constant, read as TypeName.Name); the latter
 	// reuses the same node a top-level constant uses.
+
 	ImplBlock    // impl [TypeName] "{" (MethodDecl | ConstDecl)* "}"  (the optional TypeName tags the interface this block implements)
 	MethodDecl   // [pub] ( Modifier | [extern] [fn] ) Effect* Ident ParamList ":" TypeExpr [Block]
 	Modifier     // a context-keyword accessor/static marker on a method: get, set, or static (an Ident the parser recognizes by position)
@@ -106,13 +111,16 @@ const (
 	ForStmt      // for Ident ( "of" | "in" ) Expr Block  (a collection-iteration statement)
 
 	// Top-level functions.
+
 	FuncDecl // [doc] [pub] fn Ident ParamList ":" TypeExpr ( Block | "->" Expr )
 
 	// Cross-file imports.
+
 	UseDecl // [pub] use ( Ident | UseList | "*" ) from String
 	UseList // "{" Ident ("," Ident)* "}"  (the selective-import list)
 
 	// Compile-time assertions.
+
 	AssertDecl // [doc] assert Expr
 
 	Error // a run of tokens that did not fit the grammar

@@ -19,6 +19,7 @@ import (
 // the same for both (len, fold, get, any, all) ignore it.
 type CollKind int
 
+// The collection kinds, one per list/map distinction; see each kind's comment.
 const (
 	CollUnknown CollKind = iota // an empty literal with no settling channel
 	CollList                    // a list (bare elements, or a list-typed channel)
@@ -28,6 +29,7 @@ const (
 // ConstKind distinguishes the kinds of evaluated constant value.
 type ConstKind int
 
+// The constant kinds, one per evaluated value form; see each kind's comment.
 const (
 	ConstInt        ConstKind = iota // an arbitrary-precision integer (Constant.Int)
 	ConstBool                        // a boolean (Constant.Bool)

@@ -3,6 +3,7 @@
 // analyzer (Analyze) and the incremental Program, so the two cannot diverge.
 // exprSink wires the type-checking walk's findings to diagnostics, and the
 // assembly-local helpers (refinedDef, typeNameReporter) live here too.
+
 package semantic
 
 import (

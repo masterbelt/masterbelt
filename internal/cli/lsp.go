@@ -13,6 +13,8 @@ func init() {
 	LspCmd.Flags().Bool("stdio", true, "communicate over stdio (the default and only transport)")
 }
 
+// LspCmd is the lsp subcommand: it runs the masterbelt language server,
+// speaking the Language Server Protocol over stdin and stdout.
 var LspCmd = &cobra.Command{
 	Use:   "lsp",
 	Short: "Run the masterbelt language server over stdio",

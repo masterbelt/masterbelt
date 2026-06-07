@@ -39,8 +39,7 @@ linters:
     - exhaustive
     - goconst
     - prealloc
-    - revive # the mechanical rules; the documentation rules (exported,
-             # package-comments) land with the M5 writing pass
+    - revive # the full default rule set (exported docs included)
 
 
     # --- TODO(complexity): measured 2026-06-07 at upstream defaults ---
@@ -61,11 +60,6 @@ linters:
       # A test's repeated literals are its own readability business; the
       # production name literals get canonical constants (builtin.Name*).
       ignore-tests: true
-    revive:
-      rules:
-        - name: unused-parameter
-        - name: unreachable-code
-        - name: redefines-builtin-id
     gocyclo:
       # Ceiling pinned to today's worst function. TODO: ratchet down to the
       # default 30 — 17 offenders at 30 as of 2026-06-07 (worst:

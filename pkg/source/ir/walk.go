@@ -4,6 +4,7 @@
 // editor's anchor index, the diagnostics' per-node folds — and, like the dump,
 // they panic on an unhandled form rather than silently skipping it, so a new
 // node kind cannot slip past the IR's consumers.
+
 package ir
 
 import "fmt"

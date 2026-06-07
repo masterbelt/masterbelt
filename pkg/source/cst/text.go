@@ -15,6 +15,7 @@
 // reproduces the source byte for byte (Source), which is the losslessness
 // property as a function of the tree — no buffer involved, so an unmarshaled
 // tree is as complete as a parsed one.
+
 package cst
 
 import (

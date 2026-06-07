@@ -7,6 +7,8 @@ import "fmt"
 // Hint = 4) so they can be surfaced to an editor without translation.
 type Severity int
 
+// The severities, in decreasing order of urgency, numbered to match the
+// Language Server Protocol DiagnosticSeverity scale.
 const (
 	Error Severity = iota + 1
 	Warning

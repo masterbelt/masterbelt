@@ -24,6 +24,9 @@ func init() {
 	CheckCmd.Flags().String("profile", "", "manifest profile to check (default: the top-level profile)")
 }
 
+// CheckCmd is the check subcommand: it parses and type-checks a masterbelt
+// project or a standalone file and reports every diagnostic, exiting nonzero
+// when any is an error.
 var CheckCmd = &cobra.Command{
 	Use:   "check [path]",
 	Short: "Parse and type-check a masterbelt project or file",

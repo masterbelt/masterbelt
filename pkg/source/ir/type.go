@@ -294,6 +294,7 @@ type TypeParam struct {
 // so every method that pre-dates accessors is unaffected.
 type MethodKind int
 
+// The method kinds, one per accessor modifier; see each kind's comment.
 const (
 	MethodNormal MethodKind = iota // an instance method, the default
 	MethodGetter                   // a getter: read as value.name

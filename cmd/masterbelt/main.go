@@ -1,3 +1,5 @@
+// Command masterbelt is the language's CLI: check (parse and type-check a
+// project or file), ir (the exact IR dump), and lsp (the language server).
 package main
 
 import (

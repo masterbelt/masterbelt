@@ -6,6 +6,7 @@
 // after). References the module does not declare resolve through the
 // caller's Resolver; a name nobody supplies is a loud error, never a silent
 // dangling pointer.
+
 package ir
 
 import (

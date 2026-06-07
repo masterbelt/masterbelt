@@ -7,6 +7,7 @@
 // types and the graph's annotations are exactly what the folder reads; a
 // receiver or index that does not fold (a parameter, a dynamic index) is left
 // to the runtime, the check's conservative discipline.
+
 package semantic
 
 import (

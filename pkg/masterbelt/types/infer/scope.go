@@ -5,6 +5,7 @@
 // for the context-specific leaf forms — so the one walk (exprType / check) sees
 // the right meaning for self, a name, a conversion, and a function call in
 // whatever context it is invoked.
+
 package infer
 
 import (

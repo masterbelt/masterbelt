@@ -1,6 +1,7 @@
 // This file holds assignability and the structural-type queries it rests on:
 // Assignable decides whether one type's values flow into another, reading a
 // record's fields (recordType) and a union's members (UnionType).
+
 package types
 
 import (
@@ -134,16 +135,18 @@ func adaptsToNamed(reg *builtin.Registry, from, to ir.Type) bool {
 type UnionSelection int
 
 const (
-	// UnionNotAUnion: the expected type is not a union, so member selection does
-	// not apply (the value flows in by ordinary assignability).
+	// UnionNotAUnion reports that the expected type is not a union, so member
+	// selection does not apply (the value flows in by ordinary assignability).
 	UnionNotAUnion UnionSelection = iota
-	// UnionNoMember: the value is a union but matches none of its members — the
-	// type_mismatch case, handled by the caller's existing assignability report.
+	// UnionNoMember reports that the value is a union but matches none of its
+	// members — the type_mismatch case, handled by the caller's existing
+	// assignability report.
 	UnionNoMember
-	// UnionUnique: exactly one member accepts the value; Member is it.
+	// UnionUnique reports that exactly one member accepts the value; Member is it.
 	UnionUnique
-	// UnionAmbiguous: two or more members accept the value with no exact tie-break
-	// — the ambiguous_union_member case, resolved by an explicit conversion.
+	// UnionAmbiguous reports that two or more members accept the value with no
+	// exact tie-break — the ambiguous_union_member case, resolved by an explicit
+	// conversion.
 	UnionAmbiguous
 )
 

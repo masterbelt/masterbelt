@@ -13,16 +13,19 @@ import (
 // Kind identifies the lexical category of a Token.
 type Kind int
 
+// The token kinds, one per lexical category; see each kind's comment.
 const (
 	Illegal Kind = iota // a byte (or rune) that begins no valid token
 	EOF                 // end of input
 
 	// Comments.
+
 	BlockComment // /* ... */
 	LineComment  // // ...
 	DocComment   // /// ...
 
 	// Identifiers and literals.
+
 	Ident       // identifier or type name, e.g. MaxLevel, int64
 	Int         // integer literal, e.g. 100
 	String      // string literal, e.g. "label"
@@ -30,6 +33,7 @@ const (
 	DurationLit // duration literal, e.g. 3w4d5h6m7s8ms
 
 	// Keywords.
+
 	Const     // const
 	Pub       // pub
 	True      // true
@@ -62,6 +66,7 @@ const (
 	In        // in (for: bind the key — a map key, a list index)
 
 	// Operators and punctuation.
+
 	Colon     // :
 	Question  // ?
 	Assign    // =
@@ -94,6 +99,7 @@ const (
 
 	// Trivia. Emitted so the token stream covers every byte and can reproduce
 	// the source exactly (needed by formatters and faithful round-tripping).
+
 	Whitespace // a run of spaces, tabs, and carriage returns
 	Newline    // \n
 

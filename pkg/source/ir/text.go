@@ -23,6 +23,7 @@
 // leans on: a module rebuilt from text physically cannot read the AST, so a
 // fold that agrees with the original proves the backpointers carry no
 // semantics (F-3's invariant, executed in CI).
+
 package ir
 
 import (
@@ -423,17 +424,35 @@ func decodeRecordFields(f treetext.Field) ([]Field, error) {
 
 // --- the sealed-interface obligation -------------------------------------------
 
-// MarshalText renders the type in the exact text form. Each Type form carries
-// the method so the sealed interface can embed encoding.TextMarshaler — the
-// compile-time half of the format's exhaustiveness.
-func (t *Builtin) MarshalText() ([]byte, error)  { return marshalType(t) }
-func (t *invalid) MarshalText() ([]byte, error)  { return marshalType(t) }
-func (t *Named) MarshalText() ([]byte, error)    { return marshalType(t) }
-func (t *Union) MarshalText() ([]byte, error)    { return marshalType(t) }
-func (t *Record) MarshalText() ([]byte, error)   { return marshalType(t) }
-func (t *Func) MarshalText() ([]byte, error)     { return marshalType(t) }
-func (t *TypeVar) MarshalText() ([]byte, error)  { return marshalType(t) }
-func (t *App) MarshalText() ([]byte, error)      { return marshalType(t) }
+// Each Type form carries MarshalText so the sealed interface can embed
+// encoding.TextMarshaler — the compile-time half of the format's
+// exhaustiveness.
+
+// MarshalText renders the type in the exact text form.
+func (t *Builtin) MarshalText() ([]byte, error) { return marshalType(t) }
+
+// MarshalText renders the type in the exact text form.
+func (t *invalid) MarshalText() ([]byte, error) { return marshalType(t) }
+
+// MarshalText renders the type in the exact text form.
+func (t *Named) MarshalText() ([]byte, error) { return marshalType(t) }
+
+// MarshalText renders the type in the exact text form.
+func (t *Union) MarshalText() ([]byte, error) { return marshalType(t) }
+
+// MarshalText renders the type in the exact text form.
+func (t *Record) MarshalText() ([]byte, error) { return marshalType(t) }
+
+// MarshalText renders the type in the exact text form.
+func (t *Func) MarshalText() ([]byte, error) { return marshalType(t) }
+
+// MarshalText renders the type in the exact text form.
+func (t *TypeVar) MarshalText() ([]byte, error) { return marshalType(t) }
+
+// MarshalText renders the type in the exact text form.
+func (t *App) MarshalText() ([]byte, error) { return marshalType(t) }
+
+// MarshalText renders the type in the exact text form.
 func (t *SelfType) MarshalText() ([]byte, error) { return marshalType(t) }
 
 // marshalType renders one type as a root element.

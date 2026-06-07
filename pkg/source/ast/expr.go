@@ -18,6 +18,7 @@ type IntLit struct {
 	syntax *cst.Node
 }
 
+// Syntax returns the green CST node this literal was lowered from.
 func (l *IntLit) Syntax() *cst.Node { return l.syntax }
 func (l *IntLit) node()             {}
 func (l *IntLit) expr()             {}
@@ -36,6 +37,7 @@ type DatetimeLit struct {
 	syntax *cst.Node
 }
 
+// Syntax returns the green CST node this literal was lowered from.
 func (l *DatetimeLit) Syntax() *cst.Node { return l.syntax }
 func (l *DatetimeLit) node()             {}
 func (l *DatetimeLit) expr()             {}
@@ -53,6 +55,7 @@ type DurationLit struct {
 	syntax *cst.Node
 }
 
+// Syntax returns the green CST node this literal was lowered from.
 func (l *DurationLit) Syntax() *cst.Node { return l.syntax }
 func (l *DurationLit) node()             {}
 func (l *DurationLit) expr()             {}
@@ -72,6 +75,7 @@ type StringLit struct {
 	syntax *cst.Node
 }
 
+// Syntax returns the green CST node this literal was lowered from.
 func (l *StringLit) Syntax() *cst.Node { return l.syntax }
 func (l *StringLit) node()             {}
 func (l *StringLit) expr()             {}
@@ -87,6 +91,7 @@ type BoolLit struct {
 	syntax *cst.Node
 }
 
+// Syntax returns the green CST node this literal was lowered from.
 func (l *BoolLit) Syntax() *cst.Node { return l.syntax }
 func (l *BoolLit) node()             {}
 func (l *BoolLit) expr()             {}
@@ -106,6 +111,7 @@ type CollectionLit struct {
 	syntax  *cst.Node
 }
 
+// Syntax returns the green CST node this literal was lowered from.
 func (l *CollectionLit) Syntax() *cst.Node { return l.syntax }
 func (l *CollectionLit) node()             {}
 func (l *CollectionLit) expr()             {}
@@ -139,6 +145,7 @@ type RecordLit struct {
 	syntax   *cst.Node
 }
 
+// Syntax returns the green CST node this literal was lowered from.
 func (l *RecordLit) Syntax() *cst.Node { return l.syntax }
 func (l *RecordLit) node()             {}
 func (l *RecordLit) expr()             {}
@@ -156,6 +163,7 @@ type FieldInit struct {
 	syntax *cst.Node
 }
 
+// Syntax returns the green CST node this field initializer was lowered from.
 func (f *FieldInit) Syntax() *cst.Node { return f.syntax }
 func (f *FieldInit) node()             {}
 
@@ -169,6 +177,7 @@ type NullLit struct {
 	syntax *cst.Node
 }
 
+// Syntax returns the green CST node this literal was lowered from.
 func (l *NullLit) Syntax() *cst.Node { return l.syntax }
 func (l *NullLit) node()             {}
 func (l *NullLit) expr()             {}
@@ -183,6 +192,7 @@ type SelfExpr struct {
 	syntax *cst.Node
 }
 
+// Syntax returns the green CST node this expression was lowered from.
 func (s *SelfExpr) Syntax() *cst.Node { return s.syntax }
 func (s *SelfExpr) node()             {}
 func (s *SelfExpr) expr()             {}
@@ -201,6 +211,7 @@ type Identifier struct {
 	syntax *cst.Node
 }
 
+// Syntax returns the green CST node this identifier was lowered from.
 func (i *Identifier) Syntax() *cst.Node { return i.syntax }
 func (i *Identifier) node()             {}
 func (i *Identifier) expr()             {}
@@ -218,6 +229,7 @@ type MemberExpr struct {
 	syntax   *cst.Node
 }
 
+// Syntax returns the green CST node this expression was lowered from.
 func (m *MemberExpr) Syntax() *cst.Node { return m.syntax }
 func (m *MemberExpr) node()             {}
 func (m *MemberExpr) expr()             {}
@@ -238,6 +250,7 @@ type CallExpr struct {
 	syntax    *cst.Node
 }
 
+// Syntax returns the green CST node this expression was lowered from.
 func (c *CallExpr) Syntax() *cst.Node { return c.syntax }
 func (c *CallExpr) node()             {}
 func (c *CallExpr) expr()             {}
@@ -255,6 +268,7 @@ type AwaitExpr struct {
 	syntax *cst.Node
 }
 
+// Syntax returns the green CST node this expression was lowered from.
 func (a *AwaitExpr) Syntax() *cst.Node { return a.syntax }
 func (a *AwaitExpr) node()             {}
 func (a *AwaitExpr) expr()             {}
@@ -278,6 +292,7 @@ type TernaryExpr struct {
 	syntax *cst.Node
 }
 
+// Syntax returns the green CST node this expression was lowered from.
 func (t *TernaryExpr) Syntax() *cst.Node { return t.syntax }
 func (t *TernaryExpr) node()             {}
 func (t *TernaryExpr) expr()             {}
@@ -304,6 +319,7 @@ type RangeExpr struct {
 	syntax   *cst.Node
 }
 
+// Syntax returns the green CST node this expression was lowered from.
 func (r *RangeExpr) Syntax() *cst.Node { return r.syntax }
 func (r *RangeExpr) node()             {}
 func (r *RangeExpr) expr()             {}
@@ -324,6 +340,7 @@ type FuncLit struct {
 	syntax *cst.Node
 }
 
+// Syntax returns the green CST node this literal was lowered from.
 func (l *FuncLit) Syntax() *cst.Node { return l.syntax }
 func (l *FuncLit) node()             {}
 func (l *FuncLit) expr()             {}

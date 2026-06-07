@@ -5,6 +5,7 @@
 // errors), CheckAgainst pushes a type down, and the per-form helpers
 // (checkFuncLitAgainst, checkCollectionAgainst, checkRecord*) realize each
 // pushed-down rule.
+
 package infer
 
 import (

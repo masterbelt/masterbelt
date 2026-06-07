@@ -2,12 +2,18 @@ package source
 
 import "io"
 
+// File is the immutable variant of a source buffer: a named, fixed byte slice
+// with a precomputed line-start index. Once built it never changes, so the
+// lexer and diagnostics can hold and query it freely without copying.
 type File struct {
 	name        string
 	src         []byte
 	lineOffsets []int
 }
 
+// New reads r to completion and returns a File over its bytes. If r also
+// exposes a Name method (as *os.File does), that name becomes the file's name;
+// otherwise the name is empty.
 func New(r io.Reader) (*File, error) {
 	name := ""
 	if hasName, ok := r.(interface{ Name() string }); ok {
@@ -22,6 +28,9 @@ func New(r io.Reader) (*File, error) {
 	return NewFile(name, src), nil
 }
 
+// NewFile builds a File from a name and its raw bytes, indexing the line
+// starts up front. The src slice is retained, not copied, so callers must not
+// mutate it afterwards.
 func NewFile(name string, src []byte) *File {
 	return &File{
 		name:        name,
@@ -30,14 +39,18 @@ func NewFile(name string, src []byte) *File {
 	}
 }
 
+// Name returns the file's name, which is empty when none was supplied.
 func (f File) Name() string {
 	return f.name
 }
 
+// Source returns the file's bytes. The slice is the file's own backing
+// storage and must not be modified.
 func (f File) Source() []byte {
 	return f.src
 }
 
+// Size reports the length of the file in bytes.
 func (f File) Size() int {
 	return len(f.src)
 }

@@ -1,6 +1,7 @@
 // This file is the generic half of the type algebra: Substitute applies a
 // type-variable solution, Match solves variables by structural matching, and
 // Satisfies (with hasFreeVar) checks a type against an interface bound.
+
 package types
 
 import (

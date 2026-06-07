@@ -2,6 +2,7 @@
 // dispatch shares: which definition a method table is read from, whether a
 // definition's underlying primitive backs a value kind, and the enum
 // comparison fold.
+
 package eval
 
 import (

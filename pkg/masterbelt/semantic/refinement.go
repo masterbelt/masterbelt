@@ -4,6 +4,7 @@
 // supplies a representative self value for the declaration-time probe fold, and
 // predicateEnv is the eval environment such a predicate folds in (the registry
 // alone, since a usable predicate references nothing but self and literals).
+
 package semantic
 
 import (

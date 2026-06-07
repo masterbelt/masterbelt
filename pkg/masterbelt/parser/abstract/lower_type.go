@@ -1,6 +1,7 @@
 // This file lowers type-expression CST nodes into ast type expressions: named,
 // builtin, union, record, and function types, together with the generic
 // parameters and arguments they carry.
+
 package abstract
 
 import (

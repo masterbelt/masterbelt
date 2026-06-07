@@ -6,6 +6,7 @@
 // refused the fold (the user's computation is too deep — fixable), "evaluator
 // gap" for everything else (a missing fold rule — a compiler bug, never the
 // user's).
+
 package semantic
 
 import (

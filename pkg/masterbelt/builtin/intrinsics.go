@@ -2,6 +2,7 @@
 // methods: the Intrinsic type and its dispatch entry, the factories that
 // build the integer, boolean, string, datetime, and duration intrinsics from
 // typed operand functions, and the per-type implementation maps.
+
 package builtin
 
 import (

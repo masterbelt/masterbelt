@@ -2,6 +2,7 @@
 // method on a receiver (findMethods, ReceiverMethods, Candidates, BindReceiver),
 // the operator-method result rule (MethodResult), and overload selection
 // (SelectOverload), together with the impl/interface substitution they thread.
+
 package types
 
 import (

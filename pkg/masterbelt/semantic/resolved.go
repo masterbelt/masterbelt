@@ -6,6 +6,7 @@
 // the node's type, and the explicit adaptions — monotonically widening what
 // the late re-fold can fold without growing a second type system inside
 // eval.
+
 package semantic
 
 import (

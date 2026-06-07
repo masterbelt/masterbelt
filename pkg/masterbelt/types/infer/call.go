@@ -5,6 +5,7 @@
 // arguments (a function literal, an inferred record literal) — so the call's
 // expectation reaches into each literal and the literal bodies solve what
 // remains.
+
 package infer
 
 import (

@@ -2,6 +2,7 @@
 // operator and literal surface syntax: unary and binary operators become
 // receiver.method(args) calls, string literals are decoded to their values, and
 // collection, record, member, call, and function-literal forms are flattened.
+
 package abstract
 
 import (

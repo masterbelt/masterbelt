@@ -3,6 +3,7 @@
 // invoke them. Keeping the callbacks here lets the same walk serve pure typing
 // (a nil Sink) and the diagnostic pass (the semantic layer's wiring) without
 // the rules depending on the diagnostic types.
+
 package infer
 
 import (

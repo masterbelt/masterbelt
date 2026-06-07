@@ -4,6 +4,7 @@
 // funcSignatureKey render that key (normalizeKeyType canonicalizes self and
 // type variables), and paramTypes/paramTypesOf render the human-readable list
 // the duplicate diagnostics quote.
+
 package semantic
 
 import (

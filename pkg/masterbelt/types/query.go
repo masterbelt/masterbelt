@@ -2,6 +2,7 @@
 // shape through: the enum a type carries (EnumDef), the element type a for-loop
 // iterates (ForElement and its foldable helpers), and the unifier (Unify) with
 // its same-shape predicates.
+
 package types
 
 import (

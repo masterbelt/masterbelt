@@ -4,6 +4,7 @@
 // and the fold primitive every provided method is built on) have no native
 // intrinsic and are folded here by name, with the fold/range walks bounded so a
 // wide range never hangs the folder.
+
 package eval
 
 import (

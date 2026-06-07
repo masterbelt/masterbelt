@@ -1,6 +1,7 @@
 // This file lowers top-level and member declarations — use, const, assert,
 // function, and type declarations together with the impl methods they carry —
 // from their CST nodes into the matching ast declaration nodes.
+
 package abstract
 
 import (
