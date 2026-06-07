@@ -287,6 +287,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return f["typ"].String() + " does not satisfy the bound " + f["bound"].String() + ": it does not implement that interface"
 		}
 	},
+	"masterbelt.semantic.builtin_outside_builtin": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "= builtin は builtin サーフェス専用です。registry は " + f["name"].String() + " の実体を供給しません"
+		default:
+			return "= builtin is reserved for the builtin surface; the registry supplies no native for " + f["name"].String()
+		}
+	},
 	"masterbelt.semantic.condition_not_bool": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
@@ -389,6 +397,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return f["context"].String() + " はコンパイル時に評価されるため pure である必要があります。effect " + f["effect"].String() + " は使用できません"
 		default:
 			return "a " + f["context"].String() + " is evaluated at compile time and must be pure; effect " + f["effect"].String() + " is not allowed"
+		}
+	},
+	"masterbelt.semantic.extern_outside_builtin": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "extern は builtin サーフェス専用です。ここで " + f["name"].String() + " の実体を供給する仕組みはありません"
+		default:
+			return "extern is reserved for the builtin surface; nothing here can supply a native for " + f["name"].String()
 		}
 	},
 	"masterbelt.semantic.generic_static": func(loc Locale, f map[string]fmt.Stringer) string {
@@ -517,14 +533,6 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "関数 " + f["name"].String() + " が値を返しません"
 		default:
 			return "function " + f["name"].String() + " never returns a value"
-		}
-	},
-	"masterbelt.semantic.no_bound": func(loc Locale, f map[string]fmt.Stringer) string {
-		switch loc {
-		case "ja":
-			return f["typ"].String() + " は範囲を持たないため " + f["name"].String() + " はありません"
-		default:
-			return f["typ"].String() + " has no bound and so no " + f["name"].String()
 		}
 	},
 	"masterbelt.semantic.no_matching_func_overload": func(loc Locale, f map[string]fmt.Stringer) string {

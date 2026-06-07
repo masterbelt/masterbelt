@@ -34,9 +34,7 @@ var knownGaps = map[string]string{
 	"gap-a-alias.belt":      "(a) a function value reached through a const alias",
 	"gap-a-in-body.belt":    "(a) a function value applied inside an applied body",
 	"gap-b-cross-assoc.belt": "(b) an assoc const initializer reading another type's member",
-	"gap-c-user-builtin.belt": "(c) a user-code `type Foo = builtin` with no native behind it",
 	"gap-d-overload.belt":   "(d) a fn overload split by a named type the kind rule cannot see",
-	"gap-extern-pure.belt":  "a pure extern outside the builtin surface never folds",
 	"gap-depth.belt":        "the depth budget refuses the fold with no diagnostic (M6)",
 }
 

@@ -56,9 +56,10 @@ func TestAssocConstDiagnostics(t *testing.T) {
 		// An unknown associated constant on a type.
 		{"unknown builtin const", "const X = sbyte.Bogus\n", CodeUnknownAssociatedConst},
 		{"unknown user const", "type L = sbyte impl {\n  const Max = 1\n}\nconst X = L.Bogus\n", CodeUnknownAssociatedConst},
-		// The arbitrary-precision integers have no bound, so a `= builtin` Max on
-		// them is a no_bound error.
-		{"no bound on nint", "type I = builtin impl {\n  pub const Max = builtin\n}\n", CodeNoBound},
+		// A user `= builtin` constant is a builtin-surface violation at its
+		// declaration site (the old no_bound was consolidated into it: a user
+		// file may not write `= builtin` at all).
+		{"user builtin const", "type I = builtin impl {\n  pub const Max = builtin\n}\n", CodeBuiltinOutsideBuiltin},
 		// A duplicate associated-constant name keeps the first and reports.
 		{"duplicate const", "type L = sbyte impl {\n  const Max = 1\n  const Max = 2\n}\n", CodeDuplicateDeclaration},
 	}

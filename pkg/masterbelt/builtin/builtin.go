@@ -113,6 +113,27 @@ func (r *Registry) HasIntrinsic(typeName, method string) bool {
 	return len(r.intrinsics[typeName][method]) > 0
 }
 
+// IntrinsicSurface returns every (type, method) pair that has at least one
+// native implementation, sorted by type then method. It is the registry side
+// of the per-symbol prelude agreement: the builtin tests walk it to prove
+// every native is reachable from a bundled-source declaration (a dead native
+// fails the build) while the prelude validation proves the reverse.
+func (r *Registry) IntrinsicSurface() [][2]string {
+	var out [][2]string
+	for typeName, ms := range r.intrinsics {
+		for method := range ms {
+			out = append(out, [2]string{typeName, method})
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i][0] != out[j][0] {
+			return out[i][0] < out[j][0]
+		}
+		return out[i][1] < out[j][1]
+	})
+	return out
+}
+
 // kindsEqual reports whether the two kind signatures are the same.
 func kindsEqual(a, b []ir.ConstKind) bool {
 	if len(a) != len(b) {
@@ -186,7 +207,14 @@ func Default() *Registry {
 	}
 	for _, spec := range integerSpecs {
 		kind := spec.kind
-		r.register(spec.name, &NativeType{Name: spec.name, Int: &kind}, integerMethods(), integerIntrinsics())
+		ii := integerIntrinsics()
+		if !kind.Signed {
+			// The unsigned integers declare no negation in the prelude, so a
+			// neg intrinsic on them would be a dead native — registered but
+			// reachable from no declaration (the agreement test pins this).
+			delete(ii, "neg")
+		}
+		r.register(spec.name, &NativeType{Name: spec.name, Int: &kind}, integerMethods(), ii)
 	}
 	r.register("bool", &NativeType{Name: "bool", Bool: true}, booleanMethods(), booleanIntrinsics())
 	r.register("string", &NativeType{Name: "string", Str: true}, stringMethods(), stringIntrinsics())

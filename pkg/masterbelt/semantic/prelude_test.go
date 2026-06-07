@@ -96,7 +96,8 @@ func TestPreludeBoundsMatchRegistry(t *testing.T) {
 	}
 
 	// The arbitrary-precision integers have no fixed range, so they declare no
-	// bounds (int.Max would be a no_bound error were it written).
+	// bounds (a written nint.Max would resolve to no value, which the
+	// agreement test rejects).
 	for _, name := range []string{"nint", "nuint"} {
 		if d := byName[name]; d != nil && len(d.Consts) != 0 {
 			t.Errorf("%s should declare no associated constants, has %d", name, len(d.Consts))

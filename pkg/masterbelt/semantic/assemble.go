@@ -406,6 +406,12 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 	checkFuncBodies(reg, file, q.universe(fileID), qualifiedFrom(q, imp), funcs, qfns, bodyEnv, bodySink(at, diags, reg, bodyEnv), at, diags)
 	checkEffects(reg, file, module.Types, q.universe(fileID), qualifiedFrom(q, imp), funcs, qfns, at, diags)
 
+	// The builtin-surface contract: extern and `= builtin` claim a registry-
+	// supplied implementation, which only the trusted prelude channel (never
+	// assembled) can honor — in an assembled file both are declaration-site
+	// errors.
+	checkBuiltinSurface(file, at, diags)
+
 	// Compile-time positions must be pure: a constant initializer, an assert
 	// condition, an enum member initializer, an associated constant initializer,
 	// and a refinement (where) predicate all fold to values, so an effectful

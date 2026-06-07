@@ -57,7 +57,8 @@ masterbelt.semantic.unknown_enum_member,error,enum:string member:string
 masterbelt.semantic.invalid_enum_base_type,error,typ:string
 masterbelt.semantic.duplicate_enum_value,error,name:string value:string
 masterbelt.semantic.unknown_associated_const,error,typ:string name:string
-masterbelt.semantic.no_bound,error,typ:string name:string
+masterbelt.semantic.extern_outside_builtin,error,name:string
+masterbelt.semantic.builtin_outside_builtin,error,name:string
 masterbelt.semantic.refinement_violation,error,value:string typ:string predicate:string diagram:string
 masterbelt.semantic.refinement_not_bool,error,typ:string
 masterbelt.semantic.refinement_not_constant,error,

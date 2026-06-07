@@ -722,13 +722,13 @@ func resolveAssocConstList(env eval.Env, r *infer.TypeResolver, reg *builtin.Reg
 		if c.Builtin {
 			// A `= builtin` constant takes its value from the type's native value
 			// range — Max/Min. A type with no bound on that side has no such
-			// constant (the arbitrary-precision nint): report no_bound.
+			// constant (the arbitrary-precision nint): it resolves to nothing.
+			// The declaration site needs no diagnostic here — a user file may
+			// not write `= builtin` at all (the builtin-surface check reports
+			// it), and the prelude, where the spelling is legal, is pinned
+			// bound-for-bound by its own tests.
 			value, ok := builtinBound(reg, def.Name, c.Name)
 			if !ok {
-				if at != nil && diags != nil {
-					s := at(c)
-					diags.Add(newNoBoundDiagnostic(s.offset, s.width, def.Name, c.Name))
-				}
 				ac.Type = ir.Invalid
 				out = append(out, ac)
 				continue
