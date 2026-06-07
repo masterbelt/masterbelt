@@ -30,135 +30,159 @@ import (
 // unset — the const path hooks it to the eval-based value-range check, which
 // needs the declaration's context.
 func exprSink(at func(ast.Node) span, diags *diagnostic.List, res *callResolutions) *infer.Sink {
-	return &infer.Sink{
-		// The overload-selection streams; res is nil where no collector is in
-		// play (a refinement predicate's reporting pass), and the selections
-		// are then simply not recorded.
-		ResolvedMethod: func(call *ast.CallExpr, m *ir.Method) {
-			if res != nil {
-				res.methods[call] = m
-			}
-		},
-		ResolvedStatic: func(call *ast.CallExpr, m *ir.Method) {
-			if res != nil {
-				res.statics[call] = m
-			}
-		},
-		ResolvedFunc: func(call *ast.CallExpr, fd *ast.FuncDecl) {
-			if res != nil {
-				res.funcs[call] = fd
-			}
-		},
-		CallSubst: func(call *ast.CallExpr, subst map[string]ir.Type) {
-			if res != nil {
-				// Cloned: the checker threads one live map through a call's
-				// argument checking, and the record must stay the solution as
-				// of this call's settling.
-				res.substs[call] = maps.Clone(subst)
-			}
-		},
-		Typed: func(e ast.Expr, t ir.Type) {
-			if res != nil {
-				res.types[e] = t
-			}
-		},
-		Adapted: func(e ast.Expr, to ir.Type) {
-			if res != nil {
-				res.adapts[e] = to
-			}
-		},
-		InvalidOp: func(node ast.Node, method, operands string) {
-			s := at(node)
-			diags.Add(newInvalidOperationDiagnostic(s.offset, s.width, method, operands))
-		},
-		NoMatchingOverload: func(node ast.Node, method, operands string) {
-			s := at(node)
-			diags.Add(newNoMatchingOverloadDiagnostic(s.offset, s.width, method, operands))
-		},
-		AmbiguousOverload: func(node ast.Node, method, operands string) {
-			s := at(node)
-			diags.Add(newAmbiguousOverloadDiagnostic(s.offset, s.width, method, operands))
-		},
-		Mismatch: func(node ast.Node, got, want ir.Type) {
-			s := at(node)
-			diags.Add(newTypeMismatchDiagnostic(s.offset, s.width, got.String(), want.String()))
-		},
-		AmbiguousUnionMember: func(node ast.Node, got, want ir.Type) {
-			s := at(node)
-			diags.Add(newAmbiguousUnionMemberDiagnostic(s.offset, s.width, got.String(), want.String()))
-		},
-		TernaryCondNotBool: func(cond ast.Expr, got ir.Type) {
-			s := at(cond)
-			diags.Add(newTernaryConditionNotBoolDiagnostic(s.offset, s.width, got.String()))
-		},
-		TernaryBranchMismatch: func(node ast.Node, then, els ir.Type) {
-			s := at(node)
-			diags.Add(newTernaryBranchMismatchDiagnostic(s.offset, s.width, then.String(), els.String()))
-		},
-		ArityMismatch: func(lit *ast.FuncLit, got, want int) {
-			s := at(lit)
-			diags.Add(newLambdaArityMismatchDiagnostic(s.offset, s.width, got, want))
-		},
-		CallArityMismatch: func(call *ast.CallExpr, name string, got, want int) {
-			s := at(call)
-			diags.Add(newArityMismatchDiagnostic(s.offset, s.width, name, got, want))
-		},
-		NoMatchingFuncOverload: func(call *ast.CallExpr, name, types string) {
-			s := at(call)
-			diags.Add(newNoMatchingFuncOverloadDiagnostic(s.offset, s.width, name, types))
-		},
-		AmbiguousFuncOverload: func(call *ast.CallExpr, name, types string) {
-			s := at(call)
-			diags.Add(newAmbiguousFuncOverloadDiagnostic(s.offset, s.width, name, types))
-		},
-		UninferableParam: func(p *ast.ParamDef) {
-			s := at(p)
-			diags.Add(newUninferableParameterDiagnostic(s.offset, s.width, p.Name))
-		},
-		UninferableResult: func(lit *ast.FuncLit) {
-			s := at(lit)
-			diags.Add(newUninferableResultDiagnostic(s.offset, s.width))
-		},
-		MissingField: func(lit *ast.RecordLit, field string, typ ir.Type) {
-			s := at(lit)
-			diags.Add(newMissingFieldDiagnostic(s.offset, s.width, field, typ.String()))
-		},
-		UnknownField: func(field *ast.FieldInit, name string, typ ir.Type) {
-			s := at(field)
-			diags.Add(newUnknownFieldDiagnostic(s.offset, s.width, name, typ.String()))
-		},
-		UninferableRecord: func(lit *ast.RecordLit) {
-			s := at(lit)
-			diags.Add(newUninferableRecordDiagnostic(s.offset, s.width))
-		},
-		UnknownRecordType: func(lit *ast.RecordLit, name string) {
-			s := at(lit)
-			diags.Add(newUnknownTypeDiagnostic(s.offset, s.width, name))
-		},
-		NotARecord: func(lit *ast.RecordLit, typ ir.Type) {
-			s := at(lit)
-			diags.Add(newNotARecordDiagnostic(s.offset, s.width, typ.String()))
-		},
-		BoundNotSatisfied: func(call *ast.CallExpr, typ, bound ir.Type) {
-			s := at(call)
-			diags.Add(newBoundNotSatisfiedDiagnostic(s.offset, s.width, typ.String(), bound.String()))
-		},
-		UninferableTypeParam: func(call *ast.CallExpr, name string) {
-			s := at(call)
-			diags.Add(newUninferableTypeParamDiagnostic(s.offset, s.width, name))
-		},
-		NoMethodOnUnboundedTypeVar: func(node ast.Node, method string) {
-			s := at(node)
-			diags.Add(newNoMethodOnUnboundedTypevarDiagnostic(s.offset, s.width, method))
-		},
-		UnknownStatic: func(call *ast.CallExpr, name, typ string) {
-			s := at(call)
-			diags.Add(newUnknownStaticDiagnostic(s.offset, s.width, name, typ))
-		},
-		MapKeyNotComparable: func(lit *ast.CollectionLit, key, bound ir.Type) {
-			s := at(lit)
-			diags.Add(newBoundNotSatisfiedDiagnostic(s.offset, s.width, key.String(), bound.String()))
-		},
+	sink := &infer.Sink{}
+	wireResolutionStreams(sink, res)
+	wireOverloadDiagnostics(sink, at, diags)
+	wireExprDiagnostics(sink, at, diags)
+	wireRecordAndGenericDiagnostics(sink, at, diags)
+	return sink
+}
+
+// wireResolutionStreams wires the informational overload-selection, typing, and
+// adaption streams to the resolutions collector. res is nil where no collector
+// is in play (a refinement predicate's reporting pass), and the selections are
+// then simply not recorded.
+func wireResolutionStreams(sink *infer.Sink, res *callResolutions) {
+	sink.ResolvedMethod = func(call *ast.CallExpr, m *ir.Method) {
+		if res != nil {
+			res.methods[call] = m
+		}
+	}
+	sink.ResolvedStatic = func(call *ast.CallExpr, m *ir.Method) {
+		if res != nil {
+			res.statics[call] = m
+		}
+	}
+	sink.ResolvedFunc = func(call *ast.CallExpr, fd *ast.FuncDecl) {
+		if res != nil {
+			res.funcs[call] = fd
+		}
+	}
+	sink.CallSubst = func(call *ast.CallExpr, subst map[string]ir.Type) {
+		if res != nil {
+			// Cloned: the checker threads one live map through a call's
+			// argument checking, and the record must stay the solution as
+			// of this call's settling.
+			res.substs[call] = maps.Clone(subst)
+		}
+	}
+	sink.Typed = func(e ast.Expr, t ir.Type) {
+		if res != nil {
+			res.types[e] = t
+		}
+	}
+	sink.Adapted = func(e ast.Expr, to ir.Type) {
+		if res != nil {
+			res.adapts[e] = to
+		}
+	}
+}
+
+// wireOverloadDiagnostics wires the method/function overload-resolution findings
+// to their diagnostics.
+func wireOverloadDiagnostics(sink *infer.Sink, at func(ast.Node) span, diags *diagnostic.List) {
+	sink.InvalidOp = func(node ast.Node, method, operands string) {
+		s := at(node)
+		diags.Add(newInvalidOperationDiagnostic(s.offset, s.width, method, operands))
+	}
+	sink.NoMatchingOverload = func(node ast.Node, method, operands string) {
+		s := at(node)
+		diags.Add(newNoMatchingOverloadDiagnostic(s.offset, s.width, method, operands))
+	}
+	sink.AmbiguousOverload = func(node ast.Node, method, operands string) {
+		s := at(node)
+		diags.Add(newAmbiguousOverloadDiagnostic(s.offset, s.width, method, operands))
+	}
+	sink.CallArityMismatch = func(call *ast.CallExpr, name string, got, want int) {
+		s := at(call)
+		diags.Add(newArityMismatchDiagnostic(s.offset, s.width, name, got, want))
+	}
+	sink.NoMatchingFuncOverload = func(call *ast.CallExpr, name, types string) {
+		s := at(call)
+		diags.Add(newNoMatchingFuncOverloadDiagnostic(s.offset, s.width, name, types))
+	}
+	sink.AmbiguousFuncOverload = func(call *ast.CallExpr, name, types string) {
+		s := at(call)
+		diags.Add(newAmbiguousFuncOverloadDiagnostic(s.offset, s.width, name, types))
+	}
+	sink.UnknownStatic = func(call *ast.CallExpr, name, typ string) {
+		s := at(call)
+		diags.Add(newUnknownStaticDiagnostic(s.offset, s.width, name, typ))
+	}
+}
+
+// wireExprDiagnostics wires the expression-typing findings — mismatches, union
+// member ambiguity, ternaries, and function-literal inference — to their
+// diagnostics.
+func wireExprDiagnostics(sink *infer.Sink, at func(ast.Node) span, diags *diagnostic.List) {
+	sink.Mismatch = func(node ast.Node, got, want ir.Type) {
+		s := at(node)
+		diags.Add(newTypeMismatchDiagnostic(s.offset, s.width, got.String(), want.String()))
+	}
+	sink.AmbiguousUnionMember = func(node ast.Node, got, want ir.Type) {
+		s := at(node)
+		diags.Add(newAmbiguousUnionMemberDiagnostic(s.offset, s.width, got.String(), want.String()))
+	}
+	sink.TernaryCondNotBool = func(cond ast.Expr, got ir.Type) {
+		s := at(cond)
+		diags.Add(newTernaryConditionNotBoolDiagnostic(s.offset, s.width, got.String()))
+	}
+	sink.TernaryBranchMismatch = func(node ast.Node, then, els ir.Type) {
+		s := at(node)
+		diags.Add(newTernaryBranchMismatchDiagnostic(s.offset, s.width, then.String(), els.String()))
+	}
+	sink.ArityMismatch = func(lit *ast.FuncLit, got, want int) {
+		s := at(lit)
+		diags.Add(newLambdaArityMismatchDiagnostic(s.offset, s.width, got, want))
+	}
+	sink.UninferableParam = func(p *ast.ParamDef) {
+		s := at(p)
+		diags.Add(newUninferableParameterDiagnostic(s.offset, s.width, p.Name))
+	}
+	sink.UninferableResult = func(lit *ast.FuncLit) {
+		s := at(lit)
+		diags.Add(newUninferableResultDiagnostic(s.offset, s.width))
+	}
+}
+
+// wireRecordAndGenericDiagnostics wires the record-literal and generic-call
+// (bound, type-param, map-key) findings to their diagnostics.
+func wireRecordAndGenericDiagnostics(sink *infer.Sink, at func(ast.Node) span, diags *diagnostic.List) {
+	sink.MissingField = func(lit *ast.RecordLit, field string, typ ir.Type) {
+		s := at(lit)
+		diags.Add(newMissingFieldDiagnostic(s.offset, s.width, field, typ.String()))
+	}
+	sink.UnknownField = func(field *ast.FieldInit, name string, typ ir.Type) {
+		s := at(field)
+		diags.Add(newUnknownFieldDiagnostic(s.offset, s.width, name, typ.String()))
+	}
+	sink.UninferableRecord = func(lit *ast.RecordLit) {
+		s := at(lit)
+		diags.Add(newUninferableRecordDiagnostic(s.offset, s.width))
+	}
+	sink.UnknownRecordType = func(lit *ast.RecordLit, name string) {
+		s := at(lit)
+		diags.Add(newUnknownTypeDiagnostic(s.offset, s.width, name))
+	}
+	sink.NotARecord = func(lit *ast.RecordLit, typ ir.Type) {
+		s := at(lit)
+		diags.Add(newNotARecordDiagnostic(s.offset, s.width, typ.String()))
+	}
+	sink.BoundNotSatisfied = func(call *ast.CallExpr, typ, bound ir.Type) {
+		s := at(call)
+		diags.Add(newBoundNotSatisfiedDiagnostic(s.offset, s.width, typ.String(), bound.String()))
+	}
+	sink.UninferableTypeParam = func(call *ast.CallExpr, name string) {
+		s := at(call)
+		diags.Add(newUninferableTypeParamDiagnostic(s.offset, s.width, name))
+	}
+	sink.NoMethodOnUnboundedTypeVar = func(node ast.Node, method string) {
+		s := at(node)
+		diags.Add(newNoMethodOnUnboundedTypevarDiagnostic(s.offset, s.width, method))
+	}
+	sink.MapKeyNotComparable = func(lit *ast.CollectionLit, key, bound ir.Type) {
+		s := at(lit)
+		diags.Add(newBoundNotSatisfiedDiagnostic(s.offset, s.width, key.String(), bound.String()))
 	}
 }
 

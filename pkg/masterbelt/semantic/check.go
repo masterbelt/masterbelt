@@ -434,65 +434,77 @@ func checkStmts(stmts []ast.Stmt, want ir.Type, bs infer.BodyScope, env exprFold
 				infer.CheckPredicate(stmt.X, bs, sink)
 			}
 		case *ast.SwitchStmt:
-			if noSelf != nil && stmt.Scrutinee != nil {
-				checkNoSelf(stmt.Scrutinee, noSelf)
-			}
-			// A nil diagnostic list suppresses the switch diagnostics (the
-			// func-literal-types walk wants only the checking sink); the body
-			// walk still reaches every nested statement.
-			if diags != nil {
-				checkSwitch(stmt, bs, env, sink, at, diags)
-			}
-			for _, arm := range stmt.Arms {
-				checkStmts(arm.Body, want, bs, env, noSelf, sink, at, diags)
-			}
-			checkStmts(stmt.Else, want, bs, env, noSelf, sink, at, diags)
-			// Unreachable arms still type-check, so their own errors surface even
-			// though they can never run.
-			for _, arm := range stmt.AfterElse {
-				checkStmts(arm.Body, want, bs, env, noSelf, sink, at, diags)
-			}
+			checkSwitchStmt(stmt, want, bs, env, noSelf, sink, at, diags)
 		case *ast.MatchStmt:
-			if noSelf != nil && stmt.Scrutinee != nil {
-				checkNoSelf(stmt.Scrutinee, noSelf)
-			}
-			// A nil diagnostic list suppresses the match diagnostics (the
-			// func-literal-types walk wants only the checking sink); the body
-			// walk still reaches every nested statement.
-			if diags != nil {
-				checkMatch(stmt, bs, sink, at, diags)
-			}
-			// Each arm body is checked in the scope where its binding is narrowed
-			// to the arm's member type, so a reference to the binding resolves at
-			// the narrowed type.
-			for _, arm := range stmt.Arms {
-				checkStmts(arm.Body, want, armNarrowedScope(bs, arm), env, noSelf, sink, at, diags)
-			}
-			checkStmts(stmt.Else, want, bs, env, noSelf, sink, at, diags)
-			// Unreachable arms still type-check, so their own errors surface even
-			// though they can never run.
-			for _, arm := range stmt.AfterElse {
-				checkStmts(arm.Body, want, armNarrowedScope(bs, arm), env, noSelf, sink, at, diags)
-			}
+			checkMatchStmt(stmt, want, bs, env, noSelf, sink, at, diags)
 		case *ast.IfStmt:
 			checkIf(stmt, want, bs, env, noSelf, sink, at, diags)
 		case *ast.ForStmt:
-			if noSelf != nil && stmt.Iter != nil {
-				checkNoSelf(stmt.Iter, noSelf)
-			}
-			// A nil diagnostic list suppresses the for diagnostics (the
-			// func-literal-types walk wants only the checking sink); the body walk
-			// still reaches every nested statement.
-			if diags != nil {
-				checkFor(stmt, bs, sink, at, diags)
-			}
-			// The body is checked in the scope where the loop variable is bound to
-			// its element type, so a reference to it resolves at that type.
-			checkStmts(stmt.Body, want, forNarrowedScope(bs, stmt), env, noSelf, sink, at, diags)
+			checkForStmt(stmt, want, bs, env, noSelf, sink, at, diags)
 		default:
 			panic(ast.UnhandledStmt(stmt))
 		}
 	}
+}
+
+// checkSwitchStmt is the *ast.SwitchStmt arm of checkStmts: it checks the
+// switch's own diagnostics, then walks every arm body, the else, and the
+// unreachable after-else arms (which still type-check so their own errors
+// surface even though they can never run). A nil diagnostic list suppresses the
+// switch diagnostics (the func-literal-types walk wants only the checking sink);
+// the body walk still reaches every nested statement.
+func checkSwitchStmt(stmt *ast.SwitchStmt, want ir.Type, bs infer.BodyScope, env exprFolder, noSelf func(ast.Node), sink *infer.Sink, at func(ast.Node) span, diags *diagnostic.List) {
+	if noSelf != nil && stmt.Scrutinee != nil {
+		checkNoSelf(stmt.Scrutinee, noSelf)
+	}
+	if diags != nil {
+		checkSwitch(stmt, bs, env, sink, at, diags)
+	}
+	for _, arm := range stmt.Arms {
+		checkStmts(arm.Body, want, bs, env, noSelf, sink, at, diags)
+	}
+	checkStmts(stmt.Else, want, bs, env, noSelf, sink, at, diags)
+	for _, arm := range stmt.AfterElse {
+		checkStmts(arm.Body, want, bs, env, noSelf, sink, at, diags)
+	}
+}
+
+// checkMatchStmt is the *ast.MatchStmt arm of checkStmts: it checks the match's
+// own diagnostics, then walks every arm body in the scope where its binding is
+// narrowed to the arm's member type, the else, and the unreachable after-else
+// arms (which still type-check so their own errors surface). A nil diagnostic
+// list suppresses the match diagnostics (the func-literal-types walk wants only
+// the checking sink); the body walk still reaches every nested statement.
+func checkMatchStmt(stmt *ast.MatchStmt, want ir.Type, bs infer.BodyScope, env exprFolder, noSelf func(ast.Node), sink *infer.Sink, at func(ast.Node) span, diags *diagnostic.List) {
+	if noSelf != nil && stmt.Scrutinee != nil {
+		checkNoSelf(stmt.Scrutinee, noSelf)
+	}
+	if diags != nil {
+		checkMatch(stmt, bs, sink, at, diags)
+	}
+	for _, arm := range stmt.Arms {
+		checkStmts(arm.Body, want, armNarrowedScope(bs, arm), env, noSelf, sink, at, diags)
+	}
+	checkStmts(stmt.Else, want, bs, env, noSelf, sink, at, diags)
+	for _, arm := range stmt.AfterElse {
+		checkStmts(arm.Body, want, armNarrowedScope(bs, arm), env, noSelf, sink, at, diags)
+	}
+}
+
+// checkForStmt is the *ast.ForStmt arm of checkStmts: it checks the loop's own
+// diagnostics, then walks its body in the scope where the loop variable is bound
+// to its element type, so a reference to it resolves at that type. A nil
+// diagnostic list suppresses the for diagnostics (the func-literal-types walk
+// wants only the checking sink); the body walk still reaches every nested
+// statement.
+func checkForStmt(stmt *ast.ForStmt, want ir.Type, bs infer.BodyScope, env exprFolder, noSelf func(ast.Node), sink *infer.Sink, at func(ast.Node) span, diags *diagnostic.List) {
+	if noSelf != nil && stmt.Iter != nil {
+		checkNoSelf(stmt.Iter, noSelf)
+	}
+	if diags != nil {
+		checkFor(stmt, bs, sink, at, diags)
+	}
+	checkStmts(stmt.Body, want, forNarrowedScope(bs, stmt), env, noSelf, sink, at, diags)
 }
 
 // scrutEnumOf builds the scrutinee-enum resolver return analysis uses: it reads

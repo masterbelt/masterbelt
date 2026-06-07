@@ -69,120 +69,141 @@ func Match(reg *builtin.Registry, pattern, arg ir.Type, subst map[string]ir.Type
 	}
 	switch p := pattern.(type) {
 	case *ir.Func:
-		a, ok := arg.(*ir.Func)
-		if !ok || len(a.Params) != len(p.Params) {
-			return false
-		}
-		for i := range p.Params {
-			if !Match(reg, p.Params[i], a.Params[i], subst) {
-				return false
-			}
-		}
-		return Match(reg, p.Result, a.Result, subst)
+		return matchFunc(reg, p, arg, subst)
 	case *ir.App:
-		// Two applications of the same constructor match argument-wise — list<T>
-		// against list<int> binds T = int — the structural rule that also solves a
-		// generic collection parameter.
-		if a, ok := arg.(*ir.App); ok && a.Def == p.Def && len(a.Args) == len(p.Args) {
-			for i := range p.Args {
-				if !Match(reg, p.Args[i], a.Args[i], subst) {
-					return false
-				}
-			}
-			return true
-		}
-		// A generic union alias (optional<T> = T | null) matches through its
-		// expansion: the application's arguments are substituted into the
-		// definition's body, and the resulting union solves the same way a bare
-		// union pattern does — a member value flowing in (5 into optional<int>)
-		// binds the alias' parameter (T = int). A non-union application (list<int>)
-		// has no union body, so UnionType returns nil and the match fails, leaving
-		// the collection path unchanged.
-		if u := UnionType(p); u != nil {
-			return Match(reg, u, arg, subst)
-		}
-		// The constructor did not match (or the argument is not an application).
-		// When the pattern carries no free variable left to solve, there is
-		// nothing generic to infer here, so fall back to assignability — the same
-		// rule the non-generic path uses. This is what lets a child interface flow
-		// to a generic parent application (an intBox value to a box<nint> position):
-		// the expected box<nint> is a concrete App, the argument intBox a Named, so
-		// the constructor check above misses and assignability's interface
-		// width-subtyping decides it. The no-free-var guard keeps generic inference
-		// untouched — a still-open box<T> never reaches assignability — mirroring
-		// the concrete-pattern guards the record and union cases already use.
-		if !hasFreeVar(p, subst) {
-			return Assignable(reg, arg, pattern)
-		}
-		return false
+		return matchApp(reg, p, arg, subst)
 	case *ir.Record:
-		// A concrete record pattern (no variable to solve) keeps the old
-		// assignability rule, so nothing about the non-generic path changes; a
-		// pattern carrying a variable ({ v: T }) is matched field-by-field by
-		// name, each pattern field's pattern against the argument's same-named
-		// field — mirroring Substitute's field-wise recursion, so a variable
-		// introduced inside a record parameter is also solved from the argument.
-		// The argument may be a nominal record, looked through to its fields.
-		if !hasFreeVar(p, subst) {
-			return Assignable(reg, arg, pattern)
-		}
-		a := recordType(arg)
-		if a == nil {
+		return matchRecord(reg, p, arg, subst)
+	case *ir.Union:
+		return matchUnion(reg, p, arg, subst)
+	default:
+		return Assignable(reg, arg, pattern)
+	}
+}
+
+// matchFunc matches a function pattern structurally: same parameter count, each
+// parameter and the result matched in turn.
+func matchFunc(reg *builtin.Registry, p *ir.Func, arg ir.Type, subst map[string]ir.Type) bool {
+	a, ok := arg.(*ir.Func)
+	if !ok || len(a.Params) != len(p.Params) {
+		return false
+	}
+	for i := range p.Params {
+		if !Match(reg, p.Params[i], a.Params[i], subst) {
 			return false
 		}
-		fields := make(map[string]ir.Type, len(a.Fields))
-		for _, f := range a.Fields {
-			fields[f.Name] = f.Type
-		}
-		for _, pf := range p.Fields {
-			af, ok := fields[pf.Name]
-			if !ok || !Match(reg, pf.Type, af, subst) {
+	}
+	return Match(reg, p.Result, a.Result, subst)
+}
+
+// matchApp matches a generic-application pattern. See Match for the rule.
+func matchApp(reg *builtin.Registry, p *ir.App, arg ir.Type, subst map[string]ir.Type) bool {
+	// Two applications of the same constructor match argument-wise — list<T>
+	// against list<int> binds T = int — the structural rule that also solves a
+	// generic collection parameter.
+	if a, ok := arg.(*ir.App); ok && a.Def == p.Def && len(a.Args) == len(p.Args) {
+		for i := range p.Args {
+			if !Match(reg, p.Args[i], a.Args[i], subst) {
 				return false
 			}
 		}
 		return true
-	case *ir.Union:
-		// A concrete union pattern (no variable to solve) keeps the old
-		// assignability rule — which already accepts a member value, a reordered
-		// union, or a narrower union — so the non-generic path is unchanged. A
-		// pattern carrying a variable (T | error — the central unwrap use-case)
-		// solves it: a same-arity union argument pairs positionally (int | error
-		// binds T = int), and any other argument is one member's value flowing in,
-		// matched against the members concrete-first so an error matches the error
-		// member without binding T while an int binds T = int.
-		if !hasFreeVar(p, subst) {
-			return Assignable(reg, arg, pattern)
+	}
+	// A generic union alias (optional<T> = T | null) matches through its
+	// expansion: the application's arguments are substituted into the
+	// definition's body, and the resulting union solves the same way a bare
+	// union pattern does — a member value flowing in (5 into optional<int>)
+	// binds the alias' parameter (T = int). A non-union application (list<int>)
+	// has no union body, so UnionType returns nil and the match fails, leaving
+	// the collection path unchanged.
+	if u := UnionType(p); u != nil {
+		return Match(reg, u, arg, subst)
+	}
+	// The constructor did not match (or the argument is not an application).
+	// When the pattern carries no free variable left to solve, there is
+	// nothing generic to infer here, so fall back to assignability — the same
+	// rule the non-generic path uses. This is what lets a child interface flow
+	// to a generic parent application (an intBox value to a box<nint> position):
+	// the expected box<nint> is a concrete App, the argument intBox a Named, so
+	// the constructor check above misses and assignability's interface
+	// width-subtyping decides it. The no-free-var guard keeps generic inference
+	// untouched — a still-open box<T> never reaches assignability — mirroring
+	// the concrete-pattern guards the record and union cases already use.
+	if !hasFreeVar(p, subst) {
+		return Assignable(reg, arg, p)
+	}
+	return false
+}
+
+// matchRecord matches a record pattern. See Match for the rule.
+func matchRecord(reg *builtin.Registry, p *ir.Record, arg ir.Type, subst map[string]ir.Type) bool {
+	// A concrete record pattern (no variable to solve) keeps the old
+	// assignability rule, so nothing about the non-generic path changes; a
+	// pattern carrying a variable ({ v: T }) is matched field-by-field by
+	// name, each pattern field's pattern against the argument's same-named
+	// field — mirroring Substitute's field-wise recursion, so a variable
+	// introduced inside a record parameter is also solved from the argument.
+	// The argument may be a nominal record, looked through to its fields.
+	if !hasFreeVar(p, subst) {
+		return Assignable(reg, arg, p)
+	}
+	a := recordType(arg)
+	if a == nil {
+		return false
+	}
+	fields := make(map[string]ir.Type, len(a.Fields))
+	for _, f := range a.Fields {
+		fields[f.Name] = f.Type
+	}
+	for _, pf := range p.Fields {
+		af, ok := fields[pf.Name]
+		if !ok || !Match(reg, pf.Type, af, subst) {
+			return false
 		}
-		if a, ok := arg.(*ir.Union); ok && len(a.Members) == len(p.Members) {
-			trial := maps.Clone(subst)
-			paired := true
-			for i := range p.Members {
-				if !Match(reg, p.Members[i], a.Members[i], trial) {
-					paired = false
-					break
-				}
+	}
+	return true
+}
+
+// matchUnion matches a union pattern. See Match for the rule.
+func matchUnion(reg *builtin.Registry, p *ir.Union, arg ir.Type, subst map[string]ir.Type) bool {
+	// A concrete union pattern (no variable to solve) keeps the old
+	// assignability rule — which already accepts a member value, a reordered
+	// union, or a narrower union — so the non-generic path is unchanged. A
+	// pattern carrying a variable (T | error — the central unwrap use-case)
+	// solves it: a same-arity union argument pairs positionally (int | error
+	// binds T = int), and any other argument is one member's value flowing in,
+	// matched against the members concrete-first so an error matches the error
+	// member without binding T while an int binds T = int.
+	if !hasFreeVar(p, subst) {
+		return Assignable(reg, arg, p)
+	}
+	if a, ok := arg.(*ir.Union); ok && len(a.Members) == len(p.Members) {
+		trial := maps.Clone(subst)
+		paired := true
+		for i := range p.Members {
+			if !Match(reg, p.Members[i], a.Members[i], trial) {
+				paired = false
+				break
 			}
-			if paired {
+		}
+		if paired {
+			maps.Copy(subst, trial)
+			return true
+		}
+	}
+	for _, free := range []bool{false, true} {
+		for _, m := range p.Members {
+			if hasFreeVar(m, subst) != free {
+				continue
+			}
+			trial := maps.Clone(subst)
+			if Match(reg, m, arg, trial) {
 				maps.Copy(subst, trial)
 				return true
 			}
 		}
-		for _, free := range []bool{false, true} {
-			for _, m := range p.Members {
-				if hasFreeVar(m, subst) != free {
-					continue
-				}
-				trial := maps.Clone(subst)
-				if Match(reg, m, arg, trial) {
-					maps.Copy(subst, trial)
-					return true
-				}
-			}
-		}
-		return false
-	default:
-		return Assignable(reg, arg, pattern)
 	}
+	return false
 }
 
 // hasFreeVar reports whether t still contains a type variable not yet bound in

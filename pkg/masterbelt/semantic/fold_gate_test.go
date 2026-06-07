@@ -14,6 +14,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/masterbelt/masterbelt/pkg/diagnostic"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/eval"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/lower"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/parser/abstract"
@@ -111,61 +112,85 @@ func TestFoldTotalityCorpus(t *testing.T) {
 			continue
 		}
 		files[name] = true
-		t.Run(name, func(t *testing.T) {
-			src, err := os.ReadFile(filepath.Join(foldCorpus, name))
-			if err != nil {
-				t.Fatal(err)
-			}
-			exp := parseFoldExpect(t, name, src)
-			doc := abstract.NewDocument(src)
-			for _, d := range doc.Concrete().LexDiagnostics() {
-				t.Fatalf("lex diagnostic: %s @%d: %s", d.Code, d.Offset, d.Message)
-			}
-			for _, d := range doc.Diagnostics() {
-				t.Fatalf("parse diagnostic: %s @%d: %s", d.Code, d.Offset, d.Message)
-			}
-			module, diags := Analyze(doc)
-
-			if reason, known := knownGaps[name]; known {
-				// A known gap is silent today: green analysis, missing value.
-				// Both halves are asserted so the entry cannot outlive the fix.
-				if len(diags) != 0 {
-					t.Errorf("known gap (%s) now has diagnostics %v — update its corpus expectation and remove it from knownGaps", reason, codes(diags))
-				}
-				if missing := unfoldedItems(module); len(missing) == 0 {
-					t.Errorf("known gap (%s) now folds — remove it from knownGaps to arm the gate", reason)
-				}
-				return
-			}
-
-			if exp.folds {
-				for _, d := range diags {
-					t.Errorf("unexpected diagnostic: %s @%d: %s", d.Code, d.Offset, d.Message)
-				}
-				for _, item := range unfoldedItems(module) {
-					t.Errorf("%s did not fold", item)
-				}
-				return
-			}
-			for _, code := range exp.codes {
-				found := false
-				for _, d := range diags {
-					if strings.HasSuffix(string(d.Code), "."+code) {
-						found = true
-						break
-					}
-				}
-				if !found {
-					t.Errorf("expected diagnostic %s, got %v", code, codes(diags))
-				}
-			}
-		})
+		t.Run(name, func(t *testing.T) { checkFoldCorpusCase(t, name) })
 	}
 	// Every known-gap entry must name a corpus file, so a renamed or deleted
 	// case cannot leave a stale exemption behind.
 	for name := range knownGaps {
 		if !files[name] {
 			t.Errorf("knownGaps entry %q names no corpus file", name)
+		}
+	}
+}
+
+// checkFoldCorpusCase analyzes one corpus file and asserts it meets its
+// directive: a known gap is still silently broken, a folds case is
+// diagnostic-free with every value present, and a diagnosed case carries its
+// expected codes.
+func checkFoldCorpusCase(t *testing.T, name string) {
+	t.Helper()
+	src, err := os.ReadFile(filepath.Join(foldCorpus, name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	exp := parseFoldExpect(t, name, src)
+	doc := abstract.NewDocument(src)
+	for _, d := range doc.Concrete().LexDiagnostics() {
+		t.Fatalf("lex diagnostic: %s @%d: %s", d.Code, d.Offset, d.Message)
+	}
+	for _, d := range doc.Diagnostics() {
+		t.Fatalf("parse diagnostic: %s @%d: %s", d.Code, d.Offset, d.Message)
+	}
+	module, diags := Analyze(doc)
+
+	if reason, known := knownGaps[name]; known {
+		assertKnownGap(t, reason, module, diags)
+		return
+	}
+	if exp.folds {
+		assertFolds(t, module, diags)
+		return
+	}
+	assertExpectedCodes(t, exp.codes, diags)
+}
+
+// assertKnownGap asserts a known gap is silent today: green analysis, missing
+// value. Both halves are asserted so the entry cannot outlive the fix.
+func assertKnownGap(t *testing.T, reason string, module *ir.Module, diags []diagnostic.Diagnostic) {
+	t.Helper()
+	if len(diags) != 0 {
+		t.Errorf("known gap (%s) now has diagnostics %v — update its corpus expectation and remove it from knownGaps", reason, codes(diags))
+	}
+	if missing := unfoldedItems(module); len(missing) == 0 {
+		t.Errorf("known gap (%s) now folds — remove it from knownGaps to arm the gate", reason)
+	}
+}
+
+// assertFolds asserts a folds case is diagnostic-free with every value present.
+func assertFolds(t *testing.T, module *ir.Module, diags []diagnostic.Diagnostic) {
+	t.Helper()
+	for _, d := range diags {
+		t.Errorf("unexpected diagnostic: %s @%d: %s", d.Code, d.Offset, d.Message)
+	}
+	for _, item := range unfoldedItems(module) {
+		t.Errorf("%s did not fold", item)
+	}
+}
+
+// assertExpectedCodes asserts every expected diagnostic code appears among the
+// analysis diagnostics.
+func assertExpectedCodes(t *testing.T, want []string, diags []diagnostic.Diagnostic) {
+	t.Helper()
+	for _, code := range want {
+		found := false
+		for _, d := range diags {
+			if strings.HasSuffix(string(d.Code), "."+code) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("expected diagnostic %s, got %v", code, codes(diags))
 		}
 	}
 }

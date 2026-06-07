@@ -294,15 +294,8 @@ func (s BodyScope) leaf(e ast.Expr) ir.Type {
 		// (Element.Fire) or an associated constant (int8.Max, Level.Max) — is a
 		// value of that type; a local or parameter shadowing the type name takes
 		// the record-field reading instead.
-		if recv, ok := e.Receiver.(*ast.Identifier); ok {
-			if !s.shadows(recv.Name) {
-				if t := enumMemberType(s.Universe, e); t != ir.Invalid {
-					return t
-				}
-				if t := assocConstType(s.Universe, e); t != ir.Invalid {
-					return t
-				}
-			}
+		if t, ok := s.typeMemberValue(e); ok {
+			return t
 		}
 		// A member access used as a value is a record field access or a getter read
 		// (value.name) the receiver's type declares.
@@ -310,6 +303,25 @@ func (s BodyScope) leaf(e ast.Expr) ir.Type {
 	default:
 		return ir.Invalid
 	}
+}
+
+// typeMemberValue reads a member access whose receiver names a type as a value:
+// an enum member (Element.Fire) or an associated constant (int8.Max, Level.Max),
+// of that type. It returns ok=false — leaving the caller to take the
+// record-field reading — when the receiver does not name a type, a local or
+// parameter shadows the type name, or it is neither member kind.
+func (s BodyScope) typeMemberValue(e *ast.MemberExpr) (ir.Type, bool) {
+	recv, ok := e.Receiver.(*ast.Identifier)
+	if !ok || s.shadows(recv.Name) {
+		return ir.Invalid, false
+	}
+	if t := enumMemberType(s.Universe, e); t != ir.Invalid {
+		return t, true
+	}
+	if t := assocConstType(s.Universe, e); t != ir.Invalid {
+		return t, true
+	}
+	return ir.Invalid, false
 }
 
 // lookupType resolves a type name (a conversion callee) to its type against

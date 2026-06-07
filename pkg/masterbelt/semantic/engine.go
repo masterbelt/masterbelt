@@ -284,30 +284,17 @@ func (db *database) demand(key queryKey) any {
 func equalValue(kind queryKind, old, fresh any) bool {
 	switch kind {
 	case qSymbols:
-		a, _ := old.(map[string]*ast.ConstDecl)
-		b, _ := fresh.(map[string]*ast.ConstDecl)
-		return maps.Equal(a, b)
+		return equalSymbolValues(old, fresh)
 	case qResolve:
 		return old == fresh // resolution is comparable
 	case qFuncSymbols:
-		a, _ := old.(map[string][]*ast.FuncDecl)
-		b, _ := fresh.(map[string][]*ast.FuncDecl)
-		return maps.EqualFunc(a, b, slices.Equal)
+		return equalFuncSymbolValues(old, fresh)
 	case qResolveFunc:
-		// The overload set: the declaration pointers are the fact.
-		a, _ := old.([]*ast.FuncDecl)
-		b, _ := fresh.([]*ast.FuncDecl)
-		return slices.Equal(a, b)
+		return equalResolveFuncValues(old, fresh)
 	case qImports:
-		a, _ := old.(importTable)
-		b, _ := fresh.(importTable)
-		return maps.Equal(a.values, b.values) && maps.Equal(a.types, b.types) &&
-			maps.EqualFunc(a.funcs, b.funcs, equalFuncBindings) && maps.Equal(a.namespaces, b.namespaces)
+		return equalImportValues(old, fresh)
 	case qExports:
-		a, _ := old.(exports)
-		b, _ := fresh.(exports)
-		return maps.Equal(a.consts, b.consts) && maps.Equal(a.types, b.types) &&
-			maps.EqualFunc(a.funcs, b.funcs, slices.Equal)
+		return equalExportValues(old, fresh)
 	case qReachable:
 		a, _ := old.(map[FileID]bool)
 		b, _ := fresh.(map[FileID]bool)
@@ -318,15 +305,9 @@ func equalValue(kind queryKind, old, fresh any) bool {
 		// could save.
 		return false
 	case qTypeDefs:
-		a, _ := old.(typeDefs)
-		b, _ := fresh.(typeDefs)
-		return slices.Equal(a.list, b.list) && maps.Equal(a.byName, b.byName) && maps.Equal(a.universe, b.universe)
+		return equalTypeDefValues(old, fresh)
 	case qFuncs:
-		// The function shells: the pointers are the facts (an edit re-parses
-		// into fresh declarations, hence fresh shells).
-		a, _ := old.([]*ir.Function)
-		b, _ := fresh.([]*ir.Function)
-		return slices.Equal(a, b)
+		return equalFuncShellValues(old, fresh)
 	case qTypeOf:
 		a, _ := old.(ir.Type)
 		b, _ := fresh.(ir.Type)
@@ -338,6 +319,65 @@ func equalValue(kind queryKind, old, fresh any) bool {
 	default:
 		return reflect.DeepEqual(old, fresh)
 	}
+}
+
+// equalSymbolValues is the qSymbols arm of equalValue: the const declaration
+// symbols compare by their pointer facts.
+func equalSymbolValues(old, fresh any) bool {
+	a, _ := old.(map[string]*ast.ConstDecl)
+	b, _ := fresh.(map[string]*ast.ConstDecl)
+	return maps.Equal(a, b)
+}
+
+// equalFuncSymbolValues is the qFuncSymbols arm of equalValue: the per-name
+// overload sets compare by their declaration pointer facts.
+func equalFuncSymbolValues(old, fresh any) bool {
+	a, _ := old.(map[string][]*ast.FuncDecl)
+	b, _ := fresh.(map[string][]*ast.FuncDecl)
+	return maps.EqualFunc(a, b, slices.Equal)
+}
+
+// equalResolveFuncValues is the qResolveFunc arm of equalValue: the overload
+// set's declaration pointers are the fact.
+func equalResolveFuncValues(old, fresh any) bool {
+	a, _ := old.([]*ast.FuncDecl)
+	b, _ := fresh.([]*ast.FuncDecl)
+	return slices.Equal(a, b)
+}
+
+// equalFuncShellValues is the qFuncs arm of equalValue: the function shells'
+// pointers are the facts (an edit re-parses into fresh declarations, hence
+// fresh shells).
+func equalFuncShellValues(old, fresh any) bool {
+	a, _ := old.([]*ir.Function)
+	b, _ := fresh.([]*ir.Function)
+	return slices.Equal(a, b)
+}
+
+// equalImportValues is the qImports arm of equalValue: the import table's
+// value, type, function, and namespace bindings each compare by their facts.
+func equalImportValues(old, fresh any) bool {
+	a, _ := old.(importTable)
+	b, _ := fresh.(importTable)
+	return maps.Equal(a.values, b.values) && maps.Equal(a.types, b.types) &&
+		maps.EqualFunc(a.funcs, b.funcs, equalFuncBindings) && maps.Equal(a.namespaces, b.namespaces)
+}
+
+// equalExportValues is the qExports arm of equalValue: the exported consts,
+// types, and function overload sets each compare by their facts.
+func equalExportValues(old, fresh any) bool {
+	a, _ := old.(exports)
+	b, _ := fresh.(exports)
+	return maps.Equal(a.consts, b.consts) && maps.Equal(a.types, b.types) &&
+		maps.EqualFunc(a.funcs, b.funcs, slices.Equal)
+}
+
+// equalTypeDefValues is the qTypeDefs arm of equalValue: the definition list,
+// the by-name index, and the universe each compare by their facts.
+func equalTypeDefValues(old, fresh any) bool {
+	a, _ := old.(typeDefs)
+	b, _ := fresh.(typeDefs)
+	return slices.Equal(a.list, b.list) && maps.Equal(a.byName, b.byName) && maps.Equal(a.universe, b.universe)
 }
 
 // equalFuncBindings is funcBinding equality for the cutoff: the overload set's
@@ -374,49 +414,13 @@ func equalTypes(a, b ir.Type) bool {
 		y, ok := b.(*ir.Named)
 		return ok && x.Def == y.Def
 	case *ir.App:
-		y, ok := b.(*ir.App)
-		if !ok || x.Def != y.Def || len(x.Args) != len(y.Args) {
-			return false
-		}
-		for i := range x.Args {
-			if !equalTypes(x.Args[i], y.Args[i]) {
-				return false
-			}
-		}
-		return true
+		return equalAppTypes(x, b)
 	case *ir.Union:
-		y, ok := b.(*ir.Union)
-		if !ok || len(x.Members) != len(y.Members) {
-			return false
-		}
-		for i := range x.Members {
-			if !equalTypes(x.Members[i], y.Members[i]) {
-				return false
-			}
-		}
-		return true
+		return equalUnionTypes(x, b)
 	case *ir.Record:
-		y, ok := b.(*ir.Record)
-		if !ok || len(x.Fields) != len(y.Fields) {
-			return false
-		}
-		for i := range x.Fields {
-			if x.Fields[i].Name != y.Fields[i].Name || !equalTypes(x.Fields[i].Type, y.Fields[i].Type) {
-				return false
-			}
-		}
-		return true
+		return equalRecordTypes(x, b)
 	case *ir.Func:
-		y, ok := b.(*ir.Func)
-		if !ok || len(x.Params) != len(y.Params) || !equalTypes(x.Result, y.Result) {
-			return false
-		}
-		for i := range x.Params {
-			if !equalTypes(x.Params[i], y.Params[i]) {
-				return false
-			}
-		}
-		return true
+		return equalFuncTypes(x, b)
 	case *ir.TypeVar:
 		y, ok := b.(*ir.TypeVar)
 		return ok && x.Name == y.Name
@@ -426,6 +430,66 @@ func equalTypes(a, b ir.Type) bool {
 	default:
 		return false
 	}
+}
+
+// equalAppTypes is the *ir.App arm of equalTypes: same definition pointer and
+// element-wise equal arguments.
+func equalAppTypes(x *ir.App, b ir.Type) bool {
+	y, ok := b.(*ir.App)
+	if !ok || x.Def != y.Def || len(x.Args) != len(y.Args) {
+		return false
+	}
+	for i := range x.Args {
+		if !equalTypes(x.Args[i], y.Args[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+// equalUnionTypes is the *ir.Union arm of equalTypes: element-wise equal
+// members in order.
+func equalUnionTypes(x *ir.Union, b ir.Type) bool {
+	y, ok := b.(*ir.Union)
+	if !ok || len(x.Members) != len(y.Members) {
+		return false
+	}
+	for i := range x.Members {
+		if !equalTypes(x.Members[i], y.Members[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+// equalRecordTypes is the *ir.Record arm of equalTypes: element-wise equal
+// field names and types in order.
+func equalRecordTypes(x *ir.Record, b ir.Type) bool {
+	y, ok := b.(*ir.Record)
+	if !ok || len(x.Fields) != len(y.Fields) {
+		return false
+	}
+	for i := range x.Fields {
+		if x.Fields[i].Name != y.Fields[i].Name || !equalTypes(x.Fields[i].Type, y.Fields[i].Type) {
+			return false
+		}
+	}
+	return true
+}
+
+// equalFuncTypes is the *ir.Func arm of equalTypes: equal result and
+// element-wise equal parameters in order.
+func equalFuncTypes(x *ir.Func, b ir.Type) bool {
+	y, ok := b.(*ir.Func)
+	if !ok || len(x.Params) != len(y.Params) || !equalTypes(x.Result, y.Result) {
+		return false
+	}
+	for i := range x.Params {
+		if !equalTypes(x.Params[i], y.Params[i]) {
+			return false
+		}
+	}
+	return true
 }
 
 // verify reports whether a memo's dependencies are all unchanged, so the memo
@@ -475,34 +539,12 @@ func (db *database) compute(key queryKey) any {
 		in, _ := db.read(inputKey(key.file)).(fileInput)
 		return buildSymbols(in.file)
 	case qResolve:
-		// Locals shadow imports; an imported name claimed by two or more
-		// imports resolves to nothing and is flagged ambiguous.
-		syms := db.read(symbolsKey(key.file)).(map[string]*ast.ConstDecl)
-		if d := syms[key.id.Name]; d != nil {
-			return resolution{decl: d}
-		}
-		imp, _ := db.read(importsKey(key.file)).(importTable)
-		if b, ok := imp.values[key.id.Name]; ok {
-			if b.ambiguous {
-				return resolution{ambiguous: true}
-			}
-			return resolution{decl: b.target}
-		}
-		return resolution{}
+		return db.computeResolve(key)
 	case qFuncSymbols:
 		in, _ := db.read(inputKey(key.file)).(fileInput)
 		return buildFuncSymbols(in.file)
 	case qResolveFunc:
-		// Local functions shadow imports, exactly as values do.
-		syms := db.read(funcSymbolsKey(key.file)).(map[string][]*ast.FuncDecl)
-		if fds := syms[key.id.Name]; len(fds) > 0 {
-			return fds
-		}
-		imp, _ := db.read(importsKey(key.file)).(importTable)
-		if b, ok := imp.funcs[key.id.Name]; ok && !b.ambiguous {
-			return b.targets
-		}
-		return ([]*ast.FuncDecl)(nil)
+		return db.computeResolveFunc(key)
 	case qTypeOf:
 		return infer.Decl(key.decl, typeEnv{q: engineQueries{db}, file: db.declFile[key.decl]})
 	case qValue:
@@ -520,19 +562,55 @@ func (db *database) compute(key queryKey) any {
 		// the set's dependencies are exactly the files it covers.
 		return computeReachable(engineQueries{db}, key.file)
 	case qModule:
-		in, _ := db.read(inputKey(key.file)).(fileInput)
-		if in.file == nil {
-			return assembly{}
-		}
-		// Every fact assemble pulls is read through the engine inside this
-		// computation, so the memo's dependencies are exactly what the
-		// module was built from; positions derive from the file's own tree,
-		// which the input read above covers.
-		module, diags := assemble(key.file, in.file, positionsOf(cst.Root(in.file.Syntax())), engineQueries{db}, db.shells, db.fnShells)
-		return assembly{module: module, diags: diags}
+		return db.computeModule(key)
 	default:
 		return nil
 	}
+}
+
+// computeResolve is the qResolve arm of compute: locals shadow imports; an
+// imported name claimed by two or more imports resolves to nothing and is
+// flagged ambiguous.
+func (db *database) computeResolve(key queryKey) any {
+	syms := db.read(symbolsKey(key.file)).(map[string]*ast.ConstDecl)
+	if d := syms[key.id.Name]; d != nil {
+		return resolution{decl: d}
+	}
+	imp, _ := db.read(importsKey(key.file)).(importTable)
+	if b, ok := imp.values[key.id.Name]; ok {
+		if b.ambiguous {
+			return resolution{ambiguous: true}
+		}
+		return resolution{decl: b.target}
+	}
+	return resolution{}
+}
+
+// computeResolveFunc is the qResolveFunc arm of compute: local functions shadow
+// imports, exactly as values do.
+func (db *database) computeResolveFunc(key queryKey) any {
+	syms := db.read(funcSymbolsKey(key.file)).(map[string][]*ast.FuncDecl)
+	if fds := syms[key.id.Name]; len(fds) > 0 {
+		return fds
+	}
+	imp, _ := db.read(importsKey(key.file)).(importTable)
+	if b, ok := imp.funcs[key.id.Name]; ok && !b.ambiguous {
+		return b.targets
+	}
+	return ([]*ast.FuncDecl)(nil)
+}
+
+// computeModule is the qModule arm of compute. Every fact assemble pulls is
+// read through the engine inside this computation, so the memo's dependencies
+// are exactly what the module was built from; positions derive from the file's
+// own tree, which the input read above covers.
+func (db *database) computeModule(key queryKey) any {
+	in, _ := db.read(inputKey(key.file)).(fileInput)
+	if in.file == nil {
+		return assembly{}
+	}
+	module, diags := assemble(key.file, in.file, positionsOf(cst.Root(in.file.Syntax())), engineQueries{db}, db.shells, db.fnShells)
+	return assembly{module: module, diags: diags}
 }
 
 // cycleValue is the fallback a query yields when a cycle is detected: an

@@ -264,18 +264,12 @@ func writeTypeList(w *treetext.Writer, depth int, name string, items []Type) err
 	return nil
 }
 
-// decodeType decodes an element into its Type form.
+// decodeType decodes an element into its Type form, dispatching on the
+// heading to the form's decoder.
 func decodeType(e *treetext.Element) (Type, error) {
 	switch e.Head {
 	case "Builtin":
-		if err := treetext.ExpectFields(e, "Name"); err != nil {
-			return nil, err
-		}
-		name, err := treetext.String(e.Fields[0])
-		if err != nil {
-			return nil, err
-		}
-		return &Builtin{Name: name}, nil
+		return decodeBuiltinType(e)
 	case "Invalid":
 		if err := treetext.ExpectFields(e); err != nil {
 			return nil, err
@@ -287,74 +281,117 @@ func decodeType(e *treetext.Element) (Type, error) {
 		}
 		return &SelfType{}, nil
 	case "Named":
-		if err := treetext.ExpectFields(e, "Def"); err != nil {
-			return nil, err
-		}
-		def, err := unrefTypeDef(e.Fields[0])
-		if err != nil {
-			return nil, err
-		}
-		return &Named{Def: def}, nil
+		return decodeNamedType(e)
 	case "Union":
-		if err := treetext.ExpectFields(e, "Members"); err != nil {
-			return nil, err
-		}
-		members, err := decodeTypeList(e.Fields[0])
-		if err != nil {
-			return nil, err
-		}
-		return &Union{Members: members}, nil
+		return decodeUnionType(e)
 	case "Record":
-		if err := treetext.ExpectFields(e, "Fields"); err != nil {
-			return nil, err
-		}
-		fields, err := decodeRecordFields(e.Fields[0])
-		if err != nil {
-			return nil, err
-		}
-		return &Record{Fields: fields}, nil
+		return decodeRecordType(e)
 	case "Func":
-		if err := treetext.ExpectFields(e, "Params", "Result"); err != nil {
-			return nil, err
-		}
-		params, err := decodeTypeList(e.Fields[0])
-		if err != nil {
-			return nil, err
-		}
-		result, err := decodeTypeField(e.Fields[1])
-		if err != nil {
-			return nil, err
-		}
-		return &Func{Params: params, Result: result}, nil
+		return decodeFuncType(e)
 	case "TypeVar":
-		if err := treetext.ExpectFields(e, "Name", "Bound"); err != nil {
-			return nil, err
-		}
-		name, err := treetext.String(e.Fields[0])
-		if err != nil {
-			return nil, err
-		}
-		bound, err := decodeTypeField(e.Fields[1])
-		if err != nil {
-			return nil, err
-		}
-		return &TypeVar{Name: name, Bound: bound}, nil
+		return decodeTypeVar(e)
 	case "App":
-		if err := treetext.ExpectFields(e, "Def", "Args"); err != nil {
-			return nil, err
-		}
-		def, err := unrefTypeDef(e.Fields[0])
-		if err != nil {
-			return nil, err
-		}
-		args, err := decodeTypeList(e.Fields[1])
-		if err != nil {
-			return nil, err
-		}
-		return &App{Def: def, Args: args}, nil
+		return decodeAppType(e)
 	default:
 		return nil, fmt.Errorf("treetext: line %d: %s is not a known Type", e.Line, e.Head)
 	}
+}
+
+// decodeBuiltinType decodes a primitive type by name.
+func decodeBuiltinType(e *treetext.Element) (Type, error) {
+	if err := treetext.ExpectFields(e, "Name"); err != nil {
+		return nil, err
+	}
+	name, err := treetext.String(e.Fields[0])
+	if err != nil {
+		return nil, err
+	}
+	return &Builtin{Name: name}, nil
+}
+
+// decodeNamedType decodes a nominal reference into its placeholder.
+func decodeNamedType(e *treetext.Element) (Type, error) {
+	if err := treetext.ExpectFields(e, "Def"); err != nil {
+		return nil, err
+	}
+	def, err := unrefTypeDef(e.Fields[0])
+	if err != nil {
+		return nil, err
+	}
+	return &Named{Def: def}, nil
+}
+
+// decodeUnionType decodes a union's member list.
+func decodeUnionType(e *treetext.Element) (Type, error) {
+	if err := treetext.ExpectFields(e, "Members"); err != nil {
+		return nil, err
+	}
+	members, err := decodeTypeList(e.Fields[0])
+	if err != nil {
+		return nil, err
+	}
+	return &Union{Members: members}, nil
+}
+
+// decodeRecordType decodes an anonymous product type's fields.
+func decodeRecordType(e *treetext.Element) (Type, error) {
+	if err := treetext.ExpectFields(e, "Fields"); err != nil {
+		return nil, err
+	}
+	fields, err := decodeRecordFields(e.Fields[0])
+	if err != nil {
+		return nil, err
+	}
+	return &Record{Fields: fields}, nil
+}
+
+// decodeFuncType decodes a function type's parameters and result.
+func decodeFuncType(e *treetext.Element) (Type, error) {
+	if err := treetext.ExpectFields(e, "Params", "Result"); err != nil {
+		return nil, err
+	}
+	params, err := decodeTypeList(e.Fields[0])
+	if err != nil {
+		return nil, err
+	}
+	result, err := decodeTypeField(e.Fields[1])
+	if err != nil {
+		return nil, err
+	}
+	return &Func{Params: params, Result: result}, nil
+}
+
+// decodeTypeVar decodes a generic type parameter and its optional bound.
+func decodeTypeVar(e *treetext.Element) (Type, error) {
+	if err := treetext.ExpectFields(e, "Name", "Bound"); err != nil {
+		return nil, err
+	}
+	name, err := treetext.String(e.Fields[0])
+	if err != nil {
+		return nil, err
+	}
+	bound, err := decodeTypeField(e.Fields[1])
+	if err != nil {
+		return nil, err
+	}
+	return &TypeVar{Name: name, Bound: bound}, nil
+}
+
+// decodeAppType decodes a generic application: its definition reference and
+// arguments.
+func decodeAppType(e *treetext.Element) (Type, error) {
+	if err := treetext.ExpectFields(e, "Def", "Args"); err != nil {
+		return nil, err
+	}
+	def, err := unrefTypeDef(e.Fields[0])
+	if err != nil {
+		return nil, err
+	}
+	args, err := decodeTypeList(e.Fields[1])
+	if err != nil {
+		return nil, err
+	}
+	return &App{Def: def, Args: args}, nil
 }
 
 // decodeTypeField decodes one Type-typed field: the nil marker or the type.

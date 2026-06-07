@@ -140,48 +140,62 @@ func typeAt(doc view, offset int) (*ir.TypeDef, cst.Tree, bool) {
 			return t, leaf, true
 		}
 	case cst.TypeName:
-		var idents []cst.Tree
-		for _, c := range parent.Children() {
-			if k, isTok := c.TokenKind(); isTok && k == token.Ident {
-				idents = append(idents, c)
-			}
-		}
-		if len(idents) == 2 {
-			if idents[0].Offset() == leaf.Offset() {
-				return nil, cst.Tree{}, false // the namespace qualifier
-			}
-			if t := findTypeDef(doc.QualifiedTypeNames()[idents[0].Text(buf)], name); t != nil {
-				return t, leaf, true
-			}
-			return nil, cst.Tree{}, false
-		}
-		if t := findTypeDef(doc.TypeNames(), name); t != nil {
-			return t, leaf, true
-		}
+		return typeAtTypeName(doc, parent, leaf, buf, name)
 	case cst.NameRef:
-		// A conversion's callee (error("msg")): a call's callee that names a
-		// type hovers as the type it constructs. The type rules give the type
-		// the same priority over a same-named function.
-		parentNode, isNode := parent.Node()
-		if !isNode {
-			return nil, cst.Tree{}, false
-		}
-		isCallee := false
-		forEachExpr(doc.AST().File(), func(e ast.Expr) {
-			if c, ok := e.(*ast.CallExpr); ok {
-				if i, ok := c.Callee.(*ast.Identifier); ok && i.Syntax() == parentNode {
-					isCallee = true
-				}
-			}
-		})
-		if isCallee {
-			if t := findTypeDef(doc.TypeNames(), name); t != nil {
-				return t, leaf, true
-			}
-		}
+		return typeAtNameRef(doc, parent, leaf, name)
 	default:
 		// Any other parent kind is not a type-name position (a declaration
 		// name, a type expression, or a conversion callee): nothing resolves.
+	}
+	return nil, cst.Tree{}, false
+}
+
+// typeAtTypeName resolves a type-expression name to its definition: a dotted
+// name's member (geo.Point) through the qualifier's namespace, a plain name
+// through the file's type names. The qualifier of a dotted name resolves to
+// nothing — it denotes a namespace, not a type.
+func typeAtTypeName(doc view, parent, leaf cst.Tree, buf source.Buffer, name string) (*ir.TypeDef, cst.Tree, bool) {
+	var idents []cst.Tree
+	for _, c := range parent.Children() {
+		if k, isTok := c.TokenKind(); isTok && k == token.Ident {
+			idents = append(idents, c)
+		}
+	}
+	if len(idents) == 2 {
+		if idents[0].Offset() == leaf.Offset() {
+			return nil, cst.Tree{}, false // the namespace qualifier
+		}
+		if t := findTypeDef(doc.QualifiedTypeNames()[idents[0].Text(buf)], name); t != nil {
+			return t, leaf, true
+		}
+		return nil, cst.Tree{}, false
+	}
+	if t := findTypeDef(doc.TypeNames(), name); t != nil {
+		return t, leaf, true
+	}
+	return nil, cst.Tree{}, false
+}
+
+// typeAtNameRef resolves a conversion's callee (error("msg")): a call's callee
+// that names a type hovers as the type it constructs. The type rules give the
+// type the same priority over a same-named function.
+func typeAtNameRef(doc view, parent, leaf cst.Tree, name string) (*ir.TypeDef, cst.Tree, bool) {
+	parentNode, isNode := parent.Node()
+	if !isNode {
+		return nil, cst.Tree{}, false
+	}
+	isCallee := false
+	forEachExpr(doc.AST().File(), func(e ast.Expr) {
+		if c, ok := e.(*ast.CallExpr); ok {
+			if i, ok := c.Callee.(*ast.Identifier); ok && i.Syntax() == parentNode {
+				isCallee = true
+			}
+		}
+	})
+	if isCallee {
+		if t := findTypeDef(doc.TypeNames(), name); t != nil {
+			return t, leaf, true
+		}
 	}
 	return nil, cst.Tree{}, false
 }

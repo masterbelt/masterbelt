@@ -187,33 +187,43 @@ func buildImports(q queries, file *ast.File, uses map[*ast.UseDecl]FileID) impor
 				t.namespaces[u.Namespace] = target
 			}
 		case u.Star:
-			exp := q.exportsOf(target)
-			for name, decl := range exp.consts {
-				addBinding(t.values, name, decl)
-			}
-			for name, def := range exp.types {
-				addBinding(t.types, name, def)
-			}
-			for name, fds := range exp.funcs {
-				addFuncBinding(t.funcs, name, fds)
-			}
+			importStar(t, q.exportsOf(target))
 		default:
-			exp := q.exportsOf(target)
-			for _, name := range u.Names {
-				if decl, ok := exp.consts[name]; ok {
-					addBinding(t.values, name, decl)
-				}
-				if def, ok := exp.types[name]; ok {
-					addBinding(t.types, name, def)
-				}
-				if fds, ok := exp.funcs[name]; ok {
-					addFuncBinding(t.funcs, name, fds)
-				}
-				// A name in no table: assemble reports not_exported.
-			}
+			importNames(t, q.exportsOf(target), u.Names)
 		}
 	}
 	return t
+}
+
+// importStar adds every const, type, and function the target exports to the
+// import table (a barrel import).
+func importStar(t importTable, exp exports) {
+	for name, decl := range exp.consts {
+		addBinding(t.values, name, decl)
+	}
+	for name, def := range exp.types {
+		addBinding(t.types, name, def)
+	}
+	for name, fds := range exp.funcs {
+		addFuncBinding(t.funcs, name, fds)
+	}
+}
+
+// importNames adds each named const, type, or function the target exports to
+// the import table. A name in no table is left out (assemble reports
+// not_exported).
+func importNames(t importTable, exp exports, names []string) {
+	for _, name := range names {
+		if decl, ok := exp.consts[name]; ok {
+			addBinding(t.values, name, decl)
+		}
+		if def, ok := exp.types[name]; ok {
+			addBinding(t.types, name, def)
+		}
+		if fds, ok := exp.funcs[name]; ok {
+			addFuncBinding(t.funcs, name, fds)
+		}
+	}
 }
 
 // buildExports builds a file's public surface: its own pub declarations (with
@@ -225,7 +235,22 @@ func buildExports(q queries, file *ast.File, uses map[*ast.UseDecl]FileID, ownTy
 	if file == nil {
 		return out
 	}
+	addOwnExports(out, file, ownTypes)
+	for _, u := range file.Uses {
+		if !u.Public || u.Namespace != "" {
+			continue
+		}
+		if target, ok := uses[u]; ok {
+			addReexports(out, q.exportsOf(target), u)
+		}
+	}
+	return out
+}
 
+// addOwnExports records a file's own public surface: its pub const declarations,
+// its public type definitions, and the whole public overload set of each pub
+// function (in source order).
+func addOwnExports(out exports, file *ast.File, ownTypes map[string]*ir.TypeDef) {
 	for _, decl := range file.Decls {
 		if decl.Public && decl.Name != "" {
 			if _, ok := out.consts[decl.Name]; !ok {
@@ -238,59 +263,50 @@ func buildExports(q queries, file *ast.File, uses map[*ast.UseDecl]FileID, ownTy
 			out.types[name] = def
 		}
 	}
-	// A function name exports its whole public overload set, in source order.
 	for _, fd := range file.Funcs {
 		if fd.Public && fd.Name != "" {
 			out.funcs[fd.Name] = append(out.funcs[fd.Name], fd)
 		}
 	}
+}
 
-	for _, u := range file.Uses {
-		if !u.Public || u.Namespace != "" {
-			continue
-		}
-		target, ok := uses[u]
-		if !ok {
-			continue
-		}
-		exp := q.exportsOf(target)
-		reexport := func(name string) {
-			if decl, ok := exp.consts[name]; ok {
-				if _, taken := out.consts[name]; !taken {
-					out.consts[name] = decl
-				}
-			}
-			if def, ok := exp.types[name]; ok {
-				if _, taken := out.types[name]; !taken {
-					out.types[name] = def
-				}
-			}
-			if fds, ok := exp.funcs[name]; ok {
-				if _, taken := out.funcs[name]; !taken {
-					out.funcs[name] = fds
-				}
+// addReexports records a pub use's re-exports into out. A barrel (star)
+// re-exports the target's whole surface — iterating the maps is order-free
+// because each name is first-claim and a name cannot collide with itself within
+// one target — while a named use re-exports only its listed names.
+func addReexports(out exports, exp exports, u *ast.UseDecl) {
+	reexport := func(name string) {
+		if decl, ok := exp.consts[name]; ok {
+			if _, taken := out.consts[name]; !taken {
+				out.consts[name] = decl
 			}
 		}
-		if u.Star {
-			// A barrel: the target's whole surface re-exports. Iterating the
-			// maps is order-free because reexport is first-claim per name and
-			// a name cannot collide with itself within one target.
-			for name := range exp.consts {
-				reexport(name)
+		if def, ok := exp.types[name]; ok {
+			if _, taken := out.types[name]; !taken {
+				out.types[name] = def
 			}
-			for name := range exp.types {
-				reexport(name)
-			}
-			for name := range exp.funcs {
-				reexport(name)
-			}
-		} else {
-			for _, name := range u.Names {
-				reexport(name)
+		}
+		if fds, ok := exp.funcs[name]; ok {
+			if _, taken := out.funcs[name]; !taken {
+				out.funcs[name] = fds
 			}
 		}
 	}
-	return out
+	if !u.Star {
+		for _, name := range u.Names {
+			reexport(name)
+		}
+		return
+	}
+	for name := range exp.consts {
+		reexport(name)
+	}
+	for name := range exp.types {
+		reexport(name)
+	}
+	for name := range exp.funcs {
+		reexport(name)
+	}
 }
 
 // buildTypeDefs resolves a file's type declarations with its imported type

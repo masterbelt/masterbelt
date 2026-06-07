@@ -56,10 +56,18 @@ func TestSubstituteAndMatch(t *testing.T) {
 // `T | error` or `{ v: T }` solves T from its argument.
 func TestMatchUnionAndRecord(t *testing.T) {
 	reg := builtin.Default()
+	t.Run("union", func(t *testing.T) { matchUnionCases(t, reg) })
+	t.Run("record", func(t *testing.T) { matchRecordCases(t, reg) })
+}
+
+// matchUnionCases checks Match against union patterns: a value binding the
+// variable member, a concrete member preferred when no variable member solves
+// it, two same-arity unions pairing positionally, and a concrete union keeping
+// the old assignability rule (member value, reordered, narrower).
+func matchUnionCases(t *testing.T, reg *builtin.Registry) {
+	t.Helper()
 	tvar := func(name string) ir.Type { return &ir.TypeVar{Name: name} }
 	union := func(ms ...ir.Type) ir.Type { return &ir.Union{Members: ms} }
-	record := func(fs ...ir.Field) ir.Type { return &ir.Record{Fields: fs} }
-	field := func(name string, t ir.Type) ir.Field { return ir.Field{Name: name, Type: t} }
 
 	// A value flowing into a `T | error` pattern binds T to the value's type.
 	subst := map[string]ir.Type{}
@@ -89,10 +97,33 @@ func TestMatchUnionAndRecord(t *testing.T) {
 		t.Errorf("subst[T] = %v, want nint", got)
 	}
 
+	// A concrete union pattern (no variable) keeps the old assignability rule,
+	// which accepts a member value, a reordered union, and a narrower union —
+	// the recursion must not narrow the non-generic path.
+	if !Match(reg, union(bt("nint"), bt("error")), bt("error"), map[string]ir.Type{}) {
+		t.Error("Match(nint | error, error) must accept the member value")
+	}
+	if !Match(reg, union(bt("nint"), bt("error")), union(bt("error"), bt("nint")), map[string]ir.Type{}) {
+		t.Error("Match(nint | error, error | nint) must accept the reordered union")
+	}
+	if !Match(reg, union(bt("nint"), bt("error"), bt("string")), union(bt("nint"), bt("error")), map[string]ir.Type{}) {
+		t.Error("Match(nint | error | string, nint | error) must accept the narrower union")
+	}
+}
+
+// matchRecordCases checks Match against record patterns: { v: T } solving T from
+// the argument's same-named field (through a nominal record), and the failures —
+// a missing field or a non-record argument.
+func matchRecordCases(t *testing.T, reg *builtin.Registry) {
+	t.Helper()
+	tvar := func(name string) ir.Type { return &ir.TypeVar{Name: name} }
+	record := func(fs ...ir.Field) ir.Type { return &ir.Record{Fields: fs} }
+	field := func(name string, t ir.Type) ir.Field { return ir.Field{Name: name, Type: t} }
+
 	// A record pattern { v: T } solves T from the argument's same-named field,
 	// looking through a nominal record.
 	box := &ir.Named{Def: &ir.TypeDef{Name: "Box", Body: record(field("v", bt("nint")))}}
-	subst = map[string]ir.Type{}
+	subst := map[string]ir.Type{}
 	if !Match(reg, record(field("v", tvar("T"))), box, subst) {
 		t.Fatal("Match({ v: T }, Box{ v: nint }) failed")
 	}
@@ -107,19 +138,6 @@ func TestMatchUnionAndRecord(t *testing.T) {
 	}
 	if Match(reg, record(field("v", tvar("T"))), bt("nint"), map[string]ir.Type{}) {
 		t.Error("Match({ v: T }, nint) must fail (nint is no record)")
-	}
-
-	// A concrete union pattern (no variable) keeps the old assignability rule,
-	// which accepts a member value, a reordered union, and a narrower union —
-	// the recursion must not narrow the non-generic path.
-	if !Match(reg, union(bt("nint"), bt("error")), bt("error"), map[string]ir.Type{}) {
-		t.Error("Match(nint | error, error) must accept the member value")
-	}
-	if !Match(reg, union(bt("nint"), bt("error")), union(bt("error"), bt("nint")), map[string]ir.Type{}) {
-		t.Error("Match(nint | error, error | nint) must accept the reordered union")
-	}
-	if !Match(reg, union(bt("nint"), bt("error"), bt("string")), union(bt("nint"), bt("error")), map[string]ir.Type{}) {
-		t.Error("Match(nint | error | string, nint | error) must accept the narrower union")
 	}
 }
 

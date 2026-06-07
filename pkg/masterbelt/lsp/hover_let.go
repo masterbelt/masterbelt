@@ -86,42 +86,57 @@ func letTypeOf(body []ir.Stmt, name string) (ir.Type, bool) {
 				return t, true
 			}
 		case *ir.Switch:
-			for _, arm := range s.Arms {
-				if t, ok := letTypeOf(arm.Body, name); ok {
-					return t, true
-				}
-			}
-			if t, ok := letTypeOf(s.Else, name); ok {
+			if t, ok := letTypeOfSwitch(s, name); ok {
 				return t, true
 			}
 		case *ir.Match:
-			for _, arm := range s.Arms {
-				// The arm's own binding narrows name to the arm's member type for
-				// the arm body, so it is reported before descending — a reference
-				// to the binding inside the body reads the narrowed type.
-				if arm.Name == name && arm.Type != nil {
-					return arm.Type, true
-				}
-				if t, ok := letTypeOf(arm.Body, name); ok {
-					return t, true
-				}
-			}
-			if t, ok := letTypeOf(s.Else, name); ok {
+			if t, ok := letTypeOfMatch(s, name); ok {
 				return t, true
 			}
 		case *ir.For:
-			// The loop variable binds name to its element type for the loop body,
-			// so it is reported before descending — a reference to it inside the
-			// body reads that type.
-			if s.Var == name && s.VarType != nil {
-				return s.VarType, true
-			}
-			if t, ok := letTypeOf(s.Body, name); ok {
+			if t, ok := letTypeOfFor(s, name); ok {
 				return t, true
 			}
 		}
 	}
 	return nil, false
+}
+
+// letTypeOfSwitch descends every arm body and the else body of a switch for a
+// binding of name.
+func letTypeOfSwitch(s *ir.Switch, name string) (ir.Type, bool) {
+	for _, arm := range s.Arms {
+		if t, ok := letTypeOf(arm.Body, name); ok {
+			return t, true
+		}
+	}
+	return letTypeOf(s.Else, name)
+}
+
+// letTypeOfMatch descends a match for a binding of name. An arm's own binding
+// narrows name to the arm's member type for the arm body, so it is reported
+// before descending — a reference to the binding inside the body reads the
+// narrowed type.
+func letTypeOfMatch(s *ir.Match, name string) (ir.Type, bool) {
+	for _, arm := range s.Arms {
+		if arm.Name == name && arm.Type != nil {
+			return arm.Type, true
+		}
+		if t, ok := letTypeOf(arm.Body, name); ok {
+			return t, true
+		}
+	}
+	return letTypeOf(s.Else, name)
+}
+
+// letTypeOfFor descends a for for a binding of name. The loop variable binds
+// name to its element type for the loop body, so it is reported before
+// descending — a reference to it inside the body reads that type.
+func letTypeOfFor(s *ir.For, name string) (ir.Type, bool) {
+	if s.Var == name && s.VarType != nil {
+		return s.VarType, true
+	}
+	return letTypeOf(s.Body, name)
 }
 
 // letTypeOfIf descends an if's then body, its else-if chain, and its else body

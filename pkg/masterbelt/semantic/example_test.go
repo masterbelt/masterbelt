@@ -138,52 +138,64 @@ func TestExamplesAnalyzeClean(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	reportLayers := func(t *testing.T, label string, doc *abstract.Document) {
-		t.Helper()
-		for _, d := range doc.Concrete().LexDiagnostics() {
-			t.Errorf("%s: lex diagnostic: %s @%d: %s", label, d.Code, d.Offset, d.Message)
-		}
-		for _, d := range doc.Diagnostics() {
-			t.Errorf("%s: parse diagnostic: %s @%d: %s", label, d.Code, d.Offset, d.Message)
-		}
-	}
-
 	for _, entry := range entries {
 		name := entry.Name()
 		switch {
 		case entry.IsDir():
-			t.Run(name, func(t *testing.T) {
-				proj, pdiags := project.Open(filepath.Join(sharedExamples, name))
-				if pdiags.Len() > 0 {
-					t.Fatalf("project diagnostics: %v", pdiags.Items())
-				}
-				docs := map[FileID]*abstract.Document{}
-				uses := map[FileID]map[*ast.UseDecl]FileID{}
-				for _, f := range proj.Files() {
-					reportLayers(t, string(f.ID), f.AST)
-					docs[FileID(f.ID)] = f.AST
-					uses[FileID(f.ID)] = UsesOf(f.Uses)
-				}
-				_, diags := AnalyzeProgram(docs, uses)
-				for id, ds := range diags {
-					for _, d := range ds {
-						t.Errorf("%s: semantic diagnostic: %s @%d: %s", id, d.Code, d.Offset, d.Message)
-					}
-				}
-			})
+			t.Run(name, func(t *testing.T) { analyzeProjectExample(t, name) })
 		case strings.HasSuffix(name, ".belt"):
-			t.Run(name, func(t *testing.T) {
-				src, err := os.ReadFile(filepath.Join(sharedExamples, name))
-				if err != nil {
-					t.Fatal(err)
-				}
-				doc := abstract.NewDocument(src)
-				reportLayers(t, name, doc)
-				_, diags := Analyze(doc)
-				for _, d := range diags {
-					t.Errorf("%s: semantic diagnostic: %s @%d: %s", name, d.Code, d.Offset, d.Message)
-				}
-			})
+			t.Run(name, func(t *testing.T) { analyzeFileExample(t, name) })
 		}
+	}
+}
+
+// reportExampleLayers reports any lex or parse diagnostics a document carries,
+// each prefixed with the given label.
+func reportExampleLayers(t *testing.T, label string, doc *abstract.Document) {
+	t.Helper()
+	for _, d := range doc.Concrete().LexDiagnostics() {
+		t.Errorf("%s: lex diagnostic: %s @%d: %s", label, d.Code, d.Offset, d.Message)
+	}
+	for _, d := range doc.Diagnostics() {
+		t.Errorf("%s: parse diagnostic: %s @%d: %s", label, d.Code, d.Offset, d.Message)
+	}
+}
+
+// analyzeProjectExample opens a multi-file example project, reports its lex and
+// parse diagnostics, and asserts whole-program analysis is diagnostic-free.
+func analyzeProjectExample(t *testing.T, name string) {
+	t.Helper()
+	proj, pdiags := project.Open(filepath.Join(sharedExamples, name))
+	if pdiags.Len() > 0 {
+		t.Fatalf("project diagnostics: %v", pdiags.Items())
+	}
+	docs := map[FileID]*abstract.Document{}
+	uses := map[FileID]map[*ast.UseDecl]FileID{}
+	for _, f := range proj.Files() {
+		reportExampleLayers(t, string(f.ID), f.AST)
+		docs[FileID(f.ID)] = f.AST
+		uses[FileID(f.ID)] = UsesOf(f.Uses)
+	}
+	_, diags := AnalyzeProgram(docs, uses)
+	for id, ds := range diags {
+		for _, d := range ds {
+			t.Errorf("%s: semantic diagnostic: %s @%d: %s", id, d.Code, d.Offset, d.Message)
+		}
+	}
+}
+
+// analyzeFileExample reads a single-file example, reports its lex and parse
+// diagnostics, and asserts analysis is diagnostic-free.
+func analyzeFileExample(t *testing.T, name string) {
+	t.Helper()
+	src, err := os.ReadFile(filepath.Join(sharedExamples, name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc := abstract.NewDocument(src)
+	reportExampleLayers(t, name, doc)
+	_, diags := Analyze(doc)
+	for _, d := range diags {
+		t.Errorf("%s: semantic diagnostic: %s @%d: %s", name, d.Code, d.Offset, d.Message)
 	}
 }

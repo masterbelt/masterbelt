@@ -237,55 +237,69 @@ func walkRefsEnum(fileID FileID, e ast.Expr, q queries, onIdent func(*ast.Identi
 	ast.WalkExprs(e, func(e ast.Expr) bool {
 		switch e := e.(type) {
 		case *ast.CallExpr:
-			switch callee := e.Callee.(type) {
-			case *ast.Identifier:
-				if _, isType := q.universe(fileID)[callee.Name]; isType {
-					funcCallee[callee] = true // a conversion's callee names a type
-				} else if len(q.resolveFunc(fileID, callee)) > 0 {
-					funcCallee[callee] = true
-				}
-			case *ast.MemberExpr:
-				if len(q.resolveFuncMember(fileID, callee)) > 0 {
-					funcMemberCallee[callee] = true
-				} else if recv, ok := callee.Receiver.(*ast.Identifier); ok && isTypeName(fileID, recv, q) {
-					// A call whose callee is a member access on a type name is a static
-					// fn call (Celsius.freezing()): the member is not an enum member or
-					// associated constant, so it must be exempt from the type-member
-					// reference check below — whether the static fn exists is the type
-					// checker's unknown_static finding.
-					if def := q.universe(fileID)[recv.Name]; hasStaticFn(def, callee.Member.Name) {
-						staticCallee[callee] = true
-					}
-				}
-			}
+			classifyRefCallee(fileID, e, q, funcCallee, funcMemberCallee, staticCallee)
 		case *ast.Identifier:
 			if !funcCallee[e] {
 				onIdent(e)
 			}
 		case *ast.MemberExpr:
-			recv, ok := e.Receiver.(*ast.Identifier)
-			if !ok {
-				return true
-			}
-			// An access whose receiver names a type is a type-member reference —
-			// an enum member or an associated constant — not a namespace access
-			// nor a field read: the receiver is the type, so it is consumed as one
-			// unit.
-			if onTypeMember != nil && isTypeName(fileID, recv, q) {
-				if !staticCallee[e] {
-					onTypeMember(e)
-				}
-				return false
-			}
-			if isNamespace(fileID, recv, q) {
-				if !funcMemberCallee[e] {
-					onMember(e)
-				}
-				return false
-			}
+			return walkRefsMember(fileID, e, q, onMember, onTypeMember, funcMemberCallee, staticCallee)
 		}
 		return true
 	})
+}
+
+// classifyRefCallee marks a call's callee that names a value-less target — a
+// conversion (the callee names a type) or a top-level function by name, a
+// namespace function, or a static fn — so the reference walk skips it: it refers
+// to the type or function, not to a value declaration.
+func classifyRefCallee(fileID FileID, e *ast.CallExpr, q queries, funcCallee map[*ast.Identifier]bool, funcMemberCallee, staticCallee map[*ast.MemberExpr]bool) {
+	switch callee := e.Callee.(type) {
+	case *ast.Identifier:
+		if _, isType := q.universe(fileID)[callee.Name]; isType {
+			funcCallee[callee] = true // a conversion's callee names a type
+		} else if len(q.resolveFunc(fileID, callee)) > 0 {
+			funcCallee[callee] = true
+		}
+	case *ast.MemberExpr:
+		if len(q.resolveFuncMember(fileID, callee)) > 0 {
+			funcMemberCallee[callee] = true
+		} else if recv, ok := callee.Receiver.(*ast.Identifier); ok && isTypeName(fileID, recv, q) {
+			// A call whose callee is a member access on a type name is a static
+			// fn call (Celsius.freezing()): the member is not an enum member or
+			// associated constant, so it must be exempt from the type-member
+			// reference check below — whether the static fn exists is the type
+			// checker's unknown_static finding.
+			if def := q.universe(fileID)[recv.Name]; hasStaticFn(def, callee.Member.Name) {
+				staticCallee[callee] = true
+			}
+		}
+	}
+}
+
+// walkRefsMember classifies a member access for the reference walk: a receiver
+// naming a type is a type-member reference (an enum member or associated
+// constant) consumed as one unit, a receiver naming a namespace is a namespace
+// access consumed as one unit, and any other receiver descends as an ordinary
+// expression. It returns whether the walk should descend into the receiver.
+func walkRefsMember(fileID FileID, e *ast.MemberExpr, q queries, onMember, onTypeMember func(*ast.MemberExpr), funcMemberCallee, staticCallee map[*ast.MemberExpr]bool) bool {
+	recv, ok := e.Receiver.(*ast.Identifier)
+	if !ok {
+		return true
+	}
+	if onTypeMember != nil && isTypeName(fileID, recv, q) {
+		if !staticCallee[e] {
+			onTypeMember(e)
+		}
+		return false
+	}
+	if isNamespace(fileID, recv, q) {
+		if !funcMemberCallee[e] {
+			onMember(e)
+		}
+		return false
+	}
+	return true
 }
 
 // isTypeName reports whether an identifier names a type in its file — and no

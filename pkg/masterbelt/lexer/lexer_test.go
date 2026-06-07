@@ -76,142 +76,147 @@ func TestLexerSpans(t *testing.T) {
 	}
 }
 
-func TestLexerDiagnostics(t *testing.T) {
-	t.Run("unterminated block comment", func(t *testing.T) {
-		file := source.NewFile("t.belt", []byte("const x = 1 /* oops"))
-		lex := New(file)
-		tokens := lex.Tokens()
-
-		// The dangling comment is still returned as a BlockComment so editors
-		// keep highlighting it as a comment.
-		last := tokens[len(tokens)-2] // before EOF
-		if last.Kind != token.BlockComment || last.Text(file) != "/* oops" {
-			t.Errorf("last token = %s %q, want BlockComment %q", last.Kind, last.Text(file), "/* oops")
-		}
-
-		diags := lex.Diagnostics()
-		if len(diags) != 1 {
-			t.Fatalf("Diagnostics() = %v, want exactly one", diags)
-		}
-		if diags[0].Code != CodeUnterminatedBlockComment {
-			t.Errorf("code = %q, want %q", diags[0].Code, CodeUnterminatedBlockComment)
-		}
-		if got, want := diags[0].Message, "unterminated block comment"; got != want {
-			t.Errorf("message = %q, want %q", got, want)
-		}
-	})
-
-	t.Run("unterminated string literal", func(t *testing.T) {
-		file := source.NewFile("t.belt", []byte(`const x = "oops`))
-		lex := New(file)
-		tokens := lex.Tokens()
-
-		// The dangling string is still returned as a String token, so editors
-		// keep highlighting it while the closing quote is being typed.
-		last := tokens[len(tokens)-2] // before EOF
-		if last.Kind != token.String || last.Text(file) != `"oops` {
-			t.Errorf("last token = %s %q, want String %q", last.Kind, last.Text(file), `"oops`)
-		}
-
-		diags := lex.Diagnostics()
-		if len(diags) != 1 {
-			t.Fatalf("Diagnostics() = %v, want exactly one", diags)
-		}
-		if diags[0].Code != CodeUnterminatedString {
-			t.Errorf("code = %q, want %q", diags[0].Code, CodeUnterminatedString)
-		}
-		if got, want := diags[0].Message, "unterminated string literal"; got != want {
-			t.Errorf("message = %q, want %q", got, want)
-		}
-	})
-
-	t.Run("string is not closed across a newline", func(t *testing.T) {
-		file := source.NewFile("t.belt", []byte("\"oops\nx"))
-		lex := New(file)
-		tokens := lex.Tokens()
-
-		// The newline terminates the unterminated string rather than being
-		// swallowed: it remains its own token so the stream stays lossless.
-		if tokens[0].Kind != token.String || tokens[0].Text(file) != `"oops` {
-			t.Errorf("token[0] = %s %q, want String %q", tokens[0].Kind, tokens[0].Text(file), `"oops`)
-		}
-		if tokens[1].Kind != token.Newline {
-			t.Errorf("token[1] = %s, want Newline", tokens[1].Kind)
-		}
-		diags := lex.Diagnostics()
-		if len(diags) != 1 || diags[0].Code != CodeUnterminatedString {
-			t.Fatalf("Diagnostics() = %v, want one %q", diags, CodeUnterminatedString)
-		}
-	})
-
-	t.Run("illegal ascii character", func(t *testing.T) {
-		file := source.NewFile("t.belt", []byte("const x = #"))
-		lex := New(file)
-		tokens := lex.Tokens()
-
-		bad := tokens[len(tokens)-2]
-		if bad.Kind != token.Illegal || bad.Text(file) != "#" {
-			t.Errorf("token = %s %q, want Illegal %q", bad.Kind, bad.Text(file), "#")
-		}
-		diags := lex.Diagnostics()
-		if len(diags) != 1 {
-			t.Fatalf("Diagnostics() = %v, want exactly one", diags)
-		}
-		if diags[0].Code != CodeUnexpectedCharacter {
-			t.Errorf("code = %q, want %q", diags[0].Code, CodeUnexpectedCharacter)
-		}
-		if got, want := diags[0].Message, "unexpected character: '#'"; got != want {
-			t.Errorf("message = %q, want %q", got, want)
-		}
-		if got := diags[0].Fields["char"].String(); got != "'#'" {
-			t.Errorf("Fields[char] = %q, want %q", got, "'#'")
-		}
-	})
-
-	t.Run("lone ampersand is illegal", func(t *testing.T) {
-		// "&&" is the only use of '&'; a lone one begins no token.
-		file := source.NewFile("t.belt", []byte("a & b"))
-		lex := New(file)
-		tokens := lex.Tokens()
-
-		var amp token.Token
-		for _, tok := range tokens {
-			if tok.Kind == token.Illegal {
-				amp = tok
+// lexerDiagnosticsCases drives TestLexerDiagnostics: each case lexes src, runs
+// checkTokens against the produced stream, then asserts the diagnostics: exactly
+// one with wantCode, plus the optional wantMessage and wantChar field. The
+// per-case token shape varies (some inspect the token before EOF, some the
+// leading tokens, some scan for the Illegal token), so it is carried as a closure
+// rather than flattened.
+var lexerDiagnosticsCases = []struct {
+	name        string
+	src         string
+	checkTokens func(t *testing.T, file *source.File, tokens []token.Token)
+	wantCode    diagnostic.Code
+	wantMessage string // checked when non-empty
+	wantChar    string // diags[0].Fields["char"].String(); checked when non-empty
+}{
+	{
+		name: "unterminated block comment",
+		src:  "const x = 1 /* oops",
+		checkTokens: func(t *testing.T, file *source.File, tokens []token.Token) {
+			t.Helper()
+			t.Helper()
+			// The dangling comment is still returned as a BlockComment so
+			// editors keep highlighting it as a comment.
+			last := tokens[len(tokens)-2] // before EOF
+			if last.Kind != token.BlockComment || last.Text(file) != "/* oops" {
+				t.Errorf("last token = %s %q, want BlockComment %q", last.Kind, last.Text(file), "/* oops")
 			}
-		}
-		if amp.Text(file) != "&" {
-			t.Errorf("illegal token = %q, want %q", amp.Text(file), "&")
-		}
-		diags := lex.Diagnostics()
-		if len(diags) != 1 || diags[0].Code != CodeUnexpectedCharacter {
-			t.Fatalf("Diagnostics() = %v, want one %q", diags, CodeUnexpectedCharacter)
-		}
-		if got, want := diags[0].Message, "unexpected character: '&'"; got != want {
-			t.Errorf("message = %q, want %q", got, want)
-		}
-	})
-
-	t.Run("illegal multibyte rune is one token", func(t *testing.T) {
+		},
+		wantCode:    CodeUnterminatedBlockComment,
+		wantMessage: "unterminated block comment",
+	},
+	{
+		name: "unterminated string literal",
+		src:  `const x = "oops`,
+		checkTokens: func(t *testing.T, file *source.File, tokens []token.Token) {
+			t.Helper()
+			t.Helper()
+			// The dangling string is still returned as a String token, so
+			// editors keep highlighting it while the closing quote is being
+			// typed.
+			last := tokens[len(tokens)-2] // before EOF
+			if last.Kind != token.String || last.Text(file) != `"oops` {
+				t.Errorf("last token = %s %q, want String %q", last.Kind, last.Text(file), `"oops`)
+			}
+		},
+		wantCode:    CodeUnterminatedString,
+		wantMessage: "unterminated string literal",
+	},
+	{
+		name: "string is not closed across a newline",
+		src:  "\"oops\nx",
+		checkTokens: func(t *testing.T, file *source.File, tokens []token.Token) {
+			t.Helper()
+			// The newline terminates the unterminated string rather than
+			// being swallowed: it remains its own token so the stream stays
+			// lossless.
+			if tokens[0].Kind != token.String || tokens[0].Text(file) != `"oops` {
+				t.Errorf("token[0] = %s %q, want String %q", tokens[0].Kind, tokens[0].Text(file), `"oops`)
+			}
+			if tokens[1].Kind != token.Newline {
+				t.Errorf("token[1] = %s, want Newline", tokens[1].Kind)
+			}
+		},
+		wantCode: CodeUnterminatedString,
+	},
+	{
+		name: "illegal ascii character",
+		src:  "const x = #",
+		checkTokens: func(t *testing.T, file *source.File, tokens []token.Token) {
+			t.Helper()
+			bad := tokens[len(tokens)-2]
+			if bad.Kind != token.Illegal || bad.Text(file) != "#" {
+				t.Errorf("token = %s %q, want Illegal %q", bad.Kind, bad.Text(file), "#")
+			}
+		},
+		wantCode:    CodeUnexpectedCharacter,
+		wantMessage: "unexpected character: '#'",
+		wantChar:    "'#'",
+	},
+	{
+		name: "lone ampersand is illegal",
+		// "&&" is the only use of '&'; a lone one begins no token.
+		src: "a & b",
+		checkTokens: func(t *testing.T, file *source.File, tokens []token.Token) {
+			t.Helper()
+			var amp token.Token
+			for _, tok := range tokens {
+				if tok.Kind == token.Illegal {
+					amp = tok
+				}
+			}
+			if amp.Text(file) != "&" {
+				t.Errorf("illegal token = %q, want %q", amp.Text(file), "&")
+			}
+		},
+		wantCode:    CodeUnexpectedCharacter,
+		wantMessage: "unexpected character: '&'",
+	},
+	{
+		name: "illegal multibyte rune is one token",
 		// A stray multibyte rune must not fragment into per-byte Illegal tokens.
-		file := source.NewFile("t.belt", []byte("あ"))
-		lex := New(file)
-		tokens := lex.Tokens()
+		src: "あ",
+		checkTokens: func(t *testing.T, _ *source.File, tokens []token.Token) {
+			t.Helper()
+			t.Helper()
+			if len(tokens) != 2 { // Illegal + EOF
+				t.Fatalf("got %d tokens, want 2: %v", len(tokens), tokens)
+			}
+			if tokens[0].Kind != token.Illegal || tokens[0].Width != 3 {
+				t.Errorf("token = %s width %d, want Illegal width 3", tokens[0].Kind, tokens[0].Width)
+			}
+		},
+		wantCode:    CodeUnexpectedCharacter,
+		wantMessage: "unexpected character: 'あ'",
+	},
+}
 
-		if len(tokens) != 2 { // Illegal + EOF
-			t.Fatalf("got %d tokens, want 2: %v", len(tokens), tokens)
-		}
-		if tokens[0].Kind != token.Illegal || tokens[0].Width != 3 {
-			t.Errorf("token = %s width %d, want Illegal width 3", tokens[0].Kind, tokens[0].Width)
-		}
-		diags := lex.Diagnostics()
-		if len(diags) != 1 || diags[0].Code != CodeUnexpectedCharacter {
-			t.Fatalf("Diagnostics() = %v, want one %q", diags, CodeUnexpectedCharacter)
-		}
-		if got, want := diags[0].Message, "unexpected character: 'あ'"; got != want {
-			t.Errorf("message = %q, want %q", got, want)
-		}
-	})
+func TestLexerDiagnostics(t *testing.T) {
+	for _, tt := range lexerDiagnosticsCases {
+		t.Run(tt.name, func(t *testing.T) {
+			file := source.NewFile("t.belt", []byte(tt.src))
+			lex := New(file)
+			tokens := lex.Tokens()
+
+			tt.checkTokens(t, file, tokens)
+
+			diags := lex.Diagnostics()
+			if len(diags) != 1 || diags[0].Code != tt.wantCode {
+				t.Fatalf("Diagnostics() = %v, want one %q", diags, tt.wantCode)
+			}
+			if tt.wantMessage != "" {
+				if got := diags[0].Message; got != tt.wantMessage {
+					t.Errorf("message = %q, want %q", got, tt.wantMessage)
+				}
+			}
+			if tt.wantChar != "" {
+				if got := diags[0].Fields["char"].String(); got != tt.wantChar {
+					t.Errorf("Fields[char] = %q, want %q", got, tt.wantChar)
+				}
+			}
+		})
+	}
 }
 
 // TestLexerOperators checks each operator and boolean keyword, including the
@@ -248,51 +253,78 @@ func TestLexerOperators(t *testing.T) {
 		}
 	}
 
-	// Maximal munch must not glue separated operators together.
-	t.Run("separated equals are two assigns", func(t *testing.T) {
-		file := source.NewFile("op.belt", []byte("= ="))
-		tokens := New(file).Tokens()
-		if len(tokens) != 4 || tokens[0].Kind != token.Assign || tokens[2].Kind != token.Assign {
-			t.Errorf("%q tokenized as %v, want Assign Whitespace Assign EOF", "= =", tokens)
-		}
-	})
+	for _, c := range lexerMunchCases {
+		t.Run(c.name, func(t *testing.T) {
+			file := source.NewFile("op.belt", []byte(c.src))
+			tokens := New(file).Tokens()
+			c.check(t, file, tokens)
+		})
+	}
+}
 
-	// "->" is one token, not Minus then Gt — and "- >" stays two tokens.
-	t.Run("arrow is one token", func(t *testing.T) {
-		file := source.NewFile("op.belt", []byte("a->b"))
-		tokens := New(file).Tokens()
-		var arrow token.Token
-		for _, tok := range tokens {
-			if tok.Kind == token.Arrow {
-				arrow = tok
+// lexerMunchCases drives the maximal-munch part of TestLexerOperators: a one-byte
+// operator must not glue to a neighbour, and a two-byte operator must not split.
+// Each case lexes src and runs its own check against the stream.
+var lexerMunchCases = []struct {
+	name  string
+	src   string
+	check func(t *testing.T, file *source.File, tokens []token.Token)
+}{
+	{
+		name: "separated equals are two assigns",
+		src:  "= =",
+		check: func(t *testing.T, _ *source.File, tokens []token.Token) {
+			t.Helper()
+			if len(tokens) != 4 || tokens[0].Kind != token.Assign || tokens[2].Kind != token.Assign {
+				t.Errorf("%q tokenized as %v, want Assign Whitespace Assign EOF", "= =", tokens)
 			}
-		}
-		if arrow.Text(file) != "->" {
-			t.Errorf("got %v, want a single Arrow token", tokens)
-		}
-	})
-	t.Run("separated minus gt are two tokens", func(t *testing.T) {
-		file := source.NewFile("op.belt", []byte("- >"))
-		tokens := New(file).Tokens()
-		if len(tokens) != 4 || tokens[0].Kind != token.Minus || tokens[2].Kind != token.Gt {
-			t.Errorf("%q tokenized as %v, want Minus Whitespace Gt EOF", "- >", tokens)
-		}
-	})
-
-	// "<=" is one token, not Lt then Assign.
-	t.Run("le is one token", func(t *testing.T) {
-		file := source.NewFile("op.belt", []byte("a<=b"))
-		tokens := New(file).Tokens()
-		var le token.Token
-		for _, tok := range tokens {
-			if tok.Kind == token.LtEq {
-				le = tok
+		},
+	},
+	{
+		// "->" is one token, not Minus then Gt.
+		name: "arrow is one token",
+		src:  "a->b",
+		check: func(t *testing.T, file *source.File, tokens []token.Token) {
+			t.Helper()
+			var arrow token.Token
+			for _, tok := range tokens {
+				if tok.Kind == token.Arrow {
+					arrow = tok
+				}
 			}
-		}
-		if le.Text(file) != "<=" {
-			t.Errorf("got %v, want a single LtEq token", tokens)
-		}
-	})
+			if arrow.Text(file) != "->" {
+				t.Errorf("got %v, want a single Arrow token", tokens)
+			}
+		},
+	},
+	{
+		// "- >" stays two tokens.
+		name: "separated minus gt are two tokens",
+		src:  "- >",
+		check: func(t *testing.T, _ *source.File, tokens []token.Token) {
+			t.Helper()
+			if len(tokens) != 4 || tokens[0].Kind != token.Minus || tokens[2].Kind != token.Gt {
+				t.Errorf("%q tokenized as %v, want Minus Whitespace Gt EOF", "- >", tokens)
+			}
+		},
+	},
+	{
+		// "<=" is one token, not Lt then Assign.
+		name: "le is one token",
+		src:  "a<=b",
+		check: func(t *testing.T, file *source.File, tokens []token.Token) {
+			t.Helper()
+			var le token.Token
+			for _, tok := range tokens {
+				if tok.Kind == token.LtEq {
+					le = tok
+				}
+			}
+			if le.Text(file) != "<=" {
+				t.Errorf("got %v, want a single LtEq token", tokens)
+			}
+		},
+	},
 }
 
 // kindsOf lexes src and returns the non-trivia token kinds with their texts,

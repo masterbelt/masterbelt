@@ -112,44 +112,9 @@ func (s *Server) openFile(ctx context.Context, uri protocol.DocumentURI, text []
 	path := uriPath(uri)
 
 	if root, ok := project.FindRoot(filepath.Dir(path)); ok {
-		ws := s.roots[root]
-		if ws == nil {
-			proj, diags := project.Open(root)
-			if !diags.HasErrors() {
-				ws = &workspace{
-					root: root,
-					proj: proj,
-					prog: semantic.NewProgram(),
-					open: map[semantic.FileID]protocol.DocumentURI{},
-				}
-				s.roots[root] = ws
-			} else if s.client != nil {
-				// The manifest fails to load, so the file analyzes standalone
-				// and its imports will not resolve. Say why — otherwise the
-				// user sees only mystery use_not_found diagnostics.
-				for _, d := range diags.Items() {
-					_ = s.client.LogMessage(ctx, &protocol.LogMessageParams{
-						Type:    protocol.MessageTypeWarning,
-						Message: serverName + ": project at " + root + " not loaded: " + d.String(),
-					})
-				}
-			}
-		}
-		if ws != nil {
-			if rel, err := filepath.Rel(root, path); err == nil {
-				id := project.FileID(filepath.ToSlash(rel))
-				if f := ws.proj.Include(id); f != nil {
-					// The editor's text wins over the disk copy.
-					buf := f.AST.Buffer()
-					f.AST.Edit(source.Edit{Start: 0, End: buf.Len(), NewText: text})
-					ws.proj.Resync(id)
-					ws.sync()
-
-					v := view{ws: ws, id: semantic.FileID(id), uri: uri}
-					ws.open[v.id] = uri
-					s.open[uri] = v
-					return v
-				}
+		if ws := s.workspaceForRoot(ctx, root); ws != nil {
+			if v, ok := s.attachToProject(ws, root, path, uri, text); ok {
+				return v
 			}
 		}
 	}
@@ -167,6 +132,62 @@ func (s *Server) openFile(ctx context.Context, uri protocol.DocumentURI, text []
 	v := view{ws: ws, id: id, uri: uri}
 	s.open[uri] = v
 	return v
+}
+
+// workspaceForRoot returns the workspace for a project root, opening (and
+// caching) it on first use. It returns nil when the project's manifest fails
+// to load — logged to the client, since otherwise the user sees only mystery
+// use_not_found diagnostics from a file that then analyzes standalone.
+func (s *Server) workspaceForRoot(ctx context.Context, root string) *workspace {
+	if ws := s.roots[root]; ws != nil {
+		return ws
+	}
+	proj, diags := project.Open(root)
+	if diags.HasErrors() {
+		if s.client != nil {
+			for _, d := range diags.Items() {
+				_ = s.client.LogMessage(ctx, &protocol.LogMessageParams{
+					Type:    protocol.MessageTypeWarning,
+					Message: serverName + ": project at " + root + " not loaded: " + d.String(),
+				})
+			}
+		}
+		return nil
+	}
+	ws := &workspace{
+		root: root,
+		proj: proj,
+		prog: semantic.NewProgram(),
+		open: map[semantic.FileID]protocol.DocumentURI{},
+	}
+	s.roots[root] = ws
+	return ws
+}
+
+// attachToProject places the file (identified by its path relative to root) in
+// the workspace, overriding the disk copy with the editor's text, and returns
+// its view. It returns ok=false when the file is not reachable in the project,
+// so the caller falls back to a standalone workspace.
+func (s *Server) attachToProject(ws *workspace, root, path string, uri protocol.DocumentURI, text []byte) (view, bool) {
+	rel, err := filepath.Rel(root, path)
+	if err != nil {
+		return view{}, false
+	}
+	id := project.FileID(filepath.ToSlash(rel))
+	f := ws.proj.Include(id)
+	if f == nil {
+		return view{}, false
+	}
+	// The editor's text wins over the disk copy.
+	buf := f.AST.Buffer()
+	f.AST.Edit(source.Edit{Start: 0, End: buf.Len(), NewText: text})
+	ws.proj.Resync(id)
+	ws.sync()
+
+	v := view{ws: ws, id: semantic.FileID(id), uri: uri}
+	ws.open[v.id] = uri
+	s.open[uri] = v
+	return v, true
 }
 
 // DidChange applies the edits to the document incrementally, re-resolves its

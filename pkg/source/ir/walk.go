@@ -29,8 +29,7 @@ func WalkValues(v Value, fn func(Value) bool) {
 		// Leaves: nothing beneath.
 	case *CollectionLiteral:
 		for _, e := range v.Entries {
-			WalkValues(e.Key, fn)
-			WalkValues(e.Value, fn)
+			walkAll(fn, e.Key, e.Value)
 		}
 	case *RecordValue:
 		for _, f := range v.Fields {
@@ -38,41 +37,36 @@ func WalkValues(v Value, fn func(Value) bool) {
 		}
 	case *Call:
 		WalkValues(v.Receiver, fn)
-		for _, a := range v.Args {
-			WalkValues(a, fn)
-		}
+		walkAll(fn, v.Args...)
 	case *FuncCall:
-		for _, a := range v.Args {
-			WalkValues(a, fn)
-		}
+		walkAll(fn, v.Args...)
 	case *StaticCall:
-		for _, a := range v.Args {
-			WalkValues(a, fn)
-		}
+		walkAll(fn, v.Args...)
 	case *Apply:
 		WalkValues(v.Callee, fn)
-		for _, a := range v.Args {
-			WalkValues(a, fn)
-		}
+		walkAll(fn, v.Args...)
 	case *FuncLiteral:
 		WalkBody(v.Body, fn)
 	case *FieldAccess:
 		WalkValues(v.Receiver, fn)
 	case *Conversion:
-		for _, a := range v.Args {
-			WalkValues(a, fn)
-		}
+		walkAll(fn, v.Args...)
 	case *Await:
 		WalkValues(v.Value, fn)
 	case *Ternary:
-		WalkValues(v.Cond, fn)
-		WalkValues(v.Then, fn)
-		WalkValues(v.Else, fn)
+		walkAll(fn, v.Cond, v.Then, v.Else)
 	case *RangeLit:
-		WalkValues(v.Lower, fn)
-		WalkValues(v.Upper, fn)
+		walkAll(fn, v.Lower, v.Upper)
 	default:
 		panic(unhandledValueWalk(v))
+	}
+}
+
+// walkAll walks each value in order — the operand-list shorthand the arms
+// above share.
+func walkAll(fn func(Value) bool, vs ...Value) {
+	for _, v := range vs {
+		WalkValues(v, fn)
 	}
 }
 

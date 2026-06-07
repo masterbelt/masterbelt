@@ -37,21 +37,22 @@ func TestLoadPrelude(t *testing.T) {
 	}
 
 	// int8 carries its operator methods (add, declared extern).
-	if sbyte := byName["sbyte"]; sbyte == nil || len(sbyte.Methods) == 0 {
+	sbyte := byName["sbyte"]
+	if sbyte == nil || len(sbyte.Methods) == 0 {
 		t.Fatalf("sbyte has no methods: %+v", sbyte)
-	} else {
-		var hasAdd bool
-		for _, m := range sbyte.Methods {
-			if m.Name == "add" {
-				hasAdd = true
-				if !m.Extern {
-					t.Errorf("sbyte.add should be extern")
-				}
-			}
+	}
+	var hasAdd bool
+	for _, m := range sbyte.Methods {
+		if m.Name != "add" {
+			continue
 		}
-		if !hasAdd {
-			t.Errorf("sbyte has no add method")
+		hasAdd = true
+		if !m.Extern {
+			t.Errorf("sbyte.add should be extern")
 		}
+	}
+	if !hasAdd {
+		t.Errorf("sbyte has no add method")
 	}
 }
 

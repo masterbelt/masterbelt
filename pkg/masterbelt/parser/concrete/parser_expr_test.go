@@ -339,81 +339,83 @@ func TestParseRecordLiteralDiagnostics(t *testing.T) {
 // TestParseFuncLit checks the function-literal header: the parameter and result
 // annotations are optional (the checker may infer them from context), and the
 // shape of the node reflects exactly what was written.
+// funcLitCases drives TestParseFuncLit.
+var funcLitCases = []struct {
+	name string
+	src  string
+	want []cst.Kind   // FuncLit's direct sub-nodes
+	prm  [][]cst.Kind // each Param's sub-nodes (annotation present or not)
+}{
+	{
+		"fully annotated", "const f = fn(x: nint): nint { return x }\n",
+		[]cst.Kind{cst.ParamList, cst.TypeName, cst.Block},
+		[][]cst.Kind{{cst.TypeName}},
+	},
+	{
+		"no result", "const f = fn(x: nint) { return x }\n",
+		[]cst.Kind{cst.ParamList, cst.Block},
+		[][]cst.Kind{{cst.TypeName}},
+	},
+	{
+		"no annotations", "const f = fn(x) { return x }\n",
+		[]cst.Kind{cst.ParamList, cst.Block},
+		[][]cst.Kind{nil},
+	},
+	{
+		"partially annotated", "const f = fn(x: nint, y) { return x }\n",
+		[]cst.Kind{cst.ParamList, cst.Block},
+		[][]cst.Kind{{cst.TypeName}, nil},
+	},
+	{
+		"result only", "const f = fn(x): nint { return x }\n",
+		[]cst.Kind{cst.ParamList, cst.TypeName, cst.Block},
+		[][]cst.Kind{nil},
+	},
+	{
+		"zero params", "const f = fn() {}\n",
+		[]cst.Kind{cst.ParamList, cst.Block},
+		nil,
+	},
+	{
+		"nested", "const f = fn(x) { return fn(y) { return y } }\n",
+		[]cst.Kind{cst.ParamList, cst.Block},
+		[][]cst.Kind{nil},
+	},
+	// Arrow bodies: "->" followed by a single expression instead of a block.
+	{
+		"arrow", "const f = fn(x) -> x * 2\n",
+		[]cst.Kind{cst.ParamList, cst.BinaryExpr},
+		[][]cst.Kind{nil},
+	},
+	{
+		"arrow annotated param", "const f = fn(x: nint) -> x * 3\n",
+		[]cst.Kind{cst.ParamList, cst.BinaryExpr},
+		[][]cst.Kind{{cst.TypeName}},
+	},
+	{
+		"arrow two params", "const f = fn(x, y) -> x\n",
+		[]cst.Kind{cst.ParamList, cst.NameRef},
+		[][]cst.Kind{nil, nil},
+	},
+	{
+		"arrow zero params", "const f = fn() -> 1\n",
+		[]cst.Kind{cst.ParamList, cst.Literal},
+		nil,
+	},
+	{
+		"arrow with result", "const f = fn(x): nint -> x\n",
+		[]cst.Kind{cst.ParamList, cst.TypeName, cst.NameRef},
+		[][]cst.Kind{nil},
+	},
+	{
+		"arrow nested", "const f = fn(x) -> fn(y) -> y\n",
+		[]cst.Kind{cst.ParamList, cst.FuncLit},
+		[][]cst.Kind{nil},
+	},
+}
+
 func TestParseFuncLit(t *testing.T) {
-	cases := []struct {
-		name string
-		src  string
-		want []cst.Kind   // FuncLit's direct sub-nodes
-		prm  [][]cst.Kind // each Param's sub-nodes (annotation present or not)
-	}{
-		{
-			"fully annotated", "const f = fn(x: nint): nint { return x }\n",
-			[]cst.Kind{cst.ParamList, cst.TypeName, cst.Block},
-			[][]cst.Kind{{cst.TypeName}},
-		},
-		{
-			"no result", "const f = fn(x: nint) { return x }\n",
-			[]cst.Kind{cst.ParamList, cst.Block},
-			[][]cst.Kind{{cst.TypeName}},
-		},
-		{
-			"no annotations", "const f = fn(x) { return x }\n",
-			[]cst.Kind{cst.ParamList, cst.Block},
-			[][]cst.Kind{nil},
-		},
-		{
-			"partially annotated", "const f = fn(x: nint, y) { return x }\n",
-			[]cst.Kind{cst.ParamList, cst.Block},
-			[][]cst.Kind{{cst.TypeName}, nil},
-		},
-		{
-			"result only", "const f = fn(x): nint { return x }\n",
-			[]cst.Kind{cst.ParamList, cst.TypeName, cst.Block},
-			[][]cst.Kind{nil},
-		},
-		{
-			"zero params", "const f = fn() {}\n",
-			[]cst.Kind{cst.ParamList, cst.Block},
-			nil,
-		},
-		{
-			"nested", "const f = fn(x) { return fn(y) { return y } }\n",
-			[]cst.Kind{cst.ParamList, cst.Block},
-			[][]cst.Kind{nil},
-		},
-		// Arrow bodies: "->" followed by a single expression instead of a block.
-		{
-			"arrow", "const f = fn(x) -> x * 2\n",
-			[]cst.Kind{cst.ParamList, cst.BinaryExpr},
-			[][]cst.Kind{nil},
-		},
-		{
-			"arrow annotated param", "const f = fn(x: nint) -> x * 3\n",
-			[]cst.Kind{cst.ParamList, cst.BinaryExpr},
-			[][]cst.Kind{{cst.TypeName}},
-		},
-		{
-			"arrow two params", "const f = fn(x, y) -> x\n",
-			[]cst.Kind{cst.ParamList, cst.NameRef},
-			[][]cst.Kind{nil, nil},
-		},
-		{
-			"arrow zero params", "const f = fn() -> 1\n",
-			[]cst.Kind{cst.ParamList, cst.Literal},
-			nil,
-		},
-		{
-			"arrow with result", "const f = fn(x): nint -> x\n",
-			[]cst.Kind{cst.ParamList, cst.TypeName, cst.NameRef},
-			[][]cst.Kind{nil},
-		},
-		{
-			"arrow nested", "const f = fn(x) -> fn(y) -> y\n",
-			[]cst.Kind{cst.ParamList, cst.FuncLit},
-			[][]cst.Kind{nil},
-		},
-	}
-	for _, tc := range cases {
+	for _, tc := range funcLitCases {
 		t.Run(tc.name, func(t *testing.T) {
 			_, diags := Parse([]byte(tc.src))
 			if len(diags) != 0 {
@@ -427,27 +429,40 @@ func TestParseFuncLit(t *testing.T) {
 			if got := subNodeKinds(node); strings.Join(kindStrings(got), ",") != strings.Join(kindStrings(tc.want), ",") {
 				t.Fatalf("sub-nodes = %v, want %v", got, tc.want)
 			}
-			var params []cst.Tree
-			for _, c := range e.Children() {
-				if k, ok := c.Kind(); ok && k == cst.ParamList {
-					for _, pc := range c.Children() {
-						if pk, ok := pc.Kind(); ok && pk == cst.Param {
-							params = append(params, pc)
-						}
-					}
-				}
-			}
-			if len(params) != len(tc.prm) {
-				t.Fatalf("got %d params, want %d", len(params), len(tc.prm))
-			}
-			for i, p := range params {
-				pn, _ := p.Node()
-				got := subNodeKinds(pn)
-				if strings.Join(kindStrings(got), ",") != strings.Join(kindStrings(tc.prm[i]), ",") {
-					t.Fatalf("param %d sub-nodes = %v, want %v", i, got, tc.prm[i])
-				}
-			}
+			assertParamKinds(t, funcLitParams(e), tc.prm)
 		})
+	}
+}
+
+// funcLitParams returns the Param trees of a FuncLit tree, drawn from its
+// ParamList child.
+func funcLitParams(e cst.Tree) []cst.Tree {
+	var params []cst.Tree
+	for _, c := range e.Children() {
+		if k, ok := c.Kind(); ok && k == cst.ParamList {
+			for _, pc := range c.Children() {
+				if pk, ok := pc.Kind(); ok && pk == cst.Param {
+					params = append(params, pc)
+				}
+			}
+		}
+	}
+	return params
+}
+
+// assertParamKinds checks each parsed param's sub-node kinds against want (one
+// expected kind list per param), failing on a count or shape mismatch.
+func assertParamKinds(t *testing.T, params []cst.Tree, want [][]cst.Kind) {
+	t.Helper()
+	if len(params) != len(want) {
+		t.Fatalf("got %d params, want %d", len(params), len(want))
+	}
+	for i, p := range params {
+		pn, _ := p.Node()
+		got := subNodeKinds(pn)
+		if strings.Join(kindStrings(got), ",") != strings.Join(kindStrings(want[i]), ",") {
+			t.Fatalf("param %d sub-nodes = %v, want %v", i, got, want[i])
+		}
 	}
 }
 
@@ -545,65 +560,67 @@ func armNodes(sw *cst.Node) []*cst.Node {
 	return arms
 }
 
+// switchStmtCases drives TestParseSwitchStmt.
+var switchStmtCases = []struct {
+	name string
+	src  string
+	// scrutinee is the scrutinee node's kind.
+	scrutinee cst.Kind
+	// arms is, per arm, the kinds of its direct sub-nodes (the value
+	// patterns followed by the body).
+	arms [][]cst.Kind
+}{
+	{
+		"enum arms, newline separated",
+		"pub fn c(r: R): string {\n  switch r {\n    A -> return \"a\"\n    B -> return \"b\"\n  }\n}\n",
+		cst.NameRef,
+		[][]cst.Kind{
+			{cst.NameRef, cst.ReturnStmt},
+			{cst.NameRef, cst.ReturnStmt},
+		},
+	},
+	{
+		"multi-value arm and wildcard with a block body",
+		"pub fn g(n: nint): string {\n  switch n {\n    0 -> return \"z\"\n    1, 2, 3 -> return \"l\"\n    _ -> {\n      return \"h\"\n    }\n  }\n}\n",
+		cst.NameRef,
+		[][]cst.Kind{
+			{cst.Literal, cst.ReturnStmt},
+			{cst.Literal, cst.Literal, cst.Literal, cst.ReturnStmt},
+			{cst.NameRef, cst.Block},
+		},
+	},
+	{
+		"comma separated arms",
+		"pub fn c(r: R): string {\n  switch r { A -> return \"a\", B -> return \"b\" }\n}\n",
+		cst.NameRef,
+		[][]cst.Kind{
+			{cst.NameRef, cst.ReturnStmt},
+			{cst.NameRef, cst.ReturnStmt},
+		},
+	},
+	{
+		"expression body arm",
+		"pub fn c(r: R): string {\n  switch r {\n    A -> log(r)\n  }\n}\n",
+		cst.NameRef,
+		[][]cst.Kind{
+			{cst.NameRef, cst.CallExpr},
+		},
+	},
+	{
+		"qualified-member scrutinee is not a record literal",
+		"pub fn c(r: R): string {\n  switch self.x {\n    A -> return \"a\"\n  }\n}\n",
+		cst.MemberExpr,
+		[][]cst.Kind{
+			{cst.NameRef, cst.ReturnStmt},
+		},
+	},
+}
+
 // TestParseSwitchStmt checks the shape of a parsed switch: its scrutinee, its
 // arms, the value patterns and body of each arm, the multi-value and wildcard
 // forms, and comma vs newline arm separators.
 func TestParseSwitchStmt(t *testing.T) {
-	cases := []struct {
-		name string
-		src  string
-		// scrutinee is the scrutinee node's kind.
-		scrutinee cst.Kind
-		// arms is, per arm, the kinds of its direct sub-nodes (the value
-		// patterns followed by the body).
-		arms [][]cst.Kind
-	}{
-		{
-			"enum arms, newline separated",
-			"pub fn c(r: R): string {\n  switch r {\n    A -> return \"a\"\n    B -> return \"b\"\n  }\n}\n",
-			cst.NameRef,
-			[][]cst.Kind{
-				{cst.NameRef, cst.ReturnStmt},
-				{cst.NameRef, cst.ReturnStmt},
-			},
-		},
-		{
-			"multi-value arm and wildcard with a block body",
-			"pub fn g(n: nint): string {\n  switch n {\n    0 -> return \"z\"\n    1, 2, 3 -> return \"l\"\n    _ -> {\n      return \"h\"\n    }\n  }\n}\n",
-			cst.NameRef,
-			[][]cst.Kind{
-				{cst.Literal, cst.ReturnStmt},
-				{cst.Literal, cst.Literal, cst.Literal, cst.ReturnStmt},
-				{cst.NameRef, cst.Block},
-			},
-		},
-		{
-			"comma separated arms",
-			"pub fn c(r: R): string {\n  switch r { A -> return \"a\", B -> return \"b\" }\n}\n",
-			cst.NameRef,
-			[][]cst.Kind{
-				{cst.NameRef, cst.ReturnStmt},
-				{cst.NameRef, cst.ReturnStmt},
-			},
-		},
-		{
-			"expression body arm",
-			"pub fn c(r: R): string {\n  switch r {\n    A -> log(r)\n  }\n}\n",
-			cst.NameRef,
-			[][]cst.Kind{
-				{cst.NameRef, cst.CallExpr},
-			},
-		},
-		{
-			"qualified-member scrutinee is not a record literal",
-			"pub fn c(r: R): string {\n  switch self.x {\n    A -> return \"a\"\n  }\n}\n",
-			cst.MemberExpr,
-			[][]cst.Kind{
-				{cst.NameRef, cst.ReturnStmt},
-			},
-		},
-	}
-	for _, tc := range cases {
+	for _, tc := range switchStmtCases {
 		t.Run(tc.name, func(t *testing.T) {
 			root, diags := Parse([]byte(tc.src))
 			if len(diags) != 0 {
@@ -613,22 +630,29 @@ func TestParseSwitchStmt(t *testing.T) {
 			if sw == nil {
 				t.Fatal("no SwitchStmt parsed")
 			}
-			sub := subNodeKinds(sw)
-			if len(sub) == 0 || sub[0] != tc.scrutinee {
-				t.Fatalf("scrutinee kind = %v, want %v", sub, tc.scrutinee)
-			}
-			arms := armNodes(sw)
-			if len(arms) != len(tc.arms) {
-				t.Fatalf("got %d arms, want %d", len(arms), len(tc.arms))
-			}
-			for i, arm := range arms {
-				got := subNodeKinds(arm)
-				if strings.Join(kindStrings(got), ",") != strings.Join(kindStrings(tc.arms[i]), ",") {
-					t.Fatalf("arm %d sub-nodes = %v, want %v", i, got, tc.arms[i])
-				}
-			}
+			assertSwitchShape(t, sw, tc.scrutinee, tc.arms)
 			assertLossless(t, tc.src)
 		})
+	}
+}
+
+// assertSwitchShape checks a parsed switch node: its scrutinee kind, its arm
+// count, and each arm's sub-node kinds (value patterns followed by the body).
+func assertSwitchShape(t *testing.T, sw *cst.Node, scrutinee cst.Kind, wantArms [][]cst.Kind) {
+	t.Helper()
+	sub := subNodeKinds(sw)
+	if len(sub) == 0 || sub[0] != scrutinee {
+		t.Fatalf("scrutinee kind = %v, want %v", sub, scrutinee)
+	}
+	arms := armNodes(sw)
+	if len(arms) != len(wantArms) {
+		t.Fatalf("got %d arms, want %d", len(arms), len(wantArms))
+	}
+	for i, arm := range arms {
+		got := subNodeKinds(arm)
+		if strings.Join(kindStrings(got), ",") != strings.Join(kindStrings(wantArms[i]), ",") {
+			t.Fatalf("arm %d sub-nodes = %v, want %v", i, got, wantArms[i])
+		}
 	}
 }
 

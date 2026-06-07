@@ -137,65 +137,114 @@ func collectEffectUses(e ast.Expr, bs infer.BodyScope, use func(effect string, n
 	case *ast.MemberExpr:
 		collectEffectUses(e.Receiver, bs, use)
 	case *ast.CallExpr:
-		switch callee := e.Callee.(type) {
-		case *ast.Identifier:
-			// A parameter shadows a same-named function, and a type name is a
-			// conversion (no effects), exactly as the type rules order it.
-			if _, isParam := bs.Params[callee.Name]; !isParam {
-				if _, isType := bs.Universe[callee.Name]; !isType {
-					for _, eff := range declaredEffects(bs.Funcs[callee.Name]) {
-						use(eff, e)
-					}
-				}
-			}
-		case *ast.MemberExpr:
-			// A namespace function call (geo.area(...)) uses the imported
-			// function's effects; any other member callee is a method call,
-			// resolved by the receiver's type.
-			if recv, ok := callee.Receiver.(*ast.Identifier); ok && bs.QualifiedFuncs != nil {
-				if _, isParam := bs.Params[recv.Name]; !isParam {
-					if fds := bs.QualifiedFuncs(recv.Name, callee.Member.Name); len(fds) > 0 {
-						for _, eff := range declaredEffects(fds) {
-							use(eff, e)
-						}
-						break
-					}
-				}
-			}
-			// A static fn call (Type.name(...)) uses the static fn's declared
-			// effects, the same rule a top-level function call follows; a local or
-			// parameter of the type name shadows the type (it is a value receiver).
-			if recv, ok := callee.Receiver.(*ast.Identifier); ok {
-				if _, isParam := bs.Params[recv.Name]; !isParam {
-					if def := bs.Universe[recv.Name]; def != nil {
-						if used := staticEffects(def, callee.Member.Name); len(used) > 0 {
-							for _, eff := range used {
-								use(eff, e)
-							}
-							for _, a := range e.Arguments {
-								collectEffectUses(a, bs, use)
-							}
-							return
-						}
-					}
-				}
-			}
-			recvT := infer.Body(callee.Receiver, bs)
-			if ms, _, ok := types.Candidates(bs.Reg, recvT, callee.Member.Name); ok {
-				seen := map[string]bool{}
-				for _, m := range ms {
-					for _, eff := range m.Effects {
-						if !seen[eff] {
-							seen[eff] = true
-							use(eff, e)
-						}
-					}
-				}
-			}
-			collectEffectUses(callee.Receiver, bs, use)
+		collectCallEffectUses(e, bs, use)
+	}
+}
+
+// collectCallEffectUses gathers the effects of a call: a name callee uses the
+// top-level overload set's effects, a member callee a namespace function's, a
+// static fn's, or a method's — then the arguments. A static fn call short-
+// circuits (it already descended its arguments), so it returns early.
+func collectCallEffectUses(e *ast.CallExpr, bs infer.BodyScope, use func(effect string, node ast.Node)) {
+	switch callee := e.Callee.(type) {
+	case *ast.Identifier:
+		collectNameCallEffectUses(e, callee, bs, use)
+	case *ast.MemberExpr:
+		if collectNamespaceCallEffectUses(e, callee, bs, use) {
+			break
 		}
-		for _, a := range e.Arguments {
-			collectEffectUses(a, bs, use)
+		if collectStaticCallEffectUses(e, callee, bs, use) {
+			return // a static fn call already descended its arguments
+		}
+		collectMethodCallEffectUses(e, callee, bs, use)
+		collectEffectUses(callee.Receiver, bs, use)
+	}
+	for _, a := range e.Arguments {
+		collectEffectUses(a, bs, use)
+	}
+}
+
+// collectNameCallEffectUses handles a call of a bare name: a parameter shadows
+// a same-named function, and a type name is a conversion (no effects), exactly
+// as the type rules order it.
+func collectNameCallEffectUses(e *ast.CallExpr, callee *ast.Identifier, bs infer.BodyScope, use func(effect string, node ast.Node)) {
+	if _, isParam := bs.Params[callee.Name]; isParam {
+		return
+	}
+	if _, isType := bs.Universe[callee.Name]; isType {
+		return
+	}
+	for _, eff := range declaredEffects(bs.Funcs[callee.Name]) {
+		use(eff, e)
+	}
+}
+
+// collectNamespaceCallEffectUses handles a namespace function call
+// (geo.area(...)): it uses the imported function's effects. It reports whether
+// the callee resolved to a namespace function (and the member arms are done).
+func collectNamespaceCallEffectUses(e *ast.CallExpr, callee *ast.MemberExpr, bs infer.BodyScope, use func(effect string, node ast.Node)) bool {
+	recv, ok := callee.Receiver.(*ast.Identifier)
+	if !ok || bs.QualifiedFuncs == nil {
+		return false
+	}
+	if _, isParam := bs.Params[recv.Name]; isParam {
+		return false
+	}
+	fds := bs.QualifiedFuncs(recv.Name, callee.Member.Name)
+	if len(fds) == 0 {
+		return false
+	}
+	for _, eff := range declaredEffects(fds) {
+		use(eff, e)
+	}
+	return true
+}
+
+// collectStaticCallEffectUses handles a static fn call (Type.name(...)): it
+// uses the static fn's declared effects, the same rule a top-level function
+// call follows; a local or parameter of the type name shadows the type (it is
+// a value receiver). It reports whether the call resolved to a static fn, in
+// which case it has already descended the arguments.
+func collectStaticCallEffectUses(e *ast.CallExpr, callee *ast.MemberExpr, bs infer.BodyScope, use func(effect string, node ast.Node)) bool {
+	recv, ok := callee.Receiver.(*ast.Identifier)
+	if !ok {
+		return false
+	}
+	if _, isParam := bs.Params[recv.Name]; isParam {
+		return false
+	}
+	def := bs.Universe[recv.Name]
+	if def == nil {
+		return false
+	}
+	used := staticEffects(def, callee.Member.Name)
+	if len(used) == 0 {
+		return false
+	}
+	for _, eff := range used {
+		use(eff, e)
+	}
+	for _, a := range e.Arguments {
+		collectEffectUses(a, bs, use)
+	}
+	return true
+}
+
+// collectMethodCallEffectUses handles a method call: the union of the
+// resolved method candidates' declared effects, each reported once.
+func collectMethodCallEffectUses(e *ast.CallExpr, callee *ast.MemberExpr, bs infer.BodyScope, use func(effect string, node ast.Node)) {
+	recvT := infer.Body(callee.Receiver, bs)
+	ms, _, ok := types.Candidates(bs.Reg, recvT, callee.Member.Name)
+	if !ok {
+		return
+	}
+	seen := map[string]bool{}
+	for _, m := range ms {
+		for _, eff := range m.Effects {
+			if !seen[eff] {
+				seen[eff] = true
+				use(eff, e)
+			}
 		}
 	}
 }

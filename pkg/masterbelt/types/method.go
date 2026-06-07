@@ -342,36 +342,8 @@ func findMethods(reg *builtin.Registry, def *ir.TypeDef, name string, kind ir.Me
 	if len(out) > 0 {
 		return out
 	}
-	// An interface the type opts into supplies its provided methods: a type that
-	// declares the name directly (above) overrides them, but otherwise the
-	// interface's default is the method. The required methods are also on the
-	// interface def, but the implementing type always declares them itself
-	// (conformance demands it), so they are shadowed above; only the provided
-	// ones reach here. The interface's own def carries the method signatures and
-	// bodies, so they resolve through the same overload path.
-	for _, impl := range def.Impls {
-		if idef := defOf(reg, impl); idef != nil && idef.Interface != nil {
-			if ms := findMethods(reg, idef, name, kind, seen); len(ms) > 0 {
-				out = append(out, ms...)
-			}
-		}
-	}
-	// An interface inherits its parents' members — required and provided alike —
-	// so a method named on an ancestor resolves through the child too. This is
-	// the contract-implication path for a type parameter bounded by a child
-	// interface (T: orderable reaching comparable's eql): the bound's def carries
-	// only orderable's own members, and its parents carry the rest. A child that
-	// redeclared the name is rejected elsewhere (interface_member_override), so
-	// the walk does not have to choose between a child and an ancestor signature.
-	if def.Interface != nil {
-		for _, parent := range def.Interface.Parents {
-			if pdef := interfaceDefOf(parent); pdef != nil {
-				if ms := findMethods(reg, pdef, name, kind, seen); len(ms) > 0 {
-					out = append(out, ms...)
-				}
-			}
-		}
-	}
+	out = append(out, findImplMethods(reg, def, name, kind, seen)...)
+	out = append(out, findParentMethods(reg, def, name, kind, seen)...)
 	if len(out) > 0 {
 		return out
 	}
@@ -383,4 +355,46 @@ func findMethods(reg *builtin.Registry, def *ir.TypeDef, name string, kind ir.Me
 		}
 	}
 	return nil
+}
+
+// findImplMethods collects the provided methods of every interface def opts
+// into: a type that declares the name directly overrides them, but otherwise the
+// interface's default is the method. The required methods are also on the
+// interface def, but the implementing type always declares them itself
+// (conformance demands it), so they are shadowed by the caller; only the
+// provided ones reach here. The interface's own def carries the method
+// signatures and bodies, so they resolve through the same overload path.
+func findImplMethods(reg *builtin.Registry, def *ir.TypeDef, name string, kind ir.MethodKind, seen map[*ir.TypeDef]bool) []*ir.Method {
+	var out []*ir.Method
+	for _, impl := range def.Impls {
+		if idef := defOf(reg, impl); idef != nil && idef.Interface != nil {
+			if ms := findMethods(reg, idef, name, kind, seen); len(ms) > 0 {
+				out = append(out, ms...)
+			}
+		}
+	}
+	return out
+}
+
+// findParentMethods collects the members an interface inherits from its parents
+// — required and provided alike — so a method named on an ancestor resolves
+// through the child too. This is the contract-implication path for a type
+// parameter bounded by a child interface (T: orderable reaching comparable's
+// eql): the bound's def carries only orderable's own members, and its parents
+// carry the rest. A child that redeclared the name is rejected elsewhere
+// (interface_member_override), so the walk does not have to choose between a
+// child and an ancestor signature.
+func findParentMethods(reg *builtin.Registry, def *ir.TypeDef, name string, kind ir.MethodKind, seen map[*ir.TypeDef]bool) []*ir.Method {
+	if def.Interface == nil {
+		return nil
+	}
+	var out []*ir.Method
+	for _, parent := range def.Interface.Parents {
+		if pdef := interfaceDefOf(parent); pdef != nil {
+			if ms := findMethods(reg, pdef, name, kind, seen); len(ms) > 0 {
+				out = append(out, ms...)
+			}
+		}
+	}
+	return out
 }

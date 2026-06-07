@@ -140,31 +140,9 @@ func dumpExpr(e ast.Expr) string {
 	case *ast.NullLit:
 		return "NullLit"
 	case *ast.CollectionLit:
-		label := "collection"
-		if x.IsMap() {
-			label = "map"
-		} else if len(x.Entries) > 0 {
-			label = "list"
-		}
-		parts := []string{label}
-		for _, e := range x.Entries {
-			if e.Key != nil {
-				parts = append(parts, dumpExpr(e.Key)+": "+dumpExpr(e.Value))
-			} else {
-				parts = append(parts, dumpExpr(e.Value))
-			}
-		}
-		return "(" + strings.Join(parts, " ") + ")"
+		return dumpCollection(x)
 	case *ast.RecordLit:
-		label := "record"
-		if x.TypeName != "" {
-			label = "record " + x.TypeName
-		}
-		parts := []string{label}
-		for _, f := range x.Fields {
-			parts = append(parts, f.Name+": "+dumpExpr(f.Value))
-		}
-		return "(" + strings.Join(parts, " ") + ")"
+		return dumpRecord(x)
 	case *ast.SelfExpr:
 		return "self"
 	case *ast.Identifier:
@@ -172,11 +150,7 @@ func dumpExpr(e ast.Expr) string {
 	case *ast.MemberExpr:
 		return fmt.Sprintf("(. %s %s)", dumpExpr(x.Receiver), x.Member.Name)
 	case *ast.CallExpr:
-		parts := []string{"call", dumpExpr(x.Callee)}
-		for _, a := range x.Arguments {
-			parts = append(parts, dumpExpr(a))
-		}
-		return "(" + strings.Join(parts, " ") + ")"
+		return dumpCall(x)
 	case *ast.AwaitExpr:
 		return "(await " + dumpExpr(x.Value) + ")"
 	case *ast.TernaryExpr:
@@ -188,18 +162,72 @@ func dumpExpr(e ast.Expr) string {
 		}
 		return "(" + op + " " + dumpExpr(x.Lower) + " " + dumpExpr(x.Upper) + ")"
 	case *ast.FuncLit:
-		params := make([]string, len(x.Params))
-		for i, p := range x.Params {
-			params[i] = p.Name + ": " + dumpType(p.Type)
-		}
-		parts := []string{"fn(" + strings.Join(params, ", ") + "): " + dumpType(x.Result)}
-		for _, s := range x.Body {
-			parts = append(parts, dumpStmtInline(s))
-		}
-		return "(" + strings.Join(parts, " ") + ")"
+		return dumpFuncLit(x)
 	default:
 		return "Expr(?)"
 	}
+}
+
+// dumpCollection renders a collection literal: a label (map/list/collection)
+// followed by each entry, "key: value" for a map entry and a bare value
+// otherwise, wrapped in parentheses.
+func dumpCollection(x *ast.CollectionLit) string {
+	label := "collection"
+	if x.IsMap() {
+		label = "map"
+	} else if len(x.Entries) > 0 {
+		label = "list"
+	}
+	parts := []string{label}
+	for _, e := range x.Entries {
+		if e.Key != nil {
+			parts = append(parts, dumpExpr(e.Key)+": "+dumpExpr(e.Value))
+		} else {
+			parts = append(parts, dumpExpr(e.Value))
+		}
+	}
+	return "(" + strings.Join(parts, " ") + ")"
+}
+
+// dumpRecord renders a record literal: the "record" label (with the type name
+// when one is written) followed by each "name: value" field, parenthesized.
+func dumpRecord(x *ast.RecordLit) string {
+	label := "record"
+	if x.TypeName != "" {
+		label = "record " + x.TypeName
+	}
+	parts := make([]string, 0, 1+len(x.Fields))
+	parts = append(parts, label)
+	for _, f := range x.Fields {
+		parts = append(parts, f.Name+": "+dumpExpr(f.Value))
+	}
+	return "(" + strings.Join(parts, " ") + ")"
+}
+
+// dumpCall renders an explicit call: "call", the callee, then each argument,
+// parenthesized.
+func dumpCall(x *ast.CallExpr) string {
+	parts := make([]string, 0, 2+len(x.Arguments))
+	parts = append(parts, "call", dumpExpr(x.Callee))
+	for _, a := range x.Arguments {
+		parts = append(parts, dumpExpr(a))
+	}
+	return "(" + strings.Join(parts, " ") + ")"
+}
+
+// dumpFuncLit renders a function literal: the "fn(params): result" signature
+// followed by its body statements in inline form, parenthesized.
+func dumpFuncLit(x *ast.FuncLit) string {
+	params := make([]string, len(x.Params))
+	for i, p := range x.Params {
+		params[i] = p.Name + ": " + dumpType(p.Type)
+	}
+	parts := make([]string, 0, 1+len(x.Body))
+	parts = append(parts, "fn("+strings.Join(params, ", ")+"): "+dumpType(x.Result))
+	for _, s := range x.Body {
+		parts = append(parts, dumpStmtInline(s))
+	}
+	return "(" + strings.Join(parts, " ") + ")"
 }
 
 // dumpStmtInline renders a statement compactly on one line, for a function
@@ -513,64 +541,84 @@ func dumpStmtAt(b *strings.Builder, s ast.Stmt, indent string) {
 	case *ast.AssignStmt:
 		fmt.Fprintf(b, "%sassign %s = %s\n", indent, dumpExpr(s.Target), dumpExpr(s.Value))
 	case *ast.SwitchStmt:
-		fmt.Fprintf(b, "%sswitch %s\n", indent, dumpExpr(s.Scrutinee))
-		for _, arm := range s.Arms {
-			values := make([]string, len(arm.Values))
-			for i, v := range arm.Values {
-				values[i] = dumpExpr(v)
-			}
-			fmt.Fprintf(b, "%s  arm %s\n", indent, strings.Join(values, ", "))
-			for _, bs := range arm.Body {
-				dumpStmtAt(b, bs, indent+"    ")
-			}
-		}
-		if s.Else != nil {
-			fmt.Fprintf(b, "%s  else\n", indent)
-			for _, bs := range s.Else {
-				dumpStmtAt(b, bs, indent+"    ")
-			}
-		}
-		for _, arm := range s.AfterElse {
-			values := make([]string, len(arm.Values))
-			for i, v := range arm.Values {
-				values[i] = dumpExpr(v)
-			}
-			fmt.Fprintf(b, "%s  unreachable-arm %s\n", indent, strings.Join(values, ", "))
-			for _, bs := range arm.Body {
-				dumpStmtAt(b, bs, indent+"    ")
-			}
-		}
+		dumpSwitchAt(b, s, indent)
 	case *ast.MatchStmt:
-		fmt.Fprintf(b, "%smatch %s\n", indent, dumpExpr(s.Scrutinee))
-		for _, arm := range s.Arms {
-			fmt.Fprintf(b, "%s  arm %s\n", indent, dumpMatchPattern(arm))
-			for _, bs := range arm.Body {
-				dumpStmtAt(b, bs, indent+"    ")
-			}
-		}
-		if s.Else != nil {
-			fmt.Fprintf(b, "%s  else\n", indent)
-			for _, bs := range s.Else {
-				dumpStmtAt(b, bs, indent+"    ")
-			}
-		}
-		for _, arm := range s.AfterElse {
-			fmt.Fprintf(b, "%s  unreachable-arm %s\n", indent, dumpMatchPattern(arm))
-			for _, bs := range arm.Body {
-				dumpStmtAt(b, bs, indent+"    ")
-			}
-		}
+		dumpMatchAt(b, s, indent)
 	case *ast.IfStmt:
 		dumpIfAt(b, s, indent)
 	case *ast.ForStmt:
-		fmt.Fprintf(b, "%sfor %s %s %s\n", indent, s.Var, s.Kind.String(), dumpExpr(s.Iter))
-		for _, bs := range s.Body {
-			dumpStmtAt(b, bs, indent+"    ")
-		}
+		dumpForAt(b, s, indent)
 	default:
 		// The snapshot oracle must render every statement kind; a new one panics
 		// here rather than dumping as nothing and masking the regression.
 		panic(ast.UnhandledStmt(s))
+	}
+}
+
+// dumpSwitchAt renders a switch statement at the given indent: its scrutinee,
+// each value arm and its body, an optional else block, and any unreachable arms
+// after the else. Arm bodies nest one level deeper.
+func dumpSwitchAt(b *strings.Builder, s *ast.SwitchStmt, indent string) {
+	fmt.Fprintf(b, "%sswitch %s\n", indent, dumpExpr(s.Scrutinee))
+	for _, arm := range s.Arms {
+		values := make([]string, len(arm.Values))
+		for i, v := range arm.Values {
+			values[i] = dumpExpr(v)
+		}
+		fmt.Fprintf(b, "%s  arm %s\n", indent, strings.Join(values, ", "))
+		for _, bs := range arm.Body {
+			dumpStmtAt(b, bs, indent+"    ")
+		}
+	}
+	if s.Else != nil {
+		fmt.Fprintf(b, "%s  else\n", indent)
+		for _, bs := range s.Else {
+			dumpStmtAt(b, bs, indent+"    ")
+		}
+	}
+	for _, arm := range s.AfterElse {
+		values := make([]string, len(arm.Values))
+		for i, v := range arm.Values {
+			values[i] = dumpExpr(v)
+		}
+		fmt.Fprintf(b, "%s  unreachable-arm %s\n", indent, strings.Join(values, ", "))
+		for _, bs := range arm.Body {
+			dumpStmtAt(b, bs, indent+"    ")
+		}
+	}
+}
+
+// dumpMatchAt renders a match statement at the given indent: its scrutinee, each
+// type-pattern arm and its body, an optional else block, and any unreachable arms
+// after the else. Arm bodies nest one level deeper.
+func dumpMatchAt(b *strings.Builder, s *ast.MatchStmt, indent string) {
+	fmt.Fprintf(b, "%smatch %s\n", indent, dumpExpr(s.Scrutinee))
+	for _, arm := range s.Arms {
+		fmt.Fprintf(b, "%s  arm %s\n", indent, dumpMatchPattern(arm))
+		for _, bs := range arm.Body {
+			dumpStmtAt(b, bs, indent+"    ")
+		}
+	}
+	if s.Else != nil {
+		fmt.Fprintf(b, "%s  else\n", indent)
+		for _, bs := range s.Else {
+			dumpStmtAt(b, bs, indent+"    ")
+		}
+	}
+	for _, arm := range s.AfterElse {
+		fmt.Fprintf(b, "%s  unreachable-arm %s\n", indent, dumpMatchPattern(arm))
+		for _, bs := range arm.Body {
+			dumpStmtAt(b, bs, indent+"    ")
+		}
+	}
+}
+
+// dumpForAt renders a for statement at the given indent: its variable, loop kind,
+// and iterated expression, with the body nested one level deeper.
+func dumpForAt(b *strings.Builder, s *ast.ForStmt, indent string) {
+	fmt.Fprintf(b, "%sfor %s %s %s\n", indent, s.Var, s.Kind.String(), dumpExpr(s.Iter))
+	for _, bs := range s.Body {
+		dumpStmtAt(b, bs, indent+"    ")
 	}
 }
 

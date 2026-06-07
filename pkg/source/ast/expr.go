@@ -428,6 +428,11 @@ func WalkValueIdents(e Expr, fn func(*Identifier)) {
 // expressions here, exactly once — the companion of WalkExprs for statements.
 func WalkBodyExprs(body []Stmt, fn func(Expr)) {
 	for _, stmt := range body {
+		// A flat dispatch over the exhaustive statement set: every Stmt
+		// implementer has a case, and a new form reaches the default panic
+		// rather than being silently dropped from this shared skeleton (and so
+		// from every walk layered on it). Each non-trivial case delegates to a
+		// per-statement-kind helper so the dispatch stays readable.
 		switch stmt := stmt.(type) {
 		case *ReturnStmt:
 			if stmt.Value != nil {
@@ -442,42 +447,11 @@ func WalkBodyExprs(body []Stmt, fn func(Expr)) {
 				fn(stmt.Value)
 			}
 		case *AssignStmt:
-			// The target as well as the value, so a member-access target
-			// (self.x = ...), which the parser accepts, is reached too.
-			if stmt.Target != nil {
-				fn(stmt.Target)
-			}
-			if stmt.Value != nil {
-				fn(stmt.Value)
-			}
+			walkAssignExprs(stmt, fn)
 		case *SwitchStmt:
-			if stmt.Scrutinee != nil {
-				fn(stmt.Scrutinee)
-			}
-			for _, arm := range stmt.Arms {
-				for _, v := range arm.Values {
-					fn(v)
-				}
-				WalkBodyExprs(arm.Body, fn)
-			}
-			WalkBodyExprs(stmt.Else, fn)
-			for _, arm := range stmt.AfterElse {
-				for _, v := range arm.Values {
-					fn(v)
-				}
-				WalkBodyExprs(arm.Body, fn)
-			}
+			walkSwitchExprs(stmt, fn)
 		case *MatchStmt:
-			if stmt.Scrutinee != nil {
-				fn(stmt.Scrutinee)
-			}
-			for _, arm := range stmt.Arms {
-				WalkBodyExprs(arm.Body, fn)
-			}
-			WalkBodyExprs(stmt.Else, fn)
-			for _, arm := range stmt.AfterElse {
-				WalkBodyExprs(arm.Body, fn)
-			}
+			walkMatchExprs(stmt, fn)
 		case *IfStmt:
 			walkIfExprs(stmt, fn)
 		case *ForStmt:
@@ -491,6 +465,55 @@ func WalkBodyExprs(body []Stmt, fn func(Expr)) {
 			// from this shared skeleton (and so from every walk layered on it).
 			panic(unhandledStmt(stmt))
 		}
+	}
+}
+
+// walkAssignExprs calls fn for an assignment's target and value — the target as
+// well, so a member-access target (self.x = ...), which the parser accepts, is
+// reached too.
+func walkAssignExprs(stmt *AssignStmt, fn func(Expr)) {
+	if stmt.Target != nil {
+		fn(stmt.Target)
+	}
+	if stmt.Value != nil {
+		fn(stmt.Value)
+	}
+}
+
+// walkSwitchExprs calls fn for a switch's scrutinee, each arm's value patterns,
+// and (recursively) the expressions of every arm body, the else body, and the
+// after-else arms.
+func walkSwitchExprs(stmt *SwitchStmt, fn func(Expr)) {
+	if stmt.Scrutinee != nil {
+		fn(stmt.Scrutinee)
+	}
+	for _, arm := range stmt.Arms {
+		for _, v := range arm.Values {
+			fn(v)
+		}
+		WalkBodyExprs(arm.Body, fn)
+	}
+	WalkBodyExprs(stmt.Else, fn)
+	for _, arm := range stmt.AfterElse {
+		for _, v := range arm.Values {
+			fn(v)
+		}
+		WalkBodyExprs(arm.Body, fn)
+	}
+}
+
+// walkMatchExprs calls fn for a match's scrutinee and (recursively) the
+// expressions of every arm body, the else body, and the after-else arms.
+func walkMatchExprs(stmt *MatchStmt, fn func(Expr)) {
+	if stmt.Scrutinee != nil {
+		fn(stmt.Scrutinee)
+	}
+	for _, arm := range stmt.Arms {
+		WalkBodyExprs(arm.Body, fn)
+	}
+	WalkBodyExprs(stmt.Else, fn)
+	for _, arm := range stmt.AfterElse {
+		WalkBodyExprs(arm.Body, fn)
 	}
 }
 

@@ -165,75 +165,91 @@ func ConstantsEqual(a, b *Constant) bool {
 	case ConstDatetime, ConstDuration:
 		return a.Millis == b.Millis
 	case ConstRange:
-		// Two ranges are equal when their bounds and step are equal — a range
-		// carries no other identity. The step compares through RangeStep, so a nil
-		// step (the unit-step range) equals an explicit step of 1; range(0, 9) and
-		// range(0, 9, 1) are the same value. An empty range still compares by its
-		// written bounds (range(10, 10) is not range(5, 5)), which is conservative
-		// and matches the String() rendering; nothing relies on every empty range
-		// being one value.
-		return a.Start != nil && b.Start != nil && a.End != nil && b.End != nil &&
-			a.Start.Cmp(b.Start) == 0 && a.End.Cmp(b.End) == 0 &&
-			a.RangeStep().Cmp(b.RangeStep()) == 0
+		return equalRanges(a, b)
 	case ConstCollection:
-		// The mapness is part of a collection's identity: an empty list is not an
-		// empty map (their set/keys/iteration meanings differ), and an empty
-		// CollUnknown collection — whose mapness a channel has not settled — is
-		// equal only to another CollUnknown, never to a settled empty list or map.
-		// Treating Unknown-versus-settled as unequal is the safe side for the
-		// engine's early cutoff: it triggers a recompute rather than coalescing two
-		// facts a later channel could tell apart.
-		if a.CollMapness != b.CollMapness {
-			return false
-		}
-		if len(a.Coll) != len(b.Coll) {
-			return false
-		}
-		for i := range a.Coll {
-			// A list entry has a nil key on both sides; a map entry's keys
-			// must match too. A key present on one side but not the other (a
-			// list against a map of the same length) is unequal.
-			if (a.Coll[i].Key == nil) != (b.Coll[i].Key == nil) {
-				return false
-			}
-			if a.Coll[i].Key != nil && !ConstantsEqual(a.Coll[i].Key, b.Coll[i].Key) {
-				return false
-			}
-			if !ConstantsEqual(a.Coll[i].Value, b.Coll[i].Value) {
-				return false
-			}
-		}
-		return true
+		return equalCollections(a, b)
 	case ConstRecord:
-		// RecordConstant normalizes fields to canonical name order, so equal
-		// records have identically ordered fields: a positional walk suffices.
-		if len(a.Fields) != len(b.Fields) {
-			return false
-		}
-		for i := range a.Fields {
-			if a.Fields[i].Name != b.Fields[i].Name || !ConstantsEqual(a.Fields[i].Value, b.Fields[i].Value) {
-				return false
-			}
-		}
-		return true
+		return equalRecords(a, b)
 	case ConstFunc:
-		// Two function values are the same exactly when they close over the
-		// same literal: the literal's syntax identifies it (the AST pointer is
-		// the engine's fact, surviving the fold rebuilding the IR node), with
-		// the node pointer the fallback for a literal built without syntax.
-		if funcIdentity(a.Fn) != funcIdentity(b.Fn) || len(a.Captured) != len(b.Captured) {
-			return false
-		}
-		for name, v := range a.Captured {
-			w, ok := b.Captured[name]
-			if !ok || !ConstantsEqual(v, w) {
-				return false
-			}
-		}
-		return true
+		return equalFuncs(a, b)
 	default:
 		panic("ir.ConstantsEqual: unhandled ConstKind " + strconv.Itoa(int(a.Kind)))
 	}
+}
+
+// equalRanges compares two range constants: equal when their bounds and step
+// are equal — a range carries no other identity. The step compares through
+// RangeStep, so a nil step (the unit-step range) equals an explicit step of 1;
+// range(0, 9) and range(0, 9, 1) are the same value. An empty range still
+// compares by its written bounds (range(10, 10) is not range(5, 5)), which is
+// conservative and matches the String() rendering; nothing relies on every
+// empty range being one value.
+func equalRanges(a, b *Constant) bool {
+	return a.Start != nil && b.Start != nil && a.End != nil && b.End != nil &&
+		a.Start.Cmp(b.Start) == 0 && a.End.Cmp(b.End) == 0 &&
+		a.RangeStep().Cmp(b.RangeStep()) == 0
+}
+
+// equalCollections compares two collection constants. The mapness is part of
+// a collection's identity: an empty list is not an empty map (their set/keys/
+// iteration meanings differ), and an empty CollUnknown collection — whose
+// mapness a channel has not settled — is equal only to another CollUnknown,
+// never to a settled empty list or map. Treating Unknown-versus-settled as
+// unequal is the safe side for the engine's early cutoff: it triggers a
+// recompute rather than coalescing two facts a later channel could tell apart.
+func equalCollections(a, b *Constant) bool {
+	if a.CollMapness != b.CollMapness || len(a.Coll) != len(b.Coll) {
+		return false
+	}
+	for i := range a.Coll {
+		// A list entry has a nil key on both sides; a map entry's keys must
+		// match too. A key present on one side but not the other (a list
+		// against a map of the same length) is unequal.
+		if (a.Coll[i].Key == nil) != (b.Coll[i].Key == nil) {
+			return false
+		}
+		if a.Coll[i].Key != nil && !ConstantsEqual(a.Coll[i].Key, b.Coll[i].Key) {
+			return false
+		}
+		if !ConstantsEqual(a.Coll[i].Value, b.Coll[i].Value) {
+			return false
+		}
+	}
+	return true
+}
+
+// equalRecords compares two record constants. RecordConstant normalizes
+// fields to canonical name order, so equal records have identically ordered
+// fields: a positional walk suffices.
+func equalRecords(a, b *Constant) bool {
+	if len(a.Fields) != len(b.Fields) {
+		return false
+	}
+	for i := range a.Fields {
+		if a.Fields[i].Name != b.Fields[i].Name || !ConstantsEqual(a.Fields[i].Value, b.Fields[i].Value) {
+			return false
+		}
+	}
+	return true
+}
+
+// equalFuncs compares two function values: the same exactly when they close
+// over the same literal — the literal's syntax identifies it (the AST pointer
+// is the engine's fact, surviving the fold rebuilding the IR node), with the
+// node pointer the fallback for a literal built without syntax — with equal
+// captured environments. A re-parsed but textually identical literal is a
+// different fact, so it is not equal to the original.
+func equalFuncs(a, b *Constant) bool {
+	if funcIdentity(a.Fn) != funcIdentity(b.Fn) || len(a.Captured) != len(b.Captured) {
+		return false
+	}
+	for name, v := range a.Captured {
+		w, ok := b.Captured[name]
+		if !ok || !ConstantsEqual(v, w) {
+			return false
+		}
+	}
+	return true
 }
 
 // tagsEqual reports whether two union tags denote the same member. A tag is the
@@ -495,27 +511,9 @@ func (c *Constant) String() string {
 	case ConstFunc:
 		return "<func>"
 	case ConstCollection:
-		if len(c.Coll) == 0 && c.CollMapness == CollMap {
-			return "[:]" // an empty map: a marker, since the language has no [:] literal
-		}
-		parts := make([]string, len(c.Coll))
-		for i, e := range c.Coll {
-			if e.Key != nil {
-				parts[i] = e.Key.String() + ": " + e.Value.String()
-			} else {
-				parts[i] = e.Value.String()
-			}
-		}
-		return "[" + strings.Join(parts, ", ") + "]"
+		return c.collectionString()
 	case ConstRecord:
-		if len(c.Fields) == 0 {
-			return "{}"
-		}
-		parts := make([]string, len(c.Fields))
-		for i, f := range c.Fields {
-			parts[i] = f.Name + ": " + f.Value.String()
-		}
-		return "{ " + strings.Join(parts, ", ") + " }"
+		return c.recordString()
 	case ConstError:
 		return "error(" + strconv.Quote(c.Str) + ")"
 	case ConstNull:
@@ -541,6 +539,38 @@ func (c *Constant) String() string {
 	default:
 		return c.Int.String()
 	}
+}
+
+// collectionString renders a collection constant: [a, b] for a list,
+// ["k": v] for a map, and [:] for an empty map — a diagnostic-only marker
+// (the language has no [:] literal) so a folded empty map is told apart from
+// an empty list in a dump.
+func (c *Constant) collectionString() string {
+	if len(c.Coll) == 0 && c.CollMapness == CollMap {
+		return "[:]" // an empty map: a marker, since the language has no [:] literal
+	}
+	parts := make([]string, len(c.Coll))
+	for i, e := range c.Coll {
+		if e.Key != nil {
+			parts[i] = e.Key.String() + ": " + e.Value.String()
+		} else {
+			parts[i] = e.Value.String()
+		}
+	}
+	return "[" + strings.Join(parts, ", ") + "]"
+}
+
+// recordString renders a record constant: { x: 1, y: 2 }, fields in
+// canonical order.
+func (c *Constant) recordString() string {
+	if len(c.Fields) == 0 {
+		return "{}"
+	}
+	parts := make([]string, len(c.Fields))
+	for i, f := range c.Fields {
+		parts[i] = f.Name + ": " + f.Value.String()
+	}
+	return "{ " + strings.Join(parts, ", ") + " }"
 }
 
 // durationUnits is the canonical decomposition order of a duration, largest

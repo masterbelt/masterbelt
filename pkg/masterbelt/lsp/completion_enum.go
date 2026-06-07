@@ -123,56 +123,70 @@ func enumContextAt(doc view, root cst.Tree, offset int) *ir.TypeDef {
 			break
 		}
 		if k, ok := node.Kind(); ok {
-			switch k {
-			case cst.ConstDecl:
-				if inInitializerValue(child, offset) {
-					return constDeclEnum(doc, node)
-				}
-			case cst.LetStmt:
-				// The let's initializer folds a bare member through the let's
-				// annotation enum — the body twin of the const initializer.
-				if inInitializerValue(child, offset) {
-					return letStmtEnum(doc, node, offset)
-				}
-			case cst.AssignStmt:
-				// An assignment's right-hand side folds a bare member through the
-				// target local's enum. The value follows the "=" token; the target
-				// (before it) is an ordinary value position.
-				if offset >= assignStart(node) {
-					return assignStmtEnum(doc, node, offset)
-				}
-			case cst.BinaryExpr:
-				// A comparison's argument (rarity == Common) folds a bare member
-				// through the receiver's enum — the desugared operator argument. The
-				// right operand follows the operator; the left is the receiver.
-				if def := binaryExprEnum(doc, node, offset); def != nil {
-					return def
-				}
-			case cst.SwitchStmt:
+			if k == cst.SwitchStmt {
 				enclosingSwitch, haveSwitch = node, true
-				// A fresh, still-empty arm line is whitespace directly under the
-				// switch (no SwitchArm node yet): the child the cursor sits in is not
-				// an arm, so the descent would never reach the SwitchArm case. Treat
-				// a position in the arm region (inside the braces) as the value
-				// position — but only when an arm separator (the "{", a newline, or a
-				// "," ) precedes it, so the trailing gap after an unterminated arm
-				// body (Common -> return |) is not mistaken for a new arm.
-				if k, ok := child.Kind(); (!ok || k != cst.SwitchArm) &&
-					inSwitchArmRegion(node, offset) && atArmStart(doc, offset) {
-					return switchArmEnum(doc, node, offset)
-				}
-			case cst.SwitchArm:
-				if haveSwitch && beforeArrow(node, offset) {
-					return switchArmEnum(doc, enclosingSwitch, offset)
-				}
-			default:
-				// Any other kind is not a position that folds a bare member:
-				// keep descending toward offset before giving up with nil.
+			}
+			if def, resolved := enumContextAtNode(doc, k, node, child, offset, enclosingSwitch, haveSwitch); resolved {
+				return def
 			}
 		}
 		node = child
 	}
 	return nil
+}
+
+// enumContextAtNode resolves the expected enum for one node on the descent
+// path, dispatching on the node's kind. It reports resolved=true when this node
+// settles the context (the cursor is in its value position), returning the
+// enum it folds through (possibly nil if that type is not an enum); resolved is
+// false when the node is not a folding position, so the descent continues.
+func enumContextAtNode(doc view, k cst.Kind, node, child cst.Tree, offset int, enclosingSwitch cst.Tree, haveSwitch bool) (*ir.TypeDef, bool) {
+	switch k {
+	case cst.ConstDecl:
+		if inInitializerValue(child, offset) {
+			return constDeclEnum(doc, node), true
+		}
+	case cst.LetStmt:
+		// The let's initializer folds a bare member through the let's
+		// annotation enum — the body twin of the const initializer.
+		if inInitializerValue(child, offset) {
+			return letStmtEnum(doc, node, offset), true
+		}
+	case cst.AssignStmt:
+		// An assignment's right-hand side folds a bare member through the
+		// target local's enum. The value follows the "=" token; the target
+		// (before it) is an ordinary value position.
+		if offset >= assignStart(node) {
+			return assignStmtEnum(doc, node, offset), true
+		}
+	case cst.BinaryExpr:
+		// A comparison's argument (rarity == Common) folds a bare member
+		// through the receiver's enum — the desugared operator argument. The
+		// right operand follows the operator; the left is the receiver.
+		if def := binaryExprEnum(doc, node, offset); def != nil {
+			return def, true
+		}
+	case cst.SwitchStmt:
+		// A fresh, still-empty arm line is whitespace directly under the
+		// switch (no SwitchArm node yet): the child the cursor sits in is not
+		// an arm, so the descent would never reach the SwitchArm case. Treat
+		// a position in the arm region (inside the braces) as the value
+		// position — but only when an arm separator (the "{", a newline, or a
+		// "," ) precedes it, so the trailing gap after an unterminated arm
+		// body (Common -> return |) is not mistaken for a new arm.
+		if ck, ok := child.Kind(); (!ok || ck != cst.SwitchArm) &&
+			inSwitchArmRegion(node, offset) && atArmStart(doc, offset) {
+			return switchArmEnum(doc, node, offset), true
+		}
+	case cst.SwitchArm:
+		if haveSwitch && beforeArrow(node, offset) {
+			return switchArmEnum(doc, enclosingSwitch, offset), true
+		}
+	default:
+		// Any other kind is not a position that folds a bare member:
+		// keep descending toward offset before giving up with nil.
+	}
+	return nil, false
 }
 
 // inInitializerValue reports whether the descent into a ConstDecl is entering its

@@ -27,40 +27,50 @@ import (
 // (F-4 §3): the text carries one module, and the resolver is the closure.
 func textResolver(siblings []*ir.Module) ir.Resolver {
 	return ir.Resolver{
-		Const: func(name string) *ir.Const {
-			for _, m := range siblings {
-				for _, c := range m.Consts {
-					if c != nil && c.Name == name {
-						return c
-					}
-				}
+		Const:    func(name string) *ir.Const { return siblingConst(siblings, name) },
+		TypeDef:  func(name string) *ir.TypeDef { return siblingTypeDef(siblings, name) },
+		Function: func(ref string) *ir.Function { return siblingFunction(siblings, ref) },
+	}
+}
+
+// siblingConst finds a published constant by name across the sibling modules.
+func siblingConst(siblings []*ir.Module, name string) *ir.Const {
+	for _, m := range siblings {
+		for _, c := range m.Consts {
+			if c != nil && c.Name == name {
+				return c
 			}
-			return nil
-		},
-		TypeDef: func(name string) *ir.TypeDef {
-			if def := universe().prelude[name]; def != nil {
+		}
+	}
+	return nil
+}
+
+// siblingTypeDef finds a type definition by name in the prelude, then across the
+// sibling modules.
+func siblingTypeDef(siblings []*ir.Module, name string) *ir.TypeDef {
+	if def := universe().prelude[name]; def != nil {
+		return def
+	}
+	for _, m := range siblings {
+		for _, def := range m.Types {
+			if def != nil && def.Name == name {
 				return def
 			}
-			for _, m := range siblings {
-				for _, def := range m.Types {
-					if def != nil && def.Name == name {
-						return def
-					}
-				}
-			}
-			return nil
-		},
-		Function: func(ref string) *ir.Function {
-			for _, m := range siblings {
-				for _, fn := range m.Funcs {
-					if fn != nil && ir.FunctionRef(fn) == ref {
-						return fn
-					}
-				}
-			}
-			return nil
-		},
+		}
 	}
+	return nil
+}
+
+// siblingFunction finds a function by its reference across the sibling modules.
+func siblingFunction(siblings []*ir.Module, ref string) *ir.Function {
+	for _, m := range siblings {
+		for _, fn := range m.Funcs {
+			if fn != nil && ir.FunctionRef(fn) == ref {
+				return fn
+			}
+		}
+	}
+	return nil
 }
 
 // constantText renders a folded constant for cross-graph comparison: two
@@ -138,39 +148,49 @@ func TestIRTextRoundTrip(t *testing.T) {
 		name := entry.Name()
 		switch {
 		case entry.IsDir():
-			t.Run(name, func(t *testing.T) {
-				proj, pdiags := project.Open(filepath.Join(sharedExamples, name))
-				if pdiags.Len() > 0 {
-					t.Fatalf("project diagnostics: %v", pdiags.Items())
-				}
-				docs := map[FileID]*abstract.Document{}
-				uses := map[FileID]map[*ast.UseDecl]FileID{}
-				for _, f := range proj.Files() {
-					docs[FileID(f.ID)] = f.AST
-					uses[FileID(f.ID)] = UsesOf(f.Uses)
-				}
-				modules, _ := AnalyzeProgram(docs, uses)
-				for id, m := range modules {
-					var siblings []*ir.Module
-					for sid, sm := range modules {
-						if sid != id {
-							siblings = append(siblings, sm)
-						}
-					}
-					roundTripModule(t, string(id), m, siblings)
-				}
-			})
+			t.Run(name, func(t *testing.T) { roundTripProjectExample(t, name) })
 		case strings.HasSuffix(name, ".belt"):
-			t.Run(name, func(t *testing.T) {
-				src, err := os.ReadFile(filepath.Join(sharedExamples, name))
-				if err != nil {
-					t.Fatal(err)
-				}
-				module, _ := Analyze(abstract.NewDocument(src))
-				roundTripModule(t, name, module, nil)
-			})
+			t.Run(name, func(t *testing.T) { roundTripFileExample(t, name) })
 		}
 	}
+}
+
+// roundTripProjectExample analyzes a multi-file example project and runs the
+// P1/P4 round-trip gate over each module against its siblings.
+func roundTripProjectExample(t *testing.T, name string) {
+	t.Helper()
+	proj, pdiags := project.Open(filepath.Join(sharedExamples, name))
+	if pdiags.Len() > 0 {
+		t.Fatalf("project diagnostics: %v", pdiags.Items())
+	}
+	docs := map[FileID]*abstract.Document{}
+	uses := map[FileID]map[*ast.UseDecl]FileID{}
+	for _, f := range proj.Files() {
+		docs[FileID(f.ID)] = f.AST
+		uses[FileID(f.ID)] = UsesOf(f.Uses)
+	}
+	modules, _ := AnalyzeProgram(docs, uses)
+	for id, m := range modules {
+		var siblings []*ir.Module
+		for sid, sm := range modules {
+			if sid != id {
+				siblings = append(siblings, sm)
+			}
+		}
+		roundTripModule(t, string(id), m, siblings)
+	}
+}
+
+// roundTripFileExample analyzes a single-file example and runs the P1/P4
+// round-trip gate over its module.
+func roundTripFileExample(t *testing.T, name string) {
+	t.Helper()
+	src, err := os.ReadFile(filepath.Join(sharedExamples, name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	module, _ := Analyze(abstract.NewDocument(src))
+	roundTripModule(t, name, module, nil)
 }
 
 // TestIRSnapshotsUnmarshal pins P2: every committed .ir snapshot unmarshals

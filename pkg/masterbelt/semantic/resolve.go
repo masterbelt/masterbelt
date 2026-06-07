@@ -61,51 +61,8 @@ func resolveTypes(folder exprFolder, file *ast.File, at func(ast.Node) span, dia
 	}
 
 	// First pass: a definition per declaration, by name, so references (including
-	// forward ones) bind before any body is resolved. A redeclared name keeps the
-	// first definition and is reported; shadowing an imported name is not a
-	// redeclaration. Types, enums, and interfaces share one name space, so a name
-	// collision across the kinds is a redeclaration too.
-	defs := make(map[string]*ir.TypeDef, len(file.Types)+len(file.Enums)+len(file.Interfaces)+len(extern))
-	maps.Copy(defs, extern)
-	own := make(map[string]bool, len(file.Types)+len(file.Enums)+len(file.Interfaces))
-	out := make([]*ir.TypeDef, len(file.Types))
-	claim := func(name string, def *ir.TypeDef, anchor ast.Node) {
-		if name == "" {
-			return
-		}
-		if own[name] {
-			if at != nil && diags != nil {
-				s := at(anchor)
-				diags.Add(newDuplicateDeclarationDiagnostic(s.offset, s.width, name))
-			}
-			return
-		}
-		own[name] = true
-		defs[name] = def
-	}
-	for i, td := range file.Types {
-		def := &ir.TypeDef{Name: td.Name, Public: td.Public, Doc: td.Doc, Syntax: td}
-		// The builtin mark is syntactic (`= builtin`), so set it here: a forward
-		// reference to a same-file primitive must already resolve as ir.Builtin
-		// (the spelling literals produce), not as a Named of an unmarked shell.
-		if _, ok := td.Body.(*ast.BuiltinType); ok {
-			def.Builtin = true
-		}
-		out[i] = def
-		claim(td.Name, def, td)
-	}
-	enumOut := make([]*ir.TypeDef, len(file.Enums))
-	for i, ed := range file.Enums {
-		def := &ir.TypeDef{Name: ed.Name, Public: ed.Public, Doc: ed.Doc, Enum: &ir.EnumDef{}, EnumSyntax: ed}
-		enumOut[i] = def
-		claim(ed.Name, def, ed)
-	}
-	ifaceOut := make([]*ir.TypeDef, len(file.Interfaces))
-	for i, id := range file.Interfaces {
-		def := &ir.TypeDef{Name: id.Name, Public: id.Public, Doc: id.Doc, Interface: &ir.InterfaceDef{}, InterfaceSyntax: id}
-		ifaceOut[i] = def
-		claim(id.Name, def, id)
-	}
+	// forward ones) bind before any body is resolved.
+	defs, out, enumOut, ifaceOut := declareTypeShells(file, extern, at, diags)
 
 	// Second pass: resolve parameters, body, method signatures, enum bodies, and
 	// interface members, reporting any unknown type names.
@@ -164,6 +121,58 @@ func resolveTypes(folder exprFolder, file *ast.File, at func(ast.Node) span, dia
 	return append(out, ifaceOut...)
 }
 
+// declareTypeShells is resolveTypes' first pass: it builds a definition shell
+// per type, enum, and interface declaration, by name, so references (including
+// forward ones) bind before any body is resolved. A redeclared name keeps the
+// first definition and is reported; shadowing an imported name is not a
+// redeclaration. Types, enums, and interfaces share one name space, so a name
+// collision across the kinds is a redeclaration too. It returns the universe
+// (extern names plus the file's own) and the per-kind definition slices.
+func declareTypeShells(file *ast.File, extern map[string]*ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List) (defs map[string]*ir.TypeDef, out, enumOut, ifaceOut []*ir.TypeDef) {
+	defs = make(map[string]*ir.TypeDef, len(file.Types)+len(file.Enums)+len(file.Interfaces)+len(extern))
+	maps.Copy(defs, extern)
+	own := make(map[string]bool, len(file.Types)+len(file.Enums)+len(file.Interfaces))
+	claim := func(name string, def *ir.TypeDef, anchor ast.Node) {
+		if name == "" {
+			return
+		}
+		if own[name] {
+			if at != nil && diags != nil {
+				s := at(anchor)
+				diags.Add(newDuplicateDeclarationDiagnostic(s.offset, s.width, name))
+			}
+			return
+		}
+		own[name] = true
+		defs[name] = def
+	}
+	out = make([]*ir.TypeDef, len(file.Types))
+	for i, td := range file.Types {
+		def := &ir.TypeDef{Name: td.Name, Public: td.Public, Doc: td.Doc, Syntax: td}
+		// The builtin mark is syntactic (`= builtin`), so set it here: a forward
+		// reference to a same-file primitive must already resolve as ir.Builtin
+		// (the spelling literals produce), not as a Named of an unmarked shell.
+		if _, ok := td.Body.(*ast.BuiltinType); ok {
+			def.Builtin = true
+		}
+		out[i] = def
+		claim(td.Name, def, td)
+	}
+	enumOut = make([]*ir.TypeDef, len(file.Enums))
+	for i, ed := range file.Enums {
+		def := &ir.TypeDef{Name: ed.Name, Public: ed.Public, Doc: ed.Doc, Enum: &ir.EnumDef{}, EnumSyntax: ed}
+		enumOut[i] = def
+		claim(ed.Name, def, ed)
+	}
+	ifaceOut = make([]*ir.TypeDef, len(file.Interfaces))
+	for i, id := range file.Interfaces {
+		def := &ir.TypeDef{Name: id.Name, Public: id.Public, Doc: id.Doc, Interface: &ir.InterfaceDef{}, InterfaceSyntax: id}
+		ifaceOut[i] = def
+		claim(id.Name, def, id)
+	}
+	return defs, out, enumOut, ifaceOut
+}
+
 // assocGraphEnv is the post-resolution fold environment the associated
 // constants (and enum member initializers) interpret in: referenced values and
 // the registry come from the queries, while the type-name channel reads the
@@ -202,28 +211,9 @@ func foldAssocConsts(folder exprFolder, defs map[string]*ir.TypeDef, owners []*i
 		progress = false
 		for _, def := range owners {
 			for _, ac := range def.Consts {
-				if ac.Value != nil || ac.Builtin || ac.Syntax == nil || ac.Syntax.Value == nil {
-					continue
+				if foldOneAssocConst(folder, defs, fenv, ac) {
+					progress = true
 				}
-				// A written annotation that failed to resolve withholds the
-				// fold here, inside the memoized resolution, so every file
-				// sharing this definition sees the same absence — a broken
-				// declaration has no value (the publication rule's soundness
-				// side, decided at the source).
-				if ac.Syntax.Type != nil && ac.Type != nil && ir.HasInvalid(ac.Type) {
-					continue
-				}
-				binder := folder.binder(enumDefOf(ac.Type))
-				binder.universe = defs
-				v := eval.GraphExpecting(lower.Value(ac.Syntax.Value, binder), ac.Type, fenv)
-				if v == nil {
-					continue
-				}
-				ac.Value = v
-				if ac.Type == nil {
-					ac.Type = constantType(v)
-				}
-				progress = true
 			}
 		}
 	}
@@ -236,6 +226,33 @@ func foldAssocConsts(folder exprFolder, defs map[string]*ir.TypeDef, owners []*i
 			}
 		}
 	}
+}
+
+// foldOneAssocConst folds one ordinary associated constant's initializer and
+// settles its type (the annotation when written, the folded value's kind
+// otherwise), reporting whether it made progress. An already-folded, builtin,
+// or syntax-less constant is skipped, as is one whose written annotation failed
+// to resolve — the latter withholds the fold here, inside the memoized
+// resolution, so every file sharing this definition sees the same absence (the
+// publication rule's soundness side, decided at the source).
+func foldOneAssocConst(folder exprFolder, defs map[string]*ir.TypeDef, fenv assocGraphEnv, ac *ir.AssocConst) bool {
+	if ac.Value != nil || ac.Builtin || ac.Syntax == nil || ac.Syntax.Value == nil {
+		return false
+	}
+	if ac.Syntax.Type != nil && ac.Type != nil && ir.HasInvalid(ac.Type) {
+		return false
+	}
+	binder := folder.binder(enumDefOf(ac.Type))
+	binder.universe = defs
+	v := eval.GraphExpecting(lower.Value(ac.Syntax.Value, binder), ac.Type, fenv)
+	if v == nil {
+		return false
+	}
+	ac.Value = v
+	if ac.Type == nil {
+		ac.Type = constantType(v)
+	}
+	return true
 }
 
 // resolveInterfaceDecl fills in an interface definition: its generic parameters
@@ -314,58 +331,64 @@ func checkInterfaceInheritance(decls []*ast.InterfaceDecl, defs []*ir.TypeDef, a
 		if def.Interface == nil {
 			continue
 		}
-		decl := decls[i]
-		// A cycle: the interface reaches itself through its parents. Reported once,
-		// at the declaration; the override and conflict checks below walk the same
-		// graph, so they short-circuit a cyclic chain through interfaceClosure's
-		// own seen set rather than looping.
-		if interfaceHasCycle(def) {
+		checkOneInterfaceInheritance(decls[i], def, at, diags)
+	}
+}
+
+// checkOneInterfaceInheritance validates one interface's inheritance: a cycle
+// (reported once at the declaration; the override and conflict checks below walk
+// the same graph and short-circuit a cyclic chain through interfaceClosure's own
+// seen set), a child member overriding an ancestor's, and a name two unrelated
+// ancestors both contribute.
+func checkOneInterfaceInheritance(decl *ast.InterfaceDecl, def *ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List) {
+	if interfaceHasCycle(def) {
+		s := at(decl)
+		diags.Add(newCyclicReferenceDiagnostic(s.offset, s.width, def.Name))
+		return
+	}
+	contributors := interfaceContributors(def)
+	// Override: a child member whose name an ancestor already carries.
+	for _, m := range decl.Members {
+		if anc := contributors[m.Name]; len(anc) > 0 {
+			s := at(m)
+			diags.Add(newInterfaceMemberOverrideDiagnostic(s.offset, s.width, def.Name, m.Name, anc[0].Name))
+		}
+	}
+	// Conflict: a name two unrelated ancestors both declare, which the child
+	// does not itself redeclare (an override is reported above instead).
+	own := map[string]bool{}
+	for _, m := range decl.Members {
+		own[m.Name] = true
+	}
+	for _, name := range interfaceMemberNames(def) {
+		own[name] = true // the IR member names agree with the decl's; belt and braces
+	}
+	for name, anc := range contributors {
+		if len(anc) >= 2 && !own[name] {
 			s := at(decl)
-			diags.Add(newCyclicReferenceDiagnostic(s.offset, s.width, def.Name))
-			continue
+			diags.Add(newInterfaceMemberConflictDiagnostic(s.offset, s.width, def.Name, name, anc[0].Name, anc[1].Name))
 		}
+	}
+}
 
-		// The ancestors' contributed members: for each member name an ancestor
-		// declares, the distinct ancestor definitions that declare it. A name from
-		// a single shared ancestor lands once (the closure dedups by identity); a
-		// name from two unrelated ancestors lands twice.
-		contributors := map[string][]*ir.TypeDef{}
-		for _, parent := range def.Interface.Parents {
-			for _, anc := range interfaceClosure(parent) {
-				adef := interfaceDefOf(anc)
-				if adef == nil {
-					continue
-				}
-				for _, name := range interfaceMemberNames(adef) {
-					contributors[name] = appendDistinct(contributors[name], adef)
-				}
+// interfaceContributors maps each member name an ancestor of def declares to the
+// distinct ancestor definitions that declare it. A name from a single shared
+// ancestor lands once (the closure dedups by identity); a name from two
+// unrelated ancestors lands twice.
+func interfaceContributors(def *ir.TypeDef) map[string][]*ir.TypeDef {
+	contributors := map[string][]*ir.TypeDef{}
+	for _, parent := range def.Interface.Parents {
+		for _, anc := range interfaceClosure(parent) {
+			adef := interfaceDefOf(anc)
+			if adef == nil {
+				continue
 			}
-		}
-
-		// Override: a child member whose name an ancestor already carries.
-		for _, m := range decl.Members {
-			if anc := contributors[m.Name]; len(anc) > 0 {
-				s := at(m)
-				diags.Add(newInterfaceMemberOverrideDiagnostic(s.offset, s.width, def.Name, m.Name, anc[0].Name))
-			}
-		}
-
-		// Conflict: a name two unrelated ancestors both declare, which the child
-		// does not itself redeclare (an override is reported above instead).
-		own := map[string]bool{}
-		for _, m := range decl.Members {
-			own[m.Name] = true
-		}
-		for _, name := range interfaceMemberNames(def) {
-			own[name] = true // the IR member names agree with the decl's; belt and braces
-		}
-		for name, anc := range contributors {
-			if len(anc) >= 2 && !own[name] {
-				s := at(decl)
-				diags.Add(newInterfaceMemberConflictDiagnostic(s.offset, s.width, def.Name, name, anc[0].Name, anc[1].Name))
+			for _, name := range interfaceMemberNames(adef) {
+				contributors[name] = appendDistinct(contributors[name], adef)
 			}
 		}
 	}
+	return contributors
 }
 
 // interfaceHasCycle reports whether the interface reaches itself through its
@@ -927,51 +950,7 @@ func resolveEnumDecl(folder exprFolder, defs map[string]*ir.TypeDef, r *infer.Ty
 	native, _ := reg.Native(base)
 	isString := native != nil && native.IsString()
 
-	// Member values, determined in declaration order (§3.5): an explicit
-	// initializer folds against the base type; an omitted one takes the previous
-	// integer value plus one (zero for the first), or, for a string base, the
-	// member's own name. The values are settled for the whole enum before
-	// duplicate detection, so a diagnostic never leaves the value table in a
-	// half-built state.
-	def.Enum.Members = make([]ir.EnumMember, len(ed.Members))
-	memberSeen := map[string]bool{}
-	var prevInt *big.Int
-	for i, m := range ed.Members {
-		def.Enum.Members[i] = ir.EnumMember{Name: m.Name}
-
-		// A duplicate member name is reported once, at the repeat.
-		if m.Name != "" {
-			if memberSeen[m.Name] {
-				if at != nil && diags != nil {
-					s := at(m)
-					diags.Add(newDuplicateEnumMemberDiagnostic(s.offset, s.width, m.Name))
-				}
-			}
-			memberSeen[m.Name] = true
-		}
-
-		value, nextInt := enumMemberValue(folder, defs, m, isString, baseType, prevInt)
-		prevInt = nextInt
-		def.Enum.Members[i].Value = value
-
-		// The folded value must fit the base type's range; an integer base with a
-		// fixed width rejects an out-of-range value (constant_overflow), reusing
-		// the same diagnostic an over-large const gets.
-		if value != nil && value.Kind == ir.ConstInt && !types.Fits(reg, baseType, value.Int) {
-			if at != nil && diags != nil {
-				s := enumValueSpan(at, m)
-				diags.Add(newConstantOverflowDiagnostic(s.offset, s.width, value.String(), base))
-			}
-		}
-		// A written initializer that does not type as the base (an int base given
-		// a string, say) is a type mismatch, reported the same way a const's is.
-		if m.Value != nil && value != nil && !valueFitsBaseKind(value, isString) {
-			if at != nil && diags != nil {
-				s := enumValueSpan(at, m)
-				diags.Add(newTypeMismatchDiagnostic(s.offset, s.width, kindName(value.Kind), base))
-			}
-		}
-	}
+	resolveEnumMembers(folder, defs, reg, ed, def, base, baseType, isString, at, diags)
 
 	// Duplicate values are forbidden outright (§3.5-5): two members whose
 	// settled values coincide — explicit or defaulted — are an error, reported
@@ -982,8 +961,67 @@ func resolveEnumDecl(folder exprFolder, defs map[string]*ir.TypeDef, r *infer.Ty
 	// mechanism a type declaration's impl carries.
 	def.Consts = resolveAssocConstList(r, reg, def, ed.Consts, nil, at, diags)
 
-	// The operator methods: the six comparisons every enum carries, then the
-	// impl block's own methods (which may shadow a comparison or add new ones).
+	resolveEnumMethods(r, reg, ed, def, at, diags, fns)
+	// The accessor/static declaration checks, the same as a nominal type's: a
+	// static fn collides with an enum member of the same name (both read
+	// EnumName.Name), and an accessor's signature and field/method collisions are
+	// checked too.
+	checkMemberDecls(def, at, diags)
+}
+
+// resolveEnumMembers settles the enum's member values in declaration order
+// (§3.5): an explicit initializer folds against the base type; an omitted one
+// takes the previous integer value plus one (zero for the first), or, for a
+// string base, the member's own name. The values are settled for the whole enum
+// before duplicate detection, so a diagnostic never leaves the value table in a
+// half-built state. It reports a duplicate member name, an out-of-range value,
+// and an initializer that does not type as the base.
+func resolveEnumMembers(folder exprFolder, defs map[string]*ir.TypeDef, reg *builtin.Registry, ed *ast.EnumDecl, def *ir.TypeDef, base string, baseType ir.Type, isString bool, at func(ast.Node) span, diags *diagnostic.List) {
+	def.Enum.Members = make([]ir.EnumMember, len(ed.Members))
+	memberSeen := map[string]bool{}
+	var prevInt *big.Int
+	for i, m := range ed.Members {
+		def.Enum.Members[i] = ir.EnumMember{Name: m.Name}
+
+		// A duplicate member name is reported once, at the repeat.
+		if m.Name != "" {
+			if memberSeen[m.Name] && at != nil && diags != nil {
+				s := at(m)
+				diags.Add(newDuplicateEnumMemberDiagnostic(s.offset, s.width, m.Name))
+			}
+			memberSeen[m.Name] = true
+		}
+
+		value, nextInt := enumMemberValue(folder, defs, m, isString, baseType, prevInt)
+		prevInt = nextInt
+		def.Enum.Members[i].Value = value
+		reportEnumMemberValueErrors(reg, m, value, base, baseType, isString, at, diags)
+	}
+}
+
+// reportEnumMemberValueErrors reports a member's value diagnostics: an integer
+// base with a fixed width rejects an out-of-range value (constant_overflow,
+// reusing the over-large const diagnostic), and a written initializer that does
+// not type as the base (an int base given a string, say) is a type mismatch.
+func reportEnumMemberValueErrors(reg *builtin.Registry, m *ast.EnumMember, value *ir.Constant, base string, baseType ir.Type, isString bool, at func(ast.Node) span, diags *diagnostic.List) {
+	if at == nil || diags == nil {
+		return
+	}
+	if value != nil && value.Kind == ir.ConstInt && !types.Fits(reg, baseType, value.Int) {
+		s := enumValueSpan(at, m)
+		diags.Add(newConstantOverflowDiagnostic(s.offset, s.width, value.String(), base))
+	}
+	if m.Value != nil && value != nil && !valueFitsBaseKind(value, isString) {
+		s := enumValueSpan(at, m)
+		diags.Add(newTypeMismatchDiagnostic(s.offset, s.width, kindName(value.Kind), base))
+	}
+}
+
+// resolveEnumMethods attaches the enum's operator methods — the six comparisons
+// every enum carries, then the impl block's own methods (which may shadow a
+// comparison or add new ones) — reporting a duplicate same-name, same-kind,
+// same-signature declaration.
+func resolveEnumMethods(r *infer.TypeResolver, reg *builtin.Registry, ed *ast.EnumDecl, def *ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List, fns bodyFuncs) {
 	def.AttachMethods(builtin.EnumComparisonMethods()...)
 	scope := infer.TypeScope{}
 	seen := make(map[string]bool, len(ed.Methods))
@@ -997,11 +1035,6 @@ func resolveEnumDecl(folder exprFolder, defs map[string]*ir.TypeDef, r *infer.Ty
 		seen[key] = true
 		def.AttachMethods(rm)
 	}
-	// The accessor/static declaration checks, the same as a nominal type's: a
-	// static fn collides with an enum member of the same name (both read
-	// EnumName.Name), and an accessor's signature and field/method collisions are
-	// checked too.
-	checkMemberDecls(def, at, diags)
 }
 
 // reportDuplicateMethod reports a method that repeats an earlier same-name,
@@ -1269,30 +1302,43 @@ func checkMemberDecls(def *ir.TypeDef, at func(ast.Node) span, diags *diagnostic
 		s := at(m.Syntax)
 		switch m.Kind {
 		case ir.MethodGetter, ir.MethodSetter:
-			if m.Kind == ir.MethodGetter && len(m.Params) != 0 {
-				diags.Add(newInvalidGetterSignatureDiagnostic(s.offset, s.width, m.Name))
-			}
-			if m.Kind == ir.MethodSetter && (len(m.Params) != 1 || !isSelfResult(m.Result)) {
-				diags.Add(newInvalidSetterSignatureDiagnostic(s.offset, s.width, m.Name))
-			}
-			// An accessor collides with a record field, an ordinary method of the
-			// same name, or a second accessor of the same kind. A getter+setter
-			// pair of one name is the property and is allowed.
-			if fields[m.Name] || hasNormalMethod(def, m.Name) || accessorSeen[m.Name] == m.Kind {
-				diags.Add(newAccessorCollisionDiagnostic(s.offset, s.width, m.Name, def.Name))
-			}
-			accessorSeen[m.Name] = m.Kind
+			checkAccessorDecl(def, m, s, fields, accessorSeen, diags)
 		case ir.MethodStatic:
-			if m.Syntax != nil && len(m.Syntax.TypeParams) > 0 {
-				diags.Add(newGenericStaticDiagnostic(s.offset, s.width, m.Name))
-			}
-			if consts[m.Name] || members[m.Name] {
-				diags.Add(newStaticCollisionDiagnostic(s.offset, s.width, m.Name, def.Name))
-			}
+			checkStaticDecl(def, m, s, consts, members, diags)
 		default:
 			// An ordinary method (MethodNormal) has no accessor- or
 			// static-specific collision rule to check here: move to the next.
 		}
+	}
+}
+
+// checkAccessorDecl checks one getter/setter declaration: its signature (a
+// getter takes no parameters, a setter one parameter and a self result) and its
+// collisions — a record field, an ordinary method of the same name, or a second
+// accessor of the same kind. A getter+setter pair of one name is the property
+// and is allowed, so the seen map records the kind.
+func checkAccessorDecl(def *ir.TypeDef, m *ir.Method, s span, fields map[string]bool, accessorSeen map[string]ir.MethodKind, diags *diagnostic.List) {
+	if m.Kind == ir.MethodGetter && len(m.Params) != 0 {
+		diags.Add(newInvalidGetterSignatureDiagnostic(s.offset, s.width, m.Name))
+	}
+	if m.Kind == ir.MethodSetter && (len(m.Params) != 1 || !isSelfResult(m.Result)) {
+		diags.Add(newInvalidSetterSignatureDiagnostic(s.offset, s.width, m.Name))
+	}
+	if fields[m.Name] || hasNormalMethod(def, m.Name) || accessorSeen[m.Name] == m.Kind {
+		diags.Add(newAccessorCollisionDiagnostic(s.offset, s.width, m.Name, def.Name))
+	}
+	accessorSeen[m.Name] = m.Kind
+}
+
+// checkStaticDecl checks one static fn declaration: a static fn may not be
+// generic, and it collides with an associated constant or enum member of the
+// same name (both read EnumName.Name).
+func checkStaticDecl(def *ir.TypeDef, m *ir.Method, s span, consts, members map[string]bool, diags *diagnostic.List) {
+	if m.Syntax != nil && len(m.Syntax.TypeParams) > 0 {
+		diags.Add(newGenericStaticDiagnostic(s.offset, s.width, m.Name))
+	}
+	if consts[m.Name] || members[m.Name] {
+		diags.Add(newStaticCollisionDiagnostic(s.offset, s.width, m.Name, def.Name))
 	}
 }
 

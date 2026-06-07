@@ -170,57 +170,19 @@ func (w resolutionWriter) value(v ir.Value, bd bindings) ir.Value {
 		// the inner node, so a stale adaption never survives an edit.
 		return w.value(v.Value, bd)
 	case *ir.Call:
-		v.Resolved = w.res.methods[v.Syntax]
-		v.Subst = w.res.substs[v.Syntax]
-		v.Receiver = w.value(v.Receiver, bd)
-		for i, a := range v.Args {
-			v.Args[i] = w.value(a, bd)
+		if early, done := w.valueCall(v, bd); done {
+			return early
 		}
-		if v.Setter && v.Syntax == nil {
-			// The synthetic call a property write lowers to has no call
-			// expression of its own; it computes the receiver local's next
-			// value, so its type is the receiver's.
-			v.Type = ir.TypeOf(v.Receiver)
-			return v
-		}
-		v.Type = w.res.types[v.Syntax]
 	case *ir.FuncCall:
-		v.Resolved = nil
-		if fd := w.res.funcs[v.Syntax]; fd != nil {
-			if fn := w.fnShells[fd]; fn != nil {
-				v.Resolved = fn
-				v.Target = fn
-			}
-		}
-		v.Subst = w.res.substs[v.Syntax]
-		v.Type = w.res.types[v.Syntax]
-		for i, a := range v.Args {
-			v.Args[i] = w.value(a, bd)
-		}
+		w.valueFuncCall(v, bd)
 	case *ir.StaticCall:
-		v.Resolved = w.res.statics[v.Syntax]
-		v.Subst = w.res.substs[v.Syntax]
-		v.Type = w.res.types[v.Syntax]
-		for i, a := range v.Args {
-			v.Args[i] = w.value(a, bd)
-		}
+		w.valueStaticCall(v, bd)
 	case *ir.Apply:
-		v.Type = w.res.types[v.Syntax]
-		v.Callee = w.value(v.Callee, bd)
-		for i, a := range v.Args {
-			v.Args[i] = w.value(a, bd)
-		}
+		w.valueApply(v, bd)
 	case *ir.CollectionLiteral:
-		v.Type = w.res.types[v.Syntax]
-		for i, e := range v.Entries {
-			v.Entries[i].Key = w.value(e.Key, bd)
-			v.Entries[i].Value = w.value(e.Value, bd)
-		}
+		w.valueCollectionLiteral(v, bd)
 	case *ir.RecordValue:
-		v.Type = w.res.types[v.Syntax]
-		for i, f := range v.Fields {
-			v.Fields[i].Value = w.value(f.Value, bd)
-		}
+		w.valueRecordValue(v, bd)
 	case *ir.Conversion:
 		// Born typed: its target is its type. Only the arguments take facts.
 		for i, a := range v.Args {
@@ -234,10 +196,7 @@ func (w resolutionWriter) value(v ir.Value, bd bindings) ir.Value {
 		v.Value = w.value(v.Value, bd)
 		v.Type = ir.TypeOf(v.Value)
 	case *ir.Ternary:
-		v.Type = w.res.types[v.Syntax]
-		v.Cond = w.value(v.Cond, bd)
-		v.Then = w.value(v.Then, bd)
-		v.Else = w.value(v.Else, bd)
+		w.valueTernary(v, bd)
 	case *ir.RangeLit:
 		// Every range literal is the range builtin, whatever its bounds.
 		v.Type = &ir.Builtin{Name: builtin.NameRange}
@@ -249,6 +208,25 @@ func (w resolutionWriter) value(v ir.Value, bd bindings) ir.Value {
 		// capture of the enclosing scope rides along in bd).
 		v.Type = w.res.types[v.Syntax]
 		w.stmts(v.Body, lambdaBindings(bd, v))
+	case nil:
+		// A hole in the graph (a recovered expression): nothing to bind.
+		return nil
+	default:
+		// References and leaf literals: a type binding with no child to walk.
+		w.valueLeaf(v, bd)
+	}
+	return w.wrapAdapt(v)
+}
+
+// valueLeaf binds the type of a reference or a leaf literal — the value forms
+// with no child node to walk. A reference takes its checker-settled type, a
+// param or local its bound type, an enum member its enum, an assoc const its
+// declared type, and every literal its structural builtin type (a literal keeps
+// its synthesized type even where a sized type expects it — the width settle is
+// an explicit adaption, not a retype, so the leaf literals' types are
+// structural facts).
+func (w resolutionWriter) valueLeaf(v ir.Value, bd bindings) {
+	switch v := v.(type) {
 	case *ir.Reference:
 		v.Type = w.res.types[v.Syntax]
 	case *ir.SelfValue:
@@ -267,9 +245,6 @@ func (w resolutionWriter) value(v ir.Value, bd bindings) ir.Value {
 			v.Type = v.Def.Consts[v.Index].Type
 		}
 	case *ir.IntLiteral:
-		// A literal keeps its synthesized type even where a sized type
-		// expects it — the width settle is an explicit adaption, not a
-		// retype — so the leaf literals' types are structural facts.
 		v.Type = &ir.Builtin{Name: builtin.NameNint}
 	case *ir.StringLiteral:
 		v.Type = &ir.Builtin{Name: builtin.NameString}
@@ -281,11 +256,94 @@ func (w resolutionWriter) value(v ir.Value, bd bindings) ir.Value {
 		v.Type = &ir.Builtin{Name: "duration"}
 	case *ir.NullValue:
 		v.Type = &ir.Builtin{Name: "null"}
-	case nil:
-		// A hole in the graph (a recovered expression): nothing to bind.
-		return nil
 	}
-	return w.wrapAdapt(v)
+}
+
+// valueCall is the *ir.Call arm of value: it binds the method selection, the
+// substitution, the receiver, and the arguments, then the type. A synthetic
+// setter call (no syntax) computes the receiver local's next value, so its
+// type is the receiver's and it returns early (done == true) bypassing the
+// adaption wrap.
+func (w resolutionWriter) valueCall(v *ir.Call, bd bindings) (ir.Value, bool) {
+	v.Resolved = w.res.methods[v.Syntax]
+	v.Subst = w.res.substs[v.Syntax]
+	v.Receiver = w.value(v.Receiver, bd)
+	for i, a := range v.Args {
+		v.Args[i] = w.value(a, bd)
+	}
+	if v.Setter && v.Syntax == nil {
+		v.Type = ir.TypeOf(v.Receiver)
+		return v, true
+	}
+	v.Type = w.res.types[v.Syntax]
+	return nil, false
+}
+
+// valueFuncCall is the *ir.FuncCall arm of value: it binds the resolved shell
+// (and call target) for the selected overload, the substitution, the type, and
+// the arguments.
+func (w resolutionWriter) valueFuncCall(v *ir.FuncCall, bd bindings) {
+	v.Resolved = nil
+	if fd := w.res.funcs[v.Syntax]; fd != nil {
+		if fn := w.fnShells[fd]; fn != nil {
+			v.Resolved = fn
+			v.Target = fn
+		}
+	}
+	v.Subst = w.res.substs[v.Syntax]
+	v.Type = w.res.types[v.Syntax]
+	for i, a := range v.Args {
+		v.Args[i] = w.value(a, bd)
+	}
+}
+
+// valueStaticCall is the *ir.StaticCall arm of value: it binds the static fn
+// selection, the substitution, the type, and the arguments.
+func (w resolutionWriter) valueStaticCall(v *ir.StaticCall, bd bindings) {
+	v.Resolved = w.res.statics[v.Syntax]
+	v.Subst = w.res.substs[v.Syntax]
+	v.Type = w.res.types[v.Syntax]
+	for i, a := range v.Args {
+		v.Args[i] = w.value(a, bd)
+	}
+}
+
+// valueApply is the *ir.Apply arm of value: it binds the type, the callee, and
+// the arguments.
+func (w resolutionWriter) valueApply(v *ir.Apply, bd bindings) {
+	v.Type = w.res.types[v.Syntax]
+	v.Callee = w.value(v.Callee, bd)
+	for i, a := range v.Args {
+		v.Args[i] = w.value(a, bd)
+	}
+}
+
+// valueCollectionLiteral is the *ir.CollectionLiteral arm of value: it binds
+// the type and every entry's key and value.
+func (w resolutionWriter) valueCollectionLiteral(v *ir.CollectionLiteral, bd bindings) {
+	v.Type = w.res.types[v.Syntax]
+	for i, e := range v.Entries {
+		v.Entries[i].Key = w.value(e.Key, bd)
+		v.Entries[i].Value = w.value(e.Value, bd)
+	}
+}
+
+// valueRecordValue is the *ir.RecordValue arm of value: it binds the type and
+// every field's value.
+func (w resolutionWriter) valueRecordValue(v *ir.RecordValue, bd bindings) {
+	v.Type = w.res.types[v.Syntax]
+	for i, f := range v.Fields {
+		v.Fields[i].Value = w.value(f.Value, bd)
+	}
+}
+
+// valueTernary is the *ir.Ternary arm of value: it binds the type and all
+// three operands.
+func (w resolutionWriter) valueTernary(v *ir.Ternary, bd bindings) {
+	v.Type = w.res.types[v.Syntax]
+	v.Cond = w.value(v.Cond, bd)
+	v.Then = w.value(v.Then, bd)
+	v.Else = w.value(v.Else, bd)
 }
 
 // wrapAdapt wraps a settled node in the explicit adaption the checker

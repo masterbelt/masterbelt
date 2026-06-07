@@ -22,9 +22,9 @@ linters:
     - durationcheck
     - errorlint
     - gocritic
-    - gocyclo # see settings: ceiling at 47, TODO ratchet down to 30
+    - gocyclo
     - intrange
-    - maintidx # at the upstream default floor (20)
+    - maintidx
     - misspell
     - nilerr
     - nolintlint
@@ -42,9 +42,9 @@ linters:
     - revive # the full default rule set (exported docs included)
 
 
-    - funlen # see settings: ceilings at today's worst, ratcheting to 60/40
-    - gocognit # see settings: ceiling at today's worst, ratcheting to 30
-    - nestif # see settings: ceiling at today's worst, ratcheting to 5
+    - funlen
+    - gocognit
+    - nestif
     # - cyclop # rejected: same metric as gocyclo, and the default 10 mostly
     #          # punishes the compiler's dispatch switches; gocyclo carries
     #          # the per-function ceiling instead.
@@ -58,25 +58,6 @@ linters:
       # A test's repeated literals are its own readability business; the
       # production name literals get canonical constants (builtin.Name*).
       ignore-tests: true
-    gocyclo:
-      # Ceiling pinned to today's worst function. TODO: ratchet down to the
-      # default 30 — 17 offenders at 30 as of 2026-06-07 (worst:
-      # graphValueRaw=47, recordTypes=46, ConstantsEqual=42,
-      # enforceEvalPublication=41); see tmp/plan/D-2-lint-ratchet.md §4.
-      min-complexity: 47
-    gocognit:
-      # Ceiling pinned to today's worst (collectEffectUses). TODO: ratchet
-      # to the default 30 — 54 offenders there as of 2026-06-07.
-      min-complexity: 105
-    funlen:
-      # Ceilings pinned to today's worst (treegen emitDecoder 173 lines,
-      # graphValueRaw 126 statements). TODO: ratchet to the default 60/40.
-      lines: 173
-      statements: 126
-    nestif:
-      # Ceiling pinned to today's worst (14; the linter reports at >= the
-      # minimum). TODO: ratchet to the default 5.
-      min-complexity: 15
 
   exclusions:
     # Generated files are excluded from analysis, not just reporting:

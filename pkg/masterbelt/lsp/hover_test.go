@@ -47,7 +47,17 @@ func TestTypeHover(t *testing.T) {
 	src := "/// a coin\npub type Coin = sbyte\nconst c: Coin = 1\n"
 	doc := testView(src)
 
-	t.Run("annotation reference describes the type", func(t *testing.T) {
+	t.Run("annotation reference describes the type", testTypeHoverAnnotation(doc, src))
+	t.Run("declaration name describes itself", testTypeHoverDeclName(doc, src))
+	t.Run("a builtin from the prelude describes itself", testTypeHoverBuiltin(doc, src))
+	t.Run("the range builtin describes itself", testTypeHoverRangeBuiltin)
+	t.Run("a range literal hovers as range", testTypeHoverRangeLiteral)
+}
+
+// testTypeHoverAnnotation checks that hovering a type annotation reference
+// describes the named type — its signature and doc comment.
+func testTypeHoverAnnotation(doc view, src string) func(*testing.T) {
+	return func(t *testing.T) {
 		h := hover(doc, strings.Index(src, ": Coin")+3)
 		if h == nil {
 			t.Fatal("no hover on the type reference")
@@ -58,9 +68,13 @@ func TestTypeHover(t *testing.T) {
 		if !strings.Contains(h.Contents.Value, "a coin") {
 			t.Errorf("hover = %q, want the doc comment", h.Contents.Value)
 		}
-	})
+	}
+}
 
-	t.Run("declaration name describes itself", func(t *testing.T) {
+// testTypeHoverDeclName checks that hovering a type declaration's own name
+// describes itself — its signature.
+func testTypeHoverDeclName(doc view, src string) func(*testing.T) {
+	return func(t *testing.T) {
 		h := hover(doc, strings.Index(src, "type Coin")+6)
 		if h == nil {
 			t.Fatal("no hover on the declaration name")
@@ -68,9 +82,13 @@ func TestTypeHover(t *testing.T) {
 		if !strings.Contains(h.Contents.Value, "pub type Coin = sbyte") {
 			t.Errorf("hover = %q, want the type signature", h.Contents.Value)
 		}
-	})
+	}
+}
 
-	t.Run("a builtin from the prelude describes itself", func(t *testing.T) {
+// testTypeHoverBuiltin checks that hovering a builtin type from the prelude
+// (sbyte) describes itself — its builtin signature.
+func testTypeHoverBuiltin(doc view, src string) func(*testing.T) {
+	return func(t *testing.T) {
 		h := hover(doc, strings.Index(src, "= sbyte")+3)
 		if h == nil {
 			t.Fatal("no hover on sbyte")
@@ -78,37 +96,41 @@ func TestTypeHover(t *testing.T) {
 		if !strings.Contains(h.Contents.Value, "type sbyte = builtin") {
 			t.Errorf("hover = %q, want the builtin signature", h.Contents.Value)
 		}
-	})
+	}
+}
 
-	t.Run("the range builtin describes itself", func(t *testing.T) {
-		rsrc := "pub fn f(r: range): nint -> r.count()\n"
-		rdoc := testView(rsrc)
-		h := hover(rdoc, strings.Index(rsrc, ": range")+3)
+// testTypeHoverRangeBuiltin checks that hovering the range builtin describes
+// itself — its builtin signature and doc comment.
+func testTypeHoverRangeBuiltin(t *testing.T) {
+	rsrc := "pub fn f(r: range): nint -> r.count()\n"
+	rdoc := testView(rsrc)
+	h := hover(rdoc, strings.Index(rsrc, ": range")+3)
+	if h == nil {
+		t.Fatal("no hover on range")
+	}
+	if !strings.Contains(h.Contents.Value, "type range = builtin") {
+		t.Errorf("hover = %q, want the builtin signature", h.Contents.Value)
+	}
+	if !strings.Contains(h.Contents.Value, "A sequence of integers") {
+		t.Errorf("hover = %q, want the doc comment", h.Contents.Value)
+	}
+}
+
+// testTypeHoverRangeLiteral checks that hovering a range literal's operator
+// anchor (both the ".." and "..." forms) hovers as the range type.
+func testTypeHoverRangeLiteral(t *testing.T) {
+	for _, lit := range []string{"0..9", "0...9"} {
+		src := "const R = " + lit + "\n"
+		doc := testView(src)
+		// Hover on the range operator (the literal's anchor).
+		h := hover(doc, strings.IndexByte(src, '.'))
 		if h == nil {
-			t.Fatal("no hover on range")
+			t.Fatalf("%s: no hover on the range operator", lit)
 		}
-		if !strings.Contains(h.Contents.Value, "type range = builtin") {
-			t.Errorf("hover = %q, want the builtin signature", h.Contents.Value)
+		if !strings.Contains(h.Contents.Value, "range") {
+			t.Errorf("%s: hover = %q, want the range type", lit, h.Contents.Value)
 		}
-		if !strings.Contains(h.Contents.Value, "A sequence of integers") {
-			t.Errorf("hover = %q, want the doc comment", h.Contents.Value)
-		}
-	})
-
-	t.Run("a range literal hovers as range", func(t *testing.T) {
-		for _, lit := range []string{"0..9", "0...9"} {
-			src := "const R = " + lit + "\n"
-			doc := testView(src)
-			// Hover on the range operator (the literal's anchor).
-			h := hover(doc, strings.IndexByte(src, '.'))
-			if h == nil {
-				t.Fatalf("%s: no hover on the range operator", lit)
-			}
-			if !strings.Contains(h.Contents.Value, "range") {
-				t.Errorf("%s: hover = %q, want the range type", lit, h.Contents.Value)
-			}
-		}
-	})
+	}
 }
 
 func TestInterfaceHover(t *testing.T) {

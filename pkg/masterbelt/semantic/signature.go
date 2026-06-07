@@ -68,36 +68,60 @@ func normalizeKeyType(def *ir.TypeDef, t ir.Type, bound map[string]bool, vars ma
 		}
 		return "%" + strconv.Itoa(n)
 	case *ir.App:
-		name := ""
-		if t.Def != nil {
-			name = t.Def.Name
-		}
-		args := make([]string, len(t.Args))
-		for i, a := range t.Args {
-			args[i] = normalizeKeyType(def, a, bound, vars)
-		}
-		return name + "<" + strings.Join(args, ", ") + ">"
+		return normalizeAppKey(def, t, bound, vars)
 	case *ir.Func:
-		params := make([]string, len(t.Params))
-		for i, p := range t.Params {
-			params[i] = normalizeKeyType(def, p, bound, vars)
-		}
-		return "fn(" + strings.Join(params, ", ") + "): " + normalizeKeyType(def, t.Result, bound, vars)
+		return normalizeFuncKey(def, t, bound, vars)
 	case *ir.Union:
-		members := make([]string, len(t.Members))
-		for i, m := range t.Members {
-			members[i] = normalizeKeyType(def, m, bound, vars)
-		}
-		return strings.Join(members, " | ")
+		return normalizeUnionKey(def, t, bound, vars)
 	case *ir.Record:
-		fields := make([]string, len(t.Fields))
-		for i, f := range t.Fields {
-			fields[i] = f.Name + ": " + normalizeKeyType(def, f.Type, bound, vars)
-		}
-		return "{ " + strings.Join(fields, ", ") + " }"
+		return normalizeRecordKey(def, t, bound, vars)
 	default:
 		return t.String()
 	}
+}
+
+// normalizeAppKey renders a type application's signature key, recursing through
+// its arguments.
+func normalizeAppKey(def *ir.TypeDef, t *ir.App, bound map[string]bool, vars map[string]int) string {
+	name := ""
+	if t.Def != nil {
+		name = t.Def.Name
+	}
+	args := make([]string, len(t.Args))
+	for i, a := range t.Args {
+		args[i] = normalizeKeyType(def, a, bound, vars)
+	}
+	return name + "<" + strings.Join(args, ", ") + ">"
+}
+
+// normalizeFuncKey renders a function type's signature key, recursing through
+// its parameters and result.
+func normalizeFuncKey(def *ir.TypeDef, t *ir.Func, bound map[string]bool, vars map[string]int) string {
+	params := make([]string, len(t.Params))
+	for i, p := range t.Params {
+		params[i] = normalizeKeyType(def, p, bound, vars)
+	}
+	return "fn(" + strings.Join(params, ", ") + "): " + normalizeKeyType(def, t.Result, bound, vars)
+}
+
+// normalizeUnionKey renders a union type's signature key, recursing through its
+// members.
+func normalizeUnionKey(def *ir.TypeDef, t *ir.Union, bound map[string]bool, vars map[string]int) string {
+	members := make([]string, len(t.Members))
+	for i, m := range t.Members {
+		members[i] = normalizeKeyType(def, m, bound, vars)
+	}
+	return strings.Join(members, " | ")
+}
+
+// normalizeRecordKey renders a record type's signature key, recursing through
+// its fields.
+func normalizeRecordKey(def *ir.TypeDef, t *ir.Record, bound map[string]bool, vars map[string]int) string {
+	fields := make([]string, len(t.Fields))
+	for i, f := range t.Fields {
+		fields[i] = f.Name + ": " + normalizeKeyType(def, f.Type, bound, vars)
+	}
+	return "{ " + strings.Join(fields, ", ") + " }"
 }
 
 // paramTypes renders a method's parameter types as "a, b" for the

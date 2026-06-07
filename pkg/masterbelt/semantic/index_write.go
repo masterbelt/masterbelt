@@ -45,25 +45,9 @@ func indexWriteStmts(body []ir.Stmt, locals map[string]*ir.Constant, genv graphF
 	for _, stmt := range body {
 		switch s := stmt.(type) {
 		case *ir.Let:
-			if s.Name != "" && s.Value != nil {
-				// The let's settled type is the initializer's expectation
-				// channel, so an empty literal settles its mapness and the
-				// write check can tell an upsert from a list write.
-				if v := eval.GraphInExpecting(s.Value, locals, s.Type, genv); v != nil {
-					locals[s.Name] = v
-				} else {
-					delete(locals, s.Name) // an unfoldable rebind: stop tracking it
-				}
-			}
+			indexWriteLet(s, locals, genv)
 		case *ir.Assign:
-			reportIndexWriteIR(s, locals, genv, at, diags)
-			if s.Name != "" && s.Value != nil {
-				if v := eval.GraphIn(s.Value, locals, genv); v != nil {
-					locals[s.Name] = v
-				} else {
-					delete(locals, s.Name)
-				}
-			}
+			indexWriteAssign(s, locals, genv, at, diags)
 		case *ir.If:
 			indexWriteStmts(s.Then, copyLocals(locals), genv, at, diags)
 			if s.ElseIf != nil {
@@ -71,18 +55,9 @@ func indexWriteStmts(body []ir.Stmt, locals map[string]*ir.Constant, genv graphF
 			}
 			indexWriteStmts(s.Else, copyLocals(locals), genv, at, diags)
 		case *ir.Switch:
-			for _, arm := range s.Arms {
-				indexWriteStmts(arm.Body, copyLocals(locals), genv, at, diags)
-			}
-			indexWriteStmts(s.Else, copyLocals(locals), genv, at, diags)
+			indexWriteSwitch(s, locals, genv, at, diags)
 		case *ir.Match:
-			// An arm's narrowed binding is not a foldable list constant the
-			// write check tracks, so the arm bodies walk with a copy of the
-			// locals exactly as a switch's arms do.
-			for _, arm := range s.Arms {
-				indexWriteStmts(arm.Body, copyLocals(locals), genv, at, diags)
-			}
-			indexWriteStmts(s.Else, copyLocals(locals), genv, at, diags)
+			indexWriteMatch(s, locals, genv, at, diags)
 		case *ir.For:
 			// The loop variable is bound per iteration, not to a foldable list
 			// constant the write check tracks.
@@ -92,6 +67,56 @@ func indexWriteStmts(body []ir.Stmt, locals map[string]*ir.Constant, genv graphF
 			// explicitly so a new statement kind is a deliberate decision.
 		}
 	}
+}
+
+// indexWriteLet threads a let's binding into the running locals. The let's
+// settled type is the initializer's expectation channel, so an empty literal
+// settles its mapness and the write check can tell an upsert from a list write;
+// an unfoldable rebind stops being tracked.
+func indexWriteLet(s *ir.Let, locals map[string]*ir.Constant, genv graphFoldEnv) {
+	if s.Name == "" || s.Value == nil {
+		return
+	}
+	if v := eval.GraphInExpecting(s.Value, locals, s.Type, genv); v != nil {
+		locals[s.Name] = v
+	} else {
+		delete(locals, s.Name)
+	}
+}
+
+// indexWriteAssign reports an out-of-range list write for the assignment, then
+// threads the reassigned binding into the running locals; an unfoldable rebind
+// stops being tracked.
+func indexWriteAssign(s *ir.Assign, locals map[string]*ir.Constant, genv graphFoldEnv, at func(ast.Node) span, diags *diagnostic.List) {
+	reportIndexWriteIR(s, locals, genv, at, diags)
+	if s.Name == "" || s.Value == nil {
+		return
+	}
+	if v := eval.GraphIn(s.Value, locals, genv); v != nil {
+		locals[s.Name] = v
+	} else {
+		delete(locals, s.Name)
+	}
+}
+
+// indexWriteSwitch recurses indexWriteStmts through a switch's arm bodies and
+// its wildcard, each with a copy of the locals so block bindings do not leak.
+func indexWriteSwitch(s *ir.Switch, locals map[string]*ir.Constant, genv graphFoldEnv, at func(ast.Node) span, diags *diagnostic.List) {
+	for _, arm := range s.Arms {
+		indexWriteStmts(arm.Body, copyLocals(locals), genv, at, diags)
+	}
+	indexWriteStmts(s.Else, copyLocals(locals), genv, at, diags)
+}
+
+// indexWriteMatch recurses indexWriteStmts through a match's arm bodies and its
+// wildcard. An arm's narrowed binding is not a foldable list constant the write
+// check tracks, so the arm bodies walk with a copy of the locals exactly as a
+// switch's arms do.
+func indexWriteMatch(s *ir.Match, locals map[string]*ir.Constant, genv graphFoldEnv, at func(ast.Node) span, diags *diagnostic.List) {
+	for _, arm := range s.Arms {
+		indexWriteStmts(arm.Body, copyLocals(locals), genv, at, diags)
+	}
+	indexWriteStmts(s.Else, copyLocals(locals), genv, at, diags)
 }
 
 // reportIndexWriteIR reports an out-of-range list write for an assignment

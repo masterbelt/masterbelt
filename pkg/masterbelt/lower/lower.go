@@ -128,57 +128,11 @@ func Value(e ast.Expr, b Binder) ir.Value {
 	case *ast.DurationLit:
 		return &ir.DurationLiteral{Text: e.Text, Syntax: e}
 	case *ast.CollectionLit:
-		entries := make([]ir.CollectionEntry, len(e.Entries))
-		for i, entry := range e.Entries {
-			var key ir.Value
-			if entry.Key != nil {
-				key = Value(entry.Key, b)
-			}
-			entries[i] = ir.CollectionEntry{Key: key, Value: Value(entry.Value, b)}
-		}
-		return &ir.CollectionLiteral{Entries: entries, Syntax: e}
+		return collectionValue(e, b)
 	case *ast.RecordLit:
-		fields := make([]ir.RecordField, len(e.Fields))
-		for i, f := range e.Fields {
-			fields[i] = ir.RecordField{Name: f.Name, Value: Value(f.Value, b)}
-		}
-		return &ir.RecordValue{TypeName: e.TypeName, Fields: fields, Syntax: e}
+		return recordValue(e, b)
 	case *ast.CallExpr:
-		// The binder claims the context-specific call forms first — a call of
-		// a top-level function (by name, or through a namespace import), a
-		// conversion. What remains of the member-callee form is a method call;
-		// any other callee lowers to nothing.
-		if v := b.Leaf(e, sub(b)); v != nil {
-			return v
-		}
-		if member, ok := e.Callee.(*ast.MemberExpr); ok {
-			// A bare member as an operator/method argument resolves through the
-			// receiver's static enum (rarity == Legend, desugared to
-			// rarity.eql(Legend)): when the receiver syntactically names an enum,
-			// the argument identifiers expect that enum. The enum's comparison
-			// operators all take other: self, so the expectation matches; a
-			// non-member name falls through the wrapper, and a non-enum receiver
-			// invents no expectation.
-			argBinder := expectEnum(b, expectedEnumOf(b, member.Receiver))
-			args := make([]ir.Value, len(e.Arguments))
-			for i, a := range e.Arguments {
-				args[i] = Value(a, argBinder)
-			}
-			return &ir.Call{Receiver: Value(member.Receiver, b), Method: member.Member.Name, Args: args, Syntax: e}
-		}
-		// A callee that itself lowers to a value applies — a function-typed
-		// parameter (pred(value)), a local or constant bound to a fn value, an
-		// immediately applied literal — mirroring the checker's function-value
-		// arm. A callee that lowers to nothing (an unresolved name) lowers the
-		// whole call to nothing, as before.
-		if callee := Value(e.Callee, b); callee != nil {
-			args := make([]ir.Value, len(e.Arguments))
-			for i, a := range e.Arguments {
-				args[i] = Value(a, b)
-			}
-			return &ir.Apply{Callee: callee, Args: args, Syntax: e}
-		}
-		return nil
+		return callValue(e, b)
 	case *ast.AwaitExpr:
 		// await wraps its operand: it marks the suspension point, adding
 		// nothing to the value.
@@ -204,6 +158,69 @@ func Value(e ast.Expr, b Binder) ir.Value {
 	default:
 		return b.Leaf(e, sub(b))
 	}
+}
+
+// collectionValue lowers a collection literal: each entry's optional key and its
+// value lower as ordinary values.
+func collectionValue(e *ast.CollectionLit, b Binder) ir.Value {
+	entries := make([]ir.CollectionEntry, len(e.Entries))
+	for i, entry := range e.Entries {
+		var key ir.Value
+		if entry.Key != nil {
+			key = Value(entry.Key, b)
+		}
+		entries[i] = ir.CollectionEntry{Key: key, Value: Value(entry.Value, b)}
+	}
+	return &ir.CollectionLiteral{Entries: entries, Syntax: e}
+}
+
+// recordValue lowers a record literal: each field's value lowers as an ordinary
+// value under the record's named type.
+func recordValue(e *ast.RecordLit, b Binder) ir.Value {
+	fields := make([]ir.RecordField, len(e.Fields))
+	for i, f := range e.Fields {
+		fields[i] = ir.RecordField{Name: f.Name, Value: Value(f.Value, b)}
+	}
+	return &ir.RecordValue{TypeName: e.TypeName, Fields: fields, Syntax: e}
+}
+
+// callValue lowers a call expression. The binder claims the context-specific
+// call forms first — a call of a top-level function (by name, or through a
+// namespace import), a conversion. What remains of the member-callee form is a
+// method call; a callee that itself lowers to a value applies; any other callee
+// lowers to nothing.
+func callValue(e *ast.CallExpr, b Binder) ir.Value {
+	if v := b.Leaf(e, sub(b)); v != nil {
+		return v
+	}
+	if member, ok := e.Callee.(*ast.MemberExpr); ok {
+		// A bare member as an operator/method argument resolves through the
+		// receiver's static enum (rarity == Legend, desugared to
+		// rarity.eql(Legend)): when the receiver syntactically names an enum,
+		// the argument identifiers expect that enum. The enum's comparison
+		// operators all take other: self, so the expectation matches; a
+		// non-member name falls through the wrapper, and a non-enum receiver
+		// invents no expectation.
+		argBinder := expectEnum(b, expectedEnumOf(b, member.Receiver))
+		args := make([]ir.Value, len(e.Arguments))
+		for i, a := range e.Arguments {
+			args[i] = Value(a, argBinder)
+		}
+		return &ir.Call{Receiver: Value(member.Receiver, b), Method: member.Member.Name, Args: args, Syntax: e}
+	}
+	// A callee that itself lowers to a value applies — a function-typed
+	// parameter (pred(value)), a local or constant bound to a fn value, an
+	// immediately applied literal — mirroring the checker's function-value
+	// arm. A callee that lowers to nothing (an unresolved name) lowers the
+	// whole call to nothing, as before.
+	if callee := Value(e.Callee, b); callee != nil {
+		args := make([]ir.Value, len(e.Arguments))
+		for i, a := range e.Arguments {
+			args[i] = Value(a, b)
+		}
+		return &ir.Apply{Callee: callee, Args: args, Syntax: e}
+	}
+	return nil
 }
 
 // Body lowers a method body to its IR statements (nil for an extern or empty

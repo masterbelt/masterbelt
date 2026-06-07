@@ -109,29 +109,38 @@ func checkAssign(s *ast.AssignStmt, bs infer.BodyScope, env exprFolder, noSelf f
 
 	want, isLocal := bs.Locals[id.Name]
 	if !isLocal {
-		c := at(s.Target)
-		_, isParam := bs.Params[id.Name]
-		switch {
-		case isParam:
-			// A parameter is immutable; the message points at let, the mutable
-			// form, exactly as a const target does.
-			diags.Add(newAssignToConstDiagnostic(c.offset, c.width, id.Name))
-		case isConstName(env, id):
-			diags.Add(newAssignToConstDiagnostic(c.offset, c.width, id.Name))
-		default:
-			diags.Add(newAssignToUndefinedDiagnostic(c.offset, c.width, id.Name))
-		}
-		if s.Value != nil {
-			infer.CheckBody(s.Value, ir.Invalid, bs, sink)
-		}
+		reportNonLocalAssign(s, id, bs, env, sink, at, diags)
 		return
 	}
+	checkLocalAssign(s, id, want, bs, env, sink, at, diags)
+}
 
-	// The target is a let local: the new value must stay assignable to its fixed
-	// type. The value is synthesized (checked against ir.Invalid), not checked
-	// against want — so a mismatch surfaces once, as assign_type_mismatch (which
-	// names the local and its fixed type), rather than also as a bare
-	// type_mismatch through the sink.
+// reportNonLocalAssign reports a reassignment whose name target is not a let
+// local: a parameter or const is immutable (the message points at let, the
+// mutable form), and any other name has no binding. The value is still typed so
+// its own errors surface.
+func reportNonLocalAssign(s *ast.AssignStmt, id *ast.Identifier, bs infer.BodyScope, env exprFolder, sink *infer.Sink, at func(ast.Node) span, diags *diagnostic.List) {
+	c := at(s.Target)
+	_, isParam := bs.Params[id.Name]
+	switch {
+	case isParam:
+		diags.Add(newAssignToConstDiagnostic(c.offset, c.width, id.Name))
+	case isConstName(env, id):
+		diags.Add(newAssignToConstDiagnostic(c.offset, c.width, id.Name))
+	default:
+		diags.Add(newAssignToUndefinedDiagnostic(c.offset, c.width, id.Name))
+	}
+	if s.Value != nil {
+		infer.CheckBody(s.Value, ir.Invalid, bs, sink)
+	}
+}
+
+// checkLocalAssign checks a reassignment to a let local: the new value must
+// stay assignable to its fixed type. The value is synthesized (checked against
+// ir.Invalid), not checked against want — so a mismatch surfaces once, as
+// assign_type_mismatch (which names the local and its fixed type), rather than
+// also as a bare type_mismatch through the sink.
+func checkLocalAssign(s *ast.AssignStmt, id *ast.Identifier, want ir.Type, bs infer.BodyScope, env exprFolder, sink *infer.Sink, at func(ast.Node) span, diags *diagnostic.List) {
 	if s.Value == nil {
 		return
 	}
@@ -146,20 +155,10 @@ func checkAssign(s *ast.AssignStmt, bs infer.BodyScope, env exprFolder, noSelf f
 		return
 	}
 	// A bare member of the target's enum (r = Common, where r is a Rarity let)
-	// resolves through the local's static type; a name that is not a member is the
-	// unknown_enum_member the const path reports. A genuine member of the enum is a
-	// resolved value, so the synthesis below would otherwise call it an unknown
-	// name — resolve it here first.
+	// resolves through the local's static type; resolve it here first so the
+	// synthesis below does not call a genuine member an unknown name.
 	if enumDef := enumDefOf(want); enumDef != nil {
-		reportBareEnumMember(s.Value, enumDef, bs, env, at, diags)
-		if id, ok := s.Value.(*ast.Identifier); ok && enumIndex(enumDef, id.Name) >= 0 {
-			// A bare member assigns at the enum's type; no mismatch. When the
-			// local's type is a union carrying the enum (an alias like
-			// optional<Rarity>), the member flows into it — an adaption the IR
-			// makes explicit.
-			if member := (&ir.Named{Def: enumDef}); sink != nil && sink.Adapted != nil && !types.Identical(member, want) {
-				sink.Adapted(s.Value, want)
-			}
+		if checkBareEnumAssign(s, enumDef, want, bs, env, sink, at, diags) {
 			return
 		}
 	}
@@ -178,6 +177,23 @@ func checkAssign(s *ast.AssignStmt, bs infer.BodyScope, env exprFolder, noSelf f
 	if sink != nil && sink.Adapted != nil && !types.Identical(got, want) {
 		sink.Adapted(s.Value, want)
 	}
+}
+
+// checkBareEnumAssign resolves a bare enum member assigned to an enum-typed
+// local: a name that is not a member is the unknown_enum_member the const path
+// reports. It returns true when the value was a genuine member (handled here),
+// in which case a member flowing into a union local (an alias like
+// optional<Rarity>) is the explicit adaption the IR records.
+func checkBareEnumAssign(s *ast.AssignStmt, enumDef *ir.TypeDef, want ir.Type, bs infer.BodyScope, env exprFolder, sink *infer.Sink, at func(ast.Node) span, diags *diagnostic.List) bool {
+	reportBareEnumMember(s.Value, enumDef, bs, env, at, diags)
+	id, ok := s.Value.(*ast.Identifier)
+	if !ok || enumIndex(enumDef, id.Name) < 0 {
+		return false
+	}
+	if member := (&ir.Named{Def: enumDef}); sink != nil && sink.Adapted != nil && !types.Identical(member, want) {
+		sink.Adapted(s.Value, want)
+	}
+	return true
 }
 
 // checkSetterAssign validates a property write p.name = v: the receiver must be a

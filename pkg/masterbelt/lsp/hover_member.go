@@ -156,64 +156,81 @@ func memberHover(doc view, offset int, trees map[cst.Green]cst.Tree) *protocol.H
 	r := toRange(doc.Buffer(), leaf.Offset(), leaf.End())
 
 	if ms, subst, ok := doc.MethodCandidates(recv, name); ok {
-		var b strings.Builder
-		if len(ms) == 1 {
-			// The common single-signature card: the signature, its doc below.
-			b.WriteString("```masterbelt\n")
-			b.WriteString(methodSignatureSubst(ms[0], subst))
-			b.WriteString("\n```")
-			if len(ms[0].Doc) > 0 {
-				b.WriteString("\n\n")
-				b.WriteString(strings.Join(ms[0].Doc, "\n"))
-			}
-		} else {
-			// An overloaded name lists every signature, each under its own doc
-			// comment — the card reads like the impl block itself.
-			b.WriteString("```masterbelt\n")
-			for i, m := range ms {
-				if i > 0 {
-					b.WriteString("\n")
-				}
-				for _, doc := range m.Doc {
-					b.WriteString("/// " + doc + "\n")
-				}
-				b.WriteString(methodSignatureSubst(m, subst))
-				b.WriteString("\n")
-			}
-			b.WriteString("```")
-		}
-		return &protocol.Hover{
-			Contents: protocol.MarkupContent{Kind: protocol.Markdown, Value: b.String()},
-			Range:    &r,
-		}
+		return memberMethodHover(ms, subst, r)
 	}
 	if f, ok := fieldOf(recv, name); ok {
-		return &protocol.Hover{
-			Contents: protocol.MarkupContent{
-				Kind:  protocol.Markdown,
-				Value: "```masterbelt\n" + f.Name + ": " + f.Type.String() + "\n```",
-			},
-			Range: &r,
-		}
+		return memberFieldHover(f, r)
 	}
-	// A getter read (value.name): its declaration card, the same shape a method's
-	// is — the signature with the receiver's generic arguments substituted, its
-	// doc below.
 	if g, subst, ok := receiverGetter(doc, recv, name); ok {
-		var b strings.Builder
-		b.WriteString("```masterbelt\n")
-		b.WriteString(methodSignatureSubst(g, subst))
-		b.WriteString("\n```")
-		if len(g.Doc) > 0 {
-			b.WriteString("\n\n")
-			b.WriteString(strings.Join(g.Doc, "\n"))
-		}
-		return &protocol.Hover{
-			Contents: protocol.MarkupContent{Kind: protocol.Markdown, Value: b.String()},
-			Range:    &r,
-		}
+		return memberGetterHover(g, subst, r)
 	}
 	return nil
+}
+
+// memberMethodHover builds the method card for a member access: a single
+// signature with its doc below, or — for an overloaded name — every signature
+// listed each under its own doc comment, reading like the impl block itself.
+func memberMethodHover(ms []*ir.Method, subst map[string]ir.Type, r protocol.Range) *protocol.Hover {
+	var b strings.Builder
+	if len(ms) == 1 {
+		// The common single-signature card: the signature, its doc below.
+		b.WriteString("```masterbelt\n")
+		b.WriteString(methodSignatureSubst(ms[0], subst))
+		b.WriteString("\n```")
+		if len(ms[0].Doc) > 0 {
+			b.WriteString("\n\n")
+			b.WriteString(strings.Join(ms[0].Doc, "\n"))
+		}
+	} else {
+		// An overloaded name lists every signature, each under its own doc
+		// comment — the card reads like the impl block itself.
+		b.WriteString("```masterbelt\n")
+		for i, m := range ms {
+			if i > 0 {
+				b.WriteString("\n")
+			}
+			for _, doc := range m.Doc {
+				b.WriteString("/// " + doc + "\n")
+			}
+			b.WriteString(methodSignatureSubst(m, subst))
+			b.WriteString("\n")
+		}
+		b.WriteString("```")
+	}
+	return &protocol.Hover{
+		Contents: protocol.MarkupContent{Kind: protocol.Markdown, Value: b.String()},
+		Range:    &r,
+	}
+}
+
+// memberFieldHover builds the field card for a member access: the field it
+// reads, with its type.
+func memberFieldHover(f ir.Field, r protocol.Range) *protocol.Hover {
+	return &protocol.Hover{
+		Contents: protocol.MarkupContent{
+			Kind:  protocol.Markdown,
+			Value: "```masterbelt\n" + f.Name + ": " + f.Type.String() + "\n```",
+		},
+		Range: &r,
+	}
+}
+
+// memberGetterHover builds the card for a getter read (value.name): its
+// declaration card, the same shape a method's is — the signature with the
+// receiver's generic arguments substituted, its doc below.
+func memberGetterHover(g *ir.Method, subst map[string]ir.Type, r protocol.Range) *protocol.Hover {
+	var b strings.Builder
+	b.WriteString("```masterbelt\n")
+	b.WriteString(methodSignatureSubst(g, subst))
+	b.WriteString("\n```")
+	if len(g.Doc) > 0 {
+		b.WriteString("\n\n")
+		b.WriteString(strings.Join(g.Doc, "\n"))
+	}
+	return &protocol.Hover{
+		Contents: protocol.MarkupContent{Kind: protocol.Markdown, Value: b.String()},
+		Range:    &r,
+	}
 }
 
 // receiverGetter finds the getter named name on the receiver's type, with the
@@ -281,6 +298,19 @@ func receiverTypeOf(doc view, e ast.Expr, trees map[cst.Green]cst.Tree, offset i
 // then the method's signature. A self-typed parameter resolves to the
 // enclosing impl's type, so its methods bind through it.
 func paramTypeAt(doc view, name string, trees map[cst.Green]cst.Tree, offset int) ir.Type {
+	if t := funcLitParamTypeAt(doc, name, trees, offset); t != nil {
+		return t
+	}
+	if t := methodParamTypeAt(doc, name, trees, offset); t != nil {
+		return t
+	}
+	return funcParamTypeAt(doc, name, trees, offset)
+}
+
+// funcLitParamTypeAt resolves name as a parameter of the innermost function
+// literal enclosing offset — its parameters shadow the method's, so the
+// enclosing literals are scanned innermost-first.
+func funcLitParamTypeAt(doc view, name string, trees map[cst.Green]cst.Tree, offset int) ir.Type {
 	litTypes := doc.FuncLitTypes()
 	var enclosing []*ast.FuncLit
 	forEachFuncLit(doc, func(lit *ast.FuncLit) {
@@ -300,7 +330,13 @@ func paramTypeAt(doc view, name string, trees map[cst.Green]cst.Tree, offset int
 			}
 		}
 	}
+	return nil
+}
 
+// methodParamTypeAt resolves name as a parameter of the method whose body
+// spans offset. A self-typed parameter resolves to the enclosing impl's type,
+// so its methods bind through it.
+func methodParamTypeAt(doc view, name string, trees map[cst.Green]cst.Tree, offset int) ir.Type {
 	for _, def := range doc.Module().Types {
 		for _, irm := range def.Methods {
 			if irm.Syntax == nil {
@@ -321,11 +357,15 @@ func paramTypeAt(doc view, name string, trees map[cst.Green]cst.Tree, offset int
 			}
 		}
 	}
+	return nil
+}
 
-	// A parameter of a top-level function body. A generic function's parameter
-	// is a bare TypeVar in the resolved signature, so the type-parameter bounds
-	// are rebound onto it (BindTypeParamBounds) — a `c: T` where T: foldable
-	// then surfaces the bound interface's methods on c.
+// funcParamTypeAt resolves name as a parameter of the top-level function body
+// spanning offset. A generic function's parameter is a bare TypeVar in the
+// resolved signature, so the type-parameter bounds are rebound onto it
+// (BindTypeParamBounds) — a `c: T` where T: foldable then surfaces the bound
+// interface's methods on c.
+func funcParamTypeAt(doc view, name string, trees map[cst.Green]cst.Tree, offset int) ir.Type {
 	for _, f := range doc.Module().Funcs {
 		if f.Syntax == nil {
 			continue

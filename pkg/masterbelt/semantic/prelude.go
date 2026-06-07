@@ -124,17 +124,9 @@ func validatePrelude(reg *builtin.Registry, defs []*ir.TypeDef) error {
 	for _, d := range defs {
 		declared[d.Name] = d
 	}
-
-	for _, name := range reg.Names() {
-		d, ok := declared[name]
-		if !ok {
-			return fmt.Errorf("prelude: registry primitive %q is not declared", name)
-		}
-		if !d.Builtin {
-			return fmt.Errorf("prelude: %q is declared but not as `= builtin`", name)
-		}
+	if err := validatePreludePrimitives(reg, declared); err != nil {
+		return err
 	}
-
 	for _, d := range defs {
 		// Only primitives the registry natively backs are required to have
 		// intrinsics. A builtin the registry does not yet model (the generic
@@ -148,38 +140,64 @@ func validatePrelude(reg *builtin.Registry, defs []*ir.TypeDef) error {
 			continue
 		}
 		for _, m := range d.Methods {
-			if !m.Extern {
-				continue
-			}
-			// An effectful extern has no compile-time implementation by
-			// definition (it is never folded); its obligation is the registry's
-			// effectful-native record — the explicit, per-symbol promise that a
-			// target's codegen supplies it — and the declared effects must be
-			// the recorded ones.
-			if len(m.Effects) > 0 {
-				e, ok := reg.Effectful(d.Name, m.Name, m.Kind)
-				if !ok {
-					return fmt.Errorf("prelude: %s.%s is an effectful extern but the registry records no effectful native for it", d.Name, m.Name)
-				}
-				if !slices.Equal(e.Effects, m.Effects) {
-					return fmt.Errorf("prelude: %s.%s declares effects %v but the registry records %v", d.Name, m.Name, m.Effects, e.Effects)
-				}
-				continue
-			}
-			kinds, known := paramKinds(reg, native, m.Params)
-			if !known {
-				// A parameter type the evaluator has no constant kind for
-				// (none exists on a natively-backed primitive today): the
-				// per-name check is the strongest claim left.
-				if !reg.HasIntrinsic(d.Name, m.Name) {
-					return fmt.Errorf("prelude: %s.%s is extern but the registry has no intrinsic for it", d.Name, m.Name)
-				}
-				continue
-			}
-			if _, ok := reg.Intrinsic(d.Name, m.Name, kinds); !ok {
-				return fmt.Errorf("prelude: %s.%s is extern but the registry has no intrinsic for its argument kinds", d.Name, m.Name)
+			if err := validateExternMethod(reg, d, native, m); err != nil {
+				return err
 			}
 		}
+	}
+	return nil
+}
+
+// validatePreludePrimitives checks that every registry primitive is declared in
+// the prelude as a `= builtin`.
+func validatePreludePrimitives(reg *builtin.Registry, declared map[string]*ir.TypeDef) error {
+	for _, name := range reg.Names() {
+		d, ok := declared[name]
+		if !ok {
+			return fmt.Errorf("prelude: registry primitive %q is not declared", name)
+		}
+		if !d.Builtin {
+			return fmt.Errorf("prelude: %q is declared but not as `= builtin`", name)
+		}
+	}
+	return nil
+}
+
+// validateExternMethod checks one extern method on a natively-backed primitive:
+// an effectful extern must have a registered effectful native whose effects
+// match the declared ones, and a pure extern must have a registered intrinsic
+// for its argument kinds (or, when a parameter has no constant kind, by name).
+// A non-extern method has no obligation.
+func validateExternMethod(reg *builtin.Registry, d *ir.TypeDef, native *builtin.NativeType, m *ir.Method) error {
+	if !m.Extern {
+		return nil
+	}
+	// An effectful extern has no compile-time implementation by definition (it
+	// is never folded); its obligation is the registry's effectful-native record
+	// — the explicit, per-symbol promise that a target's codegen supplies it —
+	// and the declared effects must be the recorded ones.
+	if len(m.Effects) > 0 {
+		e, ok := reg.Effectful(d.Name, m.Name, m.Kind)
+		if !ok {
+			return fmt.Errorf("prelude: %s.%s is an effectful extern but the registry records no effectful native for it", d.Name, m.Name)
+		}
+		if !slices.Equal(e.Effects, m.Effects) {
+			return fmt.Errorf("prelude: %s.%s declares effects %v but the registry records %v", d.Name, m.Name, m.Effects, e.Effects)
+		}
+		return nil
+	}
+	kinds, known := paramKinds(reg, native, m.Params)
+	if !known {
+		// A parameter type the evaluator has no constant kind for (none exists
+		// on a natively-backed primitive today): the per-name check is the
+		// strongest claim left.
+		if !reg.HasIntrinsic(d.Name, m.Name) {
+			return fmt.Errorf("prelude: %s.%s is extern but the registry has no intrinsic for it", d.Name, m.Name)
+		}
+		return nil
+	}
+	if _, ok := reg.Intrinsic(d.Name, m.Name, kinds); !ok {
+		return fmt.Errorf("prelude: %s.%s is extern but the registry has no intrinsic for its argument kinds", d.Name, m.Name)
 	}
 	return nil
 }
