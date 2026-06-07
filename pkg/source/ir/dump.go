@@ -562,6 +562,15 @@ func dumpValueForm(v Value) (form, suffix string) {
 			suffix += resolvedSuffix(x.Name, x.Resolved.Params, x.Resolved.Result)
 		}
 		return call, suffix + substSuffix(x.Subst)
+	case *Apply:
+		// callee(arg, arg): the application of a function value — the callee
+		// renders as the value it is, which is what distinguishes it from a
+		// FuncCall's bare declaration name.
+		args := make([]string, len(x.Args))
+		for i, a := range x.Args {
+			args[i] = dumpValue(a)
+		}
+		return fmt.Sprintf("%s(%s)", dumpValue(x.Callee), strings.Join(args, ", ")), ""
 	case *FuncLiteral:
 		parts := []string{"fn(" + strings.Join(x.Params, ", ") + ")"}
 		for _, s := range x.Body {

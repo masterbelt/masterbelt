@@ -272,6 +272,23 @@ type StaticCall struct {
 
 func (*StaticCall) value() {}
 
+// Apply is the application of a function value: the callee — a parameter,
+// local, or constant bound to a fn value, or a literal applied immediately —
+// applied to the argument values. It is the call form left when no
+// declaration claims the callee (a method call binds a Method, a FuncCall a
+// Function, a Conversion a type): the callee is itself a resolved value, so
+// the application carries no name to bind, only the value graph. Syntax is
+// the call expression this lowered from — the settled-type write-back key and
+// the editor's position anchor only, never semantics.
+type Apply struct {
+	Callee Value
+	Args   []Value
+	Type   Type
+	Syntax *ast.CallExpr
+}
+
+func (*Apply) value() {}
+
 // FuncLiteral is a function-literal value: its parameter names and its lowered
 // statement body. Type is the checker-solved *Func — annotations, pushed-down
 // expectations, and inferred parts combined — so the parameter and result
@@ -450,6 +467,8 @@ func TypeOf(v Value) Type {
 	case *FuncCall:
 		return v.Type
 	case *StaticCall:
+		return v.Type
+	case *Apply:
 		return v.Type
 	case *FuncLiteral:
 		return v.Type

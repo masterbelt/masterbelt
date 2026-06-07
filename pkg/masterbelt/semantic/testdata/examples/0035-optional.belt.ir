@@ -5,7 +5,7 @@ Module
     eval (nint) 5
   Const "Absent"
     type optional<nint>
-    value <none>
+    value (null : null)
     eval (null) null
   Const "FromPresent"
     type nint
@@ -13,11 +13,11 @@ Module
     eval 5
   Const "FromAbsent"
     type nint
-    value (orZero(<none>) : nint)
+    value (orZero((null : null)) : nint)
     eval 0
   Const "WithFallback"
     type nint
-    value (orFallback(<none>, (IntLiteral "99" : nint)) : nint)
+    value (orFallback((null : null), (IntLiteral "99" : nint)) : nint)
     eval 99
   Func "orZero" pub
     param v: optional<nint>

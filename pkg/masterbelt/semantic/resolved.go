@@ -216,6 +216,12 @@ func (w resolutionWriter) value(v ir.Value, bd bindings) {
 		for _, a := range v.Args {
 			w.value(a, bd)
 		}
+	case *ir.Apply:
+		v.Type = w.res.types[v.Syntax]
+		w.value(v.Callee, bd)
+		for _, a := range v.Args {
+			w.value(a, bd)
+		}
 	case *ir.CollectionLiteral:
 		v.Type = w.res.types[v.Syntax]
 		for _, e := range v.Entries {

@@ -28,6 +28,11 @@ type constBinder struct {
 
 func (b constBinder) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
 	switch e := e.(type) {
+	case *ast.NullLit:
+		// The null literal is a value like any other (const Absent:
+		// optional<nint> = null), so the graph carries it; whether null fits
+		// the declared type is the checker's question.
+		return &ir.NullValue{}
 	case *ast.Identifier:
 		if target := b.q.resolve(b.file, e); target != nil {
 			return &ir.Reference{Target: b.irOf[target], Syntax: e}

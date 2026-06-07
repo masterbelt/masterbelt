@@ -165,6 +165,18 @@ func Value(e ast.Expr, b Binder) ir.Value {
 			}
 			return &ir.Call{Receiver: Value(member.Receiver, b), Method: member.Member.Name, Args: args, Syntax: e}
 		}
+		// A callee that itself lowers to a value applies — a function-typed
+		// parameter (pred(value)), a local or constant bound to a fn value, an
+		// immediately applied literal — mirroring the checker's function-value
+		// arm. A callee that lowers to nothing (an unresolved name) lowers the
+		// whole call to nothing, as before.
+		if callee := Value(e.Callee, b); callee != nil {
+			args := make([]ir.Value, len(e.Arguments))
+			for i, a := range e.Arguments {
+				args[i] = Value(a, b)
+			}
+			return &ir.Apply{Callee: callee, Args: args, Syntax: e}
+		}
 		return nil
 	case *ast.AwaitExpr:
 		// await wraps its operand: it marks the suspension point, adding
