@@ -19,6 +19,14 @@
 // and expr.go the expression nodes (Expr and its variants). text_gen.go — the
 // generated exact text representation (format v2) — renders a File as a
 // diffable snapshot and parses it back.
+//
+// The text representation is exact: every exported field of every node
+// appears, in declaration order, in the shared element grammar (see package
+// source/internal/treetext) — a heading line per node, one "Name:" line per
+// field, scalars inline, children indented, "~" for nil. The only exclusions
+// are the unexported syntax backpointers, out by construction: an unmarshaled
+// File is detached (Syntax() is nil), which is the contract, not a defect.
+// The field-sensitivity test (P5) pins the exactness mechanically.
 package ast
 
 //go:generate go run github.com/masterbelt/masterbelt/pkg/source/internal/treegen -marshal Node -roots File -out text_gen.go
