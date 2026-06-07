@@ -47,7 +47,8 @@
 //	IfStmt        := if Expr Block [ else ( IfStmt | Block ) ]
 //	ForStmt       := for Ident ( "of" | "in" ) Expr Block
 //	Expr          := TernaryExpr
-//	TernaryExpr   := OrExpr [ "?" Expr ":" Expr ]
+//	TernaryExpr   := RangeExpr [ "?" Expr ":" Expr ]
+//	RangeExpr     := OrExpr [ ( ".." | "..." ) OrExpr ]   (non-associative: a..b..c is an error)
 //	OrExpr        := AndExpr ( "||" AndExpr )*
 //	AndExpr       := CmpExpr ( "&&" CmpExpr )*
 //	CmpExpr       := AddExpr ( ( "==" | "!=" | "<" | "<=" | ">" | ">=" ) AddExpr )*
@@ -72,10 +73,20 @@
 // function per level; the binaryPrec table is the single source of operator
 // precedence. Comparisons are left-associative here (Go forbids chaining them),
 // which keeps the parser uniform and defers "bool < int" to the type checker.
-// The ternary "?:" is the one operator looser than them all and the only
-// right-associative one: parseExpr reads it after the binary climb, and only at
-// the outermost (lowest-precedence) call, so a > b ? a : b groups as
-// (a > b) ? a : b and a ? b : c ? d : e as a ? b : (c ? d : e).
+// Two operators sit below the binary climb, read by parseExpr after it in order
+// of looseness:
+//
+//   - The range operator (".." / "...") is looser than every binary operator and
+//     tighter than the ternary (the placement Rust's range takes: below
+//     arithmetic and comparison, above the conditional). So a range bound is a
+//     whole binary expression — 0..n + 1 is 0..(n + 1) — while a range is itself
+//     a ternary branch and operand. It is non-associative: a chain a..b..c is a
+//     parse error (the operator is not in binaryPrec, so the climb never absorbs
+//     it, and the range tail consumes exactly one operator).
+//   - The ternary "?:" is the one operator looser than the range and the only
+//     right-associative one: parseExpr reads it last, after the binary climb and
+//     the range, so a > b ? a : b groups as (a > b) ? a : b and a ? b : c ? d : e
+//     as a ? b : (c ? d : e).
 //
 // Two properties make the parser usable as the front half of an incremental
 // pipeline (see Document):

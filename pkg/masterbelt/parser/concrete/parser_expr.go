@@ -465,20 +465,60 @@ func (p *parser) parseReturnStmt() *cst.Node {
 // parseExpr parses a whole expression. The cursor sits on the first significant
 // token of the expression. It returns the single green node for the whole
 // expression — a Literal/NameRef for an atom, or a BinaryExpr/UnaryExpr/
-// TernaryExpr tree.
+// RangeExpr/TernaryExpr tree.
 //
-// The ternary "?:" binds looser than every binary operator, so it is read here,
-// after the binary climb: a "?" following the binary expression opens the
-// conditional, whose then/else are themselves full expressions — which makes it
-// right-associative (a ? b : c ? d : e groups as a ? b : (c ? d : e)). A "?"
-// that surfaces inside the binary climb (the right operand of "+", say) is left
-// for this level, so a > b ? a : b is (a > b) ? a : b.
+// The two loosest operators are read here, after the binary climb, in this
+// order of looseness (loosest last): the range operator (".." / "...") binds
+// looser than every binary operator and tighter than the ternary, so a range
+// bound is a full binary expression (0..n + 1 is 0..(n+1), not (0..n)+1) yet a
+// whole range can be a ternary branch and operand. The range is non-associative:
+// a chain a..b..c is a parse error (a second range operator after one range is
+// not its own operand), unlike the left-associative binary operators and the
+// right-associative ternary.
+//
+// The ternary "?:" is the one operator looser than the range, so it wraps it: a
+// "?" following the (possibly range) expression opens the conditional, whose
+// then/else are themselves full expressions — which makes it right-associative
+// (a ? b : c ? d : e groups as a ? b : (c ? d : e)).
 func (p *parser) parseExpr() cst.Green {
 	left := p.parseBinary(precLowest)
+	if k := p.peekSignificant(); k == token.DotDot || k == token.DotDotDot {
+		left = p.parseRangeTail(left)
+	}
 	if p.peekSignificant() == token.Question {
 		return p.parseTernaryTail(left)
 	}
 	return left
+}
+
+// parseRangeTail completes a range literal from its already-parsed lower operand:
+// it consumes the ".." or "..." operator and parses the upper operand as a binary
+// expression (parseBinary), so an arithmetic bound binds tighter than the range
+// (0..n + 1 is 0..(n + 1)) while a range never reaches into a ternary or another
+// range. The range is non-associative: a second ".."/"..." after the operand is a
+// chain (a..b..c), reported as an unexpected operand rather than parsed — the
+// range operator is not in binaryPrec, so the binary climb never consumes it, and
+// this tail consumes exactly one. The cursor sits on the range operator.
+func (p *parser) parseRangeTail(lower cst.Green) cst.Green {
+	children := []cst.Green{lower}
+	p.skipTrivia(&children)
+	op := p.cur() // the range operator (cursor is on it)
+	children = append(children, p.bump())
+	if startsExpr(p.peekSignificant()) {
+		p.skipTrivia(&children)
+		children = append(children, p.parseBinary(precLowest))
+	} else {
+		p.report(newExpectedOperandDiagnostic(p.lastStart, 0, op.Kind.Symbol()))
+	}
+	// A chained range a..b..c: the upper operand stops before the second operator
+	// (it is not a binary operator, so parseBinary leaves it), and a range is not
+	// its own operand. Report the stray operator and leave it for the caller's
+	// recovery so the node round-trips and the statement/argument loop moves past
+	// it; the report anchors at the last consumed token, inside this construct.
+	if k := p.peekSignificant(); k == token.DotDot || k == token.DotDotDot {
+		p.report(newUnexpectedTokenDiagnostic(p.lastStart, 0, k.String()))
+	}
+	return cst.NewNode(cst.RangeExpr, children)
 }
 
 // parseBinary parses the binary-operator layer by precedence climbing: an
