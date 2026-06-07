@@ -126,6 +126,12 @@ func callType(e *ast.CallExpr, s scope, sink *Sink) ir.Type {
 		return ir.Invalid
 	}
 	m, subst, operand := matches[0].Method, matches[0].Subst, matches[0].Operand
+	// The selection among several signatures is the checker's overload
+	// resolution — streamed out so the semantic layer can write it back into
+	// the IR (ir.Call.Resolved) and the folder can prefer it.
+	if len(candidates) > 1 {
+		sink.resolvedMethod(e, m)
+	}
 
 	// Pass 2 — the function literals, each checked against its parameter
 	// pattern. A finding inside the literal (a mismatch, an uninferable part)
@@ -280,7 +286,7 @@ func staticSigs(def *ir.TypeDef, name string) []funcSig {
 		for i, p := range m.Params {
 			params[i] = substituteSelf(p.Type, self)
 		}
-		sigs = append(sigs, funcSig{params: params, result: substituteSelf(m.Result, self)})
+		sigs = append(sigs, funcSig{m: m, params: params, result: substituteSelf(m.Result, self)})
 	}
 	return sigs
 }
@@ -299,9 +305,12 @@ func substituteSelf(t, self ir.Type) ir.Type {
 // parameter/result types, and — for a generic function — its type parameters
 // (each a TypeVar name with an optional bound). A type parameter appears as a
 // TypeVar in params/result; the call solves it from the argument types (Match)
-// and substitutes it into the result.
+// and substitutes it into the result. Exactly one of fd (a top-level
+// function's declaration) and m (a static fn's method) is set — the handle the
+// overload-selection stream reports the winner through.
 type funcSig struct {
 	fd         *ast.FuncDecl
+	m          *ir.Method
 	typeParams []*ir.TypeParam
 	params     []ir.Type
 	result     ir.Type
@@ -445,6 +454,16 @@ func selectFuncOverload(e *ast.CallExpr, name string, sigs []funcSig, s scope, s
 	// the single-signature checkFuncCall does, rather than discarding the Match
 	// result and resolving the call against whichever binding was written first.
 	win := matches[0]
+	// The selection among several signatures is the checker's overload
+	// resolution — streamed out for the IR write-back and the folder. The
+	// winner carries the handle of its kind: a top-level function's
+	// declaration, or a static fn's method.
+	switch {
+	case win.m != nil:
+		sink.resolvedStatic(e, win.m)
+	case win.fd != nil:
+		sink.resolvedFunc(e, win.fd)
+	}
 	subst := map[string]ir.Type{}
 	for i, kt := range known {
 		if kt == nil {

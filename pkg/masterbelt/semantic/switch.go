@@ -128,7 +128,7 @@ func checkSwitch(sw *ast.SwitchStmt, bs infer.BodyScope, env eval.Env, at func(a
 // other findings (operator errors inside a value expression) keep their own
 // diagnostics, so a malformed arm value still surfaces its real cause.
 func armValueSink(at func(ast.Node) span, diags *diagnostic.List) *infer.Sink {
-	sink := exprSink(at, diags)
+	sink := exprSink(at, diags, nil)
 	sink.Mismatch = func(node ast.Node, got, want ir.Type) {
 		s := at(node)
 		diags.Add(newArmValueTypeMismatchDiagnostic(s.offset, s.width, got.String(), want.String()))

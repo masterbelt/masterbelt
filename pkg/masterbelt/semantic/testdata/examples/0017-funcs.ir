@@ -10,11 +10,11 @@ Module
     eval 12
   Const "C"
     type nint
-    value scale(IntLiteral "4")
+    value scale(IntLiteral "4") [resolved scale(x: nint): nint]
     eval 40
   Const "D"
     type list<nint>
-    value scale([IntLiteral "1", IntLiteral "2"])
+    value scale([IntLiteral "1", IntLiteral "2"]) [resolved scale(xs: list<nint>): list<nint>]
     eval [10, 20]
   Const "E"
     type string

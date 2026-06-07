@@ -574,14 +574,14 @@ func evalExprRaw(e ast.Expr, ctx evalCtx) *ir.Constant {
 					return convert(def, e.Arguments, sub)
 				}
 				if cands := ctx.env.ResolveFunc(id); len(cands) > 0 {
-					return applyFunc(cands, e.Arguments, sub)
+					return applyFunc(e, cands, sub)
 				}
 				// A bare call inside a method body whose name is a method of self
 				// is an implicit self-call (the self omitted) — the form an
 				// interface's provided method uses to call the required fold. It
 				// dispatches exactly as a written self.name(...) would, through
 				// the self value and its owning definition.
-				if v, ok := selfCall(ctx, sub, id.Name, e.Arguments); ok {
+				if v, ok := selfCall(ctx, sub, e, id.Name); ok {
 					return v
 				}
 			}
@@ -604,10 +604,10 @@ func evalExprRaw(e ast.Expr, ctx evalCtx) *ir.Constant {
 		if recv, isIdent := member.Receiver.(*ast.Identifier); isIdent {
 			if _, isLocal := ctx.locals[recv.Name]; !isLocal {
 				if cands := ctx.env.ResolveFuncMember(member); len(cands) > 0 {
-					return applyFunc(cands, e.Arguments, sub)
+					return applyFunc(e, cands, sub)
 				}
 				if def := ctx.env.LookupType(recv.Name); def != nil {
-					if v, ok := applyStatic(sub, def, member.Member.Name, e.Arguments); ok {
+					if v, ok := applyStatic(sub, e, def, member.Member.Name); ok {
 						return v
 					}
 				}
@@ -635,7 +635,7 @@ func evalExprRaw(e ast.Expr, ctx evalCtx) *ir.Constant {
 		for i, a := range e.Arguments {
 			args[i] = evalExpr(a, argCtx)
 		}
-		return call(sub, member.Receiver, recv, member.Member.Name, args)
+		return call(sub, e, member.Receiver, recv, member.Member.Name, args)
 	default:
 		return nil
 	}
@@ -663,15 +663,15 @@ func applyFuncValue(ctx evalCtx, fn *ir.Constant, argExprs []ast.Expr) *ir.Const
 // The receiver expression is the synthetic self, so the call's receiver-def
 // channel resolves to ctx.selfDef exactly as self.name(...) does, and a
 // collection self (a foldable provided method calling fold) resolves by value.
-func selfCall(ctx, sub evalCtx, name string, argExprs []ast.Expr) (*ir.Constant, bool) {
+func selfCall(ctx, sub evalCtx, e *ast.CallExpr, name string) (*ir.Constant, bool) {
 	if ctx.self == nil {
 		return nil, false
 	}
-	args := make([]*ir.Constant, len(argExprs))
-	for i, a := range argExprs {
+	args := make([]*ir.Constant, len(e.Arguments))
+	for i, a := range e.Arguments {
 		args[i] = evalExpr(a, sub)
 	}
-	return call(sub, &ast.SelfExpr{}, ctx.self, name, args), true
+	return call(sub, e, &ast.SelfExpr{}, ctx.self, name, args), true
 }
 
 // shortCircuit folds a boolean connective whose receiver already decides the

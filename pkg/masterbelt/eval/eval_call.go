@@ -9,6 +9,7 @@
 package eval
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
@@ -111,54 +112,116 @@ func annotationDef(env Env, t ast.TypeExpr) *ir.TypeDef {
 	return rt.TypeExprDef(t)
 }
 
+// CallResolver is an optional Env capability: the overload individual the type
+// checker selected for a call whose name carries several signatures. The
+// semantic layer collects the selections from the checking walk and arms them
+// for a late re-fold, so a call the value-kind rule cannot split (an overload
+// split by a named type — int vs a record — or by two same-kind sized types)
+// still folds, by the checker's choice rather than a second type system grown
+// here. Every method returns nil for a call the checker recorded no choice
+// for, which leaves the conservative value-kind fallback in force; the
+// resolutions only ever widen the foldable set.
+type CallResolver interface {
+	// ResolvedFunc returns the selected declaration of an overloaded top-level
+	// function call, or nil.
+	ResolvedFunc(call *ast.CallExpr) *ast.FuncDecl
+	// ResolvedMethod returns the selected declaration of an overloaded method
+	// call, or nil.
+	ResolvedMethod(call *ast.CallExpr) *ast.MethodDecl
+	// ResolvedStatic returns the selected declaration of an overloaded static
+	// fn call, or nil.
+	ResolvedStatic(call *ast.CallExpr) *ast.MethodDecl
+}
+
+// resolvedFuncDecl returns the checker-selected overload for a top-level
+// function call when the Env carries one and the selection is among the
+// candidates eval resolved for the name — the guard that keeps a stale or
+// foreign record from applying a body the name does not reach.
+func resolvedFuncDecl(env Env, call *ast.CallExpr, cands []*ast.FuncDecl) *ast.FuncDecl {
+	r, ok := env.(CallResolver)
+	if !ok || call == nil {
+		return nil
+	}
+	sel := r.ResolvedFunc(call)
+	if sel == nil || !slices.Contains(cands, sel) {
+		return nil
+	}
+	return sel
+}
+
+// resolvedMethod and resolvedStatic name the CallResolver channel a method-form
+// lookup reads, so resolvedMethodDecl serves both name spaces.
+func resolvedMethod(r CallResolver, call *ast.CallExpr) *ast.MethodDecl { return r.ResolvedMethod(call) }
+func resolvedStatic(r CallResolver, call *ast.CallExpr) *ast.MethodDecl { return r.ResolvedStatic(call) }
+
+// resolvedMethodDecl is resolvedFuncDecl for the method-form selections (an
+// instance method, a static fn): the checker-selected declaration when the Env
+// carries one and it is among the body-bearing candidates eval collected.
+func resolvedMethodDecl(env Env, call *ast.CallExpr, channel func(CallResolver, *ast.CallExpr) *ast.MethodDecl, cands []*ast.MethodDecl) *ast.MethodDecl {
+	r, ok := env.(CallResolver)
+	if !ok || call == nil {
+		return nil
+	}
+	sel := channel(r, call)
+	if sel == nil || !slices.Contains(cands, sel) {
+		return nil
+	}
+	return sel
+}
+
 // applyFunc folds a call of a top-level function: the arguments fold in the
-// caller's context, the overload whose parameters accept their value kinds is
-// selected, and its body's return folds with only the parameter bindings in
-// scope. Evaluation is type-blind, so the selection is by value kind and
-// conservative: when more than one candidate could plausibly accept the
-// arguments — same-kind overloads like int8/int32, or a parameter type it
-// cannot decide — the call simply does not fold, so a wrong overload's body is
-// never applied. The depth guard turns runaway recursion into an unevaluated
-// value.
-func applyFunc(cands []*ast.FuncDecl, args []ast.Expr, ctx evalCtx) *ir.Constant {
+// caller's context, the overload is selected, and its body's return folds with
+// only the parameter bindings in scope. The selection prefers the overload the
+// type checker recorded for this very call (the Env's CallResolver — how an
+// overload split by a named type the kind rule cannot see still folds, with no
+// second type system grown here); without a record it falls back to the
+// type-blind, conservative value-kind rule: when more than one candidate could
+// plausibly accept the arguments — same-kind overloads like int8/int32, or a
+// parameter type it cannot decide — the call simply does not fold, so a wrong
+// overload's body is never applied. The depth guard turns runaway recursion
+// into an unevaluated value.
+func applyFunc(e *ast.CallExpr, cands []*ast.FuncDecl, ctx evalCtx) *ir.Constant {
 	if ctx.depth >= maxApplyDepth {
 		ctx.noteBudget()
 		return nil
 	}
-	vals := make([]*ir.Constant, len(args))
-	for i, a := range args {
+	vals := make([]*ir.Constant, len(e.Arguments))
+	for i, a := range e.Arguments {
 		if vals[i] = evalExpr(a, ctx); vals[i] == nil {
 			return nil
 		}
 	}
 
-	var fd *ast.FuncDecl
-	n := 0
-	for _, cand := range cands {
-		if fits(cand.Params, vals) {
-			fd = cand
-			n++
+	fd := resolvedFuncDecl(ctx.env, e, cands)
+	if fd == nil {
+		n := 0
+		for _, cand := range cands {
+			if fits(cand.Params, vals) {
+				fd = cand
+				n++
+			}
 		}
-	}
-	if n != 1 {
-		return nil
+		if n != 1 {
+			return nil
+		}
 	}
 	// The selected overload's parameter annotations are the argument tagging
 	// channel: an argument flowing into a union-typed parameter is tagged with its
 	// member, read from the argument's own static type (Big(20) into Small | Big
 	// tags Big), in the caller's context. Tagging here, before binding, is what
 	// lets a value reach a match inside the body already tagged.
-	return applyBody(funcCallable(fd), nil, tagArguments(ctx, fd.Params, args, vals), ctx)
+	return applyBody(funcCallable(fd), nil, tagArguments(ctx, fd.Params, e.Arguments, vals), ctx)
 }
 
 // applyStatic folds a static fn call Type.name(args): the arguments fold in the
-// caller's context, the static overload whose parameters accept their value kinds
-// is selected, and its body folds with no receiver (self unbound). It reports
-// (value, true) when def declares a static fn of that name (folded, or left
-// unfolded under the depth guard or an undecidable overload), and (nil, false)
-// when def has no static fn of that name — so the caller can fall through. The
-// selection is the type-blind, conservative one applyFunc uses.
-func applyStatic(ctx evalCtx, def *ir.TypeDef, name string, args []ast.Expr) (*ir.Constant, bool) {
+// caller's context, the static overload is selected, and its body folds with no
+// receiver (self unbound). It reports (value, true) when def declares a static
+// fn of that name (folded, or left unfolded under the depth guard or an
+// undecidable overload), and (nil, false) when def has no static fn of that
+// name — so the caller can fall through. The selection prefers the overload the
+// type checker recorded for this call (the Env's CallResolver), with envFits as
+// the fallback when no record exists.
+func applyStatic(ctx evalCtx, e *ast.CallExpr, def *ir.TypeDef, name string) (*ir.Constant, bool) {
 	var cands []*ast.MethodDecl
 	for _, m := range def.Methods {
 		if m.Kind == ir.MethodStatic && m.Name == name && m.Syntax != nil && len(m.Syntax.Body) > 0 {
@@ -172,29 +235,33 @@ func applyStatic(ctx evalCtx, def *ir.TypeDef, name string, args []ast.Expr) (*i
 		ctx.noteBudget()
 		return nil, true
 	}
-	vals := make([]*ir.Constant, len(args))
-	for i, a := range args {
+	vals := make([]*ir.Constant, len(e.Arguments))
+	for i, a := range e.Arguments {
 		if vals[i] = evalExpr(a, ctx); vals[i] == nil {
 			return nil, true // an unfoldable argument: the static call does not fold
 		}
 	}
-	var sel *ast.MethodDecl
-	n := 0
-	for _, cand := range cands {
-		// A static fn has no receiver, so a self-typed parameter is undecidable
-		// (selfKind -1). A named parameter type is resolved through the env to its
-		// underlying kind (envFits), so an overload taking a record (Celsius) is
-		// ruled out for an integer argument — the distinction the type-blind fits
-		// cannot make without the universe.
-		if envFits(ctx.env, cand.Params, vals) {
-			sel = cand
-			n++
+	sel := resolvedMethodDecl(ctx.env, e, resolvedStatic, cands)
+	if sel == nil {
+		n := 0
+		for _, cand := range cands {
+			// The fallback selection, for a call the checker recorded no choice
+			// for. A static fn has no receiver, so a self-typed parameter is
+			// undecidable (selfKind -1). A named parameter type is resolved
+			// through the env to its underlying kind (envFits), so an overload
+			// taking a record (Celsius) is ruled out for an integer argument —
+			// the distinction the type-blind fits cannot make without the
+			// universe.
+			if envFits(ctx.env, cand.Params, vals) {
+				sel = cand
+				n++
+			}
+		}
+		if n != 1 {
+			return nil, true // ambiguous/undecidable: user-defined, but does not fold
 		}
 	}
-	if n != 1 {
-		return nil, true // ambiguous/undecidable: user-defined, but does not fold
-	}
-	return applyBody(methodCallable(sel, def), nil, tagArguments(ctx, sel.Params, args, vals), ctx), true
+	return applyBody(methodCallable(sel, def), nil, tagArguments(ctx, sel.Params, e.Arguments, vals), ctx), true
 }
 
 // envFits is fits with named parameter types resolved through the env to their
@@ -349,8 +416,11 @@ func kindAccepts(t ast.TypeExpr, k ir.ConstKind) bool {
 // recvExpr is the receiver's source expression, the syntactic type channel a
 // nominal-typed receiver resolves its definition through (its value carries no
 // type); it is nil for an internally synthesized receiver, which then resolves
-// only by value (an enum).
-func call(ctx evalCtx, recvExpr ast.Expr, recv *ir.Constant, name string, args []*ir.Constant) *ir.Constant {
+// only by value (an enum). e is the call expression, the key the checker's
+// overload selection (CallResolver) is read through; it is nil for an
+// internally synthesized call (a foldable's provided body driving fold), whose
+// dispatch the value rules decide alone.
+func call(ctx evalCtx, e *ast.CallExpr, recvExpr ast.Expr, recv *ir.Constant, name string, args []*ir.Constant) *ir.Constant {
 	if recv == nil {
 		return nil
 	}
@@ -370,7 +440,7 @@ func call(ctx evalCtx, recvExpr ast.Expr, recv *ir.Constant, name string, args [
 	// method (the six enum comparisons, a native intrinsic) has no body and falls
 	// through to the intrinsic path below, preserving the existing resolution
 	// order — a user-defined method only when one exists, the intrinsic otherwise.
-	if v, ok := applyUserMethod(ctx, recvExpr, recv, name, args); ok {
+	if v, ok := applyUserMethod(ctx, e, recvExpr, recv, name, args); ok {
 		return v
 	}
 	if recv.Kind == ir.ConstCollection {
@@ -414,21 +484,30 @@ func call(ctx evalCtx, recvExpr ast.Expr, recv *ir.Constant, name string, args [
 // that, from the receiver expression's declared annotation (a nominal type); a
 // definition that does not back the receiver's value kind is rejected, so a
 // wrong def (a string-based type over an integer value, say) never applies. The
-// selection mirrors a function overload's: of the methods of that name that have
-// a body, the one whose parameters accept the argument value kinds is chosen,
-// and the call folds only when exactly one fits — an ambiguous or undecidable
-// set does not fold (nil), so a wrong overload's body is never applied. The
-// depth guard (shared with applyFunc through ctx.depth) turns runaway recursion
-// — a method calling itself, or a method/function cycle — into an unevaluated
-// value rather than a stack overflow.
-func applyUserMethod(ctx evalCtx, recvExpr ast.Expr, recv *ir.Constant, name string, args []*ir.Constant) (*ir.Constant, bool) {
+// selection prefers the overload the type checker recorded for this call (the
+// Env's CallResolver), among the body-bearing candidates the receiver's def
+// reaches; without a record it mirrors a function overload's fallback: the one
+// candidate whose parameters accept the argument value kinds, an ambiguous or
+// undecidable set folding nothing (nil), so a wrong overload's body is never
+// applied. The depth guard (shared with applyFunc through ctx.depth) turns
+// runaway recursion — a method calling itself, or a method/function cycle —
+// into an unevaluated value rather than a stack overflow.
+func applyUserMethod(ctx evalCtx, e *ast.CallExpr, recvExpr ast.Expr, recv *ir.Constant, name string, args []*ir.Constant) (*ir.Constant, bool) {
 	def := receiverDef(ctx, recvExpr, recv)
 	if def == nil {
 		return nil, false
 	}
+	cands := methodSyntaxes(ctx.env.Registry(), def, name)
+	if sel := resolvedMethodDecl(ctx.env, e, resolvedMethod, cands); sel != nil {
+		if ctx.depth >= maxApplyDepth {
+			ctx.noteBudget()
+			return nil, true // the recursion guard fired: a safe, unfoldable result
+		}
+		return applyBody(methodCallable(sel, def), recv, args, ctx), true
+	}
 	var sel *ast.MethodDecl
 	n := 0
-	for _, m := range methodSyntaxes(ctx.env.Registry(), def, name) {
+	for _, m := range cands {
 		// The receiver's value kind decides a self-typed parameter, so an
 		// operator-style overload (merge(points: self) vs merge(active: bool))
 		// resolves the way the type checker did.
@@ -438,7 +517,7 @@ func applyUserMethod(ctx evalCtx, recvExpr ast.Expr, recv *ir.Constant, name str
 		}
 	}
 	if n == 0 {
-		return nil, false // no body-bearing overload: let the intrinsic path run
+		return nil, false // no fitting body-bearing overload: let the intrinsic path run
 	}
 	if ctx.depth >= maxApplyDepth {
 		ctx.noteBudget()

@@ -545,8 +545,11 @@ func TestFuncOverloadDiagnostics(t *testing.T) {
 }
 
 func TestFuncOverloadAnnotatedArgSelects(t *testing.T) {
-	// A concretely typed argument disambiguates same-kind overloads in
-	// typing; the type-blind fold stays conservative and does not pick.
+	// A concretely typed argument disambiguates same-kind overloads. The
+	// type-blind value query stays conservative and does not pick; the
+	// assembler's late re-fold then applies the checker's recorded selection,
+	// so the constant folds through the right overload rather than staying
+	// silently unfolded (gap (d) of the fold-totality plan).
 	src := "fn g(x: sbyte): nint -> 1\nfn g(x: int): nint -> 2\n" +
 		"const B: sbyte = 1\nconst A = g(B)\n"
 	m, diags := analyze(src)
@@ -556,8 +559,8 @@ func TestFuncOverloadAnnotatedArgSelects(t *testing.T) {
 	if m.Consts[1].Type.String() != "nint" {
 		t.Errorf("A type = %s, want nint", m.Consts[1].Type)
 	}
-	if m.Consts[1].Eval != nil {
-		t.Errorf("A eval = %v, want unevaluated (kind-blind fold stays conservative)", m.Consts[1].Eval)
+	if m.Consts[1].Eval == nil || m.Consts[1].Eval.String() != "1" {
+		t.Errorf("A eval = %v, want 1 (the checker-selected sbyte overload)", m.Consts[1].Eval)
 	}
 }
 

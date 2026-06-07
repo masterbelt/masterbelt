@@ -9,11 +9,11 @@ Module
     eval 32
   Const "FromBoiling"
     type Celsius
-    value Celsius.fromF(IntLiteral "212")
+    value Celsius.fromF(IntLiteral "212") [resolved fromF(v: nint): Celsius]
     eval { deg: 100 }
   Const "Roundtrip"
     type Celsius
-    value Celsius.fromF(Celsius.freezing())
+    value Celsius.fromF(Celsius.freezing()) [resolved fromF(c: Celsius): Celsius]
     eval { deg: 0 }
   Const "Full"
     type Health

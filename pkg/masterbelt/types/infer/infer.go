@@ -581,8 +581,9 @@ func hasTypeVar(t ir.Type) bool {
 // through sink's guarded method (which no-ops for a nil sink or a nil field), so
 // a finding sets *fired whether or not the wrapped sink renders it — that is what
 // lets the silent typing walk (a nil sink) share the call rule and still learn a
-// lambda argument failed. The two informational streams (Checked, SolvedFuncLit)
-// are not findings: they are forwarded as-is and never flip *fired.
+// lambda argument failed. The informational streams (Checked, SolvedFuncLit, and
+// the Resolved* overload selections) are not findings: they are forwarded as-is
+// and never flip *fired.
 //
 // Every finding callback is wrapped unconditionally — the wrapper does not look
 // at whether sink set the field — so the list here is the single point that must
@@ -694,6 +695,15 @@ func observe(sink *Sink, fired *bool) *Sink {
 		},
 		SolvedFuncLit: func(lit *ast.FuncLit, t *ir.Func) {
 			sink.solvedFuncLit(lit, t)
+		},
+		ResolvedMethod: func(call *ast.CallExpr, m *ir.Method) {
+			sink.resolvedMethod(call, m)
+		},
+		ResolvedStatic: func(call *ast.CallExpr, m *ir.Method) {
+			sink.resolvedStatic(call, m)
+		},
+		ResolvedFunc: func(call *ast.CallExpr, fd *ast.FuncDecl) {
+			sink.resolvedFunc(call, fd)
 		},
 	}
 }

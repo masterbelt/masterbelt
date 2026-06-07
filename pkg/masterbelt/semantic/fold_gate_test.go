@@ -30,7 +30,6 @@ const foldCorpus = "testdata/fold"
 // and once it is empty the gates enforce the full rule with no exceptions.
 var knownGaps = map[string]string{
 	"gap-b-cross-assoc.belt": "(b) an assoc const initializer reading another type's member",
-	"gap-d-overload.belt":    "(d) a fn overload split by a named type the kind rule cannot see",
 	"gap-depth.belt":         "the depth budget refuses the fold with no diagnostic (M6)",
 }
 

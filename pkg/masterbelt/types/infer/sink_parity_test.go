@@ -12,8 +12,11 @@ import (
 // explicit means a new field defaults to "is a finding" — the safe direction:
 // if it is really a stream, this set is updated deliberately.
 var streamFields = map[string]bool{
-	"Checked":       true,
-	"SolvedFuncLit": true,
+	"Checked":        true,
+	"SolvedFuncLit":  true,
+	"ResolvedMethod": true,
+	"ResolvedStatic": true,
+	"ResolvedFunc":   true,
 }
 
 // TestObserveForwardsEverySinkField is the structural guard against the defect

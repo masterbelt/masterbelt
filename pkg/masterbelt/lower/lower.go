@@ -163,7 +163,7 @@ func Value(e ast.Expr, b Binder) ir.Value {
 			for i, a := range e.Arguments {
 				args[i] = Value(a, argBinder)
 			}
-			return &ir.Call{Receiver: Value(member.Receiver, b), Method: member.Member.Name, Args: args}
+			return &ir.Call{Receiver: Value(member.Receiver, b), Method: member.Member.Name, Args: args, Syntax: e}
 		}
 		return nil
 	case *ast.AwaitExpr:

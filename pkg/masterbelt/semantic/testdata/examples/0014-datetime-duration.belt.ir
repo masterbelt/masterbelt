@@ -25,15 +25,15 @@ Module
     eval D2009-04-07T23:59:59.000Z
   Const "Span"
     type duration
-    value Reference -> "Release".sub(Reference -> "Epoch")
+    value Reference -> "Release".sub(Reference -> "Epoch") [resolved sub(other: self): duration]
     eval 2047w5d23h59m59s
   Const "Shift"
     type datetime
-    value Reference -> "Release".sub(DurationLiteral "1h")
+    value Reference -> "Release".sub(DurationLiteral "1h") [resolved sub(amount: duration): self]
     eval D2009-03-31T22:59:59.000Z
   Const "TwoH"
     type duration
-    value DurationLiteral "1h".add(DurationLiteral "1h")
+    value DurationLiteral "1h".add(DurationLiteral "1h") [resolved add(other: self): self]
     eval 2h
   Const "Triple"
     type duration

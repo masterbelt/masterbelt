@@ -68,18 +68,18 @@ func (b constBinder) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
 				return &ir.Conversion{Type: t, Args: convArgs(e.Arguments, sub)}
 			}
 			if cands := b.q.resolveFunc(b.file, callee); len(cands) > 0 {
-				return funcCall(b.fnOf[pickOverload(cands, len(e.Arguments))], e.Arguments, sub)
+				return funcCall(b.fnOf[pickOverload(cands, len(e.Arguments))], e, sub)
 			}
 		case *ast.MemberExpr:
 			if cands := b.q.resolveFuncMember(b.file, callee); len(cands) > 0 {
-				return funcCall(b.fnOf[pickOverload(cands, len(e.Arguments))], e.Arguments, sub)
+				return funcCall(b.fnOf[pickOverload(cands, len(e.Arguments))], e, sub)
 			}
 			// A call whose callee is a member access on a type name is a static fn
 			// call (Celsius.freezing()) — the Type.Name path, after the namespace
 			// function claim. A constant initializer has no locals/params, so no name
 			// shadows the type.
 			if def := staticFnDef(b.q.universe(b.file), callee, nil); def != nil {
-				return staticCall(def, callee.Member.Name, e.Arguments, sub)
+				return staticCall(def, callee.Member.Name, e, sub)
 			}
 		}
 	}
@@ -203,9 +203,11 @@ func hasStaticFn(def *ir.TypeDef, name string) bool {
 }
 
 // staticCall lowers a static-fn call to its IR value: the owning definition, the
-// static fn name, and the lowered arguments.
-func staticCall(def *ir.TypeDef, name string, args []ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
-	return &ir.StaticCall{Def: def, Name: name, Args: convArgs(args, sub)}
+// static fn name, and the lowered arguments. The call expression rides along as
+// the node's Syntax, the key the checker's overload selection is written back
+// through.
+func staticCall(def *ir.TypeDef, name string, e *ast.CallExpr, sub func(ast.Expr) ir.Value) ir.Value {
+	return &ir.StaticCall{Def: def, Name: name, Args: convArgs(e.Arguments, sub), Syntax: e}
 }
 
 // bodyFuncs is what a body binder needs to lower function calls: the file's
@@ -486,7 +488,7 @@ func (b bodyBinder) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
 				return &ir.Conversion{Type: t, Args: convArgs(e.Arguments, sub)}
 			}
 			if cands := b.funcs.local[callee.Name]; len(cands) > 0 {
-				return funcCall(pickShellOverload(cands, len(e.Arguments)), e.Arguments, sub)
+				return funcCall(pickShellOverload(cands, len(e.Arguments)), e, sub)
 			}
 			// A bare call inside a method body whose name is a method of self is
 			// an implicit self-call (self omitted) — the form an interface's
@@ -497,7 +499,7 @@ func (b bodyBinder) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
 				for i, a := range e.Arguments {
 					args[i] = sub(a)
 				}
-				return &ir.Call{Receiver: &ir.SelfValue{}, Method: callee.Name, Args: args}
+				return &ir.Call{Receiver: &ir.SelfValue{}, Method: callee.Name, Args: args, Syntax: e}
 			}
 		case *ast.MemberExpr:
 			recv, ok := callee.Receiver.(*ast.Identifier)
@@ -506,7 +508,7 @@ func (b bodyBinder) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
 			}
 			if b.funcs.qualified != nil {
 				if cands := b.funcs.qualified(recv.Name, callee.Member.Name); len(cands) > 0 {
-					return funcCall(b.funcs.shells[pickOverload(cands, len(e.Arguments))], e.Arguments, sub)
+					return funcCall(b.funcs.shells[pickOverload(cands, len(e.Arguments))], e, sub)
 				}
 			}
 			// A call whose callee is a member access on a type name is a static fn
@@ -514,7 +516,7 @@ func (b bodyBinder) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
 			// function claim, with a local or parameter of that name shadowing the
 			// type (checked above through shadows).
 			if def := staticFnDef(b.r.Defs, callee, b.shadows); def != nil {
-				return staticCall(def, callee.Member.Name, e.Arguments, sub)
+				return staticCall(def, callee.Member.Name, e, sub)
 			}
 		}
 		return nil
@@ -542,9 +544,10 @@ func pickShellOverload(cands []*ir.Function, arity int) *ir.Function {
 }
 
 // funcCall lowers a resolved function call: the target and its lowered
-// arguments.
-func funcCall(target *ir.Function, args []ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
-	return &ir.FuncCall{Target: target, Args: convArgs(args, sub)}
+// arguments. The call expression rides along as the node's Syntax, the key the
+// checker's overload selection is written back through.
+func funcCall(target *ir.Function, e *ast.CallExpr, sub func(ast.Expr) ir.Value) ir.Value {
+	return &ir.FuncCall{Target: target, Args: convArgs(e.Arguments, sub), Syntax: e}
 }
 
 // convArgs lowers a conversion or constructor's argument expressions to their IR

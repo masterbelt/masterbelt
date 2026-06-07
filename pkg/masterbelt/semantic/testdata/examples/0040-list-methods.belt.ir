@@ -1,15 +1,15 @@
 Module
   Const "Joined"
     type list<nint>
-    value [IntLiteral "1", IntLiteral "2"].add([IntLiteral "3", IntLiteral "4"])
+    value [IntLiteral "1", IntLiteral "2"].add([IntLiteral "3", IntLiteral "4"]) [resolved add(other: self): self]
     eval [1, 2, 3, 4]
   Const "Added"
     type list<nint>
-    value [IntLiteral "1", IntLiteral "2"].add(IntLiteral "3")
+    value [IntLiteral "1", IntLiteral "2"].add(IntLiteral "3") [resolved add(element: T): self]
     eval [1, 2, 3]
   Const "NestedAdd"
     type list<list<nint>>
-    value [[IntLiteral "1"], [IntLiteral "2"]].add([IntLiteral "3"])
+    value [[IntLiteral "1"], [IntLiteral "2"]].add([IntLiteral "3"]) [resolved add(element: T): self]
     eval [[1], [2], [3]]
   Const "Pushed"
     type list<nint>
