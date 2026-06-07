@@ -1,0 +1,60 @@
+File
+  ConstDecl
+    name "Joined"
+    value (call (. (list IntLit "1" IntLit "2") add) (list IntLit "3" IntLit "4"))
+  ConstDecl
+    name "Added"
+    value (call (. (list IntLit "1" IntLit "2") add) IntLit "3")
+  ConstDecl
+    name "NestedAdd"
+    value (call (. (list (list IntLit "1") (list IntLit "2")) add) (list IntLit "3"))
+  ConstDecl
+    name "Pushed"
+    value (call (. (list IntLit "1" IntLit "2") push) IntLit "3")
+  ConstDecl
+    name "Unshifted"
+    value (call (. (list IntLit "2" IntLit "3") unshift) IntLit "1")
+  ConstDecl
+    name "Empty"
+    type list<nint>
+    value (collection)
+  ConstDecl
+    name "Last"
+    value (call (. (list IntLit "1" IntLit "2" IntLit "3") pop))
+  ConstDecl
+    name "NoLast"
+    value (call (. Identifier "Empty" pop))
+  ConstDecl
+    name "First"
+    value (call (. (list IntLit "1" IntLit "2" IntLit "3") shift))
+  ConstDecl
+    name "NoFirst"
+    value (call (. Identifier "Empty" shift))
+  FuncDecl
+    pub
+    name "orZero"
+    param v: optional<nint>
+    result nint
+      match Identifier "v"
+        arm nint n
+          return Identifier "n"
+        arm null
+          return IntLit "0"
+  AssertDecl
+    cond (call (. (call (. (call (. (list IntLit "1" IntLit "2") add) (list IntLit "3" IntLit "4")) len)) eql) IntLit "4")
+  AssertDecl
+    cond (call (. (call (. (call (. (list IntLit "1" IntLit "2") add) IntLit "3") len)) eql) IntLit "3")
+  AssertDecl
+    cond (call (. (call (. (call (. (list IntLit "1" IntLit "2") push) IntLit "3") len)) eql) IntLit "3")
+  AssertDecl
+    cond (call (. (call (. (call (. (list IntLit "2" IntLit "3") unshift) IntLit "1") len)) eql) IntLit "3")
+  AssertDecl
+    cond (call (. (call (. (call (. (list (list IntLit "1") (list IntLit "2")) add) (list IntLit "3")) len)) eql) IntLit "3")
+  AssertDecl
+    cond (call (. (call Identifier "orZero" (call (. (list IntLit "1" IntLit "2" IntLit "3") pop))) eql) IntLit "3")
+  AssertDecl
+    cond (call (. (call Identifier "orZero" (call (. Identifier "Empty" pop))) eql) IntLit "0")
+  AssertDecl
+    cond (call (. (call Identifier "orZero" (call (. (list IntLit "1" IntLit "2" IntLit "3") shift))) eql) IntLit "1")
+  AssertDecl
+    cond (call (. (call Identifier "orZero" (call (. Identifier "Empty" shift))) eql) IntLit "0")

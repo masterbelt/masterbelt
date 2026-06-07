@@ -1,0 +1,71 @@
+Module
+  Const "Joined"
+    type list<nint>
+    value [IntLiteral "1", IntLiteral "2"].add([IntLiteral "3", IntLiteral "4"])
+  Const "Added"
+    type invalid
+    value [IntLiteral "1", IntLiteral "2"].add(IntLiteral "3")
+  Const "NestedAdd"
+    type invalid
+    value [[IntLiteral "1"], [IntLiteral "2"]].add([IntLiteral "3"])
+  Const "Pushed"
+    type invalid
+    value [IntLiteral "1", IntLiteral "2"].push(IntLiteral "3")
+  Const "Unshifted"
+    type invalid
+    value [IntLiteral "2", IntLiteral "3"].unshift(IntLiteral "1")
+  Const "Empty"
+    type list<nint>
+    value []
+    eval []
+  Const "Last"
+    type invalid
+    value [IntLiteral "1", IntLiteral "2", IntLiteral "3"].pop()
+  Const "NoLast"
+    type invalid
+    value Reference -> "Empty".pop()
+  Const "First"
+    type invalid
+    value [IntLiteral "1", IntLiteral "2", IntLiteral "3"].shift()
+  Const "NoFirst"
+    type invalid
+    value Reference -> "Empty".shift()
+  Func "orZero" pub
+    param v: optional<nint>
+    result nint
+      match ParamRef "v"
+        arm nint n
+          return LocalRef "n"
+        arm null
+          return IntLiteral "0"
+  Assert "([1, 2] + [3, 4]).len() == 4"
+    eval <unevaluated>
+      ([1, 2] + [3, 4]).len() == 4
+  Assert "([1, 2] + 3).len() == 3"
+    eval <unevaluated>
+      ([1, 2] + 3).len() == 3
+  Assert "[1, 2].push(3).len() == 3"
+    eval <unevaluated>
+      [1, 2].push(3).len() == 3
+  Assert "[2, 3].unshift(1).len() == 3"
+    eval <unevaluated>
+      [2, 3].unshift(1).len() == 3
+  Assert "([[1], [2]] + [3]).len() == 3"
+    eval <unevaluated>
+      ([[1], [2]] + [3]).len() == 3
+  Assert "orZero([1, 2, 3].pop()) == 3"
+    eval <unevaluated>
+      orZero([1, 2, 3].pop()) == 3
+  Assert "orZero(Empty.pop()) == 0"
+    eval <unevaluated>
+      orZero(Empty.pop()) == 0
+             ^
+             []
+  Assert "orZero([1, 2, 3].shift()) == 1"
+    eval <unevaluated>
+      orZero([1, 2, 3].shift()) == 1
+  Assert "orZero(Empty.shift()) == 0"
+    eval <unevaluated>
+      orZero(Empty.shift()) == 0
+             ^
+             []
