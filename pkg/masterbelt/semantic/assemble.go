@@ -130,6 +130,13 @@ func bodySink(at func(ast.Node) span, diags *diagnostic.List, reg *builtin.Regis
 	sink.Checked = func(e ast.Expr, want ir.Type) {
 		checkMemberFlow(reg, e, want, env, at, diags)
 	}
+	// A sized-scalar conversion in a body range-checks its argument exactly as it
+	// does in a const initializer (short(70000) inside a return, a let, an
+	// argument): eval folds an overflowing conversion to nil, so the Checked hook
+	// above never sees it — this is the only site that reports the overflow.
+	sink.ScalarConversion = func(call *ast.CallExpr, target ir.Type) {
+		checkScalarConversion(reg, call, target, env, at, diags)
+	}
 	return sink
 }
 
@@ -238,13 +245,7 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 			// ScalarConversion); a non-constant argument does not fold and is left to
 			// the runtime.
 			sink.ScalarConversion = func(call *ast.CallExpr, target ir.Type) {
-				if len(call.Arguments) != 1 {
-					return
-				}
-				if v := eval.Expr(call.Arguments[0], evalEnv{q: q, file: fileID}); v != nil && v.Kind == ir.ConstInt && !types.Fits(reg, target, v.Int) {
-					s := at(call)
-					diags.Add(newConstantOverflowDiagnostic(s.offset, s.width, v.String(), target.String()))
-				}
+				checkScalarConversion(reg, call, target, evalEnv{q: q, file: fileID}, at, diags)
 			}
 			if annType != ir.Invalid {
 				// The annotation is pushed into the value.
@@ -564,6 +565,24 @@ func checkMemberFlow(reg *builtin.Registry, e ast.Expr, want ir.Type, env evalEn
 			diags.Add(newRefinementViolationDiagnostic(
 				s.offset, s.width, v.String(), member.String(), ast.Render(def.Where), diagram))
 		}
+	}
+}
+
+// checkScalarConversion range-checks a sized-scalar conversion's argument against
+// the target type — short(70000), Level(70000) — reporting constant_overflow at
+// the conversion site. It is the eval-based body of the Sink.ScalarConversion
+// hook, shared by the const initializer and every function/method/lambda body
+// (through bodySink), so a conversion overflows the same way everywhere. eval
+// refuses to fold an out-of-range conversion (it folds to nil), so checkMemberFlow
+// never sees the value — this is the only site that reports it, and a non-constant
+// argument does not fold and is left to the runtime.
+func checkScalarConversion(reg *builtin.Registry, call *ast.CallExpr, target ir.Type, env evalEnv, at func(ast.Node) span, diags *diagnostic.List) {
+	if len(call.Arguments) != 1 {
+		return
+	}
+	if v := eval.Expr(call.Arguments[0], env); v != nil && v.Kind == ir.ConstInt && !types.Fits(reg, target, v.Int) {
+		s := at(call)
+		diags.Add(newConstantOverflowDiagnostic(s.offset, s.width, v.String(), target.String()))
 	}
 }
 
