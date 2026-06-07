@@ -1,0 +1,5 @@
+// fold-expect: folds
+// (a) A function value reached through a const alias.
+const F = fn(x: nint): nint -> x + 1
+const G = F
+const A = G(2)

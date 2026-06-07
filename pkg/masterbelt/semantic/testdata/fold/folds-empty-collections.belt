@@ -1,0 +1,6 @@
+// fold-expect: folds
+// An empty literal settles its mapness from the annotation and folds.
+const L: list<nint> = []
+const M: map<string, nint> = []
+assert L.len() == 0
+assert M.len() == 0

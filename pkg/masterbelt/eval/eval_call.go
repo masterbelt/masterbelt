@@ -86,7 +86,7 @@ func applyBody(c callable, self *ir.Constant, vals []*ir.Constant, ctx evalCtx) 
 	resultType := annotationType(ctx.env, c.result)
 	return evalBody(c.body, evalCtx{
 		env: ctx.env, locals: locals, self: self,
-		selfDef: c.selfDef, localDefs: localDefs, depth: ctx.depth + 1,
+		selfDef: c.selfDef, localDefs: localDefs, depth: ctx.depth + 1, budgetHit: ctx.budgetHit,
 		// The declared result type is the body's return channel: its collection
 		// mapness settles a `return []` in a map<K,V>-returning routine to an empty
 		// map, and its union tags a returned member value. It is resolved once here
@@ -122,6 +122,7 @@ func annotationDef(env Env, t ast.TypeExpr) *ir.TypeDef {
 // value.
 func applyFunc(cands []*ast.FuncDecl, args []ast.Expr, ctx evalCtx) *ir.Constant {
 	if ctx.depth >= maxApplyDepth {
+		ctx.noteBudget()
 		return nil
 	}
 	vals := make([]*ir.Constant, len(args))
@@ -168,6 +169,7 @@ func applyStatic(ctx evalCtx, def *ir.TypeDef, name string, args []ast.Expr) (*i
 		return nil, false // not a static fn of this name: let the caller fall through
 	}
 	if ctx.depth >= maxApplyDepth {
+		ctx.noteBudget()
 		return nil, true
 	}
 	vals := make([]*ir.Constant, len(args))
@@ -439,6 +441,7 @@ func applyUserMethod(ctx evalCtx, recvExpr ast.Expr, recv *ir.Constant, name str
 		return nil, false // no body-bearing overload: let the intrinsic path run
 	}
 	if ctx.depth >= maxApplyDepth {
+		ctx.noteBudget()
 		return nil, true // the recursion guard fired: a safe, unfoldable result
 	}
 	if n != 1 {
@@ -466,6 +469,7 @@ func applyGetter(ctx evalCtx, recvExpr ast.Expr, recv *ir.Constant, name string)
 		return nil, false
 	}
 	if ctx.depth >= maxApplyDepth {
+		ctx.noteBudget()
 		return nil, true // the recursion guard fired: a safe, unfoldable result
 	}
 	return applyBody(methodCallable(sel, def), recv, nil, ctx), true

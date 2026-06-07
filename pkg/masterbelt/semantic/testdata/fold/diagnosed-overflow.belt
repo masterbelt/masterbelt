@@ -1,0 +1,2 @@
+// fold-expect: diagnosed constant_overflow
+const X: sbyte = 999

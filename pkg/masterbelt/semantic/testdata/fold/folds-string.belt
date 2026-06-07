@@ -1,0 +1,4 @@
+// fold-expect: folds
+// String concatenation and comparison fold.
+const Name = "master" + "belt"
+assert Name == "masterbelt"

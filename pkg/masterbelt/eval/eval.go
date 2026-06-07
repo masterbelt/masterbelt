@@ -273,6 +273,11 @@ type evalCtx struct {
 	// nominal-typed locals appear. It shares the lifetime of locals (the applied
 	// body's environment), and like it is nil at the top level.
 	localDefs map[string]*ir.TypeDef
+	// budgetHit is the failure-classification channel: when non-nil, a budget
+	// guard (the application depth, the range iteration cap) that refuses to
+	// fold sets it through noteBudget. It is armed only by the classifiers in
+	// failure.go; ordinary evaluation carries nil.
+	budgetHit *bool
 }
 
 // maxApplyDepth caps function-application recursion: a recursive fold that has

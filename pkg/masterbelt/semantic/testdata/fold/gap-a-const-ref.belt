@@ -1,0 +1,4 @@
+// fold-expect: folds
+// (a) A const-referenced function value applied directly.
+const F = fn(x: nint): nint -> x + 1
+const A = F(2)

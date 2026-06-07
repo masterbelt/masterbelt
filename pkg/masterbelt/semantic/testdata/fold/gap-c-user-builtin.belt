@@ -1,0 +1,5 @@
+// fold-expect: diagnosed builtin_outside_builtin
+// (c) A user-code `type Foo = builtin` names a native the registry does not
+// supply; the declaration must be an error (M3), not a silent unfold.
+type Foo = builtin
+const A = Foo(1)

@@ -1,0 +1,11 @@
+// fold-expect: folds
+// A function value bound to a let local applies — the one application channel
+// eval has always had.
+const F = fn(x: nint): nint -> x + 1
+
+pub fn viaLet(): nint {
+  let f = F
+  return f(2)
+}
+const A = viaLet()
+assert A == 3

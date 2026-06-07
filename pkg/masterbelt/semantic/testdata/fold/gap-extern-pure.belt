@@ -1,0 +1,5 @@
+// fold-expect: diagnosed extern_outside_builtin
+// A pure extern outside the builtin surface has no native to supply it; the
+// declaration must be an error (M3), not a silent unfold.
+extern fn twice(x: nint): nint
+const A = twice(2)

@@ -1,0 +1,3 @@
+// fold-expect: diagnosed cyclic_reference
+const A = B
+const B = A

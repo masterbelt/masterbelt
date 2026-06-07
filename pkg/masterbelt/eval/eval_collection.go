@@ -311,6 +311,7 @@ func rangeFold(ctx evalCtx, recv *ir.Constant, args []*ir.Constant) *ir.Constant
 		return args[0] // the empty range folds to the initial accumulator
 	}
 	if count.Cmp(big.NewInt(maxRangeIterations)) > 0 {
+		ctx.noteBudget()
 		return nil // wider than the compile-time iteration bound: do not fold
 	}
 	acc := args[0]

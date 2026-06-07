@@ -1,0 +1,10 @@
+// fold-expect: folds
+// Enum members fold: qualified, bare under an expectation, and compared.
+pub enum Rarity: byte {
+  Common = 1
+  Legend = 10
+}
+const Top: Rarity = Rarity.Legend
+const Bare: Rarity = Common
+assert Rarity.Common < Rarity.Legend
+assert Bare == Rarity.Common

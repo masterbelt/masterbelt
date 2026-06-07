@@ -1,0 +1,3 @@
+// fold-expect: folds
+// (a) An immediately applied function literal.
+const A = (fn(x: nint): nint -> x + 1)(2)

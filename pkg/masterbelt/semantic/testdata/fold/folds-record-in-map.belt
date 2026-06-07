@@ -1,0 +1,5 @@
+// fold-expect: folds
+// Record values nested in a map fold with it.
+pub type Point = { x: nint, y: nint }
+const M = ["origin": Point{ x: 0, y: 0 }, "unit": Point{ x: 1, y: 1 }]
+assert M.len() == 2

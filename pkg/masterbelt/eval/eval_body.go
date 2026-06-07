@@ -20,7 +20,11 @@ import (
 // the body's return statement. A body with no return, a wrong argument count, an
 // unfoldable return, or an application past the recursion guard yields nil.
 func apply(ctx evalCtx, fn *ir.Constant, args []*ir.Constant) *ir.Constant {
-	if fn.Fn == nil || len(args) != len(fn.Fn.Params) || ctx.depth >= maxApplyDepth {
+	if fn.Fn == nil || len(args) != len(fn.Fn.Params) {
+		return nil
+	}
+	if ctx.depth >= maxApplyDepth {
+		ctx.noteBudget()
 		return nil
 	}
 	locals := make(map[string]*ir.Constant, len(fn.Captured)+len(args))
@@ -30,7 +34,7 @@ func apply(ctx evalCtx, fn *ir.Constant, args []*ir.Constant) *ir.Constant {
 	}
 	// A function body sees its parameters and captures, never an outer self: a
 	// literal has no receiver.
-	return evalBody(fn.Fn.Body, evalCtx{env: ctx.env, locals: locals, depth: ctx.depth + 1})
+	return evalBody(fn.Fn.Body, evalCtx{env: ctx.env, locals: locals, depth: ctx.depth + 1, budgetHit: ctx.budgetHit})
 }
 
 // evalBody runs a statement body to its returned value, or nil when no path
@@ -326,6 +330,7 @@ func evalSetterAssign(s *ast.AssignStmt, m *ast.MemberExpr, ctx evalCtx) bool {
 		return false
 	}
 	if ctx.depth >= maxApplyDepth {
+		ctx.noteBudget()
 		return false // the recursion guard fired: leave the local unchanged
 	}
 	v := evalExpr(s.Value, ctx)
@@ -453,6 +458,7 @@ func evalForRange(s *ast.ForStmt, rng *ir.Constant, of bool, ctx evalCtx) (*ir.C
 		return nil, ifFellThrough // the empty range: the body never runs
 	}
 	if count.Cmp(big.NewInt(maxRangeIterations)) > 0 {
+		ctx.noteBudget()
 		return nil, ifUnknown // wider than the compile-time iteration bound
 	}
 	n := count.Int64()

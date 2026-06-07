@@ -1,0 +1,16 @@
+// fold-expect: folds
+// A tagged union value dispatches a match inside an applied function body.
+pub type Coin = { amount: nint }
+pub type Level = { rank: nint }
+pub type GameValue = Coin | Level
+
+pub fn worth(v: GameValue): nint {
+  match v {
+    Coin c  -> return c.amount
+    Level l -> return l.rank
+  }
+}
+
+const Held: GameValue = Coin{ amount: 7 }
+const Total = worth(Held)
+assert Total == 7
