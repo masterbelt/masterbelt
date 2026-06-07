@@ -3,6 +3,7 @@ package semantic
 import (
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/eval"
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/lower"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/types/infer"
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
@@ -73,14 +74,56 @@ func nominalDefOf(t ir.Type) *ir.TypeDef {
 	return nil
 }
 
-// computeValue is the evaluation rule, shared by both query implementations.
-// The file is the one decl sits in. The constant's resolved annotation type is
-// the value folder's expectation channel: a bare member folds through its enum,
-// an empty collection literal settles its mapness, and a member value is tagged
-// with its union member. It is resolved here by a pure universe lookup (not the
-// type query) so the value query stays independent of typeOf.
+// graphFoldEnv is the eval.GraphEnv the post-check folds run in: a referenced
+// constant reads the type-blind value query first and falls back to this
+// file's published Eval — the late re-fold's monotone widening, exactly the
+// reading resolvedEnv.ValueOf keeps — and type names resolve in the file's
+// universe (a name lookup, never the type query).
+type graphFoldEnv struct {
+	q    queries
+	file FileID
+	own  map[*ast.ConstDecl]*ir.Const
+}
+
+func (e graphFoldEnv) ConstValue(c *ir.Const) *ir.Constant {
+	if c.Syntax == nil {
+		return nil
+	}
+	if v := e.q.valueOf(c.Syntax); v != nil {
+		return v
+	}
+	if own := e.own[c.Syntax]; own != nil {
+		return own.Eval
+	}
+	return nil
+}
+func (e graphFoldEnv) LookupType(name string) *ir.TypeDef { return e.q.universe(e.file)[name] }
+func (e graphFoldEnv) Registry() *builtin.Registry        { return e.q.registry() }
+
+// computeValue is the evaluation rule, shared by both query implementations:
+// the declaration's initializer is lowered to its (type-blind) value graph and
+// folded by the IR interpreter. The file is the one decl sits in. The
+// constant's resolved annotation type is the value folder's expectation
+// channel: a bare member folds through its enum (lowered as an
+// EnumMemberValue), an empty collection literal settles its mapness, and a
+// member value is tagged with its union member. It is resolved here by a pure
+// universe lookup (not the type query) so the value query stays independent
+// of typeOf. The reachable files' function bodies are resolved first
+// (funcsOf, a memoized, dependency-tracked point), so a call the graph binds
+// applies a deterministic body whatever order the files assemble in.
 func computeValue(file FileID, decl *ast.ConstDecl, q queries) *ir.Constant {
-	return eval.DeclExpecting(decl, annotationResolved(q, file, decl), evalEnv{q: q, file: file})
+	if decl.Value == nil {
+		return nil
+	}
+	for f := range q.reachableFrom(file) {
+		q.funcsOf(f)
+	}
+	graph := lower.Value(decl.Value, constBinder{
+		q: q, file: file,
+		irOf: q.constShellTable(), fnOf: q.funcShellTable(),
+		expected: annotationEnum(q, file, decl),
+	})
+	return eval.GraphExpecting(graph, annotationResolved(q, file, decl), graphFoldEnv{q: q, file: file})
 }
 
 // annotationResolved resolves a constant's type annotation to its full type

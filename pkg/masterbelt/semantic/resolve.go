@@ -1341,7 +1341,7 @@ func isSelfResult(t ir.Type) bool {
 // module, the first winning, exactly as a duplicate method overload is. The
 // shells are filled in place; FuncCall values across the program point at
 // them, exactly as References point at the constant shells.
-func resolveFuncs(file *ast.File, at func(ast.Node) span, diags *diagnostic.List, reg *builtin.Registry, universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, qualifiedFuncs func(namespace, name string) []*ast.FuncDecl, shells map[*ast.FuncDecl]*ir.Function) []*ir.Function {
+func resolveFuncs(file *ast.File, at func(ast.Node) span, diags *diagnostic.List, reg *builtin.Registry, universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, fns bodyFuncs) []*ir.Function {
 	if len(file.Funcs) == 0 {
 		return nil
 	}
@@ -1352,7 +1352,7 @@ func resolveFuncs(file *ast.File, at func(ast.Node) span, diags *diagnostic.List
 		Registry:       reg,
 		BoundViolation: boundViolationReporter(at, diags),
 	}
-	fns := bodyFuncs{local: funcShellsByName(file, shells), qualified: qualifiedFuncs, shells: shells}
+	shells := fns.shells
 	out := make([]*ir.Function, 0, len(file.Funcs))
 	seen := make(map[string]bool, len(file.Funcs))
 	for _, fd := range file.Funcs {

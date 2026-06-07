@@ -351,10 +351,28 @@ func (db *database) computeExports(f FileID) exports {
 	return buildExports(engineQueries{db}, in.file, in.uses, defs.byName)
 }
 
+// computeFuncs resolves a file's top-level functions — signatures and lowered
+// bodies — onto the program-wide shells, silently (the reporting pass in
+// assemble re-resolves with diagnostics, idempotently onto the same shells).
+// It is the value query's channel to a deterministic function body: a fold of
+// a call applies the shell's body, so the body must be resolved at a memoized,
+// dependency-tracked point rather than whenever some assemble happened to run.
+func (db *database) computeFuncs(f FileID) []*ir.Function {
+	in, _ := db.read(inputKey(f)).(fileInput)
+	if in.file == nil {
+		return nil
+	}
+	q := engineQueries{db}
+	imp, _ := db.read(importsKey(f)).(importTable)
+	td, _ := db.read(typeDefsKey(f)).(typeDefs)
+	fns := bodyFuncs{local: funcShellsByName(in.file, db.fnShells), qualified: qualifiedFuncsFrom(q, imp), shells: db.fnShells, constRef: constRefFrom(q, f), nsConstRef: nsConstRefFrom(q, f)}
+	return resolveFuncs(in.file, nil, nil, db.reg, td.universe, qualifiedFrom(q, imp), fns)
+}
+
 func (db *database) computeTypeDefs(f FileID) typeDefs {
 	in, _ := db.read(inputKey(f)).(fileInput)
 	imp, _ := db.read(importsKey(f)).(importTable)
 	q := engineQueries{db}
-	fns := bodyFuncs{local: funcShellsByName(in.file, db.fnShells), qualified: qualifiedFuncsFrom(q, imp), shells: db.fnShells}
+	fns := bodyFuncs{local: funcShellsByName(in.file, db.fnShells), qualified: qualifiedFuncsFrom(q, imp), shells: db.fnShells, constRef: constRefFrom(q, f), nsConstRef: nsConstRefFrom(q, f)}
 	return buildTypeDefs(q, f, in.file, imp, fns)
 }

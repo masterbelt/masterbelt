@@ -353,7 +353,7 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 	// pass re-resolves the declarations fresh and discards the definitions.
 	module.Types = q.typeDefs(fileID)
 	imp := q.importsOf(fileID)
-	bfns := bodyFuncs{local: funcShellsByName(file, fnShells), qualified: qualifiedFuncsFrom(q, imp), shells: fnShells}
+	bfns := bodyFuncs{local: funcShellsByName(file, fnShells), qualified: qualifiedFuncsFrom(q, imp), shells: fnShells, constRef: constRefFrom(q, fileID), nsConstRef: nsConstRefFrom(q, fileID)}
 	resolveTypes(evalEnv{q: q, file: fileID}, file, at, diags, res, reg, outerTypes(q, imp), qualifiedFrom(q, imp), bfns)
 
 	// The module's functions are this file's shells, their signatures and
@@ -361,7 +361,7 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 	// same way method bodies do.
 	funcs := buildFuncSymbols(file)
 	qfns := qualifiedFuncsFrom(q, imp)
-	module.Funcs = resolveFuncs(file, at, diags, reg, q.universe(fileID), qualifiedFrom(q, imp), qfns, fnShells)
+	module.Funcs = resolveFuncs(file, at, diags, reg, q.universe(fileID), qualifiedFrom(q, imp), bfns)
 	bodyEnv := evalEnv{q: q, file: fileID}
 	// A function or method body's returns, lets, and arguments run the same
 	// member-aware range and refinement check the const initializer does, so a
@@ -414,20 +414,23 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 	}
 	renv := resolvedEnv{evalEnv: evalEnv{q: q, file: fileID}, res: res, own: ownShells}
 
-	// The late re-fold: a constant the type-blind value query left unfolded is
-	// folded once more with the checker's selections armed. The resolutions
-	// only widen the foldable set (a call with no recorded selection folds
-	// exactly as before), so the memoized value query and this pass agree
+	// The late re-fold: a constant the type-blind value query left unfolded
+	// is folded once more — through the IR interpreter, over the annotated
+	// value graph the write-back just settled (node types, selections, and
+	// explicit adaptions all on the graph). The annotations only widen the
+	// foldable set (a graph without them folds by the same value-kind rules
+	// the query did), so the memoized value query and this pass agree
 	// wherever both fold — the parity the fold gate pins. The loop runs to a
-	// fixpoint: renv reads this file's published values, so a reader of a
+	// fixpoint: genv reads this file's published values, so a reader of a
 	// re-folded constant folds in a later round, whatever the declaration
 	// order.
+	genv := graphFoldEnv{q: q, file: fileID, own: ownShells}
 	for progress := true; progress; {
 		progress = false
 		for _, decl := range file.Decls {
 			c := shells[decl]
-			if c.Eval == nil && decl.Value != nil {
-				if c.Eval = eval.DeclExpecting(decl, annotationResolved(q, fileID, decl), renv); c.Eval != nil {
+			if c.Eval == nil && c.Value != nil {
+				if c.Eval = eval.GraphExpecting(c.Value, c.Type, genv); c.Eval != nil {
 					progress = true
 				}
 			}
@@ -720,7 +723,7 @@ func checkMemberFlow(reg *builtin.Registry, e ast.Expr, want ir.Type, env evalEn
 		return
 	}
 	if def := refinedDef(member); def != nil {
-		p := eval.Predicate(def.WhereSyntax(), v, def, env)
+		p := eval.GraphPredicate(def.Where, v, def, graphFoldEnv{q: env.q, file: env.file})
 		if p != nil && p.Kind == ir.ConstBool && !p.Bool {
 			s := at(e)
 			d := assert.DiagramSelf(def.WhereSyntax(), v, def, env)

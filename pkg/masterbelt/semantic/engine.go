@@ -49,6 +49,7 @@ const (
 	qTypeOf                       // *ast.ConstDecl -> ir.Type
 	qValue                        // *ast.ConstDecl -> *ir.Constant
 	qTypeDefs                     // a file's resolved type definitions (and its annotation universe)
+	qFuncs                        // a file's resolved top-level functions (signatures + lowered bodies on the shells)
 	qExports                      // a file's public surface: pub decls + pub use re-exports
 	qImports                      // a file's import bindings: selective/wildcard names + namespaces
 	qReachable                    // the files a file's use graph reaches (itself included)
@@ -72,6 +73,7 @@ func inputKey(file FileID) queryKey       { return queryKey{kind: qInput, file: 
 func symbolsKey(file FileID) queryKey     { return queryKey{kind: qSymbols, file: file} }
 func funcSymbolsKey(file FileID) queryKey { return queryKey{kind: qFuncSymbols, file: file} }
 func typeDefsKey(file FileID) queryKey    { return queryKey{kind: qTypeDefs, file: file} }
+func funcsKey(file FileID) queryKey       { return queryKey{kind: qFuncs, file: file} }
 func exportsKey(file FileID) queryKey     { return queryKey{kind: qExports, file: file} }
 func importsKey(file FileID) queryKey     { return queryKey{kind: qImports, file: file} }
 func reachableKey(file FileID) queryKey   { return queryKey{kind: qReachable, file: file} }
@@ -319,6 +321,12 @@ func equalValue(kind queryKind, old, new any) bool {
 		a, _ := old.(typeDefs)
 		b, _ := new.(typeDefs)
 		return slices.Equal(a.list, b.list) && maps.Equal(a.byName, b.byName) && maps.Equal(a.universe, b.universe)
+	case qFuncs:
+		// The function shells: the pointers are the facts (an edit re-parses
+		// into fresh declarations, hence fresh shells).
+		a, _ := old.([]*ir.Function)
+		b, _ := new.([]*ir.Function)
+		return slices.Equal(a, b)
 	case qTypeOf:
 		a, _ := old.(ir.Type)
 		b, _ := new.(ir.Type)
@@ -501,6 +509,8 @@ func (db *database) compute(key queryKey) any {
 		return computeValue(db.declFile[key.decl], key.decl, engineQueries{db})
 	case qTypeDefs:
 		return db.computeTypeDefs(key.file)
+	case qFuncs:
+		return db.computeFuncs(key.file)
 	case qExports:
 		return db.computeExports(key.file)
 	case qImports:
@@ -543,6 +553,8 @@ func cycleValue(key queryKey) any {
 		return ([]*ast.FuncDecl)(nil)
 	case qTypeDefs:
 		return typeDefs{}
+	case qFuncs:
+		return ([]*ir.Function)(nil)
 	case qExports:
 		return exports{}
 	case qImports:
@@ -646,3 +658,11 @@ func (e engineQueries) moduleOf(file FileID) assembly {
 func (e engineQueries) preludeTypes() map[string]*ir.TypeDef { return e.db.prelude }
 
 func (e engineQueries) registry() *builtin.Registry { return e.db.reg }
+
+func (e engineQueries) funcsOf(file FileID) []*ir.Function {
+	fns, _ := e.db.read(funcsKey(file)).([]*ir.Function)
+	return fns
+}
+
+func (e engineQueries) constShellTable() map[*ast.ConstDecl]*ir.Const  { return e.db.shells }
+func (e engineQueries) funcShellTable() map[*ast.FuncDecl]*ir.Function { return e.db.fnShells }

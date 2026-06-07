@@ -50,6 +50,16 @@ type queries interface {
 	// the very objects Named types point at, shared by module assembly and
 	// annotation resolution so type identity never forks.
 	typeDefs(file FileID) []*ir.TypeDef
+	// funcsOf returns a file's resolved top-level functions — signatures and
+	// lowered bodies settled onto the program-wide shells — so a value fold
+	// applies a deterministic body whatever order the files assemble in.
+	funcsOf(file FileID) []*ir.Function
+	// constShellTable is the program-wide identity ir.Const per declaration —
+	// what a lowered Reference binds to.
+	constShellTable() map[*ast.ConstDecl]*ir.Const
+	// funcShellTable is the program-wide identity ir.Function per declaration
+	// — what a lowered FuncCall binds to.
+	funcShellTable() map[*ast.FuncDecl]*ir.Function
 	// universe returns the named type definitions a file's type annotations
 	// resolve in: its own declarations shadowing its imported ones.
 	universe(file FileID) map[string]*ir.TypeDef
@@ -146,6 +156,7 @@ type directQueries struct {
 	declFile map[*ast.ConstDecl]FileID
 	reg      *builtin.Registry
 	prelude  map[string]*ir.TypeDef
+	shells   map[*ast.ConstDecl]*ir.Const
 	fnShells map[*ast.FuncDecl]*ir.Function
 
 	syms   map[FileID]map[string]*ast.ConstDecl
@@ -162,6 +173,8 @@ type directQueries struct {
 	typing    map[*ast.ConstDecl]bool
 	valueMemo map[*ast.ConstDecl]*ir.Constant
 	valuing   map[*ast.ConstDecl]bool
+	funcMemo  map[FileID][]*ir.Function
+	funcing   map[FileID]bool
 
 	reach map[FileID]map[FileID]bool
 }
@@ -173,6 +186,7 @@ func newDirectQueries(files map[FileID]*ast.File, uses map[FileID]map[*ast.UseDe
 		declFile:  map[*ast.ConstDecl]FileID{},
 		reg:       u.reg,
 		prelude:   u.prelude,
+		shells:    constShells(files),
 		fnShells:  funcShells(files),
 		syms:      map[FileID]map[string]*ast.ConstDecl{},
 		fnSyms:    map[FileID]map[string][]*ast.FuncDecl{},
@@ -186,6 +200,8 @@ func newDirectQueries(files map[FileID]*ast.File, uses map[FileID]map[*ast.UseDe
 		typing:    map[*ast.ConstDecl]bool{},
 		valueMemo: map[*ast.ConstDecl]*ir.Constant{},
 		valuing:   map[*ast.ConstDecl]bool{},
+		funcMemo:  map[FileID][]*ir.Function{},
+		funcing:   map[FileID]bool{},
 		reach:     map[FileID]map[FileID]bool{},
 	}
 	for id, f := range files {
@@ -308,12 +324,27 @@ func (d *directQueries) exportsOf(f FileID) exports {
 func (d *directQueries) typeDefsOf(f FileID) typeDefs {
 	return memoize(d.defs, d.resolving, f, typeDefs{}, func() typeDefs {
 		imp := d.importsOf(f)
-		fns := bodyFuncs{local: funcShellsByName(d.files[f], d.fnShells), qualified: qualifiedFuncsFrom(d, imp), shells: d.fnShells}
+		fns := bodyFuncs{local: funcShellsByName(d.files[f], d.fnShells), qualified: qualifiedFuncsFrom(d, imp), shells: d.fnShells, constRef: constRefFrom(d, f), nsConstRef: nsConstRefFrom(d, f)}
 		return buildTypeDefs(d, f, d.files[f], imp, fns)
 	})
 }
 
 func (d *directQueries) typeDefs(f FileID) []*ir.TypeDef { return d.typeDefsOf(f).list }
+
+func (d *directQueries) funcsOf(f FileID) []*ir.Function {
+	return memoize(d.funcMemo, d.funcing, f, nil, func() []*ir.Function {
+		file := d.files[f]
+		if file == nil {
+			return nil
+		}
+		imp := d.importsOf(f)
+		fns := bodyFuncs{local: funcShellsByName(file, d.fnShells), qualified: qualifiedFuncsFrom(d, imp), shells: d.fnShells, constRef: constRefFrom(d, f), nsConstRef: nsConstRefFrom(d, f)}
+		return resolveFuncs(file, nil, nil, d.reg, d.universe(f), qualifiedFrom(d, imp), fns)
+	})
+}
+
+func (d *directQueries) constShellTable() map[*ast.ConstDecl]*ir.Const  { return d.shells }
+func (d *directQueries) funcShellTable() map[*ast.FuncDecl]*ir.Function { return d.fnShells }
 
 func (d *directQueries) universe(f FileID) map[string]*ir.TypeDef { return d.typeDefsOf(f).universe }
 

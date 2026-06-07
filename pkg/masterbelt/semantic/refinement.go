@@ -68,19 +68,19 @@ func resolveWhere(r *infer.TypeResolver, reg *builtin.Registry, td *ast.TypeDecl
 	// its method on the type and folds its body; the predicate env resolves the
 	// universe (for a nominal annotation in a self method's signature) without
 	// the type query, keeping the value query type-independent.
+	// The predicate is lowered to its resolved value graph — self bound to a
+	// SelfValue, a self-method call to an ir.Call — the IR-only form every
+	// fold of it runs on (F-3 §2.4), the witness probe below included.
+	graph := lower.Value(td.Where, bodyBinder{r: r, reg: reg, self: true, selfType: selfType(def)})
 	env := predicateEnv{reg: reg, universe: r.Defs, qualified: r.Qualified}
-	if v := eval.Predicate(td.Where, witness(reg, def.Body), def, env); v == nil || v.Kind != ir.ConstBool {
+	if v := eval.GraphPredicate(graph, witness(reg, def.Body), def, env); v == nil || v.Kind != ir.ConstBool {
 		if report {
 			s := at(td.Where)
 			diags.Add(newRefinementNotConstantDiagnostic(s.offset, s.width))
 		}
 		return
 	}
-	// The usable predicate is kept as a resolved value graph — self bound to a
-	// SelfValue, a self-method call to an ir.Call — the IR-only form the
-	// per-constant fold will run on (F-3 §2.4). The surface form stays
-	// reachable through WhereSyntax for the transitional AST-driven fold.
-	def.Where = lower.Value(td.Where, bodyBinder{r: r, reg: reg, self: true, selfType: selfType(def)})
+	def.Where = graph
 }
 
 // witness is a representative constant of t for the declaration-time probe
@@ -124,11 +124,7 @@ type predicateEnv struct {
 	qualified func(namespace, name string) *ir.TypeDef
 }
 
-func (e predicateEnv) Resolve(*ast.Identifier) *ast.ConstDecl            { return nil }
-func (e predicateEnv) ResolveMember(*ast.MemberExpr) *ast.ConstDecl      { return nil }
-func (e predicateEnv) ResolveFunc(*ast.Identifier) []*ast.FuncDecl       { return nil }
-func (e predicateEnv) ResolveFuncMember(*ast.MemberExpr) []*ast.FuncDecl { return nil }
-func (e predicateEnv) ValueOf(*ast.ConstDecl) *ir.Constant               { return nil }
+func (e predicateEnv) ConstValue(*ir.Const) *ir.Constant { return nil }
 func (e predicateEnv) LookupType(name string) *ir.TypeDef {
 	if e.universe != nil {
 		if d, ok := e.universe[name]; ok {
@@ -139,26 +135,3 @@ func (e predicateEnv) LookupType(name string) *ir.TypeDef {
 	return d
 }
 func (e predicateEnv) Registry() *builtin.Registry { return e.reg }
-
-// TypeExprDef resolves a written type annotation to its definition — the
-// syntactic type channel a self method's chained call folds through — by a pure
-// universe lookup, never the type query, so the predicate fold stays independent
-// of typing. It satisfies eval.ReceiverTyper.
-func (e predicateEnv) TypeExprDef(t ast.TypeExpr) *ir.TypeDef {
-	if t == nil {
-		return nil
-	}
-	r := &infer.TypeResolver{Defs: e.universe, Qualified: e.qualified}
-	return nominalDefOf(r.ResolveType(t, nil))
-}
-
-// TypeExprType resolves a written annotation to its full type, the way
-// TypeExprDef resolves it to a def — a pure universe lookup for a record field
-// receiver in a self method's signature. It satisfies eval.ReceiverTyper.
-func (e predicateEnv) TypeExprType(t ast.TypeExpr) ir.Type {
-	if t == nil {
-		return nil
-	}
-	r := &infer.TypeResolver{Defs: e.universe, Qualified: e.qualified}
-	return r.ResolveType(t, nil)
-}

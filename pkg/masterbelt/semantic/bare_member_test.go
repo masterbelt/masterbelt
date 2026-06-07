@@ -132,7 +132,9 @@ func TestBareMemberUnionAliasConst(t *testing.T) {
 		t.Fatalf("unexpected diagnostics: %v", codes(diags))
 	}
 	dump := ir.Dump(m)
-	if !containsLine(dump, "value (adapt (Rarity.Legend : Rarity) : Opt)") || !containsLine(dump, "eval Rarity.Legend") {
+	// The member flows into the union, so the folded value carries its tag —
+	// the dispatch a later match folds through.
+	if !containsLine(dump, "value (adapt (Rarity.Legend : Rarity) : Opt)") || !containsLine(dump, "eval (Rarity) Rarity.Legend") {
 		t.Errorf("union alias const did not resolve/fold the bare member:\n%s", dump)
 	}
 }

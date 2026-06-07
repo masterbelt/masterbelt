@@ -382,7 +382,7 @@ func memberAdmits(ctx evalCtx, member ir.Type, v *ir.Constant) bool {
 		return false
 	}
 	if def := refinedMemberDef(member); def != nil {
-		p := Predicate(def.WhereSyntax(), v, def, ctx.env)
+		p := GraphPredicate(def.Where, v, def, evalEnvBridge{ctx.env})
 		if p != nil && p.Kind == ir.ConstBool && !p.Bool {
 			return false
 		}

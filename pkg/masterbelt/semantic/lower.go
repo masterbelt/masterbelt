@@ -223,6 +223,36 @@ type bodyFuncs struct {
 	local     map[string][]*ir.Function
 	qualified func(namespace, name string) []*ast.FuncDecl
 	shells    map[*ast.FuncDecl]*ir.Function
+	// constRef resolves a value-position identifier to the shell of the
+	// top-level constant it names (nil when it names none), and nsConstRef a
+	// namespace member access (geo.Origin) likewise — the channels a body's
+	// reference to a constant lowers to an ir.Reference through, the body twin
+	// of the const binder's resolution. Both are nil in contexts with no
+	// constant surface (a refinement predicate, whose type rules forbid one).
+	constRef   func(*ast.Identifier) *ir.Const
+	nsConstRef func(*ast.MemberExpr) *ir.Const
+}
+
+// constRefFrom builds the constRef channel over the queries: resolution to the
+// declaration, then to its program-wide shell.
+func constRefFrom(q queries, file FileID) func(*ast.Identifier) *ir.Const {
+	return func(id *ast.Identifier) *ir.Const {
+		if decl := q.resolve(file, id); decl != nil {
+			return q.constShellTable()[decl]
+		}
+		return nil
+	}
+}
+
+// nsConstRefFrom builds the nsConstRef channel over the queries, mirroring
+// constRefFrom for a namespace member access.
+func nsConstRefFrom(q queries, file FileID) func(*ast.MemberExpr) *ir.Const {
+	return func(m *ast.MemberExpr) *ir.Const {
+		if decl := q.resolveMember(file, m); decl != nil {
+			return q.constShellTable()[decl]
+		}
+		return nil
+	}
 }
 
 // astByName projects the local shells back to their declarations by name, the
@@ -454,20 +484,32 @@ func (b bodyBinder) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
 		return &ir.NullValue{Syntax: e}
 	case *ast.Identifier:
 		// A let-bound local shadows a same-named parameter or type, so it is
-		// resolved first.
+		// resolved first; a top-level constant in scope is the last reading.
 		if _, ok := b.locals[e.Name]; ok {
 			return &ir.LocalRef{Name: e.Name, Syntax: e}
 		}
 		if b.params[e.Name] {
 			return &ir.ParamRef{Name: e.Name, Syntax: e}
 		}
+		if b.funcs.constRef != nil {
+			if c := b.funcs.constRef(e); c != nil {
+				return &ir.Reference{Target: c, Syntax: e}
+			}
+		}
 		return nil
 	case *ast.MemberExpr:
-		// A member access whose receiver names a type — an enum member
-		// (Element.Fire) or an associated constant (int8.Max) — is that type's
-		// value; a parameter shadowing the type name takes the record-field
-		// reading instead.
+		// A member access whose receiver names a namespace import (geo.Origin)
+		// is a reference to the imported constant — the namespace claim runs
+		// first, exactly as the const binder orders it — then one whose
+		// receiver names a type: an enum member (Element.Fire) or an
+		// associated constant (int8.Max); a parameter shadowing the name takes
+		// the record-field reading instead.
 		if recv, ok := e.Receiver.(*ast.Identifier); ok && !b.shadows(recv.Name) {
+			if b.funcs.nsConstRef != nil {
+				if c := b.funcs.nsConstRef(e); c != nil {
+					return &ir.Reference{Target: c, Syntax: e}
+				}
+			}
 			if def := b.r.Defs[recv.Name]; def != nil {
 				if def.Enum != nil {
 					if idx := enumIndex(def, e.Member.Name); idx >= 0 {
