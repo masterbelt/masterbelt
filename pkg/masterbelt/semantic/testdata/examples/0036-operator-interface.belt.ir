@@ -1,37 +1,330 @@
 Module
-  Const "Bigger"
-    type nint
-    value (max((IntLiteral "3" : nint), (IntLiteral "7" : nint)) : nint) [subst T=nint]
-    eval 7
-  Const "Later"
-    type string
-    value (max((StringLiteral "a" : string), (StringLiteral "b" : string)) : string) [subst T=string]
-    eval "b"
-  Const "Equal"
-    type bool
-    value (same((BoolLiteral true : bool), (BoolLiteral false : bool)) : bool) [subst T=bool]
-    eval false
-  Const "Double"
-    type nint
-    value (twice((IntLiteral "21" : nint)) : nint) [subst T=nint]
-    eval 42
-  Func "max" pub
-    doc "The larger of two orderable values."
-    typeparam "T": orderable
-    param a: T
-    param b: T
-    result T
-      return ((((ParamRef "a" : T).gteq((ParamRef "b" : T)) : bool) ? (ParamRef "a" : T) : (ParamRef "b" : T)) : T)
-  Func "same" pub
-    doc "Whether two comparable values are equal."
-    typeparam "T": comparable
-    param a: T
-    param b: T
-    result bool
-      return ((ParamRef "a" : T).eql((ParamRef "b" : T)) : bool)
-  Func "twice" pub
-    doc "A numeric value added to itself."
-    typeparam "T": numeric
-    param a: T
-    result T
-      return ((ParamRef "a" : T).add((ParamRef "a" : T)) : T)
+  Consts:
+    Const
+      Name: "Bigger"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "nint"
+      Value: FuncCall
+        Target: "max(T, T)"
+        Args:
+          IntLiteral
+            Text: "3"
+            Type: Builtin
+              Name: "nint"
+          IntLiteral
+            Text: "7"
+            Type: Builtin
+              Name: "nint"
+        Resolved: ~
+        Subst:
+          Entry
+            Key: "T"
+            Value: Builtin
+              Name: "nint"
+        Type: Builtin
+          Name: "nint"
+      Eval: Constant
+        Kind: 0
+        Int: 7
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "Later"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "string"
+      Value: FuncCall
+        Target: "max(T, T)"
+        Args:
+          StringLiteral
+            Value: "a"
+            Type: Builtin
+              Name: "string"
+          StringLiteral
+            Value: "b"
+            Type: Builtin
+              Name: "string"
+        Resolved: ~
+        Subst:
+          Entry
+            Key: "T"
+            Value: Builtin
+              Name: "string"
+        Type: Builtin
+          Name: "string"
+      Eval: Constant
+        Kind: 2
+        Int: ~
+        Bool: false
+        Str: "b"
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "Equal"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "bool"
+      Value: FuncCall
+        Target: "same(T, T)"
+        Args:
+          BoolLiteral
+            Value: true
+            Type: Builtin
+              Name: "bool"
+          BoolLiteral
+            Value: false
+            Type: Builtin
+              Name: "bool"
+        Resolved: ~
+        Subst:
+          Entry
+            Key: "T"
+            Value: Builtin
+              Name: "bool"
+        Type: Builtin
+          Name: "bool"
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "Double"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "nint"
+      Value: FuncCall
+        Target: "twice(T)"
+        Args:
+          IntLiteral
+            Text: "21"
+            Type: Builtin
+              Name: "nint"
+        Resolved: ~
+        Subst:
+          Entry
+            Key: "T"
+            Value: Builtin
+              Name: "nint"
+        Type: Builtin
+          Name: "nint"
+      Eval: Constant
+        Kind: 0
+        Int: 42
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+  Types: ~
+  Funcs:
+    Function
+      Name: "max"
+      Public: true
+      Extern: false
+      Effects: ~
+      Doc: "The larger of two orderable values."
+      TypeParams:
+        TypeParam
+          Name: "T"
+          Bound: Named
+            Def: "orderable"
+      Params:
+        Param
+          Name: "a"
+          Type: TypeVar
+            Name: "T"
+            Bound: Named
+              Def: "orderable"
+        Param
+          Name: "b"
+          Type: TypeVar
+            Name: "T"
+            Bound: Named
+              Def: "orderable"
+      Result: TypeVar
+        Name: "T"
+        Bound: Named
+          Def: "orderable"
+      Body:
+        Return
+          Value: Ternary
+            Cond: Call
+              Receiver: ParamRef
+                Name: "a"
+                Type: TypeVar
+                  Name: "T"
+                  Bound: Named
+                    Def: "orderable"
+              Method: "gteq"
+              Args:
+                ParamRef
+                  Name: "b"
+                  Type: TypeVar
+                    Name: "T"
+                    Bound: Named
+                      Def: "orderable"
+              Setter: false
+              Resolved: ~
+              Subst: ~
+              Type: Builtin
+                Name: "bool"
+            Then: ParamRef
+              Name: "a"
+              Type: TypeVar
+                Name: "T"
+                Bound: Named
+                  Def: "orderable"
+            Else: ParamRef
+              Name: "b"
+              Type: TypeVar
+                Name: "T"
+                Bound: Named
+                  Def: "orderable"
+            Type: TypeVar
+              Name: "T"
+              Bound: Named
+                Def: "orderable"
+    Function
+      Name: "same"
+      Public: true
+      Extern: false
+      Effects: ~
+      Doc: "Whether two comparable values are equal."
+      TypeParams:
+        TypeParam
+          Name: "T"
+          Bound: Named
+            Def: "comparable"
+      Params:
+        Param
+          Name: "a"
+          Type: TypeVar
+            Name: "T"
+            Bound: Named
+              Def: "comparable"
+        Param
+          Name: "b"
+          Type: TypeVar
+            Name: "T"
+            Bound: Named
+              Def: "comparable"
+      Result: Builtin
+        Name: "bool"
+      Body:
+        Return
+          Value: Call
+            Receiver: ParamRef
+              Name: "a"
+              Type: TypeVar
+                Name: "T"
+                Bound: Named
+                  Def: "comparable"
+            Method: "eql"
+            Args:
+              ParamRef
+                Name: "b"
+                Type: TypeVar
+                  Name: "T"
+                  Bound: Named
+                    Def: "comparable"
+            Setter: false
+            Resolved: ~
+            Subst: ~
+            Type: Builtin
+              Name: "bool"
+    Function
+      Name: "twice"
+      Public: true
+      Extern: false
+      Effects: ~
+      Doc: "A numeric value added to itself."
+      TypeParams:
+        TypeParam
+          Name: "T"
+          Bound: Named
+            Def: "numeric"
+      Params:
+        Param
+          Name: "a"
+          Type: TypeVar
+            Name: "T"
+            Bound: Named
+              Def: "numeric"
+      Result: TypeVar
+        Name: "T"
+        Bound: Named
+          Def: "numeric"
+      Body:
+        Return
+          Value: Call
+            Receiver: ParamRef
+              Name: "a"
+              Type: TypeVar
+                Name: "T"
+                Bound: Named
+                  Def: "numeric"
+            Method: "add"
+            Args:
+              ParamRef
+                Name: "a"
+                Type: TypeVar
+                  Name: "T"
+                  Bound: Named
+                    Def: "numeric"
+            Setter: false
+            Resolved: ~
+            Subst: ~
+            Type: TypeVar
+              Name: "T"
+              Bound: Named
+                Def: "numeric"
+  Asserts: ~

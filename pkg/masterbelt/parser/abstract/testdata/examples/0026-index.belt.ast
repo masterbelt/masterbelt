@@ -1,47 +1,296 @@
 File
-  ConstDecl
-    name "Xs"
-    value (list IntLit "10" IntLit "20" IntLit "30")
-  ConstDecl
-    name "First"
-    type nint | error
-    value (call (. Identifier "Xs" get) IntLit "0")
-  ConstDecl
-    name "Third"
-    type nint | error
-    value (call (. Identifier "Xs" get) IntLit "2")
-  ConstDecl
-    name "Tbl"
-    value (map StringLit "sword": IntLit "100" StringLit "shield": IntLit "50")
-  ConstDecl
-    name "Sword"
-    type nint | error
-    value (call (. Identifier "Tbl" get) StringLit "sword")
-  ConstDecl
-    name "Bumped"
-    value (call Identifier "bumpFirst")
-  ConstDecl
-    name "Put"
-    value (call Identifier "put")
-  FuncDecl
-    pub
-    name "at"
-    param xs: list<nint>
-    param i: nint
-    result nint | error
-      return (call (. Identifier "xs" get) Identifier "i")
-  FuncDecl
-    pub
-    name "bumpFirst"
-    result list<nint>
-      let "xs" = (list IntLit "1" IntLit "2" IntLit "3")
-      assign Identifier "xs" = (call (. Identifier "xs" set) IntLit "0" IntLit "99")
-      return Identifier "xs"
-  FuncDecl
-    pub
-    name "put"
-    result map<string, nint>
-      let "m" = (map StringLit "a": IntLit "1")
-      assign Identifier "m" = (call (. Identifier "m" set) StringLit "a" IntLit "10")
-      assign Identifier "m" = (call (. Identifier "m" set) StringLit "b" IntLit "2")
-      return Identifier "m"
+  Uses: ~
+  Decls:
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Xs"
+      Type: ~
+      Value: CollectionLit
+        Entries:
+          CollectionEntry
+            Key: ~
+            Value: IntLit
+              Text: "10"
+          CollectionEntry
+            Key: ~
+            Value: IntLit
+              Text: "20"
+          CollectionEntry
+            Key: ~
+            Value: IntLit
+              Text: "30"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "First"
+      Type: UnionType
+        Members:
+          NamedType
+            Namespace: ""
+            Name: "nint"
+            Args: ~
+          NamedType
+            Namespace: ""
+            Name: "error"
+            Args: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: Identifier
+            Name: "Xs"
+          Member: Identifier
+            Name: "get"
+        Arguments:
+          IntLit
+            Text: "0"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Third"
+      Type: UnionType
+        Members:
+          NamedType
+            Namespace: ""
+            Name: "nint"
+            Args: ~
+          NamedType
+            Namespace: ""
+            Name: "error"
+            Args: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: Identifier
+            Name: "Xs"
+          Member: Identifier
+            Name: "get"
+        Arguments:
+          IntLit
+            Text: "2"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Tbl"
+      Type: ~
+      Value: CollectionLit
+        Entries:
+          CollectionEntry
+            Key: StringLit
+              Value: "sword"
+            Value: IntLit
+              Text: "100"
+          CollectionEntry
+            Key: StringLit
+              Value: "shield"
+            Value: IntLit
+              Text: "50"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Sword"
+      Type: UnionType
+        Members:
+          NamedType
+            Namespace: ""
+            Name: "nint"
+            Args: ~
+          NamedType
+            Namespace: ""
+            Name: "error"
+            Args: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: Identifier
+            Name: "Tbl"
+          Member: Identifier
+            Name: "get"
+        Arguments:
+          StringLit
+            Value: "sword"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Bumped"
+      Type: ~
+      Value: CallExpr
+        Callee: Identifier
+          Name: "bumpFirst"
+        Arguments: ~
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Put"
+      Type: ~
+      Value: CallExpr
+        Callee: Identifier
+          Name: "put"
+        Arguments: ~
+      Builtin: false
+  Types: ~
+  Enums: ~
+  Interfaces: ~
+  Funcs:
+    FuncDecl
+      Doc: ~
+      Public: true
+      Extern: false
+      Effects: ~
+      Name: "at"
+      TypeParams: ~
+      Params:
+        ParamDef
+          Name: "xs"
+          Type: NamedType
+            Namespace: ""
+            Name: "list"
+            Args:
+              NamedType
+                Namespace: ""
+                Name: "nint"
+                Args: ~
+        ParamDef
+          Name: "i"
+          Type: NamedType
+            Namespace: ""
+            Name: "nint"
+            Args: ~
+      Result: UnionType
+        Members:
+          NamedType
+            Namespace: ""
+            Name: "nint"
+            Args: ~
+          NamedType
+            Namespace: ""
+            Name: "error"
+            Args: ~
+      Body:
+        ReturnStmt
+          Value: CallExpr
+            Callee: MemberExpr
+              Receiver: Identifier
+                Name: "xs"
+              Member: Identifier
+                Name: "get"
+            Arguments:
+              Identifier
+                Name: "i"
+    FuncDecl
+      Doc: ~
+      Public: true
+      Extern: false
+      Effects: ~
+      Name: "bumpFirst"
+      TypeParams: ~
+      Params: ~
+      Result: NamedType
+        Namespace: ""
+        Name: "list"
+        Args:
+          NamedType
+            Namespace: ""
+            Name: "nint"
+            Args: ~
+      Body:
+        LetStmt
+          Name: "xs"
+          Type: ~
+          Value: CollectionLit
+            Entries:
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "1"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "2"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "3"
+        AssignStmt
+          Target: Identifier
+            Name: "xs"
+          Value: CallExpr
+            Callee: MemberExpr
+              Receiver: Identifier
+                Name: "xs"
+              Member: Identifier
+                Name: "set"
+            Arguments:
+              IntLit
+                Text: "0"
+              IntLit
+                Text: "99"
+        ReturnStmt
+          Value: Identifier
+            Name: "xs"
+    FuncDecl
+      Doc: ~
+      Public: true
+      Extern: false
+      Effects: ~
+      Name: "put"
+      TypeParams: ~
+      Params: ~
+      Result: NamedType
+        Namespace: ""
+        Name: "map"
+        Args:
+          NamedType
+            Namespace: ""
+            Name: "string"
+            Args: ~
+          NamedType
+            Namespace: ""
+            Name: "nint"
+            Args: ~
+      Body:
+        LetStmt
+          Name: "m"
+          Type: ~
+          Value: CollectionLit
+            Entries:
+              CollectionEntry
+                Key: StringLit
+                  Value: "a"
+                Value: IntLit
+                  Text: "1"
+        AssignStmt
+          Target: Identifier
+            Name: "m"
+          Value: CallExpr
+            Callee: MemberExpr
+              Receiver: Identifier
+                Name: "m"
+              Member: Identifier
+                Name: "set"
+            Arguments:
+              StringLit
+                Value: "a"
+              IntLit
+                Text: "10"
+        AssignStmt
+          Target: Identifier
+            Name: "m"
+          Value: CallExpr
+            Callee: MemberExpr
+              Receiver: Identifier
+                Name: "m"
+              Member: Identifier
+                Name: "set"
+            Arguments:
+              StringLit
+                Value: "b"
+              IntLit
+                Text: "2"
+        ReturnStmt
+          Value: Identifier
+            Name: "m"
+  Asserts: ~

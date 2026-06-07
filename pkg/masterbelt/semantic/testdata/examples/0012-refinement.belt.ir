@@ -1,49 +1,464 @@
 Module
-  Const "ServerPort"
-    type Port
-    value (adapt (IntLiteral "8080" : nint) : Port)
-    eval 8080
-  Const "MinPort"
-    type Port
-    value (adapt (IntLiteral "1" : nint) : Port)
-    eval 1
-  Const "MaxPort"
-    type Port
-    value (adapt (IntLiteral "65535" : nint) : Port)
-    eval 65535
-  Const "FullLevel"
-    type Level
-    value (adapt (IntLiteral "100" : nint) : Level)
-    eval 100
-  Const "ValidScore"
-    type Score
-    value (adapt (IntLiteral "75" : nint) : Score)
-    eval 75
-  Const "Unrefined"
-    type nint
-    value (IntLiteral "70000" : nint)
-    eval 70000
-  TypeDef "Level" pub
-    doc "A character level between 0 and 100."
-    body sbyte
-    where (((self : Level).gteq((adapt (IntLiteral "0" : nint) : Level)) : bool).anan(((self : Level).lteq((adapt (IntLiteral "100" : nint) : Level)) : bool)) : bool)
-  TypeDef "Port" pub
-    doc "A TCP port number."
-    body int
-    where (((self : Port).gteq((adapt (IntLiteral "1" : nint) : Port)) : bool).anan(((self : Port).lteq((adapt (IntLiteral "65535" : nint) : Port)) : bool)) : bool)
-  TypeDef "Percent" pub
-    doc "A percentage from 0 to 100."
-    body sbyte
-    where (((self : Percent).gteq((adapt (IntLiteral "0" : nint) : Percent)) : bool).anan(((self : Percent).lteq((adapt (IntLiteral "100" : nint) : Percent)) : bool)) : bool)
-    method "increment" pub
-      doc "The next percentage point."
-      result self
-      return ((self : Percent).add((adapt (IntLiteral "1" : nint) : Percent)) : Percent)
-  TypeDef "Score" pub
-    doc "A score that is valid only when it lies in the 0..100 band."
-    body int
-    where ((self : Score).inBand() : bool)
-    method "inBand" pub
-      doc "Whether the score is within the valid band."
-      result bool
-      return (((self : Score).gteq((adapt (IntLiteral "0" : nint) : Score)) : bool).anan(((self : Score).lteq((adapt (IntLiteral "100" : nint) : Score)) : bool)) : bool)
+  Consts:
+    Const
+      Name: "ServerPort"
+      Public: false
+      Doc: ~
+      Type: Named
+        Def: "Port"
+      Value: Adapt
+        Value: IntLiteral
+          Text: "8080"
+          Type: Builtin
+            Name: "nint"
+        To: Named
+          Def: "Port"
+      Eval: Constant
+        Kind: 0
+        Int: 8080
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "MinPort"
+      Public: false
+      Doc: ~
+      Type: Named
+        Def: "Port"
+      Value: Adapt
+        Value: IntLiteral
+          Text: "1"
+          Type: Builtin
+            Name: "nint"
+        To: Named
+          Def: "Port"
+      Eval: Constant
+        Kind: 0
+        Int: 1
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "MaxPort"
+      Public: false
+      Doc: ~
+      Type: Named
+        Def: "Port"
+      Value: Adapt
+        Value: IntLiteral
+          Text: "65535"
+          Type: Builtin
+            Name: "nint"
+        To: Named
+          Def: "Port"
+      Eval: Constant
+        Kind: 0
+        Int: 65535
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "FullLevel"
+      Public: false
+      Doc: ~
+      Type: Named
+        Def: "Level"
+      Value: Adapt
+        Value: IntLiteral
+          Text: "100"
+          Type: Builtin
+            Name: "nint"
+        To: Named
+          Def: "Level"
+      Eval: Constant
+        Kind: 0
+        Int: 100
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "ValidScore"
+      Public: false
+      Doc: ~
+      Type: Named
+        Def: "Score"
+      Value: Adapt
+        Value: IntLiteral
+          Text: "75"
+          Type: Builtin
+            Name: "nint"
+        To: Named
+          Def: "Score"
+      Eval: Constant
+        Kind: 0
+        Int: 75
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "Unrefined"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "nint"
+      Value: IntLiteral
+        Text: "70000"
+        Type: Builtin
+          Name: "nint"
+      Eval: Constant
+        Kind: 0
+        Int: 70000
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+  Types:
+    TypeDef
+      Name: "Level"
+      Public: true
+      Doc: "A character level between 0 and 100."
+      Params: ~
+      Body: Builtin
+        Name: "sbyte"
+      Methods: ~
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Where: Call
+        Receiver: Call
+          Receiver: SelfValue
+            Type: Named
+              Def: "Level"
+          Method: "gteq"
+          Args:
+            Adapt
+              Value: IntLiteral
+                Text: "0"
+                Type: Builtin
+                  Name: "nint"
+              To: Named
+                Def: "Level"
+          Setter: false
+          Resolved: ~
+          Subst: ~
+          Type: Builtin
+            Name: "bool"
+        Method: "anan"
+        Args:
+          Call
+            Receiver: SelfValue
+              Type: Named
+                Def: "Level"
+            Method: "lteq"
+            Args:
+              Adapt
+                Value: IntLiteral
+                  Text: "100"
+                  Type: Builtin
+                    Name: "nint"
+                To: Named
+                  Def: "Level"
+            Setter: false
+            Resolved: ~
+            Subst: ~
+            Type: Builtin
+              Name: "bool"
+        Setter: false
+        Resolved: ~
+        Subst: ~
+        Type: Builtin
+          Name: "bool"
+    TypeDef
+      Name: "Port"
+      Public: true
+      Doc: "A TCP port number."
+      Params: ~
+      Body: Builtin
+        Name: "int"
+      Methods: ~
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Where: Call
+        Receiver: Call
+          Receiver: SelfValue
+            Type: Named
+              Def: "Port"
+          Method: "gteq"
+          Args:
+            Adapt
+              Value: IntLiteral
+                Text: "1"
+                Type: Builtin
+                  Name: "nint"
+              To: Named
+                Def: "Port"
+          Setter: false
+          Resolved: ~
+          Subst: ~
+          Type: Builtin
+            Name: "bool"
+        Method: "anan"
+        Args:
+          Call
+            Receiver: SelfValue
+              Type: Named
+                Def: "Port"
+            Method: "lteq"
+            Args:
+              Adapt
+                Value: IntLiteral
+                  Text: "65535"
+                  Type: Builtin
+                    Name: "nint"
+                To: Named
+                  Def: "Port"
+            Setter: false
+            Resolved: ~
+            Subst: ~
+            Type: Builtin
+              Name: "bool"
+        Setter: false
+        Resolved: ~
+        Subst: ~
+        Type: Builtin
+          Name: "bool"
+    TypeDef
+      Name: "Percent"
+      Public: true
+      Doc: "A percentage from 0 to 100."
+      Params: ~
+      Body: Builtin
+        Name: "sbyte"
+      Methods:
+        Method
+          Name: "increment"
+          Public: true
+          Extern: false
+          Kind: 0
+          Effects: ~
+          Doc: "The next percentage point."
+          Params: ~
+          Result: SelfType
+          Body:
+            Return
+              Value: Call
+                Receiver: SelfValue
+                  Type: Named
+                    Def: "Percent"
+                Method: "add"
+                Args:
+                  Adapt
+                    Value: IntLiteral
+                      Text: "1"
+                      Type: Builtin
+                        Name: "nint"
+                    To: Named
+                      Def: "Percent"
+                Setter: false
+                Resolved: ~
+                Subst: ~
+                Type: Named
+                  Def: "Percent"
+          Owner: "Percent"
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Where: Call
+        Receiver: Call
+          Receiver: SelfValue
+            Type: Named
+              Def: "Percent"
+          Method: "gteq"
+          Args:
+            Adapt
+              Value: IntLiteral
+                Text: "0"
+                Type: Builtin
+                  Name: "nint"
+              To: Named
+                Def: "Percent"
+          Setter: false
+          Resolved: ~
+          Subst: ~
+          Type: Builtin
+            Name: "bool"
+        Method: "anan"
+        Args:
+          Call
+            Receiver: SelfValue
+              Type: Named
+                Def: "Percent"
+            Method: "lteq"
+            Args:
+              Adapt
+                Value: IntLiteral
+                  Text: "100"
+                  Type: Builtin
+                    Name: "nint"
+                To: Named
+                  Def: "Percent"
+            Setter: false
+            Resolved: ~
+            Subst: ~
+            Type: Builtin
+              Name: "bool"
+        Setter: false
+        Resolved: ~
+        Subst: ~
+        Type: Builtin
+          Name: "bool"
+    TypeDef
+      Name: "Score"
+      Public: true
+      Doc: "A score that is valid only when it lies in the 0..100 band."
+      Params: ~
+      Body: Builtin
+        Name: "int"
+      Methods:
+        Method
+          Name: "inBand"
+          Public: true
+          Extern: false
+          Kind: 0
+          Effects: ~
+          Doc: "Whether the score is within the valid band."
+          Params: ~
+          Result: Builtin
+            Name: "bool"
+          Body:
+            Return
+              Value: Call
+                Receiver: Call
+                  Receiver: SelfValue
+                    Type: Named
+                      Def: "Score"
+                  Method: "gteq"
+                  Args:
+                    Adapt
+                      Value: IntLiteral
+                        Text: "0"
+                        Type: Builtin
+                          Name: "nint"
+                      To: Named
+                        Def: "Score"
+                  Setter: false
+                  Resolved: ~
+                  Subst: ~
+                  Type: Builtin
+                    Name: "bool"
+                Method: "anan"
+                Args:
+                  Call
+                    Receiver: SelfValue
+                      Type: Named
+                        Def: "Score"
+                    Method: "lteq"
+                    Args:
+                      Adapt
+                        Value: IntLiteral
+                          Text: "100"
+                          Type: Builtin
+                            Name: "nint"
+                        To: Named
+                          Def: "Score"
+                    Setter: false
+                    Resolved: ~
+                    Subst: ~
+                    Type: Builtin
+                      Name: "bool"
+                Setter: false
+                Resolved: ~
+                Subst: ~
+                Type: Builtin
+                  Name: "bool"
+          Owner: "Score"
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Where: Call
+        Receiver: SelfValue
+          Type: Named
+            Def: "Score"
+        Method: "inBand"
+        Args: ~
+        Setter: false
+        Resolved: ~
+        Subst: ~
+        Type: Builtin
+          Name: "bool"
+  Funcs: ~
+  Asserts: ~

@@ -1,28 +1,133 @@
 File
-  ConstDecl
-    name "A"
-    value (call Identifier "double" IntLit "21")
-  TypeDecl
-    pub
-    name "Clock"
-    body { offset: duration }
-    method "read"
-      doc "The current instant, shifted by this clock's offset."
-      pub
-      effects nondet
-      result datetime
-      return (call (. (call (. Identifier "datetime" now)) add) (. self offset))
-  FuncDecl
-    pub
-    effects nondet
-    name "stamp"
-    result datetime
-      return (call (. Identifier "datetime" now))
-  FuncDecl
-    pub
-    name "double"
-    param x: nint
-    result nint
-      return (call (. Identifier "x" mul) IntLit "2")
-  AssertDecl
-    cond (call (. (call Identifier "double" IntLit "2") eql) IntLit "4")
+  Uses: ~
+  Decls:
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "A"
+      Type: ~
+      Value: CallExpr
+        Callee: Identifier
+          Name: "double"
+        Arguments:
+          IntLit
+            Text: "21"
+      Builtin: false
+  Types:
+    TypeDecl
+      Doc: ~
+      Public: true
+      Name: "Clock"
+      Params: ~
+      Body: RecordType
+        Fields:
+          FieldDef
+            Name: "offset"
+            Type: NamedType
+              Namespace: ""
+              Name: "duration"
+              Args: ~
+      Where: ~
+      Methods:
+        MethodDecl
+          Doc: "The current instant, shifted by this clock's offset."
+          Public: true
+          Extern: false
+          Kind: 0
+          Effects: "nondet"
+          Name: "read"
+          TypeParams: ~
+          Params: ~
+          Result: NamedType
+            Namespace: ""
+            Name: "datetime"
+            Args: ~
+          Body:
+            ReturnStmt
+              Value: CallExpr
+                Callee: MemberExpr
+                  Receiver: CallExpr
+                    Callee: MemberExpr
+                      Receiver: Identifier
+                        Name: "datetime"
+                      Member: Identifier
+                        Name: "now"
+                    Arguments: ~
+                  Member: Identifier
+                    Name: "add"
+                Arguments:
+                  MemberExpr
+                    Receiver: SelfExpr
+                    Member: Identifier
+                      Name: "offset"
+      Consts: ~
+      Impls: ~
+  Enums: ~
+  Interfaces: ~
+  Funcs:
+    FuncDecl
+      Doc: ~
+      Public: true
+      Extern: false
+      Effects: "nondet"
+      Name: "stamp"
+      TypeParams: ~
+      Params: ~
+      Result: NamedType
+        Namespace: ""
+        Name: "datetime"
+        Args: ~
+      Body:
+        ReturnStmt
+          Value: CallExpr
+            Callee: MemberExpr
+              Receiver: Identifier
+                Name: "datetime"
+              Member: Identifier
+                Name: "now"
+            Arguments: ~
+    FuncDecl
+      Doc: ~
+      Public: true
+      Extern: false
+      Effects: ~
+      Name: "double"
+      TypeParams: ~
+      Params:
+        ParamDef
+          Name: "x"
+          Type: NamedType
+            Namespace: ""
+            Name: "nint"
+            Args: ~
+      Result: NamedType
+        Namespace: ""
+        Name: "nint"
+        Args: ~
+      Body:
+        ReturnStmt
+          Value: CallExpr
+            Callee: MemberExpr
+              Receiver: Identifier
+                Name: "x"
+              Member: Identifier
+                Name: "mul"
+            Arguments:
+              IntLit
+                Text: "2"
+  Asserts:
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: Identifier
+              Name: "double"
+            Arguments:
+              IntLit
+                Text: "2"
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "4"

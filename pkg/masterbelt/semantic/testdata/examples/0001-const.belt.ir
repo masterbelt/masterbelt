@@ -1,16 +1,89 @@
 Module
-  Const "MaxLevel"
-    doc "DocComment for MaxLevel"
-    type long
-    value (adapt (IntLiteral "100" : nint) : long)
-    eval 100
-  Const "MinLevel"
-    doc "DocComment for MinLevel"
-    doc "with multiline."
-    type nint
-    value (IntLiteral "0" : nint)
-    eval 0
-  Const "PublishedMaxLevel" pub
-    type long
-    value (Reference -> "MaxLevel" : long)
-    eval 100
+  Consts:
+    Const
+      Name: "MaxLevel"
+      Public: false
+      Doc: "DocComment for MaxLevel"
+      Type: Builtin
+        Name: "long"
+      Value: Adapt
+        Value: IntLiteral
+          Text: "100"
+          Type: Builtin
+            Name: "nint"
+        To: Builtin
+          Name: "long"
+      Eval: Constant
+        Kind: 0
+        Int: 100
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "MinLevel"
+      Public: false
+      Doc: "DocComment for MinLevel" "with multiline."
+      Type: Builtin
+        Name: "nint"
+      Value: IntLiteral
+        Text: "0"
+        Type: Builtin
+          Name: "nint"
+      Eval: Constant
+        Kind: 0
+        Int: 0
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "PublishedMaxLevel"
+      Public: true
+      Doc: ~
+      Type: Builtin
+        Name: "long"
+      Value: Reference
+        Target: "MaxLevel"
+        Type: Builtin
+          Name: "long"
+      Eval: Constant
+        Kind: 0
+        Int: 100
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+  Types: ~
+  Funcs: ~
+  Asserts: ~

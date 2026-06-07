@@ -1,21 +1,118 @@
 File
-  ConstDecl
-    name "MaxLevel"
-    value IntLit "100"
-  ConstDecl
-    name "MinLevel"
-    value IntLit "0"
-  ConstDecl
-    name "Enabled"
-    value BoolLit true
-  AssertDecl
-    doc "The level range is not empty."
-    cond (call (. Identifier "MaxLevel" gt) Identifier "MinLevel")
-  AssertDecl
-    cond (call (. Identifier "MinLevel" eql) IntLit "0")
-  AssertDecl
-    cond (call (. (call (. Identifier "MaxLevel" sub) Identifier "MinLevel") eql) IntLit "100")
-  AssertDecl
-    cond (call (. Identifier "Enabled" anan) (call (. BoolLit false not)))
-  AssertDecl
-    cond (call (. (call (. Identifier "MaxLevel" gt) IntLit "0") anan) (call (. (call (. Identifier "MinLevel" gt) IntLit "0") not)))
+  Uses: ~
+  Decls:
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "MaxLevel"
+      Type: ~
+      Value: IntLit
+        Text: "100"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "MinLevel"
+      Type: ~
+      Value: IntLit
+        Text: "0"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Enabled"
+      Type: ~
+      Value: BoolLit
+        Value: true
+      Builtin: false
+  Types: ~
+  Enums: ~
+  Interfaces: ~
+  Funcs: ~
+  Asserts:
+    AssertDecl
+      Doc: "The level range is not empty."
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: Identifier
+            Name: "MaxLevel"
+          Member: Identifier
+            Name: "gt"
+        Arguments:
+          Identifier
+            Name: "MinLevel"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: Identifier
+            Name: "MinLevel"
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "0"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: MemberExpr
+              Receiver: Identifier
+                Name: "MaxLevel"
+              Member: Identifier
+                Name: "sub"
+            Arguments:
+              Identifier
+                Name: "MinLevel"
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "100"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: Identifier
+            Name: "Enabled"
+          Member: Identifier
+            Name: "anan"
+        Arguments:
+          CallExpr
+            Callee: MemberExpr
+              Receiver: BoolLit
+                Value: false
+              Member: Identifier
+                Name: "not"
+            Arguments: ~
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: MemberExpr
+              Receiver: Identifier
+                Name: "MaxLevel"
+              Member: Identifier
+                Name: "gt"
+            Arguments:
+              IntLit
+                Text: "0"
+          Member: Identifier
+            Name: "anan"
+        Arguments:
+          CallExpr
+            Callee: MemberExpr
+              Receiver: CallExpr
+                Callee: MemberExpr
+                  Receiver: Identifier
+                    Name: "MinLevel"
+                  Member: Identifier
+                    Name: "gt"
+                Arguments:
+                  IntLit
+                    Text: "0"
+              Member: Identifier
+                Name: "not"
+            Arguments: ~

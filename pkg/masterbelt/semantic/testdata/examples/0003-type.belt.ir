@@ -1,34 +1,222 @@
 Module
-  TypeDef "Coin" pub
-    doc "A coin denomination."
-    body sbyte
-  TypeDef "Level" pub
-    doc "A character level."
-    body sbyte
-    method "increment" pub
-      doc "The next level up."
-      result self
-      return ((self : Level).add((adapt (IntLiteral "1" : nint) : Level)) : Level)
-  TypeDef "GameValue" pub
-    doc "Any value the game can score: a Coin or a Level."
-    body Coin | Level
-  TypeDef "Optional" pub
-    doc "A T, or nothing."
-    param "T"
-    body T | null
-  TypeDef "OptionalNumeric" pub
-    doc "A small integer, or nothing."
-    param "T": sbyte | short
-    body T | null
-  TypeDef "Record" pub
-    doc "One saved character: an id and its level."
-    body { id: sbyte, level: Level }
-    method "game_id" pub
-      doc "The record's id widened into the game's id space."
-      result int
-      return (int(((self : Record).id : sbyte)).mul((adapt (IntLiteral "1000" : nint) : int)) : int)
-  TypeDef "Mapper" pub
-    doc "A mapping from T to R."
-    param "T"
-    param "R"
-    body fn(T): R
+  Consts: ~
+  Types:
+    TypeDef
+      Name: "Coin"
+      Public: true
+      Doc: "A coin denomination."
+      Params: ~
+      Body: Builtin
+        Name: "sbyte"
+      Methods: ~
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Where: ~
+    TypeDef
+      Name: "Level"
+      Public: true
+      Doc: "A character level."
+      Params: ~
+      Body: Builtin
+        Name: "sbyte"
+      Methods:
+        Method
+          Name: "increment"
+          Public: true
+          Extern: false
+          Kind: 0
+          Effects: ~
+          Doc: "The next level up."
+          Params: ~
+          Result: SelfType
+          Body:
+            Return
+              Value: Call
+                Receiver: SelfValue
+                  Type: Named
+                    Def: "Level"
+                Method: "add"
+                Args:
+                  Adapt
+                    Value: IntLiteral
+                      Text: "1"
+                      Type: Builtin
+                        Name: "nint"
+                    To: Named
+                      Def: "Level"
+                Setter: false
+                Resolved: ~
+                Subst: ~
+                Type: Named
+                  Def: "Level"
+          Owner: "Level"
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Where: ~
+    TypeDef
+      Name: "GameValue"
+      Public: true
+      Doc: "Any value the game can score: a Coin or a Level."
+      Params: ~
+      Body: Union
+        Members:
+          Named
+            Def: "Coin"
+          Named
+            Def: "Level"
+      Methods: ~
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Where: ~
+    TypeDef
+      Name: "Optional"
+      Public: true
+      Doc: "A T, or nothing."
+      Params:
+        TypeParam
+          Name: "T"
+          Bound: ~
+      Body: Union
+        Members:
+          TypeVar
+            Name: "T"
+            Bound: ~
+          Builtin
+            Name: "null"
+      Methods: ~
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Where: ~
+    TypeDef
+      Name: "OptionalNumeric"
+      Public: true
+      Doc: "A small integer, or nothing."
+      Params:
+        TypeParam
+          Name: "T"
+          Bound: Union
+            Members:
+              Builtin
+                Name: "sbyte"
+              Builtin
+                Name: "short"
+      Body: Union
+        Members:
+          TypeVar
+            Name: "T"
+            Bound: Union
+              Members:
+                Builtin
+                  Name: "sbyte"
+                Builtin
+                  Name: "short"
+          Builtin
+            Name: "null"
+      Methods: ~
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Where: ~
+    TypeDef
+      Name: "Record"
+      Public: true
+      Doc: "One saved character: an id and its level."
+      Params: ~
+      Body: Record
+        Fields:
+          Field
+            Name: "id"
+            Type: Builtin
+              Name: "sbyte"
+          Field
+            Name: "level"
+            Type: Named
+              Def: "Level"
+      Methods:
+        Method
+          Name: "game_id"
+          Public: true
+          Extern: false
+          Kind: 0
+          Effects: ~
+          Doc: "The record's id widened into the game's id space."
+          Params: ~
+          Result: Builtin
+            Name: "int"
+          Body:
+            Return
+              Value: Call
+                Receiver: Conversion
+                  Type: Builtin
+                    Name: "int"
+                  Args:
+                    FieldAccess
+                      Receiver: SelfValue
+                        Type: Named
+                          Def: "Record"
+                      Field: "id"
+                      Type: Builtin
+                        Name: "sbyte"
+                Method: "mul"
+                Args:
+                  Adapt
+                    Value: IntLiteral
+                      Text: "1000"
+                      Type: Builtin
+                        Name: "nint"
+                    To: Builtin
+                      Name: "int"
+                Setter: false
+                Resolved: ~
+                Subst: ~
+                Type: Builtin
+                  Name: "int"
+          Owner: "Record"
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Where: ~
+    TypeDef
+      Name: "Mapper"
+      Public: true
+      Doc: "A mapping from T to R."
+      Params:
+        TypeParam
+          Name: "T"
+          Bound: ~
+        TypeParam
+          Name: "R"
+          Bound: ~
+      Body: Func
+        Params:
+          TypeVar
+            Name: "T"
+            Bound: ~
+        Result: TypeVar
+          Name: "R"
+          Bound: ~
+      Methods: ~
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Where: ~
+  Funcs: ~
+  Asserts: ~

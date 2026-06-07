@@ -1,16 +1,75 @@
 File
-  ConstDecl
-    name "greeting"
-    value (call (. StringLit "Hello, " add) StringLit "world!")
-  ConstDecl
-    pub
-    name "same"
-    value (call (. StringLit "abc" eql) StringLit "abc")
-  ConstDecl
-    pub
-    name "ordered"
-    value (call (. StringLit "a" lt) StringLit "b")
-  ConstDecl
-    pub
-    name "banner"
-    value (call (. (call (. StringLit "[" add) Identifier "greeting") add) StringLit "]")
+  Uses: ~
+  Decls:
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "greeting"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: StringLit
+            Value: "Hello, "
+          Member: Identifier
+            Name: "add"
+        Arguments:
+          StringLit
+            Value: "world!"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: true
+      Name: "same"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: StringLit
+            Value: "abc"
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          StringLit
+            Value: "abc"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: true
+      Name: "ordered"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: StringLit
+            Value: "a"
+          Member: Identifier
+            Name: "lt"
+        Arguments:
+          StringLit
+            Value: "b"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: true
+      Name: "banner"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: MemberExpr
+              Receiver: StringLit
+                Value: "["
+              Member: Identifier
+                Name: "add"
+            Arguments:
+              Identifier
+                Name: "greeting"
+          Member: Identifier
+            Name: "add"
+        Arguments:
+          StringLit
+            Value: "]"
+      Builtin: false
+  Types: ~
+  Enums: ~
+  Interfaces: ~
+  Funcs: ~
+  Asserts: ~

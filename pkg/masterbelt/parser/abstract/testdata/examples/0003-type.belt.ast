@@ -1,50 +1,209 @@
 File
-  TypeDecl
-    doc "A coin denomination."
-    pub
-    name "Coin"
-    body sbyte
-  TypeDecl
-    doc "A character level."
-    pub
-    name "Level"
-    body sbyte
-    method "increment"
-      doc "The next level up."
-      pub
-      result self
-      return (call (. self add) IntLit "1")
-  TypeDecl
-    doc "Any value the game can score: a Coin or a Level."
-    pub
-    name "GameValue"
-    body Coin | Level
-  TypeDecl
-    doc "A T, or nothing."
-    pub
-    name "Optional"
-    param T
-    body T | null
-  TypeDecl
-    doc "A small integer, or nothing."
-    pub
-    name "OptionalNumeric"
-    param T: sbyte | short
-    body T | null
-  TypeDecl
-    doc "One saved character: an id and its level."
-    pub
-    name "Record"
-    body { id: sbyte, level: Level }
-    method "game_id"
-      doc "The record's id widened into the game's id space."
-      pub
-      result int
-      return (call (. (call Identifier "int" (. self id)) mul) IntLit "1000")
-  TypeDecl
-    doc "A mapping from T to R."
-    pub
-    name "Mapper"
-    param T
-    param R
-    body fn(src: T): R
+  Uses: ~
+  Decls: ~
+  Types:
+    TypeDecl
+      Doc: "A coin denomination."
+      Public: true
+      Name: "Coin"
+      Params: ~
+      Body: NamedType
+        Namespace: ""
+        Name: "sbyte"
+        Args: ~
+      Where: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
+    TypeDecl
+      Doc: "A character level."
+      Public: true
+      Name: "Level"
+      Params: ~
+      Body: NamedType
+        Namespace: ""
+        Name: "sbyte"
+        Args: ~
+      Where: ~
+      Methods:
+        MethodDecl
+          Doc: "The next level up."
+          Public: true
+          Extern: false
+          Kind: 0
+          Effects: ~
+          Name: "increment"
+          TypeParams: ~
+          Params: ~
+          Result: NamedType
+            Namespace: ""
+            Name: "self"
+            Args: ~
+          Body:
+            ReturnStmt
+              Value: CallExpr
+                Callee: MemberExpr
+                  Receiver: SelfExpr
+                  Member: Identifier
+                    Name: "add"
+                Arguments:
+                  IntLit
+                    Text: "1"
+      Consts: ~
+      Impls: ~
+    TypeDecl
+      Doc: "Any value the game can score: a Coin or a Level."
+      Public: true
+      Name: "GameValue"
+      Params: ~
+      Body: UnionType
+        Members:
+          NamedType
+            Namespace: ""
+            Name: "Coin"
+            Args: ~
+          NamedType
+            Namespace: ""
+            Name: "Level"
+            Args: ~
+      Where: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
+    TypeDecl
+      Doc: "A T, or nothing."
+      Public: true
+      Name: "Optional"
+      Params:
+        TypeParam
+          Name: "T"
+          Constraint: ~
+      Body: UnionType
+        Members:
+          NamedType
+            Namespace: ""
+            Name: "T"
+            Args: ~
+          NamedType
+            Namespace: ""
+            Name: "null"
+            Args: ~
+      Where: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
+    TypeDecl
+      Doc: "A small integer, or nothing."
+      Public: true
+      Name: "OptionalNumeric"
+      Params:
+        TypeParam
+          Name: "T"
+          Constraint: UnionType
+            Members:
+              NamedType
+                Namespace: ""
+                Name: "sbyte"
+                Args: ~
+              NamedType
+                Namespace: ""
+                Name: "short"
+                Args: ~
+      Body: UnionType
+        Members:
+          NamedType
+            Namespace: ""
+            Name: "T"
+            Args: ~
+          NamedType
+            Namespace: ""
+            Name: "null"
+            Args: ~
+      Where: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
+    TypeDecl
+      Doc: "One saved character: an id and its level."
+      Public: true
+      Name: "Record"
+      Params: ~
+      Body: RecordType
+        Fields:
+          FieldDef
+            Name: "id"
+            Type: NamedType
+              Namespace: ""
+              Name: "sbyte"
+              Args: ~
+          FieldDef
+            Name: "level"
+            Type: NamedType
+              Namespace: ""
+              Name: "Level"
+              Args: ~
+      Where: ~
+      Methods:
+        MethodDecl
+          Doc: "The record's id widened into the game's id space."
+          Public: true
+          Extern: false
+          Kind: 0
+          Effects: ~
+          Name: "game_id"
+          TypeParams: ~
+          Params: ~
+          Result: NamedType
+            Namespace: ""
+            Name: "int"
+            Args: ~
+          Body:
+            ReturnStmt
+              Value: CallExpr
+                Callee: MemberExpr
+                  Receiver: CallExpr
+                    Callee: Identifier
+                      Name: "int"
+                    Arguments:
+                      MemberExpr
+                        Receiver: SelfExpr
+                        Member: Identifier
+                          Name: "id"
+                  Member: Identifier
+                    Name: "mul"
+                Arguments:
+                  IntLit
+                    Text: "1000"
+      Consts: ~
+      Impls: ~
+    TypeDecl
+      Doc: "A mapping from T to R."
+      Public: true
+      Name: "Mapper"
+      Params:
+        TypeParam
+          Name: "T"
+          Constraint: ~
+        TypeParam
+          Name: "R"
+          Constraint: ~
+      Body: FuncType
+        Params:
+          ParamDef
+            Name: "src"
+            Type: NamedType
+              Namespace: ""
+              Name: "T"
+              Args: ~
+        Result: NamedType
+          Namespace: ""
+          Name: "R"
+          Args: ~
+      Where: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
+  Enums: ~
+  Interfaces: ~
+  Funcs: ~
+  Asserts: ~

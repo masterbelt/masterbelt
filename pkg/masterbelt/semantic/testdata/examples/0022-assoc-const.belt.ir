@@ -1,49 +1,369 @@
 Module
-  Const "Hi"
-    type nint
-    value (sbyte.Max : nint)
-    eval 127
-  Const "Lo"
-    type nint
-    value (sbyte.Min : nint)
-    eval -128
-  Const "Top"
-    type Level
-    value (adapt (Level.Max : nint) : Level)
-    eval 100
-  Const "Bottom"
-    type Level
-    value (adapt (Level.Min : nint) : Level)
-    eval 0
-  Const "W"
-    type int
-    value (Bits.Width : int)
-    eval 32
-  Const "ServerPort"
-    type Port
-    value (adapt (IntLiteral "8080" : nint) : Port)
-    eval 8080
-  TypeDef "Level" pub
-    doc "A character level, capped at 100."
-    body sbyte
-    const "Max" pub
-      doc "The highest level."
-      type nint
-      value 100
-    const "Min" pub
-      doc "The lowest level."
-      type nint
-      value 0
-    method "increment" pub
-      doc "The next level."
-      result self
-      return ((self : Level).add((adapt (IntLiteral "1" : nint) : Level)) : Level)
-  TypeDef "Bits" pub
-    body int
-    const "Width" pub
-      doc "The width in bits."
-      type int
-      value 32
-  TypeDef "Port" pub
-    body int
-    where (((self : Port).gteq((adapt (IntLiteral "1" : nint) : Port)) : bool).anan(((self : Port).lteq((adapt (short.Max : nint) : Port)) : bool)) : bool)
+  Consts:
+    Const
+      Name: "Hi"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "nint"
+      Value: AssocConstValue
+        Def: "sbyte"
+        Index: 0
+        Type: Builtin
+          Name: "nint"
+      Eval: Constant
+        Kind: 0
+        Int: 127
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "Lo"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "nint"
+      Value: AssocConstValue
+        Def: "sbyte"
+        Index: 1
+        Type: Builtin
+          Name: "nint"
+      Eval: Constant
+        Kind: 0
+        Int: -128
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "Top"
+      Public: false
+      Doc: ~
+      Type: Named
+        Def: "Level"
+      Value: Adapt
+        Value: AssocConstValue
+          Def: "Level"
+          Index: 0
+          Type: Builtin
+            Name: "nint"
+        To: Named
+          Def: "Level"
+      Eval: Constant
+        Kind: 0
+        Int: 100
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "Bottom"
+      Public: false
+      Doc: ~
+      Type: Named
+        Def: "Level"
+      Value: Adapt
+        Value: AssocConstValue
+          Def: "Level"
+          Index: 1
+          Type: Builtin
+            Name: "nint"
+        To: Named
+          Def: "Level"
+      Eval: Constant
+        Kind: 0
+        Int: 0
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "W"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "int"
+      Value: AssocConstValue
+        Def: "Bits"
+        Index: 0
+        Type: Builtin
+          Name: "int"
+      Eval: Constant
+        Kind: 0
+        Int: 32
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "ServerPort"
+      Public: false
+      Doc: ~
+      Type: Named
+        Def: "Port"
+      Value: Adapt
+        Value: IntLiteral
+          Text: "8080"
+          Type: Builtin
+            Name: "nint"
+        To: Named
+          Def: "Port"
+      Eval: Constant
+        Kind: 0
+        Int: 8080
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+  Types:
+    TypeDef
+      Name: "Level"
+      Public: true
+      Doc: "A character level, capped at 100."
+      Params: ~
+      Body: Builtin
+        Name: "sbyte"
+      Methods:
+        Method
+          Name: "increment"
+          Public: true
+          Extern: false
+          Kind: 0
+          Effects: ~
+          Doc: "The next level."
+          Params: ~
+          Result: SelfType
+          Body:
+            Return
+              Value: Call
+                Receiver: SelfValue
+                  Type: Named
+                    Def: "Level"
+                Method: "add"
+                Args:
+                  Adapt
+                    Value: IntLiteral
+                      Text: "1"
+                      Type: Builtin
+                        Name: "nint"
+                    To: Named
+                      Def: "Level"
+                Setter: false
+                Resolved: ~
+                Subst: ~
+                Type: Named
+                  Def: "Level"
+          Owner: "Level"
+      Consts:
+        AssocConst
+          Name: "Max"
+          Public: true
+          Doc: "The highest level."
+          Type: Builtin
+            Name: "nint"
+          Value: Constant
+            Kind: 0
+            Int: 100
+            Bool: false
+            Str: ""
+            Coll: ~
+            Fields: ~
+            CollMapness: 0
+            Millis: 0
+            Fn: ~
+            Captured: ~
+            EnumDef: ~
+            EnumIndex: 0
+            Start: ~
+            End: ~
+            Step: ~
+            UnionTag: ~
+          Builtin: false
+        AssocConst
+          Name: "Min"
+          Public: true
+          Doc: "The lowest level."
+          Type: Builtin
+            Name: "nint"
+          Value: Constant
+            Kind: 0
+            Int: 0
+            Bool: false
+            Str: ""
+            Coll: ~
+            Fields: ~
+            CollMapness: 0
+            Millis: 0
+            Fn: ~
+            Captured: ~
+            EnumDef: ~
+            EnumIndex: 0
+            Start: ~
+            End: ~
+            Step: ~
+            UnionTag: ~
+          Builtin: false
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Where: ~
+    TypeDef
+      Name: "Bits"
+      Public: true
+      Doc: ~
+      Params: ~
+      Body: Builtin
+        Name: "int"
+      Methods: ~
+      Consts:
+        AssocConst
+          Name: "Width"
+          Public: true
+          Doc: "The width in bits."
+          Type: Builtin
+            Name: "int"
+          Value: Constant
+            Kind: 0
+            Int: 32
+            Bool: false
+            Str: ""
+            Coll: ~
+            Fields: ~
+            CollMapness: 0
+            Millis: 0
+            Fn: ~
+            Captured: ~
+            EnumDef: ~
+            EnumIndex: 0
+            Start: ~
+            End: ~
+            Step: ~
+            UnionTag: ~
+          Builtin: false
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Where: ~
+    TypeDef
+      Name: "Port"
+      Public: true
+      Doc: ~
+      Params: ~
+      Body: Builtin
+        Name: "int"
+      Methods: ~
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Where: Call
+        Receiver: Call
+          Receiver: SelfValue
+            Type: Named
+              Def: "Port"
+          Method: "gteq"
+          Args:
+            Adapt
+              Value: IntLiteral
+                Text: "1"
+                Type: Builtin
+                  Name: "nint"
+              To: Named
+                Def: "Port"
+          Setter: false
+          Resolved: ~
+          Subst: ~
+          Type: Builtin
+            Name: "bool"
+        Method: "anan"
+        Args:
+          Call
+            Receiver: SelfValue
+              Type: Named
+                Def: "Port"
+            Method: "lteq"
+            Args:
+              Adapt
+                Value: AssocConstValue
+                  Def: "short"
+                  Index: 0
+                  Type: Builtin
+                    Name: "nint"
+                To: Named
+                  Def: "Port"
+            Setter: false
+            Resolved: ~
+            Subst: ~
+            Type: Builtin
+              Name: "bool"
+        Setter: false
+        Resolved: ~
+        Subst: ~
+        Type: Builtin
+          Name: "bool"
+  Funcs: ~
+  Asserts: ~

@@ -1,208 +1,1557 @@
 Module
-  Const "ClosedUp"
-    type range
-    value ((IntLiteral "0" : nint)..(IntLiteral "9" : nint) : range)
-    eval range(0, 9)
-  Const "HalfUp"
-    type range
-    value ((IntLiteral "0" : nint)...(IntLiteral "9" : nint) : range)
-    eval range(0, 8)
-  Const "ClosedDown"
-    type range
-    value ((IntLiteral "9" : nint)..(IntLiteral "0" : nint) : range)
-    eval range(9, 0, -1)
-  Const "HalfDown"
-    type range
-    value ((IntLiteral "9" : nint)...(IntLiteral "0" : nint) : range)
-    eval range(8, 0, -1)
-  Const "ClosedUpEq"
-    type range
-    value range((IntLiteral "0" : nint), (IntLiteral "9" : nint))
-    eval range(0, 9)
-  Const "HalfUpEq"
-    type range
-    value range((IntLiteral "0" : nint), (IntLiteral "8" : nint))
-    eval range(0, 8)
-  Const "ClosedDownEq"
-    type range
-    value range((IntLiteral "9" : nint), (IntLiteral "0" : nint), ((IntLiteral "1" : nint).neg() : nint))
-    eval range(9, 0, -1)
-  Const "HalfDownEq"
-    type range
-    value range((IntLiteral "8" : nint), (IntLiteral "0" : nint), ((IntLiteral "1" : nint).neg() : nint))
-    eval range(8, 0, -1)
-  Const "Single"
-    type range
-    value ((IntLiteral "5" : nint)..(IntLiteral "5" : nint) : range)
-    eval range(5, 5)
-  Const "Empty"
-    type range
-    value ((IntLiteral "5" : nint)...(IntLiteral "5" : nint) : range)
-    eval range(5, 4)
-  Const "Upto"
-    type range
-    value (upto((IntLiteral "4" : nint)) : range)
-    eval range(0, 5)
-  Const "Evens"
-    type range
-    value range((IntLiteral "0" : nint), (IntLiteral "10" : nint), (IntLiteral "2" : nint))
-    eval range(0, 10, 2)
-  Const "DownBy2"
-    type range
-    value range((IntLiteral "10" : nint), (IntLiteral "0" : nint), ((IntLiteral "2" : nint).neg() : nint))
-    eval range(10, 0, -2)
-  Const "SumUp"
-    type nint
-    value (sumUp() : nint)
-    eval 55
-  Const "SumDown"
-    type nint
-    value (sumDown() : nint)
-    eval 15
-  Const "SumHalf"
-    type nint
-    value (sumHalf() : nint)
-    eval 10
-  Const "SumEvens"
-    type nint
-    value (sumEvens() : nint)
-    eval 30
-  Const "ClosedCount"
-    type nint
-    value (((IntLiteral "0" : nint)..(IntLiteral "9" : nint) : range).count() : nint) [subst K=nint, V=nint]
-    eval 10
-  Const "HalfCount"
-    type nint
-    value (((IntLiteral "0" : nint)...(IntLiteral "9" : nint) : range).count() : nint) [subst K=nint, V=nint]
-    eval 9
-  Const "SteppedCount"
-    type nint
-    value (range((IntLiteral "0" : nint), (IntLiteral "10" : nint), (IntLiteral "2" : nint)).count() : nint) [subst K=nint, V=nint]
-    eval 6
-  Const "ClosedFold"
-    type nint
-    value (((IntLiteral "0" : nint)..(IntLiteral "4" : nint) : range).fold((IntLiteral "0" : nint), ((fn(acc, k, v) (return ((ParamRef "acc" : nint).add((ParamRef "v" : nint)) : nint))) : fn(nint, nint, nint): nint)) : nint) [subst A=nint, K=nint, V=nint]
-    eval 10
-  Const "SteppedFold"
-    type nint
-    value (range((IntLiteral "0" : nint), (IntLiteral "10" : nint), (IntLiteral "2" : nint)).fold((IntLiteral "0" : nint), ((fn(acc, k, v) (return ((ParamRef "acc" : nint).add((ParamRef "v" : nint)) : nint))) : fn(nint, nint, nint): nint)) : nint) [subst A=nint, K=nint, V=nint]
-    eval 30
-  Func "upto" pub
-    param n: nint
-    result range
-      return ((IntLiteral "0" : nint)..((ParamRef "n" : nint).add((IntLiteral "1" : nint)) : nint) : range)
-  Func "sumUp" pub
-    result nint
-      let "t": nint = (IntLiteral "0" : nint)
-      for i of nint ((IntLiteral "0" : nint)..(IntLiteral "10" : nint) : range)
-          assign "t" = ((LocalRef "t" : nint).add((LocalRef "i" : nint)) : nint)
-      return (LocalRef "t" : nint)
-  Func "sumDown" pub
-    result nint
-      let "t": nint = (IntLiteral "0" : nint)
-      for i of nint ((IntLiteral "5" : nint)..(IntLiteral "1" : nint) : range)
-          assign "t" = ((LocalRef "t" : nint).add((LocalRef "i" : nint)) : nint)
-      return (LocalRef "t" : nint)
-  Func "sumHalf" pub
-    result nint
-      let "t": nint = (IntLiteral "0" : nint)
-      for i of nint ((IntLiteral "0" : nint)...(IntLiteral "5" : nint) : range)
-          assign "t" = ((LocalRef "t" : nint).add((LocalRef "i" : nint)) : nint)
-      return (LocalRef "t" : nint)
-  Func "sumEvens" pub
-    result nint
-      let "t": nint = (IntLiteral "0" : nint)
-      for i of nint range((IntLiteral "0" : nint), (IntLiteral "10" : nint), (IntLiteral "2" : nint))
-          assign "t" = ((LocalRef "t" : nint).add((LocalRef "i" : nint)) : nint)
-      return (LocalRef "t" : nint)
-  Assert "(0..9) == range(0, 9)"
-    eval true
-      (0..9) == range(0, 9)
-        ^    ^  ^
-        |    |  range(0, 9)
-        |    true
-        range(0, 9)
-  Assert "(0...9) == range(0, 8)"
-    eval true
-      (0...9) == range(0, 8)
-        ^     ^  ^
-        |     |  range(0, 8)
-        |     true
-        range(0, 8)
-  Assert "(9..0) == range(9, 0, -1)"
-    eval true
-      (9..0) == range(9, 0, -1)
-        ^    ^  ^           ^
-        |    |  |           -1
-        |    |  range(9, 0, -1)
-        |    true
-        range(9, 0, -1)
-  Assert "(9...0) == range(8, 0, -1)"
-    eval true
-      (9...0) == range(8, 0, -1)
-        ^     ^  ^           ^
-        |     |  |           -1
-        |     |  range(8, 0, -1)
-        |     true
-        range(8, 0, -1)
-  Assert "(5..5) == range(5, 5)"
-    eval true
-      (5..5) == range(5, 5)
-        ^    ^  ^
-        |    |  range(5, 5)
-        |    true
-        range(5, 5)
-  Assert "sumUp() == 55"
-    eval true
-      sumUp() == 55
-      ^       ^
-      55      true
-  Assert "sumDown() == 15"
-    eval true
-      sumDown() == 15
-      ^         ^
-      15        true
-  Assert "sumHalf() == 10"
-    eval true
-      sumHalf() == 10
-      ^         ^
-      10        true
-  Assert "sumEvens() == 30"
-    eval true
-      sumEvens() == 30
-      ^          ^
-      30         true
-  Assert "(0..9).count() == 10"
-    eval true
-      (0..9).count() == 10
-        ^    ^       ^
-        |    10      true
-        range(0, 9)
-  Assert "(0...9).count() == 9"
-    eval true
-      (0...9).count() == 9
-        ^     ^       ^
-        |     9       true
-        range(0, 8)
-  Assert "range(0, 10, 2).count() == 6"
-    eval true
-      range(0, 10, 2).count() == 6
-      ^               ^       ^
-      range(0, 10, 2) 6       true
-  Assert "range(10, 0, -2).count() == 6"
-    eval true
-      range(10, 0, -2).count() == 6
-      ^            ^   ^       ^
-      |            -2  6       true
-      range(10, 0, -2)
-  Assert "(0..4).fold(0, fn(acc: nint, k: nint, v: nint): nint { return acc + v }) == 10"
-    eval true
-      (0..4).fold(0, fn(acc: nint, k: nint, v: nint): nint { return acc + v }) == 10
-        ^    ^                                                                 ^
-        |    10                                                                true
-        range(0, 4)
-  Assert "range(0, 10, 2).fold(0, fn(acc: nint, k: nint, v: nint): nint { return acc + v }) == 30"
-    eval true
-      range(0, 10, 2).fold(0, fn(acc: nint, k: nint, v: nint): nint { return acc + v }) == 30
-      ^               ^                                                                 ^
-      range(0, 10, 2) 30                                                                true
+  Consts:
+    Const
+      Name: "ClosedUp"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "range"
+      Value: RangeLit
+        Lower: IntLiteral
+          Text: "0"
+          Type: Builtin
+            Name: "nint"
+        Upper: IntLiteral
+          Text: "9"
+          Type: Builtin
+            Name: "nint"
+        HalfOpen: false
+        Type: Builtin
+          Name: "range"
+      Eval: Constant
+        Kind: 11
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: 0
+        End: 9
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "HalfUp"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "range"
+      Value: RangeLit
+        Lower: IntLiteral
+          Text: "0"
+          Type: Builtin
+            Name: "nint"
+        Upper: IntLiteral
+          Text: "9"
+          Type: Builtin
+            Name: "nint"
+        HalfOpen: true
+        Type: Builtin
+          Name: "range"
+      Eval: Constant
+        Kind: 11
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: 0
+        End: 8
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "ClosedDown"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "range"
+      Value: RangeLit
+        Lower: IntLiteral
+          Text: "9"
+          Type: Builtin
+            Name: "nint"
+        Upper: IntLiteral
+          Text: "0"
+          Type: Builtin
+            Name: "nint"
+        HalfOpen: false
+        Type: Builtin
+          Name: "range"
+      Eval: Constant
+        Kind: 11
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: 9
+        End: 0
+        Step: -1
+        UnionTag: ~
+    Const
+      Name: "HalfDown"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "range"
+      Value: RangeLit
+        Lower: IntLiteral
+          Text: "9"
+          Type: Builtin
+            Name: "nint"
+        Upper: IntLiteral
+          Text: "0"
+          Type: Builtin
+            Name: "nint"
+        HalfOpen: true
+        Type: Builtin
+          Name: "range"
+      Eval: Constant
+        Kind: 11
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: 8
+        End: 0
+        Step: -1
+        UnionTag: ~
+    Const
+      Name: "ClosedUpEq"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "range"
+      Value: Conversion
+        Type: Builtin
+          Name: "range"
+        Args:
+          IntLiteral
+            Text: "0"
+            Type: Builtin
+              Name: "nint"
+          IntLiteral
+            Text: "9"
+            Type: Builtin
+              Name: "nint"
+      Eval: Constant
+        Kind: 11
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: 0
+        End: 9
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "HalfUpEq"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "range"
+      Value: Conversion
+        Type: Builtin
+          Name: "range"
+        Args:
+          IntLiteral
+            Text: "0"
+            Type: Builtin
+              Name: "nint"
+          IntLiteral
+            Text: "8"
+            Type: Builtin
+              Name: "nint"
+      Eval: Constant
+        Kind: 11
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: 0
+        End: 8
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "ClosedDownEq"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "range"
+      Value: Conversion
+        Type: Builtin
+          Name: "range"
+        Args:
+          IntLiteral
+            Text: "9"
+            Type: Builtin
+              Name: "nint"
+          IntLiteral
+            Text: "0"
+            Type: Builtin
+              Name: "nint"
+          Call
+            Receiver: IntLiteral
+              Text: "1"
+              Type: Builtin
+                Name: "nint"
+            Method: "neg"
+            Args: ~
+            Setter: false
+            Resolved: ~
+            Subst: ~
+            Type: Builtin
+              Name: "nint"
+      Eval: Constant
+        Kind: 11
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: 9
+        End: 0
+        Step: -1
+        UnionTag: ~
+    Const
+      Name: "HalfDownEq"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "range"
+      Value: Conversion
+        Type: Builtin
+          Name: "range"
+        Args:
+          IntLiteral
+            Text: "8"
+            Type: Builtin
+              Name: "nint"
+          IntLiteral
+            Text: "0"
+            Type: Builtin
+              Name: "nint"
+          Call
+            Receiver: IntLiteral
+              Text: "1"
+              Type: Builtin
+                Name: "nint"
+            Method: "neg"
+            Args: ~
+            Setter: false
+            Resolved: ~
+            Subst: ~
+            Type: Builtin
+              Name: "nint"
+      Eval: Constant
+        Kind: 11
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: 8
+        End: 0
+        Step: -1
+        UnionTag: ~
+    Const
+      Name: "Single"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "range"
+      Value: RangeLit
+        Lower: IntLiteral
+          Text: "5"
+          Type: Builtin
+            Name: "nint"
+        Upper: IntLiteral
+          Text: "5"
+          Type: Builtin
+            Name: "nint"
+        HalfOpen: false
+        Type: Builtin
+          Name: "range"
+      Eval: Constant
+        Kind: 11
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: 5
+        End: 5
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "Empty"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "range"
+      Value: RangeLit
+        Lower: IntLiteral
+          Text: "5"
+          Type: Builtin
+            Name: "nint"
+        Upper: IntLiteral
+          Text: "5"
+          Type: Builtin
+            Name: "nint"
+        HalfOpen: true
+        Type: Builtin
+          Name: "range"
+      Eval: Constant
+        Kind: 11
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: 5
+        End: 4
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "Upto"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "range"
+      Value: FuncCall
+        Target: "upto(nint)"
+        Args:
+          IntLiteral
+            Text: "4"
+            Type: Builtin
+              Name: "nint"
+        Resolved: ~
+        Subst: ~
+        Type: Builtin
+          Name: "range"
+      Eval: Constant
+        Kind: 11
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: 0
+        End: 5
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "Evens"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "range"
+      Value: Conversion
+        Type: Builtin
+          Name: "range"
+        Args:
+          IntLiteral
+            Text: "0"
+            Type: Builtin
+              Name: "nint"
+          IntLiteral
+            Text: "10"
+            Type: Builtin
+              Name: "nint"
+          IntLiteral
+            Text: "2"
+            Type: Builtin
+              Name: "nint"
+      Eval: Constant
+        Kind: 11
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: 0
+        End: 10
+        Step: 2
+        UnionTag: ~
+    Const
+      Name: "DownBy2"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "range"
+      Value: Conversion
+        Type: Builtin
+          Name: "range"
+        Args:
+          IntLiteral
+            Text: "10"
+            Type: Builtin
+              Name: "nint"
+          IntLiteral
+            Text: "0"
+            Type: Builtin
+              Name: "nint"
+          Call
+            Receiver: IntLiteral
+              Text: "2"
+              Type: Builtin
+                Name: "nint"
+            Method: "neg"
+            Args: ~
+            Setter: false
+            Resolved: ~
+            Subst: ~
+            Type: Builtin
+              Name: "nint"
+      Eval: Constant
+        Kind: 11
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: 10
+        End: 0
+        Step: -2
+        UnionTag: ~
+    Const
+      Name: "SumUp"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "nint"
+      Value: FuncCall
+        Target: "sumUp()"
+        Args: ~
+        Resolved: ~
+        Subst: ~
+        Type: Builtin
+          Name: "nint"
+      Eval: Constant
+        Kind: 0
+        Int: 55
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "SumDown"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "nint"
+      Value: FuncCall
+        Target: "sumDown()"
+        Args: ~
+        Resolved: ~
+        Subst: ~
+        Type: Builtin
+          Name: "nint"
+      Eval: Constant
+        Kind: 0
+        Int: 15
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "SumHalf"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "nint"
+      Value: FuncCall
+        Target: "sumHalf()"
+        Args: ~
+        Resolved: ~
+        Subst: ~
+        Type: Builtin
+          Name: "nint"
+      Eval: Constant
+        Kind: 0
+        Int: 10
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "SumEvens"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "nint"
+      Value: FuncCall
+        Target: "sumEvens()"
+        Args: ~
+        Resolved: ~
+        Subst: ~
+        Type: Builtin
+          Name: "nint"
+      Eval: Constant
+        Kind: 0
+        Int: 30
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "ClosedCount"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "nint"
+      Value: Call
+        Receiver: RangeLit
+          Lower: IntLiteral
+            Text: "0"
+            Type: Builtin
+              Name: "nint"
+          Upper: IntLiteral
+            Text: "9"
+            Type: Builtin
+              Name: "nint"
+          HalfOpen: false
+          Type: Builtin
+            Name: "range"
+        Method: "count"
+        Args: ~
+        Setter: false
+        Resolved: ~
+        Subst:
+          Entry
+            Key: "K"
+            Value: Builtin
+              Name: "nint"
+          Entry
+            Key: "V"
+            Value: Builtin
+              Name: "nint"
+        Type: Builtin
+          Name: "nint"
+      Eval: Constant
+        Kind: 0
+        Int: 10
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "HalfCount"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "nint"
+      Value: Call
+        Receiver: RangeLit
+          Lower: IntLiteral
+            Text: "0"
+            Type: Builtin
+              Name: "nint"
+          Upper: IntLiteral
+            Text: "9"
+            Type: Builtin
+              Name: "nint"
+          HalfOpen: true
+          Type: Builtin
+            Name: "range"
+        Method: "count"
+        Args: ~
+        Setter: false
+        Resolved: ~
+        Subst:
+          Entry
+            Key: "K"
+            Value: Builtin
+              Name: "nint"
+          Entry
+            Key: "V"
+            Value: Builtin
+              Name: "nint"
+        Type: Builtin
+          Name: "nint"
+      Eval: Constant
+        Kind: 0
+        Int: 9
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "SteppedCount"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "nint"
+      Value: Call
+        Receiver: Conversion
+          Type: Builtin
+            Name: "range"
+          Args:
+            IntLiteral
+              Text: "0"
+              Type: Builtin
+                Name: "nint"
+            IntLiteral
+              Text: "10"
+              Type: Builtin
+                Name: "nint"
+            IntLiteral
+              Text: "2"
+              Type: Builtin
+                Name: "nint"
+        Method: "count"
+        Args: ~
+        Setter: false
+        Resolved: ~
+        Subst:
+          Entry
+            Key: "K"
+            Value: Builtin
+              Name: "nint"
+          Entry
+            Key: "V"
+            Value: Builtin
+              Name: "nint"
+        Type: Builtin
+          Name: "nint"
+      Eval: Constant
+        Kind: 0
+        Int: 6
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "ClosedFold"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "nint"
+      Value: Call
+        Receiver: RangeLit
+          Lower: IntLiteral
+            Text: "0"
+            Type: Builtin
+              Name: "nint"
+          Upper: IntLiteral
+            Text: "4"
+            Type: Builtin
+              Name: "nint"
+          HalfOpen: false
+          Type: Builtin
+            Name: "range"
+        Method: "fold"
+        Args:
+          IntLiteral
+            Text: "0"
+            Type: Builtin
+              Name: "nint"
+          FuncLiteral
+            Params: "acc" "k" "v"
+            Body:
+              Return
+                Value: Call
+                  Receiver: ParamRef
+                    Name: "acc"
+                    Type: Builtin
+                      Name: "nint"
+                  Method: "add"
+                  Args:
+                    ParamRef
+                      Name: "v"
+                      Type: Builtin
+                        Name: "nint"
+                  Setter: false
+                  Resolved: ~
+                  Subst: ~
+                  Type: Builtin
+                    Name: "nint"
+            Type: Func
+              Params:
+                Builtin
+                  Name: "nint"
+                Builtin
+                  Name: "nint"
+                Builtin
+                  Name: "nint"
+              Result: Builtin
+                Name: "nint"
+        Setter: false
+        Resolved: ~
+        Subst:
+          Entry
+            Key: "A"
+            Value: Builtin
+              Name: "nint"
+          Entry
+            Key: "K"
+            Value: Builtin
+              Name: "nint"
+          Entry
+            Key: "V"
+            Value: Builtin
+              Name: "nint"
+        Type: Builtin
+          Name: "nint"
+      Eval: Constant
+        Kind: 0
+        Int: 10
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "SteppedFold"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "nint"
+      Value: Call
+        Receiver: Conversion
+          Type: Builtin
+            Name: "range"
+          Args:
+            IntLiteral
+              Text: "0"
+              Type: Builtin
+                Name: "nint"
+            IntLiteral
+              Text: "10"
+              Type: Builtin
+                Name: "nint"
+            IntLiteral
+              Text: "2"
+              Type: Builtin
+                Name: "nint"
+        Method: "fold"
+        Args:
+          IntLiteral
+            Text: "0"
+            Type: Builtin
+              Name: "nint"
+          FuncLiteral
+            Params: "acc" "k" "v"
+            Body:
+              Return
+                Value: Call
+                  Receiver: ParamRef
+                    Name: "acc"
+                    Type: Builtin
+                      Name: "nint"
+                  Method: "add"
+                  Args:
+                    ParamRef
+                      Name: "v"
+                      Type: Builtin
+                        Name: "nint"
+                  Setter: false
+                  Resolved: ~
+                  Subst: ~
+                  Type: Builtin
+                    Name: "nint"
+            Type: Func
+              Params:
+                Builtin
+                  Name: "nint"
+                Builtin
+                  Name: "nint"
+                Builtin
+                  Name: "nint"
+              Result: Builtin
+                Name: "nint"
+        Setter: false
+        Resolved: ~
+        Subst:
+          Entry
+            Key: "A"
+            Value: Builtin
+              Name: "nint"
+          Entry
+            Key: "K"
+            Value: Builtin
+              Name: "nint"
+          Entry
+            Key: "V"
+            Value: Builtin
+              Name: "nint"
+        Type: Builtin
+          Name: "nint"
+      Eval: Constant
+        Kind: 0
+        Int: 30
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+  Types: ~
+  Funcs:
+    Function
+      Name: "upto"
+      Public: true
+      Extern: false
+      Effects: ~
+      Doc: ~
+      TypeParams: ~
+      Params:
+        Param
+          Name: "n"
+          Type: Builtin
+            Name: "nint"
+      Result: Builtin
+        Name: "range"
+      Body:
+        Return
+          Value: RangeLit
+            Lower: IntLiteral
+              Text: "0"
+              Type: Builtin
+                Name: "nint"
+            Upper: Call
+              Receiver: ParamRef
+                Name: "n"
+                Type: Builtin
+                  Name: "nint"
+              Method: "add"
+              Args:
+                IntLiteral
+                  Text: "1"
+                  Type: Builtin
+                    Name: "nint"
+              Setter: false
+              Resolved: ~
+              Subst: ~
+              Type: Builtin
+                Name: "nint"
+            HalfOpen: false
+            Type: Builtin
+              Name: "range"
+    Function
+      Name: "sumUp"
+      Public: true
+      Extern: false
+      Effects: ~
+      Doc: ~
+      TypeParams: ~
+      Params: ~
+      Result: Builtin
+        Name: "nint"
+      Body:
+        Let
+          Name: "t"
+          Type: Builtin
+            Name: "nint"
+          Value: IntLiteral
+            Text: "0"
+            Type: Builtin
+              Name: "nint"
+        For
+          Var: "i"
+          VarType: Builtin
+            Name: "nint"
+          Of: true
+          Iter: RangeLit
+            Lower: IntLiteral
+              Text: "0"
+              Type: Builtin
+                Name: "nint"
+            Upper: IntLiteral
+              Text: "10"
+              Type: Builtin
+                Name: "nint"
+            HalfOpen: false
+            Type: Builtin
+              Name: "range"
+          Body:
+            Assign
+              Name: "t"
+              Value: Call
+                Receiver: LocalRef
+                  Name: "t"
+                  Type: Builtin
+                    Name: "nint"
+                Method: "add"
+                Args:
+                  LocalRef
+                    Name: "i"
+                    Type: Builtin
+                      Name: "nint"
+                Setter: false
+                Resolved: ~
+                Subst: ~
+                Type: Builtin
+                  Name: "nint"
+        Return
+          Value: LocalRef
+            Name: "t"
+            Type: Builtin
+              Name: "nint"
+    Function
+      Name: "sumDown"
+      Public: true
+      Extern: false
+      Effects: ~
+      Doc: ~
+      TypeParams: ~
+      Params: ~
+      Result: Builtin
+        Name: "nint"
+      Body:
+        Let
+          Name: "t"
+          Type: Builtin
+            Name: "nint"
+          Value: IntLiteral
+            Text: "0"
+            Type: Builtin
+              Name: "nint"
+        For
+          Var: "i"
+          VarType: Builtin
+            Name: "nint"
+          Of: true
+          Iter: RangeLit
+            Lower: IntLiteral
+              Text: "5"
+              Type: Builtin
+                Name: "nint"
+            Upper: IntLiteral
+              Text: "1"
+              Type: Builtin
+                Name: "nint"
+            HalfOpen: false
+            Type: Builtin
+              Name: "range"
+          Body:
+            Assign
+              Name: "t"
+              Value: Call
+                Receiver: LocalRef
+                  Name: "t"
+                  Type: Builtin
+                    Name: "nint"
+                Method: "add"
+                Args:
+                  LocalRef
+                    Name: "i"
+                    Type: Builtin
+                      Name: "nint"
+                Setter: false
+                Resolved: ~
+                Subst: ~
+                Type: Builtin
+                  Name: "nint"
+        Return
+          Value: LocalRef
+            Name: "t"
+            Type: Builtin
+              Name: "nint"
+    Function
+      Name: "sumHalf"
+      Public: true
+      Extern: false
+      Effects: ~
+      Doc: ~
+      TypeParams: ~
+      Params: ~
+      Result: Builtin
+        Name: "nint"
+      Body:
+        Let
+          Name: "t"
+          Type: Builtin
+            Name: "nint"
+          Value: IntLiteral
+            Text: "0"
+            Type: Builtin
+              Name: "nint"
+        For
+          Var: "i"
+          VarType: Builtin
+            Name: "nint"
+          Of: true
+          Iter: RangeLit
+            Lower: IntLiteral
+              Text: "0"
+              Type: Builtin
+                Name: "nint"
+            Upper: IntLiteral
+              Text: "5"
+              Type: Builtin
+                Name: "nint"
+            HalfOpen: true
+            Type: Builtin
+              Name: "range"
+          Body:
+            Assign
+              Name: "t"
+              Value: Call
+                Receiver: LocalRef
+                  Name: "t"
+                  Type: Builtin
+                    Name: "nint"
+                Method: "add"
+                Args:
+                  LocalRef
+                    Name: "i"
+                    Type: Builtin
+                      Name: "nint"
+                Setter: false
+                Resolved: ~
+                Subst: ~
+                Type: Builtin
+                  Name: "nint"
+        Return
+          Value: LocalRef
+            Name: "t"
+            Type: Builtin
+              Name: "nint"
+    Function
+      Name: "sumEvens"
+      Public: true
+      Extern: false
+      Effects: ~
+      Doc: ~
+      TypeParams: ~
+      Params: ~
+      Result: Builtin
+        Name: "nint"
+      Body:
+        Let
+          Name: "t"
+          Type: Builtin
+            Name: "nint"
+          Value: IntLiteral
+            Text: "0"
+            Type: Builtin
+              Name: "nint"
+        For
+          Var: "i"
+          VarType: Builtin
+            Name: "nint"
+          Of: true
+          Iter: Conversion
+            Type: Builtin
+              Name: "range"
+            Args:
+              IntLiteral
+                Text: "0"
+                Type: Builtin
+                  Name: "nint"
+              IntLiteral
+                Text: "10"
+                Type: Builtin
+                  Name: "nint"
+              IntLiteral
+                Text: "2"
+                Type: Builtin
+                  Name: "nint"
+          Body:
+            Assign
+              Name: "t"
+              Value: Call
+                Receiver: LocalRef
+                  Name: "t"
+                  Type: Builtin
+                    Name: "nint"
+                Method: "add"
+                Args:
+                  LocalRef
+                    Name: "i"
+                    Type: Builtin
+                      Name: "nint"
+                Setter: false
+                Resolved: ~
+                Subst: ~
+                Type: Builtin
+                  Name: "nint"
+        Return
+          Value: LocalRef
+            Name: "t"
+            Type: Builtin
+              Name: "nint"
+  Asserts:
+    Assert
+      Cond: "(0..9) == range(0, 9)"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "(0..9) == range(0, 9)\n  ^    ^  ^\n  |    |  range(0, 9)\n  |    true\n  range(0, 9)"
+    Assert
+      Cond: "(0...9) == range(0, 8)"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "(0...9) == range(0, 8)\n  ^     ^  ^\n  |     |  range(0, 8)\n  |     true\n  range(0, 8)"
+    Assert
+      Cond: "(9..0) == range(9, 0, -1)"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "(9..0) == range(9, 0, -1)\n  ^    ^  ^           ^\n  |    |  |           -1\n  |    |  range(9, 0, -1)\n  |    true\n  range(9, 0, -1)"
+    Assert
+      Cond: "(9...0) == range(8, 0, -1)"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "(9...0) == range(8, 0, -1)\n  ^     ^  ^           ^\n  |     |  |           -1\n  |     |  range(8, 0, -1)\n  |     true\n  range(8, 0, -1)"
+    Assert
+      Cond: "(5..5) == range(5, 5)"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "(5..5) == range(5, 5)\n  ^    ^  ^\n  |    |  range(5, 5)\n  |    true\n  range(5, 5)"
+    Assert
+      Cond: "sumUp() == 55"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "sumUp() == 55\n^       ^\n55      true"
+    Assert
+      Cond: "sumDown() == 15"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "sumDown() == 15\n^         ^\n15        true"
+    Assert
+      Cond: "sumHalf() == 10"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "sumHalf() == 10\n^         ^\n10        true"
+    Assert
+      Cond: "sumEvens() == 30"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "sumEvens() == 30\n^          ^\n30         true"
+    Assert
+      Cond: "(0..9).count() == 10"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "(0..9).count() == 10\n  ^    ^       ^\n  |    10      true\n  range(0, 9)"
+    Assert
+      Cond: "(0...9).count() == 9"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "(0...9).count() == 9\n  ^     ^       ^\n  |     9       true\n  range(0, 8)"
+    Assert
+      Cond: "range(0, 10, 2).count() == 6"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "range(0, 10, 2).count() == 6\n^               ^       ^\nrange(0, 10, 2) 6       true"
+    Assert
+      Cond: "range(10, 0, -2).count() == 6"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "range(10, 0, -2).count() == 6\n^            ^   ^       ^\n|            -2  6       true\nrange(10, 0, -2)"
+    Assert
+      Cond: "(0..4).fold(0, fn(acc: nint, k: nint, v: nint): nint { return acc + v }) == 10"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "(0..4).fold(0, fn(acc: nint, k: nint, v: nint): nint { return acc + v }) == 10\n  ^    ^                                                                 ^\n  |    10                                                                true\n  range(0, 4)"
+    Assert
+      Cond: "range(0, 10, 2).fold(0, fn(acc: nint, k: nint, v: nint): nint { return acc + v }) == 30"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "range(0, 10, 2).fold(0, fn(acc: nint, k: nint, v: nint): nint { return acc + v }) == 30\n^               ^                                                                 ^\nrange(0, 10, 2) 30                                                                true"

@@ -2,7 +2,6 @@ package cst
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/masterbelt/masterbelt/pkg/source"
 	"github.com/masterbelt/masterbelt/pkg/source/token"
@@ -93,34 +92,25 @@ func (t Tree) Span(buf source.Buffer) source.Span {
 // indented by depth, with each node showing its Kind and each leaf showing its
 // token Kind and quoted text. Concatenating the quoted leaf texts top to bottom
 // reproduces the source, which is what makes the snapshot a losslessness check.
-func Sprint(buf source.Buffer, root Green) string {
-	var b strings.Builder
-	writeTree(&b, buf, Root(root), 0)
-	return b.String()
+// It is the string form of the text representation contract (text.go).
+func Sprint(root Green) string {
+	text, err := root.MarshalText()
+	if err != nil {
+		// The CST marshaler is total — greens carry nothing unrepresentable.
+		panic(fmt.Sprintf("cst: MarshalText failed: %v", err))
+	}
+	return string(text)
 }
 
-func writeTree(b *strings.Builder, buf source.Buffer, t Tree, depth int) {
-	indent := strings.Repeat("  ", depth)
-	if tok, ok := t.Token(); ok {
-		fmt.Fprintf(b, "%s%s %q\n", indent, tok.Kind(), t.Text(buf))
-		return
-	}
-	n, _ := t.Node()
-	fmt.Fprintf(b, "%s%s\n", indent, n.Kind())
-	for _, child := range t.Children() {
-		writeTree(b, buf, child, depth+1)
-	}
-}
-
-// Equal reports whether two green trees are structurally identical — same kinds,
-// same widths, same children in order. It compares only the position-independent
-// shape, so it is the oracle an incremental reparse is checked against: the
+// Equal reports whether two green trees are identical — same kinds, same
+// texts, same children in order. It compares only the position-independent
+// content, so it is the oracle an incremental reparse is checked against: the
 // spliced tree must equal a tree parsed from scratch.
 func Equal(a, b Green) bool {
 	switch x := a.(type) {
 	case *Token:
 		y, ok := b.(*Token)
-		return ok && x.kind == y.kind && x.width == y.width
+		return ok && x.kind == y.kind && x.text == y.text
 	case *Node:
 		y, ok := b.(*Node)
 		if !ok || x.kind != y.kind || x.width != y.width || len(x.children) != len(y.children) {

@@ -3,8 +3,6 @@ package abstract
 import (
 	"strings"
 	"testing"
-
-	"github.com/masterbelt/masterbelt/pkg/source/ast"
 )
 
 // valueLine lowers src and returns the rendered initializer of its first
@@ -13,7 +11,7 @@ import (
 func valueLine(t *testing.T, src string) string {
 	t.Helper()
 	file, _ := Lower([]byte(src))
-	for _, line := range strings.Split(ast.Dump(file), "\n") {
+	for _, line := range strings.Split(dumpAST(file), "\n") {
 		if rest, ok := strings.CutPrefix(strings.TrimSpace(line), "value "); ok {
 			return rest
 		}

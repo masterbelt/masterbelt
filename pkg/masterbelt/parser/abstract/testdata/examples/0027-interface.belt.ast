@@ -1,48 +1,311 @@
 File
-  TypeDecl
-    doc "A small bag of T values that folds over its contents. The `impl foldable<nint, T>`"
-    doc "tag is what gives Bag the count/any methods — written here, at Bag's own"
-    doc "definition site."
-    pub
-    name "Bag"
-    param T
-    body list<T>
-    impl foldable<nint, T>
-    method "fold"
-      doc "The required primitive: fold the underlying list."
-      typeparam A
-      param init: A
-      param step: fn(acc: A, key: nint, value: T): A
-      result A
-      return Identifier "init"
-  InterfaceDecl
-    doc "A behaviour over a keyed collection: implement the required fold and the"
-    doc "provided methods (count, map, filter, ...) come for free, defined on top of"
-    doc "it. iterability is foldable."
-    pub
-    name "foldable"
-    param K
-    param V
-    required "fold"
-      typeparam A
-      param init: A
-      param step: fn(acc: A, key: K, value: V): A
-      result A
-    provided "count"
-      doc "Provided: the number of elements, folded from the primitive."
-      pub
-      result nint
-      return (call Identifier "fold" IntLit "0" (fn(acc: <missing>, key: <missing>, value: <missing>): <missing> (return (call (. Identifier "acc" add) IntLit "1"))))
-    provided "any"
-      doc "Provided: whether any element satisfies the predicate."
-      pub
-      param pred: fn(value: V): bool
-      result bool
-      return (call Identifier "fold" BoolLit false (fn(acc: <missing>, key: <missing>, value: <missing>): <missing> (return (call (. Identifier "acc" oror) (call Identifier "pred" Identifier "value")))))
-  FuncDecl
-    doc "The total of a collection of ints, folded with addition."
-    pub
-    name "total"
-    param c: foldable<nint, nint>
-    result nint
-      return (call (. Identifier "c" fold) IntLit "0" (fn(acc: <missing>, key: <missing>, value: <missing>): <missing> (return (call (. Identifier "acc" add) Identifier "value"))))
+  Uses: ~
+  Decls: ~
+  Types:
+    TypeDecl
+      Doc: "A small bag of T values that folds over its contents. The `impl foldable<nint, T>`" "tag is what gives Bag the count/any methods — written here, at Bag's own" "definition site."
+      Public: true
+      Name: "Bag"
+      Params:
+        TypeParam
+          Name: "T"
+          Constraint: ~
+      Body: NamedType
+        Namespace: ""
+        Name: "list"
+        Args:
+          NamedType
+            Namespace: ""
+            Name: "T"
+            Args: ~
+      Where: ~
+      Methods:
+        MethodDecl
+          Doc: "The required primitive: fold the underlying list."
+          Public: false
+          Extern: false
+          Kind: 0
+          Effects: ~
+          Name: "fold"
+          TypeParams:
+            TypeParam
+              Name: "A"
+              Constraint: ~
+          Params:
+            ParamDef
+              Name: "init"
+              Type: NamedType
+                Namespace: ""
+                Name: "A"
+                Args: ~
+            ParamDef
+              Name: "step"
+              Type: FuncType
+                Params:
+                  ParamDef
+                    Name: "acc"
+                    Type: NamedType
+                      Namespace: ""
+                      Name: "A"
+                      Args: ~
+                  ParamDef
+                    Name: "key"
+                    Type: NamedType
+                      Namespace: ""
+                      Name: "nint"
+                      Args: ~
+                  ParamDef
+                    Name: "value"
+                    Type: NamedType
+                      Namespace: ""
+                      Name: "T"
+                      Args: ~
+                Result: NamedType
+                  Namespace: ""
+                  Name: "A"
+                  Args: ~
+          Result: NamedType
+            Namespace: ""
+            Name: "A"
+            Args: ~
+          Body:
+            ReturnStmt
+              Value: Identifier
+                Name: "init"
+      Consts: ~
+      Impls:
+        NamedType
+          Namespace: ""
+          Name: "foldable"
+          Args:
+            NamedType
+              Namespace: ""
+              Name: "nint"
+              Args: ~
+            NamedType
+              Namespace: ""
+              Name: "T"
+              Args: ~
+  Enums: ~
+  Interfaces:
+    InterfaceDecl
+      Doc: "A behaviour over a keyed collection: implement the required fold and the" "provided methods (count, map, filter, ...) come for free, defined on top of" "it. iterability is foldable."
+      Public: true
+      Name: "foldable"
+      Params:
+        TypeParam
+          Name: "K"
+          Constraint: ~
+        TypeParam
+          Name: "V"
+          Constraint: ~
+      Parents: ~
+      Members:
+        InterfaceMember
+          Doc: ~
+          Public: false
+          Name: "fold"
+          TypeParams:
+            TypeParam
+              Name: "A"
+              Constraint: ~
+          Params:
+            ParamDef
+              Name: "init"
+              Type: NamedType
+                Namespace: ""
+                Name: "A"
+                Args: ~
+            ParamDef
+              Name: "step"
+              Type: FuncType
+                Params:
+                  ParamDef
+                    Name: "acc"
+                    Type: NamedType
+                      Namespace: ""
+                      Name: "A"
+                      Args: ~
+                  ParamDef
+                    Name: "key"
+                    Type: NamedType
+                      Namespace: ""
+                      Name: "K"
+                      Args: ~
+                  ParamDef
+                    Name: "value"
+                    Type: NamedType
+                      Namespace: ""
+                      Name: "V"
+                      Args: ~
+                Result: NamedType
+                  Namespace: ""
+                  Name: "A"
+                  Args: ~
+          Result: NamedType
+            Namespace: ""
+            Name: "A"
+            Args: ~
+          Body: ~
+        InterfaceMember
+          Doc: "Provided: the number of elements, folded from the primitive."
+          Public: true
+          Name: "count"
+          TypeParams: ~
+          Params: ~
+          Result: NamedType
+            Namespace: ""
+            Name: "nint"
+            Args: ~
+          Body:
+            ReturnStmt
+              Value: CallExpr
+                Callee: Identifier
+                  Name: "fold"
+                Arguments:
+                  IntLit
+                    Text: "0"
+                  FuncLit
+                    Params:
+                      ParamDef
+                        Name: "acc"
+                        Type: ~
+                      ParamDef
+                        Name: "key"
+                        Type: ~
+                      ParamDef
+                        Name: "value"
+                        Type: ~
+                    Result: ~
+                    Body:
+                      ReturnStmt
+                        Value: CallExpr
+                          Callee: MemberExpr
+                            Receiver: Identifier
+                              Name: "acc"
+                            Member: Identifier
+                              Name: "add"
+                          Arguments:
+                            IntLit
+                              Text: "1"
+        InterfaceMember
+          Doc: "Provided: whether any element satisfies the predicate."
+          Public: true
+          Name: "any"
+          TypeParams: ~
+          Params:
+            ParamDef
+              Name: "pred"
+              Type: FuncType
+                Params:
+                  ParamDef
+                    Name: "value"
+                    Type: NamedType
+                      Namespace: ""
+                      Name: "V"
+                      Args: ~
+                Result: NamedType
+                  Namespace: ""
+                  Name: "bool"
+                  Args: ~
+          Result: NamedType
+            Namespace: ""
+            Name: "bool"
+            Args: ~
+          Body:
+            ReturnStmt
+              Value: CallExpr
+                Callee: Identifier
+                  Name: "fold"
+                Arguments:
+                  BoolLit
+                    Value: false
+                  FuncLit
+                    Params:
+                      ParamDef
+                        Name: "acc"
+                        Type: ~
+                      ParamDef
+                        Name: "key"
+                        Type: ~
+                      ParamDef
+                        Name: "value"
+                        Type: ~
+                    Result: ~
+                    Body:
+                      ReturnStmt
+                        Value: CallExpr
+                          Callee: MemberExpr
+                            Receiver: Identifier
+                              Name: "acc"
+                            Member: Identifier
+                              Name: "oror"
+                          Arguments:
+                            CallExpr
+                              Callee: Identifier
+                                Name: "pred"
+                              Arguments:
+                                Identifier
+                                  Name: "value"
+  Funcs:
+    FuncDecl
+      Doc: "The total of a collection of ints, folded with addition."
+      Public: true
+      Extern: false
+      Effects: ~
+      Name: "total"
+      TypeParams: ~
+      Params:
+        ParamDef
+          Name: "c"
+          Type: NamedType
+            Namespace: ""
+            Name: "foldable"
+            Args:
+              NamedType
+                Namespace: ""
+                Name: "nint"
+                Args: ~
+              NamedType
+                Namespace: ""
+                Name: "nint"
+                Args: ~
+      Result: NamedType
+        Namespace: ""
+        Name: "nint"
+        Args: ~
+      Body:
+        ReturnStmt
+          Value: CallExpr
+            Callee: MemberExpr
+              Receiver: Identifier
+                Name: "c"
+              Member: Identifier
+                Name: "fold"
+            Arguments:
+              IntLit
+                Text: "0"
+              FuncLit
+                Params:
+                  ParamDef
+                    Name: "acc"
+                    Type: ~
+                  ParamDef
+                    Name: "key"
+                    Type: ~
+                  ParamDef
+                    Name: "value"
+                    Type: ~
+                Result: ~
+                Body:
+                  ReturnStmt
+                    Value: CallExpr
+                      Callee: MemberExpr
+                        Receiver: Identifier
+                          Name: "acc"
+                        Member: Identifier
+                          Name: "add"
+                      Arguments:
+                        Identifier
+                          Name: "value"
+  Asserts: ~

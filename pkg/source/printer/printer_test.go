@@ -15,9 +15,9 @@ func TestPrintReproducesSource(t *testing.T) {
 	// Leaves tile [0,5): "ab"(2) + " "(1) + "cd"(2). The kinds are irrelevant to
 	// printing; only the widths (and the buffer) matter.
 	root := cst.NewNode(cst.File, []cst.Green{
-		cst.NewToken(token.Ident, 2),
-		cst.NewToken(token.Whitespace, 1),
-		cst.NewToken(token.Ident, 2),
+		cst.NewToken(token.Ident, "ab"),
+		cst.NewToken(token.Whitespace, " "),
+		cst.NewToken(token.Ident, "cd"),
 	})
 
 	if got := Print(buf, root); got != src {

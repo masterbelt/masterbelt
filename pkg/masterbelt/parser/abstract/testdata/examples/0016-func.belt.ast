@@ -1,55 +1,310 @@
 File
-  ConstDecl
-    name "A"
-    value (call Identifier "area" IntLit "3" IntLit "4")
-  ConstDecl
-    name "B"
-    value (call Identifier "double" IntLit "21")
-  ConstDecl
-    name "C"
-    value (call Identifier "perimeter" IntLit "2" IntLit "3")
-  ConstDecl
-    name "D"
-    value (call (. (list IntLit "1" IntLit "2" IntLit "3") map) (fn(x: <missing>): <missing> (return (call Identifier "double" Identifier "x"))))
-  ConstDecl
-    name "E"
-    value (call Identifier "greet" StringLit "belt")
-  ConstDecl
-    name "O"
-    value (call Identifier "origin")
-  TypeDecl
-    pub
-    name "Point"
-    body { x: nint, y: nint }
-  FuncDecl
-    pub
-    name "double"
-    param x: nint
-    result nint
-      return (call (. Identifier "x" mul) IntLit "2")
-  FuncDecl
-    pub
-    name "area"
-    param w: nint
-    param h: nint
-    result nint
-      return (call (. Identifier "w" mul) Identifier "h")
-  FuncDecl
-    pub
-    name "perimeter"
-    param w: nint
-    param h: nint
-    result nint
-      return (call (. (call Identifier "double" Identifier "w") add) (call Identifier "double" Identifier "h"))
-  FuncDecl
-    name "greet"
-    param name: string
-    result string
-      return (call (. StringLit "Hello, " add) Identifier "name")
-  FuncDecl
-    pub
-    name "origin"
-    result Point
-      return (record Point x: IntLit "0" y: IntLit "0")
-  AssertDecl
-    cond (call (. (call Identifier "area" IntLit "3" IntLit "4") eql) IntLit "12")
+  Uses: ~
+  Decls:
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "A"
+      Type: ~
+      Value: CallExpr
+        Callee: Identifier
+          Name: "area"
+        Arguments:
+          IntLit
+            Text: "3"
+          IntLit
+            Text: "4"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "B"
+      Type: ~
+      Value: CallExpr
+        Callee: Identifier
+          Name: "double"
+        Arguments:
+          IntLit
+            Text: "21"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "C"
+      Type: ~
+      Value: CallExpr
+        Callee: Identifier
+          Name: "perimeter"
+        Arguments:
+          IntLit
+            Text: "2"
+          IntLit
+            Text: "3"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "D"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: CollectionLit
+            Entries:
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "1"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "2"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "3"
+          Member: Identifier
+            Name: "map"
+        Arguments:
+          FuncLit
+            Params:
+              ParamDef
+                Name: "x"
+                Type: ~
+            Result: ~
+            Body:
+              ReturnStmt
+                Value: CallExpr
+                  Callee: Identifier
+                    Name: "double"
+                  Arguments:
+                    Identifier
+                      Name: "x"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "E"
+      Type: ~
+      Value: CallExpr
+        Callee: Identifier
+          Name: "greet"
+        Arguments:
+          StringLit
+            Value: "belt"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "O"
+      Type: ~
+      Value: CallExpr
+        Callee: Identifier
+          Name: "origin"
+        Arguments: ~
+      Builtin: false
+  Types:
+    TypeDecl
+      Doc: ~
+      Public: true
+      Name: "Point"
+      Params: ~
+      Body: RecordType
+        Fields:
+          FieldDef
+            Name: "x"
+            Type: NamedType
+              Namespace: ""
+              Name: "nint"
+              Args: ~
+          FieldDef
+            Name: "y"
+            Type: NamedType
+              Namespace: ""
+              Name: "nint"
+              Args: ~
+      Where: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
+  Enums: ~
+  Interfaces: ~
+  Funcs:
+    FuncDecl
+      Doc: ~
+      Public: true
+      Extern: false
+      Effects: ~
+      Name: "double"
+      TypeParams: ~
+      Params:
+        ParamDef
+          Name: "x"
+          Type: NamedType
+            Namespace: ""
+            Name: "nint"
+            Args: ~
+      Result: NamedType
+        Namespace: ""
+        Name: "nint"
+        Args: ~
+      Body:
+        ReturnStmt
+          Value: CallExpr
+            Callee: MemberExpr
+              Receiver: Identifier
+                Name: "x"
+              Member: Identifier
+                Name: "mul"
+            Arguments:
+              IntLit
+                Text: "2"
+    FuncDecl
+      Doc: ~
+      Public: true
+      Extern: false
+      Effects: ~
+      Name: "area"
+      TypeParams: ~
+      Params:
+        ParamDef
+          Name: "w"
+          Type: NamedType
+            Namespace: ""
+            Name: "nint"
+            Args: ~
+        ParamDef
+          Name: "h"
+          Type: NamedType
+            Namespace: ""
+            Name: "nint"
+            Args: ~
+      Result: NamedType
+        Namespace: ""
+        Name: "nint"
+        Args: ~
+      Body:
+        ReturnStmt
+          Value: CallExpr
+            Callee: MemberExpr
+              Receiver: Identifier
+                Name: "w"
+              Member: Identifier
+                Name: "mul"
+            Arguments:
+              Identifier
+                Name: "h"
+    FuncDecl
+      Doc: ~
+      Public: true
+      Extern: false
+      Effects: ~
+      Name: "perimeter"
+      TypeParams: ~
+      Params:
+        ParamDef
+          Name: "w"
+          Type: NamedType
+            Namespace: ""
+            Name: "nint"
+            Args: ~
+        ParamDef
+          Name: "h"
+          Type: NamedType
+            Namespace: ""
+            Name: "nint"
+            Args: ~
+      Result: NamedType
+        Namespace: ""
+        Name: "nint"
+        Args: ~
+      Body:
+        ReturnStmt
+          Value: CallExpr
+            Callee: MemberExpr
+              Receiver: CallExpr
+                Callee: Identifier
+                  Name: "double"
+                Arguments:
+                  Identifier
+                    Name: "w"
+              Member: Identifier
+                Name: "add"
+            Arguments:
+              CallExpr
+                Callee: Identifier
+                  Name: "double"
+                Arguments:
+                  Identifier
+                    Name: "h"
+    FuncDecl
+      Doc: ~
+      Public: false
+      Extern: false
+      Effects: ~
+      Name: "greet"
+      TypeParams: ~
+      Params:
+        ParamDef
+          Name: "name"
+          Type: NamedType
+            Namespace: ""
+            Name: "string"
+            Args: ~
+      Result: NamedType
+        Namespace: ""
+        Name: "string"
+        Args: ~
+      Body:
+        ReturnStmt
+          Value: CallExpr
+            Callee: MemberExpr
+              Receiver: StringLit
+                Value: "Hello, "
+              Member: Identifier
+                Name: "add"
+            Arguments:
+              Identifier
+                Name: "name"
+    FuncDecl
+      Doc: ~
+      Public: true
+      Extern: false
+      Effects: ~
+      Name: "origin"
+      TypeParams: ~
+      Params: ~
+      Result: NamedType
+        Namespace: ""
+        Name: "Point"
+        Args: ~
+      Body:
+        ReturnStmt
+          Value: RecordLit
+            TypeName: "Point"
+            Fields:
+              FieldInit
+                Name: "x"
+                Value: IntLit
+                  Text: "0"
+              FieldInit
+                Name: "y"
+                Value: IntLit
+                  Text: "0"
+  Asserts:
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: Identifier
+              Name: "area"
+            Arguments:
+              IntLit
+                Text: "3"
+              IntLit
+                Text: "4"
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "12"

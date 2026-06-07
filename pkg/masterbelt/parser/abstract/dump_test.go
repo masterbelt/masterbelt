@@ -1,15 +1,26 @@
-package ast
+// This file is the test-local curated rendering of the AST: the compact,
+// human-edited dump the lowering tests assert against (the s-expr inline
+// expressions, the source-like type forms). It is deliberately NOT the text
+// representation contract — that is ast's generated format v2
+// (ast.File.MarshalText), which carries every field; this DSL exists so a
+// test can pin one aspect of a lowering in one readable line. It moved here
+// from package ast when the exact format replaced it as the snapshot oracle.
+
+package abstract
 
 import (
 	"fmt"
 	"strings"
+	"testing"
+
+	"github.com/masterbelt/masterbelt/pkg/source/ast"
 )
 
-// Dump renders a File as a stable, diffable text tree. It reads only the
+// Dump renders a ast.File as a stable, diffable text tree. It reads only the
 // resolved fields (no positions, no buffer), so two Files dump to the same text
 // exactly when they are structurally equal — which makes Dump both the snapshot
 // format and the oracle an incremental lowering is checked against.
-func Dump(f *File) string {
+func dumpAST(f *ast.File) string {
 	var b strings.Builder
 	b.WriteString("File\n")
 	for _, d := range f.Uses {
@@ -36,7 +47,7 @@ func Dump(f *File) string {
 	return b.String()
 }
 
-func dumpUseDecl(b *strings.Builder, d *UseDecl) {
+func dumpUseDecl(b *strings.Builder, d *ast.UseDecl) {
 	b.WriteString("  UseDecl\n")
 	if d.Public {
 		b.WriteString("    pub\n")
@@ -54,7 +65,7 @@ func dumpUseDecl(b *strings.Builder, d *UseDecl) {
 	fmt.Fprintf(b, "    from %q\n", d.Path)
 }
 
-func dumpConstDecl(b *strings.Builder, d *ConstDecl) {
+func dumpConstDecl(b *strings.Builder, d *ast.ConstDecl) {
 	b.WriteString("  ConstDecl\n")
 	for _, doc := range d.Doc {
 		fmt.Fprintf(b, "    doc %q\n", doc)
@@ -71,7 +82,7 @@ func dumpConstDecl(b *strings.Builder, d *ConstDecl) {
 	}
 }
 
-func dumpFuncDecl(b *strings.Builder, d *FuncDecl) {
+func dumpFuncDecl(b *strings.Builder, d *ast.FuncDecl) {
 	b.WriteString("  FuncDecl\n")
 	for _, doc := range d.Doc {
 		fmt.Fprintf(b, "    doc %q\n", doc)
@@ -104,7 +115,7 @@ func dumpFuncDecl(b *strings.Builder, d *FuncDecl) {
 	}
 }
 
-func dumpAssertDecl(b *strings.Builder, d *AssertDecl) {
+func dumpAssertDecl(b *strings.Builder, d *ast.AssertDecl) {
 	b.WriteString("  AssertDecl\n")
 	for _, doc := range d.Doc {
 		fmt.Fprintf(b, "    doc %q\n", doc)
@@ -112,23 +123,23 @@ func dumpAssertDecl(b *strings.Builder, d *AssertDecl) {
 	fmt.Fprintf(b, "    cond %s\n", dumpExpr(d.Cond))
 }
 
-func dumpExpr(e Expr) string {
+func dumpExpr(e ast.Expr) string {
 	switch x := e.(type) {
 	case nil:
 		return "<missing>"
-	case *IntLit:
+	case *ast.IntLit:
 		return fmt.Sprintf("IntLit %q", x.Text)
-	case *StringLit:
+	case *ast.StringLit:
 		return fmt.Sprintf("StringLit %q", x.Value)
-	case *DatetimeLit:
+	case *ast.DatetimeLit:
 		return fmt.Sprintf("DatetimeLit %q", x.Text)
-	case *DurationLit:
+	case *ast.DurationLit:
 		return fmt.Sprintf("DurationLit %q", x.Text)
-	case *BoolLit:
+	case *ast.BoolLit:
 		return fmt.Sprintf("BoolLit %v", x.Value)
-	case *NullLit:
+	case *ast.NullLit:
 		return "NullLit"
-	case *CollectionLit:
+	case *ast.CollectionLit:
 		label := "collection"
 		if x.IsMap() {
 			label = "map"
@@ -144,7 +155,7 @@ func dumpExpr(e Expr) string {
 			}
 		}
 		return "(" + strings.Join(parts, " ") + ")"
-	case *RecordLit:
+	case *ast.RecordLit:
 		label := "record"
 		if x.TypeName != "" {
 			label = "record " + x.TypeName
@@ -154,29 +165,29 @@ func dumpExpr(e Expr) string {
 			parts = append(parts, f.Name+": "+dumpExpr(f.Value))
 		}
 		return "(" + strings.Join(parts, " ") + ")"
-	case *SelfExpr:
+	case *ast.SelfExpr:
 		return "self"
-	case *Identifier:
+	case *ast.Identifier:
 		return fmt.Sprintf("Identifier %q", x.Name)
-	case *MemberExpr:
+	case *ast.MemberExpr:
 		return fmt.Sprintf("(. %s %s)", dumpExpr(x.Receiver), x.Member.Name)
-	case *CallExpr:
+	case *ast.CallExpr:
 		parts := []string{"call", dumpExpr(x.Callee)}
 		for _, a := range x.Arguments {
 			parts = append(parts, dumpExpr(a))
 		}
 		return "(" + strings.Join(parts, " ") + ")"
-	case *AwaitExpr:
+	case *ast.AwaitExpr:
 		return "(await " + dumpExpr(x.Value) + ")"
-	case *TernaryExpr:
+	case *ast.TernaryExpr:
 		return "(? " + dumpExpr(x.Cond) + " " + dumpExpr(x.Then) + " " + dumpExpr(x.Else) + ")"
-	case *RangeExpr:
+	case *ast.RangeExpr:
 		op := ".."
 		if x.HalfOpen {
 			op = "..."
 		}
 		return "(" + op + " " + dumpExpr(x.Lower) + " " + dumpExpr(x.Upper) + ")"
-	case *FuncLit:
+	case *ast.FuncLit:
 		params := make([]string, len(x.Params))
 		for i, p := range x.Params {
 			params[i] = p.Name + ": " + dumpType(p.Type)
@@ -197,35 +208,35 @@ func dumpExpr(e Expr) string {
 // an inline form so a control-flow statement carried by a lambda body — an if,
 // a switch — is visible in the snapshot oracle rather than silently dropped; a
 // kind added later panics here, forcing the form to be defined.
-func dumpStmtInline(s Stmt) string {
+func dumpStmtInline(s ast.Stmt) string {
 	switch s := s.(type) {
-	case *ReturnStmt:
+	case *ast.ReturnStmt:
 		return "(return " + dumpExpr(s.Value) + ")"
-	case *ExprStmt:
+	case *ast.ExprStmt:
 		return "(expr " + dumpExpr(s.X) + ")"
-	case *LetStmt:
+	case *ast.LetStmt:
 		if s.Type != nil {
 			return "(let " + s.Name + ": " + dumpType(s.Type) + " = " + dumpExpr(s.Value) + ")"
 		}
 		return "(let " + s.Name + " = " + dumpExpr(s.Value) + ")"
-	case *AssignStmt:
+	case *ast.AssignStmt:
 		return "(assign " + dumpExpr(s.Target) + " = " + dumpExpr(s.Value) + ")"
-	case *SwitchStmt:
+	case *ast.SwitchStmt:
 		return dumpSwitchInline(s)
-	case *MatchStmt:
+	case *ast.MatchStmt:
 		return dumpMatchInline(s)
-	case *IfStmt:
+	case *ast.IfStmt:
 		return dumpIfInline(s)
-	case *ForStmt:
+	case *ast.ForStmt:
 		return dumpForInline(s)
 	default:
-		panic(unhandledStmt(s))
+		panic(ast.UnhandledStmt(s))
 	}
 }
 
 // dumpInlineBody renders a statement body as a space-joined run of inline
 // statements, e.g. "(return ...) (let ...)".
-func dumpInlineBody(body []Stmt) string {
+func dumpInlineBody(body []ast.Stmt) string {
 	parts := make([]string, len(body))
 	for i, s := range body {
 		parts[i] = dumpStmtInline(s)
@@ -235,7 +246,7 @@ func dumpInlineBody(body []Stmt) string {
 
 // dumpSwitchInline renders a switch compactly: its scrutinee, each arm's value
 // patterns and body, the wildcard else body, and any unreachable arms.
-func dumpSwitchInline(s *SwitchStmt) string {
+func dumpSwitchInline(s *ast.SwitchStmt) string {
 	var b strings.Builder
 	b.WriteString("(switch " + dumpExpr(s.Scrutinee))
 	for _, arm := range s.Arms {
@@ -254,7 +265,7 @@ func dumpSwitchInline(s *SwitchStmt) string {
 // dumpMatchInline renders a match compactly: its scrutinee, each arm's type
 // pattern (with its binding) and body, the wildcard else body, and any
 // unreachable arms.
-func dumpMatchInline(s *MatchStmt) string {
+func dumpMatchInline(s *ast.MatchStmt) string {
 	var b strings.Builder
 	b.WriteString("(match " + dumpExpr(s.Scrutinee))
 	for _, arm := range s.Arms {
@@ -272,7 +283,7 @@ func dumpMatchInline(s *MatchStmt) string {
 
 // dumpMatchPattern renders a match arm's type pattern: its member type and, when
 // present, its binding name (Coin c, null, int v).
-func dumpMatchPattern(arm *MatchArm) string {
+func dumpMatchPattern(arm *ast.MatchArm) string {
 	pat := dumpType(arm.Type)
 	if arm.Bind != "" {
 		pat += " " + arm.Bind
@@ -281,7 +292,7 @@ func dumpMatchPattern(arm *MatchArm) string {
 }
 
 // dumpArmValues renders a switch arm's value patterns, comma-joined.
-func dumpArmValues(arm *SwitchArm) string {
+func dumpArmValues(arm *ast.SwitchArm) string {
 	values := make([]string, len(arm.Values))
 	for i, v := range arm.Values {
 		values[i] = dumpExpr(v)
@@ -291,7 +302,7 @@ func dumpArmValues(arm *SwitchArm) string {
 
 // dumpIfInline renders an if compactly: its condition, then body, else-if chain,
 // and else body.
-func dumpIfInline(s *IfStmt) string {
+func dumpIfInline(s *ast.IfStmt) string {
 	out := "(if " + dumpExpr(s.Cond) + " (then " + dumpInlineBody(s.Then) + ")"
 	if s.ElseIf != nil {
 		out += " (else-if " + dumpIfInline(s.ElseIf) + ")"
@@ -304,11 +315,11 @@ func dumpIfInline(s *IfStmt) string {
 
 // dumpForInline renders a for compactly: its loop variable, of/in, the iterated
 // expression, and the loop body.
-func dumpForInline(s *ForStmt) string {
+func dumpForInline(s *ast.ForStmt) string {
 	return "(for " + s.Var + " " + s.Kind.String() + " " + dumpExpr(s.Iter) + " (body " + dumpInlineBody(s.Body) + "))"
 }
 
-func dumpTypeDecl(b *strings.Builder, d *TypeDecl) {
+func dumpTypeDecl(b *strings.Builder, d *ast.TypeDecl) {
 	b.WriteString("  TypeDecl\n")
 	for _, doc := range d.Doc {
 		fmt.Fprintf(b, "    doc %q\n", doc)
@@ -344,7 +355,7 @@ func dumpTypeDecl(b *strings.Builder, d *TypeDecl) {
 // dumpAssocConst renders one associated constant of an impl block: its name, an
 // optional type annotation and value, and the builtin marker when the value
 // comes from the registry (`= builtin`).
-func dumpAssocConst(b *strings.Builder, c *ConstDecl) {
+func dumpAssocConst(b *strings.Builder, c *ast.ConstDecl) {
 	fmt.Fprintf(b, "    const %q\n", c.Name)
 	for _, doc := range c.Doc {
 		fmt.Fprintf(b, "      doc %q\n", doc)
@@ -363,7 +374,7 @@ func dumpAssocConst(b *strings.Builder, c *ConstDecl) {
 	}
 }
 
-func dumpEnumDecl(b *strings.Builder, d *EnumDecl) {
+func dumpEnumDecl(b *strings.Builder, d *ast.EnumDecl) {
 	b.WriteString("  EnumDecl\n")
 	for _, doc := range d.Doc {
 		fmt.Fprintf(b, "    doc %q\n", doc)
@@ -396,7 +407,7 @@ func dumpEnumDecl(b *strings.Builder, d *EnumDecl) {
 // dumpInterfaceDecl renders one interface declaration: its modifiers, name,
 // generic parameters, parents (supertraits), and members (required and
 // provided, distinguished by whether the member carries a default body).
-func dumpInterfaceDecl(b *strings.Builder, d *InterfaceDecl) {
+func dumpInterfaceDecl(b *strings.Builder, d *ast.InterfaceDecl) {
 	b.WriteString("  InterfaceDecl\n")
 	for _, doc := range d.Doc {
 		fmt.Fprintf(b, "    doc %q\n", doc)
@@ -423,7 +434,7 @@ func dumpInterfaceDecl(b *strings.Builder, d *InterfaceDecl) {
 // dumpInterfaceMember renders one interface member: required or provided (the
 // keyword reflects whether it carries a default body), then its signature and,
 // for a provided member, its body.
-func dumpInterfaceMember(b *strings.Builder, m *InterfaceMember) {
+func dumpInterfaceMember(b *strings.Builder, m *ast.InterfaceMember) {
 	kind := "required"
 	if m.Provided() {
 		kind = "provided"
@@ -449,7 +460,7 @@ func dumpInterfaceMember(b *strings.Builder, m *InterfaceMember) {
 	}
 }
 
-func dumpMethod(b *strings.Builder, m *MethodDecl) {
+func dumpMethod(b *strings.Builder, m *ast.MethodDecl) {
 	fmt.Fprintf(b, "    method %q\n", m.Name)
 	for _, doc := range m.Doc {
 		fmt.Fprintf(b, "      doc %q\n", doc)
@@ -460,7 +471,7 @@ func dumpMethod(b *strings.Builder, m *MethodDecl) {
 	if m.Extern {
 		b.WriteString("      extern\n")
 	}
-	if m.Kind != MethodNormal {
+	if m.Kind != ast.MethodNormal {
 		fmt.Fprintf(b, "      kind %s\n", m.Kind)
 	}
 	if len(m.Effects) > 0 {
@@ -480,28 +491,28 @@ func dumpMethod(b *strings.Builder, m *MethodDecl) {
 	}
 }
 
-func dumpStmt(b *strings.Builder, s Stmt) {
+func dumpStmt(b *strings.Builder, s ast.Stmt) {
 	dumpStmtAt(b, s, "      ")
 }
 
 // dumpStmtAt renders one statement at the given indent. A switch's arm bodies
 // nest one level deeper, so the indent threads through rather than being fixed,
 // keeping the dump a faithful, diffable picture of the control structure.
-func dumpStmtAt(b *strings.Builder, s Stmt, indent string) {
+func dumpStmtAt(b *strings.Builder, s ast.Stmt, indent string) {
 	switch s := s.(type) {
-	case *ReturnStmt:
+	case *ast.ReturnStmt:
 		fmt.Fprintf(b, "%sreturn %s\n", indent, dumpExpr(s.Value))
-	case *ExprStmt:
+	case *ast.ExprStmt:
 		fmt.Fprintf(b, "%sexpr %s\n", indent, dumpExpr(s.X))
-	case *LetStmt:
+	case *ast.LetStmt:
 		if s.Type != nil {
 			fmt.Fprintf(b, "%slet %q: %s = %s\n", indent, s.Name, dumpType(s.Type), dumpExpr(s.Value))
 		} else {
 			fmt.Fprintf(b, "%slet %q = %s\n", indent, s.Name, dumpExpr(s.Value))
 		}
-	case *AssignStmt:
+	case *ast.AssignStmt:
 		fmt.Fprintf(b, "%sassign %s = %s\n", indent, dumpExpr(s.Target), dumpExpr(s.Value))
-	case *SwitchStmt:
+	case *ast.SwitchStmt:
 		fmt.Fprintf(b, "%sswitch %s\n", indent, dumpExpr(s.Scrutinee))
 		for _, arm := range s.Arms {
 			values := make([]string, len(arm.Values))
@@ -529,7 +540,7 @@ func dumpStmtAt(b *strings.Builder, s Stmt, indent string) {
 				dumpStmtAt(b, bs, indent+"    ")
 			}
 		}
-	case *MatchStmt:
+	case *ast.MatchStmt:
 		fmt.Fprintf(b, "%smatch %s\n", indent, dumpExpr(s.Scrutinee))
 		for _, arm := range s.Arms {
 			fmt.Fprintf(b, "%s  arm %s\n", indent, dumpMatchPattern(arm))
@@ -549,9 +560,9 @@ func dumpStmtAt(b *strings.Builder, s Stmt, indent string) {
 				dumpStmtAt(b, bs, indent+"    ")
 			}
 		}
-	case *IfStmt:
+	case *ast.IfStmt:
 		dumpIfAt(b, s, indent)
-	case *ForStmt:
+	case *ast.ForStmt:
 		fmt.Fprintf(b, "%sfor %s %s %s\n", indent, s.Var, s.Kind.String(), dumpExpr(s.Iter))
 		for _, bs := range s.Body {
 			dumpStmtAt(b, bs, indent+"    ")
@@ -559,7 +570,7 @@ func dumpStmtAt(b *strings.Builder, s Stmt, indent string) {
 	default:
 		// The snapshot oracle must render every statement kind; a new one panics
 		// here rather than dumping as nothing and masking the regression.
-		panic(unhandledStmt(s))
+		panic(ast.UnhandledStmt(s))
 	}
 }
 
@@ -568,7 +579,7 @@ func dumpStmtAt(b *strings.Builder, s Stmt, indent string) {
 // the control structure: "if cond" then its body, "else if cond" for a chained
 // if (rendered flat, not re-indented, to read as a chain), and "else" for a
 // plain else block.
-func dumpIfAt(b *strings.Builder, s *IfStmt, indent string) {
+func dumpIfAt(b *strings.Builder, s *ast.IfStmt, indent string) {
 	fmt.Fprintf(b, "%sif %s\n", indent, dumpExpr(s.Cond))
 	for _, bs := range s.Then {
 		dumpStmtAt(b, bs, indent+"    ")
@@ -593,7 +604,7 @@ func dumpIfAt(b *strings.Builder, s *IfStmt, indent string) {
 // dumpIfChainTail renders the else branch of a chained if (the "else if" or
 // "else" that follows an already-rendered "else if cond" head and body),
 // keeping the whole chain at one indent.
-func dumpIfChainTail(b *strings.Builder, s *IfStmt, indent string) {
+func dumpIfChainTail(b *strings.Builder, s *ast.IfStmt, indent string) {
 	switch {
 	case s.ElseIf != nil:
 		fmt.Fprintf(b, "%selse if %s\n", indent, dumpExpr(s.ElseIf.Cond))
@@ -611,11 +622,11 @@ func dumpIfChainTail(b *strings.Builder, s *IfStmt, indent string) {
 
 // dumpType renders a type expression in a source-like form: int8, Optional<T>,
 // A | B, { id: int8 }, fn(src: T): R.
-func dumpType(t TypeExpr) string {
+func dumpType(t ast.TypeExpr) string {
 	switch t := t.(type) {
 	case nil:
 		return "<missing>"
-	case *NamedType:
+	case *ast.NamedType:
 		name := t.Name
 		if t.Namespace != "" {
 			name = t.Namespace + "." + t.Name
@@ -628,25 +639,25 @@ func dumpType(t TypeExpr) string {
 			args[i] = dumpType(a)
 		}
 		return name + "<" + strings.Join(args, ", ") + ">"
-	case *UnionType:
+	case *ast.UnionType:
 		parts := make([]string, len(t.Members))
 		for i, m := range t.Members {
 			parts[i] = dumpType(m)
 		}
 		return strings.Join(parts, " | ")
-	case *RecordType:
+	case *ast.RecordType:
 		parts := make([]string, len(t.Fields))
 		for i, f := range t.Fields {
 			parts[i] = f.Name + ": " + dumpType(f.Type)
 		}
 		return "{ " + strings.Join(parts, ", ") + " }"
-	case *FuncType:
+	case *ast.FuncType:
 		params := make([]string, len(t.Params))
 		for i, p := range t.Params {
 			params[i] = p.Name + ": " + dumpType(p.Type)
 		}
 		return "fn(" + strings.Join(params, ", ") + "): " + dumpType(t.Result)
-	case *BuiltinType:
+	case *ast.BuiltinType:
 		if len(t.Args) == 0 {
 			return "builtin"
 		}
@@ -657,5 +668,18 @@ func dumpType(t TypeExpr) string {
 		return "builtin<" + strings.Join(args, ", ") + ">"
 	default:
 		return "Type(?)"
+	}
+}
+
+// TestDumpInlineNeverEmpty checks the funcLit snapshot path renders every
+// statement kind as something non-empty, so a kind cannot silently vanish from
+// the curated test-DSL rendering (the snapshot-masking failure mode). The four kinds with
+// a dedicated inline form render their own shape; the rest take the visible
+// "(stmt T)" marker.
+func TestDumpInlineNeverEmpty(t *testing.T) {
+	for _, s := range ast.StmtKinds() {
+		if got := dumpStmtInline(s); got == "" {
+			t.Errorf("dumpStmtInline(%T) = %q; a statement must never dump as empty", s, got)
+		}
 	}
 }

@@ -1,32 +1,123 @@
 File
-  EnumDecl
-    doc "A card's rarity tier."
-    pub
-    name "Rarity"
-    member "Common"
-    member "Rare"
-    member "Legend"
-  FuncDecl
-    pub
-    name "color"
-    param r: Rarity
-    result string
-      switch Identifier "r"
-        arm Identifier "Common"
-          return StringLit "white"
-        arm Identifier "Rare"
-          return StringLit "blue"
-        arm Identifier "Legend"
-          return StringLit "gold"
-  FuncDecl
-    pub
-    name "grade"
-    param n: nint
-    result string
-      switch Identifier "n"
-        arm IntLit "0"
-          return StringLit "zero"
-        arm IntLit "1", IntLit "2", IntLit "3"
-          return StringLit "low"
-        else
-          return StringLit "high"
+  Uses: ~
+  Decls: ~
+  Types: ~
+  Enums:
+    EnumDecl
+      Doc: "A card's rarity tier."
+      Public: true
+      Name: "Rarity"
+      Base: ~
+      Members:
+        EnumMember
+          Name: "Common"
+          Value: ~
+        EnumMember
+          Name: "Rare"
+          Value: ~
+        EnumMember
+          Name: "Legend"
+          Value: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
+  Interfaces: ~
+  Funcs:
+    FuncDecl
+      Doc: ~
+      Public: true
+      Extern: false
+      Effects: ~
+      Name: "color"
+      TypeParams: ~
+      Params:
+        ParamDef
+          Name: "r"
+          Type: NamedType
+            Namespace: ""
+            Name: "Rarity"
+            Args: ~
+      Result: NamedType
+        Namespace: ""
+        Name: "string"
+        Args: ~
+      Body:
+        SwitchStmt
+          Scrutinee: Identifier
+            Name: "r"
+          Arms:
+            SwitchArm
+              Values:
+                Identifier
+                  Name: "Common"
+              Body:
+                ReturnStmt
+                  Value: StringLit
+                    Value: "white"
+            SwitchArm
+              Values:
+                Identifier
+                  Name: "Rare"
+              Body:
+                ReturnStmt
+                  Value: StringLit
+                    Value: "blue"
+            SwitchArm
+              Values:
+                Identifier
+                  Name: "Legend"
+              Body:
+                ReturnStmt
+                  Value: StringLit
+                    Value: "gold"
+          Else: ~
+          AfterElse: ~
+    FuncDecl
+      Doc: ~
+      Public: true
+      Extern: false
+      Effects: ~
+      Name: "grade"
+      TypeParams: ~
+      Params:
+        ParamDef
+          Name: "n"
+          Type: NamedType
+            Namespace: ""
+            Name: "nint"
+            Args: ~
+      Result: NamedType
+        Namespace: ""
+        Name: "string"
+        Args: ~
+      Body:
+        SwitchStmt
+          Scrutinee: Identifier
+            Name: "n"
+          Arms:
+            SwitchArm
+              Values:
+                IntLit
+                  Text: "0"
+              Body:
+                ReturnStmt
+                  Value: StringLit
+                    Value: "zero"
+            SwitchArm
+              Values:
+                IntLit
+                  Text: "1"
+                IntLit
+                  Text: "2"
+                IntLit
+                  Text: "3"
+              Body:
+                ReturnStmt
+                  Value: StringLit
+                    Value: "low"
+          Else:
+            ReturnStmt
+              Value: StringLit
+                Value: "high"
+          AfterElse: ~
+  Asserts: ~

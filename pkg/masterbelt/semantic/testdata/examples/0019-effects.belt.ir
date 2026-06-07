@@ -1,25 +1,163 @@
 Module
-  Const "A"
-    type nint
-    value (double((IntLiteral "21" : nint)) : nint)
-    eval 42
-  TypeDef "Clock" pub
-    body { offset: duration }
-    method "read" pub
-      doc "The current instant, shifted by this clock's offset."
-      effects nondet
-      result datetime
-      return datetime.now().add(((self : Clock).offset : duration))
-  Func "stamp" pub
-    effects nondet
-    result datetime
-      return datetime.now()
-  Func "double" pub
-    param x: nint
-    result nint
-      return ((ParamRef "x" : nint).mul((IntLiteral "2" : nint)) : nint)
-  Assert "double(2) == 4"
-    eval true
-      double(2) == 4
-      ^         ^
-      4         true
+  Consts:
+    Const
+      Name: "A"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "nint"
+      Value: FuncCall
+        Target: "double(nint)"
+        Args:
+          IntLiteral
+            Text: "21"
+            Type: Builtin
+              Name: "nint"
+        Resolved: ~
+        Subst: ~
+        Type: Builtin
+          Name: "nint"
+      Eval: Constant
+        Kind: 0
+        Int: 42
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+  Types:
+    TypeDef
+      Name: "Clock"
+      Public: true
+      Doc: ~
+      Params: ~
+      Body: Record
+        Fields:
+          Field
+            Name: "offset"
+            Type: Builtin
+              Name: "duration"
+      Methods:
+        Method
+          Name: "read"
+          Public: true
+          Extern: false
+          Kind: 0
+          Effects: "nondet"
+          Doc: "The current instant, shifted by this clock's offset."
+          Params: ~
+          Result: Builtin
+            Name: "datetime"
+          Body:
+            Return
+              Value: Call
+                Receiver: StaticCall
+                  Def: "datetime"
+                  Name: "now"
+                  Args: ~
+                  Resolved: ~
+                  Subst: ~
+                  Type: ~
+                Method: "add"
+                Args:
+                  FieldAccess
+                    Receiver: SelfValue
+                      Type: Named
+                        Def: "Clock"
+                    Field: "offset"
+                    Type: Builtin
+                      Name: "duration"
+                Setter: false
+                Resolved: ~
+                Subst: ~
+                Type: ~
+          Owner: "Clock"
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Where: ~
+  Funcs:
+    Function
+      Name: "stamp"
+      Public: true
+      Extern: false
+      Effects: "nondet"
+      Doc: ~
+      TypeParams: ~
+      Params: ~
+      Result: Builtin
+        Name: "datetime"
+      Body:
+        Return
+          Value: StaticCall
+            Def: "datetime"
+            Name: "now"
+            Args: ~
+            Resolved: ~
+            Subst: ~
+            Type: ~
+    Function
+      Name: "double"
+      Public: true
+      Extern: false
+      Effects: ~
+      Doc: ~
+      TypeParams: ~
+      Params:
+        Param
+          Name: "x"
+          Type: Builtin
+            Name: "nint"
+      Result: Builtin
+        Name: "nint"
+      Body:
+        Return
+          Value: Call
+            Receiver: ParamRef
+              Name: "x"
+              Type: Builtin
+                Name: "nint"
+            Method: "mul"
+            Args:
+              IntLiteral
+                Text: "2"
+                Type: Builtin
+                  Name: "nint"
+            Setter: false
+            Resolved: ~
+            Subst: ~
+            Type: Builtin
+              Name: "nint"
+  Asserts:
+    Assert
+      Cond: "double(2) == 4"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "double(2) == 4\n^         ^\n4         true"

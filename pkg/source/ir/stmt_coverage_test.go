@@ -71,29 +71,18 @@ func stmtImplementersInSource(t *testing.T) map[string]bool {
 	return out
 }
 
-// TestDumpInlineNeverEmpty checks the inline IR dump renders every lowered
+// TestStmtMarshalNeverEmpty checks the exact text form renders every lowered
 // statement kind as something non-empty, so a kind cannot silently vanish from
-// the snapshot oracle.
-func TestDumpInlineNeverEmpty(t *testing.T) {
+// the snapshot oracle. (The sealed interface embeds encoding.TextMarshaler, so
+// a kind without a codec already fails to build; this pins the output shape.)
+func TestStmtMarshalNeverEmpty(t *testing.T) {
 	for _, s := range StmtKinds() {
-		if got := dumpStmtInline(s); got == "" {
-			t.Errorf("dumpStmtInline(%T) = %q; a statement must never dump as empty", s, got)
+		text, err := s.MarshalText()
+		if err != nil {
+			t.Errorf("MarshalText(%T): %v", s, err)
 		}
-	}
-}
-
-// TestDumpStmtAtCoversEveryStmt drives the multi-line dump over every kind; the
-// default panic fires only for a registered kind dumpStmtAt has no case for.
-func TestDumpStmtAtCoversEveryStmt(t *testing.T) {
-	for _, s := range StmtKinds() {
-		func() {
-			defer func() {
-				if r := recover(); r != nil {
-					t.Errorf("dumpStmtAt panicked on %T: %v", s, r)
-				}
-			}()
-			var b strings.Builder
-			dumpStmtAt(&b, s, "")
-		}()
+		if len(text) == 0 {
+			t.Errorf("MarshalText(%T) is empty; a statement must never marshal as nothing", s)
+		}
 	}
 }

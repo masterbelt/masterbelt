@@ -71,21 +71,18 @@ func valueImplementersInSource(t *testing.T) map[string]bool {
 	return out
 }
 
-// TestDumpValueCoversEveryValue drives the dump over every value form; a kind
-// the renderer has no case for panics rather than vanishing from the snapshot
-// oracle.
-func TestDumpValueCoversEveryValue(t *testing.T) {
+// TestValueMarshalCoversEveryValue drives the exact text form over every value
+// form; a kind without a codec already fails to build (the sealed interface
+// embeds encoding.TextMarshaler), so this pins the output non-empty.
+func TestValueMarshalCoversEveryValue(t *testing.T) {
 	for _, v := range ValueKinds() {
-		func() {
-			defer func() {
-				if r := recover(); r != nil {
-					t.Errorf("dumpValue panicked on %T: %v", v, r)
-				}
-			}()
-			if got := dumpValue(v); got == "" {
-				t.Errorf("dumpValue(%T) = %q; a value must never dump as empty", v, got)
-			}
-		}()
+		text, err := v.MarshalText()
+		if err != nil {
+			t.Errorf("MarshalText(%T): %v", v, err)
+		}
+		if len(text) == 0 {
+			t.Errorf("MarshalText(%T) is empty; a value must never marshal as nothing", v)
+		}
 	}
 }
 

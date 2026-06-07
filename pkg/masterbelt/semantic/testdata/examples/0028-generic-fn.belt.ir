@@ -1,54 +1,421 @@
 Module
-  Const "N"
-    type nint
-    value (identity((IntLiteral "42" : nint)) : nint) [subst T=nint]
-    eval 42
-  Const "P"
-    type nint
-    value (firstOf((IntLiteral "7" : nint), (IntLiteral "9" : nint)) : nint) [subst T=nint]
-    eval 7
-  TypeDef "Bag" pub
-    doc "A small bag of ints that folds over its contents — an opt-in implementor of"
-    doc "foldable, so it satisfies a `T: foldable<nint, nint>` bound."
-    impl foldable<nint, nint>
-    body list<nint>
-    method "fold"
-      param init: A
-      param step: fn(A, nint, nint): A
-      result A
-      return (ParamRef "init" : A)
-  TypeDef "foldable" pub
-    doc "A behaviour over a keyed collection: the required fold, plus the provided"
-    doc "count derived from it. The same prelude-style interface a bound refers to."
-    param "K"
-    param "V"
-    interface
-    required "fold"
-    provided "count"
-    method "fold"
-      param init: A
-      param step: fn(A, K, V): A
-      result A
-    method "count" pub
-      doc "Provided: the number of elements, folded from the primitive."
-      result nint
-      return ((self : foldable).fold((IntLiteral "0" : nint), ((fn(acc, key, value) (return ((ParamRef "acc" : nint).add((IntLiteral "1" : nint)) : nint))) : fn(nint, K, V): nint)) : nint) [subst A=nint]
-  Func "total" pub
-    doc "The total of any foldable collection of ints, folded with addition."
-    typeparam "T": foldable<nint, nint>
-    param c: T
-    result nint
-      return ((ParamRef "c" : T).fold((IntLiteral "0" : nint), ((fn(acc, key, value) (return ((ParamRef "acc" : nint).add((ParamRef "value" : nint)) : nint))) : fn(nint, nint, nint): nint)) : nint) [subst A=nint, K=nint, V=nint]
-  Func "identity" pub
-    doc "The argument, unchanged. Works for any type because it touches nothing."
-    typeparam "T"
-    param x: T
-    result T
-      return (ParamRef "x" : T)
-  Func "firstOf" pub
-    doc "The first of two values of the same type."
-    typeparam "T"
-    param a: T
-    param b: T
-    result T
-      return (ParamRef "a" : T)
+  Consts:
+    Const
+      Name: "N"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "nint"
+      Value: FuncCall
+        Target: "identity(T)"
+        Args:
+          IntLiteral
+            Text: "42"
+            Type: Builtin
+              Name: "nint"
+        Resolved: ~
+        Subst:
+          Entry
+            Key: "T"
+            Value: Builtin
+              Name: "nint"
+        Type: Builtin
+          Name: "nint"
+      Eval: Constant
+        Kind: 0
+        Int: 42
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "P"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "nint"
+      Value: FuncCall
+        Target: "firstOf(T, T)"
+        Args:
+          IntLiteral
+            Text: "7"
+            Type: Builtin
+              Name: "nint"
+          IntLiteral
+            Text: "9"
+            Type: Builtin
+              Name: "nint"
+        Resolved: ~
+        Subst:
+          Entry
+            Key: "T"
+            Value: Builtin
+              Name: "nint"
+        Type: Builtin
+          Name: "nint"
+      Eval: Constant
+        Kind: 0
+        Int: 7
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+  Types:
+    TypeDef
+      Name: "Bag"
+      Public: true
+      Doc: "A small bag of ints that folds over its contents — an opt-in implementor of" "foldable, so it satisfies a `T: foldable<nint, nint>` bound."
+      Params: ~
+      Body: App
+        Def: "list"
+        Args:
+          Builtin
+            Name: "nint"
+      Methods:
+        Method
+          Name: "fold"
+          Public: false
+          Extern: false
+          Kind: 0
+          Effects: ~
+          Doc: ~
+          Params:
+            Param
+              Name: "init"
+              Type: TypeVar
+                Name: "A"
+                Bound: ~
+            Param
+              Name: "step"
+              Type: Func
+                Params:
+                  TypeVar
+                    Name: "A"
+                    Bound: ~
+                  Builtin
+                    Name: "nint"
+                  Builtin
+                    Name: "nint"
+                Result: TypeVar
+                  Name: "A"
+                  Bound: ~
+          Result: TypeVar
+            Name: "A"
+            Bound: ~
+          Body:
+            Return
+              Value: ParamRef
+                Name: "init"
+                Type: TypeVar
+                  Name: "A"
+                  Bound: ~
+          Owner: "Bag"
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls:
+        App
+          Def: "foldable"
+          Args:
+            Builtin
+              Name: "nint"
+            Builtin
+              Name: "nint"
+      Enum: ~
+      Where: ~
+    TypeDef
+      Name: "foldable"
+      Public: true
+      Doc: "A behaviour over a keyed collection: the required fold, plus the provided" "count derived from it. The same prelude-style interface a bound refers to."
+      Params:
+        TypeParam
+          Name: "K"
+          Bound: ~
+        TypeParam
+          Name: "V"
+          Bound: ~
+      Body: ~
+      Methods:
+        Method
+          Name: "fold"
+          Public: false
+          Extern: false
+          Kind: 0
+          Effects: ~
+          Doc: ~
+          Params:
+            Param
+              Name: "init"
+              Type: TypeVar
+                Name: "A"
+                Bound: ~
+            Param
+              Name: "step"
+              Type: Func
+                Params:
+                  TypeVar
+                    Name: "A"
+                    Bound: ~
+                  TypeVar
+                    Name: "K"
+                    Bound: ~
+                  TypeVar
+                    Name: "V"
+                    Bound: ~
+                Result: TypeVar
+                  Name: "A"
+                  Bound: ~
+          Result: TypeVar
+            Name: "A"
+            Bound: ~
+          Body: ~
+          Owner: "foldable"
+        Method
+          Name: "count"
+          Public: true
+          Extern: false
+          Kind: 0
+          Effects: ~
+          Doc: "Provided: the number of elements, folded from the primitive."
+          Params: ~
+          Result: Builtin
+            Name: "nint"
+          Body:
+            Return
+              Value: Call
+                Receiver: SelfValue
+                  Type: Named
+                    Def: "foldable"
+                Method: "fold"
+                Args:
+                  IntLiteral
+                    Text: "0"
+                    Type: Builtin
+                      Name: "nint"
+                  FuncLiteral
+                    Params: "acc" "key" "value"
+                    Body:
+                      Return
+                        Value: Call
+                          Receiver: ParamRef
+                            Name: "acc"
+                            Type: Builtin
+                              Name: "nint"
+                          Method: "add"
+                          Args:
+                            IntLiteral
+                              Text: "1"
+                              Type: Builtin
+                                Name: "nint"
+                          Setter: false
+                          Resolved: ~
+                          Subst: ~
+                          Type: Builtin
+                            Name: "nint"
+                    Type: Func
+                      Params:
+                        Builtin
+                          Name: "nint"
+                        TypeVar
+                          Name: "K"
+                          Bound: ~
+                        TypeVar
+                          Name: "V"
+                          Bound: ~
+                      Result: Builtin
+                        Name: "nint"
+                Setter: false
+                Resolved: ~
+                Subst:
+                  Entry
+                    Key: "A"
+                    Value: Builtin
+                      Name: "nint"
+                Type: Builtin
+                  Name: "nint"
+          Owner: "foldable"
+      Consts: ~
+      Builtin: false
+      Interface: InterfaceDef
+        Required: "fold"
+        Provided: "count"
+        Parents: ~
+      Impls: ~
+      Enum: ~
+      Where: ~
+  Funcs:
+    Function
+      Name: "total"
+      Public: true
+      Extern: false
+      Effects: ~
+      Doc: "The total of any foldable collection of ints, folded with addition."
+      TypeParams:
+        TypeParam
+          Name: "T"
+          Bound: App
+            Def: "foldable"
+            Args:
+              Builtin
+                Name: "nint"
+              Builtin
+                Name: "nint"
+      Params:
+        Param
+          Name: "c"
+          Type: TypeVar
+            Name: "T"
+            Bound: App
+              Def: "foldable"
+              Args:
+                Builtin
+                  Name: "nint"
+                Builtin
+                  Name: "nint"
+      Result: Builtin
+        Name: "nint"
+      Body:
+        Return
+          Value: Call
+            Receiver: ParamRef
+              Name: "c"
+              Type: TypeVar
+                Name: "T"
+                Bound: App
+                  Def: "foldable"
+                  Args:
+                    Builtin
+                      Name: "nint"
+                    Builtin
+                      Name: "nint"
+            Method: "fold"
+            Args:
+              IntLiteral
+                Text: "0"
+                Type: Builtin
+                  Name: "nint"
+              FuncLiteral
+                Params: "acc" "key" "value"
+                Body:
+                  Return
+                    Value: Call
+                      Receiver: ParamRef
+                        Name: "acc"
+                        Type: Builtin
+                          Name: "nint"
+                      Method: "add"
+                      Args:
+                        ParamRef
+                          Name: "value"
+                          Type: Builtin
+                            Name: "nint"
+                      Setter: false
+                      Resolved: ~
+                      Subst: ~
+                      Type: Builtin
+                        Name: "nint"
+                Type: Func
+                  Params:
+                    Builtin
+                      Name: "nint"
+                    Builtin
+                      Name: "nint"
+                    Builtin
+                      Name: "nint"
+                  Result: Builtin
+                    Name: "nint"
+            Setter: false
+            Resolved: ~
+            Subst:
+              Entry
+                Key: "A"
+                Value: Builtin
+                  Name: "nint"
+              Entry
+                Key: "K"
+                Value: Builtin
+                  Name: "nint"
+              Entry
+                Key: "V"
+                Value: Builtin
+                  Name: "nint"
+            Type: Builtin
+              Name: "nint"
+    Function
+      Name: "identity"
+      Public: true
+      Extern: false
+      Effects: ~
+      Doc: "The argument, unchanged. Works for any type because it touches nothing."
+      TypeParams:
+        TypeParam
+          Name: "T"
+          Bound: ~
+      Params:
+        Param
+          Name: "x"
+          Type: TypeVar
+            Name: "T"
+            Bound: ~
+      Result: TypeVar
+        Name: "T"
+        Bound: ~
+      Body:
+        Return
+          Value: ParamRef
+            Name: "x"
+            Type: TypeVar
+              Name: "T"
+              Bound: ~
+    Function
+      Name: "firstOf"
+      Public: true
+      Extern: false
+      Effects: ~
+      Doc: "The first of two values of the same type."
+      TypeParams:
+        TypeParam
+          Name: "T"
+          Bound: ~
+      Params:
+        Param
+          Name: "a"
+          Type: TypeVar
+            Name: "T"
+            Bound: ~
+        Param
+          Name: "b"
+          Type: TypeVar
+            Name: "T"
+            Bound: ~
+      Result: TypeVar
+        Name: "T"
+        Bound: ~
+      Body:
+        Return
+          Value: ParamRef
+            Name: "a"
+            Type: TypeVar
+              Name: "T"
+              Bound: ~
+  Asserts: ~

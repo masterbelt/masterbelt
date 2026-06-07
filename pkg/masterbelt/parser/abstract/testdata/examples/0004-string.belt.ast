@@ -1,25 +1,56 @@
 File
-  ConstDecl
-    pub
-    name "LabelName"
-    value StringLit "label"
-  ConstDecl
-    pub
-    name "Greeting"
-    value StringLit "Hello, \"world\"!\n"
-  ConstDecl
-    pub
-    name "Control"
-    value StringLit "a\tb\r\n\x00"
-  ConstDecl
-    pub
-    name "Unicode"
-    value StringLit "日本語 🎉"
-  ConstDecl
-    pub
-    name "Party"
-    value StringLit "🎉"
-  ConstDecl
-    pub
-    name "Empty"
-    value StringLit ""
+  Uses: ~
+  Decls:
+    ConstDecl
+      Doc: ~
+      Public: true
+      Name: "LabelName"
+      Type: ~
+      Value: StringLit
+        Value: "label"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: true
+      Name: "Greeting"
+      Type: ~
+      Value: StringLit
+        Value: "Hello, \"world\"!\n"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: true
+      Name: "Control"
+      Type: ~
+      Value: StringLit
+        Value: "a\tb\r\n\x00"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: true
+      Name: "Unicode"
+      Type: ~
+      Value: StringLit
+        Value: "日本語 🎉"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: true
+      Name: "Party"
+      Type: ~
+      Value: StringLit
+        Value: "🎉"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: true
+      Name: "Empty"
+      Type: ~
+      Value: StringLit
+        Value: ""
+      Builtin: false
+  Types: ~
+  Enums: ~
+  Interfaces: ~
+  Funcs: ~
+  Asserts: ~

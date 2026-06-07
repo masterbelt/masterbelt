@@ -200,6 +200,23 @@ func (k Kind) String() string {
 	return "Kind(" + strconv.Itoa(int(k)) + ")"
 }
 
+// kindByName is the reverse of the kindNames table, built once at init.
+var kindByName = func() map[string]Kind {
+	m := make(map[string]Kind, numKinds)
+	for k := range numKinds {
+		m[k.String()] = k
+	}
+	return m
+}()
+
+// ParseKind returns the Kind named name — the inverse of Kind.String — and
+// whether the name is a known kind. It is what reads token kinds back from
+// the CST's text representation.
+func ParseKind(name string) (Kind, bool) {
+	k, ok := kindByName[name]
+	return k, ok
+}
+
 // spelling maps each fixed-spelling token — the operators and punctuation — to
 // its source text. Variable-text kinds (Ident, Int, comments, trivia) and the
 // keywords (whose spellings live in the keywords map) are absent. It is the

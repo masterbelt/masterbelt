@@ -1,31 +1,668 @@
 Module
-  Const "Origin"
-    type Point
-    value (Point{x: (IntLiteral "0" : nint), y: (IntLiteral "0" : nint)} : Point)
-    eval { x: 0, y: 0 }
-  Const "P"
-    type Point
-    value ({x: (IntLiteral "1" : nint), y: (IntLiteral "2" : nint)} : Point)
-    eval { x: 1, y: 2 }
-  Const "Q"
-    type Point
-    value (Point{x: (IntLiteral "3" : nint), y: (IntLiteral "4" : nint)} : Point)
-    eval { x: 3, y: 4 }
-  Const "Sword"
-    type Item
-    value (Item{id: (IntLiteral "1" : nint), name: (StringLiteral "Sword" : string), pos: (Point{x: (IntLiteral "0" : nint), y: (IntLiteral "0" : nint)} : Point)} : Item)
-    eval { id: 1, name: "Sword", pos: { x: 0, y: 0 } }
-  Const "Path"
-    type list<Point>
-    value ([({x: (IntLiteral "0" : nint), y: (IntLiteral "0" : nint)} : Point), (Point{x: (IntLiteral "1" : nint), y: (IntLiteral "1" : nint)} : Point)] : list<Point>)
-    eval [{ x: 0, y: 0 }, { x: 1, y: 1 }]
-  Const "U"
-    type Unit
-    value ({} : Unit)
-    eval {}
-  TypeDef "Point" pub
-    body { x: nint, y: nint }
-  TypeDef "Item" pub
-    body { id: nint, name: string, pos: Point }
-  TypeDef "Unit" pub
-    body {  }
+  Consts:
+    Const
+      Name: "Origin"
+      Public: false
+      Doc: ~
+      Type: Named
+        Def: "Point"
+      Value: RecordValue
+        TypeName: "Point"
+        Fields:
+          RecordField
+            Name: "x"
+            Value: IntLiteral
+              Text: "0"
+              Type: Builtin
+                Name: "nint"
+          RecordField
+            Name: "y"
+            Value: IntLiteral
+              Text: "0"
+              Type: Builtin
+                Name: "nint"
+        Type: Named
+          Def: "Point"
+      Eval: Constant
+        Kind: 7
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields:
+          ConstField
+            Name: "x"
+            Value: Constant
+              Kind: 0
+              Int: 0
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+          ConstField
+            Name: "y"
+            Value: Constant
+              Kind: 0
+              Int: 0
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "P"
+      Public: false
+      Doc: ~
+      Type: Named
+        Def: "Point"
+      Value: RecordValue
+        TypeName: ""
+        Fields:
+          RecordField
+            Name: "x"
+            Value: IntLiteral
+              Text: "1"
+              Type: Builtin
+                Name: "nint"
+          RecordField
+            Name: "y"
+            Value: IntLiteral
+              Text: "2"
+              Type: Builtin
+                Name: "nint"
+        Type: Named
+          Def: "Point"
+      Eval: Constant
+        Kind: 7
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields:
+          ConstField
+            Name: "x"
+            Value: Constant
+              Kind: 0
+              Int: 1
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+          ConstField
+            Name: "y"
+            Value: Constant
+              Kind: 0
+              Int: 2
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "Q"
+      Public: false
+      Doc: ~
+      Type: Named
+        Def: "Point"
+      Value: RecordValue
+        TypeName: "Point"
+        Fields:
+          RecordField
+            Name: "x"
+            Value: IntLiteral
+              Text: "3"
+              Type: Builtin
+                Name: "nint"
+          RecordField
+            Name: "y"
+            Value: IntLiteral
+              Text: "4"
+              Type: Builtin
+                Name: "nint"
+        Type: Named
+          Def: "Point"
+      Eval: Constant
+        Kind: 7
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields:
+          ConstField
+            Name: "x"
+            Value: Constant
+              Kind: 0
+              Int: 3
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+          ConstField
+            Name: "y"
+            Value: Constant
+              Kind: 0
+              Int: 4
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "Sword"
+      Public: false
+      Doc: ~
+      Type: Named
+        Def: "Item"
+      Value: RecordValue
+        TypeName: "Item"
+        Fields:
+          RecordField
+            Name: "id"
+            Value: IntLiteral
+              Text: "1"
+              Type: Builtin
+                Name: "nint"
+          RecordField
+            Name: "name"
+            Value: StringLiteral
+              Value: "Sword"
+              Type: Builtin
+                Name: "string"
+          RecordField
+            Name: "pos"
+            Value: RecordValue
+              TypeName: "Point"
+              Fields:
+                RecordField
+                  Name: "x"
+                  Value: IntLiteral
+                    Text: "0"
+                    Type: Builtin
+                      Name: "nint"
+                RecordField
+                  Name: "y"
+                  Value: IntLiteral
+                    Text: "0"
+                    Type: Builtin
+                      Name: "nint"
+              Type: Named
+                Def: "Point"
+        Type: Named
+          Def: "Item"
+      Eval: Constant
+        Kind: 7
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields:
+          ConstField
+            Name: "id"
+            Value: Constant
+              Kind: 0
+              Int: 1
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+          ConstField
+            Name: "name"
+            Value: Constant
+              Kind: 2
+              Int: ~
+              Bool: false
+              Str: "Sword"
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+          ConstField
+            Name: "pos"
+            Value: Constant
+              Kind: 7
+              Int: ~
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields:
+                ConstField
+                  Name: "x"
+                  Value: Constant
+                    Kind: 0
+                    Int: 0
+                    Bool: false
+                    Str: ""
+                    Coll: ~
+                    Fields: ~
+                    CollMapness: 0
+                    Millis: 0
+                    Fn: ~
+                    Captured: ~
+                    EnumDef: ~
+                    EnumIndex: 0
+                    Start: ~
+                    End: ~
+                    Step: ~
+                    UnionTag: ~
+                ConstField
+                  Name: "y"
+                  Value: Constant
+                    Kind: 0
+                    Int: 0
+                    Bool: false
+                    Str: ""
+                    Coll: ~
+                    Fields: ~
+                    CollMapness: 0
+                    Millis: 0
+                    Fn: ~
+                    Captured: ~
+                    EnumDef: ~
+                    EnumIndex: 0
+                    Start: ~
+                    End: ~
+                    Step: ~
+                    UnionTag: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "Path"
+      Public: false
+      Doc: ~
+      Type: App
+        Def: "list"
+        Args:
+          Named
+            Def: "Point"
+      Value: CollectionLiteral
+        Entries:
+          CollectionEntry
+            Key: ~
+            Value: RecordValue
+              TypeName: ""
+              Fields:
+                RecordField
+                  Name: "x"
+                  Value: IntLiteral
+                    Text: "0"
+                    Type: Builtin
+                      Name: "nint"
+                RecordField
+                  Name: "y"
+                  Value: IntLiteral
+                    Text: "0"
+                    Type: Builtin
+                      Name: "nint"
+              Type: Named
+                Def: "Point"
+          CollectionEntry
+            Key: ~
+            Value: RecordValue
+              TypeName: "Point"
+              Fields:
+                RecordField
+                  Name: "x"
+                  Value: IntLiteral
+                    Text: "1"
+                    Type: Builtin
+                      Name: "nint"
+                RecordField
+                  Name: "y"
+                  Value: IntLiteral
+                    Text: "1"
+                    Type: Builtin
+                      Name: "nint"
+              Type: Named
+                Def: "Point"
+        Type: App
+          Def: "list"
+          Args:
+            Named
+              Def: "Point"
+      Eval: Constant
+        Kind: 3
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll:
+          ConstEntry
+            Key: ~
+            Value: Constant
+              Kind: 7
+              Int: ~
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields:
+                ConstField
+                  Name: "x"
+                  Value: Constant
+                    Kind: 0
+                    Int: 0
+                    Bool: false
+                    Str: ""
+                    Coll: ~
+                    Fields: ~
+                    CollMapness: 0
+                    Millis: 0
+                    Fn: ~
+                    Captured: ~
+                    EnumDef: ~
+                    EnumIndex: 0
+                    Start: ~
+                    End: ~
+                    Step: ~
+                    UnionTag: ~
+                ConstField
+                  Name: "y"
+                  Value: Constant
+                    Kind: 0
+                    Int: 0
+                    Bool: false
+                    Str: ""
+                    Coll: ~
+                    Fields: ~
+                    CollMapness: 0
+                    Millis: 0
+                    Fn: ~
+                    Captured: ~
+                    EnumDef: ~
+                    EnumIndex: 0
+                    Start: ~
+                    End: ~
+                    Step: ~
+                    UnionTag: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+          ConstEntry
+            Key: ~
+            Value: Constant
+              Kind: 7
+              Int: ~
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields:
+                ConstField
+                  Name: "x"
+                  Value: Constant
+                    Kind: 0
+                    Int: 1
+                    Bool: false
+                    Str: ""
+                    Coll: ~
+                    Fields: ~
+                    CollMapness: 0
+                    Millis: 0
+                    Fn: ~
+                    Captured: ~
+                    EnumDef: ~
+                    EnumIndex: 0
+                    Start: ~
+                    End: ~
+                    Step: ~
+                    UnionTag: ~
+                ConstField
+                  Name: "y"
+                  Value: Constant
+                    Kind: 0
+                    Int: 1
+                    Bool: false
+                    Str: ""
+                    Coll: ~
+                    Fields: ~
+                    CollMapness: 0
+                    Millis: 0
+                    Fn: ~
+                    Captured: ~
+                    EnumDef: ~
+                    EnumIndex: 0
+                    Start: ~
+                    End: ~
+                    Step: ~
+                    UnionTag: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+        Fields: ~
+        CollMapness: 1
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "U"
+      Public: false
+      Doc: ~
+      Type: Named
+        Def: "Unit"
+      Value: RecordValue
+        TypeName: ""
+        Fields: ~
+        Type: Named
+          Def: "Unit"
+      Eval: Constant
+        Kind: 7
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+  Types:
+    TypeDef
+      Name: "Point"
+      Public: true
+      Doc: ~
+      Params: ~
+      Body: Record
+        Fields:
+          Field
+            Name: "x"
+            Type: Builtin
+              Name: "nint"
+          Field
+            Name: "y"
+            Type: Builtin
+              Name: "nint"
+      Methods: ~
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Where: ~
+    TypeDef
+      Name: "Item"
+      Public: true
+      Doc: ~
+      Params: ~
+      Body: Record
+        Fields:
+          Field
+            Name: "id"
+            Type: Builtin
+              Name: "nint"
+          Field
+            Name: "name"
+            Type: Builtin
+              Name: "string"
+          Field
+            Name: "pos"
+            Type: Named
+              Def: "Point"
+      Methods: ~
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Where: ~
+    TypeDef
+      Name: "Unit"
+      Public: true
+      Doc: ~
+      Params: ~
+      Body: Record
+        Fields: ~
+      Methods: ~
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Where: ~
+  Funcs: ~
+  Asserts: ~

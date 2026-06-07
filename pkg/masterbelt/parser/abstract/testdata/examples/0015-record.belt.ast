@@ -1,34 +1,208 @@
 File
-  ConstDecl
-    name "Origin"
-    value (record Point x: IntLit "0" y: IntLit "0")
-  ConstDecl
-    name "P"
-    type Point
-    value (record x: IntLit "1" y: IntLit "2")
-  ConstDecl
-    name "Q"
-    value (record Point x: IntLit "3" y: IntLit "4")
-  ConstDecl
-    name "Sword"
-    value (record Item id: IntLit "1" name: StringLit "Sword" pos: (record Point x: IntLit "0" y: IntLit "0"))
-  ConstDecl
-    name "Path"
-    type list<Point>
-    value (list (record x: IntLit "0" y: IntLit "0") (record Point x: IntLit "1" y: IntLit "1"))
-  ConstDecl
-    name "U"
-    type Unit
-    value (record)
-  TypeDecl
-    pub
-    name "Point"
-    body { x: nint, y: nint }
-  TypeDecl
-    pub
-    name "Item"
-    body { id: nint, name: string, pos: Point }
-  TypeDecl
-    pub
-    name "Unit"
-    body {  }
+  Uses: ~
+  Decls:
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Origin"
+      Type: ~
+      Value: RecordLit
+        TypeName: "Point"
+        Fields:
+          FieldInit
+            Name: "x"
+            Value: IntLit
+              Text: "0"
+          FieldInit
+            Name: "y"
+            Value: IntLit
+              Text: "0"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "P"
+      Type: NamedType
+        Namespace: ""
+        Name: "Point"
+        Args: ~
+      Value: RecordLit
+        TypeName: ""
+        Fields:
+          FieldInit
+            Name: "x"
+            Value: IntLit
+              Text: "1"
+          FieldInit
+            Name: "y"
+            Value: IntLit
+              Text: "2"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Q"
+      Type: ~
+      Value: RecordLit
+        TypeName: "Point"
+        Fields:
+          FieldInit
+            Name: "x"
+            Value: IntLit
+              Text: "3"
+          FieldInit
+            Name: "y"
+            Value: IntLit
+              Text: "4"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Sword"
+      Type: ~
+      Value: RecordLit
+        TypeName: "Item"
+        Fields:
+          FieldInit
+            Name: "id"
+            Value: IntLit
+              Text: "1"
+          FieldInit
+            Name: "name"
+            Value: StringLit
+              Value: "Sword"
+          FieldInit
+            Name: "pos"
+            Value: RecordLit
+              TypeName: "Point"
+              Fields:
+                FieldInit
+                  Name: "x"
+                  Value: IntLit
+                    Text: "0"
+                FieldInit
+                  Name: "y"
+                  Value: IntLit
+                    Text: "0"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Path"
+      Type: NamedType
+        Namespace: ""
+        Name: "list"
+        Args:
+          NamedType
+            Namespace: ""
+            Name: "Point"
+            Args: ~
+      Value: CollectionLit
+        Entries:
+          CollectionEntry
+            Key: ~
+            Value: RecordLit
+              TypeName: ""
+              Fields:
+                FieldInit
+                  Name: "x"
+                  Value: IntLit
+                    Text: "0"
+                FieldInit
+                  Name: "y"
+                  Value: IntLit
+                    Text: "0"
+          CollectionEntry
+            Key: ~
+            Value: RecordLit
+              TypeName: "Point"
+              Fields:
+                FieldInit
+                  Name: "x"
+                  Value: IntLit
+                    Text: "1"
+                FieldInit
+                  Name: "y"
+                  Value: IntLit
+                    Text: "1"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "U"
+      Type: NamedType
+        Namespace: ""
+        Name: "Unit"
+        Args: ~
+      Value: RecordLit
+        TypeName: ""
+        Fields: ~
+      Builtin: false
+  Types:
+    TypeDecl
+      Doc: ~
+      Public: true
+      Name: "Point"
+      Params: ~
+      Body: RecordType
+        Fields:
+          FieldDef
+            Name: "x"
+            Type: NamedType
+              Namespace: ""
+              Name: "nint"
+              Args: ~
+          FieldDef
+            Name: "y"
+            Type: NamedType
+              Namespace: ""
+              Name: "nint"
+              Args: ~
+      Where: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
+    TypeDecl
+      Doc: ~
+      Public: true
+      Name: "Item"
+      Params: ~
+      Body: RecordType
+        Fields:
+          FieldDef
+            Name: "id"
+            Type: NamedType
+              Namespace: ""
+              Name: "nint"
+              Args: ~
+          FieldDef
+            Name: "name"
+            Type: NamedType
+              Namespace: ""
+              Name: "string"
+              Args: ~
+          FieldDef
+            Name: "pos"
+            Type: NamedType
+              Namespace: ""
+              Name: "Point"
+              Args: ~
+      Where: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
+    TypeDecl
+      Doc: ~
+      Public: true
+      Name: "Unit"
+      Params: ~
+      Body: RecordType
+        Fields: ~
+      Where: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
+  Enums: ~
+  Interfaces: ~
+  Funcs: ~
+  Asserts: ~

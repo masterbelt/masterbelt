@@ -1,121 +1,1123 @@
 Module
-  Const "Summed"
-    type nint
-    value (sum(([(IntLiteral "1" : nint), (IntLiteral "2" : nint), (IntLiteral "3" : nint), (IntLiteral "4" : nint)] : list<nint>)) : nint)
-    eval 10
-  Const "Joined"
-    type string
-    value (keysJoined(([(StringLiteral "a" : string): (IntLiteral "1" : nint), (StringLiteral "b" : string): (IntLiteral "2" : nint), (StringLiteral "c" : string): (IntLiteral "3" : nint)] : map<string, nint>)) : string)
-    eval "abc"
-  Const "ValueSummed"
-    type nint
-    value (valueSum(([(StringLiteral "a" : string): (IntLiteral "1" : nint), (StringLiteral "b" : string): (IntLiteral "2" : nint), (StringLiteral "c" : string): (IntLiteral "3" : nint)] : map<string, nint>)) : nint)
-    eval 6
-  Const "IndexSummed"
-    type nint
-    value (indexSum(([(IntLiteral "10" : nint), (IntLiteral "20" : nint), (IntLiteral "30" : nint)] : list<nint>)) : nint)
-    eval 3
-  Const "EvenSum"
-    type nint
-    value (sumEven(([(IntLiteral "1" : nint), (IntLiteral "2" : nint), (IntLiteral "3" : nint), (IntLiteral "4" : nint), (IntLiteral "5" : nint), (IntLiteral "6" : nint)] : list<nint>)) : nint)
-    eval 12
-  Const "Pairs"
-    type nint
-    value (pairCount(([(IntLiteral "1" : nint), (IntLiteral "2" : nint)] : list<nint>), ([(IntLiteral "1" : nint), (IntLiteral "2" : nint), (IntLiteral "3" : nint)] : list<nint>)) : nint)
-    eval 6
-  Const "Product"
-    type nint
-    value (product(([(IntLiteral "1" : nint), (IntLiteral "2" : nint), (IntLiteral "3" : nint), (IntLiteral "4" : nint)] : list<nint>)) : nint)
-    eval 24
-  Func "sum" pub
-    param xs: list<nint>
-    result nint
-      let "total": nint = (IntLiteral "0" : nint)
-      for x of nint (ParamRef "xs" : list<nint>)
-          assign "total" = ((LocalRef "total" : nint).add((LocalRef "x" : nint)) : nint)
-      return (LocalRef "total" : nint)
-  Func "keysJoined" pub
-    param m: map<string, nint>
-    result string
-      let "out": string = (StringLiteral "" : string)
-      for k in string (ParamRef "m" : map<string, nint>)
-          assign "out" = ((LocalRef "out" : string).add((LocalRef "k" : string)) : string)
-      return (LocalRef "out" : string)
-  Func "valueSum" pub
-    param m: map<string, nint>
-    result nint
-      let "total": nint = (IntLiteral "0" : nint)
-      for v of nint (ParamRef "m" : map<string, nint>)
-          assign "total" = ((LocalRef "total" : nint).add((LocalRef "v" : nint)) : nint)
-      return (LocalRef "total" : nint)
-  Func "indexSum" pub
-    param xs: list<nint>
-    result nint
-      let "total": nint = (IntLiteral "0" : nint)
-      for i in nint (ParamRef "xs" : list<nint>)
-          assign "total" = ((LocalRef "total" : nint).add((LocalRef "i" : nint)) : nint)
-      return (LocalRef "total" : nint)
-  Func "sumEven" pub
-    param xs: list<nint>
-    result nint
-      let "total": nint = (IntLiteral "0" : nint)
-      for x of nint (ParamRef "xs" : list<nint>)
-          if (((LocalRef "x" : nint).rem((IntLiteral "2" : nint)) : nint).eql((IntLiteral "0" : nint)) : bool)
-              assign "total" = ((LocalRef "total" : nint).add((LocalRef "x" : nint)) : nint)
-      return (LocalRef "total" : nint)
-  Func "pairCount" pub
-    param xs: list<nint>
-    param ys: list<nint>
-    result nint
-      let "count": nint = (IntLiteral "0" : nint)
-      for x of nint (ParamRef "xs" : list<nint>)
-          for y of nint (ParamRef "ys" : list<nint>)
-              assign "count" = ((LocalRef "count" : nint).add((IntLiteral "1" : nint)) : nint)
-      return (LocalRef "count" : nint)
-  Func "product" pub
-    param xs: list<nint>
-    result nint
-      let "acc": nint = (IntLiteral "1" : nint)
-      for x of nint (ParamRef "xs" : list<nint>)
-          assign "acc" = ((LocalRef "acc" : nint).mul((LocalRef "x" : nint)) : nint)
-      return (LocalRef "acc" : nint)
-  Assert "sum([1, 2, 3, 4]) == 10"
-    eval true
-      sum([1, 2, 3, 4]) == 10
-      ^                 ^
-      10                true
-  Assert "keysJoined([\"a\": 1, \"b\": 2, \"c\": 3]) == \"abc\""
-    eval true
-      keysJoined(["a": 1, "b": 2, "c": 3]) == "abc"
-      ^                                    ^
-      "abc"                                true
-  Assert "valueSum([\"a\": 1, \"b\": 2, \"c\": 3]) == 6"
-    eval true
-      valueSum(["a": 1, "b": 2, "c": 3]) == 6
-      ^                                  ^
-      6                                  true
-  Assert "indexSum([10, 20, 30]) == 3"
-    eval true
-      indexSum([10, 20, 30]) == 3
-      ^                      ^
-      3                      true
-  Assert "sumEven([1, 2, 3, 4, 5, 6]) == 12"
-    eval true
-      sumEven([1, 2, 3, 4, 5, 6]) == 12
-      ^                           ^
-      12                          true
-  Assert "pairCount([1, 2], [1, 2, 3]) == 6"
-    eval true
-      pairCount([1, 2], [1, 2, 3]) == 6
-      ^                            ^
-      6                            true
-  Assert "product([1, 2, 3, 4]) == 24"
-    eval true
-      product([1, 2, 3, 4]) == 24
-      ^                     ^
-      24                    true
-  Assert "sum([]) == 0"
-    eval true
-      sum([]) == 0
-      ^       ^
-      0       true
+  Consts:
+    Const
+      Name: "Summed"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "nint"
+      Value: FuncCall
+        Target: "sum(list<nint>)"
+        Args:
+          CollectionLiteral
+            Entries:
+              CollectionEntry
+                Key: ~
+                Value: IntLiteral
+                  Text: "1"
+                  Type: Builtin
+                    Name: "nint"
+              CollectionEntry
+                Key: ~
+                Value: IntLiteral
+                  Text: "2"
+                  Type: Builtin
+                    Name: "nint"
+              CollectionEntry
+                Key: ~
+                Value: IntLiteral
+                  Text: "3"
+                  Type: Builtin
+                    Name: "nint"
+              CollectionEntry
+                Key: ~
+                Value: IntLiteral
+                  Text: "4"
+                  Type: Builtin
+                    Name: "nint"
+            Type: App
+              Def: "list"
+              Args:
+                Builtin
+                  Name: "nint"
+        Resolved: ~
+        Subst: ~
+        Type: Builtin
+          Name: "nint"
+      Eval: Constant
+        Kind: 0
+        Int: 10
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "Joined"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "string"
+      Value: FuncCall
+        Target: "keysJoined(map<string, nint>)"
+        Args:
+          CollectionLiteral
+            Entries:
+              CollectionEntry
+                Key: StringLiteral
+                  Value: "a"
+                  Type: Builtin
+                    Name: "string"
+                Value: IntLiteral
+                  Text: "1"
+                  Type: Builtin
+                    Name: "nint"
+              CollectionEntry
+                Key: StringLiteral
+                  Value: "b"
+                  Type: Builtin
+                    Name: "string"
+                Value: IntLiteral
+                  Text: "2"
+                  Type: Builtin
+                    Name: "nint"
+              CollectionEntry
+                Key: StringLiteral
+                  Value: "c"
+                  Type: Builtin
+                    Name: "string"
+                Value: IntLiteral
+                  Text: "3"
+                  Type: Builtin
+                    Name: "nint"
+            Type: App
+              Def: "map"
+              Args:
+                Builtin
+                  Name: "string"
+                Builtin
+                  Name: "nint"
+        Resolved: ~
+        Subst: ~
+        Type: Builtin
+          Name: "string"
+      Eval: Constant
+        Kind: 2
+        Int: ~
+        Bool: false
+        Str: "abc"
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "ValueSummed"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "nint"
+      Value: FuncCall
+        Target: "valueSum(map<string, nint>)"
+        Args:
+          CollectionLiteral
+            Entries:
+              CollectionEntry
+                Key: StringLiteral
+                  Value: "a"
+                  Type: Builtin
+                    Name: "string"
+                Value: IntLiteral
+                  Text: "1"
+                  Type: Builtin
+                    Name: "nint"
+              CollectionEntry
+                Key: StringLiteral
+                  Value: "b"
+                  Type: Builtin
+                    Name: "string"
+                Value: IntLiteral
+                  Text: "2"
+                  Type: Builtin
+                    Name: "nint"
+              CollectionEntry
+                Key: StringLiteral
+                  Value: "c"
+                  Type: Builtin
+                    Name: "string"
+                Value: IntLiteral
+                  Text: "3"
+                  Type: Builtin
+                    Name: "nint"
+            Type: App
+              Def: "map"
+              Args:
+                Builtin
+                  Name: "string"
+                Builtin
+                  Name: "nint"
+        Resolved: ~
+        Subst: ~
+        Type: Builtin
+          Name: "nint"
+      Eval: Constant
+        Kind: 0
+        Int: 6
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "IndexSummed"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "nint"
+      Value: FuncCall
+        Target: "indexSum(list<nint>)"
+        Args:
+          CollectionLiteral
+            Entries:
+              CollectionEntry
+                Key: ~
+                Value: IntLiteral
+                  Text: "10"
+                  Type: Builtin
+                    Name: "nint"
+              CollectionEntry
+                Key: ~
+                Value: IntLiteral
+                  Text: "20"
+                  Type: Builtin
+                    Name: "nint"
+              CollectionEntry
+                Key: ~
+                Value: IntLiteral
+                  Text: "30"
+                  Type: Builtin
+                    Name: "nint"
+            Type: App
+              Def: "list"
+              Args:
+                Builtin
+                  Name: "nint"
+        Resolved: ~
+        Subst: ~
+        Type: Builtin
+          Name: "nint"
+      Eval: Constant
+        Kind: 0
+        Int: 3
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "EvenSum"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "nint"
+      Value: FuncCall
+        Target: "sumEven(list<nint>)"
+        Args:
+          CollectionLiteral
+            Entries:
+              CollectionEntry
+                Key: ~
+                Value: IntLiteral
+                  Text: "1"
+                  Type: Builtin
+                    Name: "nint"
+              CollectionEntry
+                Key: ~
+                Value: IntLiteral
+                  Text: "2"
+                  Type: Builtin
+                    Name: "nint"
+              CollectionEntry
+                Key: ~
+                Value: IntLiteral
+                  Text: "3"
+                  Type: Builtin
+                    Name: "nint"
+              CollectionEntry
+                Key: ~
+                Value: IntLiteral
+                  Text: "4"
+                  Type: Builtin
+                    Name: "nint"
+              CollectionEntry
+                Key: ~
+                Value: IntLiteral
+                  Text: "5"
+                  Type: Builtin
+                    Name: "nint"
+              CollectionEntry
+                Key: ~
+                Value: IntLiteral
+                  Text: "6"
+                  Type: Builtin
+                    Name: "nint"
+            Type: App
+              Def: "list"
+              Args:
+                Builtin
+                  Name: "nint"
+        Resolved: ~
+        Subst: ~
+        Type: Builtin
+          Name: "nint"
+      Eval: Constant
+        Kind: 0
+        Int: 12
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "Pairs"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "nint"
+      Value: FuncCall
+        Target: "pairCount(list<nint>, list<nint>)"
+        Args:
+          CollectionLiteral
+            Entries:
+              CollectionEntry
+                Key: ~
+                Value: IntLiteral
+                  Text: "1"
+                  Type: Builtin
+                    Name: "nint"
+              CollectionEntry
+                Key: ~
+                Value: IntLiteral
+                  Text: "2"
+                  Type: Builtin
+                    Name: "nint"
+            Type: App
+              Def: "list"
+              Args:
+                Builtin
+                  Name: "nint"
+          CollectionLiteral
+            Entries:
+              CollectionEntry
+                Key: ~
+                Value: IntLiteral
+                  Text: "1"
+                  Type: Builtin
+                    Name: "nint"
+              CollectionEntry
+                Key: ~
+                Value: IntLiteral
+                  Text: "2"
+                  Type: Builtin
+                    Name: "nint"
+              CollectionEntry
+                Key: ~
+                Value: IntLiteral
+                  Text: "3"
+                  Type: Builtin
+                    Name: "nint"
+            Type: App
+              Def: "list"
+              Args:
+                Builtin
+                  Name: "nint"
+        Resolved: ~
+        Subst: ~
+        Type: Builtin
+          Name: "nint"
+      Eval: Constant
+        Kind: 0
+        Int: 6
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "Product"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "nint"
+      Value: FuncCall
+        Target: "product(list<nint>)"
+        Args:
+          CollectionLiteral
+            Entries:
+              CollectionEntry
+                Key: ~
+                Value: IntLiteral
+                  Text: "1"
+                  Type: Builtin
+                    Name: "nint"
+              CollectionEntry
+                Key: ~
+                Value: IntLiteral
+                  Text: "2"
+                  Type: Builtin
+                    Name: "nint"
+              CollectionEntry
+                Key: ~
+                Value: IntLiteral
+                  Text: "3"
+                  Type: Builtin
+                    Name: "nint"
+              CollectionEntry
+                Key: ~
+                Value: IntLiteral
+                  Text: "4"
+                  Type: Builtin
+                    Name: "nint"
+            Type: App
+              Def: "list"
+              Args:
+                Builtin
+                  Name: "nint"
+        Resolved: ~
+        Subst: ~
+        Type: Builtin
+          Name: "nint"
+      Eval: Constant
+        Kind: 0
+        Int: 24
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+  Types: ~
+  Funcs:
+    Function
+      Name: "sum"
+      Public: true
+      Extern: false
+      Effects: ~
+      Doc: ~
+      TypeParams: ~
+      Params:
+        Param
+          Name: "xs"
+          Type: App
+            Def: "list"
+            Args:
+              Builtin
+                Name: "nint"
+      Result: Builtin
+        Name: "nint"
+      Body:
+        Let
+          Name: "total"
+          Type: Builtin
+            Name: "nint"
+          Value: IntLiteral
+            Text: "0"
+            Type: Builtin
+              Name: "nint"
+        For
+          Var: "x"
+          VarType: Builtin
+            Name: "nint"
+          Of: true
+          Iter: ParamRef
+            Name: "xs"
+            Type: App
+              Def: "list"
+              Args:
+                Builtin
+                  Name: "nint"
+          Body:
+            Assign
+              Name: "total"
+              Value: Call
+                Receiver: LocalRef
+                  Name: "total"
+                  Type: Builtin
+                    Name: "nint"
+                Method: "add"
+                Args:
+                  LocalRef
+                    Name: "x"
+                    Type: Builtin
+                      Name: "nint"
+                Setter: false
+                Resolved: ~
+                Subst: ~
+                Type: Builtin
+                  Name: "nint"
+        Return
+          Value: LocalRef
+            Name: "total"
+            Type: Builtin
+              Name: "nint"
+    Function
+      Name: "keysJoined"
+      Public: true
+      Extern: false
+      Effects: ~
+      Doc: ~
+      TypeParams: ~
+      Params:
+        Param
+          Name: "m"
+          Type: App
+            Def: "map"
+            Args:
+              Builtin
+                Name: "string"
+              Builtin
+                Name: "nint"
+      Result: Builtin
+        Name: "string"
+      Body:
+        Let
+          Name: "out"
+          Type: Builtin
+            Name: "string"
+          Value: StringLiteral
+            Value: ""
+            Type: Builtin
+              Name: "string"
+        For
+          Var: "k"
+          VarType: Builtin
+            Name: "string"
+          Of: false
+          Iter: ParamRef
+            Name: "m"
+            Type: App
+              Def: "map"
+              Args:
+                Builtin
+                  Name: "string"
+                Builtin
+                  Name: "nint"
+          Body:
+            Assign
+              Name: "out"
+              Value: Call
+                Receiver: LocalRef
+                  Name: "out"
+                  Type: Builtin
+                    Name: "string"
+                Method: "add"
+                Args:
+                  LocalRef
+                    Name: "k"
+                    Type: Builtin
+                      Name: "string"
+                Setter: false
+                Resolved: ~
+                Subst: ~
+                Type: Builtin
+                  Name: "string"
+        Return
+          Value: LocalRef
+            Name: "out"
+            Type: Builtin
+              Name: "string"
+    Function
+      Name: "valueSum"
+      Public: true
+      Extern: false
+      Effects: ~
+      Doc: ~
+      TypeParams: ~
+      Params:
+        Param
+          Name: "m"
+          Type: App
+            Def: "map"
+            Args:
+              Builtin
+                Name: "string"
+              Builtin
+                Name: "nint"
+      Result: Builtin
+        Name: "nint"
+      Body:
+        Let
+          Name: "total"
+          Type: Builtin
+            Name: "nint"
+          Value: IntLiteral
+            Text: "0"
+            Type: Builtin
+              Name: "nint"
+        For
+          Var: "v"
+          VarType: Builtin
+            Name: "nint"
+          Of: true
+          Iter: ParamRef
+            Name: "m"
+            Type: App
+              Def: "map"
+              Args:
+                Builtin
+                  Name: "string"
+                Builtin
+                  Name: "nint"
+          Body:
+            Assign
+              Name: "total"
+              Value: Call
+                Receiver: LocalRef
+                  Name: "total"
+                  Type: Builtin
+                    Name: "nint"
+                Method: "add"
+                Args:
+                  LocalRef
+                    Name: "v"
+                    Type: Builtin
+                      Name: "nint"
+                Setter: false
+                Resolved: ~
+                Subst: ~
+                Type: Builtin
+                  Name: "nint"
+        Return
+          Value: LocalRef
+            Name: "total"
+            Type: Builtin
+              Name: "nint"
+    Function
+      Name: "indexSum"
+      Public: true
+      Extern: false
+      Effects: ~
+      Doc: ~
+      TypeParams: ~
+      Params:
+        Param
+          Name: "xs"
+          Type: App
+            Def: "list"
+            Args:
+              Builtin
+                Name: "nint"
+      Result: Builtin
+        Name: "nint"
+      Body:
+        Let
+          Name: "total"
+          Type: Builtin
+            Name: "nint"
+          Value: IntLiteral
+            Text: "0"
+            Type: Builtin
+              Name: "nint"
+        For
+          Var: "i"
+          VarType: Builtin
+            Name: "nint"
+          Of: false
+          Iter: ParamRef
+            Name: "xs"
+            Type: App
+              Def: "list"
+              Args:
+                Builtin
+                  Name: "nint"
+          Body:
+            Assign
+              Name: "total"
+              Value: Call
+                Receiver: LocalRef
+                  Name: "total"
+                  Type: Builtin
+                    Name: "nint"
+                Method: "add"
+                Args:
+                  LocalRef
+                    Name: "i"
+                    Type: Builtin
+                      Name: "nint"
+                Setter: false
+                Resolved: ~
+                Subst: ~
+                Type: Builtin
+                  Name: "nint"
+        Return
+          Value: LocalRef
+            Name: "total"
+            Type: Builtin
+              Name: "nint"
+    Function
+      Name: "sumEven"
+      Public: true
+      Extern: false
+      Effects: ~
+      Doc: ~
+      TypeParams: ~
+      Params:
+        Param
+          Name: "xs"
+          Type: App
+            Def: "list"
+            Args:
+              Builtin
+                Name: "nint"
+      Result: Builtin
+        Name: "nint"
+      Body:
+        Let
+          Name: "total"
+          Type: Builtin
+            Name: "nint"
+          Value: IntLiteral
+            Text: "0"
+            Type: Builtin
+              Name: "nint"
+        For
+          Var: "x"
+          VarType: Builtin
+            Name: "nint"
+          Of: true
+          Iter: ParamRef
+            Name: "xs"
+            Type: App
+              Def: "list"
+              Args:
+                Builtin
+                  Name: "nint"
+          Body:
+            If
+              Cond: Call
+                Receiver: Call
+                  Receiver: LocalRef
+                    Name: "x"
+                    Type: Builtin
+                      Name: "nint"
+                  Method: "rem"
+                  Args:
+                    IntLiteral
+                      Text: "2"
+                      Type: Builtin
+                        Name: "nint"
+                  Setter: false
+                  Resolved: ~
+                  Subst: ~
+                  Type: Builtin
+                    Name: "nint"
+                Method: "eql"
+                Args:
+                  IntLiteral
+                    Text: "0"
+                    Type: Builtin
+                      Name: "nint"
+                Setter: false
+                Resolved: ~
+                Subst: ~
+                Type: Builtin
+                  Name: "bool"
+              Then:
+                Assign
+                  Name: "total"
+                  Value: Call
+                    Receiver: LocalRef
+                      Name: "total"
+                      Type: Builtin
+                        Name: "nint"
+                    Method: "add"
+                    Args:
+                      LocalRef
+                        Name: "x"
+                        Type: Builtin
+                          Name: "nint"
+                    Setter: false
+                    Resolved: ~
+                    Subst: ~
+                    Type: Builtin
+                      Name: "nint"
+              ElseIf: ~
+              Else: ~
+        Return
+          Value: LocalRef
+            Name: "total"
+            Type: Builtin
+              Name: "nint"
+    Function
+      Name: "pairCount"
+      Public: true
+      Extern: false
+      Effects: ~
+      Doc: ~
+      TypeParams: ~
+      Params:
+        Param
+          Name: "xs"
+          Type: App
+            Def: "list"
+            Args:
+              Builtin
+                Name: "nint"
+        Param
+          Name: "ys"
+          Type: App
+            Def: "list"
+            Args:
+              Builtin
+                Name: "nint"
+      Result: Builtin
+        Name: "nint"
+      Body:
+        Let
+          Name: "count"
+          Type: Builtin
+            Name: "nint"
+          Value: IntLiteral
+            Text: "0"
+            Type: Builtin
+              Name: "nint"
+        For
+          Var: "x"
+          VarType: Builtin
+            Name: "nint"
+          Of: true
+          Iter: ParamRef
+            Name: "xs"
+            Type: App
+              Def: "list"
+              Args:
+                Builtin
+                  Name: "nint"
+          Body:
+            For
+              Var: "y"
+              VarType: Builtin
+                Name: "nint"
+              Of: true
+              Iter: ParamRef
+                Name: "ys"
+                Type: App
+                  Def: "list"
+                  Args:
+                    Builtin
+                      Name: "nint"
+              Body:
+                Assign
+                  Name: "count"
+                  Value: Call
+                    Receiver: LocalRef
+                      Name: "count"
+                      Type: Builtin
+                        Name: "nint"
+                    Method: "add"
+                    Args:
+                      IntLiteral
+                        Text: "1"
+                        Type: Builtin
+                          Name: "nint"
+                    Setter: false
+                    Resolved: ~
+                    Subst: ~
+                    Type: Builtin
+                      Name: "nint"
+        Return
+          Value: LocalRef
+            Name: "count"
+            Type: Builtin
+              Name: "nint"
+    Function
+      Name: "product"
+      Public: true
+      Extern: false
+      Effects: ~
+      Doc: ~
+      TypeParams: ~
+      Params:
+        Param
+          Name: "xs"
+          Type: App
+            Def: "list"
+            Args:
+              Builtin
+                Name: "nint"
+      Result: Builtin
+        Name: "nint"
+      Body:
+        Let
+          Name: "acc"
+          Type: Builtin
+            Name: "nint"
+          Value: IntLiteral
+            Text: "1"
+            Type: Builtin
+              Name: "nint"
+        For
+          Var: "x"
+          VarType: Builtin
+            Name: "nint"
+          Of: true
+          Iter: ParamRef
+            Name: "xs"
+            Type: App
+              Def: "list"
+              Args:
+                Builtin
+                  Name: "nint"
+          Body:
+            Assign
+              Name: "acc"
+              Value: Call
+                Receiver: LocalRef
+                  Name: "acc"
+                  Type: Builtin
+                    Name: "nint"
+                Method: "mul"
+                Args:
+                  LocalRef
+                    Name: "x"
+                    Type: Builtin
+                      Name: "nint"
+                Setter: false
+                Resolved: ~
+                Subst: ~
+                Type: Builtin
+                  Name: "nint"
+        Return
+          Value: LocalRef
+            Name: "acc"
+            Type: Builtin
+              Name: "nint"
+  Asserts:
+    Assert
+      Cond: "sum([1, 2, 3, 4]) == 10"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "sum([1, 2, 3, 4]) == 10\n^                 ^\n10                true"
+    Assert
+      Cond: "keysJoined([\"a\": 1, \"b\": 2, \"c\": 3]) == \"abc\""
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "keysJoined([\"a\": 1, \"b\": 2, \"c\": 3]) == \"abc\"\n^                                    ^\n\"abc\"                                true"
+    Assert
+      Cond: "valueSum([\"a\": 1, \"b\": 2, \"c\": 3]) == 6"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "valueSum([\"a\": 1, \"b\": 2, \"c\": 3]) == 6\n^                                  ^\n6                                  true"
+    Assert
+      Cond: "indexSum([10, 20, 30]) == 3"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "indexSum([10, 20, 30]) == 3\n^                      ^\n3                      true"
+    Assert
+      Cond: "sumEven([1, 2, 3, 4, 5, 6]) == 12"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "sumEven([1, 2, 3, 4, 5, 6]) == 12\n^                           ^\n12                          true"
+    Assert
+      Cond: "pairCount([1, 2], [1, 2, 3]) == 6"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "pairCount([1, 2], [1, 2, 3]) == 6\n^                            ^\n6                            true"
+    Assert
+      Cond: "product([1, 2, 3, 4]) == 24"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "product([1, 2, 3, 4]) == 24\n^                     ^\n24                    true"
+    Assert
+      Cond: "sum([]) == 0"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "sum([]) == 0\n^       ^\n0       true"

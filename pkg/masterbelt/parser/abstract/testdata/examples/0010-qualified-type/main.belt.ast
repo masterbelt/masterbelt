@@ -1,12 +1,57 @@
 File
-  UseDecl
-    namespace "geo"
-    from "geometry.belt"
-  ConstDecl
-    name "start"
-    type geo.Point
-    value (. Identifier "geo" Origin)
-  ConstDecl
-    name "path"
-    type list<geo.Point>
-    value (list (. Identifier "geo" Origin) (. Identifier "geo" Unit))
+  Uses:
+    UseDecl
+      Public: false
+      Namespace: "geo"
+      Names: ~
+      Star: false
+      Path: "geometry.belt"
+  Decls:
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "start"
+      Type: NamedType
+        Namespace: "geo"
+        Name: "Point"
+        Args: ~
+      Value: MemberExpr
+        Receiver: Identifier
+          Name: "geo"
+        Member: Identifier
+          Name: "Origin"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "path"
+      Type: NamedType
+        Namespace: ""
+        Name: "list"
+        Args:
+          NamedType
+            Namespace: "geo"
+            Name: "Point"
+            Args: ~
+      Value: CollectionLit
+        Entries:
+          CollectionEntry
+            Key: ~
+            Value: MemberExpr
+              Receiver: Identifier
+                Name: "geo"
+              Member: Identifier
+                Name: "Origin"
+          CollectionEntry
+            Key: ~
+            Value: MemberExpr
+              Receiver: Identifier
+                Name: "geo"
+              Member: Identifier
+                Name: "Unit"
+      Builtin: false
+  Types: ~
+  Enums: ~
+  Interfaces: ~
+  Funcs: ~
+  Asserts: ~

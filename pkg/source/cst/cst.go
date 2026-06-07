@@ -20,9 +20,11 @@
 //
 //	cst.go   the Kind enum, the Green element interface, and the Node/Token greens
 //	tree.go  the positioned Tree view and the Sprint/Equal helpers
+//	text.go  the text representation contract (MarshalText/UnmarshalText)
 package cst
 
 import (
+	"encoding"
 	"strconv"
 
 	"github.com/masterbelt/masterbelt/pkg/source/token"
@@ -189,13 +191,18 @@ func (k Kind) String() string {
 }
 
 // Green is an immutable, position-independent CST element: either an internal
-// *Node or a leaf *Token. It stores only its byte Width, so the same element can
-// stand at any absolute offset and be reused after an edit shifts it. Resolve
-// absolute positions and source text by wrapping a Green in a Tree.
+// *Node or a leaf *Token. It carries no absolute offset, so the same element
+// can stand anywhere and be reused after an edit shifts it. Resolve absolute
+// positions by wrapping a Green in a Tree.
+//
+// Every element marshals to the text representation (see text.go); embedding
+// encoding.TextMarshaler in the sealed interface makes that a compile-time
+// obligation on each implementation.
 //
 // The interface is sealed (green is unexported): the only implementations are
 // *Node and *Token.
 type Green interface {
+	encoding.TextMarshaler
 	// Width is the element's length in bytes — for a Node, the sum of its
 	// children's widths.
 	Width() int
@@ -232,23 +239,28 @@ func (n *Node) Children() []Green { return n.children }
 
 func (n *Node) green() {}
 
-// Token is a leaf green element wrapping one lexical token. Like the lexer's
-// token it carries its Kind and Width but no absolute offset; the covered text
-// is read from the buffer on demand once a Tree supplies the offset.
+// Token is a leaf green element wrapping one lexical token: its Kind and the
+// source text it covers, but no absolute offset. Storing the text (it is as
+// position-independent as the width it determines) makes the green tree
+// self-contained — the source is the concatenation of the leaf texts, which is
+// what lets the text representation carry the whole tree without a buffer.
 type Token struct {
-	kind  token.Kind
-	width int
+	kind token.Kind
+	text string
 }
 
-// NewToken builds a leaf token element.
-func NewToken(kind token.Kind, width int) *Token {
-	return &Token{kind: kind, width: width}
+// NewToken builds a leaf token element covering text.
+func NewToken(kind token.Kind, text string) *Token {
+	return &Token{kind: kind, text: text}
 }
 
 // Kind reports the token's lexical category.
 func (t *Token) Kind() token.Kind { return t.kind }
 
 // Width reports the token's byte length.
-func (t *Token) Width() int { return t.width }
+func (t *Token) Width() int { return len(t.text) }
+
+// Text returns the source text the token covers.
+func (t *Token) Text() string { return t.text }
 
 func (t *Token) green() {}

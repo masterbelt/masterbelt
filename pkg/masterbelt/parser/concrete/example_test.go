@@ -22,7 +22,7 @@ var update = flag.Bool("update", false, "update the example snapshots in testdat
 func formatSnapshot(buf source.Buffer, root cst.Green, diags []diagnostic.Diagnostic) string {
 	var b strings.Builder
 	b.WriteString("# tree\n")
-	b.WriteString(cst.Sprint(buf, root))
+	b.WriteString(cst.Sprint(root))
 	b.WriteString("# diagnostics\n")
 	for _, d := range diags {
 		s := d.Span(buf).Start

@@ -129,9 +129,10 @@ func Parse(src []byte) (*cst.Node, []diagnostic.Diagnostic) {
 
 // parseTokens parses toks — a lexer token stream terminated by a single EOF
 // token — into a File node and the diagnostics found. buf is the source the
-// tokens were lexed from, read only to classify the context keywords (get, set,
-// static) the lexer leaves as plain identifiers; over identical bytes it yields
-// identical nodes, so reuse at a File-child boundary stays sound.
+// tokens were lexed from: every consumed token slices its text from it, and
+// the parser reads it to classify the context keywords (get, set, static) the
+// lexer leaves as plain identifiers. Over identical bytes it yields identical
+// nodes, so reuse at a File-child boundary stays sound.
 func parseTokens(toks []token.Token, buf source.Buffer) (*cst.Node, []diagnostic.Diagnostic) {
 	p := newParser(toks, buf)
 	root := p.parseFile()
@@ -144,12 +145,17 @@ func parseTokens(toks []token.Token, buf source.Buffer) (*cst.Node, []diagnostic
 type parser struct {
 	toks []token.Token
 	pos  int
-	// buf is the source the tokens cover, read only to recover the text of a
-	// context-keyword identifier (get/set/static) at a method's modifier
-	// position. Every other parsing decision is over token kinds alone, so the
-	// boundary context-free property the incremental Document relies on holds:
-	// reading the bytes a token already covers cannot make a File child parse
-	// differently from a fresh parse of the same bytes.
+	// buf is the source the tokens cover. Each consumed token slices its own
+	// text out of it (bump), so a green token owns a small string sized to
+	// itself — never a substring of one whole-document materialization, which
+	// would cost an O(document) copy per incremental reparse and pin the full
+	// source alive through every retained green. The parser also reads it to
+	// recover the text of a context-keyword identifier (get/set/static) at a
+	// method's modifier position. Every other parsing decision is over token
+	// kinds alone, so the boundary context-free property the incremental
+	// Document relies on holds: reading the bytes a token already covers
+	// cannot make a File child parse differently from a fresh parse of the
+	// same bytes.
 	buf   source.Buffer
 	diags *diagnostic.List
 
@@ -200,12 +206,15 @@ func (p *parser) cur() token.Token { return p.toks[p.pos] }
 // atEOF reports whether the cursor sits on the terminating EOF token.
 func (p *parser) atEOF() bool { return p.kind() == token.EOF }
 
-// bump consumes the token at the cursor and returns it as a green leaf.
+// bump consumes the token at the cursor and returns it as a green leaf
+// carrying its source text — its own copy, sized to the token, so a retained
+// green never pins a larger buffer and an incremental reparse copies only the
+// window it actually re-bumps.
 func (p *parser) bump() cst.Green {
 	t := p.toks[p.pos]
 	p.lastStart = t.Offset
 	p.pos++
-	return cst.NewToken(t.Kind, t.Width)
+	return cst.NewToken(t.Kind, string(p.buf.Slice(t.Offset, t.End())))
 }
 
 // skipTrivia consumes a run of trivia tokens, appending each as a leaf to

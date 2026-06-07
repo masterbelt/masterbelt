@@ -75,7 +75,7 @@ type Constant struct {
 	// member within it. Name and the base value are read from
 	// EnumDef.Enum.Members[EnumIndex]; the design forbids duplicate values, so
 	// the index uniquely identifies the member.
-	EnumDef   *TypeDef
+	EnumDef   *TypeDef `tree:"ref"`
 	EnumIndex int
 
 	// valid when Kind == ConstRange: the integer sequence Start, Start+Step, ...,

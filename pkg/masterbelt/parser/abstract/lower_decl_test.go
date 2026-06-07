@@ -216,7 +216,7 @@ func TestLowerAssertDecl(t *testing.T) {
 	}
 	// The condition desugars like any expression: Max > Min is Max.gt(Min).
 	want := `cond (call (. Identifier "Max" gt) Identifier "Min")`
-	if got := ast.Dump(file); !strings.Contains(got, want) {
+	if got := dumpAST(file); !strings.Contains(got, want) {
 		t.Errorf("dump = %s, want it to contain %s", got, want)
 	}
 	if a.Syntax() == nil {
@@ -250,7 +250,7 @@ func TestLowerTypeDeclWhere(t *testing.T) {
 	// The predicate desugars like any expression: self >= 1 && self <= 65535 is
 	// self.gteq(1).anan(self.lteq(65535)).
 	want := `where (call (. (call (. self gteq) IntLit "1") anan) (call (. self lteq) IntLit "65535"))`
-	if got := ast.Dump(file); !strings.Contains(got, want) {
+	if got := dumpAST(file); !strings.Contains(got, want) {
 		t.Errorf("dump = %s, want it to contain %s", got, want)
 	}
 }
@@ -345,7 +345,7 @@ func TestLowerMethodKindDump(t *testing.T) {
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
-	got := ast.Dump(file)
+	got := dumpAST(file)
 	if !strings.Contains(got, "kind getter") || !strings.Contains(got, "kind static") {
 		t.Errorf("dump = %s, want it to contain kind getter and kind static", got)
 	}
@@ -401,7 +401,7 @@ func TestLowerInterfaceParents(t *testing.T) {
 	if len(iface.Parents) != 2 {
 		t.Fatalf("got %d parents, want 2", len(iface.Parents))
 	}
-	if got := ast.Dump(file); !strings.Contains(got, "parent printable") || !strings.Contains(got, "parent foldable<nint, T>") {
+	if got := dumpAST(file); !strings.Contains(got, "parent printable") || !strings.Contains(got, "parent foldable<nint, T>") {
 		t.Errorf("dump = %s, want it to contain both parents", got)
 	}
 }
@@ -418,7 +418,7 @@ func TestLowerImplInterfaceTag(t *testing.T) {
 	if len(td.Impls) != 1 {
 		t.Fatalf("got %d impls, want 1 (the tagged one)", len(td.Impls))
 	}
-	if got := ast.Dump(file); !strings.Contains(got, "impl foldable<nint, T>") {
+	if got := dumpAST(file); !strings.Contains(got, "impl foldable<nint, T>") {
 		t.Errorf("dump = %s, want it to contain the interface tag", got)
 	}
 	// Both the tagged block's fold and the inherent block's size are flattened.
@@ -475,7 +475,7 @@ func TestLowerImplConst(t *testing.T) {
 	if width.Public || width.Name != "Width" || width.Type == nil {
 		t.Errorf("Width const = %+v, want a typed bare const", width)
 	}
-	if got := ast.Dump(file); !strings.Contains(got, "const \"Max\"") || !strings.Contains(got, "const \"Width\"") {
+	if got := dumpAST(file); !strings.Contains(got, "const \"Max\"") || !strings.Contains(got, "const \"Width\"") {
 		t.Errorf("dump = %s, want it to contain the consts", got)
 	}
 }
@@ -500,7 +500,7 @@ func TestLowerImplConstBuiltin(t *testing.T) {
 			t.Errorf("const %q: want no Value, got %v", c.Name, c.Value)
 		}
 	}
-	if got := ast.Dump(file); !strings.Contains(got, "builtin") {
+	if got := dumpAST(file); !strings.Contains(got, "builtin") {
 		t.Errorf("dump = %s, want it to contain builtin", got)
 	}
 }
@@ -535,7 +535,7 @@ func TestLowerEnumDecl(t *testing.T) {
 	if len(d.Doc) != 1 || d.Doc[0] != "rarity tier" {
 		t.Errorf("doc = %q, want [rarity tier]", d.Doc)
 	}
-	if got := ast.Dump(file); !strings.Contains(got, "base byte") {
+	if got := dumpAST(file); !strings.Contains(got, "base byte") {
 		t.Errorf("dump = %s, want it to contain base byte", got)
 	}
 	if len(d.Members) != 3 {
@@ -583,7 +583,7 @@ func TestLowerEnumStringBase(t *testing.T) {
 		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
 	d := file.Enums[0]
-	if got := ast.Dump(file); !strings.Contains(got, "base string") {
+	if got := dumpAST(file); !strings.Contains(got, "base string") {
 		t.Errorf("dump = %s, want it to contain base string", got)
 	}
 	if d.Members[0].Value != nil {

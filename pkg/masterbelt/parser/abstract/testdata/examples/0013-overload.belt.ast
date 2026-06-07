@@ -1,54 +1,231 @@
 File
-  ConstDecl
-    name "Base"
-    type Score
-    value IntLit "100"
-  ConstDecl
-    name "Bumped"
-    value (call (. Identifier "Base" merge) IntLit "50")
-  ConstDecl
-    name "Counted"
-    value (call (. Identifier "Base" merge) BoolLit true)
-  ConstDecl
-    name "Start"
-    type Level
-    value IntLit "1"
-  ConstDecl
-    name "Second"
-    value (call (. Identifier "Start" next))
-  ConstDecl
-    name "Fifth"
-    value (call (. Identifier "Start" next) IntLit "4")
-  TypeDecl
-    doc "A game score in points."
-    pub
-    name "Score"
-    body int
-    method "merge"
-      doc "The score with points merged in."
-      pub
-      param points: self
-      result self
-      return (call (. self add) Identifier "points")
-    method "merge"
-      doc "Whether an active run with this score counts."
-      pub
-      param active: bool
-      result bool
-      return (call (. Identifier "active" anan) (call (. self gt) IntLit "0"))
-  TypeDecl
-    doc "A character level."
-    pub
-    name "Level"
-    body sbyte
-    method "next"
-      doc "The next level."
-      pub
-      result self
-      return (call (. self add) IntLit "1")
-    method "next"
-      doc "The level a number of steps up."
-      pub
-      param steps: self
-      result self
-      return (call (. self add) Identifier "steps")
+  Uses: ~
+  Decls:
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Base"
+      Type: NamedType
+        Namespace: ""
+        Name: "Score"
+        Args: ~
+      Value: IntLit
+        Text: "100"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Bumped"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: Identifier
+            Name: "Base"
+          Member: Identifier
+            Name: "merge"
+        Arguments:
+          IntLit
+            Text: "50"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Counted"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: Identifier
+            Name: "Base"
+          Member: Identifier
+            Name: "merge"
+        Arguments:
+          BoolLit
+            Value: true
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Start"
+      Type: NamedType
+        Namespace: ""
+        Name: "Level"
+        Args: ~
+      Value: IntLit
+        Text: "1"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Second"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: Identifier
+            Name: "Start"
+          Member: Identifier
+            Name: "next"
+        Arguments: ~
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Fifth"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: Identifier
+            Name: "Start"
+          Member: Identifier
+            Name: "next"
+        Arguments:
+          IntLit
+            Text: "4"
+      Builtin: false
+  Types:
+    TypeDecl
+      Doc: "A game score in points."
+      Public: true
+      Name: "Score"
+      Params: ~
+      Body: NamedType
+        Namespace: ""
+        Name: "int"
+        Args: ~
+      Where: ~
+      Methods:
+        MethodDecl
+          Doc: "The score with points merged in."
+          Public: true
+          Extern: false
+          Kind: 0
+          Effects: ~
+          Name: "merge"
+          TypeParams: ~
+          Params:
+            ParamDef
+              Name: "points"
+              Type: NamedType
+                Namespace: ""
+                Name: "self"
+                Args: ~
+          Result: NamedType
+            Namespace: ""
+            Name: "self"
+            Args: ~
+          Body:
+            ReturnStmt
+              Value: CallExpr
+                Callee: MemberExpr
+                  Receiver: SelfExpr
+                  Member: Identifier
+                    Name: "add"
+                Arguments:
+                  Identifier
+                    Name: "points"
+        MethodDecl
+          Doc: "Whether an active run with this score counts."
+          Public: true
+          Extern: false
+          Kind: 0
+          Effects: ~
+          Name: "merge"
+          TypeParams: ~
+          Params:
+            ParamDef
+              Name: "active"
+              Type: NamedType
+                Namespace: ""
+                Name: "bool"
+                Args: ~
+          Result: NamedType
+            Namespace: ""
+            Name: "bool"
+            Args: ~
+          Body:
+            ReturnStmt
+              Value: CallExpr
+                Callee: MemberExpr
+                  Receiver: Identifier
+                    Name: "active"
+                  Member: Identifier
+                    Name: "anan"
+                Arguments:
+                  CallExpr
+                    Callee: MemberExpr
+                      Receiver: SelfExpr
+                      Member: Identifier
+                        Name: "gt"
+                    Arguments:
+                      IntLit
+                        Text: "0"
+      Consts: ~
+      Impls: ~
+    TypeDecl
+      Doc: "A character level."
+      Public: true
+      Name: "Level"
+      Params: ~
+      Body: NamedType
+        Namespace: ""
+        Name: "sbyte"
+        Args: ~
+      Where: ~
+      Methods:
+        MethodDecl
+          Doc: "The next level."
+          Public: true
+          Extern: false
+          Kind: 0
+          Effects: ~
+          Name: "next"
+          TypeParams: ~
+          Params: ~
+          Result: NamedType
+            Namespace: ""
+            Name: "self"
+            Args: ~
+          Body:
+            ReturnStmt
+              Value: CallExpr
+                Callee: MemberExpr
+                  Receiver: SelfExpr
+                  Member: Identifier
+                    Name: "add"
+                Arguments:
+                  IntLit
+                    Text: "1"
+        MethodDecl
+          Doc: "The level a number of steps up."
+          Public: true
+          Extern: false
+          Kind: 0
+          Effects: ~
+          Name: "next"
+          TypeParams: ~
+          Params:
+            ParamDef
+              Name: "steps"
+              Type: NamedType
+                Namespace: ""
+                Name: "self"
+                Args: ~
+          Result: NamedType
+            Namespace: ""
+            Name: "self"
+            Args: ~
+          Body:
+            ReturnStmt
+              Value: CallExpr
+                Callee: MemberExpr
+                  Receiver: SelfExpr
+                  Member: Identifier
+                    Name: "add"
+                Arguments:
+                  Identifier
+                    Name: "steps"
+      Consts: ~
+      Impls: ~
+  Enums: ~
+  Interfaces: ~
+  Funcs: ~
+  Asserts: ~

@@ -16,15 +16,35 @@
 //
 // The node set is split across files: this file holds the Node interface, decl.go
 // the declaration nodes (File, ConstDecl), types.go the type-expression nodes,
-// and expr.go the expression nodes (Expr and its variants). dump.go renders a
-// File as a diffable snapshot.
+// and expr.go the expression nodes (Expr and its variants). text_gen.go — the
+// generated exact text representation (format v2) — renders a File as a
+// diffable snapshot and parses it back.
+//
+// The text representation is exact: every exported field of every node
+// appears, in declaration order, in the shared element grammar (see package
+// source/internal/treetext) — a heading line per node, one "Name:" line per
+// field, scalars inline, children indented, "~" for nil. The only exclusions
+// are the unexported syntax backpointers, out by construction: an unmarshaled
+// File is detached (Syntax() is nil), which is the contract, not a defect.
+// The field-sensitivity test (P5) pins the exactness mechanically.
 package ast
 
-import "github.com/masterbelt/masterbelt/pkg/source/cst"
+//go:generate go run github.com/masterbelt/masterbelt/pkg/source/internal/treegen -marshal Node -roots File -out text_gen.go
+
+import (
+	"encoding"
+
+	"github.com/masterbelt/masterbelt/pkg/source/cst"
+)
 
 // Node is any AST node. The interface is sealed: the node set is closed to the
 // types declared in this package.
+//
+// Every node marshals to the exact text representation (text_gen.go);
+// embedding encoding.TextMarshaler makes that a compile-time obligation, so a
+// node form added without regenerating the codec does not build.
 type Node interface {
+	encoding.TextMarshaler
 	// Syntax returns the green CST node this was lowered from.
 	Syntax() *cst.Node
 	node()

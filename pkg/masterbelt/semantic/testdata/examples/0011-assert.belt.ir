@@ -1,45 +1,191 @@
 Module
-  Const "MaxLevel"
-    type nint
-    value (IntLiteral "100" : nint)
-    eval 100
-  Const "MinLevel"
-    type nint
-    value (IntLiteral "0" : nint)
-    eval 0
-  Const "Enabled"
-    type bool
-    value (BoolLiteral true : bool)
-    eval true
-  Assert "MaxLevel > MinLevel"
-    doc "The level range is not empty."
-    eval true
-      MaxLevel > MinLevel
-      ^        ^ ^
-      100      | 0
-               true
-  Assert "MinLevel == 0"
-    eval true
-      MinLevel == 0
-      ^        ^
-      0        true
-  Assert "MaxLevel - MinLevel == 100"
-    eval true
-      MaxLevel - MinLevel == 100
-      ^        ^ ^        ^
-      100      | 0        true
-               100
-  Assert "Enabled && !false"
-    eval true
-      Enabled && !false
-      ^       ^  ^
-      true    |  true
-              true
-  Assert "MaxLevel > 0 && !(MinLevel > 0)"
-    eval true
-      MaxLevel > 0 && !(MinLevel > 0)
-      ^        ^   ^  ^ ^        ^
-      100      |   |  | 0        false
-               |   |  true
-               |   true
-               true
+  Consts:
+    Const
+      Name: "MaxLevel"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "nint"
+      Value: IntLiteral
+        Text: "100"
+        Type: Builtin
+          Name: "nint"
+      Eval: Constant
+        Kind: 0
+        Int: 100
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "MinLevel"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "nint"
+      Value: IntLiteral
+        Text: "0"
+        Type: Builtin
+          Name: "nint"
+      Eval: Constant
+        Kind: 0
+        Int: 0
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "Enabled"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "bool"
+      Value: BoolLiteral
+        Value: true
+        Type: Builtin
+          Name: "bool"
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+  Types: ~
+  Funcs: ~
+  Asserts:
+    Assert
+      Cond: "MaxLevel > MinLevel"
+      Doc: "The level range is not empty."
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "MaxLevel > MinLevel\n^        ^ ^\n100      | 0\n         true"
+    Assert
+      Cond: "MinLevel == 0"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "MinLevel == 0\n^        ^\n0        true"
+    Assert
+      Cond: "MaxLevel - MinLevel == 100"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "MaxLevel - MinLevel == 100\n^        ^ ^        ^\n100      | 0        true\n         100"
+    Assert
+      Cond: "Enabled && !false"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "Enabled && !false\n^       ^  ^\ntrue    |  true\n        true"
+    Assert
+      Cond: "MaxLevel > 0 && !(MinLevel > 0)"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "MaxLevel > 0 && !(MinLevel > 0)\n^        ^   ^  ^ ^        ^\n100      |   |  | 0        false\n         |   |  true\n         |   true\n         true"

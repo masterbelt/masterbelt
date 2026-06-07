@@ -1,39 +1,174 @@
 File
-  ConstDecl
-    name "Epoch"
-    value DatetimeLit "D1970-01-01T00:00:00.000Z"
-  ConstDecl
-    name "Release"
-    value DatetimeLit "D2009-03-31T23:59:59.000Z"
-  ConstDecl
-    name "Launch"
-    value DatetimeLit "D2026-06-05T09:00:00.000+09:00"
-  ConstDecl
-    name "Cooldown"
-    value DurationLit "5s"
-  ConstDecl
-    name "Complex"
-    value DurationLit "3w4d5h6m7s8ms"
-  ConstDecl
-    name "Deadline"
-    value (call (. Identifier "Release" add) DurationLit "7d")
-  ConstDecl
-    name "Span"
-    value (call (. Identifier "Release" sub) Identifier "Epoch")
-  ConstDecl
-    name "Shift"
-    value (call (. Identifier "Release" sub) DurationLit "1h")
-  ConstDecl
-    name "TwoH"
-    value (call (. DurationLit "1h" add) DurationLit "1h")
-  ConstDecl
-    name "Triple"
-    value (call (. DurationLit "5m" mul) IntLit "3")
-  TypeDecl
-    pub
-    name "Event"
-    body { id: nint, starts_at: datetime, cooldown: duration }
-  AssertDecl
-    cond (call (. Identifier "Release" gt) Identifier "Epoch")
-  AssertDecl
-    cond (call (. DurationLit "1h" gt) DurationLit "59m")
+  Uses: ~
+  Decls:
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Epoch"
+      Type: ~
+      Value: DatetimeLit
+        Text: "D1970-01-01T00:00:00.000Z"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Release"
+      Type: ~
+      Value: DatetimeLit
+        Text: "D2009-03-31T23:59:59.000Z"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Launch"
+      Type: ~
+      Value: DatetimeLit
+        Text: "D2026-06-05T09:00:00.000+09:00"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Cooldown"
+      Type: ~
+      Value: DurationLit
+        Text: "5s"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Complex"
+      Type: ~
+      Value: DurationLit
+        Text: "3w4d5h6m7s8ms"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Deadline"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: Identifier
+            Name: "Release"
+          Member: Identifier
+            Name: "add"
+        Arguments:
+          DurationLit
+            Text: "7d"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Span"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: Identifier
+            Name: "Release"
+          Member: Identifier
+            Name: "sub"
+        Arguments:
+          Identifier
+            Name: "Epoch"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Shift"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: Identifier
+            Name: "Release"
+          Member: Identifier
+            Name: "sub"
+        Arguments:
+          DurationLit
+            Text: "1h"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "TwoH"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: DurationLit
+            Text: "1h"
+          Member: Identifier
+            Name: "add"
+        Arguments:
+          DurationLit
+            Text: "1h"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Triple"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: DurationLit
+            Text: "5m"
+          Member: Identifier
+            Name: "mul"
+        Arguments:
+          IntLit
+            Text: "3"
+      Builtin: false
+  Types:
+    TypeDecl
+      Doc: ~
+      Public: true
+      Name: "Event"
+      Params: ~
+      Body: RecordType
+        Fields:
+          FieldDef
+            Name: "id"
+            Type: NamedType
+              Namespace: ""
+              Name: "nint"
+              Args: ~
+          FieldDef
+            Name: "starts_at"
+            Type: NamedType
+              Namespace: ""
+              Name: "datetime"
+              Args: ~
+          FieldDef
+            Name: "cooldown"
+            Type: NamedType
+              Namespace: ""
+              Name: "duration"
+              Args: ~
+      Where: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
+  Enums: ~
+  Interfaces: ~
+  Funcs: ~
+  Asserts:
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: Identifier
+            Name: "Release"
+          Member: Identifier
+            Name: "gt"
+        Arguments:
+          Identifier
+            Name: "Epoch"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: DurationLit
+            Text: "1h"
+          Member: Identifier
+            Name: "gt"
+        Arguments:
+          DurationLit
+            Text: "59m"

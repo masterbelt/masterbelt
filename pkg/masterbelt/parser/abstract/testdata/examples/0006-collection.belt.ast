@@ -1,24 +1,140 @@
 File
-  ConstDecl
-    name "ExampleList"
-    type list<nint>
-    value (list IntLit "1" IntLit "2" IntLit "3")
-  ConstDecl
-    name "ExampleMap"
-    type map<string, nint>
-    value (map StringLit "key": IntLit "100")
-  ConstDecl
-    name "Inferred"
-    value (list IntLit "10" IntLit "20" IntLit "30")
-  ConstDecl
-    name "Bytes"
-    type list<sbyte>
-    value (list IntLit "1" IntLit "2" IntLit "3")
-  ConstDecl
-    name "EmptyList"
-    type list<nint>
-    value (collection)
-  ConstDecl
-    name "EmptyMap"
-    type map<string, nint>
-    value (collection)
+  Uses: ~
+  Decls:
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "ExampleList"
+      Type: NamedType
+        Namespace: ""
+        Name: "list"
+        Args:
+          NamedType
+            Namespace: ""
+            Name: "nint"
+            Args: ~
+      Value: CollectionLit
+        Entries:
+          CollectionEntry
+            Key: ~
+            Value: IntLit
+              Text: "1"
+          CollectionEntry
+            Key: ~
+            Value: IntLit
+              Text: "2"
+          CollectionEntry
+            Key: ~
+            Value: IntLit
+              Text: "3"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "ExampleMap"
+      Type: NamedType
+        Namespace: ""
+        Name: "map"
+        Args:
+          NamedType
+            Namespace: ""
+            Name: "string"
+            Args: ~
+          NamedType
+            Namespace: ""
+            Name: "nint"
+            Args: ~
+      Value: CollectionLit
+        Entries:
+          CollectionEntry
+            Key: StringLit
+              Value: "key"
+            Value: IntLit
+              Text: "100"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Inferred"
+      Type: ~
+      Value: CollectionLit
+        Entries:
+          CollectionEntry
+            Key: ~
+            Value: IntLit
+              Text: "10"
+          CollectionEntry
+            Key: ~
+            Value: IntLit
+              Text: "20"
+          CollectionEntry
+            Key: ~
+            Value: IntLit
+              Text: "30"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Bytes"
+      Type: NamedType
+        Namespace: ""
+        Name: "list"
+        Args:
+          NamedType
+            Namespace: ""
+            Name: "sbyte"
+            Args: ~
+      Value: CollectionLit
+        Entries:
+          CollectionEntry
+            Key: ~
+            Value: IntLit
+              Text: "1"
+          CollectionEntry
+            Key: ~
+            Value: IntLit
+              Text: "2"
+          CollectionEntry
+            Key: ~
+            Value: IntLit
+              Text: "3"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "EmptyList"
+      Type: NamedType
+        Namespace: ""
+        Name: "list"
+        Args:
+          NamedType
+            Namespace: ""
+            Name: "nint"
+            Args: ~
+      Value: CollectionLit
+        Entries: ~
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "EmptyMap"
+      Type: NamedType
+        Namespace: ""
+        Name: "map"
+        Args:
+          NamedType
+            Namespace: ""
+            Name: "string"
+            Args: ~
+          NamedType
+            Namespace: ""
+            Name: "nint"
+            Args: ~
+      Value: CollectionLit
+        Entries: ~
+      Builtin: false
+  Types: ~
+  Enums: ~
+  Interfaces: ~
+  Funcs: ~
+  Asserts: ~

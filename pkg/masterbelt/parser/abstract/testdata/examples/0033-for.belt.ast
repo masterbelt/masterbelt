@@ -1,104 +1,839 @@
 File
-  ConstDecl
-    name "Summed"
-    value (call Identifier "sum" (list IntLit "1" IntLit "2" IntLit "3" IntLit "4"))
-  ConstDecl
-    name "Joined"
-    value (call Identifier "keysJoined" (map StringLit "a": IntLit "1" StringLit "b": IntLit "2" StringLit "c": IntLit "3"))
-  ConstDecl
-    name "ValueSummed"
-    value (call Identifier "valueSum" (map StringLit "a": IntLit "1" StringLit "b": IntLit "2" StringLit "c": IntLit "3"))
-  ConstDecl
-    name "IndexSummed"
-    value (call Identifier "indexSum" (list IntLit "10" IntLit "20" IntLit "30"))
-  ConstDecl
-    name "EvenSum"
-    value (call Identifier "sumEven" (list IntLit "1" IntLit "2" IntLit "3" IntLit "4" IntLit "5" IntLit "6"))
-  ConstDecl
-    name "Pairs"
-    value (call Identifier "pairCount" (list IntLit "1" IntLit "2") (list IntLit "1" IntLit "2" IntLit "3"))
-  ConstDecl
-    name "Product"
-    value (call Identifier "product" (list IntLit "1" IntLit "2" IntLit "3" IntLit "4"))
-  FuncDecl
-    pub
-    name "sum"
-    param xs: list<nint>
-    result nint
-      let "total" = IntLit "0"
-      for x of Identifier "xs"
-          assign Identifier "total" = (call (. Identifier "total" add) Identifier "x")
-      return Identifier "total"
-  FuncDecl
-    pub
-    name "keysJoined"
-    param m: map<string, nint>
-    result string
-      let "out" = StringLit ""
-      for k in Identifier "m"
-          assign Identifier "out" = (call (. Identifier "out" add) Identifier "k")
-      return Identifier "out"
-  FuncDecl
-    pub
-    name "valueSum"
-    param m: map<string, nint>
-    result nint
-      let "total" = IntLit "0"
-      for v of Identifier "m"
-          assign Identifier "total" = (call (. Identifier "total" add) Identifier "v")
-      return Identifier "total"
-  FuncDecl
-    pub
-    name "indexSum"
-    param xs: list<nint>
-    result nint
-      let "total" = IntLit "0"
-      for i in Identifier "xs"
-          assign Identifier "total" = (call (. Identifier "total" add) Identifier "i")
-      return Identifier "total"
-  FuncDecl
-    pub
-    name "sumEven"
-    param xs: list<nint>
-    result nint
-      let "total" = IntLit "0"
-      for x of Identifier "xs"
-          if (call (. (call (. Identifier "x" rem) IntLit "2") eql) IntLit "0")
-              assign Identifier "total" = (call (. Identifier "total" add) Identifier "x")
-      return Identifier "total"
-  FuncDecl
-    pub
-    name "pairCount"
-    param xs: list<nint>
-    param ys: list<nint>
-    result nint
-      let "count" = IntLit "0"
-      for x of Identifier "xs"
-          for y of Identifier "ys"
-              assign Identifier "count" = (call (. Identifier "count" add) IntLit "1")
-      return Identifier "count"
-  FuncDecl
-    pub
-    name "product"
-    param xs: list<nint>
-    result nint
-      let "acc" = IntLit "1"
-      for x of Identifier "xs"
-          assign Identifier "acc" = (call (. Identifier "acc" mul) Identifier "x")
-      return Identifier "acc"
-  AssertDecl
-    cond (call (. (call Identifier "sum" (list IntLit "1" IntLit "2" IntLit "3" IntLit "4")) eql) IntLit "10")
-  AssertDecl
-    cond (call (. (call Identifier "keysJoined" (map StringLit "a": IntLit "1" StringLit "b": IntLit "2" StringLit "c": IntLit "3")) eql) StringLit "abc")
-  AssertDecl
-    cond (call (. (call Identifier "valueSum" (map StringLit "a": IntLit "1" StringLit "b": IntLit "2" StringLit "c": IntLit "3")) eql) IntLit "6")
-  AssertDecl
-    cond (call (. (call Identifier "indexSum" (list IntLit "10" IntLit "20" IntLit "30")) eql) IntLit "3")
-  AssertDecl
-    cond (call (. (call Identifier "sumEven" (list IntLit "1" IntLit "2" IntLit "3" IntLit "4" IntLit "5" IntLit "6")) eql) IntLit "12")
-  AssertDecl
-    cond (call (. (call Identifier "pairCount" (list IntLit "1" IntLit "2") (list IntLit "1" IntLit "2" IntLit "3")) eql) IntLit "6")
-  AssertDecl
-    cond (call (. (call Identifier "product" (list IntLit "1" IntLit "2" IntLit "3" IntLit "4")) eql) IntLit "24")
-  AssertDecl
-    cond (call (. (call Identifier "sum" (collection)) eql) IntLit "0")
+  Uses: ~
+  Decls:
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Summed"
+      Type: ~
+      Value: CallExpr
+        Callee: Identifier
+          Name: "sum"
+        Arguments:
+          CollectionLit
+            Entries:
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "1"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "2"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "3"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "4"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Joined"
+      Type: ~
+      Value: CallExpr
+        Callee: Identifier
+          Name: "keysJoined"
+        Arguments:
+          CollectionLit
+            Entries:
+              CollectionEntry
+                Key: StringLit
+                  Value: "a"
+                Value: IntLit
+                  Text: "1"
+              CollectionEntry
+                Key: StringLit
+                  Value: "b"
+                Value: IntLit
+                  Text: "2"
+              CollectionEntry
+                Key: StringLit
+                  Value: "c"
+                Value: IntLit
+                  Text: "3"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "ValueSummed"
+      Type: ~
+      Value: CallExpr
+        Callee: Identifier
+          Name: "valueSum"
+        Arguments:
+          CollectionLit
+            Entries:
+              CollectionEntry
+                Key: StringLit
+                  Value: "a"
+                Value: IntLit
+                  Text: "1"
+              CollectionEntry
+                Key: StringLit
+                  Value: "b"
+                Value: IntLit
+                  Text: "2"
+              CollectionEntry
+                Key: StringLit
+                  Value: "c"
+                Value: IntLit
+                  Text: "3"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "IndexSummed"
+      Type: ~
+      Value: CallExpr
+        Callee: Identifier
+          Name: "indexSum"
+        Arguments:
+          CollectionLit
+            Entries:
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "10"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "20"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "30"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "EvenSum"
+      Type: ~
+      Value: CallExpr
+        Callee: Identifier
+          Name: "sumEven"
+        Arguments:
+          CollectionLit
+            Entries:
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "1"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "2"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "3"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "4"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "5"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "6"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Pairs"
+      Type: ~
+      Value: CallExpr
+        Callee: Identifier
+          Name: "pairCount"
+        Arguments:
+          CollectionLit
+            Entries:
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "1"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "2"
+          CollectionLit
+            Entries:
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "1"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "2"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "3"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Product"
+      Type: ~
+      Value: CallExpr
+        Callee: Identifier
+          Name: "product"
+        Arguments:
+          CollectionLit
+            Entries:
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "1"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "2"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "3"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "4"
+      Builtin: false
+  Types: ~
+  Enums: ~
+  Interfaces: ~
+  Funcs:
+    FuncDecl
+      Doc: ~
+      Public: true
+      Extern: false
+      Effects: ~
+      Name: "sum"
+      TypeParams: ~
+      Params:
+        ParamDef
+          Name: "xs"
+          Type: NamedType
+            Namespace: ""
+            Name: "list"
+            Args:
+              NamedType
+                Namespace: ""
+                Name: "nint"
+                Args: ~
+      Result: NamedType
+        Namespace: ""
+        Name: "nint"
+        Args: ~
+      Body:
+        LetStmt
+          Name: "total"
+          Type: ~
+          Value: IntLit
+            Text: "0"
+        ForStmt
+          Var: "x"
+          Kind: 0
+          Iter: Identifier
+            Name: "xs"
+          Body:
+            AssignStmt
+              Target: Identifier
+                Name: "total"
+              Value: CallExpr
+                Callee: MemberExpr
+                  Receiver: Identifier
+                    Name: "total"
+                  Member: Identifier
+                    Name: "add"
+                Arguments:
+                  Identifier
+                    Name: "x"
+        ReturnStmt
+          Value: Identifier
+            Name: "total"
+    FuncDecl
+      Doc: ~
+      Public: true
+      Extern: false
+      Effects: ~
+      Name: "keysJoined"
+      TypeParams: ~
+      Params:
+        ParamDef
+          Name: "m"
+          Type: NamedType
+            Namespace: ""
+            Name: "map"
+            Args:
+              NamedType
+                Namespace: ""
+                Name: "string"
+                Args: ~
+              NamedType
+                Namespace: ""
+                Name: "nint"
+                Args: ~
+      Result: NamedType
+        Namespace: ""
+        Name: "string"
+        Args: ~
+      Body:
+        LetStmt
+          Name: "out"
+          Type: ~
+          Value: StringLit
+            Value: ""
+        ForStmt
+          Var: "k"
+          Kind: 1
+          Iter: Identifier
+            Name: "m"
+          Body:
+            AssignStmt
+              Target: Identifier
+                Name: "out"
+              Value: CallExpr
+                Callee: MemberExpr
+                  Receiver: Identifier
+                    Name: "out"
+                  Member: Identifier
+                    Name: "add"
+                Arguments:
+                  Identifier
+                    Name: "k"
+        ReturnStmt
+          Value: Identifier
+            Name: "out"
+    FuncDecl
+      Doc: ~
+      Public: true
+      Extern: false
+      Effects: ~
+      Name: "valueSum"
+      TypeParams: ~
+      Params:
+        ParamDef
+          Name: "m"
+          Type: NamedType
+            Namespace: ""
+            Name: "map"
+            Args:
+              NamedType
+                Namespace: ""
+                Name: "string"
+                Args: ~
+              NamedType
+                Namespace: ""
+                Name: "nint"
+                Args: ~
+      Result: NamedType
+        Namespace: ""
+        Name: "nint"
+        Args: ~
+      Body:
+        LetStmt
+          Name: "total"
+          Type: ~
+          Value: IntLit
+            Text: "0"
+        ForStmt
+          Var: "v"
+          Kind: 0
+          Iter: Identifier
+            Name: "m"
+          Body:
+            AssignStmt
+              Target: Identifier
+                Name: "total"
+              Value: CallExpr
+                Callee: MemberExpr
+                  Receiver: Identifier
+                    Name: "total"
+                  Member: Identifier
+                    Name: "add"
+                Arguments:
+                  Identifier
+                    Name: "v"
+        ReturnStmt
+          Value: Identifier
+            Name: "total"
+    FuncDecl
+      Doc: ~
+      Public: true
+      Extern: false
+      Effects: ~
+      Name: "indexSum"
+      TypeParams: ~
+      Params:
+        ParamDef
+          Name: "xs"
+          Type: NamedType
+            Namespace: ""
+            Name: "list"
+            Args:
+              NamedType
+                Namespace: ""
+                Name: "nint"
+                Args: ~
+      Result: NamedType
+        Namespace: ""
+        Name: "nint"
+        Args: ~
+      Body:
+        LetStmt
+          Name: "total"
+          Type: ~
+          Value: IntLit
+            Text: "0"
+        ForStmt
+          Var: "i"
+          Kind: 1
+          Iter: Identifier
+            Name: "xs"
+          Body:
+            AssignStmt
+              Target: Identifier
+                Name: "total"
+              Value: CallExpr
+                Callee: MemberExpr
+                  Receiver: Identifier
+                    Name: "total"
+                  Member: Identifier
+                    Name: "add"
+                Arguments:
+                  Identifier
+                    Name: "i"
+        ReturnStmt
+          Value: Identifier
+            Name: "total"
+    FuncDecl
+      Doc: ~
+      Public: true
+      Extern: false
+      Effects: ~
+      Name: "sumEven"
+      TypeParams: ~
+      Params:
+        ParamDef
+          Name: "xs"
+          Type: NamedType
+            Namespace: ""
+            Name: "list"
+            Args:
+              NamedType
+                Namespace: ""
+                Name: "nint"
+                Args: ~
+      Result: NamedType
+        Namespace: ""
+        Name: "nint"
+        Args: ~
+      Body:
+        LetStmt
+          Name: "total"
+          Type: ~
+          Value: IntLit
+            Text: "0"
+        ForStmt
+          Var: "x"
+          Kind: 0
+          Iter: Identifier
+            Name: "xs"
+          Body:
+            IfStmt
+              Cond: CallExpr
+                Callee: MemberExpr
+                  Receiver: CallExpr
+                    Callee: MemberExpr
+                      Receiver: Identifier
+                        Name: "x"
+                      Member: Identifier
+                        Name: "rem"
+                    Arguments:
+                      IntLit
+                        Text: "2"
+                  Member: Identifier
+                    Name: "eql"
+                Arguments:
+                  IntLit
+                    Text: "0"
+              Then:
+                AssignStmt
+                  Target: Identifier
+                    Name: "total"
+                  Value: CallExpr
+                    Callee: MemberExpr
+                      Receiver: Identifier
+                        Name: "total"
+                      Member: Identifier
+                        Name: "add"
+                    Arguments:
+                      Identifier
+                        Name: "x"
+              ElseIf: ~
+              Else: ~
+        ReturnStmt
+          Value: Identifier
+            Name: "total"
+    FuncDecl
+      Doc: ~
+      Public: true
+      Extern: false
+      Effects: ~
+      Name: "pairCount"
+      TypeParams: ~
+      Params:
+        ParamDef
+          Name: "xs"
+          Type: NamedType
+            Namespace: ""
+            Name: "list"
+            Args:
+              NamedType
+                Namespace: ""
+                Name: "nint"
+                Args: ~
+        ParamDef
+          Name: "ys"
+          Type: NamedType
+            Namespace: ""
+            Name: "list"
+            Args:
+              NamedType
+                Namespace: ""
+                Name: "nint"
+                Args: ~
+      Result: NamedType
+        Namespace: ""
+        Name: "nint"
+        Args: ~
+      Body:
+        LetStmt
+          Name: "count"
+          Type: ~
+          Value: IntLit
+            Text: "0"
+        ForStmt
+          Var: "x"
+          Kind: 0
+          Iter: Identifier
+            Name: "xs"
+          Body:
+            ForStmt
+              Var: "y"
+              Kind: 0
+              Iter: Identifier
+                Name: "ys"
+              Body:
+                AssignStmt
+                  Target: Identifier
+                    Name: "count"
+                  Value: CallExpr
+                    Callee: MemberExpr
+                      Receiver: Identifier
+                        Name: "count"
+                      Member: Identifier
+                        Name: "add"
+                    Arguments:
+                      IntLit
+                        Text: "1"
+        ReturnStmt
+          Value: Identifier
+            Name: "count"
+    FuncDecl
+      Doc: ~
+      Public: true
+      Extern: false
+      Effects: ~
+      Name: "product"
+      TypeParams: ~
+      Params:
+        ParamDef
+          Name: "xs"
+          Type: NamedType
+            Namespace: ""
+            Name: "list"
+            Args:
+              NamedType
+                Namespace: ""
+                Name: "nint"
+                Args: ~
+      Result: NamedType
+        Namespace: ""
+        Name: "nint"
+        Args: ~
+      Body:
+        LetStmt
+          Name: "acc"
+          Type: ~
+          Value: IntLit
+            Text: "1"
+        ForStmt
+          Var: "x"
+          Kind: 0
+          Iter: Identifier
+            Name: "xs"
+          Body:
+            AssignStmt
+              Target: Identifier
+                Name: "acc"
+              Value: CallExpr
+                Callee: MemberExpr
+                  Receiver: Identifier
+                    Name: "acc"
+                  Member: Identifier
+                    Name: "mul"
+                Arguments:
+                  Identifier
+                    Name: "x"
+        ReturnStmt
+          Value: Identifier
+            Name: "acc"
+  Asserts:
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: Identifier
+              Name: "sum"
+            Arguments:
+              CollectionLit
+                Entries:
+                  CollectionEntry
+                    Key: ~
+                    Value: IntLit
+                      Text: "1"
+                  CollectionEntry
+                    Key: ~
+                    Value: IntLit
+                      Text: "2"
+                  CollectionEntry
+                    Key: ~
+                    Value: IntLit
+                      Text: "3"
+                  CollectionEntry
+                    Key: ~
+                    Value: IntLit
+                      Text: "4"
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "10"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: Identifier
+              Name: "keysJoined"
+            Arguments:
+              CollectionLit
+                Entries:
+                  CollectionEntry
+                    Key: StringLit
+                      Value: "a"
+                    Value: IntLit
+                      Text: "1"
+                  CollectionEntry
+                    Key: StringLit
+                      Value: "b"
+                    Value: IntLit
+                      Text: "2"
+                  CollectionEntry
+                    Key: StringLit
+                      Value: "c"
+                    Value: IntLit
+                      Text: "3"
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          StringLit
+            Value: "abc"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: Identifier
+              Name: "valueSum"
+            Arguments:
+              CollectionLit
+                Entries:
+                  CollectionEntry
+                    Key: StringLit
+                      Value: "a"
+                    Value: IntLit
+                      Text: "1"
+                  CollectionEntry
+                    Key: StringLit
+                      Value: "b"
+                    Value: IntLit
+                      Text: "2"
+                  CollectionEntry
+                    Key: StringLit
+                      Value: "c"
+                    Value: IntLit
+                      Text: "3"
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "6"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: Identifier
+              Name: "indexSum"
+            Arguments:
+              CollectionLit
+                Entries:
+                  CollectionEntry
+                    Key: ~
+                    Value: IntLit
+                      Text: "10"
+                  CollectionEntry
+                    Key: ~
+                    Value: IntLit
+                      Text: "20"
+                  CollectionEntry
+                    Key: ~
+                    Value: IntLit
+                      Text: "30"
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "3"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: Identifier
+              Name: "sumEven"
+            Arguments:
+              CollectionLit
+                Entries:
+                  CollectionEntry
+                    Key: ~
+                    Value: IntLit
+                      Text: "1"
+                  CollectionEntry
+                    Key: ~
+                    Value: IntLit
+                      Text: "2"
+                  CollectionEntry
+                    Key: ~
+                    Value: IntLit
+                      Text: "3"
+                  CollectionEntry
+                    Key: ~
+                    Value: IntLit
+                      Text: "4"
+                  CollectionEntry
+                    Key: ~
+                    Value: IntLit
+                      Text: "5"
+                  CollectionEntry
+                    Key: ~
+                    Value: IntLit
+                      Text: "6"
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "12"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: Identifier
+              Name: "pairCount"
+            Arguments:
+              CollectionLit
+                Entries:
+                  CollectionEntry
+                    Key: ~
+                    Value: IntLit
+                      Text: "1"
+                  CollectionEntry
+                    Key: ~
+                    Value: IntLit
+                      Text: "2"
+              CollectionLit
+                Entries:
+                  CollectionEntry
+                    Key: ~
+                    Value: IntLit
+                      Text: "1"
+                  CollectionEntry
+                    Key: ~
+                    Value: IntLit
+                      Text: "2"
+                  CollectionEntry
+                    Key: ~
+                    Value: IntLit
+                      Text: "3"
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "6"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: Identifier
+              Name: "product"
+            Arguments:
+              CollectionLit
+                Entries:
+                  CollectionEntry
+                    Key: ~
+                    Value: IntLit
+                      Text: "1"
+                  CollectionEntry
+                    Key: ~
+                    Value: IntLit
+                      Text: "2"
+                  CollectionEntry
+                    Key: ~
+                    Value: IntLit
+                      Text: "3"
+                  CollectionEntry
+                    Key: ~
+                    Value: IntLit
+                      Text: "4"
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "24"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: Identifier
+              Name: "sum"
+            Arguments:
+              CollectionLit
+                Entries: ~
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "0"

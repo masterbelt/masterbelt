@@ -52,10 +52,21 @@ func TestExamples(t *testing.T) {
 					t.Fatal(err)
 				}
 				module, _ := Analyze(abstract.NewDocument(src))
-				compareSnapshot(t, name+".ir", ir.Dump(module))
+				compareSnapshot(t, name+".ir", dumpIR(t, module))
 			})
 		}
 	}
+}
+
+// dumpIR renders a module in the exact text form — the snapshot oracle and
+// the incremental-equality oracle alike.
+func dumpIR(t *testing.T, m *ir.Module) string {
+	t.Helper()
+	text, err := m.MarshalText()
+	if err != nil {
+		t.Fatalf("MarshalText: %v", err)
+	}
+	return string(text)
 }
 
 // dumpProject opens the example project, analyzes it twice — the from-scratch
@@ -83,8 +94,8 @@ func dumpProject(t *testing.T, dir string) string {
 
 	var b strings.Builder
 	for _, id := range prog.Files() {
-		full := ir.Dump(modules[id])
-		incremental := ir.Dump(prog.Module(id))
+		full := dumpIR(t, modules[id])
+		incremental := dumpIR(t, prog.Module(id))
 		if incremental != full {
 			t.Errorf("%s: incremental != full analysis\n--- incremental ---\n%s--- full ---\n%s", id, incremental, full)
 		}

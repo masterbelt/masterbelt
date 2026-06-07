@@ -1,33 +1,214 @@
 File
-  ConstDecl
-    name "Bigger"
-    value (? (call (. IntLit "3" gt) IntLit "2") IntLit "10" IntLit "20")
-  ConstDecl
-    name "Label"
-    value (? (call (. IntLit "7" gt) IntLit "100") StringLit "high" StringLit "low")
-  ConstDecl
-    name "Capped"
-    type Level
-    value (? (call (. (. Identifier "Level" Max) gt) IntLit "50") (. Identifier "Level" Max) IntLit "0")
-  ConstDecl
-    name "Clamp"
-    value (? (call (. IntLit "150" lt) IntLit "0") IntLit "0" (? (call (. IntLit "150" gt) IntLit "100") IntLit "100" IntLit "150"))
-  ConstDecl
-    name "Score"
-    value (call (. (? (call (. IntLit "3" gt) IntLit "2") IntLit "1" IntLit "0") add) IntLit "5")
-  TypeDecl
-    pub
-    name "Level"
-    body sbyte
-    const "Max"
-      pub
-      value IntLit "100"
-  TypeDecl
-    pub
-    name "Temp"
-    body int
-    method "sign"
-      doc "-1, 0, or 1 by sign."
-      pub
-      result int
-      return (? (call (. self gt) IntLit "0") IntLit "1" (? (call (. self lt) IntLit "0") (call (. IntLit "1" neg)) IntLit "0"))
+  Uses: ~
+  Decls:
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Bigger"
+      Type: ~
+      Value: TernaryExpr
+        Cond: CallExpr
+          Callee: MemberExpr
+            Receiver: IntLit
+              Text: "3"
+            Member: Identifier
+              Name: "gt"
+          Arguments:
+            IntLit
+              Text: "2"
+        Then: IntLit
+          Text: "10"
+        Else: IntLit
+          Text: "20"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Label"
+      Type: ~
+      Value: TernaryExpr
+        Cond: CallExpr
+          Callee: MemberExpr
+            Receiver: IntLit
+              Text: "7"
+            Member: Identifier
+              Name: "gt"
+          Arguments:
+            IntLit
+              Text: "100"
+        Then: StringLit
+          Value: "high"
+        Else: StringLit
+          Value: "low"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Capped"
+      Type: NamedType
+        Namespace: ""
+        Name: "Level"
+        Args: ~
+      Value: TernaryExpr
+        Cond: CallExpr
+          Callee: MemberExpr
+            Receiver: MemberExpr
+              Receiver: Identifier
+                Name: "Level"
+              Member: Identifier
+                Name: "Max"
+            Member: Identifier
+              Name: "gt"
+          Arguments:
+            IntLit
+              Text: "50"
+        Then: MemberExpr
+          Receiver: Identifier
+            Name: "Level"
+          Member: Identifier
+            Name: "Max"
+        Else: IntLit
+          Text: "0"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Clamp"
+      Type: ~
+      Value: TernaryExpr
+        Cond: CallExpr
+          Callee: MemberExpr
+            Receiver: IntLit
+              Text: "150"
+            Member: Identifier
+              Name: "lt"
+          Arguments:
+            IntLit
+              Text: "0"
+        Then: IntLit
+          Text: "0"
+        Else: TernaryExpr
+          Cond: CallExpr
+            Callee: MemberExpr
+              Receiver: IntLit
+                Text: "150"
+              Member: Identifier
+                Name: "gt"
+            Arguments:
+              IntLit
+                Text: "100"
+          Then: IntLit
+            Text: "100"
+          Else: IntLit
+            Text: "150"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Score"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: TernaryExpr
+            Cond: CallExpr
+              Callee: MemberExpr
+                Receiver: IntLit
+                  Text: "3"
+                Member: Identifier
+                  Name: "gt"
+              Arguments:
+                IntLit
+                  Text: "2"
+            Then: IntLit
+              Text: "1"
+            Else: IntLit
+              Text: "0"
+          Member: Identifier
+            Name: "add"
+        Arguments:
+          IntLit
+            Text: "5"
+      Builtin: false
+  Types:
+    TypeDecl
+      Doc: ~
+      Public: true
+      Name: "Level"
+      Params: ~
+      Body: NamedType
+        Namespace: ""
+        Name: "sbyte"
+        Args: ~
+      Where: ~
+      Methods: ~
+      Consts:
+        ConstDecl
+          Doc: ~
+          Public: true
+          Name: "Max"
+          Type: ~
+          Value: IntLit
+            Text: "100"
+          Builtin: false
+      Impls: ~
+    TypeDecl
+      Doc: ~
+      Public: true
+      Name: "Temp"
+      Params: ~
+      Body: NamedType
+        Namespace: ""
+        Name: "int"
+        Args: ~
+      Where: ~
+      Methods:
+        MethodDecl
+          Doc: "-1, 0, or 1 by sign."
+          Public: true
+          Extern: false
+          Kind: 0
+          Effects: ~
+          Name: "sign"
+          TypeParams: ~
+          Params: ~
+          Result: NamedType
+            Namespace: ""
+            Name: "int"
+            Args: ~
+          Body:
+            ReturnStmt
+              Value: TernaryExpr
+                Cond: CallExpr
+                  Callee: MemberExpr
+                    Receiver: SelfExpr
+                    Member: Identifier
+                      Name: "gt"
+                  Arguments:
+                    IntLit
+                      Text: "0"
+                Then: IntLit
+                  Text: "1"
+                Else: TernaryExpr
+                  Cond: CallExpr
+                    Callee: MemberExpr
+                      Receiver: SelfExpr
+                      Member: Identifier
+                        Name: "lt"
+                    Arguments:
+                      IntLit
+                        Text: "0"
+                  Then: CallExpr
+                    Callee: MemberExpr
+                      Receiver: IntLit
+                        Text: "1"
+                      Member: Identifier
+                        Name: "neg"
+                    Arguments: ~
+                  Else: IntLit
+                    Text: "0"
+      Consts: ~
+      Impls: ~
+  Enums: ~
+  Interfaces: ~
+  Funcs: ~
+  Asserts: ~

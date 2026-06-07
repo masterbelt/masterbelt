@@ -1,117 +1,564 @@
 File
-  ConstDecl
-    name "Freezing"
-    value (call (. Identifier "Celsius" freezing))
-  ConstDecl
-    name "FreezingF"
-    value (. Identifier "Freezing" fahrenheit)
-  ConstDecl
-    name "FromBoiling"
-    value (call (. Identifier "Celsius" fromF) IntLit "212")
-  ConstDecl
-    name "Roundtrip"
-    value (call (. Identifier "Celsius" fromF) (call (. Identifier "Celsius" freezing)))
-  ConstDecl
-    name "Full"
-    value (call (. Identifier "Health" full))
-  ConstDecl
-    name "Default"
-    value (call (. Identifier "Element" base))
-  TypeDecl
-    pub
-    name "Celsius"
-    body { deg: nint }
-    method "freezing"
-      doc "The freezing point of water."
-      pub
-      kind static
-      result Celsius
-      return (record Celsius deg: IntLit "0")
-    method "fromF"
-      doc "A degree reading converted from a fahrenheit value."
-      pub
-      kind static
-      param v: nint
-      result Celsius
-      return (record Celsius deg: (call (. (call (. (call (. Identifier "v" sub) IntLit "32") mul) IntLit "5") div) IntLit "9"))
-    method "fromF"
-      doc "A degree reading converted from a celsius value (the static overload:"
-      doc "same name, a Celsius argument rather than a nint)."
-      pub
-      kind static
-      param c: Celsius
-      result Celsius
-      return Identifier "c"
-    method "fahrenheit"
-      doc "Fahrenheit reading: c.fahrenheit."
-      pub
-      kind getter
-      result nint
-      return (call (. (call (. (call (. (. self deg) mul) IntLit "9") div) IntLit "5") add) IntLit "32")
-    method "fahrenheit"
-      doc "Fahrenheit write: c.fahrenheit = 212 (c is a let local)."
-      pub
-      kind setter
-      param v: nint
-      result self
-      return (record Celsius deg: (call (. (call (. (call (. Identifier "v" sub) IntLit "32") mul) IntLit "5") div) IntLit "9"))
-  TypeDecl
-    pub
-    name "Health"
-    body nint
-    const "Max"
-      doc "The maximum health."
-      pub
-      value IntLit "100"
-    method "full"
-      doc "A full health bar."
-      pub
-      kind static
-      result Health
-      return (. Identifier "Health" Max)
-    method "band"
-      doc "The health expressed in tens (the band a UI shows)."
-      pub
-      kind getter
-      result nint
-      return (call (. (call Identifier "nint" self) div) IntLit "10")
-  EnumDecl
-    pub
-    name "Element"
-    member "Fire"
-    member "Water"
-    member "Wind"
-    method "hot"
-      doc "Whether this element is Fire."
-      pub
-      kind getter
-      result bool
-      return (call (. self eql) (. Identifier "Element" Fire))
-    method "base"
-      doc "The default element."
-      pub
-      kind static
-      result Element
-      return (. Identifier "Element" Fire)
-  FuncDecl
-    name "boiling"
-    result Celsius
-      let "c" = (call (. Identifier "Celsius" freezing))
-      assign (. Identifier "c" fahrenheit) = IntLit "212"
-      return Identifier "c"
-  AssertDecl
-    cond (call (. Identifier "FreezingF" eql) IntLit "32")
-  AssertDecl
-    cond (call (. (. Identifier "FromBoiling" deg) eql) IntLit "100")
-  AssertDecl
-    cond (call (. (. Identifier "Roundtrip" deg) eql) IntLit "0")
-  AssertDecl
-    cond (call (. (. (call Identifier "boiling") deg) eql) IntLit "100")
-  AssertDecl
-    cond (call (. (. Identifier "Full" band) eql) IntLit "10")
-  AssertDecl
-    cond (call (. (. Identifier "Health" Max) eql) IntLit "100")
-  AssertDecl
-    cond (. Identifier "Default" hot)
-  AssertDecl
-    cond (call (. (. (. Identifier "Element" Water) hot) not))
+  Uses: ~
+  Decls:
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Freezing"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: Identifier
+            Name: "Celsius"
+          Member: Identifier
+            Name: "freezing"
+        Arguments: ~
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "FreezingF"
+      Type: ~
+      Value: MemberExpr
+        Receiver: Identifier
+          Name: "Freezing"
+        Member: Identifier
+          Name: "fahrenheit"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "FromBoiling"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: Identifier
+            Name: "Celsius"
+          Member: Identifier
+            Name: "fromF"
+        Arguments:
+          IntLit
+            Text: "212"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Roundtrip"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: Identifier
+            Name: "Celsius"
+          Member: Identifier
+            Name: "fromF"
+        Arguments:
+          CallExpr
+            Callee: MemberExpr
+              Receiver: Identifier
+                Name: "Celsius"
+              Member: Identifier
+                Name: "freezing"
+            Arguments: ~
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Full"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: Identifier
+            Name: "Health"
+          Member: Identifier
+            Name: "full"
+        Arguments: ~
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Default"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: Identifier
+            Name: "Element"
+          Member: Identifier
+            Name: "base"
+        Arguments: ~
+      Builtin: false
+  Types:
+    TypeDecl
+      Doc: ~
+      Public: true
+      Name: "Celsius"
+      Params: ~
+      Body: RecordType
+        Fields:
+          FieldDef
+            Name: "deg"
+            Type: NamedType
+              Namespace: ""
+              Name: "nint"
+              Args: ~
+      Where: ~
+      Methods:
+        MethodDecl
+          Doc: "The freezing point of water."
+          Public: true
+          Extern: false
+          Kind: 3
+          Effects: ~
+          Name: "freezing"
+          TypeParams: ~
+          Params: ~
+          Result: NamedType
+            Namespace: ""
+            Name: "Celsius"
+            Args: ~
+          Body:
+            ReturnStmt
+              Value: RecordLit
+                TypeName: "Celsius"
+                Fields:
+                  FieldInit
+                    Name: "deg"
+                    Value: IntLit
+                      Text: "0"
+        MethodDecl
+          Doc: "A degree reading converted from a fahrenheit value."
+          Public: true
+          Extern: false
+          Kind: 3
+          Effects: ~
+          Name: "fromF"
+          TypeParams: ~
+          Params:
+            ParamDef
+              Name: "v"
+              Type: NamedType
+                Namespace: ""
+                Name: "nint"
+                Args: ~
+          Result: NamedType
+            Namespace: ""
+            Name: "Celsius"
+            Args: ~
+          Body:
+            ReturnStmt
+              Value: RecordLit
+                TypeName: "Celsius"
+                Fields:
+                  FieldInit
+                    Name: "deg"
+                    Value: CallExpr
+                      Callee: MemberExpr
+                        Receiver: CallExpr
+                          Callee: MemberExpr
+                            Receiver: CallExpr
+                              Callee: MemberExpr
+                                Receiver: Identifier
+                                  Name: "v"
+                                Member: Identifier
+                                  Name: "sub"
+                              Arguments:
+                                IntLit
+                                  Text: "32"
+                            Member: Identifier
+                              Name: "mul"
+                          Arguments:
+                            IntLit
+                              Text: "5"
+                        Member: Identifier
+                          Name: "div"
+                      Arguments:
+                        IntLit
+                          Text: "9"
+        MethodDecl
+          Doc: "A degree reading converted from a celsius value (the static overload:" "same name, a Celsius argument rather than a nint)."
+          Public: true
+          Extern: false
+          Kind: 3
+          Effects: ~
+          Name: "fromF"
+          TypeParams: ~
+          Params:
+            ParamDef
+              Name: "c"
+              Type: NamedType
+                Namespace: ""
+                Name: "Celsius"
+                Args: ~
+          Result: NamedType
+            Namespace: ""
+            Name: "Celsius"
+            Args: ~
+          Body:
+            ReturnStmt
+              Value: Identifier
+                Name: "c"
+        MethodDecl
+          Doc: "Fahrenheit reading: c.fahrenheit."
+          Public: true
+          Extern: false
+          Kind: 1
+          Effects: ~
+          Name: "fahrenheit"
+          TypeParams: ~
+          Params: ~
+          Result: NamedType
+            Namespace: ""
+            Name: "nint"
+            Args: ~
+          Body:
+            ReturnStmt
+              Value: CallExpr
+                Callee: MemberExpr
+                  Receiver: CallExpr
+                    Callee: MemberExpr
+                      Receiver: CallExpr
+                        Callee: MemberExpr
+                          Receiver: MemberExpr
+                            Receiver: SelfExpr
+                            Member: Identifier
+                              Name: "deg"
+                          Member: Identifier
+                            Name: "mul"
+                        Arguments:
+                          IntLit
+                            Text: "9"
+                      Member: Identifier
+                        Name: "div"
+                    Arguments:
+                      IntLit
+                        Text: "5"
+                  Member: Identifier
+                    Name: "add"
+                Arguments:
+                  IntLit
+                    Text: "32"
+        MethodDecl
+          Doc: "Fahrenheit write: c.fahrenheit = 212 (c is a let local)."
+          Public: true
+          Extern: false
+          Kind: 2
+          Effects: ~
+          Name: "fahrenheit"
+          TypeParams: ~
+          Params:
+            ParamDef
+              Name: "v"
+              Type: NamedType
+                Namespace: ""
+                Name: "nint"
+                Args: ~
+          Result: NamedType
+            Namespace: ""
+            Name: "self"
+            Args: ~
+          Body:
+            ReturnStmt
+              Value: RecordLit
+                TypeName: "Celsius"
+                Fields:
+                  FieldInit
+                    Name: "deg"
+                    Value: CallExpr
+                      Callee: MemberExpr
+                        Receiver: CallExpr
+                          Callee: MemberExpr
+                            Receiver: CallExpr
+                              Callee: MemberExpr
+                                Receiver: Identifier
+                                  Name: "v"
+                                Member: Identifier
+                                  Name: "sub"
+                              Arguments:
+                                IntLit
+                                  Text: "32"
+                            Member: Identifier
+                              Name: "mul"
+                          Arguments:
+                            IntLit
+                              Text: "5"
+                        Member: Identifier
+                          Name: "div"
+                      Arguments:
+                        IntLit
+                          Text: "9"
+      Consts: ~
+      Impls: ~
+    TypeDecl
+      Doc: ~
+      Public: true
+      Name: "Health"
+      Params: ~
+      Body: NamedType
+        Namespace: ""
+        Name: "nint"
+        Args: ~
+      Where: ~
+      Methods:
+        MethodDecl
+          Doc: "A full health bar."
+          Public: true
+          Extern: false
+          Kind: 3
+          Effects: ~
+          Name: "full"
+          TypeParams: ~
+          Params: ~
+          Result: NamedType
+            Namespace: ""
+            Name: "Health"
+            Args: ~
+          Body:
+            ReturnStmt
+              Value: MemberExpr
+                Receiver: Identifier
+                  Name: "Health"
+                Member: Identifier
+                  Name: "Max"
+        MethodDecl
+          Doc: "The health expressed in tens (the band a UI shows)."
+          Public: true
+          Extern: false
+          Kind: 1
+          Effects: ~
+          Name: "band"
+          TypeParams: ~
+          Params: ~
+          Result: NamedType
+            Namespace: ""
+            Name: "nint"
+            Args: ~
+          Body:
+            ReturnStmt
+              Value: CallExpr
+                Callee: MemberExpr
+                  Receiver: CallExpr
+                    Callee: Identifier
+                      Name: "nint"
+                    Arguments:
+                      SelfExpr
+                  Member: Identifier
+                    Name: "div"
+                Arguments:
+                  IntLit
+                    Text: "10"
+      Consts:
+        ConstDecl
+          Doc: "The maximum health."
+          Public: true
+          Name: "Max"
+          Type: ~
+          Value: IntLit
+            Text: "100"
+          Builtin: false
+      Impls: ~
+  Enums:
+    EnumDecl
+      Doc: ~
+      Public: true
+      Name: "Element"
+      Base: ~
+      Members:
+        EnumMember
+          Name: "Fire"
+          Value: ~
+        EnumMember
+          Name: "Water"
+          Value: ~
+        EnumMember
+          Name: "Wind"
+          Value: ~
+      Methods:
+        MethodDecl
+          Doc: "Whether this element is Fire."
+          Public: true
+          Extern: false
+          Kind: 1
+          Effects: ~
+          Name: "hot"
+          TypeParams: ~
+          Params: ~
+          Result: NamedType
+            Namespace: ""
+            Name: "bool"
+            Args: ~
+          Body:
+            ReturnStmt
+              Value: CallExpr
+                Callee: MemberExpr
+                  Receiver: SelfExpr
+                  Member: Identifier
+                    Name: "eql"
+                Arguments:
+                  MemberExpr
+                    Receiver: Identifier
+                      Name: "Element"
+                    Member: Identifier
+                      Name: "Fire"
+        MethodDecl
+          Doc: "The default element."
+          Public: true
+          Extern: false
+          Kind: 3
+          Effects: ~
+          Name: "base"
+          TypeParams: ~
+          Params: ~
+          Result: NamedType
+            Namespace: ""
+            Name: "Element"
+            Args: ~
+          Body:
+            ReturnStmt
+              Value: MemberExpr
+                Receiver: Identifier
+                  Name: "Element"
+                Member: Identifier
+                  Name: "Fire"
+      Consts: ~
+      Impls: ~
+  Interfaces: ~
+  Funcs:
+    FuncDecl
+      Doc: ~
+      Public: false
+      Extern: false
+      Effects: ~
+      Name: "boiling"
+      TypeParams: ~
+      Params: ~
+      Result: NamedType
+        Namespace: ""
+        Name: "Celsius"
+        Args: ~
+      Body:
+        LetStmt
+          Name: "c"
+          Type: ~
+          Value: CallExpr
+            Callee: MemberExpr
+              Receiver: Identifier
+                Name: "Celsius"
+              Member: Identifier
+                Name: "freezing"
+            Arguments: ~
+        AssignStmt
+          Target: MemberExpr
+            Receiver: Identifier
+              Name: "c"
+            Member: Identifier
+              Name: "fahrenheit"
+          Value: IntLit
+            Text: "212"
+        ReturnStmt
+          Value: Identifier
+            Name: "c"
+  Asserts:
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: Identifier
+            Name: "FreezingF"
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "32"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: MemberExpr
+            Receiver: Identifier
+              Name: "FromBoiling"
+            Member: Identifier
+              Name: "deg"
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "100"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: MemberExpr
+            Receiver: Identifier
+              Name: "Roundtrip"
+            Member: Identifier
+              Name: "deg"
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "0"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: MemberExpr
+            Receiver: CallExpr
+              Callee: Identifier
+                Name: "boiling"
+              Arguments: ~
+            Member: Identifier
+              Name: "deg"
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "100"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: MemberExpr
+            Receiver: Identifier
+              Name: "Full"
+            Member: Identifier
+              Name: "band"
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "10"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: MemberExpr
+            Receiver: Identifier
+              Name: "Health"
+            Member: Identifier
+              Name: "Max"
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "100"
+    AssertDecl
+      Doc: ~
+      Cond: MemberExpr
+        Receiver: Identifier
+          Name: "Default"
+        Member: Identifier
+          Name: "hot"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: MemberExpr
+            Receiver: MemberExpr
+              Receiver: Identifier
+                Name: "Element"
+              Member: Identifier
+                Name: "Water"
+            Member: Identifier
+              Name: "hot"
+          Member: Identifier
+            Name: "not"
+        Arguments: ~

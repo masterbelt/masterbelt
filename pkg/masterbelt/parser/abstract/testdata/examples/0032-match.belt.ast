@@ -1,88 +1,430 @@
 File
-  ConstDecl
-    name "Held"
-    type GameValue
-    value (record Coin amount: IntLit "7")
-  ConstDecl
-    name "Total"
-    value (call Identifier "worth" Identifier "Held")
-  TypeDecl
-    pub
-    name "Coin"
-    body { amount: nint }
-  TypeDecl
-    pub
-    name "Level"
-    body { rank: nint }
-  TypeDecl
-    pub
-    name "GameValue"
-    body Coin | Level
-  FuncDecl
-    pub
-    name "describe"
-    param v: GameValue
-    result string
-      match Identifier "v"
-        arm Coin c
-          return StringLit "coin"
-        arm Level l
-          return StringLit "level"
-  FuncDecl
-    pub
-    name "worth"
-    param v: GameValue
-    result nint
-      match Identifier "v"
-        arm Coin c
-          return (. Identifier "c" amount)
-        arm Level l
-          return (. Identifier "l" rank)
-  FuncDecl
-    pub
-    name "amountOr"
-    param v: Coin | null
-    param fallback: nint
-    result nint
-      match Identifier "v"
-        arm Coin c
-          return (. Identifier "c" amount)
-        arm null
-          return Identifier "fallback"
-  FuncDecl
-    pub
-    name "coinAmount"
-    param v: GameValue
-    result nint
-      match Identifier "v"
-        arm Coin c
-          return (. Identifier "c" amount)
-        else
-          return IntLit "0"
-  FuncDecl
-    pub
-    name "firstOr"
-    param xs: list<nint>
-    param fallback: nint
-    result nint
-      match (call (. Identifier "xs" get) IntLit "0")
-        arm nint v
-          return Identifier "v"
-        arm error e
-          return Identifier "fallback"
-  FuncDecl
-    pub
-    name "label"
-    param v: GameValue
-    param other: GameValue
-    result string
-      match Identifier "v"
-        arm Coin c
-          let "n" = (. Identifier "c" amount)
-          match Identifier "other"
-            arm Coin c2
-              return StringLit "coin/coin"
-            arm Level l
-              return StringLit "coin/level"
-        arm Level l
-          return StringLit "level"
+  Uses: ~
+  Decls:
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Held"
+      Type: NamedType
+        Namespace: ""
+        Name: "GameValue"
+        Args: ~
+      Value: RecordLit
+        TypeName: "Coin"
+        Fields:
+          FieldInit
+            Name: "amount"
+            Value: IntLit
+              Text: "7"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Total"
+      Type: ~
+      Value: CallExpr
+        Callee: Identifier
+          Name: "worth"
+        Arguments:
+          Identifier
+            Name: "Held"
+      Builtin: false
+  Types:
+    TypeDecl
+      Doc: ~
+      Public: true
+      Name: "Coin"
+      Params: ~
+      Body: RecordType
+        Fields:
+          FieldDef
+            Name: "amount"
+            Type: NamedType
+              Namespace: ""
+              Name: "nint"
+              Args: ~
+      Where: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
+    TypeDecl
+      Doc: ~
+      Public: true
+      Name: "Level"
+      Params: ~
+      Body: RecordType
+        Fields:
+          FieldDef
+            Name: "rank"
+            Type: NamedType
+              Namespace: ""
+              Name: "nint"
+              Args: ~
+      Where: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
+    TypeDecl
+      Doc: ~
+      Public: true
+      Name: "GameValue"
+      Params: ~
+      Body: UnionType
+        Members:
+          NamedType
+            Namespace: ""
+            Name: "Coin"
+            Args: ~
+          NamedType
+            Namespace: ""
+            Name: "Level"
+            Args: ~
+      Where: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
+  Enums: ~
+  Interfaces: ~
+  Funcs:
+    FuncDecl
+      Doc: ~
+      Public: true
+      Extern: false
+      Effects: ~
+      Name: "describe"
+      TypeParams: ~
+      Params:
+        ParamDef
+          Name: "v"
+          Type: NamedType
+            Namespace: ""
+            Name: "GameValue"
+            Args: ~
+      Result: NamedType
+        Namespace: ""
+        Name: "string"
+        Args: ~
+      Body:
+        MatchStmt
+          Scrutinee: Identifier
+            Name: "v"
+          Arms:
+            MatchArm
+              Type: NamedType
+                Namespace: ""
+                Name: "Coin"
+                Args: ~
+              Bind: "c"
+              Body:
+                ReturnStmt
+                  Value: StringLit
+                    Value: "coin"
+            MatchArm
+              Type: NamedType
+                Namespace: ""
+                Name: "Level"
+                Args: ~
+              Bind: "l"
+              Body:
+                ReturnStmt
+                  Value: StringLit
+                    Value: "level"
+          Else: ~
+          AfterElse: ~
+    FuncDecl
+      Doc: ~
+      Public: true
+      Extern: false
+      Effects: ~
+      Name: "worth"
+      TypeParams: ~
+      Params:
+        ParamDef
+          Name: "v"
+          Type: NamedType
+            Namespace: ""
+            Name: "GameValue"
+            Args: ~
+      Result: NamedType
+        Namespace: ""
+        Name: "nint"
+        Args: ~
+      Body:
+        MatchStmt
+          Scrutinee: Identifier
+            Name: "v"
+          Arms:
+            MatchArm
+              Type: NamedType
+                Namespace: ""
+                Name: "Coin"
+                Args: ~
+              Bind: "c"
+              Body:
+                ReturnStmt
+                  Value: MemberExpr
+                    Receiver: Identifier
+                      Name: "c"
+                    Member: Identifier
+                      Name: "amount"
+            MatchArm
+              Type: NamedType
+                Namespace: ""
+                Name: "Level"
+                Args: ~
+              Bind: "l"
+              Body:
+                ReturnStmt
+                  Value: MemberExpr
+                    Receiver: Identifier
+                      Name: "l"
+                    Member: Identifier
+                      Name: "rank"
+          Else: ~
+          AfterElse: ~
+    FuncDecl
+      Doc: ~
+      Public: true
+      Extern: false
+      Effects: ~
+      Name: "amountOr"
+      TypeParams: ~
+      Params:
+        ParamDef
+          Name: "v"
+          Type: UnionType
+            Members:
+              NamedType
+                Namespace: ""
+                Name: "Coin"
+                Args: ~
+              NamedType
+                Namespace: ""
+                Name: "null"
+                Args: ~
+        ParamDef
+          Name: "fallback"
+          Type: NamedType
+            Namespace: ""
+            Name: "nint"
+            Args: ~
+      Result: NamedType
+        Namespace: ""
+        Name: "nint"
+        Args: ~
+      Body:
+        MatchStmt
+          Scrutinee: Identifier
+            Name: "v"
+          Arms:
+            MatchArm
+              Type: NamedType
+                Namespace: ""
+                Name: "Coin"
+                Args: ~
+              Bind: "c"
+              Body:
+                ReturnStmt
+                  Value: MemberExpr
+                    Receiver: Identifier
+                      Name: "c"
+                    Member: Identifier
+                      Name: "amount"
+            MatchArm
+              Type: NamedType
+                Namespace: ""
+                Name: "null"
+                Args: ~
+              Bind: ""
+              Body:
+                ReturnStmt
+                  Value: Identifier
+                    Name: "fallback"
+          Else: ~
+          AfterElse: ~
+    FuncDecl
+      Doc: ~
+      Public: true
+      Extern: false
+      Effects: ~
+      Name: "coinAmount"
+      TypeParams: ~
+      Params:
+        ParamDef
+          Name: "v"
+          Type: NamedType
+            Namespace: ""
+            Name: "GameValue"
+            Args: ~
+      Result: NamedType
+        Namespace: ""
+        Name: "nint"
+        Args: ~
+      Body:
+        MatchStmt
+          Scrutinee: Identifier
+            Name: "v"
+          Arms:
+            MatchArm
+              Type: NamedType
+                Namespace: ""
+                Name: "Coin"
+                Args: ~
+              Bind: "c"
+              Body:
+                ReturnStmt
+                  Value: MemberExpr
+                    Receiver: Identifier
+                      Name: "c"
+                    Member: Identifier
+                      Name: "amount"
+          Else:
+            ReturnStmt
+              Value: IntLit
+                Text: "0"
+          AfterElse: ~
+    FuncDecl
+      Doc: ~
+      Public: true
+      Extern: false
+      Effects: ~
+      Name: "firstOr"
+      TypeParams: ~
+      Params:
+        ParamDef
+          Name: "xs"
+          Type: NamedType
+            Namespace: ""
+            Name: "list"
+            Args:
+              NamedType
+                Namespace: ""
+                Name: "nint"
+                Args: ~
+        ParamDef
+          Name: "fallback"
+          Type: NamedType
+            Namespace: ""
+            Name: "nint"
+            Args: ~
+      Result: NamedType
+        Namespace: ""
+        Name: "nint"
+        Args: ~
+      Body:
+        MatchStmt
+          Scrutinee: CallExpr
+            Callee: MemberExpr
+              Receiver: Identifier
+                Name: "xs"
+              Member: Identifier
+                Name: "get"
+            Arguments:
+              IntLit
+                Text: "0"
+          Arms:
+            MatchArm
+              Type: NamedType
+                Namespace: ""
+                Name: "nint"
+                Args: ~
+              Bind: "v"
+              Body:
+                ReturnStmt
+                  Value: Identifier
+                    Name: "v"
+            MatchArm
+              Type: NamedType
+                Namespace: ""
+                Name: "error"
+                Args: ~
+              Bind: "e"
+              Body:
+                ReturnStmt
+                  Value: Identifier
+                    Name: "fallback"
+          Else: ~
+          AfterElse: ~
+    FuncDecl
+      Doc: ~
+      Public: true
+      Extern: false
+      Effects: ~
+      Name: "label"
+      TypeParams: ~
+      Params:
+        ParamDef
+          Name: "v"
+          Type: NamedType
+            Namespace: ""
+            Name: "GameValue"
+            Args: ~
+        ParamDef
+          Name: "other"
+          Type: NamedType
+            Namespace: ""
+            Name: "GameValue"
+            Args: ~
+      Result: NamedType
+        Namespace: ""
+        Name: "string"
+        Args: ~
+      Body:
+        MatchStmt
+          Scrutinee: Identifier
+            Name: "v"
+          Arms:
+            MatchArm
+              Type: NamedType
+                Namespace: ""
+                Name: "Coin"
+                Args: ~
+              Bind: "c"
+              Body:
+                LetStmt
+                  Name: "n"
+                  Type: ~
+                  Value: MemberExpr
+                    Receiver: Identifier
+                      Name: "c"
+                    Member: Identifier
+                      Name: "amount"
+                MatchStmt
+                  Scrutinee: Identifier
+                    Name: "other"
+                  Arms:
+                    MatchArm
+                      Type: NamedType
+                        Namespace: ""
+                        Name: "Coin"
+                        Args: ~
+                      Bind: "c2"
+                      Body:
+                        ReturnStmt
+                          Value: StringLit
+                            Value: "coin/coin"
+                    MatchArm
+                      Type: NamedType
+                        Namespace: ""
+                        Name: "Level"
+                        Args: ~
+                      Bind: "l"
+                      Body:
+                        ReturnStmt
+                          Value: StringLit
+                            Value: "coin/level"
+                  Else: ~
+                  AfterElse: ~
+            MatchArm
+              Type: NamedType
+                Namespace: ""
+                Name: "Level"
+                Args: ~
+              Bind: "l"
+              Body:
+                ReturnStmt
+                  Value: StringLit
+                    Value: "level"
+          Else: ~
+          AfterElse: ~
+  Asserts: ~

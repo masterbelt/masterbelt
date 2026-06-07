@@ -1,42 +1,364 @@
 Module
-  TypeDef "Bag" pub
-    doc "A small bag of T values that folds over its contents. The `impl foldable<nint, T>`"
-    doc "tag is what gives Bag the count/any methods — written here, at Bag's own"
-    doc "definition site."
-    param "T"
-    impl foldable<nint, T>
-    body list<T>
-    method "fold"
-      doc "The required primitive: fold the underlying list."
-      param init: A
-      param step: fn(A, nint, T): A
-      result A
-      return (ParamRef "init" : A)
-  TypeDef "foldable" pub
-    doc "A behaviour over a keyed collection: implement the required fold and the"
-    doc "provided methods (count, map, filter, ...) come for free, defined on top of"
-    doc "it. iterability is foldable."
-    param "K"
-    param "V"
-    interface
-    required "fold"
-    provided "count"
-    provided "any"
-    method "fold"
-      param init: A
-      param step: fn(A, K, V): A
-      result A
-    method "count" pub
-      doc "Provided: the number of elements, folded from the primitive."
-      result nint
-      return ((self : foldable).fold((IntLiteral "0" : nint), ((fn(acc, key, value) (return ((ParamRef "acc" : nint).add((IntLiteral "1" : nint)) : nint))) : fn(nint, K, V): nint)) : nint) [subst A=nint]
-    method "any" pub
-      doc "Provided: whether any element satisfies the predicate."
-      param pred: fn(V): bool
-      result bool
-      return ((self : foldable).fold((BoolLiteral false : bool), ((fn(acc, key, value) (return ((ParamRef "acc" : bool).oror(((ParamRef "pred" : fn(V): bool)((ParamRef "value" : V)) : bool)) : bool))) : fn(bool, K, V): bool)) : bool) [subst A=bool]
-  Func "total" pub
-    doc "The total of a collection of ints, folded with addition."
-    param c: foldable<nint, nint>
-    result nint
-      return ((ParamRef "c" : foldable<nint, nint>).fold((IntLiteral "0" : nint), ((fn(acc, key, value) (return ((ParamRef "acc" : nint).add((ParamRef "value" : nint)) : nint))) : fn(nint, nint, nint): nint)) : nint) [subst A=nint, K=nint, V=nint]
+  Consts: ~
+  Types:
+    TypeDef
+      Name: "Bag"
+      Public: true
+      Doc: "A small bag of T values that folds over its contents. The `impl foldable<nint, T>`" "tag is what gives Bag the count/any methods — written here, at Bag's own" "definition site."
+      Params:
+        TypeParam
+          Name: "T"
+          Bound: ~
+      Body: App
+        Def: "list"
+        Args:
+          TypeVar
+            Name: "T"
+            Bound: ~
+      Methods:
+        Method
+          Name: "fold"
+          Public: false
+          Extern: false
+          Kind: 0
+          Effects: ~
+          Doc: "The required primitive: fold the underlying list."
+          Params:
+            Param
+              Name: "init"
+              Type: TypeVar
+                Name: "A"
+                Bound: ~
+            Param
+              Name: "step"
+              Type: Func
+                Params:
+                  TypeVar
+                    Name: "A"
+                    Bound: ~
+                  Builtin
+                    Name: "nint"
+                  TypeVar
+                    Name: "T"
+                    Bound: ~
+                Result: TypeVar
+                  Name: "A"
+                  Bound: ~
+          Result: TypeVar
+            Name: "A"
+            Bound: ~
+          Body:
+            Return
+              Value: ParamRef
+                Name: "init"
+                Type: TypeVar
+                  Name: "A"
+                  Bound: ~
+          Owner: "Bag"
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls:
+        App
+          Def: "foldable"
+          Args:
+            Builtin
+              Name: "nint"
+            TypeVar
+              Name: "T"
+              Bound: ~
+      Enum: ~
+      Where: ~
+    TypeDef
+      Name: "foldable"
+      Public: true
+      Doc: "A behaviour over a keyed collection: implement the required fold and the" "provided methods (count, map, filter, ...) come for free, defined on top of" "it. iterability is foldable."
+      Params:
+        TypeParam
+          Name: "K"
+          Bound: ~
+        TypeParam
+          Name: "V"
+          Bound: ~
+      Body: ~
+      Methods:
+        Method
+          Name: "fold"
+          Public: false
+          Extern: false
+          Kind: 0
+          Effects: ~
+          Doc: ~
+          Params:
+            Param
+              Name: "init"
+              Type: TypeVar
+                Name: "A"
+                Bound: ~
+            Param
+              Name: "step"
+              Type: Func
+                Params:
+                  TypeVar
+                    Name: "A"
+                    Bound: ~
+                  TypeVar
+                    Name: "K"
+                    Bound: ~
+                  TypeVar
+                    Name: "V"
+                    Bound: ~
+                Result: TypeVar
+                  Name: "A"
+                  Bound: ~
+          Result: TypeVar
+            Name: "A"
+            Bound: ~
+          Body: ~
+          Owner: "foldable"
+        Method
+          Name: "count"
+          Public: true
+          Extern: false
+          Kind: 0
+          Effects: ~
+          Doc: "Provided: the number of elements, folded from the primitive."
+          Params: ~
+          Result: Builtin
+            Name: "nint"
+          Body:
+            Return
+              Value: Call
+                Receiver: SelfValue
+                  Type: Named
+                    Def: "foldable"
+                Method: "fold"
+                Args:
+                  IntLiteral
+                    Text: "0"
+                    Type: Builtin
+                      Name: "nint"
+                  FuncLiteral
+                    Params: "acc" "key" "value"
+                    Body:
+                      Return
+                        Value: Call
+                          Receiver: ParamRef
+                            Name: "acc"
+                            Type: Builtin
+                              Name: "nint"
+                          Method: "add"
+                          Args:
+                            IntLiteral
+                              Text: "1"
+                              Type: Builtin
+                                Name: "nint"
+                          Setter: false
+                          Resolved: ~
+                          Subst: ~
+                          Type: Builtin
+                            Name: "nint"
+                    Type: Func
+                      Params:
+                        Builtin
+                          Name: "nint"
+                        TypeVar
+                          Name: "K"
+                          Bound: ~
+                        TypeVar
+                          Name: "V"
+                          Bound: ~
+                      Result: Builtin
+                        Name: "nint"
+                Setter: false
+                Resolved: ~
+                Subst:
+                  Entry
+                    Key: "A"
+                    Value: Builtin
+                      Name: "nint"
+                Type: Builtin
+                  Name: "nint"
+          Owner: "foldable"
+        Method
+          Name: "any"
+          Public: true
+          Extern: false
+          Kind: 0
+          Effects: ~
+          Doc: "Provided: whether any element satisfies the predicate."
+          Params:
+            Param
+              Name: "pred"
+              Type: Func
+                Params:
+                  TypeVar
+                    Name: "V"
+                    Bound: ~
+                Result: Builtin
+                  Name: "bool"
+          Result: Builtin
+            Name: "bool"
+          Body:
+            Return
+              Value: Call
+                Receiver: SelfValue
+                  Type: Named
+                    Def: "foldable"
+                Method: "fold"
+                Args:
+                  BoolLiteral
+                    Value: false
+                    Type: Builtin
+                      Name: "bool"
+                  FuncLiteral
+                    Params: "acc" "key" "value"
+                    Body:
+                      Return
+                        Value: Call
+                          Receiver: ParamRef
+                            Name: "acc"
+                            Type: Builtin
+                              Name: "bool"
+                          Method: "oror"
+                          Args:
+                            Apply
+                              Callee: ParamRef
+                                Name: "pred"
+                                Type: Func
+                                  Params:
+                                    TypeVar
+                                      Name: "V"
+                                      Bound: ~
+                                  Result: Builtin
+                                    Name: "bool"
+                              Args:
+                                ParamRef
+                                  Name: "value"
+                                  Type: TypeVar
+                                    Name: "V"
+                                    Bound: ~
+                              Type: Builtin
+                                Name: "bool"
+                          Setter: false
+                          Resolved: ~
+                          Subst: ~
+                          Type: Builtin
+                            Name: "bool"
+                    Type: Func
+                      Params:
+                        Builtin
+                          Name: "bool"
+                        TypeVar
+                          Name: "K"
+                          Bound: ~
+                        TypeVar
+                          Name: "V"
+                          Bound: ~
+                      Result: Builtin
+                        Name: "bool"
+                Setter: false
+                Resolved: ~
+                Subst:
+                  Entry
+                    Key: "A"
+                    Value: Builtin
+                      Name: "bool"
+                Type: Builtin
+                  Name: "bool"
+          Owner: "foldable"
+      Consts: ~
+      Builtin: false
+      Interface: InterfaceDef
+        Required: "fold"
+        Provided: "count" "any"
+        Parents: ~
+      Impls: ~
+      Enum: ~
+      Where: ~
+  Funcs:
+    Function
+      Name: "total"
+      Public: true
+      Extern: false
+      Effects: ~
+      Doc: "The total of a collection of ints, folded with addition."
+      TypeParams: ~
+      Params:
+        Param
+          Name: "c"
+          Type: App
+            Def: "foldable"
+            Args:
+              Builtin
+                Name: "nint"
+              Builtin
+                Name: "nint"
+      Result: Builtin
+        Name: "nint"
+      Body:
+        Return
+          Value: Call
+            Receiver: ParamRef
+              Name: "c"
+              Type: App
+                Def: "foldable"
+                Args:
+                  Builtin
+                    Name: "nint"
+                  Builtin
+                    Name: "nint"
+            Method: "fold"
+            Args:
+              IntLiteral
+                Text: "0"
+                Type: Builtin
+                  Name: "nint"
+              FuncLiteral
+                Params: "acc" "key" "value"
+                Body:
+                  Return
+                    Value: Call
+                      Receiver: ParamRef
+                        Name: "acc"
+                        Type: Builtin
+                          Name: "nint"
+                      Method: "add"
+                      Args:
+                        ParamRef
+                          Name: "value"
+                          Type: Builtin
+                            Name: "nint"
+                      Setter: false
+                      Resolved: ~
+                      Subst: ~
+                      Type: Builtin
+                        Name: "nint"
+                Type: Func
+                  Params:
+                    Builtin
+                      Name: "nint"
+                    Builtin
+                      Name: "nint"
+                    Builtin
+                      Name: "nint"
+                  Result: Builtin
+                    Name: "nint"
+            Setter: false
+            Resolved: ~
+            Subst:
+              Entry
+                Key: "A"
+                Value: Builtin
+                  Name: "nint"
+              Entry
+                Key: "K"
+                Value: Builtin
+                  Name: "nint"
+              Entry
+                Key: "V"
+                Value: Builtin
+                  Name: "nint"
+            Type: Builtin
+              Name: "nint"
+  Asserts: ~

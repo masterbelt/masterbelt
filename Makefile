@@ -24,6 +24,17 @@ test:
 	$(GO) test ./...
 	cd toolchain/editors/vscode && node --test
 
+# fuzz runs the text-representation fuzzers (F-4 F1) for a short burst each:
+# the unmarshalers must accept or reject arbitrary input without panicking.
+# The same targets run their seed corpora as plain tests on every `make test`;
+# this target is the standing deeper pass (CI's nightly slot once D-1 lands).
+FUZZTIME ?= 30s
+.PHONY: fuzz
+fuzz:
+	$(GO) test ./pkg/masterbelt/parser/concrete/ -run FuzzCSTUnmarshal -fuzz FuzzCSTUnmarshal -fuzztime $(FUZZTIME)
+	$(GO) test ./pkg/masterbelt/parser/abstract/ -run FuzzASTUnmarshal -fuzz FuzzASTUnmarshal -fuzztime $(FUZZTIME)
+	$(GO) test ./pkg/masterbelt/semantic/ -run FuzzIRUnmarshal -fuzz FuzzIRUnmarshal -fuzztime $(FUZZTIME)
+
 # generate runs code generation (the diagnostic tables, etc.).
 .PHONY: generate
 generate:

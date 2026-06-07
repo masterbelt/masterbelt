@@ -291,12 +291,12 @@ func (r *renderer) funcLit(x *FuncLit) {
 		}
 		r.str(p.Name)
 		if p.Type != nil {
-			r.str(": " + dumpType(p.Type))
+			r.str(": " + renderType(p.Type))
 		}
 	}
 	r.str(")")
 	if x.Result != nil {
-		r.str(": " + dumpType(x.Result))
+		r.str(": " + renderType(x.Result))
 	}
 	if len(x.Body) == 0 {
 		r.str(" {}")
@@ -317,7 +317,7 @@ func (r *renderer) funcLit(x *FuncLit) {
 		case *LetStmt:
 			r.str(" let " + s.Name)
 			if s.Type != nil {
-				r.str(": " + dumpType(s.Type))
+				r.str(": " + renderType(s.Type))
 			}
 			r.str(" = ")
 			r.expr(s.Value, 0)
@@ -341,4 +341,56 @@ func (r *renderer) funcLit(x *FuncLit) {
 // silently absent from the trace.
 func stmtMarker(s Stmt) string {
 	return fmt.Sprintf("<%T>", s)
+}
+
+// renderType renders a type expression in source-like form: int8, Optional<T>,
+// A | B, { id: int8 }, fn(src: T): R — the type half of the surface rendering,
+// used where a rendered expression carries an annotation.
+func renderType(t TypeExpr) string {
+	switch t := t.(type) {
+	case nil:
+		return "<missing>"
+	case *NamedType:
+		name := t.Name
+		if t.Namespace != "" {
+			name = t.Namespace + "." + t.Name
+		}
+		if len(t.Args) == 0 {
+			return name
+		}
+		args := make([]string, len(t.Args))
+		for i, a := range t.Args {
+			args[i] = renderType(a)
+		}
+		return name + "<" + strings.Join(args, ", ") + ">"
+	case *UnionType:
+		parts := make([]string, len(t.Members))
+		for i, m := range t.Members {
+			parts[i] = renderType(m)
+		}
+		return strings.Join(parts, " | ")
+	case *RecordType:
+		parts := make([]string, len(t.Fields))
+		for i, f := range t.Fields {
+			parts[i] = f.Name + ": " + renderType(f.Type)
+		}
+		return "{ " + strings.Join(parts, ", ") + " }"
+	case *FuncType:
+		params := make([]string, len(t.Params))
+		for i, p := range t.Params {
+			params[i] = p.Name + ": " + renderType(p.Type)
+		}
+		return "fn(" + strings.Join(params, ", ") + "): " + renderType(t.Result)
+	case *BuiltinType:
+		if len(t.Args) == 0 {
+			return "builtin"
+		}
+		args := make([]string, len(t.Args))
+		for i, a := range t.Args {
+			args[i] = renderType(a)
+		}
+		return "builtin<" + strings.Join(args, ", ") + ">"
+	default:
+		return "Type(?)"
+	}
 }

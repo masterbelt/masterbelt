@@ -1,54 +1,192 @@
 File
-  ConstDecl
-    name "Hi"
-    value (. Identifier "sbyte" Max)
-  ConstDecl
-    name "Lo"
-    value (. Identifier "sbyte" Min)
-  ConstDecl
-    name "Top"
-    type Level
-    value (. Identifier "Level" Max)
-  ConstDecl
-    name "Bottom"
-    type Level
-    value (. Identifier "Level" Min)
-  ConstDecl
-    name "W"
-    value (. Identifier "Bits" Width)
-  ConstDecl
-    name "ServerPort"
-    type Port
-    value IntLit "8080"
-  TypeDecl
-    doc "A character level, capped at 100."
-    pub
-    name "Level"
-    body sbyte
-    const "Max"
-      doc "The highest level."
-      pub
-      value IntLit "100"
-    const "Min"
-      doc "The lowest level."
-      pub
-      value IntLit "0"
-    method "increment"
-      doc "The next level."
-      pub
-      result self
-      return (call (. self add) IntLit "1")
-  TypeDecl
-    pub
-    name "Bits"
-    body int
-    const "Width"
-      doc "The width in bits."
-      pub
-      type int
-      value IntLit "32"
-  TypeDecl
-    pub
-    name "Port"
-    body int
-    where (call (. (call (. self gteq) IntLit "1") anan) (call (. self lteq) (. Identifier "short" Max)))
+  Uses: ~
+  Decls:
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Hi"
+      Type: ~
+      Value: MemberExpr
+        Receiver: Identifier
+          Name: "sbyte"
+        Member: Identifier
+          Name: "Max"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Lo"
+      Type: ~
+      Value: MemberExpr
+        Receiver: Identifier
+          Name: "sbyte"
+        Member: Identifier
+          Name: "Min"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Top"
+      Type: NamedType
+        Namespace: ""
+        Name: "Level"
+        Args: ~
+      Value: MemberExpr
+        Receiver: Identifier
+          Name: "Level"
+        Member: Identifier
+          Name: "Max"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Bottom"
+      Type: NamedType
+        Namespace: ""
+        Name: "Level"
+        Args: ~
+      Value: MemberExpr
+        Receiver: Identifier
+          Name: "Level"
+        Member: Identifier
+          Name: "Min"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "W"
+      Type: ~
+      Value: MemberExpr
+        Receiver: Identifier
+          Name: "Bits"
+        Member: Identifier
+          Name: "Width"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "ServerPort"
+      Type: NamedType
+        Namespace: ""
+        Name: "Port"
+        Args: ~
+      Value: IntLit
+        Text: "8080"
+      Builtin: false
+  Types:
+    TypeDecl
+      Doc: "A character level, capped at 100."
+      Public: true
+      Name: "Level"
+      Params: ~
+      Body: NamedType
+        Namespace: ""
+        Name: "sbyte"
+        Args: ~
+      Where: ~
+      Methods:
+        MethodDecl
+          Doc: "The next level."
+          Public: true
+          Extern: false
+          Kind: 0
+          Effects: ~
+          Name: "increment"
+          TypeParams: ~
+          Params: ~
+          Result: NamedType
+            Namespace: ""
+            Name: "self"
+            Args: ~
+          Body:
+            ReturnStmt
+              Value: CallExpr
+                Callee: MemberExpr
+                  Receiver: SelfExpr
+                  Member: Identifier
+                    Name: "add"
+                Arguments:
+                  IntLit
+                    Text: "1"
+      Consts:
+        ConstDecl
+          Doc: "The highest level."
+          Public: true
+          Name: "Max"
+          Type: ~
+          Value: IntLit
+            Text: "100"
+          Builtin: false
+        ConstDecl
+          Doc: "The lowest level."
+          Public: true
+          Name: "Min"
+          Type: ~
+          Value: IntLit
+            Text: "0"
+          Builtin: false
+      Impls: ~
+    TypeDecl
+      Doc: ~
+      Public: true
+      Name: "Bits"
+      Params: ~
+      Body: NamedType
+        Namespace: ""
+        Name: "int"
+        Args: ~
+      Where: ~
+      Methods: ~
+      Consts:
+        ConstDecl
+          Doc: "The width in bits."
+          Public: true
+          Name: "Width"
+          Type: NamedType
+            Namespace: ""
+            Name: "int"
+            Args: ~
+          Value: IntLit
+            Text: "32"
+          Builtin: false
+      Impls: ~
+    TypeDecl
+      Doc: ~
+      Public: true
+      Name: "Port"
+      Params: ~
+      Body: NamedType
+        Namespace: ""
+        Name: "int"
+        Args: ~
+      Where: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: MemberExpr
+              Receiver: SelfExpr
+              Member: Identifier
+                Name: "gteq"
+            Arguments:
+              IntLit
+                Text: "1"
+          Member: Identifier
+            Name: "anan"
+        Arguments:
+          CallExpr
+            Callee: MemberExpr
+              Receiver: SelfExpr
+              Member: Identifier
+                Name: "lteq"
+            Arguments:
+              MemberExpr
+                Receiver: Identifier
+                  Name: "short"
+                Member: Identifier
+                  Name: "Max"
+      Methods: ~
+      Consts: ~
+      Impls: ~
+  Enums: ~
+  Interfaces: ~
+  Funcs: ~
+  Asserts: ~

@@ -1,58 +1,379 @@
 Module
-  Const "Present"
-    type optional<nint>
-    value (adapt (IntLiteral "5" : nint) : optional<nint>)
-    eval (nint) 5
-  Const "Absent"
-    type optional<nint>
-    value (adapt (null : null) : optional<nint>)
-    eval (null) null
-  Const "FromPresent"
-    type nint
-    value (orZero((adapt (IntLiteral "5" : nint) : optional<nint>)) : nint)
-    eval 5
-  Const "FromAbsent"
-    type nint
-    value (orZero((adapt (null : null) : optional<nint>)) : nint)
-    eval 0
-  Const "WithFallback"
-    type nint
-    value (orFallback((adapt (null : null) : optional<nint>), (IntLiteral "99" : nint)) : nint)
-    eval 99
-  Func "orZero" pub
-    param v: optional<nint>
-    result nint
-      match (ParamRef "v" : optional<nint>)
-        arm nint n
-          return (LocalRef "n" : nint)
-        arm null
-          return (IntLiteral "0" : nint)
-  Func "orFallback" pub
-    param v: optional<nint>
-    param fallback: nint
-    result nint
-      match (ParamRef "v" : optional<nint>)
-        arm nint n
-          return (LocalRef "n" : nint)
-        else
-          return (ParamRef "fallback" : nint)
-  Assert "orZero(5) == 5"
-    eval true
-      orZero(5) == 5
-      ^         ^
-      5         true
-  Assert "orZero(null) == 0"
-    eval true
-      orZero(null) == 0
-      ^            ^
-      0            true
-  Assert "orFallback(7, 99) == 7"
-    eval true
-      orFallback(7, 99) == 7
-      ^                 ^
-      7                 true
-  Assert "orFallback(null, 99) == 99"
-    eval true
-      orFallback(null, 99) == 99
-      ^                    ^
-      99                   true
+  Consts:
+    Const
+      Name: "Present"
+      Public: false
+      Doc: ~
+      Type: App
+        Def: "optional"
+        Args:
+          Builtin
+            Name: "nint"
+      Value: Adapt
+        Value: IntLiteral
+          Text: "5"
+          Type: Builtin
+            Name: "nint"
+        To: App
+          Def: "optional"
+          Args:
+            Builtin
+              Name: "nint"
+      Eval: Constant
+        Kind: 0
+        Int: 5
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: Builtin
+          Name: "nint"
+    Const
+      Name: "Absent"
+      Public: false
+      Doc: ~
+      Type: App
+        Def: "optional"
+        Args:
+          Builtin
+            Name: "nint"
+      Value: Adapt
+        Value: NullValue
+          Type: Builtin
+            Name: "null"
+        To: App
+          Def: "optional"
+          Args:
+            Builtin
+              Name: "nint"
+      Eval: Constant
+        Kind: 10
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: Builtin
+          Name: "null"
+    Const
+      Name: "FromPresent"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "nint"
+      Value: FuncCall
+        Target: "orZero(optional<nint>)"
+        Args:
+          Adapt
+            Value: IntLiteral
+              Text: "5"
+              Type: Builtin
+                Name: "nint"
+            To: App
+              Def: "optional"
+              Args:
+                Builtin
+                  Name: "nint"
+        Resolved: ~
+        Subst: ~
+        Type: Builtin
+          Name: "nint"
+      Eval: Constant
+        Kind: 0
+        Int: 5
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "FromAbsent"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "nint"
+      Value: FuncCall
+        Target: "orZero(optional<nint>)"
+        Args:
+          Adapt
+            Value: NullValue
+              Type: Builtin
+                Name: "null"
+            To: App
+              Def: "optional"
+              Args:
+                Builtin
+                  Name: "nint"
+        Resolved: ~
+        Subst: ~
+        Type: Builtin
+          Name: "nint"
+      Eval: Constant
+        Kind: 0
+        Int: 0
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "WithFallback"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "nint"
+      Value: FuncCall
+        Target: "orFallback(optional<nint>, nint)"
+        Args:
+          Adapt
+            Value: NullValue
+              Type: Builtin
+                Name: "null"
+            To: App
+              Def: "optional"
+              Args:
+                Builtin
+                  Name: "nint"
+          IntLiteral
+            Text: "99"
+            Type: Builtin
+              Name: "nint"
+        Resolved: ~
+        Subst: ~
+        Type: Builtin
+          Name: "nint"
+      Eval: Constant
+        Kind: 0
+        Int: 99
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+  Types: ~
+  Funcs:
+    Function
+      Name: "orZero"
+      Public: true
+      Extern: false
+      Effects: ~
+      Doc: ~
+      TypeParams: ~
+      Params:
+        Param
+          Name: "v"
+          Type: App
+            Def: "optional"
+            Args:
+              Builtin
+                Name: "nint"
+      Result: Builtin
+        Name: "nint"
+      Body:
+        Match
+          Scrutinee: ParamRef
+            Name: "v"
+            Type: App
+              Def: "optional"
+              Args:
+                Builtin
+                  Name: "nint"
+          Arms:
+            MatchArm
+              Type: Builtin
+                Name: "nint"
+              Name: "n"
+              Body:
+                Return
+                  Value: LocalRef
+                    Name: "n"
+                    Type: Builtin
+                      Name: "nint"
+            MatchArm
+              Type: Builtin
+                Name: "null"
+              Name: ""
+              Body:
+                Return
+                  Value: IntLiteral
+                    Text: "0"
+                    Type: Builtin
+                      Name: "nint"
+          Else: ~
+    Function
+      Name: "orFallback"
+      Public: true
+      Extern: false
+      Effects: ~
+      Doc: ~
+      TypeParams: ~
+      Params:
+        Param
+          Name: "v"
+          Type: App
+            Def: "optional"
+            Args:
+              Builtin
+                Name: "nint"
+        Param
+          Name: "fallback"
+          Type: Builtin
+            Name: "nint"
+      Result: Builtin
+        Name: "nint"
+      Body:
+        Match
+          Scrutinee: ParamRef
+            Name: "v"
+            Type: App
+              Def: "optional"
+              Args:
+                Builtin
+                  Name: "nint"
+          Arms:
+            MatchArm
+              Type: Builtin
+                Name: "nint"
+              Name: "n"
+              Body:
+                Return
+                  Value: LocalRef
+                    Name: "n"
+                    Type: Builtin
+                      Name: "nint"
+          Else:
+            Return
+              Value: ParamRef
+                Name: "fallback"
+                Type: Builtin
+                  Name: "nint"
+  Asserts:
+    Assert
+      Cond: "orZero(5) == 5"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "orZero(5) == 5\n^         ^\n5         true"
+    Assert
+      Cond: "orZero(null) == 0"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "orZero(null) == 0\n^            ^\n0            true"
+    Assert
+      Cond: "orFallback(7, 99) == 7"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "orFallback(7, 99) == 7\n^                 ^\n7                 true"
+    Assert
+      Cond: "orFallback(null, 99) == 99"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "orFallback(null, 99) == 99\n^                    ^\n99                   true"
