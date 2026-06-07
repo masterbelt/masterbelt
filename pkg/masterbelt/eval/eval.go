@@ -363,18 +363,44 @@ func evalExpr(e ast.Expr, ctx evalCtx) *ir.Constant {
 }
 
 // memberAdmits reports whether the value v is a representable value of the union
-// member type it flows in as: an integer within the member's range. A value that
-// cannot be settled (a non-integer kind against a sized member) is admitted —
-// only a definitive violation refuses the fold, the conservative discipline the
-// const and conversion range checks share. It is the value half of the
-// member-aware soundness check; the semantic layer runs the same selection through
-// MemberFor to anchor the diagnostic at the flow site.
+// member type it flows in as: an integer within the member's range, and (when the
+// member is a refined nominal type) a value its where-predicate folds true for. A
+// value that cannot be settled either way (a non-integer kind against a sized
+// member, a predicate that does not fold to a bool) is admitted — only a
+// definitive violation refuses the fold, the conservative discipline the const
+// and conversion range checks share. It is the value half of the member-aware
+// soundness check; the semantic layer runs the same selection through MemberFor
+// to anchor the diagnostic at the flow site.
 func memberAdmits(ctx evalCtx, member ir.Type, v *ir.Constant) bool {
 	reg := ctx.env.Registry()
 	if v.Kind == ir.ConstInt && !types.Fits(reg, member, v.Int) {
 		return false
 	}
+	if def := refinedMemberDef(member); def != nil {
+		p := Predicate(def.Where, v, def, ctx.env)
+		if p != nil && p.Kind == ir.ConstBool && !p.Bool {
+			return false
+		}
+	}
 	return true
+}
+
+// refinedMemberDef returns the definition behind a nominal (or applied) member
+// type when it carries a usable where-clause, or nil — the eval twin of the
+// semantic layer's refinedDef, kept here so the fold can run a member's predicate
+// without depending on the semantic package.
+func refinedMemberDef(t ir.Type) *ir.TypeDef {
+	var def *ir.TypeDef
+	switch t := t.(type) {
+	case *ir.Named:
+		def = t.Def
+	case *ir.App:
+		def = t.Def
+	}
+	if def == nil || def.Where == nil {
+		return nil
+	}
+	return def
 }
 
 // MemberFor returns the type a value of expression e flows in as under the

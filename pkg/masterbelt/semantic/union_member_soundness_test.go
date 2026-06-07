@@ -1,8 +1,10 @@
-// These tests pin the member-aware value-range check: a sized-integer value
-// flowing into a union is range-checked against the *member* it tags, not the
-// union it passes through (whose Fits is a pass-through) — the gap that let an
-// out-of-range arithmetic result or literal fold tagged with a sized member a
-// later match would trust.
+// These tests pin the member-aware value-soundness check: a value flowing into a
+// union member (or a refined/sized type in any nested position) is range- and
+// refinement-checked against the *member* it tags, not the union it passes
+// through — the gap that let an out-of-range arithmetic result or a where-clause
+// violation fold tagged with a member a later match would trust. The two systems
+// (range and refinement) are enforced at the same set of positions, so each case
+// here has an overflow twin and a refinement twin.
 package semantic
 
 import (
@@ -34,9 +36,9 @@ func countCode(diags []diagnostic.Diagnostic, code diagnostic.Code) int {
 	return n
 }
 
-// TestUnionMemberArithOverflow covers the range gap: a sized-integer arithmetic
-// result (or a literal) flowing into a union is range-checked against the selected
-// sized member, not the union. The overflowing value must not fold tagged.
+// TestUnionMemberArithOverflow covers system 1: a sized-integer arithmetic result
+// flowing into a union is range-checked against the selected sized member, not the
+// union (whose Fits passes through). The overflowing value must not fold tagged.
 func TestUnionMemberArithOverflow(t *testing.T) {
 	cases := map[string]string{
 		"add into union":     "const A: sbyte | error = sbyte(100) + sbyte(100)\n",
@@ -73,9 +75,58 @@ func assertNoTaggedScalar(t *testing.T, v *ir.Constant) {
 	}
 }
 
-// TestNestedPositionOverflowTwin pins the nested-position range check: a collection
-// element, a record field, and a function argument each report constant_overflow
-// for an out-of-range sized value — the positions the Checked hook covers.
+// TestUnionMemberRefinementViolation covers system 2: a where-predicate violation
+// flowing into a union member runs the member's predicate (the refinedDef gate on
+// the union itself misses it), so the violating value is rejected and never folds
+// tagged with the refined member.
+func TestUnionMemberRefinementViolation(t *testing.T) {
+	port := "pub type Port = nint where self > 0\n"
+	cases := map[string]string{
+		"literal into union":    port + "const P: Port | error = -5\n",
+		"conversion into union": port + "const P: Port | error = Port(-5)\n",
+		// A named union alias unwraps through UnionType, so the member is selected
+		// (and its predicate run) exactly as for the bare union.
+		"named union alias": port + "pub type X = Port | error\nconst P: X = -5\n",
+		// A generic union alias (optional<T> = T | null) unwraps the same way.
+		"generic union alias": port + "const P: optional<Port> = -5\n",
+	}
+	for name, src := range cases {
+		t.Run(name, func(t *testing.T) {
+			m, diags := analyze(src)
+			if n := countCode(diags, CodeRefinementViolation); n != 1 {
+				t.Fatalf("got %d refinement_violation, want exactly 1 (%v)", n, codes(diags))
+			}
+			if v := constEval(m, "P"); v != nil && v.Kind == ir.ConstInt && v.UnionTag != nil {
+				t.Errorf("a violating value folded tagged as %v, want unfolded", v.UnionTag)
+			}
+		})
+	}
+}
+
+// TestRefinementInNestedPositions covers system 2's broader blast radius: the
+// where-predicate is enforced in every nested value position the range check
+// already covers — a collection element, a record field, a function argument —
+// not only the top-level annotation.
+func TestRefinementInNestedPositions(t *testing.T) {
+	port := "pub type Port = nint where self > 0\n"
+	cases := map[string]string{
+		"collection element": port + "const L: list<Port> = [-5]\n",
+		"record field":       port + "pub type R = { x: Port }\nconst V: R = { x: -5 }\n",
+		"function argument":  port + "fn g(x: Port): nint { return 0 }\nconst R = g(-5)\n",
+	}
+	for name, src := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, diags := analyze(src)
+			if n := countCode(diags, CodeRefinementViolation); n != 1 {
+				t.Fatalf("got %d refinement_violation, want exactly 1 (%v)", n, codes(diags))
+			}
+		})
+	}
+}
+
+// TestNestedPositionOverflowTwin pins the range twin of the refinement nested
+// cases: the same nested positions report constant_overflow for an out-of-range
+// sized value, so the two systems cover the same positions.
 func TestNestedPositionOverflowTwin(t *testing.T) {
 	cases := map[string]string{
 		"collection element": "const L: list<short> = [70000]\n",
@@ -92,55 +143,105 @@ func TestNestedPositionOverflowTwin(t *testing.T) {
 	}
 }
 
-// TestReturnOverflowSoundness covers the return-value site: a function or method
-// whose declared result type is sized checks a returned constant against it — the
-// position left wholly unchecked before (no overflow fired on a body return).
-func TestReturnOverflowSoundness(t *testing.T) {
-	cases := map[string]string{
-		"fn overflow":     "fn make(): short { return 70000 }\n",
-		"method overflow": "pub type T = nint {\n  fn make(): short { return 70000 }\n}\n",
+// TestReturnValueSoundness covers the return-value site: a function or method
+// whose declared result type is sized or refined checks a returned constant
+// against it — the position left wholly unchecked before (neither overflow nor
+// refinement fired on a body return).
+func TestReturnValueSoundness(t *testing.T) {
+	port := "pub type Port = nint where self > 0\n"
+	cases := []struct {
+		name, src string
+		code      diagnostic.Code
+	}{
+		{"fn refined block", port + "fn make(): Port { return -5 }\n", CodeRefinementViolation},
+		{"fn overflow", "fn make(): short { return 70000 }\n", CodeConstantOverflow},
+		{"fn refined union", port + "fn make(): Port | error { return -5 }\n", CodeRefinementViolation},
+		{"method refined", "pub type Port = nint where self > 0\npub type T = nint {\n  fn make(): Port { return -5 }\n}\n", CodeRefinementViolation},
 	}
-	for name, src := range cases {
-		t.Run(name, func(t *testing.T) {
-			_, diags := analyze(src)
-			if n := countCode(diags, CodeConstantOverflow); n != 1 {
-				t.Fatalf("got %d constant_overflow, want exactly 1 (%v)", n, codes(diags))
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, diags := analyze(tc.src)
+			if n := countCode(diags, tc.code); n != 1 {
+				t.Fatalf("got %d %v, want exactly 1 (%v)", n, tc.code, codes(diags))
 			}
 		})
 	}
 }
 
-// TestUnionMemberInRangeFolds checks the member check does not over-fire: an
-// in-range arithmetic result flows in, folds, and carries its member tag.
-func TestUnionMemberInRangeFolds(t *testing.T) {
-	m, diags := analyze("const A: sbyte | error = sbyte(10) + sbyte(20)\n")
+// TestReturnValueDynamicUnchecked pins the conservative boundary: a return whose
+// value is a parameter (not a constant) does not fold, so it is left to the
+// runtime — no false positive, exactly as the const path leaves a dynamic value.
+func TestReturnValueDynamicUnchecked(t *testing.T) {
+	src := "pub type Port = nint where self > 0\nfn pass(x: nint): Port { return x }\n"
+	_, diags := analyze(src)
 	if len(diags) != 0 {
-		t.Fatalf("unexpected diagnostics: %v", codes(diags))
-	}
-	v := constEval(m, "A")
-	if v == nil || v.String() != "30" {
-		t.Fatalf("A = %v, want 30", v)
-	}
-	if v.UnionTag == nil {
-		t.Errorf("A = %v, want a union member tag", v)
+		t.Fatalf("a non-constant return must not be checked, got %v", codes(diags))
 	}
 }
 
-// TestDownstreamDispatchBlockedOverflow is the end-to-end soundness contract: a
-// wrong sized value never reaches a match dispatch. The overflowing const does not
-// fold, so the downstream const that match-dispatches on it does not fold either.
-func TestDownstreamDispatchBlockedOverflow(t *testing.T) {
-	src := "pub type SB = sbyte | error\nconst A: SB = sbyte(100) + sbyte(100)\n" +
-		"pub fn classify(v: SB): string { match v { sbyte s -> return \"num\"  error e -> return \"err\" } }\n" +
-		"const C: string = classify(A)\n"
-	m, diags := analyze(src)
-	if n := countCode(diags, CodeConstantOverflow); n < 1 {
-		t.Fatalf("got %d constant_overflow, want at least 1 (%v)", n, codes(diags))
+// TestUnionMemberInRangeFolds checks the member check does not over-fire: an
+// in-range arithmetic result and a predicate-satisfying value flow in, fold, and
+// carry their member tag.
+func TestUnionMemberInRangeFolds(t *testing.T) {
+	cases := []struct {
+		name, src, want string
+	}{
+		{"arith in range", "const A: sbyte | error = sbyte(10) + sbyte(20)\n", "30"},
+		{"refined satisfied", "pub type Port = nint where self > 0\nconst A: Port | error = 5\n", "5"},
 	}
-	if v := constEval(m, "A"); v != nil && v.Kind == ir.ConstInt && v.UnionTag != nil {
-		t.Errorf("A folded tagged %v, want unfolded", v.UnionTag)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			m, diags := analyze(tc.src)
+			if len(diags) != 0 {
+				t.Fatalf("unexpected diagnostics: %v", codes(diags))
+			}
+			v := constEval(m, "A")
+			if v == nil || v.String() != tc.want {
+				t.Fatalf("A = %v, want %q", v, tc.want)
+			}
+			if v.UnionTag == nil {
+				t.Errorf("A = %v, want a union member tag", v)
+			}
+		})
 	}
-	if v := constEval(m, "C"); v != nil {
-		t.Errorf("C folded to %v on a wrong value, want unfolded", v)
+}
+
+// TestDownstreamDispatchBlocked is the end-to-end soundness contract: a wrong
+// value never reaches a match dispatch. The violating const does not fold, so the
+// downstream classify/recover const that match-dispatches on it does not fold
+// either — no wrong arm is taken silently.
+func TestDownstreamDispatchBlocked(t *testing.T) {
+	cases := map[string]struct {
+		src        string
+		violating  string
+		downstream string
+		code       diagnostic.Code
+	}{
+		"overflow classify": {
+			src: "pub type SB = sbyte | error\nconst A: SB = sbyte(100) + sbyte(100)\n" +
+				"pub fn classify(v: SB): string { match v { sbyte s -> return \"num\"  error e -> return \"err\" } }\n" +
+				"const C: string = classify(A)\n",
+			violating: "A", downstream: "C", code: CodeConstantOverflow,
+		},
+		"refinement recover": {
+			src: "pub type Port = nint where self >= 1 && self <= 65535\n" +
+				"pub fn portOr(v: Port | error, fb: nint): nint { match v { Port p -> return 1  error e -> return fb } }\n" +
+				"const UnionBad: Port | error = 70000\nconst Recovered = portOr(UnionBad, 999)\n",
+			violating: "UnionBad", downstream: "Recovered", code: CodeRefinementViolation,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			m, diags := analyze(tc.src)
+			if n := countCode(diags, tc.code); n < 1 {
+				t.Fatalf("got %d %v, want at least 1 (%v)", n, tc.code, codes(diags))
+			}
+			if v := constEval(m, tc.violating); v != nil && v.Kind == ir.ConstInt && v.UnionTag != nil {
+				t.Errorf("%s folded tagged %v, want unfolded", tc.violating, v.UnionTag)
+			}
+			if v := constEval(m, tc.downstream); v != nil {
+				t.Errorf("%s folded to %v on a wrong value, want unfolded", tc.downstream, v)
+			}
+		})
 	}
 }

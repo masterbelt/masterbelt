@@ -275,33 +275,15 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 			s := at(decl)
 			diags.Add(newCyclicReferenceDiagnostic(s.offset, s.width, decl.Name))
 		}
-		// The top-level value's range, against the member it flows in as (c.Type's
-		// selected union member, or c.Type itself). It folds the value raw — the
-		// arbitrary-precision nint has no fixed range, a bool never overflows, and an
-		// overflowing conversion folds to nil and is reported at its own site. It is
-		// the same member-aware check the nested positions run through Checked.
+		// The top-level value's range and refinement, against the member it flows
+		// in as (c.Type's selected union member, or c.Type itself). It folds the
+		// value raw — the arbitrary-precision nint has no fixed range, a bool never
+		// overflows, and an overflowing conversion folds to nil and is reported at
+		// its own site — and an unsatisfied where-predicate carries the power-assert
+		// diagram naming the comparison that rejected the constant. It is the same
+		// member-aware check the nested positions run through Checked.
 		if decl.Value != nil {
 			checkMemberFlow(reg, decl.Value, c.Type, evalEnv{q: q, file: fileID}, at, diags)
-		}
-		// Refinement: a nominal annotation whose definition carries a usable
-		// where-clause admits only the values that satisfy it, so the predicate
-		// folds with self bound to the evaluated value. A predicate that does not
-		// fold to a bool was reported at the type declaration, so it stays silent
-		// here (the ir.Invalid style of suppression).
-		if c.Eval != nil {
-			if def := refinedDef(c.Type); def != nil {
-				v := eval.Predicate(def.Where, c.Eval, def, evalEnv{q: q, file: fileID})
-				if v != nil && v.Kind == ir.ConstBool && !v.Bool {
-					s := at(decl.Value)
-					// The power-assert diagram with self bound to the value,
-					// indented as a block exactly like a failed assertion's —
-					// it shows which comparison rejected the constant.
-					d := assert.DiagramSelf(def.Where, c.Eval, def, evalEnv{q: q, file: fileID})
-					diagram := "\n  " + strings.ReplaceAll(d, "\n", "\n  ")
-					diags.Add(newRefinementViolationDiagnostic(
-						s.offset, s.width, c.Eval.String(), c.Type.String(), ast.Render(def.Where), diagram))
-				}
-			}
 		}
 		// An empty or heterogeneous collection literal with no annotation has
 		// no type to infer (checking mode never sees it without one).
@@ -541,21 +523,24 @@ func refinedDef(t ir.Type) *ir.TypeDef {
 }
 
 // checkMemberFlow reports the value-soundness diagnostics for a value flowing
-// into the type want at expression e: an integer outside the range of the member
-// want resolves to. It is the unified member-aware check the const,
-// nested-position (Checked), and function-body return sites all run, so the range
-// check is enforced at exactly the same positions:
+// into the type want at expression e: an integer outside the range (or a
+// where-predicate violation) of the member want resolves to. It is the unified
+// member-aware check the const, nested-position (Checked), and function-body
+// return sites all run, so range and refinement are enforced at exactly the same
+// positions:
 //
 //   - the effective target is the union member the value flows in as (eval.MemberFor
 //     runs the same exact→unique selection the fold tags with), or want itself when
-//     it is not a union — so `sbyte | error` checks the value against `sbyte`;
+//     it is not a union — so `sbyte | error` checks the value against `sbyte`, and a
+//     refined member's predicate runs;
 //   - the value is folded with no expectation (eval.Expr), so the raw value is read
 //     even though the expectation-driven fold refuses to build it (memberAdmits);
 //     an overflowing conversion already folds to nil and is reported at its own site
 //     (ScalarConversion), so it is not seen here and never double-reported.
 //
-// A non-constant or unfoldable value (a parameter) is left unchecked — the
-// runtime's job, the conservative discipline the range check already shares.
+// A non-constant or unfoldable value (a parameter, a predicate that does not fold
+// to a bool) is left unchecked — the runtime's job, the conservative discipline
+// the range and refinement checks already share.
 func checkMemberFlow(reg *builtin.Registry, e ast.Expr, want ir.Type, env evalEnv, at func(ast.Node) span, diags *diagnostic.List) {
 	if want == ir.Invalid {
 		return
@@ -569,6 +554,16 @@ func checkMemberFlow(reg *builtin.Registry, e ast.Expr, want ir.Type, env evalEn
 		s := at(e)
 		diags.Add(newConstantOverflowDiagnostic(s.offset, s.width, v.String(), member.String()))
 		return
+	}
+	if def := refinedDef(member); def != nil {
+		p := eval.Predicate(def.Where, v, def, env)
+		if p != nil && p.Kind == ir.ConstBool && !p.Bool {
+			s := at(e)
+			d := assert.DiagramSelf(def.Where, v, def, env)
+			diagram := "\n  " + strings.ReplaceAll(d, "\n", "\n  ")
+			diags.Add(newRefinementViolationDiagnostic(
+				s.offset, s.width, v.String(), member.String(), ast.Render(def.Where), diagram))
+		}
 	}
 }
 

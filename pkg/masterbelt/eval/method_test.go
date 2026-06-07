@@ -469,23 +469,37 @@ func TestConversionRangeCheck(t *testing.T) {
 	wantInt(t, conv("sbyte", "127"), env, 127) // the inclusive boundary folds
 }
 
-// TestUnionMemberAdmitsFold pins the eval-side member-aware range refusal: a value
-// flowing into a sized union member it cannot represent (an out-of-range integer)
-// does not fold (nil), so a wrong value is never tagged and a later match never
-// dispatches on it. An admitted value folds tagged with the member. It is the
-// union twin of the conversion range check.
+// TestUnionMemberAdmitsFold pins the eval-side member-aware soundness refusal: a
+// value flowing into a union member that the member cannot represent — an
+// out-of-range integer for a sized member, or a where-predicate violation for a
+// refined member — does not fold (nil), so a wrong value is never tagged and a
+// later match never dispatches on it. An admitted value folds tagged with the
+// member. It is the union twin of the conversion range check.
 func TestUnionMemberAdmitsFold(t *testing.T) {
-	env := newTypeEnv()
+	// type Port = sbyte where self > 0
+	port := nominalDef("Port", "sbyte")
+	port.Where = memberCall(selfExpr(), "gt", intLit("0")) // self > 0
+	env := newTypeEnv(port)
+
 	// sbyte | error: an integer literal selects the sbyte member by kind backing.
 	sbyteUnion := &ir.Union{Members: []ir.Type{&ir.Builtin{Name: "sbyte"}, &ir.Builtin{Name: "error"}}}
+	// Port | error: an integer literal selects the refined Port member.
+	portUnion := &ir.Union{Members: []ir.Type{&ir.Named{Def: port}, &ir.Builtin{Name: "error"}}}
 
 	// Out of sbyte range: no representable member value, so the fold is refused.
 	if v := ExprExpecting(intLit("200"), sbyteUnion, env); v != nil {
 		t.Errorf("200 into sbyte | error folded to %v, want nil (out of range)", v)
 	}
-	// An admitted value folds tagged with its member.
+	// Predicate violation: -5 does not satisfy Port's self > 0, so the fold is refused.
+	if v := ExprExpecting(intLit("-5"), portUnion, env); v != nil {
+		t.Errorf("-5 into Port | error folded to %v, want nil (predicate violation)", v)
+	}
+	// Admitted values fold tagged with their member.
 	if v := ExprExpecting(intLit("100"), sbyteUnion, env); v == nil || v.UnionTag == nil {
 		t.Errorf("100 into sbyte | error = %v, want a tagged value", v)
+	}
+	if v := ExprExpecting(intLit("5"), portUnion, env); v == nil || v.UnionTag == nil {
+		t.Errorf("5 into Port | error = %v, want a tagged value", v)
 	}
 }
 
