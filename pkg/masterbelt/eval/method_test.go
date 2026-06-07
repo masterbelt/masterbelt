@@ -22,7 +22,7 @@ func param(name string, t ast.TypeExpr) *ast.ParamDef { return ast.NewParamDef(n
 
 // method builds a non-extern, pure method declaration with the given body.
 func method(name string, params []*ast.ParamDef, result ast.TypeExpr, body ...ast.Stmt) *ast.MethodDecl {
-	return ast.NewMethodDecl(nil, true, false, nil, name, nil, params, result, body, nil)
+	return ast.NewMethodDecl(nil, true, false, ast.MethodNormal, nil, name, nil, params, result, body, nil)
 }
 
 // methodIR wraps an AST method declaration as the ir.Method the type def holds,

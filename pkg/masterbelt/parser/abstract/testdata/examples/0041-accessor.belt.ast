@@ -24,11 +24,13 @@ File
     method "freezing"
       doc "The freezing point of water."
       pub
+      kind static
       result Celsius
       return (record Celsius deg: IntLit "0")
     method "fromF"
       doc "A degree reading converted from a fahrenheit value."
       pub
+      kind static
       param v: nint
       result Celsius
       return (record Celsius deg: (call (. (call (. (call (. Identifier "v" sub) IntLit "32") mul) IntLit "5") div) IntLit "9"))
@@ -36,17 +38,20 @@ File
       doc "A degree reading converted from a celsius value (the static overload:"
       doc "same name, a Celsius argument rather than a nint)."
       pub
+      kind static
       param c: Celsius
       result Celsius
       return Identifier "c"
     method "fahrenheit"
       doc "Fahrenheit reading: c.fahrenheit."
       pub
+      kind getter
       result nint
       return (call (. (call (. (call (. (. self deg) mul) IntLit "9") div) IntLit "5") add) IntLit "32")
     method "fahrenheit"
       doc "Fahrenheit write: c.fahrenheit = 212 (c is a let local)."
       pub
+      kind setter
       param v: nint
       result self
       return (record Celsius deg: (call (. (call (. (call (. Identifier "v" sub) IntLit "32") mul) IntLit "5") div) IntLit "9"))
@@ -61,11 +66,13 @@ File
     method "full"
       doc "A full health bar."
       pub
+      kind static
       result Health
       return (. Identifier "Health" Max)
     method "band"
       doc "The health expressed in tens (the band a UI shows)."
       pub
+      kind getter
       result nint
       return (call (. self div) IntLit "10")
   EnumDecl
@@ -77,11 +84,13 @@ File
     method "hot"
       doc "Whether this element is Fire."
       pub
+      kind getter
       result bool
       return (call (. self eql) (. Identifier "Element" Fire))
     method "base"
       doc "The default element."
       pub
+      kind static
       result Element
       return (. Identifier "Element" Fire)
   FuncDecl

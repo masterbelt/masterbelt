@@ -460,6 +460,9 @@ func dumpMethod(b *strings.Builder, m *MethodDecl) {
 	if m.Extern {
 		b.WriteString("      extern\n")
 	}
+	if m.Kind != MethodNormal {
+		fmt.Fprintf(b, "      kind %s\n", m.Kind)
+	}
 	if len(m.Effects) > 0 {
 		fmt.Fprintf(b, "      effects %s\n", strings.Join(m.Effects, " "))
 	}

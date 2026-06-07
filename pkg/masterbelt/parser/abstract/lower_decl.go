@@ -430,6 +430,7 @@ func lowerMethod(t cst.Tree, buf source.Buffer) *ast.MethodDecl {
 		doc        []string
 		public     bool
 		extern     bool
+		kind       = ast.MethodNormal
 		effects    []string
 		name       string
 		typeParams []*ast.TypeParam
@@ -457,6 +458,11 @@ func lowerMethod(t cst.Tree, buf source.Buffer) *ast.MethodDecl {
 		}
 		node, _ := child.Node()
 		switch {
+		case node.Kind() == cst.Modifier:
+			// The accessor/static modifier the parser recognized. Its kind is read
+			// from the context-keyword identifier it wraps, and it is consumed here
+			// — never as the method name — so the name picks up the next Ident.
+			kind = modifierKind(child, buf)
 		case node.Kind() == cst.GenericParams:
 			typeParams = lowerGenericParams(child, buf)
 		case node.Kind() == cst.ParamList:
@@ -467,7 +473,28 @@ func lowerMethod(t cst.Tree, buf source.Buffer) *ast.MethodDecl {
 			result = lowerTypeExpr(child, buf)
 		}
 	}
-	return ast.NewMethodDecl(doc, public, extern, effects, name, typeParams, params, result, body, green)
+	return ast.NewMethodDecl(doc, public, extern, kind, effects, name, typeParams, params, result, body, green)
+}
+
+// modifierKind reads the method kind from a Modifier node: the get/set/static
+// context keyword it wraps. An unrecognized text (which the parser does not
+// produce) reads as MethodNormal.
+func modifierKind(t cst.Tree, buf source.Buffer) ast.MethodKind {
+	for _, child := range t.Children() {
+		tok, ok := child.Token()
+		if !ok || tok.Kind() != token.Ident {
+			continue
+		}
+		switch child.Text(buf) {
+		case "get":
+			return ast.MethodGetter
+		case "set":
+			return ast.MethodSetter
+		case "static":
+			return ast.MethodStatic
+		}
+	}
+	return ast.MethodNormal
 }
 
 // lowerInterfaceDecl lowers a positioned InterfaceDecl CST node into an

@@ -393,7 +393,7 @@ func resolveInterfaceMember(r *infer.TypeResolver, reg *builtin.Registry, self i
 		// call (a list's count/keys/...) by evaluating this body with self bound to
 		// the receiver, exactly as it folds a concrete method. A required member
 		// (no body) keeps a nil Syntax — its implementation is the implementor's.
-		method.Syntax = ast.NewMethodDecl(m.Doc, m.Public, false, nil, m.Name, m.TypeParams, m.Params, m.Result, m.Body, nil)
+		method.Syntax = ast.NewMethodDecl(m.Doc, m.Public, false, ast.MethodNormal, nil, m.Name, m.TypeParams, m.Params, m.Result, m.Body, nil)
 	}
 	return method
 }

@@ -303,6 +303,58 @@ func TestLowerMethodDoc(t *testing.T) {
 	}
 }
 
+// TestLowerMethodKind checks the accessor/static modifier lowers to the
+// method's Kind, the name picks up the property name (not the modifier), and an
+// ordinary method stays MethodNormal.
+func TestLowerMethodKind(t *testing.T) {
+	src := "type C = { d: nint } impl {\n" +
+		"  pub get fahrenheit(): nint {\n    return self.d\n  }\n" +
+		"  pub set fahrenheit(v: nint): self {\n    return self\n  }\n" +
+		"  pub static fn make(): C {\n    return self\n  }\n" +
+		"  pub deg(): nint {\n    return self.d\n  }\n" +
+		"}\n"
+	file, diags := Lower([]byte(src))
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	ms := file.Types[0].Methods
+	want := []struct {
+		name string
+		kind ast.MethodKind
+	}{
+		{"fahrenheit", ast.MethodGetter},
+		{"fahrenheit", ast.MethodSetter},
+		{"make", ast.MethodStatic},
+		{"deg", ast.MethodNormal},
+	}
+	if len(ms) != len(want) {
+		t.Fatalf("methods = %d, want %d", len(ms), len(want))
+	}
+	for i, w := range want {
+		if ms[i].Name != w.name || ms[i].Kind != w.kind {
+			t.Errorf("method %d = (%q, %s), want (%q, %s)", i, ms[i].Name, ms[i].Kind, w.name, w.kind)
+		}
+	}
+}
+
+// TestLowerMethodKindDump checks the AST dump surfaces the kind line, so the
+// snapshot proves the accessor/static modifier reached the AST.
+func TestLowerMethodKindDump(t *testing.T) {
+	src := "type C = sbyte impl {\n  get g(): nint {\n    return 0\n  }\n  static fn s(): C {\n    return self\n  }\n}\n"
+	file, diags := Lower([]byte(src))
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	got := ast.Dump(file)
+	if !strings.Contains(got, "kind getter") || !strings.Contains(got, "kind static") {
+		t.Errorf("dump = %s, want it to contain kind getter and kind static", got)
+	}
+	// An ordinary method records no kind line.
+	if strings.Contains(got, "kind method") {
+		t.Errorf("dump = %s, should not spell out the normal kind", got)
+	}
+}
+
 func TestLowerInterfaceDecl(t *testing.T) {
 	// An interface lowers to File.Interfaces, with required members (no body)
 	// and provided members (a default body) distinguished by Provided.
