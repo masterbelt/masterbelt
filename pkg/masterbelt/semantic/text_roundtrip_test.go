@@ -280,3 +280,40 @@ func FuzzIRUnmarshal(f *testing.F) {
 		}
 	})
 }
+
+// TestMethodOwnersStamped pins the AttachMethods convention the marshaler
+// depends on: every method of every definition — the prelude's, the
+// registry's, and the examples' — carries Owner == its containing def. A
+// method appended around TypeDef.AttachMethods would marshal as an
+// unresolvable "?." reference, and that failure would surface far from its
+// cause (at Link time of a serialized module); this pin moves it to the
+// attach site's test run.
+func TestMethodOwnersStamped(t *testing.T) {
+	checkDef := func(label string, def *ir.TypeDef) {
+		for _, m := range def.Methods {
+			if m.Owner != def {
+				t.Errorf("%s: method %s.%s has Owner %v — attach methods through TypeDef.AttachMethods", label, def.Name, m.Name, m.Owner)
+			}
+		}
+	}
+	for name, def := range universe().prelude {
+		checkDef("prelude "+name, def)
+	}
+	entries, err := os.ReadDir(sharedExamples)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".belt") {
+			continue
+		}
+		src, err := os.ReadFile(filepath.Join(sharedExamples, entry.Name()))
+		if err != nil {
+			t.Fatal(err)
+		}
+		module, _ := Analyze(abstract.NewDocument(src))
+		for _, def := range module.Types {
+			checkDef(entry.Name(), def)
+		}
+	}
+}

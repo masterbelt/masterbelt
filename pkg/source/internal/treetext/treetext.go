@@ -35,6 +35,11 @@ func Lines(data []byte) ([]Line, error) {
 	for number := 1; len(rest) > 0; number++ {
 		raw, after, _ := bytes.Cut(rest, []byte{'\n'})
 		rest = after
+		// A trailing carriage return is transport noise (git autocrlf, an
+		// editor saving CRLF): the writers never emit one, so stripping it
+		// keeps the round trip alive across line-ending normalization
+		// without admitting \r anywhere meaningful.
+		raw = bytes.TrimSuffix(raw, []byte{'\r'})
 		line := string(raw)
 		body := strings.TrimLeft(line, " ")
 		if body == "" {

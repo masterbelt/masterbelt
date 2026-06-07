@@ -76,3 +76,22 @@ func TestIRJSON(t *testing.T) {
 		t.Fatalf("embedded IR does not unmarshal: %v", err)
 	}
 }
+
+// TestIRRejectsBrokenFile pins the diagnostics gate: a file with errors gets
+// its diagnostics and a non-zero exit, never a silently partial graph.
+func TestIRRejectsBrokenFile(t *testing.T) {
+	root := t.TempDir()
+	belttest.WriteFile(t, root, "main.belt", "const A = bogus\n")
+	path := filepath.Join(root, "main.belt")
+
+	out, err := execIR(t, path)
+	if err == nil {
+		t.Fatalf("ir on a broken file succeeded:\n%s", out)
+	}
+	if strings.HasPrefix(out, "Module\n") {
+		t.Errorf("a broken file printed IR:\n%s", out)
+	}
+	if !strings.Contains(out, "undefined") && !strings.Contains(out, "error") {
+		t.Errorf("output carries no diagnostic: %q", out)
+	}
+}

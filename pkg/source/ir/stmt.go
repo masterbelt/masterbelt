@@ -64,3 +64,23 @@ func ValueKinds() []Value {
 		&AssocConstValue{},
 	}
 }
+
+// TypeKinds returns one minimal instance of every Type implementer, in a
+// stable order — the registry the type codec's exhaustiveness pins walk. The
+// Type codec is hand-written (text.go), so each form is dispatched in four
+// switches (typeHead, writeTypeFields, decodeType, linkType) guarded only by
+// panics; this registry plus the coverage test turns those panics into a
+// failing test the moment a form is added without teaching all four.
+func TypeKinds() []Type {
+	return []Type{
+		&Builtin{},
+		Invalid,
+		&Named{},
+		&Union{},
+		&Record{},
+		&Func{},
+		&TypeVar{},
+		&App{},
+		&SelfType{},
+	}
+}

@@ -57,3 +57,16 @@ func TestLinesEdges(t *testing.T) {
 		t.Errorf("Lines(no trailing newline) = %v, %v; want the one line", lines, err)
 	}
 }
+
+// TestLinesAcceptCRLF pins the transport leniency: text normalized to CRLF
+// (git autocrlf, an editor) still reads — the carriage return is stripped,
+// never part of a line's content.
+func TestLinesAcceptCRLF(t *testing.T) {
+	lines, err := Lines([]byte("File\r\n  Ident \"x\"\r\n"))
+	if err != nil {
+		t.Fatalf("Lines: %v", err)
+	}
+	if len(lines) != 2 || lines[0].Content != "File" || lines[1].Content != `Ident "x"` {
+		t.Errorf("lines = %+v", lines)
+	}
+}

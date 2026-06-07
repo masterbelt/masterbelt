@@ -69,6 +69,9 @@ func TestBareMemberLetInit(t *testing.T) {
 	if !ok || let.Name != "r" || enumMemberOf(let.Value) != "Rarity.Legend" {
 		t.Errorf("let initializer did not resolve the bare member: %+v", let)
 	}
+	if typ := ir.TypeOf(let.Value); typ == nil || typ.String() != "Rarity" {
+		t.Errorf("let initializer's settled type = %v, want Rarity", typ)
+	}
 }
 
 func TestBareMemberLetInitUnknown(t *testing.T) {
@@ -118,6 +121,12 @@ func TestBareMemberCompareArg(t *testing.T) {
 	}
 	if len(call.Args) != 1 || enumMemberOf(call.Args[0]) != "Rarity.Legend" {
 		t.Errorf("comparison argument did not resolve the bare member: %+v", call.Args)
+	}
+	if typ := ir.TypeOf(call.Receiver); typ == nil || typ.String() != "Rarity" {
+		t.Errorf("receiver's settled type = %v, want Rarity", typ)
+	}
+	if typ := ir.TypeOf(ret.Value); typ == nil || typ.String() != "bool" {
+		t.Errorf("comparison's settled type = %v, want bool", typ)
 	}
 }
 
