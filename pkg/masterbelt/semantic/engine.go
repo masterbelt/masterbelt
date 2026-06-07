@@ -401,7 +401,10 @@ func equalConstants(a, b *ir.Constant) bool {
 }
 
 // equalTypes is type equality for the cutoff: named types by their definition
-// pointer, the rest structurally.
+// pointer, the rest structurally. Its sibling walker is types.sameType (the
+// assignability comparison, which unwraps aliases where this one compares Def
+// identity) — the two deliberately differ, and a new Type form must be taught
+// to both.
 func equalTypes(a, b ir.Type) bool {
 	if a == b {
 		return true

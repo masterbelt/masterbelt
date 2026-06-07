@@ -8,7 +8,6 @@ package semantic
 
 import (
 	"maps"
-	"slices"
 	"sort"
 	"strings"
 
@@ -245,19 +244,18 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 		},
 	}
 
-	// Phase zero: prime the function-body query for every reachable file,
-	// in sorted order. The query resolves a file's function bodies onto the
-	// shared shells silently; the reporting pass below re-resolves this
-	// file's own and the write-back annotates them. Priming first pins the
-	// memo before ANY assemble's annotations exist, so a later assemble of
-	// an importing file can never be the first to demand the query and have
-	// its silent re-resolution wipe annotations an earlier assemble wrote —
-	// the order-dependence the full/incremental dump parity flaked on (the
-	// same discipline computeValue applies to the value query, extended to
-	// the assembler itself).
-	for _, f := range slices.Sorted(maps.Keys(q.reachableFrom(fileID))) {
-		q.funcsOf(f)
-	}
+	// Phase zero: prime this file's function-body query. The query resolves
+	// the bodies onto the shared shells silently; the reporting pass below
+	// re-resolves them and the write-back annotates them. Priming pins the
+	// memo before this assemble's annotations exist, so a later assemble of
+	// an importing file can never be the FIRST to demand the query and have
+	// its silent re-resolution wipe the annotations — the order-dependence
+	// the full/incremental dump parity flaked on. Only the own file is
+	// primed: cross-file function facts flow through the value queries,
+	// whose memo edges keep the early cutoff fine-grained (priming every
+	// reachable file here would couple this module to every reachable
+	// file's funcs and recompute it on any function-body edit anywhere).
+	q.funcsOf(fileID)
 
 	a.collectConsts()
 	checkUses(fileID, file, q, a.at, a.diags)

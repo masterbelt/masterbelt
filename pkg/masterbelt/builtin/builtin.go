@@ -216,10 +216,10 @@ func Default() *Registry {
 		}
 		r.register(spec.name, &NativeType{Name: spec.name, Int: &kind}, integerMethods(), ii)
 	}
-	r.register("bool", &NativeType{Name: "bool", Bool: true}, booleanMethods(), booleanIntrinsics())
-	r.register("string", &NativeType{Name: "string", Str: true}, stringMethods(), stringIntrinsics())
+	r.register(NameBool, &NativeType{Name: "bool", Bool: true}, booleanMethods(), booleanIntrinsics())
+	r.register(NameString, &NativeType{Name: "string", Str: true}, stringMethods(), stringIntrinsics())
 	r.register("null", &NativeType{Name: "null", Null: true}, nil, nil)
-	r.register("error", &NativeType{Name: "error", Err: true}, errorMethods(), errorIntrinsics())
+	r.register(NameError, &NativeType{Name: "error", Err: true}, errorMethods(), errorIntrinsics())
 
 	// datetime: the comparisons and the single-signature add are kind-
 	// agnostic; sub is overloaded by the argument's kind — another instant
@@ -242,10 +242,10 @@ func Default() *Registry {
 	drI := millisComparisons(ir.ConstDuration)
 	drI["sub"] = binaryMillis(ir.ConstDuration, ir.ConstDuration, checkedMillis(subMillis, ir.DurationConstant))
 	drI["mul"] = mulDuration
-	r.register("duration", &NativeType{Name: "duration", Duration: true}, durationMethods(), drI)
-	r.registerIntrinsic("duration", "add", []ir.ConstKind{ir.ConstDuration},
+	r.register(NameDuration, &NativeType{Name: "duration", Duration: true}, durationMethods(), drI)
+	r.registerIntrinsic(NameDuration, "add", []ir.ConstKind{ir.ConstDuration},
 		binaryMillis(ir.ConstDuration, ir.ConstDuration, checkedMillis(addMillis, ir.DurationConstant)))
-	r.registerIntrinsic("duration", "add", []ir.ConstKind{ir.ConstDatetime},
+	r.registerIntrinsic(NameDuration, "add", []ir.ConstKind{ir.ConstDatetime},
 		binaryMillis(ir.ConstDuration, ir.ConstDatetime, checkedMillis(addMillis, ir.DatetimeConstant)))
 	return r
 }

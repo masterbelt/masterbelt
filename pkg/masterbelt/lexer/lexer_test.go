@@ -95,7 +95,6 @@ var lexerDiagnosticsCases = []struct {
 		src:  "const x = 1 /* oops",
 		checkTokens: func(t *testing.T, file *source.File, tokens []token.Token) {
 			t.Helper()
-			t.Helper()
 			// The dangling comment is still returned as a BlockComment so
 			// editors keep highlighting it as a comment.
 			last := tokens[len(tokens)-2] // before EOF
@@ -110,7 +109,6 @@ var lexerDiagnosticsCases = []struct {
 		name: "unterminated string literal",
 		src:  `const x = "oops`,
 		checkTokens: func(t *testing.T, file *source.File, tokens []token.Token) {
-			t.Helper()
 			t.Helper()
 			// The dangling string is still returned as a String token, so
 			// editors keep highlighting it while the closing quote is being
@@ -178,7 +176,6 @@ var lexerDiagnosticsCases = []struct {
 		// A stray multibyte rune must not fragment into per-byte Illegal tokens.
 		src: "あ",
 		checkTokens: func(t *testing.T, _ *source.File, tokens []token.Token) {
-			t.Helper()
 			t.Helper()
 			if len(tokens) != 2 { // Illegal + EOF
 				t.Fatalf("got %d tokens, want 2: %v", len(tokens), tokens)

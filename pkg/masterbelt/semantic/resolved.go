@@ -10,6 +10,8 @@
 package semantic
 
 import (
+	"fmt"
+
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/types"
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
@@ -251,11 +253,16 @@ func (w resolutionWriter) valueLeaf(v ir.Value, bd bindings) {
 	case *ir.BoolLiteral:
 		v.Type = &ir.Builtin{Name: builtin.NameBool}
 	case *ir.DatetimeLiteral:
-		v.Type = &ir.Builtin{Name: "datetime"}
+		v.Type = &ir.Builtin{Name: builtin.NameDatetime}
 	case *ir.DurationLiteral:
-		v.Type = &ir.Builtin{Name: "duration"}
+		v.Type = &ir.Builtin{Name: builtin.NameDuration}
 	case *ir.NullValue:
 		v.Type = &ir.Builtin{Name: "null"}
+	default:
+		// The composite forms have explicit arms in value; a form reaching
+		// here without a case above was never given a write-back rule — fail
+		// loudly rather than publish an unannotated graph.
+		panic(fmt.Sprintf("semantic: write-back has no rule for %T", v))
 	}
 }
 

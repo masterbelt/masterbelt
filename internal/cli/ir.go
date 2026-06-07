@@ -53,10 +53,7 @@ var IRCmd = &cobra.Command{
 		prog.SetFile(id, doc, nil)
 		prog.Refresh()
 
-		raw := make([]diagnostic.Diagnostic, 0, len(doc.Concrete().LexDiagnostics())+len(doc.Diagnostics()))
-		raw = append(raw, doc.Concrete().LexDiagnostics()...)
-		raw = append(raw, doc.Diagnostics()...)
-		raw = append(raw, prog.Diagnostics(id)...)
+		raw := gatherDiagnostics(doc, prog, id)
 		if len(raw) > 0 {
 			rep := reporter.NewText(cmd.ErrOrStderr(), diagnostic.DefaultLocale)
 			rep.Report(source.NewFile(displayPath(args[0]), data), raw)

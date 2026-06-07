@@ -88,9 +88,9 @@ func integerIntrinsics() map[string]Intrinsic {
 		}),
 		OpEql:  binaryInt(func(a, b *big.Int) *ir.Constant { return ir.BoolConstant(a.Cmp(b) == 0) }),
 		OpNeq:  binaryInt(func(a, b *big.Int) *ir.Constant { return ir.BoolConstant(a.Cmp(b) != 0) }),
-		"lt":   binaryInt(func(a, b *big.Int) *ir.Constant { return ir.BoolConstant(a.Cmp(b) < 0) }),
+		OpLt:   binaryInt(func(a, b *big.Int) *ir.Constant { return ir.BoolConstant(a.Cmp(b) < 0) }),
 		OpLteq: binaryInt(func(a, b *big.Int) *ir.Constant { return ir.BoolConstant(a.Cmp(b) <= 0) }),
-		"gt":   binaryInt(func(a, b *big.Int) *ir.Constant { return ir.BoolConstant(a.Cmp(b) > 0) }),
+		OpGt:   binaryInt(func(a, b *big.Int) *ir.Constant { return ir.BoolConstant(a.Cmp(b) > 0) }),
 		OpGteq: binaryInt(func(a, b *big.Int) *ir.Constant { return ir.BoolConstant(a.Cmp(b) >= 0) }),
 	}
 }
@@ -132,9 +132,9 @@ func stringIntrinsics() map[string]Intrinsic {
 		"add":  binaryStr(func(a, b string) *ir.Constant { return ir.StringConstant(a + b) }),
 		OpEql:  binaryStr(func(a, b string) *ir.Constant { return ir.BoolConstant(a == b) }),
 		OpNeq:  binaryStr(func(a, b string) *ir.Constant { return ir.BoolConstant(a != b) }),
-		"lt":   binaryStr(func(a, b string) *ir.Constant { return ir.BoolConstant(a < b) }),
+		OpLt:   binaryStr(func(a, b string) *ir.Constant { return ir.BoolConstant(a < b) }),
 		OpLteq: binaryStr(func(a, b string) *ir.Constant { return ir.BoolConstant(a <= b) }),
-		"gt":   binaryStr(func(a, b string) *ir.Constant { return ir.BoolConstant(a > b) }),
+		OpGt:   binaryStr(func(a, b string) *ir.Constant { return ir.BoolConstant(a > b) }),
 		OpGteq: binaryStr(func(a, b string) *ir.Constant { return ir.BoolConstant(a >= b) }),
 	}
 }
@@ -189,9 +189,9 @@ func millisComparisons(kind ir.ConstKind) map[string]Intrinsic {
 	return map[string]Intrinsic{
 		OpEql:  binaryMillis(kind, kind, func(a, b int64) *ir.Constant { return ir.BoolConstant(a == b) }),
 		OpNeq:  binaryMillis(kind, kind, func(a, b int64) *ir.Constant { return ir.BoolConstant(a != b) }),
-		"lt":   binaryMillis(kind, kind, func(a, b int64) *ir.Constant { return ir.BoolConstant(a < b) }),
+		OpLt:   binaryMillis(kind, kind, func(a, b int64) *ir.Constant { return ir.BoolConstant(a < b) }),
 		OpLteq: binaryMillis(kind, kind, func(a, b int64) *ir.Constant { return ir.BoolConstant(a <= b) }),
-		"gt":   binaryMillis(kind, kind, func(a, b int64) *ir.Constant { return ir.BoolConstant(a > b) }),
+		OpGt:   binaryMillis(kind, kind, func(a, b int64) *ir.Constant { return ir.BoolConstant(a > b) }),
 		OpGteq: binaryMillis(kind, kind, func(a, b int64) *ir.Constant { return ir.BoolConstant(a >= b) }),
 	}
 }

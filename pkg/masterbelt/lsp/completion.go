@@ -558,8 +558,11 @@ func constantItems(doc view) []protocol.CompletionItem {
 func constructorItems(doc view) []protocol.CompletionItem {
 	kind := protocol.CompletionItemKindConstructor
 	snippet := protocol.InsertTextFormatSnippet
-	items := make([]protocol.CompletionItem, 0, len(doc.Constructors()))
-	for _, t := range doc.Constructors() {
+	// Constructors builds the in-scope type set (a sort per call), so it is
+	// read exactly once.
+	constructors := doc.Constructors()
+	items := make([]protocol.CompletionItem, 0, len(constructors))
+	for _, t := range constructors {
 		detail, insert := constructorSignature(t.Name)
 		item := protocol.CompletionItem{
 			Label:  t.Name,
