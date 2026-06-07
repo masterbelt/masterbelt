@@ -82,6 +82,11 @@ func checkTypeAgainst(e ast.Expr, want ir.Type, s scope, subst map[string]ir.Typ
 	// to ordinary identifier resolution (an undefined name).
 	if id, ok := e.(*ast.Identifier); ok {
 		if member := enumMemberExpectation(want, id.Name); member != nil {
+			// A member under a union expectation (R | error) flows into the
+			// union — an adaption the IR makes explicit.
+			if !types.Identical(member, want) {
+				sink.adapted(e, want)
+			}
 			return member
 		}
 	}
@@ -123,6 +128,15 @@ func checkTypeAgainst(e ast.Expr, want ir.Type, s scope, subst map[string]ir.Typ
 		if got != ir.Invalid {
 			if sel, _ := types.SelectUnionMember(s.registry(), got, want); sel == types.UnionAmbiguous {
 				sink.ambiguousUnionMember(e, got, want)
+				return got
+			}
+			// The walk accepted got at the differing expectation — an implicit
+			// adaption (a width settle, a nominal adaption, a union inflow) the
+			// IR makes explicit. The expectation re-substitutes because the
+			// Match above may have solved variables in it; one a variable
+			// survives in adapts at its monomorphized site, not here.
+			if to := types.Substitute(want, subst); !hasTypeVar(to) && !types.Identical(got, to) {
+				sink.adapted(e, to)
 			}
 		}
 		return got
@@ -740,20 +754,19 @@ func checkTernary(e *ast.TernaryExpr, want ir.Type, s scope, subst map[string]ir
 			sink.ternaryCondNotBool(e.Cond, condT)
 		}
 	}
-	var then, els ir.Type
 	if want != ir.Invalid {
-		then = checkType(e.Then, want, s, subst, sink)
-		els = checkType(e.Else, want, s, subst, sink)
-	} else {
-		then = checkOrInvalid(e.Then, s, sink)
-		els = checkOrInvalid(e.Else, s, sink)
+		// The expectation reaches into both branches — each reports its own
+		// mismatch, and each adapts to it where accepted — so it is the
+		// ternary's type: the branch values are carried at want, whatever
+		// their own synthesized types were.
+		checkType(e.Then, want, s, subst, sink)
+		checkType(e.Else, want, s, subst, sink)
+		return types.Substitute(want, subst)
 	}
+	then := checkOrInvalid(e.Then, s, sink)
+	els := checkOrInvalid(e.Else, s, sink)
 	if then == ir.Invalid || els == ir.Invalid {
-		// A branch was omitted or reported elsewhere; the result has no type, but
-		// an explicit expectation still stands as the ternary's type.
-		if want != ir.Invalid {
-			return want
-		}
+		// A branch was omitted or reported elsewhere; the result has no type.
 		return ir.Invalid
 	}
 	unified := types.Unify(s.registry(), then, els)

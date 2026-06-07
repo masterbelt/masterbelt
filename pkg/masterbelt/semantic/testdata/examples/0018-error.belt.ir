@@ -14,7 +14,7 @@ Module
   Func "parseLevel" pub
     param s: string
     result nint | error
-      return error(((StringLiteral "invalid level: " : string).add((ParamRef "s" : string)) : string))
+      return (adapt error(((StringLiteral "invalid level: " : string).add((ParamRef "s" : string)) : string)) : nint | error)
   Assert "error(\"x\").message() == \"x\""
     eval true
       error("x").message() == "x"

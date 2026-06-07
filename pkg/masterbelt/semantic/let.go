@@ -144,13 +144,30 @@ func checkAssign(s *ast.AssignStmt, bs infer.BodyScope, env eval.Env, noSelf fun
 	if enumDef := enumDefOf(want); enumDef != nil {
 		reportBareEnumMember(s.Value, enumDef, bs, env, at, diags)
 		if id, ok := s.Value.(*ast.Identifier); ok && enumIndex(enumDef, id.Name) >= 0 {
-			return // a bare member assigns at the enum's type; no mismatch
+			// A bare member assigns at the enum's type; no mismatch. When the
+			// local's type is a union carrying the enum (an alias like
+			// optional<Rarity>), the member flows into it — an adaption the IR
+			// makes explicit.
+			if member := (&ir.Named{Def: enumDef}); sink != nil && sink.Adapted != nil && !types.Identical(member, want) {
+				sink.Adapted(s.Value, want)
+			}
+			return
 		}
 	}
 	got := infer.CheckBody(s.Value, ir.Invalid, bs, sink)
-	if want != ir.Invalid && got != ir.Invalid && !types.Assignable(bs.Reg, got, want) {
+	if want == ir.Invalid || got == ir.Invalid {
+		return
+	}
+	if !types.Assignable(bs.Reg, got, want) {
 		c := at(s.Value)
 		diags.Add(newAssignTypeMismatchDiagnostic(c.offset, c.width, id.Name, got.String(), want.String()))
+		return
+	}
+	// The reassignment was accepted at the local's fixed type; a differing
+	// value type is an implicit adaption (a width settle, a union inflow) the
+	// IR makes explicit, exactly as a checked position's is.
+	if sink != nil && sink.Adapted != nil && !types.Identical(got, want) {
+		sink.Adapted(s.Value, want)
 	}
 }
 

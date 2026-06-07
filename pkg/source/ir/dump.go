@@ -481,6 +481,11 @@ func dumpValue(v Value) string {
 // the form).
 func dumpValueForm(v Value) (form, suffix string) {
 	switch x := v.(type) {
+	case *Adapt:
+		// "adapt <inner>" with the node's type wrap supplying the adapted-to
+		// type — (adapt (IntLiteral "1" : nint) : short) — so each adaption
+		// reads as the explicit step it is.
+		return "adapt " + dumpValue(x.Value), ""
 	case *IntLiteral:
 		return fmt.Sprintf("IntLiteral %q", x.Text), ""
 	case *StringLiteral:

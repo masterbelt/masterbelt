@@ -17,7 +17,7 @@ Module
     eval 6
   Const "Start"
     type Level
-    value (IntLiteral "10" : nint)
+    value (adapt (IntLiteral "10" : nint) : Level)
     eval 10
   Const "Eleven"
     type Level
@@ -25,7 +25,7 @@ Module
     eval 11
   Const "Thirteen"
     type Level
-    value ((Reference -> "Start" : Level).plus((IntLiteral "3" : nint)) : Level)
+    value ((Reference -> "Start" : Level).plus((adapt (IntLiteral "3" : nint) : sbyte)) : Level)
     eval 13
   Const "Three"
     type Level
@@ -53,7 +53,7 @@ Module
     method "increment" pub
       doc "The next level up — a self-returning method, so a chain keeps the type."
       result self
-      return ((self : Level).add((IntLiteral "1" : nint)) : Level)
+      return ((self : Level).add((adapt (IntLiteral "1" : nint) : Level)) : Level)
     method "plus" pub
       doc "This level a number of steps up. The base value lifts into the nominal"
       doc "type through the conversion: a Level derives sbyte's operators, but their"

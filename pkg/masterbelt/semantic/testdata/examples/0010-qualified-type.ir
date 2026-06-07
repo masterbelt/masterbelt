@@ -17,9 +17,9 @@ Module
 Module
   Const "start"
     type Point
-    value (Reference -> "Origin" : nint)
+    value (adapt (Reference -> "Origin" : nint) : Point)
     eval 0
   Const "path"
     type list<Point>
-    value ([(Reference -> "Origin" : nint), (Reference -> "Unit" : nint)] : list<Point>)
+    value ([(adapt (Reference -> "Origin" : nint) : Point), (adapt (Reference -> "Unit" : nint) : Point)] : list<Point>)
     eval [0, 1]

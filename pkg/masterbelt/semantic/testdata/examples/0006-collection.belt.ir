@@ -13,7 +13,7 @@ Module
     eval [10, 20, 30]
   Const "Bytes"
     type list<sbyte>
-    value ([(IntLiteral "1" : nint), (IntLiteral "2" : nint), (IntLiteral "3" : nint)] : list<sbyte>)
+    value ([(adapt (IntLiteral "1" : nint) : sbyte), (adapt (IntLiteral "2" : nint) : sbyte), (adapt (IntLiteral "3" : nint) : sbyte)] : list<sbyte>)
     eval [1, 2, 3]
   Const "EmptyList"
     type list<nint>

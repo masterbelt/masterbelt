@@ -95,11 +95,30 @@ type Value interface {
 	value()
 }
 
+// Adapt is an explicit adaption: Value carried at the type To — the node every
+// implicit conversion the checker accepted becomes, so nothing converts
+// silently in the IR (F-3 §2.2). The post-check write-back wraps a value at
+// each position whose expected type differs from the value's own: a default
+// integer literal settling into a sized one (Adapt to short), a value adapting
+// to a nominal type (Adapt to Level), and a value flowing into a union (Adapt
+// to the union — the inner value's type is the member it tags, the
+// ir.Constant.UnionTag the folder computes by the same member selection). The
+// adaptions nest where they compose: a literal into short | error settles to
+// short inside and tags the union outside. To is also the node's settled type.
+type Adapt struct {
+	Value Value
+	To    Type
+}
+
+func (*Adapt) value() {}
+
 // IntLiteral is an integer literal. Its Text is the literal as written; the
-// evaluated value lives on Const.Eval.
+// evaluated value lives on Const.Eval. Syntax is the literal this lowered from
+// — an editor/position anchor and write-back key only, never semantics.
 type IntLiteral struct {
-	Text string
-	Type Type
+	Text   string
+	Type   Type
+	Syntax *ast.IntLit
 }
 
 func (*IntLiteral) value() {}
@@ -107,16 +126,18 @@ func (*IntLiteral) value() {}
 // StringLiteral is a string literal. Value is the decoded string; the evaluated
 // value lives on Const.Eval (the same string).
 type StringLiteral struct {
-	Value string
-	Type  Type
+	Value  string
+	Type   Type
+	Syntax *ast.StringLit
 }
 
 func (*StringLiteral) value() {}
 
 // BoolLiteral is a boolean literal, true or false.
 type BoolLiteral struct {
-	Value bool
-	Type  Type
+	Value  bool
+	Type   Type
+	Syntax *ast.BoolLit
 }
 
 func (*BoolLiteral) value() {}
@@ -124,8 +145,9 @@ func (*BoolLiteral) value() {}
 // DatetimeLiteral is a datetime literal. Its Text is the literal as written;
 // the normalized UTC instant lives on Const.Eval.
 type DatetimeLiteral struct {
-	Text string
-	Type Type
+	Text   string
+	Type   Type
+	Syntax *ast.DatetimeLit
 }
 
 func (*DatetimeLiteral) value() {}
@@ -133,8 +155,9 @@ func (*DatetimeLiteral) value() {}
 // DurationLiteral is a duration literal. Its Text is the literal as written;
 // the totalled milliseconds live on Const.Eval.
 type DurationLiteral struct {
-	Text string
-	Type Type
+	Text   string
+	Type   Type
+	Syntax *ast.DurationLit
 }
 
 func (*DurationLiteral) value() {}
@@ -306,9 +329,11 @@ func (*FuncLiteral) value() {}
 
 // SelfValue is the method receiver (the self keyword) inside a method body.
 // Type is the enclosing type, filled by the write-back from the method's
-// owner.
+// owner. Syntax is the self expression this lowered from, or nil for the
+// implicit receiver of a bare self-method call.
 type SelfValue struct {
-	Type Type
+	Type   Type
+	Syntax *ast.SelfExpr
 }
 
 func (*SelfValue) value() {}
@@ -316,8 +341,9 @@ func (*SelfValue) value() {}
 // ParamRef is a use of a method parameter, by name. Type is the parameter's
 // declared type, read off the enclosing signature by the write-back.
 type ParamRef struct {
-	Name string
-	Type Type
+	Name   string
+	Type   Type
+	Syntax *ast.Identifier
 }
 
 func (*ParamRef) value() {}
@@ -328,8 +354,9 @@ func (*ParamRef) value() {}
 // from the body's mutable environment. Type is the binding's settled type, read
 // off the introducing Let (or match arm, or for variable) by the write-back.
 type LocalRef struct {
-	Name string
-	Type Type
+	Name   string
+	Type   Type
+	Syntax *ast.Identifier
 }
 
 func (*LocalRef) value() {}
@@ -355,8 +382,9 @@ func (*FieldAccess) value() {}
 // callee names, which is also the node's settled type (a conversion's type is
 // the type it names, whatever its arguments) — the one value form born typed.
 type Conversion struct {
-	Type Type
-	Args []Value
+	Type   Type
+	Args   []Value
+	Syntax *ast.CallExpr
 }
 
 // Value returns a single-argument conversion's argument — the common form
@@ -376,8 +404,9 @@ func (*Conversion) value() {}
 // nothing to its type — Type is the awaited value's, copied by the
 // write-back.
 type Await struct {
-	Value Value
-	Type  Type
+	Value  Value
+	Type   Type
+	Syntax *ast.AwaitExpr
 }
 
 func (*Await) value() {}
@@ -412,13 +441,15 @@ type RangeLit struct {
 	Upper    Value
 	HalfOpen bool
 	Type     Type
+	Syntax   *ast.RangeExpr
 }
 
 func (*RangeLit) value() {}
 
 // NullValue is the null literal.
 type NullValue struct {
-	Type Type
+	Type   Type
+	Syntax *ast.NullLit
 }
 
 func (*NullValue) value() {}
@@ -432,6 +463,10 @@ type EnumMemberValue struct {
 	Def   *TypeDef
 	Index int
 	Type  Type
+	// Syntax is the referring expression — a bare member (an identifier) or the
+	// qualified Rarity.Common (a member access); an anchor and write-back key
+	// only, never semantics.
+	Syntax ast.Expr
 }
 
 func (*EnumMemberValue) value() {}
@@ -446,6 +481,9 @@ func TypeOf(v Value) Type {
 	switch v := v.(type) {
 	case nil:
 		return nil
+	case *Adapt:
+		// An adaption's type is the type it adapts to.
+		return v.To
 	case *IntLiteral:
 		return v.Type
 	case *StringLiteral:
@@ -499,15 +537,149 @@ func TypeOf(v Value) Type {
 	}
 }
 
+// SyntaxOf returns the expression a value node lowered from — the editor's
+// position anchor and the post-check write-back's pairing key, never a carrier
+// of semantics. It is nil for a nil value, for a node lowered with no surface
+// form (the implicit self receiver of a bare method call, a property write's
+// synthetic setter call), and for an Adapt (a write-back construct with no
+// surface form of its own; its inner value carries the anchor). The switch is
+// exhaustive over the sealed Value forms; a new form panics here rather than
+// silently anchoring nowhere.
+func SyntaxOf(v Value) ast.Expr {
+	switch v := v.(type) {
+	case nil:
+		return nil
+	case *Adapt:
+		return SyntaxOf(v.Value)
+	case *IntLiteral:
+		if v.Syntax == nil {
+			return nil
+		}
+		return v.Syntax
+	case *StringLiteral:
+		if v.Syntax == nil {
+			return nil
+		}
+		return v.Syntax
+	case *BoolLiteral:
+		if v.Syntax == nil {
+			return nil
+		}
+		return v.Syntax
+	case *DatetimeLiteral:
+		if v.Syntax == nil {
+			return nil
+		}
+		return v.Syntax
+	case *DurationLiteral:
+		if v.Syntax == nil {
+			return nil
+		}
+		return v.Syntax
+	case *CollectionLiteral:
+		if v.Syntax == nil {
+			return nil
+		}
+		return v.Syntax
+	case *RecordValue:
+		if v.Syntax == nil {
+			return nil
+		}
+		return v.Syntax
+	case *Reference:
+		return v.Syntax // already the interface form; nil stays nil
+	case *Call:
+		if v.Syntax == nil {
+			return nil
+		}
+		return v.Syntax
+	case *FuncCall:
+		if v.Syntax == nil {
+			return nil
+		}
+		return v.Syntax
+	case *StaticCall:
+		if v.Syntax == nil {
+			return nil
+		}
+		return v.Syntax
+	case *Apply:
+		if v.Syntax == nil {
+			return nil
+		}
+		return v.Syntax
+	case *FuncLiteral:
+		if v.Syntax == nil {
+			return nil
+		}
+		return v.Syntax
+	case *SelfValue:
+		if v.Syntax == nil {
+			return nil
+		}
+		return v.Syntax
+	case *ParamRef:
+		if v.Syntax == nil {
+			return nil
+		}
+		return v.Syntax
+	case *LocalRef:
+		if v.Syntax == nil {
+			return nil
+		}
+		return v.Syntax
+	case *FieldAccess:
+		if v.Syntax == nil {
+			return nil
+		}
+		return v.Syntax
+	case *Conversion:
+		if v.Syntax == nil {
+			return nil
+		}
+		return v.Syntax
+	case *Await:
+		if v.Syntax == nil {
+			return nil
+		}
+		return v.Syntax
+	case *Ternary:
+		if v.Syntax == nil {
+			return nil
+		}
+		return v.Syntax
+	case *RangeLit:
+		if v.Syntax == nil {
+			return nil
+		}
+		return v.Syntax
+	case *NullValue:
+		if v.Syntax == nil {
+			return nil
+		}
+		return v.Syntax
+	case *EnumMemberValue:
+		return v.Syntax // already the interface form; nil stays nil
+	case *AssocConstValue:
+		if v.Syntax == nil {
+			return nil
+		}
+		return v.Syntax
+	default:
+		panic(fmt.Sprintf("ir: unhandled Value kind %T", v))
+	}
+}
+
 // AssocConstValue is a resolved reference to a type's associated constant,
 // written TypeName.Name (int8.Max, Level.Max). Def is the owning type and Index
 // the constant's position in Def.Consts; the name, type, and folded value are
 // read from Def.Consts[Index]. The evaluated value lives on Const.Eval, as for
 // every other value form.
 type AssocConstValue struct {
-	Def   *TypeDef
-	Index int
-	Type  Type
+	Def    *TypeDef
+	Index  int
+	Type   Type
+	Syntax *ast.MemberExpr
 }
 
 func (*AssocConstValue) value() {}

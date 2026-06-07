@@ -32,7 +32,7 @@ func (b constBinder) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
 		// The null literal is a value like any other (const Absent:
 		// optional<nint> = null), so the graph carries it; whether null fits
 		// the declared type is the checker's question.
-		return &ir.NullValue{}
+		return &ir.NullValue{Syntax: e}
 	case *ast.Identifier:
 		if target := b.q.resolve(b.file, e); target != nil {
 			return &ir.Reference{Target: b.irOf[target], Syntax: e}
@@ -41,7 +41,7 @@ func (b constBinder) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
 		// Legend). The expectation is the const's own annotation, so it only
 		// reaches a bare name that is the whole initializer.
 		if idx := enumIndex(b.expected, e.Name); idx >= 0 {
-			return &ir.EnumMemberValue{Def: b.expected, Index: idx}
+			return &ir.EnumMemberValue{Def: b.expected, Index: idx, Syntax: e}
 		}
 	case *ast.MemberExpr:
 		if target := b.q.resolveMember(b.file, e); target != nil {
@@ -49,12 +49,12 @@ func (b constBinder) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
 		}
 		// A member access whose receiver names an enum type (Rarity.Common).
 		if def, idx := enumMemberAccess(b.q.universe(b.file), e); idx >= 0 {
-			return &ir.EnumMemberValue{Def: def, Index: idx}
+			return &ir.EnumMemberValue{Def: def, Index: idx, Syntax: e}
 		}
 		// A member access whose receiver names a type and whose member names one
 		// of its associated constants (int8.Max, Level.Max).
 		if def, idx := assocConstAccess(b.q.universe(b.file), e); idx >= 0 {
-			return &ir.AssocConstValue{Def: def, Index: idx}
+			return &ir.AssocConstValue{Def: def, Index: idx, Syntax: e}
 		}
 		// Otherwise the receiver is a value: a field access on a record-typed
 		// constant (Hero.lv), reading the field — the same value form a method body
@@ -70,7 +70,7 @@ func (b constBinder) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
 				if def.Builtin {
 					t = &ir.Builtin{Name: def.Name}
 				}
-				return &ir.Conversion{Type: t, Args: convArgs(e.Arguments, sub)}
+				return &ir.Conversion{Type: t, Args: convArgs(e.Arguments, sub), Syntax: e}
 			}
 			if cands := b.q.resolveFunc(b.file, callee); len(cands) > 0 {
 				return funcCall(b.fnOf[pickOverload(cands, len(e.Arguments))], e, sub)
@@ -363,12 +363,13 @@ func (b bodyBinder) AnnotationEnum(t ast.TypeExpr) *ir.TypeDef {
 	return enumDefOf(b.r.ResolveType(t, b.tscope))
 }
 
-// EnumMember resolves a bare member name against an enum definition to its
-// enum-member value, or nil when def has no such member — the bare-member rule
-// a switch arm shares with a const initializer.
-func (b bodyBinder) EnumMember(def *ir.TypeDef, name string) ir.Value {
-	if idx := enumIndex(def, name); idx >= 0 {
-		return &ir.EnumMemberValue{Def: def, Index: idx}
+// EnumMember resolves a bare member identifier against an enum definition to
+// its enum-member value, or nil when def has no such member — the bare-member
+// rule a switch arm shares with a const initializer. The identifier rides
+// along as the node's Syntax anchor.
+func (b bodyBinder) EnumMember(def *ir.TypeDef, id *ast.Identifier) ir.Value {
+	if idx := enumIndex(def, id.Name); idx >= 0 {
+		return &ir.EnumMemberValue{Def: def, Index: idx, Syntax: id}
 	}
 	return nil
 }
@@ -448,17 +449,17 @@ func (b bodyBinder) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
 		if !b.self {
 			return nil // a function body has no receiver
 		}
-		return &ir.SelfValue{}
+		return &ir.SelfValue{Syntax: e}
 	case *ast.NullLit:
-		return &ir.NullValue{}
+		return &ir.NullValue{Syntax: e}
 	case *ast.Identifier:
 		// A let-bound local shadows a same-named parameter or type, so it is
 		// resolved first.
 		if _, ok := b.locals[e.Name]; ok {
-			return &ir.LocalRef{Name: e.Name}
+			return &ir.LocalRef{Name: e.Name, Syntax: e}
 		}
 		if b.params[e.Name] {
-			return &ir.ParamRef{Name: e.Name}
+			return &ir.ParamRef{Name: e.Name, Syntax: e}
 		}
 		return nil
 	case *ast.MemberExpr:
@@ -470,11 +471,11 @@ func (b bodyBinder) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
 			if def := b.r.Defs[recv.Name]; def != nil {
 				if def.Enum != nil {
 					if idx := enumIndex(def, e.Member.Name); idx >= 0 {
-						return &ir.EnumMemberValue{Def: def, Index: idx}
+						return &ir.EnumMemberValue{Def: def, Index: idx, Syntax: e}
 					}
 				}
 				if idx := assocConstIndex(def, e.Member.Name); idx >= 0 {
-					return &ir.AssocConstValue{Def: def, Index: idx}
+					return &ir.AssocConstValue{Def: def, Index: idx, Syntax: e}
 				}
 			}
 		}
@@ -490,7 +491,7 @@ func (b bodyBinder) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
 				return nil
 			}
 			if t := b.r.ResolveName(callee.Name, b.tscope); t != ir.Invalid {
-				return &ir.Conversion{Type: t, Args: convArgs(e.Arguments, sub)}
+				return &ir.Conversion{Type: t, Args: convArgs(e.Arguments, sub), Syntax: e}
 			}
 			if cands := b.funcs.local[callee.Name]; len(cands) > 0 {
 				return funcCall(pickShellOverload(cands, len(e.Arguments)), e, sub)
@@ -661,10 +662,10 @@ func (b funcBinder) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
 	case *ast.Identifier:
 		// A let-bound local shadows a same-named parameter, so it is read first.
 		if _, ok := b.scope.locals[e.Name]; ok {
-			return &ir.LocalRef{Name: e.Name}
+			return &ir.LocalRef{Name: e.Name, Syntax: e}
 		}
 		if b.scope.params[e.Name] {
-			return &ir.ParamRef{Name: e.Name}
+			return &ir.ParamRef{Name: e.Name, Syntax: e}
 		}
 	case *ast.CallExpr:
 		if id, ok := e.Callee.(*ast.Identifier); ok && b.scope.shadows(id.Name) {
@@ -709,11 +710,11 @@ func (b funcBinder) AnnotationEnum(t ast.TypeExpr) *ir.TypeDef {
 	return b.scope.AnnotationEnum(t)
 }
 
-// EnumMember resolves a bare member name against an enum definition to its
-// enum-member value — the bare-member rule a switch arm shares with a const
-// initializer, delegated to the lambda's scope.
-func (b funcBinder) EnumMember(def *ir.TypeDef, name string) ir.Value {
-	return b.scope.EnumMember(def, name)
+// EnumMember resolves a bare member identifier against an enum definition to
+// its enum-member value — the bare-member rule a switch arm shares with a
+// const initializer, delegated to the lambda's scope.
+func (b funcBinder) EnumMember(def *ir.TypeDef, id *ast.Identifier) ir.Value {
+	return b.scope.EnumMember(def, id)
 }
 
 // ArmType resolves a match arm's member type within the lambda body, delegated

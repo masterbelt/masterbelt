@@ -60,6 +60,11 @@ func exprSink(at func(ast.Node) span, diags *diagnostic.List, res *callResolutio
 				res.types[e] = t
 			}
 		},
+		Adapted: func(e ast.Expr, to ir.Type) {
+			if res != nil {
+				res.adapts[e] = to
+			}
+		},
 		InvalidOp: func(node ast.Node, method, operands string) {
 			s := at(node)
 			diags.Add(newInvalidOperationDiagnostic(s.offset, s.width, method, operands))
@@ -402,7 +407,7 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 	// Every checking walk has run: bind the checker-selected overloads into the
 	// IR (the doctrine that every reference is bound to its declaration, met
 	// for overloaded calls) and arm them for evaluation.
-	writeBackResolutions(module, res, fnShells)
+	writeBackResolutions(module, res, fnShells, reg)
 	ownShells := make(map[*ast.ConstDecl]*ir.Const, len(file.Decls))
 	for _, decl := range file.Decls {
 		ownShells[decl] = shells[decl]

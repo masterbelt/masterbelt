@@ -119,7 +119,7 @@ func TestBareMemberUnionAlias(t *testing.T) {
 		t.Fatalf("unexpected diagnostics: %v", codes(diags))
 	}
 	dump := ir.Dump(m)
-	if !containsLine(dump, `let "r": Opt = (Rarity.Legend : Rarity)`) {
+	if !containsLine(dump, `let "r": Opt = (adapt (Rarity.Legend : Rarity) : Opt)`) {
 		t.Errorf("union alias let init did not resolve the bare member:\n%s", dump)
 	}
 }
@@ -132,7 +132,7 @@ func TestBareMemberUnionAliasConst(t *testing.T) {
 		t.Fatalf("unexpected diagnostics: %v", codes(diags))
 	}
 	dump := ir.Dump(m)
-	if !containsLine(dump, "value (Rarity.Legend : Rarity)") || !containsLine(dump, "eval Rarity.Legend") {
+	if !containsLine(dump, "value (adapt (Rarity.Legend : Rarity) : Opt)") || !containsLine(dump, "eval Rarity.Legend") {
 		t.Errorf("union alias const did not resolve/fold the bare member:\n%s", dump)
 	}
 }

@@ -16,5 +16,5 @@ Module
 Module
   Const "start"
     type Point
-    value (Reference -> "Origin" : nint)
+    value (adapt (Reference -> "Origin" : nint) : Point)
     eval 0

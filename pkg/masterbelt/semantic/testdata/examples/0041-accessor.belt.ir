@@ -58,7 +58,7 @@ Module
     method "full" pub static
       doc "A full health bar."
       result Health
-      return (Health.Max : nint)
+      return (adapt (Health.Max : nint) : Health)
     method "band" pub getter
       doc "The health expressed in tens (the band a UI shows)."
       result nint

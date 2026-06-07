@@ -67,12 +67,13 @@ type LocalBinder interface {
 	LetLocal(name string, annotation ast.TypeExpr, value ast.Expr) (Binder, ir.Type)
 }
 
-// EnumMemberResolver resolves a bare member name against an enum definition to
-// its IR value — the same resolution a const initializer's bare member uses.
-// The lower package has no enum machinery of its own, so the semantic layer
+// EnumMemberResolver resolves a bare member identifier against an enum
+// definition to its IR value — the same resolution a const initializer's bare
+// member uses; the identifier rides along as the value's Syntax anchor. The
+// lower package has no enum machinery of its own, so the semantic layer
 // supplies this when it constructs a body binder.
 type EnumMemberResolver interface {
-	EnumMember(def *ir.TypeDef, name string) ir.Value
+	EnumMember(def *ir.TypeDef, id *ast.Identifier) ir.Value
 }
 
 // MatchBinder is the optional capability a body binder advertises to lower a
@@ -117,15 +118,15 @@ type ForBinder interface {
 func Value(e ast.Expr, b Binder) ir.Value {
 	switch e := e.(type) {
 	case *ast.IntLit:
-		return &ir.IntLiteral{Text: e.Text}
+		return &ir.IntLiteral{Text: e.Text, Syntax: e}
 	case *ast.StringLit:
-		return &ir.StringLiteral{Value: e.Value}
+		return &ir.StringLiteral{Value: e.Value, Syntax: e}
 	case *ast.BoolLit:
-		return &ir.BoolLiteral{Value: e.Value}
+		return &ir.BoolLiteral{Value: e.Value, Syntax: e}
 	case *ast.DatetimeLit:
-		return &ir.DatetimeLiteral{Text: e.Text}
+		return &ir.DatetimeLiteral{Text: e.Text, Syntax: e}
 	case *ast.DurationLit:
-		return &ir.DurationLiteral{Text: e.Text}
+		return &ir.DurationLiteral{Text: e.Text, Syntax: e}
 	case *ast.CollectionLit:
 		entries := make([]ir.CollectionEntry, len(e.Entries))
 		for i, entry := range e.Entries {
@@ -181,7 +182,7 @@ func Value(e ast.Expr, b Binder) ir.Value {
 	case *ast.AwaitExpr:
 		// await wraps its operand: it marks the suspension point, adding
 		// nothing to the value.
-		return &ir.Await{Value: Value(e.Value, b)}
+		return &ir.Await{Value: Value(e.Value, b), Syntax: e}
 	case *ast.TernaryExpr:
 		// cond ? then : else: the three operands lower as ordinary values; the
 		// choice between the branches is the runtime's (and the folder's), so the
@@ -191,7 +192,7 @@ func Value(e ast.Expr, b Binder) ir.Value {
 		// lo..hi keeps its own node rather than lowering to a range(...) Conversion:
 		// the direction and the half-open trim depend on the bound values, settled
 		// by the fold. Both bounds lower as ordinary values.
-		return &ir.RangeLit{Lower: Value(e.Lower, b), Upper: Value(e.Upper, b), HalfOpen: e.HalfOpen}
+		return &ir.RangeLit{Lower: Value(e.Lower, b), Upper: Value(e.Upper, b), HalfOpen: e.HalfOpen, Syntax: e}
 	case *ast.FuncLit:
 		// The body lowers in a binder that binds the literal's parameters; its
 		// own parameter values are supplied at evaluation, not here.
@@ -435,7 +436,7 @@ func (b expectingEnum) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
 		return v
 	}
 	if id, ok := e.(*ast.Identifier); ok {
-		if v := b.res.EnumMember(b.def, id.Name); v != nil {
+		if v := b.res.EnumMember(b.def, id); v != nil {
 			return v
 		}
 	}

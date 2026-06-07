@@ -1,7 +1,7 @@
 Module
   Const "Hello"
     type Tag
-    value (StringLiteral "hello" : string)
+    value (adapt (StringLiteral "hello" : string) : Tag)
     eval "hello"
   Const "World"
     type string
@@ -9,15 +9,15 @@ Module
     eval "world"
   Const "There"
     type Tag
-    value (Reference -> "World" : string)
+    value (adapt (Reference -> "World" : string) : Tag)
     eval "world"
   Const "Greeting"
     type Tag
-    value (((Reference -> "Hello" : Tag).add((StringLiteral " " : string)) : Tag).add((Reference -> "There" : Tag)) : Tag)
+    value (((Reference -> "Hello" : Tag).add((adapt (StringLiteral " " : string) : Tag)) : Tag).add((Reference -> "There" : Tag)) : Tag)
     eval "hello world"
   Const "SameTag"
     type bool
-    value ((Reference -> "Hello" : Tag).eql((StringLiteral "hello" : string)) : bool)
+    value ((Reference -> "Hello" : Tag).eql((adapt (StringLiteral "hello" : string) : Tag)) : bool)
     eval true
   Const "OtherTag"
     type bool
@@ -25,19 +25,19 @@ Module
     eval true
   Const "North"
     type Direction
-    value (StringLiteral "north" : string)
+    value (adapt (StringLiteral "north" : string) : Direction)
     eval "north"
   Const "South"
     type Direction
-    value (StringLiteral "south" : string)
+    value (adapt (StringLiteral "south" : string) : Direction)
     eval "south"
   Const "Ok"
     type Labeled
-    value (StringLiteral "tagged" : string)
+    value (adapt (adapt (StringLiteral "tagged" : string) : Tag) : Labeled)
     eval (Tag) "tagged"
   Const "FromOk"
     type Tag
-    value (label((StringLiteral "done" : string)) : Tag)
+    value (label((adapt (adapt (StringLiteral "done" : string) : Tag) : Labeled)) : Tag)
     eval "done"
   TypeDef "Tag" pub
     body string
@@ -53,7 +53,7 @@ Module
         arm Tag t
           return (LocalRef "t" : Tag)
         arm error e
-          return (StringLiteral "error" : string)
+          return (adapt (StringLiteral "error" : string) : Tag)
   Assert "Hello == \"hello\""
     eval true
       Hello == "hello"

@@ -8,7 +8,7 @@ Module
     method "increment" pub
       doc "The next level up."
       result self
-      return ((self : Level).add((IntLiteral "1" : nint)) : Level)
+      return ((self : Level).add((adapt (IntLiteral "1" : nint) : Level)) : Level)
   TypeDef "GameValue" pub
     doc "Any value the game can score: a Coin or a Level."
     body Coin | Level
@@ -26,7 +26,7 @@ Module
     method "game_id" pub
       doc "The record's id widened into the game's id space."
       result int
-      return (int(((self : Record).id : sbyte)).mul((IntLiteral "1000" : nint)) : int)
+      return (int(((self : Record).id : sbyte)).mul((adapt (IntLiteral "1000" : nint) : int)) : int)
   TypeDef "Mapper" pub
     doc "A mapping from T to R."
     param "T"

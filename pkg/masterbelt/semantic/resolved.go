@@ -11,6 +11,8 @@
 package semantic
 
 import (
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/types"
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
 )
@@ -29,6 +31,11 @@ type callResolutions struct {
 	funcs   map[*ast.CallExpr]*ast.FuncDecl
 	substs  map[*ast.CallExpr]map[string]ir.Type
 	types   map[ast.Expr]ir.Type
+	// adapts accumulates the Adapted stream: the positions where the checker
+	// accepted a value at a differing expectation, keyed by the expression,
+	// with the adapted-to type — the write-back wraps each one in an explicit
+	// ir.Adapt (F-3 §2.2).
+	adapts map[ast.Expr]ir.Type
 }
 
 func newCallResolutions() *callResolutions {
@@ -38,6 +45,7 @@ func newCallResolutions() *callResolutions {
 		funcs:   map[*ast.CallExpr]*ast.FuncDecl{},
 		substs:  map[*ast.CallExpr]map[string]ir.Type{},
 		types:   map[ast.Expr]ir.Type{},
+		adapts:  map[ast.Expr]ir.Type{},
 	}
 }
 
@@ -98,11 +106,11 @@ func (e resolvedEnv) ResolvedStatic(call *ast.CallExpr) *ast.MethodDecl {
 // the module carries: the constants' value graphs and the function and method
 // bodies (an associated constant carries no value graph — only its folded
 // value — so there is nothing to bind there).
-func writeBackResolutions(module *ir.Module, res *callResolutions, fnShells map[*ast.FuncDecl]*ir.Function) {
-	w := resolutionWriter{res: res, fnShells: fnShells}
+func writeBackResolutions(module *ir.Module, res *callResolutions, fnShells map[*ast.FuncDecl]*ir.Function, reg *builtin.Registry) {
+	w := resolutionWriter{res: res, fnShells: fnShells, reg: reg}
 	for _, c := range module.Consts {
 		if c != nil {
-			w.value(c.Value, bindings{})
+			c.Value = w.value(c.Value, bindings{})
 		}
 	}
 	for _, fn := range module.Funcs {
@@ -170,30 +178,39 @@ func (bd bindings) withLocal(name string, typ ir.Type) bindings {
 type resolutionWriter struct {
 	res      *callResolutions
 	fnShells map[*ast.FuncDecl]*ir.Function
+	reg      *builtin.Registry
 }
 
 // value binds one value graph's nodes to the checker's facts — the overload
-// selections, the solved substitutions, and the settled types — recursing
-// through every composite form. Every assignment is unconditional: a
-// method-body node lives on the memoized type definition, so a fact written
-// by an earlier assemble must be cleared when the current walk recorded none
-// rather than surviving stale. The switch lists every form explicitly so an
-// omission stays deliberate.
-func (w resolutionWriter) value(v ir.Value, bd bindings) {
+// selections, the solved substitutions, the settled types, and the accepted
+// adaptions — recursing through every composite form and returning the node
+// (wrapped in an explicit ir.Adapt where the checker accepted it at a
+// differing expectation), so the caller stores the adapted graph back into
+// its slot. Every assignment is unconditional: a method-body node lives on
+// the memoized type definition, so a fact written by an earlier assemble must
+// be cleared when the current walk recorded none rather than surviving stale
+// — an Adapt wrapper from an earlier assemble is stripped on entry and
+// rebuilt fresh for the same reason. The switch lists every form explicitly
+// so an omission stays deliberate.
+func (w resolutionWriter) value(v ir.Value, bd bindings) ir.Value {
 	switch v := v.(type) {
+	case *ir.Adapt:
+		// A wrapper from an earlier assemble on a memoized body: rebuild from
+		// the inner node, so a stale adaption never survives an edit.
+		return w.value(v.Value, bd)
 	case *ir.Call:
 		v.Resolved = w.res.methods[v.Syntax]
 		v.Subst = w.res.substs[v.Syntax]
-		w.value(v.Receiver, bd)
-		for _, a := range v.Args {
-			w.value(a, bd)
+		v.Receiver = w.value(v.Receiver, bd)
+		for i, a := range v.Args {
+			v.Args[i] = w.value(a, bd)
 		}
 		if v.Setter && v.Syntax == nil {
 			// The synthetic call a property write lowers to has no call
 			// expression of its own; it computes the receiver local's next
 			// value, so its type is the receiver's.
 			v.Type = ir.TypeOf(v.Receiver)
-			return
+			return v
 		}
 		v.Type = w.res.types[v.Syntax]
 	case *ir.FuncCall:
@@ -206,55 +223,55 @@ func (w resolutionWriter) value(v ir.Value, bd bindings) {
 		}
 		v.Subst = w.res.substs[v.Syntax]
 		v.Type = w.res.types[v.Syntax]
-		for _, a := range v.Args {
-			w.value(a, bd)
+		for i, a := range v.Args {
+			v.Args[i] = w.value(a, bd)
 		}
 	case *ir.StaticCall:
 		v.Resolved = w.res.statics[v.Syntax]
 		v.Subst = w.res.substs[v.Syntax]
 		v.Type = w.res.types[v.Syntax]
-		for _, a := range v.Args {
-			w.value(a, bd)
+		for i, a := range v.Args {
+			v.Args[i] = w.value(a, bd)
 		}
 	case *ir.Apply:
 		v.Type = w.res.types[v.Syntax]
-		w.value(v.Callee, bd)
-		for _, a := range v.Args {
-			w.value(a, bd)
+		v.Callee = w.value(v.Callee, bd)
+		for i, a := range v.Args {
+			v.Args[i] = w.value(a, bd)
 		}
 	case *ir.CollectionLiteral:
 		v.Type = w.res.types[v.Syntax]
-		for _, e := range v.Entries {
-			w.value(e.Key, bd)
-			w.value(e.Value, bd)
+		for i, e := range v.Entries {
+			v.Entries[i].Key = w.value(e.Key, bd)
+			v.Entries[i].Value = w.value(e.Value, bd)
 		}
 	case *ir.RecordValue:
 		v.Type = w.res.types[v.Syntax]
-		for _, f := range v.Fields {
-			w.value(f.Value, bd)
+		for i, f := range v.Fields {
+			v.Fields[i].Value = w.value(f.Value, bd)
 		}
 	case *ir.Conversion:
 		// Born typed: its target is its type. Only the arguments take facts.
-		for _, a := range v.Args {
-			w.value(a, bd)
+		for i, a := range v.Args {
+			v.Args[i] = w.value(a, bd)
 		}
 	case *ir.FieldAccess:
 		v.Type = w.res.types[v.Syntax]
-		w.value(v.Receiver, bd)
+		v.Receiver = w.value(v.Receiver, bd)
 	case *ir.Await:
 		// await adds nothing to its operand's type.
-		w.value(v.Value, bd)
+		v.Value = w.value(v.Value, bd)
 		v.Type = ir.TypeOf(v.Value)
 	case *ir.Ternary:
 		v.Type = w.res.types[v.Syntax]
-		w.value(v.Cond, bd)
-		w.value(v.Then, bd)
-		w.value(v.Else, bd)
+		v.Cond = w.value(v.Cond, bd)
+		v.Then = w.value(v.Then, bd)
+		v.Else = w.value(v.Else, bd)
 	case *ir.RangeLit:
 		// Every range literal is the range builtin, whatever its bounds.
 		v.Type = &ir.Builtin{Name: "range"}
-		w.value(v.Lower, bd)
-		w.value(v.Upper, bd)
+		v.Lower = w.value(v.Lower, bd)
+		v.Upper = w.value(v.Upper, bd)
 	case *ir.FuncLiteral:
 		// The literal's own type is the checker-solved signature; its body
 		// then walks with the parameters bound at the solved types (the
@@ -295,7 +312,42 @@ func (w resolutionWriter) value(v ir.Value, bd bindings) {
 		v.Type = &ir.Builtin{Name: "null"}
 	case nil:
 		// A hole in the graph (a recovered expression): nothing to bind.
+		return nil
 	}
+	return w.wrapAdapt(v)
+}
+
+// wrapAdapt wraps a settled node in the explicit adaption the checker
+// accepted at its position, when one was streamed (Adapted, keyed by the
+// node's syntax): a value flowing into a union settles its member inside (the
+// width/nominal adaption) and tags the union outside — the same member
+// selection (types.SelectUnionMember) the checker and the folder use, so the
+// three layers cannot disagree on the tag. A node whose type already is the
+// expectation, or whose type never settled, wraps nothing.
+func (w resolutionWriter) wrapAdapt(v ir.Value) ir.Value {
+	key := ir.SyntaxOf(v)
+	if key == nil {
+		return v
+	}
+	to := w.res.adapts[key]
+	if to == nil {
+		return v
+	}
+	t := ir.TypeOf(v)
+	if t == nil || types.Identical(t, to) {
+		return v
+	}
+	out := v
+	if sel, member := types.SelectUnionMember(w.reg, t, to); sel == types.UnionUnique {
+		// The member the value tags: settle into it first when the value's own
+		// type is not already the member (an nint literal into short | error
+		// settles to short), then tag the union.
+		if !types.Identical(t, member) {
+			out = &ir.Adapt{Value: out, To: member}
+		}
+		return &ir.Adapt{Value: out, To: to}
+	}
+	return &ir.Adapt{Value: out, To: to}
 }
 
 // lambdaBindings extends the binding context for a function literal's body:
@@ -328,27 +380,27 @@ func (w resolutionWriter) stmts(body []ir.Stmt, bd bindings) {
 	for _, s := range body {
 		switch s := s.(type) {
 		case *ir.Return:
-			w.value(s.Value, bd)
+			s.Value = w.value(s.Value, bd)
 		case *ir.ExprStmt:
-			w.value(s.Value, bd)
+			s.Value = w.value(s.Value, bd)
 		case *ir.Let:
-			w.value(s.Value, bd)
+			s.Value = w.value(s.Value, bd)
 			if s.Name != "" {
 				bd = bd.withLocal(s.Name, s.Type)
 			}
 		case *ir.Assign:
-			w.value(s.Value, bd)
+			s.Value = w.value(s.Value, bd)
 		case *ir.Switch:
-			w.value(s.Scrutinee, bd)
+			s.Scrutinee = w.value(s.Scrutinee, bd)
 			for _, arm := range s.Arms {
-				for _, pat := range arm.Values {
-					w.value(pat, bd)
+				for i, pat := range arm.Values {
+					arm.Values[i] = w.value(pat, bd)
 				}
 				w.stmts(arm.Body, bd)
 			}
 			w.stmts(s.Else, bd)
 		case *ir.Match:
-			w.value(s.Scrutinee, bd)
+			s.Scrutinee = w.value(s.Scrutinee, bd)
 			for _, arm := range s.Arms {
 				abd := bd
 				if arm.Name != "" {
@@ -358,14 +410,14 @@ func (w resolutionWriter) stmts(body []ir.Stmt, bd bindings) {
 			}
 			w.stmts(s.Else, bd)
 		case *ir.If:
-			w.value(s.Cond, bd)
+			s.Cond = w.value(s.Cond, bd)
 			w.stmts(s.Then, bd)
 			if s.ElseIf != nil {
 				w.stmts([]ir.Stmt{s.ElseIf}, bd)
 			}
 			w.stmts(s.Else, bd)
 		case *ir.For:
-			w.value(s.Iter, bd)
+			s.Iter = w.value(s.Iter, bd)
 			fbd := bd
 			if s.Var != "" {
 				fbd = bd.withLocal(s.Var, s.VarType)

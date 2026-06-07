@@ -195,6 +195,15 @@ func SelectUnionMember(reg *builtin.Registry, from, to ir.Type) (UnionSelection,
 	}
 }
 
+// Identical reports whether two types are structurally identical — the same
+// builtin, the same definition, the same application, member-wise the same
+// union — the exported reading of the tagging rule's sameType. It is identity,
+// not assignability: nint is not identical to short, which is exactly what an
+// adaption-detection caller (the Adapt write-back) wants to know.
+func Identical(a, b ir.Type) bool {
+	return sameType(a, b)
+}
+
 // sameType reports whether two types are the same member for tagging purposes:
 // the same builtin (by name), the same nominal type (by definition), the same
 // generic application, or the same union (member-wise). It is structural

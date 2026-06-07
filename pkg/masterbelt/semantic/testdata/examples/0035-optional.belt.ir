@@ -1,23 +1,23 @@
 Module
   Const "Present"
     type optional<nint>
-    value (IntLiteral "5" : nint)
+    value (adapt (IntLiteral "5" : nint) : optional<nint>)
     eval (nint) 5
   Const "Absent"
     type optional<nint>
-    value (null : null)
+    value (adapt (null : null) : optional<nint>)
     eval (null) null
   Const "FromPresent"
     type nint
-    value (orZero((IntLiteral "5" : nint)) : nint)
+    value (orZero((adapt (IntLiteral "5" : nint) : optional<nint>)) : nint)
     eval 5
   Const "FromAbsent"
     type nint
-    value (orZero((null : null)) : nint)
+    value (orZero((adapt (null : null) : optional<nint>)) : nint)
     eval 0
   Const "WithFallback"
     type nint
-    value (orFallback((null : null), (IntLiteral "99" : nint)) : nint)
+    value (orFallback((adapt (null : null) : optional<nint>), (IntLiteral "99" : nint)) : nint)
     eval 99
   Func "orZero" pub
     param v: optional<nint>

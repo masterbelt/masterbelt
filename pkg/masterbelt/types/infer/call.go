@@ -69,7 +69,7 @@ func callType(e *ast.CallExpr, s scope, sink *Sink) ir.Type {
 		if id, isIdent := e.Callee.(*ast.Identifier); isIdent {
 			if selfT := s.self(); selfT != ir.Invalid {
 				if _, _, found := types.Candidates(s.registry(), selfT, id.Name); found {
-					return methodCallType(e, selfT, id.Name, s, sink)
+					return methodCallType(e, nil, selfT, id.Name, s, sink)
 				}
 			}
 		}
@@ -87,14 +87,15 @@ func callType(e *ast.CallExpr, s scope, sink *Sink) ir.Type {
 	if t, ok := staticCallType(e, member, s, sink); ok {
 		return t
 	}
-	return methodCallType(e, check(member.Receiver, s, sink), member.Member.Name, s, sink)
+	return methodCallType(e, member.Receiver, check(member.Receiver, s, sink), member.Member.Name, s, sink)
 }
 
 // methodCallType is the method-call half of callType: the receiver's type is
 // already settled (synthesized from the member callee's receiver, or self for
-// an implicit self-call), and the call resolves the named method's overload
-// set against the argument types bidirectionally.
-func methodCallType(e *ast.CallExpr, recv ir.Type, method string, s scope, sink *Sink) ir.Type {
+// an implicit self-call — recvExpr is the receiver expression, or nil for the
+// implicit form), and the call resolves the named method's overload set
+// against the argument types bidirectionally.
+func methodCallType(e *ast.CallExpr, recvExpr ast.Expr, recv ir.Type, method string, s scope, sink *Sink) ir.Type {
 	reg := s.registry()
 	bad := recv == ir.Invalid
 	args := make([]ir.Type, len(e.Arguments))
@@ -212,6 +213,7 @@ func methodCallType(e *ast.CallExpr, recv ir.Type, method string, s scope, sink 
 		if len(subst) > 0 {
 			sink.callSubst(e, subst)
 		}
+		adaptedOperands(e, recvExpr, recv, m, subst, operand, args, sink)
 		return operand
 	}
 	result := types.Substitute(m.Result, subst)
@@ -225,7 +227,37 @@ func methodCallType(e *ast.CallExpr, recv ir.Type, method string, s scope, sink 
 	if len(subst) > 0 {
 		sink.callSubst(e, subst)
 	}
+	adaptedOperands(e, recvExpr, recv, m, subst, operand, args, sink)
 	return result
+}
+
+// adaptedOperands streams the adaptions a settled method call accepted on its
+// operands: each pass-1 argument whose type differs from its (substituted)
+// parameter type, a self-typed argument or the receiver differing from the
+// unified operand (the default integer adapting to the sized receiver, and
+// vice versa). The pass-2 literal arguments streamed through their own
+// checking walk, so only the synthesized ones are read here. A parameter that
+// still carries an unsolved variable adapts at its monomorphized site, not
+// here.
+func adaptedOperands(e *ast.CallExpr, recvExpr ast.Expr, recv ir.Type, m *ir.Method, subst map[string]ir.Type, operand ir.Type, args []ir.Type, sink *Sink) {
+	for i, a := range e.Arguments {
+		if _, isLit := a.(*ast.FuncLit); isLit || i >= len(m.Params) {
+			continue
+		}
+		if args[i] == nil || args[i] == ir.Invalid {
+			continue
+		}
+		pt := types.Substitute(m.Params[i].Type, subst)
+		if _, isSelf := pt.(*ir.SelfType); isSelf {
+			pt = operand
+		}
+		if !hasTypeVar(pt) && !types.Identical(args[i], pt) {
+			sink.adapted(a, pt)
+		}
+	}
+	if recvExpr != nil && !types.Identical(recv, operand) {
+		sink.adapted(recvExpr, operand)
+	}
 }
 
 // convCallType is the type rule for a conversion or constructor T(x): the
@@ -570,6 +602,19 @@ func selectFuncOverload(e *ast.CallExpr, name string, sigs []funcSig, s scope, s
 	}
 	if bad {
 		return ir.Invalid
+	}
+	// The pass-1 arguments were synthesized bare and accepted by Match; one
+	// whose type differs from its settled parameter type adapted implicitly —
+	// streamed for the IR's explicit Adapt, exactly as a method call's
+	// operands are. (The deferred arguments streamed through their own
+	// checking walk.)
+	for i, kt := range known {
+		if kt == nil {
+			continue
+		}
+		if pt := types.Substitute(win.params[i], subst); !hasTypeVar(pt) && !types.Identical(kt, pt) {
+			sink.adapted(e.Arguments[i], pt)
+		}
 	}
 	// Substitute the solved type parameters into the result and run the bound and
 	// uninferable checks, exactly as the single-signature path does.

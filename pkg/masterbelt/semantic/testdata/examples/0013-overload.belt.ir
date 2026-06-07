@@ -1,11 +1,11 @@
 Module
   Const "Base"
     type Score
-    value (IntLiteral "100" : nint)
+    value (adapt (IntLiteral "100" : nint) : Score)
     eval 100
   Const "Bumped"
     type Score
-    value ((Reference -> "Base" : Score).merge((IntLiteral "50" : nint)) : Score) [resolved merge(points: self): self]
+    value ((Reference -> "Base" : Score).merge((adapt (IntLiteral "50" : nint) : Score)) : Score) [resolved merge(points: self): self]
     eval 150
   Const "Counted"
     type bool
@@ -13,7 +13,7 @@ Module
     eval true
   Const "Start"
     type Level
-    value (IntLiteral "1" : nint)
+    value (adapt (IntLiteral "1" : nint) : Level)
     eval 1
   Const "Second"
     type Level
@@ -21,7 +21,7 @@ Module
     eval 2
   Const "Fifth"
     type Level
-    value ((Reference -> "Start" : Level).next((IntLiteral "4" : nint)) : Level) [resolved next(steps: self): self]
+    value ((Reference -> "Start" : Level).next((adapt (IntLiteral "4" : nint) : Level)) : Level) [resolved next(steps: self): self]
     eval 5
   TypeDef "Score" pub
     doc "A game score in points."
@@ -35,14 +35,14 @@ Module
       doc "Whether an active run with this score counts."
       param active: bool
       result bool
-      return ((ParamRef "active" : bool).anan(((self : Score).gt((IntLiteral "0" : nint)) : bool)) : bool)
+      return ((ParamRef "active" : bool).anan(((self : Score).gt((adapt (IntLiteral "0" : nint) : Score)) : bool)) : bool)
   TypeDef "Level" pub
     doc "A character level."
     body sbyte
     method "next" pub
       doc "The next level."
       result self
-      return ((self : Level).add((IntLiteral "1" : nint)) : Level)
+      return ((self : Level).add((adapt (IntLiteral "1" : nint) : Level)) : Level)
     method "next" pub
       doc "The level a number of steps up."
       param steps: self

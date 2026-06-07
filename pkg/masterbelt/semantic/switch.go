@@ -141,6 +141,7 @@ func armValueSink(body *infer.Sink, at func(ast.Node) span, diags *diagnostic.Li
 	// write-back exactly as any other body expression's do.
 	if body != nil {
 		sink.Typed = body.Typed
+		sink.Adapted = body.Adapted
 		sink.CallSubst = body.CallSubst
 		sink.ResolvedMethod = body.ResolvedMethod
 		sink.ResolvedStatic = body.ResolvedStatic

@@ -761,6 +761,9 @@ func observe(sink *Sink, fired *bool) *Sink {
 		Typed: func(e ast.Expr, t ir.Type) {
 			sink.typed(e, t)
 		},
+		Adapted: func(e ast.Expr, to ir.Type) {
+			sink.adapted(e, to)
+		},
 	}
 }
 

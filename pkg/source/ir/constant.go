@@ -102,6 +102,12 @@ type Constant struct {
 	// const/let/param/return/field/argument union channel) and read back by the
 	// match folder and equality; an untagged value is unchanged, so values that
 	// never meet a union are exactly as before.
+	//
+	// Tagging is the execution of the IR's explicit union-inflow adaption: the
+	// Adapt node the post-check write-back wraps a union channel in (F-3 §2.2)
+	// records the same member selection (types.SelectUnionMember) the folder's
+	// expectation-driven tagging computes — UnionTag is what evaluating that
+	// Adapt produces.
 	UnionTag Type
 }
 

@@ -9,7 +9,7 @@ Module
     eval "low"
   Const "Capped"
     type Level
-    value ((((Level.Max : nint).gt((IntLiteral "50" : nint)) : bool) ? (Level.Max : nint) : (IntLiteral "0" : nint)) : nint)
+    value ((((Level.Max : nint).gt((IntLiteral "50" : nint)) : bool) ? (adapt (Level.Max : nint) : Level) : (adapt (IntLiteral "0" : nint) : Level)) : Level)
     eval 100
   Const "Clamp"
     type nint
@@ -29,4 +29,4 @@ Module
     method "sign" pub
       doc "-1, 0, or 1 by sign."
       result int
-      return ((((self : Temp).gt((IntLiteral "0" : nint)) : bool) ? (IntLiteral "1" : nint) : ((((self : Temp).lt((IntLiteral "0" : nint)) : bool) ? ((IntLiteral "1" : nint).neg() : nint) : (IntLiteral "0" : nint)) : nint)) : nint)
+      return ((((self : Temp).gt((adapt (IntLiteral "0" : nint) : Temp)) : bool) ? (adapt (IntLiteral "1" : nint) : int) : ((((self : Temp).lt((adapt (IntLiteral "0" : nint) : Temp)) : bool) ? (adapt ((IntLiteral "1" : nint).neg() : nint) : int) : (adapt (IntLiteral "0" : nint) : int)) : int)) : int)

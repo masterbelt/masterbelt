@@ -9,11 +9,11 @@ Module
     eval -128
   Const "Top"
     type Level
-    value (Level.Max : nint)
+    value (adapt (Level.Max : nint) : Level)
     eval 100
   Const "Bottom"
     type Level
-    value (Level.Min : nint)
+    value (adapt (Level.Min : nint) : Level)
     eval 0
   Const "W"
     type int
@@ -21,7 +21,7 @@ Module
     eval 32
   Const "ServerPort"
     type Port
-    value (IntLiteral "8080" : nint)
+    value (adapt (IntLiteral "8080" : nint) : Port)
     eval 8080
   TypeDef "Level" pub
     doc "A character level, capped at 100."
@@ -37,7 +37,7 @@ Module
     method "increment" pub
       doc "The next level."
       result self
-      return ((self : Level).add((IntLiteral "1" : nint)) : Level)
+      return ((self : Level).add((adapt (IntLiteral "1" : nint) : Level)) : Level)
   TypeDef "Bits" pub
     body int
     const "Width" pub

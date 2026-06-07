@@ -1,23 +1,23 @@
 Module
   Const "ServerPort"
     type Port
-    value (IntLiteral "8080" : nint)
+    value (adapt (IntLiteral "8080" : nint) : Port)
     eval 8080
   Const "MinPort"
     type Port
-    value (IntLiteral "1" : nint)
+    value (adapt (IntLiteral "1" : nint) : Port)
     eval 1
   Const "MaxPort"
     type Port
-    value (IntLiteral "65535" : nint)
+    value (adapt (IntLiteral "65535" : nint) : Port)
     eval 65535
   Const "FullLevel"
     type Level
-    value (IntLiteral "100" : nint)
+    value (adapt (IntLiteral "100" : nint) : Level)
     eval 100
   Const "ValidScore"
     type Score
-    value (IntLiteral "75" : nint)
+    value (adapt (IntLiteral "75" : nint) : Score)
     eval 75
   Const "Unrefined"
     type nint
@@ -38,7 +38,7 @@ Module
     method "increment" pub
       doc "The next percentage point."
       result self
-      return ((self : Percent).add((IntLiteral "1" : nint)) : Percent)
+      return ((self : Percent).add((adapt (IntLiteral "1" : nint) : Percent)) : Percent)
   TypeDef "Score" pub
     doc "A score that is valid only when it lies in the 0..100 band."
     body int
@@ -46,4 +46,4 @@ Module
     method "inBand" pub
       doc "Whether the score is within the valid band."
       result bool
-      return (((self : Score).gteq((IntLiteral "0" : nint)) : bool).anan(((self : Score).lteq((IntLiteral "100" : nint)) : bool)) : bool)
+      return (((self : Score).gteq((adapt (IntLiteral "0" : nint) : Score)) : bool).anan(((self : Score).lteq((adapt (IntLiteral "100" : nint) : Score)) : bool)) : bool)

@@ -2,7 +2,7 @@ Module
   Const "MaxLevel"
     doc "DocComment for MaxLevel"
     type long
-    value (IntLiteral "100" : nint)
+    value (adapt (IntLiteral "100" : nint) : long)
     eval 100
   Const "MinLevel"
     doc "DocComment for MinLevel"

@@ -142,6 +142,15 @@ type Sink struct {
 	// fire, leaving the node's type nil — a visible hole, never an invented
 	// type.
 	Typed func(e ast.Expr, t ir.Type)
+	// Adapted fires where the walk accepted a value at a position whose
+	// expected type differs from the value's own — the implicit adaptions: a
+	// default integer settling into a sized type, a value adapting to a
+	// nominal type, a value flowing into a union (the tagging point). to is
+	// the position's settled expectation; the semantic layer wraps the IR
+	// node in an explicit ir.Adapt to it (F-3 §2.2), so no conversion stays
+	// implicit in the IR. An informational stream, never a finding; a
+	// position whose expectation the value matches identically does not fire.
+	Adapted func(e ast.Expr, to ir.Type)
 }
 
 func (s *Sink) invalidOp(node ast.Node, method, operands string) {
@@ -327,5 +336,11 @@ func (s *Sink) callSubst(call *ast.CallExpr, subst map[string]ir.Type) {
 func (s *Sink) typed(e ast.Expr, t ir.Type) {
 	if s != nil && s.Typed != nil {
 		s.Typed(e, t)
+	}
+}
+
+func (s *Sink) adapted(e ast.Expr, to ir.Type) {
+	if s != nil && s.Adapted != nil {
+		s.Adapted(e, to)
 	}
 }
