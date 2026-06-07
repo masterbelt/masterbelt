@@ -143,7 +143,10 @@ func resolvedFuncDecl(env Env, call *ast.CallExpr, cands []*ast.FuncDecl) *ast.F
 		return nil
 	}
 	sel := r.ResolvedFunc(call)
-	if sel == nil || !slices.Contains(cands, sel) {
+	// The arity check is the applyBody precondition (it indexes the folded
+	// arguments by parameter position); the checker's selection always
+	// matches, so this only rejects a stale or corrupted record.
+	if sel == nil || !slices.Contains(cands, sel) || len(sel.Params) != len(call.Arguments) {
 		return nil
 	}
 	return sel
@@ -167,7 +170,9 @@ func resolvedMethodDecl(env Env, call *ast.CallExpr, channel func(CallResolver, 
 		return nil
 	}
 	sel := channel(r, call)
-	if sel == nil || !slices.Contains(cands, sel) {
+	// The arity check mirrors resolvedFuncDecl's: applyBody indexes the
+	// folded arguments by parameter position.
+	if sel == nil || !slices.Contains(cands, sel) || len(sel.Params) != len(call.Arguments) {
 		return nil
 	}
 	return sel

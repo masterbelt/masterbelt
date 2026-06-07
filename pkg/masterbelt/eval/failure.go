@@ -34,18 +34,12 @@ func DeclFailure(decl *ast.ConstDecl, want ir.Type, env Env) string {
 	if decl.Value == nil {
 		return FailureGap
 	}
-	return ExprFailureExpecting(decl.Value, want, env)
+	return exprFailureExpecting(decl.Value, want, env)
 }
 
-// ExprFailure classifies why folding an expression produced no value — the
-// no-expectation form an assert condition uses.
-func ExprFailure(e ast.Expr, env Env) string {
-	return ExprFailureExpecting(e, nil, env)
-}
-
-// ExprFailureExpecting classifies why folding an expression against an
+// exprFailureExpecting classifies why folding an expression against an
 // expected type produced no value.
-func ExprFailureExpecting(e ast.Expr, want ir.Type, env Env) string {
+func exprFailureExpecting(e ast.Expr, want ir.Type, env Env) string {
 	hit := false
 	evalExpr(e, expectingType(evalCtx{env: env, budgetHit: &hit}, want))
 	if hit {

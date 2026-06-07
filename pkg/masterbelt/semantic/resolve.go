@@ -215,6 +215,14 @@ func foldAssocConsts(env eval.Env, defs map[string]*ir.TypeDef, qualified func(n
 				if ac.Value != nil || ac.Builtin || ac.Syntax == nil || ac.Syntax.Value == nil {
 					continue
 				}
+				// A written annotation that failed to resolve withholds the
+				// fold here, inside the memoized resolution, so every file
+				// sharing this definition sees the same absence — a broken
+				// declaration has no value (the publication rule's soundness
+				// side, decided at the source).
+				if ac.Syntax.Type != nil && ac.Type != nil && ir.HasInvalid(ac.Type) {
+					continue
+				}
 				v := eval.DeclExpecting(ac.Syntax, ac.Type, fenv)
 				if v == nil {
 					continue

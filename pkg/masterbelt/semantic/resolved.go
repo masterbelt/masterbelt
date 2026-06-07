@@ -114,14 +114,17 @@ type resolutionWriter struct {
 func (w resolutionWriter) value(v ir.Value) {
 	switch v := v.(type) {
 	case *ir.Call:
-		if m := w.res.methods[v.Syntax]; m != nil {
-			v.Resolved = m
-		}
+		// Assigned unconditionally: a method-body node lives on the memoized
+		// type definition, so a selection written by an earlier assemble must
+		// be cleared when the current walk recorded none (the overload set
+		// shrank to one, say) rather than surviving stale.
+		v.Resolved = w.res.methods[v.Syntax]
 		w.value(v.Receiver)
 		for _, a := range v.Args {
 			w.value(a)
 		}
 	case *ir.FuncCall:
+		v.Resolved = nil
 		if fd := w.res.funcs[v.Syntax]; fd != nil {
 			if fn := w.fnShells[fd]; fn != nil {
 				v.Resolved = fn
@@ -132,9 +135,7 @@ func (w resolutionWriter) value(v ir.Value) {
 			w.value(a)
 		}
 	case *ir.StaticCall:
-		if m := w.res.statics[v.Syntax]; m != nil {
-			v.Resolved = m
-		}
+		v.Resolved = w.res.statics[v.Syntax]
 		for _, a := range v.Args {
 			w.value(a)
 		}

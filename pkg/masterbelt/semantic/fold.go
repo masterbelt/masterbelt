@@ -1,10 +1,11 @@
 // This file holds the fold-totality side of the analyzer: the language rule is
 // that a constant either folds to a value or carries an error — there is no
-// silently unfolded const. foldFailure classifies the failure for the
-// unfolded_const diagnostic (and the fold gate tests): "depth" when an
-// evaluation budget guard refused the fold (the user's computation is too
-// deep — fixable), "evaluator gap" for everything else (a missing fold rule —
-// a compiler bug, never the user's).
+// silently unfolded const. enforceEvalPublication is the rule's enforcement,
+// run at the end of assemble; eval.DeclFailure classifies a failure's reason
+// for the unfolded_const diagnostic: "depth" when an evaluation budget guard
+// refused the fold (the user's computation is too deep — fixable), "evaluator
+// gap" for everything else (a missing fold rule — a compiler bug, never the
+// user's).
 package semantic
 
 import (
@@ -13,14 +14,6 @@ import (
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
 )
-
-// foldFailure classifies why a constant declaration's fold produced no value,
-// re-running the fold with eval's budget channel armed. It is only called on
-// the error path (a diagnostic-free const whose Eval is nil), so the re-run
-// costs nothing in the green case.
-func foldFailure(file FileID, decl *ast.ConstDecl, q queries) string {
-	return eval.DeclFailure(decl, annotationResolved(q, file, decl), evalEnv{q: q, file: file})
-}
 
 // enforceEvalPublication is the publication rule for compile-time values —
 // Eval ⇔ the declaration (and what it depends on) is diagnostic-free — run
@@ -56,35 +49,40 @@ func enforceEvalPublication(fileID FileID, file *ast.File, module *ir.Module, sh
 	}
 	taintedType := func(t ir.Type) bool { return t != nil && ir.HasInvalid(t) }
 
-	own := make(map[*ast.ConstDecl]*ir.Const, len(file.Decls))
-	for _, decl := range file.Decls {
-		own[decl] = shells[decl]
-	}
-	// published reads a top-level constant's published value: this file's
-	// shells carry it directly; a cross-file constant reads the value query
-	// (deterministic whatever order the program's files assemble in).
+	// published reads a constant's published value: this file's shells carry
+	// it directly (renv.own — the one map assemble built); a cross-file
+	// constant reads the value query, deterministic whatever order the
+	// program's files assemble in. Both the soundness withholding and the
+	// totality suppression read dependencies through it, so "the cause is
+	// reported at the dependency" means exactly "the dependency's published
+	// value is absent".
 	published := func(target *ast.ConstDecl) bool {
-		if c, mine := own[target]; mine {
+		if c, mine := renv.own[target]; mine {
 			return c.Eval != nil
 		}
 		return q.valueOf(target) != nil
 	}
 
-	// (⇐) Withhold the values of broken declarations.
-	for _, decl := range file.Decls {
-		c := shells[decl]
-		if c.Eval != nil && (within(at(decl)) || taintedType(c.Type)) {
-			c.Eval = nil
-		}
-	}
-	// An associated constant's type is not checker-derived (an unannotated one
-	// types from its own folded value), so the taint test reads the written
-	// annotation, and the dependency taint is read off the published values
-	// directly: an initializer reading a withheld constant is withheld too.
-	// The loop runs to a fixpoint so a chain of associated constants settles
-	// whatever its declaration order.
+	// (⇐) Withhold the values of broken declarations, to a fixpoint: an
+	// initializer reading a withheld constant is withheld too, however the
+	// chain is ordered or spread between top-level and associated constants.
+	// A top-level constant's own brokenness is its span error or its
+	// checker-tainted type; an associated constant's is its span error or its
+	// written annotation's taint (its type is not checker-derived — an
+	// unannotated one types from its own folded value, so that Invalid is a
+	// symptom, not a taint source).
 	for progress := true; progress; {
 		progress = false
+		for _, decl := range file.Decls {
+			c := shells[decl]
+			if c.Eval == nil {
+				continue
+			}
+			if within(at(decl)) || taintedType(c.Type) || dependsOnUnvalued(fileID, decl.Value, q, published) {
+				c.Eval = nil
+				progress = true
+			}
+		}
 		for _, def := range module.Types {
 			for _, ac := range def.Consts {
 				if ac.Value == nil || ac.Syntax == nil {
@@ -98,21 +96,26 @@ func enforceEvalPublication(fileID FileID, file *ast.File, module *ir.Module, sh
 			}
 		}
 	}
-
-	// (⇒) A clean declaration without a value is an error.
-	// valuedAnywhere is the totality side's dependency reading: a constant
-	// counts as valued when either the type-blind query or the published
-	// shells carry a value — so a reader is suppressed only when its
-	// dependency's failure is genuinely reported at the dependency.
-	valuedAnywhere := func(target *ast.ConstDecl) bool {
-		if q.valueOf(target) != nil {
-			return true
+	// An assert reading a withheld constant publishes no outcome either: its
+	// condition folded over a value that never passed the type-bound checks,
+	// and a green checkmark over an unverified value is the accident the rule
+	// exists to prevent. (An assert's own in-span errors are not read here:
+	// assertion_failed itself anchors at the condition, and a failed
+	// assertion must keep its Eval and diagram.)
+	for _, a := range module.Asserts {
+		if a.Eval == nil || a.Syntax == nil || a.Syntax.Cond == nil {
+			continue
 		}
-		if c, mine := own[target]; mine {
-			return c.Eval != nil
+		if dependsOnUnvalued(fileID, a.Syntax.Cond, q, published) {
+			a.Eval = nil
+			a.Diagram = ""
 		}
-		return false
 	}
+
+	// (⇒) A clean declaration without a value is an error. A reader whose
+	// dependency's published value is absent is not re-reported — the cause
+	// carries its own diagnostic at the dependency (a span error there, or
+	// its own unfolded_const) — and only that narrowly.
 	for _, decl := range file.Decls {
 		c := shells[decl]
 		if decl.Value == nil || c.Eval != nil {
@@ -122,7 +125,7 @@ func enforceEvalPublication(fileID FileID, file *ast.File, module *ir.Module, sh
 		if within(s) || taintedType(c.Type) {
 			continue // the cause is reported at (or taints through) the declaration
 		}
-		if dependsOnUnvalued(fileID, decl.Value, q, valuedAnywhere) {
+		if dependsOnUnvalued(fileID, decl.Value, q, published) {
 			continue // the cause carries its own diagnostic at the dependency
 		}
 		reason := eval.DeclFailure(decl, annotationResolved(q, fileID, decl), renv)
@@ -140,7 +143,7 @@ func enforceEvalPublication(fileID FileID, file *ast.File, module *ir.Module, sh
 			if within(s) || (ac.Syntax.Type != nil && taintedType(ac.Type)) {
 				continue
 			}
-			if dependsOnUnvalued(fileID, ac.Syntax.Value, q, valuedAnywhere) {
+			if dependsOnUnvalued(fileID, ac.Syntax.Value, q, published) {
 				continue
 			}
 			reason := eval.DeclFailure(ac.Syntax, ac.Type, renv)
@@ -163,12 +166,14 @@ func errorOffsets(diags *diagnostic.List) []int {
 }
 
 // dependsOnUnvalued reports whether the expression reads a constant that has
-// no value: a top-level or imported const topValued answers false for, an
-// associated constant that resolved to nothing, or an enum member without a
-// value. The publication rule runs it with two readings of topValued — the
-// soundness side asks "is the published value withheld?", the totality side
-// "is there genuinely no value anywhere?" — over the same reference walk.
-func dependsOnUnvalued(fileID FileID, e ast.Expr, q queries, topValued func(*ast.ConstDecl) bool) bool {
+// no value as topValued (the published surface) answers it: a top-level or
+// imported const without one, an associated constant that resolved to
+// nothing, or an enum member without a value. The walk descends into
+// function-literal bodies (ast.WalkExprs deliberately stops at a literal —
+// its body is another scope for reference reporting — but a value dependency
+// reaches through an applied one), so a reader through an immediately applied
+// lambda is suppressed exactly as a direct reader is.
+func dependsOnUnvalued(fileID FileID, root ast.Expr, q queries, topValued func(*ast.ConstDecl) bool) bool {
 	un := false
 	valued := func(target *ast.ConstDecl) bool {
 		if target == nil || target.Value == nil {
@@ -176,38 +181,51 @@ func dependsOnUnvalued(fileID FileID, e ast.Expr, q queries, topValued func(*ast
 		}
 		return topValued(target)
 	}
-	walkRefsEnum(fileID, e, q,
-		func(id *ast.Identifier) {
-			if !valued(q.resolve(fileID, id)) {
-				un = true
-			}
-		},
-		func(m *ast.MemberExpr) {
-			if !valued(q.resolveMember(fileID, m)) {
-				un = true
-			}
-		},
-		func(m *ast.MemberExpr) {
-			recv, ok := m.Receiver.(*ast.Identifier)
-			if !ok {
-				return
-			}
-			def := q.universe(fileID)[recv.Name]
-			if def == nil {
-				return
-			}
-			if def.Enum != nil {
-				for _, mem := range def.Enum.Members {
-					if mem.Name == m.Member.Name && mem.Value == nil {
+	var visit func(e ast.Expr)
+	walk := func(e ast.Expr) {
+		walkRefsEnum(fileID, e, q,
+			func(id *ast.Identifier) {
+				if !valued(q.resolve(fileID, id)) {
+					un = true
+				}
+			},
+			func(m *ast.MemberExpr) {
+				if !valued(q.resolveMember(fileID, m)) {
+					un = true
+				}
+			},
+			func(m *ast.MemberExpr) {
+				recv, ok := m.Receiver.(*ast.Identifier)
+				if !ok {
+					return
+				}
+				def := q.universe(fileID)[recv.Name]
+				if def == nil {
+					return
+				}
+				if def.Enum != nil {
+					for _, mem := range def.Enum.Members {
+						if mem.Name == m.Member.Name && mem.Value == nil {
+							un = true
+						}
+					}
+				}
+				for _, ac := range def.Consts {
+					if ac.Name == m.Member.Name && ac.Value == nil {
 						un = true
 					}
 				}
+			})
+	}
+	visit = func(e ast.Expr) {
+		walk(e)
+		ast.WalkExprs(e, func(sub ast.Expr) bool {
+			if lit, ok := sub.(*ast.FuncLit); ok {
+				ast.WalkBodyExprs(lit.Body, visit)
 			}
-			for _, ac := range def.Consts {
-				if ac.Name == m.Member.Name && ac.Value == nil {
-					un = true
-				}
-			}
+			return true
 		})
+	}
+	visit(root)
 	return un
 }

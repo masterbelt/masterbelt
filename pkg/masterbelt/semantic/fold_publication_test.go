@@ -152,3 +152,54 @@ func TestValueRevivesWhenTypeFixed(t *testing.T) {
 		t.Errorf("fixed A Eval = %v, want 1 (the value revives with the type)", m.Consts[0].Eval)
 	}
 }
+
+// TestValueBrokenReaderWithheld: a value-range-broken constant (overflow —
+// its IR type stays a concrete sized type, so no Invalid taint flows) still
+// withholds its readers' values through the published-dependency walk, and
+// the reader is not re-reported.
+func TestValueBrokenReaderWithheld(t *testing.T) {
+	m, diags := analyze("const X: sbyte = 999\nconst Y: nint = X + 1\n")
+	if !hasCode(diags, CodeConstantOverflow) {
+		t.Fatalf("want constant_overflow at X, got %v", codes(diags))
+	}
+	if hasCode(diags, CodeUnfoldedConst) {
+		t.Errorf("the reader must not pile on unfolded_const: %v", codes(diags))
+	}
+	for _, c := range m.Consts {
+		if c.Eval != nil {
+			t.Errorf("const %s published Eval %v, want none", c.Name, c.Eval)
+		}
+	}
+}
+
+// TestAssertOverValueBrokenConstNotGreen: the assert twin — a condition
+// reading an overflowing constant must not publish a green outcome, even
+// though its condition type is a perfectly healthy bool.
+func TestAssertOverValueBrokenConstNotGreen(t *testing.T) {
+	m, diags := analyze("const X: sbyte = 999\nassert X == 999\n")
+	if !hasCode(diags, CodeConstantOverflow) {
+		t.Fatalf("want constant_overflow at X, got %v", codes(diags))
+	}
+	if m.Asserts[0].Eval != nil {
+		t.Errorf("assert over an overflowing const published Eval %v, want none", m.Asserts[0].Eval)
+	}
+}
+
+// TestLambdaReaderSuppressed: the dependency walk reaches through an applied
+// function literal's body, so a reader of a failed constant through a lambda
+// is suppressed exactly as a direct reader — one failure, one diagnostic.
+func TestLambdaReaderSuppressed(t *testing.T) {
+	src := "pub fn deep(n: nint): nint {\n  if n == 0 {\n    return 0\n  }\n  return deep(n - 1)\n}\n" +
+		"const D = deep(300)\n" +
+		"const A = (fn(): nint -> D + 1)()\n"
+	_, diags := analyze(src)
+	n := 0
+	for _, code := range codes(diags) {
+		if code == CodeUnfoldedConst {
+			n++
+		}
+	}
+	if n != 1 {
+		t.Errorf("unfolded_const count = %d, want exactly 1 (at D; A reads it through the lambda), got %v", n, codes(diags))
+	}
+}

@@ -233,7 +233,7 @@ func TestFoldFailureClassifier(t *testing.T) {
 				if q.valueOf(decl) != nil {
 					t.Fatalf("const %s folded; the classifier only runs on failures", name)
 				}
-				return foldFailure(soleFileID, decl, q)
+				return eval.DeclFailure(decl, annotationResolved(q, soleFileID, decl), evalEnv{q: q, file: soleFileID})
 			}
 		}
 		t.Fatalf("const %s not found", name)
