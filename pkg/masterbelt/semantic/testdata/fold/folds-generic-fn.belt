@@ -1,0 +1,7 @@
+// fold-expect: folds
+// An unbounded generic function call folds with the concrete arguments.
+pub fn first<T>(a: T, b: T): T {
+  return a
+}
+const A = first(1, 2)
+assert A == 1

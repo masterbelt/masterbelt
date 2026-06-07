@@ -1,0 +1,11 @@
+// fold-expect: folds
+// (b) An associated constant whose initializer reads another type's member.
+pub enum Element {
+  Fire, Water
+}
+
+pub type Config = string impl {
+  pub const Default: Element = Element.Fire
+}
+
+const D = Config.Default

@@ -1,0 +1,9 @@
+// fold-expect: folds
+// Same-type associated constants fold, the builtin bounds included.
+pub type Level = sbyte impl {
+  pub const Max = 100
+}
+const Top: Level = Level.Max
+const Hi = sbyte.Max
+assert Top == 100
+assert Hi == 127

@@ -1,0 +1,7 @@
+// fold-expect: folds
+// A function value passed as an argument applies inside the applied body —
+// the nested form of the general function-value arm.
+const Apply = fn(f: fn(x: nint): nint, v: nint): nint -> f(v)
+const Doubler = fn(x: nint): nint -> x * 2
+const A = Apply(Doubler, 21)
+assert A == 42

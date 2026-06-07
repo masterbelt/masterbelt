@@ -1,0 +1,10 @@
+// fold-expect: folds
+// A user-defined method on a nominal type over a primitive folds.
+pub type Level = sbyte impl {
+  pub increment(): self {
+    return self + 1
+  }
+}
+const Start: Level = 1
+const Next = Start.increment()
+assert Next == 2

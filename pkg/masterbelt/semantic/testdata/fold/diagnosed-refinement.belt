@@ -1,0 +1,3 @@
+// fold-expect: diagnosed refinement_violation
+pub type Level = sbyte where self >= 0 && self <= 100
+const Bad: Level = 101

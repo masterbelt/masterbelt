@@ -62,8 +62,12 @@ const X = Base.merge(Base)
 	// Two method-introduced type variables are the same universal signature
 	// whatever they are named.
 	src = `pub type Box = int impl {
-  pub extern fn wrap(value: T): bool
-  pub extern fn wrap(value: U): bool
+  pub fn wrap(value: T): bool {
+    return true
+  }
+  pub fn wrap(value: U): bool {
+    return true
+  }
 }
 `
 	_, diags = analyze(src)

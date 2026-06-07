@@ -1,0 +1,2 @@
+// fold-expect: diagnosed undefined_name
+const A = bogus + 1

@@ -1,0 +1,10 @@
+// fold-expect: diagnosed assertion_not_constant
+// An assert past the depth budget is already loud — the assert layer's own
+// totality rule.
+pub fn deep(n: nint): nint {
+  if n == 0 {
+    return 0
+  }
+  return deep(n - 1)
+}
+assert deep(300) == 0

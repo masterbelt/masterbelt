@@ -215,3 +215,23 @@ func TestParseAccessorRoundTrip(t *testing.T) {
 		t.Fatalf("round-trip mismatch:\n got %q\nwant %q", b.String(), src)
 	}
 }
+
+// TestParseExternStaticFn checks the one extern-modifier combination the
+// grammar admits: `extern static fn` — the builtin surface's spelling for a
+// static native the registry supplies — parses with the static modifier
+// recognized after extern, the effect list following, and no diagnostics.
+// The accessors stay excluded (TestParseExternGetIsError).
+func TestParseExternStaticFn(t *testing.T) {
+	src := "type C = { d: nint } impl {\n  pub extern static fn nondet now(): C\n}\n"
+	root, diags := Parse([]byte(src))
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	ms := implMethods(root)
+	if len(ms) != 1 {
+		t.Fatalf("methods = %d, want 1", len(ms))
+	}
+	if got := modifierText(src, ms[0]); got != "static" {
+		t.Fatalf("modifier = %q, want static", got)
+	}
+}

@@ -1,0 +1,4 @@
+// fold-expect: folds
+// A range value and its foldable methods fold.
+const Count = range(0, 10).count()
+assert Count == 11

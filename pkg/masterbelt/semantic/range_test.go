@@ -194,8 +194,10 @@ func TestRangeStepAtBound(t *testing.T) {
 	src := "const AtCap = range(0, 2097150, 2).count()\n" + // 2097150/2 + 1 = 1048576 == cap
 		"const OverCap = range(0, 2097152, 2).count()\n" // 2097152/2 + 1 = 1048577 > cap
 	mod, diags := analyze(src)
-	if len(diags) != 0 {
-		t.Fatalf("unexpected diagnostics: %v", codes(diags))
+	// The over-cap constant is an error: past the budget it has no value, and
+	// a value-less constant never passes silently (unfolded_const, depth).
+	if got := codes(diags); len(got) != 1 || got[0] != CodeUnfoldedConst {
+		t.Fatalf("codes = %v, want [unfolded_const] for OverCap", got)
 	}
 	got := map[string]*int64{}
 	for _, c := range mod.Consts {
@@ -283,8 +285,10 @@ func TestRangeAtBound(t *testing.T) {
 		"const OverCap = range(0, 1048576).count()\n" // one wider
 
 	mod, diags := analyze(src)
-	if len(diags) != 0 {
-		t.Fatalf("unexpected diagnostics: %v", codes(diags))
+	// The over-cap constant is an error: past the budget it has no value, and
+	// a value-less constant never passes silently (unfolded_const, depth).
+	if got := codes(diags); len(got) != 1 || got[0] != CodeUnfoldedConst {
+		t.Fatalf("codes = %v, want [unfolded_const] for OverCap", got)
 	}
 	got := map[string]*int64{}
 	for _, c := range mod.Consts {

@@ -33,7 +33,7 @@ func resolveWhere(r *infer.TypeResolver, reg *builtin.Registry, td *ast.TypeDecl
 	report := at != nil && diags != nil
 	var sink *infer.Sink
 	if report {
-		sink = exprSink(at, diags)
+		sink = exprSink(at, diags, nil)
 	}
 	// The predicate types in a body scope with no parameters: self and literals,
 	// plus a method call on self. self is the nominal type being refined (not its

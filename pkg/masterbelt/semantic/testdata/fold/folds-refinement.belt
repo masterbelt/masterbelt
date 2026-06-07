@@ -1,0 +1,5 @@
+// fold-expect: folds
+// A value satisfying its refinement folds.
+pub type Level = sbyte where self >= 0 && self <= 100
+const Cap: Level = 100
+assert Cap == 100

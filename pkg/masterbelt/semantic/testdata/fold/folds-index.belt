@@ -1,0 +1,6 @@
+// fold-expect: folds
+// Index reads fold to their tagged result-union values.
+const Xs = [10, 20, 30]
+const First: nint | error = Xs[0]
+const Tbl = ["sword": 100]
+const Sword: nint | error = Tbl["sword"]

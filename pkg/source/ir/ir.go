@@ -172,35 +172,55 @@ func (*Reference) value() {}
 // it from a hand-written method call receiver.name(v) (which the setter name
 // space does not reach). Every operator, ordinary method, and index Call leaves
 // it false.
+//
+// Resolved is the overload individual the type checker selected when the
+// method name carries several signatures, written back after the checking walk
+// (the lowering is type-blind, so a Call is born with it nil; a
+// single-signature method needs no selection and stays nil). It is how the IR
+// meets its own doctrine — every reference bound to its declaration — for an
+// overloaded call: the .ir dump renders the selected signature, and the folder
+// prefers it over its value-kind selection rule. Syntax is the call expression
+// this lowered from, the key the write-back pairs the checker's selection with.
 type Call struct {
 	Receiver Value
 	Method   string
 	Args     []Value
 	Setter   bool
+	Resolved *Method
+	Syntax   *ast.CallExpr
 }
 
 func (*Call) value() {}
 
 // FuncCall is a resolved call of a top-level function: the function it
-// resolves to and the argument values.
+// resolves to and the argument values. Target is picked by the type-blind
+// lowering — by unique arity among the overload set, else the set's first
+// declaration — so for an overloaded name it is a placeholder until the
+// checker's selection is written back: Resolved then carries the selected
+// individual and Target is corrected to it (see Call.Resolved). A
+// single-signature function's Target is exact from lowering and Resolved
+// stays nil.
 type FuncCall struct {
-	Target *Function
-	Args   []Value
+	Target   *Function
+	Args     []Value
+	Resolved *Function
+	Syntax   *ast.CallExpr
 }
 
 func (*FuncCall) value() {}
 
 // StaticCall is a resolved call of a static fn, written Type.name(args) — a
 // function scoped to its type, the Type.Name path enum members and associated
-// constants take. Like a Call it holds the owning Def and the static fn's Name
-// rather than a resolved overload individual: the overload is selected by the
-// checker from the argument types and by the folder from the argument values,
-// each with its own rule, exactly as a method Call carries the method name. The
-// arguments are themselves resolved values.
+// constants take. Like a Call it holds the owning Def and the static fn's Name;
+// Resolved carries the overload individual the checker selected when the name
+// has several signatures, written back after the checking walk (see
+// Call.Resolved). The arguments are themselves resolved values.
 type StaticCall struct {
-	Def  *TypeDef
-	Name string
-	Args []Value
+	Def      *TypeDef
+	Name     string
+	Args     []Value
+	Resolved *Method
+	Syntax   *ast.CallExpr
 }
 
 func (*StaticCall) value() {}

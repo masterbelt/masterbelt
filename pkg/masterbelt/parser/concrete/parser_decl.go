@@ -763,16 +763,18 @@ func (p *parser) parseImplConstInitializer() *cst.Node {
 // parseMethodDecl parses a method inside an impl block, prepending the
 // already-collected leading trivia:
 //
-//	[doc] [pub] ( Modifier | [extern] [fn] ) Effect* Ident [GenericParams] ParamList ":" TypeExpr [Block]
-//	Modifier := "get" | "set" | "static" fn
+//	[doc] [pub] ( Modifier | [extern] [StaticModifier | fn] ) Effect* Ident [GenericParams] ParamList ":" TypeExpr [Block]
+//	Modifier := "get" | "set" | StaticModifier
+//	StaticModifier := "static" fn
 //
 // The accessor/static modifiers are context keywords (the lexer leaves them as
 // identifiers): a get/set is a modifier only when an identifier — the property
 // name — follows it on the same line, so the prelude's get(index)/set(k, v)
 // methods stay ordinary; a static is a modifier when fn follows (a missing fn
-// is reported with expected_fn and recovered). A modifier excludes extern and
-// the bare fn before it (the grammar has no `extern get` or `get fn`), so the
-// instance-method branches below are skipped once one is read.
+// is reported with expected_fn and recovered). The accessors exclude extern
+// and the bare fn before them (the grammar has no `extern get` or `get fn`);
+// extern composes only with static — `extern static fn`, the builtin surface's
+// spelling for a static native the registry supplies.
 //
 // fn is optional on an instance method (some methods omit it), the effect list
 // (io, async, nondet) sits before the name, the optional GenericParams declare
@@ -794,6 +796,12 @@ func (p *parser) parseMethodDecl(lead []cst.Green) *cst.Node {
 	if p.peekSignificant() == token.Extern {
 		p.skipTrivia(&children)
 		children = append(children, p.bump())
+		// extern static fn: the static modifier (and its fn) may follow an
+		// extern. The accessors may not — extern get/set stays unparsed, the
+		// get/set reading as the method name it would otherwise be.
+		if p.staticModifier(&children) {
+			return p.finishMethodDecl(children)
+		}
 	}
 	if p.peekSignificant() == token.Fn {
 		p.skipTrivia(&children)
@@ -827,27 +835,42 @@ func (p *parser) methodModifier(children *[]cst.Green) bool {
 		*children = append(*children, p.modifier())
 		return true
 	case "static":
-		next := p.nextOnLine(i + 1)
-		switch next {
-		case token.Fn:
-			p.skipTrivia(children)
-			*children = append(*children, p.modifier())
-			p.skipTrivia(children)
-			*children = append(*children, p.bump()) // "fn"
-			return true
-		case token.Ident:
-			// `static name(...)` with the fn forgotten: read static as the
-			// modifier and recover, rather than misreading it as a method named
-			// static and burying the real signature under cascading errors.
-			p.skipTrivia(children)
-			*children = append(*children, p.modifier())
-			p.report(newExpectedFnDiagnostic(p.lastStart, 0))
-			return true
-		default:
-			// `static(...)` or `static:` — a method literally named static.
-			return false
-		}
+		return p.staticModifier(children)
 	default:
+		return false
+	}
+}
+
+// staticModifier recognizes the static modifier at the cursor — the context
+// keyword static followed by fn — wrapping it in a Modifier node appended to
+// children (with the fn consumed) and reporting true. A static not followed by
+// fn on its line is an ordinary method named static (false), except `static
+// name(...)`, which reads as the modifier with the fn reported missing
+// (expected_fn) and recovered. It is the static arm of methodModifier, split
+// out because extern composes with it (`extern static fn`) and not with the
+// accessors.
+func (p *parser) staticModifier(children *[]cst.Green) bool {
+	i := p.nextSignificantIndex(p.pos)
+	if p.toks[i].Kind != token.Ident || p.identText(i) != "static" {
+		return false
+	}
+	switch p.nextOnLine(i + 1) {
+	case token.Fn:
+		p.skipTrivia(children)
+		*children = append(*children, p.modifier())
+		p.skipTrivia(children)
+		*children = append(*children, p.bump()) // "fn"
+		return true
+	case token.Ident:
+		// `static name(...)` with the fn forgotten: read static as the
+		// modifier and recover, rather than misreading it as a method named
+		// static and burying the real signature under cascading errors.
+		p.skipTrivia(children)
+		*children = append(*children, p.modifier())
+		p.report(newExpectedFnDiagnostic(p.lastStart, 0))
+		return true
+	default:
+		// `static(...)` or `static:` — a method literally named static.
 		return false
 	}
 }

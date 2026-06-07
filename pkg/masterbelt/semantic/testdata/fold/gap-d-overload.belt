@@ -1,0 +1,12 @@
+// fold-expect: folds
+// (d) A top-level fn overload split by a named type the kind rule cannot see.
+pub type Celsius = { deg: nint }
+
+pub fn describe(c: Celsius): string {
+  return "record"
+}
+pub fn describe(n: nint): string {
+  return "int"
+}
+
+const A = describe(3)

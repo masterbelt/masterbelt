@@ -151,8 +151,99 @@ func resolveTypes(env eval.Env, file *ast.File, at func(ast.Node) span, diags *d
 		addEnumContracts(r, enumOut[i])
 	}
 
+	// Fourth pass: fold the associated-constant initializers, deferred until
+	// every type, enum, and impl of the file has resolved so a cross-type
+	// reference (another type's enum member, associated constant, or static
+	// fn) folds — the in-pass eager fold ran before its targets existed
+	// (E-followups §E-7). The fold reads the just-built defs directly rather
+	// than the universe query, which is this very computation and would
+	// cycle-guard to nothing.
+	foldAssocConsts(env, defs, qualified, append(append([]*ir.TypeDef{}, out...), enumOut...))
+
 	out = append(out, enumOut...)
 	return append(out, ifaceOut...)
+}
+
+// assocFoldEnv is the post-resolution evaluation environment the associated
+// constants fold in: name resolution, referenced values, and the registry come
+// from the driving env, while the type channels (LookupType and the
+// ReceiverTyper annotations) read the file's just-resolved definitions — the
+// defs map resolveTypes built — so the fold sees every type and enum of the
+// file where the in-flight universe query could not supply them.
+type assocFoldEnv struct {
+	eval.Env
+	defs      map[string]*ir.TypeDef
+	qualified func(namespace, name string) *ir.TypeDef
+}
+
+func (e assocFoldEnv) LookupType(name string) *ir.TypeDef { return e.defs[name] }
+
+func (e assocFoldEnv) TypeExprDef(t ast.TypeExpr) *ir.TypeDef {
+	if t == nil {
+		return nil
+	}
+	r := &infer.TypeResolver{Defs: e.defs, Qualified: e.qualified}
+	return nominalDefOf(r.ResolveType(t, nil))
+}
+
+func (e assocFoldEnv) TypeExprType(t ast.TypeExpr) ir.Type {
+	if t == nil {
+		return nil
+	}
+	r := &infer.TypeResolver{Defs: e.defs, Qualified: e.qualified}
+	return r.ResolveType(t, nil)
+}
+
+// foldAssocConsts folds every owner's ordinary associated constants (the
+// `= builtin` ones were supplied from the registry during resolution) and
+// settles their types: the annotation when written, the folded value's kind
+// otherwise. Chains between associated constants fold by fixpoint — each round
+// folds what the previous rounds settled, stopping when a round makes no
+// progress — so declaration order never decides foldability; a genuine cycle
+// or an unresolvable reference stays unfolded, for the reference diagnostics
+// and the totality gate to report. A nil env (a resolution with no evaluator)
+// folds nothing, exactly as before.
+func foldAssocConsts(env eval.Env, defs map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, owners []*ir.TypeDef) {
+	if env == nil {
+		return
+	}
+	fenv := assocFoldEnv{Env: env, defs: defs, qualified: qualified}
+	for progress := true; progress; {
+		progress = false
+		for _, def := range owners {
+			for _, ac := range def.Consts {
+				if ac.Value != nil || ac.Builtin || ac.Syntax == nil || ac.Syntax.Value == nil {
+					continue
+				}
+				// A written annotation that failed to resolve withholds the
+				// fold here, inside the memoized resolution, so every file
+				// sharing this definition sees the same absence — a broken
+				// declaration has no value (the publication rule's soundness
+				// side, decided at the source).
+				if ac.Syntax.Type != nil && ac.Type != nil && ir.HasInvalid(ac.Type) {
+					continue
+				}
+				v := eval.DeclExpecting(ac.Syntax, ac.Type, fenv)
+				if v == nil {
+					continue
+				}
+				ac.Value = v
+				if ac.Type == nil {
+					ac.Type = constantType(v)
+				}
+				progress = true
+			}
+		}
+	}
+	// A constant that never settled a type — unannotated and unfolded — is
+	// invalid, the same verdict the in-pass rule gave.
+	for _, def := range owners {
+		for _, ac := range def.Consts {
+			if ac.Type == nil {
+				ac.Type = ir.Invalid
+			}
+		}
+	}
 }
 
 // resolveInterfaceDecl fills in an interface definition: its generic parameters
@@ -722,13 +813,13 @@ func resolveAssocConstList(env eval.Env, r *infer.TypeResolver, reg *builtin.Reg
 		if c.Builtin {
 			// A `= builtin` constant takes its value from the type's native value
 			// range — Max/Min. A type with no bound on that side has no such
-			// constant (the arbitrary-precision nint): report no_bound.
+			// constant (the arbitrary-precision nint): it resolves to nothing.
+			// The declaration site needs no diagnostic here — a user file may
+			// not write `= builtin` at all (the builtin-surface check reports
+			// it), and the prelude, where the spelling is legal, is pinned
+			// bound-for-bound by its own tests.
 			value, ok := builtinBound(reg, def.Name, c.Name)
 			if !ok {
-				if at != nil && diags != nil {
-					s := at(c)
-					diags.Add(newNoBoundDiagnostic(s.offset, s.width, def.Name, c.Name))
-				}
 				ac.Type = ir.Invalid
 				out = append(out, ac)
 				continue
@@ -748,23 +839,15 @@ func resolveAssocConstList(env eval.Env, r *infer.TypeResolver, reg *builtin.Reg
 			continue
 		}
 
-		// An ordinary associated constant folds its initializer (when an
-		// evaluator is supplied) and types as its annotation, or — without one —
-		// as the kind of its folded value. A bare member in the initializer folds
-		// through the annotation's enum (const Fav: Rarity = Legend), the assoc-const
-		// twin of a top-level const's rule — annotationEnum read here directly off the
-		// resolved type, never the type query, so the value lowering stays independent.
-		if env != nil {
-			ac.Value = eval.DeclExpecting(c, annType, env)
-		}
-		switch {
-		case annType != nil:
-			ac.Type = annType
-		case ac.Value != nil:
-			ac.Type = constantType(ac.Value)
-		default:
-			ac.Type = ir.Invalid
-		}
+		// An ordinary associated constant records its resolved annotation type
+		// here; its initializer folds in resolveTypes' fourth pass, once every
+		// type and enum of the file has resolved, so a cross-type reference
+		// folds (foldAssocConsts — which also settles the type of an
+		// unannotated constant from its folded value). The annotation is the
+		// fold's expectation channel: a bare member resolves through its enum
+		// (const Fav: Rarity = Legend), the assoc-const twin of a top-level
+		// const's rule.
+		ac.Type = annType
 		out = append(out, ac)
 	}
 	return out

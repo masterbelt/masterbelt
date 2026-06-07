@@ -28,6 +28,44 @@ type Registry struct {
 	defs       map[string]*ir.TypeDef
 	natives    map[string]*NativeType
 	intrinsics map[string]map[string][]intrinsicEntry
+	effectful  []EffectfulNative
+}
+
+// EffectfulNative records a native the registry supplies no compile-time
+// implementation for: an effectful routine — the root of an effect — whose
+// implementation a target's codegen must provide. A pure native is an
+// Intrinsic (folded at compile time); an effectful one is never folded, so its
+// registration here is the explicit, CI-pinned obligation the prelude's
+// `extern ... fn <effect>` declaration is validated against per symbol.
+type EffectfulNative struct {
+	Type    string        // the owning primitive's name
+	Name    string        // the method or static fn name
+	Kind    ir.MethodKind // ir.MethodStatic for a static fn, ir.MethodNormal for an instance method
+	Effects []string      // the declared effects, in declaration order
+}
+
+// Effectful returns the effectful-native record of the named routine of the
+// given kind on the named primitive — what the prelude validation asks for an
+// extern declaration that carries effects.
+func (r *Registry) Effectful(typeName, name string, kind ir.MethodKind) (EffectfulNative, bool) {
+	for _, e := range r.effectful {
+		if e.Type == typeName && e.Name == name && e.Kind == kind {
+			return e, true
+		}
+	}
+	return EffectfulNative{}, false
+}
+
+// EffectfulNatives returns every effectful native in registration order — the
+// finite set of implementations a target's codegen owes, which the builtin
+// tests pin against the prelude's declarations.
+func (r *Registry) EffectfulNatives() []EffectfulNative {
+	return r.effectful
+}
+
+// registerEffectful records one effectful native.
+func (r *Registry) registerEffectful(e EffectfulNative) {
+	r.effectful = append(r.effectful, e)
 }
 
 // Lookup returns the type definition of the primitive named name.
@@ -73,6 +111,27 @@ func (r *Registry) Intrinsic(typeName, method string, kinds []ir.ConstKind) (Int
 // argument values exist yet.
 func (r *Registry) HasIntrinsic(typeName, method string) bool {
 	return len(r.intrinsics[typeName][method]) > 0
+}
+
+// IntrinsicSurface returns every (type, method) pair that has at least one
+// native implementation, sorted by type then method. It is the registry side
+// of the per-symbol prelude agreement: the builtin tests walk it to prove
+// every native is reachable from a bundled-source declaration (a dead native
+// fails the build) while the prelude validation proves the reverse.
+func (r *Registry) IntrinsicSurface() [][2]string {
+	var out [][2]string
+	for typeName, ms := range r.intrinsics {
+		for method := range ms {
+			out = append(out, [2]string{typeName, method})
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i][0] != out[j][0] {
+			return out[i][0] < out[j][0]
+		}
+		return out[i][1] < out[j][1]
+	})
+	return out
 }
 
 // kindsEqual reports whether the two kind signatures are the same.
@@ -148,7 +207,14 @@ func Default() *Registry {
 	}
 	for _, spec := range integerSpecs {
 		kind := spec.kind
-		r.register(spec.name, &NativeType{Name: spec.name, Int: &kind}, integerMethods(), integerIntrinsics())
+		ii := integerIntrinsics()
+		if !kind.Signed {
+			// The unsigned integers declare no negation in the prelude, so a
+			// neg intrinsic on them would be a dead native — registered but
+			// reachable from no declaration (the agreement test pins this).
+			delete(ii, "neg")
+		}
+		r.register(spec.name, &NativeType{Name: spec.name, Int: &kind}, integerMethods(), ii)
 	}
 	r.register("bool", &NativeType{Name: "bool", Bool: true}, booleanMethods(), booleanIntrinsics())
 	r.register("string", &NativeType{Name: "string", Str: true}, stringMethods(), stringIntrinsics())
@@ -165,6 +231,11 @@ func Default() *Registry {
 		binaryMillis(ir.ConstDatetime, ir.ConstDatetime, checkedMillis(subMillis, ir.DurationConstant)))
 	r.registerIntrinsic("datetime", "sub", []ir.ConstKind{ir.ConstDuration},
 		binaryMillis(ir.ConstDatetime, ir.ConstDuration, checkedMillis(subMillis, ir.DatetimeConstant)))
+	// datetime.now(): the current instant — the first effectful native, the
+	// root of nondet. It deliberately has no compile-time implementation: a
+	// nondet value does not reproduce, so folding it would be wrong by
+	// definition; a target's codegen supplies it at runtime.
+	r.registerEffectful(EffectfulNative{Type: "datetime", Name: "now", Kind: ir.MethodStatic, Effects: []string{"nondet"}})
 
 	// duration: add is overloaded by the argument's kind — another span sums,
 	// a datetime yields the instant the span after it.

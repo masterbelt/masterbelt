@@ -1,5 +1,9 @@
 /// An instant in time: a D-prefixed ISO-8601 literal (D2009-03-31T23:59:59.000Z, offsets allowed), normalized to UTC with millisecond precision.
 pub type datetime = builtin impl {
+  /// The current instant. nondet: a wall-clock read does not reproduce, so it
+  /// is never folded — the value exists only at runtime, supplied by the
+  /// target's native implementation.
+  pub extern static fn nondet now(): datetime
   /// The + operator: the instant a duration later.
   pub extern fn add(amount: duration): self
   /// The - operator: the span from another instant to this one.

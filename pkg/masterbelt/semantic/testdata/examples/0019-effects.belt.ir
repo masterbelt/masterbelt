@@ -3,29 +3,17 @@ Module
     type nint
     value double(IntLiteral "21")
     eval 42
-  TypeDef "Client" pub
-    body { base: string }
-    method "get" pub
-      effects io async
-      param path: string
-      result string | error
-      return await fetch(self.base.add(ParamRef "path"))
-  Func "fetch" extern
-    effects io async
-    param url: string
-    result string | error
-  Func "now" extern
-    effects nondet
-    result datetime
-  Func "pageTitle" pub
-    effects io async
-    param url: string
-    result string | error
-      return await fetch(ParamRef "url")
+  TypeDef "Clock" pub
+    body { offset: duration }
+    method "read" pub
+      doc "The current instant, shifted by this clock's offset."
+      effects nondet
+      result datetime
+      return datetime.now().add(self.offset)
   Func "stamp" pub
     effects nondet
     result datetime
-      return now()
+      return datetime.now()
   Func "double" pub
     param x: nint
     result nint

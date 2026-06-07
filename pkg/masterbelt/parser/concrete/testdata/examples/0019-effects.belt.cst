@@ -12,205 +12,20 @@ File
     LineComment "// is never folded; it compiles to runtime code for a target."
     Newline "\n"
     Newline "\n"
-    LineComment "// The roots of effects are extern declarations: natives a target supplies."
+    LineComment "// The root of an effect is a native the toolchain's registry supplies — here"
     Newline "\n"
-    Extern "extern"
-    Whitespace " "
-    Fn "fn"
-    Whitespace " "
-    Io "io"
-    Whitespace " "
-    Async "async"
-    Whitespace " "
-    Ident "fetch"
-    ParamList
-      LParen "("
-      Param
-        Ident "url"
-        Colon ":"
-        Whitespace " "
-        TypeName
-          Ident "string"
-      RParen ")"
-    Colon ":"
-    Whitespace " "
-    UnionType
-      TypeName
-        Ident "string"
-      Whitespace " "
-      Pipe "|"
-      Whitespace " "
-      TypeName
-        Ident "error"
-  FuncDecl
+    LineComment "// datetime.now(), the current instant: nondet, because a wall-clock read does"
     Newline "\n"
-    Extern "extern"
-    Whitespace " "
-    Fn "fn"
-    Whitespace " "
-    Nondet "nondet"
-    Whitespace " "
-    Ident "now"
-    ParamList
-      LParen "("
-      RParen ")"
-    Colon ":"
-    Whitespace " "
-    TypeName
-      Ident "datetime"
-  FuncDecl
+    LineComment "// not reproduce. A root cannot be declared in user code: nothing there could"
+    Newline "\n"
+    LineComment "// supply its implementation."
     Newline "\n"
     Newline "\n"
-    LineComment "// Effects propagate by declaration, never by silent inference: pageTitle"
+    LineComment "// Effects propagate by declaration, never by silent inference: stamp calls"
     Newline "\n"
-    LineComment "// calls fetch, so it must declare io async itself — and the suspension point"
+    LineComment "// datetime.now(), so it must declare nondet itself. A nondet wrapper stays"
     Newline "\n"
-    LineComment "// is written out with await."
-    Newline "\n"
-    Pub "pub"
-    Whitespace " "
-    Fn "fn"
-    Whitespace " "
-    Io "io"
-    Whitespace " "
-    Async "async"
-    Whitespace " "
-    Ident "pageTitle"
-    ParamList
-      LParen "("
-      Param
-        Ident "url"
-        Colon ":"
-        Whitespace " "
-        TypeName
-          Ident "string"
-      RParen ")"
-    Colon ":"
-    Whitespace " "
-    UnionType
-      TypeName
-        Ident "string"
-      Whitespace " "
-      Pipe "|"
-      Whitespace " "
-      TypeName
-        Ident "error"
-    Whitespace " "
-    Block
-      LBrace "{"
-      Newline "\n"
-      Whitespace "  "
-      ReturnStmt
-        Return "return"
-        Whitespace " "
-        AwaitExpr
-          Await "await"
-          Whitespace " "
-          CallExpr
-            NameRef
-              Ident "fetch"
-            LParen "("
-            NameRef
-              Ident "url"
-            RParen ")"
-      Newline "\n"
-      RBrace "}"
-  TypeDecl
-    Newline "\n"
-    Newline "\n"
-    LineComment "// A method declares its effects the same way."
-    Newline "\n"
-    Pub "pub"
-    Whitespace " "
-    Type "type"
-    Whitespace " "
-    Ident "Client"
-    Whitespace " "
-    Assign "="
-    Whitespace " "
-    RecordType
-      LBrace "{"
-      Whitespace " "
-      Field
-        Ident "base"
-        Colon ":"
-        Whitespace " "
-        TypeName
-          Ident "string"
-      Whitespace " "
-      RBrace "}"
-    Whitespace " "
-    ImplBlock
-      Impl "impl"
-      Whitespace " "
-      LBrace "{"
-      MethodDecl
-        Newline "\n"
-        Whitespace "  "
-        Pub "pub"
-        Whitespace " "
-        Fn "fn"
-        Whitespace " "
-        Io "io"
-        Whitespace " "
-        Async "async"
-        Whitespace " "
-        Ident "get"
-        ParamList
-          LParen "("
-          Param
-            Ident "path"
-            Colon ":"
-            Whitespace " "
-            TypeName
-              Ident "string"
-          RParen ")"
-        Colon ":"
-        Whitespace " "
-        UnionType
-          TypeName
-            Ident "string"
-          Whitespace " "
-          Pipe "|"
-          Whitespace " "
-          TypeName
-            Ident "error"
-        Whitespace " "
-        Block
-          LBrace "{"
-          Newline "\n"
-          Whitespace "    "
-          ReturnStmt
-            Return "return"
-            Whitespace " "
-            AwaitExpr
-              Await "await"
-              Whitespace " "
-              CallExpr
-                NameRef
-                  Ident "fetch"
-                LParen "("
-                BinaryExpr
-                  MemberExpr
-                    SelfExpr
-                      Self "self"
-                    Dot "."
-                    Ident "base"
-                  Whitespace " "
-                  Plus "+"
-                  Whitespace " "
-                  NameRef
-                    Ident "path"
-                RParen ")"
-          Newline "\n"
-          Whitespace "  "
-          RBrace "}"
-      Newline "\n"
-      RBrace "}"
-  FuncDecl
-    Newline "\n"
-    Newline "\n"
-    LineComment "// A nondet wrapper stays nondet: the timestamp must not fold into a value."
+    LineComment "// nondet — the timestamp must never fold into a value."
     Newline "\n"
     Pub "pub"
     Whitespace " "
@@ -230,10 +45,92 @@ File
     Arrow "->"
     Whitespace " "
     CallExpr
-      NameRef
+      MemberExpr
+        NameRef
+          Ident "datetime"
+        Dot "."
         Ident "now"
       LParen "("
       RParen ")"
+  TypeDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// A method declares its effects the same way."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Type "type"
+    Whitespace " "
+    Ident "Clock"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    RecordType
+      LBrace "{"
+      Whitespace " "
+      Field
+        Ident "offset"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "duration"
+      Whitespace " "
+      RBrace "}"
+    Whitespace " "
+    ImplBlock
+      Impl "impl"
+      Whitespace " "
+      LBrace "{"
+      MethodDecl
+        Newline "\n"
+        Whitespace "  "
+        DocComment "/// The current instant, shifted by this clock's offset."
+        Newline "\n"
+        Whitespace "  "
+        Pub "pub"
+        Whitespace " "
+        Fn "fn"
+        Whitespace " "
+        Nondet "nondet"
+        Whitespace " "
+        Ident "read"
+        ParamList
+          LParen "("
+          RParen ")"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "datetime"
+        Whitespace " "
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            BinaryExpr
+              CallExpr
+                MemberExpr
+                  NameRef
+                    Ident "datetime"
+                  Dot "."
+                  Ident "now"
+                LParen "("
+                RParen ")"
+              Whitespace " "
+              Plus "+"
+              Whitespace " "
+              MemberExpr
+                SelfExpr
+                  Self "self"
+                Dot "."
+                Ident "offset"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
+      Newline "\n"
+      RBrace "}"
   FuncDecl
     Newline "\n"
     Newline "\n"

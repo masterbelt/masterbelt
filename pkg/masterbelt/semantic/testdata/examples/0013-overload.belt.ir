@@ -5,11 +5,11 @@ Module
     eval 100
   Const "Bumped"
     type Score
-    value Reference -> "Base".merge(IntLiteral "50")
+    value Reference -> "Base".merge(IntLiteral "50") [resolved merge(points: self): self]
     eval 150
   Const "Counted"
     type bool
-    value Reference -> "Base".merge(BoolLiteral true)
+    value Reference -> "Base".merge(BoolLiteral true) [resolved merge(active: bool): bool]
     eval true
   Const "Start"
     type Level
@@ -17,11 +17,11 @@ Module
     eval 1
   Const "Second"
     type Level
-    value Reference -> "Start".next()
+    value Reference -> "Start".next() [resolved next(): self]
     eval 2
   Const "Fifth"
     type Level
-    value Reference -> "Start".next(IntLiteral "4")
+    value Reference -> "Start".next(IntLiteral "4") [resolved next(steps: self): self]
     eval 5
   TypeDef "Score" pub
     doc "A game score in points."

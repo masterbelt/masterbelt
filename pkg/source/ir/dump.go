@@ -182,6 +182,23 @@ func dumpMethod(b *strings.Builder, m *Method) {
 	}
 }
 
+// resolvedSuffix renders the overload individual an overloaded call was bound
+// to (Call.Resolved and friends) as a suffix on the call: the selected
+// signature, so the .ir snapshot fixes which individual the type system chose
+// and a type/eval disagreement is visible in review. A single-signature call
+// carries no resolution and renders without it.
+func resolvedSuffix(name string, params []Param, result Type) string {
+	parts := make([]string, len(params))
+	for i, p := range params {
+		parts[i] = p.Name + ": " + typeString(p.Type)
+	}
+	sig := name + "(" + strings.Join(parts, ", ") + ")"
+	if result != nil {
+		sig += ": " + typeString(result)
+	}
+	return " [resolved " + sig + "]"
+}
+
 func dumpStmt(b *strings.Builder, s Stmt) {
 	dumpStmtAt(b, s, "      ")
 }
@@ -470,7 +487,13 @@ func dumpValue(v Value) string {
 		if x.Setter && len(x.Args) == 1 {
 			return fmt.Sprintf("%s.%s = %s", dumpValue(x.Receiver), x.Method, args[0])
 		}
-		return fmt.Sprintf("%s.%s(%s)", dumpValue(x.Receiver), x.Method, strings.Join(args, ", "))
+		call := fmt.Sprintf("%s.%s(%s)", dumpValue(x.Receiver), x.Method, strings.Join(args, ", "))
+		if x.Resolved != nil {
+			// An overloaded call renders the individual the checker selected,
+			// so the snapshot pins which signature the type system chose.
+			call += resolvedSuffix(x.Method, x.Resolved.Params, x.Resolved.Result)
+		}
+		return call
 	case *FuncCall:
 		name := "<unresolved>"
 		if x.Target != nil {
@@ -480,7 +503,11 @@ func dumpValue(v Value) string {
 		for i, a := range x.Args {
 			args[i] = dumpValue(a)
 		}
-		return fmt.Sprintf("%s(%s)", name, strings.Join(args, ", "))
+		call := fmt.Sprintf("%s(%s)", name, strings.Join(args, ", "))
+		if x.Resolved != nil {
+			call += resolvedSuffix(x.Resolved.Name, x.Resolved.Params, x.Resolved.Result)
+		}
+		return call
 	case *StaticCall:
 		// Type.name(arg, arg): the owning type and the static fn name, the
 		// Type.Name path enum members and associated constants render through too.
@@ -492,7 +519,11 @@ func dumpValue(v Value) string {
 		for i, a := range x.Args {
 			args[i] = dumpValue(a)
 		}
-		return fmt.Sprintf("%s.%s(%s)", typ, x.Name, strings.Join(args, ", "))
+		call := fmt.Sprintf("%s.%s(%s)", typ, x.Name, strings.Join(args, ", "))
+		if x.Resolved != nil {
+			call += resolvedSuffix(x.Name, x.Resolved.Params, x.Resolved.Result)
+		}
+		return call
 	case *FuncLiteral:
 		parts := []string{"fn(" + strings.Join(x.Params, ", ") + ")"}
 		for _, s := range x.Body {

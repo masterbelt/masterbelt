@@ -24,6 +24,7 @@ const (
 	CodeAssignToUndefined          diagnostic.Code = "masterbelt.semantic.assign_to_undefined"
 	CodeAssignTypeMismatch         diagnostic.Code = "masterbelt.semantic.assign_type_mismatch"
 	CodeBoundNotSatisfied          diagnostic.Code = "masterbelt.semantic.bound_not_satisfied"
+	CodeBuiltinOutsideBuiltin      diagnostic.Code = "masterbelt.semantic.builtin_outside_builtin"
 	CodeConditionNotBool           diagnostic.Code = "masterbelt.semantic.condition_not_bool"
 	CodeConstantOverflow           diagnostic.Code = "masterbelt.semantic.constant_overflow"
 	CodeCyclicModule               diagnostic.Code = "masterbelt.semantic.cyclic_module"
@@ -37,6 +38,7 @@ const (
 	CodeDuplicateOverload          diagnostic.Code = "masterbelt.semantic.duplicate_overload"
 	CodeDuplicateSwitchArm         diagnostic.Code = "masterbelt.semantic.duplicate_switch_arm"
 	CodeEffectInPureContext        diagnostic.Code = "masterbelt.semantic.effect_in_pure_context"
+	CodeExternOutsideBuiltin       diagnostic.Code = "masterbelt.semantic.extern_outside_builtin"
 	CodeGenericStatic              diagnostic.Code = "masterbelt.semantic.generic_static"
 	CodeImmutableData              diagnostic.Code = "masterbelt.semantic.immutable_data"
 	CodeIndexOutOfRange            diagnostic.Code = "masterbelt.semantic.index_out_of_range"
@@ -53,7 +55,6 @@ const (
 	CodeMissingInitializer         diagnostic.Code = "masterbelt.semantic.missing_initializer"
 	CodeMissingRequiredMethod      diagnostic.Code = "masterbelt.semantic.missing_required_method"
 	CodeMissingReturn              diagnostic.Code = "masterbelt.semantic.missing_return"
-	CodeNoBound                    diagnostic.Code = "masterbelt.semantic.no_bound"
 	CodeNoMatchingFuncOverload     diagnostic.Code = "masterbelt.semantic.no_matching_func_overload"
 	CodeNoMatchingOverload         diagnostic.Code = "masterbelt.semantic.no_matching_overload"
 	CodeNoMethodOnUnboundedTypevar diagnostic.Code = "masterbelt.semantic.no_method_on_unbounded_typevar"
@@ -74,6 +75,7 @@ const (
 	CodeTernaryConditionNotBool    diagnostic.Code = "masterbelt.semantic.ternary_condition_not_bool"
 	CodeTypeMismatch               diagnostic.Code = "masterbelt.semantic.type_mismatch"
 	CodeUndefinedName              diagnostic.Code = "masterbelt.semantic.undefined_name"
+	CodeUnfoldedConst              diagnostic.Code = "masterbelt.semantic.unfolded_const"
 	CodeUninferableCollection      diagnostic.Code = "masterbelt.semantic.uninferable_collection"
 	CodeUninferableParameter       diagnostic.Code = "masterbelt.semantic.uninferable_parameter"
 	CodeUninferableRecord          diagnostic.Code = "masterbelt.semantic.uninferable_record"
@@ -310,6 +312,20 @@ func newBoundNotSatisfiedDiagnostic(offset int, width int, typ string, bound str
 	}
 }
 
+func newBuiltinOutsideBuiltinDiagnostic(offset int, width int, name string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"name": diagnostic.Str(name),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeBuiltinOutsideBuiltin,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeBuiltinOutsideBuiltin, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
 func newConditionNotBoolDiagnostic(offset int, width int, typ string) diagnostic.Diagnostic {
 	fields := map[string]fmt.Stringer{
 		"typ": diagnostic.Str(typ),
@@ -488,6 +504,20 @@ func newEffectInPureContextDiagnostic(offset int, width int, effect string, cont
 		Severity: diagnostic.Error,
 		Code:     CodeEffectInPureContext,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeEffectInPureContext, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newExternOutsideBuiltinDiagnostic(offset int, width int, name string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"name": diagnostic.Str(name),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeExternOutsideBuiltin,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeExternOutsideBuiltin, fields),
 		Fields:   fields,
 		Offset:   offset,
 		Width:    width,
@@ -721,21 +751,6 @@ func newMissingReturnDiagnostic(offset int, width int, name string) diagnostic.D
 		Severity: diagnostic.Error,
 		Code:     CodeMissingReturn,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeMissingReturn, fields),
-		Fields:   fields,
-		Offset:   offset,
-		Width:    width,
-	}
-}
-
-func newNoBoundDiagnostic(offset int, width int, typ string, name string) diagnostic.Diagnostic {
-	fields := map[string]fmt.Stringer{
-		"typ":  diagnostic.Str(typ),
-		"name": diagnostic.Str(name),
-	}
-	return diagnostic.Diagnostic{
-		Severity: diagnostic.Error,
-		Code:     CodeNoBound,
-		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeNoBound, fields),
 		Fields:   fields,
 		Offset:   offset,
 		Width:    width,
@@ -1018,6 +1033,21 @@ func newUndefinedNameDiagnostic(offset int, width int, name string) diagnostic.D
 		Severity: diagnostic.Error,
 		Code:     CodeUndefinedName,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeUndefinedName, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newUnfoldedConstDiagnostic(offset int, width int, name string, reason string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"name":   diagnostic.Str(name),
+		"reason": diagnostic.Str(reason),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeUnfoldedConst,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeUnfoldedConst, fields),
 		Fields:   fields,
 		Offset:   offset,
 		Width:    width,

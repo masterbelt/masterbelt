@@ -1,0 +1,11 @@
+// fold-expect: folds
+// A for loop accumulating into a let folds inside an applied body.
+pub fn sum(xs: list<nint>): nint {
+  let total = 0
+  for x of xs {
+    total = total + x
+  }
+  return total
+}
+const S = sum([1, 2, 3])
+assert S == 6

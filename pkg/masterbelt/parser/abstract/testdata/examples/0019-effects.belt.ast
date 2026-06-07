@@ -4,38 +4,20 @@ File
     value (call Identifier "double" IntLit "21")
   TypeDecl
     pub
-    name "Client"
-    body { base: string }
-    method "get"
+    name "Clock"
+    body { offset: duration }
+    method "read"
+      doc "The current instant, shifted by this clock's offset."
       pub
-      effects io async
-      param path: string
-      result string | error
-      return (await (call Identifier "fetch" (call (. (. self base) add) Identifier "path")))
-  FuncDecl
-    extern
-    effects io async
-    name "fetch"
-    param url: string
-    result string | error
-  FuncDecl
-    extern
-    effects nondet
-    name "now"
-    result datetime
-  FuncDecl
-    pub
-    effects io async
-    name "pageTitle"
-    param url: string
-    result string | error
-      return (await (call Identifier "fetch" Identifier "url"))
+      effects nondet
+      result datetime
+      return (call (. (call (. Identifier "datetime" now)) add) (. self offset))
   FuncDecl
     pub
     effects nondet
     name "stamp"
     result datetime
-      return (call Identifier "now")
+      return (call (. Identifier "datetime" now))
   FuncDecl
     pub
     name "double"

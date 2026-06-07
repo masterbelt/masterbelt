@@ -1,0 +1,11 @@
+// fold-expect: folds
+// Every map operation folds: the literal, len, set, keys, values, filter, fold.
+const Tbl = ["sword": 100, "shield": 50]
+const N = Tbl.len()
+const Bumped = Tbl.set("sword", 120)
+const Keys = Tbl.keys()
+const Values = Tbl.values()
+const Cheap = Tbl.filter(fn(v: nint): bool -> v < 60)
+const Total = Tbl.fold(0, fn(a: nint, k: string, v: nint): nint -> a + v)
+assert N == 2
+assert Total == 150

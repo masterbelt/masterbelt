@@ -1,0 +1,6 @@
+// fold-expect: folds
+// A record literal folds, and a field access reads its value.
+pub type Point = { x: nint, y: nint }
+const P = Point{ x: 3, y: 4 }
+const X = P.x
+assert X == 3

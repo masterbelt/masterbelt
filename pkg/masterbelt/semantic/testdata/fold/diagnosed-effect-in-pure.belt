@@ -1,0 +1,5 @@
+// fold-expect: diagnosed effect_in_pure_context
+// The registry's effectful native is rejected from a const initializer: a
+// nondet value has no compile-time existence, so the position itself errors —
+// never a silent unfold.
+const T = datetime.now()

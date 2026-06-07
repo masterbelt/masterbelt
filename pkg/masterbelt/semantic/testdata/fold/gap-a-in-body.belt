@@ -1,0 +1,8 @@
+// fold-expect: folds
+// (a) A const-referenced function value applied inside an applied body.
+const F = fn(x: nint): nint -> x + 1
+
+pub fn viaBody(): nint {
+  return F(2)
+}
+const A = viaBody()

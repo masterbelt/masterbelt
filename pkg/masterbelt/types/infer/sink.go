@@ -112,6 +112,19 @@ type Sink struct {
 	// through the type resolver; this is the inferred-literal twin, anchored at
 	// the literal so a map written without an annotation is still diagnosed.
 	MapKeyNotComparable func(lit *ast.CollectionLit, key, bound ir.Type)
+	// ResolvedMethod fires at a method call whose name carries several
+	// signatures on the receiver and whose arguments settled exactly one — the
+	// checker's overload selection, which the semantic layer writes back into
+	// the IR (ir.Call.Resolved) and the folder prefers over its value-kind
+	// rule. Like Checked it is an informational stream, never a finding; a
+	// single-signature method needs no selection and does not fire.
+	ResolvedMethod func(call *ast.CallExpr, m *ir.Method)
+	// ResolvedStatic is ResolvedMethod for a static fn call Type.name(args):
+	// the selected static overload individual. An informational stream.
+	ResolvedStatic func(call *ast.CallExpr, m *ir.Method)
+	// ResolvedFunc is ResolvedMethod for a call of an overloaded top-level
+	// function: the selected declaration. An informational stream.
+	ResolvedFunc func(call *ast.CallExpr, fd *ast.FuncDecl)
 }
 
 func (s *Sink) invalidOp(node ast.Node, method, operands string) {
@@ -267,5 +280,23 @@ func (s *Sink) unknownStatic(call *ast.CallExpr, name, typ string) {
 func (s *Sink) mapKeyNotComparable(lit *ast.CollectionLit, key, bound ir.Type) {
 	if s != nil && s.MapKeyNotComparable != nil {
 		s.MapKeyNotComparable(lit, key, bound)
+	}
+}
+
+func (s *Sink) resolvedMethod(call *ast.CallExpr, m *ir.Method) {
+	if s != nil && s.ResolvedMethod != nil {
+		s.ResolvedMethod(call, m)
+	}
+}
+
+func (s *Sink) resolvedStatic(call *ast.CallExpr, m *ir.Method) {
+	if s != nil && s.ResolvedStatic != nil {
+		s.ResolvedStatic(call, m)
+	}
+}
+
+func (s *Sink) resolvedFunc(call *ast.CallExpr, fd *ast.FuncDecl) {
+	if s != nil && s.ResolvedFunc != nil {
+		s.ResolvedFunc(call, fd)
 	}
 }

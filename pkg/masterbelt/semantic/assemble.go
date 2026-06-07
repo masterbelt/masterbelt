@@ -21,11 +21,31 @@ import (
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
 )
 
-// exprSink wires the checking walk's findings to their diagnostics. The
-// Checked stream is left unset — the const path hooks it to the eval-based
-// value-range check, which needs the declaration's context.
-func exprSink(at func(ast.Node) span, diags *diagnostic.List) *infer.Sink {
+// exprSink wires the checking walk's findings to their diagnostics, and its
+// overload-selection streams to the resolutions collector (res — the channel
+// the IR write-back and the late re-fold read). The Checked stream is left
+// unset — the const path hooks it to the eval-based value-range check, which
+// needs the declaration's context.
+func exprSink(at func(ast.Node) span, diags *diagnostic.List, res *callResolutions) *infer.Sink {
 	return &infer.Sink{
+		// The overload-selection streams; res is nil where no collector is in
+		// play (a refinement predicate's reporting pass), and the selections
+		// are then simply not recorded.
+		ResolvedMethod: func(call *ast.CallExpr, m *ir.Method) {
+			if res != nil {
+				res.methods[call] = m
+			}
+		},
+		ResolvedStatic: func(call *ast.CallExpr, m *ir.Method) {
+			if res != nil {
+				res.statics[call] = m
+			}
+		},
+		ResolvedFunc: func(call *ast.CallExpr, fd *ast.FuncDecl) {
+			if res != nil {
+				res.funcs[call] = fd
+			}
+		},
 		InvalidOp: func(node ast.Node, method, operands string) {
 			s := at(node)
 			diags.Add(newInvalidOperationDiagnostic(s.offset, s.width, method, operands))
@@ -129,8 +149,8 @@ func exprSink(at func(ast.Node) span, diags *diagnostic.List) *infer.Sink {
 // flowing into a sized or refined position (the union member included) is enforced
 // in a body exactly as in a const. env folds the values; a non-constant value
 // (a parameter, a local) does not fold and is left to the runtime.
-func bodySink(at func(ast.Node) span, diags *diagnostic.List, reg *builtin.Registry, env evalEnv) *infer.Sink {
-	sink := exprSink(at, diags)
+func bodySink(at func(ast.Node) span, diags *diagnostic.List, reg *builtin.Registry, env evalEnv, res *callResolutions) *infer.Sink {
+	sink := exprSink(at, diags, res)
 	sink.Checked = func(e ast.Expr, want ir.Type) {
 		checkMemberFlow(reg, e, want, env, at, diags)
 	}
@@ -155,6 +175,10 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 	at := func(n ast.Node) span { return spanOf(positions, n) }
 	env := typeEnv{q: q, file: fileID}
 	reg := q.registry()
+	// The checker-selected overloads, collected from every checking walk below
+	// and written back into the IR (and armed for the late re-fold) once the
+	// walks are done.
+	res := newCallResolutions()
 
 	// The module's constants are this file's shells, in source order.
 	module := &ir.Module{}
@@ -226,7 +250,7 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 			// the inner expressions (collection entries, record fields,
 			// returns) are checked here — a typed record literal pushes its
 			// field types even without an annotation.
-			sink := exprSink(at, diags)
+			sink := exprSink(at, diags, res)
 			sink.Checked = func(e ast.Expr, want ir.Type) {
 				if e == decl.Value {
 					return
@@ -303,10 +327,102 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 		}
 	}
 
+	// The module's type definitions come from the memoized query — the same
+	// objects annotations resolved against, so Named identity never forks. The
+	// query resolves silently (its result is reused across revisions, but
+	// diagnostics carry offsets that shift on every edit), so the reporting
+	// pass re-resolves the declarations fresh and discards the definitions.
+	module.Types = q.typeDefs(fileID)
+	imp := q.importsOf(fileID)
+	bfns := bodyFuncs{local: funcShellsByName(file, fnShells), qualified: qualifiedFuncsFrom(q, imp), shells: fnShells}
+	resolveTypes(evalEnv{q: q, file: fileID}, file, at, diags, reg, outerTypes(q, imp), qualifiedFrom(q, imp), bfns)
+
+	// The module's functions are this file's shells, their signatures and
+	// bodies (re)resolved here with reporting; their bodies type-check the
+	// same way method bodies do.
+	funcs := buildFuncSymbols(file)
+	qfns := qualifiedFuncsFrom(q, imp)
+	module.Funcs = resolveFuncs(file, at, diags, reg, q.universe(fileID), qualifiedFrom(q, imp), qfns, fnShells)
+	bodyEnv := evalEnv{q: q, file: fileID}
+	// A function or method body's returns, lets, and arguments run the same
+	// member-aware range and refinement check the const initializer does, so a
+	// constant value flowing into a sized or refined (union member) result, local,
+	// or parameter is checked at the body site too — the position the result-type
+	// soundness gap left unchecked. Only a constant value folds; a body-local or
+	// parameter reference does not, and is left to the runtime.
+	checkMethodBodies(reg, module.Types, q.universe(fileID), qualifiedFrom(q, imp), funcs, qfns, bodyEnv, bodySink(at, diags, reg, bodyEnv, res), at, diags)
+	checkFuncBodies(reg, file, q.universe(fileID), qualifiedFrom(q, imp), funcs, qfns, bodyEnv, bodySink(at, diags, reg, bodyEnv, res), at, diags)
+	checkEffects(reg, file, module.Types, q.universe(fileID), qualifiedFrom(q, imp), funcs, qfns, at, diags)
+
+	// The builtin-surface contract: extern and `= builtin` claim a registry-
+	// supplied implementation, which only the trusted prelude channel (never
+	// assembled) can honor — in an assembled file both are declaration-site
+	// errors.
+	checkBuiltinSurface(file, at, diags)
+
+	// Reference diagnostics for the associated-constant initializers: the
+	// undefined names, unknown members, and stray selfs the const loop reports
+	// for a top-level initializer, anchored the same way — an unresolvable
+	// reference in an impl-block const must be as loud as anywhere else. A
+	// bare member resolves through the annotation's enum, exactly as a
+	// top-level const's does.
+	checkAssocConstRefs := func(consts []*ast.ConstDecl) {
+		for _, c := range consts {
+			if c.Value == nil {
+				continue
+			}
+			reportRefIssues(fileID, c.Value, q, at, diags, typeExprEnum(q, fileID, c.Type))
+			checkNoSelf(c.Value, func(node ast.Node) {
+				s := at(node)
+				diags.Add(newSelfOutsideMethodDiagnostic(s.offset, s.width))
+			})
+		}
+	}
+	for _, td := range file.Types {
+		checkAssocConstRefs(td.Consts)
+	}
+	for _, ed := range file.Enums {
+		checkAssocConstRefs(ed.Consts)
+	}
+
+	// Every checking walk has run: bind the checker-selected overloads into the
+	// IR (the doctrine that every reference is bound to its declaration, met
+	// for overloaded calls) and arm them for evaluation.
+	writeBackResolutions(module, res, fnShells)
+	ownShells := make(map[*ast.ConstDecl]*ir.Const, len(file.Decls))
+	for _, decl := range file.Decls {
+		ownShells[decl] = shells[decl]
+	}
+	renv := resolvedEnv{evalEnv: evalEnv{q: q, file: fileID}, res: res, own: ownShells}
+
+	// The late re-fold: a constant the type-blind value query left unfolded is
+	// folded once more with the checker's selections armed. The resolutions
+	// only widen the foldable set (a call with no recorded selection folds
+	// exactly as before), so the memoized value query and this pass agree
+	// wherever both fold — the parity the fold gate pins. The loop runs to a
+	// fixpoint: renv reads this file's published values, so a reader of a
+	// re-folded constant folds in a later round, whatever the declaration
+	// order.
+	for progress := true; progress; {
+		progress = false
+		for _, decl := range file.Decls {
+			c := shells[decl]
+			if c.Eval == nil && decl.Value != nil {
+				if c.Eval = eval.DeclExpecting(decl, annotationResolved(q, fileID, decl), renv); c.Eval != nil {
+					progress = true
+				}
+			}
+		}
+	}
+
 	// Compile-time assertions: each condition must resolve, type as bool, and
 	// fold to true. An assert produces no IR — it is a diagnostic-only
 	// declaration — and every fact it needs is read through q, so the
 	// incremental engine tracks its dependencies exactly as it does a const's.
+	// The loop runs after every body has been checked, so the condition folds
+	// with the complete overload-resolution map armed (renv) — a call the
+	// value-kind rule cannot split, in the condition or in a body it applies,
+	// folds by the checker's selection.
 	for _, a := range file.Asserts {
 		if a.Cond == nil {
 			continue // already a parse diagnostic
@@ -320,7 +436,7 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 
 		// Operator type errors, zero divisors, and stray selfs, through the
 		// same checking walks the const path uses.
-		condType := infer.Check(a.Cond, env, exprSink(at, diags))
+		condType := infer.Check(a.Cond, env, exprSink(at, diags, res))
 		checkDivByZero(a.Cond, evalEnv{q: q, file: fileID}, func(node ast.Node) {
 			s := at(node)
 			diags.Add(newDivisionByZeroDiagnostic(s.offset, s.width))
@@ -337,9 +453,20 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 		// The outcome — the folded condition and its power-assert diagram —
 		// is module data: the editor's hover and the failure diagnostic both
 		// read the very values the assertion was checked with.
-		v := eval.Expr(a.Cond, evalEnv{q: q, file: fileID})
-		d := assert.Diagram(a.Cond, evalEnv{q: q, file: fileID})
+		v := eval.Expr(a.Cond, renv)
+		d := assert.Diagram(a.Cond, renv)
 		cond, _, _ := strings.Cut(d, "\n")
+
+		// A poisoned condition type — the assert's own error, or a broken
+		// dependency's Invalid propagating in — publishes no outcome: the
+		// type-blind fold may well have produced a value, but one that never
+		// passed the type-bound checks must not turn an assertion green (the
+		// soundness half of the publication rule). The cause carries its own
+		// diagnostic at its origin.
+		if condType == ir.Invalid {
+			module.Asserts = append(module.Asserts, &ir.Assert{Cond: cond, Doc: a.Doc, Syntax: a})
+			continue
+		}
 		module.Asserts = append(module.Asserts, &ir.Assert{Cond: cond, Doc: a.Doc, Eval: v, Diagram: d, Syntax: a})
 
 		// The condition must be a bool. An Invalid type was reported above
@@ -378,33 +505,6 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 			diags.Add(newAssertionFailedDiagnostic(s.offset, s.width, cond, doc, diagram))
 		}
 	}
-
-	// The module's type definitions come from the memoized query — the same
-	// objects annotations resolved against, so Named identity never forks. The
-	// query resolves silently (its result is reused across revisions, but
-	// diagnostics carry offsets that shift on every edit), so the reporting
-	// pass re-resolves the declarations fresh and discards the definitions.
-	module.Types = q.typeDefs(fileID)
-	imp := q.importsOf(fileID)
-	bfns := bodyFuncs{local: funcShellsByName(file, fnShells), qualified: qualifiedFuncsFrom(q, imp), shells: fnShells}
-	resolveTypes(evalEnv{q: q, file: fileID}, file, at, diags, reg, outerTypes(q, imp), qualifiedFrom(q, imp), bfns)
-
-	// The module's functions are this file's shells, their signatures and
-	// bodies (re)resolved here with reporting; their bodies type-check the
-	// same way method bodies do.
-	funcs := buildFuncSymbols(file)
-	qfns := qualifiedFuncsFrom(q, imp)
-	module.Funcs = resolveFuncs(file, at, diags, reg, q.universe(fileID), qualifiedFrom(q, imp), qfns, fnShells)
-	bodyEnv := evalEnv{q: q, file: fileID}
-	// A function or method body's returns, lets, and arguments run the same
-	// member-aware range and refinement check the const initializer does, so a
-	// constant value flowing into a sized or refined (union member) result, local,
-	// or parameter is checked at the body site too — the position the result-type
-	// soundness gap left unchecked. Only a constant value folds; a body-local or
-	// parameter reference does not, and is left to the runtime.
-	checkMethodBodies(reg, module.Types, q.universe(fileID), qualifiedFrom(q, imp), funcs, qfns, bodyEnv, bodySink(at, diags, reg, bodyEnv), at, diags)
-	checkFuncBodies(reg, file, q.universe(fileID), qualifiedFrom(q, imp), funcs, qfns, bodyEnv, bodySink(at, diags, reg, bodyEnv), at, diags)
-	checkEffects(reg, file, module.Types, q.universe(fileID), qualifiedFrom(q, imp), funcs, qfns, at, diags)
 
 	// Compile-time positions must be pure: a constant initializer, an assert
 	// condition, an enum member initializer, an associated constant initializer,
@@ -445,6 +545,12 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 			}
 		}
 	}
+
+	// The publication rule, last — every diagnostic above is in, so both its
+	// directions read the settled facts: a broken declaration's value is
+	// withheld (soundness), and a clean declaration without a value is an
+	// error (totality, unfolded_const).
+	enforceEvalPublication(fileID, file, module, shells, q, renv, at, diags)
 
 	items := diags.Items()
 	sort.SliceStable(items, func(i, j int) bool { return items[i].Offset < items[j].Offset })

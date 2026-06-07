@@ -1,0 +1,7 @@
+// fold-expect: folds
+// Datetime and duration literals and their arithmetic fold.
+const Epoch = D1970-01-01T00:00:00.000Z
+const Release = D2009-03-31T23:59:59.000Z
+const Deadline = Release + 7d
+const Span = Release - Epoch
+assert Release > Epoch

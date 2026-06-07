@@ -98,3 +98,24 @@ func TestIntrinsicSingleImplementation(t *testing.T) {
 		t.Error("HasIntrinsic(nint, frobnicate) = true, want false")
 	}
 }
+
+// TestEffectfulNativeRecord pins the first effectful native: datetime.now is
+// recorded as a nondet static fn, and — an effectful routine is never folded —
+// it carries no intrinsic.
+func TestEffectfulNativeRecord(t *testing.T) {
+	r := Default()
+	e, ok := r.Effectful("datetime", "now", ir.MethodStatic)
+	if !ok {
+		t.Fatal("datetime.now is not recorded as an effectful native")
+	}
+	if len(e.Effects) != 1 || e.Effects[0] != "nondet" {
+		t.Fatalf("datetime.now effects = %v, want [nondet]", e.Effects)
+	}
+	if r.HasIntrinsic("datetime", "now") {
+		t.Fatal("datetime.now must not carry an intrinsic: a nondet value never folds")
+	}
+	// The record is kind-keyed: there is no instance method datetime.now.
+	if _, ok := r.Effectful("datetime", "now", ir.MethodNormal); ok {
+		t.Fatal("datetime.now recorded as an instance method, want static only")
+	}
+}

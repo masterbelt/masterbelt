@@ -33,7 +33,7 @@ func callType(e *ast.CallExpr, s scope, sink *Sink) ir.Type {
 	if !ok {
 		// A call whose callee names a type is a conversion T(x) — the type
 		// wins over a same-named function — and one that names a top-level
-		// function is a function call; any other callee is nothing.
+		// function is a function call.
 		if id, isIdent := e.Callee.(*ast.Identifier); isIdent {
 			if t := s.conv(id); t != ir.Invalid {
 				return convCallType(e, id.Name, t, s, sink)
@@ -41,6 +41,26 @@ func callType(e *ast.CallExpr, s scope, sink *Sink) ir.Type {
 			if cands := s.fn(id); len(cands) > 0 {
 				return funcCallType(e, id.Name, cands, s, sink)
 			}
+		}
+		// A callee that itself types as a function value applies — a
+		// function-typed constant (F(2)), a local or parameter bound to one,
+		// an immediately applied literal — mirroring the folder's general
+		// function-value arm: each argument checks against the function
+		// type's parameter, and the call's type is its result. A callee of
+		// any other type falls through to the leaf forms (whose channels
+		// report an unresolved name).
+		if fn, isFn := check(e.Callee, s, sink).(*ir.Func); isFn {
+			if len(e.Arguments) != len(fn.Params) {
+				for _, a := range e.Arguments {
+					check(a, s, sink)
+				}
+				sink.arityMismatch(e, calleeName(e.Callee), len(e.Arguments), len(fn.Params))
+				return ir.Invalid
+			}
+			for i, a := range e.Arguments {
+				checkType(a, fn.Params[i], s, map[string]ir.Type{}, sink)
+			}
+			return fn.Result
 		}
 		return s.leaf(e)
 	}
@@ -126,6 +146,12 @@ func callType(e *ast.CallExpr, s scope, sink *Sink) ir.Type {
 		return ir.Invalid
 	}
 	m, subst, operand := matches[0].Method, matches[0].Subst, matches[0].Operand
+	// The selection among several signatures is the checker's overload
+	// resolution — streamed out so the semantic layer can write it back into
+	// the IR (ir.Call.Resolved) and the folder can prefer it.
+	if len(candidates) > 1 {
+		sink.resolvedMethod(e, m)
+	}
 
 	// Pass 2 — the function literals, each checked against its parameter
 	// pattern. A finding inside the literal (a mismatch, an uninferable part)
@@ -280,7 +306,7 @@ func staticSigs(def *ir.TypeDef, name string) []funcSig {
 		for i, p := range m.Params {
 			params[i] = substituteSelf(p.Type, self)
 		}
-		sigs = append(sigs, funcSig{params: params, result: substituteSelf(m.Result, self)})
+		sigs = append(sigs, funcSig{m: m, params: params, result: substituteSelf(m.Result, self)})
 	}
 	return sigs
 }
@@ -299,9 +325,12 @@ func substituteSelf(t, self ir.Type) ir.Type {
 // parameter/result types, and — for a generic function — its type parameters
 // (each a TypeVar name with an optional bound). A type parameter appears as a
 // TypeVar in params/result; the call solves it from the argument types (Match)
-// and substitutes it into the result.
+// and substitutes it into the result. Exactly one of fd (a top-level
+// function's declaration) and m (a static fn's method) is set — the handle the
+// overload-selection stream reports the winner through.
 type funcSig struct {
 	fd         *ast.FuncDecl
+	m          *ir.Method
 	typeParams []*ir.TypeParam
 	params     []ir.Type
 	result     ir.Type
@@ -348,9 +377,26 @@ func funcCallType(e *ast.CallExpr, name string, cands []*ast.FuncDecl, s scope, 
 	}
 
 	if len(sigs) == 1 {
+		// The overload set collapsed to one signature — duplicates dropped,
+		// the first declaration kept callable. The survivor is still a
+		// selection among several declarations, so it is streamed out: the
+		// folder then applies the declaration the checker chose rather than
+		// refusing the by-value-ambiguous duplicate set.
+		if len(cands) > 1 {
+			sink.resolvedFunc(e, sigs[0].fd)
+		}
 		return checkFuncCall(e, name, sigs[0], s, sink)
 	}
 	return selectFuncOverload(e, name, sigs, s, sink)
+}
+
+// calleeName renders a call's callee for the arity diagnostic: an identifier
+// by its name, any other function-valued expression generically.
+func calleeName(callee ast.Expr) string {
+	if id, ok := callee.(*ast.Identifier); ok {
+		return id.Name
+	}
+	return "function value"
 }
 
 // selectFuncOverload resolves a call against an overload set of two or more
@@ -445,6 +491,16 @@ func selectFuncOverload(e *ast.CallExpr, name string, sigs []funcSig, s scope, s
 	// the single-signature checkFuncCall does, rather than discarding the Match
 	// result and resolving the call against whichever binding was written first.
 	win := matches[0]
+	// The selection among several signatures is the checker's overload
+	// resolution — streamed out for the IR write-back and the folder. The
+	// winner carries the handle of its kind: a top-level function's
+	// declaration, or a static fn's method.
+	switch {
+	case win.m != nil:
+		sink.resolvedStatic(e, win.m)
+	case win.fd != nil:
+		sink.resolvedFunc(e, win.fd)
+	}
 	subst := map[string]ir.Type{}
 	for i, kt := range known {
 		if kt == nil {

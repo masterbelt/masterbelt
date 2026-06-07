@@ -1,0 +1,2 @@
+// fold-expect: diagnosed unknown_type
+const M: Bogus = ["a": 1]

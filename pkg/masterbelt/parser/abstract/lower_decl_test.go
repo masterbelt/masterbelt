@@ -609,3 +609,24 @@ func TestLowerEnumMalformedRecovers(t *testing.T) {
 		t.Errorf("member = %+v, want name A with nil Value", m)
 	}
 }
+
+// TestLowerExternStaticFn checks `extern static fn` lowers with both markers
+// set — Extern true and Kind static — alongside its effect list and no body:
+// the builtin surface's spelling for a static native the registry supplies.
+func TestLowerExternStaticFn(t *testing.T) {
+	src := "type C = { d: nint } impl {\n  pub extern static fn nondet now(): C\n}\n"
+	file, diags := Lower([]byte(src))
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	m := file.Types[0].Methods[0]
+	if !m.Extern || m.Kind != ast.MethodStatic {
+		t.Fatalf("method = (extern %v, kind %s), want (extern true, kind static)", m.Extern, m.Kind)
+	}
+	if m.Name != "now" || len(m.Effects) != 1 || m.Effects[0] != "nondet" {
+		t.Fatalf("method = (%q, effects %v), want (now, [nondet])", m.Name, m.Effects)
+	}
+	if len(m.Body) != 0 {
+		t.Fatalf("extern static fn carries a body: %v", m.Body)
+	}
+}

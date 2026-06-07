@@ -1,0 +1,13 @@
+// fold-expect: folds
+// A static fn call and a getter read fold (E-19).
+pub type Celsius = { deg: nint } impl {
+  pub static fn freezing(): Celsius {
+    return Celsius{ deg: 0 }
+  }
+  pub get fahrenheit(): nint {
+    return self.deg * 9 / 5 + 32
+  }
+}
+const Freezing = Celsius.freezing()
+const F = Freezing.fahrenheit
+assert F == 32
