@@ -62,33 +62,35 @@ const (
 	In        // in (for: bind the key — a map key, a list index)
 
 	// Operators and punctuation.
-	Colon    // :
-	Question // ?
-	Assign   // =
-	Plus     // +
-	Minus    // -
-	Star     // *
-	Slash    // /
-	Percent  // %
-	EqEq     // ==
-	BangEq   // !=
-	Lt       // <
-	LtEq     // <=
-	Gt       // >
-	GtEq     // >=
-	AmpAmp   // &&
-	PipePipe // ||
-	Bang     // !
-	LParen   // (
-	RParen   // )
-	LBrace   // {
-	RBrace   // }
-	LBracket // [
-	RBracket // ]
-	Comma    // ,
-	Dot      // .
-	Pipe     // |
-	Arrow    // ->
+	Colon     // :
+	Question  // ?
+	Assign    // =
+	Plus      // +
+	Minus     // -
+	Star      // *
+	Slash     // /
+	Percent   // %
+	EqEq      // ==
+	BangEq    // !=
+	Lt        // <
+	LtEq      // <=
+	Gt        // >
+	GtEq      // >=
+	AmpAmp    // &&
+	PipePipe  // ||
+	Bang      // !
+	LParen    // (
+	RParen    // )
+	LBrace    // {
+	RBrace    // }
+	LBracket  // [
+	RBracket  // ]
+	Comma     // ,
+	Dot       // .
+	DotDot    // .. (the closed range operator: a..b is [min, max], both ends)
+	DotDotDot // ... (the half-open range operator: a...b excludes the larger end)
+	Pipe      // |
+	Arrow     // ->
 
 	// Trivia. Emitted so the token stream covers every byte and can reproduce
 	// the source exactly (needed by formatters and faithful round-tripping).
@@ -182,6 +184,8 @@ var kindNames = [...]string{
 	RBracket:     "RBracket",
 	Comma:        "Comma",
 	Dot:          "Dot",
+	DotDot:       "DotDot",
+	DotDotDot:    "DotDotDot",
 	Pipe:         "Pipe",
 	Arrow:        "Arrow",
 	Whitespace:   "Whitespace",
@@ -202,33 +206,35 @@ func (k Kind) String() string {
 // source of truth for operator spellings, used to name them in diagnostics and
 // available to tooling such as the editor grammar generator.
 var spelling = map[Kind]string{
-	Colon:    ":",
-	Question: "?",
-	Assign:   "=",
-	Plus:     "+",
-	Minus:    "-",
-	Star:     "*",
-	Slash:    "/",
-	Percent:  "%",
-	EqEq:     "==",
-	BangEq:   "!=",
-	Lt:       "<",
-	LtEq:     "<=",
-	Gt:       ">",
-	GtEq:     ">=",
-	AmpAmp:   "&&",
-	PipePipe: "||",
-	Bang:     "!",
-	LParen:   "(",
-	RParen:   ")",
-	LBrace:   "{",
-	RBrace:   "}",
-	LBracket: "[",
-	RBracket: "]",
-	Comma:    ",",
-	Dot:      ".",
-	Pipe:     "|",
-	Arrow:    "->",
+	Colon:     ":",
+	Question:  "?",
+	Assign:    "=",
+	Plus:      "+",
+	Minus:     "-",
+	Star:      "*",
+	Slash:     "/",
+	Percent:   "%",
+	EqEq:      "==",
+	BangEq:    "!=",
+	Lt:        "<",
+	LtEq:      "<=",
+	Gt:        ">",
+	GtEq:      ">=",
+	AmpAmp:    "&&",
+	PipePipe:  "||",
+	Bang:      "!",
+	LParen:    "(",
+	RParen:    ")",
+	LBrace:    "{",
+	RBrace:    "}",
+	LBracket:  "[",
+	RBracket:  "]",
+	Comma:     ",",
+	Dot:       ".",
+	DotDot:    "..",
+	DotDotDot: "...",
+	Pipe:      "|",
+	Arrow:     "->",
 }
 
 // Symbol returns the source spelling of a fixed operator or punctuation kind, or

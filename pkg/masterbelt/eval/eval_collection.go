@@ -101,38 +101,85 @@ func collectionFold(ctx evalCtx, recv *ir.Constant, args []*ir.Constant) *ir.Con
 }
 
 // rangeMethod folds a method on a range constant. range is not natively backed
-// in the registry, so its only native method is the foldable primitive fold —
-// the same model list/map follow, where the provided methods (count, any, all,
-// map, filter, keys, values) reach the body through the foldable impl and bottom
-// out in this fold. Anything else has no constant value here.
+// in the registry, so its native methods are folded here by name: the foldable
+// primitive fold — the same model list/map follow, where the provided methods
+// (count, any, all, map, filter, keys, values) reach the body through the
+// foldable impl and bottom out in this fold — and the comparable operators
+// eql/neq, which fold by the range's identity (its start, end, and step). A
+// range's equality does fold to a constant (unlike a list's, whose elements are
+// not known to the type rule), so (0..9) == range(0, 9) folds true. Anything
+// else has no constant value here.
 func rangeMethod(ctx evalCtx, recv *ir.Constant, name string, args []*ir.Constant) *ir.Constant {
-	if name == "fold" {
+	switch name {
+	case "fold":
 		return rangeFold(ctx, recv, args)
+	case "eql", "neq":
+		if len(args) != 1 || args[0].Kind != ir.ConstRange {
+			return nil
+		}
+		equal := ir.ConstantsEqual(recv, args[0])
+		if name == "neq" {
+			equal = !equal
+		}
+		return ir.BoolConstant(equal)
+	default:
+		return nil
 	}
-	return nil
+}
+
+// rangeCount returns the number of elements a range visits — the count of the
+// sequence start, start+step, ..., staying on the end side of step — and whether
+// the bounds are present to compute it. The formula is (end - start) / step + 1
+// when the bounds run in the step's direction (the quotient floors toward zero,
+// which is exact here because start and end are aligned to start + k*step only
+// when the remainder vanishes; a partial last stride still lands inside the
+// bound), clamped at zero when end is past start against the step's sign. It is
+// O(1): a wide or descending range is counted from its bounds without a walk, so
+// the maxRangeIterations cap is decided before any iteration.
+func rangeCount(recv *ir.Constant) (*big.Int, bool) {
+	if recv == nil || recv.Start == nil || recv.End == nil {
+		return nil, false
+	}
+	step := recv.RangeStep()
+	span := new(big.Int).Sub(recv.End, recv.Start)
+	// The span must run in the step's direction, or the range is empty: an
+	// ascending step (step > 0) needs end >= start (span >= 0), a descending one
+	// (step < 0) needs end <= start (span <= 0). A zero span (start == end) is one
+	// element either way.
+	if span.Sign() != 0 && span.Sign() != step.Sign() {
+		return big.NewInt(0), true
+	}
+	count := new(big.Int).Quo(span, step) // floors toward zero; span and step share a sign
+	count.Add(count, big.NewInt(1))
+	return count, true
+}
+
+// rangeElement returns the i-th element of a range (0-based): start + i*step.
+func rangeElement(recv *ir.Constant, i int64) *big.Int {
+	v := new(big.Int).Mul(recv.RangeStep(), big.NewInt(i))
+	return v.Add(v, recv.Start)
 }
 
 // rangeFold folds range.fold — the foldable primitive every provided method is
-// built on. It threads an accumulator over the inclusive sequence start..end,
-// the step seeing (acc, key, value) where the key is the element's 0-based
-// position (a range's key is its index, like a list's) and the value is the
-// element. An end below start is the empty range, which folds to the
-// initial accumulator. The walk is bounded by maxRangeIterations: a range wider
-// than the cap does not fold (nil), so a wide range never hangs the folder or
-// exhausts memory. An unfoldable step application (a non-function step, a body
+// built on. It threads an accumulator over the sequence start, start+step, ...,
+// the step function seeing (acc, key, value) where the key is the element's
+// 0-based position (a range's key is its index, like a list's) and the value is
+// the element. An empty range (end past start against the step's sign) folds to
+// the initial accumulator. The walk is bounded by maxRangeIterations: a range
+// wider than the cap does not fold (nil), so a wide range never hangs the folder
+// or exhausts memory. An unfoldable step application (a non-function step, a body
 // that does not fold, or the recursion guard) also leaves the fold unevaluated.
 func rangeFold(ctx evalCtx, recv *ir.Constant, args []*ir.Constant) *ir.Constant {
 	if len(args) != 2 || args[1].Kind != ir.ConstFunc {
 		return nil
 	}
-	if recv.Start == nil || recv.End == nil {
+	// The element count is computed from the bounds and step in O(1). A count past
+	// the cap does not fold — checked on the big.Int before any iteration, so a
+	// wide range is rejected without being walked.
+	count, ok := rangeCount(recv)
+	if !ok {
 		return nil
 	}
-	// The element count is end - start + 1 (both bounds included), clamped at
-	// zero. A count past the cap does not fold — checked on the big.Int before
-	// any iteration, so a wide range is rejected in O(1) rather than walked.
-	count := new(big.Int).Sub(recv.End, recv.Start)
-	count.Add(count, big.NewInt(1))
 	if count.Sign() <= 0 {
 		return args[0] // the empty range folds to the initial accumulator
 	}
@@ -141,16 +188,14 @@ func rangeFold(ctx evalCtx, recv *ir.Constant, args []*ir.Constant) *ir.Constant
 	}
 	acc := args[0]
 	step := args[1]
-	cur := new(big.Int).Set(recv.Start)
-	one := big.NewInt(1)
-	for i := int64(0); cur.Cmp(recv.End) <= 0; i++ {
+	n := count.Int64()
+	for i := int64(0); i < n; i++ {
 		key := ir.IntConstant(big.NewInt(i))           // the 0-based position
-		value := ir.IntConstant(new(big.Int).Set(cur)) // the element
+		value := ir.IntConstant(rangeElement(recv, i)) // the element
 		acc = apply(ctx, step, []*ir.Constant{acc, key, value})
 		if acc == nil {
 			return nil
 		}
-		cur.Add(cur, one)
 	}
 	return acc
 }

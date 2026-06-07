@@ -1,0 +1,1442 @@
+# tree
+File
+  ConstDecl
+    LineComment "// Range literals and the three-argument range constructor. A range literal is"
+    Newline "\n"
+    LineComment "// the surface syntax for the range builtin (0034): a..b is the closed integer"
+    Newline "\n"
+    LineComment "// interval, a...b the half-open one (the larger end excluded), iterated from the"
+    Newline "\n"
+    LineComment "// a side toward the b side, so the direction follows the bounds. Each literal"
+    Newline "\n"
+    LineComment "// folds to exactly the range(start, end, step) construction it is equivalent to,"
+    Newline "\n"
+    LineComment "// and range gains a third, step argument: range(start, end, step) walks start,"
+    Newline "\n"
+    LineComment "// start+step, ..., while the value stays on the end side of the step. The two-"
+    Newline "\n"
+    LineComment "// argument range (0034) is unchanged — its step is 1."
+    Newline "\n"
+    Newline "\n"
+    LineComment "// The four literal forms, each folding to the range value it equals."
+    Newline "\n"
+    LineComment "//  0..9   closed, ascending:  range(0, 9)        — 0,1,...,9"
+    Newline "\n"
+    LineComment "//  0...9  half-open (max 9 excluded), ascending:  range(0, 8)  — 0,1,...,8"
+    Newline "\n"
+    LineComment "//  9..0   closed, descending: range(9, 0, -1)    — 9,8,...,0"
+    Newline "\n"
+    LineComment "//  9...0  half-open (max 9 excluded), descending: range(8, 0, -1) — 8,7,...,0"
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "ClosedUp"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      RangeExpr
+        Literal
+          Int "0"
+        DotDot ".."
+        Literal
+          Int "9"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "HalfUp"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      RangeExpr
+        Literal
+          Int "0"
+        DotDotDot "..."
+        Literal
+          Int "9"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "ClosedDown"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      RangeExpr
+        Literal
+          Int "9"
+        DotDot ".."
+        Literal
+          Int "0"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "HalfDown"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      RangeExpr
+        Literal
+          Int "9"
+        DotDotDot "..."
+        Literal
+          Int "0"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// A literal folds to the very same value the equivalent range(...) constructs —"
+    Newline "\n"
+    LineComment "// the dump shows both as the same range value."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "ClosedUpEq"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "range"
+        LParen "("
+        Literal
+          Int "0"
+        Comma ","
+        Whitespace " "
+        Literal
+          Int "9"
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "HalfUpEq"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "range"
+        LParen "("
+        Literal
+          Int "0"
+        Comma ","
+        Whitespace " "
+        Literal
+          Int "8"
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "ClosedDownEq"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "range"
+        LParen "("
+        Literal
+          Int "9"
+        Comma ","
+        Whitespace " "
+        Literal
+          Int "0"
+        Comma ","
+        Whitespace " "
+        UnaryExpr
+          Minus "-"
+          Literal
+            Int "1"
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "HalfDownEq"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "range"
+        LParen "("
+        Literal
+          Int "8"
+        Comma ","
+        Whitespace " "
+        Literal
+          Int "0"
+        Comma ","
+        Whitespace " "
+        UnaryExpr
+          Minus "-"
+          Literal
+            Int "1"
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// A degenerate closed literal a..a is the one-element range [a]; the half-open"
+    Newline "\n"
+    LineComment "// a...a is empty (the max, which equals the min, is excluded)."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Single"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      RangeExpr
+        Literal
+          Int "5"
+        DotDot ".."
+        Literal
+          Int "5"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Empty"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      RangeExpr
+        Literal
+          Int "5"
+        DotDotDot "..."
+        Literal
+          Int "5"
+  FuncDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// A bound is any integer expression, so an arithmetic bound binds tighter than"
+    Newline "\n"
+    LineComment "// the range operator: 0..n+1 is 0..(n+1), not (0..n)+1."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Fn "fn"
+    Whitespace " "
+    Ident "upto"
+    ParamList
+      LParen "("
+      Param
+        Ident "n"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "nint"
+      RParen ")"
+    Colon ":"
+    Whitespace " "
+    TypeName
+      Ident "range"
+    Whitespace " "
+    Block
+      LBrace "{"
+      Newline "\n"
+      Whitespace "  "
+      ReturnStmt
+        Return "return"
+        Whitespace " "
+        RangeExpr
+          Literal
+            Int "0"
+          DotDot ".."
+          BinaryExpr
+            NameRef
+              Ident "n"
+            Whitespace " "
+            Plus "+"
+            Whitespace " "
+            Literal
+              Int "1"
+      Newline "\n"
+      RBrace "}"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Upto"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "upto"
+        LParen "("
+        Literal
+          Int "4"
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// The three-argument constructor with a positive step skips: range(0, 10, 2) is"
+    Newline "\n"
+    LineComment "// 0,2,4,6,8,10, walked while v <= end."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Evens"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "range"
+        LParen "("
+        Literal
+          Int "0"
+        Comma ","
+        Whitespace " "
+        Literal
+          Int "10"
+        Comma ","
+        Whitespace " "
+        Literal
+          Int "2"
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// A negative step walks downward while v >= end: range(10, 0, -2) is"
+    Newline "\n"
+    LineComment "// 10,8,6,4,2,0."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "DownBy2"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "range"
+        LParen "("
+        Literal
+          Int "10"
+        Comma ","
+        Whitespace " "
+        Literal
+          Int "0"
+        Comma ","
+        Whitespace " "
+        UnaryExpr
+          Minus "-"
+          Literal
+            Int "2"
+        RParen ")"
+  FuncDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// for over a range literal iterates it exactly as for over range(...): the"
+    Newline "\n"
+    LineComment "// closed ascending literal 0..10 sums to 0+1+...+10 = 55."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Fn "fn"
+    Whitespace " "
+    Ident "sumUp"
+    ParamList
+      LParen "("
+      RParen ")"
+    Colon ":"
+    Whitespace " "
+    TypeName
+      Ident "nint"
+    Whitespace " "
+    Block
+      LBrace "{"
+      Newline "\n"
+      Whitespace "  "
+      LetStmt
+        Let "let"
+        Whitespace " "
+        Ident "t"
+        Whitespace " "
+        Initializer
+          Assign "="
+          Whitespace " "
+          Literal
+            Int "0"
+      Newline "\n"
+      Whitespace "  "
+      ForStmt
+        For "for"
+        Whitespace " "
+        Ident "i"
+        Whitespace " "
+        Of "of"
+        Whitespace " "
+        RangeExpr
+          Literal
+            Int "0"
+          DotDot ".."
+          Literal
+            Int "10"
+        Whitespace " "
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          AssignStmt
+            NameRef
+              Ident "t"
+            Whitespace " "
+            Assign "="
+            Whitespace " "
+            BinaryExpr
+              NameRef
+                Ident "t"
+              Whitespace " "
+              Plus "+"
+              Whitespace " "
+              NameRef
+                Ident "i"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
+      Newline "\n"
+      Whitespace "  "
+      ReturnStmt
+        Return "return"
+        Whitespace " "
+        NameRef
+          Ident "t"
+      Newline "\n"
+      RBrace "}"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "SumUp"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "sumUp"
+        LParen "("
+        RParen ")"
+  FuncDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// A descending literal iterates from the larger bound down: 5..1 visits"
+    Newline "\n"
+    LineComment "// 5,4,3,2,1, summing to 15. \"of\" binds the element."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Fn "fn"
+    Whitespace " "
+    Ident "sumDown"
+    ParamList
+      LParen "("
+      RParen ")"
+    Colon ":"
+    Whitespace " "
+    TypeName
+      Ident "nint"
+    Whitespace " "
+    Block
+      LBrace "{"
+      Newline "\n"
+      Whitespace "  "
+      LetStmt
+        Let "let"
+        Whitespace " "
+        Ident "t"
+        Whitespace " "
+        Initializer
+          Assign "="
+          Whitespace " "
+          Literal
+            Int "0"
+      Newline "\n"
+      Whitespace "  "
+      ForStmt
+        For "for"
+        Whitespace " "
+        Ident "i"
+        Whitespace " "
+        Of "of"
+        Whitespace " "
+        RangeExpr
+          Literal
+            Int "5"
+          DotDot ".."
+          Literal
+            Int "1"
+        Whitespace " "
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          AssignStmt
+            NameRef
+              Ident "t"
+            Whitespace " "
+            Assign "="
+            Whitespace " "
+            BinaryExpr
+              NameRef
+                Ident "t"
+              Whitespace " "
+              Plus "+"
+              Whitespace " "
+              NameRef
+                Ident "i"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
+      Newline "\n"
+      Whitespace "  "
+      ReturnStmt
+        Return "return"
+        Whitespace " "
+        NameRef
+          Ident "t"
+      Newline "\n"
+      RBrace "}"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "SumDown"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "sumDown"
+        LParen "("
+        RParen ")"
+  FuncDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// A half-open literal drops the max end: 0...5 is 0,1,2,3,4, summing to 10."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Fn "fn"
+    Whitespace " "
+    Ident "sumHalf"
+    ParamList
+      LParen "("
+      RParen ")"
+    Colon ":"
+    Whitespace " "
+    TypeName
+      Ident "nint"
+    Whitespace " "
+    Block
+      LBrace "{"
+      Newline "\n"
+      Whitespace "  "
+      LetStmt
+        Let "let"
+        Whitespace " "
+        Ident "t"
+        Whitespace " "
+        Initializer
+          Assign "="
+          Whitespace " "
+          Literal
+            Int "0"
+      Newline "\n"
+      Whitespace "  "
+      ForStmt
+        For "for"
+        Whitespace " "
+        Ident "i"
+        Whitespace " "
+        Of "of"
+        Whitespace " "
+        RangeExpr
+          Literal
+            Int "0"
+          DotDotDot "..."
+          Literal
+            Int "5"
+        Whitespace " "
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          AssignStmt
+            NameRef
+              Ident "t"
+            Whitespace " "
+            Assign "="
+            Whitespace " "
+            BinaryExpr
+              NameRef
+                Ident "t"
+              Whitespace " "
+              Plus "+"
+              Whitespace " "
+              NameRef
+                Ident "i"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
+      Newline "\n"
+      Whitespace "  "
+      ReturnStmt
+        Return "return"
+        Whitespace " "
+        NameRef
+          Ident "t"
+      Newline "\n"
+      RBrace "}"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "SumHalf"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "sumHalf"
+        LParen "("
+        RParen ")"
+  FuncDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// A stepped range iterates by its step: range(0, 10, 2) sums to 0+2+4+6+8+10 = 30."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Fn "fn"
+    Whitespace " "
+    Ident "sumEvens"
+    ParamList
+      LParen "("
+      RParen ")"
+    Colon ":"
+    Whitespace " "
+    TypeName
+      Ident "nint"
+    Whitespace " "
+    Block
+      LBrace "{"
+      Newline "\n"
+      Whitespace "  "
+      LetStmt
+        Let "let"
+        Whitespace " "
+        Ident "t"
+        Whitespace " "
+        Initializer
+          Assign "="
+          Whitespace " "
+          Literal
+            Int "0"
+      Newline "\n"
+      Whitespace "  "
+      ForStmt
+        For "for"
+        Whitespace " "
+        Ident "i"
+        Whitespace " "
+        Of "of"
+        Whitespace " "
+        CallExpr
+          NameRef
+            Ident "range"
+          LParen "("
+          Literal
+            Int "0"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "10"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "2"
+          RParen ")"
+        Whitespace " "
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          AssignStmt
+            NameRef
+              Ident "t"
+            Whitespace " "
+            Assign "="
+            Whitespace " "
+            BinaryExpr
+              NameRef
+                Ident "t"
+              Whitespace " "
+              Plus "+"
+              Whitespace " "
+              NameRef
+                Ident "i"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
+      Newline "\n"
+      Whitespace "  "
+      ReturnStmt
+        Return "return"
+        Whitespace " "
+        NameRef
+          Ident "t"
+      Newline "\n"
+      RBrace "}"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "SumEvens"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "sumEvens"
+        LParen "("
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// The foldable provided methods reach a range literal the same way they reach a"
+    Newline "\n"
+    LineComment "// range(...) value — count, fold, and the rest carry over."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "ClosedCount"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        MemberExpr
+          ParenExpr
+            LParen "("
+            RangeExpr
+              Literal
+                Int "0"
+              DotDot ".."
+              Literal
+                Int "9"
+            RParen ")"
+          Dot "."
+          Ident "count"
+        LParen "("
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "HalfCount"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        MemberExpr
+          ParenExpr
+            LParen "("
+            RangeExpr
+              Literal
+                Int "0"
+              DotDotDot "..."
+              Literal
+                Int "9"
+            RParen ")"
+          Dot "."
+          Ident "count"
+        LParen "("
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "SteppedCount"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        MemberExpr
+          CallExpr
+            NameRef
+              Ident "range"
+            LParen "("
+            Literal
+              Int "0"
+            Comma ","
+            Whitespace " "
+            Literal
+              Int "10"
+            Comma ","
+            Whitespace " "
+            Literal
+              Int "2"
+            RParen ")"
+          Dot "."
+          Ident "count"
+        LParen "("
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "ClosedFold"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        MemberExpr
+          ParenExpr
+            LParen "("
+            RangeExpr
+              Literal
+                Int "0"
+              DotDot ".."
+              Literal
+                Int "4"
+            RParen ")"
+          Dot "."
+          Ident "fold"
+        LParen "("
+        Literal
+          Int "0"
+        Comma ","
+        Whitespace " "
+        FuncLit
+          Fn "fn"
+          ParamList
+            LParen "("
+            Param
+              Ident "acc"
+              Colon ":"
+              Whitespace " "
+              TypeName
+                Ident "nint"
+            Comma ","
+            Whitespace " "
+            Param
+              Ident "k"
+              Colon ":"
+              Whitespace " "
+              TypeName
+                Ident "nint"
+            Comma ","
+            Whitespace " "
+            Param
+              Ident "v"
+              Colon ":"
+              Whitespace " "
+              TypeName
+                Ident "nint"
+            RParen ")"
+          Colon ":"
+          Whitespace " "
+          TypeName
+            Ident "nint"
+          Whitespace " "
+          Arrow "->"
+          Whitespace " "
+          BinaryExpr
+            NameRef
+              Ident "acc"
+            Whitespace " "
+            Plus "+"
+            Whitespace " "
+            NameRef
+              Ident "v"
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "SteppedFold"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        MemberExpr
+          CallExpr
+            NameRef
+              Ident "range"
+            LParen "("
+            Literal
+              Int "0"
+            Comma ","
+            Whitespace " "
+            Literal
+              Int "10"
+            Comma ","
+            Whitespace " "
+            Literal
+              Int "2"
+            RParen ")"
+          Dot "."
+          Ident "fold"
+        LParen "("
+        Literal
+          Int "0"
+        Comma ","
+        Whitespace " "
+        FuncLit
+          Fn "fn"
+          ParamList
+            LParen "("
+            Param
+              Ident "acc"
+              Colon ":"
+              Whitespace " "
+              TypeName
+                Ident "nint"
+            Comma ","
+            Whitespace " "
+            Param
+              Ident "k"
+              Colon ":"
+              Whitespace " "
+              TypeName
+                Ident "nint"
+            Comma ","
+            Whitespace " "
+            Param
+              Ident "v"
+              Colon ":"
+              Whitespace " "
+              TypeName
+                Ident "nint"
+            RParen ")"
+          Colon ":"
+          Whitespace " "
+          TypeName
+            Ident "nint"
+          Whitespace " "
+          Arrow "->"
+          Whitespace " "
+          BinaryExpr
+            NameRef
+              Ident "acc"
+            Whitespace " "
+            Plus "+"
+            Whitespace " "
+            NameRef
+              Ident "v"
+        RParen ")"
+  AssertDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// Every folded result verifies in an assertion at compile time. A literal equals"
+    Newline "\n"
+    LineComment "// the range(...) it desugars to (== over two range values folds by their bounds"
+    Newline "\n"
+    LineComment "// and step), so the equivalence is checked directly."
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      ParenExpr
+        LParen "("
+        RangeExpr
+          Literal
+            Int "0"
+          DotDot ".."
+          Literal
+            Int "9"
+        RParen ")"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "range"
+        LParen "("
+        Literal
+          Int "0"
+        Comma ","
+        Whitespace " "
+        Literal
+          Int "9"
+        RParen ")"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      ParenExpr
+        LParen "("
+        RangeExpr
+          Literal
+            Int "0"
+          DotDotDot "..."
+          Literal
+            Int "9"
+        RParen ")"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "range"
+        LParen "("
+        Literal
+          Int "0"
+        Comma ","
+        Whitespace " "
+        Literal
+          Int "8"
+        RParen ")"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      ParenExpr
+        LParen "("
+        RangeExpr
+          Literal
+            Int "9"
+          DotDot ".."
+          Literal
+            Int "0"
+        RParen ")"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "range"
+        LParen "("
+        Literal
+          Int "9"
+        Comma ","
+        Whitespace " "
+        Literal
+          Int "0"
+        Comma ","
+        Whitespace " "
+        UnaryExpr
+          Minus "-"
+          Literal
+            Int "1"
+        RParen ")"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      ParenExpr
+        LParen "("
+        RangeExpr
+          Literal
+            Int "9"
+          DotDotDot "..."
+          Literal
+            Int "0"
+        RParen ")"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "range"
+        LParen "("
+        Literal
+          Int "8"
+        Comma ","
+        Whitespace " "
+        Literal
+          Int "0"
+        Comma ","
+        Whitespace " "
+        UnaryExpr
+          Minus "-"
+          Literal
+            Int "1"
+        RParen ")"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      ParenExpr
+        LParen "("
+        RangeExpr
+          Literal
+            Int "5"
+          DotDot ".."
+          Literal
+            Int "5"
+        RParen ")"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "range"
+        LParen "("
+        Literal
+          Int "5"
+        Comma ","
+        Whitespace " "
+        Literal
+          Int "5"
+        RParen ")"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      CallExpr
+        NameRef
+          Ident "sumUp"
+        LParen "("
+        RParen ")"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "55"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      CallExpr
+        NameRef
+          Ident "sumDown"
+        LParen "("
+        RParen ")"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "15"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      CallExpr
+        NameRef
+          Ident "sumHalf"
+        LParen "("
+        RParen ")"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "10"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      CallExpr
+        NameRef
+          Ident "sumEvens"
+        LParen "("
+        RParen ")"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "30"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      CallExpr
+        MemberExpr
+          ParenExpr
+            LParen "("
+            RangeExpr
+              Literal
+                Int "0"
+              DotDot ".."
+              Literal
+                Int "9"
+            RParen ")"
+          Dot "."
+          Ident "count"
+        LParen "("
+        RParen ")"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "10"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      CallExpr
+        MemberExpr
+          ParenExpr
+            LParen "("
+            RangeExpr
+              Literal
+                Int "0"
+              DotDotDot "..."
+              Literal
+                Int "9"
+            RParen ")"
+          Dot "."
+          Ident "count"
+        LParen "("
+        RParen ")"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "9"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      CallExpr
+        MemberExpr
+          CallExpr
+            NameRef
+              Ident "range"
+            LParen "("
+            Literal
+              Int "0"
+            Comma ","
+            Whitespace " "
+            Literal
+              Int "10"
+            Comma ","
+            Whitespace " "
+            Literal
+              Int "2"
+            RParen ")"
+          Dot "."
+          Ident "count"
+        LParen "("
+        RParen ")"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "6"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      CallExpr
+        MemberExpr
+          CallExpr
+            NameRef
+              Ident "range"
+            LParen "("
+            Literal
+              Int "10"
+            Comma ","
+            Whitespace " "
+            Literal
+              Int "0"
+            Comma ","
+            Whitespace " "
+            UnaryExpr
+              Minus "-"
+              Literal
+                Int "2"
+            RParen ")"
+          Dot "."
+          Ident "count"
+        LParen "("
+        RParen ")"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "6"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      CallExpr
+        MemberExpr
+          ParenExpr
+            LParen "("
+            RangeExpr
+              Literal
+                Int "0"
+              DotDot ".."
+              Literal
+                Int "4"
+            RParen ")"
+          Dot "."
+          Ident "fold"
+        LParen "("
+        Literal
+          Int "0"
+        Comma ","
+        Whitespace " "
+        FuncLit
+          Fn "fn"
+          ParamList
+            LParen "("
+            Param
+              Ident "acc"
+              Colon ":"
+              Whitespace " "
+              TypeName
+                Ident "nint"
+            Comma ","
+            Whitespace " "
+            Param
+              Ident "k"
+              Colon ":"
+              Whitespace " "
+              TypeName
+                Ident "nint"
+            Comma ","
+            Whitespace " "
+            Param
+              Ident "v"
+              Colon ":"
+              Whitespace " "
+              TypeName
+                Ident "nint"
+            RParen ")"
+          Colon ":"
+          Whitespace " "
+          TypeName
+            Ident "nint"
+          Whitespace " "
+          Arrow "->"
+          Whitespace " "
+          BinaryExpr
+            NameRef
+              Ident "acc"
+            Whitespace " "
+            Plus "+"
+            Whitespace " "
+            NameRef
+              Ident "v"
+        RParen ")"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "10"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      CallExpr
+        MemberExpr
+          CallExpr
+            NameRef
+              Ident "range"
+            LParen "("
+            Literal
+              Int "0"
+            Comma ","
+            Whitespace " "
+            Literal
+              Int "10"
+            Comma ","
+            Whitespace " "
+            Literal
+              Int "2"
+            RParen ")"
+          Dot "."
+          Ident "fold"
+        LParen "("
+        Literal
+          Int "0"
+        Comma ","
+        Whitespace " "
+        FuncLit
+          Fn "fn"
+          ParamList
+            LParen "("
+            Param
+              Ident "acc"
+              Colon ":"
+              Whitespace " "
+              TypeName
+                Ident "nint"
+            Comma ","
+            Whitespace " "
+            Param
+              Ident "k"
+              Colon ":"
+              Whitespace " "
+              TypeName
+                Ident "nint"
+            Comma ","
+            Whitespace " "
+            Param
+              Ident "v"
+              Colon ":"
+              Whitespace " "
+              TypeName
+                Ident "nint"
+            RParen ")"
+          Colon ":"
+          Whitespace " "
+          TypeName
+            Ident "nint"
+          Whitespace " "
+          Arrow "->"
+          Whitespace " "
+          BinaryExpr
+            NameRef
+              Ident "acc"
+            Whitespace " "
+            Plus "+"
+            Whitespace " "
+            NameRef
+              Ident "v"
+        RParen ")"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "30"
+  Newline "\n"
+  EOF ""
+# diagnostics

@@ -39,6 +39,23 @@ func (l *Lexer) scanFixed2(start int, next byte, two, one token.Kind) token.Toke
 	return l.scanFixed(start, 1, one)
 }
 
+// scanDot dispatches the dot run by maximal munch: "..." is the half-open range
+// operator, ".." the closed range operator, and a lone "." the member access. A
+// dot only ever begins one of these — an integer literal stops before a dot
+// (scanNumber consumes no '.'), and the only dots inside a token are the ones
+// scanDatetime/scanClock commit to within a D-prefixed instant — so munching the
+// longest dot run here never splits a datetime's fractional second or a member
+// access.
+func (l *Lexer) scanDot(start int) token.Token {
+	if l.peek(1) == '.' {
+		if l.peek(2) == '.' {
+			return l.scanFixed(start, 3, token.DotDotDot)
+		}
+		return l.scanFixed(start, 2, token.DotDot)
+	}
+	return l.scanFixed(start, 1, token.Dot)
+}
+
 // scanSlash dispatches the comment forms (//, ///, /* */). A '/' that opens no
 // comment is the division operator.
 func (l *Lexer) scanSlash(start int) token.Token {

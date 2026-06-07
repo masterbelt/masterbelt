@@ -322,7 +322,7 @@ func TestCompletionOffersRangeConstructor(t *testing.T) {
 	if item.Detail != "range(start: nint, end: nint)" {
 		t.Errorf("range detail = %q, want the constructor signature", item.Detail)
 	}
-	if item.Documentation == nil || !strings.Contains(item.Documentation.Value, "inclusive") {
+	if item.Documentation == nil || !strings.Contains(item.Documentation.Value, "A sequence of integers") {
 		t.Errorf("range documentation = %v, want the doc comment", item.Documentation)
 	}
 

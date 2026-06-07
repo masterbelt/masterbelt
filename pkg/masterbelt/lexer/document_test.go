@@ -233,6 +233,11 @@ func TestDocumentFuzz(t *testing.T) {
 		// the two-byte operators share ("=", "!", "<", ">") exercise the
 		// maximal-munch merge/split paths in the incremental relexer.
 		"+", "-", "%", "!", "<", ">", "&", "|", "==", "!=", "<=", ">=", "&&", "||",
+		// The dot run: "." (member), ".." (closed range), "..." (half-open range).
+		// Inserting or deleting a dot fuses or splits these, and a dot beside a
+		// digit ("0", "9") exercises the boundary between a range and an integer —
+		// the maximal-munch merge/split paths scanDot drives in the relexer.
+		".", "..", "...",
 		"true ", "false ",
 		// Datetime and duration ingredients: the D/T/Z markers, unit letters,
 		// and digit clusters exercise the literal merge/shatter paths (a "."

@@ -77,13 +77,18 @@ type Constant struct {
 	EnumDef   *TypeDef
 	EnumIndex int
 
-	// valid when Kind == ConstRange: the inclusive integer interval [Start, End].
-	// The elements are Start, Start+1, ..., End-1; an End at or below Start is the
-	// empty range. The bounds are kept lazily (the sequence is never materialized
-	// here), so a wide range is a small value — the evaluator bounds the walk it
-	// makes over one.
+	// valid when Kind == ConstRange: the integer sequence Start, Start+Step, ...,
+	// staying on the End side of Step — for a positive Step the elements up to and
+	// including End (Start, Start+Step, ..., <= End), for a negative Step down to
+	// and including End (>= End). Step is never zero on a folded range; a nil Step
+	// reads as 1 (the two-argument range's step), so a range built without one — by
+	// RangeConstant or an older caller — behaves exactly as before. An End past the
+	// first element in the step's direction is the empty range. The bounds and step
+	// are kept lazily (the sequence is never materialized here), so a wide range is
+	// a small value — the evaluator bounds the walk it makes over one.
 	Start *big.Int
 	End   *big.Int
+	Step  *big.Int // nil reads as 1
 
 	// UnionTag is the union member a value flowed in as — the tag a tagged union
 	// carries. It is nil when the value never passed through a union expectation
@@ -151,12 +156,16 @@ func ConstantsEqual(a, b *Constant) bool {
 	case ConstDatetime, ConstDuration:
 		return a.Millis == b.Millis
 	case ConstRange:
-		// Two ranges are equal when their bounds are equal — a range carries no
-		// other identity. An empty range still compares by its written bounds
-		// (range(10, 10) is not range(5, 5)), which is conservative and matches the
-		// String() rendering; nothing relies on every empty range being one value.
+		// Two ranges are equal when their bounds and step are equal — a range
+		// carries no other identity. The step compares through RangeStep, so a nil
+		// step (the unit-step range) equals an explicit step of 1; range(0, 9) and
+		// range(0, 9, 1) are the same value. An empty range still compares by its
+		// written bounds (range(10, 10) is not range(5, 5)), which is conservative
+		// and matches the String() rendering; nothing relies on every empty range
+		// being one value.
 		return a.Start != nil && b.Start != nil && a.End != nil && b.End != nil &&
-			a.Start.Cmp(b.Start) == 0 && a.End.Cmp(b.End) == 0
+			a.Start.Cmp(b.Start) == 0 && a.End.Cmp(b.End) == 0 &&
+			a.RangeStep().Cmp(b.RangeStep()) == 0
 	case ConstCollection:
 		// The mapness is part of a collection's identity: an empty list is not an
 		// empty map (their set/keys/iteration meanings differ), and an empty
@@ -296,12 +305,39 @@ func ErrorConstant(message string) *Constant { return &Constant{Kind: ConstError
 // carrying no payload.
 func NullConstant() *Constant { return &Constant{Kind: ConstNull} }
 
-// RangeConstant builds an inclusive integer range [start, end]: the elements
+// RangeConstant builds the unit-step integer range [start, end]: the elements
 // start, start+1, ..., end, with an end below start being the empty
-// range. The bounds are held lazily; the sequence is materialized only when a
-// fold or a for walks it, under the evaluator's iteration bound.
+// range. The step is left nil (reads as 1), so this is the two-argument range's
+// value, byte-identical to its old representation. The bounds are held lazily;
+// the sequence is materialized only when a fold or a for walks it, under the
+// evaluator's iteration bound.
 func RangeConstant(start, end *big.Int) *Constant {
 	return &Constant{Kind: ConstRange, Start: start, End: end}
+}
+
+// RangeConstantStep builds the stepped integer range start, start+step, ...,
+// staying on the end side of step. A nil or unit step builds the same value as
+// RangeConstant; a non-unit step is carried so the walk and the count honour it.
+// The caller guarantees a non-zero step (the type/eval layers reject step 0 and
+// fold a zero-step range to nothing); this constructor does not re-check.
+func RangeConstantStep(start, end, step *big.Int) *Constant {
+	if step != nil && step.Cmp(bigOne) == 0 {
+		step = nil // the unit step is the canonical nil, so range(0, 9, 1) == range(0, 9)
+	}
+	return &Constant{Kind: ConstRange, Start: start, End: end, Step: step}
+}
+
+// bigOne is the constant 1, the value a nil range Step reads as.
+var bigOne = big.NewInt(1)
+
+// RangeStep returns the range's step, reading a nil Step as 1 (the two-argument
+// range's step). It is the one place the nil-reads-as-1 convention is decoded, so
+// every walk, count, and comparison over a range agrees on the step.
+func (c *Constant) RangeStep() *big.Int {
+	if c == nil || c.Step == nil {
+		return bigOne
+	}
+	return c.Step
 }
 
 // CollectionConstant builds a collection constant from its entries, settling its
@@ -459,7 +495,13 @@ func (c *Constant) String() string {
 	case ConstNull:
 		return "null"
 	case ConstRange:
-		return "range(" + c.Start.String() + ", " + c.End.String() + ")"
+		// The two-argument form for a unit step (range(0, 9)), the three-argument
+		// form when a step is carried (range(9, 0, -1)) — the very spelling the
+		// equivalent constructor takes, so a literal and its range(...) read alike.
+		if c.Step == nil {
+			return "range(" + c.Start.String() + ", " + c.End.String() + ")"
+		}
+		return "range(" + c.Start.String() + ", " + c.End.String() + ", " + c.Step.String() + ")"
 	case ConstEnum:
 		name := c.EnumName()
 		if c.EnumDef == nil {

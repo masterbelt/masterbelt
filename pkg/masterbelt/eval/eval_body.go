@@ -375,39 +375,36 @@ func evalForCollection(s *ast.ForStmt, coll *ir.Constant, of bool, ctx evalCtx) 
 	return nil, ifFellThrough // every element visited without returning
 }
 
-// evalForRange runs a for over a folded range: each element of the inclusive
-// sequence start..end binds the loop variable (the element for of, its 0-based
+// evalForRange runs a for over a folded range: each element of the sequence
+// start, start+step, ... binds the loop variable (the element for of, its 0-based
 // position for in — the same key rangeFold threads) and runs the body. The walk
 // is bounded by maxRangeIterations: a range wider than the cap leaves the for
 // undecided (ifUnknown) rather than iterating, so a wide range never hangs the
-// folder — the same verdict rangeFold gives. An empty range (end below start)
-// falls through without running the body. The outcome semantics match the
-// collection arm.
+// folder — the same verdict rangeFold gives. An empty range (end past start
+// against the step's sign) falls through without running the body. The outcome
+// semantics match the collection arm.
 func evalForRange(s *ast.ForStmt, rng *ir.Constant, of bool, ctx evalCtx) (*ir.Constant, ifOutcome) {
-	if rng.Start == nil || rng.End == nil {
+	count, ok := rangeCount(rng)
+	if !ok {
 		return nil, ifUnknown
 	}
-	count := new(big.Int).Sub(rng.End, rng.Start)
-	count.Add(count, big.NewInt(1))
 	if count.Sign() <= 0 {
 		return nil, ifFellThrough // the empty range: the body never runs
 	}
 	if count.Cmp(big.NewInt(maxRangeIterations)) > 0 {
 		return nil, ifUnknown // wider than the compile-time iteration bound
 	}
-	cur := new(big.Int).Set(rng.Start)
-	one := big.NewInt(1)
-	for i := int64(0); cur.Cmp(rng.End) <= 0; i++ {
+	n := count.Int64()
+	for i := int64(0); i < n; i++ {
 		// The loop variable: the element for of, its 0-based position for in — the
 		// same key rangeFold threads.
-		elem := ir.IntConstant(new(big.Int).Set(cur))
+		elem := ir.IntConstant(rangeElement(rng, i))
 		if !of {
 			elem = ir.IntConstant(big.NewInt(i))
 		}
 		v, out := iterationOutcome(s, elem, ctx)
 		switch out {
 		case ifFellThrough:
-			cur.Add(cur, one)
 			continue // the body ran without returning; on to the next element
 		case ifReturned:
 			return v, ifReturned // an early return ends the whole loop

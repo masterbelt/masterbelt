@@ -133,10 +133,16 @@ func buildGrammar() grammar {
 				},
 			}},
 			// The spellings the server classifies as `operator` sit under
-			// keyword.operator, their semantic fallback scope. The arrow is
-			// listed before "=" and ":" only for clarity; none of the three
-			// overlaps another's first byte.
+			// keyword.operator, their semantic fallback scope. The range operators
+			// "..." and ".." lead so the longer one wins the cold-start match (the
+			// grammar has no maximal munch of its own); the arrow is listed before
+			// "=" and ":" only for clarity. None of the rest overlaps another's
+			// first byte. The range operators escape to "\.\.\." and "\.\." but
+			// must not match a member-access "." beside a number, so each is the
+			// exact two- or three-dot run.
 			"operators": {Patterns: []rule{
+				{Name: "keyword.operator.range.masterbelt", Match: regexp.QuoteMeta(token.DotDotDot.Symbol())},
+				{Name: "keyword.operator.range.masterbelt", Match: regexp.QuoteMeta(token.DotDot.Symbol())},
 				{Name: "keyword.operator.masterbelt", Match: regexp.QuoteMeta(token.Arrow.Symbol())},
 				{Name: "keyword.operator.assignment.masterbelt", Match: `=`},
 				{Name: "keyword.operator.masterbelt", Match: `:`},

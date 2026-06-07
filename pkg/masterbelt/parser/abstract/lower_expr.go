@@ -17,7 +17,7 @@ import (
 // isExprKind reports whether a CST node kind is an expression node.
 func isExprKind(k cst.Kind) bool {
 	switch k {
-	case cst.Literal, cst.NameRef, cst.SelfExpr, cst.UnaryExpr, cst.BinaryExpr, cst.TernaryExpr, cst.CallExpr, cst.MemberExpr, cst.IndexExpr, cst.CollectionLit, cst.RecordLit, cst.FuncLit, cst.ParenExpr, cst.AwaitExpr:
+	case cst.Literal, cst.NameRef, cst.SelfExpr, cst.UnaryExpr, cst.BinaryExpr, cst.RangeExpr, cst.TernaryExpr, cst.CallExpr, cst.MemberExpr, cst.IndexExpr, cst.CollectionLit, cst.RecordLit, cst.FuncLit, cst.ParenExpr, cst.AwaitExpr:
 		return true
 	default:
 		return false
@@ -75,6 +75,14 @@ func lowerExpr(t cst.Tree, buf source.Buffer) ast.Expr {
 		// else-branch in order; any is nil when the source omitted it.
 		cond, then, els := threeOperands(t, buf)
 		return ast.NewTernaryExpr(cond, then, els, node)
+	case cst.RangeExpr:
+		// 0..9 keeps its own node rather than desugaring to range(0, 9): the
+		// direction and the half-open trim depend on the bound values, which only
+		// the evaluator knows, so the desugaring to range(start, end, step) is
+		// deferred to the fold. The two expression children are the lower and upper
+		// bounds in order; the operator token distinguishes the half-open "..." form.
+		lower, upper := twoOperands(t, buf)
+		return ast.NewRangeExpr(lower, upper, operatorKind(t) == token.DotDotDot, node)
 	case cst.UnaryExpr:
 		// -x desugars to x.neg(): the operand is the receiver, no arguments.
 		return desugarCall(firstOperand(t, buf), unaryMethod(operatorKind(t)), nil, node)

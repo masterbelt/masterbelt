@@ -264,6 +264,11 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 				s := at(node)
 				diags.Add(newDivisionByZeroDiagnostic(s.offset, s.width))
 			})
+			// range(start, end, step) with a step that folds to zero.
+			checkRangeStepZero(decl.Value, evalEnv{q: q, file: fileID}, func(node ast.Node) {
+				s := at(node)
+				diags.Add(newRangeStepZeroDiagnostic(s.offset, s.width))
+			})
 			// A constant has no receiver: self has no meaning in its
 			// initializer (nor inside a literal nested in it).
 			checkNoSelf(decl.Value, func(node ast.Node) {
@@ -315,6 +320,10 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 		checkDivByZero(a.Cond, evalEnv{q: q, file: fileID}, func(node ast.Node) {
 			s := at(node)
 			diags.Add(newDivisionByZeroDiagnostic(s.offset, s.width))
+		})
+		checkRangeStepZero(a.Cond, evalEnv{q: q, file: fileID}, func(node ast.Node) {
+			s := at(node)
+			diags.Add(newRangeStepZeroDiagnostic(s.offset, s.width))
 		})
 		checkNoSelf(a.Cond, func(node ast.Node) {
 			s := at(node)

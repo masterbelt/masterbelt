@@ -147,6 +147,10 @@ func exprType(e ast.Expr, s scope) ir.Type {
 		// The ternary's type is its two branches' unified type; the silent walk
 		// reports nothing (the checking twin does), so it only synthesizes.
 		return ternaryType(e, s)
+	case *ast.RangeExpr:
+		// A range literal is the range builtin whatever its bounds; the bound types
+		// (each must be an integer) are the checking twin's concern.
+		return rangeBuiltin()
 	case *ast.CallExpr:
 		// A call through a member access is a method call; any other callee is a
 		// context-specific form (a conversion in a method body, otherwise nothing).
@@ -154,6 +158,13 @@ func exprType(e ast.Expr, s scope) ir.Type {
 	default:
 		return s.leaf(e)
 	}
+}
+
+// rangeBuiltin is the type of a range literal — the range builtin, the same type
+// the range(...) constructor produces. A literal's bounds do not change its type
+// (every range is a range<nint, nint> over nint), so this needs no scope.
+func rangeBuiltin() ir.Type {
+	return &ir.Builtin{Name: "range"}
 }
 
 // ternaryType is the silent type of a conditional value: the unified type of its

@@ -252,9 +252,10 @@ func classifyToken(kind token.Kind, parent cst.Kind, calleeMember bool) (tokenTy
 		return stNumber, 0, true
 	case token.String:
 		return stString, 0, true
-	case token.Colon, token.Assign, token.Arrow, token.Question:
+	case token.Colon, token.Assign, token.Arrow, token.Question, token.DotDot, token.DotDotDot:
 		// The ternary "?" colours as an operator; its ":" is the same Colon token
-		// a type clause uses, already covered above.
+		// a type clause uses, already covered above. The range operators ".." and
+		// "..." colour as operators too — the surface syntax of the range builtin.
 		return stOperator, 0, true
 	case token.Ident:
 		switch parent {

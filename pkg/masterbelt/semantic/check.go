@@ -71,6 +71,66 @@ func checkDivByZero(e ast.Expr, env evalEnv, report func(node ast.Node)) {
 	}
 }
 
+// checkRangeStepZero reports each range(start, end, step) call whose step folds
+// to a constant zero — a range with no sequence (it would neither advance nor
+// terminate). It descends the same way checkDivByZero does: into a function
+// literal's body, and through a ternary's condition and statically-taken branch
+// (an unfoldable condition walks both), so a zero-step range on a guaranteed path
+// is caught and one on a provably-dead path stays silent. A non-constant step is
+// left to the runtime — exactly the non-constant divisor's treatment — so only a
+// step that folds to zero is reported. The receiver and the other arguments are
+// walked too, so a nested range(...) anywhere in the expression is reached.
+func checkRangeStepZero(e ast.Expr, env evalEnv, report func(node ast.Node)) {
+	if lit, ok := e.(*ast.FuncLit); ok {
+		forEachBodyExpr(lit.Body, func(x ast.Expr) {
+			checkRangeStepZero(x, env, report)
+		})
+		return
+	}
+	if tern, ok := e.(*ast.TernaryExpr); ok {
+		checkRangeStepZero(tern.Cond, env, report)
+		cond := eval.Expr(tern.Cond, env)
+		switch {
+		case cond != nil && cond.Kind == ir.ConstBool && cond.Bool:
+			checkRangeStepZero(tern.Then, env, report)
+		case cond != nil && cond.Kind == ir.ConstBool && !cond.Bool:
+			checkRangeStepZero(tern.Else, env, report)
+		default:
+			checkRangeStepZero(tern.Then, env, report)
+			checkRangeStepZero(tern.Else, env, report)
+		}
+		return
+	}
+	// A range literal carries no step argument (its step is the implicit ±1), so
+	// it never has a zero step; only the three-argument constructor does. Walk a
+	// literal's bounds for a nested range(..., 0) all the same.
+	if rng, ok := e.(*ast.RangeExpr); ok {
+		checkRangeStepZero(rng.Lower, env, report)
+		checkRangeStepZero(rng.Upper, env, report)
+		return
+	}
+	call, ok := e.(*ast.CallExpr)
+	if !ok {
+		return
+	}
+	// range(start, end, step) is a conversion call: the callee names the type
+	// directly (an identifier "range"), not a member. A three-argument call whose
+	// step folds to a constant zero is the zero-step range.
+	if id, ok := call.Callee.(*ast.Identifier); ok && id.Name == "range" && len(call.Arguments) == 3 {
+		if step := eval.Expr(call.Arguments[2], env); step != nil && step.Kind == ir.ConstInt && step.Int.Sign() == 0 {
+			report(call)
+		}
+	}
+	// Walk the callee's receiver (for a method call) and every argument, so a
+	// nested range(..., 0) inside an operand is reached.
+	if member, ok := call.Callee.(*ast.MemberExpr); ok {
+		checkRangeStepZero(member.Receiver, env, report)
+	}
+	for _, a := range call.Arguments {
+		checkRangeStepZero(a, env, report)
+	}
+}
+
 // shortCircuits reports whether a boolean connective call (&& desugared to anan,
 // || to oror) short-circuits — its receiver folds to a bool that already decides
 // the result (false && _, true || _) — so its right operand is dead. A receiver

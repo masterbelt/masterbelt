@@ -78,6 +78,14 @@
     "operators": {
       "patterns": [
         {
+          "name": "keyword.operator.range.masterbelt",
+          "match": "\\.\\.\\."
+        },
+        {
+          "name": "keyword.operator.range.masterbelt",
+          "match": "\\.\\."
+        },
+        {
           "name": "keyword.operator.masterbelt",
           "match": "->"
         },

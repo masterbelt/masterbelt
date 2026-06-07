@@ -383,6 +383,16 @@ func TestWellFormedProgramsParseClean(t *testing.T) {
 		{"for in over a map", "fn f(m: map<string, nint>): string {\n  let out = \"\"\n  for k in m {\n    out = out + k\n  }\n  return out\n}\n"},
 		{"nested for", "fn f(xs: list<nint>, ys: list<nint>): nint {\n  let n = 0\n  for x of xs {\n    for y of ys {\n      n = n + 1\n    }\n  }\n  return n\n}\n"},
 		{"for over a call with a record arg", "fn f(): nint {\n  let n = 0\n  for x of g(P{a: 1}) {\n    n = n + 1\n  }\n  return n\n}\n"},
+		// Range literals: the closed and half-open operators, an arithmetic bound
+		// (the range/arithmetic precedence boundary), a parenthesized range with a
+		// member call, a range as a ternary branch (the range/ternary boundary),
+		// and a range as a for's iterated expression in the noRecordLit-headed body.
+		{"closed range literal", "const r = 0..9\n"},
+		{"half-open range literal", "const r = 0...9\n"},
+		{"range with arithmetic bound", "const r = 0..n + 1\n"},
+		{"parenthesized range with member call", "const c = (0..9).count()\n"},
+		{"range as ternary branch", "const r = b ? 0..9 : 1..2\n"},
+		{"for over a range literal", "fn f(): nint {\n  let n = 0\n  for x of 0..9 {\n    n = n + 1\n  }\n  return n\n}\n"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -410,6 +420,11 @@ func TestDocumentFuzz(t *testing.T) {
 		// oracle covers binary/unary expressions and the maximal-munch edits.
 		"+", "-", "%", "!", "<", ">", "&&", "||", "==", "!=", "<=", ">=",
 		"true", "false", "1 + 2", "a && b", "-x", "!true",
+		// Range operators and a few range fragments: the maximal-munch dot run
+		// (".", "..", "...") edited beside a digit, a well-formed range and an
+		// arithmetic bound (the precedence boundary), and a chain (the
+		// non-associativity recovery) so the random walk reaches parseRangeTail.
+		"..", "...", "0..9", "0...9", "0..n + 1", "a..b..c",
 		// Declaration and statement keywords with their brackets, so the walk
 		// reaches the malformed-recovery paths whose diagnostics once anchored on
 		// a declaration's right boundary: enum/interface/impl/control blocks

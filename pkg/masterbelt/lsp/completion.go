@@ -527,9 +527,11 @@ func constructorItems(doc view) []protocol.CompletionItem {
 
 // constructorSignature returns the detail label and the snippet insert text for
 // a value-constructing builtin: error("message") takes one string, range(start,
-// end) two ints. An unrecognized constructor falls back to a bare call snippet
-// with one placeholder, so a future constructor still completes sensibly until
-// it is given its own shape here.
+// end) two ints (the optional third step argument is left out of the snippet —
+// the two-argument form is the common case; the literal a..b and the explicit
+// range(s, e, step) cover the rest). An unrecognized constructor falls back to a
+// bare call snippet with one placeholder, so a future constructor still completes
+// sensibly until it is given its own shape here.
 func constructorSignature(name string) (detail, insert string) {
 	switch name {
 	case "range":
