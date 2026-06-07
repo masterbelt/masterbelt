@@ -1,0 +1,49 @@
+/// A behaviour over a keyed collection: a type implements the single required
+/// fold (the primitive that visits every element), and the provided methods —
+/// count, any, all, and the list-returning map, filter, keys, values — come for
+/// free, each defined on top of fold. iterability is foldable. A type opts in by
+/// writing `impl foldable<K, V>` at its own definition site (no structural
+/// auto-fit, no orphan impls); an interface may also be written in a type-
+/// requirement position (c: foldable<nint, V>), where the value's usable methods
+/// are fixed to these.
+pub interface foldable<K, V> {
+  /// The fold: visit every element in order, threading an accumulator from init
+  /// through step. This is the one method an implementor must supply; every
+  /// provided method below is defined on top of it.
+  fold<A>(init: A, step: fn(acc: A, key: K, value: V): A): A
+
+  /// The number of elements.
+  pub count(): nint {
+    return fold(0, fn(acc, key, value) -> acc + 1)
+  }
+
+  /// Whether any element satisfies the predicate.
+  pub any(pred: fn(value: V): bool): bool {
+    return fold(false, fn(acc, key, value) -> acc || pred(value))
+  }
+
+  /// Whether every element satisfies the predicate.
+  pub all(pred: fn(value: V): bool): bool {
+    return fold(true, fn(acc, key, value) -> acc && pred(value))
+  }
+
+  /// A list of f applied to each value, in fold order.
+  pub map<U>(f: fn(value: V): U): list<U> {
+    return fold([], fn(acc, key, value) -> acc.append(f(value)))
+  }
+
+  /// A list of the values satisfying the predicate, in fold order.
+  pub filter(pred: fn(value: V): bool): list<V> {
+    return fold([], fn(acc, key, value) -> pred(value) ? acc.append(value) : acc)
+  }
+
+  /// A list of the keys, in fold order.
+  pub keys(): list<K> {
+    return fold([], fn(acc, key, value) -> acc.append(key))
+  }
+
+  /// A list of the values, in fold order.
+  pub values(): list<V> {
+    return fold([], fn(acc, key, value) -> acc.append(value))
+  }
+}

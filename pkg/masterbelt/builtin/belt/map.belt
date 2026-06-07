@@ -1,0 +1,28 @@
+/// A key-value mapping, written [k: v, ...]. The key type must be comparable —
+/// a map decides membership by key equality, so a key the language cannot
+/// compare (an anonymous record) is rejected at the application site.
+pub type map<K: comparable, V> = builtin<K, V> impl {
+  /// The number of entries.
+  pub extern fn len(): nint
+
+  /// The value for key, or an error when the key is not present. The result is
+  /// a union (V | error) because a lookup can miss; handle the error.
+  pub extern fn get(key: K): V | error
+
+  /// A new map with key set to value — an upsert that updates an existing key
+  /// or adds a new one — leaving this one unchanged. A map write always succeeds.
+  pub extern fn set(key: K, value: V): self
+
+  /// The + operator: the merge of the two maps.
+  pub extern fn add(other: self): self
+} impl comparable {
+  /// The == operator: entry-wise equality.
+  pub extern fn eql(other: self): bool
+  /// The != operator.
+  pub extern fn neq(other: self): bool
+} impl foldable<K, V> {
+  /// The required primitive: visit each entry with its key and value, threading
+  /// the accumulator. The provided count/any/all/map/filter/keys/values are
+  /// defined on top of this.
+  pub extern fn fold(init: A, step: fn(acc: A, key: K, value: V): A): A
+}
