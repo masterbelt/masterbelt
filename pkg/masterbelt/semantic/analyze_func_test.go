@@ -674,6 +674,42 @@ func TestEffectInPureContext(t *testing.T) {
 	}
 }
 
+func TestEffectInPureContextFoldedPositions(t *testing.T) {
+	// The other compile-time-folded positions are governed by the same purity
+	// rule as a const initializer: an enum member initializer, an associated
+	// constant initializer, and a refinement (where) predicate all fold at
+	// compile time, so an effectful call cannot appear in any of them.
+	roots := "extern fn nondet roll(): nint\n"
+	for _, src := range []string{
+		// An enum member initializer.
+		roots + "pub enum E: nint {\n  A = roll()\n}\n",
+		// An effectful call buried in a member initializer expression.
+		roots + "pub enum E: nint {\n  A = roll() + 1\n}\n",
+		// An associated constant initializer in a type's impl block.
+		roots + "pub type T = nint impl {\n  const C = roll()\n}\n",
+		// An associated constant initializer in an enum's impl block.
+		roots + "pub enum E: nint {\n  A\n} impl {\n  const C = roll()\n}\n",
+		// A refinement predicate calling a top-level effectful function.
+		roots + "pub type T = nint where self > roll()\n",
+	} {
+		if _, diags := analyze(src); !hasCode(diags, CodeEffectInPureContext) {
+			t.Errorf("%q: want effect_in_pure_context, got %v", src, codes(diags))
+		}
+	}
+
+	// A pure call in each position stays allowed.
+	pure := "fn dbl(n: nint): nint -> n * 2\n"
+	for _, src := range []string{
+		pure + "pub enum E: nint {\n  A = dbl(3)\n}\n",
+		pure + "pub type T = nint impl {\n  const C = dbl(3)\n}\n",
+		pure + "pub type T = nint where self > dbl(1)\n",
+	} {
+		if _, diags := analyze(src); hasCode(diags, CodeEffectInPureContext) {
+			t.Errorf("%q: pure call flagged: %v", src, codes(diags))
+		}
+	}
+}
+
 func TestEffectInTernaryBranch(t *testing.T) {
 	// A ternary's branches are part of the body the effect walker must pierce:
 	// an effectful call in the then or else branch counts toward the enclosing
