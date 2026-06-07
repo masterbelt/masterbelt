@@ -42,11 +42,9 @@ linters:
     - revive # the full default rule set (exported docs included)
 
 
-    # --- TODO(complexity): measured 2026-06-07 at upstream defaults ---
-    # - funlen # 63 issues at the default 60 lines / 40 statements
-    # - gocognit # 55 funcs over the default 30. Worst: semantic effects
-    #            # collectEffectUses=105, lsp recordTypes=101, assemble=92
-    # - nestif # 15 spots over the default 5
+    - funlen # see settings: ceilings at today's worst, ratcheting to 60/40
+    - gocognit # see settings: ceiling at today's worst, ratcheting to 30
+    - nestif # see settings: ceiling at today's worst, ratcheting to 5
     # - cyclop # rejected: same metric as gocyclo, and the default 10 mostly
     #          # punishes the compiler's dispatch switches; gocyclo carries
     #          # the per-function ceiling instead.
@@ -66,6 +64,19 @@ linters:
       # graphValueRaw=47, recordTypes=46, ConstantsEqual=42,
       # enforceEvalPublication=41); see tmp/plan/D-2-lint-ratchet.md §4.
       min-complexity: 47
+    gocognit:
+      # Ceiling pinned to today's worst (collectEffectUses). TODO: ratchet
+      # to the default 30 — 54 offenders there as of 2026-06-07.
+      min-complexity: 105
+    funlen:
+      # Ceilings pinned to today's worst (treegen emitDecoder 173 lines,
+      # graphValueRaw 126 statements). TODO: ratchet to the default 60/40.
+      lines: 173
+      statements: 126
+    nestif:
+      # Ceiling pinned to today's worst (14; the linter reports at >= the
+      # minimum). TODO: ratchet to the default 5.
+      min-complexity: 15
 
   exclusions:
     # Generated files are excluded from analysis, not just reporting:
