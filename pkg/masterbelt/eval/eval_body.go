@@ -20,7 +20,16 @@ import (
 // the body's return statement. A body with no return, a wrong argument count, an
 // unfoldable return, or an application past the recursion guard yields nil.
 func apply(ctx evalCtx, fn *ir.Constant, args []*ir.Constant) *ir.Constant {
-	if fn.Fn == nil || fn.Fn.Syntax == nil || len(args) != len(fn.Fn.Params) {
+	if fn.Fn == nil || len(args) != len(fn.Fn.Params) {
+		return nil
+	}
+	// A closure the IR folder built carries its lowered statement body:
+	// interpret it directly. (An AST-built closure carries only its surface
+	// form, the transitional path below, until the AST folder retires.)
+	if len(fn.Fn.Body) > 0 {
+		return graphApply(graphCtx{env: evalEnvBridge{ctx.env}, depth: ctx.depth, budgetHit: ctx.budgetHit}, fn, args)
+	}
+	if fn.Fn.Syntax == nil {
 		return nil
 	}
 	if ctx.depth >= maxApplyDepth {
@@ -37,6 +46,21 @@ func apply(ctx evalCtx, fn *ir.Constant, args []*ir.Constant) *ir.Constant {
 	// until the folder interprets the IR statements directly — F-3 M5.)
 	return evalBody(fn.Fn.Syntax.Body, evalCtx{env: ctx.env, locals: locals, depth: ctx.depth + 1, budgetHit: ctx.budgetHit})
 }
+
+// evalEnvBridge adapts the AST folder's Env into a GraphEnv, so a closure
+// carrying a lowered body interprets inside an AST-driven fold during the
+// migration. A referenced constant reads through the declaration the shell
+// anchors.
+type evalEnvBridge struct{ env Env }
+
+func (b evalEnvBridge) ConstValue(c *ir.Const) *ir.Constant {
+	if c.Syntax == nil {
+		return nil
+	}
+	return b.env.ValueOf(c.Syntax)
+}
+func (b evalEnvBridge) LookupType(name string) *ir.TypeDef { return b.env.LookupType(name) }
+func (b evalEnvBridge) Registry() *builtin.Registry        { return b.env.Registry() }
 
 // funcLiteralValue is the IR function-literal value an AST literal folds to: a
 // transitional bridge while the folder walks syntax — the parameter names

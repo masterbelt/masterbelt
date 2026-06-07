@@ -37,7 +37,7 @@ Module
     eval { lv: 5 }
   Const "Promoted"
     type Level
-    value ((Reference -> "Hero".lv : Level).increment() : Level)
+    value (((Reference -> "Hero" : Character).lv : Level).increment() : Level)
     eval 6
   Const "Squad"
     type Party
@@ -45,7 +45,7 @@ Module
     eval { leader: { lv: 8 } }
   Const "LeaderUp"
     type Level
-    value ((Reference -> "Squad".leader.lv : Level).increment() : Level)
+    value ((((Reference -> "Squad" : Party).leader : Character).lv : Level).increment() : Level)
     eval 9
   TypeDef "Level" pub
     doc "A character level, with methods over its underlying sbyte."

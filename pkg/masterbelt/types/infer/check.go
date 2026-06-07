@@ -717,6 +717,15 @@ func synthesize(e ast.Expr, s scope, sink *Sink) ir.Type {
 		return checkRange(e, s, sink)
 	case *ast.CallExpr:
 		return callType(e, s, sink)
+	case *ast.MemberExpr:
+		// The leaf decides the member reading (an enum member, an associated
+		// constant, a namespace import, a record field or getter), deriving
+		// the receiver's type silently inside; a value receiver is checked
+		// here first so its own settled type streams out for the typed value
+		// graph (a type-name or namespace receiver settles nothing and stays
+		// silent — an Invalid never streams).
+		check(e.Receiver, s, sink)
+		return s.leaf(e)
 	default:
 		return s.leaf(e)
 	}

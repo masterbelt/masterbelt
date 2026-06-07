@@ -5,7 +5,7 @@ Module
     eval { deg: 0 }
   Const "FreezingF"
     type nint
-    value (Reference -> "Freezing".fahrenheit : nint)
+    value ((Reference -> "Freezing" : Celsius).fahrenheit : nint)
     eval 32
   Const "FromBoiling"
     type Celsius
