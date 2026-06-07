@@ -438,14 +438,21 @@ func resolveFuncResult(e *ast.CallExpr, sg funcSig, subst map[string]ir.Type, s 
 // type position there resolves to a TypeVar rather than an unknown type. The
 // semantic resolver and the call site share it, so a call types a signature
 // exactly as its declaration was resolved.
-func FuncTypeParamScope(params []*ast.TypeParam) map[string]bool {
+//
+// The scope is seeded with a nil bound per name: the bounds are not yet resolved
+// (a bound may name another parameter, fn first<T: foldable<U>, U>), so they are
+// attached afterward by ResolveFuncTypeParams, which back-fills each name's bound
+// into this same map. Resolving the parameter and result types then sees the
+// bounds, so K: comparable used as map<K, V> carries the bound to the
+// declaration-site check.
+func FuncTypeParamScope(params []*ast.TypeParam) TypeScope {
 	if len(params) == 0 {
 		return nil
 	}
-	scope := make(map[string]bool, len(params))
+	scope := make(TypeScope, len(params))
 	for _, p := range params {
 		if p.Name != "" {
-			scope[p.Name] = true
+			scope[p.Name] = nil
 		}
 	}
 	return scope
@@ -454,8 +461,12 @@ func FuncTypeParamScope(params []*ast.TypeParam) map[string]bool {
 // ResolveFuncTypeParams resolves a function's generic type parameters into
 // ir.TypeParams (name plus optional resolved bound), each bound resolved in the
 // full type-parameter scope so it may name a later parameter (the U in
-// fn first<T: foldable<U>, U>).
-func ResolveFuncTypeParams(r *TypeResolver, params []*ast.TypeParam, scope map[string]bool) []*ir.TypeParam {
+// fn first<T: foldable<U>, U>). It also back-fills each resolved bound into the
+// scope, so a subsequent resolution of the parameter and result types sees the
+// bound on each TypeVar (the canonical map<K, V> with K: comparable). The bound
+// is resolved against the scope before it is back-filled, so a self-referential
+// bound (T: foo<T>) reads T as an unbounded variable, not recursively.
+func ResolveFuncTypeParams(r *TypeResolver, params []*ast.TypeParam, scope TypeScope) []*ir.TypeParam {
 	if len(params) == 0 {
 		return nil
 	}
@@ -466,6 +477,11 @@ func ResolveFuncTypeParams(r *TypeResolver, params []*ast.TypeParam, scope map[s
 			bound = r.ResolveType(p.Constraint, scope)
 		}
 		out = append(out, &ir.TypeParam{Name: p.Name, Bound: bound})
+	}
+	for _, tp := range out {
+		if tp.Name != "" {
+			scope[tp.Name] = tp.Bound
+		}
 	}
 	return out
 }

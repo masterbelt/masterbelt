@@ -170,6 +170,13 @@ type BodyScope struct {
 	Qualified func(namespace, name string) *ir.TypeDef
 	Self      ir.Type
 	Params    map[string]ir.Type
+	// TScope is the generic type-parameter scope in effect in the body — the
+	// enclosing function's or method's type parameters, each mapped to its bound
+	// (nil if unbounded). A type annotation in the body (a let, a match/switch arm
+	// type) resolves a name through it, so a parameter T may be written there and
+	// resolves to a TypeVar carrying its bound rather than an unknown type. It is
+	// nil in a body with no type parameters (and in a refinement predicate).
+	TScope TypeScope
 	// Locals maps each let-bound block-local in scope to its settled type. A
 	// reference to one resolves to that type, shadowing a same-named parameter or
 	// type; it is nil in a body with no lets (and in a refinement predicate, which

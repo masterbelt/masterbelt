@@ -6,7 +6,6 @@ import (
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/eval"
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/types"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/types/infer"
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/source/cst"
@@ -352,6 +351,32 @@ func forEachBodyExpr(body []ast.Stmt, fn func(ast.Expr)) {
 
 // --- method bodies ----------------------------------------------------------
 
+// methodTScope is the generic type-parameter scope in effect in a method body:
+// the enclosing type's parameters (each with its resolved bound) plus the
+// method's own explicit type parameters (fold<A>). A body type annotation naming
+// one of these (a let, a match/switch arm) then resolves to a TypeVar rather than
+// an unknown type. The enclosing parameters' bounds are carried through; a method
+// type parameter is left unbounded here (a body annotation only needs its name in
+// scope, and the signature already carries the bound). A method-introduced
+// inference variable (the implicit R in map(func: fn(T): R)) is deliberately not
+// added: it is an inference hole, not a name a body annotation may pin, and
+// adding it would risk shadowing a same-named real type.
+func methodTScope(def *ir.TypeDef, m *ast.MethodDecl) infer.TypeScope {
+	if len(def.Params) == 0 && len(m.TypeParams) == 0 {
+		return nil
+	}
+	scope := make(infer.TypeScope, len(def.Params)+len(m.TypeParams))
+	for _, p := range def.Params {
+		scope[p.Name] = p.Bound
+	}
+	for _, tp := range m.TypeParams {
+		if _, ok := scope[tp.Name]; !ok {
+			scope[tp.Name] = nil
+		}
+	}
+	return scope
+}
+
 // checkMethodBodies type-checks each method body's returned value against the
 // method's declared result type, reporting through sink. It runs after
 // resolveTypes; each resolved method carries the declaration it came from
@@ -376,7 +401,7 @@ func checkMethodBodies(reg *builtin.Registry, defs []*ir.TypeDef, universe map[s
 				params[p.Name] = substSelf(p.Type, self)
 			}
 			want := substSelf(irm.Result, self)
-			bs := infer.BodyScope{Reg: reg, Universe: universe, Qualified: qualified, Self: self, Params: params, Funcs: funcs, QualifiedFuncs: qualifiedFuncs}
+			bs := infer.BodyScope{Reg: reg, Universe: universe, Qualified: qualified, Self: self, Params: params, Funcs: funcs, QualifiedFuncs: qualifiedFuncs, TScope: methodTScope(def, m)}
 			checkStmts(m.Body, want, bs, env, nil, sink, at, diags)
 			checkIndexWrites(m.Body, env, at, diags)
 			checkBareEnumArgs(m.Body, bs, env, at, diags)
@@ -410,19 +435,20 @@ func checkFuncBodies(reg *builtin.Registry, file *ast.File, universe map[string]
 	for _, fd := range file.Funcs {
 		// The function's generic type parameters are in scope for its parameter
 		// and result annotations, so a `c: T` where `T: foldable<int>` resolves
-		// to a TypeVar. Resolving a name in scope yields a bare (unbounded)
-		// TypeVar, so the bounds are rebound onto it (BindTypeParamBounds) — the
-		// body may then call the bound interface's methods on the parameter, and
-		// nothing else.
+		// to a TypeVar. ResolveFuncTypeParams back-fills each resolved bound into
+		// tscope, so resolving the parameter and result types already yields a
+		// TypeVar carrying its bound — the body may then call the bound interface's
+		// methods on the parameter, and nothing else. tscope is also the body's
+		// type-param scope (TScope), so a type annotation in the body (a let, a
+		// match/switch arm) may name a type parameter.
 		tscope := infer.FuncTypeParamScope(fd.TypeParams)
-		typeParams := infer.ResolveFuncTypeParams(r, fd.TypeParams, tscope)
-		bindBounds := infer.BindTypeParamBounds(typeParams)
+		infer.ResolveFuncTypeParams(r, fd.TypeParams, tscope)
 		params := make(map[string]ir.Type, len(fd.Params))
 		for _, p := range fd.Params {
-			params[p.Name] = types.Substitute(r.ResolveType(p.Type, tscope), bindBounds)
+			params[p.Name] = r.ResolveType(p.Type, tscope)
 		}
-		want := types.Substitute(r.ResolveType(fd.Result, tscope), bindBounds)
-		bs := infer.BodyScope{Reg: reg, Universe: universe, Qualified: qualified, Self: ir.Invalid, Params: params, Funcs: funcs, QualifiedFuncs: qualifiedFuncs}
+		want := r.ResolveType(fd.Result, tscope)
+		bs := infer.BodyScope{Reg: reg, Universe: universe, Qualified: qualified, Self: ir.Invalid, Params: params, Funcs: funcs, QualifiedFuncs: qualifiedFuncs, TScope: tscope}
 		checkStmts(fd.Body, want, bs, env, noSelf, sink, at, diags)
 		if diags == nil {
 			continue // the sink-only walk wants no further diagnostics
