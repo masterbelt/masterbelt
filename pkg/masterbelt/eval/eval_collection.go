@@ -1,9 +1,9 @@
 // This file holds the collection and range intrinsics — the foldable methods of a
 // list, map, and range constant. list/map/range are not natively backed in the
-// registry, so their methods (append, map, get, set, len, and the fold primitive
-// every provided method is built on) have no native intrinsic and are folded
-// here by name, with the fold/range walks bounded so a wide range never hangs the
-// folder.
+// registry, so their methods (push, pop, unshift, shift, add, map, get, set, len,
+// and the fold primitive every provided method is built on) have no native
+// intrinsic and are folded here by name, with the fold/range walks bounded so a
+// wide range never hangs the folder.
 package eval
 
 import (
@@ -14,9 +14,9 @@ import (
 
 // collectionMethod folds a method on a list/map constant. The list collections
 // are not natively backed in the registry, so their methods have no intrinsic;
-// the foldable ones are append, map (over a list), get (a subscript read), set (a
-// subscript write), and the fold primitive. Anything else has no constant value
-// here.
+// the foldable ones are push/pop/unshift/shift (the stack/queue methods), add
+// (the + operator), map (over a list), get (a subscript read), set (a subscript
+// write), and the fold primitive. Anything else has no constant value here.
 //
 // A collection carries an explicit mapness (list/map/unknown), settled from its
 // entries for a non-empty one and from a syntactic channel for an empty one.
@@ -34,8 +34,16 @@ func collectionMethod(ctx evalCtx, recv *ir.Constant, name string, args []*ir.Co
 		return collectionLen(recv, args)
 	case "fold":
 		return collectionFold(ctx, recv, args)
-	case "append":
-		return collectionAppend(recv, args)
+	case "push":
+		return collectionPush(recv, args)
+	case "pop":
+		return collectionPop(recv, args)
+	case "unshift":
+		return collectionUnshift(recv, args)
+	case "shift":
+		return collectionShift(recv, args)
+	case "add":
+		return collectionAdd(recv, args)
 	case "map":
 		return collectionMap(ctx, recv, args)
 	case "get":
@@ -47,14 +55,14 @@ func collectionMethod(ctx evalCtx, recv *ir.Constant, name string, args []*ir.Co
 	}
 }
 
-// collectionAppend folds list.append(v) to a new list with the value at the end,
+// collectionPush folds list.push(v) to a new list with the value at the end,
 // leaving the receiver unchanged (data is immutable). It is the builder the
 // list-returning provided methods (map, filter, keys, values) accumulate through,
-// so the fold of those methods bottoms out in a real list constant. append is a
+// so the fold of those methods bottoms out in a real list constant. push is a
 // list-only operation — a map has none — so a settled map does not fold; an
-// unknown empty receiver does (appending an element makes the result a list), and
+// unknown empty receiver does (pushing an element makes the result a list), and
 // the result is always a list.
-func collectionAppend(recv *ir.Constant, args []*ir.Constant) *ir.Constant {
+func collectionPush(recv *ir.Constant, args []*ir.Constant) *ir.Constant {
 	if len(args) != 1 || recv.IsMap() {
 		return nil
 	}
@@ -62,6 +70,125 @@ func collectionAppend(recv *ir.Constant, args []*ir.Constant) *ir.Constant {
 	copy(out, recv.Coll)
 	out = append(out, ir.ConstEntry{Value: args[0]})
 	return ir.CollectionConstantOf(out, ir.CollList)
+}
+
+// collectionUnshift folds list.unshift(v) — push's front-side mirror — to a new
+// list with the value first, leaving the receiver unchanged. Like push it is
+// list-only: a settled map does not fold, an unknown empty receiver does, and
+// the result is always a list.
+func collectionUnshift(recv *ir.Constant, args []*ir.Constant) *ir.Constant {
+	if len(args) != 1 || recv.IsMap() {
+		return nil
+	}
+	out := make([]ir.ConstEntry, 0, len(recv.Coll)+1)
+	out = append(out, ir.ConstEntry{Value: args[0]})
+	out = append(out, recv.Coll...)
+	return ir.CollectionConstantOf(out, ir.CollList)
+}
+
+// collectionPop folds list.pop() to the last element, or to null when the list
+// is empty — the taking read is a value to branch on (optional<T>), never an
+// error, and the receiver stays unchanged. pop is list-only, so a settled map
+// does not fold; an unknown empty receiver does (only a list type-checks a pop,
+// and an empty read is null regardless of the element type).
+func collectionPop(recv *ir.Constant, args []*ir.Constant) *ir.Constant {
+	if len(args) != 0 || recv.IsMap() {
+		return nil
+	}
+	if len(recv.Coll) == 0 {
+		return ir.NullConstant()
+	}
+	return recv.Coll[len(recv.Coll)-1].Value
+}
+
+// collectionShift folds list.shift() — pop's front-side mirror — to the first
+// element, or to null when the list is empty, the receiver unchanged. Like pop
+// it is list-only: a settled map does not fold, an unknown empty receiver does.
+func collectionShift(recv *ir.Constant, args []*ir.Constant) *ir.Constant {
+	if len(args) != 0 || recv.IsMap() {
+		return nil
+	}
+	if len(recv.Coll) == 0 {
+		return ir.NullConstant()
+	}
+	return recv.Coll[0].Value
+}
+
+// collectionAdd folds the + operator on a list — the one overloaded collection
+// method: add(other: self) concatenates two lists, add(element: T) pushes the
+// one element. The folder is value-blind, so it re-decides the overload from
+// the operand's shape the way SelectOverload decided it from the types: the
+// argument is read as another list of the receiver's elements (self) and as one
+// element of the receiver (T), and the call folds only when exactly one reading
+// fits — an undecidable or ambiguous operand (an empty receiver with a list
+// argument, say) leaves the call unevaluated rather than guessing between the
+// two. A settled map's + (its add(other: self)) is not folded here.
+func collectionAdd(recv *ir.Constant, args []*ir.Constant) *ir.Constant {
+	if len(args) != 1 || recv.IsMap() {
+		return nil
+	}
+	arg := args[0]
+	asSelf := arg.Kind == ir.ConstCollection && !arg.IsMap() && entriesFitElements(recv, arg.Coll)
+	asElement := elementFits(recv, arg)
+	if asSelf == asElement {
+		return nil // neither or both readings fit: do not guess
+	}
+	if asElement {
+		return collectionPush(recv, args)
+	}
+	out := make([]ir.ConstEntry, 0, len(recv.Coll)+len(arg.Coll))
+	out = append(out, recv.Coll...)
+	out = append(out, arg.Coll...)
+	return ir.CollectionConstantOf(out, ir.CollList)
+}
+
+// elementFits reports whether v could be one element of the receiver, judged by
+// value alone: it has the shape of the receiver's elements. An empty receiver
+// pins no element shape, so anything fits it.
+func elementFits(recv *ir.Constant, v *ir.Constant) bool {
+	if len(recv.Coll) == 0 {
+		return true
+	}
+	return sameShape(recv.Coll[0].Value, v)
+}
+
+// entriesFitElements reports whether every entry could be an element of the
+// receiver — i.e. the entries read as another list of the receiver's element
+// type: all unkeyed, each fitting the receiver's element shape. An empty slice
+// pins nothing and fits.
+func entriesFitElements(recv *ir.Constant, entries []ir.ConstEntry) bool {
+	for _, e := range entries {
+		if e.Key != nil || !elementFits(recv, e.Value) {
+			return false
+		}
+	}
+	return true
+}
+
+// sameShape reports whether two constants could inhabit the same type, judged
+// by value alone: their kinds agree, and two collections agree on mapness and
+// on element shape — recursively, by their first entries, since typing keeps a
+// folded collection homogeneous. An empty collection pins no element shape and
+// matches any collection whose mapness does not contradict it. The check backs
+// collectionAdd's overload re-decision, so it errs undecidable-as-fitting and
+// lets the exactly-one-fits rule reject the ambiguity.
+func sameShape(a, b *ir.Constant) bool {
+	if a == nil || b == nil || a.Kind != b.Kind {
+		return false
+	}
+	if a.Kind != ir.ConstCollection {
+		return true
+	}
+	if (a.IsMap() && b.IsList()) || (a.IsList() && b.IsMap()) {
+		return false
+	}
+	if len(a.Coll) == 0 || len(b.Coll) == 0 {
+		return true // an empty side pins no element shape
+	}
+	if (a.Coll[0].Key != nil) != (b.Coll[0].Key != nil) {
+		return false
+	}
+	return sameShape(a.Coll[0].Value, b.Coll[0].Value)
 }
 
 // collectionLen folds list.len() and map.len() to the element/entry count. It is
