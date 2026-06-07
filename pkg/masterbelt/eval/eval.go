@@ -558,7 +558,7 @@ func evalExprRaw(e ast.Expr, ctx evalCtx) *ir.Constant {
 			// A call whose callee names a type is a conversion (the type wins
 			// over a same-named function, as in the type rules); one that names
 			// a top-level function applies its body. A local binding shadows
-			// both (and a call of a local is not foldable here).
+			// both (and a call of a non-function local does not fold).
 			if id, isIdent := e.Callee.(*ast.Identifier); isIdent {
 				// A local bound to a function value is applied — a higher-order
 				// parameter (a foldable's pred/f) called by name inside the body. It
@@ -566,7 +566,7 @@ func evalExprRaw(e ast.Expr, ctx evalCtx) *ir.Constant {
 				// rules read the local.
 				if v, isLocal := ctx.locals[id.Name]; isLocal {
 					if v != nil && v.Kind == ir.ConstFunc {
-						return applyLocalFunc(sub, v, e.Arguments)
+						return applyFuncValue(sub, v, e.Arguments)
 					}
 					return nil // a call of a non-function local does not fold
 				}
@@ -584,6 +584,16 @@ func evalExprRaw(e ast.Expr, ctx evalCtx) *ir.Constant {
 				if v, ok := selfCall(ctx, sub, id.Name, e.Arguments); ok {
 					return v
 				}
+			}
+			// The general arm: a callee that folds to a function value applies,
+			// whatever channel carried it — a const reference (F(2)), an alias
+			// (const G = F; G(2)), an immediately applied literal
+			// ((fn(x) -> x + 1)(2)), or any nested form. It runs after the
+			// name-directed arms above, which a local, a type, or a top-level
+			// function claim first, exactly as the type rules order them; a
+			// callee that folds to no function value leaves the call unfolded.
+			if fn := evalExpr(e.Callee, sub); fn != nil && fn.Kind == ir.ConstFunc {
+				return applyFuncValue(sub, fn, e.Arguments)
 			}
 			return nil
 		}
@@ -631,11 +641,12 @@ func evalExprRaw(e ast.Expr, ctx evalCtx) *ir.Constant {
 	}
 }
 
-// applyLocalFunc folds a call of a function-valued local fn(args): the arguments
-// fold in the caller's context, then the closure applies over its captured
-// environment. It is how a higher-order parameter — a foldable's pred or f,
-// called by name inside the provided method's fold step — folds.
-func applyLocalFunc(ctx evalCtx, fn *ir.Constant, argExprs []ast.Expr) *ir.Constant {
+// applyFuncValue folds a call of a function value fn(args): the arguments fold
+// in the caller's context, then the closure applies over its captured
+// environment. It serves every channel a function value reaches a call through
+// — a let or parameter local (a foldable's pred/f called by name inside the
+// body), a const reference, and an immediately applied literal.
+func applyFuncValue(ctx evalCtx, fn *ir.Constant, argExprs []ast.Expr) *ir.Constant {
 	args := make([]*ir.Constant, len(argExprs))
 	for i, a := range argExprs {
 		if args[i] = evalExpr(a, ctx); args[i] == nil {

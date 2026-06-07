@@ -29,13 +29,9 @@ const foldCorpus = "testdata/fold"
 // empty the list ((a)/(d) in M4, (b) in M5, (c)/extern in M3, depth in M6),
 // and once it is empty the gates enforce the full rule with no exceptions.
 var knownGaps = map[string]string{
-	"gap-a-const-ref.belt":  "(a) a const-referenced function value applied directly",
-	"gap-a-immediate.belt":  "(a) an immediately applied function literal",
-	"gap-a-alias.belt":      "(a) a function value reached through a const alias",
-	"gap-a-in-body.belt":    "(a) a function value applied inside an applied body",
 	"gap-b-cross-assoc.belt": "(b) an assoc const initializer reading another type's member",
-	"gap-d-overload.belt":   "(d) a fn overload split by a named type the kind rule cannot see",
-	"gap-depth.belt":        "the depth budget refuses the fold with no diagnostic (M6)",
+	"gap-d-overload.belt":    "(d) a fn overload split by a named type the kind rule cannot see",
+	"gap-depth.belt":         "the depth budget refuses the fold with no diagnostic (M6)",
 }
 
 // foldExpect is one corpus case's expectation: it folds completely (and is
@@ -252,11 +248,12 @@ func TestFoldFailureClassifier(t *testing.T) {
 		t.Errorf("deep recursion classified %q, want %q", got, eval.FailureDepth)
 	}
 
-	// A const-referenced function value applied directly is gap (a) — an
-	// evaluator gap while it is open (M4 closes it; this case then needs an
-	// artificial gap instead).
-	gap := "const F = fn(x: nint): nint -> x + 1\nconst A = F(2)\n"
+	// Any non-budget failure is an evaluator gap. The production path only
+	// reaches the classifier on a diagnostic-free const (a genuine gap); the
+	// unit pins the contract itself, so an unresolvable reference — nil for a
+	// reason that is not a budget guard — serves as the stable fixture.
+	gap := "const A = bogus\n"
 	if got := classify(gap, "A"); got != eval.FailureGap {
-		t.Errorf("function-value call classified %q, want %q", got, eval.FailureGap)
+		t.Errorf("unresolvable reference classified %q, want %q", got, eval.FailureGap)
 	}
 }
