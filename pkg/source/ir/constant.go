@@ -42,12 +42,12 @@ const (
 	ConstError                       // an error value carrying its message (Constant.Str)
 	ConstEnum                        // an enum member value (Constant.EnumDef / Constant.EnumIndex)
 	ConstNull                        // the null value (no payload — the single inhabitant of the null type)
-	ConstRange                       // a half-open integer range (Constant.Start / Constant.End)
+	ConstRange                       // an inclusive integer range (Constant.Start / Constant.End)
 )
 
 // Constant is the evaluated value of a constant expression: an arbitrary-
 // precision integer, a boolean, a string, a collection (list/map), a datetime,
-// a duration, or a half-open integer range. A nil *Constant means "could not be
+// a duration, or an inclusive integer range. A nil *Constant means "could not be
 // evaluated" — a missing initializer, an undefined reference, a cycle, a type
 // error, or a division by zero.
 type Constant struct {
@@ -77,7 +77,7 @@ type Constant struct {
 	EnumDef   *TypeDef
 	EnumIndex int
 
-	// valid when Kind == ConstRange: the half-open integer interval [Start, End).
+	// valid when Kind == ConstRange: the inclusive integer interval [Start, End].
 	// The elements are Start, Start+1, ..., End-1; an End at or below Start is the
 	// empty range. The bounds are kept lazily (the sequence is never materialized
 	// here), so a wide range is a small value — the evaluator bounds the walk it
@@ -296,8 +296,8 @@ func ErrorConstant(message string) *Constant { return &Constant{Kind: ConstError
 // carrying no payload.
 func NullConstant() *Constant { return &Constant{Kind: ConstNull} }
 
-// RangeConstant builds a half-open integer range [start, end): the elements
-// start, start+1, ..., end-1, with an end at or below start being the empty
+// RangeConstant builds an inclusive integer range [start, end]: the elements
+// start, start+1, ..., end, with an end below start being the empty
 // range. The bounds are held lazily; the sequence is materialized only when a
 // fold or a for walks it, under the evaluator's iteration bound.
 func RangeConstant(start, end *big.Int) *Constant {

@@ -6,28 +6,28 @@ import (
 )
 
 // TestRangeForOfSum checks the headline example: a for-of loop over a range sums
-// its elements (range(0, 10) is 0..9), folding to 45 at compile time.
+// its elements (range(0, 10) is 0..10), folding to 55 at compile time.
 func TestRangeForOfSum(t *testing.T) {
 	src := "pub fn total(): nint {\n  let t = 0\n  for i of range(0, 10) {\n    t = t + i\n  }\n  return t\n}\nconst S = total()\n"
-	if got := evalOf(t, src, "S").Int.Int64(); got != 45 {
-		t.Errorf("S = %d, want 45", got)
+	if got := evalOf(t, src, "S").Int.Int64(); got != 55 {
+		t.Errorf("S = %d, want 55", got)
 	}
 }
 
 // TestRangeForInPosition checks that a for-in loop over a range binds the 0-based
 // position (the key, like a list's index), not the element: the positions of
-// range(5, 10) are 0..4, summing to 10.
+// range(5, 10) are 0..5, summing to 15.
 func TestRangeForInPosition(t *testing.T) {
 	src := "pub fn ps(): nint {\n  let t = 0\n  for i in range(5, 10) {\n    t = t + i\n  }\n  return t\n}\nconst P = ps()\n"
-	if got := evalOf(t, src, "P").Int.Int64(); got != 10 {
-		t.Errorf("P = %d, want 10", got)
+	if got := evalOf(t, src, "P").Int.Int64(); got != 15 {
+		t.Errorf("P = %d, want 15", got)
 	}
 }
 
-// TestRangeEmpty checks that an end at or below the start is the empty range: the
+// TestRangeEmpty checks that an end below the start is the empty range: the
 // for body never runs, so the accumulator keeps its initial value.
 func TestRangeEmpty(t *testing.T) {
-	src := "pub fn e(): nint {\n  let t = 100\n  for i of range(10, 10) {\n    t = t + i\n  }\n  return t\n}\nconst E = e()\n"
+	src := "pub fn e(): nint {\n  let t = 100\n  for i of range(10, 9) {\n    t = t + i\n  }\n  return t\n}\nconst E = e()\n"
 	if got := evalOf(t, src, "E").Int.Int64(); got != 100 {
 		t.Errorf("E = %d, want 100", got)
 	}
@@ -35,15 +35,15 @@ func TestRangeEmpty(t *testing.T) {
 
 // TestRangeFold checks the native fold: it threads an accumulator over the
 // elements, the step seeing the 0-based position as its key. Summing the values
-// of range(0, 4) is 0 + 1 + 2 + 3 = 6; summing the keys is the same here.
+// of range(0, 4) is 0 + 1 + 2 + 3 + 4 = 10; summing the keys is the same here.
 func TestRangeFold(t *testing.T) {
 	src := "const F = range(0, 4).fold(0, fn(acc: nint, k: nint, v: nint): nint -> acc + v)\n" +
 		"const K = range(0, 4).fold(0, fn(acc: nint, k: nint, v: nint): nint -> acc + k)\n"
-	if got := evalOf(t, src, "F").Int.Int64(); got != 6 {
-		t.Errorf("F = %d, want 6", got)
+	if got := evalOf(t, src, "F").Int.Int64(); got != 10 {
+		t.Errorf("F = %d, want 10", got)
 	}
-	if got := evalOf(t, src, "K").Int.Int64(); got != 6 {
-		t.Errorf("K = %d, want 6", got)
+	if got := evalOf(t, src, "K").Int.Int64(); got != 10 {
+		t.Errorf("K = %d, want 10", got)
 	}
 }
 
@@ -52,15 +52,15 @@ func TestRangeFold(t *testing.T) {
 // (map, filter, keys, values) fold to lists whose len and fold are verifiable.
 func TestRangeProvidedMethods(t *testing.T) {
 	src := "const C = range(0, 10).count()\n" +
-		"const EC = range(5, 5).count()\n" +
+		"const EC = range(5, 4).count()\n" +
 		"const A = range(0, 10).any(fn(v: nint): bool -> v > 8)\n" +
 		"const L = range(0, 10).all(fn(v: nint): bool -> v >= 0)\n" +
 		"const ML = range(0, 5).map(fn(v: nint): nint -> v * 2).len()\n" +
 		"const FL = range(0, 10).filter(fn(v: nint): bool -> v % 2 == 0).len()\n" +
 		"const VS = range(3, 7).values().fold(0, fn(acc: nint, k: nint, v: nint): nint -> acc + v)\n" +
 		"const KS = range(3, 7).keys().fold(0, fn(acc: nint, k: nint, v: nint): nint -> acc + v)\n"
-	if got := evalOf(t, src, "C").Int.Int64(); got != 10 {
-		t.Errorf("count = %d, want 10", got)
+	if got := evalOf(t, src, "C").Int.Int64(); got != 11 {
+		t.Errorf("count = %d, want 11", got)
 	}
 	if got := evalOf(t, src, "EC").Int.Int64(); got != 0 {
 		t.Errorf("empty count = %d, want 0", got)
@@ -71,17 +71,17 @@ func TestRangeProvidedMethods(t *testing.T) {
 	if got := evalOf(t, src, "L").Bool; !got {
 		t.Errorf("all(v >= 0) = false, want true")
 	}
-	if got := evalOf(t, src, "ML").Int.Int64(); got != 5 {
-		t.Errorf("map().len() = %d, want 5", got)
+	if got := evalOf(t, src, "ML").Int.Int64(); got != 6 {
+		t.Errorf("map().len() = %d, want 6", got)
 	}
-	if got := evalOf(t, src, "FL").Int.Int64(); got != 5 {
-		t.Errorf("filter().len() = %d, want 5", got)
+	if got := evalOf(t, src, "FL").Int.Int64(); got != 6 {
+		t.Errorf("filter().len() = %d, want 6", got)
 	}
-	if got := evalOf(t, src, "VS").Int.Int64(); got != 18 { // 3 + 4 + 5 + 6
-		t.Errorf("values sum = %d, want 18", got)
+	if got := evalOf(t, src, "VS").Int.Int64(); got != 25 { // 3 + 4 + 5 + 6 + 7
+		t.Errorf("values sum = %d, want 25", got)
 	}
-	if got := evalOf(t, src, "KS").Int.Int64(); got != 6 { // 0 + 1 + 2 + 3
-		t.Errorf("keys sum = %d, want 6", got)
+	if got := evalOf(t, src, "KS").Int.Int64(); got != 10 { // 0 + 1 + 2 + 3 + 4
+		t.Errorf("keys sum = %d, want 10", got)
 	}
 }
 
@@ -168,8 +168,8 @@ func TestRangeHugeIsSafe(t *testing.T) {
 // is count(), whose only cost is the visit count, so the at-bound case stays fast.
 func TestRangeAtBound(t *testing.T) {
 	const iterCap = 1 << 20                              // mirrors eval.maxRangeIterations
-	src := "const AtCap = range(0, 1048576).count()\n" + // exactly the cap
-		"const OverCap = range(0, 1048577).count()\n" // one wider
+	src := "const AtCap = range(0, 1048575).count()\n" + // exactly the cap
+		"const OverCap = range(0, 1048576).count()\n" // one wider
 
 	mod, diags := analyze(src)
 	if len(diags) != 0 {

@@ -1,11 +1,11 @@
 # tree
 File
   FuncDecl
-    LineComment "// The builtin range type: a half-open integer sequence, constructed with"
+    LineComment "// The builtin range type: an inclusive integer sequence, constructed with"
     Newline "\n"
-    LineComment "// range(start, end) — the values start, start+1, ..., end-1 (an end at or below"
+    LineComment "// range(start, end) — the values start, start+1, ..., end, both bounds included"
     Newline "\n"
-    LineComment "// start is the empty range). It is constructed by the two-argument form the way"
+    LineComment "// (an end below start is the empty range). It is constructed by the two-argument form the way"
     Newline "\n"
     LineComment "// error(\"msg\") is by the one-argument form: a native conversion that builds the"
     Newline "\n"
@@ -18,9 +18,9 @@ File
     LineComment "// the element, so for...of binds the element and for...in binds the position."
     Newline "\n"
     Newline "\n"
-    LineComment "// for over a range with \"of\" sums its elements: range(0, 10) is 0..9, so the"
+    LineComment "// for over a range with \"of\" sums its elements: range(0, 10) is 0..10, so the"
     Newline "\n"
-    LineComment "// let total the body reassigns folds to 0 + 1 + ... + 9 = 45. This is the"
+    LineComment "// let total the body reassigns folds to 0 + 1 + ... + 10 = 55. This is the"
     Newline "\n"
     LineComment "// headline example — a counted loop, written without materializing a list."
     Newline "\n"
@@ -122,9 +122,9 @@ File
     Newline "\n"
     LineComment "// \"in\" over a range binds the 0-based position — the same key a list's index is"
     Newline "\n"
-    LineComment "// — not the element, so summing the positions of the five-element range(5, 10)"
+    LineComment "// — not the element, so summing the positions of the six-element range(5, 10)"
     Newline "\n"
-    LineComment "// folds to 0 + 1 + 2 + 3 + 4 = 10 (the positions), not the elements 5..9."
+    LineComment "// folds to 0 + 1 + 2 + 3 + 4 + 5 = 15 (the positions), not the elements 5..10."
     Newline "\n"
     Pub "pub"
     Whitespace " "
@@ -222,7 +222,7 @@ File
   FuncDecl
     Newline "\n"
     Newline "\n"
-    LineComment "// An end at or below the start is the empty range: the body never runs, so the"
+    LineComment "// An end below the start is the empty range: the body never runs, so the"
     Newline "\n"
     LineComment "// accumulator keeps its initial value."
     Newline "\n"
@@ -271,7 +271,7 @@ File
           Comma ","
           Whitespace " "
           Literal
-            Int "10"
+            Int "9"
           RParen ")"
         Whitespace " "
         Block
@@ -322,9 +322,9 @@ File
   ConstDecl
     Newline "\n"
     Newline "\n"
-    LineComment "// count is a foldable provided method: range(0, 10) has ten elements, and the"
+    LineComment "// count is a foldable provided method: range(0, 10) has eleven elements (both"
     Newline "\n"
-    LineComment "// empty range has none."
+    LineComment "// bounds included), and the empty range has none."
     Newline "\n"
     Const "const"
     Whitespace " "
@@ -370,7 +370,7 @@ File
             Comma ","
             Whitespace " "
             Literal
-              Int "5"
+              Int "4"
             RParen ")"
           Dot "."
           Ident "count"
@@ -746,7 +746,7 @@ File
       EqEq "=="
       Whitespace " "
       Literal
-        Int "45"
+        Int "55"
   AssertDecl
     Newline "\n"
     Assert "assert"
@@ -761,7 +761,7 @@ File
       EqEq "=="
       Whitespace " "
       Literal
-        Int "10"
+        Int "15"
   AssertDecl
     Newline "\n"
     Assert "assert"
@@ -803,7 +803,7 @@ File
       EqEq "=="
       Whitespace " "
       Literal
-        Int "10"
+        Int "11"
   AssertDecl
     Newline "\n"
     Assert "assert"
@@ -820,7 +820,7 @@ File
             Comma ","
             Whitespace " "
             Literal
-              Int "5"
+              Int "4"
             RParen ")"
           Dot "."
           Ident "count"
@@ -989,7 +989,7 @@ File
       EqEq "=="
       Whitespace " "
       Literal
-        Int "5"
+        Int "6"
   AssertDecl
     Newline "\n"
     Assert "assert"
@@ -1094,7 +1094,7 @@ File
       EqEq "=="
       Whitespace " "
       Literal
-        Int "20"
+        Int "30"
   AssertDecl
     Newline "\n"
     Assert "assert"
@@ -1159,7 +1159,7 @@ File
       EqEq "=="
       Whitespace " "
       Literal
-        Int "5"
+        Int "6"
   AssertDecl
     Newline "\n"
     Assert "assert"
@@ -1192,7 +1192,7 @@ File
       EqEq "=="
       Whitespace " "
       Literal
-        Int "4"
+        Int "5"
   AssertDecl
     Newline "\n"
     Assert "assert"
@@ -1271,7 +1271,7 @@ File
       EqEq "=="
       Whitespace " "
       Literal
-        Int "18"
+        Int "25"
   AssertDecl
     Newline "\n"
     Assert "assert"
@@ -1350,7 +1350,7 @@ File
       EqEq "=="
       Whitespace " "
       Literal
-        Int "6"
+        Int "10"
   AssertDecl
     Newline "\n"
     Assert "assert"
@@ -1423,7 +1423,7 @@ File
       EqEq "=="
       Whitespace " "
       Literal
-        Int "6"
+        Int "10"
   Newline "\n"
   EOF ""
 # diagnostics

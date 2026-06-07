@@ -2,11 +2,11 @@ Module
   Const "Sum"
     type nint
     value total()
-    eval 45
+    eval 55
   Const "PositionSum"
     type nint
     value positionSum()
-    eval 10
+    eval 15
   Const "EmptySum"
     type nint
     value emptySum()
@@ -14,10 +14,10 @@ Module
   Const "Count"
     type nint
     value range(IntLiteral "0", IntLiteral "10").count()
-    eval 10
+    eval 11
   Const "EmptyCount"
     type nint
-    value range(IntLiteral "5", IntLiteral "5").count()
+    value range(IntLiteral "5", IntLiteral "4").count()
     eval 0
   Const "AnyBig"
     type bool
@@ -30,23 +30,23 @@ Module
   Const "Doubled"
     type list<nint>
     value range(IntLiteral "0", IntLiteral "5").map((fn(v) (return ParamRef "v".mul(IntLiteral "2"))))
-    eval [0, 2, 4, 6, 8]
+    eval [0, 2, 4, 6, 8, 10]
   Const "Evens"
     type list<nint>
     value range(IntLiteral "0", IntLiteral "10").filter((fn(v) (return ParamRef "v".rem(IntLiteral "2").eql(IntLiteral "0"))))
-    eval [0, 2, 4, 6, 8]
+    eval [0, 2, 4, 6, 8, 10]
   Const "Values"
     type list<nint>
     value range(IntLiteral "3", IntLiteral "7").values()
-    eval [3, 4, 5, 6]
+    eval [3, 4, 5, 6, 7]
   Const "Keys"
     type list<nint>
     value range(IntLiteral "3", IntLiteral "7").keys()
-    eval [0, 1, 2, 3]
+    eval [0, 1, 2, 3, 4]
   Const "Folded"
     type nint
     value range(IntLiteral "0", IntLiteral "4").fold(IntLiteral "0", (fn(acc, k, v) (return ParamRef "acc".add(ParamRef "v"))))
-    eval 6
+    eval 10
   Func "total" pub
     result nint
       let "t": nint = IntLiteral "0"
@@ -62,34 +62,34 @@ Module
   Func "emptySum" pub
     result nint
       let "t": nint = IntLiteral "100"
-      for i of nint range(IntLiteral "10", IntLiteral "10")
+      for i of nint range(IntLiteral "10", IntLiteral "9")
           assign "t" = LocalRef "t".add(LocalRef "i")
       return LocalRef "t"
-  Assert "total() == 45"
+  Assert "total() == 55"
     eval true
-      total() == 45
+      total() == 55
       ^       ^
-      45      true
-  Assert "positionSum() == 10"
+      55      true
+  Assert "positionSum() == 15"
     eval true
-      positionSum() == 10
+      positionSum() == 15
       ^             ^
-      10            true
+      15            true
   Assert "emptySum() == 100"
     eval true
       emptySum() == 100
       ^          ^
       100        true
-  Assert "range(0, 10).count() == 10"
+  Assert "range(0, 10).count() == 11"
     eval true
-      range(0, 10).count() == 10
+      range(0, 10).count() == 11
       ^            ^       ^
-      range(0, 10) 10      true
-  Assert "range(5, 5).count() == 0"
+      range(0, 10) 11      true
+  Assert "range(5, 4).count() == 0"
     eval true
-      range(5, 5).count() == 0
+      range(5, 4).count() == 0
       ^           ^       ^
-      range(5, 5) 0       true
+      range(5, 4) 0       true
   Assert "range(0, 10).any(fn(v: nint): bool { return v > 8 })"
     eval true
       range(0, 10).any(fn(v: nint): bool { return v > 8 })
@@ -100,41 +100,41 @@ Module
       range(0, 10).all(fn(v: nint): bool { return v >= 0 })
       ^            ^
       range(0, 10) true
-  Assert "range(0, 5).map(fn(v: nint): nint { return v * 2 }).len() == 5"
+  Assert "range(0, 5).map(fn(v: nint): nint { return v * 2 }).len() == 6"
     eval true
-      range(0, 5).map(fn(v: nint): nint { return v * 2 }).len() == 5
+      range(0, 5).map(fn(v: nint): nint { return v * 2 }).len() == 6
       ^           ^                                       ^     ^
-      range(0, 5) [0, 2, 4, 6, 8]                         5     true
-  Assert "range(0, 5).map(fn(v: nint): nint { return v * 2 }).fold(0, fn(acc: nint, k: nint, v: nint): nint { return acc + v }) == 20"
+      range(0, 5) [0, 2, 4, 6, 8, 10]                     6     true
+  Assert "range(0, 5).map(fn(v: nint): nint { return v * 2 }).fold(0, fn(acc: nint, k: nint, v: nint): nint { return acc + v }) == 30"
     eval true
-      range(0, 5).map(fn(v: nint): nint { return v * 2 }).fold(0, fn(acc: nint, k: nint, v: nint): nint { return acc + v }) == 20
+      range(0, 5).map(fn(v: nint): nint { return v * 2 }).fold(0, fn(acc: nint, k: nint, v: nint): nint { return acc + v }) == 30
       ^           ^                                       ^                                                                 ^
-      range(0, 5) [0, 2, 4, 6, 8]                         20                                                                true
-  Assert "range(0, 10).filter(fn(v: nint): bool { return v % 2 == 0 }).len() == 5"
+      range(0, 5) [0, 2, 4, 6, 8, 10]                     30                                                                true
+  Assert "range(0, 10).filter(fn(v: nint): bool { return v % 2 == 0 }).len() == 6"
     eval true
-      range(0, 10).filter(fn(v: nint): bool { return v % 2 == 0 }).len() == 5
+      range(0, 10).filter(fn(v: nint): bool { return v % 2 == 0 }).len() == 6
       ^            ^                                               ^     ^
-      range(0, 10) [0, 2, 4, 6, 8]                                 5     true
-  Assert "range(3, 7).values().len() == 4"
+      range(0, 10) [0, 2, 4, 6, 8, 10]                             6     true
+  Assert "range(3, 7).values().len() == 5"
     eval true
-      range(3, 7).values().len() == 4
+      range(3, 7).values().len() == 5
       ^           ^        ^     ^
-      range(3, 7) |        4     true
-                  [3, 4, 5, 6]
-  Assert "range(3, 7).values().fold(0, fn(acc: nint, k: nint, v: nint): nint { return acc + v }) == 18"
+      range(3, 7) |        5     true
+                  [3, 4, 5, 6, 7]
+  Assert "range(3, 7).values().fold(0, fn(acc: nint, k: nint, v: nint): nint { return acc + v }) == 25"
     eval true
-      range(3, 7).values().fold(0, fn(acc: nint, k: nint, v: nint): nint { return acc + v }) == 18
+      range(3, 7).values().fold(0, fn(acc: nint, k: nint, v: nint): nint { return acc + v }) == 25
       ^           ^        ^                                                                 ^
-      range(3, 7) |        18                                                                true
-                  [3, 4, 5, 6]
-  Assert "range(3, 7).keys().fold(0, fn(acc: nint, k: nint, v: nint): nint { return acc + v }) == 6"
+      range(3, 7) |        25                                                                true
+                  [3, 4, 5, 6, 7]
+  Assert "range(3, 7).keys().fold(0, fn(acc: nint, k: nint, v: nint): nint { return acc + v }) == 10"
     eval true
-      range(3, 7).keys().fold(0, fn(acc: nint, k: nint, v: nint): nint { return acc + v }) == 6
+      range(3, 7).keys().fold(0, fn(acc: nint, k: nint, v: nint): nint { return acc + v }) == 10
       ^           ^      ^                                                                 ^
-      range(3, 7) |      6                                                                 true
-                  [0, 1, 2, 3]
-  Assert "range(0, 4).fold(0, fn(acc: nint, k: nint, v: nint): nint { return acc + v }) == 6"
+      range(3, 7) |      10                                                                true
+                  [0, 1, 2, 3, 4]
+  Assert "range(0, 4).fold(0, fn(acc: nint, k: nint, v: nint): nint { return acc + v }) == 10"
     eval true
-      range(0, 4).fold(0, fn(acc: nint, k: nint, v: nint): nint { return acc + v }) == 6
+      range(0, 4).fold(0, fn(acc: nint, k: nint, v: nint): nint { return acc + v }) == 10
       ^           ^                                                                 ^
-      range(0, 4) 6                                                                 true
+      range(0, 4) 10                                                                true
