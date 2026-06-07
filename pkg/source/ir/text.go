@@ -466,28 +466,28 @@ func decodeRecordFields(f treetext.Field) ([]Field, error) {
 // exhaustiveness.
 
 // MarshalText renders the type in the exact text form.
-func (t *Builtin) MarshalText() ([]byte, error) { return marshalType(t) }
+func (b *Builtin) MarshalText() ([]byte, error) { return marshalType(b) }
 
 // MarshalText renders the type in the exact text form.
 func (t *invalid) MarshalText() ([]byte, error) { return marshalType(t) }
 
 // MarshalText renders the type in the exact text form.
-func (t *Named) MarshalText() ([]byte, error) { return marshalType(t) }
+func (n *Named) MarshalText() ([]byte, error) { return marshalType(n) }
 
 // MarshalText renders the type in the exact text form.
-func (t *Union) MarshalText() ([]byte, error) { return marshalType(t) }
+func (u *Union) MarshalText() ([]byte, error) { return marshalType(u) }
 
 // MarshalText renders the type in the exact text form.
-func (t *Record) MarshalText() ([]byte, error) { return marshalType(t) }
+func (r *Record) MarshalText() ([]byte, error) { return marshalType(r) }
 
 // MarshalText renders the type in the exact text form.
-func (t *Func) MarshalText() ([]byte, error) { return marshalType(t) }
+func (f *Func) MarshalText() ([]byte, error) { return marshalType(f) }
 
 // MarshalText renders the type in the exact text form.
-func (t *TypeVar) MarshalText() ([]byte, error) { return marshalType(t) }
+func (v *TypeVar) MarshalText() ([]byte, error) { return marshalType(v) }
 
 // MarshalText renders the type in the exact text form.
-func (t *App) MarshalText() ([]byte, error) { return marshalType(t) }
+func (a *App) MarshalText() ([]byte, error) { return marshalType(a) }
 
 // MarshalText renders the type in the exact text form.
 func (t *SelfType) MarshalText() ([]byte, error) { return marshalType(t) }

@@ -228,7 +228,16 @@ func (p *parser) parseForStmt() *cst.Node {
 // optional, mirroring the enum-member and record-literal lists). The cursor
 // sits on "switch".
 func (p *parser) parseSwitchStmt() *cst.Node {
-	children := []cst.Green{p.bump()} // "switch"
+	return p.parseDispatchStmt(cst.SwitchStmt, (*parser).parseSwitchArm)
+}
+
+// parseDispatchStmt parses the shared shape of the two dispatch statements —
+// switch (value arms) and match (type arms): the keyword, a scrutinee with
+// the record-literal reading suppressed (its "{" opens the arm block), and a
+// braced arm list with the unterminated-construct recovery the record literal
+// uses. kind picks the node; parseArm parses one arm at the cursor.
+func (p *parser) parseDispatchStmt(kind cst.Kind, parseArm func(*parser) *cst.Node) *cst.Node {
+	children := []cst.Green{p.bump()} // the keyword
 	if startsExpr(p.peekSignificant()) {
 		p.skipTrivia(&children)
 		// The scrutinee's "{" opens the arm block, not a record literal: parse
@@ -242,7 +251,7 @@ func (p *parser) parseSwitchStmt() *cst.Node {
 	}
 	if p.peekSignificant() != token.LBrace {
 		p.reportUnexpected()
-		return cst.NewNode(cst.SwitchStmt, children)
+		return cst.NewNode(kind, children)
 	}
 	p.skipTrivia(&children)
 	children = append(children, p.bump()) // "{"
@@ -251,7 +260,7 @@ func (p *parser) parseSwitchStmt() *cst.Node {
 		case p.peekSignificant() == token.RBrace:
 			p.skipTrivia(&children)
 			children = append(children, p.bump()) // "}"
-			return cst.NewNode(cst.SwitchStmt, children)
+			return cst.NewNode(kind, children)
 		case p.atUnterminatedConstructStop():
 			// Unterminated: report the missing "}" and stop at EOF or before the
 			// next File-level declaration so recovery stays local, exactly as the
@@ -259,11 +268,11 @@ func (p *parser) parseSwitchStmt() *cst.Node {
 			// dispatcher's declaration-starter set (beginsDeclaration), so the
 			// boundary always matches where a real declaration can begin.
 			p.report(newUnexpectedTokenDiagnostic(p.lastStart, 0, p.peekSignificant().String()))
-			return cst.NewNode(cst.SwitchStmt, children)
+			return cst.NewNode(kind, children)
 		default:
 			p.skipTrivia(&children)
 			before := p.pos
-			children = append(children, p.parseSwitchArm())
+			children = append(children, parseArm(p))
 			if p.pos == before {
 				// Progress guard — see parseBlock: an arm parse that consumed no
 				// token must not spin this loop.
@@ -335,51 +344,7 @@ func (p *parser) parseSwitchArm() *cst.Node {
 // sits on "match". Its driving loop mirrors parseSwitchStmt — the only
 // difference is the arm grammar (a type pattern, not value patterns).
 func (p *parser) parseMatchStmt() *cst.Node {
-	children := []cst.Green{p.bump()} // "match"
-	if startsExpr(p.peekSignificant()) {
-		p.skipTrivia(&children)
-		// The scrutinee's "{" opens the arm block, not a record literal: parse
-		// it with the record-literal reading suppressed, exactly as a switch's
-		// scrutinee does.
-		p.noRecordLit = true
-		children = append(children, p.parseExpr())
-		p.noRecordLit = false
-	} else {
-		p.report(newExpectedExpressionDiagnostic(p.lastStart, 0))
-	}
-	if p.peekSignificant() != token.LBrace {
-		p.reportUnexpected()
-		return cst.NewNode(cst.MatchStmt, children)
-	}
-	p.skipTrivia(&children)
-	children = append(children, p.bump()) // "{"
-	for {
-		switch {
-		case p.peekSignificant() == token.RBrace:
-			p.skipTrivia(&children)
-			children = append(children, p.bump()) // "}"
-			return cst.NewNode(cst.MatchStmt, children)
-		case p.atUnterminatedConstructStop():
-			// Unterminated: report the missing "}" and stop at EOF or before the
-			// next File-level declaration so recovery stays local, exactly as the
-			// switch body does.
-			p.report(newUnexpectedTokenDiagnostic(p.lastStart, 0, p.peekSignificant().String()))
-			return cst.NewNode(cst.MatchStmt, children)
-		default:
-			p.skipTrivia(&children)
-			before := p.pos
-			children = append(children, p.parseMatchArm())
-			if p.pos == before {
-				// Progress guard — see parseBlock: an arm parse that consumed no
-				// token must not spin this loop.
-				children = append(children, p.bump())
-			}
-			if p.peekSignificant() == token.Comma {
-				p.skipTrivia(&children)
-				children = append(children, p.bump()) // ","
-			}
-		}
-	}
+	return p.parseDispatchStmt(cst.MatchStmt, (*parser).parseMatchArm)
 }
 
 // parseMatchArm parses one arm of a match:

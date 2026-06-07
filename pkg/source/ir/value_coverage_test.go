@@ -1,12 +1,7 @@
 package ir
 
 import (
-	"go/ast"
-	"go/parser"
-	"go/token"
-	"os"
 	"reflect"
-	"strings"
 	"testing"
 )
 
@@ -21,7 +16,7 @@ func TestValueKindsRegistryComplete(t *testing.T) {
 		registered[reflect.TypeOf(v).Elem().Name()] = true
 	}
 
-	actual := valueImplementersInSource(t)
+	actual := implementersInSource(t, "value")
 	if len(actual) == 0 {
 		t.Fatal("found no value() implementers in the package source; the scan is broken")
 	}
@@ -35,40 +30,6 @@ func TestValueKindsRegistryComplete(t *testing.T) {
 			t.Errorf("ValueKinds() lists %s, which does not implement Value in the source", name)
 		}
 	}
-}
-
-func valueImplementersInSource(t *testing.T) map[string]bool {
-	t.Helper()
-	entries, err := os.ReadDir(".")
-	if err != nil {
-		t.Fatalf("read package dir: %v", err)
-	}
-	fset := token.NewFileSet()
-	out := map[string]bool{}
-	for _, e := range entries {
-		name := e.Name()
-		if e.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
-			continue
-		}
-		file, err := parser.ParseFile(fset, name, nil, 0)
-		if err != nil {
-			t.Fatalf("parse %s: %v", name, err)
-		}
-		for _, decl := range file.Decls {
-			fn, ok := decl.(*ast.FuncDecl)
-			if !ok || fn.Name.Name != "value" || fn.Recv == nil || len(fn.Recv.List) != 1 {
-				continue
-			}
-			star, ok := fn.Recv.List[0].Type.(*ast.StarExpr)
-			if !ok {
-				continue
-			}
-			if id, ok := star.X.(*ast.Ident); ok {
-				out[id.Name] = true
-			}
-		}
-	}
-	return out
 }
 
 // TestValueMarshalCoversEveryValue drives the exact text form over every value
