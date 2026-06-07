@@ -83,6 +83,35 @@ func TestStringOperationsFold(t *testing.T) {
 	}
 }
 
+// TestNominalStringOperatorFolds pins the operator path F-1 unblocks end to end:
+// a nominal type over a string base derives the string's operators, so a bare
+// string value as the operand resolves and the comparison folds — `t == "x"` on
+// a Tag = string is bool true, with no invalid_operation (the §0 symptom). The
+// self-returning concatenation keeps the nominal type and folds its string.
+func TestNominalStringOperatorFolds(t *testing.T) {
+	m, diags := analyze("pub type Tag = string\n" +
+		"const t: Tag = \"x\"\n" +
+		"const eq = t == \"x\"\n" +
+		"const ne = t != \"y\"\n" +
+		"const cat: Tag = t + \"!\"\n")
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if ev := m.Consts[1].Eval; ev == nil || ev.Kind != ir.ConstBool || ev.Bool != true {
+		t.Errorf("eq eval = %v, want bool true", ev)
+	}
+	if ev := m.Consts[2].Eval; ev == nil || ev.Kind != ir.ConstBool || ev.Bool != true {
+		t.Errorf("ne eval = %v, want bool true", ev)
+	}
+	// The self-returning operator keeps the nominal type and folds the string.
+	if m.Consts[3].Type.String() != "Tag" {
+		t.Errorf("cat type = %s, want Tag", m.Consts[3].Type)
+	}
+	if ev := m.Consts[3].Eval; ev == nil || ev.Kind != ir.ConstString || ev.Str != "x!" {
+		t.Errorf("cat eval = %v, want string \"x!\"", ev)
+	}
+}
+
 func TestCollectionLiteral(t *testing.T) {
 	m, diags := analyze("const L: list<nint> = [1, 2, 3]\nconst M: map<string, nint> = [\"k\": 1]\nconst I = [10, 20]\nconst E: list<nint> = []\n")
 	if len(diags) != 0 {
@@ -125,6 +154,53 @@ func TestCollectionElementAdaptsAndChecks(t *testing.T) {
 		t.Errorf("map literal should be fine, got %v", codes(diags))
 	} else if m.Consts[0].Type.String() != "map<string, nint>" {
 		t.Errorf("type = %s, want map<string, nint>", m.Consts[0].Type)
+	}
+}
+
+// TestNominalBaseValueAdapts is the end-to-end of F-1: a value of a builtin base
+// type adapts to the nominal type that wraps it, for *every* base — not only the
+// integer one that always worked. These are exactly the §0 symptoms that were
+// type_mismatch before the fix. The nominal regime is preserved: a nominal value
+// does not flow back to its base, nor across to a different wrapper of the same
+// base, and a base value does not flow into an enum.
+func TestNominalBaseValueAdapts(t *testing.T) {
+	clean := []struct{ name, src string }{
+		{"int wrapper (control)", "type Level = sbyte\nconst a: Level = 5\n"},
+		{"string wrapper", "type Tag = string\nconst b: Tag = \"x\"\n"},
+		{"bool wrapper", "type Flag = bool\nconst d: Flag = true\n"},
+		{"datetime wrapper", "type Birthday = datetime\nconst e: Birthday = D2009-02-13T23:31:30Z\n"},
+		{"duration wrapper", "type Wait = duration\nconst f: Wait = 3d\n"},
+		{"list wrapper", "type Names = list<string>\nconst g: Names = [\"a\", \"b\"]\n"},
+		{"map wrapper", "type Scores = map<string, nint>\nconst h: Scores = [\"a\": 1]\n"},
+		// The adaptation is by the value's type being the base, not by literalness:
+		// a base-typed reference adapts too (the integer rule has always done this).
+		{"reference adapts", "type Tag = string\nconst s = \"x\"\nconst b: Tag = s\n"},
+		{"chained alias", "type Tag = string\ntype Alias = Tag\nconst b: Alias = \"x\"\n"},
+	}
+	for _, tc := range clean {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, diags := analyze(tc.src); len(diags) != 0 {
+				t.Errorf("%q should adapt cleanly, got %v", tc.src, codes(diags))
+			}
+		})
+	}
+
+	rejected := []struct{ name, src string }{
+		// nominal -> its base is rejected.
+		{"nominal to base", "type Tag = string\nconst b: Tag = \"x\"\nconst back: string = b\n"},
+		// nominal -> a different wrapper of the same base is rejected.
+		{"cross wrapper", "type Tag = string\ntype Tag2 = string\nconst b: Tag = \"x\"\nconst c: Tag2 = b\n"},
+		// a base value -> an enum is rejected (the enum carries no body).
+		{"base into enum", "enum Color: string {\n  Red = \"r\"\n}\nconst c: Color = \"r\"\n"},
+		// a base of the wrong kind does not adapt.
+		{"wrong base kind", "type Tag = string\nconst b: Tag = 1\n"},
+	}
+	for _, tc := range rejected {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, diags := analyze(tc.src); !hasCode(diags, CodeTypeMismatch) {
+				t.Errorf("%q: want type_mismatch, got %v", tc.src, codes(diags))
+			}
+		})
 	}
 }
 

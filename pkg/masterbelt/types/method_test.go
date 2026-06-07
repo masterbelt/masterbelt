@@ -56,6 +56,39 @@ func TestMethodResult(t *testing.T) {
 	}
 }
 
+// TestMethodResultNominalSelfOperand pins the operator path F-1 unblocks: a
+// nominal type over a builtin base (type Tag = string) derives the base's
+// self-typed operators (eql(other: self): bool), and a bare base value as the
+// argument unifies to the nominal — so `t == "x"` on a Tag resolves to bool and
+// the operand settles on Tag. Before the fix the operand unification was Invalid
+// and the call dropped to invalid_operation. A self-returning operator over a
+// string base (add(other: self): self) returns the nominal type itself.
+func TestMethodResultNominalSelfOperand(t *testing.T) {
+	reg := builtin.Default()
+	// type Tag = string — the operators come from the string base, derived through
+	// the nominal's body.
+	tag := &ir.Named{Def: &ir.TypeDef{Name: "Tag", Body: bt("string")}}
+
+	// eql(other: self): bool with a bare string argument resolves to bool.
+	if got := MethodResult(reg, tag, "eql", []ir.Type{bt("string")}).String(); got != "bool" {
+		t.Errorf("Tag.eql(string) = %s, want bool", got)
+	}
+	// The operand unifies to Tag (the nominal side wins), exactly as the operand
+	// of merge(nint) on Score unifies to Score.
+	matches, found := SelectOverload(reg, tag, "eql", []ir.Type{bt("string")})
+	if !found || len(matches) != 1 {
+		t.Fatalf("Tag.eql(string): matches = %d, found = %v, want 1, true", len(matches), found)
+	}
+	if op := matches[0].Operand.String(); op != "Tag" {
+		t.Errorf("Tag.eql(string): operand = %s, want Tag", op)
+	}
+
+	// A self-returning operator (string add) returns the nominal type.
+	if got := MethodResult(reg, tag, "add", []ir.Type{bt("string")}).String(); got != "Tag" {
+		t.Errorf("Tag.add(string) = %s, want Tag", got)
+	}
+}
+
 // TestGenericMethodResult checks the generic method rule: a method on a generic
 // application binds the receiver's type arguments (T = int for list<int>) and
 // solves its own type variables (the R in map(func: fn(T): R): list<R>) by

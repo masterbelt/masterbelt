@@ -94,3 +94,37 @@ func TestUnifyAndAssignTypeVar(t *testing.T) {
 		t.Error("Assignable(T, U) = true, want false")
 	}
 }
+
+// TestUnifyNominalAdaptation pins that Unify returns the nominal side when a base
+// value meets the nominal type that wraps it — the twin of the default-integer
+// rule (nint unified with sbyte becomes sbyte). This is the path SelectOverload
+// takes to unify a self-typed operator's operands: Tag's eql(other: self) against
+// a bare "x" unifies to Tag, so `t == "x"` resolves. The result is the nominal
+// type whichever order the operands arrive in; a nominal type does not unify back
+// to its base, nor to a different nominal of the same base.
+func TestUnifyNominalAdaptation(t *testing.T) {
+	reg := builtin.Default()
+	tag := named("Tag", bt("string"))
+	level := named("Level", bt("sbyte"))
+	rank := named("Rank", bt("sbyte"))
+
+	// base meets nominal: the nominal wins, in either order.
+	if got := Unify(reg, bt("string"), tag); got != tag {
+		t.Errorf("Unify(string, Tag) = %v, want Tag", got)
+	}
+	if got := Unify(reg, tag, bt("string")); got != tag {
+		t.Errorf("Unify(Tag, string) = %v, want Tag", got)
+	}
+	if got := Unify(reg, bt("nint"), level); got != level {
+		t.Errorf("Unify(nint, Level) = %v, want Level", got)
+	}
+
+	// two distinct nominals of the same base do not unify.
+	if got := Unify(reg, level, rank); got != ir.Invalid {
+		t.Errorf("Unify(Level, Rank) = %v, want Invalid", got)
+	}
+	// a base of the wrong kind does not unify into the nominal.
+	if got := Unify(reg, bt("nint"), tag); got != ir.Invalid {
+		t.Errorf("Unify(nint, Tag) = %v, want Invalid", got)
+	}
+}

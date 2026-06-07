@@ -306,6 +306,67 @@ func TestExactUnionMemberNotAmbiguous(t *testing.T) {
 	}
 }
 
+// TestNominalUnionMemberSelection pins the F-1 generalization's three union
+// outcomes for a string base flowing into a union carrying a nominal string
+// wrapper — the string twin of the integer rules above:
+//
+//   - Tag | error + "x": Tag is the only assignable member, so "x" tags Tag
+//     (the improvement — previously a type_mismatch);
+//   - Tag | Tag2 (two wrappers of the same base) + "x": both accept it with no
+//     exact tie-break, so ambiguous_union_member, resolved by Tag("x");
+//   - string | Tag + "x": "x" is *exact* on the bare string member, so string
+//     wins outright and nothing changes (the exactness rule is untouched).
+func TestNominalUnionMemberSelection(t *testing.T) {
+	// Tag | error: a bare "x" tags Tag, no diagnostic.
+	tagged := "pub type Tag = string\npub type u = Tag | error\nconst a: u = \"x\"\n"
+	if _, diags := analyze(tagged); len(diags) != 0 {
+		t.Errorf("Tag | error + \"x\" should tag Tag cleanly, got %v", codes(diags))
+	}
+
+	// Tag | Tag2: two string wrappers, neither exact — ambiguous.
+	ambiguous := "pub type Tag = string\npub type Tag2 = string\npub type u = Tag | Tag2\nconst a: u = \"x\"\n"
+	if _, diags := analyze(ambiguous); !hasCode(diags, CodeAmbiguousUnionMember) {
+		t.Errorf("Tag | Tag2 + \"x\" should be ambiguous_union_member, got %v", codes(diags))
+	}
+	// An explicit conversion pins the member and clears it.
+	fixed := "pub type Tag = string\npub type Tag2 = string\npub type u = Tag | Tag2\nconst a: u = Tag(\"x\")\n"
+	if _, diags := analyze(fixed); len(diags) != 0 {
+		t.Errorf("Tag(\"x\") should resolve the ambiguity, got %v", codes(diags))
+	}
+
+	// string | Tag: the bare string member is exact, so string wins; no ambiguity.
+	exact := "pub type Tag = string\npub type u = string | Tag\nconst a: u = \"x\"\n"
+	if _, diags := analyze(exact); len(diags) != 0 {
+		t.Errorf("string | Tag + \"x\" should pick string by exactness, got %v", codes(diags))
+	}
+}
+
+// TestNominalUnionTagFoldParity is the F-1 fold-parity guarantee: when the
+// checker tags a bare string into a nominal-string union member (Tag of
+// Tag | error), the folder folds the value tagged with the *same* member — so a
+// later match dispatches on the member the type layer chose. The value keeps its
+// string, carried under the Tag tag, which is what the .ir dump renders as
+// eval (Tag) "tagged".
+func TestNominalUnionTagFoldParity(t *testing.T) {
+	m, diags := analyze("pub type Tag = string\npub type Labeled = Tag | error\nconst Ok: Labeled = \"tagged\"\n")
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", codes(diags))
+	}
+	ev := constEval(m, "Ok")
+	if ev == nil {
+		t.Fatal("Ok did not fold")
+	}
+	// The folder kept the string value...
+	if ev.Kind != ir.ConstString || ev.Str != "tagged" {
+		t.Errorf("Ok eval = %v, want string \"tagged\"", ev)
+	}
+	// ...tagged with the Tag member the checker selected (fold parity).
+	tag, ok := ev.UnionTag.(*ir.Named)
+	if !ok || tag.Def == nil || tag.Def.Name != "Tag" {
+		t.Errorf("Ok union tag = %v, want the Tag member", ev.UnionTag)
+	}
+}
+
 // TestMatchNarrowingStripsTag checks the arm narrowing drops the union tag: a
 // record union value tagged Coin, dispatched to the Coin arm, narrows its binding
 // to the bare Coin, so a field read and arithmetic on the payload fold without the

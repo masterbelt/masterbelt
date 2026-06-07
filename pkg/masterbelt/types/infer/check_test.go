@@ -272,6 +272,42 @@ func TestCheckAgainstMapLiteral(t *testing.T) {
 	}
 }
 
+// TestCheckAgainstNominalCollection pins that a collection literal checked
+// against a *nominal* list/map (type Names = list<string>) reaches the element
+// types through the wrapper and adapts to it — the collection twin of a record
+// literal checked against a nominal record. The literal takes the nominal type,
+// a wrong element is reported, and the nominal wrapper still distinguishes a list
+// expectation from a map one.
+func TestCheckAgainstNominalCollection(t *testing.T) {
+	env := collectionEnv()
+	// type Names = list<string> and type Scores = map<string, sbyte>.
+	names := &ir.Named{Def: &ir.TypeDef{Name: "Names", Body: listT(t, env, builtinT("string"))}}
+	scores := &ir.Named{Def: &ir.TypeDef{Name: "Scores", Body: mapT(t, env, builtinT("string"), builtinT("sbyte"))}}
+
+	// A matching list literal adapts to the nominal wrapper.
+	var r report
+	if got := CheckAgainst(listLit(stringLit("a"), stringLit("b")), names, env, r.sink()); got.String() != "Names" || len(r.mismatches) != 0 {
+		t.Errorf("list into Names = %s (mismatches %v), want Names", got, r.mismatches)
+	}
+	// A wrong element is reported against the wrapped element type.
+	var r2 report
+	CheckAgainst(listLit(stringLit("a"), intLit("1")), names, env, r2.sink())
+	if len(r2.mismatches) != 1 || r2.mismatches[0] != "nint -> string" {
+		t.Errorf("Names element mismatch = %v, want [nint -> string]", r2.mismatches)
+	}
+	// A matching map literal adapts to the nominal map wrapper.
+	var r3 report
+	if got := CheckAgainst(mapLit([2]ast.Expr{stringLit("a"), intLit("1")}), scores, env, r3.sink()); got.String() != "Scores" || len(r3.mismatches) != 0 {
+		t.Errorf("map into Scores = %s (mismatches %v), want Scores", got, r3.mismatches)
+	}
+	// A map literal under a nominal list wrapper is still a shape mismatch.
+	var r4 report
+	CheckAgainst(mapLit([2]ast.Expr{stringLit("a"), intLit("1")}), names, env, r4.sink())
+	if len(r4.mismatches) != 1 || r4.mismatches[0] != "map<string, nint> -> Names" {
+		t.Errorf("shape mismatch into Names = %v, want [map<string, nint> -> Names]", r4.mismatches)
+	}
+}
+
 func TestCheckAgainstArityAndInference(t *testing.T) {
 	env := emptyEnv()
 	intT := builtinT("nint")
