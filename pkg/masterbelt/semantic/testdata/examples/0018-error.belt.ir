@@ -1,34 +1,224 @@
 Module
-  Const "E"
-    type error
-    value error((StringLiteral "boom" : string))
-    eval error("boom")
-  Const "M"
-    type string
-    value ((Reference -> "E" : error).message() : string)
-    eval "boom"
-  Const "P"
-    type nint | error
-    value (parseLevel((StringLiteral "99" : string)) : nint | error)
-    eval (error) error("invalid level: 99")
-  Func "parseLevel" pub
-    param s: string
-    result nint | error
-      return (adapt error(((StringLiteral "invalid level: " : string).add((ParamRef "s" : string)) : string)) : nint | error)
-  Assert "error(\"x\").message() == \"x\""
-    eval true
-      error("x").message() == "x"
-      ^          ^         ^
-      error("x") "x"       true
-  Assert "E.message() == \"boom\""
-    eval true
-      E.message() == "boom"
-      ^ ^         ^
-      | "boom"    true
-      error("boom")
-  Assert "M == \"boom\""
-    eval true
-      M == "boom"
-      ^ ^
-      | true
-      "boom"
+  Consts:
+    Const
+      Name: "E"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "error"
+      Value: Conversion
+        Type: Builtin
+          Name: "error"
+        Args:
+          StringLiteral
+            Value: "boom"
+            Type: Builtin
+              Name: "string"
+      Eval: Constant
+        Kind: 8
+        Int: ~
+        Bool: false
+        Str: "boom"
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "M"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "string"
+      Value: Call
+        Receiver: Reference
+          Target: "E"
+          Type: Builtin
+            Name: "error"
+        Method: "message"
+        Args: ~
+        Setter: false
+        Resolved: ~
+        Subst: ~
+        Type: Builtin
+          Name: "string"
+      Eval: Constant
+        Kind: 2
+        Int: ~
+        Bool: false
+        Str: "boom"
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "P"
+      Public: false
+      Doc: ~
+      Type: Union
+        Members:
+          Builtin
+            Name: "nint"
+          Builtin
+            Name: "error"
+      Value: FuncCall
+        Target: "parseLevel(string)"
+        Args:
+          StringLiteral
+            Value: "99"
+            Type: Builtin
+              Name: "string"
+        Resolved: ~
+        Subst: ~
+        Type: Union
+          Members:
+            Builtin
+              Name: "nint"
+            Builtin
+              Name: "error"
+      Eval: Constant
+        Kind: 8
+        Int: ~
+        Bool: false
+        Str: "invalid level: 99"
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: Builtin
+          Name: "error"
+  Types: ~
+  Funcs:
+    Function
+      Name: "parseLevel"
+      Public: true
+      Extern: false
+      Effects: ~
+      Doc: ~
+      TypeParams: ~
+      Params:
+        Param
+          Name: "s"
+          Type: Builtin
+            Name: "string"
+      Result: Union
+        Members:
+          Builtin
+            Name: "nint"
+          Builtin
+            Name: "error"
+      Body:
+        Return
+          Value: Adapt
+            Value: Conversion
+              Type: Builtin
+                Name: "error"
+              Args:
+                Call
+                  Receiver: StringLiteral
+                    Value: "invalid level: "
+                    Type: Builtin
+                      Name: "string"
+                  Method: "add"
+                  Args:
+                    ParamRef
+                      Name: "s"
+                      Type: Builtin
+                        Name: "string"
+                  Setter: false
+                  Resolved: ~
+                  Subst: ~
+                  Type: Builtin
+                    Name: "string"
+            To: Union
+              Members:
+                Builtin
+                  Name: "nint"
+                Builtin
+                  Name: "error"
+  Asserts:
+    Assert
+      Cond: "error(\"x\").message() == \"x\""
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "error(\"x\").message() == \"x\"\n^          ^         ^\nerror(\"x\") \"x\"       true"
+    Assert
+      Cond: "E.message() == \"boom\""
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "E.message() == \"boom\"\n^ ^         ^\n| \"boom\"    true\nerror(\"boom\")"
+    Assert
+      Cond: "M == \"boom\""
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "M == \"boom\"\n^ ^\n| true\n\"boom\""

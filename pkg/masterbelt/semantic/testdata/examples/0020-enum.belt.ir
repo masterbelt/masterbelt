@@ -1,144 +1,808 @@
 Module
-  Const "Top"
-    type Rarity
-    value (Rarity.Legend : Rarity)
-    eval Rarity.Legend
-  Const "Bare"
-    type Rarity
-    value (Rarity.Common : Rarity)
-    eval Rarity.Common
-  Const "Highest"
-    type Rarity
-    value (highestSeen((Rarity.Legend : Rarity)) : Rarity)
-    eval Rarity.Legend
-  TypeDef "Rarity" pub
-    doc "A card's rarity tier."
-    enum byte
-    member "Common" = 1
-    member "Rare" = 2
-    member "Legend" = 10
-    impl comparable
-    impl orderable
-    method "eql" pub extern
-      param other: self
-      result bool
-    method "neq" pub extern
-      param other: self
-      result bool
-    method "lt" pub extern
-      param other: self
-      result bool
-    method "lteq" pub extern
-      param other: self
-      result bool
-    method "gt" pub extern
-      param other: self
-      result bool
-    method "gteq" pub extern
-      param other: self
-      result bool
-  TypeDef "Element" pub
-    doc "An elemental affinity."
-    enum nint
-    member "Fire" = 0
-    member "Water" = 1
-    member "Wind" = 2
-    impl comparable
-    impl orderable
-    method "eql" pub extern
-      param other: self
-      result bool
-    method "neq" pub extern
-      param other: self
-      result bool
-    method "lt" pub extern
-      param other: self
-      result bool
-    method "lteq" pub extern
-      param other: self
-      result bool
-    method "gt" pub extern
-      param other: self
-      result bool
-    method "gteq" pub extern
-      param other: self
-      result bool
-    method "isFire" pub
-      doc "Whether this element is Fire."
-      result bool
-      return ((self : Element).eql((Element.Fire : Element)) : bool)
-  TypeDef "Locale" pub
-    doc "A supported display locale."
-    enum string
-    member "Ja" = "Ja"
-    member "En" = "en-US"
-    impl comparable
-    impl orderable
-    method "eql" pub extern
-      param other: self
-      result bool
-    method "neq" pub extern
-      param other: self
-      result bool
-    method "lt" pub extern
-      param other: self
-      result bool
-    method "lteq" pub extern
-      param other: self
-      result bool
-    method "gt" pub extern
-      param other: self
-      result bool
-    method "gteq" pub extern
-      param other: self
-      result bool
-  Func "highestSeen" pub
-    param starting: Rarity
-    result Rarity
-      let "best": Rarity = (Rarity.Common : Rarity)
-      if ((ParamRef "starting" : Rarity).eql((Rarity.Legend : Rarity)) : bool)
-          assign "best" = (Rarity.Legend : Rarity)
-      return (LocalRef "best" : Rarity)
-  Assert "Rarity.Common != Rarity.Legend"
-    eval true
-      Rarity.Common != Rarity.Legend
-             ^      ^         ^
-             |      true      Rarity.Legend
-             Rarity.Common
-  Assert "Rarity.Common < Rarity.Legend"
-    eval true
-      Rarity.Common < Rarity.Legend
-             ^      ^        ^
-             |      true     Rarity.Legend
-             Rarity.Common
-  Assert "Rarity.Legend == Top"
-    eval true
-      Rarity.Legend == Top
-             ^      ^  ^
-             |      |  Rarity.Legend
-             |      true
-             Rarity.Legend
-  Assert "Bare == Rarity.Common"
-    eval true
-      Bare == Rarity.Common
-      ^    ^         ^
-      |    true      Rarity.Common
-      Rarity.Common
-  Assert "highestSeen(Rarity.Legend) == Rarity.Legend"
-    eval true
-      highestSeen(Rarity.Legend) == Rarity.Legend
-      ^                  ^       ^         ^
-      Rarity.Legend      |       true      Rarity.Legend
-                         Rarity.Legend
-  Assert "highestSeen(Rarity.Common) == Rarity.Common"
-    eval true
-      highestSeen(Rarity.Common) == Rarity.Common
-      ^                  ^       ^         ^
-      Rarity.Common      |       true      Rarity.Common
-                         Rarity.Common
-  Assert "Locale.Ja < Locale.En"
-    eval true
-      Locale.Ja < Locale.En
-             ^  ^        ^
-             |  true     Locale.En
-             Locale.Ja
+  Consts:
+    Const
+      Name: "Top"
+      Public: false
+      Doc: ~
+      Type: Named
+        Def: "Rarity"
+      Value: EnumMemberValue
+        Def: "Rarity"
+        Index: 2
+        Type: Named
+          Def: "Rarity"
+      Eval: Constant
+        Kind: 9
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: "Rarity"
+        EnumIndex: 2
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "Bare"
+      Public: false
+      Doc: ~
+      Type: Named
+        Def: "Rarity"
+      Value: EnumMemberValue
+        Def: "Rarity"
+        Index: 0
+        Type: Named
+          Def: "Rarity"
+      Eval: Constant
+        Kind: 9
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: "Rarity"
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "Highest"
+      Public: false
+      Doc: ~
+      Type: Named
+        Def: "Rarity"
+      Value: FuncCall
+        Target: "highestSeen(Rarity)"
+        Args:
+          EnumMemberValue
+            Def: "Rarity"
+            Index: 2
+            Type: Named
+              Def: "Rarity"
+        Resolved: ~
+        Subst: ~
+        Type: Named
+          Def: "Rarity"
+      Eval: Constant
+        Kind: 9
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: "Rarity"
+        EnumIndex: 2
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+  Types:
+    TypeDef
+      Name: "Rarity"
+      Public: true
+      Doc: "A card's rarity tier."
+      Params: ~
+      Body: ~
+      Methods:
+        Method
+          Name: "eql"
+          Public: true
+          Extern: true
+          Kind: 0
+          Effects: ~
+          Doc: ~
+          Params:
+            Param
+              Name: "other"
+              Type: SelfType
+          Result: Builtin
+            Name: "bool"
+          Body: ~
+          Owner: "Rarity"
+        Method
+          Name: "neq"
+          Public: true
+          Extern: true
+          Kind: 0
+          Effects: ~
+          Doc: ~
+          Params:
+            Param
+              Name: "other"
+              Type: SelfType
+          Result: Builtin
+            Name: "bool"
+          Body: ~
+          Owner: "Rarity"
+        Method
+          Name: "lt"
+          Public: true
+          Extern: true
+          Kind: 0
+          Effects: ~
+          Doc: ~
+          Params:
+            Param
+              Name: "other"
+              Type: SelfType
+          Result: Builtin
+            Name: "bool"
+          Body: ~
+          Owner: "Rarity"
+        Method
+          Name: "lteq"
+          Public: true
+          Extern: true
+          Kind: 0
+          Effects: ~
+          Doc: ~
+          Params:
+            Param
+              Name: "other"
+              Type: SelfType
+          Result: Builtin
+            Name: "bool"
+          Body: ~
+          Owner: "Rarity"
+        Method
+          Name: "gt"
+          Public: true
+          Extern: true
+          Kind: 0
+          Effects: ~
+          Doc: ~
+          Params:
+            Param
+              Name: "other"
+              Type: SelfType
+          Result: Builtin
+            Name: "bool"
+          Body: ~
+          Owner: "Rarity"
+        Method
+          Name: "gteq"
+          Public: true
+          Extern: true
+          Kind: 0
+          Effects: ~
+          Doc: ~
+          Params:
+            Param
+              Name: "other"
+              Type: SelfType
+          Result: Builtin
+            Name: "bool"
+          Body: ~
+          Owner: "Rarity"
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls:
+        Named
+          Def: "comparable"
+        Named
+          Def: "orderable"
+      Enum: EnumDef
+        Base: "byte"
+        Members:
+          EnumMember
+            Name: "Common"
+            Value: Constant
+              Kind: 0
+              Int: 1
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+          EnumMember
+            Name: "Rare"
+            Value: Constant
+              Kind: 0
+              Int: 2
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+          EnumMember
+            Name: "Legend"
+            Value: Constant
+              Kind: 0
+              Int: 10
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+      Where: ~
+    TypeDef
+      Name: "Element"
+      Public: true
+      Doc: "An elemental affinity."
+      Params: ~
+      Body: ~
+      Methods:
+        Method
+          Name: "eql"
+          Public: true
+          Extern: true
+          Kind: 0
+          Effects: ~
+          Doc: ~
+          Params:
+            Param
+              Name: "other"
+              Type: SelfType
+          Result: Builtin
+            Name: "bool"
+          Body: ~
+          Owner: "Element"
+        Method
+          Name: "neq"
+          Public: true
+          Extern: true
+          Kind: 0
+          Effects: ~
+          Doc: ~
+          Params:
+            Param
+              Name: "other"
+              Type: SelfType
+          Result: Builtin
+            Name: "bool"
+          Body: ~
+          Owner: "Element"
+        Method
+          Name: "lt"
+          Public: true
+          Extern: true
+          Kind: 0
+          Effects: ~
+          Doc: ~
+          Params:
+            Param
+              Name: "other"
+              Type: SelfType
+          Result: Builtin
+            Name: "bool"
+          Body: ~
+          Owner: "Element"
+        Method
+          Name: "lteq"
+          Public: true
+          Extern: true
+          Kind: 0
+          Effects: ~
+          Doc: ~
+          Params:
+            Param
+              Name: "other"
+              Type: SelfType
+          Result: Builtin
+            Name: "bool"
+          Body: ~
+          Owner: "Element"
+        Method
+          Name: "gt"
+          Public: true
+          Extern: true
+          Kind: 0
+          Effects: ~
+          Doc: ~
+          Params:
+            Param
+              Name: "other"
+              Type: SelfType
+          Result: Builtin
+            Name: "bool"
+          Body: ~
+          Owner: "Element"
+        Method
+          Name: "gteq"
+          Public: true
+          Extern: true
+          Kind: 0
+          Effects: ~
+          Doc: ~
+          Params:
+            Param
+              Name: "other"
+              Type: SelfType
+          Result: Builtin
+            Name: "bool"
+          Body: ~
+          Owner: "Element"
+        Method
+          Name: "isFire"
+          Public: true
+          Extern: false
+          Kind: 0
+          Effects: ~
+          Doc: "Whether this element is Fire."
+          Params: ~
+          Result: Builtin
+            Name: "bool"
+          Body:
+            Return
+              Value: Call
+                Receiver: SelfValue
+                  Type: Named
+                    Def: "Element"
+                Method: "eql"
+                Args:
+                  EnumMemberValue
+                    Def: "Element"
+                    Index: 0
+                    Type: Named
+                      Def: "Element"
+                Setter: false
+                Resolved: ~
+                Subst: ~
+                Type: Builtin
+                  Name: "bool"
+          Owner: "Element"
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls:
+        Named
+          Def: "comparable"
+        Named
+          Def: "orderable"
+      Enum: EnumDef
+        Base: "nint"
+        Members:
+          EnumMember
+            Name: "Fire"
+            Value: Constant
+              Kind: 0
+              Int: 0
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+          EnumMember
+            Name: "Water"
+            Value: Constant
+              Kind: 0
+              Int: 1
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+          EnumMember
+            Name: "Wind"
+            Value: Constant
+              Kind: 0
+              Int: 2
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+      Where: ~
+    TypeDef
+      Name: "Locale"
+      Public: true
+      Doc: "A supported display locale."
+      Params: ~
+      Body: ~
+      Methods:
+        Method
+          Name: "eql"
+          Public: true
+          Extern: true
+          Kind: 0
+          Effects: ~
+          Doc: ~
+          Params:
+            Param
+              Name: "other"
+              Type: SelfType
+          Result: Builtin
+            Name: "bool"
+          Body: ~
+          Owner: "Locale"
+        Method
+          Name: "neq"
+          Public: true
+          Extern: true
+          Kind: 0
+          Effects: ~
+          Doc: ~
+          Params:
+            Param
+              Name: "other"
+              Type: SelfType
+          Result: Builtin
+            Name: "bool"
+          Body: ~
+          Owner: "Locale"
+        Method
+          Name: "lt"
+          Public: true
+          Extern: true
+          Kind: 0
+          Effects: ~
+          Doc: ~
+          Params:
+            Param
+              Name: "other"
+              Type: SelfType
+          Result: Builtin
+            Name: "bool"
+          Body: ~
+          Owner: "Locale"
+        Method
+          Name: "lteq"
+          Public: true
+          Extern: true
+          Kind: 0
+          Effects: ~
+          Doc: ~
+          Params:
+            Param
+              Name: "other"
+              Type: SelfType
+          Result: Builtin
+            Name: "bool"
+          Body: ~
+          Owner: "Locale"
+        Method
+          Name: "gt"
+          Public: true
+          Extern: true
+          Kind: 0
+          Effects: ~
+          Doc: ~
+          Params:
+            Param
+              Name: "other"
+              Type: SelfType
+          Result: Builtin
+            Name: "bool"
+          Body: ~
+          Owner: "Locale"
+        Method
+          Name: "gteq"
+          Public: true
+          Extern: true
+          Kind: 0
+          Effects: ~
+          Doc: ~
+          Params:
+            Param
+              Name: "other"
+              Type: SelfType
+          Result: Builtin
+            Name: "bool"
+          Body: ~
+          Owner: "Locale"
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls:
+        Named
+          Def: "comparable"
+        Named
+          Def: "orderable"
+      Enum: EnumDef
+        Base: "string"
+        Members:
+          EnumMember
+            Name: "Ja"
+            Value: Constant
+              Kind: 2
+              Int: ~
+              Bool: false
+              Str: "Ja"
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+          EnumMember
+            Name: "En"
+            Value: Constant
+              Kind: 2
+              Int: ~
+              Bool: false
+              Str: "en-US"
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+      Where: ~
+  Funcs:
+    Function
+      Name: "highestSeen"
+      Public: true
+      Extern: false
+      Effects: ~
+      Doc: ~
+      TypeParams: ~
+      Params:
+        Param
+          Name: "starting"
+          Type: Named
+            Def: "Rarity"
+      Result: Named
+        Def: "Rarity"
+      Body:
+        Let
+          Name: "best"
+          Type: Named
+            Def: "Rarity"
+          Value: EnumMemberValue
+            Def: "Rarity"
+            Index: 0
+            Type: Named
+              Def: "Rarity"
+        If
+          Cond: Call
+            Receiver: ParamRef
+              Name: "starting"
+              Type: Named
+                Def: "Rarity"
+            Method: "eql"
+            Args:
+              EnumMemberValue
+                Def: "Rarity"
+                Index: 2
+                Type: Named
+                  Def: "Rarity"
+            Setter: false
+            Resolved: ~
+            Subst: ~
+            Type: Builtin
+              Name: "bool"
+          Then:
+            Assign
+              Name: "best"
+              Value: EnumMemberValue
+                Def: "Rarity"
+                Index: 2
+                Type: Named
+                  Def: "Rarity"
+          ElseIf: ~
+          Else: ~
+        Return
+          Value: LocalRef
+            Name: "best"
+            Type: Named
+              Def: "Rarity"
+  Asserts:
+    Assert
+      Cond: "Rarity.Common != Rarity.Legend"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "Rarity.Common != Rarity.Legend\n       ^      ^         ^\n       |      true      Rarity.Legend\n       Rarity.Common"
+    Assert
+      Cond: "Rarity.Common < Rarity.Legend"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "Rarity.Common < Rarity.Legend\n       ^      ^        ^\n       |      true     Rarity.Legend\n       Rarity.Common"
+    Assert
+      Cond: "Rarity.Legend == Top"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "Rarity.Legend == Top\n       ^      ^  ^\n       |      |  Rarity.Legend\n       |      true\n       Rarity.Legend"
+    Assert
+      Cond: "Bare == Rarity.Common"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "Bare == Rarity.Common\n^    ^         ^\n|    true      Rarity.Common\nRarity.Common"
+    Assert
+      Cond: "highestSeen(Rarity.Legend) == Rarity.Legend"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "highestSeen(Rarity.Legend) == Rarity.Legend\n^                  ^       ^         ^\nRarity.Legend      |       true      Rarity.Legend\n                   Rarity.Legend"
+    Assert
+      Cond: "highestSeen(Rarity.Common) == Rarity.Common"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "highestSeen(Rarity.Common) == Rarity.Common\n^                  ^       ^         ^\nRarity.Common      |       true      Rarity.Common\n                   Rarity.Common"
+    Assert
+      Cond: "Locale.Ja < Locale.En"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "Locale.Ja < Locale.En\n       ^  ^        ^\n       |  true     Locale.En\n       Locale.Ja"

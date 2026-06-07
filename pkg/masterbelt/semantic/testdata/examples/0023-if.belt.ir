@@ -1,26 +1,197 @@
 Module
-  Func "clamp" pub
-    param x: nint
-    param lo: nint
-    param hi: nint
-    result nint
-      if ((ParamRef "x" : nint).lt((ParamRef "lo" : nint)) : bool)
-          return (ParamRef "lo" : nint)
-      else if ((ParamRef "x" : nint).gt((ParamRef "hi" : nint)) : bool)
-          return (ParamRef "hi" : nint)
-      return (ParamRef "x" : nint)
-  Func "warn" pub
-    param n: nint
-    result nint
-      if ((ParamRef "n" : nint).gt((IntLiteral "100" : nint)) : bool)
-          return (IntLiteral "0" : nint)
-      return (ParamRef "n" : nint)
-  Func "sign" pub
-    param n: nint
-    result string
-      if ((ParamRef "n" : nint).gt((IntLiteral "0" : nint)) : bool)
-          return (StringLiteral "positive" : string)
-      else
-          if ((ParamRef "n" : nint).lt((IntLiteral "0" : nint)) : bool)
-              return (StringLiteral "negative" : string)
-          return (StringLiteral "zero" : string)
+  Consts: ~
+  Types: ~
+  Funcs:
+    Function
+      Name: "clamp"
+      Public: true
+      Extern: false
+      Effects: ~
+      Doc: ~
+      TypeParams: ~
+      Params:
+        Param
+          Name: "x"
+          Type: Builtin
+            Name: "nint"
+        Param
+          Name: "lo"
+          Type: Builtin
+            Name: "nint"
+        Param
+          Name: "hi"
+          Type: Builtin
+            Name: "nint"
+      Result: Builtin
+        Name: "nint"
+      Body:
+        If
+          Cond: Call
+            Receiver: ParamRef
+              Name: "x"
+              Type: Builtin
+                Name: "nint"
+            Method: "lt"
+            Args:
+              ParamRef
+                Name: "lo"
+                Type: Builtin
+                  Name: "nint"
+            Setter: false
+            Resolved: ~
+            Subst: ~
+            Type: Builtin
+              Name: "bool"
+          Then:
+            Return
+              Value: ParamRef
+                Name: "lo"
+                Type: Builtin
+                  Name: "nint"
+          ElseIf: If
+            Cond: Call
+              Receiver: ParamRef
+                Name: "x"
+                Type: Builtin
+                  Name: "nint"
+              Method: "gt"
+              Args:
+                ParamRef
+                  Name: "hi"
+                  Type: Builtin
+                    Name: "nint"
+              Setter: false
+              Resolved: ~
+              Subst: ~
+              Type: Builtin
+                Name: "bool"
+            Then:
+              Return
+                Value: ParamRef
+                  Name: "hi"
+                  Type: Builtin
+                    Name: "nint"
+            ElseIf: ~
+            Else: ~
+          Else: ~
+        Return
+          Value: ParamRef
+            Name: "x"
+            Type: Builtin
+              Name: "nint"
+    Function
+      Name: "warn"
+      Public: true
+      Extern: false
+      Effects: ~
+      Doc: ~
+      TypeParams: ~
+      Params:
+        Param
+          Name: "n"
+          Type: Builtin
+            Name: "nint"
+      Result: Builtin
+        Name: "nint"
+      Body:
+        If
+          Cond: Call
+            Receiver: ParamRef
+              Name: "n"
+              Type: Builtin
+                Name: "nint"
+            Method: "gt"
+            Args:
+              IntLiteral
+                Text: "100"
+                Type: Builtin
+                  Name: "nint"
+            Setter: false
+            Resolved: ~
+            Subst: ~
+            Type: Builtin
+              Name: "bool"
+          Then:
+            Return
+              Value: IntLiteral
+                Text: "0"
+                Type: Builtin
+                  Name: "nint"
+          ElseIf: ~
+          Else: ~
+        Return
+          Value: ParamRef
+            Name: "n"
+            Type: Builtin
+              Name: "nint"
+    Function
+      Name: "sign"
+      Public: true
+      Extern: false
+      Effects: ~
+      Doc: ~
+      TypeParams: ~
+      Params:
+        Param
+          Name: "n"
+          Type: Builtin
+            Name: "nint"
+      Result: Builtin
+        Name: "string"
+      Body:
+        If
+          Cond: Call
+            Receiver: ParamRef
+              Name: "n"
+              Type: Builtin
+                Name: "nint"
+            Method: "gt"
+            Args:
+              IntLiteral
+                Text: "0"
+                Type: Builtin
+                  Name: "nint"
+            Setter: false
+            Resolved: ~
+            Subst: ~
+            Type: Builtin
+              Name: "bool"
+          Then:
+            Return
+              Value: StringLiteral
+                Value: "positive"
+                Type: Builtin
+                  Name: "string"
+          ElseIf: ~
+          Else:
+            If
+              Cond: Call
+                Receiver: ParamRef
+                  Name: "n"
+                  Type: Builtin
+                    Name: "nint"
+                Method: "lt"
+                Args:
+                  IntLiteral
+                    Text: "0"
+                    Type: Builtin
+                      Name: "nint"
+                Setter: false
+                Resolved: ~
+                Subst: ~
+                Type: Builtin
+                  Name: "bool"
+              Then:
+                Return
+                  Value: StringLiteral
+                    Value: "negative"
+                    Type: Builtin
+                      Name: "string"
+              ElseIf: ~
+              Else: ~
+            Return
+              Value: StringLiteral
+                Value: "zero"
+                Type: Builtin
+                  Name: "string"
+  Asserts: ~

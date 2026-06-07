@@ -1,6 +1,7 @@
 package ir
 
 import (
+	"encoding"
 	"slices"
 	"strings"
 
@@ -15,9 +16,13 @@ import (
 // lets a new primitive be injected by the prelude and the registry without the
 // type system hardcoding anything.
 //
-// String renders a stable, human-readable form used by diagnostics, hovers, and
-// the IR dump.
+// String renders a stable, human-readable form used by diagnostics, hovers,
+// and the IR dump. Every form also marshals to the exact text representation
+// (text.go) — the embedded encoding.TextMarshaler is the compile-time
+// obligation, hand-written for the type algebra because of its unexported
+// singleton (Invalid) and its reference edges (Named.Def, App.Def).
 type Type interface {
+	encoding.TextMarshaler
 	typ()
 	String() string
 }
@@ -218,9 +223,9 @@ type TypeDef struct {
 	// unusable predicate is reported at the declaration and stays nil, so the
 	// per-constant check never fires for it.
 	Where           Value
-	Syntax          *ast.TypeDecl      // the type declaration this was resolved from, or nil
-	EnumSyntax      *ast.EnumDecl      // the enum declaration this was resolved from, or nil
-	InterfaceSyntax *ast.InterfaceDecl // the interface declaration this was resolved from, or nil
+	Syntax          *ast.TypeDecl      `tree:"-"` // the type declaration this was resolved from, or nil
+	EnumSyntax      *ast.EnumDecl      `tree:"-"` // the enum declaration this was resolved from, or nil
+	InterfaceSyntax *ast.InterfaceDecl `tree:"-"` // the interface declaration this was resolved from, or nil
 }
 
 // WhereSyntax returns the surface form of the refinement predicate — the
@@ -326,12 +331,30 @@ type Method struct {
 	Params  []Param
 	Result  Type
 	Body    []Stmt // the resolved body, or nil for an extern method
+	// Owner is the definition this method belongs to — the backpointer
+	// mirroring Named.Def, so a resolved method names its owner without a
+	// module walk (the text form renders Owner.name(signature)). It is
+	// stamped by TypeDef.AttachMethods, the one channel methods join a type
+	// through; a method is owned by exactly one definition (an interface's
+	// provided methods live on the interface and are surfaced on
+	// implementors at lookup, never copied).
+	Owner *TypeDef `tree:"ref"`
 	// Syntax is the declaration this method resolved from, or nil for the
 	// registry's bootstrap methods. With overloading a name no longer pairs a
 	// declaration with its resolution — and a dropped duplicate shifts the
 	// indexes — so the identity link is what the body checker and the editor
 	// navigate by.
-	Syntax *ast.MethodDecl
+	Syntax *ast.MethodDecl `tree:"-"`
+}
+
+// AttachMethods appends methods to the definition, stamping each one's Owner
+// — the single channel methods join a type through, so the backpointer cannot
+// drift from the list.
+func (t *TypeDef) AttachMethods(methods ...*Method) {
+	for _, m := range methods {
+		m.Owner = t
+	}
+	t.Methods = append(t.Methods, methods...)
 }
 
 // AssocConst is one associated constant of a type: a constant scoped to the
@@ -347,12 +370,15 @@ type AssocConst struct {
 	Type    Type           // the resolved type of the constant's value
 	Value   *Constant      // the folded value, or nil when it could not be folded
 	Builtin bool           // value supplied by the registry (`= builtin`)
-	Syntax  *ast.ConstDecl // the declaration this was resolved from, or nil
+	Syntax  *ast.ConstDecl `tree:"-"` // the declaration this was resolved from, or nil
 }
 
 // Stmt is a statement in a method body. It is a sealed interface; the only
 // implementations are Return, ExprStmt, Let, Assign, Switch, Match, and If.
+// Embedding encoding.TextMarshaler obliges every statement form to marshal
+// to the exact text representation (text_gen.go) at compile time.
 type Stmt interface {
+	encoding.TextMarshaler
 	stmt()
 }
 

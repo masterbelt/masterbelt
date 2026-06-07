@@ -45,16 +45,21 @@ const (
 	fieldString            // string
 	fieldStrings           // []string
 	fieldInt               // int, or a named type with underlying int (an enum)
+	fieldInt64             // int64
+	fieldBigInt            // *math/big.Int
 	fieldNode              // *Struct or Interface
-	fieldList              // []*Struct or []Interface
+	fieldList              // []*Struct, []Struct, or []Interface
+	fieldMap               // map[string]*Struct or map[string]Interface, sorted by key
+	fieldRef               // a graph reference (tree:"ref"): serialized by name, relinked after decode
 )
 
 // fieldModel is one exported, non-excluded struct field.
 type fieldModel struct {
-	name  string
-	kind  fieldKind
-	elem  string // the struct/interface name for node kinds; the named int type for enums ("" for plain int)
-	iface bool   // whether elem names an interface
+	name    string
+	kind    fieldKind
+	elem    string // the struct/interface name for node kinds; the named int type for enums ("" for plain int)
+	iface   bool   // whether elem names an interface
+	byValue bool   // a fieldList of value structs ([]T rather than []*T)
 }
 
 // structModel is one tree struct.
@@ -63,7 +68,7 @@ type structModel struct {
 	fields   []fieldModel
 	excluded []string // exported fields excluded by tree:"-"
 	marshal  bool     // implements a marker interface: gets MarshalText
-	root     bool     // gets UnmarshalText
+	root     bool     // gets UnmarshalText (and MarshalText, the root being the document)
 }
 
 // ifaceModel is one sealed interface used as a field type.
@@ -79,15 +84,25 @@ type model struct {
 	ifaces  []*ifaceModel  // sorted by name
 }
 
-// Generate builds the codec source for the package in dir. markers names the
-// interface(s) whose implementers get MarshalText; roots names the struct(s)
-// that get UnmarshalText.
-func Generate(dir string, markers, roots []string) ([]byte, error) {
+// config is the generation configuration beyond the target package: markers
+// names the interface(s) whose implementers get MarshalText; roots names the
+// struct(s) that get UnmarshalText (and MarshalText); custom names the
+// interfaces whose dispatchers are hand-written (the generated code calls the
+// same write<I>Field/write<I>Item/decode<I>/decode<I>Field names it would
+// generate).
+type config struct {
+	markers []string
+	roots   []string
+	custom  map[string]bool
+}
+
+// Generate builds the codec source for the package in dir.
+func Generate(dir string, cfg config) ([]byte, error) {
 	pkg, err := load(dir)
 	if err != nil {
 		return nil, err
 	}
-	m, err := buildModel(pkg, markers, roots)
+	m, err := buildModel(pkg, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -119,11 +134,11 @@ func load(dir string) (*types.Package, error) {
 }
 
 // buildModel discovers the tree structs and sealed interfaces of pkg.
-func buildModel(pkg *types.Package, markers, roots []string) (*model, error) {
+func buildModel(pkg *types.Package, cfg config) (*model, error) {
 	scope := pkg.Scope()
 
-	markerIfaces := make([]*types.Interface, 0, len(markers))
-	for _, name := range markers {
+	markerIfaces := make([]*types.Interface, 0, len(cfg.markers))
+	for _, name := range cfg.markers {
 		obj := scope.Lookup(name)
 		if obj == nil {
 			return nil, fmt.Errorf("treegen: marker interface %s is not declared in %s", name, pkg.Path())
@@ -158,6 +173,12 @@ func buildModel(pkg *types.Package, markers, roots []string) (*model, error) {
 				break
 			}
 		}
+		// A root that implements no marker (a document struct like a module)
+		// is seeded too: it anchors the reachability walk.
+		if structs[name] == nil && slices.Contains(cfg.roots, name) {
+			structs[name] = &structModel{name: name}
+			queue = append(queue, name)
+		}
 	}
 
 	// Walk the fields, pulling in the referenced structs (auxiliary entry
@@ -179,13 +200,16 @@ func buildModel(pkg *types.Package, markers, roots []string) (*model, error) {
 				sm.excluded = append(sm.excluded, f.Name())
 				continue
 			}
-			fm, refs, err := classify(pkg, f)
+			fm, refs, err := classify(pkg, f, reflect.StructTag(st.Tag(i)))
 			if err != nil {
 				return nil, fmt.Errorf("treegen: %s.%s: %w", name, f.Name(), err)
 			}
 			sm.fields = append(sm.fields, *fm)
 			for _, ref := range refs {
 				if ref.iface {
+					if cfg.custom[ref.name] {
+						continue // a hand-written codec: no dispatch generated
+					}
 					if _, ok := ifaces[ref.name]; !ok {
 						ifaces[ref.name] = &ifaceModel{name: ref.name}
 					}
@@ -199,7 +223,7 @@ func buildModel(pkg *types.Package, markers, roots []string) (*model, error) {
 		}
 	}
 
-	for _, root := range roots {
+	for _, root := range cfg.roots {
 		sm, ok := structs[root]
 		if !ok {
 			return nil, fmt.Errorf("treegen: root %s is not a discovered tree struct", root)
@@ -241,8 +265,23 @@ type ref struct {
 
 // classify maps a field's Go type onto the codec's kinds. It returns the
 // field model and the in-package types the field references.
-func classify(pkg *types.Package, f *types.Var) (*fieldModel, []ref, error) {
+func classify(pkg *types.Package, f *types.Var, tag reflect.StructTag) (*fieldModel, []ref, error) {
 	name := f.Name()
+	if tag.Get("tree") == "ref" {
+		// A graph reference: serialized by name through the hand-written
+		// refText/unref<T> hooks, relinked after decode. The target struct is
+		// not pulled into the model through this edge — a reference is a name,
+		// not an embedding.
+		ptr, ok := f.Type().(*types.Pointer)
+		if !ok {
+			return nil, nil, fmt.Errorf("tree:\"ref\" on a non-pointer field of type %s", f.Type())
+		}
+		n, ok := structName(pkg, ptr.Elem())
+		if !ok {
+			return nil, nil, fmt.Errorf("tree:\"ref\" target %s is not an in-package struct", ptr.Elem())
+		}
+		return &fieldModel{name: name, kind: fieldRef, elem: n}, nil, nil
+	}
 	switch t := f.Type().(type) {
 	case *types.Basic:
 		switch t.Kind() {
@@ -252,6 +291,8 @@ func classify(pkg *types.Package, f *types.Var) (*fieldModel, []ref, error) {
 			return &fieldModel{name: name, kind: fieldString}, nil, nil
 		case types.Int:
 			return &fieldModel{name: name, kind: fieldInt}, nil, nil
+		case types.Int64:
+			return &fieldModel{name: name, kind: fieldInt64}, nil, nil
 		}
 	case *types.Named:
 		if basic, ok := t.Underlying().(*types.Basic); ok && basic.Kind() == types.Int && samePkg(pkg, t.Obj().Pkg()) {
@@ -262,6 +303,9 @@ func classify(pkg *types.Package, f *types.Var) (*fieldModel, []ref, error) {
 			return &fieldModel{name: name, kind: fieldNode, elem: n, iface: true}, []ref{{n, true}}, nil
 		}
 	case *types.Pointer:
+		if isBigInt(t.Elem()) {
+			return &fieldModel{name: name, kind: fieldBigInt}, nil, nil
+		}
 		if n, ok := structName(pkg, t.Elem()); ok {
 			return &fieldModel{name: name, kind: fieldNode, elem: n}, []ref{{n, false}}, nil
 		}
@@ -280,9 +324,33 @@ func classify(pkg *types.Package, f *types.Var) (*fieldModel, []ref, error) {
 				n := e.Obj().Name()
 				return &fieldModel{name: name, kind: fieldList, elem: n, iface: true}, []ref{{n, true}}, nil
 			}
+			if n, ok := structName(pkg, e); ok {
+				return &fieldModel{name: name, kind: fieldList, elem: n, byValue: true}, []ref{{n, false}}, nil
+			}
+		}
+	case *types.Map:
+		if basic, ok := t.Key().(*types.Basic); !ok || basic.Kind() != types.String {
+			break
+		}
+		switch v := t.Elem().(type) {
+		case *types.Pointer:
+			if n, ok := structName(pkg, v.Elem()); ok {
+				return &fieldModel{name: name, kind: fieldMap, elem: n}, []ref{{n, false}}, nil
+			}
+		case *types.Named:
+			if _, ok := v.Underlying().(*types.Interface); ok && samePkg(pkg, v.Obj().Pkg()) {
+				n := v.Obj().Name()
+				return &fieldModel{name: name, kind: fieldMap, elem: n, iface: true}, []ref{{n, true}}, nil
+			}
 		}
 	}
 	return nil, nil, fmt.Errorf("unsupported field type %s (add a codec kind or exclude it with tree:\"-\")", f.Type())
+}
+
+// isBigInt reports whether t is math/big.Int.
+func isBigInt(t types.Type) bool {
+	named, ok := t.(*types.Named)
+	return ok && named.Obj().Pkg() != nil && named.Obj().Pkg().Path() == "math/big" && named.Obj().Name() == "Int"
 }
 
 // samePkg reports whether other is the generated package itself.
@@ -309,6 +377,15 @@ func emit(m *model) []byte {
 	var b bytes.Buffer
 	p := func(format string, args ...any) { fmt.Fprintf(&b, format+"\n", args...) }
 
+	needsMap := false
+	for _, s := range m.structs {
+		for _, f := range s.fields {
+			if f.kind == fieldMap {
+				needsMap = true
+			}
+		}
+	}
+
 	p("// Code generated by treegen. DO NOT EDIT.")
 	p("//")
 	p("// This file is the exact text representation (format v2) of the %s trees:", m.pkgName)
@@ -320,6 +397,10 @@ func emit(m *model) []byte {
 	p("")
 	p("import (")
 	p("\t\"fmt\"")
+	if needsMap {
+		p("\t\"maps\"")
+		p("\t\"slices\"")
+	}
 	p("\t\"strconv\"")
 	p("")
 	p("\t%q", treetextPath)
@@ -328,7 +409,7 @@ func emit(m *model) []byte {
 	for _, s := range m.structs {
 		emitWriter(p, s)
 		emitDecoder(p, s)
-		if s.marshal {
+		if s.marshal || s.root {
 			emitMarshal(p, s)
 		}
 		if s.root {
@@ -358,6 +439,16 @@ func emitWriter(p func(string, ...any), s *structModel) {
 			p("\tw.Line(depth, %q+treetext.QuoteStrings(n.%s))", f.name+": ", f.name)
 		case fieldInt:
 			p("\tw.Line(depth, %q+strconv.Itoa(int(n.%s)))", f.name+": ", f.name)
+		case fieldInt64:
+			p("\tw.Line(depth, %q+strconv.FormatInt(n.%s, 10))", f.name+": ", f.name)
+		case fieldBigInt:
+			p("\tif n.%s == nil {", f.name)
+			p("\t\tw.Line(depth, %q+treetext.Nil)", f.name+": ")
+			p("\t} else {")
+			p("\t\tw.Line(depth, %q+n.%s.String())", f.name+": ", f.name)
+			p("\t}")
+		case fieldRef:
+			p("\tw.Line(depth, %q+refText(n.%s))", f.name+": ", f.name)
 		case fieldNode:
 			if f.iface {
 				p("\tif err := write%sField(w, depth, %q, n.%s); err != nil {", f.elem, f.name, f.name)
@@ -378,12 +469,22 @@ func emitWriter(p func(string, ...any), s *structModel) {
 			p("\t\tw.Line(depth, %q+treetext.Nil)", f.name+": ")
 			p("\t} else {")
 			p("\t\tw.Line(depth, %q)", f.name+":")
-			p("\t\tfor _, item := range n.%s {", f.name)
-			if f.iface {
+			switch {
+			case f.iface:
+				p("\t\tfor _, item := range n.%s {", f.name)
 				p("\t\t\tif err := write%sItem(w, depth+1, item); err != nil {", f.elem)
 				p("\t\t\t\treturn err")
 				p("\t\t\t}")
-			} else {
+				p("\t\t}")
+			case f.byValue:
+				p("\t\tfor i := range n.%s {", f.name)
+				p("\t\t\tw.Line(depth+1, %q)", f.elem)
+				p("\t\t\tif err := write%s(w, &n.%s[i], depth+2); err != nil {", f.elem, f.name)
+				p("\t\t\t\treturn err")
+				p("\t\t\t}")
+				p("\t\t}")
+			default:
+				p("\t\tfor _, item := range n.%s {", f.name)
 				p("\t\t\tif item == nil {")
 				p("\t\t\t\tw.Line(depth+1, treetext.Nil)")
 				p("\t\t\t\tcontinue")
@@ -391,6 +492,30 @@ func emitWriter(p func(string, ...any), s *structModel) {
 				p("\t\t\tw.Line(depth+1, %q)", f.elem)
 				p("\t\t\tif err := write%s(w, item, depth+2); err != nil {", f.elem)
 				p("\t\t\t\treturn err")
+				p("\t\t\t}")
+				p("\t\t}")
+			}
+			p("\t}")
+		case fieldMap:
+			p("\tif len(n.%s) == 0 {", f.name)
+			p("\t\tw.Line(depth, %q+treetext.Nil)", f.name+": ")
+			p("\t} else {")
+			p("\t\tw.Line(depth, %q)", f.name+":")
+			p("\t\tfor _, key := range slices.Sorted(maps.Keys(n.%s)) {", f.name)
+			p("\t\t\tw.Line(depth+1, \"Entry\")")
+			p("\t\t\tw.Line(depth+2, \"Key: \"+strconv.Quote(key))")
+			if f.iface {
+				p("\t\t\tif err := write%sField(w, depth+2, \"Value\", n.%s[key]); err != nil {", f.elem, f.name)
+				p("\t\t\t\treturn err")
+				p("\t\t\t}")
+			} else {
+				p("\t\t\tif item := n.%s[key]; item == nil {", f.name)
+				p("\t\t\t\tw.Line(depth+2, \"Value: \"+treetext.Nil)")
+				p("\t\t\t} else {")
+				p("\t\t\t\tw.Line(depth+2, %q)", "Value: "+f.elem)
+				p("\t\t\t\tif err := write%s(w, item, depth+3); err != nil {", f.elem)
+				p("\t\t\t\t\treturn err")
+				p("\t\t\t\t}")
 				p("\t\t\t}")
 			}
 			p("\t\t}")
@@ -448,6 +573,24 @@ func emitDecoder(p func(string, ...any), s *structModel) {
 			p("\t} else {")
 			p("\t\tn.%s = %s", f.name, cast)
 			p("\t}")
+		case fieldInt64:
+			p("\tif v, err := treetext.Int64(e.Fields[%d]); err != nil {", i)
+			p("\t\treturn nil, err")
+			p("\t} else {")
+			p("\t\tn.%s = v", f.name)
+			p("\t}")
+		case fieldBigInt:
+			p("\tif v, err := treetext.BigInt(e.Fields[%d]); err != nil {", i)
+			p("\t\treturn nil, err")
+			p("\t} else {")
+			p("\t\tn.%s = v", f.name)
+			p("\t}")
+		case fieldRef:
+			p("\tif v, err := unref%s(e.Fields[%d]); err != nil {", f.elem, i)
+			p("\t\treturn nil, err")
+			p("\t} else {")
+			p("\t\tn.%s = v", f.name)
+			p("\t}")
 		case fieldNode:
 			if f.iface {
 				p("\tif v, err := decode%sField(e.Fields[%d]); err != nil {", f.elem, i)
@@ -474,17 +617,22 @@ func emitDecoder(p func(string, ...any), s *structModel) {
 			p("\tcase f.Items == nil:")
 			p("\t\treturn nil, fmt.Errorf(\"treetext: line %%d: field %%s: expected a list\", f.Line, f.Name)")
 			p("\tdefault:")
-			if f.iface {
+			switch {
+			case f.iface:
 				p("\t\tout := make([]%s, 0, len(f.Items))", f.elem)
-			} else {
+			case f.byValue:
+				p("\t\tout := make([]%s, 0, len(f.Items))", f.elem)
+			default:
 				p("\t\tout := make([]*%s, 0, len(f.Items))", f.elem)
 			}
 			p("\t\tfor j := range f.Items {")
 			p("\t\t\titem := &f.Items[j]")
-			p("\t\t\tif item.Head == treetext.Nil {")
-			p("\t\t\t\tout = append(out, nil)")
-			p("\t\t\t\tcontinue")
-			p("\t\t\t}")
+			if !f.byValue {
+				p("\t\t\tif item.Head == treetext.Nil {")
+				p("\t\t\t\tout = append(out, nil)")
+				p("\t\t\t\tcontinue")
+				p("\t\t\t}")
+			}
 			if f.iface {
 				p("\t\t\tv, err := decode%s(item)", f.elem)
 			} else {
@@ -496,7 +644,56 @@ func emitDecoder(p func(string, ...any), s *structModel) {
 			p("\t\t\tif err != nil {")
 			p("\t\t\t\treturn nil, err")
 			p("\t\t\t}")
-			p("\t\t\tout = append(out, v)")
+			if f.byValue {
+				p("\t\t\tout = append(out, *v)")
+			} else {
+				p("\t\t\tout = append(out, v)")
+			}
+			p("\t\t}")
+			p("\t\tn.%s = out", f.name)
+			p("\t}")
+		case fieldMap:
+			p("\tswitch f := e.Fields[%d]; {", i)
+			p("\tcase f.Inline == treetext.Nil:")
+			p("\tcase f.Items == nil:")
+			p("\t\treturn nil, fmt.Errorf(\"treetext: line %%d: field %%s: expected a list\", f.Line, f.Name)")
+			p("\tdefault:")
+			if f.iface {
+				p("\t\tout := make(map[string]%s, len(f.Items))", f.elem)
+			} else {
+				p("\t\tout := make(map[string]*%s, len(f.Items))", f.elem)
+			}
+			p("\t\tfor j := range f.Items {")
+			p("\t\t\titem := &f.Items[j]")
+			p("\t\t\tif item.Head != \"Entry\" {")
+			p("\t\t\t\treturn nil, fmt.Errorf(\"treetext: line %%d: %%s is not an Entry\", item.Line, item.Head)")
+			p("\t\t\t}")
+			p("\t\t\tif err := treetext.ExpectFields(item, \"Key\", \"Value\"); err != nil {")
+			p("\t\t\t\treturn nil, err")
+			p("\t\t\t}")
+			p("\t\t\tkey, err := treetext.String(item.Fields[0])")
+			p("\t\t\tif err != nil {")
+			p("\t\t\t\treturn nil, err")
+			p("\t\t\t}")
+			if f.iface {
+				p("\t\t\tval, err := decode%sField(item.Fields[1])", f.elem)
+				p("\t\t\tif err != nil {")
+				p("\t\t\t\treturn nil, err")
+				p("\t\t\t}")
+			} else {
+				p("\t\t\tvar val *%s", f.elem)
+				p("\t\t\tswitch vf := item.Fields[1]; {")
+				p("\t\t\tcase vf.Inline == treetext.Nil:")
+				p("\t\t\tcase vf.Node == nil || vf.Node.Head != %q:", f.elem)
+				p("\t\t\t\treturn nil, fmt.Errorf(\"treetext: line %%d: field %%s: expected a %s\", vf.Line, vf.Name)", f.elem)
+				p("\t\t\tdefault:")
+				p("\t\t\t\tval, err = decode%s(vf.Node)", f.elem)
+				p("\t\t\t\tif err != nil {")
+				p("\t\t\t\t\treturn nil, err")
+				p("\t\t\t\t}")
+				p("\t\t\t}")
+			}
+			p("\t\t\tout[key] = val")
 			p("\t\t}")
 			p("\t\tn.%s = out", f.name)
 			p("\t}")

@@ -1,17 +1,173 @@
 Module
-  Const "greeting"
-    type string
-    value ((StringLiteral "Hello, " : string).add((StringLiteral "world!" : string)) : string)
-    eval "Hello, world!"
-  Const "same" pub
-    type bool
-    value ((StringLiteral "abc" : string).eql((StringLiteral "abc" : string)) : bool)
-    eval true
-  Const "ordered" pub
-    type bool
-    value ((StringLiteral "a" : string).lt((StringLiteral "b" : string)) : bool)
-    eval true
-  Const "banner" pub
-    type string
-    value (((StringLiteral "[" : string).add((Reference -> "greeting" : string)) : string).add((StringLiteral "]" : string)) : string)
-    eval "[Hello, world!]"
+  Consts:
+    Const
+      Name: "greeting"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "string"
+      Value: Call
+        Receiver: StringLiteral
+          Value: "Hello, "
+          Type: Builtin
+            Name: "string"
+        Method: "add"
+        Args:
+          StringLiteral
+            Value: "world!"
+            Type: Builtin
+              Name: "string"
+        Setter: false
+        Resolved: ~
+        Subst: ~
+        Type: Builtin
+          Name: "string"
+      Eval: Constant
+        Kind: 2
+        Int: ~
+        Bool: false
+        Str: "Hello, world!"
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "same"
+      Public: true
+      Doc: ~
+      Type: Builtin
+        Name: "bool"
+      Value: Call
+        Receiver: StringLiteral
+          Value: "abc"
+          Type: Builtin
+            Name: "string"
+        Method: "eql"
+        Args:
+          StringLiteral
+            Value: "abc"
+            Type: Builtin
+              Name: "string"
+        Setter: false
+        Resolved: ~
+        Subst: ~
+        Type: Builtin
+          Name: "bool"
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "ordered"
+      Public: true
+      Doc: ~
+      Type: Builtin
+        Name: "bool"
+      Value: Call
+        Receiver: StringLiteral
+          Value: "a"
+          Type: Builtin
+            Name: "string"
+        Method: "lt"
+        Args:
+          StringLiteral
+            Value: "b"
+            Type: Builtin
+              Name: "string"
+        Setter: false
+        Resolved: ~
+        Subst: ~
+        Type: Builtin
+          Name: "bool"
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "banner"
+      Public: true
+      Doc: ~
+      Type: Builtin
+        Name: "string"
+      Value: Call
+        Receiver: Call
+          Receiver: StringLiteral
+            Value: "["
+            Type: Builtin
+              Name: "string"
+          Method: "add"
+          Args:
+            Reference
+              Target: "greeting"
+              Type: Builtin
+                Name: "string"
+          Setter: false
+          Resolved: ~
+          Subst: ~
+          Type: Builtin
+            Name: "string"
+        Method: "add"
+        Args:
+          StringLiteral
+            Value: "]"
+            Type: Builtin
+              Name: "string"
+        Setter: false
+        Resolved: ~
+        Subst: ~
+        Type: Builtin
+          Name: "string"
+      Eval: Constant
+        Kind: 2
+        Int: ~
+        Bool: false
+        Str: "[Hello, world!]"
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+  Types: ~
+  Funcs: ~
+  Asserts: ~

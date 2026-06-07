@@ -1,90 +1,621 @@
 Module
-  Const "Hello"
-    type Tag
-    value (adapt (StringLiteral "hello" : string) : Tag)
-    eval "hello"
-  Const "World"
-    type string
-    value (StringLiteral "world" : string)
-    eval "world"
-  Const "There"
-    type Tag
-    value (adapt (Reference -> "World" : string) : Tag)
-    eval "world"
-  Const "Greeting"
-    type Tag
-    value (((Reference -> "Hello" : Tag).add((adapt (StringLiteral " " : string) : Tag)) : Tag).add((Reference -> "There" : Tag)) : Tag)
-    eval "hello world"
-  Const "SameTag"
-    type bool
-    value ((Reference -> "Hello" : Tag).eql((adapt (StringLiteral "hello" : string) : Tag)) : bool)
-    eval true
-  Const "OtherTag"
-    type bool
-    value ((Reference -> "Hello" : Tag).neq((Reference -> "There" : Tag)) : bool)
-    eval true
-  Const "North"
-    type Direction
-    value (adapt (StringLiteral "north" : string) : Direction)
-    eval "north"
-  Const "South"
-    type Direction
-    value (adapt (StringLiteral "south" : string) : Direction)
-    eval "south"
-  Const "Ok"
-    type Labeled
-    value (adapt (adapt (StringLiteral "tagged" : string) : Tag) : Labeled)
-    eval (Tag) "tagged"
-  Const "FromOk"
-    type Tag
-    value (label((adapt (adapt (StringLiteral "done" : string) : Tag) : Labeled)) : Tag)
-    eval "done"
-  TypeDef "Tag" pub
-    body string
-  TypeDef "Direction" pub
-    body string
-    where (((self : Direction).eql((adapt (StringLiteral "north" : string) : Direction)) : bool).oror(((self : Direction).eql((adapt (StringLiteral "south" : string) : Direction)) : bool)) : bool)
-  TypeDef "Labeled" pub
-    body Tag | error
-  Func "label" pub
-    param v: Labeled
-    result Tag
-      match (ParamRef "v" : Labeled)
-        arm Tag t
-          return (LocalRef "t" : Tag)
-        arm error e
-          return (adapt (StringLiteral "error" : string) : Tag)
-  Assert "Hello == \"hello\""
-    eval true
-      Hello == "hello"
-      ^     ^
-      |     true
-      "hello"
-  Assert "Greeting == \"hello world\""
-    eval true
-      Greeting == "hello world"
-      ^        ^
-      |        true
-      "hello world"
-  Assert "SameTag"
-    eval true
-      SameTag
-      ^
-      true
-  Assert "OtherTag"
-    eval true
-      OtherTag
-      ^
-      true
-  Assert "North != South"
-    eval true
-      North != South
-      ^     ^  ^
-      |     |  "south"
-      |     true
-      "north"
-  Assert "label(\"done\") == \"done\""
-    eval true
-      label("done") == "done"
-      ^             ^
-      "done"        true
+  Consts:
+    Const
+      Name: "Hello"
+      Public: false
+      Doc: ~
+      Type: Named
+        Def: "Tag"
+      Value: Adapt
+        Value: StringLiteral
+          Value: "hello"
+          Type: Builtin
+            Name: "string"
+        To: Named
+          Def: "Tag"
+      Eval: Constant
+        Kind: 2
+        Int: ~
+        Bool: false
+        Str: "hello"
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "World"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "string"
+      Value: StringLiteral
+        Value: "world"
+        Type: Builtin
+          Name: "string"
+      Eval: Constant
+        Kind: 2
+        Int: ~
+        Bool: false
+        Str: "world"
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "There"
+      Public: false
+      Doc: ~
+      Type: Named
+        Def: "Tag"
+      Value: Adapt
+        Value: Reference
+          Target: "World"
+          Type: Builtin
+            Name: "string"
+        To: Named
+          Def: "Tag"
+      Eval: Constant
+        Kind: 2
+        Int: ~
+        Bool: false
+        Str: "world"
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "Greeting"
+      Public: false
+      Doc: ~
+      Type: Named
+        Def: "Tag"
+      Value: Call
+        Receiver: Call
+          Receiver: Reference
+            Target: "Hello"
+            Type: Named
+              Def: "Tag"
+          Method: "add"
+          Args:
+            Adapt
+              Value: StringLiteral
+                Value: " "
+                Type: Builtin
+                  Name: "string"
+              To: Named
+                Def: "Tag"
+          Setter: false
+          Resolved: ~
+          Subst: ~
+          Type: Named
+            Def: "Tag"
+        Method: "add"
+        Args:
+          Reference
+            Target: "There"
+            Type: Named
+              Def: "Tag"
+        Setter: false
+        Resolved: ~
+        Subst: ~
+        Type: Named
+          Def: "Tag"
+      Eval: Constant
+        Kind: 2
+        Int: ~
+        Bool: false
+        Str: "hello world"
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "SameTag"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "bool"
+      Value: Call
+        Receiver: Reference
+          Target: "Hello"
+          Type: Named
+            Def: "Tag"
+        Method: "eql"
+        Args:
+          Adapt
+            Value: StringLiteral
+              Value: "hello"
+              Type: Builtin
+                Name: "string"
+            To: Named
+              Def: "Tag"
+        Setter: false
+        Resolved: ~
+        Subst: ~
+        Type: Builtin
+          Name: "bool"
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "OtherTag"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "bool"
+      Value: Call
+        Receiver: Reference
+          Target: "Hello"
+          Type: Named
+            Def: "Tag"
+        Method: "neq"
+        Args:
+          Reference
+            Target: "There"
+            Type: Named
+              Def: "Tag"
+        Setter: false
+        Resolved: ~
+        Subst: ~
+        Type: Builtin
+          Name: "bool"
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "North"
+      Public: false
+      Doc: ~
+      Type: Named
+        Def: "Direction"
+      Value: Adapt
+        Value: StringLiteral
+          Value: "north"
+          Type: Builtin
+            Name: "string"
+        To: Named
+          Def: "Direction"
+      Eval: Constant
+        Kind: 2
+        Int: ~
+        Bool: false
+        Str: "north"
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "South"
+      Public: false
+      Doc: ~
+      Type: Named
+        Def: "Direction"
+      Value: Adapt
+        Value: StringLiteral
+          Value: "south"
+          Type: Builtin
+            Name: "string"
+        To: Named
+          Def: "Direction"
+      Eval: Constant
+        Kind: 2
+        Int: ~
+        Bool: false
+        Str: "south"
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "Ok"
+      Public: false
+      Doc: ~
+      Type: Named
+        Def: "Labeled"
+      Value: Adapt
+        Value: Adapt
+          Value: StringLiteral
+            Value: "tagged"
+            Type: Builtin
+              Name: "string"
+          To: Named
+            Def: "Tag"
+        To: Named
+          Def: "Labeled"
+      Eval: Constant
+        Kind: 2
+        Int: ~
+        Bool: false
+        Str: "tagged"
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: Named
+          Def: "Tag"
+    Const
+      Name: "FromOk"
+      Public: false
+      Doc: ~
+      Type: Named
+        Def: "Tag"
+      Value: FuncCall
+        Target: "label(Labeled)"
+        Args:
+          Adapt
+            Value: Adapt
+              Value: StringLiteral
+                Value: "done"
+                Type: Builtin
+                  Name: "string"
+              To: Named
+                Def: "Tag"
+            To: Named
+              Def: "Labeled"
+        Resolved: ~
+        Subst: ~
+        Type: Named
+          Def: "Tag"
+      Eval: Constant
+        Kind: 2
+        Int: ~
+        Bool: false
+        Str: "done"
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+  Types:
+    TypeDef
+      Name: "Tag"
+      Public: true
+      Doc: ~
+      Params: ~
+      Body: Builtin
+        Name: "string"
+      Methods: ~
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Where: ~
+    TypeDef
+      Name: "Direction"
+      Public: true
+      Doc: ~
+      Params: ~
+      Body: Builtin
+        Name: "string"
+      Methods: ~
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Where: Call
+        Receiver: Call
+          Receiver: SelfValue
+            Type: Named
+              Def: "Direction"
+          Method: "eql"
+          Args:
+            Adapt
+              Value: StringLiteral
+                Value: "north"
+                Type: Builtin
+                  Name: "string"
+              To: Named
+                Def: "Direction"
+          Setter: false
+          Resolved: ~
+          Subst: ~
+          Type: Builtin
+            Name: "bool"
+        Method: "oror"
+        Args:
+          Call
+            Receiver: SelfValue
+              Type: Named
+                Def: "Direction"
+            Method: "eql"
+            Args:
+              Adapt
+                Value: StringLiteral
+                  Value: "south"
+                  Type: Builtin
+                    Name: "string"
+                To: Named
+                  Def: "Direction"
+            Setter: false
+            Resolved: ~
+            Subst: ~
+            Type: Builtin
+              Name: "bool"
+        Setter: false
+        Resolved: ~
+        Subst: ~
+        Type: Builtin
+          Name: "bool"
+    TypeDef
+      Name: "Labeled"
+      Public: true
+      Doc: ~
+      Params: ~
+      Body: Union
+        Members:
+          Named
+            Def: "Tag"
+          Builtin
+            Name: "error"
+      Methods: ~
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Where: ~
+  Funcs:
+    Function
+      Name: "label"
+      Public: true
+      Extern: false
+      Effects: ~
+      Doc: ~
+      TypeParams: ~
+      Params:
+        Param
+          Name: "v"
+          Type: Named
+            Def: "Labeled"
+      Result: Named
+        Def: "Tag"
+      Body:
+        Match
+          Scrutinee: ParamRef
+            Name: "v"
+            Type: Named
+              Def: "Labeled"
+          Arms:
+            MatchArm
+              Type: Named
+                Def: "Tag"
+              Name: "t"
+              Body:
+                Return
+                  Value: LocalRef
+                    Name: "t"
+                    Type: Named
+                      Def: "Tag"
+            MatchArm
+              Type: Builtin
+                Name: "error"
+              Name: "e"
+              Body:
+                Return
+                  Value: Adapt
+                    Value: StringLiteral
+                      Value: "error"
+                      Type: Builtin
+                        Name: "string"
+                    To: Named
+                      Def: "Tag"
+          Else: ~
+  Asserts:
+    Assert
+      Cond: "Hello == \"hello\""
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "Hello == \"hello\"\n^     ^\n|     true\n\"hello\""
+    Assert
+      Cond: "Greeting == \"hello world\""
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "Greeting == \"hello world\"\n^        ^\n|        true\n\"hello world\""
+    Assert
+      Cond: "SameTag"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "SameTag\n^\ntrue"
+    Assert
+      Cond: "OtherTag"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "OtherTag\n^\ntrue"
+    Assert
+      Cond: "North != South"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "North != South\n^     ^  ^\n|     |  \"south\"\n|     true\n\"north\""
+    Assert
+      Cond: "label(\"done\") == \"done\""
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "label(\"done\") == \"done\"\n^             ^\n\"done\"        true"

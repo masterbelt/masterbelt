@@ -20,7 +20,10 @@
 // live in package types, which imports ir and not the reverse.
 package ir
 
+//go:generate go run github.com/masterbelt/masterbelt/pkg/source/internal/treegen -marshal Value,Stmt -roots Module,Constant -custom Type -out text_gen.go
+
 import (
+	"encoding"
 	"fmt"
 
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
@@ -57,7 +60,7 @@ type Function struct {
 	Params     []Param
 	Result     Type
 	Body       []Stmt
-	Syntax     *ast.FuncDecl // the declaration this was resolved from
+	Syntax     *ast.FuncDecl `tree:"-"` // the declaration this was resolved from
 }
 
 // Assert is one compile-time assertion's outcome: the condition in canonical
@@ -70,7 +73,7 @@ type Assert struct {
 	Doc     []string        // the doc comment — the invariant in the author's words
 	Eval    *Constant       // the folded condition, or nil if it could not be evaluated
 	Diagram string          // the condition line plus the pipe/value rows
-	Syntax  *ast.AssertDecl // the declaration this was checked from
+	Syntax  *ast.AssertDecl `tree:"-"` // the declaration this was checked from
 }
 
 // Held reports whether the assertion folded to true.
@@ -84,7 +87,7 @@ type Const struct {
 	Type   Type           // the inferred or annotated type
 	Value  Value          // the resolved initializer, or nil if missing/invalid
 	Eval   *Constant      // the evaluated value, or nil if it could not be evaluated
-	Syntax *ast.ConstDecl // the declaration this was lowered from
+	Syntax *ast.ConstDecl `tree:"-"` // the declaration this was lowered from
 }
 
 // Value is a resolved initializer: a literal or a reference to another constant.
@@ -97,7 +100,12 @@ type Const struct {
 // its binding's type, a call at the checker's result. A node in a declaration
 // the checker never settled (a broken file) keeps nil, which the dump renders
 // bare — the hole is visible, never invented.
+//
+// Every value form marshals to the exact text representation (text_gen.go);
+// embedding encoding.TextMarshaler makes that a compile-time obligation, so a
+// form added without regenerating the codec does not build.
 type Value interface {
+	encoding.TextMarshaler
 	value()
 }
 
@@ -124,7 +132,7 @@ func (*Adapt) value() {}
 type IntLiteral struct {
 	Text   string
 	Type   Type
-	Syntax *ast.IntLit
+	Syntax *ast.IntLit `tree:"-"`
 }
 
 func (*IntLiteral) value() {}
@@ -134,7 +142,7 @@ func (*IntLiteral) value() {}
 type StringLiteral struct {
 	Value  string
 	Type   Type
-	Syntax *ast.StringLit
+	Syntax *ast.StringLit `tree:"-"`
 }
 
 func (*StringLiteral) value() {}
@@ -143,7 +151,7 @@ func (*StringLiteral) value() {}
 type BoolLiteral struct {
 	Value  bool
 	Type   Type
-	Syntax *ast.BoolLit
+	Syntax *ast.BoolLit `tree:"-"`
 }
 
 func (*BoolLiteral) value() {}
@@ -153,7 +161,7 @@ func (*BoolLiteral) value() {}
 type DatetimeLiteral struct {
 	Text   string
 	Type   Type
-	Syntax *ast.DatetimeLit
+	Syntax *ast.DatetimeLit `tree:"-"`
 }
 
 func (*DatetimeLiteral) value() {}
@@ -163,7 +171,7 @@ func (*DatetimeLiteral) value() {}
 type DurationLiteral struct {
 	Text   string
 	Type   Type
-	Syntax *ast.DurationLit
+	Syntax *ast.DurationLit `tree:"-"`
 }
 
 func (*DurationLiteral) value() {}
@@ -176,7 +184,7 @@ func (*DurationLiteral) value() {}
 type CollectionLiteral struct {
 	Entries []CollectionEntry
 	Type    Type
-	Syntax  *ast.CollectionLit
+	Syntax  *ast.CollectionLit `tree:"-"`
 }
 
 func (*CollectionLiteral) value() {}
@@ -197,7 +205,7 @@ type RecordValue struct {
 	TypeName string
 	Fields   []RecordField
 	Type     Type
-	Syntax   *ast.RecordLit
+	Syntax   *ast.RecordLit `tree:"-"`
 }
 
 func (*RecordValue) value() {}
@@ -213,9 +221,9 @@ type RecordField struct {
 // the settled-type write-back key and the editor's position anchor only, never
 // semantics.
 type Reference struct {
-	Target *Const
+	Target *Const `tree:"ref"`
 	Type   Type
-	Syntax ast.Expr
+	Syntax ast.Expr `tree:"-"`
 }
 
 func (*Reference) value() {}
@@ -252,10 +260,10 @@ type Call struct {
 	Method   string
 	Args     []Value
 	Setter   bool
-	Resolved *Method
+	Resolved *Method `tree:"ref"`
 	Subst    map[string]Type
 	Type     Type
-	Syntax   *ast.CallExpr
+	Syntax   *ast.CallExpr `tree:"-"`
 }
 
 func (*Call) value() {}
@@ -271,12 +279,12 @@ func (*Call) value() {}
 // call (the T = nint of identity(42)), written back like Call.Subst and nil
 // for a non-generic call.
 type FuncCall struct {
-	Target   *Function
+	Target   *Function `tree:"ref"`
 	Args     []Value
-	Resolved *Function
+	Resolved *Function `tree:"ref"`
 	Subst    map[string]Type
 	Type     Type
-	Syntax   *ast.CallExpr
+	Syntax   *ast.CallExpr `tree:"-"`
 }
 
 func (*FuncCall) value() {}
@@ -290,13 +298,13 @@ func (*FuncCall) value() {}
 // Call.Subst; nil while static fns stay non-generic). The arguments are
 // themselves resolved values.
 type StaticCall struct {
-	Def      *TypeDef
+	Def      *TypeDef `tree:"ref"`
 	Name     string
 	Args     []Value
-	Resolved *Method
+	Resolved *Method `tree:"ref"`
 	Subst    map[string]Type
 	Type     Type
-	Syntax   *ast.CallExpr
+	Syntax   *ast.CallExpr `tree:"-"`
 }
 
 func (*StaticCall) value() {}
@@ -313,7 +321,7 @@ type Apply struct {
 	Callee Value
 	Args   []Value
 	Type   Type
-	Syntax *ast.CallExpr
+	Syntax *ast.CallExpr `tree:"-"`
 }
 
 func (*Apply) value() {}
@@ -328,7 +336,7 @@ type FuncLiteral struct {
 	Params []string
 	Body   []Stmt
 	Type   Type
-	Syntax *ast.FuncLit
+	Syntax *ast.FuncLit `tree:"-"`
 }
 
 func (*FuncLiteral) value() {}
@@ -339,7 +347,7 @@ func (*FuncLiteral) value() {}
 // implicit receiver of a bare self-method call.
 type SelfValue struct {
 	Type   Type
-	Syntax *ast.SelfExpr
+	Syntax *ast.SelfExpr `tree:"-"`
 }
 
 func (*SelfValue) value() {}
@@ -349,7 +357,7 @@ func (*SelfValue) value() {}
 type ParamRef struct {
 	Name   string
 	Type   Type
-	Syntax *ast.Identifier
+	Syntax *ast.Identifier `tree:"-"`
 }
 
 func (*ParamRef) value() {}
@@ -362,7 +370,7 @@ func (*ParamRef) value() {}
 type LocalRef struct {
 	Name   string
 	Type   Type
-	Syntax *ast.Identifier
+	Syntax *ast.Identifier `tree:"-"`
 }
 
 func (*LocalRef) value() {}
@@ -375,7 +383,7 @@ type FieldAccess struct {
 	Receiver Value
 	Field    string
 	Type     Type
-	Syntax   *ast.MemberExpr
+	Syntax   *ast.MemberExpr `tree:"-"`
 }
 
 func (*FieldAccess) value() {}
@@ -390,7 +398,7 @@ func (*FieldAccess) value() {}
 type Conversion struct {
 	Type   Type
 	Args   []Value
-	Syntax *ast.CallExpr
+	Syntax *ast.CallExpr `tree:"-"`
 }
 
 // Value returns a single-argument conversion's argument — the common form
@@ -412,7 +420,7 @@ func (*Conversion) value() {}
 type Await struct {
 	Value  Value
 	Type   Type
-	Syntax *ast.AwaitExpr
+	Syntax *ast.AwaitExpr `tree:"-"`
 }
 
 func (*Await) value() {}
@@ -428,7 +436,7 @@ type Ternary struct {
 	Then   Value
 	Else   Value
 	Type   Type
-	Syntax *ast.TernaryExpr
+	Syntax *ast.TernaryExpr `tree:"-"`
 }
 
 func (*Ternary) value() {}
@@ -447,7 +455,7 @@ type RangeLit struct {
 	Upper    Value
 	HalfOpen bool
 	Type     Type
-	Syntax   *ast.RangeExpr
+	Syntax   *ast.RangeExpr `tree:"-"`
 }
 
 func (*RangeLit) value() {}
@@ -455,7 +463,7 @@ func (*RangeLit) value() {}
 // NullValue is the null literal.
 type NullValue struct {
 	Type   Type
-	Syntax *ast.NullLit
+	Syntax *ast.NullLit `tree:"-"`
 }
 
 func (*NullValue) value() {}
@@ -466,13 +474,13 @@ func (*NullValue) value() {}
 // the base value are read from Def.Enum.Members[Index]. The evaluated value
 // (an EnumConstant) lives on Const.Eval, as for every other value form.
 type EnumMemberValue struct {
-	Def   *TypeDef
+	Def   *TypeDef `tree:"ref"`
 	Index int
 	Type  Type
 	// Syntax is the referring expression — a bare member (an identifier) or the
 	// qualified Rarity.Common (a member access); an anchor and write-back key
 	// only, never semantics.
-	Syntax ast.Expr
+	Syntax ast.Expr `tree:"-"`
 }
 
 func (*EnumMemberValue) value() {}
@@ -629,10 +637,10 @@ func exprOrNil[E any, P interface {
 // read from Def.Consts[Index]. The evaluated value lives on Const.Eval, as for
 // every other value form.
 type AssocConstValue struct {
-	Def    *TypeDef
+	Def    *TypeDef `tree:"ref"`
 	Index  int
 	Type   Type
-	Syntax *ast.MemberExpr
+	Syntax *ast.MemberExpr `tree:"-"`
 }
 
 func (*AssocConstValue) value() {}

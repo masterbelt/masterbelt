@@ -1,20 +1,110 @@
 # geometry.belt
 Module
-  Const "Origin" pub
-    doc "The zero point every path starts from."
-    type nint
-    value (IntLiteral "0" : nint)
-    eval 0
-  Const "hidden"
-    type nint
-    value (IntLiteral "1" : nint)
-    eval 1
-  TypeDef "Point" pub
-    doc "A 1-D coordinate."
-    body int
+  Consts:
+    Const
+      Name: "Origin"
+      Public: true
+      Doc: "The zero point every path starts from."
+      Type: Builtin
+        Name: "nint"
+      Value: IntLiteral
+        Text: "0"
+        Type: Builtin
+          Name: "nint"
+      Eval: Constant
+        Kind: 0
+        Int: 0
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "hidden"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "nint"
+      Value: IntLiteral
+        Text: "1"
+        Type: Builtin
+          Name: "nint"
+      Eval: Constant
+        Kind: 0
+        Int: 1
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+  Types:
+    TypeDef
+      Name: "Point"
+      Public: true
+      Doc: "A 1-D coordinate."
+      Params: ~
+      Body: Builtin
+        Name: "int"
+      Methods: ~
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Where: ~
+  Funcs: ~
+  Asserts: ~
 # main.belt
 Module
-  Const "start"
-    type Point
-    value (adapt (Reference -> "Origin" : nint) : Point)
-    eval 0
+  Consts:
+    Const
+      Name: "start"
+      Public: false
+      Doc: ~
+      Type: Named
+        Def: "Point"
+      Value: Adapt
+        Value: Reference
+          Target: "Origin"
+          Type: Builtin
+            Name: "nint"
+        To: Named
+          Def: "Point"
+      Eval: Constant
+        Kind: 0
+        Int: 0
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+  Types: ~
+  Funcs: ~
+  Asserts: ~

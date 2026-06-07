@@ -114,9 +114,12 @@ func TestSwitchBareMemberResolves(t *testing.T) {
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", codes(diags))
 	}
-	dump := ir.Dump(m)
-	if !strings.Contains(dump, "arm (Rarity.Common : Rarity)") {
-		t.Errorf("bare member Common should resolve to Rarity.Common in the IR:\n%s", dump)
+	sw, ok := fnNamed(t, m, "color").Body[0].(*ir.Switch)
+	if !ok {
+		t.Fatal("body did not lower to the switch")
+	}
+	if len(sw.Arms) == 0 || len(sw.Arms[0].Values) == 0 || enumMemberOf(sw.Arms[0].Values[0]) != "Rarity.Common" {
+		t.Errorf("bare member Common should resolve to Rarity.Common in the IR: %+v", sw.Arms)
 	}
 }
 
@@ -246,8 +249,11 @@ func TestSwitchBareMemberResolvesLetBound(t *testing.T) {
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", codes(diags))
 	}
-	dump := ir.Dump(m)
-	if !strings.Contains(dump, "arm (Rarity.Common : Rarity)") {
-		t.Errorf("bare member Common over a let-bound enum should lower to Rarity.Common:\n%s", dump)
+	sw, ok := fnNamed(t, m, "color").Body[1].(*ir.Switch)
+	if !ok {
+		t.Fatal("body did not lower to the switch after the let")
+	}
+	if len(sw.Arms) == 0 || len(sw.Arms[0].Values) == 0 || enumMemberOf(sw.Arms[0].Values[0]) != "Rarity.Common" {
+		t.Errorf("bare member Common over a let-bound enum should lower to Rarity.Common: %+v", sw.Arms)
 	}
 }

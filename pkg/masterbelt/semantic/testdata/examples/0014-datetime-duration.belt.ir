@@ -1,55 +1,403 @@
 Module
-  Const "Epoch"
-    type datetime
-    value (DatetimeLiteral "D1970-01-01T00:00:00.000Z" : datetime)
-    eval D1970-01-01T00:00:00.000Z
-  Const "Release"
-    type datetime
-    value (DatetimeLiteral "D2009-03-31T23:59:59.000Z" : datetime)
-    eval D2009-03-31T23:59:59.000Z
-  Const "Launch"
-    type datetime
-    value (DatetimeLiteral "D2026-06-05T09:00:00.000+09:00" : datetime)
-    eval D2026-06-05T00:00:00.000Z
-  Const "Cooldown"
-    type duration
-    value (DurationLiteral "5s" : duration)
-    eval 5s
-  Const "Complex"
-    type duration
-    value (DurationLiteral "3w4d5h6m7s8ms" : duration)
-    eval 3w4d5h6m7s8ms
-  Const "Deadline"
-    type datetime
-    value ((Reference -> "Release" : datetime).add((DurationLiteral "7d" : duration)) : datetime)
-    eval D2009-04-07T23:59:59.000Z
-  Const "Span"
-    type duration
-    value ((Reference -> "Release" : datetime).sub((Reference -> "Epoch" : datetime)) : duration) [resolved sub(other: self): duration]
-    eval 2047w5d23h59m59s
-  Const "Shift"
-    type datetime
-    value ((Reference -> "Release" : datetime).sub((DurationLiteral "1h" : duration)) : datetime) [resolved sub(amount: duration): self]
-    eval D2009-03-31T22:59:59.000Z
-  Const "TwoH"
-    type duration
-    value ((DurationLiteral "1h" : duration).add((DurationLiteral "1h" : duration)) : duration) [resolved add(other: self): self]
-    eval 2h
-  Const "Triple"
-    type duration
-    value ((DurationLiteral "5m" : duration).mul((IntLiteral "3" : nint)) : duration)
-    eval 15m
-  TypeDef "Event" pub
-    body { id: nint, starts_at: datetime, cooldown: duration }
-  Assert "Release > Epoch"
-    eval true
-      Release > Epoch
-      ^       ^ ^
-      |       | D1970-01-01T00:00:00.000Z
-      |       true
-      D2009-03-31T23:59:59.000Z
-  Assert "1h > 59m"
-    eval true
-      1h > 59m
-         ^
-         true
+  Consts:
+    Const
+      Name: "Epoch"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "datetime"
+      Value: DatetimeLiteral
+        Text: "D1970-01-01T00:00:00.000Z"
+        Type: Builtin
+          Name: "datetime"
+      Eval: Constant
+        Kind: 5
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "Release"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "datetime"
+      Value: DatetimeLiteral
+        Text: "D2009-03-31T23:59:59.000Z"
+        Type: Builtin
+          Name: "datetime"
+      Eval: Constant
+        Kind: 5
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 1238543999000
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "Launch"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "datetime"
+      Value: DatetimeLiteral
+        Text: "D2026-06-05T09:00:00.000+09:00"
+        Type: Builtin
+          Name: "datetime"
+      Eval: Constant
+        Kind: 5
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 1780617600000
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "Cooldown"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "duration"
+      Value: DurationLiteral
+        Text: "5s"
+        Type: Builtin
+          Name: "duration"
+      Eval: Constant
+        Kind: 6
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 5000
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "Complex"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "duration"
+      Value: DurationLiteral
+        Text: "3w4d5h6m7s8ms"
+        Type: Builtin
+          Name: "duration"
+      Eval: Constant
+        Kind: 6
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 2178367008
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "Deadline"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "datetime"
+      Value: Call
+        Receiver: Reference
+          Target: "Release"
+          Type: Builtin
+            Name: "datetime"
+        Method: "add"
+        Args:
+          DurationLiteral
+            Text: "7d"
+            Type: Builtin
+              Name: "duration"
+        Setter: false
+        Resolved: ~
+        Subst: ~
+        Type: Builtin
+          Name: "datetime"
+      Eval: Constant
+        Kind: 5
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 1239148799000
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "Span"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "duration"
+      Value: Call
+        Receiver: Reference
+          Target: "Release"
+          Type: Builtin
+            Name: "datetime"
+        Method: "sub"
+        Args:
+          Reference
+            Target: "Epoch"
+            Type: Builtin
+              Name: "datetime"
+        Setter: false
+        Resolved: "datetime.sub(self)"
+        Subst: ~
+        Type: Builtin
+          Name: "duration"
+      Eval: Constant
+        Kind: 6
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 1238543999000
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "Shift"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "datetime"
+      Value: Call
+        Receiver: Reference
+          Target: "Release"
+          Type: Builtin
+            Name: "datetime"
+        Method: "sub"
+        Args:
+          DurationLiteral
+            Text: "1h"
+            Type: Builtin
+              Name: "duration"
+        Setter: false
+        Resolved: "datetime.sub(duration)"
+        Subst: ~
+        Type: Builtin
+          Name: "datetime"
+      Eval: Constant
+        Kind: 5
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 1238540399000
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "TwoH"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "duration"
+      Value: Call
+        Receiver: DurationLiteral
+          Text: "1h"
+          Type: Builtin
+            Name: "duration"
+        Method: "add"
+        Args:
+          DurationLiteral
+            Text: "1h"
+            Type: Builtin
+              Name: "duration"
+        Setter: false
+        Resolved: "duration.add(self)"
+        Subst: ~
+        Type: Builtin
+          Name: "duration"
+      Eval: Constant
+        Kind: 6
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 7200000
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "Triple"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "duration"
+      Value: Call
+        Receiver: DurationLiteral
+          Text: "5m"
+          Type: Builtin
+            Name: "duration"
+        Method: "mul"
+        Args:
+          IntLiteral
+            Text: "3"
+            Type: Builtin
+              Name: "nint"
+        Setter: false
+        Resolved: ~
+        Subst: ~
+        Type: Builtin
+          Name: "duration"
+      Eval: Constant
+        Kind: 6
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 900000
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+  Types:
+    TypeDef
+      Name: "Event"
+      Public: true
+      Doc: ~
+      Params: ~
+      Body: Record
+        Fields:
+          Field
+            Name: "id"
+            Type: Builtin
+              Name: "nint"
+          Field
+            Name: "starts_at"
+            Type: Builtin
+              Name: "datetime"
+          Field
+            Name: "cooldown"
+            Type: Builtin
+              Name: "duration"
+      Methods: ~
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Where: ~
+  Funcs: ~
+  Asserts:
+    Assert
+      Cond: "Release > Epoch"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "Release > Epoch\n^       ^ ^\n|       | D1970-01-01T00:00:00.000Z\n|       true\nD2009-03-31T23:59:59.000Z"
+    Assert
+      Cond: "1h > 59m"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "1h > 59m\n   ^\n   true"

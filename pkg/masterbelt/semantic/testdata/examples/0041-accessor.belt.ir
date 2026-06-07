@@ -1,148 +1,1024 @@
 Module
-  Const "Freezing"
-    type Celsius
-    value (Celsius.freezing() : Celsius)
-    eval { deg: 0 }
-  Const "FreezingF"
-    type nint
-    value ((Reference -> "Freezing" : Celsius).fahrenheit : nint)
-    eval 32
-  Const "FromBoiling"
-    type Celsius
-    value (Celsius.fromF((IntLiteral "212" : nint)) : Celsius) [resolved fromF(v: nint): Celsius]
-    eval { deg: 100 }
-  Const "Roundtrip"
-    type Celsius
-    value (Celsius.fromF((Celsius.freezing() : Celsius)) : Celsius) [resolved fromF(c: Celsius): Celsius]
-    eval { deg: 0 }
-  Const "Full"
-    type Health
-    value (Health.full() : Health)
-    eval 100
-  Const "Default"
-    type Element
-    value (Element.base() : Element)
-    eval Element.Fire
-  TypeDef "Celsius" pub
-    body { deg: nint }
-    method "freezing" pub static
-      doc "The freezing point of water."
-      result Celsius
-      return (Celsius{deg: (IntLiteral "0" : nint)} : Celsius)
-    method "fromF" pub static
-      doc "A degree reading converted from a fahrenheit value."
-      param v: nint
-      result Celsius
-      return (Celsius{deg: ((((ParamRef "v" : nint).sub((IntLiteral "32" : nint)) : nint).mul((IntLiteral "5" : nint)) : nint).div((IntLiteral "9" : nint)) : nint)} : Celsius)
-    method "fromF" pub static
-      doc "A degree reading converted from a celsius value (the static overload:"
-      doc "same name, a Celsius argument rather than a nint)."
-      param c: Celsius
-      result Celsius
-      return (ParamRef "c" : Celsius)
-    method "fahrenheit" pub getter
-      doc "Fahrenheit reading: c.fahrenheit."
-      result nint
-      return (((((self : Celsius).deg : nint).mul((IntLiteral "9" : nint)) : nint).div((IntLiteral "5" : nint)) : nint).add((IntLiteral "32" : nint)) : nint)
-    method "fahrenheit" pub setter
-      doc "Fahrenheit write: c.fahrenheit = 212 (c is a let local)."
-      param v: nint
-      result self
-      return (Celsius{deg: ((((ParamRef "v" : nint).sub((IntLiteral "32" : nint)) : nint).mul((IntLiteral "5" : nint)) : nint).div((IntLiteral "9" : nint)) : nint)} : Celsius)
-  TypeDef "Health" pub
-    body nint
-    const "Max" pub
-      doc "The maximum health."
-      type nint
-      value 100
-    method "full" pub static
-      doc "A full health bar."
-      result Health
-      return (adapt (Health.Max : nint) : Health)
-    method "band" pub getter
-      doc "The health expressed in tens (the band a UI shows)."
-      result nint
-      return (nint((self : Health)).div((IntLiteral "10" : nint)) : nint)
-  TypeDef "Element" pub
-    enum nint
-    member "Fire" = 0
-    member "Water" = 1
-    member "Wind" = 2
-    impl comparable
-    impl orderable
-    method "eql" pub extern
-      param other: self
-      result bool
-    method "neq" pub extern
-      param other: self
-      result bool
-    method "lt" pub extern
-      param other: self
-      result bool
-    method "lteq" pub extern
-      param other: self
-      result bool
-    method "gt" pub extern
-      param other: self
-      result bool
-    method "gteq" pub extern
-      param other: self
-      result bool
-    method "hot" pub getter
-      doc "Whether this element is Fire."
-      result bool
-      return ((self : Element).eql((Element.Fire : Element)) : bool)
-    method "base" pub static
-      doc "The default element."
-      result Element
-      return (Element.Fire : Element)
-  Func "boiling"
-    result Celsius
-      let "c": Celsius = (Celsius.freezing() : Celsius)
-      assign "c" = ((LocalRef "c" : Celsius).fahrenheit = (IntLiteral "212" : nint) : Celsius)
-      return (LocalRef "c" : Celsius)
-  Assert "FreezingF == 32"
-    eval true
-      FreezingF == 32
-      ^         ^
-      32        true
-  Assert "FromBoiling.deg == 100"
-    eval true
-      FromBoiling.deg == 100
-      ^           ^   ^
-      |           100 true
-      { deg: 100 }
-  Assert "Roundtrip.deg == 0"
-    eval true
-      Roundtrip.deg == 0
-      ^         ^   ^
-      |         0   true
-      { deg: 0 }
-  Assert "boiling().deg == 100"
-    eval true
-      boiling().deg == 100
-      ^         ^   ^
-      |         100 true
-      { deg: 100 }
-  Assert "Full.band == 10"
-    eval true
-      Full.band == 10
-      ^    ^    ^
-      100  10   true
-  Assert "Health.Max == 100"
-    eval true
-      Health.Max == 100
-             ^   ^
-             100 true
-  Assert "Default.hot"
-    eval true
-      Default.hot
-      ^       ^
-      |       true
-      Element.Fire
-  Assert "!Element.Water.hot"
-    eval true
-      !Element.Water.hot
-      ^        ^     ^
-      true     |     false
-               Element.Water
+  Consts:
+    Const
+      Name: "Freezing"
+      Public: false
+      Doc: ~
+      Type: Named
+        Def: "Celsius"
+      Value: StaticCall
+        Def: "Celsius"
+        Name: "freezing"
+        Args: ~
+        Resolved: ~
+        Subst: ~
+        Type: Named
+          Def: "Celsius"
+      Eval: Constant
+        Kind: 7
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields:
+          ConstField
+            Name: "deg"
+            Value: Constant
+              Kind: 0
+              Int: 0
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "FreezingF"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "nint"
+      Value: FieldAccess
+        Receiver: Reference
+          Target: "Freezing"
+          Type: Named
+            Def: "Celsius"
+        Field: "fahrenheit"
+        Type: Builtin
+          Name: "nint"
+      Eval: Constant
+        Kind: 0
+        Int: 32
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "FromBoiling"
+      Public: false
+      Doc: ~
+      Type: Named
+        Def: "Celsius"
+      Value: StaticCall
+        Def: "Celsius"
+        Name: "fromF"
+        Args:
+          IntLiteral
+            Text: "212"
+            Type: Builtin
+              Name: "nint"
+        Resolved: "Celsius.fromF(nint)#static"
+        Subst: ~
+        Type: Named
+          Def: "Celsius"
+      Eval: Constant
+        Kind: 7
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields:
+          ConstField
+            Name: "deg"
+            Value: Constant
+              Kind: 0
+              Int: 100
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "Roundtrip"
+      Public: false
+      Doc: ~
+      Type: Named
+        Def: "Celsius"
+      Value: StaticCall
+        Def: "Celsius"
+        Name: "fromF"
+        Args:
+          StaticCall
+            Def: "Celsius"
+            Name: "freezing"
+            Args: ~
+            Resolved: ~
+            Subst: ~
+            Type: Named
+              Def: "Celsius"
+        Resolved: "Celsius.fromF(Celsius)#static"
+        Subst: ~
+        Type: Named
+          Def: "Celsius"
+      Eval: Constant
+        Kind: 7
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields:
+          ConstField
+            Name: "deg"
+            Value: Constant
+              Kind: 0
+              Int: 0
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "Full"
+      Public: false
+      Doc: ~
+      Type: Named
+        Def: "Health"
+      Value: StaticCall
+        Def: "Health"
+        Name: "full"
+        Args: ~
+        Resolved: ~
+        Subst: ~
+        Type: Named
+          Def: "Health"
+      Eval: Constant
+        Kind: 0
+        Int: 100
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "Default"
+      Public: false
+      Doc: ~
+      Type: Named
+        Def: "Element"
+      Value: StaticCall
+        Def: "Element"
+        Name: "base"
+        Args: ~
+        Resolved: ~
+        Subst: ~
+        Type: Named
+          Def: "Element"
+      Eval: Constant
+        Kind: 9
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: "Element"
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+  Types:
+    TypeDef
+      Name: "Celsius"
+      Public: true
+      Doc: ~
+      Params: ~
+      Body: Record
+        Fields:
+          Field
+            Name: "deg"
+            Type: Builtin
+              Name: "nint"
+      Methods:
+        Method
+          Name: "freezing"
+          Public: true
+          Extern: false
+          Kind: 3
+          Effects: ~
+          Doc: "The freezing point of water."
+          Params: ~
+          Result: Named
+            Def: "Celsius"
+          Body:
+            Return
+              Value: RecordValue
+                TypeName: "Celsius"
+                Fields:
+                  RecordField
+                    Name: "deg"
+                    Value: IntLiteral
+                      Text: "0"
+                      Type: Builtin
+                        Name: "nint"
+                Type: Named
+                  Def: "Celsius"
+          Owner: "Celsius"
+        Method
+          Name: "fromF"
+          Public: true
+          Extern: false
+          Kind: 3
+          Effects: ~
+          Doc: "A degree reading converted from a fahrenheit value."
+          Params:
+            Param
+              Name: "v"
+              Type: Builtin
+                Name: "nint"
+          Result: Named
+            Def: "Celsius"
+          Body:
+            Return
+              Value: RecordValue
+                TypeName: "Celsius"
+                Fields:
+                  RecordField
+                    Name: "deg"
+                    Value: Call
+                      Receiver: Call
+                        Receiver: Call
+                          Receiver: ParamRef
+                            Name: "v"
+                            Type: Builtin
+                              Name: "nint"
+                          Method: "sub"
+                          Args:
+                            IntLiteral
+                              Text: "32"
+                              Type: Builtin
+                                Name: "nint"
+                          Setter: false
+                          Resolved: ~
+                          Subst: ~
+                          Type: Builtin
+                            Name: "nint"
+                        Method: "mul"
+                        Args:
+                          IntLiteral
+                            Text: "5"
+                            Type: Builtin
+                              Name: "nint"
+                        Setter: false
+                        Resolved: ~
+                        Subst: ~
+                        Type: Builtin
+                          Name: "nint"
+                      Method: "div"
+                      Args:
+                        IntLiteral
+                          Text: "9"
+                          Type: Builtin
+                            Name: "nint"
+                      Setter: false
+                      Resolved: ~
+                      Subst: ~
+                      Type: Builtin
+                        Name: "nint"
+                Type: Named
+                  Def: "Celsius"
+          Owner: "Celsius"
+        Method
+          Name: "fromF"
+          Public: true
+          Extern: false
+          Kind: 3
+          Effects: ~
+          Doc: "A degree reading converted from a celsius value (the static overload:" "same name, a Celsius argument rather than a nint)."
+          Params:
+            Param
+              Name: "c"
+              Type: Named
+                Def: "Celsius"
+          Result: Named
+            Def: "Celsius"
+          Body:
+            Return
+              Value: ParamRef
+                Name: "c"
+                Type: Named
+                  Def: "Celsius"
+          Owner: "Celsius"
+        Method
+          Name: "fahrenheit"
+          Public: true
+          Extern: false
+          Kind: 1
+          Effects: ~
+          Doc: "Fahrenheit reading: c.fahrenheit."
+          Params: ~
+          Result: Builtin
+            Name: "nint"
+          Body:
+            Return
+              Value: Call
+                Receiver: Call
+                  Receiver: Call
+                    Receiver: FieldAccess
+                      Receiver: SelfValue
+                        Type: Named
+                          Def: "Celsius"
+                      Field: "deg"
+                      Type: Builtin
+                        Name: "nint"
+                    Method: "mul"
+                    Args:
+                      IntLiteral
+                        Text: "9"
+                        Type: Builtin
+                          Name: "nint"
+                    Setter: false
+                    Resolved: ~
+                    Subst: ~
+                    Type: Builtin
+                      Name: "nint"
+                  Method: "div"
+                  Args:
+                    IntLiteral
+                      Text: "5"
+                      Type: Builtin
+                        Name: "nint"
+                  Setter: false
+                  Resolved: ~
+                  Subst: ~
+                  Type: Builtin
+                    Name: "nint"
+                Method: "add"
+                Args:
+                  IntLiteral
+                    Text: "32"
+                    Type: Builtin
+                      Name: "nint"
+                Setter: false
+                Resolved: ~
+                Subst: ~
+                Type: Builtin
+                  Name: "nint"
+          Owner: "Celsius"
+        Method
+          Name: "fahrenheit"
+          Public: true
+          Extern: false
+          Kind: 2
+          Effects: ~
+          Doc: "Fahrenheit write: c.fahrenheit = 212 (c is a let local)."
+          Params:
+            Param
+              Name: "v"
+              Type: Builtin
+                Name: "nint"
+          Result: SelfType
+          Body:
+            Return
+              Value: RecordValue
+                TypeName: "Celsius"
+                Fields:
+                  RecordField
+                    Name: "deg"
+                    Value: Call
+                      Receiver: Call
+                        Receiver: Call
+                          Receiver: ParamRef
+                            Name: "v"
+                            Type: Builtin
+                              Name: "nint"
+                          Method: "sub"
+                          Args:
+                            IntLiteral
+                              Text: "32"
+                              Type: Builtin
+                                Name: "nint"
+                          Setter: false
+                          Resolved: ~
+                          Subst: ~
+                          Type: Builtin
+                            Name: "nint"
+                        Method: "mul"
+                        Args:
+                          IntLiteral
+                            Text: "5"
+                            Type: Builtin
+                              Name: "nint"
+                        Setter: false
+                        Resolved: ~
+                        Subst: ~
+                        Type: Builtin
+                          Name: "nint"
+                      Method: "div"
+                      Args:
+                        IntLiteral
+                          Text: "9"
+                          Type: Builtin
+                            Name: "nint"
+                      Setter: false
+                      Resolved: ~
+                      Subst: ~
+                      Type: Builtin
+                        Name: "nint"
+                Type: Named
+                  Def: "Celsius"
+          Owner: "Celsius"
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Where: ~
+    TypeDef
+      Name: "Health"
+      Public: true
+      Doc: ~
+      Params: ~
+      Body: Builtin
+        Name: "nint"
+      Methods:
+        Method
+          Name: "full"
+          Public: true
+          Extern: false
+          Kind: 3
+          Effects: ~
+          Doc: "A full health bar."
+          Params: ~
+          Result: Named
+            Def: "Health"
+          Body:
+            Return
+              Value: Adapt
+                Value: AssocConstValue
+                  Def: "Health"
+                  Index: 0
+                  Type: Builtin
+                    Name: "nint"
+                To: Named
+                  Def: "Health"
+          Owner: "Health"
+        Method
+          Name: "band"
+          Public: true
+          Extern: false
+          Kind: 1
+          Effects: ~
+          Doc: "The health expressed in tens (the band a UI shows)."
+          Params: ~
+          Result: Builtin
+            Name: "nint"
+          Body:
+            Return
+              Value: Call
+                Receiver: Conversion
+                  Type: Builtin
+                    Name: "nint"
+                  Args:
+                    SelfValue
+                      Type: Named
+                        Def: "Health"
+                Method: "div"
+                Args:
+                  IntLiteral
+                    Text: "10"
+                    Type: Builtin
+                      Name: "nint"
+                Setter: false
+                Resolved: ~
+                Subst: ~
+                Type: Builtin
+                  Name: "nint"
+          Owner: "Health"
+      Consts:
+        AssocConst
+          Name: "Max"
+          Public: true
+          Doc: "The maximum health."
+          Type: Builtin
+            Name: "nint"
+          Value: Constant
+            Kind: 0
+            Int: 100
+            Bool: false
+            Str: ""
+            Coll: ~
+            Fields: ~
+            CollMapness: 0
+            Millis: 0
+            Fn: ~
+            Captured: ~
+            EnumDef: ~
+            EnumIndex: 0
+            Start: ~
+            End: ~
+            Step: ~
+            UnionTag: ~
+          Builtin: false
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Where: ~
+    TypeDef
+      Name: "Element"
+      Public: true
+      Doc: ~
+      Params: ~
+      Body: ~
+      Methods:
+        Method
+          Name: "eql"
+          Public: true
+          Extern: true
+          Kind: 0
+          Effects: ~
+          Doc: ~
+          Params:
+            Param
+              Name: "other"
+              Type: SelfType
+          Result: Builtin
+            Name: "bool"
+          Body: ~
+          Owner: "Element"
+        Method
+          Name: "neq"
+          Public: true
+          Extern: true
+          Kind: 0
+          Effects: ~
+          Doc: ~
+          Params:
+            Param
+              Name: "other"
+              Type: SelfType
+          Result: Builtin
+            Name: "bool"
+          Body: ~
+          Owner: "Element"
+        Method
+          Name: "lt"
+          Public: true
+          Extern: true
+          Kind: 0
+          Effects: ~
+          Doc: ~
+          Params:
+            Param
+              Name: "other"
+              Type: SelfType
+          Result: Builtin
+            Name: "bool"
+          Body: ~
+          Owner: "Element"
+        Method
+          Name: "lteq"
+          Public: true
+          Extern: true
+          Kind: 0
+          Effects: ~
+          Doc: ~
+          Params:
+            Param
+              Name: "other"
+              Type: SelfType
+          Result: Builtin
+            Name: "bool"
+          Body: ~
+          Owner: "Element"
+        Method
+          Name: "gt"
+          Public: true
+          Extern: true
+          Kind: 0
+          Effects: ~
+          Doc: ~
+          Params:
+            Param
+              Name: "other"
+              Type: SelfType
+          Result: Builtin
+            Name: "bool"
+          Body: ~
+          Owner: "Element"
+        Method
+          Name: "gteq"
+          Public: true
+          Extern: true
+          Kind: 0
+          Effects: ~
+          Doc: ~
+          Params:
+            Param
+              Name: "other"
+              Type: SelfType
+          Result: Builtin
+            Name: "bool"
+          Body: ~
+          Owner: "Element"
+        Method
+          Name: "hot"
+          Public: true
+          Extern: false
+          Kind: 1
+          Effects: ~
+          Doc: "Whether this element is Fire."
+          Params: ~
+          Result: Builtin
+            Name: "bool"
+          Body:
+            Return
+              Value: Call
+                Receiver: SelfValue
+                  Type: Named
+                    Def: "Element"
+                Method: "eql"
+                Args:
+                  EnumMemberValue
+                    Def: "Element"
+                    Index: 0
+                    Type: Named
+                      Def: "Element"
+                Setter: false
+                Resolved: ~
+                Subst: ~
+                Type: Builtin
+                  Name: "bool"
+          Owner: "Element"
+        Method
+          Name: "base"
+          Public: true
+          Extern: false
+          Kind: 3
+          Effects: ~
+          Doc: "The default element."
+          Params: ~
+          Result: Named
+            Def: "Element"
+          Body:
+            Return
+              Value: EnumMemberValue
+                Def: "Element"
+                Index: 0
+                Type: Named
+                  Def: "Element"
+          Owner: "Element"
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls:
+        Named
+          Def: "comparable"
+        Named
+          Def: "orderable"
+      Enum: EnumDef
+        Base: "nint"
+        Members:
+          EnumMember
+            Name: "Fire"
+            Value: Constant
+              Kind: 0
+              Int: 0
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+          EnumMember
+            Name: "Water"
+            Value: Constant
+              Kind: 0
+              Int: 1
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+          EnumMember
+            Name: "Wind"
+            Value: Constant
+              Kind: 0
+              Int: 2
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+      Where: ~
+  Funcs:
+    Function
+      Name: "boiling"
+      Public: false
+      Extern: false
+      Effects: ~
+      Doc: ~
+      TypeParams: ~
+      Params: ~
+      Result: Named
+        Def: "Celsius"
+      Body:
+        Let
+          Name: "c"
+          Type: Named
+            Def: "Celsius"
+          Value: StaticCall
+            Def: "Celsius"
+            Name: "freezing"
+            Args: ~
+            Resolved: ~
+            Subst: ~
+            Type: Named
+              Def: "Celsius"
+        Assign
+          Name: "c"
+          Value: Call
+            Receiver: LocalRef
+              Name: "c"
+              Type: Named
+                Def: "Celsius"
+            Method: "fahrenheit"
+            Args:
+              IntLiteral
+                Text: "212"
+                Type: Builtin
+                  Name: "nint"
+            Setter: true
+            Resolved: ~
+            Subst: ~
+            Type: Named
+              Def: "Celsius"
+        Return
+          Value: LocalRef
+            Name: "c"
+            Type: Named
+              Def: "Celsius"
+  Asserts:
+    Assert
+      Cond: "FreezingF == 32"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "FreezingF == 32\n^         ^\n32        true"
+    Assert
+      Cond: "FromBoiling.deg == 100"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "FromBoiling.deg == 100\n^           ^   ^\n|           100 true\n{ deg: 100 }"
+    Assert
+      Cond: "Roundtrip.deg == 0"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "Roundtrip.deg == 0\n^         ^   ^\n|         0   true\n{ deg: 0 }"
+    Assert
+      Cond: "boiling().deg == 100"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "boiling().deg == 100\n^         ^   ^\n|         100 true\n{ deg: 100 }"
+    Assert
+      Cond: "Full.band == 10"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "Full.band == 10\n^    ^    ^\n100  10   true"
+    Assert
+      Cond: "Health.Max == 100"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "Health.Max == 100\n       ^   ^\n       100 true"
+    Assert
+      Cond: "Default.hot"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "Default.hot\n^       ^\n|       true\nElement.Fire"
+    Assert
+      Cond: "!Element.Water.hot"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "!Element.Water.hot\n^        ^     ^\ntrue     |     false\n         Element.Water"

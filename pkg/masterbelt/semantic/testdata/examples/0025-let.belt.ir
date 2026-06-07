@@ -1,42 +1,290 @@
 Module
-  Const "Picked"
-    type nint
-    value (pick((BoolLiteral true : bool)) : nint)
-    eval 20
-  Const "Stepped"
-    type nint
-    value (step((IntLiteral "41" : nint)) : nint)
-    eval 42
-  Func "pick" pub
-    param flag: bool
-    result nint
-      let "base": nint = (IntLiteral "10" : nint)
-      let "result": nint = (LocalRef "base" : nint)
-      if (ParamRef "flag" : bool)
-          assign "result" = ((LocalRef "base" : nint).mul((IntLiteral "2" : nint)) : nint)
-      return (LocalRef "result" : nint)
-  Func "step" pub
-    param n: nint
-    result nint
-      let "acc": nint = (ParamRef "n" : nint)
-      assign "acc" = ((LocalRef "acc" : nint).add((IntLiteral "1" : nint)) : nint)
-      return (LocalRef "acc" : nint)
-  Func "shadow" pub
-    param flag: bool
-    result nint
-      let "result": nint = (IntLiteral "1" : nint)
-      if (ParamRef "flag" : bool)
-          let "result": nint = (IntLiteral "2" : nint)
-          assign "result" = ((LocalRef "result" : nint).add((IntLiteral "10" : nint)) : nint)
-          return (LocalRef "result" : nint)
-      return (LocalRef "result" : nint)
-  Assert "pick(false) == 10"
-    eval true
-      pick(false) == 10
-      ^           ^
-      10          true
-  Assert "step(41) == 42"
-    eval true
-      step(41) == 42
-      ^        ^
-      42       true
+  Consts:
+    Const
+      Name: "Picked"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "nint"
+      Value: FuncCall
+        Target: "pick(bool)"
+        Args:
+          BoolLiteral
+            Value: true
+            Type: Builtin
+              Name: "bool"
+        Resolved: ~
+        Subst: ~
+        Type: Builtin
+          Name: "nint"
+      Eval: Constant
+        Kind: 0
+        Int: 20
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "Stepped"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "nint"
+      Value: FuncCall
+        Target: "step(nint)"
+        Args:
+          IntLiteral
+            Text: "41"
+            Type: Builtin
+              Name: "nint"
+        Resolved: ~
+        Subst: ~
+        Type: Builtin
+          Name: "nint"
+      Eval: Constant
+        Kind: 0
+        Int: 42
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+  Types: ~
+  Funcs:
+    Function
+      Name: "pick"
+      Public: true
+      Extern: false
+      Effects: ~
+      Doc: ~
+      TypeParams: ~
+      Params:
+        Param
+          Name: "flag"
+          Type: Builtin
+            Name: "bool"
+      Result: Builtin
+        Name: "nint"
+      Body:
+        Let
+          Name: "base"
+          Type: Builtin
+            Name: "nint"
+          Value: IntLiteral
+            Text: "10"
+            Type: Builtin
+              Name: "nint"
+        Let
+          Name: "result"
+          Type: Builtin
+            Name: "nint"
+          Value: LocalRef
+            Name: "base"
+            Type: Builtin
+              Name: "nint"
+        If
+          Cond: ParamRef
+            Name: "flag"
+            Type: Builtin
+              Name: "bool"
+          Then:
+            Assign
+              Name: "result"
+              Value: Call
+                Receiver: LocalRef
+                  Name: "base"
+                  Type: Builtin
+                    Name: "nint"
+                Method: "mul"
+                Args:
+                  IntLiteral
+                    Text: "2"
+                    Type: Builtin
+                      Name: "nint"
+                Setter: false
+                Resolved: ~
+                Subst: ~
+                Type: Builtin
+                  Name: "nint"
+          ElseIf: ~
+          Else: ~
+        Return
+          Value: LocalRef
+            Name: "result"
+            Type: Builtin
+              Name: "nint"
+    Function
+      Name: "step"
+      Public: true
+      Extern: false
+      Effects: ~
+      Doc: ~
+      TypeParams: ~
+      Params:
+        Param
+          Name: "n"
+          Type: Builtin
+            Name: "nint"
+      Result: Builtin
+        Name: "nint"
+      Body:
+        Let
+          Name: "acc"
+          Type: Builtin
+            Name: "nint"
+          Value: ParamRef
+            Name: "n"
+            Type: Builtin
+              Name: "nint"
+        Assign
+          Name: "acc"
+          Value: Call
+            Receiver: LocalRef
+              Name: "acc"
+              Type: Builtin
+                Name: "nint"
+            Method: "add"
+            Args:
+              IntLiteral
+                Text: "1"
+                Type: Builtin
+                  Name: "nint"
+            Setter: false
+            Resolved: ~
+            Subst: ~
+            Type: Builtin
+              Name: "nint"
+        Return
+          Value: LocalRef
+            Name: "acc"
+            Type: Builtin
+              Name: "nint"
+    Function
+      Name: "shadow"
+      Public: true
+      Extern: false
+      Effects: ~
+      Doc: ~
+      TypeParams: ~
+      Params:
+        Param
+          Name: "flag"
+          Type: Builtin
+            Name: "bool"
+      Result: Builtin
+        Name: "nint"
+      Body:
+        Let
+          Name: "result"
+          Type: Builtin
+            Name: "nint"
+          Value: IntLiteral
+            Text: "1"
+            Type: Builtin
+              Name: "nint"
+        If
+          Cond: ParamRef
+            Name: "flag"
+            Type: Builtin
+              Name: "bool"
+          Then:
+            Let
+              Name: "result"
+              Type: Builtin
+                Name: "nint"
+              Value: IntLiteral
+                Text: "2"
+                Type: Builtin
+                  Name: "nint"
+            Assign
+              Name: "result"
+              Value: Call
+                Receiver: LocalRef
+                  Name: "result"
+                  Type: Builtin
+                    Name: "nint"
+                Method: "add"
+                Args:
+                  IntLiteral
+                    Text: "10"
+                    Type: Builtin
+                      Name: "nint"
+                Setter: false
+                Resolved: ~
+                Subst: ~
+                Type: Builtin
+                  Name: "nint"
+            Return
+              Value: LocalRef
+                Name: "result"
+                Type: Builtin
+                  Name: "nint"
+          ElseIf: ~
+          Else: ~
+        Return
+          Value: LocalRef
+            Name: "result"
+            Type: Builtin
+              Name: "nint"
+  Asserts:
+    Assert
+      Cond: "pick(false) == 10"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "pick(false) == 10\n^           ^\n10          true"
+    Assert
+      Cond: "step(41) == 42"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "step(41) == 42\n^        ^\n42       true"

@@ -1,7 +1,6 @@
 package semantic
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
@@ -16,16 +15,48 @@ import (
 
 const bareMemberPrelude = "pub enum Rarity: byte {\n  Common = 1\n  Rare = 2\n  Legend = 10\n}\n"
 
-// containsLine reports whether the IR dump has a line whose trimmed text equals
-// want — a tighter check than a substring, so "<none>" cannot hide inside a
-// larger line.
-func containsLine(dump, want string) bool {
-	for _, line := range strings.Split(dump, "\n") {
-		if strings.TrimSpace(line) == want {
-			return true
+// enumMemberOf reads the enum member a value resolves to, as "Enum.Member",
+// stripping the union-inflow Adapt a channel may have wrapped it in; "" when
+// the value is no enum member. It is the structural form of the old dump-line
+// check: the member identity and its adaption are read off the IR itself.
+func enumMemberOf(v ir.Value) string {
+	if a, ok := v.(*ir.Adapt); ok {
+		v = a.Value
+	}
+	m, ok := v.(*ir.EnumMemberValue)
+	if !ok || m.Def == nil || m.Def.Enum == nil || m.Index < 0 || m.Index >= len(m.Def.Enum.Members) {
+		return ""
+	}
+	return m.Def.Name + "." + m.Def.Enum.Members[m.Index].Name
+}
+
+// fnNamed returns the module's function of the given name.
+func fnNamed(t *testing.T, m *ir.Module, name string) *ir.Function {
+	t.Helper()
+	for _, fn := range m.Funcs {
+		if fn != nil && fn.Name == name {
+			return fn
 		}
 	}
-	return false
+	t.Fatalf("no function %q in the module", name)
+	return nil
+}
+
+// methodNamed returns the named method of the named type definition.
+func methodNamed(t *testing.T, m *ir.Module, typeName, method string) *ir.Method {
+	t.Helper()
+	for _, def := range m.Types {
+		if def == nil || def.Name != typeName {
+			continue
+		}
+		for _, mt := range def.Methods {
+			if mt != nil && mt.Name == method {
+				return mt
+			}
+		}
+	}
+	t.Fatalf("no method %s.%s in the module", typeName, method)
+	return nil
 }
 
 func TestBareMemberLetInit(t *testing.T) {
@@ -34,9 +65,9 @@ func TestBareMemberLetInit(t *testing.T) {
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", codes(diags))
 	}
-	dump := ir.Dump(m)
-	if !containsLine(dump, `let "r": Rarity = (Rarity.Legend : Rarity)`) {
-		t.Errorf("let initializer did not resolve the bare member:\n%s", dump)
+	let, ok := fnNamed(t, m, "f").Body[0].(*ir.Let)
+	if !ok || let.Name != "r" || enumMemberOf(let.Value) != "Rarity.Legend" {
+		t.Errorf("let initializer did not resolve the bare member: %+v", let)
 	}
 }
 
@@ -54,9 +85,9 @@ func TestBareMemberAssign(t *testing.T) {
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", codes(diags))
 	}
-	dump := ir.Dump(m)
-	if !containsLine(dump, `assign "r" = (Rarity.Rare : Rarity)`) {
-		t.Errorf("assignment did not resolve the bare member:\n%s", dump)
+	assign, ok := fnNamed(t, m, "f").Body[1].(*ir.Assign)
+	if !ok || assign.Name != "r" || enumMemberOf(assign.Value) != "Rarity.Rare" {
+		t.Errorf("assignment did not resolve the bare member: %+v", assign)
 	}
 }
 
@@ -74,9 +105,19 @@ func TestBareMemberCompareArg(t *testing.T) {
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", codes(diags))
 	}
-	dump := ir.Dump(m)
-	if !containsLine(dump, `return ((ParamRef "rarity" : Rarity).eql((Rarity.Legend : Rarity)) : bool)`) {
-		t.Errorf("comparison argument did not resolve the bare member:\n%s", dump)
+	ret, ok := fnNamed(t, m, "f").Body[0].(*ir.Return)
+	if !ok {
+		t.Fatal("body did not lower to a return")
+	}
+	call, ok := ret.Value.(*ir.Call)
+	if !ok || call.Method != "eql" {
+		t.Fatalf("return value is not an eql call: %+v", ret.Value)
+	}
+	if _, ok := call.Receiver.(*ir.ParamRef); !ok {
+		t.Errorf("receiver is not the parameter: %+v", call.Receiver)
+	}
+	if len(call.Args) != 1 || enumMemberOf(call.Args[0]) != "Rarity.Legend" {
+		t.Errorf("comparison argument did not resolve the bare member: %+v", call.Args)
 	}
 }
 
@@ -87,9 +128,19 @@ func TestBareMemberCompareArgSelf(t *testing.T) {
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", codes(diags))
 	}
-	dump := ir.Dump(m)
-	if !containsLine(dump, `return ((self : Rarity).eql((Rarity.Legend : Rarity)) : bool)`) {
-		t.Errorf("self comparison argument did not resolve the bare member:\n%s", dump)
+	ret, ok := methodNamed(t, m, "Rarity", "isTop").Body[0].(*ir.Return)
+	if !ok {
+		t.Fatal("method body did not lower to a return")
+	}
+	call, ok := ret.Value.(*ir.Call)
+	if !ok || call.Method != "eql" {
+		t.Fatalf("return value is not an eql call: %+v", ret.Value)
+	}
+	if _, ok := call.Receiver.(*ir.SelfValue); !ok {
+		t.Errorf("receiver is not self: %+v", call.Receiver)
+	}
+	if len(call.Args) != 1 || enumMemberOf(call.Args[0]) != "Rarity.Legend" {
+		t.Errorf("self comparison argument did not resolve the bare member: %+v", call.Args)
 	}
 }
 
@@ -118,9 +169,16 @@ func TestBareMemberUnionAlias(t *testing.T) {
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", codes(diags))
 	}
-	dump := ir.Dump(m)
-	if !containsLine(dump, `let "r": Opt = (adapt (Rarity.Legend : Rarity) : Opt)`) {
-		t.Errorf("union alias let init did not resolve the bare member:\n%s", dump)
+	let, ok := fnNamed(t, m, "f").Body[0].(*ir.Let)
+	if !ok || let.Name != "r" {
+		t.Fatal("body did not lower to the let")
+	}
+	adapt, ok := let.Value.(*ir.Adapt)
+	if !ok || adapt.To == nil || adapt.To.String() != "Opt" {
+		t.Errorf("union alias let init is not an adaption to Opt: %+v", let.Value)
+	}
+	if enumMemberOf(let.Value) != "Rarity.Legend" {
+		t.Errorf("union alias let init did not resolve the bare member: %+v", let.Value)
 	}
 }
 
@@ -131,11 +189,16 @@ func TestBareMemberUnionAliasConst(t *testing.T) {
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", codes(diags))
 	}
-	dump := ir.Dump(m)
+	c := m.Consts[0]
+	adapt, ok := c.Value.(*ir.Adapt)
+	if !ok || adapt.To == nil || adapt.To.String() != "Opt" || enumMemberOf(c.Value) != "Rarity.Legend" {
+		t.Errorf("union alias const did not resolve the bare member: %+v", c.Value)
+	}
 	// The member flows into the union, so the folded value carries its tag —
 	// the dispatch a later match folds through.
-	if !containsLine(dump, "value (adapt (Rarity.Legend : Rarity) : Opt)") || !containsLine(dump, "eval (Rarity) Rarity.Legend") {
-		t.Errorf("union alias const did not resolve/fold the bare member:\n%s", dump)
+	if c.Eval == nil || c.Eval.Kind != ir.ConstEnum || c.Eval.EnumName() != "Legend" ||
+		c.Eval.UnionTag == nil || c.Eval.UnionTag.String() != "Rarity" {
+		t.Errorf("union alias const did not fold to the tagged member: %v", c.Eval)
 	}
 }
 
@@ -151,11 +214,18 @@ func TestBareMemberAssocConstInit(t *testing.T) {
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", codes(diags))
 	}
-	dump := ir.Dump(m)
-	// An associated constant's dumped value is its folded Constant (it carries
-	// no value graph), so the line renders bare, without a typed-node wrap.
-	if !containsLine(dump, "value Rarity.Legend") {
-		t.Errorf("assoc const init did not fold the bare member:\n%s", dump)
+	// An associated constant carries its folded Constant, no value graph.
+	var ac *ir.AssocConst
+	for _, def := range m.Types {
+		if def != nil && def.Name == "Rarity" && len(def.Consts) > 0 {
+			ac = def.Consts[0]
+		}
+	}
+	if ac == nil {
+		t.Fatal("no associated constant on Rarity")
+	}
+	if ac.Value == nil || ac.Value.Kind != ir.ConstEnum || ac.Value.EnumName() != "Legend" {
+		t.Errorf("assoc const init did not fold the bare member: %v", ac.Value)
 	}
 }
 

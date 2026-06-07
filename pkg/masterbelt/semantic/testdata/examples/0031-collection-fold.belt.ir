@@ -1,83 +1,1508 @@
 Module
-  Const "ListLen"
-    type nint
-    value (([(IntLiteral "1" : nint), (IntLiteral "2" : nint), (IntLiteral "3" : nint)] : list<nint>).len() : nint) [subst K=nint, T=nint, V=nint]
-    eval 3
-  Const "MapLen"
-    type nint
-    value (([(StringLiteral "a" : string): (IntLiteral "1" : nint), (StringLiteral "b" : string): (IntLiteral "2" : nint)] : map<string, nint>).len() : nint) [subst K=string, V=nint]
-    eval 2
-  Const "Sum"
-    type nint
-    value (([(IntLiteral "1" : nint), (IntLiteral "2" : nint), (IntLiteral "3" : nint)] : list<nint>).fold((IntLiteral "0" : nint), ((fn(acc, i, v) (return ((ParamRef "acc" : nint).add((ParamRef "v" : nint)) : nint))) : fn(nint, nint, nint): nint)) : nint) [subst A=nint, K=nint, T=nint, V=nint]
-    eval 6
-  Const "IndexSum"
-    type nint
-    value (([(IntLiteral "10" : nint), (IntLiteral "20" : nint), (IntLiteral "30" : nint)] : list<nint>).fold((IntLiteral "0" : nint), ((fn(acc, i, v) (return ((ParamRef "acc" : nint).add((ParamRef "i" : nint)) : nint))) : fn(nint, nint, nint): nint)) : nint) [subst A=nint, K=nint, T=nint, V=nint]
-    eval 3
-  Const "MapSum"
-    type nint
-    value (([(StringLiteral "a" : string): (IntLiteral "1" : nint), (StringLiteral "b" : string): (IntLiteral "2" : nint), (StringLiteral "c" : string): (IntLiteral "3" : nint)] : map<string, nint>).fold((IntLiteral "0" : nint), ((fn(acc, k, v) (return ((ParamRef "acc" : nint).add((ParamRef "v" : nint)) : nint))) : fn(nint, string, nint): nint)) : nint) [subst A=nint, K=string, V=nint]
-    eval 6
-  Const "Count"
-    type nint
-    value (([(IntLiteral "1" : nint), (IntLiteral "2" : nint), (IntLiteral "3" : nint), (IntLiteral "4" : nint)] : list<nint>).count() : nint) [subst K=nint, T=nint, V=nint]
-    eval 4
-  Const "AnyBig"
-    type bool
-    value (([(IntLiteral "1" : nint), (IntLiteral "2" : nint), (IntLiteral "3" : nint)] : list<nint>).any(((fn(v) (return ((ParamRef "v" : nint).gt((IntLiteral "2" : nint)) : bool))) : fn(nint): bool)) : bool) [subst K=nint, T=nint, V=nint]
-    eval true
-  Const "AllPositive"
-    type bool
-    value (([(IntLiteral "1" : nint), (IntLiteral "2" : nint), (IntLiteral "3" : nint)] : list<nint>).all(((fn(v) (return ((ParamRef "v" : nint).gt((IntLiteral "0" : nint)) : bool))) : fn(nint): bool)) : bool) [subst K=nint, T=nint, V=nint]
-    eval true
-  Const "Doubled"
-    type list<nint>
-    value (([(IntLiteral "1" : nint), (IntLiteral "2" : nint), (IntLiteral "3" : nint)] : list<nint>).map(((fn(v) (return ((ParamRef "v" : nint).mul((IntLiteral "2" : nint)) : nint))) : fn(nint): nint)) : list<nint>) [subst K=nint, R=nint, T=nint, V=nint]
-    eval [2, 4, 6]
-  Const "Big"
-    type list<nint>
-    value (([(IntLiteral "1" : nint), (IntLiteral "2" : nint), (IntLiteral "3" : nint), (IntLiteral "4" : nint)] : list<nint>).filter(((fn(v) (return ((ParamRef "v" : nint).gt((IntLiteral "2" : nint)) : bool))) : fn(nint): bool)) : list<nint>) [subst K=nint, T=nint, V=nint]
-    eval [3, 4]
-  Const "Keys"
-    type list<string>
-    value (([(StringLiteral "x" : string): (IntLiteral "1" : nint), (StringLiteral "y" : string): (IntLiteral "2" : nint)] : map<string, nint>).keys() : list<string>) [subst K=string, V=nint]
-    eval ["x", "y"]
-  Const "Values"
-    type list<nint>
-    value (([(StringLiteral "x" : string): (IntLiteral "1" : nint), (StringLiteral "y" : string): (IntLiteral "2" : nint)] : map<string, nint>).values() : list<nint>) [subst K=string, V=nint]
-    eval [1, 2]
-  Const "ListValues"
-    type list<nint>
-    value (([(IntLiteral "7" : nint), (IntLiteral "8" : nint), (IntLiteral "9" : nint)] : list<nint>).values() : list<nint>) [subst K=nint, T=nint, V=nint]
-    eval [7, 8, 9]
-  Assert "[1, 2, 3].len() == 3"
-    eval true
-      [1, 2, 3].len() == 3
-                ^     ^
-                3     true
-  Assert "[\"a\": 1, \"b\": 2].len() == 2"
-    eval true
-      ["a": 1, "b": 2].len() == 2
-                       ^     ^
-                       2     true
-  Assert "[1, 2, 3].fold(0, fn(acc: nint, i: nint, v: nint): nint { return acc + v }) == 6"
-    eval true
-      [1, 2, 3].fold(0, fn(acc: nint, i: nint, v: nint): nint { return acc + v }) == 6
-                ^                                                                 ^
-                6                                                                 true
-  Assert "[1, 2, 3, 4].count() == 4"
-    eval true
-      [1, 2, 3, 4].count() == 4
-                   ^       ^
-                   4       true
-  Assert "[1, 2, 3].any(fn(v: nint): bool { return v > 2 })"
-    eval true
-      [1, 2, 3].any(fn(v: nint): bool { return v > 2 })
-                ^
-                true
-  Assert "[1, 2, 3].all(fn(v: nint): bool { return v > 0 })"
-    eval true
-      [1, 2, 3].all(fn(v: nint): bool { return v > 0 })
-                ^
-                true
+  Consts:
+    Const
+      Name: "ListLen"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "nint"
+      Value: Call
+        Receiver: CollectionLiteral
+          Entries:
+            CollectionEntry
+              Key: ~
+              Value: IntLiteral
+                Text: "1"
+                Type: Builtin
+                  Name: "nint"
+            CollectionEntry
+              Key: ~
+              Value: IntLiteral
+                Text: "2"
+                Type: Builtin
+                  Name: "nint"
+            CollectionEntry
+              Key: ~
+              Value: IntLiteral
+                Text: "3"
+                Type: Builtin
+                  Name: "nint"
+          Type: App
+            Def: "list"
+            Args:
+              Builtin
+                Name: "nint"
+        Method: "len"
+        Args: ~
+        Setter: false
+        Resolved: ~
+        Subst:
+          Entry
+            Key: "K"
+            Value: Builtin
+              Name: "nint"
+          Entry
+            Key: "T"
+            Value: Builtin
+              Name: "nint"
+          Entry
+            Key: "V"
+            Value: Builtin
+              Name: "nint"
+        Type: Builtin
+          Name: "nint"
+      Eval: Constant
+        Kind: 0
+        Int: 3
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "MapLen"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "nint"
+      Value: Call
+        Receiver: CollectionLiteral
+          Entries:
+            CollectionEntry
+              Key: StringLiteral
+                Value: "a"
+                Type: Builtin
+                  Name: "string"
+              Value: IntLiteral
+                Text: "1"
+                Type: Builtin
+                  Name: "nint"
+            CollectionEntry
+              Key: StringLiteral
+                Value: "b"
+                Type: Builtin
+                  Name: "string"
+              Value: IntLiteral
+                Text: "2"
+                Type: Builtin
+                  Name: "nint"
+          Type: App
+            Def: "map"
+            Args:
+              Builtin
+                Name: "string"
+              Builtin
+                Name: "nint"
+        Method: "len"
+        Args: ~
+        Setter: false
+        Resolved: ~
+        Subst:
+          Entry
+            Key: "K"
+            Value: Builtin
+              Name: "string"
+          Entry
+            Key: "V"
+            Value: Builtin
+              Name: "nint"
+        Type: Builtin
+          Name: "nint"
+      Eval: Constant
+        Kind: 0
+        Int: 2
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "Sum"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "nint"
+      Value: Call
+        Receiver: CollectionLiteral
+          Entries:
+            CollectionEntry
+              Key: ~
+              Value: IntLiteral
+                Text: "1"
+                Type: Builtin
+                  Name: "nint"
+            CollectionEntry
+              Key: ~
+              Value: IntLiteral
+                Text: "2"
+                Type: Builtin
+                  Name: "nint"
+            CollectionEntry
+              Key: ~
+              Value: IntLiteral
+                Text: "3"
+                Type: Builtin
+                  Name: "nint"
+          Type: App
+            Def: "list"
+            Args:
+              Builtin
+                Name: "nint"
+        Method: "fold"
+        Args:
+          IntLiteral
+            Text: "0"
+            Type: Builtin
+              Name: "nint"
+          FuncLiteral
+            Params: "acc" "i" "v"
+            Body:
+              Return
+                Value: Call
+                  Receiver: ParamRef
+                    Name: "acc"
+                    Type: Builtin
+                      Name: "nint"
+                  Method: "add"
+                  Args:
+                    ParamRef
+                      Name: "v"
+                      Type: Builtin
+                        Name: "nint"
+                  Setter: false
+                  Resolved: ~
+                  Subst: ~
+                  Type: Builtin
+                    Name: "nint"
+            Type: Func
+              Params:
+                Builtin
+                  Name: "nint"
+                Builtin
+                  Name: "nint"
+                Builtin
+                  Name: "nint"
+              Result: Builtin
+                Name: "nint"
+        Setter: false
+        Resolved: ~
+        Subst:
+          Entry
+            Key: "A"
+            Value: Builtin
+              Name: "nint"
+          Entry
+            Key: "K"
+            Value: Builtin
+              Name: "nint"
+          Entry
+            Key: "T"
+            Value: Builtin
+              Name: "nint"
+          Entry
+            Key: "V"
+            Value: Builtin
+              Name: "nint"
+        Type: Builtin
+          Name: "nint"
+      Eval: Constant
+        Kind: 0
+        Int: 6
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "IndexSum"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "nint"
+      Value: Call
+        Receiver: CollectionLiteral
+          Entries:
+            CollectionEntry
+              Key: ~
+              Value: IntLiteral
+                Text: "10"
+                Type: Builtin
+                  Name: "nint"
+            CollectionEntry
+              Key: ~
+              Value: IntLiteral
+                Text: "20"
+                Type: Builtin
+                  Name: "nint"
+            CollectionEntry
+              Key: ~
+              Value: IntLiteral
+                Text: "30"
+                Type: Builtin
+                  Name: "nint"
+          Type: App
+            Def: "list"
+            Args:
+              Builtin
+                Name: "nint"
+        Method: "fold"
+        Args:
+          IntLiteral
+            Text: "0"
+            Type: Builtin
+              Name: "nint"
+          FuncLiteral
+            Params: "acc" "i" "v"
+            Body:
+              Return
+                Value: Call
+                  Receiver: ParamRef
+                    Name: "acc"
+                    Type: Builtin
+                      Name: "nint"
+                  Method: "add"
+                  Args:
+                    ParamRef
+                      Name: "i"
+                      Type: Builtin
+                        Name: "nint"
+                  Setter: false
+                  Resolved: ~
+                  Subst: ~
+                  Type: Builtin
+                    Name: "nint"
+            Type: Func
+              Params:
+                Builtin
+                  Name: "nint"
+                Builtin
+                  Name: "nint"
+                Builtin
+                  Name: "nint"
+              Result: Builtin
+                Name: "nint"
+        Setter: false
+        Resolved: ~
+        Subst:
+          Entry
+            Key: "A"
+            Value: Builtin
+              Name: "nint"
+          Entry
+            Key: "K"
+            Value: Builtin
+              Name: "nint"
+          Entry
+            Key: "T"
+            Value: Builtin
+              Name: "nint"
+          Entry
+            Key: "V"
+            Value: Builtin
+              Name: "nint"
+        Type: Builtin
+          Name: "nint"
+      Eval: Constant
+        Kind: 0
+        Int: 3
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "MapSum"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "nint"
+      Value: Call
+        Receiver: CollectionLiteral
+          Entries:
+            CollectionEntry
+              Key: StringLiteral
+                Value: "a"
+                Type: Builtin
+                  Name: "string"
+              Value: IntLiteral
+                Text: "1"
+                Type: Builtin
+                  Name: "nint"
+            CollectionEntry
+              Key: StringLiteral
+                Value: "b"
+                Type: Builtin
+                  Name: "string"
+              Value: IntLiteral
+                Text: "2"
+                Type: Builtin
+                  Name: "nint"
+            CollectionEntry
+              Key: StringLiteral
+                Value: "c"
+                Type: Builtin
+                  Name: "string"
+              Value: IntLiteral
+                Text: "3"
+                Type: Builtin
+                  Name: "nint"
+          Type: App
+            Def: "map"
+            Args:
+              Builtin
+                Name: "string"
+              Builtin
+                Name: "nint"
+        Method: "fold"
+        Args:
+          IntLiteral
+            Text: "0"
+            Type: Builtin
+              Name: "nint"
+          FuncLiteral
+            Params: "acc" "k" "v"
+            Body:
+              Return
+                Value: Call
+                  Receiver: ParamRef
+                    Name: "acc"
+                    Type: Builtin
+                      Name: "nint"
+                  Method: "add"
+                  Args:
+                    ParamRef
+                      Name: "v"
+                      Type: Builtin
+                        Name: "nint"
+                  Setter: false
+                  Resolved: ~
+                  Subst: ~
+                  Type: Builtin
+                    Name: "nint"
+            Type: Func
+              Params:
+                Builtin
+                  Name: "nint"
+                Builtin
+                  Name: "string"
+                Builtin
+                  Name: "nint"
+              Result: Builtin
+                Name: "nint"
+        Setter: false
+        Resolved: ~
+        Subst:
+          Entry
+            Key: "A"
+            Value: Builtin
+              Name: "nint"
+          Entry
+            Key: "K"
+            Value: Builtin
+              Name: "string"
+          Entry
+            Key: "V"
+            Value: Builtin
+              Name: "nint"
+        Type: Builtin
+          Name: "nint"
+      Eval: Constant
+        Kind: 0
+        Int: 6
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "Count"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "nint"
+      Value: Call
+        Receiver: CollectionLiteral
+          Entries:
+            CollectionEntry
+              Key: ~
+              Value: IntLiteral
+                Text: "1"
+                Type: Builtin
+                  Name: "nint"
+            CollectionEntry
+              Key: ~
+              Value: IntLiteral
+                Text: "2"
+                Type: Builtin
+                  Name: "nint"
+            CollectionEntry
+              Key: ~
+              Value: IntLiteral
+                Text: "3"
+                Type: Builtin
+                  Name: "nint"
+            CollectionEntry
+              Key: ~
+              Value: IntLiteral
+                Text: "4"
+                Type: Builtin
+                  Name: "nint"
+          Type: App
+            Def: "list"
+            Args:
+              Builtin
+                Name: "nint"
+        Method: "count"
+        Args: ~
+        Setter: false
+        Resolved: ~
+        Subst:
+          Entry
+            Key: "K"
+            Value: Builtin
+              Name: "nint"
+          Entry
+            Key: "T"
+            Value: Builtin
+              Name: "nint"
+          Entry
+            Key: "V"
+            Value: Builtin
+              Name: "nint"
+        Type: Builtin
+          Name: "nint"
+      Eval: Constant
+        Kind: 0
+        Int: 4
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "AnyBig"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "bool"
+      Value: Call
+        Receiver: CollectionLiteral
+          Entries:
+            CollectionEntry
+              Key: ~
+              Value: IntLiteral
+                Text: "1"
+                Type: Builtin
+                  Name: "nint"
+            CollectionEntry
+              Key: ~
+              Value: IntLiteral
+                Text: "2"
+                Type: Builtin
+                  Name: "nint"
+            CollectionEntry
+              Key: ~
+              Value: IntLiteral
+                Text: "3"
+                Type: Builtin
+                  Name: "nint"
+          Type: App
+            Def: "list"
+            Args:
+              Builtin
+                Name: "nint"
+        Method: "any"
+        Args:
+          FuncLiteral
+            Params: "v"
+            Body:
+              Return
+                Value: Call
+                  Receiver: ParamRef
+                    Name: "v"
+                    Type: Builtin
+                      Name: "nint"
+                  Method: "gt"
+                  Args:
+                    IntLiteral
+                      Text: "2"
+                      Type: Builtin
+                        Name: "nint"
+                  Setter: false
+                  Resolved: ~
+                  Subst: ~
+                  Type: Builtin
+                    Name: "bool"
+            Type: Func
+              Params:
+                Builtin
+                  Name: "nint"
+              Result: Builtin
+                Name: "bool"
+        Setter: false
+        Resolved: ~
+        Subst:
+          Entry
+            Key: "K"
+            Value: Builtin
+              Name: "nint"
+          Entry
+            Key: "T"
+            Value: Builtin
+              Name: "nint"
+          Entry
+            Key: "V"
+            Value: Builtin
+              Name: "nint"
+        Type: Builtin
+          Name: "bool"
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "AllPositive"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "bool"
+      Value: Call
+        Receiver: CollectionLiteral
+          Entries:
+            CollectionEntry
+              Key: ~
+              Value: IntLiteral
+                Text: "1"
+                Type: Builtin
+                  Name: "nint"
+            CollectionEntry
+              Key: ~
+              Value: IntLiteral
+                Text: "2"
+                Type: Builtin
+                  Name: "nint"
+            CollectionEntry
+              Key: ~
+              Value: IntLiteral
+                Text: "3"
+                Type: Builtin
+                  Name: "nint"
+          Type: App
+            Def: "list"
+            Args:
+              Builtin
+                Name: "nint"
+        Method: "all"
+        Args:
+          FuncLiteral
+            Params: "v"
+            Body:
+              Return
+                Value: Call
+                  Receiver: ParamRef
+                    Name: "v"
+                    Type: Builtin
+                      Name: "nint"
+                  Method: "gt"
+                  Args:
+                    IntLiteral
+                      Text: "0"
+                      Type: Builtin
+                        Name: "nint"
+                  Setter: false
+                  Resolved: ~
+                  Subst: ~
+                  Type: Builtin
+                    Name: "bool"
+            Type: Func
+              Params:
+                Builtin
+                  Name: "nint"
+              Result: Builtin
+                Name: "bool"
+        Setter: false
+        Resolved: ~
+        Subst:
+          Entry
+            Key: "K"
+            Value: Builtin
+              Name: "nint"
+          Entry
+            Key: "T"
+            Value: Builtin
+              Name: "nint"
+          Entry
+            Key: "V"
+            Value: Builtin
+              Name: "nint"
+        Type: Builtin
+          Name: "bool"
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "Doubled"
+      Public: false
+      Doc: ~
+      Type: App
+        Def: "list"
+        Args:
+          Builtin
+            Name: "nint"
+      Value: Call
+        Receiver: CollectionLiteral
+          Entries:
+            CollectionEntry
+              Key: ~
+              Value: IntLiteral
+                Text: "1"
+                Type: Builtin
+                  Name: "nint"
+            CollectionEntry
+              Key: ~
+              Value: IntLiteral
+                Text: "2"
+                Type: Builtin
+                  Name: "nint"
+            CollectionEntry
+              Key: ~
+              Value: IntLiteral
+                Text: "3"
+                Type: Builtin
+                  Name: "nint"
+          Type: App
+            Def: "list"
+            Args:
+              Builtin
+                Name: "nint"
+        Method: "map"
+        Args:
+          FuncLiteral
+            Params: "v"
+            Body:
+              Return
+                Value: Call
+                  Receiver: ParamRef
+                    Name: "v"
+                    Type: Builtin
+                      Name: "nint"
+                  Method: "mul"
+                  Args:
+                    IntLiteral
+                      Text: "2"
+                      Type: Builtin
+                        Name: "nint"
+                  Setter: false
+                  Resolved: ~
+                  Subst: ~
+                  Type: Builtin
+                    Name: "nint"
+            Type: Func
+              Params:
+                Builtin
+                  Name: "nint"
+              Result: Builtin
+                Name: "nint"
+        Setter: false
+        Resolved: ~
+        Subst:
+          Entry
+            Key: "K"
+            Value: Builtin
+              Name: "nint"
+          Entry
+            Key: "R"
+            Value: Builtin
+              Name: "nint"
+          Entry
+            Key: "T"
+            Value: Builtin
+              Name: "nint"
+          Entry
+            Key: "V"
+            Value: Builtin
+              Name: "nint"
+        Type: App
+          Def: "list"
+          Args:
+            Builtin
+              Name: "nint"
+      Eval: Constant
+        Kind: 3
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll:
+          ConstEntry
+            Key: ~
+            Value: Constant
+              Kind: 0
+              Int: 2
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+          ConstEntry
+            Key: ~
+            Value: Constant
+              Kind: 0
+              Int: 4
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+          ConstEntry
+            Key: ~
+            Value: Constant
+              Kind: 0
+              Int: 6
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+        Fields: ~
+        CollMapness: 1
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "Big"
+      Public: false
+      Doc: ~
+      Type: App
+        Def: "list"
+        Args:
+          Builtin
+            Name: "nint"
+      Value: Call
+        Receiver: CollectionLiteral
+          Entries:
+            CollectionEntry
+              Key: ~
+              Value: IntLiteral
+                Text: "1"
+                Type: Builtin
+                  Name: "nint"
+            CollectionEntry
+              Key: ~
+              Value: IntLiteral
+                Text: "2"
+                Type: Builtin
+                  Name: "nint"
+            CollectionEntry
+              Key: ~
+              Value: IntLiteral
+                Text: "3"
+                Type: Builtin
+                  Name: "nint"
+            CollectionEntry
+              Key: ~
+              Value: IntLiteral
+                Text: "4"
+                Type: Builtin
+                  Name: "nint"
+          Type: App
+            Def: "list"
+            Args:
+              Builtin
+                Name: "nint"
+        Method: "filter"
+        Args:
+          FuncLiteral
+            Params: "v"
+            Body:
+              Return
+                Value: Call
+                  Receiver: ParamRef
+                    Name: "v"
+                    Type: Builtin
+                      Name: "nint"
+                  Method: "gt"
+                  Args:
+                    IntLiteral
+                      Text: "2"
+                      Type: Builtin
+                        Name: "nint"
+                  Setter: false
+                  Resolved: ~
+                  Subst: ~
+                  Type: Builtin
+                    Name: "bool"
+            Type: Func
+              Params:
+                Builtin
+                  Name: "nint"
+              Result: Builtin
+                Name: "bool"
+        Setter: false
+        Resolved: ~
+        Subst:
+          Entry
+            Key: "K"
+            Value: Builtin
+              Name: "nint"
+          Entry
+            Key: "T"
+            Value: Builtin
+              Name: "nint"
+          Entry
+            Key: "V"
+            Value: Builtin
+              Name: "nint"
+        Type: App
+          Def: "list"
+          Args:
+            Builtin
+              Name: "nint"
+      Eval: Constant
+        Kind: 3
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll:
+          ConstEntry
+            Key: ~
+            Value: Constant
+              Kind: 0
+              Int: 3
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+          ConstEntry
+            Key: ~
+            Value: Constant
+              Kind: 0
+              Int: 4
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+        Fields: ~
+        CollMapness: 1
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "Keys"
+      Public: false
+      Doc: ~
+      Type: App
+        Def: "list"
+        Args:
+          Builtin
+            Name: "string"
+      Value: Call
+        Receiver: CollectionLiteral
+          Entries:
+            CollectionEntry
+              Key: StringLiteral
+                Value: "x"
+                Type: Builtin
+                  Name: "string"
+              Value: IntLiteral
+                Text: "1"
+                Type: Builtin
+                  Name: "nint"
+            CollectionEntry
+              Key: StringLiteral
+                Value: "y"
+                Type: Builtin
+                  Name: "string"
+              Value: IntLiteral
+                Text: "2"
+                Type: Builtin
+                  Name: "nint"
+          Type: App
+            Def: "map"
+            Args:
+              Builtin
+                Name: "string"
+              Builtin
+                Name: "nint"
+        Method: "keys"
+        Args: ~
+        Setter: false
+        Resolved: ~
+        Subst:
+          Entry
+            Key: "K"
+            Value: Builtin
+              Name: "string"
+          Entry
+            Key: "V"
+            Value: Builtin
+              Name: "nint"
+        Type: App
+          Def: "list"
+          Args:
+            Builtin
+              Name: "string"
+      Eval: Constant
+        Kind: 3
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll:
+          ConstEntry
+            Key: ~
+            Value: Constant
+              Kind: 2
+              Int: ~
+              Bool: false
+              Str: "x"
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+          ConstEntry
+            Key: ~
+            Value: Constant
+              Kind: 2
+              Int: ~
+              Bool: false
+              Str: "y"
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+        Fields: ~
+        CollMapness: 1
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "Values"
+      Public: false
+      Doc: ~
+      Type: App
+        Def: "list"
+        Args:
+          Builtin
+            Name: "nint"
+      Value: Call
+        Receiver: CollectionLiteral
+          Entries:
+            CollectionEntry
+              Key: StringLiteral
+                Value: "x"
+                Type: Builtin
+                  Name: "string"
+              Value: IntLiteral
+                Text: "1"
+                Type: Builtin
+                  Name: "nint"
+            CollectionEntry
+              Key: StringLiteral
+                Value: "y"
+                Type: Builtin
+                  Name: "string"
+              Value: IntLiteral
+                Text: "2"
+                Type: Builtin
+                  Name: "nint"
+          Type: App
+            Def: "map"
+            Args:
+              Builtin
+                Name: "string"
+              Builtin
+                Name: "nint"
+        Method: "values"
+        Args: ~
+        Setter: false
+        Resolved: ~
+        Subst:
+          Entry
+            Key: "K"
+            Value: Builtin
+              Name: "string"
+          Entry
+            Key: "V"
+            Value: Builtin
+              Name: "nint"
+        Type: App
+          Def: "list"
+          Args:
+            Builtin
+              Name: "nint"
+      Eval: Constant
+        Kind: 3
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll:
+          ConstEntry
+            Key: ~
+            Value: Constant
+              Kind: 0
+              Int: 1
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+          ConstEntry
+            Key: ~
+            Value: Constant
+              Kind: 0
+              Int: 2
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+        Fields: ~
+        CollMapness: 1
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "ListValues"
+      Public: false
+      Doc: ~
+      Type: App
+        Def: "list"
+        Args:
+          Builtin
+            Name: "nint"
+      Value: Call
+        Receiver: CollectionLiteral
+          Entries:
+            CollectionEntry
+              Key: ~
+              Value: IntLiteral
+                Text: "7"
+                Type: Builtin
+                  Name: "nint"
+            CollectionEntry
+              Key: ~
+              Value: IntLiteral
+                Text: "8"
+                Type: Builtin
+                  Name: "nint"
+            CollectionEntry
+              Key: ~
+              Value: IntLiteral
+                Text: "9"
+                Type: Builtin
+                  Name: "nint"
+          Type: App
+            Def: "list"
+            Args:
+              Builtin
+                Name: "nint"
+        Method: "values"
+        Args: ~
+        Setter: false
+        Resolved: ~
+        Subst:
+          Entry
+            Key: "K"
+            Value: Builtin
+              Name: "nint"
+          Entry
+            Key: "T"
+            Value: Builtin
+              Name: "nint"
+          Entry
+            Key: "V"
+            Value: Builtin
+              Name: "nint"
+        Type: App
+          Def: "list"
+          Args:
+            Builtin
+              Name: "nint"
+      Eval: Constant
+        Kind: 3
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll:
+          ConstEntry
+            Key: ~
+            Value: Constant
+              Kind: 0
+              Int: 7
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+          ConstEntry
+            Key: ~
+            Value: Constant
+              Kind: 0
+              Int: 8
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+          ConstEntry
+            Key: ~
+            Value: Constant
+              Kind: 0
+              Int: 9
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+        Fields: ~
+        CollMapness: 1
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+  Types: ~
+  Funcs: ~
+  Asserts:
+    Assert
+      Cond: "[1, 2, 3].len() == 3"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "[1, 2, 3].len() == 3\n          ^     ^\n          3     true"
+    Assert
+      Cond: "[\"a\": 1, \"b\": 2].len() == 2"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "[\"a\": 1, \"b\": 2].len() == 2\n                 ^     ^\n                 2     true"
+    Assert
+      Cond: "[1, 2, 3].fold(0, fn(acc: nint, i: nint, v: nint): nint { return acc + v }) == 6"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "[1, 2, 3].fold(0, fn(acc: nint, i: nint, v: nint): nint { return acc + v }) == 6\n          ^                                                                 ^\n          6                                                                 true"
+    Assert
+      Cond: "[1, 2, 3, 4].count() == 4"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "[1, 2, 3, 4].count() == 4\n             ^       ^\n             4       true"
+    Assert
+      Cond: "[1, 2, 3].any(fn(v: nint): bool { return v > 2 })"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "[1, 2, 3].any(fn(v: nint): bool { return v > 2 })\n          ^\n          true"
+    Assert
+      Cond: "[1, 2, 3].all(fn(v: nint): bool { return v > 0 })"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "[1, 2, 3].all(fn(v: nint): bool { return v > 0 })\n          ^\n          true"

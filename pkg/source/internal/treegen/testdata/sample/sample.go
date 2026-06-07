@@ -1,7 +1,10 @@
 // Package sample is treegen's own test fixture: a miniature tree package
 // exercising every field kind the generator classifies — scalars, enums,
-// excluded fields, concrete and interface nodes, and both list forms.
+// excluded fields, graph references, concrete and interface nodes, the list
+// forms, and the sorted string-keyed maps.
 package sample
+
+import "math/big"
 
 // Node is the marker interface: implementers get MarshalText.
 type Node interface{ node() }
@@ -22,15 +25,26 @@ type Root struct {
 	Tags   []string
 	Num    int
 	Kind   Kind
+	Millis int64
+	Big    *big.Int
 	Value  Expr
 	Single *Leaf
+	Target *Leaf `tree:"ref"`
 	Items  []*Leaf
 	Mixed  []Expr
+	Cells  []Cell
+	ByName map[string]*Leaf
+	Bound  map[string]Expr
 	Skip   int `tree:"-"`
 	hidden int //nolint:unused // pins that unexported fields are excluded by construction
 }
 
 func (*Root) node() {}
+
+// Cell is a value struct carried by value in a slice.
+type Cell struct {
+	Label string
+}
 
 // Leaf is a plain node that also implements Expr.
 type Leaf struct {

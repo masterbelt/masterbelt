@@ -8,7 +8,6 @@ import (
 
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/parser/abstract"
 	"github.com/masterbelt/masterbelt/pkg/source"
-	"github.com/masterbelt/masterbelt/pkg/source/ir"
 )
 
 // editable drives a one-file Program the way an editor does: edits go to the
@@ -46,7 +45,7 @@ func assertMatchesReference(t *testing.T, e *editable, content []byte) {
 	t.Helper()
 	refModule, refDiags := Analyze(abstract.NewDocument(content))
 
-	if got, want := ir.Dump(e.prog.Module(soleFileID)), ir.Dump(refModule); got != want {
+	if got, want := dumpIR(t, e.prog.Module(soleFileID)), dumpIR(t, refModule); got != want {
 		t.Fatalf("IR mismatch (content %q)\n--- got ---\n%s--- want ---\n%s", content, got, want)
 	}
 

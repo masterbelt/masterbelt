@@ -1,47 +1,291 @@
 Module
-  TypeDef "Rarity" pub
-    doc "A card's rarity tier."
-    enum nint
-    member "Common" = 0
-    member "Rare" = 1
-    member "Legend" = 2
-    impl comparable
-    impl orderable
-    method "eql" pub extern
-      param other: self
-      result bool
-    method "neq" pub extern
-      param other: self
-      result bool
-    method "lt" pub extern
-      param other: self
-      result bool
-    method "lteq" pub extern
-      param other: self
-      result bool
-    method "gt" pub extern
-      param other: self
-      result bool
-    method "gteq" pub extern
-      param other: self
-      result bool
-  Func "color" pub
-    param r: Rarity
-    result string
-      switch (ParamRef "r" : Rarity)
-        arm (Rarity.Common : Rarity)
-          return (StringLiteral "white" : string)
-        arm (Rarity.Rare : Rarity)
-          return (StringLiteral "blue" : string)
-        arm (Rarity.Legend : Rarity)
-          return (StringLiteral "gold" : string)
-  Func "grade" pub
-    param n: nint
-    result string
-      switch (ParamRef "n" : nint)
-        arm (IntLiteral "0" : nint)
-          return (StringLiteral "zero" : string)
-        arm (IntLiteral "1" : nint), (IntLiteral "2" : nint), (IntLiteral "3" : nint)
-          return (StringLiteral "low" : string)
-        else
-          return (StringLiteral "high" : string)
+  Consts: ~
+  Types:
+    TypeDef
+      Name: "Rarity"
+      Public: true
+      Doc: "A card's rarity tier."
+      Params: ~
+      Body: ~
+      Methods:
+        Method
+          Name: "eql"
+          Public: true
+          Extern: true
+          Kind: 0
+          Effects: ~
+          Doc: ~
+          Params:
+            Param
+              Name: "other"
+              Type: SelfType
+          Result: Builtin
+            Name: "bool"
+          Body: ~
+          Owner: "Rarity"
+        Method
+          Name: "neq"
+          Public: true
+          Extern: true
+          Kind: 0
+          Effects: ~
+          Doc: ~
+          Params:
+            Param
+              Name: "other"
+              Type: SelfType
+          Result: Builtin
+            Name: "bool"
+          Body: ~
+          Owner: "Rarity"
+        Method
+          Name: "lt"
+          Public: true
+          Extern: true
+          Kind: 0
+          Effects: ~
+          Doc: ~
+          Params:
+            Param
+              Name: "other"
+              Type: SelfType
+          Result: Builtin
+            Name: "bool"
+          Body: ~
+          Owner: "Rarity"
+        Method
+          Name: "lteq"
+          Public: true
+          Extern: true
+          Kind: 0
+          Effects: ~
+          Doc: ~
+          Params:
+            Param
+              Name: "other"
+              Type: SelfType
+          Result: Builtin
+            Name: "bool"
+          Body: ~
+          Owner: "Rarity"
+        Method
+          Name: "gt"
+          Public: true
+          Extern: true
+          Kind: 0
+          Effects: ~
+          Doc: ~
+          Params:
+            Param
+              Name: "other"
+              Type: SelfType
+          Result: Builtin
+            Name: "bool"
+          Body: ~
+          Owner: "Rarity"
+        Method
+          Name: "gteq"
+          Public: true
+          Extern: true
+          Kind: 0
+          Effects: ~
+          Doc: ~
+          Params:
+            Param
+              Name: "other"
+              Type: SelfType
+          Result: Builtin
+            Name: "bool"
+          Body: ~
+          Owner: "Rarity"
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls:
+        Named
+          Def: "comparable"
+        Named
+          Def: "orderable"
+      Enum: EnumDef
+        Base: "nint"
+        Members:
+          EnumMember
+            Name: "Common"
+            Value: Constant
+              Kind: 0
+              Int: 0
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+          EnumMember
+            Name: "Rare"
+            Value: Constant
+              Kind: 0
+              Int: 1
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+          EnumMember
+            Name: "Legend"
+            Value: Constant
+              Kind: 0
+              Int: 2
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+      Where: ~
+  Funcs:
+    Function
+      Name: "color"
+      Public: true
+      Extern: false
+      Effects: ~
+      Doc: ~
+      TypeParams: ~
+      Params:
+        Param
+          Name: "r"
+          Type: Named
+            Def: "Rarity"
+      Result: Builtin
+        Name: "string"
+      Body:
+        Switch
+          Scrutinee: ParamRef
+            Name: "r"
+            Type: Named
+              Def: "Rarity"
+          Arms:
+            SwitchArm
+              Values:
+                EnumMemberValue
+                  Def: "Rarity"
+                  Index: 0
+                  Type: Named
+                    Def: "Rarity"
+              Body:
+                Return
+                  Value: StringLiteral
+                    Value: "white"
+                    Type: Builtin
+                      Name: "string"
+            SwitchArm
+              Values:
+                EnumMemberValue
+                  Def: "Rarity"
+                  Index: 1
+                  Type: Named
+                    Def: "Rarity"
+              Body:
+                Return
+                  Value: StringLiteral
+                    Value: "blue"
+                    Type: Builtin
+                      Name: "string"
+            SwitchArm
+              Values:
+                EnumMemberValue
+                  Def: "Rarity"
+                  Index: 2
+                  Type: Named
+                    Def: "Rarity"
+              Body:
+                Return
+                  Value: StringLiteral
+                    Value: "gold"
+                    Type: Builtin
+                      Name: "string"
+          Else: ~
+    Function
+      Name: "grade"
+      Public: true
+      Extern: false
+      Effects: ~
+      Doc: ~
+      TypeParams: ~
+      Params:
+        Param
+          Name: "n"
+          Type: Builtin
+            Name: "nint"
+      Result: Builtin
+        Name: "string"
+      Body:
+        Switch
+          Scrutinee: ParamRef
+            Name: "n"
+            Type: Builtin
+              Name: "nint"
+          Arms:
+            SwitchArm
+              Values:
+                IntLiteral
+                  Text: "0"
+                  Type: Builtin
+                    Name: "nint"
+              Body:
+                Return
+                  Value: StringLiteral
+                    Value: "zero"
+                    Type: Builtin
+                      Name: "string"
+            SwitchArm
+              Values:
+                IntLiteral
+                  Text: "1"
+                  Type: Builtin
+                    Name: "nint"
+                IntLiteral
+                  Text: "2"
+                  Type: Builtin
+                    Name: "nint"
+                IntLiteral
+                  Text: "3"
+                  Type: Builtin
+                    Name: "nint"
+              Body:
+                Return
+                  Value: StringLiteral
+                    Value: "low"
+                    Type: Builtin
+                      Name: "string"
+          Else:
+            Return
+              Value: StringLiteral
+                Value: "high"
+                Type: Builtin
+                  Name: "string"
+  Asserts: ~

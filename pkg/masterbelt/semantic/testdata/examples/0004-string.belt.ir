@@ -1,25 +1,167 @@
 Module
-  Const "LabelName" pub
-    type string
-    value (StringLiteral "label" : string)
-    eval "label"
-  Const "Greeting" pub
-    type string
-    value (StringLiteral "Hello, \"world\"!\n" : string)
-    eval "Hello, \"world\"!\n"
-  Const "Control" pub
-    type string
-    value (StringLiteral "a\tb\r\n\x00" : string)
-    eval "a\tb\r\n\x00"
-  Const "Unicode" pub
-    type string
-    value (StringLiteral "日本語 🎉" : string)
-    eval "日本語 🎉"
-  Const "Party" pub
-    type string
-    value (StringLiteral "🎉" : string)
-    eval "🎉"
-  Const "Empty" pub
-    type string
-    value (StringLiteral "" : string)
-    eval ""
+  Consts:
+    Const
+      Name: "LabelName"
+      Public: true
+      Doc: ~
+      Type: Builtin
+        Name: "string"
+      Value: StringLiteral
+        Value: "label"
+        Type: Builtin
+          Name: "string"
+      Eval: Constant
+        Kind: 2
+        Int: ~
+        Bool: false
+        Str: "label"
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "Greeting"
+      Public: true
+      Doc: ~
+      Type: Builtin
+        Name: "string"
+      Value: StringLiteral
+        Value: "Hello, \"world\"!\n"
+        Type: Builtin
+          Name: "string"
+      Eval: Constant
+        Kind: 2
+        Int: ~
+        Bool: false
+        Str: "Hello, \"world\"!\n"
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "Control"
+      Public: true
+      Doc: ~
+      Type: Builtin
+        Name: "string"
+      Value: StringLiteral
+        Value: "a\tb\r\n\x00"
+        Type: Builtin
+          Name: "string"
+      Eval: Constant
+        Kind: 2
+        Int: ~
+        Bool: false
+        Str: "a\tb\r\n\x00"
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "Unicode"
+      Public: true
+      Doc: ~
+      Type: Builtin
+        Name: "string"
+      Value: StringLiteral
+        Value: "日本語 🎉"
+        Type: Builtin
+          Name: "string"
+      Eval: Constant
+        Kind: 2
+        Int: ~
+        Bool: false
+        Str: "日本語 🎉"
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "Party"
+      Public: true
+      Doc: ~
+      Type: Builtin
+        Name: "string"
+      Value: StringLiteral
+        Value: "🎉"
+        Type: Builtin
+          Name: "string"
+      Eval: Constant
+        Kind: 2
+        Int: ~
+        Bool: false
+        Str: "🎉"
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "Empty"
+      Public: true
+      Doc: ~
+      Type: Builtin
+        Name: "string"
+      Value: StringLiteral
+        Value: ""
+        Type: Builtin
+          Name: "string"
+      Eval: Constant
+        Kind: 2
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+  Types: ~
+  Funcs: ~
+  Asserts: ~

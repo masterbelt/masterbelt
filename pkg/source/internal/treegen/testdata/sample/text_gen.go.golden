@@ -9,10 +9,32 @@ package sample
 
 import (
 	"fmt"
+	"maps"
+	"slices"
 	"strconv"
 
 	"github.com/masterbelt/masterbelt/pkg/source/internal/treetext"
 )
+
+// writeCell emits n's fields beneath an already-written heading line.
+func writeCell(w *treetext.Writer, n *Cell, depth int) error {
+	w.Line(depth, "Label: "+strconv.Quote(n.Label))
+	return nil
+}
+
+// decodeCell builds a Cell from its element.
+func decodeCell(e *treetext.Element) (*Cell, error) {
+	if err := treetext.ExpectFields(e, "Label"); err != nil {
+		return nil, err
+	}
+	n := &Cell{}
+	if v, err := treetext.String(e.Fields[0]); err != nil {
+		return nil, err
+	} else {
+		n.Label = v
+	}
+	return n, nil
+}
 
 // writeLeaf emits n's fields beneath an already-written heading line.
 func writeLeaf(w *treetext.Writer, n *Leaf, depth int) error {
@@ -81,6 +103,12 @@ func writeRoot(w *treetext.Writer, n *Root, depth int) error {
 	w.Line(depth, "Tags: "+treetext.QuoteStrings(n.Tags))
 	w.Line(depth, "Num: "+strconv.Itoa(int(n.Num)))
 	w.Line(depth, "Kind: "+strconv.Itoa(int(n.Kind)))
+	w.Line(depth, "Millis: "+strconv.FormatInt(n.Millis, 10))
+	if n.Big == nil {
+		w.Line(depth, "Big: "+treetext.Nil)
+	} else {
+		w.Line(depth, "Big: "+n.Big.String())
+	}
 	if err := writeExprField(w, depth, "Value", n.Value); err != nil {
 		return err
 	}
@@ -92,6 +120,7 @@ func writeRoot(w *treetext.Writer, n *Root, depth int) error {
 			return err
 		}
 	}
+	w.Line(depth, "Target: "+refText(n.Target))
 	if len(n.Items) == 0 {
 		w.Line(depth, "Items: "+treetext.Nil)
 	} else {
@@ -117,12 +146,52 @@ func writeRoot(w *treetext.Writer, n *Root, depth int) error {
 			}
 		}
 	}
+	if len(n.Cells) == 0 {
+		w.Line(depth, "Cells: "+treetext.Nil)
+	} else {
+		w.Line(depth, "Cells:")
+		for i := range n.Cells {
+			w.Line(depth+1, "Cell")
+			if err := writeCell(w, &n.Cells[i], depth+2); err != nil {
+				return err
+			}
+		}
+	}
+	if len(n.ByName) == 0 {
+		w.Line(depth, "ByName: "+treetext.Nil)
+	} else {
+		w.Line(depth, "ByName:")
+		for _, key := range slices.Sorted(maps.Keys(n.ByName)) {
+			w.Line(depth+1, "Entry")
+			w.Line(depth+2, "Key: "+strconv.Quote(key))
+			if item := n.ByName[key]; item == nil {
+				w.Line(depth+2, "Value: "+treetext.Nil)
+			} else {
+				w.Line(depth+2, "Value: Leaf")
+				if err := writeLeaf(w, item, depth+3); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	if len(n.Bound) == 0 {
+		w.Line(depth, "Bound: "+treetext.Nil)
+	} else {
+		w.Line(depth, "Bound:")
+		for _, key := range slices.Sorted(maps.Keys(n.Bound)) {
+			w.Line(depth+1, "Entry")
+			w.Line(depth+2, "Key: "+strconv.Quote(key))
+			if err := writeExprField(w, depth+2, "Value", n.Bound[key]); err != nil {
+				return err
+			}
+		}
+	}
 	return nil
 }
 
 // decodeRoot builds a Root from its element.
 func decodeRoot(e *treetext.Element) (*Root, error) {
-	if err := treetext.ExpectFields(e, "Name", "Flag", "Tags", "Num", "Kind", "Value", "Single", "Items", "Mixed"); err != nil {
+	if err := treetext.ExpectFields(e, "Name", "Flag", "Tags", "Num", "Kind", "Millis", "Big", "Value", "Single", "Target", "Items", "Mixed", "Cells", "ByName", "Bound"); err != nil {
 		return nil, err
 	}
 	n := &Root{}
@@ -151,12 +220,22 @@ func decodeRoot(e *treetext.Element) (*Root, error) {
 	} else {
 		n.Kind = Kind(v)
 	}
-	if v, err := decodeExprField(e.Fields[5]); err != nil {
+	if v, err := treetext.Int64(e.Fields[5]); err != nil {
+		return nil, err
+	} else {
+		n.Millis = v
+	}
+	if v, err := treetext.BigInt(e.Fields[6]); err != nil {
+		return nil, err
+	} else {
+		n.Big = v
+	}
+	if v, err := decodeExprField(e.Fields[7]); err != nil {
 		return nil, err
 	} else {
 		n.Value = v
 	}
-	switch f := e.Fields[6]; {
+	switch f := e.Fields[8]; {
 	case f.Inline == treetext.Nil:
 	case f.Node == nil || f.Node.Head != "Leaf":
 		return nil, fmt.Errorf("treetext: line %d: field %s: expected a Leaf", f.Line, f.Name)
@@ -167,7 +246,12 @@ func decodeRoot(e *treetext.Element) (*Root, error) {
 		}
 		n.Single = v
 	}
-	switch f := e.Fields[7]; {
+	if v, err := unrefLeaf(e.Fields[9]); err != nil {
+		return nil, err
+	} else {
+		n.Target = v
+	}
+	switch f := e.Fields[10]; {
 	case f.Inline == treetext.Nil:
 	case f.Items == nil:
 		return nil, fmt.Errorf("treetext: line %d: field %s: expected a list", f.Line, f.Name)
@@ -190,7 +274,7 @@ func decodeRoot(e *treetext.Element) (*Root, error) {
 		}
 		n.Items = out
 	}
-	switch f := e.Fields[8]; {
+	switch f := e.Fields[11]; {
 	case f.Inline == treetext.Nil:
 	case f.Items == nil:
 		return nil, fmt.Errorf("treetext: line %d: field %s: expected a list", f.Line, f.Name)
@@ -209,6 +293,84 @@ func decodeRoot(e *treetext.Element) (*Root, error) {
 			out = append(out, v)
 		}
 		n.Mixed = out
+	}
+	switch f := e.Fields[12]; {
+	case f.Inline == treetext.Nil:
+	case f.Items == nil:
+		return nil, fmt.Errorf("treetext: line %d: field %s: expected a list", f.Line, f.Name)
+	default:
+		out := make([]Cell, 0, len(f.Items))
+		for j := range f.Items {
+			item := &f.Items[j]
+			if item.Head != "Cell" {
+				return nil, fmt.Errorf("treetext: line %d: %s is not a Cell", item.Line, item.Head)
+			}
+			v, err := decodeCell(item)
+			if err != nil {
+				return nil, err
+			}
+			out = append(out, *v)
+		}
+		n.Cells = out
+	}
+	switch f := e.Fields[13]; {
+	case f.Inline == treetext.Nil:
+	case f.Items == nil:
+		return nil, fmt.Errorf("treetext: line %d: field %s: expected a list", f.Line, f.Name)
+	default:
+		out := make(map[string]*Leaf, len(f.Items))
+		for j := range f.Items {
+			item := &f.Items[j]
+			if item.Head != "Entry" {
+				return nil, fmt.Errorf("treetext: line %d: %s is not an Entry", item.Line, item.Head)
+			}
+			if err := treetext.ExpectFields(item, "Key", "Value"); err != nil {
+				return nil, err
+			}
+			key, err := treetext.String(item.Fields[0])
+			if err != nil {
+				return nil, err
+			}
+			var val *Leaf
+			switch vf := item.Fields[1]; {
+			case vf.Inline == treetext.Nil:
+			case vf.Node == nil || vf.Node.Head != "Leaf":
+				return nil, fmt.Errorf("treetext: line %d: field %s: expected a Leaf", vf.Line, vf.Name)
+			default:
+				val, err = decodeLeaf(vf.Node)
+				if err != nil {
+					return nil, err
+				}
+			}
+			out[key] = val
+		}
+		n.ByName = out
+	}
+	switch f := e.Fields[14]; {
+	case f.Inline == treetext.Nil:
+	case f.Items == nil:
+		return nil, fmt.Errorf("treetext: line %d: field %s: expected a list", f.Line, f.Name)
+	default:
+		out := make(map[string]Expr, len(f.Items))
+		for j := range f.Items {
+			item := &f.Items[j]
+			if item.Head != "Entry" {
+				return nil, fmt.Errorf("treetext: line %d: %s is not an Entry", item.Line, item.Head)
+			}
+			if err := treetext.ExpectFields(item, "Key", "Value"); err != nil {
+				return nil, err
+			}
+			key, err := treetext.String(item.Fields[0])
+			if err != nil {
+				return nil, err
+			}
+			val, err := decodeExprField(item.Fields[1])
+			if err != nil {
+				return nil, err
+			}
+			out[key] = val
+		}
+		n.Bound = out
 	}
 	return n, nil
 }
@@ -381,6 +543,7 @@ func decodeExprField(f treetext.Field) (Expr, error) {
 // treeStructs lists one typed nil pointer per tree struct, for the
 // field-sensitivity pin (P5).
 var treeStructs = []any{
+	(*Cell)(nil),
 	(*Leaf)(nil),
 	(*Pair)(nil),
 	(*Root)(nil),
@@ -391,6 +554,9 @@ var treeStructs = []any{
 // bool reports whether v is a known tree struct.
 func writeTree(w *treetext.Writer, v any, depth int) (bool, error) {
 	switch n := v.(type) {
+	case *Cell:
+		w.Line(depth, "Cell")
+		return true, writeCell(w, n, depth+1)
 	case *Leaf:
 		w.Line(depth, "Leaf")
 		return true, writeLeaf(w, n, depth+1)

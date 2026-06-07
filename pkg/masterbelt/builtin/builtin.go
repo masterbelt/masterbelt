@@ -252,13 +252,14 @@ func Default() *Registry {
 
 func (r *Registry) register(name string, native *NativeType, methods []*ir.Method, intrinsics map[string]Intrinsic) {
 	r.order = append(r.order, name)
-	r.defs[name] = &ir.TypeDef{
+	def := &ir.TypeDef{
 		Name:    name,
 		Public:  true,
 		Body:    &ir.Builtin{Name: name},
-		Methods: methods,
 		Builtin: true,
 	}
+	def.AttachMethods(methods...)
+	r.defs[name] = def
 	r.natives[name] = native
 	for method, fn := range intrinsics {
 		r.registerIntrinsic(name, method, nil, fn)

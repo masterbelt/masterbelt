@@ -281,7 +281,7 @@ func resolveInterfaceDecl(r *infer.TypeResolver, reg *builtin.Registry, id *ast.
 	}
 	for _, m := range id.Members {
 		method := resolveInterfaceMember(r, reg, &ir.Named{Def: def}, m, scope, fns)
-		def.Methods = append(def.Methods, method)
+		def.AttachMethods(method)
 		if m.Provided() {
 			def.Interface.Provided = append(def.Interface.Provided, m.Name)
 		} else {
@@ -749,7 +749,7 @@ func resolveDecl(r *infer.TypeResolver, reg *builtin.Registry, td *ast.TypeDecl,
 			continue
 		}
 		seen[key] = true
-		def.Methods = append(def.Methods, rm)
+		def.AttachMethods(rm)
 	}
 	// The accessor/static declaration checks run after the methods, fields, and
 	// associated constants are all on the definition, so the collision checks see
@@ -984,7 +984,7 @@ func resolveEnumDecl(folder exprFolder, defs map[string]*ir.TypeDef, r *infer.Ty
 
 	// The operator methods: the six comparisons every enum carries, then the
 	// impl block's own methods (which may shadow a comparison or add new ones).
-	def.Methods = append(def.Methods, builtin.EnumComparisonMethods()...)
+	def.AttachMethods(builtin.EnumComparisonMethods()...)
 	scope := infer.TypeScope{}
 	seen := make(map[string]bool, len(ed.Methods))
 	for _, m := range ed.Methods {
@@ -995,7 +995,7 @@ func resolveEnumDecl(folder exprFolder, defs map[string]*ir.TypeDef, r *infer.Ty
 			continue
 		}
 		seen[key] = true
-		def.Methods = append(def.Methods, rm)
+		def.AttachMethods(rm)
 	}
 	// The accessor/static declaration checks, the same as a nominal type's: a
 	// static fn collides with an enum member of the same name (both read

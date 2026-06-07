@@ -19,6 +19,7 @@ package treetext
 
 import (
 	"fmt"
+	"math/big"
 	"strconv"
 	"strings"
 )
@@ -240,6 +241,34 @@ func Int(f Field) (int, error) {
 	v, err := strconv.Atoi(f.Inline)
 	if err != nil {
 		return 0, fmt.Errorf("treetext: line %d: field %s: malformed integer %q", f.Line, f.Name, f.Inline)
+	}
+	return v, nil
+}
+
+// Int64 decodes a field's tail as a decimal 64-bit integer.
+func Int64(f Field) (int64, error) {
+	if f.Node != nil || f.Items != nil {
+		return 0, fmt.Errorf("treetext: line %d: field %s: expected an integer", f.Line, f.Name)
+	}
+	v, err := strconv.ParseInt(f.Inline, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("treetext: line %d: field %s: malformed integer %q", f.Line, f.Name, f.Inline)
+	}
+	return v, nil
+}
+
+// BigInt decodes a field's tail as an arbitrary-precision decimal integer,
+// with the Nil marker for none.
+func BigInt(f Field) (*big.Int, error) {
+	if f.Node != nil || f.Items != nil {
+		return nil, fmt.Errorf("treetext: line %d: field %s: expected an integer", f.Line, f.Name)
+	}
+	if f.Inline == Nil {
+		return nil, nil
+	}
+	v, ok := new(big.Int).SetString(f.Inline, 10)
+	if !ok {
+		return nil, fmt.Errorf("treetext: line %d: field %s: malformed integer %q", f.Line, f.Name, f.Inline)
 	}
 	return v, nil
 }

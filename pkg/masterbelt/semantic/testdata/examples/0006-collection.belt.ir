@@ -1,25 +1,489 @@
 Module
-  Const "ExampleList"
-    type list<nint>
-    value ([(IntLiteral "1" : nint), (IntLiteral "2" : nint), (IntLiteral "3" : nint)] : list<nint>)
-    eval [1, 2, 3]
-  Const "ExampleMap"
-    type map<string, nint>
-    value ([(StringLiteral "key" : string): (IntLiteral "100" : nint)] : map<string, nint>)
-    eval ["key": 100]
-  Const "Inferred"
-    type list<nint>
-    value ([(IntLiteral "10" : nint), (IntLiteral "20" : nint), (IntLiteral "30" : nint)] : list<nint>)
-    eval [10, 20, 30]
-  Const "Bytes"
-    type list<sbyte>
-    value ([(adapt (IntLiteral "1" : nint) : sbyte), (adapt (IntLiteral "2" : nint) : sbyte), (adapt (IntLiteral "3" : nint) : sbyte)] : list<sbyte>)
-    eval [1, 2, 3]
-  Const "EmptyList"
-    type list<nint>
-    value ([] : list<nint>)
-    eval []
-  Const "EmptyMap"
-    type map<string, nint>
-    value ([] : map<string, nint>)
-    eval [:]
+  Consts:
+    Const
+      Name: "ExampleList"
+      Public: false
+      Doc: ~
+      Type: App
+        Def: "list"
+        Args:
+          Builtin
+            Name: "nint"
+      Value: CollectionLiteral
+        Entries:
+          CollectionEntry
+            Key: ~
+            Value: IntLiteral
+              Text: "1"
+              Type: Builtin
+                Name: "nint"
+          CollectionEntry
+            Key: ~
+            Value: IntLiteral
+              Text: "2"
+              Type: Builtin
+                Name: "nint"
+          CollectionEntry
+            Key: ~
+            Value: IntLiteral
+              Text: "3"
+              Type: Builtin
+                Name: "nint"
+        Type: App
+          Def: "list"
+          Args:
+            Builtin
+              Name: "nint"
+      Eval: Constant
+        Kind: 3
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll:
+          ConstEntry
+            Key: ~
+            Value: Constant
+              Kind: 0
+              Int: 1
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+          ConstEntry
+            Key: ~
+            Value: Constant
+              Kind: 0
+              Int: 2
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+          ConstEntry
+            Key: ~
+            Value: Constant
+              Kind: 0
+              Int: 3
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+        Fields: ~
+        CollMapness: 1
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "ExampleMap"
+      Public: false
+      Doc: ~
+      Type: App
+        Def: "map"
+        Args:
+          Builtin
+            Name: "string"
+          Builtin
+            Name: "nint"
+      Value: CollectionLiteral
+        Entries:
+          CollectionEntry
+            Key: StringLiteral
+              Value: "key"
+              Type: Builtin
+                Name: "string"
+            Value: IntLiteral
+              Text: "100"
+              Type: Builtin
+                Name: "nint"
+        Type: App
+          Def: "map"
+          Args:
+            Builtin
+              Name: "string"
+            Builtin
+              Name: "nint"
+      Eval: Constant
+        Kind: 3
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll:
+          ConstEntry
+            Key: Constant
+              Kind: 2
+              Int: ~
+              Bool: false
+              Str: "key"
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+            Value: Constant
+              Kind: 0
+              Int: 100
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+        Fields: ~
+        CollMapness: 2
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "Inferred"
+      Public: false
+      Doc: ~
+      Type: App
+        Def: "list"
+        Args:
+          Builtin
+            Name: "nint"
+      Value: CollectionLiteral
+        Entries:
+          CollectionEntry
+            Key: ~
+            Value: IntLiteral
+              Text: "10"
+              Type: Builtin
+                Name: "nint"
+          CollectionEntry
+            Key: ~
+            Value: IntLiteral
+              Text: "20"
+              Type: Builtin
+                Name: "nint"
+          CollectionEntry
+            Key: ~
+            Value: IntLiteral
+              Text: "30"
+              Type: Builtin
+                Name: "nint"
+        Type: App
+          Def: "list"
+          Args:
+            Builtin
+              Name: "nint"
+      Eval: Constant
+        Kind: 3
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll:
+          ConstEntry
+            Key: ~
+            Value: Constant
+              Kind: 0
+              Int: 10
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+          ConstEntry
+            Key: ~
+            Value: Constant
+              Kind: 0
+              Int: 20
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+          ConstEntry
+            Key: ~
+            Value: Constant
+              Kind: 0
+              Int: 30
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+        Fields: ~
+        CollMapness: 1
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "Bytes"
+      Public: false
+      Doc: ~
+      Type: App
+        Def: "list"
+        Args:
+          Builtin
+            Name: "sbyte"
+      Value: CollectionLiteral
+        Entries:
+          CollectionEntry
+            Key: ~
+            Value: Adapt
+              Value: IntLiteral
+                Text: "1"
+                Type: Builtin
+                  Name: "nint"
+              To: Builtin
+                Name: "sbyte"
+          CollectionEntry
+            Key: ~
+            Value: Adapt
+              Value: IntLiteral
+                Text: "2"
+                Type: Builtin
+                  Name: "nint"
+              To: Builtin
+                Name: "sbyte"
+          CollectionEntry
+            Key: ~
+            Value: Adapt
+              Value: IntLiteral
+                Text: "3"
+                Type: Builtin
+                  Name: "nint"
+              To: Builtin
+                Name: "sbyte"
+        Type: App
+          Def: "list"
+          Args:
+            Builtin
+              Name: "sbyte"
+      Eval: Constant
+        Kind: 3
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll:
+          ConstEntry
+            Key: ~
+            Value: Constant
+              Kind: 0
+              Int: 1
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+          ConstEntry
+            Key: ~
+            Value: Constant
+              Kind: 0
+              Int: 2
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+          ConstEntry
+            Key: ~
+            Value: Constant
+              Kind: 0
+              Int: 3
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+        Fields: ~
+        CollMapness: 1
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "EmptyList"
+      Public: false
+      Doc: ~
+      Type: App
+        Def: "list"
+        Args:
+          Builtin
+            Name: "nint"
+      Value: CollectionLiteral
+        Entries: ~
+        Type: App
+          Def: "list"
+          Args:
+            Builtin
+              Name: "nint"
+      Eval: Constant
+        Kind: 3
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 1
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "EmptyMap"
+      Public: false
+      Doc: ~
+      Type: App
+        Def: "map"
+        Args:
+          Builtin
+            Name: "string"
+          Builtin
+            Name: "nint"
+      Value: CollectionLiteral
+        Entries: ~
+        Type: App
+          Def: "map"
+          Args:
+            Builtin
+              Name: "string"
+            Builtin
+              Name: "nint"
+      Eval: Constant
+        Kind: 3
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 2
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+  Types: ~
+  Funcs: ~
+  Asserts: ~

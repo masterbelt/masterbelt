@@ -1,71 +1,498 @@
 Module
-  Const "Held"
-    type GameValue
-    value (Coin{amount: (IntLiteral "7" : nint)} : Coin)
-    eval (Coin) { amount: 7 }
-  Const "Total"
-    type nint
-    value (worth((Reference -> "Held" : GameValue)) : nint)
-    eval 7
-  TypeDef "Coin" pub
-    body { amount: nint }
-  TypeDef "Level" pub
-    body { rank: nint }
-  TypeDef "GameValue" pub
-    body Coin | Level
-  Func "describe" pub
-    param v: GameValue
-    result string
-      match (ParamRef "v" : GameValue)
-        arm Coin c
-          return (StringLiteral "coin" : string)
-        arm Level l
-          return (StringLiteral "level" : string)
-  Func "worth" pub
-    param v: GameValue
-    result nint
-      match (ParamRef "v" : GameValue)
-        arm Coin c
-          return ((LocalRef "c" : Coin).amount : nint)
-        arm Level l
-          return ((LocalRef "l" : Level).rank : nint)
-  Func "amountOr" pub
-    param v: Coin | null
-    param fallback: nint
-    result nint
-      match (ParamRef "v" : Coin | null)
-        arm Coin c
-          return ((LocalRef "c" : Coin).amount : nint)
-        arm null
-          return (ParamRef "fallback" : nint)
-  Func "coinAmount" pub
-    param v: GameValue
-    result nint
-      match (ParamRef "v" : GameValue)
-        arm Coin c
-          return ((LocalRef "c" : Coin).amount : nint)
-        else
-          return (IntLiteral "0" : nint)
-  Func "firstOr" pub
-    param xs: list<nint>
-    param fallback: nint
-    result nint
-      match ((ParamRef "xs" : list<nint>).get((IntLiteral "0" : nint)) : nint | error) [subst K=nint, T=nint, V=nint]
-        arm nint v
-          return (LocalRef "v" : nint)
-        arm error e
-          return (ParamRef "fallback" : nint)
-  Func "label" pub
-    param v: GameValue
-    param other: GameValue
-    result string
-      match (ParamRef "v" : GameValue)
-        arm Coin c
-          let "n": nint = ((LocalRef "c" : Coin).amount : nint)
-          match (ParamRef "other" : GameValue)
-            arm Coin c2
-              return (StringLiteral "coin/coin" : string)
-            arm Level l
-              return (StringLiteral "coin/level" : string)
-        arm Level l
-          return (StringLiteral "level" : string)
+  Consts:
+    Const
+      Name: "Held"
+      Public: false
+      Doc: ~
+      Type: Named
+        Def: "GameValue"
+      Value: RecordValue
+        TypeName: "Coin"
+        Fields:
+          RecordField
+            Name: "amount"
+            Value: IntLiteral
+              Text: "7"
+              Type: Builtin
+                Name: "nint"
+        Type: Named
+          Def: "Coin"
+      Eval: Constant
+        Kind: 7
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields:
+          ConstField
+            Name: "amount"
+            Value: Constant
+              Kind: 0
+              Int: 7
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: Named
+          Def: "Coin"
+    Const
+      Name: "Total"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "nint"
+      Value: FuncCall
+        Target: "worth(GameValue)"
+        Args:
+          Reference
+            Target: "Held"
+            Type: Named
+              Def: "GameValue"
+        Resolved: ~
+        Subst: ~
+        Type: Builtin
+          Name: "nint"
+      Eval: Constant
+        Kind: 0
+        Int: 7
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+  Types:
+    TypeDef
+      Name: "Coin"
+      Public: true
+      Doc: ~
+      Params: ~
+      Body: Record
+        Fields:
+          Field
+            Name: "amount"
+            Type: Builtin
+              Name: "nint"
+      Methods: ~
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Where: ~
+    TypeDef
+      Name: "Level"
+      Public: true
+      Doc: ~
+      Params: ~
+      Body: Record
+        Fields:
+          Field
+            Name: "rank"
+            Type: Builtin
+              Name: "nint"
+      Methods: ~
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Where: ~
+    TypeDef
+      Name: "GameValue"
+      Public: true
+      Doc: ~
+      Params: ~
+      Body: Union
+        Members:
+          Named
+            Def: "Coin"
+          Named
+            Def: "Level"
+      Methods: ~
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Where: ~
+  Funcs:
+    Function
+      Name: "describe"
+      Public: true
+      Extern: false
+      Effects: ~
+      Doc: ~
+      TypeParams: ~
+      Params:
+        Param
+          Name: "v"
+          Type: Named
+            Def: "GameValue"
+      Result: Builtin
+        Name: "string"
+      Body:
+        Match
+          Scrutinee: ParamRef
+            Name: "v"
+            Type: Named
+              Def: "GameValue"
+          Arms:
+            MatchArm
+              Type: Named
+                Def: "Coin"
+              Name: "c"
+              Body:
+                Return
+                  Value: StringLiteral
+                    Value: "coin"
+                    Type: Builtin
+                      Name: "string"
+            MatchArm
+              Type: Named
+                Def: "Level"
+              Name: "l"
+              Body:
+                Return
+                  Value: StringLiteral
+                    Value: "level"
+                    Type: Builtin
+                      Name: "string"
+          Else: ~
+    Function
+      Name: "worth"
+      Public: true
+      Extern: false
+      Effects: ~
+      Doc: ~
+      TypeParams: ~
+      Params:
+        Param
+          Name: "v"
+          Type: Named
+            Def: "GameValue"
+      Result: Builtin
+        Name: "nint"
+      Body:
+        Match
+          Scrutinee: ParamRef
+            Name: "v"
+            Type: Named
+              Def: "GameValue"
+          Arms:
+            MatchArm
+              Type: Named
+                Def: "Coin"
+              Name: "c"
+              Body:
+                Return
+                  Value: FieldAccess
+                    Receiver: LocalRef
+                      Name: "c"
+                      Type: Named
+                        Def: "Coin"
+                    Field: "amount"
+                    Type: Builtin
+                      Name: "nint"
+            MatchArm
+              Type: Named
+                Def: "Level"
+              Name: "l"
+              Body:
+                Return
+                  Value: FieldAccess
+                    Receiver: LocalRef
+                      Name: "l"
+                      Type: Named
+                        Def: "Level"
+                    Field: "rank"
+                    Type: Builtin
+                      Name: "nint"
+          Else: ~
+    Function
+      Name: "amountOr"
+      Public: true
+      Extern: false
+      Effects: ~
+      Doc: ~
+      TypeParams: ~
+      Params:
+        Param
+          Name: "v"
+          Type: Union
+            Members:
+              Named
+                Def: "Coin"
+              Builtin
+                Name: "null"
+        Param
+          Name: "fallback"
+          Type: Builtin
+            Name: "nint"
+      Result: Builtin
+        Name: "nint"
+      Body:
+        Match
+          Scrutinee: ParamRef
+            Name: "v"
+            Type: Union
+              Members:
+                Named
+                  Def: "Coin"
+                Builtin
+                  Name: "null"
+          Arms:
+            MatchArm
+              Type: Named
+                Def: "Coin"
+              Name: "c"
+              Body:
+                Return
+                  Value: FieldAccess
+                    Receiver: LocalRef
+                      Name: "c"
+                      Type: Named
+                        Def: "Coin"
+                    Field: "amount"
+                    Type: Builtin
+                      Name: "nint"
+            MatchArm
+              Type: Builtin
+                Name: "null"
+              Name: ""
+              Body:
+                Return
+                  Value: ParamRef
+                    Name: "fallback"
+                    Type: Builtin
+                      Name: "nint"
+          Else: ~
+    Function
+      Name: "coinAmount"
+      Public: true
+      Extern: false
+      Effects: ~
+      Doc: ~
+      TypeParams: ~
+      Params:
+        Param
+          Name: "v"
+          Type: Named
+            Def: "GameValue"
+      Result: Builtin
+        Name: "nint"
+      Body:
+        Match
+          Scrutinee: ParamRef
+            Name: "v"
+            Type: Named
+              Def: "GameValue"
+          Arms:
+            MatchArm
+              Type: Named
+                Def: "Coin"
+              Name: "c"
+              Body:
+                Return
+                  Value: FieldAccess
+                    Receiver: LocalRef
+                      Name: "c"
+                      Type: Named
+                        Def: "Coin"
+                    Field: "amount"
+                    Type: Builtin
+                      Name: "nint"
+          Else:
+            Return
+              Value: IntLiteral
+                Text: "0"
+                Type: Builtin
+                  Name: "nint"
+    Function
+      Name: "firstOr"
+      Public: true
+      Extern: false
+      Effects: ~
+      Doc: ~
+      TypeParams: ~
+      Params:
+        Param
+          Name: "xs"
+          Type: App
+            Def: "list"
+            Args:
+              Builtin
+                Name: "nint"
+        Param
+          Name: "fallback"
+          Type: Builtin
+            Name: "nint"
+      Result: Builtin
+        Name: "nint"
+      Body:
+        Match
+          Scrutinee: Call
+            Receiver: ParamRef
+              Name: "xs"
+              Type: App
+                Def: "list"
+                Args:
+                  Builtin
+                    Name: "nint"
+            Method: "get"
+            Args:
+              IntLiteral
+                Text: "0"
+                Type: Builtin
+                  Name: "nint"
+            Setter: false
+            Resolved: ~
+            Subst:
+              Entry
+                Key: "K"
+                Value: Builtin
+                  Name: "nint"
+              Entry
+                Key: "T"
+                Value: Builtin
+                  Name: "nint"
+              Entry
+                Key: "V"
+                Value: Builtin
+                  Name: "nint"
+            Type: Union
+              Members:
+                Builtin
+                  Name: "nint"
+                Builtin
+                  Name: "error"
+          Arms:
+            MatchArm
+              Type: Builtin
+                Name: "nint"
+              Name: "v"
+              Body:
+                Return
+                  Value: LocalRef
+                    Name: "v"
+                    Type: Builtin
+                      Name: "nint"
+            MatchArm
+              Type: Builtin
+                Name: "error"
+              Name: "e"
+              Body:
+                Return
+                  Value: ParamRef
+                    Name: "fallback"
+                    Type: Builtin
+                      Name: "nint"
+          Else: ~
+    Function
+      Name: "label"
+      Public: true
+      Extern: false
+      Effects: ~
+      Doc: ~
+      TypeParams: ~
+      Params:
+        Param
+          Name: "v"
+          Type: Named
+            Def: "GameValue"
+        Param
+          Name: "other"
+          Type: Named
+            Def: "GameValue"
+      Result: Builtin
+        Name: "string"
+      Body:
+        Match
+          Scrutinee: ParamRef
+            Name: "v"
+            Type: Named
+              Def: "GameValue"
+          Arms:
+            MatchArm
+              Type: Named
+                Def: "Coin"
+              Name: "c"
+              Body:
+                Let
+                  Name: "n"
+                  Type: Builtin
+                    Name: "nint"
+                  Value: FieldAccess
+                    Receiver: LocalRef
+                      Name: "c"
+                      Type: Named
+                        Def: "Coin"
+                    Field: "amount"
+                    Type: Builtin
+                      Name: "nint"
+                Match
+                  Scrutinee: ParamRef
+                    Name: "other"
+                    Type: Named
+                      Def: "GameValue"
+                  Arms:
+                    MatchArm
+                      Type: Named
+                        Def: "Coin"
+                      Name: "c2"
+                      Body:
+                        Return
+                          Value: StringLiteral
+                            Value: "coin/coin"
+                            Type: Builtin
+                              Name: "string"
+                    MatchArm
+                      Type: Named
+                        Def: "Level"
+                      Name: "l"
+                      Body:
+                        Return
+                          Value: StringLiteral
+                            Value: "coin/level"
+                            Type: Builtin
+                              Name: "string"
+                  Else: ~
+            MatchArm
+              Type: Named
+                Def: "Level"
+              Name: "l"
+              Body:
+                Return
+                  Value: StringLiteral
+                    Value: "level"
+                    Type: Builtin
+                      Name: "string"
+          Else: ~
+  Asserts: ~

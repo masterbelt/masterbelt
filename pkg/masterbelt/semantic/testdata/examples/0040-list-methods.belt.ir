@@ -1,98 +1,1313 @@
 Module
-  Const "Joined"
-    type list<nint>
-    value (([(IntLiteral "1" : nint), (IntLiteral "2" : nint)] : list<nint>).add(([(IntLiteral "3" : nint), (IntLiteral "4" : nint)] : list<nint>)) : list<nint>) [resolved add(other: self): self] [subst K=nint, T=nint, V=nint]
-    eval [1, 2, 3, 4]
-  Const "Added"
-    type list<nint>
-    value (([(IntLiteral "1" : nint), (IntLiteral "2" : nint)] : list<nint>).add((IntLiteral "3" : nint)) : list<nint>) [resolved add(element: T): self] [subst K=nint, T=nint, V=nint]
-    eval [1, 2, 3]
-  Const "NestedAdd"
-    type list<list<nint>>
-    value (([([(IntLiteral "1" : nint)] : list<nint>), ([(IntLiteral "2" : nint)] : list<nint>)] : list<list<nint>>).add(([(IntLiteral "3" : nint)] : list<nint>)) : list<list<nint>>) [resolved add(element: T): self] [subst K=nint, T=list<nint>, V=list<nint>]
-    eval [[1], [2], [3]]
-  Const "Pushed"
-    type list<nint>
-    value (([(IntLiteral "1" : nint), (IntLiteral "2" : nint)] : list<nint>).push((IntLiteral "3" : nint)) : list<nint>) [subst K=nint, T=nint, V=nint]
-    eval [1, 2, 3]
-  Const "Unshifted"
-    type list<nint>
-    value (([(IntLiteral "2" : nint), (IntLiteral "3" : nint)] : list<nint>).unshift((IntLiteral "1" : nint)) : list<nint>) [subst K=nint, T=nint, V=nint]
-    eval [1, 2, 3]
-  Const "Empty"
-    type list<nint>
-    value ([] : list<nint>)
-    eval []
-  Const "Last"
-    type optional<nint>
-    value (([(IntLiteral "1" : nint), (IntLiteral "2" : nint), (IntLiteral "3" : nint)] : list<nint>).pop() : optional<nint>) [subst K=nint, T=nint, V=nint]
-    eval 3
-  Const "NoLast"
-    type optional<nint>
-    value ((Reference -> "Empty" : list<nint>).pop() : optional<nint>) [subst K=nint, T=nint, V=nint]
-    eval null
-  Const "First"
-    type optional<nint>
-    value (([(IntLiteral "1" : nint), (IntLiteral "2" : nint), (IntLiteral "3" : nint)] : list<nint>).shift() : optional<nint>) [subst K=nint, T=nint, V=nint]
-    eval 1
-  Const "NoFirst"
-    type optional<nint>
-    value ((Reference -> "Empty" : list<nint>).shift() : optional<nint>) [subst K=nint, T=nint, V=nint]
-    eval null
-  Func "orZero" pub
-    param v: optional<nint>
-    result nint
-      match (ParamRef "v" : optional<nint>)
-        arm nint n
-          return (LocalRef "n" : nint)
-        arm null
-          return (IntLiteral "0" : nint)
-  Assert "([1, 2] + [3, 4]).len() == 4"
-    eval true
-      ([1, 2] + [3, 4]).len() == 4
-              ^         ^     ^
-              |         4     true
-              [1, 2, 3, 4]
-  Assert "([1, 2] + 3).len() == 3"
-    eval true
-      ([1, 2] + 3).len() == 3
-              ^    ^     ^
-              |    3     true
-              [1, 2, 3]
-  Assert "[1, 2].push(3).len() == 3"
-    eval true
-      [1, 2].push(3).len() == 3
-             ^       ^     ^
-             |       3     true
-             [1, 2, 3]
-  Assert "[2, 3].unshift(1).len() == 3"
-    eval true
-      [2, 3].unshift(1).len() == 3
-             ^          ^     ^
-             [1, 2, 3]  3     true
-  Assert "([[1], [2]] + [3]).len() == 3"
-    eval true
-      ([[1], [2]] + [3]).len() == 3
-                  ^      ^     ^
-                  |      3     true
-                  [[1], [2], [3]]
-  Assert "orZero([1, 2, 3].pop()) == 3"
-    eval true
-      orZero([1, 2, 3].pop()) == 3
-      ^                ^      ^
-      3                3      true
-  Assert "orZero(Empty.pop()) == 0"
-    eval true
-      orZero(Empty.pop()) == 0
-      ^      ^     ^      ^
-      0      []    null   true
-  Assert "orZero([1, 2, 3].shift()) == 1"
-    eval true
-      orZero([1, 2, 3].shift()) == 1
-      ^                ^        ^
-      1                1        true
-  Assert "orZero(Empty.shift()) == 0"
-    eval true
-      orZero(Empty.shift()) == 0
-      ^      ^     ^        ^
-      0      []    null     true
+  Consts:
+    Const
+      Name: "Joined"
+      Public: false
+      Doc: ~
+      Type: App
+        Def: "list"
+        Args:
+          Builtin
+            Name: "nint"
+      Value: Call
+        Receiver: CollectionLiteral
+          Entries:
+            CollectionEntry
+              Key: ~
+              Value: IntLiteral
+                Text: "1"
+                Type: Builtin
+                  Name: "nint"
+            CollectionEntry
+              Key: ~
+              Value: IntLiteral
+                Text: "2"
+                Type: Builtin
+                  Name: "nint"
+          Type: App
+            Def: "list"
+            Args:
+              Builtin
+                Name: "nint"
+        Method: "add"
+        Args:
+          CollectionLiteral
+            Entries:
+              CollectionEntry
+                Key: ~
+                Value: IntLiteral
+                  Text: "3"
+                  Type: Builtin
+                    Name: "nint"
+              CollectionEntry
+                Key: ~
+                Value: IntLiteral
+                  Text: "4"
+                  Type: Builtin
+                    Name: "nint"
+            Type: App
+              Def: "list"
+              Args:
+                Builtin
+                  Name: "nint"
+        Setter: false
+        Resolved: "list.add(self)"
+        Subst:
+          Entry
+            Key: "K"
+            Value: Builtin
+              Name: "nint"
+          Entry
+            Key: "T"
+            Value: Builtin
+              Name: "nint"
+          Entry
+            Key: "V"
+            Value: Builtin
+              Name: "nint"
+        Type: App
+          Def: "list"
+          Args:
+            Builtin
+              Name: "nint"
+      Eval: Constant
+        Kind: 3
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll:
+          ConstEntry
+            Key: ~
+            Value: Constant
+              Kind: 0
+              Int: 1
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+          ConstEntry
+            Key: ~
+            Value: Constant
+              Kind: 0
+              Int: 2
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+          ConstEntry
+            Key: ~
+            Value: Constant
+              Kind: 0
+              Int: 3
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+          ConstEntry
+            Key: ~
+            Value: Constant
+              Kind: 0
+              Int: 4
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+        Fields: ~
+        CollMapness: 1
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "Added"
+      Public: false
+      Doc: ~
+      Type: App
+        Def: "list"
+        Args:
+          Builtin
+            Name: "nint"
+      Value: Call
+        Receiver: CollectionLiteral
+          Entries:
+            CollectionEntry
+              Key: ~
+              Value: IntLiteral
+                Text: "1"
+                Type: Builtin
+                  Name: "nint"
+            CollectionEntry
+              Key: ~
+              Value: IntLiteral
+                Text: "2"
+                Type: Builtin
+                  Name: "nint"
+          Type: App
+            Def: "list"
+            Args:
+              Builtin
+                Name: "nint"
+        Method: "add"
+        Args:
+          IntLiteral
+            Text: "3"
+            Type: Builtin
+              Name: "nint"
+        Setter: false
+        Resolved: "list.add(T)"
+        Subst:
+          Entry
+            Key: "K"
+            Value: Builtin
+              Name: "nint"
+          Entry
+            Key: "T"
+            Value: Builtin
+              Name: "nint"
+          Entry
+            Key: "V"
+            Value: Builtin
+              Name: "nint"
+        Type: App
+          Def: "list"
+          Args:
+            Builtin
+              Name: "nint"
+      Eval: Constant
+        Kind: 3
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll:
+          ConstEntry
+            Key: ~
+            Value: Constant
+              Kind: 0
+              Int: 1
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+          ConstEntry
+            Key: ~
+            Value: Constant
+              Kind: 0
+              Int: 2
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+          ConstEntry
+            Key: ~
+            Value: Constant
+              Kind: 0
+              Int: 3
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+        Fields: ~
+        CollMapness: 1
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "NestedAdd"
+      Public: false
+      Doc: ~
+      Type: App
+        Def: "list"
+        Args:
+          App
+            Def: "list"
+            Args:
+              Builtin
+                Name: "nint"
+      Value: Call
+        Receiver: CollectionLiteral
+          Entries:
+            CollectionEntry
+              Key: ~
+              Value: CollectionLiteral
+                Entries:
+                  CollectionEntry
+                    Key: ~
+                    Value: IntLiteral
+                      Text: "1"
+                      Type: Builtin
+                        Name: "nint"
+                Type: App
+                  Def: "list"
+                  Args:
+                    Builtin
+                      Name: "nint"
+            CollectionEntry
+              Key: ~
+              Value: CollectionLiteral
+                Entries:
+                  CollectionEntry
+                    Key: ~
+                    Value: IntLiteral
+                      Text: "2"
+                      Type: Builtin
+                        Name: "nint"
+                Type: App
+                  Def: "list"
+                  Args:
+                    Builtin
+                      Name: "nint"
+          Type: App
+            Def: "list"
+            Args:
+              App
+                Def: "list"
+                Args:
+                  Builtin
+                    Name: "nint"
+        Method: "add"
+        Args:
+          CollectionLiteral
+            Entries:
+              CollectionEntry
+                Key: ~
+                Value: IntLiteral
+                  Text: "3"
+                  Type: Builtin
+                    Name: "nint"
+            Type: App
+              Def: "list"
+              Args:
+                Builtin
+                  Name: "nint"
+        Setter: false
+        Resolved: "list.add(T)"
+        Subst:
+          Entry
+            Key: "K"
+            Value: Builtin
+              Name: "nint"
+          Entry
+            Key: "T"
+            Value: App
+              Def: "list"
+              Args:
+                Builtin
+                  Name: "nint"
+          Entry
+            Key: "V"
+            Value: App
+              Def: "list"
+              Args:
+                Builtin
+                  Name: "nint"
+        Type: App
+          Def: "list"
+          Args:
+            App
+              Def: "list"
+              Args:
+                Builtin
+                  Name: "nint"
+      Eval: Constant
+        Kind: 3
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll:
+          ConstEntry
+            Key: ~
+            Value: Constant
+              Kind: 3
+              Int: ~
+              Bool: false
+              Str: ""
+              Coll:
+                ConstEntry
+                  Key: ~
+                  Value: Constant
+                    Kind: 0
+                    Int: 1
+                    Bool: false
+                    Str: ""
+                    Coll: ~
+                    Fields: ~
+                    CollMapness: 0
+                    Millis: 0
+                    Fn: ~
+                    Captured: ~
+                    EnumDef: ~
+                    EnumIndex: 0
+                    Start: ~
+                    End: ~
+                    Step: ~
+                    UnionTag: ~
+              Fields: ~
+              CollMapness: 1
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+          ConstEntry
+            Key: ~
+            Value: Constant
+              Kind: 3
+              Int: ~
+              Bool: false
+              Str: ""
+              Coll:
+                ConstEntry
+                  Key: ~
+                  Value: Constant
+                    Kind: 0
+                    Int: 2
+                    Bool: false
+                    Str: ""
+                    Coll: ~
+                    Fields: ~
+                    CollMapness: 0
+                    Millis: 0
+                    Fn: ~
+                    Captured: ~
+                    EnumDef: ~
+                    EnumIndex: 0
+                    Start: ~
+                    End: ~
+                    Step: ~
+                    UnionTag: ~
+              Fields: ~
+              CollMapness: 1
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+          ConstEntry
+            Key: ~
+            Value: Constant
+              Kind: 3
+              Int: ~
+              Bool: false
+              Str: ""
+              Coll:
+                ConstEntry
+                  Key: ~
+                  Value: Constant
+                    Kind: 0
+                    Int: 3
+                    Bool: false
+                    Str: ""
+                    Coll: ~
+                    Fields: ~
+                    CollMapness: 0
+                    Millis: 0
+                    Fn: ~
+                    Captured: ~
+                    EnumDef: ~
+                    EnumIndex: 0
+                    Start: ~
+                    End: ~
+                    Step: ~
+                    UnionTag: ~
+              Fields: ~
+              CollMapness: 1
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+        Fields: ~
+        CollMapness: 1
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "Pushed"
+      Public: false
+      Doc: ~
+      Type: App
+        Def: "list"
+        Args:
+          Builtin
+            Name: "nint"
+      Value: Call
+        Receiver: CollectionLiteral
+          Entries:
+            CollectionEntry
+              Key: ~
+              Value: IntLiteral
+                Text: "1"
+                Type: Builtin
+                  Name: "nint"
+            CollectionEntry
+              Key: ~
+              Value: IntLiteral
+                Text: "2"
+                Type: Builtin
+                  Name: "nint"
+          Type: App
+            Def: "list"
+            Args:
+              Builtin
+                Name: "nint"
+        Method: "push"
+        Args:
+          IntLiteral
+            Text: "3"
+            Type: Builtin
+              Name: "nint"
+        Setter: false
+        Resolved: ~
+        Subst:
+          Entry
+            Key: "K"
+            Value: Builtin
+              Name: "nint"
+          Entry
+            Key: "T"
+            Value: Builtin
+              Name: "nint"
+          Entry
+            Key: "V"
+            Value: Builtin
+              Name: "nint"
+        Type: App
+          Def: "list"
+          Args:
+            Builtin
+              Name: "nint"
+      Eval: Constant
+        Kind: 3
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll:
+          ConstEntry
+            Key: ~
+            Value: Constant
+              Kind: 0
+              Int: 1
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+          ConstEntry
+            Key: ~
+            Value: Constant
+              Kind: 0
+              Int: 2
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+          ConstEntry
+            Key: ~
+            Value: Constant
+              Kind: 0
+              Int: 3
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+        Fields: ~
+        CollMapness: 1
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "Unshifted"
+      Public: false
+      Doc: ~
+      Type: App
+        Def: "list"
+        Args:
+          Builtin
+            Name: "nint"
+      Value: Call
+        Receiver: CollectionLiteral
+          Entries:
+            CollectionEntry
+              Key: ~
+              Value: IntLiteral
+                Text: "2"
+                Type: Builtin
+                  Name: "nint"
+            CollectionEntry
+              Key: ~
+              Value: IntLiteral
+                Text: "3"
+                Type: Builtin
+                  Name: "nint"
+          Type: App
+            Def: "list"
+            Args:
+              Builtin
+                Name: "nint"
+        Method: "unshift"
+        Args:
+          IntLiteral
+            Text: "1"
+            Type: Builtin
+              Name: "nint"
+        Setter: false
+        Resolved: ~
+        Subst:
+          Entry
+            Key: "K"
+            Value: Builtin
+              Name: "nint"
+          Entry
+            Key: "T"
+            Value: Builtin
+              Name: "nint"
+          Entry
+            Key: "V"
+            Value: Builtin
+              Name: "nint"
+        Type: App
+          Def: "list"
+          Args:
+            Builtin
+              Name: "nint"
+      Eval: Constant
+        Kind: 3
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll:
+          ConstEntry
+            Key: ~
+            Value: Constant
+              Kind: 0
+              Int: 1
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+          ConstEntry
+            Key: ~
+            Value: Constant
+              Kind: 0
+              Int: 2
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+          ConstEntry
+            Key: ~
+            Value: Constant
+              Kind: 0
+              Int: 3
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+        Fields: ~
+        CollMapness: 1
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "Empty"
+      Public: false
+      Doc: ~
+      Type: App
+        Def: "list"
+        Args:
+          Builtin
+            Name: "nint"
+      Value: CollectionLiteral
+        Entries: ~
+        Type: App
+          Def: "list"
+          Args:
+            Builtin
+              Name: "nint"
+      Eval: Constant
+        Kind: 3
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 1
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "Last"
+      Public: false
+      Doc: ~
+      Type: App
+        Def: "optional"
+        Args:
+          Builtin
+            Name: "nint"
+      Value: Call
+        Receiver: CollectionLiteral
+          Entries:
+            CollectionEntry
+              Key: ~
+              Value: IntLiteral
+                Text: "1"
+                Type: Builtin
+                  Name: "nint"
+            CollectionEntry
+              Key: ~
+              Value: IntLiteral
+                Text: "2"
+                Type: Builtin
+                  Name: "nint"
+            CollectionEntry
+              Key: ~
+              Value: IntLiteral
+                Text: "3"
+                Type: Builtin
+                  Name: "nint"
+          Type: App
+            Def: "list"
+            Args:
+              Builtin
+                Name: "nint"
+        Method: "pop"
+        Args: ~
+        Setter: false
+        Resolved: ~
+        Subst:
+          Entry
+            Key: "K"
+            Value: Builtin
+              Name: "nint"
+          Entry
+            Key: "T"
+            Value: Builtin
+              Name: "nint"
+          Entry
+            Key: "V"
+            Value: Builtin
+              Name: "nint"
+        Type: App
+          Def: "optional"
+          Args:
+            Builtin
+              Name: "nint"
+      Eval: Constant
+        Kind: 0
+        Int: 3
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "NoLast"
+      Public: false
+      Doc: ~
+      Type: App
+        Def: "optional"
+        Args:
+          Builtin
+            Name: "nint"
+      Value: Call
+        Receiver: Reference
+          Target: "Empty"
+          Type: App
+            Def: "list"
+            Args:
+              Builtin
+                Name: "nint"
+        Method: "pop"
+        Args: ~
+        Setter: false
+        Resolved: ~
+        Subst:
+          Entry
+            Key: "K"
+            Value: Builtin
+              Name: "nint"
+          Entry
+            Key: "T"
+            Value: Builtin
+              Name: "nint"
+          Entry
+            Key: "V"
+            Value: Builtin
+              Name: "nint"
+        Type: App
+          Def: "optional"
+          Args:
+            Builtin
+              Name: "nint"
+      Eval: Constant
+        Kind: 10
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "First"
+      Public: false
+      Doc: ~
+      Type: App
+        Def: "optional"
+        Args:
+          Builtin
+            Name: "nint"
+      Value: Call
+        Receiver: CollectionLiteral
+          Entries:
+            CollectionEntry
+              Key: ~
+              Value: IntLiteral
+                Text: "1"
+                Type: Builtin
+                  Name: "nint"
+            CollectionEntry
+              Key: ~
+              Value: IntLiteral
+                Text: "2"
+                Type: Builtin
+                  Name: "nint"
+            CollectionEntry
+              Key: ~
+              Value: IntLiteral
+                Text: "3"
+                Type: Builtin
+                  Name: "nint"
+          Type: App
+            Def: "list"
+            Args:
+              Builtin
+                Name: "nint"
+        Method: "shift"
+        Args: ~
+        Setter: false
+        Resolved: ~
+        Subst:
+          Entry
+            Key: "K"
+            Value: Builtin
+              Name: "nint"
+          Entry
+            Key: "T"
+            Value: Builtin
+              Name: "nint"
+          Entry
+            Key: "V"
+            Value: Builtin
+              Name: "nint"
+        Type: App
+          Def: "optional"
+          Args:
+            Builtin
+              Name: "nint"
+      Eval: Constant
+        Kind: 0
+        Int: 1
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "NoFirst"
+      Public: false
+      Doc: ~
+      Type: App
+        Def: "optional"
+        Args:
+          Builtin
+            Name: "nint"
+      Value: Call
+        Receiver: Reference
+          Target: "Empty"
+          Type: App
+            Def: "list"
+            Args:
+              Builtin
+                Name: "nint"
+        Method: "shift"
+        Args: ~
+        Setter: false
+        Resolved: ~
+        Subst:
+          Entry
+            Key: "K"
+            Value: Builtin
+              Name: "nint"
+          Entry
+            Key: "T"
+            Value: Builtin
+              Name: "nint"
+          Entry
+            Key: "V"
+            Value: Builtin
+              Name: "nint"
+        Type: App
+          Def: "optional"
+          Args:
+            Builtin
+              Name: "nint"
+      Eval: Constant
+        Kind: 10
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+  Types: ~
+  Funcs:
+    Function
+      Name: "orZero"
+      Public: true
+      Extern: false
+      Effects: ~
+      Doc: ~
+      TypeParams: ~
+      Params:
+        Param
+          Name: "v"
+          Type: App
+            Def: "optional"
+            Args:
+              Builtin
+                Name: "nint"
+      Result: Builtin
+        Name: "nint"
+      Body:
+        Match
+          Scrutinee: ParamRef
+            Name: "v"
+            Type: App
+              Def: "optional"
+              Args:
+                Builtin
+                  Name: "nint"
+          Arms:
+            MatchArm
+              Type: Builtin
+                Name: "nint"
+              Name: "n"
+              Body:
+                Return
+                  Value: LocalRef
+                    Name: "n"
+                    Type: Builtin
+                      Name: "nint"
+            MatchArm
+              Type: Builtin
+                Name: "null"
+              Name: ""
+              Body:
+                Return
+                  Value: IntLiteral
+                    Text: "0"
+                    Type: Builtin
+                      Name: "nint"
+          Else: ~
+  Asserts:
+    Assert
+      Cond: "([1, 2] + [3, 4]).len() == 4"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "([1, 2] + [3, 4]).len() == 4\n        ^         ^     ^\n        |         4     true\n        [1, 2, 3, 4]"
+    Assert
+      Cond: "([1, 2] + 3).len() == 3"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "([1, 2] + 3).len() == 3\n        ^    ^     ^\n        |    3     true\n        [1, 2, 3]"
+    Assert
+      Cond: "[1, 2].push(3).len() == 3"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "[1, 2].push(3).len() == 3\n       ^       ^     ^\n       |       3     true\n       [1, 2, 3]"
+    Assert
+      Cond: "[2, 3].unshift(1).len() == 3"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "[2, 3].unshift(1).len() == 3\n       ^          ^     ^\n       [1, 2, 3]  3     true"
+    Assert
+      Cond: "([[1], [2]] + [3]).len() == 3"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "([[1], [2]] + [3]).len() == 3\n            ^      ^     ^\n            |      3     true\n            [[1], [2], [3]]"
+    Assert
+      Cond: "orZero([1, 2, 3].pop()) == 3"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "orZero([1, 2, 3].pop()) == 3\n^                ^      ^\n3                3      true"
+    Assert
+      Cond: "orZero(Empty.pop()) == 0"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "orZero(Empty.pop()) == 0\n^      ^     ^      ^\n0      []    null   true"
+    Assert
+      Cond: "orZero([1, 2, 3].shift()) == 1"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "orZero([1, 2, 3].shift()) == 1\n^                ^        ^\n1                1        true"
+    Assert
+      Cond: "orZero(Empty.shift()) == 0"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+      Diagram: "orZero(Empty.shift()) == 0\n^      ^     ^        ^\n0      []    null     true"

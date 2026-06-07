@@ -1,50 +1,388 @@
 Module
-  Const "Base"
-    type Score
-    value (adapt (IntLiteral "100" : nint) : Score)
-    eval 100
-  Const "Bumped"
-    type Score
-    value ((Reference -> "Base" : Score).merge((adapt (IntLiteral "50" : nint) : Score)) : Score) [resolved merge(points: self): self]
-    eval 150
-  Const "Counted"
-    type bool
-    value ((Reference -> "Base" : Score).merge((BoolLiteral true : bool)) : bool) [resolved merge(active: bool): bool]
-    eval true
-  Const "Start"
-    type Level
-    value (adapt (IntLiteral "1" : nint) : Level)
-    eval 1
-  Const "Second"
-    type Level
-    value ((Reference -> "Start" : Level).next() : Level) [resolved next(): self]
-    eval 2
-  Const "Fifth"
-    type Level
-    value ((Reference -> "Start" : Level).next((adapt (IntLiteral "4" : nint) : Level)) : Level) [resolved next(steps: self): self]
-    eval 5
-  TypeDef "Score" pub
-    doc "A game score in points."
-    body int
-    method "merge" pub
-      doc "The score with points merged in."
-      param points: self
-      result self
-      return ((self : Score).add((ParamRef "points" : Score)) : Score)
-    method "merge" pub
-      doc "Whether an active run with this score counts."
-      param active: bool
-      result bool
-      return ((ParamRef "active" : bool).anan(((self : Score).gt((adapt (IntLiteral "0" : nint) : Score)) : bool)) : bool)
-  TypeDef "Level" pub
-    doc "A character level."
-    body sbyte
-    method "next" pub
-      doc "The next level."
-      result self
-      return ((self : Level).add((adapt (IntLiteral "1" : nint) : Level)) : Level)
-    method "next" pub
-      doc "The level a number of steps up."
-      param steps: self
-      result self
-      return ((self : Level).add((ParamRef "steps" : Level)) : Level)
+  Consts:
+    Const
+      Name: "Base"
+      Public: false
+      Doc: ~
+      Type: Named
+        Def: "Score"
+      Value: Adapt
+        Value: IntLiteral
+          Text: "100"
+          Type: Builtin
+            Name: "nint"
+        To: Named
+          Def: "Score"
+      Eval: Constant
+        Kind: 0
+        Int: 100
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "Bumped"
+      Public: false
+      Doc: ~
+      Type: Named
+        Def: "Score"
+      Value: Call
+        Receiver: Reference
+          Target: "Base"
+          Type: Named
+            Def: "Score"
+        Method: "merge"
+        Args:
+          Adapt
+            Value: IntLiteral
+              Text: "50"
+              Type: Builtin
+                Name: "nint"
+            To: Named
+              Def: "Score"
+        Setter: false
+        Resolved: "Score.merge(self)"
+        Subst: ~
+        Type: Named
+          Def: "Score"
+      Eval: Constant
+        Kind: 0
+        Int: 150
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "Counted"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "bool"
+      Value: Call
+        Receiver: Reference
+          Target: "Base"
+          Type: Named
+            Def: "Score"
+        Method: "merge"
+        Args:
+          BoolLiteral
+            Value: true
+            Type: Builtin
+              Name: "bool"
+        Setter: false
+        Resolved: "Score.merge(bool)"
+        Subst: ~
+        Type: Builtin
+          Name: "bool"
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "Start"
+      Public: false
+      Doc: ~
+      Type: Named
+        Def: "Level"
+      Value: Adapt
+        Value: IntLiteral
+          Text: "1"
+          Type: Builtin
+            Name: "nint"
+        To: Named
+          Def: "Level"
+      Eval: Constant
+        Kind: 0
+        Int: 1
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "Second"
+      Public: false
+      Doc: ~
+      Type: Named
+        Def: "Level"
+      Value: Call
+        Receiver: Reference
+          Target: "Start"
+          Type: Named
+            Def: "Level"
+        Method: "next"
+        Args: ~
+        Setter: false
+        Resolved: "Level.next()"
+        Subst: ~
+        Type: Named
+          Def: "Level"
+      Eval: Constant
+        Kind: 0
+        Int: 2
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+    Const
+      Name: "Fifth"
+      Public: false
+      Doc: ~
+      Type: Named
+        Def: "Level"
+      Value: Call
+        Receiver: Reference
+          Target: "Start"
+          Type: Named
+            Def: "Level"
+        Method: "next"
+        Args:
+          Adapt
+            Value: IntLiteral
+              Text: "4"
+              Type: Builtin
+                Name: "nint"
+            To: Named
+              Def: "Level"
+        Setter: false
+        Resolved: "Level.next(self)"
+        Subst: ~
+        Type: Named
+          Def: "Level"
+      Eval: Constant
+        Kind: 0
+        Int: 5
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+  Types:
+    TypeDef
+      Name: "Score"
+      Public: true
+      Doc: "A game score in points."
+      Params: ~
+      Body: Builtin
+        Name: "int"
+      Methods:
+        Method
+          Name: "merge"
+          Public: true
+          Extern: false
+          Kind: 0
+          Effects: ~
+          Doc: "The score with points merged in."
+          Params:
+            Param
+              Name: "points"
+              Type: SelfType
+          Result: SelfType
+          Body:
+            Return
+              Value: Call
+                Receiver: SelfValue
+                  Type: Named
+                    Def: "Score"
+                Method: "add"
+                Args:
+                  ParamRef
+                    Name: "points"
+                    Type: Named
+                      Def: "Score"
+                Setter: false
+                Resolved: ~
+                Subst: ~
+                Type: Named
+                  Def: "Score"
+          Owner: "Score"
+        Method
+          Name: "merge"
+          Public: true
+          Extern: false
+          Kind: 0
+          Effects: ~
+          Doc: "Whether an active run with this score counts."
+          Params:
+            Param
+              Name: "active"
+              Type: Builtin
+                Name: "bool"
+          Result: Builtin
+            Name: "bool"
+          Body:
+            Return
+              Value: Call
+                Receiver: ParamRef
+                  Name: "active"
+                  Type: Builtin
+                    Name: "bool"
+                Method: "anan"
+                Args:
+                  Call
+                    Receiver: SelfValue
+                      Type: Named
+                        Def: "Score"
+                    Method: "gt"
+                    Args:
+                      Adapt
+                        Value: IntLiteral
+                          Text: "0"
+                          Type: Builtin
+                            Name: "nint"
+                        To: Named
+                          Def: "Score"
+                    Setter: false
+                    Resolved: ~
+                    Subst: ~
+                    Type: Builtin
+                      Name: "bool"
+                Setter: false
+                Resolved: ~
+                Subst: ~
+                Type: Builtin
+                  Name: "bool"
+          Owner: "Score"
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Where: ~
+    TypeDef
+      Name: "Level"
+      Public: true
+      Doc: "A character level."
+      Params: ~
+      Body: Builtin
+        Name: "sbyte"
+      Methods:
+        Method
+          Name: "next"
+          Public: true
+          Extern: false
+          Kind: 0
+          Effects: ~
+          Doc: "The next level."
+          Params: ~
+          Result: SelfType
+          Body:
+            Return
+              Value: Call
+                Receiver: SelfValue
+                  Type: Named
+                    Def: "Level"
+                Method: "add"
+                Args:
+                  Adapt
+                    Value: IntLiteral
+                      Text: "1"
+                      Type: Builtin
+                        Name: "nint"
+                    To: Named
+                      Def: "Level"
+                Setter: false
+                Resolved: ~
+                Subst: ~
+                Type: Named
+                  Def: "Level"
+          Owner: "Level"
+        Method
+          Name: "next"
+          Public: true
+          Extern: false
+          Kind: 0
+          Effects: ~
+          Doc: "The level a number of steps up."
+          Params:
+            Param
+              Name: "steps"
+              Type: SelfType
+          Result: SelfType
+          Body:
+            Return
+              Value: Call
+                Receiver: SelfValue
+                  Type: Named
+                    Def: "Level"
+                Method: "add"
+                Args:
+                  ParamRef
+                    Name: "steps"
+                    Type: Named
+                      Def: "Level"
+                Setter: false
+                Resolved: ~
+                Subst: ~
+                Type: Named
+                  Def: "Level"
+          Owner: "Level"
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Where: ~
+  Funcs: ~
+  Asserts: ~
