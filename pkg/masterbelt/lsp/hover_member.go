@@ -93,6 +93,9 @@ func methodSignatureSubst(m *ir.Method, subst map[string]ir.Type) string {
 		b.WriteString("set ")
 	case ir.MethodStatic:
 		b.WriteString("static fn ")
+	default:
+		// An ordinary method (MethodNormal) carries no leading modifier:
+		// nothing is written before its effects and name.
 	}
 	for _, eff := range m.Effects {
 		b.WriteString(eff + " ")

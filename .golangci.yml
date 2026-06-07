@@ -36,14 +36,12 @@ linters:
     - usestdlibvars
     - wastedassign
 
-    # --- medium: needs a real pass or tuned settings ---
-    # - prealloc # 22 issues (append loops without preallocation)
-    # - exhaustive # 35 issues with default-signifies-exhaustive: true
-    # - revive # 154 issues: exported 90 / package-comments 28 /
-    #          # redefines-builtin-id 22 / unused-parameter 13 /
-    #          # unreachable-code 1
-    # - goconst # 34 issues with ignore-tests: true (name literals worth
-    #           # canonical constants)
+    - exhaustive
+    - goconst
+    - prealloc
+    - revive # the mechanical rules; the documentation rules (exported,
+             # package-comments) land with the M5 writing pass
+
 
     # --- TODO(complexity): measured 2026-06-07 at upstream defaults ---
     # - funlen # 63 issues at the default 60 lines / 40 statements
@@ -54,12 +52,32 @@ linters:
     #          # punishes the compiler's dispatch switches; gocyclo carries
     #          # the per-function ceiling instead.
   settings:
+    exhaustive:
+      # Writing a default arm declares the switch intentionally
+      # non-exhaustive; an internal enum switch without one must list every
+      # member.
+      default-signifies-exhaustive: true
+    goconst:
+      # A test's repeated literals are its own readability business; the
+      # production name literals get canonical constants (builtin.Name*).
+      ignore-tests: true
+    revive:
+      rules:
+        - name: unused-parameter
+        - name: unreachable-code
+        - name: redefines-builtin-id
     gocyclo:
       # Ceiling pinned to today's worst function. TODO: ratchet down to the
       # default 30 — 17 offenders at 30 as of 2026-06-07 (worst:
       # graphValueRaw=47, recordTypes=46, ConstantsEqual=42,
       # enforceEvalPublication=41); see tmp/plan/D-2-lint-ratchet.md §4.
       min-complexity: 47
+
+  exclusions:
+    # Generated files are excluded from analysis, not just reporting:
+    # goconst would otherwise count a generated file's literals toward a
+    # hand-written file's occurrence threshold.
+    generated: strict
 
 issues:
   # The complexity linters (gocyclo, gocognit, funlen, maintidx, cyclop) all

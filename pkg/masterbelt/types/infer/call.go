@@ -10,6 +10,8 @@ package infer
 import (
 	"strings"
 
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
+
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/types"
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
@@ -277,7 +279,7 @@ func convCallType(e *ast.CallExpr, name string, t ir.Type, s scope, sink *Sink) 
 				sink.arityMismatch(e, name, len(e.Arguments), 1)
 				return t
 			}
-			checkType(e.Arguments[0], &ir.Builtin{Name: "string"}, s, map[string]ir.Type{}, sink)
+			checkType(e.Arguments[0], &ir.Builtin{Name: builtin.NameString}, s, map[string]ir.Type{}, sink)
 			return t
 		}
 		if b.Name == "range" {
@@ -296,7 +298,7 @@ func convCallType(e *ast.CallExpr, name string, t ir.Type, s scope, sink *Sink) 
 				return t
 			}
 			for _, a := range e.Arguments {
-				checkType(a, &ir.Builtin{Name: "nint"}, s, map[string]ir.Type{}, sink)
+				checkType(a, &ir.Builtin{Name: builtin.NameNint}, s, map[string]ir.Type{}, sink)
 			}
 			return t
 		}

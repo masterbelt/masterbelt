@@ -54,7 +54,7 @@ func initExpr(t *testing.T, src string) (source.Buffer, cst.Tree) {
 		}
 	}
 	t.Fatalf("no initializer expression in %q", src)
-	panic("unreachable")
+	return nil, cst.Tree{} // unreachable: Fatalf stops the test
 }
 
 func TestParseExpressionShape(t *testing.T) {

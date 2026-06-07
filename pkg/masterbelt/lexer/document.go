@@ -196,6 +196,9 @@ func isTrivia(k token.Kind) bool {
 	switch k {
 	case token.Whitespace, token.Newline, token.LineComment, token.DocComment, token.BlockComment:
 		return true
+	default:
+		// Any other kind is not trivia: it can fuse with a following literal,
+		// so a relex window may not start past it. Fall through to return false.
 	}
 	return false
 }

@@ -293,6 +293,9 @@ func classify(pkg *types.Package, f *types.Var, tag reflect.StructTag) (*fieldMo
 			return &fieldModel{name: name, kind: fieldInt}, nil, nil
 		case types.Int64:
 			return &fieldModel{name: name, kind: fieldInt64}, nil, nil
+		default:
+			// Any other basic kind has no codec kind: fall through to the
+			// unsupported-field-type error at the end of classify.
 		}
 	case *types.Named:
 		if basic, ok := t.Underlying().(*types.Basic); ok && basic.Kind() == types.Int && samePkg(pkg, t.Obj().Pkg()) {

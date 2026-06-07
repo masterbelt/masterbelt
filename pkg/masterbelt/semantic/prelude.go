@@ -70,7 +70,7 @@ func registryTypes(reg *builtin.Registry) map[string]*ir.TypeDef {
 func LoadPrelude(reg *builtin.Registry) (map[string]*ir.TypeDef, []*ir.TypeDef, error) {
 	src := builtin.PreludeSource()
 	doc := abstract.NewDocument(src)
-	var diags []diagnostic.Diagnostic
+	diags := make([]diagnostic.Diagnostic, 0, len(doc.Concrete().LexDiagnostics())+len(doc.Diagnostics()))
 	diags = append(diags, doc.Concrete().LexDiagnostics()...)
 	diags = append(diags, doc.Diagnostics()...)
 	if len(diags) > 0 {

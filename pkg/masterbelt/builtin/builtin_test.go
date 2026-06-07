@@ -15,7 +15,7 @@ func TestIntrinsicKindDispatch(t *testing.T) {
 	one := ir.IntConstant(big.NewInt(1))
 
 	mark := func(s string) Intrinsic {
-		return func(recv *ir.Constant, args []*ir.Constant) *ir.Constant {
+		return func(_ *ir.Constant, _ []*ir.Constant) *ir.Constant {
 			return ir.StringConstant(s)
 		}
 	}

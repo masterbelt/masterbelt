@@ -49,7 +49,7 @@ func constInfo(p *Program, file FileID, name string) (typ, eval string) {
 
 // codesOf flattens a file's diagnostic codes for compact assertions.
 func codesOf(p *Program, file FileID) string {
-	var out []string
+	out := make([]string, 0, len(p.Diagnostics(file)))
 	for _, d := range p.Diagnostics(file) {
 		out = append(out, string(d.Code))
 	}

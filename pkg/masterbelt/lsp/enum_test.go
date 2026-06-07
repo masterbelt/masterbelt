@@ -80,7 +80,7 @@ func TestEnumDocumentSymbols(t *testing.T) {
 	if len(enum.Children) != 3 {
 		t.Fatalf("Rarity has %d member symbols, want 3", len(enum.Children))
 	}
-	names := []string{}
+	names := make([]string, 0, len(enum.Children))
 	for _, c := range enum.Children {
 		names = append(names, c.Name)
 		if c.Kind != protocol.SymbolKindEnumMember {

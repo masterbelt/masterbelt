@@ -45,7 +45,7 @@ func TestObserveForwardsEverySinkField(t *testing.T) {
 			// recorder that records the call.
 			called := false
 			src := &Sink{}
-			recorder := reflect.MakeFunc(field.Type, func(args []reflect.Value) []reflect.Value {
+			recorder := reflect.MakeFunc(field.Type, func(_ []reflect.Value) []reflect.Value {
 				called = true
 				return nil
 			})

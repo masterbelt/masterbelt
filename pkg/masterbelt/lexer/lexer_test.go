@@ -301,12 +301,17 @@ func kindsOf(t *testing.T, src string) ([]token.Kind, []string, []diagnostic.Dia
 	t.Helper()
 	file := source.NewFile("lit.belt", []byte(src))
 	lex := New(file)
-	var kinds []token.Kind
-	var texts []string
-	for _, tok := range lex.Tokens() {
+	// Tokens drains the lexer, so it is read exactly once.
+	toks := lex.Tokens()
+	kinds := make([]token.Kind, 0, len(toks))
+	texts := make([]string, 0, len(toks))
+	for _, tok := range toks {
 		switch tok.Kind {
 		case token.Whitespace, token.Newline, token.EOF:
 			continue
+		default:
+			// Any other kind is a non-trivia token the literal tests assert
+			// against: keep it and record its text below.
 		}
 		kinds = append(kinds, tok.Kind)
 		texts = append(texts, tok.Text(file))

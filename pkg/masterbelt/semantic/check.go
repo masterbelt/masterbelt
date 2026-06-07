@@ -113,7 +113,7 @@ func checkRangeStepZero(e ast.Expr, env exprFolder, report func(node ast.Node)) 
 	// range(start, end, step) is a conversion call: the callee names the type
 	// directly (an identifier "range"), not a member. A three-argument call whose
 	// step folds to a constant zero is the zero-step range.
-	if id, ok := call.Callee.(*ast.Identifier); ok && id.Name == "range" && len(call.Arguments) == 3 {
+	if id, ok := call.Callee.(*ast.Identifier); ok && id.Name == builtin.NameRange && len(call.Arguments) == 3 {
 		if step := env.fold(call.Arguments[2]); step != nil && step.Kind == ir.ConstInt && step.Int.Sign() == 0 {
 			report(call)
 		}

@@ -226,16 +226,16 @@ func Default() *Registry {
 	// yields the span between them, a duration the earlier instant.
 	dtI := millisComparisons(ir.ConstDatetime)
 	dtI["add"] = binaryMillis(ir.ConstDatetime, ir.ConstDuration, checkedMillis(addMillis, ir.DatetimeConstant))
-	r.register("datetime", &NativeType{Name: "datetime", Datetime: true}, datetimeMethods(), dtI)
-	r.registerIntrinsic("datetime", "sub", []ir.ConstKind{ir.ConstDatetime},
+	r.register(NameDatetime, &NativeType{Name: NameDatetime, Datetime: true}, datetimeMethods(), dtI)
+	r.registerIntrinsic(NameDatetime, "sub", []ir.ConstKind{ir.ConstDatetime},
 		binaryMillis(ir.ConstDatetime, ir.ConstDatetime, checkedMillis(subMillis, ir.DurationConstant)))
-	r.registerIntrinsic("datetime", "sub", []ir.ConstKind{ir.ConstDuration},
+	r.registerIntrinsic(NameDatetime, "sub", []ir.ConstKind{ir.ConstDuration},
 		binaryMillis(ir.ConstDatetime, ir.ConstDuration, checkedMillis(subMillis, ir.DatetimeConstant)))
 	// datetime.now(): the current instant — the first effectful native, the
 	// root of nondet. It deliberately has no compile-time implementation: a
 	// nondet value does not reproduce, so folding it would be wrong by
 	// definition; a target's codegen supplies it at runtime.
-	r.registerEffectful(EffectfulNative{Type: "datetime", Name: "now", Kind: ir.MethodStatic, Effects: []string{"nondet"}})
+	r.registerEffectful(EffectfulNative{Type: NameDatetime, Name: "now", Kind: ir.MethodStatic, Effects: []string{"nondet"}})
 
 	// duration: add is overloaded by the argument's kind — another span sums,
 	// a datetime yields the instant the span after it.

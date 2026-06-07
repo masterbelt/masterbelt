@@ -34,7 +34,7 @@ func newTestFolder(file *ast.File, self *ir.Constant) *testFolder {
 
 // Leaf lowers the test's context-specific forms: a constant reference and the
 // self keyword. It satisfies lower.Binder.
-func (f *testFolder) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
+func (f *testFolder) Leaf(e ast.Expr, _ func(ast.Expr) ir.Value) ir.Value {
 	switch e := e.(type) {
 	case *ast.Identifier:
 		for _, d := range f.file.Decls {

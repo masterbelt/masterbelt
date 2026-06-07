@@ -159,7 +159,7 @@ func stringMethods() []*ir.Method {
 // datetime/duration operator signatures: the two interoperate (dt ± dr,
 // dt - dt, dr + dt), so each names the other in its overloads.
 var (
-	datetimeType ir.Type = &ir.Builtin{Name: "datetime"}
+	datetimeType ir.Type = &ir.Builtin{Name: NameDatetime}
 	durationType ir.Type = &ir.Builtin{Name: "duration"}
 	intType      ir.Type = &ir.Builtin{Name: "nint"}
 )

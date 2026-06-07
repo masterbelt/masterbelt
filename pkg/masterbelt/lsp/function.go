@@ -186,6 +186,9 @@ func funcAt(doc view, offset int) ([]*ir.Function, cst.Tree, bool) {
 		if fns := shellsOf(doc.ResolveFuncMember(member)); len(fns) > 0 {
 			return fns, leaf, true
 		}
+	default:
+		// Any other parent kind does not denote a function (a declaration
+		// name, a callee, or a namespace member): no functions are resolved.
 	}
 	return nil, cst.Tree{}, false
 }

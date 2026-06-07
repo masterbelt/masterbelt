@@ -27,9 +27,9 @@ func enumComparison(recv *ir.Constant, name string, args []*ir.Constant) *ir.Con
 		return nil
 	}
 	switch name {
-	case "eql":
+	case builtin.OpEql:
 		return ir.BoolConstant(recv.EnumIndex == other.EnumIndex)
-	case "neq":
+	case builtin.OpNeq:
 		return ir.BoolConstant(recv.EnumIndex != other.EnumIndex)
 	}
 	// The ordering comparisons read the members' base values.
@@ -126,7 +126,7 @@ func underlyingCollectionDef(def *ir.TypeDef, seen map[*ir.TypeDef]bool) *ir.Typ
 	seen[def] = true
 	switch body := def.Body.(type) {
 	case *ir.App:
-		if body.Def != nil && (body.Def.Name == "list" || body.Def.Name == "map") {
+		if body.Def != nil && (body.Def.Name == builtin.NameList || body.Def.Name == builtin.NameMap) {
 			return body.Def
 		}
 		return underlyingCollectionDef(body.Def, seen)
@@ -182,9 +182,9 @@ func methodTableDef(reg *builtin.Registry, t ir.Type) *ir.TypeDef {
 // (len, fold, count, ...) folding on an unknown empty collection.
 func collectionTypeName(recv *ir.Constant) string {
 	if recv.IsMap() {
-		return "map"
+		return builtin.NameMap
 	}
-	return "list"
+	return builtin.NameList
 }
 
 // recordOf unwraps a static type to the record it ultimately is: a record type

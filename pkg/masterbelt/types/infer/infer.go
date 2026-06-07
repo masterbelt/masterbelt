@@ -134,11 +134,11 @@ func Expr(e ast.Expr, env Env) ir.Type {
 func exprType(e ast.Expr, s scope) ir.Type {
 	switch e := e.(type) {
 	case *ast.IntLit:
-		return &ir.Builtin{Name: "nint"}
+		return &ir.Builtin{Name: builtin.NameNint}
 	case *ast.StringLit:
-		return &ir.Builtin{Name: "string"}
+		return &ir.Builtin{Name: builtin.NameString}
 	case *ast.BoolLit:
-		return &ir.Builtin{Name: "bool"}
+		return &ir.Builtin{Name: builtin.NameBool}
 	case *ast.DatetimeLit:
 		return &ir.Builtin{Name: "datetime"}
 	case *ast.DurationLit:

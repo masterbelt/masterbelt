@@ -53,7 +53,7 @@ var IRCmd = &cobra.Command{
 		prog.SetFile(id, doc, nil)
 		prog.Refresh()
 
-		var raw []diagnostic.Diagnostic
+		raw := make([]diagnostic.Diagnostic, 0, len(doc.Concrete().LexDiagnostics())+len(doc.Diagnostics()))
 		raw = append(raw, doc.Concrete().LexDiagnostics()...)
 		raw = append(raw, doc.Diagnostics()...)
 		raw = append(raw, prog.Diagnostics(id)...)

@@ -73,6 +73,9 @@ func effectfulContextAt(root cst.Tree, offset int) bool {
 			switch node.Kind() {
 			case cst.FuncDecl, cst.MethodDecl:
 				return true
+			default:
+				// Any other kind is not an effectful body boundary: keep
+				// descending toward offset before concluding it is pure.
 			}
 		}
 		child, ok := childContaining(t, offset)
@@ -555,7 +558,7 @@ func constantItems(doc view) []protocol.CompletionItem {
 func constructorItems(doc view) []protocol.CompletionItem {
 	kind := protocol.CompletionItemKindConstructor
 	snippet := protocol.InsertTextFormatSnippet
-	var items []protocol.CompletionItem
+	items := make([]protocol.CompletionItem, 0, len(doc.Constructors()))
 	for _, t := range doc.Constructors() {
 		detail, insert := constructorSignature(t.Name)
 		item := protocol.CompletionItem{

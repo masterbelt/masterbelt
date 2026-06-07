@@ -101,7 +101,7 @@ func checkProject(rep reporter.Reporter, proj *project.Project) error {
 	prog.Refresh()
 
 	for _, f := range proj.Files() {
-		var raw []diagnostic.Diagnostic
+		raw := make([]diagnostic.Diagnostic, 0, len(f.AST.Concrete().LexDiagnostics())+len(f.AST.Diagnostics()))
 		raw = append(raw, f.AST.Concrete().LexDiagnostics()...)
 		raw = append(raw, f.AST.Diagnostics()...)
 		raw = append(raw, prog.Diagnostics(semantic.FileID(f.ID))...)
@@ -162,7 +162,7 @@ func checkSource(rep reporter.Reporter, path string, data []byte) error {
 	prog.SetFile(id, doc, nil)
 	prog.Refresh()
 
-	var raw []diagnostic.Diagnostic
+	raw := make([]diagnostic.Diagnostic, 0, len(doc.Concrete().LexDiagnostics())+len(doc.Diagnostics()))
 	raw = append(raw, doc.Concrete().LexDiagnostics()...)
 	raw = append(raw, doc.Diagnostics()...)
 	raw = append(raw, prog.Diagnostics(id)...)

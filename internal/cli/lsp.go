@@ -19,7 +19,7 @@ var LspCmd = &cobra.Command{
 	Long:  "Run the masterbelt language server, speaking the Language Server Protocol over stdin/stdout.\n\nEditors launch this and communicate on the process's standard input and output; logs go to stderr to keep the protocol channel clean.",
 	Args:  cobra.NoArgs,
 
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, _ []string) error {
 		return lsp.ServeStdio(cmd.Context())
 	},
 }

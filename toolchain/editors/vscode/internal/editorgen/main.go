@@ -28,6 +28,9 @@ import (
 	"github.com/masterbelt/masterbelt/pkg/source/token"
 )
 
+// scopeKeywordControl is the TextMate scope the keyword rules share.
+const scopeKeywordControl = "keyword.control.masterbelt"
+
 // Output paths, relative to this package's directory (where `go generate` runs).
 const (
 	grammarPath  = "../../syntaxes/masterbelt.tmLanguage.json"
@@ -102,7 +105,7 @@ func buildGrammar() grammar {
 			// token when the theme defines no semanticTokenColors, so the
 			// keywords wear the same colour before and after the server is up.
 			"keywords": {Patterns: []rule{
-				{Name: "keyword.control.masterbelt", Match: keywordPattern()},
+				{Name: scopeKeywordControl, Match: keywordPattern()},
 			}},
 			// The accessor/static modifiers (get, set, static) are context
 			// keywords: the lexer leaves them identifiers, so they are not in the
@@ -115,8 +118,8 @@ func buildGrammar() grammar {
 			// server leaves it. The semantic tokens are authoritative; this is the
 			// cold-start approximation.
 			"modifiers": {Patterns: []rule{
-				{Name: "keyword.control.masterbelt", Match: `\bstatic\b(?=\s+fn\b)`},
-				{Name: "keyword.control.masterbelt", Match: `\b(get|set)\b(?=\s+[A-Za-z_])`},
+				{Name: scopeKeywordControl, Match: `\bstatic\b(?=\s+fn\b)`},
+				{Name: scopeKeywordControl, Match: `\b(get|set)\b(?=\s+[A-Za-z_])`},
 			}},
 			// A D-prefixed ISO-8601 instant: the same shape the lexer commits
 			// on, milliseconds and signed offsets included. The semantic
@@ -209,11 +212,12 @@ func buildLanguageConfig() languageConfig {
 	}
 
 	brackets := make([][]string, 0, len(bracketPairs))
-	autoClosing := []pair{
-		{Open: token.BlockCommentOpen, Close: token.BlockCommentClose},
-		{Open: `"`, Close: `"`},
-	}
-	surrounding := []pair{{Open: `"`, Close: `"`}}
+	autoClosing := make([]pair, 0, 2+len(bracketPairs))
+	autoClosing = append(autoClosing,
+		pair{Open: token.BlockCommentOpen, Close: token.BlockCommentClose},
+		pair{Open: `"`, Close: `"`})
+	surrounding := make([]pair, 0, 1+len(bracketPairs))
+	surrounding = append(surrounding, pair{Open: `"`, Close: `"`})
 	for _, bp := range bracketPairs {
 		brackets = append(brackets, []string{bp[0], bp[1]})
 		autoClosing = append(autoClosing, pair{Open: bp[0], Close: bp[1]})

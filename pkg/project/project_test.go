@@ -179,7 +179,7 @@ func TestOpenDefaultOfProfileOnlyManifest(t *testing.T) {
 // useTargets renders a file's resolved Uses table as "path->target" pairs,
 // sorted, for compact assertions.
 func useTargets(f *File) []string {
-	var out []string
+	out := make([]string, 0, len(f.Uses))
 	for u, target := range f.Uses {
 		out = append(out, u.Path+"->"+string(target))
 	}
@@ -200,7 +200,7 @@ func TestOpenClosesOverUses(t *testing.T) {
 	}
 
 	// The set is the closure of the entry's imports, ordered by id.
-	var ids []string
+	ids := make([]string, 0, len(proj.Files()))
 	for _, f := range proj.Files() {
 		ids = append(ids, string(f.ID))
 	}
@@ -345,7 +345,7 @@ func assertSingleError(t *testing.T, diags diagnostic.List, code diagnostic.Code
 
 // fileIDList flattens the project's file ids for compact assertions.
 func fileIDList(p *Project) string {
-	var ids []string
+	ids := make([]string, 0, len(p.Files()))
 	for _, f := range p.Files() {
 		ids = append(ids, string(f.ID))
 	}

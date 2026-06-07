@@ -44,7 +44,7 @@ func fromPosition(buf source.Buffer, p protocol.Position) int {
 func toDiagnostics(doc view) []protocol.Diagnostic {
 	buf := doc.Buffer()
 
-	var raw []diagnostic.Diagnostic
+	raw := make([]diagnostic.Diagnostic, 0, len(doc.AST().Concrete().LexDiagnostics())+len(doc.AST().Diagnostics())+len(doc.Diagnostics()))
 	raw = append(raw, doc.AST().Concrete().LexDiagnostics()...)
 	raw = append(raw, doc.AST().Diagnostics()...)
 	raw = append(raw, doc.Diagnostics()...)

@@ -165,6 +165,9 @@ func enumContextAt(doc view, root cst.Tree, offset int) *ir.TypeDef {
 				if haveSwitch && beforeArrow(node, offset) {
 					return switchArmEnum(doc, enclosingSwitch, offset)
 				}
+			default:
+				// Any other kind is not a position that folds a bare member:
+				// keep descending toward offset before giving up with nil.
 			}
 		}
 		node = child
@@ -221,6 +224,9 @@ func inSwitchArmRegion(sw cst.Tree, offset int) bool {
 				}
 			case token.RBrace:
 				closeAt = c.Offset()
+			default:
+				// Any other token does not bound the arm region: leave the
+				// brace offsets untouched and keep scanning the children.
 			}
 		}
 	}
@@ -344,6 +350,9 @@ func firstValueChild(node cst.Tree) (cst.Tree, bool) {
 			switch k {
 			case cst.NameRef, cst.SelfExpr:
 				return c, true
+			default:
+				// Any other kind is not the assignment target: keep scanning
+				// the children until the target or the "=" is reached.
 			}
 		}
 		// Stop at the "=" token: the target precedes it.
@@ -371,6 +380,9 @@ func comparisonReceiver(node cst.Tree) (recv cst.Tree, opStart int, ok bool) {
 				switch k {
 				case cst.NameRef, cst.SelfExpr:
 					left, haveLeft = c, true
+				default:
+					// Any other kind is not a receiver the operator desugars
+					// onto: keep scanning for the left operand.
 				}
 			}
 			continue
@@ -379,6 +391,9 @@ func comparisonReceiver(node cst.Tree) (recv cst.Tree, opStart int, ok bool) {
 			switch tok.Kind() {
 			case token.EqEq, token.BangEq, token.Lt, token.LtEq, token.Gt, token.GtEq:
 				return left, c.Offset(), true
+			default:
+				// Any other operator is not a comparison: its argument is not
+				// an enum member position, so keep scanning the children.
 			}
 		}
 	}
@@ -412,6 +427,9 @@ func switchScrutinee(sw cst.Tree) (cst.Tree, bool) {
 			switch k {
 			case cst.NameRef, cst.SelfExpr:
 				return c, true
+			default:
+				// Any other kind is not the switch scrutinee: keep scanning
+				// the children between the keyword and the "{".
 			}
 		}
 	}

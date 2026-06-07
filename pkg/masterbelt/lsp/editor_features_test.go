@@ -21,6 +21,9 @@ func TestDocumentHighlights(t *testing.T) {
 			writes++
 		case protocol.DocumentHighlightKindRead:
 			reads++
+		default:
+			// Any other highlight kind (a plain text occurrence) is neither a
+			// write nor a read: it is not counted toward the asserted tally.
 		}
 	}
 	if writes != 1 || reads != 2 {

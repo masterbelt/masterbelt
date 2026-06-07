@@ -391,7 +391,7 @@ func (p *Program) Constructors(id FileID) []*ir.TypeDef {
 // descriptor. The integer aliases and the collections are conversions whose
 // argument is itself a value, not constructors offered on their own.
 func isConstructorBuiltin(reg *builtin.Registry, name string) bool {
-	if name == "range" {
+	if name == builtin.NameRange {
 		return true
 	}
 	n, ok := reg.Native(name)

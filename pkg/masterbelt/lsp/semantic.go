@@ -90,6 +90,10 @@ func semanticTokensIn(v view) *protocol.SemanticTokens {
 				enumMembers[e.Syntax()] = true
 			case memberAssocConst:
 				assocConsts[e.Syntax()] = true
+			default:
+				// memberNone: the access is neither an enum member nor an
+				// associated constant, so the lexical property classification
+				// stands and nothing is recorded for this node.
 			}
 		case *ast.CallExpr:
 			// A type name wins over a same-named function, as in the type rules.

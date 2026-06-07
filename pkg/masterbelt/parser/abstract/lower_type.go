@@ -103,6 +103,9 @@ func lowerTypeName(t cst.Tree, buf source.Buffer, node *cst.Node) ast.TypeExpr {
 				name = "self"
 			case token.Null:
 				name = "null"
+			default:
+				// Any other token (the generic-argument angle brackets and
+				// commas) names no part of the type: it is skipped.
 			}
 			continue
 		}

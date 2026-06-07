@@ -678,11 +678,11 @@ func check(e ast.Expr, s scope, sink *Sink) ir.Type {
 func synthesize(e ast.Expr, s scope, sink *Sink) ir.Type {
 	switch e := e.(type) {
 	case *ast.IntLit:
-		return &ir.Builtin{Name: "nint"}
+		return &ir.Builtin{Name: builtin.NameNint}
 	case *ast.StringLit:
-		return &ir.Builtin{Name: "string"}
+		return &ir.Builtin{Name: builtin.NameString}
 	case *ast.BoolLit:
-		return &ir.Builtin{Name: "bool"}
+		return &ir.Builtin{Name: builtin.NameBool}
 	case *ast.DatetimeLit:
 		return &ir.Builtin{Name: "datetime"}
 	case *ast.DurationLit:
@@ -738,7 +738,7 @@ func synthesize(e ast.Expr, s scope, sink *Sink) ir.Type {
 // missing bound (a recovered literal) is skipped. The literal's type is range
 // whatever its bounds, the same type range(start, end) produces.
 func checkRange(e *ast.RangeExpr, s scope, sink *Sink) ir.Type {
-	nint := &ir.Builtin{Name: "nint"}
+	nint := &ir.Builtin{Name: builtin.NameNint}
 	if e.Lower != nil {
 		checkType(e.Lower, nint, s, map[string]ir.Type{}, sink)
 	}

@@ -142,6 +142,9 @@ func (d *Document) rebuild() {
 			}
 			nextAsserts[green] = ad
 			asserts = append(asserts, ad)
+		default:
+			// Any other kind is not a top-level declaration this document
+			// lowers: it is skipped and never enters the rebuilt File.
 		}
 	})
 

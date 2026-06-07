@@ -103,7 +103,7 @@ func allLocales(t *testing.T) []string {
 	if len(paths) == 0 {
 		t.Fatal("no locale catalogs under messages/")
 	}
-	var locales []string
+	locales := make([]string, 0, len(paths))
 	for _, p := range paths {
 		locales = append(locales, strings.TrimSuffix(filepath.Base(p), ".csv"))
 	}

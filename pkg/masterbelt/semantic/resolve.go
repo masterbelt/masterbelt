@@ -825,7 +825,7 @@ func resolveAssocConstList(r *infer.TypeResolver, reg *builtin.Registry, def *ir
 			if annType != nil {
 				ac.Type = annType
 			} else {
-				ac.Type = &ir.Builtin{Name: "nint"}
+				ac.Type = &ir.Builtin{Name: builtin.NameNint}
 			}
 			out = append(out, ac)
 			continue
@@ -878,11 +878,11 @@ func builtinBound(reg *builtin.Registry, typeName, bound string) (*ir.Constant, 
 func constantType(v *ir.Constant) ir.Type {
 	switch v.Kind {
 	case ir.ConstInt:
-		return &ir.Builtin{Name: "nint"}
+		return &ir.Builtin{Name: builtin.NameNint}
 	case ir.ConstBool:
-		return &ir.Builtin{Name: "bool"}
+		return &ir.Builtin{Name: builtin.NameBool}
 	case ir.ConstString:
-		return &ir.Builtin{Name: "string"}
+		return &ir.Builtin{Name: builtin.NameString}
 	case ir.ConstDatetime:
 		return &ir.Builtin{Name: "datetime"}
 	case ir.ConstDuration:
@@ -910,8 +910,8 @@ func resolveEnumDecl(folder exprFolder, defs map[string]*ir.TypeDef, r *infer.Ty
 	// resolve to an integer-family or string primitive — anything else (bool, a
 	// user type, a composite) is rejected, and the enum falls back to nint so the
 	// rest of resolution stays well-formed.
-	base := "nint"
-	baseType := ir.Type(&ir.Builtin{Name: "nint"})
+	base := builtin.NameNint
+	baseType := ir.Type(&ir.Builtin{Name: builtin.NameNint})
 	if ed.Base != nil {
 		bt := r.ResolveType(ed.Base, nil)
 		if name, ok := integerOrStringBase(reg, bt); ok {
@@ -1152,13 +1152,13 @@ func typeNameOf(t ir.Type) string {
 func kindName(k ir.ConstKind) string {
 	switch k {
 	case ir.ConstString:
-		return "string"
+		return builtin.NameString
 	case ir.ConstBool:
-		return "bool"
+		return builtin.NameBool
 	case ir.ConstInt:
-		return "nint"
+		return builtin.NameNint
 	default:
-		return "value"
+		return "value" //nolint:goconst // the other occurrences are generated diagnostic plumbing, not this vocabulary
 	}
 }
 
@@ -1289,6 +1289,9 @@ func checkMemberDecls(def *ir.TypeDef, at func(ast.Node) span, diags *diagnostic
 			if consts[m.Name] || members[m.Name] {
 				diags.Add(newStaticCollisionDiagnostic(s.offset, s.width, m.Name, def.Name))
 			}
+		default:
+			// An ordinary method (MethodNormal) has no accessor- or
+			// static-specific collision rule to check here: move to the next.
 		}
 	}
 }

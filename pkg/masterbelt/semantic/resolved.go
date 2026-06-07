@@ -239,7 +239,7 @@ func (w resolutionWriter) value(v ir.Value, bd bindings) ir.Value {
 		v.Else = w.value(v.Else, bd)
 	case *ir.RangeLit:
 		// Every range literal is the range builtin, whatever its bounds.
-		v.Type = &ir.Builtin{Name: "range"}
+		v.Type = &ir.Builtin{Name: builtin.NameRange}
 		v.Lower = w.value(v.Lower, bd)
 		v.Upper = w.value(v.Upper, bd)
 	case *ir.FuncLiteral:
@@ -269,11 +269,11 @@ func (w resolutionWriter) value(v ir.Value, bd bindings) ir.Value {
 		// A literal keeps its synthesized type even where a sized type
 		// expects it — the width settle is an explicit adaption, not a
 		// retype — so the leaf literals' types are structural facts.
-		v.Type = &ir.Builtin{Name: "nint"}
+		v.Type = &ir.Builtin{Name: builtin.NameNint}
 	case *ir.StringLiteral:
-		v.Type = &ir.Builtin{Name: "string"}
+		v.Type = &ir.Builtin{Name: builtin.NameString}
 	case *ir.BoolLiteral:
-		v.Type = &ir.Builtin{Name: "bool"}
+		v.Type = &ir.Builtin{Name: builtin.NameBool}
 	case *ir.DatetimeLiteral:
 		v.Type = &ir.Builtin{Name: "datetime"}
 	case *ir.DurationLiteral:

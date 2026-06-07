@@ -179,6 +179,9 @@ func typeAt(doc view, offset int) (*ir.TypeDef, cst.Tree, bool) {
 				return t, leaf, true
 			}
 		}
+	default:
+		// Any other parent kind is not a type-name position (a declaration
+		// name, a type expression, or a conversion callee): nothing resolves.
 	}
 	return nil, cst.Tree{}, false
 }

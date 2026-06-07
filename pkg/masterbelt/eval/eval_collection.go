@@ -9,6 +9,8 @@ package eval
 import (
 	"math/big"
 
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
+
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
 )
 
@@ -240,12 +242,12 @@ func rangeMethod(ctx graphCtx, recv *ir.Constant, name string, args []*ir.Consta
 	switch name {
 	case "fold":
 		return rangeFold(ctx, recv, args)
-	case "eql", "neq":
+	case builtin.OpEql, builtin.OpNeq:
 		if len(args) != 1 || args[0].Kind != ir.ConstRange {
 			return nil
 		}
 		equal := ir.ConstantsEqual(recv, args[0])
-		if name == "neq" {
+		if name == builtin.OpNeq {
 			equal = !equal
 		}
 		return ir.BoolConstant(equal)

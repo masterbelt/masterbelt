@@ -372,6 +372,9 @@ func recordFieldHover(doc view, offset int) *protocol.Hover {
 		if t := findTypeDef(doc.TypeNames(), name); t != nil {
 			return typeHover(t, buf, leaf)
 		}
+	default:
+		// Any other parent kind is not a record field initializer or a typed
+		// literal's name: there is no field card to show.
 	}
 	return nil
 }

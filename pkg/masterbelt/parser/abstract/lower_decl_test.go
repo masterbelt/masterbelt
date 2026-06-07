@@ -541,7 +541,7 @@ func TestLowerEnumDecl(t *testing.T) {
 	if len(d.Members) != 3 {
 		t.Fatalf("got %d members, want 3", len(d.Members))
 	}
-	names := []string{}
+	names := make([]string, 0, len(d.Members))
 	for _, m := range d.Members {
 		names = append(names, m.Name)
 		if m.Value == nil {

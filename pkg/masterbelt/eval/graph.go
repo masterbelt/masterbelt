@@ -527,7 +527,7 @@ func graphConvert(v *ir.Conversion, ctx graphCtx) *ir.Constant {
 	if def == nil {
 		return nil
 	}
-	if def.Builtin && def.Name == "range" {
+	if def.Builtin && def.Name == builtin.NameRange {
 		return graphConvertRange(v.Args, ctx)
 	}
 	if len(v.Args) != 1 {

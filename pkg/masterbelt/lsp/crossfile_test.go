@@ -153,7 +153,7 @@ func TestCrossFileDiagnosticsUpdate(t *testing.T) {
 	}
 
 	v := s.open[mainURI]
-	var codes []string
+	codes := make([]string, 0, len(v.Diagnostics()))
 	for _, d := range v.Diagnostics() {
 		codes = append(codes, string(d.Code))
 	}
@@ -289,7 +289,7 @@ func TestUsePathCompletion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var labels []string
+	labels := make([]string, 0, len(list.Items))
 	for _, item := range list.Items {
 		labels = append(labels, item.Label)
 	}
