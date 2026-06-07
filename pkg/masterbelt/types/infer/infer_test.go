@@ -38,11 +38,11 @@ type stubEnv struct {
 	reg *builtin.Registry
 }
 
-func (e stubEnv) Resolve(id *ast.Identifier) *ast.ConstDecl           { return e.res[id] }
-func (e stubEnv) ResolveMember(m *ast.MemberExpr) *ast.ConstDecl      { return nil }
-func (e stubEnv) ResolveFunc(id *ast.Identifier) []*ast.FuncDecl      { return e.fns[id.Name] }
-func (e stubEnv) ResolveFuncMember(m *ast.MemberExpr) []*ast.FuncDecl { return nil }
-func (e stubEnv) TypeOf(decl *ast.ConstDecl) ir.Type                  { return e.typ[decl] }
+func (e stubEnv) Resolve(id *ast.Identifier) *ast.ConstDecl         { return e.res[id] }
+func (e stubEnv) ResolveMember(*ast.MemberExpr) *ast.ConstDecl      { return nil }
+func (e stubEnv) ResolveFunc(id *ast.Identifier) []*ast.FuncDecl    { return e.fns[id.Name] }
+func (e stubEnv) ResolveFuncMember(*ast.MemberExpr) []*ast.FuncDecl { return nil }
+func (e stubEnv) TypeOf(decl *ast.ConstDecl) ir.Type                { return e.typ[decl] }
 
 // Universe mirrors what the semantic layer feeds the resolver: the prelude
 // surface (here, the registry's definitions) beneath any declared types.
@@ -53,8 +53,8 @@ func (e stubEnv) Universe() map[string]*ir.TypeDef {
 	}
 	return out
 }
-func (e stubEnv) QualifiedType(namespace, name string) *ir.TypeDef { return nil }
-func (e stubEnv) Registry() *builtin.Registry                      { return e.reg }
+func (e stubEnv) QualifiedType(string, string) *ir.TypeDef { return nil }
+func (e stubEnv) Registry() *builtin.Registry              { return e.reg }
 
 func emptyEnv() stubEnv {
 	return stubEnv{

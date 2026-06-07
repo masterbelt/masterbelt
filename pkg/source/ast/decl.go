@@ -16,6 +16,7 @@ type File struct {
 	syntax     *cst.Node
 }
 
+// Syntax returns the green CST node this file was lowered from.
 func (f *File) Syntax() *cst.Node { return f.syntax }
 func (f *File) node()             {}
 
@@ -39,6 +40,7 @@ type UseDecl struct {
 	syntax    *cst.Node
 }
 
+// Syntax returns the green CST node this declaration was lowered from.
 func (d *UseDecl) Syntax() *cst.Node { return d.syntax }
 func (d *UseDecl) node()             {}
 
@@ -72,6 +74,7 @@ type ConstDecl struct {
 	syntax  *cst.Node
 }
 
+// Syntax returns the green CST node this declaration was lowered from.
 func (d *ConstDecl) Syntax() *cst.Node { return d.syntax }
 func (d *ConstDecl) node()             {}
 
@@ -110,6 +113,7 @@ type FuncDecl struct {
 	syntax     *cst.Node
 }
 
+// Syntax returns the green CST node this declaration was lowered from.
 func (d *FuncDecl) Syntax() *cst.Node { return d.syntax }
 func (d *FuncDecl) node()             {}
 
@@ -136,6 +140,7 @@ type InterfaceDecl struct {
 	syntax  *cst.Node
 }
 
+// Syntax returns the green CST node this declaration was lowered from.
 func (d *InterfaceDecl) Syntax() *cst.Node { return d.syntax }
 func (d *InterfaceDecl) node()             {}
 
@@ -160,6 +165,7 @@ type InterfaceMember struct {
 	syntax     *cst.Node
 }
 
+// Syntax returns the green CST node this interface member was lowered from.
 func (m *InterfaceMember) Syntax() *cst.Node { return m.syntax }
 func (m *InterfaceMember) node()             {}
 
@@ -182,6 +188,7 @@ type AssertDecl struct {
 	syntax *cst.Node
 }
 
+// Syntax returns the green CST node this declaration was lowered from.
 func (d *AssertDecl) Syntax() *cst.Node { return d.syntax }
 func (d *AssertDecl) node()             {}
 

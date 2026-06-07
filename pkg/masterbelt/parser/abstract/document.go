@@ -77,80 +77,112 @@ func (d *Document) rebuild() {
 	rootNode, _ := root.Node()
 	buf := d.cst.Buffer()
 
-	next := make(map[*cst.Node]*ast.ConstDecl, len(d.cache))
-	nextTypes := make(map[*cst.Node]*ast.TypeDecl, len(d.typeCache))
-	nextEnums := make(map[*cst.Node]*ast.EnumDecl, len(d.enumCache))
-	nextInterfaces := make(map[*cst.Node]*ast.InterfaceDecl, len(d.interfaceCache))
-	nextFuncs := make(map[*cst.Node]*ast.FuncDecl, len(d.funcCache))
-	nextUses := make(map[*cst.Node]*ast.UseDecl, len(d.useCache))
-	nextAsserts := make(map[*cst.Node]*ast.AssertDecl, len(d.assertCache))
-	var uses []*ast.UseDecl
-	var decls []*ast.ConstDecl
-	var types []*ast.TypeDecl
-	var enums []*ast.EnumDecl
-	var interfaces []*ast.InterfaceDecl
-	var funcs []*ast.FuncDecl
-	var asserts []*ast.AssertDecl
+	// Phase 1: walk the top-level declarations, lowering each (or reusing the
+	// cache hit) into the fresh caches and ordered slices a rebuildState holds.
+	rs := d.newRebuildState(buf)
 	foreachDecl(root, func(child cst.Tree, green *cst.Node) {
-		switch green.Kind() {
-		case cst.UseDecl:
-			ud, ok := d.useCache[green]
-			if !ok {
-				ud = lowerUseDecl(child, buf)
-			}
-			nextUses[green] = ud
-			uses = append(uses, ud)
-		case cst.ConstDecl:
-			decl, ok := d.cache[green]
-			if !ok {
-				decl = lowerConstDecl(child, buf)
-			}
-			next[green] = decl
-			decls = append(decls, decl)
-		case cst.TypeDecl:
-			td, ok := d.typeCache[green]
-			if !ok {
-				td = lowerTypeDecl(child, buf)
-			}
-			nextTypes[green] = td
-			types = append(types, td)
-		case cst.EnumDecl:
-			ed, ok := d.enumCache[green]
-			if !ok {
-				ed = lowerEnumDecl(child, buf)
-			}
-			nextEnums[green] = ed
-			enums = append(enums, ed)
-		case cst.InterfaceDecl:
-			id, ok := d.interfaceCache[green]
-			if !ok {
-				id = lowerInterfaceDecl(child, buf)
-			}
-			nextInterfaces[green] = id
-			interfaces = append(interfaces, id)
-		case cst.FuncDecl:
-			fd, ok := d.funcCache[green]
-			if !ok {
-				fd = lowerFuncDecl(child, buf)
-			}
-			nextFuncs[green] = fd
-			funcs = append(funcs, fd)
-		case cst.AssertDecl:
-			ad, ok := d.assertCache[green]
-			if !ok {
-				ad = lowerAssertDecl(child, buf)
-			}
-			nextAsserts[green] = ad
-			asserts = append(asserts, ad)
-		}
+		rs.collect(child, green)
 	})
 
-	d.cache = next
-	d.typeCache = nextTypes
-	d.enumCache = nextEnums
-	d.interfaceCache = nextInterfaces
-	d.funcCache = nextFuncs
-	d.useCache = nextUses
-	d.assertCache = nextAsserts
-	d.file = ast.NewFile(uses, decls, types, enums, interfaces, funcs, asserts, rootNode)
+	// Phase 2: swap the rebuilt caches in and publish the new File.
+	rs.commit(d, rootNode)
+}
+
+// rebuildState accumulates one rebuild pass: the fresh per-kind caches (keyed by
+// surviving green node) and the ordered slices that become the new File. It reads
+// the prior caches off the Document for hit reuse and lowers the misses through
+// the buffer it was created with.
+type rebuildState struct {
+	d   *Document
+	buf source.Buffer
+
+	uses       map[*cst.Node]*ast.UseDecl
+	consts     map[*cst.Node]*ast.ConstDecl
+	types      map[*cst.Node]*ast.TypeDecl
+	enums      map[*cst.Node]*ast.EnumDecl
+	interfaces map[*cst.Node]*ast.InterfaceDecl
+	funcs      map[*cst.Node]*ast.FuncDecl
+	asserts    map[*cst.Node]*ast.AssertDecl
+
+	useList       []*ast.UseDecl
+	constList     []*ast.ConstDecl
+	typeList      []*ast.TypeDecl
+	enumList      []*ast.EnumDecl
+	interfaceList []*ast.InterfaceDecl
+	funcList      []*ast.FuncDecl
+	assertList    []*ast.AssertDecl
+}
+
+// newRebuildState allocates the fresh caches, each sized from its predecessor so
+// a full reuse pass does no growth.
+func (d *Document) newRebuildState(buf source.Buffer) *rebuildState {
+	return &rebuildState{
+		d:          d,
+		buf:        buf,
+		uses:       make(map[*cst.Node]*ast.UseDecl, len(d.useCache)),
+		consts:     make(map[*cst.Node]*ast.ConstDecl, len(d.cache)),
+		types:      make(map[*cst.Node]*ast.TypeDecl, len(d.typeCache)),
+		enums:      make(map[*cst.Node]*ast.EnumDecl, len(d.enumCache)),
+		interfaces: make(map[*cst.Node]*ast.InterfaceDecl, len(d.interfaceCache)),
+		funcs:      make(map[*cst.Node]*ast.FuncDecl, len(d.funcCache)),
+		asserts:    make(map[*cst.Node]*ast.AssertDecl, len(d.assertCache)),
+	}
+}
+
+// collect lowers one top-level declaration, reusing the prior cache entry when
+// the backing green node survived the edit, and records it in the matching fresh
+// cache and ordered slice. Any non-declaration kind is skipped.
+func (rs *rebuildState) collect(child cst.Tree, green *cst.Node) {
+	switch green.Kind() {
+	case cst.UseDecl:
+		rs.useList = collectDecl(green, child, rs.buf, rs.d.useCache, rs.uses, rs.useList, lowerUseDecl)
+	case cst.ConstDecl:
+		rs.constList = collectDecl(green, child, rs.buf, rs.d.cache, rs.consts, rs.constList, lowerConstDecl)
+	case cst.TypeDecl:
+		rs.typeList = collectDecl(green, child, rs.buf, rs.d.typeCache, rs.types, rs.typeList, lowerTypeDecl)
+	case cst.EnumDecl:
+		rs.enumList = collectDecl(green, child, rs.buf, rs.d.enumCache, rs.enums, rs.enumList, lowerEnumDecl)
+	case cst.InterfaceDecl:
+		rs.interfaceList = collectDecl(green, child, rs.buf, rs.d.interfaceCache, rs.interfaces, rs.interfaceList, lowerInterfaceDecl)
+	case cst.FuncDecl:
+		rs.funcList = collectDecl(green, child, rs.buf, rs.d.funcCache, rs.funcs, rs.funcList, lowerFuncDecl)
+	case cst.AssertDecl:
+		rs.assertList = collectDecl(green, child, rs.buf, rs.d.assertCache, rs.asserts, rs.assertList, lowerAssertDecl)
+	default:
+		// Any other kind is not a top-level declaration this document
+		// lowers: it is skipped and never enters the rebuilt File.
+	}
+}
+
+// collectDecl resolves one declaration of kind D: it reuses prev's entry for
+// green when the edit left the node unchanged, otherwise lowers child through
+// lower. The result is stored under green in the fresh cache next and appended to
+// list, whose extended value is returned.
+func collectDecl[D any](
+	green *cst.Node,
+	child cst.Tree,
+	buf source.Buffer,
+	prev, next map[*cst.Node]D,
+	list []D,
+	lower func(cst.Tree, source.Buffer) D,
+) []D {
+	d, ok := prev[green]
+	if !ok {
+		d = lower(child, buf)
+	}
+	next[green] = d
+	return append(list, d)
+}
+
+// commit swaps the rebuilt caches into the Document and publishes the new File
+// in source order under rootNode.
+func (rs *rebuildState) commit(d *Document, rootNode *cst.Node) {
+	d.cache = rs.consts
+	d.typeCache = rs.types
+	d.enumCache = rs.enums
+	d.interfaceCache = rs.interfaces
+	d.funcCache = rs.funcs
+	d.useCache = rs.uses
+	d.assertCache = rs.asserts
+	d.file = ast.NewFile(rs.useList, rs.constList, rs.typeList, rs.enumList, rs.interfaceList, rs.funcList, rs.assertList, rootNode)
 }

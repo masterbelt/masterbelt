@@ -1,11 +1,13 @@
 package lsp
 
 import (
+	protocol "github.com/owenrumney/go-lsp/lsp"
+
+	"github.com/masterbelt/masterbelt/pkg/source"
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/source/cst"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
 	"github.com/masterbelt/masterbelt/pkg/source/token"
-	protocol "github.com/owenrumney/go-lsp/lsp"
 )
 
 // The reverse of the resolver: given a name under the cursor, the constant or
@@ -27,8 +29,22 @@ type occurrence struct {
 // reference nested inside an expression — and the constant it denotes (which
 // may be declared in another file of the program).
 func occurrenceAt(doc view, offset int, trees map[cst.Green]cst.Tree) (occurrence, bool) {
-	// A selective-import name (the cursor on Origin in use { Origin } from ...)
-	// denotes the constant it imports.
+	if occ, settled, ok := importOccurrenceAt(doc, offset, trees); settled {
+		return occ, ok
+	}
+	if occ, settled, ok := constOccurrenceAt(doc, offset, trees); settled {
+		return occ, ok
+	}
+	if occ, ok := assertOccurrenceAt(doc, offset, trees); ok {
+		return occ, true
+	}
+	return bodyOccurrenceAt(doc, offset, trees)
+}
+
+// importOccurrenceAt finds a selective-import name at offset (the cursor on
+// Origin in use { Origin } from ...) and the constant it imports. settled
+// reports that the cursor sat on such a name and its result is final.
+func importOccurrenceAt(doc view, offset int, trees map[cst.Green]cst.Tree) (occ occurrence, settled, ok bool) {
 	buf := doc.Buffer()
 	for _, u := range doc.AST().File().Uses {
 		t, ok := trees[u.Syntax()]
@@ -40,11 +56,18 @@ func occurrenceAt(doc view, offset int, trees map[cst.Green]cst.Tree) (occurrenc
 				continue
 			}
 			if target := doc.ResolveUseName(u, nameTok.Text(buf)); target != nil {
-				return occurrence{token: nameTok, target: target}, true
+				return occurrence{token: nameTok, target: target}, true, true
 			}
 		}
 	}
+	return occurrence{}, false, false
+}
 
+// constOccurrenceAt finds a value-position reference in a const initializer or
+// a const declaration's own name at offset. settled reports that the cursor's
+// constant context is final — including an undefined reference in an
+// initializer, which denotes nothing (ok=false).
+func constOccurrenceAt(doc view, offset int, trees map[cst.Green]cst.Tree) (occ occurrence, settled, ok bool) {
 	for _, c := range doc.Module().Consts {
 		decl := c.Syntax
 
@@ -52,23 +75,26 @@ func occurrenceAt(doc view, offset int, trees map[cst.Green]cst.Tree) (occurrenc
 		if decl.Value != nil {
 			occ, found, sawIdent := exprOccurrenceAt(doc, decl.Value, offset, trees)
 			if found {
-				return occ, true
+				return occ, true, true
 			}
 			if sawIdent {
-				return occurrence{}, false // an undefined reference denotes nothing
+				return occurrence{}, true, false // an undefined reference denotes nothing
 			}
 		}
 
 		// The declaration's own name.
 		if declTree, ok := trees[decl.Syntax()]; ok {
 			if nameTok, ok := nameToken(declTree); ok && within(nameTok, offset) {
-				return occurrence{token: nameTok, target: c}, true
+				return occurrence{token: nameTok, target: c}, true, true
 			}
 		}
 	}
+	return occurrence{}, false, false
+}
 
-	// A reference inside an assertion's condition, exactly as in an
-	// initializer.
+// assertOccurrenceAt finds a reference inside an assertion's condition at
+// offset, exactly as in an initializer.
+func assertOccurrenceAt(doc view, offset int, trees map[cst.Green]cst.Tree) (occurrence, bool) {
 	for _, a := range doc.Module().Asserts {
 		if a.Syntax.Cond == nil {
 			continue
@@ -77,11 +103,14 @@ func occurrenceAt(doc view, offset int, trees map[cst.Green]cst.Tree) (occurrenc
 			return occ, true
 		}
 	}
+	return occurrence{}, false
+}
 
-	// A reference inside a method or function body — a return value, a let
-	// initializer, an assignment, or anywhere in a switch/if's control flow —
-	// resolves exactly as one in an initializer does, so find-references and
-	// rename reach a constant used from a body.
+// bodyOccurrenceAt finds a reference inside a method or function body at offset
+// — a return value, a let initializer, an assignment, or anywhere in a
+// switch/if's control flow — resolved exactly as one in an initializer is, so
+// find-references and rename reach a constant used from a body.
+func bodyOccurrenceAt(doc view, offset int, trees map[cst.Green]cst.Tree) (occurrence, bool) {
 	var occ occurrence
 	var found bool
 	forEachBodyExpr(doc.AST().File(), func(e ast.Expr) {
@@ -323,7 +352,6 @@ func programOccurrences(v view, target *ir.Const, includeDecl bool) map[protocol
 // resolves to it (qualified or not). This is occurrencesOf for types.
 func typeOccurrencesOf(fv view, target *ir.TypeDef, trees map[cst.Green]cst.Tree, includeDecl bool) []cst.Tree {
 	var tokens []cst.Tree
-	buf := fv.Buffer()
 
 	if includeDecl && target.Syntax != nil {
 		if declTree, ok := trees[target.Syntax.Syntax()]; ok {
@@ -332,9 +360,17 @@ func typeOccurrencesOf(fv view, target *ir.TypeDef, trees map[cst.Green]cst.Tree
 			}
 		}
 	}
+	tokens = append(tokens, typeImportOccurrences(fv, target, trees)...)
+	tokens = append(tokens, typeNameOccurrences(fv, target)...)
+	return tokens
+}
 
-	// A selective-import name (use { Point } from ...) binds the type: a
-	// rename must rewrite it too, or it would leave a dangling import.
+// typeImportOccurrences returns every selective-import name (use { Point } from
+// ...) in fv that binds target: a rename must rewrite it too, or it would leave
+// a dangling import.
+func typeImportOccurrences(fv view, target *ir.TypeDef, trees map[cst.Green]cst.Tree) []cst.Tree {
+	buf := fv.Buffer()
+	var tokens []cst.Tree
 	for _, u := range fv.AST().File().Uses {
 		t, ok := trees[u.Syntax()]
 		if !ok {
@@ -346,30 +382,23 @@ func typeOccurrencesOf(fv view, target *ir.TypeDef, trees map[cst.Green]cst.Tree
 			}
 		}
 	}
+	return tokens
+}
 
-	// Every TypeName in the concrete tree — annotations, type-declaration
-	// bodies, signatures — resolving exactly as an annotation does. TypeNames
-	// nest (list<Coin>), so the walk continues into a TypeName's children.
+// typeNameOccurrences returns every TypeName in fv's concrete tree —
+// annotations, type-declaration bodies, signatures — resolving (exactly as an
+// annotation does) to target. TypeNames nest (list<Coin>), so the walk
+// continues into a TypeName's children.
+func typeNameOccurrences(fv view, target *ir.TypeDef) []cst.Tree {
+	buf := fv.Buffer()
 	own := fv.TypeNames()
 	qualified := fv.QualifiedTypeNames()
+	var tokens []cst.Tree
 	var walk func(t cst.Tree)
 	walk = func(t cst.Tree) {
 		if k, ok := t.Kind(); ok && k == cst.TypeName {
-			var idents []cst.Tree
-			for _, c := range t.Children() {
-				if kk, isTok := c.TokenKind(); isTok && kk == token.Ident {
-					idents = append(idents, c)
-				}
-			}
-			switch len(idents) {
-			case 1:
-				if findTypeDef(own, idents[0].Text(buf)) == target {
-					tokens = append(tokens, idents[0])
-				}
-			case 2:
-				if findTypeDef(qualified[idents[0].Text(buf)], idents[1].Text(buf)) == target {
-					tokens = append(tokens, idents[1])
-				}
+			if tok, ok := typeNameMatch(t, target, own, qualified, buf); ok {
+				tokens = append(tokens, tok)
 			}
 		}
 		for _, c := range t.Children() {
@@ -378,6 +407,30 @@ func typeOccurrencesOf(fv view, target *ir.TypeDef, trees map[cst.Green]cst.Tree
 	}
 	walk(fv.AST().Concrete().Tree())
 	return tokens
+}
+
+// typeNameMatch reports the identifier token of a TypeName node that resolves
+// to target: the lone name for a plain TypeName, the member name for a
+// namespace-qualified one. It returns ok=false when the name resolves
+// elsewhere or the node is not a one- or two-ident name.
+func typeNameMatch(t cst.Tree, target *ir.TypeDef, own []*ir.TypeDef, qualified map[string][]*ir.TypeDef, buf source.Buffer) (cst.Tree, bool) {
+	var idents []cst.Tree
+	for _, c := range t.Children() {
+		if kk, isTok := c.TokenKind(); isTok && kk == token.Ident {
+			idents = append(idents, c)
+		}
+	}
+	switch len(idents) {
+	case 1:
+		if findTypeDef(own, idents[0].Text(buf)) == target {
+			return idents[0], true
+		}
+	case 2:
+		if findTypeDef(qualified[idents[0].Text(buf)], idents[1].Text(buf)) == target {
+			return idents[1], true
+		}
+	}
+	return cst.Tree{}, false
 }
 
 // programTypeOccurrences is programOccurrences for a type definition.

@@ -5,6 +5,7 @@
 // errors), CheckAgainst pushes a type down, and the per-form helpers
 // (checkFuncLitAgainst, checkCollectionAgainst, checkRecord*) realize each
 // pushed-down rule.
+
 package infer
 
 import (
@@ -353,12 +354,27 @@ func collectionApp(t ir.Type) (*ir.App, bool) {
 // A written annotation wins for the body scope but must agree with the
 // expectation (default-int adaption only).
 func checkFuncLitAgainst(lit *ast.FuncLit, want *ir.Func, s scope, subst map[string]ir.Type, sink *Sink) ir.Type {
-	reg := s.registry()
 	if len(lit.Params) != len(want.Params) {
 		sink.arityMismatchLit(lit, len(lit.Params), len(want.Params))
 		return ir.Invalid
 	}
 	r := &TypeResolver{Defs: s.universe(), Qualified: s.qualified()}
+	params, names := resolveLitParams(lit, want, r, s, subst, sink)
+	body := funcScope{outer: s, params: names}
+	result := resolveLitResult(lit, want, r, body, s, subst, sink)
+	t := &ir.Func{Params: params, Result: result}
+	sink.solvedFuncLit(lit, t)
+	return t
+}
+
+// resolveLitParams resolves a function literal's parameter types against the
+// expected function type: a written annotation wins for the body scope but must
+// agree with the expectation, an unannotated parameter takes the (substituted)
+// expected type when it is known, and an unpinned variable is the
+// uninferable_param case. It returns the resolved parameter types and the
+// name-to-type map the body scope binds.
+func resolveLitParams(lit *ast.FuncLit, want *ir.Func, r *TypeResolver, s scope, subst map[string]ir.Type, sink *Sink) ([]ir.Type, map[string]ir.Type) {
+	reg := s.registry()
 	params := make([]ir.Type, len(lit.Params))
 	names := make(map[string]ir.Type, len(lit.Params))
 	for i, p := range lit.Params {
@@ -383,24 +399,32 @@ func checkFuncLitAgainst(lit *ast.FuncLit, want *ir.Func, s scope, subst map[str
 		}
 		names[p.Name] = params[i]
 	}
-	body := funcScope{outer: s, params: names}
+	return params, names
+}
 
+// resolveLitResult determines a function literal's result type against the
+// expected one and checks its body's returns: an annotation wins (after
+// agreeing with the expectation), a concrete expectation is checked against
+// every return, and an expected result still carrying an unbound method type
+// variable (map's R) is synthesized from the body and matched to bind it.
+func resolveLitResult(lit *ast.FuncLit, want *ir.Func, r *TypeResolver, body funcScope, s scope, subst map[string]ir.Type, sink *Sink) ir.Type {
+	reg := s.registry()
 	wr := types.Substitute(want.Result, subst)
-	var result ir.Type
 	switch {
 	case lit.Result != nil:
 		// The annotation wins for the returns, after agreeing with the
 		// expectation the same way a parameter annotation must.
-		result = r.ResolveType(lit.Result, nil)
+		result := r.ResolveType(lit.Result, nil)
 		if conflicts(reg, result, wr, subst) {
 			sink.mismatch(lit.Result, result, wr)
 		}
 		checkReturns(lit, result, body, subst, sink)
+		return result
 	case !hasTypeVar(wr):
 		// The expectation determines the result; every return is checked
 		// against it (no return at all still leaves the signature complete).
-		result = wr
 		checkReturns(lit, wr, body, subst, sink)
+		return wr
 	default:
 		// The expected result still has an unbound method type variable (the
 		// R of map): synthesize the body's result and bind the variable.
@@ -408,19 +432,16 @@ func checkFuncLitAgainst(lit *ast.FuncLit, want *ir.Func, s scope, subst map[str
 		switch {
 		case !sawReturn:
 			sink.uninferableResult(lit)
-			result = ir.Invalid
+			return ir.Invalid
 		case unified == ir.Invalid:
-			result = ir.Invalid
+			return ir.Invalid
 		case types.Match(reg, wr, unified, subst):
-			result = types.Substitute(wr, subst)
+			return types.Substitute(wr, subst)
 		default:
 			sink.mismatch(lit, unified, wr)
-			result = ir.Invalid
+			return ir.Invalid
 		}
 	}
-	t := &ir.Func{Params: params, Result: result}
-	sink.solvedFuncLit(lit, t)
-	return t
 }
 
 // conflicts reports whether a written annotation disagrees with the expected
@@ -678,11 +699,11 @@ func check(e ast.Expr, s scope, sink *Sink) ir.Type {
 func synthesize(e ast.Expr, s scope, sink *Sink) ir.Type {
 	switch e := e.(type) {
 	case *ast.IntLit:
-		return &ir.Builtin{Name: "nint"}
+		return &ir.Builtin{Name: builtin.NameNint}
 	case *ast.StringLit:
-		return &ir.Builtin{Name: "string"}
+		return &ir.Builtin{Name: builtin.NameString}
 	case *ast.BoolLit:
-		return &ir.Builtin{Name: "bool"}
+		return &ir.Builtin{Name: builtin.NameBool}
 	case *ast.DatetimeLit:
 		return &ir.Builtin{Name: "datetime"}
 	case *ast.DurationLit:
@@ -738,7 +759,7 @@ func synthesize(e ast.Expr, s scope, sink *Sink) ir.Type {
 // missing bound (a recovered literal) is skipped. The literal's type is range
 // whatever its bounds, the same type range(start, end) produces.
 func checkRange(e *ast.RangeExpr, s scope, sink *Sink) ir.Type {
-	nint := &ir.Builtin{Name: "nint"}
+	nint := &ir.Builtin{Name: builtin.NameNint}
 	if e.Lower != nil {
 		checkType(e.Lower, nint, s, map[string]ir.Type{}, sink)
 	}

@@ -235,7 +235,16 @@ func overloadedScore() *ir.Named {
 func TestSelectOverload(t *testing.T) {
 	reg := builtin.Default()
 	score := overloadedScore()
+	t.Run("argument fit", func(t *testing.T) { selectOverloadByFit(t, reg, score) })
+	t.Run("arity", func(t *testing.T) { selectOverloadByArity(t, reg) })
+	t.Run("ambiguous sized int", func(t *testing.T) { selectOverloadAmbiguous(t, reg) })
+	t.Run("literal and generic", func(t *testing.T) { selectOverloadLiteralAndGeneric(t, reg, score) })
+}
 
+// selectOverloadByFit: the argument type picks the fitting signature, a value
+// fitting none is found-but-unmatched, and an unknown method is not found.
+func selectOverloadByFit(t *testing.T, reg *builtin.Registry, score ir.Type) {
+	t.Helper()
 	// A self-typed argument picks the points signature; the default integer
 	// adapts to the receiver.
 	matches, found := SelectOverload(reg, score, "merge", []ir.Type{bt("nint")})
@@ -263,8 +272,12 @@ func TestSelectOverload(t *testing.T) {
 	if _, found := SelectOverload(reg, score, "frobnicate", nil); found {
 		t.Error("frobnicate: found = true, want false")
 	}
+}
 
-	// Arity selects among same-name signatures: next() vs next(steps: self).
+// selectOverloadByArity: arity selects among same-name signatures, next() vs
+// next(steps: self).
+func selectOverloadByArity(t *testing.T, reg *builtin.Registry) {
+	t.Helper()
 	level := &ir.Named{Def: &ir.TypeDef{
 		Name: "Level",
 		Body: bt("sbyte"),
@@ -279,9 +292,13 @@ func TestSelectOverload(t *testing.T) {
 	if matches, _ := SelectOverload(reg, level, "next", []ir.Type{bt("nint")}); len(matches) != 1 || len(matches[0].Method.Params) != 1 {
 		t.Errorf("next(nint): want the stepping overload")
 	}
+}
 
-	// The default integer fits both sized-integer overloads at once: ambiguous,
-	// resolved by an annotation at the call site, never an implicit priority.
+// selectOverloadAmbiguous: the default integer fits both sized-integer overloads
+// at once (ambiguous), resolved by an annotation, never an implicit priority; a
+// sized argument is exact.
+func selectOverloadAmbiguous(t *testing.T, reg *builtin.Registry) {
+	t.Helper()
 	gauge := &ir.Named{Def: &ir.TypeDef{
 		Name: "Gauge",
 		Body: bt("int"),
@@ -297,7 +314,14 @@ func TestSelectOverload(t *testing.T) {
 	if matches, _ := SelectOverload(reg, gauge, "set", []ir.Type{bt("short")}); len(matches) != 1 || matches[0].Method.Params[0].Type.String() != "short" {
 		t.Errorf("set(short): want the short overload alone")
 	}
+}
 
+// selectOverloadLiteralAndGeneric: a nil argument type (a function literal
+// checked after selection) fits any parameter so only arity discriminates, and a
+// single-candidate generic method solves its variables from the argument on a
+// fresh substitution.
+func selectOverloadLiteralAndGeneric(t *testing.T, reg *builtin.Registry, score ir.Type) {
+	t.Helper()
 	// A nil argument type (a function literal checked after selection) fits
 	// any parameter, so only the arity discriminates.
 	if matches, _ := SelectOverload(reg, score, "merge", []ir.Type{nil}); len(matches) != 2 {
@@ -314,7 +338,7 @@ func TestSelectOverload(t *testing.T) {
 	}
 	recv := &ir.App{Def: listDef, Args: []ir.Type{bt("nint")}}
 	fn := &ir.Func{Params: []ir.Type{bt("nint")}, Result: bt("bool")}
-	matches, _ = SelectOverload(reg, recv, "map", []ir.Type{fn})
+	matches, _ := SelectOverload(reg, recv, "map", []ir.Type{fn})
 	if len(matches) != 1 {
 		t.Fatalf("map(fn): matches = %d, want 1", len(matches))
 	}

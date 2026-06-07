@@ -60,6 +60,8 @@ func (l *Lexer) Tokens() []token.Token {
 
 // Next scans and returns the next token. Once the input is exhausted it
 // returns an EOF token on every call.
+//
+//nolint:gocyclo,funlen // byte-dispatch lexer: one case per token kind, every case delegating to its scanner (the sanctioned flat-dispatch exception)
 func (l *Lexer) Next() token.Token {
 	start := l.offset
 	if l.offset >= len(l.src) {

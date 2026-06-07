@@ -9,6 +9,7 @@
 // checker runs) carries none of those annotations; the interpreter then falls
 // back to the conservative value-kind rules, folding what the values alone
 // decide and refusing the rest.
+
 package eval
 
 import (
@@ -177,6 +178,10 @@ func graphValue(v ir.Value, ctx graphCtx) *ir.Constant {
 // graphValueRaw folds one value node. The expectation channels are consumed at
 // this level; sub-expressions evaluate in their own (expectation-free)
 // context, exactly as the AST folder scopes them.
+// every case delegates to its form's helper, so the length is the case count,
+// not control complexity (the Lexer.Next class of exception).
+//
+//nolint:funlen // a flat exhaustive dispatch over the 25 sealed Value forms:
 func graphValueRaw(v ir.Value, ctx graphCtx) *ir.Constant {
 	sub := ctx
 	sub.expectedColl = ir.CollUnknown
@@ -185,11 +190,7 @@ func graphValueRaw(v ir.Value, ctx graphCtx) *ir.Constant {
 	case *ir.Adapt:
 		return executeAdapt(v, sub)
 	case *ir.IntLiteral:
-		n, ok := new(big.Int).SetString(v.Text, 10)
-		if !ok {
-			return nil
-		}
-		return ir.IntConstant(n)
+		return graphIntLiteral(v)
 	case *ir.StringLiteral:
 		return ir.StringConstant(v.Value)
 	case *ir.BoolLiteral:
@@ -197,15 +198,9 @@ func graphValueRaw(v ir.Value, ctx graphCtx) *ir.Constant {
 	case *ir.NullValue:
 		return ir.NullConstant()
 	case *ir.DatetimeLiteral:
-		if ms, ok := DatetimeMillis(v.Text); ok {
-			return ir.DatetimeConstant(ms)
-		}
-		return nil
+		return graphDatetimeLiteral(v)
 	case *ir.DurationLiteral:
-		if ms, ok := DurationMillis(v.Text); ok {
-			return ir.DurationConstant(ms)
-		}
-		return nil
+		return graphDurationLiteral(v)
 	case *ir.SelfValue:
 		return ctx.self
 	case *ir.ParamRef:
@@ -218,15 +213,9 @@ func graphValueRaw(v ir.Value, ctx graphCtx) *ir.Constant {
 		}
 		return ctx.env.ConstValue(v.Target)
 	case *ir.EnumMemberValue:
-		if v.Def == nil || v.Def.Enum == nil || v.Index < 0 || v.Index >= len(v.Def.Enum.Members) {
-			return nil
-		}
-		return ir.EnumConstant(v.Def, v.Index)
+		return graphEnumMember(v)
 	case *ir.AssocConstValue:
-		if v.Def == nil || v.Index < 0 || v.Index >= len(v.Def.Consts) {
-			return nil
-		}
-		return v.Def.Consts[v.Index].Value
+		return graphAssocConst(v)
 	case *ir.CollectionLiteral:
 		collCtx := sub
 		collCtx.expectedColl = ctx.expectedColl
@@ -234,14 +223,7 @@ func graphValueRaw(v ir.Value, ctx graphCtx) *ir.Constant {
 	case *ir.RecordValue:
 		return graphRecord(v, sub)
 	case *ir.Ternary:
-		cond := graphValue(v.Cond, sub)
-		if cond == nil || cond.Kind != ir.ConstBool {
-			return nil
-		}
-		if cond.Bool {
-			return graphValue(v.Then, sub)
-		}
-		return graphValue(v.Else, sub)
+		return graphTernary(v, sub)
 	case *ir.RangeLit:
 		return graphRangeLit(v, sub)
 	case *ir.FuncLiteral:
@@ -249,19 +231,7 @@ func graphValueRaw(v ir.Value, ctx graphCtx) *ir.Constant {
 		// the IR node itself, whose lowered Body the application interprets.
 		return ir.FuncConstant(v, maps.Clone(ctx.locals))
 	case *ir.FieldAccess:
-		recv := graphValue(v.Receiver, sub)
-		if recv == nil {
-			return nil
-		}
-		if recv.Kind == ir.ConstRecord {
-			if f := recordField(recv, v.Field); f != nil {
-				return f
-			}
-		}
-		if c, ok := graphGetter(sub, v.Receiver, recv, v.Field); ok {
-			return c
-		}
-		return nil
+		return graphFieldAccess(v, sub)
 	case *ir.Conversion:
 		return graphConvert(v, sub)
 	case *ir.Await:
@@ -269,11 +239,7 @@ func graphValueRaw(v ir.Value, ctx graphCtx) *ir.Constant {
 		// awaited value is effectful by construction, so it does not fold.
 		return nil
 	case *ir.Apply:
-		fn := graphValue(v.Callee, sub)
-		if fn == nil || fn.Kind != ir.ConstFunc {
-			return nil
-		}
-		return graphApplyValue(sub, fn, v.Args)
+		return graphApplyCallee(v, sub)
 	case *ir.Call:
 		return graphCall(v, sub)
 	case *ir.FuncCall:
@@ -285,6 +251,88 @@ func graphValueRaw(v ir.Value, ctx graphCtx) *ir.Constant {
 	default:
 		panic(unhandledValue(v))
 	}
+}
+
+// graphIntLiteral folds an integer literal to its arbitrary-precision value.
+func graphIntLiteral(v *ir.IntLiteral) *ir.Constant {
+	n, ok := new(big.Int).SetString(v.Text, 10)
+	if !ok {
+		return nil
+	}
+	return ir.IntConstant(n)
+}
+
+// graphDatetimeLiteral folds a datetime literal to its UTC epoch instant.
+func graphDatetimeLiteral(v *ir.DatetimeLiteral) *ir.Constant {
+	if ms, ok := DatetimeMillis(v.Text); ok {
+		return ir.DatetimeConstant(ms)
+	}
+	return nil
+}
+
+// graphDurationLiteral folds a duration literal to its total milliseconds.
+func graphDurationLiteral(v *ir.DurationLiteral) *ir.Constant {
+	if ms, ok := DurationMillis(v.Text); ok {
+		return ir.DurationConstant(ms)
+	}
+	return nil
+}
+
+// graphEnumMember folds a resolved enum member reference to its constant.
+func graphEnumMember(v *ir.EnumMemberValue) *ir.Constant {
+	if v.Def == nil || v.Def.Enum == nil || v.Index < 0 || v.Index >= len(v.Def.Enum.Members) {
+		return nil
+	}
+	return ir.EnumConstant(v.Def, v.Index)
+}
+
+// graphAssocConst folds a resolved associated-constant reference to the
+// owning definition's published value.
+func graphAssocConst(v *ir.AssocConstValue) *ir.Constant {
+	if v.Def == nil || v.Index < 0 || v.Index >= len(v.Def.Consts) {
+		return nil
+	}
+	return v.Def.Consts[v.Index].Value
+}
+
+// graphTernary folds a conditional value: only the taken branch is evaluated.
+func graphTernary(v *ir.Ternary, ctx graphCtx) *ir.Constant {
+	cond := graphValue(v.Cond, ctx)
+	if cond == nil || cond.Kind != ir.ConstBool {
+		return nil
+	}
+	if cond.Bool {
+		return graphValue(v.Then, ctx)
+	}
+	return graphValue(v.Else, ctx)
+}
+
+// graphFieldAccess folds a record field read or a getter call sharing the
+// surface form.
+func graphFieldAccess(v *ir.FieldAccess, ctx graphCtx) *ir.Constant {
+	recv := graphValue(v.Receiver, ctx)
+	if recv == nil {
+		return nil
+	}
+	if recv.Kind == ir.ConstRecord {
+		if f := recordField(recv, v.Field); f != nil {
+			return f
+		}
+	}
+	if c, ok := graphGetter(ctx, v.Receiver, recv, v.Field); ok {
+		return c
+	}
+	return nil
+}
+
+// graphApplyCallee folds the application of a function value: the callee must
+// fold to a closure, which then applies to the arguments.
+func graphApplyCallee(v *ir.Apply, ctx graphCtx) *ir.Constant {
+	fn := graphValue(v.Callee, ctx)
+	if fn == nil || fn.Kind != ir.ConstFunc {
+		return nil
+	}
+	return graphApplyValue(ctx, fn, v.Args)
 }
 
 // executeAdapt runs an explicit adaption: the inner value folds, then carries
@@ -527,7 +575,7 @@ func graphConvert(v *ir.Conversion, ctx graphCtx) *ir.Constant {
 	if def == nil {
 		return nil
 	}
-	if def.Builtin && def.Name == "range" {
+	if def.Builtin && def.Name == builtin.NameRange {
 		return graphConvertRange(v.Args, ctx)
 	}
 	if len(v.Args) != 1 {
@@ -543,19 +591,7 @@ func graphConvert(v *ir.Conversion, ctx graphCtx) *ir.Constant {
 		if !ok {
 			return nil
 		}
-		if n.Err {
-			if arg.Kind != ir.ConstString {
-				return nil
-			}
-			return ir.ErrorConstant(arg.Str)
-		}
-		if !builtinBacksKind(n, arg.Kind) {
-			return nil
-		}
-		if arg.Kind == ir.ConstInt && !n.Fits(arg.Int) {
-			return nil
-		}
-		return arg
+		return convertToNative(n, arg)
 	}
 	if defBacksKind(reg, def, arg.Kind) {
 		if arg.Kind == ir.ConstInt {
@@ -569,6 +605,26 @@ func graphConvert(v *ir.Conversion, ctx graphCtx) *ir.Constant {
 		return arg
 	}
 	return nil
+}
+
+// convertToNative applies a builtin conversion's value rules: error(msg)
+// constructs from its message, every other native accepts a value its kind
+// backs and — for a sized integer — its range fits; an inadmissible value
+// refuses to fold (the conversion site carries the diagnostic).
+func convertToNative(n *builtin.NativeType, arg *ir.Constant) *ir.Constant {
+	if n.Err {
+		if arg.Kind != ir.ConstString {
+			return nil
+		}
+		return ir.ErrorConstant(arg.Str)
+	}
+	if !builtinBacksKind(n, arg.Kind) {
+		return nil
+	}
+	if arg.Kind == ir.ConstInt && !n.Fits(arg.Int) {
+		return nil
+	}
+	return arg
 }
 
 // graphConvertRange folds the range constructor's graph form — convertRange

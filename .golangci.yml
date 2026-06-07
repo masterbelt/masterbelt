@@ -1,15 +1,17 @@
 version: "2"
 
-# Linters that pass today are enabled; the rest are commented out with the
-# issue counts measured on 2026-06-05 so enabling them is a sized, deliberate
-# step rather than a surprise. Counts come from:
-#   golangci-lint run ./... --max-issues-per-linter 0 --max-same-issues 0
+# The complete state (tmp/plan/D-2-lint-ratchet.md §5): every adopted linter
+# runs at its upstream-default thresholds — no commented-out backlog, no
+# complexity settings, no TODOs. A linter absent from the enable list is a
+# deliberate rejection recorded below, not a deferral. Exceptions live as
+# `//nolint:<linter> // <reason>` at their sites; nolintlint enforces that
+# every one names its linter and carries its reason.
 #
-# NOTE: golangci-lint 2.12.2 was observed to DROP findings between runs here
-# (scheduling-dependent): a probe run missed gocyclo on assemble=50 and all 5
-# predeclared issues, and with many linters enabled staticcheck sometimes
-# reports ~46 extra SA5011 (deref before nil check) spots in _test.go files.
-# Treat single-run counts below as lower bounds and re-measure when enabling.
+# NOTE (resolved 2026-06-07): the old "findings drop between runs" mystery
+# was issues.uniq-by-line (default true): every complexity linter reports on
+# the function declaration's line, so enabling several together made them
+# swallow each other's findings deterministically — not scheduling.
+# uniq-by-line: false below keeps the numbers real.
 
 linters:
   default: standard # errcheck, govet, ineffassign, staticcheck, unused
@@ -17,64 +19,63 @@ linters:
     - copyloopvar
     - durationcheck
     - errorlint
-    - gocyclo # see settings: ceiling at 55, TODO ratchet down to 30
-    - maintidx # see settings: floor at 10, TODO ratchet up to the default 20
+    - exhaustive
+    - funlen
+    - gocognit
+    - goconst
+    - gocritic
+    - gocyclo
+    - intrange
+    - maintidx
     - misspell
+    - nestif
+    - nilerr
     - nolintlint
+    - perfsprint
+    - prealloc
+    - predeclared
+    - revive
+    - thelper
     - unconvert
     - unparam
     - usestdlibvars
     - wastedassign
-
-    # --- quick wins: a handful of issues each, enable after a small sweep ---
-    # - gocritic # 2 issues
-    # - intrange # 5 issues (for i := 0; i < n; i++ → for i := range n)
-    # - perfsprint # 1 issue
-    # - thelper # 2 issues (missing t.Helper() in crossfile_test/function_test)
-    # - predeclared # 5 issues: min/new/int8 shadowing predeclared identifiers
-    #               # (builtin/native.go, semantic/engine.go, ast/render.go,
-    #               # prelude_test.go) — needs small renames first
-    # - nilerr # 3 issues, all pkg/project/project.go:306-329 — REVIEW: errors
-    #          # checked then nil returned; either intentional skips or real
-    #          # swallowed failures. Decide before enabling.
-
-    # --- medium: needs a real pass or tuned settings ---
-    # - prealloc # 17 issues (append loops without preallocation)
-    # - exhaustive # 51 issues; 18 with default-signifies-exhaustive: true
-    # - revive # 91 issues: exported 58 / package-comments 16 /
-    #          # unused-parameter 9 / redefines-builtin-id 7 / unreachable-code 1
-    # - goconst # 136 issues (mostly repeated literals in tests)
-
-    # --- TODO(complexity): measured 2026-06-05, decide thresholds and refactor ---
-    # - funlen # at a lax 70 lines / 70 statements still 10 issues — worst
-    #          # TestLexerDiagnostics=124 lines, assemble=106 statements,
-    #          # TestParseFuncLit=106, funcCallType=101, callType=91. The
-    #          # defaults (60/40) flag substantially more.
-    # - gocognit # 18 funcs over the default 30. Worst: semantic/assemble.go
-    #            # assemble=99, semantic/effects.go collectEffectUses=76,
-    #            # lsp/record.go recordTypes=71, lexer TestLexerDiagnostics=59.
-    #            # The top three are genuine refactor candidates.
-    # - nestif # 8 spots over the default 5 (worst 9)
-    # - cyclop # 87 funcs over the default 10 — threshold likely too strict for
-    #          # a compiler (big dispatch switches); gocyclo above covers the
-    #          # same ground with a saner ceiling.
+  # Rejected (with reasons), not deferred:
+  # - cyclop: the same metric as gocyclo, and its default 10 mostly punishes
+  #   the compiler's dispatch switches; gocyclo carries the per-function
+  #   ceiling instead.
   settings:
-    gocyclo:
-      # Ceiling that passes today. TODO: ratchet down to the default 30 —
-      # 2 offenders as of 2026-06-05: semantic assemble=50, lexer.Next=33
-      # (the dispatch switch). assemble is also the gocognit worst (99).
-      min-complexity: 55
-    maintidx:
-      # Floor that passes today. TODO: ratchet up to the default 20 —
-      # 1 offender as of 2026-06-05: semantic assemble, maintainability
-      # index 11. Every complexity metric (gocognit 99, gocyclo 50,
-      # 106 statements, MI 11) converges on assemble: refactor it first.
-      under: 10
+    exhaustive:
+      # Writing a default arm declares the switch intentionally
+      # non-exhaustive; an internal enum switch without one must list every
+      # member.
+      default-signifies-exhaustive: true
+    goconst:
+      # A test's repeated literals are its own readability business; the
+      # production name literals get canonical constants (builtin.Name*).
+      ignore-tests: true
+    nolintlint:
+      # Every exception names its linter and carries its reason — the
+      # inventory that keeps the nolint set auditable.
+      require-explanation: true
+      require-specific: true
+  exclusions:
+    # Generated files are excluded from analysis, not just reporting:
+    # goconst would otherwise count a generated file's literals toward a
+    # hand-written file's occurrence threshold.
+    generated: strict
+
+issues:
+  # The complexity linters (gocyclo, gocognit, funlen, maintidx, cyclop) all
+  # report on the function declaration's line, so the default one-issue-per-
+  # line dedupe makes them silently swallow each other's findings. Every
+  # ratchet number is a lie without this.
+  uniq-by-line: false
 
 formatters:
   enable:
     - gofmt
-    # - goimports # would regroup imports in 24 files; adopt in one sweep
+    - goimports
   settings:
     goimports:
       local-prefixes:

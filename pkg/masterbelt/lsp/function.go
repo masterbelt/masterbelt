@@ -3,11 +3,12 @@ package lsp
 import (
 	"strings"
 
+	protocol "github.com/owenrumney/go-lsp/lsp"
+
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/source/cst"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
 	"github.com/masterbelt/masterbelt/pkg/source/token"
-	protocol "github.com/owenrumney/go-lsp/lsp"
 )
 
 // The editor side of top-level functions: call-snippet completion in value
@@ -127,64 +128,85 @@ func funcAt(doc view, offset int) ([]*ir.Function, cst.Tree, bool) {
 	}
 	parentNode, _ := parent.Node()
 
-	shellsOf := func(cands []*ast.FuncDecl) []*ir.Function {
-		var fns []*ir.Function
-		for _, fd := range cands {
-			if f := doc.FunctionOf(fd); f != nil {
-				fns = append(fns, f)
-			}
-		}
-		return fns
-	}
-
 	switch pk {
 	case cst.FuncDecl:
-		// The declaration's own name: the function backed by this very node.
-		for _, f := range doc.Module().Funcs {
-			if f.Syntax != nil && f.Syntax.Syntax() == parentNode {
-				return []*ir.Function{f}, leaf, true
-			}
-		}
+		return funcAtDecl(doc, parentNode, leaf)
 	case cst.NameRef:
-		// A callee: the identifier backed by this NameRef, resolved to the
-		// overload set it calls. Operators never desugar through a NameRef
-		// callee, so only a written call matches.
-		var id *ast.Identifier
-		forEachExpr(doc.AST().File(), func(e ast.Expr) {
-			if c, ok := e.(*ast.CallExpr); ok {
-				if i, ok := c.Callee.(*ast.Identifier); ok && i.Syntax() == parentNode {
-					id = i
-				}
-			}
-		})
-		if id == nil {
-			return nil, cst.Tree{}, false
-		}
-		if fns := shellsOf(doc.ResolveFunc(id)); len(fns) > 0 {
-			return fns, leaf, true
-		}
+		return funcAtCallee(doc, parentNode, leaf)
 	case cst.MemberExpr:
-		// A namespace function call's member name (the area of geo.area(...)),
-		// when the member access is a call's callee. The receiver's qualifier
-		// hovers as a namespace elsewhere; only the member denotes functions.
-		var member *ast.MemberExpr
-		forEachExpr(doc.AST().File(), func(e ast.Expr) {
-			if c, ok := e.(*ast.CallExpr); ok {
-				if m, ok := c.Callee.(*ast.MemberExpr); ok && m.Syntax() == parentNode {
-					member = m
-				}
+		return funcAtMember(doc, parentNode, leaf)
+	default:
+		// Any other parent kind does not denote a function (a declaration
+		// name, a callee, or a namespace member): no functions are resolved.
+		return nil, cst.Tree{}, false
+	}
+}
+
+// funcShellsOf maps the candidate declarations to the program's resolved
+// function shells, dropping any the owning module did not publish.
+func funcShellsOf(doc view, cands []*ast.FuncDecl) []*ir.Function {
+	var fns []*ir.Function
+	for _, fd := range cands {
+		if f := doc.FunctionOf(fd); f != nil {
+			fns = append(fns, f)
+		}
+	}
+	return fns
+}
+
+// funcAtDecl resolves a FuncDecl header name to the function backed by this
+// very node.
+func funcAtDecl(doc view, parentNode *cst.Node, leaf cst.Tree) ([]*ir.Function, cst.Tree, bool) {
+	for _, f := range doc.Module().Funcs {
+		if f.Syntax != nil && f.Syntax.Syntax() == parentNode {
+			return []*ir.Function{f}, leaf, true
+		}
+	}
+	return nil, cst.Tree{}, false
+}
+
+// funcAtCallee resolves a callee identifier (backed by this NameRef) to the
+// overload set it calls. Operators never desugar through a NameRef callee, so
+// only a written call matches.
+func funcAtCallee(doc view, parentNode *cst.Node, leaf cst.Tree) ([]*ir.Function, cst.Tree, bool) {
+	var id *ast.Identifier
+	forEachExpr(doc.AST().File(), func(e ast.Expr) {
+		if c, ok := e.(*ast.CallExpr); ok {
+			if i, ok := c.Callee.(*ast.Identifier); ok && i.Syntax() == parentNode {
+				id = i
 			}
-		})
-		if member == nil {
-			return nil, cst.Tree{}, false
 		}
-		// Only the member-name token denotes the function, not the qualifier.
-		if recv, ok := member.Receiver.(*ast.Identifier); ok && leaf.Text(doc.Buffer()) == recv.Name {
-			return nil, cst.Tree{}, false
+	})
+	if id == nil {
+		return nil, cst.Tree{}, false
+	}
+	if fns := funcShellsOf(doc, doc.ResolveFunc(id)); len(fns) > 0 {
+		return fns, leaf, true
+	}
+	return nil, cst.Tree{}, false
+}
+
+// funcAtMember resolves a namespace function call's member name (the area of
+// geo.area(...)), when the member access is a call's callee. The receiver's
+// qualifier hovers as a namespace elsewhere; only the member denotes functions.
+func funcAtMember(doc view, parentNode *cst.Node, leaf cst.Tree) ([]*ir.Function, cst.Tree, bool) {
+	var member *ast.MemberExpr
+	forEachExpr(doc.AST().File(), func(e ast.Expr) {
+		if c, ok := e.(*ast.CallExpr); ok {
+			if m, ok := c.Callee.(*ast.MemberExpr); ok && m.Syntax() == parentNode {
+				member = m
+			}
 		}
-		if fns := shellsOf(doc.ResolveFuncMember(member)); len(fns) > 0 {
-			return fns, leaf, true
-		}
+	})
+	if member == nil {
+		return nil, cst.Tree{}, false
+	}
+	// Only the member-name token denotes the function, not the qualifier.
+	if recv, ok := member.Receiver.(*ast.Identifier); ok && leaf.Text(doc.Buffer()) == recv.Name {
+		return nil, cst.Tree{}, false
+	}
+	if fns := funcShellsOf(doc, doc.ResolveFuncMember(member)); len(fns) > 0 {
+		return fns, leaf, true
 	}
 	return nil, cst.Tree{}, false
 }

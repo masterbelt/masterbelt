@@ -6,6 +6,7 @@
 // scrutinee's member, an if on its condition, a for over a folded collection
 // or range. The body folds only when its dispatch is fully determined, the
 // soundness-over-completeness rule both folders share.
+
 package eval
 
 import (
@@ -90,26 +91,12 @@ func graphStmts(body []ir.Stmt, ctx graphCtx, scope *graphScope) (*ir.Constant, 
 	for _, stmt := range body {
 		switch s := stmt.(type) {
 		case *ir.Return:
-			if s.Value == nil {
-				return nil, graphUnknown
-			}
-			retCtx := ctx
-			retCtx.expectedColl = ctx.resultColl
-			retCtx.expectedType = ctx.resultType
-			if v := graphValue(s.Value, retCtx); v != nil {
-				return v, graphReturned
-			}
-			return nil, graphUnknown
+			return graphReturn(s, ctx)
 		case *ir.ExprStmt:
 			// A bare expression yields no binding and cannot return.
 			continue
 		case *ir.Let:
-			if s.Value == nil {
-				return nil, graphUnknown
-			}
-			letCtx := graphExpectingType(ctx, s.Type)
-			v := graphValue(s.Value, letCtx)
-			if v == nil || s.Name == "" || !scope.bind(s.Name, v) {
+			if !graphLet(s, ctx, scope) {
 				return nil, graphUnknown
 			}
 		case *ir.Assign:
@@ -145,6 +132,32 @@ func graphStmts(body []ir.Stmt, ctx graphCtx, scope *graphScope) (*ir.Constant, 
 		}
 	}
 	return nil, graphFellThrough
+}
+
+// graphReturn folds a return statement's value under the body's result
+// expectation channels.
+func graphReturn(s *ir.Return, ctx graphCtx) (*ir.Constant, graphOutcome) {
+	if s.Value == nil {
+		return nil, graphUnknown
+	}
+	retCtx := ctx
+	retCtx.expectedColl = ctx.resultColl
+	retCtx.expectedType = ctx.resultType
+	if v := graphValue(s.Value, retCtx); v != nil {
+		return v, graphReturned
+	}
+	return nil, graphUnknown
+}
+
+// graphLet folds a let binding under its annotation's expectation channel and
+// binds the local into the block scope; false means the body cannot fold.
+func graphLet(s *ir.Let, ctx graphCtx, scope *graphScope) bool {
+	if s.Value == nil {
+		return false
+	}
+	letCtx := graphExpectingType(ctx, s.Type)
+	v := graphValue(s.Value, letCtx)
+	return v != nil && s.Name != "" && scope.bind(s.Name, v)
 }
 
 // graphAssign folds an assignment: a property write (the synthetic setter
@@ -354,57 +367,69 @@ func graphFor(s *ir.For, ctx graphCtx) (*ir.Constant, graphOutcome) {
 	}
 	switch iter.Kind {
 	case ir.ConstCollection:
-		for i, entry := range iter.Coll {
-			elem := entry.Value
-			if !s.Of {
-				elem = entry.Key
-				if elem == nil {
-					elem = ir.IntConstant(big.NewInt(int64(i)))
-				}
-			}
-			v, out := graphIteration(s, elem, ctx)
-			switch out {
-			case graphFellThrough:
-				continue
-			case graphReturned:
-				return v, graphReturned
-			default:
-				return nil, graphUnknown
-			}
-		}
-		return nil, graphFellThrough
+		return graphForCollection(s, iter, ctx)
 	case ir.ConstRange:
-		count, ok := rangeCount(iter)
-		if !ok {
-			return nil, graphUnknown
-		}
-		if count.Sign() <= 0 {
-			return nil, graphFellThrough
-		}
-		if count.Cmp(big.NewInt(maxRangeIterations)) > 0 {
-			ctx.noteBudget()
-			return nil, graphUnknown
-		}
-		n := count.Int64()
-		for i := int64(0); i < n; i++ {
-			elem := ir.IntConstant(rangeElement(iter, i))
-			if !s.Of {
-				elem = ir.IntConstant(big.NewInt(i))
-			}
-			v, out := graphIteration(s, elem, ctx)
-			switch out {
-			case graphFellThrough:
-				continue
-			case graphReturned:
-				return v, graphReturned
-			default:
-				return nil, graphUnknown
-			}
-		}
-		return nil, graphFellThrough
+		return graphForRange(s, iter, ctx)
 	default:
 		return nil, graphUnknown
 	}
+}
+
+// graphForCollection runs the loop body over a folded collection's entries:
+// the value for an of-loop, the key (a list's 0-based index) for an in-loop.
+func graphForCollection(s *ir.For, iter *ir.Constant, ctx graphCtx) (*ir.Constant, graphOutcome) {
+	for i, entry := range iter.Coll {
+		elem := entry.Value
+		if !s.Of {
+			elem = entry.Key
+			if elem == nil {
+				elem = ir.IntConstant(big.NewInt(int64(i)))
+			}
+		}
+		v, out := graphIteration(s, elem, ctx)
+		switch out {
+		case graphFellThrough:
+			continue
+		case graphReturned:
+			return v, graphReturned
+		default:
+			return nil, graphUnknown
+		}
+	}
+	return nil, graphFellThrough
+}
+
+// graphForRange runs the loop body over a folded range's elements — the
+// element for an of-loop, the 0-based position for an in-loop — under the
+// compile-time iteration bound.
+func graphForRange(s *ir.For, iter *ir.Constant, ctx graphCtx) (*ir.Constant, graphOutcome) {
+	count, ok := rangeCount(iter)
+	if !ok {
+		return nil, graphUnknown
+	}
+	if count.Sign() <= 0 {
+		return nil, graphFellThrough
+	}
+	if count.Cmp(big.NewInt(maxRangeIterations)) > 0 {
+		ctx.noteBudget()
+		return nil, graphUnknown
+	}
+	for i := range count.Int64() {
+		elem := ir.IntConstant(rangeElement(iter, i))
+		if !s.Of {
+			elem = ir.IntConstant(big.NewInt(i))
+		}
+		v, out := graphIteration(s, elem, ctx)
+		switch out {
+		case graphFellThrough:
+			continue
+		case graphReturned:
+			return v, graphReturned
+		default:
+			return nil, graphUnknown
+		}
+	}
+	return nil, graphFellThrough
 }
 
 // graphIteration runs one for-iteration with the loop variable bound in a
@@ -437,20 +462,26 @@ func (s *graphScope) bind(name string, v *ir.Constant) bool {
 		return false
 	}
 	if !s.recorded(name) {
-		if prior, ok := s.locals[name]; ok {
-			if s.shadows == nil {
-				s.shadows = map[string]*ir.Constant{}
-			}
-			s.shadows[name] = prior
-		} else {
-			if s.added == nil {
-				s.added = map[string]bool{}
-			}
-			s.added[name] = true
-		}
+		s.record(name)
 	}
 	s.locals[name] = v
 	return true
+}
+
+// record notes how the scope's restore must treat name: a shadowed outer
+// binding is saved for restoration, a fresh one is marked for deletion.
+func (s *graphScope) record(name string) {
+	if prior, ok := s.locals[name]; ok {
+		if s.shadows == nil {
+			s.shadows = map[string]*ir.Constant{}
+		}
+		s.shadows[name] = prior
+		return
+	}
+	if s.added == nil {
+		s.added = map[string]bool{}
+	}
+	s.added[name] = true
 }
 
 func (s *graphScope) recorded(name string) bool {

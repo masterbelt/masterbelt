@@ -5,6 +5,7 @@
 // (directQueries) and the incremental engine can serve them identically.
 // typeEnv adapts the interface to package types/infer, and the symbol-table
 // builders the queries memoize live here too.
+
 package semantic
 
 import (

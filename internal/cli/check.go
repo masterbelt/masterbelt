@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/spf13/cobra"
+
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
 	"github.com/masterbelt/masterbelt/pkg/diagnostic/reporter"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/parser/abstract"
@@ -13,7 +15,6 @@ import (
 	"github.com/masterbelt/masterbelt/pkg/project"
 	"github.com/masterbelt/masterbelt/pkg/project/config"
 	"github.com/masterbelt/masterbelt/pkg/source"
-	"github.com/spf13/cobra"
 )
 
 func init() {
@@ -23,6 +24,9 @@ func init() {
 	CheckCmd.Flags().String("profile", "", "manifest profile to check (default: the top-level profile)")
 }
 
+// CheckCmd is the check subcommand: it parses and type-checks a masterbelt
+// project or a standalone file and reports every diagnostic, exiting nonzero
+// when any is an error.
 var CheckCmd = &cobra.Command{
 	Use:   "check [path]",
 	Short: "Parse and type-check a masterbelt project or file",
@@ -100,11 +104,7 @@ func checkProject(rep reporter.Reporter, proj *project.Project) error {
 	prog.Refresh()
 
 	for _, f := range proj.Files() {
-		var raw []diagnostic.Diagnostic
-		raw = append(raw, f.AST.Concrete().LexDiagnostics()...)
-		raw = append(raw, f.AST.Diagnostics()...)
-		raw = append(raw, prog.Diagnostics(semantic.FileID(f.ID))...)
-		rep.Report(source.NewFile(displayPath(f.Path), f.Data), raw)
+		rep.Report(source.NewFile(displayPath(f.Path), f.Data), gatherDiagnostics(f.AST, prog, semantic.FileID(f.ID)))
 	}
 	if n := rep.Errors(); n > 0 {
 		return fmt.Errorf("%d error(s)", n)
@@ -161,16 +161,26 @@ func checkSource(rep reporter.Reporter, path string, data []byte) error {
 	prog.SetFile(id, doc, nil)
 	prog.Refresh()
 
-	var raw []diagnostic.Diagnostic
-	raw = append(raw, doc.Concrete().LexDiagnostics()...)
-	raw = append(raw, doc.Diagnostics()...)
-	raw = append(raw, prog.Diagnostics(id)...)
-
-	rep.Report(source.NewFile(displayPath(path), data), raw)
+	rep.Report(source.NewFile(displayPath(path), data), gatherDiagnostics(doc, prog, id))
 	if n := rep.Errors(); n > 0 {
 		return fmt.Errorf("%s: %d error(s)", displayPath(path), n)
 	}
 	return nil
+}
+
+// gatherDiagnostics aggregates one file's full diagnostic set — lexer,
+// parser, and semantic, the same three layers every file-reporting site
+// (check's project and ad-hoc paths, the ir command) must agree on. A new
+// diagnostic source is added here, once.
+func gatherDiagnostics(doc *abstract.Document, prog *semantic.Program, id semantic.FileID) []diagnostic.Diagnostic {
+	lex := doc.Concrete().LexDiagnostics()
+	parse := doc.Diagnostics()
+	sem := prog.Diagnostics(id)
+	raw := make([]diagnostic.Diagnostic, 0, len(lex)+len(parse)+len(sem))
+	raw = append(raw, lex...)
+	raw = append(raw, parse...)
+	raw = append(raw, sem...)
+	return raw
 }
 
 // displayPath renders path relative to the working directory when it lies

@@ -61,6 +61,9 @@ func lowerFile(root cst.Tree, buf source.Buffer) *ast.File {
 			funcs = append(funcs, lowerFuncDecl(child, buf))
 		case cst.AssertDecl:
 			asserts = append(asserts, lowerAssertDecl(child, buf))
+		default:
+			// Any other kind is not a top-level declaration: it is skipped and
+			// contributes nothing to the lowered File.
 		}
 	})
 	return ast.NewFile(uses, decls, types, enums, interfaces, funcs, asserts, rootNode)
@@ -80,6 +83,9 @@ func foreachDecl(root cst.Tree, fn func(child cst.Tree, green *cst.Node)) {
 		switch node.Kind() {
 		case cst.UseDecl, cst.ConstDecl, cst.TypeDecl, cst.EnumDecl, cst.InterfaceDecl, cst.FuncDecl, cst.AssertDecl:
 			fn(child, node)
+		default:
+			// Any other kind (trivia, the EOF leaf, an Error region) is not a
+			// top-level declaration and has no place in the abstract tree: skip it.
 		}
 	}
 }
@@ -184,6 +190,9 @@ func lowerLetStmt(t cst.Tree, buf source.Buffer, node *cst.Node) ast.Stmt {
 			typ = lowerTypeClause(child, buf)
 		case cst.Initializer:
 			value = lowerInitializer(child, buf)
+		default:
+			// Any other child node is neither the annotation nor the
+			// initializer of the let binding: it contributes nothing here.
 		}
 	}
 	return ast.NewLetStmt(name, typ, value, node)

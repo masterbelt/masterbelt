@@ -5,12 +5,13 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/spf13/cobra"
+
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
 	"github.com/masterbelt/masterbelt/pkg/diagnostic/reporter"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/parser/abstract"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/semantic"
 	"github.com/masterbelt/masterbelt/pkg/source"
-	"github.com/spf13/cobra"
 )
 
 func init() {
@@ -52,10 +53,7 @@ var IRCmd = &cobra.Command{
 		prog.SetFile(id, doc, nil)
 		prog.Refresh()
 
-		var raw []diagnostic.Diagnostic
-		raw = append(raw, doc.Concrete().LexDiagnostics()...)
-		raw = append(raw, doc.Diagnostics()...)
-		raw = append(raw, prog.Diagnostics(id)...)
+		raw := gatherDiagnostics(doc, prog, id)
 		if len(raw) > 0 {
 			rep := reporter.NewText(cmd.ErrOrStderr(), diagnostic.DefaultLocale)
 			rep.Report(source.NewFile(displayPath(args[0]), data), raw)

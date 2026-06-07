@@ -43,13 +43,21 @@ func TestImportBoundary(t *testing.T) {
 }
 
 // TestTypeAlgebraSyntaxFree pins the companion invariant: the type algebra
-// this package leans on (pkg/masterbelt/types) is itself rules over IR data —
-// no syntax import may appear there either, or the boundary above would leak
-// through it.
+// this package leans on (pkg/masterbelt/types, its infer subpackage included)
+// is itself rules over IR data — no syntax import may appear there either, or
+// the boundary above would leak through it. infer is the checker over the
+// AST, so it legitimately reads pkg/source/ast — the pin there is that
+// nothing BELOW the ast (the parsers, the cst) leaks in.
 func TestTypeAlgebraSyntaxFree(t *testing.T) {
 	for path := range packageImports(t, "../types") {
 		if strings.Contains(path, "/pkg/source/") && !strings.HasSuffix(path, "/pkg/source/ir") {
 			t.Errorf("pkg/masterbelt/types imports %q — the type algebra must stay syntax-free", path)
+		}
+	}
+	for path := range packageImports(t, "../types/infer") {
+		if strings.Contains(path, "/pkg/source/") &&
+			!strings.HasSuffix(path, "/pkg/source/ir") && !strings.HasSuffix(path, "/pkg/source/ast") {
+			t.Errorf("pkg/masterbelt/types/infer imports %q — the checker reads the AST and the IR, nothing beneath", path)
 		}
 	}
 }

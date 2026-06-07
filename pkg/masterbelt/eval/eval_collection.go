@@ -4,10 +4,13 @@
 // and the fold primitive every provided method is built on) have no native
 // intrinsic and are folded here by name, with the fold/range walks bounded so a
 // wide range never hangs the folder.
+
 package eval
 
 import (
 	"math/big"
+
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
 
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
 )
@@ -240,12 +243,12 @@ func rangeMethod(ctx graphCtx, recv *ir.Constant, name string, args []*ir.Consta
 	switch name {
 	case "fold":
 		return rangeFold(ctx, recv, args)
-	case "eql", "neq":
+	case builtin.OpEql, builtin.OpNeq:
 		if len(args) != 1 || args[0].Kind != ir.ConstRange {
 			return nil
 		}
 		equal := ir.ConstantsEqual(recv, args[0])
-		if name == "neq" {
+		if name == builtin.OpNeq {
 			equal = !equal
 		}
 		return ir.BoolConstant(equal)
@@ -316,8 +319,7 @@ func rangeFold(ctx graphCtx, recv *ir.Constant, args []*ir.Constant) *ir.Constan
 	}
 	acc := args[0]
 	step := args[1]
-	n := count.Int64()
-	for i := int64(0); i < n; i++ {
+	for i := range count.Int64() {
 		key := ir.IntConstant(big.NewInt(i))           // the 0-based position
 		value := ir.IntConstant(rangeElement(recv, i)) // the element
 		acc = graphApply(ctx, step, []*ir.Constant{acc, key, value})

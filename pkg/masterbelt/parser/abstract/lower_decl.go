@@ -1,6 +1,7 @@
 // This file lowers top-level and member declarations — use, const, assert,
 // function, and type declarations together with the impl methods they carry —
 // from their CST nodes into the matching ast declaration nodes.
+
 package abstract
 
 import (
@@ -38,6 +39,9 @@ func lowerUseDecl(t cst.Tree, buf source.Buffer) *ast.UseDecl {
 				star = true
 			case token.String:
 				path = decodeString(child.Text(buf))
+			default:
+				// Any other token (the "use"/"from" keywords, the dot, commas)
+				// sets no field of the import: it is skipped.
 			}
 			continue
 		}
@@ -88,6 +92,9 @@ func lowerConstDecl(t cst.Tree, buf source.Buffer) *ast.ConstDecl {
 				// name; the type and value identifiers are nested in TypeClause
 				// and Initializer nodes.
 				name = child.Text(buf)
+			default:
+				// Any other token (the "const" keyword, ":" or "=") sets no
+				// field of the constant: it is skipped.
 			}
 			continue
 		}
@@ -98,6 +105,9 @@ func lowerConstDecl(t cst.Tree, buf source.Buffer) *ast.ConstDecl {
 			typ = lowerTypeClause(child, buf)
 		case cst.Initializer:
 			value = lowerInitializer(child, buf)
+		default:
+			// Any other child node is neither the annotation nor the value
+			// of the constant: it contributes nothing.
 		}
 	}
 
@@ -161,6 +171,9 @@ func lowerFuncDecl(t cst.Tree, buf source.Buffer) *ast.FuncDecl {
 				// The only direct Ident child is the declared name; the
 				// parameter and type names are nested in their own nodes.
 				name = child.Text(buf)
+			default:
+				// Any other token (the "fn" keyword, parens, the "->" arrow)
+				// sets no field of the function: it is skipped.
 			}
 			continue
 		}
@@ -231,6 +244,9 @@ func lowerTypeDecl(t cst.Tree, buf source.Buffer) *ast.TypeDecl {
 				// a builtin type, declarable as `type null = builtin`). Generic
 				// parameters and the body's names are nested in their own nodes.
 				name = child.Text(buf)
+			default:
+				// Any other token (the "type" keyword, "=", "where") sets no
+				// field of the type declaration: it is skipped.
 			}
 			continue
 		}
@@ -287,6 +303,9 @@ func lowerEnumDecl(t cst.Tree, buf source.Buffer) *ast.EnumDecl {
 				// name; the base type sits in a TypeClause and the member names
 				// in their EnumMember nodes.
 				name = child.Text(buf)
+			default:
+				// Any other token (the "enum" keyword, the braces) sets no
+				// field of the enum: it is skipped.
 			}
 			continue
 		}
@@ -303,6 +322,9 @@ func lowerEnumDecl(t cst.Tree, buf source.Buffer) *ast.EnumDecl {
 			if iface != nil {
 				impls = append(impls, iface)
 			}
+		default:
+			// Any other child node is not part of the enum (base, member, or
+			// impl block): it contributes nothing.
 		}
 	}
 	return ast.NewEnumDecl(doc, public, name, base, members, methods, consts, impls, green)
@@ -392,6 +414,9 @@ func lowerImplConst(t cst.Tree, buf source.Buffer) *ast.ConstDecl {
 				doc = append(doc, docText(child.Text(buf)))
 			case token.Ident:
 				name = child.Text(buf)
+			default:
+				// Any other token (the "const" keyword, ":" or "=") sets no
+				// field of the associated constant: it is skipped.
 			}
 			continue
 		}
@@ -405,6 +430,9 @@ func lowerImplConst(t cst.Tree, buf source.Buffer) *ast.ConstDecl {
 			} else {
 				value = lowerInitializer(child, buf)
 			}
+		default:
+			// Any other child node is neither the annotation nor the
+			// initializer of the associated constant: it contributes nothing.
 		}
 	}
 
@@ -453,6 +481,9 @@ func lowerMethod(t cst.Tree, buf source.Buffer) *ast.MethodDecl {
 				if name == "" {
 					name = child.Text(buf)
 				}
+			default:
+				// Any other token (the "fn" keyword, parens, the "->" arrow)
+				// sets no field of the method: it is skipped.
 			}
 			continue
 		}
@@ -521,6 +552,9 @@ func lowerInterfaceDecl(t cst.Tree, buf source.Buffer) *ast.InterfaceDecl {
 				// The only direct Ident child is the declared name; the generic
 				// parameters, parents, and member names are nested in their own nodes.
 				name = child.Text(buf)
+			default:
+				// Any other token (the "interface" keyword, the braces) sets no
+				// field of the interface: it is skipped.
 			}
 			continue
 		}
@@ -532,6 +566,9 @@ func lowerInterfaceDecl(t cst.Tree, buf source.Buffer) *ast.InterfaceDecl {
 			parents = lowerInterfaceParents(child, buf)
 		case cst.InterfaceMember:
 			members = append(members, lowerInterfaceMember(child, buf))
+		default:
+			// Any other child node is not a generic-parameter list, a parents
+			// clause, or a member: it contributes nothing.
 		}
 	}
 	return ast.NewInterfaceDecl(doc, public, name, params, parents, members, green)
@@ -576,6 +613,9 @@ func lowerInterfaceMember(t cst.Tree, buf source.Buffer) *ast.InterfaceMember {
 				if name == "" {
 					name = child.Text(buf)
 				}
+			default:
+				// Any other token (the "fn" keyword, parens, the "->" arrow)
+				// sets no field of the interface member: it is skipped.
 			}
 			continue
 		}

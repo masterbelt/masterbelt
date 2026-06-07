@@ -3,6 +3,7 @@
 // analyzer (Analyze) and the incremental Program, so the two cannot diverge.
 // exprSink wires the type-checking walk's findings to diagnostics, and the
 // assembly-local helpers (refinedDef, typeNameReporter) live here too.
+
 package semantic
 
 import (
@@ -28,135 +29,159 @@ import (
 // unset — the const path hooks it to the eval-based value-range check, which
 // needs the declaration's context.
 func exprSink(at func(ast.Node) span, diags *diagnostic.List, res *callResolutions) *infer.Sink {
-	return &infer.Sink{
-		// The overload-selection streams; res is nil where no collector is in
-		// play (a refinement predicate's reporting pass), and the selections
-		// are then simply not recorded.
-		ResolvedMethod: func(call *ast.CallExpr, m *ir.Method) {
-			if res != nil {
-				res.methods[call] = m
-			}
-		},
-		ResolvedStatic: func(call *ast.CallExpr, m *ir.Method) {
-			if res != nil {
-				res.statics[call] = m
-			}
-		},
-		ResolvedFunc: func(call *ast.CallExpr, fd *ast.FuncDecl) {
-			if res != nil {
-				res.funcs[call] = fd
-			}
-		},
-		CallSubst: func(call *ast.CallExpr, subst map[string]ir.Type) {
-			if res != nil {
-				// Cloned: the checker threads one live map through a call's
-				// argument checking, and the record must stay the solution as
-				// of this call's settling.
-				res.substs[call] = maps.Clone(subst)
-			}
-		},
-		Typed: func(e ast.Expr, t ir.Type) {
-			if res != nil {
-				res.types[e] = t
-			}
-		},
-		Adapted: func(e ast.Expr, to ir.Type) {
-			if res != nil {
-				res.adapts[e] = to
-			}
-		},
-		InvalidOp: func(node ast.Node, method, operands string) {
-			s := at(node)
-			diags.Add(newInvalidOperationDiagnostic(s.offset, s.width, method, operands))
-		},
-		NoMatchingOverload: func(node ast.Node, method, operands string) {
-			s := at(node)
-			diags.Add(newNoMatchingOverloadDiagnostic(s.offset, s.width, method, operands))
-		},
-		AmbiguousOverload: func(node ast.Node, method, operands string) {
-			s := at(node)
-			diags.Add(newAmbiguousOverloadDiagnostic(s.offset, s.width, method, operands))
-		},
-		Mismatch: func(node ast.Node, got, want ir.Type) {
-			s := at(node)
-			diags.Add(newTypeMismatchDiagnostic(s.offset, s.width, got.String(), want.String()))
-		},
-		AmbiguousUnionMember: func(node ast.Node, got, want ir.Type) {
-			s := at(node)
-			diags.Add(newAmbiguousUnionMemberDiagnostic(s.offset, s.width, got.String(), want.String()))
-		},
-		TernaryCondNotBool: func(cond ast.Expr, got ir.Type) {
-			s := at(cond)
-			diags.Add(newTernaryConditionNotBoolDiagnostic(s.offset, s.width, got.String()))
-		},
-		TernaryBranchMismatch: func(node ast.Node, then, els ir.Type) {
-			s := at(node)
-			diags.Add(newTernaryBranchMismatchDiagnostic(s.offset, s.width, then.String(), els.String()))
-		},
-		ArityMismatch: func(lit *ast.FuncLit, got, want int) {
-			s := at(lit)
-			diags.Add(newLambdaArityMismatchDiagnostic(s.offset, s.width, got, want))
-		},
-		CallArityMismatch: func(call *ast.CallExpr, name string, got, want int) {
-			s := at(call)
-			diags.Add(newArityMismatchDiagnostic(s.offset, s.width, name, got, want))
-		},
-		NoMatchingFuncOverload: func(call *ast.CallExpr, name, types string) {
-			s := at(call)
-			diags.Add(newNoMatchingFuncOverloadDiagnostic(s.offset, s.width, name, types))
-		},
-		AmbiguousFuncOverload: func(call *ast.CallExpr, name, types string) {
-			s := at(call)
-			diags.Add(newAmbiguousFuncOverloadDiagnostic(s.offset, s.width, name, types))
-		},
-		UninferableParam: func(p *ast.ParamDef) {
-			s := at(p)
-			diags.Add(newUninferableParameterDiagnostic(s.offset, s.width, p.Name))
-		},
-		UninferableResult: func(lit *ast.FuncLit) {
-			s := at(lit)
-			diags.Add(newUninferableResultDiagnostic(s.offset, s.width))
-		},
-		MissingField: func(lit *ast.RecordLit, field string, typ ir.Type) {
-			s := at(lit)
-			diags.Add(newMissingFieldDiagnostic(s.offset, s.width, field, typ.String()))
-		},
-		UnknownField: func(field *ast.FieldInit, name string, typ ir.Type) {
-			s := at(field)
-			diags.Add(newUnknownFieldDiagnostic(s.offset, s.width, name, typ.String()))
-		},
-		UninferableRecord: func(lit *ast.RecordLit) {
-			s := at(lit)
-			diags.Add(newUninferableRecordDiagnostic(s.offset, s.width))
-		},
-		UnknownRecordType: func(lit *ast.RecordLit, name string) {
-			s := at(lit)
-			diags.Add(newUnknownTypeDiagnostic(s.offset, s.width, name))
-		},
-		NotARecord: func(lit *ast.RecordLit, typ ir.Type) {
-			s := at(lit)
-			diags.Add(newNotARecordDiagnostic(s.offset, s.width, typ.String()))
-		},
-		BoundNotSatisfied: func(call *ast.CallExpr, typ, bound ir.Type) {
-			s := at(call)
-			diags.Add(newBoundNotSatisfiedDiagnostic(s.offset, s.width, typ.String(), bound.String()))
-		},
-		UninferableTypeParam: func(call *ast.CallExpr, name string) {
-			s := at(call)
-			diags.Add(newUninferableTypeParamDiagnostic(s.offset, s.width, name))
-		},
-		NoMethodOnUnboundedTypeVar: func(node ast.Node, method string) {
-			s := at(node)
-			diags.Add(newNoMethodOnUnboundedTypevarDiagnostic(s.offset, s.width, method))
-		},
-		UnknownStatic: func(call *ast.CallExpr, name, typ string) {
-			s := at(call)
-			diags.Add(newUnknownStaticDiagnostic(s.offset, s.width, name, typ))
-		},
-		MapKeyNotComparable: func(lit *ast.CollectionLit, key, bound ir.Type) {
-			s := at(lit)
-			diags.Add(newBoundNotSatisfiedDiagnostic(s.offset, s.width, key.String(), bound.String()))
-		},
+	sink := &infer.Sink{}
+	wireResolutionStreams(sink, res)
+	wireOverloadDiagnostics(sink, at, diags)
+	wireExprDiagnostics(sink, at, diags)
+	wireRecordAndGenericDiagnostics(sink, at, diags)
+	return sink
+}
+
+// wireResolutionStreams wires the informational overload-selection, typing, and
+// adaption streams to the resolutions collector. res is nil where no collector
+// is in play (a refinement predicate's reporting pass), and the selections are
+// then simply not recorded.
+func wireResolutionStreams(sink *infer.Sink, res *callResolutions) {
+	sink.ResolvedMethod = func(call *ast.CallExpr, m *ir.Method) {
+		if res != nil {
+			res.methods[call] = m
+		}
+	}
+	sink.ResolvedStatic = func(call *ast.CallExpr, m *ir.Method) {
+		if res != nil {
+			res.statics[call] = m
+		}
+	}
+	sink.ResolvedFunc = func(call *ast.CallExpr, fd *ast.FuncDecl) {
+		if res != nil {
+			res.funcs[call] = fd
+		}
+	}
+	sink.CallSubst = func(call *ast.CallExpr, subst map[string]ir.Type) {
+		if res != nil {
+			// Cloned: the checker threads one live map through a call's
+			// argument checking, and the record must stay the solution as
+			// of this call's settling.
+			res.substs[call] = maps.Clone(subst)
+		}
+	}
+	sink.Typed = func(e ast.Expr, t ir.Type) {
+		if res != nil {
+			res.types[e] = t
+		}
+	}
+	sink.Adapted = func(e ast.Expr, to ir.Type) {
+		if res != nil {
+			res.adapts[e] = to
+		}
+	}
+}
+
+// wireOverloadDiagnostics wires the method/function overload-resolution findings
+// to their diagnostics.
+func wireOverloadDiagnostics(sink *infer.Sink, at func(ast.Node) span, diags *diagnostic.List) {
+	sink.InvalidOp = func(node ast.Node, method, operands string) {
+		s := at(node)
+		diags.Add(newInvalidOperationDiagnostic(s.offset, s.width, method, operands))
+	}
+	sink.NoMatchingOverload = func(node ast.Node, method, operands string) {
+		s := at(node)
+		diags.Add(newNoMatchingOverloadDiagnostic(s.offset, s.width, method, operands))
+	}
+	sink.AmbiguousOverload = func(node ast.Node, method, operands string) {
+		s := at(node)
+		diags.Add(newAmbiguousOverloadDiagnostic(s.offset, s.width, method, operands))
+	}
+	sink.CallArityMismatch = func(call *ast.CallExpr, name string, got, want int) {
+		s := at(call)
+		diags.Add(newArityMismatchDiagnostic(s.offset, s.width, name, got, want))
+	}
+	sink.NoMatchingFuncOverload = func(call *ast.CallExpr, name, types string) {
+		s := at(call)
+		diags.Add(newNoMatchingFuncOverloadDiagnostic(s.offset, s.width, name, types))
+	}
+	sink.AmbiguousFuncOverload = func(call *ast.CallExpr, name, types string) {
+		s := at(call)
+		diags.Add(newAmbiguousFuncOverloadDiagnostic(s.offset, s.width, name, types))
+	}
+	sink.UnknownStatic = func(call *ast.CallExpr, name, typ string) {
+		s := at(call)
+		diags.Add(newUnknownStaticDiagnostic(s.offset, s.width, name, typ))
+	}
+}
+
+// wireExprDiagnostics wires the expression-typing findings — mismatches, union
+// member ambiguity, ternaries, and function-literal inference — to their
+// diagnostics.
+func wireExprDiagnostics(sink *infer.Sink, at func(ast.Node) span, diags *diagnostic.List) {
+	sink.Mismatch = func(node ast.Node, got, want ir.Type) {
+		s := at(node)
+		diags.Add(newTypeMismatchDiagnostic(s.offset, s.width, got.String(), want.String()))
+	}
+	sink.AmbiguousUnionMember = func(node ast.Node, got, want ir.Type) {
+		s := at(node)
+		diags.Add(newAmbiguousUnionMemberDiagnostic(s.offset, s.width, got.String(), want.String()))
+	}
+	sink.TernaryCondNotBool = func(cond ast.Expr, got ir.Type) {
+		s := at(cond)
+		diags.Add(newTernaryConditionNotBoolDiagnostic(s.offset, s.width, got.String()))
+	}
+	sink.TernaryBranchMismatch = func(node ast.Node, then, els ir.Type) {
+		s := at(node)
+		diags.Add(newTernaryBranchMismatchDiagnostic(s.offset, s.width, then.String(), els.String()))
+	}
+	sink.ArityMismatch = func(lit *ast.FuncLit, got, want int) {
+		s := at(lit)
+		diags.Add(newLambdaArityMismatchDiagnostic(s.offset, s.width, got, want))
+	}
+	sink.UninferableParam = func(p *ast.ParamDef) {
+		s := at(p)
+		diags.Add(newUninferableParameterDiagnostic(s.offset, s.width, p.Name))
+	}
+	sink.UninferableResult = func(lit *ast.FuncLit) {
+		s := at(lit)
+		diags.Add(newUninferableResultDiagnostic(s.offset, s.width))
+	}
+}
+
+// wireRecordAndGenericDiagnostics wires the record-literal and generic-call
+// (bound, type-param, map-key) findings to their diagnostics.
+func wireRecordAndGenericDiagnostics(sink *infer.Sink, at func(ast.Node) span, diags *diagnostic.List) {
+	sink.MissingField = func(lit *ast.RecordLit, field string, typ ir.Type) {
+		s := at(lit)
+		diags.Add(newMissingFieldDiagnostic(s.offset, s.width, field, typ.String()))
+	}
+	sink.UnknownField = func(field *ast.FieldInit, name string, typ ir.Type) {
+		s := at(field)
+		diags.Add(newUnknownFieldDiagnostic(s.offset, s.width, name, typ.String()))
+	}
+	sink.UninferableRecord = func(lit *ast.RecordLit) {
+		s := at(lit)
+		diags.Add(newUninferableRecordDiagnostic(s.offset, s.width))
+	}
+	sink.UnknownRecordType = func(lit *ast.RecordLit, name string) {
+		s := at(lit)
+		diags.Add(newUnknownTypeDiagnostic(s.offset, s.width, name))
+	}
+	sink.NotARecord = func(lit *ast.RecordLit, typ ir.Type) {
+		s := at(lit)
+		diags.Add(newNotARecordDiagnostic(s.offset, s.width, typ.String()))
+	}
+	sink.BoundNotSatisfied = func(call *ast.CallExpr, typ, bound ir.Type) {
+		s := at(call)
+		diags.Add(newBoundNotSatisfiedDiagnostic(s.offset, s.width, typ.String(), bound.String()))
+	}
+	sink.UninferableTypeParam = func(call *ast.CallExpr, name string) {
+		s := at(call)
+		diags.Add(newUninferableTypeParamDiagnostic(s.offset, s.width, name))
+	}
+	sink.NoMethodOnUnboundedTypeVar = func(node ast.Node, method string) {
+		s := at(node)
+		diags.Add(newNoMethodOnUnboundedTypevarDiagnostic(s.offset, s.width, method))
+	}
+	sink.MapKeyNotComparable = func(lit *ast.CollectionLit, key, bound ir.Type) {
+		s := at(lit)
+		diags.Add(newBoundNotSatisfiedDiagnostic(s.offset, s.width, key.String(), bound.String()))
 	}
 }
 
@@ -188,251 +213,356 @@ func bodySink(at func(ast.Node) span, diags *diagnostic.List, reg *builtin.Regis
 // the program, scoping its identifier resolution, and shells/fnShells hold the
 // program-wide IR constants and functions (this file's and every importable
 // file's). It is shared by the reference and incremental analyzers, so they
-// cannot diverge.
+// cannot diverge. The work is a fixed sequence of phases, each a method on
+// the assembler, run in dependency order: the constants' value walks first,
+// then types and functions, then the post-check write-back, and only then the
+// passes that read the settled graph (index writes, the late re-fold, the
+// asserts, the publication rule).
 func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q queries, shells map[*ast.ConstDecl]*ir.Const, fnShells map[*ast.FuncDecl]*ir.Function) (*ir.Module, []diagnostic.Diagnostic) {
-	diags := &diagnostic.List{}
-	at := func(n ast.Node) span { return spanOf(positions, n) }
-	env := typeEnv{q: q, file: fileID}
-	reg := q.registry()
-	// The checker-selected overloads, collected from every checking walk below
-	// and written back into the IR (and armed for the late re-fold) once the
-	// walks are done.
-	res := newCallResolutions()
-
-	// The module's constants are this file's shells, in source order.
-	module := &ir.Module{}
-	for _, decl := range file.Decls {
-		module.Consts = append(module.Consts, shells[decl])
+	imp := q.importsOf(fileID)
+	a := &assembler{
+		fileID:   fileID,
+		file:     file,
+		q:        q,
+		at:       func(n ast.Node) span { return spanOf(positions, n) },
+		diags:    &diagnostic.List{},
+		env:      typeEnv{q: q, file: fileID},
+		reg:      q.registry(),
+		res:      newCallResolutions(),
+		shells:   shells,
+		fnShells: fnShells,
+		module:   &ir.Module{},
+		imp:      imp,
+		funcs:    buildFuncSymbols(file),
+		qfns:     qualifiedFuncsFrom(q, imp),
+		bfns: bodyFuncs{
+			local:      funcShellsByName(file, fnShells),
+			qualified:  qualifiedFuncsFrom(q, imp),
+			shells:     fnShells,
+			constRef:   constRefFrom(q, fileID),
+			nsConstRef: nsConstRefFrom(q, fileID),
+		},
 	}
 
-	// The use declarations' own problems: imports that resolved to no file,
-	// selective names the target does not export, and module cycles.
-	checkUses(fileID, file, q, at, diags)
+	// Phase zero: prime this file's function-body query. The query resolves
+	// the bodies onto the shared shells silently; the reporting pass below
+	// re-resolves them and the write-back annotates them. Priming pins the
+	// memo before this assemble's annotations exist, so a later assemble of
+	// an importing file can never be the FIRST to demand the query and have
+	// its silent re-resolution wipe the annotations — the order-dependence
+	// the full/incremental dump parity flaked on. Only the own file is
+	// primed: cross-file function facts flow through the value queries,
+	// whose memo edges keep the early cutoff fine-grained (priming every
+	// reachable file here would couple this module to every reachable
+	// file's funcs and recompute it on any function-body edit anywhere).
+	q.funcsOf(fileID)
 
-	// Redeclarations of the same name — constants and functions each within
-	// their own namespace (a call form looks up functions, a bare name
-	// constants, so the two tables never collide).
+	a.collectConsts()
+	checkUses(fileID, file, q, a.at, a.diags)
+	a.reportRedeclarations()
+	a.resolveConsts()
+	a.resolveTypeDecls()
+	a.resolveFuncDecls()
+	checkBuiltinSurface(file, a.at, a.diags)
+	a.checkAssocConstRefs()
+	genv := a.writeBack()
+	checkIndexWritesIR(a.module, genv, a.at, a.diags)
+	a.refoldConsts(genv)
+	a.evaluateAsserts(genv)
+	a.checkPureContexts()
+	enforceEvalPublication(fileID, file, a.module, shells, q, a.own, genv, a.at, a.diags)
+
+	items := a.diags.Items()
+	sort.SliceStable(items, func(i, j int) bool { return items[i].Offset < items[j].Offset })
+	return a.module, items
+}
+
+// assembler carries one assemble run's shared state: the inputs, the
+// diagnostic sink, and the facts the later phases read off the earlier ones
+// (the import surface, the function symbol tables, the call resolutions the
+// checking walks stream and the write-back binds).
+type assembler struct {
+	fileID   FileID
+	file     *ast.File
+	q        queries
+	at       func(ast.Node) span
+	diags    *diagnostic.List
+	env      typeEnv
+	reg      *builtin.Registry
+	res      *callResolutions
+	shells   map[*ast.ConstDecl]*ir.Const
+	fnShells map[*ast.FuncDecl]*ir.Function
+	module   *ir.Module
+
+	imp   importTable
+	funcs map[string][]*ast.FuncDecl
+	qfns  func(namespace, name string) []*ast.FuncDecl
+	bfns  bodyFuncs
+
+	// own indexes this file's constant shells, set by writeBack for the
+	// phases that read only the file's own declarations (the fold env, the
+	// publication rule).
+	own map[*ast.ConstDecl]*ir.Const
+}
+
+// folder returns the lower-then-fold channel the in-walk checks read.
+func (a *assembler) folder() exprFolder {
+	return exprFolder{q: a.q, file: a.fileID}
+}
+
+// collectConsts fills the module's constants: this file's shells, in source
+// order.
+func (a *assembler) collectConsts() {
+	for _, decl := range a.file.Decls {
+		a.module.Consts = append(a.module.Consts, a.shells[decl])
+	}
+}
+
+// reportRedeclarations reports redeclarations of the same name — constants
+// and functions each within their own namespace (a call form looks up
+// functions, a bare name constants, so the two tables never collide).
+func (a *assembler) reportRedeclarations() {
 	seen := map[string]bool{}
-	for _, decl := range file.Decls {
+	for _, decl := range a.file.Decls {
 		if decl.Name == "" {
 			continue // already a parse diagnostic
 		}
 		if seen[decl.Name] {
-			s := at(decl)
-			diags.Add(newDuplicateDeclarationDiagnostic(s.offset, s.width, decl.Name))
+			s := a.at(decl)
+			a.diags.Add(newDuplicateDeclarationDiagnostic(s.offset, s.width, decl.Name))
 		}
 		seen[decl.Name] = true
 	}
-	cyclic := cyclicDecls(fileID, file, q)
+}
 
-	for _, decl := range file.Decls {
-		c := shells[decl]
-		// A bare member in the initializer (const Top: Rarity = Legend) lowers
-		// through the annotation's enum, so resolve it first. The annotation is
-		// resolved against the universe — a pure name lookup, not the type query
-		// — so the value lowering stays independent of typeOf.
-		c.Value = lower.Value(decl.Value, constBinder{q: q, file: fileID, irOf: shells, fnOf: fnShells, expected: annotationEnum(q, fileID, decl)})
-		c.Type = q.typeOf(decl)
-		c.Eval = q.valueOf(decl)
+// resolveConsts runs the constants' phase: each declaration's value is
+// lowered, its facts are read off the queries, and its initializer walked
+// with the reporting sinks.
+func (a *assembler) resolveConsts() {
+	cyclic := cyclicDecls(a.fileID, a.file, a.q)
+	for _, decl := range a.file.Decls {
+		a.resolveConst(decl, cyclic[decl])
+	}
+}
 
-		// Resolve the annotation with reporting enabled, so an unknown type
-		// name anywhere in it (e.g. list<Bogus>) is diagnosed at its own node.
-		// The annotation resolves in the file's universe: its own type
-		// declarations shadowing its imported ones, over the registry.
-		annType := ir.Invalid
-		if decl.Type != nil {
-			r := &infer.TypeResolver{
-				Defs:           q.universe(fileID),
-				Qualified:      qualifiedFrom(q, q.importsOf(fileID)),
-				Report:         typeNameReporter(fileID, q, at, diags),
-				Registry:       reg,
-				BoundViolation: boundViolationReporter(at, diags),
-			}
-			annType = r.ResolveType(decl.Type, nil)
-		}
+// resolveConst assembles one constant: the lowered value graph, the settled
+// type and fold off the queries, the annotation resolution, and the checking
+// walks over the initializer.
+func (a *assembler) resolveConst(decl *ast.ConstDecl, cyclic bool) {
+	c := a.shells[decl]
+	// A bare member in the initializer (const Top: Rarity = Legend) lowers
+	// through the annotation's enum, so resolve it first. The annotation is
+	// resolved against the universe — a pure name lookup, not the type query
+	// — so the value lowering stays independent of typeOf.
+	c.Value = lower.Value(decl.Value, constBinder{q: a.q, file: a.fileID, irOf: a.shells, fnOf: a.fnShells, expected: annotationEnum(a.q, a.fileID, decl)})
+	c.Type = a.q.typeOf(decl)
+	c.Eval = a.q.valueOf(decl)
 
-		// Undefined references: every value-position identifier that resolves
-		// to no declaration — distinguishing names that failed because two or
-		// more imports claimed them (ambiguous_import) — and every namespace
-		// member access whose member the target does not export
-		// (unknown_member). Method names are not value references; the walk
-		// skips them, and it treats a namespace access as one unit, so its
-		// receiver is never reported as an undefined value.
-		if decl.Value != nil {
-			reportRefIssues(fileID, decl.Value, q, at, diags, annotationEnum(q, fileID, decl))
-			// One checking walk reports the expression diagnostics: operator
-			// type errors, type mismatches (against the annotation when there
-			// is one, and inside function-literal bodies), and literals whose
-			// parameter or result types cannot be inferred. Value-range checks
-			// hook the walk's Checked stream so infer stays eval-free; the
-			// top-level value is range-checked against c.Type below, so only
-			// the inner expressions (collection entries, record fields,
-			// returns) are checked here — a typed record literal pushes its
-			// field types even without an annotation.
-			sink := exprSink(at, diags, res)
-			sink.Checked = func(e ast.Expr, want ir.Type) {
-				if e == decl.Value {
-					return
-				}
-				// Range and refinement, against the member the value flows in as —
-				// so a nested position (a collection entry, a record field, an
-				// argument) enforces both checks at the same sites, the union member
-				// included (its Fits and refinedDef both pass through directly).
-				checkMemberFlow(reg, e, want, exprFolder{q: q, file: fileID}, at, diags)
-			}
-			// A conversion to a sized integer (short(70000), Level(70000)) range-
-			// checks its argument against the target — the diagnostic the const-level
-			// check cannot make when the constant's own type is a union the value
-			// flows into (the union's Fits passes through), and also the one for the
-			// direct case (const A: short = short(70000)), whose folded value is now
-			// nil (eval refuses the out-of-range conversion), so the const-level check
-			// no longer sees it. An overflowing conversion folds to nil, so it never
-			// also trips the const-level report — the two are mutually exclusive. The
-			// argument is folded here (the type layer flagged the conversion through
-			// ScalarConversion); a non-constant argument does not fold and is left to
-			// the runtime.
-			sink.ScalarConversion = func(call *ast.CallExpr, target ir.Type) {
-				checkScalarConversion(reg, call, target, exprFolder{q: q, file: fileID}, at, diags)
-			}
-			if annType != ir.Invalid {
-				// The annotation is pushed into the value.
-				infer.CheckAgainst(decl.Value, annType, env, sink)
-			} else {
-				if decl.Type != nil {
-					// The annotation failed to resolve and was reported at its
-					// own node; had it resolved, it would have supplied the
-					// inferred record form its type — don't pile on.
-					sink.UninferableRecord = nil
-				}
-				infer.Check(decl.Value, env, sink)
-			}
-			// Division or remainder by a zero divisor.
-			checkDivByZero(decl.Value, exprFolder{q: q, file: fileID}, func(node ast.Node) {
-				s := at(node)
-				diags.Add(newDivisionByZeroDiagnostic(s.offset, s.width))
-			})
-			// range(start, end, step) with a step that folds to zero.
-			checkRangeStepZero(decl.Value, exprFolder{q: q, file: fileID}, func(node ast.Node) {
-				s := at(node)
-				diags.Add(newRangeStepZeroDiagnostic(s.offset, s.width))
-			})
-			// A constant has no receiver: self has no meaning in its
-			// initializer (nor inside a literal nested in it).
-			checkNoSelf(decl.Value, func(node ast.Node) {
-				s := at(node)
-				diags.Add(newSelfOutsideMethodDiagnostic(s.offset, s.width))
-			})
+	// Resolve the annotation with reporting enabled, so an unknown type
+	// name anywhere in it (e.g. list<Bogus>) is diagnosed at its own node.
+	// The annotation resolves in the file's universe: its own type
+	// declarations shadowing its imported ones, over the registry.
+	annType := ir.Invalid
+	if decl.Type != nil {
+		r := &infer.TypeResolver{
+			Defs:           a.q.universe(a.fileID),
+			Qualified:      qualifiedFrom(a.q, a.imp),
+			Report:         typeNameReporter(a.fileID, a.q, a.at, a.diags),
+			Registry:       a.reg,
+			BoundViolation: boundViolationReporter(a.at, a.diags),
 		}
-
-		if cyclic[decl] {
-			s := at(decl)
-			diags.Add(newCyclicReferenceDiagnostic(s.offset, s.width, decl.Name))
-		}
-		// The top-level value's range and refinement, against the member it flows
-		// in as (c.Type's selected union member, or c.Type itself). It folds the
-		// value raw — the arbitrary-precision nint has no fixed range, a bool never
-		// overflows, and an overflowing conversion folds to nil and is reported at
-		// its own site — and an unsatisfied where-predicate carries the power-assert
-		// diagram naming the comparison that rejected the constant. It is the same
-		// member-aware check the nested positions run through Checked.
-		if decl.Value != nil {
-			checkMemberFlow(reg, decl.Value, c.Type, exprFolder{q: q, file: fileID}, at, diags)
-		}
-		// An empty or heterogeneous collection literal with no annotation has
-		// no type to infer (checking mode never sees it without one).
-		if lit, ok := decl.Value.(*ast.CollectionLit); ok && decl.Type == nil && c.Type == ir.Invalid {
-			s := at(lit)
-			diags.Add(newUninferableCollectionDiagnostic(s.offset, s.width))
-		}
+		annType = r.ResolveType(decl.Type, nil)
 	}
 
-	// The module's type definitions come from the memoized query — the same
-	// objects annotations resolved against, so Named identity never forks. The
-	// query resolves silently (its result is reused across revisions, but
-	// diagnostics carry offsets that shift on every edit), so the reporting
-	// pass re-resolves the declarations fresh and discards the definitions.
-	module.Types = q.typeDefs(fileID)
-	imp := q.importsOf(fileID)
-	bfns := bodyFuncs{local: funcShellsByName(file, fnShells), qualified: qualifiedFuncsFrom(q, imp), shells: fnShells, constRef: constRefFrom(q, fileID), nsConstRef: nsConstRefFrom(q, fileID)}
-	resolveTypes(exprFolder{q: q, file: fileID}, file, at, diags, res, reg, outerTypes(q, imp), qualifiedFrom(q, imp), bfns)
+	if decl.Value != nil {
+		a.checkConstValue(decl, annType)
+	}
 
-	// The module's functions are this file's shells, their signatures and
-	// bodies (re)resolved here with reporting; their bodies type-check the
-	// same way method bodies do.
-	funcs := buildFuncSymbols(file)
-	qfns := qualifiedFuncsFrom(q, imp)
-	module.Funcs = resolveFuncs(file, at, diags, reg, q.universe(fileID), qualifiedFrom(q, imp), bfns)
-	bodyEnv := exprFolder{q: q, file: fileID}
-	// A function or method body's returns, lets, and arguments run the same
-	// member-aware range and refinement check the const initializer does, so a
-	// constant value flowing into a sized or refined (union member) result, local,
-	// or parameter is checked at the body site too — the position the result-type
-	// soundness gap left unchecked. Only a constant value folds; a body-local or
-	// parameter reference does not, and is left to the runtime.
-	checkMethodBodies(reg, module.Types, q.universe(fileID), qualifiedFrom(q, imp), funcs, qfns, bodyEnv, bodySink(at, diags, reg, bodyEnv, res), at, diags)
-	checkFuncBodies(reg, file, q.universe(fileID), qualifiedFrom(q, imp), funcs, qfns, bodyEnv, bodySink(at, diags, reg, bodyEnv, res), at, diags)
-	checkEffects(reg, file, module.Types, q.universe(fileID), qualifiedFrom(q, imp), funcs, qfns, at, diags)
+	if cyclic {
+		s := a.at(decl)
+		a.diags.Add(newCyclicReferenceDiagnostic(s.offset, s.width, decl.Name))
+	}
+	// The top-level value's range and refinement, against the member it flows
+	// in as (c.Type's selected union member, or c.Type itself). It folds the
+	// value raw — the arbitrary-precision nint has no fixed range, a bool never
+	// overflows, and an overflowing conversion folds to nil and is reported at
+	// its own site — and an unsatisfied where-predicate carries the power-assert
+	// diagram naming the comparison that rejected the constant. It is the same
+	// member-aware check the nested positions run through Checked.
+	if decl.Value != nil {
+		checkMemberFlow(a.reg, decl.Value, c.Type, a.folder(), a.at, a.diags)
+	}
+	// An empty or heterogeneous collection literal with no annotation has
+	// no type to infer (checking mode never sees it without one).
+	if lit, ok := decl.Value.(*ast.CollectionLit); ok && decl.Type == nil && c.Type == ir.Invalid {
+		s := a.at(lit)
+		a.diags.Add(newUninferableCollectionDiagnostic(s.offset, s.width))
+	}
+}
 
-	// The builtin-surface contract: extern and `= builtin` claim a registry-
-	// supplied implementation, which only the trusted prelude channel (never
-	// assembled) can honor — in an assembled file both are declaration-site
-	// errors.
-	checkBuiltinSurface(file, at, diags)
+// checkConstValue runs the reporting walks over one constant's initializer:
+// the reference issues, the type-checking walk with the range/refinement and
+// conversion hooks, and the expression-level checks (zero divisors, zero
+// range steps, stray selfs).
+func (a *assembler) checkConstValue(decl *ast.ConstDecl, annType ir.Type) {
+	// Undefined references: every value-position identifier that resolves
+	// to no declaration — distinguishing names that failed because two or
+	// more imports claimed them (ambiguous_import) — and every namespace
+	// member access whose member the target does not export
+	// (unknown_member). Method names are not value references; the walk
+	// skips them, and it treats a namespace access as one unit, so its
+	// receiver is never reported as an undefined value.
+	reportRefIssues(a.fileID, decl.Value, a.q, a.at, a.diags, annotationEnum(a.q, a.fileID, decl))
+	// One checking walk reports the expression diagnostics: operator
+	// type errors, type mismatches (against the annotation when there
+	// is one, and inside function-literal bodies), and literals whose
+	// parameter or result types cannot be inferred. Value-range checks
+	// hook the walk's Checked stream so infer stays eval-free; the
+	// top-level value is range-checked against c.Type by the caller, so only
+	// the inner expressions (collection entries, record fields,
+	// returns) are checked here — a typed record literal pushes its
+	// field types even without an annotation.
+	sink := exprSink(a.at, a.diags, a.res)
+	sink.Checked = func(e ast.Expr, want ir.Type) {
+		if e == decl.Value {
+			return
+		}
+		// Range and refinement, against the member the value flows in as —
+		// so a nested position (a collection entry, a record field, an
+		// argument) enforces both checks at the same sites, the union member
+		// included (its Fits and refinedDef both pass through directly).
+		checkMemberFlow(a.reg, e, want, a.folder(), a.at, a.diags)
+	}
+	// A conversion to a sized integer (short(70000), Level(70000)) range-
+	// checks its argument against the target — the diagnostic the const-level
+	// check cannot make when the constant's own type is a union the value
+	// flows into (the union's Fits passes through), and also the one for the
+	// direct case (const A: short = short(70000)), whose folded value is now
+	// nil (eval refuses the out-of-range conversion), so the const-level check
+	// no longer sees it. An overflowing conversion folds to nil, so it never
+	// also trips the const-level report — the two are mutually exclusive. The
+	// argument is folded here (the type layer flagged the conversion through
+	// ScalarConversion); a non-constant argument does not fold and is left to
+	// the runtime.
+	sink.ScalarConversion = func(call *ast.CallExpr, target ir.Type) {
+		checkScalarConversion(a.reg, call, target, a.folder(), a.at, a.diags)
+	}
+	if annType != ir.Invalid {
+		// The annotation is pushed into the value.
+		infer.CheckAgainst(decl.Value, annType, a.env, sink)
+	} else {
+		if decl.Type != nil {
+			// The annotation failed to resolve and was reported at its
+			// own node; had it resolved, it would have supplied the
+			// inferred record form its type — don't pile on.
+			sink.UninferableRecord = nil
+		}
+		infer.Check(decl.Value, a.env, sink)
+	}
+	a.checkExprDiagnostics(decl.Value)
+}
 
-	// Reference diagnostics for the associated-constant initializers: the
-	// undefined names, unknown members, and stray selfs the const loop reports
-	// for a top-level initializer, anchored the same way — an unresolvable
-	// reference in an impl-block const must be as loud as anywhere else. A
-	// bare member resolves through the annotation's enum, exactly as a
-	// top-level const's does.
-	checkAssocConstRefs := func(consts []*ast.ConstDecl) {
+// checkExprDiagnostics runs the expression-level checks shared by a constant
+// initializer and an assert condition: division or remainder by a zero
+// divisor, range(start, end, step) with a step that folds to zero, and self
+// outside a method body (a constant and an assert have no receiver).
+func (a *assembler) checkExprDiagnostics(e ast.Expr) {
+	checkDivByZero(e, a.folder(), func(node ast.Node) {
+		s := a.at(node)
+		a.diags.Add(newDivisionByZeroDiagnostic(s.offset, s.width))
+	})
+	checkRangeStepZero(e, a.folder(), func(node ast.Node) {
+		s := a.at(node)
+		a.diags.Add(newRangeStepZeroDiagnostic(s.offset, s.width))
+	})
+	checkNoSelf(e, func(node ast.Node) {
+		s := a.at(node)
+		a.diags.Add(newSelfOutsideMethodDiagnostic(s.offset, s.width))
+	})
+}
+
+// resolveTypeDecls fills the module's type definitions and re-resolves the
+// declarations with reporting. The definitions come from the memoized query —
+// the same objects annotations resolved against, so Named identity never
+// forks. The query resolves silently (its result is reused across revisions,
+// but diagnostics carry offsets that shift on every edit), so the reporting
+// pass re-resolves the declarations fresh and discards the definitions.
+func (a *assembler) resolveTypeDecls() {
+	a.module.Types = a.q.typeDefs(a.fileID)
+	resolveTypes(a.folder(), a.file, a.at, a.diags, a.res, a.reg, outerTypes(a.q, a.imp), qualifiedFrom(a.q, a.imp), a.bfns)
+}
+
+// resolveFuncDecls fills the module's functions — this file's shells, their
+// signatures and bodies (re)resolved with reporting — and runs the body and
+// effect checks. A function or method body's returns, lets, and arguments run
+// the same member-aware range and refinement check the const initializer
+// does, so a constant value flowing into a sized or refined (union member)
+// result, local, or parameter is checked at the body site too. Only a
+// constant value folds; a body-local or parameter reference does not, and is
+// left to the runtime.
+func (a *assembler) resolveFuncDecls() {
+	a.module.Funcs = resolveFuncs(a.file, a.at, a.diags, a.reg, a.q.universe(a.fileID), qualifiedFrom(a.q, a.imp), a.bfns)
+	bodyEnv := a.folder()
+	checkMethodBodies(a.reg, a.module.Types, a.q.universe(a.fileID), qualifiedFrom(a.q, a.imp), a.funcs, a.qfns, bodyEnv, bodySink(a.at, a.diags, a.reg, bodyEnv, a.res), a.at, a.diags)
+	checkFuncBodies(a.reg, a.file, a.q.universe(a.fileID), qualifiedFrom(a.q, a.imp), a.funcs, a.qfns, bodyEnv, bodySink(a.at, a.diags, a.reg, bodyEnv, a.res), a.at, a.diags)
+	checkEffects(a.reg, a.file, a.module.Types, a.q.universe(a.fileID), qualifiedFrom(a.q, a.imp), a.funcs, a.qfns, a.at, a.diags)
+}
+
+// checkAssocConstRefs reports the reference diagnostics for the associated-
+// constant initializers: the undefined names, unknown members, and stray
+// selfs the const phase reports for a top-level initializer, anchored the
+// same way — an unresolvable reference in an impl-block const must be as loud
+// as anywhere else. A bare member resolves through the annotation's enum,
+// exactly as a top-level const's does.
+func (a *assembler) checkAssocConstRefs() {
+	check := func(consts []*ast.ConstDecl) {
 		for _, c := range consts {
 			if c.Value == nil {
 				continue
 			}
-			reportRefIssues(fileID, c.Value, q, at, diags, typeExprEnum(q, fileID, c.Type))
+			reportRefIssues(a.fileID, c.Value, a.q, a.at, a.diags, typeExprEnum(a.q, a.fileID, c.Type))
 			checkNoSelf(c.Value, func(node ast.Node) {
-				s := at(node)
-				diags.Add(newSelfOutsideMethodDiagnostic(s.offset, s.width))
+				s := a.at(node)
+				a.diags.Add(newSelfOutsideMethodDiagnostic(s.offset, s.width))
 			})
 		}
 	}
-	for _, td := range file.Types {
-		checkAssocConstRefs(td.Consts)
+	for _, td := range a.file.Types {
+		check(td.Consts)
 	}
-	for _, ed := range file.Enums {
-		checkAssocConstRefs(ed.Consts)
+	for _, ed := range a.file.Enums {
+		check(ed.Consts)
 	}
+}
 
-	// Every checking walk has run: bind the checker-selected overloads, the
-	// settled types, and the explicit adaptions into the IR (the doctrine that
-	// every reference is bound to its declaration, met for overloaded calls).
-	writeBackResolutions(module, res, fnShells, reg)
-	ownShells := make(map[*ast.ConstDecl]*ir.Const, len(file.Decls))
-	for _, decl := range file.Decls {
-		ownShells[decl] = shells[decl]
+// writeBack binds the checker-selected overloads, the settled types, and the
+// explicit adaptions into the IR — every checking walk has run, so the
+// resolutions are complete — and builds the graph fold env the settled-graph
+// phases read (the doctrine that every reference is bound to its declaration,
+// met for overloaded calls).
+func (a *assembler) writeBack() graphFoldEnv {
+	writeBackResolutions(a.module, a.res, a.fnShells, a.reg)
+	a.own = make(map[*ast.ConstDecl]*ir.Const, len(a.file.Decls))
+	for _, decl := range a.file.Decls {
+		a.own[decl] = a.shells[decl]
 	}
-	genv := graphFoldEnv{q: q, file: fileID, own: ownShells}
+	return graphFoldEnv{q: a.q, file: a.fileID, own: a.own}
+}
 
-	// Index writes fold over the lowered bodies, post-write-back: the IR
-	// carries the locals' settled types and the write calls, so the check
-	// reads the same graph the folder runs.
-	checkIndexWritesIR(module, genv, at, diags)
-
-	// The late re-fold: a constant the type-blind value query left unfolded
-	// is folded once more — through the IR interpreter, over the annotated
-	// value graph the write-back just settled (node types, selections, and
-	// explicit adaptions all on the graph). The annotations only widen the
-	// foldable set (a graph without them folds by the same value-kind rules
-	// the query did), so the memoized value query and this pass agree
-	// wherever both fold — the parity the fold gate pins. The loop runs to a
-	// fixpoint: genv reads this file's published values, so a reader of a
-	// re-folded constant folds in a later round, whatever the declaration
-	// order.
+// refoldConsts is the late re-fold: a constant the type-blind value query
+// left unfolded is folded once more — through the IR interpreter, over the
+// annotated value graph the write-back just settled (node types, selections,
+// and explicit adaptions all on the graph). The annotations only widen the
+// foldable set (a graph without them folds by the same value-kind rules the
+// query did), so the memoized value query and this pass agree wherever both
+// fold — the parity the fold gate pins. The loop runs to a fixpoint: genv
+// reads this file's published values, so a reader of a re-folded constant
+// folds in a later round, whatever the declaration order.
+func (a *assembler) refoldConsts(genv graphFoldEnv) {
 	for progress := true; progress; {
 		progress = false
-		for _, decl := range file.Decls {
-			c := shells[decl]
+		for _, decl := range a.file.Decls {
+			c := a.shells[decl]
 			if c.Eval == nil && c.Value != nil {
 				if c.Eval = eval.GraphExpecting(c.Value, c.Type, genv); c.Eval != nil {
 					progress = true
@@ -440,158 +570,139 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 			}
 		}
 	}
+}
 
-	// Compile-time assertions: each condition must resolve, type as bool, and
-	// fold to true. An assert produces no IR — it is a diagnostic-only
-	// declaration — and every fact it needs is read through q, so the
-	// incremental engine tracks its dependencies exactly as it does a const's.
-	// The loop runs after every body has been checked, so the condition folds
-	// with the complete overload-resolution map armed (renv) — a call the
-	// value-kind rule cannot split, in the condition or in a body it applies,
-	// folds by the checker's selection.
-	for _, a := range file.Asserts {
-		if a.Cond == nil {
+// evaluateAsserts checks the compile-time assertions: each condition must
+// resolve, type as bool, and fold to true. An assert produces no IR — it is a
+// diagnostic-only declaration — and every fact it needs is read through q, so
+// the incremental engine tracks its dependencies exactly as it does a
+// const's. The phase runs after every body has been checked, so the condition
+// folds with the complete overload-resolution map armed — a call the
+// value-kind rule cannot split, in the condition or in a body it applies,
+// folds by the checker's selection.
+func (a *assembler) evaluateAsserts(genv graphFoldEnv) {
+	for _, decl := range a.file.Asserts {
+		if decl.Cond == nil {
 			continue // already a parse diagnostic
 		}
-		before := diags.Len()
+		a.evaluateAssert(decl, genv)
+	}
+}
 
-		// Undefined references and unknown namespace members, exactly as for a
-		// const's initializer. An assert condition has no annotation, so a bare
-		// member is not in scope (nil expected enum).
-		reportRefIssues(fileID, a.Cond, q, at, diags, nil)
+// evaluateAssert checks one assertion and publishes its outcome.
+func (a *assembler) evaluateAssert(decl *ast.AssertDecl, genv graphFoldEnv) {
+	before := a.diags.Len()
 
-		// Operator type errors, zero divisors, and stray selfs, through the
-		// same checking walks the const path uses.
-		condType := infer.Check(a.Cond, env, exprSink(at, diags, res))
-		checkDivByZero(a.Cond, exprFolder{q: q, file: fileID}, func(node ast.Node) {
-			s := at(node)
-			diags.Add(newDivisionByZeroDiagnostic(s.offset, s.width))
-		})
-		checkRangeStepZero(a.Cond, exprFolder{q: q, file: fileID}, func(node ast.Node) {
-			s := at(node)
-			diags.Add(newRangeStepZeroDiagnostic(s.offset, s.width))
-		})
-		checkNoSelf(a.Cond, func(node ast.Node) {
-			s := at(node)
-			diags.Add(newSelfOutsideMethodDiagnostic(s.offset, s.width))
-		})
+	// Undefined references and unknown namespace members, exactly as for a
+	// const's initializer. An assert condition has no annotation, so a bare
+	// member is not in scope (nil expected enum). Then the operator type
+	// errors, zero divisors, and stray selfs, through the same checking
+	// walks the const path uses.
+	reportRefIssues(a.fileID, decl.Cond, a.q, a.at, a.diags, nil)
+	condType := infer.Check(decl.Cond, a.env, exprSink(a.at, a.diags, a.res))
+	a.checkExprDiagnostics(decl.Cond)
 
-		// The outcome — the folded condition and its power-assert diagram —
-		// is module data: the editor's hover and the failure diagnostic both
-		// read the very values the assertion was checked with. The condition
-		// lowers to its value graph, takes the checker's write-back (the walks
-		// above streamed its facts into res), and folds through the IR
-		// interpreter — sub-expression by sub-expression for the diagram.
-		condGraph := annotateGraph(lower.Value(a.Cond, constBinder{q: q, file: fileID, irOf: shells, fnOf: fnShells}), res, fnShells, reg)
-		condNodes := nodesBySyntax(condGraph)
-		foldCondAt := func(e ast.Expr) *ir.Constant {
-			if n, ok := condNodes[e]; ok {
-				return eval.Graph(n, genv)
-			}
-			return nil
+	// The outcome — the folded condition and its power-assert diagram —
+	// is module data: the editor's hover and the failure diagnostic both
+	// read the very values the assertion was checked with. The condition
+	// lowers to its value graph, takes the checker's write-back (the walks
+	// above streamed its facts into res), and folds through the IR
+	// interpreter — sub-expression by sub-expression for the diagram.
+	condGraph := annotateGraph(lower.Value(decl.Cond, constBinder{q: a.q, file: a.fileID, irOf: a.shells, fnOf: a.fnShells}), a.res, a.fnShells, a.reg)
+	condNodes := nodesBySyntax(condGraph)
+	foldCondAt := func(e ast.Expr) *ir.Constant {
+		if n, ok := condNodes[e]; ok {
+			return eval.Graph(n, genv)
 		}
-		v := eval.Graph(condGraph, genv)
-		d := assert.Diagram(a.Cond, foldCondAt)
-		cond, _, _ := strings.Cut(d, "\n")
+		return nil
+	}
+	v := eval.Graph(condGraph, genv)
+	d := assert.Diagram(decl.Cond, foldCondAt)
+	cond, _, _ := strings.Cut(d, "\n")
 
-		// A poisoned condition type — the assert's own error, or a broken
-		// dependency's Invalid propagating in — publishes no outcome: the
-		// type-blind fold may well have produced a value, but one that never
-		// passed the type-bound checks must not turn an assertion green (the
-		// soundness half of the publication rule). The cause carries its own
-		// diagnostic at its origin.
-		if condType == ir.Invalid {
-			module.Asserts = append(module.Asserts, &ir.Assert{Cond: cond, Doc: a.Doc, Syntax: a})
-			continue
-		}
-		module.Asserts = append(module.Asserts, &ir.Assert{Cond: cond, Doc: a.Doc, Eval: v, Diagram: d, Syntax: a})
+	// A poisoned condition type — the assert's own error, or a broken
+	// dependency's Invalid propagating in — publishes no outcome: the
+	// type-blind fold may well have produced a value, but one that never
+	// passed the type-bound checks must not turn an assertion green (the
+	// soundness half of the publication rule). The cause carries its own
+	// diagnostic at its origin.
+	if condType == ir.Invalid {
+		a.module.Asserts = append(a.module.Asserts, &ir.Assert{Cond: cond, Doc: decl.Doc, Syntax: decl})
+		return
+	}
+	a.module.Asserts = append(a.module.Asserts, &ir.Assert{Cond: cond, Doc: decl.Doc, Eval: v, Diagram: d, Syntax: decl})
 
-		// The condition must be a bool. An Invalid type was reported above
-		// (an undefined name, a misapplied operator), so it is not re-reported
-		// as a non-bool here.
-		if condType != ir.Invalid && !types.IsBoolean(reg, condType) {
-			s := at(a.Cond)
-			diags.Add(newAssertionNotBoolDiagnostic(s.offset, s.width, condType.String()))
-			continue
-		}
-
-		// The condition must fold at compile time. When it does not — and
-		// nothing above explained why — the assertion itself is the problem:
-		// it asks for something the evaluator cannot verify.
-		if v == nil || v.Kind != ir.ConstBool {
-			if diags.Len() == before {
-				s := at(a.Cond)
-				diags.Add(newAssertionNotConstantDiagnostic(s.offset, s.width))
-			}
-			continue
-		}
-
-		// The assertion proper. The failure quotes the condition twice — the
-		// canonical one-liner (the summary a diagnostic list shows) and the
-		// power-assert diagram beneath it, indented as a block so its pipe
-		// columns align independently of the message prefix — with the doc
-		// comment above the diagram: the broken invariant in the author's
-		// own words.
-		if !v.Bool {
-			s := at(a.Cond)
-			doc := ""
-			if len(a.Doc) > 0 {
-				doc = "\n  " + strings.Join(a.Doc, "\n  ")
-			}
-			diagram := "\n  " + strings.ReplaceAll(d, "\n", "\n  ")
-			diags.Add(newAssertionFailedDiagnostic(s.offset, s.width, cond, doc, diagram))
-		}
+	// The condition must be a bool. An Invalid type was reported above
+	// (an undefined name, a misapplied operator), so it is not re-reported
+	// as a non-bool here.
+	if !types.IsBoolean(a.reg, condType) {
+		s := a.at(decl.Cond)
+		a.diags.Add(newAssertionNotBoolDiagnostic(s.offset, s.width, condType.String()))
+		return
 	}
 
-	// Compile-time positions must be pure: a constant initializer, an assert
-	// condition, an enum member initializer, an associated constant initializer,
-	// and a refinement (where) predicate all fold to values, so an effectful
-	// call cannot appear in any of them — pure folds, effectful cannot even be
-	// written. Every such expression goes through the same checkPureContext, so
-	// a new fold position cannot be added without a matching purity check.
-	pureScope := infer.BodyScope{Reg: reg, Universe: q.universe(fileID), Qualified: qualifiedFrom(q, imp), Self: ir.Invalid, Funcs: funcs, QualifiedFuncs: qfns}
-	for _, decl := range file.Decls {
-		if decl.Value != nil {
-			checkPureContext(decl.Value, "constant initializer", pureScope, at, diags)
+	// The condition must fold at compile time. When it does not — and
+	// nothing above explained why — the assertion itself is the problem:
+	// it asks for something the evaluator cannot verify.
+	if v == nil || v.Kind != ir.ConstBool {
+		if a.diags.Len() == before {
+			s := a.at(decl.Cond)
+			a.diags.Add(newAssertionNotConstantDiagnostic(s.offset, s.width))
+		}
+		return
+	}
+
+	// The assertion proper. The failure quotes the condition twice — the
+	// canonical one-liner (the summary a diagnostic list shows) and the
+	// power-assert diagram beneath it, indented as a block so its pipe
+	// columns align independently of the message prefix — with the doc
+	// comment above the diagram: the broken invariant in the author's
+	// own words.
+	if !v.Bool {
+		s := a.at(decl.Cond)
+		doc := ""
+		if len(decl.Doc) > 0 {
+			doc = "\n  " + strings.Join(decl.Doc, "\n  ")
+		}
+		diagram := "\n  " + strings.ReplaceAll(d, "\n", "\n  ")
+		a.diags.Add(newAssertionFailedDiagnostic(s.offset, s.width, cond, doc, diagram))
+	}
+}
+
+// checkPureContexts enforces that compile-time positions are pure: a constant
+// initializer, an assert condition, an enum member initializer, an associated
+// constant initializer, and a refinement (where) predicate all fold to
+// values, so an effectful call cannot appear in any of them — pure folds,
+// effectful cannot even be written. Every such expression goes through the
+// same checkPureContext, so a new fold position cannot be added without a
+// matching purity check.
+func (a *assembler) checkPureContexts() {
+	scope := infer.BodyScope{Reg: a.reg, Universe: a.q.universe(a.fileID), Qualified: qualifiedFrom(a.q, a.imp), Self: ir.Invalid, Funcs: a.funcs, QualifiedFuncs: a.qfns}
+	check := func(e ast.Expr, position string) {
+		if e != nil {
+			checkPureContext(e, position, scope, a.at, a.diags)
 		}
 	}
-	for _, a := range file.Asserts {
-		if a.Cond != nil {
-			checkPureContext(a.Cond, "assert condition", pureScope, at, diags)
-		}
+	for _, decl := range a.file.Decls {
+		check(decl.Value, "constant initializer")
 	}
-	for _, td := range file.Types {
+	for _, decl := range a.file.Asserts {
+		check(decl.Cond, "assert condition")
+	}
+	for _, td := range a.file.Types {
 		for _, c := range td.Consts {
-			if c.Value != nil {
-				checkPureContext(c.Value, "associated constant initializer", pureScope, at, diags)
-			}
+			check(c.Value, "associated constant initializer")
 		}
-		if td.Where != nil {
-			checkPureContext(td.Where, "refinement predicate", pureScope, at, diags)
-		}
+		check(td.Where, "refinement predicate")
 	}
-	for _, ed := range file.Enums {
+	for _, ed := range a.file.Enums {
 		for _, m := range ed.Members {
-			if m.Value != nil {
-				checkPureContext(m.Value, "enum member initializer", pureScope, at, diags)
-			}
+			check(m.Value, "enum member initializer")
 		}
 		for _, c := range ed.Consts {
-			if c.Value != nil {
-				checkPureContext(c.Value, "associated constant initializer", pureScope, at, diags)
-			}
+			check(c.Value, "associated constant initializer")
 		}
 	}
-
-	// The publication rule, last — every diagnostic above is in, so both its
-	// directions read the settled facts: a broken declaration's value is
-	// withheld (soundness), and a clean declaration without a value is an
-	// error (totality, unfolded_const).
-	enforceEvalPublication(fileID, file, module, shells, q, ownShells, genv, at, diags)
-
-	items := diags.Items()
-	sort.SliceStable(items, func(i, j int) bool { return items[i].Offset < items[j].Offset })
-	return module, items
 }
 
 // reportRefIssues reports the reference problems of a constant initializer or

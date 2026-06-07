@@ -1,6 +1,7 @@
 // This file holds the native descriptions of the primitives: the integer
 // value-range kinds, the NativeType descriptor and its predicates, and the
 // builders that assemble each primitive's extern operator-method signatures.
+
 package builtin
 
 import (
@@ -19,7 +20,7 @@ type IntKind struct {
 
 // bounds returns the inclusive value range of the integer kind. A nil bound
 // means "unbounded on that side".
-func (k IntKind) bounds() (min, max *big.Int) {
+func (k IntKind) bounds() (lo, hi *big.Int) {
 	one := big.NewInt(1)
 	if k.Bits == 0 {
 		if k.Signed {
@@ -63,7 +64,7 @@ func (n *NativeType) IsString() bool { return n.Str }
 // precision unsigned int has only the lower bound of zero). A non-integer
 // primitive has no range — both bounds are nil. It is the source the builtin
 // associated constants Max/Min draw their value from.
-func (n *NativeType) Bounds() (min, max *big.Int) {
+func (n *NativeType) Bounds() (lo, hi *big.Int) {
 	if n.Int == nil {
 		return nil, nil
 	}
@@ -77,11 +78,11 @@ func (n *NativeType) Fits(v *big.Int) bool {
 	if n.Int == nil {
 		return true
 	}
-	min, max := n.Int.bounds()
-	if min != nil && v.Cmp(min) < 0 {
+	lo, hi := n.Int.bounds()
+	if lo != nil && v.Cmp(lo) < 0 {
 		return false
 	}
-	if max != nil && v.Cmp(max) > 0 {
+	if hi != nil && v.Cmp(hi) > 0 {
 		return false
 	}
 	return true
@@ -159,7 +160,7 @@ func stringMethods() []*ir.Method {
 // datetime/duration operator signatures: the two interoperate (dt ± dr,
 // dt - dt, dr + dt), so each names the other in its overloads.
 var (
-	datetimeType ir.Type = &ir.Builtin{Name: "datetime"}
+	datetimeType ir.Type = &ir.Builtin{Name: NameDatetime}
 	durationType ir.Type = &ir.Builtin{Name: "duration"}
 	intType      ir.Type = &ir.Builtin{Name: "nint"}
 )

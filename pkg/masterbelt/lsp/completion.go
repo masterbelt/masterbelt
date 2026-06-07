@@ -6,13 +6,14 @@ import (
 	"slices"
 	"strings"
 
+	protocol "github.com/owenrumney/go-lsp/lsp"
+
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/types"
 	"github.com/masterbelt/masterbelt/pkg/project"
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/source/cst"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
 	"github.com/masterbelt/masterbelt/pkg/source/token"
-	protocol "github.com/owenrumney/go-lsp/lsp"
 )
 
 // Completion offers the program's value namespace. masterbelt's nameable values
@@ -72,6 +73,9 @@ func effectfulContextAt(root cst.Tree, offset int) bool {
 			switch node.Kind() {
 			case cst.FuncDecl, cst.MethodDecl:
 				return true
+			default:
+				// Any other kind is not an effectful body boundary: keep
+				// descending toward offset before concluding it is pure.
 			}
 		}
 		child, ok := childContaining(t, offset)
@@ -554,8 +558,11 @@ func constantItems(doc view) []protocol.CompletionItem {
 func constructorItems(doc view) []protocol.CompletionItem {
 	kind := protocol.CompletionItemKindConstructor
 	snippet := protocol.InsertTextFormatSnippet
-	var items []protocol.CompletionItem
-	for _, t := range doc.Constructors() {
+	// Constructors builds the in-scope type set (a sort per call), so it is
+	// read exactly once.
+	constructors := doc.Constructors()
+	items := make([]protocol.CompletionItem, 0, len(constructors))
+	for _, t := range constructors {
 		detail, insert := constructorSignature(t.Name)
 		item := protocol.CompletionItem{
 			Label:  t.Name,

@@ -151,16 +151,7 @@ func TestParseImplConstChildren(t *testing.T) {
 				t.Fatalf("unexpected diagnostics: %v", diags)
 			}
 			decl := root.Children()[0].(*cst.Node)
-			var c *cst.Node
-			for _, child := range decl.Children() {
-				if n, ok := child.(*cst.Node); ok && n.Kind() == cst.ImplBlock {
-					for _, ic := range n.Children() {
-						if cn, ok := ic.(*cst.Node); ok && cn.Kind() == cst.ConstDecl {
-							c = cn
-						}
-					}
-				}
-			}
+			c := findImplConstDecl(decl)
 			if c == nil {
 				t.Fatalf("no impl ConstDecl found in %q", tc.src)
 			}
@@ -175,6 +166,24 @@ func TestParseImplConstChildren(t *testing.T) {
 			}
 		})
 	}
+}
+
+// findImplConstDecl returns the last ConstDecl node nested in decl's ImplBlock
+// children, or nil when none is present.
+func findImplConstDecl(decl *cst.Node) *cst.Node {
+	var c *cst.Node
+	for _, child := range decl.Children() {
+		n, ok := child.(*cst.Node)
+		if !ok || n.Kind() != cst.ImplBlock {
+			continue
+		}
+		for _, ic := range n.Children() {
+			if cn, ok := ic.(*cst.Node); ok && cn.Kind() == cst.ConstDecl {
+				c = cn
+			}
+		}
+	}
+	return c
 }
 
 // TestParseInterfaceDeclFileShape checks that an interface declaration is
@@ -473,69 +482,104 @@ func TestParseFnThreeUses(t *testing.T) {
 // missing its name still parses as a (reported) declaration, a bare nameless
 // fn is a stray expression, and an error run stops before a following
 // function declaration.
+// funcDeclRecoveryCases drives TestParseFuncDeclRecovery: each case parses src
+// and runs check against the resulting tree and diagnostics. The per-case
+// assertions vary (some inspect the first child's kind, one the full file-child
+// sequence, some only assert a diagnostic code), so they ride in a closure rather
+// than being flattened to columns.
+var funcDeclRecoveryCases = []struct {
+	name  string
+	src   string
+	check func(t *testing.T, src string, root *cst.Node, diags []diagnostic.Diagnostic)
+}{
+	{
+		name: "pub fn without a name is a reported FuncDecl",
+		src:  "pub fn(x: nint): nint -> x\n",
+		check: func(t *testing.T, src string, root *cst.Node, diags []diagnostic.Diagnostic) {
+			t.Helper()
+			if len(diags) == 0 {
+				t.Fatal("want a diagnostic for the missing name")
+			}
+			assertLossless(t, src)
+			decl := root.Children()[0].(*cst.Node)
+			if decl.Kind() != cst.FuncDecl {
+				t.Fatalf("first child kind = %s, want FuncDecl", decl.Kind())
+			}
+		},
+	},
+	{
+		name: "bare nameless fn is an error run",
+		src:  "fn(x: nint): nint -> x\n",
+		check: func(t *testing.T, src string, root *cst.Node, diags []diagnostic.Diagnostic) {
+			t.Helper()
+			if len(diags) == 0 {
+				t.Fatal("want a diagnostic for the stray literal")
+			}
+			assertLossless(t, src)
+			decl := root.Children()[0].(*cst.Node)
+			if decl.Kind() != cst.Error {
+				t.Fatalf("first child kind = %s, want Error", decl.Kind())
+			}
+		},
+	},
+	{
+		name: "an error run stops before a fn declaration",
+		src:  "1 + 2\nfn h(): nint -> 0\n",
+		check: func(t *testing.T, src string, root *cst.Node, diags []diagnostic.Diagnostic) {
+			t.Helper()
+			if len(diags) == 0 {
+				t.Fatal("want a diagnostic for the stray expression")
+			}
+			assertLossless(t, src)
+			got := declKinds(root)
+			want := []string{"Error", "FuncDecl", "<Newline>", "<EOF>"}
+			if strings.Join(got, ",") != strings.Join(want, ",") {
+				t.Fatalf("file children = %v, want %v", got, want)
+			}
+		},
+	},
+	{
+		name: "missing body is reported",
+		src:  "fn h(): nint\n",
+		check: func(t *testing.T, src string, _ *cst.Node, diags []diagnostic.Diagnostic) {
+			t.Helper()
+			found := false
+			for _, d := range diags {
+				if d.Code == CodeExpectedFuncBody {
+					found = true
+				}
+			}
+			if !found {
+				t.Fatalf("want expected_func_body, got %v", diags)
+			}
+			assertLossless(t, src)
+		},
+	},
+	{
+		name: "arrow block body is reported",
+		src:  "fn h(): nint -> { return 1 }\n",
+		check: func(t *testing.T, _ string, _ *cst.Node, diags []diagnostic.Diagnostic) {
+			t.Helper()
+			found := false
+			for _, d := range diags {
+				if d.Code == CodeArrowBlockBody {
+					found = true
+				}
+			}
+			if !found {
+				t.Fatalf("want arrow_block_body, got %v", diags)
+			}
+		},
+	},
+}
+
 func TestParseFuncDeclRecovery(t *testing.T) {
-	t.Run("pub fn without a name is a reported FuncDecl", func(t *testing.T) {
-		src := "pub fn(x: nint): nint -> x\n"
-		root, diags := Parse([]byte(src))
-		if len(diags) == 0 {
-			t.Fatal("want a diagnostic for the missing name")
-		}
-		assertLossless(t, src)
-		decl := root.Children()[0].(*cst.Node)
-		if decl.Kind() != cst.FuncDecl {
-			t.Fatalf("first child kind = %s, want FuncDecl", decl.Kind())
-		}
-	})
-	t.Run("bare nameless fn is an error run", func(t *testing.T) {
-		src := "fn(x: nint): nint -> x\n"
-		root, diags := Parse([]byte(src))
-		if len(diags) == 0 {
-			t.Fatal("want a diagnostic for the stray literal")
-		}
-		assertLossless(t, src)
-		decl := root.Children()[0].(*cst.Node)
-		if decl.Kind() != cst.Error {
-			t.Fatalf("first child kind = %s, want Error", decl.Kind())
-		}
-	})
-	t.Run("an error run stops before a fn declaration", func(t *testing.T) {
-		src := "1 + 2\nfn h(): nint -> 0\n"
-		root, diags := Parse([]byte(src))
-		if len(diags) == 0 {
-			t.Fatal("want a diagnostic for the stray expression")
-		}
-		assertLossless(t, src)
-		got := declKinds(root)
-		want := []string{"Error", "FuncDecl", "<Newline>", "<EOF>"}
-		if strings.Join(got, ",") != strings.Join(want, ",") {
-			t.Fatalf("file children = %v, want %v", got, want)
-		}
-	})
-	t.Run("missing body is reported", func(t *testing.T) {
-		_, diags := Parse([]byte("fn h(): nint\n"))
-		found := false
-		for _, d := range diags {
-			if d.Code == CodeExpectedFuncBody {
-				found = true
-			}
-		}
-		if !found {
-			t.Fatalf("want expected_func_body, got %v", diags)
-		}
-		assertLossless(t, "fn h(): nint\n")
-	})
-	t.Run("arrow block body is reported", func(t *testing.T) {
-		_, diags := Parse([]byte("fn h(): nint -> { return 1 }\n"))
-		found := false
-		for _, d := range diags {
-			if d.Code == CodeArrowBlockBody {
-				found = true
-			}
-		}
-		if !found {
-			t.Fatalf("want arrow_block_body, got %v", diags)
-		}
-	})
+	for _, tt := range funcDeclRecoveryCases {
+		t.Run(tt.name, func(t *testing.T) {
+			root, diags := Parse([]byte(tt.src))
+			tt.check(t, tt.src, root, diags)
+		})
+	}
 }
 
 // TestParamAnnotationStillRequired checks that relaxing the function-literal

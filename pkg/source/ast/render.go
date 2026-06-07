@@ -102,9 +102,43 @@ func (r *renderer) anchor(e Expr) {
 	}
 }
 
-// expr renders e, parenthesizing it when its own binding is looser than min —
-// the binding the enclosing context requires.
-func (r *renderer) expr(e Expr, min int) {
+// expr renders e, parenthesizing it when its own binding is looser than
+// minPrec — the binding the enclosing context requires.
+func (r *renderer) expr(e Expr, minPrec int) {
+	if r.leafExpr(e) {
+		return
+	}
+	switch x := e.(type) {
+	case *CollectionLit:
+		r.collectionLit(x)
+	case *RecordLit:
+		r.recordLit(x)
+	case *MemberExpr:
+		r.expr(x.Receiver, precPostfix)
+		r.str(".")
+		r.anchor(x)
+		r.str(x.Member.Name)
+	case *CallExpr:
+		r.call(x, minPrec)
+	case *AwaitExpr:
+		r.awaitExpr(x, minPrec)
+	case *TernaryExpr:
+		r.ternaryExpr(x, minPrec)
+	case *RangeExpr:
+		r.rangeExpr(x, minPrec)
+	case *FuncLit:
+		r.funcLit(x)
+	default:
+		r.str("<expr>")
+	}
+}
+
+// leafExpr renders the atom expression forms — the literals, self, and a plain
+// identifier — whose rendering is precedence-independent and needs no
+// parentheses, returning true when it handled e. A composite form (or a kind
+// with no atom rendering) returns false, leaving the caller's switch to render
+// it. nil renders the missing-expression marker.
+func (r *renderer) leafExpr(e Expr) bool {
 	switch x := e.(type) {
 	case nil:
 		r.str("<missing>")
@@ -130,96 +164,102 @@ func (r *renderer) expr(e Expr, min int) {
 	case *Identifier:
 		r.anchor(x)
 		r.str(x.Name)
-	case *CollectionLit:
-		r.str("[")
-		for i, entry := range x.Entries {
-			if i > 0 {
-				r.str(", ")
-			}
-			if entry.Key != nil {
-				r.expr(entry.Key, 0)
-				r.str(": ")
-			}
-			r.expr(entry.Value, 0)
-		}
-		r.str("]")
-	case *RecordLit:
-		r.str(x.TypeName) // "" for the inferred form
-		if len(x.Fields) == 0 {
-			r.str("{}")
-			break
-		}
-		r.str("{ ")
-		for i, f := range x.Fields {
-			if i > 0 {
-				r.str(", ")
-			}
-			r.str(f.Name + ": ")
-			r.expr(f.Value, 0)
-		}
-		r.str(" }")
-	case *MemberExpr:
-		r.expr(x.Receiver, precPostfix)
-		r.str(".")
-		r.anchor(x)
-		r.str(x.Member.Name)
-	case *CallExpr:
-		r.call(x, min)
-	case *AwaitExpr:
-		// await binds like a prefix operator over its operand's postfix chain.
-		paren := precUnary < min
-		if paren {
-			r.str("(")
-		}
-		r.anchor(x)
-		r.str("await ")
-		r.expr(x.Value, precUnary)
-		if paren {
-			r.str(")")
-		}
-	case *TernaryExpr:
-		// The ternary binds loosest and nests on the right: the condition and the
-		// then-branch render one level tighter (so a nested ternary there is
-		// parenthesized), while the else-branch renders at the ternary level — a
-		// chained a ? b : c ? d : e needs no parentheses around its tail.
-		paren := precTernary < min
-		if paren {
-			r.str("(")
-		}
-		r.expr(x.Cond, precTernary+1)
-		r.str(" ")
-		r.anchor(x)
-		r.str("? ")
-		r.expr(x.Then, precTernary+1)
-		r.str(" : ")
-		r.expr(x.Else, precTernary)
-		if paren {
-			r.str(")")
-		}
-	case *RangeExpr:
-		// The range binds looser than every binary operator and tighter than the
-		// ternary, and is non-associative: both bounds render one step tighter
-		// (precRange+1), so a range bound that is itself a range or a ternary is
-		// parenthesized, while an arithmetic bound (binding tighter) is not.
-		paren := precRange < min
-		if paren {
-			r.str("(")
-		}
-		r.expr(x.Lower, precRange+1)
-		r.anchor(x)
-		if x.HalfOpen {
-			r.str("...")
-		} else {
-			r.str("..")
-		}
-		r.expr(x.Upper, precRange+1)
-		if paren {
-			r.str(")")
-		}
-	case *FuncLit:
-		r.funcLit(x)
 	default:
-		r.str("<expr>")
+		return false
+	}
+	return true
+}
+
+// collectionLit renders a list or map literal: [a, b] or [k: v, ...].
+func (r *renderer) collectionLit(x *CollectionLit) {
+	r.str("[")
+	for i, entry := range x.Entries {
+		if i > 0 {
+			r.str(", ")
+		}
+		if entry.Key != nil {
+			r.expr(entry.Key, 0)
+			r.str(": ")
+		}
+		r.expr(entry.Value, 0)
+	}
+	r.str("]")
+}
+
+// recordLit renders a record literal: Type{} for the empty form, Type{ f: v }
+// otherwise (the type name is "" for the inferred form).
+func (r *renderer) recordLit(x *RecordLit) {
+	r.str(x.TypeName) // "" for the inferred form
+	if len(x.Fields) == 0 {
+		r.str("{}")
+		return
+	}
+	r.str("{ ")
+	for i, f := range x.Fields {
+		if i > 0 {
+			r.str(", ")
+		}
+		r.str(f.Name + ": ")
+		r.expr(f.Value, 0)
+	}
+	r.str(" }")
+}
+
+// awaitExpr renders an await: it binds like a prefix operator over its operand's
+// postfix chain.
+func (r *renderer) awaitExpr(x *AwaitExpr, minPrec int) {
+	paren := precUnary < minPrec
+	if paren {
+		r.str("(")
+	}
+	r.anchor(x)
+	r.str("await ")
+	r.expr(x.Value, precUnary)
+	if paren {
+		r.str(")")
+	}
+}
+
+// ternaryExpr renders a ternary. It binds loosest and nests on the right: the
+// condition and the then-branch render one level tighter (so a nested ternary
+// there is parenthesized), while the else-branch renders at the ternary level —
+// a chained a ? b : c ? d : e needs no parentheses around its tail.
+func (r *renderer) ternaryExpr(x *TernaryExpr, minPrec int) {
+	paren := precTernary < minPrec
+	if paren {
+		r.str("(")
+	}
+	r.expr(x.Cond, precTernary+1)
+	r.str(" ")
+	r.anchor(x)
+	r.str("? ")
+	r.expr(x.Then, precTernary+1)
+	r.str(" : ")
+	r.expr(x.Else, precTernary)
+	if paren {
+		r.str(")")
+	}
+}
+
+// rangeExpr renders a range. It binds looser than every binary operator and
+// tighter than the ternary, and is non-associative: both bounds render one step
+// tighter (precRange+1), so a range bound that is itself a range or a ternary is
+// parenthesized, while an arithmetic bound (binding tighter) is not.
+func (r *renderer) rangeExpr(x *RangeExpr, minPrec int) {
+	paren := precRange < minPrec
+	if paren {
+		r.str("(")
+	}
+	r.expr(x.Lower, precRange+1)
+	r.anchor(x)
+	if x.HalfOpen {
+		r.str("...")
+	} else {
+		r.str("..")
+	}
+	r.expr(x.Upper, precRange+1)
+	if paren {
+		r.str(")")
 	}
 }
 
@@ -227,36 +267,9 @@ func (r *renderer) expr(e Expr, min int) {
 // form, anything else as callee(args). The call's value anchors at the
 // operator symbol or the callee's name — the callee itself is not a value, so
 // it records no anchor of its own.
-func (r *renderer) call(x *CallExpr, min int) {
+func (r *renderer) call(x *CallExpr, minPrec int) {
 	if m, ok := x.Callee.(*MemberExpr); ok {
-		if op, ok := binaryOps[m.Member.Name]; ok && len(x.Arguments) == 1 {
-			paren := op.prec < min
-			if paren {
-				r.str("(")
-			}
-			r.expr(m.Receiver, op.prec)
-			r.str(" ")
-			r.anchor(x)
-			r.str(op.sym + " ")
-			// prec+1 on the right keeps the rendering left-associative,
-			// exactly as the parser is.
-			r.expr(x.Arguments[0], op.prec+1)
-			if paren {
-				r.str(")")
-			}
-			return
-		}
-		if sym, ok := unaryOps[m.Member.Name]; ok && len(x.Arguments) == 0 {
-			paren := precUnary < min
-			if paren {
-				r.str("(")
-			}
-			r.anchor(x)
-			r.str(sym)
-			r.expr(m.Receiver, precUnary)
-			if paren {
-				r.str(")")
-			}
+		if r.operatorCall(x, m, minPrec) {
 			return
 		}
 		r.expr(m.Receiver, precPostfix)
@@ -279,6 +292,44 @@ func (r *renderer) call(x *CallExpr, min int) {
 		r.expr(a, 0)
 	}
 	r.str(")")
+}
+
+// operatorCall renders a call of an operator method (member callee m) back as
+// its surface operator form — a one-argument binary operator or a no-argument
+// unary one — returning true when it handled the call. A member call that is not
+// an operator form returns false, leaving the caller to render the method call.
+func (r *renderer) operatorCall(x *CallExpr, m *MemberExpr, minPrec int) bool {
+	if op, ok := binaryOps[m.Member.Name]; ok && len(x.Arguments) == 1 {
+		paren := op.prec < minPrec
+		if paren {
+			r.str("(")
+		}
+		r.expr(m.Receiver, op.prec)
+		r.str(" ")
+		r.anchor(x)
+		r.str(op.sym + " ")
+		// prec+1 on the right keeps the rendering left-associative,
+		// exactly as the parser is.
+		r.expr(x.Arguments[0], op.prec+1)
+		if paren {
+			r.str(")")
+		}
+		return true
+	}
+	if sym, ok := unaryOps[m.Member.Name]; ok && len(x.Arguments) == 0 {
+		paren := precUnary < minPrec
+		if paren {
+			r.str("(")
+		}
+		r.anchor(x)
+		r.str(sym)
+		r.expr(m.Receiver, precUnary)
+		if paren {
+			r.str(")")
+		}
+		return true
+	}
+	return false
 }
 
 // funcLit renders a function literal on one line — statements joined by ";" —

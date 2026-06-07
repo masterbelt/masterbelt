@@ -307,7 +307,8 @@ func generatePackage(defs []codeDef) ([]byte, error) {
 	b.WriteString(")\n")
 
 	for _, d := range defs {
-		params := []string{"offset int", "width int"}
+		params := make([]string, 0, 2+len(d.fields))
+		params = append(params, "offset int", "width int")
 		for _, f := range d.fields {
 			params = append(params, f.name+" "+f.typ)
 		}

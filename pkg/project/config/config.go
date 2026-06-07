@@ -19,9 +19,10 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/pelletier/go-toml/v2"
+
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
 	"github.com/masterbelt/masterbelt/pkg/source"
-	"github.com/pelletier/go-toml/v2"
 )
 
 // FileName is the manifest's file name. The directory that contains it is the

@@ -498,94 +498,133 @@ func (b bodyBinder) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
 	case *ast.NullLit:
 		return &ir.NullValue{Syntax: e}
 	case *ast.Identifier:
-		// A let-bound local shadows a same-named parameter or type, so it is
-		// resolved first; a top-level constant in scope is the last reading.
-		if _, ok := b.locals[e.Name]; ok {
-			return &ir.LocalRef{Name: e.Name, Syntax: e}
-		}
-		if b.params[e.Name] {
-			return &ir.ParamRef{Name: e.Name, Syntax: e}
-		}
-		if b.funcs.constRef != nil {
-			if c := b.funcs.constRef(e); c != nil {
-				return &ir.Reference{Target: c, Syntax: e}
-			}
-		}
-		return nil
+		return b.leafIdentifier(e)
 	case *ast.MemberExpr:
-		// A member access whose receiver names a namespace import (geo.Origin)
-		// is a reference to the imported constant — the namespace claim runs
-		// first, exactly as the const binder orders it — then one whose
-		// receiver names a type: an enum member (Element.Fire) or an
-		// associated constant (int8.Max); a parameter shadowing the name takes
-		// the record-field reading instead.
-		if recv, ok := e.Receiver.(*ast.Identifier); ok && !b.shadows(recv.Name) {
-			if b.funcs.nsConstRef != nil {
-				if c := b.funcs.nsConstRef(e); c != nil {
-					return &ir.Reference{Target: c, Syntax: e}
-				}
-			}
-			if def := b.r.Defs[recv.Name]; def != nil {
-				if def.Enum != nil {
-					if idx := enumIndex(def, e.Member.Name); idx >= 0 {
-						return &ir.EnumMemberValue{Def: def, Index: idx, Syntax: e}
-					}
-				}
-				if idx := assocConstIndex(def, e.Member.Name); idx >= 0 {
-					return &ir.AssocConstValue{Def: def, Index: idx, Syntax: e}
-				}
-			}
-		}
-		// A member access used as a value is a record field access.
-		return &ir.FieldAccess{Receiver: sub(e.Receiver), Field: e.Member.Name, Syntax: e}
+		return b.leafMember(e, sub)
 	case *ast.CallExpr:
-		// A call whose callee names a type is a conversion T(x); one that
-		// names a top-level function — by name, or through a namespace import
-		// (geo.area(...)) — is a function call.
-		switch callee := e.Callee.(type) {
-		case *ast.Identifier:
-			if b.shadows(callee.Name) {
-				return nil
-			}
-			if t := b.r.ResolveName(callee.Name, b.tscope); t != ir.Invalid {
-				return &ir.Conversion{Type: t, Args: convArgs(e.Arguments, sub), Syntax: e}
-			}
-			if cands := b.funcs.local[callee.Name]; len(cands) > 0 {
-				return funcCall(pickShellOverload(cands, len(e.Arguments)), e, sub)
-			}
-			// A bare call inside a method body whose name is a method of self is
-			// an implicit self-call (self omitted) — the form an interface's
-			// provided method uses to call the required fold. It lowers to the
-			// same ir.Call a written self.fold(...) would.
-			if b.self && b.selfHasMethod(callee.Name) {
-				args := make([]ir.Value, len(e.Arguments))
-				for i, a := range e.Arguments {
-					args[i] = sub(a)
-				}
-				return &ir.Call{Receiver: &ir.SelfValue{}, Method: callee.Name, Args: args, Syntax: e}
-			}
-		case *ast.MemberExpr:
-			recv, ok := callee.Receiver.(*ast.Identifier)
-			if !ok || b.shadows(recv.Name) {
-				return nil
-			}
-			if b.funcs.qualified != nil {
-				if cands := b.funcs.qualified(recv.Name, callee.Member.Name); len(cands) > 0 {
-					return funcCall(b.funcs.shells[pickOverload(cands, len(e.Arguments))], e, sub)
-				}
-			}
-			// A call whose callee is a member access on a type name is a static fn
-			// call (Celsius.freezing()) — the Type.Name path, after the namespace
-			// function claim, with a local or parameter of that name shadowing the
-			// type (checked above through shadows).
-			if def := staticFnDef(b.r.Defs, callee, b.shadows); def != nil {
-				return staticCall(def, callee.Member.Name, e, sub)
-			}
-		}
-		return nil
+		return b.leafCall(e, sub)
 	default:
 		return nil
 	}
+}
+
+// leafIdentifier lowers a bare name in value position. A let-bound local
+// shadows a same-named parameter or type, so it is resolved first; a top-level
+// constant in scope is the last reading.
+func (b bodyBinder) leafIdentifier(e *ast.Identifier) ir.Value {
+	if _, ok := b.locals[e.Name]; ok {
+		return &ir.LocalRef{Name: e.Name, Syntax: e}
+	}
+	if b.params[e.Name] {
+		return &ir.ParamRef{Name: e.Name, Syntax: e}
+	}
+	if b.funcs.constRef != nil {
+		if c := b.funcs.constRef(e); c != nil {
+			return &ir.Reference{Target: c, Syntax: e}
+		}
+	}
+	return nil
+}
+
+// leafMember lowers a member access in value position. A receiver naming a
+// namespace import (geo.Origin) is a reference to the imported constant — the
+// namespace claim runs first, exactly as the const binder orders it — then one
+// naming a type: an enum member (Element.Fire) or an associated constant
+// (int8.Max); a parameter shadowing the name, or any other receiver, takes the
+// record-field reading instead.
+func (b bodyBinder) leafMember(e *ast.MemberExpr, sub func(ast.Expr) ir.Value) ir.Value {
+	if ref := b.leafNamespaceOrTypeMember(e); ref != nil {
+		return ref
+	}
+	// A member access used as a value is a record field access.
+	return &ir.FieldAccess{Receiver: sub(e.Receiver), Field: e.Member.Name, Syntax: e}
+}
+
+// leafNamespaceOrTypeMember resolves a member access whose receiver names a
+// namespace import or a type, returning the imported-constant reference, enum
+// member, or associated constant — or nil when the receiver is shadowed or
+// names neither (the caller then reads it as a record field access).
+func (b bodyBinder) leafNamespaceOrTypeMember(e *ast.MemberExpr) ir.Value {
+	recv, ok := e.Receiver.(*ast.Identifier)
+	if !ok || b.shadows(recv.Name) {
+		return nil
+	}
+	if b.funcs.nsConstRef != nil {
+		if c := b.funcs.nsConstRef(e); c != nil {
+			return &ir.Reference{Target: c, Syntax: e}
+		}
+	}
+	def := b.r.Defs[recv.Name]
+	if def == nil {
+		return nil
+	}
+	if def.Enum != nil {
+		if idx := enumIndex(def, e.Member.Name); idx >= 0 {
+			return &ir.EnumMemberValue{Def: def, Index: idx, Syntax: e}
+		}
+	}
+	if idx := assocConstIndex(def, e.Member.Name); idx >= 0 {
+		return &ir.AssocConstValue{Def: def, Index: idx, Syntax: e}
+	}
+	return nil
+}
+
+// leafCall lowers a call in value position. A call whose callee names a type is
+// a conversion T(x); one that names a top-level function — by name, or through
+// a namespace import (geo.area(...)) — is a function call.
+func (b bodyBinder) leafCall(e *ast.CallExpr, sub func(ast.Expr) ir.Value) ir.Value {
+	switch callee := e.Callee.(type) {
+	case *ast.Identifier:
+		return b.leafIdentCall(e, callee, sub)
+	case *ast.MemberExpr:
+		return b.leafMemberCall(e, callee, sub)
+	}
+	return nil
+}
+
+// leafIdentCall lowers a call whose callee is a bare name: a type name is a
+// conversion, a top-level function name a function call, and a method of self
+// an implicit self-call (self omitted) — the form an interface's provided
+// method uses to call the required fold, lowering to the same ir.Call a written
+// self.fold(...) would.
+func (b bodyBinder) leafIdentCall(e *ast.CallExpr, callee *ast.Identifier, sub func(ast.Expr) ir.Value) ir.Value {
+	if b.shadows(callee.Name) {
+		return nil
+	}
+	if t := b.r.ResolveName(callee.Name, b.tscope); t != ir.Invalid {
+		return &ir.Conversion{Type: t, Args: convArgs(e.Arguments, sub), Syntax: e}
+	}
+	if cands := b.funcs.local[callee.Name]; len(cands) > 0 {
+		return funcCall(pickShellOverload(cands, len(e.Arguments)), e, sub)
+	}
+	if b.self && b.selfHasMethod(callee.Name) {
+		args := make([]ir.Value, len(e.Arguments))
+		for i, a := range e.Arguments {
+			args[i] = sub(a)
+		}
+		return &ir.Call{Receiver: &ir.SelfValue{}, Method: callee.Name, Args: args, Syntax: e}
+	}
+	return nil
+}
+
+// leafMemberCall lowers a call whose callee is a member access: a namespace
+// function call (geo.area(...)), or a static fn call on a type name
+// (Celsius.freezing()) — the Type.Name path, after the namespace function
+// claim, with a local or parameter of that name shadowing the type.
+func (b bodyBinder) leafMemberCall(e *ast.CallExpr, callee *ast.MemberExpr, sub func(ast.Expr) ir.Value) ir.Value {
+	recv, ok := callee.Receiver.(*ast.Identifier)
+	if !ok || b.shadows(recv.Name) {
+		return nil
+	}
+	if b.funcs.qualified != nil {
+		if cands := b.funcs.qualified(recv.Name, callee.Member.Name); len(cands) > 0 {
+			return funcCall(b.funcs.shells[pickOverload(cands, len(e.Arguments))], e, sub)
+		}
+	}
+	if def := staticFnDef(b.r.Defs, callee, b.shadows); def != nil {
+		return staticCall(def, callee.Member.Name, e, sub)
+	}
+	return nil
 }
 
 // pickShellOverload is pickOverload over function shells: the arity reads off

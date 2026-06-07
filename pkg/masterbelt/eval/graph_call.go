@@ -5,6 +5,7 @@
 // overload (Resolved) drives an annotated call; a type-blind one falls back to
 // the conservative value-kind selection — the rules the AST folder shares,
 // over resolved signatures instead of written annotations.
+
 package eval
 
 import (
@@ -341,7 +342,7 @@ func graphReceiverDef(ctx graphCtx, recvNode ir.Value, recv *ir.Constant) *ir.Ty
 		return ctx.env.LookupType(collectionTypeName(recv))
 	}
 	if recv.Kind == ir.ConstRange {
-		return ctx.env.LookupType("range")
+		return ctx.env.LookupType(builtin.NameRange)
 	}
 	def := methodTableDef(ctx.env.Registry(), receiverNodeType(ctx, recvNode))
 	if def == nil || !defBacksKind(ctx.env.Registry(), def, recv.Kind) {
@@ -475,10 +476,10 @@ func typeAcceptsKind(reg *builtin.Registry, t ir.Type, k ir.ConstKind) bool {
 	case nil:
 		return true
 	case *ir.Builtin:
-		if t.Name == "list" || t.Name == "map" {
+		if t.Name == builtin.NameList || t.Name == builtin.NameMap {
 			return k == ir.ConstCollection
 		}
-		if t.Name == "range" {
+		if t.Name == builtin.NameRange {
 			return k == ir.ConstRange
 		}
 		n, ok := reg.Native(t.Name)
@@ -491,9 +492,9 @@ func typeAcceptsKind(reg *builtin.Registry, t ir.Type, k ir.ConstKind) bool {
 	case *ir.App:
 		if t.Def != nil {
 			switch t.Def.Name {
-			case "list", "map":
+			case builtin.NameList, builtin.NameMap:
 				return k == ir.ConstCollection
-			case "range":
+			case builtin.NameRange:
 				return k == ir.ConstRange
 			}
 		}
@@ -523,10 +524,10 @@ func defAcceptsKind(reg *builtin.Registry, def *ir.TypeDef, k ir.ConstKind) bool
 		if n, ok := reg.Native(def.Name); ok {
 			return builtinBacksKind(n, k)
 		}
-		if def.Name == "list" || def.Name == "map" {
+		if def.Name == builtin.NameList || def.Name == builtin.NameMap {
 			return k == ir.ConstCollection
 		}
-		if def.Name == "range" {
+		if def.Name == builtin.NameRange {
 			return k == ir.ConstRange
 		}
 		return true

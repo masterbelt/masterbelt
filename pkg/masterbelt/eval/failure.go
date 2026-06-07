@@ -4,6 +4,7 @@
 // reads which verdict refused it. It only runs on the error path (a constant
 // that should have folded and did not), so the second evaluation costs nothing
 // in the green case.
+
 package eval
 
 // The two reasons a pure constant can fail to fold. There is no third: an

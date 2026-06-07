@@ -1,6 +1,7 @@
 // This file lowers type-expression CST nodes into ast type expressions: named,
 // builtin, union, record, and function types, together with the generic
 // parameters and arguments they carry.
+
 package abstract
 
 import (
@@ -103,6 +104,9 @@ func lowerTypeName(t cst.Tree, buf source.Buffer, node *cst.Node) ast.TypeExpr {
 				name = "self"
 			case token.Null:
 				name = "null"
+			default:
+				// Any other token (the generic-argument angle brackets and
+				// commas) names no part of the type: it is skipped.
 			}
 			continue
 		}

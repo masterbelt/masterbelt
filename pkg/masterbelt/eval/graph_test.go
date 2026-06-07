@@ -228,8 +228,8 @@ func TestGraphPredicateSelfMethod(t *testing.T) {
 func TestGraphMatchDispatch(t *testing.T) {
 	env := newStubEnv()
 	small := &ir.TypeDef{Name: "Small", Body: &ir.Builtin{Name: "sbyte"}}
-	big_ := &ir.TypeDef{Name: "Big", Body: &ir.Builtin{Name: "int"}}
-	env.defs["Small"], env.defs["Big"] = small, big_
+	bigDef := &ir.TypeDef{Name: "Big", Body: &ir.Builtin{Name: "int"}}
+	env.defs["Small"], env.defs["Big"] = small, bigDef
 
 	armed := func(scrut ir.Value) *ir.Function {
 		fn := &ir.Function{Name: "pick", Result: &ir.Builtin{Name: "nint"}}
@@ -237,15 +237,15 @@ func TestGraphMatchDispatch(t *testing.T) {
 			Scrutinee: scrut,
 			Arms: []ir.MatchArm{
 				{Type: &ir.Named{Def: small}, Body: []ir.Stmt{&ir.Return{Value: intLit("1")}}},
-				{Type: &ir.Named{Def: big_}, Body: []ir.Stmt{&ir.Return{Value: intLit("2")}}},
+				{Type: &ir.Named{Def: bigDef}, Body: []ir.Stmt{&ir.Return{Value: intLit("2")}}},
 			},
 		}}
 		return fn
 	}
 
 	// Tagged: an Adapt into the union pins the member, so the dispatch folds.
-	union := &ir.Union{Members: []ir.Type{&ir.Named{Def: small}, &ir.Named{Def: big_}}}
-	tagged := &ir.Adapt{Value: &ir.Adapt{Value: intLit("7"), To: &ir.Named{Def: big_}}, To: union}
+	union := &ir.Union{Members: []ir.Type{&ir.Named{Def: small}, &ir.Named{Def: bigDef}}}
+	tagged := &ir.Adapt{Value: &ir.Adapt{Value: intLit("7"), To: &ir.Named{Def: bigDef}}, To: union}
 	wantInt(t, Graph(&ir.FuncCall{Target: armed(tagged), Args: nil}, env), 2)
 
 	// Untagged: two nominal-over-int arms could both hold the value — refuse.

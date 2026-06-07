@@ -134,11 +134,11 @@ func Expr(e ast.Expr, env Env) ir.Type {
 func exprType(e ast.Expr, s scope) ir.Type {
 	switch e := e.(type) {
 	case *ast.IntLit:
-		return &ir.Builtin{Name: "nint"}
+		return &ir.Builtin{Name: builtin.NameNint}
 	case *ast.StringLit:
-		return &ir.Builtin{Name: "string"}
+		return &ir.Builtin{Name: builtin.NameString}
 	case *ast.BoolLit:
-		return &ir.Builtin{Name: "bool"}
+		return &ir.Builtin{Name: builtin.NameBool}
 	case *ast.DatetimeLit:
 		return &ir.Builtin{Name: "datetime"}
 	case *ast.DurationLit:
@@ -613,129 +613,149 @@ func hasTypeVar(t ir.Type) bool {
 // fails if any field is not forwarded, so a callback added to Sink cannot be
 // dropped on this path again.
 func observe(sink *Sink, fired *bool) *Sink {
-	return &Sink{
-		// Findings: flip *fired, then delegate through the guarded method.
-		InvalidOp: func(node ast.Node, method, operands string) {
-			*fired = true
-			sink.invalidOp(node, method, operands)
-		},
-		NoMatchingOverload: func(node ast.Node, method, operands string) {
-			*fired = true
-			sink.noMatchingOverload(node, method, operands)
-		},
-		AmbiguousOverload: func(node ast.Node, method, operands string) {
-			*fired = true
-			sink.ambiguousOverload(node, method, operands)
-		},
-		Mismatch: func(node ast.Node, got, want ir.Type) {
-			*fired = true
-			sink.mismatch(node, got, want)
-		},
-		AmbiguousUnionMember: func(node ast.Node, got, want ir.Type) {
-			*fired = true
-			sink.ambiguousUnionMember(node, got, want)
-		},
-		ScalarConversion: func(call *ast.CallExpr, target ir.Type) {
-			*fired = true
-			sink.scalarConversion(call, target)
-		},
-		TernaryCondNotBool: func(cond ast.Expr, got ir.Type) {
-			*fired = true
-			sink.ternaryCondNotBool(cond, got)
-		},
-		TernaryBranchMismatch: func(node ast.Node, then, els ir.Type) {
-			*fired = true
-			sink.ternaryBranchMismatch(node, then, els)
-		},
-		ArityMismatch: func(lit *ast.FuncLit, got, want int) {
-			*fired = true
-			sink.arityMismatchLit(lit, got, want)
-		},
-		CallArityMismatch: func(call *ast.CallExpr, name string, got, want int) {
-			*fired = true
-			sink.arityMismatch(call, name, got, want)
-		},
-		NoMatchingFuncOverload: func(call *ast.CallExpr, name, types string) {
-			*fired = true
-			sink.noMatchingFuncOverload(call, name, types)
-		},
-		AmbiguousFuncOverload: func(call *ast.CallExpr, name, types string) {
-			*fired = true
-			sink.ambiguousFuncOverload(call, name, types)
-		},
-		UninferableParam: func(p *ast.ParamDef) {
-			*fired = true
-			sink.uninferableParam(p)
-		},
-		UninferableResult: func(lit *ast.FuncLit) {
-			*fired = true
-			sink.uninferableResult(lit)
-		},
-		MissingField: func(lit *ast.RecordLit, field string, typ ir.Type) {
-			*fired = true
-			sink.missingField(lit, field, typ)
-		},
-		UnknownField: func(field *ast.FieldInit, name string, typ ir.Type) {
-			*fired = true
-			sink.unknownField(field, name, typ)
-		},
-		UninferableRecord: func(lit *ast.RecordLit) {
-			*fired = true
-			sink.uninferableRecord(lit)
-		},
-		UnknownRecordType: func(lit *ast.RecordLit, name string) {
-			*fired = true
-			sink.unknownRecordType(lit, name)
-		},
-		NotARecord: func(lit *ast.RecordLit, typ ir.Type) {
-			*fired = true
-			sink.notARecord(lit, typ)
-		},
-		BoundNotSatisfied: func(call *ast.CallExpr, typ, bound ir.Type) {
-			*fired = true
-			sink.boundNotSatisfied(call, typ, bound)
-		},
-		UninferableTypeParam: func(call *ast.CallExpr, name string) {
-			*fired = true
-			sink.uninferableTypeParam(call, name)
-		},
-		NoMethodOnUnboundedTypeVar: func(node ast.Node, method string) {
-			*fired = true
-			sink.noMethodOnUnboundedTypeVar(node, method)
-		},
-		UnknownStatic: func(call *ast.CallExpr, name, typ string) {
-			*fired = true
-			sink.unknownStatic(call, name, typ)
-		},
-		MapKeyNotComparable: func(lit *ast.CollectionLit, key, bound ir.Type) {
-			*fired = true
-			sink.mapKeyNotComparable(lit, key, bound)
-		},
-		// Streams (not findings): forwarded as-is, never flip *fired.
-		Checked: func(e ast.Expr, want ir.Type) {
-			sink.checked(e, want)
-		},
-		SolvedFuncLit: func(lit *ast.FuncLit, t *ir.Func) {
-			sink.solvedFuncLit(lit, t)
-		},
-		ResolvedMethod: func(call *ast.CallExpr, m *ir.Method) {
-			sink.resolvedMethod(call, m)
-		},
-		ResolvedStatic: func(call *ast.CallExpr, m *ir.Method) {
-			sink.resolvedStatic(call, m)
-		},
-		ResolvedFunc: func(call *ast.CallExpr, fd *ast.FuncDecl) {
-			sink.resolvedFunc(call, fd)
-		},
-		CallSubst: func(call *ast.CallExpr, subst map[string]ir.Type) {
-			sink.callSubst(call, subst)
-		},
-		Typed: func(e ast.Expr, t ir.Type) {
-			sink.typed(e, t)
-		},
-		Adapted: func(e ast.Expr, to ir.Type) {
-			sink.adapted(e, to)
-		},
+	w := &Sink{}
+	observeOpFindings(w, sink, fired)
+	observeLitFindings(w, sink, fired)
+	observeStreams(w, sink)
+	return w
+}
+
+// observeOpFindings fills w's operation, overload, ternary, and conversion
+// finding callbacks: each flips *fired, then delegates through sink's guarded
+// method. observeLitFindings and observeStreams fill the rest; together the
+// three cover every Sink field, which TestObserveForwardsEverySinkField
+// enforces.
+func observeOpFindings(w, sink *Sink, fired *bool) {
+	w.InvalidOp = func(node ast.Node, method, operands string) {
+		*fired = true
+		sink.invalidOp(node, method, operands)
+	}
+	w.NoMatchingOverload = func(node ast.Node, method, operands string) {
+		*fired = true
+		sink.noMatchingOverload(node, method, operands)
+	}
+	w.AmbiguousOverload = func(node ast.Node, method, operands string) {
+		*fired = true
+		sink.ambiguousOverload(node, method, operands)
+	}
+	w.Mismatch = func(node ast.Node, got, want ir.Type) {
+		*fired = true
+		sink.mismatch(node, got, want)
+	}
+	w.AmbiguousUnionMember = func(node ast.Node, got, want ir.Type) {
+		*fired = true
+		sink.ambiguousUnionMember(node, got, want)
+	}
+	w.ScalarConversion = func(call *ast.CallExpr, target ir.Type) {
+		*fired = true
+		sink.scalarConversion(call, target)
+	}
+	w.TernaryCondNotBool = func(cond ast.Expr, got ir.Type) {
+		*fired = true
+		sink.ternaryCondNotBool(cond, got)
+	}
+	w.TernaryBranchMismatch = func(node ast.Node, then, els ir.Type) {
+		*fired = true
+		sink.ternaryBranchMismatch(node, then, els)
+	}
+	w.ArityMismatch = func(lit *ast.FuncLit, got, want int) {
+		*fired = true
+		sink.arityMismatchLit(lit, got, want)
+	}
+	w.CallArityMismatch = func(call *ast.CallExpr, name string, got, want int) {
+		*fired = true
+		sink.arityMismatch(call, name, got, want)
+	}
+	w.NoMatchingFuncOverload = func(call *ast.CallExpr, name, types string) {
+		*fired = true
+		sink.noMatchingFuncOverload(call, name, types)
+	}
+	w.AmbiguousFuncOverload = func(call *ast.CallExpr, name, types string) {
+		*fired = true
+		sink.ambiguousFuncOverload(call, name, types)
+	}
+}
+
+// observeLitFindings fills w's literal, record, and generic-bound finding
+// callbacks: each flips *fired, then delegates through sink's guarded method.
+func observeLitFindings(w, sink *Sink, fired *bool) {
+	w.UninferableParam = func(p *ast.ParamDef) {
+		*fired = true
+		sink.uninferableParam(p)
+	}
+	w.UninferableResult = func(lit *ast.FuncLit) {
+		*fired = true
+		sink.uninferableResult(lit)
+	}
+	w.MissingField = func(lit *ast.RecordLit, field string, typ ir.Type) {
+		*fired = true
+		sink.missingField(lit, field, typ)
+	}
+	w.UnknownField = func(field *ast.FieldInit, name string, typ ir.Type) {
+		*fired = true
+		sink.unknownField(field, name, typ)
+	}
+	w.UninferableRecord = func(lit *ast.RecordLit) {
+		*fired = true
+		sink.uninferableRecord(lit)
+	}
+	w.UnknownRecordType = func(lit *ast.RecordLit, name string) {
+		*fired = true
+		sink.unknownRecordType(lit, name)
+	}
+	w.NotARecord = func(lit *ast.RecordLit, typ ir.Type) {
+		*fired = true
+		sink.notARecord(lit, typ)
+	}
+	w.BoundNotSatisfied = func(call *ast.CallExpr, typ, bound ir.Type) {
+		*fired = true
+		sink.boundNotSatisfied(call, typ, bound)
+	}
+	w.UninferableTypeParam = func(call *ast.CallExpr, name string) {
+		*fired = true
+		sink.uninferableTypeParam(call, name)
+	}
+	w.NoMethodOnUnboundedTypeVar = func(node ast.Node, method string) {
+		*fired = true
+		sink.noMethodOnUnboundedTypeVar(node, method)
+	}
+	w.UnknownStatic = func(call *ast.CallExpr, name, typ string) {
+		*fired = true
+		sink.unknownStatic(call, name, typ)
+	}
+	w.MapKeyNotComparable = func(lit *ast.CollectionLit, key, bound ir.Type) {
+		*fired = true
+		sink.mapKeyNotComparable(lit, key, bound)
+	}
+}
+
+// observeStreams fills w's informational-stream callbacks (not findings):
+// forwarded as-is to sink, never flipping *fired. It mutates w in place, the
+// wrapper observeFindings allocated.
+func observeStreams(w, sink *Sink) {
+	w.Checked = func(e ast.Expr, want ir.Type) {
+		sink.checked(e, want)
+	}
+	w.SolvedFuncLit = func(lit *ast.FuncLit, t *ir.Func) {
+		sink.solvedFuncLit(lit, t)
+	}
+	w.ResolvedMethod = func(call *ast.CallExpr, m *ir.Method) {
+		sink.resolvedMethod(call, m)
+	}
+	w.ResolvedStatic = func(call *ast.CallExpr, m *ir.Method) {
+		sink.resolvedStatic(call, m)
+	}
+	w.ResolvedFunc = func(call *ast.CallExpr, fd *ast.FuncDecl) {
+		sink.resolvedFunc(call, fd)
+	}
+	w.CallSubst = func(call *ast.CallExpr, subst map[string]ir.Type) {
+		sink.callSubst(call, subst)
+	}
+	w.Typed = func(e ast.Expr, t ir.Type) {
+		sink.typed(e, t)
+	}
+	w.Adapted = func(e ast.Expr, to ir.Type) {
+		sink.adapted(e, to)
 	}
 }
 

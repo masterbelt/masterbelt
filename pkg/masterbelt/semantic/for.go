@@ -70,27 +70,9 @@ func reportLoopVarWrites(body []ast.Stmt, name string, at func(ast.Node) span, d
 			}
 			reportLoopVarWrites(s.Else, name, at, diags)
 		case *ast.SwitchStmt:
-			for _, arm := range s.Arms {
-				reportLoopVarWrites(arm.Body, name, at, diags)
-			}
-			reportLoopVarWrites(s.Else, name, at, diags)
-			for _, arm := range s.AfterElse {
-				reportLoopVarWrites(arm.Body, name, at, diags)
-			}
+			reportLoopVarWritesInSwitch(s, name, at, diags)
 		case *ast.MatchStmt:
-			for _, arm := range s.Arms {
-				if arm.Bind == name {
-					continue // the arm's binding shadows the loop variable in its body
-				}
-				reportLoopVarWrites(arm.Body, name, at, diags)
-			}
-			reportLoopVarWrites(s.Else, name, at, diags)
-			for _, arm := range s.AfterElse {
-				if arm.Bind == name {
-					continue
-				}
-				reportLoopVarWrites(arm.Body, name, at, diags)
-			}
+			reportLoopVarWritesInMatch(s, name, at, diags)
 		case *ast.ForStmt:
 			if s.Var == name {
 				continue // an inner for of the same name shadows the loop variable
@@ -100,6 +82,37 @@ func reportLoopVarWrites(body []ast.Stmt, name string, at func(ast.Node) span, d
 			// Neither reassigns a local, so neither can write the loop variable.
 			// Listed explicitly so a new statement kind forces a decision here.
 		}
+	}
+}
+
+// reportLoopVarWritesInSwitch recurses reportLoopVarWrites through a switch's
+// arm bodies, its wildcard, and its unreachable after-else arms.
+func reportLoopVarWritesInSwitch(s *ast.SwitchStmt, name string, at func(ast.Node) span, diags *diagnostic.List) {
+	for _, arm := range s.Arms {
+		reportLoopVarWrites(arm.Body, name, at, diags)
+	}
+	reportLoopVarWrites(s.Else, name, at, diags)
+	for _, arm := range s.AfterElse {
+		reportLoopVarWrites(arm.Body, name, at, diags)
+	}
+}
+
+// reportLoopVarWritesInMatch recurses reportLoopVarWrites through a match's arm
+// bodies, its wildcard, and its unreachable after-else arms — skipping an arm
+// whose binding shadows the loop variable in its body.
+func reportLoopVarWritesInMatch(s *ast.MatchStmt, name string, at func(ast.Node) span, diags *diagnostic.List) {
+	for _, arm := range s.Arms {
+		if arm.Bind == name {
+			continue // the arm's binding shadows the loop variable in its body
+		}
+		reportLoopVarWrites(arm.Body, name, at, diags)
+	}
+	reportLoopVarWrites(s.Else, name, at, diags)
+	for _, arm := range s.AfterElse {
+		if arm.Bind == name {
+			continue
+		}
+		reportLoopVarWrites(arm.Body, name, at, diags)
 	}
 }
 

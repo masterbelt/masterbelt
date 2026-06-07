@@ -90,99 +90,129 @@ func TestCheckFuncLitBody(t *testing.T) {
 // error in a skipped statement is reported.
 func TestCheckFuncLitStatementBody(t *testing.T) {
 	env := emptyEnv()
+	t.Run("let initializer error", func(t *testing.T) { checkLitLetInitError(t, env) })
+	t.Run("let local in scope", func(t *testing.T) { checkLitLetInScope(t, env) })
+	t.Run("nested return synthesis", func(t *testing.T) { checkLitNestedReturnSynth(t, env) })
+	t.Run("nested return mismatch", func(t *testing.T) { checkLitNestedReturnMismatch(t, env) })
+	t.Run("if condition error", func(t *testing.T) { checkLitIfCondError(t, env) })
+	t.Run("assign value error", func(t *testing.T) { checkLitAssignValueError(t, env) })
+}
 
-	// 1. A type error in a let initializer inside a lambda body is reported.
-	var r1 report
-	lit1 := funcLit([]*ast.ParamDef{param("acc", namedType("nint")), param("value", namedType("nint"))},
+// checkLitLetInitError: a type error in a let initializer inside a lambda body
+// is reported.
+func checkLitLetInitError(t *testing.T, env stubEnv) {
+	t.Helper()
+	var r report
+	lit := funcLit([]*ast.ParamDef{param("acc", namedType("nint")), param("value", namedType("nint"))},
 		namedType("nint"),
 		letStmt("bump", nil, binary(stringLit("str"), "add", intLit("1"))),
 		ret(binary(ident("acc"), "add", ident("value"))),
 	)
-	Check(lit1, env, r1.sink())
-	if len(r1.methods) != 1 || r1.methods[0] != "add" {
-		t.Errorf("let-initializer error: methods = %v, want [add]", r1.methods)
+	Check(lit, env, r.sink())
+	if len(r.methods) != 1 || r.methods[0] != "add" {
+		t.Errorf("let-initializer error: methods = %v, want [add]", r.methods)
 	}
+}
 
-	// 2. A let local is in scope for the statements after it; a return that uses
-	// it is checked against the result, and unifies for synthesis.
-	var r2 report
-	lit2 := funcLit([]*ast.ParamDef{param("value", namedType("nint"))}, nil,
+// checkLitLetInScope: a let local is in scope for the statements after it; a
+// return that uses it is checked against the result, and unifies for synthesis.
+func checkLitLetInScope(t *testing.T, env stubEnv) {
+	t.Helper()
+	var r report
+	lit := funcLit([]*ast.ParamDef{param("value", namedType("nint"))}, nil,
 		letStmt("bump", nil, binary(ident("value"), "add", intLit("1"))),
 		ret(ident("bump")),
 	)
-	if got := Check(lit2, env, r2.sink()).String(); got != "fn(nint): nint" {
+	if got := Check(lit, env, r.sink()).String(); got != "fn(nint): nint" {
 		t.Errorf("let local in scope: Check = %s, want fn(nint): nint", got)
 	}
-	if r2.uninferables != 0 || len(r2.methods) != 0 || len(r2.mismatches) != 0 {
-		t.Errorf("healthy let body reported %v %v %d", r2.methods, r2.mismatches, r2.uninferables)
+	if r.uninferables != 0 || len(r.methods) != 0 || len(r.mismatches) != 0 {
+		t.Errorf("healthy let body reported %v %v %d", r.methods, r.mismatches, r.uninferables)
 	}
+}
 
-	// 3. A return nested inside an if drives result synthesis: it must not be
-	// reported as uninferable, and its type is the lambda's result.
-	var r3 report
-	lit3 := funcLit([]*ast.ParamDef{param("v", namedType("nint"))}, nil,
+// checkLitNestedReturnSynth: a return nested inside an if drives result
+// synthesis: it must not be reported as uninferable, and its type is the
+// lambda's result.
+func checkLitNestedReturnSynth(t *testing.T, env stubEnv) {
+	t.Helper()
+	var r report
+	lit := funcLit([]*ast.ParamDef{param("v", namedType("nint"))}, nil,
 		ifStmt(binary(ident("v"), "gt", intLit("0")),
 			[]ast.Stmt{ret(binary(ident("v"), "add", intLit("1")))}, nil, nil),
 	)
-	if got := Check(lit3, env, r3.sink()).String(); got != "fn(nint): nint" {
+	if got := Check(lit, env, r.sink()).String(); got != "fn(nint): nint" {
 		t.Errorf("nested return synthesis: Check = %s, want fn(nint): nint", got)
 	}
-	if r3.uninferables != 0 {
-		t.Errorf("nested return falsely uninferable %d times", r3.uninferables)
+	if r.uninferables != 0 {
+		t.Errorf("nested return falsely uninferable %d times", r.uninferables)
 	}
+}
 
-	// 4. A return nested inside an if is checked against the declared result.
-	var r4 report
-	lit4 := funcLit([]*ast.ParamDef{param("v", namedType("nint"))}, namedType("nint"),
+// checkLitNestedReturnMismatch: a return nested inside an if is checked against
+// the declared result.
+func checkLitNestedReturnMismatch(t *testing.T, env stubEnv) {
+	t.Helper()
+	var r report
+	lit := funcLit([]*ast.ParamDef{param("v", namedType("nint"))}, namedType("nint"),
 		ifStmt(binary(ident("v"), "gt", intLit("0")),
 			[]ast.Stmt{ret(stringLit("oops"))}, nil, nil),
 		ret(ident("v")),
 	)
-	Check(lit4, env, r4.sink())
-	if len(r4.mismatches) != 1 || r4.mismatches[0] != "string -> nint" {
-		t.Errorf("nested return mismatch: %v, want [string -> nint]", r4.mismatches)
+	Check(lit, env, r.sink())
+	if len(r.mismatches) != 1 || r.mismatches[0] != "string -> nint" {
+		t.Errorf("nested return mismatch: %v, want [string -> nint]", r.mismatches)
 	}
+}
 
-	// 5. An operator error in an if condition is reported.
-	var r5 report
-	lit5 := funcLit([]*ast.ParamDef{param("v", namedType("nint"))}, namedType("nint"),
+// checkLitIfCondError: an operator error in an if condition is reported.
+func checkLitIfCondError(t *testing.T, env stubEnv) {
+	t.Helper()
+	var r report
+	lit := funcLit([]*ast.ParamDef{param("v", namedType("nint"))}, namedType("nint"),
 		ifStmt(binary(ident("v"), "anan", intLit("1")),
 			[]ast.Stmt{ret(ident("v"))}, nil, nil),
 		ret(ident("v")),
 	)
-	Check(lit5, env, r5.sink())
-	if len(r5.methods) != 1 || r5.methods[0] != "anan" {
-		t.Errorf("if-condition error: methods = %v, want [anan]", r5.methods)
+	Check(lit, env, r.sink())
+	if len(r.methods) != 1 || r.methods[0] != "anan" {
+		t.Errorf("if-condition error: methods = %v, want [anan]", r.methods)
 	}
+}
 
-	// 6. An assignment value's error is reported, and an assignment to a let
-	// local does not disturb result inference.
-	var r6 report
-	lit6 := funcLit([]*ast.ParamDef{param("v", namedType("nint"))}, namedType("nint"),
+// checkLitAssignValueError: an assignment value's error is reported, and an
+// assignment to a let local does not disturb result inference.
+func checkLitAssignValueError(t *testing.T, env stubEnv) {
+	t.Helper()
+	var r report
+	lit := funcLit([]*ast.ParamDef{param("v", namedType("nint"))}, namedType("nint"),
 		letStmt("acc", nil, intLit("0")),
 		assignStmtT(ident("acc"), binary(stringLit("x"), "add", intLit("1"))),
 		ret(ident("v")),
 	)
-	Check(lit6, env, r6.sink())
-	if len(r6.methods) != 1 || r6.methods[0] != "add" {
-		t.Errorf("assign-value error: methods = %v, want [add]", r6.methods)
+	Check(lit, env, r.sink())
+	if len(r.methods) != 1 || r.methods[0] != "add" {
+		t.Errorf("assign-value error: methods = %v, want [add]", r.methods)
 	}
 }
 
 // --- checking mode (CheckAgainst) --------------------------------------------
 
-// TestCheckAgainst covers the checking rules (form × want): push-down into
-// function and collection literals, synthesis plus subsumption for everything
-// else.
-func TestCheckAgainst(t *testing.T) {
-	env := collectionEnv()
-	cases := []struct {
-		name       string
-		expr       ast.Expr
-		want       ir.Type
-		typ        string   // the returned type
-		mismatches []string // expected Mismatch reports, "got -> want"
-	}{
+// checkAgainstCase is one form × want row of TestCheckAgainst: the expression,
+// the expectation (nil meaning the list<sbyte> default), the returned type, and
+// the Mismatch reports expected as "got -> want".
+type checkAgainstCase struct {
+	name       string
+	expr       ast.Expr
+	want       ir.Type
+	typ        string
+	mismatches []string
+}
+
+// checkAgainstCases is the table TestCheckAgainst runs: push-down into function
+// and collection literals, synthesis plus subsumption for everything else.
+func checkAgainstCases() []checkAgainstCase {
+	return []checkAgainstCase{
 		// Synthesis + subsumption.
 		{"nint adapts", intLit("1"), builtinT("sbyte"), "nint", nil},
 		{"same type", boolLit(true), builtinT("bool"), "bool", nil},
@@ -224,7 +254,14 @@ func TestCheckAgainst(t *testing.T) {
 			"fn(): nint", []string{"fn(): nint -> nint"},
 		},
 	}
-	for _, tc := range cases {
+}
+
+// TestCheckAgainst covers the checking rules (form × want): push-down into
+// function and collection literals, synthesis plus subsumption for everything
+// else.
+func TestCheckAgainst(t *testing.T) {
+	env := collectionEnv()
+	for _, tc := range checkAgainstCases() {
 		t.Run(tc.name, func(t *testing.T) {
 			want := tc.want
 			if want == nil {

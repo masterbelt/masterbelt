@@ -129,7 +129,7 @@ func TestDocumentSequentialEdits(t *testing.T) {
 	content := []byte(nil)
 
 	typed := "pub const Answer = 42\n"
-	for i := 0; i < len(typed); i++ {
+	for i := range len(typed) {
 		e := source.Edit{Start: len(content), End: len(content), NewText: []byte{typed[i]}}
 		content = naiveSplice(content, e.Start, e.End, e.NewText)
 		doc.Edit(e)

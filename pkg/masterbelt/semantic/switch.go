@@ -50,12 +50,29 @@ func checkSwitch(sw *ast.SwitchStmt, bs infer.BodyScope, env exprFolder, sink *i
 		diags.Add(newScrutineeNotComparableDiagnostic(s.offset, s.width, scrutT.String()))
 	}
 	enumDef := enumDefOf(scrutT)
-	armSink := armValueSink(sink, at, diags)
 
 	// covered records, for an enum scrutinee, which member indices the arms
-	// account for; seen records the folded values already matched, so a repeat
-	// is a duplicate. The wildcard (Else) makes the switch exhaustive on its
-	// own.
+	// account for. The wildcard (Else) makes the switch exhaustive on its own.
+	covered := checkSwitchArms(sw, scrutT, enumDef, bs, env, sink, at, diags)
+
+	// Any arm written after the wildcard can never run: the catch-all already
+	// matched every remaining value.
+	for _, arm := range sw.AfterElse {
+		s := at(arm)
+		diags.Add(newUnreachableArmDiagnostic(s.offset, s.width))
+	}
+
+	if sw.Else != nil {
+		return // a wildcard covers every remaining value: always exhaustive
+	}
+	checkSwitchExhaustive(sw, scrutT, enumDef, covered, at, diags)
+}
+
+// checkSwitchArms checks every arm's value types, duplicate values, and
+// reachability, returning the set of enum member indices the arms cover. seen
+// records the folded values already matched, so a repeat is a duplicate.
+func checkSwitchArms(sw *ast.SwitchStmt, scrutT ir.Type, enumDef *ir.TypeDef, bs infer.BodyScope, env exprFolder, sink *infer.Sink, at func(ast.Node) span, diags *diagnostic.List) map[int]bool {
+	armSink := armValueSink(sink, at, diags)
 	covered := map[int]bool{}
 	seen := map[string]bool{}
 	for _, arm := range sw.Arms {
@@ -97,17 +114,13 @@ func checkSwitch(sw *ast.SwitchStmt, bs infer.BodyScope, env exprFolder, sink *i
 			diags.Add(newUnreachableArmDiagnostic(s.offset, s.width))
 		}
 	}
+	return covered
+}
 
-	// Any arm written after the wildcard can never run: the catch-all already
-	// matched every remaining value.
-	for _, arm := range sw.AfterElse {
-		s := at(arm)
-		diags.Add(newUnreachableArmDiagnostic(s.offset, s.width))
-	}
-
-	if sw.Else != nil {
-		return // a wildcard covers every remaining value: always exhaustive
-	}
+// checkSwitchExhaustive reports non_exhaustive_switch for a wildcard-less
+// switch: an enum scrutinee must cover every member, and any other scrutinee
+// ranges over an unbounded domain, so it can only be exhausted by a wildcard.
+func checkSwitchExhaustive(sw *ast.SwitchStmt, scrutT ir.Type, enumDef *ir.TypeDef, covered map[int]bool, at func(ast.Node) span, diags *diagnostic.List) {
 	switch {
 	case enumDef != nil:
 		var missing []string
@@ -121,8 +134,6 @@ func checkSwitch(sw *ast.SwitchStmt, bs infer.BodyScope, env exprFolder, sink *i
 			diags.Add(newNonExhaustiveSwitchDiagnostic(s.offset, s.width, scrutT.String(), "missing "+strings.Join(missing, ", ")))
 		}
 	case scrutT != ir.Invalid:
-		// A scalar (or any non-enum) scrutinee ranges over an unbounded domain,
-		// so it can only be exhausted by a wildcard.
 		s := at(sw)
 		diags.Add(newNonExhaustiveSwitchDiagnostic(s.offset, s.width, scrutT.String(), "add a _ arm for the remaining values"))
 	}

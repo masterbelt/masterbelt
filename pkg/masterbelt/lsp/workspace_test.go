@@ -4,10 +4,11 @@ import (
 	"reflect"
 	"testing"
 
+	protocol "github.com/owenrumney/go-lsp/lsp"
+
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/parser/abstract"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/semantic"
 	"github.com/masterbelt/masterbelt/pkg/source"
-	protocol "github.com/owenrumney/go-lsp/lsp"
 )
 
 // testView analyzes src as a standalone single-file program — the way the

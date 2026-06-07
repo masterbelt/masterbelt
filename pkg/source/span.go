@@ -1,5 +1,9 @@
 package source
 
+// Span is a resolved half-open range [Start, End) within a buffer, given as
+// the two endpoint Positions. It is produced by Buffer.Span (File.Span,
+// Text.Span) and carries enough location to underline a region in a
+// diagnostic.
 type Span struct {
 	Start Position
 	End   Position

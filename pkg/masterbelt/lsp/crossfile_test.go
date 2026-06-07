@@ -7,9 +7,10 @@ import (
 	"strings"
 	"testing"
 
+	protocol "github.com/owenrumney/go-lsp/lsp"
+
 	"github.com/masterbelt/masterbelt/internal/belttest"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/semantic"
-	protocol "github.com/owenrumney/go-lsp/lsp"
 )
 
 // fileURI builds the URI of a project file through the same conversion the
@@ -37,6 +38,7 @@ func openOnDisk(t *testing.T, s *Server, root, name string) protocol.DocumentURI
 const crossMainSrc = "use geo from \"geometry.belt\"\nuse { Unit } from \"geometry.belt\"\nconst start = geo.Origin\nconst step = Unit\n"
 
 func crossProject(t *testing.T) (root string) {
+	t.Helper()
 	return belttest.WriteFiles(t, map[string]string{
 		"masterbelt.toml": "entry = \"main.belt\"\n",
 		"main.belt":       crossMainSrc,
@@ -151,7 +153,7 @@ func TestCrossFileDiagnosticsUpdate(t *testing.T) {
 	}
 
 	v := s.open[mainURI]
-	var codes []string
+	codes := make([]string, 0, len(v.Diagnostics()))
 	for _, d := range v.Diagnostics() {
 		codes = append(codes, string(d.Code))
 	}
@@ -287,7 +289,7 @@ func TestUsePathCompletion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var labels []string
+	labels := make([]string, 0, len(list.Items))
 	for _, item := range list.Items {
 		labels = append(labels, item.Label)
 	}

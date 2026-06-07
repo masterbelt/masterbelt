@@ -4,8 +4,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/parser/abstract"
 	protocol "github.com/owenrumney/go-lsp/lsp"
+
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/parser/abstract"
 )
 
 // recordSrc declares a record type and both literal forms. The typed literal

@@ -5,10 +5,13 @@
 // arguments (a function literal, an inferred record literal) — so the call's
 // expectation reaches into each literal and the literal bodies solve what
 // remains.
+
 package infer
 
 import (
 	"strings"
+
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
 
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/types"
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
@@ -31,49 +34,7 @@ import (
 func callType(e *ast.CallExpr, s scope, sink *Sink) ir.Type {
 	member, ok := e.Callee.(*ast.MemberExpr)
 	if !ok {
-		// A call whose callee names a type is a conversion T(x) — the type
-		// wins over a same-named function — and one that names a top-level
-		// function is a function call.
-		if id, isIdent := e.Callee.(*ast.Identifier); isIdent {
-			if t := s.conv(id); t != ir.Invalid {
-				return convCallType(e, id.Name, t, s, sink)
-			}
-			if cands := s.fn(id); len(cands) > 0 {
-				return funcCallType(e, id.Name, cands, s, sink)
-			}
-		}
-		// A callee that itself types as a function value applies — a
-		// function-typed constant (F(2)), a local or parameter bound to one,
-		// an immediately applied literal — mirroring the folder's general
-		// function-value arm: each argument checks against the function
-		// type's parameter, and the call's type is its result. A callee of
-		// any other type falls through to the leaf forms (whose channels
-		// report an unresolved name).
-		if fn, isFn := check(e.Callee, s, sink).(*ir.Func); isFn {
-			if len(e.Arguments) != len(fn.Params) {
-				for _, a := range e.Arguments {
-					check(a, s, sink)
-				}
-				sink.arityMismatch(e, calleeName(e.Callee), len(e.Arguments), len(fn.Params))
-				return ir.Invalid
-			}
-			for i, a := range e.Arguments {
-				checkType(a, fn.Params[i], s, map[string]ir.Type{}, sink)
-			}
-			return fn.Result
-		}
-		// A bare call whose name is a method of self is an implicit self-call
-		// (self omitted) — the form an interface's provided method uses to
-		// call the required fold. It types exactly as the written self.name(...)
-		// would, the same claim order the lowering's body binder uses.
-		if id, isIdent := e.Callee.(*ast.Identifier); isIdent {
-			if selfT := s.self(); selfT != ir.Invalid {
-				if _, _, found := types.Candidates(s.registry(), selfT, id.Name); found {
-					return methodCallType(e, nil, selfT, id.Name, s, sink)
-				}
-			}
-		}
-		return s.leaf(e)
+		return nonMemberCallType(e, s, sink)
 	}
 	// A member-access callee whose receiver names a namespace is a call of an
 	// imported function (geo.area(...)), never a method call.
@@ -90,6 +51,63 @@ func callType(e *ast.CallExpr, s scope, sink *Sink) ir.Type {
 	return methodCallType(e, member.Receiver, check(member.Receiver, s, sink), member.Member.Name, s, sink)
 }
 
+// nonMemberCallType types a call whose callee is not a member access: a
+// conversion or function named by an identifier, a function-valued callee
+// applied directly, an implicit self-call, or a leaf form. It is the !ok arm of
+// callType, extracted so the dispatch stays flat.
+func nonMemberCallType(e *ast.CallExpr, s scope, sink *Sink) ir.Type {
+	// A call whose callee names a type is a conversion T(x) — the type
+	// wins over a same-named function — and one that names a top-level
+	// function is a function call.
+	if id, isIdent := e.Callee.(*ast.Identifier); isIdent {
+		if t := s.conv(id); t != ir.Invalid {
+			return convCallType(e, id.Name, t, s, sink)
+		}
+		if cands := s.fn(id); len(cands) > 0 {
+			return funcCallType(e, id.Name, cands, s, sink)
+		}
+	}
+	// A callee that itself types as a function value applies — a
+	// function-typed constant (F(2)), a local or parameter bound to one,
+	// an immediately applied literal — mirroring the folder's general
+	// function-value arm: each argument checks against the function
+	// type's parameter, and the call's type is its result. A callee of
+	// any other type falls through to the leaf forms (whose channels
+	// report an unresolved name).
+	if fn, isFn := check(e.Callee, s, sink).(*ir.Func); isFn {
+		return funcValueCallType(e, fn, s, sink)
+	}
+	// A bare call whose name is a method of self is an implicit self-call
+	// (self omitted) — the form an interface's provided method uses to
+	// call the required fold. It types exactly as the written self.name(...)
+	// would, the same claim order the lowering's body binder uses.
+	if id, isIdent := e.Callee.(*ast.Identifier); isIdent {
+		if selfT := s.self(); selfT != ir.Invalid {
+			if _, _, found := types.Candidates(s.registry(), selfT, id.Name); found {
+				return methodCallType(e, nil, selfT, id.Name, s, sink)
+			}
+		}
+	}
+	return s.leaf(e)
+}
+
+// funcValueCallType types a call whose callee is a function value: each argument
+// checks against the function type's parameter (a wrong count is an
+// arity_mismatch), and the call's type is the function's result.
+func funcValueCallType(e *ast.CallExpr, fn *ir.Func, s scope, sink *Sink) ir.Type {
+	if len(e.Arguments) != len(fn.Params) {
+		for _, a := range e.Arguments {
+			check(a, s, sink)
+		}
+		sink.arityMismatch(e, calleeName(e.Callee), len(e.Arguments), len(fn.Params))
+		return ir.Invalid
+	}
+	for i, a := range e.Arguments {
+		checkType(a, fn.Params[i], s, map[string]ir.Type{}, sink)
+	}
+	return fn.Result
+}
+
 // methodCallType is the method-call half of callType: the receiver's type is
 // already settled (synthesized from the member callee's receiver, or self for
 // an implicit self-call — recvExpr is the receiver expression, or nil for the
@@ -102,25 +120,7 @@ func methodCallType(e *ast.CallExpr, recvExpr ast.Expr, recv ir.Type, method str
 
 	candidates, _, found := types.Candidates(reg, recv, method)
 	if !found {
-		// No such method: synthesize the arguments for their own diagnostics,
-		// then report the call.
-		for i, a := range e.Arguments {
-			args[i] = check(a, s, sink)
-			bad = bad || args[i] == ir.Invalid
-		}
-		if !bad {
-			// A method call on an unbounded type parameter is the distinct
-			// E-17 error: nothing is known about the type, so it has no methods
-			// (only pass-through is allowed). A bounded parameter resolves its
-			// interface's methods, so an unknown method on it is an ordinary
-			// invalid_operation.
-			if v, ok := recv.(*ir.TypeVar); ok && v.Bound == nil {
-				sink.noMethodOnUnboundedTypeVar(e, method)
-			} else {
-				sink.invalidOp(e, method, typesList(recv, args))
-			}
-		}
-		return ir.Invalid
+		return reportNoMethod(e, recv, method, args, bad, s, sink)
 	}
 
 	// Pass 1 — synthesize the non-literal arguments, left to right. The
@@ -129,53 +129,11 @@ func methodCallType(e *ast.CallExpr, recvExpr ast.Expr, recv ir.Type, method str
 	// push the winner's parameter patterns into each one. An Invalid argument
 	// (its cause reported at its own node) also selects as fits-anything, so
 	// the suppression style survives overloading.
-	known := make([]ir.Type, len(e.Arguments))
-	for i, a := range e.Arguments {
-		if _, isLit := a.(*ast.FuncLit); isLit {
-			continue
-		}
-		args[i] = check(a, s, sink)
-		if args[i] == ir.Invalid {
-			// A bare member of the receiver's enum (rarity == Legend, desugared
-			// to rarity.eql(Legend)) is that enum's value — the same channel the
-			// lowering's argument binder resolves it through, tried after
-			// ordinary resolution so a same-named binding still shadows the
-			// member. Streamed out so the typed value graph carries it.
-			if id, ok := a.(*ast.Identifier); ok {
-				if mt := enumMemberExpectation(recv, id.Name); mt != nil {
-					args[i] = mt
-					known[i] = mt
-					sink.typed(a, mt)
-					continue
-				}
-			}
-			bad = true
-			continue
-		}
-		known[i] = args[i]
-	}
+	known := synthMethodArgs(e, recv, args, &bad, s, sink)
 
 	matches, _ := types.SelectOverload(reg, recv, method, known)
 	if len(matches) != 1 {
-		// No fitting signature, or several: check the literals bare for their
-		// own diagnostics, then report the call — unless an operand already
-		// carried its own report.
-		for i, a := range e.Arguments {
-			if lit, isLit := a.(*ast.FuncLit); isLit {
-				args[i] = check(lit, s, sink)
-			}
-		}
-		if !bad {
-			switch {
-			case len(matches) > 1:
-				sink.ambiguousOverload(e, method, typesList(recv, args))
-			case len(candidates) > 1:
-				sink.noMatchingOverload(e, method, typesList(recv, args))
-			default:
-				sink.invalidOp(e, method, typesList(recv, args))
-			}
-		}
-		return ir.Invalid
+		return reportMethodOverloadFailure(e, recv, method, args, matches, candidates, bad, s, sink)
 	}
 	m, subst, operand := matches[0].Method, matches[0].Subst, matches[0].Operand
 	// The selection among several signatures is the checker's overload
@@ -189,18 +147,7 @@ func methodCallType(e *ast.CallExpr, recvExpr ast.Expr, recv ir.Type, method str
 	// pattern. A finding inside the literal (a mismatch, an uninferable part)
 	// fails the call without the generic report; so does an Invalid left in
 	// the literal's type by a cause reported elsewhere.
-	for i, a := range e.Arguments {
-		lit, isLit := a.(*ast.FuncLit)
-		if !isLit {
-			continue
-		}
-		pt := types.Substitute(m.Params[i].Type, subst)
-		litFailed := false
-		args[i] = checkType(lit, pt, s, subst, observe(sink, &litFailed))
-		if litFailed || ir.HasInvalid(args[i]) {
-			bad = true
-		}
-	}
+	checkMethodLits(e, m, subst, args, &bad, s, sink)
 
 	if bad {
 		return ir.Invalid
@@ -229,6 +176,102 @@ func methodCallType(e *ast.CallExpr, recvExpr ast.Expr, recv ir.Type, method str
 	}
 	adaptedOperands(e, recvExpr, recv, m, subst, operand, args, sink)
 	return result
+}
+
+// reportNoMethod handles the no-such-method arm of methodCallType: synthesize
+// the arguments for their own diagnostics, then report the call.
+func reportNoMethod(e *ast.CallExpr, recv ir.Type, method string, args []ir.Type, bad bool, s scope, sink *Sink) ir.Type {
+	for i, a := range e.Arguments {
+		args[i] = check(a, s, sink)
+		bad = bad || args[i] == ir.Invalid
+	}
+	if !bad {
+		// A method call on an unbounded type parameter is the distinct
+		// E-17 error: nothing is known about the type, so it has no methods
+		// (only pass-through is allowed). A bounded parameter resolves its
+		// interface's methods, so an unknown method on it is an ordinary
+		// invalid_operation.
+		if v, ok := recv.(*ir.TypeVar); ok && v.Bound == nil {
+			sink.noMethodOnUnboundedTypeVar(e, method)
+		} else {
+			sink.invalidOp(e, method, typesList(recv, args))
+		}
+	}
+	return ir.Invalid
+}
+
+// synthMethodArgs is pass 1 of methodCallType: synthesize the non-literal
+// arguments left to right, filling args and the parallel known slice (nil for a
+// literal or an Invalid argument, so the overload settles before any literal is
+// checked). It flags bad when an argument is Invalid with no enum-member
+// fallback.
+func synthMethodArgs(e *ast.CallExpr, recv ir.Type, args []ir.Type, bad *bool, s scope, sink *Sink) []ir.Type {
+	known := make([]ir.Type, len(e.Arguments))
+	for i, a := range e.Arguments {
+		if _, isLit := a.(*ast.FuncLit); isLit {
+			continue
+		}
+		args[i] = check(a, s, sink)
+		if args[i] == ir.Invalid {
+			// A bare member of the receiver's enum (rarity == Legend, desugared
+			// to rarity.eql(Legend)) is that enum's value — the same channel the
+			// lowering's argument binder resolves it through, tried after
+			// ordinary resolution so a same-named binding still shadows the
+			// member. Streamed out so the typed value graph carries it.
+			if id, ok := a.(*ast.Identifier); ok {
+				if mt := enumMemberExpectation(recv, id.Name); mt != nil {
+					args[i] = mt
+					known[i] = mt
+					sink.typed(a, mt)
+					continue
+				}
+			}
+			*bad = true
+			continue
+		}
+		known[i] = args[i]
+	}
+	return known
+}
+
+// reportMethodOverloadFailure handles the no-single-match arm of methodCallType:
+// check the literals bare for their own diagnostics, then report the call unless
+// an operand already carried its own report.
+func reportMethodOverloadFailure(e *ast.CallExpr, recv ir.Type, method string, args []ir.Type, matches []types.Overload, candidates []*ir.Method, bad bool, s scope, sink *Sink) ir.Type {
+	for i, a := range e.Arguments {
+		if lit, isLit := a.(*ast.FuncLit); isLit {
+			args[i] = check(lit, s, sink)
+		}
+	}
+	if !bad {
+		switch {
+		case len(matches) > 1:
+			sink.ambiguousOverload(e, method, typesList(recv, args))
+		case len(candidates) > 1:
+			sink.noMatchingOverload(e, method, typesList(recv, args))
+		default:
+			sink.invalidOp(e, method, typesList(recv, args))
+		}
+	}
+	return ir.Invalid
+}
+
+// checkMethodLits is pass 2 of methodCallType: each function literal is checked
+// against its (substituted) parameter pattern. A finding inside the literal, or
+// an Invalid left in its type by a cause reported elsewhere, flags bad.
+func checkMethodLits(e *ast.CallExpr, m *ir.Method, subst map[string]ir.Type, args []ir.Type, bad *bool, s scope, sink *Sink) {
+	for i, a := range e.Arguments {
+		lit, isLit := a.(*ast.FuncLit)
+		if !isLit {
+			continue
+		}
+		pt := types.Substitute(m.Params[i].Type, subst)
+		litFailed := false
+		args[i] = checkType(lit, pt, s, subst, observe(sink, &litFailed))
+		if litFailed || ir.HasInvalid(args[i]) {
+			*bad = true
+		}
+	}
 }
 
 // adaptedOperands streams the adaptions a settled method call accepted on its
@@ -269,36 +312,8 @@ func adaptedOperands(e *ast.CallExpr, recvExpr ast.Expr, recv ir.Type, m *ir.Met
 // conversion's arguments are checked bare for their own findings.
 func convCallType(e *ast.CallExpr, name string, t ir.Type, s scope, sink *Sink) ir.Type {
 	if b, ok := t.(*ir.Builtin); ok {
-		if n, found := s.registry().Native(b.Name); found && n.Err {
-			if len(e.Arguments) != 1 {
-				for _, a := range e.Arguments {
-					check(a, s, sink)
-				}
-				sink.arityMismatch(e, name, len(e.Arguments), 1)
-				return t
-			}
-			checkType(e.Arguments[0], &ir.Builtin{Name: "string"}, s, map[string]ir.Type{}, sink)
-			return t
-		}
-		if b.Name == "range" {
-			// range(start, end) and range(start, end, step): the integer sequence,
-			// unit-step in the two-argument form and stepped in the three-argument
-			// one. Each argument is an int (the same nint check the range literal's
-			// bounds take); a count other than two or three is an arity_mismatch
-			// (reported against two, the canonical form). A step that folds to zero
-			// is the zero-step range diagnostic, raised where the value folds (the
-			// semantic layer), not here — the type layer does not evaluate.
-			if len(e.Arguments) != 2 && len(e.Arguments) != 3 {
-				for _, a := range e.Arguments {
-					check(a, s, sink)
-				}
-				sink.arityMismatch(e, name, len(e.Arguments), 2)
-				return t
-			}
-			for _, a := range e.Arguments {
-				checkType(a, &ir.Builtin{Name: "nint"}, s, map[string]ir.Type{}, sink)
-			}
-			return t
+		if rt, handled := builtinConvCallType(e, name, t, b, s, sink); handled {
+			return rt
 		}
 	}
 	for _, a := range e.Arguments {
@@ -316,6 +331,46 @@ func convCallType(e *ast.CallExpr, name string, t ir.Type, s scope, sink *Sink) 
 		sink.scalarConversion(e, t)
 	}
 	return t
+}
+
+// builtinConvCallType handles the two builtin types that construct from
+// arguments with value semantics — error("msg") from one string, and range from
+// two or three ints — returning handled=false for any other builtin so the
+// general conversion path takes over. Each enforces its argument count (an
+// arity_mismatch otherwise) and checks its arguments against the expected types.
+func builtinConvCallType(e *ast.CallExpr, name string, t ir.Type, b *ir.Builtin, s scope, sink *Sink) (ir.Type, bool) {
+	if n, found := s.registry().Native(b.Name); found && n.Err {
+		if len(e.Arguments) != 1 {
+			for _, a := range e.Arguments {
+				check(a, s, sink)
+			}
+			sink.arityMismatch(e, name, len(e.Arguments), 1)
+			return t, true
+		}
+		checkType(e.Arguments[0], &ir.Builtin{Name: builtin.NameString}, s, map[string]ir.Type{}, sink)
+		return t, true
+	}
+	if b.Name == "range" {
+		// range(start, end) and range(start, end, step): the integer sequence,
+		// unit-step in the two-argument form and stepped in the three-argument
+		// one. Each argument is an int (the same nint check the range literal's
+		// bounds take); a count other than two or three is an arity_mismatch
+		// (reported against two, the canonical form). A step that folds to zero
+		// is the zero-step range diagnostic, raised where the value folds (the
+		// semantic layer), not here — the type layer does not evaluate.
+		if len(e.Arguments) != 2 && len(e.Arguments) != 3 {
+			for _, a := range e.Arguments {
+				check(a, s, sink)
+			}
+			sink.arityMismatch(e, name, len(e.Arguments), 2)
+			return t, true
+		}
+		for _, a := range e.Arguments {
+			checkType(a, &ir.Builtin{Name: builtin.NameNint}, s, map[string]ir.Type{}, sink)
+		}
+		return t, true
+	}
+	return t, false
 }
 
 // staticCallType is the type rule for a static fn call, Type.name(args). It
@@ -439,15 +494,16 @@ func funcCallType(e *ast.CallExpr, name string, cands []*ast.FuncDecl, s scope, 
 		tscope := FuncTypeParamScope(fd.TypeParams)
 		typeParams := ResolveFuncTypeParams(r, fd.TypeParams, tscope)
 		params := make([]ir.Type, len(fd.Params))
-		key := ""
+		var key strings.Builder
 		for i, p := range fd.Params {
 			params[i] = r.ResolveType(p.Type, tscope)
-			key += typeKey(params[i]) + ","
+			key.WriteString(typeKey(params[i]))
+			key.WriteString(",")
 		}
-		if seen[key] {
+		if seen[key.String()] {
 			continue
 		}
-		seen[key] = true
+		seen[key.String()] = true
 		sigs = append(sigs, funcSig{fd: fd, typeParams: typeParams, params: params, result: r.ResolveType(fd.Result, tscope)})
 	}
 
@@ -488,74 +544,13 @@ func selectFuncOverload(e *ast.CallExpr, name string, sigs []funcSig, s scope, s
 	// the overload settles before any of them is checked. An Invalid argument
 	// (its cause reported at its own node) also selects as fits-anything.
 	args := make([]ir.Type, len(e.Arguments))
-	known := make([]ir.Type, len(e.Arguments))
 	bad := false
-	for i, a := range e.Arguments {
-		if deferredArg(a) {
-			continue
-		}
-		args[i] = check(a, s, sink)
-		if args[i] == ir.Invalid {
-			bad = true
-			continue
-		}
-		known[i] = args[i]
-	}
+	known := synthFuncArgs(e, args, &bad, s, sink)
 
-	var matches, arity []funcSig
-	for _, sg := range sigs {
-		if len(sg.params) != len(e.Arguments) {
-			continue
-		}
-		arity = append(arity, sg)
-		// One subst threaded across all known arguments — so a type parameter
-		// pinned to int by one argument and string by another drops this
-		// candidate, exactly as types.SelectOverload's per-candidate Clone does
-		// for methods. A fresh map per argument (the old behavior) hid that
-		// cross-argument inconsistency and made the result order-dependent.
-		cand := map[string]ir.Type{}
-		fits := true
-		for i, kt := range known {
-			if kt == nil {
-				continue
-			}
-			if !types.Match(s.registry(), sg.params[i], kt, cand) {
-				fits = false
-				break
-			}
-		}
-		if fits {
-			matches = append(matches, sg)
-		}
-	}
-
-	// When exactly one signature has the right arity but the arguments do not
-	// fit it, fall through to that signature and let the shared-subst pass
-	// below report the precise mismatch — the same type_mismatch a
-	// single-signature call gives, rather than the vaguer
-	// no_matching_func_overload (which stays for a genuine ambiguity: several
-	// same-arity signatures, none fitting).
-	if len(matches) == 0 && len(arity) == 1 {
-		matches = arity
-	}
+	matches := matchFuncSigs(e, sigs, known, s)
 
 	if len(matches) != 1 {
-		// No fitting signature, or several: check the deferred arguments bare
-		// for their own diagnostics, then report the call — unless an operand
-		// already carried its own report.
-		for i, a := range e.Arguments {
-			if deferredArg(a) {
-				args[i] = check(a, s, sink)
-			}
-		}
-		if !bad {
-			if len(matches) > 1 {
-				sink.ambiguousFuncOverload(e, name, argTypesList(args))
-			} else {
-				sink.noMatchingFuncOverload(e, name, argTypesList(args))
-			}
-		}
-		return ir.Invalid
+		return reportFuncOverloadFailure(e, name, args, matches, bad, s, sink)
 	}
 
 	// Seed the shared subst with what the non-deferred arguments pinned (Pass 1
@@ -590,16 +585,7 @@ func selectFuncOverload(e *ast.CallExpr, name string, sigs []funcSig, s scope, s
 	// Pass 2 — the deferred arguments, each checked against the winner's
 	// parameter type. A finding inside one fails the call without a generic
 	// report, exactly as a method call's literal arguments do.
-	for i, a := range e.Arguments {
-		if !deferredArg(a) {
-			continue
-		}
-		argFailed := false
-		args[i] = checkType(a, win.params[i], s, subst, observe(sink, &argFailed))
-		if argFailed || ir.HasInvalid(args[i]) {
-			bad = true
-		}
-	}
+	checkDeferredArgs(e, win, subst, args, &bad, s, sink)
 	if bad {
 		return ir.Invalid
 	}
@@ -619,6 +605,102 @@ func selectFuncOverload(e *ast.CallExpr, name string, sigs []funcSig, s scope, s
 	// Substitute the solved type parameters into the result and run the bound and
 	// uninferable checks, exactly as the single-signature path does.
 	return resolveFuncResult(e, win, subst, s, sink)
+}
+
+// synthFuncArgs is pass 1 of selectFuncOverload: synthesize the non-deferred
+// arguments left to right, filling args and the parallel known slice (nil for a
+// deferred or Invalid argument, so the overload settles before any deferred
+// form is checked). It flags bad when an argument is Invalid.
+func synthFuncArgs(e *ast.CallExpr, args []ir.Type, bad *bool, s scope, sink *Sink) []ir.Type {
+	known := make([]ir.Type, len(e.Arguments))
+	for i, a := range e.Arguments {
+		if deferredArg(a) {
+			continue
+		}
+		args[i] = check(a, s, sink)
+		if args[i] == ir.Invalid {
+			*bad = true
+			continue
+		}
+		known[i] = args[i]
+	}
+	return known
+}
+
+// matchFuncSigs selects the signatures the known argument types fit. When
+// exactly one signature has the right arity but the arguments do not fit it, it
+// falls through to that signature and lets the caller's shared-subst pass report
+// the precise mismatch — the same type_mismatch a single-signature call gives,
+// rather than the vaguer no_matching_func_overload (which stays for a genuine
+// ambiguity: several same-arity signatures, none fitting).
+func matchFuncSigs(e *ast.CallExpr, sigs []funcSig, known []ir.Type, s scope) []funcSig {
+	var matches, arity []funcSig
+	for _, sg := range sigs {
+		if len(sg.params) != len(e.Arguments) {
+			continue
+		}
+		arity = append(arity, sg)
+		// One subst threaded across all known arguments — so a type parameter
+		// pinned to int by one argument and string by another drops this
+		// candidate, exactly as types.SelectOverload's per-candidate Clone does
+		// for methods. A fresh map per argument (the old behavior) hid that
+		// cross-argument inconsistency and made the result order-dependent.
+		cand := map[string]ir.Type{}
+		fits := true
+		for i, kt := range known {
+			if kt == nil {
+				continue
+			}
+			if !types.Match(s.registry(), sg.params[i], kt, cand) {
+				fits = false
+				break
+			}
+		}
+		if fits {
+			matches = append(matches, sg)
+		}
+	}
+	if len(matches) == 0 && len(arity) == 1 {
+		matches = arity
+	}
+	return matches
+}
+
+// reportFuncOverloadFailure handles the no-single-match arm of
+// selectFuncOverload: check the deferred arguments bare for their own
+// diagnostics, then report the call unless an operand already carried its own
+// report.
+func reportFuncOverloadFailure(e *ast.CallExpr, name string, args []ir.Type, matches []funcSig, bad bool, s scope, sink *Sink) ir.Type {
+	for i, a := range e.Arguments {
+		if deferredArg(a) {
+			args[i] = check(a, s, sink)
+		}
+	}
+	if !bad {
+		if len(matches) > 1 {
+			sink.ambiguousFuncOverload(e, name, argTypesList(args))
+		} else {
+			sink.noMatchingFuncOverload(e, name, argTypesList(args))
+		}
+	}
+	return ir.Invalid
+}
+
+// checkDeferredArgs is pass 2 of selectFuncOverload: each deferred argument is
+// checked against the winner's parameter type. A finding inside one, or an
+// Invalid left in its type, flags bad — without a generic report, exactly as a
+// method call's literal arguments do.
+func checkDeferredArgs(e *ast.CallExpr, win funcSig, subst map[string]ir.Type, args []ir.Type, bad *bool, s scope, sink *Sink) {
+	for i, a := range e.Arguments {
+		if !deferredArg(a) {
+			continue
+		}
+		argFailed := false
+		args[i] = checkType(a, win.params[i], s, subst, observe(sink, &argFailed))
+		if argFailed || ir.HasInvalid(args[i]) {
+			*bad = true
+		}
+	}
 }
 
 // checkFuncCall types a call of a single-signature function, generic or not.

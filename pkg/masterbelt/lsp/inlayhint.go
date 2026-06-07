@@ -3,8 +3,9 @@ package lsp
 import (
 	"encoding/json"
 
-	"github.com/masterbelt/masterbelt/pkg/source/ir"
 	protocol "github.com/owenrumney/go-lsp/lsp"
+
+	"github.com/masterbelt/masterbelt/pkg/source/ir"
 )
 
 // inlayHints returns a type hint for each constant whose source omits the type

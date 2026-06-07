@@ -2,6 +2,7 @@
 // methods: the Intrinsic type and its dispatch entry, the factories that
 // build the integer, boolean, string, datetime, and duration intrinsics from
 // typed operand functions, and the per-type implementation maps.
+
 package builtin
 
 import (
@@ -85,22 +86,22 @@ func integerIntrinsics() map[string]Intrinsic {
 			}
 			return ir.IntConstant(new(big.Int).Rem(a, b))
 		}),
-		"eql":  binaryInt(func(a, b *big.Int) *ir.Constant { return ir.BoolConstant(a.Cmp(b) == 0) }),
-		"neq":  binaryInt(func(a, b *big.Int) *ir.Constant { return ir.BoolConstant(a.Cmp(b) != 0) }),
-		"lt":   binaryInt(func(a, b *big.Int) *ir.Constant { return ir.BoolConstant(a.Cmp(b) < 0) }),
-		"lteq": binaryInt(func(a, b *big.Int) *ir.Constant { return ir.BoolConstant(a.Cmp(b) <= 0) }),
-		"gt":   binaryInt(func(a, b *big.Int) *ir.Constant { return ir.BoolConstant(a.Cmp(b) > 0) }),
-		"gteq": binaryInt(func(a, b *big.Int) *ir.Constant { return ir.BoolConstant(a.Cmp(b) >= 0) }),
+		OpEql:  binaryInt(func(a, b *big.Int) *ir.Constant { return ir.BoolConstant(a.Cmp(b) == 0) }),
+		OpNeq:  binaryInt(func(a, b *big.Int) *ir.Constant { return ir.BoolConstant(a.Cmp(b) != 0) }),
+		OpLt:   binaryInt(func(a, b *big.Int) *ir.Constant { return ir.BoolConstant(a.Cmp(b) < 0) }),
+		OpLteq: binaryInt(func(a, b *big.Int) *ir.Constant { return ir.BoolConstant(a.Cmp(b) <= 0) }),
+		OpGt:   binaryInt(func(a, b *big.Int) *ir.Constant { return ir.BoolConstant(a.Cmp(b) > 0) }),
+		OpGteq: binaryInt(func(a, b *big.Int) *ir.Constant { return ir.BoolConstant(a.Cmp(b) >= 0) }),
 	}
 }
 
 func booleanIntrinsics() map[string]Intrinsic {
 	return map[string]Intrinsic{
-		"not":  func(r *ir.Constant, args []*ir.Constant) *ir.Constant { return notBool(r, args) },
+		"not":  notBool,
 		"anan": binaryBool(func(a, b bool) *ir.Constant { return ir.BoolConstant(a && b) }),
 		"oror": binaryBool(func(a, b bool) *ir.Constant { return ir.BoolConstant(a || b) }),
-		"eql":  binaryBool(func(a, b bool) *ir.Constant { return ir.BoolConstant(a == b) }),
-		"neq":  binaryBool(func(a, b bool) *ir.Constant { return ir.BoolConstant(a != b) }),
+		OpEql:  binaryBool(func(a, b bool) *ir.Constant { return ir.BoolConstant(a == b) }),
+		OpNeq:  binaryBool(func(a, b bool) *ir.Constant { return ir.BoolConstant(a != b) }),
 	}
 }
 
@@ -129,12 +130,12 @@ func errorIntrinsics() map[string]Intrinsic {
 func stringIntrinsics() map[string]Intrinsic {
 	return map[string]Intrinsic{
 		"add":  binaryStr(func(a, b string) *ir.Constant { return ir.StringConstant(a + b) }),
-		"eql":  binaryStr(func(a, b string) *ir.Constant { return ir.BoolConstant(a == b) }),
-		"neq":  binaryStr(func(a, b string) *ir.Constant { return ir.BoolConstant(a != b) }),
-		"lt":   binaryStr(func(a, b string) *ir.Constant { return ir.BoolConstant(a < b) }),
-		"lteq": binaryStr(func(a, b string) *ir.Constant { return ir.BoolConstant(a <= b) }),
-		"gt":   binaryStr(func(a, b string) *ir.Constant { return ir.BoolConstant(a > b) }),
-		"gteq": binaryStr(func(a, b string) *ir.Constant { return ir.BoolConstant(a >= b) }),
+		OpEql:  binaryStr(func(a, b string) *ir.Constant { return ir.BoolConstant(a == b) }),
+		OpNeq:  binaryStr(func(a, b string) *ir.Constant { return ir.BoolConstant(a != b) }),
+		OpLt:   binaryStr(func(a, b string) *ir.Constant { return ir.BoolConstant(a < b) }),
+		OpLteq: binaryStr(func(a, b string) *ir.Constant { return ir.BoolConstant(a <= b) }),
+		OpGt:   binaryStr(func(a, b string) *ir.Constant { return ir.BoolConstant(a > b) }),
+		OpGteq: binaryStr(func(a, b string) *ir.Constant { return ir.BoolConstant(a >= b) }),
 	}
 }
 
@@ -186,12 +187,12 @@ func checkedMillis(op func(a, b int64) (int64, bool), build func(int64) *ir.Cons
 // duration: both order by their millisecond value.
 func millisComparisons(kind ir.ConstKind) map[string]Intrinsic {
 	return map[string]Intrinsic{
-		"eql":  binaryMillis(kind, kind, func(a, b int64) *ir.Constant { return ir.BoolConstant(a == b) }),
-		"neq":  binaryMillis(kind, kind, func(a, b int64) *ir.Constant { return ir.BoolConstant(a != b) }),
-		"lt":   binaryMillis(kind, kind, func(a, b int64) *ir.Constant { return ir.BoolConstant(a < b) }),
-		"lteq": binaryMillis(kind, kind, func(a, b int64) *ir.Constant { return ir.BoolConstant(a <= b) }),
-		"gt":   binaryMillis(kind, kind, func(a, b int64) *ir.Constant { return ir.BoolConstant(a > b) }),
-		"gteq": binaryMillis(kind, kind, func(a, b int64) *ir.Constant { return ir.BoolConstant(a >= b) }),
+		OpEql:  binaryMillis(kind, kind, func(a, b int64) *ir.Constant { return ir.BoolConstant(a == b) }),
+		OpNeq:  binaryMillis(kind, kind, func(a, b int64) *ir.Constant { return ir.BoolConstant(a != b) }),
+		OpLt:   binaryMillis(kind, kind, func(a, b int64) *ir.Constant { return ir.BoolConstant(a < b) }),
+		OpLteq: binaryMillis(kind, kind, func(a, b int64) *ir.Constant { return ir.BoolConstant(a <= b) }),
+		OpGt:   binaryMillis(kind, kind, func(a, b int64) *ir.Constant { return ir.BoolConstant(a > b) }),
+		OpGteq: binaryMillis(kind, kind, func(a, b int64) *ir.Constant { return ir.BoolConstant(a >= b) }),
 	}
 }
 

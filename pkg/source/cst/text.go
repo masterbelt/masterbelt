@@ -15,9 +15,11 @@
 // reproduces the source byte for byte (Source), which is the losslessness
 // property as a function of the tree — no buffer involved, so an unmarshaled
 // tree is as complete as a parsed one.
+
 package cst
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -66,7 +68,7 @@ func (n *Node) UnmarshalText(data []byte) error {
 		return err
 	}
 	if len(lines) == 0 {
-		return fmt.Errorf("cst: empty text")
+		return errors.New("cst: empty text")
 	}
 	p := &textParser{lines: lines}
 	root, err := p.element(0)
@@ -78,7 +80,7 @@ func (n *Node) UnmarshalText(data []byte) error {
 	}
 	rootNode, ok := root.(*Node)
 	if !ok {
-		return fmt.Errorf("cst: the root element is a token, want a node")
+		return errors.New("cst: the root element is a token, want a node")
 	}
 	*n = *rootNode
 	return nil

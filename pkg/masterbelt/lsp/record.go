@@ -1,12 +1,13 @@
 package lsp
 
 import (
+	protocol "github.com/owenrumney/go-lsp/lsp"
+
 	"github.com/masterbelt/masterbelt/pkg/source"
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/source/cst"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
 	"github.com/masterbelt/masterbelt/pkg/source/token"
-	protocol "github.com/owenrumney/go-lsp/lsp"
 )
 
 // The editor side of record literals: which record type a literal's fields
@@ -21,113 +22,11 @@ import (
 // elements, and method result types.
 func recordTypes(doc view) map[*ast.RecordLit]ir.Type {
 	out := map[*ast.RecordLit]ir.Type{}
-	var push func(e ast.Expr, want ir.Type)
-	push = func(e ast.Expr, want ir.Type) {
-		switch e := e.(type) {
-		case *ast.RecordLit:
-			t := want
-			if e.TypeName != "" {
-				t = nil
-				if def := findTypeDef(doc.TypeNames(), e.TypeName); def != nil && !def.Builtin {
-					t = &ir.Named{Def: def}
-				}
-			}
-			if t == nil || t == ir.Invalid {
-				return
-			}
-			rec, ok := recordOf(t)
-			if !ok {
-				return
-			}
-			out[e] = t
-			declared := make(map[string]ir.Type, len(rec.Fields))
-			for _, f := range rec.Fields {
-				declared[f.Name] = f.Type
-			}
-			for _, f := range e.Fields {
-				if ft, ok := declared[f.Name]; ok && f.Value != nil {
-					push(f.Value, ft)
-				}
-			}
-		case *ast.CollectionLit:
-			app, ok := want.(*ir.App)
-			if !ok || app.Def == nil {
-				return
-			}
-			for _, entry := range e.Entries {
-				switch {
-				case len(app.Args) == 1 && entry.Value != nil:
-					push(entry.Value, app.Args[0])
-				case len(app.Args) == 2:
-					if entry.Key != nil {
-						push(entry.Key, app.Args[0])
-					}
-					if entry.Value != nil {
-						push(entry.Value, app.Args[1])
-					}
-				}
-			}
-		}
-	}
-	// pushBody pushes the expected types through a method or function body: the
-	// declared result type to every return value (reached through the if/switch
-	// control flow, not only the top level), and a let's annotated record type
-	// to its initializer — so an inferred record literal returned from inside a
-	// branch, or bound by `let p: Point = { ... }`, gets its field typing the
-	// same way a top-level return does.
-	var pushBody func(body []ast.Stmt, result ir.Type)
-	pushBody = func(body []ast.Stmt, result ir.Type) {
-		for _, stmt := range body {
-			switch stmt := stmt.(type) {
-			case *ast.ReturnStmt:
-				if stmt.Value != nil {
-					push(stmt.Value, result)
-				}
-			case *ast.LetStmt:
-				if stmt.Value != nil && stmt.Type != nil {
-					if t := annotationType(doc, stmt.Type); t != nil {
-						push(stmt.Value, t)
-					}
-				}
-			case *ast.SwitchStmt:
-				for _, arm := range stmt.Arms {
-					pushBody(arm.Body, result)
-				}
-				pushBody(stmt.Else, result)
-				for _, arm := range stmt.AfterElse {
-					pushBody(arm.Body, result)
-				}
-			case *ast.MatchStmt:
-				for _, arm := range stmt.Arms {
-					pushBody(arm.Body, result)
-				}
-				pushBody(stmt.Else, result)
-				for _, arm := range stmt.AfterElse {
-					pushBody(arm.Body, result)
-				}
-			case *ast.IfStmt:
-				pushIfBody(stmt, result, pushBody)
-			case *ast.ForStmt:
-				// A return inside the loop body still yields the function's result,
-				// so a record literal returned from a for needs its field typing the
-				// same way a returned-from-a-branch one does.
-				pushBody(stmt.Body, result)
-			case *ast.ExprStmt, *ast.AssignStmt:
-				// Neither carries a result-typed slot for a record literal: a
-				// bare expression has no expected type to push, and an
-				// assignment's target is a let local, not a return position.
-				// Listed so a new statement kind hits the default.
-			default:
-				panic(ast.UnhandledStmt(stmt))
-			}
-		}
-	}
-
 	for _, c := range doc.Module().Consts {
 		if c.Syntax == nil || c.Syntax.Value == nil {
 			continue
 		}
-		push(c.Syntax.Value, c.Type)
+		pushRecordType(doc, out, c.Syntax.Value, c.Type)
 	}
 	for _, def := range doc.Module().Types {
 		self := ir.Type(&ir.Named{Def: def})
@@ -139,26 +38,159 @@ func recordTypes(doc view) map[*ast.RecordLit]ir.Type {
 			if _, isSelf := want.(*ir.SelfType); isSelf {
 				want = self
 			}
-			pushBody(m.Syntax.Body, want)
+			pushRecordBody(doc, out, m.Syntax.Body, want)
 		}
 	}
 	for _, fn := range doc.Module().Funcs {
 		if fn.Syntax == nil {
 			continue
 		}
-		pushBody(fn.Syntax.Body, fn.Result)
+		pushRecordBody(doc, out, fn.Syntax.Body, fn.Result)
 	}
 	return out
 }
 
-// pushIfBody descends an if's then body, its else-if chain, and its else body,
-// pushing the result type through each — the statement-body twin of letTypeOfIf.
-func pushIfBody(s *ast.IfStmt, result ir.Type, pushBody func([]ast.Stmt, ir.Type)) {
-	pushBody(s.Then, result)
-	if s.ElseIf != nil {
-		pushIfBody(s.ElseIf, result, pushBody)
+// pushRecordType pushes the expected type want down into an expression: a
+// record literal records its own resolved type and recurses into its declared
+// fields; a collection literal recurses into its entries against the element
+// (and key) type. It mirrors the checker's push-down through record fields and
+// collection elements, recording every reached literal in out.
+func pushRecordType(doc view, out map[*ast.RecordLit]ir.Type, e ast.Expr, want ir.Type) {
+	switch e := e.(type) {
+	case *ast.RecordLit:
+		pushRecordLit(doc, out, e, want)
+	case *ast.CollectionLit:
+		pushRecordCollection(doc, out, e, want)
 	}
-	pushBody(s.Else, result)
+}
+
+// pushRecordLit records the type a record literal's fields fill — its own
+// named type for the typed form, the pushed-down want for the inferred form —
+// then recurses into each field's value against the declared field type.
+func pushRecordLit(doc view, out map[*ast.RecordLit]ir.Type, e *ast.RecordLit, want ir.Type) {
+	t := want
+	if e.TypeName != "" {
+		t = nil
+		if def := findTypeDef(doc.TypeNames(), e.TypeName); def != nil && !def.Builtin {
+			t = &ir.Named{Def: def}
+		}
+	}
+	if t == nil || t == ir.Invalid {
+		return
+	}
+	rec, ok := recordOf(t)
+	if !ok {
+		return
+	}
+	out[e] = t
+	declared := make(map[string]ir.Type, len(rec.Fields))
+	for _, f := range rec.Fields {
+		declared[f.Name] = f.Type
+	}
+	for _, f := range e.Fields {
+		if ft, ok := declared[f.Name]; ok && f.Value != nil {
+			pushRecordType(doc, out, f.Value, ft)
+		}
+	}
+}
+
+// pushRecordCollection recurses into a collection literal's entries against
+// the element type (single-arg form) or the key and value types (two-arg
+// form) of the expected collection type.
+func pushRecordCollection(doc view, out map[*ast.RecordLit]ir.Type, e *ast.CollectionLit, want ir.Type) {
+	app, ok := want.(*ir.App)
+	if !ok || app.Def == nil {
+		return
+	}
+	for _, entry := range e.Entries {
+		switch {
+		case len(app.Args) == 1 && entry.Value != nil:
+			pushRecordType(doc, out, entry.Value, app.Args[0])
+		case len(app.Args) == 2:
+			if entry.Key != nil {
+				pushRecordType(doc, out, entry.Key, app.Args[0])
+			}
+			if entry.Value != nil {
+				pushRecordType(doc, out, entry.Value, app.Args[1])
+			}
+		}
+	}
+}
+
+// pushRecordBody pushes the expected types through a method or function body:
+// the declared result type to every return value (reached through the if/switch
+// control flow, not only the top level), and a let's annotated record type to
+// its initializer — so an inferred record literal returned from inside a
+// branch, or bound by `let p: Point = { ... }`, gets its field typing the same
+// way a top-level return does.
+func pushRecordBody(doc view, out map[*ast.RecordLit]ir.Type, body []ast.Stmt, result ir.Type) {
+	for _, stmt := range body {
+		switch stmt := stmt.(type) {
+		case *ast.ReturnStmt:
+			if stmt.Value != nil {
+				pushRecordType(doc, out, stmt.Value, result)
+			}
+		case *ast.LetStmt:
+			if stmt.Value != nil && stmt.Type != nil {
+				if t := annotationType(doc, stmt.Type); t != nil {
+					pushRecordType(doc, out, stmt.Value, t)
+				}
+			}
+		case *ast.SwitchStmt:
+			pushRecordSwitch(doc, out, stmt, result)
+		case *ast.MatchStmt:
+			pushRecordMatch(doc, out, stmt, result)
+		case *ast.IfStmt:
+			pushRecordIf(doc, out, stmt, result)
+		case *ast.ForStmt:
+			// A return inside the loop body still yields the function's result,
+			// so a record literal returned from a for needs its field typing the
+			// same way a returned-from-a-branch one does.
+			pushRecordBody(doc, out, stmt.Body, result)
+		case *ast.ExprStmt, *ast.AssignStmt:
+			// Neither carries a result-typed slot for a record literal: a
+			// bare expression has no expected type to push, and an
+			// assignment's target is a let local, not a return position.
+			// Listed so a new statement kind hits the default.
+		default:
+			panic(ast.UnhandledStmt(stmt))
+		}
+	}
+}
+
+// pushRecordSwitch descends every arm body, the else body, and the after-else
+// arm bodies of a switch, pushing the result type through each.
+func pushRecordSwitch(doc view, out map[*ast.RecordLit]ir.Type, s *ast.SwitchStmt, result ir.Type) {
+	for _, arm := range s.Arms {
+		pushRecordBody(doc, out, arm.Body, result)
+	}
+	pushRecordBody(doc, out, s.Else, result)
+	for _, arm := range s.AfterElse {
+		pushRecordBody(doc, out, arm.Body, result)
+	}
+}
+
+// pushRecordMatch descends every arm body, the else body, and the after-else
+// arm bodies of a match, pushing the result type through each.
+func pushRecordMatch(doc view, out map[*ast.RecordLit]ir.Type, s *ast.MatchStmt, result ir.Type) {
+	for _, arm := range s.Arms {
+		pushRecordBody(doc, out, arm.Body, result)
+	}
+	pushRecordBody(doc, out, s.Else, result)
+	for _, arm := range s.AfterElse {
+		pushRecordBody(doc, out, arm.Body, result)
+	}
+}
+
+// pushRecordIf descends an if's then body, its else-if chain, and its else
+// body, pushing the result type through each — the statement-body twin of
+// letTypeOfIf.
+func pushRecordIf(doc view, out map[*ast.RecordLit]ir.Type, s *ast.IfStmt, result ir.Type) {
+	pushRecordBody(doc, out, s.Then, result)
+	if s.ElseIf != nil {
+		pushRecordIf(doc, out, s.ElseIf, result)
+	}
+	pushRecordBody(doc, out, s.Else, result)
 }
 
 // annotationType resolves a let binding's record-relevant type annotation to a
@@ -371,6 +403,9 @@ func recordFieldHover(doc view, offset int) *protocol.Hover {
 		if t := findTypeDef(doc.TypeNames(), name); t != nil {
 			return typeHover(t, buf, leaf)
 		}
+	default:
+		// Any other parent kind is not a record field initializer or a typed
+		// literal's name: there is no field card to show.
 	}
 	return nil
 }

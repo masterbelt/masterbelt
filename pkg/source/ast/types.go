@@ -33,6 +33,7 @@ type TypeDecl struct {
 	syntax *cst.Node
 }
 
+// Syntax returns the green CST node this declaration was lowered from.
 func (d *TypeDecl) Syntax() *cst.Node { return d.syntax }
 func (d *TypeDecl) node()             {}
 
@@ -49,6 +50,7 @@ type TypeParam struct {
 	syntax     *cst.Node
 }
 
+// Syntax returns the green CST node this type parameter was lowered from.
 func (p *TypeParam) Syntax() *cst.Node { return p.syntax }
 func (p *TypeParam) node()             {}
 
@@ -77,6 +79,7 @@ type EnumDecl struct {
 	syntax  *cst.Node
 }
 
+// Syntax returns the green CST node this declaration was lowered from.
 func (d *EnumDecl) Syntax() *cst.Node { return d.syntax }
 func (d *EnumDecl) node()             {}
 
@@ -96,6 +99,7 @@ type EnumMember struct {
 	syntax *cst.Node
 }
 
+// Syntax returns the green CST node this enum member was lowered from.
 func (m *EnumMember) Syntax() *cst.Node { return m.syntax }
 func (m *EnumMember) node()             {}
 
@@ -125,6 +129,7 @@ type NamedType struct {
 	syntax    *cst.Node
 }
 
+// Syntax returns the green CST node this type was lowered from.
 func (t *NamedType) Syntax() *cst.Node { return t.syntax }
 func (t *NamedType) node()             {}
 func (t *NamedType) typeExpr()         {}
@@ -140,6 +145,7 @@ type UnionType struct {
 	syntax  *cst.Node
 }
 
+// Syntax returns the green CST node this type was lowered from.
 func (t *UnionType) Syntax() *cst.Node { return t.syntax }
 func (t *UnionType) node()             {}
 func (t *UnionType) typeExpr()         {}
@@ -155,6 +161,7 @@ type RecordType struct {
 	syntax *cst.Node
 }
 
+// Syntax returns the green CST node this type was lowered from.
 func (t *RecordType) Syntax() *cst.Node { return t.syntax }
 func (t *RecordType) node()             {}
 func (t *RecordType) typeExpr()         {}
@@ -171,6 +178,7 @@ type FuncType struct {
 	syntax *cst.Node
 }
 
+// Syntax returns the green CST node this type was lowered from.
 func (t *FuncType) Syntax() *cst.Node { return t.syntax }
 func (t *FuncType) node()             {}
 func (t *FuncType) typeExpr()         {}
@@ -189,6 +197,7 @@ type BuiltinType struct {
 	syntax *cst.Node
 }
 
+// Syntax returns the green CST node this type was lowered from.
 func (t *BuiltinType) Syntax() *cst.Node { return t.syntax }
 func (t *BuiltinType) node()             {}
 func (t *BuiltinType) typeExpr()         {}
@@ -205,6 +214,7 @@ type FieldDef struct {
 	syntax *cst.Node
 }
 
+// Syntax returns the green CST node this field definition was lowered from.
 func (f *FieldDef) Syntax() *cst.Node { return f.syntax }
 func (f *FieldDef) node()             {}
 
@@ -222,6 +232,7 @@ type ParamDef struct {
 	syntax *cst.Node
 }
 
+// Syntax returns the green CST node this parameter was lowered from.
 func (p *ParamDef) Syntax() *cst.Node { return p.syntax }
 func (p *ParamDef) node()             {}
 
@@ -240,6 +251,7 @@ func NewParamDef(name string, typ TypeExpr, syntax *cst.Node) *ParamDef {
 // type rules, evaluation — read it without re-deriving it from the syntax.
 type MethodKind int
 
+// The method kinds, one per accessor modifier; see each kind's comment.
 const (
 	MethodNormal MethodKind = iota // an instance method, the default (no modifier)
 	MethodGetter                   // a getter: get name(): T, read as value.name
@@ -280,6 +292,7 @@ type MethodDecl struct {
 	syntax     *cst.Node
 }
 
+// Syntax returns the green CST node this declaration was lowered from.
 func (m *MethodDecl) Syntax() *cst.Node { return m.syntax }
 func (m *MethodDecl) node()             {}
 
@@ -304,6 +317,7 @@ type ReturnStmt struct {
 	syntax *cst.Node
 }
 
+// Syntax returns the green CST node this statement was lowered from.
 func (s *ReturnStmt) Syntax() *cst.Node { return s.syntax }
 func (s *ReturnStmt) node()             {}
 func (s *ReturnStmt) stmt()             {}
@@ -319,6 +333,7 @@ type ExprStmt struct {
 	syntax *cst.Node
 }
 
+// Syntax returns the green CST node this statement was lowered from.
 func (s *ExprStmt) Syntax() *cst.Node { return s.syntax }
 func (s *ExprStmt) node()             {}
 func (s *ExprStmt) stmt()             {}
@@ -340,6 +355,7 @@ type LetStmt struct {
 	syntax *cst.Node
 }
 
+// Syntax returns the green CST node this statement was lowered from.
 func (s *LetStmt) Syntax() *cst.Node { return s.syntax }
 func (s *LetStmt) node()             {}
 func (s *LetStmt) stmt()             {}
@@ -360,6 +376,7 @@ type AssignStmt struct {
 	syntax *cst.Node
 }
 
+// Syntax returns the green CST node this statement was lowered from.
 func (s *AssignStmt) Syntax() *cst.Node { return s.syntax }
 func (s *AssignStmt) node()             {}
 func (s *AssignStmt) stmt()             {}
@@ -387,6 +404,7 @@ type SwitchStmt struct {
 	syntax    *cst.Node
 }
 
+// Syntax returns the green CST node this statement was lowered from.
 func (s *SwitchStmt) Syntax() *cst.Node { return s.syntax }
 func (s *SwitchStmt) node()             {}
 func (s *SwitchStmt) stmt()             {}
@@ -406,6 +424,7 @@ type SwitchArm struct {
 	syntax *cst.Node
 }
 
+// Syntax returns the green CST node this switch arm was lowered from.
 func (a *SwitchArm) Syntax() *cst.Node { return a.syntax }
 func (a *SwitchArm) node()             {}
 
@@ -434,6 +453,7 @@ type MatchStmt struct {
 	syntax    *cst.Node
 }
 
+// Syntax returns the green CST node this statement was lowered from.
 func (s *MatchStmt) Syntax() *cst.Node { return s.syntax }
 func (s *MatchStmt) node()             {}
 func (s *MatchStmt) stmt()             {}
@@ -454,6 +474,7 @@ type MatchArm struct {
 	syntax *cst.Node
 }
 
+// Syntax returns the green CST node this match arm was lowered from.
 func (a *MatchArm) Syntax() *cst.Node { return a.syntax }
 func (a *MatchArm) node()             {}
 
@@ -477,6 +498,7 @@ type IfStmt struct {
 	syntax *cst.Node
 }
 
+// Syntax returns the green CST node this statement was lowered from.
 func (s *IfStmt) Syntax() *cst.Node { return s.syntax }
 func (s *IfStmt) node()             {}
 func (s *IfStmt) stmt()             {}
@@ -491,6 +513,7 @@ func NewIfStmt(cond Expr, then []Stmt, elseIf *IfStmt, els []Stmt, syntax *cst.N
 // a map value), "in" binds the key (a map key, a list index).
 type ForKind int
 
+// The for forms, one per binding mode; see each kind's comment.
 const (
 	ForOf ForKind = iota // for x of c — x is each value
 	ForIn                // for k in c — k is each key
@@ -517,6 +540,7 @@ type ForStmt struct {
 	syntax *cst.Node
 }
 
+// Syntax returns the green CST node this statement was lowered from.
 func (s *ForStmt) Syntax() *cst.Node { return s.syntax }
 func (s *ForStmt) node()             {}
 func (s *ForStmt) stmt()             {}

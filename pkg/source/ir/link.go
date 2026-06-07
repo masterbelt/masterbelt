@@ -6,6 +6,7 @@
 // after). References the module does not declare resolve through the
 // caller's Resolver; a name nobody supplies is a loud error, never a silent
 // dangling pointer.
+
 package ir
 
 import (
@@ -321,6 +322,11 @@ func (l *linker) linkIf(s *If) {
 // linkValue relinks one value node in place: its reference edges, its settled
 // type, and its operands. The switch is exhaustive over the sealed Value
 // forms; a new form panics rather than silently keeping its placeholders.
+//
+// every case is the form's edge list, so the length is the case count, not
+// control complexity (the Lexer.Next class of exception).
+//
+//nolint:funlen // a flat exhaustive dispatch over the 25 sealed Value forms:
 func (l *linker) linkValue(p *Value) {
 	switch v := (*p).(type) {
 	case nil:
@@ -353,33 +359,25 @@ func (l *linker) linkValue(p *Value) {
 		l.linkType(&v.Type)
 	case *Call:
 		l.linkValue(&v.Receiver)
-		for i := range v.Args {
-			l.linkValue(&v.Args[i])
-		}
+		l.linkArgs(v.Args)
 		l.resolveMethod(&v.Resolved)
 		l.linkSubst(v.Subst)
 		l.linkType(&v.Type)
 	case *FuncCall:
 		l.resolveFunction(&v.Target)
-		for i := range v.Args {
-			l.linkValue(&v.Args[i])
-		}
+		l.linkArgs(v.Args)
 		l.resolveFunction(&v.Resolved)
 		l.linkSubst(v.Subst)
 		l.linkType(&v.Type)
 	case *StaticCall:
 		l.resolveTypeDef(&v.Def)
-		for i := range v.Args {
-			l.linkValue(&v.Args[i])
-		}
+		l.linkArgs(v.Args)
 		l.resolveMethod(&v.Resolved)
 		l.linkSubst(v.Subst)
 		l.linkType(&v.Type)
 	case *Apply:
 		l.linkValue(&v.Callee)
-		for i := range v.Args {
-			l.linkValue(&v.Args[i])
-		}
+		l.linkArgs(v.Args)
 		l.linkType(&v.Type)
 	case *FuncLiteral:
 		l.linkBody(v.Body)
@@ -395,9 +393,7 @@ func (l *linker) linkValue(p *Value) {
 		l.linkType(&v.Type)
 	case *Conversion:
 		l.linkType(&v.Type)
-		for i := range v.Args {
-			l.linkValue(&v.Args[i])
-		}
+		l.linkArgs(v.Args)
 	case *Await:
 		l.linkValue(&v.Value)
 		l.linkType(&v.Type)
@@ -420,6 +416,14 @@ func (l *linker) linkValue(p *Value) {
 		l.linkType(&v.Type)
 	default:
 		panic(fmt.Sprintf("ir: link: unhandled Value %T", v))
+	}
+}
+
+// linkArgs relinks an argument list in place — the operand shorthand the
+// call-shaped arms share.
+func (l *linker) linkArgs(args []Value) {
+	for i := range args {
+		l.linkValue(&args[i])
 	}
 }
 

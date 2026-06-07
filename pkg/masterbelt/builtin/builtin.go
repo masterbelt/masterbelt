@@ -216,36 +216,36 @@ func Default() *Registry {
 		}
 		r.register(spec.name, &NativeType{Name: spec.name, Int: &kind}, integerMethods(), ii)
 	}
-	r.register("bool", &NativeType{Name: "bool", Bool: true}, booleanMethods(), booleanIntrinsics())
-	r.register("string", &NativeType{Name: "string", Str: true}, stringMethods(), stringIntrinsics())
+	r.register(NameBool, &NativeType{Name: "bool", Bool: true}, booleanMethods(), booleanIntrinsics())
+	r.register(NameString, &NativeType{Name: "string", Str: true}, stringMethods(), stringIntrinsics())
 	r.register("null", &NativeType{Name: "null", Null: true}, nil, nil)
-	r.register("error", &NativeType{Name: "error", Err: true}, errorMethods(), errorIntrinsics())
+	r.register(NameError, &NativeType{Name: "error", Err: true}, errorMethods(), errorIntrinsics())
 
 	// datetime: the comparisons and the single-signature add are kind-
 	// agnostic; sub is overloaded by the argument's kind — another instant
 	// yields the span between them, a duration the earlier instant.
 	dtI := millisComparisons(ir.ConstDatetime)
 	dtI["add"] = binaryMillis(ir.ConstDatetime, ir.ConstDuration, checkedMillis(addMillis, ir.DatetimeConstant))
-	r.register("datetime", &NativeType{Name: "datetime", Datetime: true}, datetimeMethods(), dtI)
-	r.registerIntrinsic("datetime", "sub", []ir.ConstKind{ir.ConstDatetime},
+	r.register(NameDatetime, &NativeType{Name: NameDatetime, Datetime: true}, datetimeMethods(), dtI)
+	r.registerIntrinsic(NameDatetime, "sub", []ir.ConstKind{ir.ConstDatetime},
 		binaryMillis(ir.ConstDatetime, ir.ConstDatetime, checkedMillis(subMillis, ir.DurationConstant)))
-	r.registerIntrinsic("datetime", "sub", []ir.ConstKind{ir.ConstDuration},
+	r.registerIntrinsic(NameDatetime, "sub", []ir.ConstKind{ir.ConstDuration},
 		binaryMillis(ir.ConstDatetime, ir.ConstDuration, checkedMillis(subMillis, ir.DatetimeConstant)))
 	// datetime.now(): the current instant — the first effectful native, the
 	// root of nondet. It deliberately has no compile-time implementation: a
 	// nondet value does not reproduce, so folding it would be wrong by
 	// definition; a target's codegen supplies it at runtime.
-	r.registerEffectful(EffectfulNative{Type: "datetime", Name: "now", Kind: ir.MethodStatic, Effects: []string{"nondet"}})
+	r.registerEffectful(EffectfulNative{Type: NameDatetime, Name: "now", Kind: ir.MethodStatic, Effects: []string{"nondet"}})
 
 	// duration: add is overloaded by the argument's kind — another span sums,
 	// a datetime yields the instant the span after it.
 	drI := millisComparisons(ir.ConstDuration)
 	drI["sub"] = binaryMillis(ir.ConstDuration, ir.ConstDuration, checkedMillis(subMillis, ir.DurationConstant))
 	drI["mul"] = mulDuration
-	r.register("duration", &NativeType{Name: "duration", Duration: true}, durationMethods(), drI)
-	r.registerIntrinsic("duration", "add", []ir.ConstKind{ir.ConstDuration},
+	r.register(NameDuration, &NativeType{Name: "duration", Duration: true}, durationMethods(), drI)
+	r.registerIntrinsic(NameDuration, "add", []ir.ConstKind{ir.ConstDuration},
 		binaryMillis(ir.ConstDuration, ir.ConstDuration, checkedMillis(addMillis, ir.DurationConstant)))
-	r.registerIntrinsic("duration", "add", []ir.ConstKind{ir.ConstDatetime},
+	r.registerIntrinsic(NameDuration, "add", []ir.ConstKind{ir.ConstDatetime},
 		binaryMillis(ir.ConstDuration, ir.ConstDatetime, checkedMillis(addMillis, ir.DatetimeConstant)))
 	return r
 }

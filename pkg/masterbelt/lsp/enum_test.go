@@ -4,9 +4,10 @@ import (
 	"strings"
 	"testing"
 
+	protocol "github.com/owenrumney/go-lsp/lsp"
+
 	"github.com/masterbelt/masterbelt/pkg/source/cst"
 	"github.com/masterbelt/masterbelt/pkg/source/token"
-	protocol "github.com/owenrumney/go-lsp/lsp"
 )
 
 const enumSrc = "/// rarity tier\npub enum Rarity: byte {\n  Common = 1\n  Rare = 2\n  Legend = 10\n}\nconst Top: Rarity = Rarity.Legend\n"
@@ -79,7 +80,7 @@ func TestEnumDocumentSymbols(t *testing.T) {
 	if len(enum.Children) != 3 {
 		t.Fatalf("Rarity has %d member symbols, want 3", len(enum.Children))
 	}
-	names := []string{}
+	names := make([]string, 0, len(enum.Children))
 	for _, c := range enum.Children {
 		names = append(names, c.Name)
 		if c.Kind != protocol.SymbolKindEnumMember {

@@ -79,7 +79,7 @@ func TestTextPositionService(t *testing.T) {
 
 	// OffsetAt agrees with File across encodings.
 	for _, enc := range []Encoding{ByteEncoding, UTF16Encoding, UTF32Encoding} {
-		for col := 0; col <= 6; col++ {
+		for col := range 7 {
 			if got, want := text.OffsetAt(0, col, enc), file.OffsetAt(0, col, enc); got != want {
 				t.Errorf("OffsetAt(0, %d, %s) = %d, want %d", col, enc, got, want)
 			}

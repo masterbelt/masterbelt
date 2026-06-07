@@ -33,9 +33,9 @@ func CollKindOf(want ir.Type) ir.CollKind {
 			return ir.CollUnknown
 		}
 		switch w.Def.Name {
-		case "map":
+		case builtin.NameMap:
 			return ir.CollMap
-		case "list":
+		case builtin.NameList:
 			return ir.CollList
 		}
 		return collKindFromDef(w.Def)
@@ -54,9 +54,9 @@ func collKindFromDef(def *ir.TypeDef) ir.CollKind {
 		return ir.CollUnknown
 	}
 	switch d.Name {
-	case "map":
+	case builtin.NameMap:
 		return ir.CollMap
-	case "list":
+	case builtin.NameList:
 		return ir.CollList
 	}
 	return ir.CollUnknown

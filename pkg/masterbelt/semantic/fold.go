@@ -6,6 +6,7 @@
 // refused the fold (the user's computation is too deep — fixable), "evaluator
 // gap" for everything else (a missing fold rule — a compiler bug, never the
 // user's).
+
 package semantic
 
 import (
@@ -64,14 +65,21 @@ func enforceEvalPublication(fileID FileID, file *ast.File, module *ir.Module, sh
 		return q.valueOf(target) != nil
 	}
 
-	// (⇐) Withhold the values of broken declarations, to a fixpoint: an
-	// initializer reading a withheld constant is withheld too, however the
-	// chain is ordered or spread between top-level and associated constants.
-	// A top-level constant's own brokenness is its span error or its
-	// checker-tainted type; an associated constant's is its span error or its
-	// written annotation's taint (its type is not checker-derived — an
-	// unannotated one types from its own folded value, so that Invalid is a
-	// symptom, not a taint source).
+	withholdBrokenValues(fileID, file, module, shells, q, published, within, taintedType, at)
+	withholdBrokenAsserts(fileID, module, q, published)
+	reportUnvaluedDecls(fileID, file, shells, q, genv, published, within, taintedType, at, diags)
+	reportUnvaluedAssocConsts(fileID, module, q, genv, published, within, taintedType, at, diags)
+}
+
+// withholdBrokenValues is the soundness (⇐) phase: it withholds the values of
+// broken declarations, to a fixpoint, so an initializer reading a withheld
+// constant is withheld too, however the chain is ordered or spread between
+// top-level and associated constants. A top-level constant's own brokenness is
+// its span error or its checker-tainted type; an associated constant's is its
+// span error or its written annotation's taint (its type is not checker-derived
+// — an unannotated one types from its own folded value, so that Invalid is a
+// symptom, not a taint source).
+func withholdBrokenValues(fileID FileID, file *ast.File, module *ir.Module, shells map[*ast.ConstDecl]*ir.Const, q queries, published func(*ast.ConstDecl) bool, within func(span) bool, taintedType func(ir.Type) bool, at func(ast.Node) span) {
 	for progress := true; progress; {
 		progress = false
 		for _, decl := range file.Decls {
@@ -86,23 +94,35 @@ func enforceEvalPublication(fileID FileID, file *ast.File, module *ir.Module, sh
 		}
 		for _, def := range module.Types {
 			for _, ac := range def.Consts {
-				if ac.Value == nil || ac.Syntax == nil {
-					continue
-				}
-				annTainted := ac.Syntax.Type != nil && taintedType(ac.Type)
-				if within(at(ac.Syntax)) || annTainted || dependsOnUnvalued(fileID, ac.Syntax.Value, q, published) {
-					ac.Value = nil
+				if withholdBrokenAssocConst(fileID, ac, q, published, within, taintedType, at) {
 					progress = true
 				}
 			}
 		}
 	}
-	// An assert reading a withheld constant publishes no outcome either: its
-	// condition folded over a value that never passed the type-bound checks,
-	// and a green checkmark over an unverified value is the accident the rule
-	// exists to prevent. (An assert's own in-span errors are not read here:
-	// assertion_failed itself anchors at the condition, and a failed
-	// assertion must keep its Eval and diagram.)
+}
+
+// withholdBrokenAssocConst withholds one associated constant's value if its
+// declaration is broken, reporting whether it changed.
+func withholdBrokenAssocConst(fileID FileID, ac *ir.AssocConst, q queries, published func(*ast.ConstDecl) bool, within func(span) bool, taintedType func(ir.Type) bool, at func(ast.Node) span) bool {
+	if ac.Value == nil || ac.Syntax == nil {
+		return false
+	}
+	annTainted := ac.Syntax.Type != nil && taintedType(ac.Type)
+	if within(at(ac.Syntax)) || annTainted || dependsOnUnvalued(fileID, ac.Syntax.Value, q, published) {
+		ac.Value = nil
+		return true
+	}
+	return false
+}
+
+// withholdBrokenAsserts withholds an assert reading a withheld constant: its
+// condition folded over a value that never passed the type-bound checks, and a
+// green checkmark over an unverified value is the accident the rule exists to
+// prevent. (An assert's own in-span errors are not read here: assertion_failed
+// itself anchors at the condition, and a failed assertion must keep its Eval
+// and diagram.)
+func withholdBrokenAsserts(fileID FileID, module *ir.Module, q queries, published func(*ast.ConstDecl) bool) {
 	for _, a := range module.Asserts {
 		if a.Eval == nil || a.Syntax == nil || a.Syntax.Cond == nil {
 			continue
@@ -112,11 +132,14 @@ func enforceEvalPublication(fileID FileID, file *ast.File, module *ir.Module, sh
 			a.Diagram = ""
 		}
 	}
+}
 
-	// (⇒) A clean declaration without a value is an error. A reader whose
-	// dependency's published value is absent is not re-reported — the cause
-	// carries its own diagnostic at the dependency (a span error there, or
-	// its own unfolded_const) — and only that narrowly.
+// reportUnvaluedDecls is the totality (⇒) phase for top-level constants: a
+// clean declaration without a value is an error. A reader whose dependency's
+// published value is absent is not re-reported — the cause carries its own
+// diagnostic at the dependency (a span error there, or its own unfolded_const)
+// — and only that narrowly.
+func reportUnvaluedDecls(fileID FileID, file *ast.File, shells map[*ast.ConstDecl]*ir.Const, q queries, genv graphFoldEnv, published func(*ast.ConstDecl) bool, within func(span) bool, taintedType func(ir.Type) bool, at func(ast.Node) span, diags *diagnostic.List) {
 	for _, decl := range file.Decls {
 		c := shells[decl]
 		if decl.Value == nil || c.Eval != nil {
@@ -132,23 +155,26 @@ func enforceEvalPublication(fileID FileID, file *ast.File, module *ir.Module, sh
 		reason := eval.GraphFailure(c.Value, c.Type, genv)
 		diags.Add(newUnfoldedConstDiagnostic(s.offset, s.width, decl.Name, reason))
 	}
+}
+
+// reportUnvaluedAssocConsts is the totality (⇒) phase for associated constants.
+// The written annotation carries the taint; the Invalid an unannotated,
+// unfolded constant fell back to is the symptom being diagnosed here, not a
+// cause to skip over. An associated constant carries no value graph; its
+// initializer lowers ad hoc for the classification fold.
+func reportUnvaluedAssocConsts(fileID FileID, module *ir.Module, q queries, genv graphFoldEnv, published func(*ast.ConstDecl) bool, within func(span) bool, taintedType func(ir.Type) bool, at func(ast.Node) span, diags *diagnostic.List) {
 	for _, def := range module.Types {
 		for _, ac := range def.Consts {
 			if ac.Builtin || ac.Syntax == nil || ac.Syntax.Value == nil || ac.Value != nil {
 				continue
 			}
 			s := at(ac.Syntax)
-			// The written annotation carries the taint; the Invalid an
-			// unannotated, unfolded constant fell back to is the symptom being
-			// diagnosed here, not a cause to skip over.
 			if within(s) || (ac.Syntax.Type != nil && taintedType(ac.Type)) {
 				continue
 			}
 			if dependsOnUnvalued(fileID, ac.Syntax.Value, q, published) {
 				continue
 			}
-			// An associated constant carries no value graph; its initializer
-			// lowers ad hoc for the classification fold.
 			folder := exprFolder{q: q, file: fileID}
 			reason := eval.GraphFailure(lower.Value(ac.Syntax.Value, folder.binder(enumDefOf(ac.Type))), ac.Type, genv)
 			diags.Add(newUnfoldedConstDiagnostic(s.offset, s.width, def.Name+"."+ac.Name, reason))
@@ -199,25 +225,8 @@ func dependsOnUnvalued(fileID FileID, root ast.Expr, q queries, topValued func(*
 				}
 			},
 			func(m *ast.MemberExpr) {
-				recv, ok := m.Receiver.(*ast.Identifier)
-				if !ok {
-					return
-				}
-				def := q.universe(fileID)[recv.Name]
-				if def == nil {
-					return
-				}
-				if def.Enum != nil {
-					for _, mem := range def.Enum.Members {
-						if mem.Name == m.Member.Name && mem.Value == nil {
-							un = true
-						}
-					}
-				}
-				for _, ac := range def.Consts {
-					if ac.Name == m.Member.Name && ac.Value == nil {
-						un = true
-					}
+				if unvaluedTypeMember(fileID, m, q) {
+					un = true
 				}
 			})
 	}
@@ -232,4 +241,32 @@ func dependsOnUnvalued(fileID FileID, root ast.Expr, q queries, topValued func(*
 	}
 	visit(root)
 	return un
+}
+
+// unvaluedTypeMember reports whether a type-qualified member reference reaches
+// a value-less declaration: an enum member without a value, or an associated
+// constant that resolved to nothing. A receiver that is not a type name in the
+// universe contributes no value dependency.
+func unvaluedTypeMember(fileID FileID, m *ast.MemberExpr, q queries) bool {
+	recv, ok := m.Receiver.(*ast.Identifier)
+	if !ok {
+		return false
+	}
+	def := q.universe(fileID)[recv.Name]
+	if def == nil {
+		return false
+	}
+	if def.Enum != nil {
+		for _, mem := range def.Enum.Members {
+			if mem.Name == m.Member.Name && mem.Value == nil {
+				return true
+			}
+		}
+	}
+	for _, ac := range def.Consts {
+		if ac.Name == m.Member.Name && ac.Value == nil {
+			return true
+		}
+	}
+	return false
 }

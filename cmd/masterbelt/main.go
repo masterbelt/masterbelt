@@ -1,3 +1,5 @@
+// Command masterbelt is the language's CLI: check (parse and type-check a
+// project or file), ir (the exact IR dump), and lsp (the language server).
 package main
 
 import (
@@ -11,7 +13,12 @@ import (
 )
 
 func main() {
-	// Setup context with signal
+	os.Exit(run())
+}
+
+// run executes the CLI and returns the process exit code. os.Exit lives in
+// main alone so run's deferred signal-handler release always executes.
+func run() int {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
@@ -20,6 +27,7 @@ func main() {
 
 	if err := cli.RootCmd.ExecuteContext(ctx); err != nil {
 		logger.Error("masterbelt exited", "err", err)
-		os.Exit(1)
+		return 1
 	}
+	return 0
 }

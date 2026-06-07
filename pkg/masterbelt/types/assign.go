@@ -1,6 +1,7 @@
 // This file holds assignability and the structural-type queries it rests on:
 // Assignable decides whether one type's values flow into another, reading a
 // record's fields (recordType) and a union's members (UnionType).
+
 package types
 
 import (
@@ -20,27 +21,7 @@ func Assignable(reg *builtin.Registry, from, to ir.Type) bool {
 		return true
 	}
 	if u := UnionType(to); u != nil {
-		// A union accepts a value of any of its member types; a union-typed
-		// value flows in when every member it may hold is accepted. Both sides are
-		// read through UnionType, so a nominal alias of a union (type GameValue =
-		// Coin | Level) or a generic union alias (optional<int> = int | null)
-		// behaves exactly like the bare union it stands for — a member value flows
-		// into the named union, and the named union flows where its members are
-		// expected.
-		if fu := UnionType(from); fu != nil {
-			for _, m := range fu.Members {
-				if !Assignable(reg, m, u) {
-					return false
-				}
-			}
-			return true
-		}
-		for _, m := range u.Members {
-			if Assignable(reg, from, m) {
-				return true
-			}
-		}
-		return false
+		return assignableToUnion(reg, from, u)
 	}
 	// A base value flows into the nominal type that wraps it: a value whose type is
 	// the underlying type itself (a string into type Tag = string, an nint into
@@ -69,14 +50,8 @@ func Assignable(reg *builtin.Registry, from, to ir.Type) bool {
 	// expected). Only the declared parent chain is walked — no other variance —
 	// so a value typed as an interface keeps exactly the methods the target
 	// interface fixes. A non-interface from or to leaves this untouched.
-	if tdef := interfaceDefOf(to); tdef != nil && interfaceDefOf(from) != nil {
-		var tArgs []ir.Type
-		if app, ok := to.(*ir.App); ok {
-			tArgs = app.Args
-		}
-		if interfaceInherits(from, tdef, tArgs, reg, map[*ir.TypeDef]bool{}) {
-			return true
-		}
+	if assignableByInterface(reg, from, to) {
+		return true
 	}
 	// The same generic type variable is assignable to itself — two occurrences of
 	// one parameter (max<T>(a: T, b: T): T returns a T where T is expected) are
@@ -85,6 +60,48 @@ func Assignable(reg *builtin.Registry, from, to ir.Type) bool {
 	// handled a bounded variable flowing to its bound interface (a T: orderable
 	// usable where comparable is expected).
 	return sameBuiltin(from, to) || sameNamed(from, to) || sameTypeVar(from, to)
+}
+
+// assignableToUnion reports whether a value of type from flows into the union u.
+// A union accepts a value of any of its member types; a union-typed value flows
+// in when every member it may hold is accepted. The from side is read through
+// UnionType, so a nominal alias of a union (type GameValue = Coin | Level) or a
+// generic union alias (optional<int> = int | null) behaves exactly like the bare
+// union it stands for — a member value flows into the named union, and the named
+// union flows where its members are expected.
+func assignableToUnion(reg *builtin.Registry, from ir.Type, u *ir.Union) bool {
+	if fu := UnionType(from); fu != nil {
+		for _, m := range fu.Members {
+			if !Assignable(reg, m, u) {
+				return false
+			}
+		}
+		return true
+	}
+	for _, m := range u.Members {
+		if Assignable(reg, from, m) {
+			return true
+		}
+	}
+	return false
+}
+
+// assignableByInterface reports whether an interface value of type from flows to
+// the ancestor interface to: width subtyping along the inheritance chain (an
+// ordered value is usable where a comparable is expected). Only the declared
+// parent chain is walked — no other variance — so a value typed as an interface
+// keeps exactly the methods the target interface fixes. A non-interface from or
+// to is false.
+func assignableByInterface(reg *builtin.Registry, from, to ir.Type) bool {
+	tdef := interfaceDefOf(to)
+	if tdef == nil || interfaceDefOf(from) == nil {
+		return false
+	}
+	var tArgs []ir.Type
+	if app, ok := to.(*ir.App); ok {
+		tArgs = app.Args
+	}
+	return interfaceInherits(from, tdef, tArgs, reg, map[*ir.TypeDef]bool{})
 }
 
 // adaptsToNamed reports whether a base value of type from adapts to the nominal
@@ -134,16 +151,18 @@ func adaptsToNamed(reg *builtin.Registry, from, to ir.Type) bool {
 type UnionSelection int
 
 const (
-	// UnionNotAUnion: the expected type is not a union, so member selection does
-	// not apply (the value flows in by ordinary assignability).
+	// UnionNotAUnion reports that the expected type is not a union, so member
+	// selection does not apply (the value flows in by ordinary assignability).
 	UnionNotAUnion UnionSelection = iota
-	// UnionNoMember: the value is a union but matches none of its members — the
-	// type_mismatch case, handled by the caller's existing assignability report.
+	// UnionNoMember reports that the value is a union but matches none of its
+	// members — the type_mismatch case, handled by the caller's existing
+	// assignability report.
 	UnionNoMember
-	// UnionUnique: exactly one member accepts the value; Member is it.
+	// UnionUnique reports that exactly one member accepts the value; Member is it.
 	UnionUnique
-	// UnionAmbiguous: two or more members accept the value with no exact tie-break
-	// — the ambiguous_union_member case, resolved by an explicit conversion.
+	// UnionAmbiguous reports that two or more members accept the value with no
+	// exact tie-break — the ambiguous_union_member case, resolved by an explicit
+	// conversion.
 	UnionAmbiguous
 )
 

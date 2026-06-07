@@ -37,21 +37,22 @@ func TestLoadPrelude(t *testing.T) {
 	}
 
 	// int8 carries its operator methods (add, declared extern).
-	if int8 := byName["sbyte"]; int8 == nil || len(int8.Methods) == 0 {
-		t.Fatalf("sbyte has no methods: %+v", int8)
-	} else {
-		var hasAdd bool
-		for _, m := range int8.Methods {
-			if m.Name == "add" {
-				hasAdd = true
-				if !m.Extern {
-					t.Errorf("sbyte.add should be extern")
-				}
-			}
+	sbyte := byName["sbyte"]
+	if sbyte == nil || len(sbyte.Methods) == 0 {
+		t.Fatalf("sbyte has no methods: %+v", sbyte)
+	}
+	var hasAdd bool
+	for _, m := range sbyte.Methods {
+		if m.Name != "add" {
+			continue
 		}
-		if !hasAdd {
-			t.Errorf("sbyte has no add method")
+		hasAdd = true
+		if !m.Extern {
+			t.Errorf("sbyte.add should be extern")
 		}
+	}
+	if !hasAdd {
+		t.Errorf("sbyte has no add method")
 	}
 }
 
@@ -79,7 +80,7 @@ func TestPreludeBoundsMatchRegistry(t *testing.T) {
 			continue
 		}
 		native, _ := reg.Native(name)
-		min, max := native.Bounds()
+		lo, hi := native.Bounds()
 		got := map[string]*ir.Constant{}
 		for _, c := range d.Consts {
 			if !c.Builtin {
@@ -87,11 +88,11 @@ func TestPreludeBoundsMatchRegistry(t *testing.T) {
 			}
 			got[c.Name] = c.Value
 		}
-		if v := got["Max"]; v == nil || v.Kind != ir.ConstInt || v.Int.Cmp(max) != 0 {
-			t.Errorf("%s.Max = %v, want %v", name, v, max)
+		if v := got["Max"]; v == nil || v.Kind != ir.ConstInt || v.Int.Cmp(hi) != 0 {
+			t.Errorf("%s.Max = %v, want %v", name, v, hi)
 		}
-		if v := got["Min"]; v == nil || v.Kind != ir.ConstInt || v.Int.Cmp(min) != 0 {
-			t.Errorf("%s.Min = %v, want %v", name, v, min)
+		if v := got["Min"]; v == nil || v.Kind != ir.ConstInt || v.Int.Cmp(lo) != 0 {
+			t.Errorf("%s.Min = %v, want %v", name, v, lo)
 		}
 	}
 

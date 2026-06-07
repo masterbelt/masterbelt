@@ -2,6 +2,7 @@
 // operator and literal surface syntax: unary and binary operators become
 // receiver.method(args) calls, string literals are decoded to their values, and
 // collection, record, member, call, and function-literal forms are flattened.
+
 package abstract
 
 import (
@@ -48,16 +49,7 @@ func lowerExpr(t cst.Tree, buf source.Buffer) ast.Expr {
 	case cst.CallExpr:
 		return lowerCallExpr(t, buf, node)
 	case cst.IndexExpr:
-		// coll[i] desugars to coll.get(i): the receiver is the collection, the
-		// index the single argument. A read may miss (out of range, key absent),
-		// so get's result is a union (V | error) — but that is the type rule's
-		// concern; here it is just a method call, the same shape an operator takes.
-		recv, index := twoOperands(t, buf)
-		var args []ast.Expr
-		if index != nil {
-			args = append(args, index)
-		}
-		return desugarCall(recv, "get", args, node)
+		return lowerIndexExpr(t, buf, node)
 	case cst.FuncLit:
 		return lowerFuncLit(t, buf, node)
 	case cst.ParenExpr:
@@ -69,35 +61,66 @@ func lowerExpr(t cst.Tree, buf source.Buffer) ast.Expr {
 		// desugaring to a method call.
 		return ast.NewAwaitExpr(firstOperand(t, buf), node)
 	case cst.TernaryExpr:
-		// cond ? then : else keeps its own node rather than desugaring: only the
-		// taken branch is evaluated, which a uniform call could not express. The
-		// three expression children are the condition, then-branch, and
-		// else-branch in order; any is nil when the source omitted it.
-		cond, then, els := threeOperands(t, buf)
-		return ast.NewTernaryExpr(cond, then, els, node)
+		return lowerTernaryExpr(t, buf, node)
 	case cst.RangeExpr:
-		// 0..9 keeps its own node rather than desugaring to range(0, 9): the
-		// direction and the half-open trim depend on the bound values, which only
-		// the evaluator knows, so the desugaring to range(start, end, step) is
-		// deferred to the fold. The two expression children are the lower and upper
-		// bounds in order; the operator token distinguishes the half-open "..." form.
-		lower, upper := twoOperands(t, buf)
-		return ast.NewRangeExpr(lower, upper, operatorKind(t) == token.DotDotDot, node)
+		return lowerRangeExpr(t, buf, node)
 	case cst.UnaryExpr:
-		// -x desugars to x.neg(): the operand is the receiver, no arguments.
-		return desugarCall(firstOperand(t, buf), unaryMethod(operatorKind(t)), nil, node)
+		return lowerUnaryExpr(t, buf, node)
 	case cst.BinaryExpr:
-		// 1 + 2 desugars to 1.add(2): the left operand is the receiver, the
-		// right operand the single argument (absent when recovered away).
-		x, y := twoOperands(t, buf)
-		var args []ast.Expr
-		if y != nil {
-			args = append(args, y)
-		}
-		return desugarCall(x, binaryMethod(operatorKind(t)), args, node)
+		return lowerBinaryExpr(t, buf, node)
 	default:
 		return nil
 	}
+}
+
+// lowerIndexExpr lowers coll[i], which desugars to coll.get(i): the receiver is
+// the collection, the index the single argument. A read may miss (out of range,
+// key absent), so get's result is a union (V | error) — but that is the type
+// rule's concern; here it is just a method call, the same shape an operator takes.
+func lowerIndexExpr(t cst.Tree, buf source.Buffer, node *cst.Node) ast.Expr {
+	recv, index := twoOperands(t, buf)
+	var args []ast.Expr
+	if index != nil {
+		args = append(args, index)
+	}
+	return desugarCall(recv, "get", args, node)
+}
+
+// lowerTernaryExpr lowers cond ? then : else, which keeps its own node rather
+// than desugaring: only the taken branch is evaluated, which a uniform call could
+// not express. The three expression children are the condition, then-branch, and
+// else-branch in order; any is nil when the source omitted it.
+func lowerTernaryExpr(t cst.Tree, buf source.Buffer, node *cst.Node) ast.Expr {
+	cond, then, els := threeOperands(t, buf)
+	return ast.NewTernaryExpr(cond, then, els, node)
+}
+
+// lowerRangeExpr lowers 0..9, which keeps its own node rather than desugaring to
+// range(0, 9): the direction and the half-open trim depend on the bound values,
+// which only the evaluator knows, so the desugaring to range(start, end, step) is
+// deferred to the fold. The two expression children are the lower and upper bounds
+// in order; the operator token distinguishes the half-open "..." form.
+func lowerRangeExpr(t cst.Tree, buf source.Buffer, node *cst.Node) ast.Expr {
+	lower, upper := twoOperands(t, buf)
+	return ast.NewRangeExpr(lower, upper, operatorKind(t) == token.DotDotDot, node)
+}
+
+// lowerUnaryExpr lowers a prefix operator: -x desugars to x.neg(), the operand
+// being the receiver with no arguments.
+func lowerUnaryExpr(t cst.Tree, buf source.Buffer, node *cst.Node) ast.Expr {
+	return desugarCall(firstOperand(t, buf), unaryMethod(operatorKind(t)), nil, node)
+}
+
+// lowerBinaryExpr lowers an infix operator: 1 + 2 desugars to 1.add(2), the left
+// operand being the receiver and the right operand the single argument (absent
+// when recovered away).
+func lowerBinaryExpr(t cst.Tree, buf source.Buffer, node *cst.Node) ast.Expr {
+	x, y := twoOperands(t, buf)
+	var args []ast.Expr
+	if y != nil {
+		args = append(args, y)
+	}
+	return desugarCall(x, binaryMethod(operatorKind(t)), args, node)
 }
 
 // desugarCall builds the "receiver.method(args)" form an operator lowers to: a
@@ -160,39 +183,48 @@ func decodeString(raw string) string {
 		if i >= len(body) {
 			break // a trailing backslash (only reachable for an unterminated literal)
 		}
-		switch body[i] {
-		case 'n':
-			b.WriteByte('\n')
-			i++
-		case 'r':
-			b.WriteByte('\r')
-			i++
-		case 't':
-			b.WriteByte('\t')
-			i++
-		case '0':
-			b.WriteByte(0)
-			i++
-		case '\\':
-			b.WriteByte('\\')
-			i++
-		case '"':
-			b.WriteByte('"')
-			i++
-		case 'u':
-			i++ // consume the "u"
-			if r, n, ok := decodeUnicodeEscape(body[i:]); ok {
-				b.WriteRune(r)
-				i += n
-			}
-			// A malformed \u{...} was lexer-reported; drop it best-effort.
-		default:
-			// An unknown escape was lexer-reported; keep the escaped byte.
-			b.WriteByte(body[i])
-			i++
-		}
+		i = decodeEscape(&b, body, i)
 	}
 	return b.String()
+}
+
+// decodeEscape interprets the escape sequence in body that begins at index i
+// (positioned just past the backslash), writes its value to b, and returns the
+// index of the byte after the sequence. A malformed or unknown escape was already
+// lexer-reported, so it is decoded best-effort rather than reported again.
+func decodeEscape(b *strings.Builder, body string, i int) int {
+	switch body[i] {
+	case 'n':
+		b.WriteByte('\n')
+		return i + 1
+	case 'r':
+		b.WriteByte('\r')
+		return i + 1
+	case 't':
+		b.WriteByte('\t')
+		return i + 1
+	case '0':
+		b.WriteByte(0)
+		return i + 1
+	case '\\':
+		b.WriteByte('\\')
+		return i + 1
+	case '"':
+		b.WriteByte('"')
+		return i + 1
+	case 'u':
+		i++ // consume the "u"
+		if r, n, ok := decodeUnicodeEscape(body[i:]); ok {
+			b.WriteRune(r)
+			i += n
+		}
+		// A malformed \u{...} was lexer-reported; drop it best-effort.
+		return i
+	default:
+		// An unknown escape was lexer-reported; keep the escaped byte.
+		b.WriteByte(body[i])
+		return i + 1
+	}
 }
 
 // decodeUnicodeEscape decodes the body of a \u{...} escape from the start of s

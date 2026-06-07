@@ -573,6 +573,16 @@ func (p *parser) parseFuncDecl(lead []cst.Green) *cst.Node {
 	}
 	p.skipTrivia(&children)
 	children = append(children, p.bump()) // "fn" (guaranteed by the dispatcher)
+	children = p.parseFuncSignature(children)
+	children = p.parseFuncBody(children, extern)
+	return cst.NewNode(cst.FuncDecl, children)
+}
+
+// parseFuncSignature parses the function header after "fn": the effect keywords,
+// the declared name, the optional generic parameters, the parameter list, and the
+// required result type. It appends each element to children and returns the
+// extended slice; a missing element records a diagnostic and is simply absent.
+func (p *parser) parseFuncSignature(children []cst.Green) []cst.Green {
 	for p.peekSignificant().Effect() {
 		p.skipTrivia(&children)
 		children = append(children, p.bump()) // an effect keyword
@@ -605,6 +615,13 @@ func (p *parser) parseFuncDecl(lead []cst.Green) *cst.Node {
 	} else {
 		p.report(newExpectedTypeDiagnostic(p.lastStart, 0))
 	}
+	return children
+}
+
+// parseFuncBody parses the function's body — a "->" expression (an implicit
+// return), a statement block, or nothing for an extern. It appends to children
+// and returns the extended slice; a missing non-extern body records a diagnostic.
+func (p *parser) parseFuncBody(children []cst.Green, extern bool) []cst.Green {
 	switch p.peekSignificant() {
 	case token.Arrow:
 		p.skipTrivia(&children)
@@ -635,7 +652,7 @@ func (p *parser) parseFuncDecl(lead []cst.Green) *cst.Node {
 			p.report(newExpectedFuncBodyDiagnostic(p.lastStart, 0))
 		}
 	}
-	return cst.NewNode(cst.FuncDecl, children)
+	return children
 }
 
 // --- implementations and method bodies --------------------------------------

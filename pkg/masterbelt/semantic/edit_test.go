@@ -167,7 +167,7 @@ func TestFuncLitTypes(t *testing.T) {
 		"pub fn g(): nint {\n  return [1, 2].map(fn(y) { return y + 1 }).count()\n}\n"
 	e := newEditable([]byte(src))
 
-	var got []string
+	got := make([]string, 0, len(e.prog.FuncLitTypes(soleFileID)))
 	for _, ft := range e.prog.FuncLitTypes(soleFileID) {
 		got = append(got, ft.String())
 	}

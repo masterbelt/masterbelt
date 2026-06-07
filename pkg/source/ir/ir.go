@@ -491,6 +491,10 @@ func (*EnumMemberValue) value() {}
 // Conversion's type is its target (the one form born typed); every other form
 // reads its Type field. The switch is exhaustive over the sealed Value forms;
 // a new form panics here rather than silently reading as untyped.
+// one case = one field read, so the length is the case count, not control
+// complexity (the Lexer.Next class of exception).
+//
+//nolint:funlen // a flat exhaustive dispatch over the 25 sealed Value forms:
 func TypeOf(v Value) Type {
 	switch v := v.(type) {
 	case nil:
@@ -559,6 +563,9 @@ func TypeOf(v Value) Type {
 // surface form of its own; its inner value carries the anchor). The switch is
 // exhaustive over the sealed Value forms; a new form panics here rather than
 // silently anchoring nowhere.
+// one case = one anchor read (the Lexer.Next class of exception).
+//
+//nolint:funlen // a flat exhaustive dispatch over the 25 sealed Value forms:
 func SyntaxOf(v Value) ast.Expr {
 	switch v := v.(type) {
 	case nil:

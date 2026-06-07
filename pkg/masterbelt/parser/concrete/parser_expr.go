@@ -628,7 +628,8 @@ func (p *parser) parsePostfix() cst.Green {
 			}
 			left = cst.NewNode(cst.MemberExpr, children)
 		case token.LParen:
-			children := []cst.Green{left}
+			children := make([]cst.Green, 0, 2)
+			children = append(children, left)
 			p.skipTrivia(&children)
 			children = append(children, p.bump()) // "("
 			p.parseCallArgs(&children)
