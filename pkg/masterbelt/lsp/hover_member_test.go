@@ -167,6 +167,59 @@ func TestMethodHoverPrelude(t *testing.T) {
 	}
 }
 
+func TestMethodHoverListStackQueue(t *testing.T) {
+	// The list stack/queue methods hover with the prelude doc, the receiver's
+	// element type substituted: push takes a nint, pop yields its optional.
+	src := "const Pushed = [1, 2].push(3)\nconst Last = [1, 2, 3].pop()\n"
+	doc := testView(src)
+
+	t.Run("push", func(t *testing.T) {
+		h := hover(doc, strings.Index(src, ".push")+3)
+		if h == nil {
+			t.Fatal("no hover on push")
+		}
+		for _, want := range []string{"pub extern push(value: nint): self", "A new list with value pushed at the end"} {
+			if !strings.Contains(h.Contents.Value, want) {
+				t.Errorf("hover = %q, want it to contain %q", h.Contents.Value, want)
+			}
+		}
+	})
+
+	t.Run("pop", func(t *testing.T) {
+		h := hover(doc, strings.Index(src, ".pop")+2)
+		if h == nil {
+			t.Fatal("no hover on pop")
+		}
+		for _, want := range []string{"pub extern pop(): optional<nint>", "The last element, or null when the list is empty."} {
+			if !strings.Contains(h.Contents.Value, want) {
+				t.Errorf("hover = %q, want it to contain %q", h.Contents.Value, want)
+			}
+		}
+	})
+}
+
+func TestMethodHoverListAddOverloads(t *testing.T) {
+	// The overloaded list + hovers as the whole overload set: the concatenation
+	// and the element push, each under its own doc comment.
+	src := "const xs: list<sbyte> = [1]\nconst ys = xs.add(2)\n"
+	doc := testView(src)
+
+	h := hover(doc, strings.Index(src, "xs.add")+4)
+	if h == nil {
+		t.Fatal("no hover on the overloaded prelude call site")
+	}
+	for _, want := range []string{
+		"pub extern add(other: self): self",
+		"pub extern add(element: sbyte): self",
+		"/// The + operator: the concatenation.",
+		"/// The + operator with one element:",
+	} {
+		if !strings.Contains(h.Contents.Value, want) {
+			t.Errorf("hover = %q, want it to contain %q", h.Contents.Value, want)
+		}
+	}
+}
+
 func TestMethodHoverGenericSubstitution(t *testing.T) {
 	// The receiver's type arguments substitute into the signature: map on a
 	// list<int8> takes an int8 item.

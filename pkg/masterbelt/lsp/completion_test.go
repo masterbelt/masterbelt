@@ -245,10 +245,39 @@ func TestMemberCompletionAfterBareDot(t *testing.T) {
 	doc := testView(src)
 
 	got := byLabel(completion(doc, strings.Index(src, "xs.")+3).Items)
-	for _, want := range []string{"map", "len", "add", "eql", "neq"} {
+	for _, want := range []string{"map", "len", "add", "eql", "neq", "push", "pop", "unshift", "shift"} {
 		if _, ok := got[want]; !ok {
 			t.Errorf("completion after the dot missing %q; got %v", want, got)
 		}
+	}
+}
+
+func TestMemberCompletionPreludeOverloads(t *testing.T) {
+	// The prelude's overloaded list.add completes once per signature — the
+	// concatenation and the element push — with the receiver's element type
+	// substituted into the element overload.
+	src := "const xs: list<sbyte> = [1]\nconst ys = xs.add(2)\n"
+	doc := testView(src)
+
+	items := completion(doc, strings.Index(src, "xs.add(2)")+5).Items
+	var details []string
+	for _, item := range items {
+		if item.Label == "add" {
+			details = append(details, item.Detail)
+		}
+	}
+	if len(details) != 2 {
+		t.Fatalf("add completes %d times, want 2: %v", len(details), details)
+	}
+	want := map[string]bool{
+		"pub extern add(other: self): self":    true,
+		"pub extern add(element: sbyte): self": true,
+	}
+	for _, d := range details {
+		if !want[d] {
+			t.Errorf("unexpected add signature %q", d)
+		}
+		delete(want, d)
 	}
 }
 
