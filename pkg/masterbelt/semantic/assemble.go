@@ -360,6 +360,31 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 	// errors.
 	checkBuiltinSurface(file, at, diags)
 
+	// Reference diagnostics for the associated-constant initializers: the
+	// undefined names, unknown members, and stray selfs the const loop reports
+	// for a top-level initializer, anchored the same way — an unresolvable
+	// reference in an impl-block const must be as loud as anywhere else. A
+	// bare member resolves through the annotation's enum, exactly as a
+	// top-level const's does.
+	checkAssocConstRefs := func(consts []*ast.ConstDecl) {
+		for _, c := range consts {
+			if c.Value == nil {
+				continue
+			}
+			reportRefIssues(fileID, c.Value, q, at, diags, typeExprEnum(q, fileID, c.Type))
+			checkNoSelf(c.Value, func(node ast.Node) {
+				s := at(node)
+				diags.Add(newSelfOutsideMethodDiagnostic(s.offset, s.width))
+			})
+		}
+	}
+	for _, td := range file.Types {
+		checkAssocConstRefs(td.Consts)
+	}
+	for _, ed := range file.Enums {
+		checkAssocConstRefs(ed.Consts)
+	}
+
 	// Every checking walk has run: bind the checker-selected overloads into the
 	// IR (the doctrine that every reference is bound to its declaration, met
 	// for overloaded calls) and arm them for evaluation.

@@ -1,0 +1,6 @@
+// fold-expect: diagnosed undefined_name
+// An unresolvable reference in an associated-constant initializer is loud —
+// it used to be entirely silent (no diagnostic, no value).
+pub type Config = string impl {
+  pub const Default = bogus
+}

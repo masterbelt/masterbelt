@@ -29,8 +29,7 @@ const foldCorpus = "testdata/fold"
 // empty the list ((a)/(d) in M4, (b) in M5, (c)/extern in M3, depth in M6),
 // and once it is empty the gates enforce the full rule with no exceptions.
 var knownGaps = map[string]string{
-	"gap-b-cross-assoc.belt": "(b) an assoc const initializer reading another type's member",
-	"gap-depth.belt":         "the depth budget refuses the fold with no diagnostic (M6)",
+	"gap-depth.belt": "the depth budget refuses the fold with no diagnostic (M6)",
 }
 
 // foldExpect is one corpus case's expectation: it folds completely (and is

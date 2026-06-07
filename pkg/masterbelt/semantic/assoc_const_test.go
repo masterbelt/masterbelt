@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
+	"github.com/masterbelt/masterbelt/pkg/source/ir"
 )
 
 // TestAssocConstUserType checks a user type's associated constants: they resolve
@@ -89,5 +90,60 @@ func TestAssocConstIsTypeAccessOnly(t *testing.T) {
 	// it must not fold to 100 — it has no value at all.
 	if x.Eval != nil {
 		t.Errorf("Five.Max folded to %v, want no value (type access only)", x.Eval)
+	}
+}
+
+// TestAssocConstCrossTypeFolds pins gap (b) of the fold-totality plan: an
+// associated constant whose initializer reads another type's member — an enum
+// member here — folds, and so does a top-level reader of it. The fold runs
+// after every type and enum of the file has resolved (resolveTypes' fourth
+// pass), so declaration order does not decide foldability.
+func TestAssocConstCrossTypeFolds(t *testing.T) {
+	src := "pub enum Element {\n  Fire, Water\n}\n" +
+		"pub type Config = string impl {\n  pub const Default: Element = Element.Fire\n}\n" +
+		"const D = Config.Default\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", codes(diags))
+	}
+	var config *ir.TypeDef
+	for _, def := range m.Types {
+		if def.Name == "Config" {
+			config = def
+		}
+	}
+	if config == nil || len(config.Consts) != 1 {
+		t.Fatalf("Config not resolved with its constant")
+	}
+	if v := config.Consts[0].Value; v == nil || v.Kind != ir.ConstEnum || v.EnumIndex != 0 {
+		t.Errorf("Config.Default = %v, want Element.Fire", v)
+	}
+	if v := m.Consts[0].Eval; v == nil || v.Kind != ir.ConstEnum || v.EnumIndex != 0 {
+		t.Errorf("const D = %v, want Element.Fire (the Type.Name reader folds too)", v)
+	}
+}
+
+// TestAssocConstReferenceDiagnostics pins that an associated-constant
+// initializer reports its reference problems — they used to be entirely
+// silent: an undefined name, an unknown namespace-less member, and a stray
+// self.
+func TestAssocConstReferenceDiagnostics(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+		want diagnostic.Code
+	}{
+		{"undefined name", "pub type C = string impl {\n  pub const D = bogus\n}\n", CodeUndefinedName},
+		{"unknown enum member", "pub enum E {\n  A\n}\npub type C = string impl {\n  pub const D: E = Bogus\n}\n", CodeUnknownEnumMember},
+		{"self in initializer", "pub type C = string impl {\n  pub const D = self\n}\n", CodeSelfOutsideMethod},
+		{"enum impl undefined", "pub enum E {\n  A\n} impl {\n  pub const D = bogus\n}\n", CodeUndefinedName},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, diags := analyze(tc.src)
+			if !hasCode(diags, tc.want) {
+				t.Errorf("want %s, got %v", tc.want, codes(diags))
+			}
+		})
 	}
 }

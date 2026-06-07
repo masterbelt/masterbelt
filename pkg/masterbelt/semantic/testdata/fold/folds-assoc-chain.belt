@@ -1,0 +1,17 @@
+// fold-expect: folds
+// Associated constants chained across types fold by fixpoint, regardless of
+// declaration order: Later.Cap reads Config.Default, declared after it.
+pub type Later = nint impl {
+  pub const Cap: Element = Config.Default
+}
+
+pub enum Element {
+  Fire, Water
+}
+
+pub type Config = string impl {
+  pub const Default: Element = Element.Fire
+}
+
+const D = Later.Cap
+assert D == Element.Fire
