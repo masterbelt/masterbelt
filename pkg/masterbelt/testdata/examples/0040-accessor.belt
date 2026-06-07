@@ -1,0 +1,94 @@
+// Accessors and static functions: a getter computes a property read
+// (value.name), a setter computes the next value a property write rebinds
+// (local.name = v), and a static fn is a function scoped to its type, called
+// Type.name(...) — the Type.Name path enum members and associated constants
+// already take. A getter and a setter are pure by construction: there is no
+// syntax to give an accessor an effect, so a field-spelled read can never hide
+// IO behind it — the guarantee an AI-facing language wants from `value.name`.
+
+pub type Celsius = { deg: nint } impl {
+  /// The freezing point of water.
+  pub static fn freezing(): Celsius {
+    return Celsius{ deg: 0 }
+  }
+  /// A degree reading converted from a fahrenheit value.
+  pub static fn fromF(v: nint): Celsius {
+    return Celsius{ deg: (v - 32) * 5 / 9 }
+  }
+  /// A degree reading converted from a celsius value (the static overload:
+  /// same name, a Celsius argument rather than a nint).
+  pub static fn fromF(c: Celsius): Celsius {
+    return c
+  }
+  /// Fahrenheit reading: c.fahrenheit.
+  pub get fahrenheit(): nint {
+    return self.deg * 9 / 5 + 32
+  }
+  /// Fahrenheit write: c.fahrenheit = 212 (c is a let local).
+  pub set fahrenheit(v: nint): self {
+    return Celsius{ deg: (v - 32) * 5 / 9 }
+  }
+}
+
+// A static fn is called through its type, exactly as an associated constant or
+// an enum member is read.
+const Freezing = Celsius.freezing()
+// A getter reads as a field would, in a constant initializer.
+const FreezingF = Freezing.fahrenheit
+assert FreezingF == 32
+
+// The static overload set selects by argument type.
+const FromBoiling = Celsius.fromF(212)
+assert FromBoiling.deg == 100
+const Roundtrip = Celsius.fromF(Celsius.freezing())
+assert Roundtrip.deg == 0
+
+// A property write rebinds the let local through the setter, which computes the
+// next value and returns self — the data stays immutable.
+fn boiling(): Celsius {
+  let c = Celsius.freezing()
+  c.fahrenheit = 212
+  return c
+}
+assert boiling().deg == 100
+
+// A nominal type over a builtin base derives the base's methods; its own impl
+// may add an accessor and a static fn, and they live alongside associated
+// constants without colliding (a getter `band` reads value.band, a static fn
+// `full` is called Health.full(), the assoc const Health.Max is read Type.Name).
+pub type Health = nint impl {
+  /// The maximum health.
+  pub const Max = 100
+
+  /// A full health bar.
+  pub static fn full(): Health {
+    return Health.Max
+  }
+  /// The health expressed in tens (the band a UI shows).
+  pub get band(): nint {
+    return self / 10
+  }
+}
+
+const Full = Health.full()
+assert Full.band == 10
+assert Health.Max == 100
+
+// An enum impl carries an accessor and a static fn just as a nominal type's
+// does: a getter reads each member's property, a static fn names a default.
+pub enum Element {
+  Fire, Water, Wind
+} impl {
+  /// Whether this element is Fire.
+  pub get hot(): bool {
+    return self == Element.Fire
+  }
+  /// The default element.
+  pub static fn base(): Element {
+    return Element.Fire
+  }
+}
+
+const Default = Element.base()
+assert Default.hot
+assert !Element.Water.hot

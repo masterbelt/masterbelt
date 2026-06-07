@@ -1,0 +1,117 @@
+File
+  ConstDecl
+    name "Freezing"
+    value (call (. Identifier "Celsius" freezing))
+  ConstDecl
+    name "FreezingF"
+    value (. Identifier "Freezing" fahrenheit)
+  ConstDecl
+    name "FromBoiling"
+    value (call (. Identifier "Celsius" fromF) IntLit "212")
+  ConstDecl
+    name "Roundtrip"
+    value (call (. Identifier "Celsius" fromF) (call (. Identifier "Celsius" freezing)))
+  ConstDecl
+    name "Full"
+    value (call (. Identifier "Health" full))
+  ConstDecl
+    name "Default"
+    value (call (. Identifier "Element" base))
+  TypeDecl
+    pub
+    name "Celsius"
+    body { deg: nint }
+    method "static"
+      doc "The freezing point of water."
+      pub
+    method "freezing"
+      result Celsius
+      return (record Celsius deg: IntLit "0")
+    method "static"
+      doc "A degree reading converted from a fahrenheit value."
+      pub
+    method "fromF"
+      param v: nint
+      result Celsius
+      return (record Celsius deg: (call (. (call (. (call (. Identifier "v" sub) IntLit "32") mul) IntLit "5") div) IntLit "9"))
+    method "static"
+      doc "A degree reading converted from a celsius value (the static overload:"
+      doc "same name, a Celsius argument rather than a nint)."
+      pub
+    method "fromF"
+      param c: Celsius
+      result Celsius
+      return Identifier "c"
+    method "get"
+      doc "Fahrenheit reading: c.fahrenheit."
+      pub
+    method "fahrenheit"
+      result nint
+      return (call (. (call (. (call (. (. self deg) mul) IntLit "9") div) IntLit "5") add) IntLit "32")
+    method "set"
+      doc "Fahrenheit write: c.fahrenheit = 212 (c is a let local)."
+      pub
+    method "fahrenheit"
+      param v: nint
+      result self
+      return (record Celsius deg: (call (. (call (. (call (. Identifier "v" sub) IntLit "32") mul) IntLit "5") div) IntLit "9"))
+  TypeDecl
+    pub
+    name "Health"
+    body nint
+    const "Max"
+      doc "The maximum health."
+      pub
+      value IntLit "100"
+    method "static"
+      doc "A full health bar."
+      pub
+    method "full"
+      result Health
+      return (. Identifier "Health" Max)
+    method "get"
+      doc "The health expressed in tens (the band a UI shows)."
+      pub
+    method "band"
+      result nint
+      return (call (. self div) IntLit "10")
+  EnumDecl
+    pub
+    name "Element"
+    member "Fire"
+    member "Water"
+    member "Wind"
+    method "get"
+      doc "Whether this element is Fire."
+      pub
+    method "hot"
+      result bool
+      return (call (. self eql) (. Identifier "Element" Fire))
+    method "static"
+      doc "The default element."
+      pub
+    method "base"
+      result Element
+      return (. Identifier "Element" Fire)
+  FuncDecl
+    name "boiling"
+    result Celsius
+      let "c" = (call (. Identifier "Celsius" freezing))
+      assign (. Identifier "c" fahrenheit) = IntLit "212"
+      return Identifier "c"
+  AssertDecl
+    cond (call (. Identifier "FreezingF" eql) IntLit "32")
+  AssertDecl
+    cond (call (. (. Identifier "FromBoiling" deg) eql) IntLit "100")
+  AssertDecl
+    cond (call (. (. Identifier "Roundtrip" deg) eql) IntLit "0")
+  AssertDecl
+    cond (call (. (. (call Identifier "boiling") deg) eql) IntLit "100")
+  AssertDecl
+    cond (call (. (. Identifier "Full" band) eql) IntLit "10")
+  AssertDecl
+    cond (call (. (. Identifier "Health" Max) eql) IntLit "100")
+  AssertDecl
+    cond (. Identifier "Default" hot)
+  AssertDecl
+    cond (call (. (. (. Identifier "Element" Water) hot) not))
