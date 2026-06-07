@@ -393,9 +393,12 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 	checkFuncBodies(reg, file, q.universe(fileID), qualifiedFrom(q, imp), funcs, qfns, bodyEnv, bodySink(at, diags, reg, bodyEnv), at, diags)
 	checkEffects(reg, file, module.Types, q.universe(fileID), qualifiedFrom(q, imp), funcs, qfns, at, diags)
 
-	// Compile-time positions must be pure: a constant initializer and an
-	// assert condition fold to values, so an effectful call cannot appear in
-	// them at all — pure folds, effectful cannot even be written.
+	// Compile-time positions must be pure: a constant initializer, an assert
+	// condition, an enum member initializer, an associated constant initializer,
+	// and a refinement (where) predicate all fold to values, so an effectful
+	// call cannot appear in any of them — pure folds, effectful cannot even be
+	// written. Every such expression goes through the same checkPureContext, so
+	// a new fold position cannot be added without a matching purity check.
 	pureScope := infer.BodyScope{Reg: reg, Universe: q.universe(fileID), Qualified: qualifiedFrom(q, imp), Self: ir.Invalid, Funcs: funcs, QualifiedFuncs: qfns}
 	for _, decl := range file.Decls {
 		if decl.Value != nil {
@@ -405,6 +408,28 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 	for _, a := range file.Asserts {
 		if a.Cond != nil {
 			checkPureContext(a.Cond, "assert condition", pureScope, at, diags)
+		}
+	}
+	for _, td := range file.Types {
+		for _, c := range td.Consts {
+			if c.Value != nil {
+				checkPureContext(c.Value, "associated constant initializer", pureScope, at, diags)
+			}
+		}
+		if td.Where != nil {
+			checkPureContext(td.Where, "refinement predicate", pureScope, at, diags)
+		}
+	}
+	for _, ed := range file.Enums {
+		for _, m := range ed.Members {
+			if m.Value != nil {
+				checkPureContext(m.Value, "enum member initializer", pureScope, at, diags)
+			}
+		}
+		for _, c := range ed.Consts {
+			if c.Value != nil {
+				checkPureContext(c.Value, "associated constant initializer", pureScope, at, diags)
+			}
 		}
 	}
 
