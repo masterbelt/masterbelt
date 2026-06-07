@@ -48,8 +48,8 @@ File
         Whitespace "  "
         Pub "pub"
         Whitespace " "
-        Ident "static"
-      MethodDecl
+        Modifier
+          Ident "static"
         Whitespace " "
         Fn "fn"
         Whitespace " "
@@ -92,8 +92,8 @@ File
         Whitespace "  "
         Pub "pub"
         Whitespace " "
-        Ident "static"
-      MethodDecl
+        Modifier
+          Ident "static"
         Whitespace " "
         Fn "fn"
         Whitespace " "
@@ -166,8 +166,8 @@ File
         Whitespace "  "
         Pub "pub"
         Whitespace " "
-        Ident "static"
-      MethodDecl
+        Modifier
+          Ident "static"
         Whitespace " "
         Fn "fn"
         Whitespace " "
@@ -206,8 +206,8 @@ File
         Whitespace "  "
         Pub "pub"
         Whitespace " "
-        Ident "get"
-      MethodDecl
+        Modifier
+          Ident "get"
         Whitespace " "
         Ident "fahrenheit"
         ParamList
@@ -259,8 +259,8 @@ File
         Whitespace "  "
         Pub "pub"
         Whitespace " "
-        Ident "set"
-      MethodDecl
+        Modifier
+          Ident "set"
         Whitespace " "
         Ident "fahrenheit"
         ParamList
@@ -579,8 +579,8 @@ File
         Whitespace "  "
         Pub "pub"
         Whitespace " "
-        Ident "static"
-      MethodDecl
+        Modifier
+          Ident "static"
         Whitespace " "
         Fn "fn"
         Whitespace " "
@@ -616,8 +616,8 @@ File
         Whitespace "  "
         Pub "pub"
         Whitespace " "
-        Ident "get"
-      MethodDecl
+        Modifier
+          Ident "get"
         Whitespace " "
         Ident "band"
         ParamList
@@ -737,8 +737,8 @@ File
         Whitespace "  "
         Pub "pub"
         Whitespace " "
-        Ident "get"
-      MethodDecl
+        Modifier
+          Ident "get"
         Whitespace " "
         Ident "hot"
         ParamList
@@ -778,8 +778,8 @@ File
         Whitespace "  "
         Pub "pub"
         Whitespace " "
-        Ident "static"
-      MethodDecl
+        Modifier
+          Ident "static"
         Whitespace " "
         Fn "fn"
         Whitespace " "
@@ -853,21 +853,3 @@ File
   Newline "\n"
   EOF ""
 # diagnostics
-error[masterbelt.parser.concrete.unexpected_token] 11:7 unexpected token: Fn
-error[masterbelt.parser.concrete.expected_type] 11:7 expected type
-error[masterbelt.parser.concrete.unexpected_token] 15:7 unexpected token: Fn
-error[masterbelt.parser.concrete.expected_type] 15:7 expected type
-error[masterbelt.parser.concrete.unexpected_token] 20:7 unexpected token: Fn
-error[masterbelt.parser.concrete.expected_type] 20:7 expected type
-error[masterbelt.parser.concrete.unexpected_token] 24:7 unexpected token: Ident
-error[masterbelt.parser.concrete.expected_type] 24:7 expected type
-error[masterbelt.parser.concrete.unexpected_token] 28:7 unexpected token: Ident
-error[masterbelt.parser.concrete.expected_type] 28:7 expected type
-error[masterbelt.parser.concrete.unexpected_token] 64:7 unexpected token: Fn
-error[masterbelt.parser.concrete.expected_type] 64:7 expected type
-error[masterbelt.parser.concrete.unexpected_token] 68:7 unexpected token: Ident
-error[masterbelt.parser.concrete.expected_type] 68:7 expected type
-error[masterbelt.parser.concrete.unexpected_token] 83:7 unexpected token: Ident
-error[masterbelt.parser.concrete.expected_type] 83:7 expected type
-error[masterbelt.parser.concrete.unexpected_token] 87:7 unexpected token: Fn
-error[masterbelt.parser.concrete.expected_type] 87:7 expected type

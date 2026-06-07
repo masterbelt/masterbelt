@@ -13,6 +13,7 @@ const (
 	CodeExpectedAssign     diagnostic.Code = "masterbelt.parser.concrete.expected_assign"
 	CodeExpectedConst      diagnostic.Code = "masterbelt.parser.concrete.expected_const"
 	CodeExpectedExpression diagnostic.Code = "masterbelt.parser.concrete.expected_expression"
+	CodeExpectedFn         diagnostic.Code = "masterbelt.parser.concrete.expected_fn"
 	CodeExpectedFrom       diagnostic.Code = "masterbelt.parser.concrete.expected_from"
 	CodeExpectedFuncBody   diagnostic.Code = "masterbelt.parser.concrete.expected_func_body"
 	CodeExpectedIdentifier diagnostic.Code = "masterbelt.parser.concrete.expected_identifier"
@@ -61,6 +62,17 @@ func newExpectedExpressionDiagnostic(offset int, width int) diagnostic.Diagnosti
 		Severity: diagnostic.Error,
 		Code:     CodeExpectedExpression,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeExpectedExpression, nil),
+		Fields:   nil,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newExpectedFnDiagnostic(offset int, width int) diagnostic.Diagnostic {
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeExpectedFn,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeExpectedFn, nil),
 		Fields:   nil,
 		Offset:   offset,
 		Width:    width,

@@ -17,6 +17,7 @@ masterbelt.parser.concrete.expected_from,error,
 masterbelt.parser.concrete.expected_path,error,
 masterbelt.parser.concrete.expected_param_list,error,
 masterbelt.parser.concrete.expected_func_body,error,
+masterbelt.parser.concrete.expected_fn,error,
 masterbelt.parser.concrete.arrow_block_body,error,
 masterbelt.semantic.duplicate_declaration,error,name:string
 masterbelt.semantic.undefined_name,error,name:string

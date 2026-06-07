@@ -19,30 +19,27 @@ Module
     value <none>.base()
   TypeDef "Celsius" pub
     body { deg: nint }
-    method "static" pub
+    method "freezing" pub
       doc "The freezing point of water."
-      result invalid
-    method "freezing"
       result Celsius
       return Celsius{deg: IntLiteral "0"}
-    method "fromF"
+    method "fromF" pub
+      doc "A degree reading converted from a fahrenheit value."
       param v: nint
       result Celsius
       return Celsius{deg: ParamRef "v".sub(IntLiteral "32").mul(IntLiteral "5").div(IntLiteral "9")}
-    method "fromF"
+    method "fromF" pub
+      doc "A degree reading converted from a celsius value (the static overload:"
+      doc "same name, a Celsius argument rather than a nint)."
       param c: Celsius
       result Celsius
       return ParamRef "c"
-    method "get" pub
+    method "fahrenheit" pub
       doc "Fahrenheit reading: c.fahrenheit."
-      result invalid
-    method "fahrenheit"
       result nint
       return self.deg.mul(IntLiteral "9").div(IntLiteral "5").add(IntLiteral "32")
-    method "set" pub
+    method "fahrenheit" pub
       doc "Fahrenheit write: c.fahrenheit = 212 (c is a let local)."
-      result invalid
-    method "fahrenheit"
       param v: nint
       result self
       return Celsius{deg: ParamRef "v".sub(IntLiteral "32").mul(IntLiteral "5").div(IntLiteral "9")}
@@ -52,16 +49,12 @@ Module
       doc "The maximum health."
       type nint
       value 100
-    method "static" pub
+    method "full" pub
       doc "A full health bar."
-      result invalid
-    method "full"
       result Health
       return Health.Max
-    method "get" pub
+    method "band" pub
       doc "The health expressed in tens (the band a UI shows)."
-      result invalid
-    method "band"
       result nint
       return self.div(IntLiteral "10")
   TypeDef "Element" pub
@@ -89,16 +82,12 @@ Module
     method "gteq" pub extern
       param other: self
       result bool
-    method "get" pub
+    method "hot" pub
       doc "Whether this element is Fire."
-      result invalid
-    method "hot"
       result bool
       return self.eql(Element.Fire)
-    method "static" pub
+    method "base" pub
       doc "The default element."
-      result invalid
-    method "base"
       result Element
       return Element.Fire
   Func "boiling"

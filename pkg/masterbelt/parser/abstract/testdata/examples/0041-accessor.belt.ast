@@ -21,37 +21,32 @@ File
     pub
     name "Celsius"
     body { deg: nint }
-    method "static"
+    method "freezing"
       doc "The freezing point of water."
       pub
-    method "freezing"
       result Celsius
       return (record Celsius deg: IntLit "0")
-    method "static"
+    method "fromF"
       doc "A degree reading converted from a fahrenheit value."
       pub
-    method "fromF"
       param v: nint
       result Celsius
       return (record Celsius deg: (call (. (call (. (call (. Identifier "v" sub) IntLit "32") mul) IntLit "5") div) IntLit "9"))
-    method "static"
+    method "fromF"
       doc "A degree reading converted from a celsius value (the static overload:"
       doc "same name, a Celsius argument rather than a nint)."
       pub
-    method "fromF"
       param c: Celsius
       result Celsius
       return Identifier "c"
-    method "get"
+    method "fahrenheit"
       doc "Fahrenheit reading: c.fahrenheit."
       pub
-    method "fahrenheit"
       result nint
       return (call (. (call (. (call (. (. self deg) mul) IntLit "9") div) IntLit "5") add) IntLit "32")
-    method "set"
+    method "fahrenheit"
       doc "Fahrenheit write: c.fahrenheit = 212 (c is a let local)."
       pub
-    method "fahrenheit"
       param v: nint
       result self
       return (record Celsius deg: (call (. (call (. (call (. Identifier "v" sub) IntLit "32") mul) IntLit "5") div) IntLit "9"))
@@ -63,16 +58,14 @@ File
       doc "The maximum health."
       pub
       value IntLit "100"
-    method "static"
+    method "full"
       doc "A full health bar."
       pub
-    method "full"
       result Health
       return (. Identifier "Health" Max)
-    method "get"
+    method "band"
       doc "The health expressed in tens (the band a UI shows)."
       pub
-    method "band"
       result nint
       return (call (. self div) IntLit "10")
   EnumDecl
@@ -81,16 +74,14 @@ File
     member "Fire"
     member "Water"
     member "Wind"
-    method "get"
+    method "hot"
       doc "Whether this element is Fire."
       pub
-    method "hot"
       result bool
       return (call (. self eql) (. Identifier "Element" Fire))
-    method "static"
+    method "base"
       doc "The default element."
       pub
-    method "base"
       result Element
       return (. Identifier "Element" Fire)
   FuncDecl

@@ -31,7 +31,8 @@
 //	FuncType      := fn ParamList ":" TypeExpr
 //	ImplBlock     := impl [TypeName] "{" ( MethodDecl | AssocConst )* "}"
 //	AssocConst    := [pub] const Ident [TypeClause] "=" ( Expr | "builtin" )
-//	MethodDecl    := [pub] [extern] [fn] Effect* Ident [GenericParams] ParamList ":" TypeExpr [Block]
+//	MethodDecl    := [pub] ( Modifier | [extern] [fn] ) Effect* Ident [GenericParams] ParamList ":" TypeExpr [Block]
+//	Modifier      := "get" | "set" | "static" fn   (get/set/static are context keywords: a modifier only at a method's start, get/set only when an Ident follows on the same line, static only before fn)
 //	ParamList     := "(" [ Param ( "," Param )* ] ")"
 //	Param         := Ident ":" TypeExpr
 //	Block         := "{" Stmt* "}"
@@ -113,6 +114,7 @@ package concrete
 import (
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/lexer"
+	"github.com/masterbelt/masterbelt/pkg/source"
 	"github.com/masterbelt/masterbelt/pkg/source/cst"
 	"github.com/masterbelt/masterbelt/pkg/source/token"
 )
@@ -121,13 +123,17 @@ import (
 // the one-shot entry point; use Document for incremental editing. Lexer-phase
 // diagnostics are reported separately by the lexer and are not returned here.
 func Parse(src []byte) (*cst.Node, []diagnostic.Diagnostic) {
-	return parseTokens(lexer.NewDocument(src).Tokens())
+	doc := lexer.NewDocument(src)
+	return parseTokens(doc.Tokens(), doc.Buffer())
 }
 
 // parseTokens parses toks — a lexer token stream terminated by a single EOF
-// token — into a File node and the diagnostics found.
-func parseTokens(toks []token.Token) (*cst.Node, []diagnostic.Diagnostic) {
-	p := newParser(toks)
+// token — into a File node and the diagnostics found. buf is the source the
+// tokens were lexed from, read only to classify the context keywords (get, set,
+// static) the lexer leaves as plain identifiers; over identical bytes it yields
+// identical nodes, so reuse at a File-child boundary stays sound.
+func parseTokens(toks []token.Token, buf source.Buffer) (*cst.Node, []diagnostic.Diagnostic) {
+	p := newParser(toks, buf)
 	root := p.parseFile()
 	return root, p.diags.Items()
 }
@@ -136,8 +142,15 @@ func parseTokens(toks []token.Token) (*cst.Node, []diagnostic.Diagnostic) {
 // state beyond the cursor and the diagnostic sink, so a parse can be started at
 // any token index (Document does this to reparse a window).
 type parser struct {
-	toks  []token.Token
-	pos   int
+	toks []token.Token
+	pos  int
+	// buf is the source the tokens cover, read only to recover the text of a
+	// context-keyword identifier (get/set/static) at a method's modifier
+	// position. Every other parsing decision is over token kinds alone, so the
+	// boundary context-free property the incremental Document relies on holds:
+	// reading the bytes a token already covers cannot make a File child parse
+	// differently from a fresh parse of the same bytes.
+	buf   source.Buffer
 	diags *diagnostic.List
 
 	// noRecordLit suppresses the "Ident {" / "{" record-literal reading of an
@@ -162,8 +175,19 @@ type parser struct {
 	lastStart int
 }
 
-func newParser(toks []token.Token) *parser {
-	return &parser{toks: toks, diags: &diagnostic.List{}}
+func newParser(toks []token.Token, buf source.Buffer) *parser {
+	return &parser{toks: toks, buf: buf, diags: &diagnostic.List{}}
+}
+
+// identText returns the source text of the token at index i, read from the
+// buffer. It is used only to classify a context-keyword identifier (get/set/
+// static); a parser built without a buffer (no source to read) yields "".
+func (p *parser) identText(i int) string {
+	if p.buf == nil {
+		return ""
+	}
+	t := p.toks[i]
+	return string(p.buf.Slice(t.Offset, t.End()))
 }
 
 // kind reports the kind of the token at the cursor. The slice always ends with

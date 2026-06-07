@@ -95,6 +95,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "expected expression"
 		}
 	},
+	"masterbelt.parser.concrete.expected_fn": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "'static' の後には 'fn' が必要です"
+		default:
+			return "expected 'fn' after 'static'"
+		}
+	},
 	"masterbelt.parser.concrete.expected_from": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":

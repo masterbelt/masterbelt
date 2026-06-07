@@ -17,6 +17,7 @@ masterbelt.parser.concrete.expected_from,expected 'from'
 masterbelt.parser.concrete.expected_path,expected import path string
 masterbelt.parser.concrete.expected_param_list,expected '('
 masterbelt.parser.concrete.expected_func_body,expected '->' or '{'
+masterbelt.parser.concrete.expected_fn,expected 'fn' after 'static'
 masterbelt.parser.concrete.arrow_block_body,expected expression after '->'; remove '->' to use a block body
 masterbelt.semantic.duplicate_declaration,duplicate declaration of {name}
 masterbelt.semantic.undefined_name,undefined name: {name}

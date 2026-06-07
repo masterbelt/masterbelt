@@ -17,6 +17,7 @@ masterbelt.parser.concrete.expected_from,'from' が必要です
 masterbelt.parser.concrete.expected_path,インポートパスの文字列が必要です
 masterbelt.parser.concrete.expected_param_list,'(' が必要です
 masterbelt.parser.concrete.expected_func_body,'->' か '{' が必要です
+masterbelt.parser.concrete.expected_fn,'static' の後には 'fn' が必要です
 masterbelt.parser.concrete.arrow_block_body,'->' の後には式が必要です。ブロック本体にするには '->' を削除してください
 masterbelt.semantic.duplicate_declaration,{name} が重複して宣言されています
 masterbelt.semantic.undefined_name,未定義の名前: {name}

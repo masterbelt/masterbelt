@@ -763,17 +763,33 @@ func (p *parser) parseImplConstInitializer() *cst.Node {
 // parseMethodDecl parses a method inside an impl block, prepending the
 // already-collected leading trivia:
 //
-//	[doc] [pub] [extern] [fn] Effect* Ident [GenericParams] ParamList ":" TypeExpr [Block]
+//	[doc] [pub] ( Modifier | [extern] [fn] ) Effect* Ident [GenericParams] ParamList ":" TypeExpr [Block]
+//	Modifier := "get" | "set" | "static" fn
 //
-// fn is optional (some methods omit it), the effect list (io, async, nondet)
-// sits before the name, the optional GenericParams declare the method's own
-// type variables (the A in fold<A>), and the body Block is absent for an extern
-// method.
-// The cursor sits on the first of pub/extern/fn/an effect/Ident.
+// The accessor/static modifiers are context keywords (the lexer leaves them as
+// identifiers): a get/set is a modifier only when an identifier — the property
+// name — follows it on the same line, so the prelude's get(index)/set(k, v)
+// methods stay ordinary; a static is a modifier when fn follows (a missing fn
+// is reported with expected_fn and recovered). A modifier excludes extern and
+// the bare fn before it (the grammar has no `extern get` or `get fn`), so the
+// instance-method branches below are skipped once one is read.
+//
+// fn is optional on an instance method (some methods omit it), the effect list
+// (io, async, nondet) sits before the name, the optional GenericParams declare
+// the method's own type variables (the A in fold<A>), and the body Block is
+// absent for an extern method. The cursor sits on the first of
+// pub/get/set/static/extern/fn/an effect/Ident.
 func (p *parser) parseMethodDecl(lead []cst.Green) *cst.Node {
 	children := lead
 	if p.kind() == token.Pub {
 		children = append(children, p.bump())
+	}
+	if p.methodModifier(&children) {
+		// A get/set modifier goes straight to the property name; a static
+		// modifier was followed by fn (consumed inside methodModifier), so an
+		// effect list may follow. Either way extern and the leading bare fn are
+		// excluded, so fall through to the effect list and name.
+		return p.finishMethodDecl(children)
 	}
 	if p.peekSignificant() == token.Extern {
 		p.skipTrivia(&children)
@@ -783,6 +799,84 @@ func (p *parser) parseMethodDecl(lead []cst.Green) *cst.Node {
 		p.skipTrivia(&children)
 		children = append(children, p.bump())
 	}
+	return p.finishMethodDecl(children)
+}
+
+// methodModifier recognizes an accessor or static modifier at the cursor and, if
+// it finds one, wraps its context-keyword identifier in a Modifier node appended
+// to children (consuming the following fn keyword for a static modifier) and
+// reports true. It returns false when the cursor begins an ordinary instance
+// method — including a method literally named get/set/static, distinguished by
+// what follows the identifier on the same line. The lookahead never crosses a
+// newline: impl members are newline-separated, so a get at a line's end is the
+// (mis-spelled) name of its own member, not a modifier over the next line's.
+func (p *parser) methodModifier(children *[]cst.Green) bool {
+	i := p.nextSignificantIndex(p.pos)
+	if p.toks[i].Kind != token.Ident {
+		return false
+	}
+	switch p.identText(i) {
+	case "get", "set":
+		// A modifier only when an identifier (the property name) follows on the
+		// same line; otherwise get/set is the method's own name (the prelude's
+		// get(i)/set(k, v) take this path, their "(" not an Ident).
+		if p.nextOnLine(i+1) != token.Ident {
+			return false
+		}
+		p.skipTrivia(children)
+		*children = append(*children, p.modifier())
+		return true
+	case "static":
+		next := p.nextOnLine(i + 1)
+		switch next {
+		case token.Fn:
+			p.skipTrivia(children)
+			*children = append(*children, p.modifier())
+			p.skipTrivia(children)
+			*children = append(*children, p.bump()) // "fn"
+			return true
+		case token.Ident:
+			// `static name(...)` with the fn forgotten: read static as the
+			// modifier and recover, rather than misreading it as a method named
+			// static and burying the real signature under cascading errors.
+			p.skipTrivia(children)
+			*children = append(*children, p.modifier())
+			p.report(newExpectedFnDiagnostic(p.lastStart, 0))
+			return true
+		default:
+			// `static(...)` or `static:` — a method literally named static.
+			return false
+		}
+	default:
+		return false
+	}
+}
+
+// modifier consumes the context-keyword identifier at the cursor and wraps it in
+// a Modifier node, so the AST lowering and the editor's token classifier read
+// the accessor/static marker from one node rather than re-deriving it.
+func (p *parser) modifier() cst.Green {
+	return cst.NewNode(cst.Modifier, []cst.Green{p.bump()})
+}
+
+// nextOnLine returns the kind of the next significant token at or after index i,
+// or token.Newline if a newline is reached first. It is the modifier lookahead's
+// same-line peek: a context keyword binds only to what follows it on its own
+// line, so a newline (an impl member separator) ends the window.
+func (p *parser) nextOnLine(i int) token.Kind {
+	for {
+		k := p.toks[i].Kind
+		if k == token.Newline || !isTrivia(k) {
+			return k
+		}
+		i++
+	}
+}
+
+// finishMethodDecl parses the remainder of a method declaration after its
+// modifiers — the effect list, name, optional generic parameters, parameter
+// list, result type, and body — and assembles the MethodDecl node.
+func (p *parser) finishMethodDecl(children []cst.Green) *cst.Node {
 	for p.peekSignificant().Effect() {
 		p.skipTrivia(&children)
 		children = append(children, p.bump()) // an effect keyword
