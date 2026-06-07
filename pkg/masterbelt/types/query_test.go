@@ -64,3 +64,33 @@ func TestForElement(t *testing.T) {
 		})
 	}
 }
+
+// TestUnifyAndAssignTypeVar checks two distinct TypeVar instances of the same
+// generic parameter unify and assign to each other — the basis for a generic
+// signature whose receiver and a self-typed argument are both T (max<T>(a: T,
+// b: T): T). Each type position resolves to a fresh TypeVar pointer carrying the
+// bound, so the relation must be by name, not identity. A different name does
+// not unify.
+func TestUnifyAndAssignTypeVar(t *testing.T) {
+	reg := builtin.Default()
+	comparable := &ir.TypeDef{Name: "comparable", Interface: &ir.InterfaceDef{}}
+	a := &ir.TypeVar{Name: "T", Bound: &ir.Named{Def: comparable}}
+	b := &ir.TypeVar{Name: "T", Bound: &ir.Named{Def: comparable}}
+	other := &ir.TypeVar{Name: "U"}
+
+	if a == b {
+		t.Fatal("test setup: a and b must be distinct pointers")
+	}
+	if got := Unify(reg, a, b); got != a {
+		t.Errorf("Unify(T, T) = %v, want the T", got)
+	}
+	if !Assignable(reg, a, b) {
+		t.Error("Assignable(T, T) = false, want true")
+	}
+	if got := Unify(reg, a, other); got != ir.Invalid {
+		t.Errorf("Unify(T, U) = %v, want Invalid", got)
+	}
+	if Assignable(reg, a, other) {
+		t.Error("Assignable(T, U) = true, want false")
+	}
+}

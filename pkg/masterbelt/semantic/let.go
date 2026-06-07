@@ -199,12 +199,15 @@ func withLocal(bs infer.BodyScope, name string, typ ir.Type) infer.BodyScope {
 
 // resolveBodyType resolves a let's type annotation against the body's universe
 // and namespace-qualified lookup — the same resolution a parameter annotation
-// uses — so list<int>, a named type, and a qualified name all resolve. It
+// uses — so list<int>, a named type, and a qualified name all resolve. The
+// enclosing function's or method's type parameters are in scope (bs.TScope), so a
+// match/switch arm or a let in a generic body may name a type parameter T and it
+// resolves to a TypeVar carrying its bound rather than an unknown type. It
 // reports nothing (the type names a let already resolved through the body
 // binder); an unknown name there yields ir.Invalid.
 func resolveBodyType(bs infer.BodyScope, t ast.TypeExpr) ir.Type {
 	r := &infer.TypeResolver{Defs: bs.Universe, Qualified: bs.Qualified}
-	return r.ResolveType(t, nil)
+	return r.ResolveType(t, bs.TScope)
 }
 
 // isConstName reports whether id names a top-level constant — so assigning to it

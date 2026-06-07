@@ -156,7 +156,7 @@ func Unify(reg *builtin.Registry, a, b ir.Type) ir.Type {
 		return b
 	case isDefaultInt(b) && IsInteger(reg, a):
 		return a
-	case sameBuiltin(a, b), sameNamed(a, b):
+	case sameBuiltin(a, b), sameNamed(a, b), sameTypeVar(a, b):
 		return a
 	}
 	if x, y, ok := sameAppShape(a, b); ok {
@@ -187,6 +187,22 @@ func sameNamed(a, b ir.Type) bool {
 	}
 	y, ok := b.(*ir.Named)
 	return ok && x.Def == y.Def
+}
+
+// sameTypeVar reports whether a and b are the same generic type variable — the
+// same name — so two occurrences of one parameter (max<T>(a: T, b: T), where the
+// receiver and a self-typed argument are both T) unify to it. They are distinct
+// pointers — each type position resolves to a fresh TypeVar carrying the bound —
+// so identity (the a == b case above) does not catch this; the name is the
+// variable's identity. Both bounds are the same parameter's bound, so neither is
+// consulted here.
+func sameTypeVar(a, b ir.Type) bool {
+	x, ok := a.(*ir.TypeVar)
+	if !ok {
+		return false
+	}
+	y, ok := b.(*ir.TypeVar)
+	return ok && x.Name == y.Name
 }
 
 // sameAppShape reports whether a and b are both applications of the same generic

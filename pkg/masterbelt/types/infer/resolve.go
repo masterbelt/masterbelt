@@ -40,9 +40,21 @@ func (r *TypeResolver) reportUnknown(node ast.Node, name string) {
 	}
 }
 
+// TypeScope is the set of generic parameter names in effect while resolving a
+// type expression, each mapped to its declared bound (nil for an unbounded
+// parameter, or one whose bound is not yet known). A name's presence in the map
+// — checked with comma-ok, not the value — marks it in scope; the bound is what
+// the resolver attaches to the TypeVar it returns, so a parameter declared with
+// a bound (map<K: comparable, V>) resolves to a TypeVar that already carries it.
+// This makes the declaration-site bound check (app) see the parameter's bound
+// instead of a free variable, the way E-17's BindTypeParamBounds rebinds bounds
+// onto a body's parameter types — only here at resolution time, from the start.
+type TypeScope = map[string]ir.Type
+
 // ResolveType resolves a type expression to its ir.Type, with scope holding the
-// generic parameter names in effect. A nil or unresolvable type is ir.Invalid.
-func (r *TypeResolver) ResolveType(t ast.TypeExpr, scope map[string]bool) ir.Type {
+// generic parameter names in effect (each mapped to its bound, nil if none). A
+// nil or unresolvable type is ir.Invalid.
+func (r *TypeResolver) ResolveType(t ast.TypeExpr, scope TypeScope) ir.Type {
 	switch t := t.(type) {
 	case nil:
 		return ir.Invalid
@@ -74,15 +86,15 @@ func (r *TypeResolver) ResolveType(t ast.TypeExpr, scope map[string]bool) ir.Typ
 // resolveNamed resolves a named type: a namespace-qualified type, the self
 // type, a generic parameter in scope, a generic application, a builtin
 // primitive, or a reference to a declared type.
-func (r *TypeResolver) resolveNamed(t *ast.NamedType, scope map[string]bool) ir.Type {
+func (r *TypeResolver) resolveNamed(t *ast.NamedType, scope TypeScope) ir.Type {
 	if t.Namespace != "" {
 		return r.resolveQualified(t, scope)
 	}
 	if t.Name == "self" {
 		return &ir.SelfType{}
 	}
-	if len(t.Args) == 0 && scope[t.Name] {
-		return &ir.TypeVar{Name: t.Name}
+	if bound, ok := scope[t.Name]; ok && len(t.Args) == 0 {
+		return &ir.TypeVar{Name: t.Name, Bound: bound}
 	}
 	if len(t.Args) > 0 {
 		def := r.lookup(t.Name)
@@ -109,7 +121,7 @@ func (r *TypeResolver) resolveNamed(t *ast.NamedType, scope map[string]bool) ir.
 // registry — only the import surface can satisfy it — and a local type never
 // shadows it: types have no members, so the dotted form has exactly one
 // meaning.
-func (r *TypeResolver) resolveQualified(t *ast.NamedType, scope map[string]bool) ir.Type {
+func (r *TypeResolver) resolveQualified(t *ast.NamedType, scope TypeScope) ir.Type {
 	if t.Name == "" {
 		return ir.Invalid // a recovered geo. — already a parse diagnostic
 	}
@@ -138,7 +150,15 @@ func (r *TypeResolver) resolveQualified(t *ast.NamedType, scope map[string]bool)
 // against the offending argument's syntax. The check is purely diagnostic: the
 // App is built regardless, so typing proceeds with the written type. It applies
 // uniformly to every declared generic type, not just map.
-func (r *TypeResolver) app(def *ir.TypeDef, argExprs []ast.TypeExpr, scope map[string]bool) ir.Type {
+//
+// An argument that is itself a type parameter (a TypeVar) carries the bound the
+// resolver attached from the parameter scope, so the check is exact at the
+// declaration site: a parameter declared with the required bound (K: comparable
+// used as map<K, V>) satisfies it via Satisfies' interface-inheritance walk,
+// while a parameter declared with no bound — or too weak a bound — fails it, the
+// first line of defense against an unbounded variable smuggled into a bounded
+// constructor (fn g<K>(m: map<K, nint>)).
+func (r *TypeResolver) app(def *ir.TypeDef, argExprs []ast.TypeExpr, scope TypeScope) ir.Type {
 	args := make([]ir.Type, len(argExprs))
 	for i, a := range argExprs {
 		args[i] = r.ResolveType(a, scope)
@@ -162,9 +182,9 @@ func (r *TypeResolver) app(def *ir.TypeDef, argExprs []ast.TypeExpr, scope map[s
 
 // ResolveName resolves a bare type name (a conversion's callee) to its type, or
 // ir.Invalid if it is not a known type. A name in scope is a generic parameter.
-func (r *TypeResolver) ResolveName(name string, scope map[string]bool) ir.Type {
-	if scope[name] {
-		return &ir.TypeVar{Name: name}
+func (r *TypeResolver) ResolveName(name string, scope TypeScope) ir.Type {
+	if bound, ok := scope[name]; ok {
+		return &ir.TypeVar{Name: name, Bound: bound}
 	}
 	if def := r.lookup(name); def != nil {
 		if def.Builtin {
@@ -179,7 +199,7 @@ func (r *TypeResolver) ResolveName(name string, scope map[string]bool) ir.Type {
 // scope nor a known type — the implicit type variables a method signature
 // introduces (the R in map(func: fn(T): R): list<R>). They are returned in order
 // of first appearance, so a caller can add them to the scope before resolving.
-func (r *TypeResolver) FreeTypeVars(scope map[string]bool, ts ...ast.TypeExpr) []string {
+func (r *TypeResolver) FreeTypeVars(scope TypeScope, ts ...ast.TypeExpr) []string {
 	var out []string
 	seen := map[string]bool{}
 	var walk func(t ast.TypeExpr)
@@ -189,7 +209,7 @@ func (r *TypeResolver) FreeTypeVars(scope map[string]bool, ts ...ast.TypeExpr) [
 			// A qualified name (geo.Point) is never a type variable: it can
 			// only mean a namespace's export, and resolves (or is reported)
 			// there.
-			if t.Namespace == "" && len(t.Args) == 0 && t.Name != "self" && !scope[t.Name] && !seen[t.Name] && r.lookup(t.Name) == nil {
+			if _, inScope := scope[t.Name]; t.Namespace == "" && len(t.Args) == 0 && t.Name != "self" && !inScope && !seen[t.Name] && r.lookup(t.Name) == nil {
 				seen[t.Name] = true
 				out = append(out, t.Name)
 			}

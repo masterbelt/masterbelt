@@ -66,7 +66,13 @@ func Assignable(reg *builtin.Registry, from, to ir.Type) bool {
 			return true
 		}
 	}
-	return sameBuiltin(from, to) || sameNamed(from, to)
+	// The same generic type variable is assignable to itself — two occurrences of
+	// one parameter (max<T>(a: T, b: T): T returns a T where T is expected) are
+	// distinct TypeVar pointers, so the identity check above does not catch it; the
+	// name is the variable's identity. The interface-inheritance arm above already
+	// handled a bounded variable flowing to its bound interface (a T: orderable
+	// usable where comparable is expected).
+	return sameBuiltin(from, to) || sameNamed(from, to) || sameTypeVar(from, to)
 }
 
 // UnionSelection is the outcome of choosing which member of a union a value
@@ -149,7 +155,7 @@ func sameType(a, b ir.Type) bool {
 	if a == b {
 		return true
 	}
-	if sameBuiltin(a, b) || sameNamed(a, b) {
+	if sameBuiltin(a, b) || sameNamed(a, b) || sameTypeVar(a, b) {
 		return true
 	}
 	if x, y, ok := sameAppShape(a, b); ok {

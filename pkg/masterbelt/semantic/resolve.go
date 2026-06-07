@@ -164,9 +164,9 @@ func resolveTypes(env eval.Env, file *ast.File, at func(ast.Node) span, diags *d
 // versus provided, for the conformance check; Interface.Parents records the
 // resolved parent applications, for the inheritance closure.
 func resolveInterfaceDecl(r *infer.TypeResolver, reg *builtin.Registry, id *ast.InterfaceDecl, def *ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List, fns bodyFuncs) {
-	scope := make(map[string]bool, len(id.Params))
+	scope := make(infer.TypeScope, len(id.Params))
 	for _, p := range id.Params {
-		scope[p.Name] = true
+		scope[p.Name] = nil
 	}
 	for _, p := range id.Params {
 		var bound ir.Type
@@ -174,6 +174,10 @@ func resolveInterfaceDecl(r *infer.TypeResolver, reg *builtin.Registry, id *ast.
 			bound = r.ResolveType(p.Constraint, scope)
 		}
 		def.Params = append(def.Params, &ir.TypeParam{Name: p.Name, Bound: bound})
+		// Back-fill the resolved bound into the scope, so a member signature that
+		// names this parameter as a bounded constructor's argument resolves it to a
+		// TypeVar carrying the bound (the declaration-site bound check then sees it).
+		scope[p.Name] = bound
 	}
 	// The parents (supertraits): each must resolve to an interface, the way an
 	// impl tag must. A parent that is not an interface is reported here
@@ -335,13 +339,15 @@ func appendDistinct(defs []*ir.TypeDef, def *ir.TypeDef) []*ir.TypeDef {
 // the implicit ones (free names in a parameter position) join the signature's
 // scope, the parameters and result resolve against it, and a provided member's
 // default body lowers to IR. A required member has no body.
-func resolveInterfaceMember(r *infer.TypeResolver, reg *builtin.Registry, self ir.Type, m *ast.InterfaceMember, scope map[string]bool, fns bodyFuncs) *ir.Method {
+func resolveInterfaceMember(r *infer.TypeResolver, reg *builtin.Registry, self ir.Type, m *ast.InterfaceMember, scope infer.TypeScope, fns bodyFuncs) *ir.Method {
 	method := &ir.Method{Name: m.Name, Public: m.Public, Doc: m.Doc}
 
 	// The member's own type variables join a fresh scope: the explicit ones
 	// (the A in fold<A>) and the implicit free names appearing in a parameter
 	// type (the R in map's fn(T): R), neither bound by the interface nor naming
 	// a known type. A member with no own variables reuses the interface scope.
+	// An explicit member type parameter carries its own bound (fold<A: orderable>),
+	// an implicit free name is unbounded.
 	mscope := scope
 	var extra []string
 	for _, tp := range m.TypeParams {
@@ -355,12 +361,19 @@ func resolveInterfaceMember(r *infer.TypeResolver, reg *builtin.Registry, self i
 		extra = append(extra, free...)
 	}
 	if len(extra) > 0 {
-		mscope = make(map[string]bool, len(scope)+len(extra))
-		for k := range scope {
-			mscope[k] = true
+		mscope = make(infer.TypeScope, len(scope)+len(extra))
+		for k, v := range scope {
+			mscope[k] = v
 		}
 		for _, n := range extra {
-			mscope[n] = true
+			mscope[n] = nil
+		}
+		// Resolve each explicit member type parameter's bound in the full member
+		// scope and back-fill it, so a member naming it carries the bound.
+		for _, tp := range m.TypeParams {
+			if tp.Constraint != nil {
+				mscope[tp.Name] = r.ResolveType(tp.Constraint, mscope)
+			}
 		}
 	}
 
@@ -401,9 +414,9 @@ func resolveInterfaceMember(r *infer.TypeResolver, reg *builtin.Registry, self i
 // hover card — see the inherited contracts through the child alone, with no
 // special-casing for inheritance.
 func resolveImpls(r *infer.TypeResolver, reg *builtin.Registry, impls []ast.TypeExpr, def *ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List) {
-	scope := make(map[string]bool, len(def.Params))
+	scope := make(infer.TypeScope, len(def.Params))
 	for _, p := range def.Params {
-		scope[p.Name] = true
+		scope[p.Name] = p.Bound
 	}
 	for _, impl := range impls {
 		t := r.ResolveType(impl, scope)
@@ -609,9 +622,9 @@ func bodyDef(reg *builtin.Registry, t ir.Type) *ir.TypeDef {
 // env folds the associated-constant initializers (it is nil in callers that do
 // not evaluate).
 func resolveDecl(env eval.Env, r *infer.TypeResolver, reg *builtin.Registry, td *ast.TypeDecl, def *ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List, fns bodyFuncs) {
-	scope := make(map[string]bool, len(td.Params))
+	scope := make(infer.TypeScope, len(td.Params))
 	for _, p := range td.Params {
-		scope[p.Name] = true
+		scope[p.Name] = nil
 	}
 	for _, p := range td.Params {
 		var bound ir.Type
@@ -619,6 +632,12 @@ func resolveDecl(env eval.Env, r *infer.TypeResolver, reg *builtin.Registry, td 
 			bound = r.ResolveType(p.Constraint, scope)
 		}
 		def.Params = append(def.Params, &ir.TypeParam{Name: p.Name, Bound: bound})
+		// Back-fill the resolved bound, so the body, associated constants, and
+		// methods that name this parameter as a bounded constructor's argument
+		// (type Index<K: comparable> = map<K, nint>) resolve it to a TypeVar
+		// carrying the bound — the declaration-site bound check then passes for a
+		// sufficiently-bounded parameter and fires for an unbounded one.
+		scope[p.Name] = bound
 	}
 	// A `= builtin` body marks a primitive: its type is itself, and its native
 	// semantics come from the registry rather than from a defining type.
@@ -667,13 +686,13 @@ func resolveDecl(env eval.Env, r *infer.TypeResolver, reg *builtin.Registry, td 
 // with no bound on that side (the arbitrary-precision nint). A duplicate name
 // keeps the first and is reported. tscope holds the type's generic-parameter
 // names, so an annotation may mention them.
-func resolveAssocConsts(env eval.Env, r *infer.TypeResolver, reg *builtin.Registry, td *ast.TypeDecl, def *ir.TypeDef, tscope map[string]bool, at func(ast.Node) span, diags *diagnostic.List) {
+func resolveAssocConsts(env eval.Env, r *infer.TypeResolver, reg *builtin.Registry, td *ast.TypeDecl, def *ir.TypeDef, tscope infer.TypeScope, at func(ast.Node) span, diags *diagnostic.List) {
 	def.Consts = resolveAssocConstList(env, r, reg, def, td.Consts, tscope, at, diags)
 }
 
 // resolveAssocConstList is the shared resolution of a list of associated
 // constants — used for both a type declaration's and an enum's impl block.
-func resolveAssocConstList(env eval.Env, r *infer.TypeResolver, reg *builtin.Registry, def *ir.TypeDef, decls []*ast.ConstDecl, tscope map[string]bool, at func(ast.Node) span, diags *diagnostic.List) []*ir.AssocConst {
+func resolveAssocConstList(env eval.Env, r *infer.TypeResolver, reg *builtin.Registry, def *ir.TypeDef, decls []*ast.ConstDecl, tscope infer.TypeScope, at func(ast.Node) span, diags *diagnostic.List) []*ir.AssocConst {
 	if len(decls) == 0 {
 		return nil
 	}
@@ -890,7 +909,7 @@ func resolveEnumDecl(env eval.Env, r *infer.TypeResolver, reg *builtin.Registry,
 	// The operator methods: the six comparisons every enum carries, then the
 	// impl block's own methods (which may shadow a comparison or add new ones).
 	def.Methods = append(def.Methods, builtin.EnumComparisonMethods()...)
-	scope := map[string]bool{}
+	scope := infer.TypeScope{}
 	seen := make(map[string]bool, len(ed.Methods))
 	for _, m := range ed.Methods {
 		rm := resolveMethod(r, reg, &ir.Named{Def: def}, m, scope, fns)
@@ -1047,28 +1066,40 @@ func kindName(k ir.ConstKind) string {
 // body may call a top-level function. reg and self (the receiver type) let the
 // body binder infer an inferred let's value type. The body is not yet
 // type-checked.
-func resolveMethod(r *infer.TypeResolver, reg *builtin.Registry, self ir.Type, m *ast.MethodDecl, scope map[string]bool, fns bodyFuncs) *ir.Method {
+func resolveMethod(r *infer.TypeResolver, reg *builtin.Registry, self ir.Type, m *ast.MethodDecl, scope infer.TypeScope, fns bodyFuncs) *ir.Method {
 	method := &ir.Method{Name: m.Name, Public: m.Public, Extern: m.Extern, Effects: m.Effects, Doc: m.Doc, Syntax: m}
 
-	// Method-introduced type variables: free type names appearing in a parameter
-	// type that the enclosing type does not bind and that name no known type — the
-	// R in map(func: fn(T): R): list<R>. They join the scope for this method's
-	// signature so they resolve to ir.TypeVar instead of being reported unknown.
-	// Only parameter positions are scanned: a variable must be inferable from an
-	// argument, so an unknown name in the result alone (a typo like `Nope`) stays
-	// an unknown-type error rather than becoming a silent, unsolvable variable.
+	// Method-introduced type variables: the explicit ones (the A in fold<A>) and
+	// the free type names appearing in a parameter type that the enclosing type
+	// does not bind and that name no known type — the R in map(func: fn(T): R):
+	// list<R>. They join the scope for this method's signature so they resolve to
+	// ir.TypeVar instead of being reported unknown. Free names are scanned only in
+	// parameter positions: a variable must be inferable from an argument, so an
+	// unknown name in the result alone (a typo like `Nope`) stays an unknown-type
+	// error rather than becoming a silent, unsolvable variable.
 	mscope := scope
 	paramTypes := make([]ast.TypeExpr, 0, len(m.Params))
 	for _, p := range m.Params {
 		paramTypes = append(paramTypes, p.Type)
 	}
-	if vars := r.FreeTypeVars(scope, paramTypes...); len(vars) > 0 {
-		mscope = make(map[string]bool, len(scope)+len(vars))
-		for k := range scope {
-			mscope[k] = true
+	free := r.FreeTypeVars(scope, paramTypes...)
+	if len(m.TypeParams) > 0 || len(free) > 0 {
+		mscope = make(infer.TypeScope, len(scope)+len(m.TypeParams)+len(free))
+		for k, v := range scope {
+			mscope[k] = v
 		}
-		for _, v := range vars {
-			mscope[v] = true
+		for _, tp := range m.TypeParams {
+			mscope[tp.Name] = nil
+		}
+		for _, v := range free {
+			mscope[v] = nil
+		}
+		// Resolve each explicit method type parameter's bound in the full method
+		// scope and back-fill it, so a parameter naming it carries the bound.
+		for _, tp := range m.TypeParams {
+			if tp.Constraint != nil {
+				mscope[tp.Name] = r.ResolveType(tp.Constraint, mscope)
+			}
 		}
 	}
 

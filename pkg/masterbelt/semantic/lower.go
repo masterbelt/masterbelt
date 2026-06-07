@@ -209,7 +209,7 @@ type bodyBinder struct {
 	// type (a method body), used the same way for a "switch self".
 	paramTypes map[string]ir.Type
 	selfType   ir.Type
-	tscope     map[string]bool
+	tscope     infer.TypeScope
 	funcs      bodyFuncs
 	self       bool // whether self has a value here (a method body; never a function's)
 	// locals maps each let-bound block-local in scope to its settled type. A
