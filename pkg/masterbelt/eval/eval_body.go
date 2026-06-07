@@ -375,19 +375,20 @@ func evalForCollection(s *ast.ForStmt, coll *ir.Constant, of bool, ctx evalCtx) 
 	return nil, ifFellThrough // every element visited without returning
 }
 
-// evalForRange runs a for over a folded range: each element of the half-open
-// sequence start..end-1 binds the loop variable (the element for of, its 0-based
+// evalForRange runs a for over a folded range: each element of the inclusive
+// sequence start..end binds the loop variable (the element for of, its 0-based
 // position for in — the same key rangeFold threads) and runs the body. The walk
 // is bounded by maxRangeIterations: a range wider than the cap leaves the for
 // undecided (ifUnknown) rather than iterating, so a wide range never hangs the
-// folder — the same verdict rangeFold gives. An empty range (end at or below
-// start) falls through without running the body. The outcome semantics match the
+// folder — the same verdict rangeFold gives. An empty range (end below start)
+// falls through without running the body. The outcome semantics match the
 // collection arm.
 func evalForRange(s *ast.ForStmt, rng *ir.Constant, of bool, ctx evalCtx) (*ir.Constant, ifOutcome) {
 	if rng.Start == nil || rng.End == nil {
 		return nil, ifUnknown
 	}
 	count := new(big.Int).Sub(rng.End, rng.Start)
+	count.Add(count, big.NewInt(1))
 	if count.Sign() <= 0 {
 		return nil, ifFellThrough // the empty range: the body never runs
 	}
@@ -396,7 +397,7 @@ func evalForRange(s *ast.ForStmt, rng *ir.Constant, of bool, ctx evalCtx) (*ir.C
 	}
 	cur := new(big.Int).Set(rng.Start)
 	one := big.NewInt(1)
-	for i := int64(0); cur.Cmp(rng.End) < 0; i++ {
+	for i := int64(0); cur.Cmp(rng.End) <= 0; i++ {
 		// The loop variable: the element for of, its 0-based position for in — the
 		// same key rangeFold threads.
 		elem := ir.IntConstant(new(big.Int).Set(cur))

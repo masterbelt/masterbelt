@@ -745,8 +745,8 @@ func convert(def *ir.TypeDef, args []ast.Expr, ctx evalCtx) *ir.Constant {
 }
 
 // convertRange folds the range constructor range(start, end): both bounds must
-// fold to integers, and the result is a range value over them — the half-open
-// sequence start..end-1 (an end at or below start being the empty range). The
+// fold to integers, and the result is a range value over them — the inclusive
+// sequence start..end (an end below start being the empty range). The
 // sequence is not materialized here; the bounds are kept lazily so a wide range
 // is a small value, and the fold/for walk over it is bounded separately. A
 // non-two argument list (a recovered or step-form call) or an unfoldable or

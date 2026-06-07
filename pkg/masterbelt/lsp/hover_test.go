@@ -90,7 +90,7 @@ func TestTypeHover(t *testing.T) {
 		if !strings.Contains(h.Contents.Value, "type range = builtin") {
 			t.Errorf("hover = %q, want the builtin signature", h.Contents.Value)
 		}
-		if !strings.Contains(h.Contents.Value, "half-open") {
+		if !strings.Contains(h.Contents.Value, "inclusive") {
 			t.Errorf("hover = %q, want the doc comment", h.Contents.Value)
 		}
 	})

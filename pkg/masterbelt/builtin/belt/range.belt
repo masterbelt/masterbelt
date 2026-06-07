@@ -1,9 +1,9 @@
 use { nint } from "./signed.belt"
 use { foldable } from "./collection.belt"
 
-/// A half-open sequence of integers, constructed with range(start, end): the
-/// values start, start+1, ..., end-1, with an end at or below start being the
-/// empty sequence. It is constructed by the two-argument conversion form the way
+/// An inclusive sequence of integers, constructed with range(start, end): the
+/// values start, start+1, ..., end — both bounds included — with an end below
+/// start being the empty sequence. It is constructed by the two-argument conversion form the way
 /// error("msg") is by the one-argument form — a native constructor that builds
 /// the value — and is not a stored collection: its bounds are kept lazily, so a
 /// wide range costs nothing until it is walked.

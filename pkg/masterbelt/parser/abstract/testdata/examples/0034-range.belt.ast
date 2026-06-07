@@ -13,7 +13,7 @@ File
     value (call (. (call Identifier "range" IntLit "0" IntLit "10") count))
   ConstDecl
     name "EmptyCount"
-    value (call (. (call Identifier "range" IntLit "5" IntLit "5") count))
+    value (call (. (call Identifier "range" IntLit "5" IntLit "4") count))
   ConstDecl
     name "AnyBig"
     value (call (. (call Identifier "range" IntLit "0" IntLit "10") any) (fn(v: nint): bool (return (call (. Identifier "v" gt) IntLit "8"))))
@@ -56,34 +56,34 @@ File
     name "emptySum"
     result nint
       let "t" = IntLit "100"
-      for i of (call Identifier "range" IntLit "10" IntLit "10")
+      for i of (call Identifier "range" IntLit "10" IntLit "9")
           assign Identifier "t" = (call (. Identifier "t" add) Identifier "i")
       return Identifier "t"
   AssertDecl
-    cond (call (. (call Identifier "total") eql) IntLit "45")
+    cond (call (. (call Identifier "total") eql) IntLit "55")
   AssertDecl
-    cond (call (. (call Identifier "positionSum") eql) IntLit "10")
+    cond (call (. (call Identifier "positionSum") eql) IntLit "15")
   AssertDecl
     cond (call (. (call Identifier "emptySum") eql) IntLit "100")
   AssertDecl
-    cond (call (. (call (. (call Identifier "range" IntLit "0" IntLit "10") count)) eql) IntLit "10")
+    cond (call (. (call (. (call Identifier "range" IntLit "0" IntLit "10") count)) eql) IntLit "11")
   AssertDecl
-    cond (call (. (call (. (call Identifier "range" IntLit "5" IntLit "5") count)) eql) IntLit "0")
+    cond (call (. (call (. (call Identifier "range" IntLit "5" IntLit "4") count)) eql) IntLit "0")
   AssertDecl
     cond (call (. (call Identifier "range" IntLit "0" IntLit "10") any) (fn(v: nint): bool (return (call (. Identifier "v" gt) IntLit "8"))))
   AssertDecl
     cond (call (. (call Identifier "range" IntLit "0" IntLit "10") all) (fn(v: nint): bool (return (call (. Identifier "v" gteq) IntLit "0"))))
   AssertDecl
-    cond (call (. (call (. (call (. (call Identifier "range" IntLit "0" IntLit "5") map) (fn(v: nint): nint (return (call (. Identifier "v" mul) IntLit "2")))) len)) eql) IntLit "5")
+    cond (call (. (call (. (call (. (call Identifier "range" IntLit "0" IntLit "5") map) (fn(v: nint): nint (return (call (. Identifier "v" mul) IntLit "2")))) len)) eql) IntLit "6")
   AssertDecl
-    cond (call (. (call (. (call (. (call Identifier "range" IntLit "0" IntLit "5") map) (fn(v: nint): nint (return (call (. Identifier "v" mul) IntLit "2")))) fold) IntLit "0" (fn(acc: nint, k: nint, v: nint): nint (return (call (. Identifier "acc" add) Identifier "v")))) eql) IntLit "20")
+    cond (call (. (call (. (call (. (call Identifier "range" IntLit "0" IntLit "5") map) (fn(v: nint): nint (return (call (. Identifier "v" mul) IntLit "2")))) fold) IntLit "0" (fn(acc: nint, k: nint, v: nint): nint (return (call (. Identifier "acc" add) Identifier "v")))) eql) IntLit "30")
   AssertDecl
-    cond (call (. (call (. (call (. (call Identifier "range" IntLit "0" IntLit "10") filter) (fn(v: nint): bool (return (call (. (call (. Identifier "v" rem) IntLit "2") eql) IntLit "0")))) len)) eql) IntLit "5")
+    cond (call (. (call (. (call (. (call Identifier "range" IntLit "0" IntLit "10") filter) (fn(v: nint): bool (return (call (. (call (. Identifier "v" rem) IntLit "2") eql) IntLit "0")))) len)) eql) IntLit "6")
   AssertDecl
-    cond (call (. (call (. (call (. (call Identifier "range" IntLit "3" IntLit "7") values)) len)) eql) IntLit "4")
+    cond (call (. (call (. (call (. (call Identifier "range" IntLit "3" IntLit "7") values)) len)) eql) IntLit "5")
   AssertDecl
-    cond (call (. (call (. (call (. (call Identifier "range" IntLit "3" IntLit "7") values)) fold) IntLit "0" (fn(acc: nint, k: nint, v: nint): nint (return (call (. Identifier "acc" add) Identifier "v")))) eql) IntLit "18")
+    cond (call (. (call (. (call (. (call Identifier "range" IntLit "3" IntLit "7") values)) fold) IntLit "0" (fn(acc: nint, k: nint, v: nint): nint (return (call (. Identifier "acc" add) Identifier "v")))) eql) IntLit "25")
   AssertDecl
-    cond (call (. (call (. (call (. (call Identifier "range" IntLit "3" IntLit "7") keys)) fold) IntLit "0" (fn(acc: nint, k: nint, v: nint): nint (return (call (. Identifier "acc" add) Identifier "v")))) eql) IntLit "6")
+    cond (call (. (call (. (call (. (call Identifier "range" IntLit "3" IntLit "7") keys)) fold) IntLit "0" (fn(acc: nint, k: nint, v: nint): nint (return (call (. Identifier "acc" add) Identifier "v")))) eql) IntLit "10")
   AssertDecl
-    cond (call (. (call (. (call Identifier "range" IntLit "0" IntLit "4") fold) IntLit "0" (fn(acc: nint, k: nint, v: nint): nint (return (call (. Identifier "acc" add) Identifier "v")))) eql) IntLit "6")
+    cond (call (. (call (. (call Identifier "range" IntLit "0" IntLit "4") fold) IntLit "0" (fn(acc: nint, k: nint, v: nint): nint (return (call (. Identifier "acc" add) Identifier "v")))) eql) IntLit "10")

@@ -113,10 +113,10 @@ func rangeMethod(ctx evalCtx, recv *ir.Constant, name string, args []*ir.Constan
 }
 
 // rangeFold folds range.fold — the foldable primitive every provided method is
-// built on. It threads an accumulator over the half-open sequence start..end-1,
+// built on. It threads an accumulator over the inclusive sequence start..end,
 // the step seeing (acc, key, value) where the key is the element's 0-based
 // position (a range's key is its index, like a list's) and the value is the
-// element. An end at or below start is the empty range, which folds to the
+// element. An end below start is the empty range, which folds to the
 // initial accumulator. The walk is bounded by maxRangeIterations: a range wider
 // than the cap does not fold (nil), so a wide range never hangs the folder or
 // exhausts memory. An unfoldable step application (a non-function step, a body
@@ -128,10 +128,11 @@ func rangeFold(ctx evalCtx, recv *ir.Constant, args []*ir.Constant) *ir.Constant
 	if recv.Start == nil || recv.End == nil {
 		return nil
 	}
-	// The element count is end - start, clamped at zero. A count past the cap does
-	// not fold — checked on the big.Int before any iteration, so a wide range is
-	// rejected in O(1) rather than walked.
+	// The element count is end - start + 1 (both bounds included), clamped at
+	// zero. A count past the cap does not fold — checked on the big.Int before
+	// any iteration, so a wide range is rejected in O(1) rather than walked.
 	count := new(big.Int).Sub(recv.End, recv.Start)
+	count.Add(count, big.NewInt(1))
 	if count.Sign() <= 0 {
 		return args[0] // the empty range folds to the initial accumulator
 	}
@@ -142,7 +143,7 @@ func rangeFold(ctx evalCtx, recv *ir.Constant, args []*ir.Constant) *ir.Constant
 	step := args[1]
 	cur := new(big.Int).Set(recv.Start)
 	one := big.NewInt(1)
-	for i := int64(0); cur.Cmp(recv.End) < 0; i++ {
+	for i := int64(0); cur.Cmp(recv.End) <= 0; i++ {
 		key := ir.IntConstant(big.NewInt(i))           // the 0-based position
 		value := ir.IntConstant(new(big.Int).Set(cur)) // the element
 		acc = apply(ctx, step, []*ir.Constant{acc, key, value})
