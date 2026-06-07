@@ -308,7 +308,7 @@ func buildTypeDefs(q queries, fileID FileID, file *ast.File, imp importTable, fn
 	// Enum member initializers fold through the file's evaluator (which the
 	// memoizing engine tracks and cycle-guards); a const reference in an enum
 	// value resolves like any other.
-	td.list = resolveTypes(evalEnv{q: q, file: fileID}, file, nil, nil, nil, q.registry(), extern, qualifiedFrom(q, imp), fns)
+	td.list = resolveTypes(exprFolder{q: q, file: fileID}, file, nil, nil, nil, q.registry(), extern, qualifiedFrom(q, imp), fns)
 	for _, def := range td.list {
 		if def.Name != "" {
 			if _, ok := td.byName[def.Name]; !ok {

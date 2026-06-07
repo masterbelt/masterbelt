@@ -24,6 +24,21 @@ type constBinder struct {
 	// annotation), or nil when there is none. It reaches only the initializer's
 	// top leaf — a bare member is meaningful only as the const's whole value.
 	expected *ir.TypeDef
+	// universe, when non-nil, overrides the file's universe query for type-name
+	// resolution — the in-flight defs map the type-resolution pass supplies, so
+	// an eager fold inside the memoized typeDefs computation (an enum member's
+	// or associated constant's initializer) resolves the file's own types
+	// without re-entering its own query.
+	universe map[string]*ir.TypeDef
+}
+
+// uni is the type-name surface the binder resolves against: the override when
+// the caller supplied one, else the file's universe query.
+func (b constBinder) uni() map[string]*ir.TypeDef {
+	if b.universe != nil {
+		return b.universe
+	}
+	return b.q.universe(b.file)
 }
 
 func (b constBinder) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
@@ -48,12 +63,12 @@ func (b constBinder) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
 			return &ir.Reference{Target: b.irOf[target], Syntax: e}
 		}
 		// A member access whose receiver names an enum type (Rarity.Common).
-		if def, idx := enumMemberAccess(b.q.universe(b.file), e); idx >= 0 {
+		if def, idx := enumMemberAccess(b.uni(), e); idx >= 0 {
 			return &ir.EnumMemberValue{Def: def, Index: idx, Syntax: e}
 		}
 		// A member access whose receiver names a type and whose member names one
 		// of its associated constants (int8.Max, Level.Max).
-		if def, idx := assocConstAccess(b.q.universe(b.file), e); idx >= 0 {
+		if def, idx := assocConstAccess(b.uni(), e); idx >= 0 {
 			return &ir.AssocConstValue{Def: def, Index: idx, Syntax: e}
 		}
 		// Otherwise the receiver is a value: a field access on a record-typed
@@ -65,7 +80,7 @@ func (b constBinder) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
 		case *ast.Identifier:
 			// A call whose callee names a type is a conversion T(x) — the type
 			// wins over a same-named function, exactly as in a body.
-			if def, ok := b.q.universe(b.file)[callee.Name]; ok {
+			if def, ok := b.uni()[callee.Name]; ok {
 				t := ir.Type(&ir.Named{Def: def})
 				if def.Builtin {
 					t = &ir.Builtin{Name: def.Name}
@@ -83,7 +98,7 @@ func (b constBinder) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
 			// call (Celsius.freezing()) — the Type.Name path, after the namespace
 			// function claim. A constant initializer has no locals/params, so no name
 			// shadows the type.
-			if def := staticFnDef(b.q.universe(b.file), callee, nil); def != nil {
+			if def := staticFnDef(b.uni(), callee, nil); def != nil {
 				return staticCall(def, callee.Member.Name, e, sub)
 			}
 		}

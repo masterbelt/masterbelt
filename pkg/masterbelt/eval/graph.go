@@ -511,6 +511,13 @@ func graphRangeLit(v *ir.RangeLit, ctx graphCtx) *ir.Constant {
 func graphConvert(v *ir.Conversion, ctx graphCtx) *ir.Constant {
 	def := methodTableDef(ctx.env.Registry(), v.Type)
 	if def == nil {
+		// A builtin the registry does not natively model (range, list, map —
+		// prelude-declared) resolves through the universe instead.
+		if b, ok := v.Type.(*ir.Builtin); ok {
+			def = ctx.env.LookupType(b.Name)
+		}
+	}
+	if def == nil {
 		return nil
 	}
 	if def.Builtin && def.Name == "range" {

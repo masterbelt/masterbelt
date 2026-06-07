@@ -111,13 +111,11 @@ func selfType(def *ir.TypeDef) ir.Type {
 	return &ir.Named{Def: def}
 }
 
-// predicateEnv is the eval environment of a refinement predicate: the registry,
-// and the type universe a self-method call's annotations resolve against (its
-// own ReceiverTyper). The type rules guarantee the predicate references no
-// constant or top-level function — only self, literals, and self's own methods —
-// so Resolve/ResolveFunc never need to find anything; the universe is read only
-// to resolve a nominal type annotation a self method's signature names (the
-// receiver-def channel for a chained self-method call).
+// predicateEnv is the fold environment of a refinement predicate: the
+// registry, and the type universe a name in the predicate's graph resolves
+// against. The type rules guarantee the predicate references no constant —
+// only self, literals, and self's own methods — so ConstValue never needs to
+// find anything.
 type predicateEnv struct {
 	reg       *builtin.Registry
 	universe  map[string]*ir.TypeDef

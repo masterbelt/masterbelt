@@ -1,13 +1,11 @@
-// This file carries the checker-selected overloads from the checking walk
-// into the IR and the folder. The IR's doctrine is that every reference is
-// bound to its declaration; an overloaded call lowered type-blind carries only
-// a name, so after the checking walks run, writeBackResolutions binds each
-// call node to the individual the checker selected (ir.Call.Resolved and
-// friends — the .ir dump renders the selection, and codegen and the structural
-// editors are its future readers). resolvedEnv then arms the same selections
-// as an eval.CallResolver for the late re-fold: a call the value-kind rule
-// cannot split folds by the checker's choice, monotonically widening the
-// foldable set without growing a second type system inside eval.
+// This file carries the checker's settled facts from the checking walk into
+// the IR. The IR's doctrine is that every reference is bound to its
+// declaration; the lowering is type-blind, so after the checking walks run,
+// writeBackResolutions binds each node to what the checker settled — the
+// selected overload (ir.Call.Resolved and friends), the solved substitution,
+// the node's type, and the explicit adaptions — monotonically widening what
+// the late re-fold can fold without growing a second type system inside
+// eval.
 package semantic
 
 import (

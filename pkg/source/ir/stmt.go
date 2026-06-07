@@ -28,3 +28,39 @@ func StmtKinds() []Stmt {
 func unhandledStmt(s Stmt) string {
 	return fmt.Sprintf("ir: unhandled Stmt kind %T", s)
 }
+
+// ValueKinds returns one minimal instance of every Value implementer, in a
+// stable order — the registry the exhaustiveness pins walk, exactly as
+// StmtKinds does for the statement forms. A reflection check asserts it lists
+// every type in this package that satisfies Value, so adding a value form
+// forces adding it here — which forces the dump, the walkers, and the
+// interpreter to account for it rather than silently dropping it.
+func ValueKinds() []Value {
+	return []Value{
+		&Adapt{},
+		&IntLiteral{},
+		&StringLiteral{},
+		&BoolLiteral{},
+		&DatetimeLiteral{},
+		&DurationLiteral{},
+		&CollectionLiteral{},
+		&RecordValue{},
+		&Reference{},
+		&Call{},
+		&FuncCall{},
+		&StaticCall{},
+		&Apply{},
+		&FuncLiteral{},
+		&SelfValue{},
+		&ParamRef{},
+		&LocalRef{},
+		&FieldAccess{},
+		&Conversion{},
+		&Await{},
+		&Ternary{},
+		&RangeLit{},
+		&NullValue{},
+		&EnumMemberValue{},
+		&AssocConstValue{},
+	}
+}

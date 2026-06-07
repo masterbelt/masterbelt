@@ -10,7 +10,6 @@ package eval
 import (
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/types"
-	"github.com/masterbelt/masterbelt/pkg/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
 )
 
@@ -86,15 +85,7 @@ func graphApplyValue(ctx graphCtx, fn *ir.Constant, argNodes []ir.Value) *ir.Con
 			return nil
 		}
 	}
-	return apply(ctx.toEval(), fn, args)
-}
-
-// toEval bridges the graph context into the AST folder's evalCtx for the
-// machinery the two folders share during the migration (the closure apply, the
-// collection intrinsics). The shared pieces read only the value-level fields —
-// env, locals, depth, the budget channel — never the AST channels.
-func (ctx graphCtx) toEval() evalCtx {
-	return evalCtx{env: graphEnvBridge{ctx.env}, locals: ctx.locals, depth: ctx.depth, budgetHit: ctx.budgetHit}
+	return graphApply(ctx, fn, args)
 }
 
 // graphFuncCall folds a call of a top-level function: the checker-selected
@@ -239,10 +230,10 @@ func dispatchCall(ctx graphCtx, v *ir.Call, recv *ir.Constant, name string, args
 		return c
 	}
 	if recv.Kind == ir.ConstCollection {
-		return collectionMethod(ctx.toEval(), recv, name, args)
+		return collectionMethod(ctx, recv, name, args)
 	}
 	if recv.Kind == ir.ConstRange {
-		return rangeMethod(ctx.toEval(), recv, name, args)
+		return rangeMethod(ctx, recv, name, args)
 	}
 	if recv.Kind == ir.ConstEnum {
 		return enumComparison(recv, name, args)
@@ -557,17 +548,3 @@ func defAcceptsKind(reg *builtin.Registry, def *ir.TypeDef, k ir.ConstKind) bool
 	}
 	return true
 }
-
-// graphEnvBridge adapts a GraphEnv into the AST folder's Env for the shared
-// value-level machinery (the collection intrinsics, the closure apply) during
-// the migration. The resolution methods are never reached by that machinery —
-// it works on folded values — so they answer nothing.
-type graphEnvBridge struct{ env GraphEnv }
-
-func (b graphEnvBridge) Resolve(*ast.Identifier) *ast.ConstDecl            { return nil }
-func (b graphEnvBridge) ResolveMember(*ast.MemberExpr) *ast.ConstDecl      { return nil }
-func (b graphEnvBridge) ResolveFunc(*ast.Identifier) []*ast.FuncDecl       { return nil }
-func (b graphEnvBridge) ResolveFuncMember(*ast.MemberExpr) []*ast.FuncDecl { return nil }
-func (b graphEnvBridge) ValueOf(*ast.ConstDecl) *ir.Constant               { return nil }
-func (b graphEnvBridge) LookupType(name string) *ir.TypeDef                { return b.env.LookupType(name) }
-func (b graphEnvBridge) Registry() *builtin.Registry                       { return b.env.Registry() }

@@ -354,7 +354,7 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 	module.Types = q.typeDefs(fileID)
 	imp := q.importsOf(fileID)
 	bfns := bodyFuncs{local: funcShellsByName(file, fnShells), qualified: qualifiedFuncsFrom(q, imp), shells: fnShells, constRef: constRefFrom(q, fileID), nsConstRef: nsConstRefFrom(q, fileID)}
-	resolveTypes(evalEnv{q: q, file: fileID}, file, at, diags, res, reg, outerTypes(q, imp), qualifiedFrom(q, imp), bfns)
+	resolveTypes(exprFolder{q: q, file: fileID}, file, at, diags, res, reg, outerTypes(q, imp), qualifiedFrom(q, imp), bfns)
 
 	// The module's functions are this file's shells, their signatures and
 	// bodies (re)resolved here with reporting; their bodies type-check the
@@ -711,12 +711,12 @@ func refinedDef(t ir.Type) *ir.TypeDef {
 // return sites all run, so range and refinement are enforced at exactly the same
 // positions:
 //
-//   - the effective target is the union member the value flows in as (eval.MemberFor
-//     runs the same exact→unique selection the fold tags with), or want itself when
-//     it is not a union — so `sbyte | error` checks the value against `sbyte`, and a
-//     refined member's predicate runs;
-//   - the value is folded with no expectation (eval.Expr), so the raw value is read
-//     even though the expectation-driven fold refuses to build it (memberAdmits);
+//   - the effective target is the union member the value flows in as (the same
+//     exact→unique selection the fold tags with), or want itself when it is not a
+//     union — so `sbyte | error` checks the value against `sbyte`, and a refined
+//     member's predicate runs;
+//   - the value is folded with no expectation, so the raw value is read even
+//     though the expectation-driven fold refuses to build it (memberAdmits);
 //     an overflowing conversion already folds to nil and is reported at its own site
 //     (ScalarConversion), so it is not seen here and never double-reported.
 //

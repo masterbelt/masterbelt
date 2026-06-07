@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/eval"
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/lower"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/parser/abstract"
 	"github.com/masterbelt/masterbelt/pkg/project"
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
@@ -233,7 +234,9 @@ func TestFoldFailureClassifier(t *testing.T) {
 				if q.valueOf(decl) != nil {
 					t.Fatalf("const %s folded; the classifier only runs on failures", name)
 				}
-				return eval.DeclFailure(decl, annotationResolved(q, soleFileID, decl), evalEnv{q: q, file: soleFileID})
+				folder := exprFolder{q: q, file: soleFileID}
+				graph := lower.Value(decl.Value, folder.binder(annotationEnum(q, soleFileID, decl)))
+				return eval.GraphFailure(graph, annotationResolved(q, soleFileID, decl), folder.env())
 			}
 		}
 		t.Fatalf("const %s not found", name)

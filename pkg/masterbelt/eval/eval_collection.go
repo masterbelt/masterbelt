@@ -28,7 +28,7 @@ import (
 //   - mapness-dependent — does not fold for an unknown empty collection, since a
 //     list and a map disagree: set (a list's out-of-range write versus a map's
 //     upsert). A settled map's set is the upsert this fold's main case folds.
-func collectionMethod(ctx evalCtx, recv *ir.Constant, name string, args []*ir.Constant) *ir.Constant {
+func collectionMethod(ctx graphCtx, recv *ir.Constant, name string, args []*ir.Constant) *ir.Constant {
 	switch name {
 	case "len":
 		return collectionLen(recv, args)
@@ -208,7 +208,7 @@ func collectionLen(recv *ir.Constant, args []*ir.Constant) *ir.Constant {
 // and a list's is the element index. An unfoldable step application (a non-
 // function step, a body that does not fold, or the recursion guard) leaves the
 // whole fold unevaluated.
-func collectionFold(ctx evalCtx, recv *ir.Constant, args []*ir.Constant) *ir.Constant {
+func collectionFold(ctx graphCtx, recv *ir.Constant, args []*ir.Constant) *ir.Constant {
 	if len(args) != 2 || args[1].Kind != ir.ConstFunc {
 		return nil
 	}
@@ -219,7 +219,7 @@ func collectionFold(ctx evalCtx, recv *ir.Constant, args []*ir.Constant) *ir.Con
 		if key == nil {
 			key = ir.IntConstant(big.NewInt(int64(i))) // a list's key is the index
 		}
-		acc = apply(ctx, step, []*ir.Constant{acc, key, entry.Value})
+		acc = graphApply(ctx, step, []*ir.Constant{acc, key, entry.Value})
 		if acc == nil {
 			return nil
 		}
@@ -236,7 +236,7 @@ func collectionFold(ctx evalCtx, recv *ir.Constant, args []*ir.Constant) *ir.Con
 // range's equality does fold to a constant (unlike a list's, whose elements are
 // not known to the type rule), so (0..9) == range(0, 9) folds true. Anything
 // else has no constant value here.
-func rangeMethod(ctx evalCtx, recv *ir.Constant, name string, args []*ir.Constant) *ir.Constant {
+func rangeMethod(ctx graphCtx, recv *ir.Constant, name string, args []*ir.Constant) *ir.Constant {
 	switch name {
 	case "fold":
 		return rangeFold(ctx, recv, args)
@@ -296,7 +296,7 @@ func rangeElement(recv *ir.Constant, i int64) *big.Int {
 // wider than the cap does not fold (nil), so a wide range never hangs the folder
 // or exhausts memory. An unfoldable step application (a non-function step, a body
 // that does not fold, or the recursion guard) also leaves the fold unevaluated.
-func rangeFold(ctx evalCtx, recv *ir.Constant, args []*ir.Constant) *ir.Constant {
+func rangeFold(ctx graphCtx, recv *ir.Constant, args []*ir.Constant) *ir.Constant {
 	if len(args) != 2 || args[1].Kind != ir.ConstFunc {
 		return nil
 	}
@@ -320,7 +320,7 @@ func rangeFold(ctx evalCtx, recv *ir.Constant, args []*ir.Constant) *ir.Constant
 	for i := int64(0); i < n; i++ {
 		key := ir.IntConstant(big.NewInt(i))           // the 0-based position
 		value := ir.IntConstant(rangeElement(recv, i)) // the element
-		acc = apply(ctx, step, []*ir.Constant{acc, key, value})
+		acc = graphApply(ctx, step, []*ir.Constant{acc, key, value})
 		if acc == nil {
 			return nil
 		}
@@ -333,7 +333,7 @@ func rangeFold(ctx evalCtx, recv *ir.Constant, args []*ir.Constant) *ir.Constant
 // its provided foldable.map through the def channel instead, so a keyed entry here
 // does not fold; an unknown empty receiver folds to the empty list — map over no
 // elements is the empty list whichever kind it is. The result is always a list.
-func collectionMap(ctx evalCtx, recv *ir.Constant, args []*ir.Constant) *ir.Constant {
+func collectionMap(ctx graphCtx, recv *ir.Constant, args []*ir.Constant) *ir.Constant {
 	if len(args) != 1 || args[0].Kind != ir.ConstFunc {
 		return nil
 	}
@@ -342,7 +342,7 @@ func collectionMap(ctx evalCtx, recv *ir.Constant, args []*ir.Constant) *ir.Cons
 		if entry.Key != nil {
 			return nil // map.map (keyed entries) is not foldable
 		}
-		v := apply(ctx, args[0], []*ir.Constant{entry.Value})
+		v := graphApply(ctx, args[0], []*ir.Constant{entry.Value})
 		if v == nil {
 			return nil
 		}
