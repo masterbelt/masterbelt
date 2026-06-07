@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	protocol "github.com/owenrumney/go-lsp/lsp"
+
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/parser/abstract"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/semantic"
@@ -13,7 +15,6 @@ import (
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/source/cst"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
-	protocol "github.com/owenrumney/go-lsp/lsp"
 )
 
 // workspace is one analyzed program: the file closure of a project an open

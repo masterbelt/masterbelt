@@ -7,9 +7,10 @@ import (
 	"strings"
 	"testing"
 
+	protocol "github.com/owenrumney/go-lsp/lsp"
+
 	"github.com/masterbelt/masterbelt/internal/belttest"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/semantic"
-	protocol "github.com/owenrumney/go-lsp/lsp"
 )
 
 // fileURI builds the URI of a project file through the same conversion the

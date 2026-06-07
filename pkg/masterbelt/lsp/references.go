@@ -1,10 +1,12 @@
 package lsp
 
 import (
+	"sort"
+
+	protocol "github.com/owenrumney/go-lsp/lsp"
+
 	"github.com/masterbelt/masterbelt/pkg/source/cst"
 	"github.com/masterbelt/masterbelt/pkg/source/token"
-	protocol "github.com/owenrumney/go-lsp/lsp"
-	"sort"
 )
 
 // References, rename, and prepare-rename are all the reverse of the resolver:

@@ -29,12 +29,13 @@ import (
 	"path/filepath"
 	"sync"
 
+	protocol "github.com/owenrumney/go-lsp/lsp"
+	"github.com/owenrumney/go-lsp/server"
+
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/parser/abstract"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/semantic"
 	"github.com/masterbelt/masterbelt/pkg/project"
 	"github.com/masterbelt/masterbelt/pkg/source"
-	protocol "github.com/owenrumney/go-lsp/lsp"
-	"github.com/owenrumney/go-lsp/server"
 )
 
 const serverName = "masterbelt"

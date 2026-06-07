@@ -4,8 +4,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/masterbelt/masterbelt/internal/belttest"
 	protocol "github.com/owenrumney/go-lsp/lsp"
+
+	"github.com/masterbelt/masterbelt/internal/belttest"
 )
 
 // funcSrc declares a documented function and a call site.

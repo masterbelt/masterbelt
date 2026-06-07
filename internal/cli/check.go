@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/spf13/cobra"
+
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
 	"github.com/masterbelt/masterbelt/pkg/diagnostic/reporter"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/parser/abstract"
@@ -13,7 +15,6 @@ import (
 	"github.com/masterbelt/masterbelt/pkg/project"
 	"github.com/masterbelt/masterbelt/pkg/project/config"
 	"github.com/masterbelt/masterbelt/pkg/source"
-	"github.com/spf13/cobra"
 )
 
 func init() {

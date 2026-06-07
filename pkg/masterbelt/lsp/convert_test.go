@@ -3,9 +3,10 @@ package lsp
 import (
 	"testing"
 
+	protocol "github.com/owenrumney/go-lsp/lsp"
+
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/parser/abstract"
 	"github.com/masterbelt/masterbelt/pkg/source"
-	protocol "github.com/owenrumney/go-lsp/lsp"
 )
 
 func TestPositionUTF16RoundTrip(t *testing.T) {

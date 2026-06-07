@@ -6,9 +6,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/masterbelt/masterbelt/pkg/source/ast"
 	protocol "github.com/owenrumney/go-lsp/lsp"
 	"github.com/owenrumney/go-lsp/servertest"
+
+	"github.com/masterbelt/masterbelt/pkg/source/ast"
 )
 
 // TestIncrementalDidChange drives the range-based change path directly: an LSP

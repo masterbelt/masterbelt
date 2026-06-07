@@ -1,8 +1,9 @@
 package lsp
 
 import (
-	"github.com/masterbelt/masterbelt/pkg/source/ir"
 	protocol "github.com/owenrumney/go-lsp/lsp"
+
+	"github.com/masterbelt/masterbelt/pkg/source/ir"
 )
 
 // codeActions offers, for each un-annotated constant overlapping the requested

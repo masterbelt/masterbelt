@@ -71,7 +71,7 @@ issues:
 formatters:
   enable:
     - gofmt
-    # - goimports # would regroup imports in 28 files; adopt in one sweep
+    - goimports
   settings:
     goimports:
       local-prefixes:

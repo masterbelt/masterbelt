@@ -1,9 +1,10 @@
 package lsp
 
 import (
+	protocol "github.com/owenrumney/go-lsp/lsp"
+
 	"github.com/masterbelt/masterbelt/pkg/source/cst"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
-	protocol "github.com/owenrumney/go-lsp/lsp"
 )
 
 // letHover describes the block-local denoted at offset: a let-bound local (its

@@ -5,6 +5,8 @@ import (
 	"sort"
 	"strconv"
 
+	protocol "github.com/owenrumney/go-lsp/lsp"
+
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/parser/abstract"
 	"github.com/masterbelt/masterbelt/pkg/source"
@@ -12,7 +14,6 @@ import (
 	"github.com/masterbelt/masterbelt/pkg/source/formatter"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
 	"github.com/masterbelt/masterbelt/pkg/source/token"
-	protocol "github.com/owenrumney/go-lsp/lsp"
 )
 
 // This file converts between masterbelt's byte-offset model and LSP's
