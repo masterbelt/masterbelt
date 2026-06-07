@@ -267,16 +267,48 @@ type TypeParam struct {
 	Bound Type // the constraint, or nil if unconstrained
 }
 
+// MethodKind classifies a method by how it is accessed: an ordinary instance
+// method (value.name(args)), a getter (value.name, read like a field), a setter
+// (value.name = v), or a static fn (Type.name(args)). It mirrors ast.MethodKind,
+// carried onto the resolved method so the type rules and the evaluator place and
+// reach each member through the right name space. The registry's bootstrap
+// methods and the prelude's existing methods stay MethodNormal (the zero value),
+// so every method that pre-dates accessors is unaffected.
+type MethodKind int
+
+const (
+	MethodNormal MethodKind = iota // an instance method, the default
+	MethodGetter                   // a getter: read as value.name
+	MethodSetter                   // a setter: written value.name = v
+	MethodStatic                   // a static fn: called Type.name(...)
+)
+
+func (k MethodKind) String() string {
+	switch k {
+	case MethodGetter:
+		return "getter"
+	case MethodSetter:
+		return "setter"
+	case MethodStatic:
+		return "static"
+	default:
+		return "method"
+	}
+}
+
 // Method is one method declared in a type's impl block: its signature and, for a
 // non-extern method, the statement body that computes its result. Extern methods
 // have no body — their implementation is a native intrinsic in the builtin
 // registry. The effect list declares the method's interaction with the world;
-// an empty list means pure.
+// an empty list means pure. Kind records the accessor/static modifier (or
+// MethodNormal for an ordinary method), which decides the name space the member
+// lives in.
 type Method struct {
 	Name    string
 	Public  bool
 	Extern  bool
-	Effects []string // the declared effects in source order, or nil for pure
+	Kind    MethodKind // the accessor/static modifier, or MethodNormal
+	Effects []string   // the declared effects in source order, or nil for pure
 	Doc     []string
 	Params  []Param
 	Result  Type

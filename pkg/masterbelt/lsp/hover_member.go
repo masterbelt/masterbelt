@@ -83,6 +83,16 @@ func methodSignatureSubst(m *ir.Method, subst map[string]ir.Type) string {
 	if m.Extern {
 		b.WriteString("extern ")
 	}
+	// The accessor/static modifier leads the signature, the way it is written:
+	// get name / set name / static fn name. An ordinary method carries none.
+	switch m.Kind {
+	case ir.MethodGetter:
+		b.WriteString("get ")
+	case ir.MethodSetter:
+		b.WriteString("set ")
+	case ir.MethodStatic:
+		b.WriteString("static fn ")
+	}
 	for _, eff := range m.Effects {
 		b.WriteString(eff + " ")
 	}
@@ -182,7 +192,40 @@ func memberHover(doc view, offset int, trees map[cst.Green]cst.Tree) *protocol.H
 			Range: &r,
 		}
 	}
+	// A getter read (value.name): its declaration card, the same shape a method's
+	// is — the signature with the receiver's generic arguments substituted, its
+	// doc below.
+	if g, subst, ok := receiverGetter(doc, recv, name); ok {
+		var b strings.Builder
+		b.WriteString("```masterbelt\n")
+		b.WriteString(methodSignatureSubst(g, subst))
+		b.WriteString("\n```")
+		if len(g.Doc) > 0 {
+			b.WriteString("\n\n")
+			b.WriteString(strings.Join(g.Doc, "\n"))
+		}
+		return &protocol.Hover{
+			Contents: protocol.MarkupContent{Kind: protocol.Markdown, Value: b.String()},
+			Range:    &r,
+		}
+	}
 	return nil
+}
+
+// receiverGetter finds the getter named name on the receiver's type, with the
+// receiver's substitution, for a getter-read hover. It reads the kind-tagged
+// methods from ReceiverMethods (which returns every kind) and keeps the getter.
+func receiverGetter(doc view, recv ir.Type, name string) (*ir.Method, map[string]ir.Type, bool) {
+	methods, subst, ok := doc.ReceiverMethods(recv)
+	if !ok {
+		return nil, nil, false
+	}
+	for _, m := range methods {
+		if m.Kind == ir.MethodGetter && m.Name == name {
+			return m, subst, true
+		}
+	}
+	return nil, nil, false
 }
 
 // receiverTypeOf resolves the type a member access's receiver has: self is
@@ -452,6 +495,56 @@ func assocConstHover(doc view, offset int) *protocol.Hover {
 		b.WriteString("\n\n")
 		b.WriteString(strings.Join(c.Doc, "\n"))
 	}
+
+	node, _ := memberNodeAt(doc, offset)
+	rng := cst.Root(node)
+	r := toRange(doc.Buffer(), rng.Offset(), rng.End())
+	return &protocol.Hover{
+		Contents: protocol.MarkupContent{Kind: protocol.Markdown, Value: b.String()},
+		Range:    &r,
+	}
+}
+
+// staticCallHover describes a static fn call's callee at offset (Celsius.freezing):
+// each static fn overload of that name on the type, its signature and doc — the
+// Type.name(...) twin of the method hover card. It returns nil when offset is not
+// on a static-fn member access (the enum, associated-constant, and value hover
+// paths claim their forms first).
+func staticCallHover(doc view, offset int) *protocol.Hover {
+	member, ok := memberAccessAt(doc, offset)
+	if !ok {
+		return nil
+	}
+	recv, ok := member.Receiver.(*ast.Identifier)
+	if !ok || doc.Resolve(recv) != nil {
+		return nil // a value shadowing the type name is a value access
+	}
+	def := lookupTypeName(doc, recv.Name)
+	if def == nil {
+		return nil
+	}
+	var statics []*ir.Method
+	for _, m := range def.Methods {
+		if m.Kind == ir.MethodStatic && m.Name == member.Member.Name {
+			statics = append(statics, m)
+		}
+	}
+	if len(statics) == 0 {
+		return nil
+	}
+	var b strings.Builder
+	b.WriteString("```masterbelt\n")
+	for i, m := range statics {
+		if i > 0 {
+			b.WriteString("\n")
+		}
+		for _, d := range m.Doc {
+			b.WriteString("/// " + d + "\n")
+		}
+		b.WriteString(methodSignatureSubst(m, nil))
+		b.WriteString("\n")
+	}
+	b.WriteString("```")
 
 	node, _ := memberNodeAt(doc, offset)
 	rng := cst.Root(node)

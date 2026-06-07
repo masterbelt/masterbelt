@@ -450,6 +450,13 @@ func TestDocumentFuzz(t *testing.T) {
 		// run between the name and the brace, with a bare and an applied parent, so
 		// the random walk reaches parseInterfaceParents and its recovery.
 		"interface I: a, b { f(): nint }", ": foldable<nint, T>",
+		// The accessor/static modifiers (context keywords): the bare words edited
+		// beside an impl member, and a whole impl carrying a getter and a static
+		// fn, so the random walk reaches the modifier lookahead — which reads the
+		// buffer to classify get/set/static — and the incremental == full oracle
+		// pins that the buffer-reading reparse matches a fresh parse.
+		"get ", "set ", "static ", "static fn ",
+		"type C = sbyte impl { get g(): nint { return 0 } static fn s(): C { return self } }",
 	}
 
 	start := "const x = 0\n"

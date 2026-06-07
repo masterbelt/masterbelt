@@ -9,6 +9,7 @@ import (
 )
 
 const (
+	CodeAccessorCollision          diagnostic.Code = "masterbelt.semantic.accessor_collision"
 	CodeAmbiguousFuncOverload      diagnostic.Code = "masterbelt.semantic.ambiguous_func_overload"
 	CodeAmbiguousImport            diagnostic.Code = "masterbelt.semantic.ambiguous_import"
 	CodeAmbiguousOverload          diagnostic.Code = "masterbelt.semantic.ambiguous_overload"
@@ -36,12 +37,15 @@ const (
 	CodeDuplicateOverload          diagnostic.Code = "masterbelt.semantic.duplicate_overload"
 	CodeDuplicateSwitchArm         diagnostic.Code = "masterbelt.semantic.duplicate_switch_arm"
 	CodeEffectInPureContext        diagnostic.Code = "masterbelt.semantic.effect_in_pure_context"
+	CodeGenericStatic              diagnostic.Code = "masterbelt.semantic.generic_static"
 	CodeImmutableData              diagnostic.Code = "masterbelt.semantic.immutable_data"
 	CodeIndexOutOfRange            diagnostic.Code = "masterbelt.semantic.index_out_of_range"
 	CodeInterfaceMemberConflict    diagnostic.Code = "masterbelt.semantic.interface_member_conflict"
 	CodeInterfaceMemberOverride    diagnostic.Code = "masterbelt.semantic.interface_member_override"
 	CodeInvalidEnumBaseType        diagnostic.Code = "masterbelt.semantic.invalid_enum_base_type"
+	CodeInvalidGetterSignature     diagnostic.Code = "masterbelt.semantic.invalid_getter_signature"
 	CodeInvalidOperation           diagnostic.Code = "masterbelt.semantic.invalid_operation"
+	CodeInvalidSetterSignature     diagnostic.Code = "masterbelt.semantic.invalid_setter_signature"
 	CodeLambdaArityMismatch        diagnostic.Code = "masterbelt.semantic.lambda_arity_mismatch"
 	CodeLoopVarImmutable           diagnostic.Code = "masterbelt.semantic.loop_var_immutable"
 	CodeMissingEffect              diagnostic.Code = "masterbelt.semantic.missing_effect"
@@ -65,6 +69,7 @@ const (
 	CodeRefinementViolation        diagnostic.Code = "masterbelt.semantic.refinement_violation"
 	CodeScrutineeNotComparable     diagnostic.Code = "masterbelt.semantic.scrutinee_not_comparable"
 	CodeSelfOutsideMethod          diagnostic.Code = "masterbelt.semantic.self_outside_method"
+	CodeStaticCollision            diagnostic.Code = "masterbelt.semantic.static_collision"
 	CodeTernaryBranchMismatch      diagnostic.Code = "masterbelt.semantic.ternary_branch_mismatch"
 	CodeTernaryConditionNotBool    diagnostic.Code = "masterbelt.semantic.ternary_condition_not_bool"
 	CodeTypeMismatch               diagnostic.Code = "masterbelt.semantic.type_mismatch"
@@ -78,11 +83,27 @@ const (
 	CodeUnknownEnumMember          diagnostic.Code = "masterbelt.semantic.unknown_enum_member"
 	CodeUnknownField               diagnostic.Code = "masterbelt.semantic.unknown_field"
 	CodeUnknownMember              diagnostic.Code = "masterbelt.semantic.unknown_member"
+	CodeUnknownStatic              diagnostic.Code = "masterbelt.semantic.unknown_static"
 	CodeUnknownType                diagnostic.Code = "masterbelt.semantic.unknown_type"
 	CodeUnreachableArm             diagnostic.Code = "masterbelt.semantic.unreachable_arm"
 	CodeUnusedEffect               diagnostic.Code = "masterbelt.semantic.unused_effect"
 	CodeUseNotFound                diagnostic.Code = "masterbelt.semantic.use_not_found"
 )
+
+func newAccessorCollisionDiagnostic(offset int, width int, name string, typ string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"name": diagnostic.Str(name),
+		"typ":  diagnostic.Str(typ),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeAccessorCollision,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeAccessorCollision, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
 
 func newAmbiguousFuncOverloadDiagnostic(offset int, width int, name string, types string) diagnostic.Diagnostic {
 	fields := map[string]fmt.Stringer{
@@ -473,6 +494,20 @@ func newEffectInPureContextDiagnostic(offset int, width int, effect string, cont
 	}
 }
 
+func newGenericStaticDiagnostic(offset int, width int, name string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"name": diagnostic.Str(name),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeGenericStatic,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeGenericStatic, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
 func newImmutableDataDiagnostic(offset int, width int) diagnostic.Diagnostic {
 	return diagnostic.Diagnostic{
 		Severity: diagnostic.Error,
@@ -546,6 +581,20 @@ func newInvalidEnumBaseTypeDiagnostic(offset int, width int, typ string) diagnos
 	}
 }
 
+func newInvalidGetterSignatureDiagnostic(offset int, width int, name string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"name": diagnostic.Str(name),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeInvalidGetterSignature,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeInvalidGetterSignature, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
 func newInvalidOperationDiagnostic(offset int, width int, method string, types string) diagnostic.Diagnostic {
 	fields := map[string]fmt.Stringer{
 		"method": diagnostic.Str(method),
@@ -555,6 +604,20 @@ func newInvalidOperationDiagnostic(offset int, width int, method string, types s
 		Severity: diagnostic.Error,
 		Code:     CodeInvalidOperation,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeInvalidOperation, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newInvalidSetterSignatureDiagnostic(offset int, width int, name string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"name": diagnostic.Str(name),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeInvalidSetterSignature,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeInvalidSetterSignature, fields),
 		Fields:   fields,
 		Offset:   offset,
 		Width:    width,
@@ -888,6 +951,21 @@ func newSelfOutsideMethodDiagnostic(offset int, width int) diagnostic.Diagnostic
 	}
 }
 
+func newStaticCollisionDiagnostic(offset int, width int, name string, typ string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"name": diagnostic.Str(name),
+		"typ":  diagnostic.Str(typ),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeStaticCollision,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeStaticCollision, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
 func newTernaryBranchMismatchDiagnostic(offset int, width int, then string, els string) diagnostic.Diagnostic {
 	fields := map[string]fmt.Stringer{
 		"then": diagnostic.Str(then),
@@ -1061,6 +1139,21 @@ func newUnknownMemberDiagnostic(offset int, width int, name string, namespace st
 		Severity: diagnostic.Error,
 		Code:     CodeUnknownMember,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeUnknownMember, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newUnknownStaticDiagnostic(offset int, width int, name string, typ string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"name": diagnostic.Str(name),
+		"typ":  diagnostic.Str(typ),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeUnknownStatic,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeUnknownStatic, fields),
 		Fields:   fields,
 		Offset:   offset,
 		Width:    width,

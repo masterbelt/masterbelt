@@ -161,6 +161,9 @@ func dumpMethod(b *strings.Builder, m *Method) {
 	if m.Extern {
 		mod += " extern"
 	}
+	if m.Kind != MethodNormal {
+		mod += " " + m.Kind.String()
+	}
 	fmt.Fprintf(b, "    method %q%s\n", m.Name, mod)
 	for _, doc := range m.Doc {
 		fmt.Fprintf(b, "      doc %q\n", doc)
@@ -457,10 +460,15 @@ func dumpValue(v Value) string {
 		}
 		return fmt.Sprintf("Reference -> %q", name)
 	case *Call:
-		// receiver.method(arg, arg) with each operand rendered recursively.
+		// receiver.method(arg, arg) with each operand rendered recursively; a
+		// setter call renders as the property write it lowered from, receiver.name
+		// = v, so the .ir diff shows the rebinding form rather than a method call.
 		args := make([]string, len(x.Args))
 		for i, a := range x.Args {
 			args[i] = dumpValue(a)
+		}
+		if x.Setter && len(x.Args) == 1 {
+			return fmt.Sprintf("%s.%s = %s", dumpValue(x.Receiver), x.Method, args[0])
 		}
 		return fmt.Sprintf("%s.%s(%s)", dumpValue(x.Receiver), x.Method, strings.Join(args, ", "))
 	case *FuncCall:
@@ -473,6 +481,18 @@ func dumpValue(v Value) string {
 			args[i] = dumpValue(a)
 		}
 		return fmt.Sprintf("%s(%s)", name, strings.Join(args, ", "))
+	case *StaticCall:
+		// Type.name(arg, arg): the owning type and the static fn name, the
+		// Type.Name path enum members and associated constants render through too.
+		typ := "<unresolved>"
+		if x.Def != nil {
+			typ = x.Def.Name
+		}
+		args := make([]string, len(x.Args))
+		for i, a := range x.Args {
+			args[i] = dumpValue(a)
+		}
+		return fmt.Sprintf("%s.%s(%s)", typ, x.Name, strings.Join(args, ", "))
 	case *FuncLiteral:
 		parts := []string{"fn(" + strings.Join(x.Params, ", ") + ")"}
 		for _, s := range x.Body {

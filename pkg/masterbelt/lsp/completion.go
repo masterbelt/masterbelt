@@ -106,23 +106,44 @@ func memberItems(doc view, offset int) ([]protocol.CompletionItem, bool) {
 
 	var items []protocol.CompletionItem
 	if methods, subst, ok := doc.ReceiverMethods(recv); ok {
-		kind := protocol.CompletionItemKindMethod
+		methodKind := protocol.CompletionItemKindMethod
+		propertyKind := protocol.CompletionItemKindProperty
 		snippet := protocol.InsertTextFormatSnippet
 		for _, m := range methods {
-			item := protocol.CompletionItem{
-				Label:  m.Name,
-				Kind:   &kind,
-				Detail: methodSignatureSubst(m, subst),
-			}
-			if len(m.Doc) > 0 {
-				item.Documentation = &protocol.MarkupContent{
-					Kind:  protocol.Markdown,
-					Value: strings.Join(m.Doc, "\n"),
+			switch m.Kind {
+			case ir.MethodSetter, ir.MethodStatic:
+				// A setter is written on the left of an assignment, not read after a
+				// dot; a static fn is reached through the type (Type.name), not a
+				// value. Neither belongs in a value member-access completion.
+				continue
+			case ir.MethodGetter:
+				// A getter reads as a property (value.name), so it is offered as a
+				// Property with its result type, not a call snippet.
+				item := protocol.CompletionItem{
+					Label:  m.Name,
+					Kind:   &propertyKind,
+					Detail: ": " + types.Substitute(m.Result, subst).String(),
 				}
+				if len(m.Doc) > 0 {
+					item.Documentation = &protocol.MarkupContent{Kind: protocol.Markdown, Value: strings.Join(m.Doc, "\n")}
+				}
+				items = append(items, item)
+			default:
+				item := protocol.CompletionItem{
+					Label:  m.Name,
+					Kind:   &methodKind,
+					Detail: methodSignatureSubst(m, subst),
+				}
+				if len(m.Doc) > 0 {
+					item.Documentation = &protocol.MarkupContent{
+						Kind:  protocol.Markdown,
+						Value: strings.Join(m.Doc, "\n"),
+					}
+				}
+				item.InsertText = callSnippet(m, subst)
+				item.InsertTextFormat = &snippet
+				items = append(items, item)
 			}
-			item.InsertText = callSnippet(m, subst)
-			item.InsertTextFormat = &snippet
-			items = append(items, item)
 		}
 	}
 	if rec, ok := recordOf(recv); ok {
@@ -155,7 +176,7 @@ func typeMemberItems(doc view, member *ast.MemberExpr) ([]protocol.CompletionIte
 		return nil, false
 	}
 	def := lookupTypeName(doc, recv.Name)
-	if def == nil || (def.Enum == nil && len(def.Consts) == 0) {
+	if def == nil || (def.Enum == nil && len(def.Consts) == 0 && !hasStatic(def)) {
 		return nil, false
 	}
 	var items []protocol.CompletionItem
@@ -181,7 +202,36 @@ func typeMemberItems(doc view, member *ast.MemberExpr) ([]protocol.CompletionIte
 		}
 		items = append(items, item)
 	}
+	// Static fns are reached through the type (Type.name(...)) — the same Type.Name
+	// path the enum members and associated constants above take — so they join the
+	// type-member completion as Function items with a call snippet.
+	fnKind := protocol.CompletionItemKindFunction
+	snippet := protocol.InsertTextFormatSnippet
+	for _, m := range def.Methods {
+		if m.Kind != ir.MethodStatic {
+			continue
+		}
+		item := protocol.CompletionItem{Label: m.Name, Kind: &fnKind, Detail: methodSignatureSubst(m, nil)}
+		if len(m.Doc) > 0 {
+			item.Documentation = &protocol.MarkupContent{Kind: protocol.Markdown, Value: strings.Join(m.Doc, "\n")}
+		}
+		item.InsertText = callSnippet(m, nil)
+		item.InsertTextFormat = &snippet
+		items = append(items, item)
+	}
 	return items, true
+}
+
+// hasStatic reports whether a type definition declares any static fn — so a
+// type-member completion (Type.) is offered even when the type has no enum
+// members or associated constants.
+func hasStatic(def *ir.TypeDef) bool {
+	for _, m := range def.Methods {
+		if m.Kind == ir.MethodStatic {
+			return true
+		}
+	}
+	return false
 }
 
 // lookupEnumType returns the enum definition named name in the document's type

@@ -232,16 +232,46 @@ func NewParamDef(name string, typ TypeExpr, syntax *cst.Node) *ParamDef {
 
 // --- methods and statements -------------------------------------------------
 
-// MethodDecl is a method of an impl block: its modifiers, effects, name,
+// MethodKind classifies an impl member by how it is accessed: an ordinary
+// instance method (value.name(args)), a getter (value.name, read like a field),
+// a setter (value.name = v, a property write), or a static fn (Type.name(args),
+// scoped to the type rather than to a receiver). The kind is carried from the
+// parser's context-keyword modifier so the later layers — name-space placement,
+// type rules, evaluation — read it without re-deriving it from the syntax.
+type MethodKind int
+
+const (
+	MethodNormal MethodKind = iota // an instance method, the default (no modifier)
+	MethodGetter                   // a getter: get name(): T, read as value.name
+	MethodSetter                   // a setter: set name(v: T): self, written value.name = v
+	MethodStatic                   // a static fn: static fn name(...): T, called Type.name(...)
+)
+
+func (k MethodKind) String() string {
+	switch k {
+	case MethodGetter:
+		return "getter"
+	case MethodSetter:
+		return "setter"
+	case MethodStatic:
+		return "static"
+	default:
+		return "method"
+	}
+}
+
+// MethodDecl is a method of an impl block: its modifiers, kind, effects, name,
 // parameters, result type, and body. An extern method has no body (Body is
 // nil); its implementation is a native intrinsic. The effect list (io, async,
 // nondet) declares the method's interaction with the world; an empty list
-// means pure.
+// means pure. Kind records the accessor/static modifier the parser read, or
+// MethodNormal for an ordinary instance method.
 type MethodDecl struct {
 	Doc        []string
 	Public     bool
 	Extern     bool
-	Effects    []string // the declared effects in source order, or nil for pure
+	Kind       MethodKind // the accessor/static modifier, or MethodNormal
+	Effects    []string   // the declared effects in source order, or nil for pure
 	Name       string
 	TypeParams []*TypeParam // explicit method type variables (the A in fold<A>), or nil
 	Params     []*ParamDef
@@ -254,8 +284,8 @@ func (m *MethodDecl) Syntax() *cst.Node { return m.syntax }
 func (m *MethodDecl) node()             {}
 
 // NewMethodDecl builds a MethodDecl node.
-func NewMethodDecl(doc []string, public, extern bool, effects []string, name string, typeParams []*TypeParam, params []*ParamDef, result TypeExpr, body []Stmt, syntax *cst.Node) *MethodDecl {
-	return &MethodDecl{Doc: doc, Public: public, Extern: extern, Effects: effects, Name: name, TypeParams: typeParams, Params: params, Result: result, Body: body, syntax: syntax}
+func NewMethodDecl(doc []string, public, extern bool, kind MethodKind, effects []string, name string, typeParams []*TypeParam, params []*ParamDef, result TypeExpr, body []Stmt, syntax *cst.Node) *MethodDecl {
+	return &MethodDecl{Doc: doc, Public: public, Extern: extern, Kind: kind, Effects: effects, Name: name, TypeParams: typeParams, Params: params, Result: result, Body: body, syntax: syntax}
 }
 
 // Stmt is a statement inside a method body: a return (ReturnStmt), a mutable

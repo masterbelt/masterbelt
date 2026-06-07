@@ -532,10 +532,19 @@ func evalExprRaw(e ast.Expr, ctx evalCtx) *ir.Constant {
 		}
 		// A member access whose receiver folds to a record value reads the named
 		// field (p.lv), so a field's value participates in folding and a method
-		// call on it has a receiver. It is the last branch — the type-member and
-		// namespace forms above resolve by name, this one by value.
-		if recv := evalExpr(e.Receiver, sub); recv != nil && recv.Kind == ir.ConstRecord {
-			return recordField(recv, e.Member.Name)
+		// call on it has a receiver. It is the last value-by-value branch — the
+		// type-member and namespace forms above resolve by name, this one by value.
+		if recv := evalExpr(e.Receiver, sub); recv != nil {
+			if recv.Kind == ir.ConstRecord {
+				if v := recordField(recv, e.Member.Name); v != nil {
+					return v
+				}
+			}
+			// No field of that name (or a non-record receiver): a getter read
+			// value.name folds its body with self bound to the receiver.
+			if v, ok := applyGetter(sub, e.Receiver, recv, e.Member.Name); ok {
+				return v
+			}
 		}
 		return nil
 	case *ast.CallExpr:
@@ -574,11 +583,18 @@ func evalExprRaw(e ast.Expr, ctx evalCtx) *ir.Constant {
 			return nil
 		}
 		// A member-access callee whose receiver names a namespace applies the
-		// imported function; a local binding shadows the namespace.
+		// imported function; one whose receiver names a type and member names a
+		// static fn applies that — the Type.name(...) path. A local binding shadows
+		// both.
 		if recv, isIdent := member.Receiver.(*ast.Identifier); isIdent {
 			if _, isLocal := ctx.locals[recv.Name]; !isLocal {
 				if cands := ctx.env.ResolveFuncMember(member); len(cands) > 0 {
 					return applyFunc(cands, e.Arguments, sub)
+				}
+				if def := ctx.env.LookupType(recv.Name); def != nil {
+					if v, ok := applyStatic(sub, def, member.Member.Name, e.Arguments); ok {
+						return v
+					}
 				}
 			}
 		}

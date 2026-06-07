@@ -298,6 +298,11 @@ func classifyToken(kind token.Kind, parent cst.Kind, calleeMember bool) (tokenTy
 		case cst.RecordLit:
 			// The typed form's leading type name (Point{ ... }).
 			return stType, 0, true
+		case cst.Modifier:
+			// An accessor/static modifier (get/set/static) is a context keyword:
+			// the lexer leaves it an identifier, but inside a Modifier node it
+			// colours as a keyword, the same set keyword.control covers.
+			return stKeyword, 0, true
 		case cst.MethodDecl:
 			// A method's declared name inside an impl block.
 			return stMethod, smDeclaration, true

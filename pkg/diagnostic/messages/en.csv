@@ -17,6 +17,7 @@ masterbelt.parser.concrete.expected_from,expected 'from'
 masterbelt.parser.concrete.expected_path,expected import path string
 masterbelt.parser.concrete.expected_param_list,expected '('
 masterbelt.parser.concrete.expected_func_body,expected '->' or '{'
+masterbelt.parser.concrete.expected_fn,expected 'fn' after 'static'
 masterbelt.parser.concrete.arrow_block_body,expected expression after '->'; remove '->' to use a block body
 masterbelt.semantic.duplicate_declaration,duplicate declaration of {name}
 masterbelt.semantic.undefined_name,undefined name: {name}
@@ -91,6 +92,12 @@ masterbelt.semantic.no_method_on_unbounded_typevar,cannot call {method} on an un
 masterbelt.semantic.not_iterable,for can only iterate a foldable collection; {typ} is not foldable
 masterbelt.semantic.loop_var_immutable,cannot assign to the loop variable {name}: it is immutable; accumulate into a let
 masterbelt.semantic.range_step_zero,range step cannot be zero
+masterbelt.semantic.invalid_getter_signature,getter {name} must take no parameters
+masterbelt.semantic.invalid_setter_signature,setter {name} must take one parameter and return self
+masterbelt.semantic.accessor_collision,accessor {name} collides with another member of the same name on {typ}
+masterbelt.semantic.static_collision,static fn {name} collides with an associated constant or enum member of the same name on {typ}
+masterbelt.semantic.unknown_static,{typ} has no static fn {name}
+masterbelt.semantic.generic_static,generic static fn {name} is not supported
 project.config.missing,masterbelt.toml not found in this directory or any parent
 project.config.invalid,invalid masterbelt.toml: {detail}
 project.config.missing_entry,masterbelt.toml does not set entry

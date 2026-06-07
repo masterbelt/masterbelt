@@ -79,6 +79,7 @@ func buildGrammar() grammar {
 		Patterns: []rule{
 			{Include: "#comments"},
 			{Include: "#keywords"},
+			{Include: "#modifiers"},
 			// The datetime/duration literals must precede #numbers, or their
 			// digit runs would half-match as plain integers.
 			{Include: "#datetimes"},
@@ -102,6 +103,20 @@ func buildGrammar() grammar {
 			// keywords wear the same colour before and after the server is up.
 			"keywords": {Patterns: []rule{
 				{Name: "keyword.control.masterbelt", Match: keywordPattern()},
+			}},
+			// The accessor/static modifiers (get, set, static) are context
+			// keywords: the lexer leaves them identifiers, so they are not in the
+			// keyword table and would not flow into #keywords. This approximates
+			// their modifier position — get/set followed by an identifier (the
+			// property name), static followed by fn or a name — and colours them
+			// keyword.control to match the server's semantic `keyword` token. A
+			// get/set/static used as an ordinary name (the prelude's list.get(i))
+			// is not followed by that shape, so it is left uncoloured, as the
+			// server leaves it. The semantic tokens are authoritative; this is the
+			// cold-start approximation.
+			"modifiers": {Patterns: []rule{
+				{Name: "keyword.control.masterbelt", Match: `\bstatic\b(?=\s+fn\b)`},
+				{Name: "keyword.control.masterbelt", Match: `\b(get|set)\b(?=\s+[A-Za-z_])`},
 			}},
 			// A D-prefixed ISO-8601 instant: the same shape the lexer commits
 			// on, milliseconds and signed offsets included. The semantic

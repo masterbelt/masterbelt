@@ -246,14 +246,37 @@ func evalLet(s *ast.LetStmt, ctx evalCtx, scope *blockScope) bool {
 	if v == nil {
 		return false
 	}
-	return scope.bind(s.Name, v, annotationDef(ctx.env, s.Type))
+	return scope.bind(s.Name, v, letDef(ctx, s))
+}
+
+// letDef resolves a let local's static type definition: its annotation's def, or
+// — when unannotated — its initializer call's result def (let c =
+// Celsius.freezing() is a Celsius), so a getter read or setter write on the local
+// later in the body resolves its receiver. Resolved syntactically, never through
+// the type query.
+func letDef(ctx evalCtx, s *ast.LetStmt) *ir.TypeDef {
+	if def := annotationDef(ctx.env, s.Type); def != nil {
+		return def
+	}
+	if call, ok := s.Value.(*ast.CallExpr); ok {
+		return callResultDef(ctx, call)
+	}
+	return nil
 }
 
 // evalAssign folds an assignment's value and updates the target local in place,
 // so a later read (and an outer block) sees the new value. It returns false when
 // the target is not a plain local name (an immutable-data error the checker
 // already reported), the local is not in scope, or the value cannot be folded.
+//
+// A property write p.name = v folds through the setter: the setter's body is
+// applied with self bound to the local's current value and the new value as its
+// argument, and the local is rebound to the result — the let-local rebinding
+// semantics the surface write means.
 func evalAssign(s *ast.AssignStmt, ctx evalCtx) bool {
+	if m, ok := s.Target.(*ast.MemberExpr); ok {
+		return evalSetterAssign(s, m, ctx)
+	}
 	id, ok := s.Target.(*ast.Identifier)
 	if !ok || ctx.locals == nil {
 		return false
@@ -276,6 +299,44 @@ func evalAssign(s *ast.AssignStmt, ctx evalCtx) bool {
 		return false
 	}
 	ctx.locals[id.Name] = v
+	return true
+}
+
+// evalSetterAssign folds a property write p.name = v: it folds the new value,
+// applies the setter named name with self bound to p's current value, and rebinds
+// p to the result. It returns false — leaving the local unchanged, so the body
+// stops folding — when the receiver is not a local in scope, has no setter of that
+// name reachable, or either the value or the setter body does not fold. Like the
+// getter fold it depends only on the syntactic channels, never on a type query.
+func evalSetterAssign(s *ast.AssignStmt, m *ast.MemberExpr, ctx evalCtx) bool {
+	recv, ok := m.Receiver.(*ast.Identifier)
+	if !ok || ctx.locals == nil {
+		return false
+	}
+	cur, inScope := ctx.locals[recv.Name]
+	if !inScope || cur == nil || s.Value == nil {
+		return false
+	}
+	def := receiverDef(ctx, m.Receiver, cur)
+	if def == nil {
+		return false
+	}
+	sel := setterSyntax(ctx.env.Registry(), def, m.Member.Name)
+	if sel == nil {
+		return false
+	}
+	if ctx.depth >= maxApplyDepth {
+		return false // the recursion guard fired: leave the local unchanged
+	}
+	v := evalExpr(s.Value, ctx)
+	if v == nil {
+		return false
+	}
+	next := applyBody(methodCallable(sel, def), cur, []*ir.Constant{v}, ctx)
+	if next == nil {
+		return false
+	}
+	ctx.locals[recv.Name] = next
 	return true
 }
 

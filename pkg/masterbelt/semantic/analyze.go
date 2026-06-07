@@ -233,6 +233,7 @@ func computeReachable(q queries, from FileID) map[FileID]bool {
 func walkRefsEnum(fileID FileID, e ast.Expr, q queries, onIdent func(*ast.Identifier), onMember func(*ast.MemberExpr), onTypeMember func(*ast.MemberExpr)) {
 	funcCallee := map[*ast.Identifier]bool{}
 	funcMemberCallee := map[*ast.MemberExpr]bool{}
+	staticCallee := map[*ast.MemberExpr]bool{}
 	ast.WalkExprs(e, func(e ast.Expr) bool {
 		switch e := e.(type) {
 		case *ast.CallExpr:
@@ -246,6 +247,15 @@ func walkRefsEnum(fileID FileID, e ast.Expr, q queries, onIdent func(*ast.Identi
 			case *ast.MemberExpr:
 				if len(q.resolveFuncMember(fileID, callee)) > 0 {
 					funcMemberCallee[callee] = true
+				} else if recv, ok := callee.Receiver.(*ast.Identifier); ok && isTypeName(fileID, recv, q) {
+					// A call whose callee is a member access on a type name is a static
+					// fn call (Celsius.freezing()): the member is not an enum member or
+					// associated constant, so it must be exempt from the type-member
+					// reference check below — whether the static fn exists is the type
+					// checker's unknown_static finding.
+					if def := q.universe(fileID)[recv.Name]; hasStaticFn(def, callee.Member.Name) {
+						staticCallee[callee] = true
+					}
 				}
 			}
 		case *ast.Identifier:
@@ -262,7 +272,9 @@ func walkRefsEnum(fileID FileID, e ast.Expr, q queries, onIdent func(*ast.Identi
 			// nor a field read: the receiver is the type, so it is consumed as one
 			// unit.
 			if onTypeMember != nil && isTypeName(fileID, recv, q) {
-				onTypeMember(e)
+				if !staticCallee[e] {
+					onTypeMember(e)
+				}
 				return false
 			}
 			if isNamespace(fileID, recv, q) {

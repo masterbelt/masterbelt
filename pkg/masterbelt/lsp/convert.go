@@ -164,6 +164,45 @@ func documentSymbols(doc view) []protocol.DocumentSymbol {
 		}
 		symbols = append(symbols, s)
 	}
+	// A plain type with accessors or static fns gets a type symbol whose children
+	// are those members: a getter/setter as a Property (it reads/writes
+	// value.name), a static fn as a Function (called Type.name(...)). Ordinary
+	// instance methods are left out of this outline — they are reached through a
+	// value, not the type. An enum or interface is already outlined above.
+	for _, t := range doc.Module().Types {
+		if t.Syntax == nil || t.Enum != nil || t.Interface != nil {
+			continue
+		}
+		var children []protocol.DocumentSymbol
+		for _, m := range t.Methods {
+			if m.Syntax == nil {
+				continue
+			}
+			var kind protocol.SymbolKind
+			switch m.Kind {
+			case ir.MethodGetter, ir.MethodSetter:
+				kind = protocol.SymbolKindProperty
+			case ir.MethodStatic:
+				kind = protocol.SymbolKindFunction
+			default:
+				continue // an ordinary method is reached through a value, not the type
+			}
+			if ms, ok := symbol(m.Syntax.Syntax(), m.Name, methodSignature(m), kind); ok {
+				children = append(children, ms)
+			}
+		}
+		if len(children) == 0 {
+			continue // no accessor or static fn: no type outline to add
+		}
+		kind := protocol.SymbolKindClass
+		if t.Builtin {
+			kind = protocol.SymbolKindStruct
+		}
+		if s, ok := symbol(t.Syntax.Syntax(), t.Name, "", kind); ok {
+			s.Children = children
+			symbols = append(symbols, s)
+		}
+	}
 	for _, f := range doc.Module().Funcs {
 		if f.Syntax == nil {
 			continue

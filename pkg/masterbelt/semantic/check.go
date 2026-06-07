@@ -449,6 +449,13 @@ func methodTScope(def *ir.TypeDef, m *ast.MethodDecl) infer.TypeScope {
 // resolves exactly as an annotation does. env folds switch arm values for the
 // exhaustiveness and duplicate checks.
 func checkMethodBodies(reg *builtin.Registry, defs []*ir.TypeDef, universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, funcs map[string][]*ast.FuncDecl, qualifiedFuncs func(namespace, name string) []*ast.FuncDecl, env eval.Env, sink *infer.Sink, at func(ast.Node) span, diags *diagnostic.List) {
+	var noSelf func(node ast.Node)
+	if diags != nil {
+		noSelf = func(node ast.Node) {
+			s := at(node)
+			diags.Add(newSelfOutsideMethodDiagnostic(s.offset, s.width))
+		}
+	}
 	for _, def := range defs {
 		self := &ir.Named{Def: def}
 		for _, irm := range def.Methods {
@@ -456,13 +463,23 @@ func checkMethodBodies(reg *builtin.Registry, defs []*ir.TypeDef, universe map[s
 			if m == nil || len(m.Body) == 0 {
 				continue // an extern or empty body has nothing to check
 			}
+			// A static fn has no receiver: its body is checked with self unbound
+			// (Self ir.Invalid) and a self reference reported (self_outside_method),
+			// exactly as a top-level function body is. An instance method, getter, or
+			// setter binds self to the receiver and passes a nil noSelf.
+			selfT := ir.Type(self)
+			var bodyNoSelf func(ast.Node)
+			if irm.Kind == ir.MethodStatic {
+				selfT = ir.Invalid
+				bodyNoSelf = noSelf
+			}
 			params := make(map[string]ir.Type, len(irm.Params))
 			for _, p := range irm.Params {
 				params[p.Name] = substSelf(p.Type, self)
 			}
 			want := substSelf(irm.Result, self)
-			bs := infer.BodyScope{Reg: reg, Universe: universe, Qualified: qualified, Self: self, Params: params, Funcs: funcs, QualifiedFuncs: qualifiedFuncs, TScope: methodTScope(def, m)}
-			checkStmts(m.Body, want, bs, env, nil, sink, at, diags)
+			bs := infer.BodyScope{Reg: reg, Universe: universe, Qualified: qualified, Self: selfT, Params: params, Funcs: funcs, QualifiedFuncs: qualifiedFuncs, TScope: methodTScope(def, m)}
+			checkStmts(m.Body, want, bs, env, bodyNoSelf, sink, at, diags)
 			checkIndexWrites(m.Body, env, at, diags)
 			checkBareEnumArgs(m.Body, bs, env, at, diags)
 		}

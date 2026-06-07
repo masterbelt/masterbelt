@@ -150,6 +150,81 @@ func applyFunc(cands []*ast.FuncDecl, args []ast.Expr, ctx evalCtx) *ir.Constant
 	return applyBody(funcCallable(fd), nil, tagArguments(ctx, fd.Params, args, vals), ctx)
 }
 
+// applyStatic folds a static fn call Type.name(args): the arguments fold in the
+// caller's context, the static overload whose parameters accept their value kinds
+// is selected, and its body folds with no receiver (self unbound). It reports
+// (value, true) when def declares a static fn of that name (folded, or left
+// unfolded under the depth guard or an undecidable overload), and (nil, false)
+// when def has no static fn of that name — so the caller can fall through. The
+// selection is the type-blind, conservative one applyFunc uses.
+func applyStatic(ctx evalCtx, def *ir.TypeDef, name string, args []ast.Expr) (*ir.Constant, bool) {
+	var cands []*ast.MethodDecl
+	for _, m := range def.Methods {
+		if m.Kind == ir.MethodStatic && m.Name == name && m.Syntax != nil && len(m.Syntax.Body) > 0 {
+			cands = append(cands, m.Syntax)
+		}
+	}
+	if len(cands) == 0 {
+		return nil, false // not a static fn of this name: let the caller fall through
+	}
+	if ctx.depth >= maxApplyDepth {
+		return nil, true
+	}
+	vals := make([]*ir.Constant, len(args))
+	for i, a := range args {
+		if vals[i] = evalExpr(a, ctx); vals[i] == nil {
+			return nil, true // an unfoldable argument: the static call does not fold
+		}
+	}
+	var sel *ast.MethodDecl
+	n := 0
+	for _, cand := range cands {
+		// A static fn has no receiver, so a self-typed parameter is undecidable
+		// (selfKind -1). A named parameter type is resolved through the env to its
+		// underlying kind (envFits), so an overload taking a record (Celsius) is
+		// ruled out for an integer argument — the distinction the type-blind fits
+		// cannot make without the universe.
+		if envFits(ctx.env, cand.Params, vals) {
+			sel = cand
+			n++
+		}
+	}
+	if n != 1 {
+		return nil, true // ambiguous/undecidable: user-defined, but does not fold
+	}
+	return applyBody(methodCallable(sel, def), nil, tagArguments(ctx, sel.Params, args, vals), ctx), true
+}
+
+// envFits is fits with named parameter types resolved through the env to their
+// underlying kind, so an overload taking a nominal type (a record-bodied Celsius,
+// a wrapped integer) is matched against the argument's kind rather than treated
+// as undecidable. It is used for static-fn overload selection, where the env is
+// at hand; the type-blind fits remains the shared default for the method and
+// function paths. A parameter the env cannot resolve falls back to the spelling
+// rule (kindAccepts), keeping the conservative behavior.
+func envFits(env Env, params []*ast.ParamDef, vals []*ir.Constant) bool {
+	if len(params) != len(vals) {
+		return false
+	}
+	for i, p := range params {
+		if !paramAcceptsKind(env, p.Type, vals[i].Kind) {
+			return false
+		}
+	}
+	return true
+}
+
+// paramAcceptsKind reports whether a parameter type accepts a value of the given
+// kind, resolving a named (nominal) type through the env to the kind its
+// underlying primitive or composite backs. It falls back to kindAccepts (the
+// spelling rule) for a type the env resolves to no def.
+func paramAcceptsKind(env Env, t ast.TypeExpr, k ir.ConstKind) bool {
+	if def := annotationDef(env, t); def != nil {
+		return defBacksKind(env.Registry(), def, k) || defBacksKindCollection(def) && k == ir.ConstCollection
+	}
+	return kindAccepts(t, k)
+}
+
 // tagArguments tags each folded argument with the union member it flows into its
 // parameter as — the call-site half of the tagged-union rule. A parameter whose
 // resolved annotation is a union and whose argument settles on one member tags
@@ -372,6 +447,74 @@ func applyUserMethod(ctx evalCtx, recvExpr ast.Expr, recv *ir.Constant, name str
 	return applyBody(methodCallable(sel, def), recv, args, ctx), true
 }
 
+// applyGetter folds a getter read value.name: it resolves the receiver's static
+// definition the way a method call does (the same syntactic channels), finds the
+// getter named name with a body, and applies it with self bound to the receiver
+// and no arguments. It returns (value, true) when a getter of that name is
+// declared (folded, or left unevaluated under the depth guard), and (nil, false)
+// when the receiver has no such getter — the field reading then stands. Like the
+// rest of the folder it depends only on the syntactic channels, never on a type
+// query, so it is sound: a receiver whose def cannot be resolved simply does not
+// fold.
+func applyGetter(ctx evalCtx, recvExpr ast.Expr, recv *ir.Constant, name string) (*ir.Constant, bool) {
+	def := receiverDef(ctx, recvExpr, recv)
+	if def == nil {
+		return nil, false
+	}
+	sel := getterSyntax(ctx.env.Registry(), def, name)
+	if sel == nil {
+		return nil, false
+	}
+	if ctx.depth >= maxApplyDepth {
+		return nil, true // the recursion guard fired: a safe, unfoldable result
+	}
+	return applyBody(methodCallable(sel, def), recv, nil, ctx), true
+}
+
+// getterSyntax returns the body-bearing AST declaration of the getter named name
+// the definition binds — its own, or one derived from its underlying type — or
+// nil when it declares no such getter. A getter takes no overloads, so there is
+// at most one. It mirrors methodSyntaxes' shadowing within the getter name space.
+func getterSyntax(reg *builtin.Registry, def *ir.TypeDef, name string) *ast.MethodDecl {
+	return collectAccessorSyntax(reg, def, name, ir.MethodGetter, map[*ir.TypeDef]bool{})
+}
+
+// setterSyntax returns the body-bearing AST declaration of the setter named name
+// the definition binds — its own, or one derived from its underlying type — or
+// nil when it declares no such setter. It mirrors getterSyntax in the setter name
+// space.
+func setterSyntax(reg *builtin.Registry, def *ir.TypeDef, name string) *ast.MethodDecl {
+	return collectAccessorSyntax(reg, def, name, ir.MethodSetter, map[*ir.TypeDef]bool{})
+}
+
+// collectAccessorSyntax is the shared body-bearing-accessor lookup behind
+// getterSyntax and setterSyntax: the accessor of the given kind and name a
+// definition binds, shadowing within that accessor's name space and deriving from
+// the underlying type, exactly as collectMethodSyntaxes does for instance methods.
+func collectAccessorSyntax(reg *builtin.Registry, def *ir.TypeDef, name string, kind ir.MethodKind, seen map[*ir.TypeDef]bool) *ast.MethodDecl {
+	if def == nil || seen[def] {
+		return nil
+	}
+	seen[def] = true
+	declares := false
+	for _, m := range def.Methods {
+		if m.Name != name || m.Kind != kind {
+			continue
+		}
+		declares = true
+		if m.Syntax != nil && len(m.Syntax.Body) > 0 {
+			return m.Syntax
+		}
+	}
+	if declares {
+		return nil
+	}
+	if !def.Builtin {
+		return collectAccessorSyntax(reg, methodTableDef(reg, def.Body), name, kind, seen)
+	}
+	return nil
+}
+
 // methodSyntaxes collects the body-bearing AST declarations of the named method
 // the definition binds: its own declarations, and — when it declares the name
 // nowhere — the provided defaults of each interface it opts into (a list's
@@ -398,8 +541,8 @@ func collectMethodSyntaxes(reg *builtin.Registry, def *ir.TypeDef, name string, 
 	declares := false
 	var out []*ast.MethodDecl
 	for _, m := range def.Methods {
-		if m.Name != name {
-			continue
+		if m.Name != name || m.Kind != ir.MethodNormal {
+			continue // an instance call resolves only against instance methods
 		}
 		declares = true
 		if m.Syntax != nil && len(m.Syntax.Body) > 0 {
@@ -515,9 +658,17 @@ func syntacticDef(ctx evalCtx, recvExpr ast.Expr) *ir.TypeDef {
 		if _, isLocal := ctx.locals[e.Name]; isLocal {
 			return ctx.localDefs[e.Name]
 		}
-		// A top-level constant reference resolves through its own annotation.
+		// A top-level constant reference resolves through its own annotation, or —
+		// when unannotated — through its initializer call's result def (const
+		// Freezing = Celsius.freezing() is a Celsius), so a getter on it folds. The
+		// initializer is resolved syntactically, never through the type query.
 		if decl := ctx.env.Resolve(e); decl != nil {
-			return annotationDef(ctx.env, decl.Type)
+			if def := annotationDef(ctx.env, decl.Type); def != nil {
+				return def
+			}
+			if call, ok := decl.Value.(*ast.CallExpr); ok {
+				return callResultDef(ctx, call)
+			}
 		}
 		return nil
 	case *ast.MemberExpr:
@@ -662,6 +813,13 @@ func callResultDef(ctx evalCtx, e *ast.CallExpr) *ir.TypeDef {
 				if cands := ctx.env.ResolveFuncMember(callee); len(cands) > 0 {
 					return funcResultDef(ctx.env, cands)
 				}
+				// A static fn call (Celsius.freezing()): its result def lets a let or
+				// const initialized by it resolve a later getter/setter on the value.
+				if def := ctx.env.LookupType(recv.Name); def != nil {
+					if d := staticResultDef(ctx.env, def, callee.Member.Name); d != nil {
+						return d
+					}
+				}
 			}
 		}
 		// A method call: find the method on the inner receiver's definition and
@@ -724,6 +882,35 @@ func methodResultDef(env Env, def *ir.TypeDef, name string) *ir.TypeDef {
 	return result
 }
 
+// staticResultDef resolves the type definition the static fns named name on def
+// return, across their body-bearing overloads. A self result is the owning type
+// (a static fn returning self yields its own type). The overloads must agree, or
+// the chain does not resolve. It mirrors methodResultDef, filtered to the static
+// name space.
+func staticResultDef(env Env, def *ir.TypeDef, name string) *ir.TypeDef {
+	var result *ir.TypeDef
+	found := false
+	for _, m := range def.Methods {
+		if m.Kind != ir.MethodStatic || m.Name != name || m.Syntax == nil {
+			continue
+		}
+		var d *ir.TypeDef
+		if isSelfType(m.Syntax.Result) {
+			d = def
+		} else {
+			d = annotationDef(env, m.Syntax.Result)
+		}
+		if !found {
+			result, found = d, true
+			continue
+		}
+		if d != result {
+			return nil
+		}
+	}
+	return result
+}
+
 // isSelfType reports whether a written type annotation is the self receiver type
 // — the result spelling (increment(): self) a method uses to return its own type.
 func isSelfType(t ast.TypeExpr) bool {
@@ -739,6 +926,13 @@ func isSelfType(t ast.TypeExpr) bool {
 // the guard that keeps a def read from an annotation from applying to a value of
 // the wrong kind.
 func defBacksKind(reg *builtin.Registry, def *ir.TypeDef, kind ir.ConstKind) bool {
+	// A record-bodied def (a record type, or a nominal type over one) backs a
+	// record value: a method or getter on a record receiver reaches its body
+	// through the receiver's annotation, the same syntactic channel a primitive
+	// uses, so value.name folds on a record exactly as it does on a wrapped int.
+	if kind == ir.ConstRecord {
+		return recordOf(&ir.Named{Def: def}) != nil
+	}
 	n := underlyingPrimitive(reg, def, map[*ir.TypeDef]bool{})
 	if n == nil {
 		return false

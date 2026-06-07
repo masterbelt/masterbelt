@@ -423,6 +423,35 @@ func fieldType(recv ir.Type, name string) ir.Type {
 	return ir.Invalid
 }
 
+// memberReadType types a value member read value.name: a record field when the
+// receiver has one of that name, otherwise a getter the receiver declares. The
+// field reading wins (a collision is rejected at the getter's declaration), so
+// the order matches the declaration check's guarantee that the two never share a
+// name. It is the last reading the value-scope leaf falls through to, after the
+// Type.Name paths (enum member, associated constant) the receiver-as-type forms
+// take. The result is ir.Invalid when neither a field nor a getter matches.
+func memberReadType(reg *builtin.Registry, recv ir.Type, name string) ir.Type {
+	if t := fieldType(recv, name); t != ir.Invalid {
+		return t
+	}
+	return getterType(reg, recv, name)
+}
+
+// getterType returns the type a getter read value.name produces: the getter's
+// result, with self resolving to the receiver (a getter that returns self yields
+// the receiver's type, exactly as a self-returning method does). It is
+// ir.Invalid when the receiver declares no getter of that name.
+func getterType(reg *builtin.Registry, recv ir.Type, name string) ir.Type {
+	m, subst, ok := types.Getter(reg, recv, name)
+	if !ok {
+		return ir.Invalid
+	}
+	if _, isSelf := m.Result.(*ir.SelfType); isSelf {
+		return recv
+	}
+	return types.Substitute(m.Result, subst)
+}
+
 func recordOf(t ir.Type) *ir.Record {
 	switch t := t.(type) {
 	case *ir.Record:
@@ -650,6 +679,10 @@ func observe(sink *Sink, fired *bool) *Sink {
 		NoMethodOnUnboundedTypeVar: func(node ast.Node, method string) {
 			*fired = true
 			sink.noMethodOnUnboundedTypeVar(node, method)
+		},
+		UnknownStatic: func(call *ast.CallExpr, name, typ string) {
+			*fired = true
+			sink.unknownStatic(call, name, typ)
 		},
 		MapKeyNotComparable: func(lit *ast.CollectionLit, key, bound ir.Type) {
 			*fired = true

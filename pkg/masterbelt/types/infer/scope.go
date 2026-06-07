@@ -134,10 +134,11 @@ func (s constScope) leaf(e ast.Expr) ir.Type {
 			return t
 		}
 		// Otherwise the receiver is a value: a field access on a record-typed
-		// constant (Hero.lv, and a nested path a.b.c), reading the field's type
-		// from the record. The receiver types through the same const scope, so it
-		// reaches another constant's record value (or this one's, recursively).
-		return fieldType(exprType(e.Receiver, s), e.Member.Name)
+		// constant (Hero.lv, and a nested path a.b.c) or a getter read
+		// (Freezing.fahrenheit). The receiver types through the same const scope,
+		// so it reaches another constant's record value (or this one's,
+		// recursively).
+		return memberReadType(s.registry(), exprType(e.Receiver, s), e.Member.Name)
 	}
 	return ir.Invalid
 }
@@ -268,8 +269,9 @@ func (s BodyScope) leaf(e ast.Expr) ir.Type {
 				}
 			}
 		}
-		// A member access used as a value is a record field access.
-		return fieldType(exprType(e.Receiver, s), e.Member.Name)
+		// A member access used as a value is a record field access or a getter read
+		// (value.name) the receiver's type declares.
+		return memberReadType(s.Reg, exprType(e.Receiver, s), e.Member.Name)
 	default:
 		return ir.Invalid
 	}

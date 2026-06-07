@@ -35,7 +35,7 @@ type Document struct {
 // Edits.
 func NewDocument(src []byte) *Document {
 	lx := lexer.NewDocument(src)
-	root, diags := parseTokens(lx.Tokens())
+	root, diags := parseTokens(lx.Tokens(), lx.Buffer())
 	return &Document{lex: lx, root: root, diags: diags}
 }
 
@@ -95,7 +95,7 @@ func (d *Document) Edit(e source.Edit) {
 	prefix := oldChildren[:iStart]
 
 	// Reparse forward from winStart in the new token stream.
-	p := newParser(newTokens)
+	p := newParser(newTokens, d.lex.Buffer())
 	p.pos = tokenIndexAt(newTokens, winStart)
 	changedEnd := e.Start + len(e.NewText)
 

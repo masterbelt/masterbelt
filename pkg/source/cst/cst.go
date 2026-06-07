@@ -87,7 +87,8 @@ const (
 	// ConstDecl (an associated constant, read as TypeName.Name); the latter
 	// reuses the same node a top-level constant uses.
 	ImplBlock    // impl [TypeName] "{" (MethodDecl | ConstDecl)* "}"  (the optional TypeName tags the interface this block implements)
-	MethodDecl   // [pub] [extern] [fn] Ident ParamList ":" TypeExpr [Block]
+	MethodDecl   // [pub] ( Modifier | [extern] [fn] ) Effect* Ident ParamList ":" TypeExpr [Block]
+	Modifier     // a context-keyword accessor/static marker on a method: get, set, or static (an Ident the parser recognizes by position)
 	ParamList    // "(" [Param ("," Param)*] ")"
 	Param        // Ident ":" TypeExpr
 	Block        // "{" Stmt* "}"
@@ -158,6 +159,7 @@ var kindNames = [...]string{
 	InterfaceMember:  "InterfaceMember",
 	ImplBlock:        "ImplBlock",
 	MethodDecl:       "MethodDecl",
+	Modifier:         "Modifier",
 	ParamList:        "ParamList",
 	Param:            "Param",
 	Block:            "Block",

@@ -84,6 +84,16 @@ func TestScriptedEdits(t *testing.T) {
 		{"fix an assertion via its const", "const A = 1\nassert A < 0\n", source.Edit{Start: 10, End: 11, NewText: []byte("-1")}},
 		{"insert an assertion", "const A = 1\n", source.Edit{Start: 12, End: 12, NewText: []byte("assert A == 1\n")}},
 		{"delete an assertion", "const A = 1\nassert A < 0\n", source.Edit{Start: 12, End: 25, NewText: nil}},
+		// Flip a getter to an ordinary method by deleting its `get ` modifier: the
+		// read `t.size` was a getter read and is now a method value, so the
+		// signature key must change (it carries the kind) for the use site to
+		// re-resolve rather than reuse the stale getter typing. The incremental ==
+		// full oracle catches an over-eager early cutoff here.
+		{
+			"getter becomes a method",
+			"pub type T = { n: nint } impl {\n  pub get size(): nint {\n    return self.n\n  }\n}\nconst V: T = T{ n: 1 }\nconst S = V.size\n",
+			source.Edit{Start: 38, End: 42, NewText: nil}, // delete "get "
+		},
 	}
 
 	for _, tc := range cases {

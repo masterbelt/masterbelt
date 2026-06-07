@@ -17,6 +17,7 @@ masterbelt.parser.concrete.expected_from,'from' が必要です
 masterbelt.parser.concrete.expected_path,インポートパスの文字列が必要です
 masterbelt.parser.concrete.expected_param_list,'(' が必要です
 masterbelt.parser.concrete.expected_func_body,'->' か '{' が必要です
+masterbelt.parser.concrete.expected_fn,'static' の後には 'fn' が必要です
 masterbelt.parser.concrete.arrow_block_body,'->' の後には式が必要です。ブロック本体にするには '->' を削除してください
 masterbelt.semantic.duplicate_declaration,{name} が重複して宣言されています
 masterbelt.semantic.undefined_name,未定義の名前: {name}
@@ -91,6 +92,12 @@ masterbelt.semantic.no_method_on_unbounded_typevar,無境界の型パラメー�
 masterbelt.semantic.not_iterable,for で反復できるのは foldable なコレクションだけです。{typ} は foldable ではありません
 masterbelt.semantic.loop_var_immutable,ループ変数 {name} には代入できません。不変です。蓄積には let を使ってください
 masterbelt.semantic.range_step_zero,range のステップに 0 は指定できません
+masterbelt.semantic.invalid_getter_signature,ゲッター {name} は引数を取れません
+masterbelt.semantic.invalid_setter_signature,セッター {name} は引数を 1 つ取り self を返す必要があります
+masterbelt.semantic.accessor_collision,アクセサ {name} は {typ} の同名の別メンバと衝突しています
+masterbelt.semantic.static_collision,static fn {name} は {typ} の同名の関連定数か enum メンバと衝突しています
+masterbelt.semantic.unknown_static,{typ} に static fn {name} はありません
+masterbelt.semantic.generic_static,ジェネリックな static fn {name} はサポートされていません
 project.config.missing,masterbelt.toml がこのディレクトリにも親ディレクトリにも見つかりません
 project.config.invalid,不正な masterbelt.toml: {detail}
 project.config.missing_entry,masterbelt.toml に entry が指定されていません

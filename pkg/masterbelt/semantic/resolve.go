@@ -393,7 +393,7 @@ func resolveInterfaceMember(r *infer.TypeResolver, reg *builtin.Registry, self i
 		// call (a list's count/keys/...) by evaluating this body with self bound to
 		// the receiver, exactly as it folds a concrete method. A required member
 		// (no body) keeps a nil Syntax — its implementation is the implementor's.
-		method.Syntax = ast.NewMethodDecl(m.Doc, m.Public, false, nil, m.Name, m.TypeParams, m.Params, m.Result, m.Body, nil)
+		method.Syntax = ast.NewMethodDecl(m.Doc, m.Public, false, ast.MethodNormal, nil, m.Name, m.TypeParams, m.Params, m.Result, m.Body, nil)
 	}
 	return method
 }
@@ -662,15 +662,16 @@ func resolveDecl(env eval.Env, r *infer.TypeResolver, reg *builtin.Registry, td 
 		rm := resolveMethod(r, reg, &ir.Named{Def: def}, m, scope, fns)
 		key := rm.Name + signatureKey(def, rm)
 		if m.Name != "" && seen[key] {
-			if at != nil && diags != nil {
-				s := at(m)
-				diags.Add(newDuplicateOverloadDiagnostic(s.offset, s.width, rm.Name, paramTypes(rm)))
-			}
+			reportDuplicateMethod(rm, def, m, at, diags)
 			continue
 		}
 		seen[key] = true
 		def.Methods = append(def.Methods, rm)
 	}
+	// The accessor/static declaration checks run after the methods, fields, and
+	// associated constants are all on the definition, so the collision checks see
+	// the whole type.
+	checkMemberDecls(def, at, diags)
 	// The where-clause is resolved last, after the methods, so a predicate that
 	// calls a method of the type (`where self.isValid()`) can resolve it — self
 	// is the nominal type, and its impl methods are now on the definition.
@@ -915,14 +916,37 @@ func resolveEnumDecl(env eval.Env, r *infer.TypeResolver, reg *builtin.Registry,
 		rm := resolveMethod(r, reg, &ir.Named{Def: def}, m, scope, fns)
 		key := rm.Name + signatureKey(def, rm)
 		if m.Name != "" && seen[key] {
-			if at != nil && diags != nil {
-				s := at(m)
-				diags.Add(newDuplicateOverloadDiagnostic(s.offset, s.width, rm.Name, paramTypes(rm)))
-			}
+			reportDuplicateMethod(rm, def, m, at, diags)
 			continue
 		}
 		seen[key] = true
 		def.Methods = append(def.Methods, rm)
+	}
+	// The accessor/static declaration checks, the same as a nominal type's: a
+	// static fn collides with an enum member of the same name (both read
+	// EnumName.Name), and an accessor's signature and field/method collisions are
+	// checked too.
+	checkMemberDecls(def, at, diags)
+}
+
+// reportDuplicateMethod reports a method that repeats an earlier same-name,
+// same-kind, same-signature declaration. The diagnostic depends on the kind: an
+// ordinary method is a dropped overload (duplicate_overload), a getter/setter is
+// an accessor collision (a property name belongs to one accessor of each kind),
+// and a static fn is a dropped function-style overload (duplicate_func_overload,
+// reading Type.name). It is a no-op when there is nowhere to report.
+func reportDuplicateMethod(rm *ir.Method, def *ir.TypeDef, m *ast.MethodDecl, at func(ast.Node) span, diags *diagnostic.List) {
+	if at == nil || diags == nil {
+		return
+	}
+	s := at(m)
+	switch rm.Kind {
+	case ir.MethodGetter, ir.MethodSetter:
+		diags.Add(newAccessorCollisionDiagnostic(s.offset, s.width, rm.Name, def.Name))
+	case ir.MethodStatic:
+		diags.Add(newDuplicateFuncOverloadDiagnostic(s.offset, s.width, def.Name+"."+rm.Name, paramTypes(rm)))
+	default:
+		diags.Add(newDuplicateOverloadDiagnostic(s.offset, s.width, rm.Name, paramTypes(rm)))
 	}
 }
 
@@ -1061,13 +1085,29 @@ func kindName(k ir.ConstKind) string {
 	}
 }
 
+// methodKind maps the AST method kind onto the IR method kind. The two enums
+// mirror each other; the mapping is explicit so a future divergence is a compile
+// error rather than a silent miscarry.
+func methodKind(k ast.MethodKind) ir.MethodKind {
+	switch k {
+	case ast.MethodGetter:
+		return ir.MethodGetter
+	case ast.MethodSetter:
+		return ir.MethodSetter
+	case ast.MethodStatic:
+		return ir.MethodStatic
+	default:
+		return ir.MethodNormal
+	}
+}
+
 // resolveMethod resolves a method's signature (parameter types and result type)
 // and lowers its body to IR; fns is the file's function shells by name, so a
 // body may call a top-level function. reg and self (the receiver type) let the
 // body binder infer an inferred let's value type. The body is not yet
 // type-checked.
 func resolveMethod(r *infer.TypeResolver, reg *builtin.Registry, self ir.Type, m *ast.MethodDecl, scope infer.TypeScope, fns bodyFuncs) *ir.Method {
-	method := &ir.Method{Name: m.Name, Public: m.Public, Extern: m.Extern, Effects: m.Effects, Doc: m.Doc, Syntax: m}
+	method := &ir.Method{Name: m.Name, Public: m.Public, Extern: m.Extern, Kind: methodKind(m.Kind), Effects: m.Effects, Doc: m.Doc, Syntax: m}
 
 	// Method-introduced type variables: the explicit ones (the A in fold<A>) and
 	// the free type names appearing in a parameter type that the enclosing type
@@ -1114,6 +1154,99 @@ func resolveMethod(r *infer.TypeResolver, reg *builtin.Registry, self ir.Type, m
 	method.Result = r.ResolveType(m.Result, mscope)
 	method.Body = lower.Body(m.Body, bodyBinder{r: r, reg: reg, params: params, paramTypes: resolvedParams, selfType: self, tscope: mscope, funcs: fns, self: true})
 	return method
+}
+
+// checkMemberDecls runs the declaration-site checks for accessors and static
+// fns over a resolved type: each accessor/static method's signature is verified
+// by kind (a getter takes no parameters, a setter takes one and returns self, a
+// static fn is not generic in the MVP), and the three member name spaces are
+// checked for collisions — an accessor against a record field, an ordinary
+// method, or a same-kind duplicate of the same name; a static fn against an
+// associated constant or enum member of the same name. The checks are gathered
+// here so every kind's declaration rule lives in one place, run once per type
+// after its methods, fields, constants, and enum members are resolved. It is a
+// no-op when there is nowhere to report (the prelude, a memoized resolution).
+func checkMemberDecls(def *ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List) {
+	if at == nil || diags == nil {
+		return
+	}
+	fields := recordFieldNames(def.Body)
+	consts := make(map[string]bool, len(def.Consts))
+	for _, c := range def.Consts {
+		consts[c.Name] = true
+	}
+	members := map[string]bool{}
+	if def.Enum != nil {
+		for _, em := range def.Enum.Members {
+			members[em.Name] = true
+		}
+	}
+	// An accessor pairs a getter with a setter of the same name (that is a
+	// property), so a get and a set of one name do not collide with each other.
+	// Every other same-name member across the value/method/type name spaces does.
+	accessorSeen := map[string]ir.MethodKind{}
+	for _, m := range def.Methods {
+		if m.Syntax == nil || m.Name == "" {
+			continue // a bootstrap/synthesized method carries no declaration to anchor
+		}
+		s := at(m.Syntax)
+		switch m.Kind {
+		case ir.MethodGetter, ir.MethodSetter:
+			if m.Kind == ir.MethodGetter && len(m.Params) != 0 {
+				diags.Add(newInvalidGetterSignatureDiagnostic(s.offset, s.width, m.Name))
+			}
+			if m.Kind == ir.MethodSetter && (len(m.Params) != 1 || !isSelfResult(m.Result)) {
+				diags.Add(newInvalidSetterSignatureDiagnostic(s.offset, s.width, m.Name))
+			}
+			// An accessor collides with a record field, an ordinary method of the
+			// same name, or a second accessor of the same kind. A getter+setter
+			// pair of one name is the property and is allowed.
+			if fields[m.Name] || hasNormalMethod(def, m.Name) || accessorSeen[m.Name] == m.Kind {
+				diags.Add(newAccessorCollisionDiagnostic(s.offset, s.width, m.Name, def.Name))
+			}
+			accessorSeen[m.Name] = m.Kind
+		case ir.MethodStatic:
+			if m.Syntax != nil && len(m.Syntax.TypeParams) > 0 {
+				diags.Add(newGenericStaticDiagnostic(s.offset, s.width, m.Name))
+			}
+			if consts[m.Name] || members[m.Name] {
+				diags.Add(newStaticCollisionDiagnostic(s.offset, s.width, m.Name, def.Name))
+			}
+		}
+	}
+}
+
+// recordFieldNames returns the set of field names a record body declares, or an
+// empty set for a non-record body (a nominal type over a primitive, an enum).
+func recordFieldNames(body ir.Type) map[string]bool {
+	rec, ok := body.(*ir.Record)
+	if !ok {
+		return map[string]bool{}
+	}
+	names := make(map[string]bool, len(rec.Fields))
+	for _, f := range rec.Fields {
+		names[f.Name] = true
+	}
+	return names
+}
+
+// hasNormalMethod reports whether def declares an ordinary instance method of
+// the given name — an accessor of the same name collides with it (the read
+// `value.name` would be ambiguous with the method value `value.name`).
+func hasNormalMethod(def *ir.TypeDef, name string) bool {
+	for _, m := range def.Methods {
+		if m.Kind == ir.MethodNormal && m.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+// isSelfResult reports whether a method's result type is self — the shape a
+// setter must return (it computes the next value of its own type).
+func isSelfResult(t ir.Type) bool {
+	_, ok := t.(*ir.SelfType)
+	return ok
 }
 
 // resolveFuncs resolves the file's function declarations into their identity

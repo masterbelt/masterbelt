@@ -166,10 +166,17 @@ func (*Reference) value() {}
 // receiver, the method name, and the argument values (one for a binary
 // operator, none for a unary). Receiver and arguments are themselves resolved
 // values, so a Call is the whole operator expression with references bound.
+//
+// Setter marks the call form a property write lowers to: receiver.name = v
+// builds a Call{Receiver, Method: name, Args: [v], Setter: true}, distinguishing
+// it from a hand-written method call receiver.name(v) (which the setter name
+// space does not reach). Every operator, ordinary method, and index Call leaves
+// it false.
 type Call struct {
 	Receiver Value
 	Method   string
 	Args     []Value
+	Setter   bool
 }
 
 func (*Call) value() {}
@@ -182,6 +189,21 @@ type FuncCall struct {
 }
 
 func (*FuncCall) value() {}
+
+// StaticCall is a resolved call of a static fn, written Type.name(args) — a
+// function scoped to its type, the Type.Name path enum members and associated
+// constants take. Like a Call it holds the owning Def and the static fn's Name
+// rather than a resolved overload individual: the overload is selected by the
+// checker from the argument types and by the folder from the argument values,
+// each with its own rule, exactly as a method Call carries the method name. The
+// arguments are themselves resolved values.
+type StaticCall struct {
+	Def  *TypeDef
+	Name string
+	Args []Value
+}
+
+func (*StaticCall) value() {}
 
 // FuncLiteral is a function-literal value: its parameter names and its lowered
 // statement body. Like the rest of the value graph it is untyped — the

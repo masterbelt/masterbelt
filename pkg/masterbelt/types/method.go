@@ -54,17 +54,55 @@ func BindReceiver(reg *builtin.Registry, recv ir.Type, method string) (*ir.Metho
 	return ms[0], subst, true
 }
 
-// Candidates returns the overload set of method on the receiver's type — every
-// same-name method the receiver binds, the nearest declaring definition
-// shadowing the same name derived from its underlying type — together with the
-// substitution the receiver's type arguments pin. It reports false when the
-// receiver has no method of that name.
+// Candidates returns the instance-method overload set of method on the
+// receiver's type — every same-name ordinary method the receiver binds, the
+// nearest declaring definition shadowing the same name derived from its
+// underlying type — together with the substitution the receiver's type arguments
+// pin. It reports false when the receiver has no instance method of that name.
+// Accessors and static fns live in their own name spaces (Getter, the static
+// path), so they are not returned here: an instance-method call resolves only
+// against instance methods.
 func Candidates(reg *builtin.Registry, recv ir.Type, method string) ([]*ir.Method, map[string]ir.Type, bool) {
+	return candidatesOfKind(reg, recv, method, ir.MethodNormal)
+}
+
+// Getter returns the getter named name on the receiver's type — the property
+// read value.name folds to — together with the receiver's substitution, or
+// false when the receiver has no such getter. A getter takes no overloads (it
+// has no parameters), so the slice holds at most one method; it is returned as
+// a slice for symmetry with Candidates and to carry the (rare) derived-getter
+// case a nominal type inherits from its base.
+func Getter(reg *builtin.Registry, recv ir.Type, name string) (*ir.Method, map[string]ir.Type, bool) {
+	ms, subst, ok := candidatesOfKind(reg, recv, name, ir.MethodGetter)
+	if !ok {
+		return nil, nil, false
+	}
+	return ms[0], subst, true
+}
+
+// Setter returns the setter named name on the receiver's type — the accessor a
+// property write value.name = v computes the next value through — together with
+// the receiver's substitution, or false when the receiver has no such setter. A
+// setter takes no overloads (one parameter, result self) in the MVP, so the
+// slice holds at most one method.
+func Setter(reg *builtin.Registry, recv ir.Type, name string) (*ir.Method, map[string]ir.Type, bool) {
+	ms, subst, ok := candidatesOfKind(reg, recv, name, ir.MethodSetter)
+	if !ok {
+		return nil, nil, false
+	}
+	return ms[0], subst, true
+}
+
+// candidatesOfKind is the kind-filtered overload lookup behind Candidates and
+// Getter: it collects the receiver's same-name methods of the given kind,
+// shadowing by name within each kind independently (an accessor and an ordinary
+// method of one name never shadow each other — they are different name spaces).
+func candidatesOfKind(reg *builtin.Registry, recv ir.Type, method string, kind ir.MethodKind) ([]*ir.Method, map[string]ir.Type, bool) {
 	def := defOf(reg, recv)
 	if def == nil {
 		return nil, nil, false
 	}
-	ms := findMethods(reg, def, method, map[*ir.TypeDef]bool{})
+	ms := findMethods(reg, def, method, kind, map[*ir.TypeDef]bool{})
 	if len(ms) == 0 {
 		return nil, nil, false
 	}
@@ -281,20 +319,22 @@ func interfaceDefOf(t ir.Type) *ir.TypeDef {
 	return nil
 }
 
-// findMethods collects every method named name on def — the overload set a
-// call site selects from — deriving from the underlying type when def does not
-// declare the name itself: a nominal type (type Level = int8) thus inherits
-// the operator methods of its underlying type. A definition that declares the
-// name at all (however many overloads) shadows every same-name method it
-// would derive. The seen set guards against a cyclic definition.
-func findMethods(reg *builtin.Registry, def *ir.TypeDef, name string, seen map[*ir.TypeDef]bool) []*ir.Method {
+// findMethods collects every method named name and of the given kind on def —
+// the overload set a call site selects from — deriving from the underlying type
+// when def does not declare the name itself: a nominal type (type Level = int8)
+// thus inherits the operator methods (and any getters/setters) of its underlying
+// type. A definition that declares the name in that kind at all (however many
+// overloads) shadows every same-name, same-kind method it would derive; a
+// different kind is a different name space, so it neither contributes nor
+// shadows. The seen set guards against a cyclic definition.
+func findMethods(reg *builtin.Registry, def *ir.TypeDef, name string, kind ir.MethodKind, seen map[*ir.TypeDef]bool) []*ir.Method {
 	if def == nil || seen[def] {
 		return nil
 	}
 	seen[def] = true
 	var out []*ir.Method
 	for _, m := range def.Methods {
-		if m.Name == name {
+		if m.Name == name && m.Kind == kind {
 			out = append(out, m)
 		}
 	}
@@ -310,7 +350,7 @@ func findMethods(reg *builtin.Registry, def *ir.TypeDef, name string, seen map[*
 	// bodies, so they resolve through the same overload path.
 	for _, impl := range def.Impls {
 		if idef := defOf(reg, impl); idef != nil && idef.Interface != nil {
-			if ms := findMethods(reg, idef, name, seen); len(ms) > 0 {
+			if ms := findMethods(reg, idef, name, kind, seen); len(ms) > 0 {
 				out = append(out, ms...)
 			}
 		}
@@ -325,7 +365,7 @@ func findMethods(reg *builtin.Registry, def *ir.TypeDef, name string, seen map[*
 	if def.Interface != nil {
 		for _, parent := range def.Interface.Parents {
 			if pdef := interfaceDefOf(parent); pdef != nil {
-				if ms := findMethods(reg, pdef, name, seen); len(ms) > 0 {
+				if ms := findMethods(reg, pdef, name, kind, seen); len(ms) > 0 {
 					out = append(out, ms...)
 				}
 			}
@@ -338,7 +378,7 @@ func findMethods(reg *builtin.Registry, def *ir.TypeDef, name string, seen map[*
 	// itself) or has no underlying definition.
 	if !def.Builtin {
 		if ud := defOf(reg, def.Body); ud != nil {
-			return findMethods(reg, ud, name, seen)
+			return findMethods(reg, ud, name, kind, seen)
 		}
 	}
 	return nil

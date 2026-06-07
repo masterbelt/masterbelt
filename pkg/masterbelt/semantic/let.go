@@ -88,10 +88,16 @@ func checkAssign(s *ast.AssignStmt, bs infer.BodyScope, env eval.Env, noSelf fun
 		return
 	}
 
+	if m, ok := s.Target.(*ast.MemberExpr); ok {
+		checkSetterAssign(s, m, bs, sink, at, diags)
+		return
+	}
+
 	id, ok := s.Target.(*ast.Identifier)
 	if !ok {
-		// A field access (item.field = ...) or any other non-name target is a
-		// write to immutable data: there is no let local to update.
+		// Any other non-name target (an index access already desugared away leaves a
+		// member or identifier; anything else here) is a write to immutable data:
+		// there is no let local to update.
 		if s.Target != nil {
 			c := at(s.Target)
 			diags.Add(newImmutableDataDiagnostic(c.offset, c.width))
@@ -146,6 +152,53 @@ func checkAssign(s *ast.AssignStmt, bs infer.BodyScope, env eval.Env, noSelf fun
 		c := at(s.Value)
 		diags.Add(newAssignTypeMismatchDiagnostic(c.offset, c.width, id.Name, got.String(), want.String()))
 	}
+}
+
+// checkSetterAssign validates a property write p.name = v: the receiver must be a
+// let local (the binding the write rebinds), and its type must declare a setter
+// named name. The value is checked against the setter's parameter type — a
+// literal pushes into it through the same bidirectional path a method argument
+// does. When no setter matches, the write is immutable data, exactly as a field
+// write was before accessors. The result type is self (the setter returns the
+// next value), so the local's type is unchanged and no reassignment-type check is
+// needed.
+func checkSetterAssign(s *ast.AssignStmt, m *ast.MemberExpr, bs infer.BodyScope, sink *infer.Sink, at func(ast.Node) span, diags *diagnostic.List) {
+	recv, ok := m.Receiver.(*ast.Identifier)
+	var want ir.Type
+	isLocal := false
+	if ok {
+		want, isLocal = bs.Locals[recv.Name]
+	}
+	// Only a let local can be rebound by a property write. A const/parameter/field
+	// receiver, or a non-identifier receiver (a chained p.a.b = v), is immutable
+	// data — the same finding a plain field write gives.
+	var setter *ir.Method
+	var subst map[string]ir.Type
+	if isLocal && want != ir.Invalid {
+		setter, subst, _ = types.Setter(bs.Reg, want, m.Member.Name)
+	}
+	if setter == nil {
+		c := at(s.Target)
+		diags.Add(newImmutableDataDiagnostic(c.offset, c.width))
+		if s.Value != nil {
+			infer.CheckBody(s.Value, ir.Invalid, bs, sink)
+		}
+		return
+	}
+	if s.Value == nil {
+		return
+	}
+	// The value is checked against the setter's single parameter type — a self
+	// parameter unifies with the receiver, anything else takes its declared type —
+	// so a literal pushes in and a mismatch is the ordinary type_mismatch.
+	paramT := ir.Invalid
+	if len(setter.Params) == 1 {
+		paramT = types.Substitute(setter.Params[0].Type, subst)
+		if _, isSelf := paramT.(*ir.SelfType); isSelf {
+			paramT = want
+		}
+	}
+	infer.CheckBody(s.Value, paramT, bs, sink)
 }
 
 // reportBareEnumMember reports a bare identifier under an enum expectation that

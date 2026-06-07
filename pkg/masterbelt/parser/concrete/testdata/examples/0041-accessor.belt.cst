@@ -1,0 +1,860 @@
+# tree
+File
+  TypeDecl
+    LineComment "// Accessors and static functions: a getter computes a property read"
+    Newline "\n"
+    LineComment "// (value.name), a setter computes the next value a property write rebinds"
+    Newline "\n"
+    LineComment "// (local.name = v), and a static fn is a function scoped to its type, called"
+    Newline "\n"
+    LineComment "// Type.name(...) — the Type.Name path enum members and associated constants"
+    Newline "\n"
+    LineComment "// already take. A getter and a setter are pure by construction: there is no"
+    Newline "\n"
+    LineComment "// syntax to give an accessor an effect, so a field-spelled read can never hide"
+    Newline "\n"
+    LineComment "// IO behind it — the guarantee an AI-facing language wants from `value.name`."
+    Newline "\n"
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Type "type"
+    Whitespace " "
+    Ident "Celsius"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    RecordType
+      LBrace "{"
+      Whitespace " "
+      Field
+        Ident "deg"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "nint"
+      Whitespace " "
+      RBrace "}"
+    Whitespace " "
+    ImplBlock
+      Impl "impl"
+      Whitespace " "
+      LBrace "{"
+      MethodDecl
+        Newline "\n"
+        Whitespace "  "
+        DocComment "/// The freezing point of water."
+        Newline "\n"
+        Whitespace "  "
+        Pub "pub"
+        Whitespace " "
+        Modifier
+          Ident "static"
+        Whitespace " "
+        Fn "fn"
+        Whitespace " "
+        Ident "freezing"
+        ParamList
+          LParen "("
+          RParen ")"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "Celsius"
+        Whitespace " "
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            RecordLit
+              Ident "Celsius"
+              LBrace "{"
+              Whitespace " "
+              RecordField
+                Ident "deg"
+                Colon ":"
+                Whitespace " "
+                Literal
+                  Int "0"
+              Whitespace " "
+              RBrace "}"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
+      MethodDecl
+        Newline "\n"
+        Whitespace "  "
+        DocComment "/// A degree reading converted from a fahrenheit value."
+        Newline "\n"
+        Whitespace "  "
+        Pub "pub"
+        Whitespace " "
+        Modifier
+          Ident "static"
+        Whitespace " "
+        Fn "fn"
+        Whitespace " "
+        Ident "fromF"
+        ParamList
+          LParen "("
+          Param
+            Ident "v"
+            Colon ":"
+            Whitespace " "
+            TypeName
+              Ident "nint"
+          RParen ")"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "Celsius"
+        Whitespace " "
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            RecordLit
+              Ident "Celsius"
+              LBrace "{"
+              Whitespace " "
+              RecordField
+                Ident "deg"
+                Colon ":"
+                Whitespace " "
+                BinaryExpr
+                  BinaryExpr
+                    ParenExpr
+                      LParen "("
+                      BinaryExpr
+                        NameRef
+                          Ident "v"
+                        Whitespace " "
+                        Minus "-"
+                        Whitespace " "
+                        Literal
+                          Int "32"
+                      RParen ")"
+                    Whitespace " "
+                    Star "*"
+                    Whitespace " "
+                    Literal
+                      Int "5"
+                  Whitespace " "
+                  Slash "/"
+                  Whitespace " "
+                  Literal
+                    Int "9"
+              Whitespace " "
+              RBrace "}"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
+      MethodDecl
+        Newline "\n"
+        Whitespace "  "
+        DocComment "/// A degree reading converted from a celsius value (the static overload:"
+        Newline "\n"
+        Whitespace "  "
+        DocComment "/// same name, a Celsius argument rather than a nint)."
+        Newline "\n"
+        Whitespace "  "
+        Pub "pub"
+        Whitespace " "
+        Modifier
+          Ident "static"
+        Whitespace " "
+        Fn "fn"
+        Whitespace " "
+        Ident "fromF"
+        ParamList
+          LParen "("
+          Param
+            Ident "c"
+            Colon ":"
+            Whitespace " "
+            TypeName
+              Ident "Celsius"
+          RParen ")"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "Celsius"
+        Whitespace " "
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            NameRef
+              Ident "c"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
+      MethodDecl
+        Newline "\n"
+        Whitespace "  "
+        DocComment "/// Fahrenheit reading: c.fahrenheit."
+        Newline "\n"
+        Whitespace "  "
+        Pub "pub"
+        Whitespace " "
+        Modifier
+          Ident "get"
+        Whitespace " "
+        Ident "fahrenheit"
+        ParamList
+          LParen "("
+          RParen ")"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "nint"
+        Whitespace " "
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            BinaryExpr
+              BinaryExpr
+                BinaryExpr
+                  MemberExpr
+                    SelfExpr
+                      Self "self"
+                    Dot "."
+                    Ident "deg"
+                  Whitespace " "
+                  Star "*"
+                  Whitespace " "
+                  Literal
+                    Int "9"
+                Whitespace " "
+                Slash "/"
+                Whitespace " "
+                Literal
+                  Int "5"
+              Whitespace " "
+              Plus "+"
+              Whitespace " "
+              Literal
+                Int "32"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
+      MethodDecl
+        Newline "\n"
+        Whitespace "  "
+        DocComment "/// Fahrenheit write: c.fahrenheit = 212 (c is a let local)."
+        Newline "\n"
+        Whitespace "  "
+        Pub "pub"
+        Whitespace " "
+        Modifier
+          Ident "set"
+        Whitespace " "
+        Ident "fahrenheit"
+        ParamList
+          LParen "("
+          Param
+            Ident "v"
+            Colon ":"
+            Whitespace " "
+            TypeName
+              Ident "nint"
+          RParen ")"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Self "self"
+        Whitespace " "
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            RecordLit
+              Ident "Celsius"
+              LBrace "{"
+              Whitespace " "
+              RecordField
+                Ident "deg"
+                Colon ":"
+                Whitespace " "
+                BinaryExpr
+                  BinaryExpr
+                    ParenExpr
+                      LParen "("
+                      BinaryExpr
+                        NameRef
+                          Ident "v"
+                        Whitespace " "
+                        Minus "-"
+                        Whitespace " "
+                        Literal
+                          Int "32"
+                      RParen ")"
+                    Whitespace " "
+                    Star "*"
+                    Whitespace " "
+                    Literal
+                      Int "5"
+                  Whitespace " "
+                  Slash "/"
+                  Whitespace " "
+                  Literal
+                    Int "9"
+              Whitespace " "
+              RBrace "}"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
+      Newline "\n"
+      RBrace "}"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// A static fn is called through its type, exactly as an associated constant or"
+    Newline "\n"
+    LineComment "// an enum member is read."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Freezing"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        MemberExpr
+          NameRef
+            Ident "Celsius"
+          Dot "."
+          Ident "freezing"
+        LParen "("
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    LineComment "// A getter reads as a field would, in a constant initializer."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "FreezingF"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      MemberExpr
+        NameRef
+          Ident "Freezing"
+        Dot "."
+        Ident "fahrenheit"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      NameRef
+        Ident "FreezingF"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "32"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// The static overload set selects by argument type."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "FromBoiling"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        MemberExpr
+          NameRef
+            Ident "Celsius"
+          Dot "."
+          Ident "fromF"
+        LParen "("
+        Literal
+          Int "212"
+        RParen ")"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      MemberExpr
+        NameRef
+          Ident "FromBoiling"
+        Dot "."
+        Ident "deg"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "100"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Roundtrip"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        MemberExpr
+          NameRef
+            Ident "Celsius"
+          Dot "."
+          Ident "fromF"
+        LParen "("
+        CallExpr
+          MemberExpr
+            NameRef
+              Ident "Celsius"
+            Dot "."
+            Ident "freezing"
+          LParen "("
+          RParen ")"
+        RParen ")"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      MemberExpr
+        NameRef
+          Ident "Roundtrip"
+        Dot "."
+        Ident "deg"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "0"
+  FuncDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// A property write rebinds the let local through the setter, which computes the"
+    Newline "\n"
+    LineComment "// next value and returns self — the data stays immutable."
+    Newline "\n"
+    Fn "fn"
+    Whitespace " "
+    Ident "boiling"
+    ParamList
+      LParen "("
+      RParen ")"
+    Colon ":"
+    Whitespace " "
+    TypeName
+      Ident "Celsius"
+    Whitespace " "
+    Block
+      LBrace "{"
+      Newline "\n"
+      Whitespace "  "
+      LetStmt
+        Let "let"
+        Whitespace " "
+        Ident "c"
+        Whitespace " "
+        Initializer
+          Assign "="
+          Whitespace " "
+          CallExpr
+            MemberExpr
+              NameRef
+                Ident "Celsius"
+              Dot "."
+              Ident "freezing"
+            LParen "("
+            RParen ")"
+      Newline "\n"
+      Whitespace "  "
+      AssignStmt
+        MemberExpr
+          NameRef
+            Ident "c"
+          Dot "."
+          Ident "fahrenheit"
+        Whitespace " "
+        Assign "="
+        Whitespace " "
+        Literal
+          Int "212"
+      Newline "\n"
+      Whitespace "  "
+      ReturnStmt
+        Return "return"
+        Whitespace " "
+        NameRef
+          Ident "c"
+      Newline "\n"
+      RBrace "}"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      MemberExpr
+        CallExpr
+          NameRef
+            Ident "boiling"
+          LParen "("
+          RParen ")"
+        Dot "."
+        Ident "deg"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "100"
+  TypeDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// A nominal type over a builtin base derives the base's methods; its own impl"
+    Newline "\n"
+    LineComment "// may add an accessor and a static fn, and they live alongside associated"
+    Newline "\n"
+    LineComment "// constants without colliding (a getter `band` reads value.band, a static fn"
+    Newline "\n"
+    LineComment "// `full` is called Health.full(), the assoc const Health.Max is read Type.Name)."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Type "type"
+    Whitespace " "
+    Ident "Health"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    TypeName
+      Ident "nint"
+    Whitespace " "
+    ImplBlock
+      Impl "impl"
+      Whitespace " "
+      LBrace "{"
+      ConstDecl
+        Newline "\n"
+        Whitespace "  "
+        DocComment "/// The maximum health."
+        Newline "\n"
+        Whitespace "  "
+        Pub "pub"
+        Whitespace " "
+        Const "const"
+        Whitespace " "
+        Ident "Max"
+        Whitespace " "
+        Initializer
+          Assign "="
+          Whitespace " "
+          Literal
+            Int "100"
+      MethodDecl
+        Newline "\n"
+        Newline "\n"
+        Whitespace "  "
+        DocComment "/// A full health bar."
+        Newline "\n"
+        Whitespace "  "
+        Pub "pub"
+        Whitespace " "
+        Modifier
+          Ident "static"
+        Whitespace " "
+        Fn "fn"
+        Whitespace " "
+        Ident "full"
+        ParamList
+          LParen "("
+          RParen ")"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "Health"
+        Whitespace " "
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            MemberExpr
+              NameRef
+                Ident "Health"
+              Dot "."
+              Ident "Max"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
+      MethodDecl
+        Newline "\n"
+        Whitespace "  "
+        DocComment "/// The health expressed in tens (the band a UI shows)."
+        Newline "\n"
+        Whitespace "  "
+        Pub "pub"
+        Whitespace " "
+        Modifier
+          Ident "get"
+        Whitespace " "
+        Ident "band"
+        ParamList
+          LParen "("
+          RParen ")"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "nint"
+        Whitespace " "
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            BinaryExpr
+              CallExpr
+                NameRef
+                  Ident "nint"
+                LParen "("
+                SelfExpr
+                  Self "self"
+                RParen ")"
+              Whitespace " "
+              Slash "/"
+              Whitespace " "
+              Literal
+                Int "10"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
+      Newline "\n"
+      RBrace "}"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Full"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        MemberExpr
+          NameRef
+            Ident "Health"
+          Dot "."
+          Ident "full"
+        LParen "("
+        RParen ")"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      MemberExpr
+        NameRef
+          Ident "Full"
+        Dot "."
+        Ident "band"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "10"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      MemberExpr
+        NameRef
+          Ident "Health"
+        Dot "."
+        Ident "Max"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "100"
+  EnumDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// An enum impl carries an accessor and a static fn just as a nominal type's"
+    Newline "\n"
+    LineComment "// does: a getter reads each member's property, a static fn names a default."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Enum "enum"
+    Whitespace " "
+    Ident "Element"
+    Whitespace " "
+    LBrace "{"
+    EnumMember
+      Newline "\n"
+      Whitespace "  "
+      Ident "Fire"
+    Comma ","
+    EnumMember
+      Whitespace " "
+      Ident "Water"
+    Comma ","
+    EnumMember
+      Whitespace " "
+      Ident "Wind"
+    Newline "\n"
+    RBrace "}"
+    Whitespace " "
+    ImplBlock
+      Impl "impl"
+      Whitespace " "
+      LBrace "{"
+      MethodDecl
+        Newline "\n"
+        Whitespace "  "
+        DocComment "/// Whether this element is Fire."
+        Newline "\n"
+        Whitespace "  "
+        Pub "pub"
+        Whitespace " "
+        Modifier
+          Ident "get"
+        Whitespace " "
+        Ident "hot"
+        ParamList
+          LParen "("
+          RParen ")"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "bool"
+        Whitespace " "
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            BinaryExpr
+              SelfExpr
+                Self "self"
+              Whitespace " "
+              EqEq "=="
+              Whitespace " "
+              MemberExpr
+                NameRef
+                  Ident "Element"
+                Dot "."
+                Ident "Fire"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
+      MethodDecl
+        Newline "\n"
+        Whitespace "  "
+        DocComment "/// The default element."
+        Newline "\n"
+        Whitespace "  "
+        Pub "pub"
+        Whitespace " "
+        Modifier
+          Ident "static"
+        Whitespace " "
+        Fn "fn"
+        Whitespace " "
+        Ident "base"
+        ParamList
+          LParen "("
+          RParen ")"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "Element"
+        Whitespace " "
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            MemberExpr
+              NameRef
+                Ident "Element"
+              Dot "."
+              Ident "Fire"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
+      Newline "\n"
+      RBrace "}"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Default"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        MemberExpr
+          NameRef
+            Ident "Element"
+          Dot "."
+          Ident "base"
+        LParen "("
+        RParen ")"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    MemberExpr
+      NameRef
+        Ident "Default"
+      Dot "."
+      Ident "hot"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    UnaryExpr
+      Bang "!"
+      MemberExpr
+        MemberExpr
+          NameRef
+            Ident "Element"
+          Dot "."
+          Ident "Water"
+        Dot "."
+        Ident "hot"
+  Newline "\n"
+  EOF ""
+# diagnostics
