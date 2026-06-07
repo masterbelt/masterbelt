@@ -19,26 +19,26 @@ Module
     value <none>.base()
   TypeDef "Celsius" pub
     body { deg: nint }
-    method "freezing" pub
+    method "freezing" pub static
       doc "The freezing point of water."
       result Celsius
       return Celsius{deg: IntLiteral "0"}
-    method "fromF" pub
+    method "fromF" pub static
       doc "A degree reading converted from a fahrenheit value."
       param v: nint
       result Celsius
       return Celsius{deg: ParamRef "v".sub(IntLiteral "32").mul(IntLiteral "5").div(IntLiteral "9")}
-    method "fromF" pub
+    method "fromF" pub static
       doc "A degree reading converted from a celsius value (the static overload:"
       doc "same name, a Celsius argument rather than a nint)."
       param c: Celsius
       result Celsius
       return ParamRef "c"
-    method "fahrenheit" pub
+    method "fahrenheit" pub getter
       doc "Fahrenheit reading: c.fahrenheit."
       result nint
       return self.deg.mul(IntLiteral "9").div(IntLiteral "5").add(IntLiteral "32")
-    method "fahrenheit" pub
+    method "fahrenheit" pub setter
       doc "Fahrenheit write: c.fahrenheit = 212 (c is a let local)."
       param v: nint
       result self
@@ -49,14 +49,14 @@ Module
       doc "The maximum health."
       type nint
       value 100
-    method "full" pub
+    method "full" pub static
       doc "A full health bar."
       result Health
       return Health.Max
-    method "band" pub
+    method "band" pub getter
       doc "The health expressed in tens (the band a UI shows)."
       result nint
-      return self.div(IntLiteral "10")
+      return nint(self).div(IntLiteral "10")
   TypeDef "Element" pub
     enum nint
     member "Fire" = 0
@@ -82,11 +82,11 @@ Module
     method "gteq" pub extern
       param other: self
       result bool
-    method "hot" pub
+    method "hot" pub getter
       doc "Whether this element is Fire."
       result bool
       return self.eql(Element.Fire)
-    method "base" pub
+    method "base" pub static
       doc "The default element."
       result Element
       return Element.Fire
@@ -119,7 +119,8 @@ Module
     eval <unevaluated>
       Default.hot
   Assert "!Element.Water.hot"
-    eval <unevaluated>
+    eval true
       !Element.Water.hot
-               ^
+      ^        ^     ^
+      true     |     false
                Element.Water

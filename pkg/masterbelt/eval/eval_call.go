@@ -372,6 +372,62 @@ func applyUserMethod(ctx evalCtx, recvExpr ast.Expr, recv *ir.Constant, name str
 	return applyBody(methodCallable(sel, def), recv, args, ctx), true
 }
 
+// applyGetter folds a getter read value.name: it resolves the receiver's static
+// definition the way a method call does (the same syntactic channels), finds the
+// getter named name with a body, and applies it with self bound to the receiver
+// and no arguments. It returns (value, true) when a getter of that name is
+// declared (folded, or left unevaluated under the depth guard), and (nil, false)
+// when the receiver has no such getter — the field reading then stands. Like the
+// rest of the folder it depends only on the syntactic channels, never on a type
+// query, so it is sound: a receiver whose def cannot be resolved simply does not
+// fold.
+func applyGetter(ctx evalCtx, recvExpr ast.Expr, recv *ir.Constant, name string) (*ir.Constant, bool) {
+	def := receiverDef(ctx, recvExpr, recv)
+	if def == nil {
+		return nil, false
+	}
+	sel := getterSyntax(ctx.env.Registry(), def, name)
+	if sel == nil {
+		return nil, false
+	}
+	if ctx.depth >= maxApplyDepth {
+		return nil, true // the recursion guard fired: a safe, unfoldable result
+	}
+	return applyBody(methodCallable(sel, def), recv, nil, ctx), true
+}
+
+// getterSyntax returns the body-bearing AST declaration of the getter named name
+// the definition binds — its own, or one derived from its underlying type — or
+// nil when it declares no such getter. A getter takes no overloads, so there is
+// at most one. It mirrors methodSyntaxes' shadowing within the getter name space.
+func getterSyntax(reg *builtin.Registry, def *ir.TypeDef, name string) *ast.MethodDecl {
+	return collectGetterSyntax(reg, def, name, map[*ir.TypeDef]bool{})
+}
+
+func collectGetterSyntax(reg *builtin.Registry, def *ir.TypeDef, name string, seen map[*ir.TypeDef]bool) *ast.MethodDecl {
+	if def == nil || seen[def] {
+		return nil
+	}
+	seen[def] = true
+	declares := false
+	for _, m := range def.Methods {
+		if m.Name != name || m.Kind != ir.MethodGetter {
+			continue
+		}
+		declares = true
+		if m.Syntax != nil && len(m.Syntax.Body) > 0 {
+			return m.Syntax
+		}
+	}
+	if declares {
+		return nil // declared but bodiless (would be extern; not foldable)
+	}
+	if !def.Builtin {
+		return collectGetterSyntax(reg, methodTableDef(reg, def.Body), name, seen)
+	}
+	return nil
+}
+
 // methodSyntaxes collects the body-bearing AST declarations of the named method
 // the definition binds: its own declarations, and — when it declares the name
 // nowhere — the provided defaults of each interface it opts into (a list's
@@ -398,8 +454,8 @@ func collectMethodSyntaxes(reg *builtin.Registry, def *ir.TypeDef, name string, 
 	declares := false
 	var out []*ast.MethodDecl
 	for _, m := range def.Methods {
-		if m.Name != name {
-			continue
+		if m.Name != name || m.Kind != ir.MethodNormal {
+			continue // an instance call resolves only against instance methods
 		}
 		declares = true
 		if m.Syntax != nil && len(m.Syntax.Body) > 0 {
@@ -739,6 +795,13 @@ func isSelfType(t ast.TypeExpr) bool {
 // the guard that keeps a def read from an annotation from applying to a value of
 // the wrong kind.
 func defBacksKind(reg *builtin.Registry, def *ir.TypeDef, kind ir.ConstKind) bool {
+	// A record-bodied def (a record type, or a nominal type over one) backs a
+	// record value: a method or getter on a record receiver reaches its body
+	// through the receiver's annotation, the same syntactic channel a primitive
+	// uses, so value.name folds on a record exactly as it does on a wrapped int.
+	if kind == ir.ConstRecord {
+		return recordOf(&ir.Named{Def: def}) != nil
+	}
 	n := underlyingPrimitive(reg, def, map[*ir.TypeDef]bool{})
 	if n == nil {
 		return false

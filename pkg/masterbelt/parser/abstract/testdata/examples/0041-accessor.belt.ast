@@ -74,7 +74,7 @@ File
       pub
       kind getter
       result nint
-      return (call (. self div) IntLit "10")
+      return (call (. (call Identifier "nint" self) div) IntLit "10")
   EnumDecl
     pub
     name "Element"

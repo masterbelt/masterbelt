@@ -13,15 +13,23 @@ import (
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
 )
 
-// signatureKey renders a method's parameter-type list as the duplicate-
-// detection key: two same-name methods collide exactly when their resolved
-// parameter types denote the same signature. Spellings of the same type are
-// normalized — the enclosing type's own name reads as self (inside the impl
+// signatureKey renders a method's kind and parameter-type list as the duplicate-
+// detection key: two same-name methods collide exactly when their kind and
+// resolved parameter types denote the same signature. The kind is part of the
+// key so the three name spaces stay apart — a getter `max` and an ordinary
+// method `max()` both take no parameters, but live in different name spaces, so
+// they must not dedup against each other (their collision, when illegal, is the
+// accessor_collision check, not a dropped overload). Spellings of the same type
+// are normalized — the enclosing type's own name reads as self (inside the impl
 // they are the same type, and would otherwise both fit every call, making it
 // permanently ambiguous), and the method's own type variables read by binding
 // position (foo(a: T) and foo(a: U) are the same universal signature). The
 // enclosing type's generic parameters keep their names: they are bound by the
 // receiver, so distinct parameters are distinct types.
+//
+// The early-cutoff edit guard (TestEarlyCutoff*) rides on the kind being here:
+// rewriting `get size(): T` to `size(): T` changes the key, so the edit
+// re-resolves rather than reusing the stale getter typing.
 func signatureKey(def *ir.TypeDef, m *ir.Method) string {
 	bound := make(map[string]bool, len(def.Params))
 	for _, p := range def.Params {
@@ -32,7 +40,7 @@ func signatureKey(def *ir.TypeDef, m *ir.Method) string {
 	for i, p := range m.Params {
 		parts[i] = normalizeKeyType(def, p.Type, bound, vars)
 	}
-	return "(" + strings.Join(parts, ", ") + ")"
+	return m.Kind.String() + "(" + strings.Join(parts, ", ") + ")"
 }
 
 // normalizeKeyType renders one parameter type for signatureKey, recursing

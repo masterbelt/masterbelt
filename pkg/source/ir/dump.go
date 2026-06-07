@@ -161,6 +161,9 @@ func dumpMethod(b *strings.Builder, m *Method) {
 	if m.Extern {
 		mod += " extern"
 	}
+	if m.Kind != MethodNormal {
+		mod += " " + m.Kind.String()
+	}
 	fmt.Fprintf(b, "    method %q%s\n", m.Name, mod)
 	for _, doc := range m.Doc {
 		fmt.Fprintf(b, "      doc %q\n", doc)

@@ -636,8 +636,13 @@ File
             Return "return"
             Whitespace " "
             BinaryExpr
-              SelfExpr
-                Self "self"
+              CallExpr
+                NameRef
+                  Ident "nint"
+                LParen "("
+                SelfExpr
+                  Self "self"
+                RParen ")"
               Whitespace " "
               Slash "/"
               Whitespace " "

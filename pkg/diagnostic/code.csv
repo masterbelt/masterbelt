@@ -92,6 +92,12 @@ masterbelt.semantic.no_method_on_unbounded_typevar,error,method:string
 masterbelt.semantic.not_iterable,error,typ:string
 masterbelt.semantic.loop_var_immutable,error,name:string
 masterbelt.semantic.range_step_zero,error,
+masterbelt.semantic.invalid_getter_signature,error,name:string
+masterbelt.semantic.invalid_setter_signature,error,name:string
+masterbelt.semantic.accessor_collision,error,name:string typ:string
+masterbelt.semantic.static_collision,error,name:string typ:string
+masterbelt.semantic.unknown_static,error,name:string typ:string
+masterbelt.semantic.generic_static,error,name:string
 project.config.missing,error,
 project.config.invalid,error,detail:string
 project.config.missing_entry,error,

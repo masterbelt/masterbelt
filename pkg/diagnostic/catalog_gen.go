@@ -167,6 +167,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "unexpected token: " + f["kind"].String()
 		}
 	},
+	"masterbelt.semantic.accessor_collision": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "アクセサ " + f["name"].String() + " は " + f["typ"].String() + " の同名の別メンバと衝突しています"
+		default:
+			return "accessor " + f["name"].String() + " collides with another member of the same name on " + f["typ"].String()
+		}
+	},
 	"masterbelt.semantic.ambiguous_func_overload": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
@@ -383,6 +391,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "a " + f["context"].String() + " is evaluated at compile time and must be pure; effect " + f["effect"].String() + " is not allowed"
 		}
 	},
+	"masterbelt.semantic.generic_static": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "ジェネリックな static fn " + f["name"].String() + " はサポートされていません"
+		default:
+			return "generic static fn " + f["name"].String() + " is not supported"
+		}
+	},
 	"masterbelt.semantic.immutable_data": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
@@ -423,12 +439,28 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return f["typ"].String() + " is not a valid enum base type (use an integer type or string)"
 		}
 	},
+	"masterbelt.semantic.invalid_getter_signature": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "ゲッター " + f["name"].String() + " は引数を取れません"
+		default:
+			return "getter " + f["name"].String() + " must take no parameters"
+		}
+	},
 	"masterbelt.semantic.invalid_operation": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "メソッド " + f["method"].String() + " を " + f["types"].String() + " に適用できません"
 		default:
 			return "cannot apply method " + f["method"].String() + " to " + f["types"].String()
+		}
+	},
+	"masterbelt.semantic.invalid_setter_signature": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "セッター " + f["name"].String() + " は引数を 1 つ取り self を返す必要があります"
+		default:
+			return "setter " + f["name"].String() + " must take one parameter and return self"
 		}
 	},
 	"masterbelt.semantic.lambda_arity_mismatch": func(loc Locale, f map[string]fmt.Stringer) string {
@@ -615,6 +647,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "self is only available inside a method body"
 		}
 	},
+	"masterbelt.semantic.static_collision": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "static fn " + f["name"].String() + " は " + f["typ"].String() + " の同名の関連定数か enum メンバと衝突しています"
+		default:
+			return "static fn " + f["name"].String() + " collides with an associated constant or enum member of the same name on " + f["typ"].String()
+		}
+	},
 	"masterbelt.semantic.ternary_branch_mismatch": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
@@ -717,6 +757,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return f["namespace"].String() + " に公開メンバ " + f["name"].String() + " はありません"
 		default:
 			return f["namespace"].String() + " has no exported member " + f["name"].String()
+		}
+	},
+	"masterbelt.semantic.unknown_static": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return f["typ"].String() + " に static fn " + f["name"].String() + " はありません"
+		default:
+			return f["typ"].String() + " has no static fn " + f["name"].String()
 		}
 	},
 	"masterbelt.semantic.unknown_type": func(loc Locale, f map[string]fmt.Stringer) string {
