@@ -1,19 +1,31 @@
 use { nint } from "./signed.belt"
 use { foldable } from "./collection.belt"
+use { comparable } from "./operators.belt"
 
-/// An inclusive sequence of integers, constructed with range(start, end): the
-/// values start, start+1, ..., end — both bounds included — with an end below
-/// start being the empty sequence. It is constructed by the two-argument conversion form the way
-/// error("msg") is by the one-argument form — a native constructor that builds
-/// the value — and is not a stored collection: its bounds are kept lazily, so a
-/// wide range costs nothing until it is walked.
+/// A sequence of integers, constructed with range(start, end) or range(start,
+/// end, step): the values start, start+step, ..., staying on the end side of
+/// step — for the two-argument form (step 1) start, start+1, ..., end, both
+/// bounds included, an end below start being empty. The range literal is its
+/// surface syntax: a..b is the closed range, a...b the half-open one (the larger
+/// end excluded), iterated from the a side toward the b side, so 9..0 is the
+/// descending range(9, 0, -1). It is constructed by the two- or three-argument
+/// conversion form the way error("msg") is by the one-argument form — a native
+/// constructor that builds the value — and is not a stored collection: its
+/// bounds and step are kept lazily, so a wide range costs nothing until walked.
 ///
 /// range impls foldable<nint, nint>, so it iterates with for and carries the whole
 /// provided method set (count, any, all, map, filter, keys, values) for free.
 /// Its key is the 0-based position — like a list's index — and its value is the
 /// element, so for...of binds the element and for...in binds the position; the
 /// K/V semantics are list's exactly.
-pub type range = builtin impl foldable<nint, nint> {
+pub type range = builtin impl comparable {
+  /// The == operator: two ranges are equal when their start, end, and step are
+  /// equal. A literal and the range(...) it desugars to compare equal, so the
+  /// equivalence is checkable directly — (0..9) == range(0, 9).
+  pub extern fn eql(other: self): bool
+  /// The != operator.
+  pub extern fn neq(other: self): bool
+} impl foldable<nint, nint> {
   /// The required primitive: visit each element in order with its 0-based
   /// position as the key, threading the accumulator. The provided
   /// count/any/all/map/filter/keys/values are defined on top of this.

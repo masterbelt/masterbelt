@@ -90,6 +90,7 @@ masterbelt.semantic.uninferable_type_param,型パラメータ {name} を引数�
 masterbelt.semantic.no_method_on_unbounded_typevar,無境界の型パラメータに対して {method} は呼べません。メソッドを使うには interface 境界を付けてください
 masterbelt.semantic.not_iterable,for で反復できるのは foldable なコレクションだけです。{typ} は foldable ではありません
 masterbelt.semantic.loop_var_immutable,ループ変数 {name} には代入できません。不変です。蓄積には let を使ってください
+masterbelt.semantic.range_step_zero,range のステップに 0 は指定できません
 project.config.missing,masterbelt.toml がこのディレクトリにも親ディレクトリにも見つかりません
 project.config.invalid,不正な masterbelt.toml: {detail}
 project.config.missing_entry,masterbelt.toml に entry が指定されていません

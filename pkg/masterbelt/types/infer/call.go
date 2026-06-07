@@ -173,11 +173,14 @@ func convCallType(e *ast.CallExpr, name string, t ir.Type, s scope, sink *Sink) 
 			return t
 		}
 		if b.Name == "range" {
-			// range(start, end): the half-open integer sequence. A future step
-			// variant (range(start, end, step)) would add a third arm here rather
-			// than reject a third argument, so the design does not close the door
-			// on it; today exactly two int arguments construct one.
-			if len(e.Arguments) != 2 {
+			// range(start, end) and range(start, end, step): the integer sequence,
+			// unit-step in the two-argument form and stepped in the three-argument
+			// one. Each argument is an int (the same nint check the range literal's
+			// bounds take); a count other than two or three is an arity_mismatch
+			// (reported against two, the canonical form). A step that folds to zero
+			// is the zero-step range diagnostic, raised where the value folds (the
+			// semantic layer), not here — the type layer does not evaluate.
+			if len(e.Arguments) != 2 && len(e.Arguments) != 3 {
 				for _, a := range e.Arguments {
 					check(a, s, sink)
 				}

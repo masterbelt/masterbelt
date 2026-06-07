@@ -559,6 +559,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "for can only iterate a foldable collection; " + f["typ"].String() + " is not foldable"
 		}
 	},
+	"masterbelt.semantic.range_step_zero": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "range のステップに 0 は指定できません"
+		default:
+			return "range step cannot be zero"
+		}
+	},
 	"masterbelt.semantic.refinement_not_bool": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":

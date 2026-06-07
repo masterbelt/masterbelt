@@ -674,11 +674,30 @@ func check(e ast.Expr, s scope, sink *Sink) ir.Type {
 		return check(e.Value, s, sink)
 	case *ast.TernaryExpr:
 		return checkTernary(e, ir.Invalid, s, map[string]ir.Type{}, sink)
+	case *ast.RangeExpr:
+		return checkRange(e, s, sink)
 	case *ast.CallExpr:
 		return callType(e, s, sink)
 	default:
 		return s.leaf(e)
 	}
+}
+
+// checkRange checks a range literal lo..hi (or lo...hi) and returns its type, the
+// range builtin. Each bound must be an integer (nint adapts where a sized integer
+// is expected), checked against nint exactly as the range(...) constructor's
+// arguments are — so a non-integer bound is the familiar type_mismatch — and a
+// missing bound (a recovered literal) is skipped. The literal's type is range
+// whatever its bounds, the same type range(start, end) produces.
+func checkRange(e *ast.RangeExpr, s scope, sink *Sink) ir.Type {
+	nint := &ir.Builtin{Name: "nint"}
+	if e.Lower != nil {
+		checkType(e.Lower, nint, s, map[string]ir.Type{}, sink)
+	}
+	if e.Upper != nil {
+		checkType(e.Upper, nint, s, map[string]ir.Type{}, sink)
+	}
+	return rangeBuiltin()
 }
 
 // checkTernary checks a conditional value cond ? then : else and returns its

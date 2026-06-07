@@ -85,19 +85,130 @@ func TestRangeProvidedMethods(t *testing.T) {
 	}
 }
 
-// TestRangeArity checks the constructor's argument count: range takes exactly two
-// arguments today. A one- or three-argument call is an arity_mismatch — the
-// three-argument form is rejected by the same rule, leaving the door open for a
-// future range(start, end, step) to add an arm rather than change this check.
+// TestRangeArity checks the constructor's argument count: range takes two or
+// three arguments. A one- or four-argument call is an arity_mismatch; the two-
+// and three-argument forms are both valid (the third is the step).
 func TestRangeArity(t *testing.T) {
 	for _, src := range []string{
 		"const R = range(0)\n",
-		"const R = range(0, 10, 2)\n",
+		"const R = range(0, 10, 2, 3)\n",
 	} {
 		_, diags := analyze(src)
 		if !hasCode(diags, CodeArityMismatch) {
 			t.Errorf("src %q: want arity_mismatch, got %v", src, codes(diags))
 		}
+	}
+	for _, src := range []string{
+		"const R = range(0, 10)\n",
+		"const R = range(0, 10, 2)\n",
+	} {
+		if _, diags := analyze(src); len(diags) != 0 {
+			t.Errorf("src %q: want no diagnostic, got %v", src, codes(diags))
+		}
+	}
+}
+
+// TestRangeStepConstructor checks the three-argument constructor: a positive step
+// walks up while v <= end (range(0, 10, 2) is 0,2,4,6,8,10), a negative step
+// walks down while v >= end (range(10, 0, -2) is 10,8,6,4,2,0). Both fold their
+// element count and their sum.
+func TestRangeStepConstructor(t *testing.T) {
+	src := "const UpCount = range(0, 10, 2).count()\n" +
+		"const UpSum = range(0, 10, 2).fold(0, fn(acc: nint, k: nint, v: nint): nint -> acc + v)\n" +
+		"const DownCount = range(10, 0, -2).count()\n" +
+		"const DownSum = range(10, 0, -2).fold(0, fn(acc: nint, k: nint, v: nint): nint -> acc + v)\n"
+	if got := evalOf(t, src, "UpCount").Int.Int64(); got != 6 {
+		t.Errorf("range(0, 10, 2).count() = %d, want 6", got)
+	}
+	if got := evalOf(t, src, "UpSum").Int.Int64(); got != 30 { // 0+2+4+6+8+10
+		t.Errorf("range(0, 10, 2) sum = %d, want 30", got)
+	}
+	if got := evalOf(t, src, "DownCount").Int.Int64(); got != 6 {
+		t.Errorf("range(10, 0, -2).count() = %d, want 6", got)
+	}
+	if got := evalOf(t, src, "DownSum").Int.Int64(); got != 30 { // 10+8+6+4+2+0
+		t.Errorf("range(10, 0, -2) sum = %d, want 30", got)
+	}
+}
+
+// TestRangeStepPartialStride checks a step that does not divide the span: the
+// last element lands inside the bound, never past it. range(0, 9, 2) is
+// 0,2,4,6,8 (5 elements; 9 is skipped because 10 > 9), and range(0, 10, 3) is
+// 0,3,6,9 (4 elements; 12 > 10). The count is (end-start)/step + 1, flooring.
+func TestRangeStepPartialStride(t *testing.T) {
+	src := "const A = range(0, 9, 2).count()\n" +
+		"const B = range(0, 10, 3).count()\n" +
+		"const C = range(9, 0, -2).count()\n" // 9,7,5,3,1 -> 5 (0 skipped, -1 < 0)
+	if got := evalOf(t, src, "A").Int.Int64(); got != 5 {
+		t.Errorf("range(0, 9, 2).count() = %d, want 5", got)
+	}
+	if got := evalOf(t, src, "B").Int.Int64(); got != 4 {
+		t.Errorf("range(0, 10, 3).count() = %d, want 4", got)
+	}
+	if got := evalOf(t, src, "C").Int.Int64(); got != 5 {
+		t.Errorf("range(9, 0, -2).count() = %d, want 5", got)
+	}
+}
+
+// TestRangeStepEmpty checks an end past the start against the step's sign: the
+// range is empty. range(0, 10, -1) walks down from 0 but 0 < 10, so it visits
+// nothing; range(10, 0, 1) walks up from 10 but 10 > 0, likewise empty.
+func TestRangeStepEmpty(t *testing.T) {
+	src := "const A = range(0, 10, -1).count()\n" +
+		"const B = range(10, 0, 1).count()\n"
+	if got := evalOf(t, src, "A").Int.Int64(); got != 0 {
+		t.Errorf("range(0, 10, -1).count() = %d, want 0", got)
+	}
+	if got := evalOf(t, src, "B").Int.Int64(); got != 0 {
+		t.Errorf("range(10, 0, 1).count() = %d, want 0", got)
+	}
+}
+
+// TestRangeStepZero checks the zero-step diagnostic: a range whose step folds to
+// a constant zero has no sequence (it neither advances nor terminates), reported
+// as range_step_zero. A non-constant step is left to the runtime — no diagnostic.
+func TestRangeStepZero(t *testing.T) {
+	if _, diags := analyze("const R = range(0, 10, 0)\n"); !hasCode(diags, CodeRangeStepZero) {
+		t.Errorf("range(0, 10, 0): want range_step_zero, got %v", codes(diags))
+	}
+	// A zero-step range does not fold to a value: the const stays unevaluated.
+	mod, _ := analyze("const R = range(0, 10, 0)\n")
+	for _, c := range mod.Consts {
+		if c.Name == "R" && c.Eval != nil {
+			t.Errorf("range(0, 10, 0) folded to %v, want unevaluated", c.Eval)
+		}
+	}
+	// A non-constant step is not diagnosed (left to the runtime).
+	nonConst := "pub fn r(s: nint): range {\n  return range(0, 10, s)\n}\n"
+	if _, diags := analyze(nonConst); hasCode(diags, CodeRangeStepZero) {
+		t.Errorf("range(0, 10, s) with a non-constant step: want no diagnostic, got %v", codes(diags))
+	}
+}
+
+// TestRangeStepAtBound checks the iteration cap honours the step: a stepped range
+// is counted from its bounds in O(1), so a range whose stepped element count is
+// at the cap still folds and one past it does not — the limit is the visit count,
+// not the bound magnitudes. With step 2 the span is twice the cap.
+func TestRangeStepAtBound(t *testing.T) {
+	const iterCap = 1 << 20                                 // 1048576
+	src := "const AtCap = range(0, 2097150, 2).count()\n" + // 2097150/2 + 1 = 1048576 == cap
+		"const OverCap = range(0, 2097152, 2).count()\n" // 2097152/2 + 1 = 1048577 > cap
+	mod, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", codes(diags))
+	}
+	got := map[string]*int64{}
+	for _, c := range mod.Consts {
+		if c.Eval != nil && c.Eval.Int != nil {
+			v := c.Eval.Int.Int64()
+			got[c.Name] = &v
+		}
+	}
+	if got["AtCap"] == nil || *got["AtCap"] != iterCap {
+		t.Errorf("AtCap = %v, want %d (a stepped range at the cap still folds)", got["AtCap"], iterCap)
+	}
+	if got["OverCap"] != nil {
+		t.Errorf("OverCap folded to %d, want unevaluated (past the cap must not fold)", *got["OverCap"])
 	}
 }
 

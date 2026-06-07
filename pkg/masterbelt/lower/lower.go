@@ -175,6 +175,11 @@ func Value(e ast.Expr, b Binder) ir.Value {
 		// choice between the branches is the runtime's (and the folder's), so the
 		// node carries both.
 		return &ir.Ternary{Cond: Value(e.Cond, b), Then: Value(e.Then, b), Else: Value(e.Else, b)}
+	case *ast.RangeExpr:
+		// lo..hi keeps its own node rather than lowering to a range(...) Conversion:
+		// the direction and the half-open trim depend on the bound values, settled
+		// by the fold. Both bounds lower as ordinary values.
+		return &ir.RangeLit{Lower: Value(e.Lower, b), Upper: Value(e.Upper, b), HalfOpen: e.HalfOpen}
 	case *ast.FuncLit:
 		// The body lowers in a binder that binds the literal's parameters; its
 		// own parameter values are supplied at evaluation, not here.

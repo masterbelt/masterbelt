@@ -1,16 +1,20 @@
 Module
   Const "ClosedUp"
-    type invalid
-    value IntLiteral "0"..
+    type range
+    value IntLiteral "0"..IntLiteral "9"
+    eval range(0, 9)
   Const "HalfUp"
-    type invalid
-    value IntLiteral "0"...
+    type range
+    value IntLiteral "0"...IntLiteral "9"
+    eval range(0, 8)
   Const "ClosedDown"
-    type invalid
-    value IntLiteral "9"..
+    type range
+    value IntLiteral "9"..IntLiteral "0"
+    eval range(9, 0, -1)
   Const "HalfDown"
-    type invalid
-    value IntLiteral "9"...
+    type range
+    value IntLiteral "9"...IntLiteral "0"
+    eval range(8, 0, -1)
   Const "ClosedUpEq"
     type range
     value range(IntLiteral "0", IntLiteral "9")
@@ -22,75 +26,88 @@ Module
   Const "ClosedDownEq"
     type range
     value range(IntLiteral "9", IntLiteral "0", IntLiteral "1".neg())
+    eval range(9, 0, -1)
   Const "HalfDownEq"
     type range
     value range(IntLiteral "8", IntLiteral "0", IntLiteral "1".neg())
+    eval range(8, 0, -1)
   Const "Single"
-    type invalid
-    value IntLiteral "5"..
+    type range
+    value IntLiteral "5"..IntLiteral "5"
+    eval range(5, 5)
   Const "Empty"
-    type invalid
-    value IntLiteral "5"...
+    type range
+    value IntLiteral "5"...IntLiteral "5"
+    eval range(5, 4)
   Const "Upto"
     type range
     value upto(IntLiteral "4")
+    eval range(0, 5)
   Const "Evens"
     type range
     value range(IntLiteral "0", IntLiteral "10", IntLiteral "2")
+    eval range(0, 10, 2)
   Const "DownBy2"
     type range
     value range(IntLiteral "10", IntLiteral "0", IntLiteral "2".neg())
+    eval range(10, 0, -2)
   Const "SumUp"
     type nint
     value sumUp()
+    eval 55
   Const "SumDown"
     type nint
     value sumDown()
+    eval 15
   Const "SumHalf"
     type nint
     value sumHalf()
+    eval 10
   Const "SumEvens"
     type nint
     value sumEvens()
+    eval 30
   Const "ClosedCount"
-    type invalid
-    value IntLiteral "0"..
+    type nint
+    value IntLiteral "0"..IntLiteral "9".count()
+    eval 10
   Const "HalfCount"
-    type invalid
-    value IntLiteral "0"...
+    type nint
+    value IntLiteral "0"...IntLiteral "9".count()
+    eval 9
   Const "SteppedCount"
     type nint
     value range(IntLiteral "0", IntLiteral "10", IntLiteral "2").count()
+    eval 6
   Const "ClosedFold"
-    type invalid
-    value IntLiteral "0"..
+    type nint
+    value IntLiteral "0"..IntLiteral "4".fold(IntLiteral "0", (fn(acc, k, v) (return ParamRef "acc".add(ParamRef "v"))))
+    eval 10
   Const "SteppedFold"
     type nint
     value range(IntLiteral "0", IntLiteral "10", IntLiteral "2").fold(IntLiteral "0", (fn(acc, k, v) (return ParamRef "acc".add(ParamRef "v"))))
+    eval 30
   Func "upto" pub
     param n: nint
     result range
-      return IntLiteral "0"..n.add(IntLiteral "1")
+      return IntLiteral "0"..ParamRef "n".add(IntLiteral "1")
   Func "sumUp" pub
     result nint
       let "t": nint = IntLiteral "0"
-      for i of invalid IntLiteral "0"..
-      expr IntLiteral "10"
-      expr {t: <none>, t: <none>, i: <none>}
+      for i of nint IntLiteral "0"..IntLiteral "10"
+          assign "t" = LocalRef "t".add(LocalRef "i")
       return LocalRef "t"
   Func "sumDown" pub
     result nint
       let "t": nint = IntLiteral "0"
-      for i of invalid IntLiteral "5"..
-      expr IntLiteral "1"
-      expr {t: <none>, t: <none>, i: <none>}
+      for i of nint IntLiteral "5"..IntLiteral "1"
+          assign "t" = LocalRef "t".add(LocalRef "i")
       return LocalRef "t"
   Func "sumHalf" pub
     result nint
       let "t": nint = IntLiteral "0"
-      for i of invalid IntLiteral "0"...
-      expr IntLiteral "5"
-      expr {t: <none>, t: <none>, i: <none>}
+      for i of nint IntLiteral "0"...IntLiteral "5"
+          assign "t" = LocalRef "t".add(LocalRef "i")
       return LocalRef "t"
   Func "sumEvens" pub
     result nint
@@ -98,50 +115,94 @@ Module
       for i of nint range(IntLiteral "0", IntLiteral "10", IntLiteral "2")
           assign "t" = LocalRef "t".add(LocalRef "i")
       return LocalRef "t"
-  Assert "0.."
-    eval <unevaluated>
-      0..
-  Assert "0..."
-    eval <unevaluated>
-      0...
-  Assert "9.."
-    eval <unevaluated>
-      9..
-  Assert "9..."
-    eval <unevaluated>
-      9...
-  Assert "5.."
-    eval <unevaluated>
-      5..
+  Assert "(0..9) == range(0, 9)"
+    eval true
+      (0..9) == range(0, 9)
+        ^    ^  ^
+        |    |  range(0, 9)
+        |    true
+        range(0, 9)
+  Assert "(0...9) == range(0, 8)"
+    eval true
+      (0...9) == range(0, 8)
+        ^     ^  ^
+        |     |  range(0, 8)
+        |     true
+        range(0, 8)
+  Assert "(9..0) == range(9, 0, -1)"
+    eval true
+      (9..0) == range(9, 0, -1)
+        ^    ^  ^           ^
+        |    |  |           -1
+        |    |  range(9, 0, -1)
+        |    true
+        range(9, 0, -1)
+  Assert "(9...0) == range(8, 0, -1)"
+    eval true
+      (9...0) == range(8, 0, -1)
+        ^     ^  ^           ^
+        |     |  |           -1
+        |     |  range(8, 0, -1)
+        |     true
+        range(8, 0, -1)
+  Assert "(5..5) == range(5, 5)"
+    eval true
+      (5..5) == range(5, 5)
+        ^    ^  ^
+        |    |  range(5, 5)
+        |    true
+        range(5, 5)
   Assert "sumUp() == 55"
-    eval <unevaluated>
+    eval true
       sumUp() == 55
+      ^       ^
+      55      true
   Assert "sumDown() == 15"
-    eval <unevaluated>
+    eval true
       sumDown() == 15
+      ^         ^
+      15        true
   Assert "sumHalf() == 10"
-    eval <unevaluated>
+    eval true
       sumHalf() == 10
+      ^         ^
+      10        true
   Assert "sumEvens() == 30"
-    eval <unevaluated>
+    eval true
       sumEvens() == 30
-  Assert "0.."
-    eval <unevaluated>
-      0..
-  Assert "0..."
-    eval <unevaluated>
-      0...
+      ^          ^
+      30         true
+  Assert "(0..9).count() == 10"
+    eval true
+      (0..9).count() == 10
+        ^    ^       ^
+        |    10      true
+        range(0, 9)
+  Assert "(0...9).count() == 9"
+    eval true
+      (0...9).count() == 9
+        ^     ^       ^
+        |     9       true
+        range(0, 8)
   Assert "range(0, 10, 2).count() == 6"
-    eval <unevaluated>
+    eval true
       range(0, 10, 2).count() == 6
+      ^               ^       ^
+      range(0, 10, 2) 6       true
   Assert "range(10, 0, -2).count() == 6"
-    eval <unevaluated>
+    eval true
       range(10, 0, -2).count() == 6
-                   ^
-                   -2
-  Assert "0.."
-    eval <unevaluated>
-      0..
+      ^            ^   ^       ^
+      |            -2  6       true
+      range(10, 0, -2)
+  Assert "(0..4).fold(0, fn(acc: nint, k: nint, v: nint): nint { return acc + v }) == 10"
+    eval true
+      (0..4).fold(0, fn(acc: nint, k: nint, v: nint): nint { return acc + v }) == 10
+        ^    ^                                                                 ^
+        |    10                                                                true
+        range(0, 4)
   Assert "range(0, 10, 2).fold(0, fn(acc: nint, k: nint, v: nint): nint { return acc + v }) == 30"
-    eval <unevaluated>
+    eval true
       range(0, 10, 2).fold(0, fn(acc: nint, k: nint, v: nint): nint { return acc + v }) == 30
+      ^               ^                                                                 ^
+      range(0, 10, 2) 30                                                                true

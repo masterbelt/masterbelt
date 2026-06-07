@@ -59,6 +59,7 @@ const (
 	CodeNotAnInterface             diagnostic.Code = "masterbelt.semantic.not_an_interface"
 	CodeNotExported                diagnostic.Code = "masterbelt.semantic.not_exported"
 	CodeNotIterable                diagnostic.Code = "masterbelt.semantic.not_iterable"
+	CodeRangeStepZero              diagnostic.Code = "masterbelt.semantic.range_step_zero"
 	CodeRefinementNotBool          diagnostic.Code = "masterbelt.semantic.refinement_not_bool"
 	CodeRefinementNotConstant      diagnostic.Code = "masterbelt.semantic.refinement_not_constant"
 	CodeRefinementViolation        diagnostic.Code = "masterbelt.semantic.refinement_violation"
@@ -804,6 +805,17 @@ func newNotIterableDiagnostic(offset int, width int, typ string) diagnostic.Diag
 		Code:     CodeNotIterable,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeNotIterable, fields),
 		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newRangeStepZeroDiagnostic(offset int, width int) diagnostic.Diagnostic {
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeRangeStepZero,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeRangeStepZero, nil),
+		Fields:   nil,
 		Offset:   offset,
 		Width:    width,
 	}

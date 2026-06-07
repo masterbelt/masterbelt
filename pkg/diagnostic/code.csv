@@ -90,6 +90,7 @@ masterbelt.semantic.uninferable_type_param,error,name:string
 masterbelt.semantic.no_method_on_unbounded_typevar,error,method:string
 masterbelt.semantic.not_iterable,error,typ:string
 masterbelt.semantic.loop_var_immutable,error,name:string
+masterbelt.semantic.range_step_zero,error,
 project.config.missing,error,
 project.config.invalid,error,detail:string
 project.config.missing_entry,error,

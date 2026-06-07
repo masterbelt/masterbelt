@@ -485,6 +485,8 @@ func evalExprRaw(e ast.Expr, ctx evalCtx) *ir.Constant {
 		return record(e, sub)
 	case *ast.TernaryExpr:
 		return ternary(e, sub)
+	case *ast.RangeExpr:
+		return rangeLit(e, sub)
 	case *ast.FuncLit:
 		// A function literal folds to a closure over the bindings in scope, so it
 		// can be applied later (by list.map) or stored in a constant. The capture
@@ -744,15 +746,19 @@ func convert(def *ir.TypeDef, args []ast.Expr, ctx evalCtx) *ir.Constant {
 	return nil
 }
 
-// convertRange folds the range constructor range(start, end): both bounds must
-// fold to integers, and the result is a range value over them — the inclusive
-// sequence start..end (an end below start being the empty range). The
-// sequence is not materialized here; the bounds are kept lazily so a wide range
-// is a small value, and the fold/for walk over it is bounded separately. A
-// non-two argument list (a recovered or step-form call) or an unfoldable or
-// non-integer bound does not fold.
+// convertRange folds the range constructor range(start, end) and range(start,
+// end, step): every bound (and the step) must fold to an integer, and the result
+// is a range value over them — the two-argument form's unit-step sequence
+// start..end (an end below start being empty), the three-argument form's stepped
+// sequence start, start+step, ..., staying on the end side of step. A step that
+// folds to zero does not fold to a value (nil): a zero step has no sequence, and
+// the semantic layer reports it as the zero-step range diagnostic, so producing a
+// value would let a malformed range slip past. The sequence is not materialized
+// here; the bounds and step are kept lazily so a wide range is a small value, and
+// the fold/for walk over it is bounded separately. A non-two/three argument list
+// (a recovered call) or an unfoldable or non-integer bound does not fold.
 func convertRange(args []ast.Expr, ctx evalCtx) *ir.Constant {
-	if len(args) != 2 {
+	if len(args) != 2 && len(args) != 3 {
 		return nil
 	}
 	start := evalExpr(args[0], ctx)
@@ -760,7 +766,48 @@ func convertRange(args []ast.Expr, ctx evalCtx) *ir.Constant {
 	if start == nil || end == nil || start.Kind != ir.ConstInt || end.Kind != ir.ConstInt {
 		return nil
 	}
-	return ir.RangeConstant(start.Int, end.Int)
+	if len(args) == 2 {
+		return ir.RangeConstant(start.Int, end.Int)
+	}
+	step := evalExpr(args[2], ctx)
+	if step == nil || step.Kind != ir.ConstInt || step.Int.Sign() == 0 {
+		return nil // an unfoldable, non-integer, or zero step has no range value
+	}
+	return ir.RangeConstantStep(start.Int, end.Int, step.Int)
+}
+
+// rangeLit folds a range literal lo..hi (closed) or lo...hi (half-open) to the
+// range value it equals, deciding the direction from the bound values: when both
+// bounds fold to integers, the range runs from lo's side toward hi's, so the step
+// is +1 when lo <= hi (ascending) and -1 otherwise (descending). The closed form
+// is the bounds as written; the half-open form drops the larger end (the max),
+// which is hi for an ascending range and lo for a descending one — so 0...9 is
+// range(0, 8) and 9...0 is range(8, 0, -1), each the very value the equivalent
+// range(...) constructs (an a...a is empty). A bound that does not fold, or folds
+// to a non-integer, leaves the literal unevaluated (the type is still range).
+func rangeLit(e *ast.RangeExpr, ctx evalCtx) *ir.Constant {
+	lo := evalExpr(e.Lower, ctx)
+	hi := evalExpr(e.Upper, ctx)
+	if lo == nil || hi == nil || lo.Kind != ir.ConstInt || hi.Kind != ir.ConstInt {
+		return nil
+	}
+	one := big.NewInt(1)
+	start := new(big.Int).Set(lo.Int)
+	end := new(big.Int).Set(hi.Int)
+	if lo.Int.Cmp(hi.Int) <= 0 {
+		// Ascending (lo <= hi), step +1. The max is the upper end; the half-open
+		// form excludes it by pulling the end in by one.
+		if e.HalfOpen {
+			end.Sub(end, one)
+		}
+		return ir.RangeConstant(start, end)
+	}
+	// Descending (lo > hi), step -1. The max is the lower end; the half-open form
+	// excludes it by pulling the start in by one.
+	if e.HalfOpen {
+		start.Sub(start, one)
+	}
+	return ir.RangeConstantStep(start, end, big.NewInt(-1))
 }
 
 // ternary folds a conditional value cond ? then : else: it folds the condition

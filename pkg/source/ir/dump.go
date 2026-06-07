@@ -497,6 +497,12 @@ func dumpValue(v Value) string {
 		return "await " + dumpValue(x.Value)
 	case *Ternary:
 		return fmt.Sprintf("(%s ? %s : %s)", dumpValue(x.Cond), dumpValue(x.Then), dumpValue(x.Else))
+	case *RangeLit:
+		op := ".."
+		if x.HalfOpen {
+			op = "..."
+		}
+		return dumpValue(x.Lower) + op + dumpValue(x.Upper)
 	case *NullValue:
 		return "null"
 	case *EnumMemberValue:

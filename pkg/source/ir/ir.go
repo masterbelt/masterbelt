@@ -267,6 +267,23 @@ type Ternary struct {
 
 func (*Ternary) value() {}
 
+// RangeLit is a resolved range literal, lo..hi (closed) or lo...hi (half-open).
+// It is the value form of the range builtin written in the surface range syntax,
+// kept as its own node rather than lowered to a range(...) Conversion because the
+// direction (ascending or descending) and the half-open trim depend on the bound
+// values: the equivalent range(start, end, step) is settled by the fold, where a
+// literal whose bounds fold matches the constructor it equals exactly. HalfOpen
+// distinguishes the "..." form (the larger end excluded) from the closed ".."
+// form. The evaluated value (a range ConstRange) lives on Const.Eval, as for
+// every other value form.
+type RangeLit struct {
+	Lower    Value
+	Upper    Value
+	HalfOpen bool
+}
+
+func (*RangeLit) value() {}
+
 // NullValue is the null literal.
 type NullValue struct{}
 
