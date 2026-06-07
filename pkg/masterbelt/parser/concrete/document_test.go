@@ -26,7 +26,7 @@ func assertMatchesFullParse(t *testing.T, d *Document, content []byte) {
 
 	if !cst.Equal(d.Root(), oracleRoot) {
 		t.Fatalf("tree mismatch (content %q)\n--- got ---\n%s--- want ---\n%s",
-			content, cst.Sprint(d.Buffer(), d.Root()), cst.Sprint(source.NewFile("", content), oracleRoot))
+			content, cst.Sprint(d.Root()), cst.Sprint(oracleRoot))
 	}
 
 	// Losslessness: the leaves must still reproduce the source.
@@ -292,7 +292,7 @@ func TestUnterminatedRecordLitStopsAtDeclaration(t *testing.T) {
 			}
 			if !found {
 				t.Fatalf("declaration %v was swallowed, not recovered as a File child\n%s",
-					tc.declKind, cst.Sprint(source.NewFile("", []byte(tc.src)), root))
+					tc.declKind, cst.Sprint(root))
 			}
 		})
 	}

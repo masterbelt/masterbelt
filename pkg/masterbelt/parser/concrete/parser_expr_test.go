@@ -506,7 +506,7 @@ func TestParseAwaitExpr(t *testing.T) {
 		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
 	assertLossless(t, src)
-	tree := cst.Sprint(source.NewFile("", []byte(src)), root)
+	tree := cst.Sprint(root)
 	if !strings.Contains(tree, "AwaitExpr") {
 		t.Errorf("tree = %s, want an AwaitExpr node", tree)
 	}

@@ -11,7 +11,7 @@ import (
 func TestFormat(t *testing.T) {
 	src := "ab  \n\n"
 	buf := source.NewFile("", []byte(src))
-	root := cst.NewNode(cst.File, []cst.Green{cst.NewToken(token.Whitespace, len(src))})
+	root := cst.NewNode(cst.File, []cst.Green{cst.NewToken(token.Whitespace, src)})
 
 	if got := Format(buf, root); got != "ab\n" {
 		t.Errorf("Format = %q, want %q", got, "ab\n")

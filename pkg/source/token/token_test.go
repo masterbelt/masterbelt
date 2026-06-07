@@ -140,3 +140,19 @@ func TestTokenResolution(t *testing.T) {
 		t.Errorf("Span().Len() = %d, want %d", got, tok.Width)
 	}
 }
+
+// TestParseKindRoundTrip pins the reverse registry to the String table: every
+// real kind parses back from its name, and non-names are rejected.
+func TestParseKindRoundTrip(t *testing.T) {
+	for k := range numKinds {
+		got, ok := ParseKind(k.String())
+		if !ok || got != k {
+			t.Errorf("ParseKind(%q) = %v, %v; want %v", k.String(), got, ok, k)
+		}
+	}
+	for _, name := range []string{"", "Kind(3)", "ident", "Bogus"} {
+		if _, ok := ParseKind(name); ok {
+			t.Errorf("ParseKind(%q) accepted, want rejection", name)
+		}
+	}
+}

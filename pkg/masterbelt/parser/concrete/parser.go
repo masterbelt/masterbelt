@@ -144,13 +144,15 @@ func parseTokens(toks []token.Token, buf source.Buffer) (*cst.Node, []diagnostic
 type parser struct {
 	toks []token.Token
 	pos  int
-	// buf is the source the tokens cover, read only to recover the text of a
-	// context-keyword identifier (get/set/static) at a method's modifier
-	// position. Every other parsing decision is over token kinds alone, so the
-	// boundary context-free property the incremental Document relies on holds:
-	// reading the bytes a token already covers cannot make a File child parse
+	// src is the source text the tokens cover, materialized once from the
+	// buffer. The greens slice their token texts out of it (one string, shared
+	// backing), and the parser reads it to recover the text of a context-
+	// keyword identifier (get/set/static) at a method's modifier position.
+	// Every other parsing decision is over token kinds alone, so the boundary
+	// context-free property the incremental Document relies on holds: reading
+	// the bytes a token already covers cannot make a File child parse
 	// differently from a fresh parse of the same bytes.
-	buf   source.Buffer
+	src   string
 	diags *diagnostic.List
 
 	// noRecordLit suppresses the "Ident {" / "{" record-literal reading of an
@@ -176,18 +178,22 @@ type parser struct {
 }
 
 func newParser(toks []token.Token, buf source.Buffer) *parser {
-	return &parser{toks: toks, buf: buf, diags: &diagnostic.List{}}
+	p := &parser{toks: toks, diags: &diagnostic.List{}}
+	if buf != nil {
+		p.src = string(buf.Slice(0, buf.Len()))
+	}
+	return p
 }
 
-// identText returns the source text of the token at index i, read from the
-// buffer. It is used only to classify a context-keyword identifier (get/set/
-// static); a parser built without a buffer (no source to read) yields "".
+// identText returns the source text of the token at index i. It is used only
+// to classify a context-keyword identifier (get/set/static); a parser built
+// without a buffer (no source to read) yields "".
 func (p *parser) identText(i int) string {
-	if p.buf == nil {
+	if p.src == "" {
 		return ""
 	}
 	t := p.toks[i]
-	return string(p.buf.Slice(t.Offset, t.End()))
+	return p.src[t.Offset:t.End()]
 }
 
 // kind reports the kind of the token at the cursor. The slice always ends with
@@ -200,12 +206,14 @@ func (p *parser) cur() token.Token { return p.toks[p.pos] }
 // atEOF reports whether the cursor sits on the terminating EOF token.
 func (p *parser) atEOF() bool { return p.kind() == token.EOF }
 
-// bump consumes the token at the cursor and returns it as a green leaf.
+// bump consumes the token at the cursor and returns it as a green leaf
+// carrying its source text — a substring of the parser's materialized source,
+// so the greens share one backing string.
 func (p *parser) bump() cst.Green {
 	t := p.toks[p.pos]
 	p.lastStart = t.Offset
 	p.pos++
-	return cst.NewToken(t.Kind, t.Width)
+	return cst.NewToken(t.Kind, p.src[t.Offset:t.End()])
 }
 
 // skipTrivia consumes a run of trivia tokens, appending each as a leaf to
