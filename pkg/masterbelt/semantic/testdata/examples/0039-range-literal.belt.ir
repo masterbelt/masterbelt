@@ -69,23 +69,23 @@ Module
     eval 30
   Const "ClosedCount"
     type nint
-    value IntLiteral "0"..IntLiteral "9".count()
+    value IntLiteral "0"..IntLiteral "9".count() [subst K=nint, V=nint]
     eval 10
   Const "HalfCount"
     type nint
-    value IntLiteral "0"...IntLiteral "9".count()
+    value IntLiteral "0"...IntLiteral "9".count() [subst K=nint, V=nint]
     eval 9
   Const "SteppedCount"
     type nint
-    value range(IntLiteral "0", IntLiteral "10", IntLiteral "2").count()
+    value range(IntLiteral "0", IntLiteral "10", IntLiteral "2").count() [subst K=nint, V=nint]
     eval 6
   Const "ClosedFold"
     type nint
-    value IntLiteral "0"..IntLiteral "4".fold(IntLiteral "0", (fn(acc, k, v) (return ParamRef "acc".add(ParamRef "v"))))
+    value IntLiteral "0"..IntLiteral "4".fold(IntLiteral "0", (fn(acc, k, v) (return ParamRef "acc".add(ParamRef "v")))) [subst A=nint, K=nint, V=nint]
     eval 10
   Const "SteppedFold"
     type nint
-    value range(IntLiteral "0", IntLiteral "10", IntLiteral "2").fold(IntLiteral "0", (fn(acc, k, v) (return ParamRef "acc".add(ParamRef "v"))))
+    value range(IntLiteral "0", IntLiteral "10", IntLiteral "2").fold(IntLiteral "0", (fn(acc, k, v) (return ParamRef "acc".add(ParamRef "v")))) [subst A=nint, K=nint, V=nint]
     eval 30
   Func "upto" pub
     param n: nint

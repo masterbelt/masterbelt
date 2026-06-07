@@ -6,6 +6,7 @@
 package semantic
 
 import (
+	"maps"
 	"sort"
 	"strings"
 
@@ -44,6 +45,14 @@ func exprSink(at func(ast.Node) span, diags *diagnostic.List, res *callResolutio
 		ResolvedFunc: func(call *ast.CallExpr, fd *ast.FuncDecl) {
 			if res != nil {
 				res.funcs[call] = fd
+			}
+		},
+		CallSubst: func(call *ast.CallExpr, subst map[string]ir.Type) {
+			if res != nil {
+				// Cloned: the checker threads one live map through a call's
+				// argument checking, and the record must stay the solution as
+				// of this call's settling.
+				res.substs[call] = maps.Clone(subst)
 			}
 		},
 		InvalidOp: func(node ast.Node, method, operands string) {

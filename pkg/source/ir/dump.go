@@ -2,6 +2,8 @@ package ir
 
 import (
 	"fmt"
+	"maps"
+	"slices"
 	"strings"
 
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
@@ -197,6 +199,22 @@ func resolvedSuffix(name string, params []Param, result Type) string {
 		sig += ": " + typeString(result)
 	}
 	return " [resolved " + sig + "]"
+}
+
+// substSuffix renders the checker-solved type-variable substitution a call was
+// bound to (Call.Subst and friends) as a suffix, sorted by variable name so the
+// dump is stable: the snapshot fixes the instantiation monomorphization will
+// read. A call that pinned no variable carries nil and renders without it.
+func substSuffix(subst map[string]Type) string {
+	if len(subst) == 0 {
+		return ""
+	}
+	names := slices.Sorted(maps.Keys(subst))
+	parts := make([]string, len(names))
+	for i, n := range names {
+		parts[i] = n + "=" + typeString(subst[n])
+	}
+	return " [subst " + strings.Join(parts, ", ") + "]"
 }
 
 func dumpStmt(b *strings.Builder, s Stmt) {
@@ -493,7 +511,7 @@ func dumpValue(v Value) string {
 			// so the snapshot pins which signature the type system chose.
 			call += resolvedSuffix(x.Method, x.Resolved.Params, x.Resolved.Result)
 		}
-		return call
+		return call + substSuffix(x.Subst)
 	case *FuncCall:
 		name := "<unresolved>"
 		if x.Target != nil {
@@ -507,7 +525,7 @@ func dumpValue(v Value) string {
 		if x.Resolved != nil {
 			call += resolvedSuffix(x.Resolved.Name, x.Resolved.Params, x.Resolved.Result)
 		}
-		return call
+		return call + substSuffix(x.Subst)
 	case *StaticCall:
 		// Type.name(arg, arg): the owning type and the static fn name, the
 		// Type.Name path enum members and associated constants render through too.
@@ -523,7 +541,7 @@ func dumpValue(v Value) string {
 		if x.Resolved != nil {
 			call += resolvedSuffix(x.Name, x.Resolved.Params, x.Resolved.Result)
 		}
-		return call
+		return call + substSuffix(x.Subst)
 	case *FuncLiteral:
 		parts := []string{"fn(" + strings.Join(x.Params, ", ") + ")"}
 		for _, s := range x.Body {

@@ -181,12 +181,21 @@ func (*Reference) value() {}
 // overloaded call: the .ir dump renders the selected signature, and the folder
 // prefers it over its value-kind selection rule. Syntax is the call expression
 // this lowered from, the key the write-back pairs the checker's selection with.
+//
+// Subst is the type-variable solution the checker settled for the call — the
+// receiver's type arguments (T = nint for a list<nint> receiver, the bound or
+// impl interface's parameters included) combined with what the argument
+// matching solved (the R of map) — written back after the checking walk like
+// Resolved, and nil for a call that pins no variable. It is the input
+// monomorphization (or a runtime reify) reads; without it the checker's
+// solution would be used for the result type and discarded.
 type Call struct {
 	Receiver Value
 	Method   string
 	Args     []Value
 	Setter   bool
 	Resolved *Method
+	Subst    map[string]Type
 	Syntax   *ast.CallExpr
 }
 
@@ -199,11 +208,14 @@ func (*Call) value() {}
 // checker's selection is written back: Resolved then carries the selected
 // individual and Target is corrected to it (see Call.Resolved). A
 // single-signature function's Target is exact from lowering and Resolved
-// stays nil.
+// stays nil. Subst is the solved type-parameter substitution of a generic
+// call (the T = nint of identity(42)), written back like Call.Subst and nil
+// for a non-generic call.
 type FuncCall struct {
 	Target   *Function
 	Args     []Value
 	Resolved *Function
+	Subst    map[string]Type
 	Syntax   *ast.CallExpr
 }
 
@@ -214,12 +226,15 @@ func (*FuncCall) value() {}
 // constants take. Like a Call it holds the owning Def and the static fn's Name;
 // Resolved carries the overload individual the checker selected when the name
 // has several signatures, written back after the checking walk (see
-// Call.Resolved). The arguments are themselves resolved values.
+// Call.Resolved), and Subst the solved type-variable substitution (see
+// Call.Subst; nil while static fns stay non-generic). The arguments are
+// themselves resolved values.
 type StaticCall struct {
 	Def      *TypeDef
 	Name     string
 	Args     []Value
 	Resolved *Method
+	Subst    map[string]Type
 	Syntax   *ast.CallExpr
 }
 

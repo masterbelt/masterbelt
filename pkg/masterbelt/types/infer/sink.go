@@ -125,6 +125,14 @@ type Sink struct {
 	// ResolvedFunc is ResolvedMethod for a call of an overloaded top-level
 	// function: the selected declaration. An informational stream.
 	ResolvedFunc func(call *ast.CallExpr, fd *ast.FuncDecl)
+	// CallSubst fires for every call the walk types successfully whose
+	// resolution pinned at least one type variable — the receiver's type
+	// arguments combined with what the argument matching solved — with the
+	// settled substitution. The semantic layer writes it back into the IR
+	// (ir.Call.Subst and friends), the monomorphization input. Like Checked
+	// it is an informational stream, never a finding; a call that pins no
+	// variable does not fire.
+	CallSubst func(call *ast.CallExpr, subst map[string]ir.Type)
 }
 
 func (s *Sink) invalidOp(node ast.Node, method, operands string) {
@@ -298,5 +306,11 @@ func (s *Sink) resolvedStatic(call *ast.CallExpr, m *ir.Method) {
 func (s *Sink) resolvedFunc(call *ast.CallExpr, fd *ast.FuncDecl) {
 	if s != nil && s.ResolvedFunc != nil {
 		s.ResolvedFunc(call, fd)
+	}
+}
+
+func (s *Sink) callSubst(call *ast.CallExpr, subst map[string]ir.Type) {
+	if s != nil && s.CallSubst != nil {
+		s.CallSubst(call, subst)
 	}
 }

@@ -17,6 +17,7 @@ var streamFields = map[string]bool{
 	"ResolvedMethod": true,
 	"ResolvedStatic": true,
 	"ResolvedFunc":   true,
+	"CallSubst":      true,
 }
 
 // TestObserveForwardsEverySinkField is the structural guard against the defect

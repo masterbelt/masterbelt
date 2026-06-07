@@ -1,11 +1,11 @@
 Module
   Const "N"
     type nint
-    value identity(IntLiteral "42")
+    value identity(IntLiteral "42") [subst T=nint]
     eval 42
   Const "P"
     type nint
-    value firstOf(IntLiteral "7", IntLiteral "9")
+    value firstOf(IntLiteral "7", IntLiteral "9") [subst T=nint]
     eval 7
   TypeDef "Bag" pub
     doc "A small bag of ints that folds over its contents — an opt-in implementor of"
@@ -38,7 +38,7 @@ Module
     typeparam "T": foldable<nint, nint>
     param c: T
     result nint
-      return ParamRef "c".fold(IntLiteral "0", (fn(acc, key, value) (return ParamRef "acc".add(ParamRef "value"))))
+      return ParamRef "c".fold(IntLiteral "0", (fn(acc, key, value) (return ParamRef "acc".add(ParamRef "value")))) [subst A=nint, K=nint, V=nint]
   Func "identity" pub
     doc "The argument, unchanged. Works for any type because it touches nothing."
     typeparam "T"

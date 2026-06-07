@@ -1,19 +1,19 @@
 Module
   Const "Bigger"
     type nint
-    value max(IntLiteral "3", IntLiteral "7")
+    value max(IntLiteral "3", IntLiteral "7") [subst T=nint]
     eval 7
   Const "Later"
     type string
-    value max(StringLiteral "a", StringLiteral "b")
+    value max(StringLiteral "a", StringLiteral "b") [subst T=string]
     eval "b"
   Const "Equal"
     type bool
-    value same(BoolLiteral true, BoolLiteral false)
+    value same(BoolLiteral true, BoolLiteral false) [subst T=bool]
     eval false
   Const "Double"
     type nint
-    value twice(IntLiteral "21")
+    value twice(IntLiteral "21") [subst T=nint]
     eval 42
   Func "max" pub
     doc "The larger of two orderable values."

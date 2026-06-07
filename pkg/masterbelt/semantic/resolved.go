@@ -18,11 +18,15 @@ import (
 // callResolutions accumulates the overload selections the checking walk
 // streams out (Sink.ResolvedMethod / ResolvedStatic / ResolvedFunc), keyed by
 // the call expression. Only calls whose name carries several signatures
-// appear; a single-signature call needs no selection.
+// appear; a single-signature call needs no selection. substs accumulates the
+// CallSubst stream the same way: the type-variable solution of every call
+// that pinned at least one variable, the write-back's source for
+// ir.Call.Subst and friends.
 type callResolutions struct {
 	methods map[*ast.CallExpr]*ir.Method
 	statics map[*ast.CallExpr]*ir.Method
 	funcs   map[*ast.CallExpr]*ast.FuncDecl
+	substs  map[*ast.CallExpr]map[string]ir.Type
 }
 
 func newCallResolutions() *callResolutions {
@@ -30,6 +34,7 @@ func newCallResolutions() *callResolutions {
 		methods: map[*ast.CallExpr]*ir.Method{},
 		statics: map[*ast.CallExpr]*ir.Method{},
 		funcs:   map[*ast.CallExpr]*ast.FuncDecl{},
+		substs:  map[*ast.CallExpr]map[string]ir.Type{},
 	}
 }
 
@@ -79,10 +84,11 @@ func (e resolvedEnv) ResolvedStatic(call *ast.CallExpr) *ast.MethodDecl {
 // checker-selected overload: ir.Call.Resolved and ir.StaticCall.Resolved take
 // the selected method, and an overloaded ir.FuncCall takes the selected
 // function as both Resolved and Target — correcting the type-blind lowering's
-// arity-based guess. It walks every value position the module carries: the
-// constants' value graphs and the function and method bodies (an associated
-// constant carries no value graph — only its folded value — so there is
-// nothing to bind there).
+// arity-based guess. Each call form also takes the checker's solved
+// type-variable substitution (Subst), the monomorphization input. It walks
+// every value position the module carries: the constants' value graphs and
+// the function and method bodies (an associated constant carries no value
+// graph — only its folded value — so there is nothing to bind there).
 func writeBackResolutions(module *ir.Module, res *callResolutions, fnShells map[*ast.FuncDecl]*ir.Function) {
 	w := resolutionWriter{res: res, fnShells: fnShells}
 	for _, c := range module.Consts {
@@ -117,8 +123,10 @@ func (w resolutionWriter) value(v ir.Value) {
 		// Assigned unconditionally: a method-body node lives on the memoized
 		// type definition, so a selection written by an earlier assemble must
 		// be cleared when the current walk recorded none (the overload set
-		// shrank to one, say) rather than surviving stale.
+		// shrank to one, say) rather than surviving stale. Subst follows the
+		// same rule.
 		v.Resolved = w.res.methods[v.Syntax]
+		v.Subst = w.res.substs[v.Syntax]
 		w.value(v.Receiver)
 		for _, a := range v.Args {
 			w.value(a)
@@ -131,11 +139,13 @@ func (w resolutionWriter) value(v ir.Value) {
 				v.Target = fn
 			}
 		}
+		v.Subst = w.res.substs[v.Syntax]
 		for _, a := range v.Args {
 			w.value(a)
 		}
 	case *ir.StaticCall:
 		v.Resolved = w.res.statics[v.Syntax]
+		v.Subst = w.res.substs[v.Syntax]
 		for _, a := range v.Args {
 			w.value(a)
 		}

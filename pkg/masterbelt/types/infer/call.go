@@ -174,6 +174,13 @@ func callType(e *ast.CallExpr, s scope, sink *Sink) ir.Type {
 		return ir.Invalid
 	}
 	if _, isSelf := m.Result.(*ir.SelfType); isSelf {
+		// The settled type-variable solution — the receiver's bindings plus what
+		// the argument matching solved — streamed out for the IR write-back
+		// (ir.Call.Subst), on each path that types the call successfully. A call
+		// that pinned nothing records nothing.
+		if len(subst) > 0 {
+			sink.callSubst(e, subst)
+		}
 		return operand
 	}
 	result := types.Substitute(m.Result, subst)
@@ -181,6 +188,9 @@ func callType(e *ast.CallExpr, s scope, sink *Sink) ir.Type {
 		// A variable no argument could solve survived to the result.
 		sink.invalidOp(e, member.Member.Name, typesList(recv, args))
 		return ir.Invalid
+	}
+	if len(subst) > 0 {
+		sink.callSubst(e, subst)
 	}
 	return result
 }
@@ -584,6 +594,12 @@ func resolveFuncResult(e *ast.CallExpr, sg funcSig, subst map[string]ir.Type, s 
 	}
 	if !ok {
 		return ir.Invalid
+	}
+	// The solved substitution, streamed out for the IR write-back
+	// (ir.FuncCall.Subst / ir.StaticCall.Subst) — every parameter checked
+	// solved above, so the solution is complete.
+	if len(subst) > 0 {
+		sink.callSubst(e, subst)
 	}
 	return types.Substitute(sg.result, subst)
 }

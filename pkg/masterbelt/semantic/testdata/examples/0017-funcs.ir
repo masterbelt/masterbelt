@@ -53,7 +53,7 @@ Module
     doc "Scales every element of a list."
     param xs: list<nint>
     result list<nint>
-      return ParamRef "xs".map((fn(x) (return ParamRef "x".mul(IntLiteral "10"))))
+      return ParamRef "xs".map((fn(x) (return ParamRef "x".mul(IntLiteral "10")))) [subst K=nint, R=nint, T=nint, V=nint]
   Func "hidden"
     result nint
       return IntLiteral "0"

@@ -111,6 +111,56 @@ func TestFuncCallTargetCorrected(t *testing.T) {
 	}
 }
 
+// TestSubstWriteBack checks the checker's solved type-variable substitution is
+// written back onto the call nodes (F-3 §2.3): a generic function call records
+// what the arguments pinned, a method call on a generic receiver records the
+// receiver's bindings combined with its own solved variables, and a call that
+// pins nothing stays nil — so the IR carries the monomorphization input
+// instead of discarding it after the result type is computed.
+func TestSubstWriteBack(t *testing.T) {
+	src := "pub fn identity<T>(x: T): T {\n  return x\n}\n" +
+		"const N = identity(42)\n" +
+		"const Doubled = [1, 2, 3].map(fn(x) -> x * 2)\n" +
+		"const Plain = 1 + 2\n"
+	module, _ := analyzeWithQueries(t, src)
+
+	fc, ok := module.Consts[0].Value.(*ir.FuncCall)
+	if !ok {
+		t.Fatalf("N's value = %T, want *ir.FuncCall", module.Consts[0].Value)
+	}
+	if got := typeName(fc.Subst["T"]); got != "nint" {
+		t.Errorf("identity(42) Subst[T] = %s, want nint (full subst: %v)", got, fc.Subst)
+	}
+
+	call, ok := module.Consts[1].Value.(*ir.Call)
+	if !ok {
+		t.Fatalf("Doubled's value = %T, want *ir.Call", module.Consts[1].Value)
+	}
+	if got := typeName(call.Subst["T"]); got != "nint" {
+		t.Errorf("map Subst[T] = %s, want nint (the receiver's element binding; full subst: %v)", got, call.Subst)
+	}
+	if got := typeName(call.Subst["R"]); got != "nint" {
+		t.Errorf("map Subst[R] = %s, want nint (the literal-solved result variable; full subst: %v)", got, call.Subst)
+	}
+
+	plain, ok := module.Consts[2].Value.(*ir.Call)
+	if !ok {
+		t.Fatalf("Plain's value = %T, want *ir.Call", module.Consts[2].Value)
+	}
+	if plain.Subst != nil {
+		t.Errorf("1 + 2 Subst = %v, want nil (no type variable to pin)", plain.Subst)
+	}
+}
+
+// typeName renders a substitution entry for the assertions above; a missing
+// entry reads as "<none>".
+func typeName(t ir.Type) string {
+	if t == nil {
+		return "<none>"
+	}
+	return t.String()
+}
+
 // TestResolvedStaticAndMethodWriteBack checks the other two call forms carry
 // their selections in the IR: an overloaded static call and an overloaded
 // method call both get Resolved bound after the checking walk.

@@ -39,4 +39,4 @@ Module
     doc "The total of a collection of ints, folded with addition."
     param c: foldable<nint, nint>
     result nint
-      return ParamRef "c".fold(IntLiteral "0", (fn(acc, key, value) (return ParamRef "acc".add(ParamRef "value"))))
+      return ParamRef "c".fold(IntLiteral "0", (fn(acc, key, value) (return ParamRef "acc".add(ParamRef "value")))) [subst A=nint, K=nint, V=nint]

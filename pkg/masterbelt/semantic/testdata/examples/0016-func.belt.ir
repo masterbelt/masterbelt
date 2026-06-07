@@ -13,7 +13,7 @@ Module
     eval 10
   Const "D"
     type list<nint>
-    value [IntLiteral "1", IntLiteral "2", IntLiteral "3"].map((fn(x) (return double(ParamRef "x"))))
+    value [IntLiteral "1", IntLiteral "2", IntLiteral "3"].map((fn(x) (return double(ParamRef "x")))) [subst K=nint, R=nint, T=nint, V=nint]
     eval [2, 4, 6]
   Const "E"
     type string

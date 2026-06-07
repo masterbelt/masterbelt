@@ -13,39 +13,39 @@ Module
     eval 100
   Const "Count"
     type nint
-    value range(IntLiteral "0", IntLiteral "10").count()
+    value range(IntLiteral "0", IntLiteral "10").count() [subst K=nint, V=nint]
     eval 11
   Const "EmptyCount"
     type nint
-    value range(IntLiteral "5", IntLiteral "4").count()
+    value range(IntLiteral "5", IntLiteral "4").count() [subst K=nint, V=nint]
     eval 0
   Const "AnyBig"
     type bool
-    value range(IntLiteral "0", IntLiteral "10").any((fn(v) (return ParamRef "v".gt(IntLiteral "8"))))
+    value range(IntLiteral "0", IntLiteral "10").any((fn(v) (return ParamRef "v".gt(IntLiteral "8")))) [subst K=nint, V=nint]
     eval true
   Const "AllNonNeg"
     type bool
-    value range(IntLiteral "0", IntLiteral "10").all((fn(v) (return ParamRef "v".gteq(IntLiteral "0"))))
+    value range(IntLiteral "0", IntLiteral "10").all((fn(v) (return ParamRef "v".gteq(IntLiteral "0")))) [subst K=nint, V=nint]
     eval true
   Const "Doubled"
     type list<nint>
-    value range(IntLiteral "0", IntLiteral "5").map((fn(v) (return ParamRef "v".mul(IntLiteral "2"))))
+    value range(IntLiteral "0", IntLiteral "5").map((fn(v) (return ParamRef "v".mul(IntLiteral "2")))) [subst K=nint, U=nint, V=nint]
     eval [0, 2, 4, 6, 8, 10]
   Const "Evens"
     type list<nint>
-    value range(IntLiteral "0", IntLiteral "10").filter((fn(v) (return ParamRef "v".rem(IntLiteral "2").eql(IntLiteral "0"))))
+    value range(IntLiteral "0", IntLiteral "10").filter((fn(v) (return ParamRef "v".rem(IntLiteral "2").eql(IntLiteral "0")))) [subst K=nint, V=nint]
     eval [0, 2, 4, 6, 8, 10]
   Const "Values"
     type list<nint>
-    value range(IntLiteral "3", IntLiteral "7").values()
+    value range(IntLiteral "3", IntLiteral "7").values() [subst K=nint, V=nint]
     eval [3, 4, 5, 6, 7]
   Const "Keys"
     type list<nint>
-    value range(IntLiteral "3", IntLiteral "7").keys()
+    value range(IntLiteral "3", IntLiteral "7").keys() [subst K=nint, V=nint]
     eval [0, 1, 2, 3, 4]
   Const "Folded"
     type nint
-    value range(IntLiteral "0", IntLiteral "4").fold(IntLiteral "0", (fn(acc, k, v) (return ParamRef "acc".add(ParamRef "v"))))
+    value range(IntLiteral "0", IntLiteral "4").fold(IntLiteral "0", (fn(acc, k, v) (return ParamRef "acc".add(ParamRef "v")))) [subst A=nint, K=nint, V=nint]
     eval 10
   Func "total" pub
     result nint

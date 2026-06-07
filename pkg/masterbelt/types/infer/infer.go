@@ -705,6 +705,9 @@ func observe(sink *Sink, fired *bool) *Sink {
 		ResolvedFunc: func(call *ast.CallExpr, fd *ast.FuncDecl) {
 			sink.resolvedFunc(call, fd)
 		},
+		CallSubst: func(call *ast.CallExpr, subst map[string]ir.Type) {
+			sink.callSubst(call, subst)
+		},
 	}
 }
 

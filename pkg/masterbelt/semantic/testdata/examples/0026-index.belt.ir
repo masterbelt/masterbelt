@@ -5,11 +5,11 @@ Module
     eval [10, 20, 30]
   Const "First"
     type nint | error
-    value Reference -> "Xs".get(IntLiteral "0")
+    value Reference -> "Xs".get(IntLiteral "0") [subst K=nint, T=nint, V=nint]
     eval (nint) 10
   Const "Third"
     type nint | error
-    value Reference -> "Xs".get(IntLiteral "2")
+    value Reference -> "Xs".get(IntLiteral "2") [subst K=nint, T=nint, V=nint]
     eval (nint) 30
   Const "Tbl"
     type map<string, nint>
@@ -17,7 +17,7 @@ Module
     eval ["sword": 100, "shield": 50]
   Const "Sword"
     type nint | error
-    value Reference -> "Tbl".get(StringLiteral "sword")
+    value Reference -> "Tbl".get(StringLiteral "sword") [subst K=string, V=nint]
     eval (nint) 100
   Const "Bumped"
     type list<nint>
@@ -31,15 +31,15 @@ Module
     param xs: list<nint>
     param i: nint
     result nint | error
-      return ParamRef "xs".get(ParamRef "i")
+      return ParamRef "xs".get(ParamRef "i") [subst K=nint, T=nint, V=nint]
   Func "bumpFirst" pub
     result list<nint>
       let "xs": list<nint> = [IntLiteral "1", IntLiteral "2", IntLiteral "3"]
-      assign "xs" = LocalRef "xs".set(IntLiteral "0", IntLiteral "99")
+      assign "xs" = LocalRef "xs".set(IntLiteral "0", IntLiteral "99") [subst K=nint, T=nint, V=nint]
       return LocalRef "xs"
   Func "put" pub
     result map<string, nint>
       let "m": map<string, nint> = [StringLiteral "a": IntLiteral "1"]
-      assign "m" = LocalRef "m".set(StringLiteral "a", IntLiteral "10")
-      assign "m" = LocalRef "m".set(StringLiteral "b", IntLiteral "2")
+      assign "m" = LocalRef "m".set(StringLiteral "a", IntLiteral "10") [subst K=string, V=nint]
+      assign "m" = LocalRef "m".set(StringLiteral "b", IntLiteral "2") [subst K=string, V=nint]
       return LocalRef "m"
