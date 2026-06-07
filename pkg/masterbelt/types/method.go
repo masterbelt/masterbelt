@@ -80,6 +80,19 @@ func Getter(reg *builtin.Registry, recv ir.Type, name string) (*ir.Method, map[s
 	return ms[0], subst, true
 }
 
+// Setter returns the setter named name on the receiver's type — the accessor a
+// property write value.name = v computes the next value through — together with
+// the receiver's substitution, or false when the receiver has no such setter. A
+// setter takes no overloads (one parameter, result self) in the MVP, so the
+// slice holds at most one method.
+func Setter(reg *builtin.Registry, recv ir.Type, name string) (*ir.Method, map[string]ir.Type, bool) {
+	ms, subst, ok := candidatesOfKind(reg, recv, name, ir.MethodSetter)
+	if !ok {
+		return nil, nil, false
+	}
+	return ms[0], subst, true
+}
+
 // candidatesOfKind is the kind-filtered overload lookup behind Candidates and
 // Getter: it collects the receiver's same-name methods of the given kind,
 // shadowing by name within each kind independently (an accessor and an ordinary

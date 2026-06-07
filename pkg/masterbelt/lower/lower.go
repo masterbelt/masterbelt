@@ -242,12 +242,29 @@ func Body(body []ast.Stmt, b Binder) []ir.Stmt {
 	return stmts
 }
 
-// assignStmt lowers a reassignment: the target's name (an identifier names the
-// let local being updated) and the new value. A non-identifier target — a field
-// access, say — has no local name; it lowers with an empty name, which the
-// semantic layer has already reported as immutable-data, so the IR carries the
-// (unreachable-at-runtime) value without a target.
+// assignStmt lowers a reassignment. A plain identifier target names the let local
+// being updated, rebound to the new value. A property write — a member access on
+// a let local, p.name = v — rebinds that same local to a setter call:
+// p = p.name(v) tagged Setter, the let-local rebinding semantics E-18's indexed
+// write takes. The setter form is built whenever the target is a member access on
+// an identifier; whether name actually names a setter (rather than a field) is
+// the type-knowing layers' decision — the checker reports immutable_data when it
+// is not one, and the folder applies the setter only when the receiver's def
+// declares it. A non-identifier or chained target has no local name; it lowers
+// with an empty name, which the semantic layer has reported as immutable-data, so
+// the IR carries the (unreachable-at-runtime) value without a target.
 func assignStmt(s *ast.AssignStmt, b Binder) *ir.Assign {
+	if m, ok := s.Target.(*ast.MemberExpr); ok {
+		if recv, ok := m.Receiver.(*ast.Identifier); ok {
+			return &ir.Assign{Name: recv.Name, Value: &ir.Call{
+				Receiver: Value(m.Receiver, b),
+				Method:   m.Member.Name,
+				Args:     []ir.Value{Value(s.Value, b)},
+				Setter:   true,
+			}}
+		}
+		return &ir.Assign{Name: "", Value: Value(s.Value, b)}
+	}
 	name := ""
 	if id, ok := s.Target.(*ast.Identifier); ok {
 		name = id.Name

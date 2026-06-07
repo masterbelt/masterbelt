@@ -166,10 +166,17 @@ func (*Reference) value() {}
 // receiver, the method name, and the argument values (one for a binary
 // operator, none for a unary). Receiver and arguments are themselves resolved
 // values, so a Call is the whole operator expression with references bound.
+//
+// Setter marks the call form a property write lowers to: receiver.name = v
+// builds a Call{Receiver, Method: name, Args: [v], Setter: true}, distinguishing
+// it from a hand-written method call receiver.name(v) (which the setter name
+// space does not reach). Every operator, ordinary method, and index Call leaves
+// it false.
 type Call struct {
 	Receiver Value
 	Method   string
 	Args     []Value
+	Setter   bool
 }
 
 func (*Call) value() {}

@@ -93,7 +93,7 @@ Module
   Func "boiling"
     result Celsius
       let "c": invalid = <none>.freezing()
-      assign "" = IntLiteral "212"
+      assign "c" = LocalRef "c".fahrenheit = IntLiteral "212"
       return LocalRef "c"
   Assert "FreezingF == 32"
     eval <unevaluated>

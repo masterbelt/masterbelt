@@ -401,17 +401,29 @@ func applyGetter(ctx evalCtx, recvExpr ast.Expr, recv *ir.Constant, name string)
 // nil when it declares no such getter. A getter takes no overloads, so there is
 // at most one. It mirrors methodSyntaxes' shadowing within the getter name space.
 func getterSyntax(reg *builtin.Registry, def *ir.TypeDef, name string) *ast.MethodDecl {
-	return collectGetterSyntax(reg, def, name, map[*ir.TypeDef]bool{})
+	return collectAccessorSyntax(reg, def, name, ir.MethodGetter, map[*ir.TypeDef]bool{})
 }
 
-func collectGetterSyntax(reg *builtin.Registry, def *ir.TypeDef, name string, seen map[*ir.TypeDef]bool) *ast.MethodDecl {
+// setterSyntax returns the body-bearing AST declaration of the setter named name
+// the definition binds — its own, or one derived from its underlying type — or
+// nil when it declares no such setter. It mirrors getterSyntax in the setter name
+// space.
+func setterSyntax(reg *builtin.Registry, def *ir.TypeDef, name string) *ast.MethodDecl {
+	return collectAccessorSyntax(reg, def, name, ir.MethodSetter, map[*ir.TypeDef]bool{})
+}
+
+// collectAccessorSyntax is the shared body-bearing-accessor lookup behind
+// getterSyntax and setterSyntax: the accessor of the given kind and name a
+// definition binds, shadowing within that accessor's name space and deriving from
+// the underlying type, exactly as collectMethodSyntaxes does for instance methods.
+func collectAccessorSyntax(reg *builtin.Registry, def *ir.TypeDef, name string, kind ir.MethodKind, seen map[*ir.TypeDef]bool) *ast.MethodDecl {
 	if def == nil || seen[def] {
 		return nil
 	}
 	seen[def] = true
 	declares := false
 	for _, m := range def.Methods {
-		if m.Name != name || m.Kind != ir.MethodGetter {
+		if m.Name != name || m.Kind != kind {
 			continue
 		}
 		declares = true
@@ -420,10 +432,10 @@ func collectGetterSyntax(reg *builtin.Registry, def *ir.TypeDef, name string, se
 		}
 	}
 	if declares {
-		return nil // declared but bodiless (would be extern; not foldable)
+		return nil
 	}
 	if !def.Builtin {
-		return collectGetterSyntax(reg, methodTableDef(reg, def.Body), name, seen)
+		return collectAccessorSyntax(reg, methodTableDef(reg, def.Body), name, kind, seen)
 	}
 	return nil
 }

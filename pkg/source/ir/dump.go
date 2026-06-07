@@ -460,10 +460,15 @@ func dumpValue(v Value) string {
 		}
 		return fmt.Sprintf("Reference -> %q", name)
 	case *Call:
-		// receiver.method(arg, arg) with each operand rendered recursively.
+		// receiver.method(arg, arg) with each operand rendered recursively; a
+		// setter call renders as the property write it lowered from, receiver.name
+		// = v, so the .ir diff shows the rebinding form rather than a method call.
 		args := make([]string, len(x.Args))
 		for i, a := range x.Args {
 			args[i] = dumpValue(a)
+		}
+		if x.Setter && len(x.Args) == 1 {
+			return fmt.Sprintf("%s.%s = %s", dumpValue(x.Receiver), x.Method, args[0])
 		}
 		return fmt.Sprintf("%s.%s(%s)", dumpValue(x.Receiver), x.Method, strings.Join(args, ", "))
 	case *FuncCall:
