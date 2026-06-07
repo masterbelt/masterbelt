@@ -537,10 +537,21 @@ func hasTypeVar(t ir.Type) bool {
 }
 
 // observe wraps sink so the caller learns whether the wrapped walk reported a
-// finding (Checked is a stream, not a finding). The wrapper stays valid for a
-// nil sink, which is what lets the silent walk share the call rule.
+// finding. It re-wraps every finding callback to flip *fired and then delegate
+// through sink's guarded method (which no-ops for a nil sink or a nil field), so
+// a finding sets *fired whether or not the wrapped sink renders it — that is what
+// lets the silent typing walk (a nil sink) share the call rule and still learn a
+// lambda argument failed. The two informational streams (Checked, SolvedFuncLit)
+// are not findings: they are forwarded as-is and never flip *fired.
+//
+// Every finding callback is wrapped unconditionally — the wrapper does not look
+// at whether sink set the field — so the list here is the single point that must
+// track the Sink struct. TestObserveForwardsEverySinkField reflects over Sink and
+// fails if any field is not forwarded, so a callback added to Sink cannot be
+// dropped on this path again.
 func observe(sink *Sink, fired *bool) *Sink {
 	return &Sink{
+		// Findings: flip *fired, then delegate through the guarded method.
 		InvalidOp: func(node ast.Node, method, operands string) {
 			*fired = true
 			sink.invalidOp(node, method, operands)
@@ -557,8 +568,21 @@ func observe(sink *Sink, fired *bool) *Sink {
 			*fired = true
 			sink.mismatch(node, got, want)
 		},
-		Checked: func(e ast.Expr, want ir.Type) {
-			sink.checked(e, want)
+		AmbiguousUnionMember: func(node ast.Node, got, want ir.Type) {
+			*fired = true
+			sink.ambiguousUnionMember(node, got, want)
+		},
+		ScalarConversion: func(call *ast.CallExpr, target ir.Type) {
+			*fired = true
+			sink.scalarConversion(call, target)
+		},
+		TernaryCondNotBool: func(cond ast.Expr, got ir.Type) {
+			*fired = true
+			sink.ternaryCondNotBool(cond, got)
+		},
+		TernaryBranchMismatch: func(node ast.Node, then, els ir.Type) {
+			*fired = true
+			sink.ternaryBranchMismatch(node, then, els)
 		},
 		ArityMismatch: func(lit *ast.FuncLit, got, want int) {
 			*fired = true
@@ -603,6 +627,26 @@ func observe(sink *Sink, fired *bool) *Sink {
 		NotARecord: func(lit *ast.RecordLit, typ ir.Type) {
 			*fired = true
 			sink.notARecord(lit, typ)
+		},
+		BoundNotSatisfied: func(call *ast.CallExpr, typ, bound ir.Type) {
+			*fired = true
+			sink.boundNotSatisfied(call, typ, bound)
+		},
+		UninferableTypeParam: func(call *ast.CallExpr, name string) {
+			*fired = true
+			sink.uninferableTypeParam(call, name)
+		},
+		NoMethodOnUnboundedTypeVar: func(node ast.Node, method string) {
+			*fired = true
+			sink.noMethodOnUnboundedTypeVar(node, method)
+		},
+		MapKeyNotComparable: func(lit *ast.CollectionLit, key, bound ir.Type) {
+			*fired = true
+			sink.mapKeyNotComparable(lit, key, bound)
+		},
+		// Streams (not findings): forwarded as-is, never flip *fired.
+		Checked: func(e ast.Expr, want ir.Type) {
+			sink.checked(e, want)
 		},
 		SolvedFuncLit: func(lit *ast.FuncLit, t *ir.Func) {
 			sink.solvedFuncLit(lit, t)
