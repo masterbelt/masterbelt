@@ -385,8 +385,7 @@ func graphFor(s *ir.For, ctx graphCtx) (*ir.Constant, graphOutcome) {
 			ctx.noteBudget()
 			return nil, graphUnknown
 		}
-		n := count.Int64()
-		for i := int64(0); i < n; i++ {
+		for i := range count.Int64() {
 			elem := ir.IntConstant(rangeElement(iter, i))
 			if !s.Of {
 				elem = ir.IntConstant(big.NewInt(i))

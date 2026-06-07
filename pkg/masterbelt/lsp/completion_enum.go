@@ -210,26 +210,26 @@ func atArmStart(doc view, offset int) bool {
 // the scrutinee before the brace. It is how a still-empty arm line (no SwitchArm
 // node yet) is recognised as the value position.
 func inSwitchArmRegion(sw cst.Tree, offset int) bool {
-	open, close := -1, -1
+	openAt, closeAt := -1, -1
 	for _, c := range sw.Children() {
 		if tok, ok := c.Token(); ok {
 			switch tok.Kind() {
 			case token.LBrace:
-				if open < 0 {
-					open = c.End()
+				if openAt < 0 {
+					openAt = c.End()
 				}
 			case token.RBrace:
-				close = c.Offset()
+				closeAt = c.Offset()
 			}
 		}
 	}
-	if open < 0 {
+	if openAt < 0 {
 		return false
 	}
-	if close < 0 {
-		close = sw.End() // an unclosed switch: the region runs to its end
+	if closeAt < 0 {
+		closeAt = sw.End() // an unclosed switch: the region runs to its end
 	}
-	return offset >= open && offset <= close
+	return offset >= openAt && offset <= closeAt
 }
 
 // beforeArrow reports whether offset sits before a switch arm's "->" — its value

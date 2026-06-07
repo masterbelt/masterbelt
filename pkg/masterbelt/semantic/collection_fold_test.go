@@ -87,8 +87,8 @@ func TestListFilterFolds(t *testing.T) {
 
 // TestListAnyAllFold checks any and all fold to bools.
 func TestListAnyAllFold(t *testing.T) {
-	any := "const B = [1, 2, 3].any(fn(v: nint): bool -> v > 2)\n"
-	if !evalOf(t, any, "B").Bool {
+	anySrc := "const B = [1, 2, 3].any(fn(v: nint): bool -> v > 2)\n"
+	if !evalOf(t, anySrc, "B").Bool {
 		t.Errorf("any(>2) = false, want true")
 	}
 	all := "const B = [1, 2, 3].all(fn(v: nint): bool -> v > 2)\n"

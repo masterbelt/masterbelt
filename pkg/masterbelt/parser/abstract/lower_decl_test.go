@@ -464,12 +464,12 @@ func TestLowerImplConst(t *testing.T) {
 	if len(d.Methods) != 1 || d.Methods[0].Name != "inc" {
 		t.Fatalf("methods = %+v, want one inc method", d.Methods)
 	}
-	max := d.Consts[0]
-	if !max.Public || max.Name != "Max" || max.Builtin {
-		t.Errorf("Max const = %+v, want pub non-builtin Max", max)
+	maxConst := d.Consts[0]
+	if !maxConst.Public || maxConst.Name != "Max" || maxConst.Builtin {
+		t.Errorf("Max const = %+v, want pub non-builtin Max", maxConst)
 	}
-	if len(max.Doc) != 1 || max.Doc[0] != "the cap" {
-		t.Errorf("Max doc = %q, want [the cap]", max.Doc)
+	if len(maxConst.Doc) != 1 || maxConst.Doc[0] != "the cap" {
+		t.Errorf("Max doc = %q, want [the cap]", maxConst.Doc)
 	}
 	width := d.Consts[1]
 	if width.Public || width.Name != "Width" || width.Type == nil {

@@ -21,12 +21,12 @@ func TestEnumAutoContract(t *testing.T) {
 		t.Fatal("Rarity not resolved")
 	}
 	reg := universe().reg
-	comparable := universe().prelude["comparable"]
+	comparableDef := universe().prelude["comparable"]
 	orderable := universe().prelude["orderable"]
-	if comparable == nil || orderable == nil {
+	if comparableDef == nil || orderable == nil {
 		t.Fatal("prelude is missing comparable/orderable")
 	}
-	if !types.Satisfies(reg, &ir.Named{Def: def}, &ir.Named{Def: comparable}) {
+	if !types.Satisfies(reg, &ir.Named{Def: def}, &ir.Named{Def: comparableDef}) {
 		t.Errorf("enum should satisfy comparable")
 	}
 	if !types.Satisfies(reg, &ir.Named{Def: def}, &ir.Named{Def: orderable}) {
@@ -49,8 +49,8 @@ func TestNominalEmptyImplOptIn(t *testing.T) {
 		t.Fatal("Level not resolved")
 	}
 	reg := universe().reg
-	comparable := universe().prelude["comparable"]
-	if !types.Satisfies(reg, &ir.Named{Def: def}, &ir.Named{Def: comparable}) {
+	comparableDef := universe().prelude["comparable"]
+	if !types.Satisfies(reg, &ir.Named{Def: def}, &ir.Named{Def: comparableDef}) {
 		t.Errorf("Level should satisfy comparable")
 	}
 }

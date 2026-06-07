@@ -37,6 +37,7 @@ func openOnDisk(t *testing.T, s *Server, root, name string) protocol.DocumentURI
 const crossMainSrc = "use geo from \"geometry.belt\"\nuse { Unit } from \"geometry.belt\"\nconst start = geo.Origin\nconst step = Unit\n"
 
 func crossProject(t *testing.T) (root string) {
+	t.Helper()
 	return belttest.WriteFiles(t, map[string]string{
 		"masterbelt.toml": "entry = \"main.belt\"\n",
 		"main.belt":       crossMainSrc,

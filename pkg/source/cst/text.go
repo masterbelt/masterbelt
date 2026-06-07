@@ -18,6 +18,7 @@
 package cst
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -66,7 +67,7 @@ func (n *Node) UnmarshalText(data []byte) error {
 		return err
 	}
 	if len(lines) == 0 {
-		return fmt.Errorf("cst: empty text")
+		return errors.New("cst: empty text")
 	}
 	p := &textParser{lines: lines}
 	root, err := p.element(0)
@@ -78,7 +79,7 @@ func (n *Node) UnmarshalText(data []byte) error {
 	}
 	rootNode, ok := root.(*Node)
 	if !ok {
-		return fmt.Errorf("cst: the root element is a token, want a node")
+		return errors.New("cst: the root element is a token, want a node")
 	}
 	*n = *rootNode
 	return nil

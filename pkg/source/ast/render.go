@@ -102,9 +102,9 @@ func (r *renderer) anchor(e Expr) {
 	}
 }
 
-// expr renders e, parenthesizing it when its own binding is looser than min —
-// the binding the enclosing context requires.
-func (r *renderer) expr(e Expr, min int) {
+// expr renders e, parenthesizing it when its own binding is looser than
+// minPrec — the binding the enclosing context requires.
+func (r *renderer) expr(e Expr, minPrec int) {
 	switch x := e.(type) {
 	case nil:
 		r.str("<missing>")
@@ -164,10 +164,10 @@ func (r *renderer) expr(e Expr, min int) {
 		r.anchor(x)
 		r.str(x.Member.Name)
 	case *CallExpr:
-		r.call(x, min)
+		r.call(x, minPrec)
 	case *AwaitExpr:
 		// await binds like a prefix operator over its operand's postfix chain.
-		paren := precUnary < min
+		paren := precUnary < minPrec
 		if paren {
 			r.str("(")
 		}
@@ -182,7 +182,7 @@ func (r *renderer) expr(e Expr, min int) {
 		// then-branch render one level tighter (so a nested ternary there is
 		// parenthesized), while the else-branch renders at the ternary level — a
 		// chained a ? b : c ? d : e needs no parentheses around its tail.
-		paren := precTernary < min
+		paren := precTernary < minPrec
 		if paren {
 			r.str("(")
 		}
@@ -201,7 +201,7 @@ func (r *renderer) expr(e Expr, min int) {
 		// ternary, and is non-associative: both bounds render one step tighter
 		// (precRange+1), so a range bound that is itself a range or a ternary is
 		// parenthesized, while an arithmetic bound (binding tighter) is not.
-		paren := precRange < min
+		paren := precRange < minPrec
 		if paren {
 			r.str("(")
 		}
@@ -227,10 +227,10 @@ func (r *renderer) expr(e Expr, min int) {
 // form, anything else as callee(args). The call's value anchors at the
 // operator symbol or the callee's name — the callee itself is not a value, so
 // it records no anchor of its own.
-func (r *renderer) call(x *CallExpr, min int) {
+func (r *renderer) call(x *CallExpr, minPrec int) {
 	if m, ok := x.Callee.(*MemberExpr); ok {
 		if op, ok := binaryOps[m.Member.Name]; ok && len(x.Arguments) == 1 {
-			paren := op.prec < min
+			paren := op.prec < minPrec
 			if paren {
 				r.str("(")
 			}
@@ -247,7 +247,7 @@ func (r *renderer) call(x *CallExpr, min int) {
 			return
 		}
 		if sym, ok := unaryOps[m.Member.Name]; ok && len(x.Arguments) == 0 {
-			paren := precUnary < min
+			paren := precUnary < minPrec
 			if paren {
 				r.str("(")
 			}

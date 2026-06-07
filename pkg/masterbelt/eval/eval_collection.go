@@ -316,8 +316,7 @@ func rangeFold(ctx graphCtx, recv *ir.Constant, args []*ir.Constant) *ir.Constan
 	}
 	acc := args[0]
 	step := args[1]
-	n := count.Int64()
-	for i := int64(0); i < n; i++ {
+	for i := range count.Int64() {
 		key := ir.IntConstant(big.NewInt(i))           // the 0-based position
 		value := ir.IntConstant(rangeElement(recv, i)) // the element
 		acc = graphApply(ctx, step, []*ir.Constant{acc, key, value})

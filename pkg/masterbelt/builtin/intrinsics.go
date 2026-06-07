@@ -96,7 +96,7 @@ func integerIntrinsics() map[string]Intrinsic {
 
 func booleanIntrinsics() map[string]Intrinsic {
 	return map[string]Intrinsic{
-		"not":  func(r *ir.Constant, args []*ir.Constant) *ir.Constant { return notBool(r, args) },
+		"not":  notBool,
 		"anan": binaryBool(func(a, b bool) *ir.Constant { return ir.BoolConstant(a && b) }),
 		"oror": binaryBool(func(a, b bool) *ir.Constant { return ir.BoolConstant(a || b) }),
 		"eql":  binaryBool(func(a, b bool) *ir.Constant { return ir.BoolConstant(a == b) }),

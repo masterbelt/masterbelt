@@ -18,6 +18,7 @@ package treetext
 // field, so the parser here stays generic.
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 	"strconv"
@@ -53,7 +54,7 @@ func Parse(data []byte) (*Element, error) {
 		return nil, err
 	}
 	if len(lines) == 0 {
-		return nil, fmt.Errorf("treetext: empty text")
+		return nil, errors.New("treetext: empty text")
 	}
 	p := &elementParser{lines: lines}
 	root, err := p.parseElement(0)

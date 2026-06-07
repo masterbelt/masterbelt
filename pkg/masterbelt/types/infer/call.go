@@ -439,15 +439,16 @@ func funcCallType(e *ast.CallExpr, name string, cands []*ast.FuncDecl, s scope, 
 		tscope := FuncTypeParamScope(fd.TypeParams)
 		typeParams := ResolveFuncTypeParams(r, fd.TypeParams, tscope)
 		params := make([]ir.Type, len(fd.Params))
-		key := ""
+		var key strings.Builder
 		for i, p := range fd.Params {
 			params[i] = r.ResolveType(p.Type, tscope)
-			key += typeKey(params[i]) + ","
+			key.WriteString(typeKey(params[i]))
+			key.WriteString(",")
 		}
-		if seen[key] {
+		if seen[key.String()] {
 			continue
 		}
-		seen[key] = true
+		seen[key.String()] = true
 		sigs = append(sigs, funcSig{fd: fd, typeParams: typeParams, params: params, result: r.ResolveType(fd.Result, tscope)})
 	}
 

@@ -855,18 +855,18 @@ func builtinBound(reg *builtin.Registry, typeName, bound string) (*ir.Constant, 
 	if !ok || !native.IsInteger() {
 		return nil, false
 	}
-	min, max := native.Bounds()
+	lo, hi := native.Bounds()
 	switch bound {
 	case "Max":
-		if max == nil {
+		if hi == nil {
 			return nil, false
 		}
-		return ir.IntConstant(max), true
+		return ir.IntConstant(hi), true
 	case "Min":
-		if min == nil {
+		if lo == nil {
 			return nil, false
 		}
-		return ir.IntConstant(min), true
+		return ir.IntConstant(lo), true
 	default:
 		return nil, false
 	}

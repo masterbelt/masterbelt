@@ -192,23 +192,23 @@ func (db *database) dropInput(id FileID) {
 // new ones enter, and unedited declarations — whose AST pointers the old and
 // new trees share — keep their shells, so references across files (and across
 // refreshes) keep binding the same ir.Const objects.
-func (db *database) rebindDecls(id FileID, old, new *ast.File) {
+func (db *database) rebindDecls(id FileID, old, fresh *ast.File) {
 	keep := map[*ast.ConstDecl]bool{}
 	keepTypes := map[*ast.TypeDecl]bool{}
 	keepFuncs := map[*ast.FuncDecl]bool{}
-	if new != nil {
-		for _, d := range new.Decls {
+	if fresh != nil {
+		for _, d := range fresh.Decls {
 			keep[d] = true
 			db.declFile[d] = id
 			if db.shells[d] == nil {
 				db.shells[d] = &ir.Const{Name: d.Name, Public: d.Public, Doc: d.Doc, Syntax: d}
 			}
 		}
-		for _, t := range new.Types {
+		for _, t := range fresh.Types {
 			keepTypes[t] = true
 			db.typeFile[t] = id
 		}
-		for _, fd := range new.Funcs {
+		for _, fd := range fresh.Funcs {
 			keepFuncs[fd] = true
 			if db.fnShells[fd] == nil {
 				db.fnShells[fd] = &ir.Function{Name: fd.Name, Public: fd.Public, Doc: fd.Doc, Syntax: fd}
@@ -281,36 +281,36 @@ func (db *database) demand(key queryKey) any {
 // pointer is the fact — a resolution binds a declaration object, a Named hangs
 // type equality on its Def — so a structurally identical table built from a
 // re-parsed file is a different fact and must propagate.
-func equalValue(kind queryKind, old, new any) bool {
+func equalValue(kind queryKind, old, fresh any) bool {
 	switch kind {
 	case qSymbols:
 		a, _ := old.(map[string]*ast.ConstDecl)
-		b, _ := new.(map[string]*ast.ConstDecl)
+		b, _ := fresh.(map[string]*ast.ConstDecl)
 		return maps.Equal(a, b)
 	case qResolve:
-		return old == new // resolution is comparable
+		return old == fresh // resolution is comparable
 	case qFuncSymbols:
 		a, _ := old.(map[string][]*ast.FuncDecl)
-		b, _ := new.(map[string][]*ast.FuncDecl)
+		b, _ := fresh.(map[string][]*ast.FuncDecl)
 		return maps.EqualFunc(a, b, slices.Equal)
 	case qResolveFunc:
 		// The overload set: the declaration pointers are the fact.
 		a, _ := old.([]*ast.FuncDecl)
-		b, _ := new.([]*ast.FuncDecl)
+		b, _ := fresh.([]*ast.FuncDecl)
 		return slices.Equal(a, b)
 	case qImports:
 		a, _ := old.(importTable)
-		b, _ := new.(importTable)
+		b, _ := fresh.(importTable)
 		return maps.Equal(a.values, b.values) && maps.Equal(a.types, b.types) &&
 			maps.EqualFunc(a.funcs, b.funcs, equalFuncBindings) && maps.Equal(a.namespaces, b.namespaces)
 	case qExports:
 		a, _ := old.(exports)
-		b, _ := new.(exports)
+		b, _ := fresh.(exports)
 		return maps.Equal(a.consts, b.consts) && maps.Equal(a.types, b.types) &&
 			maps.EqualFunc(a.funcs, b.funcs, slices.Equal)
 	case qReachable:
 		a, _ := old.(map[FileID]bool)
-		b, _ := new.(map[FileID]bool)
+		b, _ := fresh.(map[FileID]bool)
 		return maps.Equal(a, b)
 	case qModule:
 		// A sink: no query depends on a module, so there is no propagation
@@ -319,24 +319,24 @@ func equalValue(kind queryKind, old, new any) bool {
 		return false
 	case qTypeDefs:
 		a, _ := old.(typeDefs)
-		b, _ := new.(typeDefs)
+		b, _ := fresh.(typeDefs)
 		return slices.Equal(a.list, b.list) && maps.Equal(a.byName, b.byName) && maps.Equal(a.universe, b.universe)
 	case qFuncs:
 		// The function shells: the pointers are the facts (an edit re-parses
 		// into fresh declarations, hence fresh shells).
 		a, _ := old.([]*ir.Function)
-		b, _ := new.([]*ir.Function)
+		b, _ := fresh.([]*ir.Function)
 		return slices.Equal(a, b)
 	case qTypeOf:
 		a, _ := old.(ir.Type)
-		b, _ := new.(ir.Type)
+		b, _ := fresh.(ir.Type)
 		return equalTypes(a, b)
 	case qValue:
 		a, _ := old.(*ir.Constant)
-		b, _ := new.(*ir.Constant)
+		b, _ := fresh.(*ir.Constant)
 		return equalConstants(a, b)
 	default:
-		return reflect.DeepEqual(old, new)
+		return reflect.DeepEqual(old, fresh)
 	}
 }
 

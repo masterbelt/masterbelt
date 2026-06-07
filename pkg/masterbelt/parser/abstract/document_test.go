@@ -94,7 +94,7 @@ func TestDocumentSequentialEdits(t *testing.T) {
 	var content []byte
 
 	typed := "/// doc\npub const Answer: long = 42\nconst Mirror = Answer\n"
-	for i := 0; i < len(typed); i++ {
+	for i := range len(typed) {
 		e := source.Edit{Start: len(content), End: len(content), NewText: []byte{typed[i]}}
 		content = naiveSplice(content, e.Start, e.End, e.NewText)
 		d.Edit(e)

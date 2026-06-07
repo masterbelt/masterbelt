@@ -34,7 +34,7 @@ var streamFields = map[string]bool{
 func TestObserveForwardsEverySinkField(t *testing.T) {
 	sinkType := reflect.TypeOf(Sink{})
 
-	for i := 0; i < sinkType.NumField(); i++ {
+	for i := range sinkType.NumField() {
 		field := sinkType.Field(i)
 		if field.Type.Kind() != reflect.Func {
 			t.Fatalf("Sink.%s is not a func field; the parity guard assumes every callback is a func", field.Name)
@@ -96,7 +96,7 @@ func TestObserveNilSink(t *testing.T) {
 		t.Fatal("observe(nil, ...) returned nil")
 	}
 	wv := reflect.ValueOf(wrapped).Elem()
-	for i := 0; i < sinkType.NumField(); i++ {
+	for i := range sinkType.NumField() {
 		field := sinkType.Field(i)
 		f := wv.Field(i)
 		if f.IsNil() {

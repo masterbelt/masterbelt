@@ -21,25 +21,20 @@ linters:
     - copyloopvar
     - durationcheck
     - errorlint
+    - gocritic
     - gocyclo # see settings: ceiling at 47, TODO ratchet down to 30
+    - intrange
     - maintidx # at the upstream default floor (20)
     - misspell
+    - nilerr
     - nolintlint
+    - perfsprint
+    - predeclared
+    - thelper
     - unconvert
     - unparam
     - usestdlibvars
     - wastedassign
-
-    # --- quick wins: a handful of issues each, enable after a small sweep ---
-    # - gocritic # 2 issues
-    # - intrange # 9 issues (for i := 0; i < n; i++ → for i := range n);
-    #            # 2 have function-call range targets (evaluate-once change)
-    # - perfsprint # 4 issues
-    # - thelper # 2 issues (missing t.Helper() in crossfile_test/function_test)
-    # - predeclared # 21 issues: min/max/new/int8/any/comparable/close shadowing
-    #               # predeclared identifiers — small renames first
-    # - nilerr # 3 issues, all pkg/project/project.go CandidateImports —
-    #          # reviewed: intentional walk-on skips; nolint with rationale
 
     # --- medium: needs a real pass or tuned settings ---
     # - prealloc # 22 issues (append loops without preallocation)

@@ -73,9 +73,9 @@ func TestForElement(t *testing.T) {
 // not unify.
 func TestUnifyAndAssignTypeVar(t *testing.T) {
 	reg := builtin.Default()
-	comparable := &ir.TypeDef{Name: "comparable", Interface: &ir.InterfaceDef{}}
-	a := &ir.TypeVar{Name: "T", Bound: &ir.Named{Def: comparable}}
-	b := &ir.TypeVar{Name: "T", Bound: &ir.Named{Def: comparable}}
+	comparableDef := &ir.TypeDef{Name: "comparable", Interface: &ir.InterfaceDef{}}
+	a := &ir.TypeVar{Name: "T", Bound: &ir.Named{Def: comparableDef}}
+	b := &ir.TypeVar{Name: "T", Bound: &ir.Named{Def: comparableDef}}
 	other := &ir.TypeVar{Name: "U"}
 
 	if a == b {

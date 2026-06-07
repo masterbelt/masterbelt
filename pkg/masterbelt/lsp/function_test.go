@@ -141,6 +141,7 @@ func TestDocumentSymbolsIncludeFunctions(t *testing.T) {
 const funcMainSrc = "use { double } from \"math.belt\"\nuse math from \"math.belt\"\nconst A = double(21)\nconst B = math.greet(\"belt\")\n"
 
 func funcProject(t *testing.T) (root string) {
+	t.Helper()
 	return belttest.WriteFiles(t, map[string]string{
 		"masterbelt.toml": "entry = \"main.belt\"\n",
 		"main.belt":       funcMainSrc,

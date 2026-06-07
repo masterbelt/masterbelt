@@ -305,7 +305,7 @@ func (p *Project) CandidateImports(importer FileID) []string {
 	var out []string
 	_ = filepath.WalkDir(p.Root, func(fp string, d fs.DirEntry, err error) error {
 		if err != nil {
-			return nil
+			return nil //nolint:nilerr // an unreadable entry is no candidate; keep walking the rest
 		}
 		if d.IsDir() {
 			if fp != p.Root && strings.HasPrefix(d.Name(), ".") {
@@ -318,7 +318,7 @@ func (p *Project) CandidateImports(importer FileID) []string {
 		}
 		rel, err := filepath.Rel(p.Root, fp)
 		if err != nil {
-			return nil
+			return nil //nolint:nilerr // a path outside the root is no candidate; keep walking
 		}
 		target := fileID(rel)
 		if target == importer {
@@ -326,7 +326,7 @@ func (p *Project) CandidateImports(importer FileID) []string {
 		}
 		usePath, err := filepath.Rel(importerDir, filepath.FromSlash(string(target)))
 		if err != nil {
-			return nil
+			return nil //nolint:nilerr // unreachable from the importer: no use path renders it
 		}
 		candidate := filepath.ToSlash(usePath)
 		if resolved, ok := resolveUse(importer, candidate); !ok || resolved != target {
