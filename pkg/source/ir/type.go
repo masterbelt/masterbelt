@@ -211,15 +211,28 @@ type TypeDef struct {
 	// enum — the base lives in Enum.Base — so the type algebra treats it as a
 	// leaf, exactly as it treats a primitive.
 	Enum *EnumDef
-	// Where is the refinement predicate over self, kept in its evaluable AST
-	// form so the predicate can fold per constant (self bound to each value).
+	// Where is the refinement predicate over self as a resolved value graph —
+	// self bound to a SelfValue node, every reference resolved, the typed and
+	// adapted IR every fold of the predicate runs (self bound to each value).
 	// It is set only when the predicate type-checks to a foldable bool; an
 	// unusable predicate is reported at the declaration and stays nil, so the
 	// per-constant check never fires for it.
-	Where           ast.Expr
+	Where           Value
 	Syntax          *ast.TypeDecl      // the type declaration this was resolved from, or nil
 	EnumSyntax      *ast.EnumDecl      // the enum declaration this was resolved from, or nil
 	InterfaceSyntax *ast.InterfaceDecl // the interface declaration this was resolved from, or nil
+}
+
+// WhereSyntax returns the surface form of the refinement predicate — the
+// declaration's where expression — when the definition carries a usable one
+// (Where is its value-graph truth), or nil. It is a rendering channel only:
+// the violation diagnostic and the editor's hover quote the predicate as
+// written, while every fold runs on the Where graph.
+func (t *TypeDef) WhereSyntax() ast.Expr {
+	if t.Where == nil || t.Syntax == nil {
+		return nil
+	}
+	return t.Syntax.Where
 }
 
 // EnumDef is the description of an enum type: the name of its base type (an

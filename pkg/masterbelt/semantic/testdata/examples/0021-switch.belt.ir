@@ -28,20 +28,20 @@ Module
   Func "color" pub
     param r: Rarity
     result string
-      switch ParamRef "r"
-        arm Rarity.Common
-          return StringLiteral "white"
-        arm Rarity.Rare
-          return StringLiteral "blue"
-        arm Rarity.Legend
-          return StringLiteral "gold"
+      switch (ParamRef "r" : Rarity)
+        arm (Rarity.Common : Rarity)
+          return (StringLiteral "white" : string)
+        arm (Rarity.Rare : Rarity)
+          return (StringLiteral "blue" : string)
+        arm (Rarity.Legend : Rarity)
+          return (StringLiteral "gold" : string)
   Func "grade" pub
     param n: nint
     result string
-      switch ParamRef "n"
-        arm IntLiteral "0"
-          return StringLiteral "zero"
-        arm IntLiteral "1", IntLiteral "2", IntLiteral "3"
-          return StringLiteral "low"
+      switch (ParamRef "n" : nint)
+        arm (IntLiteral "0" : nint)
+          return (StringLiteral "zero" : string)
+        arm (IntLiteral "1" : nint), (IntLiteral "2" : nint), (IntLiteral "3" : nint)
+          return (StringLiteral "low" : string)
         else
-          return StringLiteral "high"
+          return (StringLiteral "high" : string)

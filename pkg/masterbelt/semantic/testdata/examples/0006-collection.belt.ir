@@ -1,25 +1,25 @@
 Module
   Const "ExampleList"
     type list<nint>
-    value [IntLiteral "1", IntLiteral "2", IntLiteral "3"]
+    value ([(IntLiteral "1" : nint), (IntLiteral "2" : nint), (IntLiteral "3" : nint)] : list<nint>)
     eval [1, 2, 3]
   Const "ExampleMap"
     type map<string, nint>
-    value [StringLiteral "key": IntLiteral "100"]
+    value ([(StringLiteral "key" : string): (IntLiteral "100" : nint)] : map<string, nint>)
     eval ["key": 100]
   Const "Inferred"
     type list<nint>
-    value [IntLiteral "10", IntLiteral "20", IntLiteral "30"]
+    value ([(IntLiteral "10" : nint), (IntLiteral "20" : nint), (IntLiteral "30" : nint)] : list<nint>)
     eval [10, 20, 30]
   Const "Bytes"
     type list<sbyte>
-    value [IntLiteral "1", IntLiteral "2", IntLiteral "3"]
+    value ([(adapt (IntLiteral "1" : nint) : sbyte), (adapt (IntLiteral "2" : nint) : sbyte), (adapt (IntLiteral "3" : nint) : sbyte)] : list<sbyte>)
     eval [1, 2, 3]
   Const "EmptyList"
     type list<nint>
-    value []
+    value ([] : list<nint>)
     eval []
   Const "EmptyMap"
     type map<string, nint>
-    value []
+    value ([] : map<string, nint>)
     eval [:]

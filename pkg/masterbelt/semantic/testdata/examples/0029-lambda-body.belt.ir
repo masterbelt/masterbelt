@@ -1,13 +1,13 @@
 Module
   Const "Bumped"
     type list<nint>
-    value [IntLiteral "1", IntLiteral "2", IntLiteral "3"].map((fn(x) (let step: nint = IntLiteral "1") (return ParamRef "x".add(LocalRef "step"))))
+    value (([(IntLiteral "1" : nint), (IntLiteral "2" : nint), (IntLiteral "3" : nint)] : list<nint>).map(((fn(x) (let step: nint = (IntLiteral "1" : nint)) (return ((ParamRef "x" : nint).add((LocalRef "step" : nint)) : nint))) : fn(nint): nint)) : list<nint>) [subst K=nint, R=nint, T=nint, V=nint]
     eval [2, 3, 4]
   Const "Clamped"
     type list<nint>
-    value [IntLiteral "1".neg(), IntLiteral "0", IntLiteral "5"].map((fn(x) (if ParamRef "x".lt(IntLiteral "0") (then (return IntLiteral "0"))) (return ParamRef "x")))
+    value (([((IntLiteral "1" : nint).neg() : nint), (IntLiteral "0" : nint), (IntLiteral "5" : nint)] : list<nint>).map(((fn(x) (if ((ParamRef "x" : nint).lt((IntLiteral "0" : nint)) : bool) (then (return (IntLiteral "0" : nint)))) (return (ParamRef "x" : nint))) : fn(nint): nint)) : list<nint>) [subst K=nint, R=nint, T=nint, V=nint]
     eval [0, 0, 5]
   Const "Labeled"
     type list<nint>
-    value [IntLiteral "0", IntLiteral "1", IntLiteral "2"].map((fn(x) (switch ParamRef "x" (arm IntLiteral "0" (return IntLiteral "0")) (arm IntLiteral "1" (return IntLiteral "10")) (else (return IntLiteral "100")))))
+    value (([(IntLiteral "0" : nint), (IntLiteral "1" : nint), (IntLiteral "2" : nint)] : list<nint>).map(((fn(x) (switch (ParamRef "x" : nint) (arm (IntLiteral "0" : nint) (return (IntLiteral "0" : nint))) (arm (IntLiteral "1" : nint) (return (IntLiteral "10" : nint))) (else (return (IntLiteral "100" : nint))))) : fn(nint): nint)) : list<nint>) [subst K=nint, R=nint, T=nint, V=nint]
     eval [0, 10, 100]

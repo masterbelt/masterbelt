@@ -2,15 +2,15 @@ Module
   Const "MaxLevel"
     doc "DocComment for MaxLevel"
     type long
-    value IntLiteral "100"
+    value (adapt (IntLiteral "100" : nint) : long)
     eval 100
   Const "MinLevel"
     doc "DocComment for MinLevel"
     doc "with multiline."
     type nint
-    value IntLiteral "0"
+    value (IntLiteral "0" : nint)
     eval 0
   Const "PublishedMaxLevel" pub
     type long
-    value Reference -> "MaxLevel"
+    value (Reference -> "MaxLevel" : long)
     eval 100

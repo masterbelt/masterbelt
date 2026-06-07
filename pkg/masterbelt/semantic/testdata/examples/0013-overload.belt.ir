@@ -1,27 +1,27 @@
 Module
   Const "Base"
     type Score
-    value IntLiteral "100"
+    value (adapt (IntLiteral "100" : nint) : Score)
     eval 100
   Const "Bumped"
     type Score
-    value Reference -> "Base".merge(IntLiteral "50") [resolved merge(points: self): self]
+    value ((Reference -> "Base" : Score).merge((adapt (IntLiteral "50" : nint) : Score)) : Score) [resolved merge(points: self): self]
     eval 150
   Const "Counted"
     type bool
-    value Reference -> "Base".merge(BoolLiteral true) [resolved merge(active: bool): bool]
+    value ((Reference -> "Base" : Score).merge((BoolLiteral true : bool)) : bool) [resolved merge(active: bool): bool]
     eval true
   Const "Start"
     type Level
-    value IntLiteral "1"
+    value (adapt (IntLiteral "1" : nint) : Level)
     eval 1
   Const "Second"
     type Level
-    value Reference -> "Start".next() [resolved next(): self]
+    value ((Reference -> "Start" : Level).next() : Level) [resolved next(): self]
     eval 2
   Const "Fifth"
     type Level
-    value Reference -> "Start".next(IntLiteral "4") [resolved next(steps: self): self]
+    value ((Reference -> "Start" : Level).next((adapt (IntLiteral "4" : nint) : Level)) : Level) [resolved next(steps: self): self]
     eval 5
   TypeDef "Score" pub
     doc "A game score in points."
@@ -30,21 +30,21 @@ Module
       doc "The score with points merged in."
       param points: self
       result self
-      return self.add(ParamRef "points")
+      return ((self : Score).add((ParamRef "points" : Score)) : Score)
     method "merge" pub
       doc "Whether an active run with this score counts."
       param active: bool
       result bool
-      return ParamRef "active".anan(self.gt(IntLiteral "0"))
+      return ((ParamRef "active" : bool).anan(((self : Score).gt((adapt (IntLiteral "0" : nint) : Score)) : bool)) : bool)
   TypeDef "Level" pub
     doc "A character level."
     body sbyte
     method "next" pub
       doc "The next level."
       result self
-      return self.add(IntLiteral "1")
+      return ((self : Level).add((adapt (IntLiteral "1" : nint) : Level)) : Level)
     method "next" pub
       doc "The level a number of steps up."
       param steps: self
       result self
-      return self.add(ParamRef "steps")
+      return ((self : Level).add((ParamRef "steps" : Level)) : Level)

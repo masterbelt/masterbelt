@@ -1,59 +1,59 @@
 Module
   Const "Hello"
     type Tag
-    value StringLiteral "hello"
+    value (adapt (StringLiteral "hello" : string) : Tag)
     eval "hello"
   Const "World"
     type string
-    value StringLiteral "world"
+    value (StringLiteral "world" : string)
     eval "world"
   Const "There"
     type Tag
-    value Reference -> "World"
+    value (adapt (Reference -> "World" : string) : Tag)
     eval "world"
   Const "Greeting"
     type Tag
-    value Reference -> "Hello".add(StringLiteral " ").add(Reference -> "There")
+    value (((Reference -> "Hello" : Tag).add((adapt (StringLiteral " " : string) : Tag)) : Tag).add((Reference -> "There" : Tag)) : Tag)
     eval "hello world"
   Const "SameTag"
     type bool
-    value Reference -> "Hello".eql(StringLiteral "hello")
+    value ((Reference -> "Hello" : Tag).eql((adapt (StringLiteral "hello" : string) : Tag)) : bool)
     eval true
   Const "OtherTag"
     type bool
-    value Reference -> "Hello".neq(Reference -> "There")
+    value ((Reference -> "Hello" : Tag).neq((Reference -> "There" : Tag)) : bool)
     eval true
   Const "North"
     type Direction
-    value StringLiteral "north"
+    value (adapt (StringLiteral "north" : string) : Direction)
     eval "north"
   Const "South"
     type Direction
-    value StringLiteral "south"
+    value (adapt (StringLiteral "south" : string) : Direction)
     eval "south"
   Const "Ok"
     type Labeled
-    value StringLiteral "tagged"
+    value (adapt (adapt (StringLiteral "tagged" : string) : Tag) : Labeled)
     eval (Tag) "tagged"
   Const "FromOk"
     type Tag
-    value label(StringLiteral "done")
+    value (label((adapt (adapt (StringLiteral "done" : string) : Tag) : Labeled)) : Tag)
     eval "done"
   TypeDef "Tag" pub
     body string
   TypeDef "Direction" pub
     body string
-    where self == "north" || self == "south"
+    where (((self : Direction).eql((adapt (StringLiteral "north" : string) : Direction)) : bool).oror(((self : Direction).eql((adapt (StringLiteral "south" : string) : Direction)) : bool)) : bool)
   TypeDef "Labeled" pub
     body Tag | error
   Func "label" pub
     param v: Labeled
     result Tag
-      match ParamRef "v"
+      match (ParamRef "v" : Labeled)
         arm Tag t
-          return LocalRef "t"
+          return (LocalRef "t" : Tag)
         arm error e
-          return StringLiteral "error"
+          return (adapt (StringLiteral "error" : string) : Tag)
   Assert "Hello == \"hello\""
     eval true
       Hello == "hello"

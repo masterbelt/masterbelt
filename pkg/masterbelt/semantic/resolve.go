@@ -55,7 +55,7 @@ func boundViolationReporter(at func(ast.Node) span, diags *diagnostic.List) func
 // bounds, the defined body type, each method's signature, and the where-clause
 // predicate. Method bodies are lowered to IR here (lower.Body) but not
 // type-checked.
-func resolveTypes(env eval.Env, file *ast.File, at func(ast.Node) span, diags *diagnostic.List, reg *builtin.Registry, extern map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, fns bodyFuncs) []*ir.TypeDef {
+func resolveTypes(folder exprFolder, file *ast.File, at func(ast.Node) span, diags *diagnostic.List, res *callResolutions, reg *builtin.Registry, extern map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, fns bodyFuncs) []*ir.TypeDef {
 	if len(file.Types) == 0 && len(file.Enums) == 0 && len(file.Interfaces) == 0 {
 		return nil
 	}
@@ -125,10 +125,10 @@ func resolveTypes(env eval.Env, file *ast.File, at func(ast.Node) span, diags *d
 	// the whole graph, so they run once all parents are populated.
 	checkInterfaceInheritance(file.Interfaces, ifaceOut, at, diags)
 	for i, td := range file.Types {
-		resolveDecl(env, r, reg, td, out[i], at, diags, fns)
+		resolveDecl(r, reg, td, out[i], at, diags, res, fns)
 	}
 	for i, ed := range file.Enums {
-		resolveEnumDecl(env, r, reg, ed, enumOut[i], at, diags, fns)
+		resolveEnumDecl(folder, defs, r, reg, ed, enumOut[i], at, diags, fns)
 	}
 
 	// Third pass: resolve each type's and enum's declared interface impls and,
@@ -158,41 +158,31 @@ func resolveTypes(env eval.Env, file *ast.File, at func(ast.Node) span, diags *d
 	// (E-followups §E-7). The fold reads the just-built defs directly rather
 	// than the universe query, which is this very computation and would
 	// cycle-guard to nothing.
-	foldAssocConsts(env, defs, qualified, append(append([]*ir.TypeDef{}, out...), enumOut...))
+	foldAssocConsts(folder, defs, append(append([]*ir.TypeDef{}, out...), enumOut...))
 
 	out = append(out, enumOut...)
 	return append(out, ifaceOut...)
 }
 
-// assocFoldEnv is the post-resolution evaluation environment the associated
-// constants fold in: name resolution, referenced values, and the registry come
-// from the driving env, while the type channels (LookupType and the
-// ReceiverTyper annotations) read the file's just-resolved definitions — the
-// defs map resolveTypes built — so the fold sees every type and enum of the
-// file where the in-flight universe query could not supply them.
-type assocFoldEnv struct {
-	eval.Env
-	defs      map[string]*ir.TypeDef
-	qualified func(namespace, name string) *ir.TypeDef
+// assocGraphEnv is the post-resolution fold environment the associated
+// constants (and enum member initializers) interpret in: referenced values and
+// the registry come from the queries, while the type-name channel reads the
+// file's just-resolved definitions — the defs map resolveTypes built — so the
+// fold sees every type and enum of the file where the in-flight universe query
+// could not supply them.
+type assocGraphEnv struct {
+	q    queries
+	defs map[string]*ir.TypeDef
 }
 
-func (e assocFoldEnv) LookupType(name string) *ir.TypeDef { return e.defs[name] }
-
-func (e assocFoldEnv) TypeExprDef(t ast.TypeExpr) *ir.TypeDef {
-	if t == nil {
+func (e assocGraphEnv) ConstValue(c *ir.Const) *ir.Constant {
+	if c.Syntax == nil {
 		return nil
 	}
-	r := &infer.TypeResolver{Defs: e.defs, Qualified: e.qualified}
-	return nominalDefOf(r.ResolveType(t, nil))
+	return e.q.valueOf(c.Syntax)
 }
-
-func (e assocFoldEnv) TypeExprType(t ast.TypeExpr) ir.Type {
-	if t == nil {
-		return nil
-	}
-	r := &infer.TypeResolver{Defs: e.defs, Qualified: e.qualified}
-	return r.ResolveType(t, nil)
-}
+func (e assocGraphEnv) LookupType(name string) *ir.TypeDef { return e.defs[name] }
+func (e assocGraphEnv) Registry() *builtin.Registry        { return e.q.registry() }
 
 // foldAssocConsts folds every owner's ordinary associated constants (the
 // `= builtin` ones were supplied from the registry during resolution) and
@@ -201,13 +191,13 @@ func (e assocFoldEnv) TypeExprType(t ast.TypeExpr) ir.Type {
 // folds what the previous rounds settled, stopping when a round makes no
 // progress — so declaration order never decides foldability; a genuine cycle
 // or an unresolvable reference stays unfolded, for the reference diagnostics
-// and the totality gate to report. A nil env (a resolution with no evaluator)
-// folds nothing, exactly as before.
-func foldAssocConsts(env eval.Env, defs map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, owners []*ir.TypeDef) {
-	if env == nil {
+// and the totality gate to report. A folder with no queries (a resolution
+// with no evaluator) folds nothing, exactly as before.
+func foldAssocConsts(folder exprFolder, defs map[string]*ir.TypeDef, owners []*ir.TypeDef) {
+	if folder.q == nil {
 		return
 	}
-	fenv := assocFoldEnv{Env: env, defs: defs, qualified: qualified}
+	fenv := assocGraphEnv{q: folder.q, defs: defs}
 	for progress := true; progress; {
 		progress = false
 		for _, def := range owners {
@@ -223,7 +213,9 @@ func foldAssocConsts(env eval.Env, defs map[string]*ir.TypeDef, qualified func(n
 				if ac.Syntax.Type != nil && ac.Type != nil && ir.HasInvalid(ac.Type) {
 					continue
 				}
-				v := eval.DeclExpecting(ac.Syntax, ac.Type, fenv)
+				binder := folder.binder(enumDefOf(ac.Type))
+				binder.universe = defs
+				v := eval.GraphExpecting(lower.Value(ac.Syntax.Value, binder), ac.Type, fenv)
 				if v == nil {
 					continue
 				}
@@ -712,7 +704,7 @@ func bodyDef(reg *builtin.Registry, t ir.Type) *ir.TypeDef {
 // associated constants, the refinement predicate, and the method signatures.
 // env folds the associated-constant initializers (it is nil in callers that do
 // not evaluate).
-func resolveDecl(env eval.Env, r *infer.TypeResolver, reg *builtin.Registry, td *ast.TypeDecl, def *ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List, fns bodyFuncs) {
+func resolveDecl(r *infer.TypeResolver, reg *builtin.Registry, td *ast.TypeDecl, def *ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List, res *callResolutions, fns bodyFuncs) {
 	scope := make(infer.TypeScope, len(td.Params))
 	for _, p := range td.Params {
 		scope[p.Name] = nil
@@ -740,7 +732,7 @@ func resolveDecl(env eval.Env, r *infer.TypeResolver, reg *builtin.Registry, td 
 	}
 	// The associated constants are resolved before the where-clause, so a
 	// self-referential predicate (`where self <= Percent.Max`) can read them.
-	resolveAssocConsts(env, r, reg, td, def, scope, at, diags)
+	resolveAssocConsts(r, reg, td, def, scope, at, diags)
 	// Same-name methods are overloads — legal as long as their parameter
 	// types differ. A signature that repeats an earlier one (the same name
 	// and the same parameter-type list) is a true redeclaration: the first
@@ -766,7 +758,7 @@ func resolveDecl(env eval.Env, r *infer.TypeResolver, reg *builtin.Registry, td 
 	// The where-clause is resolved last, after the methods, so a predicate that
 	// calls a method of the type (`where self.isValid()`) can resolve it — self
 	// is the nominal type, and its impl methods are now on the definition.
-	resolveWhere(r, reg, td, def, at, diags)
+	resolveWhere(r, reg, td, def, at, diags, res)
 }
 
 // resolveAssocConsts resolves a type's associated constants — the impl block's
@@ -778,13 +770,13 @@ func resolveDecl(env eval.Env, r *infer.TypeResolver, reg *builtin.Registry, td 
 // with no bound on that side (the arbitrary-precision nint). A duplicate name
 // keeps the first and is reported. tscope holds the type's generic-parameter
 // names, so an annotation may mention them.
-func resolveAssocConsts(env eval.Env, r *infer.TypeResolver, reg *builtin.Registry, td *ast.TypeDecl, def *ir.TypeDef, tscope infer.TypeScope, at func(ast.Node) span, diags *diagnostic.List) {
-	def.Consts = resolveAssocConstList(env, r, reg, def, td.Consts, tscope, at, diags)
+func resolveAssocConsts(r *infer.TypeResolver, reg *builtin.Registry, td *ast.TypeDecl, def *ir.TypeDef, tscope infer.TypeScope, at func(ast.Node) span, diags *diagnostic.List) {
+	def.Consts = resolveAssocConstList(r, reg, def, td.Consts, tscope, at, diags)
 }
 
 // resolveAssocConstList is the shared resolution of a list of associated
 // constants — used for both a type declaration's and an enum's impl block.
-func resolveAssocConstList(env eval.Env, r *infer.TypeResolver, reg *builtin.Registry, def *ir.TypeDef, decls []*ast.ConstDecl, tscope infer.TypeScope, at func(ast.Node) span, diags *diagnostic.List) []*ir.AssocConst {
+func resolveAssocConstList(r *infer.TypeResolver, reg *builtin.Registry, def *ir.TypeDef, decls []*ast.ConstDecl, tscope infer.TypeScope, at func(ast.Node) span, diags *diagnostic.List) []*ir.AssocConst {
 	if len(decls) == 0 {
 		return nil
 	}
@@ -913,7 +905,7 @@ func constantType(v *ir.Constant) ir.Type {
 // reported through diags (nil in the silent memoized pass). env folds the
 // member initializers (a constant expression may reference a top-level const);
 // it is nil in callers that do not evaluate.
-func resolveEnumDecl(env eval.Env, r *infer.TypeResolver, reg *builtin.Registry, ed *ast.EnumDecl, def *ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List, fns bodyFuncs) {
+func resolveEnumDecl(folder exprFolder, defs map[string]*ir.TypeDef, r *infer.TypeResolver, reg *builtin.Registry, ed *ast.EnumDecl, def *ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List, fns bodyFuncs) {
 	// The base type: the annotation when present, else the default nint. It must
 	// resolve to an integer-family or string primitive — anything else (bool, a
 	// user type, a composite) is rejected, and the enum falls back to nint so the
@@ -958,7 +950,7 @@ func resolveEnumDecl(env eval.Env, r *infer.TypeResolver, reg *builtin.Registry,
 			memberSeen[m.Name] = true
 		}
 
-		value, nextInt := enumMemberValue(env, m, isString, baseType, prevInt)
+		value, nextInt := enumMemberValue(folder, defs, m, isString, baseType, prevInt)
 		prevInt = nextInt
 		def.Enum.Members[i].Value = value
 
@@ -988,7 +980,7 @@ func resolveEnumDecl(env eval.Env, r *infer.TypeResolver, reg *builtin.Registry,
 
 	// The impl block's associated constants (read as EnumName.Name), the same
 	// mechanism a type declaration's impl carries.
-	def.Consts = resolveAssocConstList(env, r, reg, def, ed.Consts, nil, at, diags)
+	def.Consts = resolveAssocConstList(r, reg, def, ed.Consts, nil, at, diags)
 
 	// The operator methods: the six comparisons every enum carries, then the
 	// impl block's own methods (which may shadow a comparison or add new ones).
@@ -1040,10 +1032,12 @@ func reportDuplicateMethod(rm *ir.Method, def *ir.TypeDef, m *ast.MethodDecl, at
 // base. nextInt is the counter the following member continues from — the folded
 // value when it is an integer, else prev+1 so auto-numbering survives an
 // unevaluable explicit value.
-func enumMemberValue(env eval.Env, m *ast.EnumMember, isString bool, baseType ir.Type, prevInt *big.Int) (value *ir.Constant, nextInt *big.Int) {
+func enumMemberValue(folder exprFolder, defs map[string]*ir.TypeDef, m *ast.EnumMember, isString bool, baseType ir.Type, prevInt *big.Int) (value *ir.Constant, nextInt *big.Int) {
 	if m.Value != nil {
-		if env != nil {
-			value = eval.ExprExpecting(m.Value, baseType, env)
+		if folder.q != nil {
+			binder := folder.binder(nil)
+			binder.universe = defs
+			value = eval.GraphExpecting(lower.Value(m.Value, binder), baseType, assocGraphEnv{q: folder.q, defs: defs})
 		}
 		if value != nil && value.Kind == ir.ConstInt {
 			return value, new(big.Int).Add(value.Int, big.NewInt(1))
@@ -1341,7 +1335,7 @@ func isSelfResult(t ir.Type) bool {
 // module, the first winning, exactly as a duplicate method overload is. The
 // shells are filled in place; FuncCall values across the program point at
 // them, exactly as References point at the constant shells.
-func resolveFuncs(file *ast.File, at func(ast.Node) span, diags *diagnostic.List, reg *builtin.Registry, universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, qualifiedFuncs func(namespace, name string) []*ast.FuncDecl, shells map[*ast.FuncDecl]*ir.Function) []*ir.Function {
+func resolveFuncs(file *ast.File, at func(ast.Node) span, diags *diagnostic.List, reg *builtin.Registry, universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, fns bodyFuncs) []*ir.Function {
 	if len(file.Funcs) == 0 {
 		return nil
 	}
@@ -1352,7 +1346,7 @@ func resolveFuncs(file *ast.File, at func(ast.Node) span, diags *diagnostic.List
 		Registry:       reg,
 		BoundViolation: boundViolationReporter(at, diags),
 	}
-	fns := bodyFuncs{local: funcShellsByName(file, shells), qualified: qualifiedFuncs, shells: shells}
+	shells := fns.shells
 	out := make([]*ir.Function, 0, len(file.Funcs))
 	seen := make(map[string]bool, len(file.Funcs))
 	for _, fd := range file.Funcs {

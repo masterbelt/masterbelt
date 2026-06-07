@@ -11,7 +11,7 @@ Module
       param init: A
       param step: fn(A, nint, T): A
       result A
-      return ParamRef "init"
+      return (ParamRef "init" : A)
   TypeDef "foldable" pub
     doc "A behaviour over a keyed collection: implement the required fold and the"
     doc "provided methods (count, map, filter, ...) come for free, defined on top of"
@@ -29,14 +29,14 @@ Module
     method "count" pub
       doc "Provided: the number of elements, folded from the primitive."
       result nint
-      return self.fold(IntLiteral "0", (fn(acc, key, value) (return ParamRef "acc".add(IntLiteral "1"))))
+      return ((self : foldable).fold((IntLiteral "0" : nint), ((fn(acc, key, value) (return ((ParamRef "acc" : nint).add((IntLiteral "1" : nint)) : nint))) : fn(nint, K, V): nint)) : nint) [subst A=nint]
     method "any" pub
       doc "Provided: whether any element satisfies the predicate."
       param pred: fn(V): bool
       result bool
-      return self.fold(BoolLiteral false, (fn(acc, key, value) (return ParamRef "acc".oror(<none>))))
+      return ((self : foldable).fold((BoolLiteral false : bool), ((fn(acc, key, value) (return ((ParamRef "acc" : bool).oror(((ParamRef "pred" : fn(V): bool)((ParamRef "value" : V)) : bool)) : bool))) : fn(bool, K, V): bool)) : bool) [subst A=bool]
   Func "total" pub
     doc "The total of a collection of ints, folded with addition."
     param c: foldable<nint, nint>
     result nint
-      return ParamRef "c".fold(IntLiteral "0", (fn(acc, key, value) (return ParamRef "acc".add(ParamRef "value"))))
+      return ((ParamRef "c" : foldable<nint, nint>).fold((IntLiteral "0" : nint), ((fn(acc, key, value) (return ((ParamRef "acc" : nint).add((ParamRef "value" : nint)) : nint))) : fn(nint, nint, nint): nint)) : nint) [subst A=nint, K=nint, V=nint]

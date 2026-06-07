@@ -46,6 +46,15 @@ func (s funcScope) withLocal(name string, typ ir.Type) funcScope {
 
 func (s funcScope) registry() *builtin.Registry { return s.outer.registry() }
 
+// self inherits the enclosing context's receiver: a function literal in a
+// method body keeps self, exactly as the lowering's funcBinder delegates its
+// leaves outward.
+func (s funcScope) self() ir.Type { return s.outer.self() }
+
+// rigid inherits the enclosing context's type-parameter scope: a literal in a
+// generic body sees the same rigid variables its body does.
+func (s funcScope) rigid(name string) bool { return s.outer.rigid(name) }
+
 func (s funcScope) universe() map[string]*ir.TypeDef { return s.outer.universe() }
 
 func (s funcScope) qualified() func(namespace, name string) *ir.TypeDef { return s.outer.qualified() }
@@ -98,13 +107,19 @@ func (s funcScope) fnMember(m *ast.MemberExpr) []*ast.FuncDecl {
 }
 
 // constScope types a constant initializer: the context-specific forms are a
-// value reference, whose type is its referent's, and a conversion, whose type
-// is the type it names. A field access reads a record-typed constant's field
-// (Hero.lv); self and the null literal are not meaningful in a constant, so they
-// are ir.Invalid.
+// value reference, whose type is its referent's, a conversion, whose type
+// is the type it names, and the null literal. A field access reads a
+// record-typed constant's field (Hero.lv); self is not meaningful in a
+// constant, so it is ir.Invalid.
 type constScope struct{ env Env }
 
 func (s constScope) registry() *builtin.Registry { return s.env.Registry() }
+
+// self: a constant initializer has no receiver.
+func (s constScope) self() ir.Type { return ir.Invalid }
+
+// rigid: a constant initializer has no generic type parameters in scope.
+func (s constScope) rigid(string) bool { return false }
 
 func (s constScope) universe() map[string]*ir.TypeDef { return s.env.Universe() }
 
@@ -112,6 +127,8 @@ func (s constScope) qualified() func(namespace, name string) *ir.TypeDef { retur
 
 func (s constScope) leaf(e ast.Expr) ir.Type {
 	switch e := e.(type) {
+	case *ast.NullLit:
+		return &ir.Builtin{Name: "null"}
 	case *ast.Identifier:
 		if target := s.env.Resolve(e); target != nil {
 			return s.env.TypeOf(target)
@@ -199,6 +216,23 @@ type BodyScope struct {
 func Body(e ast.Expr, s BodyScope) ir.Type { return exprType(e, s) }
 
 func (s BodyScope) registry() *builtin.Registry { return s.Reg }
+
+// self is the receiver type — ir.Invalid in a function or static-fn body,
+// which the implicit self-call claim then skips.
+func (s BodyScope) self() ir.Type {
+	if s.Self == nil {
+		return ir.Invalid
+	}
+	return s.Self
+}
+
+// rigid reports whether name is a generic type parameter of the enclosing
+// declaration (TScope) — the enclosing type's or function's own parameters, a
+// known type within the body rather than an inference hole.
+func (s BodyScope) rigid(name string) bool {
+	_, ok := s.TScope[name]
+	return ok
+}
 
 func (s BodyScope) universe() map[string]*ir.TypeDef { return s.Universe }
 

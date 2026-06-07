@@ -1,49 +1,49 @@
 Module
   Const "ServerPort"
     type Port
-    value IntLiteral "8080"
+    value (adapt (IntLiteral "8080" : nint) : Port)
     eval 8080
   Const "MinPort"
     type Port
-    value IntLiteral "1"
+    value (adapt (IntLiteral "1" : nint) : Port)
     eval 1
   Const "MaxPort"
     type Port
-    value IntLiteral "65535"
+    value (adapt (IntLiteral "65535" : nint) : Port)
     eval 65535
   Const "FullLevel"
     type Level
-    value IntLiteral "100"
+    value (adapt (IntLiteral "100" : nint) : Level)
     eval 100
   Const "ValidScore"
     type Score
-    value IntLiteral "75"
+    value (adapt (IntLiteral "75" : nint) : Score)
     eval 75
   Const "Unrefined"
     type nint
-    value IntLiteral "70000"
+    value (IntLiteral "70000" : nint)
     eval 70000
   TypeDef "Level" pub
     doc "A character level between 0 and 100."
     body sbyte
-    where self >= 0 && self <= 100
+    where (((self : Level).gteq((adapt (IntLiteral "0" : nint) : Level)) : bool).anan(((self : Level).lteq((adapt (IntLiteral "100" : nint) : Level)) : bool)) : bool)
   TypeDef "Port" pub
     doc "A TCP port number."
     body int
-    where self >= 1 && self <= 65535
+    where (((self : Port).gteq((adapt (IntLiteral "1" : nint) : Port)) : bool).anan(((self : Port).lteq((adapt (IntLiteral "65535" : nint) : Port)) : bool)) : bool)
   TypeDef "Percent" pub
     doc "A percentage from 0 to 100."
     body sbyte
-    where self >= 0 && self <= 100
+    where (((self : Percent).gteq((adapt (IntLiteral "0" : nint) : Percent)) : bool).anan(((self : Percent).lteq((adapt (IntLiteral "100" : nint) : Percent)) : bool)) : bool)
     method "increment" pub
       doc "The next percentage point."
       result self
-      return self.add(IntLiteral "1")
+      return ((self : Percent).add((adapt (IntLiteral "1" : nint) : Percent)) : Percent)
   TypeDef "Score" pub
     doc "A score that is valid only when it lies in the 0..100 band."
     body int
-    where self.inBand()
+    where ((self : Score).inBand() : bool)
     method "inBand" pub
       doc "Whether the score is within the valid band."
       result bool
-      return self.gteq(IntLiteral "0").anan(self.lteq(IntLiteral "100"))
+      return (((self : Score).gteq((adapt (IntLiteral "0" : nint) : Score)) : bool).anan(((self : Score).lteq((adapt (IntLiteral "100" : nint) : Score)) : bool)) : bool)

@@ -1,70 +1,70 @@
 Module
   Const "Sum"
     type nint
-    value total()
+    value (total() : nint)
     eval 55
   Const "PositionSum"
     type nint
-    value positionSum()
+    value (positionSum() : nint)
     eval 15
   Const "EmptySum"
     type nint
-    value emptySum()
+    value (emptySum() : nint)
     eval 100
   Const "Count"
     type nint
-    value range(IntLiteral "0", IntLiteral "10").count()
+    value (range((IntLiteral "0" : nint), (IntLiteral "10" : nint)).count() : nint) [subst K=nint, V=nint]
     eval 11
   Const "EmptyCount"
     type nint
-    value range(IntLiteral "5", IntLiteral "4").count()
+    value (range((IntLiteral "5" : nint), (IntLiteral "4" : nint)).count() : nint) [subst K=nint, V=nint]
     eval 0
   Const "AnyBig"
     type bool
-    value range(IntLiteral "0", IntLiteral "10").any((fn(v) (return ParamRef "v".gt(IntLiteral "8"))))
+    value (range((IntLiteral "0" : nint), (IntLiteral "10" : nint)).any(((fn(v) (return ((ParamRef "v" : nint).gt((IntLiteral "8" : nint)) : bool))) : fn(nint): bool)) : bool) [subst K=nint, V=nint]
     eval true
   Const "AllNonNeg"
     type bool
-    value range(IntLiteral "0", IntLiteral "10").all((fn(v) (return ParamRef "v".gteq(IntLiteral "0"))))
+    value (range((IntLiteral "0" : nint), (IntLiteral "10" : nint)).all(((fn(v) (return ((ParamRef "v" : nint).gteq((IntLiteral "0" : nint)) : bool))) : fn(nint): bool)) : bool) [subst K=nint, V=nint]
     eval true
   Const "Doubled"
     type list<nint>
-    value range(IntLiteral "0", IntLiteral "5").map((fn(v) (return ParamRef "v".mul(IntLiteral "2"))))
+    value (range((IntLiteral "0" : nint), (IntLiteral "5" : nint)).map(((fn(v) (return ((ParamRef "v" : nint).mul((IntLiteral "2" : nint)) : nint))) : fn(nint): nint)) : list<nint>) [subst K=nint, U=nint, V=nint]
     eval [0, 2, 4, 6, 8, 10]
   Const "Evens"
     type list<nint>
-    value range(IntLiteral "0", IntLiteral "10").filter((fn(v) (return ParamRef "v".rem(IntLiteral "2").eql(IntLiteral "0"))))
+    value (range((IntLiteral "0" : nint), (IntLiteral "10" : nint)).filter(((fn(v) (return (((ParamRef "v" : nint).rem((IntLiteral "2" : nint)) : nint).eql((IntLiteral "0" : nint)) : bool))) : fn(nint): bool)) : list<nint>) [subst K=nint, V=nint]
     eval [0, 2, 4, 6, 8, 10]
   Const "Values"
     type list<nint>
-    value range(IntLiteral "3", IntLiteral "7").values()
+    value (range((IntLiteral "3" : nint), (IntLiteral "7" : nint)).values() : list<nint>) [subst K=nint, V=nint]
     eval [3, 4, 5, 6, 7]
   Const "Keys"
     type list<nint>
-    value range(IntLiteral "3", IntLiteral "7").keys()
+    value (range((IntLiteral "3" : nint), (IntLiteral "7" : nint)).keys() : list<nint>) [subst K=nint, V=nint]
     eval [0, 1, 2, 3, 4]
   Const "Folded"
     type nint
-    value range(IntLiteral "0", IntLiteral "4").fold(IntLiteral "0", (fn(acc, k, v) (return ParamRef "acc".add(ParamRef "v"))))
+    value (range((IntLiteral "0" : nint), (IntLiteral "4" : nint)).fold((IntLiteral "0" : nint), ((fn(acc, k, v) (return ((ParamRef "acc" : nint).add((ParamRef "v" : nint)) : nint))) : fn(nint, nint, nint): nint)) : nint) [subst A=nint, K=nint, V=nint]
     eval 10
   Func "total" pub
     result nint
-      let "t": nint = IntLiteral "0"
-      for i of nint range(IntLiteral "0", IntLiteral "10")
-          assign "t" = LocalRef "t".add(LocalRef "i")
-      return LocalRef "t"
+      let "t": nint = (IntLiteral "0" : nint)
+      for i of nint range((IntLiteral "0" : nint), (IntLiteral "10" : nint))
+          assign "t" = ((LocalRef "t" : nint).add((LocalRef "i" : nint)) : nint)
+      return (LocalRef "t" : nint)
   Func "positionSum" pub
     result nint
-      let "t": nint = IntLiteral "0"
-      for i in nint range(IntLiteral "5", IntLiteral "10")
-          assign "t" = LocalRef "t".add(LocalRef "i")
-      return LocalRef "t"
+      let "t": nint = (IntLiteral "0" : nint)
+      for i in nint range((IntLiteral "5" : nint), (IntLiteral "10" : nint))
+          assign "t" = ((LocalRef "t" : nint).add((LocalRef "i" : nint)) : nint)
+      return (LocalRef "t" : nint)
   Func "emptySum" pub
     result nint
-      let "t": nint = IntLiteral "100"
-      for i of nint range(IntLiteral "10", IntLiteral "9")
-          assign "t" = LocalRef "t".add(LocalRef "i")
-      return LocalRef "t"
+      let "t": nint = (IntLiteral "100" : nint)
+      for i of nint range((IntLiteral "10" : nint), (IntLiteral "9" : nint))
+          assign "t" = ((LocalRef "t" : nint).add((LocalRef "i" : nint)) : nint)
+      return (LocalRef "t" : nint)
   Assert "total() == 55"
     eval true
       total() == 55

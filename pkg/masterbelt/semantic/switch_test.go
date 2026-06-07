@@ -115,7 +115,7 @@ func TestSwitchBareMemberResolves(t *testing.T) {
 		t.Fatalf("unexpected diagnostics: %v", codes(diags))
 	}
 	dump := ir.Dump(m)
-	if !strings.Contains(dump, "arm Rarity.Common") {
+	if !strings.Contains(dump, "arm (Rarity.Common : Rarity)") {
 		t.Errorf("bare member Common should resolve to Rarity.Common in the IR:\n%s", dump)
 	}
 }
@@ -247,7 +247,7 @@ func TestSwitchBareMemberResolvesLetBound(t *testing.T) {
 		t.Fatalf("unexpected diagnostics: %v", codes(diags))
 	}
 	dump := ir.Dump(m)
-	if !strings.Contains(dump, "arm Rarity.Common") {
+	if !strings.Contains(dump, "arm (Rarity.Common : Rarity)") {
 		t.Errorf("bare member Common over a let-bound enum should lower to Rarity.Common:\n%s", dump)
 	}
 }

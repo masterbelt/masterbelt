@@ -1,0 +1,13 @@
+// fold-expect: folds
+// Reassigning a local to an empty literal re-settles its mapness from the
+// local's declared type, so the rebuilt map still folds (regression pin:
+// the bare [] used to lose the expectation channel and unfold the const).
+pub fn rebuild(): map<string, nint> {
+  let m: map<string, nint> = ["a": 1]
+  m = []
+  m = m.set("b", 2)
+  return m
+}
+const B = rebuild()
+const Got: nint | error = B["b"]
+assert B.len() == 1

@@ -1,41 +1,41 @@
 Module
   Const "Present"
     type optional<nint>
-    value IntLiteral "5"
+    value (adapt (IntLiteral "5" : nint) : optional<nint>)
     eval (nint) 5
   Const "Absent"
     type optional<nint>
-    value <none>
+    value (adapt (null : null) : optional<nint>)
     eval (null) null
   Const "FromPresent"
     type nint
-    value orZero(IntLiteral "5")
+    value (orZero((adapt (IntLiteral "5" : nint) : optional<nint>)) : nint)
     eval 5
   Const "FromAbsent"
     type nint
-    value orZero(<none>)
+    value (orZero((adapt (null : null) : optional<nint>)) : nint)
     eval 0
   Const "WithFallback"
     type nint
-    value orFallback(<none>, IntLiteral "99")
+    value (orFallback((adapt (null : null) : optional<nint>), (IntLiteral "99" : nint)) : nint)
     eval 99
   Func "orZero" pub
     param v: optional<nint>
     result nint
-      match ParamRef "v"
+      match (ParamRef "v" : optional<nint>)
         arm nint n
-          return LocalRef "n"
+          return (LocalRef "n" : nint)
         arm null
-          return IntLiteral "0"
+          return (IntLiteral "0" : nint)
   Func "orFallback" pub
     param v: optional<nint>
     param fallback: nint
     result nint
-      match ParamRef "v"
+      match (ParamRef "v" : optional<nint>)
         arm nint n
-          return LocalRef "n"
+          return (LocalRef "n" : nint)
         else
-          return ParamRef "fallback"
+          return (ParamRef "fallback" : nint)
   Assert "orZero(5) == 5"
     eval true
       orZero(5) == 5

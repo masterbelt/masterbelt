@@ -11,6 +11,7 @@ package semantic
 import (
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/eval"
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/lower"
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
 )
@@ -37,7 +38,7 @@ import (
 // the check is deliberately that narrow (own-declaration error, HasInvalid
 // taint, unvalued dependency) so a genuine evaluator gap cannot hide behind a
 // broad exemption.
-func enforceEvalPublication(fileID FileID, file *ast.File, module *ir.Module, shells map[*ast.ConstDecl]*ir.Const, q queries, renv resolvedEnv, at func(ast.Node) span, diags *diagnostic.List) {
+func enforceEvalPublication(fileID FileID, file *ast.File, module *ir.Module, shells map[*ast.ConstDecl]*ir.Const, q queries, own map[*ast.ConstDecl]*ir.Const, genv graphFoldEnv, at func(ast.Node) span, diags *diagnostic.List) {
 	errOffsets := errorOffsets(diags)
 	within := func(s span) bool {
 		for _, off := range errOffsets {
@@ -57,7 +58,7 @@ func enforceEvalPublication(fileID FileID, file *ast.File, module *ir.Module, sh
 	// reported at the dependency" means exactly "the dependency's published
 	// value is absent".
 	published := func(target *ast.ConstDecl) bool {
-		if c, mine := renv.own[target]; mine {
+		if c, mine := own[target]; mine {
 			return c.Eval != nil
 		}
 		return q.valueOf(target) != nil
@@ -128,7 +129,7 @@ func enforceEvalPublication(fileID FileID, file *ast.File, module *ir.Module, sh
 		if dependsOnUnvalued(fileID, decl.Value, q, published) {
 			continue // the cause carries its own diagnostic at the dependency
 		}
-		reason := eval.DeclFailure(decl, annotationResolved(q, fileID, decl), renv)
+		reason := eval.GraphFailure(c.Value, c.Type, genv)
 		diags.Add(newUnfoldedConstDiagnostic(s.offset, s.width, decl.Name, reason))
 	}
 	for _, def := range module.Types {
@@ -146,7 +147,10 @@ func enforceEvalPublication(fileID FileID, file *ast.File, module *ir.Module, sh
 			if dependsOnUnvalued(fileID, ac.Syntax.Value, q, published) {
 				continue
 			}
-			reason := eval.DeclFailure(ac.Syntax, ac.Type, renv)
+			// An associated constant carries no value graph; its initializer
+			// lowers ad hoc for the classification fold.
+			folder := exprFolder{q: q, file: fileID}
+			reason := eval.GraphFailure(lower.Value(ac.Syntax.Value, folder.binder(enumDefOf(ac.Type))), ac.Type, genv)
 			diags.Add(newUnfoldedConstDiagnostic(s.offset, s.width, def.Name+"."+ac.Name, reason))
 		}
 	}

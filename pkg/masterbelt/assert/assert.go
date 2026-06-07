@@ -10,9 +10,10 @@
 // The condition line and the anchor columns come from ast.RenderTrace, which
 // inverts the operator desugaring while recording where each sub-expression's
 // value reads best (an operator form at its operator, a reference at its
-// name). The values come from the same constant folding the assertion was
-// checked with, read through an eval.Env so the semantic engine's memoization
-// and dependency tracking apply here too.
+// name). The values come from the caller's fold of each anchored
+// sub-expression — the semantic layer folds the condition's resolved value
+// graph node by node, so the diagram shows the very values the assertion (or
+// the refinement check) was decided with.
 package assert
 
 import (
@@ -20,32 +21,23 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/eval"
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
 )
 
 // Diagram renders the power-assert diagram for cond: the rendered condition
-// followed by a caret row pointing at the anchors and the value rows. A
-// sub-expression that does not fold (or folds to a function value) contributes
-// no row; with no foldable sub-expressions at all the diagram is just the
-// condition line.
-func Diagram(cond ast.Expr, env eval.Env) string {
-	return DiagramSelf(cond, nil, nil, env)
-}
-
-// DiagramSelf is Diagram with the self keyword bound to self — the refinement
-// form, where a violated predicate's sub-expressions fold against the
-// constant's value and the diagram shows which comparison failed. selfDef is the
-// refined type's definition, so a self-method sub-expression (where
-// self.isValid()) folds its body the same way the predicate check does.
-func DiagramSelf(cond ast.Expr, self *ir.Constant, selfDef *ir.TypeDef, env eval.Env) string {
+// followed by a caret row pointing at the anchors and the value rows. foldAt
+// folds one anchored sub-expression to its constant value (nil when it does
+// not fold); a sub-expression that does not fold (or folds to a function
+// value) contributes no row, and with no foldable sub-expressions at all the
+// diagram is just the condition line.
+func Diagram(cond ast.Expr, foldAt func(ast.Expr) *ir.Constant) string {
 	text, anchors := ast.RenderTrace(cond)
 
 	markers := make([]marker, 0, len(anchors))
 	seen := map[int]bool{}
 	for _, a := range anchors {
-		v := eval.Predicate(a.Expr, self, selfDef, env)
+		v := foldAt(a.Expr)
 		if v == nil || v.Kind == ir.ConstFunc || seen[a.Col] {
 			continue
 		}

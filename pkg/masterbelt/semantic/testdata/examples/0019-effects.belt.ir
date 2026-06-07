@@ -1,7 +1,7 @@
 Module
   Const "A"
     type nint
-    value double(IntLiteral "21")
+    value (double((IntLiteral "21" : nint)) : nint)
     eval 42
   TypeDef "Clock" pub
     body { offset: duration }
@@ -9,7 +9,7 @@ Module
       doc "The current instant, shifted by this clock's offset."
       effects nondet
       result datetime
-      return datetime.now().add(self.offset)
+      return datetime.now().add(((self : Clock).offset : duration))
   Func "stamp" pub
     effects nondet
     result datetime
@@ -17,7 +17,7 @@ Module
   Func "double" pub
     param x: nint
     result nint
-      return ParamRef "x".mul(IntLiteral "2")
+      return ((ParamRef "x" : nint).mul((IntLiteral "2" : nint)) : nint)
   Assert "double(2) == 4"
     eval true
       double(2) == 4

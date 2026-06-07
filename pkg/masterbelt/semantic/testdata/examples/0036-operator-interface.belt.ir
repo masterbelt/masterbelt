@@ -1,19 +1,19 @@
 Module
   Const "Bigger"
     type nint
-    value max(IntLiteral "3", IntLiteral "7")
+    value (max((IntLiteral "3" : nint), (IntLiteral "7" : nint)) : nint) [subst T=nint]
     eval 7
   Const "Later"
     type string
-    value max(StringLiteral "a", StringLiteral "b")
+    value (max((StringLiteral "a" : string), (StringLiteral "b" : string)) : string) [subst T=string]
     eval "b"
   Const "Equal"
     type bool
-    value same(BoolLiteral true, BoolLiteral false)
+    value (same((BoolLiteral true : bool), (BoolLiteral false : bool)) : bool) [subst T=bool]
     eval false
   Const "Double"
     type nint
-    value twice(IntLiteral "21")
+    value (twice((IntLiteral "21" : nint)) : nint) [subst T=nint]
     eval 42
   Func "max" pub
     doc "The larger of two orderable values."
@@ -21,17 +21,17 @@ Module
     param a: T
     param b: T
     result T
-      return (ParamRef "a".gteq(ParamRef "b") ? ParamRef "a" : ParamRef "b")
+      return ((((ParamRef "a" : T).gteq((ParamRef "b" : T)) : bool) ? (ParamRef "a" : T) : (ParamRef "b" : T)) : T)
   Func "same" pub
     doc "Whether two comparable values are equal."
     typeparam "T": comparable
     param a: T
     param b: T
     result bool
-      return ParamRef "a".eql(ParamRef "b")
+      return ((ParamRef "a" : T).eql((ParamRef "b" : T)) : bool)
   Func "twice" pub
     doc "A numeric value added to itself."
     typeparam "T": numeric
     param a: T
     result T
-      return ParamRef "a".add(ParamRef "a")
+      return ((ParamRef "a" : T).add((ParamRef "a" : T)) : T)

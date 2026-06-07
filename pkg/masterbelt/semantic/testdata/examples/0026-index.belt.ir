@@ -1,45 +1,45 @@
 Module
   Const "Xs"
     type list<nint>
-    value [IntLiteral "10", IntLiteral "20", IntLiteral "30"]
+    value ([(IntLiteral "10" : nint), (IntLiteral "20" : nint), (IntLiteral "30" : nint)] : list<nint>)
     eval [10, 20, 30]
   Const "First"
     type nint | error
-    value Reference -> "Xs".get(IntLiteral "0")
+    value ((Reference -> "Xs" : list<nint>).get((IntLiteral "0" : nint)) : nint | error) [subst K=nint, T=nint, V=nint]
     eval (nint) 10
   Const "Third"
     type nint | error
-    value Reference -> "Xs".get(IntLiteral "2")
+    value ((Reference -> "Xs" : list<nint>).get((IntLiteral "2" : nint)) : nint | error) [subst K=nint, T=nint, V=nint]
     eval (nint) 30
   Const "Tbl"
     type map<string, nint>
-    value [StringLiteral "sword": IntLiteral "100", StringLiteral "shield": IntLiteral "50"]
+    value ([(StringLiteral "sword" : string): (IntLiteral "100" : nint), (StringLiteral "shield" : string): (IntLiteral "50" : nint)] : map<string, nint>)
     eval ["sword": 100, "shield": 50]
   Const "Sword"
     type nint | error
-    value Reference -> "Tbl".get(StringLiteral "sword")
+    value ((Reference -> "Tbl" : map<string, nint>).get((StringLiteral "sword" : string)) : nint | error) [subst K=string, V=nint]
     eval (nint) 100
   Const "Bumped"
     type list<nint>
-    value bumpFirst()
+    value (bumpFirst() : list<nint>)
     eval [99, 2, 3]
   Const "Put"
     type map<string, nint>
-    value put()
+    value (put() : map<string, nint>)
     eval ["a": 10, "b": 2]
   Func "at" pub
     param xs: list<nint>
     param i: nint
     result nint | error
-      return ParamRef "xs".get(ParamRef "i")
+      return ((ParamRef "xs" : list<nint>).get((ParamRef "i" : nint)) : nint | error) [subst K=nint, T=nint, V=nint]
   Func "bumpFirst" pub
     result list<nint>
-      let "xs": list<nint> = [IntLiteral "1", IntLiteral "2", IntLiteral "3"]
-      assign "xs" = LocalRef "xs".set(IntLiteral "0", IntLiteral "99")
-      return LocalRef "xs"
+      let "xs": list<nint> = ([(IntLiteral "1" : nint), (IntLiteral "2" : nint), (IntLiteral "3" : nint)] : list<nint>)
+      assign "xs" = ((LocalRef "xs" : list<nint>).set((IntLiteral "0" : nint), (IntLiteral "99" : nint)) : list<nint>) [subst K=nint, T=nint, V=nint]
+      return (LocalRef "xs" : list<nint>)
   Func "put" pub
     result map<string, nint>
-      let "m": map<string, nint> = [StringLiteral "a": IntLiteral "1"]
-      assign "m" = LocalRef "m".set(StringLiteral "a", IntLiteral "10")
-      assign "m" = LocalRef "m".set(StringLiteral "b", IntLiteral "2")
-      return LocalRef "m"
+      let "m": map<string, nint> = ([(StringLiteral "a" : string): (IntLiteral "1" : nint)] : map<string, nint>)
+      assign "m" = ((LocalRef "m" : map<string, nint>).set((StringLiteral "a" : string), (IntLiteral "10" : nint)) : map<string, nint>) [subst K=string, V=nint]
+      assign "m" = ((LocalRef "m" : map<string, nint>).set((StringLiteral "b" : string), (IntLiteral "2" : nint)) : map<string, nint>) [subst K=string, V=nint]
+      return (LocalRef "m" : map<string, nint>)

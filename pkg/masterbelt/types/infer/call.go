@@ -62,6 +62,17 @@ func callType(e *ast.CallExpr, s scope, sink *Sink) ir.Type {
 			}
 			return fn.Result
 		}
+		// A bare call whose name is a method of self is an implicit self-call
+		// (self omitted) — the form an interface's provided method uses to
+		// call the required fold. It types exactly as the written self.name(...)
+		// would, the same claim order the lowering's body binder uses.
+		if id, isIdent := e.Callee.(*ast.Identifier); isIdent {
+			if selfT := s.self(); selfT != ir.Invalid {
+				if _, _, found := types.Candidates(s.registry(), selfT, id.Name); found {
+					return methodCallType(e, nil, selfT, id.Name, s, sink)
+				}
+			}
+		}
 		return s.leaf(e)
 	}
 	// A member-access callee whose receiver names a namespace is a call of an
@@ -76,12 +87,20 @@ func callType(e *ast.CallExpr, s scope, sink *Sink) ir.Type {
 	if t, ok := staticCallType(e, member, s, sink); ok {
 		return t
 	}
+	return methodCallType(e, member.Receiver, check(member.Receiver, s, sink), member.Member.Name, s, sink)
+}
+
+// methodCallType is the method-call half of callType: the receiver's type is
+// already settled (synthesized from the member callee's receiver, or self for
+// an implicit self-call — recvExpr is the receiver expression, or nil for the
+// implicit form), and the call resolves the named method's overload set
+// against the argument types bidirectionally.
+func methodCallType(e *ast.CallExpr, recvExpr ast.Expr, recv ir.Type, method string, s scope, sink *Sink) ir.Type {
 	reg := s.registry()
-	recv := check(member.Receiver, s, sink)
 	bad := recv == ir.Invalid
 	args := make([]ir.Type, len(e.Arguments))
 
-	candidates, _, found := types.Candidates(reg, recv, member.Member.Name)
+	candidates, _, found := types.Candidates(reg, recv, method)
 	if !found {
 		// No such method: synthesize the arguments for their own diagnostics,
 		// then report the call.
@@ -96,9 +115,9 @@ func callType(e *ast.CallExpr, s scope, sink *Sink) ir.Type {
 			// interface's methods, so an unknown method on it is an ordinary
 			// invalid_operation.
 			if v, ok := recv.(*ir.TypeVar); ok && v.Bound == nil {
-				sink.noMethodOnUnboundedTypeVar(e, member.Member.Name)
+				sink.noMethodOnUnboundedTypeVar(e, method)
 			} else {
-				sink.invalidOp(e, member.Member.Name, typesList(recv, args))
+				sink.invalidOp(e, method, typesList(recv, args))
 			}
 		}
 		return ir.Invalid
@@ -117,13 +136,26 @@ func callType(e *ast.CallExpr, s scope, sink *Sink) ir.Type {
 		}
 		args[i] = check(a, s, sink)
 		if args[i] == ir.Invalid {
+			// A bare member of the receiver's enum (rarity == Legend, desugared
+			// to rarity.eql(Legend)) is that enum's value — the same channel the
+			// lowering's argument binder resolves it through, tried after
+			// ordinary resolution so a same-named binding still shadows the
+			// member. Streamed out so the typed value graph carries it.
+			if id, ok := a.(*ast.Identifier); ok {
+				if mt := enumMemberExpectation(recv, id.Name); mt != nil {
+					args[i] = mt
+					known[i] = mt
+					sink.typed(a, mt)
+					continue
+				}
+			}
 			bad = true
 			continue
 		}
 		known[i] = args[i]
 	}
 
-	matches, _ := types.SelectOverload(reg, recv, member.Member.Name, known)
+	matches, _ := types.SelectOverload(reg, recv, method, known)
 	if len(matches) != 1 {
 		// No fitting signature, or several: check the literals bare for their
 		// own diagnostics, then report the call — unless an operand already
@@ -136,11 +168,11 @@ func callType(e *ast.CallExpr, s scope, sink *Sink) ir.Type {
 		if !bad {
 			switch {
 			case len(matches) > 1:
-				sink.ambiguousOverload(e, member.Member.Name, typesList(recv, args))
+				sink.ambiguousOverload(e, method, typesList(recv, args))
 			case len(candidates) > 1:
-				sink.noMatchingOverload(e, member.Member.Name, typesList(recv, args))
+				sink.noMatchingOverload(e, method, typesList(recv, args))
 			default:
-				sink.invalidOp(e, member.Member.Name, typesList(recv, args))
+				sink.invalidOp(e, method, typesList(recv, args))
 			}
 		}
 		return ir.Invalid
@@ -174,15 +206,58 @@ func callType(e *ast.CallExpr, s scope, sink *Sink) ir.Type {
 		return ir.Invalid
 	}
 	if _, isSelf := m.Result.(*ir.SelfType); isSelf {
+		// The settled type-variable solution — the receiver's bindings plus what
+		// the argument matching solved — streamed out for the IR write-back
+		// (ir.Call.Subst), on each path that types the call successfully. A call
+		// that pinned nothing records nothing.
+		if len(subst) > 0 {
+			sink.callSubst(e, subst)
+		}
+		adaptedOperands(e, recvExpr, recv, m, subst, operand, args, sink)
 		return operand
 	}
 	result := types.Substitute(m.Result, subst)
-	if hasTypeVar(result) {
-		// A variable no argument could solve survived to the result.
-		sink.invalidOp(e, member.Member.Name, typesList(recv, args))
+	if hasTypeVar(result) && !varsRigid(result, s) {
+		// A variable no argument could solve survived to the result. (A rigid
+		// variable — the enclosing declaration's own parameter — is a known
+		// type within the body, not an unsolved hole.)
+		sink.invalidOp(e, method, typesList(recv, args))
 		return ir.Invalid
 	}
+	if len(subst) > 0 {
+		sink.callSubst(e, subst)
+	}
+	adaptedOperands(e, recvExpr, recv, m, subst, operand, args, sink)
 	return result
+}
+
+// adaptedOperands streams the adaptions a settled method call accepted on its
+// operands: each pass-1 argument whose type differs from its (substituted)
+// parameter type, a self-typed argument or the receiver differing from the
+// unified operand (the default integer adapting to the sized receiver, and
+// vice versa). The pass-2 literal arguments streamed through their own
+// checking walk, so only the synthesized ones are read here. A parameter that
+// still carries an unsolved variable adapts at its monomorphized site, not
+// here.
+func adaptedOperands(e *ast.CallExpr, recvExpr ast.Expr, recv ir.Type, m *ir.Method, subst map[string]ir.Type, operand ir.Type, args []ir.Type, sink *Sink) {
+	for i, a := range e.Arguments {
+		if _, isLit := a.(*ast.FuncLit); isLit || i >= len(m.Params) {
+			continue
+		}
+		if args[i] == nil || args[i] == ir.Invalid {
+			continue
+		}
+		pt := types.Substitute(m.Params[i].Type, subst)
+		if _, isSelf := pt.(*ir.SelfType); isSelf {
+			pt = operand
+		}
+		if !hasTypeVar(pt) && !types.Identical(args[i], pt) {
+			sink.adapted(a, pt)
+		}
+	}
+	if recvExpr != nil && !types.Identical(recv, operand) {
+		sink.adapted(recvExpr, operand)
+	}
 }
 
 // convCallType is the type rule for a conversion or constructor T(x): the
@@ -528,6 +603,19 @@ func selectFuncOverload(e *ast.CallExpr, name string, sigs []funcSig, s scope, s
 	if bad {
 		return ir.Invalid
 	}
+	// The pass-1 arguments were synthesized bare and accepted by Match; one
+	// whose type differs from its settled parameter type adapted implicitly —
+	// streamed for the IR's explicit Adapt, exactly as a method call's
+	// operands are. (The deferred arguments streamed through their own
+	// checking walk.)
+	for i, kt := range known {
+		if kt == nil {
+			continue
+		}
+		if pt := types.Substitute(win.params[i], subst); !hasTypeVar(pt) && !types.Identical(kt, pt) {
+			sink.adapted(e.Arguments[i], pt)
+		}
+	}
 	// Substitute the solved type parameters into the result and run the bound and
 	// uninferable checks, exactly as the single-signature path does.
 	return resolveFuncResult(e, win, subst, s, sink)
@@ -584,6 +672,12 @@ func resolveFuncResult(e *ast.CallExpr, sg funcSig, subst map[string]ir.Type, s 
 	}
 	if !ok {
 		return ir.Invalid
+	}
+	// The solved substitution, streamed out for the IR write-back
+	// (ir.FuncCall.Subst / ir.StaticCall.Subst) — every parameter checked
+	// solved above, so the solution is complete.
+	if len(subst) > 0 {
+		sink.callSubst(e, subst)
 	}
 	return types.Substitute(sg.result, subst)
 }

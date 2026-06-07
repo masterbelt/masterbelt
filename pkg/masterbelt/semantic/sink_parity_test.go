@@ -24,12 +24,25 @@ func TestLambdaArgTernaryConditionNotBool(t *testing.T) {
 }
 
 // TestLambdaArgTernaryBranchMismatch checks two non-unifying ternary branches
-// inside a lambda passed to fold are reported as ternary_branch_mismatch (the
-// same as a top-level `const X = true ? 1 : "s"`).
+// inside a lambda passed to fold are reported. Under an expectation (the
+// solved lambda result drives both branches) the precise per-branch
+// type_mismatch is the diagnostic — the offending branch named, no pile-on
+// ternary_branch_mismatch — while the synthesis form (no expectation, pinned
+// below) keeps ternary_branch_mismatch.
 func TestLambdaArgTernaryBranchMismatch(t *testing.T) {
 	src := "const xs = [1, 2]\nconst X = xs.fold(0, fn(acc, k, v) -> true ? 1 : \"s\")\n"
+	if _, diags := analyze(src); !hasCodeSwitch(diags, CodeTypeMismatch) {
+		t.Fatalf("lambda-arg ternary branch mismatch: want type_mismatch at the branch, got %v", codes(diags))
+	}
+}
+
+// TestBareTernaryBranchMismatch pins the synthesis form: with no expectation
+// to drive the branches, two non-unifying branch types are the ternary's own
+// finding, ternary_branch_mismatch.
+func TestBareTernaryBranchMismatch(t *testing.T) {
+	src := "const X = true ? 1 : \"s\"\n"
 	if _, diags := analyze(src); !hasCodeSwitch(diags, CodeTernaryBranchMismatch) {
-		t.Fatalf("lambda-arg ternary branch mismatch: want ternary_branch_mismatch, got %v", codes(diags))
+		t.Fatalf("bare ternary branch mismatch: want ternary_branch_mismatch, got %v", codes(diags))
 	}
 }
 

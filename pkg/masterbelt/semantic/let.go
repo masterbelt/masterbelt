@@ -2,7 +2,6 @@ package semantic
 
 import (
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/eval"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/types"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/types/infer"
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
@@ -31,7 +30,7 @@ import (
 // assignment's type check — resolves through it. A nil diagnostic list (the
 // func-literal-types walk) still extends the scope and types the value through
 // the sink, but reports no let-specific diagnostics.
-func checkLet(s *ast.LetStmt, bs infer.BodyScope, env eval.Env, noSelf func(ast.Node), sink *infer.Sink, at func(ast.Node) span, diags *diagnostic.List) infer.BodyScope {
+func checkLet(s *ast.LetStmt, bs infer.BodyScope, env exprFolder, noSelf func(ast.Node), sink *infer.Sink, at func(ast.Node) span, diags *diagnostic.List) infer.BodyScope {
 	if s.Value != nil && noSelf != nil {
 		checkNoSelf(s.Value, noSelf)
 	}
@@ -75,7 +74,7 @@ func checkLet(s *ast.LetStmt, bs infer.BodyScope, env eval.Env, noSelf func(ast.
 // name has no binding, and a field or element access is immutable data. A nil
 // diagnostic list suppresses the assignment diagnostics but still types the
 // value through the sink.
-func checkAssign(s *ast.AssignStmt, bs infer.BodyScope, env eval.Env, noSelf func(ast.Node), sink *infer.Sink, at func(ast.Node) span, diags *diagnostic.List) {
+func checkAssign(s *ast.AssignStmt, bs infer.BodyScope, env exprFolder, noSelf func(ast.Node), sink *infer.Sink, at func(ast.Node) span, diags *diagnostic.List) {
 	if s.Value != nil && noSelf != nil {
 		checkNoSelf(s.Value, noSelf)
 	}
@@ -136,6 +135,16 @@ func checkAssign(s *ast.AssignStmt, bs infer.BodyScope, env eval.Env, noSelf fun
 	if s.Value == nil {
 		return
 	}
+	// An empty collection literal has no type of its own — synthesis would
+	// leave it Invalid and the rebinding unfoldable — so the local's fixed
+	// type reaches in, exactly as a let annotation reaches its initializer:
+	// the literal settles (and the typed graph records) the local's mapness,
+	// so a reassignment m = [] of a map local stays a map for the fold and
+	// the index-write check.
+	if lit, ok := s.Value.(*ast.CollectionLit); ok && len(lit.Entries) == 0 && want != ir.Invalid {
+		infer.CheckBody(s.Value, want, bs, sink)
+		return
+	}
 	// A bare member of the target's enum (r = Common, where r is a Rarity let)
 	// resolves through the local's static type; a name that is not a member is the
 	// unknown_enum_member the const path reports. A genuine member of the enum is a
@@ -144,13 +153,30 @@ func checkAssign(s *ast.AssignStmt, bs infer.BodyScope, env eval.Env, noSelf fun
 	if enumDef := enumDefOf(want); enumDef != nil {
 		reportBareEnumMember(s.Value, enumDef, bs, env, at, diags)
 		if id, ok := s.Value.(*ast.Identifier); ok && enumIndex(enumDef, id.Name) >= 0 {
-			return // a bare member assigns at the enum's type; no mismatch
+			// A bare member assigns at the enum's type; no mismatch. When the
+			// local's type is a union carrying the enum (an alias like
+			// optional<Rarity>), the member flows into it — an adaption the IR
+			// makes explicit.
+			if member := (&ir.Named{Def: enumDef}); sink != nil && sink.Adapted != nil && !types.Identical(member, want) {
+				sink.Adapted(s.Value, want)
+			}
+			return
 		}
 	}
 	got := infer.CheckBody(s.Value, ir.Invalid, bs, sink)
-	if want != ir.Invalid && got != ir.Invalid && !types.Assignable(bs.Reg, got, want) {
+	if want == ir.Invalid || got == ir.Invalid {
+		return
+	}
+	if !types.Assignable(bs.Reg, got, want) {
 		c := at(s.Value)
 		diags.Add(newAssignTypeMismatchDiagnostic(c.offset, c.width, id.Name, got.String(), want.String()))
+		return
+	}
+	// The reassignment was accepted at the local's fixed type; a differing
+	// value type is an implicit adaption (a width settle, a union inflow) the
+	// IR makes explicit, exactly as a checked position's is.
+	if sink != nil && sink.Adapted != nil && !types.Identical(got, want) {
+		sink.Adapted(s.Value, want)
 	}
 }
 
@@ -209,7 +235,7 @@ func checkSetterAssign(s *ast.AssignStmt, m *ast.MemberExpr, bs infer.BodyScope,
 // name that is a parameter, a let local, a top-level function, or a constant is a
 // legitimate reference (its own type rules apply), not a mistyped member. A nil
 // diagnostic list (the func-literal-types walk) reports nothing.
-func reportBareEnumMember(value ast.Expr, enumDef *ir.TypeDef, bs infer.BodyScope, env eval.Env, at func(ast.Node) span, diags *diagnostic.List) {
+func reportBareEnumMember(value ast.Expr, enumDef *ir.TypeDef, bs infer.BodyScope, env exprFolder, at func(ast.Node) span, diags *diagnostic.List) {
 	if diags == nil || enumDef == nil {
 		return
 	}
@@ -229,7 +255,7 @@ func reportBareEnumMember(value ast.Expr, enumDef *ir.TypeDef, bs infer.BodyScop
 	if _, isFunc := bs.Funcs[id.Name]; isFunc {
 		return
 	}
-	if env != nil && env.Resolve(id) != nil {
+	if env.q != nil && env.q.resolve(env.file, id) != nil {
 		return // a top-level constant: a legitimate reference
 	}
 	s := at(id)
@@ -265,9 +291,8 @@ func resolveBodyType(bs infer.BodyScope, t ast.TypeExpr) ir.Type {
 
 // isConstName reports whether id names a top-level constant — so assigning to it
 // is assign_to_const (a const is immutable) rather than assign_to_undefined. It
-// resolves through the body's environment, the same lookup a value reference in
-// the body folds through; a nil environment (a checking path that folds nothing)
-// reports false, leaving the name undefined.
-func isConstName(env eval.Env, id *ast.Identifier) bool {
-	return env != nil && env.Resolve(id) != nil
+// resolves through the folder's queries, the same lookup a value reference in
+// the body folds through.
+func isConstName(env exprFolder, id *ast.Identifier) bool {
+	return env.q != nil && env.q.resolve(env.file, id) != nil
 }

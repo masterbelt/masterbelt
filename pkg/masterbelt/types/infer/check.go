@@ -52,8 +52,19 @@ func CheckPredicate(e ast.Expr, s BodyScope, sink *Sink) ir.Type {
 // checkType is the checking walk: the bidirectional half of the type rules.
 // want may contain still-unbound method type variables — a call site passes
 // its bindings in subst and gains the ones the walk solves; the declaration
-// paths pass a fresh map.
+// paths pass a fresh map. The settled type is streamed out (Sink.Typed) for
+// the typed-value-graph write-back, exactly as check streams its synthesis.
 func checkType(e ast.Expr, want ir.Type, s scope, subst map[string]ir.Type, sink *Sink) ir.Type {
+	t := checkTypeAgainst(e, want, s, subst, sink)
+	if e != nil && t != ir.Invalid {
+		sink.typed(e, t)
+	}
+	return t
+}
+
+// checkTypeAgainst is checkType's body, split out so the entry point can
+// stream the settled type once whatever path produced it.
+func checkTypeAgainst(e ast.Expr, want ir.Type, s scope, subst map[string]ir.Type, sink *Sink) ir.Type {
 	if e == nil {
 		return ir.Invalid
 	}
@@ -71,6 +82,11 @@ func checkType(e ast.Expr, want ir.Type, s scope, subst map[string]ir.Type, sink
 	// to ordinary identifier resolution (an undefined name).
 	if id, ok := e.(*ast.Identifier); ok {
 		if member := enumMemberExpectation(want, id.Name); member != nil {
+			// A member under a union expectation (R | error) flows into the
+			// union — an adaption the IR makes explicit.
+			if !types.Identical(member, want) {
+				sink.adapted(e, want)
+			}
 			return member
 		}
 	}
@@ -112,6 +128,15 @@ func checkType(e ast.Expr, want ir.Type, s scope, subst map[string]ir.Type, sink
 		if got != ir.Invalid {
 			if sel, _ := types.SelectUnionMember(s.registry(), got, want); sel == types.UnionAmbiguous {
 				sink.ambiguousUnionMember(e, got, want)
+				return got
+			}
+			// The walk accepted got at the differing expectation — an implicit
+			// adaption (a width settle, a nominal adaption, a union inflow) the
+			// IR makes explicit. The expectation re-substitutes because the
+			// Match above may have solved variables in it; one a variable
+			// survives in adapts at its monomorphized site, not here.
+			if to := types.Substitute(want, subst); !hasTypeVar(to) && !types.Identical(got, to) {
+				sink.adapted(e, to)
 			}
 		}
 		return got
@@ -345,7 +370,10 @@ func checkFuncLitAgainst(lit *ast.FuncLit, want *ir.Func, s scope, subst map[str
 				sink.mismatch(p, ap, wp)
 			}
 			params[i] = ap
-		case !hasTypeVar(wp):
+		case !hasTypeVar(wp) || varsRigid(wp, s):
+			// Concrete, or generic only in the enclosing declaration's own
+			// rigid parameters (a provided-method body reading the interface's
+			// K and V): either way the parameter's type is known.
 			params[i] = wp
 		default:
 			// The context has not pinned the variable this parameter needs
@@ -635,8 +663,19 @@ func forScope(s funcScope, stmt *ast.ForStmt) funcScope {
 }
 
 // check is the checking walk behind Check, parameterized over the scope so a
-// function literal's body is checked in its parameter scope.
+// function literal's body is checked in its parameter scope. The synthesized
+// type is streamed out (Sink.Typed) for the typed-value-graph write-back.
 func check(e ast.Expr, s scope, sink *Sink) ir.Type {
+	t := synthesize(e, s, sink)
+	if e != nil && t != ir.Invalid {
+		sink.typed(e, t)
+	}
+	return t
+}
+
+// synthesize is check's body, split out so the entry point can stream the
+// synthesized type once whatever case produced it.
+func synthesize(e ast.Expr, s scope, sink *Sink) ir.Type {
 	switch e := e.(type) {
 	case *ast.IntLit:
 		return &ir.Builtin{Name: "nint"}
@@ -678,6 +717,15 @@ func check(e ast.Expr, s scope, sink *Sink) ir.Type {
 		return checkRange(e, s, sink)
 	case *ast.CallExpr:
 		return callType(e, s, sink)
+	case *ast.MemberExpr:
+		// The leaf decides the member reading (an enum member, an associated
+		// constant, a namespace import, a record field or getter), deriving
+		// the receiver's type silently inside; a value receiver is checked
+		// here first so its own settled type streams out for the typed value
+		// graph (a type-name or namespace receiver settles nothing and stays
+		// silent — an Invalid never streams).
+		check(e.Receiver, s, sink)
+		return s.leaf(e)
 	default:
 		return s.leaf(e)
 	}
@@ -715,20 +763,19 @@ func checkTernary(e *ast.TernaryExpr, want ir.Type, s scope, subst map[string]ir
 			sink.ternaryCondNotBool(e.Cond, condT)
 		}
 	}
-	var then, els ir.Type
 	if want != ir.Invalid {
-		then = checkType(e.Then, want, s, subst, sink)
-		els = checkType(e.Else, want, s, subst, sink)
-	} else {
-		then = checkOrInvalid(e.Then, s, sink)
-		els = checkOrInvalid(e.Else, s, sink)
+		// The expectation reaches into both branches — each reports its own
+		// mismatch, and each adapts to it where accepted — so it is the
+		// ternary's type: the branch values are carried at want, whatever
+		// their own synthesized types were.
+		checkType(e.Then, want, s, subst, sink)
+		checkType(e.Else, want, s, subst, sink)
+		return types.Substitute(want, subst)
 	}
+	then := checkOrInvalid(e.Then, s, sink)
+	els := checkOrInvalid(e.Else, s, sink)
 	if then == ir.Invalid || els == ir.Invalid {
-		// A branch was omitted or reported elsewhere; the result has no type, but
-		// an explicit expectation still stands as the ternary's type.
-		if want != ir.Invalid {
-			return want
-		}
+		// A branch was omitted or reported elsewhere; the result has no type.
 		return ir.Invalid
 	}
 	unified := types.Unify(s.registry(), then, els)

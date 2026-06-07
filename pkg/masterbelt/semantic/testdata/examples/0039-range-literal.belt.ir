@@ -1,120 +1,120 @@
 Module
   Const "ClosedUp"
     type range
-    value IntLiteral "0"..IntLiteral "9"
+    value ((IntLiteral "0" : nint)..(IntLiteral "9" : nint) : range)
     eval range(0, 9)
   Const "HalfUp"
     type range
-    value IntLiteral "0"...IntLiteral "9"
+    value ((IntLiteral "0" : nint)...(IntLiteral "9" : nint) : range)
     eval range(0, 8)
   Const "ClosedDown"
     type range
-    value IntLiteral "9"..IntLiteral "0"
+    value ((IntLiteral "9" : nint)..(IntLiteral "0" : nint) : range)
     eval range(9, 0, -1)
   Const "HalfDown"
     type range
-    value IntLiteral "9"...IntLiteral "0"
+    value ((IntLiteral "9" : nint)...(IntLiteral "0" : nint) : range)
     eval range(8, 0, -1)
   Const "ClosedUpEq"
     type range
-    value range(IntLiteral "0", IntLiteral "9")
+    value range((IntLiteral "0" : nint), (IntLiteral "9" : nint))
     eval range(0, 9)
   Const "HalfUpEq"
     type range
-    value range(IntLiteral "0", IntLiteral "8")
+    value range((IntLiteral "0" : nint), (IntLiteral "8" : nint))
     eval range(0, 8)
   Const "ClosedDownEq"
     type range
-    value range(IntLiteral "9", IntLiteral "0", IntLiteral "1".neg())
+    value range((IntLiteral "9" : nint), (IntLiteral "0" : nint), ((IntLiteral "1" : nint).neg() : nint))
     eval range(9, 0, -1)
   Const "HalfDownEq"
     type range
-    value range(IntLiteral "8", IntLiteral "0", IntLiteral "1".neg())
+    value range((IntLiteral "8" : nint), (IntLiteral "0" : nint), ((IntLiteral "1" : nint).neg() : nint))
     eval range(8, 0, -1)
   Const "Single"
     type range
-    value IntLiteral "5"..IntLiteral "5"
+    value ((IntLiteral "5" : nint)..(IntLiteral "5" : nint) : range)
     eval range(5, 5)
   Const "Empty"
     type range
-    value IntLiteral "5"...IntLiteral "5"
+    value ((IntLiteral "5" : nint)...(IntLiteral "5" : nint) : range)
     eval range(5, 4)
   Const "Upto"
     type range
-    value upto(IntLiteral "4")
+    value (upto((IntLiteral "4" : nint)) : range)
     eval range(0, 5)
   Const "Evens"
     type range
-    value range(IntLiteral "0", IntLiteral "10", IntLiteral "2")
+    value range((IntLiteral "0" : nint), (IntLiteral "10" : nint), (IntLiteral "2" : nint))
     eval range(0, 10, 2)
   Const "DownBy2"
     type range
-    value range(IntLiteral "10", IntLiteral "0", IntLiteral "2".neg())
+    value range((IntLiteral "10" : nint), (IntLiteral "0" : nint), ((IntLiteral "2" : nint).neg() : nint))
     eval range(10, 0, -2)
   Const "SumUp"
     type nint
-    value sumUp()
+    value (sumUp() : nint)
     eval 55
   Const "SumDown"
     type nint
-    value sumDown()
+    value (sumDown() : nint)
     eval 15
   Const "SumHalf"
     type nint
-    value sumHalf()
+    value (sumHalf() : nint)
     eval 10
   Const "SumEvens"
     type nint
-    value sumEvens()
+    value (sumEvens() : nint)
     eval 30
   Const "ClosedCount"
     type nint
-    value IntLiteral "0"..IntLiteral "9".count()
+    value (((IntLiteral "0" : nint)..(IntLiteral "9" : nint) : range).count() : nint) [subst K=nint, V=nint]
     eval 10
   Const "HalfCount"
     type nint
-    value IntLiteral "0"...IntLiteral "9".count()
+    value (((IntLiteral "0" : nint)...(IntLiteral "9" : nint) : range).count() : nint) [subst K=nint, V=nint]
     eval 9
   Const "SteppedCount"
     type nint
-    value range(IntLiteral "0", IntLiteral "10", IntLiteral "2").count()
+    value (range((IntLiteral "0" : nint), (IntLiteral "10" : nint), (IntLiteral "2" : nint)).count() : nint) [subst K=nint, V=nint]
     eval 6
   Const "ClosedFold"
     type nint
-    value IntLiteral "0"..IntLiteral "4".fold(IntLiteral "0", (fn(acc, k, v) (return ParamRef "acc".add(ParamRef "v"))))
+    value (((IntLiteral "0" : nint)..(IntLiteral "4" : nint) : range).fold((IntLiteral "0" : nint), ((fn(acc, k, v) (return ((ParamRef "acc" : nint).add((ParamRef "v" : nint)) : nint))) : fn(nint, nint, nint): nint)) : nint) [subst A=nint, K=nint, V=nint]
     eval 10
   Const "SteppedFold"
     type nint
-    value range(IntLiteral "0", IntLiteral "10", IntLiteral "2").fold(IntLiteral "0", (fn(acc, k, v) (return ParamRef "acc".add(ParamRef "v"))))
+    value (range((IntLiteral "0" : nint), (IntLiteral "10" : nint), (IntLiteral "2" : nint)).fold((IntLiteral "0" : nint), ((fn(acc, k, v) (return ((ParamRef "acc" : nint).add((ParamRef "v" : nint)) : nint))) : fn(nint, nint, nint): nint)) : nint) [subst A=nint, K=nint, V=nint]
     eval 30
   Func "upto" pub
     param n: nint
     result range
-      return IntLiteral "0"..ParamRef "n".add(IntLiteral "1")
+      return ((IntLiteral "0" : nint)..((ParamRef "n" : nint).add((IntLiteral "1" : nint)) : nint) : range)
   Func "sumUp" pub
     result nint
-      let "t": nint = IntLiteral "0"
-      for i of nint IntLiteral "0"..IntLiteral "10"
-          assign "t" = LocalRef "t".add(LocalRef "i")
-      return LocalRef "t"
+      let "t": nint = (IntLiteral "0" : nint)
+      for i of nint ((IntLiteral "0" : nint)..(IntLiteral "10" : nint) : range)
+          assign "t" = ((LocalRef "t" : nint).add((LocalRef "i" : nint)) : nint)
+      return (LocalRef "t" : nint)
   Func "sumDown" pub
     result nint
-      let "t": nint = IntLiteral "0"
-      for i of nint IntLiteral "5"..IntLiteral "1"
-          assign "t" = LocalRef "t".add(LocalRef "i")
-      return LocalRef "t"
+      let "t": nint = (IntLiteral "0" : nint)
+      for i of nint ((IntLiteral "5" : nint)..(IntLiteral "1" : nint) : range)
+          assign "t" = ((LocalRef "t" : nint).add((LocalRef "i" : nint)) : nint)
+      return (LocalRef "t" : nint)
   Func "sumHalf" pub
     result nint
-      let "t": nint = IntLiteral "0"
-      for i of nint IntLiteral "0"...IntLiteral "5"
-          assign "t" = LocalRef "t".add(LocalRef "i")
-      return LocalRef "t"
+      let "t": nint = (IntLiteral "0" : nint)
+      for i of nint ((IntLiteral "0" : nint)...(IntLiteral "5" : nint) : range)
+          assign "t" = ((LocalRef "t" : nint).add((LocalRef "i" : nint)) : nint)
+      return (LocalRef "t" : nint)
   Func "sumEvens" pub
     result nint
-      let "t": nint = IntLiteral "0"
-      for i of nint range(IntLiteral "0", IntLiteral "10", IntLiteral "2")
-          assign "t" = LocalRef "t".add(LocalRef "i")
-      return LocalRef "t"
+      let "t": nint = (IntLiteral "0" : nint)
+      for i of nint range((IntLiteral "0" : nint), (IntLiteral "10" : nint), (IntLiteral "2" : nint))
+          assign "t" = ((LocalRef "t" : nint).add((LocalRef "i" : nint)) : nint)
+      return (LocalRef "t" : nint)
   Assert "(0..9) == range(0, 9)"
     eval true
       (0..9) == range(0, 9)

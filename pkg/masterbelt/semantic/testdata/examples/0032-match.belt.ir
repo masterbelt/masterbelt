@@ -1,11 +1,11 @@
 Module
   Const "Held"
     type GameValue
-    value Coin{amount: IntLiteral "7"}
+    value (Coin{amount: (IntLiteral "7" : nint)} : Coin)
     eval (Coin) { amount: 7 }
   Const "Total"
     type nint
-    value worth(Reference -> "Held")
+    value (worth((Reference -> "Held" : GameValue)) : nint)
     eval 7
   TypeDef "Coin" pub
     body { amount: nint }
@@ -16,56 +16,56 @@ Module
   Func "describe" pub
     param v: GameValue
     result string
-      match ParamRef "v"
+      match (ParamRef "v" : GameValue)
         arm Coin c
-          return StringLiteral "coin"
+          return (StringLiteral "coin" : string)
         arm Level l
-          return StringLiteral "level"
+          return (StringLiteral "level" : string)
   Func "worth" pub
     param v: GameValue
     result nint
-      match ParamRef "v"
+      match (ParamRef "v" : GameValue)
         arm Coin c
-          return LocalRef "c".amount
+          return ((LocalRef "c" : Coin).amount : nint)
         arm Level l
-          return LocalRef "l".rank
+          return ((LocalRef "l" : Level).rank : nint)
   Func "amountOr" pub
     param v: Coin | null
     param fallback: nint
     result nint
-      match ParamRef "v"
+      match (ParamRef "v" : Coin | null)
         arm Coin c
-          return LocalRef "c".amount
+          return ((LocalRef "c" : Coin).amount : nint)
         arm null
-          return ParamRef "fallback"
+          return (ParamRef "fallback" : nint)
   Func "coinAmount" pub
     param v: GameValue
     result nint
-      match ParamRef "v"
+      match (ParamRef "v" : GameValue)
         arm Coin c
-          return LocalRef "c".amount
+          return ((LocalRef "c" : Coin).amount : nint)
         else
-          return IntLiteral "0"
+          return (IntLiteral "0" : nint)
   Func "firstOr" pub
     param xs: list<nint>
     param fallback: nint
     result nint
-      match ParamRef "xs".get(IntLiteral "0")
+      match ((ParamRef "xs" : list<nint>).get((IntLiteral "0" : nint)) : nint | error) [subst K=nint, T=nint, V=nint]
         arm nint v
-          return LocalRef "v"
+          return (LocalRef "v" : nint)
         arm error e
-          return ParamRef "fallback"
+          return (ParamRef "fallback" : nint)
   Func "label" pub
     param v: GameValue
     param other: GameValue
     result string
-      match ParamRef "v"
+      match (ParamRef "v" : GameValue)
         arm Coin c
-          let "n": nint = LocalRef "c".amount
-          match ParamRef "other"
+          let "n": nint = ((LocalRef "c" : Coin).amount : nint)
+          match (ParamRef "other" : GameValue)
             arm Coin c2
-              return StringLiteral "coin/coin"
+              return (StringLiteral "coin/coin" : string)
             arm Level l
-              return StringLiteral "coin/level"
+              return (StringLiteral "coin/level" : string)
         arm Level l
-          return StringLiteral "level"
+          return (StringLiteral "level" : string)

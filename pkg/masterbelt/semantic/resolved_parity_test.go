@@ -30,9 +30,12 @@ func analyzeWithQueries(t *testing.T, src string) (*ir.Module, map[string]*ir.Co
 	return module, raw
 }
 
-// TestResolvedFoldParity checks the both-fold case: an overloaded call the
-// value-kind rule can split folds identically through the raw value query and
-// the published (resolution-armed) Eval.
+// TestResolvedFoldParity checks the monotone split: a method call on a
+// nominal-typed receiver is conservative in the type-blind value query (the
+// blind graph carries no receiver type, so the overload set is unreachable)
+// and folds in the published Eval, through the annotated graph's settled
+// receiver type and the checker's selection. Where the raw query does fold, it
+// agrees with the published value.
 func TestResolvedFoldParity(t *testing.T) {
 	src := "pub type Score = int impl {\n" +
 		"  pub fn merge(points: self): self {\n    return self + points\n  }\n" +
@@ -46,7 +49,8 @@ func TestResolvedFoldParity(t *testing.T) {
 		if c.Eval == nil {
 			t.Fatalf("const %s did not fold", c.Name)
 		}
-		if !ir.ConstantsEqual(raw[c.Name], c.Eval) {
+		// Monotone: every raw fold survives into the published Eval unchanged.
+		if raw[c.Name] != nil && !ir.ConstantsEqual(raw[c.Name], c.Eval) {
 			t.Errorf("const %s: value query %v != published Eval %v", c.Name, raw[c.Name], c.Eval)
 		}
 	}
@@ -109,6 +113,56 @@ func TestFuncCallTargetCorrected(t *testing.T) {
 	if got := call.Resolved.Syntax.Params[0].Name; got != "n" {
 		t.Errorf("resolved overload's parameter = %q, want n (the nint overload)", got)
 	}
+}
+
+// TestSubstWriteBack checks the checker's solved type-variable substitution is
+// written back onto the call nodes (F-3 §2.3): a generic function call records
+// what the arguments pinned, a method call on a generic receiver records the
+// receiver's bindings combined with its own solved variables, and a call that
+// pins nothing stays nil — so the IR carries the monomorphization input
+// instead of discarding it after the result type is computed.
+func TestSubstWriteBack(t *testing.T) {
+	src := "pub fn identity<T>(x: T): T {\n  return x\n}\n" +
+		"const N = identity(42)\n" +
+		"const Doubled = [1, 2, 3].map(fn(x) -> x * 2)\n" +
+		"const Plain = 1 + 2\n"
+	module, _ := analyzeWithQueries(t, src)
+
+	fc, ok := module.Consts[0].Value.(*ir.FuncCall)
+	if !ok {
+		t.Fatalf("N's value = %T, want *ir.FuncCall", module.Consts[0].Value)
+	}
+	if got := typeName(fc.Subst["T"]); got != "nint" {
+		t.Errorf("identity(42) Subst[T] = %s, want nint (full subst: %v)", got, fc.Subst)
+	}
+
+	call, ok := module.Consts[1].Value.(*ir.Call)
+	if !ok {
+		t.Fatalf("Doubled's value = %T, want *ir.Call", module.Consts[1].Value)
+	}
+	if got := typeName(call.Subst["T"]); got != "nint" {
+		t.Errorf("map Subst[T] = %s, want nint (the receiver's element binding; full subst: %v)", got, call.Subst)
+	}
+	if got := typeName(call.Subst["R"]); got != "nint" {
+		t.Errorf("map Subst[R] = %s, want nint (the literal-solved result variable; full subst: %v)", got, call.Subst)
+	}
+
+	plain, ok := module.Consts[2].Value.(*ir.Call)
+	if !ok {
+		t.Fatalf("Plain's value = %T, want *ir.Call", module.Consts[2].Value)
+	}
+	if plain.Subst != nil {
+		t.Errorf("1 + 2 Subst = %v, want nil (no type variable to pin)", plain.Subst)
+	}
+}
+
+// typeName renders a substitution entry for the assertions above; a missing
+// entry reads as "<none>".
+func typeName(t ir.Type) string {
+	if t == nil {
+		return "<none>"
+	}
+	return t.String()
 }
 
 // TestResolvedStaticAndMethodWriteBack checks the other two call forms carry

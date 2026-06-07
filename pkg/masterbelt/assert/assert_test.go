@@ -7,35 +7,100 @@ import (
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/assert"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/eval"
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/lower"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/parser/abstract"
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
 )
 
-// fileEnv resolves names against one lowered file and folds values on demand —
-// the minimal eval.Env a test diagram needs.
-type fileEnv struct {
-	file *ast.File
-	reg  *builtin.Registry
+// testFolder folds one file's expressions through the IR interpreter — the
+// minimal lowering-plus-fold a test diagram needs: an identifier resolves to
+// the file's constant (its value folded on demand), and everything else
+// lowers through the shared walk.
+type testFolder struct {
+	file   *ast.File
+	reg    *builtin.Registry
+	shells map[*ast.ConstDecl]*ir.Const
+	self   *ir.Constant
 }
 
-func (e fileEnv) Resolve(id *ast.Identifier) *ast.ConstDecl {
-	for _, d := range e.file.Decls {
-		if d.Name == id.Name {
-			return d
+func newTestFolder(file *ast.File, self *ir.Constant) *testFolder {
+	f := &testFolder{file: file, reg: builtin.Default(), shells: map[*ast.ConstDecl]*ir.Const{}, self: self}
+	for _, d := range file.Decls {
+		f.shells[d] = &ir.Const{Name: d.Name, Syntax: d}
+	}
+	return f
+}
+
+// Leaf lowers the test's context-specific forms: a constant reference and the
+// self keyword. It satisfies lower.Binder.
+func (f *testFolder) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
+	switch e := e.(type) {
+	case *ast.Identifier:
+		for _, d := range f.file.Decls {
+			if d.Name == e.Name {
+				return &ir.Reference{Target: f.shells[d], Syntax: e}
+			}
 		}
+	case *ast.SelfExpr:
+		return &ir.SelfValue{Syntax: e}
+	case *ast.NullLit:
+		return &ir.NullValue{Syntax: e}
 	}
 	return nil
 }
-func (e fileEnv) ResolveMember(m *ast.MemberExpr) *ast.ConstDecl      { return nil }
-func (e fileEnv) ResolveFunc(id *ast.Identifier) []*ast.FuncDecl      { return nil }
-func (e fileEnv) ResolveFuncMember(m *ast.MemberExpr) []*ast.FuncDecl { return nil }
-func (e fileEnv) ValueOf(decl *ast.ConstDecl) *ir.Constant            { return eval.Decl(decl, e) }
-func (e fileEnv) LookupType(name string) *ir.TypeDef {
-	d, _ := e.reg.Lookup(name)
+
+func (f *testFolder) EnterFunc(params []*ast.ParamDef) lower.Binder {
+	names := make(map[string]bool, len(params))
+	for _, p := range params {
+		names[p.Name] = true
+	}
+	return testFuncBinder{outer: f, params: names}
+}
+
+// testFuncBinder binds a literal's parameters over the file folder, so a
+// lambda body's x lowers to a ParamRef.
+type testFuncBinder struct {
+	outer  lower.Binder
+	params map[string]bool
+}
+
+func (b testFuncBinder) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
+	if id, ok := e.(*ast.Identifier); ok && b.params[id.Name] {
+		return &ir.ParamRef{Name: id.Name, Syntax: id}
+	}
+	return b.outer.Leaf(e, sub)
+}
+
+func (b testFuncBinder) EnterFunc(params []*ast.ParamDef) lower.Binder {
+	names := make(map[string]bool, len(params))
+	for _, p := range params {
+		names[p.Name] = true
+	}
+	return testFuncBinder{outer: b, params: names}
+}
+
+// ConstValue folds a referenced constant's initializer on demand. It satisfies
+// eval.GraphEnv.
+func (f *testFolder) ConstValue(c *ir.Const) *ir.Constant {
+	if c.Syntax == nil || c.Syntax.Value == nil {
+		return nil
+	}
+	return f.foldAt(c.Syntax.Value)
+}
+
+func (f *testFolder) LookupType(name string) *ir.TypeDef {
+	d, _ := f.reg.Lookup(name)
 	return d
 }
-func (e fileEnv) Registry() *builtin.Registry { return e.reg }
+
+func (f *testFolder) Registry() *builtin.Registry { return f.reg }
+
+// foldAt lowers and folds one expression, self bound when the folder carries
+// one — the diagram's per-anchor channel.
+func (f *testFolder) foldAt(e ast.Expr) *ir.Constant {
+	return eval.GraphPredicate(lower.Value(e, f), f.self, nil, f)
+}
 
 // diagram lowers src (consts plus exactly one assert) and renders the
 // assert's diagram.
@@ -48,7 +113,7 @@ func diagram(t *testing.T, src string) string {
 	if len(file.Asserts) != 1 {
 		t.Fatalf("got %d asserts, want 1", len(file.Asserts))
 	}
-	return assert.Diagram(file.Asserts[0].Cond, fileEnv{file: file, reg: builtin.Default()})
+	return assert.Diagram(file.Asserts[0].Cond, newTestFolder(file, nil).foldAt)
 }
 
 func TestDiagram(t *testing.T) {
@@ -120,7 +185,7 @@ func TestDiagramSelf(t *testing.T) {
 		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
 	pred := file.Types[0].Where
-	got := assert.DiagramSelf(pred, ir.IntConstant(big.NewInt(70000)), nil, fileEnv{file: file, reg: builtin.Default()})
+	got := assert.Diagram(pred, newTestFolder(file, ir.IntConstant(big.NewInt(70000))).foldAt)
 	want := "self >= 1 && self <= 65535\n" +
 		"^    ^    ^  ^    ^\n" +
 		"|    true |  |    false\n" +
@@ -132,13 +197,13 @@ func TestDiagramSelf(t *testing.T) {
 }
 
 func TestDiagramSelfUnbound(t *testing.T) {
-	// Diagram (no self binding) leaves a predicate's self rows out: nothing
-	// folds, so only the condition line renders.
+	// With no self binding a predicate's self rows stay out: nothing folds, so
+	// only the condition line renders.
 	file, diags := abstract.Lower([]byte("type Port = int where self >= 1\n"))
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", diags)
 	}
-	got := assert.Diagram(file.Types[0].Where, fileEnv{file: file, reg: builtin.Default()})
+	got := assert.Diagram(file.Types[0].Where, newTestFolder(file, nil).foldAt)
 	if got != "self >= 1" {
 		t.Errorf("diagram = %q, want the bare condition line", got)
 	}

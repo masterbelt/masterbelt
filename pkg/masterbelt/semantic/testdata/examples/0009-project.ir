@@ -3,11 +3,11 @@ Module
   Const "Origin" pub
     doc "The zero point every path starts from."
     type nint
-    value IntLiteral "0"
+    value (IntLiteral "0" : nint)
     eval 0
   Const "hidden"
     type nint
-    value IntLiteral "1"
+    value (IntLiteral "1" : nint)
     eval 1
   TypeDef "Point" pub
     doc "A 1-D coordinate."
@@ -16,5 +16,5 @@ Module
 Module
   Const "start"
     type Point
-    value Reference -> "Origin"
+    value (adapt (Reference -> "Origin" : nint) : Point)
     eval 0

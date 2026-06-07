@@ -1,15 +1,15 @@
 Module
   Const "MaxLevel"
     type nint
-    value IntLiteral "100"
+    value (IntLiteral "100" : nint)
     eval 100
   Const "MinLevel"
     type nint
-    value IntLiteral "0"
+    value (IntLiteral "0" : nint)
     eval 0
   Const "Enabled"
     type bool
-    value BoolLiteral true
+    value (BoolLiteral true : bool)
     eval true
   Assert "MaxLevel > MinLevel"
     doc "The level range is not empty."
