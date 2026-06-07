@@ -341,6 +341,32 @@ func TestNominalUnionMemberSelection(t *testing.T) {
 	}
 }
 
+// TestNominalUnionTagFoldParity is the F-1 fold-parity guarantee: when the
+// checker tags a bare string into a nominal-string union member (Tag of
+// Tag | error), the folder folds the value tagged with the *same* member — so a
+// later match dispatches on the member the type layer chose. The value keeps its
+// string, carried under the Tag tag, which is what the .ir dump renders as
+// eval (Tag) "tagged".
+func TestNominalUnionTagFoldParity(t *testing.T) {
+	m, diags := analyze("pub type Tag = string\npub type Labeled = Tag | error\nconst Ok: Labeled = \"tagged\"\n")
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", codes(diags))
+	}
+	ev := constEval(m, "Ok")
+	if ev == nil {
+		t.Fatal("Ok did not fold")
+	}
+	// The folder kept the string value...
+	if ev.Kind != ir.ConstString || ev.Str != "tagged" {
+		t.Errorf("Ok eval = %v, want string \"tagged\"", ev)
+	}
+	// ...tagged with the Tag member the checker selected (fold parity).
+	tag, ok := ev.UnionTag.(*ir.Named)
+	if !ok || tag.Def == nil || tag.Def.Name != "Tag" {
+		t.Errorf("Ok union tag = %v, want the Tag member", ev.UnionTag)
+	}
+}
+
 // TestMatchNarrowingStripsTag checks the arm narrowing drops the union tag: a
 // record union value tagged Coin, dispatched to the Coin arm, narrows its binding
 // to the bare Coin, so a field read and arithmetic on the payload fold without the

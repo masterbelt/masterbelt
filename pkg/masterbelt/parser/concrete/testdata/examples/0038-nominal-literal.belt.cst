@@ -1,0 +1,423 @@
+# tree
+File
+  TypeDecl
+    LineComment "// A nominal type over a builtin base is a wrapper: a value of the base type flows"
+    Newline "\n"
+    LineComment "// into it, the way an integer literal has always flowed into `type Level = int8`."
+    Newline "\n"
+    LineComment "// Before F-1 this adaptation existed for integers alone, so a string, bool, or"
+    Newline "\n"
+    LineComment "// collection wrapper could not be written with a literal. This example folds that"
+    Newline "\n"
+    LineComment "// generalization end to end — a string base, a refinement, and union tagging."
+    Newline "\n"
+    Newline "\n"
+    LineComment "// A bare string adapts to the nominal type that wraps it. The const folds to the"
+    Newline "\n"
+    LineComment "// string, carried at the nominal type Tag."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Type "type"
+    Whitespace " "
+    Ident "Tag"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    TypeName
+      Ident "string"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Hello"
+    TypeClause
+      Colon ":"
+      Whitespace " "
+      TypeName
+        Ident "Tag"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      Literal
+        String "\"hello\""
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// The adaptation is by the value's type being the base, not by literalness: a"
+    Newline "\n"
+    LineComment "// string-typed reference and a self-typed concatenation adapt the same way."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "World"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      Literal
+        String "\"world\""
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "There"
+    TypeClause
+      Colon ":"
+      Whitespace " "
+      TypeName
+        Ident "Tag"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      NameRef
+        Ident "World"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Greeting"
+    TypeClause
+      Colon ":"
+      Whitespace " "
+      TypeName
+        Ident "Tag"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      BinaryExpr
+        BinaryExpr
+          NameRef
+            Ident "Hello"
+          Whitespace " "
+          Plus "+"
+          Whitespace " "
+          Literal
+            String "\" \""
+        Whitespace " "
+        Plus "+"
+        Whitespace " "
+        NameRef
+          Ident "There"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// The self-typed operators the base carries resolve against a bare string"
+    Newline "\n"
+    LineComment "// operand, so a comparison against a literal type-checks and folds to a bool."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "SameTag"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      BinaryExpr
+        NameRef
+          Ident "Hello"
+        Whitespace " "
+        EqEq "=="
+        Whitespace " "
+        Literal
+          String "\"hello\""
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "OtherTag"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      BinaryExpr
+        NameRef
+          Ident "Hello"
+        Whitespace " "
+        BangEq "!="
+        Whitespace " "
+        NameRef
+          Ident "There"
+  TypeDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// The \"literal union\" idiom: a string base refined to a fixed value set. The"
+    Newline "\n"
+    LineComment "// predicate's `self == \"north\"` type-checks because the self-typed operand now"
+    Newline "\n"
+    LineComment "// unifies with the literal — the original motivation for F-1."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Type "type"
+    Whitespace " "
+    Ident "Direction"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    TypeName
+      Ident "string"
+    Whitespace " "
+    WhereClause
+      Where "where"
+      Whitespace " "
+      BinaryExpr
+        BinaryExpr
+          SelfExpr
+            Self "self"
+          Whitespace " "
+          EqEq "=="
+          Whitespace " "
+          Literal
+            String "\"north\""
+        Whitespace " "
+        PipePipe "||"
+        Whitespace " "
+        BinaryExpr
+          SelfExpr
+            Self "self"
+          Whitespace " "
+          EqEq "=="
+          Whitespace " "
+          Literal
+            String "\"south\""
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "North"
+    TypeClause
+      Colon ":"
+      Whitespace " "
+      TypeName
+        Ident "Direction"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      Literal
+        String "\"north\""
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "South"
+    TypeClause
+      Colon ":"
+      Whitespace " "
+      TypeName
+        Ident "Direction"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      Literal
+        String "\"south\""
+  TypeDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// A union carrying a nominal string wrapper tags a bare string as that member:"
+    Newline "\n"
+    LineComment "// Tag is the only member a string adapts to, so \"tagged\" flows in as Tag and the"
+    Newline "\n"
+    LineComment "// folder tags it Tag — the dump shows eval (Tag) \"tagged\"."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Type "type"
+    Whitespace " "
+    Ident "Labeled"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    UnionType
+      TypeName
+        Ident "Tag"
+      Whitespace " "
+      Pipe "|"
+      Whitespace " "
+      TypeName
+        Ident "error"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Ok"
+    TypeClause
+      Colon ":"
+      Whitespace " "
+      TypeName
+        Ident "Labeled"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      Literal
+        String "\"tagged\""
+  FuncDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// match dispatches the union by the tagged member, narrowing the Tag arm to the"
+    Newline "\n"
+    LineComment "// bare Tag so its string folds."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Fn "fn"
+    Whitespace " "
+    Ident "label"
+    ParamList
+      LParen "("
+      Param
+        Ident "v"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "Labeled"
+      RParen ")"
+    Colon ":"
+    Whitespace " "
+    TypeName
+      Ident "Tag"
+    Whitespace " "
+    Block
+      LBrace "{"
+      Newline "\n"
+      Whitespace "  "
+      MatchStmt
+        Match "match"
+        Whitespace " "
+        NameRef
+          Ident "v"
+        Whitespace " "
+        LBrace "{"
+        Newline "\n"
+        Whitespace "    "
+        MatchArm
+          MatchPattern
+            TypeName
+              Ident "Tag"
+            Whitespace " "
+            Ident "t"
+          Whitespace " "
+          Arrow "->"
+          Whitespace " "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            NameRef
+              Ident "t"
+        Newline "\n"
+        Whitespace "    "
+        MatchArm
+          MatchPattern
+            TypeName
+              Ident "error"
+            Whitespace " "
+            Ident "e"
+          Whitespace " "
+          Arrow "->"
+          Whitespace " "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            Literal
+              String "\"error\""
+        Newline "\n"
+        Whitespace "  "
+        RBrace "}"
+      Newline "\n"
+      RBrace "}"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "FromOk"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "label"
+        LParen "("
+        Literal
+          String "\"done\""
+        RParen ")"
+  AssertDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// Every folded result verifies in a compile-time assertion: the operators fold,"
+    Newline "\n"
+    LineComment "// the refinement members are what was written, and the union round-trips."
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      NameRef
+        Ident "Hello"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        String "\"hello\""
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      NameRef
+        Ident "Greeting"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        String "\"hello world\""
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    NameRef
+      Ident "SameTag"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    NameRef
+      Ident "OtherTag"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      NameRef
+        Ident "North"
+      Whitespace " "
+      BangEq "!="
+      Whitespace " "
+      NameRef
+        Ident "South"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      CallExpr
+        NameRef
+          Ident "label"
+        LParen "("
+        Literal
+          String "\"done\""
+        RParen ")"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        String "\"done\""
+  Newline "\n"
+  EOF ""
+# diagnostics

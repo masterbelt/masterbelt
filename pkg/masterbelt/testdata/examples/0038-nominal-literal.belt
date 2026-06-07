@@ -1,0 +1,54 @@
+// A nominal type over a builtin base is a wrapper: a value of the base type flows
+// into it, the way an integer literal has always flowed into `type Level = int8`.
+// Before F-1 this adaptation existed for integers alone, so a string, bool, or
+// collection wrapper could not be written with a literal. This example folds that
+// generalization end to end — a string base, a refinement, and union tagging.
+
+// A bare string adapts to the nominal type that wraps it. The const folds to the
+// string, carried at the nominal type Tag.
+pub type Tag = string
+const Hello: Tag = "hello"
+
+// The adaptation is by the value's type being the base, not by literalness: a
+// string-typed reference and a self-typed concatenation adapt the same way.
+const World = "world"
+const There: Tag = World
+const Greeting: Tag = Hello + " " + There
+
+// The self-typed operators the base carries resolve against a bare string
+// operand, so a comparison against a literal type-checks and folds to a bool.
+const SameTag = Hello == "hello"
+const OtherTag = Hello != There
+
+// The "literal union" idiom: a string base refined to a fixed value set. The
+// predicate's `self == "north"` type-checks because the self-typed operand now
+// unifies with the literal — the original motivation for F-1.
+pub type Direction = string where self == "north" || self == "south"
+const North: Direction = "north"
+const South: Direction = "south"
+
+// A union carrying a nominal string wrapper tags a bare string as that member:
+// Tag is the only member a string adapts to, so "tagged" flows in as Tag and the
+// folder tags it Tag — the dump shows eval (Tag) "tagged".
+pub type Labeled = Tag | error
+const Ok: Labeled = "tagged"
+
+// match dispatches the union by the tagged member, narrowing the Tag arm to the
+// bare Tag so its string folds.
+pub fn label(v: Labeled): Tag {
+  match v {
+    Tag t -> return t
+    error e -> return "error"
+  }
+}
+
+const FromOk = label("done")
+
+// Every folded result verifies in a compile-time assertion: the operators fold,
+// the refinement members are what was written, and the union round-trips.
+assert Hello == "hello"
+assert Greeting == "hello world"
+assert SameTag
+assert OtherTag
+assert North != South
+assert label("done") == "done"
