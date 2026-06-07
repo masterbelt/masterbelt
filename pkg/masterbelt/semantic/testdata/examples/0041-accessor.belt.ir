@@ -1,22 +1,28 @@
 Module
   Const "Freezing"
-    type invalid
-    value <none>.freezing()
+    type Celsius
+    value Celsius.freezing()
+    eval { deg: 0 }
   Const "FreezingF"
-    type invalid
+    type nint
     value Reference -> "Freezing".fahrenheit
+    eval 32
   Const "FromBoiling"
-    type invalid
-    value <none>.fromF(IntLiteral "212")
+    type Celsius
+    value Celsius.fromF(IntLiteral "212")
+    eval { deg: 100 }
   Const "Roundtrip"
-    type invalid
-    value <none>.fromF(<none>.freezing())
+    type Celsius
+    value Celsius.fromF(Celsius.freezing())
+    eval { deg: 0 }
   Const "Full"
-    type invalid
-    value <none>.full()
+    type Health
+    value Health.full()
+    eval 100
   Const "Default"
-    type invalid
-    value <none>.base()
+    type Element
+    value Element.base()
+    eval Element.Fire
   TypeDef "Celsius" pub
     body { deg: nint }
     method "freezing" pub static
@@ -92,32 +98,48 @@ Module
       return Element.Fire
   Func "boiling"
     result Celsius
-      let "c": invalid = <none>.freezing()
+      let "c": Celsius = Celsius.freezing()
       assign "c" = LocalRef "c".fahrenheit = IntLiteral "212"
       return LocalRef "c"
   Assert "FreezingF == 32"
-    eval <unevaluated>
+    eval true
       FreezingF == 32
+      ^         ^
+      32        true
   Assert "FromBoiling.deg == 100"
-    eval <unevaluated>
+    eval true
       FromBoiling.deg == 100
+      ^           ^   ^
+      |           100 true
+      { deg: 100 }
   Assert "Roundtrip.deg == 0"
-    eval <unevaluated>
+    eval true
       Roundtrip.deg == 0
+      ^         ^   ^
+      |         0   true
+      { deg: 0 }
   Assert "boiling().deg == 100"
-    eval <unevaluated>
+    eval true
       boiling().deg == 100
+      ^         ^   ^
+      |         100 true
+      { deg: 100 }
   Assert "Full.band == 10"
-    eval <unevaluated>
+    eval true
       Full.band == 10
+      ^    ^    ^
+      100  10   true
   Assert "Health.Max == 100"
     eval true
       Health.Max == 100
              ^   ^
              100 true
   Assert "Default.hot"
-    eval <unevaluated>
+    eval true
       Default.hot
+      ^       ^
+      |       true
+      Element.Fire
   Assert "!Element.Water.hot"
     eval true
       !Element.Water.hot

@@ -246,7 +246,22 @@ func evalLet(s *ast.LetStmt, ctx evalCtx, scope *blockScope) bool {
 	if v == nil {
 		return false
 	}
-	return scope.bind(s.Name, v, annotationDef(ctx.env, s.Type))
+	return scope.bind(s.Name, v, letDef(ctx, s))
+}
+
+// letDef resolves a let local's static type definition: its annotation's def, or
+// — when unannotated — its initializer call's result def (let c =
+// Celsius.freezing() is a Celsius), so a getter read or setter write on the local
+// later in the body resolves its receiver. Resolved syntactically, never through
+// the type query.
+func letDef(ctx evalCtx, s *ast.LetStmt) *ir.TypeDef {
+	if def := annotationDef(ctx.env, s.Type); def != nil {
+		return def
+	}
+	if call, ok := s.Value.(*ast.CallExpr); ok {
+		return callResultDef(ctx, call)
+	}
+	return nil
 }
 
 // evalAssign folds an assignment's value and updates the target local in place,

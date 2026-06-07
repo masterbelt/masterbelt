@@ -102,6 +102,10 @@ type Sink struct {
 	// unbounded type parameter: nothing is known about the type, so it has no
 	// methods — only pass-through (receive, store, return) is allowed.
 	NoMethodOnUnboundedTypeVar func(node ast.Node, method string)
+	// UnknownStatic fires at a static-fn call whose receiver names a type with no
+	// static fn of that name (Celsius.nope()) — the Type.name(...) twin of an
+	// unknown associated constant.
+	UnknownStatic func(call *ast.CallExpr, name, typ string)
 	// MapKeyNotComparable fires at a map literal whose inferred key type does not
 	// satisfy map's K: comparable bound — a key the language cannot compare
 	// (an anonymous record). The annotation path catches the same violation
@@ -251,6 +255,12 @@ func (s *Sink) uninferableTypeParam(call *ast.CallExpr, name string) {
 func (s *Sink) noMethodOnUnboundedTypeVar(node ast.Node, method string) {
 	if s != nil && s.NoMethodOnUnboundedTypeVar != nil {
 		s.NoMethodOnUnboundedTypeVar(node, method)
+	}
+}
+
+func (s *Sink) unknownStatic(call *ast.CallExpr, name, typ string) {
+	if s != nil && s.UnknownStatic != nil {
+		s.UnknownStatic(call, name, typ)
 	}
 }
 

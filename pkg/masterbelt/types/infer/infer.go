@@ -680,6 +680,10 @@ func observe(sink *Sink, fired *bool) *Sink {
 			*fired = true
 			sink.noMethodOnUnboundedTypeVar(node, method)
 		},
+		UnknownStatic: func(call *ast.CallExpr, name, typ string) {
+			*fired = true
+			sink.unknownStatic(call, name, typ)
+		},
 		MapKeyNotComparable: func(lit *ast.CollectionLit, key, bound ir.Type) {
 			*fired = true
 			sink.mapKeyNotComparable(lit, key, bound)

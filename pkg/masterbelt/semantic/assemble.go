@@ -110,6 +110,10 @@ func exprSink(at func(ast.Node) span, diags *diagnostic.List) *infer.Sink {
 			s := at(node)
 			diags.Add(newNoMethodOnUnboundedTypevarDiagnostic(s.offset, s.width, method))
 		},
+		UnknownStatic: func(call *ast.CallExpr, name, typ string) {
+			s := at(call)
+			diags.Add(newUnknownStaticDiagnostic(s.offset, s.width, name, typ))
+		},
 		MapKeyNotComparable: func(lit *ast.CollectionLit, key, bound ir.Type) {
 			s := at(lit)
 			diags.Add(newBoundNotSatisfiedDiagnostic(s.offset, s.width, key.String(), bound.String()))

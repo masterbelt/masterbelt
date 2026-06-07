@@ -150,6 +150,81 @@ func applyFunc(cands []*ast.FuncDecl, args []ast.Expr, ctx evalCtx) *ir.Constant
 	return applyBody(funcCallable(fd), nil, tagArguments(ctx, fd.Params, args, vals), ctx)
 }
 
+// applyStatic folds a static fn call Type.name(args): the arguments fold in the
+// caller's context, the static overload whose parameters accept their value kinds
+// is selected, and its body folds with no receiver (self unbound). It reports
+// (value, true) when def declares a static fn of that name (folded, or left
+// unfolded under the depth guard or an undecidable overload), and (nil, false)
+// when def has no static fn of that name — so the caller can fall through. The
+// selection is the type-blind, conservative one applyFunc uses.
+func applyStatic(ctx evalCtx, def *ir.TypeDef, name string, args []ast.Expr) (*ir.Constant, bool) {
+	var cands []*ast.MethodDecl
+	for _, m := range def.Methods {
+		if m.Kind == ir.MethodStatic && m.Name == name && m.Syntax != nil && len(m.Syntax.Body) > 0 {
+			cands = append(cands, m.Syntax)
+		}
+	}
+	if len(cands) == 0 {
+		return nil, false // not a static fn of this name: let the caller fall through
+	}
+	if ctx.depth >= maxApplyDepth {
+		return nil, true
+	}
+	vals := make([]*ir.Constant, len(args))
+	for i, a := range args {
+		if vals[i] = evalExpr(a, ctx); vals[i] == nil {
+			return nil, true // an unfoldable argument: the static call does not fold
+		}
+	}
+	var sel *ast.MethodDecl
+	n := 0
+	for _, cand := range cands {
+		// A static fn has no receiver, so a self-typed parameter is undecidable
+		// (selfKind -1). A named parameter type is resolved through the env to its
+		// underlying kind (envFits), so an overload taking a record (Celsius) is
+		// ruled out for an integer argument — the distinction the type-blind fits
+		// cannot make without the universe.
+		if envFits(ctx.env, cand.Params, vals) {
+			sel = cand
+			n++
+		}
+	}
+	if n != 1 {
+		return nil, true // ambiguous/undecidable: user-defined, but does not fold
+	}
+	return applyBody(methodCallable(sel, def), nil, tagArguments(ctx, sel.Params, args, vals), ctx), true
+}
+
+// envFits is fits with named parameter types resolved through the env to their
+// underlying kind, so an overload taking a nominal type (a record-bodied Celsius,
+// a wrapped integer) is matched against the argument's kind rather than treated
+// as undecidable. It is used for static-fn overload selection, where the env is
+// at hand; the type-blind fits remains the shared default for the method and
+// function paths. A parameter the env cannot resolve falls back to the spelling
+// rule (kindAccepts), keeping the conservative behavior.
+func envFits(env Env, params []*ast.ParamDef, vals []*ir.Constant) bool {
+	if len(params) != len(vals) {
+		return false
+	}
+	for i, p := range params {
+		if !paramAcceptsKind(env, p.Type, vals[i].Kind) {
+			return false
+		}
+	}
+	return true
+}
+
+// paramAcceptsKind reports whether a parameter type accepts a value of the given
+// kind, resolving a named (nominal) type through the env to the kind its
+// underlying primitive or composite backs. It falls back to kindAccepts (the
+// spelling rule) for a type the env resolves to no def.
+func paramAcceptsKind(env Env, t ast.TypeExpr, k ir.ConstKind) bool {
+	if def := annotationDef(env, t); def != nil {
+		return defBacksKind(env.Registry(), def, k) || defBacksKindCollection(def) && k == ir.ConstCollection
+	}
+	return kindAccepts(t, k)
+}
+
 // tagArguments tags each folded argument with the union member it flows into its
 // parameter as — the call-site half of the tagged-union rule. A parameter whose
 // resolved annotation is a union and whose argument settles on one member tags
@@ -583,9 +658,17 @@ func syntacticDef(ctx evalCtx, recvExpr ast.Expr) *ir.TypeDef {
 		if _, isLocal := ctx.locals[e.Name]; isLocal {
 			return ctx.localDefs[e.Name]
 		}
-		// A top-level constant reference resolves through its own annotation.
+		// A top-level constant reference resolves through its own annotation, or —
+		// when unannotated — through its initializer call's result def (const
+		// Freezing = Celsius.freezing() is a Celsius), so a getter on it folds. The
+		// initializer is resolved syntactically, never through the type query.
 		if decl := ctx.env.Resolve(e); decl != nil {
-			return annotationDef(ctx.env, decl.Type)
+			if def := annotationDef(ctx.env, decl.Type); def != nil {
+				return def
+			}
+			if call, ok := decl.Value.(*ast.CallExpr); ok {
+				return callResultDef(ctx, call)
+			}
 		}
 		return nil
 	case *ast.MemberExpr:
@@ -730,6 +813,13 @@ func callResultDef(ctx evalCtx, e *ast.CallExpr) *ir.TypeDef {
 				if cands := ctx.env.ResolveFuncMember(callee); len(cands) > 0 {
 					return funcResultDef(ctx.env, cands)
 				}
+				// A static fn call (Celsius.freezing()): its result def lets a let or
+				// const initialized by it resolve a later getter/setter on the value.
+				if def := ctx.env.LookupType(recv.Name); def != nil {
+					if d := staticResultDef(ctx.env, def, callee.Member.Name); d != nil {
+						return d
+					}
+				}
 			}
 		}
 		// A method call: find the method on the inner receiver's definition and
@@ -778,6 +868,35 @@ func methodResultDef(env Env, def *ir.TypeDef, name string) *ir.TypeDef {
 		var d *ir.TypeDef
 		if isSelfType(m.Syntax.Result) {
 			d = def // a self result keeps the receiver's type
+		} else {
+			d = annotationDef(env, m.Syntax.Result)
+		}
+		if !found {
+			result, found = d, true
+			continue
+		}
+		if d != result {
+			return nil
+		}
+	}
+	return result
+}
+
+// staticResultDef resolves the type definition the static fns named name on def
+// return, across their body-bearing overloads. A self result is the owning type
+// (a static fn returning self yields its own type). The overloads must agree, or
+// the chain does not resolve. It mirrors methodResultDef, filtered to the static
+// name space.
+func staticResultDef(env Env, def *ir.TypeDef, name string) *ir.TypeDef {
+	var result *ir.TypeDef
+	found := false
+	for _, m := range def.Methods {
+		if m.Kind != ir.MethodStatic || m.Name != name || m.Syntax == nil {
+			continue
+		}
+		var d *ir.TypeDef
+		if isSelfType(m.Syntax.Result) {
+			d = def
 		} else {
 			d = annotationDef(env, m.Syntax.Result)
 		}

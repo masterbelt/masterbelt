@@ -49,6 +49,13 @@ func callType(e *ast.CallExpr, s scope, sink *Sink) ir.Type {
 	if cands := s.fnMember(member); len(cands) > 0 {
 		return funcCallType(e, member.Member.Name, cands, s, sink)
 	}
+	// A member-access callee whose receiver names a type is a static fn call
+	// (Celsius.freezing()) — the Type.Name path, after the namespace function
+	// claim and before a method call. The static overload set is selected by the
+	// argument types through the same machinery a top-level function uses.
+	if t, ok := staticCallType(e, member, s, sink); ok {
+		return t
+	}
 	reg := s.registry()
 	recv := check(member.Receiver, s, sink)
 	bad := recv == ir.Invalid
@@ -210,6 +217,84 @@ func convCallType(e *ast.CallExpr, name string, t ir.Type, s scope, sink *Sink) 
 	return t
 }
 
+// staticCallType is the type rule for a static fn call, Type.name(args). It
+// reports ok=false when the callee's receiver does not name a type (a shadowing
+// local or a value receiver), so the caller falls through to the method-call
+// path. When the receiver names a type, the call is a static call: the type's
+// static fns of that name are the overload set, selected by the argument types
+// through the same funcSig machinery a top-level function uses. An unknown name
+// is reported unknown_static; selection failures reuse the function-overload
+// diagnostics (the name read as Type.name).
+func staticCallType(e *ast.CallExpr, member *ast.MemberExpr, s scope, sink *Sink) (ir.Type, bool) {
+	id, ok := member.Receiver.(*ast.Identifier)
+	if !ok {
+		return ir.Invalid, false
+	}
+	recvT := s.conv(id) // the type the receiver names, or Invalid when shadowed/unknown
+	def := namedDef(recvT)
+	if def == nil {
+		return ir.Invalid, false
+	}
+	sigs := staticSigs(def, member.Member.Name)
+	if len(sigs) == 0 {
+		// The receiver names a type but it has no static fn of that name. This is
+		// the static call's own unknown — an enum member or associated constant of
+		// the same name is a value (handled by the leaf), so reaching here means a
+		// genuine call of a missing static fn.
+		for _, a := range e.Arguments {
+			check(a, s, sink)
+		}
+		sink.unknownStatic(e, member.Member.Name, def.Name)
+		return ir.Invalid, true
+	}
+	name := def.Name + "." + member.Member.Name
+	if len(sigs) == 1 {
+		return checkFuncCall(e, name, sigs[0], s, sink), true
+	}
+	return selectFuncOverload(e, name, sigs, s, sink), true
+}
+
+// namedDef returns the type definition a named (non-builtin) type refers to, or
+// nil for any other type. A static call's receiver must name a declared type
+// (the only kind that carries an impl block, and so static fns).
+func namedDef(t ir.Type) *ir.TypeDef {
+	if n, ok := t.(*ir.Named); ok {
+		return n.Def
+	}
+	return nil
+}
+
+// staticSigs builds the funcSig overload set for the static fns named name on a
+// definition: each static method's already-resolved parameter and result types,
+// with self (a static fn that returns its own type written as self) resolved to
+// the owning type. Static fns are not generic in the MVP, so the signatures carry
+// no type parameters.
+func staticSigs(def *ir.TypeDef, name string) []funcSig {
+	self := ir.Type(&ir.Named{Def: def})
+	var sigs []funcSig
+	for _, m := range def.Methods {
+		if m.Kind != ir.MethodStatic || m.Name != name {
+			continue
+		}
+		params := make([]ir.Type, len(m.Params))
+		for i, p := range m.Params {
+			params[i] = substituteSelf(p.Type, self)
+		}
+		sigs = append(sigs, funcSig{params: params, result: substituteSelf(m.Result, self)})
+	}
+	return sigs
+}
+
+// substituteSelf replaces a SelfType with the owning type, leaving every other
+// type unchanged — a static fn has no receiver, so a self in its signature reads
+// as the type it is scoped to.
+func substituteSelf(t, self ir.Type) ir.Type {
+	if _, ok := t.(*ir.SelfType); ok {
+		return self
+	}
+	return t
+}
+
 // funcSig is one resolved candidate of a function call: its declaration, its
 // parameter/result types, and — for a generic function — its type parameters
 // (each a TypeVar name with an optional bound). A type parameter appears as a
@@ -265,7 +350,18 @@ func funcCallType(e *ast.CallExpr, name string, cands []*ast.FuncDecl, s scope, 
 	if len(sigs) == 1 {
 		return checkFuncCall(e, name, sigs[0], s, sink)
 	}
+	return selectFuncOverload(e, name, sigs, s, sink)
+}
 
+// selectFuncOverload resolves a call against an overload set of two or more
+// function-style signatures (top-level functions, or a type's static fns): it
+// synthesizes the non-deferred arguments, selects the one signature the argument
+// types fit, then checks the deferred arguments against the winner's parameter
+// types. It reports ambiguous_func_overload / no_matching_func_overload (name
+// read as the call's name) when none or several fit, and the precise mismatch
+// when exactly one same-arity signature is wrong. It is shared by funcCallType
+// and the static-call path so the two select identically.
+func selectFuncOverload(e *ast.CallExpr, name string, sigs []funcSig, s scope, sink *Sink) ir.Type {
 	// Pass 1 — synthesize the non-deferred arguments, left to right. The
 	// deferred forms stay nil — they fit any parameter during selection — so
 	// the overload settles before any of them is checked. An Invalid argument

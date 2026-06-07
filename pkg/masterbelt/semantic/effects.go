@@ -162,6 +162,24 @@ func collectEffectUses(e ast.Expr, bs infer.BodyScope, use func(effect string, n
 					}
 				}
 			}
+			// A static fn call (Type.name(...)) uses the static fn's declared
+			// effects, the same rule a top-level function call follows; a local or
+			// parameter of the type name shadows the type (it is a value receiver).
+			if recv, ok := callee.Receiver.(*ast.Identifier); ok {
+				if _, isParam := bs.Params[recv.Name]; !isParam {
+					if def := bs.Universe[recv.Name]; def != nil {
+						if used := staticEffects(def, callee.Member.Name); len(used) > 0 {
+							for _, eff := range used {
+								use(eff, e)
+							}
+							for _, a := range e.Arguments {
+								collectEffectUses(a, bs, use)
+							}
+							return
+						}
+					}
+				}
+			}
 			recvT := infer.Body(callee.Receiver, bs)
 			if ms, _, ok := types.Candidates(bs.Reg, recvT, callee.Member.Name); ok {
 				seen := map[string]bool{}
@@ -180,6 +198,26 @@ func collectEffectUses(e ast.Expr, bs infer.BodyScope, use func(effect string, n
 			collectEffectUses(a, bs, use)
 		}
 	}
+}
+
+// staticEffects is the union of a type's static fns of the given name's declared
+// effects, in first-seen order — the conservative set a Type.name(...) call may
+// use, mirroring declaredEffects for a top-level overload set.
+func staticEffects(def *ir.TypeDef, name string) []string {
+	var out []string
+	seen := map[string]bool{}
+	for _, m := range def.Methods {
+		if m.Kind != ir.MethodStatic || m.Name != name {
+			continue
+		}
+		for _, eff := range m.Effects {
+			if !seen[eff] {
+				seen[eff] = true
+				out = append(out, eff)
+			}
+		}
+	}
+	return out
 }
 
 // declaredEffects is the union of an overload set's declared effects, in

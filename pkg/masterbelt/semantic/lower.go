@@ -74,6 +74,13 @@ func (b constBinder) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
 			if cands := b.q.resolveFuncMember(b.file, callee); len(cands) > 0 {
 				return funcCall(b.fnOf[pickOverload(cands, len(e.Arguments))], e.Arguments, sub)
 			}
+			// A call whose callee is a member access on a type name is a static fn
+			// call (Celsius.freezing()) — the Type.Name path, after the namespace
+			// function claim. A constant initializer has no locals/params, so no name
+			// shadows the type.
+			if def := staticFnDef(b.q.universe(b.file), callee, nil); def != nil {
+				return staticCall(def, callee.Member.Name, e.Arguments, sub)
+			}
 		}
 	}
 	return nil
@@ -157,6 +164,48 @@ func assocConstIndex(def *ir.TypeDef, name string) int {
 		}
 	}
 	return -1
+}
+
+// staticFnDef resolves a call whose callee is a member access on a type name to
+// the owning definition, when the type declares a static fn of that name:
+// Celsius.freezing() yields Celsius's def. It returns nil when the receiver names
+// no known type or the type has no static fn of that name — the same fall-through
+// the enum-member and associated-constant claims give, so the static call shares
+// the Type.Name path. shadow reports whether the receiver name is shadowed by a
+// local or parameter (a value of that name, not the type); a shadowed name is not
+// a static call.
+func staticFnDef(universe map[string]*ir.TypeDef, callee *ast.MemberExpr, shadow func(string) bool) *ir.TypeDef {
+	recv, ok := callee.Receiver.(*ast.Identifier)
+	if !ok || (shadow != nil && shadow(recv.Name)) {
+		return nil
+	}
+	def, ok := universe[recv.Name]
+	if !ok || !hasStaticFn(def, callee.Member.Name) {
+		return nil
+	}
+	return def
+}
+
+// hasStaticFn reports whether a type definition declares a static fn of the given
+// name. A static fn is not derived from the underlying type (it is scoped to the
+// declaring type, like an associated constant), so only the definition's own
+// methods are consulted.
+func hasStaticFn(def *ir.TypeDef, name string) bool {
+	if def == nil {
+		return false
+	}
+	for _, m := range def.Methods {
+		if m.Kind == ir.MethodStatic && m.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+// staticCall lowers a static-fn call to its IR value: the owning definition, the
+// static fn name, and the lowered arguments.
+func staticCall(def *ir.TypeDef, name string, args []ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
+	return &ir.StaticCall{Def: def, Name: name, Args: convArgs(args, sub)}
 }
 
 // bodyFuncs is what a body binder needs to lower function calls: the file's
@@ -452,11 +501,20 @@ func (b bodyBinder) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
 			}
 		case *ast.MemberExpr:
 			recv, ok := callee.Receiver.(*ast.Identifier)
-			if !ok || b.shadows(recv.Name) || b.funcs.qualified == nil {
+			if !ok || b.shadows(recv.Name) {
 				return nil
 			}
-			if cands := b.funcs.qualified(recv.Name, callee.Member.Name); len(cands) > 0 {
-				return funcCall(b.funcs.shells[pickOverload(cands, len(e.Arguments))], e.Arguments, sub)
+			if b.funcs.qualified != nil {
+				if cands := b.funcs.qualified(recv.Name, callee.Member.Name); len(cands) > 0 {
+					return funcCall(b.funcs.shells[pickOverload(cands, len(e.Arguments))], e.Arguments, sub)
+				}
+			}
+			// A call whose callee is a member access on a type name is a static fn
+			// call (Celsius.freezing()) — the Type.Name path, after the namespace
+			// function claim, with a local or parameter of that name shadowing the
+			// type (checked above through shadows).
+			if def := staticFnDef(b.r.Defs, callee, b.shadows); def != nil {
+				return staticCall(def, callee.Member.Name, e.Arguments, sub)
 			}
 		}
 		return nil

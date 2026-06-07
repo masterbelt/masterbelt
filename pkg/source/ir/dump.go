@@ -481,6 +481,18 @@ func dumpValue(v Value) string {
 			args[i] = dumpValue(a)
 		}
 		return fmt.Sprintf("%s(%s)", name, strings.Join(args, ", "))
+	case *StaticCall:
+		// Type.name(arg, arg): the owning type and the static fn name, the
+		// Type.Name path enum members and associated constants render through too.
+		typ := "<unresolved>"
+		if x.Def != nil {
+			typ = x.Def.Name
+		}
+		args := make([]string, len(x.Args))
+		for i, a := range x.Args {
+			args[i] = dumpValue(a)
+		}
+		return fmt.Sprintf("%s.%s(%s)", typ, x.Name, strings.Join(args, ", "))
 	case *FuncLiteral:
 		parts := []string{"fn(" + strings.Join(x.Params, ", ") + ")"}
 		for _, s := range x.Body {

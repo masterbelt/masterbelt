@@ -190,6 +190,21 @@ type FuncCall struct {
 
 func (*FuncCall) value() {}
 
+// StaticCall is a resolved call of a static fn, written Type.name(args) — a
+// function scoped to its type, the Type.Name path enum members and associated
+// constants take. Like a Call it holds the owning Def and the static fn's Name
+// rather than a resolved overload individual: the overload is selected by the
+// checker from the argument types and by the folder from the argument values,
+// each with its own rule, exactly as a method Call carries the method name. The
+// arguments are themselves resolved values.
+type StaticCall struct {
+	Def  *TypeDef
+	Name string
+	Args []Value
+}
+
+func (*StaticCall) value() {}
+
 // FuncLiteral is a function-literal value: its parameter names and its lowered
 // statement body. Like the rest of the value graph it is untyped — the
 // expression's type lives on the constant's Type and in the type system — so it

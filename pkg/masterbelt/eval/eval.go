@@ -583,11 +583,18 @@ func evalExprRaw(e ast.Expr, ctx evalCtx) *ir.Constant {
 			return nil
 		}
 		// A member-access callee whose receiver names a namespace applies the
-		// imported function; a local binding shadows the namespace.
+		// imported function; one whose receiver names a type and member names a
+		// static fn applies that — the Type.name(...) path. A local binding shadows
+		// both.
 		if recv, isIdent := member.Receiver.(*ast.Identifier); isIdent {
 			if _, isLocal := ctx.locals[recv.Name]; !isLocal {
 				if cands := ctx.env.ResolveFuncMember(member); len(cands) > 0 {
 					return applyFunc(cands, e.Arguments, sub)
+				}
+				if def := ctx.env.LookupType(recv.Name); def != nil {
+					if v, ok := applyStatic(sub, def, member.Member.Name, e.Arguments); ok {
+						return v
+					}
 				}
 			}
 		}
