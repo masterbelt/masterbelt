@@ -2,7 +2,6 @@ package semantic
 
 import (
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/eval"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/types"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/types/infer"
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
@@ -24,7 +23,7 @@ import (
 // condition must type as a bool, and the then body, the else-if chain, and the
 // else body are each checked against the declared result type want. noSelf,
 // when non-nil (a function body), reports a self expression in the condition.
-func checkIf(s *ast.IfStmt, want ir.Type, bs infer.BodyScope, env eval.Env, noSelf func(ast.Node), sink *infer.Sink, at func(ast.Node) span, diags *diagnostic.List) {
+func checkIf(s *ast.IfStmt, want ir.Type, bs infer.BodyScope, env exprFolder, noSelf func(ast.Node), sink *infer.Sink, at func(ast.Node) span, diags *diagnostic.List) {
 	if s.Cond != nil {
 		if noSelf != nil {
 			checkNoSelf(s.Cond, noSelf)

@@ -1,11 +1,8 @@
 package semantic
 
 import (
-	"strconv"
-
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/eval"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/types/infer"
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/source/cst"
@@ -17,7 +14,7 @@ import (
 // checkDivByZero reports each div/rem whose divisor folds to zero. It descends
 // into a function literal's body — a divisor folds (or doesn't) the same way
 // there, since parameters never fold to a constant.
-func checkDivByZero(e ast.Expr, env evalEnv, report func(node ast.Node)) {
+func checkDivByZero(e ast.Expr, env exprFolder, report func(node ast.Node)) {
 	if lit, ok := e.(*ast.FuncLit); ok {
 		forEachBodyExpr(lit.Body, func(x ast.Expr) {
 			checkDivByZero(x, env, report)
@@ -33,7 +30,7 @@ func checkDivByZero(e ast.Expr, env evalEnv, report func(node ast.Node)) {
 		// unfoldable condition walks both branches conservatively (either could
 		// run), so a definite div-by-zero on every path is still caught.
 		checkDivByZero(tern.Cond, env, report)
-		cond := eval.Expr(tern.Cond, env)
+		cond := env.fold(tern.Cond)
 		switch {
 		case cond != nil && cond.Kind == ir.ConstBool && cond.Bool:
 			checkDivByZero(tern.Then, env, report)
@@ -54,7 +51,7 @@ func checkDivByZero(e ast.Expr, env evalEnv, report func(node ast.Node)) {
 		return
 	}
 	if (member.Member.Name == "div" || member.Member.Name == "rem") && len(call.Arguments) == 1 {
-		if d := eval.Expr(call.Arguments[0], env); d != nil && d.Kind == ir.ConstInt && d.Int.Sign() == 0 {
+		if d := env.fold(call.Arguments[0]); d != nil && d.Kind == ir.ConstInt && d.Int.Sign() == 0 {
 			report(call)
 		}
 	}
@@ -80,7 +77,7 @@ func checkDivByZero(e ast.Expr, env evalEnv, report func(node ast.Node)) {
 // left to the runtime — exactly the non-constant divisor's treatment — so only a
 // step that folds to zero is reported. The receiver and the other arguments are
 // walked too, so a nested range(...) anywhere in the expression is reached.
-func checkRangeStepZero(e ast.Expr, env evalEnv, report func(node ast.Node)) {
+func checkRangeStepZero(e ast.Expr, env exprFolder, report func(node ast.Node)) {
 	if lit, ok := e.(*ast.FuncLit); ok {
 		forEachBodyExpr(lit.Body, func(x ast.Expr) {
 			checkRangeStepZero(x, env, report)
@@ -89,7 +86,7 @@ func checkRangeStepZero(e ast.Expr, env evalEnv, report func(node ast.Node)) {
 	}
 	if tern, ok := e.(*ast.TernaryExpr); ok {
 		checkRangeStepZero(tern.Cond, env, report)
-		cond := eval.Expr(tern.Cond, env)
+		cond := env.fold(tern.Cond)
 		switch {
 		case cond != nil && cond.Kind == ir.ConstBool && cond.Bool:
 			checkRangeStepZero(tern.Then, env, report)
@@ -117,7 +114,7 @@ func checkRangeStepZero(e ast.Expr, env evalEnv, report func(node ast.Node)) {
 	// directly (an identifier "range"), not a member. A three-argument call whose
 	// step folds to a constant zero is the zero-step range.
 	if id, ok := call.Callee.(*ast.Identifier); ok && id.Name == "range" && len(call.Arguments) == 3 {
-		if step := eval.Expr(call.Arguments[2], env); step != nil && step.Kind == ir.ConstInt && step.Int.Sign() == 0 {
+		if step := env.fold(call.Arguments[2]); step != nil && step.Kind == ir.ConstInt && step.Int.Sign() == 0 {
 			report(call)
 		}
 	}
@@ -136,11 +133,11 @@ func checkRangeStepZero(e ast.Expr, env evalEnv, report func(node ast.Node)) {
 // the result (false && _, true || _) — so its right operand is dead. A receiver
 // that does not fold, or the non-deciding bool, returns false: the argument is
 // live and must be walked.
-func shortCircuits(member *ast.MemberExpr, args []ast.Expr, env evalEnv) bool {
+func shortCircuits(member *ast.MemberExpr, args []ast.Expr, env exprFolder) bool {
 	if len(args) != 1 {
 		return false
 	}
-	recv := eval.Expr(member.Receiver, env)
+	recv := env.fold(member.Receiver)
 	if recv == nil || recv.Kind != ir.ConstBool {
 		return false
 	}
@@ -151,146 +148,6 @@ func shortCircuits(member *ast.MemberExpr, args []ast.Expr, env evalEnv) bool {
 		return recv.Bool
 	}
 	return false
-}
-
-// checkIndexWrites reports a list index write past the end (index_out_of_range).
-// A write coll[i] = v desugared to coll = coll.set(i, v); when the collection
-// folds to a list of known length and the index folds to a constant out of that
-// range, the write is a compile-time bug — a list write cannot grow the list, so
-// it has nowhere to land (a map write upserts and is never out of range). The
-// folding tracks the body's let locals so a write to a let-bound list is reached;
-// a receiver or index that does not fold (a parameter, a dynamic index) is left
-// to the runtime, exactly as the plan scopes it.
-//
-// The walk mirrors eval's body execution for the bindings it needs: a let adds a
-// local, an assignment updates one, and a nested block (an if/switch branch) gets
-// a copy so its bindings do not leak out. Only foldable bindings are tracked;
-// the check is a best-effort static catch, not a guarantee.
-func checkIndexWrites(body []ast.Stmt, env eval.Env, at func(ast.Node) span, diags *diagnostic.List) {
-	locals := map[string]*ir.Constant{}
-	checkIndexWritesIn(body, locals, env, at, diags)
-}
-
-// checkIndexWritesIn walks a statement body with the running local environment
-// locals, reporting out-of-range list writes and threading the bindings each
-// statement introduces. A nested block is walked with a copy of locals so its
-// lets stay block-scoped, while an assignment to an outer local persists.
-func checkIndexWritesIn(body []ast.Stmt, locals map[string]*ir.Constant, env eval.Env, at func(ast.Node) span, diags *diagnostic.List) {
-	for _, stmt := range body {
-		switch s := stmt.(type) {
-		case *ast.LetStmt:
-			if s.Name != "" && s.Value != nil {
-				// The let annotation is the value folder's expectation channel: an
-				// empty map/list literal folds to the settled empty collection the
-				// write check needs to tell an upsert from a list write, and a member
-				// value is tagged with its union member.
-				if v := eval.ExprInExpecting(s.Value, locals, annotationTypeOf(env, s.Type), env); v != nil {
-					locals[s.Name] = v
-				} else {
-					delete(locals, s.Name) // an unfoldable rebind: stop tracking it
-				}
-			}
-		case *ast.AssignStmt:
-			reportIndexWrite(s, locals, env, at, diags)
-			if id, ok := s.Target.(*ast.Identifier); ok && s.Value != nil {
-				if v := eval.ExprIn(s.Value, locals, env); v != nil {
-					locals[id.Name] = v
-				} else {
-					delete(locals, id.Name)
-				}
-			}
-		case *ast.IfStmt:
-			checkIndexWritesIn(s.Then, copyLocals(locals), env, at, diags)
-			if s.ElseIf != nil {
-				checkIndexWritesIn([]ast.Stmt{s.ElseIf}, copyLocals(locals), env, at, diags)
-			}
-			checkIndexWritesIn(s.Else, copyLocals(locals), env, at, diags)
-		case *ast.SwitchStmt:
-			for _, arm := range s.Arms {
-				checkIndexWritesIn(arm.Body, copyLocals(locals), env, at, diags)
-			}
-			checkIndexWritesIn(s.Else, copyLocals(locals), env, at, diags)
-			for _, arm := range s.AfterElse {
-				checkIndexWritesIn(arm.Body, copyLocals(locals), env, at, diags)
-			}
-		case *ast.MatchStmt:
-			// A match arm's narrowed binding is not a foldable list constant the
-			// write check tracks, so the arm bodies are walked with a copy of the
-			// locals exactly as a switch's arms are.
-			for _, arm := range s.Arms {
-				checkIndexWritesIn(arm.Body, copyLocals(locals), env, at, diags)
-			}
-			checkIndexWritesIn(s.Else, copyLocals(locals), env, at, diags)
-			for _, arm := range s.AfterElse {
-				checkIndexWritesIn(arm.Body, copyLocals(locals), env, at, diags)
-			}
-		case *ast.ForStmt:
-			// The loop variable is bound per iteration, not to a foldable list
-			// constant the write check tracks, so the body is walked with a copy of
-			// the locals exactly as a switch's arms are.
-			checkIndexWritesIn(s.Body, copyLocals(locals), env, at, diags)
-		case *ast.ReturnStmt, *ast.ExprStmt:
-			// Neither binds or reassigns a local, so neither can carry an index
-			// write or change which list a later write targets: nothing to do.
-			// Listed explicitly so a new statement kind hits the default instead.
-		default:
-			panic(ast.UnhandledStmt(stmt))
-		}
-	}
-}
-
-// reportIndexWrite reports an out-of-range list write for an assignment whose
-// value is a set call on a foldable list. The set call carries the index and the
-// new value (a desugared coll[i] = v, or a hand-written coll = coll.set(i, v));
-// when the receiver folds to a settled list and the index to a constant outside
-// it, the write is reported at the index expression. A map receiver is an upsert
-// and never out of range, and an unknown empty collection (its mapness unsettled)
-// is ambiguous, so neither is reported — only a settled list is.
-func reportIndexWrite(s *ast.AssignStmt, locals map[string]*ir.Constant, env eval.Env, at func(ast.Node) span, diags *diagnostic.List) {
-	call, ok := s.Value.(*ast.CallExpr)
-	if !ok {
-		return
-	}
-	member, ok := call.Callee.(*ast.MemberExpr)
-	if !ok || member.Member.Name != "set" || len(call.Arguments) != 2 {
-		return
-	}
-	recv := eval.ExprIn(member.Receiver, locals, env)
-	if recv == nil || recv.Kind != ir.ConstCollection || !recv.IsList() {
-		return
-	}
-	idx := eval.ExprIn(call.Arguments[0], locals, env)
-	if idx == nil || idx.Kind != ir.ConstInt {
-		return
-	}
-	n := len(recv.Coll)
-	if idx.Int.IsInt64() && idx.Int.Int64() >= 0 && idx.Int.Int64() < int64(n) {
-		return // in range
-	}
-	c := at(call.Arguments[0])
-	diags.Add(newIndexOutOfRangeDiagnostic(c.offset, c.width, idx.Int.String(), strconv.Itoa(n)))
-}
-
-// annotationTypeOf resolves a let's type annotation to its full type through a
-// pure universe lookup, or nil for no annotation (or an Env that supplies no type
-// resolution). It is the channel the write check threads so an empty collection
-// let folds to a settled value and a member let is tagged with its union member.
-func annotationTypeOf(env eval.Env, t ast.TypeExpr) ir.Type {
-	rt, ok := env.(eval.ReceiverTyper)
-	if !ok || t == nil {
-		return nil
-	}
-	return rt.TypeExprType(t)
-}
-
-// copyLocals returns a shallow copy of a local environment, so a nested block's
-// bindings do not leak back to the enclosing one.
-func copyLocals(locals map[string]*ir.Constant) map[string]*ir.Constant {
-	out := make(map[string]*ir.Constant, len(locals))
-	for k, v := range locals {
-		out[k] = v
-	}
-	return out
 }
 
 // checkBareEnumArgs reports a bare member in an operator/method argument whose
@@ -304,7 +161,7 @@ func copyLocals(locals map[string]*ir.Constant) map[string]*ir.Constant {
 // The walk threads bs through a block's lets exactly as the checking walk does
 // (a fresh scope per let, a copy per nested block), so a comparison against a
 // let-bound enum local resolves its receiver from the local in scope.
-func checkBareEnumArgs(body []ast.Stmt, bs infer.BodyScope, env eval.Env, at func(ast.Node) span, diags *diagnostic.List) {
+func checkBareEnumArgs(body []ast.Stmt, bs infer.BodyScope, env exprFolder, at func(ast.Node) span, diags *diagnostic.List) {
 	for _, stmt := range body {
 		switch s := stmt.(type) {
 		case *ast.LetStmt:
@@ -347,7 +204,7 @@ func checkBareEnumArgs(body []ast.Stmt, bs infer.BodyScope, env eval.Env, at fun
 }
 
 // checkBareEnumArgsArms walks each switch arm's value patterns and body.
-func checkBareEnumArgsArms(arms []*ast.SwitchArm, bs infer.BodyScope, env eval.Env, at func(ast.Node) span, diags *diagnostic.List) {
+func checkBareEnumArgsArms(arms []*ast.SwitchArm, bs infer.BodyScope, env exprFolder, at func(ast.Node) span, diags *diagnostic.List) {
 	for _, arm := range arms {
 		for _, v := range arm.Values {
 			reportBareEnumArgsIn(v, bs, env, at, diags)
@@ -361,7 +218,7 @@ func checkBareEnumArgsArms(arms []*ast.SwitchArm, bs infer.BodyScope, env eval.E
 // receiver type is read through the type query (infer.Body) — this is the
 // reporting pass, which the value query never feeds, so the early-cutoff
 // invariant (value-blind folding) is untouched.
-func reportBareEnumArgsIn(e ast.Expr, bs infer.BodyScope, env eval.Env, at func(ast.Node) span, diags *diagnostic.List) {
+func reportBareEnumArgsIn(e ast.Expr, bs infer.BodyScope, env exprFolder, at func(ast.Node) span, diags *diagnostic.List) {
 	if e == nil {
 		return
 	}
@@ -448,7 +305,7 @@ func methodTScope(def *ir.TypeDef, m *ast.MethodDecl) infer.TypeScope {
 // ones — and qualified its namespace-qualified lookup, so a type in a body
 // resolves exactly as an annotation does. env folds switch arm values for the
 // exhaustiveness and duplicate checks.
-func checkMethodBodies(reg *builtin.Registry, defs []*ir.TypeDef, universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, funcs map[string][]*ast.FuncDecl, qualifiedFuncs func(namespace, name string) []*ast.FuncDecl, env eval.Env, sink *infer.Sink, at func(ast.Node) span, diags *diagnostic.List) {
+func checkMethodBodies(reg *builtin.Registry, defs []*ir.TypeDef, universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, funcs map[string][]*ast.FuncDecl, qualifiedFuncs func(namespace, name string) []*ast.FuncDecl, env exprFolder, sink *infer.Sink, at func(ast.Node) span, diags *diagnostic.List) {
 	var noSelf func(node ast.Node)
 	if diags != nil {
 		noSelf = func(node ast.Node) {
@@ -480,7 +337,6 @@ func checkMethodBodies(reg *builtin.Registry, defs []*ir.TypeDef, universe map[s
 			want := substSelf(irm.Result, self)
 			bs := infer.BodyScope{Reg: reg, Universe: universe, Qualified: qualified, Self: selfT, Params: params, Funcs: funcs, QualifiedFuncs: qualifiedFuncs, TScope: methodTScope(def, m)}
 			checkStmts(m.Body, want, bs, env, bodyNoSelf, sink, at, diags)
-			checkIndexWrites(m.Body, env, at, diags)
 			checkBareEnumArgs(m.Body, bs, env, at, diags)
 		}
 	}
@@ -500,7 +356,7 @@ func checkMethodBodies(reg *builtin.Registry, defs []*ir.TypeDef, universe map[s
 // func-literal-types path settles the signatures of the lambdas inside a
 // function body without reporting (the self and missing-return diagnostics, and
 // the index-write check, are suppressed) — mirroring checkMethodBodies.
-func checkFuncBodies(reg *builtin.Registry, file *ast.File, universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, funcs map[string][]*ast.FuncDecl, qualifiedFuncs func(namespace, name string) []*ast.FuncDecl, env eval.Env, sink *infer.Sink, at func(ast.Node) span, diags *diagnostic.List) {
+func checkFuncBodies(reg *builtin.Registry, file *ast.File, universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, funcs map[string][]*ast.FuncDecl, qualifiedFuncs func(namespace, name string) []*ast.FuncDecl, env exprFolder, sink *infer.Sink, at func(ast.Node) span, diags *diagnostic.List) {
 	r := &infer.TypeResolver{Defs: universe, Qualified: qualified}
 	var noSelf func(node ast.Node)
 	if diags != nil {
@@ -530,7 +386,6 @@ func checkFuncBodies(reg *builtin.Registry, file *ast.File, universe map[string]
 		if diags == nil {
 			continue // the sink-only walk wants no further diagnostics
 		}
-		checkIndexWrites(fd.Body, env, at, diags)
 		checkBareEnumArgs(fd.Body, bs, env, at, diags)
 		if hasBlockBody(fd) && !bodyReturns(fd.Body, bs) {
 			s := at(fd)
@@ -545,7 +400,7 @@ func checkFuncBodies(reg *builtin.Registry, file *ast.File, universe map[string]
 // bodies (and its wildcard) so a nested switch is checked the same way. noSelf,
 // when non-nil (a function body), reports a self expression in any statement;
 // a method body passes nil, since self is bound there.
-func checkStmts(stmts []ast.Stmt, want ir.Type, bs infer.BodyScope, env eval.Env, noSelf func(ast.Node), sink *infer.Sink, at func(ast.Node) span, diags *diagnostic.List) {
+func checkStmts(stmts []ast.Stmt, want ir.Type, bs infer.BodyScope, env exprFolder, noSelf func(ast.Node), sink *infer.Sink, at func(ast.Node) span, diags *diagnostic.List) {
 	// A let introduces a block-local that the statements after it (within this
 	// block) see, so bs is rebound with the new local as the walk descends — a
 	// fresh BodyScope per let, leaving the caller's scope untouched. A nested

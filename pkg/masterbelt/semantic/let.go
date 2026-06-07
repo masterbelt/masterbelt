@@ -2,7 +2,6 @@ package semantic
 
 import (
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/eval"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/types"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/types/infer"
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
@@ -31,7 +30,7 @@ import (
 // assignment's type check — resolves through it. A nil diagnostic list (the
 // func-literal-types walk) still extends the scope and types the value through
 // the sink, but reports no let-specific diagnostics.
-func checkLet(s *ast.LetStmt, bs infer.BodyScope, env eval.Env, noSelf func(ast.Node), sink *infer.Sink, at func(ast.Node) span, diags *diagnostic.List) infer.BodyScope {
+func checkLet(s *ast.LetStmt, bs infer.BodyScope, env exprFolder, noSelf func(ast.Node), sink *infer.Sink, at func(ast.Node) span, diags *diagnostic.List) infer.BodyScope {
 	if s.Value != nil && noSelf != nil {
 		checkNoSelf(s.Value, noSelf)
 	}
@@ -75,7 +74,7 @@ func checkLet(s *ast.LetStmt, bs infer.BodyScope, env eval.Env, noSelf func(ast.
 // name has no binding, and a field or element access is immutable data. A nil
 // diagnostic list suppresses the assignment diagnostics but still types the
 // value through the sink.
-func checkAssign(s *ast.AssignStmt, bs infer.BodyScope, env eval.Env, noSelf func(ast.Node), sink *infer.Sink, at func(ast.Node) span, diags *diagnostic.List) {
+func checkAssign(s *ast.AssignStmt, bs infer.BodyScope, env exprFolder, noSelf func(ast.Node), sink *infer.Sink, at func(ast.Node) span, diags *diagnostic.List) {
 	if s.Value != nil && noSelf != nil {
 		checkNoSelf(s.Value, noSelf)
 	}
@@ -226,7 +225,7 @@ func checkSetterAssign(s *ast.AssignStmt, m *ast.MemberExpr, bs infer.BodyScope,
 // name that is a parameter, a let local, a top-level function, or a constant is a
 // legitimate reference (its own type rules apply), not a mistyped member. A nil
 // diagnostic list (the func-literal-types walk) reports nothing.
-func reportBareEnumMember(value ast.Expr, enumDef *ir.TypeDef, bs infer.BodyScope, env eval.Env, at func(ast.Node) span, diags *diagnostic.List) {
+func reportBareEnumMember(value ast.Expr, enumDef *ir.TypeDef, bs infer.BodyScope, env exprFolder, at func(ast.Node) span, diags *diagnostic.List) {
 	if diags == nil || enumDef == nil {
 		return
 	}
@@ -246,7 +245,7 @@ func reportBareEnumMember(value ast.Expr, enumDef *ir.TypeDef, bs infer.BodyScop
 	if _, isFunc := bs.Funcs[id.Name]; isFunc {
 		return
 	}
-	if env != nil && env.Resolve(id) != nil {
+	if env.q != nil && env.q.resolve(env.file, id) != nil {
 		return // a top-level constant: a legitimate reference
 	}
 	s := at(id)
@@ -282,9 +281,8 @@ func resolveBodyType(bs infer.BodyScope, t ast.TypeExpr) ir.Type {
 
 // isConstName reports whether id names a top-level constant — so assigning to it
 // is assign_to_const (a const is immutable) rather than assign_to_undefined. It
-// resolves through the body's environment, the same lookup a value reference in
-// the body folds through; a nil environment (a checking path that folds nothing)
-// reports false, leaving the name undefined.
-func isConstName(env eval.Env, id *ast.Identifier) bool {
-	return env != nil && env.Resolve(id) != nil
+// resolves through the folder's queries, the same lookup a value reference in
+// the body folds through.
+func isConstName(env exprFolder, id *ast.Identifier) bool {
+	return env.q != nil && env.q.resolve(env.file, id) != nil
 }

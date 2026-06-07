@@ -6,6 +6,7 @@ import (
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/eval"
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/lower"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/types"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/types/infer"
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
@@ -33,7 +34,7 @@ import (
 // types through it (reporting its own operator errors and streaming its
 // settled type for the typed value graph), and the arm values' sink forwards
 // its informational streams.
-func checkSwitch(sw *ast.SwitchStmt, bs infer.BodyScope, env eval.Env, sink *infer.Sink, at func(ast.Node) span, diags *diagnostic.List) {
+func checkSwitch(sw *ast.SwitchStmt, bs infer.BodyScope, env exprFolder, sink *infer.Sink, at func(ast.Node) span, diags *diagnostic.List) {
 	if sw.Scrutinee == nil {
 		return
 	}
@@ -171,19 +172,28 @@ func scrutineeComparable(reg *builtin.Registry, typ ir.Type) bool {
 	return types.Satisfies(reg, typ, &ir.Named{Def: cmp})
 }
 
+// enumWant wraps an enum definition as the expectation an arm value folds
+// against — nil when the scrutinee names no enum, leaving the channels clear.
+func enumWant(def *ir.TypeDef) ir.Type {
+	if def == nil {
+		return nil
+	}
+	return &ir.Named{Def: def}
+}
+
 // armValueKey returns a stable key identifying an arm value for duplicate
 // detection, and whether it could be determined. An enum member keys on its
 // index; any other value keys on its folded constant. An unfoldable value has
 // no key (the second result is false), so it is neither a duplicate nor counts
 // toward coverage.
-func armValueKey(v ast.Expr, enumDef *ir.TypeDef, env eval.Env) (string, bool) {
+func armValueKey(v ast.Expr, enumDef *ir.TypeDef, env exprFolder) (string, bool) {
 	if enumDef != nil {
 		if idx := enumValueIndex(v, enumDef, env); idx >= 0 {
 			return "enum:" + enumDef.Name + ":" + itoa(idx), true
 		}
 		return "", false
 	}
-	c := eval.Expr(v, env)
+	c := eval.GraphExpecting(lower.Value(v, env.binder(enumDef)), enumWant(enumDef), env.env())
 	if c == nil {
 		return "", false
 	}
@@ -192,13 +202,13 @@ func armValueKey(v ast.Expr, enumDef *ir.TypeDef, env eval.Env) (string, bool) {
 
 // armValueLabel renders an arm value for a diagnostic: an enum member by its
 // qualified name, any other value by its folded constant or its surface form.
-func armValueLabel(v ast.Expr, enumDef *ir.TypeDef, env eval.Env) string {
+func armValueLabel(v ast.Expr, enumDef *ir.TypeDef, env exprFolder) string {
 	if enumDef != nil {
 		if idx := enumValueIndex(v, enumDef, env); idx >= 0 {
 			return enumDef.Name + "." + enumDef.Enum.Members[idx].Name
 		}
 	}
-	if c := eval.Expr(v, env); c != nil {
+	if c := eval.GraphExpecting(lower.Value(v, env.binder(enumDef)), enumWant(enumDef), env.env()); c != nil {
 		return c.String()
 	}
 	return ast.Render(v)
@@ -207,7 +217,7 @@ func armValueLabel(v ast.Expr, enumDef *ir.TypeDef, env eval.Env) string {
 // enumValueIndex returns the member index an arm value names within enumDef, or
 // -1 when the value is not a member of it. It accepts both the bare form
 // (Common) and the qualified form (Rarity.Common).
-func enumValueIndex(v ast.Expr, enumDef *ir.TypeDef, env eval.Env) int {
+func enumValueIndex(v ast.Expr, enumDef *ir.TypeDef, env exprFolder) int {
 	if enumDef == nil {
 		return -1
 	}
@@ -219,7 +229,7 @@ func enumValueIndex(v ast.Expr, enumDef *ir.TypeDef, env eval.Env) int {
 			return enumIndex(enumDef, e.Member.Name)
 		}
 	}
-	if c := eval.Expr(v, env); c != nil && c.Kind == ir.ConstEnum && c.EnumDef == enumDef {
+	if c := eval.GraphExpecting(lower.Value(v, env.binder(enumDef)), enumWant(enumDef), env.env()); c != nil && c.Kind == ir.ConstEnum && c.EnumDef == enumDef {
 		return c.EnumIndex
 	}
 	return -1

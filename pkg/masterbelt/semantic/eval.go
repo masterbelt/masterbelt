@@ -100,6 +100,64 @@ func (e graphFoldEnv) ConstValue(c *ir.Const) *ir.Constant {
 func (e graphFoldEnv) LookupType(name string) *ir.TypeDef { return e.q.universe(e.file)[name] }
 func (e graphFoldEnv) Registry() *builtin.Registry        { return e.q.registry() }
 
+// exprFolder folds source expressions for the in-walk diagnostics: each fold
+// lowers the expression to its type-blind value graph through the constant
+// binder and interprets it — the same two steps the value query takes — so
+// the checks read exactly the semantics the folder publishes. The checks fold
+// only constant values (a local or parameter does not fold), the conservative
+// discipline they have always kept.
+type exprFolder struct {
+	q    queries
+	file FileID
+}
+
+func (f exprFolder) binder(expected *ir.TypeDef) constBinder {
+	return constBinder{q: f.q, file: f.file, irOf: f.q.constShellTable(), fnOf: f.q.funcShellTable(), expected: expected}
+}
+
+func (f exprFolder) env() graphFoldEnv { return graphFoldEnv{q: f.q, file: f.file} }
+
+// fold lowers and folds one expression, with no expectation.
+func (f exprFolder) fold(e ast.Expr) *ir.Constant {
+	if e == nil {
+		return nil
+	}
+	return eval.Graph(lower.Value(e, f.binder(nil)), f.env())
+}
+
+// foldExpecting lowers and folds one expression against the resolved type its
+// value flows into — the enum, mapness, and union channels.
+func (f exprFolder) foldExpecting(e ast.Expr, want ir.Type) *ir.Constant {
+	if e == nil {
+		return nil
+	}
+	return eval.GraphExpecting(lower.Value(e, f.binder(enumDefOf(want))), want, f.env())
+}
+
+// memberFor resolves the member a folded expression flows into want as.
+func (f exprFolder) memberFor(e ast.Expr, want ir.Type) ir.Type {
+	if e == nil {
+		return want
+	}
+	return eval.GraphMemberFor(lower.Value(e, f.binder(nil)), want, f.env())
+}
+
+// nodesBySyntax indexes a value graph's nodes by their syntax anchors, the
+// outermost wrapper claiming each anchor (parents walk first) — the channel a
+// per-sub-expression fold (the power-assert diagram) reads its nodes through.
+func nodesBySyntax(root ir.Value) map[ast.Expr]ir.Value {
+	out := map[ast.Expr]ir.Value{}
+	ir.WalkValues(root, func(v ir.Value) bool {
+		if syn := ir.SyntaxOf(v); syn != nil {
+			if _, claimed := out[syn]; !claimed {
+				out[syn] = v
+			}
+		}
+		return true
+	})
+	return out
+}
+
 // computeValue is the evaluation rule, shared by both query implementations:
 // the declaration's initializer is lowered to its (type-blind) value graph and
 // folded by the IR interpreter. The file is the one decl sits in. The

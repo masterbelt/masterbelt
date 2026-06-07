@@ -312,11 +312,11 @@ func funcLitTypesOf(db *database, fileID FileID, file *ast.File) map[*ast.FuncLi
 	// the same way one inside a method body or a const initializer does.
 	funcs := buildFuncSymbols(file)
 	qualifiedFuncs := qualifiedFuncsFrom(q, q.importsOf(fileID))
-	// A nil diagnostic list (the sink-only walks) folds nothing, so the eval
-	// environment is unused and stays nil, exactly as the method-body walk here
-	// always has.
-	checkMethodBodies(reg, q.typeDefs(fileID), q.universe(fileID), qualified, funcs, qualifiedFuncs, nil, sink, nil, nil)
-	checkFuncBodies(reg, file, q.universe(fileID), qualified, funcs, qualifiedFuncs, nil, sink, nil, nil)
+	// A nil diagnostic list (the sink-only walks) folds nothing, so the fold
+	// channel is the zero folder (its queries unread), exactly as the
+	// method-body walk here always has.
+	checkMethodBodies(reg, q.typeDefs(fileID), q.universe(fileID), qualified, funcs, qualifiedFuncs, exprFolder{}, sink, nil, nil)
+	checkFuncBodies(reg, file, q.universe(fileID), qualified, funcs, qualifiedFuncs, exprFolder{}, sink, nil, nil)
 	return out
 }
 

@@ -63,6 +63,43 @@ func GraphInExpecting(v ir.Value, locals map[string]*ir.Constant, want ir.Type, 
 	return graphValue(v, graphExpectingType(graphCtx{env: env, locals: locals}, want))
 }
 
+// GraphFailure classifies why folding a value graph against want produced no
+// value: it re-runs the fold with the budget channel armed and reports
+// FailureDepth when a budget guard refused it, FailureGap otherwise — the
+// graph twin of the AST classifier, run only on the error path.
+func GraphFailure(v ir.Value, want ir.Type, env GraphEnv) string {
+	if v == nil {
+		return FailureGap
+	}
+	hit := false
+	graphValue(v, graphExpectingType(graphCtx{env: env, budgetHit: &hit}, want))
+	if hit {
+		return FailureDepth
+	}
+	return FailureGap
+}
+
+// GraphMemberFor returns the type a value graph's fold flows in as under the
+// expected type want: the union member it would be tagged with when want is a
+// union, or want itself — the channel the member-aware range and refinement
+// checks resolve their effective target through, the graph twin of the old
+// expression form. The value folds raw, so the member selection reads the
+// same value the checks will.
+func GraphMemberFor(v ir.Value, want ir.Type, env GraphEnv) ir.Type {
+	if types.UnionType(want) == nil {
+		return want
+	}
+	ctx := graphCtx{env: env}
+	c := graphValueRaw(v, ctx)
+	if c == nil {
+		return want
+	}
+	if tag := graphUnionTag(ctx, v, c, want); tag != nil {
+		return tag
+	}
+	return want
+}
+
 // GraphPredicate folds a refinement predicate graph with self bound to self
 // and its owning definition selfDef in scope — so a self-method call in the
 // predicate (where self.isValid()) resolves its method even on a type-blind

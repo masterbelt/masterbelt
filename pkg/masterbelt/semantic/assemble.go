@@ -168,7 +168,7 @@ func exprSink(at func(ast.Node) span, diags *diagnostic.List, res *callResolutio
 // flowing into a sized or refined position (the union member included) is enforced
 // in a body exactly as in a const. env folds the values; a non-constant value
 // (a parameter, a local) does not fold and is left to the runtime.
-func bodySink(at func(ast.Node) span, diags *diagnostic.List, reg *builtin.Registry, env evalEnv, res *callResolutions) *infer.Sink {
+func bodySink(at func(ast.Node) span, diags *diagnostic.List, reg *builtin.Registry, env exprFolder, res *callResolutions) *infer.Sink {
 	sink := exprSink(at, diags, res)
 	sink.Checked = func(e ast.Expr, want ir.Type) {
 		checkMemberFlow(reg, e, want, env, at, diags)
@@ -278,7 +278,7 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 				// so a nested position (a collection entry, a record field, an
 				// argument) enforces both checks at the same sites, the union member
 				// included (its Fits and refinedDef both pass through directly).
-				checkMemberFlow(reg, e, want, evalEnv{q: q, file: fileID}, at, diags)
+				checkMemberFlow(reg, e, want, exprFolder{q: q, file: fileID}, at, diags)
 			}
 			// A conversion to a sized integer (short(70000), Level(70000)) range-
 			// checks its argument against the target — the diagnostic the const-level
@@ -292,7 +292,7 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 			// ScalarConversion); a non-constant argument does not fold and is left to
 			// the runtime.
 			sink.ScalarConversion = func(call *ast.CallExpr, target ir.Type) {
-				checkScalarConversion(reg, call, target, evalEnv{q: q, file: fileID}, at, diags)
+				checkScalarConversion(reg, call, target, exprFolder{q: q, file: fileID}, at, diags)
 			}
 			if annType != ir.Invalid {
 				// The annotation is pushed into the value.
@@ -307,12 +307,12 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 				infer.Check(decl.Value, env, sink)
 			}
 			// Division or remainder by a zero divisor.
-			checkDivByZero(decl.Value, evalEnv{q: q, file: fileID}, func(node ast.Node) {
+			checkDivByZero(decl.Value, exprFolder{q: q, file: fileID}, func(node ast.Node) {
 				s := at(node)
 				diags.Add(newDivisionByZeroDiagnostic(s.offset, s.width))
 			})
 			// range(start, end, step) with a step that folds to zero.
-			checkRangeStepZero(decl.Value, evalEnv{q: q, file: fileID}, func(node ast.Node) {
+			checkRangeStepZero(decl.Value, exprFolder{q: q, file: fileID}, func(node ast.Node) {
 				s := at(node)
 				diags.Add(newRangeStepZeroDiagnostic(s.offset, s.width))
 			})
@@ -336,7 +336,7 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 		// diagram naming the comparison that rejected the constant. It is the same
 		// member-aware check the nested positions run through Checked.
 		if decl.Value != nil {
-			checkMemberFlow(reg, decl.Value, c.Type, evalEnv{q: q, file: fileID}, at, diags)
+			checkMemberFlow(reg, decl.Value, c.Type, exprFolder{q: q, file: fileID}, at, diags)
 		}
 		// An empty or heterogeneous collection literal with no annotation has
 		// no type to infer (checking mode never sees it without one).
@@ -362,7 +362,7 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 	funcs := buildFuncSymbols(file)
 	qfns := qualifiedFuncsFrom(q, imp)
 	module.Funcs = resolveFuncs(file, at, diags, reg, q.universe(fileID), qualifiedFrom(q, imp), bfns)
-	bodyEnv := evalEnv{q: q, file: fileID}
+	bodyEnv := exprFolder{q: q, file: fileID}
 	// A function or method body's returns, lets, and arguments run the same
 	// member-aware range and refinement check the const initializer does, so a
 	// constant value flowing into a sized or refined (union member) result, local,
@@ -404,15 +404,20 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 		checkAssocConstRefs(ed.Consts)
 	}
 
-	// Every checking walk has run: bind the checker-selected overloads into the
-	// IR (the doctrine that every reference is bound to its declaration, met
-	// for overloaded calls) and arm them for evaluation.
+	// Every checking walk has run: bind the checker-selected overloads, the
+	// settled types, and the explicit adaptions into the IR (the doctrine that
+	// every reference is bound to its declaration, met for overloaded calls).
 	writeBackResolutions(module, res, fnShells, reg)
 	ownShells := make(map[*ast.ConstDecl]*ir.Const, len(file.Decls))
 	for _, decl := range file.Decls {
 		ownShells[decl] = shells[decl]
 	}
-	renv := resolvedEnv{evalEnv: evalEnv{q: q, file: fileID}, res: res, own: ownShells}
+	genv := graphFoldEnv{q: q, file: fileID, own: ownShells}
+
+	// Index writes fold over the lowered bodies, post-write-back: the IR
+	// carries the locals' settled types and the write calls, so the check
+	// reads the same graph the folder runs.
+	checkIndexWritesIR(module, genv, at, diags)
 
 	// The late re-fold: a constant the type-blind value query left unfolded
 	// is folded once more — through the IR interpreter, over the annotated
@@ -424,7 +429,6 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 	// fixpoint: genv reads this file's published values, so a reader of a
 	// re-folded constant folds in a later round, whatever the declaration
 	// order.
-	genv := graphFoldEnv{q: q, file: fileID, own: ownShells}
 	for progress := true; progress; {
 		progress = false
 		for _, decl := range file.Decls {
@@ -459,11 +463,11 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 		// Operator type errors, zero divisors, and stray selfs, through the
 		// same checking walks the const path uses.
 		condType := infer.Check(a.Cond, env, exprSink(at, diags, res))
-		checkDivByZero(a.Cond, evalEnv{q: q, file: fileID}, func(node ast.Node) {
+		checkDivByZero(a.Cond, exprFolder{q: q, file: fileID}, func(node ast.Node) {
 			s := at(node)
 			diags.Add(newDivisionByZeroDiagnostic(s.offset, s.width))
 		})
-		checkRangeStepZero(a.Cond, evalEnv{q: q, file: fileID}, func(node ast.Node) {
+		checkRangeStepZero(a.Cond, exprFolder{q: q, file: fileID}, func(node ast.Node) {
 			s := at(node)
 			diags.Add(newRangeStepZeroDiagnostic(s.offset, s.width))
 		})
@@ -474,9 +478,20 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 
 		// The outcome — the folded condition and its power-assert diagram —
 		// is module data: the editor's hover and the failure diagnostic both
-		// read the very values the assertion was checked with.
-		v := eval.Expr(a.Cond, renv)
-		d := assert.Diagram(a.Cond, renv)
+		// read the very values the assertion was checked with. The condition
+		// lowers to its value graph, takes the checker's write-back (the walks
+		// above streamed its facts into res), and folds through the IR
+		// interpreter — sub-expression by sub-expression for the diagram.
+		condGraph := annotateGraph(lower.Value(a.Cond, constBinder{q: q, file: fileID, irOf: shells, fnOf: fnShells}), res, fnShells, reg)
+		condNodes := nodesBySyntax(condGraph)
+		foldCondAt := func(e ast.Expr) *ir.Constant {
+			if n, ok := condNodes[e]; ok {
+				return eval.Graph(n, genv)
+			}
+			return nil
+		}
+		v := eval.Graph(condGraph, genv)
+		d := assert.Diagram(a.Cond, foldCondAt)
 		cond, _, _ := strings.Cut(d, "\n")
 
 		// A poisoned condition type — the assert's own error, or a broken
@@ -572,7 +587,7 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 	// directions read the settled facts: a broken declaration's value is
 	// withheld (soundness), and a clean declaration without a value is an
 	// error (totality, unfolded_const).
-	enforceEvalPublication(fileID, file, module, shells, q, renv, at, diags)
+	enforceEvalPublication(fileID, file, module, shells, q, ownShells, genv, at, diags)
 
 	items := diags.Items()
 	sort.SliceStable(items, func(i, j int) bool { return items[i].Offset < items[j].Offset })
@@ -708,29 +723,43 @@ func refinedDef(t ir.Type) *ir.TypeDef {
 // A non-constant or unfoldable value (a parameter, a predicate that does not fold
 // to a bool) is left unchecked — the runtime's job, the conservative discipline
 // the range and refinement checks already share.
-func checkMemberFlow(reg *builtin.Registry, e ast.Expr, want ir.Type, env evalEnv, at func(ast.Node) span, diags *diagnostic.List) {
+func checkMemberFlow(reg *builtin.Registry, e ast.Expr, want ir.Type, env exprFolder, at func(ast.Node) span, diags *diagnostic.List) {
 	if want == ir.Invalid {
 		return
 	}
-	v := eval.Expr(e, env)
+	v := env.fold(e)
 	if v == nil {
 		return
 	}
-	member := eval.MemberFor(e, want, env)
+	member := env.memberFor(e, want)
 	if v.Kind == ir.ConstInt && !types.Fits(reg, member, v.Int) {
 		s := at(e)
 		diags.Add(newConstantOverflowDiagnostic(s.offset, s.width, v.String(), member.String()))
 		return
 	}
 	if def := refinedDef(member); def != nil {
-		p := eval.GraphPredicate(def.Where, v, def, graphFoldEnv{q: env.q, file: env.file})
+		p := eval.GraphPredicate(def.Where, v, def, env.env())
 		if p != nil && p.Kind == ir.ConstBool && !p.Bool {
 			s := at(e)
-			d := assert.DiagramSelf(def.WhereSyntax(), v, def, env)
+			d := assert.Diagram(def.WhereSyntax(), whereFoldAt(def, v, env))
 			diagram := "\n  " + strings.ReplaceAll(d, "\n", "\n  ")
 			diags.Add(newRefinementViolationDiagnostic(
 				s.offset, s.width, v.String(), member.String(), ast.Render(def.WhereSyntax()), diagram))
 		}
+	}
+}
+
+// whereFoldAt folds a refinement predicate's sub-expressions for the violation
+// diagram: each anchor reads its node off the definition's Where graph and
+// folds with self bound to the rejected value.
+func whereFoldAt(def *ir.TypeDef, self *ir.Constant, env exprFolder) func(ast.Expr) *ir.Constant {
+	nodes := nodesBySyntax(def.Where)
+	genv := env.env()
+	return func(e ast.Expr) *ir.Constant {
+		if n, ok := nodes[e]; ok {
+			return eval.GraphPredicate(n, self, def, genv)
+		}
+		return nil
 	}
 }
 
@@ -742,11 +771,11 @@ func checkMemberFlow(reg *builtin.Registry, e ast.Expr, want ir.Type, env evalEn
 // refuses to fold an out-of-range conversion (it folds to nil), so checkMemberFlow
 // never sees the value — this is the only site that reports it, and a non-constant
 // argument does not fold and is left to the runtime.
-func checkScalarConversion(reg *builtin.Registry, call *ast.CallExpr, target ir.Type, env evalEnv, at func(ast.Node) span, diags *diagnostic.List) {
+func checkScalarConversion(reg *builtin.Registry, call *ast.CallExpr, target ir.Type, env exprFolder, at func(ast.Node) span, diags *diagnostic.List) {
 	if len(call.Arguments) != 1 {
 		return
 	}
-	if v := eval.Expr(call.Arguments[0], env); v != nil && v.Kind == ir.ConstInt && !types.Fits(reg, target, v.Int) {
+	if v := env.fold(call.Arguments[0]); v != nil && v.Kind == ir.ConstInt && !types.Fits(reg, target, v.Int) {
 		s := at(call)
 		diags.Add(newConstantOverflowDiagnostic(s.offset, s.width, v.String(), target.String()))
 	}
