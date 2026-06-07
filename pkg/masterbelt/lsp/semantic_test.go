@@ -131,6 +131,38 @@ func TestSemanticTokensTernary(t *testing.T) {
 	}
 }
 
+func TestSemanticTokensRange(t *testing.T) {
+	// The range operators ".." and "..." colour as operators, like ? and ->; the
+	// bounds read through the existing number rules. Two ranges in one const pin
+	// both the two- and three-dot spellings.
+	doc := abstract.NewDocument([]byte("const R = 0..9\nconst H = 0...9\n"))
+	got := decode(semanticTokens(doc).Data)
+
+	want := []decodedToken{
+		{0, 0, 5, stKeyword, 0},                           // const
+		{0, 6, 1, stVariable, smDeclaration | smReadonly}, // R
+		{0, 8, 1, stOperator, 0},                          // =
+		{0, 10, 1, stNumber, 0},                           // 0
+		{0, 11, 2, stOperator, 0},                         // ..
+		{0, 13, 1, stNumber, 0},                           // 9
+		{1, 0, 5, stKeyword, 0},                           // const (line 1)
+		{1, 6, 1, stVariable, smDeclaration | smReadonly}, // H
+		{1, 8, 1, stOperator, 0},                          // =
+		{1, 10, 1, stNumber, 0},                           // 0
+		{1, 11, 3, stOperator, 0},                         // ...
+		{1, 14, 1, stNumber, 0},                           // 9
+	}
+
+	if len(got) != len(want) {
+		t.Fatalf("got %d tokens, want %d:\n got:  %+v\n want: %+v", len(got), len(want), got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("token[%d] = %+v, want %+v", i, got[i], want[i])
+		}
+	}
+}
+
 func TestSemanticTokensWhereClause(t *testing.T) {
 	// where colours as a keyword like the rest of the declaration; the
 	// comparison operator carries no semantic token (the grammar colours it).

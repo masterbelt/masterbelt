@@ -61,6 +61,9 @@ func hover(doc view, offset int) *protocol.Hover {
 	if h := literalHover(doc, offset); h != nil {
 		return h
 	}
+	if h := rangeLitHover(doc, offset); h != nil {
+		return h
+	}
 	return assertHover(doc, offset, trees)
 }
 

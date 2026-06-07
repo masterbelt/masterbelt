@@ -90,8 +90,23 @@ func TestTypeHover(t *testing.T) {
 		if !strings.Contains(h.Contents.Value, "type range = builtin") {
 			t.Errorf("hover = %q, want the builtin signature", h.Contents.Value)
 		}
-		if !strings.Contains(h.Contents.Value, "inclusive") {
+		if !strings.Contains(h.Contents.Value, "A sequence of integers") {
 			t.Errorf("hover = %q, want the doc comment", h.Contents.Value)
+		}
+	})
+
+	t.Run("a range literal hovers as range", func(t *testing.T) {
+		for _, lit := range []string{"0..9", "0...9"} {
+			src := "const R = " + lit + "\n"
+			doc := testView(src)
+			// Hover on the range operator (the literal's anchor).
+			h := hover(doc, strings.IndexByte(src, '.'))
+			if h == nil {
+				t.Fatalf("%s: no hover on the range operator", lit)
+			}
+			if !strings.Contains(h.Contents.Value, "range") {
+				t.Errorf("%s: hover = %q, want the range type", lit, h.Contents.Value)
+			}
 		}
 	})
 }

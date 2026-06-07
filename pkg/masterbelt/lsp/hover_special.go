@@ -59,6 +59,32 @@ func literalHover(doc view, offset int) *protocol.Hover {
 	}
 }
 
+// rangeLitHover describes the range literal at offset — the cursor on its ".."
+// or "..." operator — as the range type. A range literal is the surface syntax
+// of the range builtin, so hovering its operator reads the same type a range(...)
+// call would; the operator is the literal's anchor (its bounds hover as their own
+// expressions). The card names the type only — the folded value is not always
+// available here (a bound may reference a parameter) — matching how the other
+// type cards read.
+func rangeLitHover(doc view, offset int) *protocol.Hover {
+	leaf, _, ok := leafAt(doc.AST().Concrete().Tree(), offset)
+	if !ok {
+		return nil
+	}
+	kind, isTok := leaf.TokenKind()
+	if !isTok || (kind != token.DotDot && kind != token.DotDotDot) {
+		return nil
+	}
+	r := toRange(doc.Buffer(), leaf.Offset(), leaf.End())
+	return &protocol.Hover{
+		Contents: protocol.MarkupContent{
+			Kind:  protocol.Markdown,
+			Value: "```masterbelt\nrange\n```",
+		},
+		Range: &r,
+	}
+}
+
 // assertHover renders the assertion at offset as its power-assert diagram —
 // the condition with every sub-expression's folded value beneath it — so a
 // holding assertion's values are visible without making it fail. The module
