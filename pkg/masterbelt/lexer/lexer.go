@@ -94,8 +94,8 @@ func (l *Lexer) Next() token.Token {
 		return l.scanFixed(start, 1, token.RBracket)
 	case c == ',':
 		return l.scanFixed(start, 1, token.Comma)
-	case c == '.':
-		return l.scanFixed(start, 1, token.Dot)
+	case c == '.': // "..." (half-open range), ".." (closed range), or "." (member)
+		return l.scanDot(start)
 	case c == '+':
 		return l.scanFixed(start, 1, token.Plus)
 	case c == '-': // "->" or "-"
