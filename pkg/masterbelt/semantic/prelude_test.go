@@ -234,3 +234,50 @@ func TestImportShadowsPrelude(t *testing.T) {
 	})
 	findDiag(t, p, "main.belt", CodeTypeMismatch) // 1 is no record: the import won
 }
+
+// TestPreludeValidationChecksEffectfulExtern checks the effectful branch of
+// the validation: an effectful extern is backed by the registry's
+// effectful-native record (never an intrinsic), the declared effects must
+// match the recorded ones, and an unrecorded one fails.
+func TestPreludeValidationChecksEffectfulExtern(t *testing.T) {
+	reg := builtin.Default()
+	withDatetime := func(d *ir.TypeDef) []*ir.TypeDef {
+		defs := []*ir.TypeDef{d}
+		for _, name := range reg.Names() {
+			if name != d.Name {
+				defs = append(defs, &ir.TypeDef{Name: name, Builtin: true})
+			}
+		}
+		return defs
+	}
+
+	// The recorded native validates.
+	ok := &ir.TypeDef{
+		Name:    "datetime",
+		Builtin: true,
+		Methods: []*ir.Method{{Name: "now", Extern: true, Kind: ir.MethodStatic, Effects: []string{"nondet"}}},
+	}
+	if err := validatePrelude(reg, withDatetime(ok)); err != nil {
+		t.Fatalf("validatePrelude rejected the recorded effectful native: %v", err)
+	}
+
+	// An effectful extern the registry records nothing for fails.
+	unrecorded := &ir.TypeDef{
+		Name:    "datetime",
+		Builtin: true,
+		Methods: []*ir.Method{{Name: "sleep", Extern: true, Kind: ir.MethodStatic, Effects: []string{"io"}}},
+	}
+	if err := validatePrelude(reg, withDatetime(unrecorded)); err == nil {
+		t.Fatal("validatePrelude accepted an effectful extern with no registry record")
+	}
+
+	// A declared effect list that disagrees with the record fails.
+	wrongEffects := &ir.TypeDef{
+		Name:    "datetime",
+		Builtin: true,
+		Methods: []*ir.Method{{Name: "now", Extern: true, Kind: ir.MethodStatic, Effects: []string{"io"}}},
+	}
+	if err := validatePrelude(reg, withDatetime(wrongEffects)); err == nil {
+		t.Fatal("validatePrelude accepted an effectful extern whose effects disagree with the record")
+	}
+}

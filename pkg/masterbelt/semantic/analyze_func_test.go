@@ -577,10 +577,27 @@ func TestFuncOverloadRecordArgDefers(t *testing.T) {
 	}
 }
 
+// nondetRoot is the effects fixture rooted in the registry's real effectful
+// native: roll() declares nondet and reads datetime.now(), so the effect
+// chain bottoms out in a native the toolchain actually supplies. The extern
+// spelling is reserved for the builtin surface, so tests root their effects
+// here rather than in an extern declaration.
+const nondetRoot = "pub fn nondet roll(): nint {\n" +
+	"  return datetime.now() > D1970-01-01T00:00:00.000Z ? 1 : 0\n" +
+	"}\n"
+
+// ioAsyncRoot is the io/async fixture: those effects have no registry-supplied
+// native yet (dormant until one lands), so the fixture justifies its effects
+// through its own recursive await — the machinery stays exercised in pure user
+// code, with no extern.
+const ioAsyncRoot = "pub fn io async fetch(url: string): string {\n" +
+	"  return await fetch(url)\n" +
+	"}\n"
+
 func TestEffectDeclarationsPropagate(t *testing.T) {
 	// A function calling an effectful one must declare the effects itself;
 	// declaring them silences the check, and awaiting consumes async.
-	src := "extern fn io async fetch(url: string): string\n" +
+	src := ioAsyncRoot +
 		"pub fn io async page(url: string): string {\n" +
 		"  return await fetch(url)\n" +
 		"}\n"
@@ -591,7 +608,7 @@ func TestEffectDeclarationsPropagate(t *testing.T) {
 
 func TestMissingEffect(t *testing.T) {
 	// Each undeclared-but-used effect is reported once, at the first site.
-	src := "extern fn io async fetch(url: string): string\n" +
+	src := ioAsyncRoot +
 		"pub fn page(url: string): string {\n" +
 		"  return fetch(url)\n" +
 		"}\n"
@@ -607,7 +624,7 @@ func TestMissingEffect(t *testing.T) {
 	}
 
 	// await outside an async declaration is itself a missing async.
-	src = "extern fn nondet roll(): nint\n" +
+	src = nondetRoot +
 		"pub fn nondet f(): nint {\n" +
 		"  return await roll()\n" +
 		"}\n"
@@ -617,7 +634,7 @@ func TestMissingEffect(t *testing.T) {
 }
 
 func TestMissingEffectOnMethod(t *testing.T) {
-	src := "extern fn io async fetch(url: string): string\n" +
+	src := ioAsyncRoot +
 		"pub type Client = { base: string } impl {\n" +
 		"  pub fn get(path: string): string {\n" +
 		"    return await fetch(self.base + path)\n" +
@@ -629,22 +646,31 @@ func TestMissingEffectOnMethod(t *testing.T) {
 	}
 }
 
+func TestMissingEffectOnNativeStaticCall(t *testing.T) {
+	// The registry's effectful native is a root like any other effectful
+	// callee: a pure fn reading datetime.now() directly is missing nondet.
+	src := "pub fn f(): datetime {\n  return datetime.now()\n}\n"
+	if _, diags := analyze(src); !hasCode(diags, CodeMissingEffect) {
+		t.Errorf("want missing_effect for a bare datetime.now() call, got %v", codes(diags))
+	}
+}
+
 func TestUnusedEffect(t *testing.T) {
-	// A declared effect the body never uses is a warning; an extern's
-	// effects are roots and never flagged.
+	// A declared effect the body never uses is a warning; a declaration whose
+	// effect bottoms out in the registry's native root is not.
 	_, diags := analyze("pub fn io f(): nint -> 1\n")
 	if !hasCode(diags, CodeUnusedEffect) {
 		t.Fatalf("want unused_effect, got %v", codes(diags))
 	}
-	if _, diags := analyze("extern fn io async fetch(url: string): string\n"); len(diags) != 0 {
-		t.Errorf("extern roots should not be checked, got %v", codes(diags))
+	if _, diags := analyze("pub fn nondet stamp(): datetime -> datetime.now()\n"); len(diags) != 0 {
+		t.Errorf("a wrapper over the native root should be green, got %v", codes(diags))
 	}
 }
 
 func TestEffectPropagatesThroughLambda(t *testing.T) {
 	// A literal's body executes where it is applied, so its effect uses
 	// count toward the enclosing declaration.
-	src := "extern fn nondet roll(): nint\n" +
+	src := nondetRoot +
 		"pub fn f(): nint {\n" +
 		"  return [1].map(fn(x) -> x + roll()).count()\n" +
 		"}\n"
@@ -657,7 +683,7 @@ func TestEffectPropagatesThroughLambda(t *testing.T) {
 func TestEffectInPureContext(t *testing.T) {
 	// A compile-time position — a constant initializer, an assert condition —
 	// must be pure: an effectful call (or an await) cannot appear in it.
-	roots := "extern fn nondet roll(): nint\nextern fn io async fetch(url: string): string\n"
+	roots := nondetRoot + ioAsyncRoot
 	for _, src := range []string{
 		roots + "const T = roll()\n",
 		roots + "const U = roll() + 1\n",
@@ -679,7 +705,7 @@ func TestEffectInPureContextFoldedPositions(t *testing.T) {
 	// rule as a const initializer: an enum member initializer, an associated
 	// constant initializer, and a refinement (where) predicate all fold at
 	// compile time, so an effectful call cannot appear in any of them.
-	roots := "extern fn nondet roll(): nint\n"
+	roots := nondetRoot
 	for _, src := range []string{
 		// An enum member initializer.
 		roots + "pub enum E: nint {\n  A = roll()\n}\n",
@@ -716,7 +742,7 @@ func TestEffectInTernaryBranch(t *testing.T) {
 	// declaration's effects, exactly as one in a return value does. Before
 	// collectEffectUses handled TernaryExpr, the branch was never visited, so
 	// the effect slipped past both completeness checks.
-	roots := "extern fn nondet roll(): nint\n"
+	roots := nondetRoot
 
 	// missing_effect: an undeclared effect in a ternary branch of a function body.
 	for _, body := range []string{

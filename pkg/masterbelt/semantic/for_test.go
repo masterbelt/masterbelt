@@ -210,7 +210,9 @@ func TestForOverBoundedTypeParam(t *testing.T) {
 // value drives the iteration, so the accumulation collapses to a constant.
 func TestForOverUserFoldableConcrete(t *testing.T) {
 	src := "pub type Bag = list<nint> impl foldable<nint, nint> {\n" +
-		"  pub extern fn fold(init: A, step: fn(acc: A, key: nint, value: nint): A): A\n" +
+		"  pub fn fold<A>(init: A, step: fn(acc: A, key: nint, value: nint): A): A {\n" +
+		"    return init\n" +
+		"  }\n" +
 		"}\n" +
 		"pub fn sum(b: Bag): nint {\n" +
 		"  let total = 0\n" +

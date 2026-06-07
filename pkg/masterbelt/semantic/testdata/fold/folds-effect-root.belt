@@ -1,0 +1,5 @@
+// fold-expect: folds
+// A nondet wrapper over the registry's effectful native is green and carries
+// no fold target: a fn body is never folded — datetime.now() must never
+// become a value.
+pub fn nondet stamp(): datetime -> datetime.now()

@@ -3,6 +3,7 @@ package semantic
 import (
 	"bytes"
 	"fmt"
+	"slices"
 	"sync"
 
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
@@ -148,6 +149,21 @@ func validatePrelude(reg *builtin.Registry, defs []*ir.TypeDef) error {
 		}
 		for _, m := range d.Methods {
 			if !m.Extern {
+				continue
+			}
+			// An effectful extern has no compile-time implementation by
+			// definition (it is never folded); its obligation is the registry's
+			// effectful-native record — the explicit, per-symbol promise that a
+			// target's codegen supplies it — and the declared effects must be
+			// the recorded ones.
+			if len(m.Effects) > 0 {
+				e, ok := reg.Effectful(d.Name, m.Name, m.Kind)
+				if !ok {
+					return fmt.Errorf("prelude: %s.%s is an effectful extern but the registry records no effectful native for it", d.Name, m.Name)
+				}
+				if !slices.Equal(e.Effects, m.Effects) {
+					return fmt.Errorf("prelude: %s.%s declares effects %v but the registry records %v", d.Name, m.Name, m.Effects, e.Effects)
+				}
 				continue
 			}
 			kinds, known := paramKinds(reg, native, m.Params)
