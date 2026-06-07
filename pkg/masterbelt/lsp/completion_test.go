@@ -197,8 +197,8 @@ func TestMemberCompletion(t *testing.T) {
 	}
 
 	// A plain parameter is a plain tab stop.
-	if add, ok := got["add"]; !ok || add.InsertText != "add(${1:other})" {
-		t.Errorf("add snippet = %+v, want add(${1:other})", got["add"])
+	if push, ok := got["push"]; !ok || push.InsertText != "push(${1:value})" {
+		t.Errorf("push snippet = %+v, want push(${1:value})", got["push"])
 	}
 	if l, ok := got["len"]; !ok || l.InsertText != "len()" {
 		t.Errorf("len snippet = %+v, want len()", got["len"])

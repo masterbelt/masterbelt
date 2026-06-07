@@ -6,8 +6,19 @@ pub type list<T> = builtin<T> impl {
   /// A new list: func applied to each element, in order.
   pub extern fn map(func: fn(item: T): R): list<R>
 
-  /// A new list with value appended at the end, leaving this one unchanged.
-  pub extern fn append(value: T): self
+  /// A new list with value pushed at the end, leaving this one unchanged.
+  pub extern fn push(value: T): self
+
+  /// The last element, or null when the list is empty. The taking read is a
+  /// value to branch on, not an error; the receiver stays unchanged.
+  pub extern fn pop(): optional<T>
+
+  /// A new list with value at the front, leaving this one unchanged.
+  pub extern fn unshift(value: T): self
+
+  /// The first element, or null when the list is empty. The taking read is a
+  /// value to branch on, not an error; the receiver stays unchanged.
+  pub extern fn shift(): optional<T>
 
   /// The element at index, or an error when the index is out of range. The
   /// result is a union (T | error) because a read can miss; handle the error.
@@ -19,6 +30,10 @@ pub type list<T> = builtin<T> impl {
 
   /// The + operator: the concatenation.
   pub extern fn add(other: self): self
+
+  /// The + operator with one element: a new list with it pushed at the end,
+  /// so [1, 2] + 3 is [1, 2, 3].
+  pub extern fn add(element: T): self
 } impl comparable {
   /// The == operator: element-wise equality.
   pub extern fn eql(other: self): bool

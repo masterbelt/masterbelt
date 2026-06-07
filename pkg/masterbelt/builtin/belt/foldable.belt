@@ -29,21 +29,21 @@ pub interface foldable<K, V> {
 
   /// A list of f applied to each value, in fold order.
   pub map<U>(f: fn(value: V): U): list<U> {
-    return fold([], fn(acc, key, value) -> acc.append(f(value)))
+    return fold([], fn(acc, key, value) -> acc.push(f(value)))
   }
 
   /// A list of the values satisfying the predicate, in fold order.
   pub filter(pred: fn(value: V): bool): list<V> {
-    return fold([], fn(acc, key, value) -> pred(value) ? acc.append(value) : acc)
+    return fold([], fn(acc, key, value) -> pred(value) ? acc.push(value) : acc)
   }
 
   /// A list of the keys, in fold order.
   pub keys(): list<K> {
-    return fold([], fn(acc, key, value) -> acc.append(key))
+    return fold([], fn(acc, key, value) -> acc.push(key))
   }
 
   /// A list of the values, in fold order.
   pub values(): list<V> {
-    return fold([], fn(acc, key, value) -> acc.append(value))
+    return fold([], fn(acc, key, value) -> acc.push(value))
   }
 }

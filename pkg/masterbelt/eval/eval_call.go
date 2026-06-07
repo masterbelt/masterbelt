@@ -258,8 +258,8 @@ func kindAccepts(t ast.TypeExpr, k ir.ConstKind) bool {
 	}
 }
 
-// call evaluates a method call: a collection receiver is handled here (the only
-// foldable collection method is list.map), and a primitive receiver dispatches
+// call evaluates a method call: a collection receiver dispatches to the
+// collection intrinsics (collectionMethod), and a primitive receiver dispatches
 // to its native intrinsic in the builtin registry, keyed on the receiver's value
 // kind (every integer type shares one set of intrinsics, every boolean another)
 // and the arguments' kinds — which is how an overloaded method (a name with

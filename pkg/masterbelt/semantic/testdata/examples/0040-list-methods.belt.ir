@@ -2,34 +2,43 @@ Module
   Const "Joined"
     type list<nint>
     value [IntLiteral "1", IntLiteral "2"].add([IntLiteral "3", IntLiteral "4"])
+    eval [1, 2, 3, 4]
   Const "Added"
-    type invalid
+    type list<nint>
     value [IntLiteral "1", IntLiteral "2"].add(IntLiteral "3")
+    eval [1, 2, 3]
   Const "NestedAdd"
-    type invalid
+    type list<list<nint>>
     value [[IntLiteral "1"], [IntLiteral "2"]].add([IntLiteral "3"])
+    eval [[1], [2], [3]]
   Const "Pushed"
-    type invalid
+    type list<nint>
     value [IntLiteral "1", IntLiteral "2"].push(IntLiteral "3")
+    eval [1, 2, 3]
   Const "Unshifted"
-    type invalid
+    type list<nint>
     value [IntLiteral "2", IntLiteral "3"].unshift(IntLiteral "1")
+    eval [1, 2, 3]
   Const "Empty"
     type list<nint>
     value []
     eval []
   Const "Last"
-    type invalid
+    type optional<nint>
     value [IntLiteral "1", IntLiteral "2", IntLiteral "3"].pop()
+    eval 3
   Const "NoLast"
-    type invalid
+    type optional<nint>
     value Reference -> "Empty".pop()
+    eval null
   Const "First"
-    type invalid
+    type optional<nint>
     value [IntLiteral "1", IntLiteral "2", IntLiteral "3"].shift()
+    eval 1
   Const "NoFirst"
-    type invalid
+    type optional<nint>
     value Reference -> "Empty".shift()
+    eval null
   Func "orZero" pub
     param v: optional<nint>
     result nint
@@ -39,33 +48,51 @@ Module
         arm null
           return IntLiteral "0"
   Assert "([1, 2] + [3, 4]).len() == 4"
-    eval <unevaluated>
+    eval true
       ([1, 2] + [3, 4]).len() == 4
+              ^         ^     ^
+              |         4     true
+              [1, 2, 3, 4]
   Assert "([1, 2] + 3).len() == 3"
-    eval <unevaluated>
+    eval true
       ([1, 2] + 3).len() == 3
+              ^    ^     ^
+              |    3     true
+              [1, 2, 3]
   Assert "[1, 2].push(3).len() == 3"
-    eval <unevaluated>
+    eval true
       [1, 2].push(3).len() == 3
+             ^       ^     ^
+             |       3     true
+             [1, 2, 3]
   Assert "[2, 3].unshift(1).len() == 3"
-    eval <unevaluated>
+    eval true
       [2, 3].unshift(1).len() == 3
+             ^          ^     ^
+             [1, 2, 3]  3     true
   Assert "([[1], [2]] + [3]).len() == 3"
-    eval <unevaluated>
+    eval true
       ([[1], [2]] + [3]).len() == 3
+                  ^      ^     ^
+                  |      3     true
+                  [[1], [2], [3]]
   Assert "orZero([1, 2, 3].pop()) == 3"
-    eval <unevaluated>
+    eval true
       orZero([1, 2, 3].pop()) == 3
+      ^                ^      ^
+      3                3      true
   Assert "orZero(Empty.pop()) == 0"
-    eval <unevaluated>
+    eval true
       orZero(Empty.pop()) == 0
-             ^
-             []
+      ^      ^     ^      ^
+      0      []    null   true
   Assert "orZero([1, 2, 3].shift()) == 1"
-    eval <unevaluated>
+    eval true
       orZero([1, 2, 3].shift()) == 1
+      ^                ^        ^
+      1                1        true
   Assert "orZero(Empty.shift()) == 0"
-    eval <unevaluated>
+    eval true
       orZero(Empty.shift()) == 0
-             ^
-             []
+      ^      ^     ^        ^
+      0      []    null     true
