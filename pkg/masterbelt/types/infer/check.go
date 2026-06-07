@@ -289,16 +289,34 @@ func checkMapKeyComparable(lit *ast.CollectionLit, t ir.Type, s scope, sink *Sin
 }
 
 // collectionApp returns t as a list or map application, or false if t is not a
-// builtin collection type.
+// builtin collection type. A nominal wrapper of one (type Names = list<string>)
+// is looked through to its underlying collection — the collection twin of
+// recordOf unwrapping a nominal record — so a collection literal checks against a
+// nominal list/map's element types and adapts to the wrapper, exactly as a record
+// literal already does for a nominal record. The seen set keeps a self-referential
+// definition finite.
 func collectionApp(t ir.Type) (*ir.App, bool) {
-	app, ok := t.(*ir.App)
-	if !ok || app.Def == nil {
-		return nil, false
+	seen := map[*ir.TypeDef]bool{}
+	for {
+		switch x := t.(type) {
+		case *ir.App:
+			if x.Def == nil {
+				return nil, false
+			}
+			if x.Def.Name == "list" || x.Def.Name == "map" {
+				return x, true
+			}
+			return nil, false
+		case *ir.Named:
+			if x.Def == nil || x.Def.Body == nil || seen[x.Def] {
+				return nil, false
+			}
+			seen[x.Def] = true
+			t = x.Def.Body
+		default:
+			return nil, false
+		}
 	}
-	if app.Def.Name == "list" || app.Def.Name == "map" {
-		return app, true
-	}
-	return nil, false
 }
 
 // checkFuncLitAgainst checks a function literal against an expected function

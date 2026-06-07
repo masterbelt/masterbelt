@@ -143,11 +143,15 @@ func implMatches(reg *builtin.Registry, impl ir.Type, idef *ir.TypeDef, bArgs []
 }
 
 // Unify combines two operand types: the default integer adapts to the other
-// integer operand, two equal types keep that type, and two applications of the
-// same generic constructor (list<A> and list<B>) unify element-wise. Anything
-// else is a mismatch (ir.Invalid). It is how an integer literal takes the type
-// of the sized integer it is combined with, and how a collection literal's
-// element type is inferred across its entries.
+// integer operand, a base value adapts to the nominal type that wraps it (a
+// string operand unified with a Tag = string operand becomes Tag), two equal
+// types keep that type, and two applications of the same generic constructor
+// (list<A> and list<B>) unify element-wise. Anything else is a mismatch
+// (ir.Invalid). It is how an integer literal takes the type of the sized integer
+// it is combined with, how a base value takes the type of the nominal operand it
+// meets (so a self-typed operator on a nominal type — Tag's eql(other: self) —
+// unifies a bare "x" to Tag), and how a collection literal's element type is
+// inferred across its entries.
 func Unify(reg *builtin.Registry, a, b ir.Type) ir.Type {
 	switch {
 	case a == b:
@@ -155,6 +159,12 @@ func Unify(reg *builtin.Registry, a, b ir.Type) ir.Type {
 	case isDefaultInt(a) && IsInteger(reg, b):
 		return b
 	case isDefaultInt(b) && IsInteger(reg, a):
+		return a
+	case adaptsToNamed(reg, a, b):
+		// The nominal side wins, as a sized integer wins over the default integer:
+		// b is the nominal wrapper a's base value adapts into.
+		return b
+	case adaptsToNamed(reg, b, a):
 		return a
 	case sameBuiltin(a, b), sameNamed(a, b), sameTypeVar(a, b):
 		return a

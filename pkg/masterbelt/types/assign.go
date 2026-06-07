@@ -42,6 +42,18 @@ func Assignable(reg *builtin.Registry, from, to ir.Type) bool {
 		}
 		return false
 	}
+	// A base value flows into the nominal type that wraps it: a value whose type is
+	// the underlying type itself (a string into type Tag = string, an nint into
+	// type Level = int8, a list<string> into type Names = list<string>) adapts to
+	// the named wrapper — the same adaptation the integer case has always had,
+	// generalized to every builtin base. It fires only when from is not itself a
+	// nominal type, so a nominal type never flows into a *different* nominal wrapper
+	// of the same base (Celsius does not adapt to Fahrenheit) nor back to its base.
+	// The union arm above runs first, so a value flowing into a named union still
+	// selects a member rather than being matched against the union body wholesale.
+	if adaptsToNamed(reg, from, to) {
+		return true
+	}
 	if x, y, ok := sameAppShape(from, to); ok {
 		// list<A> is assignable to list<B> when A is assignable to B (the same,
 		// covariant, element-wise rule that lets list<int> flow into list<int8>).
@@ -73,6 +85,47 @@ func Assignable(reg *builtin.Registry, from, to ir.Type) bool {
 	// handled a bounded variable flowing to its bound interface (a T: orderable
 	// usable where comparable is expected).
 	return sameBuiltin(from, to) || sameNamed(from, to) || sameTypeVar(from, to)
+}
+
+// adaptsToNamed reports whether a base value of type from adapts to the nominal
+// type to: to is a nominal type (a *Named whose definition has a body) and from
+// is not itself nominal, so from flows in when it is assignable to to's
+// underlying type. This is the generalization of the default-integer-into-Level
+// rule to every builtin base — a string into type Tag = string, a bool into type
+// Flag = bool, a list<string> into type Names = list<string> (the body is an App
+// reached through the covariant collection rule).
+//
+// to is peeled one nominal level at a time, so a chained alias (type B = A, type
+// A = string) reaches the base; the visited set keeps a self-referential
+// definition finite. The body must be non-nil, which structurally excludes an
+// enum or an interface — neither carries a body (their base lives in Enum.Base /
+// the interface contract) — so a base value never flows into one. from being
+// non-nominal is what keeps a nominal type from adapting to a different nominal
+// wrapper of the same base, or back to its own base.
+func adaptsToNamed(reg *builtin.Registry, from, to ir.Type) bool {
+	if _, ok := from.(*ir.Named); ok {
+		return false
+	}
+	seen := map[*ir.TypeDef]bool{}
+	for {
+		n, ok := to.(*ir.Named)
+		if !ok {
+			return false
+		}
+		if n.Def == nil || n.Def.Body == nil || seen[n.Def] {
+			return false
+		}
+		seen[n.Def] = true
+		// A chained alias (type B = A, type A = string) is peeled in this loop, so
+		// the guarded seen set spans every level — calling Assignable on a Named body
+		// instead would re-enter with a fresh guard and a self-referential definition
+		// (type T = T) would not terminate. A non-Named body is the base to match.
+		if _, body := n.Def.Body.(*ir.Named); body {
+			to = n.Def.Body
+			continue
+		}
+		return Assignable(reg, from, n.Def.Body)
+	}
 }
 
 // UnionSelection is the outcome of choosing which member of a union a value
