@@ -1,51 +1,51 @@
 Module
   Const "A"
     type nint
-    value area(IntLiteral "3", IntLiteral "4")
+    value (area((IntLiteral "3" : nint), (IntLiteral "4" : nint)) : nint)
     eval 12
   Const "B"
     type nint
-    value double(IntLiteral "21")
+    value (double((IntLiteral "21" : nint)) : nint)
     eval 42
   Const "C"
     type nint
-    value perimeter(IntLiteral "2", IntLiteral "3")
+    value (perimeter((IntLiteral "2" : nint), (IntLiteral "3" : nint)) : nint)
     eval 10
   Const "D"
     type list<nint>
-    value [IntLiteral "1", IntLiteral "2", IntLiteral "3"].map((fn(x) (return double(ParamRef "x")))) [subst K=nint, R=nint, T=nint, V=nint]
+    value (([(IntLiteral "1" : nint), (IntLiteral "2" : nint), (IntLiteral "3" : nint)] : list<nint>).map(((fn(x) (return (double((ParamRef "x" : nint)) : nint))) : fn(nint): nint)) : list<nint>) [subst K=nint, R=nint, T=nint, V=nint]
     eval [2, 4, 6]
   Const "E"
     type string
-    value greet(StringLiteral "belt")
+    value (greet((StringLiteral "belt" : string)) : string)
     eval "Hello, belt"
   Const "O"
     type Point
-    value origin()
+    value (origin() : Point)
     eval { x: 0, y: 0 }
   TypeDef "Point" pub
     body { x: nint, y: nint }
   Func "double" pub
     param x: nint
     result nint
-      return ParamRef "x".mul(IntLiteral "2")
+      return ((ParamRef "x" : nint).mul((IntLiteral "2" : nint)) : nint)
   Func "area" pub
     param w: nint
     param h: nint
     result nint
-      return ParamRef "w".mul(ParamRef "h")
+      return ((ParamRef "w" : nint).mul((ParamRef "h" : nint)) : nint)
   Func "perimeter" pub
     param w: nint
     param h: nint
     result nint
-      return double(ParamRef "w").add(double(ParamRef "h"))
+      return ((double((ParamRef "w" : nint)) : nint).add((double((ParamRef "h" : nint)) : nint)) : nint)
   Func "greet"
     param name: string
     result string
-      return StringLiteral "Hello, ".add(ParamRef "name")
+      return ((StringLiteral "Hello, " : string).add((ParamRef "name" : string)) : string)
   Func "origin" pub
     result Point
-      return Point{x: IntLiteral "0", y: IntLiteral "0"}
+      return (Point{x: (IntLiteral "0" : nint), y: (IntLiteral "0" : nint)} : Point)
   Assert "area(3, 4) == 12"
     eval true
       area(3, 4) == 12

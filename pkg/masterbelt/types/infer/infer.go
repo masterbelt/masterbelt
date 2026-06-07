@@ -89,6 +89,18 @@ type scope interface {
 	// overload set the namespace's target exports, or nil when the receiver
 	// names no namespace (a value's method call).
 	fnMember(m *ast.MemberExpr) []*ast.FuncDecl
+	// self is the receiver type in scope, or ir.Invalid where there is none
+	// (a constant initializer, a function body). A bare call of one of its
+	// methods is an implicit self-call; a function literal inherits the
+	// enclosing context's receiver, mirroring the lowering's binder chain.
+	self() ir.Type
+	// rigid reports whether name is a generic type parameter of the enclosing
+	// declaration — the K and V of an interface's own provided-method body, or
+	// a generic function's T. A rigid variable is a known (if opaque) type,
+	// not an inference hole: a lambda parameter typed K inside the interface's
+	// body is perfectly inferred, where an unpinned method-local variable (the
+	// R of map at a call site) is uninferable.
+	rigid(name string) bool
 }
 
 // Decl is the type rule for a declaration: an annotation gives a concrete type,
@@ -541,6 +553,44 @@ func enumMemberExpectation(want ir.Type, name string) ir.Type {
 	return nil
 }
 
+// varsRigid reports whether every type variable in t is rigid in scope s — a
+// generic type parameter of the enclosing declaration, a known (if opaque)
+// type rather than an unsolved inference hole. A type with no variables is
+// trivially rigid; the interesting case is a provided-method body whose
+// signature reads the interface's own K and V.
+func varsRigid(t ir.Type, s scope) bool {
+	switch t := t.(type) {
+	case *ir.TypeVar:
+		return s.rigid(t.Name)
+	case *ir.App:
+		for _, a := range t.Args {
+			if !varsRigid(a, s) {
+				return false
+			}
+		}
+	case *ir.Func:
+		for _, p := range t.Params {
+			if !varsRigid(p, s) {
+				return false
+			}
+		}
+		return varsRigid(t.Result, s)
+	case *ir.Union:
+		for _, m := range t.Members {
+			if !varsRigid(m, s) {
+				return false
+			}
+		}
+	case *ir.Record:
+		for _, f := range t.Fields {
+			if !varsRigid(f.Type, s) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
 // hasTypeVar reports whether t still contains a type variable — i.e. the
 // checking context has not pinned every generic part to a concrete type.
 func hasTypeVar(t ir.Type) bool {
@@ -707,6 +757,9 @@ func observe(sink *Sink, fired *bool) *Sink {
 		},
 		CallSubst: func(call *ast.CallExpr, subst map[string]ir.Type) {
 			sink.callSubst(call, subst)
+		},
+		Typed: func(e ast.Expr, t ir.Type) {
+			sink.typed(e, t)
 		},
 	}
 }

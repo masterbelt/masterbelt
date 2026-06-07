@@ -1,17 +1,17 @@
 Module
   Const "greeting"
     type string
-    value StringLiteral "Hello, ".add(StringLiteral "world!")
+    value ((StringLiteral "Hello, " : string).add((StringLiteral "world!" : string)) : string)
     eval "Hello, world!"
   Const "same" pub
     type bool
-    value StringLiteral "abc".eql(StringLiteral "abc")
+    value ((StringLiteral "abc" : string).eql((StringLiteral "abc" : string)) : bool)
     eval true
   Const "ordered" pub
     type bool
-    value StringLiteral "a".lt(StringLiteral "b")
+    value ((StringLiteral "a" : string).lt((StringLiteral "b" : string)) : bool)
     eval true
   Const "banner" pub
     type string
-    value StringLiteral "[".add(Reference -> "greeting").add(StringLiteral "]")
+    value (((StringLiteral "[" : string).add((Reference -> "greeting" : string)) : string).add((StringLiteral "]" : string)) : string)
     eval "[Hello, world!]"

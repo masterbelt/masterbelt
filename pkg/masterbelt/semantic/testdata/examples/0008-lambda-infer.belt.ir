@@ -1,29 +1,29 @@
 Module
   Const "Doubled"
     type list<nint>
-    value [IntLiteral "1", IntLiteral "2", IntLiteral "3"].map((fn(x) (return ParamRef "x".mul(IntLiteral "2")))) [subst K=nint, R=nint, T=nint, V=nint]
+    value (([(IntLiteral "1" : nint), (IntLiteral "2" : nint), (IntLiteral "3" : nint)] : list<nint>).map(((fn(x) (return ((ParamRef "x" : nint).mul((IntLiteral "2" : nint)) : nint))) : fn(nint): nint)) : list<nint>) [subst K=nint, R=nint, T=nint, V=nint]
     eval [2, 4, 6]
   Const "Evens"
     type list<bool>
-    value [IntLiteral "1", IntLiteral "2", IntLiteral "3", IntLiteral "4"].map((fn(x) (return ParamRef "x".rem(IntLiteral "2").eql(IntLiteral "0")))) [subst K=nint, R=bool, T=nint, V=nint]
+    value (([(IntLiteral "1" : nint), (IntLiteral "2" : nint), (IntLiteral "3" : nint), (IntLiteral "4" : nint)] : list<nint>).map(((fn(x) (return (((ParamRef "x" : nint).rem((IntLiteral "2" : nint)) : nint).eql((IntLiteral "0" : nint)) : bool))) : fn(nint): bool)) : list<bool>) [subst K=nint, R=bool, T=nint, V=nint]
     eval [false, true, false, true]
   Const "Tripled"
     type list<nint>
-    value [IntLiteral "1", IntLiteral "2", IntLiteral "3"].map((fn(x) (return ParamRef "x".mul(IntLiteral "3")))) [subst K=nint, R=nint, T=nint, V=nint]
+    value (([(IntLiteral "1" : nint), (IntLiteral "2" : nint), (IntLiteral "3" : nint)] : list<nint>).map(((fn(x) (return ((ParamRef "x" : nint).mul((IntLiteral "3" : nint)) : nint))) : fn(nint): nint)) : list<nint>) [subst K=nint, R=nint, T=nint, V=nint]
     eval [3, 6, 9]
   Const "Twice"
     type fn(nint): nint
-    value (fn(x) (return ParamRef "x".mul(IntLiteral "2")))
+    value ((fn(x) (return ((ParamRef "x" : nint).mul((IntLiteral "2" : nint)) : nint))) : fn(nint): nint)
     eval <func>
   Const "Stepped"
     type list<nint>
-    value [IntLiteral "1", IntLiteral "2", IntLiteral "3"].map((fn(x) (return ParamRef "x".add(IntLiteral "1")))) [subst K=nint, R=nint, T=nint, V=nint]
+    value (([(IntLiteral "1" : nint), (IntLiteral "2" : nint), (IntLiteral "3" : nint)] : list<nint>).map(((fn(x) (return ((ParamRef "x" : nint).add((IntLiteral "1" : nint)) : nint))) : fn(nint): nint)) : list<nint>) [subst K=nint, R=nint, T=nint, V=nint]
     eval [2, 3, 4]
   Const "Bytes"
     type list<sbyte>
-    value [IntLiteral "1", IntLiteral "2", IntLiteral "3"]
+    value ([(IntLiteral "1" : nint), (IntLiteral "2" : nint), (IntLiteral "3" : nint)] : list<sbyte>)
     eval [1, 2, 3]
   Const "Empty"
     type list<nint>
-    value []
+    value ([] : list<nint>)
     eval []

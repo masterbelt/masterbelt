@@ -1,55 +1,55 @@
 Module
   Const "ListLen"
     type nint
-    value [IntLiteral "1", IntLiteral "2", IntLiteral "3"].len() [subst K=nint, T=nint, V=nint]
+    value (([(IntLiteral "1" : nint), (IntLiteral "2" : nint), (IntLiteral "3" : nint)] : list<nint>).len() : nint) [subst K=nint, T=nint, V=nint]
     eval 3
   Const "MapLen"
     type nint
-    value [StringLiteral "a": IntLiteral "1", StringLiteral "b": IntLiteral "2"].len() [subst K=string, V=nint]
+    value (([(StringLiteral "a" : string): (IntLiteral "1" : nint), (StringLiteral "b" : string): (IntLiteral "2" : nint)] : map<string, nint>).len() : nint) [subst K=string, V=nint]
     eval 2
   Const "Sum"
     type nint
-    value [IntLiteral "1", IntLiteral "2", IntLiteral "3"].fold(IntLiteral "0", (fn(acc, i, v) (return ParamRef "acc".add(ParamRef "v")))) [subst A=nint, K=nint, T=nint, V=nint]
+    value (([(IntLiteral "1" : nint), (IntLiteral "2" : nint), (IntLiteral "3" : nint)] : list<nint>).fold((IntLiteral "0" : nint), ((fn(acc, i, v) (return ((ParamRef "acc" : nint).add((ParamRef "v" : nint)) : nint))) : fn(nint, nint, nint): nint)) : nint) [subst A=nint, K=nint, T=nint, V=nint]
     eval 6
   Const "IndexSum"
     type nint
-    value [IntLiteral "10", IntLiteral "20", IntLiteral "30"].fold(IntLiteral "0", (fn(acc, i, v) (return ParamRef "acc".add(ParamRef "i")))) [subst A=nint, K=nint, T=nint, V=nint]
+    value (([(IntLiteral "10" : nint), (IntLiteral "20" : nint), (IntLiteral "30" : nint)] : list<nint>).fold((IntLiteral "0" : nint), ((fn(acc, i, v) (return ((ParamRef "acc" : nint).add((ParamRef "i" : nint)) : nint))) : fn(nint, nint, nint): nint)) : nint) [subst A=nint, K=nint, T=nint, V=nint]
     eval 3
   Const "MapSum"
     type nint
-    value [StringLiteral "a": IntLiteral "1", StringLiteral "b": IntLiteral "2", StringLiteral "c": IntLiteral "3"].fold(IntLiteral "0", (fn(acc, k, v) (return ParamRef "acc".add(ParamRef "v")))) [subst A=nint, K=string, V=nint]
+    value (([(StringLiteral "a" : string): (IntLiteral "1" : nint), (StringLiteral "b" : string): (IntLiteral "2" : nint), (StringLiteral "c" : string): (IntLiteral "3" : nint)] : map<string, nint>).fold((IntLiteral "0" : nint), ((fn(acc, k, v) (return ((ParamRef "acc" : nint).add((ParamRef "v" : nint)) : nint))) : fn(nint, string, nint): nint)) : nint) [subst A=nint, K=string, V=nint]
     eval 6
   Const "Count"
     type nint
-    value [IntLiteral "1", IntLiteral "2", IntLiteral "3", IntLiteral "4"].count() [subst K=nint, T=nint, V=nint]
+    value (([(IntLiteral "1" : nint), (IntLiteral "2" : nint), (IntLiteral "3" : nint), (IntLiteral "4" : nint)] : list<nint>).count() : nint) [subst K=nint, T=nint, V=nint]
     eval 4
   Const "AnyBig"
     type bool
-    value [IntLiteral "1", IntLiteral "2", IntLiteral "3"].any((fn(v) (return ParamRef "v".gt(IntLiteral "2")))) [subst K=nint, T=nint, V=nint]
+    value (([(IntLiteral "1" : nint), (IntLiteral "2" : nint), (IntLiteral "3" : nint)] : list<nint>).any(((fn(v) (return ((ParamRef "v" : nint).gt((IntLiteral "2" : nint)) : bool))) : fn(nint): bool)) : bool) [subst K=nint, T=nint, V=nint]
     eval true
   Const "AllPositive"
     type bool
-    value [IntLiteral "1", IntLiteral "2", IntLiteral "3"].all((fn(v) (return ParamRef "v".gt(IntLiteral "0")))) [subst K=nint, T=nint, V=nint]
+    value (([(IntLiteral "1" : nint), (IntLiteral "2" : nint), (IntLiteral "3" : nint)] : list<nint>).all(((fn(v) (return ((ParamRef "v" : nint).gt((IntLiteral "0" : nint)) : bool))) : fn(nint): bool)) : bool) [subst K=nint, T=nint, V=nint]
     eval true
   Const "Doubled"
     type list<nint>
-    value [IntLiteral "1", IntLiteral "2", IntLiteral "3"].map((fn(v) (return ParamRef "v".mul(IntLiteral "2")))) [subst K=nint, R=nint, T=nint, V=nint]
+    value (([(IntLiteral "1" : nint), (IntLiteral "2" : nint), (IntLiteral "3" : nint)] : list<nint>).map(((fn(v) (return ((ParamRef "v" : nint).mul((IntLiteral "2" : nint)) : nint))) : fn(nint): nint)) : list<nint>) [subst K=nint, R=nint, T=nint, V=nint]
     eval [2, 4, 6]
   Const "Big"
     type list<nint>
-    value [IntLiteral "1", IntLiteral "2", IntLiteral "3", IntLiteral "4"].filter((fn(v) (return ParamRef "v".gt(IntLiteral "2")))) [subst K=nint, T=nint, V=nint]
+    value (([(IntLiteral "1" : nint), (IntLiteral "2" : nint), (IntLiteral "3" : nint), (IntLiteral "4" : nint)] : list<nint>).filter(((fn(v) (return ((ParamRef "v" : nint).gt((IntLiteral "2" : nint)) : bool))) : fn(nint): bool)) : list<nint>) [subst K=nint, T=nint, V=nint]
     eval [3, 4]
   Const "Keys"
     type list<string>
-    value [StringLiteral "x": IntLiteral "1", StringLiteral "y": IntLiteral "2"].keys() [subst K=string, V=nint]
+    value (([(StringLiteral "x" : string): (IntLiteral "1" : nint), (StringLiteral "y" : string): (IntLiteral "2" : nint)] : map<string, nint>).keys() : list<string>) [subst K=string, V=nint]
     eval ["x", "y"]
   Const "Values"
     type list<nint>
-    value [StringLiteral "x": IntLiteral "1", StringLiteral "y": IntLiteral "2"].values() [subst K=string, V=nint]
+    value (([(StringLiteral "x" : string): (IntLiteral "1" : nint), (StringLiteral "y" : string): (IntLiteral "2" : nint)] : map<string, nint>).values() : list<nint>) [subst K=string, V=nint]
     eval [1, 2]
   Const "ListValues"
     type list<nint>
-    value [IntLiteral "7", IntLiteral "8", IntLiteral "9"].values() [subst K=nint, T=nint, V=nint]
+    value (([(IntLiteral "7" : nint), (IntLiteral "8" : nint), (IntLiteral "9" : nint)] : list<nint>).values() : list<nint>) [subst K=nint, T=nint, V=nint]
     eval [7, 8, 9]
   Assert "[1, 2, 3].len() == 3"
     eval true

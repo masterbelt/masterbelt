@@ -1,27 +1,27 @@
 Module
   Const "Origin"
     type Point
-    value Point{x: IntLiteral "0", y: IntLiteral "0"}
+    value (Point{x: (IntLiteral "0" : nint), y: (IntLiteral "0" : nint)} : Point)
     eval { x: 0, y: 0 }
   Const "P"
     type Point
-    value {x: IntLiteral "1", y: IntLiteral "2"}
+    value ({x: (IntLiteral "1" : nint), y: (IntLiteral "2" : nint)} : Point)
     eval { x: 1, y: 2 }
   Const "Q"
     type Point
-    value Point{x: IntLiteral "3", y: IntLiteral "4"}
+    value (Point{x: (IntLiteral "3" : nint), y: (IntLiteral "4" : nint)} : Point)
     eval { x: 3, y: 4 }
   Const "Sword"
     type Item
-    value Item{id: IntLiteral "1", name: StringLiteral "Sword", pos: Point{x: IntLiteral "0", y: IntLiteral "0"}}
+    value (Item{id: (IntLiteral "1" : nint), name: (StringLiteral "Sword" : string), pos: (Point{x: (IntLiteral "0" : nint), y: (IntLiteral "0" : nint)} : Point)} : Item)
     eval { id: 1, name: "Sword", pos: { x: 0, y: 0 } }
   Const "Path"
     type list<Point>
-    value [{x: IntLiteral "0", y: IntLiteral "0"}, Point{x: IntLiteral "1", y: IntLiteral "1"}]
+    value ([({x: (IntLiteral "0" : nint), y: (IntLiteral "0" : nint)} : Point), (Point{x: (IntLiteral "1" : nint), y: (IntLiteral "1" : nint)} : Point)] : list<Point>)
     eval [{ x: 0, y: 0 }, { x: 1, y: 1 }]
   Const "U"
     type Unit
-    value {}
+    value ({} : Unit)
     eval {}
   TypeDef "Point" pub
     body { x: nint, y: nint }

@@ -30,7 +30,7 @@ func (b constBinder) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
 	switch e := e.(type) {
 	case *ast.Identifier:
 		if target := b.q.resolve(b.file, e); target != nil {
-			return &ir.Reference{Target: b.irOf[target]}
+			return &ir.Reference{Target: b.irOf[target], Syntax: e}
 		}
 		// A bare member resolves through the expected enum (const Top: Rarity =
 		// Legend). The expectation is the const's own annotation, so it only
@@ -40,7 +40,7 @@ func (b constBinder) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
 		}
 	case *ast.MemberExpr:
 		if target := b.q.resolveMember(b.file, e); target != nil {
-			return &ir.Reference{Target: b.irOf[target]}
+			return &ir.Reference{Target: b.irOf[target], Syntax: e}
 		}
 		// A member access whose receiver names an enum type (Rarity.Common).
 		if def, idx := enumMemberAccess(b.q.universe(b.file), e); idx >= 0 {
@@ -54,7 +54,7 @@ func (b constBinder) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
 		// Otherwise the receiver is a value: a field access on a record-typed
 		// constant (Hero.lv), reading the field — the same value form a method body
 		// lowers, so a const initializer reading a record field has a value graph.
-		return &ir.FieldAccess{Receiver: sub(e.Receiver), Field: e.Member.Name}
+		return &ir.FieldAccess{Receiver: sub(e.Receiver), Field: e.Member.Name, Syntax: e}
 	case *ast.CallExpr:
 		switch callee := e.Callee.(type) {
 		case *ast.Identifier:
@@ -474,7 +474,7 @@ func (b bodyBinder) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
 			}
 		}
 		// A member access used as a value is a record field access.
-		return &ir.FieldAccess{Receiver: sub(e.Receiver), Field: e.Member.Name}
+		return &ir.FieldAccess{Receiver: sub(e.Receiver), Field: e.Member.Name, Syntax: e}
 	case *ast.CallExpr:
 		// A call whose callee names a type is a conversion T(x); one that
 		// names a top-level function — by name, or through a namespace import

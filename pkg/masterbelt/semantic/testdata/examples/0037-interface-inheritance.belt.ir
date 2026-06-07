@@ -9,16 +9,16 @@ Module
     method "show"
       doc "Render the tag."
       result string
-      return StringLiteral "tag"
+      return (StringLiteral "tag" : string)
     method "rank"
       doc "The tag's rank."
       result nint
-      return IntLiteral "1"
+      return (IntLiteral "1" : nint)
     method "before"
       doc "Order tags by value."
       param other: self
       result bool
-      return self.lt(ParamRef "other")
+      return ((self : Tag).lt((ParamRef "other" : Tag)) : bool)
   TypeDef "printable" pub
     doc "A behaviour layered on a parent: a printable value is comparable, so it"
     doc "carries eql/neq (from comparable) on top of its own show."
@@ -55,4 +55,4 @@ Module
     param a: T
     param b: T
     result bool
-      return ParamRef "a".eql(ParamRef "b")
+      return ((ParamRef "a" : T).eql((ParamRef "b" : T)) : bool)

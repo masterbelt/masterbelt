@@ -1,73 +1,73 @@
 Module
   Const "add"
     type nint
-    value IntLiteral "1".add(IntLiteral "2")
+    value ((IntLiteral "1" : nint).add((IntLiteral "2" : nint)) : nint)
     eval 3
   Const "sub"
     type nint
-    value IntLiteral "1".sub(IntLiteral "2")
+    value ((IntLiteral "1" : nint).sub((IntLiteral "2" : nint)) : nint)
     eval -1
   Const "mul"
     type nint
-    value IntLiteral "1".mul(IntLiteral "2")
+    value ((IntLiteral "1" : nint).mul((IntLiteral "2" : nint)) : nint)
     eval 2
   Const "div"
     type nint
-    value IntLiteral "1".div(IntLiteral "2")
+    value ((IntLiteral "1" : nint).div((IntLiteral "2" : nint)) : nint)
     eval 0
   Const "rem"
     type nint
-    value IntLiteral "1".rem(IntLiteral "2")
+    value ((IntLiteral "1" : nint).rem((IntLiteral "2" : nint)) : nint)
     eval 1
   Const "eql"
     type bool
-    value IntLiteral "1".eql(IntLiteral "1")
+    value ((IntLiteral "1" : nint).eql((IntLiteral "1" : nint)) : bool)
     eval true
   Const "neq"
     type bool
-    value IntLiteral "1".neq(IntLiteral "1")
+    value ((IntLiteral "1" : nint).neq((IntLiteral "1" : nint)) : bool)
     eval false
   Const "lt"
     type bool
-    value IntLiteral "1".lt(IntLiteral "2")
+    value ((IntLiteral "1" : nint).lt((IntLiteral "2" : nint)) : bool)
     eval true
   Const "lteq"
     type bool
-    value IntLiteral "1".lteq(IntLiteral "2")
+    value ((IntLiteral "1" : nint).lteq((IntLiteral "2" : nint)) : bool)
     eval true
   Const "gt"
     type bool
-    value IntLiteral "1".gt(IntLiteral "2")
+    value ((IntLiteral "1" : nint).gt((IntLiteral "2" : nint)) : bool)
     eval false
   Const "gteq"
     type bool
-    value IntLiteral "1".gteq(IntLiteral "2")
+    value ((IntLiteral "1" : nint).gteq((IntLiteral "2" : nint)) : bool)
     eval false
   Const "anan"
     type bool
-    value BoolLiteral true.anan(BoolLiteral false)
+    value ((BoolLiteral true : bool).anan((BoolLiteral false : bool)) : bool)
     eval false
   Const "oror"
     type bool
-    value BoolLiteral false.oror(BoolLiteral true)
+    value ((BoolLiteral false : bool).oror((BoolLiteral true : bool)) : bool)
     eval true
   Const "pos"
     type nint
-    value IntLiteral "1".pos()
+    value ((IntLiteral "1" : nint).pos() : nint)
     eval 1
   Const "neg"
     type nint
-    value IntLiteral "1".neg()
+    value ((IntLiteral "1" : nint).neg() : nint)
     eval -1
   Const "not"
     type bool
-    value BoolLiteral false.not()
+    value ((BoolLiteral false : bool).not() : bool)
     eval true
   Const "grouped"
     type nint
-    value IntLiteral "1".add(IntLiteral "2").mul(IntLiteral "3")
+    value (((IntLiteral "1" : nint).add((IntLiteral "2" : nint)) : nint).mul((IntLiteral "3" : nint)) : nint)
     eval 9
   Const "nested"
     type bool
-    value IntLiteral "1".gt(IntLiteral "2").not()
+    value (((IntLiteral "1" : nint).gt((IntLiteral "2" : nint)) : bool).not() : bool)
     eval true

@@ -26,10 +26,11 @@ import (
 // checkFor validates one for statement: its iterated expression's iterability and
 // any reassignment of the loop variable. The body itself is walked by the caller
 // (checkStmts), which binds the loop variable and threads the result type into
-// its returns.
-func checkFor(s *ast.ForStmt, bs infer.BodyScope, at func(ast.Node) span, diags *diagnostic.List) {
+// its returns. The iter types through the body's checking sink, reporting its
+// own operator errors and streaming its settled type for the typed value graph.
+func checkFor(s *ast.ForStmt, bs infer.BodyScope, sink *infer.Sink, at func(ast.Node) span, diags *diagnostic.List) {
 	if s.Iter != nil {
-		iterT := infer.Body(s.Iter, bs)
+		iterT := infer.CheckPredicate(s.Iter, bs, sink)
 		// An unresolved iter already produced its own reference/type diagnostic; only
 		// a resolved, non-foldable type is reported as not_iterable here.
 		if iterT != ir.Invalid {

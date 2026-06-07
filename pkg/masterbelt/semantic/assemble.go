@@ -55,6 +55,11 @@ func exprSink(at func(ast.Node) span, diags *diagnostic.List, res *callResolutio
 				res.substs[call] = maps.Clone(subst)
 			}
 		},
+		Typed: func(e ast.Expr, t ir.Type) {
+			if res != nil {
+				res.types[e] = t
+			}
+		},
 		InvalidOp: func(node ast.Node, method, operands string) {
 			s := at(node)
 			diags.Add(newInvalidOperationDiagnostic(s.offset, s.width, method, operands))

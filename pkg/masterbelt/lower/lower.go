@@ -135,13 +135,13 @@ func Value(e ast.Expr, b Binder) ir.Value {
 			}
 			entries[i] = ir.CollectionEntry{Key: key, Value: Value(entry.Value, b)}
 		}
-		return &ir.CollectionLiteral{Entries: entries}
+		return &ir.CollectionLiteral{Entries: entries, Syntax: e}
 	case *ast.RecordLit:
 		fields := make([]ir.RecordField, len(e.Fields))
 		for i, f := range e.Fields {
 			fields[i] = ir.RecordField{Name: f.Name, Value: Value(f.Value, b)}
 		}
-		return &ir.RecordValue{TypeName: e.TypeName, Fields: fields}
+		return &ir.RecordValue{TypeName: e.TypeName, Fields: fields, Syntax: e}
 	case *ast.CallExpr:
 		// The binder claims the context-specific call forms first — a call of
 		// a top-level function (by name, or through a namespace import), a
@@ -174,7 +174,7 @@ func Value(e ast.Expr, b Binder) ir.Value {
 		// cond ? then : else: the three operands lower as ordinary values; the
 		// choice between the branches is the runtime's (and the folder's), so the
 		// node carries both.
-		return &ir.Ternary{Cond: Value(e.Cond, b), Then: Value(e.Then, b), Else: Value(e.Else, b)}
+		return &ir.Ternary{Cond: Value(e.Cond, b), Then: Value(e.Then, b), Else: Value(e.Else, b), Syntax: e}
 	case *ast.RangeExpr:
 		// lo..hi keeps its own node rather than lowering to a range(...) Conversion:
 		// the direction and the half-open trim depend on the bound values, settled
@@ -187,7 +187,7 @@ func Value(e ast.Expr, b Binder) ir.Value {
 		for i, p := range e.Params {
 			names[i] = p.Name
 		}
-		return &ir.FuncLiteral{Params: names, Body: Body(e.Body, b.EnterFunc(e.Params))}
+		return &ir.FuncLiteral{Params: names, Body: Body(e.Body, b.EnterFunc(e.Params)), Syntax: e}
 	default:
 		return b.Leaf(e, sub(b))
 	}

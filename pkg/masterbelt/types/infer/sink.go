@@ -133,6 +133,15 @@ type Sink struct {
 	// it is an informational stream, never a finding; a call that pins no
 	// variable does not fire.
 	CallSubst func(call *ast.CallExpr, subst map[string]ir.Type)
+	// Typed fires for every expression the walk settles with a usable (non-
+	// Invalid) type — synthesized, or filled in by a pushed-down expectation.
+	// It is the typed-value-graph channel: the semantic layer writes each
+	// settled type back onto the IR value node the expression lowered to
+	// (F-3 §2.1). An informational stream, never a finding; an expression
+	// whose type never settles (its own error reported elsewhere) does not
+	// fire, leaving the node's type nil — a visible hole, never an invented
+	// type.
+	Typed func(e ast.Expr, t ir.Type)
 }
 
 func (s *Sink) invalidOp(node ast.Node, method, operands string) {
@@ -312,5 +321,11 @@ func (s *Sink) resolvedFunc(call *ast.CallExpr, fd *ast.FuncDecl) {
 func (s *Sink) callSubst(call *ast.CallExpr, subst map[string]ir.Type) {
 	if s != nil && s.CallSubst != nil {
 		s.CallSubst(call, subst)
+	}
+}
+
+func (s *Sink) typed(e ast.Expr, t ir.Type) {
+	if s != nil && s.Typed != nil {
+		s.Typed(e, t)
 	}
 }

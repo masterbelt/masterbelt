@@ -1,54 +1,54 @@
 Module
   Const "Freezing"
     type Celsius
-    value Celsius.freezing()
+    value (Celsius.freezing() : Celsius)
     eval { deg: 0 }
   Const "FreezingF"
     type nint
-    value Reference -> "Freezing".fahrenheit
+    value (Reference -> "Freezing".fahrenheit : nint)
     eval 32
   Const "FromBoiling"
     type Celsius
-    value Celsius.fromF(IntLiteral "212") [resolved fromF(v: nint): Celsius]
+    value (Celsius.fromF((IntLiteral "212" : nint)) : Celsius) [resolved fromF(v: nint): Celsius]
     eval { deg: 100 }
   Const "Roundtrip"
     type Celsius
-    value Celsius.fromF(Celsius.freezing()) [resolved fromF(c: Celsius): Celsius]
+    value (Celsius.fromF((Celsius.freezing() : Celsius)) : Celsius) [resolved fromF(c: Celsius): Celsius]
     eval { deg: 0 }
   Const "Full"
     type Health
-    value Health.full()
+    value (Health.full() : Health)
     eval 100
   Const "Default"
     type Element
-    value Element.base()
+    value (Element.base() : Element)
     eval Element.Fire
   TypeDef "Celsius" pub
     body { deg: nint }
     method "freezing" pub static
       doc "The freezing point of water."
       result Celsius
-      return Celsius{deg: IntLiteral "0"}
+      return (Celsius{deg: (IntLiteral "0" : nint)} : Celsius)
     method "fromF" pub static
       doc "A degree reading converted from a fahrenheit value."
       param v: nint
       result Celsius
-      return Celsius{deg: ParamRef "v".sub(IntLiteral "32").mul(IntLiteral "5").div(IntLiteral "9")}
+      return (Celsius{deg: ((((ParamRef "v" : nint).sub((IntLiteral "32" : nint)) : nint).mul((IntLiteral "5" : nint)) : nint).div((IntLiteral "9" : nint)) : nint)} : Celsius)
     method "fromF" pub static
       doc "A degree reading converted from a celsius value (the static overload:"
       doc "same name, a Celsius argument rather than a nint)."
       param c: Celsius
       result Celsius
-      return ParamRef "c"
+      return (ParamRef "c" : Celsius)
     method "fahrenheit" pub getter
       doc "Fahrenheit reading: c.fahrenheit."
       result nint
-      return self.deg.mul(IntLiteral "9").div(IntLiteral "5").add(IntLiteral "32")
+      return (((((self : Celsius).deg : nint).mul((IntLiteral "9" : nint)) : nint).div((IntLiteral "5" : nint)) : nint).add((IntLiteral "32" : nint)) : nint)
     method "fahrenheit" pub setter
       doc "Fahrenheit write: c.fahrenheit = 212 (c is a let local)."
       param v: nint
       result self
-      return Celsius{deg: ParamRef "v".sub(IntLiteral "32").mul(IntLiteral "5").div(IntLiteral "9")}
+      return (Celsius{deg: ((((ParamRef "v" : nint).sub((IntLiteral "32" : nint)) : nint).mul((IntLiteral "5" : nint)) : nint).div((IntLiteral "9" : nint)) : nint)} : Celsius)
   TypeDef "Health" pub
     body nint
     const "Max" pub
@@ -58,11 +58,11 @@ Module
     method "full" pub static
       doc "A full health bar."
       result Health
-      return Health.Max
+      return (Health.Max : nint)
     method "band" pub getter
       doc "The health expressed in tens (the band a UI shows)."
       result nint
-      return nint(self).div(IntLiteral "10")
+      return (nint((self : Health)).div((IntLiteral "10" : nint)) : nint)
   TypeDef "Element" pub
     enum nint
     member "Fire" = 0
@@ -91,16 +91,16 @@ Module
     method "hot" pub getter
       doc "Whether this element is Fire."
       result bool
-      return self.eql(Element.Fire)
+      return ((self : Element).eql((Element.Fire : Element)) : bool)
     method "base" pub static
       doc "The default element."
       result Element
-      return Element.Fire
+      return (Element.Fire : Element)
   Func "boiling"
     result Celsius
-      let "c": Celsius = Celsius.freezing()
-      assign "c" = LocalRef "c".fahrenheit = IntLiteral "212"
-      return LocalRef "c"
+      let "c": Celsius = (Celsius.freezing() : Celsius)
+      assign "c" = ((LocalRef "c" : Celsius).fahrenheit = (IntLiteral "212" : nint) : Celsius)
+      return (LocalRef "c" : Celsius)
   Assert "FreezingF == 32"
     eval true
       FreezingF == 32

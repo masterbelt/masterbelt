@@ -1,25 +1,25 @@
 Module
   Const "LabelName" pub
     type string
-    value StringLiteral "label"
+    value (StringLiteral "label" : string)
     eval "label"
   Const "Greeting" pub
     type string
-    value StringLiteral "Hello, \"world\"!\n"
+    value (StringLiteral "Hello, \"world\"!\n" : string)
     eval "Hello, \"world\"!\n"
   Const "Control" pub
     type string
-    value StringLiteral "a\tb\r\n\x00"
+    value (StringLiteral "a\tb\r\n\x00" : string)
     eval "a\tb\r\n\x00"
   Const "Unicode" pub
     type string
-    value StringLiteral "日本語 🎉"
+    value (StringLiteral "日本語 🎉" : string)
     eval "日本語 🎉"
   Const "Party" pub
     type string
-    value StringLiteral "🎉"
+    value (StringLiteral "🎉" : string)
     eval "🎉"
   Const "Empty" pub
     type string
-    value StringLiteral ""
+    value (StringLiteral "" : string)
     eval ""

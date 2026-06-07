@@ -35,7 +35,7 @@ func TestBareMemberLetInit(t *testing.T) {
 		t.Fatalf("unexpected diagnostics: %v", codes(diags))
 	}
 	dump := ir.Dump(m)
-	if !containsLine(dump, `let "r": Rarity = Rarity.Legend`) {
+	if !containsLine(dump, `let "r": Rarity = (Rarity.Legend : Rarity)`) {
 		t.Errorf("let initializer did not resolve the bare member:\n%s", dump)
 	}
 }
@@ -55,7 +55,7 @@ func TestBareMemberAssign(t *testing.T) {
 		t.Fatalf("unexpected diagnostics: %v", codes(diags))
 	}
 	dump := ir.Dump(m)
-	if !containsLine(dump, `assign "r" = Rarity.Rare`) {
+	if !containsLine(dump, `assign "r" = (Rarity.Rare : Rarity)`) {
 		t.Errorf("assignment did not resolve the bare member:\n%s", dump)
 	}
 }
@@ -75,7 +75,7 @@ func TestBareMemberCompareArg(t *testing.T) {
 		t.Fatalf("unexpected diagnostics: %v", codes(diags))
 	}
 	dump := ir.Dump(m)
-	if !containsLine(dump, `return ParamRef "rarity".eql(Rarity.Legend)`) {
+	if !containsLine(dump, `return ((ParamRef "rarity" : Rarity).eql((Rarity.Legend : Rarity)) : bool)`) {
 		t.Errorf("comparison argument did not resolve the bare member:\n%s", dump)
 	}
 }
@@ -88,7 +88,7 @@ func TestBareMemberCompareArgSelf(t *testing.T) {
 		t.Fatalf("unexpected diagnostics: %v", codes(diags))
 	}
 	dump := ir.Dump(m)
-	if !containsLine(dump, `return self.eql(Rarity.Legend)`) {
+	if !containsLine(dump, `return ((self : Rarity).eql((Rarity.Legend : Rarity)) : bool)`) {
 		t.Errorf("self comparison argument did not resolve the bare member:\n%s", dump)
 	}
 }
@@ -119,7 +119,7 @@ func TestBareMemberUnionAlias(t *testing.T) {
 		t.Fatalf("unexpected diagnostics: %v", codes(diags))
 	}
 	dump := ir.Dump(m)
-	if !containsLine(dump, `let "r": Opt = Rarity.Legend`) {
+	if !containsLine(dump, `let "r": Opt = (Rarity.Legend : Rarity)`) {
 		t.Errorf("union alias let init did not resolve the bare member:\n%s", dump)
 	}
 }
@@ -132,7 +132,7 @@ func TestBareMemberUnionAliasConst(t *testing.T) {
 		t.Fatalf("unexpected diagnostics: %v", codes(diags))
 	}
 	dump := ir.Dump(m)
-	if !containsLine(dump, "value Rarity.Legend") || !containsLine(dump, "eval Rarity.Legend") {
+	if !containsLine(dump, "value (Rarity.Legend : Rarity)") || !containsLine(dump, "eval Rarity.Legend") {
 		t.Errorf("union alias const did not resolve/fold the bare member:\n%s", dump)
 	}
 }
@@ -150,6 +150,8 @@ func TestBareMemberAssocConstInit(t *testing.T) {
 		t.Fatalf("unexpected diagnostics: %v", codes(diags))
 	}
 	dump := ir.Dump(m)
+	// An associated constant's dumped value is its folded Constant (it carries
+	// no value graph), so the line renders bare, without a typed-node wrap.
 	if !containsLine(dump, "value Rarity.Legend") {
 		t.Errorf("assoc const init did not fold the bare member:\n%s", dump)
 	}

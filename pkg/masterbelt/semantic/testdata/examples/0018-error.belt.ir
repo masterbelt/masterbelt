@@ -1,20 +1,20 @@
 Module
   Const "E"
     type error
-    value error(StringLiteral "boom")
+    value error((StringLiteral "boom" : string))
     eval error("boom")
   Const "M"
     type string
-    value Reference -> "E".message()
+    value ((Reference -> "E" : error).message() : string)
     eval "boom"
   Const "P"
     type nint | error
-    value parseLevel(StringLiteral "99")
+    value (parseLevel((StringLiteral "99" : string)) : nint | error)
     eval (error) error("invalid level: 99")
   Func "parseLevel" pub
     param s: string
     result nint | error
-      return error(StringLiteral "invalid level: ".add(ParamRef "s"))
+      return error(((StringLiteral "invalid level: " : string).add((ParamRef "s" : string)) : string))
   Assert "error(\"x\").message() == \"x\""
     eval true
       error("x").message() == "x"

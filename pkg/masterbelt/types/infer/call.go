@@ -62,6 +62,17 @@ func callType(e *ast.CallExpr, s scope, sink *Sink) ir.Type {
 			}
 			return fn.Result
 		}
+		// A bare call whose name is a method of self is an implicit self-call
+		// (self omitted) — the form an interface's provided method uses to
+		// call the required fold. It types exactly as the written self.name(...)
+		// would, the same claim order the lowering's body binder uses.
+		if id, isIdent := e.Callee.(*ast.Identifier); isIdent {
+			if selfT := s.self(); selfT != ir.Invalid {
+				if _, _, found := types.Candidates(s.registry(), selfT, id.Name); found {
+					return methodCallType(e, selfT, id.Name, s, sink)
+				}
+			}
+		}
 		return s.leaf(e)
 	}
 	// A member-access callee whose receiver names a namespace is a call of an
@@ -76,12 +87,19 @@ func callType(e *ast.CallExpr, s scope, sink *Sink) ir.Type {
 	if t, ok := staticCallType(e, member, s, sink); ok {
 		return t
 	}
+	return methodCallType(e, check(member.Receiver, s, sink), member.Member.Name, s, sink)
+}
+
+// methodCallType is the method-call half of callType: the receiver's type is
+// already settled (synthesized from the member callee's receiver, or self for
+// an implicit self-call), and the call resolves the named method's overload
+// set against the argument types bidirectionally.
+func methodCallType(e *ast.CallExpr, recv ir.Type, method string, s scope, sink *Sink) ir.Type {
 	reg := s.registry()
-	recv := check(member.Receiver, s, sink)
 	bad := recv == ir.Invalid
 	args := make([]ir.Type, len(e.Arguments))
 
-	candidates, _, found := types.Candidates(reg, recv, member.Member.Name)
+	candidates, _, found := types.Candidates(reg, recv, method)
 	if !found {
 		// No such method: synthesize the arguments for their own diagnostics,
 		// then report the call.
@@ -96,9 +114,9 @@ func callType(e *ast.CallExpr, s scope, sink *Sink) ir.Type {
 			// interface's methods, so an unknown method on it is an ordinary
 			// invalid_operation.
 			if v, ok := recv.(*ir.TypeVar); ok && v.Bound == nil {
-				sink.noMethodOnUnboundedTypeVar(e, member.Member.Name)
+				sink.noMethodOnUnboundedTypeVar(e, method)
 			} else {
-				sink.invalidOp(e, member.Member.Name, typesList(recv, args))
+				sink.invalidOp(e, method, typesList(recv, args))
 			}
 		}
 		return ir.Invalid
@@ -117,13 +135,26 @@ func callType(e *ast.CallExpr, s scope, sink *Sink) ir.Type {
 		}
 		args[i] = check(a, s, sink)
 		if args[i] == ir.Invalid {
+			// A bare member of the receiver's enum (rarity == Legend, desugared
+			// to rarity.eql(Legend)) is that enum's value — the same channel the
+			// lowering's argument binder resolves it through, tried after
+			// ordinary resolution so a same-named binding still shadows the
+			// member. Streamed out so the typed value graph carries it.
+			if id, ok := a.(*ast.Identifier); ok {
+				if mt := enumMemberExpectation(recv, id.Name); mt != nil {
+					args[i] = mt
+					known[i] = mt
+					sink.typed(a, mt)
+					continue
+				}
+			}
 			bad = true
 			continue
 		}
 		known[i] = args[i]
 	}
 
-	matches, _ := types.SelectOverload(reg, recv, member.Member.Name, known)
+	matches, _ := types.SelectOverload(reg, recv, method, known)
 	if len(matches) != 1 {
 		// No fitting signature, or several: check the literals bare for their
 		// own diagnostics, then report the call — unless an operand already
@@ -136,11 +167,11 @@ func callType(e *ast.CallExpr, s scope, sink *Sink) ir.Type {
 		if !bad {
 			switch {
 			case len(matches) > 1:
-				sink.ambiguousOverload(e, member.Member.Name, typesList(recv, args))
+				sink.ambiguousOverload(e, method, typesList(recv, args))
 			case len(candidates) > 1:
-				sink.noMatchingOverload(e, member.Member.Name, typesList(recv, args))
+				sink.noMatchingOverload(e, method, typesList(recv, args))
 			default:
-				sink.invalidOp(e, member.Member.Name, typesList(recv, args))
+				sink.invalidOp(e, method, typesList(recv, args))
 			}
 		}
 		return ir.Invalid
@@ -184,9 +215,11 @@ func callType(e *ast.CallExpr, s scope, sink *Sink) ir.Type {
 		return operand
 	}
 	result := types.Substitute(m.Result, subst)
-	if hasTypeVar(result) {
-		// A variable no argument could solve survived to the result.
-		sink.invalidOp(e, member.Member.Name, typesList(recv, args))
+	if hasTypeVar(result) && !varsRigid(result, s) {
+		// A variable no argument could solve survived to the result. (A rigid
+		// variable — the enclosing declaration's own parameter — is a known
+		// type within the body, not an unsolved hole.)
+		sink.invalidOp(e, method, typesList(recv, args))
 		return ir.Invalid
 	}
 	if len(subst) > 0 {

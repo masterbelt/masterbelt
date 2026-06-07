@@ -1,35 +1,35 @@
 Module
   Const "Picked"
     type nint
-    value pick(BoolLiteral true)
+    value (pick((BoolLiteral true : bool)) : nint)
     eval 20
   Const "Stepped"
     type nint
-    value step(IntLiteral "41")
+    value (step((IntLiteral "41" : nint)) : nint)
     eval 42
   Func "pick" pub
     param flag: bool
     result nint
-      let "base": nint = IntLiteral "10"
-      let "result": nint = LocalRef "base"
-      if ParamRef "flag"
-          assign "result" = LocalRef "base".mul(IntLiteral "2")
-      return LocalRef "result"
+      let "base": nint = (IntLiteral "10" : nint)
+      let "result": nint = (LocalRef "base" : nint)
+      if (ParamRef "flag" : bool)
+          assign "result" = ((LocalRef "base" : nint).mul((IntLiteral "2" : nint)) : nint)
+      return (LocalRef "result" : nint)
   Func "step" pub
     param n: nint
     result nint
-      let "acc": nint = ParamRef "n"
-      assign "acc" = LocalRef "acc".add(IntLiteral "1")
-      return LocalRef "acc"
+      let "acc": nint = (ParamRef "n" : nint)
+      assign "acc" = ((LocalRef "acc" : nint).add((IntLiteral "1" : nint)) : nint)
+      return (LocalRef "acc" : nint)
   Func "shadow" pub
     param flag: bool
     result nint
-      let "result": nint = IntLiteral "1"
-      if ParamRef "flag"
-          let "result": nint = IntLiteral "2"
-          assign "result" = LocalRef "result".add(IntLiteral "10")
-          return LocalRef "result"
-      return LocalRef "result"
+      let "result": nint = (IntLiteral "1" : nint)
+      if (ParamRef "flag" : bool)
+          let "result": nint = (IntLiteral "2" : nint)
+          assign "result" = ((LocalRef "result" : nint).add((IntLiteral "10" : nint)) : nint)
+          return (LocalRef "result" : nint)
+      return (LocalRef "result" : nint)
   Assert "pick(false) == 10"
     eval true
       pick(false) == 10

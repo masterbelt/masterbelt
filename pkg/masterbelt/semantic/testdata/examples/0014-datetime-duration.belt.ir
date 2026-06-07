@@ -1,43 +1,43 @@
 Module
   Const "Epoch"
     type datetime
-    value DatetimeLiteral "D1970-01-01T00:00:00.000Z"
+    value (DatetimeLiteral "D1970-01-01T00:00:00.000Z" : datetime)
     eval D1970-01-01T00:00:00.000Z
   Const "Release"
     type datetime
-    value DatetimeLiteral "D2009-03-31T23:59:59.000Z"
+    value (DatetimeLiteral "D2009-03-31T23:59:59.000Z" : datetime)
     eval D2009-03-31T23:59:59.000Z
   Const "Launch"
     type datetime
-    value DatetimeLiteral "D2026-06-05T09:00:00.000+09:00"
+    value (DatetimeLiteral "D2026-06-05T09:00:00.000+09:00" : datetime)
     eval D2026-06-05T00:00:00.000Z
   Const "Cooldown"
     type duration
-    value DurationLiteral "5s"
+    value (DurationLiteral "5s" : duration)
     eval 5s
   Const "Complex"
     type duration
-    value DurationLiteral "3w4d5h6m7s8ms"
+    value (DurationLiteral "3w4d5h6m7s8ms" : duration)
     eval 3w4d5h6m7s8ms
   Const "Deadline"
     type datetime
-    value Reference -> "Release".add(DurationLiteral "7d")
+    value ((Reference -> "Release" : datetime).add((DurationLiteral "7d" : duration)) : datetime)
     eval D2009-04-07T23:59:59.000Z
   Const "Span"
     type duration
-    value Reference -> "Release".sub(Reference -> "Epoch") [resolved sub(other: self): duration]
+    value ((Reference -> "Release" : datetime).sub((Reference -> "Epoch" : datetime)) : duration) [resolved sub(other: self): duration]
     eval 2047w5d23h59m59s
   Const "Shift"
     type datetime
-    value Reference -> "Release".sub(DurationLiteral "1h") [resolved sub(amount: duration): self]
+    value ((Reference -> "Release" : datetime).sub((DurationLiteral "1h" : duration)) : datetime) [resolved sub(amount: duration): self]
     eval D2009-03-31T22:59:59.000Z
   Const "TwoH"
     type duration
-    value DurationLiteral "1h".add(DurationLiteral "1h") [resolved add(other: self): self]
+    value ((DurationLiteral "1h" : duration).add((DurationLiteral "1h" : duration)) : duration) [resolved add(other: self): self]
     eval 2h
   Const "Triple"
     type duration
-    value DurationLiteral "5m".mul(IntLiteral "3")
+    value ((DurationLiteral "5m" : duration).mul((IntLiteral "3" : nint)) : duration)
     eval 15m
   TypeDef "Event" pub
     body { id: nint, starts_at: datetime, cooldown: duration }

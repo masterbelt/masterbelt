@@ -459,18 +459,38 @@ func dumpConstant(c *Constant) string {
 	return "(" + typeString(c.UnionTag) + ") " + c.String()
 }
 
+// dumpValue renders one value node: its form wrapped with its settled type —
+// "(form : type)" — so the snapshot pins the whole typed value graph and a
+// type/fold disagreement is visible per node. An untyped node (nil Type — a
+// declaration the checker never settled) renders bare: the hole is visible,
+// never papered over. A Conversion renders bare too — its form short(...)
+// already names its type — and the call forms carry their resolved/subst
+// suffixes outside the wrap, as before.
 func dumpValue(v Value) string {
+	form, suffix := dumpValueForm(v)
+	if _, isConv := v.(*Conversion); !isConv && v != nil {
+		if t := TypeOf(v); t != nil {
+			form = "(" + form + " : " + t.String() + ")"
+		}
+	}
+	return form + suffix
+}
+
+// dumpValueForm renders a value node's bare form, plus the call forms'
+// resolved/subst suffix (returned separately so the type wrap encloses only
+// the form).
+func dumpValueForm(v Value) (form, suffix string) {
 	switch x := v.(type) {
 	case *IntLiteral:
-		return fmt.Sprintf("IntLiteral %q", x.Text)
+		return fmt.Sprintf("IntLiteral %q", x.Text), ""
 	case *StringLiteral:
-		return fmt.Sprintf("StringLiteral %q", x.Value)
+		return fmt.Sprintf("StringLiteral %q", x.Value), ""
 	case *BoolLiteral:
-		return fmt.Sprintf("BoolLiteral %v", x.Value)
+		return fmt.Sprintf("BoolLiteral %v", x.Value), ""
 	case *DatetimeLiteral:
-		return fmt.Sprintf("DatetimeLiteral %q", x.Text)
+		return fmt.Sprintf("DatetimeLiteral %q", x.Text), ""
 	case *DurationLiteral:
-		return fmt.Sprintf("DurationLiteral %q", x.Text)
+		return fmt.Sprintf("DurationLiteral %q", x.Text), ""
 	case *CollectionLiteral:
 		parts := make([]string, len(x.Entries))
 		for i, e := range x.Entries {
@@ -480,20 +500,20 @@ func dumpValue(v Value) string {
 				parts[i] = dumpValue(e.Value)
 			}
 		}
-		return "[" + strings.Join(parts, ", ") + "]"
+		return "[" + strings.Join(parts, ", ") + "]", ""
 	case *RecordValue:
 		// TypeName{f: v, ...} for the typed form, {f: v, ...} for the inferred.
 		parts := make([]string, len(x.Fields))
 		for i, f := range x.Fields {
 			parts[i] = f.Name + ": " + dumpValue(f.Value)
 		}
-		return x.TypeName + "{" + strings.Join(parts, ", ") + "}"
+		return x.TypeName + "{" + strings.Join(parts, ", ") + "}", ""
 	case *Reference:
 		name := "<unresolved>"
 		if x.Target != nil {
 			name = x.Target.Name
 		}
-		return fmt.Sprintf("Reference -> %q", name)
+		return fmt.Sprintf("Reference -> %q", name), ""
 	case *Call:
 		// receiver.method(arg, arg) with each operand rendered recursively; a
 		// setter call renders as the property write it lowered from, receiver.name
@@ -503,15 +523,15 @@ func dumpValue(v Value) string {
 			args[i] = dumpValue(a)
 		}
 		if x.Setter && len(x.Args) == 1 {
-			return fmt.Sprintf("%s.%s = %s", dumpValue(x.Receiver), x.Method, args[0])
+			return fmt.Sprintf("%s.%s = %s", dumpValue(x.Receiver), x.Method, args[0]), ""
 		}
 		call := fmt.Sprintf("%s.%s(%s)", dumpValue(x.Receiver), x.Method, strings.Join(args, ", "))
 		if x.Resolved != nil {
 			// An overloaded call renders the individual the checker selected,
 			// so the snapshot pins which signature the type system chose.
-			call += resolvedSuffix(x.Method, x.Resolved.Params, x.Resolved.Result)
+			suffix += resolvedSuffix(x.Method, x.Resolved.Params, x.Resolved.Result)
 		}
-		return call + substSuffix(x.Subst)
+		return call, suffix + substSuffix(x.Subst)
 	case *FuncCall:
 		name := "<unresolved>"
 		if x.Target != nil {
@@ -523,9 +543,9 @@ func dumpValue(v Value) string {
 		}
 		call := fmt.Sprintf("%s(%s)", name, strings.Join(args, ", "))
 		if x.Resolved != nil {
-			call += resolvedSuffix(x.Resolved.Name, x.Resolved.Params, x.Resolved.Result)
+			suffix += resolvedSuffix(x.Resolved.Name, x.Resolved.Params, x.Resolved.Result)
 		}
-		return call + substSuffix(x.Subst)
+		return call, suffix + substSuffix(x.Subst)
 	case *StaticCall:
 		// Type.name(arg, arg): the owning type and the static fn name, the
 		// Type.Name path enum members and associated constants render through too.
@@ -539,41 +559,41 @@ func dumpValue(v Value) string {
 		}
 		call := fmt.Sprintf("%s.%s(%s)", typ, x.Name, strings.Join(args, ", "))
 		if x.Resolved != nil {
-			call += resolvedSuffix(x.Name, x.Resolved.Params, x.Resolved.Result)
+			suffix += resolvedSuffix(x.Name, x.Resolved.Params, x.Resolved.Result)
 		}
-		return call + substSuffix(x.Subst)
+		return call, suffix + substSuffix(x.Subst)
 	case *FuncLiteral:
 		parts := []string{"fn(" + strings.Join(x.Params, ", ") + ")"}
 		for _, s := range x.Body {
 			parts = append(parts, dumpStmtInline(s))
 		}
-		return "(" + strings.Join(parts, " ") + ")"
+		return "(" + strings.Join(parts, " ") + ")", ""
 	case *SelfValue:
-		return "self"
+		return "self", ""
 	case *ParamRef:
-		return fmt.Sprintf("ParamRef %q", x.Name)
+		return fmt.Sprintf("ParamRef %q", x.Name), ""
 	case *LocalRef:
-		return fmt.Sprintf("LocalRef %q", x.Name)
+		return fmt.Sprintf("LocalRef %q", x.Name), ""
 	case *FieldAccess:
-		return fmt.Sprintf("%s.%s", dumpValue(x.Receiver), x.Field)
+		return fmt.Sprintf("%s.%s", dumpValue(x.Receiver), x.Field), ""
 	case *Conversion:
 		parts := make([]string, len(x.Args))
 		for i, a := range x.Args {
 			parts[i] = dumpValue(a)
 		}
-		return fmt.Sprintf("%s(%s)", x.Type, strings.Join(parts, ", "))
+		return fmt.Sprintf("%s(%s)", x.Type, strings.Join(parts, ", ")), ""
 	case *Await:
-		return "await " + dumpValue(x.Value)
+		return "await " + dumpValue(x.Value), ""
 	case *Ternary:
-		return fmt.Sprintf("(%s ? %s : %s)", dumpValue(x.Cond), dumpValue(x.Then), dumpValue(x.Else))
+		return fmt.Sprintf("(%s ? %s : %s)", dumpValue(x.Cond), dumpValue(x.Then), dumpValue(x.Else)), ""
 	case *RangeLit:
 		op := ".."
 		if x.HalfOpen {
 			op = "..."
 		}
-		return dumpValue(x.Lower) + op + dumpValue(x.Upper)
+		return dumpValue(x.Lower) + op + dumpValue(x.Upper), ""
 	case *NullValue:
-		return "null"
+		return "null", ""
 	case *EnumMemberValue:
 		name := "<unresolved>"
 		if x.Def != nil {
@@ -582,7 +602,7 @@ func dumpValue(v Value) string {
 				name += "." + x.Def.Enum.Members[x.Index].Name
 			}
 		}
-		return name
+		return name, ""
 	case *AssocConstValue:
 		name := "<unresolved>"
 		if x.Def != nil {
@@ -591,8 +611,8 @@ func dumpValue(v Value) string {
 				name += "." + x.Def.Consts[x.Index].Name
 			}
 		}
-		return name
+		return name, ""
 	default:
-		return "<none>"
+		return "<none>", ""
 	}
 }

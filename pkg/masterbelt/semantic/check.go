@@ -586,7 +586,7 @@ func checkStmts(stmts []ast.Stmt, want ir.Type, bs infer.BodyScope, env eval.Env
 			// func-literal-types walk wants only the checking sink); the body
 			// walk still reaches every nested statement.
 			if diags != nil {
-				checkSwitch(stmt, bs, env, at, diags)
+				checkSwitch(stmt, bs, env, sink, at, diags)
 			}
 			for _, arm := range stmt.Arms {
 				checkStmts(arm.Body, want, bs, env, noSelf, sink, at, diags)
@@ -605,7 +605,7 @@ func checkStmts(stmts []ast.Stmt, want ir.Type, bs infer.BodyScope, env eval.Env
 			// func-literal-types walk wants only the checking sink); the body
 			// walk still reaches every nested statement.
 			if diags != nil {
-				checkMatch(stmt, bs, at, diags)
+				checkMatch(stmt, bs, sink, at, diags)
 			}
 			// Each arm body is checked in the scope where its binding is narrowed
 			// to the arm's member type, so a reference to the binding resolves at
@@ -629,7 +629,7 @@ func checkStmts(stmts []ast.Stmt, want ir.Type, bs infer.BodyScope, env eval.Env
 			// func-literal-types walk wants only the checking sink); the body walk
 			// still reaches every nested statement.
 			if diags != nil {
-				checkFor(stmt, bs, at, diags)
+				checkFor(stmt, bs, sink, at, diags)
 			}
 			// The body is checked in the scope where the loop variable is bound to
 			// its element type, so a reference to it resolves at that type.

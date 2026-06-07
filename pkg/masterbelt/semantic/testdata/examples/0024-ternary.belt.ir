@@ -1,23 +1,23 @@
 Module
   Const "Bigger"
     type nint
-    value (IntLiteral "3".gt(IntLiteral "2") ? IntLiteral "10" : IntLiteral "20")
+    value ((((IntLiteral "3" : nint).gt((IntLiteral "2" : nint)) : bool) ? (IntLiteral "10" : nint) : (IntLiteral "20" : nint)) : nint)
     eval 10
   Const "Label"
     type string
-    value (IntLiteral "7".gt(IntLiteral "100") ? StringLiteral "high" : StringLiteral "low")
+    value ((((IntLiteral "7" : nint).gt((IntLiteral "100" : nint)) : bool) ? (StringLiteral "high" : string) : (StringLiteral "low" : string)) : string)
     eval "low"
   Const "Capped"
     type Level
-    value (Level.Max.gt(IntLiteral "50") ? Level.Max : IntLiteral "0")
+    value ((((Level.Max : nint).gt((IntLiteral "50" : nint)) : bool) ? (Level.Max : nint) : (IntLiteral "0" : nint)) : nint)
     eval 100
   Const "Clamp"
     type nint
-    value (IntLiteral "150".lt(IntLiteral "0") ? IntLiteral "0" : (IntLiteral "150".gt(IntLiteral "100") ? IntLiteral "100" : IntLiteral "150"))
+    value ((((IntLiteral "150" : nint).lt((IntLiteral "0" : nint)) : bool) ? (IntLiteral "0" : nint) : ((((IntLiteral "150" : nint).gt((IntLiteral "100" : nint)) : bool) ? (IntLiteral "100" : nint) : (IntLiteral "150" : nint)) : nint)) : nint)
     eval 100
   Const "Score"
     type nint
-    value (IntLiteral "3".gt(IntLiteral "2") ? IntLiteral "1" : IntLiteral "0").add(IntLiteral "5")
+    value (((((IntLiteral "3" : nint).gt((IntLiteral "2" : nint)) : bool) ? (IntLiteral "1" : nint) : (IntLiteral "0" : nint)) : nint).add((IntLiteral "5" : nint)) : nint)
     eval 6
   TypeDef "Level" pub
     body sbyte
@@ -29,4 +29,4 @@ Module
     method "sign" pub
       doc "-1, 0, or 1 by sign."
       result int
-      return (self.gt(IntLiteral "0") ? IntLiteral "1" : (self.lt(IntLiteral "0") ? IntLiteral "1".neg() : IntLiteral "0"))
+      return ((((self : Temp).gt((IntLiteral "0" : nint)) : bool) ? (IntLiteral "1" : nint) : ((((self : Temp).lt((IntLiteral "0" : nint)) : bool) ? ((IntLiteral "1" : nint).neg() : nint) : (IntLiteral "0" : nint)) : nint)) : nint)

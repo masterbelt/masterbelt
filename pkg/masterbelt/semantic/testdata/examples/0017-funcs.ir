@@ -2,23 +2,23 @@
 Module
   Const "A"
     type nint
-    value double(IntLiteral "21")
+    value (double((IntLiteral "21" : nint)) : nint)
     eval 42
   Const "B"
     type nint
-    value area(IntLiteral "3", IntLiteral "4")
+    value (area((IntLiteral "3" : nint), (IntLiteral "4" : nint)) : nint)
     eval 12
   Const "C"
     type nint
-    value scale(IntLiteral "4") [resolved scale(x: nint): nint]
+    value (scale((IntLiteral "4" : nint)) : nint) [resolved scale(x: nint): nint]
     eval 40
   Const "D"
     type list<nint>
-    value scale([IntLiteral "1", IntLiteral "2"]) [resolved scale(xs: list<nint>): list<nint>]
+    value (scale(([(IntLiteral "1" : nint), (IntLiteral "2" : nint)] : list<nint>)) : list<nint>) [resolved scale(xs: list<nint>): list<nint>]
     eval [10, 20]
   Const "E"
     type string
-    value greet(StringLiteral "belt")
+    value (greet((StringLiteral "belt" : string)) : string)
     eval "Hello, belt"
   Assert "math.double(2) == double(2)"
     eval true
@@ -32,28 +32,28 @@ Module
     doc "Doubles x."
     param x: nint
     result nint
-      return ParamRef "x".mul(IntLiteral "2")
+      return ((ParamRef "x" : nint).mul((IntLiteral "2" : nint)) : nint)
   Func "area" pub
     doc "The area of a w-by-h rectangle."
     param w: nint
     param h: nint
     result nint
-      return ParamRef "w".mul(ParamRef "h")
+      return ((ParamRef "w" : nint).mul((ParamRef "h" : nint)) : nint)
   Func "greet" pub
     doc "Greets by name."
     param name: string
     result string
-      return StringLiteral "Hello, ".add(ParamRef "name")
+      return ((StringLiteral "Hello, " : string).add((ParamRef "name" : string)) : string)
   Func "scale" pub
     doc "Scales an nint."
     param x: nint
     result nint
-      return ParamRef "x".mul(IntLiteral "10")
+      return ((ParamRef "x" : nint).mul((IntLiteral "10" : nint)) : nint)
   Func "scale" pub
     doc "Scales every element of a list."
     param xs: list<nint>
     result list<nint>
-      return ParamRef "xs".map((fn(x) (return ParamRef "x".mul(IntLiteral "10")))) [subst K=nint, R=nint, T=nint, V=nint]
+      return ((ParamRef "xs" : list<nint>).map(((fn(x) (return ((ParamRef "x" : nint).mul((IntLiteral "10" : nint)) : nint))) : fn(nint): nint)) : list<nint>) [subst K=nint, R=nint, T=nint, V=nint]
   Func "hidden"
     result nint
-      return IntLiteral "0"
+      return (IntLiteral "0" : nint)

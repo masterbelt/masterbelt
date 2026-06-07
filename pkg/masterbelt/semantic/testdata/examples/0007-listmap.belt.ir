@@ -1,9 +1,9 @@
 Module
   Const "Doubled"
     type list<nint>
-    value [IntLiteral "1", IntLiteral "2", IntLiteral "3"].map((fn(x) (return ParamRef "x".mul(IntLiteral "2")))) [subst K=nint, R=nint, T=nint, V=nint]
+    value (([(IntLiteral "1" : nint), (IntLiteral "2" : nint), (IntLiteral "3" : nint)] : list<nint>).map(((fn(x) (return ((ParamRef "x" : nint).mul((IntLiteral "2" : nint)) : nint))) : fn(nint): nint)) : list<nint>) [subst K=nint, R=nint, T=nint, V=nint]
     eval [2, 4, 6]
   Const "Evens"
     type list<bool>
-    value [IntLiteral "1", IntLiteral "2", IntLiteral "3", IntLiteral "4"].map((fn(x) (return ParamRef "x".rem(IntLiteral "2").eql(IntLiteral "0")))) [subst K=nint, R=bool, T=nint, V=nint]
+    value (([(IntLiteral "1" : nint), (IntLiteral "2" : nint), (IntLiteral "3" : nint), (IntLiteral "4" : nint)] : list<nint>).map(((fn(x) (return (((ParamRef "x" : nint).rem((IntLiteral "2" : nint)) : nint).eql((IntLiteral "0" : nint)) : bool))) : fn(nint): bool)) : list<bool>) [subst K=nint, R=bool, T=nint, V=nint]
     eval [false, true, false, true]

@@ -29,12 +29,15 @@ import (
 // checkSwitch validates one switch statement: its scrutinee and arm value
 // types, its exhaustiveness, its duplicate and unreachable arms. The arm bodies
 // themselves are walked by the caller (checkStmts), which threads the result
-// type into their returns.
-func checkSwitch(sw *ast.SwitchStmt, bs infer.BodyScope, env eval.Env, at func(ast.Node) span, diags *diagnostic.List) {
+// type into their returns. sink is the body's checking sink: the scrutinee
+// types through it (reporting its own operator errors and streaming its
+// settled type for the typed value graph), and the arm values' sink forwards
+// its informational streams.
+func checkSwitch(sw *ast.SwitchStmt, bs infer.BodyScope, env eval.Env, sink *infer.Sink, at func(ast.Node) span, diags *diagnostic.List) {
 	if sw.Scrutinee == nil {
 		return
 	}
-	scrutT := infer.Body(sw.Scrutinee, bs)
+	scrutT := infer.CheckPredicate(sw.Scrutinee, bs, sink)
 	// A switch dispatches on the scrutinee's value equality, so the scrutinee
 	// must be comparable — the same equality-driven discipline a map key obeys.
 	// A record or union does not opt into comparable, so a switch over it is
@@ -46,7 +49,7 @@ func checkSwitch(sw *ast.SwitchStmt, bs infer.BodyScope, env eval.Env, at func(a
 		diags.Add(newScrutineeNotComparableDiagnostic(s.offset, s.width, scrutT.String()))
 	}
 	enumDef := enumDefOf(scrutT)
-	armSink := armValueSink(at, diags)
+	armSink := armValueSink(sink, at, diags)
 
 	// covered records, for an enum scrutinee, which member indices the arms
 	// account for; seen records the folded values already matched, so a repeat
@@ -127,11 +130,21 @@ func checkSwitch(sw *ast.SwitchStmt, bs infer.BodyScope, env eval.Env, at func(a
 // arm_value_type_mismatch, reusing the checking walk's Mismatch finding. The
 // other findings (operator errors inside a value expression) keep their own
 // diagnostics, so a malformed arm value still surfaces its real cause.
-func armValueSink(at func(ast.Node) span, diags *diagnostic.List) *infer.Sink {
+func armValueSink(body *infer.Sink, at func(ast.Node) span, diags *diagnostic.List) *infer.Sink {
 	sink := exprSink(at, diags, nil)
 	sink.Mismatch = func(node ast.Node, got, want ir.Type) {
 		s := at(node)
 		diags.Add(newArmValueTypeMismatchDiagnostic(s.offset, s.width, got.String(), want.String()))
+	}
+	// The informational streams forward to the body's sink, so an arm value's
+	// settled type, overload selection, and substitution reach the IR
+	// write-back exactly as any other body expression's do.
+	if body != nil {
+		sink.Typed = body.Typed
+		sink.CallSubst = body.CallSubst
+		sink.ResolvedMethod = body.ResolvedMethod
+		sink.ResolvedStatic = body.ResolvedStatic
+		sink.ResolvedFunc = body.ResolvedFunc
 	}
 	return sink
 }

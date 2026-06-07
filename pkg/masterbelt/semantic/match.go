@@ -32,11 +32,13 @@ import (
 // member type and binding, its exhaustiveness, and its duplicate and unreachable
 // arms. The arm bodies themselves are walked by the caller (checkStmts), which
 // narrows each arm's binding and threads the result type into their returns.
-func checkMatch(m *ast.MatchStmt, bs infer.BodyScope, at func(ast.Node) span, diags *diagnostic.List) {
+// The scrutinee types through the body's checking sink, reporting its own
+// operator errors and streaming its settled type for the typed value graph.
+func checkMatch(m *ast.MatchStmt, bs infer.BodyScope, sink *infer.Sink, at func(ast.Node) span, diags *diagnostic.List) {
 	if m.Scrutinee == nil {
 		return
 	}
-	scrutT := infer.Body(m.Scrutinee, bs)
+	scrutT := infer.CheckPredicate(m.Scrutinee, bs, sink)
 	members := unionMembers(scrutT)
 
 	// covered records which union members an arm's type accounts for, keyed by the

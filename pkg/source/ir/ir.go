@@ -15,6 +15,8 @@
 package ir
 
 import (
+	"fmt"
+
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
 )
 
@@ -80,6 +82,15 @@ type Const struct {
 }
 
 // Value is a resolved initializer: a literal or a reference to another constant.
+//
+// Every value node carries a Type — its checker-settled type, the typed value
+// graph (F-3 §2.1). A node is born with it nil at lowering (which is
+// type-blind) and the post-check write-back fills it: a literal at its
+// synthesized type (an integer literal is nint even where a sized type expects
+// it — the width settle is an explicit adaption, not a retype), a reference at
+// its binding's type, a call at the checker's result. A node in a declaration
+// the checker never settled (a broken file) keeps nil, which the dump renders
+// bare — the hole is visible, never invented.
 type Value interface {
 	value()
 }
@@ -88,6 +99,7 @@ type Value interface {
 // evaluated value lives on Const.Eval.
 type IntLiteral struct {
 	Text string
+	Type Type
 }
 
 func (*IntLiteral) value() {}
@@ -96,6 +108,7 @@ func (*IntLiteral) value() {}
 // value lives on Const.Eval (the same string).
 type StringLiteral struct {
 	Value string
+	Type  Type
 }
 
 func (*StringLiteral) value() {}
@@ -103,6 +116,7 @@ func (*StringLiteral) value() {}
 // BoolLiteral is a boolean literal, true or false.
 type BoolLiteral struct {
 	Value bool
+	Type  Type
 }
 
 func (*BoolLiteral) value() {}
@@ -111,6 +125,7 @@ func (*BoolLiteral) value() {}
 // the normalized UTC instant lives on Const.Eval.
 type DatetimeLiteral struct {
 	Text string
+	Type Type
 }
 
 func (*DatetimeLiteral) value() {}
@@ -119,15 +134,20 @@ func (*DatetimeLiteral) value() {}
 // the totalled milliseconds live on Const.Eval.
 type DurationLiteral struct {
 	Text string
+	Type Type
 }
 
 func (*DurationLiteral) value() {}
 
 // CollectionLiteral is a list or map literal. A list's entries each carry only a
 // Value; a map's entries each carry a Key and a Value. An empty literal has no
-// entries; its kind comes from the constant's type.
+// entries; its kind comes from the constant's type. Syntax is the literal this
+// lowered from — the key the settled type is written back through, and the
+// editor's position anchor; it carries no semantics.
 type CollectionLiteral struct {
 	Entries []CollectionEntry
+	Type    Type
+	Syntax  *ast.CollectionLit
 }
 
 func (*CollectionLiteral) value() {}
@@ -141,10 +161,14 @@ type CollectionEntry struct {
 
 // RecordValue is a record literal: its named type ("" for the inferred form,
 // whose type comes from the constant's Type) and its field values in source
-// order. The evaluated, canonically ordered value lives on Const.Eval.
+// order. The evaluated, canonically ordered value lives on Const.Eval. Syntax
+// is the literal this lowered from — the settled-type write-back key and the
+// editor's position anchor only, never semantics.
 type RecordValue struct {
 	TypeName string
 	Fields   []RecordField
+	Type     Type
+	Syntax   *ast.RecordLit
 }
 
 func (*RecordValue) value() {}
@@ -155,9 +179,14 @@ type RecordField struct {
 	Value Value
 }
 
-// Reference is a use of another constant, resolved to its declaration.
+// Reference is a use of another constant, resolved to its declaration. Syntax
+// is the referring expression (an identifier, or a namespace member access) —
+// the settled-type write-back key and the editor's position anchor only, never
+// semantics.
 type Reference struct {
 	Target *Const
+	Type   Type
+	Syntax ast.Expr
 }
 
 func (*Reference) value() {}
@@ -196,6 +225,7 @@ type Call struct {
 	Setter   bool
 	Resolved *Method
 	Subst    map[string]Type
+	Type     Type
 	Syntax   *ast.CallExpr
 }
 
@@ -216,6 +246,7 @@ type FuncCall struct {
 	Args     []Value
 	Resolved *Function
 	Subst    map[string]Type
+	Type     Type
 	Syntax   *ast.CallExpr
 }
 
@@ -235,30 +266,41 @@ type StaticCall struct {
 	Args     []Value
 	Resolved *Method
 	Subst    map[string]Type
+	Type     Type
 	Syntax   *ast.CallExpr
 }
 
 func (*StaticCall) value() {}
 
 // FuncLiteral is a function-literal value: its parameter names and its lowered
-// statement body. Like the rest of the value graph it is untyped — the
-// expression's type lives on the constant's Type and in the type system — so it
-// carries names and a body, not resolved parameter types.
+// statement body. Type is the checker-solved *Func — annotations, pushed-down
+// expectations, and inferred parts combined — so the parameter and result
+// types read off the node even though the lowering carries only names. Syntax
+// is the literal this lowered from — the settled-type write-back key and the
+// editor's position anchor only, never semantics.
 type FuncLiteral struct {
 	Params []string
 	Body   []Stmt
+	Type   Type
+	Syntax *ast.FuncLit
 }
 
 func (*FuncLiteral) value() {}
 
 // SelfValue is the method receiver (the self keyword) inside a method body.
-type SelfValue struct{}
+// Type is the enclosing type, filled by the write-back from the method's
+// owner.
+type SelfValue struct {
+	Type Type
+}
 
 func (*SelfValue) value() {}
 
-// ParamRef is a use of a method parameter, by name.
+// ParamRef is a use of a method parameter, by name. Type is the parameter's
+// declared type, read off the enclosing signature by the write-back.
 type ParamRef struct {
 	Name string
+	Type Type
 }
 
 func (*ParamRef) value() {}
@@ -266,17 +308,24 @@ func (*ParamRef) value() {}
 // LocalRef is a use of a let-bound block-local, by name. It is the value form a
 // reference to a mutable local takes — distinct from a ParamRef (an immutable
 // parameter) and a Reference (a top-level constant) — so the evaluator reads it
-// from the body's mutable environment.
+// from the body's mutable environment. Type is the binding's settled type, read
+// off the introducing Let (or match arm, or for variable) by the write-back.
 type LocalRef struct {
 	Name string
+	Type Type
 }
 
 func (*LocalRef) value() {}
 
-// FieldAccess is a record field access: Receiver.Field.
+// FieldAccess is a record field access — or a getter read, which shares the
+// surface form: Receiver.Field. Syntax is the member expression this lowered
+// from — the settled-type write-back key and the editor's position anchor
+// only, never semantics.
 type FieldAccess struct {
 	Receiver Value
 	Field    string
+	Type     Type
+	Syntax   *ast.MemberExpr
 }
 
 func (*FieldAccess) value() {}
@@ -285,7 +334,9 @@ func (*FieldAccess) value() {}
 // the form a builtin type name takes when applied to its arguments. Most
 // conversions take one argument (Level(5), error("msg")); a constructor takes
 // several (range(start, end)), so the arguments are a slice. Value returns the
-// sole argument for the common single-argument form.
+// sole argument for the common single-argument form. Type is the target the
+// callee names, which is also the node's settled type (a conversion's type is
+// the type it names, whatever its arguments) — the one value form born typed.
 type Conversion struct {
 	Type Type
 	Args []Value
@@ -305,9 +356,11 @@ func (*Conversion) value() {}
 
 // Await is an await expression: the explicit suspension point that consumes
 // the async effect at a call site. It wraps the awaited value and adds
-// nothing to its type.
+// nothing to its type — Type is the awaited value's, copied by the
+// write-back.
 type Await struct {
 	Value Value
+	Type  Type
 }
 
 func (*Await) value() {}
@@ -315,11 +368,15 @@ func (*Await) value() {}
 // Ternary is a resolved conditional value, cond ? then : else: it yields Then
 // when Cond holds and Else otherwise. It is the value form of a two-way choice
 // (the if statement's expression counterpart); only the taken branch is
-// evaluated, so it keeps its own node rather than lowering to a call.
+// evaluated, so it keeps its own node rather than lowering to a call. Syntax
+// is the expression this lowered from — the settled-type write-back key and
+// the editor's position anchor only, never semantics.
 type Ternary struct {
-	Cond Value
-	Then Value
-	Else Value
+	Cond   Value
+	Then   Value
+	Else   Value
+	Type   Type
+	Syntax *ast.TernaryExpr
 }
 
 func (*Ternary) value() {}
@@ -337,12 +394,15 @@ type RangeLit struct {
 	Lower    Value
 	Upper    Value
 	HalfOpen bool
+	Type     Type
 }
 
 func (*RangeLit) value() {}
 
 // NullValue is the null literal.
-type NullValue struct{}
+type NullValue struct {
+	Type Type
+}
 
 func (*NullValue) value() {}
 
@@ -354,9 +414,71 @@ func (*NullValue) value() {}
 type EnumMemberValue struct {
 	Def   *TypeDef
 	Index int
+	Type  Type
 }
 
 func (*EnumMemberValue) value() {}
+
+// TypeOf returns a value node's settled type — the typed value graph's uniform
+// reading. It is nil for a node the post-check write-back never settled (a
+// broken declaration, or a graph not yet written back) and for a nil value. A
+// Conversion's type is its target (the one form born typed); every other form
+// reads its Type field. The switch is exhaustive over the sealed Value forms;
+// a new form panics here rather than silently reading as untyped.
+func TypeOf(v Value) Type {
+	switch v := v.(type) {
+	case nil:
+		return nil
+	case *IntLiteral:
+		return v.Type
+	case *StringLiteral:
+		return v.Type
+	case *BoolLiteral:
+		return v.Type
+	case *DatetimeLiteral:
+		return v.Type
+	case *DurationLiteral:
+		return v.Type
+	case *CollectionLiteral:
+		return v.Type
+	case *RecordValue:
+		return v.Type
+	case *Reference:
+		return v.Type
+	case *Call:
+		return v.Type
+	case *FuncCall:
+		return v.Type
+	case *StaticCall:
+		return v.Type
+	case *FuncLiteral:
+		return v.Type
+	case *SelfValue:
+		return v.Type
+	case *ParamRef:
+		return v.Type
+	case *LocalRef:
+		return v.Type
+	case *FieldAccess:
+		return v.Type
+	case *Conversion:
+		return v.Type
+	case *Await:
+		return v.Type
+	case *Ternary:
+		return v.Type
+	case *RangeLit:
+		return v.Type
+	case *NullValue:
+		return v.Type
+	case *EnumMemberValue:
+		return v.Type
+	case *AssocConstValue:
+		return v.Type
+	default:
+		panic(fmt.Sprintf("ir: unhandled Value kind %T", v))
+	}
+}
 
 // AssocConstValue is a resolved reference to a type's associated constant,
 // written TypeName.Name (int8.Max, Level.Max). Def is the owning type and Index
@@ -366,6 +488,7 @@ func (*EnumMemberValue) value() {}
 type AssocConstValue struct {
 	Def   *TypeDef
 	Index int
+	Type  Type
 }
 
 func (*AssocConstValue) value() {}

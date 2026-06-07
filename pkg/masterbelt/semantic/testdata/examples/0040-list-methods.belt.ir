@@ -1,52 +1,52 @@
 Module
   Const "Joined"
     type list<nint>
-    value [IntLiteral "1", IntLiteral "2"].add([IntLiteral "3", IntLiteral "4"]) [resolved add(other: self): self] [subst K=nint, T=nint, V=nint]
+    value (([(IntLiteral "1" : nint), (IntLiteral "2" : nint)] : list<nint>).add(([(IntLiteral "3" : nint), (IntLiteral "4" : nint)] : list<nint>)) : list<nint>) [resolved add(other: self): self] [subst K=nint, T=nint, V=nint]
     eval [1, 2, 3, 4]
   Const "Added"
     type list<nint>
-    value [IntLiteral "1", IntLiteral "2"].add(IntLiteral "3") [resolved add(element: T): self] [subst K=nint, T=nint, V=nint]
+    value (([(IntLiteral "1" : nint), (IntLiteral "2" : nint)] : list<nint>).add((IntLiteral "3" : nint)) : list<nint>) [resolved add(element: T): self] [subst K=nint, T=nint, V=nint]
     eval [1, 2, 3]
   Const "NestedAdd"
     type list<list<nint>>
-    value [[IntLiteral "1"], [IntLiteral "2"]].add([IntLiteral "3"]) [resolved add(element: T): self] [subst K=nint, T=list<nint>, V=list<nint>]
+    value (([([(IntLiteral "1" : nint)] : list<nint>), ([(IntLiteral "2" : nint)] : list<nint>)] : list<list<nint>>).add(([(IntLiteral "3" : nint)] : list<nint>)) : list<list<nint>>) [resolved add(element: T): self] [subst K=nint, T=list<nint>, V=list<nint>]
     eval [[1], [2], [3]]
   Const "Pushed"
     type list<nint>
-    value [IntLiteral "1", IntLiteral "2"].push(IntLiteral "3") [subst K=nint, T=nint, V=nint]
+    value (([(IntLiteral "1" : nint), (IntLiteral "2" : nint)] : list<nint>).push((IntLiteral "3" : nint)) : list<nint>) [subst K=nint, T=nint, V=nint]
     eval [1, 2, 3]
   Const "Unshifted"
     type list<nint>
-    value [IntLiteral "2", IntLiteral "3"].unshift(IntLiteral "1") [subst K=nint, T=nint, V=nint]
+    value (([(IntLiteral "2" : nint), (IntLiteral "3" : nint)] : list<nint>).unshift((IntLiteral "1" : nint)) : list<nint>) [subst K=nint, T=nint, V=nint]
     eval [1, 2, 3]
   Const "Empty"
     type list<nint>
-    value []
+    value ([] : list<nint>)
     eval []
   Const "Last"
     type optional<nint>
-    value [IntLiteral "1", IntLiteral "2", IntLiteral "3"].pop() [subst K=nint, T=nint, V=nint]
+    value (([(IntLiteral "1" : nint), (IntLiteral "2" : nint), (IntLiteral "3" : nint)] : list<nint>).pop() : optional<nint>) [subst K=nint, T=nint, V=nint]
     eval 3
   Const "NoLast"
     type optional<nint>
-    value Reference -> "Empty".pop() [subst K=nint, T=nint, V=nint]
+    value ((Reference -> "Empty" : list<nint>).pop() : optional<nint>) [subst K=nint, T=nint, V=nint]
     eval null
   Const "First"
     type optional<nint>
-    value [IntLiteral "1", IntLiteral "2", IntLiteral "3"].shift() [subst K=nint, T=nint, V=nint]
+    value (([(IntLiteral "1" : nint), (IntLiteral "2" : nint), (IntLiteral "3" : nint)] : list<nint>).shift() : optional<nint>) [subst K=nint, T=nint, V=nint]
     eval 1
   Const "NoFirst"
     type optional<nint>
-    value Reference -> "Empty".shift() [subst K=nint, T=nint, V=nint]
+    value ((Reference -> "Empty" : list<nint>).shift() : optional<nint>) [subst K=nint, T=nint, V=nint]
     eval null
   Func "orZero" pub
     param v: optional<nint>
     result nint
-      match ParamRef "v"
+      match (ParamRef "v" : optional<nint>)
         arm nint n
-          return LocalRef "n"
+          return (LocalRef "n" : nint)
         arm null
-          return IntLiteral "0"
+          return (IntLiteral "0" : nint)
   Assert "([1, 2] + [3, 4]).len() == 4"
     eval true
       ([1, 2] + [3, 4]).len() == 4

@@ -1,15 +1,15 @@
 Module
   Const "Top"
     type Rarity
-    value Rarity.Legend
+    value (Rarity.Legend : Rarity)
     eval Rarity.Legend
   Const "Bare"
     type Rarity
-    value Rarity.Common
+    value (Rarity.Common : Rarity)
     eval Rarity.Common
   Const "Highest"
     type Rarity
-    value highestSeen(Rarity.Legend)
+    value (highestSeen((Rarity.Legend : Rarity)) : Rarity)
     eval Rarity.Legend
   TypeDef "Rarity" pub
     doc "A card's rarity tier."
@@ -66,7 +66,7 @@ Module
     method "isFire" pub
       doc "Whether this element is Fire."
       result bool
-      return self.eql(Element.Fire)
+      return ((self : Element).eql((Element.Fire : Element)) : bool)
   TypeDef "Locale" pub
     doc "A supported display locale."
     enum string
@@ -95,10 +95,10 @@ Module
   Func "highestSeen" pub
     param starting: Rarity
     result Rarity
-      let "best": Rarity = Rarity.Common
-      if ParamRef "starting".eql(Rarity.Legend)
-          assign "best" = Rarity.Legend
-      return LocalRef "best"
+      let "best": Rarity = (Rarity.Common : Rarity)
+      if ((ParamRef "starting" : Rarity).eql((Rarity.Legend : Rarity)) : bool)
+          assign "best" = (Rarity.Legend : Rarity)
+      return (LocalRef "best" : Rarity)
   Assert "Rarity.Common != Rarity.Legend"
     eval true
       Rarity.Common != Rarity.Legend

@@ -1,51 +1,51 @@
 Module
   Const "FireIsFire"
     type bool
-    value Element.Fire.isFire()
+    value ((Element.Fire : Element).isFire() : bool)
     eval true
   Const "FireLabel"
     type nint
-    value Element.Fire.label()
+    value ((Element.Fire : Element).label() : nint)
     eval 1
   Const "WaterLabel"
     type nint
-    value Element.Water.label()
+    value ((Element.Water : Element).label() : nint)
     eval 0
   Const "Six"
     type Level
-    value Level(IntLiteral "5").increment()
+    value (Level((IntLiteral "5" : nint)).increment() : Level)
     eval 6
   Const "Start"
     type Level
-    value IntLiteral "10"
+    value (IntLiteral "10" : nint)
     eval 10
   Const "Eleven"
     type Level
-    value Reference -> "Start".increment()
+    value ((Reference -> "Start" : Level).increment() : Level)
     eval 11
   Const "Thirteen"
     type Level
-    value Reference -> "Start".plus(IntLiteral "3")
+    value ((Reference -> "Start" : Level).plus((IntLiteral "3" : nint)) : Level)
     eval 13
   Const "Three"
     type Level
-    value base().increment().increment()
+    value (((base() : Level).increment() : Level).increment() : Level)
     eval 3
   Const "Hero"
     type Character
-    value {lv: Level(IntLiteral "5")}
+    value ({lv: Level((IntLiteral "5" : nint))} : Character)
     eval { lv: 5 }
   Const "Promoted"
     type Level
-    value Reference -> "Hero".lv.increment()
+    value ((Reference -> "Hero".lv : Level).increment() : Level)
     eval 6
   Const "Squad"
     type Party
-    value {leader: {lv: Level(IntLiteral "8")}}
+    value ({leader: ({lv: Level((IntLiteral "8" : nint))} : Character)} : Party)
     eval { leader: { lv: 8 } }
   Const "LeaderUp"
     type Level
-    value Reference -> "Squad".leader.lv.increment()
+    value ((Reference -> "Squad".leader.lv : Level).increment() : Level)
     eval 9
   TypeDef "Level" pub
     doc "A character level, with methods over its underlying sbyte."
@@ -53,7 +53,7 @@ Module
     method "increment" pub
       doc "The next level up — a self-returning method, so a chain keeps the type."
       result self
-      return self.add(IntLiteral "1")
+      return ((self : Level).add((IntLiteral "1" : nint)) : Level)
     method "plus" pub
       doc "This level a number of steps up. The base value lifts into the nominal"
       doc "type through the conversion: a Level derives sbyte's operators, but their"
@@ -61,7 +61,7 @@ Module
       doc "error — Level(steps) is the explicit lift."
       param steps: sbyte
       result self
-      return self.add(Level(ParamRef "steps"))
+      return ((self : Level).add(Level((ParamRef "steps" : sbyte))) : Level)
   TypeDef "Character" pub
     doc "A character with a level field."
     body { lv: Level }
@@ -97,22 +97,22 @@ Module
     method "isFire" pub
       doc "Whether this element is Fire — a one-line body that folds to a bool."
       result bool
-      return self.eql(Element.Fire)
+      return ((self : Element).eql((Element.Fire : Element)) : bool)
     method "notFire" pub
       doc "Whether this element is not Fire — a method that calls another method."
       result bool
-      return self.isFire().not()
+      return (((self : Element).isFire() : bool).not() : bool)
     method "label" pub
       doc "A let- and if-bearing body, to exercise the full statement walker."
       result nint
-      let "fire": bool = self.isFire()
-      if LocalRef "fire"
-          return IntLiteral "1"
-      return IntLiteral "0"
+      let "fire": bool = ((self : Element).isFire() : bool)
+      if (LocalRef "fire" : bool)
+          return (IntLiteral "1" : nint)
+      return (IntLiteral "0" : nint)
   Func "base" pub
     doc "A function whose declared result type names Level — the chain channel."
     result Level
-      return Level(IntLiteral "1")
+      return Level((IntLiteral "1" : nint))
   Assert "Element.Fire.isFire()"
     eval true
       Element.Fire.isFire()
