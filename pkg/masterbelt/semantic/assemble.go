@@ -11,6 +11,7 @@ import (
 
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/assert"
+	"github.com/masterbelt/masterbelt/pkg/masterbelt/builtin"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/eval"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/lower"
 	"github.com/masterbelt/masterbelt/pkg/masterbelt/types"
@@ -116,6 +117,22 @@ func exprSink(at func(ast.Node) span, diags *diagnostic.List) *infer.Sink {
 	}
 }
 
+// bodySink builds the function/method body checking sink: exprSink plus the
+// member-aware Checked hook that range- and refinement-checks every (value,
+// expected-type) pair the body walk visits — a return against the declared
+// result, a let against its annotation, an argument against the parameter. It is
+// the body twin of the const initializer's Checked hook, so a constant value
+// flowing into a sized or refined position (the union member included) is enforced
+// in a body exactly as in a const. env folds the values; a non-constant value
+// (a parameter, a local) does not fold and is left to the runtime.
+func bodySink(at func(ast.Node) span, diags *diagnostic.List, reg *builtin.Registry, env evalEnv) *infer.Sink {
+	sink := exprSink(at, diags)
+	sink.Checked = func(e ast.Expr, want ir.Type) {
+		checkMemberFlow(reg, e, want, env, at, diags)
+	}
+	return sink
+}
+
 // assemble builds one file's IR module and semantic diagnostics from its AST,
 // using q for the resolution and typing facts; fileID names the file within
 // the program, scoping its identifier resolution, and shells/fnShells hold the
@@ -203,10 +220,11 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 				if e == decl.Value {
 					return
 				}
-				if v := eval.Expr(e, evalEnv{q: q, file: fileID}); v != nil && v.Kind == ir.ConstInt && !types.Fits(reg, want, v.Int) {
-					s := at(e)
-					diags.Add(newConstantOverflowDiagnostic(s.offset, s.width, v.String(), want.String()))
-				}
+				// Range and refinement, against the member the value flows in as —
+				// so a nested position (a collection entry, a record field, an
+				// argument) enforces both checks at the same sites, the union member
+				// included (its Fits and refinedDef both pass through directly).
+				checkMemberFlow(reg, e, want, evalEnv{q: q, file: fileID}, at, diags)
 			}
 			// A conversion to a sized integer (short(70000), Level(70000)) range-
 			// checks its argument against the target — the diagnostic the const-level
@@ -257,21 +275,20 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 			s := at(decl)
 			diags.Add(newCyclicReferenceDiagnostic(s.offset, s.width, decl.Name))
 		}
-		// An integer value outside its concrete type's range overflows. The
-		// arbitrary-precision nint has no fixed range (Fits accepts any value),
-		// and booleans never overflow.
-		overflow := c.Eval != nil && c.Eval.Kind == ir.ConstInt && !types.Fits(reg, c.Type, c.Eval.Int)
-		if overflow {
-			s := at(decl.Value)
-			diags.Add(newConstantOverflowDiagnostic(s.offset, s.width, c.Eval.String(), c.Type.String()))
+		// The top-level value's range, against the member it flows in as (c.Type's
+		// selected union member, or c.Type itself). It folds the value raw — the
+		// arbitrary-precision nint has no fixed range, a bool never overflows, and an
+		// overflowing conversion folds to nil and is reported at its own site. It is
+		// the same member-aware check the nested positions run through Checked.
+		if decl.Value != nil {
+			checkMemberFlow(reg, decl.Value, c.Type, evalEnv{q: q, file: fileID}, at, diags)
 		}
 		// Refinement: a nominal annotation whose definition carries a usable
 		// where-clause admits only the values that satisfy it, so the predicate
-		// folds with self bound to the evaluated value. An overflowed value is
-		// already reported as outside the type; a predicate that does not fold
-		// to a bool was reported at the type declaration, so both stay silent
+		// folds with self bound to the evaluated value. A predicate that does not
+		// fold to a bool was reported at the type declaration, so it stays silent
 		// here (the ir.Invalid style of suppression).
-		if !overflow && c.Eval != nil {
+		if c.Eval != nil {
 			if def := refinedDef(c.Type); def != nil {
 				v := eval.Predicate(def.Where, c.Eval, def, evalEnv{q: q, file: fileID})
 				if v != nil && v.Kind == ir.ConstBool && !v.Bool {
@@ -383,8 +400,14 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 	qfns := qualifiedFuncsFrom(q, imp)
 	module.Funcs = resolveFuncs(file, at, diags, reg, q.universe(fileID), qualifiedFrom(q, imp), qfns, fnShells)
 	bodyEnv := evalEnv{q: q, file: fileID}
-	checkMethodBodies(reg, module.Types, q.universe(fileID), qualifiedFrom(q, imp), funcs, qfns, bodyEnv, exprSink(at, diags), at, diags)
-	checkFuncBodies(reg, file, q.universe(fileID), qualifiedFrom(q, imp), funcs, qfns, bodyEnv, exprSink(at, diags), at, diags)
+	// A function or method body's returns, lets, and arguments run the same
+	// member-aware range and refinement check the const initializer does, so a
+	// constant value flowing into a sized or refined (union member) result, local,
+	// or parameter is checked at the body site too — the position the result-type
+	// soundness gap left unchecked. Only a constant value folds; a body-local or
+	// parameter reference does not, and is left to the runtime.
+	checkMethodBodies(reg, module.Types, q.universe(fileID), qualifiedFrom(q, imp), funcs, qfns, bodyEnv, bodySink(at, diags, reg, bodyEnv), at, diags)
+	checkFuncBodies(reg, file, q.universe(fileID), qualifiedFrom(q, imp), funcs, qfns, bodyEnv, bodySink(at, diags, reg, bodyEnv), at, diags)
 	checkEffects(reg, file, module.Types, q.universe(fileID), qualifiedFrom(q, imp), funcs, qfns, at, diags)
 
 	// Compile-time positions must be pure: a constant initializer and an
@@ -515,6 +538,38 @@ func refinedDef(t ir.Type) *ir.TypeDef {
 		return nil
 	}
 	return def
+}
+
+// checkMemberFlow reports the value-soundness diagnostics for a value flowing
+// into the type want at expression e: an integer outside the range of the member
+// want resolves to. It is the unified member-aware check the const,
+// nested-position (Checked), and function-body return sites all run, so the range
+// check is enforced at exactly the same positions:
+//
+//   - the effective target is the union member the value flows in as (eval.MemberFor
+//     runs the same exact→unique selection the fold tags with), or want itself when
+//     it is not a union — so `sbyte | error` checks the value against `sbyte`;
+//   - the value is folded with no expectation (eval.Expr), so the raw value is read
+//     even though the expectation-driven fold refuses to build it (memberAdmits);
+//     an overflowing conversion already folds to nil and is reported at its own site
+//     (ScalarConversion), so it is not seen here and never double-reported.
+//
+// A non-constant or unfoldable value (a parameter) is left unchecked — the
+// runtime's job, the conservative discipline the range check already shares.
+func checkMemberFlow(reg *builtin.Registry, e ast.Expr, want ir.Type, env evalEnv, at func(ast.Node) span, diags *diagnostic.List) {
+	if want == ir.Invalid {
+		return
+	}
+	v := eval.Expr(e, env)
+	if v == nil {
+		return
+	}
+	member := eval.MemberFor(e, want, env)
+	if v.Kind == ir.ConstInt && !types.Fits(reg, member, v.Int) {
+		s := at(e)
+		diags.Add(newConstantOverflowDiagnostic(s.offset, s.width, v.String(), member.String()))
+		return
+	}
 }
 
 // typeNameReporter builds the callback the type resolver reports a failed type

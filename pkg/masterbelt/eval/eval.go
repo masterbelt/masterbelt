@@ -347,9 +347,57 @@ func evalExpr(e ast.Expr, ctx evalCtx) *ir.Constant {
 		return v
 	}
 	if tag := unionMemberTag(ctx, e, v, ctx.expectedType); tag != nil {
+		// The value flows in as this member: an out-of-range integer or a
+		// where-predicate violation against the member is not a representable
+		// value of it, so it does not fold — the same refusal a scalar conversion
+		// makes, keeping a wrong constant out of a union the const-level checks
+		// cannot see through (the union's Fits and refinedDef both pass through).
+		// The semantic layer reports the diagnostic at the flow site, folding the
+		// raw value (no expectation) so the unfolded value here never hides it.
+		if !memberAdmits(ctx, tag, v) {
+			return nil
+		}
 		return ir.Tagged(v, tag)
 	}
 	return v
+}
+
+// memberAdmits reports whether the value v is a representable value of the union
+// member type it flows in as: an integer within the member's range. A value that
+// cannot be settled (a non-integer kind against a sized member) is admitted —
+// only a definitive violation refuses the fold, the conservative discipline the
+// const and conversion range checks share. It is the value half of the
+// member-aware soundness check; the semantic layer runs the same selection through
+// MemberFor to anchor the diagnostic at the flow site.
+func memberAdmits(ctx evalCtx, member ir.Type, v *ir.Constant) bool {
+	reg := ctx.env.Registry()
+	if v.Kind == ir.ConstInt && !types.Fits(reg, member, v.Int) {
+		return false
+	}
+	return true
+}
+
+// MemberFor returns the type a value of expression e flows in as under the
+// expected type want: the union member it would be tagged with (the same
+// exact→unique selection the fold uses for tagging) when want is a union, or want
+// itself when it is not a union or no single member is settled. It is the channel
+// the semantic layer's member-aware range and refinement checks resolve their
+// effective target through, so the diagnostic checks against exactly the member
+// the fold tags — and the value the eval refusal drops. env supplies the
+// resolution; the value is folded with no expectation, so the raw value is read.
+func MemberFor(e ast.Expr, want ir.Type, env Env) ir.Type {
+	if types.UnionType(want) == nil {
+		return want
+	}
+	ctx := evalCtx{env: env}
+	v := evalExprRaw(e, ctx)
+	if v == nil {
+		return want
+	}
+	if tag := unionMemberTag(ctx, e, v, want); tag != nil {
+		return tag
+	}
+	return want
 }
 
 // evalExprRaw folds an expression, resolving an identifier first against the
