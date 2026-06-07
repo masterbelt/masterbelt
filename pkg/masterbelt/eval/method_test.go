@@ -469,6 +469,60 @@ func TestConversionRangeCheck(t *testing.T) {
 	wantInt(t, conv("sbyte", "127"), env, 127) // the inclusive boundary folds
 }
 
+// TestUnionMemberAdmitsFold pins the eval-side member-aware soundness refusal: a
+// value flowing into a union member that the member cannot represent — an
+// out-of-range integer for a sized member, or a where-predicate violation for a
+// refined member — does not fold (nil), so a wrong value is never tagged and a
+// later match never dispatches on it. An admitted value folds tagged with the
+// member. It is the union twin of the conversion range check.
+func TestUnionMemberAdmitsFold(t *testing.T) {
+	// type Port = sbyte where self > 0
+	port := nominalDef("Port", "sbyte")
+	port.Where = memberCall(selfExpr(), "gt", intLit("0")) // self > 0
+	env := newTypeEnv(port)
+
+	// sbyte | error: an integer literal selects the sbyte member by kind backing.
+	sbyteUnion := &ir.Union{Members: []ir.Type{&ir.Builtin{Name: "sbyte"}, &ir.Builtin{Name: "error"}}}
+	// Port | error: an integer literal selects the refined Port member.
+	portUnion := &ir.Union{Members: []ir.Type{&ir.Named{Def: port}, &ir.Builtin{Name: "error"}}}
+
+	// Out of sbyte range: no representable member value, so the fold is refused.
+	if v := ExprExpecting(intLit("200"), sbyteUnion, env); v != nil {
+		t.Errorf("200 into sbyte | error folded to %v, want nil (out of range)", v)
+	}
+	// Predicate violation: -5 does not satisfy Port's self > 0, so the fold is refused.
+	if v := ExprExpecting(intLit("-5"), portUnion, env); v != nil {
+		t.Errorf("-5 into Port | error folded to %v, want nil (predicate violation)", v)
+	}
+	// Admitted values fold tagged with their member.
+	if v := ExprExpecting(intLit("100"), sbyteUnion, env); v == nil || v.UnionTag == nil {
+		t.Errorf("100 into sbyte | error = %v, want a tagged value", v)
+	}
+	if v := ExprExpecting(intLit("5"), portUnion, env); v == nil || v.UnionTag == nil {
+		t.Errorf("5 into Port | error = %v, want a tagged value", v)
+	}
+}
+
+// TestMemberForSelection pins the MemberFor channel the semantic layer resolves
+// its member-aware check through: a union returns the selected member, a non-union
+// returns the type itself, and an unfoldable value falls back to the type.
+func TestMemberForSelection(t *testing.T) {
+	port := nominalDef("Port", "sbyte")
+	port.Where = memberCall(selfExpr(), "gt", intLit("0"))
+	env := newTypeEnv(port)
+	sbyteUnion := &ir.Union{Members: []ir.Type{&ir.Builtin{Name: "sbyte"}, &ir.Builtin{Name: "error"}}}
+
+	// A union resolves to the selected member.
+	if m := MemberFor(intLit("5"), sbyteUnion, env); m == nil || m.String() != "sbyte" {
+		t.Errorf("MemberFor(5, sbyte | error) = %v, want sbyte", m)
+	}
+	// A non-union returns the type itself.
+	short := &ir.Builtin{Name: "short"}
+	if m := MemberFor(intLit("5"), short, env); m != short {
+		t.Errorf("MemberFor(5, short) = %v, want short itself", m)
+	}
+}
+
 // TestNominalConstRefFold covers channel 2, a top-level const reference:
 // const base: Level = 5; base.increment() reads base's annotation for the def.
 func TestNominalConstRefFold(t *testing.T) {
