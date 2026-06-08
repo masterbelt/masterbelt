@@ -32,6 +32,7 @@ import (
 	protocol "github.com/owenrumney/go-lsp/lsp"
 	"github.com/owenrumney/go-lsp/server"
 
+	"github.com/masterbelt/masterbelt/internal/version"
 	"github.com/masterbelt/masterbelt/pkg/belt/parser/abstract"
 	"github.com/masterbelt/masterbelt/pkg/belt/semantic"
 	"github.com/masterbelt/masterbelt/pkg/project"
@@ -87,7 +88,7 @@ func (s *Server) Initialize(_ context.Context, _ *protocol.InitializeParams) (*p
 				Full:   &protocol.SemanticTokensFull{},
 			},
 		},
-		ServerInfo: &protocol.ServerInfo{Name: serverName, Version: "0.1.0"},
+		ServerInfo: &protocol.ServerInfo{Name: serverName, Version: version.String()},
 	}, nil
 }
 
