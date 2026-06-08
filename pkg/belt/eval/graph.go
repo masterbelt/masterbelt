@@ -419,24 +419,23 @@ func graphUnionTag(ctx graphCtx, v ir.Value, c *ir.Constant, want ir.Type) ir.Ty
 	// path, whose no-member verdict leaves the value untagged — the same
 	// asymmetry the expectation-driven folder settles through its written-
 	// annotation channels.
-	if st := graphStaticType(ctx, v); st != nil {
-		if _, bare := st.(*ir.Union); !bare {
-			if sel, m := types.SelectUnionMember(ctx.env.Registry(), st, want); sel == types.UnionUnique {
-				// A member still carrying a type variable is no concrete tag: a
-				// generic body returning into its own optional<T> selects the T
-				// member, but an unsubstituted T is not a value's union member.
-				// Leave it untagged — the value's kind is the fact — so the fold
-				// matches the one over the same call freshly lowered, where the
-				// generic member likewise pins nothing.
-				if types.HasTypeVar(m) {
-					return nil
-				}
-				return m
-			}
-			return nil
-		}
+	st := graphStaticType(ctx, v)
+	if _, bare := st.(*ir.Union); st == nil || bare {
+		return uniqueKindMemberOf(ctx.env.Registry(), u, c.Kind)
 	}
-	return uniqueKindMemberOf(ctx.env.Registry(), u, c.Kind)
+	sel, m := types.SelectUnionMember(ctx.env.Registry(), st, want)
+	if sel != types.UnionUnique {
+		return nil
+	}
+	// A member still carrying a type variable is no concrete tag: a generic body
+	// returning into its own optional<T> selects the T member, but an
+	// unsubstituted T is not a value's union member. Leave it untagged — the
+	// value's kind is the fact — so the fold matches the one over the same call
+	// freshly lowered, where the generic member likewise pins nothing.
+	if types.HasTypeVar(m) {
+		return nil
+	}
+	return m
 }
 
 // graphStaticType reads a node's static type for union member selection: the
