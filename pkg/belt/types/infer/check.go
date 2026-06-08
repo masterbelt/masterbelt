@@ -381,7 +381,7 @@ func resolveLitParams(lit *ast.FuncLit, want *ir.Func, r *TypeResolver, s scope,
 		wp := types.Substitute(want.Params[i], subst)
 		switch {
 		case p.Type != nil:
-			ap := r.ResolveType(p.Type, nil)
+			ap := r.ResolveType(p.Type, s.tscope())
 			if conflicts(reg, ap, wp, subst) {
 				sink.mismatch(p, ap, wp)
 			}
@@ -414,7 +414,7 @@ func resolveLitResult(lit *ast.FuncLit, want *ir.Func, r *TypeResolver, body fun
 	case lit.Result != nil:
 		// The annotation wins for the returns, after agreeing with the
 		// expectation the same way a parameter annotation must.
-		result := r.ResolveType(lit.Result, nil)
+		result := r.ResolveType(lit.Result, s.tscope())
 		if conflicts(reg, result, wr, subst) {
 			sink.mismatch(lit.Result, result, wr)
 		}
@@ -562,7 +562,7 @@ func walkLet(stmt *ast.LetStmt, s funcScope, sink *Sink) funcScope {
 	switch {
 	case stmt.Type != nil:
 		r := &TypeResolver{Defs: s.universe(), Qualified: s.qualified()}
-		typ = r.ResolveType(stmt.Type, nil)
+		typ = r.ResolveType(stmt.Type, s.tscope())
 		if stmt.Value != nil {
 			checkType(stmt.Value, typ, s, map[string]ir.Type{}, sink)
 		}
@@ -656,7 +656,7 @@ func narrowArmScope(s funcScope, arm *ast.MatchArm) funcScope {
 		return s
 	}
 	r := &TypeResolver{Defs: s.universe(), Qualified: s.qualified()}
-	return s.withLocal(arm.Bind, r.ResolveType(arm.Type, nil))
+	return s.withLocal(arm.Bind, r.ResolveType(arm.Type, s.tscope()))
 }
 
 // walkFor type-checks a for's iterated expression and recurses into its body in a
@@ -832,14 +832,14 @@ func checkFuncLit(lit *ast.FuncLit, s scope, sink *Sink) ir.Type {
 			// unannotated parameter from.
 			sink.uninferableParam(p)
 		}
-		params[i] = r.ResolveType(p.Type, nil)
+		params[i] = r.ResolveType(p.Type, s.tscope())
 		names[p.Name] = params[i]
 	}
 	body := funcScope{outer: s, params: names}
 
 	var result ir.Type
 	if lit.Result != nil {
-		result = r.ResolveType(lit.Result, nil)
+		result = r.ResolveType(lit.Result, s.tscope())
 		checkReturns(lit, result, body, map[string]ir.Type{}, sink)
 	} else {
 		unified, sawReturn := synthesizeReturns(lit, body, sink)

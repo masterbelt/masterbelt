@@ -138,6 +138,12 @@ type graphCtx struct {
 	// routine whose body is being folded, threaded to each return expression.
 	resultColl ir.CollKind
 	resultType ir.Type
+	// subst is the type-variable solution the routine whose body is being folded
+	// runs under — the checker-settled T = nint of a generic call. A match arm
+	// over a type variable (the T arm of an optional<T> scrutinee) resolves
+	// through it so the dispatch can decide which arm a concrete value takes; it
+	// is nil for a non-generic body, where every arm type is already concrete.
+	subst map[string]ir.Type
 	// budgetHit is the failure-classification channel: a budget guard that
 	// refuses to fold sets it. See evalCtx.budgetHit.
 	budgetHit *bool
@@ -416,6 +422,15 @@ func graphUnionTag(ctx graphCtx, v ir.Value, c *ir.Constant, want ir.Type) ir.Ty
 	if st := graphStaticType(ctx, v); st != nil {
 		if _, bare := st.(*ir.Union); !bare {
 			if sel, m := types.SelectUnionMember(ctx.env.Registry(), st, want); sel == types.UnionUnique {
+				// A member still carrying a type variable is no concrete tag: a
+				// generic body returning into its own optional<T> selects the T
+				// member, but an unsubstituted T is not a value's union member.
+				// Leave it untagged — the value's kind is the fact — so the fold
+				// matches the one over the same call freshly lowered, where the
+				// generic member likewise pins nothing.
+				if types.HasTypeVar(m) {
+					return nil
+				}
 				return m
 			}
 			return nil

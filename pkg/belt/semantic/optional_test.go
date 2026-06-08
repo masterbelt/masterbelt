@@ -58,14 +58,12 @@ func TestOptionalNonExhaustiveMatch(t *testing.T) {
 
 // TestOptionalGenericSolve pins that a generic function solves T through the
 // alias parameter: optional<T> expands to T | null and Match's union recursion
-// binds T from the argument, so the call type-checks. The fold of a match
-// whose arm type is the function's type parameter (T n -> ...) is a capability
-// the type-blind evaluator does not have — it resolves an arm type through a
-// universe lookup, which a generic parameter is not in, so the dispatch is
-// undecided. Under the fold-totality rule that open gap is loud rather than
-// silent: the constant errs with unfolded_const (reason: evaluator gap) until
-// the evaluator learns generic arm dispatch — at which point this pin flips to
-// the folded value below.
+// binds T from the argument, so the call type-checks. The fold of a match whose
+// arm type is the function's type parameter (T n -> ...) dispatches through the
+// call's settled substitution (T = nint), which the evaluator threads into the
+// body: the constant folds to the bound member, with no diagnostic. (This was
+// once an open evaluator gap, loud as unfolded_const; closing it flipped the pin
+// to the folded value.)
 func TestOptionalGenericSolve(t *testing.T) {
 	src := `pub fn orFallback<T>(v: optional<T>, fb: T): T {
   match v {
@@ -76,16 +74,59 @@ func TestOptionalGenericSolve(t *testing.T) {
 const A = orFallback(5, 0)
 `
 	m, diags := analyze(src)
-	if got := codes(diags); len(got) != 1 || got[0] != CodeUnfoldedConst {
-		t.Fatalf("codes = %v, want [unfolded_const] (the generic-arm dispatch gap is loud, not silent)", got)
+	if len(diags) != 0 {
+		t.Fatalf("codes = %v, want none (the generic arm now dispatches through the substitution)", codes(diags))
 	}
 	for _, c := range m.Consts {
-		if c.Name == "A" && c.Eval != nil {
-			// A fold is a bonus, not the contract: if the evaluator ever learns to
-			// dispatch a generic match arm, the value must be the bound member.
-			if got := c.Eval.String(); got != "5" {
-				t.Fatalf("A folded to %q, want 5", got)
-			}
+		if c.Name != "A" {
+			continue
+		}
+		if c.Eval == nil {
+			t.Fatal("A did not fold; want the bound member 5")
+		}
+		if got := c.Eval.String(); got != "5" {
+			t.Fatalf("A folded to %q, want 5", got)
+		}
+	}
+}
+
+// TestGenericUnionAccumulatorFolds pins the std:math reduction shape end to end:
+// a generic function whose nested fold lambda annotates its accumulator with a
+// union over the type parameter (T | error) and dispatches it with a match. It
+// exercises three fixes at once — the lambda annotation resolving T inside the
+// union (not optional<invalid>), the generic match arm folding through the
+// call's substitution, and the result never carrying the type variable as a
+// union tag — and it must fold each element exactly once (the error seed flows
+// in only on the first step), so a list of three sums to 6, not 7.
+func TestGenericUnionAccumulatorFolds(t *testing.T) {
+	src := `pub fn sum<T: numeric>(xs: list<T>): T | error {
+  let total: T | error = error("empty")
+  return xs.fold(total, fn(acc: T | error, i: nint, v: T): T | error {
+    match acc {
+      T a -> return a + v
+      error e -> return v
+    }
+  })
+}
+const S = sum([1, 2, 3])
+const E: list<nint> = []
+const Empty = sum(E)
+`
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("codes = %v, want none", codes(diags))
+	}
+	want := map[string]string{"S": "6", "Empty": `error("empty")`}
+	for _, c := range m.Consts {
+		exp, ok := want[c.Name]
+		if !ok {
+			continue
+		}
+		if c.Eval == nil {
+			t.Fatalf("%s did not fold; want %s", c.Name, exp)
+		}
+		if got := c.Eval.String(); got != exp {
+			t.Errorf("%s folded to %q, want %s", c.Name, got, exp)
 		}
 	}
 }

@@ -101,6 +101,14 @@ type scope interface {
 	// body is perfectly inferred, where an unpinned method-local variable (the
 	// R of map at a call site) is uninferable.
 	rigid(name string) bool
+	// tscope is the generic type-parameter scope in effect — the enclosing
+	// declaration's type parameters, each mapped to its bound — that a written
+	// type annotation in this scope (a lambda parameter or result, a let, a
+	// match arm) resolves a name through. Without it such an annotation resolving
+	// T would fall through to an unknown type (optional<T> becoming
+	// optional<invalid>); with it T resolves to the TypeVar carrying its bound.
+	// It is nil where no type parameters are in scope (a constant initializer).
+	tscope() TypeScope
 }
 
 // Decl is the type rule for a declaration: an annotation gives a concrete type,
@@ -241,10 +249,10 @@ func funcLitType(e *ast.FuncLit, s scope) ir.Type {
 	params := make([]ir.Type, len(e.Params))
 	names := make(map[string]ir.Type, len(e.Params))
 	for i, p := range e.Params {
-		params[i] = r.ResolveType(p.Type, nil)
+		params[i] = r.ResolveType(p.Type, s.tscope())
 		names[p.Name] = params[i]
 	}
-	result := r.ResolveType(e.Result, nil)
+	result := r.ResolveType(e.Result, s.tscope())
 	if e.Result == nil {
 		result = returnedType(e.Body, funcScope{outer: s, params: names})
 	}
@@ -363,7 +371,7 @@ func letScope(stmt *ast.LetStmt, s funcScope) funcScope {
 	switch {
 	case stmt.Type != nil:
 		r := &TypeResolver{Defs: s.universe(), Qualified: s.qualified()}
-		typ = r.ResolveType(stmt.Type, nil)
+		typ = r.ResolveType(stmt.Type, s.tscope())
 	case stmt.Value != nil:
 		typ = exprType(stmt.Value, s)
 	default:

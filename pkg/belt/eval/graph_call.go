@@ -39,7 +39,10 @@ func graphMethodCallable(m *ir.Method, selfDef *ir.TypeDef) graphCallable {
 // (the value-only catch-all; the call site's explicit Adapt tagged what the
 // static types could settle), and the declared result type threads the return
 // channels.
-func graphApplyBody(c graphCallable, self *ir.Constant, vals []*ir.Constant, ctx graphCtx) *ir.Constant {
+// subst is the called routine's type-variable solution (the call node's Subst),
+// installed for the body so a match over a type-variable arm folds; it is nil
+// for a non-generic call.
+func graphApplyBody(c graphCallable, self *ir.Constant, vals []*ir.Constant, subst map[string]ir.Type, ctx graphCtx) *ir.Constant {
 	if c.extern || c.effectful {
 		return nil
 	}
@@ -58,6 +61,7 @@ func graphApplyBody(c graphCallable, self *ir.Constant, vals []*ir.Constant, ctx
 		selfDef: c.selfDef, depth: ctx.depth + 1, budgetHit: ctx.budgetHit,
 		resultColl: CollKindOf(c.result),
 		resultType: c.result,
+		subst:      subst,
 	})
 }
 
@@ -117,7 +121,7 @@ func graphFuncCall(v *ir.FuncCall, ctx graphCtx) *ir.Constant {
 	if v.Resolved == nil && !graphFits(ctx.env.Registry(), fn.Params, vals, -1) {
 		return nil
 	}
-	return graphApplyBody(graphFuncCallable(fn), nil, vals, ctx)
+	return graphApplyBody(graphFuncCallable(fn), nil, vals, v.Subst, ctx)
 }
 
 // graphStaticCall folds a static fn call Type.name(args): the checker's
@@ -168,7 +172,7 @@ func graphStaticCall(v *ir.StaticCall, ctx graphCtx) *ir.Constant {
 			return nil
 		}
 	}
-	return graphApplyBody(graphMethodCallable(sel, v.Def), nil, vals, ctx)
+	return graphApplyBody(graphMethodCallable(sel, v.Def), nil, vals, v.Subst, ctx)
 }
 
 // graphCall folds a method call node: short-circuiting connectives first, then
@@ -287,7 +291,7 @@ func graphUserMethod(ctx graphCtx, v *ir.Call, recv *ir.Constant, name string, a
 			ctx.noteBudget()
 			return nil, true
 		}
-		return graphApplyBody(graphMethodCallable(sel, def), recv, args, ctx), true
+		return graphApplyBody(graphMethodCallable(sel, def), recv, args, v.Subst, ctx), true
 	}
 	var sel *ir.Method
 	n := 0
@@ -307,7 +311,7 @@ func graphUserMethod(ctx graphCtx, v *ir.Call, recv *ir.Constant, name string, a
 	if n != 1 {
 		return nil, true // ambiguous: user-defined, but does not fold
 	}
-	return graphApplyBody(graphMethodCallable(sel, def), recv, args, ctx), true
+	return graphApplyBody(graphMethodCallable(sel, def), recv, args, v.Subst, ctx), true
 }
 
 // graphGetter folds a getter read value.name on the graph: the receiver's
@@ -326,7 +330,10 @@ func graphGetter(ctx graphCtx, recvNode ir.Value, recv *ir.Constant, name string
 		ctx.noteBudget()
 		return nil, true
 	}
-	return graphApplyBody(graphMethodCallable(sel, def), recv, nil, ctx), true
+	// A getter takes no type arguments, so it folds with no substitution to
+	// install (a type variable in its body would come from the receiver's own
+	// arguments, which getters here do not reify).
+	return graphApplyBody(graphMethodCallable(sel, def), recv, nil, nil, ctx), true
 }
 
 // graphReceiverDef determines the receiver's type definition: from the value

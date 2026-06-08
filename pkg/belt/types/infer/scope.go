@@ -56,6 +56,11 @@ func (s funcScope) self() ir.Type { return s.outer.self() }
 // generic body sees the same rigid variables its body does.
 func (s funcScope) rigid(name string) bool { return s.outer.rigid(name) }
 
+// tscope inherits the enclosing context's generic type-parameter scope: a
+// literal's annotations (its parameters, its result, a let or match arm in its
+// body) resolve the enclosing generic's T exactly as the body's own do.
+func (s funcScope) tscope() TypeScope { return s.outer.tscope() }
+
 func (s funcScope) universe() map[string]*ir.TypeDef { return s.outer.universe() }
 
 func (s funcScope) qualified() func(namespace, name string) *ir.TypeDef { return s.outer.qualified() }
@@ -121,6 +126,10 @@ func (s constScope) self() ir.Type { return ir.Invalid }
 
 // rigid: a constant initializer has no generic type parameters in scope.
 func (s constScope) rigid(string) bool { return false }
+
+// tscope: a constant initializer has no generic type parameters, so a lambda
+// in one resolves its annotations with no type-variable scope.
+func (s constScope) tscope() TypeScope { return nil }
 
 func (s constScope) universe() map[string]*ir.TypeDef { return s.env.Universe() }
 
@@ -234,6 +243,11 @@ func (s BodyScope) rigid(name string) bool {
 	_, ok := s.TScope[name]
 	return ok
 }
+
+// tscope is the body's generic type-parameter scope — the enclosing function's
+// or method's type parameters — that a body annotation (a let, a match arm) and
+// a lambda within it resolve a written T through.
+func (s BodyScope) tscope() TypeScope { return s.TScope }
 
 func (s BodyScope) universe() map[string]*ir.TypeDef { return s.Universe }
 

@@ -1,0 +1,12 @@
+// fold-expect: folds
+// A match whose arm type is the function's own type parameter (T n -> ...)
+// dispatches through the call's settled substitution (T = nint), which the
+// evaluator threads into the body — so the constant folds to the bound member.
+pub fn orFallback<T>(v: optional<T>, fb: T): T {
+  match v {
+    T n -> return n
+    _ -> return fb
+  }
+}
+const A = orFallback(5, 0)
+assert A == 5

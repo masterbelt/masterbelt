@@ -51,6 +51,10 @@ func graphApply(ctx graphCtx, fn *ir.Constant, args []*ir.Constant) *ir.Constant
 	return graphBody(fn.Fn.Body, graphCtx{
 		env: ctx.env, locals: locals, depth: ctx.depth + 1, budgetHit: ctx.budgetHit,
 		resultColl: CollKindOf(resultType), resultType: resultType,
+		// A closure captures its defining environment's type parameters, so a
+		// match in its body folds under the same substitution as the routine the
+		// literal was written in (the T of the enclosing generic function).
+		subst: ctx.subst,
 	})
 }
 
@@ -209,7 +213,7 @@ func graphSetterAssign(name string, call *ir.Call, cur *ir.Constant, ctx graphCt
 	if v == nil {
 		return false
 	}
-	next := graphApplyBody(graphMethodCallable(sel, def), cur, []*ir.Constant{v}, ctx)
+	next := graphApplyBody(graphMethodCallable(sel, def), cur, []*ir.Constant{v}, call.Subst, ctx)
 	if next == nil {
 		return false
 	}
@@ -262,6 +266,18 @@ func graphSwitch(s *ir.Switch, ctx graphCtx) (*ir.Constant, graphOutcome) {
 	return nil, graphUnknown
 }
 
+// substArmType resolves a match arm's type through the substitution the body
+// folds under — the checker-settled T = nint of the enclosing generic call — so
+// a type-variable arm (the T arm of an optional<T> scrutinee) becomes the
+// concrete type the dispatch can decide. Without a substitution (a non-generic
+// body) the arm type is returned unchanged, so nothing else's folding shifts.
+func (ctx graphCtx) substArmType(t ir.Type) ir.Type {
+	if len(ctx.subst) == 0 {
+		return t
+	}
+	return types.Substitute(t, ctx.subst)
+}
+
 // graphMatch selects and runs the matching arm of a match: a tagged scrutinee
 // dispatches confidently on its member tag; an untagged one folds only when
 // exactly one arm can hold the value — the soundness rule evalMatch keeps. The
@@ -274,14 +290,16 @@ func graphMatch(m *ir.Match, ctx graphCtx) (*ir.Constant, graphOutcome) {
 	}
 	if scrut.UnionTag != nil {
 		for _, arm := range m.Arms {
-			if arm.Type == nil || arm.Type == ir.Invalid || types.HasTypeVar(arm.Type) {
-				// An unresolved arm, or one over a still-generic type (the T
-				// arm of a generic body): which values it matches depends on
-				// the instantiation, so the dispatch order is undecidable —
-				// running the wildcard instead would fold the wrong arm.
+			armType := ctx.substArmType(arm.Type)
+			if armType == nil || armType == ir.Invalid || types.HasTypeVar(armType) {
+				// An unresolved arm, or one still generic after the body's
+				// substitution (a free variable no call pinned): which values it
+				// matches depends on the instantiation, so the dispatch order is
+				// undecidable — running the wildcard instead would fold the wrong
+				// arm.
 				return nil, graphUnknown
 			}
-			if tagMatchesType(scrut.UnionTag, normalizeBuiltin(arm.Type)) {
+			if tagMatchesType(scrut.UnionTag, normalizeBuiltin(armType)) {
 				return graphBranch(arm.Body, narrowGraphBinding(ctx, arm.Name, ir.Untagged(scrut)))
 			}
 		}
@@ -292,7 +310,7 @@ func graphMatch(m *ir.Match, ctx graphCtx) (*ir.Constant, graphOutcome) {
 	}
 	selected := -1
 	for i, arm := range m.Arms {
-		matched, certain := graphMatchesArm(ctx, scrut, arm.Type)
+		matched, certain := graphMatchesArm(ctx, scrut, ctx.substArmType(arm.Type))
 		if !certain {
 			return nil, graphUnknown
 		}
