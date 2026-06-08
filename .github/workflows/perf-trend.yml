@@ -1,0 +1,151 @@
+# perf-trend — the wall-clock / memory TREND layer (D-1 M5, §4.2).
+#
+# WHAT THIS MEASURES: it runs the scoped wall-clock + bytes/op benchmarks
+# (`make bench-trend`: cold-compile and incremental edit-replay over the
+# synthetic corpus) on BOTH the PR head and its merge-base on main, then diffs
+# them with benchstat. The table surfaces in the job summary AND as a build
+# artifact (and, when permissions allow, as a PR comment).
+#
+# THIS IS ADVISORY — IT IS NEVER A MERGE BLOCKER. The performance loop's hard
+# gates are DETERMINISTIC counts only (the reuse snapshot + allocs/op, run by
+# `make perf` in ci.yml); wall-clock and memory are TREND metrics, reported but
+# never failed, because shared CI runners are too noisy to gate on time without
+# becoming flaky (D-1 §1 insight 1, §4.2, §9). Accordingly the benchstat step
+# can never exit non-zero into the job result: it is guarded so a regression —
+# or even a benchstat error — only prints, it does not fail the build.
+name: perf-trend
+
+on:
+  pull_request:
+
+# One trend run per PR ref; a new push supersedes the old comparison.
+concurrency:
+  group: perf-trend-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  # pull-requests: write is requested so the optional comment step can post;
+  # it is dropped to read automatically for forked-PR runs, where the comment
+  # step is simply skipped and the artifact + summary still carry the result.
+  pull-requests: write
+
+jobs:
+  trend:
+    name: benchstat (advisory, never blocks merge)
+    runs-on: ubuntu-latest
+    steps:
+      # fetch-depth: 0 so the merge-base commit is present to check out as the
+      # baseline; a shallow clone would not contain it.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Resolve merge-base
+        id: base
+        run: echo "sha=$(git merge-base origin/${{ github.base_ref }} HEAD)" >> "$GITHUB_OUTPUT"
+
+      # New = the PR head. `make bench-trend` is the exact command developers run
+      # locally, so CI and local results are produced the same way.
+      - name: Bench PR head (new)
+        run: make bench-trend BENCHOUT=new.txt
+
+      # Old = the merge-base on the target branch. We check it out into a
+      # detached HEAD, bench, then return to the PR head. The corpus and benches
+      # live in the working tree, so checking out the baseline gives us its code.
+      - name: Bench merge-base (old)
+        run: |
+          git checkout --quiet --detach "${{ steps.base.outputs.sha }}"
+          # The baseline may predate bench-trend (M5); fall back to a direct
+          # invocation so the comparison still works against older history.
+          if make -n bench-trend >/dev/null 2>&1; then
+            make bench-trend BENCHOUT=old.txt
+          else
+            go test -run '^$' -bench 'BenchmarkColdCompile|BenchmarkIncremental' \
+              -benchmem -benchtime=100ms -count=6 \
+              ./internal/beltgen/ ./pkg/masterbelt/semantic/ | tee old.txt
+          fi
+          git checkout --quiet -
+
+      # benchstat compares the two samples. continue-on-error guarantees that a
+      # measured regression (or any benchstat hiccup) can NEVER fail this job —
+      # wall-clock is a trend, not a gate (D-1 §1, §4.2). We capture the table to
+      # a file used by the later surfacing steps.
+      - name: benchstat old vs new (advisory)
+        id: benchstat
+        continue-on-error: true
+        run: |
+          go run golang.org/x/perf/cmd/benchstat@latest old.txt new.txt | tee benchstat.txt
+
+      # Surface in the job summary — always runs, even if benchstat errored, so
+      # the trend is visible without downloading anything.
+      - name: Publish to job summary
+        if: always()
+        run: |
+          {
+            echo "## Performance trend (advisory — never blocks merge)"
+            echo
+            echo "Wall-clock and memory are TREND metrics (D-1 §1, §4.2): reported,"
+            echo "never failed. The hard gates are the deterministic reuse snapshot"
+            echo "and allocs/op in the \`ci\` workflow (\`make perf\`). Shared-runner"
+            echo "variance makes the numbers below advisory (D-1 §9) — read the"
+            echo "p-values, not single deltas."
+            echo
+            echo "\`\`\`"
+            cat benchstat.txt 2>/dev/null || echo "(benchstat produced no output)"
+            echo "\`\`\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Keep the raw samples + table as an artifact for offline inspection.
+      - name: Upload trend artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-trend
+          path: |
+            old.txt
+            new.txt
+            benchstat.txt
+          if-no-files-found: warn
+
+      # Optional: post/refresh a sticky PR comment. Skipped on forked PRs (no
+      # write token) and never fails the job. The summary + artifact above are
+      # the robust path; the comment is a convenience.
+      - name: Comment on PR (advisory)
+        if: always() && github.event.pull_request.head.repo.full_name == github.repository
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let table = '(benchstat produced no output)';
+            try { table = fs.readFileSync('benchstat.txt', 'utf8').trim() || table; } catch (e) {}
+            const marker = '<!-- perf-trend -->';
+            const body = [
+              marker,
+              '## Performance trend (advisory — never blocks merge)',
+              '',
+              'Wall-clock and memory are **trend** metrics (D-1 §1, §4.2): reported,',
+              'never failed. The hard gates are the deterministic reuse snapshot and',
+              'allocs/op in the `ci` workflow. Shared-runner variance makes these',
+              'advisory (D-1 §9) — read the p-values, not single deltas.',
+              '',
+              '```',
+              table,
+              '```',
+            ].join('\n');
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const comments = await github.rest.issues.listComments({ owner, repo, issue_number });
+            const existing = comments.data.find(c => c.body && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            }
