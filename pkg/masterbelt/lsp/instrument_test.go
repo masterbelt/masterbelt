@@ -7,7 +7,7 @@ import (
 	protocol "github.com/owenrumney/go-lsp/lsp"
 )
 
-// TestInstrumentationOffByDefault is the off-by-default proof (D-1 §8-4): with
+// TestInstrumentationOffByDefault is the off-by-default proof: with
 // neither env switch set, a server constructed by NewServer carries no
 // instrumentation, so the request path and sampler short-circuit and a normal
 // session pays nothing. (The env is unset in the test process by default; this

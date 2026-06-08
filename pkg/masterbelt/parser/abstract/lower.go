@@ -204,9 +204,10 @@ func lowerLetStmt(t cst.Tree, buf source.Buffer, node *cst.Node) ast.Stmt {
 //
 // An index target, coll[i] = v, is desugared here to a rebind of the collection:
 // coll = coll.set(i, v). set returns a new collection (self), so the assignment
-// stays a plain rebind of the let local — the same shape the E-15 assignment
-// already checks and folds — and data stays immutable (a new collection, not an
-// in-place write). The receiver of the rebind is the index's own receiver
+// stays a plain rebind of the let local — the same shape an ordinary bare-name
+// assignment already checks and folds — and data stays immutable (a new
+// collection, not an in-place write). The receiver of the rebind is the index's
+// own receiver
 // (coll), which the checker validates as a let local exactly as a bare name
 // target.
 func lowerAssignStmt(t cst.Tree, buf source.Buffer, node *cst.Node) ast.Stmt {

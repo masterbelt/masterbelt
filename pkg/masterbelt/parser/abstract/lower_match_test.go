@@ -115,8 +115,8 @@ func TestLowerMatchAfterWildcard(t *testing.T) {
 	namedArm(t, m.AfterElse[0], "Level", "l")
 }
 
-// TestLowerMatchIndexScrutinee checks the E-18 use case: an index read scrutinee
-// desugars to a get call and the error/value arms lower as type patterns.
+// TestLowerMatchIndexScrutinee checks that an index read scrutinee desugars to a
+// get call and the error/value arms lower as type patterns.
 func TestLowerMatchIndexScrutinee(t *testing.T) {
 	m := matchOf(t, "pub fn f(xs: list<nint>): nint {\n  match xs[0] {\n    nint v   -> return v\n    error e -> return 0\n  }\n}\n")
 	if _, ok := m.Scrutinee.(*ast.CallExpr); !ok {

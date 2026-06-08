@@ -1,8 +1,8 @@
-// This file holds the AST half of the text-representation gates (F-4 §2.4):
-// P1 canonicity (re-marshal of an unmarshal is byte-identical), P2 golden
-// survival (every committed .ast snapshot parses back to its own bytes), and
-// F1 (the unmarshaler never panics). The corpus is the shared example set —
-// the same sources the snapshots are lowered from.
+// This file holds the AST half of the text-representation gates:
+// canonicity (re-marshal of an unmarshal is byte-identical), golden survival
+// (every committed .ast snapshot parses back to its own bytes), and
+// panic-freedom (the unmarshaler never panics). The corpus is the shared
+// example set — the same sources the snapshots are lowered from.
 package abstract
 
 import (
@@ -14,8 +14,8 @@ import (
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
 )
 
-// TestTextRoundTrip pins P1 over the corpus: every lowered example marshals,
-// unmarshals to a detached File, and re-marshals byte-identically.
+// TestTextRoundTrip pins canonicity over the corpus: every lowered example
+// marshals, unmarshals to a detached File, and re-marshals byte-identically.
 func TestTextRoundTrip(t *testing.T) {
 	paths, err := exampleSources(sharedExamples)
 	if err != nil {
@@ -51,15 +51,15 @@ func TestTextRoundTrip(t *testing.T) {
 				t.Fatalf("re-MarshalText: %v", err)
 			}
 			if !bytes.Equal(first, second) {
-				t.Error("re-marshal is not byte-identical (P1)")
+				t.Error("re-marshal is not byte-identical")
 			}
 		})
 	}
 }
 
-// TestSnapshotsUnmarshal pins P2: every committed .ast snapshot unmarshals and
-// re-marshals to its own bytes — the goldens are a living contract whose
-// format rot fails CI, not just diff fodder.
+// TestSnapshotsUnmarshal pins golden survival: every committed .ast snapshot
+// unmarshals and re-marshals to its own bytes — the goldens are a living
+// contract whose format rot fails CI, not just diff fodder.
 func TestSnapshotsUnmarshal(t *testing.T) {
 	matches, err := snapshotFiles()
 	if err != nil {
@@ -107,8 +107,8 @@ func snapshotFiles() ([]string, error) {
 	return append(flat, nested...), nil
 }
 
-// FuzzASTUnmarshal is the F1 gate: the unmarshaler accepts or rejects any
-// input without panicking, and whatever it accepts marshals to a fixpoint of
+// FuzzASTUnmarshal is the panic-freedom gate: the unmarshaler accepts or rejects
+// any input without panicking, and whatever it accepts marshals to a fixpoint of
 // the round trip.
 func FuzzASTUnmarshal(f *testing.F) {
 	matches, err := snapshotFiles()

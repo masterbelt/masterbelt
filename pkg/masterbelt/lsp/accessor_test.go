@@ -185,7 +185,7 @@ func TestDocumentSymbolsAccessors(t *testing.T) {
 }
 
 // TestDocumentSymbolAnchors checks the outline carries each declaration's
-// stable anchor (A-5) in its detail: the type on its own line, and a member as
+// stable anchor in its detail: the type on its own line, and a member as
 // the type's anchor with the member appended.
 func TestDocumentSymbolAnchors(t *testing.T) {
 	doc := testView(accessorType)

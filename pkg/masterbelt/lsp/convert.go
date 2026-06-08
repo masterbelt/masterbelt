@@ -115,7 +115,7 @@ type symbolBuilder struct {
 	green  *cst.Node
 	name   string
 	detail string
-	// anchor is the declaration's stable address (A-5), appended to the detail
+	// anchor is the declaration's stable address, appended to the detail
 	// in the outline so an agent reading the symbol tree sees the name to
 	// reference it by; "" for a symbol that carries none (an enum member).
 	anchor   string

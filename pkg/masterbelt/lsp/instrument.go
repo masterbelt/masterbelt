@@ -1,12 +1,12 @@
-// This file is the LSP server's performance instrumentation (D-1 §2 LSP row,
-// §7-M6, §8-4): a live pprof endpoint, coarse per-request latency spans, and a
-// steady-memory + memo-table sampler. All three are off by default and add zero
-// overhead when their env switches are unset — the constructor reads the
-// switches once, and the hot paths short-circuit on a bool.
+// This file is the LSP server's performance instrumentation: a live pprof
+// endpoint, coarse per-request latency spans, and a steady-memory + memo-table
+// sampler. All three are off by default and add zero overhead when their env
+// switches are unset — the constructor reads the switches once, and the hot
+// paths short-circuit on a bool.
 //
-// Dependency note (D-1 §8-4): the plan names otel for the request spans, but the
-// repo is deliberately lean and the plan is explicit that the backend is "stdout
-// /ログ" with query-loop tracing forbidden. Pulling in the OpenTelemetry SDK for
+// Dependency note: otel would be the obvious choice for the request spans, but
+// the repo is deliberately lean and the tracing backend is only "stdout/ログ"
+// with query-loop tracing forbidden. Pulling in the OpenTelemetry SDK for
 // coarse, flagged, log-only spans would add a heavy dependency tree for no gain,
 // so this uses only the standard library: net/http/pprof for live profiling and
 // slog for the per-request timing and the memory sampler. No new module
@@ -35,13 +35,13 @@ const (
 	envPprofAddr = "MASTERBELT_PPROF_ADDR"
 	// envTraceRequests, when set to any non-empty value, logs one coarse span per
 	// LSP request: the method and its wall-clock duration, via slog. Coarse by
-	// design (D-1 §8-4) — one span per request, never per query — so the request
-	// timing stays cheap and the log readable.
+	// design — one span per request, never per query — so the request timing
+	// stays cheap and the log readable.
 	envTraceRequests = "MASTERBELT_TRACE_REQUESTS"
 )
 
 // sampleInterval is how often the steady-memory sampler logs heap and memo-table
-// size when request tracing is on (D-1 §4.2 leak signal). Coarse on purpose:
+// size when request tracing is on, to surface the leak signal. Coarse on purpose:
 // the signal is monotonic growth over a long session, not fine-grained spikes.
 const sampleInterval = 30 * time.Second
 
@@ -89,8 +89,8 @@ func startPprof(addr string) {
 // timed runs fn, and when request tracing is on logs one coarse span — the LSP
 // method and fn's wall-clock duration — via slog. When tracing is off it calls
 // fn directly: no timer, no allocation, no log. This is the single
-// DidChange→parse→analyze→respond span the plan asks for (D-1 §8-4); the
-// handlers route their bodies through it so the timing wraps in one place.
+// DidChange→parse→analyze→respond span; the handlers route their bodies through
+// it so the timing wraps in one place.
 func (s *Server) timed(method string, fn func() error) error {
 	if !s.instr.traceRequests {
 		return fn()
@@ -103,8 +103,8 @@ func (s *Server) timed(method string, fn func() error) error {
 
 // startMemorySampler launches, when request tracing is on, a background
 // goroutine that every sampleInterval logs the runtime heap (HeapAlloc) and the
-// total memo-table size across the server's workspaces (D-1 §4.2). Monotonic
-// growth of either over a long session is the leak signal. The goroutine stops
+// total memo-table size across the server's workspaces. Monotonic growth of
+// either over a long session is the leak signal. The goroutine stops
 // when ctx is done (the server is shutting down). When tracing is off it starts
 // nothing.
 func (s *Server) startMemorySampler(ctx context.Context) {
