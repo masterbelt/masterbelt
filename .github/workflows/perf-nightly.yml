@@ -33,10 +33,10 @@ jobs:
     name: scale sweep + leak signal (advisory)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
           cache: true
@@ -75,7 +75,7 @@ jobs:
       # long enough that a slow curve drift is comparable across nights.
       - name: Upload nightly trend artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: perf-nightly-${{ github.run_id }}
           path: |
