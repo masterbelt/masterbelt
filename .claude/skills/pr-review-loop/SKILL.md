@@ -79,15 +79,19 @@ gh api repos/<owner>/<repo>/pulls/<n>/comments/<comment-id>/replies \
 
 A reply per comment is what lets the reviewer (and the human) see the loop is actually closing, not stalling.
 
-- **Resolve the thread once it is handled** — a reply is not the same as resolving, and an open thread reads as "still outstanding". After you have *fixed* or *disproven* a finding, mark its review thread resolved (leave a thread you escalated to the human open — that one is theirs to close). Resolving is a GraphQL mutation keyed by the thread id, so map the comment's REST id (`databaseId`) to its thread, then resolve:
+- **Resolve the thread once it is handled** — a reply is not the same as resolving, and an open thread reads as "still outstanding". After you have *fixed* or *disproven* a finding, mark its review thread resolved (leave a thread you escalated to the human open — that one is theirs to close). Resolving is a GraphQL mutation keyed by the thread id, so map the comment you addressed to its thread, then resolve. Two traps: a finding posted as a *reply* is **not** the thread's first comment, so match against **any** comment's `databaseId`; and the threads connection is paginated, so follow `pageInfo` (`gh api graphql --paginate` does this when the query carries `$endCursor` and `pageInfo{ hasNextPage endCursor }`):
 
 ```
-# the thread id for each unresolved thread, paired with its first comment's REST id
-gh api graphql -f query='{ repository(owner:"<owner>", name:"<repo>"){ pullRequest(number:<n>){
-  reviewThreads(first:100){ nodes{ id isResolved comments(first:1){ nodes{ databaseId } } } } } } }' \
-  --jq '.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved|not) | "\(.id)\t\(.comments.nodes[0].databaseId)"'
+# every unresolved thread, paged, with ALL of its comment ids
+gh api graphql --paginate -F owner=<owner> -F repo=<repo> -F number=<n> -f query='
+query($owner:String!,$repo:String!,$number:Int!,$endCursor:String){
+  repository(owner:$owner,name:$repo){ pullRequest(number:$number){
+    reviewThreads(first:100, after:$endCursor){
+      nodes{ id isResolved comments(first:50){ nodes{ databaseId } } }
+      pageInfo{ hasNextPage endCursor } } } } }' \
+  --jq '.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved|not) | "\(.id)\t\([.comments.nodes[].databaseId]|join(","))"'
 
-# resolve the one whose databaseId matches the comment you addressed
+# resolve the thread whose id list contains the comment you addressed
 gh api graphql -f query='mutation($t:ID!){ resolveReviewThread(input:{threadId:$t}){ thread{ isResolved } } }' -f t=<thread-id>
 ```
 
@@ -108,22 +112,22 @@ Triggering — the part the earlier "never touch `@codex review`" advice got wro
 
 Detecting the outcome: after the trigger/push, poll for the **terminal** signal — a 👍 `+1` (approve) or new comments (findings) — and treat 👀 `eyes` as "still running", never as the answer:
 
-All three lookups must **paginate** (pipe `gh api --paginate` to `jq -s 'add'`, since `--slurp` is rejected with `--jq`); a multi-page PR otherwise hides the bot's reaction/comments on a later page and the loop stalls or converges falsely:
+Every terminal probe must do two things or it misfires: **paginate** (pipe `gh api --paginate` to `jq -s 'add'`, since `--slurp` is rejected with `--jq`) so a later page is not hidden, and **cut off by your trigger time** so a *previous* round's verdict does not count — an old `+1` would falsely converge, old comments would falsely send you back to Stage 1. Record `SINCE` = the moment you triggered/pushed (ISO 8601), and gate every decision on it:
 
 ```
-# all the bot's reactions, to read state — eyes (running) vs +1 (approved)
+SINCE=<your trigger/push time, e.g. 2026-01-02T03:04:05Z>
+
+# convergence — a +1 from the bot newer than your trigger (never eyes, never an old +1)
+gh api --paginate repos/<owner>/<repo>/issues/<n>/reactions \
+  | jq -s --arg since "$SINCE" '[add[] | select((.user.login|test("codex")) and .content=="+1" and .created_at > $since)] | length'
+
+# findings — bot inline comments newer than your trigger
+gh api --paginate repos/<owner>/<repo>/pulls/<n>/comments \
+  | jq -s --arg since "$SINCE" '[add[] | select((.user.login|test("codex")) and .created_at > $since)] | length'
+
+# state, for context — the bot's reactions (eyes = running, +1 = approved)
 gh api --paginate repos/<owner>/<repo>/issues/<n>/reactions \
   | jq -s 'add | map(select(.user.login|test("codex"))) | .[] | "\(.content)\t\(.created_at)"'
-
-# convergence test — APPROVE is content == "+1" only, never eyes
-gh api --paginate repos/<owner>/<repo>/issues/<n>/reactions \
-  | jq -s '[add[] | select((.user.login|test("codex")) and .content=="+1")] | length'
-
-# findings — bot inline comments across all pages, and the latest bot review
-gh api --paginate repos/<owner>/<repo>/pulls/<n>/comments \
-  | jq -s '[add[] | select(.user.login|test("codex"))] | length'
-gh api --paginate repos/<owner>/<repo>/pulls/<n>/reviews \
-  | jq -s '[add[] | select(.user.login|test("codex"))] | last | "\(.state)\t\(.submitted_at)"'
 ```
 
 - **Poll in modest intervals**, not tightly — the verdict takes minutes (observed on this repo: the 👀 lands within seconds of the trigger, but the 👍 / comments arrive roughly 10–20 minutes later). Schedule a wake-up / background poll rather than blocking the turn. Record your trigger/push time so you only count signals newer than it.
