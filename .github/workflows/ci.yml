@@ -1,9 +1,9 @@
-# CI — the performance loop's home (D-1 M4). This workflow is the gate the
-# loop bootstraps: a PR must pass the correctness checks AND the deterministic
-# performance gates (the reuse snapshot and the allocation ceilings). Wall-clock
-# benchmarks are a trend, never a fail condition (D-1 §1, §4.2), so they live in
-# the separate perf-trend workflow, not here — this job stays non-flaky by
-# gating only on deterministic counts.
+# CI — the correctness checks plus the deterministic performance gates (the
+# reuse snapshot and the allocation ceilings). Each concern is its own job so a
+# failure points at exactly one thing and the checks run in parallel. Wall-clock
+# benchmarks are a trend, not a pass/fail condition, so they live in the separate
+# perf-trend workflow; this workflow gates only on deterministic results to stay
+# non-flaky.
 name: ci
 
 on:
@@ -20,44 +20,80 @@ permissions:
   contents: read
 
 jobs:
-  build-test:
-    name: build, test, gates
+  format:
+    name: gofmt
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-
-      - name: Set up Go
-        uses: actions/setup-go@v6
+      - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
           cache: true
-
-      - name: gofmt
-        run: |
+      - run: |
           unformatted="$(gofmt -l pkg cmd internal toolchain)"
           if [ -n "$unformatted" ]; then
             echo "These files are not gofmt-clean:"; echo "$unformatted"; exit 1
           fi
 
-      - name: go vet
-        run: go vet ./...
+  vet:
+    name: go vet
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: go vet ./...
 
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v9
+  lint:
+    name: golangci-lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: golangci/golangci-lint-action@v9
         with:
           version: v2.12.2
 
-      - name: Generated files up to date
-        run: make verify-generated
+  generate:
+    name: generated files
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: make verify-generated
 
-      - name: Tests
-        run: go test ./...
+  test:
+    name: go test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: go test ./...
 
-      - name: Performance gates (deterministic)
-        run: make perf
+  perf:
+    name: performance gates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: make perf
 
-  grammar:
-    name: editor grammar
+  editor:
+    name: editor extension
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -68,10 +104,10 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           # Track the project's Node version (.tool-versions), the single source
-          # of truth dev and CI share — as the Go job tracks go.mod.
+          # of truth dev and CI share — as the Go jobs track go.mod.
           node-version-file: .tool-versions
           cache: 'pnpm'
       - name: Install workspace dependencies
         run: pnpm install --frozen-lockfile
-      - name: VS Code grammar tests
+      - name: Editor extension tests
         run: cd toolchain/editors/vscode && node --test
