@@ -18,9 +18,6 @@
     "Programming Languages"
   ],
   "main": "./dist/extension.js",
-  "activationEvents": [
-    "onLanguage:masterbelt"
-  ],
   "contributes": {
     "languages": [
       {
