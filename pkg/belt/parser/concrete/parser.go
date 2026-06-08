@@ -373,12 +373,17 @@ func (p *parser) externBeginsFunc() bool {
 
 // masterBeginsDecl reports whether the construct at the cursor begins a master
 // declaration: an optional pub, then the context keyword master (an Ident the
-// lexer leaves plain), then the declared name (an Ident). The trailing-name
-// check is what tells the context keyword apart from an ordinary identifier
-// literally named "master", mirroring how get/set bind only before a name. The
-// lookahead reads the identifier's text exactly as the modifier check does;
-// reading bytes a token already covers keeps the boundary context-free property
-// the incremental Document relies on.
+// lexer leaves plain), then the declared name (an Ident) or the opening brace.
+// The trailing check is what tells the context keyword apart from an ordinary
+// identifier literally named "master", which begins no declaration. Accepting
+// the brace as well as a name means a master whose name has not been typed yet
+// (master { ... }) still routes to parseMasterDecl, which reports the missing
+// name and builds a MasterDecl — so the editor keeps an outline and symbols
+// while the declaration is being written, rather than reading the half-typed
+// form as a stray run or a malformed constant. The lookahead reads the
+// identifier's text exactly as the modifier check does; reading bytes a token
+// already covers keeps the boundary context-free property the incremental
+// Document relies on.
 func (p *parser) masterBeginsDecl() bool {
 	i := p.nextSignificantIndex(p.pos)
 	if p.toks[i].Kind == token.Pub {
@@ -387,7 +392,12 @@ func (p *parser) masterBeginsDecl() bool {
 	if p.toks[i].Kind != token.Ident || p.identText(i) != "master" {
 		return false
 	}
-	return p.toks[p.nextSignificantIndex(i+1)].Kind == token.Ident
+	switch p.toks[p.nextSignificantIndex(i+1)].Kind {
+	case token.Ident, token.LBrace:
+		return true
+	default:
+		return false
+	}
 }
 
 // nextSignificantIndex returns the index of the next non-trivia token at or
