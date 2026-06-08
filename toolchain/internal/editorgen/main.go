@@ -61,7 +61,11 @@ func run() error {
 	// The tree-sitter target's generated lexical layer. tree-sitter generate
 	// (run by `make generate` after this) turns grammar.js + this module into
 	// src/parser.c.
-	return writeFile(lexicalPath, buildLexicalJS())
+	if err := writeFile(lexicalPath, buildLexicalJS()); err != nil {
+		return err
+	}
+	// The tree-sitter highlight queries, one per editor target.
+	return writeQueries()
 }
 
 // --- TextMate grammar ---------------------------------------------------------

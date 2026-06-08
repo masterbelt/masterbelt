@@ -86,7 +86,8 @@ GENERATED := $(shell git ls-files '*_gen.go' \
 	'toolchain/editors/vscode/syntaxes/*.json' \
 	'toolchain/editors/vscode/language-configuration.json' \
 	'toolchain/grammars/tree-sitter-masterbelt/lexical.js' \
-	'toolchain/grammars/tree-sitter-masterbelt/src')
+	'toolchain/grammars/tree-sitter-masterbelt/src' \
+	'toolchain/grammars/tree-sitter-masterbelt/queries')
 .PHONY: verify-generated
 verify-generated:
 	$(GO) generate ./...
