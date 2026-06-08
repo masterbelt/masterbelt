@@ -60,12 +60,14 @@ subdirectory). The mirror is generated, never hand-edited.
    travels):
    - Install the masterbelt GitHub App on `tree-sitter-masterbelt` with
      **Contents: write** permission.
-   - On this repo, add two secrets from the App: `TREE_SITTER_APP_ID` (the App
-     ID) and `TREE_SITTER_APP_PRIVATE_KEY` (a generated private key).
+   - On this repo, add two secrets from the App: `TREE_SITTER_APP_CLIENT_ID`
+     (the App's **Client ID**) and `TREE_SITTER_APP_PRIVATE_KEY` (a generated
+     private key, the full PEM).
 
-   The App key only mints tokens scoped to the repos it is installed on with
-   the permissions it was granted, and each token expires in ~1h. Without the
-   secrets the publish job still runs but only uploads the assembled tree as an
+   Each run mints a token scoped to that one repo and to Contents alone
+   (`permission-contents: write`), expiring in ~1h and revoked at job end —
+   even the App's own broader permissions do not travel. Without the secrets
+   the publish job still runs but only uploads the assembled tree as an
    artifact — it never fails.
 3. Run the `tree-sitter` workflow via *Run workflow* (workflow_dispatch) to do
    the first sync, and verify the mirror.
