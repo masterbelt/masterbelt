@@ -70,16 +70,10 @@ jobs:
           cache: true
       - run: make verify-generated
 
+  # The test suite is the one check shared with the nightly gate, so it lives in
+  # a reusable workflow both call.
   test:
-    name: go test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-go@v6
-        with:
-          go-version-file: go.mod
-          cache: true
-      - run: go test ./...
+    uses: ./.github/workflows/test.yml
 
   perf:
     name: performance gates

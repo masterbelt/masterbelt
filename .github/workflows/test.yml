@@ -1,0 +1,23 @@
+# test runs the Go test suite. It is a reusable workflow (workflow_call) so the
+# CI checks and the nightly gate run the exact same tests from one definition —
+# tests are the gate that says the build works; the other checks (gofmt, vet,
+# lint, …) are quality signals, not ship blockers.
+name: test
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: go test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: go test ./...
