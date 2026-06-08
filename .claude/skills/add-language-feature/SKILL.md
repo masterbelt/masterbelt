@@ -115,8 +115,12 @@ layers the feature needs; the dependency direction is strictly one-way (see
 *Architecture map*).
 
 - **IR data** — `pkg/source/ir/` (`ir.go` value graph, `type.go`
-  types, `constant.go` evaluated values). Add `dump.go` rendering for any new
-  node so the `.ir` snapshot stays meaningful (Dump is the oracle).
+  types, `constant.go` evaluated values). The `.ir` snapshot is the generated
+  exact text representation (`text_gen.go`, `MarshalText`), not a hand-written
+  dump: a new value/stmt/type form is sealed into its interface (it must
+  implement the marker, a compile-time obligation) and `go generate ./...`
+  re-emits its codec, so the snapshot stays complete automatically — add the
+  form to its `…Kinds()` registry so the coverage pins see it.
 - **Type rules** — `pkg/masterbelt/types/` (pure algebra) and
   `pkg/masterbelt/types/infer/` (AST→type: `Expr`/`Decl`/`Check`/`Body`;
   `TypeResolver` for type expressions). Const and method-body paths share one
@@ -132,11 +136,36 @@ layers the feature needs; the dependency direction is strictly one-way (see
   incremental façade). New diagnostic codes are generated — edit the source of
   `diagnostic_gen.go`'s generator, then `make generate`.
 - **Guard rails**: keep `go test ./pkg/masterbelt/semantic/` green —
-  `TestExamples` (the `ir.Dump` oracle: incremental == full `Analyze`),
+  `TestExamples` (the `.ir` oracle: incremental == full `Analyze`),
   `TestEarlyCutoff`/`TestEarlyCutoffValue` (an edit must not over-invalidate),
   and `TestDocumentFuzz`. The value query must not depend on the type query.
 - Refresh/review snapshot: `go test ./pkg/masterbelt/semantic/ -update`. The
   `.ir` diff is the heart of the review — it shows the resolved, typed program.
+
+## Stage 7 — Performance case (the reuse flywheel)
+
+Performance coverage grows with the language, the same way snapshot coverage
+does (D-1 §6, §M7): a feature that ships without a performance case is a blind
+spot the loop cannot see. Add **one** reuse-snapshot case exercising an edit to
+the new construct, so the engine's early-cutoff behaviour for it is pinned as a
+number from day one.
+
+- Add a case to the reuse-snapshot harness
+  (`pkg/masterbelt/semantic/reusesnapshot_test.go`): a small source using the
+  feature, a representative edit to it, and a golden name. Regenerate with
+  `go test ./pkg/masterbelt/semantic/ -run TestReuseSnapshot -update` and
+  **read** the golden — it records exactly which queries the edit recomputes.
+  An edit that recomputes far more than it should is a finding, not a golden to
+  rubber-stamp.
+- Run the deterministic gates: `make perf` (the reuse snapshots + the
+  allocation ceilings). These are the non-flaky hard gates; wall-clock is a
+  trend (`make bench`), never a fail condition.
+- If the feature plausibly changes allocation behaviour on the hot path,
+  sanity-check `make bench` before/after — but only the counts (`make perf`)
+  block a merge.
+- Review artifact: the new `.snap` golden (and any deliberate shift in existing
+  goldens, which means the feature changed another edit's invalidation
+  footprint — explain it).
 
 ## Stage 6 — LSP / editor
 
