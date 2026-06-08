@@ -91,7 +91,7 @@ func (d *Document) Edit(e source.Edit) {
 	//     across an effect list (see beginsDeclaration). reparseStart re-derives
 	//     every affected right edge by anchoring at/before the last significant
 	//     token before the edit that no such lookahead can see past.
-	winStart, iStart := reparseStart(oldTokens, oldOffsets, len(oldChildren), e.Start)
+	winStart, iStart := reparseStart(oldTokens, oldOffsets, len(oldChildren), e.Start, d.lex.Buffer())
 	prefix := oldChildren[:iStart]
 
 	// Reparse forward from winStart in the new token stream.
@@ -206,15 +206,19 @@ func lexSafePoint(oldTokens []token.Token, eStart int) int {
 // it.
 //
 // The anchor additionally backs off past any trailing run of lookaheadChain
-// tokens (pub/extern/fn and the effect keywords). A File-child boundary can
-// hinge on a multi-token lookahead across exactly such a run — an error run
-// stops at fn only when a name follows ([pub] extern only when fn follows), and
-// fn skips an effect list to find its name — so a construct whose right edge
-// was decided by looking across that run must be reparsed when the tokens after
-// the run change. Once the anchor is a token no decision can see past, the
-// declaration ending at that boundary parses identically in the new stream, so
-// it (and everything before it) is reusable while the boundary stays valid.
-func reparseStart(oldTokens []token.Token, oldOffsets []int, n, eStart int) (winStart, iStart int) {
+// tokens (pub/extern/fn and the effect keywords) and the master context keyword.
+// A File-child boundary can hinge on a multi-token lookahead across exactly such
+// a run — an error run stops at fn only when a name follows ([pub] extern only
+// when fn follows), fn skips an effect list to find its name, and master begins
+// a declaration only when a name or the block brace follows it — so a construct
+// whose right edge was decided by looking across that run must be reparsed when
+// the tokens after the run change. Once the anchor is a token no decision can
+// see past, the declaration ending at that boundary parses identically in the
+// new stream, so it (and everything before it) is reusable while the boundary
+// stays valid. buf reads the text of the master context keyword; it is sound
+// because every token examined here ends at or before the lexer's safe point,
+// left of the edit, where the buffer is unchanged.
+func reparseStart(oldTokens []token.Token, oldOffsets []int, n, eStart int, buf source.Buffer) (winStart, iStart int) {
 	safe := lexSafePoint(oldTokens, eStart)
 
 	last := -1
@@ -225,7 +229,7 @@ func reparseStart(oldTokens []token.Token, oldOffsets []int, n, eStart int) (win
 		last = i
 	}
 	j := last
-	for j >= 0 && (isTrivia(oldTokens[j].Kind) || lookaheadChain(oldTokens[j].Kind)) {
+	for j >= 0 && (isTrivia(oldTokens[j].Kind) || lookaheadChain(oldTokens[j].Kind) || isMasterContextKeyword(oldTokens[j], buf)) {
 		j--
 	}
 	if j < 0 {
@@ -240,9 +244,23 @@ func reparseStart(oldTokens []token.Token, oldOffsets []int, n, eStart int) (win
 // extern-function declaration, fn looks past the effect keywords for its
 // declaring name, and any of them can itself be the decision token. A child
 // boundary anchored on such a token can change meaning when the tokens after it
-// change, so reparseStart refuses to anchor on one.
+// change, so reparseStart refuses to anchor on one. The master context keyword
+// belongs to the same set but is an identifier, so it is recognised by text in
+// isMasterContextKeyword rather than here.
 func lookaheadChain(k token.Kind) bool {
 	return k == token.Pub || k == token.Extern || k == token.Fn || k.Effect()
+}
+
+// isMasterContextKeyword reports whether t is the master context keyword — an
+// identifier whose text is "master". Like the lookaheadChain keywords, it
+// decides a File-child boundary by the token that follows it (masterBeginsDecl:
+// a name or the block brace makes it a declaration, anything else folds it into
+// a surrounding error run), so a boundary anchored on it can change meaning when
+// those following tokens change. The text read mirrors the parser's own
+// (identText); a nil buffer (a parse with no source) recognises no context
+// keyword, exactly as the parser would.
+func isMasterContextKeyword(t token.Token, buf source.Buffer) bool {
+	return t.Kind == token.Ident && buf != nil && string(buf.Slice(t.Offset, t.End())) == "master"
 }
 
 // tokenIndexAt returns the index of the token starting exactly at off. The
