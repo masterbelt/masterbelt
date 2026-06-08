@@ -1,0 +1,67 @@
+# nightly — the cross-platform CLI build. It runs the test gate, cross-builds
+# every release target with `make dist`, checks the build is reproducible,
+# smoke-runs the native binary, and uploads the archives as workflow artifacts.
+#
+# It does NOT publish a release yet: the rolling nightly release (and the
+# unchanged-since-last-nightly guard that needs a release to compare against)
+# come later. Until then the artifacts are the distribution, kept for two weeks.
+name: nightly
+
+on:
+  schedule:
+    # 04:17 UTC daily — off-peak, a non-round minute to dodge the cron rush, and
+    # distinct from perf-nightly's 03:17.
+    - cron: '17 4 * * *'
+  # Manual re-runs, and the initial bring-up.
+  workflow_dispatch:
+
+# Serialize nightly runs without aborting one in flight (a build is not a gate).
+concurrency:
+  group: nightly
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  # Don't ship red: the same tests CI runs must pass before anything is built.
+  gate:
+    uses: ./.github/workflows/test.yml
+
+  build:
+    name: cross-build
+    needs: gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      # Fail before the full cross-build if the build is not reproducible.
+      - name: Reproducibility check
+        run: make repro-check
+
+      - name: Cross-build and archive
+        run: make dist
+
+      # The cross-built linux/amd64 binary runs on this runner: confirm it starts
+      # and type-checks a real project before the artifacts are kept.
+      - name: Smoke test
+        run: |
+          tmp="$(mktemp -d)"
+          tar -xzf dist/masterbelt-linux-amd64-*.tar.gz -C "$tmp"
+          "$tmp/masterbelt" version
+          "$tmp/masterbelt" check pkg/belt/testdata/examples/0009-project
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: masterbelt-nightly
+          path: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/SHA256SUMS
+          retention-days: 14
+          if-no-files-found: error
