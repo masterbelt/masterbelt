@@ -17,9 +17,9 @@ you worked from.
   (`A-5`, `F-3`), no section numbers (`§3.5`), no milestone or phase tags
   (`M3`, `P5 gate`), no "per the plan". The history is not a scratchpad.
 - Commit in small, self-contained steps; each commit builds and passes its tests.
-- AI-assisted commits end with the trailer:
-
-      Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
+- AI-assisted commits end with a `Co-Authored-By` trailer. commitlint enforces
+  its exact form (the agent-coauthor rule) and reports the value to use, so this
+  guide neither spells it out nor risks drifting from it.
 
 ## Code comments
 
