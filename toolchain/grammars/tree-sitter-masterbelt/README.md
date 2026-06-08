@@ -54,18 +54,19 @@ subdirectory). The mirror is generated, never hand-edited.
 **Bring-up (one-time, human):**
 
 1. Create the empty `masterbelt/tree-sitter-masterbelt` repository.
-2. Authorize the push with an **SSH deploy key scoped to that repo alone** — not
-   an account-wide token:
-   - `ssh-keygen -t ed25519 -C tree-sitter-masterbelt-deploy -f ts_deploy -N ''`
-   - On the mirror repo: *Settings → Deploy keys → Add* `ts_deploy.pub`, **Allow
-     write access** checked.
-   - On this repo: add the private half (`ts_deploy`) as the secret
-     `TREE_SITTER_DEPLOY_KEY`. (Delete the local key files afterward.)
+2. Authorize the push with a **GitHub App** — the org disallows deploy keys and
+   recommends an App, which is the stronger choice anyway (the workflow mints a
+   short-lived, repo-scoped installation token at run time; nothing long-lived
+   travels):
+   - Install the masterbelt GitHub App on `tree-sitter-masterbelt` with
+     **Contents: write** permission.
+   - On this repo, add two secrets from the App: `TREE_SITTER_APP_ID` (the App
+     ID) and `TREE_SITTER_APP_PRIVATE_KEY` (a generated private key).
 
-   A deploy key only grants write to that one mirror, so a leak's blast radius
-   is the generated mirror (regenerated from source); revoke by removing the
-   deploy key. Without the secret the publish job still runs but only uploads
-   the assembled tree as an artifact — it never fails.
+   The App key only mints tokens scoped to the repos it is installed on with
+   the permissions it was granted, and each token expires in ~1h. Without the
+   secrets the publish job still runs but only uploads the assembled tree as an
+   artifact — it never fails.
 3. Run the `tree-sitter` workflow via *Run workflow* (workflow_dispatch) to do
    the first sync, and verify the mirror.
 4. Add the `tree-sitter` check to this repo's branch protection so the grammar
