@@ -1,9 +1,12 @@
 .vscode/**
 src/**
+internal/**
+test/**
 node_modules/**
 esbuild.mjs
 tsconfig.json
 **/*.ts
+**/*.go
 **/*.map
 .gitignore
 .vscodeignore
