@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -44,10 +45,17 @@ func main() {
 }
 
 func run() error {
+	// VS Code's TextMate target.
 	if err := writeJSON(grammarPath, buildGrammar()); err != nil {
 		return err
 	}
-	return writeJSON(langConfPath, buildLanguageConfig())
+	if err := writeJSON(langConfPath, buildLanguageConfig()); err != nil {
+		return err
+	}
+	// The tree-sitter target's generated lexical layer. tree-sitter generate
+	// (run by `make generate` after this) turns grammar.js + this module into
+	// src/parser.c.
+	return writeFile(lexicalPath, buildLexicalJS())
 }
 
 // --- TextMate grammar ---------------------------------------------------------
@@ -80,10 +88,14 @@ type rule struct {
 // tree-sitter's longest-match. Keeping the shapes in one place is what lets the
 // two grammars share a lexer truth instead of each transcribing it.
 const (
-	reInteger  = `[0-9]+`
-	reDatetime = `D[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]{3})?(Z|[+-][0-9]{2}:[0-9]{2})`
-	reDuration = `([0-9]+(ms|w|d|h|m|s))+`
-	reEscape   = `\\(u\{[0-9A-Fa-f]{1,6}\}|[nrt0\\"])`
+	// reIdentifier is the lexer's word shape. The TextMate grammar leaves
+	// identifiers uncoloured so it never names this, but the tree-sitter grammar
+	// needs it as its `word` token (keyword extraction keys off it).
+	reIdentifier = `[A-Za-z_][A-Za-z0-9_]*`
+	reInteger    = `[0-9]+`
+	reDatetime   = `D[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]{3})?(Z|[+-][0-9]{2}:[0-9]{2})`
+	reDuration   = `([0-9]+(ms|w|d|h|m|s))+`
+	reEscape     = `\\(u\{[0-9A-Fa-f]{1,6}\}|[nrt0\\"])`
 )
 
 func buildGrammar() grammar {
@@ -257,7 +269,16 @@ func writeJSON(path string, v any) error {
 	if err := enc.Encode(v); err != nil {
 		return err
 	}
-	if err := os.WriteFile(path, buf.Bytes(), 0o644); err != nil {
+	return writeFile(path, buf.String())
+}
+
+// writeFile writes content to path verbatim (the generated JS module is not
+// JSON), creating the parent directory if it does not yet exist, and logs it.
+func writeFile(path, content string) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		return err
 	}
 	fmt.Println("wrote", path)

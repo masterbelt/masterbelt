@@ -1,0 +1,28 @@
+{
+  "name": "tree-sitter-masterbelt",
+  "version": "0.1.0",
+  "description": "masterbelt grammar for tree-sitter",
+  "private": true,
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/masterbelt/masterbelt.git",
+    "directory": "toolchain/grammars/tree-sitter-masterbelt"
+  },
+  "scripts": {
+    "generate": "tree-sitter generate",
+    "test": "tree-sitter test",
+    "parse": "tree-sitter parse"
+  },
+  "tree-sitter": [
+    {
+      "scope": "source.masterbelt",
+      "file-types": [
+        "belt"
+      ]
+    }
+  ],
+  "devDependencies": {
+    "tree-sitter-cli": "^0.26.9"
+  }
+}
