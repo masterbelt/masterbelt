@@ -56,21 +56,37 @@ fuzz:
 	$(GO) test ./pkg/belt/parser/abstract/ -run FuzzASTUnmarshal -fuzz FuzzASTUnmarshal -fuzztime $(FUZZTIME)
 	$(GO) test ./pkg/belt/semantic/ -run FuzzIRUnmarshal -fuzz FuzzIRUnmarshal -fuzztime $(FUZZTIME)
 
-# generate runs code generation (the diagnostic tables, etc.).
+# TREE_SITTER_PKG is the tree-sitter grammar's pnpm workspace package. editorgen
+# writes its lexical layer (via `go generate`); `tree-sitter generate` (this
+# package's generate script) then turns grammar.js + that layer into
+# src/parser.c. It needs the tree-sitter CLI, pinned as the package's
+# devDependency, so `pnpm install` must have run first.
+TREE_SITTER_PKG := tree-sitter-masterbelt
+
+# generate runs code generation: the Go generators (diagnostic tables, the
+# editor grammars' lexical layers, etc.) and then tree-sitter generate, which
+# compiles grammar.js into the committed parser so it tracks the lexer.
 .PHONY: generate
 generate:
 	$(GO) generate ./...
+	pnpm --filter $(TREE_SITTER_PKG) run generate
 
 # verify-generated regenerates and fails if any generated file changed — the
-# guard for a CSV (or other generator input) edited without rerunning
-# `make generate`, or a regenerate whose output was never committed. Intended to
-# run in CI on a clean checkout; the diff is scoped to the generator's outputs
-# (the *_gen.go files and the editor grammar) so an unrelated working-tree edit
-# does not trip it.
-GENERATED := $(shell git ls-files '*_gen.go' 'toolchain/editors/vscode/syntaxes/*.json' 'toolchain/editors/vscode/language-configuration.json')
+# guard for a generator input (a CSV, the keyword table, grammar.js) edited
+# without rerunning `make generate`, or a regenerate whose output was never
+# committed. Intended to run in CI on a clean checkout; the diff is scoped to
+# the generators' outputs — the *_gen.go files, the VS Code TextMate grammar,
+# and the tree-sitter lexical layer and generated parser — so an unrelated
+# working-tree edit does not trip it.
+GENERATED := $(shell git ls-files '*_gen.go' \
+	'toolchain/editors/vscode/syntaxes/*.json' \
+	'toolchain/editors/vscode/language-configuration.json' \
+	'toolchain/grammars/tree-sitter-masterbelt/lexical.js' \
+	'toolchain/grammars/tree-sitter-masterbelt/src')
 .PHONY: verify-generated
 verify-generated:
 	$(GO) generate ./...
+	pnpm --filter $(TREE_SITTER_PKG) run generate
 	git diff --exit-code -- $(GENERATED)
 
 # fmt formats all Go sources in place.
