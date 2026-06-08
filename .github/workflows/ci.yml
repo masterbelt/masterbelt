@@ -61,8 +61,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+      # pnpm must be set up before setup-node so its cache: 'pnpm' can find the
+      # store; the pnpm version comes from the root package.json packageManager
+      # field.
+      - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
-          node-version: '22'
+          # Track the project's Node version (.tool-versions), the single source
+          # of truth dev and CI share — as the Go job tracks go.mod.
+          node-version-file: .tool-versions
+          cache: 'pnpm'
+      - name: Install workspace dependencies
+        run: pnpm install --frozen-lockfile
       - name: VS Code grammar tests
         run: cd toolchain/editors/vscode && node --test
