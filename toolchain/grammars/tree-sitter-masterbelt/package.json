@@ -14,14 +14,6 @@
     "test": "tree-sitter test",
     "parse": "tree-sitter parse"
   },
-  "tree-sitter": [
-    {
-      "scope": "source.masterbelt",
-      "file-types": [
-        "belt"
-      ]
-    }
-  ],
   "devDependencies": {
     "tree-sitter-cli": "0.26.9"
   }
