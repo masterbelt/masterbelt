@@ -130,6 +130,7 @@ func documentSymbols(doc view) []protocol.DocumentSymbol {
 	symbols = append(symbols, interfaceSymbols(doc)...)
 	symbols = append(symbols, typeMemberSymbols(doc)...)
 	symbols = append(symbols, funcSymbols(doc)...)
+	symbols = append(symbols, masterSymbols(doc)...)
 
 	out := make([]protocol.DocumentSymbol, 0, len(symbols))
 	for _, b := range symbols {
@@ -365,6 +366,27 @@ func funcSymbols(doc view) []symbolBuilder {
 			detail: funcSignature(f),
 			anchor: f.Anchor,
 			kind:   protocol.SymbolKindFunction,
+		})
+	}
+	return out
+}
+
+// masterSymbols outlines every master declaration as a struct-kinded symbol.
+// Unlike the other outlines it reads the AST (doc.AST().File().Masters) rather
+// than the IR module: a master has no IR representation yet (that arrives with
+// the semantic recognition in 0002), but its name and span are already in the
+// abstract tree. A nil Syntax (a recovered-away declaration) is skipped, exactly
+// as the IR-backed outlines skip a missing syntax link.
+func masterSymbols(doc view) []symbolBuilder {
+	var out []symbolBuilder
+	for _, m := range doc.AST().File().Masters {
+		if m.Syntax() == nil {
+			continue
+		}
+		out = append(out, symbolBuilder{
+			green: m.Syntax(),
+			name:  m.Name,
+			kind:  protocol.SymbolKindStruct,
 		})
 	}
 	return out

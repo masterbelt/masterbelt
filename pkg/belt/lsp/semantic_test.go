@@ -51,6 +51,34 @@ func TestSemanticTokens(t *testing.T) {
 	}
 }
 
+func TestSemanticTokensMaster(t *testing.T) {
+	// master/record/primary are context keywords coloured through the
+	// MasterKeyword node; the master name reads as a declared type, a record
+	// field as a property, and a primary-key column as a property.
+	doc := abstract.NewDocument([]byte("master Skill {\n  record {\n    id: int\n  }\n  primary id\n}\n"))
+	got := decode(semanticTokens(doc).Data)
+
+	want := []decodedToken{
+		{0, 0, 6, stKeyword, 0},              // master
+		{0, 7, 5, stType, smDeclaration},     // Skill (declared name)
+		{1, 2, 6, stKeyword, 0},              // record
+		{2, 4, 2, stProperty, smDeclaration}, // id (field name)
+		{2, 6, 1, stOperator, 0},             // :
+		{2, 8, 3, stType, 0},                 // int
+		{4, 2, 7, stKeyword, 0},              // primary
+		{4, 10, 2, stProperty, 0},            // id (primary-key column)
+	}
+
+	if len(got) != len(want) {
+		t.Fatalf("got %d tokens, want %d:\n got:  %+v\n want: %+v", len(got), len(want), got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("token[%d] = %+v, want %+v", i, got[i], want[i])
+		}
+	}
+}
+
 func TestSemanticTokensLiterals(t *testing.T) {
 	// Datetime and duration literals colour as numbers, one token each —
 	// matching their cold-start constant.numeric scopes.

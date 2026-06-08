@@ -78,6 +78,7 @@ module.exports = grammar({
         $.func_decl,
         $.use_decl,
         $.assert_decl,
+        $.master_decl,
       ),
 
     // --- declarations --------------------------------------------------------
@@ -173,6 +174,48 @@ module.exports = grammar({
     use_list: ($) => seq(op.LBrace, commaSep1($.identifier), op.RBrace),
 
     assert_decl: ($) => seq(kw.assert, $._expr),
+
+    // --- master declarations -------------------------------------------------
+
+    // master Name { record <type-body> primary <key> }. master/record/primary
+    // are context keywords, exactly like the get/set/static modifiers: the
+    // lexer leaves them identifiers and the real parser recognises them by
+    // position, while here they are extracted as keywords (sound while they are
+    // not also used as ordinary names, which they are not in the corpus). Each
+    // is wrapped in a master_keyword node to mirror the CST's MasterKeyword.
+    //
+    // The keyword is pinned per construct (master_keyword for the head, then
+    // "record"/"primary" aliased to the same node name in the members) so a
+    // primary whose key is a bare identifier — which would also parse as a record
+    // body's type — is not ambiguous with the record member.
+    master_decl: ($) =>
+      seq(
+        optional(kw.pub),
+        $.master_keyword,
+        field("name", $.identifier),
+        op.LBrace,
+        repeat(choice($.master_record, $.master_primary)),
+        op.RBrace,
+      ),
+
+    master_keyword: ($) => "master",
+
+    master_record: ($) =>
+      seq(
+        alias("record", $.master_keyword),
+        field("type", $._type),
+        optional($.where_clause),
+        repeat($.impl_block),
+      ),
+
+    master_primary: ($) =>
+      seq(
+        alias("primary", $.master_keyword),
+        choice(
+          field("key", $.identifier),
+          seq(op.LParen, commaSep1($.identifier), op.RParen),
+        ),
+      ),
 
     // --- impl blocks and methods --------------------------------------------
 
