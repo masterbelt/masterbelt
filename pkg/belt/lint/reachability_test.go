@@ -63,7 +63,7 @@ func TestCheckReportsUnreachableTail(t *testing.T) {
 	fn := &ast.FuncDecl{}
 	mod := &ir.Module{Funcs: []*ir.Function{{
 		Name:   "f",
-		Syntax: fn,
+		Public: true, Syntax: fn,
 		Body: []ir.Stmt{
 			&ir.Return{Syntax: live},
 			&ir.Let{Syntax: dead1},
@@ -95,7 +95,7 @@ func TestCheckSuppressedByError(t *testing.T) {
 	live, dead := &ast.ReturnStmt{}, &ast.ReturnStmt{}
 	fn := &ast.FuncDecl{}
 	mod := &ir.Module{Funcs: []*ir.Function{{
-		Name: "f", Syntax: fn,
+		Name: "f", Public: true, Syntax: fn,
 		Body: []ir.Stmt{&ir.Return{Syntax: live}, &ir.Return{Syntax: dead}},
 	}}}
 	span := fakeSpan(map[ast.Node][2]int{fn: {0, 40}, live: {10, 8}, dead: {20, 8}})
@@ -117,7 +117,7 @@ func TestCheckNestedDeadCode(t *testing.T) {
 	inner, dead := &ast.ReturnStmt{}, &ast.ExprStmt{}
 	fn := &ast.FuncDecl{}
 	mod := &ir.Module{Funcs: []*ir.Function{{
-		Name: "f", Syntax: fn,
+		Name: "f", Public: true, Syntax: fn,
 		Body: []ir.Stmt{
 			&ir.If{Then: []ir.Stmt{
 				&ir.Return{Syntax: inner},
@@ -142,7 +142,7 @@ func TestCheckClean(t *testing.T) {
 	a, b := &ast.LetStmt{}, &ast.ReturnStmt{}
 	fn := &ast.FuncDecl{}
 	mod := &ir.Module{Funcs: []*ir.Function{{
-		Name: "f", Syntax: fn,
+		Name: "f", Public: true, Syntax: fn,
 		Body: []ir.Stmt{&ir.Let{Syntax: a}, &ir.Return{Syntax: b}},
 	}}}
 	span := fakeSpan(map[ast.Node][2]int{fn: {0, 40}, a: {10, 9}, b: {20, 8}})

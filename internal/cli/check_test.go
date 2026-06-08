@@ -341,6 +341,33 @@ func TestCheckUnusedDeclaration(t *testing.T) {
 	}
 }
 
+func TestCheckUnusedFuncAndType(t *testing.T) {
+	// The unused lint reaches functions and types too: a private one no root
+	// names is dead, while one the public surface reaches is live.
+	dir := t.TempDir()
+	belttest.WriteFile(t, dir, "m.belt",
+		"pub fn api(): nint { return helper() }\nfn helper(): nint { return 1 }\nfn dead(): nint { return 2 }\n"+
+			"pub type Used = nint\ntype Dead = nint\n")
+
+	out, err := execCheck(t, "--reporter=json", filepath.Join(dir, "m.belt"))
+	if err != nil {
+		t.Fatalf("check = %v, want success\n%s", err, out)
+	}
+	if n := strings.Count(out, `"code": "belt.lint.unused_declaration"`); n != 2 {
+		t.Errorf("got %d unused diagnostics, want 2 (dead fn + Dead type)\n%s", n, out)
+	}
+	for _, want := range []string{"dead is never used", "Dead is never used"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output missing %q:\n%s", want, out)
+		}
+	}
+	for _, live := range []string{"helper is never used", "api is never used", "Used is never used"} {
+		if strings.Contains(out, live) {
+			t.Errorf("output wrongly flagged a live declaration: %s\n%s", live, out)
+		}
+	}
+}
+
 func TestCheckExplicitFile(t *testing.T) {
 	// An explicit file is checked ad hoc: no manifest required.
 	dir := t.TempDir()

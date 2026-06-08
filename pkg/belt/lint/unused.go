@@ -2,33 +2,70 @@ package lint
 
 import (
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
+	"github.com/masterbelt/masterbelt/pkg/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
 )
 
-// unusedDeclarations reports private constants no root reaches — a mark-and-
+// unusedDeclarations reports private declarations no root reaches — a mark-and-
 // sweep over the module's reference graph. The roots (every public declaration
 // and every assert) are live; a declaration is live when a live one references
-// it. An unreached private constant is dead, even one in a reference cycle that
-// a plain reference count would miss (two private constants that name only each
-// other are both dead).
+// it. An unreached private declaration is dead, even one in a reference cycle
+// that a plain reference count would miss (two private declarations that name
+// only each other are both dead).
 //
 // The marking is comprehensive — it follows references through constants,
 // functions, methods, types, where-predicates, asserts, associated constants,
-// and enum members — so a constant used anywhere reachable stays live. Only the
-// reporting is scoped to top-level constants; functions and types follow in a
-// later pass. A public constant is never reported: the public surface is live
-// by definition, used or not.
+// and enum members — so a declaration used anywhere reachable stays live. The
+// reporting covers top-level constants, functions, and types (enums and
+// interfaces are types): the named declarations a name can reach. A method or
+// an associated constant is not reported — a reached type's are marked whole,
+// since which a caller invokes is a dispatch question the lint does not decide.
+// A public declaration is never reported: the public surface is live by
+// definition, used or not.
 func (l *linter) unusedDeclarations(m *ir.Module) {
 	mk := newMarker()
 	mk.seedRoots(m)
 	for _, c := range m.Consts {
-		if c == nil || c.Name == "" || c.Public || c.Syntax == nil || mk.consts[c] {
-			continue
+		if c != nil && c.Syntax != nil && !c.Public && !mk.consts[c] {
+			l.reportUnused(c.Syntax, c.Name)
 		}
-		off, width := l.span(c.Syntax)
-		if width > 0 && !l.brokenWithin(off, width) {
-			l.diags = append(l.diags, unusedDeclaration(off, width, c.Name))
+	}
+	for _, f := range m.Funcs {
+		if f != nil && f.Syntax != nil && !f.Public && !mk.funcs[f] {
+			l.reportUnused(f.Syntax, f.Name)
 		}
+	}
+	for _, t := range m.Types {
+		if t != nil && !t.Public && !mk.types[t] {
+			l.reportUnused(typeDeclSyntax(t), t.Name)
+		}
+	}
+}
+
+// reportUnused emits the unused-declaration diagnostic for a named declaration
+// at syntax, unless it is unnamed, unanchored, or already covered by an error.
+func (l *linter) reportUnused(syntax ast.Node, name string) {
+	if name == "" || syntax == nil {
+		return
+	}
+	off, width := l.span(syntax)
+	if width > 0 && !l.brokenWithin(off, width) {
+		l.diags = append(l.diags, unusedDeclaration(off, width, name))
+	}
+}
+
+// typeDeclSyntax returns the declaration a type definition was resolved from —
+// a type, enum, or interface declaration — or nil for one built outside source.
+func typeDeclSyntax(t *ir.TypeDef) ast.Node {
+	switch {
+	case t.Syntax != nil:
+		return t.Syntax
+	case t.EnumSyntax != nil:
+		return t.EnumSyntax
+	case t.InterfaceSyntax != nil:
+		return t.InterfaceSyntax
+	default:
+		return nil
 	}
 }
 
