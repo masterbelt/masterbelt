@@ -38,40 +38,68 @@ func TestLowerConstDecl(t *testing.T) {
 	}
 }
 
-// TestLowerMasterDecl checks the master-declaration lowering: the record body
-// (reused from the type-body lowering), the primary-key columns, and — the
-// regression — that a stray identifier the body recovery appends directly under
-// the master does not overwrite the declared name.
+// TestLowerMasterDecl checks the well-formed master-declaration lowering: the
+// record body (reused from the type-body lowering) and the primary-key columns.
 func TestLowerMasterDecl(t *testing.T) {
-	t.Run("well-formed", func(t *testing.T) {
-		file, _ := Lower([]byte("pub master Skill {\n  record { id: int, name: string }\n  primary id\n}\n"))
-		if len(file.Masters) != 1 {
-			t.Fatalf("masters = %d, want 1", len(file.Masters))
+	file, _ := Lower([]byte("pub master Skill {\n  record { id: int, name: string }\n  primary id\n}\n"))
+	if len(file.Masters) != 1 {
+		t.Fatalf("masters = %d, want 1", len(file.Masters))
+	}
+	m := file.Masters[0]
+	if !m.Public || m.Name != "Skill" {
+		t.Errorf("master = pub %v name %q, want pub Skill", m.Public, m.Name)
+	}
+	if rt, ok := m.Record.(*ast.RecordType); !ok || len(rt.Fields) != 2 {
+		t.Fatalf("record = %#v, want a RecordType with 2 fields", m.Record)
+	}
+	if len(m.Primary) != 1 || m.Primary[0] != "id" {
+		t.Errorf("primary = %v, want [id]", m.Primary)
+	}
+}
+
+// lowerMasterRecovery lowers a deliberately malformed master, asserts it still
+// recorded a diagnostic and produced a single MasterDecl, and returns it.
+func lowerMasterRecovery(t *testing.T, src string) *ast.MasterDecl {
+	t.Helper()
+	file, diags := Lower([]byte(src))
+	if len(diags) == 0 {
+		t.Fatalf("%q: want a recovery diagnostic", src)
+	}
+	if len(file.Masters) != 1 {
+		t.Fatalf("%q: masters = %d, want 1", src, len(file.Masters))
+	}
+	return file.Masters[0]
+}
+
+// TestLowerMasterRecovery pins that a malformed master body recovers without one
+// member consuming the next: a stray identifier does not overwrite the name, and
+// a member left without its content (record's type, primary's key) does not
+// swallow the following member's context keyword.
+func TestLowerMasterRecovery(t *testing.T) {
+	t.Run("name survives a stray body token", func(t *testing.T) {
+		m := lowerMasterRecovery(t, "master Skill { bogus record { id: int } primary id }\n")
+		if m.Name != "Skill" {
+			t.Errorf("name = %q, want Skill (the stray \"bogus\" must not overwrite it)", m.Name)
 		}
-		m := file.Masters[0]
-		if !m.Public || m.Name != "Skill" {
-			t.Errorf("master = pub %v name %q, want pub Skill", m.Public, m.Name)
-		}
-		if rt, ok := m.Record.(*ast.RecordType); !ok || len(rt.Fields) != 2 {
-			t.Fatalf("record = %#v, want a RecordType with 2 fields", m.Record)
+	})
+
+	t.Run("primary survives a missing record body", func(t *testing.T) {
+		m := lowerMasterRecovery(t, "master M {\n  record\n  primary id\n}\n")
+		if m.Record != nil {
+			t.Errorf("record = %#v, want nil (primary must not be read as the record type)", m.Record)
 		}
 		if len(m.Primary) != 1 || m.Primary[0] != "id" {
 			t.Errorf("primary = %v, want [id]", m.Primary)
 		}
 	})
 
-	t.Run("name survives body recovery", func(t *testing.T) {
-		// A stray identifier in the body is appended directly under the
-		// MasterDecl by recovery; it must not overwrite the declared name.
-		file, diags := Lower([]byte("master Skill { bogus record { id: int } primary id }\n"))
-		if len(diags) == 0 {
-			t.Fatal("want a diagnostic for the stray body token")
+	t.Run("record survives a primary with no key", func(t *testing.T) {
+		m := lowerMasterRecovery(t, "master M {\n  primary\n  record { id: int }\n}\n")
+		if len(m.Primary) != 0 {
+			t.Errorf("primary = %v, want empty (record must not be read as the key)", m.Primary)
 		}
-		if len(file.Masters) != 1 {
-			t.Fatalf("masters = %d, want 1", len(file.Masters))
-		}
-		if got := file.Masters[0].Name; got != "Skill" {
-			t.Errorf("name = %q, want Skill (the stray \"bogus\" must not overwrite it)", got)
+		if rt, ok := m.Record.(*ast.RecordType); !ok || len(rt.Fields) != 1 {
+			t.Errorf("record = %#v, want a RecordType with 1 field", m.Record)
 		}
 	})
 }

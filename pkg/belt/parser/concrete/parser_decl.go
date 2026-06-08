@@ -626,7 +626,12 @@ func (p *parser) parseMasterRecord(lead []cst.Green) *cst.Node {
 	children := lead
 	children = append(children, p.masterKeyword()) // "record"
 
-	if startsType(p.peekSignificant()) {
+	// The row type begins here, unless a member keyword (record or primary) is
+	// next: those are context keywords the lexer leaves as identifiers, so
+	// startsType would otherwise read a following "primary" as the record's type
+	// name and swallow the primary member. Leaving the body absent keeps the
+	// keyword available as the next member.
+	if startsType(p.peekSignificant()) && !p.masterMemberAhead() {
 		p.skipTrivia(&children)
 		children = append(children, p.parseTypeExpr())
 	} else {
@@ -660,11 +665,11 @@ func (p *parser) parseMasterPrimary(lead []cst.Green) *cst.Node {
 	children := lead
 	children = append(children, p.masterKeyword()) // "primary"
 
-	switch p.peekSignificant() {
-	case token.Ident:
+	switch {
+	case p.peekSignificant() == token.Ident && !p.masterMemberAhead():
 		p.skipTrivia(&children)
 		children = append(children, p.bump()) // the single key column
-	case token.LParen:
+	case p.peekSignificant() == token.LParen:
 		p.skipTrivia(&children)
 		children = append(children, p.bump()) // "("
 		// A composite key names at least one column: an empty "()" records the
@@ -714,6 +719,15 @@ func (p *parser) masterKeyword() cst.Green {
 func (p *parser) masterMemberIs(kw string) bool {
 	i := p.nextSignificantIndex(p.pos)
 	return p.toks[i].Kind == token.Ident && p.identText(i) == kw
+}
+
+// masterMemberAhead reports whether the next significant token opens a master
+// member — the record or primary context keyword. A member's own content (the
+// record's row type, the primary's key) refuses to consume such a token, so a
+// member left without its content does not swallow the keyword that begins the
+// next member, which stays available to the member loop's recovery.
+func (p *parser) masterMemberAhead() bool {
+	return p.masterMemberIs("record") || p.masterMemberIs("primary")
 }
 
 // --- top-level functions ------------------------------------------------------
