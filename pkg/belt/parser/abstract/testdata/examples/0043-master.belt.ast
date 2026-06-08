@@ -1,0 +1,95 @@
+File
+  Uses: ~
+  Decls: ~
+  Types: ~
+  Enums:
+    EnumDecl
+      Doc: "How a skill is triggered."
+      Public: true
+      Name: "SkillKind"
+      Base: ~
+      Members:
+        EnumMember
+          Name: "active"
+          Value: ~
+        EnumMember
+          Name: "passive"
+          Value: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
+  Interfaces: ~
+  Funcs: ~
+  Asserts: ~
+  Masters:
+    MasterDecl
+      Doc: "One row of the Skill master."
+      Public: true
+      Name: "Skill"
+      Record: RecordType
+        Fields:
+          FieldDef
+            Name: "id"
+            Type: NamedType
+              Namespace: ""
+              Name: "int"
+              Args: ~
+          FieldDef
+            Name: "name"
+            Type: NamedType
+              Namespace: ""
+              Name: "string"
+              Args: ~
+          FieldDef
+            Name: "kind"
+            Type: NamedType
+              Namespace: ""
+              Name: "SkillKind"
+              Args: ~
+      Where: ~
+      Methods:
+        MethodDecl
+          Doc: "The skill's display label."
+          Public: true
+          Extern: false
+          Kind: 0
+          Effects: ~
+          Name: "label"
+          TypeParams: ~
+          Params: ~
+          Result: NamedType
+            Namespace: ""
+            Name: "string"
+            Args: ~
+          Body:
+            ReturnStmt
+              Value: MemberExpr
+                Receiver: SelfExpr
+                Member: Identifier
+                  Name: "name"
+      Consts: ~
+      Impls: ~
+      Primary: "id"
+    MasterDecl
+      Doc: ~
+      Public: false
+      Name: "SkillUpgrade"
+      Record: RecordType
+        Fields:
+          FieldDef
+            Name: "skill"
+            Type: NamedType
+              Namespace: ""
+              Name: "int"
+              Args: ~
+          FieldDef
+            Name: "level"
+            Type: NamedType
+              Namespace: ""
+              Name: "int"
+              Args: ~
+      Where: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
+      Primary: "skill" "level"

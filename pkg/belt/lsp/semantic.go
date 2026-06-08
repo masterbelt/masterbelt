@@ -369,6 +369,15 @@ var identClasses = map[cst.Kind]identClass{
 	// lexer leaves it an identifier, but inside a Modifier node it colours as a
 	// keyword, the same set keyword.control covers.
 	cst.Modifier: {stKeyword, 0},
+	// A master/record/primary context keyword: the lexer leaves it an identifier,
+	// but inside a MasterKeyword node it colours as a keyword, exactly as the
+	// accessor modifiers above do.
+	cst.MasterKeyword: {stKeyword, 0},
+	// The declared master's own name — a nominal data table, coloured as a type.
+	cst.MasterDecl: {stType, smDeclaration},
+	// A primary-key column name (the key columns are the direct Ident children of
+	// the primary member) reads as a property — it names a record field.
+	cst.MasterPrimary: {stProperty, 0},
 	// A method's declared name inside an impl block.
 	cst.MethodDecl: {stMethod, smDeclaration},
 	// A top-level function's declared name.

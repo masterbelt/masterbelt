@@ -1,0 +1,159 @@
+Module
+  Consts: ~
+  Types:
+    TypeDef
+      Name: "SkillKind"
+      Anchor: "belt:/SkillKind"
+      Public: true
+      Doc: "How a skill is triggered."
+      Params: ~
+      Body: ~
+      Methods:
+        Method
+          Name: "eql"
+          Anchor: "belt:/SkillKind#eql"
+          Public: true
+          Extern: true
+          Kind: 0
+          Effects: ~
+          Doc: ~
+          Params:
+            Param
+              Name: "other"
+              Type: SelfType
+          Result: Builtin
+            Name: "bool"
+          Body: ~
+          Owner: "SkillKind"
+        Method
+          Name: "neq"
+          Anchor: "belt:/SkillKind#neq"
+          Public: true
+          Extern: true
+          Kind: 0
+          Effects: ~
+          Doc: ~
+          Params:
+            Param
+              Name: "other"
+              Type: SelfType
+          Result: Builtin
+            Name: "bool"
+          Body: ~
+          Owner: "SkillKind"
+        Method
+          Name: "lt"
+          Anchor: "belt:/SkillKind#lt"
+          Public: true
+          Extern: true
+          Kind: 0
+          Effects: ~
+          Doc: ~
+          Params:
+            Param
+              Name: "other"
+              Type: SelfType
+          Result: Builtin
+            Name: "bool"
+          Body: ~
+          Owner: "SkillKind"
+        Method
+          Name: "lteq"
+          Anchor: "belt:/SkillKind#lteq"
+          Public: true
+          Extern: true
+          Kind: 0
+          Effects: ~
+          Doc: ~
+          Params:
+            Param
+              Name: "other"
+              Type: SelfType
+          Result: Builtin
+            Name: "bool"
+          Body: ~
+          Owner: "SkillKind"
+        Method
+          Name: "gt"
+          Anchor: "belt:/SkillKind#gt"
+          Public: true
+          Extern: true
+          Kind: 0
+          Effects: ~
+          Doc: ~
+          Params:
+            Param
+              Name: "other"
+              Type: SelfType
+          Result: Builtin
+            Name: "bool"
+          Body: ~
+          Owner: "SkillKind"
+        Method
+          Name: "gteq"
+          Anchor: "belt:/SkillKind#gteq"
+          Public: true
+          Extern: true
+          Kind: 0
+          Effects: ~
+          Doc: ~
+          Params:
+            Param
+              Name: "other"
+              Type: SelfType
+          Result: Builtin
+            Name: "bool"
+          Body: ~
+          Owner: "SkillKind"
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls:
+        Named
+          Def: "comparable"
+        Named
+          Def: "orderable"
+      Enum: EnumDef
+        Base: "nint"
+        Members:
+          EnumMember
+            Name: "active"
+            Value: Constant
+              Kind: 0
+              Int: 0
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+          EnumMember
+            Name: "passive"
+            Value: Constant
+              Kind: 0
+              Int: 1
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+      Where: ~
+  Funcs: ~
+  Asserts: ~

@@ -38,6 +38,82 @@ func TestLowerConstDecl(t *testing.T) {
 	}
 }
 
+// TestLowerMasterDecl checks the well-formed master-declaration lowering: the
+// record body (reused from the type-body lowering) and the primary-key columns.
+func TestLowerMasterDecl(t *testing.T) {
+	file, _ := Lower([]byte("pub master Skill {\n  record { id: int, name: string }\n  primary id\n}\n"))
+	if len(file.Masters) != 1 {
+		t.Fatalf("masters = %d, want 1", len(file.Masters))
+	}
+	m := file.Masters[0]
+	if !m.Public || m.Name != "Skill" {
+		t.Errorf("master = pub %v name %q, want pub Skill", m.Public, m.Name)
+	}
+	if rt, ok := m.Record.(*ast.RecordType); !ok || len(rt.Fields) != 2 {
+		t.Fatalf("record = %#v, want a RecordType with 2 fields", m.Record)
+	}
+	if len(m.Primary) != 1 || m.Primary[0] != "id" {
+		t.Errorf("primary = %v, want [id]", m.Primary)
+	}
+}
+
+// lowerMasterRecovery lowers a deliberately malformed master, asserts it still
+// recorded a diagnostic and produced a single MasterDecl, and returns it.
+func lowerMasterRecovery(t *testing.T, src string) *ast.MasterDecl {
+	t.Helper()
+	file, diags := Lower([]byte(src))
+	if len(diags) == 0 {
+		t.Fatalf("%q: want a recovery diagnostic", src)
+	}
+	if len(file.Masters) != 1 {
+		t.Fatalf("%q: masters = %d, want 1", src, len(file.Masters))
+	}
+	return file.Masters[0]
+}
+
+// TestLowerMasterRecovery pins that a stray identifier the body recovery appends
+// directly under the master does not overwrite the declared name.
+func TestLowerMasterRecovery(t *testing.T) {
+	m := lowerMasterRecovery(t, "master Skill { bogus record { id: int } primary id }\n")
+	if m.Name != "Skill" {
+		t.Errorf("name = %q, want Skill (the stray \"bogus\" must not overwrite it)", m.Name)
+	}
+}
+
+// TestLowerMasterContextKeywordNames pins that record/primary are ordinary
+// identifiers in content position: a row type or a primary-key column may be
+// spelled "primary" (or "record"), parsing cleanly rather than being mistaken
+// for the next member's keyword.
+func TestLowerMasterContextKeywordNames(t *testing.T) {
+	t.Run("row type named primary", func(t *testing.T) {
+		file, diags := Lower([]byte("master M { record primary primary id }\n"))
+		if len(diags) != 0 {
+			t.Fatalf("want no diagnostics, got %v", diags)
+		}
+		m := file.Masters[0]
+		if nt, ok := m.Record.(*ast.NamedType); !ok || nt.Name != "primary" {
+			t.Errorf("record = %#v, want NamedType primary", m.Record)
+		}
+		if len(m.Primary) != 1 || m.Primary[0] != "id" {
+			t.Errorf("primary = %v, want [id]", m.Primary)
+		}
+	})
+
+	t.Run("primary key named primary", func(t *testing.T) {
+		file, diags := Lower([]byte("master M { record { primary: int } primary primary }\n"))
+		if len(diags) != 0 {
+			t.Fatalf("want no diagnostics, got %v", diags)
+		}
+		m := file.Masters[0]
+		if rt, ok := m.Record.(*ast.RecordType); !ok || len(rt.Fields) != 1 {
+			t.Errorf("record = %#v, want a RecordType with 1 field", m.Record)
+		}
+		if len(m.Primary) != 1 || m.Primary[0] != "primary" {
+			t.Errorf("primary = %v, want [primary]", m.Primary)
+		}
+	})
+}
+
 func TestLowerInference(t *testing.T) {
 	file, _ := Lower([]byte("const MinLevel = 0\nconst Alias = MinLevel\n"))
 	if len(file.Decls) != 2 {

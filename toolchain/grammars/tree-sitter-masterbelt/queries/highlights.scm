@@ -61,6 +61,7 @@
 (type_decl name: (identifier) @type)
 (enum_decl name: (identifier) @type)
 (interface_decl name: (identifier) @type)
+(master_decl name: (identifier) @type)
 (generic_param name: (identifier) @type)
 (func_decl name: (identifier) @function)
 (method_decl name: (identifier) @function.method)
@@ -68,9 +69,11 @@
 (param name: (identifier) @variable.parameter)
 (field name: (identifier) @property)
 (record_field name: (identifier) @property)
+(master_primary (identifier) @property)
 (enum_member name: (identifier) @constant)
 (use_decl (identifier) @module)
 (modifier) @keyword
+(master_keyword) @keyword
 
 (type_name (identifier) @type)
 (record_literal type: (identifier) @type)

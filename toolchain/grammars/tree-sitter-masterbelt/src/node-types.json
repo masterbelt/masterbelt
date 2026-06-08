@@ -2041,6 +2041,128 @@
     }
   },
   {
+    "type": "master_decl",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "master_keyword",
+          "named": true
+        },
+        {
+          "type": "master_primary",
+          "named": true
+        },
+        {
+          "type": "master_record",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "master_primary",
+    "named": true,
+    "fields": {
+      "key": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "identifier",
+          "named": true
+        },
+        {
+          "type": "master_keyword",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "master_record",
+    "named": true,
+    "fields": {
+      "type": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "builtin_type",
+            "named": true
+          },
+          {
+            "type": "func_type",
+            "named": true
+          },
+          {
+            "type": "null_type",
+            "named": true
+          },
+          {
+            "type": "record_type",
+            "named": true
+          },
+          {
+            "type": "self_type",
+            "named": true
+          },
+          {
+            "type": "type_name",
+            "named": true
+          },
+          {
+            "type": "union_type",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "impl_block",
+          "named": true
+        },
+        {
+          "type": "master_keyword",
+          "named": true
+        },
+        {
+          "type": "where_clause",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "match_arm",
     "named": true,
     "fields": {},
@@ -2892,6 +3014,10 @@
         },
         {
           "type": "interface_decl",
+          "named": true
+        },
+        {
+          "type": "master_decl",
           "named": true
         },
         {
@@ -3906,6 +4032,10 @@
     "type": "line_comment",
     "named": true,
     "extra": true
+  },
+  {
+    "type": "master_keyword",
+    "named": true
   },
   {
     "type": "match",

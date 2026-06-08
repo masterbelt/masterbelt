@@ -108,6 +108,12 @@ func TestReparseBacksOffLookaheadChain(t *testing.T) {
 		{"extern loses its fn", "+ 2extern fn f(): nint { return 1 }\n", source.Edit{Start: 10, End: 12, NewText: []byte("zz")}},
 		// "pub extern fn" likewise, with the chain crossing two tokens.
 		{"pub extern loses its fn", "+ 2pub extern fn f(): nint { return 1 }\n", source.Edit{Start: 14, End: 16, NewText: []byte("zz")}},
+		// "master i" is a declaration; the edit turns the name into the type
+		// keyword, so master — a File-level context keyword recognised by the
+		// token that follows it — must fold back into the preceding error run.
+		{"master loses its name", "+ 2master i\n", source.Edit{Start: 10, End: 11, NewText: []byte("type ")}},
+		// The same after pub: the anchor must back off past both master and pub.
+		{"master loses its name after pub", "+ 2pub master i\n", source.Edit{Start: 14, End: 15, NewText: []byte("type ")}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -457,6 +463,17 @@ func TestDocumentFuzz(t *testing.T) {
 		// pins that the buffer-reading reparse matches a fresh parse.
 		"get ", "set ", "static ", "static fn ",
 		"type C = sbyte impl { get g(): nint { return 0 } static fn s(): C { return self } }",
+		// The master/record/primary context keywords: master is a File-level
+		// context keyword whose declaration-or-not hinges on the following token
+		// (a name or the block brace), so the random walk must reach it beside an
+		// error run for the reparse-window backoff to be pinned; record/primary
+		// are its block members. A whole master declaration exercises the
+		// type-body reuse and the composite key too. The incremental == full
+		// oracle pins that the buffer-reading master lookahead matches a fresh
+		// parse, exactly as it does for get/set/static above.
+		"master ", "master M ", "record ", "primary ",
+		"master M { record { id: int } primary id }",
+		"master M { record { a: int, b: int } primary (a, b,) }",
 	}
 
 	start := "const x = 0\n"

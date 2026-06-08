@@ -45,6 +45,7 @@ func lowerFile(root cst.Tree, buf source.Buffer) *ast.File {
 	var interfaces []*ast.InterfaceDecl
 	var funcs []*ast.FuncDecl
 	var asserts []*ast.AssertDecl
+	var masters []*ast.MasterDecl
 	foreachDecl(root, func(child cst.Tree, green *cst.Node) {
 		switch green.Kind() {
 		case cst.UseDecl:
@@ -61,12 +62,14 @@ func lowerFile(root cst.Tree, buf source.Buffer) *ast.File {
 			funcs = append(funcs, lowerFuncDecl(child, buf))
 		case cst.AssertDecl:
 			asserts = append(asserts, lowerAssertDecl(child, buf))
+		case cst.MasterDecl:
+			masters = append(masters, lowerMasterDecl(child, buf))
 		default:
 			// Any other kind is not a top-level declaration: it is skipped and
 			// contributes nothing to the lowered File.
 		}
 	})
-	return ast.NewFile(uses, decls, types, enums, interfaces, funcs, asserts, rootNode)
+	return ast.NewFile(uses, decls, types, enums, interfaces, funcs, asserts, masters, rootNode)
 }
 
 // foreachDecl calls fn for each top-level declaration child of root (a
@@ -81,7 +84,7 @@ func foreachDecl(root cst.Tree, fn func(child cst.Tree, green *cst.Node)) {
 			continue
 		}
 		switch node.Kind() {
-		case cst.UseDecl, cst.ConstDecl, cst.TypeDecl, cst.EnumDecl, cst.InterfaceDecl, cst.FuncDecl, cst.AssertDecl:
+		case cst.UseDecl, cst.ConstDecl, cst.TypeDecl, cst.EnumDecl, cst.InterfaceDecl, cst.FuncDecl, cst.AssertDecl, cst.MasterDecl:
 			fn(child, node)
 		default:
 			// Any other kind (trivia, the EOF leaf, an Error region) is not a

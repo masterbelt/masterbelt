@@ -123,6 +123,7 @@ var declRules = []highlightRule{
 	{pattern: "(type_decl name: (identifier) %s)\n", category: catType},
 	{pattern: "(enum_decl name: (identifier) %s)\n", category: catType},
 	{pattern: "(interface_decl name: (identifier) %s)\n", category: catType},
+	{pattern: "(master_decl name: (identifier) %s)\n", category: catType},
 	{pattern: "(generic_param name: (identifier) %s)\n", category: catType},
 	{pattern: "(func_decl name: (identifier) %s)\n", category: catFunction},
 	{pattern: "(method_decl name: (identifier) %s)\n", category: catMethod},
@@ -130,9 +131,11 @@ var declRules = []highlightRule{
 	{pattern: "(param name: (identifier) %s)\n", category: catParameter},
 	{pattern: "(field name: (identifier) %s)\n", category: catProperty},
 	{pattern: "(record_field name: (identifier) %s)\n", category: catProperty},
+	{pattern: "(master_primary (identifier) %s)\n", category: catProperty},
 	{pattern: "(enum_member name: (identifier) %s)\n", category: catEnumMember},
 	{pattern: "(use_decl (identifier) %s)\n", category: catNamespace},
 	{pattern: "(modifier) %s\n", category: catKeyword},
+	{pattern: "(master_keyword) %s\n", category: catKeyword},
 }
 
 // refRules colour name references. A name in a type position is a type; the

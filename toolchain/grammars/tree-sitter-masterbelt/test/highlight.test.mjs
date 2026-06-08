@@ -43,6 +43,11 @@ test('the default highlights.scm colours every category', () => {
     ['property', 'channel'], // a record field
     ['constant', 'Bronze'], // an enum member
     ['variable', 'Base'], // a constant's declared name
+    ['keyword', 'master'], // the master/record/primary context keywords
+    ['keyword', 'record'],
+    ['keyword', 'primary'],
+    ['type', 'Skill'], // a master declaration's name
+    ['property', 'id'], // a primary-key column
   ];
 
   for (const [capture, text] of [...lexical, ...structural]) {

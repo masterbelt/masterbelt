@@ -933,12 +933,27 @@ func writeFile(w *treetext.Writer, n *File, depth int) error {
 			}
 		}
 	}
+	if len(n.Masters) == 0 {
+		w.Line(depth, "Masters: "+treetext.Nil)
+	} else {
+		w.Line(depth, "Masters:")
+		for _, item := range n.Masters {
+			if item == nil {
+				w.Line(depth+1, treetext.Nil)
+				continue
+			}
+			w.Line(depth+1, "MasterDecl")
+			if err := writeMasterDecl(w, item, depth+2); err != nil {
+				return err
+			}
+		}
+	}
 	return nil
 }
 
 // decodeFile builds a File from its element.
 func decodeFile(e *treetext.Element) (*File, error) {
-	if err := treetext.ExpectFields(e, "Uses", "Decls", "Types", "Enums", "Interfaces", "Funcs", "Asserts"); err != nil {
+	if err := treetext.ExpectFields(e, "Uses", "Decls", "Types", "Enums", "Interfaces", "Funcs", "Asserts", "Masters"); err != nil {
 		return nil, err
 	}
 	n := &File{}
@@ -1102,6 +1117,29 @@ func decodeFile(e *treetext.Element) (*File, error) {
 			out = append(out, v)
 		}
 		n.Asserts = out
+	}
+	switch f := e.Fields[7]; {
+	case f.Inline == treetext.Nil:
+	case f.Items == nil:
+		return nil, fmt.Errorf("treetext: line %d: field %s: expected a list", f.Line, f.Name)
+	default:
+		out := make([]*MasterDecl, 0, len(f.Items))
+		for j := range f.Items {
+			item := &f.Items[j]
+			if item.Head == treetext.Nil {
+				out = append(out, nil)
+				continue
+			}
+			if item.Head != "MasterDecl" {
+				return nil, fmt.Errorf("treetext: line %d: %s is not a MasterDecl", item.Line, item.Head)
+			}
+			v, err := decodeMasterDecl(item)
+			if err != nil {
+				return nil, err
+			}
+			out = append(out, v)
+		}
+		n.Masters = out
 	}
 	return n, nil
 }
@@ -2062,6 +2100,176 @@ func (n *LetStmt) MarshalText() ([]byte, error) {
 	var w treetext.Writer
 	w.Line(0, "LetStmt")
 	if err := writeLetStmt(&w, n, 1); err != nil {
+		return nil, err
+	}
+	return w.Bytes(), nil
+}
+
+// writeMasterDecl emits n's fields beneath an already-written heading line.
+func writeMasterDecl(w *treetext.Writer, n *MasterDecl, depth int) error {
+	w.Line(depth, "Doc: "+treetext.QuoteStrings(n.Doc))
+	w.Line(depth, "Public: "+strconv.FormatBool(n.Public))
+	w.Line(depth, "Name: "+strconv.Quote(n.Name))
+	if err := writeTypeExprField(w, depth, "Record", n.Record); err != nil {
+		return err
+	}
+	if err := writeExprField(w, depth, "Where", n.Where); err != nil {
+		return err
+	}
+	if len(n.Methods) == 0 {
+		w.Line(depth, "Methods: "+treetext.Nil)
+	} else {
+		w.Line(depth, "Methods:")
+		for _, item := range n.Methods {
+			if item == nil {
+				w.Line(depth+1, treetext.Nil)
+				continue
+			}
+			w.Line(depth+1, "MethodDecl")
+			if err := writeMethodDecl(w, item, depth+2); err != nil {
+				return err
+			}
+		}
+	}
+	if len(n.Consts) == 0 {
+		w.Line(depth, "Consts: "+treetext.Nil)
+	} else {
+		w.Line(depth, "Consts:")
+		for _, item := range n.Consts {
+			if item == nil {
+				w.Line(depth+1, treetext.Nil)
+				continue
+			}
+			w.Line(depth+1, "ConstDecl")
+			if err := writeConstDecl(w, item, depth+2); err != nil {
+				return err
+			}
+		}
+	}
+	if len(n.Impls) == 0 {
+		w.Line(depth, "Impls: "+treetext.Nil)
+	} else {
+		w.Line(depth, "Impls:")
+		for _, item := range n.Impls {
+			if err := writeTypeExprItem(w, depth+1, item); err != nil {
+				return err
+			}
+		}
+	}
+	w.Line(depth, "Primary: "+treetext.QuoteStrings(n.Primary))
+	return nil
+}
+
+// decodeMasterDecl builds a MasterDecl from its element.
+func decodeMasterDecl(e *treetext.Element) (*MasterDecl, error) {
+	if err := treetext.ExpectFields(e, "Doc", "Public", "Name", "Record", "Where", "Methods", "Consts", "Impls", "Primary"); err != nil {
+		return nil, err
+	}
+	n := &MasterDecl{}
+	if v, err := treetext.Strings(e.Fields[0]); err != nil {
+		return nil, err
+	} else {
+		n.Doc = v
+	}
+	if v, err := treetext.Bool(e.Fields[1]); err != nil {
+		return nil, err
+	} else {
+		n.Public = v
+	}
+	if v, err := treetext.String(e.Fields[2]); err != nil {
+		return nil, err
+	} else {
+		n.Name = v
+	}
+	if v, err := decodeTypeExprField(e.Fields[3]); err != nil {
+		return nil, err
+	} else {
+		n.Record = v
+	}
+	if v, err := decodeExprField(e.Fields[4]); err != nil {
+		return nil, err
+	} else {
+		n.Where = v
+	}
+	switch f := e.Fields[5]; {
+	case f.Inline == treetext.Nil:
+	case f.Items == nil:
+		return nil, fmt.Errorf("treetext: line %d: field %s: expected a list", f.Line, f.Name)
+	default:
+		out := make([]*MethodDecl, 0, len(f.Items))
+		for j := range f.Items {
+			item := &f.Items[j]
+			if item.Head == treetext.Nil {
+				out = append(out, nil)
+				continue
+			}
+			if item.Head != "MethodDecl" {
+				return nil, fmt.Errorf("treetext: line %d: %s is not a MethodDecl", item.Line, item.Head)
+			}
+			v, err := decodeMethodDecl(item)
+			if err != nil {
+				return nil, err
+			}
+			out = append(out, v)
+		}
+		n.Methods = out
+	}
+	switch f := e.Fields[6]; {
+	case f.Inline == treetext.Nil:
+	case f.Items == nil:
+		return nil, fmt.Errorf("treetext: line %d: field %s: expected a list", f.Line, f.Name)
+	default:
+		out := make([]*ConstDecl, 0, len(f.Items))
+		for j := range f.Items {
+			item := &f.Items[j]
+			if item.Head == treetext.Nil {
+				out = append(out, nil)
+				continue
+			}
+			if item.Head != "ConstDecl" {
+				return nil, fmt.Errorf("treetext: line %d: %s is not a ConstDecl", item.Line, item.Head)
+			}
+			v, err := decodeConstDecl(item)
+			if err != nil {
+				return nil, err
+			}
+			out = append(out, v)
+		}
+		n.Consts = out
+	}
+	switch f := e.Fields[7]; {
+	case f.Inline == treetext.Nil:
+	case f.Items == nil:
+		return nil, fmt.Errorf("treetext: line %d: field %s: expected a list", f.Line, f.Name)
+	default:
+		out := make([]TypeExpr, 0, len(f.Items))
+		for j := range f.Items {
+			item := &f.Items[j]
+			if item.Head == treetext.Nil {
+				out = append(out, nil)
+				continue
+			}
+			v, err := decodeTypeExpr(item)
+			if err != nil {
+				return nil, err
+			}
+			out = append(out, v)
+		}
+		n.Impls = out
+	}
+	if v, err := treetext.Strings(e.Fields[8]); err != nil {
+		return nil, err
+	} else {
+		n.Primary = v
+	}
+	return n, nil
+}
+
+// MarshalText renders the node and its subtree in the exact text form.
+func (n *MasterDecl) MarshalText() ([]byte, error) {
+	var w treetext.Writer
+	w.Line(0, "MasterDecl")
+	if err := writeMasterDecl(&w, n, 1); err != nil {
 		return nil, err
 	}
 	return w.Bytes(), nil
@@ -4129,6 +4337,7 @@ var treeStructs = []any{
 	(*InterfaceDecl)(nil),
 	(*InterfaceMember)(nil),
 	(*LetStmt)(nil),
+	(*MasterDecl)(nil),
 	(*MatchArm)(nil),
 	(*MatchStmt)(nil),
 	(*MemberExpr)(nil),
@@ -4236,6 +4445,9 @@ func writeTree(w *treetext.Writer, v any, depth int) (bool, error) {
 	case *LetStmt:
 		w.Line(depth, "LetStmt")
 		return true, writeLetStmt(w, n, depth+1)
+	case *MasterDecl:
+		w.Line(depth, "MasterDecl")
+		return true, writeMasterDecl(w, n, depth+1)
 	case *MatchArm:
 		w.Line(depth, "MatchArm")
 		return true, writeMatchArm(w, n, depth+1)

@@ -111,6 +111,24 @@ func TestDocumentSymbols(t *testing.T) {
 	}
 }
 
+func TestDocumentSymbolsMaster(t *testing.T) {
+	// A master outlines as a single struct-kinded symbol, read from the AST
+	// (it has no IR representation yet). Its SelectionRange covers just the name.
+	doc := testView("pub master Skill {\n  record {\n    id: int\n  }\n  primary id\n}\n")
+	syms := documentSymbols(doc)
+	if len(syms) != 1 {
+		t.Fatalf("got %d symbols, want 1: %+v", len(syms), syms)
+	}
+	if syms[0].Name != "Skill" || syms[0].Kind != protocol.SymbolKindStruct {
+		t.Errorf("symbol 0 = %+v, want Skill as a struct", syms[0])
+	}
+	// SelectionRange must cover just the name "Skill" (line 0, cols 11..16).
+	sel := syms[0].SelectionRange
+	if sel.Start.Line != 0 || sel.Start.Character != 11 || sel.End.Character != 16 {
+		t.Errorf("symbol 0 selection range = %+v, want cols 11..16 on line 0", sel)
+	}
+}
+
 func TestFormatEdits(t *testing.T) {
 	t.Run("trims trailing space and normalises final newline", func(t *testing.T) {
 		doc := abstract.NewDocument([]byte("const x = 1   \n\n\n"))

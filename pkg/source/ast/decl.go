@@ -2,9 +2,9 @@ package ast
 
 import "github.com/masterbelt/masterbelt/pkg/source/cst"
 
-// File is a whole source file: its use, constant, type, function, and assert
-// declarations in source order. Trivia and any unparsable regions present in
-// the CST are dropped here.
+// File is a whole source file: its use, constant, type, enum, interface,
+// function, assert, and master declarations in source order. Trivia and any
+// unparsable regions present in the CST are dropped here.
 type File struct {
 	Uses       []*UseDecl
 	Decls      []*ConstDecl
@@ -13,6 +13,7 @@ type File struct {
 	Interfaces []*InterfaceDecl
 	Funcs      []*FuncDecl
 	Asserts    []*AssertDecl
+	Masters    []*MasterDecl
 	syntax     *cst.Node
 }
 
@@ -22,8 +23,8 @@ func (f *File) node()             {}
 
 // NewFile builds a File node. The constructors keep each node's syntax backlink
 // unexported while package parser/abstract populates it.
-func NewFile(uses []*UseDecl, decls []*ConstDecl, types []*TypeDecl, enums []*EnumDecl, interfaces []*InterfaceDecl, funcs []*FuncDecl, asserts []*AssertDecl, syntax *cst.Node) *File {
-	return &File{Uses: uses, Decls: decls, Types: types, Enums: enums, Interfaces: interfaces, Funcs: funcs, Asserts: asserts, syntax: syntax}
+func NewFile(uses []*UseDecl, decls []*ConstDecl, types []*TypeDecl, enums []*EnumDecl, interfaces []*InterfaceDecl, funcs []*FuncDecl, asserts []*AssertDecl, masters []*MasterDecl, syntax *cst.Node) *File {
+	return &File{Uses: uses, Decls: decls, Types: types, Enums: enums, Interfaces: interfaces, Funcs: funcs, Asserts: asserts, Masters: masters, syntax: syntax}
 }
 
 // UseDecl is a cross-file import: an optional pub modifier (re-export the
@@ -195,4 +196,46 @@ func (d *AssertDecl) node()             {}
 // NewAssertDecl builds an AssertDecl node.
 func NewAssertDecl(doc []string, cond Expr, syntax *cst.Node) *AssertDecl {
 	return &AssertDecl{Doc: doc, Cond: cond, syntax: syntax}
+}
+
+// MasterDecl is a master declaration: a master-data table named by a record
+// type and a primary key. It carries an optional run of doc-comment lines, an
+// optional pub modifier, the declared Name, the row Record type, and the
+// primary-key columns (Primary, in declaration order).
+//
+// The record body reuses the type-declaration body wholesale, so its fields
+// mirror TypeDecl's: Record is the row type (a RecordType in practice), Where
+// its refinement predicate over a row, and Methods/Consts/Impls the members of
+// the record's impl blocks — the per-row methods, the associated constants, and
+// the interfaces the record opts into. So a master's rows get per-row methods
+// and refinements by reuse, not bespoke syntax. The optional parts are nil/zero
+// when the source omitted them (or when it was malformed and the parser
+// recovered).
+type MasterDecl struct {
+	Doc     []string
+	Public  bool
+	Name    string        // the declared identifier, or "" if missing
+	Record  TypeExpr      // the row record type, or nil if missing
+	Where   Expr          // the refinement predicate over a row, or nil if none
+	Methods []*MethodDecl // the record impl blocks' per-row methods
+	Consts  []*ConstDecl  // the record impl blocks' associated constants, in source order
+	Impls   []TypeExpr    // the interfaces the record opts into (see TypeDecl.Impls)
+	Primary []string      // the primary-key column names, in declaration order
+	syntax  *cst.Node
+}
+
+// Syntax returns the green CST node this declaration was lowered from.
+func (d *MasterDecl) Syntax() *cst.Node { return d.syntax }
+func (d *MasterDecl) node()             {}
+
+// MasterDecl satisfies the sealed Node contract (Syntax, node, and the
+// generated MarshalText). The other declaration nodes earn that implicitly by
+// being passed as an ast.Node to the semantic layer's span/diagnostic anchors;
+// master is not yet consumed there, so this assertion both documents the
+// contract and keeps the sealing method from reading as dead code.
+var _ Node = (*MasterDecl)(nil)
+
+// NewMasterDecl builds a MasterDecl node.
+func NewMasterDecl(doc []string, public bool, name string, record TypeExpr, where Expr, methods []*MethodDecl, consts []*ConstDecl, impls []TypeExpr, primary []string, syntax *cst.Node) *MasterDecl {
+	return &MasterDecl{Doc: doc, Public: public, Name: name, Record: record, Where: where, Methods: methods, Consts: consts, Impls: impls, Primary: primary, syntax: syntax}
 }
