@@ -53,11 +53,21 @@ func (t tsTarget) cap(category string) string {
 // where its convention differs (see tsTargets), so the shared names live here
 // once.
 var defaultCaptures = map[string]string{
-	catKeyword: "keyword", catComment: "comment", catCommentDoc: "comment.documentation",
-	catType: "type", catVariable: "variable", catNumber: "number",
-	catString: "string", catStringEscape: "string.escape", catOperator: "operator",
-	catNamespace: "module", catProperty: "property", catMethod: "function.method",
-	catParameter: "variable.parameter", catFunction: "function", catEnumMember: "constant",
+	catKeyword:      "keyword",
+	catComment:      "comment",
+	catCommentDoc:   "comment.documentation",
+	catType:         "type",
+	catVariable:     "variable",
+	catNumber:       "number",
+	catString:       "string",
+	catStringEscape: "string.escape",
+	catOperator:     "operator",
+	catNamespace:    "module",
+	catProperty:     "property",
+	catMethod:       "function.method",
+	catParameter:    "variable.parameter",
+	catFunction:     "function",
+	catEnumMember:   "constant",
 }
 
 // tsTargets are the highlight targets generated. The default (nvim-treesitter)
