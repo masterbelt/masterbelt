@@ -29,7 +29,7 @@ func TestJSONReport(t *testing.T) {
 	// The exact document is the contract: stable field order, byte offsets,
 	// 1-based line/column, fixes always present.
 	want := `{
-  "version": 1,
+  "version": 2,
   "diagnostics": [
     {
       "code": "x.broken",
@@ -114,6 +114,30 @@ func TestJSONReportNoAnchorResolver(t *testing.T) {
 	}
 }
 
+func TestJSONReportTags(t *testing.T) {
+	// A tagged diagnostic carries its markers as a names array; an untagged one
+	// omits the field (omitempty), so consumers see tags only where they apply.
+	file := source.NewFile("a.belt", []byte("const A = 1\n"))
+	var out bytes.Buffer
+	r := NewJSON(&out, diagnostic.DefaultLocale)
+
+	r.Report(file, []diagnostic.Diagnostic{
+		{Severity: diagnostic.Hint, Code: "belt.lint.unreachable_code", Message: "dead", Tags: []diagnostic.Tag{diagnostic.TagUnnecessary}, Offset: 0, Width: 5},
+		{Severity: diagnostic.Error, Code: "x.plain", Message: "no", Offset: 6, Width: 1},
+	})
+	if err := r.Flush(); err != nil {
+		t.Fatalf("Flush() = %v", err)
+	}
+
+	if !bytes.Contains(out.Bytes(), []byte("\"tags\": [\n        \"unnecessary\"\n      ]")) {
+		t.Errorf("output missing the unnecessary tag array:\n%s", out.String())
+	}
+	// Exactly one diagnostic is tagged, so the field appears once.
+	if n := bytes.Count(out.Bytes(), []byte(`"tags"`)); n != 1 {
+		t.Errorf("tags field count = %d, want 1 (the untagged diagnostic omits it):\n%s", n, out.String())
+	}
+}
+
 func TestJSONReportBare(t *testing.T) {
 	// No file to anchor to: the diagnostic is emitted without file and range.
 	var out bytes.Buffer
@@ -129,7 +153,7 @@ func TestJSONReportBare(t *testing.T) {
 	}
 
 	want := `{
-  "version": 1,
+  "version": 2,
   "diagnostics": [
     {
       "code": "project.config.missing",
@@ -157,7 +181,7 @@ func TestJSONEmpty(t *testing.T) {
 		t.Fatalf("Flush() = %v", err)
 	}
 
-	want := "{\n  \"version\": 1,\n  \"diagnostics\": []\n}\n"
+	want := "{\n  \"version\": 2,\n  \"diagnostics\": []\n}\n"
 	if out.String() != want {
 		t.Errorf("Flush() wrote %q, want %q", out.String(), want)
 	}

@@ -46,8 +46,12 @@ type Diagnostic struct {
 	Code     Code
 	Message  string
 	Fields   map[string]fmt.Stringer
-	Offset   int // byte offset of the diagnostic's start within the file
-	Width    int // byte length of the diagnostic's span
+	// Tags are orthogonal markers on the diagnostic (Unnecessary for dead code,
+	// …), independent of Severity; nil for most. The producer sets them, the
+	// same way it populates the other exported fields.
+	Tags   []Tag
+	Offset int // byte offset of the diagnostic's start within the file
+	Width  int // byte length of the diagnostic's span
 }
 
 // End returns the byte offset one past the diagnostic (Offset + Width).

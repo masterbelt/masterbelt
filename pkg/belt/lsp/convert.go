@@ -63,6 +63,9 @@ func toDiagnostics(doc view) []protocol.Diagnostic {
 			Code:    json.RawMessage(strconv.Quote(string(d.Code))),
 			Source:  "masterbelt",
 			Message: d.Message,
+			// Tags drive the editor's rendering beyond severity: Unnecessary
+			// fades dead code rather than underlining it.
+			Tags: toTags(d.Tags),
 		})
 	}
 	return out
@@ -79,6 +82,26 @@ func toSeverity(s diagnostic.Severity) protocol.DiagnosticSeverity {
 	default:
 		return protocol.SeverityError
 	}
+}
+
+// toTags maps a diagnostic's orthogonal markers to the protocol's — the tag
+// counterpart of toSeverity. Both scales mirror the protocol's, but the switch
+// keeps the mapping an explicit seam rather than a numeric cast. nil stays nil,
+// so an untagged diagnostic carries no tags field.
+func toTags(ts []diagnostic.Tag) []protocol.DiagnosticTag {
+	if len(ts) == 0 {
+		return nil
+	}
+	out := make([]protocol.DiagnosticTag, 0, len(ts))
+	for _, t := range ts {
+		switch t {
+		case diagnostic.TagUnnecessary:
+			out = append(out, protocol.TagUnnecessary)
+		case diagnostic.TagDeprecated:
+			out = append(out, protocol.TagDeprecated)
+		}
+	}
+	return out
 }
 
 // documentSymbols turns the program's constants and functions into an LSP

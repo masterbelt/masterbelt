@@ -11,14 +11,14 @@ import (
 
 // schemaVersion is bumped when the JSON report shape changes, so downstream
 // consumers (CI, agents, the MCP surface when it lands) can tell what they
-// are reading.
-const schemaVersion = 1
+// are reading. v2 added the optional tags array.
+const schemaVersion = 2
 
 // JSON accumulates diagnostics and emits them on Flush as one machine-readable
 // document, the `check --format=json` schema:
 //
 //	{
-//	  "version": 1,
+//	  "version": 2,
 //	  "diagnostics": [
 //	    {
 //	      "code": "belt.semantic.constant_overflow",
@@ -42,6 +42,9 @@ const schemaVersion = 1
 // is the stable address of the declaration enclosing the diagnostic,
 // present when an anchor resolver is installed and the offset falls in a
 // declaration: a position-independent handle a consumer can keep across edits.
+// tags is the diagnostic's orthogonal markers ("unnecessary" for dead code,
+// …), present only when it carries any — the machine-readable side of the
+// editor's faded rendering.
 type JSON struct {
 	w      io.Writer
 	locale diagnostic.Locale
@@ -109,8 +112,22 @@ func (r *JSON) diag(d diagnostic.Diagnostic) jsonDiag {
 		Severity: d.Severity.String(),
 		Message:  jsonMessage{Locale: string(r.locale), Text: message(d, r.locale)},
 		Data:     data(d.Fields),
+		Tags:     tags(d.Tags),
 		Fixes:    []jsonFix{},
 	}
+}
+
+// tags renders a diagnostic's tags to their stable names, or nil when it has
+// none so the field is omitted.
+func tags(ts []diagnostic.Tag) []string {
+	if len(ts) == 0 {
+		return nil
+	}
+	out := make([]string, len(ts))
+	for i, t := range ts {
+		out[i] = t.String()
+	}
+	return out
 }
 
 func position(file *source.File, offset int) jsonPos {
@@ -144,6 +161,7 @@ type jsonDiag struct {
 	Range    *jsonRange        `json:"range,omitempty"`
 	Message  jsonMessage       `json:"message"`
 	Data     map[string]string `json:"data,omitempty"`
+	Tags     []string          `json:"tags,omitempty"` // orthogonal markers ("unnecessary", …)
 	Fixes    []jsonFix         `json:"fixes"`
 }
 

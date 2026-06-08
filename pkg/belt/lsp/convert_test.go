@@ -6,6 +6,7 @@ import (
 	protocol "github.com/owenrumney/go-lsp/lsp"
 
 	"github.com/masterbelt/masterbelt/pkg/belt/parser/abstract"
+	"github.com/masterbelt/masterbelt/pkg/diagnostic"
 	"github.com/masterbelt/masterbelt/pkg/source"
 )
 
@@ -56,6 +57,19 @@ func TestToDiagnostics(t *testing.T) {
 	want := protocol.Range{Start: protocol.Position{Line: 0, Character: 0}, End: protocol.Position{Line: 0, Character: 0}}
 	if d.Range != want {
 		t.Errorf("Range = %+v, want %+v", d.Range, want)
+	}
+}
+
+func TestToTags(t *testing.T) {
+	// The diagnostic tag scale maps onto the protocol's, and an untagged
+	// diagnostic carries no tags field (nil, not an empty slice).
+	if got := toTags(nil); got != nil {
+		t.Errorf("toTags(nil) = %v, want nil", got)
+	}
+	got := toTags([]diagnostic.Tag{diagnostic.TagUnnecessary, diagnostic.TagDeprecated})
+	want := []protocol.DiagnosticTag{protocol.TagUnnecessary, protocol.TagDeprecated}
+	if len(got) != len(want) || got[0] != want[0] || got[1] != want[1] {
+		t.Errorf("toTags = %v, want %v", got, want)
 	}
 }
 

@@ -168,8 +168,8 @@ func TestCheckJSON(t *testing.T) {
 	if err := json.Unmarshal([]byte(out), &report); err != nil {
 		t.Fatalf("output is not JSON: %v\n%s", err, out)
 	}
-	if report.Version != 1 || len(report.Diagnostics) != 1 {
-		t.Fatalf("report = %+v, want version 1 with one diagnostic", report)
+	if report.Version != 2 || len(report.Diagnostics) != 1 {
+		t.Fatalf("report = %+v, want version 2 with one diagnostic", report)
 	}
 	d := report.Diagnostics[0]
 	if d.Code != "belt.semantic.undefined_name" {
