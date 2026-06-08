@@ -6,7 +6,8 @@ BIN_DIR       := bin
 
 # build compiles every command under ./cmd into BIN_DIR, one binary per command
 # directory (e.g. cmd/masterbelt -> bin/masterbelt). New commands are picked up
-# automatically.
+# automatically. The binary reports its own version from Go's build info (the
+# recorded VCS revision and commit date) — nothing is stamped in here.
 .PHONY: build
 build:
 	$(GO) build -o $(BIN_DIR)/ ./cmd/...
