@@ -626,12 +626,13 @@ func (p *parser) parseMasterRecord(lead []cst.Green) *cst.Node {
 	children := lead
 	children = append(children, p.masterKeyword()) // "record"
 
-	// The row type begins here, unless a member keyword (record or primary) is
-	// next: those are context keywords the lexer leaves as identifiers, so
-	// startsType would otherwise read a following "primary" as the record's type
-	// name and swallow the primary member. Leaving the body absent keeps the
-	// keyword available as the next member.
-	if startsType(p.peekSignificant()) && !p.masterMemberAhead() {
+	// The row type follows, parsed as a full type expression. record/primary are
+	// context keywords only at a member's head: in type position they are
+	// ordinary identifiers, so a row type may be spelled "primary" (record
+	// primary) just as any other name. A row type written as a member keyword
+	// therefore parses as that type; the parser does not try to guess that the
+	// keyword was meant to open the next member instead.
+	if startsType(p.peekSignificant()) {
 		p.skipTrivia(&children)
 		children = append(children, p.parseTypeExpr())
 	} else {
@@ -665,11 +666,13 @@ func (p *parser) parseMasterPrimary(lead []cst.Green) *cst.Node {
 	children := lead
 	children = append(children, p.masterKeyword()) // "primary"
 
-	switch {
-	case p.peekSignificant() == token.Ident && !p.masterMemberAhead():
+	switch p.peekSignificant() {
+	case token.Ident:
+		// The single key column. record/primary in key position are ordinary
+		// identifiers (a column may be named "primary"), not the next member.
 		p.skipTrivia(&children)
 		children = append(children, p.bump()) // the single key column
-	case p.peekSignificant() == token.LParen:
+	case token.LParen:
 		p.skipTrivia(&children)
 		children = append(children, p.bump()) // "("
 		// A composite key names at least one column: an empty "()" records the
@@ -719,15 +722,6 @@ func (p *parser) masterKeyword() cst.Green {
 func (p *parser) masterMemberIs(kw string) bool {
 	i := p.nextSignificantIndex(p.pos)
 	return p.toks[i].Kind == token.Ident && p.identText(i) == kw
-}
-
-// masterMemberAhead reports whether the next significant token opens a master
-// member — the record or primary context keyword. A member's own content (the
-// record's row type, the primary's key) refuses to consume such a token, so a
-// member left without its content does not swallow the keyword that begins the
-// next member, which stays available to the member loop's recovery.
-func (p *parser) masterMemberAhead() bool {
-	return p.masterMemberIs("record") || p.masterMemberIs("primary")
 }
 
 // --- top-level functions ------------------------------------------------------

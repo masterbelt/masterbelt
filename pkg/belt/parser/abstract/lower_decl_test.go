@@ -71,35 +71,45 @@ func lowerMasterRecovery(t *testing.T, src string) *ast.MasterDecl {
 	return file.Masters[0]
 }
 
-// TestLowerMasterRecovery pins that a malformed master body recovers without one
-// member consuming the next: a stray identifier does not overwrite the name, and
-// a member left without its content (record's type, primary's key) does not
-// swallow the following member's context keyword.
+// TestLowerMasterRecovery pins that a stray identifier the body recovery appends
+// directly under the master does not overwrite the declared name.
 func TestLowerMasterRecovery(t *testing.T) {
-	t.Run("name survives a stray body token", func(t *testing.T) {
-		m := lowerMasterRecovery(t, "master Skill { bogus record { id: int } primary id }\n")
-		if m.Name != "Skill" {
-			t.Errorf("name = %q, want Skill (the stray \"bogus\" must not overwrite it)", m.Name)
-		}
-	})
+	m := lowerMasterRecovery(t, "master Skill { bogus record { id: int } primary id }\n")
+	if m.Name != "Skill" {
+		t.Errorf("name = %q, want Skill (the stray \"bogus\" must not overwrite it)", m.Name)
+	}
+}
 
-	t.Run("primary survives a missing record body", func(t *testing.T) {
-		m := lowerMasterRecovery(t, "master M {\n  record\n  primary id\n}\n")
-		if m.Record != nil {
-			t.Errorf("record = %#v, want nil (primary must not be read as the record type)", m.Record)
+// TestLowerMasterContextKeywordNames pins that record/primary are ordinary
+// identifiers in content position: a row type or a primary-key column may be
+// spelled "primary" (or "record"), parsing cleanly rather than being mistaken
+// for the next member's keyword.
+func TestLowerMasterContextKeywordNames(t *testing.T) {
+	t.Run("row type named primary", func(t *testing.T) {
+		file, diags := Lower([]byte("master M { record primary primary id }\n"))
+		if len(diags) != 0 {
+			t.Fatalf("want no diagnostics, got %v", diags)
+		}
+		m := file.Masters[0]
+		if nt, ok := m.Record.(*ast.NamedType); !ok || nt.Name != "primary" {
+			t.Errorf("record = %#v, want NamedType primary", m.Record)
 		}
 		if len(m.Primary) != 1 || m.Primary[0] != "id" {
 			t.Errorf("primary = %v, want [id]", m.Primary)
 		}
 	})
 
-	t.Run("record survives a primary with no key", func(t *testing.T) {
-		m := lowerMasterRecovery(t, "master M {\n  primary\n  record { id: int }\n}\n")
-		if len(m.Primary) != 0 {
-			t.Errorf("primary = %v, want empty (record must not be read as the key)", m.Primary)
+	t.Run("primary key named primary", func(t *testing.T) {
+		file, diags := Lower([]byte("master M { record { primary: int } primary primary }\n"))
+		if len(diags) != 0 {
+			t.Fatalf("want no diagnostics, got %v", diags)
 		}
+		m := file.Masters[0]
 		if rt, ok := m.Record.(*ast.RecordType); !ok || len(rt.Fields) != 1 {
 			t.Errorf("record = %#v, want a RecordType with 1 field", m.Record)
+		}
+		if len(m.Primary) != 1 || m.Primary[0] != "primary" {
+			t.Errorf("primary = %v, want [primary]", m.Primary)
 		}
 	})
 }
