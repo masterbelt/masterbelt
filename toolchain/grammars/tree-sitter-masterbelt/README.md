@@ -45,11 +45,15 @@ subdirectory). The mirror is generated, never hand-edited.
 
 - `make publish-tree-sitter` assembles the standalone package tree (this
   directory flattened to a root, the dev-only test harness dropped, the MIT
-  license and a consumer README added) into `dist/tree-sitter-masterbelt`.
-- The `tree-sitter` workflow's `publish` job (a manual dispatch) regenerates,
-  verifies, assembles, and — when a token is configured — syncs the tree to the
-  mirror, pushing its rolling default branch and an immutable `v<version>-<sha>`
-  tag for editors to pin (never a moving reference).
+  license and a consumer README added) into `dist/tree-sitter-masterbelt`,
+  stamped with masterbelt's own commit-derived version (the grammar ships under
+  the same version as the language it tracks).
+- The **nightly** workflow's `tree-sitter` job rides along with the CLI and
+  vsix releases: it verifies, runs the grammar tests, assembles, and — when the
+  App is configured — syncs the tree to the mirror, pushing its rolling default
+  branch and an immutable `v<version>` tag (the version carries the commit SHA,
+  so it never moves) for editors to pin. Token-less, it degrades to an
+  artifact.
 
 **Bring-up (one-time, human):**
 
@@ -67,10 +71,11 @@ subdirectory). The mirror is generated, never hand-edited.
    Each run mints a token scoped to that one repo and to Contents alone
    (`permission-contents: write`), expiring in ~1h and revoked at job end —
    even the App's own broader permissions do not travel. Without the secrets
-   the publish job still runs but only uploads the assembled tree as an
-   artifact — it never fails.
-3. Run the `tree-sitter` workflow via *Run workflow* (workflow_dispatch) to do
-   the first sync, and verify the mirror.
+   the nightly's `tree-sitter` job still runs but only uploads the assembled
+   tree as an artifact — it never fails.
+3. Trigger the **nightly** workflow via *Run workflow* (or wait for the
+   schedule) to do the first sync, and verify the mirror. The grammar then
+   re-syncs on every nightly that changes it.
 4. Add the `tree-sitter` check to this repo's branch protection so the grammar
    gate is required, alongside `go` and `vscode`.
 
