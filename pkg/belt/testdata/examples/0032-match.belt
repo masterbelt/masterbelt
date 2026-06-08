@@ -14,7 +14,7 @@ pub type GameValue = Coin | Level
 
 pub fn describe(v: GameValue): string {
   match v {
-    Coin c -> return "coin"        // c is narrowed to Coin inside the arm
+    Coin c -> return "coin" // c is narrowed to Coin inside the arm
     Level l -> return "level"
   }
 }

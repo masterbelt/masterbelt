@@ -6,10 +6,10 @@
 // rather than echo the source's whitespace, it regenerates indentation from the
 // bracket nesting and the space between tokens from the grammar, so the layout
 // is a function of the tree, not of the input. Line breaks are still reproduced
-// as they were (normalising those is a later pass), and whitespace touching a
-// comment is preserved verbatim (comment placement is a later pass too).
-// Regenerating all spacing is what makes the result idempotent and independent
-// of however the input was spaced.
+// as they were (normalising those is a later pass), and a trailing comment is
+// set off from the code before it by a single space rather than whatever
+// alignment the input used. Regenerating all spacing is what makes the result
+// idempotent and independent of however the input was spaced.
 //
 // Indentation tracks the line each open bracket was opened on, not a raw bracket
 // count, so brackets that open together and stay open — `.map(fn(x) {` — hug
@@ -42,9 +42,8 @@ func Print(buf source.Buffer, node cst.Green, indent string) string {
 // printer carries the running render state: the output and indent unit; the
 // stack of open brackets (each holding the indent level of the line it opened
 // on) and the current line's indent level; whether the next token begins a line;
-// the previous token's kind, parent, and whether it was a comment (for spacing);
-// and any whitespace seen since the last token (kept only to reproduce spacing
-// around comments).
+// and the previous token's kind, parent, and whether it was a comment (all for
+// deciding the inter-token spacing).
 type printer struct {
 	b           strings.Builder
 	indent      string
@@ -54,7 +53,6 @@ type printer struct {
 	prevKind    token.Kind
 	prevParent  cst.Kind
 	prevComment bool
-	pendingWS   string
 }
 
 // walk renders a positioned element: a leaf goes through leaf with its immediate
@@ -70,21 +68,18 @@ func (p *printer) walk(buf source.Buffer, t cst.Tree, parent cst.Kind) {
 	}
 }
 
-// leaf renders one token. A newline opens a new line; whitespace is buffered
-// (and emitted only to reproduce spacing around comments, otherwise dropped). A
-// significant token at the start of a line is preceded by the regenerated
-// indent; mid-line it is preceded by a single space or none per spaceBetween —
-// except next to a comment, where the original whitespace is reproduced so
-// comment placement is left to a later pass.
+// leaf renders one token. A newline opens a new line; whitespace is dropped (all
+// spacing is regenerated). A significant token at the start of a line is preceded
+// by the regenerated indent; mid-line it is preceded by a single space or none
+// per spaceBetween — except next to a comment, which a single space always sets
+// off from the code on its line.
 func (p *printer) leaf(kind token.Kind, parent cst.Kind, text string) {
 	switch kind {
 	case token.Newline:
 		p.b.WriteByte('\n')
 		p.atLineStart = true
-		p.pendingWS = ""
 		return
 	case token.Whitespace:
-		p.pendingWS += text
 		return
 	}
 
@@ -105,7 +100,7 @@ func (p *printer) leaf(kind token.Kind, parent cst.Kind, text string) {
 	} else {
 		switch {
 		case comment || p.prevComment:
-			p.b.WriteString(p.pendingWS)
+			p.b.WriteByte(' ')
 		case spaceBetween(p.prevKind, kind, p.prevParent, parent):
 			p.b.WriteByte(' ')
 		}
@@ -113,7 +108,6 @@ func (p *printer) leaf(kind token.Kind, parent cst.Kind, text string) {
 			p.pop()
 		}
 	}
-	p.pendingWS = ""
 
 	if !comment && isOpen(kind) {
 		p.stack = append(p.stack, p.lineIndent)

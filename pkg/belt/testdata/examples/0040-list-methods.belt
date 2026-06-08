@@ -7,29 +7,29 @@
 // never mutating the receiver.
 
 // + over two lists concatenates, as before.
-const Joined = [1, 2] + [3, 4]          // [1, 2, 3, 4]
+const Joined = [1, 2] + [3, 4] // [1, 2, 3, 4]
 
 // + with an element appends it: the add(element: T) overload.
-const Added = [1, 2] + 3                // [1, 2, 3]
+const Added = [1, 2] + 3 // [1, 2, 3]
 
 // The overloads resolve by the operand's type even when T is itself a list:
 // [3] is one element of list<list<nint>>, so it appends as one element.
-const NestedAdd = [[1], [2]] + [3]      // [[1], [2], [3]]
+const NestedAdd = [[1], [2]] + [3] // [[1], [2], [3]]
 
 // push is the method spelling of the element append (the old append, renamed).
-const Pushed = [1, 2].push(3)           // [1, 2, 3]
+const Pushed = [1, 2].push(3) // [1, 2, 3]
 
 // unshift is push's front-side mirror: the element goes first.
-const Unshifted = [2, 3].unshift(1)     // [1, 2, 3]
+const Unshifted = [2, 3].unshift(1) // [1, 2, 3]
 
 // pop reads the last element, shift the first. Each yields optional<T> — the
 // element when one exists, null when the list is empty — so an empty read is
 // a value to branch on, not an error.
 const Empty: list<nint> = []
-const Last = [1, 2, 3].pop()            // 3
-const NoLast = Empty.pop()              // null
-const First = [1, 2, 3].shift()         // 1
-const NoFirst = Empty.shift()           // null
+const Last = [1, 2, 3].pop() // 3
+const NoLast = Empty.pop() // null
+const First = [1, 2, 3].shift() // 1
+const NoFirst = Empty.shift() // null
 
 // match narrows the optional result, so a folded element flows on as nint.
 pub fn orZero(v: optional<nint>): nint {

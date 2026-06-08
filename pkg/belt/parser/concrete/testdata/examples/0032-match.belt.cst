@@ -126,7 +126,7 @@ File
             Whitespace " "
             Literal
               String "\"coin\""
-        Whitespace "        "
+        Whitespace " "
         LineComment "// c is narrowed to Coin inside the arm"
         Newline "\n"
         Whitespace "    "

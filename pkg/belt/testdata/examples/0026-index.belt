@@ -43,5 +43,5 @@ pub fn put(): map<string, nint> {
 
 // The writes fold end to end: calling the writers produces the new collections,
 // so the rebind and the set folding are visible in the constants.
-const Bumped = bumpFirst()        // [99, 2, 3]
-const Put = put()              // ["a": 10, "b": 2]
+const Bumped = bumpFirst() // [99, 2, 3]
+const Put = put() // ["a": 10, "b": 2]

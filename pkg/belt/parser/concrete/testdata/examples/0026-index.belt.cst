@@ -401,7 +401,7 @@ File
         LParen "("
         RParen ")"
   ConstDecl
-    Whitespace "        "
+    Whitespace " "
     LineComment "// [99, 2, 3]"
     Newline "\n"
     Const "const"
@@ -416,7 +416,7 @@ File
           Ident "put"
         LParen "("
         RParen ")"
-  Whitespace "              "
+  Whitespace " "
   LineComment "// [\"a\": 10, \"b\": 2]"
   Newline "\n"
   EOF ""

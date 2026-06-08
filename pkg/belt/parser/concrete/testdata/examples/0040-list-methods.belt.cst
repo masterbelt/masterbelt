@@ -48,7 +48,7 @@ File
             Int "4"
           RBracket "]"
   ConstDecl
-    Whitespace "          "
+    Whitespace " "
     LineComment "// [1, 2, 3, 4]"
     Newline "\n"
     Newline "\n"
@@ -77,7 +77,7 @@ File
         Literal
           Int "3"
   ConstDecl
-    Whitespace "                "
+    Whitespace " "
     LineComment "// [1, 2, 3]"
     Newline "\n"
     Newline "\n"
@@ -117,7 +117,7 @@ File
             Int "3"
           RBracket "]"
   ConstDecl
-    Whitespace "      "
+    Whitespace " "
     LineComment "// [[1], [2], [3]]"
     Newline "\n"
     Newline "\n"
@@ -148,7 +148,7 @@ File
           Int "3"
         RParen ")"
   ConstDecl
-    Whitespace "           "
+    Whitespace " "
     LineComment "// [1, 2, 3]"
     Newline "\n"
     Newline "\n"
@@ -179,7 +179,7 @@ File
           Int "1"
         RParen ")"
   ConstDecl
-    Whitespace "     "
+    Whitespace " "
     LineComment "// [1, 2, 3]"
     Newline "\n"
     Newline "\n"
@@ -238,7 +238,7 @@ File
         LParen "("
         RParen ")"
   ConstDecl
-    Whitespace "            "
+    Whitespace " "
     LineComment "// 3"
     Newline "\n"
     Const "const"
@@ -257,7 +257,7 @@ File
         LParen "("
         RParen ")"
   ConstDecl
-    Whitespace "              "
+    Whitespace " "
     LineComment "// null"
     Newline "\n"
     Const "const"
@@ -287,7 +287,7 @@ File
         LParen "("
         RParen ")"
   ConstDecl
-    Whitespace "         "
+    Whitespace " "
     LineComment "// 1"
     Newline "\n"
     Const "const"
@@ -306,7 +306,7 @@ File
         LParen "("
         RParen ")"
   FuncDecl
-    Whitespace "           "
+    Whitespace " "
     LineComment "// null"
     Newline "\n"
     Newline "\n"
