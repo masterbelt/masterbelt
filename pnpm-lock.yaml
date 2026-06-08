@@ -49,6 +49,12 @@ importers:
         specifier: ^9.0.0
         version: 9.3.2
 
+  toolchain/grammars/tree-sitter-masterbelt:
+    devDependencies:
+      tree-sitter-cli:
+        specifier: 0.26.9
+        version: 0.26.9
+
 packages:
 
   '@babel/code-frame@7.29.7':
@@ -526,6 +532,11 @@ packages:
     resolution: {integrity: sha512-SHf/r48b7vOrjve9PxJo3MN5v5yuyjHvdUcrQffT3WXMUfnGmHDVbC4k3sHJaJTgZCwpUplIaAo5ANtMyp3YHg==}
     engines: {node: '>=18'}
 
+  tree-sitter-cli@0.26.9:
+    resolution: {integrity: sha512-7l+U1RmazPVe+yA/JiX80GFOILnL/j24GbawamIzNQC8UlINrcyECbaWGaG1wuq4j/m0DQTx7Uu4r0iW9Ao1BQ==}
+    engines: {node: '>=12.0.0'}
+    hasBin: true
+
   typescript@6.0.3:
     resolution: {integrity: sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw==}
     engines: {node: '>=14.17'}
@@ -988,6 +999,8 @@ snapshots:
       ansi-regex: 6.2.2
 
   tinyexec@1.2.4: {}
+
+  tree-sitter-cli@0.26.9: {}
 
   typescript@6.0.3: {}
 

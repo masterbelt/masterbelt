@@ -1,8 +1,10 @@
 packages:
   - toolchain/editors/vscode
+  - toolchain/grammars/tree-sitter-masterbelt
 
 allowBuilds:
   esbuild: true
+  tree-sitter-cli: true
 
 minimumReleaseAgeExclude:
   - commitlint-config-agent-coauthor@1.0.0
