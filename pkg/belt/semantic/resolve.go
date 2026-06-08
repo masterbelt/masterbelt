@@ -243,7 +243,11 @@ func foldOneAssocConst(folder exprFolder, defs map[string]*ir.TypeDef, fenv asso
 	}
 	binder := folder.binder(enumDefOf(ac.Type))
 	binder.universe = defs
-	v := eval.GraphExpecting(lower.Value(ac.Syntax.Value, binder), ac.Type, fenv)
+	// Keep the resolved graph for reachability before folding it away: it
+	// carries the references (a top-level const an assoc const reads) the folded
+	// value drops.
+	ac.ValueGraph = lower.Value(ac.Syntax.Value, binder)
+	v := eval.GraphExpecting(ac.ValueGraph, ac.Type, fenv)
 	if v == nil {
 		return false
 	}
@@ -990,9 +994,10 @@ func resolveEnumMembers(folder exprFolder, defs map[string]*ir.TypeDef, reg *bui
 			memberSeen[m.Name] = true
 		}
 
-		value, nextInt := enumMemberValue(folder, defs, m, isString, baseType, prevInt)
+		value, graph, nextInt := enumMemberValue(folder, defs, m, isString, baseType, prevInt)
 		prevInt = nextInt
 		def.Enum.Members[i].Value = value
+		def.Enum.Members[i].ValueGraph = graph
 		reportEnumMemberValueErrors(reg, m, value, base, baseType, isString, at, diags)
 	}
 }
@@ -1063,29 +1068,32 @@ func reportDuplicateMethod(rm *ir.Method, def *ir.TypeDef, m *ast.MethodDecl, at
 // base. nextInt is the counter the following member continues from — the folded
 // value when it is an integer, else prev+1 so auto-numbering survives an
 // unevaluable explicit value.
-func enumMemberValue(folder exprFolder, defs map[string]*ir.TypeDef, m *ast.EnumMember, isString bool, baseType ir.Type, prevInt *big.Int) (value *ir.Constant, nextInt *big.Int) {
+func enumMemberValue(folder exprFolder, defs map[string]*ir.TypeDef, m *ast.EnumMember, isString bool, baseType ir.Type, prevInt *big.Int) (value *ir.Constant, graph ir.Value, nextInt *big.Int) {
 	if m.Value != nil {
 		if folder.q != nil {
 			binder := folder.binder(nil)
 			binder.universe = defs
-			value = eval.GraphExpecting(lower.Value(m.Value, binder), baseType, assocGraphEnv{q: folder.q, defs: defs})
+			// Keep the resolved graph for reachability: a member's initializer may
+			// read a top-level const the folded value drops.
+			graph = lower.Value(m.Value, binder)
+			value = eval.GraphExpecting(graph, baseType, assocGraphEnv{q: folder.q, defs: defs})
 		}
 		if value != nil && value.Kind == ir.ConstInt {
-			return value, new(big.Int).Add(value.Int, big.NewInt(1))
+			return value, graph, new(big.Int).Add(value.Int, big.NewInt(1))
 		}
-		return value, nextIntCounter(prevInt)
+		return value, graph, nextIntCounter(prevInt)
 	}
 	if isString {
 		// A string base defaults a member to its own name.
 		if m.Name == "" {
-			return nil, prevInt
+			return nil, nil, prevInt
 		}
-		return ir.StringConstant(m.Name), prevInt
+		return ir.StringConstant(m.Name), nil, prevInt
 	}
 	// An integer base auto-numbers: zero for the first member, the previous
 	// value plus one thereafter.
 	n := nextIntCounter(prevInt)
-	return ir.IntConstant(n), new(big.Int).Add(n, big.NewInt(1))
+	return ir.IntConstant(n), nil, new(big.Int).Add(n, big.NewInt(1))
 }
 
 // nextIntCounter returns the next auto-numbering value: zero when there is no

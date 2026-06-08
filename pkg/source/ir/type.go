@@ -260,6 +260,12 @@ type EnumDef struct {
 type EnumMember struct {
 	Name  string
 	Value *Constant
+	// ValueGraph is the resolved initializer value graph (references bound),
+	// kept in memory so reachability and find-references can traverse what a
+	// member uses; nil for an auto-numbered or string-default member, which
+	// names nothing. tree:"-", like the other retained graphs: the text form
+	// renders Value, the folded outcome.
+	ValueGraph Value `tree:"-"`
 }
 
 // InterfaceDef is the description of an interface type: the names of its
@@ -381,10 +387,15 @@ type AssocConst struct {
 	Anchor  string
 	Public  bool
 	Doc     []string
-	Type    Type           // the resolved type of the constant's value
-	Value   *Constant      // the folded value, or nil when it could not be folded
-	Builtin bool           // value supplied by the registry (`= builtin`)
-	Syntax  *ast.ConstDecl `tree:"-"` // the declaration this was resolved from, or nil
+	Type    Type      // the resolved type of the constant's value
+	Value   *Constant // the folded value, or nil when it could not be folded
+	Builtin bool      // value supplied by the registry (`= builtin`)
+	// ValueGraph is the resolved initializer value graph (references bound),
+	// kept in memory so reachability and find-references can traverse what the
+	// constant uses; nil for a `= builtin` constant, which has no initializer.
+	// tree:"-", like the other retained graphs: the text form renders Value.
+	ValueGraph Value          `tree:"-"`
+	Syntax     *ast.ConstDecl `tree:"-"` // the declaration this was resolved from, or nil
 }
 
 // Stmt is a statement in a method body. It is a sealed interface; the only

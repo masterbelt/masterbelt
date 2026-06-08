@@ -81,7 +81,11 @@ func TestExplicitExclusions(t *testing.T) {
 		"Syntax":          true,
 		"EnumSyntax":      true,
 		"InterfaceSyntax": true,
-		"CondGraph":       true, // Assert: in-memory condition graph; the outcome is the contract
+		// The resolved value graphs kept in memory for reachability and
+		// find-references; the text form renders the folded outcome, not the
+		// graph (Assert.CondGraph, AssocConst.ValueGraph, EnumMember.ValueGraph).
+		"CondGraph":  true,
+		"ValueGraph": true,
 	}
 	for name, fields := range treeExcluded {
 		for _, field := range fields {
