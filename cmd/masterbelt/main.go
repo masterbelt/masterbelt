@@ -22,11 +22,11 @@ func run() int {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
-	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelWarn}))
-	slog.SetDefault(logger)
-
+	// The default logger is set up by the root command's pre-run, so its handler
+	// can honour --format; until then slog's built-in default carries any early
+	// error.
 	if err := cli.RootCmd.ExecuteContext(ctx); err != nil {
-		logger.Error("masterbelt exited", "err", err)
+		slog.Error("masterbelt exited", "err", err)
 		return 1
 	}
 	return 0

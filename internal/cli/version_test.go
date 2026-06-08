@@ -28,7 +28,7 @@ func execVersion(t *testing.T, args ...string) string {
 		RootCmd.SetOut(nil)
 		RootCmd.SetErr(nil)
 		RootCmd.SetArgs([]string{})
-		_ = VersionCmd.Flags().Set("format", "text")
+		_ = RootCmd.PersistentFlags().Set("reporter", reporterText)
 	})
 	if err := RootCmd.Execute(); err != nil {
 		t.Fatalf("version = %v\n%s", err, out.String())
@@ -51,12 +51,12 @@ func TestVersionText(t *testing.T) {
 
 func TestVersionJSON(t *testing.T) {
 	stampVersion(t)
-	out := execVersion(t, "--format=json")
+	out := execVersion(t, "--reporter=json")
 	var got struct {
 		Version, Channel, Commit, Date, Go, OS, Arch string
 	}
 	if err := json.Unmarshal([]byte(out), &got); err != nil {
-		t.Fatalf("version --format=json is not JSON: %v\n%s", err, out)
+		t.Fatalf("version --reporter=json is not JSON: %v\n%s", err, out)
 	}
 	if got.Version != "0.1.20260608+dfbe69a" || got.Channel != "nightly" {
 		t.Errorf("json identity = %+v", got)

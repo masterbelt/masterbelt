@@ -24,7 +24,7 @@ func TestStatsFlagEmitsReuseProfile(t *testing.T) {
 		RootCmd.SetOut(nil)
 		RootCmd.SetErr(nil)
 		RootCmd.SetArgs([]string{})
-		_ = IRCmd.Flags().Set("format", "text")
+		_ = RootCmd.PersistentFlags().Set("reporter", reporterText)
 		_ = RootCmd.PersistentFlags().Set("stats", "")
 		profileState.stats = nil
 	})

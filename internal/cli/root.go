@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"runtime"
 	"runtime/pprof"
@@ -38,6 +39,10 @@ func init() {
 	// NoOptDefVal lets bare --stats stand without swallowing the next argument
 	// as its value; the sentinel routes to stderr, an explicit =PATH to a file.
 	f.Lookup("stats").NoOptDefVal = statsStderr
+	// --reporter is shared by the machine-readable subcommands (check, ir,
+	// version); on the root so one definition serves them all and the logger can
+	// honour it.
+	f.String("reporter", reporterText, "diagnostic reporter for check, ir, and version: text or json")
 	// OnFinalize runs after Execute whatever the outcome — the cleanup hook
 	// that survives a RunE error (PersistentPostRunE does not).
 	cobra.OnFinalize(finishProfiling)
@@ -47,6 +52,19 @@ func init() {
 // NoOptDefVal a bare --stats takes, distinct from any real file path.
 const statsStderr = "\x00stderr"
 
+// configureLogger installs the run's default slog logger — the one initialized
+// here rather than in main so the choice can read the run's flags. It logs at
+// warning level to stderr, as JSON when the machine-readable --reporter=json is
+// requested (so logs share the output's shape) and as text otherwise.
+func configureLogger(cmd *cobra.Command) {
+	opts := &slog.HandlerOptions{Level: slog.LevelWarn}
+	var h slog.Handler = slog.NewTextHandler(os.Stderr, opts)
+	if kind, _ := cmd.Flags().GetString("reporter"); kind == reporterJSON {
+		h = slog.NewJSONHandler(os.Stderr, opts)
+	}
+	slog.SetDefault(slog.New(h))
+}
+
 // RootCmd is the masterbelt root command every subcommand hangs off; main
 // executes it after wiring the process context and logger.
 var RootCmd = &cobra.Command{
@@ -55,7 +73,16 @@ var RootCmd = &cobra.Command{
 	Long:              "masterbelt is the toolchain for the masterbelt language.\n\nRun a subcommand such as `masterbelt lsp` to start the language server.",
 	SilenceUsage:      true,
 	SilenceErrors:     true,
-	PersistentPreRunE: startProfiling,
+	PersistentPreRunE: prepareRun,
+}
+
+// prepareRun is the root's single pre-run hook. cobra runs exactly one
+// PersistentPreRunE, so the two independent setup concerns — configuring the
+// run's logger and starting its profiling captures — are sequenced here rather
+// than entangled in one function.
+func prepareRun(cmd *cobra.Command, args []string) error {
+	configureLogger(cmd)
+	return startProfiling(cmd, args)
 }
 
 // profileState holds the running command's profiling lifecycle: the open CPU
@@ -171,7 +198,7 @@ func writeHeapProfile(path string, errOut io.Writer) {
 
 // writeStats emits the recorded stats as JSON when --stats was set and the
 // subcommand produced a report. An empty flag value writes to stderr (stdout
-// is the command's own output channel, e.g. check --format=json); a path
+// is the command's own output channel, e.g. check --reporter=json); a path
 // writes there.
 func writeStats() error {
 	if profileState.statsDest == "" || profileState.stats == nil {

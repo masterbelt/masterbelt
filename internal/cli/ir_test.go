@@ -23,7 +23,7 @@ func execIR(t *testing.T, args ...string) (string, error) {
 		RootCmd.SetOut(nil)
 		RootCmd.SetErr(nil)
 		RootCmd.SetArgs([]string{})
-		_ = IRCmd.Flags().Set("format", "text")
+		_ = RootCmd.PersistentFlags().Set("reporter", reporterText)
 	})
 	err := RootCmd.Execute()
 	return out.String(), err
@@ -57,9 +57,9 @@ func TestIRJSON(t *testing.T) {
 	belttest.WriteFile(t, root, "main.belt", "const A = 1\n")
 	path := filepath.Join(root, "main.belt")
 
-	out, err := execIR(t, path, "--format", "json")
+	out, err := execIR(t, path, "--reporter", "json")
 	if err != nil {
-		t.Fatalf("ir --format json = %v\n%s", err, out)
+		t.Fatalf("ir --reporter json = %v\n%s", err, out)
 	}
 	var doc struct {
 		File string `json:"file"`

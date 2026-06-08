@@ -9,14 +9,11 @@ import (
 
 	"github.com/masterbelt/masterbelt/pkg/belt/parser/abstract"
 	"github.com/masterbelt/masterbelt/pkg/belt/semantic"
-	"github.com/masterbelt/masterbelt/pkg/diagnostic"
-	"github.com/masterbelt/masterbelt/pkg/diagnostic/reporter"
 	"github.com/masterbelt/masterbelt/pkg/source"
 )
 
 func init() {
 	RootCmd.AddCommand(IRCmd)
-	IRCmd.Flags().String("format", formatText, "output format: text or json")
 }
 
 // IRCmd dumps a file's resolved IR in the exact text representation:
@@ -59,7 +56,10 @@ var IRCmd = &cobra.Command{
 
 		raw := gatherDiagnostics(doc, prog, id)
 		if len(raw) > 0 {
-			rep := reporter.NewText(cmd.ErrOrStderr(), diagnostic.DefaultLocale)
+			rep, err := newReporter(cmd, cmd.ErrOrStderr())
+			if err != nil {
+				return err
+			}
 			rep.Report(source.NewFile(displayPath(args[0]), data), raw)
 			if err := rep.Flush(); err != nil {
 				return err
@@ -70,16 +70,16 @@ var IRCmd = &cobra.Command{
 		}
 		module := prog.Module(id)
 
-		format, _ := cmd.Flags().GetString("format")
-		switch format {
-		case formatText:
+		kind, _ := cmd.Flags().GetString("reporter")
+		switch kind {
+		case reporterText:
 			text, err := module.MarshalText()
 			if err != nil {
 				return err
 			}
 			_, err = cmd.OutOrStdout().Write(text)
 			return err
-		case formatJSON:
+		case reporterJSON:
 			// The module implements encoding.TextMarshaler, so json.Marshal
 			// embeds the exact text form with no further code.
 			out, err := json.MarshalIndent(map[string]any{
@@ -92,7 +92,7 @@ var IRCmd = &cobra.Command{
 			_, err = fmt.Fprintln(cmd.OutOrStdout(), string(out))
 			return err
 		default:
-			return fmt.Errorf("unknown format %q (want text or json)", format)
+			return fmt.Errorf("unknown reporter %q (want text or json)", kind)
 		}
 	},
 }

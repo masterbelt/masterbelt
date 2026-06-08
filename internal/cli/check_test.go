@@ -23,7 +23,7 @@ func execCheck(t *testing.T, args ...string) (string, error) {
 		RootCmd.SetErr(nil)
 		RootCmd.SetArgs([]string{})
 		// Flag values persist on the command between Execute calls.
-		_ = CheckCmd.Flags().Set("format", "text")
+		_ = RootCmd.PersistentFlags().Set("reporter", reporterText)
 		_ = CheckCmd.Flags().Set("locale", "en")
 		_ = CheckCmd.Flags().Set("profile", "")
 	})
@@ -142,7 +142,7 @@ func TestCheckJSON(t *testing.T) {
 	belttest.WriteFile(t, root, "masterbelt.toml", "entry = \"main.belt\"\n")
 	belttest.WriteFile(t, root, "main.belt", "const A = B\n")
 
-	out, err := execCheck(t, "--format=json", root)
+	out, err := execCheck(t, "--reporter=json", root)
 	if err == nil {
 		t.Fatalf("check succeeded, want an error\n%s", out)
 	}
@@ -201,7 +201,7 @@ func TestCheckJSONClean(t *testing.T) {
 	belttest.WriteFile(t, root, "masterbelt.toml", "entry = \"main.belt\"\n")
 	belttest.WriteFile(t, root, "main.belt", "const A = 1\n")
 
-	out, err := execCheck(t, "--format=json", root)
+	out, err := execCheck(t, "--reporter=json", root)
 	if err != nil {
 		t.Fatalf("check = %v\n%s", err, out)
 	}
@@ -220,7 +220,7 @@ func TestCheckJSONManifestError(t *testing.T) {
 	root := t.TempDir()
 	belttest.WriteFile(t, root, "masterbelt.toml", "name = \"broken\"\n")
 
-	out, err := execCheck(t, "--format=json", root)
+	out, err := execCheck(t, "--reporter=json", root)
 	if err == nil {
 		t.Fatalf("check succeeded, want an error\n%s", out)
 	}
@@ -280,13 +280,13 @@ func TestCheckUnknownProfile(t *testing.T) {
 	}
 }
 
-func TestCheckUnknownFormat(t *testing.T) {
+func TestCheckUnknownReporter(t *testing.T) {
 	root := t.TempDir()
 	belttest.WriteFile(t, root, "masterbelt.toml", "entry = \"main.belt\"\n")
 	belttest.WriteFile(t, root, "main.belt", "const A = 1\n")
 
-	if out, err := execCheck(t, "--format=yaml", root); err == nil || !strings.Contains(err.Error(), "unknown format") {
-		t.Errorf("check = %v, want an unknown-format error\n%s", err, out)
+	if out, err := execCheck(t, "--reporter=yaml", root); err == nil || !strings.Contains(err.Error(), "unknown reporter") {
+		t.Errorf("check = %v, want an unknown-reporter error\n%s", err, out)
 	}
 }
 
