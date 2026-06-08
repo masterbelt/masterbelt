@@ -2,6 +2,7 @@ Module
   Consts:
     Const
       Name: "Origin"
+      Anchor: "belt:/Origin"
       Public: false
       Doc: ~
       Type: Named
@@ -80,6 +81,7 @@ Module
         UnionTag: ~
     Const
       Name: "P"
+      Anchor: "belt:/P"
       Public: false
       Doc: ~
       Type: Named
@@ -158,6 +160,7 @@ Module
         UnionTag: ~
     Const
       Name: "Q"
+      Anchor: "belt:/Q"
       Public: false
       Doc: ~
       Type: Named
@@ -236,6 +239,7 @@ Module
         UnionTag: ~
     Const
       Name: "Sword"
+      Anchor: "belt:/Sword"
       Public: false
       Doc: ~
       Type: Named
@@ -390,6 +394,7 @@ Module
         UnionTag: ~
     Const
       Name: "Path"
+      Anchor: "belt:/Path"
       Public: false
       Doc: ~
       Type: App
@@ -575,6 +580,7 @@ Module
         UnionTag: ~
     Const
       Name: "U"
+      Anchor: "belt:/U"
       Public: false
       Doc: ~
       Type: Named
@@ -604,6 +610,7 @@ Module
   Types:
     TypeDef
       Name: "Point"
+      Anchor: "belt:/Point"
       Public: true
       Doc: ~
       Params: ~
@@ -626,6 +633,7 @@ Module
       Where: ~
     TypeDef
       Name: "Item"
+      Anchor: "belt:/Item"
       Public: true
       Doc: ~
       Params: ~
@@ -652,6 +660,7 @@ Module
       Where: ~
     TypeDef
       Name: "Unit"
+      Anchor: "belt:/Unit"
       Public: true
       Doc: ~
       Params: ~

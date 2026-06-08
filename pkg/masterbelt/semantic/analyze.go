@@ -68,12 +68,13 @@ func AnalyzeProgram(docs map[FileID]*abstract.Document, uses map[FileID]map[*ast
 // the owning module publishes, which is what makes the IR one pointer graph.
 func constShells(files map[FileID]*ast.File) map[*ast.ConstDecl]*ir.Const {
 	shells := map[*ast.ConstDecl]*ir.Const{}
-	for _, f := range files {
+	for id, f := range files {
 		if f == nil {
 			continue
 		}
+		module := moduleSegment(id)
 		for _, decl := range f.Decls {
-			shells[decl] = &ir.Const{Name: decl.Name, Public: decl.Public, Doc: decl.Doc, Syntax: decl}
+			shells[decl] = &ir.Const{Name: decl.Name, Anchor: declAnchor(module, decl.Name), Public: decl.Public, Doc: decl.Doc, Syntax: decl}
 		}
 	}
 	return shells
@@ -84,12 +85,13 @@ func constShells(files map[FileID]*ast.File) map[*ast.ConstDecl]*ir.Const {
 // values bind to the same objects the owning module publishes.
 func funcShells(files map[FileID]*ast.File) map[*ast.FuncDecl]*ir.Function {
 	shells := map[*ast.FuncDecl]*ir.Function{}
-	for _, f := range files {
+	for id, f := range files {
 		if f == nil {
 			continue
 		}
+		module := moduleSegment(id)
 		for _, fd := range f.Funcs {
-			shells[fd] = &ir.Function{Name: fd.Name, Public: fd.Public, Doc: fd.Doc, Syntax: fd}
+			shells[fd] = &ir.Function{Name: fd.Name, Anchor: declAnchor(module, fd.Name), Public: fd.Public, Doc: fd.Doc, Syntax: fd}
 		}
 	}
 	return shells

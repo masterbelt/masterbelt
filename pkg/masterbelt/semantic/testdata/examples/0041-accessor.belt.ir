@@ -2,6 +2,7 @@ Module
   Consts:
     Const
       Name: "Freezing"
+      Anchor: "belt:/Freezing"
       Public: false
       Doc: ~
       Type: Named
@@ -52,6 +53,7 @@ Module
         UnionTag: ~
     Const
       Name: "FreezingF"
+      Anchor: "belt:/FreezingF"
       Public: false
       Doc: ~
       Type: Builtin
@@ -83,6 +85,7 @@ Module
         UnionTag: ~
     Const
       Name: "FromBoiling"
+      Anchor: "belt:/FromBoiling"
       Public: false
       Doc: ~
       Type: Named
@@ -137,6 +140,7 @@ Module
         UnionTag: ~
     Const
       Name: "Roundtrip"
+      Anchor: "belt:/Roundtrip"
       Public: false
       Doc: ~
       Type: Named
@@ -195,6 +199,7 @@ Module
         UnionTag: ~
     Const
       Name: "Full"
+      Anchor: "belt:/Full"
       Public: false
       Doc: ~
       Type: Named
@@ -226,6 +231,7 @@ Module
         UnionTag: ~
     Const
       Name: "Default"
+      Anchor: "belt:/Default"
       Public: false
       Doc: ~
       Type: Named
@@ -258,6 +264,7 @@ Module
   Types:
     TypeDef
       Name: "Celsius"
+      Anchor: "belt:/Celsius"
       Public: true
       Doc: ~
       Params: ~
@@ -270,6 +277,7 @@ Module
       Methods:
         Method
           Name: "freezing"
+          Anchor: "belt:/Celsius#freezing"
           Public: true
           Extern: false
           Kind: 3
@@ -294,6 +302,7 @@ Module
           Owner: "Celsius"
         Method
           Name: "fromF"
+          Anchor: "belt:/Celsius#fromF"
           Public: true
           Extern: false
           Kind: 3
@@ -358,6 +367,7 @@ Module
           Owner: "Celsius"
         Method
           Name: "fromF"
+          Anchor: "belt:/Celsius#fromF"
           Public: true
           Extern: false
           Kind: 3
@@ -379,6 +389,7 @@ Module
           Owner: "Celsius"
         Method
           Name: "fahrenheit"
+          Anchor: "belt:/Celsius#fahrenheit"
           Public: true
           Extern: false
           Kind: 1
@@ -435,6 +446,7 @@ Module
           Owner: "Celsius"
         Method
           Name: "fahrenheit"
+          Anchor: "belt:/Celsius#fahrenheit"
           Public: true
           Extern: false
           Kind: 2
@@ -504,6 +516,7 @@ Module
       Where: ~
     TypeDef
       Name: "Health"
+      Anchor: "belt:/Health"
       Public: true
       Doc: ~
       Params: ~
@@ -512,6 +525,7 @@ Module
       Methods:
         Method
           Name: "full"
+          Anchor: "belt:/Health#full"
           Public: true
           Extern: false
           Kind: 3
@@ -533,6 +547,7 @@ Module
           Owner: "Health"
         Method
           Name: "band"
+          Anchor: "belt:/Health#band"
           Public: true
           Extern: false
           Kind: 1
@@ -566,6 +581,7 @@ Module
       Consts:
         AssocConst
           Name: "Max"
+          Anchor: "belt:/Health#Max"
           Public: true
           Doc: "The maximum health."
           Type: Builtin
@@ -595,6 +611,7 @@ Module
       Where: ~
     TypeDef
       Name: "Element"
+      Anchor: "belt:/Element"
       Public: true
       Doc: ~
       Params: ~
@@ -602,6 +619,7 @@ Module
       Methods:
         Method
           Name: "eql"
+          Anchor: "belt:/Element#eql"
           Public: true
           Extern: true
           Kind: 0
@@ -617,6 +635,7 @@ Module
           Owner: "Element"
         Method
           Name: "neq"
+          Anchor: "belt:/Element#neq"
           Public: true
           Extern: true
           Kind: 0
@@ -632,6 +651,7 @@ Module
           Owner: "Element"
         Method
           Name: "lt"
+          Anchor: "belt:/Element#lt"
           Public: true
           Extern: true
           Kind: 0
@@ -647,6 +667,7 @@ Module
           Owner: "Element"
         Method
           Name: "lteq"
+          Anchor: "belt:/Element#lteq"
           Public: true
           Extern: true
           Kind: 0
@@ -662,6 +683,7 @@ Module
           Owner: "Element"
         Method
           Name: "gt"
+          Anchor: "belt:/Element#gt"
           Public: true
           Extern: true
           Kind: 0
@@ -677,6 +699,7 @@ Module
           Owner: "Element"
         Method
           Name: "gteq"
+          Anchor: "belt:/Element#gteq"
           Public: true
           Extern: true
           Kind: 0
@@ -692,6 +715,7 @@ Module
           Owner: "Element"
         Method
           Name: "hot"
+          Anchor: "belt:/Element#hot"
           Public: true
           Extern: false
           Kind: 1
@@ -721,6 +745,7 @@ Module
           Owner: "Element"
         Method
           Name: "base"
+          Anchor: "belt:/Element#base"
           Public: true
           Extern: false
           Kind: 3
@@ -809,6 +834,7 @@ Module
   Funcs:
     Function
       Name: "boiling"
+      Anchor: "belt:/boiling"
       Public: false
       Extern: false
       Effects: ~

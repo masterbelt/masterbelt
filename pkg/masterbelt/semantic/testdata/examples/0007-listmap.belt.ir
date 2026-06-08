@@ -2,6 +2,7 @@ Module
   Consts:
     Const
       Name: "Doubled"
+      Anchor: "belt:/Doubled"
       Public: false
       Doc: ~
       Type: App
@@ -163,6 +164,7 @@ Module
         UnionTag: ~
     Const
       Name: "Evens"
+      Anchor: "belt:/Evens"
       Public: false
       Doc: ~
       Type: App

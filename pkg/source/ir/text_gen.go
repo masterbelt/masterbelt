@@ -218,6 +218,7 @@ func (n *Assign) MarshalText() ([]byte, error) {
 // writeAssocConst emits n's fields beneath an already-written heading line.
 func writeAssocConst(w *treetext.Writer, n *AssocConst, depth int) error {
 	w.Line(depth, "Name: "+strconv.Quote(n.Name))
+	w.Line(depth, "Anchor: "+strconv.Quote(n.Anchor))
 	w.Line(depth, "Public: "+strconv.FormatBool(n.Public))
 	w.Line(depth, "Doc: "+treetext.QuoteStrings(n.Doc))
 	if err := writeTypeField(w, depth, "Type", n.Type); err != nil {
@@ -237,7 +238,7 @@ func writeAssocConst(w *treetext.Writer, n *AssocConst, depth int) error {
 
 // decodeAssocConst builds a AssocConst from its element.
 func decodeAssocConst(e *treetext.Element) (*AssocConst, error) {
-	if err := treetext.ExpectFields(e, "Name", "Public", "Doc", "Type", "Value", "Builtin"); err != nil {
+	if err := treetext.ExpectFields(e, "Name", "Anchor", "Public", "Doc", "Type", "Value", "Builtin"); err != nil {
 		return nil, err
 	}
 	n := &AssocConst{}
@@ -246,22 +247,27 @@ func decodeAssocConst(e *treetext.Element) (*AssocConst, error) {
 	} else {
 		n.Name = v
 	}
-	if v, err := treetext.Bool(e.Fields[1]); err != nil {
+	if v, err := treetext.String(e.Fields[1]); err != nil {
+		return nil, err
+	} else {
+		n.Anchor = v
+	}
+	if v, err := treetext.Bool(e.Fields[2]); err != nil {
 		return nil, err
 	} else {
 		n.Public = v
 	}
-	if v, err := treetext.Strings(e.Fields[2]); err != nil {
+	if v, err := treetext.Strings(e.Fields[3]); err != nil {
 		return nil, err
 	} else {
 		n.Doc = v
 	}
-	if v, err := decodeTypeField(e.Fields[3]); err != nil {
+	if v, err := decodeTypeField(e.Fields[4]); err != nil {
 		return nil, err
 	} else {
 		n.Type = v
 	}
-	switch f := e.Fields[4]; {
+	switch f := e.Fields[5]; {
 	case f.Inline == treetext.Nil:
 	case f.Node == nil || f.Node.Head != "Constant":
 		return nil, fmt.Errorf("treetext: line %d: field %s: expected a Constant", f.Line, f.Name)
@@ -272,7 +278,7 @@ func decodeAssocConst(e *treetext.Element) (*AssocConst, error) {
 		}
 		n.Value = v
 	}
-	if v, err := treetext.Bool(e.Fields[5]); err != nil {
+	if v, err := treetext.Bool(e.Fields[6]); err != nil {
 		return nil, err
 	} else {
 		n.Builtin = v
@@ -623,6 +629,7 @@ func (n *CollectionLiteral) MarshalText() ([]byte, error) {
 // writeConst emits n's fields beneath an already-written heading line.
 func writeConst(w *treetext.Writer, n *Const, depth int) error {
 	w.Line(depth, "Name: "+strconv.Quote(n.Name))
+	w.Line(depth, "Anchor: "+strconv.Quote(n.Anchor))
 	w.Line(depth, "Public: "+strconv.FormatBool(n.Public))
 	w.Line(depth, "Doc: "+treetext.QuoteStrings(n.Doc))
 	if err := writeTypeField(w, depth, "Type", n.Type); err != nil {
@@ -644,7 +651,7 @@ func writeConst(w *treetext.Writer, n *Const, depth int) error {
 
 // decodeConst builds a Const from its element.
 func decodeConst(e *treetext.Element) (*Const, error) {
-	if err := treetext.ExpectFields(e, "Name", "Public", "Doc", "Type", "Value", "Eval"); err != nil {
+	if err := treetext.ExpectFields(e, "Name", "Anchor", "Public", "Doc", "Type", "Value", "Eval"); err != nil {
 		return nil, err
 	}
 	n := &Const{}
@@ -653,27 +660,32 @@ func decodeConst(e *treetext.Element) (*Const, error) {
 	} else {
 		n.Name = v
 	}
-	if v, err := treetext.Bool(e.Fields[1]); err != nil {
+	if v, err := treetext.String(e.Fields[1]); err != nil {
+		return nil, err
+	} else {
+		n.Anchor = v
+	}
+	if v, err := treetext.Bool(e.Fields[2]); err != nil {
 		return nil, err
 	} else {
 		n.Public = v
 	}
-	if v, err := treetext.Strings(e.Fields[2]); err != nil {
+	if v, err := treetext.Strings(e.Fields[3]); err != nil {
 		return nil, err
 	} else {
 		n.Doc = v
 	}
-	if v, err := decodeTypeField(e.Fields[3]); err != nil {
+	if v, err := decodeTypeField(e.Fields[4]); err != nil {
 		return nil, err
 	} else {
 		n.Type = v
 	}
-	if v, err := decodeValueField(e.Fields[4]); err != nil {
+	if v, err := decodeValueField(e.Fields[5]); err != nil {
 		return nil, err
 	} else {
 		n.Value = v
 	}
-	switch f := e.Fields[5]; {
+	switch f := e.Fields[6]; {
 	case f.Inline == treetext.Nil:
 	case f.Node == nil || f.Node.Head != "Constant":
 		return nil, fmt.Errorf("treetext: line %d: field %s: expected a Constant", f.Line, f.Name)
@@ -1653,6 +1665,7 @@ func (n *FuncLiteral) MarshalText() ([]byte, error) {
 // writeFunction emits n's fields beneath an already-written heading line.
 func writeFunction(w *treetext.Writer, n *Function, depth int) error {
 	w.Line(depth, "Name: "+strconv.Quote(n.Name))
+	w.Line(depth, "Anchor: "+strconv.Quote(n.Anchor))
 	w.Line(depth, "Public: "+strconv.FormatBool(n.Public))
 	w.Line(depth, "Extern: "+strconv.FormatBool(n.Extern))
 	w.Line(depth, "Effects: "+treetext.QuoteStrings(n.Effects))
@@ -1701,7 +1714,7 @@ func writeFunction(w *treetext.Writer, n *Function, depth int) error {
 
 // decodeFunction builds a Function from its element.
 func decodeFunction(e *treetext.Element) (*Function, error) {
-	if err := treetext.ExpectFields(e, "Name", "Public", "Extern", "Effects", "Doc", "TypeParams", "Params", "Result", "Body"); err != nil {
+	if err := treetext.ExpectFields(e, "Name", "Anchor", "Public", "Extern", "Effects", "Doc", "TypeParams", "Params", "Result", "Body"); err != nil {
 		return nil, err
 	}
 	n := &Function{}
@@ -1710,27 +1723,32 @@ func decodeFunction(e *treetext.Element) (*Function, error) {
 	} else {
 		n.Name = v
 	}
-	if v, err := treetext.Bool(e.Fields[1]); err != nil {
+	if v, err := treetext.String(e.Fields[1]); err != nil {
 		return nil, err
 	} else {
-		n.Public = v
+		n.Anchor = v
 	}
 	if v, err := treetext.Bool(e.Fields[2]); err != nil {
 		return nil, err
 	} else {
-		n.Extern = v
+		n.Public = v
 	}
-	if v, err := treetext.Strings(e.Fields[3]); err != nil {
+	if v, err := treetext.Bool(e.Fields[3]); err != nil {
 		return nil, err
 	} else {
-		n.Effects = v
+		n.Extern = v
 	}
 	if v, err := treetext.Strings(e.Fields[4]); err != nil {
 		return nil, err
 	} else {
+		n.Effects = v
+	}
+	if v, err := treetext.Strings(e.Fields[5]); err != nil {
+		return nil, err
+	} else {
 		n.Doc = v
 	}
-	switch f := e.Fields[5]; {
+	switch f := e.Fields[6]; {
 	case f.Inline == treetext.Nil:
 	case f.Items == nil:
 		return nil, fmt.Errorf("treetext: line %d: field %s: expected a list", f.Line, f.Name)
@@ -1753,7 +1771,7 @@ func decodeFunction(e *treetext.Element) (*Function, error) {
 		}
 		n.TypeParams = out
 	}
-	switch f := e.Fields[6]; {
+	switch f := e.Fields[7]; {
 	case f.Inline == treetext.Nil:
 	case f.Items == nil:
 		return nil, fmt.Errorf("treetext: line %d: field %s: expected a list", f.Line, f.Name)
@@ -1772,12 +1790,12 @@ func decodeFunction(e *treetext.Element) (*Function, error) {
 		}
 		n.Params = out
 	}
-	if v, err := decodeTypeField(e.Fields[7]); err != nil {
+	if v, err := decodeTypeField(e.Fields[8]); err != nil {
 		return nil, err
 	} else {
 		n.Result = v
 	}
-	switch f := e.Fields[8]; {
+	switch f := e.Fields[9]; {
 	case f.Inline == treetext.Nil:
 	case f.Items == nil:
 		return nil, fmt.Errorf("treetext: line %d: field %s: expected a list", f.Line, f.Name)
@@ -2242,6 +2260,7 @@ func decodeMatchArm(e *treetext.Element) (*MatchArm, error) {
 // writeMethod emits n's fields beneath an already-written heading line.
 func writeMethod(w *treetext.Writer, n *Method, depth int) error {
 	w.Line(depth, "Name: "+strconv.Quote(n.Name))
+	w.Line(depth, "Anchor: "+strconv.Quote(n.Anchor))
 	w.Line(depth, "Public: "+strconv.FormatBool(n.Public))
 	w.Line(depth, "Extern: "+strconv.FormatBool(n.Extern))
 	w.Line(depth, "Kind: "+strconv.Itoa(int(n.Kind)))
@@ -2277,7 +2296,7 @@ func writeMethod(w *treetext.Writer, n *Method, depth int) error {
 
 // decodeMethod builds a Method from its element.
 func decodeMethod(e *treetext.Element) (*Method, error) {
-	if err := treetext.ExpectFields(e, "Name", "Public", "Extern", "Kind", "Effects", "Doc", "Params", "Result", "Body", "Owner"); err != nil {
+	if err := treetext.ExpectFields(e, "Name", "Anchor", "Public", "Extern", "Kind", "Effects", "Doc", "Params", "Result", "Body", "Owner"); err != nil {
 		return nil, err
 	}
 	n := &Method{}
@@ -2286,32 +2305,37 @@ func decodeMethod(e *treetext.Element) (*Method, error) {
 	} else {
 		n.Name = v
 	}
-	if v, err := treetext.Bool(e.Fields[1]); err != nil {
+	if v, err := treetext.String(e.Fields[1]); err != nil {
 		return nil, err
 	} else {
-		n.Public = v
+		n.Anchor = v
 	}
 	if v, err := treetext.Bool(e.Fields[2]); err != nil {
 		return nil, err
 	} else {
+		n.Public = v
+	}
+	if v, err := treetext.Bool(e.Fields[3]); err != nil {
+		return nil, err
+	} else {
 		n.Extern = v
 	}
-	if v, err := treetext.Int(e.Fields[3]); err != nil {
+	if v, err := treetext.Int(e.Fields[4]); err != nil {
 		return nil, err
 	} else {
 		n.Kind = MethodKind(v)
 	}
-	if v, err := treetext.Strings(e.Fields[4]); err != nil {
+	if v, err := treetext.Strings(e.Fields[5]); err != nil {
 		return nil, err
 	} else {
 		n.Effects = v
 	}
-	if v, err := treetext.Strings(e.Fields[5]); err != nil {
+	if v, err := treetext.Strings(e.Fields[6]); err != nil {
 		return nil, err
 	} else {
 		n.Doc = v
 	}
-	switch f := e.Fields[6]; {
+	switch f := e.Fields[7]; {
 	case f.Inline == treetext.Nil:
 	case f.Items == nil:
 		return nil, fmt.Errorf("treetext: line %d: field %s: expected a list", f.Line, f.Name)
@@ -2330,12 +2354,12 @@ func decodeMethod(e *treetext.Element) (*Method, error) {
 		}
 		n.Params = out
 	}
-	if v, err := decodeTypeField(e.Fields[7]); err != nil {
+	if v, err := decodeTypeField(e.Fields[8]); err != nil {
 		return nil, err
 	} else {
 		n.Result = v
 	}
-	switch f := e.Fields[8]; {
+	switch f := e.Fields[9]; {
 	case f.Inline == treetext.Nil:
 	case f.Items == nil:
 		return nil, fmt.Errorf("treetext: line %d: field %s: expected a list", f.Line, f.Name)
@@ -2355,7 +2379,7 @@ func decodeMethod(e *treetext.Element) (*Method, error) {
 		}
 		n.Body = out
 	}
-	if v, err := unrefTypeDef(e.Fields[9]); err != nil {
+	if v, err := unrefTypeDef(e.Fields[10]); err != nil {
 		return nil, err
 	} else {
 		n.Owner = v
@@ -3288,6 +3312,7 @@ func (n *Ternary) MarshalText() ([]byte, error) {
 // writeTypeDef emits n's fields beneath an already-written heading line.
 func writeTypeDef(w *treetext.Writer, n *TypeDef, depth int) error {
 	w.Line(depth, "Name: "+strconv.Quote(n.Name))
+	w.Line(depth, "Anchor: "+strconv.Quote(n.Anchor))
 	w.Line(depth, "Public: "+strconv.FormatBool(n.Public))
 	w.Line(depth, "Doc: "+treetext.QuoteStrings(n.Doc))
 	if len(n.Params) == 0 {
@@ -3373,7 +3398,7 @@ func writeTypeDef(w *treetext.Writer, n *TypeDef, depth int) error {
 
 // decodeTypeDef builds a TypeDef from its element.
 func decodeTypeDef(e *treetext.Element) (*TypeDef, error) {
-	if err := treetext.ExpectFields(e, "Name", "Public", "Doc", "Params", "Body", "Methods", "Consts", "Builtin", "Interface", "Impls", "Enum", "Where"); err != nil {
+	if err := treetext.ExpectFields(e, "Name", "Anchor", "Public", "Doc", "Params", "Body", "Methods", "Consts", "Builtin", "Interface", "Impls", "Enum", "Where"); err != nil {
 		return nil, err
 	}
 	n := &TypeDef{}
@@ -3382,17 +3407,22 @@ func decodeTypeDef(e *treetext.Element) (*TypeDef, error) {
 	} else {
 		n.Name = v
 	}
-	if v, err := treetext.Bool(e.Fields[1]); err != nil {
+	if v, err := treetext.String(e.Fields[1]); err != nil {
+		return nil, err
+	} else {
+		n.Anchor = v
+	}
+	if v, err := treetext.Bool(e.Fields[2]); err != nil {
 		return nil, err
 	} else {
 		n.Public = v
 	}
-	if v, err := treetext.Strings(e.Fields[2]); err != nil {
+	if v, err := treetext.Strings(e.Fields[3]); err != nil {
 		return nil, err
 	} else {
 		n.Doc = v
 	}
-	switch f := e.Fields[3]; {
+	switch f := e.Fields[4]; {
 	case f.Inline == treetext.Nil:
 	case f.Items == nil:
 		return nil, fmt.Errorf("treetext: line %d: field %s: expected a list", f.Line, f.Name)
@@ -3415,12 +3445,12 @@ func decodeTypeDef(e *treetext.Element) (*TypeDef, error) {
 		}
 		n.Params = out
 	}
-	if v, err := decodeTypeField(e.Fields[4]); err != nil {
+	if v, err := decodeTypeField(e.Fields[5]); err != nil {
 		return nil, err
 	} else {
 		n.Body = v
 	}
-	switch f := e.Fields[5]; {
+	switch f := e.Fields[6]; {
 	case f.Inline == treetext.Nil:
 	case f.Items == nil:
 		return nil, fmt.Errorf("treetext: line %d: field %s: expected a list", f.Line, f.Name)
@@ -3443,7 +3473,7 @@ func decodeTypeDef(e *treetext.Element) (*TypeDef, error) {
 		}
 		n.Methods = out
 	}
-	switch f := e.Fields[6]; {
+	switch f := e.Fields[7]; {
 	case f.Inline == treetext.Nil:
 	case f.Items == nil:
 		return nil, fmt.Errorf("treetext: line %d: field %s: expected a list", f.Line, f.Name)
@@ -3466,12 +3496,12 @@ func decodeTypeDef(e *treetext.Element) (*TypeDef, error) {
 		}
 		n.Consts = out
 	}
-	if v, err := treetext.Bool(e.Fields[7]); err != nil {
+	if v, err := treetext.Bool(e.Fields[8]); err != nil {
 		return nil, err
 	} else {
 		n.Builtin = v
 	}
-	switch f := e.Fields[8]; {
+	switch f := e.Fields[9]; {
 	case f.Inline == treetext.Nil:
 	case f.Node == nil || f.Node.Head != "InterfaceDef":
 		return nil, fmt.Errorf("treetext: line %d: field %s: expected a InterfaceDef", f.Line, f.Name)
@@ -3482,7 +3512,7 @@ func decodeTypeDef(e *treetext.Element) (*TypeDef, error) {
 		}
 		n.Interface = v
 	}
-	switch f := e.Fields[9]; {
+	switch f := e.Fields[10]; {
 	case f.Inline == treetext.Nil:
 	case f.Items == nil:
 		return nil, fmt.Errorf("treetext: line %d: field %s: expected a list", f.Line, f.Name)
@@ -3502,7 +3532,7 @@ func decodeTypeDef(e *treetext.Element) (*TypeDef, error) {
 		}
 		n.Impls = out
 	}
-	switch f := e.Fields[10]; {
+	switch f := e.Fields[11]; {
 	case f.Inline == treetext.Nil:
 	case f.Node == nil || f.Node.Head != "EnumDef":
 		return nil, fmt.Errorf("treetext: line %d: field %s: expected a EnumDef", f.Line, f.Name)
@@ -3513,7 +3543,7 @@ func decodeTypeDef(e *treetext.Element) (*TypeDef, error) {
 		}
 		n.Enum = v
 	}
-	if v, err := decodeValueField(e.Fields[11]); err != nil {
+	if v, err := decodeValueField(e.Fields[12]); err != nil {
 		return nil, err
 	} else {
 		n.Where = v

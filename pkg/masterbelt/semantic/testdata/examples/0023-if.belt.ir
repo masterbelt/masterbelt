@@ -4,6 +4,7 @@ Module
   Funcs:
     Function
       Name: "clamp"
+      Anchor: "belt:/clamp"
       Public: true
       Extern: false
       Effects: ~
@@ -81,6 +82,7 @@ Module
               Name: "nint"
     Function
       Name: "warn"
+      Anchor: "belt:/warn"
       Public: true
       Extern: false
       Effects: ~
@@ -126,6 +128,7 @@ Module
               Name: "nint"
     Function
       Name: "sign"
+      Anchor: "belt:/sign"
       Public: true
       Extern: false
       Effects: ~

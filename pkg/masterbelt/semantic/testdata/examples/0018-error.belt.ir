@@ -2,6 +2,7 @@ Module
   Consts:
     Const
       Name: "E"
+      Anchor: "belt:/E"
       Public: false
       Doc: ~
       Type: Builtin
@@ -33,6 +34,7 @@ Module
         UnionTag: ~
     Const
       Name: "M"
+      Anchor: "belt:/M"
       Public: false
       Doc: ~
       Type: Builtin
@@ -68,6 +70,7 @@ Module
         UnionTag: ~
     Const
       Name: "P"
+      Anchor: "belt:/P"
       Public: false
       Doc: ~
       Type: Union
@@ -113,6 +116,7 @@ Module
   Funcs:
     Function
       Name: "parseLevel"
+      Anchor: "belt:/parseLevel"
       Public: true
       Extern: false
       Effects: ~

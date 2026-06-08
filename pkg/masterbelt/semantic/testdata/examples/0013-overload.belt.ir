@@ -2,6 +2,7 @@ Module
   Consts:
     Const
       Name: "Base"
+      Anchor: "belt:/Base"
       Public: false
       Doc: ~
       Type: Named
@@ -32,6 +33,7 @@ Module
         UnionTag: ~
     Const
       Name: "Bumped"
+      Anchor: "belt:/Bumped"
       Public: false
       Doc: ~
       Type: Named
@@ -74,6 +76,7 @@ Module
         UnionTag: ~
     Const
       Name: "Counted"
+      Anchor: "belt:/Counted"
       Public: false
       Doc: ~
       Type: Builtin
@@ -113,6 +116,7 @@ Module
         UnionTag: ~
     Const
       Name: "Start"
+      Anchor: "belt:/Start"
       Public: false
       Doc: ~
       Type: Named
@@ -143,6 +147,7 @@ Module
         UnionTag: ~
     Const
       Name: "Second"
+      Anchor: "belt:/Second"
       Public: false
       Doc: ~
       Type: Named
@@ -178,6 +183,7 @@ Module
         UnionTag: ~
     Const
       Name: "Fifth"
+      Anchor: "belt:/Fifth"
       Public: false
       Doc: ~
       Type: Named
@@ -221,6 +227,7 @@ Module
   Types:
     TypeDef
       Name: "Score"
+      Anchor: "belt:/Score"
       Public: true
       Doc: "A game score in points."
       Params: ~
@@ -229,6 +236,7 @@ Module
       Methods:
         Method
           Name: "merge"
+          Anchor: "belt:/Score#merge"
           Public: true
           Extern: false
           Kind: 0
@@ -259,6 +267,7 @@ Module
           Owner: "Score"
         Method
           Name: "merge"
+          Anchor: "belt:/Score#merge"
           Public: true
           Extern: false
           Kind: 0
@@ -312,6 +321,7 @@ Module
       Where: ~
     TypeDef
       Name: "Level"
+      Anchor: "belt:/Level"
       Public: true
       Doc: "A character level."
       Params: ~
@@ -320,6 +330,7 @@ Module
       Methods:
         Method
           Name: "next"
+          Anchor: "belt:/Level#next"
           Public: true
           Extern: false
           Kind: 0
@@ -350,6 +361,7 @@ Module
           Owner: "Level"
         Method
           Name: "next"
+          Anchor: "belt:/Level#next"
           Public: true
           Extern: false
           Kind: 0

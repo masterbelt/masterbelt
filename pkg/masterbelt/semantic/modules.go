@@ -325,6 +325,7 @@ func buildTypeDefs(q queries, fileID FileID, file *ast.File, imp importTable, fn
 	// memoizing engine tracks and cycle-guards); a const reference in an enum
 	// value resolves like any other.
 	td.list = resolveTypes(exprFolder{q: q, file: fileID}, file, nil, nil, nil, q.registry(), extern, qualifiedFrom(q, imp), fns)
+	stampTypeAnchors(moduleSegment(fileID), td.list)
 	for _, def := range td.list {
 		if def.Name != "" {
 			if _, ok := td.byName[def.Name]; !ok {

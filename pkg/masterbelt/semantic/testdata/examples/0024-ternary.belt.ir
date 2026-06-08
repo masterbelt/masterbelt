@@ -2,6 +2,7 @@ Module
   Consts:
     Const
       Name: "Bigger"
+      Anchor: "belt:/Bigger"
       Public: false
       Doc: ~
       Type: Builtin
@@ -52,6 +53,7 @@ Module
         UnionTag: ~
     Const
       Name: "Label"
+      Anchor: "belt:/Label"
       Public: false
       Doc: ~
       Type: Builtin
@@ -102,6 +104,7 @@ Module
         UnionTag: ~
     Const
       Name: "Capped"
+      Anchor: "belt:/Capped"
       Public: false
       Doc: ~
       Type: Named
@@ -160,6 +163,7 @@ Module
         UnionTag: ~
     Const
       Name: "Clamp"
+      Anchor: "belt:/Clamp"
       Public: false
       Doc: ~
       Type: Builtin
@@ -233,6 +237,7 @@ Module
         UnionTag: ~
     Const
       Name: "Score"
+      Anchor: "belt:/Score"
       Public: false
       Doc: ~
       Type: Builtin
@@ -296,6 +301,7 @@ Module
   Types:
     TypeDef
       Name: "Level"
+      Anchor: "belt:/Level"
       Public: true
       Doc: ~
       Params: ~
@@ -305,6 +311,7 @@ Module
       Consts:
         AssocConst
           Name: "Max"
+          Anchor: "belt:/Level#Max"
           Public: true
           Doc: ~
           Type: Builtin
@@ -334,6 +341,7 @@ Module
       Where: ~
     TypeDef
       Name: "Temp"
+      Anchor: "belt:/Temp"
       Public: true
       Doc: ~
       Params: ~
@@ -342,6 +350,7 @@ Module
       Methods:
         Method
           Name: "sign"
+          Anchor: "belt:/Temp#sign"
           Public: true
           Extern: false
           Kind: 0

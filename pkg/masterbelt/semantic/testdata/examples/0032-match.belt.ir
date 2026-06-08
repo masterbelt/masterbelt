@@ -2,6 +2,7 @@ Module
   Consts:
     Const
       Name: "Held"
+      Anchor: "belt:/Held"
       Public: false
       Doc: ~
       Type: Named
@@ -56,6 +57,7 @@ Module
           Def: "Coin"
     Const
       Name: "Total"
+      Anchor: "belt:/Total"
       Public: false
       Doc: ~
       Type: Builtin
@@ -91,6 +93,7 @@ Module
   Types:
     TypeDef
       Name: "Coin"
+      Anchor: "belt:/Coin"
       Public: true
       Doc: ~
       Params: ~
@@ -109,6 +112,7 @@ Module
       Where: ~
     TypeDef
       Name: "Level"
+      Anchor: "belt:/Level"
       Public: true
       Doc: ~
       Params: ~
@@ -127,6 +131,7 @@ Module
       Where: ~
     TypeDef
       Name: "GameValue"
+      Anchor: "belt:/GameValue"
       Public: true
       Doc: ~
       Params: ~
@@ -146,6 +151,7 @@ Module
   Funcs:
     Function
       Name: "describe"
+      Anchor: "belt:/describe"
       Public: true
       Extern: false
       Effects: ~
@@ -188,6 +194,7 @@ Module
           Else: ~
     Function
       Name: "worth"
+      Anchor: "belt:/worth"
       Public: true
       Extern: false
       Effects: ~
@@ -238,6 +245,7 @@ Module
           Else: ~
     Function
       Name: "amountOr"
+      Anchor: "belt:/amountOr"
       Public: true
       Extern: false
       Effects: ~
@@ -296,6 +304,7 @@ Module
           Else: ~
     Function
       Name: "coinAmount"
+      Anchor: "belt:/coinAmount"
       Public: true
       Extern: false
       Effects: ~
@@ -337,6 +346,7 @@ Module
                   Name: "nint"
     Function
       Name: "firstOr"
+      Anchor: "belt:/firstOr"
       Public: true
       Extern: false
       Effects: ~
@@ -417,6 +427,7 @@ Module
           Else: ~
     Function
       Name: "label"
+      Anchor: "belt:/label"
       Public: true
       Extern: false
       Effects: ~

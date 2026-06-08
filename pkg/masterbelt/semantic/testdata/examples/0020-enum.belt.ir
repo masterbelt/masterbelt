@@ -2,6 +2,7 @@ Module
   Consts:
     Const
       Name: "Top"
+      Anchor: "belt:/Top"
       Public: false
       Doc: ~
       Type: Named
@@ -30,6 +31,7 @@ Module
         UnionTag: ~
     Const
       Name: "Bare"
+      Anchor: "belt:/Bare"
       Public: false
       Doc: ~
       Type: Named
@@ -58,6 +60,7 @@ Module
         UnionTag: ~
     Const
       Name: "Highest"
+      Anchor: "belt:/Highest"
       Public: false
       Doc: ~
       Type: Named
@@ -94,6 +97,7 @@ Module
   Types:
     TypeDef
       Name: "Rarity"
+      Anchor: "belt:/Rarity"
       Public: true
       Doc: "A card's rarity tier."
       Params: ~
@@ -101,6 +105,7 @@ Module
       Methods:
         Method
           Name: "eql"
+          Anchor: "belt:/Rarity#eql"
           Public: true
           Extern: true
           Kind: 0
@@ -116,6 +121,7 @@ Module
           Owner: "Rarity"
         Method
           Name: "neq"
+          Anchor: "belt:/Rarity#neq"
           Public: true
           Extern: true
           Kind: 0
@@ -131,6 +137,7 @@ Module
           Owner: "Rarity"
         Method
           Name: "lt"
+          Anchor: "belt:/Rarity#lt"
           Public: true
           Extern: true
           Kind: 0
@@ -146,6 +153,7 @@ Module
           Owner: "Rarity"
         Method
           Name: "lteq"
+          Anchor: "belt:/Rarity#lteq"
           Public: true
           Extern: true
           Kind: 0
@@ -161,6 +169,7 @@ Module
           Owner: "Rarity"
         Method
           Name: "gt"
+          Anchor: "belt:/Rarity#gt"
           Public: true
           Extern: true
           Kind: 0
@@ -176,6 +185,7 @@ Module
           Owner: "Rarity"
         Method
           Name: "gteq"
+          Anchor: "belt:/Rarity#gteq"
           Public: true
           Extern: true
           Kind: 0
@@ -260,6 +270,7 @@ Module
       Where: ~
     TypeDef
       Name: "Element"
+      Anchor: "belt:/Element"
       Public: true
       Doc: "An elemental affinity."
       Params: ~
@@ -267,6 +278,7 @@ Module
       Methods:
         Method
           Name: "eql"
+          Anchor: "belt:/Element#eql"
           Public: true
           Extern: true
           Kind: 0
@@ -282,6 +294,7 @@ Module
           Owner: "Element"
         Method
           Name: "neq"
+          Anchor: "belt:/Element#neq"
           Public: true
           Extern: true
           Kind: 0
@@ -297,6 +310,7 @@ Module
           Owner: "Element"
         Method
           Name: "lt"
+          Anchor: "belt:/Element#lt"
           Public: true
           Extern: true
           Kind: 0
@@ -312,6 +326,7 @@ Module
           Owner: "Element"
         Method
           Name: "lteq"
+          Anchor: "belt:/Element#lteq"
           Public: true
           Extern: true
           Kind: 0
@@ -327,6 +342,7 @@ Module
           Owner: "Element"
         Method
           Name: "gt"
+          Anchor: "belt:/Element#gt"
           Public: true
           Extern: true
           Kind: 0
@@ -342,6 +358,7 @@ Module
           Owner: "Element"
         Method
           Name: "gteq"
+          Anchor: "belt:/Element#gteq"
           Public: true
           Extern: true
           Kind: 0
@@ -357,6 +374,7 @@ Module
           Owner: "Element"
         Method
           Name: "isFire"
+          Anchor: "belt:/Element#isFire"
           Public: true
           Extern: false
           Kind: 0
@@ -455,6 +473,7 @@ Module
       Where: ~
     TypeDef
       Name: "Locale"
+      Anchor: "belt:/Locale"
       Public: true
       Doc: "A supported display locale."
       Params: ~
@@ -462,6 +481,7 @@ Module
       Methods:
         Method
           Name: "eql"
+          Anchor: "belt:/Locale#eql"
           Public: true
           Extern: true
           Kind: 0
@@ -477,6 +497,7 @@ Module
           Owner: "Locale"
         Method
           Name: "neq"
+          Anchor: "belt:/Locale#neq"
           Public: true
           Extern: true
           Kind: 0
@@ -492,6 +513,7 @@ Module
           Owner: "Locale"
         Method
           Name: "lt"
+          Anchor: "belt:/Locale#lt"
           Public: true
           Extern: true
           Kind: 0
@@ -507,6 +529,7 @@ Module
           Owner: "Locale"
         Method
           Name: "lteq"
+          Anchor: "belt:/Locale#lteq"
           Public: true
           Extern: true
           Kind: 0
@@ -522,6 +545,7 @@ Module
           Owner: "Locale"
         Method
           Name: "gt"
+          Anchor: "belt:/Locale#gt"
           Public: true
           Extern: true
           Kind: 0
@@ -537,6 +561,7 @@ Module
           Owner: "Locale"
         Method
           Name: "gteq"
+          Anchor: "belt:/Locale#gteq"
           Public: true
           Extern: true
           Kind: 0
@@ -603,6 +628,7 @@ Module
   Funcs:
     Function
       Name: "highestSeen"
+      Anchor: "belt:/highestSeen"
       Public: true
       Extern: false
       Effects: ~

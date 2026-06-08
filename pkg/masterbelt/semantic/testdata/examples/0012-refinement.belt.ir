@@ -2,6 +2,7 @@ Module
   Consts:
     Const
       Name: "ServerPort"
+      Anchor: "belt:/ServerPort"
       Public: false
       Doc: ~
       Type: Named
@@ -32,6 +33,7 @@ Module
         UnionTag: ~
     Const
       Name: "MinPort"
+      Anchor: "belt:/MinPort"
       Public: false
       Doc: ~
       Type: Named
@@ -62,6 +64,7 @@ Module
         UnionTag: ~
     Const
       Name: "MaxPort"
+      Anchor: "belt:/MaxPort"
       Public: false
       Doc: ~
       Type: Named
@@ -92,6 +95,7 @@ Module
         UnionTag: ~
     Const
       Name: "FullLevel"
+      Anchor: "belt:/FullLevel"
       Public: false
       Doc: ~
       Type: Named
@@ -122,6 +126,7 @@ Module
         UnionTag: ~
     Const
       Name: "ValidScore"
+      Anchor: "belt:/ValidScore"
       Public: false
       Doc: ~
       Type: Named
@@ -152,6 +157,7 @@ Module
         UnionTag: ~
     Const
       Name: "Unrefined"
+      Anchor: "belt:/Unrefined"
       Public: false
       Doc: ~
       Type: Builtin
@@ -180,6 +186,7 @@ Module
   Types:
     TypeDef
       Name: "Level"
+      Anchor: "belt:/Level"
       Public: true
       Doc: "A character level between 0 and 100."
       Params: ~
@@ -237,6 +244,7 @@ Module
           Name: "bool"
     TypeDef
       Name: "Port"
+      Anchor: "belt:/Port"
       Public: true
       Doc: "A TCP port number."
       Params: ~
@@ -294,6 +302,7 @@ Module
           Name: "bool"
     TypeDef
       Name: "Percent"
+      Anchor: "belt:/Percent"
       Public: true
       Doc: "A percentage from 0 to 100."
       Params: ~
@@ -302,6 +311,7 @@ Module
       Methods:
         Method
           Name: "increment"
+          Anchor: "belt:/Percent#increment"
           Public: true
           Extern: false
           Kind: 0
@@ -381,6 +391,7 @@ Module
           Name: "bool"
     TypeDef
       Name: "Score"
+      Anchor: "belt:/Score"
       Public: true
       Doc: "A score that is valid only when it lies in the 0..100 band."
       Params: ~
@@ -389,6 +400,7 @@ Module
       Methods:
         Method
           Name: "inBand"
+          Anchor: "belt:/Score#inBand"
           Public: true
           Extern: false
           Kind: 0

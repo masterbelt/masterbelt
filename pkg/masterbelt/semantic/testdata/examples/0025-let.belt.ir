@@ -2,6 +2,7 @@ Module
   Consts:
     Const
       Name: "Picked"
+      Anchor: "belt:/Picked"
       Public: false
       Doc: ~
       Type: Builtin
@@ -36,6 +37,7 @@ Module
         UnionTag: ~
     Const
       Name: "Stepped"
+      Anchor: "belt:/Stepped"
       Public: false
       Doc: ~
       Type: Builtin
@@ -72,6 +74,7 @@ Module
   Funcs:
     Function
       Name: "pick"
+      Anchor: "belt:/pick"
       Public: true
       Extern: false
       Effects: ~
@@ -134,6 +137,7 @@ Module
               Name: "nint"
     Function
       Name: "step"
+      Anchor: "belt:/step"
       Public: true
       Extern: false
       Effects: ~
@@ -180,6 +184,7 @@ Module
               Name: "nint"
     Function
       Name: "shadow"
+      Anchor: "belt:/shadow"
       Public: true
       Extern: false
       Effects: ~

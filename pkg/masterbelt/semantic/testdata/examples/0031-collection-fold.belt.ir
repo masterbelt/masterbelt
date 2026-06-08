@@ -2,6 +2,7 @@ Module
   Consts:
     Const
       Name: "ListLen"
+      Anchor: "belt:/ListLen"
       Public: false
       Doc: ~
       Type: Builtin
@@ -70,6 +71,7 @@ Module
         UnionTag: ~
     Const
       Name: "MapLen"
+      Anchor: "belt:/MapLen"
       Public: false
       Doc: ~
       Type: Builtin
@@ -136,6 +138,7 @@ Module
         UnionTag: ~
     Const
       Name: "Sum"
+      Anchor: "belt:/Sum"
       Public: false
       Doc: ~
       Type: Builtin
@@ -242,6 +245,7 @@ Module
         UnionTag: ~
     Const
       Name: "IndexSum"
+      Anchor: "belt:/IndexSum"
       Public: false
       Doc: ~
       Type: Builtin
@@ -348,6 +352,7 @@ Module
         UnionTag: ~
     Const
       Name: "MapSum"
+      Anchor: "belt:/MapSum"
       Public: false
       Doc: ~
       Type: Builtin
@@ -461,6 +466,7 @@ Module
         UnionTag: ~
     Const
       Name: "Count"
+      Anchor: "belt:/Count"
       Public: false
       Doc: ~
       Type: Builtin
@@ -535,6 +541,7 @@ Module
         UnionTag: ~
     Const
       Name: "AnyBig"
+      Anchor: "belt:/AnyBig"
       Public: false
       Doc: ~
       Type: Builtin
@@ -629,6 +636,7 @@ Module
         UnionTag: ~
     Const
       Name: "AllPositive"
+      Anchor: "belt:/AllPositive"
       Public: false
       Doc: ~
       Type: Builtin
@@ -723,6 +731,7 @@ Module
         UnionTag: ~
     Const
       Name: "Doubled"
+      Anchor: "belt:/Doubled"
       Public: false
       Doc: ~
       Type: App
@@ -884,6 +893,7 @@ Module
         UnionTag: ~
     Const
       Name: "Big"
+      Anchor: "belt:/Big"
       Public: false
       Doc: ~
       Type: App
@@ -1028,6 +1038,7 @@ Module
         UnionTag: ~
     Const
       Name: "Keys"
+      Anchor: "belt:/Keys"
       Public: false
       Doc: ~
       Type: App
@@ -1138,6 +1149,7 @@ Module
         UnionTag: ~
     Const
       Name: "Values"
+      Anchor: "belt:/Values"
       Public: false
       Doc: ~
       Type: App
@@ -1248,6 +1260,7 @@ Module
         UnionTag: ~
     Const
       Name: "ListValues"
+      Anchor: "belt:/ListValues"
       Public: false
       Doc: ~
       Type: App

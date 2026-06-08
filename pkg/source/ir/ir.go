@@ -46,7 +46,13 @@ type Module struct {
 // function's interaction with the world; an empty list means pure (foldable
 // at compile time).
 type Function struct {
-	Name    string
+	Name string
+	// Anchor is the declaration's stable, position-independent address
+	// (belt:module/name) — the same string across edits that do not rename it
+	// or move its file (A-5). It is "" for an unnamed declaration, which has no
+	// address; the semantic layer stamps it, deterministically from the name
+	// and the file path, so it survives incremental recompute unchanged.
+	Anchor  string
 	Public  bool
 	Extern  bool     // declared extern: a native the target supplies, no body
 	Effects []string // the declared effects in source order, or nil for pure
@@ -81,8 +87,11 @@ func (a *Assert) Held() bool { return a.Eval != nil && a.Eval.Kind == ConstBool 
 
 // Const is a resolved constant declaration.
 type Const struct {
-	Name   string // the declared name ("" if the source omitted it)
-	Public bool   // whether it is marked pub
+	Name string // the declared name ("" if the source omitted it)
+	// Anchor is the constant's stable, position-independent address
+	// (belt:module/name); see Function.Anchor. "" for an unnamed constant.
+	Anchor string
+	Public bool // whether it is marked pub
 	Doc    []string
 	Type   Type           // the inferred or annotated type
 	Value  Value          // the resolved initializer, or nil if missing/invalid

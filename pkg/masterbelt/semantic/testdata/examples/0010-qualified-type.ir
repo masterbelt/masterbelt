@@ -3,6 +3,7 @@ Module
   Consts:
     Const
       Name: "Origin"
+      Anchor: "belt:geometry/Origin"
       Public: true
       Doc: "The zero point every path starts from."
       Type: Builtin
@@ -30,6 +31,7 @@ Module
         UnionTag: ~
     Const
       Name: "Unit"
+      Anchor: "belt:geometry/Unit"
       Public: true
       Doc: "One step along the axis."
       Type: Builtin
@@ -58,6 +60,7 @@ Module
   Types:
     TypeDef
       Name: "Point"
+      Anchor: "belt:geometry/Point"
       Public: true
       Doc: "A 1-D coordinate."
       Params: ~
@@ -77,6 +80,7 @@ Module
   Consts:
     Const
       Name: "start"
+      Anchor: "belt:main/start"
       Public: false
       Doc: ~
       Type: Named
@@ -107,6 +111,7 @@ Module
         UnionTag: ~
     Const
       Name: "path"
+      Anchor: "belt:main/path"
       Public: false
       Doc: ~
       Type: App

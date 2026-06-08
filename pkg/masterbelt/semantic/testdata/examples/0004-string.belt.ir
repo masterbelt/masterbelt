@@ -2,6 +2,7 @@ Module
   Consts:
     Const
       Name: "LabelName"
+      Anchor: "belt:/LabelName"
       Public: true
       Doc: ~
       Type: Builtin
@@ -29,6 +30,7 @@ Module
         UnionTag: ~
     Const
       Name: "Greeting"
+      Anchor: "belt:/Greeting"
       Public: true
       Doc: ~
       Type: Builtin
@@ -56,6 +58,7 @@ Module
         UnionTag: ~
     Const
       Name: "Control"
+      Anchor: "belt:/Control"
       Public: true
       Doc: ~
       Type: Builtin
@@ -83,6 +86,7 @@ Module
         UnionTag: ~
     Const
       Name: "Unicode"
+      Anchor: "belt:/Unicode"
       Public: true
       Doc: ~
       Type: Builtin
@@ -110,6 +114,7 @@ Module
         UnionTag: ~
     Const
       Name: "Party"
+      Anchor: "belt:/Party"
       Public: true
       Doc: ~
       Type: Builtin
@@ -137,6 +142,7 @@ Module
         UnionTag: ~
     Const
       Name: "Empty"
+      Anchor: "belt:/Empty"
       Public: true
       Doc: ~
       Type: Builtin

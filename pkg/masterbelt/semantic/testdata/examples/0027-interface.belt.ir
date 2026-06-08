@@ -3,6 +3,7 @@ Module
   Types:
     TypeDef
       Name: "Bag"
+      Anchor: "belt:/Bag"
       Public: true
       Doc: "A small bag of T values that folds over its contents. The `impl foldable<nint, T>`" "tag is what gives Bag the count/any methods — written here, at Bag's own" "definition site."
       Params:
@@ -18,6 +19,7 @@ Module
       Methods:
         Method
           Name: "fold"
+          Anchor: "belt:/Bag#fold"
           Public: false
           Extern: false
           Kind: 0
@@ -71,6 +73,7 @@ Module
       Where: ~
     TypeDef
       Name: "foldable"
+      Anchor: "belt:/foldable"
       Public: true
       Doc: "A behaviour over a keyed collection: implement the required fold and the" "provided methods (count, map, filter, ...) come for free, defined on top of" "it. iterability is foldable."
       Params:
@@ -84,6 +87,7 @@ Module
       Methods:
         Method
           Name: "fold"
+          Anchor: "belt:/foldable#fold"
           Public: false
           Extern: false
           Kind: 0
@@ -118,6 +122,7 @@ Module
           Owner: "foldable"
         Method
           Name: "count"
+          Anchor: "belt:/foldable#count"
           Public: true
           Extern: false
           Kind: 0
@@ -182,6 +187,7 @@ Module
           Owner: "foldable"
         Method
           Name: "any"
+          Anchor: "belt:/foldable#any"
           Public: true
           Extern: false
           Kind: 0
@@ -279,6 +285,7 @@ Module
   Funcs:
     Function
       Name: "total"
+      Anchor: "belt:/total"
       Public: true
       Extern: false
       Effects: ~

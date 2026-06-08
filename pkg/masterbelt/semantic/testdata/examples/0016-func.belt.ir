@@ -2,6 +2,7 @@ Module
   Consts:
     Const
       Name: "A"
+      Anchor: "belt:/A"
       Public: false
       Doc: ~
       Type: Builtin
@@ -40,6 +41,7 @@ Module
         UnionTag: ~
     Const
       Name: "B"
+      Anchor: "belt:/B"
       Public: false
       Doc: ~
       Type: Builtin
@@ -74,6 +76,7 @@ Module
         UnionTag: ~
     Const
       Name: "C"
+      Anchor: "belt:/C"
       Public: false
       Doc: ~
       Type: Builtin
@@ -112,6 +115,7 @@ Module
         UnionTag: ~
     Const
       Name: "D"
+      Anchor: "belt:/D"
       Public: false
       Doc: ~
       Type: App
@@ -268,6 +272,7 @@ Module
         UnionTag: ~
     Const
       Name: "E"
+      Anchor: "belt:/E"
       Public: false
       Doc: ~
       Type: Builtin
@@ -302,6 +307,7 @@ Module
         UnionTag: ~
     Const
       Name: "O"
+      Anchor: "belt:/O"
       Public: false
       Doc: ~
       Type: Named
@@ -371,6 +377,7 @@ Module
   Types:
     TypeDef
       Name: "Point"
+      Anchor: "belt:/Point"
       Public: true
       Doc: ~
       Params: ~
@@ -394,6 +401,7 @@ Module
   Funcs:
     Function
       Name: "double"
+      Anchor: "belt:/double"
       Public: true
       Extern: false
       Effects: ~
@@ -426,6 +434,7 @@ Module
               Name: "nint"
     Function
       Name: "area"
+      Anchor: "belt:/area"
       Public: true
       Extern: false
       Effects: ~
@@ -462,6 +471,7 @@ Module
               Name: "nint"
     Function
       Name: "perimeter"
+      Anchor: "belt:/perimeter"
       Public: true
       Extern: false
       Effects: ~
@@ -512,6 +522,7 @@ Module
               Name: "nint"
     Function
       Name: "greet"
+      Anchor: "belt:/greet"
       Public: false
       Extern: false
       Effects: ~
@@ -544,6 +555,7 @@ Module
               Name: "string"
     Function
       Name: "origin"
+      Anchor: "belt:/origin"
       Public: true
       Extern: false
       Effects: ~

@@ -2,6 +2,7 @@ Module
   Consts:
     Const
       Name: "Bigger"
+      Anchor: "belt:/Bigger"
       Public: false
       Doc: ~
       Type: Builtin
@@ -44,6 +45,7 @@ Module
         UnionTag: ~
     Const
       Name: "Later"
+      Anchor: "belt:/Later"
       Public: false
       Doc: ~
       Type: Builtin
@@ -86,6 +88,7 @@ Module
         UnionTag: ~
     Const
       Name: "Equal"
+      Anchor: "belt:/Equal"
       Public: false
       Doc: ~
       Type: Builtin
@@ -128,6 +131,7 @@ Module
         UnionTag: ~
     Const
       Name: "Double"
+      Anchor: "belt:/Double"
       Public: false
       Doc: ~
       Type: Builtin
@@ -168,6 +172,7 @@ Module
   Funcs:
     Function
       Name: "max"
+      Anchor: "belt:/max"
       Public: true
       Extern: false
       Effects: ~
@@ -235,6 +240,7 @@ Module
                 Def: "orderable"
     Function
       Name: "same"
+      Anchor: "belt:/same"
       Public: true
       Extern: false
       Effects: ~
@@ -283,6 +289,7 @@ Module
               Name: "bool"
     Function
       Name: "twice"
+      Anchor: "belt:/twice"
       Public: true
       Extern: false
       Effects: ~

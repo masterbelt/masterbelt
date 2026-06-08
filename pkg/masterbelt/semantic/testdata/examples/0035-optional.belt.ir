@@ -2,6 +2,7 @@ Module
   Consts:
     Const
       Name: "Present"
+      Anchor: "belt:/Present"
       Public: false
       Doc: ~
       Type: App
@@ -39,6 +40,7 @@ Module
           Name: "nint"
     Const
       Name: "Absent"
+      Anchor: "belt:/Absent"
       Public: false
       Doc: ~
       Type: App
@@ -75,6 +77,7 @@ Module
           Name: "null"
     Const
       Name: "FromPresent"
+      Anchor: "belt:/FromPresent"
       Public: false
       Doc: ~
       Type: Builtin
@@ -115,6 +118,7 @@ Module
         UnionTag: ~
     Const
       Name: "FromAbsent"
+      Anchor: "belt:/FromAbsent"
       Public: false
       Doc: ~
       Type: Builtin
@@ -154,6 +158,7 @@ Module
         UnionTag: ~
     Const
       Name: "WithFallback"
+      Anchor: "belt:/WithFallback"
       Public: false
       Doc: ~
       Type: Builtin
@@ -199,6 +204,7 @@ Module
   Funcs:
     Function
       Name: "orZero"
+      Anchor: "belt:/orZero"
       Public: true
       Extern: false
       Effects: ~
@@ -247,6 +253,7 @@ Module
           Else: ~
     Function
       Name: "orFallback"
+      Anchor: "belt:/orFallback"
       Public: true
       Extern: false
       Effects: ~

@@ -182,7 +182,11 @@ func typeString(t Type) string {
 // type's Body is the corresponding composite. Named and App point at a TypeDef,
 // so type references form a graph just like value references.
 type TypeDef struct {
-	Name    string
+	Name string
+	// Anchor is the type's stable, position-independent address
+	// (belt:module/name); see Function.Anchor. Its methods and associated
+	// constants anchor beneath it as Anchor#member. "" for an unnamed type.
+	Anchor  string
 	Public  bool
 	Doc     []string
 	Params  []*TypeParam // generic parameters, in declaration order
@@ -323,7 +327,12 @@ func (k MethodKind) String() string {
 // MethodNormal for an ordinary method), which decides the name space the member
 // lives in.
 type Method struct {
-	Name    string
+	Name string
+	// Anchor is the method's stable, position-independent address, the owning
+	// type's anchor with the member appended (belt:module/Type#name); see
+	// Function.Anchor. "" for a method of an unnamed type or built outside a
+	// source declaration (the registry's bootstrap methods).
+	Anchor  string
 	Public  bool
 	Extern  bool
 	Kind    MethodKind // the accessor/static modifier, or MethodNormal
@@ -365,7 +374,11 @@ func (t *TypeDef) AttachMethods(methods ...*Method) {
 // value comes from the registry (the integer bounds Max/Min): such a constant
 // has no source initializer, and the builtin layer fills in its value and type.
 type AssocConst struct {
-	Name    string
+	Name string
+	// Anchor is the associated constant's stable, position-independent address,
+	// the owning type's anchor with the member appended (belt:module/Type#name);
+	// see Function.Anchor. "" for a constant of an unnamed type.
+	Anchor  string
 	Public  bool
 	Doc     []string
 	Type    Type           // the resolved type of the constant's value

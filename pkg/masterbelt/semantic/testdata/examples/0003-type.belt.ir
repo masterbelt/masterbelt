@@ -3,6 +3,7 @@ Module
   Types:
     TypeDef
       Name: "Coin"
+      Anchor: "belt:/Coin"
       Public: true
       Doc: "A coin denomination."
       Params: ~
@@ -17,6 +18,7 @@ Module
       Where: ~
     TypeDef
       Name: "Level"
+      Anchor: "belt:/Level"
       Public: true
       Doc: "A character level."
       Params: ~
@@ -25,6 +27,7 @@ Module
       Methods:
         Method
           Name: "increment"
+          Anchor: "belt:/Level#increment"
           Public: true
           Extern: false
           Kind: 0
@@ -61,6 +64,7 @@ Module
       Where: ~
     TypeDef
       Name: "GameValue"
+      Anchor: "belt:/GameValue"
       Public: true
       Doc: "Any value the game can score: a Coin or a Level."
       Params: ~
@@ -79,6 +83,7 @@ Module
       Where: ~
     TypeDef
       Name: "Optional"
+      Anchor: "belt:/Optional"
       Public: true
       Doc: "A T, or nothing."
       Params:
@@ -101,6 +106,7 @@ Module
       Where: ~
     TypeDef
       Name: "OptionalNumeric"
+      Anchor: "belt:/OptionalNumeric"
       Public: true
       Doc: "A small integer, or nothing."
       Params:
@@ -133,6 +139,7 @@ Module
       Where: ~
     TypeDef
       Name: "Record"
+      Anchor: "belt:/Record"
       Public: true
       Doc: "One saved character: an id and its level."
       Params: ~
@@ -149,6 +156,7 @@ Module
       Methods:
         Method
           Name: "game_id"
+          Anchor: "belt:/Record#game_id"
           Public: true
           Extern: false
           Kind: 0
@@ -194,6 +202,7 @@ Module
       Where: ~
     TypeDef
       Name: "Mapper"
+      Anchor: "belt:/Mapper"
       Public: true
       Doc: "A mapping from T to R."
       Params:

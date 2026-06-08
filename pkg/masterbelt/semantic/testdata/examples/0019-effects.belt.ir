@@ -2,6 +2,7 @@ Module
   Consts:
     Const
       Name: "A"
+      Anchor: "belt:/A"
       Public: false
       Doc: ~
       Type: Builtin
@@ -37,6 +38,7 @@ Module
   Types:
     TypeDef
       Name: "Clock"
+      Anchor: "belt:/Clock"
       Public: true
       Doc: ~
       Params: ~
@@ -49,6 +51,7 @@ Module
       Methods:
         Method
           Name: "read"
+          Anchor: "belt:/Clock#read"
           Public: true
           Extern: false
           Kind: 0
@@ -90,6 +93,7 @@ Module
   Funcs:
     Function
       Name: "stamp"
+      Anchor: "belt:/stamp"
       Public: true
       Extern: false
       Effects: "nondet"
@@ -109,6 +113,7 @@ Module
             Type: ~
     Function
       Name: "double"
+      Anchor: "belt:/double"
       Public: true
       Extern: false
       Effects: ~

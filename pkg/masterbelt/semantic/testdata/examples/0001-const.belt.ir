@@ -2,6 +2,7 @@ Module
   Consts:
     Const
       Name: "MaxLevel"
+      Anchor: "belt:/MaxLevel"
       Public: false
       Doc: "DocComment for MaxLevel"
       Type: Builtin
@@ -32,6 +33,7 @@ Module
         UnionTag: ~
     Const
       Name: "MinLevel"
+      Anchor: "belt:/MinLevel"
       Public: false
       Doc: "DocComment for MinLevel" "with multiline."
       Type: Builtin
@@ -59,6 +61,7 @@ Module
         UnionTag: ~
     Const
       Name: "PublishedMaxLevel"
+      Anchor: "belt:/PublishedMaxLevel"
       Public: true
       Doc: ~
       Type: Builtin

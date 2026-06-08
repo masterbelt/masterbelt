@@ -2,6 +2,7 @@ Module
   Consts:
     Const
       Name: "ClosedUp"
+      Anchor: "belt:/ClosedUp"
       Public: false
       Doc: ~
       Type: Builtin
@@ -37,6 +38,7 @@ Module
         UnionTag: ~
     Const
       Name: "HalfUp"
+      Anchor: "belt:/HalfUp"
       Public: false
       Doc: ~
       Type: Builtin
@@ -72,6 +74,7 @@ Module
         UnionTag: ~
     Const
       Name: "ClosedDown"
+      Anchor: "belt:/ClosedDown"
       Public: false
       Doc: ~
       Type: Builtin
@@ -107,6 +110,7 @@ Module
         UnionTag: ~
     Const
       Name: "HalfDown"
+      Anchor: "belt:/HalfDown"
       Public: false
       Doc: ~
       Type: Builtin
@@ -142,6 +146,7 @@ Module
         UnionTag: ~
     Const
       Name: "ClosedUpEq"
+      Anchor: "belt:/ClosedUpEq"
       Public: false
       Doc: ~
       Type: Builtin
@@ -177,6 +182,7 @@ Module
         UnionTag: ~
     Const
       Name: "HalfUpEq"
+      Anchor: "belt:/HalfUpEq"
       Public: false
       Doc: ~
       Type: Builtin
@@ -212,6 +218,7 @@ Module
         UnionTag: ~
     Const
       Name: "ClosedDownEq"
+      Anchor: "belt:/ClosedDownEq"
       Public: false
       Doc: ~
       Type: Builtin
@@ -259,6 +266,7 @@ Module
         UnionTag: ~
     Const
       Name: "HalfDownEq"
+      Anchor: "belt:/HalfDownEq"
       Public: false
       Doc: ~
       Type: Builtin
@@ -306,6 +314,7 @@ Module
         UnionTag: ~
     Const
       Name: "Single"
+      Anchor: "belt:/Single"
       Public: false
       Doc: ~
       Type: Builtin
@@ -341,6 +350,7 @@ Module
         UnionTag: ~
     Const
       Name: "Empty"
+      Anchor: "belt:/Empty"
       Public: false
       Doc: ~
       Type: Builtin
@@ -376,6 +386,7 @@ Module
         UnionTag: ~
     Const
       Name: "Upto"
+      Anchor: "belt:/Upto"
       Public: false
       Doc: ~
       Type: Builtin
@@ -410,6 +421,7 @@ Module
         UnionTag: ~
     Const
       Name: "Evens"
+      Anchor: "belt:/Evens"
       Public: false
       Doc: ~
       Type: Builtin
@@ -449,6 +461,7 @@ Module
         UnionTag: ~
     Const
       Name: "DownBy2"
+      Anchor: "belt:/DownBy2"
       Public: false
       Doc: ~
       Type: Builtin
@@ -496,6 +509,7 @@ Module
         UnionTag: ~
     Const
       Name: "SumUp"
+      Anchor: "belt:/SumUp"
       Public: false
       Doc: ~
       Type: Builtin
@@ -526,6 +540,7 @@ Module
         UnionTag: ~
     Const
       Name: "SumDown"
+      Anchor: "belt:/SumDown"
       Public: false
       Doc: ~
       Type: Builtin
@@ -556,6 +571,7 @@ Module
         UnionTag: ~
     Const
       Name: "SumHalf"
+      Anchor: "belt:/SumHalf"
       Public: false
       Doc: ~
       Type: Builtin
@@ -586,6 +602,7 @@ Module
         UnionTag: ~
     Const
       Name: "SumEvens"
+      Anchor: "belt:/SumEvens"
       Public: false
       Doc: ~
       Type: Builtin
@@ -616,6 +633,7 @@ Module
         UnionTag: ~
     Const
       Name: "ClosedCount"
+      Anchor: "belt:/ClosedCount"
       Public: false
       Doc: ~
       Type: Builtin
@@ -667,6 +685,7 @@ Module
         UnionTag: ~
     Const
       Name: "HalfCount"
+      Anchor: "belt:/HalfCount"
       Public: false
       Doc: ~
       Type: Builtin
@@ -718,6 +737,7 @@ Module
         UnionTag: ~
     Const
       Name: "SteppedCount"
+      Anchor: "belt:/SteppedCount"
       Public: false
       Doc: ~
       Type: Builtin
@@ -773,6 +793,7 @@ Module
         UnionTag: ~
     Const
       Name: "ClosedFold"
+      Anchor: "belt:/ClosedFold"
       Public: false
       Doc: ~
       Type: Builtin
@@ -862,6 +883,7 @@ Module
         UnionTag: ~
     Const
       Name: "SteppedFold"
+      Anchor: "belt:/SteppedFold"
       Public: false
       Doc: ~
       Type: Builtin
@@ -957,6 +979,7 @@ Module
   Funcs:
     Function
       Name: "upto"
+      Anchor: "belt:/upto"
       Public: true
       Extern: false
       Effects: ~
@@ -997,6 +1020,7 @@ Module
               Name: "range"
     Function
       Name: "sumUp"
+      Anchor: "belt:/sumUp"
       Public: true
       Extern: false
       Effects: ~
@@ -1057,6 +1081,7 @@ Module
               Name: "nint"
     Function
       Name: "sumDown"
+      Anchor: "belt:/sumDown"
       Public: true
       Extern: false
       Effects: ~
@@ -1117,6 +1142,7 @@ Module
               Name: "nint"
     Function
       Name: "sumHalf"
+      Anchor: "belt:/sumHalf"
       Public: true
       Extern: false
       Effects: ~
@@ -1177,6 +1203,7 @@ Module
               Name: "nint"
     Function
       Name: "sumEvens"
+      Anchor: "belt:/sumEvens"
       Public: true
       Extern: false
       Effects: ~

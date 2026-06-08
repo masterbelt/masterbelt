@@ -2,6 +2,7 @@ Module
   Consts:
     Const
       Name: "add"
+      Anchor: "belt:/add"
       Public: false
       Doc: ~
       Type: Builtin
@@ -41,6 +42,7 @@ Module
         UnionTag: ~
     Const
       Name: "sub"
+      Anchor: "belt:/sub"
       Public: false
       Doc: ~
       Type: Builtin
@@ -80,6 +82,7 @@ Module
         UnionTag: ~
     Const
       Name: "mul"
+      Anchor: "belt:/mul"
       Public: false
       Doc: ~
       Type: Builtin
@@ -119,6 +122,7 @@ Module
         UnionTag: ~
     Const
       Name: "div"
+      Anchor: "belt:/div"
       Public: false
       Doc: ~
       Type: Builtin
@@ -158,6 +162,7 @@ Module
         UnionTag: ~
     Const
       Name: "rem"
+      Anchor: "belt:/rem"
       Public: false
       Doc: ~
       Type: Builtin
@@ -197,6 +202,7 @@ Module
         UnionTag: ~
     Const
       Name: "eql"
+      Anchor: "belt:/eql"
       Public: false
       Doc: ~
       Type: Builtin
@@ -236,6 +242,7 @@ Module
         UnionTag: ~
     Const
       Name: "neq"
+      Anchor: "belt:/neq"
       Public: false
       Doc: ~
       Type: Builtin
@@ -275,6 +282,7 @@ Module
         UnionTag: ~
     Const
       Name: "lt"
+      Anchor: "belt:/lt"
       Public: false
       Doc: ~
       Type: Builtin
@@ -314,6 +322,7 @@ Module
         UnionTag: ~
     Const
       Name: "lteq"
+      Anchor: "belt:/lteq"
       Public: false
       Doc: ~
       Type: Builtin
@@ -353,6 +362,7 @@ Module
         UnionTag: ~
     Const
       Name: "gt"
+      Anchor: "belt:/gt"
       Public: false
       Doc: ~
       Type: Builtin
@@ -392,6 +402,7 @@ Module
         UnionTag: ~
     Const
       Name: "gteq"
+      Anchor: "belt:/gteq"
       Public: false
       Doc: ~
       Type: Builtin
@@ -431,6 +442,7 @@ Module
         UnionTag: ~
     Const
       Name: "anan"
+      Anchor: "belt:/anan"
       Public: false
       Doc: ~
       Type: Builtin
@@ -470,6 +482,7 @@ Module
         UnionTag: ~
     Const
       Name: "oror"
+      Anchor: "belt:/oror"
       Public: false
       Doc: ~
       Type: Builtin
@@ -509,6 +522,7 @@ Module
         UnionTag: ~
     Const
       Name: "pos"
+      Anchor: "belt:/pos"
       Public: false
       Doc: ~
       Type: Builtin
@@ -544,6 +558,7 @@ Module
         UnionTag: ~
     Const
       Name: "neg"
+      Anchor: "belt:/neg"
       Public: false
       Doc: ~
       Type: Builtin
@@ -579,6 +594,7 @@ Module
         UnionTag: ~
     Const
       Name: "not"
+      Anchor: "belt:/not"
       Public: false
       Doc: ~
       Type: Builtin
@@ -614,6 +630,7 @@ Module
         UnionTag: ~
     Const
       Name: "grouped"
+      Anchor: "belt:/grouped"
       Public: false
       Doc: ~
       Type: Builtin
@@ -665,6 +682,7 @@ Module
         UnionTag: ~
     Const
       Name: "nested"
+      Anchor: "belt:/nested"
       Public: false
       Doc: ~
       Type: Builtin

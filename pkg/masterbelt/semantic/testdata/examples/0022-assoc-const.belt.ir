@@ -2,6 +2,7 @@ Module
   Consts:
     Const
       Name: "Hi"
+      Anchor: "belt:/Hi"
       Public: false
       Doc: ~
       Type: Builtin
@@ -30,6 +31,7 @@ Module
         UnionTag: ~
     Const
       Name: "Lo"
+      Anchor: "belt:/Lo"
       Public: false
       Doc: ~
       Type: Builtin
@@ -58,6 +60,7 @@ Module
         UnionTag: ~
     Const
       Name: "Top"
+      Anchor: "belt:/Top"
       Public: false
       Doc: ~
       Type: Named
@@ -89,6 +92,7 @@ Module
         UnionTag: ~
     Const
       Name: "Bottom"
+      Anchor: "belt:/Bottom"
       Public: false
       Doc: ~
       Type: Named
@@ -120,6 +124,7 @@ Module
         UnionTag: ~
     Const
       Name: "W"
+      Anchor: "belt:/W"
       Public: false
       Doc: ~
       Type: Builtin
@@ -148,6 +153,7 @@ Module
         UnionTag: ~
     Const
       Name: "ServerPort"
+      Anchor: "belt:/ServerPort"
       Public: false
       Doc: ~
       Type: Named
@@ -179,6 +185,7 @@ Module
   Types:
     TypeDef
       Name: "Level"
+      Anchor: "belt:/Level"
       Public: true
       Doc: "A character level, capped at 100."
       Params: ~
@@ -187,6 +194,7 @@ Module
       Methods:
         Method
           Name: "increment"
+          Anchor: "belt:/Level#increment"
           Public: true
           Extern: false
           Kind: 0
@@ -218,6 +226,7 @@ Module
       Consts:
         AssocConst
           Name: "Max"
+          Anchor: "belt:/Level#Max"
           Public: true
           Doc: "The highest level."
           Type: Builtin
@@ -242,6 +251,7 @@ Module
           Builtin: false
         AssocConst
           Name: "Min"
+          Anchor: "belt:/Level#Min"
           Public: true
           Doc: "The lowest level."
           Type: Builtin
@@ -271,6 +281,7 @@ Module
       Where: ~
     TypeDef
       Name: "Bits"
+      Anchor: "belt:/Bits"
       Public: true
       Doc: ~
       Params: ~
@@ -280,6 +291,7 @@ Module
       Consts:
         AssocConst
           Name: "Width"
+          Anchor: "belt:/Bits#Width"
           Public: true
           Doc: "The width in bits."
           Type: Builtin
@@ -309,6 +321,7 @@ Module
       Where: ~
     TypeDef
       Name: "Port"
+      Anchor: "belt:/Port"
       Public: true
       Doc: ~
       Params: ~

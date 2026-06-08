@@ -2,6 +2,7 @@ Module
   Consts:
     Const
       Name: "Summed"
+      Anchor: "belt:/Summed"
       Public: false
       Doc: ~
       Type: Builtin
@@ -63,6 +64,7 @@ Module
         UnionTag: ~
     Const
       Name: "Joined"
+      Anchor: "belt:/Joined"
       Public: false
       Doc: ~
       Type: Builtin
@@ -129,6 +131,7 @@ Module
         UnionTag: ~
     Const
       Name: "ValueSummed"
+      Anchor: "belt:/ValueSummed"
       Public: false
       Doc: ~
       Type: Builtin
@@ -195,6 +198,7 @@ Module
         UnionTag: ~
     Const
       Name: "IndexSummed"
+      Anchor: "belt:/IndexSummed"
       Public: false
       Doc: ~
       Type: Builtin
@@ -250,6 +254,7 @@ Module
         UnionTag: ~
     Const
       Name: "EvenSum"
+      Anchor: "belt:/EvenSum"
       Public: false
       Doc: ~
       Type: Builtin
@@ -323,6 +328,7 @@ Module
         UnionTag: ~
     Const
       Name: "Pairs"
+      Anchor: "belt:/Pairs"
       Public: false
       Doc: ~
       Type: Builtin
@@ -397,6 +403,7 @@ Module
         UnionTag: ~
     Const
       Name: "Product"
+      Anchor: "belt:/Product"
       Public: false
       Doc: ~
       Type: Builtin
@@ -460,6 +467,7 @@ Module
   Funcs:
     Function
       Name: "sum"
+      Anchor: "belt:/sum"
       Public: true
       Extern: false
       Effects: ~
@@ -522,6 +530,7 @@ Module
               Name: "nint"
     Function
       Name: "keysJoined"
+      Anchor: "belt:/keysJoined"
       Public: true
       Extern: false
       Effects: ~
@@ -588,6 +597,7 @@ Module
               Name: "string"
     Function
       Name: "valueSum"
+      Anchor: "belt:/valueSum"
       Public: true
       Extern: false
       Effects: ~
@@ -654,6 +664,7 @@ Module
               Name: "nint"
     Function
       Name: "indexSum"
+      Anchor: "belt:/indexSum"
       Public: true
       Extern: false
       Effects: ~
@@ -716,6 +727,7 @@ Module
               Name: "nint"
     Function
       Name: "sumEven"
+      Anchor: "belt:/sumEven"
       Public: true
       Extern: false
       Effects: ~
@@ -810,6 +822,7 @@ Module
               Name: "nint"
     Function
       Name: "pairCount"
+      Anchor: "belt:/pairCount"
       Public: true
       Extern: false
       Effects: ~
@@ -892,6 +905,7 @@ Module
               Name: "nint"
     Function
       Name: "product"
+      Anchor: "belt:/product"
       Public: true
       Extern: false
       Effects: ~

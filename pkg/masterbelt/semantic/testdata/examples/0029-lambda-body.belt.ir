@@ -2,6 +2,7 @@ Module
   Consts:
     Const
       Name: "Bumped"
+      Anchor: "belt:/Bumped"
       Public: false
       Doc: ~
       Type: App
@@ -171,6 +172,7 @@ Module
         UnionTag: ~
     Const
       Name: "Clamped"
+      Anchor: "belt:/Clamped"
       Public: false
       Doc: ~
       Type: App
@@ -353,6 +355,7 @@ Module
         UnionTag: ~
     Const
       Name: "Labeled"
+      Anchor: "belt:/Labeled"
       Public: false
       Doc: ~
       Type: App

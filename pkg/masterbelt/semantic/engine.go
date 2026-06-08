@@ -201,11 +201,12 @@ func (db *database) rebindDecls(id FileID, old, fresh *ast.File) {
 	keepTypes := map[*ast.TypeDecl]bool{}
 	keepFuncs := map[*ast.FuncDecl]bool{}
 	if fresh != nil {
+		module := moduleSegment(id)
 		for _, d := range fresh.Decls {
 			keep[d] = true
 			db.declFile[d] = id
 			if db.shells[d] == nil {
-				db.shells[d] = &ir.Const{Name: d.Name, Public: d.Public, Doc: d.Doc, Syntax: d}
+				db.shells[d] = &ir.Const{Name: d.Name, Anchor: declAnchor(module, d.Name), Public: d.Public, Doc: d.Doc, Syntax: d}
 			}
 		}
 		for _, t := range fresh.Types {
@@ -215,7 +216,7 @@ func (db *database) rebindDecls(id FileID, old, fresh *ast.File) {
 		for _, fd := range fresh.Funcs {
 			keepFuncs[fd] = true
 			if db.fnShells[fd] == nil {
-				db.fnShells[fd] = &ir.Function{Name: fd.Name, Public: fd.Public, Doc: fd.Doc, Syntax: fd}
+				db.fnShells[fd] = &ir.Function{Name: fd.Name, Anchor: declAnchor(module, fd.Name), Public: fd.Public, Doc: fd.Doc, Syntax: fd}
 			}
 		}
 	}

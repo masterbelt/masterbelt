@@ -2,6 +2,7 @@ Module
   Consts:
     Const
       Name: "ExampleList"
+      Anchor: "belt:/ExampleList"
       Public: false
       Doc: ~
       Type: App
@@ -110,6 +111,7 @@ Module
         UnionTag: ~
     Const
       Name: "ExampleMap"
+      Anchor: "belt:/ExampleMap"
       Public: false
       Doc: ~
       Type: App
@@ -191,6 +193,7 @@ Module
         UnionTag: ~
     Const
       Name: "Inferred"
+      Anchor: "belt:/Inferred"
       Public: false
       Doc: ~
       Type: App
@@ -299,6 +302,7 @@ Module
         UnionTag: ~
     Const
       Name: "Bytes"
+      Anchor: "belt:/Bytes"
       Public: false
       Doc: ~
       Type: App
@@ -416,6 +420,7 @@ Module
         UnionTag: ~
     Const
       Name: "EmptyList"
+      Anchor: "belt:/EmptyList"
       Public: false
       Doc: ~
       Type: App
@@ -449,6 +454,7 @@ Module
         UnionTag: ~
     Const
       Name: "EmptyMap"
+      Anchor: "belt:/EmptyMap"
       Public: false
       Doc: ~
       Type: App

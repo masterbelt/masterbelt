@@ -2,6 +2,7 @@ Module
   Consts:
     Const
       Name: "N"
+      Anchor: "belt:/N"
       Public: false
       Doc: ~
       Type: Builtin
@@ -40,6 +41,7 @@ Module
         UnionTag: ~
     Const
       Name: "P"
+      Anchor: "belt:/P"
       Public: false
       Doc: ~
       Type: Builtin
@@ -83,6 +85,7 @@ Module
   Types:
     TypeDef
       Name: "Bag"
+      Anchor: "belt:/Bag"
       Public: true
       Doc: "A small bag of ints that folds over its contents — an opt-in implementor of" "foldable, so it satisfies a `T: foldable<nint, nint>` bound."
       Params: ~
@@ -94,6 +97,7 @@ Module
       Methods:
         Method
           Name: "fold"
+          Anchor: "belt:/Bag#fold"
           Public: false
           Extern: false
           Kind: 0
@@ -145,6 +149,7 @@ Module
       Where: ~
     TypeDef
       Name: "foldable"
+      Anchor: "belt:/foldable"
       Public: true
       Doc: "A behaviour over a keyed collection: the required fold, plus the provided" "count derived from it. The same prelude-style interface a bound refers to."
       Params:
@@ -158,6 +163,7 @@ Module
       Methods:
         Method
           Name: "fold"
+          Anchor: "belt:/foldable#fold"
           Public: false
           Extern: false
           Kind: 0
@@ -192,6 +198,7 @@ Module
           Owner: "foldable"
         Method
           Name: "count"
+          Anchor: "belt:/foldable#count"
           Public: true
           Extern: false
           Kind: 0
@@ -266,6 +273,7 @@ Module
   Funcs:
     Function
       Name: "total"
+      Anchor: "belt:/total"
       Public: true
       Extern: false
       Effects: ~
@@ -363,6 +371,7 @@ Module
               Name: "nint"
     Function
       Name: "identity"
+      Anchor: "belt:/identity"
       Public: true
       Extern: false
       Effects: ~
@@ -389,6 +398,7 @@ Module
               Bound: ~
     Function
       Name: "firstOf"
+      Anchor: "belt:/firstOf"
       Public: true
       Extern: false
       Effects: ~

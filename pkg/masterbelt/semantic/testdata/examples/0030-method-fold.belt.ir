@@ -2,6 +2,7 @@ Module
   Consts:
     Const
       Name: "FireIsFire"
+      Anchor: "belt:/FireIsFire"
       Public: false
       Doc: ~
       Type: Builtin
@@ -38,6 +39,7 @@ Module
         UnionTag: ~
     Const
       Name: "FireLabel"
+      Anchor: "belt:/FireLabel"
       Public: false
       Doc: ~
       Type: Builtin
@@ -74,6 +76,7 @@ Module
         UnionTag: ~
     Const
       Name: "WaterLabel"
+      Anchor: "belt:/WaterLabel"
       Public: false
       Doc: ~
       Type: Builtin
@@ -110,6 +113,7 @@ Module
         UnionTag: ~
     Const
       Name: "Six"
+      Anchor: "belt:/Six"
       Public: false
       Doc: ~
       Type: Named
@@ -149,6 +153,7 @@ Module
         UnionTag: ~
     Const
       Name: "Start"
+      Anchor: "belt:/Start"
       Public: false
       Doc: ~
       Type: Named
@@ -179,6 +184,7 @@ Module
         UnionTag: ~
     Const
       Name: "Eleven"
+      Anchor: "belt:/Eleven"
       Public: false
       Doc: ~
       Type: Named
@@ -214,6 +220,7 @@ Module
         UnionTag: ~
     Const
       Name: "Thirteen"
+      Anchor: "belt:/Thirteen"
       Public: false
       Doc: ~
       Type: Named
@@ -256,6 +263,7 @@ Module
         UnionTag: ~
     Const
       Name: "Three"
+      Anchor: "belt:/Three"
       Public: false
       Doc: ~
       Type: Named
@@ -302,6 +310,7 @@ Module
         UnionTag: ~
     Const
       Name: "Hero"
+      Anchor: "belt:/Hero"
       Public: false
       Doc: ~
       Type: Named
@@ -359,6 +368,7 @@ Module
         UnionTag: ~
     Const
       Name: "Promoted"
+      Anchor: "belt:/Promoted"
       Public: false
       Doc: ~
       Type: Named
@@ -398,6 +408,7 @@ Module
         UnionTag: ~
     Const
       Name: "Squad"
+      Anchor: "belt:/Squad"
       Public: false
       Doc: ~
       Type: Named
@@ -481,6 +492,7 @@ Module
         UnionTag: ~
     Const
       Name: "LeaderUp"
+      Anchor: "belt:/LeaderUp"
       Public: false
       Doc: ~
       Type: Named
@@ -525,6 +537,7 @@ Module
   Types:
     TypeDef
       Name: "Level"
+      Anchor: "belt:/Level"
       Public: true
       Doc: "A character level, with methods over its underlying sbyte."
       Params: ~
@@ -533,6 +546,7 @@ Module
       Methods:
         Method
           Name: "increment"
+          Anchor: "belt:/Level#increment"
           Public: true
           Extern: false
           Kind: 0
@@ -563,6 +577,7 @@ Module
           Owner: "Level"
         Method
           Name: "plus"
+          Anchor: "belt:/Level#plus"
           Public: true
           Extern: false
           Kind: 0
@@ -604,6 +619,7 @@ Module
       Where: ~
     TypeDef
       Name: "Character"
+      Anchor: "belt:/Character"
       Public: true
       Doc: "A character with a level field."
       Params: ~
@@ -622,6 +638,7 @@ Module
       Where: ~
     TypeDef
       Name: "Party"
+      Anchor: "belt:/Party"
       Public: true
       Doc: "A party wrapping a character, to exercise a nested field path."
       Params: ~
@@ -640,6 +657,7 @@ Module
       Where: ~
     TypeDef
       Name: "Element"
+      Anchor: "belt:/Element"
       Public: true
       Doc: "An elemental affinity, with methods that fold over a constant member."
       Params: ~
@@ -647,6 +665,7 @@ Module
       Methods:
         Method
           Name: "eql"
+          Anchor: "belt:/Element#eql"
           Public: true
           Extern: true
           Kind: 0
@@ -662,6 +681,7 @@ Module
           Owner: "Element"
         Method
           Name: "neq"
+          Anchor: "belt:/Element#neq"
           Public: true
           Extern: true
           Kind: 0
@@ -677,6 +697,7 @@ Module
           Owner: "Element"
         Method
           Name: "lt"
+          Anchor: "belt:/Element#lt"
           Public: true
           Extern: true
           Kind: 0
@@ -692,6 +713,7 @@ Module
           Owner: "Element"
         Method
           Name: "lteq"
+          Anchor: "belt:/Element#lteq"
           Public: true
           Extern: true
           Kind: 0
@@ -707,6 +729,7 @@ Module
           Owner: "Element"
         Method
           Name: "gt"
+          Anchor: "belt:/Element#gt"
           Public: true
           Extern: true
           Kind: 0
@@ -722,6 +745,7 @@ Module
           Owner: "Element"
         Method
           Name: "gteq"
+          Anchor: "belt:/Element#gteq"
           Public: true
           Extern: true
           Kind: 0
@@ -737,6 +761,7 @@ Module
           Owner: "Element"
         Method
           Name: "isFire"
+          Anchor: "belt:/Element#isFire"
           Public: true
           Extern: false
           Kind: 0
@@ -766,6 +791,7 @@ Module
           Owner: "Element"
         Method
           Name: "notFire"
+          Anchor: "belt:/Element#notFire"
           Public: true
           Extern: false
           Kind: 0
@@ -798,6 +824,7 @@ Module
           Owner: "Element"
         Method
           Name: "label"
+          Anchor: "belt:/Element#label"
           Public: true
           Extern: false
           Kind: 0
@@ -913,6 +940,7 @@ Module
   Funcs:
     Function
       Name: "base"
+      Anchor: "belt:/base"
       Public: true
       Extern: false
       Effects: ~

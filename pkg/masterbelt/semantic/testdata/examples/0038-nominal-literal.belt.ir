@@ -2,6 +2,7 @@ Module
   Consts:
     Const
       Name: "Hello"
+      Anchor: "belt:/Hello"
       Public: false
       Doc: ~
       Type: Named
@@ -32,6 +33,7 @@ Module
         UnionTag: ~
     Const
       Name: "World"
+      Anchor: "belt:/World"
       Public: false
       Doc: ~
       Type: Builtin
@@ -59,6 +61,7 @@ Module
         UnionTag: ~
     Const
       Name: "There"
+      Anchor: "belt:/There"
       Public: false
       Doc: ~
       Type: Named
@@ -89,6 +92,7 @@ Module
         UnionTag: ~
     Const
       Name: "Greeting"
+      Anchor: "belt:/Greeting"
       Public: false
       Doc: ~
       Type: Named
@@ -143,6 +147,7 @@ Module
         UnionTag: ~
     Const
       Name: "SameTag"
+      Anchor: "belt:/SameTag"
       Public: false
       Doc: ~
       Type: Builtin
@@ -185,6 +190,7 @@ Module
         UnionTag: ~
     Const
       Name: "OtherTag"
+      Anchor: "belt:/OtherTag"
       Public: false
       Doc: ~
       Type: Builtin
@@ -224,6 +230,7 @@ Module
         UnionTag: ~
     Const
       Name: "North"
+      Anchor: "belt:/North"
       Public: false
       Doc: ~
       Type: Named
@@ -254,6 +261,7 @@ Module
         UnionTag: ~
     Const
       Name: "South"
+      Anchor: "belt:/South"
       Public: false
       Doc: ~
       Type: Named
@@ -284,6 +292,7 @@ Module
         UnionTag: ~
     Const
       Name: "Ok"
+      Anchor: "belt:/Ok"
       Public: false
       Doc: ~
       Type: Named
@@ -318,6 +327,7 @@ Module
           Def: "Tag"
     Const
       Name: "FromOk"
+      Anchor: "belt:/FromOk"
       Public: false
       Doc: ~
       Type: Named
@@ -359,6 +369,7 @@ Module
   Types:
     TypeDef
       Name: "Tag"
+      Anchor: "belt:/Tag"
       Public: true
       Doc: ~
       Params: ~
@@ -373,6 +384,7 @@ Module
       Where: ~
     TypeDef
       Name: "Direction"
+      Anchor: "belt:/Direction"
       Public: true
       Doc: ~
       Params: ~
@@ -430,6 +442,7 @@ Module
           Name: "bool"
     TypeDef
       Name: "Labeled"
+      Anchor: "belt:/Labeled"
       Public: true
       Doc: ~
       Params: ~
@@ -449,6 +462,7 @@ Module
   Funcs:
     Function
       Name: "label"
+      Anchor: "belt:/label"
       Public: true
       Extern: false
       Effects: ~

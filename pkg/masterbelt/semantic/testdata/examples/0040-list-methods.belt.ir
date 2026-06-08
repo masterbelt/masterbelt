@@ -2,6 +2,7 @@ Module
   Consts:
     Const
       Name: "Joined"
+      Anchor: "belt:/Joined"
       Public: false
       Doc: ~
       Type: App
@@ -165,6 +166,7 @@ Module
         UnionTag: ~
     Const
       Name: "Added"
+      Anchor: "belt:/Added"
       Public: false
       Doc: ~
       Type: App
@@ -294,6 +296,7 @@ Module
         UnionTag: ~
     Const
       Name: "NestedAdd"
+      Anchor: "belt:/NestedAdd"
       Public: false
       Doc: ~
       Type: App
@@ -522,6 +525,7 @@ Module
         UnionTag: ~
     Const
       Name: "Pushed"
+      Anchor: "belt:/Pushed"
       Public: false
       Doc: ~
       Type: App
@@ -651,6 +655,7 @@ Module
         UnionTag: ~
     Const
       Name: "Unshifted"
+      Anchor: "belt:/Unshifted"
       Public: false
       Doc: ~
       Type: App
@@ -780,6 +785,7 @@ Module
         UnionTag: ~
     Const
       Name: "Empty"
+      Anchor: "belt:/Empty"
       Public: false
       Doc: ~
       Type: App
@@ -813,6 +819,7 @@ Module
         UnionTag: ~
     Const
       Name: "Last"
+      Anchor: "belt:/Last"
       Public: false
       Doc: ~
       Type: App
@@ -887,6 +894,7 @@ Module
         UnionTag: ~
     Const
       Name: "NoLast"
+      Anchor: "belt:/NoLast"
       Public: false
       Doc: ~
       Type: App
@@ -943,6 +951,7 @@ Module
         UnionTag: ~
     Const
       Name: "First"
+      Anchor: "belt:/First"
       Public: false
       Doc: ~
       Type: App
@@ -1017,6 +1026,7 @@ Module
         UnionTag: ~
     Const
       Name: "NoFirst"
+      Anchor: "belt:/NoFirst"
       Public: false
       Doc: ~
       Type: App
@@ -1075,6 +1085,7 @@ Module
   Funcs:
     Function
       Name: "orZero"
+      Anchor: "belt:/orZero"
       Public: true
       Extern: false
       Effects: ~

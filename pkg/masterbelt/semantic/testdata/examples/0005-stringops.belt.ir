@@ -2,6 +2,7 @@ Module
   Consts:
     Const
       Name: "greeting"
+      Anchor: "belt:/greeting"
       Public: false
       Doc: ~
       Type: Builtin
@@ -41,6 +42,7 @@ Module
         UnionTag: ~
     Const
       Name: "same"
+      Anchor: "belt:/same"
       Public: true
       Doc: ~
       Type: Builtin
@@ -80,6 +82,7 @@ Module
         UnionTag: ~
     Const
       Name: "ordered"
+      Anchor: "belt:/ordered"
       Public: true
       Doc: ~
       Type: Builtin
@@ -119,6 +122,7 @@ Module
         UnionTag: ~
     Const
       Name: "banner"
+      Anchor: "belt:/banner"
       Public: true
       Doc: ~
       Type: Builtin

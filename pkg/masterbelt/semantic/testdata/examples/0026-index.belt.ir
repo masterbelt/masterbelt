@@ -2,6 +2,7 @@ Module
   Consts:
     Const
       Name: "Xs"
+      Anchor: "belt:/Xs"
       Public: false
       Doc: ~
       Type: App
@@ -110,6 +111,7 @@ Module
         UnionTag: ~
     Const
       Name: "First"
+      Anchor: "belt:/First"
       Public: false
       Doc: ~
       Type: Union
@@ -173,6 +175,7 @@ Module
           Name: "nint"
     Const
       Name: "Third"
+      Anchor: "belt:/Third"
       Public: false
       Doc: ~
       Type: Union
@@ -236,6 +239,7 @@ Module
           Name: "nint"
     Const
       Name: "Tbl"
+      Anchor: "belt:/Tbl"
       Public: false
       Doc: ~
       Type: App
@@ -361,6 +365,7 @@ Module
         UnionTag: ~
     Const
       Name: "Sword"
+      Anchor: "belt:/Sword"
       Public: false
       Doc: ~
       Type: Union
@@ -422,6 +427,7 @@ Module
           Name: "nint"
     Const
       Name: "Bumped"
+      Anchor: "belt:/Bumped"
       Public: false
       Doc: ~
       Type: App
@@ -515,6 +521,7 @@ Module
         UnionTag: ~
     Const
       Name: "Put"
+      Anchor: "belt:/Put"
       Public: false
       Doc: ~
       Type: App
@@ -627,6 +634,7 @@ Module
   Funcs:
     Function
       Name: "at"
+      Anchor: "belt:/at"
       Public: true
       Extern: false
       Effects: ~
@@ -689,6 +697,7 @@ Module
                   Name: "error"
     Function
       Name: "bumpFirst"
+      Anchor: "belt:/bumpFirst"
       Public: true
       Extern: false
       Effects: ~
@@ -783,6 +792,7 @@ Module
                   Name: "nint"
     Function
       Name: "put"
+      Anchor: "belt:/put"
       Public: true
       Extern: false
       Effects: ~

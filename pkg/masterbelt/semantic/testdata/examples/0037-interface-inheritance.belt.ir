@@ -3,6 +3,7 @@ Module
   Types:
     TypeDef
       Name: "Tag"
+      Anchor: "belt:/Tag"
       Public: true
       Doc: "A small ordered, printable, rankable tag value."
       Params: ~
@@ -11,6 +12,7 @@ Module
       Methods:
         Method
           Name: "show"
+          Anchor: "belt:/Tag#show"
           Public: false
           Extern: false
           Kind: 0
@@ -28,6 +30,7 @@ Module
           Owner: "Tag"
         Method
           Name: "rank"
+          Anchor: "belt:/Tag#rank"
           Public: false
           Extern: false
           Kind: 0
@@ -45,6 +48,7 @@ Module
           Owner: "Tag"
         Method
           Name: "before"
+          Anchor: "belt:/Tag#before"
           Public: false
           Extern: false
           Kind: 0
@@ -90,6 +94,7 @@ Module
       Where: ~
     TypeDef
       Name: "printable"
+      Anchor: "belt:/printable"
       Public: true
       Doc: "A behaviour layered on a parent: a printable value is comparable, so it" "carries eql/neq (from comparable) on top of its own show."
       Params: ~
@@ -97,6 +102,7 @@ Module
       Methods:
         Method
           Name: "show"
+          Anchor: "belt:/printable#show"
           Public: false
           Extern: false
           Kind: 0
@@ -120,6 +126,7 @@ Module
       Where: ~
     TypeDef
       Name: "rankable"
+      Anchor: "belt:/rankable"
       Public: true
       Doc: "A diamond: ordered inherits comparable through two distinct parents" "(printable and rankable, each comparable). The shared ancestor is deduped by" "definition identity, so ordered's contract carries comparable's members once."
       Params: ~
@@ -127,6 +134,7 @@ Module
       Methods:
         Method
           Name: "rank"
+          Anchor: "belt:/rankable#rank"
           Public: false
           Extern: false
           Kind: 0
@@ -150,6 +158,7 @@ Module
       Where: ~
     TypeDef
       Name: "ordered"
+      Anchor: "belt:/ordered"
       Public: true
       Doc: "The join of two comparable-derived parents: a single shared comparable" "ancestor, reached two ways — the diamond closes cleanly."
       Params: ~
@@ -157,6 +166,7 @@ Module
       Methods:
         Method
           Name: "before"
+          Anchor: "belt:/ordered#before"
           Public: false
           Extern: false
           Kind: 0
@@ -186,6 +196,7 @@ Module
   Funcs:
     Function
       Name: "equal"
+      Anchor: "belt:/equal"
       Public: true
       Extern: false
       Effects: ~

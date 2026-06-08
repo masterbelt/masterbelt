@@ -2,6 +2,7 @@ Module
   Consts:
     Const
       Name: "Sum"
+      Anchor: "belt:/Sum"
       Public: false
       Doc: ~
       Type: Builtin
@@ -32,6 +33,7 @@ Module
         UnionTag: ~
     Const
       Name: "PositionSum"
+      Anchor: "belt:/PositionSum"
       Public: false
       Doc: ~
       Type: Builtin
@@ -62,6 +64,7 @@ Module
         UnionTag: ~
     Const
       Name: "EmptySum"
+      Anchor: "belt:/EmptySum"
       Public: false
       Doc: ~
       Type: Builtin
@@ -92,6 +95,7 @@ Module
         UnionTag: ~
     Const
       Name: "Count"
+      Anchor: "belt:/Count"
       Public: false
       Doc: ~
       Type: Builtin
@@ -143,6 +147,7 @@ Module
         UnionTag: ~
     Const
       Name: "EmptyCount"
+      Anchor: "belt:/EmptyCount"
       Public: false
       Doc: ~
       Type: Builtin
@@ -194,6 +199,7 @@ Module
         UnionTag: ~
     Const
       Name: "AnyBig"
+      Anchor: "belt:/AnyBig"
       Public: false
       Doc: ~
       Type: Builtin
@@ -271,6 +277,7 @@ Module
         UnionTag: ~
     Const
       Name: "AllNonNeg"
+      Anchor: "belt:/AllNonNeg"
       Public: false
       Doc: ~
       Type: Builtin
@@ -348,6 +355,7 @@ Module
         UnionTag: ~
     Const
       Name: "Doubled"
+      Anchor: "belt:/Doubled"
       Public: false
       Doc: ~
       Type: App
@@ -549,6 +557,7 @@ Module
         UnionTag: ~
     Const
       Name: "Evens"
+      Anchor: "belt:/Evens"
       Public: false
       Doc: ~
       Type: App
@@ -758,6 +767,7 @@ Module
         UnionTag: ~
     Const
       Name: "Values"
+      Anchor: "belt:/Values"
       Public: false
       Doc: ~
       Type: App
@@ -910,6 +920,7 @@ Module
         UnionTag: ~
     Const
       Name: "Keys"
+      Anchor: "belt:/Keys"
       Public: false
       Doc: ~
       Type: App
@@ -1062,6 +1073,7 @@ Module
         UnionTag: ~
     Const
       Name: "Folded"
+      Anchor: "belt:/Folded"
       Public: false
       Doc: ~
       Type: Builtin
@@ -1153,6 +1165,7 @@ Module
   Funcs:
     Function
       Name: "total"
+      Anchor: "belt:/total"
       Public: true
       Extern: false
       Effects: ~
@@ -1213,6 +1226,7 @@ Module
               Name: "nint"
     Function
       Name: "positionSum"
+      Anchor: "belt:/positionSum"
       Public: true
       Extern: false
       Effects: ~
@@ -1273,6 +1287,7 @@ Module
               Name: "nint"
     Function
       Name: "emptySum"
+      Anchor: "belt:/emptySum"
       Public: true
       Extern: false
       Effects: ~
