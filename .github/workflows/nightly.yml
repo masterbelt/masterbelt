@@ -94,3 +94,34 @@ jobs:
             dist/SHA256SUMS
           retention-days: 14
           if-no-files-found: error
+
+  # Overwrite the single rolling `nightly` pre-release with this build's archives,
+  # moving its tag to the built commit. Past builds live on as the 14-day
+  # artifacts above; this release always points at the latest.
+  publish:
+    name: publish nightly release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v8
+        with:
+          name: masterbelt-nightly
+          path: dist
+      - name: Generate release notes
+        run: sh build/release-notes.sh >notes.md
+      - name: Publish the rolling nightly release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="$(basename dist/masterbelt-linux-amd64-*.tar.gz .tar.gz | sed 's/^masterbelt-linux-amd64-//')"
+          # Delete the old release and its tag, then recreate at this commit, so
+          # the tag the guard reads back is this build's full SHA.
+          gh release delete nightly --yes --cleanup-tag 2>/dev/null || true
+          gh release create nightly dist/* \
+            --target "$(git rev-parse HEAD)" \
+            --title "nightly $version" \
+            --notes-file notes.md \
+            --prerelease
