@@ -1,0 +1,39 @@
+# Dependabot keeps the project's dependencies — and the SHA-pinned workflow
+# actions — current. A pin with no updater rots: this is the other half of
+# pinning. Each ecosystem's updates are grouped into a single weekly PR to keep
+# the noise down.
+version: 2
+updates:
+  # The workflow actions, pinned by commit SHA: Dependabot bumps the SHA and its
+  # version comment when a new release lands.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ['*']
+    commit-message:
+      prefix: ci
+
+  # Go modules, including the actionlint tool dependency.
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      go-modules:
+        patterns: ['*']
+    commit-message:
+      prefix: build
+
+  # The pnpm workspace: the VS Code extension and the root dev dependencies.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      npm:
+        patterns: ['*']
+    commit-message:
+      prefix: build
