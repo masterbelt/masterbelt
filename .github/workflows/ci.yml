@@ -105,3 +105,16 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Editor extension tests
         run: cd toolchain/editors/vscode && node --test
+
+  # Lint the workflows themselves (actionlint, pinned as a go.mod tool) so a
+  # broken or unsafe workflow change is caught here.
+  actionlint:
+    name: workflow lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: go tool actionlint -color
