@@ -135,7 +135,7 @@ func TestMatchOptionalMissingNull(t *testing.T) {
 	}
 }
 
-// TestMatchIndexUnionRecovery checks the E-18 use case: a match over an index
+// TestMatchIndexUnionRecovery checks that a match over an index
 // read recovers V | error with narrowing and is exhaustive.
 func TestMatchIndexUnionRecovery(t *testing.T) {
 	_, diags := analyze("pub fn f(xs: list<nint>, fb: nint): nint {\n  match xs[0] {\n    nint v   -> return v\n    error e -> return fb\n  }\n}\n")
@@ -306,7 +306,7 @@ func TestExactUnionMemberNotAmbiguous(t *testing.T) {
 	}
 }
 
-// TestNominalUnionMemberSelection pins the F-1 generalization's three union
+// TestNominalUnionMemberSelection pins the three union-member-selection
 // outcomes for a string base flowing into a union carrying a nominal string
 // wrapper — the string twin of the integer rules above:
 //
@@ -341,8 +341,8 @@ func TestNominalUnionMemberSelection(t *testing.T) {
 	}
 }
 
-// TestNominalUnionTagFoldParity is the F-1 fold-parity guarantee: when the
-// checker tags a bare string into a nominal-string union member (Tag of
+// TestNominalUnionTagFoldParity is the nominal-union fold-parity guarantee: when
+// the checker tags a bare string into a nominal-string union member (Tag of
 // Tag | error), the folder folds the value tagged with the *same* member — so a
 // later match dispatches on the member the type layer chose. The value keeps its
 // string, carried under the Tag tag, which is what the .ir dump renders as

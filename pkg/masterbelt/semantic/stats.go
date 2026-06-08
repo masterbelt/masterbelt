@@ -1,10 +1,10 @@
-// This file is the engine's performance side-channel (D-1 M1): per-revision
+// This file is the engine's performance side-channel: per-revision
 // counters of how many distinct queries of each kind were recomputed versus
 // reused (served from a verified memo). It is the executable measure of early
 // cutoff — the engine's defining property — turned into a number a test can
 // pin and an agent can read after an edit.
 //
-// The cardinal rule (D-1 §0, §8-2): instrumentation must not perturb what it
+// The cardinal rule: instrumentation must not perturb what it
 // measures. These counters live beside database.computed, never inside a
 // memo's value and never consulted by equalValue — a stat folded into the
 // cutoff comparison would make every query look changed and destroy the
@@ -43,8 +43,8 @@ func (k queryKind) String() string {
 }
 
 // Stats is a snapshot of one revision's query work: per-kind counts of the
-// distinct queries recomputed and reused, with the totals. It is the M-reuse
-// metric — the hard-gate signal of D-1 — in a form both a golden test and the
+// distinct queries recomputed and reused, with the totals. It is the reuse
+// metric — the engine's hard-gate signal — in a form both a golden test and the
 // --stats CLI output read.
 type Stats struct {
 	Computed map[string]int `json:"computed"`
@@ -58,7 +58,7 @@ type Stats struct {
 // memoCount is the number of live memo entries in the engine — the size of the
 // memo table. It is a pure read of len(db.memos) and touches nothing the engine
 // memoizes (no determinism impact); the LSP samples it over a long session as
-// the leak signal (D-1 §4.2): monotonic growth = a memo table that never sheds.
+// the leak signal: monotonic growth = a memo table that never sheds.
 func (db *database) memoCount() int { return len(db.memos) }
 
 // stats derives the snapshot from the revision's recompute key set and reuse

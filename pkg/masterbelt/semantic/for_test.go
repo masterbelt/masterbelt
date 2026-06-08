@@ -153,7 +153,7 @@ const forInterfaceSrc = "" +
 // interface in requirement position (c: foldable<int, int>) is iterable: the
 // loop variable types at the interface's V for of (and K for in), and the
 // function type-checks with no not_iterable. The same value's c.fold(...) call is
-// accepted, so for must be too (plan §3.1).
+// accepted, so for must be too.
 func TestForOverInterfaceParam(t *testing.T) {
 	src := forInterfaceSrc +
 		"pub fn total(c: foldable<nint, nint>): nint {\n" +

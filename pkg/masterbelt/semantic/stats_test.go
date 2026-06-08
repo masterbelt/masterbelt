@@ -7,7 +7,7 @@ import (
 	"github.com/masterbelt/masterbelt/pkg/source"
 )
 
-// TestStatsDoesNotPerturbCutoff is the M1 invariant (D-1 §8-2): reading the
+// TestStatsDoesNotPerturbCutoff pins the invariant that reading the
 // performance side-channel must not change what the engine memoizes. The same
 // incremental edit is replayed on two programs — one whose Stats() is read on
 // every Refresh, one never read — and their recompute sets must be identical.
@@ -40,7 +40,7 @@ func TestStatsDoesNotPerturbCutoff(t *testing.T) {
 // TestStatsReuseReflectsCutoff pins that the counters report what early cutoff
 // actually did: editing a leaf constant no one depends on recomputes its own
 // queries while the rest survive as reused. The exact numbers are the
-// reuse-snapshot's business (M3); here we pin the shape — a steady edit reuses
+// reuse-snapshot's business; here we pin the shape — a steady edit reuses
 // more than nothing, proving the counter observes the cutoff.
 func TestStatsReuseReflectsCutoff(t *testing.T) {
 	// const C = B is the leaf; rewriting its initializer to a literal recomputes
@@ -58,7 +58,7 @@ func TestStatsReuseReflectsCutoff(t *testing.T) {
 }
 
 // TestMemoCount pins the memo-table size accessor the LSP samples as its leak
-// signal (D-1 §4.2): it is non-zero after a real analysis, and a no-op refresh
+// signal: it is non-zero after a real analysis, and a no-op refresh
 // (re-pushing the same input, which setInput treats as a no-op) neither grows
 // nor resets it — the table is stable when nothing changed. It is a pure read,
 // so calling it must not perturb what the engine memoizes.

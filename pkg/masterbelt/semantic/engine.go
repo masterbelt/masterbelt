@@ -138,7 +138,7 @@ type database struct {
 	stack          []*frame // active computations, for dependency capture
 	running        map[queryKey]bool
 	computed       map[queryKey]bool // keys (re)computed since the last setInput; for tests
-	reused         map[queryKind]int // per-kind count of queries served from a verified memo since the last setInput (D-1 M-reuse side-channel)
+	reused         map[queryKind]int // per-kind count of queries served from a verified memo since the last setInput (the reuse side-channel)
 }
 
 func newDatabase(u builtins) *database {

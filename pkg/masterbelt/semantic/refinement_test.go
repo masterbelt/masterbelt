@@ -112,8 +112,8 @@ func TestRefinementBadMethod(t *testing.T) {
 	}
 }
 
-// TestStringRefinement is the original motivation of F-1: a string-based
-// refinement (the "literal union" idiom) was impossible because `self == "north"`
+// TestStringRefinement checks a string-based
+// refinement (the "literal union" idiom), which was impossible because `self == "north"`
 // did not type-check — the self-typed operand never unified with the string
 // literal. Now the predicate validates, a member of the value set passes, and a
 // non-member is a refinement_violation with the value, type, and predicate quoted.

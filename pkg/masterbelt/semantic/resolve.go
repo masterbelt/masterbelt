@@ -111,10 +111,9 @@ func resolveTypes(folder exprFolder, file *ast.File, at func(ast.Node) span, dia
 	// Fourth pass: fold the associated-constant initializers, deferred until
 	// every type, enum, and impl of the file has resolved so a cross-type
 	// reference (another type's enum member, associated constant, or static
-	// fn) folds — the in-pass eager fold ran before its targets existed
-	// (E-followups §E-7). The fold reads the just-built defs directly rather
-	// than the universe query, which is this very computation and would
-	// cycle-guard to nothing.
+	// fn) folds — the in-pass eager fold ran before its targets existed. The
+	// fold reads the just-built defs directly rather than the universe query,
+	// which is this very computation and would cycle-guard to nothing.
 	foldAssocConsts(folder, defs, append(append([]*ir.TypeDef{}, out...), enumOut...))
 
 	out = append(out, enumOut...)
@@ -922,7 +921,7 @@ func constantType(v *ir.Constant) ir.Type {
 
 // resolveEnumDecl fills in an enum definition from its declaration: the base
 // type (the integer family or string; the default nint when omitted), the member
-// values determined by the §3.5 rules, and the operator methods (the six
+// values determined by the enum member-value rules, and the operator methods (the six
 // comparisons every enum has, plus the impl block's). Diagnostics — an invalid
 // base type, an out-of-range or duplicate value, a duplicate member name — are
 // reported through diags (nil in the silent memoized pass). env folds the
@@ -952,9 +951,8 @@ func resolveEnumDecl(folder exprFolder, defs map[string]*ir.TypeDef, r *infer.Ty
 
 	resolveEnumMembers(folder, defs, reg, ed, def, base, baseType, isString, at, diags)
 
-	// Duplicate values are forbidden outright (§3.5-5): two members whose
-	// settled values coincide — explicit or defaulted — are an error, reported
-	// at the second.
+	// Duplicate values are forbidden outright: two members whose settled values
+	// coincide — explicit or defaulted — are an error, reported at the second.
 	checkDuplicateEnumValues(def, ed, at, diags)
 
 	// The impl block's associated constants (read as EnumName.Name), the same
@@ -969,8 +967,8 @@ func resolveEnumDecl(folder exprFolder, defs map[string]*ir.TypeDef, r *infer.Ty
 	checkMemberDecls(def, at, diags)
 }
 
-// resolveEnumMembers settles the enum's member values in declaration order
-// (§3.5): an explicit initializer folds against the base type; an omitted one
+// resolveEnumMembers settles the enum's member values in declaration order:
+// an explicit initializer folds against the base type; an omitted one
 // takes the previous integer value plus one (zero for the first), or, for a
 // string base, the member's own name. The values are settled for the whole enum
 // before duplicate detection, so a diagnostic never leaves the value table in a
@@ -1100,8 +1098,8 @@ func nextIntCounter(prev *big.Int) *big.Int {
 }
 
 // checkDuplicateEnumValues reports a duplicate_enum_value for any member whose
-// settled value coincides with an earlier member's — the no-alias rule (§3.5-5),
-// which keeps Name and Value in bijection. A member with no settled value (an
+// settled value coincides with an earlier member's — the no-alias rule, which
+// keeps Name and Value in bijection. A member with no settled value (an
 // unevaluable initializer) is skipped: its duplication cannot be decided.
 func checkDuplicateEnumValues(def *ir.TypeDef, ed *ast.EnumDecl, at func(ast.Node) span, diags *diagnostic.List) {
 	if at == nil || diags == nil {

@@ -8,10 +8,10 @@ import (
 
 // BenchmarkIncremental measures the LSP-realistic inner loop: a single
 // keystroke applied through the incremental Document.Edit path followed by a
-// Refresh (D-1 M-inc). The program is built cold once outside the loop; only the
+// Refresh. The program is built cold once outside the loop; only the
 // edit and the re-analysis it triggers are timed, which is what early cutoff is
 // supposed to keep cheap regardless of project size. Sub-benchmarks per
-// generator size make the incremental curve visible (D-1 M-scale); -benchmem
+// generator size make the incremental curve visible; -benchmem
 // gives the per-edit allocation gate.
 func BenchmarkIncremental(b *testing.B) {
 	for _, p := range benchCorpus {

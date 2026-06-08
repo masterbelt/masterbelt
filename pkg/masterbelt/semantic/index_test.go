@@ -6,7 +6,7 @@ import "testing"
 // union (V | error). A write coll[i] = v desugars to coll = coll.set(i, v): a
 // rebind of the collection. The reads and the in-range writes analyze cleanly;
 // the only new diagnostic is a list write past the end (index_out_of_range),
-// which the const/immutable-data rules of E-15 still pre-empt for an immutable
+// which the const/immutable-data rules still pre-empt for an immutable
 // target.
 
 // TestIndexReadOK checks that index reads — a list element, a map value, a
@@ -85,8 +85,8 @@ func TestIndexOutOfRange(t *testing.T) {
 }
 
 // TestIndexWriteToConst checks that a write to a const collection is rejected as
-// assign_to_const (a const is immutable), the E-15 rule, rather than as an
-// out-of-range write: the immutable target is caught before the bounds.
+// assign_to_const (a const is immutable) rather than as an out-of-range write:
+// the immutable target is caught before the bounds.
 func TestIndexWriteToConst(t *testing.T) {
 	_, diags := analyze("const Ys = [1, 2, 3]\npub fn f(): nint {\n  Ys[0] = 9\n  return 0\n}\n")
 	if !hasCode(diags, CodeAssignToConst) {
@@ -110,7 +110,7 @@ func TestIndexWriteDynamic(t *testing.T) {
 // constEqual learned the composite kinds, a list/record key always compared
 // unequal, so the read mis-folded to a key-not-found error and the write built a
 // map with two entries for the same key.
-// TestEmptyMapConstUpsertFolds is the E-18 follow-up's main case: an empty
+// TestEmptyMapConstUpsertFolds checks that an empty
 // collection typed as a map (const M: map<string, int> = []) carries the map
 // mapness through its annotation, so a set on it upserts and folds — where the old
 // "empty reads as list" default left the upsert unfolded. The empty list stays a

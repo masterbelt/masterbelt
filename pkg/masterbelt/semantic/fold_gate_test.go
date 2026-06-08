@@ -27,10 +27,9 @@ const foldCorpus = "testdata/fold"
 
 // knownGaps names the corpus cases that are open silent-unfold gaps —
 // analysis green, value missing. Each entry is asserted to still be broken,
-// so closing a gap fails the gate until its entry is removed. The F-2
-// milestones emptied the list ((c)/extern in M3, (a)/(d) in M4, (b) in M5,
-// depth in M6): the gates now enforce the full rule with no exceptions, and
-// any future entry is a deliberate, reviewed regression allowance.
+// so closing a gap fails the gate until its entry is removed. The list is now
+// empty: the gates enforce the full rule with no exceptions, and any future
+// entry is a deliberate, reviewed regression allowance.
 var knownGaps = map[string]string{}
 
 // foldExpect is one corpus case's expectation: it folds completely (and is

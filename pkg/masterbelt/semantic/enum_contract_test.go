@@ -8,8 +8,8 @@ import (
 )
 
 // TestEnumAutoContract checks that an enum's definition opts into comparable and
-// orderable automatically — it carries the six comparisons (E-2 §3.4: equality
-// by index, order by base value), so a generic bound of either is satisfied by
+// orderable automatically — it carries the six comparisons (equality by index,
+// order by base value), so a generic bound of either is satisfied by
 // an enum without the author writing an impl tag.
 func TestEnumAutoContract(t *testing.T) {
 	m, diags := analyze("pub enum Rarity {\n  Common\n  Rare\n}\n")

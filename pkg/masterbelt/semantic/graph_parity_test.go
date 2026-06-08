@@ -1,4 +1,4 @@
-// This file pins the IR interpreter against the published folds (F-3 §2.6):
+// This file pins the IR interpreter against the published folds:
 // every shared example's constant must fold to the same value through
 // eval.Graph over the annotated value graph as the AST-driven folder published
 // (Const.Eval) — the parity gate the migration holds while the consumers

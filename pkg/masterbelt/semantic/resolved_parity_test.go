@@ -116,7 +116,7 @@ func TestFuncCallTargetCorrected(t *testing.T) {
 }
 
 // TestSubstWriteBack checks the checker's solved type-variable substitution is
-// written back onto the call nodes (F-3 §2.3): a generic function call records
+// written back onto the call nodes: a generic function call records
 // what the arguments pinned, a method call on a generic receiver records the
 // receiver's bindings combined with its own solved variables, and a call that
 // pins nothing stays nil — so the IR carries the monomorphization input

@@ -1,7 +1,7 @@
 package semantic
 
-// This file is the performance equivalent of the IR snapshot (D-1 §4.1, §7-M3,
-// §8-3): the reuse snapshot, the deterministic hard gate that is the plan's
+// This file is the performance equivalent of the IR snapshot: the reuse
+// snapshot, the deterministic hard gate that is the plan's
 // crown jewel. It generalizes the hand-written TestEarlyCutoff* assertions into
 // a corpus-driven golden harness. For each (project source, edit) case it
 // applies the edit through the incremental path and snapshots the per-kind
@@ -15,7 +15,7 @@ package semantic
 // is exactly the silent decay this gate exists to catch.
 //
 // The profile is counts only — no wall-clock, no nondeterministic value — so it
-// is a deterministic metric and a hard gate (D-1 §1). The engine is
+// is a deterministic metric and a hard gate. The engine is
 // deterministic (pointer keys, revisioned memos), so a fixed edit on a fixed
 // project recomputes exactly the same key set every run; if these counts ever
 // vary across runs, the engine or this rendering is nondeterministic and must

@@ -1,10 +1,11 @@
-// This file holds the IR half of the text-representation gates (F-4 §2.4)
-// and the headline one, P4: a module rebuilt from its text form has lost
-// every AST backpointer by construction, so when the IR interpreter folds the
-// detached graph to the very values the live pipeline published, "the AST
-// carries no semantics" (F-3's invariant) is a fact CI re-proves on every
-// run, not a doctrine. P1 (linked canonicity) and P2 (golden survival) ride
-// the same corpus; F1 keeps the unmarshaler panic-free on arbitrary input.
+// This file holds the IR half of the text-representation gates, and the
+// headline one — the detached fold: a module rebuilt from its text form has
+// lost every AST backpointer by construction, so when the IR interpreter folds
+// the detached graph to the very values the live pipeline published, "the AST
+// carries no semantics" is a fact CI re-proves on every run, not a doctrine.
+// Linked canonicity (the linked re-marshal is byte-identical) and golden
+// survival (committed .ir snapshots round-trip) ride the same corpus; the fuzz
+// gate keeps the unmarshaler panic-free on arbitrary input.
 package semantic
 
 import (
@@ -23,8 +24,8 @@ import (
 
 // textResolver links a detached module against the world outside it: the
 // prelude's type definitions and — for a project file — the live sibling
-// modules' declarations. This is the explicit-Link half of the closure story
-// (F-4 §3): the text carries one module, and the resolver is the closure.
+// modules' declarations. This is the explicit-Link half of the closure story:
+// the text carries one module, and the resolver is the closure.
 func textResolver(siblings []*ir.Module) ir.Resolver {
 	return ir.Resolver{
 		Const:    func(name string) *ir.Const { return siblingConst(siblings, name) },
@@ -90,8 +91,8 @@ func constantText(t *testing.T, c *ir.Constant) string {
 }
 
 // roundTripModule drives one module through the whole gate: marshal,
-// unmarshal, link, re-marshal byte-identically (P1), then fold every
-// constant of the detached graph and compare with the published Eval (P4).
+// unmarshal, link, re-marshal byte-identically, then fold every
+// constant of the detached graph and compare with the published Eval.
 func roundTripModule(t *testing.T, label string, live *ir.Module, siblings []*ir.Module) {
 	t.Helper()
 	first, err := live.MarshalText()
@@ -110,10 +111,10 @@ func roundTripModule(t *testing.T, label string, live *ir.Module, siblings []*ir
 		t.Fatalf("%s: re-MarshalText: %v", label, err)
 	}
 	if !bytes.Equal(first, second) {
-		t.Errorf("%s: linked re-marshal is not byte-identical (P1)", label)
+		t.Errorf("%s: linked re-marshal is not byte-identical", label)
 	}
 
-	// P4: the detached fold. The graph env reads types off the detached
+	// The detached fold. The graph env reads types off the detached
 	// module (plus the prelude and the siblings); the folder reads only the
 	// graph. Nothing here can touch an AST — the backpointers do not exist.
 	// The oracle is the same interpreter folding the live module's graph:
@@ -132,13 +133,13 @@ func roundTripModule(t *testing.T, label string, live *ir.Module, siblings []*ir
 		got := eval.GraphExpecting(c.Value, c.Type, detachedEnv)
 		want := eval.GraphExpecting(live.Consts[i].Value, live.Consts[i].Type, liveEnv)
 		if constantText(t, got) != constantText(t, want) {
-			t.Errorf("%s: const %s: detached fold = %s, live fold = %s (P4)", label, c.Name, got, want)
+			t.Errorf("%s: const %s: detached fold = %s, live fold = %s", label, c.Name, got, want)
 		}
 	}
 }
 
-// TestIRTextRoundTrip runs the P1/P4 gates over every shared example, single
-// files and projects alike.
+// TestIRTextRoundTrip runs the round-trip and detached-fold gates over every
+// shared example, single files and projects alike.
 func TestIRTextRoundTrip(t *testing.T) {
 	entries, err := os.ReadDir(sharedExamples)
 	if err != nil {
@@ -156,7 +157,7 @@ func TestIRTextRoundTrip(t *testing.T) {
 }
 
 // roundTripProjectExample analyzes a multi-file example project and runs the
-// P1/P4 round-trip gate over each module against its siblings.
+// round-trip gate over each module against its siblings.
 func roundTripProjectExample(t *testing.T, name string) {
 	t.Helper()
 	proj, pdiags := project.Open(filepath.Join(sharedExamples, name))
@@ -181,7 +182,7 @@ func roundTripProjectExample(t *testing.T, name string) {
 	}
 }
 
-// roundTripFileExample analyzes a single-file example and runs the P1/P4
+// roundTripFileExample analyzes a single-file example and runs the
 // round-trip gate over its module.
 func roundTripFileExample(t *testing.T, name string) {
 	t.Helper()
@@ -193,8 +194,8 @@ func roundTripFileExample(t *testing.T, name string) {
 	roundTripModule(t, name, module, nil)
 }
 
-// TestIRSnapshotsUnmarshal pins P2: every committed .ir snapshot unmarshals
-// and re-marshals to its own bytes. A project snapshot concatenates its
+// TestIRSnapshotsUnmarshal pins golden survival: every committed .ir snapshot
+// unmarshals and re-marshals to its own bytes. A project snapshot concatenates its
 // per-file modules under "# id" headers; each section is its own module text.
 func TestIRSnapshotsUnmarshal(t *testing.T) {
 	matches, err := irSnapshotFiles()
@@ -265,7 +266,7 @@ func irSnapshotSections(data []byte) map[string][]byte {
 	return out
 }
 
-// FuzzIRUnmarshal is the F1 gate: the unmarshaler accepts or rejects any
+// FuzzIRUnmarshal is the fuzz gate: the unmarshaler accepts or rejects any
 // input without panicking, and whatever it accepts marshals without error to
 // something the unmarshaler accepts again. (Byte canonicity is the linked
 // round trip's property — TestIRTextRoundTrip pins it; an unlinked module's

@@ -10,7 +10,7 @@ import (
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
 )
 
-// midsizeDir is the committed mid-size real fixture (D-1 §3): a game-data
+// midsizeDir is the committed mid-size real fixture: a game-data
 // project of several files with cross-file imports, modeling the language's
 // purpose rather than the synthetic generator's shape. Its files share one
 // directory, so a use path is the imported file's name — the flat resolution

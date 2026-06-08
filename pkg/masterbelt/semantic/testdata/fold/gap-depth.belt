@@ -1,5 +1,5 @@
 // fold-expect: diagnosed unfolded_const
-// A recursion past the application depth budget must be an error (M6), not a
+// A recursion past the application depth budget must be an error, not a
 // silent unfold.
 pub fn deep(n: nint): nint {
   if n == 0 {

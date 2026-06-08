@@ -1,5 +1,5 @@
 // fold-expect: folds
-// A static fn call and a getter read fold (E-19).
+// A static fn call and a getter read fold.
 pub type Celsius = { deg: nint } impl {
   pub static fn freezing(): Celsius {
     return Celsius{ deg: 0 }

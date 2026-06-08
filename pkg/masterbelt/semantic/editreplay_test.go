@@ -12,7 +12,7 @@ import (
 // replayer drives a multi-file Program the way an editor session does: an edit
 // goes to one file's syntax document, that file is re-pushed with its
 // re-resolved use table, and the program is refreshed — the LSP-realistic
-// incremental path (D-1 §3 edit-replay). It is the multi-file generalization of
+// incremental path (edit-replay). It is the multi-file generalization of
 // edit_test.go's editable, used by the incremental benchmarks and reusable by
 // later trend work.
 //
@@ -78,7 +78,7 @@ func (r *replayer) apply(file FileID, ed source.Edit) Stats {
 	return r.prog.Stats()
 }
 
-// The realistic edit kinds of D-1 §3, each a constructor for a source.Edit
+// The realistic edit kinds, each a constructor for a source.Edit
 // given a position in the current text. They are deliberately tiny so a replay
 // sequence reads as the editor gestures it models.
 
@@ -117,7 +117,7 @@ type editScript struct {
 	steps []source.Edit
 }
 
-// soleScripts returns the realistic single-file edit gestures of D-1 §3 against
+// soleScripts returns the realistic single-file edit gestures against
 // a one-file program whose source is src: a keystroke, a paste, a rename, and a
 // new use. Each script is independent — a benchmark resets the session between
 // scripts — so the offsets are all into the original src.

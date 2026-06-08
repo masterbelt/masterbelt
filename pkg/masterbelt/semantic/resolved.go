@@ -35,7 +35,7 @@ type callResolutions struct {
 	// adapts accumulates the Adapted stream: the positions where the checker
 	// accepted a value at a differing expectation, keyed by the expression,
 	// with the adapted-to type — the write-back wraps each one in an explicit
-	// ir.Adapt (F-3 §2.2).
+	// ir.Adapt.
 	adapts map[ast.Expr]ir.Type
 }
 
@@ -56,7 +56,7 @@ func newCallResolutions() *callResolutions {
 // function as both Resolved and Target — correcting the type-blind lowering's
 // arity-based guess. Each call form also takes the checker's solved
 // type-variable substitution (Subst), the monomorphization input, and every
-// value node takes its settled type (the typed value graph, F-3 §2.1): a node
+// value node takes its settled type (the typed value graph): a node
 // with a Syntax key reads the checker's Typed stream, and a binding reference
 // (a parameter, a local, self) reads its binding's type off the enclosing
 // signature or introducing statement — the same fact the checker's scope

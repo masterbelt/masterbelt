@@ -14,7 +14,7 @@
 // exists to supply a user-declared native (codegen and link verification do
 // not exist yet), so admitting any extern admits an unverifiable claim.
 // When a supply-verifying link stage exists, user externs may return with it
-// — and only with it (tmp/plan/F-2-fold-totality.md §6).
+// — and only with it.
 
 package semantic
 

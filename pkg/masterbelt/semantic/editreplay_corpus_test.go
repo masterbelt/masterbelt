@@ -46,7 +46,7 @@ func entryEdit(src []byte) source.Edit {
 // single keystroke on the entry file must leave the program clean and must
 // reuse work rather than recompute everything — an edit that recomputed every
 // query would mean the incremental path collapsed to a cold compile, the exact
-// regression D-1's loop exists to catch.
+// regression the incremental loop exists to catch.
 func TestEditReplayCorpus(t *testing.T) {
 	for _, p := range benchCorpus {
 		t.Run(corpusLabel(p), func(t *testing.T) {

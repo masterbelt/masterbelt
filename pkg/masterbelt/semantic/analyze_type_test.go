@@ -48,7 +48,7 @@ func TestDuplicateDeclaration(t *testing.T) {
 
 func TestLocalTypeAnnotation(t *testing.T) {
 	// A file's own type declarations are visible to its const annotations —
-	// the same universe imported types join (P-2). The annotated constant's
+	// the same universe imported types join. The annotated constant's
 	// Named type points at the very TypeDef the module publishes.
 	m, diags := analyze("pub type Coin = sbyte\nconst c: Coin = 1\n")
 	if len(diags) != 0 {

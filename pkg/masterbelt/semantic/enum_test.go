@@ -20,7 +20,7 @@ func enumDef(m *ir.Module, name string) *ir.TypeDef {
 }
 
 // memberValues renders an enum's members as "Name=value" pairs in declaration
-// order, for asserting the §3.5 value rules.
+// order, for asserting the value rules.
 func memberValues(def *ir.TypeDef) string {
 	parts := make([]string, len(def.Enum.Members))
 	for i, m := range def.Enum.Members {

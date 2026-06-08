@@ -83,11 +83,11 @@ func TestStringOperationsFold(t *testing.T) {
 	}
 }
 
-// TestNominalStringOperatorFolds pins the operator path F-1 unblocks end to end:
-// a nominal type over a string base derives the string's operators, so a bare
-// string value as the operand resolves and the comparison folds — `t == "x"` on
-// a Tag = string is bool true, with no invalid_operation (the §0 symptom). The
-// self-returning concatenation keeps the nominal type and folds its string.
+// TestNominalStringOperatorFolds pins that a nominal type over a string base
+// derives the string's operators end to end, so a bare string value as the
+// operand resolves and the comparison folds — `t == "x"` on a Tag = string is
+// bool true, with no invalid_operation. The self-returning concatenation keeps
+// the nominal type and folds its string.
 func TestNominalStringOperatorFolds(t *testing.T) {
 	m, diags := analyze("pub type Tag = string\n" +
 		"const t: Tag = \"x\"\n" +
@@ -157,10 +157,10 @@ func TestCollectionElementAdaptsAndChecks(t *testing.T) {
 	}
 }
 
-// TestNominalBaseValueAdapts is the end-to-end of F-1: a value of a builtin base
-// type adapts to the nominal type that wraps it, for *every* base — not only the
-// integer one that always worked. These are exactly the §0 symptoms that were
-// type_mismatch before the fix. The nominal regime is preserved: a nominal value
+// TestNominalBaseValueAdapts is the end-to-end check that a value of a builtin
+// base type adapts to the nominal type that wraps it, for *every* base — not only
+// the integer one that always worked. These cases were all type_mismatch before
+// the fix. The nominal regime is preserved: a nominal value
 // does not flow back to its base, nor across to a different wrapper of the same
 // base, and a base value does not flow into an enum.
 func TestNominalBaseValueAdapts(t *testing.T) {

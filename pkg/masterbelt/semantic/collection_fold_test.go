@@ -2,13 +2,13 @@ package semantic
 
 import "testing"
 
-// These tests pin the collection folding completeness work (stream A): the
+// These tests pin the collection folding completeness work: the
 // native list.len and the native fold (list and map), and the foldable provided
 // methods defined on top of fold — count, any, all, map, filter, keys, values —
 // which all fold at compile time through the real prelude (foldable.belt, list.belt, map.belt).
 
 // TestListLenFolds checks that list.len() folds to the element count — the
-// intrinsic E-18 left for map but not list.
+// intrinsic that previously existed for map but not list.
 func TestListLenFolds(t *testing.T) {
 	src := "const N = [1, 2, 3].len()\n"
 	if got := evalOf(t, src, "N").Int.Int64(); got != 3 {

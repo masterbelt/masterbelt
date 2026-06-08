@@ -1,4 +1,4 @@
-// These tests pin the explicit-adaption write-back (F-3 §2.2): every implicit
+// These tests pin the explicit-adaption write-back: every implicit
 // conversion the checker accepts — a literal width settle, a nominal adaption,
 // a union inflow — becomes an ir.Adapt node in the value graph, so nothing
 // converts silently in the IR and the union tag is readable off the structure

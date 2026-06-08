@@ -203,7 +203,7 @@ func TestEnclosingDecl(t *testing.T) {
 	}
 }
 
-// TestAnchorIncremental pins the stability rule (A-5 §7): editing a
+// TestAnchorIncremental pins the stability rule: editing a
 // declaration's body leaves its anchor unchanged, while renaming it changes the
 // anchor (the address tracks the name, not the position).
 func TestAnchorIncremental(t *testing.T) {

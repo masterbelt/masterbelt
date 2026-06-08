@@ -126,7 +126,7 @@ func TestStaticAndMethodNamespacesCoexist(t *testing.T) {
 }
 
 // TestGetterAndAssocConstCoexist checks a getter max and an associated constant
-// Max coexist (value.max vs Type.Max), the §3.5 example.
+// Max coexist (value.max vs Type.Max).
 func TestGetterAndAssocConstCoexist(t *testing.T) {
 	src := "pub type C = { d: nint } impl {\n" +
 		"  pub const Max = 100\n" +

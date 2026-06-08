@@ -7,7 +7,7 @@ import (
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
 )
 
-// This file holds the one place anchors are made (A-5): the stable,
+// This file holds the one place anchors are made: the stable,
 // position-independent address every declaration carries. An anchor is
 //
 //	belt:<module>/<name>[#<member>]
@@ -19,7 +19,7 @@ import (
 // across edits that shift line numbers, and an incremental recompute reproduces
 // it exactly (it cannot fork the engine's early cutoff). It does change when a
 // declaration is renamed or its file moved: an anchor is stable against
-// position edits, not against renames (A-5 §7).
+// position edits, not against renames.
 
 // anchorScheme is the prefix every anchor carries, naming the addressing scheme.
 const anchorScheme = "belt:"
@@ -56,9 +56,9 @@ func memberAnchor(parent, member string) string {
 // ByAnchor returns every declaration in the program with the given anchor, in
 // file-id order — an overload set spread across files holds several, a "(sig)"
 // suffix narrows it to one, and an address nothing carries returns nil. It is
-// the resolution side of A-5: the common address a structure-editing or MCP
-// request names a declaration by (B-2, B-6), rather than a file-and-position
-// the next edit invalidates. The returned values are the concrete IR nodes; see
+// the resolution side of anchoring: the common address a structure-editing or
+// MCP request names a declaration by, rather than a file-and-position the next
+// edit invalidates. The returned values are the concrete IR nodes; see
 // ir.Module.ByAnchor for the matching rule.
 func (p *Program) ByAnchor(anchor string) []any {
 	var out []any
@@ -75,8 +75,8 @@ func (p *Program) ByAnchor(anchor string) []any {
 // function, or a method or associated constant nested in a type — and ok=false
 // when the offset lies in no declaration (or the file has no module). It is how
 // a position-only fact, a diagnostic's offset above all, is given a stable
-// address at the boundary where it is serialized (the check JSON, A-5 §3.5),
-// without the diagnostic itself ever carrying one.
+// address at the boundary where it is serialized (the check JSON), without the
+// diagnostic itself ever carrying one.
 func (p *Program) EnclosingDecl(file FileID, offset int) (string, bool) {
 	module := p.modules[file]
 	doc := p.docs[file]

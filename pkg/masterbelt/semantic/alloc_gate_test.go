@@ -8,7 +8,7 @@ import (
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
 )
 
-// This file is the allocation hard gate (D-1 §4.1): allocs/op is a nearly
+// This file is the allocation hard gate: allocs/op is a nearly
 // deterministic metric — the same code path makes the same allocations — so a
 // ceiling on it catches an allocation regression (a doubling when early cutoff
 // collapses or a new per-node alloc creeps in) without the flakiness of a

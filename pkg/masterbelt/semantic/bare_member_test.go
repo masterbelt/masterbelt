@@ -214,7 +214,7 @@ func TestBareMemberUnionAliasConst(t *testing.T) {
 // TestBareMemberAssocConstInit pins context 5: an enum's own impl-block
 // associated constant, whose bare-member initializer folds through the enum's
 // annotation. (An enum's members are settled before its impl consts, so its own
-// const sees them — the meaningful E-2 case. A cross-type assoc const referencing
+// const sees them — the case that meaningfully folds. A cross-type assoc const referencing
 // another enum's member does not fold for the bare form any more than for the
 // qualified one — a separate, pre-existing assoc-const ordering limitation.)
 func TestBareMemberAssocConstInit(t *testing.T) {
