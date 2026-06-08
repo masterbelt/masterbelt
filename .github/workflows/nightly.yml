@@ -32,6 +32,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       build: ${{ steps.decide.outputs.build }}
+      attest: ${{ steps.decide.outputs.attest }}
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
       - id: decide
@@ -51,6 +52,19 @@ jobs:
             echo "build=true" >>"$GITHUB_OUTPUT"
           fi
 
+          # Build provenance attestation needs a public repo or an org plan that
+          # includes artifact attestations; on a private repo without it the
+          # attest API returns "Feature not available" and reds the build. Probe
+          # visibility so the build skips the attest steps instead of failing,
+          # and picks them back up automatically once the repo is public. (If the
+          # plan gains attestations while the repo stays private, widen this.)
+          if [ "$(gh repo view --json visibility -q .visibility 2>/dev/null || echo private)" = public ]; then
+            echo "attest=true" >>"$GITHUB_OUTPUT"
+          else
+            echo "provenance attestation unavailable for a private repo on this plan — skipping it"
+            echo "attest=false" >>"$GITHUB_OUTPUT"
+          fi
+
   # Don't ship red: the same tests CI runs must pass before anything is built.
   gate:
     needs: guard
@@ -59,7 +73,7 @@ jobs:
 
   build:
     name: cross-build
-    needs: gate
+    needs: [guard, gate]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -88,7 +102,10 @@ jobs:
           "$tmp/masterbelt" version
           "$tmp/masterbelt" check pkg/belt/testdata/examples/0009-project
 
+      # Attestation needs a public repo or a plan with artifact attestations;
+      # guard probes for it so a private repo skips this rather than failing.
       - name: Attest build provenance
+        if: needs.guard.outputs.attest == 'true'
         uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
         with:
           subject-path: |
@@ -147,7 +164,7 @@ jobs:
   # :nightly-<date>-<sha> tag is immutable for pinning.
   image:
     name: container image
-    needs: build
+    needs: [guard, build]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -194,6 +211,7 @@ jobs:
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.created=${{ steps.meta.outputs.created }}
       - name: Attest image provenance
+        if: needs.guard.outputs.attest == 'true'
         uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
         with:
           subject-name: ghcr.io/${{ github.repository }}
