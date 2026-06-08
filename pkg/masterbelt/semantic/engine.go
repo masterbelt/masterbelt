@@ -138,6 +138,7 @@ type database struct {
 	stack          []*frame // active computations, for dependency capture
 	running        map[queryKey]bool
 	computed       map[queryKey]bool // keys (re)computed since the last setInput; for tests
+	reused         map[queryKind]int // per-kind count of queries served from a verified memo since the last setInput (D-1 M-reuse side-channel)
 }
 
 func newDatabase(u builtins) *database {
@@ -153,6 +154,7 @@ func newDatabase(u builtins) *database {
 		memos:          map[queryKey]*memo{},
 		running:        map[queryKey]bool{},
 		computed:       map[queryKey]bool{},
+		reused:         map[queryKind]int{},
 	}
 }
 
@@ -171,6 +173,7 @@ func (db *database) setInput(id FileID, file *ast.File, uses map[*ast.UseDecl]Fi
 	db.files[id] = fileInput{file: file, uses: uses}
 	db.inputChangedAt[id] = db.revision
 	db.computed = map[queryKey]bool{}
+	db.reused = map[queryKind]int{}
 	db.rebindDecls(id, old.file, file)
 }
 
@@ -184,6 +187,7 @@ func (db *database) dropInput(id FileID) {
 	delete(db.files, id)
 	delete(db.inputChangedAt, id)
 	db.computed = map[queryKey]bool{}
+	db.reused = map[queryKind]int{}
 	db.rebindDecls(id, old.file, nil)
 }
 
@@ -254,6 +258,7 @@ func (db *database) demand(key queryKey) any {
 	m := db.memos[key]
 	if m != nil && db.verify(m) {
 		m.verifiedAt = db.revision
+		db.reused[key.kind]++ // a memo carried across the revision: early cutoff worked
 		return m.value
 	}
 

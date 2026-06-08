@@ -85,6 +85,18 @@ func (p *Program) Files() []FileID {
 // Module returns a file's resolved, typed IR from the last Refresh.
 func (p *Program) Module(id FileID) *ir.Module { return p.modules[id] }
 
+// Stats returns the query-engine work of the last Refresh: per-kind counts of
+// the queries recomputed versus reused (D-1 M-reuse). It is a side-channel
+// read — calling it changes nothing the engine memoizes.
+func (p *Program) Stats() Stats { return p.db.stats() }
+
+// MemoCount returns the number of live entries in the engine's memo table — the
+// program's retained query-cache size. It is a side-channel read (len of the
+// memo map); calling it changes nothing the engine memoizes. The LSP samples it
+// across a long editing session as the memo-table leak signal (D-1 §4.2):
+// monotonic growth over many edits is a table that never sheds stale keys.
+func (p *Program) MemoCount() int { return p.db.memoCount() }
+
 // Diagnostics returns a file's semantic diagnostics from the last Refresh,
 // ordered by offset.
 func (p *Program) Diagnostics(id FileID) []diagnostic.Diagnostic { return p.diags[id] }

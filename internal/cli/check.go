@@ -15,6 +15,7 @@ import (
 	"github.com/masterbelt/masterbelt/pkg/project"
 	"github.com/masterbelt/masterbelt/pkg/project/config"
 	"github.com/masterbelt/masterbelt/pkg/source"
+	"github.com/masterbelt/masterbelt/pkg/source/ast"
 )
 
 func init() {
@@ -103,9 +104,12 @@ func checkProject(rep reporter.Reporter, proj *project.Project) error {
 	}
 	prog.Refresh()
 
+	decls := 0
 	for _, f := range proj.Files() {
 		rep.Report(source.NewFile(displayPath(f.Path), f.Data), gatherDiagnostics(f.AST, prog, semantic.FileID(f.ID)))
+		decls += countDecls(f.AST.File())
 	}
+	reportStats(prog.Stats(), len(proj.Files()), decls)
 	if n := rep.Errors(); n > 0 {
 		return fmt.Errorf("%d error(s)", n)
 	}
@@ -162,6 +166,7 @@ func checkSource(rep reporter.Reporter, path string, data []byte) error {
 	prog.Refresh()
 
 	rep.Report(source.NewFile(displayPath(path), data), gatherDiagnostics(doc, prog, id))
+	reportStats(prog.Stats(), 1, countDecls(doc.File()))
 	if n := rep.Errors(); n > 0 {
 		return fmt.Errorf("%s: %d error(s)", displayPath(path), n)
 	}
@@ -181,6 +186,15 @@ func gatherDiagnostics(doc *abstract.Document, prog *semantic.Program, id semant
 	raw = append(raw, parse...)
 	raw = append(raw, sem...)
 	return raw
+}
+
+// countDecls counts every top-level declaration of a file — constants, types,
+// enums, interfaces, functions, and asserts — so the --stats "decls" corpus
+// size reflects the whole file, not the const declarations alone (ast.File
+// keeps each kind in its own slice). Use declarations are imports, not
+// declarations, and are excluded.
+func countDecls(f *ast.File) int {
+	return len(f.Decls) + len(f.Types) + len(f.Enums) + len(f.Interfaces) + len(f.Funcs) + len(f.Asserts)
 }
 
 // displayPath renders path relative to the working directory when it lies

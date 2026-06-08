@@ -63,3 +63,66 @@ fmt:
 vet:
 	$(GO) vet ./...
 	$(GOLANGCI_LINT) run ./...
+
+# bench runs the performance benchmarks (D-1 M2): the cold-compile and scale
+# benches over the synthetic corpus (internal/beltgen) and the incremental
+# edit-replay bench (pkg/masterbelt/semantic). -benchmem reports the allocation
+# counts the deterministic alloc gate (D-1 M3/M4) reads.
+.PHONY: bench
+bench:
+	$(GO) test -bench=. -benchmem ./...
+
+# bench-trend is the scoped wall-clock/memory benchmark the PR trend workflow
+# (.github/workflows/perf-trend.yml) runs on both the PR and the merge-base so
+# benchstat can compare them. It is a TREND measurement (D-1 §1, §4.2): time and
+# bytes/op are advisory and NEVER a fail condition — only the deterministic
+# counts in `make perf` gate. The scope is the cold-compile and incremental
+# edit-replay benches (the same ones `make bench` covers) with a fixed, short
+# -benchtime/-count so it finishes in CI time; benchstat's repeated samples are
+# what make the comparison meaningful, not any single run. Override BENCHTIME /
+# BENCHCOUNT / BENCHOUT to retarget (the workflow points BENCHOUT at new.txt /
+# old.txt). Shared-runner variance means the result is advisory (D-1 §9).
+BENCH_TREND_PKGS ?= ./internal/beltgen/ ./pkg/masterbelt/semantic/
+BENCH_TREND_RE   ?= BenchmarkColdCompile|BenchmarkIncremental
+BENCHTIME        ?= 100ms
+BENCHCOUNT       ?= 6
+.PHONY: bench-trend
+bench-trend:
+	$(GO) test -run '^$$' -bench '$(BENCH_TREND_RE)' -benchmem \
+		-benchtime=$(BENCHTIME) -count=$(BENCHCOUNT) $(BENCH_TREND_PKGS) \
+		$(if $(BENCHOUT),| tee $(BENCHOUT),)
+
+# bench-save runs bench-trend and writes its output to a file (default
+# bench.txt) for later comparison: `make bench-save BENCHOUT=old.txt` on main,
+# `make bench-save BENCHOUT=new.txt` on the branch, then `make benchstat`.
+BENCHOUT ?=
+.PHONY: bench-save
+bench-save:
+	$(MAKE) bench-trend BENCHOUT=$(or $(BENCHOUT),bench.txt)
+
+# benchstat compares two saved bench-trend runs with golang.org/x/perf/cmd/
+# benchstat (run via `go run` so no global install is needed). This is the same
+# tool and invocation the PR trend workflow uses. It only REPORTS deltas; it has
+# no fail mode here. Usage: `make benchstat OLD=old.txt NEW=new.txt`.
+OLD ?= old.txt
+NEW ?= new.txt
+.PHONY: benchstat
+benchstat:
+	$(GO) run golang.org/x/perf/cmd/benchstat@latest $(OLD) $(NEW)
+
+# perf runs the deterministic performance gates (D-1 §4.1) — the non-flaky
+# hard fails CI relies on: the reuse snapshot (an edit's recompute footprint
+# vs its golden, the over-invalidation guard) and the allocation ceilings
+# (cold and incremental allocs/op). Wall-clock is a trend, measured by `bench`,
+# never a fail condition; everything here is a deterministic count.
+.PHONY: perf
+perf:
+	$(GO) test ./pkg/masterbelt/semantic/ -run 'TestReuseSnapshot|TestColdCompileAllocCeiling|TestIncrementalAllocCeiling' -count=1
+
+# prof captures a profile of a check run via the root's cross-cutting flags
+# (D-1 §2): `make prof PROF_ARGS="check path/to/project"` writes cpu.prof and
+# mem.prof to the working directory. Open with `go tool pprof`.
+PROF_ARGS ?= check pkg/masterbelt/testdata/projects/midsize
+.PHONY: prof
+prof: build
+	$(BIN_DIR)/masterbelt --cpuprofile cpu.prof --memprofile mem.prof $(PROF_ARGS)

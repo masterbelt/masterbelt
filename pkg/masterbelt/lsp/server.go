@@ -48,13 +48,17 @@ type Server struct {
 	open   map[protocol.DocumentURI]view
 	roots  map[string]*workspace // project workspaces, by root directory
 	client *server.Client
+	instr  instrumentation // performance switches, read once at construction (instrument.go)
 }
 
-// NewServer creates a language server with no open documents.
+// NewServer creates a language server with no open documents. It snapshots the
+// performance instrumentation switches (instrument.go) once here, so every
+// later request tests a bool rather than re-reading the environment.
 func NewServer() *Server {
 	return &Server{
 		open:  map[protocol.DocumentURI]view{},
 		roots: map[string]*workspace{},
+		instr: readInstrumentation(),
 	}
 }
 
@@ -97,12 +101,14 @@ func (s *Server) SetClient(client *server.Client) { s.client = client }
 // DidOpen starts tracking a document — in its project's workspace when it has
 // one — and publishes diagnostics for the workspace's open files.
 func (s *Server) DidOpen(ctx context.Context, params *protocol.DidOpenTextDocumentParams) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	return s.timed("textDocument/didOpen", func() error {
+		s.mu.Lock()
+		defer s.mu.Unlock()
 
-	v := s.openFile(ctx, params.TextDocument.URI, []byte(params.TextDocument.Text))
-	s.publishWorkspace(ctx, v.ws)
-	return nil
+		v := s.openFile(ctx, params.TextDocument.URI, []byte(params.TextDocument.Text))
+		s.publishWorkspace(ctx, v.ws)
+		return nil
+	})
 }
 
 // openFile places a document in a workspace: the project found at or above it
@@ -195,36 +201,38 @@ func (s *Server) attachToProject(ws *workspace, root, path string, uri protocol.
 // change here may surface in an importer). Range-based changes drive the
 // incremental pipeline; a change without a range replaces the whole text.
 func (s *Server) DidChange(ctx context.Context, params *protocol.DidChangeTextDocumentParams) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	return s.timed("textDocument/didChange", func() error {
+		s.mu.Lock()
+		defer s.mu.Unlock()
 
-	v, ok := s.open[params.TextDocument.URI]
-	if !ok {
-		return nil
-	}
-
-	doc := v.AST()
-	for _, change := range params.ContentChanges {
-		buf := doc.Buffer()
-		start, end := 0, buf.Len()
-		if change.Range != nil {
-			// Each change's range refers to the document state left by the
-			// previous changes in this batch.
-			start = fromPosition(buf, change.Range.Start)
-			end = fromPosition(buf, change.Range.End)
+		v, ok := s.open[params.TextDocument.URI]
+		if !ok {
+			return nil
 		}
-		doc.Edit(source.Edit{Start: start, End: end, NewText: []byte(change.Text)})
-	}
 
-	if v.ws.proj != nil {
-		v.ws.proj.Resync(project.FileID(v.id))
-		v.ws.sync()
-	} else {
-		v.ws.prog.SetFile(v.id, doc, nil)
-		v.ws.prog.Refresh()
-	}
-	s.publishWorkspace(ctx, v.ws)
-	return nil
+		doc := v.AST()
+		for _, change := range params.ContentChanges {
+			buf := doc.Buffer()
+			start, end := 0, buf.Len()
+			if change.Range != nil {
+				// Each change's range refers to the document state left by the
+				// previous changes in this batch.
+				start = fromPosition(buf, change.Range.Start)
+				end = fromPosition(buf, change.Range.End)
+			}
+			doc.Edit(source.Edit{Start: start, End: end, NewText: []byte(change.Text)})
+		}
+
+		if v.ws.proj != nil {
+			v.ws.proj.Resync(project.FileID(v.id))
+			v.ws.sync()
+		} else {
+			v.ws.prog.SetFile(v.id, doc, nil)
+			v.ws.prog.Refresh()
+		}
+		s.publishWorkspace(ctx, v.ws)
+		return nil
+	})
 }
 
 // DidClose stops tracking a document and clears its diagnostics. A project

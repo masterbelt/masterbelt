@@ -1,0 +1,37 @@
+// The project entry point: it pulls the roster, the catalog, and the balance
+// sheet together and asserts the invariants the game data must hold. An editor
+// opens here first, and the asserts are the smoke test the whole closure
+// type-checks and folds.
+use units from "units.belt"
+use items from "items.belt"
+use balance from "balance.belt"
+use rarity from "rarity.belt"
+use { Rarity } from "rarity.belt"
+
+/// The headline roster the title screen shows.
+pub const Roster: list<string> = [units.Vanguard.name, units.Ember.name]
+
+/// The catalog's most valuable item price, for the store's "featured" slot.
+pub const FeaturedPrice: nint = items.Flameblade.price()
+
+/// The starter blade's price, for the tutorial shop.
+pub const StarterPrice: nint = items.IronSword.price()
+
+/// The bracket power budget the matchmaker balances around, surfaced from the
+/// balance sheet for the debug overlay.
+pub const Budget: nint = balance.PowerBudget
+
+// A frontline knight out-rates a glass-cannon mage on raw stats.
+assert units.Vanguard.rating() > units.Ember.rating()
+
+// The legendary blade is worth more than the iron one.
+assert items.Flameblade.price() > items.IronSword.price()
+
+// The rarest tier is the rarest drop.
+assert rarity.dropWeight(Rarity.Legendary) < rarity.dropWeight(Rarity.Common)
+
+// The featured item costs more than the tutorial starter.
+assert FeaturedPrice > StarterPrice
+
+// The roster lists exactly the two showcase units.
+assert Roster.count() == 2

@@ -1,0 +1,85 @@
+# perf-nightly — the nightly TREND sweep (D-1 M5, §4.2, §5).
+#
+# WHAT THIS MEASURES:
+#   1. Scale sweep (ci/scale-sweep.sh): the cold-compile + incremental benches
+#      across the generator size sweep, so an O(n^2) cliff in the curve becomes
+#      visible over time (D-1 M-scale).
+#   2. Steady-memory / leak signal (ci/leak-signal.sh): the incremental
+#      edit-replay over a long keystroke sequence, reporting bytes/op as a
+#      retained-memory proxy. A night-over-night rise is a suspected-leak SIGNAL
+#      (D-1 M-mem-rss, §4.2). Real leak DETECTION is M6's LSP heap/memo sampling;
+#      this is the advisory placeholder until those hooks land.
+#
+# THIS IS ADVISORY — IT NEVER GATES ANYTHING. It runs on a schedule, not on PRs,
+# and its results surface only in the job summary and as build artifacts. There
+# is NO commit-from-CI: trend storage is the artifact + summary, the lighter of
+# the two options the plan offers (D-1 §5). Wall-clock and memory are TREND
+# metrics, never fail conditions (D-1 §1 insight 1, §4.2, §9); only the
+# deterministic counts in the `ci` workflow (`make perf`) gate.
+name: perf-nightly
+
+on:
+  schedule:
+    # 03:17 UTC daily — an off-peak, non-round minute to avoid the cron rush.
+    - cron: '17 3 * * *'
+  # Allow a manual run for ad-hoc curve inspection.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sweep:
+    name: scale sweep + leak signal (advisory)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      # The scale sweep. The script exits non-zero only if the benchmark fails
+      # to build/run (a real breakage worth a red nightly); no performance
+      # number can fail it. continue-on-error keeps even a build hiccup from
+      # masking the leak-signal step below.
+      - name: Scale sweep
+        id: scale
+        continue-on-error: true
+        run: sh ci/scale-sweep.sh | tee scale-sweep.md
+
+      - name: Steady-memory / leak signal
+        id: leak
+        continue-on-error: true
+        run: sh ci/leak-signal.sh | tee leak-signal.md
+
+      - name: Publish to job summary
+        if: always()
+        run: |
+          {
+            echo "# perf-nightly (advisory — never a merge blocker)"
+            echo
+            echo "Trend layer (D-1 M5). Wall-clock and memory are trend metrics"
+            echo "(D-1 §1); the hard gates are the deterministic reuse snapshot and"
+            echo "allocs/op in the \`ci\` workflow. Numbers below are advisory"
+            echo "(shared-runner variance, D-1 §9) — read the curve over time."
+            echo
+            cat scale-sweep.md 2>/dev/null || echo "_(scale sweep produced no output)_"
+            echo
+            cat leak-signal.md 2>/dev/null || echo "_(leak signal produced no output)_"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Artifact = the trend store (no committing from CI, per D-1 §5). Retained
+      # long enough that a slow curve drift is comparable across nights.
+      - name: Upload nightly trend artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-nightly-${{ github.run_id }}
+          path: |
+            scale-sweep.md
+            leak-signal.md
+          retention-days: 90
+          if-no-files-found: warn

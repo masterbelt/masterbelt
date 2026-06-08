@@ -1,0 +1,36 @@
+// The item catalog: equippable gear tagged with a rarity and an element, with
+// the price curve derived from both. It imports the rarity and element systems,
+// taking the enum names by selective import and the star helper by namespace.
+use { Rarity } from "rarity.belt"
+use { Element } from "elements.belt"
+use rarity from "rarity.belt"
+
+/// A piece of equipment: its display name, its tier, the affinity it grants,
+/// and the flat attack it adds.
+pub type Item = {
+  name: string
+  tier: Rarity
+  element: Element
+  attackBonus: nint
+} impl {
+  /// The shop price: a base scaled up by the rarity's star rating.
+  pub fn price(): nint {
+    return self.attackBonus * 10 * rarity.stars(self.tier)
+  }
+}
+
+/// A common starter blade with no affinity.
+pub const IronSword: Item = Item{
+  name: "Iron Sword"
+  tier: Rarity.Common
+  element: Element.Neutral
+  attackBonus: 8
+}
+
+/// A legendary fire blade, the catalog's showpiece.
+pub const Flameblade: Item = Item{
+  name: "Flameblade"
+  tier: Rarity.Legendary
+  element: Element.Fire
+  attackBonus: 40
+}

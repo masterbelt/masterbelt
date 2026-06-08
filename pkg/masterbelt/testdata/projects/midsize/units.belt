@@ -1,0 +1,59 @@
+// The unit roster: a few named recruits built on the shared stat block, with
+// the per-class growth that turns a recruit into a fielded unit. It pulls the
+// stat block and the element enum it annotates with.
+use { Stats } from "stats.belt"
+use { Element } from "elements.belt"
+
+/// A combat role; the growth function below branches on it.
+pub enum UnitClass {
+  Knight, Mage, Scout
+}
+
+/// The flat stat bonus a class grants on top of a recruit's base.
+pub fn classBonus(role: UnitClass): nint {
+  switch role {
+    Knight -> return 30
+    Mage   -> return 10
+    Scout  -> return 20
+  }
+}
+
+/// A fielded unit: its class, its stat block, and its affinity-aware power.
+pub type Unit = {
+  name: string
+  role: UnitClass
+  base: Stats
+} impl {
+  /// The unit's effective power: its base stat weighting plus its class bonus.
+  /// The weighting mirrors Stats.power, computed over the base fields directly
+  /// so the rating folds without a nested cross-file method call.
+  pub fn rating(): nint {
+    return self.base.hp + self.base.attack * 2 + self.base.defense + self.base.speed + classBonus(self.role)
+  }
+}
+
+/// A frontline knight built on the shared recruit block, retuned for defense.
+pub const Vanguard: Unit = Unit{
+  name: "Vanguard"
+  role: UnitClass.Knight
+  base: Stats{
+    hp: 160
+    attack: 25
+    defense: 40
+    speed: 8
+    affinity: Element.Earth
+  }
+}
+
+/// A glass-cannon mage with a fire affinity.
+pub const Ember: Unit = Unit{
+  name: "Ember"
+  role: UnitClass.Mage
+  base: Stats{
+    hp: 90
+    attack: 55
+    defense: 10
+    speed: 14
+    affinity: Element.Fire
+  }
+}

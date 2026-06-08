@@ -1,0 +1,31 @@
+// The rarity tier system shared by units and items: a string-backed enum so a
+// tier serializes as its own name, plus the drop weights the loot tables read.
+
+/// A collectible's rarity tier.
+pub enum Rarity: string {
+  Common
+  Rare
+  Epic
+  Legendary
+}
+
+/// The relative drop weight of each tier, highest for the commonest. A loot
+/// roll picks a tier in proportion to these.
+pub fn dropWeight(tier: Rarity): nint {
+  switch tier {
+    Common    -> return 60
+    Rare      -> return 25
+    Epic      -> return 12
+    Legendary -> return 3
+  }
+}
+
+/// The star rating a tier shows in the UI.
+pub fn stars(tier: Rarity): nint {
+  switch tier {
+    Common    -> return 1
+    Rare      -> return 2
+    Epic      -> return 3
+    Legendary -> return 4
+  }
+}

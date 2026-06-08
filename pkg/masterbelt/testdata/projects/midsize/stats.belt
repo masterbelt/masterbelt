@@ -1,0 +1,35 @@
+// The core stat block every combatant carries, plus the refinement that keeps a
+// level inside the playable band. It imports the element system so a stat block
+// names its affinity.
+use { Element } from "elements.belt"
+
+/// A character level, capped at the game's ceiling.
+pub type Level = nint where self >= 1 && self <= 99
+
+/// A combatant's base stats: the four numbers the battle math reads, plus the
+/// elemental affinity that scales them.
+pub type Stats = {
+  hp: nint
+  attack: nint
+  defense: nint
+  speed: nint
+  affinity: Element
+} impl {
+  /// A rough power score, the weighted sum the matchmaker sorts on.
+  pub fn power(): nint {
+    return self.hp + self.attack * 2 + self.defense + self.speed
+  }
+}
+
+/// The starting stats of a generic recruit, before any class growth applies.
+pub const Recruit: Stats = Stats{
+  hp: 100
+  attack: 20
+  defense: 15
+  speed: 10
+  affinity: Element.Neutral
+}
+
+/// The lowest and highest levels, as the refinement admits them.
+pub const FirstLevel: Level = 1
+pub const LastLevel: Level = 99
