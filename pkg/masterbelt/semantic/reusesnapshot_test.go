@@ -21,6 +21,20 @@ package semantic
 // vary across runs, the engine or this rendering is nondeterministic and must
 // be investigated, not papered over.
 //
+// KNOWN OVER-INVALIDATION (do not mistake the goldens for the target): several
+// cases — leaf_value, root_value_cascade, add_reference — currently recompute
+// the whole file's const layer with zero reuse, because qSymbols is a coarse
+// per-file pointer-keyed fact: reparsing any const decl gives it a fresh
+// *ast.ConstDecl, equalSymbolValues sees the table changed, and every
+// name-resolving query in the file recomputes. The goldens pin that footprint
+// as a number so it is visible and reviewable, NOT because 17/0 is good. The
+// day qSymbols is narrowed, these goldens SHRINK — that is an improvement to
+// bless via -update, not a regression. A golden alone only catches a change,
+// so it cannot catch a uniform collapse (every footprint widening together
+// would just re-bless green); the minReused floor below is the absolute guard
+// against that — it fails in code, independent of the goldens, if a case that
+// must reuse stops reusing.
+//
 // Refresh the goldens with:
 //
 //	go test ./pkg/masterbelt/semantic/ -run TestReuseSnapshot -update
@@ -58,6 +72,13 @@ type reuseCase struct {
 	find     string // text to replace (within the whole src); "" inserts at anchor's end
 	repl     string // replacement text
 	keepsLen bool   // the edit preserves source length (and so downstream offsets)
+	// minReused is an absolute floor on TotalReused for cases where early
+	// cutoff genuinely should reuse work (a body/consumer/type edit that leaves
+	// the chain's facts intact). It is asserted in code, not via the golden, so
+	// a uniform cutoff collapse — which would re-bless every golden green —
+	// still fails here. Zero leaves the floor unasserted (the known
+	// over-invalidation cases, which currently reuse nothing).
+	minReused int
 }
 
 // editFor turns a case's text-anchored edit into a byte-offset source.Edit
@@ -129,12 +150,12 @@ func reuseCases() []reuseCase {
 		// Assert-body edit (length-preserving): a pure consumer. The assert
 		// re-checks (its diagnostic flips) but the constants it reads keep their
 		// memoized type and value.
-		{name: "assert_body", src: chain, keepsLen: true,
+		{name: "assert_body", src: chain, keepsLen: true, minReused: 2,
 			find: "assert C > 0", repl: "assert C > 9"},
 		// Whitespace edit inside the fn body (length-preserving): a token-
 		// identical line, shifting one space across the operator, so the analyzer
 		// sees the same tokens and the footprint is near the floor.
-		{name: "whitespace", src: chain, keepsLen: true,
+		{name: "whitespace", src: chain, keepsLen: true, minReused: 2,
 			find: "return x + x ", repl: "return x +  x"},
 		// Comment-only edit (insertion): a new trailing comment line below the
 		// chain. It changes no token the analyzer reads, but it shifts every
@@ -149,18 +170,18 @@ func reuseCases() []reuseCase {
 		// Type-field rename (length-preserving): n -> m in both the field and the
 		// getter body. The type changes shape, exercising the type-defs /
 		// signature path that the value chain does not.
-		{name: "type_field_rename", src: chain, keepsLen: true,
+		{name: "type_field_rename", src: chain, keepsLen: true, minReused: 5,
 			find: "{ n: nint }", repl: "{ m: nint }"},
 		// Method-body edit that does not change the getter's result type (length-
 		// preserving): self.n and self.n + 0 both type as nint, so dependents'
 		// type side is cut off and only this method re-checks. The pad slack
 		// absorbs the four extra characters.
-		{name: "method_body", src: chain, keepsLen: true,
+		{name: "method_body", src: chain, keepsLen: true, minReused: 5,
 			find: "return self.n       ", repl: "return self.n + 0   "},
 		// Fn result-type edit (length-preserving): widening twice's result is a
 		// contract change a caller would re-resolve; here it documents twice's
 		// own re-typing footprint. nint->long keeps the width.
-		{name: "fn_result_type", src: chain, keepsLen: true,
+		{name: "fn_result_type", src: chain, keepsLen: true, minReused: 2,
 			find: "(x: nint): nint", repl: "(x: nint): long"},
 	}
 }
@@ -173,7 +194,11 @@ func TestReuseSnapshot(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			e := newEditable([]byte(tc.src))
 			e.edit(tc.editFor(t))
-			compareReuseSnapshot(t, tc.name, renderProfile(e.prog.Stats()))
+			stats := e.prog.Stats()
+			if stats.TotalReused < tc.minReused {
+				t.Errorf("%s reused %d queries, floor %d — early cutoff regressed for an edit that should reuse work", tc.name, stats.TotalReused, tc.minReused)
+			}
+			compareReuseSnapshot(t, tc.name, renderProfile(stats))
 		})
 	}
 }

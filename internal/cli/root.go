@@ -2,15 +2,23 @@
 // lsp. The cross-cutting profiling and stats flags live here on the root, not
 // on any subcommand (D-1 §2, §8-7): CPU/heap/trace capture and the
 // machine-readable --stats report are wanted from whichever subcommand runs,
-// so they hang off RootCmd.PersistentFlags and start/stop in the root's
-// Persistent{Pre,Post}RunE. Subcommands must NOT define their own persistent
-// hooks — cobra runs only the nearest one, so a subcommand hook would silently
-// shadow these.
+// so they hang off RootCmd.PersistentFlags and are framed by the profiling
+// lifecycle. Subcommands must NOT define their own persistent hooks — cobra
+// runs only the nearest one, so a subcommand hook would shadow the root's.
+//
+// The lifecycle starts in PersistentPreRunE and ends in a cobra.OnFinalize
+// callback, NOT PersistentPostRunE: cobra skips the post-run hooks when RunE
+// (or the pre-run) returns an error, but OnFinalize fires after Execute
+// regardless — so a profile or --stats report is still flushed for a `check`
+// that exits non-zero on diagnostics (the case an operator most wants to
+// profile), and a CPU profile started before a trace-open failure is still
+// stopped.
 package cli
 
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"runtime"
 	"runtime/pprof"
@@ -30,6 +38,9 @@ func init() {
 	// NoOptDefVal lets bare --stats stand without swallowing the next argument
 	// as its value; the sentinel routes to stderr, an explicit =PATH to a file.
 	f.Lookup("stats").NoOptDefVal = statsStderr
+	// OnFinalize runs after Execute whatever the outcome — the cleanup hook
+	// that survives a RunE error (PersistentPostRunE does not).
+	cobra.OnFinalize(finishProfiling)
 }
 
 // statsStderr is the --stats value standing for "write to stderr" — the
@@ -37,8 +48,7 @@ func init() {
 const statsStderr = "\x00stderr"
 
 // RootCmd is the masterbelt root command every subcommand hangs off; main
-// executes it after wiring the process context and logger. Its persistent
-// hooks frame every subcommand run with the profiling/stats lifecycle.
+// executes it after wiring the process context and logger.
 var RootCmd = &cobra.Command{
 	Use:               "masterbelt [subcommand]",
 	Short:             "masterbelt is the toolchain for the masterbelt language",
@@ -46,23 +56,21 @@ var RootCmd = &cobra.Command{
 	SilenceUsage:      true,
 	SilenceErrors:     true,
 	PersistentPreRunE: startProfiling,
-	PersistentPostRunE: func(cmd *cobra.Command, _ []string) error {
-		return stopProfiling(cmd)
-	},
 }
 
-// profileState holds the open profile sinks for the current command, closed in
-// PersistentPostRunE. It is process-global because the CLI runs one command
-// per process.
+// profileState holds the running command's profiling lifecycle: the open CPU
+// and trace sinks and the destinations resolved from the flags at start, so
+// the OnFinalize cleanup needs no *cobra.Command. It is process-global because
+// the CLI runs one command per process; startProfiling resets it each run so a
+// re-entrant Execute (a test) does not inherit a prior run's state.
 var profileState struct {
-	cpu      *os.File
-	traceOut *os.File
+	cpu       *os.File
+	traceOut  *os.File
+	memPath   string    // --memprofile destination, or "" if unset
+	statsDest string    // "" = off, statsStderr = stderr, else a file path
+	errOut    io.Writer // where a stderr stats report goes
+	stats     *statsReport
 }
-
-// runStats is the stats the running subcommand recorded, written out by
-// stopProfiling when --stats is set. A subcommand calls reportStats once it
-// has analyzed; nil means the subcommand produced no stats (e.g. lsp).
-var runStats *statsReport
 
 // statsReport is the machine-readable shape of a run's work: the query-engine
 // reuse profile (D-1 M-reuse) plus the corpus size. Phase timings join it when
@@ -73,17 +81,27 @@ type statsReport struct {
 	Decls   int            `json:"decls"`
 }
 
-// reportStats records the analyzed run's stats for the --stats writer. A
-// subcommand calls it after Refresh; it is a no-op sink when --stats is unset
-// (the writer simply finds the value and discards it), so the call is cheap to
-// leave in unconditionally.
+// reportStats records the analyzed run's stats for the finalizer to write. A
+// subcommand calls it after Refresh; the finalizer emits it only when --stats
+// is set, so the call is cheap to leave in unconditionally.
 func reportStats(s semantic.Stats, files, decls int) {
-	runStats = &statsReport{Queries: s, Files: files, Decls: decls}
+	profileState.stats = &statsReport{Queries: s, Files: files, Decls: decls}
 }
 
-// startProfiling opens the CPU and trace sinks named by the persistent flags
-// and begins capture. The heap profile and stats are written at stop.
+// startProfiling resets the lifecycle state, resolves the flag destinations,
+// and opens and begins the CPU and trace captures. The heap profile and stats
+// are written by finishProfiling.
 func startProfiling(cmd *cobra.Command, _ []string) error {
+	profileState.cpu = nil
+	profileState.traceOut = nil
+	profileState.stats = nil
+	profileState.memPath, _ = cmd.Flags().GetString("memprofile")
+	profileState.errOut = cmd.ErrOrStderr()
+	profileState.statsDest = ""
+	if flag := cmd.Flags().Lookup("stats"); flag != nil && flag.Changed {
+		profileState.statsDest = flag.Value.String()
+	}
+
 	if path, _ := cmd.Flags().GetString("cpuprofile"); path != "" {
 		f, err := os.Create(path)
 		if err != nil {
@@ -109,57 +127,63 @@ func startProfiling(cmd *cobra.Command, _ []string) error {
 	return nil
 }
 
-// stopProfiling ends capture, writes the heap profile and the stats report,
-// and closes every sink. It runs in PersistentPostRunE, so it fires after the
-// subcommand's RunE returns (including on a RunE error, which cobra still
-// pairs with the post-run hook).
-func stopProfiling(cmd *cobra.Command) error {
+// finishProfiling ends every capture, writes the heap profile and the stats
+// report, and closes the sinks. It runs from cobra.OnFinalize, so it fires
+// after Execute whatever the command returned — including a RunE error and a
+// startProfiling error that left the CPU profiler running. Errors here are
+// logged to stderr rather than returned: the finalizer has no way to influence
+// the exit code, and the command's own error is the one that matters.
+func finishProfiling() {
 	if profileState.cpu != nil {
-		pprof.StopCPUProfile() // flushes the profile; the Close only frees the fd
+		pprof.StopCPUProfile() // flushes the profile; Close only frees the fd
 		_ = profileState.cpu.Close()
 		profileState.cpu = nil
 	}
 	if profileState.traceOut != nil {
-		trace.Stop() // flushes the trace; the Close only frees the fd
+		trace.Stop() // flushes the trace; Close only frees the fd
 		_ = profileState.traceOut.Close()
 		profileState.traceOut = nil
 	}
-	if path, _ := cmd.Flags().GetString("memprofile"); path != "" {
-		f, err := os.Create(path)
-		if err != nil {
-			return fmt.Errorf("memprofile: %w", err)
-		}
-		runtime.GC() // materialize the live heap before the snapshot
-		writeErr := pprof.WriteHeapProfile(f)
-		closeErr := f.Close()
-		if writeErr != nil {
-			return fmt.Errorf("memprofile: %w", writeErr)
-		}
-		if closeErr != nil {
-			return fmt.Errorf("memprofile: %w", closeErr)
-		}
+	if profileState.memPath != "" {
+		writeHeapProfile(profileState.memPath, profileState.errOut)
 	}
-	return writeStats(cmd)
+	if err := writeStats(); err != nil {
+		_, _ = fmt.Fprintf(profileState.errOut, "masterbelt: writing stats: %v\n", err)
+	}
 }
 
-// writeStats emits the recorded stats as JSON when --stats is set. An empty
-// flag value writes to stderr (stdout is the command's own output channel,
-// e.g. check --format=json); a path writes there.
-func writeStats(cmd *cobra.Command) error {
-	flag := cmd.Flags().Lookup("stats")
-	if flag == nil || !flag.Changed {
+// writeHeapProfile materializes the live heap and writes it to path.
+func writeHeapProfile(path string, errOut io.Writer) {
+	f, err := os.Create(path)
+	if err != nil {
+		_, _ = fmt.Fprintf(errOut, "masterbelt: memprofile: %v\n", err)
+		return
+	}
+	runtime.GC() // materialize the live heap before the snapshot
+	writeErr := pprof.WriteHeapProfile(f)
+	closeErr := f.Close()
+	if writeErr != nil {
+		_, _ = fmt.Fprintf(errOut, "masterbelt: memprofile: %v\n", writeErr)
+	} else if closeErr != nil {
+		_, _ = fmt.Fprintf(errOut, "masterbelt: memprofile: %v\n", closeErr)
+	}
+}
+
+// writeStats emits the recorded stats as JSON when --stats was set and the
+// subcommand produced a report. An empty flag value writes to stderr (stdout
+// is the command's own output channel, e.g. check --format=json); a path
+// writes there.
+func writeStats() error {
+	if profileState.statsDest == "" || profileState.stats == nil {
 		return nil
 	}
-	if runStats == nil {
-		return nil // the subcommand recorded nothing (e.g. lsp)
-	}
-	doc, err := json.MarshalIndent(runStats, "", "  ")
+	doc, err := json.MarshalIndent(profileState.stats, "", "  ")
 	if err != nil {
 		return err
 	}
-	if path := flag.Value.String(); path != "" && path != statsStderr {
-		return os.WriteFile(path, append(doc, '\n'), 0o644)
+	if profileState.statsDest != statsStderr {
+		return os.WriteFile(profileState.statsDest, append(doc, '\n'), 0o644)
 	}
-	_, err = fmt.Fprintln(cmd.ErrOrStderr(), string(doc))
+	_, err = fmt.Fprintln(profileState.errOut, string(doc))
 	return err
 }

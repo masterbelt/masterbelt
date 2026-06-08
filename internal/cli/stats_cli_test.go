@@ -26,7 +26,7 @@ func TestStatsFlagEmitsReuseProfile(t *testing.T) {
 		RootCmd.SetArgs([]string{})
 		_ = IRCmd.Flags().Set("format", "text")
 		_ = RootCmd.PersistentFlags().Set("stats", "")
-		runStats = nil
+		profileState.stats = nil
 	})
 	if err := RootCmd.Execute(); err != nil {
 		t.Fatalf("ir --stats: %v\n%s", err, out.String())

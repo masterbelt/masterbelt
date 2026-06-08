@@ -53,6 +53,10 @@ var IRCmd = &cobra.Command{
 		prog.SetFile(id, doc, nil)
 		prog.Refresh()
 
+		// Record stats before the error gate, so --stats reports a broken
+		// file's footprint too — the same point check records them.
+		reportStats(prog.Stats(), 1, countDecls(doc.File()))
+
 		raw := gatherDiagnostics(doc, prog, id)
 		if len(raw) > 0 {
 			rep := reporter.NewText(cmd.ErrOrStderr(), diagnostic.DefaultLocale)
@@ -64,7 +68,6 @@ var IRCmd = &cobra.Command{
 				return fmt.Errorf("%s: %d error(s)", displayPath(args[0]), rep.Errors())
 			}
 		}
-		reportStats(prog.Stats(), 1, len(doc.File().Decls))
 		module := prog.Module(id)
 
 		format, _ := cmd.Flags().GetString("format")

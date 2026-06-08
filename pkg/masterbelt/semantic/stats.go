@@ -13,6 +13,8 @@
 
 package semantic
 
+import "strconv"
+
 // kindNames maps each query kind to the stable label its stats and snapshots
 // carry. A kind added to the enum without a name here renders as its number,
 // which the completeness test below rejects.
@@ -37,30 +39,7 @@ func (k queryKind) String() string {
 	if name, ok := kindNames[k]; ok {
 		return name
 	}
-	return "queryKind(" + sortableInt(int(k)) + ")"
-}
-
-// sortableInt renders n in decimal without pulling in strconv at this leaf.
-func sortableInt(n int) string {
-	if n == 0 {
-		return "0"
-	}
-	neg := n < 0
-	if neg {
-		n = -n
-	}
-	var b [20]byte
-	i := len(b)
-	for n > 0 {
-		i--
-		b[i] = byte('0' + n%10)
-		n /= 10
-	}
-	if neg {
-		i--
-		b[i] = '-'
-	}
-	return string(b[i:])
+	return "queryKind(" + strconv.Itoa(int(k)) + ")"
 }
 
 // Stats is a snapshot of one revision's query work: per-kind counts of the
@@ -82,18 +61,20 @@ type Stats struct {
 // the leak signal (D-1 §4.2): monotonic growth = a memo table that never sheds.
 func (db *database) memoCount() int { return len(db.memos) }
 
-// stats derives the snapshot from the revision's computed and reused key sets.
-// It counts distinct keys per kind: the same query demanded twice in one
-// revision is one fact, recomputed or reused once.
+// stats derives the snapshot from the revision's recompute key set and reuse
+// counter. Computed counts distinct keys per kind (the same query demanded
+// twice in one revision is one fact); reused is already a per-kind count of
+// distinct keys, since a key reaches the verify-success mark at most once per
+// revision (a later demand returns at the verified fast path).
 func (db *database) stats() Stats {
 	s := Stats{Computed: map[string]int{}, Reused: map[string]int{}}
 	for key := range db.computed {
 		s.Computed[key.kind.String()]++
 		s.TotalComputed++
 	}
-	for key := range db.reused {
-		s.Reused[key.kind.String()]++
-		s.TotalReused++
+	for kind, n := range db.reused {
+		s.Reused[kind.String()] += n
+		s.TotalReused += n
 	}
 	return s
 }

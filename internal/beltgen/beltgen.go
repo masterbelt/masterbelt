@@ -13,7 +13,6 @@ package beltgen
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 )
 
@@ -125,11 +124,6 @@ func (g *gen) emit() map[string][]byte {
 	return out
 }
 
-// Manifest returns the masterbelt.toml content naming the generated entry.
-func Manifest() []byte {
-	return []byte(fmt.Sprintf("entry = %q\n", EntryFile))
-}
-
 // UsePaths returns, for each generated file id, the use paths it imports — the
 // inverse of the file tree, in source order. A caller that wants to resolve the
 // engine's use table without re-parsing can pair these with the file ids; the
@@ -147,24 +141,6 @@ func UsePaths(p Params) map[string][]string {
 		out[n.id] = paths
 	}
 	return out
-}
-
-// SortedIDs returns the generated file ids in stable order, the entry first.
-func SortedIDs(srcs map[string][]byte) []string {
-	ids := make([]string, 0, len(srcs))
-	for id := range srcs {
-		ids = append(ids, id)
-	}
-	sort.Slice(ids, func(i, j int) bool {
-		if ids[i] == EntryFile {
-			return true
-		}
-		if ids[j] == EntryFile {
-			return false
-		}
-		return ids[i] < ids[j]
-	})
-	return ids
 }
 
 // namespaceOf is the import namespace a parent binds a child under. It is

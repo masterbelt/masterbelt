@@ -57,21 +57,26 @@ jobs:
         run: make bench-trend BENCHOUT=new.txt
 
       # Old = the merge-base on the target branch. We check it out into a
-      # detached HEAD, bench, then return to the PR head. The corpus and benches
-      # live in the working tree, so checking out the baseline gives us its code.
+      # detached HEAD, bench, then return to the PR head. The baseline may
+      # predate the benches entirely (every PR opened before a baseline carrying
+      # internal/beltgen lands on main): in that case there is simply no
+      # comparison to make, which is fine for an advisory trend. So this step is
+      # best-effort — continue-on-error plus an always-created old.txt — and it
+      # must never red the PR. benchstat below renders new-only when old.txt is
+      # empty.
       - name: Bench merge-base (old)
+        continue-on-error: true
         run: |
-          git checkout --quiet --detach "${{ steps.base.outputs.sha }}"
-          # The baseline may predate bench-trend (M5); fall back to a direct
-          # invocation so the comparison still works against older history.
+          : > old.txt
+          git checkout --quiet --detach "${{ steps.base.outputs.sha }}" || exit 0
           if make -n bench-trend >/dev/null 2>&1; then
-            make bench-trend BENCHOUT=old.txt
-          else
+            make bench-trend BENCHOUT=old.txt || true
+          elif go list ./internal/beltgen/ >/dev/null 2>&1; then
             go test -run '^$' -bench 'BenchmarkColdCompile|BenchmarkIncremental' \
               -benchmem -benchtime=100ms -count=6 \
-              ./internal/beltgen/ ./pkg/masterbelt/semantic/ | tee old.txt
+              ./internal/beltgen/ ./pkg/masterbelt/semantic/ | tee old.txt || true
           fi
-          git checkout --quiet -
+          git checkout --quiet - || true
 
       # benchstat compares the two samples. continue-on-error guarantees that a
       # measured regression (or any benchstat hiccup) can NEVER fail this job —
@@ -81,7 +86,15 @@ jobs:
         id: benchstat
         continue-on-error: true
         run: |
-          go run golang.org/x/perf/cmd/benchstat@latest old.txt new.txt | tee benchstat.txt
+          # When the baseline predates the benches, old.txt is empty — render
+          # the PR head's numbers alone rather than feeding benchstat an empty
+          # file (which it rejects).
+          if [ -s old.txt ]; then
+            go run golang.org/x/perf/cmd/benchstat@latest old.txt new.txt | tee benchstat.txt
+          else
+            echo "(no baseline benchmarks at the merge-base — PR-head numbers only)" | tee benchstat.txt
+            go run golang.org/x/perf/cmd/benchstat@latest new.txt | tee -a benchstat.txt
+          fi
 
       # Surface in the job summary — always runs, even if benchstat errored, so
       # the trend is visible without downloading anything.
