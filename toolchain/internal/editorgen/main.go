@@ -73,6 +73,19 @@ type rule struct {
 	Patterns []rule `json:"patterns,omitempty"`
 }
 
+// The core regexes for the literal tokens — the lexical shapes the lexer
+// commits on, with no anchoring of their own. Both targets build on these: the
+// TextMate grammar wraps them in word boundaries (it has no maximal munch),
+// while the tree-sitter lexical layer (next) uses them bare and leans on
+// tree-sitter's longest-match. Keeping the shapes in one place is what lets the
+// two grammars share a lexer truth instead of each transcribing it.
+const (
+	reInteger  = `[0-9]+`
+	reDatetime = `D[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]{3})?(Z|[+-][0-9]{2}:[0-9]{2})`
+	reDuration = `([0-9]+(ms|w|d|h|m|s))+`
+	reEscape   = `\\(u\{[0-9A-Fa-f]{1,6}\}|[nrt0\\"])`
+)
+
 func buildGrammar() grammar {
 	return grammar{
 		Schema:    "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
@@ -125,16 +138,16 @@ func buildGrammar() grammar {
 			// `number` token lands on constant.numeric, so the literal wears
 			// the same colour before and after the server is up.
 			"datetimes": {Patterns: []rule{
-				{Name: lexNumberDatetime.tmScope(), Match: `\bD[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]{3})?(Z|[+-][0-9]{2}:[0-9]{2})`},
+				{Name: lexNumberDatetime.tmScope(), Match: `\b` + reDatetime},
 			}},
 			// Concatenated digit+unit groups (3w4d5h6m7s8ms); ms is listed
 			// before its prefix letters so the alternation munches maximally,
 			// exactly as the lexer does.
 			"durations": {Patterns: []rule{
-				{Name: lexNumberDuration.tmScope(), Match: `\b([0-9]+(ms|w|d|h|m|s))+\b`},
+				{Name: lexNumberDuration.tmScope(), Match: `\b` + reDuration + `\b`},
 			}},
 			"numbers": {Patterns: []rule{
-				{Name: lexNumberInteger.tmScope(), Match: `\b[0-9]+\b`},
+				{Name: lexNumberInteger.tmScope(), Match: `\b` + reInteger + `\b`},
 			}},
 			// A double-quoted string with the escapes the lexer recognizes —
 			// \n \r \t \0 \\ \" and \u{...}. Only a cold-start approximation; the
@@ -145,7 +158,7 @@ func buildGrammar() grammar {
 					Begin: `"`,
 					End:   `"`,
 					Patterns: []rule{
-						{Name: lexStringEscape.tmScope(), Match: `\\(u\{[0-9A-Fa-f]{1,6}\}|[nrt0\\"])`},
+						{Name: lexStringEscape.tmScope(), Match: reEscape},
 					},
 				},
 			}},
