@@ -157,8 +157,8 @@ func TestFmtCorpusIsCanonical(t *testing.T) {
 			t.Fatalf("corpus directory %s is missing: %v", dir, err)
 		}
 	}
-	out, _, err := execFmt(t, "", append([]string{"--check"}, corpora...)...)
+	out, _, err := execFormat(t, "", append([]string{"--check"}, corpora...)...)
 	if err != nil {
-		t.Errorf("the in-repo .belt corpus is not canonically formatted; run `masterbelt fmt -w` on:\n%s", out)
+		t.Errorf("the in-repo .belt corpus is not canonically formatted; run `masterbelt format -w` on:\n%s", out)
 	}
 }

@@ -8,7 +8,7 @@ import (
 // unifiedDiff renders the change turning a into b as a unified diff with the
 // conventional three lines of context, headed by git-style a/ and b/ labels.
 //
-// It is a plain line-based LCS diff: `masterbelt fmt --diff` shows what
+// It is a plain line-based LCS diff: `masterbelt format --diff` shows what
 // formatting would change, the inputs are one source file each, so the O(n·m)
 // table is never a concern, and keeping it in-process means the command needs
 // no external diff tool and is deterministic across platforms.

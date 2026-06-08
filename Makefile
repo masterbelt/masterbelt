@@ -79,20 +79,20 @@ fmt:
 	$(GO) fmt ./...
 
 # fmt-belt formats every masterbelt source in the repository in place. The name
-# is distinct from `fmt` (Go sources) on purpose: `masterbelt fmt` is the belt
+# is distinct from `fmt` (Go sources) on purpose: `masterbelt format` is the belt
 # formatter, this Makefile target is the belt-formatting entry point. The dirty
 # fixtures under internal/cli/testdata are intentionally unformatted and are not
 # in pkg, so they are left alone.
 .PHONY: fmt-belt
 fmt-belt:
-	$(GO) run ./cmd/masterbelt fmt -w pkg
+	$(GO) run ./cmd/masterbelt format -w pkg
 
 # check-fmt fails (writing nothing) if any masterbelt source is not in its
 # canonical form — the CI gate that keeps the example and prelude corpus
 # canonical. The counterpart to verify-generated for hand-written .belt.
 .PHONY: check-fmt
 check-fmt:
-	$(GO) run ./cmd/masterbelt fmt --check pkg
+	$(GO) run ./cmd/masterbelt format --check pkg
 
 # vet runs go vet and golangci-lint (configured by .golangci.yml) over the
 # module.

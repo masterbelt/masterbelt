@@ -108,7 +108,7 @@ func checkProject(rep reporter.Reporter, proj *project.Project) error {
 // loadProject opens the project at or above dir with the given profile ("" is
 // the default), reporting the manifest's diagnostics when there are any. It is
 // the project-opening front door shared by every project-scoped subcommand
-// (check today, and a future fmt subcommand).
+// (check today, and a future format subcommand).
 func loadProject(rep reporter.Reporter, dir, profile string) (*project.Project, error) {
 	proj, diags := project.OpenProfile(dir, profile)
 	if diags.Len() == 0 {

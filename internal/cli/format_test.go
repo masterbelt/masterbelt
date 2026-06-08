@@ -11,26 +11,26 @@ import (
 	"github.com/masterbelt/masterbelt/internal/belttest"
 )
 
-// execFmt runs `masterbelt fmt args...` with stdin as the input stream, and
-// returns the command's stdout and stderr separately plus its error. The fmt
+// execFormat runs `masterbelt format args...` with stdin as the input stream, and
+// returns the command's stdout and stderr separately plus its error. The format
 // flags persist on the command between Execute calls, so they are reset on
 // cleanup.
-func execFmt(t *testing.T, stdin string, args ...string) (stdout, stderr string, err error) {
+func execFormat(t *testing.T, stdin string, args ...string) (stdout, stderr string, err error) {
 	t.Helper()
 	var out, errb bytes.Buffer
 	RootCmd.SetOut(&out)
 	RootCmd.SetErr(&errb)
 	RootCmd.SetIn(strings.NewReader(stdin))
-	RootCmd.SetArgs(append([]string{"fmt"}, args...))
+	RootCmd.SetArgs(append([]string{"format"}, args...))
 	t.Cleanup(func() {
 		RootCmd.SetOut(nil)
 		RootCmd.SetErr(nil)
 		RootCmd.SetIn(nil)
 		RootCmd.SetArgs(nil)
-		_ = FmtCmd.Flags().Set("write", "false")
-		_ = FmtCmd.Flags().Set("check", "false")
-		_ = FmtCmd.Flags().Set("diff", "false")
-		_ = FmtCmd.Flags().Set("stdin-filepath", "")
+		_ = FormatCmd.Flags().Set("write", "false")
+		_ = FormatCmd.Flags().Set("check", "false")
+		_ = FormatCmd.Flags().Set("diff", "false")
+		_ = FormatCmd.Flags().Set("stdin-filepath", "")
 	})
 	err = RootCmd.Execute()
 	return out.String(), errb.String(), err
@@ -44,9 +44,9 @@ func TestFmtStdout(t *testing.T) {
 	belttest.WriteFile(t, dir, "a.belt", messy)
 	path := filepath.Join(dir, "a.belt")
 
-	out, _, err := execFmt(t, "", path)
+	out, _, err := execFormat(t, "", path)
 	if err != nil {
-		t.Fatalf("fmt = %v", err)
+		t.Fatalf("format = %v", err)
 	}
 	if out != canonical {
 		t.Errorf("stdout = %q, want %q", out, canonical)
@@ -58,9 +58,9 @@ func TestFmtStdout(t *testing.T) {
 }
 
 func TestFmtStdin(t *testing.T) {
-	out, _, err := execFmt(t, messy, "-")
+	out, _, err := execFormat(t, messy, "-")
 	if err != nil {
-		t.Fatalf("fmt = %v", err)
+		t.Fatalf("format = %v", err)
 	}
 	if out != canonical {
 		t.Errorf("stdout = %q, want %q", out, canonical)
@@ -72,9 +72,9 @@ func TestFmtWrite(t *testing.T) {
 	belttest.WriteFile(t, dir, "a.belt", messy)
 	path := filepath.Join(dir, "a.belt")
 
-	out, _, err := execFmt(t, "", "-w", path)
+	out, _, err := execFormat(t, "", "-w", path)
 	if err != nil {
-		t.Fatalf("fmt -w = %v", err)
+		t.Fatalf("format -w = %v", err)
 	}
 	if out != "" {
 		t.Errorf("stdout = %q, want none for -w", out)
@@ -95,8 +95,8 @@ func TestFmtWriteOnlyWhenChanged(t *testing.T) {
 	if err := os.Chtimes(path, old, old); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := execFmt(t, "", "-w", path); err != nil {
-		t.Fatalf("fmt -w = %v", err)
+	if _, _, err := execFormat(t, "", "-w", path); err != nil {
+		t.Fatalf("format -w = %v", err)
 	}
 	info, err := os.Stat(path)
 	if err != nil {
@@ -112,9 +112,9 @@ func TestFmtCheck(t *testing.T) {
 	belttest.WriteFile(t, dir, "a.belt", messy)
 	path := filepath.Join(dir, "a.belt")
 
-	out, _, err := execFmt(t, "", "--check", path)
+	out, _, err := execFormat(t, "", "--check", path)
 	if err == nil {
-		t.Fatal("fmt --check on an unformatted file succeeded, want non-zero")
+		t.Fatal("format --check on an unformatted file succeeded, want non-zero")
 	}
 	if !strings.Contains(out, "a.belt") {
 		t.Errorf("stdout = %q, want it to list a.belt", out)
@@ -130,9 +130,9 @@ func TestFmtCheckClean(t *testing.T) {
 	belttest.WriteFile(t, dir, "a.belt", canonical)
 	path := filepath.Join(dir, "a.belt")
 
-	out, _, err := execFmt(t, "", "--check", path)
+	out, _, err := execFormat(t, "", "--check", path)
 	if err != nil {
-		t.Fatalf("fmt --check on a formatted file = %v", err)
+		t.Fatalf("format --check on a formatted file = %v", err)
 	}
 	if out != "" {
 		t.Errorf("stdout = %q, want none for a formatted file", out)
@@ -144,9 +144,9 @@ func TestFmtDiff(t *testing.T) {
 	belttest.WriteFile(t, dir, "a.belt", messy)
 	path := filepath.Join(dir, "a.belt")
 
-	out, _, err := execFmt(t, "", "--diff", path)
+	out, _, err := execFormat(t, "", "--diff", path)
 	if err != nil {
-		t.Fatalf("fmt --diff = %v", err)
+		t.Fatalf("format --diff = %v", err)
 	}
 	for _, want := range []string{"@@", "-const x = 1   ", "+const x = 1"} {
 		if !strings.Contains(out, want) {
@@ -164,9 +164,9 @@ func TestFmtWriteSkipsBrokenInput(t *testing.T) {
 	belttest.WriteFile(t, dir, "bad.belt", broken)
 	path := filepath.Join(dir, "bad.belt")
 
-	_, stderr, err := execFmt(t, "", "-w", path)
+	_, stderr, err := execFormat(t, "", "-w", path)
 	if err != nil {
-		t.Fatalf("fmt -w on a broken file = %v, want it to skip and succeed", err)
+		t.Fatalf("format -w on a broken file = %v, want it to skip and succeed", err)
 	}
 	if !strings.Contains(stderr, "syntax errors") {
 		t.Errorf("stderr = %q, want a syntax-errors warning", stderr)
@@ -177,14 +177,14 @@ func TestFmtWriteSkipsBrokenInput(t *testing.T) {
 }
 
 func TestFmtStdinWriteRejected(t *testing.T) {
-	if _, _, err := execFmt(t, canonical, "-w", "-"); err == nil {
-		t.Fatal("fmt -w - succeeded, want an error: stdin cannot be written back")
+	if _, _, err := execFormat(t, canonical, "-w", "-"); err == nil {
+		t.Fatal("format -w - succeeded, want an error: stdin cannot be written back")
 	}
 }
 
 func TestFmtConflictingModes(t *testing.T) {
-	if _, _, err := execFmt(t, "", "-w", "--check", "x.belt"); err == nil {
-		t.Fatal("fmt -w --check succeeded, want an error: modes are exclusive")
+	if _, _, err := execFormat(t, "", "-w", "--check", "x.belt"); err == nil {
+		t.Fatal("format -w --check succeeded, want an error: modes are exclusive")
 	}
 }
 
@@ -196,9 +196,9 @@ func TestFmtStdinFilepathLayout(t *testing.T) {
 	belttest.WriteFile(t, dir, ".editorconfig", "root = true\n[*.belt]\nindent_style = space\nindent_size = 2\nend_of_line = crlf\n")
 	stdinPath := filepath.Join(dir, "x.belt")
 
-	out, _, err := execFmt(t, messy, "--stdin-filepath", stdinPath, "-")
+	out, _, err := execFormat(t, messy, "--stdin-filepath", stdinPath, "-")
 	if err != nil {
-		t.Fatalf("fmt = %v", err)
+		t.Fatalf("format = %v", err)
 	}
 	if out != "const x = 1\r\n" {
 		t.Errorf("stdout = %q, want CRLF-terminated output from the .editorconfig", out)
@@ -211,9 +211,9 @@ func TestFmtDirectoryWalk(t *testing.T) {
 	belttest.WriteFile(t, dir, "sub/b.belt", messy)
 	belttest.WriteFile(t, dir, "notbelt.txt", messy)
 
-	out, _, err := execFmt(t, "", "--check", dir)
+	out, _, err := execFormat(t, "", "--check", dir)
 	if err == nil {
-		t.Fatal("fmt --check over the directory succeeded, want non-zero")
+		t.Fatal("format --check over the directory succeeded, want non-zero")
 	}
 	for _, want := range []string{"a.belt", filepath.Join("sub", "b.belt")} {
 		if !strings.Contains(out, want) {
@@ -231,9 +231,9 @@ func TestFmtProjectNoArgs(t *testing.T) {
 	belttest.WriteFile(t, dir, "main.belt", "const A = 1   \n")
 	t.Chdir(dir)
 
-	out, _, err := execFmt(t, "", "--check")
+	out, _, err := execFormat(t, "", "--check")
 	if err == nil {
-		t.Fatal("fmt --check on the unformatted project succeeded, want non-zero")
+		t.Fatal("format --check on the unformatted project succeeded, want non-zero")
 	}
 	if !strings.Contains(out, "main.belt") {
 		t.Errorf("listing = %q, want it to include main.belt", out)
@@ -243,13 +243,13 @@ func TestFmtProjectNoArgs(t *testing.T) {
 // TestFmtIdempotent pins the invariant: formatting a formatted result is a
 // no-op. Format(Format(x)) == Format(x).
 func TestFmtIdempotent(t *testing.T) {
-	once, _, err := execFmt(t, messy, "-")
+	once, _, err := execFormat(t, messy, "-")
 	if err != nil {
-		t.Fatalf("first fmt = %v", err)
+		t.Fatalf("first format = %v", err)
 	}
-	twice, _, err := execFmt(t, once, "-")
+	twice, _, err := execFormat(t, once, "-")
 	if err != nil {
-		t.Fatalf("second fmt = %v", err)
+		t.Fatalf("second format = %v", err)
 	}
 	if once != twice {
 		t.Errorf("not idempotent: first = %q, second = %q", once, twice)
