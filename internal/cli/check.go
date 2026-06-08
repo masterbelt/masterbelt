@@ -103,9 +103,12 @@ func checkProject(rep reporter.Reporter, proj *project.Project) error {
 	}
 	prog.Refresh()
 
+	decls := 0
 	for _, f := range proj.Files() {
 		rep.Report(source.NewFile(displayPath(f.Path), f.Data), gatherDiagnostics(f.AST, prog, semantic.FileID(f.ID)))
+		decls += len(f.AST.File().Decls)
 	}
+	reportStats(prog.Stats(), len(proj.Files()), decls)
 	if n := rep.Errors(); n > 0 {
 		return fmt.Errorf("%d error(s)", n)
 	}
@@ -162,6 +165,7 @@ func checkSource(rep reporter.Reporter, path string, data []byte) error {
 	prog.Refresh()
 
 	rep.Report(source.NewFile(displayPath(path), data), gatherDiagnostics(doc, prog, id))
+	reportStats(prog.Stats(), 1, len(doc.File().Decls))
 	if n := rep.Errors(); n > 0 {
 		return fmt.Errorf("%s: %d error(s)", displayPath(path), n)
 	}

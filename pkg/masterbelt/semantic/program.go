@@ -85,6 +85,11 @@ func (p *Program) Files() []FileID {
 // Module returns a file's resolved, typed IR from the last Refresh.
 func (p *Program) Module(id FileID) *ir.Module { return p.modules[id] }
 
+// Stats returns the query-engine work of the last Refresh: per-kind counts of
+// the queries recomputed versus reused (D-1 M-reuse). It is a side-channel
+// read — calling it changes nothing the engine memoizes.
+func (p *Program) Stats() Stats { return p.db.stats() }
+
 // Diagnostics returns a file's semantic diagnostics from the last Refresh,
 // ordered by offset.
 func (p *Program) Diagnostics(id FileID) []diagnostic.Diagnostic { return p.diags[id] }

@@ -64,6 +64,7 @@ var IRCmd = &cobra.Command{
 				return fmt.Errorf("%s: %d error(s)", displayPath(args[0]), rep.Errors())
 			}
 		}
+		reportStats(prog.Stats(), 1, len(doc.File().Decls))
 		module := prog.Module(id)
 
 		format, _ := cmd.Flags().GetString("format")
