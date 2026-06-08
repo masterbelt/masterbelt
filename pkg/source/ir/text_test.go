@@ -68,17 +68,25 @@ func TestTypeFieldSensitivity(t *testing.T) {
 }
 
 // TestExplicitExclusions pins the manifest of deliberate no-output decisions:
-// exactly the Syntax backpointers (the detached contract) are
-// excluded — every entry must be a Syntax-family field, and a tree:"-" added
-// to anything else must update this pin with a format decision.
+// the Syntax backpointers (the detached contract), plus Assert.CondGraph — the
+// resolved condition graph kept in memory for the reachability lint and
+// find-references, never serialized because an assert's text contract is its
+// outcome (Cond, Eval, Diagram). A tree:"-" added to anything else must update
+// this pin with a format decision.
 func TestExplicitExclusions(t *testing.T) {
 	if len(treeExcluded) == 0 {
 		t.Fatal("treeExcluded is empty; the IR excludes its Syntax backpointers")
 	}
+	deliberate := map[string]bool{
+		"Syntax":          true,
+		"EnumSyntax":      true,
+		"InterfaceSyntax": true,
+		"CondGraph":       true, // Assert: in-memory condition graph; the outcome is the contract
+	}
 	for name, fields := range treeExcluded {
 		for _, field := range fields {
-			if field != "Syntax" && field != "EnumSyntax" && field != "InterfaceSyntax" {
-				t.Errorf("%s.%s is excluded from the format but is not a Syntax backpointer — make the decision explicit here", name, field)
+			if !deliberate[field] {
+				t.Errorf("%s.%s is excluded from the format but is not a deliberate exclusion — make the decision explicit here", name, field)
 			}
 		}
 	}

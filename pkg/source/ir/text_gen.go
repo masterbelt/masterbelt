@@ -4421,7 +4421,7 @@ func writeTree(w *treetext.Writer, v any, depth int) (bool, error) {
 // construction and do not appear here.
 var treeExcluded = map[string][]string{
 	"Apply":             {"Syntax"},
-	"Assert":            {"Syntax"},
+	"Assert":            {"CondGraph", "Syntax"},
 	"Assign":            {"Syntax"},
 	"AssocConst":        {"Syntax"},
 	"AssocConstValue":   {"Syntax"},

@@ -75,11 +75,18 @@ type Function struct {
 // editor's hover and the failure diagnostic render the very values the
 // assertion was checked with.
 type Assert struct {
-	Cond    string          // canonical surface rendering of the condition
-	Doc     []string        // the doc comment — the invariant in the author's words
-	Eval    *Constant       // the folded condition, or nil if it could not be evaluated
-	Diagram string          // the condition line plus the pipe/value rows
-	Syntax  *ast.AssertDecl `tree:"-"` // the declaration this was checked from
+	Cond    string    // canonical surface rendering of the condition
+	Doc     []string  // the doc comment — the invariant in the author's words
+	Eval    *Constant // the folded condition, or nil if it could not be evaluated
+	Diagram string    // the condition line plus the pipe/value rows
+	// CondGraph is the resolved condition value graph — references bound, self
+	// resolved — kept in memory so a consumer can traverse what the assertion
+	// uses: the reachability lint reads it to keep a constant an assert exercises
+	// live, and find-references reaches an assert's uses through it. It is
+	// tree:"-", so the text form renders the outcome (Cond, Eval, Diagram), not
+	// the graph; a module read back from text has it nil, as it does the Syntax.
+	CondGraph Value           `tree:"-"`
+	Syntax    *ast.AssertDecl `tree:"-"` // the declaration this was checked from
 }
 
 // Held reports whether the assertion folded to true.

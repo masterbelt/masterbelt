@@ -646,10 +646,10 @@ func (a *assembler) evaluateAssert(decl *ast.AssertDecl, genv graphFoldEnv) {
 	// soundness half of the publication rule). The cause carries its own
 	// diagnostic at its origin.
 	if condType == ir.Invalid {
-		a.module.Asserts = append(a.module.Asserts, &ir.Assert{Cond: cond, Doc: decl.Doc, Syntax: decl})
+		a.module.Asserts = append(a.module.Asserts, &ir.Assert{Cond: cond, Doc: decl.Doc, CondGraph: condGraph, Syntax: decl})
 		return
 	}
-	a.module.Asserts = append(a.module.Asserts, &ir.Assert{Cond: cond, Doc: decl.Doc, Eval: v, Diagram: d, Syntax: decl})
+	a.module.Asserts = append(a.module.Asserts, &ir.Assert{Cond: cond, Doc: decl.Doc, Eval: v, Diagram: d, CondGraph: condGraph, Syntax: decl})
 
 	// The condition must be a bool. An Invalid type was reported above
 	// (an undefined name, a misapplied operator), so it is not re-reported
