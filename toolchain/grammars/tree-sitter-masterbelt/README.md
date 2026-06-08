@@ -38,22 +38,32 @@ as the one new development dependency.
 
 ## Distribution (C-3)
 
-The source lives here; editors consume it from a **dedicated mirror repo**,
-`masterbelt/tree-sitter-masterbelt`, because the tree-sitter ecosystem expects
-`grammar.js` and `src/parser.c` at a repository root (this package is a
-subdirectory). The mirror is generated, never hand-edited.
+The grammar ships on the **nightly**, under the same commit-derived version as
+the CLI, to two channels:
+
+- **A dedicated git mirror**, `masterbelt/tree-sitter-masterbelt` — editors pin
+  it, because the tree-sitter ecosystem expects `grammar.js` and `src/parser.c`
+  at a repository root (this package is a subdirectory). Generated, never
+  hand-edited.
+- **GitHub Packages** (`@masterbelt/tree-sitter-masterbelt`) — the npm package
+  with a prebuilt **WebAssembly** module, for `web-tree-sitter` consumers (no
+  native build).
+
+How it is produced:
 
 - `make publish-tree-sitter` assembles the standalone package tree (this
   directory flattened to a root, the dev-only test harness dropped, the MIT
-  license and a consumer README added) into `dist/tree-sitter-masterbelt`,
-  stamped with masterbelt's own commit-derived version (the grammar ships under
-  the same version as the language it tracks).
-- The **nightly** workflow's `tree-sitter` job rides along with the CLI and
-  vsix releases: it verifies, runs the grammar tests, assembles, and — when the
-  App is configured — syncs the tree to the mirror, pushing its rolling default
-  branch and an immutable `v<version>` tag (the version carries the commit SHA,
-  so it never moves) for editors to pin. Token-less, it degrades to an
-  artifact.
+  license and a consumer README added, the package.json made publish-ready)
+  into `dist/tree-sitter-masterbelt`, stamped with masterbelt's own
+  commit-derived version. `make tree-sitter-wasm` then builds the wasm into it
+  (needs Docker).
+- The **nightly** `tree-sitter` job verifies, runs the grammar tests,
+  assembles, and: (1) when the App is configured, syncs the tree to the git
+  mirror — rolling default branch plus an immutable `v<version>` tag (the
+  version carries the commit SHA, so it never moves) for editors to pin;
+  (2) builds the wasm and publishes the npm package to GitHub Packages with the
+  built-in token. The mirror is synced before the wasm is built, so the editor
+  channel never depends on Docker or npm.
 
 **Bring-up (one-time, human):**
 
@@ -79,7 +89,28 @@ subdirectory). The mirror is generated, never hand-edited.
 4. Add the `tree-sitter` check to this repo's branch protection so the grammar
    gate is required, alongside `go` and `vscode`.
 
-The npm package is named `@masterbelt/tree-sitter-masterbelt` so it can later be
-published to GitHub Packages (and public npm); that, with the node/rust
-bindings, is C-3 M5.3 — optional and after the editor mirror, which needs only
-the committed `src/parser.c`.
+The GitHub Packages publish needs no extra secret — it uses the workflow's
+built-in token (the job has `packages: write`) and runs only on the canonical
+repo. It is independent of the App, so it works even before the mirror is set
+up.
+
+The npm package on GitHub Packages carries the wasm for `web-tree-sitter`
+(verified against `web-tree-sitter` at the CLI's own version). Load it with the
+module path:
+
+```js
+import { Parser, Language } from 'web-tree-sitter';
+await Parser.init();
+const lang = await Language.load(
+  require.resolve('@masterbelt/tree-sitter-masterbelt/tree-sitter-masterbelt.wasm'),
+);
+const parser = new Parser();
+parser.setLanguage(lang);
+```
+
+Installing from GitHub Packages needs an `.npmrc` pointing the `@masterbelt`
+scope at `https://npm.pkg.github.com` with a token (GitHub Packages requires
+authentication to install, even for public packages).
+
+Native node/rust bindings are not shipped (the committed `src/parser.c` lets a
+consumer build them); web-tree-sitter is the supported JS path.

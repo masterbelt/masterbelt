@@ -260,16 +260,23 @@ jobs:
           path: toolchain/editors/vscode/masterbelt.vsix
           if-no-files-found: error
 
-  # Sync the tree-sitter grammar to its dedicated distribution repo, the way the
-  # vsix publishes to the Marketplace: a generated artifact shipped on the
-  # nightly, under the same commit-derived version as the CLI. When the
-  # masterbelt GitHub App is configured it pushes the mirror's rolling default
-  # branch and an immutable v<version> tag for editors to pin; absent, it only
-  # uploads the assembled tree as an artifact (publish degrades, never fails).
+  # Publish the tree-sitter grammar on the nightly, under the same
+  # commit-derived version as the CLI, to two channels (the way the vsix
+  # publishes to the Marketplace):
+  #   - the dedicated git mirror (editors pin it) — when the masterbelt GitHub
+  #     App is configured, pushing the rolling default branch and an immutable
+  #     v<version> tag; absent, it only uploads the artifact.
+  #   - GitHub Packages (web-tree-sitter consumers) — the npm package with the
+  #     built WebAssembly module, via the built-in GITHUB_TOKEN.
+  # The git mirror is synced before the wasm is built, so the editor channel
+  # never depends on Docker/npm; a wasm or publish failure leaves it intact.
   tree-sitter:
-    name: tree-sitter grammar mirror
+    name: tree-sitter grammar
     needs: gate
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write # publish the npm package to GitHub Packages
     env:
       # Routed through env so the token step can gate on it (secrets are not
       # usable in `if`). The App mints a short-lived token scoped to the mirror
@@ -299,11 +306,6 @@ jobs:
       # Assemble the standalone tree (stamps the masterbelt version into it).
       - name: Assemble the standalone package tree
         run: make publish-tree-sitter
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: tree-sitter-masterbelt
-          path: dist/tree-sitter-masterbelt
-          if-no-files-found: error
 
       # Mint the short-lived, repo-scoped, contents-only token from the App.
       # Skips cleanly when the App is not configured (degrade to artifact).
@@ -356,3 +358,41 @@ jobs:
             git push origin "$tag"
             echo "published ${tag}"
           fi
+
+      # Build the WebAssembly module into the assembled tree (web-tree-sitter's
+      # consumption path), then upload the complete package as an artifact. The
+      # mirror was synced above without it, so this Docker step cannot affect the
+      # editor channel.
+      - name: Build the WebAssembly module
+        run: make tree-sitter-wasm
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: tree-sitter-masterbelt
+          path: dist/tree-sitter-masterbelt
+          if-no-files-found: error
+
+      # Publish the npm package (grammar + wasm) to GitHub Packages with the
+      # built-in token — no extra secret, since the package scope matches the
+      # org. Only from the canonical repo (a fork lacks the scope); a version
+      # already published is skipped rather than failed (npm ignores build
+      # metadata, so a same-day rebuild is the same version).
+      - name: Publish to GitHub Packages
+        if: github.repository == 'masterbelt/masterbelt'
+        working-directory: dist/tree-sitter-masterbelt
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -eu
+          {
+            echo "@masterbelt:registry=https://npm.pkg.github.com"
+            echo "//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}"
+          } > .npmrc
+          if npm publish 2>publish.err; then
+            echo "published $(node -p "require('./package.json').version")"
+          elif grep -qiE "cannot publish over|previously published|already exists|409" publish.err; then
+            echo "version already published — skipping"
+          else
+            cat publish.err >&2
+            exit 1
+          fi
+          rm -f .npmrc publish.err
