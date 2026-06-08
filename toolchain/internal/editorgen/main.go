@@ -1,18 +1,24 @@
-// Command editorgen generates the VS Code editor configuration for masterbelt —
-// the TextMate grammar and the language-configuration — from the lexer's own
-// definitions (the keyword table and comment markers in package token), so none
-// of it is maintained by hand.
+// Command editorgen generates masterbelt's editor highlighting artifacts from
+// one source — the lexer's own definitions (the keyword table, operator
+// spellings, and comment markers in package token, plus the shared literal
+// regexes) projected through the category table — so none of them is
+// maintained by hand. It has two targets, siblings of one source (C-2 plan):
 //
-// The grammar is only a "cold start" approximation (the lexical basics that
-// colour a file before the language server responds); the accurate highlighting
-// comes from the server's semantic tokens, which read the same parse. So the
-// colours do not shift when the server comes up, every scope here is chosen to
-// be the one VS Code falls back to for the matching semantic token type
-// (keyword -> keyword.control, operator -> keyword.operator, ...), and the one
-// thing lexing cannot decide — an identifier's role (type, reference,
-// declaration) — is deliberately left uncoloured for the semantic tokens to
-// enrich. The language-configuration's comment settings are derived from the
-// same comment markers the lexer scans.
+//   - VS Code's TextMate grammar and language-configuration (buildGrammar /
+//     buildLanguageConfig).
+//   - The tree-sitter grammar's lexical layer, lexical.js (buildLexicalJS),
+//     which the hand-written grammar.js builds its structural rules on top of.
+//
+// Both are only a "cold start" approximation (the lexical basics that colour a
+// file before the language server responds); the accurate highlighting comes
+// from the server's semantic tokens, which read the same parse. So the colours
+// do not shift when the server comes up, every category here is the one its
+// consumer falls back to for the matching semantic token type (keyword ->
+// keyword.control, operator -> keyword.operator, ...), and the one thing
+// lexing cannot decide — an identifier's role (type, reference, declaration) —
+// is deliberately left uncoloured for the semantic tokens to enrich. The
+// language-configuration's comment settings are derived from the same comment
+// markers the lexer scans.
 //
 //go:generate go run .
 package main
