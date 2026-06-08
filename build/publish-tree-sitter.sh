@@ -54,6 +54,12 @@ done
 # internal/version) so a developer's `make publish-tree-sitter` and CI produce
 # the identical stamp. Overridable via TS_VERSION (e.g. to stub it in a test).
 version="${TS_VERSION:-$(go run -buildvcs=true ./cmd/masterbelt --version | awk '{print $3}')}"
+case "$version" in
+	''|*[!0-9A-Za-z.+-]*)
+		echo "publish-tree-sitter: failed to extract a valid version (got: '$version') from ./cmd/masterbelt --version; set TS_VERSION explicitly or update parser" >&2
+		exit 1
+		;;
+esac
 node - "$out" "$version" <<'NODE'
 const fs = require('fs');
 const [dir, version] = process.argv.slice(2);
