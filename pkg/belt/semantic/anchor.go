@@ -24,12 +24,28 @@ import (
 // anchorScheme is the prefix every anchor carries, naming the addressing scheme.
 const anchorScheme = "belt:"
 
+// stdScheme is the file-id prefix the bundled standard library carries: a std
+// module imported as `use { max } from "std:math"` loads under FileID
+// "std:math". It is the one bit two semantic concerns read off a file id — the
+// builtin-surface trust channel (builtin_surface.go) and the anchor module
+// segment below — so the scheme the loader (pkg/belt/std) stamps and the prefix
+// the core interprets meet here. The compiler core does not import the std
+// package; the convention is shared, not the dependency.
+const stdScheme = "std:"
+
 // moduleSegment derives an anchor's module segment from a FileID: the
 // project-root-relative path with the .belt extension dropped. The sole file of
 // an ad-hoc single-file analysis (soleFileID, the empty string) yields the
 // empty segment, so its declarations anchor as "belt:/Name"; the prelude file
-// ("builtin.belt") yields the reserved "builtin" segment.
+// ("builtin.belt") yields the reserved "builtin" segment. A std module's file id
+// (std:math) maps to the reserved "std/" top segment (std/math), so max anchors
+// at belt:std/math/max — slash-formed exactly like a project's multi-segment
+// path, so every downstream consumer (declAnchor, ByAnchor, EnclosingDecl) is
+// unchanged.
 func moduleSegment(id FileID) string {
+	if rest, ok := strings.CutPrefix(string(id), stdScheme); ok {
+		return "std/" + rest
+	}
 	return strings.TrimSuffix(string(id), ".belt")
 }
 

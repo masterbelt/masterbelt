@@ -1,0 +1,42 @@
+// std:math, the bundled standard library's first module, imported by name. The
+// std: locator resolves to embedded source on the same trusted channel the
+// prelude rides — but unlike the prelude it is explicit and loaded only because
+// this file imports it. Every result folds at compile time with no native
+// backing. The constants are pub so they read as the module's demonstrated
+// surface rather than dead locals.
+use { max, min, clamp, sum, product, abs, sign, gcd, lcm, pow } from "std:math"
+
+// The binary forms, clamp, and the integer utilities fold to plain values.
+pub const hi = max(3, 7)
+pub const lo = min(3, 7)
+pub const cl = clamp(5, 0, 3)
+pub const ab = abs(-5)
+pub const sg = sign(-9)
+pub const g = gcd(12, 18)
+pub const l = lcm(4, 6)
+pub const p = pow(2, 10)
+
+// The collection+floor form is total — the floor seeds the fold, so it stands
+// in even for an empty list.
+pub const floored = max([1, 2], 5)
+
+// The collection reductions fold to T | error; here they hold the value.
+pub const biggest = max([3, 1, 7])
+pub const total = sum([1, 2, 3, 4])
+pub const prod = product([1, 2, 3, 4])
+
+// An empty list has no extremum, so the result is the error member — the value
+// to branch on, folded just as readily.
+pub const empties: list<nint> = []
+pub const noMax = max(empties)
+
+// The plain-valued results verify at compile time.
+assert hi == 7
+assert lo == 3
+assert cl == 3
+assert ab == 5
+assert sg == -1
+assert g == 6
+assert l == 12
+assert p == 1024
+assert floored == 5

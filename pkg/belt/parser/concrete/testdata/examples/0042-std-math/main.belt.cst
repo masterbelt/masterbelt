@@ -1,0 +1,528 @@
+# tree
+File
+  UseDecl
+    LineComment "// std:math, the bundled standard library's first module, imported by name. The"
+    Newline "\n"
+    LineComment "// std: locator resolves to embedded source on the same trusted channel the"
+    Newline "\n"
+    LineComment "// prelude rides — but unlike the prelude it is explicit and loaded only because"
+    Newline "\n"
+    LineComment "// this file imports it. Every result folds at compile time with no native"
+    Newline "\n"
+    LineComment "// backing. The constants are pub so they read as the module's demonstrated"
+    Newline "\n"
+    LineComment "// surface rather than dead locals."
+    Newline "\n"
+    Use "use"
+    Whitespace " "
+    UseList
+      LBrace "{"
+      Whitespace " "
+      Ident "max"
+      Comma ","
+      Whitespace " "
+      Ident "min"
+      Comma ","
+      Whitespace " "
+      Ident "clamp"
+      Comma ","
+      Whitespace " "
+      Ident "sum"
+      Comma ","
+      Whitespace " "
+      Ident "product"
+      Comma ","
+      Whitespace " "
+      Ident "abs"
+      Comma ","
+      Whitespace " "
+      Ident "sign"
+      Comma ","
+      Whitespace " "
+      Ident "gcd"
+      Comma ","
+      Whitespace " "
+      Ident "lcm"
+      Comma ","
+      Whitespace " "
+      Ident "pow"
+      Whitespace " "
+      RBrace "}"
+    Whitespace " "
+    From "from"
+    Whitespace " "
+    String "\"std:math\""
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// The binary forms, clamp, and the integer utilities fold to plain values."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Const "const"
+    Whitespace " "
+    Ident "hi"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "max"
+        LParen "("
+        Literal
+          Int "3"
+        Comma ","
+        Whitespace " "
+        Literal
+          Int "7"
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Const "const"
+    Whitespace " "
+    Ident "lo"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "min"
+        LParen "("
+        Literal
+          Int "3"
+        Comma ","
+        Whitespace " "
+        Literal
+          Int "7"
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Const "const"
+    Whitespace " "
+    Ident "cl"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "clamp"
+        LParen "("
+        Literal
+          Int "5"
+        Comma ","
+        Whitespace " "
+        Literal
+          Int "0"
+        Comma ","
+        Whitespace " "
+        Literal
+          Int "3"
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Const "const"
+    Whitespace " "
+    Ident "ab"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "abs"
+        LParen "("
+        UnaryExpr
+          Minus "-"
+          Literal
+            Int "5"
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Const "const"
+    Whitespace " "
+    Ident "sg"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "sign"
+        LParen "("
+        UnaryExpr
+          Minus "-"
+          Literal
+            Int "9"
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Const "const"
+    Whitespace " "
+    Ident "g"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "gcd"
+        LParen "("
+        Literal
+          Int "12"
+        Comma ","
+        Whitespace " "
+        Literal
+          Int "18"
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Const "const"
+    Whitespace " "
+    Ident "l"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "lcm"
+        LParen "("
+        Literal
+          Int "4"
+        Comma ","
+        Whitespace " "
+        Literal
+          Int "6"
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Const "const"
+    Whitespace " "
+    Ident "p"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "pow"
+        LParen "("
+        Literal
+          Int "2"
+        Comma ","
+        Whitespace " "
+        Literal
+          Int "10"
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// The collection+floor form is total — the floor seeds the fold, so it stands"
+    Newline "\n"
+    LineComment "// in even for an empty list."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Const "const"
+    Whitespace " "
+    Ident "floored"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "max"
+        LParen "("
+        CollectionLit
+          LBracket "["
+          Literal
+            Int "1"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "2"
+          RBracket "]"
+        Comma ","
+        Whitespace " "
+        Literal
+          Int "5"
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// The collection reductions fold to T | error; here they hold the value."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Const "const"
+    Whitespace " "
+    Ident "biggest"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "max"
+        LParen "("
+        CollectionLit
+          LBracket "["
+          Literal
+            Int "3"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "1"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "7"
+          RBracket "]"
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Const "const"
+    Whitespace " "
+    Ident "total"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "sum"
+        LParen "("
+        CollectionLit
+          LBracket "["
+          Literal
+            Int "1"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "2"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "3"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "4"
+          RBracket "]"
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Const "const"
+    Whitespace " "
+    Ident "prod"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "product"
+        LParen "("
+        CollectionLit
+          LBracket "["
+          Literal
+            Int "1"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "2"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "3"
+          Comma ","
+          Whitespace " "
+          Literal
+            Int "4"
+          RBracket "]"
+        RParen ")"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// An empty list has no extremum, so the result is the error member — the value"
+    Newline "\n"
+    LineComment "// to branch on, folded just as readily."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Const "const"
+    Whitespace " "
+    Ident "empties"
+    TypeClause
+      Colon ":"
+      Whitespace " "
+      TypeName
+        Ident "list"
+        GenericArgs
+          Lt "<"
+          TypeName
+            Ident "nint"
+          Gt ">"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CollectionLit
+        LBracket "["
+        RBracket "]"
+  ConstDecl
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Const "const"
+    Whitespace " "
+    Ident "noMax"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "max"
+        LParen "("
+        NameRef
+          Ident "empties"
+        RParen ")"
+  AssertDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// The plain-valued results verify at compile time."
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      NameRef
+        Ident "hi"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "7"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      NameRef
+        Ident "lo"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "3"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      NameRef
+        Ident "cl"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "3"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      NameRef
+        Ident "ab"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "5"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      NameRef
+        Ident "sg"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      UnaryExpr
+        Minus "-"
+        Literal
+          Int "1"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      NameRef
+        Ident "g"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "6"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      NameRef
+        Ident "l"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "12"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      NameRef
+        Ident "p"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "1024"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      NameRef
+        Ident "floored"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "5"
+  Newline "\n"
+  EOF ""
+# diagnostics

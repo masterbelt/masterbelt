@@ -63,6 +63,12 @@ func TestAnchorStrings(t *testing.T) {
 	if got := moduleSegment("builtin.belt"); got != "builtin" {
 		t.Errorf("moduleSegment(prelude) = %q, want builtin", got)
 	}
+	if got := moduleSegment("std:math"); got != "std/math" {
+		t.Errorf("moduleSegment(std:math) = %q, want std/math", got)
+	}
+	if got := declAnchor(moduleSegment("std:math"), "max"); got != "belt:std/math/max" {
+		t.Errorf("std declAnchor = %q, want belt:std/math/max", got)
+	}
 	if got := declAnchor("game", "Level"); got != "belt:game/Level" {
 		t.Errorf("declAnchor = %q", got)
 	}

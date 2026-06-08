@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	"github.com/masterbelt/masterbelt/pkg/belt/parser/abstract"
+	"github.com/masterbelt/masterbelt/pkg/belt/std"
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
 	"github.com/masterbelt/masterbelt/pkg/project/config"
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
@@ -162,8 +163,20 @@ func OpenProfile(dir, profile string) (*Project, diagnostic.List) {
 	}, diags
 }
 
-// loadFile reads and parses one project file.
+// loadFile reads and parses one project file. A std: file id is served from the
+// bundled standard library's embedded source rather than from disk, so a std
+// module joins the file set as an ordinary file — its source merely embedded —
+// and the layers above (the semantic engine, the editor) treat it like any
+// other. Its Path is the locator itself, the only sensible label for source
+// that lives in no file.
 func loadFile(root string, id FileID) (*File, error) {
+	if name, ok := strings.CutPrefix(string(id), std.Scheme); ok {
+		data, ok := std.Resolve(name)
+		if !ok {
+			return nil, fs.ErrNotExist // no such std module: absent from the set
+		}
+		return &File{ID: id, Path: string(id), Data: data, AST: abstract.NewDocument(data)}, nil
+	}
 	p := filepath.Join(root, filepath.FromSlash(string(id)))
 	data, err := os.ReadFile(p)
 	if err != nil {
@@ -281,16 +294,36 @@ func (p *Project) prune() {
 	}
 }
 
-// resolveUse resolves a use path as written in importer's source to the
-// FileID it names: use paths are relative to the importing file and must stay
-// inside the project root.
+// resolveUse resolves a use path as written in importer's source to the FileID
+// it names. A locator is a module reference, not a verbatim filename: a std:
+// locator names a bundled standard module, and a project locator is relative to
+// the importing file, confined to the project root, with the .belt extension
+// supplied here rather than written. So `from "geometry"` and `from
+// "geometry.belt"` name one file, just as `from "std:math"` names the embedded
+// std module — the two schemes resolve for the same reason.
 func resolveUse(importer FileID, usePath string) (FileID, bool) {
-	if usePath == "" || path.IsAbs(usePath) {
+	if usePath == "" {
+		return "", false
+	}
+	// A std: locator resolves before any path computation — it is not a
+	// project-relative path, and joining it against the importer's directory
+	// would mangle the scheme. Whether the module exists is loadFile's call.
+	if std.IsLocator(usePath) {
+		return FileID(usePath), true
+	}
+	if path.IsAbs(usePath) {
 		return "", false
 	}
 	target := path.Join(path.Dir(string(importer)), usePath) // Join also cleans
 	if target == ".." || strings.HasPrefix(target, "../") {
 		return "", false
+	}
+	// The extension is the resolution layer's to supply, so an unqualified
+	// locator names the .belt file. Appending is a no-op on a path that already
+	// carries the suffix, so a .belt-qualified locator resolves unchanged and no
+	// path ever doubles to foo.belt.belt.
+	if !strings.HasSuffix(target, ".belt") {
+		target += ".belt"
 	}
 	return FileID(target), true
 }

@@ -89,3 +89,38 @@ func TestBuiltinSurfaceExemptsPrelude(t *testing.T) {
 		t.Fatalf("prelude failed to load: %v", err)
 	}
 }
+
+// TestBuiltinSurfaceExemptsStd pins the generalization F-2 promised: a bundled
+// std module — a file whose id carries the std: scheme — rides the same trusted
+// channel the prelude does, so it may declare extern and `= builtin`, the very
+// spellings a user file is forbidden. The identical source under a user file id
+// is rejected, proving the exemption is the load channel's, not the syntax's. A
+// std module is assembled (unlike the prelude), so this is the channel's only
+// assembled member and the check it must skip.
+func TestBuiltinSurfaceExemptsStd(t *testing.T) {
+	const src = `pub extern fn nondet roll(): nint
+pub type Level = sbyte impl {
+  pub const Max = builtin
+}
+`
+	p := buildProgram(map[string]string{
+		"std:trust": src,
+		"user.belt": src,
+	})
+
+	// The user file is held to the surface rule: both spellings error.
+	if !hasCode(p.Diagnostics("user.belt"), CodeExternOutsideBuiltin) {
+		t.Errorf("user.belt: want extern_outside_builtin, got [%s]", codesOf(p, "user.belt"))
+	}
+	if !hasCode(p.Diagnostics("user.belt"), CodeBuiltinOutsideBuiltin) {
+		t.Errorf("user.belt: want builtin_outside_builtin, got [%s]", codesOf(p, "user.belt"))
+	}
+
+	// The std module rides the trust channel: neither spelling is reported.
+	if hasCode(p.Diagnostics("std:trust"), CodeExternOutsideBuiltin) {
+		t.Errorf("std:trust: extern_outside_builtin leaked through the trust channel; got [%s]", codesOf(p, "std:trust"))
+	}
+	if hasCode(p.Diagnostics("std:trust"), CodeBuiltinOutsideBuiltin) {
+		t.Errorf("std:trust: builtin_outside_builtin leaked through the trust channel; got [%s]", codesOf(p, "std:trust"))
+	}
+}

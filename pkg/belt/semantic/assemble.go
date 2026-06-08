@@ -263,7 +263,12 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 	a.resolveConsts()
 	a.resolveTypeDecls()
 	a.resolveFuncDecls()
-	checkBuiltinSurface(file, a.at, a.diags)
+	// A file on the builtin-surface trust channel (a bundled std module) is
+	// licensed to declare extern and `= builtin`; only assembled user files are
+	// held to the surface rule. The prelude never reaches here at all.
+	if !trustedFileID(fileID) {
+		checkBuiltinSurface(file, a.at, a.diags)
+	}
 	a.checkAssocConstRefs()
 	genv := a.writeBack()
 	checkIndexWritesIR(a.module, genv, a.at, a.diags)

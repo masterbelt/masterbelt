@@ -450,3 +450,140 @@ func TestCandidateImports(t *testing.T) {
 		t.Errorf("CandidateImports(entry.belt) = %s", got)
 	}
 }
+
+// TestResolveUseCompletesBeltExtension pins that a locator is a module
+// reference, not a verbatim filename: the .belt extension is supplied by the
+// resolution layer, so an unqualified locator and a .belt-qualified one name the
+// same file, and a qualified one never doubles its suffix.
+func TestResolveUseCompletesBeltExtension(t *testing.T) {
+	cases := []struct {
+		importer FileID
+		usePath  string
+		want     FileID
+	}{
+		{"main.belt", "geometry", "geometry.belt"},
+		{"main.belt", "geometry.belt", "geometry.belt"}, // already qualified: unchanged
+		{"src/main.belt", "geometry", "src/geometry.belt"},
+		{"src/main.belt", "../lib/util", "lib/util.belt"},
+	}
+	for _, c := range cases {
+		got, ok := resolveUse(c.importer, c.usePath)
+		if !ok || got != c.want {
+			t.Errorf("resolveUse(%q, %q) = %q, %v; want %q, true", c.importer, c.usePath, got, ok, c.want)
+		}
+	}
+}
+
+// TestResolveUseStdLocator pins that a std: locator resolves to a std file id
+// verbatim — before any path computation, so the scheme is never mangled by a
+// join against the importer's directory and the colon never doubles.
+func TestResolveUseStdLocator(t *testing.T) {
+	for _, importer := range []FileID{"main.belt", "src/deep/main.belt"} {
+		got, ok := resolveUse(importer, "std:math")
+		if !ok || got != "std:math" {
+			t.Errorf("resolveUse(%q, std:math) = %q, %v; want std:math, true", importer, got, ok)
+		}
+	}
+}
+
+// TestOpenBeltExtensionOptional pins that the closure follows an unqualified
+// locator: `use geo from "geometry"` resolves to geometry.belt and pulls it in,
+// the same file `from "geometry.belt"` would.
+func TestOpenBeltExtensionOptional(t *testing.T) {
+	root := t.TempDir()
+	belttest.WriteFile(t, root, "masterbelt.toml", "entry = \"main.belt\"\n")
+	belttest.WriteFile(t, root, "main.belt", "use geo from \"geometry\"\nconst A = 1\n")
+	belttest.WriteFile(t, root, "geometry.belt", "pub const Origin = 0\n")
+
+	proj, diags := Open(root)
+	if diags.Len() != 0 {
+		t.Fatalf("Open() diagnostics = %v, want none", diags.Items())
+	}
+	if got := fileIDList(proj); got != "geometry.belt,main.belt" {
+		t.Errorf("Files() = %s, want geometry.belt,main.belt", got)
+	}
+	if got := useTargets(proj.EntryFile()); !slices.Equal(got, []string{"geometry->geometry.belt"}) {
+		t.Errorf("entry Uses = %v, want geometry->geometry.belt", got)
+	}
+}
+
+// TestOpenResolvesStdModule pins the supply path through the loader: a std:
+// locator pulls the bundled module into the file set from embedded source (it
+// lives in no file on disk), keyed by its std: file id, with its Path the
+// locator itself.
+func TestOpenResolvesStdModule(t *testing.T) {
+	root := t.TempDir()
+	belttest.WriteFile(t, root, "masterbelt.toml", "entry = \"main.belt\"\n")
+	belttest.WriteFile(t, root, "main.belt", "use { max } from \"std:math\"\nconst A = max(3, 7)\n")
+
+	proj, diags := Open(root)
+	if diags.Len() != 0 {
+		t.Fatalf("Open() diagnostics = %v, want none", diags.Items())
+	}
+	if got := fileIDList(proj); got != "main.belt,std:math" {
+		t.Fatalf("Files() = %s, want main.belt,std:math", got)
+	}
+	if got := useTargets(proj.EntryFile()); !slices.Equal(got, []string{"std:math->std:math"}) {
+		t.Errorf("entry Uses = %v, want std:math->std:math", got)
+	}
+	mod := proj.File("std:math")
+	if mod == nil {
+		t.Fatal("std:math not in the file set")
+	}
+	if mod.Path != "std:math" {
+		t.Errorf("std module Path = %q, want std:math", mod.Path)
+	}
+	if !strings.Contains(string(mod.Data), "pub fn max") {
+		t.Errorf("std:math source = %q, want the embedded module", mod.Data)
+	}
+}
+
+// TestOpenUnknownStdModule pins that an unregistered std module is left
+// unresolved, exactly as a missing file: the use site reports it later, the set
+// does not grow, and Open does not fail.
+func TestOpenUnknownStdModule(t *testing.T) {
+	root := t.TempDir()
+	belttest.WriteFile(t, root, "masterbelt.toml", "entry = \"main.belt\"\n")
+	belttest.WriteFile(t, root, "main.belt", "use { x } from \"std:nonesuch\"\nconst A = 1\n")
+
+	proj, diags := Open(root)
+	if diags.Len() != 0 {
+		t.Fatalf("Open() diagnostics = %v, want none", diags.Items())
+	}
+	if got := fileIDList(proj); got != "main.belt" {
+		t.Errorf("Files() = %s, want just the entry", got)
+	}
+	if got := useTargets(proj.EntryFile()); len(got) != 0 {
+		t.Errorf("entry Uses = %v, want empty (unresolved std module)", got)
+	}
+}
+
+// TestStdModuleLoadsLazily pins the "pay for what you use" rule: a std module is
+// in the set only while a use chain reaches it, so dropping the import prunes it
+// on Resync, and restoring it reloads from embedded source.
+func TestStdModuleLoadsLazily(t *testing.T) {
+	root := t.TempDir()
+	belttest.WriteFile(t, root, "masterbelt.toml", "entry = \"main.belt\"\n")
+	belttest.WriteFile(t, root, "main.belt", "use { max } from \"std:math\"\nconst A = 1\n")
+
+	proj, diags := Open(root)
+	if diags.Len() != 0 {
+		t.Fatalf("Open() diagnostics = %v, want none", diags.Items())
+	}
+	if got := fileIDList(proj); got != "main.belt,std:math" {
+		t.Fatalf("Files() = %s, want main.belt,std:math", got)
+	}
+
+	entry := proj.EntryFile()
+	entry.AST.Edit(source.Edit{Start: 0, End: entry.AST.Buffer().Len(), NewText: []byte("const A = 1\n")})
+	proj.Resync("main.belt")
+	if got := fileIDList(proj); got != "main.belt" {
+		t.Errorf("Files() after dropping the import = %s, want just the entry", got)
+	}
+
+	entry.AST.Edit(source.Edit{Start: 0, End: entry.AST.Buffer().Len(), NewText: []byte("use { max } from \"std:math\"\nconst A = 1\n")})
+	proj.Resync("main.belt")
+	if got := fileIDList(proj); got != "main.belt,std:math" {
+		t.Errorf("Files() after restoring the import = %s, want the std module back", got)
+	}
+}

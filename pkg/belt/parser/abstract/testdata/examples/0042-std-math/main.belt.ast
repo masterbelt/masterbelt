@@ -1,0 +1,367 @@
+File
+  Uses:
+    UseDecl
+      Public: false
+      Namespace: ""
+      Names: "max" "min" "clamp" "sum" "product" "abs" "sign" "gcd" "lcm" "pow"
+      Star: false
+      Path: "std:math"
+  Decls:
+    ConstDecl
+      Doc: ~
+      Public: true
+      Name: "hi"
+      Type: ~
+      Value: CallExpr
+        Callee: Identifier
+          Name: "max"
+        Arguments:
+          IntLit
+            Text: "3"
+          IntLit
+            Text: "7"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: true
+      Name: "lo"
+      Type: ~
+      Value: CallExpr
+        Callee: Identifier
+          Name: "min"
+        Arguments:
+          IntLit
+            Text: "3"
+          IntLit
+            Text: "7"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: true
+      Name: "cl"
+      Type: ~
+      Value: CallExpr
+        Callee: Identifier
+          Name: "clamp"
+        Arguments:
+          IntLit
+            Text: "5"
+          IntLit
+            Text: "0"
+          IntLit
+            Text: "3"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: true
+      Name: "ab"
+      Type: ~
+      Value: CallExpr
+        Callee: Identifier
+          Name: "abs"
+        Arguments:
+          CallExpr
+            Callee: MemberExpr
+              Receiver: IntLit
+                Text: "5"
+              Member: Identifier
+                Name: "neg"
+            Arguments: ~
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: true
+      Name: "sg"
+      Type: ~
+      Value: CallExpr
+        Callee: Identifier
+          Name: "sign"
+        Arguments:
+          CallExpr
+            Callee: MemberExpr
+              Receiver: IntLit
+                Text: "9"
+              Member: Identifier
+                Name: "neg"
+            Arguments: ~
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: true
+      Name: "g"
+      Type: ~
+      Value: CallExpr
+        Callee: Identifier
+          Name: "gcd"
+        Arguments:
+          IntLit
+            Text: "12"
+          IntLit
+            Text: "18"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: true
+      Name: "l"
+      Type: ~
+      Value: CallExpr
+        Callee: Identifier
+          Name: "lcm"
+        Arguments:
+          IntLit
+            Text: "4"
+          IntLit
+            Text: "6"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: true
+      Name: "p"
+      Type: ~
+      Value: CallExpr
+        Callee: Identifier
+          Name: "pow"
+        Arguments:
+          IntLit
+            Text: "2"
+          IntLit
+            Text: "10"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: true
+      Name: "floored"
+      Type: ~
+      Value: CallExpr
+        Callee: Identifier
+          Name: "max"
+        Arguments:
+          CollectionLit
+            Entries:
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "1"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "2"
+          IntLit
+            Text: "5"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: true
+      Name: "biggest"
+      Type: ~
+      Value: CallExpr
+        Callee: Identifier
+          Name: "max"
+        Arguments:
+          CollectionLit
+            Entries:
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "3"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "1"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "7"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: true
+      Name: "total"
+      Type: ~
+      Value: CallExpr
+        Callee: Identifier
+          Name: "sum"
+        Arguments:
+          CollectionLit
+            Entries:
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "1"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "2"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "3"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "4"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: true
+      Name: "prod"
+      Type: ~
+      Value: CallExpr
+        Callee: Identifier
+          Name: "product"
+        Arguments:
+          CollectionLit
+            Entries:
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "1"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "2"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "3"
+              CollectionEntry
+                Key: ~
+                Value: IntLit
+                  Text: "4"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: true
+      Name: "empties"
+      Type: NamedType
+        Namespace: ""
+        Name: "list"
+        Args:
+          NamedType
+            Namespace: ""
+            Name: "nint"
+            Args: ~
+      Value: CollectionLit
+        Entries: ~
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: true
+      Name: "noMax"
+      Type: ~
+      Value: CallExpr
+        Callee: Identifier
+          Name: "max"
+        Arguments:
+          Identifier
+            Name: "empties"
+      Builtin: false
+  Types: ~
+  Enums: ~
+  Interfaces: ~
+  Funcs: ~
+  Asserts:
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: Identifier
+            Name: "hi"
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "7"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: Identifier
+            Name: "lo"
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "3"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: Identifier
+            Name: "cl"
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "3"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: Identifier
+            Name: "ab"
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "5"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: Identifier
+            Name: "sg"
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          CallExpr
+            Callee: MemberExpr
+              Receiver: IntLit
+                Text: "1"
+              Member: Identifier
+                Name: "neg"
+            Arguments: ~
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: Identifier
+            Name: "g"
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "6"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: Identifier
+            Name: "l"
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "12"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: Identifier
+            Name: "p"
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "1024"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: Identifier
+            Name: "floored"
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "5"

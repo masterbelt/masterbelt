@@ -19,9 +19,25 @@
 package semantic
 
 import (
+	"strings"
+
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
 )
+
+// trustedFileID reports whether a file rides the builtin-surface trust channel:
+// toolchain-bundled source the registry backs per symbol, where extern and `=
+// builtin` are licensed. Today that is the bundled standard library, whose files
+// carry the std: scheme (stdScheme, anchor.go). The prelude is trusted too but
+// never reaches this check — it loads through LoadPrelude without ever being
+// assembled — so std is the only assembled member of the channel. The first std
+// module is pure belt and declares no extern, so the exemption is unused today;
+// it is wired now so a later native-backed std module needs no rule change, the
+// generalization builtin_surface.go's contract promised: the boundary is the
+// load channel, not a path.
+func trustedFileID(id FileID) bool {
+	return strings.HasPrefix(string(id), stdScheme)
+}
 
 // checkBuiltinSurface reports every extern and `= builtin` declaration in an
 // assembled (user) file at its declaration site.

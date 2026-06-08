@@ -1,0 +1,120 @@
+// std:math — the bundled standard library's order and integer utilities. Every
+// function is pure belt over the prelude's orderable/numeric contracts, so each
+// folds at compile time with no native backing — the supply path proven end to
+// end without any native plumbing.
+//
+// Reconciled from the sketch to what the language expresses today: the
+// collection reductions take list<T> rather than a generic foldable (a concrete
+// collection cannot yet pin a foldable<K, V> bound by inference), and abs/sign
+// are int (a generic numeric has no zero, negation, or comparison to build them
+// from). float-only functions (sqrt, trig) wait on a float type.
+
+// ---- max / min ----------------------------------------------------------
+// Three forms each: the binary operator, the collection reduction (empty has no
+// extremum, so the result is T | error), and the collection reduction with a
+// floor/ceiling (total — the bound seeds the fold, so an empty list yields it).
+
+/// The greater of two orderable values.
+pub fn max<T: orderable>(a: T, b: T): T {
+  return a > b ? a : b
+}
+
+/// The greatest element of xs, or an error when xs is empty.
+pub fn max<T: orderable>(xs: list<T>): T | error {
+  match xs.shift() {
+    null -> return error("max of an empty list")
+    T first -> return xs.fold(first, fn(acc: T, i: nint, v: T): T -> acc > v ? acc : v)
+  }
+}
+
+/// The greatest of xs and floor — floor when xs is empty. Total: the floor is
+/// the fold's seed, so there is no empty case to fail on.
+pub fn max<T: orderable>(xs: list<T>, floor: T): T {
+  return xs.fold(floor, fn(acc: T, i: nint, v: T): T -> acc > v ? acc : v)
+}
+
+/// The lesser of two orderable values.
+pub fn min<T: orderable>(a: T, b: T): T {
+  return a < b ? a : b
+}
+
+/// The least element of xs, or an error when xs is empty.
+pub fn min<T: orderable>(xs: list<T>): T | error {
+  match xs.shift() {
+    null -> return error("min of an empty list")
+    T first -> return xs.fold(first, fn(acc: T, i: nint, v: T): T -> acc < v ? acc : v)
+  }
+}
+
+/// The least of xs and ceiling — ceiling when xs is empty. Total, like the
+/// max ceiling form.
+pub fn min<T: orderable>(xs: list<T>, ceiling: T): T {
+  return xs.fold(ceiling, fn(acc: T, i: nint, v: T): T -> acc < v ? acc : v)
+}
+
+// ---- clamp ---------------------------------------------------------------
+
+/// x confined to [lo, hi]: lo when below, hi when above, x otherwise.
+pub fn clamp<T: orderable>(x: T, lo: T, hi: T): T {
+  return x < lo ? lo : (x > hi ? hi : x)
+}
+
+// ---- sum / product -------------------------------------------------------
+// Reductions over a numeric list. An empty list has no element to seed with —
+// and a generic numeric has no zero/one literal to fall back on — so the empty
+// case is T | error. The fold carries a T | error accumulator: error until the
+// first element, then the running total, so each element is added (multiplied)
+// exactly once.
+
+/// The sum of xs, or an error when xs is empty.
+pub fn sum<T: numeric>(xs: list<T>): T | error {
+  let total: T | error = error("sum of an empty list")
+  return xs.fold(total, fn(acc: T | error, i: nint, v: T): T | error {
+    match acc {
+      T a -> return a + v
+      error e -> return v
+    }
+  })
+}
+
+/// The product of xs, or an error when xs is empty.
+pub fn product<T: numeric>(xs: list<T>): T | error {
+  let total: T | error = error("product of an empty list")
+  return xs.fold(total, fn(acc: T | error, i: nint, v: T): T | error {
+    match acc {
+      T a -> return a * v
+      error e -> return v
+    }
+  })
+}
+
+// ---- integer utilities ---------------------------------------------------
+
+/// The absolute value of x.
+pub fn abs(x: int): int {
+  return x < 0 ? -x : x
+}
+
+/// The sign of x: -1, 0, or 1.
+pub fn sign(x: int): int {
+  return x < 0 ? -1 : (x > 0 ? 1 : 0)
+}
+
+/// The greatest common divisor of a and b (non-negative; gcd(0, 0) is 0).
+pub fn gcd(a: int, b: int): int {
+  return b == 0 ? abs(a) : gcd(b, a % b)
+}
+
+/// The least common multiple of a and b (non-negative; 0 when either is 0).
+pub fn lcm(a: int, b: int): int {
+  return a == 0 || b == 0 ? 0 : abs(a / gcd(a, b) * b)
+}
+
+/// base raised to a non-negative integer exponent (pow(x, 0) is 1).
+pub fn pow(base: int, exp: nint): int {
+  let acc: int = 1
+  for i in range(1, exp) {
+    acc = acc * base
+  }
+  return acc
+}
