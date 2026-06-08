@@ -46,6 +46,28 @@ for d in $dirs; do
 	cp -R "$src/$d" "$out/$d"
 done
 
+# Stamp the published version to masterbelt's own — the grammar is generated in
+# lockstep with the language, so it ships under the same version, not a separate
+# hand-set one. The committed package.json/tree-sitter.json carry a 0.1.0
+# placeholder (like the vscode package); the real, commit-derived version is
+# read from the CLI here (the single source, internal/version) and written into
+# the assembled tree, so a developer's `make publish-tree-sitter` and CI produce
+# the identical stamp. Overridable via TS_VERSION (e.g. to stub it in a test).
+version="${TS_VERSION:-$(go run -buildvcs=true ./cmd/masterbelt --version | awk '{print $3}')}"
+node - "$out" "$version" <<'NODE'
+const fs = require('fs');
+const [dir, version] = process.argv.slice(2);
+for (const [file, set] of [
+  ['package.json', (j) => { j.version = version; }],
+  ['tree-sitter.json', (j) => { j.metadata.version = version; }],
+]) {
+  const path = dir + '/' + file;
+  const json = JSON.parse(fs.readFileSync(path, 'utf8'));
+  set(json);
+  fs.writeFileSync(path, JSON.stringify(json, null, 2) + '\n');
+}
+NODE
+
 # The repo's single MIT license, copied in (not a second committed copy that
 # could drift) — the same approach the vsix package and dist.sh take.
 cp LICENSE "$out/LICENSE"
@@ -66,7 +88,8 @@ The [tree-sitter](https://tree-sitter.github.io/) grammar for the
 > **This repository is a generated mirror — do not edit it here.** The source is
 > \`toolchain/grammars/tree-sitter-masterbelt\` in the masterbelt monorepo; this
 > tree is assembled and published from there (\`build/publish-tree-sitter.sh\`).
-> Cut from masterbelt commit \`$rev\`.
+> Version \`$version\`, cut from masterbelt commit \`$rev\` — the grammar ships
+> under the same version as the language it tracks.
 
 The committed \`src/parser.c\` means consumers need no tree-sitter CLI — only a C
 compiler, which the editors invoke for you.
@@ -88,4 +111,4 @@ names, which GitHub also reads); \`queries/helix\` and \`queries/zed\` hold the
 variants whose capture vocabulary differs.
 EOF
 
-echo "assembled tree-sitter-masterbelt -> $out (from $rev)"
+echo "assembled tree-sitter-masterbelt $version -> $out (from $rev)"
