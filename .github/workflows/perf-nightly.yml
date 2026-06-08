@@ -14,7 +14,7 @@
 # and its results surface only in the job summary and as build artifacts. There
 # is NO commit-from-CI: trend storage is the artifact + summary. Wall-clock and
 # memory are TREND metrics, never fail conditions; only the deterministic counts
-# in the `ci` workflow (`make perf`) gate.
+# in the `go` workflow (`make perf`) gate.
 name: perf-nightly
 
 on:
@@ -62,7 +62,7 @@ jobs:
             echo
             echo "Trend layer. Wall-clock and memory are trend metrics; the hard"
             echo "gates are the deterministic reuse snapshot and allocs/op in the"
-            echo "\`ci\` workflow. Numbers below are advisory (shared-runner"
+            echo "\`go\` workflow. Numbers below are advisory (shared-runner"
             echo "variance) — read the curve over time."
             echo
             cat scale-sweep.md 2>/dev/null || echo "_(scale sweep produced no output)_"

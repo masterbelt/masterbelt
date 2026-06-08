@@ -1,0 +1,161 @@
+# go — the Go toolchain CI: gofmt, vet, golangci-lint, generated-file check,
+# the test suite, and the deterministic performance gates (the reuse snapshot
+# and the allocation ceilings). Each concern is its own job so a failure points
+# at exactly one thing and the checks run in parallel.
+#
+# Every job is conditional on a Go-relevant change (the `changes` filter): a PR
+# that touches only the editor extension, docs, or another workflow skips them
+# all. To keep that safe for branch protection, the workflow ALWAYS triggers and
+# the skipping happens per job — a path filter on the trigger would leave a
+# required check pending forever on a non-matching PR. The single required check
+# is the `go` gate, which passes when every Go job succeeded or was skipped.
+#
+# Wall-clock benchmarks are a trend, not a pass/fail condition, so they live in
+# the separate perf-trend workflow; this workflow gates only on deterministic
+# results to stay non-flaky.
+name: go
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancel superseded runs on a branch so a fast push does not queue stale work.
+concurrency:
+  group: go-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read # paths-filter reads the PR's changed files
+
+jobs:
+  # Detect whether anything that can move a Go result changed. Every job below
+  # gates on `go`; the gate job treats a skip as a pass.
+  changes:
+    name: detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      go: ${{ steps.filter.outputs.go }}
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: dorny/paths-filter@d1c1ffe0248fe513906c8e24db8ea791d46f8590 # v3.0.3
+        id: filter
+        with:
+          filters: |
+            go:
+              - '**.go'
+              - 'go.mod'
+              - 'go.sum'
+              - 'Makefile'
+              - '.golangci.yml'
+              - '**/testdata/**'
+              - '.github/workflows/go.yml'
+              - '.github/workflows/test.yml'
+
+  format:
+    name: gofmt
+    needs: changes
+    if: needs.changes.outputs.go == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: |
+          unformatted="$(gofmt -l pkg cmd internal toolchain)"
+          if [ -n "$unformatted" ]; then
+            echo "These files are not gofmt-clean:"; echo "$unformatted"; exit 1
+          fi
+
+  vet:
+    name: go vet
+    needs: changes
+    if: needs.changes.outputs.go == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: go vet ./...
+
+  lint:
+    name: golangci-lint
+    needs: changes
+    if: needs.changes.outputs.go == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: golangci/golangci-lint-action@82606bf257cbaff209d206a39f5134f0cfbfd2ee # v9.2.1
+        with:
+          version: v2.12.2
+
+  generate:
+    name: generated files
+    needs: changes
+    if: needs.changes.outputs.go == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: make verify-generated
+
+  # The test suite is the one check shared with the nightly gate, so it lives in
+  # a reusable workflow both call.
+  test:
+    needs: changes
+    if: needs.changes.outputs.go == 'true'
+    uses: ./.github/workflows/test.yml
+
+  perf:
+    name: performance gates
+    needs: changes
+    if: needs.changes.outputs.go == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: make perf
+
+  # The single required check. It always runs and passes when every Go job
+  # either succeeded or was skipped (the change did not touch Go), so a
+  # non-matching PR is never left pending — and a real failure still reds it.
+  go:
+    name: go
+    needs: [changes, format, vet, lint, generate, test, perf]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every Go check to have passed or been skipped
+        env:
+          RESULTS: >-
+            ${{ needs.changes.result }}
+            ${{ needs.format.result }}
+            ${{ needs.vet.result }}
+            ${{ needs.lint.result }}
+            ${{ needs.generate.result }}
+            ${{ needs.test.result }}
+            ${{ needs.perf.result }}
+        run: |
+          ok=1
+          for r in $RESULTS; do
+            case "$r" in
+              success|skipped) ;;
+              *) echo "::error::a Go check ended in '$r'"; ok=0 ;;
+            esac
+          done
+          [ "$ok" = 1 ]

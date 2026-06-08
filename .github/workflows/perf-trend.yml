@@ -8,7 +8,7 @@
 #
 # THIS IS ADVISORY — IT IS NEVER A MERGE BLOCKER. The performance loop's hard
 # gates are DETERMINISTIC counts only (the reuse snapshot + allocs/op, run by
-# `make perf` in ci.yml); wall-clock and memory are TREND metrics, reported but
+# `make perf` in go.yml); wall-clock and memory are TREND metrics, reported but
 # never failed, because shared CI runners are too noisy to gate on time without
 # becoming flaky. Accordingly the benchstat step
 # can never exit non-zero into the job result: it is guarded so a regression —
@@ -119,7 +119,7 @@ jobs:
             echo
             echo "Wall-clock and memory are TREND metrics: reported, never failed."
             echo "The hard gates are the deterministic reuse snapshot and allocs/op"
-            echo "in the \`ci\` workflow (\`make perf\`). Shared-runner variance makes"
+            echo "in the \`go\` workflow (\`make perf\`). Shared-runner variance makes"
             echo "the numbers below advisory — read the p-values, not single deltas."
             echo
             echo "\`\`\`"
@@ -158,7 +158,7 @@ jobs:
               '',
               'Wall-clock and memory are **trend** metrics: reported, never failed.',
               'The hard gates are the deterministic reuse snapshot and allocs/op in',
-              'the `ci` workflow. Shared-runner variance makes these advisory — read',
+              'the `go` workflow. Shared-runner variance makes these advisory — read',
               'the p-values, not single deltas.',
               '',
               '```',
