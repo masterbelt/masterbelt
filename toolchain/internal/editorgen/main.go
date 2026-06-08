@@ -28,9 +28,6 @@ import (
 	"github.com/masterbelt/masterbelt/pkg/source/token"
 )
 
-// scopeKeywordControl is the TextMate scope the keyword rules share.
-const scopeKeywordControl = "keyword.control.masterbelt"
-
 // Output paths, relative to this package's directory (where `go generate` runs).
 // editorgen now lives outside any single editor's tree (it is a multi-target
 // generator), so the VS Code outputs are reached through toolchain/editors.
@@ -79,8 +76,8 @@ type rule struct {
 func buildGrammar() grammar {
 	return grammar{
 		Schema:    "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
-		Name:      "masterbelt",
-		ScopeName: "source.masterbelt",
+		Name:      langName,
+		ScopeName: "source." + langName,
 		Patterns: []rule{
 			{Include: "#comments"},
 			{Include: "#keywords"},
@@ -99,15 +96,15 @@ func buildGrammar() grammar {
 		},
 		Repository: map[string]ruleGroup{
 			"comments": {Patterns: []rule{
-				{Name: "comment.line.documentation.masterbelt", Match: regexp.QuoteMeta(token.DocCommentPrefix) + `.*$`},
-				{Name: "comment.line.double-slash.masterbelt", Match: regexp.QuoteMeta(token.LineCommentPrefix) + `.*$`},
-				{Name: "comment.block.masterbelt", Begin: regexp.QuoteMeta(token.BlockCommentOpen), End: regexp.QuoteMeta(token.BlockCommentClose)},
+				{Name: lexCommentDoc.tmScope(), Match: regexp.QuoteMeta(token.DocCommentPrefix) + `.*$`},
+				{Name: lexCommentLine.tmScope(), Match: regexp.QuoteMeta(token.LineCommentPrefix) + `.*$`},
+				{Name: lexCommentBlock.tmScope(), Begin: regexp.QuoteMeta(token.BlockCommentOpen), End: regexp.QuoteMeta(token.BlockCommentClose)},
 			}},
 			// keyword.control is where VS Code lands a semantic `keyword`
 			// token when the theme defines no semanticTokenColors, so the
 			// keywords wear the same colour before and after the server is up.
 			"keywords": {Patterns: []rule{
-				{Name: scopeKeywordControl, Match: keywordPattern()},
+				{Name: lexKeyword.tmScope(), Match: keywordPattern()},
 			}},
 			// The accessor/static modifiers (get, set, static) are context
 			// keywords: the lexer leaves them identifiers, so they are not in the
@@ -120,35 +117,35 @@ func buildGrammar() grammar {
 			// server leaves it. The semantic tokens are authoritative; this is the
 			// cold-start approximation.
 			"modifiers": {Patterns: []rule{
-				{Name: scopeKeywordControl, Match: `\bstatic\b(?=\s+fn\b)`},
-				{Name: scopeKeywordControl, Match: `\b(get|set)\b(?=\s+[A-Za-z_])`},
+				{Name: lexKeyword.tmScope(), Match: `\bstatic\b(?=\s+fn\b)`},
+				{Name: lexKeyword.tmScope(), Match: `\b(get|set)\b(?=\s+[A-Za-z_])`},
 			}},
 			// A D-prefixed ISO-8601 instant: the same shape the lexer commits
 			// on, milliseconds and signed offsets included. The semantic
 			// `number` token lands on constant.numeric, so the literal wears
 			// the same colour before and after the server is up.
 			"datetimes": {Patterns: []rule{
-				{Name: "constant.numeric.datetime.masterbelt", Match: `\bD[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]{3})?(Z|[+-][0-9]{2}:[0-9]{2})`},
+				{Name: lexNumberDatetime.tmScope(), Match: `\bD[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]{3})?(Z|[+-][0-9]{2}:[0-9]{2})`},
 			}},
 			// Concatenated digit+unit groups (3w4d5h6m7s8ms); ms is listed
 			// before its prefix letters so the alternation munches maximally,
 			// exactly as the lexer does.
 			"durations": {Patterns: []rule{
-				{Name: "constant.numeric.duration.masterbelt", Match: `\b([0-9]+(ms|w|d|h|m|s))+\b`},
+				{Name: lexNumberDuration.tmScope(), Match: `\b([0-9]+(ms|w|d|h|m|s))+\b`},
 			}},
 			"numbers": {Patterns: []rule{
-				{Name: "constant.numeric.integer.masterbelt", Match: `\b[0-9]+\b`},
+				{Name: lexNumberInteger.tmScope(), Match: `\b[0-9]+\b`},
 			}},
 			// A double-quoted string with the escapes the lexer recognizes —
 			// \n \r \t \0 \\ \" and \u{...}. Only a cold-start approximation; the
 			// server's semantic tokens are authoritative.
 			"strings": {Patterns: []rule{
 				{
-					Name:  "string.quoted.double.masterbelt",
+					Name:  lexString.tmScope(),
 					Begin: `"`,
 					End:   `"`,
 					Patterns: []rule{
-						{Name: "constant.character.escape.masterbelt", Match: `\\(u\{[0-9A-Fa-f]{1,6}\}|[nrt0\\"])`},
+						{Name: lexStringEscape.tmScope(), Match: `\\(u\{[0-9A-Fa-f]{1,6}\}|[nrt0\\"])`},
 					},
 				},
 			}},
@@ -161,11 +158,11 @@ func buildGrammar() grammar {
 			// must not match a member-access "." beside a number, so each is the
 			// exact two- or three-dot run.
 			"operators": {Patterns: []rule{
-				{Name: "keyword.operator.range.masterbelt", Match: regexp.QuoteMeta(token.DotDotDot.Symbol())},
-				{Name: "keyword.operator.range.masterbelt", Match: regexp.QuoteMeta(token.DotDot.Symbol())},
-				{Name: "keyword.operator.masterbelt", Match: regexp.QuoteMeta(token.Arrow.Symbol())},
-				{Name: "keyword.operator.assignment.masterbelt", Match: `=`},
-				{Name: "keyword.operator.masterbelt", Match: `:`},
+				{Name: lexOperatorRange.tmScope(), Match: regexp.QuoteMeta(token.DotDotDot.Symbol())},
+				{Name: lexOperatorRange.tmScope(), Match: regexp.QuoteMeta(token.DotDot.Symbol())},
+				{Name: lexOperator.tmScope(), Match: regexp.QuoteMeta(token.Arrow.Symbol())},
+				{Name: lexOperatorAssign.tmScope(), Match: `=`},
+				{Name: lexOperator.tmScope(), Match: `:`},
 			}},
 		},
 	}
