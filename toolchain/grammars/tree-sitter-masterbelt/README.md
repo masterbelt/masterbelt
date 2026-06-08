@@ -32,5 +32,37 @@ make verify-generated  # fails if the committed output is stale
 ```
 
 `tree-sitter generate` needs the tree-sitter CLI; it is pinned as this
-package's `devDependency` (`npm ci` here installs it). The C-2 plan's §5
-records this as the one new development dependency.
+package's `devDependency` and installed by `pnpm install` at the workspace root
+(this package is a member of the pnpm workspace). The C-2 plan's §5 records this
+as the one new development dependency.
+
+## Distribution (C-3)
+
+The source lives here; editors consume it from a **dedicated mirror repo**,
+`masterbelt/tree-sitter-masterbelt`, because the tree-sitter ecosystem expects
+`grammar.js` and `src/parser.c` at a repository root (this package is a
+subdirectory). The mirror is generated, never hand-edited.
+
+- `make publish-tree-sitter` assembles the standalone package tree (this
+  directory flattened to a root, the dev-only test harness dropped, the MIT
+  license and a consumer README added) into `dist/tree-sitter-masterbelt`.
+- The `tree-sitter` workflow's `publish` job (a manual dispatch) regenerates,
+  verifies, assembles, and — when a token is configured — syncs the tree to the
+  mirror, pushing its rolling default branch and an immutable `v<version>-<sha>`
+  tag for editors to pin (never a moving reference).
+
+**Bring-up (one-time, human):**
+
+1. Create the empty `masterbelt/tree-sitter-masterbelt` repository.
+2. Add a repository secret `TREE_SITTER_TOKEN` (a token with contents-write on
+   that repo) to this repo. Without it the publish job still runs but only
+   uploads the assembled tree as an artifact — it never fails.
+3. Run the `tree-sitter` workflow via *Run workflow* (workflow_dispatch) to do
+   the first sync, and verify the mirror.
+4. Add the `tree-sitter` check to this repo's branch protection so the grammar
+   gate is required, alongside `go` and `vscode`.
+
+The npm package is named `@masterbelt/tree-sitter-masterbelt` so it can later be
+published to GitHub Packages (and public npm); that, with the node/rust
+bindings, is C-3 M5.3 — optional and after the editor mirror, which needs only
+the committed `src/parser.c`.
