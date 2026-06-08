@@ -27,9 +27,10 @@ import (
 )
 
 // Format returns the canonical formatting of the file rooted at root, reading
-// token text from buf and laying lines out under layout.
+// token text from buf and laying lines out under layout: the printer re-indents
+// with layout.Indent, and normalize renders the line breaks as layout.EndOfLine.
 func Format(buf source.Buffer, root cst.Green, layout Layout) string {
-	return normalize(printer.Print(buf, root), layout)
+	return normalize(printer.Print(buf, root, layout.Indent), layout)
 }
 
 // normalize trims trailing whitespace from every line, collapses the file to a

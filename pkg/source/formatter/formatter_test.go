@@ -11,7 +11,15 @@ import (
 func TestFormat(t *testing.T) {
 	src := "ab  \n\n"
 	buf := source.NewFile("", []byte(src))
-	root := cst.NewNode(cst.File, []cst.Green{cst.NewToken(token.Whitespace, src)})
+	// A realistic leaf tiling of "ab  \n\n": the identifier, its trailing
+	// spaces, then two newlines. Format trims the trailing spaces and the extra
+	// blank line down to a single final newline.
+	root := cst.NewNode(cst.File, []cst.Green{
+		cst.NewToken(token.Ident, "ab"),
+		cst.NewToken(token.Whitespace, "  "),
+		cst.NewToken(token.Newline, "\n"),
+		cst.NewToken(token.Newline, "\n"),
+	})
 
 	if got := Format(buf, root, DefaultLayout); got != "ab\n" {
 		t.Errorf("Format = %q, want %q", got, "ab\n")
