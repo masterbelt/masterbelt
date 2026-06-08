@@ -667,6 +667,12 @@ func (p *parser) parseMasterPrimary(lead []cst.Green) *cst.Node {
 	case token.LParen:
 		p.skipTrivia(&children)
 		children = append(children, p.bump()) // "("
+		// A composite key names at least one column: an empty "()" records the
+		// same missing-identifier diagnostic a bare primary without a key does,
+		// rather than lowering silently to no key.
+		if p.peekSignificant() != token.Ident {
+			p.report(newExpectedIdentifierDiagnostic(p.lastStart, 0))
+		}
 		for p.peekSignificant() == token.Ident {
 			p.skipTrivia(&children)
 			children = append(children, p.bump()) // a key column

@@ -38,6 +38,10 @@ func TestParseMaster(t *testing.T) {
 	for _, tc := range []struct{ name, src string }{
 		{"missing name", "master {\n}\n"},
 		{"missing name after pub", "pub master {\n}\n"},
+		// A primary with no key, and a composite key with no column, both report
+		// the missing identifier rather than recovering silently.
+		{"primary without a key", "master M {\n  record { id: int }\n  primary\n}\n"},
+		{"empty composite key", "master M {\n  record { id: int }\n  primary ()\n}\n"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			root, diags := Parse([]byte(tc.src))
