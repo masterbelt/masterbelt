@@ -69,7 +69,10 @@ for (const [file, set] of [
     j.keywords = ['tree-sitter', 'masterbelt', 'parser', 'grammar'];
     j.files = ['grammar.js', 'lexical.js', 'tree-sitter.json', 'src/', 'queries/', '*.wasm'];
   }],
-  ['tree-sitter.json', (j) => { j.metadata.version = version; }],
+  ['tree-sitter.json', (j) => {
+    if (!j.metadata || typeof j.metadata !== 'object') j.metadata = {};
+    j.metadata.version = version;
+  }],
 ]) {
   const path = dir + '/' + file;
   const json = JSON.parse(fs.readFileSync(path, 'utf8'));
