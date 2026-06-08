@@ -20,6 +20,15 @@ build:
 dist:
 	DIST_DIR=$(DIST_DIR) sh build/dist.sh
 
+# publish-tree-sitter assembles the standalone tree-sitter-masterbelt package
+# tree (the in-repo grammar flattened to the package root the dedicated
+# distribution repo expects) into dist/tree-sitter-masterbelt. It is the local
+# half of the publish workflow (C-3): the same tree CI syncs to the dedicated
+# repo. Run `make generate` first if the grammar changed.
+.PHONY: publish-tree-sitter
+publish-tree-sitter:
+	TS_DIST_DIR=$(DIST_DIR)/tree-sitter-masterbelt sh build/publish-tree-sitter.sh
+
 # repro-check builds the release binary twice and asserts the two are
 # byte-identical — the reproducible-build regression check. The flags match
 # build/dist.sh; the version comes from the commit, so a rebuild reproduces it.
