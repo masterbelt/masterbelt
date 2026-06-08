@@ -237,9 +237,9 @@ func Body(body []ast.Stmt, b Binder) []ir.Stmt {
 	for _, s := range body {
 		switch s := s.(type) {
 		case *ast.ReturnStmt:
-			stmts = append(stmts, &ir.Return{Value: Value(s.Value, b)})
+			stmts = append(stmts, &ir.Return{Value: Value(s.Value, b), Syntax: s})
 		case *ast.ExprStmt:
-			stmts = append(stmts, &ir.ExprStmt{Value: Value(s.X, b)})
+			stmts = append(stmts, &ir.ExprStmt{Value: Value(s.X, b), Syntax: s})
 		case *ast.LetStmt:
 			lb, ok := b.(LocalBinder)
 			if !ok {
@@ -250,7 +250,7 @@ func Body(body []ast.Stmt, b Binder) []ir.Stmt {
 			// The initializer sees the scope before the let, expecting that enum.
 			value := Value(s.Value, expectEnum(b, annotationEnumOf(b, s.Type)))
 			next, typ := lb.LetLocal(s.Name, s.Type, s.Value)
-			stmts = append(stmts, &ir.Let{Name: s.Name, Type: typ, Value: value})
+			stmts = append(stmts, &ir.Let{Name: s.Name, Type: typ, Value: value, Syntax: s})
 			b = next
 		case *ast.AssignStmt:
 			if _, ok := b.(LocalBinder); !ok {
@@ -286,14 +286,14 @@ func Body(body []ast.Stmt, b Binder) []ir.Stmt {
 func assignStmt(s *ast.AssignStmt, b Binder) *ir.Assign {
 	if m, ok := s.Target.(*ast.MemberExpr); ok {
 		if recv, ok := m.Receiver.(*ast.Identifier); ok {
-			return &ir.Assign{Name: recv.Name, Value: &ir.Call{
+			return &ir.Assign{Name: recv.Name, Syntax: s, Value: &ir.Call{
 				Receiver: Value(m.Receiver, b),
 				Method:   m.Member.Name,
 				Args:     []ir.Value{Value(s.Value, b)},
 				Setter:   true,
 			}}
 		}
-		return &ir.Assign{Name: "", Value: Value(s.Value, b)}
+		return &ir.Assign{Name: "", Value: Value(s.Value, b), Syntax: s}
 	}
 	name := ""
 	if id, ok := s.Target.(*ast.Identifier); ok {
@@ -302,14 +302,14 @@ func assignStmt(s *ast.AssignStmt, b Binder) *ir.Assign {
 	// A bare member on the right resolves through the target local's enum (r =
 	// Common, where r is a Rarity let), the static type read syntactically from
 	// the binder's scope — the assignment twin of the let-initializer rule.
-	return &ir.Assign{Name: name, Value: Value(s.Value, expectEnum(b, expectedEnumOf(b, s.Target)))}
+	return &ir.Assign{Name: name, Value: Value(s.Value, expectEnum(b, expectedEnumOf(b, s.Target))), Syntax: s}
 }
 
 // ifStmt lowers an if statement: its condition, its then body, and its else
 // branch — an else-if chain into a nested ir.If, a plain else into the Else
 // body. An if yields no value, so only its condition and branch bodies lower.
 func ifStmt(s *ast.IfStmt, b Binder) *ir.If {
-	out := &ir.If{Cond: Value(s.Cond, b), Then: Body(s.Then, b)}
+	out := &ir.If{Cond: Value(s.Cond, b), Then: Body(s.Then, b), Syntax: s}
 	if s.ElseIf != nil {
 		out.ElseIf = ifStmt(s.ElseIf, b)
 	}
@@ -327,7 +327,7 @@ func ifStmt(s *ast.IfStmt, b Binder) *ir.If {
 // for in practice. A for yields no value, so only its iter and body lower.
 func forStmt(s *ast.ForStmt, b Binder) *ir.For {
 	of := s.Kind == ast.ForOf
-	out := &ir.For{Var: s.Var, Of: of, Iter: Value(s.Iter, b)}
+	out := &ir.For{Var: s.Var, Of: of, Iter: Value(s.Iter, b), Syntax: s}
 	bodyBinder := b
 	if fb, ok := b.(ForBinder); ok && s.Var != "" {
 		next, typ := fb.ForLocal(s.Var, s.Iter, of)
@@ -344,7 +344,7 @@ func forStmt(s *ast.ForStmt, b Binder) *ir.For {
 // reached so a bare member resolves — the same path a const initializer's bare
 // member takes.
 func switchStmt(s *ast.SwitchStmt, b Binder) *ir.Switch {
-	sw := &ir.Switch{Scrutinee: Value(s.Scrutinee, b)}
+	sw := &ir.Switch{Scrutinee: Value(s.Scrutinee, b), Syntax: s}
 	armValue := expectEnum(b, expectedEnumOf(b, s.Scrutinee))
 	for _, arm := range s.Arms {
 		values := make([]ir.Value, len(arm.Values))
@@ -373,7 +373,7 @@ func switchStmt(s *ast.SwitchStmt, b Binder) *ir.Switch {
 // capability (no narrowing scope) lowers the arm body unchanged, leaving the
 // binding unresolved — a context that never carries a match in practice.
 func matchStmt(s *ast.MatchStmt, b Binder) *ir.Match {
-	m := &ir.Match{Scrutinee: Value(s.Scrutinee, b)}
+	m := &ir.Match{Scrutinee: Value(s.Scrutinee, b), Syntax: s}
 	mb, hasNarrow := b.(MatchBinder)
 	for _, arm := range s.Arms {
 		armType := ir.Invalid

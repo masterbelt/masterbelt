@@ -398,14 +398,16 @@ type Stmt interface {
 
 // Return is a return statement: it yields Value (nil if the source omitted it).
 type Return struct {
-	Value Value
+	Value  Value
+	Syntax ast.Stmt `tree:"-"` // the statement this was lowered from, a diagnostic anchor
 }
 
 func (*Return) stmt() {}
 
 // ExprStmt is an expression evaluated as a statement.
 type ExprStmt struct {
-	Value Value
+	Value  Value
+	Syntax ast.Stmt `tree:"-"`
 }
 
 func (*ExprStmt) stmt() {}
@@ -415,9 +417,10 @@ func (*ExprStmt) stmt() {}
 // settled type — the annotation when written, otherwise the value's inferred
 // type — carried here because the value graph is otherwise untyped.
 type Let struct {
-	Name  string
-	Type  Type
-	Value Value
+	Name   string
+	Type   Type
+	Value  Value
+	Syntax ast.Stmt `tree:"-"`
 }
 
 func (*Let) stmt() {}
@@ -426,8 +429,9 @@ func (*Let) stmt() {}
 // target local's name (the parser's target expression, validated to be a let
 // local by the semantic layer); Value is the new value.
 type Assign struct {
-	Name  string
-	Value Value
+	Name   string
+	Value  Value
+	Syntax ast.Stmt `tree:"-"`
 }
 
 func (*Assign) stmt() {}
@@ -439,7 +443,8 @@ func (*Assign) stmt() {}
 type Switch struct {
 	Scrutinee Value
 	Arms      []SwitchArm
-	Else      []Stmt // the wildcard body, or nil if the switch had no wildcard
+	Else      []Stmt   // the wildcard body, or nil if the switch had no wildcard
+	Syntax    ast.Stmt `tree:"-"`
 }
 
 func (*Switch) stmt() {}
@@ -458,7 +463,8 @@ type SwitchArm struct {
 type Match struct {
 	Scrutinee Value
 	Arms      []MatchArm
-	Else      []Stmt // the wildcard body, or nil if the match had no wildcard
+	Else      []Stmt   // the wildcard body, or nil if the match had no wildcard
+	Syntax    ast.Stmt `tree:"-"`
 }
 
 func (*Match) stmt() {}
@@ -479,8 +485,9 @@ type MatchArm struct {
 type If struct {
 	Cond   Value
 	Then   []Stmt
-	ElseIf *If    // the chained "else if", or nil
-	Else   []Stmt // the "else" body, or nil when there is no plain else
+	ElseIf *If      // the chained "else if", or nil
+	Else   []Stmt   // the "else" body, or nil when there is no plain else
+	Syntax ast.Stmt `tree:"-"`
 }
 
 func (*If) stmt() {}
@@ -497,9 +504,40 @@ type For struct {
 	Of      bool   // true for an of-loop (the value), false for an in-loop (the key)
 	Iter    Value
 	Body    []Stmt
+	Syntax  ast.Stmt `tree:"-"`
 }
 
 func (*For) stmt() {}
+
+// SyntaxOfStmt returns the statement a lowered Stmt came from — its source
+// anchor for a diagnostic, never a carrier of semantics. It is nil for a nil
+// statement and for one built with no surface form. The switch is exhaustive
+// over the sealed Stmt forms; a new form panics here rather than silently
+// anchoring nowhere, the contract SyntaxOf keeps for values.
+func SyntaxOfStmt(s Stmt) ast.Stmt {
+	switch s := s.(type) {
+	case nil:
+		return nil
+	case *Return:
+		return s.Syntax
+	case *ExprStmt:
+		return s.Syntax
+	case *Let:
+		return s.Syntax
+	case *Assign:
+		return s.Syntax
+	case *Switch:
+		return s.Syntax
+	case *Match:
+		return s.Syntax
+	case *If:
+		return s.Syntax
+	case *For:
+		return s.Syntax
+	default:
+		panic(unhandledStmt(s))
+	}
+}
 
 // Param is one method parameter: a name and its type.
 type Param struct {
