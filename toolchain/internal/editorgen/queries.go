@@ -53,11 +53,21 @@ func (t tsTarget) cap(category string) string {
 // where its convention differs (see tsTargets), so the shared names live here
 // once.
 var defaultCaptures = map[string]string{
-	catKeyword: "keyword", catComment: "comment", catCommentDoc: "comment.documentation",
-	catType: "type", catVariable: "variable", catNumber: "number",
-	catString: "string", catStringEscape: "string.escape", catOperator: "operator",
-	catNamespace: "module", catProperty: "property", catMethod: "function.method",
-	catParameter: "variable.parameter", catFunction: "function", catEnumMember: "constant",
+	catKeyword:      "keyword",
+	catComment:      "comment",
+	catCommentDoc:   "comment.documentation",
+	catType:         "type",
+	catVariable:     "variable",
+	catNumber:       "number",
+	catString:       "string",
+	catStringEscape: "string.escape",
+	catOperator:     "operator",
+	catNamespace:    "module",
+	catProperty:     "property",
+	catMethod:       "function.method",
+	catParameter:    "variable.parameter",
+	catFunction:     "function",
+	catEnumMember:   "constant",
 }
 
 // tsTargets are the highlight targets generated. The default (nvim-treesitter)
@@ -90,11 +100,69 @@ func semanticOperatorSpellings() []string {
 	}
 }
 
-// contextModifiers are the accessor/static context keywords. The lexer leaves
-// them identifiers (so they are absent from token.Keywords), but they colour as
-// keywords, the same set keyword.control covers — matching semantic.go's
-// Modifier handling and the TextMate #modifiers rule.
+// contextModifiers are contextual accessor/static modifiers: `get`, `set`, and
+// `static`. They are intentionally not reserved words in token.Keywords because
+// they should remain legal identifiers outside modifier positions; the lexer
+// therefore emits them as identifiers. During highlighting, when they appear in
+// modifier/accessor context, we promote them to keyword colouring (keyword.control),
+// matching semantic.go's Modifier handling and the TextMate #modifiers rule.
 var contextModifiers = []string{"get", "set", "static"}
+
+// highlightRule maps a tree-sitter query pattern, with a single %s capture
+// placeholder, to the category whose capture name fills it.
+type highlightRule struct {
+	pattern  string
+	category string
+}
+
+// declRules colour declared names; the kind of declaration fixes the colour,
+// matching semantic.go's identClasses.
+var declRules = []highlightRule{
+	{pattern: "(const_decl name: (identifier) %s)\n", category: catVariable},
+	{pattern: "(let_stmt name: (identifier) %s)\n", category: catVariable},
+	{pattern: "(type_decl name: (identifier) %s)\n", category: catType},
+	{pattern: "(enum_decl name: (identifier) %s)\n", category: catType},
+	{pattern: "(interface_decl name: (identifier) %s)\n", category: catType},
+	{pattern: "(master_decl name: (identifier) %s)\n", category: catType},
+	{pattern: "(generic_param name: (identifier) %s)\n", category: catType},
+	{pattern: "(func_decl name: (identifier) %s)\n", category: catFunction},
+	{pattern: "(method_decl name: (identifier) %s)\n", category: catMethod},
+	{pattern: "(interface_member name: (identifier) %s)\n", category: catMethod},
+	{pattern: "(param name: (identifier) %s)\n", category: catParameter},
+	{pattern: "(field name: (identifier) %s)\n", category: catProperty},
+	{pattern: "(record_field name: (identifier) %s)\n", category: catProperty},
+	{pattern: "(master_primary (identifier) %s)\n", category: catProperty},
+	{pattern: "(enum_member name: (identifier) %s)\n", category: catEnumMember},
+	{pattern: "(use_decl (identifier) %s)\n", category: catNamespace},
+	{pattern: "(modifier) %s\n", category: catKeyword},
+	{pattern: "(master_keyword) %s\n", category: catKeyword},
+}
+
+// refRules colour name references. A name in a type position is a type; the
+// type prefix of a record literal is too. A bare value reference is a
+// variable, and a member access reads as a property.
+var refRules = []highlightRule{
+	{pattern: "(type_name (identifier) %s)\n", category: catType},
+	{pattern: "(record_literal type: (identifier) %s)\n", category: catType},
+	{pattern: "(value_ref (identifier) %s)\n", category: catVariable},
+	{pattern: "(member_expr member: (identifier) %s)\n", category: catProperty},
+}
+
+// overrideRules are contextual overrides emitted last, so they win: a call's
+// callee names the function or method being called, not a plain value or
+// property.
+var overrideRules = []highlightRule{
+	{pattern: "(call_expr callee: (value_ref (identifier) %s))\n", category: catFunction},
+	{pattern: "(call_expr callee: (member_expr member: (identifier) %s))\n", category: catMethod},
+}
+
+// writeRules renders each rule's pattern with the target's capture name for
+// the rule's category.
+func writeRules(b *strings.Builder, t tsTarget, rules []highlightRule) {
+	for _, r := range rules {
+		fmt.Fprintf(b, r.pattern, t.cap(r.category))
+	}
+}
 
 // buildHighlights renders one target's highlights.scm. The node->category
 // structure is identical across targets; t.cap projects each category to the
@@ -141,51 +209,16 @@ func buildHighlights(t tsTarget) string {
 	}
 	fmt.Fprintf(&b, "] %s\n\n", t.cap(catOperator))
 
-	// Declared names. The kind of declaration fixes the colour, matching
-	// semantic.go's identClasses.
-	writeDeclaredNames(&b, t)
-
-	// References. A name in a type position is a type; the type prefix of a
-	// record literal is too. A bare value reference is a variable, and a member
-	// access reads as a property.
-	fmt.Fprintf(&b, "(type_name (identifier) %s)\n", t.cap(catType))
-	fmt.Fprintf(&b, "(record_literal type: (identifier) %s)\n", t.cap(catType))
-	fmt.Fprintf(&b, "(value_ref (identifier) %s)\n", t.cap(catVariable))
-	fmt.Fprintf(&b, "(member_expr member: (identifier) %s)\n\n", t.cap(catProperty))
-
-	// Contextual overrides (later, so they win): a call's callee names the
-	// function or method being called, not a plain value or property.
-	fmt.Fprintf(&b, "(call_expr callee: (value_ref (identifier) %s))\n", t.cap(catFunction))
-	fmt.Fprintf(&b, "(call_expr callee: (member_expr member: (identifier) %s))\n", t.cap(catMethod))
+	// Declared names, then references, then the contextual overrides; later
+	// patterns win, so the overrides follow the general identifier rules. The
+	// blank lines between groups match the original hand-written layout.
+	writeRules(&b, t, declRules)
+	b.WriteString("\n")
+	writeRules(&b, t, refRules)
+	b.WriteString("\n")
+	writeRules(&b, t, overrideRules)
 
 	return b.String()
-}
-
-// writeDeclaredNames emits the captures for declared names: the colour each
-// kind of declaration fixes for its own name, matching semantic.go's
-// identClasses. A master colours its name as a type and its primary-key columns
-// as properties, and the master/record/primary context keywords colour as
-// keywords through their MasterKeyword node, the same way the accessor modifiers
-// do through theirs.
-func writeDeclaredNames(b *strings.Builder, t tsTarget) {
-	fmt.Fprintf(b, "(const_decl name: (identifier) %s)\n", t.cap(catVariable))
-	fmt.Fprintf(b, "(let_stmt name: (identifier) %s)\n", t.cap(catVariable))
-	fmt.Fprintf(b, "(type_decl name: (identifier) %s)\n", t.cap(catType))
-	fmt.Fprintf(b, "(enum_decl name: (identifier) %s)\n", t.cap(catType))
-	fmt.Fprintf(b, "(interface_decl name: (identifier) %s)\n", t.cap(catType))
-	fmt.Fprintf(b, "(master_decl name: (identifier) %s)\n", t.cap(catType))
-	fmt.Fprintf(b, "(generic_param name: (identifier) %s)\n", t.cap(catType))
-	fmt.Fprintf(b, "(func_decl name: (identifier) %s)\n", t.cap(catFunction))
-	fmt.Fprintf(b, "(method_decl name: (identifier) %s)\n", t.cap(catMethod))
-	fmt.Fprintf(b, "(interface_member name: (identifier) %s)\n", t.cap(catMethod))
-	fmt.Fprintf(b, "(param name: (identifier) %s)\n", t.cap(catParameter))
-	fmt.Fprintf(b, "(field name: (identifier) %s)\n", t.cap(catProperty))
-	fmt.Fprintf(b, "(record_field name: (identifier) %s)\n", t.cap(catProperty))
-	fmt.Fprintf(b, "(master_primary (identifier) %s)\n", t.cap(catProperty))
-	fmt.Fprintf(b, "(enum_member name: (identifier) %s)\n", t.cap(catEnumMember))
-	fmt.Fprintf(b, "(use_decl (identifier) %s)\n", t.cap(catNamespace))
-	fmt.Fprintf(b, "(modifier) %s\n", t.cap(catKeyword))
-	fmt.Fprintf(b, "(master_keyword) %s\n\n", t.cap(catKeyword))
 }
 
 // targetLabel names a target for the generated file's header comment.

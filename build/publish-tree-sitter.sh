@@ -54,6 +54,14 @@ done
 # internal/version) so a developer's `make publish-tree-sitter` and CI produce
 # the identical stamp. Overridable via TS_VERSION (e.g. to stub it in a test).
 version="${TS_VERSION:-$(go run -buildvcs=true ./cmd/masterbelt --version | awk '{print $3}')}"
+case "$version" in
+	# Accept a SemVer-like token for package stamping: non-empty and only
+	# [0-9A-Za-z.+-] characters (e.g. 1.2.3, 1.2.3-rc.1, 1.2.3+build.5).
+	''|*[!0-9A-Za-z.+-]*)
+		echo "publish-tree-sitter: invalid version '$version' from ./cmd/masterbelt --version; expected non-empty [0-9A-Za-z.+-] (SemVer-like, e.g. 1.2.3, 1.2.3-rc.1, 1.2.3+build.5). Set TS_VERSION explicitly or update parser." >&2
+		exit 1
+		;;
+esac
 node - "$out" "$version" <<'NODE'
 const fs = require('fs');
 const [dir, version] = process.argv.slice(2);
@@ -69,7 +77,10 @@ for (const [file, set] of [
     j.keywords = ['tree-sitter', 'masterbelt', 'parser', 'grammar'];
     j.files = ['grammar.js', 'lexical.js', 'tree-sitter.json', 'src/', 'queries/', '*.wasm'];
   }],
-  ['tree-sitter.json', (j) => { j.metadata.version = version; }],
+  ['tree-sitter.json', (j) => {
+    if (!j.metadata || typeof j.metadata !== 'object') j.metadata = {};
+    j.metadata.version = version;
+  }],
 ]) {
   const path = dir + '/' + file;
   const json = JSON.parse(fs.readFileSync(path, 'utf8'));
