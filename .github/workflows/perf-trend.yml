@@ -17,6 +17,19 @@ name: perf-trend
 
 on:
   pull_request:
+    # A trend only means something when the benched code or how it is built
+    # could have moved: Go sources and their module graph, the bench-trend
+    # recipe, the toolchain pinned in go.mod, or this workflow. A PR that
+    # touches none of these — an npm/editor bump, docs, another workflow —
+    # cannot shift the numbers, so benchstat would only report runner noise.
+    # perf-trend is advisory, never a required check, so skipping it on those
+    # PRs leaves no status pending.
+    paths:
+      - '**.go'
+      - 'go.mod'
+      - 'go.sum'
+      - 'Makefile'
+      - '.github/workflows/perf-trend.yml'
 
 # One trend run per PR ref; a new push supersedes the old comparison.
 concurrency:
