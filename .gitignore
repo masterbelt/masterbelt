@@ -1,6 +1,7 @@
 node_modules
 tmp
 /bin/
+/dist/
 
 # tool build artifacts dropped at the repo root
 /editorgen

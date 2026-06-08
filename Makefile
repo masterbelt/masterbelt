@@ -1,6 +1,7 @@
 GO            ?= go
 GOLANGCI_LINT ?= golangci-lint
 BIN_DIR       := bin
+DIST_DIR      := dist
 
 .DEFAULT_GOAL := build
 
@@ -12,10 +13,29 @@ BIN_DIR       := bin
 build:
 	$(GO) build -o $(BIN_DIR)/ ./cmd/...
 
-# clean removes the built binaries.
+# dist cross-builds the CLI for every release target into DIST_DIR, each archived
+# deterministically with a SHA256SUMS manifest. The work lives in build/dist.sh
+# so the same artifacts are produced locally and in CI (no CI-only build path).
+.PHONY: dist
+dist:
+	DIST_DIR=$(DIST_DIR) sh build/dist.sh
+
+# repro-check builds the release binary twice and asserts the two are
+# byte-identical — the reproducible-build regression check. The flags match
+# build/dist.sh; the version comes from the commit, so a rebuild reproduces it.
+.PHONY: repro-check
+repro-check:
+	@tmp=$$(mktemp -d); \
+	for o in a b; do \
+		CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GO) build -trimpath -buildvcs=true -ldflags "-s -w -buildid=" -o $$tmp/$$o ./cmd/masterbelt; \
+	done; \
+	if cmp -s $$tmp/a $$tmp/b; then echo "reproducible: two linux/amd64 builds are byte-identical"; rm -rf $$tmp; \
+	else echo "NOT reproducible: the two builds differ"; rm -rf $$tmp; exit 1; fi
+
+# clean removes the built binaries and the dist artifacts.
 .PHONY: clean
 clean:
-	rm -rf $(BIN_DIR)
+	rm -rf $(BIN_DIR) $(DIST_DIR)
 
 # test runs the full test suite: the Go packages and the VS Code extension's
 # grammar tests (which go test cannot reach — the generated TextMate grammar
