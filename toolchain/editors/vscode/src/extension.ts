@@ -12,7 +12,11 @@ let client: LanguageClient | undefined;
 // highlighting are served by the language server; the TextMate grammar provides
 // cold-start colouring and needs no server.
 export function activate(context: vscode.ExtensionContext): void {
-  const output = vscode.window.createOutputChannel('masterbelt');
+  // A log output channel ({ log: true }): vscode-languageclient v10 treats the
+  // client's channel as a LogOutputChannel — it reads its logLevel and
+  // subscribes to onDidChangeLogLevel — so a plain OutputChannel makes the
+  // client throw "onDidChangeLogLevel is not a function" on start.
+  const output = vscode.window.createOutputChannel('masterbelt', { log: true });
   context.subscriptions.push(output);
 
   startClient(output);
@@ -38,7 +42,7 @@ export function activate(context: vscode.ExtensionContext): void {
 // reporting a failed launch clearly (a stale binary without the `lsp`
 // subcommand exits immediately, which otherwise surfaces only as a cryptic
 // EPIPE).
-function startClient(output: vscode.OutputChannel): void {
+function startClient(output: vscode.LogOutputChannel): void {
   const settings = vscode.workspace.getConfiguration('masterbelt');
   // MASTERBELT_SERVER_PATH lets the F5 launch config point at a freshly built
   // binary regardless of which folder the development host opens (see the
