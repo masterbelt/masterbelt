@@ -1,0 +1,3 @@
+pub type Point = { x : nint , y : nint }
+const Origin = Point{ x : 0 , y : 0 }
+const Tbl = ["a" : 1 , "b" : 2]

@@ -1,0 +1,4 @@
+const Neg = - 1
+const Not = ! ( 1 > 2 )
+const Pick = 3>2?10:20
+const Grouped = ( 1+2 )*3

@@ -1,0 +1,4 @@
+pub fn identity < T > (x : T) : T {
+  return x
+}
+const Xs : list < nint > = [1, 2]
