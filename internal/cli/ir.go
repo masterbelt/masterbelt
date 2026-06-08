@@ -16,7 +16,7 @@ import (
 
 func init() {
 	RootCmd.AddCommand(IRCmd)
-	IRCmd.Flags().String("format", "text", "output format: text or json")
+	IRCmd.Flags().String("format", formatText, "output format: text or json")
 }
 
 // IRCmd dumps a file's resolved IR in the exact text representation:
@@ -72,14 +72,14 @@ var IRCmd = &cobra.Command{
 
 		format, _ := cmd.Flags().GetString("format")
 		switch format {
-		case "text":
+		case formatText:
 			text, err := module.MarshalText()
 			if err != nil {
 				return err
 			}
 			_, err = cmd.OutOrStdout().Write(text)
 			return err
-		case "json":
+		case formatJSON:
 			// The module implements encoding.TextMarshaler, so json.Marshal
 			// embeds the exact text form with no further code.
 			out, err := json.MarshalIndent(map[string]any{

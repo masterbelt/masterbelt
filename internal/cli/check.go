@@ -20,7 +20,7 @@ import (
 
 func init() {
 	RootCmd.AddCommand(CheckCmd)
-	CheckCmd.Flags().String("format", "text", "output format: text or json")
+	CheckCmd.Flags().String("format", formatText, "output format: text or json")
 	CheckCmd.Flags().String("locale", string(diagnostic.DefaultLocale), "message locale (en, ja)")
 	CheckCmd.Flags().String("profile", "", "manifest profile to check (default: the top-level profile)")
 }
@@ -62,9 +62,9 @@ func newReporter(cmd *cobra.Command) (reporter.Reporter, error) {
 	format, _ := cmd.Flags().GetString("format")
 	locale, _ := cmd.Flags().GetString("locale")
 	switch format {
-	case "text":
+	case formatText:
 		return reporter.NewText(cmd.OutOrStdout(), diagnostic.Locale(locale)), nil
-	case "json":
+	case formatJSON:
 		return reporter.NewJSON(cmd.OutOrStdout(), diagnostic.Locale(locale)), nil
 	default:
 		return nil, fmt.Errorf("unknown format %q (want text or json)", format)
