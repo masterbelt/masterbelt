@@ -112,9 +112,13 @@ func documentSymbols(doc view) []protocol.DocumentSymbol {
 // build is deferred so that a parent whose own declaration tree is missing is
 // dropped together with its children.
 type symbolBuilder struct {
-	green    *cst.Node
-	name     string
-	detail   string
+	green  *cst.Node
+	name   string
+	detail string
+	// anchor is the declaration's stable address (A-5), appended to the detail
+	// in the outline so an agent reading the symbol tree sees the name to
+	// reference it by; "" for a symbol that carries none (an enum member).
+	anchor   string
 	kind     protocol.SymbolKind
 	children []symbolBuilder
 	// dropIfNoChildren marks a container symbol that exists only to hold its
@@ -152,12 +156,27 @@ func (b symbolBuilder) build(buf source.Buffer, trees map[cst.Green]cst.Tree) (p
 	}
 	return protocol.DocumentSymbol{
 		Name:           name,
-		Detail:         b.detail,
+		Detail:         appendAnchor(b.detail, b.anchor),
 		Kind:           b.kind,
 		Range:          toRange(buf, declTree.Offset(), declTree.End()),
 		SelectionRange: selection,
 		Children:       children,
 	}, true
+}
+
+// appendAnchor joins a symbol's detail and its anchor for the outline: the
+// detail, a middle-dot separator, then the anchor — or either alone when the
+// other is empty (an interface symbol has no type detail; an enum member has no
+// anchor).
+func appendAnchor(detail, anchor string) string {
+	switch {
+	case anchor == "":
+		return detail
+	case detail == "":
+		return anchor
+	default:
+		return detail + "  ·  " + anchor
+	}
 }
 
 // constSymbols outlines every constant, detailed with its inferred type.
@@ -172,6 +191,7 @@ func constSymbols(doc view) []symbolBuilder {
 			green:  c.Syntax.Syntax(),
 			name:   c.Name,
 			detail: detail,
+			anchor: c.Anchor,
 			kind:   protocol.SymbolKindConstant,
 		})
 	}
@@ -190,6 +210,7 @@ func enumSymbols(doc view) []symbolBuilder {
 			green:  t.EnumSyntax.Syntax(),
 			name:   t.Name,
 			detail: ": " + t.Enum.Base,
+			anchor: t.Anchor,
 			kind:   protocol.SymbolKindEnum,
 		}
 		for i, m := range t.Enum.Members {
@@ -222,9 +243,10 @@ func interfaceSymbols(doc view) []symbolBuilder {
 			continue // interfaces carry a member outline; other types are omitted here
 		}
 		b := symbolBuilder{
-			green: t.InterfaceSyntax.Syntax(),
-			name:  t.Name,
-			kind:  protocol.SymbolKindInterface,
+			green:  t.InterfaceSyntax.Syntax(),
+			name:   t.Name,
+			anchor: t.Anchor,
+			kind:   protocol.SymbolKindInterface,
 		}
 		for i, m := range t.Methods {
 			if i >= len(t.InterfaceSyntax.Members) {
@@ -234,6 +256,7 @@ func interfaceSymbols(doc view) []symbolBuilder {
 				green:  t.InterfaceSyntax.Members[i].Syntax(),
 				name:   m.Name,
 				detail: methodSignature(m),
+				anchor: m.Anchor,
 				kind:   protocol.SymbolKindMethod,
 			})
 		}
@@ -272,6 +295,7 @@ func typeMemberSymbols(doc view) []symbolBuilder {
 				green:  m.Syntax.Syntax(),
 				name:   m.Name,
 				detail: methodSignature(m),
+				anchor: m.Anchor,
 				kind:   kind,
 			})
 		}
@@ -285,6 +309,7 @@ func typeMemberSymbols(doc view) []symbolBuilder {
 		out = append(out, symbolBuilder{
 			green:            t.Syntax.Syntax(),
 			name:             t.Name,
+			anchor:           t.Anchor,
 			kind:             kind,
 			children:         children,
 			dropIfNoChildren: true,
@@ -304,6 +329,7 @@ func funcSymbols(doc view) []symbolBuilder {
 			green:  f.Syntax.Syntax(),
 			name:   f.Name,
 			detail: funcSignature(f),
+			anchor: f.Anchor,
 			kind:   protocol.SymbolKindFunction,
 		})
 	}

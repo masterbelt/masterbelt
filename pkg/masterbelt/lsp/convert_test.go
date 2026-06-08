@@ -80,8 +80,8 @@ func TestDocumentSymbols(t *testing.T) {
 	if syms[0].Name != "MaxLevel" || syms[0].Kind != protocol.SymbolKindConstant {
 		t.Errorf("symbol 0 = %+v", syms[0])
 	}
-	if syms[0].Detail != ": long" {
-		t.Errorf("symbol 0 detail = %q, want %q", syms[0].Detail, ": long")
+	if syms[0].Detail != ": long  ·  belt:test/MaxLevel" {
+		t.Errorf("symbol 0 detail = %q, want the type and anchor", syms[0].Detail)
 	}
 	// SelectionRange must cover just the name "MaxLevel" (columns 6..14).
 	sel := syms[0].SelectionRange
@@ -89,8 +89,8 @@ func TestDocumentSymbols(t *testing.T) {
 		t.Errorf("symbol 0 selection range = %+v, want cols 6..14 on line 0", sel)
 	}
 
-	if syms[1].Name != "Min" || syms[1].Detail != ": nint" {
-		t.Errorf("symbol 1 = %+v, want Min: nint", syms[1])
+	if syms[1].Name != "Min" || syms[1].Detail != ": nint  ·  belt:test/Min" {
+		t.Errorf("symbol 1 = %+v, want Min: nint with anchor", syms[1])
 	}
 }
 

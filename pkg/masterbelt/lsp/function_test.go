@@ -132,8 +132,8 @@ func TestDocumentSymbolsIncludeFunctions(t *testing.T) {
 	if fn.Kind != protocol.SymbolKindFunction {
 		t.Errorf("double kind = %v, want Function", fn.Kind)
 	}
-	if fn.Detail != "pub fn double(x: nint): nint" {
-		t.Errorf("double detail = %q, want the signature", fn.Detail)
+	if fn.Detail != "pub fn double(x: nint): nint  ·  belt:test/double" {
+		t.Errorf("double detail = %q, want the signature with anchor", fn.Detail)
 	}
 }
 

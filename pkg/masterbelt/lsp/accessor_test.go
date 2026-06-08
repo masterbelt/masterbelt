@@ -184,6 +184,33 @@ func TestDocumentSymbolsAccessors(t *testing.T) {
 	}
 }
 
+// TestDocumentSymbolAnchors checks the outline carries each declaration's
+// stable anchor (A-5) in its detail: the type on its own line, and a member as
+// the type's anchor with the member appended.
+func TestDocumentSymbolAnchors(t *testing.T) {
+	doc := testView(accessorType)
+	syms := documentSymbols(doc)
+	var celsius *protocol.DocumentSymbol
+	for i := range syms {
+		if syms[i].Name == "Celsius" {
+			celsius = &syms[i]
+		}
+	}
+	if celsius == nil {
+		t.Fatalf("no Celsius type symbol: %+v", syms)
+	}
+	if !strings.Contains(celsius.Detail, "belt:test/Celsius") {
+		t.Errorf("Celsius detail = %q, want it to carry the anchor belt:test/Celsius", celsius.Detail)
+	}
+	details := map[string]string{}
+	for _, c := range celsius.Children {
+		details[c.Name] = c.Detail
+	}
+	if d := details["freezing"]; !strings.Contains(d, "belt:test/Celsius#freezing") {
+		t.Errorf("freezing detail = %q, want it to carry belt:test/Celsius#freezing", d)
+	}
+}
+
 // labels returns the keys of a label map, for diagnostics.
 func labels(items map[string]protocol.CompletionItem) []string {
 	out := make([]string, 0, len(items))
