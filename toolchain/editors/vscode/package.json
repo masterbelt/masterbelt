@@ -6,6 +6,11 @@
   "publisher": "masterbelt",
   "private": true,
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/masterbelt/masterbelt.git",
+    "directory": "toolchain/editors/vscode"
+  },
   "engines": {
     "vscode": "^1.90.0"
   },

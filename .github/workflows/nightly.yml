@@ -239,6 +239,9 @@ jobs:
       - name: Package the extension
         working-directory: toolchain/editors/vscode
         run: |
+          # vsce wants a LICENSE in the package; copy the repo's single MIT
+          # license in rather than committing a second copy that could drift.
+          cp "$GITHUB_WORKSPACE/LICENSE" LICENSE
           # The marketplace version is the CLI version without build metadata —
           # 0.1.<UTC commit date>, monotonic for the rolling pre-release.
           version="0.1.$(TZ=UTC0 git show -s --date=format-local:%Y%m%d --format=%cd HEAD)"

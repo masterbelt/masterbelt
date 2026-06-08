@@ -1,2 +1,5 @@
 dist/
 *.vsix
+# Copied from the repo root at package time so the .vsix carries the license
+# without a second committed copy that could drift from the source.
+LICENSE
