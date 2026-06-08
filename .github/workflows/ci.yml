@@ -1,0 +1,68 @@
+# CI — the performance loop's home (D-1 M4). This workflow is the gate the
+# loop bootstraps: a PR must pass the correctness checks AND the deterministic
+# performance gates (the reuse snapshot and the allocation ceilings). Wall-clock
+# benchmarks are a trend, never a fail condition (D-1 §1, §4.2), so they live in
+# the separate perf-trend workflow, not here — this job stays non-flaky by
+# gating only on deterministic counts.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancel superseded runs on a branch so a fast push does not queue stale work.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    name: build, test, gates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: gofmt
+        run: |
+          unformatted="$(gofmt -l pkg cmd internal toolchain)"
+          if [ -n "$unformatted" ]; then
+            echo "These files are not gofmt-clean:"; echo "$unformatted"; exit 1
+          fi
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v2.12.2
+
+      - name: Generated files up to date
+        run: make verify-generated
+
+      - name: Tests
+        run: go test ./...
+
+      - name: Performance gates (deterministic)
+        run: make perf
+
+  grammar:
+    name: editor grammar
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: VS Code grammar tests
+        run: cd toolchain/editors/vscode && node --test

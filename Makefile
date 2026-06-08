@@ -71,3 +71,20 @@ vet:
 .PHONY: bench
 bench:
 	$(GO) test -bench=. -benchmem ./...
+
+# perf runs the deterministic performance gates (D-1 §4.1) — the non-flaky
+# hard fails CI relies on: the reuse snapshot (an edit's recompute footprint
+# vs its golden, the over-invalidation guard) and the allocation ceilings
+# (cold and incremental allocs/op). Wall-clock is a trend, measured by `bench`,
+# never a fail condition; everything here is a deterministic count.
+.PHONY: perf
+perf:
+	$(GO) test ./pkg/masterbelt/semantic/ -run 'TestReuseSnapshot|TestColdCompileAllocCeiling|TestIncrementalAllocCeiling' -count=1
+
+# prof captures a profile of a check run via the root's cross-cutting flags
+# (D-1 §2): `make prof PROF_ARGS="check path/to/project"` writes cpu.prof and
+# mem.prof to the working directory. Open with `go tool pprof`.
+PROF_ARGS ?= check pkg/masterbelt/testdata/projects/midsize
+.PHONY: prof
+prof: build
+	$(BIN_DIR)/masterbelt --cpuprofile cpu.prof --memprofile mem.prof $(PROF_ARGS)
