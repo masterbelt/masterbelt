@@ -48,7 +48,7 @@ When unsure which bucket, prefer Stage 4's "verify first": reproduce the claim w
 1. **Fix it minimally**, in the spirit of the surrounding code. Stay inside the PR's scope — do not start the "not yet" work to satisfy a finding.
 2. **Add a gate that catches this exact defect next time.** Put it where the repo already pins that class (a snapshot, a table-driven parser/lowering test, the document fuzz alphabet, a highlight golden). Then **prove the gate works**: temporarily revert the fix, run the test, confirm it goes **red**, restore the fix, confirm **green**. A gate you have not seen fail is not a gate. (Disable the fix in a way that still compiles — e.g. flip a condition that still reads its variable — so you are testing the gate, not a build error.)
 3. **Hardening a symmetric hole is fair game** — if a finding exposes a class (e.g. one recovery path swallowing the next token), fix the analogous path too and pin it, so the reviewer does not file the mirror image next round. This is *closing the class*, not scope creep; mechanical scope-widening (new features) is not.
-4. **Make all gates green** (`go test ./...`, then `make test` / `make vet` / `make verify-generated`) before moving on.
+4. **Make all the Stage 0 gates green** before moving on — `go test ./...` for the fast inner loop, then the full required set (`gofmt -l …`, `make check-fmt`, `make vet`, `make verify-generated`, `make test`, `make perf`). The format and perf jobs are required CI too, so the shorter `test`/`vet`/`verify-generated` trio is not enough.
 
 ## Stage 4 — Disprove a misfire, with evidence
 
@@ -95,7 +95,7 @@ query($owner:String!,$repo:String!,$number:Int!,$endCursor:String){
 gh api graphql -f query='mutation($t:ID!){ resolveReviewThread(input:{threadId:$t}){ thread{ isResolved } } }' -f t=<thread-id>
 ```
 
-The PR's "unresolved conversations" count is the human's at-a-glance progress bar: drive it to zero for everything you handled, so what remains is exactly what still needs a person.
+The PR's "unresolved conversations" count is the human's at-a-glance progress bar: drive it to zero for everything you handled, so what remains is exactly what still needs a person. These `gh` snippets are illustrative for the PR sizes this loop actually meets; a pathological thread (50+ comments in one thread) or a very large thread set would need the inner `comments` connection paginated as well — extend them if you ever hit that, rather than treating the one-liners as exhaustive.
 
 ## Stage 7 — Trigger if needed, then detect the outcome (no human webhook)
 
@@ -119,15 +119,15 @@ SINCE=<your trigger/push time, e.g. 2026-01-02T03:04:05Z>
 
 # convergence — a +1 from the bot newer than your trigger (never eyes, never an old +1)
 gh api --paginate repos/<owner>/<repo>/issues/<n>/reactions \
-  | jq -s --arg since "$SINCE" '[add[] | select((.user.login|test("codex")) and .content=="+1" and .created_at > $since)] | length'
+  | jq -s --arg since "$SINCE" '[add[] | select((.user.login=="chatgpt-codex-connector[bot]") and .content=="+1" and .created_at > $since)] | length'
 
 # findings — bot inline comments newer than your trigger
 gh api --paginate repos/<owner>/<repo>/pulls/<n>/comments \
-  | jq -s --arg since "$SINCE" '[add[] | select((.user.login|test("codex")) and .created_at > $since)] | length'
+  | jq -s --arg since "$SINCE" '[add[] | select((.user.login=="chatgpt-codex-connector[bot]") and .created_at > $since)] | length'
 
 # state, for context — the bot's reactions (eyes = running, +1 = approved)
 gh api --paginate repos/<owner>/<repo>/issues/<n>/reactions \
-  | jq -s 'add | map(select(.user.login|test("codex"))) | .[] | "\(.content)\t\(.created_at)"'
+  | jq -s 'add | map(select(.user.login=="chatgpt-codex-connector[bot]")) | .[] | "\(.content)\t\(.created_at)"'
 ```
 
 - **Poll in modest intervals**, not tightly — the verdict takes minutes (observed on this repo: the 👀 lands within seconds of the trigger, but the 👍 / comments arrive roughly 10–20 minutes later). Schedule a wake-up / background poll rather than blocking the turn. Record your trigger/push time so you only count signals newer than it.
