@@ -1,14 +1,14 @@
 #!/bin/sh
 # release-notes.sh prints the markdown body for the rolling nightly release: the
 # build's identity, the per-archive checksums, and an honest scope note. It reads
-# the version from a built archive's name and the checksums from DIST_DIR, so it
-# runs after `make dist` (or against the downloaded artifacts).
+# the version from DIST_DIR's VERSION file and the checksums from SHA256SUMS, so
+# it runs after `make dist` (or against the downloaded artifacts).
 set -eu
 
 root="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 out="$root/${DIST_DIR:-dist}"
 
-version="$(basename "$out"/masterbelt-linux-amd64-*.tar.gz .tar.gz | sed 's/^masterbelt-linux-amd64-//')"
+version="$(cat "$out/VERSION")"
 commit="$(git -C "$root" rev-parse HEAD)"
 date="$(git -C "$root" show -s --format=%cI HEAD)"
 
@@ -30,7 +30,7 @@ Automated nightly build — **not a stable release.**
 
 ### Also published
 
-- Editor extension \`masterbelt-$vsix.vsix\` (attached) — and the Marketplace pre-release channel when a token is configured.
+- Editor extension \`masterbelt.vsix\` (attached, version \`$vsix\`) — and the Marketplace pre-release channel when a token is configured.
 - Container \`ghcr.io/$repo:nightly\` (rolling) and \`ghcr.io/$repo:nightly-$patch-$sha\` (pinned).
 
 ### Checksums (SHA-256)

@@ -30,14 +30,12 @@ case "$arch" in
 		;;
 esac
 
-echo "masterbelt: resolving the latest nightly for $os/$arch…"
-json="$(curl -fsSL "https://api.github.com/repos/$repo/releases/tags/nightly")"
-asset_url="$(printf '%s\n' "$json" | grep -o "https://[^\"]*/masterbelt-$os-$arch-[^\"]*\.tar\.gz" | head -n1)"
-sums_url="$(printf '%s\n' "$json" | grep -o "https://[^\"]*/SHA256SUMS" | head -n1)"
-if [ -z "$asset_url" ] || [ -z "$sums_url" ]; then
-	echo "masterbelt: no $os/$arch nightly asset found in $repo." >&2
-	exit 1
-fi
+# The nightly assets have deterministic names, so the URLs are fixed — no
+# release-API lookup needed. The rolling `nightly` tag always points at the
+# latest build, and each archive is masterbelt-<os>-<arch>.tar.gz.
+base="https://github.com/$repo/releases/download/nightly"
+asset_url="$base/masterbelt-$os-$arch.tar.gz"
+sums_url="$base/SHA256SUMS"
 
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT

@@ -31,9 +31,10 @@ export SOURCE_DATE_EPOCH CGO_ENABLED=0
 build_flags="-trimpath -buildvcs=true"
 ldflags="-s -w -buildid="
 
-# The version the binary reports: build it natively so we can run it, then reuse
-# the string for every target's archive name (it is commit-derived, so identical
-# across targets).
+# The version the binary reports: build it natively so we can run it, then write
+# the string to a VERSION file beside the archives (below). It is commit-derived,
+# so identical across targets; keeping it out of the archive names is what makes
+# a download URL deterministic — the names are masterbelt-<os>-<arch>.tar.gz.
 native="$(mktemp -d)"
 # shellcheck disable=SC2086
 go build $build_flags -ldflags "$ldflags" -o "$native/masterbelt" ./cmd/masterbelt
@@ -55,7 +56,7 @@ for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 wi
 	# Pin every staged file's mtime so the archive does not embed the build time.
 	find "$stage" -exec touch --no-dereference --date="@$SOURCE_DATE_EPOCH" {} +
 
-	name="masterbelt-$os-$arch-$version"
+	name="masterbelt-$os-$arch"
 	if [ "$os" = windows ]; then
 		# zip stores per-file mtimes (pinned above); -X drops extra fields, and a
 		# sorted file list fixes the entry order.
@@ -71,3 +72,9 @@ done
 # One checksum manifest over every archive, in sorted order with bare names.
 ( cd "$out" && find . -maxdepth 1 -type f ! -name SHA256SUMS -printf '%P\n' | LC_ALL=C sort | xargs sha256sum >SHA256SUMS )
 echo "wrote $dir/SHA256SUMS"
+
+# The version, beside the archives rather than baked into their names — written
+# after SHA256SUMS so it is not itself checksummed. Consumers (the release notes,
+# the publish/image jobs) read it instead of parsing a filename.
+printf '%s\n' "$version" >"$out/VERSION"
+echo "wrote $dir/VERSION"

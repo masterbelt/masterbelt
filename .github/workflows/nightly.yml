@@ -98,7 +98,7 @@ jobs:
       - name: Smoke test
         run: |
           tmp="$(mktemp -d)"
-          tar -xzf dist/masterbelt-linux-amd64-*.tar.gz -C "$tmp"
+          tar -xzf dist/masterbelt-linux-amd64.tar.gz -C "$tmp"
           "$tmp/masterbelt" version
           "$tmp/masterbelt" check pkg/belt/testdata/examples/0009-project
 
@@ -120,6 +120,7 @@ jobs:
             dist/*.tar.gz
             dist/*.zip
             dist/SHA256SUMS
+            dist/VERSION
           retention-days: 14
           if-no-files-found: error
 
@@ -149,7 +150,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          version="$(basename dist/masterbelt-linux-amd64-*.tar.gz .tar.gz | sed 's/^masterbelt-linux-amd64-//')"
+          version="$(cat dist/VERSION)"
           # Delete the old release and its tag, then recreate at this commit, so
           # the tag the guard reads back is this build's full SHA.
           gh release delete nightly --yes --cleanup-tag 2>/dev/null || true
@@ -181,12 +182,12 @@ jobs:
         run: |
           for arch in amd64 arm64; do
             mkdir -p build/ctx/linux/"$arch"
-            tar -xzf dist/masterbelt-linux-"$arch"-*.tar.gz -C build/ctx/linux/"$arch"
+            tar -xzf dist/masterbelt-linux-"$arch".tar.gz -C build/ctx/linux/"$arch"
           done
       - name: Image metadata
         id: meta
         run: |
-          version="$(basename dist/masterbelt-linux-amd64-*.tar.gz .tar.gz | sed 's/^masterbelt-linux-amd64-//')"
+          version="$(cat dist/VERSION)"
           patch="${version%+*}"; patch="${patch##*.}"   # the commit date
           sha="${version#*+}"                            # the short SHA
           echo "datesha=$patch-$sha" >>"$GITHUB_OUTPUT"
@@ -246,13 +247,15 @@ jobs:
           # 0.1.<UTC commit date>, monotonic for the rolling pre-release.
           version="0.1.$(TZ=UTC0 git show -s --date=format-local:%Y%m%d --format=%cd HEAD)"
           npm pkg set version="$version"
-          pnpm dlx @vscode/vsce package --pre-release --no-dependencies -o "masterbelt-$version.vsix"
+          # Version-free filename for a deterministic download URL; vsce reads
+          # the version from package.json (set above), not the file name.
+          pnpm dlx @vscode/vsce package --pre-release --no-dependencies -o masterbelt.vsix
       - name: Publish to the Marketplace (when a PAT is configured)
         if: env.VSCE_PAT != ''
         working-directory: toolchain/editors/vscode
-        run: pnpm dlx @vscode/vsce publish --pre-release --packagePath masterbelt-*.vsix
+        run: pnpm dlx @vscode/vsce publish --pre-release --packagePath masterbelt.vsix
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: masterbelt-vsix
-          path: toolchain/editors/vscode/masterbelt-*.vsix
+          path: toolchain/editors/vscode/masterbelt.vsix
           if-no-files-found: error
