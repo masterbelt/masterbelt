@@ -57,6 +57,34 @@ func TestStatsReuseReflectsCutoff(t *testing.T) {
 	}
 }
 
+// TestMemoCount pins the memo-table size accessor the LSP samples as its leak
+// signal (D-1 §4.2): it is non-zero after a real analysis, and a no-op refresh
+// (re-pushing the same input, which setInput treats as a no-op) neither grows
+// nor resets it — the table is stable when nothing changed. It is a pure read,
+// so calling it must not perturb what the engine memoizes.
+func TestMemoCount(t *testing.T) {
+	e := newEditable([]byte("const A = 1\nconst B = A\nconst C = B\n"))
+
+	after := e.prog.MemoCount()
+	if after == 0 {
+		t.Fatal("MemoCount is 0 after analysis; the analysis populated no memos")
+	}
+
+	// A no-op refresh: re-push the identical document and refresh. setInput sees
+	// the same syntax tree and uses, so it opens no new revision and the memo
+	// table neither grows nor sheds.
+	e.prog.SetFile(soleFileID, e.doc, nil)
+	e.prog.Refresh()
+	if got := e.prog.MemoCount(); got != after {
+		t.Errorf("MemoCount changed across a no-op refresh: %d -> %d", after, got)
+	}
+
+	// Reading it again is idempotent — a side-channel read perturbs nothing.
+	if got := e.prog.MemoCount(); got != after {
+		t.Errorf("MemoCount is not stable across reads: %d -> %d", after, got)
+	}
+}
+
 // TestKindNamesComplete pins that every query kind has a stable stats label —
 // a kind added to the enum without a kindNames entry would render as its
 // number in every snapshot and stats output, which this rejects.

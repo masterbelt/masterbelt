@@ -76,6 +76,12 @@ type Stats struct {
 	TotalReused   int `json:"totalReused"`
 }
 
+// memoCount is the number of live memo entries in the engine — the size of the
+// memo table. It is a pure read of len(db.memos) and touches nothing the engine
+// memoizes (no determinism impact); the LSP samples it over a long session as
+// the leak signal (D-1 §4.2): monotonic growth = a memo table that never sheds.
+func (db *database) memoCount() int { return len(db.memos) }
+
 // stats derives the snapshot from the revision's computed and reused key sets.
 // It counts distinct keys per kind: the same query demanded twice in one
 // revision is one fact, recomputed or reused once.

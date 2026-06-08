@@ -21,7 +21,15 @@ import (
 // Logs are emitted through slog.Default(); point it at stderr (not stdout) so
 // the protocol channel stays uncorrupted.
 func ServeStdio(ctx context.Context) error {
-	srv := server.NewServer(NewServer(), server.WithLogger(slog.Default()))
+	s := NewServer()
+	// Start the optional performance instrumentation (instrument.go): the live
+	// pprof endpoint and, when request tracing is on, the steady-memory sampler.
+	// Both are no-ops unless their env switches are set, so a normal session pays
+	// nothing. They bind to the serving session: the sampler stops with ctx.
+	startPprof(s.instr.pprofAddr)
+	s.startMemorySampler(ctx)
+
+	srv := server.NewServer(s, server.WithLogger(slog.Default()))
 	if err := srv.Run(ctx, server.RunStdio()); err != nil && !errors.Is(err, io.EOF) {
 		return err
 	}
