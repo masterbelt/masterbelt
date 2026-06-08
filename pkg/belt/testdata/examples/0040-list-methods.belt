@@ -35,7 +35,7 @@ const NoFirst = Empty.shift()           // null
 pub fn orZero(v: optional<nint>): nint {
   match v {
     nint n -> return n
-    null  -> return 0
+    null -> return 0
   }
 }
 

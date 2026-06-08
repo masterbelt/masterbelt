@@ -13,8 +13,8 @@ pub enum UnitClass {
 pub fn classBonus(role: UnitClass): nint {
   switch role {
     Knight -> return 30
-    Mage   -> return 10
-    Scout  -> return 20
+    Mage -> return 10
+    Scout -> return 20
   }
 }
 

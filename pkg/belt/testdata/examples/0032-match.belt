@@ -14,7 +14,7 @@ pub type GameValue = Coin | Level
 
 pub fn describe(v: GameValue): string {
   match v {
-    Coin c  -> return "coin"        // c is narrowed to Coin inside the arm
+    Coin c -> return "coin"        // c is narrowed to Coin inside the arm
     Level l -> return "level"
   }
 }
@@ -23,7 +23,7 @@ pub fn describe(v: GameValue): string {
 // amount field reads; in the Level arm l has type Level.
 pub fn worth(v: GameValue): nint {
   match v {
-    Coin c  -> return c.amount
+    Coin c -> return c.amount
     Level l -> return l.rank
   }
 }
@@ -41,7 +41,7 @@ const Total = worth(Held)
 pub fn amountOr(v: Coin | null, fallback: nint): nint {
   match v {
     Coin c -> return c.amount
-    null   -> {
+    null -> {
       return fallback
     }
   }
@@ -53,7 +53,7 @@ pub fn amountOr(v: Coin | null, fallback: nint): nint {
 pub fn coinAmount(v: GameValue): nint {
   match v {
     Coin c -> return c.amount
-    _      -> return 0
+    _ -> return 0
   }
 }
 
@@ -62,7 +62,7 @@ pub fn coinAmount(v: GameValue): nint {
 // failure. This is the unwrap pattern a fallible read needs.
 pub fn firstOr(xs: list<nint>, fallback: nint): nint {
   match xs[0] {
-    nint v   -> return v
+    nint v -> return v
     error e -> return fallback
   }
 }

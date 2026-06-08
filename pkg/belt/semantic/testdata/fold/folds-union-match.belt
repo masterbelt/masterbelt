@@ -6,7 +6,7 @@ pub type GameValue = Coin | Level
 
 pub fn worth(v: GameValue): nint {
   match v {
-    Coin c  -> return c.amount
+    Coin c -> return c.amount
     Level l -> return l.rank
   }
 }

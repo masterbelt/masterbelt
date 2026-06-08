@@ -18,7 +18,7 @@ const Absent: optional<nint> = null
 pub fn orZero(v: optional<nint>): nint {
   match v {
     nint n -> return n
-    null  -> return 0
+    null -> return 0
   }
 }
 
@@ -31,7 +31,7 @@ const FromAbsent = orZero(null)
 pub fn orFallback(v: optional<nint>, fallback: nint): nint {
   match v {
     nint n -> return n
-    _     -> return fallback
+    _ -> return fallback
   }
 }
 

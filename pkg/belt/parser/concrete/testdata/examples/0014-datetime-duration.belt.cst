@@ -11,7 +11,7 @@ File
     Const "const"
     Whitespace " "
     Ident "Epoch"
-    Whitespace "   "
+    Whitespace " "
     Initializer
       Assign "="
       Whitespace " "
@@ -35,7 +35,7 @@ File
     Const "const"
     Whitespace " "
     Ident "Launch"
-    Whitespace "  "
+    Whitespace " "
     Initializer
       Assign "="
       Whitespace " "
@@ -58,7 +58,7 @@ File
     Const "const"
     Whitespace " "
     Ident "Complex"
-    Whitespace "  "
+    Whitespace " "
     Initializer
       Assign "="
       Whitespace " "
@@ -116,7 +116,7 @@ File
     Const "const"
     Whitespace " "
     Ident "Span"
-    Whitespace "     "
+    Whitespace " "
     Initializer
       Assign "="
       Whitespace " "
@@ -133,7 +133,7 @@ File
     Const "const"
     Whitespace " "
     Ident "Shift"
-    Whitespace "    "
+    Whitespace " "
     Initializer
       Assign "="
       Whitespace " "
@@ -150,7 +150,7 @@ File
     Const "const"
     Whitespace " "
     Ident "TwoH"
-    Whitespace "     "
+    Whitespace " "
     Initializer
       Assign "="
       Whitespace " "
@@ -167,7 +167,7 @@ File
     Const "const"
     Whitespace " "
     Ident "Triple"
-    Whitespace "   "
+    Whitespace " "
     Initializer
       Assign "="
       Whitespace " "

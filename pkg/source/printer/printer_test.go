@@ -25,12 +25,14 @@ func print(t *testing.T, indent string, leaves ...cst.Green) string {
 
 func tok(k token.Kind, text string) cst.Green { return cst.NewToken(k, text) }
 
-func TestPrintPreservesInlineTokens(t *testing.T) {
-	// No newline and no bracket: inter-token spacing is kept verbatim (spacing
-	// is a later pass), and a single-line run is unchanged.
+func TestPrintNormalizesInterTokenSpace(t *testing.T) {
+	// Two adjacent words get a single regenerated space regardless of the input
+	// spacing. (Context-sensitive spacing — colons, generics, records, operators
+	// — is exercised by the parsed fixtures, where parent kinds are real; a flat
+	// hand-built tree has only File parents.)
 	got := print(t, "  ",
 		tok(token.Ident, "ab"),
-		tok(token.Whitespace, " "),
+		tok(token.Whitespace, "   "),
 		tok(token.Ident, "cd"),
 	)
 	if got != "ab cd" {
@@ -77,20 +79,19 @@ func TestPrintNestedDepth(t *testing.T) {
 }
 
 func TestPrintHugsBracketsOpenedTogether(t *testing.T) {
-	// Two brackets that open on one line and stay open ("a({") indent the body
-	// by a single level, not two; the trailing "})" returns to the opener line.
+	// Two brackets that open on one line and stay open ("[{") indent the body by
+	// a single level, not two; the trailing "}]" returns to the opener line.
 	leaves := []cst.Green{
-		tok(token.Ident, "a"),
-		tok(token.LParen, "("),
+		tok(token.LBracket, "["),
 		tok(token.LBrace, "{"),
 		tok(token.Newline, "\n"),
 		tok(token.Ident, "x"),
 		tok(token.Newline, "\n"),
 		tok(token.RBrace, "}"),
-		tok(token.RParen, ")"),
+		tok(token.RBracket, "]"),
 	}
-	if got := print(t, "  ", leaves...); got != "a({\n  x\n})" {
-		t.Errorf("Print = %q, want %q", got, "a({\n  x\n})")
+	if got := print(t, "  ", leaves...); got != "[{\n  x\n}]" {
+		t.Errorf("Print = %q, want %q", got, "[{\n  x\n}]")
 	}
 }
 

@@ -127,7 +127,7 @@ File
           MatchPattern
             TypeName
               Null "null"
-          Whitespace "  "
+          Whitespace " "
           Arrow "->"
           Whitespace " "
           ReturnStmt
@@ -247,7 +247,7 @@ File
           MatchPattern
             TypeName
               Ident "_"
-          Whitespace "     "
+          Whitespace " "
           Arrow "->"
           Whitespace " "
           ReturnStmt

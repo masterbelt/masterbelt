@@ -7,7 +7,7 @@
 
 // The condition is an ordinary boolean expression; the branches are values.
 const Bigger = 3 > 2 ? 10 : 20
-const Label  = 7 > 100 ? "high" : "low"
+const Label = 7 > 100 ? "high" : "low"
 
 // The branches unify the way a collection's elements do — an nint branch beside a
 // default-nint literal stays nint.

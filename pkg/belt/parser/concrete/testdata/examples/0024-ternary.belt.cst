@@ -47,7 +47,7 @@ File
     Const "const"
     Whitespace " "
     Ident "Label"
-    Whitespace "  "
+    Whitespace " "
     Initializer
       Assign "="
       Whitespace " "

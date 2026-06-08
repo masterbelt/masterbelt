@@ -13,7 +13,7 @@ pub enum Rarity {
 pub fn color(r: Rarity): string {
   switch r {
     Common -> return "white"
-    Rare   -> return "blue"
+    Rare -> return "blue"
     Legend -> return "gold"
   }
 }
@@ -23,9 +23,9 @@ pub fn color(r: Rarity): string {
 // may be a block of several statements.
 pub fn grade(n: nint): string {
   switch n {
-    0       -> return "zero"
+    0 -> return "zero"
     1, 2, 3 -> return "low"
-    _       -> {
+    _ -> {
       return "high"
     }
   }

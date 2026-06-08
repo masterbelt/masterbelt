@@ -407,7 +407,7 @@ File
     Const "const"
     Whitespace " "
     Ident "Put"
-    Whitespace "    "
+    Whitespace " "
     Initializer
       Assign "="
       Whitespace " "

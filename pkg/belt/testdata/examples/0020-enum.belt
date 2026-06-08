@@ -2,7 +2,7 @@
 /// A card's rarity tier.
 pub enum Rarity: byte {
   Common = 1
-  Rare   = 2
+  Rare = 2
   Legend = 10
 }
 

@@ -369,7 +369,7 @@ File
           MatchPattern
             TypeName
               Null "null"
-          Whitespace "  "
+          Whitespace " "
           Arrow "->"
           Whitespace " "
           ReturnStmt

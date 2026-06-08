@@ -2,20 +2,23 @@
 // source text.
 //
 // The green tree stores only widths, so the actual characters live in the buffer
-// the tree was parsed from; the printer pairs the two. It is structure-driven
-// for indentation: rather than echo the source's leading whitespace, it
-// re-indents every line from the bracket nesting, so the indentation is a
-// function of the tree, not of the input. Line breaks and inter-token spacing
-// are still reproduced as they were; normalising those is the job of later
-// formatting passes. Dropping all indentation and regenerating it is what makes
-// the result idempotent and independent of however the input was indented.
+// the tree was parsed from; the printer pairs the two. It is structure-driven:
+// rather than echo the source's whitespace, it regenerates indentation from the
+// bracket nesting and the space between tokens from the grammar, so the layout
+// is a function of the tree, not of the input. Line breaks are still reproduced
+// as they were (normalising those is a later pass), and whitespace touching a
+// comment is preserved verbatim (comment placement is a later pass too).
+// Regenerating all spacing is what makes the result idempotent and independent
+// of however the input was spaced.
 //
-// The indent model tracks the line each open bracket was opened on, not a raw
-// bracket count. A line's body sits one level inside the innermost still-open
-// bracket's opener line, so several brackets that open on one line and stay open
-// — `.map(fn(x) {` — hug into a single level rather than stacking. A line that
-// begins by closing a bracket aligns with that bracket's opener line, so the
-// `})` that ends such a construct returns to the opener's column.
+// Indentation tracks the line each open bracket was opened on, not a raw bracket
+// count, so brackets that open together and stay open — `.map(fn(x) {` — hug
+// into a single level, and a line that begins by closing a bracket aligns with
+// its opener line. Inter-token spacing is decided per token pair by
+// spaceBetween, using each token's immediate parent node to disambiguate the
+// context-sensitive cases (a type colon versus a ternary colon, a unary versus a
+// binary operator, a generic bracket versus a comparison, a record brace versus
+// a block brace).
 package printer
 
 import (
@@ -26,62 +29,69 @@ import (
 	"github.com/masterbelt/masterbelt/pkg/source/token"
 )
 
-// Print renders node and its descendants to text, re-indenting each line to its
-// nesting depth with indent as one level and reading each leaf token's
-// characters from buf. Newlines are emitted as "\n"; the line ending is applied
-// downstream.
+// Print renders node and its descendants to text, regenerating indentation (one
+// level of indent per nesting depth) and inter-token spacing, and reading each
+// leaf token's characters from buf. Newlines are emitted as "\n"; the line
+// ending is applied downstream.
 func Print(buf source.Buffer, node cst.Green, indent string) string {
 	p := printer{indent: indent, atLineStart: true}
-	p.walk(buf, cst.Root(node))
+	p.walk(buf, cst.Root(node), cst.File)
 	return p.b.String()
 }
 
-// printer carries the running render state: the output, the indent unit, the
+// printer carries the running render state: the output and indent unit; the
 // stack of open brackets (each holding the indent level of the line it opened
-// on), the current line's indent level, and whether the next significant token
-// begins a line (and so needs indentation regenerated in front of it).
+// on) and the current line's indent level; whether the next token begins a line;
+// the previous token's kind, parent, and whether it was a comment (for spacing);
+// and any whitespace seen since the last token (kept only to reproduce spacing
+// around comments).
 type printer struct {
 	b           strings.Builder
 	indent      string
 	stack       []int
 	lineIndent  int
 	atLineStart bool
+	prevKind    token.Kind
+	prevParent  cst.Kind
+	prevComment bool
+	pendingWS   string
 }
 
-// walk renders a positioned element: a leaf goes through leaf, a node recurses
-// over its children in source order.
-func (p *printer) walk(buf source.Buffer, t cst.Tree) {
+// walk renders a positioned element: a leaf goes through leaf with its immediate
+// parent's kind, a node recurses over its children as their parent.
+func (p *printer) walk(buf source.Buffer, t cst.Tree, parent cst.Kind) {
 	if tok, ok := t.Token(); ok {
-		p.leaf(tok.Kind(), t.Text(buf))
+		p.leaf(tok.Kind(), parent, t.Text(buf))
 		return
 	}
+	kind, _ := t.Kind()
 	for _, child := range t.Children() {
-		p.walk(buf, child)
+		p.walk(buf, child, kind)
 	}
 }
 
-// leaf renders one token, normalising indentation. A newline opens a new line; a
-// run of whitespace is kept between tokens but dropped at the start of a line
-// (where it was indentation, now regenerated). Any other token, when it starts a
-// line, is preceded by the line's indent: a leading closer aligns with its
-// opener line (and pops it), otherwise the line sits one level inside the
-// innermost open bracket. An opener records the line it opened on, so brackets
-// opening together on one line hug into a single level.
-func (p *printer) leaf(kind token.Kind, text string) {
+// leaf renders one token. A newline opens a new line; whitespace is buffered
+// (and emitted only to reproduce spacing around comments, otherwise dropped). A
+// significant token at the start of a line is preceded by the regenerated
+// indent; mid-line it is preceded by a single space or none per spaceBetween —
+// except next to a comment, where the original whitespace is reproduced so
+// comment placement is left to a later pass.
+func (p *printer) leaf(kind token.Kind, parent cst.Kind, text string) {
 	switch kind {
 	case token.Newline:
 		p.b.WriteByte('\n')
 		p.atLineStart = true
+		p.pendingWS = ""
 		return
 	case token.Whitespace:
-		if !p.atLineStart {
-			p.b.WriteString(text)
-		}
+		p.pendingWS += text
 		return
 	}
 
-	leadingCloser := p.atLineStart && isClose(kind) && len(p.stack) > 0
+	comment := isComment(kind)
+
 	if p.atLineStart {
+		leadingCloser := !comment && isClose(kind) && len(p.stack) > 0
 		switch {
 		case leadingCloser:
 			p.lineIndent = p.pop()
@@ -92,14 +102,27 @@ func (p *printer) leaf(kind token.Kind, text string) {
 		}
 		p.b.WriteString(strings.Repeat(p.indent, p.lineIndent))
 		p.atLineStart = false
-	} else if isClose(kind) && len(p.stack) > 0 {
-		p.pop()
+	} else {
+		switch {
+		case comment || p.prevComment:
+			p.b.WriteString(p.pendingWS)
+		case spaceBetween(p.prevKind, kind, p.prevParent, parent):
+			p.b.WriteByte(' ')
+		}
+		if !comment && isClose(kind) && len(p.stack) > 0 {
+			p.pop()
+		}
 	}
+	p.pendingWS = ""
 
-	if isOpen(kind) {
+	if !comment && isOpen(kind) {
 		p.stack = append(p.stack, p.lineIndent)
 	}
+
 	p.b.WriteString(text)
+	p.prevKind = kind
+	p.prevParent = parent
+	p.prevComment = comment
 }
 
 // pop removes the innermost open bracket and returns the indent level of the
@@ -110,12 +133,85 @@ func (p *printer) pop() int {
 	return top
 }
 
-// isOpen reports whether the token opens an indented region.
+// spaceBetween reports whether a single space separates two adjacent significant
+// tokens on one line. The default is a space; the cases below are where the
+// canonical spelling hugs instead. prev/cur are the token kinds, pp/cp their
+// immediate parent node kinds — the parent is what tells a type colon from a
+// ternary colon, a unary from a binary operator, a generic bracket from a
+// comparison, and a record brace from a block brace.
+func spaceBetween(prev, cur token.Kind, pp, cp cst.Kind) bool {
+	switch {
+	// A comma or a closing bracket hugs what precedes it; an opening paren or
+	// bracket hugs what follows it.
+	case cur == token.Comma, cur == token.RParen, cur == token.RBracket:
+		return false
+	case prev == token.LParen, prev == token.LBracket:
+		return false
+	// Member access and the range operators bind tight on both sides.
+	case cur == token.Dot, prev == token.Dot:
+		return false
+	case cur == token.DotDot, cur == token.DotDotDot, prev == token.DotDot, prev == token.DotDotDot:
+		return false
+	}
+
+	// Record braces carry inner spaces ("{ x: 0 }"), except an empty record is
+	// tight ("{}") and a record's type name hugs its brace ("Point{").
+	if cur == token.LBrace && isRecord(cp) {
+		return !(prev == token.Ident && pp == cst.RecordLit)
+	}
+	if prev == token.LBrace && isRecord(pp) {
+		return cur != token.RBrace
+	}
+	if cur == token.RBrace && isRecord(cp) {
+		return prev != token.LBrace
+	}
+
+	switch {
+	// A call/parameter "(" and an index "[" hug their head.
+	case cur == token.LParen && (cp == cst.CallExpr || cp == cst.ParamList):
+		return false
+	case cur == token.LBracket && cp == cst.IndexExpr:
+		return false
+	// A type, key, or return colon has no space before it — only after.
+	case cur == token.Colon && cp != cst.TernaryExpr:
+		return false
+	// A unary operator hugs its operand.
+	case (prev == token.Plus || prev == token.Minus || prev == token.Bang) && pp == cst.UnaryExpr:
+		return false
+	// Generic brackets hug their contents and their head.
+	case cur == token.Lt && isGeneric(cp):
+		return false
+	case prev == token.Lt && isGeneric(pp):
+		return false
+	case cur == token.Gt && isGeneric(cp):
+		return false
+	}
+	return true
+}
+
+// isOpen reports whether the token opens an indented/bracketed region.
 func isOpen(k token.Kind) bool {
 	return k == token.LBrace || k == token.LBracket || k == token.LParen
 }
 
-// isClose reports whether the token closes an indented region.
+// isClose reports whether the token closes an indented/bracketed region.
 func isClose(k token.Kind) bool {
 	return k == token.RBrace || k == token.RBracket || k == token.RParen
+}
+
+// isComment reports whether the token is a comment (line, block, or doc).
+func isComment(k token.Kind) bool {
+	return k == token.LineComment || k == token.BlockComment || k == token.DocComment
+}
+
+// isRecord reports whether the node is a record literal or record type — the
+// braces that carry inner spaces.
+func isRecord(k cst.Kind) bool {
+	return k == cst.RecordLit || k == cst.RecordType
+}
+
+// isGeneric reports whether the node is a generic argument or parameter list —
+// the angle brackets that hug.
+func isGeneric(k cst.Kind) bool {
+	return k == cst.GenericArgs || k == cst.GenericParams
 }

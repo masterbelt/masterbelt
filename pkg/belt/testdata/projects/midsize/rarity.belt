@@ -13,9 +13,9 @@ pub enum Rarity: string {
 /// roll picks a tier in proportion to these.
 pub fn dropWeight(tier: Rarity): nint {
   switch tier {
-    Common    -> return 60
-    Rare      -> return 25
-    Epic      -> return 12
+    Common -> return 60
+    Rare -> return 25
+    Epic -> return 12
     Legendary -> return 3
   }
 }
@@ -23,9 +23,9 @@ pub fn dropWeight(tier: Rarity): nint {
 /// The star rating a tier shows in the UI.
 pub fn stars(tier: Rarity): nint {
   switch tier {
-    Common    -> return 1
-    Rare      -> return 2
-    Epic      -> return 3
+    Common -> return 1
+    Rare -> return 2
+    Epic -> return 3
     Legendary -> return 4
   }
 }

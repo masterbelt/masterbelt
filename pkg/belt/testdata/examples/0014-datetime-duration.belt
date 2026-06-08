@@ -2,13 +2,13 @@
 // normalized to UTC milliseconds, and digit+unit runs totalled in
 // milliseconds. The two interoperate: dt ± dr, dt - dt, dr * nint.
 
-const Epoch   = D1970-01-01T00:00:00.000Z
+const Epoch = D1970-01-01T00:00:00.000Z
 const Release = D2009-03-31T23:59:59.000Z
 // An offset input normalizes to the same UTC instant.
-const Launch  = D2026-06-05T09:00:00.000+09:00
+const Launch = D2026-06-05T09:00:00.000+09:00
 
 const Cooldown = 5s
-const Complex  = 3w4d5h6m7s8ms
+const Complex = 3w4d5h6m7s8ms
 
 // Comparison works within each type.
 assert Release > Epoch
@@ -16,10 +16,10 @@ assert 1h > 59m
 
 // Mixed arithmetic resolves per argument type (overloading).
 const Deadline = Release + 7d
-const Span     = Release - Epoch
-const Shift    = Release - 1h
-const TwoH     = 1h + 1h
-const Triple   = 5m * 3
+const Span = Release - Epoch
+const Shift = Release - 1h
+const TwoH = 1h + 1h
+const Triple = 5m * 3
 
 // Master data columns carry instants and periods.
 pub type Event = {
