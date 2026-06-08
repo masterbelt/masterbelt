@@ -74,7 +74,7 @@ fuzz:
 # package's generate script) then turns grammar.js + that layer into
 # src/parser.c. It needs the tree-sitter CLI, pinned as the package's
 # devDependency, so `pnpm install` must have run first.
-TREE_SITTER_PKG := tree-sitter-masterbelt
+TREE_SITTER_PKG := @masterbelt/tree-sitter-masterbelt
 
 # generate runs code generation: the Go generators (diagnostic tables, the
 # editor grammars' lexical layers, etc.) and then tree-sitter generate, which

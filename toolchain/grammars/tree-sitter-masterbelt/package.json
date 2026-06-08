@@ -1,5 +1,5 @@
 {
-  "name": "tree-sitter-masterbelt",
+  "name": "@masterbelt/tree-sitter-masterbelt",
   "version": "0.1.0",
   "description": "masterbelt grammar for tree-sitter",
   "private": true,
