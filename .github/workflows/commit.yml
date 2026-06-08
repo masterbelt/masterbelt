@@ -1,0 +1,41 @@
+# commit — lint the pull request's commit messages with commitlint, the same
+# config (commitlint.config.ts) and version the husky commit-msg hook runs
+# locally, so a commit pushed past the local hook is still caught. It always
+# runs on a pull request (commit messages are not path-scoped) and reports, so
+# it is safe to require.
+name: commit
+
+on:
+  pull_request:
+
+concurrency:
+  group: commit-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  commitlint:
+    name: commitlint
+    runs-on: ubuntu-latest
+    steps:
+      # fetch-depth: 0 so the base..head commits are present to lint the range.
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          fetch-depth: 0
+      # pnpm before setup-node so its cache: 'pnpm' finds the store; the pnpm
+      # version comes from the root package.json packageManager field.
+      - uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6.0.8
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version-file: .tool-versions
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - name: Lint the PR's commit messages
+        # The shas are passed through the environment, not interpolated into the
+        # script, so nothing from the event reaches the shell directly.
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: pnpm exec commitlint --from "$BASE" --to "$HEAD" --verbose
