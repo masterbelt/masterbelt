@@ -42,6 +42,25 @@ func TestNormalize(t *testing.T) {
 	}
 }
 
+// TestNormalizeBlankLines pins blank-line collapsing: a run of blank lines
+// becomes a single blank line, and leading and trailing blanks vanish.
+func TestNormalizeBlankLines(t *testing.T) {
+	cases := map[string]string{
+		"a\n\n\n\nb\n":    "a\n\nb\n",      // a long gap collapses to one blank line
+		"a\n\nb\n":        "a\n\nb\n",      // a single blank line is kept
+		"a\nb\n":          "a\nb\n",        // no blank line stays none
+		"\n\n\na\n":       "a\n",           // leading blanks vanish
+		"a\n\n\n":         "a\n",           // trailing blanks vanish
+		"a\n\nb\n\n\nc\n": "a\n\nb\n\nc\n", // each gap independently collapses
+		"a\n  \n\nb\n":    "a\n\nb\n",      // a whitespace-only line counts as blank
+	}
+	for in, want := range cases {
+		if got := normalize(in, DefaultLayout); got != want {
+			t.Errorf("normalize(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
 // TestNormalizeEndOfLine pins the one substrate property normalize draws today:
 // every line break renders as the layout's terminator, whatever the input used.
 func TestNormalizeEndOfLine(t *testing.T) {

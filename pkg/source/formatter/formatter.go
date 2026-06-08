@@ -33,21 +33,35 @@ func Format(buf source.Buffer, root cst.Green, layout Layout) string {
 	return normalize(printer.Print(buf, root, layout.Indent), layout)
 }
 
-// normalize trims trailing whitespace from every line, collapses the file to a
-// single trailing line break (and to empty when there is no content), and
-// renders every break as layout.EndOfLine. It splits on "\n" and trims a
-// dangling "\r" from each line, so any input line ending is folded to the
-// layout's before being re-emitted.
+// normalize trims trailing whitespace from every line, collapses every run of
+// blank lines to a single blank line (and drops leading and trailing blanks),
+// ensures exactly one trailing line break (and empty output when there is no
+// content), and renders every break as layout.EndOfLine. It splits on "\n" and
+// trims a dangling "\r" from each line, so any input line ending is folded to
+// the layout's before being re-emitted.
 func normalize(text string, layout Layout) string {
-	lines := strings.Split(text, "\n")
-	for i, line := range lines {
-		lines[i] = strings.TrimRight(line, " \t\r")
+	raw := strings.Split(text, "\n")
+	lines := make([]string, 0, len(raw))
+	pendingBlank := false
+	for _, line := range raw {
+		line = strings.TrimRight(line, " \t\r")
+		if line == "" {
+			pendingBlank = true
+			continue
+		}
+		// A blank line is emitted only between content lines, and at most one
+		// per run — so leading and trailing blanks vanish and any longer gap
+		// collapses to a single blank line.
+		if pendingBlank && len(lines) > 0 {
+			lines = append(lines, "")
+		}
+		pendingBlank = false
+		lines = append(lines, line)
 	}
-	out := strings.TrimRight(strings.Join(lines, "\n"), "\n")
-	if out == "" {
+	if len(lines) == 0 {
 		return ""
 	}
-	out += "\n"
+	out := strings.Join(lines, "\n") + "\n"
 	if eol := layout.EndOfLine; eol != "" && eol != "\n" {
 		out = strings.ReplaceAll(out, "\n", eol)
 	}
