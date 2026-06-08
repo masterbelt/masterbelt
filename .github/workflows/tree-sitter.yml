@@ -104,10 +104,12 @@ jobs:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     env:
-      # A token (PAT or fine-grained, repo:contents write on
-      # masterbelt/tree-sitter-masterbelt) enables the push; absent, the job
-      # only uploads the artifact.
-      TS_TOKEN: ${{ secrets.TREE_SITTER_TOKEN }}
+      # An SSH deploy key with write access to masterbelt/tree-sitter-masterbelt
+      # ALONE enables the push; absent, the job only uploads the artifact. A
+      # deploy key is scoped to that one repo (not an account-wide token), so a
+      # leak only risks the generated mirror — which is regenerated from source —
+      # and is revoked by removing the single key.
+      TS_DEPLOY_KEY: ${{ secrets.TREE_SITTER_DEPLOY_KEY }}
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
       - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
@@ -136,22 +138,29 @@ jobs:
           path: dist/tree-sitter-masterbelt
           if-no-files-found: error
 
-      # Sync to the dedicated repo when the token is set. The source repo stays
-      # the single truth; the dedicated repo is overwritten with the assembled
-      # tree (so a removed file propagates), pushed to its default branch (the
-      # rolling preview) and tagged immutably as v<version>-<source-sha> for
-      # editors to pin — never a moving tag (C-3 §5).
-      - name: Sync to masterbelt/tree-sitter-masterbelt (when a token is configured)
-        if: env.TS_TOKEN != ''
+      # Sync to the dedicated repo when the deploy key is set. The source repo
+      # stays the single truth; the dedicated repo is overwritten with the
+      # assembled tree (so a removed file propagates), pushed to its default
+      # branch (the rolling preview) and tagged immutably as v<version>-<sha>
+      # for editors to pin — never a moving tag (C-3 §5).
+      - name: Sync to masterbelt/tree-sitter-masterbelt (when a deploy key is configured)
+        if: env.TS_DEPLOY_KEY != ''
         run: |
           set -eu
+          # Load the write-scoped deploy key into a fresh ssh-agent (the key
+          # never touches disk), and pin GitHub's published ed25519 host key so
+          # the connection is verified rather than trusted on first use.
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          echo 'github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl' >> ~/.ssh/known_hosts
+          eval "$(ssh-agent -s)"
+          printf '%s\n' "$TS_DEPLOY_KEY" | ssh-add - >/dev/null
+
           src="$PWD/dist/tree-sitter-masterbelt"
           version="$(node -p "require('$src/package.json').version")"
           sha="$(git rev-parse --short HEAD)"
           git config --global user.name 'masterbelt-bot'
           git config --global user.email 'noreply@masterbelt.dev'
-          git clone --depth=1 \
-            "https://x-access-token:${TS_TOKEN}@github.com/masterbelt/tree-sitter-masterbelt.git" dest
+          git clone --depth=1 git@github.com:masterbelt/tree-sitter-masterbelt.git dest
           # Replace tracked content (keep .git) so deletions propagate.
           find dest -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
           cp -R "$src"/. dest/

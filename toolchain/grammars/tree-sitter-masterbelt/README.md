@@ -54,9 +54,18 @@ subdirectory). The mirror is generated, never hand-edited.
 **Bring-up (one-time, human):**
 
 1. Create the empty `masterbelt/tree-sitter-masterbelt` repository.
-2. Add a repository secret `TREE_SITTER_TOKEN` (a token with contents-write on
-   that repo) to this repo. Without it the publish job still runs but only
-   uploads the assembled tree as an artifact — it never fails.
+2. Authorize the push with an **SSH deploy key scoped to that repo alone** — not
+   an account-wide token:
+   - `ssh-keygen -t ed25519 -C tree-sitter-masterbelt-deploy -f ts_deploy -N ''`
+   - On the mirror repo: *Settings → Deploy keys → Add* `ts_deploy.pub`, **Allow
+     write access** checked.
+   - On this repo: add the private half (`ts_deploy`) as the secret
+     `TREE_SITTER_DEPLOY_KEY`. (Delete the local key files afterward.)
+
+   A deploy key only grants write to that one mirror, so a leak's blast radius
+   is the generated mirror (regenerated from source); revoke by removing the
+   deploy key. Without the secret the publish job still runs but only uploads
+   the assembled tree as an artifact — it never fails.
 3. Run the `tree-sitter` workflow via *Run workflow* (workflow_dispatch) to do
    the first sync, and verify the mirror.
 4. Add the `tree-sitter` check to this repo's branch protection so the grammar
