@@ -1,0 +1,173 @@
+# tree-sitter — the tree-sitter grammar's CI gate and its publish to the
+# dedicated distribution repo (C-3).
+#
+# The gate mirrors vscode.yml: it always triggers, the `grammar` job is
+# conditional on a grammar-relevant change, and the single required check is the
+# `tree-sitter` gate, which passes when the job succeeded or was skipped. The
+# grammar job runs the node test suites the Go gate cannot reach — the CST-pin
+# (the tree-sitter skeleton vs the real parser's CST) and the highlight golden.
+# (Grammar *consistency* — the committed parser matching grammar.js — is already
+# guarded by go.yml's generate job via `make verify-generated`.)
+#
+# The `publish` job runs only on a manual dispatch: it assembles the standalone
+# package tree and, when a token to the dedicated repo is configured, syncs it
+# there. Without the token it uploads the tree as an artifact and does not fail
+# (publish degrades, never blocks — the same shape as nightly.yml's vsix).
+name: tree-sitter
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: tree-sitter-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read # paths-filter reads the PR's changed files
+
+jobs:
+  changes:
+    name: detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      grammar: ${{ steps.filter.outputs.grammar }}
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
+        id: filter
+        with:
+          filters: |
+            grammar:
+              - 'toolchain/grammars/tree-sitter-masterbelt/**'
+              # The CST-pin reads the example corpus and the real parser's CST
+              # snapshots, so a change to either must re-run it.
+              - 'pkg/belt/testdata/examples/**'
+              - 'pkg/belt/parser/concrete/testdata/examples/**'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - '.tool-versions'
+              - '.github/workflows/tree-sitter.yml'
+
+  grammar:
+    name: grammar tests
+    needs: changes
+    if: needs.changes.outputs.grammar == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      # pnpm before setup-node so cache: 'pnpm' finds the store.
+      - uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6.0.8
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version-file: .tool-versions
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      # The CST-pin and the highlight golden compile the committed parser.c
+      # (tree-sitter parse/query), so a C compiler is needed — present on the
+      # runner by default.
+      - name: Grammar tests (CST-pin + highlight golden)
+        run: cd toolchain/grammars/tree-sitter-masterbelt && node --test
+
+  # The single required check — passes when the grammar job succeeded or was
+  # skipped, so a PR that does not touch the grammar is never left pending.
+  tree-sitter:
+    name: tree-sitter
+    needs: [changes, grammar]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require the grammar check to have passed or been skipped
+        env:
+          RESULTS: >-
+            ${{ needs.changes.result }}
+            ${{ needs.grammar.result }}
+        run: |
+          ok=1
+          for r in $RESULTS; do
+            case "$r" in
+              success|skipped) ;;
+              *) echo "::error::a grammar check ended in '$r'"; ok=0 ;;
+            esac
+          done
+          [ "$ok" = 1 ]
+
+  # Assemble the standalone package tree and, on a manual dispatch, sync it to
+  # the dedicated repo when a token is configured. Always uploads the tree as an
+  # artifact, so a token-less run still produces the publishable output.
+  publish:
+    name: publish to the dedicated repo
+    needs: grammar
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    env:
+      # A token (PAT or fine-grained, repo:contents write on
+      # masterbelt/tree-sitter-masterbelt) enables the push; absent, the job
+      # only uploads the artifact.
+      TS_TOKEN: ${{ secrets.TREE_SITTER_TOKEN }}
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6.0.8
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version-file: .tool-versions
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+
+      # Never publish stale: regenerate and fail if the committed grammar output
+      # is not up to date before assembling the tree from it.
+      - name: Verify the generated grammar is fresh
+        run: make verify-generated
+
+      - name: Assemble the standalone package tree
+        run: make publish-tree-sitter
+
+      - name: Upload the assembled tree
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: tree-sitter-masterbelt
+          path: dist/tree-sitter-masterbelt
+          if-no-files-found: error
+
+      # Sync to the dedicated repo when the token is set. The source repo stays
+      # the single truth; the dedicated repo is overwritten with the assembled
+      # tree (so a removed file propagates), pushed to its default branch (the
+      # rolling preview) and tagged immutably as v<version>-<source-sha> for
+      # editors to pin — never a moving tag (C-3 §5).
+      - name: Sync to masterbelt/tree-sitter-masterbelt (when a token is configured)
+        if: env.TS_TOKEN != ''
+        run: |
+          set -eu
+          src="$PWD/dist/tree-sitter-masterbelt"
+          version="$(node -p "require('$src/package.json').version")"
+          sha="$(git rev-parse --short HEAD)"
+          git config --global user.name 'masterbelt-bot'
+          git config --global user.email 'noreply@masterbelt.dev'
+          git clone --depth=1 \
+            "https://x-access-token:${TS_TOKEN}@github.com/masterbelt/tree-sitter-masterbelt.git" dest
+          # Replace tracked content (keep .git) so deletions propagate.
+          find dest -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp -R "$src"/. dest/
+          cd dest
+          git add -A
+          if git diff --cached --quiet; then
+            echo "dedicated repo already up to date — nothing to publish"
+            exit 0
+          fi
+          git commit -m "sync grammar from masterbelt@${sha}"
+          git push origin HEAD:main
+          tag="v${version}-${sha}"
+          if git ls-remote --exit-code --tags origin "refs/tags/${tag}" >/dev/null 2>&1; then
+            echo "tag ${tag} already exists — leaving it immutable"
+          else
+            git tag "$tag"
+            git push origin "$tag"
+            echo "published ${tag}"
+          fi
