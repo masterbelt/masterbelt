@@ -1,0 +1,6 @@
+// a leading comment
+const A = 1        // a trailing comment
+pub fn f(): nint {
+        // a comment indented to its block
+  return A   // another trailing comment
+}
