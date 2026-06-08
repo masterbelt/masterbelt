@@ -29,6 +29,15 @@ dist:
 publish-tree-sitter:
 	TS_DIST_DIR=$(DIST_DIR)/tree-sitter-masterbelt sh build/publish-tree-sitter.sh
 
+# tree-sitter-wasm builds the WebAssembly module into the assembled package tree
+# (run `make publish-tree-sitter` first). It is the web-tree-sitter consumption
+# path the npm package ships, verified against web-tree-sitter at the same
+# version as the CLI. It needs Docker — `tree-sitter build --wasm` runs
+# emscripten in a container.
+.PHONY: tree-sitter-wasm
+tree-sitter-wasm:
+	cd $(DIST_DIR)/tree-sitter-masterbelt && "$(CURDIR)/toolchain/grammars/tree-sitter-masterbelt/node_modules/.bin/tree-sitter" build --wasm
+
 # repro-check builds the release binary twice and asserts the two are
 # byte-identical — the reproducible-build regression check. The flags match
 # build/dist.sh; the version comes from the commit, so a rebuild reproduces it.

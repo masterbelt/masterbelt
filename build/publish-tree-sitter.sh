@@ -48,17 +48,27 @@ done
 
 # Stamp the published version to masterbelt's own — the grammar is generated in
 # lockstep with the language, so it ships under the same version, not a separate
-# hand-set one. The committed package.json/tree-sitter.json carry a 0.1.0
-# placeholder (like the vscode package); the real, commit-derived version is
-# read from the CLI here (the single source, internal/version) and written into
-# the assembled tree, so a developer's `make publish-tree-sitter` and CI produce
+# hand-set one — and make the package.json publish-ready (the committed source
+# stays a private 0.1.0 placeholder, like the vscode package). The real,
+# commit-derived version is read from the CLI here (the single source,
+# internal/version) so a developer's `make publish-tree-sitter` and CI produce
 # the identical stamp. Overridable via TS_VERSION (e.g. to stub it in a test).
 version="${TS_VERSION:-$(go run -buildvcs=true ./cmd/masterbelt --version | awk '{print $3}')}"
 node - "$out" "$version" <<'NODE'
 const fs = require('fs');
 const [dir, version] = process.argv.slice(2);
 for (const [file, set] of [
-  ['package.json', (j) => { j.version = version; }],
+  ['package.json', (j) => {
+    j.version = version;
+    // Publish-ready: drop the workspace `private` guard and point npm at GitHub
+    // Packages (the @masterbelt scope's registry). The wasm — built into this
+    // tree before publish — is the web-tree-sitter consumption path; the source
+    // and committed parser ship alongside it.
+    delete j.private;
+    j.publishConfig = { registry: 'https://npm.pkg.github.com' };
+    j.keywords = ['tree-sitter', 'masterbelt', 'parser', 'grammar'];
+    j.files = ['grammar.js', 'lexical.js', 'tree-sitter.json', 'src/', 'queries/', '*.wasm'];
+  }],
   ['tree-sitter.json', (j) => { j.metadata.version = version; }],
 ]) {
   const path = dir + '/' + file;
