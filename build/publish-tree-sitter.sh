@@ -55,8 +55,10 @@ done
 # the identical stamp. Overridable via TS_VERSION (e.g. to stub it in a test).
 version="${TS_VERSION:-$(go run -buildvcs=true ./cmd/masterbelt --version | awk '{print $3}')}"
 case "$version" in
+	# Accept a SemVer-like token for package stamping: non-empty and only
+	# [0-9A-Za-z.+-] characters (e.g. 1.2.3, 1.2.3-rc.1, 1.2.3+build.5).
 	''|*[!0-9A-Za-z.+-]*)
-		echo "publish-tree-sitter: failed to extract a valid version (got: '$version') from ./cmd/masterbelt --version; set TS_VERSION explicitly or update parser" >&2
+		echo "publish-tree-sitter: invalid version '$version' from ./cmd/masterbelt --version; expected non-empty [0-9A-Za-z.+-] (SemVer-like, e.g. 1.2.3, 1.2.3-rc.1, 1.2.3+build.5). Set TS_VERSION explicitly or update parser." >&2
 		exit 1
 		;;
 esac
