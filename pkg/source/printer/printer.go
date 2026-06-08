@@ -20,14 +20,18 @@
 // binary operator, a generic bracket versus a comparison, a record brace versus
 // a block brace).
 //
-// Line breaks are reproduced as in the input, with one exception: a record or
-// collection literal whose every part fits on one line — it carries no comment
-// and no block — is collapsed onto one line, its element separators regenerated
-// as ", " (a newline-separated literal has no comma tokens to reproduce, so they
-// are synthesized). This is the one-spelling rule for data literals: the same
-// data has one form, whether the input wrote it across lines or not. A literal
-// that does carry a comment or a block keeps its line breaks, since collapsing
-// would lose the comment's line or pack a block onto one line.
+// A comma-separated list (a record or collection literal, a call's arguments, a
+// parameter list, a generic argument or parameter list, a use list) keeps the
+// line-break choice the input made — the "magic trailing comma" rule, chosen for
+// minimal diffs: a list the author wrote across lines stays one element per line,
+// each ending with a comma (so adding an element is a one-line diff); a list on
+// one line stays inline, separated by ", " with no trailing comma. The signal is
+// a newline directly between the brackets, so a one-line call whose only argument
+// is a multi-line lambda stays inline (the lambda's own breaks are its business).
+// Either way the separators are regenerated — source commas are dropped, the
+// trailing one synthesized only when multi-line — so a list has one form for its
+// chosen shape. A list carrying a comment is left exactly as written, since
+// moving its elements could strand the comment.
 package printer
 
 import (
@@ -62,22 +66,19 @@ type printer struct {
 	prevKind    token.Kind
 	prevParent  cst.Kind
 	prevComment bool
-	flatDepth   int // > 0 while rendering inside a collapsed literal: newlines are dropped
 }
 
 // walk renders a positioned element: a leaf goes through leaf with its immediate
 // parent's kind; a node recurses over its children as their parent, except a
-// collapsible record or collection literal, which renders flat.
+// comma-separated list, which renders through commaList.
 func (p *printer) walk(buf source.Buffer, t cst.Tree, parent cst.Kind) {
 	if tok, ok := t.Token(); ok {
 		p.leaf(tok.Kind(), parent, t.Text(buf))
 		return
 	}
 	kind, _ := t.Kind()
-	if (kind == cst.RecordLit || kind == cst.CollectionLit) && collapsible(t) {
-		p.flatDepth++
-		p.flatLiteral(buf, t, kind)
-		p.flatDepth--
+	if isCommaList(kind) {
+		p.commaList(buf, t, kind)
 		return
 	}
 	for _, child := range t.Children() {
@@ -85,74 +86,144 @@ func (p *printer) walk(buf source.Buffer, t cst.Tree, parent cst.Kind) {
 	}
 }
 
-// flatLiteral renders a record or collection literal on one line. Its trivia is
-// dropped (newlines by flatDepth, whitespace as always) and its element
-// separators are regenerated: the source commas are dropped — a newline-
-// separated literal has none, and a trailing one before the closer must not
-// survive — and a single comma is synthesized before every element after the
-// first, so any input separation reads as one canonical list.
-func (p *printer) flatLiteral(buf source.Buffer, t cst.Tree, kind cst.Kind) {
-	prevElement := false
-	for _, child := range t.Children() {
-		if ck, ok := child.TokenKind(); ok {
-			if ck == token.Comma {
-				continue // separators are regenerated below
-			}
-			p.walk(buf, child, kind) // the name, the brackets
+// commaList renders a comma-separated list under the magic-trailing-comma rule.
+// It walks the prefix (a record's type name, a call's callee) and the opening
+// bracket, then the region between the brackets one of three ways, then the
+// closing bracket and any suffix. A region with a comment is left as written (so
+// the comment keeps its place); a region the author broke across lines (a
+// newline sits directly between the brackets) is expanded one element per line
+// with a trailing comma; otherwise it is flattened inline.
+func (p *printer) commaList(buf source.Buffer, t cst.Tree, kind cst.Kind) {
+	children := t.Children()
+	openIdx, closeIdx := bracketBounds(children)
+	if openIdx < 0 || closeIdx <= openIdx {
+		for _, child := range children { // malformed: render faithfully
+			p.walk(buf, child, kind)
+		}
+		return
+	}
+	for _, child := range children[:openIdx+1] { // prefix and "(" / "{" / "[" / "<"
+		p.walk(buf, child, kind)
+	}
+	region := children[openIdx+1 : closeIdx]
+	switch {
+	case regionHasComment(region):
+		for _, child := range region {
+			p.walk(buf, child, kind)
+		}
+	case regionIsMultiline(region):
+		p.expandRegion(buf, region, kind)
+		p.leaf(token.Newline, kind, "\n")
+	default:
+		p.flatRegion(buf, region, kind)
+	}
+	for _, child := range children[closeIdx:] { // ")" / "}" / "]" / ">" and any suffix
+		p.walk(buf, child, kind)
+	}
+}
+
+// flatRegion renders the elements inline, separated by a synthesized comma (the
+// source commas, trailing one included, are dropped). Trivia is skipped; an
+// element's own internal line breaks — a multi-line lambda argument — are left
+// to its own rendering.
+func (p *printer) flatRegion(buf source.Buffer, region []cst.Tree, kind cst.Kind) {
+	first := true
+	for _, child := range region {
+		if isListSeparator(child) {
 			continue
 		}
-		// A node child is an element (a field, a map entry, or a value).
-		if prevElement {
+		if !first {
 			p.leaf(token.Comma, kind, ",")
 		}
 		p.walk(buf, child, kind)
-		prevElement = true
+		first = false
 	}
 }
 
-// maxFlatElements is the most elements a literal may have and still be put on
-// one line. The threshold (not a line width — masterbelt never wraps on width)
-// is the element-count rule B-3 calls for: it is set where the example and
-// prelude corpus already draws the line by hand — records of up to three fields
-// are written inline, larger ones one field per line — so the one-spelling rule
-// matches the corpus's own judgement and a longer literal keeps its readable
-// one-per-line shape.
-const maxFlatElements = 3
-
-// collapsible reports whether a literal can be put on one line: it must carry no
-// comment (whose line would be lost) and no block (which is never packed onto
-// one line), and no literal in it — itself included — may have more than
-// maxFlatElements elements. The whole subtree is checked, so a literal nested
-// inside another keeps both multi-line when either must be.
-func collapsible(t cst.Tree) bool {
-	if tk, ok := t.TokenKind(); ok {
-		return !isComment(tk)
-	}
-	switch k, _ := t.Kind(); {
-	case k == cst.Block:
-		return false
-	case (k == cst.RecordLit || k == cst.CollectionLit) && elementCount(t) > maxFlatElements:
-		return false
-	}
-	for _, child := range t.Children() {
-		if !collapsible(child) {
-			return false
+// expandRegion renders one element per line, each followed by a synthesized
+// trailing comma. The newline before each element drives the structural indent;
+// the source trivia and commas are dropped and regenerated.
+func (p *printer) expandRegion(buf source.Buffer, region []cst.Tree, kind cst.Kind) {
+	for _, child := range region {
+		if isListSeparator(child) {
+			continue
 		}
+		p.leaf(token.Newline, kind, "\n")
+		p.walk(buf, child, kind)
+		p.leaf(token.Comma, kind, ",")
 	}
-	return true
 }
 
-// elementCount returns the number of element children of a literal — its fields,
-// map entries, or values. Those are the node children; the name, brackets, and
-// commas are token children.
-func elementCount(t cst.Tree) int {
-	n := 0
-	for _, child := range t.Children() {
-		if _, isToken := child.TokenKind(); !isToken {
-			n++
+// isCommaList reports whether a node kind is a comma-separated list the
+// magic-trailing-comma rule governs.
+func isCommaList(k cst.Kind) bool {
+	switch k {
+	case cst.RecordLit, cst.RecordType, cst.CollectionLit, cst.CallExpr,
+		cst.ParamList, cst.GenericArgs, cst.GenericParams, cst.UseList:
+		return true
+	}
+	return false
+}
+
+// bracketBounds returns the indices of the list's opening and closing bracket
+// among its children — the first opener and the last closer — or (-1, -1) when
+// the list is not bracketed as expected (an unclosed list during recovery).
+func bracketBounds(children []cst.Tree) (openIdx, closeIdx int) {
+	openIdx, closeIdx = -1, -1
+	for i, child := range children {
+		ck, ok := child.TokenKind()
+		if !ok {
+			continue
+		}
+		if openIdx < 0 && isListOpen(ck) {
+			openIdx = i
+		}
+		if isListClose(ck) {
+			closeIdx = i
 		}
 	}
-	return n
+	return openIdx, closeIdx
+}
+
+// regionIsMultiline reports whether the author broke the list across lines: a
+// newline sits directly between the brackets. A newline buried inside an element
+// (a multi-line lambda) does not count — only the list's own breaks do.
+func regionIsMultiline(region []cst.Tree) bool {
+	for _, child := range region {
+		if ck, ok := child.TokenKind(); ok && ck == token.Newline {
+			return true
+		}
+	}
+	return false
+}
+
+// regionHasComment reports whether a comment sits directly between the brackets,
+// in which case the list is rendered as written to keep the comment placed.
+func regionHasComment(region []cst.Tree) bool {
+	for _, child := range region {
+		if ck, ok := child.TokenKind(); ok && isComment(ck) {
+			return true
+		}
+	}
+	return false
+}
+
+// isListSeparator reports whether a child is list punctuation or trivia the
+// renderer regenerates: a comma, a newline, or whitespace.
+func isListSeparator(child cst.Tree) bool {
+	ck, ok := child.TokenKind()
+	return ok && (ck == token.Comma || ck == token.Newline || ck == token.Whitespace)
+}
+
+// isListOpen / isListClose recognize every list's brackets, angle brackets
+// included (generic lists) — wider than the indenting isOpen/isClose, which
+// leave "<"/">" out because generics do not nest indentation.
+func isListOpen(k token.Kind) bool {
+	return k == token.LBrace || k == token.LBracket || k == token.LParen || k == token.Lt
+}
+
+func isListClose(k token.Kind) bool {
+	return k == token.RBrace || k == token.RBracket || k == token.RParen || k == token.Gt
 }
 
 // leaf renders one token. A newline opens a new line; whitespace is dropped (all
@@ -163,9 +234,6 @@ func elementCount(t cst.Tree) int {
 func (p *printer) leaf(kind token.Kind, parent cst.Kind, text string) {
 	switch kind {
 	case token.Newline:
-		if p.flatDepth > 0 {
-			return // collapsed onto one line
-		}
 		p.b.WriteByte('\n')
 		p.atLineStart = true
 		return

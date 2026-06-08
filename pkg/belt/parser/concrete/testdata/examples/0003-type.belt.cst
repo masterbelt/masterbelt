@@ -188,6 +188,7 @@ File
         Whitespace " "
         TypeName
           Ident "sbyte"
+      Comma ","
       Newline "\n"
       Whitespace "  "
       Field
@@ -196,6 +197,7 @@ File
         Whitespace " "
         TypeName
           Ident "Level"
+      Comma ","
       Newline "\n"
       RBrace "}"
     Whitespace " "

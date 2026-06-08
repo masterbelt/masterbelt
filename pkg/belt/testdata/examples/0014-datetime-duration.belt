@@ -23,7 +23,7 @@ const Triple = 5m * 3
 
 // Master data columns carry instants and periods.
 pub type Event = {
-  id: nint
-  starts_at: datetime
-  cooldown: duration
+  id: nint,
+  starts_at: datetime,
+  cooldown: duration,
 }

@@ -26,8 +26,8 @@ pub type OptionalNumeric<T: sbyte | short> = T | null
 // Product type
 /// One saved character: an id and its level.
 pub type Record = {
-  id: sbyte
-  level: Level
+  id: sbyte,
+  level: Level,
 } impl {
   /// The record's id widened into the game's id space.
   pub fn game_id(): int {

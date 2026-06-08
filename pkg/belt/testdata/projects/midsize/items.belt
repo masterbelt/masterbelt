@@ -8,10 +8,10 @@ use rarity from "rarity.belt"
 /// A piece of equipment: its display name, its tier, the affinity it grants,
 /// and the flat attack it adds.
 pub type Item = {
-  name: string
-  tier: Rarity
-  element: Element
-  attackBonus: nint
+  name: string,
+  tier: Rarity,
+  element: Element,
+  attackBonus: nint,
 } impl {
   /// The shop price: a base scaled up by the rarity's star rating.
   pub fn price(): nint {
@@ -21,16 +21,16 @@ pub type Item = {
 
 /// A common starter blade with no affinity.
 pub const IronSword: Item = Item{
-  name: "Iron Sword"
-  tier: Rarity.Common
-  element: Element.Neutral
-  attackBonus: 8
+  name: "Iron Sword",
+  tier: Rarity.Common,
+  element: Element.Neutral,
+  attackBonus: 8,
 }
 
 /// A legendary fire blade, the catalog's showpiece.
 pub const Flameblade: Item = Item{
-  name: "Flameblade"
-  tier: Rarity.Legendary
-  element: Element.Fire
-  attackBonus: 40
+  name: "Flameblade",
+  tier: Rarity.Legendary,
+  element: Element.Fire,
+  attackBonus: 40,
 }

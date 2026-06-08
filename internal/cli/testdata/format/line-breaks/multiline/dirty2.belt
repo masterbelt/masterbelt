@@ -1,0 +1,5 @@
+pub type Pair = { a: nint, b: nint }
+const P = Pair{
+        a: 1,
+  b: 2,
+}

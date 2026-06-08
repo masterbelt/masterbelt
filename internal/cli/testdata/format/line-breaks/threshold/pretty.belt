@@ -1,7 +1,0 @@
-pub type Quad = { a: nint, b: nint, c: nint, d: nint }
-const R = Quad{
-  a: 1
-  b: 2
-  c: 3
-  d: 4
-}

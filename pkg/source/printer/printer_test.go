@@ -55,32 +55,33 @@ func lit(n string) cst.Green {
 	return cst.NewNode(cst.Literal, []cst.Green{tok(token.Int, n)})
 }
 
-// collection builds a newline-separated CollectionLit of the given integer
-// elements — a multi-line literal with no comma tokens, the shape collapsing
-// must turn into a one-line comma list.
-func collection(elems ...string) cst.Green {
-	children := []cst.Green{tok(token.LBracket, "["), tok(token.Newline, "\n")}
+// collection builds a CollectionLit of integer-literal elements. With sep set to
+// a newline the list is multi-line (the magic-trailing-comma signal); with a
+// comma it is a one-line list. Trailing separators land before the "]" so the
+// renderer's separator regeneration is exercised.
+func collection(sep token.Kind, sepText string, elems ...string) cst.Green {
+	children := []cst.Green{tok(token.LBracket, "[")}
 	for _, e := range elems {
-		children = append(children, lit(e), tok(token.Newline, "\n"))
+		children = append(children, tok(sep, sepText), lit(e))
 	}
-	children = append(children, tok(token.RBracket, "]"))
+	children = append(children, tok(sep, sepText), tok(token.RBracket, "]"))
 	return cst.NewNode(cst.File, []cst.Green{cst.NewNode(cst.CollectionLit, children)})
 }
 
-func TestPrintCollapsesShortLiteral(t *testing.T) {
-	// A newline-separated literal of <= maxFlatElements elements collapses onto
-	// one line, its missing separators synthesized as ", ".
-	if got := printTree(t, "  ", collection("1", "2", "3")); got != "[1, 2, 3]" {
-		t.Errorf("Print = %q, want %q", got, "[1, 2, 3]")
+func TestPrintExpandsMultilineList(t *testing.T) {
+	// A list the author broke across lines stays one element per line, each with
+	// a synthesized trailing comma, re-indented to its bracket depth.
+	want := "[\n  1,\n  2,\n  3,\n]"
+	if got := printTree(t, "  ", collection(token.Newline, "\n", "1", "2", "3")); got != want {
+		t.Errorf("Print = %q, want %q", got, want)
 	}
 }
 
-func TestPrintKeepsLongLiteralMultiline(t *testing.T) {
-	// One element over the threshold: the literal is left as the input had it,
-	// one element per line, re-indented to its bracket depth.
-	want := "[\n  1\n  2\n  3\n  4\n]"
-	if got := printTree(t, "  ", collection("1", "2", "3", "4")); got != want {
-		t.Errorf("Print = %q, want %q", got, want)
+func TestPrintFlattensInlineList(t *testing.T) {
+	// A one-line list stays inline, comma-separated, with no trailing comma — the
+	// source trailing comma (the sep before "]") is dropped.
+	if got := printTree(t, "  ", collection(token.Comma, ",", "1", "2", "3")); got != "[1, 2, 3]" {
+		t.Errorf("Print = %q, want %q", got, "[1, 2, 3]")
 	}
 }
 
