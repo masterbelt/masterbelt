@@ -14,7 +14,7 @@ const Tripled = [1, 2, 3].map(fn(x: nint) -> x * 3)
 const Twice: fn(x: nint): nint = fn(x) -> x * 2
 
 // A block body still works: same inference path, explicit return.
-const Stepped = [1, 2, 3].map(fn(x) { return x + 1 })
+const Stepped = [1, 2, 3].map(fn(x) -> x + 1)
 
 // Checking mode subsumes the collection special cases that exist today.
 const Bytes: list<sbyte> = [1, 2, 3]

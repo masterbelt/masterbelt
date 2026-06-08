@@ -1,3 +1,3 @@
-const Doubled = [1, 2].map(fn(x) {
+pub fn doubled(x: nint): nint {
 	return x + x
-})
+}

@@ -1,0 +1,4 @@
+const Doubled = [1, 2, 3].map(fn(x: nint): nint {
+  return x * 2
+})
+const Stepped = [1, 2, 3].map(fn(x: nint): nint { return x + 1 })

@@ -77,6 +77,12 @@ func (p *printer) walk(buf source.Buffer, t cst.Tree, parent cst.Kind) {
 		return
 	}
 	kind, _ := t.Kind()
+	if kind == cst.FuncLit {
+		if expr, ok := arrowBody(t); ok {
+			p.funcLitArrow(buf, t, expr)
+			return
+		}
+	}
 	if isCommaList(kind) {
 		p.commaList(buf, t, kind)
 		return
@@ -84,6 +90,86 @@ func (p *printer) walk(buf source.Buffer, t cst.Tree, parent cst.Kind) {
 	for _, child := range t.Children() {
 		p.walk(buf, child, kind)
 	}
+}
+
+// funcLitArrow renders a lambda whose block body is a single value-returning
+// statement in the arrow shorthand: the head (fn, parameters, optional return
+// type) as written, then "-> " and the returned expression in place of the
+// "{ return E }" block. The two forms are semantically identical, so this is a
+// spelling choice.
+func (p *printer) funcLitArrow(buf source.Buffer, funcLit cst.Tree, expr cst.Tree) {
+	for _, child := range funcLit.Children() {
+		if k, ok := child.Kind(); ok && k == cst.Block {
+			break // the block is replaced by the arrow body
+		}
+		p.walk(buf, child, cst.FuncLit)
+	}
+	p.leaf(token.Arrow, cst.FuncLit, "->")
+	p.walk(buf, expr, cst.FuncLit)
+}
+
+// arrowBody returns the returned expression when funcLit's body is a block of
+// exactly one "return E" statement and nothing else — no other statements, no
+// comment whose line the shorthand would drop — and reports false otherwise (a
+// lambda already in arrow form, a multi-statement body, a bare return, or a
+// commented one), in which case the body is rendered as written.
+func arrowBody(funcLit cst.Tree) (cst.Tree, bool) {
+	block, ok := childOfKind(funcLit, cst.Block)
+	if !ok {
+		return cst.Tree{}, false // already the arrow form
+	}
+	var ret cst.Tree
+	returns := 0
+	for _, child := range block.Children() {
+		if ck, isToken := child.TokenKind(); isToken {
+			switch ck {
+			case token.LBrace, token.RBrace, token.Whitespace, token.Newline:
+				continue
+			default:
+				return cst.Tree{}, false // a comment or stray token: keep the block
+			}
+		}
+		if k, _ := child.Kind(); k != cst.ReturnStmt {
+			return cst.Tree{}, false // some other statement: keep the block
+		}
+		ret = child
+		returns++
+	}
+	if returns != 1 {
+		return cst.Tree{}, false
+	}
+	return returnValue(ret)
+}
+
+// returnValue returns the expression of a "return E" statement, or false when it
+// is a bare return or carries a comment.
+func returnValue(ret cst.Tree) (cst.Tree, bool) {
+	var expr cst.Tree
+	values := 0
+	for _, child := range ret.Children() {
+		if ck, isToken := child.TokenKind(); isToken {
+			if ck == token.Return || ck == token.Whitespace || ck == token.Newline {
+				continue
+			}
+			return cst.Tree{}, false // a comment or stray token
+		}
+		expr = child
+		values++
+	}
+	if values != 1 {
+		return cst.Tree{}, false
+	}
+	return expr, true
+}
+
+// childOfKind returns the first child node of the given kind.
+func childOfKind(t cst.Tree, kind cst.Kind) (cst.Tree, bool) {
+	for _, child := range t.Children() {
+		if k, ok := child.Kind(); ok && k == kind {
+			return child, true
+		}
+	}
+	return cst.Tree{}, false
 }
 
 // commaList renders a comma-separated list under the magic-trailing-comma rule.

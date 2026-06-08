@@ -251,22 +251,16 @@ File
               Ident "x"
             RParen ")"
           Whitespace " "
-          Block
-            LBrace "{"
+          Arrow "->"
+          Whitespace " "
+          BinaryExpr
+            NameRef
+              Ident "x"
             Whitespace " "
-            ReturnStmt
-              Return "return"
-              Whitespace " "
-              BinaryExpr
-                NameRef
-                  Ident "x"
-                Whitespace " "
-                Plus "+"
-                Whitespace " "
-                Literal
-                  Int "1"
+            Plus "+"
             Whitespace " "
-            RBrace "}"
+            Literal
+              Int "1"
         RParen ")"
   ConstDecl
     Newline "\n"

@@ -1,0 +1,8 @@
+const Clamped = [-1, 0, 5].map(fn(x: nint): nint {
+  let s = 1
+  return x + s
+})
+const Noted = [1].map(fn(x: nint): nint {
+  // keep this note
+  return x
+})
