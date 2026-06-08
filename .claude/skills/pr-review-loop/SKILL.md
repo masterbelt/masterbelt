@@ -1,7 +1,7 @@
 ---
 name: pr-review-loop
 description: >-
-  Drive the PR review→fix loop with the automated reviewer (Codex on GitHub) to convergence, so a human never has to relay each review by hand. The reviewer is push-triggered (no @codex review needed); after each fix push you detect its outcome — new inline comments (findings) or an approve reaction on the PR (no findings) — triage each finding into bug / misfire / judgment call, fix real bugs with a regression gate, disprove misfires with evidence, and STOP to ask the human only when a finding is a genuine design/scope decision or the reviewer contradicts an earlier accepted one. Use when a PR has (or is about to get) automated code-review comments to work through — "address the review", "レビュー来た", "Codex review", "handle the PR feedback", or right after opening/updating a reviewed PR.
+  Drive the PR review→fix loop with the automated reviewer (Codex on GitHub) to convergence, so a human never has to relay each review by hand. You start the first review on a self-opened PR with @codex review (fix pushes auto-trigger), then detect the reviewer's outcome from its PR reactions and comments — 👀 means the review started, 👍 means approved with no findings, inline comments mean findings — triage each finding into bug / misfire / judgment call, fix real bugs with a regression gate, disprove misfires with evidence, and STOP to ask the human only when a finding is a genuine design/scope decision or the reviewer contradicts an earlier accepted one. Use when a PR has (or is about to get) automated code-review comments to work through — "address the review", "レビュー来た", "Codex review", "handle the PR feedback", or right after opening/updating a reviewed PR.
 argument-hint: "[PR number, e.g. 2 — defaults to the current branch's PR]"
 ---
 
@@ -19,18 +19,18 @@ The point is the triage and the escalation, not the mechanics. Three things make
 
 - Find the PR: the argument, or the current branch's PR (`gh pr view --json number,url,headRefName,state`). Confirm it is open.
 - Note the reviewer's login (`chatgpt-codex-connector[bot]`) and your own, so you can tell review comments from your own replies.
-- Know the gates this repo merges on (run them green before every push): `make test` (unit + snapshots + tree-sitter cst-pin + fmt corpus + grammar tests), `make vet` (vet + golangci, incl. complexity/funlen/gocognit), and `make verify-generated` (no generated drift). `go test ./...` is the fast per-fix check; run the full `make test` before pushing. (If `make test` fails immediately after `make generate`, re-run it once — `tree-sitter generate` briefly leaves `parser.c` mid-write and the cst-pin reads it racily.)
+- Know the gates this repo merges on (run them green before every push). The `go` aggregate check `needs` every job in `.github/workflows/go.yml` — treat that workflow as the authoritative list and match it: `gofmt -l pkg cmd internal toolchain` (must print nothing), `make check-fmt` (the belt-fmt corpus), `make vet` (vet + golangci, incl. complexity/funlen/gocognit), `make verify-generated` (no generated drift), `make test` (unit + snapshots + tree-sitter cst-pin + fmt corpus + grammar tests), and `make perf` (the deterministic performance gates). `go test ./...` is the fast per-fix check; run the full set before pushing — a change can pass `make test`/`vet`/`verify-generated` yet still fail required CI on the format or perf jobs. (If `make test` fails immediately after `make generate`, re-run it once — `tree-sitter generate` briefly leaves `parser.c` mid-write and the cst-pin reads it racily.)
 
 ## Stage 1 — Fetch the current review, fresh
 
-Pull the inline comments (the substance — the review *body* is usually boilerplate):
+Pull the inline comments (the substance — the review *body* is usually boilerplate). **Paginate**, or on a multi-page PR you see only the first page and can miss fresh findings (and Stage 7 can falsely declare convergence). `gh api`'s own `--slurp` is rejected together with `--jq`, so paginate and merge the pages through an external `jq -s 'add'` before sorting:
 
 ```
-gh api repos/<owner>/<repo>/pulls/<n>/comments \
-  --jq 'sort_by(.created_at) | reverse | .[] | "ID:\(.id)|\(.user.login)|\(.path):\(.line // .original_line)|\(.original_commit_id[0:9])|\(.created_at)\nIN_REPLY_TO:\(.in_reply_to_id // "none")\n\(.body)\n==="'
+gh api --paginate repos/<owner>/<repo>/pulls/<n>/comments \
+  | jq -s 'add | sort_by(.created_at) | reverse | .[] | "ID:\(.id)|\(.user.login)|\(.path):\(.line // .original_line)|\(.original_commit_id[0:9])|\(.created_at)\nIN_REPLY_TO:\(.in_reply_to_id // "none")\n\(.body)\n==="'
 ```
 
-- Process only comments from the reviewer that you have **not addressed yet** — track them by `created_at` (newer than your last push) or by id. Skip your own replies (`in_reply_to_id` set) and findings you already resolved in an earlier round, so you never re-litigate an old comment.
+- Process only comments **from the reviewer** that you have **not addressed yet**. Decide "mine vs the bot's" by the comment's author (`user.login`), **not** by `in_reply_to_id`: the reviewer can post a *fresh finding* as a reply inside an existing thread, so it carries `in_reply_to_id` too — skipping every reply with that field set would silently drop it. A comment is "already handled" only when *you* authored it or its id is in the set you have already addressed.
 - Each finding usually carries a severity (P1/P2). Order your work by severity, but triage every one.
 
 ## Stage 2 — Triage each finding into one of three buckets
@@ -79,28 +79,55 @@ gh api repos/<owner>/<repo>/pulls/<n>/comments/<comment-id>/replies \
 
 A reply per comment is what lets the reviewer (and the human) see the loop is actually closing, not stalling.
 
-## Stage 7 — Detect and handle the auto-review (no human webhook)
-
-This is the step that removes the human from the relay. **Do not** comment `@codex review` — the reviewer triggers itself on every push. Your job is to push, then **detect the outcome of that automatic review** and act on it. After a push the review takes a couple of minutes and resolves into exactly one of two signals; poll for whichever lands first (record your push time / the head SHA so you only count signals newer than the push):
-
-- **Findings → it leaves comments.** A new review (`pulls/<n>/reviews`, `submitted_at` after your push) with **new inline comments** from the bot. → go back to Stage 1 and work the new comments.
-- **No findings → it approves with a reaction.** With nothing to suggest, the reviewer marks the PR approved by reacting (👍) on the PR description rather than commenting. → this is **convergence**; go to Stage 8.
-
-Poll both, e.g.:
+- **Resolve the thread once it is handled** — a reply is not the same as resolving, and an open thread reads as "still outstanding". After you have *fixed* or *disproven* a finding, mark its review thread resolved (leave a thread you escalated to the human open — that one is theirs to close). Resolving is a GraphQL mutation keyed by the thread id, so map the comment's REST id (`databaseId`) to its thread, then resolve:
 
 ```
-# the approve signal — a reaction on the PR body (PRs live in the issues namespace)
-gh api repos/<owner>/<repo>/issues/<n>/reactions \
-  --jq '.[] | select(.user.login|test("codex")) | "\(.content)\t\(.created_at)"'
+# the thread id for each unresolved thread, paired with its first comment's REST id
+gh api graphql -f query='{ repository(owner:"<owner>", name:"<repo>"){ pullRequest(number:<n>){
+  reviewThreads(first:100){ nodes{ id isResolved comments(first:1){ nodes{ databaseId } } } } } } }' \
+  --jq '.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved|not) | "\(.id)\t\(.comments.nodes[0].databaseId)"'
 
-# the findings signal — a new bot review and its fresh inline comments
-gh api repos/<owner>/<repo>/pulls/<n>/reviews \
-  --jq '.[] | select(.user.login|test("codex")) | "\(.state)\t\(.submitted_at)"' | tail -1
-gh api repos/<owner>/<repo>/pulls/<n>/comments \
-  --jq '[.[] | select(.user.login|test("codex"))] | sort_by(.created_at) | last | {created_at, line, body: (.body[0:80])}'
+# resolve the one whose databaseId matches the comment you addressed
+gh api graphql -f query='mutation($t:ID!){ resolveReviewThread(input:{threadId:$t}){ thread{ isResolved } } }' -f t=<thread-id>
 ```
 
-- **Until one of the two signals appears, the review is still running** — wait in modest intervals (do not spin tightly; the review is not instant). If you have nothing else to do, schedule a wake-up / poll loop rather than blocking the turn. If neither signal lands after a generous wait (the review never ran, or failed), surface that to the human instead of looping forever.
+The PR's "unresolved conversations" count is the human's at-a-glance progress bar: drive it to zero for everything you handled, so what remains is exactly what still needs a person.
+
+## Stage 7 — Trigger if needed, then detect the outcome (no human webhook)
+
+This is the step that removes the human from the relay. The reviewer signals its state with **reactions on the PR body** (PRs live in the issues namespace) and with review comments — learn the three:
+
+- **👀 `eyes`** — the review has *started* and is running. This is **not** a verdict; keep waiting. It lands within seconds of a trigger.
+- **👍 `+1`** — *approved, no findings*. This is **convergence** → Stage 8.
+- **inline comments / a submitted review** — *findings* → back to Stage 1.
+
+Triggering — the part the earlier "never touch `@codex review`" advice got wrong:
+
+- A **fix push to an already-open PR auto-triggers** a fresh review; you normally do not comment `@codex review`.
+- But the **first review on a PR you opened yourself may not auto-start** — the "opened / ready-for-review" event is unreliable or slow here. **Post `@codex review` once** to kick it off; within seconds you should see the 👀 reaction. The same applies to any push that produces no 👀 after a few minutes — re-post `@codex review` to (re)trigger that one.
+
+Detecting the outcome: after the trigger/push, poll for the **terminal** signal — a 👍 `+1` (approve) or new comments (findings) — and treat 👀 `eyes` as "still running", never as the answer:
+
+All three lookups must **paginate** (pipe `gh api --paginate` to `jq -s 'add'`, since `--slurp` is rejected with `--jq`); a multi-page PR otherwise hides the bot's reaction/comments on a later page and the loop stalls or converges falsely:
+
+```
+# all the bot's reactions, to read state — eyes (running) vs +1 (approved)
+gh api --paginate repos/<owner>/<repo>/issues/<n>/reactions \
+  | jq -s 'add | map(select(.user.login|test("codex"))) | .[] | "\(.content)\t\(.created_at)"'
+
+# convergence test — APPROVE is content == "+1" only, never eyes
+gh api --paginate repos/<owner>/<repo>/issues/<n>/reactions \
+  | jq -s '[add[] | select((.user.login|test("codex")) and .content=="+1")] | length'
+
+# findings — bot inline comments across all pages, and the latest bot review
+gh api --paginate repos/<owner>/<repo>/pulls/<n>/comments \
+  | jq -s '[add[] | select(.user.login|test("codex"))] | length'
+gh api --paginate repos/<owner>/<repo>/pulls/<n>/reviews \
+  | jq -s '[add[] | select(.user.login|test("codex"))] | last | "\(.state)\t\(.submitted_at)"'
+```
+
+- **Poll in modest intervals**, not tightly — the verdict takes minutes (observed on this repo: the 👀 lands within seconds of the trigger, but the 👍 / comments arrive roughly 10–20 minutes later). Schedule a wake-up / background poll rather than blocking the turn. Record your trigger/push time so you only count signals newer than it.
+- **No 👀 a few minutes after your trigger means the trigger did not take** — re-post `@codex review`. A 👀 but no verdict after a generous wait is worth surfacing to the human.
 - **A findings-free review counts as approval too** — if a new bot review lands with no new inline comments and no unresolved threads, treat it as the approve signal even if you did not catch the reaction (reactions can be cleared, e.g. on merge). The robust test for convergence is "a fresh review happened and it introduced no actionable comment."
 - **Non-convergence guard:** if the loop keeps surfacing *new substantive* issues after several rounds, or the same finding keeps coming back, that is itself a signal — pause and summarize to the human rather than grinding. A reviewer can also drift into self-contradiction or nits; recognising "this has converged enough" or "this needs a human" is part of the skill.
 
@@ -114,11 +141,14 @@ When the review has converged and every gate plus CI is green:
 ## Anti-patterns
 
 - **Being the human webhook in reverse** — fixing, pushing, and then stopping to be *told* the auto-review came. Detect it yourself: poll for the new comments or the approve reaction (Stage 7).
-- **Commenting `@codex review`** — the reviewer is push-triggered; an explicit trigger is noise. Push and watch for the outcome.
-- **Missing the silent approve** — treating "no new comments" as "still waiting" forever. No-findings is signalled by a reaction / a comment-free review, not by a comment; poll for that signal too, or the loop never finishes.
+- **Assuming the first review auto-starts** — relying on the "opened / ready-for-review" event to kick off the first review on a PR you opened. It is unreliable here; post `@codex review` once and watch for the 👀.
+- **Mistaking 👀 for approval** — the `eyes` reaction means the review *started*, not that it passed. Wait for 👍 `+1` (approve) or comments (findings); never converge on `eyes`.
+- **Missing the silent approve** — treating "no new comments" as "still waiting" forever. No-findings is signalled by the 👍 `+1` reaction / a comment-free review, not by a comment; poll for that signal too, or the loop never finishes.
 - **Fixing a misfire** because pushing back feels confrontational. Disprove it.
 - **Flip-flopping** to satisfy a self-contradicting reviewer. Escalate the contradiction (Stage 5).
 - **A fix with no gate.** The same finding returns; the loop never converges.
+- **Replying but not resolving.** An answered-but-open thread reads as outstanding and hides your progress; resolve every thread you fixed or disproved (leave only the escalated ones open).
+- **Reading only the first REST page.** Without pagination you miss findings or the approval on a later page; `gh api --paginate … | jq -s 'add | …'` (gh's `--slurp` is rejected with `--jq`).
 - **Force-pushing** a reviewed branch, or squashing mid-review.
 - **Plan/section refs in commit messages or code comments.** State the concept.
 - **Over-asking.** A clear bug or a clear misfire is yours to handle without a human round-trip; the human is for the forks, not the easy calls.
