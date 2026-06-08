@@ -12,6 +12,13 @@ version="$(basename "$out"/masterbelt-linux-amd64-*.tar.gz .tar.gz | sed 's/^mas
 commit="$(git -C "$root" rev-parse HEAD)"
 date="$(git -C "$root" show -s --format=%cI HEAD)"
 
+# The companion artifacts derived from the same commit: the .vsix carries the
+# version without build metadata, the image tag the commit date and SHA.
+vsix="${version%+*}"
+sha="${version#*+}"
+patch="${vsix##*.}"
+repo="${GITHUB_REPOSITORY:-masterbelt/masterbelt}"
+
 cat <<EOF
 Automated nightly build — **not a stable release.**
 
@@ -20,6 +27,13 @@ Automated nightly build — **not a stable release.**
 | version | \`$version\` |
 | commit | \`$commit\` |
 | date | $date |
+
+### Also published
+
+- Editor extension \`masterbelt-$vsix.vsix\` (attached) — and the Marketplace
+  pre-release channel when a token is configured.
+- Container \`ghcr.io/$repo:nightly\` (rolling) and
+  \`ghcr.io/$repo:nightly-$patch-$sha\` (pinned).
 
 ### Checksums (SHA-256)
 

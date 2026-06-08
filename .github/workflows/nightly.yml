@@ -100,7 +100,7 @@ jobs:
   # artifacts above; this release always points at the latest.
   publish:
     name: publish nightly release
-    needs: build
+    needs: [build, vsix]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -109,6 +109,11 @@ jobs:
       - uses: actions/download-artifact@v8
         with:
           name: masterbelt-nightly
+          path: dist
+      # The .vsix lands in dist/ too, so it is attached alongside the archives.
+      - uses: actions/download-artifact@v8
+        with:
+          name: masterbelt-vsix
           path: dist
       - name: Generate release notes
         run: sh build/release-notes.sh >notes.md
@@ -174,3 +179,39 @@ jobs:
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.created=${{ steps.meta.outputs.created }}
+
+  # Package the VS Code extension as a .vsix and, when a Marketplace token is
+  # configured, publish it to the pre-release channel. Without the token the
+  # .vsix is still built and attached to the release (publish degrades, never
+  # fails) — so forks and token-less setups stay green.
+  vsix:
+    name: editor extension package
+    needs: gate
+    runs-on: ubuntu-latest
+    env:
+      VSCE_PAT: ${{ secrets.VSCE_PAT }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .tool-versions
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - name: Package the extension
+        working-directory: toolchain/editors/vscode
+        run: |
+          # The marketplace version is the CLI version without build metadata —
+          # 0.1.<UTC commit date>, monotonic for the rolling pre-release.
+          version="0.1.$(TZ=UTC0 git show -s --date=format-local:%Y%m%d --format=%cd HEAD)"
+          npm pkg set version="$version"
+          pnpm dlx @vscode/vsce package --pre-release --no-dependencies -o "masterbelt-$version.vsix"
+      - name: Publish to the Marketplace (when a PAT is configured)
+        if: env.VSCE_PAT != ''
+        working-directory: toolchain/editors/vscode
+        run: pnpm dlx @vscode/vsce publish --pre-release --packagePath masterbelt-*.vsix
+      - uses: actions/upload-artifact@v7
+        with:
+          name: masterbelt-vsix
+          path: toolchain/editors/vscode/masterbelt-*.vsix
+          if-no-files-found: error
