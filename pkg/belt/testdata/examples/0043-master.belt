@@ -26,11 +26,12 @@ pub master Skill {
   primary id
 }
 
-// A composite primary key names more than one column, in order.
+// A composite primary key names more than one column, in order. A trailing
+// comma is allowed, as in the record fields above.
 master SkillUpgrade {
   record {
     skill: int,
     level: int,
   }
-  primary (skill, level)
+  primary (skill, level,)
 }

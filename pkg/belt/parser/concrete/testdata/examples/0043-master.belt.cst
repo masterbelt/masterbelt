@@ -136,7 +136,9 @@ File
   MasterDecl
     Newline "\n"
     Newline "\n"
-    LineComment "// A composite primary key names more than one column, in order."
+    LineComment "// A composite primary key names more than one column, in order. A trailing"
+    Newline "\n"
+    LineComment "// comma is allowed, as in the record fields above."
     Newline "\n"
     MasterKeyword
       Ident "master"
@@ -184,6 +186,7 @@ File
       Comma ","
       Whitespace " "
       Ident "level"
+      Comma ","
       RParen ")"
     Newline "\n"
     RBrace "}"

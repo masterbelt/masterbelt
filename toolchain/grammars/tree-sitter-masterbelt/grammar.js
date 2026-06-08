@@ -213,7 +213,9 @@ module.exports = grammar({
         alias("primary", $.master_keyword),
         choice(
           field("key", $.identifier),
-          seq(op.LParen, commaSep1($.identifier), op.RParen),
+          // A trailing comma is permitted before ")", mirroring the concrete
+          // parser, so a composite key under construction is not flagged.
+          seq(op.LParen, commaSep1($.identifier), optional(op.Comma), op.RParen),
         ),
       ),
 
