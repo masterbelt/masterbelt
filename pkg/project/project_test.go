@@ -56,7 +56,7 @@ func TestOpen(t *testing.T) {
 		t.Errorf("Entry = %q, want %q", proj.Entry, "src/main.belt")
 	}
 
-	// P-1: the file set is exactly the entry.
+	// With no imports, the file set is exactly the entry.
 	files := proj.Files()
 	if len(files) != 1 || files[0] != proj.EntryFile() {
 		t.Fatalf("Files() = %v, want just the entry file", files)

@@ -12,8 +12,8 @@ import (
 
 // This test is the run-time guard for the diagnostic catalog's parity: it binds
 // code.csv, messages/en.csv, and messages/ja.csv together at `go test` time so
-// the catalog cannot drift the way it did in E-16 (a code missing from the ja
-// catalog, which compiled and silently rendered in English). The generator's
+// the catalog cannot drift the way it once did: a code missing from the ja
+// catalog, which compiled and silently rendered in English. The generator's
 // validate() enforces the same invariants, but it runs only under
 // `make generate`; this test runs in CI and on every `go test ./...`, catching
 // a hand-edit of a CSV that forgets to regenerate, or a regenerate whose
@@ -121,8 +121,8 @@ func placeholdersOf(msg string) map[string]bool {
 
 // TestCatalogCodeSetParity binds the code set across code.csv and every locale
 // catalog: each must declare exactly the same codes. A code added to code.csv
-// but not to a locale (or vice versa) fails here — the E-16 regression's exact
-// shape.
+// but not to a locale (or vice versa) fails here — the exact shape of the
+// regression that motivated this guard.
 func TestCatalogCodeSetParity(t *testing.T) {
 	declared := codeFields(t)
 	if len(declared) == 0 {

@@ -14,9 +14,9 @@ func init() {
 	// stdio, so accept the flag for compatibility and ignore it.
 	LspCmd.Flags().Bool("stdio", true, "communicate over stdio (the default and only transport)")
 	// --pprof starts a live net/http/pprof endpoint on the given localhost
-	// address for interactive profiling of the resident server (D-1 §7-M6). It
+	// address for interactive profiling of the resident server. It
 	// is a plain local flag, NOT a persistent hook: a subcommand PersistentPreRun
-	// would shadow the root's profiling hooks (D-1 §8-7). It feeds the same
+	// would shadow the root's profiling hooks. It feeds the same
 	// switch as the MASTERBELT_PPROF_ADDR env var; off by default.
 	LspCmd.Flags().String("pprof", "", "serve net/http/pprof on this localhost address (e.g. localhost:6060) for live profiling")
 }

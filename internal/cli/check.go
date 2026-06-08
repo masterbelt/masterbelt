@@ -125,7 +125,7 @@ func checkProject(rep reporter.Reporter, proj *project.Project) error {
 // loadProject opens the project at or above dir with the given profile ("" is
 // the default), reporting the manifest's diagnostics when there are any. It is
 // the project-opening front door shared by every project-scoped subcommand
-// (check today, fmt when B-3 lands).
+// (check today, and a future fmt subcommand).
 func loadProject(rep reporter.Reporter, dir, profile string) (*project.Project, error) {
 	proj, diags := project.OpenProfile(dir, profile)
 	if diags.Len() == 0 {
@@ -182,7 +182,7 @@ func checkSource(rep reporter.Reporter, path string, data []byte) error {
 
 // installAnchors wires the program's stable-anchor lookup into a JSON reporter,
 // so each diagnostic it emits carries the address of the declaration enclosing
-// its offset (A-5 §3.5). It is a no-op for the text reporter, which has no
+// its offset. It is a no-op for the text reporter, which has no
 // anchor field. The resolver maps a reported file's display name back to its
 // program FileID — the bridge between the two identifiers the CLI already owns
 // — then asks the program for the enclosing declaration.

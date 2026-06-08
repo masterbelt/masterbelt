@@ -19,7 +19,7 @@ func init() {
 	IRCmd.Flags().String("format", "text", "output format: text or json")
 }
 
-// IRCmd dumps a file's resolved IR in the exact text representation (F-4):
+// IRCmd dumps a file's resolved IR in the exact text representation:
 // the typed value graph, the folded constants, the resolved references — the
 // same form the .ir snapshots pin and (*ir.Module).UnmarshalText reads back.
 // The json format wraps the text in a JSON envelope; the tree marshals

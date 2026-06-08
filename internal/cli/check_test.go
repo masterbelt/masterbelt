@@ -179,7 +179,7 @@ func TestCheckJSON(t *testing.T) {
 		t.Errorf("file = %q, want the entry file", d.File)
 	}
 	// The undefined reference sits inside `const A`, so the diagnostic carries
-	// that declaration's stable anchor (A-5).
+	// that declaration's stable anchor.
 	if d.Anchor != "belt:main/A" {
 		t.Errorf("anchor = %q, want belt:main/A", d.Anchor)
 	}

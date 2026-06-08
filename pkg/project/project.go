@@ -28,7 +28,7 @@ import (
 // FileID identifies a file within its project: the file's path relative to
 // the project root, cleaned and "/"-separated regardless of platform. It is
 // the address later layers key on — the query engine's inputs and symbols
-// (P-2) and the module segment of belt: anchors (A-5). Identity is purely
+// and the module segment of belt: anchors. Identity is purely
 // path-based: symbolic links are not resolved, so two links to the same file
 // are two distinct FileIDs.
 type FileID string
@@ -80,8 +80,8 @@ func (p *Project) File(id FileID) *File { return p.files[id] }
 // EntryFile returns the entry point's file.
 func (p *Project) EntryFile() *File { return p.files[p.Entry] }
 
-// Files returns the project's files ordered by id. In P-1 this is always the
-// entry file alone; P-2 grows the set by following `use`.
+// Files returns the project's files ordered by id — the closure of the entry's
+// imports, grown by following `use`.
 func (p *Project) Files() []*File {
 	out := make([]*File, 0, len(p.files))
 	for _, f := range p.files {

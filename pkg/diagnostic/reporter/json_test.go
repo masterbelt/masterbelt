@@ -101,7 +101,7 @@ func TestJSONReportAnchor(t *testing.T) {
 
 func TestJSONReportNoAnchorResolver(t *testing.T) {
 	// Without a resolver the anchor field never appears — the field stays
-	// backward compatible for consumers that predate A-5.
+	// backward compatible for consumers that predate the anchor field.
 	file := source.NewFile("a.belt", []byte("const A = B\n"))
 	var out bytes.Buffer
 	r := NewJSON(&out, diagnostic.DefaultLocale)

@@ -49,7 +49,7 @@ func TestIRText(t *testing.T) {
 	}
 }
 
-// TestIRJSON pins the stdlib dividend (F-4 motivation 6): the module embeds
+// TestIRJSON pins the stdlib dividend: the module embeds
 // in a JSON document through encoding.TextMarshaler with no custom code, and
 // the embedded text is the same exact representation the text format emits.
 func TestIRJSON(t *testing.T) {

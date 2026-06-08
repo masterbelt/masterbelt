@@ -1,4 +1,4 @@
-// Package beltgen is a deterministic synthetic-project generator (D-1 M2): it
+// Package beltgen is a deterministic synthetic-project generator: it
 // produces a map of .belt sources whose use-graph has real cross-file depth and
 // branching, so a benchmark can exercise reachability and early cutoff at scale.
 //

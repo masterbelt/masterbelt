@@ -39,7 +39,7 @@ const schemaVersion = 1
 // bytes; line and column are 1-based with byte-measured columns. Bare
 // diagnostics carry neither file nor range. fixes is always present — empty
 // until fix metadata lands — so consumers never branch on its absence. anchor
-// is the stable address of the declaration enclosing the diagnostic (A-5),
+// is the stable address of the declaration enclosing the diagnostic,
 // present when an anchor resolver is installed and the offset falls in a
 // declaration: a position-independent handle a consumer can keep across edits.
 type JSON struct {
@@ -56,7 +56,7 @@ func NewJSON(w io.Writer, locale diagnostic.Locale) *JSON {
 }
 
 // SetAnchorResolver installs the function the reporter calls to attach a
-// semantic anchor (A-5) to each diagnostic: given the file name a diagnostic is
+// semantic anchor to each diagnostic: given the file name a diagnostic is
 // reported under and its byte offset, it returns the anchor of the enclosing
 // declaration, or "" when none. It is optional — without it the anchor field is
 // simply omitted — so the compiler core's EnclosingDecl is wired in by the
@@ -140,7 +140,7 @@ type jsonDiag struct {
 	Code     string            `json:"code"`
 	Severity string            `json:"severity"` // "error" | "warning" | "info" | "hint"
 	File     string            `json:"file,omitempty"`
-	Anchor   string            `json:"anchor,omitempty"` // the enclosing declaration's stable address (A-5)
+	Anchor   string            `json:"anchor,omitempty"` // the enclosing declaration's stable address
 	Range    *jsonRange        `json:"range,omitempty"`
 	Message  jsonMessage       `json:"message"`
 	Data     map[string]string `json:"data,omitempty"`

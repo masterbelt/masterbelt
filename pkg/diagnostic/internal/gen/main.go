@@ -216,8 +216,8 @@ var placeholderRE = regexp.MustCompile(`\{([a-zA-Z_][a-zA-Z0-9_]*)\}`)
 // default) covers every code, no locale references an unknown code, and every
 // message interpolates precisely the fields declared for its code — no missing,
 // no extras — so all locales stay consistent. The completeness check is applied
-// to every locale uniformly, so dropping a row from a non-default catalog (the
-// E-16 ja regression: a message silently falling back to English) fails the
+// to every locale uniformly, so dropping a row from a non-default catalog (a
+// ja message silently falling back to English) fails the
 // build rather than slipping through.
 func validate(codes []codeDef, locales map[string]map[string]string) error {
 	declared := map[string]codeDef{}

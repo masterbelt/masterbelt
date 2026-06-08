@@ -1,6 +1,6 @@
 // Package cli implements the masterbelt command's subcommands: check, ir, and
 // lsp. The cross-cutting profiling and stats flags live here on the root, not
-// on any subcommand (D-1 §2, §8-7): CPU/heap/trace capture and the
+// on any subcommand: CPU/heap/trace capture and the
 // machine-readable --stats report are wanted from whichever subcommand runs,
 // so they hang off RootCmd.PersistentFlags and are framed by the profiling
 // lifecycle. Subcommands must NOT define their own persistent hooks — cobra
@@ -73,7 +73,7 @@ var profileState struct {
 }
 
 // statsReport is the machine-readable shape of a run's work: the query-engine
-// reuse profile (D-1 M-reuse) plus the corpus size. Phase timings join it when
+// reuse profile plus the corpus size. Phase timings join it when
 // the phase-timer instrumentation lands; the JSON shape is forward-compatible.
 type statsReport struct {
 	Queries semantic.Stats `json:"queries"`

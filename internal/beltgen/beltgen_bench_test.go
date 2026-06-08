@@ -11,9 +11,9 @@ import (
 
 // BenchmarkColdCompile measures a from-scratch whole-program analysis
 // (semantic.AnalyzeProgram) of each generated size — the one-shot CLI compile
-// path (D-1 M-cold). Documents are parsed once outside the loop so the bench
+// path. Documents are parsed once outside the loop so the bench
 // isolates analysis, not parsing; the sub-benchmark labels make the size curve
-// visible (D-1 M-scale). Run with -benchmem for the allocation gate.
+// visible. Run with -benchmem for the allocation gate.
 func BenchmarkColdCompile(b *testing.B) {
 	for _, p := range corpus {
 		srcs := beltgen.Project(p)
