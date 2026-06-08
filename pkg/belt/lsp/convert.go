@@ -398,7 +398,7 @@ func nameToken(decl cst.Tree) (cst.Tree, bool) {
 func formatEdits(doc *abstract.Document) []protocol.TextEdit {
 	buf := doc.Buffer()
 	original := string(buf.Slice(0, buf.Len()))
-	formatted := formatter.Format(buf, doc.Concrete().Root())
+	formatted := formatter.Format(buf, doc.Concrete().Root(), formatter.DefaultLayout)
 	if formatted == original {
 		return nil
 	}
