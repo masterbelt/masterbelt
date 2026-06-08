@@ -56,23 +56,30 @@ func toDiagnostics(doc view) []protocol.Diagnostic {
 
 	out := make([]protocol.Diagnostic, 0, len(raw))
 	for _, d := range raw {
-		severity := toSeverity(d.Severity)
-		out = append(out, protocol.Diagnostic{
-			Range:    toRange(buf, d.Offset, d.End()),
-			Severity: &severity,
-			// The catalog code (belt.semantic.invalid_operation, ...), so
-			// the editor's problems panel identifies the diagnostic beyond its
-			// rendered message. The field is int|string in the protocol; ours is
-			// always the string form.
-			Code:    json.RawMessage(strconv.Quote(string(d.Code))),
-			Source:  "masterbelt",
-			Message: d.Message,
-			// Tags drive the editor's rendering beyond severity: Unnecessary
-			// fades dead code rather than underlining it.
-			Tags: toTags(d.Tags),
-		})
+		out = append(out, toDiagnostic(buf, d))
 	}
 	return out
+}
+
+// toDiagnostic renders one diagnostic into the protocol shape — shared by the
+// publish path and the code-action handler, which attaches the diagnostic its
+// quick-fix repairs.
+func toDiagnostic(buf source.Buffer, d diagnostic.Diagnostic) protocol.Diagnostic {
+	severity := toSeverity(d.Severity)
+	return protocol.Diagnostic{
+		Range:    toRange(buf, d.Offset, d.End()),
+		Severity: &severity,
+		// The catalog code (belt.semantic.invalid_operation, ...), so the
+		// editor's problems panel identifies the diagnostic beyond its rendered
+		// message. The field is int|string in the protocol; ours is always the
+		// string form.
+		Code:    json.RawMessage(strconv.Quote(string(d.Code))),
+		Source:  "masterbelt",
+		Message: d.Message,
+		// Tags drive the editor's rendering beyond severity: Unnecessary fades
+		// dead code rather than underlining it.
+		Tags: toTags(d.Tags),
+	}
 }
 
 func toSeverity(s diagnostic.Severity) protocol.DiagnosticSeverity {

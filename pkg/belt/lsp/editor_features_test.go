@@ -132,9 +132,11 @@ func TestLambdaInlayHintsSkipUninferable(t *testing.T) {
 }
 
 func TestCodeActionAddsTypeAnnotation(t *testing.T) {
-	doc := testView("const A = 1\n")
+	// pub so the only action is the annotation refactor, not the unused-
+	// declaration delete a private unreferenced const would also offer.
+	doc := testView("pub const A = 1\n")
 	uri := doc.uri
-	actions := codeActions(doc, 0, 11) // range over the whole declaration
+	actions := codeActions(doc, 0, 15) // range over the whole declaration
 
 	if len(actions) != 1 {
 		t.Fatalf("got %d code actions, want 1", len(actions))
@@ -148,10 +150,47 @@ func TestCodeActionAddsTypeAnnotation(t *testing.T) {
 	}
 }
 
+func TestCodeActionDeletesUnused(t *testing.T) {
+	// An unused private constant offers a delete quick-fix that removes its whole
+	// line, with the diagnostic it repairs attached.
+	doc := testView("pub const Api = 1\nconst dead = 2\n")
+	buf := doc.Buffer()
+	start := fromPosition(buf, protocol.Position{Line: 1, Character: 0})
+	end := fromPosition(buf, protocol.Position{Line: 1, Character: 5})
+
+	actions := codeActions(doc, start, end)
+	var del *protocol.CodeAction
+	for i := range actions {
+		if actions[i].Title == "Delete unused declaration" {
+			del = &actions[i]
+		}
+	}
+	if del == nil {
+		t.Fatal("no delete action offered for the unused declaration")
+	}
+	if del.Kind == nil || *del.Kind != protocol.CodeActionQuickFix {
+		t.Errorf("kind = %v, want quickfix", del.Kind)
+	}
+	if len(del.Diagnostics) != 1 || del.Diagnostics[0].Source != "masterbelt" {
+		t.Errorf("want the repaired diagnostic attached, got %+v", del.Diagnostics)
+	}
+	edits := del.Edit.Changes[doc.uri]
+	if len(edits) != 1 || edits[0].NewText != "" {
+		t.Fatalf("edit = %+v, want one whole-line deletion", edits)
+	}
+	// The deletion spans the second line entirely: line 1, col 0 up to the start
+	// of line 2 (the const declaration plus its trailing newline).
+	r := edits[0].Range
+	if r.Start.Line != 1 || r.Start.Character != 0 || r.End.Line != 2 || r.End.Character != 0 {
+		t.Errorf("delete range = %+v, want all of line 1", r)
+	}
+}
+
 func TestCodeActionSkipsAnnotated(t *testing.T) {
-	// An already-annotated constant offers no add-annotation action.
-	doc := testView("const A: long = 1\n")
-	if actions := codeActions(doc, 0, 18); len(actions) != 0 {
+	// An already-annotated constant offers no add-annotation action (pub, so the
+	// unused-declaration delete action does not appear either).
+	doc := testView("pub const A: long = 1\n")
+	if actions := codeActions(doc, 0, 22); len(actions) != 0 {
 		t.Errorf("got %d code actions for an annotated const, want 0", len(actions))
 	}
 }
