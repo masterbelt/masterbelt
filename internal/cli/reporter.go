@@ -11,7 +11,7 @@ import (
 )
 
 // reporterText and reporterJSON are the --reporter flag values shared by the
-// subcommands that offer one (check, ir, version).
+// subcommands that offer one (check, dump, version).
 const (
 	reporterText = "text"
 	reporterJSON = "json"

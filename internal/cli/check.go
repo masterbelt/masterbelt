@@ -189,7 +189,7 @@ func installAnchors(rep reporter.Reporter, prog *semantic.Program, byName map[st
 
 // gatherDiagnostics aggregates one file's full diagnostic set — lexer,
 // parser, and semantic, the same three layers every file-reporting site
-// (check's project and ad-hoc paths, the ir command) must agree on. A new
+// (check's project and ad-hoc paths, dump's ir stage) must agree on. A new
 // diagnostic source is added here, once.
 func gatherDiagnostics(doc *abstract.Document, prog *semantic.Program, id semantic.FileID) []diagnostic.Diagnostic {
 	lex := doc.Concrete().LexDiagnostics()

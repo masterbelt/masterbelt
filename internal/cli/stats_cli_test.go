@@ -10,7 +10,8 @@ import (
 	"github.com/masterbelt/masterbelt/internal/belttest"
 )
 
-// execIRStats runs `masterbelt ir --stats <file>` capturing stdout+stderr.
+// TestStatsFlagEmitsReuseProfile runs `masterbelt dump ir --stats <file>`,
+// capturing stdout+stderr.
 func TestStatsFlagEmitsReuseProfile(t *testing.T) {
 	root := t.TempDir()
 	belttest.WriteFile(t, root, "main.belt", "const A = 1\nconst B = A\n")
@@ -19,7 +20,7 @@ func TestStatsFlagEmitsReuseProfile(t *testing.T) {
 	var out bytes.Buffer
 	RootCmd.SetOut(&out)
 	RootCmd.SetErr(&out)
-	RootCmd.SetArgs([]string{"ir", "--stats", path})
+	RootCmd.SetArgs([]string{"dump", "ir", "--stats", path})
 	t.Cleanup(func() {
 		RootCmd.SetOut(nil)
 		RootCmd.SetErr(nil)

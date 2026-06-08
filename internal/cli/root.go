@@ -1,5 +1,5 @@
-// Package cli implements the masterbelt command's subcommands: check, ir, and
-// lsp. The cross-cutting profiling and stats flags live here on the root, not
+// Package cli implements the masterbelt command's subcommands: check, dump,
+// and lsp. The cross-cutting profiling and stats flags live here on the root, not
 // on any subcommand: CPU/heap/trace capture and the
 // machine-readable --stats report are wanted from whichever subcommand runs,
 // so they hang off RootCmd.PersistentFlags and are framed by the profiling
@@ -39,10 +39,10 @@ func init() {
 	// NoOptDefVal lets bare --stats stand without swallowing the next argument
 	// as its value; the sentinel routes to stderr, an explicit =PATH to a file.
 	f.Lookup("stats").NoOptDefVal = statsStderr
-	// --reporter is shared by the machine-readable subcommands (check, ir,
+	// --reporter is shared by the machine-readable subcommands (check, dump,
 	// version); on the root so one definition serves them all and the logger can
 	// honour it.
-	f.String("reporter", reporterText, "diagnostic reporter for check, ir, and version: text or json")
+	f.String("reporter", reporterText, "diagnostic reporter for check, dump, and version: text or json")
 	// OnFinalize runs after Execute whatever the outcome — the cleanup hook
 	// that survives a RunE error (PersistentPostRunE does not).
 	cobra.OnFinalize(finishProfiling)
