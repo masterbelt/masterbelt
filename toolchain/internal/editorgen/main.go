@@ -32,9 +32,11 @@ import (
 const scopeKeywordControl = "keyword.control.masterbelt"
 
 // Output paths, relative to this package's directory (where `go generate` runs).
+// editorgen now lives outside any single editor's tree (it is a multi-target
+// generator), so the VS Code outputs are reached through toolchain/editors.
 const (
-	grammarPath  = "../../syntaxes/masterbelt.tmLanguage.json"
-	langConfPath = "../../language-configuration.json"
+	grammarPath  = "../../editors/vscode/syntaxes/masterbelt.tmLanguage.json"
+	langConfPath = "../../editors/vscode/language-configuration.json"
 )
 
 func main() {
