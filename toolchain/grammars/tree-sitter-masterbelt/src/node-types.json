@@ -796,40 +796,6 @@
     "type": "enum_decl",
     "named": true,
     "fields": {
-      "base": {
-        "multiple": false,
-        "required": false,
-        "types": [
-          {
-            "type": "builtin_type",
-            "named": true
-          },
-          {
-            "type": "func_type",
-            "named": true
-          },
-          {
-            "type": "null_type",
-            "named": true
-          },
-          {
-            "type": "record_type",
-            "named": true
-          },
-          {
-            "type": "self_type",
-            "named": true
-          },
-          {
-            "type": "type_name",
-            "named": true
-          },
-          {
-            "type": "union_type",
-            "named": true
-          }
-        ]
-      },
       "name": {
         "multiple": false,
         "required": true,
@@ -851,6 +817,10 @@
         },
         {
           "type": "impl_block",
+          "named": true
+        },
+        {
+          "type": "type_clause",
           "named": true
         }
       ]
@@ -1888,78 +1858,16 @@
             "named": true
           }
         ]
-      },
-      "value": {
-        "multiple": false,
-        "required": true,
-        "types": [
-          {
-            "type": "await_expr",
-            "named": true
-          },
-          {
-            "type": "binary_expr",
-            "named": true
-          },
-          {
-            "type": "call_expr",
-            "named": true
-          },
-          {
-            "type": "collection_literal",
-            "named": true
-          },
-          {
-            "type": "func_literal",
-            "named": true
-          },
-          {
-            "type": "index_expr",
-            "named": true
-          },
-          {
-            "type": "literal",
-            "named": true
-          },
-          {
-            "type": "member_expr",
-            "named": true
-          },
-          {
-            "type": "paren_expr",
-            "named": true
-          },
-          {
-            "type": "range_expr",
-            "named": true
-          },
-          {
-            "type": "record_literal",
-            "named": true
-          },
-          {
-            "type": "self_expr",
-            "named": true
-          },
-          {
-            "type": "ternary_expr",
-            "named": true
-          },
-          {
-            "type": "unary_expr",
-            "named": true
-          },
-          {
-            "type": "value_ref",
-            "named": true
-          }
-        ]
       }
     },
     "children": {
-      "multiple": false,
-      "required": false,
+      "multiple": true,
+      "required": true,
       "types": [
+        {
+          "type": "initializer",
+          "named": true
+        },
         {
           "type": "type_clause",
           "named": true
@@ -2224,10 +2132,6 @@
         },
         {
           "type": "union_type",
-          "named": true
-        },
-        {
-          "type": "wildcard",
           "named": true
         }
       ]
@@ -3114,10 +3018,6 @@
         },
         {
           "type": "value_ref",
-          "named": true
-        },
-        {
-          "type": "wildcard",
           "named": true
         }
       ]
@@ -4062,10 +3962,6 @@
   {
     "type": "where",
     "named": false
-  },
-  {
-    "type": "wildcard",
-    "named": true
   },
   {
     "type": "{",

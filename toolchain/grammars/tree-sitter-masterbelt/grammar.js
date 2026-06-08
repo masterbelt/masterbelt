@@ -108,7 +108,7 @@ module.exports = grammar({
         optional(kw.pub),
         kw.enum,
         field("name", $.identifier),
-        optional(seq(op.Colon, field("base", $._type))),
+        optional($.type_clause),
         op.LBrace,
         repeat(seq($.enum_member, optional(op.Comma))),
         op.RBrace,
@@ -286,14 +286,10 @@ module.exports = grammar({
 
     return_stmt: ($) => seq(kw.return, $._expr),
 
+    // The `= expr` is an initializer node, as in a const declaration (the CST
+    // reuses the Initializer kind here).
     let_stmt: ($) =>
-      seq(
-        kw.let,
-        field("name", $.identifier),
-        optional($.type_clause),
-        op.Assign,
-        field("value", $._expr),
-      ),
+      seq(kw.let, field("name", $.identifier), optional($.type_clause), $.initializer),
 
     assign_stmt: ($) =>
       seq(field("target", $._expr), op.Assign, field("value", $._expr)),
@@ -309,12 +305,11 @@ module.exports = grammar({
     switch_stmt: ($) =>
       seq(kw.switch, field("value", $._expr), op.LBrace, repeat($.switch_arm), op.RBrace),
 
+    // The wildcard `_` is an ordinary identifier: the lexer does not reserve
+    // it, and the real parser reads a switch `_` as a value reference (NameRef)
+    // and a match `_` as a member type (TypeName), so it needs no node here.
     switch_arm: ($) =>
-      seq(
-        choice(commaSep1($._expr), $.wildcard),
-        op.Arrow,
-        choice($.block, $._statement),
-      ),
+      seq(commaSep1($._expr), op.Arrow, choice($.block, $._statement)),
 
     match_stmt: ($) =>
       seq(kw.match, field("value", $._expr), op.LBrace, repeat($.match_arm), op.RBrace),
@@ -323,9 +318,7 @@ module.exports = grammar({
       seq($.match_pattern, op.Arrow, choice($.block, $._statement)),
 
     match_pattern: ($) =>
-      choice($.wildcard, seq($._type, optional(field("binding", $.identifier)))),
-
-    wildcard: ($) => "_",
+      seq($._type, optional(field("binding", $.identifier))),
 
     for_stmt: ($) =>
       seq(
