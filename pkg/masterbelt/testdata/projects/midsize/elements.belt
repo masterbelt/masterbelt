@@ -1,0 +1,15 @@
+// The elemental affinity system — the smallest shared vocabulary the rest of
+// the game data builds on. It exports an enum and the type-affinity bonus, and
+// imports nothing, so it sits at the bottom of the use graph.
+
+/// An elemental affinity a unit, skill, or item can carry.
+pub enum Element {
+  Neutral, Fire, Water, Wind, Earth
+}
+
+/// The damage multiplier, in percent, a matching element grants. 100 is
+/// no change.
+pub const MatchingBonus: nint = 150
+
+/// The damage multiplier, in percent, a resisted element suffers.
+pub const ResistedPenalty: nint = 50

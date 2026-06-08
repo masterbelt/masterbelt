@@ -63,3 +63,11 @@ fmt:
 vet:
 	$(GO) vet ./...
 	$(GOLANGCI_LINT) run ./...
+
+# bench runs the performance benchmarks (D-1 M2): the cold-compile and scale
+# benches over the synthetic corpus (internal/beltgen) and the incremental
+# edit-replay bench (pkg/masterbelt/semantic). -benchmem reports the allocation
+# counts the deterministic alloc gate (D-1 M3/M4) reads.
+.PHONY: bench
+bench:
+	$(GO) test -bench=. -benchmem ./...

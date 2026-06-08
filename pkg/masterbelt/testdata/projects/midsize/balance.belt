@@ -1,0 +1,21 @@
+// The balance sheet: the cross-cutting constants that tie the roster and the
+// catalog together, the file an editor edits most when tuning the game. It reads
+// the deepest into the use graph, so an edit here exercises the longest reuse
+// chains.
+use units from "units.belt"
+use items from "items.belt"
+use elements from "elements.belt"
+
+/// A fully equipped unit's attack: the unit's rating plus its weapon's bonus.
+pub const VanguardArmed: nint = units.Vanguard.rating() + items.IronSword.attackBonus
+
+/// The mage's armed attack, with the legendary blade.
+pub const EmberArmed: nint = units.Ember.rating() + items.Flameblade.attackBonus
+
+/// The damage a fire attacker deals into a wind defender, in percent of base —
+/// the matching-affinity case scaled by the element table.
+pub const FireVsWind: nint = elements.MatchingBonus
+
+/// The combined armed attack of the two showcase units — the bracket's total
+/// power budget the matchmaker balances around.
+pub const PowerBudget: nint = VanguardArmed + EmberArmed
