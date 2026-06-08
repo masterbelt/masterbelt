@@ -71,10 +71,11 @@
   },
   "scripts": {
     "build": "node esbuild.mjs",
+    "package": "node esbuild.mjs --production",
     "watch": "node esbuild.mjs --watch",
     "check-types": "tsc --noEmit",
     "test": "node --test",
-    "vscode:prepublish": "pnpm run build"
+    "vscode:prepublish": "pnpm run package"
   },
   "dependencies": {
     "vscode-languageclient": "^10.0.0"
