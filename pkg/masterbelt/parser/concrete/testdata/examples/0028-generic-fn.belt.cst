@@ -1,9 +1,9 @@
 # tree
 File
   InterfaceDecl
-    LineComment "// A generic function (E-17): a top-level function with named type parameters,"
+    LineComment "// A generic function: a top-level function with named type parameters,"
     Newline "\n"
-    LineComment "// each optionally bounded by an interface (E-16). A bound names the methods the"
+    LineComment "// each optionally bounded by an interface. A bound names the methods the"
     Newline "\n"
     LineComment "// parameter's type may call in the body; an unbounded parameter is pass-through"
     Newline "\n"

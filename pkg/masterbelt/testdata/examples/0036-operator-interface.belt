@@ -1,4 +1,4 @@
-// The operator contracts (E-16/E-17): the prelude gathers the comparison and
+// The operator contracts: the prelude gathers the comparison and
 // arithmetic operators into named interfaces — comparable (== !=), orderable
 // (< <= > >=), and numeric (unary +, and + - * / %) — that the builtin types opt
 // into at their own definition sites. A generic function can then bound a type

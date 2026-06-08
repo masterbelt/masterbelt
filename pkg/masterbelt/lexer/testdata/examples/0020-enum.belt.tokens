@@ -165,7 +165,7 @@ LineComment   "// resolves through a let's annotation, an assignment's target ty
 Newline       "\n"
 LineComment   "// comparison's receiver enum (the desugared operator argument) — the master-data"
 Newline       "\n"
-LineComment   "// `rarity == Legend` E-2 motivates."
+LineComment   "// `rarity == Legend` pattern."
 Newline       "\n"
 Pub           "pub"
 Whitespace    " "

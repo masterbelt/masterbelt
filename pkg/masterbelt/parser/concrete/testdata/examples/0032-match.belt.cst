@@ -11,7 +11,7 @@ File
     Newline "\n"
     LineComment "// block, so a match dispatches a value by returning from the matching arm. match"
     Newline "\n"
-    LineComment "// branches on a value's *type* (a union); switch (E-11) branches on its *value*."
+    LineComment "// branches on a value's *type* (a union); switch branches on its *value*."
     Newline "\n"
     Newline "\n"
     Pub "pub"
@@ -458,7 +458,7 @@ File
   FuncDecl
     Newline "\n"
     Newline "\n"
-    LineComment "// The headline use case (E-18): an index read yields V | error, and match"
+    LineComment "// The headline use case: an index read yields V | error, and match"
     Newline "\n"
     LineComment "// recovers it — the value arm narrows to the element type, the error arm to the"
     Newline "\n"

@@ -3,7 +3,7 @@
 // the arm. Each arm is a type pattern — a member type with an optional binding
 // name, or the wildcard "_" — and its body is a statement (an early return) or a
 // block, so a match dispatches a value by returning from the matching arm. match
-// branches on a value's *type* (a union); switch (E-11) branches on its *value*.
+// branches on a value's *type* (a union); switch branches on its *value*.
 
 pub type Coin = { amount: nint }
 pub type Level = { rank: nint }
@@ -57,7 +57,7 @@ pub fn coinAmount(v: GameValue): nint {
   }
 }
 
-// The headline use case (E-18): an index read yields V | error, and match
+// The headline use case: an index read yields V | error, and match
 // recovers it — the value arm narrows to the element type, the error arm to the
 // failure. This is the unwrap pattern a fallible read needs.
 pub fn firstOr(xs: list<nint>, fallback: nint): nint {

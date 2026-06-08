@@ -2,7 +2,7 @@
 // otherwise the else branch (another if, for an else-if chain, or a block). An if
 // is a statement, not an expression — it yields no value, so each branch drives
 // control flow by returning. The value form of a two-way choice is the ternary
-// "?:" (E-13), not if.
+// "?:", not if.
 
 // An else-if chain: the first condition that holds wins, and the trailing return
 // covers the values no branch named. else is optional, so a lone guarded return

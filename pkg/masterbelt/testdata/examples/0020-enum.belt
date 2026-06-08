@@ -35,7 +35,7 @@ const Bare: Rarity = Common
 // The same bidirectional channel reaches into a function body: a bare member
 // resolves through a let's annotation, an assignment's target type, and a
 // comparison's receiver enum (the desugared operator argument) — the master-data
-// `rarity == Legend` E-2 motivates.
+// `rarity == Legend` pattern.
 pub fn highestSeen(starting: Rarity): Rarity {
   let best: Rarity = Common
   if starting == Legend {

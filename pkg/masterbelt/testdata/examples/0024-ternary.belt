@@ -1,5 +1,5 @@
 // The ternary "?:" is the value form of a two-way choice: cond ? a : b folds to
-// a when the condition holds and to b otherwise. Unlike if (E-9, a statement that
+// a when the condition holds and to b otherwise. Unlike if (a statement that
 // drives control flow by returning), the ternary is an expression — it yields a
 // value, so it appears wherever a value is wanted (a const initializer, a method
 // body's return). The condition must be a bool and the two branches must share a

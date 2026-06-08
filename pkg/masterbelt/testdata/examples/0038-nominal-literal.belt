@@ -1,6 +1,6 @@
 // A nominal type over a builtin base is a wrapper: a value of the base type flows
 // into it, the way an integer literal has always flowed into `type Level = int8`.
-// Before F-1 this adaptation existed for integers alone, so a string, bool, or
+// Previously this adaptation existed for integers alone, so a string, bool, or
 // collection wrapper could not be written with a literal. This example folds that
 // generalization end to end — a string base, a refinement, and union tagging.
 
@@ -22,7 +22,7 @@ const OtherTag = Hello != There
 
 // The "literal union" idiom: a string base refined to a fixed value set. The
 // predicate's `self == "north"` type-checks because the self-typed operand now
-// unifies with the literal — the original motivation for F-1.
+// unifies with the literal — the original motivation for this generalization.
 pub type Direction = string where self == "north" || self == "south"
 const North: Direction = "north"
 const South: Direction = "south"

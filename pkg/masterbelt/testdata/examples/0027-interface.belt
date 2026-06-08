@@ -1,4 +1,4 @@
-// An interface (E-16): a nominal, explicit-impl behaviour. A type gains the
+// An interface: a nominal, explicit-impl behaviour. A type gains the
 // interface's methods only by writing `impl <interface>` at its definition site
 // (no structural auto-fit, no orphan impls), and an interface may be written in
 // a type-requirement position, where the value's usable methods are fixed to the

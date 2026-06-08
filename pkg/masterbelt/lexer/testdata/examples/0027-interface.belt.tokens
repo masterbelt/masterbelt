@@ -1,5 +1,5 @@
 # tokens
-LineComment   "// An interface (E-16): a nominal, explicit-impl behaviour. A type gains the"
+LineComment   "// An interface: a nominal, explicit-impl behaviour. A type gains the"
 Newline       "\n"
 LineComment   "// interface's methods only by writing `impl <interface>` at its definition site"
 Newline       "\n"

@@ -3,9 +3,9 @@
 // the body once per element. "of" binds the value (a list element, a map value);
 // "in" binds the key (a map key, a list index) — the JS reading. The loop
 // variable is an immutable per-iteration binding; accumulation goes through a
-// let (E-15) the body reassigns, so a for that sums or joins folds to a constant
+// let the body reassigns, so a for that sums or joins folds to a constant
 // exactly as the equivalent fold does. for is a statement: it yields no value.
-// Iterability is foldable (E-16) — a for runs over anything that impls it.
+// Iterability is foldable — a for runs over anything that impls it.
 
 // for over a list with "of" sums its elements: the let total is the accumulator
 // the body reassigns each iteration, and the function folds to the total. This

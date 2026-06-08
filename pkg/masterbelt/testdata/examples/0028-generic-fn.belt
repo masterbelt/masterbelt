@@ -1,5 +1,5 @@
-// A generic function (E-17): a top-level function with named type parameters,
-// each optionally bounded by an interface (E-16). A bound names the methods the
+// A generic function: a top-level function with named type parameters,
+// each optionally bounded by an interface. A bound names the methods the
 // parameter's type may call in the body; an unbounded parameter is pass-through
 // only — it may be received, stored, and returned, but its methods are unknown.
 // A call resolves each type variable from the argument types (the same Match

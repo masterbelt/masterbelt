@@ -1,5 +1,5 @@
 # tokens
-LineComment   "// The operator contracts (E-16/E-17): the prelude gathers the comparison and"
+LineComment   "// The operator contracts: the prelude gathers the comparison and"
 Newline       "\n"
 LineComment   "// arithmetic operators into named interfaces — comparable (== !=), orderable"
 Newline       "\n"

@@ -1,7 +1,7 @@
 # tokens
 LineComment   "// The ternary \"?:\" is the value form of a two-way choice: cond ? a : b folds to"
 Newline       "\n"
-LineComment   "// a when the condition holds and to b otherwise. Unlike if (E-9, a statement that"
+LineComment   "// a when the condition holds and to b otherwise. Unlike if (a statement that"
 Newline       "\n"
 LineComment   "// drives control flow by returning), the ternary is an expression — it yields a"
 Newline       "\n"
