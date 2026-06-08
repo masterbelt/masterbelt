@@ -24,8 +24,37 @@ permissions:
   contents: read
 
 jobs:
+  # Skip a nightly that would rebuild the exact commit already released — but
+  # never skip a manual dispatch, and never skip when the last release can't be
+  # read (better to rebuild than to miss a build).
+  guard:
+    name: skip if unchanged
+    runs-on: ubuntu-latest
+    outputs:
+      build: ${{ steps.decide.outputs.build }}
+    steps:
+      - uses: actions/checkout@v6
+      - id: decide
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          head="$(git rev-parse HEAD)"
+          last="$(gh release view nightly --json targetCommitish -q .targetCommitish 2>/dev/null || true)"
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
+            echo "manual dispatch — building"
+            echo "build=true" >>"$GITHUB_OUTPUT"
+          elif [ -n "$last" ] && [ "$last" = "$head" ]; then
+            echo "HEAD ($head) is already the nightly — skipping"
+            echo "build=false" >>"$GITHUB_OUTPUT"
+          else
+            echo "building (previous nightly: ${last:-none})"
+            echo "build=true" >>"$GITHUB_OUTPUT"
+          fi
+
   # Don't ship red: the same tests CI runs must pass before anything is built.
   gate:
+    needs: guard
+    if: needs.guard.outputs.build == 'true'
     uses: ./.github/workflows/test.yml
 
   build:
