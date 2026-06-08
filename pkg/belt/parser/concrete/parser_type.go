@@ -87,7 +87,10 @@ func (p *parser) parseGenericArgs() *cst.Node {
 			if p.peekSignificant() == token.Comma {
 				p.skipTrivia(&children)
 				children = append(children, p.bump()) // ","
-				continue
+				if startsType(p.peekSignificant()) {
+					continue // another type argument follows the comma
+				}
+				// A trailing comma: the loop ends and ">" follows.
 			}
 			break
 		}

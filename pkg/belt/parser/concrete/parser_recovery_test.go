@@ -21,7 +21,6 @@ func TestParseDiagnostics(t *testing.T) {
 		{"missing unary operand", "const X = -\n", CodeExpectedOperand},
 		{"missing type", "const X: = 1", CodeExpectedType},
 		{"stray token", "= 1\n", CodeUnexpectedToken},
-		{"param after comma", "const f = fn(x,) { return x }\n", CodeExpectedIdentifier},
 		{"func lit without parens", "const f = fn x -> x * 2\n", CodeExpectedParamList},
 		{"fat arrow is no body", "const f = fn(x) => x * 2\n", CodeExpectedFuncBody},
 		{"block after arrow", "const f = fn(x) -> { return 1 }\n", CodeArrowBlockBody},

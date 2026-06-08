@@ -16,8 +16,8 @@
 //	FuncDecl      := [pub] [extern] fn Effect* Ident ParamList ":" TypeExpr ( Block | "->" Expr )
 //	Effect        := io | async | nondet
 //	UseTarget     := Ident | UseList | "*"
-//	UseList       := "{" Ident ( "," Ident )* "}"
-//	GenericParams := "<" GenericParam ( "," GenericParam )* ">"
+//	UseList       := "{" Ident ( "," Ident )* [","] "}"
+//	GenericParams := "<" GenericParam ( "," GenericParam )* [","] ">"
 //	GenericParam  := Ident [ ":" TypeExpr ]
 //	TypeClause    := ":" TypeExpr
 //	Initializer   := "=" Expr
@@ -25,7 +25,7 @@
 //	TypeExpr      := PrimaryType ( "|" PrimaryType )*
 //	PrimaryType   := TypeName | RecordType | FuncType
 //	TypeName      := ( Ident ["." Ident] [GenericArgs] ) | "self" | "null"
-//	GenericArgs   := "<" TypeExpr ( "," TypeExpr )* ">"
+//	GenericArgs   := "<" TypeExpr ( "," TypeExpr )* [","] ">"
 //	RecordType    := "{" ( Field [","] )* "}"
 //	Field         := Ident ":" TypeExpr
 //	FuncType      := fn ParamList ":" TypeExpr
@@ -33,7 +33,7 @@
 //	AssocConst    := [pub] const Ident [TypeClause] "=" ( Expr | "builtin" )
 //	MethodDecl    := [pub] ( Modifier | [extern] [fn] ) Effect* Ident [GenericParams] ParamList ":" TypeExpr [Block]
 //	Modifier      := "get" | "set" | "static" fn   (get/set/static are context keywords: a modifier only at a method's start, get/set only when an Ident follows on the same line, static only before fn)
-//	ParamList     := "(" [ Param ( "," Param )* ] ")"
+//	ParamList     := "(" [ Param ( "," Param )* [","] ] ")"
 //	Param         := Ident ":" TypeExpr
 //	Block         := "{" Stmt* "}"
 //	Stmt          := LetStmt | ReturnStmt | SwitchStmt | MatchStmt | IfStmt | ForStmt | AssignStmt | Expr
@@ -57,11 +57,11 @@
 //	MulExpr       := Unary ( ( "*" | "/" | "%" ) Unary )*
 //	Unary         := ( "+" | "-" | "!" ) Unary | AwaitExpr | Postfix
 //	AwaitExpr     := await Unary
-//	Postfix       := Operand ( "." Ident | "(" [ Expr ( "," Expr )* ] ")" | "[" Expr "]" )*
+//	Postfix       := Operand ( "." Ident | "(" [ Expr ( "," Expr )* [","] ] ")" | "[" Expr "]" )*
 //	Operand       := Literal | CollectionLit | RecordLit | NameRef | "self" | FuncLit | ParenExpr
 //	ParenExpr     := "(" Expr ")"
 //	FuncLit       := fn LitParamList [":" TypeExpr] ( "->" Expr | Block )
-//	LitParamList  := "(" [ LitParam ( "," LitParam )* ] ")"
+//	LitParamList  := "(" [ LitParam ( "," LitParam )* [","] ] ")"
 //	LitParam      := Ident [":" TypeExpr]
 //	CollectionLit := "[" [ Element ( "," Element )* [","] ] "]"
 //	Element       := Expr [ ":" Expr ]

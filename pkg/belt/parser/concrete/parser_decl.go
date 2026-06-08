@@ -499,7 +499,9 @@ func (p *parser) parseUseList() *cst.Node {
 				if p.peekSignificant() == token.Ident {
 					continue
 				}
-				p.report(newExpectedIdentifierDiagnostic(p.lastStart, 0))
+				if p.peekSignificant() != token.RBrace {
+					p.report(newExpectedIdentifierDiagnostic(p.lastStart, 0))
+				}
 			}
 			break
 		}
@@ -973,13 +975,15 @@ func (p *parser) parseParamList(requireType bool) *cst.Node {
 			if p.peekSignificant() == token.Comma {
 				p.skipTrivia(&children)
 				children = append(children, p.bump()) // ","
-				// A comma promises another parameter; without the check a
-				// truncated list ("fn(x,") would bump EOF as the next name and
-				// run the cursor off the token slice.
+				// A comma promises another parameter unless it is a trailing one
+				// before ")"; without the name check a truncated list ("fn(x,")
+				// would bump EOF as the next name and run the cursor off the slice.
 				if p.peekSignificant() == token.Ident {
 					continue
 				}
-				p.report(newExpectedIdentifierDiagnostic(p.lastStart, 0))
+				if p.peekSignificant() != token.RParen {
+					p.report(newExpectedIdentifierDiagnostic(p.lastStart, 0))
+				}
 			}
 			break
 		}

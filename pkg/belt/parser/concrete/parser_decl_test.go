@@ -686,7 +686,6 @@ func TestParseUseDiagnostics(t *testing.T) {
 		{"missing from", "use geo \"a.belt\"\n", CodeExpectedFrom},
 		{"missing path", "use geo from\n", CodeExpectedPath},
 		{"empty list", "use {} from \"a.belt\"\n", CodeExpectedIdentifier},
-		{"name after comma", "use { a, } from \"x.belt\"\n", CodeExpectedIdentifier},
 		{"junk after star", "use * x from \"a.belt\"\n", CodeExpectedFrom},
 		{"unclosed list", "use { a from \"x.belt\"\n", CodeUnexpectedToken},
 	}
