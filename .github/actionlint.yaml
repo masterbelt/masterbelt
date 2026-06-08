@@ -1,0 +1,14 @@
+# actionlint configuration.
+#
+# The one suppression: GitHub's `code-quality` permission scope (a 2026-05
+# preview, used by the coverage job's upload) is newer than the pinned linter's
+# built-in scope list, so actionlint reports it as unknown. The ignore is scoped
+# to go.yml and names that exact scope, so a typo in any other permission still
+# fails — its message names a different scope and does not match.
+self-hosted-runner:
+  labels: []
+config-variables: null
+paths:
+  .github/workflows/go.yml:
+    ignore:
+      - 'unknown permission scope "code-quality"'
