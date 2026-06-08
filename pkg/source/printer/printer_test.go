@@ -9,11 +9,11 @@ import (
 	"github.com/masterbelt/masterbelt/pkg/source/token"
 )
 
-// print renders a flat run of leaf tokens. The printer flattens the tree and
+// printLeaves renders a flat run of leaf tokens. The printer flattens the tree and
 // tracks depth by bracket tokens, so a flat File of leaves exercises the layout
 // logic without building real nodes. The buffer is the in-order concatenation
 // of the leaf texts, which is what the positioned tree reads through.
-func print(t *testing.T, indent string, leaves ...cst.Green) string {
+func printLeaves(t *testing.T, indent string, leaves ...cst.Green) string {
 	t.Helper()
 	root := cst.NewNode(cst.File, leaves)
 	var src strings.Builder
@@ -26,7 +26,7 @@ func print(t *testing.T, indent string, leaves ...cst.Green) string {
 func tok(k token.Kind, text string) cst.Green { return cst.NewToken(k, text) }
 
 // printTree renders a green tree whose buffer is the in-order concatenation of
-// its leaf texts. It is the node-aware counterpart to print, for the layout
+// its leaf texts. It is the node-aware counterpart to printLeaves, for the layout
 // rules (literal collapsing) that depend on real node kinds.
 func printTree(t *testing.T, indent string, root cst.Green) string {
 	t.Helper()
@@ -60,7 +60,9 @@ func lit(n string) cst.Green {
 // comma it is a one-line list. Trailing separators land before the "]" so the
 // renderer's separator regeneration is exercised.
 func collection(sep token.Kind, sepText string, elems ...string) cst.Green {
-	children := []cst.Green{tok(token.LBracket, "[")}
+	// "[", then a (sep, lit) pair per element, then a trailing sep and "]".
+	children := make([]cst.Green, 0, 1+2*len(elems)+2)
+	children = append(children, tok(token.LBracket, "["))
 	for _, e := range elems {
 		children = append(children, tok(sep, sepText), lit(e))
 	}
@@ -90,7 +92,7 @@ func TestPrintNormalizesInterTokenSpace(t *testing.T) {
 	// spacing. (Context-sensitive spacing — colons, generics, records, operators
 	// — is exercised by the parsed fixtures, where parent kinds are real; a flat
 	// hand-built tree has only File parents.)
-	got := print(t, "  ",
+	got := printLeaves(t, "  ",
 		tok(token.Ident, "ab"),
 		tok(token.Whitespace, "   "),
 		tok(token.Ident, "cd"),
@@ -111,10 +113,10 @@ func TestPrintReindentsToDepth(t *testing.T) {
 		tok(token.Newline, "\n"),
 		tok(token.RBrace, "}"),
 	}
-	if got := print(t, "  ", leaves...); got != "{\n  x\n}" {
+	if got := printLeaves(t, "  ", leaves...); got != "{\n  x\n}" {
 		t.Errorf("two-space: Print = %q, want %q", got, "{\n  x\n}")
 	}
-	if got := print(t, "\t", leaves...); got != "{\n\tx\n}" {
+	if got := printLeaves(t, "\t", leaves...); got != "{\n\tx\n}" {
 		t.Errorf("tab: Print = %q, want %q", got, "{\n\tx\n}")
 	}
 }
@@ -133,7 +135,7 @@ func TestPrintNestedDepth(t *testing.T) {
 		tok(token.RBrace, "}"),
 	}
 	want := "{\n  [\n    x\n  ]\n}"
-	if got := print(t, "  ", leaves...); got != want {
+	if got := printLeaves(t, "  ", leaves...); got != want {
 		t.Errorf("Print = %q, want %q", got, want)
 	}
 }
@@ -150,7 +152,7 @@ func TestPrintHugsBracketsOpenedTogether(t *testing.T) {
 		tok(token.RBrace, "}"),
 		tok(token.RBracket, "]"),
 	}
-	if got := print(t, "  ", leaves...); got != "[{\n  x\n}]" {
+	if got := printLeaves(t, "  ", leaves...); got != "[{\n  x\n}]" {
 		t.Errorf("Print = %q, want %q", got, "[{\n  x\n}]")
 	}
 }
@@ -165,7 +167,7 @@ func TestPrintLeavesBlankLinesEmpty(t *testing.T) {
 		tok(token.Newline, "\n"),
 		tok(token.RBrace, "}"),
 	}
-	if got := print(t, "  ", leaves...); got != "{\n\n  x\n}" {
+	if got := printLeaves(t, "  ", leaves...); got != "{\n\n  x\n}" {
 		t.Errorf("Print = %q, want %q", got, "{\n\n  x\n}")
 	}
 }

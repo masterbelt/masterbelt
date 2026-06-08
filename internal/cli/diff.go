@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -76,11 +77,12 @@ func lcsTable(a, b []string) [][]int {
 	}
 	for i := n - 1; i >= 0; i-- {
 		for j := m - 1; j >= 0; j-- {
-			if a[i] == b[j] {
+			switch {
+			case a[i] == b[j]:
 				c[i][j] = c[i+1][j+1] + 1
-			} else if c[i+1][j] >= c[i][j+1] {
+			case c[i+1][j] >= c[i][j+1]:
 				c[i][j] = c[i+1][j]
-			} else {
+			default:
 				c[i][j] = c[i][j+1]
 			}
 		}
@@ -155,7 +157,7 @@ func span(before, count int) string {
 		return fmt.Sprintf("%d,0", before)
 	}
 	if count == 1 {
-		return fmt.Sprintf("%d", before+1)
+		return strconv.Itoa(before + 1)
 	}
 	return fmt.Sprintf("%d,%d", before+1, count)
 }

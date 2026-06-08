@@ -51,6 +51,7 @@ func TestFormatFixtures(t *testing.T) {
 }
 
 func runFixtureCase(t *testing.T, dir string) {
+	t.Helper()
 	prettyPath := filepath.Join(dir, "pretty.belt")
 	dirty, err := filepath.Glob(filepath.Join(dir, "dirty*.belt"))
 	if err != nil {
@@ -107,6 +108,7 @@ func runFixtureCase(t *testing.T, dir string) {
 
 // fixtureCases returns every directory under root that holds a pretty.belt.
 func fixtureCases(t *testing.T, root string) []string {
+	t.Helper()
 	var dirs []string
 	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
 		if err != nil {

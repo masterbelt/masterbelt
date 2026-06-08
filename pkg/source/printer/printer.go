@@ -247,8 +247,9 @@ func isCommaList(k cst.Kind) bool {
 	case cst.RecordLit, cst.RecordType, cst.CollectionLit, cst.CallExpr,
 		cst.ParamList, cst.GenericArgs, cst.GenericParams, cst.UseList:
 		return true
+	default:
+		return false
 	}
-	return false
 }
 
 // bracketBounds returns the indices of the list's opening and closing bracket
@@ -325,6 +326,8 @@ func (p *printer) leaf(kind token.Kind, parent cst.Kind, text string) {
 		return
 	case token.Whitespace:
 		return
+	default:
+		// Every significant token falls through to the rendering below.
 	}
 
 	comment := isComment(kind)
@@ -395,7 +398,7 @@ func spaceBetween(prev, cur token.Kind, pp, cp cst.Kind) bool {
 	// Record braces carry inner spaces ("{ x: 0 }"), except an empty record is
 	// tight ("{}") and a record's type name hugs its brace ("Point{").
 	if cur == token.LBrace && isRecord(cp) {
-		return !(prev == token.Ident && pp == cst.RecordLit)
+		return prev != token.Ident || pp != cst.RecordLit
 	}
 	if prev == token.LBrace && isRecord(pp) {
 		return cur != token.RBrace

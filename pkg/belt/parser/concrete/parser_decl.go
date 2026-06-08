@@ -493,15 +493,16 @@ func (p *parser) parseUseList() *cst.Node {
 		for {
 			p.skipTrivia(&children)
 			children = append(children, p.bump()) // an imported name
-			if p.peekSignificant() == token.Comma {
-				p.skipTrivia(&children)
-				children = append(children, p.bump()) // ","
-				if p.peekSignificant() == token.Ident {
-					continue
-				}
-				if p.peekSignificant() != token.RBrace {
-					p.report(newExpectedIdentifierDiagnostic(p.lastStart, 0))
-				}
+			if p.peekSignificant() != token.Comma {
+				break
+			}
+			p.skipTrivia(&children)
+			children = append(children, p.bump()) // ","
+			if p.peekSignificant() == token.Ident {
+				continue
+			}
+			if p.peekSignificant() != token.RBrace {
+				p.report(newExpectedIdentifierDiagnostic(p.lastStart, 0))
 			}
 			break
 		}
@@ -972,18 +973,19 @@ func (p *parser) parseParamList(requireType bool) *cst.Node {
 		for {
 			p.skipTrivia(&children)
 			children = append(children, p.parseParam(requireType))
-			if p.peekSignificant() == token.Comma {
-				p.skipTrivia(&children)
-				children = append(children, p.bump()) // ","
-				// A comma promises another parameter unless it is a trailing one
-				// before ")"; without the name check a truncated list ("fn(x,")
-				// would bump EOF as the next name and run the cursor off the slice.
-				if p.peekSignificant() == token.Ident {
-					continue
-				}
-				if p.peekSignificant() != token.RParen {
-					p.report(newExpectedIdentifierDiagnostic(p.lastStart, 0))
-				}
+			if p.peekSignificant() != token.Comma {
+				break
+			}
+			p.skipTrivia(&children)
+			children = append(children, p.bump()) // ","
+			// A comma promises another parameter unless it is a trailing one
+			// before ")"; without the name check a truncated list ("fn(x,")
+			// would bump EOF as the next name and run the cursor off the slice.
+			if p.peekSignificant() == token.Ident {
+				continue
+			}
+			if p.peekSignificant() != token.RParen {
+				p.report(newExpectedIdentifierDiagnostic(p.lastStart, 0))
 			}
 			break
 		}

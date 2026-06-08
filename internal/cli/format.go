@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -70,13 +71,13 @@ func runFormat(cmd *cobra.Command, args []string) error {
 	switch {
 	case len(args) == 1 && args[0] == "-":
 		if mode == formatWrite {
-			return fmt.Errorf("cannot use -w/--write with standard input")
+			return errors.New("cannot use -w/--write with standard input")
 		}
 		if err := run.stdin(cmd.InOrStdin(), stdinPath); err != nil {
 			return err
 		}
 	case slices.Contains(args, "-"):
-		return fmt.Errorf("cannot mix standard input (-) with file arguments")
+		return errors.New("cannot mix standard input (-) with file arguments")
 	default:
 		paths, err := formatTargets(cmd, args)
 		if err != nil {
@@ -106,7 +107,7 @@ func resolveMode(write, check, diff bool) (formatMode, error) {
 		}
 	}
 	if set > 1 {
-		return 0, fmt.Errorf("at most one of -w/--write, --check, and --diff may be set")
+		return 0, errors.New("at most one of -w/--write, --check, and --diff may be set")
 	}
 	switch {
 	case write:
@@ -205,7 +206,7 @@ func (r *formatRun) file(path string) error {
 		// Never write a parse-error file back: formatting a broken tree can
 		// drop the text the error stands on, so the safe move is to leave it.
 		if broken {
-			fmt.Fprintf(r.errOut, "masterbelt format: skipping %s: source has syntax errors\n", displayPath(path))
+			_, _ = fmt.Fprintf(r.errOut, "masterbelt format: skipping %s: source has syntax errors\n", displayPath(path))
 			return nil
 		}
 		if out != string(src) {
