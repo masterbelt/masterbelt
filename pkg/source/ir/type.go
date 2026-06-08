@@ -399,7 +399,7 @@ type Stmt interface {
 // Return is a return statement: it yields Value (nil if the source omitted it).
 type Return struct {
 	Value  Value
-	Syntax ast.Stmt `tree:"-"` // the statement this was lowered from, a diagnostic anchor
+	Syntax *ast.ReturnStmt `tree:"-"` // the statement this was lowered from, a diagnostic anchor
 }
 
 func (*Return) stmt() {}
@@ -407,7 +407,7 @@ func (*Return) stmt() {}
 // ExprStmt is an expression evaluated as a statement.
 type ExprStmt struct {
 	Value  Value
-	Syntax ast.Stmt `tree:"-"`
+	Syntax *ast.ExprStmt `tree:"-"`
 }
 
 func (*ExprStmt) stmt() {}
@@ -420,7 +420,7 @@ type Let struct {
 	Name   string
 	Type   Type
 	Value  Value
-	Syntax ast.Stmt `tree:"-"`
+	Syntax *ast.LetStmt `tree:"-"`
 }
 
 func (*Let) stmt() {}
@@ -431,7 +431,7 @@ func (*Let) stmt() {}
 type Assign struct {
 	Name   string
 	Value  Value
-	Syntax ast.Stmt `tree:"-"`
+	Syntax *ast.AssignStmt `tree:"-"`
 }
 
 func (*Assign) stmt() {}
@@ -443,8 +443,8 @@ func (*Assign) stmt() {}
 type Switch struct {
 	Scrutinee Value
 	Arms      []SwitchArm
-	Else      []Stmt   // the wildcard body, or nil if the switch had no wildcard
-	Syntax    ast.Stmt `tree:"-"`
+	Else      []Stmt          // the wildcard body, or nil if the switch had no wildcard
+	Syntax    *ast.SwitchStmt `tree:"-"`
 }
 
 func (*Switch) stmt() {}
@@ -463,8 +463,8 @@ type SwitchArm struct {
 type Match struct {
 	Scrutinee Value
 	Arms      []MatchArm
-	Else      []Stmt   // the wildcard body, or nil if the match had no wildcard
-	Syntax    ast.Stmt `tree:"-"`
+	Else      []Stmt         // the wildcard body, or nil if the match had no wildcard
+	Syntax    *ast.MatchStmt `tree:"-"`
 }
 
 func (*Match) stmt() {}
@@ -485,9 +485,9 @@ type MatchArm struct {
 type If struct {
 	Cond   Value
 	Then   []Stmt
-	ElseIf *If      // the chained "else if", or nil
-	Else   []Stmt   // the "else" body, or nil when there is no plain else
-	Syntax ast.Stmt `tree:"-"`
+	ElseIf *If         // the chained "else if", or nil
+	Else   []Stmt      // the "else" body, or nil when there is no plain else
+	Syntax *ast.IfStmt `tree:"-"`
 }
 
 func (*If) stmt() {}
@@ -504,7 +504,7 @@ type For struct {
 	Of      bool   // true for an of-loop (the value), false for an in-loop (the key)
 	Iter    Value
 	Body    []Stmt
-	Syntax  ast.Stmt `tree:"-"`
+	Syntax  *ast.ForStmt `tree:"-"`
 }
 
 func (*For) stmt() {}
@@ -519,24 +519,38 @@ func SyntaxOfStmt(s Stmt) ast.Stmt {
 	case nil:
 		return nil
 	case *Return:
-		return s.Syntax
+		return stmtOrNil(s.Syntax)
 	case *ExprStmt:
-		return s.Syntax
+		return stmtOrNil(s.Syntax)
 	case *Let:
-		return s.Syntax
+		return stmtOrNil(s.Syntax)
 	case *Assign:
-		return s.Syntax
+		return stmtOrNil(s.Syntax)
 	case *Switch:
-		return s.Syntax
+		return stmtOrNil(s.Syntax)
 	case *Match:
-		return s.Syntax
+		return stmtOrNil(s.Syntax)
 	case *If:
-		return s.Syntax
+		return stmtOrNil(s.Syntax)
 	case *For:
-		return s.Syntax
+		return stmtOrNil(s.Syntax)
 	default:
 		panic(unhandledStmt(s))
 	}
+}
+
+// stmtOrNil widens a concrete statement pointer to ast.Stmt, keeping a nil
+// pointer nil — the typed-nil guard SyntaxOfStmt needs, the statement twin of
+// exprOrNil, kept in one place so a case written without it cannot reintroduce
+// the bug.
+func stmtOrNil[S any, P interface {
+	*S
+	ast.Stmt
+}](p P) ast.Stmt {
+	if p == nil {
+		return nil
+	}
+	return p
 }
 
 // Param is one method parameter: a name and its type.
