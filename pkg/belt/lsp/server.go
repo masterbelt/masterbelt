@@ -334,7 +334,7 @@ func (s *Server) Formatting(_ context.Context, params *protocol.DocumentFormatti
 	if !ok {
 		return nil, nil
 	}
-	return formatEdits(v.AST()), nil
+	return formatEdits(v.AST(), formatLayout(params.TextDocument.URI, params.Options)), nil
 }
 
 // Hover returns documentation and type information for the symbol under the

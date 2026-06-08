@@ -1,6 +1,8 @@
 package lsp
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	protocol "github.com/owenrumney/go-lsp/lsp"
@@ -8,6 +10,7 @@ import (
 	"github.com/masterbelt/masterbelt/pkg/belt/parser/abstract"
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
 	"github.com/masterbelt/masterbelt/pkg/source"
+	"github.com/masterbelt/masterbelt/pkg/source/formatter"
 )
 
 func TestPositionUTF16RoundTrip(t *testing.T) {
@@ -111,7 +114,7 @@ func TestDocumentSymbols(t *testing.T) {
 func TestFormatEdits(t *testing.T) {
 	t.Run("trims trailing space and normalises final newline", func(t *testing.T) {
 		doc := abstract.NewDocument([]byte("const x = 1   \n\n\n"))
-		edits := formatEdits(doc)
+		edits := formatEdits(doc, formatter.DefaultLayout)
 		if len(edits) != 1 {
 			t.Fatalf("got %d edits, want 1", len(edits))
 		}
@@ -122,8 +125,49 @@ func TestFormatEdits(t *testing.T) {
 
 	t.Run("no edits when already formatted", func(t *testing.T) {
 		doc := abstract.NewDocument([]byte("const x = 1\n"))
-		if edits := formatEdits(doc); edits != nil {
+		if edits := formatEdits(doc, formatter.DefaultLayout); edits != nil {
 			t.Errorf("got %+v, want nil", edits)
 		}
 	})
+}
+
+// TestFormatLayout pins the LSP's Layout precedence: a project .editorconfig
+// outranks the editor's FormattingOptions, which outrank the house default.
+func TestFormatLayout(t *testing.T) {
+	editorOpts := protocol.FormattingOptions{TabSize: 4, InsertSpaces: true}
+
+	t.Run("editorconfig overrides editor options", func(t *testing.T) {
+		dir := t.TempDir()
+		writeFile(t, filepath.Join(dir, ".editorconfig"),
+			"root = true\n[*.belt]\nindent_style = tab\nend_of_line = crlf\n")
+		got := formatLayout(protocol.DocumentURI(filepath.Join(dir, "foo.belt")), editorOpts)
+		if want := (formatter.Layout{Indent: "\t", EndOfLine: "\r\n"}); got != want {
+			t.Errorf("layout = %#v, want %#v", got, want)
+		}
+	})
+
+	t.Run("editor options fill in where editorconfig is silent", func(t *testing.T) {
+		dir := t.TempDir()
+		writeFile(t, filepath.Join(dir, ".editorconfig"), "root = true\n")
+		got := formatLayout(protocol.DocumentURI(filepath.Join(dir, "foo.belt")), editorOpts)
+		if want := (formatter.Layout{Indent: "    ", EndOfLine: "\n"}); got != want {
+			t.Errorf("layout = %#v, want %#v", got, want)
+		}
+	})
+
+	t.Run("house default when neither speaks", func(t *testing.T) {
+		dir := t.TempDir()
+		writeFile(t, filepath.Join(dir, ".editorconfig"), "root = true\n")
+		got := formatLayout(protocol.DocumentURI(filepath.Join(dir, "foo.belt")), protocol.FormattingOptions{})
+		if got != formatter.DefaultLayout {
+			t.Errorf("layout = %#v, want house default %#v", got, formatter.DefaultLayout)
+		}
+	})
+}
+
+func writeFile(t *testing.T, path, content string) {
+	t.Helper()
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
 }

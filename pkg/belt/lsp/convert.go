@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"sort"
 	"strconv"
+	"strings"
 
 	protocol "github.com/owenrumney/go-lsp/lsp"
 
@@ -390,15 +391,15 @@ func nameToken(decl cst.Tree) (cst.Tree, bool) {
 	return cst.Tree{}, false
 }
 
-// formatEdits returns the edits to format the document, or nil if it is already
-// formatted. The formatting policy lives in source/formatter (which works on the
-// lossless concrete tree, so comments are preserved); the server only diffs the
-// result against the current text and, on a change, returns it as a single
-// whole-document replacement.
-func formatEdits(doc *abstract.Document) []protocol.TextEdit {
+// formatEdits returns the edits to format the document under layout, or nil if
+// it is already formatted. The formatting policy lives in source/formatter
+// (which works on the lossless concrete tree, so comments are preserved); the
+// server only diffs the result against the current text and, on a change,
+// returns it as a single whole-document replacement.
+func formatEdits(doc *abstract.Document, layout formatter.Layout) []protocol.TextEdit {
 	buf := doc.Buffer()
 	original := string(buf.Slice(0, buf.Len()))
-	formatted := formatter.Format(buf, doc.Concrete().Root(), formatter.DefaultLayout)
+	formatted := formatter.Format(buf, doc.Concrete().Root(), layout)
 	if formatted == original {
 		return nil
 	}
@@ -406,4 +407,24 @@ func formatEdits(doc *abstract.Document) []protocol.TextEdit {
 		Range:   toRange(buf, 0, buf.Len()),
 		NewText: formatted,
 	}}
+}
+
+// formatLayout resolves the Layout to format the document at uri with, giving
+// the project's .editorconfig the final say. The editor's FormattingOptions
+// (tabSize/insertSpaces) are folded onto the house default as the fallback, so
+// the precedence is .editorconfig > editor options > house default — the CLI
+// and the LSP resolve the same config for the same file and cannot disagree.
+//
+// Editors always send a positive tabSize; a zero one means no options arrived,
+// and the house default stands.
+func formatLayout(uri protocol.DocumentURI, opts protocol.FormattingOptions) formatter.Layout {
+	fallback := formatter.DefaultLayout
+	if opts.TabSize > 0 {
+		if opts.InsertSpaces {
+			fallback.Indent = strings.Repeat(" ", opts.TabSize)
+		} else {
+			fallback.Indent = "\t"
+		}
+	}
+	return formatter.Resolve(uriPath(uri), fallback)
 }
