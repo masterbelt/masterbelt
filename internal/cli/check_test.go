@@ -35,7 +35,7 @@ func execCheck(t *testing.T, args ...string) (string, error) {
 func TestCheckProject(t *testing.T) {
 	root := t.TempDir()
 	belttest.WriteFile(t, root, "masterbelt.toml", "entry = \"src/main.belt\"\n")
-	belttest.WriteFile(t, root, "src/main.belt", "const MaxLevel: long = 100\n")
+	belttest.WriteFile(t, root, "src/main.belt", "pub const MaxLevel: long = 100\n")
 
 	out, err := execCheck(t, root)
 	if err != nil {
@@ -51,7 +51,7 @@ func TestCheckProjectFromSubdirectory(t *testing.T) {
 	// directory, go.mod style.
 	root := t.TempDir()
 	belttest.WriteFile(t, root, "masterbelt.toml", "entry = \"main.belt\"\n")
-	belttest.WriteFile(t, root, "main.belt", "const A = 1\n")
+	belttest.WriteFile(t, root, "main.belt", "pub const A = 1\n")
 	belttest.WriteFile(t, root, "sub/keep", "")
 	t.Chdir(filepath.Join(root, "sub"))
 
@@ -199,7 +199,7 @@ func TestCheckJSONClean(t *testing.T) {
 	// A clean run still emits a well-formed document, and exits zero.
 	root := t.TempDir()
 	belttest.WriteFile(t, root, "masterbelt.toml", "entry = \"main.belt\"\n")
-	belttest.WriteFile(t, root, "main.belt", "const A = 1\n")
+	belttest.WriteFile(t, root, "main.belt", "pub const A = 1\n")
 
 	out, err := execCheck(t, "--reporter=json", root)
 	if err != nil {
@@ -251,7 +251,7 @@ func TestCheckProfile(t *testing.T) {
 	// so the flag's effect is observable.
 	root := t.TempDir()
 	belttest.WriteFile(t, root, "masterbelt.toml", "entry = \"main.belt\"\n\n[profile.editor]\nentry = \"editor.belt\"\n")
-	belttest.WriteFile(t, root, "main.belt", "const A = 1\n")
+	belttest.WriteFile(t, root, "main.belt", "pub const A = 1\n")
 	belttest.WriteFile(t, root, "editor.belt", "const E = F\n")
 
 	if out, err := execCheck(t, root); err != nil {
@@ -269,7 +269,7 @@ func TestCheckProfile(t *testing.T) {
 func TestCheckUnknownProfile(t *testing.T) {
 	root := t.TempDir()
 	belttest.WriteFile(t, root, "masterbelt.toml", "entry = \"main.belt\"\n")
-	belttest.WriteFile(t, root, "main.belt", "const A = 1\n")
+	belttest.WriteFile(t, root, "main.belt", "pub const A = 1\n")
 
 	out, err := execCheck(t, "--profile=editor", root)
 	if err == nil {
@@ -283,7 +283,7 @@ func TestCheckUnknownProfile(t *testing.T) {
 func TestCheckUnknownReporter(t *testing.T) {
 	root := t.TempDir()
 	belttest.WriteFile(t, root, "masterbelt.toml", "entry = \"main.belt\"\n")
-	belttest.WriteFile(t, root, "main.belt", "const A = 1\n")
+	belttest.WriteFile(t, root, "main.belt", "pub const A = 1\n")
 
 	if out, err := execCheck(t, "--reporter=yaml", root); err == nil || !strings.Contains(err.Error(), "unknown reporter") {
 		t.Errorf("check = %v, want an unknown-reporter error\n%s", err, out)
@@ -307,6 +307,36 @@ func TestCheckUnreachableCode(t *testing.T) {
 	} {
 		if !strings.Contains(out, fragment) {
 			t.Errorf("output missing %s:\n%s", fragment, out)
+		}
+	}
+}
+
+func TestCheckUnusedDeclaration(t *testing.T) {
+	// A private constant no root reaches is reported as a hint, tagged
+	// unnecessary, end to end — while a constant kept live through the public
+	// surface, an assert, an assoc const, or an enum member is not. This is the
+	// whole chain: the retained graphs plus the surface mark-and-sweep.
+	dir := t.TempDir()
+	belttest.WriteFile(t, dir, "m.belt",
+		"pub const Api = Helper\nconst Helper = 1\nconst Dead = 2\nconst Floor = 0\n"+
+			"pub type Scaled = nint impl { const Max = Floor }\nassert Api > 0\n")
+
+	out, err := execCheck(t, "--reporter=json", filepath.Join(dir, "m.belt"))
+	if err != nil {
+		t.Fatalf("check = %v, want success (a hint must not fail the build)\n%s", err, out)
+	}
+	// Exactly Dead is unused: Helper rides the public Api, Floor the assoc const.
+	if n := strings.Count(out, `"code": "belt.lint.unused_declaration"`); n != 1 {
+		t.Errorf("got %d unused_declaration diagnostics, want 1 (only Dead)\n%s", n, out)
+	}
+	for _, fragment := range []string{`"Dead is never used"`, `"unnecessary"`, `"severity": "hint"`} {
+		if !strings.Contains(out, fragment) {
+			t.Errorf("output missing %s:\n%s", fragment, out)
+		}
+	}
+	for _, live := range []string{"Helper is never used", "Floor is never used", "Api is never used"} {
+		if strings.Contains(out, live) {
+			t.Errorf("output wrongly flagged a live declaration: %s\n%s", live, out)
 		}
 	}
 }

@@ -7,6 +7,7 @@ belt.lexer.invalid_unicode_escape,error,escape:string
 belt.lexer.invalid_datetime,error,text:string
 belt.lexer.unknown_duration_unit,error,unit:string
 belt.lint.unreachable_code,hint,
+belt.lint.unused_declaration,hint,name:string
 belt.parser.concrete.expected_const,error,
 belt.parser.concrete.expected_identifier,error,
 belt.parser.concrete.expected_type,error,

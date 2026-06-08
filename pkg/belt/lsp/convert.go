@@ -49,6 +49,9 @@ func toDiagnostics(doc view) []protocol.Diagnostic {
 	raw = append(raw, doc.AST().Concrete().LexDiagnostics()...)
 	raw = append(raw, doc.AST().Diagnostics()...)
 	raw = append(raw, doc.Diagnostics()...)
+	// Advisory lint (faded dead code) rides the same publish as the analyzer's
+	// diagnostics, sorted in by position.
+	raw = append(raw, doc.Lint()...)
 	sort.SliceStable(raw, func(i, j int) bool { return raw[i].Offset < raw[j].Offset })
 
 	out := make([]protocol.Diagnostic, 0, len(raw))

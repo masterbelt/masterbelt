@@ -31,6 +31,7 @@ func Check(m *ir.Module, span Span, prior []diagnostic.Diagnostic) []diagnostic.
 	}
 	l := &linter{span: span, errors: errorRanges(prior)}
 	l.unreachableCode(m)
+	l.unusedDeclarations(m)
 	return l.diags
 }
 

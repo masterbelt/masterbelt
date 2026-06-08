@@ -3,11 +3,14 @@
 package lint
 
 import (
+	"fmt"
+
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
 )
 
 const (
-	CodeUnreachableCode diagnostic.Code = "belt.lint.unreachable_code"
+	CodeUnreachableCode   diagnostic.Code = "belt.lint.unreachable_code"
+	CodeUnusedDeclaration diagnostic.Code = "belt.lint.unused_declaration"
 )
 
 func newUnreachableCodeDiagnostic(offset int, width int) diagnostic.Diagnostic {
@@ -16,6 +19,20 @@ func newUnreachableCodeDiagnostic(offset int, width int) diagnostic.Diagnostic {
 		Code:     CodeUnreachableCode,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeUnreachableCode, nil),
 		Fields:   nil,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newUnusedDeclarationDiagnostic(offset int, width int, name string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"name": diagnostic.Str(name),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Hint,
+		Code:     CodeUnusedDeclaration,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeUnusedDeclaration, fields),
+		Fields:   fields,
 		Offset:   offset,
 		Width:    width,
 	}

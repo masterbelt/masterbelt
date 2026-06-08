@@ -67,7 +67,7 @@ func TestServerEndToEnd(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	const src = "const MaxLevel: long = 100\nconst Min = 0\n"
+	const src = "pub const MaxLevel: long = 100\npub const Min = 0\n"
 	if err := h.DidOpen(uri, "masterbelt", src); err != nil {
 		t.Fatal(err)
 	}

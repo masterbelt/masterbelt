@@ -127,6 +127,10 @@ func (v view) FuncLitTypes() map[*ast.FuncLit]*ir.Func { return v.ws.prog.FuncLi
 
 func (v view) Diagnostics() []diagnostic.Diagnostic { return v.ws.prog.Diagnostics(v.id) }
 
+// Lint returns the file's advisory lint diagnostics — the editor surfaces them
+// (faded dead code) alongside the analyzer's, but they stay a separate channel.
+func (v view) Lint() []diagnostic.Diagnostic { return v.ws.prog.Lint(v.id) }
+
 func (v view) TypeNames() []*ir.TypeDef { return v.ws.prog.TypeNames(v.id) }
 
 func (v view) Constructors() []*ir.TypeDef { return v.ws.prog.Constructors(v.id) }

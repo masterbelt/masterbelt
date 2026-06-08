@@ -95,7 +95,9 @@ func checkProject(rep reporter.Reporter, proj *project.Project) error {
 
 	decls := 0
 	for _, f := range proj.Files() {
-		rep.Report(source.NewFile(displayPath(f.Path), f.Data), gatherDiagnostics(f.AST, prog, semantic.FileID(f.ID)))
+		id := semantic.FileID(f.ID)
+		diags := append(gatherDiagnostics(f.AST, prog, id), prog.Lint(id)...)
+		rep.Report(source.NewFile(displayPath(f.Path), f.Data), diags)
 		decls += countDecls(f.AST.File())
 	}
 	reportStats(prog.Stats(), len(proj.Files()), decls)
@@ -155,7 +157,8 @@ func checkSource(rep reporter.Reporter, path string, data []byte) error {
 	prog.Refresh()
 
 	installAnchors(rep, prog, map[string]semantic.FileID{displayPath(path): id})
-	rep.Report(source.NewFile(displayPath(path), data), gatherDiagnostics(doc, prog, id))
+	diags := append(gatherDiagnostics(doc, prog, id), prog.Lint(id)...)
+	rep.Report(source.NewFile(displayPath(path), data), diags)
 	reportStats(prog.Stats(), 1, countDecls(doc.File()))
 	if n := rep.Errors(); n > 0 {
 		return fmt.Errorf("%s: %d error(s)", displayPath(path), n)

@@ -77,7 +77,7 @@ func TestToTags(t *testing.T) {
 }
 
 func TestToDiagnosticsEmptyIsNonNil(t *testing.T) {
-	diags := toDiagnostics(testView("const X = 1\n"))
+	diags := toDiagnostics(testView("pub const X = 1\n"))
 	if diags == nil {
 		t.Fatal("toDiagnostics returned nil; want an empty (clearing) slice")
 	}

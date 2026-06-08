@@ -5,6 +5,7 @@ import (
 	"slices"
 
 	"github.com/masterbelt/masterbelt/pkg/belt/builtin"
+	"github.com/masterbelt/masterbelt/pkg/belt/lint"
 	"github.com/masterbelt/masterbelt/pkg/belt/parser/abstract"
 	"github.com/masterbelt/masterbelt/pkg/belt/types"
 	"github.com/masterbelt/masterbelt/pkg/belt/types/infer"
@@ -100,6 +101,26 @@ func (p *Program) MemoCount() int { return p.db.memoCount() }
 // Diagnostics returns a file's semantic diagnostics from the last Refresh,
 // ordered by offset.
 func (p *Program) Diagnostics(id FileID) []diagnostic.Diagnostic { return p.diags[id] }
+
+// Lint returns a file's advisory lint diagnostics — unreachable code, unused
+// declarations — computed over its resolved module. They are deliberately kept
+// out of Diagnostics, the analyzer's errors: lint is a layer a surface opts
+// into (check and the LSP surface it), not a result the analyzer's own callers
+// and tests must account for. A declaration the analyzer already reported an
+// error for is left alone, so a broken declaration is not also called dead.
+func (p *Program) Lint(id FileID) []diagnostic.Diagnostic {
+	module := p.modules[id]
+	doc := p.docs[id]
+	if module == nil || doc == nil {
+		return nil
+	}
+	positions := positionsOf(doc.Concrete().Tree())
+	span := func(n ast.Node) (int, int) {
+		s := spanOf(positions, n)
+		return s.offset, s.width
+	}
+	return lint.Check(module, span, p.diags[id])
+}
 
 // Document returns the file's underlying syntax document.
 func (p *Program) Document(id FileID) *abstract.Document { return p.docs[id] }
