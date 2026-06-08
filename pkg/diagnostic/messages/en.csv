@@ -1,105 +1,105 @@
 code,message
-masterbelt.lexer.unexpected_character,unexpected character: {char}
-masterbelt.lexer.unterminated_block_comment,unterminated block comment
-masterbelt.lexer.unterminated_string,unterminated string literal
-masterbelt.lexer.invalid_escape,invalid escape sequence: {escape}
-masterbelt.lexer.invalid_unicode_escape,invalid unicode escape: {escape}
-masterbelt.lexer.invalid_datetime,invalid datetime literal: {text}
-masterbelt.lexer.unknown_duration_unit,unknown duration unit: {unit}
-masterbelt.parser.concrete.expected_const,expected 'const'
-masterbelt.parser.concrete.expected_identifier,expected identifier
-masterbelt.parser.concrete.expected_type,expected type
-masterbelt.parser.concrete.expected_assign,expected '='
-masterbelt.parser.concrete.expected_expression,expected expression
-masterbelt.parser.concrete.unexpected_token,unexpected token: {kind}
-masterbelt.parser.concrete.expected_operand,expected operand after '{operator}'
-masterbelt.parser.concrete.expected_from,expected 'from'
-masterbelt.parser.concrete.expected_path,expected import path string
-masterbelt.parser.concrete.expected_param_list,expected '('
-masterbelt.parser.concrete.expected_func_body,expected '->' or '{'
-masterbelt.parser.concrete.expected_fn,expected 'fn' after 'static'
-masterbelt.parser.concrete.arrow_block_body,expected expression after '->'; remove '->' to use a block body
-masterbelt.semantic.duplicate_declaration,duplicate declaration of {name}
-masterbelt.semantic.undefined_name,undefined name: {name}
-masterbelt.semantic.unknown_type,unknown type: {name}
-masterbelt.semantic.cyclic_reference,cyclic reference involving {name}
-masterbelt.semantic.constant_overflow,constant {value} overflows {typ}
-masterbelt.semantic.invalid_operation,cannot apply method {method} to {types}
-masterbelt.semantic.no_matching_overload,no overload of method {method} accepts {types}
-masterbelt.semantic.ambiguous_overload,ambiguous call: more than one overload of method {method} accepts {types}
-masterbelt.semantic.duplicate_overload,method {method} redeclares the parameter types ({types})
-masterbelt.semantic.division_by_zero,division by zero
-masterbelt.semantic.type_mismatch,cannot use {actual} as {expected}
-masterbelt.semantic.uninferable_collection,cannot infer the type of this collection literal; annotate it
-masterbelt.semantic.missing_field,record literal of {typ} is missing field {field}
-masterbelt.semantic.unknown_field,{typ} has no field {field}
-masterbelt.semantic.uninferable_record,cannot infer the type of this record literal; name its type or annotate it
-masterbelt.semantic.not_a_record,{typ} is not a record type
-masterbelt.semantic.uninferable_result,cannot infer this function literal's result type; annotate it or return a value
-masterbelt.semantic.uninferable_parameter,cannot infer the type of parameter {name}; annotate it
-masterbelt.semantic.lambda_arity_mismatch,function literal has {actual} parameters; {expected} expected
-masterbelt.semantic.arity_mismatch,function {name} takes {expected} argument(s); {actual} given
-masterbelt.semantic.missing_return,function {name} never returns a value
-masterbelt.semantic.no_matching_func_overload,no overload of function {name} accepts {types}
-masterbelt.semantic.ambiguous_func_overload,ambiguous call: more than one overload of function {name} accepts {types}
-masterbelt.semantic.duplicate_func_overload,function {name} redeclares the parameter types ({types})
-masterbelt.semantic.self_outside_method,self is only available inside a method body
-masterbelt.semantic.use_not_found,imported file not found: {path}
-masterbelt.semantic.not_exported,{path} does not export {name}
-masterbelt.semantic.unknown_member,{namespace} has no exported member {name}
-masterbelt.semantic.ambiguous_import,{name} is ambiguous; it arrives from more than one import
-masterbelt.semantic.cyclic_module,import cycle through {path}
-masterbelt.semantic.assertion_failed,assertion failed: {cond}{doc}{diagram}
-masterbelt.semantic.assertion_not_bool,assertion must be a bool; got {typ}
-masterbelt.semantic.assertion_not_constant,assertion is not a compile-time constant
-masterbelt.semantic.duplicate_enum_member,duplicate enum member {name}
-masterbelt.semantic.unknown_enum_member,{enum} has no member {member}
-masterbelt.semantic.invalid_enum_base_type,{typ} is not a valid enum base type (use an integer type or string)
-masterbelt.semantic.duplicate_enum_value,enum member {name} duplicates the value {value}
-masterbelt.semantic.unknown_associated_const,{typ} has no associated constant {name}
-masterbelt.semantic.extern_outside_builtin,extern is reserved for the builtin surface; nothing here can supply a native for {name}
-masterbelt.semantic.builtin_outside_builtin,= builtin is reserved for the builtin surface; the registry supplies no native for {name}
-masterbelt.semantic.unfolded_const,constant {name} has no compile-time value: {reason} — depth means the computation exceeded the evaluation budget (make it shallower or split it); evaluator gap means this is a masterbelt bug (please report it)
-masterbelt.semantic.refinement_violation,value {value} does not satisfy {typ}: {predicate}{diagram}
-masterbelt.semantic.refinement_not_bool,where clause must be a bool; got {typ}
-masterbelt.semantic.refinement_not_constant,where clause is not a compile-time predicate
-masterbelt.semantic.missing_effect,function {fn} uses effect {effect} without declaring it
-masterbelt.semantic.unused_effect,function {fn} declares effect {effect} but never uses it
-masterbelt.semantic.effect_in_pure_context,a {context} is evaluated at compile time and must be pure; effect {effect} is not allowed
-masterbelt.semantic.non_exhaustive_switch,switch on {typ} is not exhaustive: {missing}
-masterbelt.semantic.duplicate_switch_arm,duplicate switch arm for {value}
-masterbelt.semantic.arm_value_type_mismatch,cannot use {actual} as a {expected} switch value
-masterbelt.semantic.unreachable_arm,unreachable arm: a previous arm or the wildcard already matches every value
-masterbelt.semantic.scrutinee_not_comparable,switch needs a comparable scrutinee ({typ}); use match to branch on a record or union type
-masterbelt.semantic.non_exhaustive_match,match on {typ} is not exhaustive: {missing}
-masterbelt.semantic.arm_type_not_in_union,{arm} is not a member of {typ}
-masterbelt.semantic.ambiguous_union_member,cannot tell which member of {typ} {actual} flows in as; pin it with an explicit conversion (e.g. short(1))
-masterbelt.semantic.duplicate_match_arm,duplicate match arm for {arm}
-masterbelt.semantic.condition_not_bool,if condition must be a bool; got {typ}
-masterbelt.semantic.ternary_condition_not_bool,ternary condition must be a bool; got {typ}
-masterbelt.semantic.ternary_branch_mismatch,ternary branches have mismatched types: {then} and {els}
-masterbelt.semantic.assign_to_const,cannot assign to {name}: a const is immutable; use let for a mutable local
-masterbelt.semantic.assign_to_undefined,cannot assign to {name}: no let binding with that name is in scope
-masterbelt.semantic.assign_type_mismatch,cannot assign {actual} to {name}: its type is fixed to {expected}
-masterbelt.semantic.immutable_data,cannot assign to a field or element: data is immutable; build a new value instead
-masterbelt.semantic.missing_initializer,let {name} must be initialized: write let {name} = value
-masterbelt.semantic.index_out_of_range,index {index} is out of range for a list of length {length}
-masterbelt.semantic.missing_required_method,{typ} does not implement {iface}: missing required method {method}
-masterbelt.semantic.not_an_interface,{name} is not an interface
-masterbelt.semantic.interface_member_override,{child} cannot redeclare {method}: it is already inherited from {ancestor}
-masterbelt.semantic.interface_member_conflict,{child} inherits {method} from two unrelated interfaces ({first} and {second})
-masterbelt.semantic.bound_not_satisfied,{typ} does not satisfy the bound {bound}: it does not implement that interface
-masterbelt.semantic.uninferable_type_param,cannot infer the type parameter {name} from the arguments; no argument pins it
-masterbelt.semantic.no_method_on_unbounded_typevar,cannot call {method} on an unbounded type parameter: add an interface bound to call its methods
-masterbelt.semantic.not_iterable,for can only iterate a foldable collection; {typ} is not foldable
-masterbelt.semantic.loop_var_immutable,cannot assign to the loop variable {name}: it is immutable; accumulate into a let
-masterbelt.semantic.range_step_zero,range step cannot be zero
-masterbelt.semantic.invalid_getter_signature,getter {name} must take no parameters
-masterbelt.semantic.invalid_setter_signature,setter {name} must take one parameter and return self
-masterbelt.semantic.accessor_collision,accessor {name} collides with another member of the same name on {typ}
-masterbelt.semantic.static_collision,static fn {name} collides with an associated constant or enum member of the same name on {typ}
-masterbelt.semantic.unknown_static,{typ} has no static fn {name}
-masterbelt.semantic.generic_static,generic static fn {name} is not supported
+belt.lexer.unexpected_character,unexpected character: {char}
+belt.lexer.unterminated_block_comment,unterminated block comment
+belt.lexer.unterminated_string,unterminated string literal
+belt.lexer.invalid_escape,invalid escape sequence: {escape}
+belt.lexer.invalid_unicode_escape,invalid unicode escape: {escape}
+belt.lexer.invalid_datetime,invalid datetime literal: {text}
+belt.lexer.unknown_duration_unit,unknown duration unit: {unit}
+belt.parser.concrete.expected_const,expected 'const'
+belt.parser.concrete.expected_identifier,expected identifier
+belt.parser.concrete.expected_type,expected type
+belt.parser.concrete.expected_assign,expected '='
+belt.parser.concrete.expected_expression,expected expression
+belt.parser.concrete.unexpected_token,unexpected token: {kind}
+belt.parser.concrete.expected_operand,expected operand after '{operator}'
+belt.parser.concrete.expected_from,expected 'from'
+belt.parser.concrete.expected_path,expected import path string
+belt.parser.concrete.expected_param_list,expected '('
+belt.parser.concrete.expected_func_body,expected '->' or '{'
+belt.parser.concrete.expected_fn,expected 'fn' after 'static'
+belt.parser.concrete.arrow_block_body,expected expression after '->'; remove '->' to use a block body
+belt.semantic.duplicate_declaration,duplicate declaration of {name}
+belt.semantic.undefined_name,undefined name: {name}
+belt.semantic.unknown_type,unknown type: {name}
+belt.semantic.cyclic_reference,cyclic reference involving {name}
+belt.semantic.constant_overflow,constant {value} overflows {typ}
+belt.semantic.invalid_operation,cannot apply method {method} to {types}
+belt.semantic.no_matching_overload,no overload of method {method} accepts {types}
+belt.semantic.ambiguous_overload,ambiguous call: more than one overload of method {method} accepts {types}
+belt.semantic.duplicate_overload,method {method} redeclares the parameter types ({types})
+belt.semantic.division_by_zero,division by zero
+belt.semantic.type_mismatch,cannot use {actual} as {expected}
+belt.semantic.uninferable_collection,cannot infer the type of this collection literal; annotate it
+belt.semantic.missing_field,record literal of {typ} is missing field {field}
+belt.semantic.unknown_field,{typ} has no field {field}
+belt.semantic.uninferable_record,cannot infer the type of this record literal; name its type or annotate it
+belt.semantic.not_a_record,{typ} is not a record type
+belt.semantic.uninferable_result,cannot infer this function literal's result type; annotate it or return a value
+belt.semantic.uninferable_parameter,cannot infer the type of parameter {name}; annotate it
+belt.semantic.lambda_arity_mismatch,function literal has {actual} parameters; {expected} expected
+belt.semantic.arity_mismatch,function {name} takes {expected} argument(s); {actual} given
+belt.semantic.missing_return,function {name} never returns a value
+belt.semantic.no_matching_func_overload,no overload of function {name} accepts {types}
+belt.semantic.ambiguous_func_overload,ambiguous call: more than one overload of function {name} accepts {types}
+belt.semantic.duplicate_func_overload,function {name} redeclares the parameter types ({types})
+belt.semantic.self_outside_method,self is only available inside a method body
+belt.semantic.use_not_found,imported file not found: {path}
+belt.semantic.not_exported,{path} does not export {name}
+belt.semantic.unknown_member,{namespace} has no exported member {name}
+belt.semantic.ambiguous_import,{name} is ambiguous; it arrives from more than one import
+belt.semantic.cyclic_module,import cycle through {path}
+belt.semantic.assertion_failed,assertion failed: {cond}{doc}{diagram}
+belt.semantic.assertion_not_bool,assertion must be a bool; got {typ}
+belt.semantic.assertion_not_constant,assertion is not a compile-time constant
+belt.semantic.duplicate_enum_member,duplicate enum member {name}
+belt.semantic.unknown_enum_member,{enum} has no member {member}
+belt.semantic.invalid_enum_base_type,{typ} is not a valid enum base type (use an integer type or string)
+belt.semantic.duplicate_enum_value,enum member {name} duplicates the value {value}
+belt.semantic.unknown_associated_const,{typ} has no associated constant {name}
+belt.semantic.extern_outside_builtin,extern is reserved for the builtin surface; nothing here can supply a native for {name}
+belt.semantic.builtin_outside_builtin,= builtin is reserved for the builtin surface; the registry supplies no native for {name}
+belt.semantic.unfolded_const,constant {name} has no compile-time value: {reason} — depth means the computation exceeded the evaluation budget (make it shallower or split it); evaluator gap means this is a masterbelt bug (please report it)
+belt.semantic.refinement_violation,value {value} does not satisfy {typ}: {predicate}{diagram}
+belt.semantic.refinement_not_bool,where clause must be a bool; got {typ}
+belt.semantic.refinement_not_constant,where clause is not a compile-time predicate
+belt.semantic.missing_effect,function {fn} uses effect {effect} without declaring it
+belt.semantic.unused_effect,function {fn} declares effect {effect} but never uses it
+belt.semantic.effect_in_pure_context,a {context} is evaluated at compile time and must be pure; effect {effect} is not allowed
+belt.semantic.non_exhaustive_switch,switch on {typ} is not exhaustive: {missing}
+belt.semantic.duplicate_switch_arm,duplicate switch arm for {value}
+belt.semantic.arm_value_type_mismatch,cannot use {actual} as a {expected} switch value
+belt.semantic.unreachable_arm,unreachable arm: a previous arm or the wildcard already matches every value
+belt.semantic.scrutinee_not_comparable,switch needs a comparable scrutinee ({typ}); use match to branch on a record or union type
+belt.semantic.non_exhaustive_match,match on {typ} is not exhaustive: {missing}
+belt.semantic.arm_type_not_in_union,{arm} is not a member of {typ}
+belt.semantic.ambiguous_union_member,cannot tell which member of {typ} {actual} flows in as; pin it with an explicit conversion (e.g. short(1))
+belt.semantic.duplicate_match_arm,duplicate match arm for {arm}
+belt.semantic.condition_not_bool,if condition must be a bool; got {typ}
+belt.semantic.ternary_condition_not_bool,ternary condition must be a bool; got {typ}
+belt.semantic.ternary_branch_mismatch,ternary branches have mismatched types: {then} and {els}
+belt.semantic.assign_to_const,cannot assign to {name}: a const is immutable; use let for a mutable local
+belt.semantic.assign_to_undefined,cannot assign to {name}: no let binding with that name is in scope
+belt.semantic.assign_type_mismatch,cannot assign {actual} to {name}: its type is fixed to {expected}
+belt.semantic.immutable_data,cannot assign to a field or element: data is immutable; build a new value instead
+belt.semantic.missing_initializer,let {name} must be initialized: write let {name} = value
+belt.semantic.index_out_of_range,index {index} is out of range for a list of length {length}
+belt.semantic.missing_required_method,{typ} does not implement {iface}: missing required method {method}
+belt.semantic.not_an_interface,{name} is not an interface
+belt.semantic.interface_member_override,{child} cannot redeclare {method}: it is already inherited from {ancestor}
+belt.semantic.interface_member_conflict,{child} inherits {method} from two unrelated interfaces ({first} and {second})
+belt.semantic.bound_not_satisfied,{typ} does not satisfy the bound {bound}: it does not implement that interface
+belt.semantic.uninferable_type_param,cannot infer the type parameter {name} from the arguments; no argument pins it
+belt.semantic.no_method_on_unbounded_typevar,cannot call {method} on an unbounded type parameter: add an interface bound to call its methods
+belt.semantic.not_iterable,for can only iterate a foldable collection; {typ} is not foldable
+belt.semantic.loop_var_immutable,cannot assign to the loop variable {name}: it is immutable; accumulate into a let
+belt.semantic.range_step_zero,range step cannot be zero
+belt.semantic.invalid_getter_signature,getter {name} must take no parameters
+belt.semantic.invalid_setter_signature,setter {name} must take one parameter and return self
+belt.semantic.accessor_collision,accessor {name} collides with another member of the same name on {typ}
+belt.semantic.static_collision,static fn {name} collides with an associated constant or enum member of the same name on {typ}
+belt.semantic.unknown_static,{typ} has no static fn {name}
+belt.semantic.generic_static,generic static fn {name} is not supported
 project.config.missing,masterbelt.toml not found in this directory or any parent
 project.config.invalid,invalid masterbelt.toml: {detail}
 project.config.missing_entry,masterbelt.toml does not set entry

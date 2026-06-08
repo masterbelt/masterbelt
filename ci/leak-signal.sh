@@ -20,7 +20,7 @@ GO="${GO:-go}"
 # A long edit sequence so retained-memory drift, if any, has room to show.
 BENCHTIME="${BENCHTIME:-2s}"
 BENCHCOUNT="${BENCHCOUNT:-3}"
-PKG="${PKG:-./pkg/masterbelt/semantic/}"
+PKG="${PKG:-./pkg/belt/semantic/}"
 
 raw="$(mktemp)"
 trap 'rm -f "$raw"' EXIT

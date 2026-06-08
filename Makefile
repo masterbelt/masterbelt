@@ -31,9 +31,9 @@ test:
 FUZZTIME ?= 30s
 .PHONY: fuzz
 fuzz:
-	$(GO) test ./pkg/masterbelt/parser/concrete/ -run FuzzCSTUnmarshal -fuzz FuzzCSTUnmarshal -fuzztime $(FUZZTIME)
-	$(GO) test ./pkg/masterbelt/parser/abstract/ -run FuzzASTUnmarshal -fuzz FuzzASTUnmarshal -fuzztime $(FUZZTIME)
-	$(GO) test ./pkg/masterbelt/semantic/ -run FuzzIRUnmarshal -fuzz FuzzIRUnmarshal -fuzztime $(FUZZTIME)
+	$(GO) test ./pkg/belt/parser/concrete/ -run FuzzCSTUnmarshal -fuzz FuzzCSTUnmarshal -fuzztime $(FUZZTIME)
+	$(GO) test ./pkg/belt/parser/abstract/ -run FuzzASTUnmarshal -fuzz FuzzASTUnmarshal -fuzztime $(FUZZTIME)
+	$(GO) test ./pkg/belt/semantic/ -run FuzzIRUnmarshal -fuzz FuzzIRUnmarshal -fuzztime $(FUZZTIME)
 
 # generate runs code generation (the diagnostic tables, etc.).
 .PHONY: generate
@@ -66,7 +66,7 @@ vet:
 
 # bench runs the performance benchmarks (D-1 M2): the cold-compile and scale
 # benches over the synthetic corpus (internal/beltgen) and the incremental
-# edit-replay bench (pkg/masterbelt/semantic). -benchmem reports the allocation
+# edit-replay bench (pkg/belt/semantic). -benchmem reports the allocation
 # counts the deterministic alloc gate (D-1 M3/M4) reads.
 .PHONY: bench
 bench:
@@ -82,7 +82,7 @@ bench:
 # what make the comparison meaningful, not any single run. Override BENCHTIME /
 # BENCHCOUNT / BENCHOUT to retarget (the workflow points BENCHOUT at new.txt /
 # old.txt). Shared-runner variance means the result is advisory (D-1 §9).
-BENCH_TREND_PKGS ?= ./internal/beltgen/ ./pkg/masterbelt/semantic/
+BENCH_TREND_PKGS ?= ./internal/beltgen/ ./pkg/belt/semantic/
 BENCH_TREND_RE   ?= BenchmarkColdCompile|BenchmarkIncremental
 BENCHTIME        ?= 100ms
 BENCHCOUNT       ?= 6
@@ -117,12 +117,12 @@ benchstat:
 # never a fail condition; everything here is a deterministic count.
 .PHONY: perf
 perf:
-	$(GO) test ./pkg/masterbelt/semantic/ -run 'TestReuseSnapshot|TestColdCompileAllocCeiling|TestIncrementalAllocCeiling' -count=1
+	$(GO) test ./pkg/belt/semantic/ -run 'TestReuseSnapshot|TestColdCompileAllocCeiling|TestIncrementalAllocCeiling' -count=1
 
 # prof captures a profile of a check run via the root's cross-cutting flags
 # (D-1 §2): `make prof PROF_ARGS="check path/to/project"` writes cpu.prof and
 # mem.prof to the working directory. Open with `go tool pprof`.
-PROF_ARGS ?= check pkg/masterbelt/testdata/projects/midsize
+PROF_ARGS ?= check pkg/belt/testdata/projects/midsize
 .PHONY: prof
 prof: build
 	$(BIN_DIR)/masterbelt --cpuprofile cpu.prof --memprofile mem.prof $(PROF_ARGS)

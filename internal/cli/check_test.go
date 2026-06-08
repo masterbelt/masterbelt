@@ -70,7 +70,7 @@ func TestCheckReportsSourceErrors(t *testing.T) {
 		t.Fatalf("check succeeded, want an error\n%s", out)
 	}
 	// The diagnostic is anchored to the entry file with line and column.
-	if !strings.Contains(out, "main.belt:1:11: error[masterbelt.semantic.undefined_name]: undefined name: B") {
+	if !strings.Contains(out, "main.belt:1:11: error[belt.semantic.undefined_name]: undefined name: B") {
 		t.Errorf("output = %q, want the anchored undefined_name diagnostic", out)
 	}
 }
@@ -118,7 +118,7 @@ func TestCheckMultiFileProject(t *testing.T) {
 	if err == nil {
 		t.Fatalf("check succeeded, want an error\n%s", out)
 	}
-	if !strings.Contains(out, "geometry.belt:1:20: error[masterbelt.semantic.undefined_name]: undefined name: Broken") {
+	if !strings.Contains(out, "geometry.belt:1:20: error[belt.semantic.undefined_name]: undefined name: Broken") {
 		t.Errorf("output = %q, want the error anchored in geometry.belt", out)
 	}
 }
@@ -132,7 +132,7 @@ func TestCheckUseNotFound(t *testing.T) {
 	if err == nil {
 		t.Fatalf("check succeeded, want an error\n%s", out)
 	}
-	if !strings.Contains(out, "error[masterbelt.semantic.use_not_found]: imported file not found: missing.belt") {
+	if !strings.Contains(out, "error[belt.semantic.use_not_found]: imported file not found: missing.belt") {
 		t.Errorf("output = %q, want the use_not_found diagnostic", out)
 	}
 }
@@ -172,7 +172,7 @@ func TestCheckJSON(t *testing.T) {
 		t.Fatalf("report = %+v, want version 1 with one diagnostic", report)
 	}
 	d := report.Diagnostics[0]
-	if d.Code != "masterbelt.semantic.undefined_name" {
+	if d.Code != "belt.semantic.undefined_name" {
 		t.Errorf("code = %q", d.Code)
 	}
 	if !strings.HasSuffix(d.File, "main.belt") {
@@ -261,7 +261,7 @@ func TestCheckProfile(t *testing.T) {
 	if err == nil {
 		t.Fatalf("check --profile=editor succeeded, want an error\n%s", out)
 	}
-	if !strings.Contains(out, "editor.belt:1:11: error[masterbelt.semantic.undefined_name]") {
+	if !strings.Contains(out, "editor.belt:1:11: error[belt.semantic.undefined_name]") {
 		t.Errorf("output = %q, want the editor entry's diagnostic", out)
 	}
 }
@@ -299,7 +299,7 @@ func TestCheckExplicitFile(t *testing.T) {
 	if err == nil {
 		t.Fatalf("check succeeded, want an error\n%s", out)
 	}
-	if !strings.Contains(out, "error[masterbelt.semantic.undefined_name]") {
+	if !strings.Contains(out, "error[belt.semantic.undefined_name]") {
 		t.Errorf("output = %q, want the undefined_name diagnostic", out)
 	}
 }

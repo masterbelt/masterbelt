@@ -1,7 +1,7 @@
 package beltgen
 
 import (
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/parser/abstract"
+	"github.com/masterbelt/masterbelt/pkg/belt/parser/abstract"
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
 )
 

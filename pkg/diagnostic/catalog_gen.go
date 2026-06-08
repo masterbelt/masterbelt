@@ -7,7 +7,7 @@ import "fmt"
 // renderers maps each diagnostic code to a function that renders its message
 // in a given locale from the diagnostic's fields.
 var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
-	"masterbelt.lexer.invalid_datetime": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.lexer.invalid_datetime": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "不正な日時リテラル: " + f["text"].String()
@@ -15,7 +15,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "invalid datetime literal: " + f["text"].String()
 		}
 	},
-	"masterbelt.lexer.invalid_escape": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.lexer.invalid_escape": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "不正なエスケープシーケンス: " + f["escape"].String()
@@ -23,7 +23,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "invalid escape sequence: " + f["escape"].String()
 		}
 	},
-	"masterbelt.lexer.invalid_unicode_escape": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.lexer.invalid_unicode_escape": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "不正なUnicodeエスケープ: " + f["escape"].String()
@@ -31,7 +31,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "invalid unicode escape: " + f["escape"].String()
 		}
 	},
-	"masterbelt.lexer.unexpected_character": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.lexer.unexpected_character": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "予期しない文字: " + f["char"].String()
@@ -39,7 +39,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "unexpected character: " + f["char"].String()
 		}
 	},
-	"masterbelt.lexer.unknown_duration_unit": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.lexer.unknown_duration_unit": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "未知の期間単位: " + f["unit"].String()
@@ -47,7 +47,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "unknown duration unit: " + f["unit"].String()
 		}
 	},
-	"masterbelt.lexer.unterminated_block_comment": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.lexer.unterminated_block_comment": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "ブロックコメントが閉じられていません"
@@ -55,7 +55,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "unterminated block comment"
 		}
 	},
-	"masterbelt.lexer.unterminated_string": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.lexer.unterminated_string": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "文字列リテラルが閉じられていません"
@@ -63,7 +63,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "unterminated string literal"
 		}
 	},
-	"masterbelt.parser.concrete.arrow_block_body": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.parser.concrete.arrow_block_body": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "'->' の後には式が必要です。ブロック本体にするには '->' を削除してください"
@@ -71,7 +71,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "expected expression after '->'; remove '->' to use a block body"
 		}
 	},
-	"masterbelt.parser.concrete.expected_assign": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.parser.concrete.expected_assign": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "'=' が必要です"
@@ -79,7 +79,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "expected '='"
 		}
 	},
-	"masterbelt.parser.concrete.expected_const": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.parser.concrete.expected_const": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "'const' が必要です"
@@ -87,7 +87,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "expected 'const'"
 		}
 	},
-	"masterbelt.parser.concrete.expected_expression": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.parser.concrete.expected_expression": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "式が必要です"
@@ -95,7 +95,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "expected expression"
 		}
 	},
-	"masterbelt.parser.concrete.expected_fn": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.parser.concrete.expected_fn": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "'static' の後には 'fn' が必要です"
@@ -103,7 +103,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "expected 'fn' after 'static'"
 		}
 	},
-	"masterbelt.parser.concrete.expected_from": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.parser.concrete.expected_from": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "'from' が必要です"
@@ -111,7 +111,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "expected 'from'"
 		}
 	},
-	"masterbelt.parser.concrete.expected_func_body": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.parser.concrete.expected_func_body": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "'->' か '{' が必要です"
@@ -119,7 +119,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "expected '->' or '{'"
 		}
 	},
-	"masterbelt.parser.concrete.expected_identifier": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.parser.concrete.expected_identifier": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "識別子が必要です"
@@ -127,7 +127,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "expected identifier"
 		}
 	},
-	"masterbelt.parser.concrete.expected_operand": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.parser.concrete.expected_operand": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "'" + f["operator"].String() + "' の後にオペランドが必要です"
@@ -135,7 +135,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "expected operand after '" + f["operator"].String() + "'"
 		}
 	},
-	"masterbelt.parser.concrete.expected_param_list": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.parser.concrete.expected_param_list": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "'(' が必要です"
@@ -143,7 +143,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "expected '('"
 		}
 	},
-	"masterbelt.parser.concrete.expected_path": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.parser.concrete.expected_path": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "インポートパスの文字列が必要です"
@@ -151,7 +151,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "expected import path string"
 		}
 	},
-	"masterbelt.parser.concrete.expected_type": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.parser.concrete.expected_type": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "型が必要です"
@@ -159,7 +159,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "expected type"
 		}
 	},
-	"masterbelt.parser.concrete.unexpected_token": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.parser.concrete.unexpected_token": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "予期しないトークン: " + f["kind"].String()
@@ -167,7 +167,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "unexpected token: " + f["kind"].String()
 		}
 	},
-	"masterbelt.semantic.accessor_collision": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.accessor_collision": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "アクセサ " + f["name"].String() + " は " + f["typ"].String() + " の同名の別メンバと衝突しています"
@@ -175,7 +175,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "accessor " + f["name"].String() + " collides with another member of the same name on " + f["typ"].String()
 		}
 	},
-	"masterbelt.semantic.ambiguous_func_overload": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.ambiguous_func_overload": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "関数 " + f["name"].String() + " の呼び出しが曖昧です: " + f["types"].String() + " に複数のオーバーロードが適合します"
@@ -183,7 +183,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "ambiguous call: more than one overload of function " + f["name"].String() + " accepts " + f["types"].String()
 		}
 	},
-	"masterbelt.semantic.ambiguous_import": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.ambiguous_import": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return f["name"].String() + " は曖昧です。複数のインポートから到来しています"
@@ -191,7 +191,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return f["name"].String() + " is ambiguous; it arrives from more than one import"
 		}
 	},
-	"masterbelt.semantic.ambiguous_overload": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.ambiguous_overload": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "メソッド " + f["method"].String() + " の呼び出しが曖昧です: " + f["types"].String() + " に複数のオーバーロードが適合します"
@@ -199,7 +199,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "ambiguous call: more than one overload of method " + f["method"].String() + " accepts " + f["types"].String()
 		}
 	},
-	"masterbelt.semantic.ambiguous_union_member": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.ambiguous_union_member": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return f["actual"].String() + " が " + f["typ"].String() + " のどのメンバとして流入するか確定できません。short(1) のような明示変換で確定させてください"
@@ -207,7 +207,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "cannot tell which member of " + f["typ"].String() + " " + f["actual"].String() + " flows in as; pin it with an explicit conversion (e.g. short(1))"
 		}
 	},
-	"masterbelt.semantic.arity_mismatch": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.arity_mismatch": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "関数 " + f["name"].String() + " は引数を " + f["expected"].String() + " 個取りますが、" + f["actual"].String() + " 個が渡されています"
@@ -215,7 +215,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "function " + f["name"].String() + " takes " + f["expected"].String() + " argument(s); " + f["actual"].String() + " given"
 		}
 	},
-	"masterbelt.semantic.arm_type_not_in_union": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.arm_type_not_in_union": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return f["arm"].String() + " は " + f["typ"].String() + " のメンバではありません"
@@ -223,7 +223,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return f["arm"].String() + " is not a member of " + f["typ"].String()
 		}
 	},
-	"masterbelt.semantic.arm_value_type_mismatch": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.arm_value_type_mismatch": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return f["actual"].String() + " を " + f["expected"].String() + " の switch 値として使用できません"
@@ -231,7 +231,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "cannot use " + f["actual"].String() + " as a " + f["expected"].String() + " switch value"
 		}
 	},
-	"masterbelt.semantic.assertion_failed": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.assertion_failed": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "表明が成立しません: " + f["cond"].String() + f["doc"].String() + f["diagram"].String()
@@ -239,7 +239,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "assertion failed: " + f["cond"].String() + f["doc"].String() + f["diagram"].String()
 		}
 	},
-	"masterbelt.semantic.assertion_not_bool": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.assertion_not_bool": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "表明は bool でなければなりません(" + f["typ"].String() + ")"
@@ -247,7 +247,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "assertion must be a bool; got " + f["typ"].String()
 		}
 	},
-	"masterbelt.semantic.assertion_not_constant": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.assertion_not_constant": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "表明はコンパイル時定数ではありません"
@@ -255,7 +255,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "assertion is not a compile-time constant"
 		}
 	},
-	"masterbelt.semantic.assign_to_const": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.assign_to_const": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return f["name"].String() + " には代入できません。const は不変です。可変なローカルには let を使ってください"
@@ -263,7 +263,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "cannot assign to " + f["name"].String() + ": a const is immutable; use let for a mutable local"
 		}
 	},
-	"masterbelt.semantic.assign_to_undefined": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.assign_to_undefined": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return f["name"].String() + " には代入できません。その名前の let 束縛がスコープにありません"
@@ -271,7 +271,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "cannot assign to " + f["name"].String() + ": no let binding with that name is in scope"
 		}
 	},
-	"masterbelt.semantic.assign_type_mismatch": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.assign_type_mismatch": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return f["name"].String() + " に " + f["actual"].String() + " を代入できません。型は " + f["expected"].String() + " に固定されています"
@@ -279,7 +279,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "cannot assign " + f["actual"].String() + " to " + f["name"].String() + ": its type is fixed to " + f["expected"].String()
 		}
 	},
-	"masterbelt.semantic.bound_not_satisfied": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.bound_not_satisfied": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return f["typ"].String() + " は境界 " + f["bound"].String() + " を満たしません: その interface を実装していません"
@@ -287,7 +287,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return f["typ"].String() + " does not satisfy the bound " + f["bound"].String() + ": it does not implement that interface"
 		}
 	},
-	"masterbelt.semantic.builtin_outside_builtin": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.builtin_outside_builtin": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "= builtin は builtin サーフェス専用です。registry は " + f["name"].String() + " の実体を供給しません"
@@ -295,7 +295,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "= builtin is reserved for the builtin surface; the registry supplies no native for " + f["name"].String()
 		}
 	},
-	"masterbelt.semantic.condition_not_bool": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.condition_not_bool": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "if の条件は bool でなければなりません(" + f["typ"].String() + ")"
@@ -303,7 +303,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "if condition must be a bool; got " + f["typ"].String()
 		}
 	},
-	"masterbelt.semantic.constant_overflow": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.constant_overflow": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "定数 " + f["value"].String() + " は " + f["typ"].String() + " に収まりません"
@@ -311,7 +311,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "constant " + f["value"].String() + " overflows " + f["typ"].String()
 		}
 	},
-	"masterbelt.semantic.cyclic_module": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.cyclic_module": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return f["path"].String() + " を経由するインポートサイクルです"
@@ -319,7 +319,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "import cycle through " + f["path"].String()
 		}
 	},
-	"masterbelt.semantic.cyclic_reference": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.cyclic_reference": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return f["name"].String() + " を含む循環参照です"
@@ -327,7 +327,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "cyclic reference involving " + f["name"].String()
 		}
 	},
-	"masterbelt.semantic.division_by_zero": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.division_by_zero": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "ゼロ除算です"
@@ -335,7 +335,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "division by zero"
 		}
 	},
-	"masterbelt.semantic.duplicate_declaration": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.duplicate_declaration": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return f["name"].String() + " が重複して宣言されています"
@@ -343,7 +343,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "duplicate declaration of " + f["name"].String()
 		}
 	},
-	"masterbelt.semantic.duplicate_enum_member": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.duplicate_enum_member": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "enum メンバ " + f["name"].String() + " が重複しています"
@@ -351,7 +351,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "duplicate enum member " + f["name"].String()
 		}
 	},
-	"masterbelt.semantic.duplicate_enum_value": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.duplicate_enum_value": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "enum メンバ " + f["name"].String() + " は値 " + f["value"].String() + " を重複させています"
@@ -359,7 +359,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "enum member " + f["name"].String() + " duplicates the value " + f["value"].String()
 		}
 	},
-	"masterbelt.semantic.duplicate_func_overload": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.duplicate_func_overload": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "関数 " + f["name"].String() + " が同じ引数型 (" + f["types"].String() + ") で再宣言されています"
@@ -367,7 +367,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "function " + f["name"].String() + " redeclares the parameter types (" + f["types"].String() + ")"
 		}
 	},
-	"masterbelt.semantic.duplicate_match_arm": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.duplicate_match_arm": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "match の arm が重複しています: " + f["arm"].String()
@@ -375,7 +375,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "duplicate match arm for " + f["arm"].String()
 		}
 	},
-	"masterbelt.semantic.duplicate_overload": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.duplicate_overload": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "メソッド " + f["method"].String() + " が同じ引数型 (" + f["types"].String() + ") で再宣言されています"
@@ -383,7 +383,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "method " + f["method"].String() + " redeclares the parameter types (" + f["types"].String() + ")"
 		}
 	},
-	"masterbelt.semantic.duplicate_switch_arm": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.duplicate_switch_arm": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "switch の arm が重複しています: " + f["value"].String()
@@ -391,7 +391,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "duplicate switch arm for " + f["value"].String()
 		}
 	},
-	"masterbelt.semantic.effect_in_pure_context": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.effect_in_pure_context": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return f["context"].String() + " はコンパイル時に評価されるため pure である必要があります。effect " + f["effect"].String() + " は使用できません"
@@ -399,7 +399,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "a " + f["context"].String() + " is evaluated at compile time and must be pure; effect " + f["effect"].String() + " is not allowed"
 		}
 	},
-	"masterbelt.semantic.extern_outside_builtin": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.extern_outside_builtin": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "extern は builtin サーフェス専用です。ここで " + f["name"].String() + " の実体を供給する仕組みはありません"
@@ -407,7 +407,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "extern is reserved for the builtin surface; nothing here can supply a native for " + f["name"].String()
 		}
 	},
-	"masterbelt.semantic.generic_static": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.generic_static": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "ジェネリックな static fn " + f["name"].String() + " はサポートされていません"
@@ -415,7 +415,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "generic static fn " + f["name"].String() + " is not supported"
 		}
 	},
-	"masterbelt.semantic.immutable_data": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.immutable_data": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "フィールドや要素には代入できません。データは不変です。新しい値を作ってください"
@@ -423,7 +423,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "cannot assign to a field or element: data is immutable; build a new value instead"
 		}
 	},
-	"masterbelt.semantic.index_out_of_range": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.index_out_of_range": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "インデックス " + f["index"].String() + " は長さ " + f["length"].String() + " のリストの範囲外です"
@@ -431,7 +431,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "index " + f["index"].String() + " is out of range for a list of length " + f["length"].String()
 		}
 	},
-	"masterbelt.semantic.interface_member_conflict": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.interface_member_conflict": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return f["child"].String() + " は無関係な 2 つの interface (" + f["first"].String() + " と " + f["second"].String() + ") から " + f["method"].String() + " を継承しています"
@@ -439,7 +439,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return f["child"].String() + " inherits " + f["method"].String() + " from two unrelated interfaces (" + f["first"].String() + " and " + f["second"].String() + ")"
 		}
 	},
-	"masterbelt.semantic.interface_member_override": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.interface_member_override": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return f["child"].String() + " は " + f["method"].String() + " を再宣言できません: すでに " + f["ancestor"].String() + " から継承しています"
@@ -447,7 +447,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return f["child"].String() + " cannot redeclare " + f["method"].String() + ": it is already inherited from " + f["ancestor"].String()
 		}
 	},
-	"masterbelt.semantic.invalid_enum_base_type": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.invalid_enum_base_type": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return f["typ"].String() + " は enum の基底型に使えません(整数型か string を指定してください)"
@@ -455,7 +455,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return f["typ"].String() + " is not a valid enum base type (use an integer type or string)"
 		}
 	},
-	"masterbelt.semantic.invalid_getter_signature": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.invalid_getter_signature": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "ゲッター " + f["name"].String() + " は引数を取れません"
@@ -463,7 +463,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "getter " + f["name"].String() + " must take no parameters"
 		}
 	},
-	"masterbelt.semantic.invalid_operation": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.invalid_operation": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "メソッド " + f["method"].String() + " を " + f["types"].String() + " に適用できません"
@@ -471,7 +471,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "cannot apply method " + f["method"].String() + " to " + f["types"].String()
 		}
 	},
-	"masterbelt.semantic.invalid_setter_signature": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.invalid_setter_signature": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "セッター " + f["name"].String() + " は引数を 1 つ取り self を返す必要があります"
@@ -479,7 +479,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "setter " + f["name"].String() + " must take one parameter and return self"
 		}
 	},
-	"masterbelt.semantic.lambda_arity_mismatch": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.lambda_arity_mismatch": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "関数リテラルのパラメータが " + f["actual"].String() + " 個ありますが、" + f["expected"].String() + " 個が必要です"
@@ -487,7 +487,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "function literal has " + f["actual"].String() + " parameters; " + f["expected"].String() + " expected"
 		}
 	},
-	"masterbelt.semantic.loop_var_immutable": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.loop_var_immutable": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "ループ変数 " + f["name"].String() + " には代入できません。不変です。蓄積には let を使ってください"
@@ -495,7 +495,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "cannot assign to the loop variable " + f["name"].String() + ": it is immutable; accumulate into a let"
 		}
 	},
-	"masterbelt.semantic.missing_effect": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.missing_effect": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "関数 " + f["fn"].String() + " は effect " + f["effect"].String() + " を宣言せずに使用しています"
@@ -503,7 +503,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "function " + f["fn"].String() + " uses effect " + f["effect"].String() + " without declaring it"
 		}
 	},
-	"masterbelt.semantic.missing_field": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.missing_field": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return f["typ"].String() + " のレコードリテラルにフィールド " + f["field"].String() + " がありません"
@@ -511,7 +511,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "record literal of " + f["typ"].String() + " is missing field " + f["field"].String()
 		}
 	},
-	"masterbelt.semantic.missing_initializer": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.missing_initializer": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "let " + f["name"].String() + " は初期化が必要です。let " + f["name"].String() + " = 値 と書いてください"
@@ -519,7 +519,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "let " + f["name"].String() + " must be initialized: write let " + f["name"].String() + " = value"
 		}
 	},
-	"masterbelt.semantic.missing_required_method": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.missing_required_method": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return f["typ"].String() + " は " + f["iface"].String() + " を実装していません: 必須メソッド " + f["method"].String() + " がありません"
@@ -527,7 +527,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return f["typ"].String() + " does not implement " + f["iface"].String() + ": missing required method " + f["method"].String()
 		}
 	},
-	"masterbelt.semantic.missing_return": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.missing_return": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "関数 " + f["name"].String() + " が値を返しません"
@@ -535,7 +535,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "function " + f["name"].String() + " never returns a value"
 		}
 	},
-	"masterbelt.semantic.no_matching_func_overload": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.no_matching_func_overload": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "関数 " + f["name"].String() + " のどのオーバーロードも " + f["types"].String() + " に適合しません"
@@ -543,7 +543,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "no overload of function " + f["name"].String() + " accepts " + f["types"].String()
 		}
 	},
-	"masterbelt.semantic.no_matching_overload": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.no_matching_overload": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "メソッド " + f["method"].String() + " のどのオーバーロードも " + f["types"].String() + " に適合しません"
@@ -551,7 +551,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "no overload of method " + f["method"].String() + " accepts " + f["types"].String()
 		}
 	},
-	"masterbelt.semantic.no_method_on_unbounded_typevar": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.no_method_on_unbounded_typevar": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "無境界の型パラメータに対して " + f["method"].String() + " は呼べません。メソッドを使うには interface 境界を付けてください"
@@ -559,7 +559,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "cannot call " + f["method"].String() + " on an unbounded type parameter: add an interface bound to call its methods"
 		}
 	},
-	"masterbelt.semantic.non_exhaustive_match": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.non_exhaustive_match": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return f["typ"].String() + " の match が網羅的ではありません: " + f["missing"].String()
@@ -567,7 +567,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "match on " + f["typ"].String() + " is not exhaustive: " + f["missing"].String()
 		}
 	},
-	"masterbelt.semantic.non_exhaustive_switch": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.non_exhaustive_switch": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return f["typ"].String() + " の switch が網羅的ではありません: " + f["missing"].String()
@@ -575,7 +575,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "switch on " + f["typ"].String() + " is not exhaustive: " + f["missing"].String()
 		}
 	},
-	"masterbelt.semantic.not_a_record": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.not_a_record": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return f["typ"].String() + " はレコード型ではありません"
@@ -583,7 +583,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return f["typ"].String() + " is not a record type"
 		}
 	},
-	"masterbelt.semantic.not_an_interface": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.not_an_interface": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return f["name"].String() + " は interface ではありません"
@@ -591,7 +591,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return f["name"].String() + " is not an interface"
 		}
 	},
-	"masterbelt.semantic.not_exported": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.not_exported": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return f["path"].String() + " は " + f["name"].String() + " を公開していません"
@@ -599,7 +599,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return f["path"].String() + " does not export " + f["name"].String()
 		}
 	},
-	"masterbelt.semantic.not_iterable": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.not_iterable": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "for で反復できるのは foldable なコレクションだけです。" + f["typ"].String() + " は foldable ではありません"
@@ -607,7 +607,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "for can only iterate a foldable collection; " + f["typ"].String() + " is not foldable"
 		}
 	},
-	"masterbelt.semantic.range_step_zero": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.range_step_zero": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "range のステップに 0 は指定できません"
@@ -615,7 +615,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "range step cannot be zero"
 		}
 	},
-	"masterbelt.semantic.refinement_not_bool": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.refinement_not_bool": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "where 節は bool でなければなりません(" + f["typ"].String() + ")"
@@ -623,7 +623,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "where clause must be a bool; got " + f["typ"].String()
 		}
 	},
-	"masterbelt.semantic.refinement_not_constant": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.refinement_not_constant": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "where 節はコンパイル時に評価できる述語ではありません"
@@ -631,7 +631,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "where clause is not a compile-time predicate"
 		}
 	},
-	"masterbelt.semantic.refinement_violation": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.refinement_violation": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "値 " + f["value"].String() + " は " + f["typ"].String() + " の制約を満たしません: " + f["predicate"].String() + f["diagram"].String()
@@ -639,7 +639,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "value " + f["value"].String() + " does not satisfy " + f["typ"].String() + ": " + f["predicate"].String() + f["diagram"].String()
 		}
 	},
-	"masterbelt.semantic.scrutinee_not_comparable": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.scrutinee_not_comparable": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "switch の対象は comparable が必要です (" + f["typ"].String() + ")。record や union を型で分岐するには match を使ってください"
@@ -647,7 +647,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "switch needs a comparable scrutinee (" + f["typ"].String() + "); use match to branch on a record or union type"
 		}
 	},
-	"masterbelt.semantic.self_outside_method": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.self_outside_method": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "self はメソッド本体の中でのみ使えます"
@@ -655,7 +655,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "self is only available inside a method body"
 		}
 	},
-	"masterbelt.semantic.static_collision": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.static_collision": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "static fn " + f["name"].String() + " は " + f["typ"].String() + " の同名の関連定数か enum メンバと衝突しています"
@@ -663,7 +663,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "static fn " + f["name"].String() + " collides with an associated constant or enum member of the same name on " + f["typ"].String()
 		}
 	},
-	"masterbelt.semantic.ternary_branch_mismatch": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.ternary_branch_mismatch": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "三項演算子の両枝の型が一致しません: " + f["then"].String() + " と " + f["els"].String()
@@ -671,7 +671,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "ternary branches have mismatched types: " + f["then"].String() + " and " + f["els"].String()
 		}
 	},
-	"masterbelt.semantic.ternary_condition_not_bool": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.ternary_condition_not_bool": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "三項演算子の条件は bool でなければなりません(" + f["typ"].String() + ")"
@@ -679,7 +679,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "ternary condition must be a bool; got " + f["typ"].String()
 		}
 	},
-	"masterbelt.semantic.type_mismatch": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.type_mismatch": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return f["actual"].String() + " を " + f["expected"].String() + " として使えません"
@@ -687,7 +687,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "cannot use " + f["actual"].String() + " as " + f["expected"].String()
 		}
 	},
-	"masterbelt.semantic.undefined_name": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.undefined_name": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "未定義の名前: " + f["name"].String()
@@ -695,7 +695,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "undefined name: " + f["name"].String()
 		}
 	},
-	"masterbelt.semantic.unfolded_const": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.unfolded_const": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "定数 " + f["name"].String() + " はコンパイル時値に畳めませんでした: " + f["reason"].String() + " — depth は評価予算の超過です(計算を浅くするか分割してください)。evaluator gap は masterbelt のバグです(報告してください)"
@@ -703,7 +703,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "constant " + f["name"].String() + " has no compile-time value: " + f["reason"].String() + " — depth means the computation exceeded the evaluation budget (make it shallower or split it); evaluator gap means this is a masterbelt bug (please report it)"
 		}
 	},
-	"masterbelt.semantic.uninferable_collection": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.uninferable_collection": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "このコレクションリテラルの型を推論できません。型注釈を付けてください"
@@ -711,7 +711,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "cannot infer the type of this collection literal; annotate it"
 		}
 	},
-	"masterbelt.semantic.uninferable_parameter": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.uninferable_parameter": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "パラメータ " + f["name"].String() + " の型を推論できません。型注釈を付けてください"
@@ -719,7 +719,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "cannot infer the type of parameter " + f["name"].String() + "; annotate it"
 		}
 	},
-	"masterbelt.semantic.uninferable_record": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.uninferable_record": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "このレコードリテラルの型を推論できません。型名を付けるか型注釈を付けてください"
@@ -727,7 +727,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "cannot infer the type of this record literal; name its type or annotate it"
 		}
 	},
-	"masterbelt.semantic.uninferable_result": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.uninferable_result": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "この関数リテラルの結果型を推論できません。注釈を付けるか値を返してください"
@@ -735,7 +735,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "cannot infer this function literal's result type; annotate it or return a value"
 		}
 	},
-	"masterbelt.semantic.uninferable_type_param": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.uninferable_type_param": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "型パラメータ " + f["name"].String() + " を引数から推論できません。引数で決まるようにしてください"
@@ -743,7 +743,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "cannot infer the type parameter " + f["name"].String() + " from the arguments; no argument pins it"
 		}
 	},
-	"masterbelt.semantic.unknown_associated_const": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.unknown_associated_const": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return f["typ"].String() + " に関連定数 " + f["name"].String() + " はありません"
@@ -751,7 +751,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return f["typ"].String() + " has no associated constant " + f["name"].String()
 		}
 	},
-	"masterbelt.semantic.unknown_enum_member": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.unknown_enum_member": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return f["enum"].String() + " にメンバ " + f["member"].String() + " はありません"
@@ -759,7 +759,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return f["enum"].String() + " has no member " + f["member"].String()
 		}
 	},
-	"masterbelt.semantic.unknown_field": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.unknown_field": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return f["typ"].String() + " にフィールド " + f["field"].String() + " はありません"
@@ -767,7 +767,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return f["typ"].String() + " has no field " + f["field"].String()
 		}
 	},
-	"masterbelt.semantic.unknown_member": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.unknown_member": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return f["namespace"].String() + " に公開メンバ " + f["name"].String() + " はありません"
@@ -775,7 +775,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return f["namespace"].String() + " has no exported member " + f["name"].String()
 		}
 	},
-	"masterbelt.semantic.unknown_static": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.unknown_static": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return f["typ"].String() + " に static fn " + f["name"].String() + " はありません"
@@ -783,7 +783,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return f["typ"].String() + " has no static fn " + f["name"].String()
 		}
 	},
-	"masterbelt.semantic.unknown_type": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.unknown_type": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "未知の型: " + f["name"].String()
@@ -791,7 +791,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "unknown type: " + f["name"].String()
 		}
 	},
-	"masterbelt.semantic.unreachable_arm": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.unreachable_arm": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "到達不能な arm です。先行する arm かワイルドカードがすべての値に一致します"
@@ -799,7 +799,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "unreachable arm: a previous arm or the wildcard already matches every value"
 		}
 	},
-	"masterbelt.semantic.unused_effect": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.unused_effect": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "関数 " + f["fn"].String() + " は effect " + f["effect"].String() + " を宣言していますが使用していません"
@@ -807,7 +807,7 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "function " + f["fn"].String() + " declares effect " + f["effect"].String() + " but never uses it"
 		}
 	},
-	"masterbelt.semantic.use_not_found": func(loc Locale, f map[string]fmt.Stringer) string {
+	"belt.semantic.use_not_found": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
 			return "インポートするファイルが見つかりません: " + f["path"].String()

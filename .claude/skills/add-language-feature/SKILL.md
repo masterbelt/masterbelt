@@ -61,14 +61,14 @@ commit.
 
 ## Stage 1 — Example (the north star)
 
-The shared examples live in `pkg/masterbelt/testdata/examples/NNNN-<name>.belt`
+The shared examples live in `pkg/belt/testdata/examples/NNNN-<name>.belt`
 (numbered in sequence). Every layer's `example_test.go` runs all of them and
 compares its output against a committed snapshot under that layer's
 `testdata/examples/`:
 
 | layer | snapshot |
 |---|---|
-| lexer | `pkg/masterbelt/lexer/testdata/examples/<name>.belt.tokens` |
+| lexer | `pkg/belt/lexer/testdata/examples/<name>.belt.tokens` |
 | parser/concrete | `.../parser/concrete/testdata/examples/<name>.belt.cst` |
 | parser/abstract | `.../parser/abstract/testdata/examples/<name>.belt.ast` |
 | semantic | `.../semantic/testdata/examples/<name>.belt.ir` |
@@ -83,30 +83,30 @@ compares its output against a committed snapshot under that layer's
 ## Stage 2 — Lexer
 
 - New tokens: add the `Kind` in `pkg/source/token/token.go` (and its
-  name/keyword mapping there), then recognize it in `pkg/masterbelt/lexer/`.
+  name/keyword mapping there), then recognize it in `pkg/belt/lexer/`.
 - Run `make generate` if you added a token/keyword — it regenerates the editor
   grammar (and diagnostics); review the generated diff.
-- Refresh and review the lexer snapshot: `go test ./pkg/masterbelt/lexer/ -update`.
+- Refresh and review the lexer snapshot: `go test ./pkg/belt/lexer/ -update`.
 
 ## Stage 3 — Parser / CST
 
 - New node kinds: add the `Kind` in `pkg/source/cst/cst.go` (and its
   `kindNames` entry).
-- Parse it in `pkg/masterbelt/parser/concrete/` — the parser is split by
+- Parse it in `pkg/belt/parser/concrete/` — the parser is split by
   concern: `parser_decl.go` (declarations), `parser_type.go` (type expressions),
   `parser_expr.go` (statements/expressions/precedence), `parser.go` (driver).
   Update the grammar comment at the top of `parser.go`.
 - Keep it **lossless** (trivia attached as leading children) and **boundary
   context-free** (a File child parses from its tokens alone) — the incremental
   `Document` depends on both; `document_test.go` fuzzes it.
-- Refresh/review snapshot: `go test ./pkg/masterbelt/parser/concrete/ -update`.
+- Refresh/review snapshot: `go test ./pkg/belt/parser/concrete/ -update`.
 
 ## Stage 4 — Parser / AST
 
 - New AST nodes: `pkg/source/ast/`. Lower CST → AST in
-  `pkg/masterbelt/parser/abstract/`. Operators are desugared to method calls
+  `pkg/belt/parser/abstract/`. Operators are desugared to method calls
   here (e.g. `1 + 2` → `1.add(2)`), which keeps the later layers uniform.
-- Refresh/review snapshot: `go test ./pkg/masterbelt/parser/abstract/ -update`.
+- Refresh/review snapshot: `go test ./pkg/belt/parser/abstract/ -update`.
 
 ## Stage 5 — Semantic (make it build & analyze)
 
@@ -121,25 +121,25 @@ layers the feature needs; the dependency direction is strictly one-way (see
   implement the marker, a compile-time obligation) and `go generate ./...`
   re-emits its codec, so the snapshot stays complete automatically — add the
   form to its `…Kinds()` registry so the coverage pins see it.
-- **Type rules** — `pkg/masterbelt/types/` (pure algebra) and
-  `pkg/masterbelt/types/infer/` (AST→type: `Expr`/`Decl`/`Check`/`Body`;
+- **Type rules** — `pkg/belt/types/` (pure algebra) and
+  `pkg/belt/types/infer/` (AST→type: `Expr`/`Decl`/`Check`/`Body`;
   `TypeResolver` for type expressions). Const and method-body paths share one
   walk — extend the shared logic, not a second copy.
-- **Lowering** — `pkg/masterbelt/lower/` (AST→IR graph; context goes through a
+- **Lowering** — `pkg/belt/lower/` (AST→IR graph; context goes through a
   `Binder`).
-- **Evaluation** — `pkg/masterbelt/eval/` (AST→`ir.Constant`, constant folding).
+- **Evaluation** — `pkg/belt/eval/` (AST→`ir.Constant`, constant folding).
 - **Primitives/prelude** — to add a builtin type or operator: register it in
-  `pkg/masterbelt/builtin/builtin.go` and declare it in
-  `pkg/masterbelt/builtin/belt/*.belt`; the prelude test validates the two agree.
-- **Diagnostics & assembly** — `pkg/masterbelt/semantic/` (`assemble` emits
+  `pkg/belt/builtin/builtin.go` and declare it in
+  `pkg/belt/builtin/belt/*.belt`; the prelude test validates the two agree.
+- **Diagnostics & assembly** — `pkg/belt/semantic/` (`assemble` emits
   diagnostics; `check.go` runs them; `engine.go`/`document.go` are the
   incremental façade). New diagnostic codes are generated — edit the source of
   `diagnostic_gen.go`'s generator, then `make generate`.
-- **Guard rails**: keep `go test ./pkg/masterbelt/semantic/` green —
+- **Guard rails**: keep `go test ./pkg/belt/semantic/` green —
   `TestExamples` (the `.ir` oracle: incremental == full `Analyze`),
   `TestEarlyCutoff`/`TestEarlyCutoffValue` (an edit must not over-invalidate),
   and `TestDocumentFuzz`. The value query must not depend on the type query.
-- Refresh/review snapshot: `go test ./pkg/masterbelt/semantic/ -update`. The
+- Refresh/review snapshot: `go test ./pkg/belt/semantic/ -update`. The
   `.ir` diff is the heart of the review — it shows the resolved, typed program.
 
 ## Stage 7 — Performance case (the reuse flywheel)
@@ -151,9 +151,9 @@ the new construct, so the engine's early-cutoff behaviour for it is pinned as a
 number from day one.
 
 - Add a case to the reuse-snapshot harness
-  (`pkg/masterbelt/semantic/reusesnapshot_test.go`): a small source using the
+  (`pkg/belt/semantic/reusesnapshot_test.go`): a small source using the
   feature, a representative edit to it, and a golden name. Regenerate with
-  `go test ./pkg/masterbelt/semantic/ -run TestReuseSnapshot -update` and
+  `go test ./pkg/belt/semantic/ -run TestReuseSnapshot -update` and
   **read** the golden — it records exactly which queries the edit recomputes.
   An edit that recomputes far more than it should is a finding, not a golden to
   rubber-stamp.
@@ -169,7 +169,7 @@ number from day one.
 
 ## Stage 6 — LSP / editor
 
-- `pkg/masterbelt/lsp/` adapts `semantic.Document` to LSP. Likely touch points:
+- `pkg/belt/lsp/` adapts `semantic.Document` to LSP. Likely touch points:
   `semantic.go` (`classifyToken` — colour the new syntax), `completion.go`
   (offer new names/keywords; `typeContextAt` gates value vs type), `hover.go`,
   and `convert.go` (document symbols). Add a handler + capability in `server.go`
@@ -178,7 +178,7 @@ number from day one.
   VSCode TextMate grammar (`toolchain/editors/vscode/...`, via
   `internal/editorgen`). The grammar's keyword table is derived from the token
   table, so a new keyword flows through automatically.
-- Test in `pkg/masterbelt/lsp/` mirroring the existing `*_test.go`.
+- Test in `pkg/belt/lsp/` mirroring the existing `*_test.go`.
 
 ## Verify (run before every review)
 

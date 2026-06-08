@@ -6,7 +6,7 @@ import (
 )
 
 func TestRenderLocale(t *testing.T) {
-	code := Code("masterbelt.lexer.unexpected_character")
+	code := Code("belt.lexer.unexpected_character")
 	fields := map[string]fmt.Stringer{"char": Rune('#')}
 
 	if got, want := Render(DefaultLocale, code, fields), "unexpected character: '#'"; got != want {
@@ -20,12 +20,12 @@ func TestRenderLocale(t *testing.T) {
 		t.Errorf("Render(fr fallback) = %q, want %q", got, want)
 	}
 	// An unknown code falls back to the code string.
-	if got, want := Render(DefaultLocale, Code("masterbelt.unknown"), nil), "masterbelt.unknown"; got != want {
+	if got, want := Render(DefaultLocale, Code("belt.unknown"), nil), "belt.unknown"; got != want {
 		t.Errorf("Render(unknown code) = %q, want %q", got, want)
 	}
 
 	// A field-less code renders in each locale too.
-	plain := Code("masterbelt.lexer.unterminated_block_comment")
+	plain := Code("belt.lexer.unterminated_block_comment")
 	if got, want := Render(DefaultLocale, plain, nil), "unterminated block comment"; got != want {
 		t.Errorf("Render(en plain) = %q, want %q", got, want)
 	}

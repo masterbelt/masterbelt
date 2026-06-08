@@ -7,8 +7,8 @@
       "request": "launch",
       "args": [
         "--extensionDevelopmentPath=${workspaceFolder}/toolchain/editors/vscode",
-        "${workspaceFolder}/pkg/masterbelt/testdata/examples",
-        "${workspaceFolder}/pkg/masterbelt/testdata/examples/0001-const.belt"
+        "${workspaceFolder}/pkg/belt/testdata/examples",
+        "${workspaceFolder}/pkg/belt/testdata/examples/0001-const.belt"
       ],
       "env": {
         "MASTERBELT_SERVER_PATH": "${workspaceFolder}/bin/masterbelt"

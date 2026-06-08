@@ -1,105 +1,105 @@
 code,message
-masterbelt.lexer.unexpected_character,予期しない文字: {char}
-masterbelt.lexer.unterminated_block_comment,ブロックコメントが閉じられていません
-masterbelt.lexer.unterminated_string,文字列リテラルが閉じられていません
-masterbelt.lexer.invalid_escape,不正なエスケープシーケンス: {escape}
-masterbelt.lexer.invalid_unicode_escape,不正なUnicodeエスケープ: {escape}
-masterbelt.lexer.invalid_datetime,不正な日時リテラル: {text}
-masterbelt.lexer.unknown_duration_unit,未知の期間単位: {unit}
-masterbelt.parser.concrete.expected_const,'const' が必要です
-masterbelt.parser.concrete.expected_identifier,識別子が必要です
-masterbelt.parser.concrete.expected_type,型が必要です
-masterbelt.parser.concrete.expected_assign,'=' が必要です
-masterbelt.parser.concrete.expected_expression,式が必要です
-masterbelt.parser.concrete.unexpected_token,予期しないトークン: {kind}
-masterbelt.parser.concrete.expected_operand,'{operator}' の後にオペランドが必要です
-masterbelt.parser.concrete.expected_from,'from' が必要です
-masterbelt.parser.concrete.expected_path,インポートパスの文字列が必要です
-masterbelt.parser.concrete.expected_param_list,'(' が必要です
-masterbelt.parser.concrete.expected_func_body,'->' か '{' が必要です
-masterbelt.parser.concrete.expected_fn,'static' の後には 'fn' が必要です
-masterbelt.parser.concrete.arrow_block_body,'->' の後には式が必要です。ブロック本体にするには '->' を削除してください
-masterbelt.semantic.duplicate_declaration,{name} が重複して宣言されています
-masterbelt.semantic.undefined_name,未定義の名前: {name}
-masterbelt.semantic.unknown_type,未知の型: {name}
-masterbelt.semantic.cyclic_reference,{name} を含む循環参照です
-masterbelt.semantic.constant_overflow,定数 {value} は {typ} に収まりません
-masterbelt.semantic.invalid_operation,メソッド {method} を {types} に適用できません
-masterbelt.semantic.no_matching_overload,メソッド {method} のどのオーバーロードも {types} に適合しません
-masterbelt.semantic.ambiguous_overload,メソッド {method} の呼び出しが曖昧です: {types} に複数のオーバーロードが適合します
-masterbelt.semantic.duplicate_overload,メソッド {method} が同じ引数型 ({types}) で再宣言されています
-masterbelt.semantic.division_by_zero,ゼロ除算です
-masterbelt.semantic.type_mismatch,{actual} を {expected} として使えません
-masterbelt.semantic.uninferable_collection,このコレクションリテラルの型を推論できません。型注釈を付けてください
-masterbelt.semantic.missing_field,{typ} のレコードリテラルにフィールド {field} がありません
-masterbelt.semantic.unknown_field,{typ} にフィールド {field} はありません
-masterbelt.semantic.uninferable_record,このレコードリテラルの型を推論できません。型名を付けるか型注釈を付けてください
-masterbelt.semantic.not_a_record,{typ} はレコード型ではありません
-masterbelt.semantic.uninferable_result,この関数リテラルの結果型を推論できません。注釈を付けるか値を返してください
-masterbelt.semantic.uninferable_parameter,パラメータ {name} の型を推論できません。型注釈を付けてください
-masterbelt.semantic.lambda_arity_mismatch,関数リテラルのパラメータが {actual} 個ありますが、{expected} 個が必要です
-masterbelt.semantic.arity_mismatch,関数 {name} は引数を {expected} 個取りますが、{actual} 個が渡されています
-masterbelt.semantic.missing_return,関数 {name} が値を返しません
-masterbelt.semantic.no_matching_func_overload,関数 {name} のどのオーバーロードも {types} に適合しません
-masterbelt.semantic.ambiguous_func_overload,関数 {name} の呼び出しが曖昧です: {types} に複数のオーバーロードが適合します
-masterbelt.semantic.duplicate_func_overload,関数 {name} が同じ引数型 ({types}) で再宣言されています
-masterbelt.semantic.self_outside_method,self はメソッド本体の中でのみ使えます
-masterbelt.semantic.use_not_found,インポートするファイルが見つかりません: {path}
-masterbelt.semantic.not_exported,{path} は {name} を公開していません
-masterbelt.semantic.unknown_member,{namespace} に公開メンバ {name} はありません
-masterbelt.semantic.ambiguous_import,{name} は曖昧です。複数のインポートから到来しています
-masterbelt.semantic.cyclic_module,{path} を経由するインポートサイクルです
-masterbelt.semantic.assertion_failed,表明が成立しません: {cond}{doc}{diagram}
-masterbelt.semantic.assertion_not_bool,表明は bool でなければなりません({typ})
-masterbelt.semantic.assertion_not_constant,表明はコンパイル時定数ではありません
-masterbelt.semantic.duplicate_enum_member,enum メンバ {name} が重複しています
-masterbelt.semantic.unknown_enum_member,{enum} にメンバ {member} はありません
-masterbelt.semantic.invalid_enum_base_type,{typ} は enum の基底型に使えません(整数型か string を指定してください)
-masterbelt.semantic.duplicate_enum_value,enum メンバ {name} は値 {value} を重複させています
-masterbelt.semantic.unknown_associated_const,{typ} に関連定数 {name} はありません
-masterbelt.semantic.extern_outside_builtin,extern は builtin サーフェス専用です。ここで {name} の実体を供給する仕組みはありません
-masterbelt.semantic.builtin_outside_builtin,= builtin は builtin サーフェス専用です。registry は {name} の実体を供給しません
-masterbelt.semantic.unfolded_const,定数 {name} はコンパイル時値に畳めませんでした: {reason} — depth は評価予算の超過です(計算を浅くするか分割してください)。evaluator gap は masterbelt のバグです(報告してください)
-masterbelt.semantic.refinement_violation,値 {value} は {typ} の制約を満たしません: {predicate}{diagram}
-masterbelt.semantic.refinement_not_bool,where 節は bool でなければなりません({typ})
-masterbelt.semantic.refinement_not_constant,where 節はコンパイル時に評価できる述語ではありません
-masterbelt.semantic.missing_effect,関数 {fn} は effect {effect} を宣言せずに使用しています
-masterbelt.semantic.unused_effect,関数 {fn} は effect {effect} を宣言していますが使用していません
-masterbelt.semantic.effect_in_pure_context,{context} はコンパイル時に評価されるため pure である必要があります。effect {effect} は使用できません
-masterbelt.semantic.non_exhaustive_switch,{typ} の switch が網羅的ではありません: {missing}
-masterbelt.semantic.duplicate_switch_arm,switch の arm が重複しています: {value}
-masterbelt.semantic.arm_value_type_mismatch,{actual} を {expected} の switch 値として使用できません
-masterbelt.semantic.unreachable_arm,到達不能な arm です。先行する arm かワイルドカードがすべての値に一致します
-masterbelt.semantic.scrutinee_not_comparable,switch の対象は comparable が必要です ({typ})。record や union を型で分岐するには match を使ってください
-masterbelt.semantic.non_exhaustive_match,{typ} の match が網羅的ではありません: {missing}
-masterbelt.semantic.arm_type_not_in_union,{arm} は {typ} のメンバではありません
-masterbelt.semantic.ambiguous_union_member,{actual} が {typ} のどのメンバとして流入するか確定できません。short(1) のような明示変換で確定させてください
-masterbelt.semantic.duplicate_match_arm,match の arm が重複しています: {arm}
-masterbelt.semantic.condition_not_bool,if の条件は bool でなければなりません({typ})
-masterbelt.semantic.ternary_condition_not_bool,三項演算子の条件は bool でなければなりません({typ})
-masterbelt.semantic.ternary_branch_mismatch,三項演算子の両枝の型が一致しません: {then} と {els}
-masterbelt.semantic.assign_to_const,{name} には代入できません。const は不変です。可変なローカルには let を使ってください
-masterbelt.semantic.assign_to_undefined,{name} には代入できません。その名前の let 束縛がスコープにありません
-masterbelt.semantic.assign_type_mismatch,{name} に {actual} を代入できません。型は {expected} に固定されています
-masterbelt.semantic.immutable_data,フィールドや要素には代入できません。データは不変です。新しい値を作ってください
-masterbelt.semantic.missing_initializer,let {name} は初期化が必要です。let {name} = 値 と書いてください
-masterbelt.semantic.index_out_of_range,インデックス {index} は長さ {length} のリストの範囲外です
-masterbelt.semantic.missing_required_method,{typ} は {iface} を実装していません: 必須メソッド {method} がありません
-masterbelt.semantic.not_an_interface,{name} は interface ではありません
-masterbelt.semantic.interface_member_override,{child} は {method} を再宣言できません: すでに {ancestor} から継承しています
-masterbelt.semantic.interface_member_conflict,{child} は無関係な 2 つの interface ({first} と {second}) から {method} を継承しています
-masterbelt.semantic.bound_not_satisfied,{typ} は境界 {bound} を満たしません: その interface を実装していません
-masterbelt.semantic.uninferable_type_param,型パラメータ {name} を引数から推論できません。引数で決まるようにしてください
-masterbelt.semantic.no_method_on_unbounded_typevar,無境界の型パラメータに対して {method} は呼べません。メソッドを使うには interface 境界を付けてください
-masterbelt.semantic.not_iterable,for で反復できるのは foldable なコレクションだけです。{typ} は foldable ではありません
-masterbelt.semantic.loop_var_immutable,ループ変数 {name} には代入できません。不変です。蓄積には let を使ってください
-masterbelt.semantic.range_step_zero,range のステップに 0 は指定できません
-masterbelt.semantic.invalid_getter_signature,ゲッター {name} は引数を取れません
-masterbelt.semantic.invalid_setter_signature,セッター {name} は引数を 1 つ取り self を返す必要があります
-masterbelt.semantic.accessor_collision,アクセサ {name} は {typ} の同名の別メンバと衝突しています
-masterbelt.semantic.static_collision,static fn {name} は {typ} の同名の関連定数か enum メンバと衝突しています
-masterbelt.semantic.unknown_static,{typ} に static fn {name} はありません
-masterbelt.semantic.generic_static,ジェネリックな static fn {name} はサポートされていません
+belt.lexer.unexpected_character,予期しない文字: {char}
+belt.lexer.unterminated_block_comment,ブロックコメントが閉じられていません
+belt.lexer.unterminated_string,文字列リテラルが閉じられていません
+belt.lexer.invalid_escape,不正なエスケープシーケンス: {escape}
+belt.lexer.invalid_unicode_escape,不正なUnicodeエスケープ: {escape}
+belt.lexer.invalid_datetime,不正な日時リテラル: {text}
+belt.lexer.unknown_duration_unit,未知の期間単位: {unit}
+belt.parser.concrete.expected_const,'const' が必要です
+belt.parser.concrete.expected_identifier,識別子が必要です
+belt.parser.concrete.expected_type,型が必要です
+belt.parser.concrete.expected_assign,'=' が必要です
+belt.parser.concrete.expected_expression,式が必要です
+belt.parser.concrete.unexpected_token,予期しないトークン: {kind}
+belt.parser.concrete.expected_operand,'{operator}' の後にオペランドが必要です
+belt.parser.concrete.expected_from,'from' が必要です
+belt.parser.concrete.expected_path,インポートパスの文字列が必要です
+belt.parser.concrete.expected_param_list,'(' が必要です
+belt.parser.concrete.expected_func_body,'->' か '{' が必要です
+belt.parser.concrete.expected_fn,'static' の後には 'fn' が必要です
+belt.parser.concrete.arrow_block_body,'->' の後には式が必要です。ブロック本体にするには '->' を削除してください
+belt.semantic.duplicate_declaration,{name} が重複して宣言されています
+belt.semantic.undefined_name,未定義の名前: {name}
+belt.semantic.unknown_type,未知の型: {name}
+belt.semantic.cyclic_reference,{name} を含む循環参照です
+belt.semantic.constant_overflow,定数 {value} は {typ} に収まりません
+belt.semantic.invalid_operation,メソッド {method} を {types} に適用できません
+belt.semantic.no_matching_overload,メソッド {method} のどのオーバーロードも {types} に適合しません
+belt.semantic.ambiguous_overload,メソッド {method} の呼び出しが曖昧です: {types} に複数のオーバーロードが適合します
+belt.semantic.duplicate_overload,メソッド {method} が同じ引数型 ({types}) で再宣言されています
+belt.semantic.division_by_zero,ゼロ除算です
+belt.semantic.type_mismatch,{actual} を {expected} として使えません
+belt.semantic.uninferable_collection,このコレクションリテラルの型を推論できません。型注釈を付けてください
+belt.semantic.missing_field,{typ} のレコードリテラルにフィールド {field} がありません
+belt.semantic.unknown_field,{typ} にフィールド {field} はありません
+belt.semantic.uninferable_record,このレコードリテラルの型を推論できません。型名を付けるか型注釈を付けてください
+belt.semantic.not_a_record,{typ} はレコード型ではありません
+belt.semantic.uninferable_result,この関数リテラルの結果型を推論できません。注釈を付けるか値を返してください
+belt.semantic.uninferable_parameter,パラメータ {name} の型を推論できません。型注釈を付けてください
+belt.semantic.lambda_arity_mismatch,関数リテラルのパラメータが {actual} 個ありますが、{expected} 個が必要です
+belt.semantic.arity_mismatch,関数 {name} は引数を {expected} 個取りますが、{actual} 個が渡されています
+belt.semantic.missing_return,関数 {name} が値を返しません
+belt.semantic.no_matching_func_overload,関数 {name} のどのオーバーロードも {types} に適合しません
+belt.semantic.ambiguous_func_overload,関数 {name} の呼び出しが曖昧です: {types} に複数のオーバーロードが適合します
+belt.semantic.duplicate_func_overload,関数 {name} が同じ引数型 ({types}) で再宣言されています
+belt.semantic.self_outside_method,self はメソッド本体の中でのみ使えます
+belt.semantic.use_not_found,インポートするファイルが見つかりません: {path}
+belt.semantic.not_exported,{path} は {name} を公開していません
+belt.semantic.unknown_member,{namespace} に公開メンバ {name} はありません
+belt.semantic.ambiguous_import,{name} は曖昧です。複数のインポートから到来しています
+belt.semantic.cyclic_module,{path} を経由するインポートサイクルです
+belt.semantic.assertion_failed,表明が成立しません: {cond}{doc}{diagram}
+belt.semantic.assertion_not_bool,表明は bool でなければなりません({typ})
+belt.semantic.assertion_not_constant,表明はコンパイル時定数ではありません
+belt.semantic.duplicate_enum_member,enum メンバ {name} が重複しています
+belt.semantic.unknown_enum_member,{enum} にメンバ {member} はありません
+belt.semantic.invalid_enum_base_type,{typ} は enum の基底型に使えません(整数型か string を指定してください)
+belt.semantic.duplicate_enum_value,enum メンバ {name} は値 {value} を重複させています
+belt.semantic.unknown_associated_const,{typ} に関連定数 {name} はありません
+belt.semantic.extern_outside_builtin,extern は builtin サーフェス専用です。ここで {name} の実体を供給する仕組みはありません
+belt.semantic.builtin_outside_builtin,= builtin は builtin サーフェス専用です。registry は {name} の実体を供給しません
+belt.semantic.unfolded_const,定数 {name} はコンパイル時値に畳めませんでした: {reason} — depth は評価予算の超過です(計算を浅くするか分割してください)。evaluator gap は masterbelt のバグです(報告してください)
+belt.semantic.refinement_violation,値 {value} は {typ} の制約を満たしません: {predicate}{diagram}
+belt.semantic.refinement_not_bool,where 節は bool でなければなりません({typ})
+belt.semantic.refinement_not_constant,where 節はコンパイル時に評価できる述語ではありません
+belt.semantic.missing_effect,関数 {fn} は effect {effect} を宣言せずに使用しています
+belt.semantic.unused_effect,関数 {fn} は effect {effect} を宣言していますが使用していません
+belt.semantic.effect_in_pure_context,{context} はコンパイル時に評価されるため pure である必要があります。effect {effect} は使用できません
+belt.semantic.non_exhaustive_switch,{typ} の switch が網羅的ではありません: {missing}
+belt.semantic.duplicate_switch_arm,switch の arm が重複しています: {value}
+belt.semantic.arm_value_type_mismatch,{actual} を {expected} の switch 値として使用できません
+belt.semantic.unreachable_arm,到達不能な arm です。先行する arm かワイルドカードがすべての値に一致します
+belt.semantic.scrutinee_not_comparable,switch の対象は comparable が必要です ({typ})。record や union を型で分岐するには match を使ってください
+belt.semantic.non_exhaustive_match,{typ} の match が網羅的ではありません: {missing}
+belt.semantic.arm_type_not_in_union,{arm} は {typ} のメンバではありません
+belt.semantic.ambiguous_union_member,{actual} が {typ} のどのメンバとして流入するか確定できません。short(1) のような明示変換で確定させてください
+belt.semantic.duplicate_match_arm,match の arm が重複しています: {arm}
+belt.semantic.condition_not_bool,if の条件は bool でなければなりません({typ})
+belt.semantic.ternary_condition_not_bool,三項演算子の条件は bool でなければなりません({typ})
+belt.semantic.ternary_branch_mismatch,三項演算子の両枝の型が一致しません: {then} と {els}
+belt.semantic.assign_to_const,{name} には代入できません。const は不変です。可変なローカルには let を使ってください
+belt.semantic.assign_to_undefined,{name} には代入できません。その名前の let 束縛がスコープにありません
+belt.semantic.assign_type_mismatch,{name} に {actual} を代入できません。型は {expected} に固定されています
+belt.semantic.immutable_data,フィールドや要素には代入できません。データは不変です。新しい値を作ってください
+belt.semantic.missing_initializer,let {name} は初期化が必要です。let {name} = 値 と書いてください
+belt.semantic.index_out_of_range,インデックス {index} は長さ {length} のリストの範囲外です
+belt.semantic.missing_required_method,{typ} は {iface} を実装していません: 必須メソッド {method} がありません
+belt.semantic.not_an_interface,{name} は interface ではありません
+belt.semantic.interface_member_override,{child} は {method} を再宣言できません: すでに {ancestor} から継承しています
+belt.semantic.interface_member_conflict,{child} は無関係な 2 つの interface ({first} と {second}) から {method} を継承しています
+belt.semantic.bound_not_satisfied,{typ} は境界 {bound} を満たしません: その interface を実装していません
+belt.semantic.uninferable_type_param,型パラメータ {name} を引数から推論できません。引数で決まるようにしてください
+belt.semantic.no_method_on_unbounded_typevar,無境界の型パラメータに対して {method} は呼べません。メソッドを使うには interface 境界を付けてください
+belt.semantic.not_iterable,for で反復できるのは foldable なコレクションだけです。{typ} は foldable ではありません
+belt.semantic.loop_var_immutable,ループ変数 {name} には代入できません。不変です。蓄積には let を使ってください
+belt.semantic.range_step_zero,range のステップに 0 は指定できません
+belt.semantic.invalid_getter_signature,ゲッター {name} は引数を取れません
+belt.semantic.invalid_setter_signature,セッター {name} は引数を 1 つ取り self を返す必要があります
+belt.semantic.accessor_collision,アクセサ {name} は {typ} の同名の別メンバと衝突しています
+belt.semantic.static_collision,static fn {name} は {typ} の同名の関連定数か enum メンバと衝突しています
+belt.semantic.unknown_static,{typ} に static fn {name} はありません
+belt.semantic.generic_static,ジェネリックな static fn {name} はサポートされていません
 project.config.missing,masterbelt.toml がこのディレクトリにも親ディレクトリにも見つかりません
 project.config.invalid,不正な masterbelt.toml: {detail}
 project.config.missing_entry,masterbelt.toml に entry が指定されていません

@@ -21,7 +21,7 @@ const schemaVersion = 1
 //	  "version": 1,
 //	  "diagnostics": [
 //	    {
-//	      "code": "masterbelt.semantic.constant_overflow",
+//	      "code": "belt.semantic.constant_overflow",
 //	      "severity": "error",
 //	      "file": "examples/bad.belt",
 //	      "range": {"start": {"offset": 120, "line": 3, "column": 14},

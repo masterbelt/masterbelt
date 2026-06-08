@@ -1,105 +1,105 @@
 code,severity,fields
-masterbelt.lexer.unexpected_character,error,char:rune
-masterbelt.lexer.unterminated_block_comment,error,
-masterbelt.lexer.unterminated_string,error,
-masterbelt.lexer.invalid_escape,error,escape:string
-masterbelt.lexer.invalid_unicode_escape,error,escape:string
-masterbelt.lexer.invalid_datetime,error,text:string
-masterbelt.lexer.unknown_duration_unit,error,unit:string
-masterbelt.parser.concrete.expected_const,error,
-masterbelt.parser.concrete.expected_identifier,error,
-masterbelt.parser.concrete.expected_type,error,
-masterbelt.parser.concrete.expected_assign,error,
-masterbelt.parser.concrete.expected_expression,error,
-masterbelt.parser.concrete.unexpected_token,error,kind:string
-masterbelt.parser.concrete.expected_operand,error,operator:string
-masterbelt.parser.concrete.expected_from,error,
-masterbelt.parser.concrete.expected_path,error,
-masterbelt.parser.concrete.expected_param_list,error,
-masterbelt.parser.concrete.expected_func_body,error,
-masterbelt.parser.concrete.expected_fn,error,
-masterbelt.parser.concrete.arrow_block_body,error,
-masterbelt.semantic.duplicate_declaration,error,name:string
-masterbelt.semantic.undefined_name,error,name:string
-masterbelt.semantic.unknown_type,error,name:string
-masterbelt.semantic.cyclic_reference,error,name:string
-masterbelt.semantic.constant_overflow,error,value:string typ:string
-masterbelt.semantic.invalid_operation,error,method:string types:string
-masterbelt.semantic.no_matching_overload,error,method:string types:string
-masterbelt.semantic.ambiguous_overload,error,method:string types:string
-masterbelt.semantic.duplicate_overload,error,method:string types:string
-masterbelt.semantic.division_by_zero,error,
-masterbelt.semantic.type_mismatch,error,actual:string expected:string
-masterbelt.semantic.uninferable_collection,error,
-masterbelt.semantic.missing_field,error,field:string typ:string
-masterbelt.semantic.unknown_field,error,field:string typ:string
-masterbelt.semantic.uninferable_record,error,
-masterbelt.semantic.not_a_record,error,typ:string
-masterbelt.semantic.uninferable_result,error,
-masterbelt.semantic.uninferable_parameter,error,name:string
-masterbelt.semantic.lambda_arity_mismatch,error,actual:int expected:int
-masterbelt.semantic.arity_mismatch,error,name:string actual:int expected:int
-masterbelt.semantic.missing_return,error,name:string
-masterbelt.semantic.no_matching_func_overload,error,name:string types:string
-masterbelt.semantic.ambiguous_func_overload,error,name:string types:string
-masterbelt.semantic.duplicate_func_overload,error,name:string types:string
-masterbelt.semantic.self_outside_method,error,
-masterbelt.semantic.use_not_found,error,path:string
-masterbelt.semantic.not_exported,error,name:string path:string
-masterbelt.semantic.unknown_member,error,name:string namespace:string
-masterbelt.semantic.ambiguous_import,error,name:string
-masterbelt.semantic.cyclic_module,error,path:string
-masterbelt.semantic.assertion_failed,error,cond:string doc:string diagram:string
-masterbelt.semantic.assertion_not_bool,error,typ:string
-masterbelt.semantic.assertion_not_constant,error,
-masterbelt.semantic.duplicate_enum_member,error,name:string
-masterbelt.semantic.unknown_enum_member,error,enum:string member:string
-masterbelt.semantic.invalid_enum_base_type,error,typ:string
-masterbelt.semantic.duplicate_enum_value,error,name:string value:string
-masterbelt.semantic.unknown_associated_const,error,typ:string name:string
-masterbelt.semantic.extern_outside_builtin,error,name:string
-masterbelt.semantic.builtin_outside_builtin,error,name:string
-masterbelt.semantic.unfolded_const,error,name:string reason:string
-masterbelt.semantic.refinement_violation,error,value:string typ:string predicate:string diagram:string
-masterbelt.semantic.refinement_not_bool,error,typ:string
-masterbelt.semantic.refinement_not_constant,error,
-masterbelt.semantic.missing_effect,error,fn:string effect:string
-masterbelt.semantic.unused_effect,warning,fn:string effect:string
-masterbelt.semantic.effect_in_pure_context,error,effect:string context:string
-masterbelt.semantic.non_exhaustive_switch,error,typ:string missing:string
-masterbelt.semantic.duplicate_switch_arm,error,value:string
-masterbelt.semantic.arm_value_type_mismatch,error,actual:string expected:string
-masterbelt.semantic.unreachable_arm,error,
-masterbelt.semantic.scrutinee_not_comparable,error,typ:string
-masterbelt.semantic.non_exhaustive_match,error,typ:string missing:string
-masterbelt.semantic.arm_type_not_in_union,error,arm:string typ:string
-masterbelt.semantic.ambiguous_union_member,error,actual:string typ:string
-masterbelt.semantic.duplicate_match_arm,error,arm:string
-masterbelt.semantic.condition_not_bool,error,typ:string
-masterbelt.semantic.ternary_condition_not_bool,error,typ:string
-masterbelt.semantic.ternary_branch_mismatch,error,then:string els:string
-masterbelt.semantic.assign_to_const,error,name:string
-masterbelt.semantic.assign_to_undefined,error,name:string
-masterbelt.semantic.assign_type_mismatch,error,name:string actual:string expected:string
-masterbelt.semantic.immutable_data,error,
-masterbelt.semantic.missing_initializer,error,name:string
-masterbelt.semantic.index_out_of_range,error,index:string length:string
-masterbelt.semantic.missing_required_method,error,typ:string iface:string method:string
-masterbelt.semantic.not_an_interface,error,name:string
-masterbelt.semantic.interface_member_override,error,child:string method:string ancestor:string
-masterbelt.semantic.interface_member_conflict,error,child:string method:string first:string second:string
-masterbelt.semantic.bound_not_satisfied,error,typ:string bound:string
-masterbelt.semantic.uninferable_type_param,error,name:string
-masterbelt.semantic.no_method_on_unbounded_typevar,error,method:string
-masterbelt.semantic.not_iterable,error,typ:string
-masterbelt.semantic.loop_var_immutable,error,name:string
-masterbelt.semantic.range_step_zero,error,
-masterbelt.semantic.invalid_getter_signature,error,name:string
-masterbelt.semantic.invalid_setter_signature,error,name:string
-masterbelt.semantic.accessor_collision,error,name:string typ:string
-masterbelt.semantic.static_collision,error,name:string typ:string
-masterbelt.semantic.unknown_static,error,name:string typ:string
-masterbelt.semantic.generic_static,error,name:string
+belt.lexer.unexpected_character,error,char:rune
+belt.lexer.unterminated_block_comment,error,
+belt.lexer.unterminated_string,error,
+belt.lexer.invalid_escape,error,escape:string
+belt.lexer.invalid_unicode_escape,error,escape:string
+belt.lexer.invalid_datetime,error,text:string
+belt.lexer.unknown_duration_unit,error,unit:string
+belt.parser.concrete.expected_const,error,
+belt.parser.concrete.expected_identifier,error,
+belt.parser.concrete.expected_type,error,
+belt.parser.concrete.expected_assign,error,
+belt.parser.concrete.expected_expression,error,
+belt.parser.concrete.unexpected_token,error,kind:string
+belt.parser.concrete.expected_operand,error,operator:string
+belt.parser.concrete.expected_from,error,
+belt.parser.concrete.expected_path,error,
+belt.parser.concrete.expected_param_list,error,
+belt.parser.concrete.expected_func_body,error,
+belt.parser.concrete.expected_fn,error,
+belt.parser.concrete.arrow_block_body,error,
+belt.semantic.duplicate_declaration,error,name:string
+belt.semantic.undefined_name,error,name:string
+belt.semantic.unknown_type,error,name:string
+belt.semantic.cyclic_reference,error,name:string
+belt.semantic.constant_overflow,error,value:string typ:string
+belt.semantic.invalid_operation,error,method:string types:string
+belt.semantic.no_matching_overload,error,method:string types:string
+belt.semantic.ambiguous_overload,error,method:string types:string
+belt.semantic.duplicate_overload,error,method:string types:string
+belt.semantic.division_by_zero,error,
+belt.semantic.type_mismatch,error,actual:string expected:string
+belt.semantic.uninferable_collection,error,
+belt.semantic.missing_field,error,field:string typ:string
+belt.semantic.unknown_field,error,field:string typ:string
+belt.semantic.uninferable_record,error,
+belt.semantic.not_a_record,error,typ:string
+belt.semantic.uninferable_result,error,
+belt.semantic.uninferable_parameter,error,name:string
+belt.semantic.lambda_arity_mismatch,error,actual:int expected:int
+belt.semantic.arity_mismatch,error,name:string actual:int expected:int
+belt.semantic.missing_return,error,name:string
+belt.semantic.no_matching_func_overload,error,name:string types:string
+belt.semantic.ambiguous_func_overload,error,name:string types:string
+belt.semantic.duplicate_func_overload,error,name:string types:string
+belt.semantic.self_outside_method,error,
+belt.semantic.use_not_found,error,path:string
+belt.semantic.not_exported,error,name:string path:string
+belt.semantic.unknown_member,error,name:string namespace:string
+belt.semantic.ambiguous_import,error,name:string
+belt.semantic.cyclic_module,error,path:string
+belt.semantic.assertion_failed,error,cond:string doc:string diagram:string
+belt.semantic.assertion_not_bool,error,typ:string
+belt.semantic.assertion_not_constant,error,
+belt.semantic.duplicate_enum_member,error,name:string
+belt.semantic.unknown_enum_member,error,enum:string member:string
+belt.semantic.invalid_enum_base_type,error,typ:string
+belt.semantic.duplicate_enum_value,error,name:string value:string
+belt.semantic.unknown_associated_const,error,typ:string name:string
+belt.semantic.extern_outside_builtin,error,name:string
+belt.semantic.builtin_outside_builtin,error,name:string
+belt.semantic.unfolded_const,error,name:string reason:string
+belt.semantic.refinement_violation,error,value:string typ:string predicate:string diagram:string
+belt.semantic.refinement_not_bool,error,typ:string
+belt.semantic.refinement_not_constant,error,
+belt.semantic.missing_effect,error,fn:string effect:string
+belt.semantic.unused_effect,warning,fn:string effect:string
+belt.semantic.effect_in_pure_context,error,effect:string context:string
+belt.semantic.non_exhaustive_switch,error,typ:string missing:string
+belt.semantic.duplicate_switch_arm,error,value:string
+belt.semantic.arm_value_type_mismatch,error,actual:string expected:string
+belt.semantic.unreachable_arm,error,
+belt.semantic.scrutinee_not_comparable,error,typ:string
+belt.semantic.non_exhaustive_match,error,typ:string missing:string
+belt.semantic.arm_type_not_in_union,error,arm:string typ:string
+belt.semantic.ambiguous_union_member,error,actual:string typ:string
+belt.semantic.duplicate_match_arm,error,arm:string
+belt.semantic.condition_not_bool,error,typ:string
+belt.semantic.ternary_condition_not_bool,error,typ:string
+belt.semantic.ternary_branch_mismatch,error,then:string els:string
+belt.semantic.assign_to_const,error,name:string
+belt.semantic.assign_to_undefined,error,name:string
+belt.semantic.assign_type_mismatch,error,name:string actual:string expected:string
+belt.semantic.immutable_data,error,
+belt.semantic.missing_initializer,error,name:string
+belt.semantic.index_out_of_range,error,index:string length:string
+belt.semantic.missing_required_method,error,typ:string iface:string method:string
+belt.semantic.not_an_interface,error,name:string
+belt.semantic.interface_member_override,error,child:string method:string ancestor:string
+belt.semantic.interface_member_conflict,error,child:string method:string first:string second:string
+belt.semantic.bound_not_satisfied,error,typ:string bound:string
+belt.semantic.uninferable_type_param,error,name:string
+belt.semantic.no_method_on_unbounded_typevar,error,method:string
+belt.semantic.not_iterable,error,typ:string
+belt.semantic.loop_var_immutable,error,name:string
+belt.semantic.range_step_zero,error,
+belt.semantic.invalid_getter_signature,error,name:string
+belt.semantic.invalid_setter_signature,error,name:string
+belt.semantic.accessor_collision,error,name:string typ:string
+belt.semantic.static_collision,error,name:string typ:string
+belt.semantic.unknown_static,error,name:string typ:string
+belt.semantic.generic_static,error,name:string
 project.config.missing,error,
 project.config.invalid,error,detail:string
 project.config.missing_entry,error,

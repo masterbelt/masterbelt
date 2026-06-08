@@ -5,7 +5,7 @@
 // Everything is derived from the seed and the file/decl index — there is no
 // clock and no unseeded randomness — so the same Params always yield byte-equal
 // sources. The generated language is the real one (study
-// pkg/masterbelt/testdata/examples/*.belt): pub const, type, enum, fn, and use
+// pkg/belt/testdata/examples/*.belt): pub const, type, enum, fn, and use
 // declarations. The cross-file edges are genuine: a file imports its children
 // by namespace and reads their exported constants, so the dependency graph the
 // engine walks matches the file tree the generator lays out.

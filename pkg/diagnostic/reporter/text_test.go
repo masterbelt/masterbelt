@@ -58,13 +58,13 @@ func TestTextLocale(t *testing.T) {
 
 	r.Report(file, []diagnostic.Diagnostic{{
 		Severity: diagnostic.Error,
-		Code:     "masterbelt.lexer.unterminated_string",
+		Code:     "belt.lexer.unterminated_string",
 		Message:  "unterminated string literal",
 		Offset:   0,
 		Width:    2,
 	}})
 
-	want := "a.belt:1:1: error[masterbelt.lexer.unterminated_string]: 文字列リテラルが閉じられていません\n"
+	want := "a.belt:1:1: error[belt.lexer.unterminated_string]: 文字列リテラルが閉じられていません\n"
 	if out.String() != want {
 		t.Errorf("Report() wrote %q, want %q", out.String(), want)
 	}

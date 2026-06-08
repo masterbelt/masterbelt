@@ -7,8 +7,8 @@
 //
 //	code     dotted identifier; all but the last segment name the owning
 //	         package by its path under pkg/
-//	         (masterbelt.lexer.unexpected_character -> package
-//	         pkg/masterbelt/lexer, code "unexpected_character";
+//	         (belt.lexer.unexpected_character -> package
+//	         pkg/belt/lexer, code "unexpected_character";
 //	         project.config.missing -> package pkg/project/config)
 //	severity error | warning | info | hint
 //	fields   space-separated name:type pairs (e.g. "char:rune", "start:int end:int")
@@ -40,7 +40,7 @@ const (
 	diagnosticPkg = "github.com/masterbelt/masterbelt/pkg/diagnostic"
 	// pkgPrefix is the import-path prefix of pkg/, the tree that owns every
 	// generated diagnostic_gen.go: a code's package path mirrors its owner's
-	// location under pkg/ (masterbelt.lexer.* -> pkg/masterbelt/lexer,
+	// location under pkg/ (belt.lexer.* -> pkg/belt/lexer,
 	// project.config.* -> pkg/project/config). pkgDir is the same tree on
 	// disk, relative to this (the diagnostic) package, where those files are
 	// written.

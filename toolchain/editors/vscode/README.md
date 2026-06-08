@@ -33,7 +33,7 @@ Extension"). The launch config (the repo-root `.vscode/launch.json`):
 
 - builds both the language server (`make build` -> `bin/masterbelt`) and the
   extension bundle first (the repo-root `.vscode/tasks.json`);
-- opens `pkg/masterbelt/testdata/examples/` (and `0001-const.belt`) in the
+- opens `pkg/belt/testdata/examples/` (and `0001-const.belt`) in the
   development host, so you immediately see highlighting and diagnostics — run
   **Format Document** to format;
 - points the extension at the freshly built `bin/masterbelt` via the

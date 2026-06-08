@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	"github.com/masterbelt/masterbelt/internal/beltgen"
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/parser/abstract"
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/semantic"
+	"github.com/masterbelt/masterbelt/pkg/belt/parser/abstract"
+	"github.com/masterbelt/masterbelt/pkg/belt/semantic"
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
 )
 

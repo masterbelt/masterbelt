@@ -175,7 +175,7 @@ func TestJSONLocale(t *testing.T) {
 
 	r.Report(file, []diagnostic.Diagnostic{{
 		Severity: diagnostic.Error,
-		Code:     "masterbelt.lexer.unterminated_string",
+		Code:     "belt.lexer.unterminated_string",
 		Message:  "unterminated string literal",
 		Offset:   0,
 		Width:    2,
@@ -187,7 +187,7 @@ func TestJSONLocale(t *testing.T) {
 	for _, fragment := range []string{
 		`"locale": "ja"`,
 		`"text": "文字列リテラルが閉じられていません"`,
-		`"code": "masterbelt.lexer.unterminated_string"`,
+		`"code": "belt.lexer.unterminated_string"`,
 	} {
 		if !bytes.Contains(out.Bytes(), []byte(fragment)) {
 			t.Errorf("Flush() wrote:\n%s\nwant it to contain %s", out.String(), fragment)

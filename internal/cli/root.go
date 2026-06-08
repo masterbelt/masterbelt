@@ -26,7 +26,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/semantic"
+	"github.com/masterbelt/masterbelt/pkg/belt/semantic"
 )
 
 func init() {

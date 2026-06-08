@@ -10,12 +10,12 @@ import (
 func TestDiagnosticString(t *testing.T) {
 	d := Diagnostic{
 		Severity: Error,
-		Code:     Code("masterbelt.lexer.unterminated_block_comment"),
+		Code:     Code("belt.lexer.unterminated_block_comment"),
 		Message:  "unterminated block comment",
 		Offset:   12,
 		Width:    8,
 	}
-	want := "error[masterbelt.lexer.unterminated_block_comment]: unterminated block comment"
+	want := "error[belt.lexer.unterminated_block_comment]: unterminated block comment"
 	if got := d.String(); got != want {
 		t.Errorf("String() = %q, want %q", got, want)
 	}
@@ -43,7 +43,7 @@ func TestLocalize(t *testing.T) {
 	// A diagnostic carries Code + Fields, so it can be re-rendered in any locale
 	// regardless of the default-locale Message it was built with.
 	d := Diagnostic{
-		Code:    Code("masterbelt.lexer.unexpected_character"),
+		Code:    Code("belt.lexer.unexpected_character"),
 		Message: "unexpected character: '#'",
 		Fields:  map[string]fmt.Stringer{"char": Rune('#')},
 	}

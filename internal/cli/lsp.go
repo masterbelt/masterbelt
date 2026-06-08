@@ -5,7 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/lsp"
+	"github.com/masterbelt/masterbelt/pkg/belt/lsp"
 )
 
 func init() {

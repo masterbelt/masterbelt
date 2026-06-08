@@ -19,7 +19,7 @@ set -eu
 GO="${GO:-go}"
 BENCHTIME="${BENCHTIME:-200ms}"
 BENCHCOUNT="${BENCHCOUNT:-3}"
-PKGS="${PKGS:-./internal/beltgen/ ./pkg/masterbelt/semantic/}"
+PKGS="${PKGS:-./internal/beltgen/ ./pkg/belt/semantic/}"
 RE="${RE:-BenchmarkColdCompile|BenchmarkIncremental}"
 
 raw="$(mktemp)"

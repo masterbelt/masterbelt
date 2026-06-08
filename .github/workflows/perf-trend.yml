@@ -74,7 +74,7 @@ jobs:
           elif go list ./internal/beltgen/ >/dev/null 2>&1; then
             go test -run '^$' -bench 'BenchmarkColdCompile|BenchmarkIncremental' \
               -benchmem -benchtime=100ms -count=6 \
-              ./internal/beltgen/ ./pkg/masterbelt/semantic/ | tee old.txt || true
+              ./internal/beltgen/ ./pkg/belt/semantic/ | tee old.txt || true
           fi
           git checkout --quiet - || true
 

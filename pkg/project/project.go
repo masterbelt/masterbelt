@@ -3,7 +3,7 @@
 // from the entry point — the closure of the entry's use declarations.
 //
 // The project layer owns the meaning of a use path: relative to the importing
-// file, confined to the project root. It parses files (pkg/masterbelt/parser)
+// file, confined to the project root. It parses files (pkg/belt/parser)
 // to follow their imports, but never resolves names or types — the semantic
 // layer consumes each File's resolved Uses table as an input, so the path
 // semantics live in exactly one place. The dependency arrow keeps pointing
@@ -19,8 +19,8 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/masterbelt/masterbelt/pkg/belt/parser/abstract"
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
-	"github.com/masterbelt/masterbelt/pkg/masterbelt/parser/abstract"
 	"github.com/masterbelt/masterbelt/pkg/project/config"
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
 )

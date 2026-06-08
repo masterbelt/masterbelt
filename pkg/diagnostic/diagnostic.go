@@ -2,7 +2,7 @@
 // notes — anchored to the source span they refer to.
 //
 // Diagnostics are not constructed freely. Every diagnostic has a stable Code
-// (e.g. masterbelt.lexer.unexpected_character) with a fixed set of typed Fields
+// (e.g. belt.lexer.unexpected_character) with a fixed set of typed Fields
 // and a per-locale message template, declared in code.csv and
 // messages/<locale>.csv. The generator (go generate ./...) compiles those tables
 // into a typed constructor per code in each owning package — the only way to
@@ -32,7 +32,7 @@ import (
 )
 
 // Code is the stable identifier of a diagnostic kind, e.g.
-// "masterbelt.lexer.unexpected_character".
+// "belt.lexer.unexpected_character".
 type Code string
 
 // Diagnostic is a single message anchored to a byte range of the source. Like a
