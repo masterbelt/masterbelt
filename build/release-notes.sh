@@ -30,10 +30,8 @@ Automated nightly build — **not a stable release.**
 
 ### Also published
 
-- Editor extension \`masterbelt-$vsix.vsix\` (attached) — and the Marketplace
-  pre-release channel when a token is configured.
-- Container \`ghcr.io/$repo:nightly\` (rolling) and
-  \`ghcr.io/$repo:nightly-$patch-$sha\` (pinned).
+- Editor extension \`masterbelt-$vsix.vsix\` (attached) — and the Marketplace pre-release channel when a token is configured.
+- Container \`ghcr.io/$repo:nightly\` (rolling) and \`ghcr.io/$repo:nightly-$patch-$sha\` (pinned).
 
 ### Checksums (SHA-256)
 
@@ -43,9 +41,5 @@ $(cat "$out/SHA256SUMS")
 
 ### Scope
 
-Built on linux with CGO disabled. **Run-confirmed on linux/amd64 only**; the
-other targets are build-confirmed (checksums above). macOS binaries are
-**unsigned and unnotarized** — Gatekeeper will warn. This is a rolling build: the
-\`nightly\` tag and these assets are overwritten every run, so pin a build by its
-commit or checksum, not by the tag.
+Built on linux with CGO disabled. **Run-confirmed on linux/amd64 only**; the other targets are build-confirmed (checksums above). macOS binaries are **unsigned and unnotarized** — Gatekeeper will warn. This is a rolling build: the \`nightly\` tag and these assets are overwritten every run, so pin a build by its commit or checksum, not by the tag.
 EOF
