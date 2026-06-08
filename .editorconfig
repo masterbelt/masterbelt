@@ -7,6 +7,15 @@ insert_final_newline = true
 indent_style = space
 indent_size = 2
 
+# The substrate `masterbelt fmt` reads for .belt sources: indent unit and line
+# ending. Everything else fmt decides itself and is not configurable. The values
+# match the example and prelude canon, so resolving this config reproduces the
+# committed formatting rather than moving it.
+[*.belt]
+indent_style = space
+indent_size = 2
+end_of_line = lf
+
 [{*.go,go.mod,go.sum}]
 indent_style = tab
 
