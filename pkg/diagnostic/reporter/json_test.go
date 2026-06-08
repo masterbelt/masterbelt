@@ -67,6 +67,53 @@ func TestJSONReport(t *testing.T) {
 	}
 }
 
+func TestJSONReportAnchor(t *testing.T) {
+	// With an anchor resolver installed, each diagnostic carries the address of
+	// its enclosing declaration; an offset the resolver maps to nothing leaves
+	// the field out entirely (omitempty).
+	file := source.NewFile("src/main.belt", []byte("const A = B\n"))
+	var out bytes.Buffer
+	r := NewJSON(&out, diagnostic.DefaultLocale)
+	r.SetAnchorResolver(func(name string, offset int) string {
+		if name == "src/main.belt" && offset == 10 {
+			return "belt:src/main/A"
+		}
+		return ""
+	})
+
+	r.Report(file, []diagnostic.Diagnostic{
+		{Severity: diagnostic.Error, Code: "x.undefined", Message: "no", Offset: 10, Width: 1},
+		{Severity: diagnostic.Error, Code: "x.stray", Message: "no", Offset: 0, Width: 1},
+	})
+	if err := r.Flush(); err != nil {
+		t.Fatalf("Flush() = %v", err)
+	}
+
+	if !bytes.Contains(out.Bytes(), []byte(`"anchor": "belt:src/main/A"`)) {
+		t.Errorf("output missing the resolved anchor:\n%s", out.String())
+	}
+	// The offset-0 diagnostic resolves to no declaration, so its entry omits the
+	// anchor key rather than emitting an empty string.
+	if bytes.Count(out.Bytes(), []byte(`"anchor"`)) != 1 {
+		t.Errorf("want exactly one anchor field; got:\n%s", out.String())
+	}
+}
+
+func TestJSONReportNoAnchorResolver(t *testing.T) {
+	// Without a resolver the anchor field never appears — the field stays
+	// backward compatible for consumers that predate A-5.
+	file := source.NewFile("a.belt", []byte("const A = B\n"))
+	var out bytes.Buffer
+	r := NewJSON(&out, diagnostic.DefaultLocale)
+	r.Report(file, []diagnostic.Diagnostic{{Severity: diagnostic.Error, Code: "x.y", Message: "no", Offset: 10, Width: 1}})
+	if err := r.Flush(); err != nil {
+		t.Fatalf("Flush() = %v", err)
+	}
+	if bytes.Contains(out.Bytes(), []byte(`"anchor"`)) {
+		t.Errorf("anchor field present without a resolver:\n%s", out.String())
+	}
+}
+
 func TestJSONReportBare(t *testing.T) {
 	// No file to anchor to: the diagnostic is emitted without file and range.
 	var out bytes.Buffer

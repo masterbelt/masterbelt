@@ -38,11 +38,14 @@ const schemaVersion = 1
 // needed; humans read message, rendered in the reporter's locale. Offsets are
 // bytes; line and column are 1-based with byte-measured columns. Bare
 // diagnostics carry neither file nor range. fixes is always present — empty
-// until fix metadata lands — so consumers never branch on its absence, and
-// anchor joins it when semantic anchors (A-5) land.
+// until fix metadata lands — so consumers never branch on its absence. anchor
+// is the stable address of the declaration enclosing the diagnostic (A-5),
+// present when an anchor resolver is installed and the offset falls in a
+// declaration: a position-independent handle a consumer can keep across edits.
 type JSON struct {
 	w      io.Writer
 	locale diagnostic.Locale
+	anchor func(file string, offset int) string
 	diags  []jsonDiag
 	errors errorCount
 }
@@ -52,12 +55,25 @@ func NewJSON(w io.Writer, locale diagnostic.Locale) *JSON {
 	return &JSON{w: w, locale: locale, diags: []jsonDiag{}}
 }
 
+// SetAnchorResolver installs the function the reporter calls to attach a
+// semantic anchor (A-5) to each diagnostic: given the file name a diagnostic is
+// reported under and its byte offset, it returns the anchor of the enclosing
+// declaration, or "" when none. It is optional — without it the anchor field is
+// simply omitted — so the compiler core's EnclosingDecl is wired in by the
+// binding layer (the CLI) without this low-level reporter depending on it.
+func (r *JSON) SetAnchorResolver(resolve func(file string, offset int) string) {
+	r.anchor = resolve
+}
+
 // Report accumulates diags anchored to file, ordered by offset.
 func (r *JSON) Report(file *source.File, diags []diagnostic.Diagnostic) {
 	for _, d := range byOffset(diags) {
 		jd := r.diag(d)
 		jd.File = file.Name()
 		jd.Range = &jsonRange{Start: position(file, d.Offset), End: position(file, d.End())}
+		if r.anchor != nil {
+			jd.Anchor = r.anchor(file.Name(), d.Offset)
+		}
 		r.diags = append(r.diags, jd)
 	}
 	r.errors.add(diags)
@@ -124,7 +140,7 @@ type jsonDiag struct {
 	Code     string            `json:"code"`
 	Severity string            `json:"severity"` // "error" | "warning" | "info" | "hint"
 	File     string            `json:"file,omitempty"`
-	Anchor   string            `json:"anchor,omitempty"` // supplied by A-5, once it lands
+	Anchor   string            `json:"anchor,omitempty"` // the enclosing declaration's stable address (A-5)
 	Range    *jsonRange        `json:"range,omitempty"`
 	Message  jsonMessage       `json:"message"`
 	Data     map[string]string `json:"data,omitempty"`

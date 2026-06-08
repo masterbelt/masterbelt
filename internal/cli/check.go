@@ -104,6 +104,12 @@ func checkProject(rep reporter.Reporter, proj *project.Project) error {
 	}
 	prog.Refresh()
 
+	byName := make(map[string]semantic.FileID, len(proj.Files()))
+	for _, f := range proj.Files() {
+		byName[displayPath(f.Path)] = semantic.FileID(f.ID)
+	}
+	installAnchors(rep, prog, byName)
+
 	decls := 0
 	for _, f := range proj.Files() {
 		rep.Report(source.NewFile(displayPath(f.Path), f.Data), gatherDiagnostics(f.AST, prog, semantic.FileID(f.ID)))
@@ -165,12 +171,34 @@ func checkSource(rep reporter.Reporter, path string, data []byte) error {
 	prog.SetFile(id, doc, nil)
 	prog.Refresh()
 
+	installAnchors(rep, prog, map[string]semantic.FileID{displayPath(path): id})
 	rep.Report(source.NewFile(displayPath(path), data), gatherDiagnostics(doc, prog, id))
 	reportStats(prog.Stats(), 1, countDecls(doc.File()))
 	if n := rep.Errors(); n > 0 {
 		return fmt.Errorf("%s: %d error(s)", displayPath(path), n)
 	}
 	return nil
+}
+
+// installAnchors wires the program's stable-anchor lookup into a JSON reporter,
+// so each diagnostic it emits carries the address of the declaration enclosing
+// its offset (A-5 §3.5). It is a no-op for the text reporter, which has no
+// anchor field. The resolver maps a reported file's display name back to its
+// program FileID — the bridge between the two identifiers the CLI already owns
+// — then asks the program for the enclosing declaration.
+func installAnchors(rep reporter.Reporter, prog *semantic.Program, byName map[string]semantic.FileID) {
+	jr, ok := rep.(*reporter.JSON)
+	if !ok {
+		return
+	}
+	jr.SetAnchorResolver(func(file string, offset int) string {
+		id, ok := byName[file]
+		if !ok {
+			return ""
+		}
+		anchor, _ := prog.EnclosingDecl(id, offset)
+		return anchor
+	})
 }
 
 // gatherDiagnostics aggregates one file's full diagnostic set — lexer,

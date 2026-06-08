@@ -150,9 +150,10 @@ func TestCheckJSON(t *testing.T) {
 	var report struct {
 		Version     int `json:"version"`
 		Diagnostics []struct {
-			Code  string `json:"code"`
-			File  string `json:"file"`
-			Range *struct {
+			Code   string `json:"code"`
+			File   string `json:"file"`
+			Anchor string `json:"anchor"`
+			Range  *struct {
 				Start struct {
 					Offset, Line, Column int
 				} `json:"start"`
@@ -176,6 +177,11 @@ func TestCheckJSON(t *testing.T) {
 	}
 	if !strings.HasSuffix(d.File, "main.belt") {
 		t.Errorf("file = %q, want the entry file", d.File)
+	}
+	// The undefined reference sits inside `const A`, so the diagnostic carries
+	// that declaration's stable anchor (A-5).
+	if d.Anchor != "belt:main/A" {
+		t.Errorf("anchor = %q, want belt:main/A", d.Anchor)
 	}
 	if d.Range == nil || d.Range.Start.Line != 1 || d.Range.Start.Column != 11 || d.Range.Start.Offset != 10 {
 		t.Errorf("range = %+v, want 1:11 at offset 10", d.Range)
