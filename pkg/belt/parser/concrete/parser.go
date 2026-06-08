@@ -3,7 +3,7 @@
 //
 // The grammar is small and recursive-descent:
 //
-//	File          := ( ConstDecl | TypeDecl | EnumDecl | InterfaceDecl | UseDecl | AssertDecl | FuncDecl | Error )*
+//	File          := ( ConstDecl | TypeDecl | EnumDecl | InterfaceDecl | UseDecl | AssertDecl | FuncDecl | MasterDecl | Error )*
 //	ConstDecl     := [pub] const Ident [TypeClause] [Initializer]
 //	TypeDecl      := [pub] type Ident [GenericParams] "=" TypeExpr [WhereClause] [ImplBlock]
 //	EnumDecl      := [pub] enum Ident [":" TypeExpr] "{" ( EnumMember ( ("," | NL) EnumMember )* )? "}" [ImplBlock]
@@ -13,6 +13,9 @@
 //	InterfaceMember := [pub] Ident [GenericParams] ParamList ":" TypeExpr [Block]
 //	UseDecl       := [pub] use UseTarget from String
 //	AssertDecl    := assert Expr
+//	MasterDecl    := [pub] master Ident "{" ( MasterRecord | MasterPrimary )* "}"   (master/record/primary are context keywords, each wrapped in a MasterKeyword node)
+//	MasterRecord  := record TypeExpr [WhereClause] [ImplBlock]*   (the row type, reusing the type-body grammar)
+//	MasterPrimary := primary ( Ident | "(" Ident ( "," Ident )* [","] ")" )
 //	FuncDecl      := [pub] [extern] fn Effect* Ident ParamList ":" TypeExpr ( Block | "->" Expr )
 //	Effect        := io | async | nondet
 //	UseTarget     := Ident | UseList | "*"
@@ -300,6 +303,11 @@ func (p *parser) nextChildren() (batch []cst.Green, done bool) {
 	case p.atEOF():
 		lead = append(lead, p.bump()) // the EOF leaf
 		return lead, true
+	case p.masterBeginsDecl():
+		// A master declaration, headed by the context keyword master (an Ident
+		// the lexer leaves plain). Checked before the pub/keyword branch since a
+		// pub master begins with pub, which that branch would otherwise claim.
+		return []cst.Green{p.parseMasterDecl(lead)}, false
 	case p.kind() == token.Pub || p.kind() == token.Const || p.kind() == token.Type || p.kind() == token.Enum || p.kind() == token.Interface || p.kind() == token.Use || p.kind() == token.Extern:
 		switch p.declKind() {
 		case token.Type:
@@ -363,6 +371,25 @@ func (p *parser) externBeginsFunc() bool {
 	return p.toks[p.nextSignificantIndex(i+1)].Kind == token.Fn
 }
 
+// masterBeginsDecl reports whether the construct at the cursor begins a master
+// declaration: an optional pub, then the context keyword master (an Ident the
+// lexer leaves plain), then the declared name (an Ident). The trailing-name
+// check is what tells the context keyword apart from an ordinary identifier
+// literally named "master", mirroring how get/set bind only before a name. The
+// lookahead reads the identifier's text exactly as the modifier check does;
+// reading bytes a token already covers keeps the boundary context-free property
+// the incremental Document relies on.
+func (p *parser) masterBeginsDecl() bool {
+	i := p.nextSignificantIndex(p.pos)
+	if p.toks[i].Kind == token.Pub {
+		i = p.nextSignificantIndex(i + 1)
+	}
+	if p.toks[i].Kind != token.Ident || p.identText(i) != "master" {
+		return false
+	}
+	return p.toks[p.nextSignificantIndex(i+1)].Kind == token.Ident
+}
+
 // nextSignificantIndex returns the index of the next non-trivia token at or
 // after i.
 func (p *parser) nextSignificantIndex(i int) int {
@@ -394,11 +421,14 @@ func (p *parser) declKind() token.Kind {
 // a construct nextChildren parses as a declaration — one that must end an error
 // run. It mirrors nextChildren's dispatch exactly: const/type/enum/interface/
 // use/assert always do; fn only as a declaration (fn name, not a stray
-// literal); extern only as [pub] extern fn; and pub always, except the one
+// literal); extern only as [pub] extern fn; a bare master (its context keyword
+// is an Ident, so it falls to the default); and pub always, except the one
 // shape the dispatcher itself routes back to the error parser — pub extern
-// without fn. Keeping this predicate in lockstep with the dispatch is what
-// guarantees parseError consumes at least one token (nextChildren only calls it
-// on a token this predicate rejects), so the File-level loops always progress.
+// without fn (a pub master is a declaration, so the Pub case returning true
+// matches the dispatcher routing it to parseMasterDecl). Keeping this predicate
+// in lockstep with the dispatch is what guarantees parseError consumes at least
+// one token (nextChildren only calls it on a token this predicate rejects), so
+// the File-level loops always progress.
 func (p *parser) beginsDeclaration() bool {
 	switch p.peekSignificant() {
 	case token.Const, token.Type, token.Enum, token.Interface, token.Use, token.Assert:
@@ -413,7 +443,9 @@ func (p *parser) beginsDeclaration() bool {
 		}
 		return true
 	default:
-		return false
+		// A bare master declaration: its context keyword master is an Ident, so
+		// it lands here rather than in a keyword case (pub master is caught above).
+		return p.masterBeginsDecl()
 	}
 }
 

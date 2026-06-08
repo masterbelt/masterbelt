@@ -1,0 +1,36 @@
+// A master declares a master-data table: the record type of its rows and the
+// primary key naming the columns that identify a row. The record body is an
+// ordinary type body — a record type with the optional where-refinement and
+// impl block reused wholesale — so per-row methods come along for free
+// (north star §2/§3). master/record/primary are context keywords: ordinary
+// identifiers everywhere else, recognized only at these positions.
+
+/// How a skill is triggered.
+pub enum SkillKind {
+  active
+  passive
+}
+
+/// One row of the Skill master.
+pub master Skill {
+  record {
+    id: int,
+    name: string,
+    kind: SkillKind,
+  } impl {
+    /// The skill's display label.
+    pub label(): string {
+      return self.name
+    }
+  }
+  primary id
+}
+
+// A composite primary key names more than one column, in order.
+master SkillUpgrade {
+  record {
+    skill: int,
+    level: int,
+  }
+  primary (skill, level)
+}

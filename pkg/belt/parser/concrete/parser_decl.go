@@ -542,6 +542,174 @@ func (p *parser) parseAssertDecl(lead []cst.Green) *cst.Node {
 	return cst.NewNode(cst.AssertDecl, children)
 }
 
+// --- master declarations ------------------------------------------------------
+
+// parseMasterDecl parses a master declaration, prepending the already-collected
+// leading trivia:
+//
+//	[pub] master Ident "{" ( MasterRecord | MasterPrimary )* "}"
+//
+// master/record/primary are context keywords — ordinary identifiers the lexer
+// leaves plain, recognized only at these positions (the get/set/static
+// precedent) and wrapped in a MasterKeyword node so the lowering ignores them
+// and the editor colours them. The record member reuses the type-body grammar
+// (a type expression with an optional where-refinement and impl blocks), so
+// per-row methods and predicates come along for free; the primary member names
+// the key column(s). As elsewhere every expected element is optional in the
+// parse: a missing one records a diagnostic and is simply absent from the tree
+// while losslessness is preserved. The cursor sits on pub or the master keyword.
+func (p *parser) parseMasterDecl(lead []cst.Green) *cst.Node {
+	children := lead
+
+	if p.kind() == token.Pub {
+		children = append(children, p.bump())
+	}
+	p.skipTrivia(&children)
+	children = append(children, p.masterKeyword()) // "master" (guaranteed by the dispatcher)
+
+	if p.peekSignificant() == token.Ident {
+		p.skipTrivia(&children)
+		children = append(children, p.bump()) // the declared name
+	} else {
+		p.report(newExpectedIdentifierDiagnostic(p.lastStart, 0))
+	}
+
+	if p.peekSignificant() == token.LBrace {
+		p.skipTrivia(&children)
+		children = append(children, p.bump()) // "{"
+	} else {
+		p.reportUnexpected()
+		return cst.NewNode(cst.MasterDecl, children)
+	}
+
+	// The members: a record member and a primary member, each introduced by its
+	// context keyword. They are newline-separated like the fields they hold, and
+	// either may be absent (a missing one is the semantic layer's concern, not
+	// the parser's). The leading trivia of a member (its doc comment most of all)
+	// belongs to it, exactly as a top-level declaration's does.
+	for {
+		switch {
+		case p.peekSignificant() == token.RBrace:
+			p.skipTrivia(&children)
+			children = append(children, p.bump()) // "}"
+			return cst.NewNode(cst.MasterDecl, children)
+		case p.peekSignificant() == token.EOF:
+			return cst.NewNode(cst.MasterDecl, children)
+		case p.masterMemberIs("record"):
+			var lead []cst.Green
+			p.skipTrivia(&lead)
+			children = append(children, p.parseMasterRecord(lead))
+		case p.masterMemberIs("primary"):
+			var lead []cst.Green
+			p.skipTrivia(&lead)
+			children = append(children, p.parseMasterPrimary(lead))
+		default:
+			p.skipTrivia(&children)
+			p.report(newUnexpectedTokenDiagnostic(p.cur().Offset, p.cur().Width, p.kind().String()))
+			children = append(children, p.bump())
+		}
+	}
+}
+
+// parseMasterRecord parses the record member of a master declaration, prepending
+// the already-collected leading trivia:
+//
+//	record TypeExpr [WhereClause] [ImplBlock]*
+//
+// The body after the record keyword is the type-body grammar a type declaration
+// uses, reused wholesale (parseTypeExpr / parseWhereClause / parseImplBlock): a
+// type expression — a RecordType in practice — an optional where-refinement over
+// self, and any number of impl blocks (an inherent one and one per interface).
+// So a master's rows get per-row methods and refinements with no bespoke grammar.
+// The cursor sits on the record keyword.
+func (p *parser) parseMasterRecord(lead []cst.Green) *cst.Node {
+	children := lead
+	children = append(children, p.masterKeyword()) // "record"
+
+	if startsType(p.peekSignificant()) {
+		p.skipTrivia(&children)
+		children = append(children, p.parseTypeExpr())
+	} else {
+		p.report(newExpectedTypeDiagnostic(p.lastStart, 0))
+	}
+
+	if p.peekSignificant() == token.Where {
+		p.skipTrivia(&children)
+		children = append(children, p.parseWhereClause())
+	}
+
+	for p.peekSignificant() == token.Impl {
+		p.skipTrivia(&children)
+		children = append(children, p.parseImplBlock())
+	}
+
+	return cst.NewNode(cst.MasterRecord, children)
+}
+
+// parseMasterPrimary parses the primary-key member of a master declaration,
+// prepending the already-collected leading trivia:
+//
+//	primary ( Ident | "(" Ident ( "," Ident )* [","] ")" )
+//
+// The key is a single column name or a parenthesized, comma-separated list of
+// them — a composite key, in declaration order. The key columns are kept as
+// direct Ident children (the primary keyword is wrapped in a MasterKeyword
+// node), so the lowering reads them apart from the keyword. The cursor sits on
+// the primary keyword.
+func (p *parser) parseMasterPrimary(lead []cst.Green) *cst.Node {
+	children := lead
+	children = append(children, p.masterKeyword()) // "primary"
+
+	switch p.peekSignificant() {
+	case token.Ident:
+		p.skipTrivia(&children)
+		children = append(children, p.bump()) // the single key column
+	case token.LParen:
+		p.skipTrivia(&children)
+		children = append(children, p.bump()) // "("
+		for p.peekSignificant() == token.Ident {
+			p.skipTrivia(&children)
+			children = append(children, p.bump()) // a key column
+			if p.peekSignificant() != token.Comma {
+				break
+			}
+			p.skipTrivia(&children)
+			children = append(children, p.bump()) // ","
+		}
+		if p.peekSignificant() == token.RParen {
+			p.skipTrivia(&children)
+			children = append(children, p.bump()) // ")"
+		} else {
+			p.reportUnexpected()
+		}
+	default:
+		p.report(newExpectedIdentifierDiagnostic(p.lastStart, 0))
+	}
+
+	return cst.NewNode(cst.MasterPrimary, children)
+}
+
+// masterKeyword consumes the context-keyword identifier at the cursor
+// (master/record/primary) and wraps it in a MasterKeyword node, so the AST
+// lowering reads it as the construct's keyword rather than as a name, and the
+// editor's token classifier colours it as a keyword — the same role the
+// Modifier node plays for the get/set/static accessors. The cursor sits on the
+// keyword, guaranteed by the dispatcher (master) or masterMemberIs (record,
+// primary).
+func (p *parser) masterKeyword() cst.Green {
+	return cst.NewNode(cst.MasterKeyword, []cst.Green{p.bump()})
+}
+
+// masterMemberIs reports whether the next significant token is the context
+// keyword kw (record or primary) opening a master member. The lookahead reads
+// the identifier's text the same way the get/set/static modifier check does;
+// reading bytes a token already covers keeps the boundary context-free property
+// the incremental Document relies on.
+func (p *parser) masterMemberIs(kw string) bool {
+	i := p.nextSignificantIndex(p.pos)
+	return p.toks[i].Kind == token.Ident && p.identText(i) == kw
+}
+
 // --- top-level functions ------------------------------------------------------
 
 // parseFuncDecl parses a top-level function declaration, prepending the

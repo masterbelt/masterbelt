@@ -1,0 +1,23 @@
+File
+  Uses: ~
+  Decls: ~
+  Types: ~
+  Enums:
+    EnumDecl
+      Doc: "How a skill is triggered."
+      Public: true
+      Name: "SkillKind"
+      Base: ~
+      Members:
+        EnumMember
+          Name: "active"
+          Value: ~
+        EnumMember
+          Name: "passive"
+          Value: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
+  Interfaces: ~
+  Funcs: ~
+  Asserts: ~

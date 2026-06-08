@@ -1,0 +1,192 @@
+# tree
+File
+  EnumDecl
+    LineComment "// A master declares a master-data table: the record type of its rows and the"
+    Newline "\n"
+    LineComment "// primary key naming the columns that identify a row. The record body is an"
+    Newline "\n"
+    LineComment "// ordinary type body — a record type with the optional where-refinement and"
+    Newline "\n"
+    LineComment "// impl block reused wholesale — so per-row methods come along for free"
+    Newline "\n"
+    LineComment "// (north star §2/§3). master/record/primary are context keywords: ordinary"
+    Newline "\n"
+    LineComment "// identifiers everywhere else, recognized only at these positions."
+    Newline "\n"
+    Newline "\n"
+    DocComment "/// How a skill is triggered."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Enum "enum"
+    Whitespace " "
+    Ident "SkillKind"
+    Whitespace " "
+    LBrace "{"
+    EnumMember
+      Newline "\n"
+      Whitespace "  "
+      Ident "active"
+    EnumMember
+      Newline "\n"
+      Whitespace "  "
+      Ident "passive"
+    Newline "\n"
+    RBrace "}"
+  MasterDecl
+    Newline "\n"
+    Newline "\n"
+    DocComment "/// One row of the Skill master."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    MasterKeyword
+      Ident "master"
+    Whitespace " "
+    Ident "Skill"
+    Whitespace " "
+    LBrace "{"
+    MasterRecord
+      Newline "\n"
+      Whitespace "  "
+      MasterKeyword
+        Ident "record"
+      Whitespace " "
+      RecordType
+        LBrace "{"
+        Newline "\n"
+        Whitespace "    "
+        Field
+          Ident "id"
+          Colon ":"
+          Whitespace " "
+          TypeName
+            Ident "int"
+        Comma ","
+        Newline "\n"
+        Whitespace "    "
+        Field
+          Ident "name"
+          Colon ":"
+          Whitespace " "
+          TypeName
+            Ident "string"
+        Comma ","
+        Newline "\n"
+        Whitespace "    "
+        Field
+          Ident "kind"
+          Colon ":"
+          Whitespace " "
+          TypeName
+            Ident "SkillKind"
+        Comma ","
+        Newline "\n"
+        Whitespace "  "
+        RBrace "}"
+      Whitespace " "
+      ImplBlock
+        Impl "impl"
+        Whitespace " "
+        LBrace "{"
+        MethodDecl
+          Newline "\n"
+          Whitespace "    "
+          DocComment "/// The skill's display label."
+          Newline "\n"
+          Whitespace "    "
+          Pub "pub"
+          Whitespace " "
+          Ident "label"
+          ParamList
+            LParen "("
+            RParen ")"
+          Colon ":"
+          Whitespace " "
+          TypeName
+            Ident "string"
+          Whitespace " "
+          Block
+            LBrace "{"
+            Newline "\n"
+            Whitespace "      "
+            ReturnStmt
+              Return "return"
+              Whitespace " "
+              MemberExpr
+                SelfExpr
+                  Self "self"
+                Dot "."
+                Ident "name"
+            Newline "\n"
+            Whitespace "    "
+            RBrace "}"
+        Newline "\n"
+        Whitespace "  "
+        RBrace "}"
+    MasterPrimary
+      Newline "\n"
+      Whitespace "  "
+      MasterKeyword
+        Ident "primary"
+      Whitespace " "
+      Ident "id"
+    Newline "\n"
+    RBrace "}"
+  MasterDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// A composite primary key names more than one column, in order."
+    Newline "\n"
+    MasterKeyword
+      Ident "master"
+    Whitespace " "
+    Ident "SkillUpgrade"
+    Whitespace " "
+    LBrace "{"
+    MasterRecord
+      Newline "\n"
+      Whitespace "  "
+      MasterKeyword
+        Ident "record"
+      Whitespace " "
+      RecordType
+        LBrace "{"
+        Newline "\n"
+        Whitespace "    "
+        Field
+          Ident "skill"
+          Colon ":"
+          Whitespace " "
+          TypeName
+            Ident "int"
+        Comma ","
+        Newline "\n"
+        Whitespace "    "
+        Field
+          Ident "level"
+          Colon ":"
+          Whitespace " "
+          TypeName
+            Ident "int"
+        Comma ","
+        Newline "\n"
+        Whitespace "  "
+        RBrace "}"
+    MasterPrimary
+      Newline "\n"
+      Whitespace "  "
+      MasterKeyword
+        Ident "primary"
+      Whitespace " "
+      LParen "("
+      Ident "skill"
+      Comma ","
+      Whitespace " "
+      Ident "level"
+      RParen ")"
+    Newline "\n"
+    RBrace "}"
+  Newline "\n"
+  EOF ""
+# diagnostics

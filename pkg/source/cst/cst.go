@@ -123,6 +123,17 @@ const (
 
 	AssertDecl // [doc] assert Expr
 
+	// Master declarations. A master declares a master-data table: the record
+	// type of its rows and the primary key naming the columns that identify a
+	// row. master/record/primary are context keywords — ordinary identifiers the
+	// lexer leaves plain, each wrapped in a MasterKeyword node where it is
+	// recognized (the Modifier precedent for get/set/static).
+
+	MasterDecl    // [doc] [pub] master Ident "{" ( MasterRecord | MasterPrimary )* "}"
+	MasterRecord  // record TypeExpr [WhereClause] [ImplBlock]*  (the row type, reusing the type-body grammar)
+	MasterPrimary // primary ( Ident | "(" Ident ("," Ident)* ")" )  (the key column(s))
+	MasterKeyword // a context keyword in a master declaration: master, record, or primary (an Ident the parser recognizes by position)
+
 	Error // a run of tokens that did not fit the grammar
 
 	numKinds // sentinel: the count of Kind values; not a real kind
@@ -187,6 +198,10 @@ var kindNames = [...]string{
 	UseDecl:          "UseDecl",
 	UseList:          "UseList",
 	AssertDecl:       "AssertDecl",
+	MasterDecl:       "MasterDecl",
+	MasterRecord:     "MasterRecord",
+	MasterPrimary:    "MasterPrimary",
+	MasterKeyword:    "MasterKeyword",
 	Error:            "Error",
 }
 
