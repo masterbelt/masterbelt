@@ -1,4 +1,4 @@
-# perf-trend — the wall-clock / memory TREND layer (D-1 M5, §4.2).
+# perf-trend — the wall-clock / memory TREND layer.
 #
 # WHAT THIS MEASURES: it runs the scoped wall-clock + bytes/op benchmarks
 # (`make bench-trend`: cold-compile and incremental edit-replay over the
@@ -10,7 +10,7 @@
 # gates are DETERMINISTIC counts only (the reuse snapshot + allocs/op, run by
 # `make perf` in ci.yml); wall-clock and memory are TREND metrics, reported but
 # never failed, because shared CI runners are too noisy to gate on time without
-# becoming flaky (D-1 §1 insight 1, §4.2, §9). Accordingly the benchstat step
+# becoming flaky. Accordingly the benchstat step
 # can never exit non-zero into the job result: it is guarded so a regression —
 # or even a benchstat error — only prints, it does not fail the build.
 name: perf-trend
@@ -80,7 +80,7 @@ jobs:
 
       # benchstat compares the two samples. continue-on-error guarantees that a
       # measured regression (or any benchstat hiccup) can NEVER fail this job —
-      # wall-clock is a trend, not a gate (D-1 §1, §4.2). We capture the table to
+      # wall-clock is a trend, not a gate. We capture the table to
       # a file used by the later surfacing steps.
       - name: benchstat old vs new (advisory)
         id: benchstat
@@ -104,11 +104,10 @@ jobs:
           {
             echo "## Performance trend (advisory — never blocks merge)"
             echo
-            echo "Wall-clock and memory are TREND metrics (D-1 §1, §4.2): reported,"
-            echo "never failed. The hard gates are the deterministic reuse snapshot"
-            echo "and allocs/op in the \`ci\` workflow (\`make perf\`). Shared-runner"
-            echo "variance makes the numbers below advisory (D-1 §9) — read the"
-            echo "p-values, not single deltas."
+            echo "Wall-clock and memory are TREND metrics: reported, never failed."
+            echo "The hard gates are the deterministic reuse snapshot and allocs/op"
+            echo "in the \`ci\` workflow (\`make perf\`). Shared-runner variance makes"
+            echo "the numbers below advisory — read the p-values, not single deltas."
             echo
             echo "\`\`\`"
             cat benchstat.txt 2>/dev/null || echo "(benchstat produced no output)"
@@ -144,10 +143,10 @@ jobs:
               marker,
               '## Performance trend (advisory — never blocks merge)',
               '',
-              'Wall-clock and memory are **trend** metrics (D-1 §1, §4.2): reported,',
-              'never failed. The hard gates are the deterministic reuse snapshot and',
-              'allocs/op in the `ci` workflow. Shared-runner variance makes these',
-              'advisory (D-1 §9) — read the p-values, not single deltas.',
+              'Wall-clock and memory are **trend** metrics: reported, never failed.',
+              'The hard gates are the deterministic reuse snapshot and allocs/op in',
+              'the `ci` workflow. Shared-runner variance makes these advisory — read',
+              'the p-values, not single deltas.',
               '',
               '```',
               table,
