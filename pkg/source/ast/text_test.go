@@ -8,12 +8,13 @@ import (
 	"github.com/masterbelt/masterbelt/pkg/source/internal/treetext"
 )
 
-// TestFieldSensitivity is the P5 gate (F-4 §2.4): for every tree struct,
+// TestFieldSensitivity is the field-sensitivity gate: for every tree struct,
 // mutating any exported, non-excluded field must change the marshal output —
 // the executable definition of "every field appears in the format". A field
 // the codec dropped would marshal identically before and after the mutation
 // and fail here, which is exactly the blind spot the exact format exists to
-// kill (the overload-resolution gap of F-2 was this shape).
+// kill (an overload-resolution gap, where a field the curated dump did not
+// render went unnoticed, was this shape).
 func TestFieldSensitivity(t *testing.T) {
 	for _, probe := range treeStructs {
 		st := reflect.TypeOf(probe).Elem()
@@ -71,7 +72,7 @@ func mutate(t *testing.T, f reflect.Value, name string) {
 	case reflect.Pointer, reflect.Interface:
 		f.Set(instanceOf(t, f.Type(), name))
 	default:
-		t.Fatalf("field %s: no mutation for kind %s — extend the P5 pin", name, f.Kind())
+		t.Fatalf("field %s: no mutation for kind %s — extend the field-sensitivity pin", name, f.Kind())
 	}
 }
 
@@ -96,7 +97,7 @@ func instanceOf(t *testing.T, typ reflect.Type, name string) reflect.Value {
 // TestNoSilentExclusions pins the explicit-exclusion manifest: the AST
 // excludes nothing exported from its format today, and the unexported syntax
 // backpointers are out by construction. A tree:"-" added later must extend
-// this pin — the "never an implicit omission" rule of F-4 §2.2.
+// this pin — the "never an implicit omission" rule of the exact format.
 func TestNoSilentExclusions(t *testing.T) {
 	if len(treeExcluded) != 0 {
 		t.Errorf("treeExcluded = %v; the AST format excludes no exported fields — update this pin only with a deliberate format decision", treeExcluded)

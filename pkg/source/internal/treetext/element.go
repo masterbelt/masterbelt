@@ -1,7 +1,7 @@
 package treetext
 
-// This file is the element grammar of the exact tree formats (format v2,
-// F-4 §2.2): every node is an element — a heading line carrying its type name
+// This file is the element grammar of the exact tree formats (format v2):
+// every node is an element — a heading line carrying its type name
 // — followed by one field line per struct field, in declaration order. A field
 // line is "Name:" plus one of three tails:
 //

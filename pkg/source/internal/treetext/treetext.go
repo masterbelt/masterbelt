@@ -1,5 +1,5 @@
 // Package treetext implements the line discipline shared by the source trees'
-// text formats (F-4): one element per line, nesting expressed by two-space
+// text formats: one element per line, nesting expressed by two-space
 // indentation, the line body free-form for the layer to interpret. The reader
 // turns raw text into depth-annotated lines and rejects everything the formats
 // never produce — tabs in the indentation, odd indents, blank interior lines —

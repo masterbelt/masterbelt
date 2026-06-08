@@ -11,7 +11,7 @@
 // are editor and diagnostic anchors — positions, hovers, the write-back's
 // pairing keys — and never carry semantics: everything a consumer of the IR
 // needs to know is on the IR's own fields, so the graph (plus the builtin
-// registry's native table) is a complete input on its own (F-3 §0).
+// registry's native table) is a complete input on its own.
 //
 // The package is split across files: this file holds the IR graph nodes
 // (Module, Const, and the Value forms); type.go holds the type as data (Type and
@@ -49,7 +49,7 @@ type Function struct {
 	Name string
 	// Anchor is the declaration's stable, position-independent address
 	// (belt:module/name) — the same string across edits that do not rename it
-	// or move its file (A-5). It is "" for an unnamed declaration, which has no
+	// or move its file. It is "" for an unnamed declaration, which has no
 	// address; the semantic layer stamps it, deterministically from the name
 	// and the file path, so it survives incremental recompute unchanged.
 	Anchor  string
@@ -102,7 +102,7 @@ type Const struct {
 // Value is a resolved initializer: a literal or a reference to another constant.
 //
 // Every value node carries a Type — its checker-settled type, the typed value
-// graph (F-3 §2.1). A node is born with it nil at lowering (which is
+// graph. A node is born with it nil at lowering (which is
 // type-blind) and the post-check write-back fills it: a literal at its
 // synthesized type (an integer literal is nint even where a sized type expects
 // it — the width settle is an explicit adaption, not a retype), a reference at
@@ -120,7 +120,7 @@ type Value interface {
 
 // Adapt is an explicit adaption: Value carried at the type To — the node every
 // implicit conversion the checker accepted becomes, so nothing converts
-// silently in the IR (F-3 §2.2). The post-check write-back wraps a value at
+// silently in the IR. The post-check write-back wraps a value at
 // each position whose expected type differs from the value's own: a default
 // integer literal settling into a sized one (Adapt to short), a value adapting
 // to a nominal type (Adapt to Level), and a value flowing into a union (Adapt

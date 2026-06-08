@@ -67,7 +67,7 @@ type Constant struct {
 
 	// valid when Kind == ConstFunc: the function-literal value and the values
 	// it captured from its enclosing scope (the closure environment). Fn is
-	// the IR node — the folded value references no syntax (F-3 §2.4), and an
+	// the IR node — the folded value references no syntax, and an
 	// application interprets its lowered Body; the literal's syntax anchor is
 	// the identity the engine's cutoff compares by.
 	Fn       *FuncLiteral
@@ -107,7 +107,7 @@ type Constant struct {
 	// never meet a union are exactly as before.
 	//
 	// Tagging is the execution of the IR's explicit union-inflow adaption: the
-	// Adapt node the post-check write-back wraps a union channel in (F-3 §2.2)
+	// Adapt node the post-check write-back wraps a union channel in
 	// records the same member selection (types.SelectUnionMember) the folder's
 	// expectation-driven tagging computes — UnionTag is what evaluating that
 	// Adapt produces.

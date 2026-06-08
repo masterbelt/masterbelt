@@ -10,12 +10,11 @@ import (
 	"github.com/masterbelt/masterbelt/pkg/source/internal/treetext"
 )
 
-// TestFieldSensitivity is the P5 gate (F-4 §2.4) over the IR: for every tree
-// struct, mutating any exported, non-excluded field must change the marshal
-// output — the executable definition of "every field appears in the format".
-// The overload-resolution gap F-2 closed (b58443a) was exactly a field the
-// curated dump did not render; this pin makes that class of blind spot fail
-// in CI.
+// TestFieldSensitivity is the field-sensitivity gate over the IR: for every
+// tree struct, mutating any exported, non-excluded field must change the
+// marshal output — the executable definition of "every field appears in the
+// format". An overload-resolution gap was once exactly a field the curated
+// dump did not render; this pin makes that class of blind spot fail in CI.
 func TestFieldSensitivity(t *testing.T) {
 	for _, probe := range treeStructs {
 		st := reflect.TypeOf(probe).Elem()
@@ -36,8 +35,9 @@ func TestFieldSensitivity(t *testing.T) {
 	}
 }
 
-// TestTypeFieldSensitivity is the hand-written type codec's half of the P5
-// pin: every field of every Type form must appear in its marshal.
+// TestTypeFieldSensitivity is the hand-written type codec's half of the
+// field-sensitivity pin: every field of every Type form must appear in its
+// marshal.
 func TestTypeFieldSensitivity(t *testing.T) {
 	cases := map[string][2]Type{
 		"Builtin.Name":   {&Builtin{}, &Builtin{Name: "x"}},
@@ -68,7 +68,7 @@ func TestTypeFieldSensitivity(t *testing.T) {
 }
 
 // TestExplicitExclusions pins the manifest of deliberate no-output decisions:
-// exactly the Syntax backpointers (the detached contract, F-4 §2.6) are
+// exactly the Syntax backpointers (the detached contract) are
 // excluded — every entry must be a Syntax-family field, and a tree:"-" added
 // to anything else must update this pin with a format decision.
 func TestExplicitExclusions(t *testing.T) {
@@ -146,7 +146,7 @@ func mutate(t *testing.T, f reflect.Value, name string) {
 		}
 		f.Set(instanceOf(t, f.Type(), name))
 	default:
-		t.Fatalf("field %s: no mutation for kind %s — extend the P5 pin", name, f.Kind())
+		t.Fatalf("field %s: no mutation for kind %s — extend the field-sensitivity pin", name, f.Kind())
 	}
 }
 
@@ -170,8 +170,8 @@ func instanceOf(t *testing.T, typ reflect.Type, name string) reflect.Value {
 
 // TestModuleRoundTrip pins the unit round trip: a small hand-built module
 // marshals, unmarshals, links against itself, and re-marshals byte-
-// identically — P1 in miniature, plus the relink resolving a reference and an
-// enum definition by name.
+// identically — the full marshal round trip in miniature, plus the relink
+// resolving a reference and an enum definition by name.
 func TestModuleRoundTrip(t *testing.T) {
 	target := &Const{Name: "A", Type: &Builtin{Name: "nint"},
 		Value: &IntLiteral{Text: "1", Type: &Builtin{Name: "nint"}},

@@ -1,5 +1,5 @@
-// This file is the hand-written half of the IR's text representation (F-4
-// M3); text_gen.go carries the generated structural codec. By hand here is
+// This file is the hand-written half of the IR's text representation;
+// text_gen.go carries the generated structural codec. By hand here is
 // exactly what the generator cannot derive from the struct definitions:
 //
 //   - the Type codec: the type algebra includes an unexported singleton
@@ -19,10 +19,10 @@
 //     caller's Resolver.
 //
 // The unmarshaled module is detached by construction — the Syntax
-// backpointers are tagged out of the format — which is what the P4 gate
-// leans on: a module rebuilt from text physically cannot read the AST, so a
-// fold that agrees with the original proves the backpointers carry no
-// semantics (F-3's invariant, executed in CI).
+// backpointers are tagged out of the format — which is what the detached-fold
+// check leans on: a module rebuilt from text physically cannot read the AST,
+// so a fold that agrees with the original proves the backpointers carry no
+// semantics, the invariant that consumers read only the IR's own fields.
 
 package ir
 

@@ -26,7 +26,7 @@
 // field, scalars inline, children indented, "~" for nil. The only exclusions
 // are the unexported syntax backpointers, out by construction: an unmarshaled
 // File is detached (Syntax() is nil), which is the contract, not a defect.
-// The field-sensitivity test (P5) pins the exactness mechanically.
+// The field-sensitivity test pins the exactness mechanically.
 package ast
 
 //go:generate go run github.com/masterbelt/masterbelt/pkg/source/internal/treegen -marshal Node -roots File -out text_gen.go

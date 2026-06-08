@@ -4100,7 +4100,7 @@ func decodeTypeExprField(f treetext.Field) (TypeExpr, error) {
 }
 
 // treeStructs lists one typed nil pointer per tree struct, for the
-// field-sensitivity pin (P5).
+// field-sensitivity pin.
 var treeStructs = []any{
 	(*AssertDecl)(nil),
 	(*AssignStmt)(nil),

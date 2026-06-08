@@ -1,5 +1,5 @@
-// Package treegen generates the exact text representation (format v2, F-4
-// §2.2) of a tree package: one writer and one strict decoder per node struct,
+// Package treegen generates the exact text representation (format v2) of a
+// tree package: one writer and one strict decoder per node struct,
 // derived from the struct definitions themselves so every exported field
 // appears in the format by construction — a field added to a node is a field
 // added to the text, never a silent omission.
@@ -14,7 +14,7 @@
 //     interface used as a field type, dispatching over its implementers
 //   - UnmarshalText on the root struct(s)
 //   - the treeStructs/writeTree/treeExcluded registry the field-sensitivity
-//     pin (P5) walks
+//     pin walks
 //
 // Exclusions are explicit: unexported fields (the syntax backpointers) are
 // out by construction, and an exported field is excluded only by a tree:"-"
@@ -992,7 +992,7 @@ func emitIfaceDecodeField(p func(string, ...any), i *ifaceModel) {
 func emitRegistry(p func(string, ...any), m *model) {
 	p("")
 	p("// treeStructs lists one typed nil pointer per tree struct, for the")
-	p("// field-sensitivity pin (P5).")
+	p("// field-sensitivity pin.")
 	p("var treeStructs = []any{")
 	for _, s := range m.structs {
 		p("\t(*%s)(nil),", s.name)

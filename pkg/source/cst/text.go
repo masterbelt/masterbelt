@@ -1,4 +1,4 @@
-// This file is the CST's text representation contract (F-4): every green
+// This file is the CST's text representation contract: every green
 // element marshals to the one-element-per-line indented form the snapshots
 // have always used, and a File round-trips back through UnmarshalText. The
 // format was already exact — every token, every kind, trivia included — so it

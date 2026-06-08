@@ -2,7 +2,7 @@ package ir
 
 import "strings"
 
-// This file is the read side of semantic anchors (A-5): looking a declaration
+// This file is the read side of semantic anchors: looking a declaration
 // up by the stable address the semantic layer stamped onto it. The address
 // itself is made in package semantic (the module segment comes from the file
 // path); here the IR only matches the strings its nodes already carry.
