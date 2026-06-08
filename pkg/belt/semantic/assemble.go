@@ -14,6 +14,7 @@ import (
 	"github.com/masterbelt/masterbelt/pkg/belt/assert"
 	"github.com/masterbelt/masterbelt/pkg/belt/builtin"
 	"github.com/masterbelt/masterbelt/pkg/belt/eval"
+	"github.com/masterbelt/masterbelt/pkg/belt/lint"
 	"github.com/masterbelt/masterbelt/pkg/belt/lower"
 	"github.com/masterbelt/masterbelt/pkg/belt/types"
 	"github.com/masterbelt/masterbelt/pkg/belt/types/infer"
@@ -272,9 +273,27 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 	a.checkPureContexts()
 	enforceEvalPublication(fileID, file, a.module, shells, q, a.own, genv, a.at, a.diags)
 
+	// Lint runs last, over the resolved module: advisory notes layered on the
+	// semantic diagnostics, suppressed where an error already covers the
+	// declaration so a broken body is not also called dead. The findings join
+	// a.diags and sort in with the rest.
+	for _, d := range lint.Check(a.module, lintSpan(a.at), a.diags.Items()) {
+		a.diags.Add(d)
+	}
+
 	items := a.diags.Items()
 	sort.SliceStable(items, func(i, j int) bool { return items[i].Offset < items[j].Offset })
 	return a.module, items
+}
+
+// lintSpan adapts the assembler's positioned-node lookup to the offset/width
+// pair the lint layer resolves spans through, so lint depends on neither the
+// span type nor the position table.
+func lintSpan(at func(ast.Node) span) lint.Span {
+	return func(n ast.Node) (int, int) {
+		s := at(n)
+		return s.offset, s.width
+	}
 }
 
 // assembler carries one assemble run's shared state: the inputs, the

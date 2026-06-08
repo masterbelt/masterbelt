@@ -63,6 +63,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "unterminated string literal"
 		}
 	},
+	"belt.lint.unreachable_code": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "到達できないコード"
+		default:
+			return "unreachable code"
+		}
+	},
 	"belt.parser.concrete.arrow_block_body": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":

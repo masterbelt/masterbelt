@@ -290,6 +290,27 @@ func TestCheckUnknownReporter(t *testing.T) {
 	}
 }
 
+func TestCheckUnreachableCode(t *testing.T) {
+	// Code after a return is dead: the reachability lint reports it as a hint,
+	// tagged unnecessary, end to end — and a hint never fails the build.
+	dir := t.TempDir()
+	belttest.WriteFile(t, dir, "dead.belt", "pub fn f(x: nint): nint {\n  return x\n  let y = x + 1\n  return y\n}\n")
+
+	out, err := execCheck(t, "--reporter=json", filepath.Join(dir, "dead.belt"))
+	if err != nil {
+		t.Fatalf("check = %v, want success (a hint must not fail the build)\n%s", err, out)
+	}
+	for _, fragment := range []string{
+		`"code": "belt.lint.unreachable_code"`,
+		`"severity": "hint"`,
+		`"unnecessary"`,
+	} {
+		if !strings.Contains(out, fragment) {
+			t.Errorf("output missing %s:\n%s", fragment, out)
+		}
+	}
+}
+
 func TestCheckExplicitFile(t *testing.T) {
 	// An explicit file is checked ad hoc: no manifest required.
 	dir := t.TempDir()

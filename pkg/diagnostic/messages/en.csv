@@ -6,6 +6,7 @@ belt.lexer.invalid_escape,invalid escape sequence: {escape}
 belt.lexer.invalid_unicode_escape,invalid unicode escape: {escape}
 belt.lexer.invalid_datetime,invalid datetime literal: {text}
 belt.lexer.unknown_duration_unit,unknown duration unit: {unit}
+belt.lint.unreachable_code,unreachable code
 belt.parser.concrete.expected_const,expected 'const'
 belt.parser.concrete.expected_identifier,expected identifier
 belt.parser.concrete.expected_type,expected type
