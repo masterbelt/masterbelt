@@ -183,3 +183,22 @@ export function treeSitterParse(beltPath) {
 export function treeSitterSkeleton(beltPath) {
   return normalizeTreeSitter(parseSExpr(treeSitterParse(beltPath)));
 }
+
+// queryCaptures runs a highlight query file over a source and returns the
+// { capture, text } pairs `tree-sitter query` reports — the colours the editor
+// would paint. It is how the highlight golden checks the generated queries.
+export function queryCaptures(queryPath, beltPath) {
+  const out = execFileSync(treeSitterBin, ['query', queryPath, beltPath], {
+    cwd: pkgDir,
+    encoding: 'utf8',
+    maxBuffer: 64 * 1024 * 1024,
+    stdio: ['ignore', 'pipe', 'ignore'],
+  });
+  const captures = [];
+  const re = /capture: \d+ - ([^,]+), start: \([^)]*\), end: \([^)]*\), text: `(.*)`/g;
+  let m;
+  while ((m = re.exec(out)) !== null) {
+    captures.push({ capture: m[1], text: m[2] });
+  }
+  return captures;
+}

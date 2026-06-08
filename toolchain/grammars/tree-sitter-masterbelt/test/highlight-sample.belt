@@ -1,0 +1,17 @@
+/// A doc comment.
+pub type Color = { channel: nint } impl {
+  pub fn make(value: nint): Color {
+    return Color{ channel: value } // a line comment
+  }
+}
+
+pub enum Tier {
+  Bronze, Silver
+}
+
+pub fn paint(c: Color): nint {
+  return c.channel
+}
+
+const Base: nint = 1 + 2
+const Made = paint(Color{ channel: 3 })
