@@ -61,6 +61,10 @@ jobs:
     name: cross-build
     needs: gate
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write     # mint the OIDC token the attestation is signed with
+      attestations: write # write the SLSA provenance attestation
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-go@v6
@@ -83,6 +87,13 @@ jobs:
           tar -xzf dist/masterbelt-linux-amd64-*.tar.gz -C "$tmp"
           "$tmp/masterbelt" version
           "$tmp/masterbelt" check pkg/belt/testdata/examples/0009-project
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: |
+            dist/masterbelt-*.tar.gz
+            dist/masterbelt-*.zip
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v7
@@ -141,6 +152,8 @@ jobs:
     permissions:
       contents: read
       packages: write
+      id-token: write     # mint the OIDC token the attestation is signed with
+      attestations: write # write the SLSA provenance attestation
     steps:
       - uses: actions/checkout@v6
       - uses: actions/download-artifact@v8
@@ -168,6 +181,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ github.token }}
       - uses: docker/build-push-action@v7
+        id: build
         with:
           context: build
           platforms: linux/amd64,linux/arm64
@@ -179,6 +193,12 @@ jobs:
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.created=${{ steps.meta.outputs.created }}
+      - name: Attest image provenance
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-name: ghcr.io/${{ github.repository }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
 
   # Package the VS Code extension as a .vsix and, when a Marketplace token is
   # configured, publish it to the pre-release channel. Without the token the
