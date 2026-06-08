@@ -37,13 +37,17 @@ repro-check:
 clean:
 	rm -rf $(BIN_DIR) $(DIST_DIR)
 
-# test runs the full test suite: the Go packages and the VS Code extension's
-# grammar tests (which go test cannot reach — the generated TextMate grammar
-# is pinned there).
+# test runs the full test suite: the Go packages, the VS Code extension's
+# grammar tests (which go test cannot reach — the generated TextMate grammar is
+# pinned there), and the tree-sitter grammar's tests (the CST-pin: its skeleton
+# is checked against the real parser's CST snapshots — C-2 §3). The node suites
+# need `pnpm install` to have run; the tree-sitter suite also needs a C compiler
+# (tree-sitter parse compiles the committed parser.c).
 .PHONY: test
 test:
 	$(GO) test ./...
 	cd toolchain/editors/vscode && node --test
+	cd toolchain/grammars/tree-sitter-masterbelt && node --test
 
 # fuzz runs the text-representation fuzzers (F-4 F1) for a short burst each:
 # the unmarshalers must accept or reject arbitrary input without panicking.
