@@ -58,6 +58,25 @@ func TestForEachExprInterfaceDefaultBody(t *testing.T) {
 	}
 }
 
+// TestForEachExprMasterMethodBody pins that an expression inside a master's
+// per-row impl method is walked: the walk descends file.Masters' methods, so a
+// FuncLit (and thus any call or member access) nested in such a body is reached
+// by the resolution-aware editor features, exactly as for a type's methods.
+func TestForEachExprMasterMethodBody(t *testing.T) {
+	src := "master M {\n  record { id: int } impl {\n    bump(): nint {\n      return fn(x: nint): nint { return x }(1)\n    }\n  }\n  primary id\n}\n"
+	doc := testView(src)
+
+	var sawLit bool
+	forEachExpr(doc.AST().File(), func(e ast.Expr) {
+		if _, ok := e.(*ast.FuncLit); ok {
+			sawLit = true
+		}
+	})
+	if !sawLit {
+		t.Error("forEachExpr did not visit the FuncLit inside the master method body")
+	}
+}
+
 // TestForEachExprLetInitializer pins that an expression inside a let
 // initializer is walked: walkStmts had no LetStmt case, so any expression in a
 // let's value was invisible. A lambda parameter inside a let-bound lambda

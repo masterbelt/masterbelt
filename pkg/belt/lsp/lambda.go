@@ -127,10 +127,10 @@ func forEachFuncLit(doc view, fn func(*ast.FuncLit)) {
 
 // forEachExpr visits every expression of a file — constant initializers,
 // assert conditions, and the bodies of every kind of method and function
-// (a type's and an enum's impl methods, an interface's provided defaults, and
-// top-level functions), descending into a statement body's full control flow
-// and into function-literal bodies — an enclosing expression before the ones
-// nested in it.
+// (a type's and an enum's impl methods, an interface's provided defaults, a
+// master's per-row methods, and top-level functions), descending into a
+// statement body's full control flow and into function-literal bodies — an
+// enclosing expression before the ones nested in it.
 //
 // The statement-level walk delegates to the shared ast.WalkBodyExprs so the
 // editor reaches every expression a let initializer, an assignment, a switch
@@ -185,6 +185,11 @@ func forEachExpr(file *ast.File, fn func(ast.Expr)) {
 	}
 	for _, fd := range file.Funcs {
 		walkBody(fd.Body)
+	}
+	for _, md := range file.Masters {
+		for _, m := range md.Methods {
+			walkBody(m.Body)
+		}
 	}
 }
 
