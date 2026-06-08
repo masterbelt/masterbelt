@@ -13,6 +13,9 @@
       "include": "#modifiers"
     },
     {
+      "include": "#masters"
+    },
+    {
       "include": "#datetimes"
     },
     {
@@ -67,6 +70,22 @@
         {
           "name": "keyword.control.masterbelt",
           "match": "\\b(assert|async|await|builtin|const|else|enum|extern|false|fn|for|from|if|impl|in|interface|io|let|match|nondet|null|of|pub|return|self|switch|true|type|use|where)\\b"
+        }
+      ]
+    },
+    "masters": {
+      "patterns": [
+        {
+          "name": "keyword.control.masterbelt",
+          "match": "\\bmaster\\b(?=\\s+[A-Za-z_])"
+        },
+        {
+          "name": "keyword.control.masterbelt",
+          "match": "\\brecord\\b(?=\\s+\\{)"
+        },
+        {
+          "name": "keyword.control.masterbelt",
+          "match": "\\bprimary\\b(?=\\s+[A-Za-z_(])"
         }
       ]
     },

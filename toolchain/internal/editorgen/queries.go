@@ -143,21 +143,7 @@ func buildHighlights(t tsTarget) string {
 
 	// Declared names. The kind of declaration fixes the colour, matching
 	// semantic.go's identClasses.
-	fmt.Fprintf(&b, "(const_decl name: (identifier) %s)\n", t.cap(catVariable))
-	fmt.Fprintf(&b, "(let_stmt name: (identifier) %s)\n", t.cap(catVariable))
-	fmt.Fprintf(&b, "(type_decl name: (identifier) %s)\n", t.cap(catType))
-	fmt.Fprintf(&b, "(enum_decl name: (identifier) %s)\n", t.cap(catType))
-	fmt.Fprintf(&b, "(interface_decl name: (identifier) %s)\n", t.cap(catType))
-	fmt.Fprintf(&b, "(generic_param name: (identifier) %s)\n", t.cap(catType))
-	fmt.Fprintf(&b, "(func_decl name: (identifier) %s)\n", t.cap(catFunction))
-	fmt.Fprintf(&b, "(method_decl name: (identifier) %s)\n", t.cap(catMethod))
-	fmt.Fprintf(&b, "(interface_member name: (identifier) %s)\n", t.cap(catMethod))
-	fmt.Fprintf(&b, "(param name: (identifier) %s)\n", t.cap(catParameter))
-	fmt.Fprintf(&b, "(field name: (identifier) %s)\n", t.cap(catProperty))
-	fmt.Fprintf(&b, "(record_field name: (identifier) %s)\n", t.cap(catProperty))
-	fmt.Fprintf(&b, "(enum_member name: (identifier) %s)\n", t.cap(catEnumMember))
-	fmt.Fprintf(&b, "(use_decl (identifier) %s)\n", t.cap(catNamespace))
-	fmt.Fprintf(&b, "(modifier) %s\n\n", t.cap(catKeyword))
+	writeDeclaredNames(&b, t)
 
 	// References. A name in a type position is a type; the type prefix of a
 	// record literal is too. A bare value reference is a variable, and a member
@@ -173,6 +159,33 @@ func buildHighlights(t tsTarget) string {
 	fmt.Fprintf(&b, "(call_expr callee: (member_expr member: (identifier) %s))\n", t.cap(catMethod))
 
 	return b.String()
+}
+
+// writeDeclaredNames emits the captures for declared names: the colour each
+// kind of declaration fixes for its own name, matching semantic.go's
+// identClasses. A master colours its name as a type and its primary-key columns
+// as properties, and the master/record/primary context keywords colour as
+// keywords through their MasterKeyword node, the same way the accessor modifiers
+// do through theirs.
+func writeDeclaredNames(b *strings.Builder, t tsTarget) {
+	fmt.Fprintf(b, "(const_decl name: (identifier) %s)\n", t.cap(catVariable))
+	fmt.Fprintf(b, "(let_stmt name: (identifier) %s)\n", t.cap(catVariable))
+	fmt.Fprintf(b, "(type_decl name: (identifier) %s)\n", t.cap(catType))
+	fmt.Fprintf(b, "(enum_decl name: (identifier) %s)\n", t.cap(catType))
+	fmt.Fprintf(b, "(interface_decl name: (identifier) %s)\n", t.cap(catType))
+	fmt.Fprintf(b, "(master_decl name: (identifier) %s)\n", t.cap(catType))
+	fmt.Fprintf(b, "(generic_param name: (identifier) %s)\n", t.cap(catType))
+	fmt.Fprintf(b, "(func_decl name: (identifier) %s)\n", t.cap(catFunction))
+	fmt.Fprintf(b, "(method_decl name: (identifier) %s)\n", t.cap(catMethod))
+	fmt.Fprintf(b, "(interface_member name: (identifier) %s)\n", t.cap(catMethod))
+	fmt.Fprintf(b, "(param name: (identifier) %s)\n", t.cap(catParameter))
+	fmt.Fprintf(b, "(field name: (identifier) %s)\n", t.cap(catProperty))
+	fmt.Fprintf(b, "(record_field name: (identifier) %s)\n", t.cap(catProperty))
+	fmt.Fprintf(b, "(master_primary (identifier) %s)\n", t.cap(catProperty))
+	fmt.Fprintf(b, "(enum_member name: (identifier) %s)\n", t.cap(catEnumMember))
+	fmt.Fprintf(b, "(use_decl (identifier) %s)\n", t.cap(catNamespace))
+	fmt.Fprintf(b, "(modifier) %s\n", t.cap(catKeyword))
+	fmt.Fprintf(b, "(master_keyword) %s\n\n", t.cap(catKeyword))
 }
 
 // targetLabel names a target for the generated file's header comment.

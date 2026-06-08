@@ -117,6 +117,7 @@ func buildGrammar() grammar {
 			{Include: "#comments"},
 			{Include: "#keywords"},
 			{Include: "#modifiers"},
+			{Include: "#masters"},
 			// The datetime/duration literals must precede #numbers, or their
 			// digit runs would half-match as plain integers.
 			{Include: "#datetimes"},
@@ -141,20 +142,8 @@ func buildGrammar() grammar {
 			"keywords": {Patterns: []rule{
 				{Name: lexKeyword.tmScope(), Match: keywordPattern()},
 			}},
-			// The accessor/static modifiers (get, set, static) are context
-			// keywords: the lexer leaves them identifiers, so they are not in the
-			// keyword table and would not flow into #keywords. This approximates
-			// their modifier position — get/set followed by an identifier (the
-			// property name), static followed by fn or a name — and colours them
-			// keyword.control to match the server's semantic `keyword` token. A
-			// get/set/static used as an ordinary name (the prelude's list.get(i))
-			// is not followed by that shape, so it is left uncoloured, as the
-			// server leaves it. The semantic tokens are authoritative; this is the
-			// cold-start approximation.
-			"modifiers": {Patterns: []rule{
-				{Name: lexKeyword.tmScope(), Match: `\bstatic\b(?=\s+fn\b)`},
-				{Name: lexKeyword.tmScope(), Match: `\b(get|set)\b(?=\s+[A-Za-z_])`},
-			}},
+			"modifiers": modifierRules(),
+			"masters":   masterRules(),
 			// A D-prefixed ISO-8601 instant: the same shape the lexer commits
 			// on, milliseconds and signed offsets included. The semantic
 			// `number` token lands on constant.numeric, so the literal wears
@@ -201,6 +190,36 @@ func buildGrammar() grammar {
 			}},
 		},
 	}
+}
+
+// modifierRules colours the accessor/static modifiers (get, set, static),
+// context keywords the lexer leaves as identifiers so they are absent from
+// #keywords. It approximates their modifier position — get/set followed by an
+// identifier (the property name), static followed by fn or a name — and colours
+// them keyword.control to match the server's semantic `keyword` token. A
+// get/set/static used as an ordinary name (the prelude's list.get(i)) is not in
+// that shape, so it is left uncoloured, as the server leaves it. The semantic
+// tokens are authoritative; this is the cold-start approximation.
+func modifierRules() ruleGroup {
+	return ruleGroup{Patterns: []rule{
+		{Name: lexKeyword.tmScope(), Match: `\bstatic\b(?=\s+fn\b)`},
+		{Name: lexKeyword.tmScope(), Match: `\b(get|set)\b(?=\s+[A-Za-z_])`},
+	}}
+}
+
+// masterRules colours the master/record/primary context keywords by position,
+// the same way modifierRules colours the accessors: master heads a declaration
+// (master Name {), record introduces the row type (record {), and primary names
+// the key (primary id / primary (a, b)). A master/record/primary used as an
+// ordinary name is not in that shape, so it is left uncoloured, as the server
+// leaves it. The semantic tokens are authoritative; this is the cold-start
+// approximation.
+func masterRules() ruleGroup {
+	return ruleGroup{Patterns: []rule{
+		{Name: lexKeyword.tmScope(), Match: `\bmaster\b(?=\s+[A-Za-z_])`},
+		{Name: lexKeyword.tmScope(), Match: `\brecord\b(?=\s+\{)`},
+		{Name: lexKeyword.tmScope(), Match: `\bprimary\b(?=\s+[A-Za-z_(])`},
+	}}
 }
 
 // keywordPattern builds a word-bounded alternation of the language's keywords,
