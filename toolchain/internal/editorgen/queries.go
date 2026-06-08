@@ -90,10 +90,12 @@ func semanticOperatorSpellings() []string {
 	}
 }
 
-// contextModifiers are the accessor/static context keywords. The lexer leaves
-// them identifiers (so they are absent from token.Keywords), but they colour as
-// keywords, the same set keyword.control covers — matching semantic.go's
-// Modifier handling and the TextMate #modifiers rule.
+// contextModifiers are contextual accessor/static modifiers: `get`, `set`, and
+// `static`. They are intentionally not reserved words in token.Keywords because
+// they should remain legal identifiers outside modifier positions; the lexer
+// therefore emits them as identifiers. During highlighting, when they appear in
+// modifier/accessor context, we promote them to keyword colouring (keyword.control),
+// matching semantic.go's Modifier handling and the TextMate #modifiers rule.
 var contextModifiers = []string{"get", "set", "static"}
 
 // buildHighlights renders one target's highlights.scm. The node->category
