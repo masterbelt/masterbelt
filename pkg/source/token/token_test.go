@@ -95,6 +95,29 @@ func TestOperatorKindsHaveSpelling(t *testing.T) {
 	}
 }
 
+// TestOperators pins Operators() to the operator Kind run: it must list every
+// kind from firstOperator to lastOperator exactly once, in order, each with a
+// non-empty spelling and a name that parses back to its kind. It is the source
+// the editor grammars read, so a gap or a stray entry there is a lexer drift.
+func TestOperators(t *testing.T) {
+	ops := Operators()
+	if got, want := len(ops), int(lastOperator-firstOperator+1); got != want {
+		t.Fatalf("Operators() returned %d entries, want %d", got, want)
+	}
+	for i, op := range ops {
+		want := firstOperator + Kind(i)
+		if op.Name != want.String() {
+			t.Errorf("Operators()[%d].Name = %q, want %q", i, op.Name, want.String())
+		}
+		if op.Symbol == "" {
+			t.Errorf("Operators()[%d] (%s) has an empty spelling", i, op.Name)
+		}
+		if k, ok := ParseKind(op.Name); !ok || k != want {
+			t.Errorf("ParseKind(%q) = %v, %v; want %v", op.Name, k, ok, want)
+		}
+	}
+}
+
 func TestLookup(t *testing.T) {
 	cases := map[string]Kind{
 		"const":   Const,

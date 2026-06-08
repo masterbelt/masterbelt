@@ -329,6 +329,26 @@ func Keywords() []string {
 	return out
 }
 
+// OperatorSpelling pairs an operator or punctuation kind's name with its source
+// spelling. Operators returns these.
+type OperatorSpelling struct {
+	Name   string // the Kind's name, e.g. "Arrow"
+	Symbol string // its source spelling, e.g. "->"
+}
+
+// Operators returns every fixed-spelling operator and punctuation kind, in Kind
+// declaration order, paired with its spelling. It is the operator counterpart
+// of Keywords: the single source the editor grammar generators read so their
+// operator lexemes — the TextMate scopes and the tree-sitter tokens — never
+// drift from the lexer's spelling map.
+func Operators() []OperatorSpelling {
+	out := make([]OperatorSpelling, 0, lastOperator-firstOperator+1)
+	for k := firstOperator; k <= lastOperator; k++ {
+		out = append(out, OperatorSpelling{Name: k.String(), Symbol: k.Symbol()})
+	}
+	return out
+}
+
 // Comment markers are the language's comment syntax. The lexer scans them and
 // the editor-config generator emits its grammar and language configuration from
 // them, so syntax highlighting and comment toggling never drift from the lexer.
