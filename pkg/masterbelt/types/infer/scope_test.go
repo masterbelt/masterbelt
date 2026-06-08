@@ -60,7 +60,7 @@ func TestFuncLitParamShadowsOuter(t *testing.T) {
 // TestBoundedTypeVarMethods checks that in a function body a parameter typed as
 // a bounded type variable resolves its bound interface's methods, while an
 // unbounded one has none and a method call on it is reported as the distinct
-// no_method_on_unbounded_typevar (E-17).
+// no_method_on_unbounded_typevar.
 func TestBoundedTypeVarMethods(t *testing.T) {
 	reg := builtin.Default()
 	foldable := &ir.TypeDef{

@@ -187,10 +187,10 @@ func reportNoMethod(e *ast.CallExpr, recv ir.Type, method string, args []ir.Type
 	}
 	if !bad {
 		// A method call on an unbounded type parameter is the distinct
-		// E-17 error: nothing is known about the type, so it has no methods
-		// (only pass-through is allowed). A bounded parameter resolves its
-		// interface's methods, so an unknown method on it is an ordinary
-		// invalid_operation.
+		// no_method_on_unbounded_typevar error: nothing is known about the
+		// type, so it has no methods (only pass-through is allowed). A bounded
+		// parameter resolves its interface's methods, so an unknown method on
+		// it is an ordinary invalid_operation.
 		if v, ok := recv.(*ir.TypeVar); ok && v.Bound == nil {
 			sink.noMethodOnUnboundedTypeVar(e, method)
 		} else {

@@ -47,7 +47,7 @@ func (r *TypeResolver) reportUnknown(node ast.Node, name string) {
 // the resolver attaches to the TypeVar it returns, so a parameter declared with
 // a bound (map<K: comparable, V>) resolves to a TypeVar that already carries it.
 // This makes the declaration-site bound check (app) see the parameter's bound
-// instead of a free variable, the way E-17's BindTypeParamBounds rebinds bounds
+// instead of a free variable, the way BindTypeParamBounds rebinds bounds
 // onto a body's parameter types — only here at resolution time, from the start.
 type TypeScope = map[string]ir.Type
 
@@ -143,7 +143,7 @@ func (r *TypeResolver) resolveQualified(t *ast.NamedType, scope TypeScope) ir.Ty
 }
 
 // app builds a generic type application (def<args...>), resolving each argument
-// in scope and — the type-application bound check of E-16/E-17 — verifying it
+// in scope and — the type-application bound check — verifying it
 // satisfies the matching parameter's declared bound. A parameter with a bound
 // (map<K: comparable, V>) is satisfied only by an argument that opts into the
 // bound's interface; a violation is reported through BoundViolation (when set)

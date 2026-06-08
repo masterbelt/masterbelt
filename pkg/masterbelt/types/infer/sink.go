@@ -93,7 +93,7 @@ type Sink struct {
 	SolvedFuncLit func(lit *ast.FuncLit, t *ir.Func)
 	// BoundNotSatisfied fires at a generic-function call whose solved concrete
 	// type for a type parameter does not implement the parameter's interface
-	// bound (E-17): the argument's type carries no opt-in impl of the bound.
+	// bound: the argument's type carries no opt-in impl of the bound.
 	BoundNotSatisfied func(call *ast.CallExpr, typ, bound ir.Type)
 	// UninferableTypeParam fires at a generic-function call from which a type
 	// parameter cannot be solved — no argument pins it (fn h<T>(): T) — so the
@@ -137,8 +137,8 @@ type Sink struct {
 	// Typed fires for every expression the walk settles with a usable (non-
 	// Invalid) type — synthesized, or filled in by a pushed-down expectation.
 	// It is the typed-value-graph channel: the semantic layer writes each
-	// settled type back onto the IR value node the expression lowered to
-	// (F-3 §2.1). An informational stream, never a finding; an expression
+	// settled type back onto the IR value node the expression lowered to. An
+	// informational stream, never a finding; an expression
 	// whose type never settles (its own error reported elsewhere) does not
 	// fire, leaving the node's type nil — a visible hole, never an invented
 	// type.
@@ -148,7 +148,7 @@ type Sink struct {
 	// default integer settling into a sized type, a value adapting to a
 	// nominal type, a value flowing into a union (the tagging point). to is
 	// the position's settled expectation; the semantic layer wraps the IR
-	// node in an explicit ir.Adapt to it (F-3 §2.2), so no conversion stays
+	// node in an explicit ir.Adapt to it, so no conversion stays
 	// implicit in the IR. An informational stream, never a finding; a
 	// position whose expectation the value matches identically does not fire.
 	Adapted func(e ast.Expr, to ir.Type)

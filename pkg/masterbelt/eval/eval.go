@@ -4,7 +4,7 @@
 // types reasons about an expression's type, eval derives its value, over the
 // same resolved graph: a Reference is bound to its declaration, a call to its
 // selection, every implicit conversion to an explicit Adapt — so a fold needs
-// nothing but the IR and the builtin registry's native table (F-3 §0).
+// nothing but the IR and the builtin registry's native table.
 //
 // Evaluation reads referenced values through a GraphEnv, so it has no
 // dependency on the semantic query engine: the engine supplies a memoizing

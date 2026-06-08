@@ -275,7 +275,7 @@ func Body(body []ast.Stmt, b Binder) []ir.Stmt {
 // assignStmt lowers a reassignment. A plain identifier target names the let local
 // being updated, rebound to the new value. A property write — a member access on
 // a let local, p.name = v — rebinds that same local to a setter call:
-// p = p.name(v) tagged Setter, the let-local rebinding semantics E-18's indexed
+// p = p.name(v) tagged Setter, the same let-local rebinding semantics an indexed
 // write takes. The setter form is built whenever the target is a member access on
 // an identifier; whether name actually names a setter (rather than a field) is
 // the type-knowing layers' decision — the checker reports immutable_data when it

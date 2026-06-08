@@ -142,7 +142,7 @@ func matchRecordCases(t *testing.T, reg *builtin.Registry) {
 }
 
 // TestSatisfies checks the nominal-satisfaction rule a generic-function bound
-// uses (E-17): a type satisfies an interface bound only when it opts into the
+// uses: a type satisfies an interface bound only when it opts into the
 // interface (an entry in its Impls) with matching arguments, and a bounded type
 // parameter resolves its bound interface's methods (defOf/receiverSubst).
 func TestSatisfies(t *testing.T) {

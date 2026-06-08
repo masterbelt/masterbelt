@@ -195,7 +195,7 @@ func sameShape(a, b *ir.Constant) bool {
 }
 
 // collectionLen folds list.len() and map.len() to the element/entry count. It is
-// the intrinsic E-18 supplied for neither list nor map; the count is the same
+// the intrinsic the registry supplies for neither list nor map; the count is the same
 // for both — the number of entries the folded collection carries.
 func collectionLen(recv *ir.Constant, args []*ir.Constant) *ir.Constant {
 	if len(args) != 0 {

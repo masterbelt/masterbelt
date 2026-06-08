@@ -1,5 +1,5 @@
-// This file is the IR interpreter: the fold over the resolved value graph
-// (F-3 §2.6). Where the AST folder walks syntax and reads static types through
+// This file is the IR interpreter: the fold over the resolved value graph.
+// Where the AST folder walks syntax and reads static types through
 // annotation channels, this interpreter reads everything off the graph — a
 // Reference is bound, a bare member is an EnumMemberValue, a call carries its
 // checker-selected overload (Resolved), every node its settled type, and every

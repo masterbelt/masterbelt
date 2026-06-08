@@ -56,7 +56,7 @@ func TestMethodResult(t *testing.T) {
 	}
 }
 
-// TestMethodResultNominalSelfOperand pins the operator path F-1 unblocks: a
+// TestMethodResultNominalSelfOperand pins the nominal self-operand operator path: a
 // nominal type over a builtin base (type Tag = string) derives the base's
 // self-typed operators (eql(other: self): bool), and a bare base value as the
 // argument unifies to the nominal — so `t == "x"` on a Tag resolves to bool and

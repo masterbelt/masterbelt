@@ -281,7 +281,7 @@ func ReceiverMethods(reg *builtin.Registry, recv ir.Type) ([]*ir.Method, map[str
 // the registry definition for a builtin, the referent for a named type, and —
 // for a bounded generic type parameter (the T of fn f<T: foldable<int>>) — the
 // definition of its bound interface, so the only methods in scope on the
-// parameter are the interface's own (E-17: a bound fixes T to the interface's
+// parameter are the interface's own (a bound fixes T to the interface's
 // methods). An unbounded type parameter has no methods.
 func defOf(reg *builtin.Registry, t ir.Type) *ir.TypeDef {
 	switch t := t.(type) {

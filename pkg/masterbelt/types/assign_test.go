@@ -92,11 +92,12 @@ func named(name string, body ir.Type) *ir.Named {
 	return &ir.Named{Def: &ir.TypeDef{Name: name, Body: body}}
 }
 
-// TestAssignableNominalAdaptation is the invariant matrix of F-1: a builtin base
-// value adapts to the nominal type that wraps it — for *every* base, not just the
-// integer one that always worked — while the nominal regime is preserved: a
-// nominal type does not flow back to its base, nor across to a different nominal
-// wrapper of the same base, and an enum (which carries no body) admits no base
+// TestAssignableNominalAdaptation is the base-value-into-nominal adaptation
+// matrix: a builtin base value adapts to the nominal type that wraps it — for
+// *every* base, not just the integer one that always worked — while the nominal
+// regime is preserved: a nominal type does not flow back to its base, nor across
+// to a different nominal wrapper of the same base, and an enum (which carries no
+// body) admits no base
 // value. The integer rows are the established semantics the rest are generalized
 // from.
 func TestAssignableNominalAdaptation(t *testing.T) {

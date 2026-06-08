@@ -1,6 +1,6 @@
 // These tests drive the IR interpreter over hand-built value graphs — no
 // syntax anywhere, which is itself the point: a fold needs nothing but the IR
-// and the registry (F-3 §0). The semantic package's corpus, examples, and
+// and the registry. The semantic package's corpus, examples, and
 // parity gates cover the end-to-end channels; these pin the interpreter's own
 // value-level rules.
 package eval

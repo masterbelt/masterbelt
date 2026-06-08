@@ -244,7 +244,7 @@ func hasFreeVar(t ir.Type, subst map[string]ir.Type) bool {
 }
 
 // Satisfies reports whether the type typ satisfies the interface bound — the
-// nominal-satisfaction rule of E-16/E-17, generalized over interface
+// nominal-satisfaction rule, generalized over interface
 // inheritance:
 //
 //   - a concrete type satisfies a bound its definition opts into at its own

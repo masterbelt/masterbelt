@@ -1,4 +1,4 @@
-// This file is the completeness gate's mechanical half (F-3 §2.7): the
+// This file is the completeness gate's mechanical half: the
 // interpreter must work from the IR (and the builtin registry's native table)
 // alone, so this package's imports are pinned — pkg/source/ir, the registry,
 // and the type algebra over IR data, nothing else. The moment a syntax import
@@ -94,7 +94,7 @@ func packageImports(t *testing.T, dir string) map[string]bool {
 // TestInterpreterCoversEveryValue feeds one instance of every IR value form
 // through the interpreter: a form it has no case for panics by design, so
 // adding a value form without teaching the fold fails here — the
-// exhaustiveness pin of §2.7. (The fold's verdict per form is the semantic
+// exhaustiveness pin. (The fold's verdict per form is the semantic
 // gates' business; this pins only that every form is decided, never dropped.)
 func TestInterpreterCoversEveryValue(t *testing.T) {
 	env := newStubEnv()
