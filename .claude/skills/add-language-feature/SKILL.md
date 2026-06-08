@@ -174,10 +174,26 @@ number from day one.
   (offer new names/keywords; `typeContextAt` gates value vs type), `hover.go`,
   and `convert.go` (document symbols). Add a handler + capability in `server.go`
   only for a genuinely new request.
-- Editor assets are generated: run `make generate` and review the regenerated
-  VSCode TextMate grammar (`toolchain/editors/vscode/...`, via
-  `internal/editorgen`). The grammar's keyword table is derived from the token
-  table, so a new keyword flows through automatically.
+- Editor assets are generated from one source (the token table + the category
+  table) into two sibling targets, via `toolchain/internal/editorgen`. Run
+  `make generate` and review both:
+  - **TextMate** (`toolchain/editors/vscode/...`) — the lexical cold-start
+    grammar. A new keyword/operator/comment marker flows through from the token
+    table automatically; a new highlight *category* goes in the category table.
+  - **tree-sitter** (`toolchain/grammars/tree-sitter-masterbelt/`) — its lexical
+    layer (`lexical.js`) and highlight queries (`queries/*.scm`) are generated
+    too, but its **structural rules in `grammar.js` are hand-written**: add the
+    rules for the new construct there (mirror the CST kind names), then
+    `make generate` reruns `tree-sitter generate` to recompile `src/parser.c`.
+    A new highlight needs a query rule in `editorgen`'s `buildHighlights`.
+- **Pin the second parser to the real one (non-negotiable, C-2 §3).** The
+  example you added in Stage 1 is the coverage: `make test`'s CST-pin
+  (`toolchain/grammars/tree-sitter-masterbelt/test/cst-pin.test.mjs`) parses it
+  with the tree-sitter parser and checks the result has no error node and that
+  its skeleton matches the real parser's `.belt.cst`. Make `grammar.js` parse
+  the new construct cleanly and its skeleton align; add a highlight-golden
+  assertion if the construct introduces a new colour. The tree-sitter CLI
+  (a pnpm devDependency) and a C compiler are needed for `make generate`/`test`.
 - Test in `pkg/belt/lsp/` mirroring the existing `*_test.go`.
 
 ## Verify (run before every review)
@@ -239,5 +255,8 @@ lsp ──────────────────► semantic (+ source
   (the editor façade), `assemble` (IR + diagnostics). `Analyze` is the reference
   oracle the incremental engine is checked against — keep them sharing `assemble`.
 - `lsp` — the language server over `semantic.Document`.
-- `toolchain/editors/vscode` + `internal/editorgen` — editor assets via
-  `go generate`.
+- `toolchain/internal/editorgen` — the multi-target highlight generator: one
+  source (token + category table) → VS Code's TextMate grammar
+  (`toolchain/editors/vscode`) and the tree-sitter lexical layer + queries
+  (`toolchain/grammars/tree-sitter-masterbelt`), via `go generate` then
+  `tree-sitter generate` (both under `make generate`).
