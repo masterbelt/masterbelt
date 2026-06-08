@@ -29,6 +29,7 @@ type Document struct {
 	funcCache      map[*cst.Node]*ast.FuncDecl
 	useCache       map[*cst.Node]*ast.UseDecl
 	assertCache    map[*cst.Node]*ast.AssertDecl
+	masterCache    map[*cst.Node]*ast.MasterDecl
 }
 
 // NewDocument lexes, parses, and lowers src, then keeps the AST up to date
@@ -43,6 +44,7 @@ func NewDocument(src []byte) *Document {
 		funcCache:      map[*cst.Node]*ast.FuncDecl{},
 		useCache:       map[*cst.Node]*ast.UseDecl{},
 		assertCache:    map[*cst.Node]*ast.AssertDecl{},
+		masterCache:    map[*cst.Node]*ast.MasterDecl{},
 	}
 	d.rebuild()
 	return d
@@ -103,6 +105,7 @@ type rebuildState struct {
 	interfaces map[*cst.Node]*ast.InterfaceDecl
 	funcs      map[*cst.Node]*ast.FuncDecl
 	asserts    map[*cst.Node]*ast.AssertDecl
+	masters    map[*cst.Node]*ast.MasterDecl
 
 	useList       []*ast.UseDecl
 	constList     []*ast.ConstDecl
@@ -111,6 +114,7 @@ type rebuildState struct {
 	interfaceList []*ast.InterfaceDecl
 	funcList      []*ast.FuncDecl
 	assertList    []*ast.AssertDecl
+	masterList    []*ast.MasterDecl
 }
 
 // newRebuildState allocates the fresh caches, each sized from its predecessor so
@@ -126,6 +130,7 @@ func (d *Document) newRebuildState(buf source.Buffer) *rebuildState {
 		interfaces: make(map[*cst.Node]*ast.InterfaceDecl, len(d.interfaceCache)),
 		funcs:      make(map[*cst.Node]*ast.FuncDecl, len(d.funcCache)),
 		asserts:    make(map[*cst.Node]*ast.AssertDecl, len(d.assertCache)),
+		masters:    make(map[*cst.Node]*ast.MasterDecl, len(d.masterCache)),
 	}
 }
 
@@ -148,6 +153,8 @@ func (rs *rebuildState) collect(child cst.Tree, green *cst.Node) {
 		rs.funcList = collectDecl(green, child, rs.buf, rs.d.funcCache, rs.funcs, rs.funcList, lowerFuncDecl)
 	case cst.AssertDecl:
 		rs.assertList = collectDecl(green, child, rs.buf, rs.d.assertCache, rs.asserts, rs.assertList, lowerAssertDecl)
+	case cst.MasterDecl:
+		rs.masterList = collectDecl(green, child, rs.buf, rs.d.masterCache, rs.masters, rs.masterList, lowerMasterDecl)
 	default:
 		// Any other kind is not a top-level declaration this document
 		// lowers: it is skipped and never enters the rebuilt File.
@@ -184,5 +191,6 @@ func (rs *rebuildState) commit(d *Document, rootNode *cst.Node) {
 	d.funcCache = rs.funcs
 	d.useCache = rs.uses
 	d.assertCache = rs.asserts
-	d.file = ast.NewFile(rs.useList, rs.constList, rs.typeList, rs.enumList, rs.interfaceList, rs.funcList, rs.assertList, rootNode)
+	d.masterCache = rs.masters
+	d.file = ast.NewFile(rs.useList, rs.constList, rs.typeList, rs.enumList, rs.interfaceList, rs.funcList, rs.assertList, rs.masterList, rootNode)
 }

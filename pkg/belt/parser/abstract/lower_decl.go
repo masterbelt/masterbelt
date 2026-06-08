@@ -273,6 +273,101 @@ func lowerTypeDecl(t cst.Tree, buf source.Buffer) *ast.TypeDecl {
 	return ast.NewTypeDecl(doc, public, name, params, body, where, methods, consts, impls, green)
 }
 
+// lowerMasterDecl lowers a positioned MasterDecl CST node into an
+// ast.MasterDecl: its modifiers, name, the row record body (reusing the
+// type-body lowering — record type, where-refinement, and impl members), and
+// the primary-key columns.
+func lowerMasterDecl(t cst.Tree, buf source.Buffer) *ast.MasterDecl {
+	green, _ := t.Node()
+
+	var (
+		doc     []string
+		public  bool
+		name    string
+		record  ast.TypeExpr
+		where   ast.Expr
+		methods []*ast.MethodDecl
+		consts  []*ast.ConstDecl
+		impls   []ast.TypeExpr
+		primary []string
+	)
+	for _, child := range t.Children() {
+		if tok, ok := child.Token(); ok {
+			switch tok.Kind() {
+			case token.Pub:
+				public = true
+			case token.DocComment:
+				doc = append(doc, docText(child.Text(buf)))
+			case token.Ident:
+				// The only direct Ident child of a MasterDecl is the declared
+				// name; the master keyword is wrapped in a MasterKeyword node, and
+				// the record and primary members nest their own names.
+				name = child.Text(buf)
+			default:
+				// Any other token (the braces) sets no field of the master: it is
+				// skipped.
+			}
+			continue
+		}
+		node, _ := child.Node()
+		switch node.Kind() {
+		case cst.MasterRecord:
+			record, where, methods, consts, impls = lowerMasterRecord(child, buf)
+		case cst.MasterPrimary:
+			primary = lowerMasterPrimary(child, buf)
+		default:
+			// Any other child node (the MasterKeyword wrapping the master keyword)
+			// contributes no field of the master.
+		}
+	}
+	return ast.NewMasterDecl(doc, public, name, record, where, methods, consts, impls, primary, green)
+}
+
+// lowerMasterRecord lowers a master's record member — the row type and the
+// members of its impl blocks — reusing the type-declaration body lowering: the
+// type expression is the record type, a WhereClause its refinement over a row,
+// and each ImplBlock its methods, associated constants, and interface tag. The
+// record keyword (a MasterKeyword node) carries no field. The lowering mirrors
+// the body handling in lowerTypeDecl, so a master's rows and a type share one
+// path.
+func lowerMasterRecord(t cst.Tree, buf source.Buffer) (record ast.TypeExpr, where ast.Expr, methods []*ast.MethodDecl, consts []*ast.ConstDecl, impls []ast.TypeExpr) {
+	for _, child := range t.Children() {
+		node, ok := child.Node()
+		if !ok {
+			continue
+		}
+		switch {
+		case node.Kind() == cst.WhereClause:
+			where = lowerWhereClause(child, buf)
+		case node.Kind() == cst.ImplBlock:
+			ms, cs, iface := lowerImpl(child, buf)
+			methods = append(methods, ms...)
+			consts = append(consts, cs...)
+			if iface != nil {
+				impls = append(impls, iface)
+			}
+		case isTypeExprKind(node.Kind()):
+			record = lowerTypeExpr(child, buf)
+		}
+	}
+	return record, where, methods, consts, impls
+}
+
+// lowerMasterPrimary lowers a master's primary member to its key column names,
+// in declaration order: each direct Ident child is one column (the primary
+// keyword is wrapped in a MasterKeyword node, and the parentheses and commas of
+// a composite key are non-Ident tokens), so the keyword and punctuation are
+// read apart from the columns.
+func lowerMasterPrimary(t cst.Tree, buf source.Buffer) []string {
+	var keys []string
+	for _, child := range t.Children() {
+		if tok, ok := child.Token(); ok && tok.Kind() == token.Ident {
+			keys = append(keys, child.Text(buf))
+		}
+	}
+	return keys
+}
+
 // lowerEnumDecl lowers a positioned EnumDecl CST node into an ast.EnumDecl: its
 // modifiers, name, optional base-type annotation (a TypeClause, lowered the
 // same way a const's is), members in declaration order, and the methods of its
