@@ -125,3 +125,52 @@ jobs:
             --title "nightly $version" \
             --notes-file notes.md \
             --prerelease
+
+  # Push the multi-arch container image to ghcr: the same static binaries the
+  # release ships, copied onto distroless. The :nightly tag rolls; the
+  # :nightly-<date>-<sha> tag is immutable for pinning.
+  image:
+    name: container image
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v8
+        with:
+          name: masterbelt-nightly
+          path: dist
+      - name: Stage the linux binaries into the build context
+        run: |
+          for arch in amd64 arm64; do
+            mkdir -p build/ctx/linux/"$arch"
+            tar -xzf dist/masterbelt-linux-"$arch"-*.tar.gz -C build/ctx/linux/"$arch"
+          done
+      - name: Image metadata
+        id: meta
+        run: |
+          version="$(basename dist/masterbelt-linux-amd64-*.tar.gz .tar.gz | sed 's/^masterbelt-linux-amd64-//')"
+          patch="${version%+*}"; patch="${patch##*.}"   # the commit date
+          sha="${version#*+}"                            # the short SHA
+          echo "datesha=$patch-$sha" >>"$GITHUB_OUTPUT"
+          echo "created=$(git show -s --format=%cI HEAD)" >>"$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - uses: docker/build-push-action@v7
+        with:
+          context: build
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}:nightly
+            ghcr.io/${{ github.repository }}:nightly-${{ steps.meta.outputs.datesha }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.created=${{ steps.meta.outputs.created }}
