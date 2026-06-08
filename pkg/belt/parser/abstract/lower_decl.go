@@ -281,15 +281,16 @@ func lowerMasterDecl(t cst.Tree, buf source.Buffer) *ast.MasterDecl {
 	green, _ := t.Node()
 
 	var (
-		doc     []string
-		public  bool
-		name    string
-		record  ast.TypeExpr
-		where   ast.Expr
-		methods []*ast.MethodDecl
-		consts  []*ast.ConstDecl
-		impls   []ast.TypeExpr
-		primary []string
+		doc      []string
+		public   bool
+		name     string
+		seenBody bool
+		record   ast.TypeExpr
+		where    ast.Expr
+		methods  []*ast.MethodDecl
+		consts   []*ast.ConstDecl
+		impls    []ast.TypeExpr
+		primary  []string
 	)
 	for _, child := range t.Children() {
 		if tok, ok := child.Token(); ok {
@@ -298,14 +299,20 @@ func lowerMasterDecl(t cst.Tree, buf source.Buffer) *ast.MasterDecl {
 				public = true
 			case token.DocComment:
 				doc = append(doc, docText(child.Text(buf)))
+			case token.LBrace:
+				seenBody = true
 			case token.Ident:
-				// The only direct Ident child of a MasterDecl is the declared
-				// name; the master keyword is wrapped in a MasterKeyword node, and
-				// the record and primary members nest their own names.
-				name = child.Text(buf)
+				// The declared name is the identifier between the master keyword
+				// (wrapped in a MasterKeyword node) and the body brace. An
+				// identifier the member recovery appends directly under the master
+				// — a stray token in a malformed body — comes after the brace and
+				// must not overwrite the name.
+				if !seenBody {
+					name = child.Text(buf)
+				}
 			default:
-				// Any other token (the braces) sets no field of the master: it is
-				// skipped.
+				// Any other token (the closing brace) sets no field of the master:
+				// it is skipped.
 			}
 			continue
 		}

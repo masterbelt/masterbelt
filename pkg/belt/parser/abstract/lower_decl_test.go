@@ -38,6 +38,44 @@ func TestLowerConstDecl(t *testing.T) {
 	}
 }
 
+// TestLowerMasterDecl checks the master-declaration lowering: the record body
+// (reused from the type-body lowering), the primary-key columns, and — the
+// regression — that a stray identifier the body recovery appends directly under
+// the master does not overwrite the declared name.
+func TestLowerMasterDecl(t *testing.T) {
+	t.Run("well-formed", func(t *testing.T) {
+		file, _ := Lower([]byte("pub master Skill {\n  record { id: int, name: string }\n  primary id\n}\n"))
+		if len(file.Masters) != 1 {
+			t.Fatalf("masters = %d, want 1", len(file.Masters))
+		}
+		m := file.Masters[0]
+		if !m.Public || m.Name != "Skill" {
+			t.Errorf("master = pub %v name %q, want pub Skill", m.Public, m.Name)
+		}
+		if rt, ok := m.Record.(*ast.RecordType); !ok || len(rt.Fields) != 2 {
+			t.Fatalf("record = %#v, want a RecordType with 2 fields", m.Record)
+		}
+		if len(m.Primary) != 1 || m.Primary[0] != "id" {
+			t.Errorf("primary = %v, want [id]", m.Primary)
+		}
+	})
+
+	t.Run("name survives body recovery", func(t *testing.T) {
+		// A stray identifier in the body is appended directly under the
+		// MasterDecl by recovery; it must not overwrite the declared name.
+		file, diags := Lower([]byte("master Skill { bogus record { id: int } primary id }\n"))
+		if len(diags) == 0 {
+			t.Fatal("want a diagnostic for the stray body token")
+		}
+		if len(file.Masters) != 1 {
+			t.Fatalf("masters = %d, want 1", len(file.Masters))
+		}
+		if got := file.Masters[0].Name; got != "Skill" {
+			t.Errorf("name = %q, want Skill (the stray \"bogus\" must not overwrite it)", got)
+		}
+	})
+}
+
 func TestLowerInference(t *testing.T) {
 	file, _ := Lower([]byte("const MinLevel = 0\nconst Alias = MinLevel\n"))
 	if len(file.Decls) != 2 {
