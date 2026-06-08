@@ -231,9 +231,8 @@ func (d *MasterDecl) node()             {}
 // MasterDecl satisfies the sealed Node contract (Syntax, node, and the
 // generated MarshalText). The other declaration nodes earn that implicitly by
 // being passed as an ast.Node to the semantic layer's span/diagnostic anchors;
-// master has no such consumer in this layer yet (the semantic recognition is
-// 0002), so this assertion both documents the contract and keeps the sealing
-// method from reading as dead code.
+// master is not yet consumed there, so this assertion both documents the
+// contract and keeps the sealing method from reading as dead code.
 var _ Node = (*MasterDecl)(nil)
 
 // NewMasterDecl builds a MasterDecl node.

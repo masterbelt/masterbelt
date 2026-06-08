@@ -373,9 +373,9 @@ func funcSymbols(doc view) []symbolBuilder {
 
 // masterSymbols outlines every master declaration as a struct-kinded symbol.
 // Unlike the other outlines it reads the AST (doc.AST().File().Masters) rather
-// than the IR module: a master has no IR representation yet (that arrives with
-// the semantic recognition in 0002), but its name and span are already in the
-// abstract tree. A nil Syntax (a recovered-away declaration) is skipped, exactly
+// than the IR module: a master is not yet resolved into a typed module entry,
+// but its name and span are already in the abstract tree, which is all the
+// outline needs. A nil Syntax (a recovered-away declaration) is skipped, exactly
 // as the IR-backed outlines skip a missing syntax link.
 func masterSymbols(doc view) []symbolBuilder {
 	var out []symbolBuilder
