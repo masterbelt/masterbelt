@@ -1,0 +1,3 @@
+const Doubled = [1, 2].map(fn(x) {
+      return x + x
+})

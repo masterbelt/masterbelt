@@ -1,0 +1,5 @@
+pub type Point = { x: nint, y: nint }
+const Q = Point{
+        x: 3
+y: 4
+  }

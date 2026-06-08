@@ -1,0 +1,3 @@
+root = true
+[*.belt]
+indent_style = tab
