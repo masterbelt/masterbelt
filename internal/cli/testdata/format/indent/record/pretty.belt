@@ -1,5 +1,7 @@
-pub type Point = { x: nint, y: nint }
-const Q = Point{
-  x: 3
-  y: 4
+pub type Quad = { a: nint, b: nint, c: nint, d: nint }
+const Q = Quad{
+  a: 1
+  b: 2
+  c: 3
+  d: 4
 }

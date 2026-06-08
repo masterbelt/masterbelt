@@ -11,10 +11,7 @@ const Origin = Point{ x: 0, y: 0 }
 const P: Point = { x: 1, y: 2 }
 
 // Newline-separated fields.
-const Q = Point{
-  x: 3
-  y: 4
-}
+const Q = Point{ x: 3, y: 4 }
 
 // Nested records compose with other literals.
 pub type Item = { id: nint, name: string, pos: Point }

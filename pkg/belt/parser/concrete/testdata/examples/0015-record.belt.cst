@@ -118,23 +118,22 @@ File
       RecordLit
         Ident "Point"
         LBrace "{"
-        Newline "\n"
-        Whitespace "  "
+        Whitespace " "
         RecordField
           Ident "x"
           Colon ":"
           Whitespace " "
           Literal
             Int "3"
-        Newline "\n"
-        Whitespace "  "
+        Comma ","
+        Whitespace " "
         RecordField
           Ident "y"
           Colon ":"
           Whitespace " "
           Literal
             Int "4"
-        Newline "\n"
+        Whitespace " "
         RBrace "}"
   TypeDecl
     Newline "\n"

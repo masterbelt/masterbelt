@@ -19,6 +19,15 @@
 // context-sensitive cases (a type colon versus a ternary colon, a unary versus a
 // binary operator, a generic bracket versus a comparison, a record brace versus
 // a block brace).
+//
+// Line breaks are reproduced as in the input, with one exception: a record or
+// collection literal whose every part fits on one line — it carries no comment
+// and no block — is collapsed onto one line, its element separators regenerated
+// as ", " (a newline-separated literal has no comma tokens to reproduce, so they
+// are synthesized). This is the one-spelling rule for data literals: the same
+// data has one form, whether the input wrote it across lines or not. A literal
+// that does carry a comment or a block keeps its line breaks, since collapsing
+// would lose the comment's line or pack a block onto one line.
 package printer
 
 import (
@@ -53,19 +62,97 @@ type printer struct {
 	prevKind    token.Kind
 	prevParent  cst.Kind
 	prevComment bool
+	flatDepth   int // > 0 while rendering inside a collapsed literal: newlines are dropped
 }
 
 // walk renders a positioned element: a leaf goes through leaf with its immediate
-// parent's kind, a node recurses over its children as their parent.
+// parent's kind; a node recurses over its children as their parent, except a
+// collapsible record or collection literal, which renders flat.
 func (p *printer) walk(buf source.Buffer, t cst.Tree, parent cst.Kind) {
 	if tok, ok := t.Token(); ok {
 		p.leaf(tok.Kind(), parent, t.Text(buf))
 		return
 	}
 	kind, _ := t.Kind()
+	if (kind == cst.RecordLit || kind == cst.CollectionLit) && collapsible(t) {
+		p.flatDepth++
+		p.flatLiteral(buf, t, kind)
+		p.flatDepth--
+		return
+	}
 	for _, child := range t.Children() {
 		p.walk(buf, child, kind)
 	}
+}
+
+// flatLiteral renders a record or collection literal on one line. Its trivia is
+// dropped (newlines by flatDepth, whitespace as always) and its element
+// separators are regenerated: the source commas are dropped — a newline-
+// separated literal has none, and a trailing one before the closer must not
+// survive — and a single comma is synthesized before every element after the
+// first, so any input separation reads as one canonical list.
+func (p *printer) flatLiteral(buf source.Buffer, t cst.Tree, kind cst.Kind) {
+	prevElement := false
+	for _, child := range t.Children() {
+		if ck, ok := child.TokenKind(); ok {
+			if ck == token.Comma {
+				continue // separators are regenerated below
+			}
+			p.walk(buf, child, kind) // the name, the brackets
+			continue
+		}
+		// A node child is an element (a field, a map entry, or a value).
+		if prevElement {
+			p.leaf(token.Comma, kind, ",")
+		}
+		p.walk(buf, child, kind)
+		prevElement = true
+	}
+}
+
+// maxFlatElements is the most elements a literal may have and still be put on
+// one line. The threshold (not a line width — masterbelt never wraps on width)
+// is the element-count rule B-3 calls for: it is set where the example and
+// prelude corpus already draws the line by hand — records of up to three fields
+// are written inline, larger ones one field per line — so the one-spelling rule
+// matches the corpus's own judgement and a longer literal keeps its readable
+// one-per-line shape.
+const maxFlatElements = 3
+
+// collapsible reports whether a literal can be put on one line: it must carry no
+// comment (whose line would be lost) and no block (which is never packed onto
+// one line), and no literal in it — itself included — may have more than
+// maxFlatElements elements. The whole subtree is checked, so a literal nested
+// inside another keeps both multi-line when either must be.
+func collapsible(t cst.Tree) bool {
+	if tk, ok := t.TokenKind(); ok {
+		return !isComment(tk)
+	}
+	switch k, _ := t.Kind(); {
+	case k == cst.Block:
+		return false
+	case (k == cst.RecordLit || k == cst.CollectionLit) && elementCount(t) > maxFlatElements:
+		return false
+	}
+	for _, child := range t.Children() {
+		if !collapsible(child) {
+			return false
+		}
+	}
+	return true
+}
+
+// elementCount returns the number of element children of a literal — its fields,
+// map entries, or values. Those are the node children; the name, brackets, and
+// commas are token children.
+func elementCount(t cst.Tree) int {
+	n := 0
+	for _, child := range t.Children() {
+		if _, isToken := child.TokenKind(); !isToken {
+			n++
+		}
+	}
+	return n
 }
 
 // leaf renders one token. A newline opens a new line; whitespace is dropped (all
@@ -76,6 +163,9 @@ func (p *printer) walk(buf source.Buffer, t cst.Tree, parent cst.Kind) {
 func (p *printer) leaf(kind token.Kind, parent cst.Kind, text string) {
 	switch kind {
 	case token.Newline:
+		if p.flatDepth > 0 {
+			return // collapsed onto one line
+		}
 		p.b.WriteByte('\n')
 		p.atLineStart = true
 		return
