@@ -102,7 +102,7 @@ func resolveTypes(folder exprFolder, file *ast.File, at func(ast.Node) span, dia
 	// impls, conformance, and associated-constant value passes consume those
 	// types — reading the resolved IR, with an in-progress set that rejects an
 	// ungrounded projection cycle and lets a grounded one bottom out.
-	foldProjections(out, enumOut, masterOut, ifaceOut, at, diags)
+	foldProjections(out, enumOut, masterOut, ifaceOut, reg, at, diags)
 
 	// Third pass: resolve each type's and enum's declared interface impls and,
 	// when reporting, check conformance (every required method present) and the
@@ -171,24 +171,47 @@ type projKey struct {
 type projectionFolder struct {
 	memo      map[projKey]ir.Type
 	resolving map[projKey]bool
+	reg       *builtin.Registry
 	at        func(ast.Node) span
 	diags     *diagnostic.List
+	// boundViolation reports a generic-application bound violation for a projected
+	// argument, anchored at the projection — the check app() defers because the
+	// projection is not yet folded when the application is built. nil where there
+	// is nowhere to report.
+	boundViolation func(arg ast.TypeExpr, argType ir.Type, param *ir.TypeParam)
+}
+
+// newProjectionFolder builds a fold over the file's resolved types: the bound
+// reporter is the same one the type resolver uses, so a deferred check reads like
+// the eager one.
+func newProjectionFolder(reg *builtin.Registry, at func(ast.Node) span, diags *diagnostic.List) *projectionFolder {
+	return &projectionFolder{
+		memo:           map[projKey]ir.Type{},
+		resolving:      map[projKey]bool{},
+		reg:            reg,
+		at:             at,
+		diags:          diags,
+		boundViolation: boundViolationReporter(at, diags),
+	}
 }
 
 // foldProjections folds every type-position member projection the file's
 // definitions hold to the member's declared type, in place.
-func foldProjections(out, enumOut, masterOut, ifaceOut []*ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List) {
-	pf := &projectionFolder{
-		memo:      map[projKey]ir.Type{},
-		resolving: map[projKey]bool{},
-		at:        at,
-		diags:     diags,
-	}
+func foldProjections(out, enumOut, masterOut, ifaceOut []*ir.TypeDef, reg *builtin.Registry, at func(ast.Node) span, diags *diagnostic.List) {
+	pf := newProjectionFolder(reg, at, diags)
 	for _, defs := range [][]*ir.TypeDef{out, enumOut, masterOut, ifaceOut} {
 		for _, def := range defs {
 			pf.foldDef(def)
 		}
 	}
+}
+
+// foldProjectionType folds the projections in a single type resolved at a use
+// site after the type bodies have settled — an impl tag, which resolveImpls
+// classifies as an interface — where no projection cycle is possible. It returns
+// the concrete type the interface check then consumes.
+func foldProjectionType(t ir.Type, reg *builtin.Registry, at func(ast.Node) span, diags *diagnostic.List) ir.Type {
+	return newProjectionFolder(reg, at, diags).foldType(t)
 }
 
 // foldDef folds the projections in a definition's resolved type positions: its
@@ -240,12 +263,36 @@ func (pf *projectionFolder) foldType(t ir.Type) ir.Type {
 		t.Result = pf.foldType(t.Result)
 	case *ir.App:
 		for i := range t.Args {
+			proj, wasProj := t.Args[i].(*ir.Projection)
 			t.Args[i] = pf.foldType(t.Args[i])
+			if wasProj {
+				pf.checkArgBound(t.Def, i, t.Args[i], proj)
+			}
 		}
 	case *ir.TypeVar:
 		t.Bound = pf.foldType(t.Bound)
 	}
 	return t
+}
+
+// checkArgBound runs the generic-application bound check app() deferred for a
+// projected argument: now that arg is folded to its declared type, a violation
+// of the parameter's bound is reported at the projection it was written as.
+func (pf *projectionFolder) checkArgBound(def *ir.TypeDef, i int, arg ir.Type, proj *ir.Projection) {
+	if pf.reg == nil || pf.boundViolation == nil || def == nil || i >= len(def.Params) {
+		return
+	}
+	p := def.Params[i]
+	if p.Bound == nil || arg == ir.Invalid {
+		return
+	}
+	syntax, ok := proj.Syntax.(ast.TypeExpr)
+	if !ok {
+		return
+	}
+	if !types.Satisfies(pf.reg, arg, p.Bound) {
+		pf.boundViolation(syntax, arg, p)
+	}
 }
 
 // project resolves one projection to the member's declared type, folding that
@@ -266,6 +313,8 @@ func (pf *projectionFolder) project(p *ir.Projection) ir.Type {
 	}
 	mt, res := types.ProjectMemberType(p.Recv, p.Member)
 	switch res {
+	case types.ProjectFound:
+		// fall through to fold the member's declared type below
 	case types.ProjectAmbiguousStatic:
 		pf.report(p, newAmbiguousStaticProjectionDiagnostic)
 		pf.memo[key] = ir.Invalid
@@ -708,7 +757,11 @@ func resolveImpls(r *infer.TypeResolver, reg *builtin.Registry, impls []ast.Type
 		scope[p.Name] = p.Bound
 	}
 	for _, impl := range impls {
-		t := r.ResolveType(impl, scope)
+		// An impl tag may be a projection (impl Holder.P, where Holder.P is an
+		// associated constant typed as an interface). The type bodies are settled
+		// by now, so fold it to the interface before classifying — otherwise a
+		// valid projected interface reads as not-an-interface.
+		t := foldProjectionType(r.ResolveType(impl, scope), reg, at, diags)
 		idef := interfaceDefOf(t)
 		if idef == nil {
 			// The tag resolved to a non-interface (or failed to resolve). An

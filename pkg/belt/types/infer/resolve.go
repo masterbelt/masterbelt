@@ -192,6 +192,12 @@ func (r *TypeResolver) app(def *ir.TypeDef, argExprs []ast.TypeExpr, scope TypeS
 			if p.Bound == nil || args[i] == ir.Invalid {
 				continue
 			}
+			// A projection argument is not yet folded to its declared type, so the
+			// bound cannot be judged here; the projection fold re-runs the check on
+			// the resolved type once it is known.
+			if _, projected := args[i].(*ir.Projection); projected {
+				continue
+			}
 			if !types.Satisfies(r.Registry, args[i], p.Bound) {
 				r.BoundViolation(argExprs[i], args[i], p)
 			}

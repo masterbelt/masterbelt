@@ -160,6 +160,46 @@ func isFunc(t ir.Type) bool {
 	return ok
 }
 
+func TestTypeProjectionGenericArgBound(t *testing.T) {
+	// A projected type used as a bounded generic argument is checked against the
+	// bound after it folds, not as the unfolded projection: Character.level folds
+	// to Level (an int, comparable), so pair<Character.level> is clean.
+	src := "pub type Level = int\n" +
+		"pub type Character = { level: Level }\n" +
+		"pub type pair<T: comparable> = list<T>\n" +
+		"pub type Use = pair<Character.level>\n"
+	_, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", codes(diags))
+	}
+}
+
+func TestTypeProjectionGenericArgBoundViolation(t *testing.T) {
+	// The deferred bound check still fires: a projected type that does not satisfy
+	// the bound (a record is not comparable) is reported, not silently accepted.
+	src := "pub type Rec = { a: nint }\n" +
+		"pub type Holder = { r: Rec }\n" +
+		"pub type pair<T: comparable> = list<T>\n" +
+		"pub type Use = pair<Holder.r>\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeBoundNotSatisfied) {
+		t.Fatalf("codes = %v, want bound_not_satisfied", codes(diags))
+	}
+}
+
+func TestTypeProjectionImplTag(t *testing.T) {
+	// An impl tag that is a projection folds to the interface before it is
+	// classified: impl Holder.g opts X into Greet (X supplies hello), rather than
+	// being reported as not-an-interface.
+	src := "pub interface Greet {\n  hello(): nint\n}\n" +
+		"pub type Holder = { g: Greet }\n" +
+		"pub type X = nint impl Holder.g {\n  hello(): nint { return 1 }\n}\n"
+	_, diags := analyze(src)
+	if hasCode(diags, CodeNotAnInterface) {
+		t.Fatalf("impl Holder.g reported not_an_interface; codes = %v", codes(diags))
+	}
+}
+
 func TestTypeProjectionNotInMethodBody(t *testing.T) {
 	// A projection annotation inside a concrete method body is not covered by the
 	// declaration fold pass, so it must not be emitted there: the body keeps the
