@@ -171,5 +171,45 @@ Module
       Enum: ~
       Master: ~
       Where: ~
+    TypeDef
+      Name: "Schema"
+      Anchor: "belt:/Schema"
+      Public: true
+      Doc: "A schema with a column literally named `type` whose declared type is the" "metatype itself — the keyword as a field name and the type atom together."
+      Params: ~
+      Body: Record
+        Fields:
+          Field
+            Name: "type"
+            Type: Builtin
+              Name: "type"
+      Methods: ~
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Master: ~
+      Where: ~
+    TypeDef
+      Name: "Remap"
+      Anchor: "belt:/Remap"
+      Public: true
+      Doc: "A type-to-type mapping whose parameter is literally named `type` — the" "shape a generic (a comptime type function) takes in a later slice."
+      Params: ~
+      Body: Func
+        Params:
+          Builtin
+            Name: "type"
+        Result: Builtin
+          Name: "type"
+      Methods: ~
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Master: ~
+      Where: ~
   Funcs: ~
   Asserts: ~

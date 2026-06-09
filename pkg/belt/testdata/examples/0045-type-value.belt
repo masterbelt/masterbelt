@@ -25,3 +25,19 @@ pub const meta = type
 
 /// A type value passed on by reference, still of type `type`.
 pub const same_level = level_t
+
+// The `type` keyword has three roles at once here, each told apart by position:
+// a field/parameter name (a reserved word read as an identifier), the metatype
+// in type position, and — were one written bare in value position — a type
+// value. A column or parameter literally named `type`, whose declared type is
+// the metatype, is the masterdata edge the keyword unlocks.
+
+/// A schema with a column literally named `type` whose declared type is the
+/// metatype itself — the keyword as a field name and the type atom together.
+pub type Schema = {
+  type: type,
+}
+
+/// A type-to-type mapping whose parameter is literally named `type` — the
+/// shape a generic (a comptime type function) takes in a later slice.
+pub type Remap = fn(type: type): type

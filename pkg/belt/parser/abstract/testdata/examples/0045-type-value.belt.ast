@@ -58,6 +58,44 @@ File
       Methods: ~
       Consts: ~
       Impls: ~
+    TypeDecl
+      Doc: "A schema with a column literally named `type` whose declared type is the" "metatype itself — the keyword as a field name and the type atom together."
+      Public: true
+      Name: "Schema"
+      Params: ~
+      Body: RecordType
+        Fields:
+          FieldDef
+            Name: "type"
+            Type: NamedType
+              Namespace: ""
+              Name: "type"
+              Args: ~
+      Where: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
+    TypeDecl
+      Doc: "A type-to-type mapping whose parameter is literally named `type` — the" "shape a generic (a comptime type function) takes in a later slice."
+      Public: true
+      Name: "Remap"
+      Params: ~
+      Body: FuncType
+        Params:
+          ParamDef
+            Name: "type"
+            Type: NamedType
+              Namespace: ""
+              Name: "type"
+              Args: ~
+        Result: NamedType
+          Namespace: ""
+          Name: "type"
+          Args: ~
+      Where: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
   Enums: ~
   Interfaces: ~
   Funcs: ~
