@@ -200,12 +200,11 @@ func (mk *marker) reachType(t *ir.TypeDef) {
 			mk.walkValue(em.ValueGraph)
 		}
 	}
-	// A master's row fields live on the descriptor rather than on Body, so reach
-	// the types they name (a master field typed by an enum keeps that enum live).
+	// A master's row is a type on the descriptor rather than on Body, so reach it:
+	// this keeps a named row alias live (record Row) and the types its fields name
+	// (a field typed by an enum keeps that enum live).
 	if t.Master != nil {
-		for _, f := range t.Master.Fields {
-			mk.reachTypeRef(f.Type)
-		}
+		mk.reachTypeRef(t.Master.Row)
 	}
 	for _, meth := range t.Methods {
 		mk.reachMethod(meth)

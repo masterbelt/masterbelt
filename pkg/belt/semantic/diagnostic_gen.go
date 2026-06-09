@@ -54,6 +54,7 @@ const (
 	CodeMasterMissingPrimary       diagnostic.Code = "belt.semantic.master_missing_primary"
 	CodeMasterMissingRow           diagnostic.Code = "belt.semantic.master_missing_row"
 	CodeMasterPrimaryUnknownField  diagnostic.Code = "belt.semantic.master_primary_unknown_field"
+	CodeMasterWhereUnsupported     diagnostic.Code = "belt.semantic.master_where_unsupported"
 	CodeMissingEffect              diagnostic.Code = "belt.semantic.missing_effect"
 	CodeMissingField               diagnostic.Code = "belt.semantic.missing_field"
 	CodeMissingInitializer         diagnostic.Code = "belt.semantic.missing_initializer"
@@ -739,6 +740,20 @@ func newMasterPrimaryUnknownFieldDiagnostic(offset int, width int, key string, m
 		Severity: diagnostic.Error,
 		Code:     CodeMasterPrimaryUnknownField,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeMasterPrimaryUnknownField, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newMasterWhereUnsupportedDiagnostic(offset int, width int, master string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"master": diagnostic.Str(master),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeMasterWhereUnsupported,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeMasterWhereUnsupported, fields),
 		Fields:   fields,
 		Offset:   offset,
 		Width:    width,

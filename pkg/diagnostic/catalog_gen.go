@@ -543,6 +543,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "master " + f["master"].String() + " has no field " + f["key"].String() + " named by its primary key"
 		}
 	},
+	"belt.semantic.master_where_unsupported": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "master " + f["master"].String() + " の行述語(where)はまだサポートされていません"
+		default:
+			return "master " + f["master"].String() + " does not support a row predicate (where) yet"
+		}
+	},
 	"belt.semantic.missing_effect": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":

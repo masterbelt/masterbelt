@@ -191,19 +191,20 @@ Module
       Impls: ~
       Enum: ~
       Master: MasterDef
-        Fields:
-          Field
-            Name: "id"
-            Type: Builtin
-              Name: "int"
-          Field
-            Name: "name"
-            Type: Builtin
-              Name: "string"
-          Field
-            Name: "kind"
-            Type: Named
-              Def: "SkillKind"
+        Row: Record
+          Fields:
+            Field
+              Name: "id"
+              Type: Builtin
+                Name: "int"
+            Field
+              Name: "name"
+              Type: Builtin
+                Name: "string"
+            Field
+              Name: "kind"
+              Type: Named
+                Def: "SkillKind"
         Primary: "id"
       Where: ~
     TypeDef
@@ -220,15 +221,16 @@ Module
       Impls: ~
       Enum: ~
       Master: MasterDef
-        Fields:
-          Field
-            Name: "skill"
-            Type: Builtin
-              Name: "int"
-          Field
-            Name: "level"
-            Type: Builtin
-              Name: "int"
+        Row: Record
+          Fields:
+            Field
+              Name: "skill"
+              Type: Builtin
+                Name: "int"
+            Field
+              Name: "level"
+              Type: Builtin
+                Name: "int"
         Primary: "skill" "level"
       Where: ~
   Funcs: ~

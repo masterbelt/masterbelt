@@ -242,15 +242,17 @@ type TypeDef struct {
 	MasterSyntax    *ast.MasterDecl    `tree:"-"` // the master declaration this was resolved from, or nil
 }
 
-// MasterDef is the description of a master type: the row's fields (each a name
-// and resolved type, in source order) and the names of the primary-key columns
-// (in declaration order). The fields live here rather than on TypeDef.Body so a
+// MasterDef is the description of a master type: the row's type (the record the
+// rows conform to, as written — an inline record, a named record alias, or a
+// generic application) and the primary-key column names (in declaration order,
+// already de-duplicated). The row lives here rather than on TypeDef.Body so a
 // master stays a leaf in the type algebra — opaque to its row record — while
 // still exposing the row shape its own methods (and a foreign-key reference to
-// it) read. A primary-key name is one of the field names; the semantic layer
-// reports one that is not.
+// it) read; keeping it as a Type (rather than a flattened field list) preserves
+// the reference to a named alias for liveness and relinking. A primary-key name
+// is one of the row's field names; the semantic layer reports one that is not.
 type MasterDef struct {
-	Fields  []Field  // the row's fields, in source order
+	Row     Type     // the row record type, as written (nil when absent or invalid)
 	Primary []string // the primary-key column names, in declaration order
 }
 

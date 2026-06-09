@@ -233,12 +233,10 @@ func (l *linker) linkTypeDef(def *TypeDef) {
 		}
 	}
 	if def.Master != nil {
-		// The row field types carry the same Named/App references a body does, so
-		// relink them too — otherwise a master field typed by another declaration
-		// stays a detached placeholder after a text round-trip.
-		for i := range def.Master.Fields {
-			l.linkType(&def.Master.Fields[i].Type)
-		}
+		// The row type carries the same Named/App references a body does, so relink
+		// it too — otherwise a master row typed by another declaration stays a
+		// detached placeholder after a text round-trip.
+		l.linkType(&def.Master.Row)
 	}
 	l.linkValue(&def.Where)
 }

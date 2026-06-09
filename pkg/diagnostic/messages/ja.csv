@@ -39,6 +39,7 @@ belt.semantic.master_primary_unknown_field,master {master} に primary キー {k
 belt.semantic.master_missing_primary,master {master} に primary キーがありません
 belt.semantic.master_missing_row,master {master} に行レコードがありません
 belt.semantic.master_duplicate_primary_key,master {master} は primary キー列 {key} を重複させています
+belt.semantic.master_where_unsupported,master {master} の行述語(where)はまだサポートされていません
 belt.semantic.uninferable_record,このレコードリテラルの型を推論できません。型名を付けるか型注釈を付けてください
 belt.semantic.not_a_record,{typ} はレコード型ではありません
 belt.semantic.uninferable_result,この関数リテラルの結果型を推論できません。注釈を付けるか値を返してください

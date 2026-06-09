@@ -15,7 +15,7 @@ func TestLinkRelinksMasterRowFields(t *testing.T) {
 		Name:   "Skill",
 		Anchor: "belt:/Skill",
 		Master: &MasterDef{
-			Fields:  []Field{{Name: "rarity", Type: &Named{Def: rarity}}},
+			Row:     &Record{Fields: []Field{{Name: "rarity", Type: &Named{Def: rarity}}}},
 			Primary: []string{"rarity"},
 		},
 	}
@@ -45,9 +45,13 @@ func TestLinkRelinksMasterRowFields(t *testing.T) {
 	if master == nil || backRarity == nil {
 		t.Fatal("round-trip lost a declaration")
 	}
-	n, ok := master.Master.Fields[0].Type.(*Named)
+	row, ok := master.Master.Row.(*Record)
+	if !ok || len(row.Fields) != 1 {
+		t.Fatalf("master row = %#v, want a one-field record", master.Master.Row)
+	}
+	n, ok := row.Fields[0].Type.(*Named)
 	if !ok || n.Def != backRarity {
-		t.Fatalf("master field type = %#v, want it relinked to the module's Rarity def", master.Master.Fields[0].Type)
+		t.Fatalf("master row field type = %#v, want it relinked to the module's Rarity def", row.Fields[0].Type)
 	}
 }
 

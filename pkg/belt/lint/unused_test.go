@@ -136,3 +136,28 @@ func TestUnusedPrivateMaster(t *testing.T) {
 		t.Errorf("code = %q", l.diags[0].Code)
 	}
 }
+
+// TestUnusedRowAliasKeptByMaster pins that a private named record used as a
+// master's row is live: the master references it through its row type, so the
+// liveness marker reaches it and it is not reported unused.
+func TestUnusedRowAliasKeptByMaster(t *testing.T) {
+	row := &ir.TypeDef{
+		Name:   "Row",
+		Syntax: &ast.TypeDecl{},
+		Body:   &ir.Record{Fields: []ir.Field{{Name: "id", Type: &ir.Builtin{Name: "int"}}}},
+	}
+	master := &ir.TypeDef{
+		Name:         "M",
+		Public:       true,
+		MasterSyntax: &ast.MasterDecl{},
+		Master:       &ir.MasterDef{Row: &ir.Named{Def: row}, Primary: []string{"id"}},
+	}
+	m := &ir.Module{Types: []*ir.TypeDef{row, master}}
+	span := fakeSpan(map[ast.Node][2]int{row.Syntax: {0, 10}, master.MasterSyntax: {11, 10}})
+
+	l := &linter{span: span}
+	l.unusedDeclarations(m)
+	if len(l.diags) != 0 {
+		t.Fatalf("Row is the master's row type, so it is used; want no diagnostics, got %+v", l.diags)
+	}
+}

@@ -23,10 +23,15 @@ func masterDef(m *ir.Module, name string) *ir.TypeDef {
 	return nil
 }
 
-// fieldNames renders a master's row fields as "name:type" pairs in source order.
+// fieldNames renders a master's row fields as "name:type" pairs in source order,
+// reading them from the row type the descriptor keeps.
 func fieldNames(def *ir.TypeDef) string {
-	parts := make([]string, len(def.Master.Fields))
-	for i, f := range def.Master.Fields {
+	rec := underlyingRecord(def.Master.Row)
+	if rec == nil {
+		return ""
+	}
+	parts := make([]string, len(rec.Fields))
+	for i, f := range rec.Fields {
 		parts[i] = f.Name + ":" + f.Type.String()
 	}
 	return strings.Join(parts, ",")
@@ -313,6 +318,35 @@ func TestMasterImplConstChecked(t *testing.T) {
 				t.Fatalf("want %s, got %v", tc.want, codes(diags))
 			}
 		})
+	}
+}
+
+// TestMasterDuplicatePrimaryKeyNotPersisted pins that a repeated primary column
+// is both reported and dropped from the IR, so a downstream consumer reading the
+// recovered module never builds a doubled key tuple.
+func TestMasterDuplicatePrimaryKeyNotPersisted(t *testing.T) {
+	src := "master M {\n  record {\n    id: int,\n  }\n  primary (id, id)\n}\n"
+	m, diags := analyze(src)
+	if !hasCode(diags, CodeMasterDuplicatePrimaryKey) {
+		t.Fatalf("want master_duplicate_primary_key, got %v", codes(diags))
+	}
+	def := masterDef(m, "M")
+	if def == nil {
+		t.Fatal("master M not resolved")
+	}
+	if got := def.Master.Primary; len(got) != 1 || got[0] != "id" {
+		t.Errorf("Master.Primary = %v, want the de-duplicated [id]", got)
+	}
+}
+
+// TestMasterWhereUnsupported pins that a row predicate (where) on a master is
+// rejected as not-yet-supported rather than silently dropped — row validation is
+// later work.
+func TestMasterWhereUnsupported(t *testing.T) {
+	src := "master M {\n  record {\n    id: int,\n  } where true\n  primary id\n}\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeMasterWhereUnsupported) {
+		t.Fatalf("want master_where_unsupported, got %v", codes(diags))
 	}
 }
 

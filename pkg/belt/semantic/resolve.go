@@ -819,18 +819,18 @@ func resolveDecl(r *infer.TypeResolver, reg *builtin.Registry, td *ast.TypeDecl,
 // only checked body it produces, a row method, is checked by checkMethodBodies
 // like every other method, not here.
 func resolveMasterDecl(r *infer.TypeResolver, reg *builtin.Registry, md *ast.MasterDecl, def *ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List, fns bodyFuncs) {
-	// The row may be written inline (record { ... }) or as a named record type
-	// (record Row, type Row = { ... }), so unwrap a nominal alias to its record.
-	// An absent or non-record row leaves it nil — reported by checkMaster. A
-	// generic record alias (record Row<int>) resolves to an application this slice
-	// does not expand: it is a real record row, just not validated here, so it is
-	// not reported as missing even though its fields are not read.
+	// The row type is kept as written (inline record, named record alias, or a
+	// generic application). underlyingRecord unwraps a nominal alias to the record
+	// for the key/field checks; an absent or non-record row leaves it nil (reported
+	// by checkMaster), while a generic record alias (record Row<int>) resolves to
+	// an application this slice does not expand — a real record row, validated
+	// later, so it is neither reported missing nor read here.
 	rowType := r.ResolveType(md.Record, nil)
+	def.Master.Row = rowType
 	row := underlyingRecord(rowType)
-	if row != nil {
-		def.Master.Fields = row.Fields
-	}
-	def.Master.Primary = md.Primary
+	// The primary key is stored de-duplicated, so the IR never carries a malformed
+	// doubled key tuple even when the duplicate is also reported below.
+	def.Master.Primary = dedupeStrings(md.Primary)
 	def.Consts = resolveAssocConstList(r, reg, def, md.Consts, nil, at, diags)
 	// Same-name methods are overloads unless a signature repeats; the first wins
 	// and the repeat is reported, exactly as resolveDecl drops a type's.
@@ -868,6 +868,12 @@ func checkMaster(md *ast.MasterDecl, row *ir.Record, deferredRow bool, at func(a
 		return
 	}
 	s := at(md)
+	// A row predicate (where) is parsed but not yet given meaning — row validation
+	// is later work — so it is rejected as unsupported rather than silently
+	// dropped, which would lose a misspelled or intended constraint without a word.
+	if md.Where != nil {
+		diags.Add(newMasterWhereUnsupportedDiagnostic(s.offset, s.width, md.Name))
+	}
 	if row == nil && !deferredRow {
 		diags.Add(newMasterMissingRowDiagnostic(s.offset, s.width, md.Name))
 	}
@@ -1506,18 +1512,43 @@ func isGenericRecordAlias(t ir.Type) bool {
 
 // memberFields returns the field names the member-collision checks compare an
 // accessor or static against. A type's or enum's fields are its record body's; a
-// master keeps Body nil and stores its row fields on the descriptor, so they are
-// read from there — without this a master getter/setter could shadow a row field
-// uncaught.
+// master keeps Body nil and stores its row as a type on the descriptor, so its
+// fields are read from the row record — without this a master getter/setter could
+// shadow a row field uncaught.
 func memberFields(def *ir.TypeDef) map[string]bool {
 	if def.Master != nil {
-		names := make(map[string]bool, len(def.Master.Fields))
-		for _, f := range def.Master.Fields {
-			names[f.Name] = true
-		}
-		return names
+		return recordFieldNames(underlyingRecordOf(def.Master.Row))
 	}
 	return recordFieldNames(def.Body)
+}
+
+// underlyingRecordOf returns a master row type's record as an ir.Type for the
+// field-name helper (nil when the row is absent or a form this slice does not
+// expand), so recordFieldNames reads its fields the same way it reads a body's.
+func underlyingRecordOf(row ir.Type) ir.Type {
+	if rec := underlyingRecord(row); rec != nil {
+		return rec
+	}
+	return nil
+}
+
+// dedupeStrings returns names with later duplicates dropped, preserving the
+// first occurrence's order. It keeps a primary key tuple free of repeated
+// columns in the IR even when the repeat is reported as a diagnostic.
+func dedupeStrings(names []string) []string {
+	if len(names) == 0 {
+		return names
+	}
+	seen := make(map[string]bool, len(names))
+	out := make([]string, 0, len(names))
+	for _, n := range names {
+		if seen[n] {
+			continue
+		}
+		seen[n] = true
+		out = append(out, n)
+	}
+	return out
 }
 
 // hasNormalMethod reports whether def declares an ordinary instance method of
