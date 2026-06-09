@@ -9,6 +9,7 @@ File
         Namespace: ""
         Name: "Port"
         Args: ~
+        Projections: ~
       Value: IntLit
         Text: "8080"
       Builtin: false
@@ -20,6 +21,7 @@ File
         Namespace: ""
         Name: "Port"
         Args: ~
+        Projections: ~
       Value: IntLit
         Text: "1"
       Builtin: false
@@ -31,6 +33,7 @@ File
         Namespace: ""
         Name: "Port"
         Args: ~
+        Projections: ~
       Value: IntLit
         Text: "65535"
       Builtin: false
@@ -42,6 +45,7 @@ File
         Namespace: ""
         Name: "Level"
         Args: ~
+        Projections: ~
       Value: IntLit
         Text: "100"
       Builtin: false
@@ -53,6 +57,7 @@ File
         Namespace: ""
         Name: "Score"
         Args: ~
+        Projections: ~
       Value: IntLit
         Text: "75"
       Builtin: false
@@ -74,6 +79,7 @@ File
         Namespace: ""
         Name: "sbyte"
         Args: ~
+        Projections: ~
       Where: CallExpr
         Callee: MemberExpr
           Receiver: CallExpr
@@ -107,6 +113,7 @@ File
         Namespace: ""
         Name: "int"
         Args: ~
+        Projections: ~
       Where: CallExpr
         Callee: MemberExpr
           Receiver: CallExpr
@@ -140,6 +147,7 @@ File
         Namespace: ""
         Name: "sbyte"
         Args: ~
+        Projections: ~
       Where: CallExpr
         Callee: MemberExpr
           Receiver: CallExpr
@@ -175,6 +183,7 @@ File
             Namespace: ""
             Name: "self"
             Args: ~
+            Projections: ~
           Body:
             ReturnStmt
               Value: CallExpr
@@ -196,6 +205,7 @@ File
         Namespace: ""
         Name: "int"
         Args: ~
+        Projections: ~
       Where: CallExpr
         Callee: MemberExpr
           Receiver: SelfExpr
@@ -216,6 +226,7 @@ File
             Namespace: ""
             Name: "bool"
             Args: ~
+            Projections: ~
           Body:
             ReturnStmt
               Value: CallExpr

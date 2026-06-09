@@ -130,18 +130,21 @@ File
               Namespace: ""
               Name: "nint"
               Args: ~
+              Projections: ~
           FieldDef
             Name: "starts_at"
             Type: NamedType
               Namespace: ""
               Name: "datetime"
               Args: ~
+              Projections: ~
           FieldDef
             Name: "cooldown"
             Type: NamedType
               Namespace: ""
               Name: "duration"
               Args: ~
+              Projections: ~
       Where: ~
       Methods: ~
       Consts: ~

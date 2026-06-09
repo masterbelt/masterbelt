@@ -15,6 +15,7 @@ File
         Namespace: "geo"
         Name: "Point"
         Args: ~
+        Projections: ~
       Value: MemberExpr
         Receiver: Identifier
           Name: "geo"
@@ -33,6 +34,8 @@ File
             Namespace: "geo"
             Name: "Point"
             Args: ~
+            Projections: ~
+        Projections: ~
       Value: CollectionLit
         Entries:
           CollectionEntry

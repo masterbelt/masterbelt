@@ -57,6 +57,7 @@ File
         Namespace: ""
         Name: "Level"
         Args: ~
+        Projections: ~
       Value: CallExpr
         Callee: MemberExpr
           Receiver: CallExpr
@@ -77,6 +78,7 @@ File
         Namespace: ""
         Name: "Level"
         Args: ~
+        Projections: ~
       Value: IntLit
         Text: "10"
       Builtin: false
@@ -136,6 +138,7 @@ File
         Namespace: ""
         Name: "Character"
         Args: ~
+        Projections: ~
       Value: RecordLit
         TypeName: ""
         Fields:
@@ -172,6 +175,7 @@ File
         Namespace: ""
         Name: "Party"
         Args: ~
+        Projections: ~
       Value: RecordLit
         TypeName: ""
         Fields:
@@ -218,6 +222,7 @@ File
         Namespace: ""
         Name: "sbyte"
         Args: ~
+        Projections: ~
       Where: ~
       Methods:
         MethodDecl
@@ -233,6 +238,7 @@ File
             Namespace: ""
             Name: "self"
             Args: ~
+            Projections: ~
           Body:
             ReturnStmt
               Value: CallExpr
@@ -258,10 +264,12 @@ File
                 Namespace: ""
                 Name: "sbyte"
                 Args: ~
+                Projections: ~
           Result: NamedType
             Namespace: ""
             Name: "self"
             Args: ~
+            Projections: ~
           Body:
             ReturnStmt
               Value: CallExpr
@@ -291,6 +299,7 @@ File
               Namespace: ""
               Name: "Level"
               Args: ~
+              Projections: ~
       Where: ~
       Methods: ~
       Consts: ~
@@ -308,6 +317,7 @@ File
               Namespace: ""
               Name: "Character"
               Args: ~
+              Projections: ~
       Where: ~
       Methods: ~
       Consts: ~
@@ -342,6 +352,7 @@ File
             Namespace: ""
             Name: "bool"
             Args: ~
+            Projections: ~
           Body:
             ReturnStmt
               Value: CallExpr
@@ -368,6 +379,7 @@ File
             Namespace: ""
             Name: "bool"
             Args: ~
+            Projections: ~
           Body:
             ReturnStmt
               Value: CallExpr
@@ -394,6 +406,7 @@ File
             Namespace: ""
             Name: "nint"
             Args: ~
+            Projections: ~
           Body:
             LetStmt
               Name: "fire"
@@ -432,6 +445,7 @@ File
         Namespace: ""
         Name: "Level"
         Args: ~
+        Projections: ~
       Body:
         ReturnStmt
           Value: CallExpr

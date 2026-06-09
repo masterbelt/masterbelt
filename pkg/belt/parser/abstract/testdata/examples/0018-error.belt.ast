@@ -36,10 +36,12 @@ File
             Namespace: ""
             Name: "nint"
             Args: ~
+            Projections: ~
           NamedType
             Namespace: ""
             Name: "error"
             Args: ~
+            Projections: ~
       Value: CallExpr
         Callee: Identifier
           Name: "parseLevel"
@@ -65,16 +67,19 @@ File
             Namespace: ""
             Name: "string"
             Args: ~
+            Projections: ~
       Result: UnionType
         Members:
           NamedType
             Namespace: ""
             Name: "nint"
             Args: ~
+            Projections: ~
           NamedType
             Namespace: ""
             Name: "error"
             Args: ~
+            Projections: ~
       Body:
         ReturnStmt
           Value: CallExpr

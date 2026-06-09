@@ -9,6 +9,7 @@ File
         Namespace: ""
         Name: "Tag"
         Args: ~
+        Projections: ~
       Value: StringLit
         Value: "hello"
       Builtin: false
@@ -28,6 +29,7 @@ File
         Namespace: ""
         Name: "Tag"
         Args: ~
+        Projections: ~
       Value: Identifier
         Name: "World"
       Builtin: false
@@ -39,6 +41,7 @@ File
         Namespace: ""
         Name: "Tag"
         Args: ~
+        Projections: ~
       Value: CallExpr
         Callee: MemberExpr
           Receiver: CallExpr
@@ -94,6 +97,7 @@ File
         Namespace: ""
         Name: "Direction"
         Args: ~
+        Projections: ~
       Value: StringLit
         Value: "north"
       Builtin: false
@@ -105,6 +109,7 @@ File
         Namespace: ""
         Name: "Direction"
         Args: ~
+        Projections: ~
       Value: StringLit
         Value: "south"
       Builtin: false
@@ -116,6 +121,7 @@ File
         Namespace: ""
         Name: "Labeled"
         Args: ~
+        Projections: ~
       Value: StringLit
         Value: "tagged"
       Builtin: false
@@ -141,6 +147,7 @@ File
         Namespace: ""
         Name: "string"
         Args: ~
+        Projections: ~
       Where: ~
       Methods: ~
       Consts: ~
@@ -154,6 +161,7 @@ File
         Namespace: ""
         Name: "string"
         Args: ~
+        Projections: ~
       Where: CallExpr
         Callee: MemberExpr
           Receiver: CallExpr
@@ -189,10 +197,12 @@ File
             Namespace: ""
             Name: "Tag"
             Args: ~
+            Projections: ~
           NamedType
             Namespace: ""
             Name: "error"
             Args: ~
+            Projections: ~
       Where: ~
       Methods: ~
       Consts: ~
@@ -214,10 +224,12 @@ File
             Namespace: ""
             Name: "Labeled"
             Args: ~
+            Projections: ~
       Result: NamedType
         Namespace: ""
         Name: "Tag"
         Args: ~
+        Projections: ~
       Body:
         MatchStmt
           Scrutinee: Identifier
@@ -228,6 +240,7 @@ File
                 Namespace: ""
                 Name: "Tag"
                 Args: ~
+                Projections: ~
               Bind: "t"
               Body:
                 ReturnStmt
@@ -238,6 +251,7 @@ File
                 Namespace: ""
                 Name: "error"
                 Args: ~
+                Projections: ~
               Bind: "e"
               Body:
                 ReturnStmt

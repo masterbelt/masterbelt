@@ -406,14 +406,18 @@ func renderType(t TypeExpr) string {
 		if t.Namespace != "" {
 			name = t.Namespace + "." + t.Name
 		}
-		if len(t.Args) == 0 {
-			return name
+		if len(t.Args) > 0 {
+			args := make([]string, len(t.Args))
+			for i, a := range t.Args {
+				args[i] = renderType(a)
+			}
+			name += "<" + strings.Join(args, ", ") + ">"
 		}
-		args := make([]string, len(t.Args))
-		for i, a := range t.Args {
-			args[i] = renderType(a)
+		// The field-type-projection segments dotted onto the head: Order.customer.id.
+		if len(t.Projections) > 0 {
+			name += "." + strings.Join(t.Projections, ".")
 		}
-		return name + "<" + strings.Join(args, ", ") + ">"
+		return name
 	case *UnionType:
 		parts := make([]string, len(t.Members))
 		for i, m := range t.Members {

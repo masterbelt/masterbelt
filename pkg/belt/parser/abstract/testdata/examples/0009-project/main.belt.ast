@@ -21,6 +21,7 @@ File
         Namespace: ""
         Name: "Point"
         Args: ~
+        Projections: ~
       Value: MemberExpr
         Receiver: Identifier
           Name: "geo"

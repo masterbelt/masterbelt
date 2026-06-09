@@ -25,6 +25,7 @@ File
         Namespace: ""
         Name: "type"
         Args: ~
+        Projections: ~
       Value: Identifier
         Name: "Level"
       Builtin: false
@@ -54,6 +55,7 @@ File
         Namespace: ""
         Name: "sbyte"
         Args: ~
+        Projections: ~
       Where: ~
       Methods: ~
       Consts: ~
@@ -71,6 +73,7 @@ File
               Namespace: ""
               Name: "type"
               Args: ~
+              Projections: ~
       Where: ~
       Methods: ~
       Consts: ~
@@ -88,10 +91,12 @@ File
               Namespace: ""
               Name: "type"
               Args: ~
+              Projections: ~
         Result: NamedType
           Namespace: ""
           Name: "type"
           Args: ~
+          Projections: ~
       Where: ~
       Methods: ~
       Consts: ~

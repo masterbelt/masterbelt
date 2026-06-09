@@ -116,15 +116,24 @@ func lowerTypeName(t cst.Tree, buf source.Buffer, node *cst.Node) ast.TypeExpr {
 			args = lowerGenericArgs(child, buf)
 		}
 	}
+	var projections []string
 	switch {
 	case len(idents) >= 2:
+		// The first dot is the namespace-or-projection head (Namespace.Name);
+		// every further dot is a field-type projection on top of it. Item.level
+		// is Namespace "Item" Name "level" with no projections; Order.customer.id
+		// is Namespace "Order" Name "customer" with projection "id". The resolver
+		// reads the head as a namespace import or a type and applies the rest.
 		namespace, name = idents[0], idents[1]
+		if len(idents) > 2 {
+			projections = idents[2:]
+		}
 	case len(idents) == 1 && dotted:
 		namespace = idents[0] // geo. — the qualified name is missing
 	case len(idents) == 1:
 		name = idents[0]
 	}
-	return ast.NewNamedType(namespace, name, args, node)
+	return ast.NewNamedType(namespace, name, args, projections, node)
 }
 
 // lowerGenericArgs lowers a GenericArgs node to its type arguments.

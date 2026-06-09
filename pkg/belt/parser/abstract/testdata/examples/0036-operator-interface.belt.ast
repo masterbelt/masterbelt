@@ -72,6 +72,7 @@ File
             Namespace: ""
             Name: "orderable"
             Args: ~
+            Projections: ~
       Params:
         ParamDef
           Name: "a"
@@ -79,16 +80,19 @@ File
             Namespace: ""
             Name: "T"
             Args: ~
+            Projections: ~
         ParamDef
           Name: "b"
           Type: NamedType
             Namespace: ""
             Name: "T"
             Args: ~
+            Projections: ~
       Result: NamedType
         Namespace: ""
         Name: "T"
         Args: ~
+        Projections: ~
       Body:
         ReturnStmt
           Value: TernaryExpr
@@ -118,6 +122,7 @@ File
             Namespace: ""
             Name: "comparable"
             Args: ~
+            Projections: ~
       Params:
         ParamDef
           Name: "a"
@@ -125,16 +130,19 @@ File
             Namespace: ""
             Name: "T"
             Args: ~
+            Projections: ~
         ParamDef
           Name: "b"
           Type: NamedType
             Namespace: ""
             Name: "T"
             Args: ~
+            Projections: ~
       Result: NamedType
         Namespace: ""
         Name: "bool"
         Args: ~
+        Projections: ~
       Body:
         ReturnStmt
           Value: CallExpr
@@ -159,6 +167,7 @@ File
             Namespace: ""
             Name: "numeric"
             Args: ~
+            Projections: ~
       Params:
         ParamDef
           Name: "a"
@@ -166,10 +175,12 @@ File
             Namespace: ""
             Name: "T"
             Args: ~
+            Projections: ~
       Result: NamedType
         Namespace: ""
         Name: "T"
         Args: ~
+        Projections: ~
       Body:
         ReturnStmt
           Value: CallExpr

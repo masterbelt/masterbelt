@@ -15,6 +15,7 @@ File
               Namespace: ""
               Name: "SkillKind"
               Args: ~
+              Projections: ~
           FieldDef
             Name: "handler"
             Type: FuncType
@@ -25,10 +26,12 @@ File
                     Namespace: ""
                     Name: "int"
                     Args: ~
+                    Projections: ~
               Result: NamedType
                 Namespace: ""
                 Name: "int"
                 Args: ~
+                Projections: ~
       Where: ~
       Methods: ~
       Consts: ~
@@ -65,10 +68,12 @@ File
             Namespace: ""
             Name: "SkillRow"
             Args: ~
+            Projections: ~
       Result: NamedType
         Namespace: ""
         Name: "SkillKind"
         Args: ~
+        Projections: ~
       Body:
         ReturnStmt
           Value: MemberExpr
@@ -90,10 +95,12 @@ File
             Namespace: ""
             Name: "int"
             Args: ~
+            Projections: ~
       Result: NamedType
         Namespace: ""
         Name: "int"
         Args: ~
+        Projections: ~
       Body:
         ReturnStmt
           Value: CallExpr

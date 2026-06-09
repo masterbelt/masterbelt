@@ -116,12 +116,14 @@ File
               Namespace: ""
               Name: "nint"
               Args: ~
+              Projections: ~
           FieldDef
             Name: "y"
             Type: NamedType
               Namespace: ""
               Name: "nint"
               Args: ~
+              Projections: ~
       Where: ~
       Methods: ~
       Consts: ~
@@ -143,10 +145,12 @@ File
             Namespace: ""
             Name: "nint"
             Args: ~
+            Projections: ~
       Result: NamedType
         Namespace: ""
         Name: "nint"
         Args: ~
+        Projections: ~
       Body:
         ReturnStmt
           Value: CallExpr
@@ -172,16 +176,19 @@ File
             Namespace: ""
             Name: "nint"
             Args: ~
+            Projections: ~
         ParamDef
           Name: "h"
           Type: NamedType
             Namespace: ""
             Name: "nint"
             Args: ~
+            Projections: ~
       Result: NamedType
         Namespace: ""
         Name: "nint"
         Args: ~
+        Projections: ~
       Body:
         ReturnStmt
           Value: CallExpr
@@ -207,16 +214,19 @@ File
             Namespace: ""
             Name: "nint"
             Args: ~
+            Projections: ~
         ParamDef
           Name: "h"
           Type: NamedType
             Namespace: ""
             Name: "nint"
             Args: ~
+            Projections: ~
       Result: NamedType
         Namespace: ""
         Name: "nint"
         Args: ~
+        Projections: ~
       Body:
         ReturnStmt
           Value: CallExpr
@@ -250,10 +260,12 @@ File
             Namespace: ""
             Name: "string"
             Args: ~
+            Projections: ~
       Result: NamedType
         Namespace: ""
         Name: "string"
         Args: ~
+        Projections: ~
       Body:
         ReturnStmt
           Value: CallExpr
@@ -277,6 +289,7 @@ File
         Namespace: ""
         Name: "Point"
         Args: ~
+        Projections: ~
       Body:
         ReturnStmt
           Value: RecordLit
