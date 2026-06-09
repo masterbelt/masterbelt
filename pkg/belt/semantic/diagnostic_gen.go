@@ -29,6 +29,7 @@ const (
 	CodeConstantOverflow           diagnostic.Code = "belt.semantic.constant_overflow"
 	CodeCyclicModule               diagnostic.Code = "belt.semantic.cyclic_module"
 	CodeCyclicReference            diagnostic.Code = "belt.semantic.cyclic_reference"
+	CodeCyclicTypeProjection       diagnostic.Code = "belt.semantic.cyclic_type_projection"
 	CodeDivisionByZero             diagnostic.Code = "belt.semantic.division_by_zero"
 	CodeDuplicateDeclaration       diagnostic.Code = "belt.semantic.duplicate_declaration"
 	CodeDuplicateEnumMember        diagnostic.Code = "belt.semantic.duplicate_enum_member"
@@ -382,6 +383,20 @@ func newCyclicReferenceDiagnostic(offset int, width int, name string) diagnostic
 		Severity: diagnostic.Error,
 		Code:     CodeCyclicReference,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeCyclicReference, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newCyclicTypeProjectionDiagnostic(offset int, width int, name string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"name": diagnostic.Str(name),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeCyclicTypeProjection,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeCyclicTypeProjection, fields),
 		Fields:   fields,
 		Offset:   offset,
 		Width:    width,

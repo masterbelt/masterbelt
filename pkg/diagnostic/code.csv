@@ -25,6 +25,7 @@ belt.semantic.duplicate_declaration,error,name:string
 belt.semantic.undefined_name,error,name:string
 belt.semantic.unknown_type,error,name:string
 belt.semantic.cyclic_reference,error,name:string
+belt.semantic.cyclic_type_projection,error,name:string
 belt.semantic.constant_overflow,error,value:string typ:string
 belt.semantic.invalid_operation,error,method:string types:string
 belt.semantic.no_matching_overload,error,method:string types:string

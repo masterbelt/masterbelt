@@ -343,6 +343,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "cyclic reference involving " + f["name"].String()
 		}
 	},
+	"belt.semantic.cyclic_type_projection": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return f["name"].String() + " を含む循環型射影です"
+		default:
+			return "cyclic type projection involving " + f["name"].String()
+		}
+	},
 	"belt.semantic.division_by_zero": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
