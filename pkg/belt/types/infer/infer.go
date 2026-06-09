@@ -514,8 +514,14 @@ func typeMemberType(universe map[string]*ir.TypeDef, m *ast.MemberExpr) ir.Type 
 			return t
 		}
 	case types.MemberNone, types.MemberStatic:
-		// Not a value-typed member: no match, or a static fn (read without a call,
-		// which the scope's record-field reading takes instead).
+		// A declared field projected in value position (Character.level) is a type
+		// value, whose own type is the metatype `type` — the value half of the §3
+		// field-type projection, which a comptime test (assert Character.id == long)
+		// consumes. A static fn read without a call falls through to the record-
+		// field reading, as before.
+		if _, ok := types.FieldProjection(def, m.Member.Name); ok {
+			return metatype()
+		}
 	}
 	return ir.Invalid
 }

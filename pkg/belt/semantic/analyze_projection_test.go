@@ -123,3 +123,30 @@ func TestTypeProjectionUnknownField(t *testing.T) {
 		t.Fatalf("want unknown_field, got %v", codes(diags))
 	}
 }
+
+func TestTypeProjectionValueConsumedByAssert(t *testing.T) {
+	// A type value projected in value position (Item.id) is comptime-only; an
+	// assert may consume it through == (type equality), which folds to a bool —
+	// nominal identity, so Item.level is Level (true) and not sbyte (false).
+	src := "pub type Level = sbyte\n" +
+		"pub type Item = { id: long, level: Level }\n" +
+		"assert Item.id == long\n" +
+		"assert Item.level == Level\n" +
+		"assert Item.id != sbyte\n"
+	_, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("want clean, got %v", codes(diags))
+	}
+}
+
+func TestTypeProjectionAssertNominalIdentity(t *testing.T) {
+	// Item.level is the declared alias Level, not the sbyte it unwraps to: the
+	// equality is by nominal identity, so == sbyte is false and the assert fails.
+	src := "pub type Level = sbyte\n" +
+		"pub type Item = { level: Level }\n" +
+		"assert Item.level == sbyte\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeAssertionFailed) {
+		t.Fatalf("want assertion_failed (Level != sbyte), got %v", codes(diags))
+	}
+}

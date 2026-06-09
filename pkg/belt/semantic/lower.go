@@ -173,9 +173,19 @@ func typeMemberValue(def *ir.TypeDef, m *ast.MemberExpr) ir.Value {
 		return &ir.EnumMemberValue{Def: def, Index: r.Index, Syntax: m}
 	case types.MemberConst:
 		return &ir.AssocConstValue{Def: def, Index: r.Index, Syntax: m}
-	default:
-		return nil
+	case types.MemberNone, types.MemberStatic:
+		// A declared field of a record (or master) type, projected in value
+		// position (Character.level), is a type value of the field's declared type
+		// — the comptime projection a consuming expression (assert Character.id ==
+		// long) reads. The field type is read from the settled body, so nominal
+		// identity is preserved. A static fn read without a call, or any other
+		// non-field member, returns nil, which the caller takes as an instance
+		// field access (item.level — the master track's runtime read).
+		if ft, ok := types.FieldProjection(def, m.Member.Name); ok {
+			return &ir.TypeValue{Reified: ft, Syntax: m}
+		}
 	}
+	return nil
 }
 
 // staticFnDef resolves a call whose callee is a member access on a type name to

@@ -215,6 +215,20 @@ func EnumComparisonMethods() []*ir.Method {
 	return comparisonMethods()
 }
 
+// typeMethods is the method signature set of the metatype `type`: equality only
+// (eql/neq, against self, returning bool). A type value carries nominal
+// identity, so the comparison is by declared identity, not structure; types have
+// no order, so there are no ordering comparisons. Like the enum comparisons, the
+// evaluator folds these directly (typeValueComparison) rather than through a
+// registry intrinsic — the metatype is declared in no prelude file, so a native
+// would be a dead one — which is why they carry no entry in any intrinsic table.
+func typeMethods() []*ir.Method {
+	return []*ir.Method{
+		externMethod(OpEql, boolType, self()),
+		externMethod(OpNeq, boolType, self()),
+	}
+}
+
 // errorMethods is the method signature set of the error primitive: message
 // reads back the message the error was constructed with. It mirrors the
 // prelude's error.belt.

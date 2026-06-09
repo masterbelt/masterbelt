@@ -789,8 +789,13 @@ func reportRefIssues(fileID FileID, e ast.Expr, q queries, at func(ast.Node) spa
 				return
 			}
 			// A non-enum type: the member must be an associated constant (a static
-			// fn call was exempted as a static callee, leaving the read forms here).
+			// fn call was exempted as a static callee, leaving the read forms here)
+			// or a declared field projected in value position (Character.level — a
+			// type value the comptime expression consumes).
 			if member.Kind != types.MemberConst {
+				if _, ok := types.FieldProjection(def, m.Member.Name); ok {
+					return
+				}
 				s := at(m)
 				diags.Add(newUnknownAssociatedConstDiagnostic(s.offset, s.width, recv.Name, m.Member.Name))
 			}
