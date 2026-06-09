@@ -1,14 +1,15 @@
-// This file pins the master-declaration semantics added in plan master/0002:
-// a master resolves to an opaque nominal TypeDef carrying its row fields and
-// primary key (Body stays nil), its row methods read their fields through self,
-// a primary key naming no field is reported, and a master shares the type name
-// space so a name a type/enum/interface claims collides.
+// This file pins the master-declaration semantics: a master resolves to an
+// opaque nominal TypeDef carrying its row fields and primary key (Body stays
+// nil), its row methods read their fields through self, a primary key naming no
+// field is reported, and a master shares the type name space so a name a
+// type/enum/interface claims collides.
 package semantic
 
 import (
 	"strings"
 	"testing"
 
+	"github.com/masterbelt/masterbelt/pkg/diagnostic"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
 )
 
@@ -34,8 +35,8 @@ func fieldNames(def *ir.TypeDef) string {
 // TestMasterResolvesToOpaqueNominal pins the happy path: a master's record field
 // types resolve (a field typed by an enum becomes a Named of it), its primary
 // key is recorded, and it is an opaque nominal — Body stays nil, so the type
-// algebra treats it as a leaf (decl 0002 §1/§2). A row method reading self.field
-// type-checks, so the whole declaration is diagnostic-free.
+// algebra treats it as a leaf. A row method reading self.field type-checks, so
+// the whole declaration is diagnostic-free.
 func TestMasterResolvesToOpaqueNominal(t *testing.T) {
 	src := "enum SkillKind {\n  active\n  passive\n}\n\n" +
 		"master Skill {\n" +
@@ -64,8 +65,8 @@ func TestMasterResolvesToOpaqueNominal(t *testing.T) {
 	}
 }
 
-// TestMasterCompositePrimary pins a multi-column primary key (the pkey basics
-// 0001 admitted): every column is a field, in declaration order.
+// TestMasterCompositePrimary pins a multi-column primary key: every column is a
+// field, in declaration order.
 func TestMasterCompositePrimary(t *testing.T) {
 	src := "master SkillUpgrade {\n  record {\n    skill: int,\n    level: int,\n  }\n  primary (skill, level)\n}\n"
 	m, diags := analyze(src)
@@ -122,10 +123,62 @@ func TestMasterPrimaryUnknownField(t *testing.T) {
 	}
 }
 
-// TestMasterSharesTypeNamespace pins decl 0002 §3: a master shares the one type
-// name space, so a name a type, enum, or interface already claims is a
-// redeclaration, reported by the existing duplicate_declaration path (no master
-// machinery of its own).
+// TestMasterAccessorCollidesWithRowField pins that a getter/setter named like a
+// row field collides, just as it does on a type. A master keeps Body nil and
+// stores its row fields on the descriptor, so the member check must read them
+// from there — otherwise the collision goes unreported.
+func TestMasterAccessorCollidesWithRowField(t *testing.T) {
+	src := "master M {\n" +
+		"  record {\n    name: string,\n  } impl {\n" +
+		"    pub get name(): string {\n      return \"\"\n    }\n  }\n" +
+		"  primary name\n}\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeAccessorCollision) {
+		t.Fatalf("want accessor_collision, got %v", codes(diags))
+	}
+}
+
+// TestMasterImplConstChecked pins that a master's impl associated constants get
+// the same initializer diagnostics a type's or enum's do: an undefined name, a
+// stray self, and an effect in the compile-time (pure) context. Without the
+// master path joining those checks these would silently pass.
+func TestMasterImplConstChecked(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+		want diagnostic.Code
+	}{
+		{
+			name: "undefined name",
+			src:  "master M {\n  record {\n    id: int,\n  } impl {\n    const X: int = Nope\n  }\n  primary id\n}\n",
+			want: CodeUndefinedName,
+		},
+		{
+			name: "stray self",
+			src:  "master M {\n  record {\n    id: int,\n  } impl {\n    const X: int = self.id\n  }\n  primary id\n}\n",
+			want: CodeSelfOutsideMethod,
+		},
+		{
+			name: "effect in pure context",
+			src: "pub type C = { d: nint } impl {\n  pub static fn io load(): C {\n    return C{ d: 0 }\n  }\n}\n" +
+				"master M {\n  record {\n    id: int,\n  } impl {\n    const X = C.load()\n  }\n  primary id\n}\n",
+			want: CodeEffectInPureContext,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, diags := analyze(tc.src)
+			if !hasCode(diags, tc.want) {
+				t.Fatalf("want %s, got %v", tc.want, codes(diags))
+			}
+		})
+	}
+}
+
+// TestMasterSharesTypeNamespace pins that a master shares the one type name
+// space, so a name a type, enum, or interface already claims is a redeclaration,
+// reported by the existing duplicate_declaration path (no master machinery of
+// its own).
 func TestMasterSharesTypeNamespace(t *testing.T) {
 	cases := []struct {
 		name string

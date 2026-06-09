@@ -178,8 +178,8 @@ func declareTypeShells(file *ast.File, extern map[string]*ir.TypeDef, at func(as
 		ifaceOut[i] = def
 		claim(id.Name, def, id)
 	}
-	// A master shares the type name space (decl 0002 §3): a name a type, enum, or
-	// interface already claims is a redeclaration, reported by the same claim.
+	// A master shares the one type name space: a name a type, enum, or interface
+	// already claims is a redeclaration, reported by the same claim.
 	masterOut = make([]*ir.TypeDef, len(file.Masters))
 	for i, md := range file.Masters {
 		def := &ir.TypeDef{Name: md.Name, Public: md.Public, Doc: md.Doc, Master: &ir.MasterDef{}, MasterSyntax: md}
@@ -808,7 +808,7 @@ func resolveDecl(r *infer.TypeResolver, reg *builtin.Registry, td *ast.TypeDecl,
 // is an ordinary record body, so its field types resolve through the same
 // resolver a type's body does; the resolved fields are kept on def.Master rather
 // than def.Body, which leaves the master a leaf the type algebra does not look
-// through (opaque to its row record — decl 0002 §2). The impl methods and
+// through (opaque to its row record). The impl methods and
 // associated constants resolve exactly as a type's do, with self the master
 // nominal, so a row method (label(): string { return self.name }) resolves its
 // field reads through recordOf, which knows the master case. Finally the
@@ -847,7 +847,7 @@ func resolveMasterDecl(r *infer.TypeResolver, reg *builtin.Registry, md *ast.Mas
 // definition without it, so the definitions and the diagnostics never disagree.
 // The diagnostic is anchored at the whole master declaration — the AST keeps the
 // primary key as a bare name with no node of its own, so the declaration is the
-// finest anchor available (a precise cell locator is 0017).
+// finest anchor available for now.
 func checkMasterPrimary(md *ast.MasterDecl, def *ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List) {
 	if at == nil || diags == nil {
 		return
@@ -1363,7 +1363,7 @@ func checkMemberDecls(def *ir.TypeDef, at func(ast.Node) span, diags *diagnostic
 	if at == nil || diags == nil {
 		return
 	}
-	fields := recordFieldNames(def.Body)
+	fields := memberFields(def)
 	consts := make(map[string]bool, len(def.Consts))
 	for _, c := range def.Consts {
 		consts[c.Name] = true
@@ -1437,6 +1437,22 @@ func recordFieldNames(body ir.Type) map[string]bool {
 		names[f.Name] = true
 	}
 	return names
+}
+
+// memberFields returns the field names the member-collision checks compare an
+// accessor or static against. A type's or enum's fields are its record body's; a
+// master keeps Body nil and stores its row fields on the descriptor, so they are
+// read from there — without this a master getter/setter could shadow a row field
+// uncaught.
+func memberFields(def *ir.TypeDef) map[string]bool {
+	if def.Master != nil {
+		names := make(map[string]bool, len(def.Master.Fields))
+		for _, f := range def.Master.Fields {
+			names[f.Name] = true
+		}
+		return names
+	}
+	return recordFieldNames(def.Body)
 }
 
 // hasNormalMethod reports whether def declares an ordinary instance method of

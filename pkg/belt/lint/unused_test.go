@@ -113,3 +113,26 @@ func TestUnusedSuppressedByError(t *testing.T) {
 		t.Errorf("got %d diagnostics, want 0 (suppressed by the error): %+v", len(l.diags), l.diags)
 	}
 }
+
+// TestUnusedPrivateMaster pins that a private master nothing reaches is reported
+// as dead code, like a private type/enum/interface. A master keeps Body nil and
+// anchors through MasterSyntax, so the reporter must read that backpointer; a
+// public master is a root and is never reported.
+func TestUnusedPrivateMaster(t *testing.T) {
+	dead := &ir.TypeDef{Name: "Dead", Master: &ir.MasterDef{}, MasterSyntax: &ast.MasterDecl{}}
+	pub := &ir.TypeDef{Name: "Api", Public: true, Master: &ir.MasterDef{}, MasterSyntax: &ast.MasterDecl{}}
+	m := &ir.Module{Types: []*ir.TypeDef{pub, dead}}
+	span := fakeSpan(map[ast.Node][2]int{pub.MasterSyntax: {0, 10}, dead.MasterSyntax: {11, 10}})
+
+	l := &linter{span: span}
+	l.unusedDeclarations(m)
+	if len(l.diags) != 1 {
+		t.Fatalf("got %d diagnostics, want 1 (only the private Dead master): %+v", len(l.diags), l.diags)
+	}
+	if l.diags[0].Offset != 11 {
+		t.Errorf("offset = %d, want 11 (Dead)", l.diags[0].Offset)
+	}
+	if l.diags[0].Code != "belt.lint.unused_declaration" {
+		t.Errorf("code = %q", l.diags[0].Code)
+	}
+}

@@ -55,7 +55,9 @@ func (l *linter) reportUnused(syntax ast.Node, name string) {
 }
 
 // typeDeclSyntax returns the declaration a type definition was resolved from —
-// a type, enum, or interface declaration — or nil for one built outside source.
+// a type, enum, interface, or master declaration — or nil for one built outside
+// source. A master carries its backpointer in MasterSyntax (Body is nil for it),
+// so an unused private master is anchored and reported like the other kinds.
 func typeDeclSyntax(t *ir.TypeDef) ast.Node {
 	switch {
 	case t.Syntax != nil:
@@ -64,6 +66,8 @@ func typeDeclSyntax(t *ir.TypeDef) ast.Node {
 		return t.EnumSyntax
 	case t.InterfaceSyntax != nil:
 		return t.InterfaceSyntax
+	case t.MasterSyntax != nil:
+		return t.MasterSyntax
 	default:
 		return nil
 	}

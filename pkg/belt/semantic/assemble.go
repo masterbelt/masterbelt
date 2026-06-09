@@ -538,6 +538,9 @@ func (a *assembler) checkAssocConstRefs() {
 	for _, ed := range a.file.Enums {
 		check(ed.Consts)
 	}
+	for _, md := range a.file.Masters {
+		check(md.Consts)
+	}
 }
 
 // writeBack binds the checker-selected overloads, the settled types, and the
@@ -705,6 +708,14 @@ func (a *assembler) checkPureContexts() {
 			check(m.Value, "enum member initializer")
 		}
 		for _, c := range ed.Consts {
+			check(c.Value, "associated constant initializer")
+		}
+	}
+	// A master's impl constants are checked like a type's; its row predicate
+	// (where) is not resolved in this slice, so it is left for the work that makes
+	// row predicates active rather than checked here on inactive syntax.
+	for _, md := range a.file.Masters {
+		for _, c := range md.Consts {
 			check(c.Value, "associated constant initializer")
 		}
 	}
