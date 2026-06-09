@@ -182,6 +182,8 @@ func typeHead(v Type) string {
 		return "App"
 	case *SelfType:
 		return "SelfType"
+	case *Projection:
+		return "Projection"
 	default:
 		panic(fmt.Sprintf("ir: typeHead: unhandled Type %T", v))
 	}
@@ -243,6 +245,9 @@ func writeTypeFields(w *treetext.Writer, v Type, depth int) error {
 	case *App:
 		w.Line(depth, "Def: "+refText(t.Def))
 		return writeTypeList(w, depth, "Args", t.Args)
+	case *Projection:
+		w.Line(depth, "Recv: "+refText(t.Recv))
+		w.Line(depth, "Member: "+strconv.Quote(t.Member))
 	default:
 		panic(fmt.Sprintf("ir: writeTypeFields: unhandled Type %T", v))
 	}
@@ -292,6 +297,8 @@ func decodeType(e *treetext.Element) (Type, error) {
 		return decodeTypeVar(e)
 	case "App":
 		return decodeAppType(e)
+	case "Projection":
+		return decodeProjectionType(e)
 	default:
 		return nil, fmt.Errorf("treetext: line %d: %s is not a known Type", e.Line, e.Head)
 	}
@@ -319,6 +326,26 @@ func decodeNamedType(e *treetext.Element) (Type, error) {
 		return nil, err
 	}
 	return &Named{Def: def}, nil
+}
+
+// decodeProjectionType decodes a type-position member projection into its
+// placeholder: a receiver reference (relinked like a Named's) and the member
+// name. The surface form Projection anchors a cyclic diagnostic at does not
+// survive serialization (a Projection is folded away before any module is
+// written), so Syntax decodes to nil.
+func decodeProjectionType(e *treetext.Element) (Type, error) {
+	if err := treetext.ExpectFields(e, "Recv", "Member"); err != nil {
+		return nil, err
+	}
+	recv, err := unrefTypeDef(e.Fields[0])
+	if err != nil {
+		return nil, err
+	}
+	member, err := treetext.String(e.Fields[1])
+	if err != nil {
+		return nil, err
+	}
+	return &Projection{Recv: recv, Member: member}, nil
 }
 
 // decodeUnionType decodes a union's member list.

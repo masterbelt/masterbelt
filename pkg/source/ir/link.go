@@ -471,6 +471,8 @@ func (l *linker) linkType(p *Type) {
 		for i := range t.Args {
 			l.linkType(&t.Args[i])
 		}
+	case *Projection:
+		l.resolveTypeDef(&t.Recv)
 	default:
 		panic(fmt.Sprintf("ir: link: unhandled Type %T", t))
 	}

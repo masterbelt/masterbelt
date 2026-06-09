@@ -65,6 +65,10 @@ func HasInvalid(t Type) bool {
 		return slices.ContainsFunc(t.Members, HasInvalid)
 	case *Record:
 		return slices.ContainsFunc(t.Fields, func(f Field) bool { return HasInvalid(f.Type) })
+	case *Projection:
+		// A transient node, folded away before typing; a nil receiver is the only
+		// way it can be broken, which the fold reports as it cannot project.
+		return t.Recv == nil
 	default:
 		return t == Invalid
 	}
@@ -164,6 +168,35 @@ type SelfType struct{}
 
 func (*SelfType) typ()           {}
 func (*SelfType) String() string { return "self" }
+
+// Projection is a type-position member projection (Character.level) before it is
+// resolved: the receiver type's definition and the member name. It is a
+// transient node — the type resolver emits one while resolving a body, since the
+// receiver's own body may not be resolved yet (a forward reference or a cycle),
+// and a later pass folds every Projection to the member's declared type (a
+// field's type, an associated constant's type, an enum's own type, or a static
+// fn's function type) before the definitions are published. A Projection
+// therefore never reaches the serialized IR — the type algebra and the text
+// codec never see one — so it carries only the minimum the resolver and the
+// fold pass read, plus the surface form the cyclic-projection diagnostic anchors
+// at. Recv is the receiver definition (a named type, builtins included), Member
+// the projected name, and Syntax the projection type expression.
+type Projection struct {
+	Recv   *TypeDef
+	Member string
+	Syntax ast.Node `tree:"-"`
+}
+
+func (*Projection) typ() {}
+func (p *Projection) String() string {
+	recv := "<unresolved type>"
+	if p.Recv != nil {
+		recv = p.Recv.Name
+	}
+	return recv + "." + p.Member
+}
+
+func (p *Projection) MarshalText() ([]byte, error) { return marshalType(p) }
 
 // typeString renders t, treating a nil type as "<none>" so the renderers above
 // never panic on a partially-resolved type.

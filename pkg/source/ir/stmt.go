@@ -83,5 +83,6 @@ func TypeKinds() []Type {
 		&TypeVar{},
 		&App{},
 		&SelfType{},
+		&Projection{},
 	}
 }
