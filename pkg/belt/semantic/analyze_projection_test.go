@@ -98,3 +98,63 @@ func TestTypeProjectionUnknownMember(t *testing.T) {
 		t.Fatalf("codes = %v, want unknown_type", codes(diags))
 	}
 }
+
+func TestTypeProjectionAliasChain(t *testing.T) {
+	// recordOf follows an alias chain to the underlying record: C.y projects
+	// AliasB.x through type AliasB = AliasA = Rec, the way the value-position
+	// field read resolves a chained record alias.
+	m, diags := analyze("pub type Rec = { x: sbyte }\npub type AliasA = Rec\npub type AliasB = AliasA\npub type C = { y: AliasB.x }\n")
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", codes(diags))
+	}
+	if got := fieldType(t, m, "C", 0); got.String() != "sbyte" {
+		t.Errorf("C.y = %s, want sbyte", got)
+	}
+}
+
+func TestTypeProjectionGenericReceiverRejected(t *testing.T) {
+	// A member of an unapplied generic receiver is not projectable: projecting
+	// Box.value would leak Box's free type parameter into Use. It reads as
+	// unknown_type and the field type is Invalid, not a leaked TypeVar.
+	m, diags := analyze("pub type Box<T> = { value: T }\npub type Use = { v: Box.value }\n")
+	if !hasCode(diags, CodeUnknownType) {
+		t.Fatalf("codes = %v, want unknown_type", codes(diags))
+	}
+	if got := fieldType(t, m, "Use", 0); got != ir.Invalid {
+		t.Errorf("Use.v = %s (%T), want Invalid (no TypeVar leak)", got, got)
+	}
+}
+
+func TestTypeProjectionOverloadedStaticRejected(t *testing.T) {
+	// An overloaded static fn cannot be projected: a type position carries no
+	// call arguments to select an overload, so the result would be order-dependent.
+	src := "pub type C = { d: nint } impl {\n" +
+		"  pub static fn make(v: nint): C { return C{ d: v } }\n" +
+		"  pub static fn make(c: C): C { return c }\n" +
+		"}\n" +
+		"pub type Use = { m: C.make }\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeAmbiguousStaticProjection) {
+		t.Fatalf("codes = %v, want ambiguous_static_projection", codes(diags))
+	}
+}
+
+func TestTypeProjectionSingleStatic(t *testing.T) {
+	// A single (non-overloaded) static fn projects to its function type.
+	src := "pub type C = { d: nint } impl {\n" +
+		"  pub static fn zero(): C { return C{ d: 0 } }\n" +
+		"}\n" +
+		"pub type Use = { m: C.zero }\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", codes(diags))
+	}
+	if got := fieldType(t, m, "Use", 0); !isFunc(got) {
+		t.Errorf("Use.m = %s (%T), want Func", got, got)
+	}
+}
+
+func isFunc(t ir.Type) bool {
+	_, ok := t.(*ir.Func)
+	return ok
+}

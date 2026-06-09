@@ -251,8 +251,10 @@ func (pf *projectionFolder) foldType(t ir.Type) ir.Type {
 // project resolves one projection to the member's declared type, folding that
 // type in turn so a chain of projections collapses. A re-entry into a member
 // already being resolved is the ungrounded cycle; a member the receiver does not
-// declare is an unknown type. Both report and resolve to Invalid, memoized so a
-// second projection of the same member neither re-reports nor recomputes.
+// declare (or one of an unapplied generic receiver) is an unknown type; an
+// overloaded static fn is ambiguous. Each reports and resolves to Invalid,
+// memoized so a second projection of the same member neither re-reports nor
+// recomputes.
 func (pf *projectionFolder) project(p *ir.Projection) ir.Type {
 	key := projKey{p.Recv, p.Member}
 	if pf.resolving[key] {
@@ -262,8 +264,13 @@ func (pf *projectionFolder) project(p *ir.Projection) ir.Type {
 	if t, ok := pf.memo[key]; ok {
 		return t
 	}
-	mt, ok := types.ProjectMemberType(p.Recv, p.Member)
-	if !ok {
+	mt, res := types.ProjectMemberType(p.Recv, p.Member)
+	switch res {
+	case types.ProjectAmbiguousStatic:
+		pf.report(p, newAmbiguousStaticProjectionDiagnostic)
+		pf.memo[key] = ir.Invalid
+		return ir.Invalid
+	case types.ProjectMissing:
 		pf.report(p, newUnknownTypeDiagnostic)
 		pf.memo[key] = ir.Invalid
 		return ir.Invalid

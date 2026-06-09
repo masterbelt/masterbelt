@@ -26,6 +26,7 @@ belt.semantic.undefined_name,未定義の名前: {name}
 belt.semantic.unknown_type,未知の型: {name}
 belt.semantic.cyclic_reference,{name} を含む循環参照です
 belt.semantic.cyclic_type_projection,{name} を含む循環型射影です
+belt.semantic.ambiguous_static_projection,{name} の型射影が曖昧です: 静的関数がオーバーロードされています
 belt.semantic.constant_overflow,定数 {value} は {typ} に収まりません
 belt.semantic.invalid_operation,メソッド {method} を {types} に適用できません
 belt.semantic.no_matching_overload,メソッド {method} のどのオーバーロードも {types} に適合しません

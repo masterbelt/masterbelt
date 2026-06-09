@@ -13,6 +13,7 @@ const (
 	CodeAmbiguousFuncOverload      diagnostic.Code = "belt.semantic.ambiguous_func_overload"
 	CodeAmbiguousImport            diagnostic.Code = "belt.semantic.ambiguous_import"
 	CodeAmbiguousOverload          diagnostic.Code = "belt.semantic.ambiguous_overload"
+	CodeAmbiguousStaticProjection  diagnostic.Code = "belt.semantic.ambiguous_static_projection"
 	CodeAmbiguousUnionMember       diagnostic.Code = "belt.semantic.ambiguous_union_member"
 	CodeArityMismatch              diagnostic.Code = "belt.semantic.arity_mismatch"
 	CodeArmTypeNotInUnion          diagnostic.Code = "belt.semantic.arm_type_not_in_union"
@@ -151,6 +152,20 @@ func newAmbiguousOverloadDiagnostic(offset int, width int, method string, types 
 		Severity: diagnostic.Error,
 		Code:     CodeAmbiguousOverload,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeAmbiguousOverload, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newAmbiguousStaticProjectionDiagnostic(offset int, width int, name string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"name": diagnostic.Str(name),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeAmbiguousStaticProjection,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeAmbiguousStaticProjection, fields),
 		Fields:   fields,
 		Offset:   offset,
 		Width:    width,

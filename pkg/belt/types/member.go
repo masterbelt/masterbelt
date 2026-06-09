@@ -65,30 +65,52 @@ func ResolveMember(def *ir.TypeDef, name string) Member {
 	return Member{Kind: MemberNone, Index: -1}
 }
 
+// ProjectResult classifies a type-position projection's outcome so the caller
+// reports the matching diagnostic. Found carries the projected type; the others
+// carry a nil type and name why the projection is not well defined.
+type ProjectResult int
+
+// The projection outcomes; see each one's comment.
+const (
+	ProjectFound           ProjectResult = iota // the member projects to the returned type
+	ProjectMissing                              // the receiver declares no such member, or the receiver is an unapplied generic
+	ProjectAmbiguousStatic                      // the member is an overloaded static fn, which a projection cannot disambiguate
+)
+
 // ProjectMemberType returns the declared type a type-position projection
-// def.member resolves to, and whether the member exists. It runs the one member
-// classifier and maps each kind to the member's declared type: an associated
-// constant to its declared type, an enum member to the enum itself (a member is
-// a value of the enum), a static fn to its function type, and a record field —
-// the kind ResolveMember leaves as MemberNone — to the field's declared type.
-// The returned type is the member's type as declared, which may itself be a
-// projection the caller resolves in turn. A name the type does not declare
-// returns (nil, false), which the caller reports.
-func ProjectMemberType(def *ir.TypeDef, name string) (ir.Type, bool) {
-	if def == nil {
-		return nil, false
+// def.member resolves to, and a result classifying the outcome. It runs the one
+// member classifier and maps each kind to the member's declared type: an
+// associated constant to its declared type, an enum member to the enum itself (a
+// member is a value of the enum), a single static fn to its function type, and a
+// record field — the kind ResolveMember leaves as MemberNone — to the field's
+// declared type. The returned type is the member's type as declared, which may
+// itself be a projection the caller resolves in turn.
+//
+// A member of an unapplied generic receiver is not projectable — the syntax
+// gives no type arguments, so a member typed by a parameter would leak a free
+// variable into the projecting declaration — and reads as ProjectMissing. An
+// overloaded static fn reads as ProjectAmbiguousStatic, since a projection
+// carries no call arguments to select an overload.
+func ProjectMemberType(def *ir.TypeDef, name string) (ir.Type, ProjectResult) {
+	if def == nil || len(def.Params) > 0 {
+		return nil, ProjectMissing
 	}
 	switch m := ResolveMember(def, name); m.Kind {
 	case MemberConst:
-		return def.Consts[m.Index].Type, true
+		return def.Consts[m.Index].Type, ProjectFound
 	case MemberEnum:
-		return &ir.Named{Def: def}, true
+		return &ir.Named{Def: def}, ProjectFound
 	case MemberStatic:
-		return staticFnType(def, name), true
+		if staticOverloaded(def, name) {
+			return nil, ProjectAmbiguousStatic
+		}
+		return staticFnType(def, name), ProjectFound
 	case MemberNone:
-		return recordFieldType(def, name)
+		if t, ok := recordFieldType(def, name); ok {
+			return t, ProjectFound
+		}
 	}
-	return nil, false
+	return nil, ProjectMissing
 }
 
 // recordFieldType returns a record field's declared type on def, looking through
@@ -108,18 +130,39 @@ func recordFieldType(def *ir.TypeDef, name string) (ir.Type, bool) {
 }
 
 // recordOf returns the record a type's values conform to: its body when that is
-// a record or a one-step alias to one, or a master's row record. It is nil for a
-// type with no record shape (a primitive, a union, an enum without fields).
+// a record, the underlying record an alias chain (type C = B = record {...})
+// resolves to, or a master's row record — the same chain the value-position
+// field read follows. It is nil for a type with no record shape (a primitive, a
+// union, an enum without fields). A seen set bounds an alias cycle.
 func recordOf(def *ir.TypeDef) *ir.Record {
 	t := def.Body
 	if def.Master != nil {
 		t = def.Master.Row
 	}
-	if n, ok := t.(*ir.Named); ok && n.Def != nil {
+	seen := map[*ir.TypeDef]bool{}
+	for {
+		n, ok := t.(*ir.Named)
+		if !ok || n.Def == nil || seen[n.Def] {
+			break
+		}
+		seen[n.Def] = true
 		t = n.Def.Body
 	}
 	rec, _ := t.(*ir.Record)
 	return rec
+}
+
+// staticOverloaded reports whether def declares more than one static fn named
+// name — an overload set a type-position projection cannot disambiguate, since
+// it carries no call arguments to select among them.
+func staticOverloaded(def *ir.TypeDef, name string) bool {
+	count := 0
+	for _, m := range def.Methods {
+		if m.Kind == ir.MethodStatic && m.Name == name {
+			count++
+		}
+	}
+	return count > 1
 }
 
 // staticFnType builds the function type of a static fn member — the signature
