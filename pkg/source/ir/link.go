@@ -232,6 +232,12 @@ func (l *linker) linkTypeDef(def *TypeDef) {
 			l.linkConstant(def.Enum.Members[i].Value)
 		}
 	}
+	if def.Master != nil {
+		// The row type carries the same Named/App references a body does, so relink
+		// it too — otherwise a master row typed by another declaration stays a
+		// detached placeholder after a text round-trip.
+		l.linkType(&def.Master.Row)
+	}
 	l.linkValue(&def.Where)
 }
 

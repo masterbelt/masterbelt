@@ -55,7 +55,9 @@ func (l *linter) reportUnused(syntax ast.Node, name string) {
 }
 
 // typeDeclSyntax returns the declaration a type definition was resolved from —
-// a type, enum, or interface declaration — or nil for one built outside source.
+// a type, enum, interface, or master declaration — or nil for one built outside
+// source. A master carries its backpointer in MasterSyntax (Body is nil for it),
+// so an unused private master is anchored and reported like the other kinds.
 func typeDeclSyntax(t *ir.TypeDef) ast.Node {
 	switch {
 	case t.Syntax != nil:
@@ -64,6 +66,8 @@ func typeDeclSyntax(t *ir.TypeDef) ast.Node {
 		return t.EnumSyntax
 	case t.InterfaceSyntax != nil:
 		return t.InterfaceSyntax
+	case t.MasterSyntax != nil:
+		return t.MasterSyntax
 	default:
 		return nil
 	}
@@ -195,6 +199,12 @@ func (mk *marker) reachType(t *ir.TypeDef) {
 		for _, em := range t.Enum.Members {
 			mk.walkValue(em.ValueGraph)
 		}
+	}
+	// A master's row is a type on the descriptor rather than on Body, so reach it:
+	// this keeps a named row alias live (record Row) and the types its fields name
+	// (a field typed by an enum keeps that enum live).
+	if t.Master != nil {
+		mk.reachTypeRef(t.Master.Row)
 	}
 	for _, meth := range t.Methods {
 		mk.reachMethod(meth)

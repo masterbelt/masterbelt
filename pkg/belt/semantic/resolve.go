@@ -56,13 +56,13 @@ func boundViolationReporter(at func(ast.Node) span, diags *diagnostic.List) func
 // predicate. Method bodies are lowered to IR here (lower.Body) but not
 // type-checked.
 func resolveTypes(folder exprFolder, file *ast.File, at func(ast.Node) span, diags *diagnostic.List, res *callResolutions, reg *builtin.Registry, extern map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, fns bodyFuncs) []*ir.TypeDef {
-	if len(file.Types) == 0 && len(file.Enums) == 0 && len(file.Interfaces) == 0 {
+	if len(file.Types) == 0 && len(file.Enums) == 0 && len(file.Interfaces) == 0 && len(file.Masters) == 0 {
 		return nil
 	}
 
 	// First pass: a definition per declaration, by name, so references (including
 	// forward ones) bind before any body is resolved.
-	defs, out, enumOut, ifaceOut := declareTypeShells(file, extern, at, diags)
+	defs, out, enumOut, ifaceOut, masterOut := declareTypeShells(file, extern, at, diags)
 
 	// Second pass: resolve parameters, body, method signatures, enum bodies, and
 	// interface members, reporting any unknown type names.
@@ -87,6 +87,9 @@ func resolveTypes(folder exprFolder, file *ast.File, at func(ast.Node) span, dia
 	for i, ed := range file.Enums {
 		resolveEnumDecl(folder, defs, r, reg, ed, enumOut[i], at, diags, fns)
 	}
+	for i, md := range file.Masters {
+		resolveMasterDecl(r, reg, md, masterOut[i], at, diags, fns)
+	}
 
 	// Third pass: resolve each type's and enum's declared interface impls and,
 	// when reporting, check conformance (every required method present) and the
@@ -96,6 +99,9 @@ func resolveTypes(folder exprFolder, file *ast.File, at func(ast.Node) span, dia
 	// universe the bodies were.
 	for i, td := range file.Types {
 		resolveImpls(r, reg, td.Impls, out[i], at, diags)
+	}
+	for i, md := range file.Masters {
+		resolveImpls(r, reg, md.Impls, masterOut[i], at, diags)
 	}
 	for i, ed := range file.Enums {
 		resolveImpls(r, reg, ed.Impls, enumOut[i], at, diags)
@@ -114,10 +120,13 @@ func resolveTypes(folder exprFolder, file *ast.File, at func(ast.Node) span, dia
 	// fn) folds — the in-pass eager fold ran before its targets existed. The
 	// fold reads the just-built defs directly rather than the universe query,
 	// which is this very computation and would cycle-guard to nothing.
-	foldAssocConsts(folder, defs, append(append([]*ir.TypeDef{}, out...), enumOut...))
+	foldOwners := append(append([]*ir.TypeDef{}, out...), enumOut...)
+	foldOwners = append(foldOwners, masterOut...)
+	foldAssocConsts(folder, defs, foldOwners)
 
 	out = append(out, enumOut...)
-	return append(out, ifaceOut...)
+	out = append(out, ifaceOut...)
+	return append(out, masterOut...)
 }
 
 // declareTypeShells is resolveTypes' first pass: it builds a definition shell
@@ -127,10 +136,10 @@ func resolveTypes(folder exprFolder, file *ast.File, at func(ast.Node) span, dia
 // redeclaration. Types, enums, and interfaces share one name space, so a name
 // collision across the kinds is a redeclaration too. It returns the universe
 // (extern names plus the file's own) and the per-kind definition slices.
-func declareTypeShells(file *ast.File, extern map[string]*ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List) (defs map[string]*ir.TypeDef, out, enumOut, ifaceOut []*ir.TypeDef) {
-	defs = make(map[string]*ir.TypeDef, len(file.Types)+len(file.Enums)+len(file.Interfaces)+len(extern))
+func declareTypeShells(file *ast.File, extern map[string]*ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List) (defs map[string]*ir.TypeDef, out, enumOut, ifaceOut, masterOut []*ir.TypeDef) {
+	defs = make(map[string]*ir.TypeDef, len(file.Types)+len(file.Enums)+len(file.Interfaces)+len(file.Masters)+len(extern))
 	maps.Copy(defs, extern)
-	own := make(map[string]bool, len(file.Types)+len(file.Enums)+len(file.Interfaces))
+	own := make(map[string]bool, len(file.Types)+len(file.Enums)+len(file.Interfaces)+len(file.Masters))
 	claim := func(name string, def *ir.TypeDef, anchor ast.Node) {
 		if name == "" {
 			return
@@ -169,7 +178,15 @@ func declareTypeShells(file *ast.File, extern map[string]*ir.TypeDef, at func(as
 		ifaceOut[i] = def
 		claim(id.Name, def, id)
 	}
-	return defs, out, enumOut, ifaceOut
+	// A master shares the one type name space: a name a type, enum, or interface
+	// already claims is a redeclaration, reported by the same claim.
+	masterOut = make([]*ir.TypeDef, len(file.Masters))
+	for i, md := range file.Masters {
+		def := &ir.TypeDef{Name: md.Name, Public: md.Public, Doc: md.Doc, Master: &ir.MasterDef{}, MasterSyntax: md}
+		masterOut[i] = def
+		claim(md.Name, def, md)
+	}
+	return defs, out, enumOut, ifaceOut, masterOut
 }
 
 // assocGraphEnv is the post-resolution fold environment the associated
@@ -787,6 +804,106 @@ func resolveDecl(r *infer.TypeResolver, reg *builtin.Registry, td *ast.TypeDecl,
 	resolveWhere(r, reg, td, def, at, diags, res)
 }
 
+// resolveMasterDecl resolves a master declaration into its definition. The row
+// is an ordinary record body, so its field types resolve through the same
+// resolver a type's body does; the resolved fields are kept on def.Master rather
+// than def.Body, which leaves the master a leaf the type algebra does not look
+// through (opaque to its row record). The impl methods and
+// associated constants resolve exactly as a type's do, with self the master
+// nominal, so a row method (label(): string { return self.name }) resolves its
+// field reads through recordOf, which knows the master case. Finally the
+// primary-key columns are recorded and any that names no field is reported. A
+// master has no generic parameters; the row predicate (a where over a row) is a
+// later concern, so — with Body nil — resolveWhere is not run (it would skip a
+// body-less definition anyway). It takes no callResolutions stream because the
+// only checked body it produces, a row method, is checked by checkMethodBodies
+// like every other method, not here.
+func resolveMasterDecl(r *infer.TypeResolver, reg *builtin.Registry, md *ast.MasterDecl, def *ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List, fns bodyFuncs) {
+	// The row type is kept as written (inline record, named record alias, or a
+	// generic application). underlyingRecord unwraps a nominal alias to the record
+	// for the key/field checks; an absent or non-record row leaves it nil (reported
+	// by checkMaster), while a generic record alias (record Row<int>) resolves to
+	// an application this slice does not expand — a real record row, validated
+	// later, so it is neither reported missing nor read here.
+	rowType := r.ResolveType(md.Record, nil)
+	def.Master.Row = rowType
+	row := underlyingRecord(rowType)
+	// The primary key is stored de-duplicated, so the IR never carries a malformed
+	// doubled key tuple even when the duplicate is also reported below.
+	def.Master.Primary = dedupeStrings(md.Primary)
+	def.Consts = resolveAssocConstList(r, reg, def, md.Consts, nil, at, diags)
+	// Same-name methods are overloads unless a signature repeats; the first wins
+	// and the repeat is reported, exactly as resolveDecl drops a type's.
+	seen := make(map[string]bool, len(md.Methods))
+	for _, m := range md.Methods {
+		rm := resolveMethod(r, reg, &ir.Named{Def: def}, m, nil, fns)
+		key := rm.Name + signatureKey(def, rm)
+		if m.Name != "" && seen[key] {
+			reportDuplicateMethod(rm, def, m, at, diags)
+			continue
+		}
+		seen[key] = true
+		def.AttachMethods(rm)
+	}
+	checkMemberDecls(def, at, diags)
+	checkMaster(md, row, isGenericRecordAlias(rowType), at, diags)
+}
+
+// checkMaster reports a master's well-formedness problems: an absent or
+// non-record row (master_missing_row — there is nothing to key), an absent
+// primary key (master_missing_primary — a master with no key cannot identify a
+// row), a primary column repeated (master_duplicate_primary_key — a key tuple
+// must not name a column twice), and each named key that is not a field of the
+// row (master_primary_unknown_field). row is the resolved row record, or nil
+// when it is absent or not a record. deferredRow is true when the row is a
+// generic record alias this slice does not expand: it is a real record, so it is
+// neither reported as missing nor its keys checked (the fields are unknown). It
+// runs only in the reporting pass (at/diags non-nil); the silent memoized pass
+// builds the same definition without it, so the definitions and the diagnostics
+// never disagree. Each diagnostic is anchored at the whole master declaration —
+// the AST keeps the primary key as a bare name with no node of its own, so the
+// declaration is the finest anchor available for now.
+func checkMaster(md *ast.MasterDecl, row *ir.Record, deferredRow bool, at func(ast.Node) span, diags *diagnostic.List) {
+	if at == nil || diags == nil {
+		return
+	}
+	s := at(md)
+	// A row predicate (where) is parsed but not yet given meaning — row validation
+	// is later work — so it is rejected as unsupported rather than silently
+	// dropped, which would lose a misspelled or intended constraint without a word.
+	if md.Where != nil {
+		diags.Add(newMasterWhereUnsupportedDiagnostic(s.offset, s.width, md.Name))
+	}
+	if row == nil && !deferredRow {
+		diags.Add(newMasterMissingRowDiagnostic(s.offset, s.width, md.Name))
+	}
+	if len(md.Primary) == 0 {
+		diags.Add(newMasterMissingPrimaryDiagnostic(s.offset, s.width, md.Name))
+		return
+	}
+	// A repeated column is malformed regardless of the row, so the duplicate check
+	// runs even when there is no field list to read (a deferred generic-alias row);
+	// only the unknown-column check needs the row's fields, so it is skipped then —
+	// the missing-row diagnostic above already covers a row that is truly absent.
+	fields := map[string]bool{}
+	if row != nil {
+		fields = make(map[string]bool, len(row.Fields))
+		for _, f := range row.Fields {
+			fields[f.Name] = true
+		}
+	}
+	seen := make(map[string]bool, len(md.Primary))
+	for _, key := range md.Primary {
+		switch {
+		case seen[key]:
+			diags.Add(newMasterDuplicatePrimaryKeyDiagnostic(s.offset, s.width, key, md.Name))
+		case row != nil && !fields[key]:
+			diags.Add(newMasterPrimaryUnknownFieldDiagnostic(s.offset, s.width, key, md.Name))
+		}
+		seen[key] = true
+	}
+}
+
 // resolveAssocConsts resolves a type's associated constants — the impl block's
 // `const` items, read as TypeName.Name — into ir.AssocConsts, in source order.
 // Each carries its resolved type (the annotation when present, else the kind of
@@ -1286,7 +1403,7 @@ func checkMemberDecls(def *ir.TypeDef, at func(ast.Node) span, diags *diagnostic
 	if at == nil || diags == nil {
 		return
 	}
-	fields := recordFieldNames(def.Body)
+	fields := memberFields(def)
 	consts := make(map[string]bool, len(def.Consts))
 	for _, c := range def.Consts {
 		consts[c.Name] = true
@@ -1360,6 +1477,80 @@ func recordFieldNames(body ir.Type) map[string]bool {
 		names[f.Name] = true
 	}
 	return names
+}
+
+// underlyingRecord returns the record a type denotes — the record itself, or the
+// one a named record type aliases (record Row, type Row = { ... }) — or nil when
+// it is neither. It looks through a nominal alias one level at a time, guarding a
+// self-referential definition, so a master's row resolves whether it is written
+// inline or by name.
+func underlyingRecord(t ir.Type) *ir.Record {
+	seen := map[*ir.TypeDef]bool{}
+	for {
+		switch x := t.(type) {
+		case *ir.Record:
+			return x
+		case *ir.Named:
+			if x.Def == nil || x.Def.Body == nil || seen[x.Def] {
+				return nil
+			}
+			seen[x.Def] = true
+			t = x.Def.Body
+		default:
+			return nil
+		}
+	}
+}
+
+// isGenericRecordAlias reports whether t is a generic record alias applied to
+// type arguments (record Row<int>, type Row<T> = { ... }) — an application this
+// slice does not expand into row fields. It tells a master row written with a
+// generic alias (a real record, deferred) apart from one that is genuinely not a
+// record, so the former is not reported as a missing row.
+func isGenericRecordAlias(t ir.Type) bool {
+	app, ok := t.(*ir.App)
+	return ok && app.Def != nil && underlyingRecord(app.Def.Body) != nil
+}
+
+// memberFields returns the field names the member-collision checks compare an
+// accessor or static against. A type's or enum's fields are its record body's; a
+// master keeps Body nil and stores its row as a type on the descriptor, so its
+// fields are read from the row record — without this a master getter/setter could
+// shadow a row field uncaught.
+func memberFields(def *ir.TypeDef) map[string]bool {
+	if def.Master != nil {
+		return recordFieldNames(underlyingRecordOf(def.Master.Row))
+	}
+	return recordFieldNames(def.Body)
+}
+
+// underlyingRecordOf returns a master row type's record as an ir.Type for the
+// field-name helper (nil when the row is absent or a form this slice does not
+// expand), so recordFieldNames reads its fields the same way it reads a body's.
+func underlyingRecordOf(row ir.Type) ir.Type {
+	if rec := underlyingRecord(row); rec != nil {
+		return rec
+	}
+	return nil
+}
+
+// dedupeStrings returns names with later duplicates dropped, preserving the
+// first occurrence's order. It keeps a primary key tuple free of repeated
+// columns in the IR even when the repeat is reported as a diagnostic.
+func dedupeStrings(names []string) []string {
+	if len(names) == 0 {
+		return names
+	}
+	seen := make(map[string]bool, len(names))
+	out := make([]string, 0, len(names))
+	for _, n := range names {
+		if seen[n] {
+			continue
+		}
+		seen[n] = true
+		out = append(out, n)
+	}
+	return out
 }
 
 // hasNormalMethod reports whether def declares an ordinary instance method of

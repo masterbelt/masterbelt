@@ -91,6 +91,7 @@ Module
         Named
           Def: "rankable"
       Enum: ~
+      Master: ~
       Where: ~
     TypeDef
       Name: "printable"
@@ -123,6 +124,7 @@ Module
             Def: "comparable"
       Impls: ~
       Enum: ~
+      Master: ~
       Where: ~
     TypeDef
       Name: "rankable"
@@ -155,6 +157,7 @@ Module
             Def: "comparable"
       Impls: ~
       Enum: ~
+      Master: ~
       Where: ~
     TypeDef
       Name: "ordered"
@@ -192,6 +195,7 @@ Module
             Def: "rankable"
       Impls: ~
       Enum: ~
+      Master: ~
       Where: ~
   Funcs:
     Function

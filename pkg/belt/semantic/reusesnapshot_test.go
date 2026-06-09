@@ -130,6 +130,25 @@ func reuseCases() []reuseCase {
 		"}\n" +
 		"assert C > 0\n"
 
+	// masterChain is the chain fixture with a master appended: a master is a
+	// TypeDef, so editing its row method re-resolves the type-defs
+	// layer, but the unrelated value chain (A->B->C, the assert) keeps its
+	// memoized types and values — the cutoff the master shares with every other
+	// type. The "// pad" tail is slack the length-preserving edit grows into so
+	// downstream offsets stay put.
+	const masterChain = chain +
+		"pub master Skill {\n" +
+		"  record {\n" +
+		"    id: int,\n" +
+		"    name: string,\n" +
+		"  } impl {\n" +
+		"    pub get label(): string {\n" +
+		"      return self.name       // pad\n" +
+		"    }\n" +
+		"  }\n" +
+		"  primary id\n" +
+		"}\n"
+
 	return []reuseCase{
 		// Leaf-value edit (length-preserving): C is read by nothing, so changing
 		// its initializer to an equal-width, same-typed expression keeps every
@@ -183,6 +202,13 @@ func reuseCases() []reuseCase {
 		// own re-typing footprint. nint->long keeps the width.
 		{name: "fn_result_type", src: chain, keepsLen: true, minReused: 2,
 			find: "(x: nint): nint", repl: "(x: nint): long"},
+		// Master row-method edit (length-preserving): a master is a TypeDef, so
+		// editing its row method re-resolves the type-defs layer, but the unrelated
+		// value chain keeps its memoized types and values. self.name and
+		// self.name + "" both type as string, so no dependent re-types. The pad
+		// slack absorbs the edit's extra characters.
+		{name: "master_method_body", src: masterChain, keepsLen: true, minReused: 5,
+			find: "return self.name       ", repl: "return self.name + \"\"  "},
 	}
 }
 

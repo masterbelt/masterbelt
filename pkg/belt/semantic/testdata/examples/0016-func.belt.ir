@@ -397,6 +397,7 @@ Module
       Interface: ~
       Impls: ~
       Enum: ~
+      Master: ~
       Where: ~
   Funcs:
     Function

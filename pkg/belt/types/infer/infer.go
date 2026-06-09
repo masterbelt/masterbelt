@@ -429,9 +429,15 @@ func collectionType(e *ast.CollectionLit, s scope) ir.Type {
 }
 
 // fieldType returns the type of a record's field, following named types to their
-// underlying record.
+// underlying record. A master is opaque to its row record — recordOf does not
+// look through a master, so a record literal cannot target one — but its own row
+// fields are readable through a receiver (self.name inside a master method): the
+// row type the descriptor keeps is unwrapped here instead.
 func fieldType(recv ir.Type, name string) ir.Type {
 	rec := recordOf(recv)
+	if n, ok := recv.(*ir.Named); ok && n.Def != nil && n.Def.Master != nil {
+		rec = recordOf(n.Def.Master.Row)
+	}
 	if rec == nil {
 		return ir.Invalid
 	}

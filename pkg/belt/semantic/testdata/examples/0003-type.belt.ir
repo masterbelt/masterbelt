@@ -15,6 +15,7 @@ Module
       Interface: ~
       Impls: ~
       Enum: ~
+      Master: ~
       Where: ~
     TypeDef
       Name: "Level"
@@ -61,6 +62,7 @@ Module
       Interface: ~
       Impls: ~
       Enum: ~
+      Master: ~
       Where: ~
     TypeDef
       Name: "GameValue"
@@ -80,6 +82,7 @@ Module
       Interface: ~
       Impls: ~
       Enum: ~
+      Master: ~
       Where: ~
     TypeDef
       Name: "Optional"
@@ -103,6 +106,7 @@ Module
       Interface: ~
       Impls: ~
       Enum: ~
+      Master: ~
       Where: ~
     TypeDef
       Name: "OptionalNumeric"
@@ -136,6 +140,7 @@ Module
       Interface: ~
       Impls: ~
       Enum: ~
+      Master: ~
       Where: ~
     TypeDef
       Name: "Record"
@@ -199,6 +204,7 @@ Module
       Interface: ~
       Impls: ~
       Enum: ~
+      Master: ~
       Where: ~
     TypeDef
       Name: "Mapper"
@@ -226,6 +232,7 @@ Module
       Interface: ~
       Impls: ~
       Enum: ~
+      Master: ~
       Where: ~
   Funcs: ~
   Asserts: ~

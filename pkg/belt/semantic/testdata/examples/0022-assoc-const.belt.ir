@@ -278,6 +278,7 @@ Module
       Interface: ~
       Impls: ~
       Enum: ~
+      Master: ~
       Where: ~
     TypeDef
       Name: "Bits"
@@ -318,6 +319,7 @@ Module
       Interface: ~
       Impls: ~
       Enum: ~
+      Master: ~
       Where: ~
     TypeDef
       Name: "Port"
@@ -333,6 +335,7 @@ Module
       Interface: ~
       Impls: ~
       Enum: ~
+      Master: ~
       Where: Call
         Receiver: Call
           Receiver: SelfValue

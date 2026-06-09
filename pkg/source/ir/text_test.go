@@ -81,6 +81,7 @@ func TestExplicitExclusions(t *testing.T) {
 		"Syntax":          true,
 		"EnumSyntax":      true,
 		"InterfaceSyntax": true,
+		"MasterSyntax":    true,
 		// The resolved value graphs kept in memory for reachability and
 		// find-references; the text form renders the folded outcome, not the
 		// graph (Assert.CondGraph, AssocConst.ValueGraph, EnumMember.ValueGraph).

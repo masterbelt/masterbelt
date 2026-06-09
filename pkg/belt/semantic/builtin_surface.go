@@ -61,6 +61,12 @@ func checkBuiltinSurface(file *ast.File, at func(ast.Node) span, diags *diagnost
 	for _, ed := range file.Enums {
 		checkBuiltinSurfaceImpl(ed.Name, ed.Methods, ed.Consts, at, diags)
 	}
+	// A master's impl members are held to the same surface rule: a master has no
+	// `= builtin` body of its own (it is never a primitive), so only its impl's
+	// extern methods and builtin constants are checked.
+	for _, md := range file.Masters {
+		checkBuiltinSurfaceImpl(md.Name, md.Methods, md.Consts, at, diags)
+	}
 }
 
 // checkBuiltinSurfaceImpl reports the extern methods and `= builtin`

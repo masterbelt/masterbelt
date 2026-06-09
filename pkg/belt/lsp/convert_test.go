@@ -112,8 +112,9 @@ func TestDocumentSymbols(t *testing.T) {
 }
 
 func TestDocumentSymbolsMaster(t *testing.T) {
-	// A master outlines as a single struct-kinded symbol, read from the AST
-	// (it has no IR representation yet). Its SelectionRange covers just the name.
+	// A master outlines as a single struct-kinded symbol, read from the IR like
+	// every other declaration, so its detail carries the anchor the way a const's
+	// does. Its SelectionRange covers just the name.
 	doc := testView("pub master Skill {\n  record {\n    id: int\n  }\n  primary id\n}\n")
 	syms := documentSymbols(doc)
 	if len(syms) != 1 {
@@ -121,6 +122,9 @@ func TestDocumentSymbolsMaster(t *testing.T) {
 	}
 	if syms[0].Name != "Skill" || syms[0].Kind != protocol.SymbolKindStruct {
 		t.Errorf("symbol 0 = %+v, want Skill as a struct", syms[0])
+	}
+	if syms[0].Detail != "belt:test/Skill" {
+		t.Errorf("symbol 0 detail = %q, want the anchor", syms[0].Detail)
 	}
 	// SelectionRange must cover just the name "Skill" (line 0, cols 11..16).
 	sel := syms[0].SelectionRange

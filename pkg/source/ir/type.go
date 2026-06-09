@@ -220,6 +220,15 @@ type TypeDef struct {
 	// enum — the base lives in Enum.Base — so the type algebra treats it as a
 	// leaf, exactly as it treats a primitive.
 	Enum *EnumDef
+	// Master is the master-data description when this definition is a master
+	// (`master Name {...}`), or nil for every other kind of type. A master is a
+	// nominal type whose values are the rows of a master-data table: like an enum
+	// it is a leaf the type algebra does not look through — Body stays nil, so a
+	// master is opaque to its row record (not assignable to or from it) — with
+	// the row's fields in Master.Fields and its primary-key columns in
+	// Master.Primary. The kind = master test is Master != nil — what resolving a
+	// field typed by a master into a foreign-key reference reads.
+	Master *MasterDef
 	// Where is the refinement predicate over self as a resolved value graph —
 	// self bound to a SelfValue node, every reference resolved, the typed and
 	// adapted IR every fold of the predicate runs (self bound to each value).
@@ -230,6 +239,21 @@ type TypeDef struct {
 	Syntax          *ast.TypeDecl      `tree:"-"` // the type declaration this was resolved from, or nil
 	EnumSyntax      *ast.EnumDecl      `tree:"-"` // the enum declaration this was resolved from, or nil
 	InterfaceSyntax *ast.InterfaceDecl `tree:"-"` // the interface declaration this was resolved from, or nil
+	MasterSyntax    *ast.MasterDecl    `tree:"-"` // the master declaration this was resolved from, or nil
+}
+
+// MasterDef is the description of a master type: the row's type (the record the
+// rows conform to, as written — an inline record, a named record alias, or a
+// generic application) and the primary-key column names (in declaration order,
+// already de-duplicated). The row lives here rather than on TypeDef.Body so a
+// master stays a leaf in the type algebra — opaque to its row record — while
+// still exposing the row shape its own methods (and a foreign-key reference to
+// it) read; keeping it as a Type (rather than a flattened field list) preserves
+// the reference to a named alias for liveness and relinking. A primary-key name
+// is one of the row's field names; the semantic layer reports one that is not.
+type MasterDef struct {
+	Row     Type     // the row record type, as written (nil when absent or invalid)
+	Primary []string // the primary-key column names, in declaration order
 }
 
 // WhereSyntax returns the surface form of the refinement predicate — the

@@ -128,6 +128,8 @@ func (p *Program) EnclosingDecl(file FileID, offset int) (string, bool) {
 			consider(t.Anchor, t.EnumSyntax)
 		case t.InterfaceSyntax != nil:
 			consider(t.Anchor, t.InterfaceSyntax)
+		case t.MasterSyntax != nil:
+			consider(t.Anchor, t.MasterSyntax)
 		}
 		for _, m := range t.Methods {
 			if m.Syntax != nil {

@@ -5,6 +5,56 @@ import (
 	"testing"
 )
 
+// TestLinkRelinksMasterRowFields pins that a master's row field types are
+// relinked after a text round-trip, the way a body's references are: a field
+// typed by another declaration is re-pointed to the resolved definition instead
+// of being left the by-name placeholder unmarshalling produces.
+func TestLinkRelinksMasterRowFields(t *testing.T) {
+	rarity := &TypeDef{Name: "Rarity", Anchor: "belt:/Rarity", Enum: &EnumDef{Base: "nint"}}
+	skill := &TypeDef{
+		Name:   "Skill",
+		Anchor: "belt:/Skill",
+		Master: &MasterDef{
+			Row:     &Record{Fields: []Field{{Name: "rarity", Type: &Named{Def: rarity}}}},
+			Primary: []string{"rarity"},
+		},
+	}
+	data, err := (&Module{Types: []*TypeDef{rarity, skill}}).MarshalText()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var back Module
+	if err := back.UnmarshalText(data); err != nil {
+		t.Fatal(err)
+	}
+	// Unmarshalling makes each Named reference a by-name placeholder; Link
+	// re-points it to the module's own declaration. Rarity is in-module, so the
+	// relinked field type must be back's Rarity def, not a leftover placeholder.
+	if err := back.Link(Resolver{}); err != nil {
+		t.Fatal(err)
+	}
+	var backRarity, master *TypeDef
+	for _, td := range back.Types {
+		if td.Name == "Rarity" {
+			backRarity = td
+		}
+		if td.Master != nil {
+			master = td
+		}
+	}
+	if master == nil || backRarity == nil {
+		t.Fatal("round-trip lost a declaration")
+	}
+	row, ok := master.Master.Row.(*Record)
+	if !ok || len(row.Fields) != 1 {
+		t.Fatalf("master row = %#v, want a one-field record", master.Master.Row)
+	}
+	n, ok := row.Fields[0].Type.(*Named)
+	if !ok || n.Def != backRarity {
+		t.Fatalf("master row field type = %#v, want it relinked to the module's Rarity def", row.Fields[0].Type)
+	}
+}
+
 // TestLinkCoversEveryValue drives the relink walk over every value form: the
 // linker is an exhaustive switch guarded by a panic, and this pin turns an
 // unhandled form into a failing test rather than a runtime crash on the first
