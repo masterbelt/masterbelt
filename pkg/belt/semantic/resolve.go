@@ -106,20 +106,8 @@ func resolveTypes(folder exprFolder, file *ast.File, at func(ast.Node) span, dia
 	// here on the folded type.
 	pf := foldProjections(out, enumOut, masterOut, ifaceOut, reg, at, diags)
 
-	// Phase 3 — the checks that read a resolved type, now folded: the interface
-	// inheritance graph (a cycle A: B, B: A, an override, a conflict), each
-	// refinement predicate, and each master's keys. A projected interface parent,
-	// refined body, or master row is folded by phase 2, so these see the concrete
-	// type.
-	classifyInterfaceParents(file.Interfaces, ifaceOut, at, diags)
-	checkInterfaceInheritance(file.Interfaces, ifaceOut, at, diags)
-	for i, td := range file.Types {
-		resolveWhere(r, reg, td, out[i], at, diags, res)
-	}
-	for i, md := range file.Masters {
-		def := masterOut[i]
-		checkMaster(md, underlyingRecord(def.Master.Row), isGenericRecordAlias(def.Master.Row), at, diags)
-	}
+	// Phase 3 — the checks that read a resolved type, now folded.
+	checkFoldedTypes(file, out, enumOut, masterOut, ifaceOut, r, reg, res, at, diags)
 
 	// Resolve each type's and enum's declared interface impls and,
 	// when reporting, check conformance (every required method present) and the
@@ -128,13 +116,13 @@ func resolveTypes(folder exprFolder, file *ast.File, at func(ast.Node) span, dia
 	// impl list). The interface applications are resolved against the same
 	// universe the bodies were.
 	for i, td := range file.Types {
-		resolveImpls(r, reg, td.Impls, out[i], at, diags)
+		resolveImpls(r, reg, td.Impls, out[i], pf, at, diags)
 	}
 	for i, md := range file.Masters {
-		resolveImpls(r, reg, md.Impls, masterOut[i], at, diags)
+		resolveImpls(r, reg, md.Impls, masterOut[i], pf, at, diags)
 	}
 	for i, ed := range file.Enums {
-		resolveImpls(r, reg, ed.Impls, enumOut[i], at, diags)
+		resolveImpls(r, reg, ed.Impls, enumOut[i], pf, at, diags)
 		// Every enum is comparable and orderable: it carries the six comparison
 		// methods (equality by index, order by base value), so it opts into both
 		// contracts automatically — a generic bound of either is satisfied by an
@@ -162,6 +150,29 @@ func resolveTypes(folder exprFolder, file *ast.File, at func(ast.Node) span, dia
 	out = append(out, enumOut...)
 	out = append(out, ifaceOut...)
 	return append(out, masterOut...)
+}
+
+// checkFoldedTypes runs the well-formedness checks that read a resolved type,
+// once phase 2 has folded the member projections those types hold: the interface
+// inheritance graph (a cycle, an override, a conflict), the accessor/static/field
+// collisions (read against a body folded from a projection), each refinement
+// predicate, and each master's keys. A projected interface parent, body, or
+// master row is concrete by now, so each check sees the type it denotes.
+func checkFoldedTypes(file *ast.File, out, enumOut, masterOut, ifaceOut []*ir.TypeDef, r *infer.TypeResolver, reg *builtin.Registry, res *callResolutions, at func(ast.Node) span, diags *diagnostic.List) {
+	classifyInterfaceParents(file.Interfaces, ifaceOut, at, diags)
+	checkInterfaceInheritance(file.Interfaces, ifaceOut, at, diags)
+	for _, defs := range [][]*ir.TypeDef{out, masterOut, enumOut} {
+		for _, def := range defs {
+			checkMemberDecls(def, at, diags)
+		}
+	}
+	for i, td := range file.Types {
+		resolveWhere(r, reg, td, out[i], at, diags, res)
+	}
+	for i, md := range file.Masters {
+		def := masterOut[i]
+		checkMaster(md, underlyingRecord(def.Master.Row), isGenericRecordAlias(def.Master.Row), at, diags)
+	}
 }
 
 // bodyResolver returns a copy of r that does not project members: a body lowers
@@ -245,17 +256,6 @@ func foldProjections(out, enumOut, masterOut, ifaceOut []*ir.TypeDef, reg *built
 		}
 	}
 	return pf
-}
-
-// foldProjectionType folds the projections in a single type resolved at a use
-// site after the type bodies and impls have settled — an impl tag or a function
-// signature — where no projection cycle is possible and a bound can be judged at
-// once. It returns the concrete type the caller then consumes.
-func foldProjectionType(t ir.Type, reg *builtin.Registry, at func(ast.Node) span, diags *diagnostic.List) ir.Type {
-	pf := newProjectionFolder(reg, at, diags)
-	t = pf.foldType(t)
-	pf.runPendingBounds()
-	return t
 }
 
 // foldDef folds the projections in a definition's resolved type positions: its
@@ -375,10 +375,6 @@ func (pf *projectionFolder) project(p *ir.Projection) ir.Type {
 	switch res {
 	case types.ProjectFound:
 		// fall through to fold the member's declared type below
-	case types.ProjectAmbiguousStatic:
-		pf.report(p, newAmbiguousStaticProjectionDiagnostic)
-		pf.memo[key] = ir.Invalid
-		return ir.Invalid
 	case types.ProjectUnannotatedConst:
 		pf.report(p, newUnannotatedConstProjectionDiagnostic)
 		pf.memo[key] = ir.Invalid
@@ -763,6 +759,9 @@ func appendDistinct(defs []*ir.TypeDef, def *ir.TypeDef) []*ir.TypeDef {
 // scope, the parameters and result resolve against it, and a provided member's
 // default body lowers to IR. A required member has no body.
 func resolveInterfaceMember(r *infer.TypeResolver, reg *builtin.Registry, self ir.Type, m *ast.InterfaceMember, scope infer.TypeScope, fns bodyFuncs) *ir.Method {
+	// An interface member is a signature, which does not project; signature-
+	// position projection is deferred to a later track.
+	r = bodyResolver(r)
 	method := &ir.Method{Name: m.Name, Public: m.Public, Doc: m.Doc}
 
 	// The member's own type variables join a fresh scope: the explicit ones
@@ -836,7 +835,7 @@ func resolveInterfaceMember(r *infer.TypeResolver, reg *builtin.Registry, self i
 // every path that reads Impls — Satisfies, the switch and map-key checks, the
 // hover card — see the inherited contracts through the child alone, with no
 // special-casing for inheritance.
-func resolveImpls(r *infer.TypeResolver, reg *builtin.Registry, impls []ast.TypeExpr, def *ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List) {
+func resolveImpls(r *infer.TypeResolver, reg *builtin.Registry, impls []ast.TypeExpr, def *ir.TypeDef, pf *projectionFolder, at func(ast.Node) span, diags *diagnostic.List) {
 	scope := make(infer.TypeScope, len(def.Params))
 	for _, p := range def.Params {
 		scope[p.Name] = p.Bound
@@ -845,8 +844,11 @@ func resolveImpls(r *infer.TypeResolver, reg *builtin.Registry, impls []ast.Type
 		// An impl tag may be a projection (impl Holder.P, where Holder.P is an
 		// associated constant typed as an interface). The type bodies are settled
 		// by now, so fold it to the interface before classifying — otherwise a
-		// valid projected interface reads as not-an-interface.
-		t := foldProjectionType(r.ResolveType(impl, scope), reg, at, diags)
+		// valid projected interface reads as not-an-interface. Folding through the
+		// shared folder defers a projected type argument's bound check to
+		// runPendingBounds, after every file impl is added (an impl declared later
+		// may be the one that satisfies it).
+		t := pf.foldType(r.ResolveType(impl, scope))
 		idef := interfaceDefOf(t)
 		if idef == nil {
 			// The tag resolved to a non-interface (or failed to resolve). An
@@ -1095,12 +1097,10 @@ func resolveDecl(r *infer.TypeResolver, reg *builtin.Registry, td *ast.TypeDecl,
 		seen[key] = true
 		def.AttachMethods(rm)
 	}
-	// The accessor/static declaration checks run after the methods, fields, and
-	// associated constants are all on the definition, so the collision checks see
-	// the whole type. The where-clause is resolved in a later phase, after the
-	// member projections in the body are folded, so a predicate reads the body's
-	// concrete type — the methods it may call are already on the definition here.
-	checkMemberDecls(def, at, diags)
+	// The accessor/static declaration checks and the where-clause are resolved in
+	// a later phase, after the member projections in the body are folded, so the
+	// collision checks read the body's concrete fields and a predicate its
+	// concrete type. The methods they may reference are already on the definition.
 }
 
 // resolveMasterDecl resolves a master declaration into its definition. The row
@@ -1142,9 +1142,8 @@ func resolveMasterDecl(r *infer.TypeResolver, reg *builtin.Registry, md *ast.Mas
 		seen[key] = true
 		def.AttachMethods(rm)
 	}
-	checkMemberDecls(def, at, diags)
-	// checkMaster runs in a later phase, after the row's member projections are
-	// folded, so a row written through a projection (record Holder.row) is keyed
+	// checkMemberDecls and checkMaster run in a later phase, after the row's member
+	// projections are folded, so a row written through a projection (record Holder.row) is keyed
 	// against the concrete record rather than the transient projection.
 }
 
@@ -1380,11 +1379,9 @@ func resolveEnumDecl(folder exprFolder, defs map[string]*ir.TypeDef, r *infer.Ty
 	def.Consts = resolveAssocConstList(r, reg, def, ed.Consts, nil, at, diags)
 
 	resolveEnumMethods(r, reg, ed, def, at, diags, fns)
-	// The accessor/static declaration checks, the same as a nominal type's: a
-	// static fn collides with an enum member of the same name (both read
-	// EnumName.Name), and an accessor's signature and field/method collisions are
-	// checked too.
-	checkMemberDecls(def, at, diags)
+	// The accessor/static declaration checks (the same as a nominal type's: a
+	// static fn collides with an enum member of the same name, both read
+	// EnumName.Name) run in a later phase with every type's, after the bodies fold.
 }
 
 // resolveEnumMembers settles the enum's member values in declaration order:
@@ -1639,6 +1636,11 @@ func methodKind(k ast.MethodKind) ir.MethodKind {
 // body binder infer an inferred let's value type. The body is not yet
 // type-checked.
 func resolveMethod(r *infer.TypeResolver, reg *builtin.Registry, self ir.Type, m *ast.MethodDecl, scope infer.TypeScope, fns bodyFuncs) *ir.Method {
+	// A method's signature is a signature position, so it does not project: the
+	// resolver is the non-projecting one, the same the body lowers through.
+	// Signature-position projection (a parameter or result written as Type.member)
+	// is deferred to a later track, so a qualified name keeps its prior meaning.
+	r = bodyResolver(r)
 	method := &ir.Method{Name: m.Name, Public: m.Public, Extern: m.Extern, Kind: methodKind(m.Kind), Effects: m.Effects, Doc: m.Doc, Syntax: m}
 
 	// Method-introduced type variables: the explicit ones (the A in fold<A>) and
@@ -1684,7 +1686,7 @@ func resolveMethod(r *infer.TypeResolver, reg *builtin.Registry, self ir.Type, m
 		resolvedParams[p.Name] = t
 	}
 	method.Result = r.ResolveType(m.Result, mscope)
-	method.Body = lower.Body(m.Body, bodyBinder{r: bodyResolver(r), reg: reg, params: params, paramTypes: resolvedParams, selfType: self, tscope: mscope, funcs: fns, self: true})
+	method.Body = lower.Body(m.Body, bodyBinder{r: r, reg: reg, params: params, paramTypes: resolvedParams, selfType: self, tscope: mscope, funcs: fns, self: true})
 	return method
 }
 
@@ -1890,11 +1892,9 @@ func resolveFuncs(file *ast.File, at func(ast.Node) span, diags *diagnostic.List
 		Report:         unknownTypeReporter(at, diags),
 		Registry:       reg,
 		BoundViolation: boundViolationReporter(at, diags),
-		// A function signature is a type position, so a parameter or result may be
-		// a projection (fn f(x: Character.level)). The types are already resolved
-		// here, so each is folded inline below; the body keeps the prior meaning of
-		// a qualified name through the non-projecting clone.
-		ProjectMembers: true,
+		// A function signature is a signature position, so it does not project:
+		// signature-position projection (fn f(x: Character.level)) is deferred to a
+		// later track, so a qualified name keeps its prior meaning here.
 	}
 	shells := fns.shells
 	out := make([]*ir.Function, 0, len(file.Funcs))
@@ -1914,13 +1914,13 @@ func resolveFuncs(file *ast.File, at func(ast.Node) span, diags *diagnostic.List
 		paramTypes := make(map[string]ir.Type, len(fd.Params))
 		fn.Params = make([]ir.Param, 0, len(fd.Params))
 		for _, p := range fd.Params {
-			t := foldProjectionType(r.ResolveType(p.Type, tscope), reg, at, diags)
+			t := r.ResolveType(p.Type, tscope)
 			fn.Params = append(fn.Params, ir.Param{Name: p.Name, Type: t})
 			params[p.Name] = true
 			paramTypes[p.Name] = t
 		}
-		fn.Result = foldProjectionType(r.ResolveType(fd.Result, tscope), reg, at, diags)
-		fn.Body = lower.Body(fd.Body, bodyBinder{r: bodyResolver(r), reg: reg, params: params, paramTypes: paramTypes, tscope: tscope, funcs: fns})
+		fn.Result = r.ResolveType(fd.Result, tscope)
+		fn.Body = lower.Body(fd.Body, bodyBinder{r: r, reg: reg, params: params, paramTypes: paramTypes, tscope: tscope, funcs: fns})
 
 		key := fn.Name + funcSignatureKey(fn)
 		if fn.Name != "" && seen[key] {

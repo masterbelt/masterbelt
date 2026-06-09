@@ -215,14 +215,6 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "ambiguous call: more than one overload of method " + f["method"].String() + " accepts " + f["types"].String()
 		}
 	},
-	"belt.semantic.ambiguous_static_projection": func(loc Locale, f map[string]fmt.Stringer) string {
-		switch loc {
-		case "ja":
-			return f["name"].String() + " の型射影が曖昧です: 静的関数がオーバーロードされています"
-		default:
-			return "ambiguous static projection " + f["name"].String() + ": the static fn is overloaded"
-		}
-	},
 	"belt.semantic.ambiguous_union_member": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":

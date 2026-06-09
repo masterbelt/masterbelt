@@ -126,38 +126,25 @@ func TestTypeProjectionGenericReceiverRejected(t *testing.T) {
 	}
 }
 
-func TestTypeProjectionOverloadedStaticRejected(t *testing.T) {
-	// An overloaded static fn cannot be projected: a type position carries no
-	// call arguments to select an overload, so the result would be order-dependent.
-	src := "pub type C = { d: nint } impl {\n" +
-		"  pub static fn make(v: nint): C { return C{ d: v } }\n" +
-		"  pub static fn make(c: C): C { return c }\n" +
-		"}\n" +
-		"pub type Use = { m: C.make }\n"
-	_, diags := analyze(src)
-	if !hasCode(diags, CodeAmbiguousStaticProjection) {
-		t.Fatalf("codes = %v, want ambiguous_static_projection", codes(diags))
+func TestTypeProjectionSignatureDeferred(t *testing.T) {
+	// Signature-position projection is deferred to a later track: a static fn (a
+	// signature), a method signature, and a top-level function signature keep the
+	// prior meaning of a qualified name (an unknown type), rather than projecting.
+	base := "pub type Level = sbyte\npub type Character = { level: Level }\n"
+	cases := []string{
+		// a static fn projected as a value type
+		base + "pub type C = sbyte impl {\n  pub static fn zero(): C { return 0 }\n}\npub type Use = { m: C.zero }\n",
+		// a method signature parameter
+		base + "pub type C = sbyte impl {\n  pub m(x: Character.level): sbyte { return 0 }\n}\n",
+		// a top-level function signature result
+		base + "pub fn f(): Character.level { return 0 }\n",
 	}
-}
-
-func TestTypeProjectionSingleStatic(t *testing.T) {
-	// A single (non-overloaded) static fn projects to its function type.
-	src := "pub type C = { d: nint } impl {\n" +
-		"  pub static fn zero(): C { return C{ d: 0 } }\n" +
-		"}\n" +
-		"pub type Use = { m: C.zero }\n"
-	m, diags := analyze(src)
-	if len(diags) != 0 {
-		t.Fatalf("unexpected diagnostics: %v", codes(diags))
+	for i, src := range cases {
+		_, diags := analyze(src)
+		if !hasCode(diags, CodeUnknownType) {
+			t.Errorf("case %d: signature projection should be deferred (unknown_type); got %v", i, codes(diags))
+		}
 	}
-	if got := fieldType(t, m, "Use", 0); !isFunc(got) {
-		t.Errorf("Use.m = %s (%T), want Func", got, got)
-	}
-}
-
-func isFunc(t ir.Type) bool {
-	_, ok := t.(*ir.Func)
-	return ok
 }
 
 func TestTypeProjectionGenericArgBound(t *testing.T) {
@@ -238,22 +225,16 @@ func TestTypeProjectionInterfaceParent(t *testing.T) {
 	}
 }
 
-func TestTypeProjectionFunctionSignature(t *testing.T) {
-	// A top-level function signature is a type position: a parameter and result
-	// projection fold to the declared type, the way a method signature's do.
-	src := "pub type Level = sbyte\n" +
-		"pub type Character = { level: Level }\n" +
-		"pub fn f(x: Character.level): Character.level { return x }\n"
-	m, diags := analyze(src)
-	if len(diags) != 0 {
-		t.Fatalf("unexpected diagnostics: %v", codes(diags))
-	}
-	fn := m.Funcs[0]
-	if fn.Params[0].Type.String() != "Level" {
-		t.Errorf("param = %s, want Level", fn.Params[0].Type)
-	}
-	if fn.Result.String() != "Level" {
-		t.Errorf("result = %s, want Level", fn.Result)
+func TestTypeProjectionMemberCollisionOnProjectedBody(t *testing.T) {
+	// A body written through a projection is checked for member collisions after it
+	// folds: type C = Holder.row, where Holder.row is a record with field x, plus
+	// an accessor x() — the collision is reported because checkMemberDecls reads
+	// the folded record's fields.
+	src := "pub type Holder = { row: { x: nint } }\n" +
+		"pub type C = Holder.row impl {\n  pub get x(): nint { return 0 }\n}\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeAccessorCollision) {
+		t.Fatalf("accessor x collides with the projected body's field x; want accessor_collision, got %v", codes(diags))
 	}
 }
 

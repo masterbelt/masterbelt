@@ -73,8 +73,7 @@ type ProjectResult int
 // The projection outcomes; see each one's comment.
 const (
 	ProjectFound            ProjectResult = iota // the member projects to the returned type
-	ProjectMissing                               // the receiver declares no such member, or the receiver is an unapplied generic
-	ProjectAmbiguousStatic                       // the member is an overloaded static fn, which a projection cannot disambiguate
+	ProjectMissing                               // the receiver declares no such member, the receiver is an unapplied generic, or the member is a signature (a static fn) whose projection is deferred
 	ProjectUnannotatedConst                      // the member is an associated constant with no type annotation, whose type is not yet known
 )
 
@@ -82,16 +81,16 @@ const (
 // def.member resolves to, and a result classifying the outcome. It runs the one
 // member classifier and maps each kind to the member's declared type: an
 // associated constant to its declared type, an enum member to the enum itself (a
-// member is a value of the enum), a single static fn to its function type, and a
-// record field — the kind ResolveMember leaves as MemberNone — to the field's
-// declared type. The returned type is the member's type as declared, which may
-// itself be a projection the caller resolves in turn.
+// member is a value of the enum), and a record field — the kind ResolveMember
+// leaves as MemberNone — to the field's declared type. The returned type is the
+// member's type as declared, which may itself be a projection the caller
+// resolves in turn.
 //
 // A member of an unapplied generic receiver is not projectable — the syntax
 // gives no type arguments, so a member typed by a parameter would leak a free
-// variable into the projecting declaration — and reads as ProjectMissing. An
-// overloaded static fn reads as ProjectAmbiguousStatic, since a projection
-// carries no call arguments to select an overload.
+// variable into the projecting declaration — and reads as ProjectMissing. A
+// static fn is a signature, and signature-position projection is deferred to a
+// later track, so it too reads as ProjectMissing.
 func ProjectMemberType(def *ir.TypeDef, name string) (ir.Type, ProjectResult) {
 	if def == nil || len(def.Params) > 0 {
 		return nil, ProjectMissing
@@ -108,10 +107,9 @@ func ProjectMemberType(def *ir.TypeDef, name string) (ir.Type, ProjectResult) {
 	case MemberEnum:
 		return &ir.Named{Def: def}, ProjectFound
 	case MemberStatic:
-		if staticOverloaded(def, name) {
-			return nil, ProjectAmbiguousStatic
-		}
-		return staticFnType(def, name), ProjectFound
+		// A static fn projects to its function type — a signature. Signature-
+		// position projection is deferred, so it is not projected here.
+		return nil, ProjectMissing
 	case MemberNone:
 		if t, ok := recordFieldType(def, name); ok {
 			return t, ProjectFound
@@ -157,34 +155,4 @@ func recordOf(def *ir.TypeDef) *ir.Record {
 	}
 	rec, _ := t.(*ir.Record)
 	return rec
-}
-
-// staticOverloaded reports whether def declares more than one static fn named
-// name — an overload set a type-position projection cannot disambiguate, since
-// it carries no call arguments to select among them.
-func staticOverloaded(def *ir.TypeDef, name string) bool {
-	count := 0
-	for _, m := range def.Methods {
-		if m.Kind == ir.MethodStatic && m.Name == name {
-			count++
-		}
-	}
-	return count > 1
-}
-
-// staticFnType builds the function type of a static fn member — the signature
-// the call site reads, projected when the member appears in type position. A
-// name that is not a static fn yields Invalid (ProjectMemberType only calls it
-// for one).
-func staticFnType(def *ir.TypeDef, name string) ir.Type {
-	for _, m := range def.Methods {
-		if m.Kind == ir.MethodStatic && m.Name == name {
-			params := make([]ir.Type, len(m.Params))
-			for i, p := range m.Params {
-				params[i] = p.Type
-			}
-			return &ir.Func{Params: params, Result: m.Result}
-		}
-	}
-	return ir.Invalid
 }
