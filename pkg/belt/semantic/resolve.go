@@ -881,21 +881,23 @@ func checkMaster(md *ast.MasterDecl, row *ir.Record, deferredRow bool, at func(a
 		diags.Add(newMasterMissingPrimaryDiagnostic(s.offset, s.width, md.Name))
 		return
 	}
-	// Without a row the key-existence check is meaningless (every column would
-	// read as unknown); the missing-row diagnostic above already covers it.
-	if row == nil {
-		return
-	}
-	fields := make(map[string]bool, len(row.Fields))
-	for _, f := range row.Fields {
-		fields[f.Name] = true
+	// A repeated column is malformed regardless of the row, so the duplicate check
+	// runs even when there is no field list to read (a deferred generic-alias row);
+	// only the unknown-column check needs the row's fields, so it is skipped then —
+	// the missing-row diagnostic above already covers a row that is truly absent.
+	fields := map[string]bool{}
+	if row != nil {
+		fields = make(map[string]bool, len(row.Fields))
+		for _, f := range row.Fields {
+			fields[f.Name] = true
+		}
 	}
 	seen := make(map[string]bool, len(md.Primary))
 	for _, key := range md.Primary {
 		switch {
 		case seen[key]:
 			diags.Add(newMasterDuplicatePrimaryKeyDiagnostic(s.offset, s.width, key, md.Name))
-		case !fields[key]:
+		case row != nil && !fields[key]:
 			diags.Add(newMasterPrimaryUnknownFieldDiagnostic(s.offset, s.width, key, md.Name))
 		}
 		seen[key] = true

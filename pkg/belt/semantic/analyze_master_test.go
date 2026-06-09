@@ -201,6 +201,21 @@ func TestMasterGenericRowAliasDeferred(t *testing.T) {
 	}
 }
 
+// TestMasterDuplicateKeyOnDeferredRow pins that a repeated primary column is
+// reported even when the row is a deferred generic alias whose fields are not
+// expanded — the duplicate check needs no field list, only the unknown-column
+// check does.
+func TestMasterDuplicateKeyOnDeferredRow(t *testing.T) {
+	src := "type Row<T> = { id: T }\nmaster M {\n  record Row<int>\n  primary (id, id)\n}\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeMasterDuplicatePrimaryKey) {
+		t.Fatalf("want master_duplicate_primary_key on a deferred row, got %v", codes(diags))
+	}
+	if hasCode(diags, CodeMasterMissingRow) {
+		t.Errorf("a generic alias row should not be reported missing: %v", codes(diags))
+	}
+}
+
 // TestMasterDuplicatePrimaryKey pins that a composite primary key repeating a
 // column is rejected: a key tuple must not name a column twice, or a consumer
 // building key tuples or foreign-key references would see it doubled.
