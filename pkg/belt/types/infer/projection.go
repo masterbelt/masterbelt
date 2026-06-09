@@ -189,13 +189,25 @@ func recordFieldSyntax(def *ir.TypeDef, member string) (ast.TypeExpr, bool) {
 	return nil, false
 }
 
-// recordSyntaxOf returns the record-type syntax of a type declaration's body, or
-// nil when the declaration carries no syntax or its body is not a record (a
-// master's row is reached through its resolved Master.Row, not here).
+// recordSyntaxOf returns the record-type syntax a declaration's fields come from
+// — a type declaration's record body, or a master's row record — for the lazy
+// forward-reference resolution, when the body is not resolved yet. It is nil when
+// the declaration carries no record syntax. A master is read here too, so a
+// same-file master whose row is still a shell (its Master.Row nil) projects a
+// declared field exactly as an already-resolved one does.
 func recordSyntaxOf(def *ir.TypeDef) *ast.RecordType {
-	if def == nil || def.Syntax == nil {
+	if def == nil {
 		return nil
 	}
-	rec, _ := def.Syntax.Body.(*ast.RecordType)
-	return rec
+	if def.Syntax != nil {
+		if rec, ok := def.Syntax.Body.(*ast.RecordType); ok {
+			return rec
+		}
+	}
+	if def.MasterSyntax != nil {
+		if rec, ok := def.MasterSyntax.Record.(*ast.RecordType); ok {
+			return rec
+		}
+	}
+	return nil
 }

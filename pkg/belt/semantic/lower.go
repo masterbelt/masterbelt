@@ -201,6 +201,12 @@ func staticFnDef(universe map[string]*ir.TypeDef, callee *ast.MemberExpr, shadow
 	if !ok || (shadow != nil && shadow(recv.Name)) {
 		return nil
 	}
+	// A metatype method (eql/neq) on a type name is type-value equality, never a
+	// static call — even when the type also declares a static of that name — so it
+	// lowers to a method call on the reified type value, mirroring the type rule.
+	if types.IsMetatypeMethod(universe[builtin.NameType], callee.Member.Name) {
+		return nil
+	}
 	def := universe[recv.Name]
 	if types.ResolveMember(def, callee.Member.Name).Kind != types.MemberStatic {
 		return nil

@@ -56,8 +56,12 @@ func FieldProjection(def *ir.TypeDef, name string) (ir.Type, bool) {
 
 // recordBody returns the record a definition ultimately carries — its own record
 // body, the record of a nominal type it aliases (through the chain), or a
-// master's row record — or nil for a def with no record. seen guards a cyclic
-// alias chain (reported elsewhere) from looping.
+// master's row record — or nil for a def with no record. A generic application
+// (a body or alias of Inner<string>) is deliberately not followed: projecting a
+// field off it needs the application's arguments substituted through the field
+// type, which the generics work owns, so it is left unprojectable here rather
+// than yielding an unbound parameter. seen guards a cyclic alias chain (reported
+// elsewhere) from looping.
 func recordBody(def *ir.TypeDef, seen map[*ir.TypeDef]bool) *ir.Record {
 	if def == nil || seen[def] {
 		return nil
@@ -67,8 +71,6 @@ func recordBody(def *ir.TypeDef, seen map[*ir.TypeDef]bool) *ir.Record {
 	case *ir.Record:
 		return b
 	case *ir.Named:
-		return recordBody(b.Def, seen)
-	case *ir.App:
 		return recordBody(b.Def, seen)
 	}
 	if def.Master != nil {

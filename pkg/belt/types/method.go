@@ -13,16 +13,17 @@ import (
 )
 
 // IsMetatypeMethod reports whether name is an instance method of the metatype
-// `type` — its equality, eql/neq. A call on a bare type name (Level == long,
-// desugared to Level.eql(long)) resolves to one of these: the receiver is the
-// reified type value, not a static-call namespace, so the static-call rule and
-// the reference walk both defer such a call to the type-value method path.
-func IsMetatypeMethod(reg *builtin.Registry, name string) bool {
-	def, ok := reg.Lookup(builtin.NameType)
-	if !ok {
+// `type` — its equality, eql/neq — given the metatype's definition (the universe
+// entry for `type`, or the registry's). A call on a bare type name (Level ==
+// long, desugared to Level.eql(long)) resolves to one of these: the receiver is
+// the reified type value, not a static-call namespace, so the static-call rule
+// and the reference walk both defer such a call to the type-value method path. A
+// nil def (no metatype in scope) yields false.
+func IsMetatypeMethod(metatype *ir.TypeDef, name string) bool {
+	if metatype == nil {
 		return false
 	}
-	for _, m := range def.Methods {
+	for _, m := range metatype.Methods {
 		if m.Name == name && m.Kind == ir.MethodNormal {
 			return true
 		}

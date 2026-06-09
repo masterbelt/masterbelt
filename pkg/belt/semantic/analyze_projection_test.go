@@ -186,6 +186,51 @@ func TestTypeProjectionMatchArmError(t *testing.T) {
 	}
 }
 
+func TestTypeProjectionSameFileMasterForwardRef(t *testing.T) {
+	// A projection off a same-file master whose row is still a shell (resolved
+	// after the projecting type) reads the master's row syntax in the lazy
+	// fallback, so Skill.name projects the row's declared field type.
+	src := "pub type Name = Skill.name\n" +
+		"master Skill {\n  record { name: string }\n  primary name\n}\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("want clean, got %v", codes(diags))
+	}
+	for _, def := range m.Types {
+		if def.Name == "Name" {
+			if def.Body == nil || def.Body.String() != "string" {
+				t.Fatalf("Name = %v, want string (Skill.name projection)", def.Body)
+			}
+		}
+	}
+}
+
+func TestTypeProjectionGenericAliasRejected(t *testing.T) {
+	// Projecting a field off an alias to a generic application (Box = Inner<string>)
+	// is not silently resolved to the unbound parameter T — substituting the
+	// application's arguments through the field type is deferred generics work, so
+	// the projection is rejected rather than half-resolved.
+	src := "pub type Inner<T> = { value: T }\n" +
+		"pub type Box = Inner<string>\n" +
+		"assert Box.value == string\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeUnknownAssociatedConst) {
+		t.Fatalf("want the projection rejected (not silently the unbound T), got %v", codes(diags))
+	}
+}
+
+func TestTypeEqualityWinsOverStaticEql(t *testing.T) {
+	// A type that declares a static eql does not hijack == on type values: the
+	// receiver is the reified type value, so Level == Level is metatype equality
+	// (a clean bool), not a call of the static eql with a type-valued argument.
+	src := "pub type Level = sbyte impl {\n  pub static fn eql(x: nint): nint {\n    return 0\n  }\n}\n" +
+		"assert Level == Level\n"
+	_, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("want clean (metatype equality wins over static eql), got %v", codes(diags))
+	}
+}
+
 func TestTypeProjectionValueConsumedByAssert(t *testing.T) {
 	// A type value projected in value position (Item.id) is comptime-only; an
 	// assert may consume it through == (type equality), which folds to a bool —

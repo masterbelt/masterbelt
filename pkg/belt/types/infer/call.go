@@ -391,19 +391,20 @@ func staticCallType(e *ast.CallExpr, member *ast.MemberExpr, s scope, sink *Sink
 	if def == nil {
 		return ir.Invalid, false
 	}
+	// A bare type name's == / != is metatype equality (Level == long, desugared to
+	// Level.eql(long)): the receiver is the reified type value, so it must take the
+	// method-call path (metatype receiver) even when the named type also declares a
+	// static eql/neq — the metatype equality wins over the static overload set
+	// rather than the static hijacking the comparison.
+	if types.IsMetatypeMethod(s.universe()[builtin.NameType], member.Member.Name) {
+		return ir.Invalid, false
+	}
 	sigs := staticSigs(def, member.Member.Name)
 	if len(sigs) == 0 {
-		// The receiver names a type but it has no static fn of that name. If the
-		// name is a method of the metatype (Level == long, desugared to
-		// Level.eql(long)), the receiver is the reified type value, not a static-
-		// call namespace: fall through so the method-call path types the receiver
-		// as the metatype and resolves the call there.
-		if types.IsMetatypeMethod(s.registry(), member.Member.Name) {
-			return ir.Invalid, false
-		}
-		// Otherwise this is the static call's own unknown — an enum member or
-		// associated constant of the same name is a value (handled by the leaf), so
-		// reaching here means a genuine call of a missing static fn.
+		// The receiver names a type but it has no static fn of that name. This is
+		// the static call's own unknown — an enum member or associated constant of
+		// the same name is a value (handled by the leaf), so reaching here means a
+		// genuine call of a missing static fn.
 		for _, a := range e.Arguments {
 			check(a, s, sink)
 		}

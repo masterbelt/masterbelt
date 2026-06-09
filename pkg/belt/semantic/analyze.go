@@ -26,6 +26,7 @@
 package semantic
 
 import (
+	"github.com/masterbelt/masterbelt/pkg/belt/builtin"
 	"github.com/masterbelt/masterbelt/pkg/belt/parser/abstract"
 	"github.com/masterbelt/masterbelt/pkg/belt/types"
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
@@ -278,7 +279,7 @@ func classifyRefCallee(fileID FileID, e *ast.CallExpr, q queries, funcCallee map
 			switch {
 			case types.ResolveMember(q.universe(fileID)[recv.Name], callee.Member.Name).Kind == types.MemberStatic:
 				staticCallee[callee] = true
-			case types.IsMetatypeMethod(q.registry(), callee.Member.Name):
+			case types.IsMetatypeMethod(q.universe(fileID)[builtin.NameType], callee.Member.Name):
 				staticCallee[callee] = true
 			}
 		}
