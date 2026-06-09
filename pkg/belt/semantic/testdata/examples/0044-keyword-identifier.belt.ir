@@ -1,0 +1,249 @@
+Module
+  Consts: ~
+  Types:
+    TypeDef
+      Name: "SkillRow"
+      Anchor: "belt:/SkillRow"
+      Public: true
+      Doc: "A skill row whose trigger lives in a column literally named `type`, beside a" "handler whose parameter is the reserved word `for`."
+      Params: ~
+      Body: Record
+        Fields:
+          Field
+            Name: "type"
+            Type: Named
+              Def: "SkillKind"
+          Field
+            Name: "handler"
+            Type: Func
+              Params:
+                Builtin
+                  Name: "int"
+              Result: Builtin
+                Name: "int"
+      Methods: ~
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Master: ~
+      Where: ~
+    TypeDef
+      Name: "SkillKind"
+      Anchor: "belt:/SkillKind"
+      Public: true
+      Doc: "How a skill triggers."
+      Params: ~
+      Body: ~
+      Methods:
+        Method
+          Name: "eql"
+          Anchor: "belt:/SkillKind#eql"
+          Public: true
+          Extern: true
+          Kind: 0
+          Effects: ~
+          Doc: ~
+          Params:
+            Param
+              Name: "other"
+              Type: SelfType
+          Result: Builtin
+            Name: "bool"
+          Body: ~
+          Owner: "SkillKind"
+        Method
+          Name: "neq"
+          Anchor: "belt:/SkillKind#neq"
+          Public: true
+          Extern: true
+          Kind: 0
+          Effects: ~
+          Doc: ~
+          Params:
+            Param
+              Name: "other"
+              Type: SelfType
+          Result: Builtin
+            Name: "bool"
+          Body: ~
+          Owner: "SkillKind"
+        Method
+          Name: "lt"
+          Anchor: "belt:/SkillKind#lt"
+          Public: true
+          Extern: true
+          Kind: 0
+          Effects: ~
+          Doc: ~
+          Params:
+            Param
+              Name: "other"
+              Type: SelfType
+          Result: Builtin
+            Name: "bool"
+          Body: ~
+          Owner: "SkillKind"
+        Method
+          Name: "lteq"
+          Anchor: "belt:/SkillKind#lteq"
+          Public: true
+          Extern: true
+          Kind: 0
+          Effects: ~
+          Doc: ~
+          Params:
+            Param
+              Name: "other"
+              Type: SelfType
+          Result: Builtin
+            Name: "bool"
+          Body: ~
+          Owner: "SkillKind"
+        Method
+          Name: "gt"
+          Anchor: "belt:/SkillKind#gt"
+          Public: true
+          Extern: true
+          Kind: 0
+          Effects: ~
+          Doc: ~
+          Params:
+            Param
+              Name: "other"
+              Type: SelfType
+          Result: Builtin
+            Name: "bool"
+          Body: ~
+          Owner: "SkillKind"
+        Method
+          Name: "gteq"
+          Anchor: "belt:/SkillKind#gteq"
+          Public: true
+          Extern: true
+          Kind: 0
+          Effects: ~
+          Doc: ~
+          Params:
+            Param
+              Name: "other"
+              Type: SelfType
+          Result: Builtin
+            Name: "bool"
+          Body: ~
+          Owner: "SkillKind"
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls:
+        Named
+          Def: "comparable"
+        Named
+          Def: "orderable"
+      Enum: EnumDef
+        Base: "nint"
+        Members:
+          EnumMember
+            Name: "active"
+            Value: Constant
+              Kind: 0
+              Int: 0
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+          EnumMember
+            Name: "passive"
+            Value: Constant
+              Kind: 0
+              Int: 1
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+      Master: ~
+      Where: ~
+  Funcs:
+    Function
+      Name: "trigger_of"
+      Anchor: "belt:/trigger_of"
+      Public: true
+      Extern: false
+      Effects: ~
+      Doc: "The row's trigger kind, read through the keyword-named field with `.type`."
+      TypeParams: ~
+      Params:
+        Param
+          Name: "row"
+          Type: Named
+            Def: "SkillRow"
+      Result: Named
+        Def: "SkillKind"
+      Body:
+        Return
+          Value: FieldAccess
+            Receiver: ParamRef
+              Name: "row"
+              Type: Named
+                Def: "SkillRow"
+            Field: "type"
+            Type: Named
+              Def: "SkillKind"
+    Function
+      Name: "doubled"
+      Anchor: "belt:/doubled"
+      Public: true
+      Extern: false
+      Effects: ~
+      Doc: "A parameter named `for` — a reserved word read as an ordinary name. It is" "declarable here even though a bare `for` in value position would open a loop."
+      TypeParams: ~
+      Params:
+        Param
+          Name: "for"
+          Type: Builtin
+            Name: "int"
+      Result: Builtin
+        Name: "int"
+      Body:
+        Return
+          Value: Adapt
+            Value: Call
+              Receiver: IntLiteral
+                Text: "2"
+                Type: Builtin
+                  Name: "nint"
+              Method: "mul"
+              Args:
+                IntLiteral
+                  Text: "2"
+                  Type: Builtin
+                    Name: "nint"
+              Setter: false
+              Resolved: ~
+              Subst: ~
+              Type: Builtin
+                Name: "nint"
+            To: Builtin
+              Name: "int"
+  Asserts: ~

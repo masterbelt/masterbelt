@@ -1,0 +1,109 @@
+File
+  Uses: ~
+  Decls: ~
+  Types:
+    TypeDecl
+      Doc: "A skill row whose trigger lives in a column literally named `type`, beside a" "handler whose parameter is the reserved word `for`."
+      Public: true
+      Name: "SkillRow"
+      Params: ~
+      Body: RecordType
+        Fields:
+          FieldDef
+            Name: "type"
+            Type: NamedType
+              Namespace: ""
+              Name: "SkillKind"
+              Args: ~
+          FieldDef
+            Name: "handler"
+            Type: FuncType
+              Params:
+                ParamDef
+                  Name: "for"
+                  Type: NamedType
+                    Namespace: ""
+                    Name: "int"
+                    Args: ~
+              Result: NamedType
+                Namespace: ""
+                Name: "int"
+                Args: ~
+      Where: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
+  Enums:
+    EnumDecl
+      Doc: "How a skill triggers."
+      Public: true
+      Name: "SkillKind"
+      Base: ~
+      Members:
+        EnumMember
+          Name: "active"
+          Value: ~
+        EnumMember
+          Name: "passive"
+          Value: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
+  Interfaces: ~
+  Funcs:
+    FuncDecl
+      Doc: "The row's trigger kind, read through the keyword-named field with `.type`."
+      Public: true
+      Extern: false
+      Effects: ~
+      Name: "trigger_of"
+      TypeParams: ~
+      Params:
+        ParamDef
+          Name: "row"
+          Type: NamedType
+            Namespace: ""
+            Name: "SkillRow"
+            Args: ~
+      Result: NamedType
+        Namespace: ""
+        Name: "SkillKind"
+        Args: ~
+      Body:
+        ReturnStmt
+          Value: MemberExpr
+            Receiver: Identifier
+              Name: "row"
+            Member: Identifier
+              Name: "type"
+    FuncDecl
+      Doc: "A parameter named `for` — a reserved word read as an ordinary name. It is" "declarable here even though a bare `for` in value position would open a loop."
+      Public: true
+      Extern: false
+      Effects: ~
+      Name: "doubled"
+      TypeParams: ~
+      Params:
+        ParamDef
+          Name: "for"
+          Type: NamedType
+            Namespace: ""
+            Name: "int"
+            Args: ~
+      Result: NamedType
+        Namespace: ""
+        Name: "int"
+        Args: ~
+      Body:
+        ReturnStmt
+          Value: CallExpr
+            Callee: MemberExpr
+              Receiver: IntLit
+                Text: "2"
+              Member: Identifier
+                Name: "mul"
+            Arguments:
+              IntLit
+                Text: "2"
+  Asserts: ~
+  Masters: ~

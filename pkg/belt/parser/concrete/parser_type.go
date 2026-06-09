@@ -110,14 +110,18 @@ func (p *parser) parseGenericArgs() *cst.Node {
 func (p *parser) parseRecordType() *cst.Node {
 	children := []cst.Green{p.bump()} // "{"
 	for {
-		switch p.peekSignificant() {
-		case token.RBrace:
+		switch {
+		case p.peekSignificant() == token.RBrace:
 			p.skipTrivia(&children)
 			children = append(children, p.bump()) // "}"
 			return cst.NewNode(cst.RecordType, children)
-		case token.EOF:
+		case p.peekSignificant() == token.EOF:
 			return cst.NewNode(cst.RecordType, children) // unterminated; the leaves are still lossless
-		case token.Ident:
+		case p.peekSignificant() == token.Ident || p.recordFieldKeyword():
+			// A field, its name a plain Ident or a keyword read as an identifier
+			// (type: SkillKind). The keyword arm requires the trailing ":" so a stray
+			// keyword in an unterminated body still falls to the recovery default
+			// rather than being eaten as a malformed field name.
 			p.skipTrivia(&children)
 			children = append(children, p.parseField())
 			if p.peekSignificant() == token.Comma {

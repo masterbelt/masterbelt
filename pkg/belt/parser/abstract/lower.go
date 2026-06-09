@@ -111,7 +111,7 @@ func lowerParam(t cst.Tree, buf source.Buffer) *ast.ParamDef {
 	var typ ast.TypeExpr
 	for _, child := range t.Children() {
 		if tok, ok := child.Token(); ok {
-			if tok.Kind() == token.Ident && name == "" {
+			if isNameToken(tok.Kind()) && name == "" {
 				name = child.Text(buf)
 			}
 			continue
@@ -585,6 +585,16 @@ func threeOperands(t cst.Tree, buf source.Buffer) (cond, then, els ast.Expr) {
 		els = operands[2]
 	}
 	return cond, then, els
+}
+
+// isNameToken reports whether a token kind names an identifier at a position the
+// grammar admits a reserved word as one — a member name after ".", a record
+// field name, a function parameter name. It mirrors the concrete parser's
+// nameLike, so the keyword leaf the parser accepts there lowers to its text as
+// the name. The excluded positions (let/loop/match bindings, generic parameter
+// and declaration names) keep matching token.Ident alone.
+func isNameToken(k token.Kind) bool {
+	return k == token.Ident || k.Keyword()
 }
 
 // isTrivia reports whether k is a trivia token kind (interleaved in an

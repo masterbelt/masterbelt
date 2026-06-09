@@ -165,7 +165,7 @@ func lowerField(t cst.Tree, buf source.Buffer) *ast.FieldDef {
 	var typ ast.TypeExpr
 	for _, child := range t.Children() {
 		if tok, ok := child.Token(); ok {
-			if tok.Kind() == token.Ident && name == "" {
+			if isNameToken(tok.Kind()) && name == "" {
 				name = child.Text(buf)
 			}
 			continue

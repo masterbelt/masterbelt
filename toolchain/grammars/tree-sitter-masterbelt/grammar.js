@@ -259,10 +259,18 @@ module.exports = grammar({
 
     effect: ($) => choice(kw.io, kw.async, kw.nondet),
 
+    // A name position the grammar reads a reserved word as an ordinary
+    // identifier: a member after ".", a record field name, a parameter name.
+    // It mirrors the real parser's nameLike — every keyword is admissible there
+    // because the position begins no keyword construct (item.type, { type: ... },
+    // fn(for: int)). The tree-sitter lexer extracts keywords eagerly, so each
+    // must be listed explicitly to be accepted here.
+    _name: ($) => choice($.identifier, ...Object.values(lex.kw)),
+
     param_list: ($) => seq(op.LParen, commaSep($.param), op.RParen),
 
     param: ($) =>
-      seq(field("name", $.identifier), optional(seq(op.Colon, field("type", $._type)))),
+      seq(field("name", $._name), optional(seq(op.Colon, field("type", $._type)))),
 
     // --- type expressions ----------------------------------------------------
 
@@ -300,7 +308,7 @@ module.exports = grammar({
     record_type: ($) =>
       seq(op.LBrace, repeat(seq($.field, optional(op.Comma))), op.RBrace),
     field: ($) =>
-      seq(field("name", $.identifier), op.Colon, field("type", $._type)),
+      seq(field("name", $._name), op.Colon, field("type", $._type)),
 
     // The return type is a primary type: a union return (fn(): A | B) would be
     // ambiguous with a union *of* function types, so it must be parenthesised.
@@ -452,7 +460,7 @@ module.exports = grammar({
     arguments: ($) => seq(op.LParen, commaSep($._expr), op.RParen),
 
     member_expr: ($) =>
-      prec(PREC.postfix, seq(field("receiver", $._expr), op.Dot, field("member", $.identifier))),
+      prec(PREC.postfix, seq(field("receiver", $._expr), op.Dot, field("member", $._name))),
 
     index_expr: ($) =>
       prec(PREC.postfix, seq(field("receiver", $._expr), op.LBracket, $._expr, op.RBracket)),
@@ -478,7 +486,7 @@ module.exports = grammar({
         op.RBrace,
       ),
     record_field: ($) =>
-      seq(field("name", $.identifier), op.Colon, field("value", $._expr)),
+      seq(field("name", $._name), op.Colon, field("value", $._expr)),
 
     func_literal: ($) =>
       seq(
