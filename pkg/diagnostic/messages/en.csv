@@ -27,6 +27,7 @@ belt.semantic.unknown_type,unknown type: {name}
 belt.semantic.cyclic_reference,cyclic reference involving {name}
 belt.semantic.cyclic_type_projection,cyclic type projection involving {name}
 belt.semantic.ambiguous_static_projection,ambiguous static projection {name}: the static fn is overloaded
+belt.semantic.unannotated_const_projection,cannot project {name}: the associated constant has no type annotation
 belt.semantic.constant_overflow,constant {value} overflows {typ}
 belt.semantic.invalid_operation,cannot apply method {method} to {types}
 belt.semantic.no_matching_overload,no overload of method {method} accepts {types}

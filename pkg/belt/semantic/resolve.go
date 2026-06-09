@@ -104,7 +104,7 @@ func resolveTypes(folder exprFolder, file *ast.File, at func(ast.Node) span, dia
 	// in-progress set rejects an ungrounded projection cycle and lets a grounded
 	// one bottom out; a projected generic argument's deferred bound check re-runs
 	// here on the folded type.
-	foldProjections(out, enumOut, masterOut, ifaceOut, reg, at, diags)
+	pf := foldProjections(out, enumOut, masterOut, ifaceOut, reg, at, diags)
 
 	// Phase 3 — the checks that read a resolved type, now folded: the interface
 	// inheritance graph (a cycle A: B, B: A, an override, a conflict), each
@@ -143,6 +143,11 @@ func resolveTypes(folder exprFolder, file *ast.File, at func(ast.Node) span, dia
 		// duplicated.
 		addEnumContracts(r, enumOut[i])
 	}
+
+	// With the impls resolved, judge the bound checks the projection fold deferred:
+	// a projected generic argument whose bound is a user interface is satisfied
+	// through an impl, so it can only be checked now.
+	pf.runPendingBounds()
 
 	// Fourth pass: fold the associated-constant initializers, deferred until
 	// every type, enum, and impl of the file has resolved so a cross-type
@@ -196,6 +201,22 @@ type projectionFolder struct {
 	// projection is not yet folded when the application is built. nil where there
 	// is nowhere to report.
 	boundViolation func(arg ast.TypeExpr, argType ir.Type, param *ir.TypeParam)
+	// pending collects the deferred bound checks the fold cannot run yet: a
+	// projected generic argument whose bound is a user interface is judged only
+	// after the impls that satisfy it are resolved, so runPendingBounds runs after
+	// that pass (a builtin bound like comparable would already pass here).
+	pending []pendingBound
+}
+
+// pendingBound is a deferred generic-application bound check on a folded
+// projected argument: the application's definition, the argument's position, the
+// argument folded to its declared type, and the projection it was written with
+// (the diagnostic's anchor).
+type pendingBound struct {
+	def   *ir.TypeDef
+	index int
+	arg   ir.Type
+	proj  *ir.Projection
 }
 
 // newProjectionFolder builds a fold over the file's resolved types: the bound
@@ -213,22 +234,28 @@ func newProjectionFolder(reg *builtin.Registry, at func(ast.Node) span, diags *d
 }
 
 // foldProjections folds every type-position member projection the file's
-// definitions hold to the member's declared type, in place.
-func foldProjections(out, enumOut, masterOut, ifaceOut []*ir.TypeDef, reg *builtin.Registry, at func(ast.Node) span, diags *diagnostic.List) {
+// definitions hold to the member's declared type, in place. It returns the
+// folder carrying the deferred bound checks; the caller runs runPendingBounds
+// once the impls are resolved.
+func foldProjections(out, enumOut, masterOut, ifaceOut []*ir.TypeDef, reg *builtin.Registry, at func(ast.Node) span, diags *diagnostic.List) *projectionFolder {
 	pf := newProjectionFolder(reg, at, diags)
 	for _, defs := range [][]*ir.TypeDef{out, enumOut, masterOut, ifaceOut} {
 		for _, def := range defs {
 			pf.foldDef(def)
 		}
 	}
+	return pf
 }
 
 // foldProjectionType folds the projections in a single type resolved at a use
-// site after the type bodies have settled — an impl tag, which resolveImpls
-// classifies as an interface — where no projection cycle is possible. It returns
-// the concrete type the interface check then consumes.
+// site after the type bodies and impls have settled — an impl tag or a function
+// signature — where no projection cycle is possible and a bound can be judged at
+// once. It returns the concrete type the caller then consumes.
 func foldProjectionType(t ir.Type, reg *builtin.Registry, at func(ast.Node) span, diags *diagnostic.List) ir.Type {
-	return newProjectionFolder(reg, at, diags).foldType(t)
+	pf := newProjectionFolder(reg, at, diags)
+	t = pf.foldType(t)
+	pf.runPendingBounds()
+	return t
 }
 
 // foldDef folds the projections in a definition's resolved type positions: its
@@ -280,9 +307,9 @@ func (pf *projectionFolder) foldType(t ir.Type) ir.Type {
 		t.Result = pf.foldType(t.Result)
 	case *ir.App:
 		for i := range t.Args {
-			proj, wasProj := t.Args[i].(*ir.Projection)
+			proj := ir.FirstProjection(t.Args[i])
 			t.Args[i] = pf.foldType(t.Args[i])
-			if wasProj {
+			if proj != nil {
 				pf.checkArgBound(t.Def, i, t.Args[i], proj)
 			}
 		}
@@ -292,24 +319,40 @@ func (pf *projectionFolder) foldType(t ir.Type) ir.Type {
 	return t
 }
 
-// checkArgBound runs the generic-application bound check app() deferred for a
-// projected argument: now that arg is folded to its declared type, a violation
-// of the parameter's bound is reported at the projection it was written as.
+// checkArgBound records the generic-application bound check app() deferred for a
+// projected argument now that arg is folded to its declared type. The check
+// itself runs in runPendingBounds, after the impls that may satisfy a user
+// interface bound are resolved.
 func (pf *projectionFolder) checkArgBound(def *ir.TypeDef, i int, arg ir.Type, proj *ir.Projection) {
-	if pf.reg == nil || pf.boundViolation == nil || def == nil || i >= len(def.Params) {
+	pf.pending = append(pf.pending, pendingBound{def: def, index: i, arg: arg, proj: proj})
+}
+
+// runPendingBounds judges the deferred bound checks and reports each violation at
+// the projection the argument was written with. The caller runs it once the
+// impls are resolved (a user interface bound is satisfied through an impl), so a
+// folded projected argument is judged against a complete picture.
+func (pf *projectionFolder) runPendingBounds() {
+	if pf.reg == nil || pf.boundViolation == nil {
+		pf.pending = nil
 		return
 	}
-	p := def.Params[i]
-	if p.Bound == nil || arg == ir.Invalid {
-		return
+	for _, pb := range pf.pending {
+		if pb.def == nil || pb.index >= len(pb.def.Params) {
+			continue
+		}
+		p := pb.def.Params[pb.index]
+		if p.Bound == nil || pb.arg == ir.Invalid {
+			continue
+		}
+		syntax, ok := pb.proj.Syntax.(ast.TypeExpr)
+		if !ok {
+			continue
+		}
+		if !types.Satisfies(pf.reg, pb.arg, p.Bound) {
+			pf.boundViolation(syntax, pb.arg, p)
+		}
 	}
-	syntax, ok := proj.Syntax.(ast.TypeExpr)
-	if !ok {
-		return
-	}
-	if !types.Satisfies(pf.reg, arg, p.Bound) {
-		pf.boundViolation(syntax, arg, p)
-	}
+	pf.pending = nil
 }
 
 // project resolves one projection to the member's declared type, folding that
@@ -334,6 +377,10 @@ func (pf *projectionFolder) project(p *ir.Projection) ir.Type {
 		// fall through to fold the member's declared type below
 	case types.ProjectAmbiguousStatic:
 		pf.report(p, newAmbiguousStaticProjectionDiagnostic)
+		pf.memo[key] = ir.Invalid
+		return ir.Invalid
+	case types.ProjectUnannotatedConst:
+		pf.report(p, newUnannotatedConstProjectionDiagnostic)
 		pf.memo[key] = ir.Invalid
 		return ir.Invalid
 	case types.ProjectMissing:
@@ -1843,6 +1890,11 @@ func resolveFuncs(file *ast.File, at func(ast.Node) span, diags *diagnostic.List
 		Report:         unknownTypeReporter(at, diags),
 		Registry:       reg,
 		BoundViolation: boundViolationReporter(at, diags),
+		// A function signature is a type position, so a parameter or result may be
+		// a projection (fn f(x: Character.level)). The types are already resolved
+		// here, so each is folded inline below; the body keeps the prior meaning of
+		// a qualified name through the non-projecting clone.
+		ProjectMembers: true,
 	}
 	shells := fns.shells
 	out := make([]*ir.Function, 0, len(file.Funcs))
@@ -1862,13 +1914,13 @@ func resolveFuncs(file *ast.File, at func(ast.Node) span, diags *diagnostic.List
 		paramTypes := make(map[string]ir.Type, len(fd.Params))
 		fn.Params = make([]ir.Param, 0, len(fd.Params))
 		for _, p := range fd.Params {
-			t := r.ResolveType(p.Type, tscope)
+			t := foldProjectionType(r.ResolveType(p.Type, tscope), reg, at, diags)
 			fn.Params = append(fn.Params, ir.Param{Name: p.Name, Type: t})
 			params[p.Name] = true
 			paramTypes[p.Name] = t
 		}
-		fn.Result = r.ResolveType(fd.Result, tscope)
-		fn.Body = lower.Body(fd.Body, bodyBinder{r: r, reg: reg, params: params, paramTypes: paramTypes, tscope: tscope, funcs: fns})
+		fn.Result = foldProjectionType(r.ResolveType(fd.Result, tscope), reg, at, diags)
+		fn.Body = lower.Body(fd.Body, bodyBinder{r: bodyResolver(r), reg: reg, params: params, paramTypes: paramTypes, tscope: tscope, funcs: fns})
 
 		key := fn.Name + funcSignatureKey(fn)
 		if fn.Name != "" && seen[key] {

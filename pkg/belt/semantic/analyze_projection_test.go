@@ -238,6 +238,69 @@ func TestTypeProjectionInterfaceParent(t *testing.T) {
 	}
 }
 
+func TestTypeProjectionFunctionSignature(t *testing.T) {
+	// A top-level function signature is a type position: a parameter and result
+	// projection fold to the declared type, the way a method signature's do.
+	src := "pub type Level = sbyte\n" +
+		"pub type Character = { level: Level }\n" +
+		"pub fn f(x: Character.level): Character.level { return x }\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", codes(diags))
+	}
+	fn := m.Funcs[0]
+	if fn.Params[0].Type.String() != "Level" {
+		t.Errorf("param = %s, want Level", fn.Params[0].Type)
+	}
+	if fn.Result.String() != "Level" {
+		t.Errorf("result = %s, want Level", fn.Result)
+	}
+}
+
+func TestTypeProjectionUnannotatedConst(t *testing.T) {
+	// A projected associated constant must be annotated: its type is inferred from
+	// its value in a later pass, so projecting an unannotated one is reported
+	// rather than publishing a malformed nil field type.
+	src := "pub type Stat = sbyte impl {\n  pub const Top = 99\n}\n" +
+		"pub type X = { hi: Stat.Top }\n"
+	m, diags := analyze(src)
+	if !hasCode(diags, CodeUnannotatedConstProjection) {
+		t.Fatalf("codes = %v, want unannotated_const_projection", codes(diags))
+	}
+	if got := fieldType(t, m, "X", 0); got != ir.Invalid {
+		t.Errorf("X.hi = %v (%T), want Invalid (not a malformed nil type)", got, got)
+	}
+}
+
+func TestTypeProjectionGenericArgUserBound(t *testing.T) {
+	// A projected generic argument whose bound is a user interface is judged after
+	// the impls resolve, not during the fold: Character.level folds to Level,
+	// which opts into Show, so pair<Character.level> satisfies pair<T: Show>.
+	src := "pub interface Show {\n  show(): nint\n}\n" +
+		"pub type Level = int impl Show {\n  show(): nint { return 0 }\n}\n" +
+		"pub type Character = { level: Level }\n" +
+		"pub type pair<T: Show> = list<T>\n" +
+		"pub type Use = pair<Character.level>\n"
+	_, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", codes(diags))
+	}
+}
+
+func TestTypeProjectionGenericArgUserBoundViolation(t *testing.T) {
+	// The deferred user-bound check genuinely fires: Level does not opt into Show,
+	// so pair<Character.level> is reported (it is not silently accepted).
+	src := "pub interface Show {\n  show(): nint\n}\n" +
+		"pub type Level = int\n" +
+		"pub type Character = { level: Level }\n" +
+		"pub type pair<T: Show> = list<T>\n" +
+		"pub type Use = pair<Character.level>\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeBoundNotSatisfied) {
+		t.Fatalf("Level does not impl Show; want bound_not_satisfied, got %v", codes(diags))
+	}
+}
+
 func TestTypeProjectionNotInMethodBody(t *testing.T) {
 	// A projection annotation inside a concrete method body is not covered by the
 	// declaration fold pass, so it must not be emitted there: the body keeps the

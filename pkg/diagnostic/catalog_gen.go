@@ -759,6 +759,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "cannot use " + f["actual"].String() + " as " + f["expected"].String()
 		}
 	},
+	"belt.semantic.unannotated_const_projection": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return f["name"].String() + " を射影できません: 関連定数に型注釈がありません"
+		default:
+			return "cannot project " + f["name"].String() + ": the associated constant has no type annotation"
+		}
+	},
 	"belt.semantic.undefined_name": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":

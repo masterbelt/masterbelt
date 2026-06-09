@@ -74,6 +74,47 @@ func HasInvalid(t Type) bool {
 	}
 }
 
+// FirstProjection returns the first Projection found in t in a pre-order walk, or
+// nil if t holds none. It is what a generic-application bound check reads to
+// defer judging a type argument that contains an unfolded projection (a bare
+// Character.level or a nested Box<Character.level>), and what the fold then reads
+// to anchor the deferred diagnostic at the projection the argument was written
+// with.
+func FirstProjection(t Type) *Projection {
+	switch t := t.(type) {
+	case *Projection:
+		return t
+	case *App:
+		for _, a := range t.Args {
+			if p := FirstProjection(a); p != nil {
+				return p
+			}
+		}
+	case *Func:
+		for _, param := range t.Params {
+			if p := FirstProjection(param); p != nil {
+				return p
+			}
+		}
+		return FirstProjection(t.Result)
+	case *Union:
+		for _, m := range t.Members {
+			if p := FirstProjection(m); p != nil {
+				return p
+			}
+		}
+	case *Record:
+		for _, f := range t.Fields {
+			if p := FirstProjection(f.Type); p != nil {
+				return p
+			}
+		}
+	case *TypeVar:
+		return FirstProjection(t.Bound)
+	}
+	return nil
+}
+
 // --- declared and composite types -------------------------------------------
 
 // unresolvedType is the placeholder String() renders for a type reference whose

@@ -72,9 +72,10 @@ type ProjectResult int
 
 // The projection outcomes; see each one's comment.
 const (
-	ProjectFound           ProjectResult = iota // the member projects to the returned type
-	ProjectMissing                              // the receiver declares no such member, or the receiver is an unapplied generic
-	ProjectAmbiguousStatic                      // the member is an overloaded static fn, which a projection cannot disambiguate
+	ProjectFound            ProjectResult = iota // the member projects to the returned type
+	ProjectMissing                               // the receiver declares no such member, or the receiver is an unapplied generic
+	ProjectAmbiguousStatic                       // the member is an overloaded static fn, which a projection cannot disambiguate
+	ProjectUnannotatedConst                      // the member is an associated constant with no type annotation, whose type is not yet known
 )
 
 // ProjectMemberType returns the declared type a type-position projection
@@ -97,7 +98,13 @@ func ProjectMemberType(def *ir.TypeDef, name string) (ir.Type, ProjectResult) {
 	}
 	switch m := ResolveMember(def, name); m.Kind {
 	case MemberConst:
-		return def.Consts[m.Index].Type, ProjectFound
+		// An unannotated constant's type is inferred from its folded value in a
+		// later pass, so it is not yet known when projections fold; projecting it
+		// would publish a nil field type. Require the annotation instead.
+		if t := def.Consts[m.Index].Type; t != nil {
+			return t, ProjectFound
+		}
+		return nil, ProjectUnannotatedConst
 	case MemberEnum:
 		return &ir.Named{Def: def}, ProjectFound
 	case MemberStatic:

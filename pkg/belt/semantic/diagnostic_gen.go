@@ -81,6 +81,7 @@ const (
 	CodeTernaryBranchMismatch      diagnostic.Code = "belt.semantic.ternary_branch_mismatch"
 	CodeTernaryConditionNotBool    diagnostic.Code = "belt.semantic.ternary_condition_not_bool"
 	CodeTypeMismatch               diagnostic.Code = "belt.semantic.type_mismatch"
+	CodeUnannotatedConstProjection diagnostic.Code = "belt.semantic.unannotated_const_projection"
 	CodeUndefinedName              diagnostic.Code = "belt.semantic.undefined_name"
 	CodeUnfoldedConst              diagnostic.Code = "belt.semantic.unfolded_const"
 	CodeUninferableCollection      diagnostic.Code = "belt.semantic.uninferable_collection"
@@ -1126,6 +1127,20 @@ func newTypeMismatchDiagnostic(offset int, width int, actual string, expected st
 		Severity: diagnostic.Error,
 		Code:     CodeTypeMismatch,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeTypeMismatch, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newUnannotatedConstProjectionDiagnostic(offset int, width int, name string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"name": diagnostic.Str(name),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeUnannotatedConstProjection,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeUnannotatedConstProjection, fields),
 		Fields:   fields,
 		Offset:   offset,
 		Width:    width,
