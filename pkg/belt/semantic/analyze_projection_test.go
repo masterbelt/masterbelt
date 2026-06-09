@@ -225,6 +225,48 @@ func TestTypeProjectionInterfaceParent(t *testing.T) {
 	}
 }
 
+func TestTypeProjectionGenericParamBound(t *testing.T) {
+	// A generic parameter's bound written as a projection is judged after it
+	// folds: Holder.s folds to Show, and Level (which opts into Show) satisfies it,
+	// so Need<Level> is clean — the bound projection does not falsely reject it.
+	src := "pub interface Show {\n  show(): nint\n}\n" +
+		"pub type Level = int impl Show {\n  show(): nint { return 0 }\n}\n" +
+		"pub type Holder = { s: Show }\n" +
+		"pub type Need<T: Holder.s> = list<T>\n" +
+		"pub type Use = Need<Level>\n"
+	_, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", codes(diags))
+	}
+}
+
+func TestTypeProjectionEnumBaseDeferred(t *testing.T) {
+	// An enum base written as a projection is not folded (the enum needs its
+	// concrete base in place to fold the member values), so it reads as an unknown
+	// type rather than an invalid-base report on an unresolved projection.
+	src := "pub type Holder = { b: byte }\n" +
+		"pub enum E: Holder.b {\n  A = 1\n}\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeUnknownType) {
+		t.Fatalf("enum base projection should be deferred (unknown_type); got %v", codes(diags))
+	}
+}
+
+func TestTypeProjectionFieldNotMaskedByStatic(t *testing.T) {
+	// A record field projects even when a static fn shares its name (different
+	// namespaces): C.x is the field's declared type, not masked by the deferred
+	// static x.
+	src := "pub type C = { x: nint } impl {\n  pub static fn x(): nint { return 0 }\n}\n" +
+		"pub type Use = { v: C.x }\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", codes(diags))
+	}
+	if got := fieldType(t, m, "Use", 0); got.String() != "nint" {
+		t.Errorf("Use.v = %s, want nint", got)
+	}
+}
+
 func TestTypeProjectionMemberCollisionOnProjectedBody(t *testing.T) {
 	// A body written through a projection is checked for member collisions after it
 	// folds: type C = Holder.row, where Holder.row is a record with field x, plus

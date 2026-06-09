@@ -192,11 +192,12 @@ func (r *TypeResolver) app(def *ir.TypeDef, argExprs []ast.TypeExpr, scope TypeS
 			if p.Bound == nil || args[i] == ir.Invalid {
 				continue
 			}
-			// An argument that holds a projection — a bare Character.level or a
-			// nested Box<Character.level> — is not yet folded to its declared type,
-			// so the bound cannot be judged here; the projection fold re-runs the
-			// check on the resolved type once it is known.
-			if ir.FirstProjection(args[i]) != nil {
+			// A projection on either side — an argument that holds one (a bare
+			// Character.level or a nested Box<Character.level>) or a parameter whose
+			// bound is one (T: Holder.s) — is not yet folded to its declared type, so
+			// the bound cannot be judged here; the projection fold re-runs the check
+			// on the resolved types once they are known.
+			if ir.FirstProjection(args[i]) != nil || ir.FirstProjection(p.Bound) != nil {
 				continue
 			}
 			if !types.Satisfies(r.Registry, args[i], p.Bound) {

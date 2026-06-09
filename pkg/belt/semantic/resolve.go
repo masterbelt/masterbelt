@@ -307,10 +307,16 @@ func (pf *projectionFolder) foldType(t ir.Type) ir.Type {
 		t.Result = pf.foldType(t.Result)
 	case *ir.App:
 		for i := range t.Args {
-			proj := ir.FirstProjection(t.Args[i])
+			// The bound check app() deferred re-runs here for a projection on either
+			// side: the argument, or the parameter's bound. Either projection is the
+			// diagnostic's anchor — the argument's when it has one, else the bound's.
+			anchor := ir.FirstProjection(t.Args[i])
 			t.Args[i] = pf.foldType(t.Args[i])
-			if proj != nil {
-				pf.checkArgBound(t.Def, i, t.Args[i], proj)
+			if anchor == nil && t.Def != nil && i < len(t.Def.Params) {
+				anchor = ir.FirstProjection(t.Def.Params[i].Bound)
+			}
+			if anchor != nil {
+				pf.checkArgBound(t.Def, i, t.Args[i], anchor)
 			}
 		}
 	case *ir.TypeVar:
@@ -1347,6 +1353,11 @@ func constantType(v *ir.Constant) ir.Type {
 // member initializers (a constant expression may reference a top-level const);
 // it is nil in callers that do not evaluate.
 func resolveEnumDecl(folder exprFolder, defs map[string]*ir.TypeDef, r *infer.TypeResolver, reg *builtin.Registry, ed *ast.EnumDecl, def *ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List, fns bodyFuncs) {
+	// The enum is resolved through the non-projecting resolver: its base is needed
+	// concrete here to fold the member values, so it cannot be a projection folded
+	// in a later phase, and its methods are signatures. Base/signature projection
+	// is deferred, so a qualified name keeps its prior meaning (an unknown type).
+	r = bodyResolver(r)
 	// The base type: the annotation when present, else the default nint. It must
 	// resolve to an integer-family or string primitive — anything else (bool, a
 	// user type, a composite) is rejected, and the enum falls back to nint so the

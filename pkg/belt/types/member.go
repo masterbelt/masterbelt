@@ -107,8 +107,13 @@ func ProjectMemberType(def *ir.TypeDef, name string) (ir.Type, ProjectResult) {
 	case MemberEnum:
 		return &ir.Named{Def: def}, ProjectFound
 	case MemberStatic:
-		// A static fn projects to its function type — a signature. Signature-
-		// position projection is deferred, so it is not projected here.
+		// A static fn projects to its function type — a signature — and signature-
+		// position projection is deferred. A record field may share the name in a
+		// different namespace (value.x is the field, Type.x() the static), so the
+		// deferred static does not mask a projectable field of the same name.
+		if t, ok := recordFieldType(def, name); ok {
+			return t, ProjectFound
+		}
 		return nil, ProjectMissing
 	case MemberNone:
 		if t, ok := recordFieldType(def, name); ok {
