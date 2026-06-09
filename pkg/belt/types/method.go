@@ -12,6 +12,24 @@ import (
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
 )
 
+// IsMetatypeMethod reports whether name is an instance method of the metatype
+// `type` — its equality, eql/neq. A call on a bare type name (Level == long,
+// desugared to Level.eql(long)) resolves to one of these: the receiver is the
+// reified type value, not a static-call namespace, so the static-call rule and
+// the reference walk both defer such a call to the type-value method path.
+func IsMetatypeMethod(reg *builtin.Registry, name string) bool {
+	def, ok := reg.Lookup(builtin.NameType)
+	if !ok {
+		return false
+	}
+	for _, m := range def.Methods {
+		if m.Name == name && m.Kind == ir.MethodNormal {
+			return true
+		}
+	}
+	return false
+}
+
 // MethodResult is the type rule for a method call: it selects the one overload
 // of the method the argument types fit (SelectOverload), unifying the
 // self-typed operands (so the default integer adapts to a sized one), and

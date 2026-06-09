@@ -1,50 +1,6 @@
 File
   Uses: ~
-  Decls:
-    ConstDecl
-      Doc: "A builtin type, reified: the value is sbyte, its own type is `type`."
-      Public: true
-      Name: "sbyte_t"
-      Type: ~
-      Value: Identifier
-        Name: "sbyte"
-      Builtin: false
-    ConstDecl
-      Doc: "A nominal type, reified: the declared identity is preserved (Level, not the" "sbyte it aliases) — type values carry nominal identity, not structure."
-      Public: true
-      Name: "level_t"
-      Type: ~
-      Value: Identifier
-        Name: "Level"
-      Builtin: false
-    ConstDecl
-      Doc: "The metatype carried as a written annotation — the value flows in at `type`."
-      Public: true
-      Name: "annotated"
-      Type: NamedType
-        Namespace: ""
-        Name: "type"
-        Args: ~
-        Projections: ~
-      Value: Identifier
-        Name: "Level"
-      Builtin: false
-    ConstDecl
-      Doc: "The metatype itself, as a value: type is a value of type type."
-      Public: true
-      Name: "meta"
-      Type: ~
-      Value: Identifier
-        Name: "type"
-      Builtin: false
-    ConstDecl
-      Doc: "A type value passed on by reference, still of type `type`."
-      Public: true
-      Name: "same_level"
-      Type: ~
-      Value: Identifier
-        Name: "level_t"
-      Builtin: false
+  Decls: ~
   Types:
     TypeDecl
       Doc: "A character level, a nominal alias the schema shares."
@@ -61,7 +17,71 @@ File
       Consts: ~
       Impls: ~
     TypeDecl
-      Doc: "A schema with a column literally named `type` whose declared type is the" "metatype itself — the keyword as a field name and the type atom together."
+      Doc: "A structural record. Its fields' declared types — long, Level — are what a" "projection off it recovers, with nominal identity intact."
+      Public: true
+      Name: "Item"
+      Params: ~
+      Body: RecordType
+        Fields:
+          FieldDef
+            Name: "id"
+            Type: NamedType
+              Namespace: ""
+              Name: "long"
+              Args: ~
+              Projections: ~
+          FieldDef
+            Name: "level"
+            Type: NamedType
+              Namespace: ""
+              Name: "Level"
+              Args: ~
+              Projections: ~
+      Where: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
+    TypeDecl
+      Doc: "A second record reusing Item's field types by projection in type position:" "rank is exactly Item.level, the declared alias Level — change Level once and" "both records follow (schema DRY). A projection is a type, so it stands in a" "type position; it is never stored in a value."
+      Public: true
+      Name: "Mob"
+      Params: ~
+      Body: RecordType
+        Fields:
+          FieldDef
+            Name: "id"
+            Type: NamedType
+              Namespace: "Item"
+              Name: "id"
+              Args: ~
+              Projections: ~
+          FieldDef
+            Name: "rank"
+            Type: NamedType
+              Namespace: "Item"
+              Name: "level"
+              Args: ~
+              Projections: ~
+      Where: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
+    TypeDecl
+      Doc: "A type alias naming a projected field type directly — Item's id column type," "kept in one place rather than repeated."
+      Public: true
+      Name: "ItemId"
+      Params: ~
+      Body: NamedType
+        Namespace: "Item"
+        Name: "id"
+        Args: ~
+        Projections: ~
+      Where: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
+    TypeDecl
+      Doc: "A schema with a column named `type`, whose declared type is an ordinary type."
       Public: true
       Name: "Schema"
       Params: ~
@@ -71,32 +91,9 @@ File
             Name: "type"
             Type: NamedType
               Namespace: ""
-              Name: "type"
+              Name: "Level"
               Args: ~
               Projections: ~
-      Where: ~
-      Methods: ~
-      Consts: ~
-      Impls: ~
-    TypeDecl
-      Doc: "A type-to-type mapping whose parameter is literally named `type` — the shape" "a generic, a comptime type function, takes."
-      Public: true
-      Name: "Remap"
-      Params: ~
-      Body: FuncType
-        Params:
-          ParamDef
-            Name: "type"
-            Type: NamedType
-              Namespace: ""
-              Name: "type"
-              Args: ~
-              Projections: ~
-        Result: NamedType
-          Namespace: ""
-          Name: "type"
-          Args: ~
-          Projections: ~
       Where: ~
       Methods: ~
       Consts: ~
@@ -104,5 +101,58 @@ File
   Enums: ~
   Interfaces: ~
   Funcs: ~
-  Asserts: ~
+  Asserts:
+    AssertDecl
+      Doc: "The projected field type is the declared one."
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: MemberExpr
+            Receiver: Identifier
+              Name: "Item"
+            Member: Identifier
+              Name: "id"
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          Identifier
+            Name: "long"
+    AssertDecl
+      Doc: "Nominal identity is preserved: Item.level is Level, not its sbyte base."
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: MemberExpr
+            Receiver: Identifier
+              Name: "Item"
+            Member: Identifier
+              Name: "level"
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          Identifier
+            Name: "Level"
+    AssertDecl
+      Doc: "A bare type name reifies to a type value too, so two names compare directly."
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: Identifier
+            Name: "Level"
+          Member: Identifier
+            Name: "neq"
+        Arguments:
+          Identifier
+            Name: "long"
+    AssertDecl
+      Doc: "That column's declared type, recovered by projection — the keyword read as a" "member name after the dot."
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: MemberExpr
+            Receiver: Identifier
+              Name: "Schema"
+            Member: Identifier
+              Name: "type"
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          Identifier
+            Name: "Level"
   Masters: ~

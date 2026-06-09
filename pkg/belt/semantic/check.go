@@ -386,6 +386,15 @@ func checkFuncBodies(reg *builtin.Registry, file *ast.File, universe map[string]
 		if diags == nil {
 			continue // the sink-only walk wants no further diagnostics
 		}
+		// A function parameter or result may not be a type value: fn f(t: type) or
+		// fn f(): type is type_in_value_position — there are no type-value functions
+		// (§4), which is why generics stay type parameters rather than type-value
+		// parameters.
+		ptypes := make([]ir.Type, len(fd.Params))
+		for i, p := range fd.Params {
+			ptypes[i] = params[p.Name]
+		}
+		reportMetatypeSlot(at, diags, fd, &ir.Func{Params: ptypes, Result: want})
 		checkBareEnumArgs(fd.Body, bs, env, at, diags)
 		if hasBlockBody(fd) && !bodyReturns(fd.Body, bs) {
 			s := at(fd)

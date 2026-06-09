@@ -363,6 +363,12 @@ func (a *assembler) resolveConst(decl *ast.ConstDecl, cyclic bool) {
 	c.Type = a.q.typeOf(decl)
 	c.Eval = a.q.valueOf(decl)
 
+	// A const may not hold a type value: const x = sbyte (the 0001 const
+	// reification, withdrawn) or const x: type is type_in_value_position. A
+	// projected type is named with a type alias (type X = Character.level), never
+	// bound to a const; the type value lives only inside a comptime expression.
+	reportMetatypeSlot(a.at, a.diags, decl, c.Type)
+
 	// Resolve the annotation with reporting enabled, so an unknown type
 	// name anywhere in it (e.g. list<Bogus>) is diagnosed at its own node.
 	// The annotation resolves in the file's universe: its own type

@@ -1,159 +1,5 @@
 Module
-  Consts:
-    Const
-      Name: "sbyte_t"
-      Anchor: "belt:/sbyte_t"
-      Public: true
-      Doc: "A builtin type, reified: the value is sbyte, its own type is `type`."
-      Type: Builtin
-        Name: "type"
-      Value: TypeValue
-        Reified: Builtin
-          Name: "sbyte"
-        Type: Builtin
-          Name: "type"
-      Eval: Constant
-        Kind: 12
-        Int: ~
-        Bool: false
-        Str: ""
-        Coll: ~
-        Fields: ~
-        CollMapness: 0
-        Millis: 0
-        Fn: ~
-        Captured: ~
-        EnumDef: ~
-        EnumIndex: 0
-        Start: ~
-        End: ~
-        Step: ~
-        UnionTag: ~
-        Reified: Builtin
-          Name: "sbyte"
-    Const
-      Name: "level_t"
-      Anchor: "belt:/level_t"
-      Public: true
-      Doc: "A nominal type, reified: the declared identity is preserved (Level, not the" "sbyte it aliases) — type values carry nominal identity, not structure."
-      Type: Builtin
-        Name: "type"
-      Value: TypeValue
-        Reified: Named
-          Def: "Level"
-        Type: Builtin
-          Name: "type"
-      Eval: Constant
-        Kind: 12
-        Int: ~
-        Bool: false
-        Str: ""
-        Coll: ~
-        Fields: ~
-        CollMapness: 0
-        Millis: 0
-        Fn: ~
-        Captured: ~
-        EnumDef: ~
-        EnumIndex: 0
-        Start: ~
-        End: ~
-        Step: ~
-        UnionTag: ~
-        Reified: Named
-          Def: "Level"
-    Const
-      Name: "annotated"
-      Anchor: "belt:/annotated"
-      Public: true
-      Doc: "The metatype carried as a written annotation — the value flows in at `type`."
-      Type: Builtin
-        Name: "type"
-      Value: TypeValue
-        Reified: Named
-          Def: "Level"
-        Type: Builtin
-          Name: "type"
-      Eval: Constant
-        Kind: 12
-        Int: ~
-        Bool: false
-        Str: ""
-        Coll: ~
-        Fields: ~
-        CollMapness: 0
-        Millis: 0
-        Fn: ~
-        Captured: ~
-        EnumDef: ~
-        EnumIndex: 0
-        Start: ~
-        End: ~
-        Step: ~
-        UnionTag: ~
-        Reified: Named
-          Def: "Level"
-    Const
-      Name: "meta"
-      Anchor: "belt:/meta"
-      Public: true
-      Doc: "The metatype itself, as a value: type is a value of type type."
-      Type: Builtin
-        Name: "type"
-      Value: TypeValue
-        Reified: Builtin
-          Name: "type"
-        Type: Builtin
-          Name: "type"
-      Eval: Constant
-        Kind: 12
-        Int: ~
-        Bool: false
-        Str: ""
-        Coll: ~
-        Fields: ~
-        CollMapness: 0
-        Millis: 0
-        Fn: ~
-        Captured: ~
-        EnumDef: ~
-        EnumIndex: 0
-        Start: ~
-        End: ~
-        Step: ~
-        UnionTag: ~
-        Reified: Builtin
-          Name: "type"
-    Const
-      Name: "same_level"
-      Anchor: "belt:/same_level"
-      Public: true
-      Doc: "A type value passed on by reference, still of type `type`."
-      Type: Builtin
-        Name: "type"
-      Value: Reference
-        Target: "level_t"
-        Type: Builtin
-          Name: "type"
-      Eval: Constant
-        Kind: 12
-        Int: ~
-        Bool: false
-        Str: ""
-        Coll: ~
-        Fields: ~
-        CollMapness: 0
-        Millis: 0
-        Fn: ~
-        Captured: ~
-        EnumDef: ~
-        EnumIndex: 0
-        Start: ~
-        End: ~
-        Step: ~
-        UnionTag: ~
-        Reified: Named
-          Def: "Level"
+  Consts: ~
   Types:
     TypeDef
       Name: "Level"
@@ -172,17 +18,21 @@ Module
       Master: ~
       Where: ~
     TypeDef
-      Name: "Schema"
-      Anchor: "belt:/Schema"
+      Name: "Item"
+      Anchor: "belt:/Item"
       Public: true
-      Doc: "A schema with a column literally named `type` whose declared type is the" "metatype itself — the keyword as a field name and the type atom together."
+      Doc: "A structural record. Its fields' declared types — long, Level — are what a" "projection off it recovers, with nominal identity intact."
       Params: ~
       Body: Record
         Fields:
           Field
-            Name: "type"
+            Name: "id"
             Type: Builtin
-              Name: "type"
+              Name: "long"
+          Field
+            Name: "level"
+            Type: Named
+              Def: "Level"
       Methods: ~
       Consts: ~
       Builtin: false
@@ -192,17 +42,57 @@ Module
       Master: ~
       Where: ~
     TypeDef
-      Name: "Remap"
-      Anchor: "belt:/Remap"
+      Name: "Mob"
+      Anchor: "belt:/Mob"
       Public: true
-      Doc: "A type-to-type mapping whose parameter is literally named `type` — the shape" "a generic, a comptime type function, takes."
+      Doc: "A second record reusing Item's field types by projection in type position:" "rank is exactly Item.level, the declared alias Level — change Level once and" "both records follow (schema DRY). A projection is a type, so it stands in a" "type position; it is never stored in a value."
       Params: ~
-      Body: Func
-        Params:
-          Builtin
+      Body: Record
+        Fields:
+          Field
+            Name: "id"
+            Type: Builtin
+              Name: "long"
+          Field
+            Name: "rank"
+            Type: Named
+              Def: "Level"
+      Methods: ~
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Master: ~
+      Where: ~
+    TypeDef
+      Name: "ItemId"
+      Anchor: "belt:/ItemId"
+      Public: true
+      Doc: "A type alias naming a projected field type directly — Item's id column type," "kept in one place rather than repeated."
+      Params: ~
+      Body: Builtin
+        Name: "long"
+      Methods: ~
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Master: ~
+      Where: ~
+    TypeDef
+      Name: "Schema"
+      Anchor: "belt:/Schema"
+      Public: true
+      Doc: "A schema with a column named `type`, whose declared type is an ordinary type."
+      Params: ~
+      Body: Record
+        Fields:
+          Field
             Name: "type"
-        Result: Builtin
-          Name: "type"
+            Type: Named
+              Def: "Level"
       Methods: ~
       Consts: ~
       Builtin: false
@@ -212,4 +102,92 @@ Module
       Master: ~
       Where: ~
   Funcs: ~
-  Asserts: ~
+  Asserts:
+    Assert
+      Cond: "Item.id == long"
+      Doc: "The projected field type is the declared one."
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+        Reified: ~
+      Diagram: "Item.id == long\n     ^  ^  ^\n     |  |  long\n     |  true\n     long"
+    Assert
+      Cond: "Item.level == Level"
+      Doc: "Nominal identity is preserved: Item.level is Level, not its sbyte base."
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+        Reified: ~
+      Diagram: "Item.level == Level\n     ^     ^  ^\n     Level |  Level\n           true"
+    Assert
+      Cond: "Level != long"
+      Doc: "A bare type name reifies to a type value too, so two names compare directly."
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+        Reified: ~
+      Diagram: "Level != long\n^     ^  ^\nLevel |  long\n      true"
+    Assert
+      Cond: "Schema.type == Level"
+      Doc: "That column's declared type, recovered by projection — the keyword read as a" "member name after the dot."
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+        Reified: ~
+      Diagram: "Schema.type == Level\n       ^    ^  ^\n       |    |  Level\n       |    true\n       Level"

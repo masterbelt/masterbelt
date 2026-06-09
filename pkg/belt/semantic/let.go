@@ -60,6 +60,10 @@ func checkLet(s *ast.LetStmt, bs infer.BodyScope, env exprFolder, noSelf func(as
 		diags.Add(newMissingInitializerDiagnostic(c.offset, c.width, s.Name))
 	}
 
+	// A let may not hold a type value: let x = sbyte or let x: type is
+	// type_in_value_position, the local-binding twin of the const rule (§4).
+	reportMetatypeSlot(at, diags, s, typ)
+
 	// A nameless let (recovered away by the parser) cannot be bound or referenced;
 	// extend nothing.
 	if s.Name == "" {

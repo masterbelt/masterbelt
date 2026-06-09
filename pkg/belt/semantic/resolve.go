@@ -3,6 +3,7 @@ package semantic
 import (
 	"maps"
 	"math/big"
+	"slices"
 
 	"github.com/masterbelt/masterbelt/pkg/belt/builtin"
 	"github.com/masterbelt/masterbelt/pkg/belt/eval"
@@ -41,6 +42,53 @@ func boundViolationReporter(at func(ast.Node) span, diags *diagnostic.List) func
 		s := at(arg)
 		diags.Add(newBoundNotSatisfiedDiagnostic(s.offset, s.width, argType.String(), param.Bound.String()))
 	}
+}
+
+// mentionsMetatype reports whether a resolved type is — or contains, anywhere in
+// a composite — the metatype `type` (the type a reified type value carries). A
+// type value is comptime-only and may not be stored, so any storage slot whose
+// resolved type mentions the metatype is rejected; the recursive check closes
+// the escape a bare top-level test would miss (list<type>, fn(type): type).
+func mentionsMetatype(t ir.Type) bool {
+	switch t := t.(type) {
+	case *ir.Builtin:
+		return t.Name == builtin.NameType
+	case *ir.App:
+		return slices.ContainsFunc(t.Args, mentionsMetatype)
+	case *ir.Union:
+		return slices.ContainsFunc(t.Members, mentionsMetatype)
+	case *ir.Record:
+		return slices.ContainsFunc(t.Fields, func(f ir.Field) bool { return mentionsMetatype(f.Type) })
+	case *ir.Func:
+		return slices.ContainsFunc(t.Params, mentionsMetatype) || mentionsMetatype(t.Result)
+	default:
+		return false
+	}
+}
+
+// sigType packs a signature's parameter and result types into an ir.Func, so a
+// single metatype test over it reports one diagnostic per signature however many
+// of its slots are a type value.
+func sigType(params []ir.Param, result ir.Type) *ir.Func {
+	ts := make([]ir.Type, len(params))
+	for i, p := range params {
+		ts[i] = p.Type
+	}
+	return &ir.Func{Params: ts, Result: result}
+}
+
+// reportMetatypeSlot reports type_in_value_position when a storage slot's
+// resolved type mentions the metatype — a const, let, record field, function
+// parameter, or result whose type is (or carries) `type`. A type value is a
+// comptime value and cannot be stored; the alias form (type X = Character.level)
+// is how a projected type is named. It anchors at node and is a no-op without a
+// reporter (a memoized resolution) or when the slot type is metatype-free.
+func reportMetatypeSlot(at func(ast.Node) span, diags *diagnostic.List, node ast.Node, t ir.Type) {
+	if at == nil || diags == nil || node == nil || !mentionsMetatype(t) {
+		return
+	}
+	s := at(node)
+	diags.Add(newTypeInValuePositionDiagnostic(s.offset, s.width))
 }
 
 // projectionErrorReporter builds the callback the type resolver reports a failed
@@ -799,6 +847,12 @@ func resolveDecl(r *infer.TypeResolver, reg *builtin.Registry, td *ast.TypeDecl,
 		def.Body = &ir.Builtin{Name: td.Name}
 	} else {
 		def.Body = r.ResolveType(td.Body, scope)
+		// A storage slot may not hold a type value: a record field, a function
+		// type's parameter or result, or the alias itself resolving to the metatype
+		// (type Schema = { type: type }, type Remap = fn(type): type) is
+		// type_in_value_position. The projected-type alias (type X = Character.level)
+		// resolves to the field's declared type, not the metatype, so it is allowed.
+		reportMetatypeSlot(at, diags, td.Body, def.Body)
 	}
 	// The associated constants are resolved before the where-clause, so a
 	// self-referential predicate (`where self <= Percent.Max`) can read them.
@@ -813,6 +867,9 @@ func resolveDecl(r *infer.TypeResolver, reg *builtin.Registry, td *ast.TypeDecl,
 	seen := make(map[string]bool, len(td.Methods))
 	for _, m := range td.Methods {
 		rm := resolveMethod(r, reg, &ir.Named{Def: def}, m, scope, fns)
+		// A method parameter or result may not be a type value (fn f(t: type) — the
+		// "no type-value functions" half of the storage rule, §4).
+		reportMetatypeSlot(at, diags, m, sigType(rm.Params, rm.Result))
 		key := rm.Name + signatureKey(def, rm)
 		if m.Name != "" && seen[key] {
 			reportDuplicateMethod(rm, def, m, at, diags)

@@ -272,8 +272,13 @@ func classifyRefCallee(fileID FileID, e *ast.CallExpr, q queries, funcCallee map
 			// fn call (Celsius.freezing()): the member is not an enum member or
 			// associated constant, so it must be exempt from the type-member
 			// reference check below — whether the static fn exists is the type
-			// checker's unknown_static finding.
-			if types.ResolveMember(q.universe(fileID)[recv.Name], callee.Member.Name).Kind == types.MemberStatic {
+			// checker's unknown_static finding. A metatype method call (Level ==
+			// long, desugared to Level.eql(long)) is exempt the same way: it calls
+			// the reified type value's equality, not a member of the type itself.
+			switch {
+			case types.ResolveMember(q.universe(fileID)[recv.Name], callee.Member.Name).Kind == types.MemberStatic:
+				staticCallee[callee] = true
+			case types.IsMetatypeMethod(q.registry(), callee.Member.Name):
 				staticCallee[callee] = true
 			}
 		}
