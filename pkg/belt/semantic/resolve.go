@@ -821,8 +821,10 @@ func resolveDecl(r *infer.TypeResolver, reg *builtin.Registry, td *ast.TypeDecl,
 func resolveMasterDecl(r *infer.TypeResolver, reg *builtin.Registry, md *ast.MasterDecl, def *ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List, fns bodyFuncs) {
 	// The row may be written inline (record { ... }) or as a named record type
 	// (record Row, type Row = { ... }), so unwrap a nominal alias to its record.
-	if rec := underlyingRecord(r.ResolveType(md.Record, nil)); rec != nil {
-		def.Master.Fields = rec.Fields
+	// An absent or non-record row leaves it nil — reported by checkMaster.
+	row := underlyingRecord(r.ResolveType(md.Record, nil))
+	if row != nil {
+		def.Master.Fields = row.Fields
 	}
 	def.Master.Primary = md.Primary
 	def.Consts = resolveAssocConstList(r, reg, def, md.Consts, nil, at, diags)
@@ -840,36 +842,51 @@ func resolveMasterDecl(r *infer.TypeResolver, reg *builtin.Registry, md *ast.Mas
 		def.AttachMethods(rm)
 	}
 	checkMemberDecls(def, at, diags)
-	checkMasterPrimary(md, def, at, diags)
+	checkMaster(md, row, at, diags)
 }
 
-// checkMasterPrimary reports the primary-key problems of a master: an absent
+// checkMaster reports a master's well-formedness problems: an absent or
+// non-record row (master_missing_row — there is nothing to key), an absent
 // primary key (master_missing_primary — a master with no key cannot identify a
-// row), and each named key that is not a field of the row
-// (master_primary_unknown_field). It runs only in the reporting pass (at/diags
-// non-nil); the silent memoized pass builds the same definition without it, so
-// the definitions and the diagnostics never disagree. Each diagnostic is
-// anchored at the whole master declaration — the AST keeps the primary key as a
-// bare name with no node of its own, so the declaration is the finest anchor
-// available for now.
-func checkMasterPrimary(md *ast.MasterDecl, def *ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List) {
+// row), a primary column repeated (master_duplicate_primary_key — a key tuple
+// must not name a column twice), and each named key that is not a field of the
+// row (master_primary_unknown_field). row is the resolved row record, or nil
+// when it is absent or not a record. It runs only in the reporting pass
+// (at/diags non-nil); the silent memoized pass builds the same definition
+// without it, so the definitions and the diagnostics never disagree. Each
+// diagnostic is anchored at the whole master declaration — the AST keeps the
+// primary key as a bare name with no node of its own, so the declaration is the
+// finest anchor available for now.
+func checkMaster(md *ast.MasterDecl, row *ir.Record, at func(ast.Node) span, diags *diagnostic.List) {
 	if at == nil || diags == nil {
 		return
 	}
+	s := at(md)
+	if row == nil {
+		diags.Add(newMasterMissingRowDiagnostic(s.offset, s.width, md.Name))
+	}
 	if len(md.Primary) == 0 {
-		s := at(md)
 		diags.Add(newMasterMissingPrimaryDiagnostic(s.offset, s.width, md.Name))
 		return
 	}
-	fields := make(map[string]bool, len(def.Master.Fields))
-	for _, f := range def.Master.Fields {
+	// Without a row the key-existence check is meaningless (every column would
+	// read as unknown); the missing-row diagnostic above already covers it.
+	if row == nil {
+		return
+	}
+	fields := make(map[string]bool, len(row.Fields))
+	for _, f := range row.Fields {
 		fields[f.Name] = true
 	}
+	seen := make(map[string]bool, len(md.Primary))
 	for _, key := range md.Primary {
-		if !fields[key] {
-			s := at(md)
+		switch {
+		case seen[key]:
+			diags.Add(newMasterDuplicatePrimaryKeyDiagnostic(s.offset, s.width, key, md.Name))
+		case !fields[key]:
 			diags.Add(newMasterPrimaryUnknownFieldDiagnostic(s.offset, s.width, key, md.Name))
 		}
+		seen[key] = true
 	}
 }
 

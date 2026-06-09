@@ -154,6 +154,47 @@ func TestMasterMissingPrimary(t *testing.T) {
 	}
 }
 
+// TestMasterMissingRow pins that a master with no row record is rejected: the
+// parser leaves an absent record member to the semantic layer, so a master with
+// no row (record absent or not a record type) is reported, not published as an
+// unusable empty-row descriptor. With no row the key-existence check is skipped,
+// so a primary column does not also report as unknown.
+func TestMasterMissingRow(t *testing.T) {
+	src := "master M {\n  primary id\n}\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeMasterMissingRow) {
+		t.Fatalf("want master_missing_row, got %v", codes(diags))
+	}
+	if hasCode(diags, CodeMasterPrimaryUnknownField) {
+		t.Errorf("did not expect a primary-unknown diagnostic when the row is missing: %v", codes(diags))
+	}
+}
+
+// TestMasterDuplicatePrimaryKey pins that a composite primary key repeating a
+// column is rejected: a key tuple must not name a column twice, or a consumer
+// building key tuples or foreign-key references would see it doubled.
+func TestMasterDuplicatePrimaryKey(t *testing.T) {
+	src := "master M {\n  record {\n    id: int,\n  }\n  primary (id, id)\n}\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeMasterDuplicatePrimaryKey) {
+		t.Fatalf("want master_duplicate_primary_key, got %v", codes(diags))
+	}
+}
+
+// TestEnclosingDeclMaster pins that an offset inside a master maps to the
+// master's stable anchor — the anchor lookup reads the master backpointer like
+// it does a type/enum/interface, so a diagnostic anchored in a master resolves.
+func TestEnclosingDeclMaster(t *testing.T) {
+	src := "pub master Foo {\n  record {\n    id: int\n  }\n  primary id\n}\n"
+	p := buildProgram(map[string]string{"game.belt": src})
+	assertClean(t, p, "game.belt")
+	offset := strings.Index(src, "record")
+	got, ok := p.EnclosingDecl("game.belt", offset+1)
+	if !ok || got != "belt:game/Foo" {
+		t.Errorf("EnclosingDecl inside master = %q (ok=%v), want belt:game/Foo", got, ok)
+	}
+}
+
 // TestMasterOpaqueToRecordLiteral pins the opaque-nominal rule: a record literal
 // cannot target a master type even though the master's row has those fields. The
 // row shape is readable through a receiver (self.name) but the master is not

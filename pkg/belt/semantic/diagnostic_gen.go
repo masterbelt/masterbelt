@@ -50,7 +50,9 @@ const (
 	CodeInvalidSetterSignature     diagnostic.Code = "belt.semantic.invalid_setter_signature"
 	CodeLambdaArityMismatch        diagnostic.Code = "belt.semantic.lambda_arity_mismatch"
 	CodeLoopVarImmutable           diagnostic.Code = "belt.semantic.loop_var_immutable"
+	CodeMasterDuplicatePrimaryKey  diagnostic.Code = "belt.semantic.master_duplicate_primary_key"
 	CodeMasterMissingPrimary       diagnostic.Code = "belt.semantic.master_missing_primary"
+	CodeMasterMissingRow           diagnostic.Code = "belt.semantic.master_missing_row"
 	CodeMasterPrimaryUnknownField  diagnostic.Code = "belt.semantic.master_primary_unknown_field"
 	CodeMissingEffect              diagnostic.Code = "belt.semantic.missing_effect"
 	CodeMissingField               diagnostic.Code = "belt.semantic.missing_field"
@@ -685,6 +687,21 @@ func newLoopVarImmutableDiagnostic(offset int, width int, name string) diagnosti
 	}
 }
 
+func newMasterDuplicatePrimaryKeyDiagnostic(offset int, width int, key string, master string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"key":    diagnostic.Str(key),
+		"master": diagnostic.Str(master),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeMasterDuplicatePrimaryKey,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeMasterDuplicatePrimaryKey, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
 func newMasterMissingPrimaryDiagnostic(offset int, width int, master string) diagnostic.Diagnostic {
 	fields := map[string]fmt.Stringer{
 		"master": diagnostic.Str(master),
@@ -693,6 +710,20 @@ func newMasterMissingPrimaryDiagnostic(offset int, width int, master string) dia
 		Severity: diagnostic.Error,
 		Code:     CodeMasterMissingPrimary,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeMasterMissingPrimary, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newMasterMissingRowDiagnostic(offset int, width int, master string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"master": diagnostic.Str(master),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeMasterMissingRow,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeMasterMissingRow, fields),
 		Fields:   fields,
 		Offset:   offset,
 		Width:    width,
