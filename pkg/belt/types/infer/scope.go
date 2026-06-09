@@ -112,6 +112,11 @@ func (s funcScope) fnMember(m *ast.MemberExpr) []*ast.FuncDecl {
 	return s.outer.fnMember(m)
 }
 
+// metatype is the type of a reified type value — the builtin `type` (type :
+// type), the type a bare type name carries in value position. It is built fresh
+// per call, like the other primitive types the scopes synthesize.
+func metatype() ir.Type { return &ir.Builtin{Name: builtin.NameType} }
+
 // constScope types a constant initializer: the context-specific forms are a
 // value reference, whose type is its referent's, a conversion, whose type
 // is the type it names, and the null literal. A field access reads a
@@ -142,6 +147,12 @@ func (s constScope) leaf(e ast.Expr) ir.Type {
 	case *ast.Identifier:
 		if target := s.env.Resolve(e); target != nil {
 			return s.env.TypeOf(target)
+		}
+		// A bare type name in value position is a compile-time type value, of type
+		// `type` (the metatype): const x = int8. A value of that name (a constant)
+		// wins above, so only a name resolving to a type alone reaches here.
+		if _, ok := s.universe()[e.Name]; ok {
+			return metatype()
 		}
 	case *ast.MemberExpr:
 		// A member access on a namespace import (geo.Origin) inherits the

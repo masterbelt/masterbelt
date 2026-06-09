@@ -69,6 +69,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "MapLen"
       Anchor: "belt:/MapLen"
@@ -136,6 +137,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Sum"
       Anchor: "belt:/Sum"
@@ -243,6 +245,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "IndexSum"
       Anchor: "belt:/IndexSum"
@@ -350,6 +353,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "MapSum"
       Anchor: "belt:/MapSum"
@@ -464,6 +468,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Count"
       Anchor: "belt:/Count"
@@ -539,6 +544,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "AnyBig"
       Anchor: "belt:/AnyBig"
@@ -634,6 +640,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "AllPositive"
       Anchor: "belt:/AllPositive"
@@ -729,6 +736,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Doubled"
       Anchor: "belt:/Doubled"
@@ -842,6 +850,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
           ConstEntry
             Key: ~
             Value: Constant
@@ -861,6 +870,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
           ConstEntry
             Key: ~
             Value: Constant
@@ -880,6 +890,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
         Fields: ~
         CollMapness: 1
         Millis: 0
@@ -891,6 +902,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Big"
       Anchor: "belt:/Big"
@@ -1006,6 +1018,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
           ConstEntry
             Key: ~
             Value: Constant
@@ -1025,6 +1038,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
         Fields: ~
         CollMapness: 1
         Millis: 0
@@ -1036,6 +1050,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Keys"
       Anchor: "belt:/Keys"
@@ -1117,6 +1132,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
           ConstEntry
             Key: ~
             Value: Constant
@@ -1136,6 +1152,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
         Fields: ~
         CollMapness: 1
         Millis: 0
@@ -1147,6 +1164,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Values"
       Anchor: "belt:/Values"
@@ -1228,6 +1246,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
           ConstEntry
             Key: ~
             Value: Constant
@@ -1247,6 +1266,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
         Fields: ~
         CollMapness: 1
         Millis: 0
@@ -1258,6 +1278,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "ListValues"
       Anchor: "belt:/ListValues"
@@ -1341,6 +1362,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
           ConstEntry
             Key: ~
             Value: Constant
@@ -1360,6 +1382,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
           ConstEntry
             Key: ~
             Value: Constant
@@ -1379,6 +1402,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
         Fields: ~
         CollMapness: 1
         Millis: 0
@@ -1390,6 +1414,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
   Types: ~
   Funcs: ~
   Asserts:
@@ -1413,6 +1438,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "[1, 2, 3].len() == 3\n          ^     ^\n          3     true"
     Assert
       Cond: "[\"a\": 1, \"b\": 2].len() == 2"
@@ -1434,6 +1460,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "[\"a\": 1, \"b\": 2].len() == 2\n                 ^     ^\n                 2     true"
     Assert
       Cond: "[1, 2, 3].fold(0, fn(acc: nint, i: nint, v: nint): nint { return acc + v }) == 6"
@@ -1455,6 +1482,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "[1, 2, 3].fold(0, fn(acc: nint, i: nint, v: nint): nint { return acc + v }) == 6\n          ^                                                                 ^\n          6                                                                 true"
     Assert
       Cond: "[1, 2, 3, 4].count() == 4"
@@ -1476,6 +1504,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "[1, 2, 3, 4].count() == 4\n             ^       ^\n             4       true"
     Assert
       Cond: "[1, 2, 3].any(fn(v: nint): bool { return v > 2 })"
@@ -1497,6 +1526,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "[1, 2, 3].any(fn(v: nint): bool { return v > 2 })\n          ^\n          true"
     Assert
       Cond: "[1, 2, 3].all(fn(v: nint): bool { return v > 0 })"
@@ -1518,4 +1548,5 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "[1, 2, 3].all(fn(v: nint): bool { return v > 0 })\n          ^\n          true"

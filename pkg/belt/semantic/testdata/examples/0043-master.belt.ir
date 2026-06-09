@@ -135,6 +135,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
           EnumMember
             Name: "passive"
             Value: Constant
@@ -154,6 +155,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
       Master: ~
       Where: ~
     TypeDef

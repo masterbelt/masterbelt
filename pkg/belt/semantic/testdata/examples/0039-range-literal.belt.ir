@@ -36,6 +36,7 @@ Module
         End: 9
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "HalfUp"
       Anchor: "belt:/HalfUp"
@@ -72,6 +73,7 @@ Module
         End: 8
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "ClosedDown"
       Anchor: "belt:/ClosedDown"
@@ -108,6 +110,7 @@ Module
         End: 0
         Step: -1
         UnionTag: ~
+        Reified: ~
     Const
       Name: "HalfDown"
       Anchor: "belt:/HalfDown"
@@ -144,6 +147,7 @@ Module
         End: 0
         Step: -1
         UnionTag: ~
+        Reified: ~
     Const
       Name: "ClosedUpEq"
       Anchor: "belt:/ClosedUpEq"
@@ -180,6 +184,7 @@ Module
         End: 9
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "HalfUpEq"
       Anchor: "belt:/HalfUpEq"
@@ -216,6 +221,7 @@ Module
         End: 8
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "ClosedDownEq"
       Anchor: "belt:/ClosedDownEq"
@@ -264,6 +270,7 @@ Module
         End: 0
         Step: -1
         UnionTag: ~
+        Reified: ~
     Const
       Name: "HalfDownEq"
       Anchor: "belt:/HalfDownEq"
@@ -312,6 +319,7 @@ Module
         End: 0
         Step: -1
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Single"
       Anchor: "belt:/Single"
@@ -348,6 +356,7 @@ Module
         End: 5
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Empty"
       Anchor: "belt:/Empty"
@@ -384,6 +393,7 @@ Module
         End: 4
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Upto"
       Anchor: "belt:/Upto"
@@ -419,6 +429,7 @@ Module
         End: 5
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Evens"
       Anchor: "belt:/Evens"
@@ -459,6 +470,7 @@ Module
         End: 10
         Step: 2
         UnionTag: ~
+        Reified: ~
     Const
       Name: "DownBy2"
       Anchor: "belt:/DownBy2"
@@ -507,6 +519,7 @@ Module
         End: 0
         Step: -2
         UnionTag: ~
+        Reified: ~
     Const
       Name: "SumUp"
       Anchor: "belt:/SumUp"
@@ -538,6 +551,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "SumDown"
       Anchor: "belt:/SumDown"
@@ -569,6 +583,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "SumHalf"
       Anchor: "belt:/SumHalf"
@@ -600,6 +615,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "SumEvens"
       Anchor: "belt:/SumEvens"
@@ -631,6 +647,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "ClosedCount"
       Anchor: "belt:/ClosedCount"
@@ -683,6 +700,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "HalfCount"
       Anchor: "belt:/HalfCount"
@@ -735,6 +753,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "SteppedCount"
       Anchor: "belt:/SteppedCount"
@@ -791,6 +810,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "ClosedFold"
       Anchor: "belt:/ClosedFold"
@@ -881,6 +901,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "SteppedFold"
       Anchor: "belt:/SteppedFold"
@@ -975,6 +996,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
   Types: ~
   Funcs:
     Function
@@ -1287,6 +1309,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "(0..9) == range(0, 9)\n  ^    ^  ^\n  |    |  range(0, 9)\n  |    true\n  range(0, 9)"
     Assert
       Cond: "(0...9) == range(0, 8)"
@@ -1308,6 +1331,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "(0...9) == range(0, 8)\n  ^     ^  ^\n  |     |  range(0, 8)\n  |     true\n  range(0, 8)"
     Assert
       Cond: "(9..0) == range(9, 0, -1)"
@@ -1329,6 +1353,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "(9..0) == range(9, 0, -1)\n  ^    ^  ^           ^\n  |    |  |           -1\n  |    |  range(9, 0, -1)\n  |    true\n  range(9, 0, -1)"
     Assert
       Cond: "(9...0) == range(8, 0, -1)"
@@ -1350,6 +1375,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "(9...0) == range(8, 0, -1)\n  ^     ^  ^           ^\n  |     |  |           -1\n  |     |  range(8, 0, -1)\n  |     true\n  range(8, 0, -1)"
     Assert
       Cond: "(5..5) == range(5, 5)"
@@ -1371,6 +1397,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "(5..5) == range(5, 5)\n  ^    ^  ^\n  |    |  range(5, 5)\n  |    true\n  range(5, 5)"
     Assert
       Cond: "sumUp() == 55"
@@ -1392,6 +1419,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "sumUp() == 55\n^       ^\n55      true"
     Assert
       Cond: "sumDown() == 15"
@@ -1413,6 +1441,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "sumDown() == 15\n^         ^\n15        true"
     Assert
       Cond: "sumHalf() == 10"
@@ -1434,6 +1463,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "sumHalf() == 10\n^         ^\n10        true"
     Assert
       Cond: "sumEvens() == 30"
@@ -1455,6 +1485,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "sumEvens() == 30\n^          ^\n30         true"
     Assert
       Cond: "(0..9).count() == 10"
@@ -1476,6 +1507,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "(0..9).count() == 10\n  ^    ^       ^\n  |    10      true\n  range(0, 9)"
     Assert
       Cond: "(0...9).count() == 9"
@@ -1497,6 +1529,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "(0...9).count() == 9\n  ^     ^       ^\n  |     9       true\n  range(0, 8)"
     Assert
       Cond: "range(0, 10, 2).count() == 6"
@@ -1518,6 +1551,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "range(0, 10, 2).count() == 6\n^               ^       ^\nrange(0, 10, 2) 6       true"
     Assert
       Cond: "range(10, 0, -2).count() == 6"
@@ -1539,6 +1573,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "range(10, 0, -2).count() == 6\n^            ^   ^       ^\n|            -2  6       true\nrange(10, 0, -2)"
     Assert
       Cond: "(0..4).fold(0, fn(acc: nint, k: nint, v: nint): nint { return acc + v }) == 10"
@@ -1560,6 +1595,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "(0..4).fold(0, fn(acc: nint, k: nint, v: nint): nint { return acc + v }) == 10\n  ^    ^                                                                 ^\n  |    10                                                                true\n  range(0, 4)"
     Assert
       Cond: "range(0, 10, 2).fold(0, fn(acc: nint, k: nint, v: nint): nint { return acc + v }) == 30"
@@ -1581,4 +1617,5 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "range(0, 10, 2).fold(0, fn(acc: nint, k: nint, v: nint): nint { return acc + v }) == 30\n^               ^                                                                 ^\nrange(0, 10, 2) 30                                                                true"

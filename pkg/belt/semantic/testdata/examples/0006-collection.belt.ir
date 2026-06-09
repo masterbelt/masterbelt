@@ -60,6 +60,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
           ConstEntry
             Key: ~
             Value: Constant
@@ -79,6 +80,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
           ConstEntry
             Key: ~
             Value: Constant
@@ -98,6 +100,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
         Fields: ~
         CollMapness: 1
         Millis: 0
@@ -109,6 +112,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "ExampleMap"
       Anchor: "belt:/ExampleMap"
@@ -163,6 +167,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
             Value: Constant
               Kind: 0
               Int: 100
@@ -180,6 +185,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
         Fields: ~
         CollMapness: 2
         Millis: 0
@@ -191,6 +197,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Inferred"
       Anchor: "belt:/Inferred"
@@ -251,6 +258,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
           ConstEntry
             Key: ~
             Value: Constant
@@ -270,6 +278,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
           ConstEntry
             Key: ~
             Value: Constant
@@ -289,6 +298,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
         Fields: ~
         CollMapness: 1
         Millis: 0
@@ -300,6 +310,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Bytes"
       Anchor: "belt:/Bytes"
@@ -369,6 +380,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
           ConstEntry
             Key: ~
             Value: Constant
@@ -388,6 +400,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
           ConstEntry
             Key: ~
             Value: Constant
@@ -407,6 +420,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
         Fields: ~
         CollMapness: 1
         Millis: 0
@@ -418,6 +432,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "EmptyList"
       Anchor: "belt:/EmptyList"
@@ -452,6 +467,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "EmptyMap"
       Anchor: "belt:/EmptyMap"
@@ -490,6 +506,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
   Types: ~
   Funcs: ~
   Asserts: ~

@@ -246,6 +246,10 @@ func (w resolutionWriter) valueLeaf(v ir.Value, bd bindings) {
 		if v.Def != nil && v.Index >= 0 && v.Index < len(v.Def.Consts) {
 			v.Type = v.Def.Consts[v.Index].Type
 		}
+	case *ir.TypeValue:
+		// A type value's type is always the metatype `type` (type : type),
+		// whatever type it reifies — the one fact the checker need not settle.
+		v.Type = &ir.Builtin{Name: builtin.NameType}
 	case *ir.IntLiteral:
 		v.Type = &ir.Builtin{Name: builtin.NameNint}
 	case *ir.StringLiteral:

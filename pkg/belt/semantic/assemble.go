@@ -738,6 +738,12 @@ func reportRefIssues(fileID FileID, e ast.Expr, q queries, at func(ast.Node) spa
 			if expectedEnum != nil && enumIndex(expectedEnum, id.Name) >= 0 {
 				return
 			}
+			// A bare type name is a compile-time type value (const x = int8), not
+			// an undefined name — the value-position reading the lowering and the
+			// type checker both give it.
+			if q.universe(fileID)[id.Name] != nil {
+				return
+			}
 			s := at(id)
 			if q.ambiguousImport(fileID, id) {
 				diags.Add(newAmbiguousImportDiagnostic(s.offset, s.width, id.Name))

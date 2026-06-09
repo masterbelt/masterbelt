@@ -60,6 +60,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
           ConstEntry
             Key: ~
             Value: Constant
@@ -79,6 +80,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
           ConstEntry
             Key: ~
             Value: Constant
@@ -98,6 +100,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
         Fields: ~
         CollMapness: 1
         Millis: 0
@@ -109,6 +112,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "First"
       Anchor: "belt:/First"
@@ -173,6 +177,7 @@ Module
         Step: ~
         UnionTag: Builtin
           Name: "nint"
+        Reified: ~
     Const
       Name: "Third"
       Anchor: "belt:/Third"
@@ -237,6 +242,7 @@ Module
         Step: ~
         UnionTag: Builtin
           Name: "nint"
+        Reified: ~
     Const
       Name: "Tbl"
       Anchor: "belt:/Tbl"
@@ -300,6 +306,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
             Value: Constant
               Kind: 0
               Int: 100
@@ -317,6 +324,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
           ConstEntry
             Key: Constant
               Kind: 2
@@ -335,6 +343,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
             Value: Constant
               Kind: 0
               Int: 50
@@ -352,6 +361,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
         Fields: ~
         CollMapness: 2
         Millis: 0
@@ -363,6 +373,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Sword"
       Anchor: "belt:/Sword"
@@ -425,6 +436,7 @@ Module
         Step: ~
         UnionTag: Builtin
           Name: "nint"
+        Reified: ~
     Const
       Name: "Bumped"
       Anchor: "belt:/Bumped"
@@ -470,6 +482,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
           ConstEntry
             Key: ~
             Value: Constant
@@ -489,6 +502,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
           ConstEntry
             Key: ~
             Value: Constant
@@ -508,6 +522,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
         Fields: ~
         CollMapness: 1
         Millis: 0
@@ -519,6 +534,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Put"
       Anchor: "belt:/Put"
@@ -567,6 +583,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
             Value: Constant
               Kind: 0
               Int: 10
@@ -584,6 +601,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
           ConstEntry
             Key: Constant
               Kind: 2
@@ -602,6 +620,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
             Value: Constant
               Kind: 0
               Int: 2
@@ -619,6 +638,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
         Fields: ~
         CollMapness: 2
         Millis: 0
@@ -630,6 +650,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
   Types: ~
   Funcs:
     Function

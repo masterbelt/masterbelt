@@ -51,7 +51,10 @@ func (p *parser) parsePrimaryType() cst.Green {
 			children = append(children, p.parseGenericArgs())
 		}
 		return cst.NewNode(cst.TypeName, children)
-	case token.Self, token.Null:
+	case token.Self, token.Null, token.Type:
+		// self / null / type are builtin type names. type is the metatype (the type
+		// of a type value), admissible here because a type-expression position never
+		// begins the `type Foo =` declaration the keyword otherwise heads.
 		return cst.NewNode(cst.TypeName, []cst.Green{p.bump()})
 	case token.LBrace:
 		return p.parseRecordType()
@@ -182,7 +185,7 @@ func (p *parser) parseFuncType() *cst.Node {
 // startsType reports whether kind can begin a type expression.
 func startsType(kind token.Kind) bool {
 	switch kind {
-	case token.Ident, token.Self, token.Null, token.LBrace, token.Fn, token.Builtin:
+	case token.Ident, token.Self, token.Null, token.Type, token.LBrace, token.Fn, token.Builtin:
 		return true
 	default:
 		return false

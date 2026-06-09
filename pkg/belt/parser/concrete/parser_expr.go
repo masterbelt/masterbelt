@@ -706,6 +706,12 @@ func (p *parser) parseOperand() cst.Green {
 		return cst.NewNode(cst.NameRef, []cst.Green{name})
 	case token.Self:
 		return cst.NewNode(cst.SelfExpr, []cst.Green{p.bump()})
+	case token.Type:
+		// The `type` keyword names the metatype as a value (const t = type; type :
+		// type). It reads as a name reference here — a value-expression position
+		// never begins the `type Foo =` declaration the keyword otherwise heads —
+		// and the semantic layer reifies it to a type value, like any type name.
+		return cst.NewNode(cst.NameRef, []cst.Green{p.bump()})
 	case token.Fn:
 		return p.parseFuncLit()
 	case token.LParen:
@@ -1045,7 +1051,7 @@ func nameLike(kind token.Kind) bool {
 func startsExpr(kind token.Kind) bool {
 	switch kind {
 	case token.Int, token.String, token.DatetimeLit, token.DurationLit,
-		token.Ident, token.True, token.False, token.Null, token.Self,
+		token.Ident, token.True, token.False, token.Null, token.Self, token.Type,
 		token.LBracket, token.LBrace, token.Plus, token.Minus, token.Bang,
 		token.Fn, token.LParen, token.Await:
 		return true

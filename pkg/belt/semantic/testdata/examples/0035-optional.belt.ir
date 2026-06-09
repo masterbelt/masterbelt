@@ -38,6 +38,7 @@ Module
         Step: ~
         UnionTag: Builtin
           Name: "nint"
+        Reified: ~
     Const
       Name: "Absent"
       Anchor: "belt:/Absent"
@@ -75,6 +76,7 @@ Module
         Step: ~
         UnionTag: Builtin
           Name: "null"
+        Reified: ~
     Const
       Name: "FromPresent"
       Anchor: "belt:/FromPresent"
@@ -116,6 +118,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "FromAbsent"
       Anchor: "belt:/FromAbsent"
@@ -156,6 +159,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "WithFallback"
       Anchor: "belt:/WithFallback"
@@ -200,6 +204,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
   Types: ~
   Funcs:
     Function
@@ -320,6 +325,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "orZero(5) == 5\n^         ^\n5         true"
     Assert
       Cond: "orZero(null) == 0"
@@ -341,6 +347,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "orZero(null) == 0\n^            ^\n0            true"
     Assert
       Cond: "orFallback(7, 99) == 7"
@@ -362,6 +369,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "orFallback(7, 99) == 7\n^                 ^\n7                 true"
     Assert
       Cond: "orFallback(null, 99) == 99"
@@ -383,4 +391,5 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "orFallback(null, 99) == 99\n^                    ^\n99                   true"

@@ -135,6 +135,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
           EnumMember
             Name: "Rare"
             Value: Constant
@@ -154,6 +155,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
           EnumMember
             Name: "Legend"
             Value: Constant
@@ -173,6 +175,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
       Master: ~
       Where: ~
   Funcs:

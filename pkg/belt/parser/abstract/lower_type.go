@@ -104,6 +104,8 @@ func lowerTypeName(t cst.Tree, buf source.Buffer, node *cst.Node) ast.TypeExpr {
 				name = "self"
 			case token.Null:
 				name = "null"
+			case token.Type:
+				name = "type" // the metatype, a builtin type name (type : type)
 			default:
 				// Any other token (the generic-argument angle brackets and
 				// commas) names no part of the type: it is skipped.

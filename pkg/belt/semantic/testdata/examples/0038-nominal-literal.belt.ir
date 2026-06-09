@@ -31,6 +31,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "World"
       Anchor: "belt:/World"
@@ -59,6 +60,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "There"
       Anchor: "belt:/There"
@@ -90,6 +92,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Greeting"
       Anchor: "belt:/Greeting"
@@ -145,6 +148,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "SameTag"
       Anchor: "belt:/SameTag"
@@ -188,6 +192,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "OtherTag"
       Anchor: "belt:/OtherTag"
@@ -228,6 +233,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "North"
       Anchor: "belt:/North"
@@ -259,6 +265,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "South"
       Anchor: "belt:/South"
@@ -290,6 +297,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Ok"
       Anchor: "belt:/Ok"
@@ -325,6 +333,7 @@ Module
         Step: ~
         UnionTag: Named
           Def: "Tag"
+        Reified: ~
     Const
       Name: "FromOk"
       Anchor: "belt:/FromOk"
@@ -366,6 +375,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
   Types:
     TypeDef
       Name: "Tag"
@@ -530,6 +540,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "Hello == \"hello\"\n^     ^\n|     true\n\"hello\""
     Assert
       Cond: "Greeting == \"hello world\""
@@ -551,6 +562,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "Greeting == \"hello world\"\n^        ^\n|        true\n\"hello world\""
     Assert
       Cond: "SameTag"
@@ -572,6 +584,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "SameTag\n^\ntrue"
     Assert
       Cond: "OtherTag"
@@ -593,6 +606,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "OtherTag\n^\ntrue"
     Assert
       Cond: "North != South"
@@ -614,6 +628,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "North != South\n^     ^  ^\n|     |  \"south\"\n|     true\n\"north\""
     Assert
       Cond: "label(\"done\") == \"done\""
@@ -635,4 +650,5 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "label(\"done\") == \"done\"\n^             ^\n\"done\"        true"

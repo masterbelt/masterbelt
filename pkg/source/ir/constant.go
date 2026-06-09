@@ -43,6 +43,7 @@ const (
 	ConstEnum                        // an enum member value (Constant.EnumDef / Constant.EnumIndex)
 	ConstNull                        // the null value (no payload — the single inhabitant of the null type)
 	ConstRange                       // an inclusive integer range (Constant.Start / Constant.End)
+	ConstType                        // a compile-time type value (Constant.Reified)
 )
 
 // Constant is the evaluated value of a constant expression: an arbitrary-
@@ -112,6 +113,13 @@ type Constant struct {
 	// expectation-driven tagging computes — UnionTag is what evaluating that
 	// Adapt produces.
 	UnionTag Type
+
+	// Reified is the type a type value denotes (valid when Kind == ConstType): the
+	// type a bare type name or the `type` keyword folds to (const x = int8 → int8;
+	// type → the `type` metatype). A type value is comptime-only — it exists for
+	// the fold and is gone before codegen — so this is the one constant kind with
+	// no runtime form.
+	Reified Type
 }
 
 // ConstantsEqual reports whether two folded constants are structurally equal —
@@ -166,6 +174,8 @@ func ConstantsEqual(a, b *Constant) bool {
 		return a.Millis == b.Millis
 	case ConstRange:
 		return equalRanges(a, b)
+	case ConstType:
+		return typeValuesEqual(a.Reified, b.Reified)
 	case ConstCollection:
 		return equalCollections(a, b)
 	case ConstRecord:
@@ -251,6 +261,13 @@ func equalFuncs(a, b *Constant) bool {
 	}
 	return true
 }
+
+// typeValuesEqual reports whether two reified type values denote the same type —
+// the equality a ConstType compares by. It is the type-value twin of tagsEqual:
+// identity by the Named's definition or the Builtin's name (a primitive int8, a
+// nominal Level), with pointer identity the conservative fallback for the
+// structural forms a 0001 type value does not yet take.
+func typeValuesEqual(a, b Type) bool { return tagsEqual(a, b) }
 
 // tagsEqual reports whether two union tags denote the same member. A tag is the
 // member type a value flowed in as, which is always a nominal type (Named — a
@@ -536,6 +553,13 @@ func (c *Constant) String() string {
 		return "D" + time.UnixMilli(c.Millis).UTC().Format("2006-01-02T15:04:05.000Z07:00")
 	case ConstDuration:
 		return formatDuration(c.Millis)
+	case ConstType:
+		// The denoted type's own rendering — int8, Level, or `type` itself — so a
+		// folded type value reads as the type it is in a dump.
+		if c.Reified == nil {
+			return "type"
+		}
+		return c.Reified.String()
 	default:
 		return c.Int.String()
 	}

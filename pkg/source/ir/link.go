@@ -420,6 +420,9 @@ func (l *linker) linkValue(p *Value) {
 	case *AssocConstValue:
 		l.resolveTypeDef(&v.Def)
 		l.linkType(&v.Type)
+	case *TypeValue:
+		l.linkType(&v.Reified)
+		l.linkType(&v.Type)
 	default:
 		panic(fmt.Sprintf("ir: link: unhandled Value %T", v))
 	}

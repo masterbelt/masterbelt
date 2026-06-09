@@ -43,6 +43,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Later"
       Anchor: "belt:/Later"
@@ -86,6 +87,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Equal"
       Anchor: "belt:/Equal"
@@ -129,6 +131,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Double"
       Anchor: "belt:/Double"
@@ -168,6 +171,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
   Types: ~
   Funcs:
     Function

@@ -28,6 +28,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Release"
       Anchor: "belt:/Release"
@@ -56,6 +57,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Launch"
       Anchor: "belt:/Launch"
@@ -84,6 +86,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Cooldown"
       Anchor: "belt:/Cooldown"
@@ -112,6 +115,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Complex"
       Anchor: "belt:/Complex"
@@ -140,6 +144,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Deadline"
       Anchor: "belt:/Deadline"
@@ -180,6 +185,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Span"
       Anchor: "belt:/Span"
@@ -220,6 +226,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Shift"
       Anchor: "belt:/Shift"
@@ -260,6 +267,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "TwoH"
       Anchor: "belt:/TwoH"
@@ -300,6 +308,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Triple"
       Anchor: "belt:/Triple"
@@ -340,6 +349,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
   Types:
     TypeDef
       Name: "Event"
@@ -391,6 +401,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "Release > Epoch\n^       ^ ^\n|       | D1970-01-01T00:00:00.000Z\n|       true\nD2009-03-31T23:59:59.000Z"
     Assert
       Cond: "1h > 59m"
@@ -412,4 +423,5 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "1h > 59m\n   ^\n   true"

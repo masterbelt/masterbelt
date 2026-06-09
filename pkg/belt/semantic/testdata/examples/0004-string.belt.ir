@@ -28,6 +28,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Greeting"
       Anchor: "belt:/Greeting"
@@ -56,6 +57,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Control"
       Anchor: "belt:/Control"
@@ -84,6 +86,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Unicode"
       Anchor: "belt:/Unicode"
@@ -112,6 +115,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Party"
       Anchor: "belt:/Party"
@@ -140,6 +144,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Empty"
       Anchor: "belt:/Empty"
@@ -168,6 +173,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
   Types: ~
   Funcs: ~
   Asserts: ~

@@ -28,6 +28,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "MinLevel"
       Anchor: "belt:/MinLevel"
@@ -56,6 +57,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Enabled"
       Anchor: "belt:/Enabled"
@@ -84,6 +86,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
   Types: ~
   Funcs: ~
   Asserts:
@@ -107,6 +110,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "MaxLevel > MinLevel\n^        ^ ^\n100      | 0\n         true"
     Assert
       Cond: "MinLevel == 0"
@@ -128,6 +132,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "MinLevel == 0\n^        ^\n0        true"
     Assert
       Cond: "MaxLevel - MinLevel == 100"
@@ -149,6 +154,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "MaxLevel - MinLevel == 100\n^        ^ ^        ^\n100      | 0        true\n         100"
     Assert
       Cond: "Enabled && !false"
@@ -170,6 +176,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "Enabled && !false\n^       ^  ^\ntrue    |  true\n        true"
     Assert
       Cond: "MaxLevel > 0 && !(MinLevel > 0)"
@@ -191,4 +198,5 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "MaxLevel > 0 && !(MinLevel > 0)\n^        ^   ^  ^ ^        ^\n100      |   |  | 0        false\n         |   |  true\n         |   true\n         true"

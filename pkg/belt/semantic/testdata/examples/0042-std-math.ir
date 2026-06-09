@@ -44,6 +44,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "lo"
       Anchor: "belt:main/lo"
@@ -87,6 +88,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "cl"
       Anchor: "belt:main/cl"
@@ -134,6 +136,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "ab"
       Anchor: "belt:main/ab"
@@ -180,6 +183,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "sg"
       Anchor: "belt:main/sg"
@@ -226,6 +230,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "g"
       Anchor: "belt:main/g"
@@ -271,6 +276,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "l"
       Anchor: "belt:main/l"
@@ -316,6 +322,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "p"
       Anchor: "belt:main/p"
@@ -358,6 +365,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "floored"
       Anchor: "belt:main/floored"
@@ -416,6 +424,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "biggest"
       Anchor: "belt:main/biggest"
@@ -485,6 +494,7 @@ Module
         Step: ~
         UnionTag: Builtin
           Name: "nint"
+        Reified: ~
     Const
       Name: "total"
       Anchor: "belt:main/total"
@@ -562,6 +572,7 @@ Module
         Step: ~
         UnionTag: Builtin
           Name: "nint"
+        Reified: ~
     Const
       Name: "prod"
       Anchor: "belt:main/prod"
@@ -639,6 +650,7 @@ Module
         Step: ~
         UnionTag: Builtin
           Name: "nint"
+        Reified: ~
     Const
       Name: "empties"
       Anchor: "belt:main/empties"
@@ -673,6 +685,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "noMax"
       Anchor: "belt:main/noMax"
@@ -724,6 +737,7 @@ Module
         Step: ~
         UnionTag: Builtin
           Name: "error"
+        Reified: ~
   Types: ~
   Funcs: ~
   Asserts:
@@ -747,6 +761,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "hi == 7\n^  ^\n7  true"
     Assert
       Cond: "lo == 3"
@@ -768,6 +783,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "lo == 3\n^  ^\n3  true"
     Assert
       Cond: "cl == 3"
@@ -789,6 +805,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "cl == 3\n^  ^\n3  true"
     Assert
       Cond: "ab == 5"
@@ -810,6 +827,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "ab == 5\n^  ^\n5  true"
     Assert
       Cond: "sg == -1"
@@ -831,6 +849,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "sg == -1\n^  ^  ^\n-1 |  -1\n   true"
     Assert
       Cond: "g == 6"
@@ -852,6 +871,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "g == 6\n^ ^\n6 true"
     Assert
       Cond: "l == 12"
@@ -873,6 +893,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "l == 12\n^ ^\n| true\n12"
     Assert
       Cond: "p == 1024"
@@ -894,6 +915,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "p == 1024\n^ ^\n| true\n1024"
     Assert
       Cond: "floored == 5"
@@ -915,6 +937,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "floored == 5\n^       ^\n5       true"
 # std:math
 Module

@@ -25,8 +25,8 @@ func WalkValues(v Value, fn func(Value) bool) {
 		WalkValues(v.Value, fn)
 	case *IntLiteral, *StringLiteral, *BoolLiteral, *DatetimeLiteral,
 		*DurationLiteral, *NullValue, *SelfValue, *ParamRef, *LocalRef,
-		*Reference, *EnumMemberValue, *AssocConstValue:
-		// Leaves: nothing beneath.
+		*Reference, *EnumMemberValue, *AssocConstValue, *TypeValue:
+		// Leaves: nothing beneath (a type value's Reified is a type, not a value).
 	case *CollectionLiteral:
 		for _, e := range v.Entries {
 			walkAll(fn, e.Key, e.Value)

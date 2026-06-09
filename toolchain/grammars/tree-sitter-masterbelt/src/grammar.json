@@ -1302,6 +1302,10 @@
         {
           "type": "SYMBOL",
           "name": "self_type"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "type_type"
         }
       ]
     },
@@ -1349,6 +1353,10 @@
     "self_type": {
       "type": "STRING",
       "value": "self"
+    },
+    "type_type": {
+      "type": "STRING",
+      "value": "type"
     },
     "generic_params": {
       "type": "SEQ",
@@ -2064,8 +2072,17 @@
       ]
     },
     "value_ref": {
-      "type": "SYMBOL",
-      "name": "identifier"
+      "type": "CHOICE",
+      "members": [
+        {
+          "type": "SYMBOL",
+          "name": "identifier"
+        },
+        {
+          "type": "STRING",
+          "value": "type"
+        }
+      ]
     },
     "self_expr": {
       "type": "STRING",

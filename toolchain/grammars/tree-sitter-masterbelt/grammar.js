@@ -287,6 +287,7 @@ module.exports = grammar({
         $.builtin_type,
         $.null_type,
         $.self_type,
+        $.type_type,
       ),
 
     // A named type, optionally qualified by a sibling's namespace (geo.Point)
@@ -297,6 +298,10 @@ module.exports = grammar({
 
     null_type: ($) => kw.null,
     self_type: ($) => kw.self,
+    // The `type` keyword names the metatype (type : type). It is a builtin type
+    // name in type position, the CST's TypeName, admissible because the position
+    // never begins the `type Foo =` declaration the keyword otherwise heads.
+    type_type: ($) => kw.type,
 
     generic_params: ($) => seq(op.Lt, commaSep1($.generic_param), op.Gt),
     generic_param: ($) =>
@@ -403,7 +408,10 @@ module.exports = grammar({
         $.await_expr,
       ),
 
-    value_ref: ($) => $.identifier,
+    // A value reference: a name, or the `type` keyword naming the metatype as a
+    // value (const t = type). The real parser lowers `type` here to a NameRef,
+    // which value_ref aliases to in the CST skeleton.
+    value_ref: ($) => choice($.identifier, kw.type),
     self_expr: ($) => kw.self,
 
     literal: ($) =>

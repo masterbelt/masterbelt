@@ -51,6 +51,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Label"
       Anchor: "belt:/Label"
@@ -102,6 +103,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Capped"
       Anchor: "belt:/Capped"
@@ -161,6 +163,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Clamp"
       Anchor: "belt:/Clamp"
@@ -235,6 +238,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Score"
       Anchor: "belt:/Score"
@@ -298,6 +302,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
   Types:
     TypeDef
       Name: "Level"
@@ -333,6 +338,7 @@ Module
             End: ~
             Step: ~
             UnionTag: ~
+            Reified: ~
           Builtin: false
       Builtin: false
       Interface: ~

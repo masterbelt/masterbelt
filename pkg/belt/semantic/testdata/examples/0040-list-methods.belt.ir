@@ -96,6 +96,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
           ConstEntry
             Key: ~
             Value: Constant
@@ -115,6 +116,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
           ConstEntry
             Key: ~
             Value: Constant
@@ -134,6 +136,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
           ConstEntry
             Key: ~
             Value: Constant
@@ -153,6 +156,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
         Fields: ~
         CollMapness: 1
         Millis: 0
@@ -164,6 +168,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Added"
       Anchor: "belt:/Added"
@@ -245,6 +250,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
           ConstEntry
             Key: ~
             Value: Constant
@@ -264,6 +270,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
           ConstEntry
             Key: ~
             Value: Constant
@@ -283,6 +290,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
         Fields: ~
         CollMapness: 1
         Millis: 0
@@ -294,6 +302,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "NestedAdd"
       Anchor: "belt:/NestedAdd"
@@ -425,6 +434,7 @@ Module
                     End: ~
                     Step: ~
                     UnionTag: ~
+                    Reified: ~
               Fields: ~
               CollMapness: 1
               Millis: 0
@@ -436,6 +446,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
           ConstEntry
             Key: ~
             Value: Constant
@@ -463,6 +474,7 @@ Module
                     End: ~
                     Step: ~
                     UnionTag: ~
+                    Reified: ~
               Fields: ~
               CollMapness: 1
               Millis: 0
@@ -474,6 +486,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
           ConstEntry
             Key: ~
             Value: Constant
@@ -501,6 +514,7 @@ Module
                     End: ~
                     Step: ~
                     UnionTag: ~
+                    Reified: ~
               Fields: ~
               CollMapness: 1
               Millis: 0
@@ -512,6 +526,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
         Fields: ~
         CollMapness: 1
         Millis: 0
@@ -523,6 +538,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Pushed"
       Anchor: "belt:/Pushed"
@@ -604,6 +620,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
           ConstEntry
             Key: ~
             Value: Constant
@@ -623,6 +640,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
           ConstEntry
             Key: ~
             Value: Constant
@@ -642,6 +660,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
         Fields: ~
         CollMapness: 1
         Millis: 0
@@ -653,6 +672,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Unshifted"
       Anchor: "belt:/Unshifted"
@@ -734,6 +754,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
           ConstEntry
             Key: ~
             Value: Constant
@@ -753,6 +774,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
           ConstEntry
             Key: ~
             Value: Constant
@@ -772,6 +794,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
         Fields: ~
         CollMapness: 1
         Millis: 0
@@ -783,6 +806,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Empty"
       Anchor: "belt:/Empty"
@@ -817,6 +841,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Last"
       Anchor: "belt:/Last"
@@ -892,6 +917,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "NoLast"
       Anchor: "belt:/NoLast"
@@ -949,6 +975,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "First"
       Anchor: "belt:/First"
@@ -1024,6 +1051,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "NoFirst"
       Anchor: "belt:/NoFirst"
@@ -1081,6 +1109,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
   Types: ~
   Funcs:
     Function
@@ -1153,6 +1182,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "([1, 2] + [3, 4]).len() == 4\n        ^         ^     ^\n        |         4     true\n        [1, 2, 3, 4]"
     Assert
       Cond: "([1, 2] + 3).len() == 3"
@@ -1174,6 +1204,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "([1, 2] + 3).len() == 3\n        ^    ^     ^\n        |    3     true\n        [1, 2, 3]"
     Assert
       Cond: "[1, 2].push(3).len() == 3"
@@ -1195,6 +1226,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "[1, 2].push(3).len() == 3\n       ^       ^     ^\n       |       3     true\n       [1, 2, 3]"
     Assert
       Cond: "[2, 3].unshift(1).len() == 3"
@@ -1216,6 +1248,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "[2, 3].unshift(1).len() == 3\n       ^          ^     ^\n       [1, 2, 3]  3     true"
     Assert
       Cond: "([[1], [2]] + [3]).len() == 3"
@@ -1237,6 +1270,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "([[1], [2]] + [3]).len() == 3\n            ^      ^     ^\n            |      3     true\n            [[1], [2], [3]]"
     Assert
       Cond: "orZero([1, 2, 3].pop()) == 3"
@@ -1258,6 +1292,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "orZero([1, 2, 3].pop()) == 3\n^                ^      ^\n3                3      true"
     Assert
       Cond: "orZero(Empty.pop()) == 0"
@@ -1279,6 +1314,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "orZero(Empty.pop()) == 0\n^      ^     ^      ^\n0      []    null   true"
     Assert
       Cond: "orZero([1, 2, 3].shift()) == 1"
@@ -1300,6 +1336,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "orZero([1, 2, 3].shift()) == 1\n^                ^        ^\n1                1        true"
     Assert
       Cond: "orZero(Empty.shift()) == 0"
@@ -1321,4 +1358,5 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "orZero(Empty.shift()) == 0\n^      ^     ^        ^\n0      []    null     true"

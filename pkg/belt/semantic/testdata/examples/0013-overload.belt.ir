@@ -31,6 +31,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Bumped"
       Anchor: "belt:/Bumped"
@@ -74,6 +75,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Counted"
       Anchor: "belt:/Counted"
@@ -114,6 +116,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Start"
       Anchor: "belt:/Start"
@@ -145,6 +148,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Second"
       Anchor: "belt:/Second"
@@ -181,6 +185,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Fifth"
       Anchor: "belt:/Fifth"
@@ -224,6 +229,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
   Types:
     TypeDef
       Name: "Score"

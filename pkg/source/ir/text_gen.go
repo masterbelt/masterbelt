@@ -869,12 +869,15 @@ func writeConstant(w *treetext.Writer, n *Constant, depth int) error {
 	if err := writeTypeField(w, depth, "UnionTag", n.UnionTag); err != nil {
 		return err
 	}
+	if err := writeTypeField(w, depth, "Reified", n.Reified); err != nil {
+		return err
+	}
 	return nil
 }
 
 // decodeConstant builds a Constant from its element.
 func decodeConstant(e *treetext.Element) (*Constant, error) {
-	if err := treetext.ExpectFields(e, "Kind", "Int", "Bool", "Str", "Coll", "Fields", "CollMapness", "Millis", "Fn", "Captured", "EnumDef", "EnumIndex", "Start", "End", "Step", "UnionTag"); err != nil {
+	if err := treetext.ExpectFields(e, "Kind", "Int", "Bool", "Str", "Coll", "Fields", "CollMapness", "Millis", "Fn", "Captured", "EnumDef", "EnumIndex", "Start", "End", "Step", "UnionTag", "Reified"); err != nil {
 		return nil, err
 	}
 	n := &Constant{}
@@ -1019,6 +1022,11 @@ func decodeConstant(e *treetext.Element) (*Constant, error) {
 		return nil, err
 	} else {
 		n.UnionTag = v
+	}
+	if v, err := decodeTypeField(e.Fields[16]); err != nil {
+		return nil, err
+	} else {
+		n.Reified = v
 	}
 	return n, nil
 }
@@ -3626,6 +3634,46 @@ func decodeTypeParam(e *treetext.Element) (*TypeParam, error) {
 	return n, nil
 }
 
+// writeTypeValue emits n's fields beneath an already-written heading line.
+func writeTypeValue(w *treetext.Writer, n *TypeValue, depth int) error {
+	if err := writeTypeField(w, depth, "Reified", n.Reified); err != nil {
+		return err
+	}
+	if err := writeTypeField(w, depth, "Type", n.Type); err != nil {
+		return err
+	}
+	return nil
+}
+
+// decodeTypeValue builds a TypeValue from its element.
+func decodeTypeValue(e *treetext.Element) (*TypeValue, error) {
+	if err := treetext.ExpectFields(e, "Reified", "Type"); err != nil {
+		return nil, err
+	}
+	n := &TypeValue{}
+	if v, err := decodeTypeField(e.Fields[0]); err != nil {
+		return nil, err
+	} else {
+		n.Reified = v
+	}
+	if v, err := decodeTypeField(e.Fields[1]); err != nil {
+		return nil, err
+	} else {
+		n.Type = v
+	}
+	return n, nil
+}
+
+// MarshalText renders the node and its subtree in the exact text form.
+func (n *TypeValue) MarshalText() ([]byte, error) {
+	var w treetext.Writer
+	w.Line(0, "TypeValue")
+	if err := writeTypeValue(&w, n, 1); err != nil {
+		return nil, err
+	}
+	return w.Bytes(), nil
+}
+
 // writeStmtField emits one Stmt-typed field: the nil marker or the concrete
 // node behind its heading.
 func writeStmtField(w *treetext.Writer, depth int, name string, v Stmt) error {
@@ -3979,6 +4027,13 @@ func writeValueField(w *treetext.Writer, depth int, name string, v Value) error 
 		}
 		w.Line(depth, name+": Ternary")
 		return writeTernary(w, n, depth+1)
+	case *TypeValue:
+		if n == nil {
+			w.Line(depth, name+": "+treetext.Nil)
+			return nil
+		}
+		w.Line(depth, name+": TypeValue")
+		return writeTypeValue(w, n, depth+1)
 	default:
 		return fmt.Errorf("treetext: field %s: unsupported Value %T", name, v)
 	}
@@ -4166,6 +4221,13 @@ func writeValueItem(w *treetext.Writer, depth int, v Value) error {
 		}
 		w.Line(depth, "Ternary")
 		return writeTernary(w, n, depth+1)
+	case *TypeValue:
+		if n == nil {
+			w.Line(depth, treetext.Nil)
+			return nil
+		}
+		w.Line(depth, "TypeValue")
+		return writeTypeValue(w, n, depth+1)
 	default:
 		return fmt.Errorf("treetext: unsupported Value %T", v)
 	}
@@ -4224,6 +4286,8 @@ func decodeValue(e *treetext.Element) (Value, error) {
 		return decodeStringLiteral(e)
 	case "Ternary":
 		return decodeTernary(e)
+	case "TypeValue":
+		return decodeTypeValue(e)
 	default:
 		return nil, fmt.Errorf("treetext: line %d: %s is not a known Value", e.Line, e.Head)
 	}
@@ -4296,6 +4360,7 @@ var treeStructs = []any{
 	(*Ternary)(nil),
 	(*TypeDef)(nil),
 	(*TypeParam)(nil),
+	(*TypeValue)(nil),
 }
 
 // writeTree dispatches a tree struct to its writer (test support); the
@@ -4461,6 +4526,9 @@ func writeTree(w *treetext.Writer, v any, depth int) (bool, error) {
 	case *TypeParam:
 		w.Line(depth, "TypeParam")
 		return true, writeTypeParam(w, n, depth+1)
+	case *TypeValue:
+		w.Line(depth, "TypeValue")
+		return true, writeTypeValue(w, n, depth+1)
 	default:
 		return false, nil
 	}
@@ -4510,4 +4578,5 @@ var treeExcluded = map[string][]string{
 	"Switch":            {"Syntax"},
 	"Ternary":           {"Syntax"},
 	"TypeDef":           {"Syntax", "EnumSyntax", "InterfaceSyntax", "MasterSyntax"},
+	"TypeValue":         {"Syntax"},
 }

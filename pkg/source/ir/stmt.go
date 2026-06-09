@@ -62,6 +62,7 @@ func ValueKinds() []Value {
 		&NullValue{},
 		&EnumMemberValue{},
 		&AssocConstValue{},
+		&TypeValue{},
 	}
 }
 

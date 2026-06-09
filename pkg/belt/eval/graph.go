@@ -222,6 +222,11 @@ func graphValueRaw(v ir.Value, ctx graphCtx) *ir.Constant {
 		return graphEnumMember(v)
 	case *ir.AssocConstValue:
 		return graphAssocConst(v)
+	case *ir.TypeValue:
+		// A reified type folds to a type constant — its denoted type carried as a
+		// comptime value. It is gone before codegen; the fold is what lets a const
+		// bound to it (const x = int8) publish a value.
+		return &ir.Constant{Kind: ir.ConstType, Reified: v.Reified}
 	case *ir.CollectionLiteral:
 		collCtx := sub
 		collCtx.expectedColl = ctx.expectedColl
