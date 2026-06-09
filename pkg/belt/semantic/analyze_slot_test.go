@@ -94,6 +94,47 @@ func TestSlotEnumMethodMetatype(t *testing.T) {
 	}
 }
 
+func TestSlotInterfaceMethodMetatype(t *testing.T) {
+	// An interface member's parameter may not be a type value — interfaces are
+	// resolved in their own loop, which must obey the storage rule, so an
+	// interface cannot expose a type-valued runtime slot.
+	src := "pub interface I {\n  f(x: type): nint\n}\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeTypeInValuePosition) {
+		t.Fatalf("want type_in_value_position on interface member, got %v", codes(diags))
+	}
+}
+
+func TestSlotAssocConstMetatypeAnnotated(t *testing.T) {
+	// An associated constant annotated with the metatype may not store a type
+	// value, the impl-block twin of the top-level const rule.
+	src := "pub type T = nint impl {\n  pub const C: type = sbyte\n}\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeTypeInValuePosition) {
+		t.Fatalf("want type_in_value_position on annotated assoc const, got %v", codes(diags))
+	}
+}
+
+func TestSlotAssocConstMetatypeInferred(t *testing.T) {
+	// An associated constant inferred from a type-value initializer is rejected
+	// too — the check runs after the fold settles its type.
+	src := "pub type T = nint impl {\n  pub const C = sbyte\n}\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeTypeInValuePosition) {
+		t.Fatalf("want type_in_value_position on inferred assoc const, got %v", codes(diags))
+	}
+}
+
+func TestSlotMasterRowFieldMetatype(t *testing.T) {
+	// A master row column may not store a type value — the row is the master's
+	// record body, so the record-field storage rule applies to it too.
+	src := "master M {\n  record {\n    id: int,\n    x: type,\n  }\n  primary id\n}\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeTypeInValuePosition) {
+		t.Fatalf("want type_in_value_position on master row field, got %v", codes(diags))
+	}
+}
+
 func TestSlotProjectionAnnotationAllowed(t *testing.T) {
 	// A projected type is not the metatype — it is the field's declared type — so
 	// a const annotated with one is fine: x has type long.

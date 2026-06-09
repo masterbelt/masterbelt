@@ -203,6 +203,16 @@ func resolveTypes(folder exprFolder, file *ast.File, at func(ast.Node) span, dia
 	foldOwners = append(foldOwners, masterOut...)
 	foldAssocConsts(folder, defs, foldOwners)
 
+	// An associated constant may not store a type value either, the impl-block
+	// twin of the top-level const rule: the check runs after the fold settles each
+	// constant's type, so it catches both an annotated slot (const C: type) and
+	// one inferred from a type-value initializer (const C = sbyte).
+	for _, owner := range foldOwners {
+		for _, ac := range owner.Consts {
+			reportMetatypeSlot(at, diags, ac.Syntax, ac.Type)
+		}
+	}
+
 	out = append(out, enumOut...)
 	out = append(out, ifaceOut...)
 	return append(out, masterOut...)
@@ -397,6 +407,10 @@ func resolveInterfaceDecl(r *infer.TypeResolver, reg *builtin.Registry, id *ast.
 	}
 	for _, m := range id.Members {
 		method := resolveInterfaceMember(r, reg, &ir.Named{Def: def}, m, scope, fns)
+		// An interface member's parameter or result may not be a type value, the
+		// same storage rule a concrete method obeys — so an interface cannot expose
+		// a type-valued runtime slot.
+		reportMetatypeSlot(at, diags, m, sigType(method.Params, method.Result))
 		def.AttachMethods(method)
 		if m.Provided() {
 			def.Interface.Provided = append(def.Interface.Provided, m.Name)
@@ -915,6 +929,9 @@ func resolveMasterDecl(r *infer.TypeResolver, reg *builtin.Registry, md *ast.Mas
 	// later, so it is neither reported missing nor read here.
 	rowType := r.ResolveType(md.Record, nil)
 	def.Master.Row = rowType
+	// A row column may not store a type value, the master twin of a record field's
+	// storage rule (the row is the master's record body).
+	reportMetatypeSlot(at, diags, md.Record, rowType)
 	row := underlyingRecord(rowType)
 	// The primary key is stored de-duplicated, so the IR never carries a malformed
 	// doubled key tuple even when the duplicate is also reported below.
@@ -1126,6 +1143,11 @@ func constantType(v *ir.Constant) ir.Type {
 			return &ir.Named{Def: v.EnumDef}
 		}
 		return ir.Invalid
+	case ir.ConstType:
+		// A type value's own type is the metatype `type` — so an associated
+		// constant inferred from one (const C = sbyte) settles to it and the
+		// storage-rule check then rejects the slot.
+		return &ir.Builtin{Name: builtin.NameType}
 	default:
 		return ir.Invalid
 	}
