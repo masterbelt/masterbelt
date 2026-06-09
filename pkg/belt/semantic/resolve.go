@@ -821,8 +821,12 @@ func resolveDecl(r *infer.TypeResolver, reg *builtin.Registry, td *ast.TypeDecl,
 func resolveMasterDecl(r *infer.TypeResolver, reg *builtin.Registry, md *ast.MasterDecl, def *ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List, fns bodyFuncs) {
 	// The row may be written inline (record { ... }) or as a named record type
 	// (record Row, type Row = { ... }), so unwrap a nominal alias to its record.
-	// An absent or non-record row leaves it nil — reported by checkMaster.
-	row := underlyingRecord(r.ResolveType(md.Record, nil))
+	// An absent or non-record row leaves it nil — reported by checkMaster. A
+	// generic record alias (record Row<int>) resolves to an application this slice
+	// does not expand: it is a real record row, just not validated here, so it is
+	// not reported as missing even though its fields are not read.
+	rowType := r.ResolveType(md.Record, nil)
+	row := underlyingRecord(rowType)
 	if row != nil {
 		def.Master.Fields = row.Fields
 	}
@@ -842,7 +846,7 @@ func resolveMasterDecl(r *infer.TypeResolver, reg *builtin.Registry, md *ast.Mas
 		def.AttachMethods(rm)
 	}
 	checkMemberDecls(def, at, diags)
-	checkMaster(md, row, at, diags)
+	checkMaster(md, row, isGenericRecordAlias(rowType), at, diags)
 }
 
 // checkMaster reports a master's well-formedness problems: an absent or
@@ -851,18 +855,20 @@ func resolveMasterDecl(r *infer.TypeResolver, reg *builtin.Registry, md *ast.Mas
 // row), a primary column repeated (master_duplicate_primary_key — a key tuple
 // must not name a column twice), and each named key that is not a field of the
 // row (master_primary_unknown_field). row is the resolved row record, or nil
-// when it is absent or not a record. It runs only in the reporting pass
-// (at/diags non-nil); the silent memoized pass builds the same definition
-// without it, so the definitions and the diagnostics never disagree. Each
-// diagnostic is anchored at the whole master declaration — the AST keeps the
-// primary key as a bare name with no node of its own, so the declaration is the
-// finest anchor available for now.
-func checkMaster(md *ast.MasterDecl, row *ir.Record, at func(ast.Node) span, diags *diagnostic.List) {
+// when it is absent or not a record. deferredRow is true when the row is a
+// generic record alias this slice does not expand: it is a real record, so it is
+// neither reported as missing nor its keys checked (the fields are unknown). It
+// runs only in the reporting pass (at/diags non-nil); the silent memoized pass
+// builds the same definition without it, so the definitions and the diagnostics
+// never disagree. Each diagnostic is anchored at the whole master declaration —
+// the AST keeps the primary key as a bare name with no node of its own, so the
+// declaration is the finest anchor available for now.
+func checkMaster(md *ast.MasterDecl, row *ir.Record, deferredRow bool, at func(ast.Node) span, diags *diagnostic.List) {
 	if at == nil || diags == nil {
 		return
 	}
 	s := at(md)
-	if row == nil {
+	if row == nil && !deferredRow {
 		diags.Add(newMasterMissingRowDiagnostic(s.offset, s.width, md.Name))
 	}
 	if len(md.Primary) == 0 {
@@ -1486,6 +1492,16 @@ func underlyingRecord(t ir.Type) *ir.Record {
 			return nil
 		}
 	}
+}
+
+// isGenericRecordAlias reports whether t is a generic record alias applied to
+// type arguments (record Row<int>, type Row<T> = { ... }) — an application this
+// slice does not expand into row fields. It tells a master row written with a
+// generic alias (a real record, deferred) apart from one that is genuinely not a
+// record, so the former is not reported as a missing row.
+func isGenericRecordAlias(t ir.Type) bool {
+	app, ok := t.(*ir.App)
+	return ok && app.Def != nil && underlyingRecord(app.Def.Body) != nil
 }
 
 // memberFields returns the field names the member-collision checks compare an

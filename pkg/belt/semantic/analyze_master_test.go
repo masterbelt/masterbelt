@@ -170,6 +170,32 @@ func TestMasterMissingRow(t *testing.T) {
 	}
 }
 
+// TestMasterRowMustBeRecord pins that a row that is genuinely not a record (a
+// builtin, an enum) is reported as a missing row, distinct from the deferred
+// generic-alias case below.
+func TestMasterRowMustBeRecord(t *testing.T) {
+	src := "master M {\n  record int\n  primary id\n}\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeMasterMissingRow) {
+		t.Fatalf("want master_missing_row for a non-record row, got %v", codes(diags))
+	}
+}
+
+// TestMasterGenericRowAliasDeferred pins that a generic record alias row is a
+// real record this slice does not expand: it is not falsely reported as a
+// missing row, and its (unknown) key column is not flagged unknown. Full support
+// for generic row aliases is left to later work.
+func TestMasterGenericRowAliasDeferred(t *testing.T) {
+	src := "type Row<T> = { id: T }\nmaster M {\n  record Row<int>\n  primary id\n}\n"
+	_, diags := analyze(src)
+	if hasCode(diags, CodeMasterMissingRow) {
+		t.Errorf("a generic record alias row should not be reported missing: %v", codes(diags))
+	}
+	if hasCode(diags, CodeMasterPrimaryUnknownField) {
+		t.Errorf("a deferred generic alias row should not flag its key unknown: %v", codes(diags))
+	}
+}
+
 // TestMasterDuplicatePrimaryKey pins that a composite primary key repeating a
 // column is rejected: a key tuple must not name a column twice, or a consumer
 // building key tuples or foreign-key references would see it doubled.
