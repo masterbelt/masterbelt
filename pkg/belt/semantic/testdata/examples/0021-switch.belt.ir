@@ -173,6 +173,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+      Master: ~
       Where: ~
   Funcs:
     Function

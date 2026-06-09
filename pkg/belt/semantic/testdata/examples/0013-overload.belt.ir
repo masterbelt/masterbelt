@@ -318,6 +318,7 @@ Module
       Interface: ~
       Impls: ~
       Enum: ~
+      Master: ~
       Where: ~
     TypeDef
       Name: "Level"
@@ -395,6 +396,7 @@ Module
       Interface: ~
       Impls: ~
       Enum: ~
+      Master: ~
       Where: ~
   Funcs: ~
   Asserts: ~

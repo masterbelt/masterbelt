@@ -146,6 +146,7 @@ Module
             Builtin
               Name: "nint"
       Enum: ~
+      Master: ~
       Where: ~
     TypeDef
       Name: "foldable"
@@ -269,6 +270,7 @@ Module
         Parents: ~
       Impls: ~
       Enum: ~
+      Master: ~
       Where: ~
   Funcs:
     Function

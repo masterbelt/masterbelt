@@ -35,6 +35,7 @@ belt.semantic.type_mismatch,{actual} を {expected} として使えません
 belt.semantic.uninferable_collection,このコレクションリテラルの型を推論できません。型注釈を付けてください
 belt.semantic.missing_field,{typ} のレコードリテラルにフィールド {field} がありません
 belt.semantic.unknown_field,{typ} にフィールド {field} はありません
+belt.semantic.master_primary_unknown_field,master {master} に primary キー {key} のフィールドがありません
 belt.semantic.uninferable_record,このレコードリテラルの型を推論できません。型名を付けるか型注釈を付けてください
 belt.semantic.not_a_record,{typ} はレコード型ではありません
 belt.semantic.uninferable_result,この関数リテラルの結果型を推論できません。注釈を付けるか値を返してください

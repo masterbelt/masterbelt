@@ -513,6 +513,7 @@ Module
       Interface: ~
       Impls: ~
       Enum: ~
+      Master: ~
       Where: ~
     TypeDef
       Name: "Health"
@@ -608,6 +609,7 @@ Module
       Interface: ~
       Impls: ~
       Enum: ~
+      Master: ~
       Where: ~
     TypeDef
       Name: "Element"
@@ -830,6 +832,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+      Master: ~
       Where: ~
   Funcs:
     Function

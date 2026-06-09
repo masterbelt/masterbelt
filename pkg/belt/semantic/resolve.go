@@ -56,13 +56,13 @@ func boundViolationReporter(at func(ast.Node) span, diags *diagnostic.List) func
 // predicate. Method bodies are lowered to IR here (lower.Body) but not
 // type-checked.
 func resolveTypes(folder exprFolder, file *ast.File, at func(ast.Node) span, diags *diagnostic.List, res *callResolutions, reg *builtin.Registry, extern map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, fns bodyFuncs) []*ir.TypeDef {
-	if len(file.Types) == 0 && len(file.Enums) == 0 && len(file.Interfaces) == 0 {
+	if len(file.Types) == 0 && len(file.Enums) == 0 && len(file.Interfaces) == 0 && len(file.Masters) == 0 {
 		return nil
 	}
 
 	// First pass: a definition per declaration, by name, so references (including
 	// forward ones) bind before any body is resolved.
-	defs, out, enumOut, ifaceOut := declareTypeShells(file, extern, at, diags)
+	defs, out, enumOut, ifaceOut, masterOut := declareTypeShells(file, extern, at, diags)
 
 	// Second pass: resolve parameters, body, method signatures, enum bodies, and
 	// interface members, reporting any unknown type names.
@@ -87,6 +87,9 @@ func resolveTypes(folder exprFolder, file *ast.File, at func(ast.Node) span, dia
 	for i, ed := range file.Enums {
 		resolveEnumDecl(folder, defs, r, reg, ed, enumOut[i], at, diags, fns)
 	}
+	for i, md := range file.Masters {
+		resolveMasterDecl(r, reg, md, masterOut[i], at, diags, fns)
+	}
 
 	// Third pass: resolve each type's and enum's declared interface impls and,
 	// when reporting, check conformance (every required method present) and the
@@ -96,6 +99,9 @@ func resolveTypes(folder exprFolder, file *ast.File, at func(ast.Node) span, dia
 	// universe the bodies were.
 	for i, td := range file.Types {
 		resolveImpls(r, reg, td.Impls, out[i], at, diags)
+	}
+	for i, md := range file.Masters {
+		resolveImpls(r, reg, md.Impls, masterOut[i], at, diags)
 	}
 	for i, ed := range file.Enums {
 		resolveImpls(r, reg, ed.Impls, enumOut[i], at, diags)
@@ -114,10 +120,13 @@ func resolveTypes(folder exprFolder, file *ast.File, at func(ast.Node) span, dia
 	// fn) folds — the in-pass eager fold ran before its targets existed. The
 	// fold reads the just-built defs directly rather than the universe query,
 	// which is this very computation and would cycle-guard to nothing.
-	foldAssocConsts(folder, defs, append(append([]*ir.TypeDef{}, out...), enumOut...))
+	foldOwners := append(append([]*ir.TypeDef{}, out...), enumOut...)
+	foldOwners = append(foldOwners, masterOut...)
+	foldAssocConsts(folder, defs, foldOwners)
 
 	out = append(out, enumOut...)
-	return append(out, ifaceOut...)
+	out = append(out, ifaceOut...)
+	return append(out, masterOut...)
 }
 
 // declareTypeShells is resolveTypes' first pass: it builds a definition shell
@@ -127,10 +136,10 @@ func resolveTypes(folder exprFolder, file *ast.File, at func(ast.Node) span, dia
 // redeclaration. Types, enums, and interfaces share one name space, so a name
 // collision across the kinds is a redeclaration too. It returns the universe
 // (extern names plus the file's own) and the per-kind definition slices.
-func declareTypeShells(file *ast.File, extern map[string]*ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List) (defs map[string]*ir.TypeDef, out, enumOut, ifaceOut []*ir.TypeDef) {
-	defs = make(map[string]*ir.TypeDef, len(file.Types)+len(file.Enums)+len(file.Interfaces)+len(extern))
+func declareTypeShells(file *ast.File, extern map[string]*ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List) (defs map[string]*ir.TypeDef, out, enumOut, ifaceOut, masterOut []*ir.TypeDef) {
+	defs = make(map[string]*ir.TypeDef, len(file.Types)+len(file.Enums)+len(file.Interfaces)+len(file.Masters)+len(extern))
 	maps.Copy(defs, extern)
-	own := make(map[string]bool, len(file.Types)+len(file.Enums)+len(file.Interfaces))
+	own := make(map[string]bool, len(file.Types)+len(file.Enums)+len(file.Interfaces)+len(file.Masters))
 	claim := func(name string, def *ir.TypeDef, anchor ast.Node) {
 		if name == "" {
 			return
@@ -169,7 +178,15 @@ func declareTypeShells(file *ast.File, extern map[string]*ir.TypeDef, at func(as
 		ifaceOut[i] = def
 		claim(id.Name, def, id)
 	}
-	return defs, out, enumOut, ifaceOut
+	// A master shares the type name space (decl 0002 §3): a name a type, enum, or
+	// interface already claims is a redeclaration, reported by the same claim.
+	masterOut = make([]*ir.TypeDef, len(file.Masters))
+	for i, md := range file.Masters {
+		def := &ir.TypeDef{Name: md.Name, Public: md.Public, Doc: md.Doc, Master: &ir.MasterDef{}, MasterSyntax: md}
+		masterOut[i] = def
+		claim(md.Name, def, md)
+	}
+	return defs, out, enumOut, ifaceOut, masterOut
 }
 
 // assocGraphEnv is the post-resolution fold environment the associated
@@ -785,6 +802,66 @@ func resolveDecl(r *infer.TypeResolver, reg *builtin.Registry, td *ast.TypeDecl,
 	// calls a method of the type (`where self.isValid()`) can resolve it — self
 	// is the nominal type, and its impl methods are now on the definition.
 	resolveWhere(r, reg, td, def, at, diags, res)
+}
+
+// resolveMasterDecl resolves a master declaration into its definition. The row
+// is an ordinary record body, so its field types resolve through the same
+// resolver a type's body does; the resolved fields are kept on def.Master rather
+// than def.Body, which leaves the master a leaf the type algebra does not look
+// through (opaque to its row record — decl 0002 §2). The impl methods and
+// associated constants resolve exactly as a type's do, with self the master
+// nominal, so a row method (label(): string { return self.name }) resolves its
+// field reads through recordOf, which knows the master case. Finally the
+// primary-key columns are recorded and any that names no field is reported. A
+// master has no generic parameters; the row predicate (a where over a row) is a
+// later concern, so — with Body nil — resolveWhere is not run (it would skip a
+// body-less definition anyway). It takes no callResolutions stream because the
+// only checked body it produces, a row method, is checked by checkMethodBodies
+// like every other method, not here.
+func resolveMasterDecl(r *infer.TypeResolver, reg *builtin.Registry, md *ast.MasterDecl, def *ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List, fns bodyFuncs) {
+	if rec, ok := r.ResolveType(md.Record, nil).(*ir.Record); ok {
+		def.Master.Fields = rec.Fields
+	}
+	def.Master.Primary = md.Primary
+	def.Consts = resolveAssocConstList(r, reg, def, md.Consts, nil, at, diags)
+	// Same-name methods are overloads unless a signature repeats; the first wins
+	// and the repeat is reported, exactly as resolveDecl drops a type's.
+	seen := make(map[string]bool, len(md.Methods))
+	for _, m := range md.Methods {
+		rm := resolveMethod(r, reg, &ir.Named{Def: def}, m, nil, fns)
+		key := rm.Name + signatureKey(def, rm)
+		if m.Name != "" && seen[key] {
+			reportDuplicateMethod(rm, def, m, at, diags)
+			continue
+		}
+		seen[key] = true
+		def.AttachMethods(rm)
+	}
+	checkMemberDecls(def, at, diags)
+	checkMasterPrimary(md, def, at, diags)
+}
+
+// checkMasterPrimary reports each primary-key column that names no field of the
+// master's row (belt.semantic.master_primary_unknown_field). It runs only in the
+// reporting pass (at/diags non-nil); the silent memoized pass builds the same
+// definition without it, so the definitions and the diagnostics never disagree.
+// The diagnostic is anchored at the whole master declaration — the AST keeps the
+// primary key as a bare name with no node of its own, so the declaration is the
+// finest anchor available (a precise cell locator is 0017).
+func checkMasterPrimary(md *ast.MasterDecl, def *ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List) {
+	if at == nil || diags == nil {
+		return
+	}
+	fields := make(map[string]bool, len(def.Master.Fields))
+	for _, f := range def.Master.Fields {
+		fields[f.Name] = true
+	}
+	for _, key := range md.Primary {
+		if !fields[key] {
+			s := at(md)
+			diags.Add(newMasterPrimaryUnknownFieldDiagnostic(s.offset, s.width, key, md.Name))
+		}
+	}
 }
 
 // resolveAssocConsts resolves a type's associated constants — the impl block's

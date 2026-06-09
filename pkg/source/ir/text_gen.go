@@ -1354,6 +1354,34 @@ func (n *ExprStmt) MarshalText() ([]byte, error) {
 	return w.Bytes(), nil
 }
 
+// writeField emits n's fields beneath an already-written heading line.
+func writeField(w *treetext.Writer, n *Field, depth int) error {
+	w.Line(depth, "Name: "+strconv.Quote(n.Name))
+	if err := writeTypeField(w, depth, "Type", n.Type); err != nil {
+		return err
+	}
+	return nil
+}
+
+// decodeField builds a Field from its element.
+func decodeField(e *treetext.Element) (*Field, error) {
+	if err := treetext.ExpectFields(e, "Name", "Type"); err != nil {
+		return nil, err
+	}
+	n := &Field{}
+	if v, err := treetext.String(e.Fields[0]); err != nil {
+		return nil, err
+	} else {
+		n.Name = v
+	}
+	if v, err := decodeTypeField(e.Fields[1]); err != nil {
+		return nil, err
+	} else {
+		n.Type = v
+	}
+	return n, nil
+}
+
 // writeFieldAccess emits n's fields beneath an already-written heading line.
 func writeFieldAccess(w *treetext.Writer, n *FieldAccess, depth int) error {
 	if err := writeValueField(w, depth, "Receiver", n.Receiver); err != nil {
@@ -2105,6 +2133,56 @@ func (n *LocalRef) MarshalText() ([]byte, error) {
 		return nil, err
 	}
 	return w.Bytes(), nil
+}
+
+// writeMasterDef emits n's fields beneath an already-written heading line.
+func writeMasterDef(w *treetext.Writer, n *MasterDef, depth int) error {
+	if len(n.Fields) == 0 {
+		w.Line(depth, "Fields: "+treetext.Nil)
+	} else {
+		w.Line(depth, "Fields:")
+		for i := range n.Fields {
+			w.Line(depth+1, "Field")
+			if err := writeField(w, &n.Fields[i], depth+2); err != nil {
+				return err
+			}
+		}
+	}
+	w.Line(depth, "Primary: "+treetext.QuoteStrings(n.Primary))
+	return nil
+}
+
+// decodeMasterDef builds a MasterDef from its element.
+func decodeMasterDef(e *treetext.Element) (*MasterDef, error) {
+	if err := treetext.ExpectFields(e, "Fields", "Primary"); err != nil {
+		return nil, err
+	}
+	n := &MasterDef{}
+	switch f := e.Fields[0]; {
+	case f.Inline == treetext.Nil:
+	case f.Items == nil:
+		return nil, fmt.Errorf("treetext: line %d: field %s: expected a list", f.Line, f.Name)
+	default:
+		out := make([]Field, 0, len(f.Items))
+		for j := range f.Items {
+			item := &f.Items[j]
+			if item.Head != "Field" {
+				return nil, fmt.Errorf("treetext: line %d: %s is not a Field", item.Line, item.Head)
+			}
+			v, err := decodeField(item)
+			if err != nil {
+				return nil, err
+			}
+			out = append(out, *v)
+		}
+		n.Fields = out
+	}
+	if v, err := treetext.Strings(e.Fields[1]); err != nil {
+		return nil, err
+	} else {
+		n.Primary = v
+	}
+	return n, nil
 }
 
 // writeMatch emits n's fields beneath an already-written heading line.
@@ -3390,6 +3468,14 @@ func writeTypeDef(w *treetext.Writer, n *TypeDef, depth int) error {
 			return err
 		}
 	}
+	if n.Master == nil {
+		w.Line(depth, "Master: "+treetext.Nil)
+	} else {
+		w.Line(depth, "Master: MasterDef")
+		if err := writeMasterDef(w, n.Master, depth+1); err != nil {
+			return err
+		}
+	}
 	if err := writeValueField(w, depth, "Where", n.Where); err != nil {
 		return err
 	}
@@ -3398,7 +3484,7 @@ func writeTypeDef(w *treetext.Writer, n *TypeDef, depth int) error {
 
 // decodeTypeDef builds a TypeDef from its element.
 func decodeTypeDef(e *treetext.Element) (*TypeDef, error) {
-	if err := treetext.ExpectFields(e, "Name", "Anchor", "Public", "Doc", "Params", "Body", "Methods", "Consts", "Builtin", "Interface", "Impls", "Enum", "Where"); err != nil {
+	if err := treetext.ExpectFields(e, "Name", "Anchor", "Public", "Doc", "Params", "Body", "Methods", "Consts", "Builtin", "Interface", "Impls", "Enum", "Master", "Where"); err != nil {
 		return nil, err
 	}
 	n := &TypeDef{}
@@ -3543,7 +3629,18 @@ func decodeTypeDef(e *treetext.Element) (*TypeDef, error) {
 		}
 		n.Enum = v
 	}
-	if v, err := decodeValueField(e.Fields[12]); err != nil {
+	switch f := e.Fields[12]; {
+	case f.Inline == treetext.Nil:
+	case f.Node == nil || f.Node.Head != "MasterDef":
+		return nil, fmt.Errorf("treetext: line %d: field %s: expected a MasterDef", f.Line, f.Name)
+	default:
+		v, err := decodeMasterDef(f.Node)
+		if err != nil {
+			return nil, err
+		}
+		n.Master = v
+	}
+	if v, err := decodeValueField(e.Fields[13]); err != nil {
 		return nil, err
 	} else {
 		n.Where = v
@@ -4218,6 +4315,7 @@ var treeStructs = []any{
 	(*EnumMember)(nil),
 	(*EnumMemberValue)(nil),
 	(*ExprStmt)(nil),
+	(*Field)(nil),
 	(*FieldAccess)(nil),
 	(*For)(nil),
 	(*FuncCall)(nil),
@@ -4228,6 +4326,7 @@ var treeStructs = []any{
 	(*InterfaceDef)(nil),
 	(*Let)(nil),
 	(*LocalRef)(nil),
+	(*MasterDef)(nil),
 	(*Match)(nil),
 	(*MatchArm)(nil),
 	(*Method)(nil),
@@ -4320,6 +4419,9 @@ func writeTree(w *treetext.Writer, v any, depth int) (bool, error) {
 	case *ExprStmt:
 		w.Line(depth, "ExprStmt")
 		return true, writeExprStmt(w, n, depth+1)
+	case *Field:
+		w.Line(depth, "Field")
+		return true, writeField(w, n, depth+1)
 	case *FieldAccess:
 		w.Line(depth, "FieldAccess")
 		return true, writeFieldAccess(w, n, depth+1)
@@ -4350,6 +4452,9 @@ func writeTree(w *treetext.Writer, v any, depth int) (bool, error) {
 	case *LocalRef:
 		w.Line(depth, "LocalRef")
 		return true, writeLocalRef(w, n, depth+1)
+	case *MasterDef:
+		w.Line(depth, "MasterDef")
+		return true, writeMasterDef(w, n, depth+1)
 	case *Match:
 		w.Line(depth, "Match")
 		return true, writeMatch(w, n, depth+1)
@@ -4458,5 +4563,5 @@ var treeExcluded = map[string][]string{
 	"StringLiteral":     {"Syntax"},
 	"Switch":            {"Syntax"},
 	"Ternary":           {"Syntax"},
-	"TypeDef":           {"Syntax", "EnumSyntax", "InterfaceSyntax"},
+	"TypeDef":           {"Syntax", "EnumSyntax", "InterfaceSyntax", "MasterSyntax"},
 }

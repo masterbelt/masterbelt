@@ -267,6 +267,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+      Master: ~
       Where: ~
     TypeDef
       Name: "Element"
@@ -470,6 +471,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+      Master: ~
       Where: ~
     TypeDef
       Name: "Locale"
@@ -624,6 +626,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+      Master: ~
       Where: ~
   Funcs:
     Function

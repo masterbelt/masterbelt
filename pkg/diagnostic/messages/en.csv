@@ -35,6 +35,7 @@ belt.semantic.type_mismatch,cannot use {actual} as {expected}
 belt.semantic.uninferable_collection,cannot infer the type of this collection literal; annotate it
 belt.semantic.missing_field,record literal of {typ} is missing field {field}
 belt.semantic.unknown_field,{typ} has no field {field}
+belt.semantic.master_primary_unknown_field,master {master} has no field {key} named by its primary key
 belt.semantic.uninferable_record,cannot infer the type of this record literal; name its type or annotate it
 belt.semantic.not_a_record,{typ} is not a record type
 belt.semantic.uninferable_result,cannot infer this function literal's result type; annotate it or return a value

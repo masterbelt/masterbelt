@@ -1,0 +1,145 @@
+// This file pins the master-declaration semantics added in plan master/0002:
+// a master resolves to an opaque nominal TypeDef carrying its row fields and
+// primary key (Body stays nil), its row methods read their fields through self,
+// a primary key naming no field is reported, and a master shares the type name
+// space so a name a type/enum/interface claims collides.
+package semantic
+
+import (
+	"strings"
+	"testing"
+
+	"github.com/masterbelt/masterbelt/pkg/source/ir"
+)
+
+// masterDef returns the resolved master definition of the given name, or nil.
+func masterDef(m *ir.Module, name string) *ir.TypeDef {
+	for _, t := range m.Types {
+		if t.Name == name && t.Master != nil {
+			return t
+		}
+	}
+	return nil
+}
+
+// fieldNames renders a master's row fields as "name:type" pairs in source order.
+func fieldNames(def *ir.TypeDef) string {
+	parts := make([]string, len(def.Master.Fields))
+	for i, f := range def.Master.Fields {
+		parts[i] = f.Name + ":" + f.Type.String()
+	}
+	return strings.Join(parts, ",")
+}
+
+// TestMasterResolvesToOpaqueNominal pins the happy path: a master's record field
+// types resolve (a field typed by an enum becomes a Named of it), its primary
+// key is recorded, and it is an opaque nominal — Body stays nil, so the type
+// algebra treats it as a leaf (decl 0002 §1/§2). A row method reading self.field
+// type-checks, so the whole declaration is diagnostic-free.
+func TestMasterResolvesToOpaqueNominal(t *testing.T) {
+	src := "enum SkillKind {\n  active\n  passive\n}\n\n" +
+		"master Skill {\n" +
+		"  record {\n    id: int,\n    name: string,\n    kind: SkillKind,\n  } impl {\n" +
+		"    pub label(): string {\n      return self.name\n    }\n  }\n" +
+		"  primary id\n}\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", codes(diags))
+	}
+	def := masterDef(m, "Skill")
+	if def == nil {
+		t.Fatalf("master Skill not resolved: %+v", m.Types)
+	}
+	if def.Body != nil {
+		t.Errorf("master Body = %v, want nil (opaque nominal)", def.Body)
+	}
+	if got, want := fieldNames(def), "id:int,name:string,kind:SkillKind"; got != want {
+		t.Errorf("fields = %q, want %q", got, want)
+	}
+	if got, want := len(def.Master.Primary), 1; want != got || def.Master.Primary[0] != "id" {
+		t.Errorf("primary = %v, want [id]", def.Master.Primary)
+	}
+	if def.Anchor != "belt:/Skill" {
+		t.Errorf("anchor = %q, want belt:/Skill", def.Anchor)
+	}
+}
+
+// TestMasterCompositePrimary pins a multi-column primary key (the pkey basics
+// 0001 admitted): every column is a field, in declaration order.
+func TestMasterCompositePrimary(t *testing.T) {
+	src := "master SkillUpgrade {\n  record {\n    skill: int,\n    level: int,\n  }\n  primary (skill, level)\n}\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", codes(diags))
+	}
+	def := masterDef(m, "SkillUpgrade")
+	if def == nil {
+		t.Fatalf("master SkillUpgrade not resolved")
+	}
+	if got := def.Master.Primary; len(got) != 2 || got[0] != "skill" || got[1] != "level" {
+		t.Errorf("primary = %v, want [skill level]", got)
+	}
+}
+
+// TestMasterPrimaryUnknownField pins the only new diagnostic: a primary key that
+// names no row field is reported, once, as master_primary_unknown_field — and a
+// composite key reports each unknown column.
+func TestMasterPrimaryUnknownField(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+		want int // number of master_primary_unknown_field diagnostics expected
+	}{
+		{
+			name: "single unknown",
+			src:  "master M {\n  record {\n    id: int,\n  }\n  primary nope\n}\n",
+			want: 1,
+		},
+		{
+			name: "one of composite unknown",
+			src:  "master M {\n  record {\n    a: int,\n    b: int,\n  }\n  primary (a, missing)\n}\n",
+			want: 1,
+		},
+		{
+			name: "both composite unknown",
+			src:  "master M {\n  record {\n    a: int,\n  }\n  primary (x, y)\n}\n",
+			want: 2,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, diags := analyze(tc.src)
+			got := 0
+			for _, d := range diags {
+				if d.Code == CodeMasterPrimaryUnknownField {
+					got++
+				}
+			}
+			if got != tc.want {
+				t.Fatalf("master_primary_unknown_field count = %d, want %d (all: %v)", got, tc.want, codes(diags))
+			}
+		})
+	}
+}
+
+// TestMasterSharesTypeNamespace pins decl 0002 §3: a master shares the one type
+// name space, so a name a type, enum, or interface already claims is a
+// redeclaration, reported by the existing duplicate_declaration path (no master
+// machinery of its own).
+func TestMasterSharesTypeNamespace(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+	}{
+		{"type then master", "type Skill = int\nmaster Skill {\n  record {\n    id: int,\n  }\n  primary id\n}\n"},
+		{"master then enum", "master Skill {\n  record {\n    id: int,\n  }\n  primary id\n}\nenum Skill {\n  a\n}\n"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, diags := analyze(tc.src)
+			if !hasCode(diags, CodeDuplicateDeclaration) {
+				t.Fatalf("want duplicate_declaration, got %v", codes(diags))
+			}
+		})
+	}
+}

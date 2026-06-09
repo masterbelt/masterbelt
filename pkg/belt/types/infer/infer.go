@@ -478,6 +478,12 @@ func recordOf(t ir.Type) *ir.Record {
 		return t
 	case *ir.Named:
 		if t.Def != nil {
+			// A master is opaque to its row record (Body is nil), but its own row
+			// fields are reachable from inside its methods (self.name): they live on
+			// the master descriptor, so a master receiver reads as a record of them.
+			if t.Def.Master != nil {
+				return &ir.Record{Fields: t.Def.Master.Fields}
+			}
 			return recordOf(t.Def.Body)
 		}
 	}

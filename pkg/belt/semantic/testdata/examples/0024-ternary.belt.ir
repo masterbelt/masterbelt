@@ -338,6 +338,7 @@ Module
       Interface: ~
       Impls: ~
       Enum: ~
+      Master: ~
       Where: ~
     TypeDef
       Name: "Temp"
@@ -438,6 +439,7 @@ Module
       Interface: ~
       Impls: ~
       Enum: ~
+      Master: ~
       Where: ~
   Funcs: ~
   Asserts: ~

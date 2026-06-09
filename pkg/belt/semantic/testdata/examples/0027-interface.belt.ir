@@ -70,6 +70,7 @@ Module
               Name: "T"
               Bound: ~
       Enum: ~
+      Master: ~
       Where: ~
     TypeDef
       Name: "foldable"
@@ -281,6 +282,7 @@ Module
         Parents: ~
       Impls: ~
       Enum: ~
+      Master: ~
       Where: ~
   Funcs:
     Function

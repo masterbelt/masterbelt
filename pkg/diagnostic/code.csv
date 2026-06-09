@@ -35,6 +35,7 @@ belt.semantic.type_mismatch,error,actual:string expected:string
 belt.semantic.uninferable_collection,error,
 belt.semantic.missing_field,error,field:string typ:string
 belt.semantic.unknown_field,error,field:string typ:string
+belt.semantic.master_primary_unknown_field,error,key:string master:string
 belt.semantic.uninferable_record,error,
 belt.semantic.not_a_record,error,typ:string
 belt.semantic.uninferable_result,error,
