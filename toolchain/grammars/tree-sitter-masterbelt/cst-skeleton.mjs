@@ -41,6 +41,7 @@ const treeSitterAlias = {
   self_expr: 'SelfExpr',
   null_type: 'TypeName',
   self_type: 'TypeName',
+  type_type: 'TypeName',
 };
 
 function pascal(name) {

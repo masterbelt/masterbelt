@@ -307,6 +307,16 @@ func (k Kind) Effect() bool {
 	return k == Io || k == Async || k == Nondet
 }
 
+// Keyword reports whether the kind is one of the reserved-word keyword kinds
+// (the contiguous Const..In run). It is the predicate that lets a keyword be
+// read as a plain identifier where the grammar makes one unambiguous — a member
+// name after ".", a record field name, a function parameter name — so type, for,
+// and the rest stay usable as ordinary names (item.type, fn f(for: int)) without
+// the lexer carving out per-word exceptions.
+func (k Kind) Keyword() bool {
+	return firstKeyword <= k && k <= lastKeyword
+}
+
 // Lookup returns the keyword Kind for ident, or Ident if it is not a
 // reserved word.
 func Lookup(ident string) Kind {

@@ -16,6 +16,12 @@ const (
 	NameDatetime = "datetime"
 	NameDuration = "duration"
 	NameError    = "error"
+	// NameType is the metatype: the type of a reified type value (type : type).
+	// It is opaque — no value range, no operators — and declared in no prelude
+	// file (its name is the `type` keyword a declaration head reserves), so it is
+	// registered as a definition but not a Names() primitive and carries no
+	// NativeType.
+	NameType = "type"
 )
 
 // The canonical operator-method names every operand type shares: the

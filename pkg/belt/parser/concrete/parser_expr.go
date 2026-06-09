@@ -571,6 +571,21 @@ func (p *parser) parseUnary() cst.Green {
 	return cst.NewNode(cst.UnaryExpr, children)
 }
 
+// memberNameAhead reports whether a member name follows the just-consumed ".".
+// A plain identifier is a member name even across a newline — the leading-dot
+// continuation a method chain takes (foo\n  .bar). A keyword is a member name
+// only on the dot's own line: a reserved word on the next line heads a new
+// declaration (const, type, pub, …), and an incomplete "x." at a line's end must
+// not swallow it. So item.type reads `type` as the member, while `C.` at end of
+// line leaves the member missing and the following `const B = …` intact.
+func (p *parser) memberNameAhead() bool {
+	k := p.peekSignificant()
+	if k == token.Ident {
+		return true
+	}
+	return k.Keyword() && p.nextOnLine(p.pos) == k
+}
+
 // parsePostfix parses an operand followed by any chain of member accesses,
 // calls, and index accesses — receiver.member, callee(args), and receiver[i] —
 // applied left to right, so self.id, int32(self.id), and xs[0][1] form
@@ -585,9 +600,9 @@ func (p *parser) parsePostfix() cst.Green {
 			children := []cst.Green{left}
 			p.skipTrivia(&children)
 			children = append(children, p.bump()) // "."
-			if p.peekSignificant() == token.Ident {
+			if p.memberNameAhead() {
 				p.skipTrivia(&children)
-				children = append(children, p.bump()) // the member name
+				children = append(children, p.bump()) // the member name (a keyword reads as a name here)
 			} else {
 				p.report(newExpectedIdentifierDiagnostic(p.lastStart, 0))
 			}
@@ -691,6 +706,12 @@ func (p *parser) parseOperand() cst.Green {
 		return cst.NewNode(cst.NameRef, []cst.Green{name})
 	case token.Self:
 		return cst.NewNode(cst.SelfExpr, []cst.Green{p.bump()})
+	case token.Type:
+		// The `type` keyword names the metatype as a value (const t = type; type :
+		// type). It reads as a name reference here — a value-expression position
+		// never begins the `type Foo =` declaration the keyword otherwise heads —
+		// and the semantic layer reifies it to a type value, like any type name.
+		return cst.NewNode(cst.NameRef, []cst.Green{p.bump()})
 	case token.Fn:
 		return p.parseFuncLit()
 	case token.LParen:
@@ -727,6 +748,16 @@ func (p *parser) parseRecordLit(children []cst.Green) *cst.Node {
 				children = append(children, p.bump()) // "}"
 				node = cst.NewNode(cst.RecordLit, children)
 				return
+			case p.recordFieldKeyword():
+				// A field whose name is a keyword read as an identifier (type:, for:):
+				// recognized only when the ":" follows, so a leaked declaration the
+				// unterminated-recovery below stops at is not mistaken for a field.
+				p.skipTrivia(&children)
+				children = append(children, p.parseRecordField())
+				if p.peekSignificant() == token.Comma {
+					p.skipTrivia(&children)
+					children = append(children, p.bump()) // ","
+				}
 			case p.atUnterminatedConstructStop():
 				// Unterminated: report the missing "}" and stop at EOF or before the
 				// next File-level declaration so recovery stays local. The boundary
@@ -753,6 +784,22 @@ func (p *parser) parseRecordLit(children []cst.Green) *cst.Node {
 		}
 	})
 	return node
+}
+
+// recordFieldKeyword reports whether the cursor begins a record-literal field
+// whose name is a keyword read as an identifier — a reserved word (type, for, …)
+// immediately followed by the ":" that opens its value. The trailing-colon check
+// keeps a leaked declaration (an unterminated literal running into `type Foo =`)
+// out of the field path, so the unterminated-recovery loop still stops at the
+// declaration boundary; a plain-Ident field is handled by its own arm, where a
+// keyword can never reach. The lookahead reads only token kinds, so the boundary
+// context-free property the incremental Document relies on holds.
+func (p *parser) recordFieldKeyword() bool {
+	i := p.nextSignificantIndex(p.pos)
+	if !p.toks[i].Kind.Keyword() {
+		return false
+	}
+	return p.toks[p.nextSignificantIndex(i+1)].Kind == token.Colon
 }
 
 // parseRecordField parses one field initializer: Ident ":" Expr. A missing ":"
@@ -987,13 +1034,24 @@ var unaryOps = map[token.Kind]bool{
 	token.Bang:  true,
 }
 
+// nameLike reports whether kind can stand in for an identifier at a position the
+// grammar makes unambiguous: a member name after ".", a record field name, a
+// function parameter name. Any keyword qualifies there (item.type, record { type:
+// SkillKind }, fn f(for: int)) — the position never begins a keyword construct,
+// so reading the reserved word as a name introduces no ambiguity. The let/loop
+// binding names and the declaration names keep requiring a plain Ident, where a
+// keyword would collide with the construct it heads (type Foo = ...).
+func nameLike(kind token.Kind) bool {
+	return kind == token.Ident || kind.Keyword()
+}
+
 // startsExpr reports whether kind can begin an expression. The parser checks it
 // before committing to an operand so a missing one is reported (and leaves
 // trailing trivia for the next construct) rather than mis-parsed.
 func startsExpr(kind token.Kind) bool {
 	switch kind {
 	case token.Int, token.String, token.DatetimeLit, token.DurationLit,
-		token.Ident, token.True, token.False, token.Null, token.Self,
+		token.Ident, token.True, token.False, token.Null, token.Self, token.Type,
 		token.LBracket, token.LBrace, token.Plus, token.Minus, token.Bang,
 		token.Fn, token.LParen, token.Await:
 		return true

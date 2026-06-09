@@ -39,6 +39,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "P"
       Anchor: "belt:/P"
@@ -82,6 +83,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
   Types:
     TypeDef
       Name: "Bag"

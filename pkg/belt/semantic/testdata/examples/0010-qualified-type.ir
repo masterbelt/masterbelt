@@ -29,6 +29,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Unit"
       Anchor: "belt:geometry/Unit"
@@ -57,6 +58,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
   Types:
     TypeDef
       Name: "Point"
@@ -110,6 +112,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "path"
       Anchor: "belt:main/path"
@@ -170,6 +173,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
           ConstEntry
             Key: ~
             Value: Constant
@@ -189,6 +193,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
         Fields: ~
         CollMapness: 1
         Millis: 0
@@ -200,6 +205,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
   Types: ~
   Funcs: ~
   Asserts: ~

@@ -1,0 +1,42 @@
+// Type values. Every type symbol is, in value position, a compile-time value —
+// immutable, side-effect-free, of the builtin type `type` (the metatype, with
+// type : type). A bare type name reifies to one (const t = sbyte), and the
+// `type` keyword names the metatype as a value. Type values exist only at
+// compile time: they fold and are gone before any runtime. They are the basis a
+// master is built on — a master is a type value carrying a master descriptor —
+// and the foundation that type projections and generics resolve against.
+
+/// A character level, a nominal alias the schema shares.
+pub type Level = sbyte
+
+/// A builtin type, reified: the value is sbyte, its own type is `type`.
+pub const sbyte_t = sbyte
+
+/// A nominal type, reified: the declared identity is preserved (Level, not the
+/// sbyte it aliases) — type values carry nominal identity, not structure.
+pub const level_t = Level
+
+/// The metatype carried as a written annotation — the value flows in at `type`.
+pub const annotated: type = Level
+
+/// The metatype itself, as a value: type is a value of type type.
+pub const meta = type
+
+/// A type value passed on by reference, still of type `type`.
+pub const same_level = level_t
+
+// The `type` keyword has three roles at once here, each told apart by position:
+// a field/parameter name (a reserved word read as an identifier), the metatype
+// in type position, and — were one written bare in value position — a type
+// value. A column or parameter literally named `type`, whose declared type is
+// the metatype, is the masterdata edge the keyword unlocks.
+
+/// A schema with a column literally named `type` whose declared type is the
+/// metatype itself — the keyword as a field name and the type atom together.
+pub type Schema = {
+  type: type,
+}
+
+/// A type-to-type mapping whose parameter is literally named `type` — the shape
+/// a generic, a comptime type function, takes.
+pub type Remap = fn(type: type): type

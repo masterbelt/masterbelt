@@ -50,6 +50,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
           ConstField
             Name: "y"
             Value: Constant
@@ -69,6 +70,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
         CollMapness: 0
         Millis: 0
         Fn: ~
@@ -79,6 +81,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "P"
       Anchor: "belt:/P"
@@ -129,6 +132,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
           ConstField
             Name: "y"
             Value: Constant
@@ -148,6 +152,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
         CollMapness: 0
         Millis: 0
         Fn: ~
@@ -158,6 +163,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Q"
       Anchor: "belt:/Q"
@@ -208,6 +214,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
           ConstField
             Name: "y"
             Value: Constant
@@ -227,6 +234,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
         CollMapness: 0
         Millis: 0
         Fn: ~
@@ -237,6 +245,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Sword"
       Anchor: "belt:/Sword"
@@ -306,6 +315,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
           ConstField
             Name: "name"
             Value: Constant
@@ -325,6 +335,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
           ConstField
             Name: "pos"
             Value: Constant
@@ -353,6 +364,7 @@ Module
                     End: ~
                     Step: ~
                     UnionTag: ~
+                    Reified: ~
                 ConstField
                   Name: "y"
                   Value: Constant
@@ -372,6 +384,7 @@ Module
                     End: ~
                     Step: ~
                     UnionTag: ~
+                    Reified: ~
               CollMapness: 0
               Millis: 0
               Fn: ~
@@ -382,6 +395,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
         CollMapness: 0
         Millis: 0
         Fn: ~
@@ -392,6 +406,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Path"
       Anchor: "belt:/Path"
@@ -481,6 +496,7 @@ Module
                     End: ~
                     Step: ~
                     UnionTag: ~
+                    Reified: ~
                 ConstField
                   Name: "y"
                   Value: Constant
@@ -500,6 +516,7 @@ Module
                     End: ~
                     Step: ~
                     UnionTag: ~
+                    Reified: ~
               CollMapness: 0
               Millis: 0
               Fn: ~
@@ -510,6 +527,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
           ConstEntry
             Key: ~
             Value: Constant
@@ -538,6 +556,7 @@ Module
                     End: ~
                     Step: ~
                     UnionTag: ~
+                    Reified: ~
                 ConstField
                   Name: "y"
                   Value: Constant
@@ -557,6 +576,7 @@ Module
                     End: ~
                     Step: ~
                     UnionTag: ~
+                    Reified: ~
               CollMapness: 0
               Millis: 0
               Fn: ~
@@ -567,6 +587,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
         Fields: ~
         CollMapness: 1
         Millis: 0
@@ -578,6 +599,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "U"
       Anchor: "belt:/U"
@@ -607,6 +629,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
   Types:
     TypeDef
       Name: "Point"

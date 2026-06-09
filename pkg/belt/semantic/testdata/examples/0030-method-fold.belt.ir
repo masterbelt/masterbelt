@@ -37,6 +37,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "FireLabel"
       Anchor: "belt:/FireLabel"
@@ -74,6 +75,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "WaterLabel"
       Anchor: "belt:/WaterLabel"
@@ -111,6 +113,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Six"
       Anchor: "belt:/Six"
@@ -151,6 +154,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Start"
       Anchor: "belt:/Start"
@@ -182,6 +186,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Eleven"
       Anchor: "belt:/Eleven"
@@ -218,6 +223,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Thirteen"
       Anchor: "belt:/Thirteen"
@@ -261,6 +267,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Three"
       Anchor: "belt:/Three"
@@ -308,6 +315,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Hero"
       Anchor: "belt:/Hero"
@@ -356,6 +364,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
         CollMapness: 0
         Millis: 0
         Fn: ~
@@ -366,6 +375,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Promoted"
       Anchor: "belt:/Promoted"
@@ -406,6 +416,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Squad"
       Anchor: "belt:/Squad"
@@ -470,6 +481,7 @@ Module
                     End: ~
                     Step: ~
                     UnionTag: ~
+                    Reified: ~
               CollMapness: 0
               Millis: 0
               Fn: ~
@@ -480,6 +492,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
         CollMapness: 0
         Millis: 0
         Fn: ~
@@ -490,6 +503,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "LeaderUp"
       Anchor: "belt:/LeaderUp"
@@ -534,6 +548,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
   Types:
     TypeDef
       Name: "Level"
@@ -901,6 +916,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
           EnumMember
             Name: "Water"
             Value: Constant
@@ -920,6 +936,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
           EnumMember
             Name: "Wind"
             Value: Constant
@@ -939,6 +956,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
       Master: ~
       Where: ~
   Funcs:
@@ -984,6 +1002,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "Element.Fire.isFire()\n        ^    ^\n        |    true\n        Element.Fire"
     Assert
       Cond: "Element.Water.notFire()"
@@ -1005,6 +1024,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "Element.Water.notFire()\n        ^     ^\n        |     true\n        Element.Water"
     Assert
       Cond: "Element.Fire.label() == 1"
@@ -1026,6 +1046,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "Element.Fire.label() == 1\n        ^    ^       ^\n        |    1       true\n        Element.Fire"
     Assert
       Cond: "Element.Wind.label() == 0"
@@ -1047,6 +1068,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "Element.Wind.label() == 0\n        ^    ^       ^\n        |    0       true\n        Element.Wind"
     Assert
       Cond: "Start.increment() == 11"
@@ -1068,6 +1090,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "Start.increment() == 11\n^     ^           ^\n10    11          true"
     Assert
       Cond: "base().plus(4) == 5"
@@ -1089,6 +1112,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "base().plus(4) == 5\n^      ^       ^\n1      5       true"
     Assert
       Cond: "Hero.lv.increment() == 6"
@@ -1110,6 +1134,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "Hero.lv.increment() == 6\n^    ^  ^           ^\n|    5  6           true\n{ lv: 5 }"
     Assert
       Cond: "Squad.leader.lv.increment().increment() == 10"
@@ -1131,4 +1156,5 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "Squad.leader.lv.increment().increment() == 10\n^     ^      ^  ^           ^           ^\n|     |      8  9           10          true\n|     { lv: 8 }\n{ leader: { lv: 8 } }"

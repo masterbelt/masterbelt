@@ -566,6 +566,8 @@ func TypeOf(v Value) Type {
 		return v.Type
 	case *AssocConstValue:
 		return v.Type
+	case *TypeValue:
+		return v.Type
 	default:
 		panic(fmt.Sprintf("ir: unhandled Value kind %T", v))
 	}
@@ -636,6 +638,8 @@ func SyntaxOf(v Value) ast.Expr {
 		return v.Syntax // already the interface form; nil stays nil
 	case *AssocConstValue:
 		return exprOrNil(v.Syntax)
+	case *TypeValue:
+		return v.Syntax // already the interface form; nil stays nil
 	default:
 		panic(fmt.Sprintf("ir: unhandled Value kind %T", v))
 	}
@@ -667,3 +671,21 @@ type AssocConstValue struct {
 }
 
 func (*AssocConstValue) value() {}
+
+// TypeValue is a reified type used as a compile-time value: a bare type name in
+// value position (const x = int8) or the `type` keyword itself (type : type).
+// Reified is the type it denotes; Type is its own type — always the builtin
+// `type` (the metatype) — which TypeOf returns. The evaluated value (a
+// ConstType) lives on Const.Eval, as for every other value form. A type value is
+// comptime-only: it exists for the fold and is gone before codegen, so a runtime
+// value position it reaches is reported type_in_value_position.
+type TypeValue struct {
+	Reified Type
+	Type    Type
+	// Syntax is the referring expression — a bare type name (an identifier) or the
+	// `type` keyword (also lowered to an identifier); an anchor and write-back key
+	// only, never semantics.
+	Syntax ast.Expr `tree:"-"`
+}
+
+func (*TypeValue) value() {}

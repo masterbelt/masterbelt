@@ -36,6 +36,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "B"
       Anchor: "belt:main/B"
@@ -75,6 +76,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "C"
       Anchor: "belt:main/C"
@@ -110,6 +112,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "D"
       Anchor: "belt:main/D"
@@ -174,6 +177,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
           ConstEntry
             Key: ~
             Value: Constant
@@ -193,6 +197,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
         Fields: ~
         CollMapness: 1
         Millis: 0
@@ -204,6 +209,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "E"
       Anchor: "belt:main/E"
@@ -239,6 +245,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
   Types: ~
   Funcs: ~
   Asserts:
@@ -262,6 +269,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "math.double(2) == double(2)\n     ^         ^  ^\n     4         |  4\n               true"
 # math.belt
 Module

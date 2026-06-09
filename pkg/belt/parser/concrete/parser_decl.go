@@ -1151,7 +1151,7 @@ func (p *parser) finishMethodDecl(children []cst.Green) *cst.Node {
 // sits on "(".
 func (p *parser) parseParamList(requireType bool) *cst.Node {
 	children := []cst.Green{p.bump()} // "("
-	if p.peekSignificant() == token.Ident {
+	if nameLike(p.peekSignificant()) {
 		for {
 			p.skipTrivia(&children)
 			children = append(children, p.parseParam(requireType))
@@ -1163,7 +1163,8 @@ func (p *parser) parseParamList(requireType bool) *cst.Node {
 			// A comma promises another parameter unless it is a trailing one
 			// before ")"; without the name check a truncated list ("fn(x,")
 			// would bump EOF as the next name and run the cursor off the slice.
-			if p.peekSignificant() == token.Ident {
+			// A keyword reads as a parameter name here (fn f(for: int)).
+			if nameLike(p.peekSignificant()) {
 				continue
 			}
 			if p.peekSignificant() != token.RParen {

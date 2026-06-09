@@ -1,0 +1,215 @@
+Module
+  Consts:
+    Const
+      Name: "sbyte_t"
+      Anchor: "belt:/sbyte_t"
+      Public: true
+      Doc: "A builtin type, reified: the value is sbyte, its own type is `type`."
+      Type: Builtin
+        Name: "type"
+      Value: TypeValue
+        Reified: Builtin
+          Name: "sbyte"
+        Type: Builtin
+          Name: "type"
+      Eval: Constant
+        Kind: 12
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+        Reified: Builtin
+          Name: "sbyte"
+    Const
+      Name: "level_t"
+      Anchor: "belt:/level_t"
+      Public: true
+      Doc: "A nominal type, reified: the declared identity is preserved (Level, not the" "sbyte it aliases) — type values carry nominal identity, not structure."
+      Type: Builtin
+        Name: "type"
+      Value: TypeValue
+        Reified: Named
+          Def: "Level"
+        Type: Builtin
+          Name: "type"
+      Eval: Constant
+        Kind: 12
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+        Reified: Named
+          Def: "Level"
+    Const
+      Name: "annotated"
+      Anchor: "belt:/annotated"
+      Public: true
+      Doc: "The metatype carried as a written annotation — the value flows in at `type`."
+      Type: Builtin
+        Name: "type"
+      Value: TypeValue
+        Reified: Named
+          Def: "Level"
+        Type: Builtin
+          Name: "type"
+      Eval: Constant
+        Kind: 12
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+        Reified: Named
+          Def: "Level"
+    Const
+      Name: "meta"
+      Anchor: "belt:/meta"
+      Public: true
+      Doc: "The metatype itself, as a value: type is a value of type type."
+      Type: Builtin
+        Name: "type"
+      Value: TypeValue
+        Reified: Builtin
+          Name: "type"
+        Type: Builtin
+          Name: "type"
+      Eval: Constant
+        Kind: 12
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+        Reified: Builtin
+          Name: "type"
+    Const
+      Name: "same_level"
+      Anchor: "belt:/same_level"
+      Public: true
+      Doc: "A type value passed on by reference, still of type `type`."
+      Type: Builtin
+        Name: "type"
+      Value: Reference
+        Target: "level_t"
+        Type: Builtin
+          Name: "type"
+      Eval: Constant
+        Kind: 12
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+        Reified: Named
+          Def: "Level"
+  Types:
+    TypeDef
+      Name: "Level"
+      Anchor: "belt:/Level"
+      Public: true
+      Doc: "A character level, a nominal alias the schema shares."
+      Params: ~
+      Body: Builtin
+        Name: "sbyte"
+      Methods: ~
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Master: ~
+      Where: ~
+    TypeDef
+      Name: "Schema"
+      Anchor: "belt:/Schema"
+      Public: true
+      Doc: "A schema with a column literally named `type` whose declared type is the" "metatype itself — the keyword as a field name and the type atom together."
+      Params: ~
+      Body: Record
+        Fields:
+          Field
+            Name: "type"
+            Type: Builtin
+              Name: "type"
+      Methods: ~
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Master: ~
+      Where: ~
+    TypeDef
+      Name: "Remap"
+      Anchor: "belt:/Remap"
+      Public: true
+      Doc: "A type-to-type mapping whose parameter is literally named `type` — the shape" "a generic, a comptime type function, takes."
+      Params: ~
+      Body: Func
+        Params:
+          Builtin
+            Name: "type"
+        Result: Builtin
+          Name: "type"
+      Methods: ~
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Master: ~
+      Where: ~
+  Funcs: ~
+  Asserts: ~

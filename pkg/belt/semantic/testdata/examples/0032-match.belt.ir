@@ -44,6 +44,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
         CollMapness: 0
         Millis: 0
         Fn: ~
@@ -55,6 +56,7 @@ Module
         Step: ~
         UnionTag: Named
           Def: "Coin"
+        Reified: ~
     Const
       Name: "Total"
       Anchor: "belt:/Total"
@@ -90,6 +92,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
   Types:
     TypeDef
       Name: "Coin"

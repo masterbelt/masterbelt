@@ -319,7 +319,7 @@ func lowerRecordField(t cst.Tree, buf source.Buffer) *ast.FieldInit {
 	var value ast.Expr
 	for _, child := range t.Children() {
 		if tok, ok := child.Token(); ok {
-			if tok.Kind() == token.Ident && name == "" {
+			if isNameToken(tok.Kind()) && name == "" {
 				name = child.Text(buf)
 			}
 			continue
@@ -342,7 +342,7 @@ func lowerMemberExpr(t cst.Tree, buf source.Buffer, node *cst.Node) ast.Expr {
 			receiver = lowerExpr(child, buf)
 			continue
 		}
-		if tok, ok := child.Token(); ok && tok.Kind() == token.Ident {
+		if tok, ok := child.Token(); ok && isNameToken(tok.Kind()) {
 			member = child.Text(buf)
 		}
 	}

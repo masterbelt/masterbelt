@@ -39,6 +39,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "B"
       Anchor: "belt:/B"
@@ -74,6 +75,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "C"
       Anchor: "belt:/C"
@@ -113,6 +115,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "D"
       Anchor: "belt:/D"
@@ -221,6 +224,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
           ConstEntry
             Key: ~
             Value: Constant
@@ -240,6 +244,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
           ConstEntry
             Key: ~
             Value: Constant
@@ -259,6 +264,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
         Fields: ~
         CollMapness: 1
         Millis: 0
@@ -270,6 +276,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "E"
       Anchor: "belt:/E"
@@ -305,6 +312,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "O"
       Anchor: "belt:/O"
@@ -345,6 +353,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
           ConstField
             Name: "y"
             Value: Constant
@@ -364,6 +373,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
         CollMapness: 0
         Millis: 0
         Fn: ~
@@ -374,6 +384,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
   Types:
     TypeDef
       Name: "Point"
@@ -605,4 +616,5 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "area(3, 4) == 12\n^          ^\n12         true"

@@ -41,6 +41,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
         CollMapness: 0
         Millis: 0
         Fn: ~
@@ -51,6 +52,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "FreezingF"
       Anchor: "belt:/FreezingF"
@@ -83,6 +85,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "FromBoiling"
       Anchor: "belt:/FromBoiling"
@@ -128,6 +131,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
         CollMapness: 0
         Millis: 0
         Fn: ~
@@ -138,6 +142,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Roundtrip"
       Anchor: "belt:/Roundtrip"
@@ -187,6 +192,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
         CollMapness: 0
         Millis: 0
         Fn: ~
@@ -197,6 +203,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Full"
       Anchor: "belt:/Full"
@@ -229,6 +236,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Default"
       Anchor: "belt:/Default"
@@ -261,6 +269,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
   Types:
     TypeDef
       Name: "Celsius"
@@ -604,6 +613,7 @@ Module
             End: ~
             Step: ~
             UnionTag: ~
+            Reified: ~
           Builtin: false
       Builtin: false
       Interface: ~
@@ -794,6 +804,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
           EnumMember
             Name: "Water"
             Value: Constant
@@ -813,6 +824,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
           EnumMember
             Name: "Wind"
             Value: Constant
@@ -832,6 +844,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
       Master: ~
       Where: ~
   Funcs:
@@ -903,6 +916,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "FreezingF == 32\n^         ^\n32        true"
     Assert
       Cond: "FromBoiling.deg == 100"
@@ -924,6 +938,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "FromBoiling.deg == 100\n^           ^   ^\n|           100 true\n{ deg: 100 }"
     Assert
       Cond: "Roundtrip.deg == 0"
@@ -945,6 +960,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "Roundtrip.deg == 0\n^         ^   ^\n|         0   true\n{ deg: 0 }"
     Assert
       Cond: "boiling().deg == 100"
@@ -966,6 +982,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "boiling().deg == 100\n^         ^   ^\n|         100 true\n{ deg: 100 }"
     Assert
       Cond: "Full.band == 10"
@@ -987,6 +1004,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "Full.band == 10\n^    ^    ^\n100  10   true"
     Assert
       Cond: "Health.Max == 100"
@@ -1008,6 +1026,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "Health.Max == 100\n       ^   ^\n       100 true"
     Assert
       Cond: "Default.hot"
@@ -1029,6 +1048,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "Default.hot\n^       ^\n|       true\nElement.Fire"
     Assert
       Cond: "!Element.Water.hot"
@@ -1050,4 +1070,5 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "!Element.Water.hot\n^        ^     ^\ntrue     |     false\n         Element.Water"

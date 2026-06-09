@@ -2,10 +2,38 @@ Module
   Consts: ~
   Types:
     TypeDef
+      Name: "SkillRow"
+      Anchor: "belt:/SkillRow"
+      Public: true
+      Doc: "A skill row whose trigger lives in a column literally named `type`, beside a" "handler whose parameter is the reserved word `for`."
+      Params: ~
+      Body: Record
+        Fields:
+          Field
+            Name: "type"
+            Type: Named
+              Def: "SkillKind"
+          Field
+            Name: "handler"
+            Type: Func
+              Params:
+                Builtin
+                  Name: "int"
+              Result: Builtin
+                Name: "int"
+      Methods: ~
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Master: ~
+      Where: ~
+    TypeDef
       Name: "SkillKind"
       Anchor: "belt:/SkillKind"
       Public: true
-      Doc: "How a skill is triggered."
+      Doc: "How a skill triggers."
       Params: ~
       Body: ~
       Methods:
@@ -158,82 +186,66 @@ Module
               Reified: ~
       Master: ~
       Where: ~
-    TypeDef
-      Name: "Skill"
-      Anchor: "belt:/Skill"
+  Funcs:
+    Function
+      Name: "trigger_of"
+      Anchor: "belt:/trigger_of"
       Public: true
-      Doc: "One row of the Skill master."
-      Params: ~
-      Body: ~
-      Methods:
-        Method
-          Name: "label"
-          Anchor: "belt:/Skill#label"
-          Public: true
-          Extern: false
-          Kind: 0
-          Effects: ~
-          Doc: "The skill's display label."
-          Params: ~
-          Result: Builtin
-            Name: "string"
-          Body:
-            Return
-              Value: FieldAccess
-                Receiver: SelfValue
-                  Type: Named
-                    Def: "Skill"
-                Field: "name"
-                Type: Builtin
-                  Name: "string"
-          Owner: "Skill"
-      Consts: ~
-      Builtin: false
-      Interface: ~
-      Impls: ~
-      Enum: ~
-      Master: MasterDef
-        Row: Record
-          Fields:
-            Field
-              Name: "id"
-              Type: Builtin
-                Name: "int"
-            Field
-              Name: "name"
-              Type: Builtin
-                Name: "string"
-            Field
-              Name: "kind"
+      Extern: false
+      Effects: ~
+      Doc: "The row's trigger kind, read through the keyword-named field with `.type`."
+      TypeParams: ~
+      Params:
+        Param
+          Name: "row"
+          Type: Named
+            Def: "SkillRow"
+      Result: Named
+        Def: "SkillKind"
+      Body:
+        Return
+          Value: FieldAccess
+            Receiver: ParamRef
+              Name: "row"
               Type: Named
-                Def: "SkillKind"
-        Primary: "id"
-      Where: ~
-    TypeDef
-      Name: "SkillUpgrade"
-      Anchor: "belt:/SkillUpgrade"
-      Public: false
-      Doc: ~
-      Params: ~
-      Body: ~
-      Methods: ~
-      Consts: ~
-      Builtin: false
-      Interface: ~
-      Impls: ~
-      Enum: ~
-      Master: MasterDef
-        Row: Record
-          Fields:
-            Field
-              Name: "skill"
+                Def: "SkillRow"
+            Field: "type"
+            Type: Named
+              Def: "SkillKind"
+    Function
+      Name: "doubled"
+      Anchor: "belt:/doubled"
+      Public: true
+      Extern: false
+      Effects: ~
+      Doc: "A parameter named `for` — a reserved word read as an ordinary name. It is" "declarable here even though a bare `for` in value position would open a loop."
+      TypeParams: ~
+      Params:
+        Param
+          Name: "for"
+          Type: Builtin
+            Name: "int"
+      Result: Builtin
+        Name: "int"
+      Body:
+        Return
+          Value: Adapt
+            Value: Call
+              Receiver: IntLiteral
+                Text: "2"
+                Type: Builtin
+                  Name: "nint"
+              Method: "mul"
+              Args:
+                IntLiteral
+                  Text: "2"
+                  Type: Builtin
+                    Name: "nint"
+              Setter: false
+              Resolved: ~
+              Subst: ~
               Type: Builtin
-                Name: "int"
-            Field
-              Name: "level"
-              Type: Builtin
-                Name: "int"
-        Primary: "skill" "level"
-      Where: ~
-  Funcs: ~
+                Name: "nint"
+            To: Builtin
+              Name: "int"
   Asserts: ~

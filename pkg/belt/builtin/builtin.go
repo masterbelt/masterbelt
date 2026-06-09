@@ -247,6 +247,15 @@ func Default() *Registry {
 		binaryMillis(ir.ConstDuration, ir.ConstDuration, checkedMillis(addMillis, ir.DurationConstant)))
 	r.registerIntrinsic(NameDuration, "add", []ir.ConstKind{ir.ConstDatetime},
 		binaryMillis(ir.ConstDuration, ir.ConstDatetime, checkedMillis(addMillis, ir.DatetimeConstant)))
+
+	// type: the metatype — the type a reified type value reports as its own
+	// (type : type). It is opaque (no value range, no operators, no prelude
+	// declaration), so it is registered as a def but not via register: not a
+	// Names() primitive (nothing to validate against the prelude) and with no
+	// NativeType. Lookup resolves it to ir.Builtin{type}, the type every type
+	// value carries; the semantic layer layers it onto the implicit-import surface
+	// so a file resolves `type` the way it resolves a prelude primitive.
+	r.defs[NameType] = &ir.TypeDef{Name: NameType, Public: true, Body: &ir.Builtin{Name: NameType}, Builtin: true}
 	return r
 }
 

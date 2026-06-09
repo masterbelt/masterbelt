@@ -40,6 +40,15 @@ func universe() builtins {
 			reg.Install(defs)
 			u.prelude = surface
 		}
+		// `type` — the metatype — is registered in the registry but declared in no
+		// prelude file (its name is the `type` keyword a declaration head reserves),
+		// so it is layered onto the implicit-import surface here, after the prelude
+		// load replaces it: every file then resolves `type` the way it resolves a
+		// prelude primitive. Re-adding it is idempotent on the bootstrap fallback,
+		// where registryTypes already carried it.
+		if d, ok := reg.Lookup(builtin.NameType); ok {
+			u.prelude[builtin.NameType] = d
+		}
 		universeVal = u
 	})
 	return universeVal

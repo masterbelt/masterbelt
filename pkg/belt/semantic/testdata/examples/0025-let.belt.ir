@@ -35,6 +35,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Stepped"
       Anchor: "belt:/Stepped"
@@ -70,6 +71,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
   Types: ~
   Funcs:
     Function
@@ -271,6 +273,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "pick(false) == 10\n^           ^\n10          true"
     Assert
       Cond: "step(41) == 42"
@@ -292,4 +295,5 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "step(41) == 42\n^        ^\n42       true"

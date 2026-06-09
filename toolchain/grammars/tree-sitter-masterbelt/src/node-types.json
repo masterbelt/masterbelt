@@ -861,8 +861,128 @@
         "required": true,
         "types": [
           {
+            "type": "assert",
+            "named": false
+          },
+          {
+            "type": "async",
+            "named": false
+          },
+          {
+            "type": "await",
+            "named": false
+          },
+          {
+            "type": "builtin",
+            "named": false
+          },
+          {
+            "type": "const",
+            "named": false
+          },
+          {
+            "type": "else",
+            "named": false
+          },
+          {
+            "type": "enum",
+            "named": false
+          },
+          {
+            "type": "extern",
+            "named": false
+          },
+          {
+            "type": "false",
+            "named": false
+          },
+          {
+            "type": "fn",
+            "named": false
+          },
+          {
+            "type": "for",
+            "named": false
+          },
+          {
+            "type": "from",
+            "named": false
+          },
+          {
             "type": "identifier",
             "named": true
+          },
+          {
+            "type": "if",
+            "named": false
+          },
+          {
+            "type": "impl",
+            "named": false
+          },
+          {
+            "type": "in",
+            "named": false
+          },
+          {
+            "type": "interface",
+            "named": false
+          },
+          {
+            "type": "io",
+            "named": false
+          },
+          {
+            "type": "let",
+            "named": false
+          },
+          {
+            "type": "match",
+            "named": false
+          },
+          {
+            "type": "nondet",
+            "named": false
+          },
+          {
+            "type": "null",
+            "named": false
+          },
+          {
+            "type": "of",
+            "named": false
+          },
+          {
+            "type": "pub",
+            "named": false
+          },
+          {
+            "type": "return",
+            "named": false
+          },
+          {
+            "type": "self",
+            "named": false
+          },
+          {
+            "type": "switch",
+            "named": false
+          },
+          {
+            "type": "true",
+            "named": false
+          },
+          {
+            "type": "type",
+            "named": false
+          },
+          {
+            "type": "use",
+            "named": false
+          },
+          {
+            "type": "where",
+            "named": false
           }
         ]
       },
@@ -892,6 +1012,10 @@
           },
           {
             "type": "type_name",
+            "named": true
+          },
+          {
+            "type": "type_type",
             "named": true
           },
           {
@@ -1103,6 +1227,10 @@
             "named": true
           },
           {
+            "type": "type_type",
+            "named": true
+          },
+          {
             "type": "union_type",
             "named": true
           }
@@ -1231,6 +1359,10 @@
             "named": true
           },
           {
+            "type": "type_type",
+            "named": true
+          },
+          {
             "type": "union_type",
             "named": true
           }
@@ -1283,6 +1415,10 @@
           {
             "type": "type_name",
             "named": true
+          },
+          {
+            "type": "type_type",
+            "named": true
           }
         ]
       }
@@ -1331,6 +1467,10 @@
           "named": true
         },
         {
+          "type": "type_type",
+          "named": true
+        },
+        {
           "type": "union_type",
           "named": true
         }
@@ -1367,6 +1507,10 @@
           },
           {
             "type": "type_name",
+            "named": true
+          },
+          {
+            "type": "type_type",
             "named": true
           },
           {
@@ -1805,6 +1949,10 @@
             "named": true
           },
           {
+            "type": "type_type",
+            "named": true
+          },
+          {
             "type": "union_type",
             "named": true
           }
@@ -2137,6 +2285,10 @@
             "named": true
           },
           {
+            "type": "type_type",
+            "named": true
+          },
+          {
             "type": "union_type",
             "named": true
           }
@@ -2253,6 +2405,10 @@
           "named": true
         },
         {
+          "type": "type_type",
+          "named": true
+        },
+        {
           "type": "union_type",
           "named": true
         }
@@ -2350,8 +2506,128 @@
         "required": true,
         "types": [
           {
+            "type": "assert",
+            "named": false
+          },
+          {
+            "type": "async",
+            "named": false
+          },
+          {
+            "type": "await",
+            "named": false
+          },
+          {
+            "type": "builtin",
+            "named": false
+          },
+          {
+            "type": "const",
+            "named": false
+          },
+          {
+            "type": "else",
+            "named": false
+          },
+          {
+            "type": "enum",
+            "named": false
+          },
+          {
+            "type": "extern",
+            "named": false
+          },
+          {
+            "type": "false",
+            "named": false
+          },
+          {
+            "type": "fn",
+            "named": false
+          },
+          {
+            "type": "for",
+            "named": false
+          },
+          {
+            "type": "from",
+            "named": false
+          },
+          {
             "type": "identifier",
             "named": true
+          },
+          {
+            "type": "if",
+            "named": false
+          },
+          {
+            "type": "impl",
+            "named": false
+          },
+          {
+            "type": "in",
+            "named": false
+          },
+          {
+            "type": "interface",
+            "named": false
+          },
+          {
+            "type": "io",
+            "named": false
+          },
+          {
+            "type": "let",
+            "named": false
+          },
+          {
+            "type": "match",
+            "named": false
+          },
+          {
+            "type": "nondet",
+            "named": false
+          },
+          {
+            "type": "null",
+            "named": false
+          },
+          {
+            "type": "of",
+            "named": false
+          },
+          {
+            "type": "pub",
+            "named": false
+          },
+          {
+            "type": "return",
+            "named": false
+          },
+          {
+            "type": "self",
+            "named": false
+          },
+          {
+            "type": "switch",
+            "named": false
+          },
+          {
+            "type": "true",
+            "named": false
+          },
+          {
+            "type": "type",
+            "named": false
+          },
+          {
+            "type": "use",
+            "named": false
+          },
+          {
+            "type": "where",
+            "named": false
           }
         ]
       },
@@ -2466,6 +2742,10 @@
             "named": true
           },
           {
+            "type": "type_type",
+            "named": true
+          },
+          {
             "type": "union_type",
             "named": true
           }
@@ -2518,8 +2798,128 @@
         "required": true,
         "types": [
           {
+            "type": "assert",
+            "named": false
+          },
+          {
+            "type": "async",
+            "named": false
+          },
+          {
+            "type": "await",
+            "named": false
+          },
+          {
+            "type": "builtin",
+            "named": false
+          },
+          {
+            "type": "const",
+            "named": false
+          },
+          {
+            "type": "else",
+            "named": false
+          },
+          {
+            "type": "enum",
+            "named": false
+          },
+          {
+            "type": "extern",
+            "named": false
+          },
+          {
+            "type": "false",
+            "named": false
+          },
+          {
+            "type": "fn",
+            "named": false
+          },
+          {
+            "type": "for",
+            "named": false
+          },
+          {
+            "type": "from",
+            "named": false
+          },
+          {
             "type": "identifier",
             "named": true
+          },
+          {
+            "type": "if",
+            "named": false
+          },
+          {
+            "type": "impl",
+            "named": false
+          },
+          {
+            "type": "in",
+            "named": false
+          },
+          {
+            "type": "interface",
+            "named": false
+          },
+          {
+            "type": "io",
+            "named": false
+          },
+          {
+            "type": "let",
+            "named": false
+          },
+          {
+            "type": "match",
+            "named": false
+          },
+          {
+            "type": "nondet",
+            "named": false
+          },
+          {
+            "type": "null",
+            "named": false
+          },
+          {
+            "type": "of",
+            "named": false
+          },
+          {
+            "type": "pub",
+            "named": false
+          },
+          {
+            "type": "return",
+            "named": false
+          },
+          {
+            "type": "self",
+            "named": false
+          },
+          {
+            "type": "switch",
+            "named": false
+          },
+          {
+            "type": "true",
+            "named": false
+          },
+          {
+            "type": "type",
+            "named": false
+          },
+          {
+            "type": "use",
+            "named": false
+          },
+          {
+            "type": "where",
+            "named": false
           }
         ]
       },
@@ -2549,6 +2949,10 @@
           },
           {
             "type": "type_name",
+            "named": true
+          },
+          {
+            "type": "type_type",
             "named": true
           },
           {
@@ -2792,8 +3196,128 @@
         "required": true,
         "types": [
           {
+            "type": "assert",
+            "named": false
+          },
+          {
+            "type": "async",
+            "named": false
+          },
+          {
+            "type": "await",
+            "named": false
+          },
+          {
+            "type": "builtin",
+            "named": false
+          },
+          {
+            "type": "const",
+            "named": false
+          },
+          {
+            "type": "else",
+            "named": false
+          },
+          {
+            "type": "enum",
+            "named": false
+          },
+          {
+            "type": "extern",
+            "named": false
+          },
+          {
+            "type": "false",
+            "named": false
+          },
+          {
+            "type": "fn",
+            "named": false
+          },
+          {
+            "type": "for",
+            "named": false
+          },
+          {
+            "type": "from",
+            "named": false
+          },
+          {
             "type": "identifier",
             "named": true
+          },
+          {
+            "type": "if",
+            "named": false
+          },
+          {
+            "type": "impl",
+            "named": false
+          },
+          {
+            "type": "in",
+            "named": false
+          },
+          {
+            "type": "interface",
+            "named": false
+          },
+          {
+            "type": "io",
+            "named": false
+          },
+          {
+            "type": "let",
+            "named": false
+          },
+          {
+            "type": "match",
+            "named": false
+          },
+          {
+            "type": "nondet",
+            "named": false
+          },
+          {
+            "type": "null",
+            "named": false
+          },
+          {
+            "type": "of",
+            "named": false
+          },
+          {
+            "type": "pub",
+            "named": false
+          },
+          {
+            "type": "return",
+            "named": false
+          },
+          {
+            "type": "self",
+            "named": false
+          },
+          {
+            "type": "switch",
+            "named": false
+          },
+          {
+            "type": "true",
+            "named": false
+          },
+          {
+            "type": "type",
+            "named": false
+          },
+          {
+            "type": "use",
+            "named": false
+          },
+          {
+            "type": "where",
+            "named": false
           }
         ]
       },
@@ -3468,6 +3992,10 @@
             "named": true
           },
           {
+            "type": "type_type",
+            "named": true
+          },
+          {
             "type": "union_type",
             "named": true
           }
@@ -3518,6 +4046,10 @@
             "named": true
           },
           {
+            "type": "type_type",
+            "named": true
+          },
+          {
             "type": "union_type",
             "named": true
           }
@@ -3561,6 +4093,11 @@
         }
       ]
     }
+  },
+  {
+    "type": "type_type",
+    "named": true,
+    "fields": {}
   },
   {
     "type": "unary_expr",
@@ -3683,6 +4220,10 @@
         {
           "type": "type_name",
           "named": true
+        },
+        {
+          "type": "type_type",
+          "named": true
         }
       ]
     }
@@ -3738,7 +4279,7 @@
     "fields": {},
     "children": {
       "multiple": false,
-      "required": true,
+      "required": false,
       "types": [
         {
           "type": "identifier",

@@ -112,6 +112,11 @@ func (s funcScope) fnMember(m *ast.MemberExpr) []*ast.FuncDecl {
 	return s.outer.fnMember(m)
 }
 
+// metatype is the type of a reified type value — the builtin `type` (type :
+// type), the type a bare type name carries in value position. It is built fresh
+// per call, like the other primitive types the scopes synthesize.
+func metatype() ir.Type { return &ir.Builtin{Name: builtin.NameType} }
+
 // constScope types a constant initializer: the context-specific forms are a
 // value reference, whose type is its referent's, a conversion, whose type
 // is the type it names, and the null literal. A field access reads a
@@ -143,21 +148,22 @@ func (s constScope) leaf(e ast.Expr) ir.Type {
 		if target := s.env.Resolve(e); target != nil {
 			return s.env.TypeOf(target)
 		}
+		// A bare type name in value position is a compile-time type value, of type
+		// `type` (the metatype): const x = int8. A value of that name (a constant)
+		// wins above, so only a name resolving to a type alone reaches here.
+		if _, ok := s.universe()[e.Name]; ok {
+			return metatype()
+		}
 	case *ast.MemberExpr:
 		// A member access on a namespace import (geo.Origin) inherits the
 		// referenced declaration's type.
 		if target := s.env.ResolveMember(e); target != nil {
 			return s.env.TypeOf(target)
 		}
-		// A member access whose receiver names an enum type (Rarity.Common) is
-		// a value of that enum.
-		if t := enumMemberType(s.universe(), e); t != ir.Invalid {
-			return t
-		}
-		// A member access whose receiver names a type and whose member names one
-		// of its associated constants (int8.Max, Level.Max) is that constant's
-		// value — the same Type.Name path an enum member takes.
-		if t := assocConstType(s.universe(), e); t != ir.Invalid {
+		// A member access whose receiver names a type — an enum member
+		// (Rarity.Common) or an associated constant (sbyte.Max, Level.Max) — is a
+		// value of that type, resolved through the single member resolver.
+		if t := typeMemberType(s.universe(), e); t != ir.Invalid {
 			return t
 		}
 		// Otherwise the receiver is a value: a field access on a record-typed
@@ -329,10 +335,7 @@ func (s BodyScope) typeMemberValue(e *ast.MemberExpr) (ir.Type, bool) {
 	if !ok || s.shadows(recv.Name) {
 		return ir.Invalid, false
 	}
-	if t := enumMemberType(s.Universe, e); t != ir.Invalid {
-		return t, true
-	}
-	if t := assocConstType(s.Universe, e); t != ir.Invalid {
+	if t := typeMemberType(s.Universe, e); t != ir.Invalid {
 		return t, true
 	}
 	return ir.Invalid, false

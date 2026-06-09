@@ -31,6 +31,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "MinPort"
       Anchor: "belt:/MinPort"
@@ -62,6 +63,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "MaxPort"
       Anchor: "belt:/MaxPort"
@@ -93,6 +95,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "FullLevel"
       Anchor: "belt:/FullLevel"
@@ -124,6 +127,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "ValidScore"
       Anchor: "belt:/ValidScore"
@@ -155,6 +159,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Unrefined"
       Anchor: "belt:/Unrefined"
@@ -183,6 +188,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
   Types:
     TypeDef
       Name: "Level"

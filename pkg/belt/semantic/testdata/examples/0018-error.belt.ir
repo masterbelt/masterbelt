@@ -32,6 +32,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "M"
       Anchor: "belt:/M"
@@ -68,6 +69,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "P"
       Anchor: "belt:/P"
@@ -112,6 +114,7 @@ Module
         Step: ~
         UnionTag: Builtin
           Name: "error"
+        Reified: ~
   Types: ~
   Funcs:
     Function
@@ -183,6 +186,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "error(\"x\").message() == \"x\"\n^          ^         ^\nerror(\"x\") \"x\"       true"
     Assert
       Cond: "E.message() == \"boom\""
@@ -204,6 +208,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "E.message() == \"boom\"\n^ ^         ^\n| \"boom\"    true\nerror(\"boom\")"
     Assert
       Cond: "M == \"boom\""
@@ -225,4 +230,5 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "M == \"boom\"\n^ ^\n| true\n\"boom\""

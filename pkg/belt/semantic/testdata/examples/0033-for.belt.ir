@@ -62,6 +62,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Joined"
       Anchor: "belt:/Joined"
@@ -129,6 +130,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "ValueSummed"
       Anchor: "belt:/ValueSummed"
@@ -196,6 +198,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "IndexSummed"
       Anchor: "belt:/IndexSummed"
@@ -252,6 +255,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "EvenSum"
       Anchor: "belt:/EvenSum"
@@ -326,6 +330,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Pairs"
       Anchor: "belt:/Pairs"
@@ -401,6 +406,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Product"
       Anchor: "belt:/Product"
@@ -463,6 +469,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
   Types: ~
   Funcs:
     Function
@@ -987,6 +994,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "sum([1, 2, 3, 4]) == 10\n^                 ^\n10                true"
     Assert
       Cond: "keysJoined([\"a\": 1, \"b\": 2, \"c\": 3]) == \"abc\""
@@ -1008,6 +1016,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "keysJoined([\"a\": 1, \"b\": 2, \"c\": 3]) == \"abc\"\n^                                    ^\n\"abc\"                                true"
     Assert
       Cond: "valueSum([\"a\": 1, \"b\": 2, \"c\": 3]) == 6"
@@ -1029,6 +1038,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "valueSum([\"a\": 1, \"b\": 2, \"c\": 3]) == 6\n^                                  ^\n6                                  true"
     Assert
       Cond: "indexSum([10, 20, 30]) == 3"
@@ -1050,6 +1060,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "indexSum([10, 20, 30]) == 3\n^                      ^\n3                      true"
     Assert
       Cond: "sumEven([1, 2, 3, 4, 5, 6]) == 12"
@@ -1071,6 +1082,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "sumEven([1, 2, 3, 4, 5, 6]) == 12\n^                           ^\n12                          true"
     Assert
       Cond: "pairCount([1, 2], [1, 2, 3]) == 6"
@@ -1092,6 +1104,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "pairCount([1, 2], [1, 2, 3]) == 6\n^                            ^\n6                            true"
     Assert
       Cond: "product([1, 2, 3, 4]) == 24"
@@ -1113,6 +1126,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "product([1, 2, 3, 4]) == 24\n^                     ^\n24                    true"
     Assert
       Cond: "sum([]) == 0"
@@ -1134,4 +1148,5 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "sum([]) == 0\n^       ^\n0       true"

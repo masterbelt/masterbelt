@@ -29,6 +29,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Bare"
       Anchor: "belt:/Bare"
@@ -58,6 +59,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
     Const
       Name: "Highest"
       Anchor: "belt:/Highest"
@@ -94,6 +96,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
   Types:
     TypeDef
       Name: "Rarity"
@@ -229,6 +232,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
           EnumMember
             Name: "Rare"
             Value: Constant
@@ -248,6 +252,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
           EnumMember
             Name: "Legend"
             Value: Constant
@@ -267,6 +272,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
       Master: ~
       Where: ~
     TypeDef
@@ -433,6 +439,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
           EnumMember
             Name: "Water"
             Value: Constant
@@ -452,6 +459,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
           EnumMember
             Name: "Wind"
             Value: Constant
@@ -471,6 +479,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
       Master: ~
       Where: ~
     TypeDef
@@ -607,6 +616,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
           EnumMember
             Name: "En"
             Value: Constant
@@ -626,6 +636,7 @@ Module
               End: ~
               Step: ~
               UnionTag: ~
+              Reified: ~
       Master: ~
       Where: ~
   Funcs:
@@ -708,6 +719,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "Rarity.Common != Rarity.Legend\n       ^      ^         ^\n       |      true      Rarity.Legend\n       Rarity.Common"
     Assert
       Cond: "Rarity.Common < Rarity.Legend"
@@ -729,6 +741,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "Rarity.Common < Rarity.Legend\n       ^      ^        ^\n       |      true     Rarity.Legend\n       Rarity.Common"
     Assert
       Cond: "Rarity.Legend == Top"
@@ -750,6 +763,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "Rarity.Legend == Top\n       ^      ^  ^\n       |      |  Rarity.Legend\n       |      true\n       Rarity.Legend"
     Assert
       Cond: "Bare == Rarity.Common"
@@ -771,6 +785,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "Bare == Rarity.Common\n^    ^         ^\n|    true      Rarity.Common\nRarity.Common"
     Assert
       Cond: "highestSeen(Rarity.Legend) == Rarity.Legend"
@@ -792,6 +807,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "highestSeen(Rarity.Legend) == Rarity.Legend\n^                  ^       ^         ^\nRarity.Legend      |       true      Rarity.Legend\n                   Rarity.Legend"
     Assert
       Cond: "highestSeen(Rarity.Common) == Rarity.Common"
@@ -813,6 +829,7 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "highestSeen(Rarity.Common) == Rarity.Common\n^                  ^       ^         ^\nRarity.Common      |       true      Rarity.Common\n                   Rarity.Common"
     Assert
       Cond: "Locale.Ja < Locale.En"
@@ -834,4 +851,5 @@ Module
         End: ~
         Step: ~
         UnionTag: ~
+        Reified: ~
       Diagram: "Locale.Ja < Locale.En\n       ^  ^        ^\n       |  true     Locale.En\n       Locale.Ja"

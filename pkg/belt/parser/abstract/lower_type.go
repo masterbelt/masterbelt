@@ -104,6 +104,8 @@ func lowerTypeName(t cst.Tree, buf source.Buffer, node *cst.Node) ast.TypeExpr {
 				name = "self"
 			case token.Null:
 				name = "null"
+			case token.Type:
+				name = "type" // the metatype, a builtin type name (type : type)
 			default:
 				// Any other token (the generic-argument angle brackets and
 				// commas) names no part of the type: it is skipped.
@@ -165,7 +167,7 @@ func lowerField(t cst.Tree, buf source.Buffer) *ast.FieldDef {
 	var typ ast.TypeExpr
 	for _, child := range t.Children() {
 		if tok, ok := child.Token(); ok {
-			if tok.Kind() == token.Ident && name == "" {
+			if isNameToken(tok.Kind()) && name == "" {
 				name = child.Text(buf)
 			}
 			continue
