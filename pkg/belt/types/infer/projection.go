@@ -30,10 +30,11 @@ type ProjectionErrorKind int
 
 // The projection-error kinds, one per way a field-type projection fails.
 const (
-	ProjMemberNotType ProjectionErrorKind = iota // the member is a value or method (member_is_not_a_type)
-	ProjNoFields                                 // the receiver type has no fields at all (type_has_no_fields)
-	ProjUnknownField                             // a record/master receiver declares no such field (unknown_field)
-	ProjCyclic                                   // an ungrounded cyclic projection (cyclic_type_projection)
+	ProjMemberNotType      ProjectionErrorKind = iota // the member is a value or method (member_is_not_a_type)
+	ProjNoFields                                      // the receiver type has no fields at all (type_has_no_fields)
+	ProjUnknownField                                  // a record/master receiver declares no such field (unknown_field)
+	ProjCyclic                                        // an ungrounded cyclic projection (cyclic_type_projection)
+	ProjGenericUnsupported                            // the receiver is a generic type (generic_type_projection)
 )
 
 // applyProjections projects each segment in turn off the running type, left to
@@ -53,33 +54,30 @@ func (r *TypeResolver) applyProjections(head ir.Type, projections []string, node
 // master without the field is unknown_field; a fieldless type (a primitive,
 // enum, union) is type_has_no_fields. A field whose type loops back to itself
 // with no grounding type is cyclic_type_projection.
+//
+// Projecting off a generic type (Box<T>.value) is generic_type_projection: it is
+// not supported yet — instantiating a parameterised field type belongs to the
+// generics work — so it is reported rather than resolved to an unbound parameter.
 func (r *TypeResolver) project(head ir.Type, member string, node ast.Node) ir.Type {
 	if head == nil || head == ir.Invalid {
 		return ir.Invalid // the head already failed and was reported; do not cascade
 	}
 	def := r.projectionDef(head)
-	ft := r.projectMember(head, def, member, node)
-	// A generic head instantiates the projected field type: Box<string>.value is
-	// string, not the unbound parameter T the field declares. The arguments map
-	// onto the definition's parameters and substitute through the field type.
-	if app, ok := head.(*ir.App); ok && def != nil && ft != ir.Invalid {
-		ft = types.Substitute(ft, appSubst(def, app))
+	if def != nil && len(def.Params) > 0 {
+		r.reportProjection(node, ProjGenericUnsupported, head, member)
+		return ir.Invalid
 	}
-	return ft
-}
-
-// projectMember resolves member's declared field type off head, before any
-// generic substitution: from a resolved record (a record alias's body, an
-// anonymous record, a master's row, or a generic definition's body), or — for a
-// forward or mutual reference whose body is not resolved yet — from the
-// declaration's syntax, guarded against an ungrounded cycle.
-func (r *TypeResolver) projectMember(head ir.Type, def *ir.TypeDef, member string, node ast.Node) ir.Type {
+	// A resolved record — a record alias's body, an anonymous record, or a
+	// master's row — yields the field's declared type directly.
 	if rec := resolvedRecord(head, def); rec != nil {
 		if f := fieldNamed(rec, member); f != nil {
 			return f.Type
 		}
 		return r.failedProjection(node, head, def, member, true)
 	}
+	// A declared type whose body is not resolved yet — a forward or mutual
+	// reference reached mid-pass: resolve the one field's type from the
+	// declaration's syntax, guarded so a cycle with no grounding type is caught.
 	if def != nil {
 		if fieldType, ok := recordFieldSyntax(def, member); ok {
 			return r.projectThroughSyntax(def, member, fieldType, node)
@@ -89,19 +87,6 @@ func (r *TypeResolver) projectMember(head ir.Type, def *ir.TypeDef, member strin
 		}
 	}
 	return r.failedProjection(node, head, def, member, false)
-}
-
-// appSubst maps a generic application's arguments onto the definition's
-// parameters — the substitution that instantiates a projected field type
-// (Box<string> binds T = string).
-func appSubst(def *ir.TypeDef, app *ir.App) map[string]ir.Type {
-	subst := make(map[string]ir.Type, len(def.Params))
-	for i, p := range def.Params {
-		if i < len(app.Args) {
-			subst[p.Name] = app.Args[i]
-		}
-	}
-	return subst
 }
 
 // projectThroughSyntax resolves member's field type from def's declaration
@@ -165,21 +150,15 @@ func (r *TypeResolver) projectionDef(t ir.Type) *ir.TypeDef {
 
 // resolvedRecord returns the resolved record a head projects fields from — an
 // anonymous record, a record alias's body (through any chain of named aliases),
-// a generic application's record body (its field types still parameterised, to
-// be substituted by the caller), or a master's row — or nil when the head is not
-// a (resolved) record. A nil return is either a fieldless type or a body not
-// resolved yet; project tells them apart through the declaration syntax.
+// or a master's row — or nil when the head is not a (resolved) record. A nil
+// return is either a fieldless type or a body not resolved yet; project tells
+// them apart through the declaration syntax.
 func resolvedRecord(head ir.Type, def *ir.TypeDef) *ir.Record {
 	if rec := recordOf(head); rec != nil {
 		return rec
 	}
-	if def != nil {
-		if rec, ok := def.Body.(*ir.Record); ok {
-			return rec // a generic application's record body (App head)
-		}
-		if def.Master != nil {
-			return recordOf(def.Master.Row)
-		}
+	if def != nil && def.Master != nil {
+		return recordOf(def.Master.Row)
 	}
 	return nil
 }

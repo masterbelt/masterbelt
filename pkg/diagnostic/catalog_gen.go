@@ -439,6 +439,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "generic static fn " + f["name"].String() + " is not supported"
 		}
 	},
+	"belt.semantic.generic_type_projection": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "ジェネリック型 " + f["typ"].String() + " のフィールド射影はまだサポートされていません"
+		default:
+			return "projecting a field off the generic type " + f["typ"].String() + " is not supported yet"
+		}
+	},
 	"belt.semantic.immutable_data": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":

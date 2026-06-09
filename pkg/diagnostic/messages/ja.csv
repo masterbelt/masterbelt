@@ -111,6 +111,7 @@ belt.semantic.type_in_value_position,型はコンパイル時の値であり、�
 belt.semantic.member_is_not_a_type,{typ}.{member} は値であり型ではないため、型位置には置けません
 belt.semantic.type_has_no_fields,{typ} には射影できるフィールドがありません ({member})
 belt.semantic.cyclic_type_projection,{typ} の {member} の型射影が循環しており、地となる具体型がありません
+belt.semantic.generic_type_projection,ジェネリック型 {typ} のフィールド射影はまだサポートされていません
 project.config.missing,masterbelt.toml がこのディレクトリにも親ディレクトリにも見つかりません
 project.config.invalid,不正な masterbelt.toml: {detail}
 project.config.missing_entry,masterbelt.toml に entry が指定されていません

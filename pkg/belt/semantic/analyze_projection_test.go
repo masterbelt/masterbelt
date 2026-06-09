@@ -144,18 +144,15 @@ func TestTypeProjectionUnknownField(t *testing.T) {
 	}
 }
 
-func TestTypeProjectionGenericInstantiation(t *testing.T) {
-	// A generic head instantiates the projected field type: Box<string>.value is
-	// string, not the unbound parameter T the field declares — the arguments are
-	// applied, not dropped.
+func TestTypeProjectionGenericRejected(t *testing.T) {
+	// Projecting a field off a generic type is not supported yet — instantiating a
+	// parameterised field type belongs to the generics work — so it is reported
+	// rather than resolved to an unbound parameter or a silently-dropped argument.
 	src := "pub type Box<T> = { value: T }\n" +
 		"pub type S = { v: Box.value<string> }\n"
-	m, diags := analyze(src)
-	if len(diags) != 0 {
-		t.Fatalf("want clean, got %v", codes(diags))
-	}
-	if got := fieldType(m, "S", "v"); got == nil || got.String() != "string" {
-		t.Fatalf("S.v = %v, want string (Box<string>.value), not the unbound T", got)
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeGenericTypeProjection) {
+		t.Fatalf("want generic_type_projection, got %v", codes(diags))
 	}
 }
 

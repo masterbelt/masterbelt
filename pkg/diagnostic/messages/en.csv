@@ -111,6 +111,7 @@ belt.semantic.type_in_value_position,a type is a compile-time value and cannot b
 belt.semantic.member_is_not_a_type,{typ}.{member} is a value and not a type so it cannot be used in type position
 belt.semantic.type_has_no_fields,{typ} has no fields to project {member} from
 belt.semantic.cyclic_type_projection,the type projection of {member} on {typ} is cyclic with no grounding type
+belt.semantic.generic_type_projection,projecting a field off the generic type {typ} is not supported yet
 project.config.missing,masterbelt.toml not found in this directory or any parent
 project.config.invalid,invalid masterbelt.toml: {detail}
 project.config.missing_entry,masterbelt.toml does not set entry

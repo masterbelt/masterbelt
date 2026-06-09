@@ -115,6 +115,8 @@ func projectionErrorReporter(at func(ast.Node) span, diags *diagnostic.List) fun
 			diags.Add(newUnknownFieldDiagnostic(s.offset, s.width, member, typ.String()))
 		case infer.ProjCyclic:
 			diags.Add(newCyclicTypeProjectionDiagnostic(s.offset, s.width, typ.String(), member))
+		case infer.ProjGenericUnsupported:
+			diags.Add(newGenericTypeProjectionDiagnostic(s.offset, s.width, typ.String()))
 		}
 	}
 }

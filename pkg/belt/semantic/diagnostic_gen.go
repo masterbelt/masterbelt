@@ -41,6 +41,7 @@ const (
 	CodeEffectInPureContext        diagnostic.Code = "belt.semantic.effect_in_pure_context"
 	CodeExternOutsideBuiltin       diagnostic.Code = "belt.semantic.extern_outside_builtin"
 	CodeGenericStatic              diagnostic.Code = "belt.semantic.generic_static"
+	CodeGenericTypeProjection      diagnostic.Code = "belt.semantic.generic_type_projection"
 	CodeImmutableData              diagnostic.Code = "belt.semantic.immutable_data"
 	CodeIndexOutOfRange            diagnostic.Code = "belt.semantic.index_out_of_range"
 	CodeInterfaceMemberConflict    diagnostic.Code = "belt.semantic.interface_member_conflict"
@@ -556,6 +557,20 @@ func newGenericStaticDiagnostic(offset int, width int, name string) diagnostic.D
 		Severity: diagnostic.Error,
 		Code:     CodeGenericStatic,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeGenericStatic, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newGenericTypeProjectionDiagnostic(offset int, width int, typ string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"typ": diagnostic.Str(typ),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeGenericTypeProjection,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeGenericTypeProjection, fields),
 		Fields:   fields,
 		Offset:   offset,
 		Width:    width,
