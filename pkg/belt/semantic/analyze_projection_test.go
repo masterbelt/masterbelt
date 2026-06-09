@@ -5,6 +5,7 @@
 package semantic
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
@@ -157,4 +158,28 @@ func TestTypeProjectionSingleStatic(t *testing.T) {
 func isFunc(t ir.Type) bool {
 	_, ok := t.(*ir.Func)
 	return ok
+}
+
+func TestTypeProjectionNotInMethodBody(t *testing.T) {
+	// A projection annotation inside a concrete method body is not covered by the
+	// declaration fold pass, so it must not be emitted there: the body keeps the
+	// prior meaning of a qualified name (reported as unknown_type, like a
+	// top-level function body), and no transient Projection node leaks into the
+	// serialized IR.
+	src := "pub type Level = sbyte\n" +
+		"pub type Character = { level: Level }\n" +
+		"pub type Foo = sbyte impl {\n" +
+		"  pub bar(): sbyte {\n" +
+		"    let x: Character.level = 1\n" +
+		"    return x\n" +
+		"  }\n" +
+		"}\n"
+	m, _ := analyze(src)
+	txt, err := m.MarshalText()
+	if err != nil {
+		t.Fatalf("MarshalText: %v", err)
+	}
+	if strings.Contains(string(txt), "Projection") {
+		t.Errorf("a Projection node leaked into method-body IR:\n%s", txt)
+	}
 }

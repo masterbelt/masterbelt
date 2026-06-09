@@ -1548,7 +1548,7 @@ func resolveMethod(r *infer.TypeResolver, reg *builtin.Registry, self ir.Type, m
 		resolvedParams[p.Name] = t
 	}
 	method.Result = r.ResolveType(m.Result, mscope)
-	method.Body = lower.Body(m.Body, bodyBinder{r: r, reg: reg, params: params, paramTypes: resolvedParams, selfType: self, tscope: mscope, funcs: fns, self: true})
+	method.Body = lower.Body(m.Body, bodyBinder{r: bodyResolver(r), reg: reg, params: params, paramTypes: resolvedParams, selfType: self, tscope: mscope, funcs: fns, self: true})
 	return method
 }
 
