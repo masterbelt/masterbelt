@@ -113,8 +113,8 @@ func TestDocumentSymbols(t *testing.T) {
 
 func TestDocumentSymbolsMaster(t *testing.T) {
 	// A master outlines as a single struct-kinded symbol, read from the IR like
-	// every other declaration (master/0002 decision 5), so its detail carries the
-	// anchor the way a const's does. Its SelectionRange covers just the name.
+	// every other declaration, so its detail carries the anchor the way a const's
+	// does. Its SelectionRange covers just the name.
 	doc := testView("pub master Skill {\n  record {\n    id: int\n  }\n  primary id\n}\n")
 	syms := documentSymbols(doc)
 	if len(syms) != 1 {

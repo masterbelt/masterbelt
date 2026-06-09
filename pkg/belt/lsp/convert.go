@@ -372,10 +372,10 @@ func funcSymbols(doc view) []symbolBuilder {
 }
 
 // masterSymbols outlines every master declaration as a struct-kinded symbol,
-// read from the IR module like every other declaration (master/0002 resolves a
-// master to a TypeDef carrying a Master descriptor), so the outline carries the
-// master's anchor in its detail the way a const's or type's does. A master with
-// no MasterSyntax link (a recovered-away declaration) is skipped, exactly as the
+// read from the IR module like every other declaration (a master resolves to a
+// TypeDef carrying a Master descriptor), so the outline carries the master's
+// anchor in its detail the way a const's or type's does. A master with no
+// MasterSyntax link (a recovered-away declaration) is skipped, exactly as the
 // other IR-backed outlines skip a missing syntax link.
 func masterSymbols(doc view) []symbolBuilder {
 	var out []symbolBuilder

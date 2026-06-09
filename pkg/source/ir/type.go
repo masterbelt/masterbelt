@@ -226,8 +226,8 @@ type TypeDef struct {
 	// it is a leaf the type algebra does not look through — Body stays nil, so a
 	// master is opaque to its row record (not assignable to or from it) — with
 	// the row's fields in Master.Fields and its primary-key columns in
-	// Master.Primary. The kind = master test is Master != nil; 0012 reads it to
-	// resolve a field typed by a master as a foreign-key reference.
+	// Master.Primary. The kind = master test is Master != nil — what resolving a
+	// field typed by a master into a foreign-key reference reads.
 	Master *MasterDef
 	// Where is the refinement predicate over self as a resolved value graph —
 	// self bound to a SelfValue node, every reference resolved, the typed and
@@ -246,9 +246,9 @@ type TypeDef struct {
 // and resolved type, in source order) and the names of the primary-key columns
 // (in declaration order). The fields live here rather than on TypeDef.Body so a
 // master stays a leaf in the type algebra — opaque to its row record — while
-// still exposing the row shape its own methods (and, from 0012, a foreign-key
-// reference to it) read. A primary-key name is one of the field names; the
-// semantic layer reports one that is not.
+// still exposing the row shape its own methods (and a foreign-key reference to
+// it) read. A primary-key name is one of the field names; the semantic layer
+// reports one that is not.
 type MasterDef struct {
 	Fields  []Field  // the row's fields, in source order
 	Primary []string // the primary-key column names, in declaration order

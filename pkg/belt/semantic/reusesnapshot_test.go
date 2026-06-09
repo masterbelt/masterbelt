@@ -130,8 +130,8 @@ func reuseCases() []reuseCase {
 		"}\n" +
 		"assert C > 0\n"
 
-	// masterChain is the chain fixture with a master appended (plan master/0002):
-	// a master is a TypeDef, so editing its row method re-resolves the type-defs
+	// masterChain is the chain fixture with a master appended: a master is a
+	// TypeDef, so editing its row method re-resolves the type-defs
 	// layer, but the unrelated value chain (A->B->C, the assert) keeps its
 	// memoized types and values — the cutoff the master shares with every other
 	// type. The "// pad" tail is slack the length-preserving edit grows into so
