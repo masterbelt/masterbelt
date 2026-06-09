@@ -107,6 +107,10 @@ belt.semantic.accessor_collision,accessor {name} collides with another member of
 belt.semantic.static_collision,static fn {name} collides with an associated constant or enum member of the same name on {typ}
 belt.semantic.unknown_static,{typ} has no static fn {name}
 belt.semantic.generic_static,generic static fn {name} is not supported
+belt.semantic.type_in_value_position,a type is a compile-time value and cannot be stored in a value slot; use a type alias (type X = ...) instead
+belt.semantic.member_is_not_a_type,{typ}.{member} is a value and not a type so it cannot be used in type position
+belt.semantic.type_has_no_fields,{typ} has no fields to project {member} from
+belt.semantic.cyclic_type_projection,the type projection of {member} on {typ} is cyclic with no grounding type
 project.config.missing,masterbelt.toml not found in this directory or any parent
 project.config.invalid,invalid masterbelt.toml: {detail}
 project.config.missing_entry,masterbelt.toml does not set entry

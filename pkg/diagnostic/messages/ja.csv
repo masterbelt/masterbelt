@@ -107,6 +107,10 @@ belt.semantic.accessor_collision,アクセサ {name} は {typ} の同名の別�
 belt.semantic.static_collision,static fn {name} は {typ} の同名の関連定数か enum メンバと衝突しています
 belt.semantic.unknown_static,{typ} に static fn {name} はありません
 belt.semantic.generic_static,ジェネリックな static fn {name} はサポートされていません
+belt.semantic.type_in_value_position,型はコンパイル時の値であり、値スロットには格納できません。型エイリアス (type X = ...) を使ってください
+belt.semantic.member_is_not_a_type,{typ}.{member} は値であり型ではないため、型位置には置けません
+belt.semantic.type_has_no_fields,{typ} には射影できるフィールドがありません ({member})
+belt.semantic.cyclic_type_projection,{typ} の {member} の型射影が循環しており、地となる具体型がありません
 project.config.missing,masterbelt.toml がこのディレクトリにも親ディレクトリにも見つかりません
 project.config.invalid,不正な masterbelt.toml: {detail}
 project.config.missing_entry,masterbelt.toml に entry が指定されていません

@@ -32,6 +32,18 @@ type TypeResolver struct {
 	// It is nil wherever bound violations are not reported (a memoized resolution
 	// without diagnostics); the App is still built so typing proceeds.
 	BoundViolation func(arg ast.TypeExpr, argType ir.Type, param *ir.TypeParam)
+	// ProjectionError reports a field-type projection (T.member in type position)
+	// that does not resolve to a type — the member is a value, the receiver has no
+	// such field or no fields at all, or the projection is cyclic. It is nil
+	// wherever projection diagnostics are not reported (a memoized resolution, the
+	// prelude); the projection still yields ir.Invalid so typing proceeds.
+	ProjectionError func(node ast.Node, kind ProjectionErrorKind, typ ir.Type, member string)
+	// resolving is the set of field-type-projection steps currently on the
+	// resolution stack — the re-entry guard that catches an ungrounded cyclic
+	// projection (A.x: B.x ⇄ B.x: A.x) while letting a grounded one (Item.level →
+	// Level) resolve. It is created lazily on the first projection that recurses
+	// through a declaration's syntax.
+	resolving map[projKey]bool
 }
 
 func (r *TypeResolver) reportUnknown(node ast.Node, name string) {
@@ -115,26 +127,38 @@ func (r *TypeResolver) resolveNamed(t *ast.NamedType, scope TypeScope) ir.Type {
 	return &ir.Named{Def: def}
 }
 
-// resolveQualified resolves a namespace-qualified named type (geo.Point): the
-// qualifier must name a namespace import and the name one of its target's
-// exported types. The qualifier is opaque to the generic scope and the
-// registry — only the import surface can satisfy it — and a local type never
-// shadows it: types have no members, so the dotted form has exactly one
-// meaning.
+// resolveQualified resolves a dotted named type, deciding its head by context.
+// A namespace-qualified type wins (geo.Point): the qualifier names an import and
+// the name one of its target's exported types, with any further dots projecting
+// fields off the result. Otherwise the qualifier names a type and the head is a
+// field-type projection (Item.level → Level), projecting the name — then each
+// further segment — off it (§3). A qualifier that is neither is an unknown type.
 func (r *TypeResolver) resolveQualified(t *ast.NamedType, scope TypeScope) ir.Type {
 	if t.Name == "" {
 		return ir.Invalid // a recovered geo. — already a parse diagnostic
 	}
-	var def *ir.TypeDef
 	if r.Qualified != nil {
-		def = r.Qualified(t.Namespace, t.Name)
+		if def := r.Qualified(t.Namespace, t.Name); def != nil {
+			return r.applyProjections(r.namedType(def, t.Args, scope), t.Projections, t)
+		}
 	}
-	if def == nil {
-		r.reportUnknown(t, t.Namespace+"."+t.Name)
-		return ir.Invalid
+	// The qualifier names a type, so Namespace.Name is a field-type projection.
+	// Generic arguments on a projection head are meaningless and ignored.
+	if def := r.lookup(t.Namespace); def != nil {
+		head := r.project(r.namedType(def, nil, scope), t.Name, t)
+		return r.applyProjections(head, t.Projections, t)
 	}
-	if len(t.Args) > 0 {
-		return r.app(def, t.Args, scope)
+	r.reportUnknown(t, t.Namespace+"."+t.Name)
+	return ir.Invalid
+}
+
+// namedType builds the type a definition denotes at a use site: a generic
+// application when arguments are given (and the registry-backed bound check
+// runs), a primitive's Builtin, or a declared type's Named — the shared tail of
+// resolving a name to its definition.
+func (r *TypeResolver) namedType(def *ir.TypeDef, args []ast.TypeExpr, scope TypeScope) ir.Type {
+	if len(args) > 0 {
+		return r.app(def, args, scope)
 	}
 	if def.Builtin {
 		return &ir.Builtin{Name: def.Name}

@@ -370,11 +370,12 @@ func (a *assembler) resolveConst(decl *ast.ConstDecl, cyclic bool) {
 	annType := ir.Invalid
 	if decl.Type != nil {
 		r := &infer.TypeResolver{
-			Defs:           a.q.universe(a.fileID),
-			Qualified:      qualifiedFrom(a.q, a.imp),
-			Report:         typeNameReporter(a.fileID, a.q, a.at, a.diags),
-			Registry:       a.reg,
-			BoundViolation: boundViolationReporter(a.at, a.diags),
+			Defs:            a.q.universe(a.fileID),
+			Qualified:       qualifiedFrom(a.q, a.imp),
+			Report:          typeNameReporter(a.fileID, a.q, a.at, a.diags),
+			Registry:        a.reg,
+			BoundViolation:  boundViolationReporter(a.at, a.diags),
+			ProjectionError: projectionErrorReporter(a.at, a.diags),
 		}
 		annType = r.ResolveType(decl.Type, nil)
 	}

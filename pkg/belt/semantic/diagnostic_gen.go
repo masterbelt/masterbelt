@@ -29,6 +29,7 @@ const (
 	CodeConstantOverflow           diagnostic.Code = "belt.semantic.constant_overflow"
 	CodeCyclicModule               diagnostic.Code = "belt.semantic.cyclic_module"
 	CodeCyclicReference            diagnostic.Code = "belt.semantic.cyclic_reference"
+	CodeCyclicTypeProjection       diagnostic.Code = "belt.semantic.cyclic_type_projection"
 	CodeDivisionByZero             diagnostic.Code = "belt.semantic.division_by_zero"
 	CodeDuplicateDeclaration       diagnostic.Code = "belt.semantic.duplicate_declaration"
 	CodeDuplicateEnumMember        diagnostic.Code = "belt.semantic.duplicate_enum_member"
@@ -55,6 +56,7 @@ const (
 	CodeMasterMissingRow           diagnostic.Code = "belt.semantic.master_missing_row"
 	CodeMasterPrimaryUnknownField  diagnostic.Code = "belt.semantic.master_primary_unknown_field"
 	CodeMasterWhereUnsupported     diagnostic.Code = "belt.semantic.master_where_unsupported"
+	CodeMemberIsNotAType           diagnostic.Code = "belt.semantic.member_is_not_a_type"
 	CodeMissingEffect              diagnostic.Code = "belt.semantic.missing_effect"
 	CodeMissingField               diagnostic.Code = "belt.semantic.missing_field"
 	CodeMissingInitializer         diagnostic.Code = "belt.semantic.missing_initializer"
@@ -78,6 +80,8 @@ const (
 	CodeStaticCollision            diagnostic.Code = "belt.semantic.static_collision"
 	CodeTernaryBranchMismatch      diagnostic.Code = "belt.semantic.ternary_branch_mismatch"
 	CodeTernaryConditionNotBool    diagnostic.Code = "belt.semantic.ternary_condition_not_bool"
+	CodeTypeHasNoFields            diagnostic.Code = "belt.semantic.type_has_no_fields"
+	CodeTypeInValuePosition        diagnostic.Code = "belt.semantic.type_in_value_position"
 	CodeTypeMismatch               diagnostic.Code = "belt.semantic.type_mismatch"
 	CodeUndefinedName              diagnostic.Code = "belt.semantic.undefined_name"
 	CodeUnfoldedConst              diagnostic.Code = "belt.semantic.unfolded_const"
@@ -382,6 +386,21 @@ func newCyclicReferenceDiagnostic(offset int, width int, name string) diagnostic
 		Severity: diagnostic.Error,
 		Code:     CodeCyclicReference,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeCyclicReference, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newCyclicTypeProjectionDiagnostic(offset int, width int, typ string, member string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"typ":    diagnostic.Str(typ),
+		"member": diagnostic.Str(member),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeCyclicTypeProjection,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeCyclicTypeProjection, fields),
 		Fields:   fields,
 		Offset:   offset,
 		Width:    width,
@@ -760,6 +779,21 @@ func newMasterWhereUnsupportedDiagnostic(offset int, width int, master string) d
 	}
 }
 
+func newMemberIsNotATypeDiagnostic(offset int, width int, typ string, member string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"typ":    diagnostic.Str(typ),
+		"member": diagnostic.Str(member),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeMemberIsNotAType,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeMemberIsNotAType, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
 func newMissingEffectDiagnostic(offset int, width int, fn string, effect string) diagnostic.Diagnostic {
 	fields := map[string]fmt.Stringer{
 		"fn":     diagnostic.Str(fn),
@@ -1082,6 +1116,32 @@ func newTernaryConditionNotBoolDiagnostic(offset int, width int, typ string) dia
 		Code:     CodeTernaryConditionNotBool,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeTernaryConditionNotBool, fields),
 		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newTypeHasNoFieldsDiagnostic(offset int, width int, typ string, member string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"typ":    diagnostic.Str(typ),
+		"member": diagnostic.Str(member),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeTypeHasNoFields,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeTypeHasNoFields, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newTypeInValuePositionDiagnostic(offset int, width int) diagnostic.Diagnostic {
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeTypeInValuePosition,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeTypeInValuePosition, nil),
+		Fields:   nil,
 		Offset:   offset,
 		Width:    width,
 	}

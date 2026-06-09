@@ -43,6 +43,32 @@ func boundViolationReporter(at func(ast.Node) span, diags *diagnostic.List) func
 	}
 }
 
+// projectionErrorReporter builds the callback the type resolver reports a failed
+// field-type projection (T.member in type position) through, anchored at the
+// offending type expression: a value-or-method member (member_is_not_a_type), a
+// fieldless receiver (type_has_no_fields), a record/master missing the field
+// (unknown_field), or an ungrounded cyclic projection (cyclic_type_projection).
+// It returns nil when there is nowhere to report (the prelude, a memoized
+// resolution), so the resolver resolves projections silently for the IR.
+func projectionErrorReporter(at func(ast.Node) span, diags *diagnostic.List) func(ast.Node, infer.ProjectionErrorKind, ir.Type, string) {
+	if at == nil || diags == nil {
+		return nil
+	}
+	return func(node ast.Node, kind infer.ProjectionErrorKind, typ ir.Type, member string) {
+		s := at(node)
+		switch kind {
+		case infer.ProjMemberNotType:
+			diags.Add(newMemberIsNotATypeDiagnostic(s.offset, s.width, typ.String(), member))
+		case infer.ProjNoFields:
+			diags.Add(newTypeHasNoFieldsDiagnostic(s.offset, s.width, typ.String(), member))
+		case infer.ProjUnknownField:
+			diags.Add(newUnknownFieldDiagnostic(s.offset, s.width, typ.String(), member))
+		case infer.ProjCyclic:
+			diags.Add(newCyclicTypeProjectionDiagnostic(s.offset, s.width, typ.String(), member))
+		}
+	}
+}
+
 // resolveTypes resolves the file's type declarations into ir.TypeDefs, in source
 // order. A type reference resolves against the other declarations in the file
 // (so a declaration may refer to a type defined later in the file), extern —
@@ -67,11 +93,12 @@ func resolveTypes(folder exprFolder, file *ast.File, at func(ast.Node) span, dia
 	// Second pass: resolve parameters, body, method signatures, enum bodies, and
 	// interface members, reporting any unknown type names.
 	r := &infer.TypeResolver{
-		Defs:           defs,
-		Qualified:      qualified,
-		Report:         unknownTypeReporter(at, diags),
-		Registry:       reg,
-		BoundViolation: boundViolationReporter(at, diags),
+		Defs:            defs,
+		Qualified:       qualified,
+		Report:          unknownTypeReporter(at, diags),
+		Registry:        reg,
+		BoundViolation:  boundViolationReporter(at, diags),
+		ProjectionError: projectionErrorReporter(at, diags),
 	}
 	for i, id := range file.Interfaces {
 		resolveInterfaceDecl(r, reg, id, ifaceOut[i], at, diags, fns)

@@ -343,6 +343,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "cyclic reference involving " + f["name"].String()
 		}
 	},
+	"belt.semantic.cyclic_type_projection": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return f["typ"].String() + " の " + f["member"].String() + " の型射影が循環しており、地となる具体型がありません"
+		default:
+			return "the type projection of " + f["member"].String() + " on " + f["typ"].String() + " is cyclic with no grounding type"
+		}
+	},
 	"belt.semantic.division_by_zero": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
@@ -551,6 +559,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "master " + f["master"].String() + " does not support a row predicate (where) yet"
 		}
 	},
+	"belt.semantic.member_is_not_a_type": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return f["typ"].String() + "." + f["member"].String() + " は値であり型ではないため、型位置には置けません"
+		default:
+			return f["typ"].String() + "." + f["member"].String() + " is a value and not a type so it cannot be used in type position"
+		}
+	},
 	"belt.semantic.missing_effect": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
@@ -733,6 +749,22 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "三項演算子の条件は bool でなければなりません(" + f["typ"].String() + ")"
 		default:
 			return "ternary condition must be a bool; got " + f["typ"].String()
+		}
+	},
+	"belt.semantic.type_has_no_fields": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return f["typ"].String() + " には射影できるフィールドがありません (" + f["member"].String() + ")"
+		default:
+			return f["typ"].String() + " has no fields to project " + f["member"].String() + " from"
+		}
+	},
+	"belt.semantic.type_in_value_position": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "型はコンパイル時の値であり、値スロットには格納できません。型エイリアス (type X = ...) を使ってください"
+		default:
+			return "a type is a compile-time value and cannot be stored in a value slot; use a type alias (type X = ...) instead"
 		}
 	},
 	"belt.semantic.type_mismatch": func(loc Locale, f map[string]fmt.Stringer) string {
