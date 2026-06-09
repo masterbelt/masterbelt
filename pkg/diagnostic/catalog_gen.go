@@ -511,6 +511,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "cannot assign to the loop variable " + f["name"].String() + ": it is immutable; accumulate into a let"
 		}
 	},
+	"belt.semantic.master_missing_primary": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "master " + f["master"].String() + " に primary キーがありません"
+		default:
+			return "master " + f["master"].String() + " has no primary key"
+		}
+	},
 	"belt.semantic.master_primary_unknown_field": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":

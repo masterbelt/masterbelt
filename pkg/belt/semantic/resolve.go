@@ -819,7 +819,9 @@ func resolveDecl(r *infer.TypeResolver, reg *builtin.Registry, td *ast.TypeDecl,
 // only checked body it produces, a row method, is checked by checkMethodBodies
 // like every other method, not here.
 func resolveMasterDecl(r *infer.TypeResolver, reg *builtin.Registry, md *ast.MasterDecl, def *ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List, fns bodyFuncs) {
-	if rec, ok := r.ResolveType(md.Record, nil).(*ir.Record); ok {
+	// The row may be written inline (record { ... }) or as a named record type
+	// (record Row, type Row = { ... }), so unwrap a nominal alias to its record.
+	if rec := underlyingRecord(r.ResolveType(md.Record, nil)); rec != nil {
 		def.Master.Fields = rec.Fields
 	}
 	def.Master.Primary = md.Primary
@@ -841,15 +843,22 @@ func resolveMasterDecl(r *infer.TypeResolver, reg *builtin.Registry, md *ast.Mas
 	checkMasterPrimary(md, def, at, diags)
 }
 
-// checkMasterPrimary reports each primary-key column that names no field of the
-// master's row (belt.semantic.master_primary_unknown_field). It runs only in the
-// reporting pass (at/diags non-nil); the silent memoized pass builds the same
-// definition without it, so the definitions and the diagnostics never disagree.
-// The diagnostic is anchored at the whole master declaration — the AST keeps the
-// primary key as a bare name with no node of its own, so the declaration is the
-// finest anchor available for now.
+// checkMasterPrimary reports the primary-key problems of a master: an absent
+// primary key (master_missing_primary — a master with no key cannot identify a
+// row), and each named key that is not a field of the row
+// (master_primary_unknown_field). It runs only in the reporting pass (at/diags
+// non-nil); the silent memoized pass builds the same definition without it, so
+// the definitions and the diagnostics never disagree. Each diagnostic is
+// anchored at the whole master declaration — the AST keeps the primary key as a
+// bare name with no node of its own, so the declaration is the finest anchor
+// available for now.
 func checkMasterPrimary(md *ast.MasterDecl, def *ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List) {
 	if at == nil || diags == nil {
+		return
+	}
+	if len(md.Primary) == 0 {
+		s := at(md)
+		diags.Add(newMasterMissingPrimaryDiagnostic(s.offset, s.width, md.Name))
 		return
 	}
 	fields := make(map[string]bool, len(def.Master.Fields))
@@ -1437,6 +1446,29 @@ func recordFieldNames(body ir.Type) map[string]bool {
 		names[f.Name] = true
 	}
 	return names
+}
+
+// underlyingRecord returns the record a type denotes — the record itself, or the
+// one a named record type aliases (record Row, type Row = { ... }) — or nil when
+// it is neither. It looks through a nominal alias one level at a time, guarding a
+// self-referential definition, so a master's row resolves whether it is written
+// inline or by name.
+func underlyingRecord(t ir.Type) *ir.Record {
+	seen := map[*ir.TypeDef]bool{}
+	for {
+		switch x := t.(type) {
+		case *ir.Record:
+			return x
+		case *ir.Named:
+			if x.Def == nil || x.Def.Body == nil || seen[x.Def] {
+				return nil
+			}
+			seen[x.Def] = true
+			t = x.Def.Body
+		default:
+			return nil
+		}
+	}
 }
 
 // memberFields returns the field names the member-collision checks compare an

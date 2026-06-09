@@ -123,6 +123,80 @@ func TestMasterPrimaryUnknownField(t *testing.T) {
 	}
 }
 
+// TestMasterRowNamedRecordType pins that a master row written as a named record
+// type resolves its fields from the alias (record Row, type Row = { ... }), so
+// the primary key is found and the master is diagnostic-free — the row resolver
+// unwraps a nominal alias rather than only accepting an inline record.
+func TestMasterRowNamedRecordType(t *testing.T) {
+	src := "type Row = { id: int, name: string }\n" +
+		"master M {\n  record Row\n  primary id\n}\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", codes(diags))
+	}
+	def := masterDef(m, "M")
+	if def == nil {
+		t.Fatalf("master M not resolved")
+	}
+	if got, want := fieldNames(def), "id:int,name:string"; got != want {
+		t.Errorf("fields = %q, want %q", got, want)
+	}
+}
+
+// TestMasterMissingPrimary pins that a master with no primary key is rejected: a
+// master with no key cannot identify a row, so an omitted primary member is an
+// error, not silently accepted.
+func TestMasterMissingPrimary(t *testing.T) {
+	src := "master M {\n  record {\n    id: int,\n  }\n}\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeMasterMissingPrimary) {
+		t.Fatalf("want master_missing_primary, got %v", codes(diags))
+	}
+}
+
+// TestMasterOpaqueToRecordLiteral pins the opaque-nominal rule: a record literal
+// cannot target a master type even though the master's row has those fields. The
+// row shape is readable through a receiver (self.name) but the master is not
+// assignable to or from its row record, so this is a type error.
+func TestMasterOpaqueToRecordLiteral(t *testing.T) {
+	src := "master Skill {\n  record {\n    id: int,\n    name: string,\n  }\n  primary id\n}\n" +
+		"const S: Skill = { id: 1, name: \"x\" }\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeTypeMismatch) {
+		t.Fatalf("want type_mismatch (a master is opaque to its row record), got %v", codes(diags))
+	}
+}
+
+// TestMasterBuiltinSurface pins that a master impl is held to the builtin-surface
+// rule like a type's: an extern method or a `= builtin` constant in a user file
+// is reported, not silently admitted.
+func TestMasterBuiltinSurface(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+		want diagnostic.Code
+	}{
+		{
+			name: "extern method",
+			src:  "master M {\n  record {\n    id: int,\n  } impl {\n    pub extern fn native(): int\n  }\n  primary id\n}\n",
+			want: CodeExternOutsideBuiltin,
+		},
+		{
+			name: "builtin const",
+			src:  "master M {\n  record {\n    id: int,\n  } impl {\n    const Max = builtin\n  }\n  primary id\n}\n",
+			want: CodeBuiltinOutsideBuiltin,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, diags := analyze(tc.src)
+			if !hasCode(diags, tc.want) {
+				t.Fatalf("want %s, got %v", tc.want, codes(diags))
+			}
+		})
+	}
+}
+
 // TestMasterAccessorCollidesWithRowField pins that a getter/setter named like a
 // row field collides, just as it does on a type. A master keeps Body nil and
 // stores its row fields on the descriptor, so the member check must read them

@@ -50,6 +50,7 @@ const (
 	CodeInvalidSetterSignature     diagnostic.Code = "belt.semantic.invalid_setter_signature"
 	CodeLambdaArityMismatch        diagnostic.Code = "belt.semantic.lambda_arity_mismatch"
 	CodeLoopVarImmutable           diagnostic.Code = "belt.semantic.loop_var_immutable"
+	CodeMasterMissingPrimary       diagnostic.Code = "belt.semantic.master_missing_primary"
 	CodeMasterPrimaryUnknownField  diagnostic.Code = "belt.semantic.master_primary_unknown_field"
 	CodeMissingEffect              diagnostic.Code = "belt.semantic.missing_effect"
 	CodeMissingField               diagnostic.Code = "belt.semantic.missing_field"
@@ -678,6 +679,20 @@ func newLoopVarImmutableDiagnostic(offset int, width int, name string) diagnosti
 		Severity: diagnostic.Error,
 		Code:     CodeLoopVarImmutable,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeLoopVarImmutable, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newMasterMissingPrimaryDiagnostic(offset int, width int, master string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"master": diagnostic.Str(master),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeMasterMissingPrimary,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeMasterMissingPrimary, fields),
 		Fields:   fields,
 		Offset:   offset,
 		Width:    width,
