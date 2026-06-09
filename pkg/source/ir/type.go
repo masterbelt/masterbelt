@@ -76,6 +76,11 @@ func HasInvalid(t Type) bool {
 
 // --- declared and composite types -------------------------------------------
 
+// unresolvedType is the placeholder String() renders for a type reference whose
+// definition has not been linked (a nil Def), shared by every form that holds
+// one so the rendered form does not drift between them.
+const unresolvedType = "<unresolved type>"
+
 // Named is a reference to a declared type (Coin, Level, ...): a resolved pointer
 // to its definition, mirroring how Reference points at a *Const.
 type Named struct{ Def *TypeDef }
@@ -83,7 +88,7 @@ type Named struct{ Def *TypeDef }
 func (*Named) typ() {}
 func (n *Named) String() string {
 	if n.Def == nil {
-		return "<unresolved type>"
+		return unresolvedType
 	}
 	return n.Def.Name
 }
@@ -151,7 +156,7 @@ type App struct {
 
 func (*App) typ() {}
 func (a *App) String() string {
-	name := "<unresolved type>"
+	name := unresolvedType
 	if a.Def != nil {
 		name = a.Def.Name
 	}
@@ -189,13 +194,16 @@ type Projection struct {
 
 func (*Projection) typ() {}
 func (p *Projection) String() string {
-	recv := "<unresolved type>"
+	recv := unresolvedType
 	if p.Recv != nil {
 		recv = p.Recv.Name
 	}
 	return recv + "." + p.Member
 }
 
+// MarshalText renders the projection through the shared type codec. A Projection
+// is folded away before the IR is serialized, so this is reached only by the
+// codec's coverage round trip, never by a real module's snapshot.
 func (p *Projection) MarshalText() ([]byte, error) { return marshalType(p) }
 
 // typeString renders t, treating a nil type as "<none>" so the renderers above

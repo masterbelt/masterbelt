@@ -72,7 +72,7 @@ func resolveWhere(r *infer.TypeResolver, reg *builtin.Registry, td *ast.TypeDecl
 	// The predicate is lowered to its resolved value graph — self bound to a
 	// SelfValue, a self-method call to an ir.Call — the IR-only form every
 	// fold of it runs on, the witness probe below included.
-	graph := lower.Value(td.Where, bodyBinder{r: r, reg: reg, self: true, selfType: selfType(def)})
+	graph := lower.Value(td.Where, bodyBinder{r: bodyResolver(r), reg: reg, self: true, selfType: selfType(def)})
 	env := predicateEnv{reg: reg, universe: r.Defs, qualified: r.Qualified}
 	if v := eval.GraphPredicate(graph, witness(reg, def.Body), def, env); v == nil || v.Kind != ir.ConstBool {
 		if report {

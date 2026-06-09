@@ -1,0 +1,205 @@
+File
+  Uses: ~
+  Decls: ~
+  Types:
+    TypeDecl
+      Doc: "A character level, a nominal alias the schema shares."
+      Public: true
+      Name: "Level"
+      Params: ~
+      Body: NamedType
+        Namespace: ""
+        Name: "sbyte"
+        Args: ~
+      Where: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
+    TypeDecl
+      Doc: "A character: its level field is declared as Level."
+      Public: true
+      Name: "Character"
+      Params: ~
+      Body: RecordType
+        Fields:
+          FieldDef
+            Name: "level"
+            Type: NamedType
+              Namespace: ""
+              Name: "Level"
+              Args: ~
+          FieldDef
+            Name: "name"
+            Type: NamedType
+              Namespace: ""
+              Name: "string"
+              Args: ~
+      Where: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
+    TypeDecl
+      Doc: "A monster reuses Character's level type by projection: Monster.level is the" "declared alias Level, so a change to Level retypes this field too."
+      Public: true
+      Name: "Monster"
+      Params: ~
+      Body: RecordType
+        Fields:
+          FieldDef
+            Name: "level"
+            Type: NamedType
+              Namespace: "Character"
+              Name: "level"
+              Args: ~
+          FieldDef
+            Name: "hp"
+            Type: NamedType
+              Namespace: ""
+              Name: "short"
+              Args: ~
+      Where: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
+    TypeDecl
+      Doc: "A capacity alias and a stat whose associated constant carries it."
+      Public: true
+      Name: "Cap"
+      Params: ~
+      Body: NamedType
+        Namespace: ""
+        Name: "sbyte"
+        Args: ~
+      Where: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
+    TypeDecl
+      Doc: ~
+      Public: true
+      Name: "Stat"
+      Params: ~
+      Body: NamedType
+        Namespace: ""
+        Name: "sbyte"
+        Args: ~
+      Where: ~
+      Methods: ~
+      Consts:
+        ConstDecl
+          Doc: "The ceiling, declared as Cap."
+          Public: true
+          Name: "Top"
+          Type: NamedType
+            Namespace: ""
+            Name: "Cap"
+            Args: ~
+          Value: IntLit
+            Text: "99"
+          Builtin: false
+      Impls: ~
+    TypeDecl
+      Doc: "A bar projects the associated constant's declared type: Stat.Top is a Cap."
+      Public: true
+      Name: "Bar"
+      Params: ~
+      Body: RecordType
+        Fields:
+          FieldDef
+            Name: "ceiling"
+            Type: NamedType
+              Namespace: "Stat"
+              Name: "Top"
+              Args: ~
+      Where: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
+    TypeDecl
+      Doc: "A slot projects an enum member's type: Element.Fire is an Element."
+      Public: true
+      Name: "Slot"
+      Params: ~
+      Body: RecordType
+        Fields:
+          FieldDef
+            Name: "kind"
+            Type: NamedType
+              Namespace: "Element"
+              Name: "Fire"
+              Args: ~
+      Where: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
+    TypeDecl
+      Doc: "The ground of the chain: a concrete int field."
+      Public: true
+      Name: "Source"
+      Params: ~
+      Body: RecordType
+        Fields:
+          FieldDef
+            Name: "v"
+            Type: NamedType
+              Namespace: ""
+              Name: "int"
+              Args: ~
+      Where: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
+    TypeDecl
+      Doc: "A relay projecting the source's field type."
+      Public: true
+      Name: "Relay"
+      Params: ~
+      Body: RecordType
+        Fields:
+          FieldDef
+            Name: "v"
+            Type: NamedType
+              Namespace: "Source"
+              Name: "v"
+              Args: ~
+      Where: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
+    TypeDecl
+      Doc: "An echo projecting the relay's field type, two projections from the ground."
+      Public: true
+      Name: "Echo"
+      Params: ~
+      Body: RecordType
+        Fields:
+          FieldDef
+            Name: "v"
+            Type: NamedType
+              Namespace: "Relay"
+              Name: "v"
+              Args: ~
+      Where: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
+  Enums:
+    EnumDecl
+      Doc: "An element kind."
+      Public: true
+      Name: "Element"
+      Base: ~
+      Members:
+        EnumMember
+          Name: "Fire"
+          Value: ~
+        EnumMember
+          Name: "Water"
+          Value: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
+  Interfaces: ~
+  Funcs: ~
+  Asserts: ~
+  Masters: ~

@@ -1,0 +1,384 @@
+Module
+  Consts: ~
+  Types:
+    TypeDef
+      Name: "Level"
+      Anchor: "belt:/Level"
+      Public: true
+      Doc: "A character level, a nominal alias the schema shares."
+      Params: ~
+      Body: Builtin
+        Name: "sbyte"
+      Methods: ~
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Master: ~
+      Where: ~
+    TypeDef
+      Name: "Character"
+      Anchor: "belt:/Character"
+      Public: true
+      Doc: "A character: its level field is declared as Level."
+      Params: ~
+      Body: Record
+        Fields:
+          Field
+            Name: "level"
+            Type: Named
+              Def: "Level"
+          Field
+            Name: "name"
+            Type: Builtin
+              Name: "string"
+      Methods: ~
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Master: ~
+      Where: ~
+    TypeDef
+      Name: "Monster"
+      Anchor: "belt:/Monster"
+      Public: true
+      Doc: "A monster reuses Character's level type by projection: Monster.level is the" "declared alias Level, so a change to Level retypes this field too."
+      Params: ~
+      Body: Record
+        Fields:
+          Field
+            Name: "level"
+            Type: Named
+              Def: "Level"
+          Field
+            Name: "hp"
+            Type: Builtin
+              Name: "short"
+      Methods: ~
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Master: ~
+      Where: ~
+    TypeDef
+      Name: "Cap"
+      Anchor: "belt:/Cap"
+      Public: true
+      Doc: "A capacity alias and a stat whose associated constant carries it."
+      Params: ~
+      Body: Builtin
+        Name: "sbyte"
+      Methods: ~
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Master: ~
+      Where: ~
+    TypeDef
+      Name: "Stat"
+      Anchor: "belt:/Stat"
+      Public: true
+      Doc: ~
+      Params: ~
+      Body: Builtin
+        Name: "sbyte"
+      Methods: ~
+      Consts:
+        AssocConst
+          Name: "Top"
+          Anchor: "belt:/Stat#Top"
+          Public: true
+          Doc: "The ceiling, declared as Cap."
+          Type: Named
+            Def: "Cap"
+          Value: Constant
+            Kind: 0
+            Int: 99
+            Bool: false
+            Str: ""
+            Coll: ~
+            Fields: ~
+            CollMapness: 0
+            Millis: 0
+            Fn: ~
+            Captured: ~
+            EnumDef: ~
+            EnumIndex: 0
+            Start: ~
+            End: ~
+            Step: ~
+            UnionTag: ~
+            Reified: ~
+          Builtin: false
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Master: ~
+      Where: ~
+    TypeDef
+      Name: "Bar"
+      Anchor: "belt:/Bar"
+      Public: true
+      Doc: "A bar projects the associated constant's declared type: Stat.Top is a Cap."
+      Params: ~
+      Body: Record
+        Fields:
+          Field
+            Name: "ceiling"
+            Type: Named
+              Def: "Cap"
+      Methods: ~
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Master: ~
+      Where: ~
+    TypeDef
+      Name: "Slot"
+      Anchor: "belt:/Slot"
+      Public: true
+      Doc: "A slot projects an enum member's type: Element.Fire is an Element."
+      Params: ~
+      Body: Record
+        Fields:
+          Field
+            Name: "kind"
+            Type: Named
+              Def: "Element"
+      Methods: ~
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Master: ~
+      Where: ~
+    TypeDef
+      Name: "Source"
+      Anchor: "belt:/Source"
+      Public: true
+      Doc: "The ground of the chain: a concrete int field."
+      Params: ~
+      Body: Record
+        Fields:
+          Field
+            Name: "v"
+            Type: Builtin
+              Name: "int"
+      Methods: ~
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Master: ~
+      Where: ~
+    TypeDef
+      Name: "Relay"
+      Anchor: "belt:/Relay"
+      Public: true
+      Doc: "A relay projecting the source's field type."
+      Params: ~
+      Body: Record
+        Fields:
+          Field
+            Name: "v"
+            Type: Builtin
+              Name: "int"
+      Methods: ~
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Master: ~
+      Where: ~
+    TypeDef
+      Name: "Echo"
+      Anchor: "belt:/Echo"
+      Public: true
+      Doc: "An echo projecting the relay's field type, two projections from the ground."
+      Params: ~
+      Body: Record
+        Fields:
+          Field
+            Name: "v"
+            Type: Builtin
+              Name: "int"
+      Methods: ~
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Master: ~
+      Where: ~
+    TypeDef
+      Name: "Element"
+      Anchor: "belt:/Element"
+      Public: true
+      Doc: "An element kind."
+      Params: ~
+      Body: ~
+      Methods:
+        Method
+          Name: "eql"
+          Anchor: "belt:/Element#eql"
+          Public: true
+          Extern: true
+          Kind: 0
+          Effects: ~
+          Doc: ~
+          Params:
+            Param
+              Name: "other"
+              Type: SelfType
+          Result: Builtin
+            Name: "bool"
+          Body: ~
+          Owner: "Element"
+        Method
+          Name: "neq"
+          Anchor: "belt:/Element#neq"
+          Public: true
+          Extern: true
+          Kind: 0
+          Effects: ~
+          Doc: ~
+          Params:
+            Param
+              Name: "other"
+              Type: SelfType
+          Result: Builtin
+            Name: "bool"
+          Body: ~
+          Owner: "Element"
+        Method
+          Name: "lt"
+          Anchor: "belt:/Element#lt"
+          Public: true
+          Extern: true
+          Kind: 0
+          Effects: ~
+          Doc: ~
+          Params:
+            Param
+              Name: "other"
+              Type: SelfType
+          Result: Builtin
+            Name: "bool"
+          Body: ~
+          Owner: "Element"
+        Method
+          Name: "lteq"
+          Anchor: "belt:/Element#lteq"
+          Public: true
+          Extern: true
+          Kind: 0
+          Effects: ~
+          Doc: ~
+          Params:
+            Param
+              Name: "other"
+              Type: SelfType
+          Result: Builtin
+            Name: "bool"
+          Body: ~
+          Owner: "Element"
+        Method
+          Name: "gt"
+          Anchor: "belt:/Element#gt"
+          Public: true
+          Extern: true
+          Kind: 0
+          Effects: ~
+          Doc: ~
+          Params:
+            Param
+              Name: "other"
+              Type: SelfType
+          Result: Builtin
+            Name: "bool"
+          Body: ~
+          Owner: "Element"
+        Method
+          Name: "gteq"
+          Anchor: "belt:/Element#gteq"
+          Public: true
+          Extern: true
+          Kind: 0
+          Effects: ~
+          Doc: ~
+          Params:
+            Param
+              Name: "other"
+              Type: SelfType
+          Result: Builtin
+            Name: "bool"
+          Body: ~
+          Owner: "Element"
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls:
+        Named
+          Def: "comparable"
+        Named
+          Def: "orderable"
+      Enum: EnumDef
+        Base: "nint"
+        Members:
+          EnumMember
+            Name: "Fire"
+            Value: Constant
+              Kind: 0
+              Int: 0
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+              Reified: ~
+          EnumMember
+            Name: "Water"
+            Value: Constant
+              Kind: 0
+              Int: 1
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+              Reified: ~
+      Master: ~
+      Where: ~
+  Funcs: ~
+  Asserts: ~

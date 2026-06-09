@@ -64,3 +64,77 @@ func ResolveMember(def *ir.TypeDef, name string) Member {
 	}
 	return Member{Kind: MemberNone, Index: -1}
 }
+
+// ProjectMemberType returns the declared type a type-position projection
+// def.member resolves to, and whether the member exists. It runs the one member
+// classifier and maps each kind to the member's declared type: an associated
+// constant to its declared type, an enum member to the enum itself (a member is
+// a value of the enum), a static fn to its function type, and a record field —
+// the kind ResolveMember leaves as MemberNone — to the field's declared type.
+// The returned type is the member's type as declared, which may itself be a
+// projection the caller resolves in turn. A name the type does not declare
+// returns (nil, false), which the caller reports.
+func ProjectMemberType(def *ir.TypeDef, name string) (ir.Type, bool) {
+	if def == nil {
+		return nil, false
+	}
+	switch m := ResolveMember(def, name); m.Kind {
+	case MemberConst:
+		return def.Consts[m.Index].Type, true
+	case MemberEnum:
+		return &ir.Named{Def: def}, true
+	case MemberStatic:
+		return staticFnType(def, name), true
+	case MemberNone:
+		return recordFieldType(def, name)
+	}
+	return nil, false
+}
+
+// recordFieldType returns a record field's declared type on def, looking through
+// the record a record/alias body or a master's row carries, or (nil, false)
+// when def declares no such field.
+func recordFieldType(def *ir.TypeDef, name string) (ir.Type, bool) {
+	rec := recordOf(def)
+	if rec == nil {
+		return nil, false
+	}
+	for _, f := range rec.Fields {
+		if f.Name == name {
+			return f.Type, true
+		}
+	}
+	return nil, false
+}
+
+// recordOf returns the record a type's values conform to: its body when that is
+// a record or a one-step alias to one, or a master's row record. It is nil for a
+// type with no record shape (a primitive, a union, an enum without fields).
+func recordOf(def *ir.TypeDef) *ir.Record {
+	t := def.Body
+	if def.Master != nil {
+		t = def.Master.Row
+	}
+	if n, ok := t.(*ir.Named); ok && n.Def != nil {
+		t = n.Def.Body
+	}
+	rec, _ := t.(*ir.Record)
+	return rec
+}
+
+// staticFnType builds the function type of a static fn member — the signature
+// the call site reads, projected when the member appears in type position. A
+// name that is not a static fn yields Invalid (ProjectMemberType only calls it
+// for one).
+func staticFnType(def *ir.TypeDef, name string) ir.Type {
+	for _, m := range def.Methods {
+		if m.Kind == ir.MethodStatic && m.Name == name {
+			params := make([]ir.Type, len(m.Params))
+			for i, p := range m.Params {
+				params[i] = p.Type
+			}
+			return &ir.Func{Params: params, Result: m.Result}
+		}
+	}
+	return ir.Invalid
+}

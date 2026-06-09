@@ -32,6 +32,16 @@ type TypeResolver struct {
 	// It is nil wherever bound violations are not reported (a memoized resolution
 	// without diagnostics); the App is still built so typing proceeds.
 	BoundViolation func(arg ast.TypeExpr, argType ir.Type, param *ir.TypeParam)
+	// ProjectMembers turns a qualified name whose qualifier is a type — rather
+	// than a namespace import — into a type-position member projection
+	// (Character.level), emitted as an ir.Projection a later pass folds to the
+	// member's declared type. It is set only for resolving a declaration's type
+	// positions (a record field, a master row, a signature), where the fold pass
+	// runs and the receiver's body may be a forward reference or a cycle. It stays
+	// off for a body or a standalone constant, which keep the prior meaning (a
+	// qualified name is a namespace export or unknown) — body-level projection is
+	// deferred with the rest of body-level type-value work.
+	ProjectMembers bool
 }
 
 func (r *TypeResolver) reportUnknown(node ast.Node, name string) {
@@ -130,6 +140,16 @@ func (r *TypeResolver) resolveQualified(t *ast.NamedType, scope TypeScope) ir.Ty
 		def = r.Qualified(t.Namespace, t.Name)
 	}
 	if def == nil {
+		// Not a namespace import. When projecting, the qualifier may instead name
+		// a type in the universe, making Type.member a type-position projection;
+		// the receiver's own body may not be resolved yet, so emit a Projection a
+		// later pass folds to the member's declared type. A generic argument list
+		// is not a projection (Type.member<...> has no meaning) and falls through.
+		if r.ProjectMembers && len(t.Args) == 0 {
+			if recv := r.lookup(t.Namespace); recv != nil {
+				return &ir.Projection{Recv: recv, Member: t.Name, Syntax: t}
+			}
+		}
 		r.reportUnknown(t, t.Namespace+"."+t.Name)
 		return ir.Invalid
 	}

@@ -1,0 +1,66 @@
+// Type-position member projection: a type expression Type.member resolves to the
+// member's declared type. The unified member resolution that answers a value's
+// Type.member answers it in type position too — a record field projects to its
+// declared type, an associated constant and an enum member to theirs, a static fn
+// to its function type. The projected type is the one declared, not the structure
+// it aliases, so a schema change to the source type follows wherever it is
+// projected. Projections resolve lazily and may chain; a chain that grounds on a
+// concrete type bottoms out (only a ground-less mutual projection, rejected
+// elsewhere, has no fixed point).
+
+/// A character level, a nominal alias the schema shares.
+pub type Level = sbyte
+
+/// A character: its level field is declared as Level.
+pub type Character = {
+  level: Level,
+  name: string,
+}
+
+/// A monster reuses Character's level type by projection: Monster.level is the
+/// declared alias Level, so a change to Level retypes this field too.
+pub type Monster = {
+  level: Character.level,
+  hp: short,
+}
+
+/// A capacity alias and a stat whose associated constant carries it.
+pub type Cap = sbyte
+pub type Stat = sbyte impl {
+  /// The ceiling, declared as Cap.
+  pub const Top: Cap = 99
+}
+
+/// A bar projects the associated constant's declared type: Stat.Top is a Cap.
+pub type Bar = {
+  ceiling: Stat.Top,
+}
+
+/// An element kind.
+pub enum Element {
+  Fire,
+  Water,
+}
+
+/// A slot projects an enum member's type: Element.Fire is an Element.
+pub type Slot = {
+  kind: Element.Fire,
+}
+
+// Projections resolve lazily and chain: Echo.v projects Relay.v, which projects
+// Source.v, which grounds on int — the chain bottoms out and every link is int.
+
+/// The ground of the chain: a concrete int field.
+pub type Source = {
+  v: int,
+}
+
+/// A relay projecting the source's field type.
+pub type Relay = {
+  v: Source.v,
+}
+
+/// An echo projecting the relay's field type, two projections from the ground.
+pub type Echo = {
+  v: Relay.v,
+}

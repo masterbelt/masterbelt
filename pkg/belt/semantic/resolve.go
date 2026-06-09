@@ -72,6 +72,11 @@ func resolveTypes(folder exprFolder, file *ast.File, at func(ast.Node) span, dia
 		Report:         unknownTypeReporter(at, diags),
 		Registry:       reg,
 		BoundViolation: boundViolationReporter(at, diags),
+		// Resolve type-position member projections (Character.level) in the
+		// declarations' type positions; the fold pass below resolves the
+		// ir.Projection nodes this emits. Bodies lower with a non-projecting clone
+		// (bodyResolver), so a body keeps the prior meaning of a qualified name.
+		ProjectMembers: true,
 	}
 	for i, id := range file.Interfaces {
 		resolveInterfaceDecl(r, reg, id, ifaceOut[i], at, diags, fns)
@@ -90,6 +95,14 @@ func resolveTypes(folder exprFolder, file *ast.File, at func(ast.Node) span, dia
 	for i, md := range file.Masters {
 		resolveMasterDecl(r, reg, md, masterOut[i], at, diags, fns)
 	}
+
+	// With every type's, enum's, and master's body, signature, and associated-
+	// constant type resolved, fold the type-position member projections they hold
+	// (Character.level) to the member's declared type. It runs here — before the
+	// impls, conformance, and associated-constant value passes consume those
+	// types — reading the resolved IR, with an in-progress set that rejects an
+	// ungrounded projection cycle and lets a grounded one bottom out.
+	foldProjections(out, enumOut, masterOut, ifaceOut, at, diags)
 
 	// Third pass: resolve each type's and enum's declared interface impls and,
 	// when reporting, check conformance (every required method present) and the
@@ -127,6 +140,149 @@ func resolveTypes(folder exprFolder, file *ast.File, at func(ast.Node) span, dia
 	out = append(out, enumOut...)
 	out = append(out, ifaceOut...)
 	return append(out, masterOut...)
+}
+
+// bodyResolver returns a copy of r that does not project members: a body lowers
+// type annotations through the prior meaning of a qualified name (a namespace
+// export or unknown), since the projection fold pass only covers a declaration's
+// own type positions and body-level type-value work is deferred. The copy shares
+// r's maps and callbacks (read-only here), differing only in ProjectMembers.
+func bodyResolver(r *infer.TypeResolver) *infer.TypeResolver {
+	rb := *r
+	rb.ProjectMembers = false
+	return &rb
+}
+
+// projKey identifies a type-position projection by its receiver and member — the
+// in-progress and memo key the fold shares a member's resolved type by.
+type projKey struct {
+	recv   *ir.TypeDef
+	member string
+}
+
+// projectionFolder folds the transient ir.Projection nodes a file's resolved
+// types hold to the member's declared type. memo shares a member's resolved type
+// across the projections that name it; resolving is the design's in-progress
+// set, an entry per (receiver, member) being computed, so a re-entry is an
+// ungrounded projection cycle (A.x: B.x and B.x: A.x) reported as
+// cyclic_type_projection at the projection that re-enters. A grounded cycle
+// bottoms out on a concrete type before re-entry and resolves. at and diags are
+// nil where there is nowhere to report; the fold still runs.
+type projectionFolder struct {
+	memo      map[projKey]ir.Type
+	resolving map[projKey]bool
+	at        func(ast.Node) span
+	diags     *diagnostic.List
+}
+
+// foldProjections folds every type-position member projection the file's
+// definitions hold to the member's declared type, in place.
+func foldProjections(out, enumOut, masterOut, ifaceOut []*ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List) {
+	pf := &projectionFolder{
+		memo:      map[projKey]ir.Type{},
+		resolving: map[projKey]bool{},
+		at:        at,
+		diags:     diags,
+	}
+	for _, defs := range [][]*ir.TypeDef{out, enumOut, masterOut, ifaceOut} {
+		for _, def := range defs {
+			pf.foldDef(def)
+		}
+	}
+}
+
+// foldDef folds the projections in a definition's resolved type positions: its
+// body, a master's row, each method's signature, each associated constant's
+// type, each generic parameter's bound, and an interface's parents.
+func (pf *projectionFolder) foldDef(def *ir.TypeDef) {
+	def.Body = pf.foldType(def.Body)
+	if def.Master != nil {
+		def.Master.Row = pf.foldType(def.Master.Row)
+	}
+	for _, m := range def.Methods {
+		for i := range m.Params {
+			m.Params[i].Type = pf.foldType(m.Params[i].Type)
+		}
+		m.Result = pf.foldType(m.Result)
+	}
+	for _, c := range def.Consts {
+		c.Type = pf.foldType(c.Type)
+	}
+	for _, p := range def.Params {
+		p.Bound = pf.foldType(p.Bound)
+	}
+	if def.Interface != nil {
+		for i := range def.Interface.Parents {
+			def.Interface.Parents[i] = pf.foldType(def.Interface.Parents[i])
+		}
+	}
+}
+
+// foldType replaces every Projection in t with the member's declared type,
+// recursing through the composite forms. A non-projection concrete type is
+// returned unchanged.
+func (pf *projectionFolder) foldType(t ir.Type) ir.Type {
+	switch t := t.(type) {
+	case *ir.Projection:
+		return pf.project(t)
+	case *ir.Union:
+		for i := range t.Members {
+			t.Members[i] = pf.foldType(t.Members[i])
+		}
+	case *ir.Record:
+		for i := range t.Fields {
+			t.Fields[i].Type = pf.foldType(t.Fields[i].Type)
+		}
+	case *ir.Func:
+		for i := range t.Params {
+			t.Params[i] = pf.foldType(t.Params[i])
+		}
+		t.Result = pf.foldType(t.Result)
+	case *ir.App:
+		for i := range t.Args {
+			t.Args[i] = pf.foldType(t.Args[i])
+		}
+	case *ir.TypeVar:
+		t.Bound = pf.foldType(t.Bound)
+	}
+	return t
+}
+
+// project resolves one projection to the member's declared type, folding that
+// type in turn so a chain of projections collapses. A re-entry into a member
+// already being resolved is the ungrounded cycle; a member the receiver does not
+// declare is an unknown type. Both report and resolve to Invalid, memoized so a
+// second projection of the same member neither re-reports nor recomputes.
+func (pf *projectionFolder) project(p *ir.Projection) ir.Type {
+	key := projKey{p.Recv, p.Member}
+	if pf.resolving[key] {
+		pf.report(p, newCyclicTypeProjectionDiagnostic)
+		return ir.Invalid
+	}
+	if t, ok := pf.memo[key]; ok {
+		return t
+	}
+	mt, ok := types.ProjectMemberType(p.Recv, p.Member)
+	if !ok {
+		pf.report(p, newUnknownTypeDiagnostic)
+		pf.memo[key] = ir.Invalid
+		return ir.Invalid
+	}
+	pf.resolving[key] = true
+	mt = pf.foldType(mt)
+	delete(pf.resolving, key)
+	pf.memo[key] = mt
+	return mt
+}
+
+// report anchors a projection diagnostic at the projection expression — the
+// surface form the receiver and member name, the site a cycle re-enters at.
+func (pf *projectionFolder) report(p *ir.Projection, build func(offset, width int, name string) diagnostic.Diagnostic) {
+	if pf.diags == nil || pf.at == nil || p.Syntax == nil {
+		return
+	}
+	s := pf.at(p.Syntax)
+	pf.diags.Add(build(s.offset, s.width, p.String()))
 }
 
 // declareTypeShells is resolveTypes' first pass: it builds a definition shell
@@ -513,7 +669,7 @@ func resolveInterfaceMember(r *infer.TypeResolver, reg *builtin.Registry, self i
 	}
 	method.Result = r.ResolveType(m.Result, mscope)
 	if m.Body != nil {
-		method.Body = lower.Body(m.Body, bodyBinder{r: r, reg: reg, params: params, paramTypes: resolvedParams, selfType: self, tscope: mscope, funcs: fns, self: true})
+		method.Body = lower.Body(m.Body, bodyBinder{r: bodyResolver(r), reg: reg, params: params, paramTypes: resolvedParams, selfType: self, tscope: mscope, funcs: fns, self: true})
 		// A provided member carries an AST syntax link, the way a concrete method
 		// does, so the constant folder reaches its body: it folds a provided method
 		// call (a list's count/keys/...) by evaluating this body with self bound to
