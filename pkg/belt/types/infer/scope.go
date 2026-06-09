@@ -160,15 +160,10 @@ func (s constScope) leaf(e ast.Expr) ir.Type {
 		if target := s.env.ResolveMember(e); target != nil {
 			return s.env.TypeOf(target)
 		}
-		// A member access whose receiver names an enum type (Rarity.Common) is
-		// a value of that enum.
-		if t := enumMemberType(s.universe(), e); t != ir.Invalid {
-			return t
-		}
-		// A member access whose receiver names a type and whose member names one
-		// of its associated constants (int8.Max, Level.Max) is that constant's
-		// value — the same Type.Name path an enum member takes.
-		if t := assocConstType(s.universe(), e); t != ir.Invalid {
+		// A member access whose receiver names a type — an enum member
+		// (Rarity.Common) or an associated constant (sbyte.Max, Level.Max) — is a
+		// value of that type, resolved through the single member resolver.
+		if t := typeMemberType(s.universe(), e); t != ir.Invalid {
 			return t
 		}
 		// Otherwise the receiver is a value: a field access on a record-typed
@@ -340,10 +335,7 @@ func (s BodyScope) typeMemberValue(e *ast.MemberExpr) (ir.Type, bool) {
 	if !ok || s.shadows(recv.Name) {
 		return ir.Invalid, false
 	}
-	if t := enumMemberType(s.Universe, e); t != ir.Invalid {
-		return t, true
-	}
-	if t := assocConstType(s.Universe, e); t != ir.Invalid {
+	if t := typeMemberType(s.Universe, e); t != ir.Invalid {
 		return t, true
 	}
 	return ir.Invalid, false

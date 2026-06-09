@@ -27,6 +27,7 @@ package semantic
 
 import (
 	"github.com/masterbelt/masterbelt/pkg/belt/parser/abstract"
+	"github.com/masterbelt/masterbelt/pkg/belt/types"
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
@@ -272,7 +273,7 @@ func classifyRefCallee(fileID FileID, e *ast.CallExpr, q queries, funcCallee map
 			// associated constant, so it must be exempt from the type-member
 			// reference check below — whether the static fn exists is the type
 			// checker's unknown_static finding.
-			if def := q.universe(fileID)[recv.Name]; hasStaticFn(def, callee.Member.Name) {
+			if types.ResolveMember(q.universe(fileID)[recv.Name], callee.Member.Name).Kind == types.MemberStatic {
 				staticCallee[callee] = true
 			}
 		}

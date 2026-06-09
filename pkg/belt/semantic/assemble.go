@@ -777,14 +777,19 @@ func reportRefIssues(fileID FileID, e ast.Expr, q queries, at func(ast.Node) spa
 			}
 			recv := m.Receiver.(*ast.Identifier)
 			def := q.universe(fileID)[recv.Name]
+			member := types.ResolveMember(def, m.Member.Name)
 			if def != nil && def.Enum != nil {
-				if enumIndex(def, m.Member.Name) < 0 {
+				// An enum type: the member must be one of its members. A name that
+				// resolves to anything else (or nothing) is an unknown enum member.
+				if member.Kind != types.MemberEnum {
 					s := at(m)
 					diags.Add(newUnknownEnumMemberDiagnostic(s.offset, s.width, recv.Name, m.Member.Name))
 				}
 				return
 			}
-			if assocConstIndex(def, m.Member.Name) < 0 {
+			// A non-enum type: the member must be an associated constant (a static
+			// fn call was exempted as a static callee, leaving the read forms here).
+			if member.Kind != types.MemberConst {
 				s := at(m)
 				diags.Add(newUnknownAssociatedConstDiagnostic(s.offset, s.width, recv.Name, m.Member.Name))
 			}

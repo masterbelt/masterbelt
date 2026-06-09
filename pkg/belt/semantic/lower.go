@@ -83,11 +83,10 @@ func (b constBinder) leafConstMember(e *ast.MemberExpr, sub func(ast.Expr) ir.Va
 	if target := b.q.resolveMember(b.file, e); target != nil {
 		return &ir.Reference{Target: b.irOf[target], Syntax: e}
 	}
-	if def, idx := enumMemberAccess(b.uni(), e); idx >= 0 {
-		return &ir.EnumMemberValue{Def: def, Index: idx, Syntax: e}
-	}
-	if def, idx := assocConstAccess(b.uni(), e); idx >= 0 {
-		return &ir.AssocConstValue{Def: def, Index: idx, Syntax: e}
+	if recv, ok := e.Receiver.(*ast.Identifier); ok {
+		if v := typeMemberValue(b.uni()[recv.Name], e); v != nil {
+			return v
+		}
 	}
 	return &ir.FieldAccess{Receiver: sub(e.Receiver), Field: e.Member.Name, Syntax: e}
 }
@@ -162,49 +161,21 @@ func enumIndex(def *ir.TypeDef, name string) int {
 	return -1
 }
 
-// enumMemberAccess resolves a member access whose receiver names an enum type
-// (Rarity.Common): the enum definition and the member's index, or (nil, -1)
-// when the receiver is not an enum or the member is unknown.
-func enumMemberAccess(universe map[string]*ir.TypeDef, m *ast.MemberExpr) (*ir.TypeDef, int) {
-	recv, ok := m.Receiver.(*ast.Identifier)
-	if !ok {
-		return nil, -1
+// typeMemberValue lowers a member access whose receiver names the type def to its
+// value node — an enum member or an associated constant — through the single
+// member resolver (types.ResolveMember). It returns nil for a static fn (read
+// without a call) or no match, which the caller takes as a record-field access.
+// It is the one place T.member becomes a value, shared by the const and the
+// method-body value lowering, so there is no second member resolution.
+func typeMemberValue(def *ir.TypeDef, m *ast.MemberExpr) ir.Value {
+	switch r := types.ResolveMember(def, m.Member.Name); r.Kind {
+	case types.MemberEnum:
+		return &ir.EnumMemberValue{Def: def, Index: r.Index, Syntax: m}
+	case types.MemberConst:
+		return &ir.AssocConstValue{Def: def, Index: r.Index, Syntax: m}
+	default:
+		return nil
 	}
-	def, ok := universe[recv.Name]
-	if !ok || def.Enum == nil {
-		return nil, -1
-	}
-	return def, enumIndex(def, m.Member.Name)
-}
-
-// assocConstAccess resolves a member access whose receiver names a type and
-// whose member names one of its associated constants (int8.Max, Level.Max): the
-// owning definition and the constant's index, or (nil, -1) when the receiver
-// names no type or has no such constant.
-func assocConstAccess(universe map[string]*ir.TypeDef, m *ast.MemberExpr) (*ir.TypeDef, int) {
-	recv, ok := m.Receiver.(*ast.Identifier)
-	if !ok {
-		return nil, -1
-	}
-	def, ok := universe[recv.Name]
-	if !ok {
-		return nil, -1
-	}
-	return def, assocConstIndex(def, m.Member.Name)
-}
-
-// assocConstIndex returns the index of the named associated constant of a type
-// definition, or -1 when it has no such constant.
-func assocConstIndex(def *ir.TypeDef, name string) int {
-	if def == nil {
-		return -1
-	}
-	for i, c := range def.Consts {
-		if c.Name == name {
-			return i
-		}
-	}
-	return -1
 }
 
 // staticFnDef resolves a call whose callee is a member access on a type name to
@@ -220,27 +191,11 @@ func staticFnDef(universe map[string]*ir.TypeDef, callee *ast.MemberExpr, shadow
 	if !ok || (shadow != nil && shadow(recv.Name)) {
 		return nil
 	}
-	def, ok := universe[recv.Name]
-	if !ok || !hasStaticFn(def, callee.Member.Name) {
+	def := universe[recv.Name]
+	if types.ResolveMember(def, callee.Member.Name).Kind != types.MemberStatic {
 		return nil
 	}
 	return def
-}
-
-// hasStaticFn reports whether a type definition declares a static fn of the given
-// name. A static fn is not derived from the underlying type (it is scoped to the
-// declaring type, like an associated constant), so only the definition's own
-// methods are consulted.
-func hasStaticFn(def *ir.TypeDef, name string) bool {
-	if def == nil {
-		return false
-	}
-	for _, m := range def.Methods {
-		if m.Kind == ir.MethodStatic && m.Name == name {
-			return true
-		}
-	}
-	return false
 }
 
 // staticCall lowers a static-fn call to its IR value: the owning definition, the
@@ -575,19 +530,11 @@ func (b bodyBinder) leafNamespaceOrTypeMember(e *ast.MemberExpr) ir.Value {
 			return &ir.Reference{Target: c, Syntax: e}
 		}
 	}
-	def := b.r.Defs[recv.Name]
-	if def == nil {
-		return nil
-	}
-	if def.Enum != nil {
-		if idx := enumIndex(def, e.Member.Name); idx >= 0 {
-			return &ir.EnumMemberValue{Def: def, Index: idx, Syntax: e}
-		}
-	}
-	if idx := assocConstIndex(def, e.Member.Name); idx >= 0 {
-		return &ir.AssocConstValue{Def: def, Index: idx, Syntax: e}
-	}
-	return nil
+	// The type-member reading, through the single resolver — the same enum-member
+	// or associated-constant value the const initializer lowers, so a body and a
+	// const agree on T.member. A static fn, or no match, returns nil and the
+	// caller reads a record-field access.
+	return typeMemberValue(b.r.Defs[recv.Name], e)
 }
 
 // leafCall lowers a call in value position. A call whose callee names a type is

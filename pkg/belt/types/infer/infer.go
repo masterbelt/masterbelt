@@ -490,36 +490,14 @@ func recordOf(t ir.Type) *ir.Record {
 	return nil
 }
 
-// enumMemberType types a member access whose receiver names an enum: the enum's
-// Named type when the receiver resolves to an enum definition in universe that
-// declares the member, ir.Invalid otherwise (an unknown enum, a non-enum
-// receiver, or an unknown member). A member access that is not an enum access
-// falls through to the scope's other readings (a namespace import, a record
-// field).
-func enumMemberType(universe map[string]*ir.TypeDef, m *ast.MemberExpr) ir.Type {
-	recv, ok := m.Receiver.(*ast.Identifier)
-	if !ok {
-		return ir.Invalid
-	}
-	def, ok := universe[recv.Name]
-	if !ok || def.Enum == nil {
-		return ir.Invalid
-	}
-	for _, member := range def.Enum.Members {
-		if member.Name == m.Member.Name {
-			return &ir.Named{Def: def}
-		}
-	}
-	return ir.Invalid
-}
-
-// assocConstType types a member access whose receiver names a type and whose
-// member names one of that type's associated constants (int8.Max, Level.Max):
-// the constant's resolved type. It returns ir.Invalid when the receiver names
-// no known type or the type has no such associated constant — the same fall-
-// through enumMemberType gives, so the two share the one Type.Name path. A type
-// access wins over a record-field reading, exactly as an enum member does.
-func assocConstType(universe map[string]*ir.TypeDef, m *ast.MemberExpr) ir.Type {
+// typeMemberType types a member access whose receiver names a type, reading the
+// member through the single resolver (types.ResolveMember): an enum member is the
+// enum's Named type, an associated constant its declared type. It returns
+// ir.Invalid when the receiver names no known type, the member is a static fn or
+// no member, or an associated constant has no resolved type — the fall-through
+// the scope's other readings (a namespace import, a record field) take. A
+// type-member access wins over a record-field reading, the one Type.Name path.
+func typeMemberType(universe map[string]*ir.TypeDef, m *ast.MemberExpr) ir.Type {
 	recv, ok := m.Receiver.(*ast.Identifier)
 	if !ok {
 		return ir.Invalid
@@ -528,13 +506,16 @@ func assocConstType(universe map[string]*ir.TypeDef, m *ast.MemberExpr) ir.Type 
 	if !ok {
 		return ir.Invalid
 	}
-	for _, c := range def.Consts {
-		if c.Name == m.Member.Name {
-			if c.Type == nil {
-				return ir.Invalid
-			}
-			return c.Type
+	switch r := types.ResolveMember(def, m.Member.Name); r.Kind {
+	case types.MemberEnum:
+		return &ir.Named{Def: def}
+	case types.MemberConst:
+		if t := def.Consts[r.Index].Type; t != nil {
+			return t
 		}
+	case types.MemberNone, types.MemberStatic:
+		// Not a value-typed member: no match, or a static fn (read without a call,
+		// which the scope's record-field reading takes instead).
 	}
 	return ir.Invalid
 }
