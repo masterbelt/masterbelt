@@ -78,16 +78,18 @@ func resolveTypes(folder exprFolder, file *ast.File, at func(ast.Node) span, dia
 		// (bodyResolver), so a body keeps the prior meaning of a qualified name.
 		ProjectMembers: true,
 	}
+	// Phase 1 — structure: resolve every interface, type, enum, and master's
+	// generic parameters, body or row, associated-constant types, and method
+	// signatures. The well-formedness checks that read a resolved type — the
+	// interface inheritance graph, each refinement predicate, each master's keys —
+	// are deferred to phase 3, so phase 2 can first fold the type-position member
+	// projections those types hold; a check then sees the member's declared type
+	// rather than the transient projection.
 	for i, id := range file.Interfaces {
-		resolveInterfaceDecl(r, reg, id, ifaceOut[i], at, diags, fns)
+		resolveInterfaceDecl(r, reg, id, ifaceOut[i], fns)
 	}
-	// With every interface's parents resolved, check the inheritance graph: a
-	// cycle (A: B, B: A), a child re-declaring an ancestor's member (override),
-	// and a name two unrelated ancestors both contribute (conflict). These read
-	// the whole graph, so they run once all parents are populated.
-	checkInterfaceInheritance(file.Interfaces, ifaceOut, at, diags)
 	for i, td := range file.Types {
-		resolveDecl(r, reg, td, out[i], at, diags, res, fns)
+		resolveDecl(r, reg, td, out[i], at, diags, fns)
 	}
 	for i, ed := range file.Enums {
 		resolveEnumDecl(folder, defs, r, reg, ed, enumOut[i], at, diags, fns)
@@ -96,15 +98,30 @@ func resolveTypes(folder exprFolder, file *ast.File, at func(ast.Node) span, dia
 		resolveMasterDecl(r, reg, md, masterOut[i], at, diags, fns)
 	}
 
-	// With every type's, enum's, and master's body, signature, and associated-
-	// constant type resolved, fold the type-position member projections they hold
-	// (Character.level) to the member's declared type. It runs here — before the
-	// impls, conformance, and associated-constant value passes consume those
-	// types — reading the resolved IR, with an in-progress set that rejects an
-	// ungrounded projection cycle and lets a grounded one bottom out.
+	// Phase 2 — fold every type-position member projection (Character.level) to
+	// the member's declared type, across all definitions, now that their structure
+	// is resolved (a forward reference or a cycle between bodies has settled). An
+	// in-progress set rejects an ungrounded projection cycle and lets a grounded
+	// one bottom out; a projected generic argument's deferred bound check re-runs
+	// here on the folded type.
 	foldProjections(out, enumOut, masterOut, ifaceOut, reg, at, diags)
 
-	// Third pass: resolve each type's and enum's declared interface impls and,
+	// Phase 3 — the checks that read a resolved type, now folded: the interface
+	// inheritance graph (a cycle A: B, B: A, an override, a conflict), each
+	// refinement predicate, and each master's keys. A projected interface parent,
+	// refined body, or master row is folded by phase 2, so these see the concrete
+	// type.
+	classifyInterfaceParents(file.Interfaces, ifaceOut, at, diags)
+	checkInterfaceInheritance(file.Interfaces, ifaceOut, at, diags)
+	for i, td := range file.Types {
+		resolveWhere(r, reg, td, out[i], at, diags, res)
+	}
+	for i, md := range file.Masters {
+		def := masterOut[i]
+		checkMaster(md, underlyingRecord(def.Master.Row), isGenericRecordAlias(def.Master.Row), at, diags)
+	}
+
+	// Resolve each type's and enum's declared interface impls and,
 	// when reporting, check conformance (every required method present) and the
 	// orphan rule (the interface is implemented at the type's own definition
 	// site, which it always is here — a third-party file cannot reach a type's
@@ -495,7 +512,7 @@ func foldOneAssocConst(folder exprFolder, defs map[string]*ir.TypeDef, fenv asso
 // Interface.Required and Interface.Provided record which names are required
 // versus provided, for the conformance check; Interface.Parents records the
 // resolved parent applications, for the inheritance closure.
-func resolveInterfaceDecl(r *infer.TypeResolver, reg *builtin.Registry, id *ast.InterfaceDecl, def *ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List, fns bodyFuncs) {
+func resolveInterfaceDecl(r *infer.TypeResolver, reg *builtin.Registry, id *ast.InterfaceDecl, def *ir.TypeDef, fns bodyFuncs) {
 	scope := make(infer.TypeScope, len(id.Params))
 	for _, p := range id.Params {
 		scope[p.Name] = nil
@@ -512,21 +529,14 @@ func resolveInterfaceDecl(r *infer.TypeResolver, reg *builtin.Registry, id *ast.
 		scope[p.Name] = bound
 	}
 	// The parents (supertraits): each must resolve to an interface, the way an
-	// impl tag must. A parent that is not an interface is reported here
-	// (not_an_interface), exactly as a non-interface impl tag is; an unknown name
-	// is already reported by the resolver. The resolved applications carry the
-	// child's own type variables, so a generic parent (foldable<nint, T>) keeps
-	// them for the closure to substitute.
+	// impl tag must. They are appended one-to-one with the syntax and classified
+	// later (classifyInterfaceParents), after phase 2 folds a projected parent
+	// (interface Child: Holder.member) to the interface it names; a non-interface
+	// is dropped and reported there. The resolved applications carry the child's
+	// own type variables, so a generic parent (foldable<nint, T>) keeps them for
+	// the closure to substitute.
 	for _, p := range id.Parents {
-		t := r.ResolveType(p, scope)
-		if interfaceDefOf(t) == nil {
-			if at != nil && diags != nil && t != ir.Invalid {
-				s := at(p)
-				diags.Add(newNotAnInterfaceDiagnostic(s.offset, s.width, t.String()))
-			}
-			continue
-		}
-		def.Interface.Parents = append(def.Interface.Parents, t)
+		def.Interface.Parents = append(def.Interface.Parents, r.ResolveType(p, scope))
 	}
 	for _, m := range id.Members {
 		method := resolveInterfaceMember(r, reg, &ir.Named{Def: def}, m, scope, fns)
@@ -536,6 +546,34 @@ func resolveInterfaceDecl(r *infer.TypeResolver, reg *builtin.Registry, id *ast.
 		} else {
 			def.Interface.Required = append(def.Interface.Required, m.Name)
 		}
+	}
+}
+
+// classifyInterfaceParents drops each interface parent that did not resolve to
+// an interface — run after phase 2 folds a projected parent (interface Child:
+// Holder.member) to the interface it names — and reports the dropped one
+// (not_an_interface), exactly as a non-interface impl tag is. It keeps the silent
+// memoized pass and the reporting pass in agreement: both filter the parents,
+// only the reporting pass adds the diagnostic, so the definitions never disagree.
+// Parents are appended one-to-one with the declaration's parent syntax, so the
+// dropped one anchors at the parent it was written as.
+func classifyInterfaceParents(decls []*ast.InterfaceDecl, defs []*ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List) {
+	for i, def := range defs {
+		if def.Interface == nil {
+			continue
+		}
+		kept := def.Interface.Parents[:0]
+		for j, parent := range def.Interface.Parents {
+			if interfaceDefOf(parent) == nil {
+				if at != nil && diags != nil && parent != ir.Invalid && j < len(decls[i].Parents) {
+					s := at(decls[i].Parents[j])
+					diags.Add(newNotAnInterfaceDiagnostic(s.offset, s.width, parent.String()))
+				}
+				continue
+			}
+			kept = append(kept, parent)
+		}
+		def.Interface.Parents = kept
 	}
 }
 
@@ -963,7 +1001,7 @@ func bodyDef(reg *builtin.Registry, t ir.Type) *ir.TypeDef {
 // associated constants, the refinement predicate, and the method signatures.
 // env folds the associated-constant initializers (it is nil in callers that do
 // not evaluate).
-func resolveDecl(r *infer.TypeResolver, reg *builtin.Registry, td *ast.TypeDecl, def *ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List, res *callResolutions, fns bodyFuncs) {
+func resolveDecl(r *infer.TypeResolver, reg *builtin.Registry, td *ast.TypeDecl, def *ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List, fns bodyFuncs) {
 	scope := make(infer.TypeScope, len(td.Params))
 	for _, p := range td.Params {
 		scope[p.Name] = nil
@@ -1012,12 +1050,10 @@ func resolveDecl(r *infer.TypeResolver, reg *builtin.Registry, td *ast.TypeDecl,
 	}
 	// The accessor/static declaration checks run after the methods, fields, and
 	// associated constants are all on the definition, so the collision checks see
-	// the whole type.
+	// the whole type. The where-clause is resolved in a later phase, after the
+	// member projections in the body are folded, so a predicate reads the body's
+	// concrete type — the methods it may call are already on the definition here.
 	checkMemberDecls(def, at, diags)
-	// The where-clause is resolved last, after the methods, so a predicate that
-	// calls a method of the type (`where self.isValid()`) can resolve it — self
-	// is the nominal type, and its impl methods are now on the definition.
-	resolveWhere(r, reg, td, def, at, diags, res)
 }
 
 // resolveMasterDecl resolves a master declaration into its definition. The row
@@ -1041,9 +1077,7 @@ func resolveMasterDecl(r *infer.TypeResolver, reg *builtin.Registry, md *ast.Mas
 	// by checkMaster), while a generic record alias (record Row<int>) resolves to
 	// an application this slice does not expand — a real record row, validated
 	// later, so it is neither reported missing nor read here.
-	rowType := r.ResolveType(md.Record, nil)
-	def.Master.Row = rowType
-	row := underlyingRecord(rowType)
+	def.Master.Row = r.ResolveType(md.Record, nil)
 	// The primary key is stored de-duplicated, so the IR never carries a malformed
 	// doubled key tuple even when the duplicate is also reported below.
 	def.Master.Primary = dedupeStrings(md.Primary)
@@ -1062,7 +1096,9 @@ func resolveMasterDecl(r *infer.TypeResolver, reg *builtin.Registry, md *ast.Mas
 		def.AttachMethods(rm)
 	}
 	checkMemberDecls(def, at, diags)
-	checkMaster(md, row, isGenericRecordAlias(rowType), at, diags)
+	// checkMaster runs in a later phase, after the row's member projections are
+	// folded, so a row written through a projection (record Holder.row) is keyed
+	// against the concrete record rather than the transient projection.
 }
 
 // checkMaster reports a master's well-formedness problems: an absent or

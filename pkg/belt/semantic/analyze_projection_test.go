@@ -200,6 +200,44 @@ func TestTypeProjectionImplTag(t *testing.T) {
 	}
 }
 
+func TestTypeProjectionInRefinement(t *testing.T) {
+	// A refined alias whose body is a projection: the refinement is checked after
+	// the body folds, so Holder.base folds to int and the predicate self > 0 is
+	// valid rather than an operation on an unresolved projection.
+	src := "pub type Holder = { base: int }\n" +
+		"pub type Pos = Holder.base where self > 0\n"
+	_, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", codes(diags))
+	}
+}
+
+func TestTypeProjectionMasterRow(t *testing.T) {
+	// A master row written through a projection: the row folds to the record
+	// before the key check, so Thing keys against the concrete row rather than
+	// being reported as a missing row.
+	src := "pub type Row = { id: int, name: string }\n" +
+		"pub type Holder = { row: Row }\n" +
+		"pub master Thing {\n  record Holder.row\n  primary id\n}\n"
+	_, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", codes(diags))
+	}
+}
+
+func TestTypeProjectionInterfaceParent(t *testing.T) {
+	// An interface parent that is a projection folds to the interface before the
+	// inheritance check, so Child inherits Greet rather than being reported as
+	// extending a non-interface.
+	src := "pub interface Greet {\n  hello(): nint\n}\n" +
+		"pub type Holder = { g: Greet }\n" +
+		"pub interface Child: Holder.g {\n}\n"
+	_, diags := analyze(src)
+	if hasCode(diags, CodeNotAnInterface) {
+		t.Fatalf("interface Child: Holder.g reported not_an_interface; codes = %v", codes(diags))
+	}
+}
+
 func TestTypeProjectionNotInMethodBody(t *testing.T) {
 	// A projection annotation inside a concrete method body is not covered by the
 	// declaration fold pass, so it must not be emitted there: the body keeps the
