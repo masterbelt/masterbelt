@@ -84,6 +84,16 @@ func TestFuncSignatureProjectionErrorReported(t *testing.T) {
 	}
 }
 
+func TestSlotEnumMethodMetatype(t *testing.T) {
+	// An enum method's parameter may not be a type value — enum methods are
+	// resolved in their own loop, which must obey the storage rule too.
+	src := "pub enum E {\n  A\n} impl {\n  pub f(x: type): nint {\n    return 0\n  }\n}\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeTypeInValuePosition) {
+		t.Fatalf("want type_in_value_position on enum method, got %v", codes(diags))
+	}
+}
+
 func TestSlotProjectionAnnotationAllowed(t *testing.T) {
 	// A projected type is not the metatype — it is the field's declared type — so
 	// a const annotated with one is fine: x has type long.

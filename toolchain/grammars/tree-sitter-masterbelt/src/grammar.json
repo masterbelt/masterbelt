@@ -1327,7 +1327,7 @@
               },
               {
                 "type": "SYMBOL",
-                "name": "identifier"
+                "name": "_name"
               }
             ]
           }

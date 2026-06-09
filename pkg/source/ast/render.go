@@ -406,16 +406,19 @@ func renderType(t TypeExpr) string {
 		if t.Namespace != "" {
 			name = t.Namespace + "." + t.Name
 		}
+		// The field-type-projection segments dotted onto the head (Order.customer.id)
+		// come before any generic arguments: the parser associates the arguments
+		// with the whole dotted head, so Order.customer.id<string> must render with
+		// the segments first or it re-parses with .id left dangling.
+		if len(t.Projections) > 0 {
+			name += "." + strings.Join(t.Projections, ".")
+		}
 		if len(t.Args) > 0 {
 			args := make([]string, len(t.Args))
 			for i, a := range t.Args {
 				args[i] = renderType(a)
 			}
 			name += "<" + strings.Join(args, ", ") + ">"
-		}
-		// The field-type-projection segments dotted onto the head: Order.customer.id.
-		if len(t.Projections) > 0 {
-			name += "." + strings.Join(t.Projections, ".")
 		}
 		return name
 	case *UnionType:

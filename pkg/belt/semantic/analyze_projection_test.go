@@ -159,6 +159,36 @@ func TestTypeProjectionGenericInstantiation(t *testing.T) {
 	}
 }
 
+func TestTypeProjectionKeywordFieldName(t *testing.T) {
+	// A column named with a keyword (type) projects in type position exactly as in
+	// value position: the keyword is read as a member name after the dot.
+	src := "pub type Level = sbyte\n" +
+		"pub type Schema = { type: Level }\n" +
+		"pub type X = Schema.type\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("want clean, got %v", codes(diags))
+	}
+	for _, def := range m.Types {
+		if def.Name == "X" {
+			if def.Body == nil || def.Body.String() != "Level" {
+				t.Fatalf("X = %v, want Level (Schema.type projection)", def.Body)
+			}
+		}
+	}
+}
+
+func TestTypeProjectionMatchArmError(t *testing.T) {
+	// A failed field-type projection in a match arm type surfaces its diagnostic
+	// rather than being silently dropped.
+	src := "pub type Item = { id: long }\n" +
+		"pub fn f(v: Item | error): nint {\n  match v {\n    Item.nope x -> return 1\n    _ -> return 0\n  }\n}\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeUnknownField) {
+		t.Fatalf("want unknown_field in match arm, got %v", codes(diags))
+	}
+}
+
 func TestTypeProjectionValueConsumedByAssert(t *testing.T) {
 	// A type value projected in value position (Item.id) is comptime-only; an
 	// assert may consume it through == (type equality), which folds to a bool —

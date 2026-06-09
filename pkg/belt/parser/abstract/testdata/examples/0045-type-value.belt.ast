@@ -98,6 +98,20 @@ File
       Methods: ~
       Consts: ~
       Impls: ~
+    TypeDecl
+      Doc: "A type alias projecting that keyword-named column in type position — the" "keyword read as a member name after the dot, exactly as in value position."
+      Public: true
+      Name: "SchemaType"
+      Params: ~
+      Body: NamedType
+        Namespace: "Schema"
+        Name: "type"
+        Args: ~
+        Projections: ~
+      Where: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
   Enums: ~
   Interfaces: ~
   Funcs: ~
@@ -142,7 +156,7 @@ File
           Identifier
             Name: "long"
     AssertDecl
-      Doc: "That column's declared type, recovered by projection — the keyword read as a" "member name after the dot."
+      Doc: "That column's declared type, recovered by projection in value position too."
       Cond: CallExpr
         Callee: MemberExpr
           Receiver: MemberExpr

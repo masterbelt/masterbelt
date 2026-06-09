@@ -54,6 +54,9 @@ pub type Schema = {
   type: Level,
 }
 
-/// That column's declared type, recovered by projection — the keyword read as a
-/// member name after the dot.
+/// A type alias projecting that keyword-named column in type position — the
+/// keyword read as a member name after the dot, exactly as in value position.
+pub type SchemaType = Schema.type
+
+/// That column's declared type, recovered by projection in value position too.
 assert Schema.type == Level

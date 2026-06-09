@@ -292,9 +292,10 @@ module.exports = grammar({
 
     // A named type, optionally qualified by a sibling's namespace (geo.Point)
     // and optionally applied (list<T>). The CST keeps the dotted path flat
-    // inside the TypeName.
+    // inside the TypeName. A segment after a dot may be a keyword read as a field
+    // name (Schema.type), the same as a member name in value position.
     type_name: ($) =>
-      seq($.identifier, repeat(seq(op.Dot, $.identifier)), optional($.generic_args)),
+      seq($.identifier, repeat(seq(op.Dot, $._name)), optional($.generic_args)),
 
     null_type: ($) => kw.null,
     self_type: ($) => kw.self,

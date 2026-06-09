@@ -44,9 +44,9 @@ func (p *parser) parsePrimaryType() cst.Green {
 		for p.peekSignificant() == token.Dot {
 			p.skipTrivia(&children)
 			children = append(children, p.bump()) // "."
-			if p.peekSignificant() == token.Ident {
+			if p.memberNameAhead() {
 				p.skipTrivia(&children)
-				children = append(children, p.bump()) // the next path segment
+				children = append(children, p.bump()) // the next path segment — an identifier or a keyword read as a field name (Schema.type)
 			} else {
 				p.report(newExpectedIdentifierDiagnostic(p.lastStart, 0))
 				break

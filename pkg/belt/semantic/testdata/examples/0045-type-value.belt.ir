@@ -101,6 +101,22 @@ Module
       Enum: ~
       Master: ~
       Where: ~
+    TypeDef
+      Name: "SchemaType"
+      Anchor: "belt:/SchemaType"
+      Public: true
+      Doc: "A type alias projecting that keyword-named column in type position — the" "keyword read as a member name after the dot, exactly as in value position."
+      Params: ~
+      Body: Named
+        Def: "Level"
+      Methods: ~
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Master: ~
+      Where: ~
   Funcs: ~
   Asserts:
     Assert
@@ -171,7 +187,7 @@ Module
       Diagram: "Level != long\n^     ^  ^\nLevel |  long\n      true"
     Assert
       Cond: "Schema.type == Level"
-      Doc: "That column's declared type, recovered by projection — the keyword read as a" "member name after the dot."
+      Doc: "That column's declared type, recovered by projection in value position too."
       Eval: Constant
         Kind: 1
         Int: ~

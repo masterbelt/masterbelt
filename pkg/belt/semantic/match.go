@@ -51,7 +51,7 @@ func checkMatch(m *ast.MatchStmt, bs infer.BodyScope, sink *infer.Sink, at func(
 		if arm.Type == nil {
 			continue
 		}
-		armT := resolveBodyType(bs, arm.Type)
+		armT := resolveBodyTypeReporting(bs, arm.Type, at, diags)
 		if armT == ir.Invalid {
 			continue // the arm names no type; a type-name diagnostic already fired
 		}

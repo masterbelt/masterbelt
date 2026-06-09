@@ -95,17 +95,17 @@ func lowerTypeName(t cst.Tree, buf source.Buffer, node *cst.Node) ast.TypeExpr {
 	var args []ast.TypeExpr
 	for _, child := range t.Children() {
 		if tok, ok := child.Token(); ok {
-			switch tok.Kind() {
-			case token.Ident:
+			switch {
+			case tok.Kind() == token.Ident:
 				idents = append(idents, child.Text(buf))
-			case token.Dot:
+			case tok.Kind() == token.Dot:
 				dotted = true
-			case token.Self:
-				name = "self"
-			case token.Null:
-				name = "null"
-			case token.Type:
-				name = "type" // the metatype, a builtin type name (type : type)
+			case tok.Kind().Keyword():
+				// A reserved word read as a name: the builtin type names self/null/type
+				// standalone, or a keyword field name in a projection segment
+				// (Schema.type). Collected by spelling alongside the identifiers, so a
+				// keyword segment projects exactly as an ordinary one does.
+				idents = append(idents, child.Text(buf))
 			default:
 				// Any other token (the generic-argument angle brackets and
 				// commas) names no part of the type: it is skipped.

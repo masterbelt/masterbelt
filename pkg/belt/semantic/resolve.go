@@ -923,6 +923,9 @@ func resolveMasterDecl(r *infer.TypeResolver, reg *builtin.Registry, md *ast.Mas
 	seen := make(map[string]bool, len(md.Methods))
 	for _, m := range md.Methods {
 		rm := resolveMethod(r, reg, &ir.Named{Def: def}, m, nil, fns)
+		// A master method's parameter or result may not be a type value, the same
+		// storage rule a nominal type's method obeys.
+		reportMetatypeSlot(at, diags, m, sigType(rm.Params, rm.Result))
 		key := rm.Name + signatureKey(def, rm)
 		if m.Name != "" && seen[key] {
 			reportDuplicateMethod(rm, def, m, at, diags)
@@ -1233,6 +1236,9 @@ func resolveEnumMethods(r *infer.TypeResolver, reg *builtin.Registry, ed *ast.En
 	seen := make(map[string]bool, len(ed.Methods))
 	for _, m := range ed.Methods {
 		rm := resolveMethod(r, reg, &ir.Named{Def: def}, m, scope, fns)
+		// An enum method's parameter or result may not be a type value, the same
+		// storage rule a nominal type's method obeys.
+		reportMetatypeSlot(at, diags, m, sigType(rm.Params, rm.Result))
 		key := rm.Name + signatureKey(def, rm)
 		if m.Name != "" && seen[key] {
 			reportDuplicateMethod(rm, def, m, at, diags)
