@@ -371,22 +371,23 @@ func funcSymbols(doc view) []symbolBuilder {
 	return out
 }
 
-// masterSymbols outlines every master declaration as a struct-kinded symbol.
-// Unlike the other outlines it reads the AST (doc.AST().File().Masters) rather
-// than the IR module: a master is not yet resolved into a typed module entry,
-// but its name and span are already in the abstract tree, which is all the
-// outline needs. A nil Syntax (a recovered-away declaration) is skipped, exactly
-// as the IR-backed outlines skip a missing syntax link.
+// masterSymbols outlines every master declaration as a struct-kinded symbol,
+// read from the IR module like every other declaration (master/0002 resolves a
+// master to a TypeDef carrying a Master descriptor), so the outline carries the
+// master's anchor in its detail the way a const's or type's does. A master with
+// no MasterSyntax link (a recovered-away declaration) is skipped, exactly as the
+// other IR-backed outlines skip a missing syntax link.
 func masterSymbols(doc view) []symbolBuilder {
 	var out []symbolBuilder
-	for _, m := range doc.AST().File().Masters {
-		if m.Syntax() == nil {
-			continue
+	for _, t := range doc.Module().Types {
+		if t.Master == nil || t.MasterSyntax == nil {
+			continue // only masters carry a master outline
 		}
 		out = append(out, symbolBuilder{
-			green: m.Syntax(),
-			name:  m.Name,
-			kind:  protocol.SymbolKindStruct,
+			green:  t.MasterSyntax.Syntax(),
+			name:   t.Name,
+			anchor: t.Anchor,
+			kind:   protocol.SymbolKindStruct,
 		})
 	}
 	return out
