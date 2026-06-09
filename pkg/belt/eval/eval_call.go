@@ -52,7 +52,7 @@ func enumComparison(recv *ir.Constant, name string, args []*ir.Constant) *ir.Con
 }
 
 // typeValueComparison folds the equality of two type values — Character.id ==
-// long, the comptime type-equality the design admits (§4). A type value carries
+// long, the comptime type-equality the design admits. A type value carries
 // nominal identity, so Level and the int8 it aliases are distinct; the
 // comparison is ConstantsEqual's ConstType case (typeValuesEqual). It has no
 // registry intrinsic — the metatype is opaque and declared in no prelude file,

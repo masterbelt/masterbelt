@@ -132,7 +132,7 @@ func (r *TypeResolver) resolveNamed(t *ast.NamedType, scope TypeScope) ir.Type {
 // the name one of its target's exported types, with any further dots projecting
 // fields off the result. Otherwise the qualifier names a type and the head is a
 // field-type projection (Item.level → Level), projecting the name — then each
-// further segment — off it (§3). A qualifier that is neither is an unknown type.
+// further segment — off it. A qualifier that is neither is an unknown type.
 func (r *TypeResolver) resolveQualified(t *ast.NamedType, scope TypeScope) ir.Type {
 	if t.Name == "" {
 		return ir.Invalid // a recovered geo. — already a parse diagnostic
@@ -143,9 +143,11 @@ func (r *TypeResolver) resolveQualified(t *ast.NamedType, scope TypeScope) ir.Ty
 		}
 	}
 	// The qualifier names a type, so Namespace.Name is a field-type projection.
-	// Generic arguments on a projection head are meaningless and ignored.
+	// Generic arguments instantiate the projected type (Box.value<string>
+	// projects value off Box<string>), so they apply to the head rather than
+	// being dropped.
 	if def := r.lookup(t.Namespace); def != nil {
-		head := r.project(r.namedType(def, nil, scope), t.Name, t)
+		head := r.project(r.namedType(def, t.Args, scope), t.Name, t)
 		return r.applyProjections(head, t.Projections, t)
 	}
 	r.reportUnknown(t, t.Namespace+"."+t.Name)

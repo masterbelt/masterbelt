@@ -1,12 +1,12 @@
 // This file is the field-type projection of the type resolver: T.member used in
 // type position, resolved to member's declared field type (Character.level →
-// Level, nominal identity preserved — §3 of the type-values design). Only a
-// declared field projects; an associated constant, static fn, or enum member is
-// a value, not a type. Resolution is lazy — a field's type is read from the
-// declaration's syntax when its body is not resolved yet — and guarded against
-// an ungrounded cyclic projection so a mutual reference with a concrete floor
-// (Item.level → Level) resolves while one without (A.x: B.x ⇄ B.x: A.x) is
-// rejected rather than looping (§5).
+// Level, nominal identity preserved). Only a declared field projects; an
+// associated constant, static fn, or enum member is a value, not a type.
+// Resolution is lazy — a field's type is read from the declaration's syntax when
+// its body is not resolved yet — and guarded against an ungrounded cyclic
+// projection so a mutual reference with a concrete floor (Item.level → Level)
+// resolves while one without (A.x: B.x ⇄ B.x: A.x) is rejected rather than
+// looping.
 
 package infer
 
@@ -58,17 +58,28 @@ func (r *TypeResolver) project(head ir.Type, member string, node ast.Node) ir.Ty
 		return ir.Invalid // the head already failed and was reported; do not cascade
 	}
 	def := r.projectionDef(head)
-	// A resolved record — a record alias's body, an anonymous record, or a
-	// master's row — yields the field's declared type directly.
+	ft := r.projectMember(head, def, member, node)
+	// A generic head instantiates the projected field type: Box<string>.value is
+	// string, not the unbound parameter T the field declares. The arguments map
+	// onto the definition's parameters and substitute through the field type.
+	if app, ok := head.(*ir.App); ok && def != nil && ft != ir.Invalid {
+		ft = types.Substitute(ft, appSubst(def, app))
+	}
+	return ft
+}
+
+// projectMember resolves member's declared field type off head, before any
+// generic substitution: from a resolved record (a record alias's body, an
+// anonymous record, a master's row, or a generic definition's body), or — for a
+// forward or mutual reference whose body is not resolved yet — from the
+// declaration's syntax, guarded against an ungrounded cycle.
+func (r *TypeResolver) projectMember(head ir.Type, def *ir.TypeDef, member string, node ast.Node) ir.Type {
 	if rec := resolvedRecord(head, def); rec != nil {
 		if f := fieldNamed(rec, member); f != nil {
 			return f.Type
 		}
 		return r.failedProjection(node, head, def, member, true)
 	}
-	// A declared type whose body is not resolved yet — a forward or mutual
-	// reference reached mid-pass: resolve the one field's type from the
-	// declaration's syntax, guarded so a cycle with no grounding type is caught.
 	if def != nil {
 		if fieldType, ok := recordFieldSyntax(def, member); ok {
 			return r.projectThroughSyntax(def, member, fieldType, node)
@@ -78,6 +89,19 @@ func (r *TypeResolver) project(head ir.Type, member string, node ast.Node) ir.Ty
 		}
 	}
 	return r.failedProjection(node, head, def, member, false)
+}
+
+// appSubst maps a generic application's arguments onto the definition's
+// parameters — the substitution that instantiates a projected field type
+// (Box<string> binds T = string).
+func appSubst(def *ir.TypeDef, app *ir.App) map[string]ir.Type {
+	subst := make(map[string]ir.Type, len(def.Params))
+	for i, p := range def.Params {
+		if i < len(app.Args) {
+			subst[p.Name] = app.Args[i]
+		}
+	}
+	return subst
 }
 
 // projectThroughSyntax resolves member's field type from def's declaration
@@ -141,15 +165,21 @@ func (r *TypeResolver) projectionDef(t ir.Type) *ir.TypeDef {
 
 // resolvedRecord returns the resolved record a head projects fields from — an
 // anonymous record, a record alias's body (through any chain of named aliases),
-// or a master's row — or nil when the head is not a (resolved) record. A nil
-// return is either a fieldless type or a body not resolved yet; project tells
-// them apart through the declaration syntax.
+// a generic application's record body (its field types still parameterised, to
+// be substituted by the caller), or a master's row — or nil when the head is not
+// a (resolved) record. A nil return is either a fieldless type or a body not
+// resolved yet; project tells them apart through the declaration syntax.
 func resolvedRecord(head ir.Type, def *ir.TypeDef) *ir.Record {
 	if rec := recordOf(head); rec != nil {
 		return rec
 	}
-	if def != nil && def.Master != nil {
-		return recordOf(def.Master.Row)
+	if def != nil {
+		if rec, ok := def.Body.(*ir.Record); ok {
+			return rec // a generic application's record body (App head)
+		}
+		if def.Master != nil {
+			return recordOf(def.Master.Row)
+		}
 	}
 	return nil
 }

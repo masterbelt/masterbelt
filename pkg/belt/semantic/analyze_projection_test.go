@@ -8,8 +8,19 @@ package semantic
 import (
 	"testing"
 
+	"github.com/masterbelt/masterbelt/pkg/diagnostic"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
 )
+
+// diagWith returns the first diagnostic of the given code, or a zero value.
+func diagWith(diags []diagnostic.Diagnostic, code diagnostic.Code) diagnostic.Diagnostic {
+	for _, d := range diags {
+		if d.Code == code {
+			return d
+		}
+	}
+	return diagnostic.Diagnostic{}
+}
 
 // fieldType returns the resolved type of field in the named record-aliased type
 // of the module, or nil when the type or field is absent.
@@ -115,12 +126,36 @@ func TestTypeProjectionTypeHasNoFields(t *testing.T) {
 }
 
 func TestTypeProjectionUnknownField(t *testing.T) {
-	// Item is a record, but it has no field named bogus.
+	// Item is a record, but it has no field named bogus. The diagnostic reads
+	// "Item has no field bogus": the receiver type fills {typ}, the missing field
+	// fills {field} — not the reverse.
 	src := "pub type Item = { id: long }\n" +
 		"pub type T = { z: Item.bogus }\n"
 	_, diags := analyze(src)
-	if !hasCode(diags, CodeUnknownField) {
+	d := diagWith(diags, CodeUnknownField)
+	if d.Code != CodeUnknownField {
 		t.Fatalf("want unknown_field, got %v", codes(diags))
+	}
+	if got := d.Fields["typ"].String(); got != "Item" {
+		t.Errorf("unknown_field typ = %q, want Item", got)
+	}
+	if got := d.Fields["field"].String(); got != "bogus" {
+		t.Errorf("unknown_field field = %q, want bogus", got)
+	}
+}
+
+func TestTypeProjectionGenericInstantiation(t *testing.T) {
+	// A generic head instantiates the projected field type: Box<string>.value is
+	// string, not the unbound parameter T the field declares — the arguments are
+	// applied, not dropped.
+	src := "pub type Box<T> = { value: T }\n" +
+		"pub type S = { v: Box.value<string> }\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("want clean, got %v", codes(diags))
+	}
+	if got := fieldType(m, "S", "v"); got == nil || got.String() != "string" {
+		t.Fatalf("S.v = %v, want string (Box<string>.value), not the unbound T", got)
 	}
 }
 

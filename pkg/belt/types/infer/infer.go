@@ -515,7 +515,7 @@ func typeMemberType(universe map[string]*ir.TypeDef, m *ast.MemberExpr) ir.Type 
 		}
 	case types.MemberNone, types.MemberStatic:
 		// A declared field projected in value position (Character.level) is a type
-		// value, whose own type is the metatype `type` — the value half of the §3
+		// value, whose own type is the metatype `type` — the value half of the
 		// field-type projection, which a comptime test (assert Character.id == long)
 		// consumes. A static fn read without a call falls through to the record-
 		// field reading, as before.

@@ -1,4 +1,4 @@
-// These tests pin the storage rule (§4): a type value is comptime-only and may
+// These tests pin the storage rule: a type value is comptime-only and may
 // not be stored, so a const, let, record field, function parameter, or result
 // whose type is the metatype `type` is type_in_value_position. This is also
 // where the 0001 const reification (const x = sbyte) is withdrawn — it is now an
@@ -59,6 +59,28 @@ func TestSlotLetMetatype(t *testing.T) {
 	_, diags := analyze(src)
 	if !hasCode(diags, CodeTypeInValuePosition) {
 		t.Fatalf("want type_in_value_position, got %v", codes(diags))
+	}
+}
+
+func TestLetProjectionErrorReported(t *testing.T) {
+	// A failed field-type projection in a let annotation surfaces its diagnostic,
+	// the same as in a type or const annotation — not a silent Invalid.
+	src := "pub type Item = { id: long }\n" +
+		"pub fn f(): nint {\n  let x: Item.nope = 1\n  return x\n}\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeUnknownField) {
+		t.Fatalf("want unknown_field in let annotation, got %v", codes(diags))
+	}
+}
+
+func TestFuncSignatureProjectionErrorReported(t *testing.T) {
+	// A failed field-type projection in a function parameter surfaces its
+	// diagnostic, the same as in a type or const annotation.
+	src := "pub type Item = { id: long }\n" +
+		"pub fn f(x: Item.nope): nint {\n  return 0\n}\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeUnknownField) {
+		t.Fatalf("want unknown_field in function signature, got %v", codes(diags))
 	}
 }
 

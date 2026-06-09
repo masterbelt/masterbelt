@@ -110,7 +110,9 @@ func projectionErrorReporter(at func(ast.Node) span, diags *diagnostic.List) fun
 		case infer.ProjNoFields:
 			diags.Add(newTypeHasNoFieldsDiagnostic(s.offset, s.width, typ.String(), member))
 		case infer.ProjUnknownField:
-			diags.Add(newUnknownFieldDiagnostic(s.offset, s.width, typ.String(), member))
+			// unknown_field is "{typ} has no field {field}": the receiver type is
+			// typ, the missing field is member.
+			diags.Add(newUnknownFieldDiagnostic(s.offset, s.width, member, typ.String()))
 		case infer.ProjCyclic:
 			diags.Add(newCyclicTypeProjectionDiagnostic(s.offset, s.width, typ.String(), member))
 		}
@@ -868,7 +870,7 @@ func resolveDecl(r *infer.TypeResolver, reg *builtin.Registry, td *ast.TypeDecl,
 	for _, m := range td.Methods {
 		rm := resolveMethod(r, reg, &ir.Named{Def: def}, m, scope, fns)
 		// A method parameter or result may not be a type value (fn f(t: type) — the
-		// "no type-value functions" half of the storage rule, §4).
+		// "no type-value functions" half of the storage rule).
 		reportMetatypeSlot(at, diags, m, sigType(rm.Params, rm.Result))
 		key := rm.Name + signatureKey(def, rm)
 		if m.Name != "" && seen[key] {
