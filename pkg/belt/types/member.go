@@ -1,9 +1,9 @@
 // This file is the single type-member resolver: T.member classified against a
 // type's one member namespace. The value lowering, the type checker, and the
 // reference diagnostics all read a member through ResolveMember, so exactly one
-// member resolution exists (type-values.md §2) — the separate enum-member,
-// associated-constant, and static-fn lookups the layers used to each carry are
-// gone, folded into this one classifier.
+// member resolution exists — the separate enum-member, associated-constant, and
+// static-fn lookups the layers used to each carry are gone, folded into this one
+// classifier.
 
 package types
 
@@ -36,8 +36,9 @@ type Member struct {
 // ResolveMember classifies name against def's single member namespace — the one
 // place T.member is resolved, shared by the value lowering, the type checker, and
 // the reference diagnostics. An enum member, an associated constant, and a static
-// fn are the three member kinds, in that precedence; the design forbids a
-// collision across them, so the precedence never hides a second meaning. A name
+// fn are the three member kinds, in that precedence; a collision across them is
+// rejected at the declaration site, so the precedence never hides a second
+// meaning. A name
 // matching none (or a nil def) is MemberNone, which the read path takes as a
 // record-field access and the call path as a missing static fn.
 func ResolveMember(def *ir.TypeDef, name string) Member {

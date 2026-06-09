@@ -2,10 +2,9 @@
 // immutable, side-effect-free, of the builtin type `type` (the metatype, with
 // type : type). A bare type name reifies to one (const t = sbyte), and the
 // `type` keyword names the metatype as a value. Type values exist only at
-// compile time: they fold and are gone before any runtime. This is the basis the
-// masterdata layer is rebuilt on (a master is a type value with a master
-// descriptor); 0001 lands the representation, member resolution unifies onto it,
-// and the projections (Character.level, generics) come in the slices after.
+// compile time: they fold and are gone before any runtime. They are the basis a
+// master is built on — a master is a type value carrying a master descriptor —
+// and the foundation that type projections and generics resolve against.
 
 /// A character level, a nominal alias the schema shares.
 pub type Level = sbyte
@@ -38,6 +37,6 @@ pub type Schema = {
   type: type,
 }
 
-/// A type-to-type mapping whose parameter is literally named `type` — the
-/// shape a generic (a comptime type function) takes in a later slice.
+/// A type-to-type mapping whose parameter is literally named `type` — the shape
+/// a generic, a comptime type function, takes.
 pub type Remap = fn(type: type): type

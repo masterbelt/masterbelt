@@ -195,7 +195,7 @@ Module
       Name: "Remap"
       Anchor: "belt:/Remap"
       Public: true
-      Doc: "A type-to-type mapping whose parameter is literally named `type` — the" "shape a generic (a comptime type function) takes in a later slice."
+      Doc: "A type-to-type mapping whose parameter is literally named `type` — the shape" "a generic, a comptime type function, takes."
       Params: ~
       Body: Func
         Params:

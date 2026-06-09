@@ -266,7 +266,7 @@ func equalFuncs(a, b *Constant) bool {
 // the equality a ConstType compares by. It is the type-value twin of tagsEqual:
 // identity by the Named's definition or the Builtin's name (a primitive int8, a
 // nominal Level), with pointer identity the conservative fallback for the
-// structural forms a 0001 type value does not yet take.
+// structural forms a type value does not yet reify.
 func typeValuesEqual(a, b Type) bool { return tagsEqual(a, b) }
 
 // tagsEqual reports whether two union tags denote the same member. A tag is the

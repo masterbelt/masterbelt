@@ -76,7 +76,7 @@ File
       Consts: ~
       Impls: ~
     TypeDecl
-      Doc: "A type-to-type mapping whose parameter is literally named `type` — the" "shape a generic (a comptime type function) takes in a later slice."
+      Doc: "A type-to-type mapping whose parameter is literally named `type` — the shape" "a generic, a comptime type function, takes."
       Public: true
       Name: "Remap"
       Params: ~
