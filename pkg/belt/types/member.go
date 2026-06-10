@@ -150,12 +150,24 @@ func ReadableMemberType(reg *builtin.Registry, recv ir.Type, name string) (ir.Ty
 	if t, ok := fieldMemberType(recv, name); ok {
 		return t, true
 	}
-	if reg != nil {
+	// A getter on a bare generic (Box<T>, no application supplying arguments) would
+	// read the free parameter T, so it is not projectable here — the getter twin of
+	// FieldProjection's bare-generic guard. An application instantiates it via the
+	// type-position path instead.
+	if reg != nil && !isBareGeneric(recv) {
 		if t, ok := GetterResultType(reg, recv, name); ok {
 			return t, true
 		}
 	}
 	return nil, false
+}
+
+// isBareGeneric reports whether recv is a generic type used without arguments — a
+// Named whose definition takes type parameters — so a member off it would leak a
+// free parameter rather than a concrete type.
+func isBareGeneric(recv ir.Type) bool {
+	n, ok := recv.(*ir.Named)
+	return ok && n.Def != nil && len(n.Def.Params) > 0
 }
 
 // fieldMemberType returns the type of a record field of recv, with the same

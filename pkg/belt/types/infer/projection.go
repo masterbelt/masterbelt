@@ -270,11 +270,12 @@ func isGenericDef(def *ir.TypeDef) bool {
 // a fieldless receiver is type_has_no_fields.
 func (r *TypeResolver) failedProjection(node ast.Node, head ir.Type, def *ir.TypeDef, member string, hasFields bool) ir.Type {
 	switch {
-	case def != nil && (types.ResolveMember(def, member).Kind != types.MemberNone || hasMethodNamed(def, member)):
+	case def != nil && (types.ResolveMember(def, member).Kind != types.MemberNone || r.hasMethodMember(head, member)):
 		// A value member, not a type: an enum member, associated constant, or
-		// static fn (ResolveMember), or a plain method/setter (hasMethodNamed). A
-		// getter is a readable member and was already projected, so it does not
-		// reach here; what remains is a member that is a value, not a type.
+		// static fn (ResolveMember), or a plain method/setter (hasMethodMember,
+		// which follows inheritance too). A getter is a readable member and was
+		// already projected, so it does not reach here; what remains is a member
+		// that is a value, not a type.
 		r.reportProjection(node, ProjMemberNotType, head, member)
 	case hasFields:
 		r.reportProjection(node, ProjUnknownField, head, member)
@@ -284,22 +285,25 @@ func (r *TypeResolver) failedProjection(node ast.Node, head ir.Type, def *ir.Typ
 	return ir.Invalid
 }
 
-// hasMethodNamed reports whether def declares a method of the given name (of any
-// kind) — used to classify a projected non-field, non-getter member as a value
-// (member_is_not_a_type) rather than an unknown field.
-func hasMethodNamed(def *ir.TypeDef, name string) bool {
-	for _, m := range def.Methods {
-		if m.Name == name {
-			return true
-		}
+// hasMethodMember reports whether head has a callable method of the given name —
+// declared directly or inherited — used to classify a projected non-field,
+// non-getter member as a value (member_is_not_a_type) rather than an unknown
+// field. It reads the registry-backed method lookup, so an inherited method is
+// classified the same as a directly-declared one.
+func (r *TypeResolver) hasMethodMember(head ir.Type, name string) bool {
+	if r.Registry == nil {
+		return false
 	}
-	return false
+	_, _, ok := types.Candidates(r.Registry, head, name)
+	return ok
 }
 
 // projectReadable returns a getter projection off head when member names a
 // getter — the second readable member, tried after the field paths in project
-// did not match — and otherwise reports the field-projection failure. So a
-// getter projects to its result type, while a method or unknown name falls to
+// did not match — and otherwise reports the field-projection failure. A getter
+// on a type declared later (a forward reference whose methods are not attached
+// yet) is read from the declaration syntax, mirroring the field forward path. So
+// a getter projects to its result type, while a method or unknown name falls to
 // the right diagnostic.
 func (r *TypeResolver) projectReadable(head ir.Type, def *ir.TypeDef, member string, node ast.Node, hasFields bool) ir.Type {
 	if r.Registry != nil {
@@ -307,7 +311,34 @@ func (r *TypeResolver) projectReadable(head ir.Type, def *ir.TypeDef, member str
 			return t
 		}
 	}
+	if def != nil {
+		if result, isSelf, ok := getterResultSyntax(def, member); ok {
+			if isSelf {
+				return head // a self-returning getter projects the receiver
+			}
+			return r.projectThroughSyntax(def, member, result, node)
+		}
+	}
 	return r.failedProjection(node, head, def, member, hasFields)
+}
+
+// getterResultSyntax returns the declared result type of a getter named member
+// in def's declaration syntax — for the forward reference where the getter's
+// method is not attached to the resolved def yet — and whether that result is the
+// self type. ok is false when def's syntax declares no getter of that name.
+func getterResultSyntax(def *ir.TypeDef, member string) (ast.TypeExpr, bool, bool) {
+	if def.Syntax == nil {
+		return nil, false, false
+	}
+	for _, m := range def.Syntax.Methods {
+		if m.Kind == ast.MethodGetter && m.Name == member {
+			if nt, ok := m.Result.(*ast.NamedType); ok && nt.Namespace == "" && nt.Name == selfTypeName {
+				return m.Result, true, true
+			}
+			return m.Result, false, true
+		}
+	}
+	return nil, false, false
 }
 
 func (r *TypeResolver) reportProjection(node ast.Node, kind ProjectionErrorKind, typ ir.Type, member string) {

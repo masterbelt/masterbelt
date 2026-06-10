@@ -89,3 +89,55 @@ func TestMethodStillNotAType(t *testing.T) {
 		t.Fatalf("want member_is_not_a_type, got %v", codes(diags))
 	}
 }
+
+func TestGetterProjectionBareGenericRejected(t *testing.T) {
+	// A getter on a bare generic has no application to instantiate, so projecting
+	// it in value position is rejected just as a field is — not reified as the free
+	// parameter T.
+	src := "pub type Box<T> = { v: T } impl {\n  pub get item(): T { return self.v }\n}\n" +
+		"assert Box.item == string\n"
+	_, diags := analyze(src)
+	if hasCode(diags, CodeAssertionFailed) || len(diags) == 0 {
+		t.Fatalf("want the projection rejected (not a free-T reification), got %v", codes(diags))
+	}
+}
+
+func TestGetterProjectionForwardReference(t *testing.T) {
+	// A getter on a type declared after the projecting alias resolves through the
+	// declaration syntax, exactly as a forward field projection does.
+	src := "pub type L = Item.level\n" +
+		"pub type Item = { n: nint } impl {\n  pub get level(): long { return self.n }\n}\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("want clean (forward getter projection), got %v", codes(diags))
+	}
+	for _, def := range m.Types {
+		if def.Name == "L" && (def.Body == nil || def.Body.String() != "long") {
+			t.Fatalf("L = %v, want long (forward Item.level getter)", def.Body)
+		}
+	}
+}
+
+func TestGetterProjectionOnEnum(t *testing.T) {
+	// A getter on an enum is a readable member too: projecting it in value position
+	// is the getter's result type, not an unknown enum member.
+	src := "pub enum R { A } impl {\n  pub get code(): long { return 0 }\n}\n" +
+		"assert R.code == long\n"
+	_, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("want clean (enum getter projection), got %v", codes(diags))
+	}
+}
+
+func TestInheritedMethodNotAType(t *testing.T) {
+	// A method reached through a nominal alias (inherited, not declared directly on
+	// the alias) is a value member, not a type: member_is_not_a_type, the same as a
+	// directly-declared method.
+	src := "pub type Base = sbyte impl {\n  pub fn calc(): nint { return 1 }\n}\n" +
+		"pub type Alias = Base\n" +
+		"pub type X = Alias.calc\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeMemberIsNotAType) {
+		t.Fatalf("want member_is_not_a_type (inherited method), got %v", codes(diags))
+	}
+}
