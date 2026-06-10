@@ -1,0 +1,233 @@
+name: codex-review-gate
+
+# Mechanises the Codex review status into a merge blocker.
+#
+# Single source of truth: every trigger calls the same idempotent `reconcile`,
+# which recomputes the FULL desired state from current facts and converges the
+# PR's label, the `codex-review` check run, and one sticky status comment to it.
+# It never does incremental add/remove, so contradictory states cannot arise.
+#
+# State precedence (first match wins), per PR, against the current head SHA:
+#   1. draft/closed         -> clear our labels (check left pending; drafts can't merge)
+#   2. approved & 0 open     -> accepted   (check success = the ONLY unblock)
+#   3. open conversations    -> reviewed   (check action_required; ask to fix/reply/resolve)
+#   4. eyes reaction         -> in review  (check in_progress = blocked)
+#   5. otherwise (initial)   -> neutral    (no label; check in_progress = blocked, fail-closed)
+# where, for the bot chatgpt-codex-connector[bot]:
+#   approved = a `+1` body reaction created AFTER the head commit (stale +1 ignored),
+#   open     = unresolved review threads on the PR,
+#   eyes     = a `eyes` body reaction exists.
+#
+# Reactions have no webhook trigger, so a light `schedule` poll reconciles open
+# non-draft PRs to catch the `eyes` (-> in review) and the `+1` (-> accepted),
+# which Codex emits as reactions only (verified: its approve is never an
+# APPROVED review). Events handle the findings/resolution transitions promptly.
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review, converted_to_draft, synchronize]
+  pull_request_review:
+    types: [submitted, dismissed, edited]
+  pull_request_review_comment:
+    types: [created, edited, deleted]
+  pull_request_review_thread:
+    types: [resolved, unresolved]
+  schedule:
+    - cron: '*/10 * * * *'
+
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: codex-review-gate-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const BOT = 'chatgpt-codex-connector[bot]';
+            const CHECK = 'codex-review';
+            const MARKER = '<!-- codex-review-gate -->';
+            const LABELS = {
+              in_review: 'codex: in review',
+              reviewed:  'codex: reviewed',
+              accepted:  'codex: accepted',
+            };
+            const OUR_LABELS = Object.values(LABELS);
+            const COLORS = {
+              'codex: in review': 'fbca04',
+              'codex: reviewed':  'd93f0b',
+              'codex: accepted':  '0e8a16',
+            };
+            const { owner, repo } = context.repo;
+
+            // Create the label if missing; tolerate the concurrent-create race
+            // (422 = already exists). Never overwrites an existing label, so a
+            // pre-created colour/description is preserved.
+            async function ensureLabel(name) {
+              try {
+                await github.rest.issues.createLabel({ owner, repo, name, color: COLORS[name] || 'ededed' });
+              } catch (e) {
+                if (e.status !== 422) throw e;
+              }
+            }
+
+            // Count unresolved review threads (all authors = GitHub's native
+            // "conversation" semantics). To gate on Codex threads only, filter
+            // by t.comments.nodes[0].author.login === BOT.
+            async function countOpenConversations(number) {
+              let cursor = null, open = 0;
+              for (;;) {
+                const q = `query($owner:String!,$repo:String!,$number:Int!,$cursor:String){
+                  repository(owner:$owner,name:$repo){ pullRequest(number:$number){
+                    reviewThreads(first:100, after:$cursor){
+                      nodes{ isResolved comments(first:1){ nodes{ author{ login } } } }
+                      pageInfo{ hasNextPage endCursor } } } } }`;
+                const r = await github.graphql(q, { owner, repo, number, cursor });
+                const tt = r.repository.pullRequest.reviewThreads;
+                for (const t of tt.nodes) { if (!t.isResolved) open++; }
+                if (!tt.pageInfo.hasNextPage) break;
+                cursor = tt.pageInfo.endCursor;
+              }
+              return open;
+            }
+
+            async function upsertCheck(headSha, m) {
+              const found = await github.paginate(github.rest.checks.listForRef, {
+                owner, repo, ref: headSha, check_name: CHECK, per_page: 100,
+              });
+              const output = { title: m.title, summary: m.summary };
+              if (found.length) {
+                const payload = { owner, repo, check_run_id: found[0].id, status: m.status, output };
+                if (m.conclusion) payload.conclusion = m.conclusion;
+                await github.rest.checks.update(payload);
+              } else {
+                const payload = { owner, repo, name: CHECK, head_sha: headSha, status: m.status, output };
+                if (m.conclusion) payload.conclusion = m.conclusion;
+                await github.rest.checks.create(payload);
+              }
+            }
+
+            async function setLabel(number, desired) {
+              const cur = (await github.rest.issues.listLabelsOnIssue({
+                owner, repo, issue_number: number, per_page: 100,
+              })).data.map(l => l.name);
+              for (const l of OUR_LABELS) {
+                if (cur.includes(l) && l !== desired) {
+                  await github.rest.issues.removeLabel({ owner, repo, issue_number: number, name: l }).catch(() => {});
+                }
+              }
+              if (desired && !cur.includes(desired)) {
+                await ensureLabel(desired);
+                await github.rest.issues.addLabels({ owner, repo, issue_number: number, labels: [desired] });
+              }
+            }
+
+            async function upsertComment(number, body) {
+              const comments = await github.paginate(github.rest.issues.listComments, {
+                owner, repo, issue_number: number, per_page: 100,
+              });
+              const mine = comments.find(c => c.body && c.body.includes(MARKER));
+              if (body) {
+                if (mine) await github.rest.issues.updateComment({ owner, repo, comment_id: mine.id, body });
+                else await github.rest.issues.createComment({ owner, repo, issue_number: number, body });
+              } else if (mine) {
+                await github.rest.issues.deleteComment({ owner, repo, comment_id: mine.id });
+              }
+            }
+
+            async function reconcile(number) {
+              const pr = (await github.rest.pulls.get({ owner, repo, pull_number: number })).data;
+              const headSha = pr.head.sha;
+
+              // Inactive: draft or not open -> strip our labels & comment.
+              // Draft can't be merged anyway; keep the check pending (blocked).
+              if (pr.state !== 'open' || pr.draft) {
+                await setLabel(number, null);
+                await upsertComment(number, null);
+                if (pr.state === 'open' && pr.draft) {
+                  await upsertCheck(headSha, {
+                    status: 'in_progress',
+                    title: 'Draft — Codex gate paused',
+                    summary: 'Mark the PR ready for review to engage the Codex merge gate.',
+                  });
+                }
+                core.info(`PR #${number}: inactive (state=${pr.state}, draft=${pr.draft})`);
+                return;
+              }
+
+              const headTime = new Date(
+                (await github.rest.repos.getCommit({ owner, repo, ref: headSha })).data.commit.committer.date
+              );
+
+              const reactions = await github.paginate(github.rest.reactions.listForIssue, {
+                owner, repo, issue_number: number, per_page: 100,
+              });
+              const botR = reactions.filter(x => x.user && x.user.login === BOT);
+              const approved = botR.some(x => x.content === '+1' && new Date(x.created_at) > headTime);
+              const eyed = botR.some(x => x.content === 'eyes');
+              const open = await countOpenConversations(number);
+
+              let state;
+              if (approved && open === 0) state = 'accepted';
+              else if (open > 0) state = 'reviewed';
+              else if (eyed) state = 'in_review';
+              else state = 'neutral';
+
+              const checkByState = {
+                accepted: {
+                  status: 'completed', conclusion: 'success',
+                  title: 'Codex approved',
+                  summary: 'Codex approved (+1) and every conversation is resolved.',
+                },
+                reviewed: {
+                  status: 'completed', conclusion: 'action_required',
+                  title: `${open} open conversation(s)`,
+                  summary: 'Fix or reply to each Codex finding, resolve the thread, then let Codex re-approve (+1).',
+                },
+                in_review: {
+                  status: 'in_progress',
+                  title: 'Codex review in progress',
+                  summary: 'Codex is reviewing, or its approval (+1) is still pending. If you resolved every conversation without pushing a fix, comment "@codex review" so Codex can re-approve. Merge stays blocked until the +1 lands.',
+                },
+                neutral: {
+                  status: 'in_progress',
+                  title: 'Awaiting Codex review',
+                  summary: 'Trigger Codex (e.g. comment "@codex review"). Merge stays blocked until Codex approves (+1).',
+                },
+              };
+
+              const commentByState = {
+                accepted: `${MARKER}\n### 🟢 Codex: accepted\nApproved (\`+1\`) かつ全 conversation 解決済み。マージ可能です。`,
+                reviewed: `${MARKER}\n### 🟠 Codex: changes requested\n未解決の conversation が **${open}** 件あります。各スレッドを **修正、あるいはレビューへ返答** したうえで resolve してください。\n全 resolve かつ Codex の \`+1\` でマージブロックが解除されます。`,
+                in_review: null,
+                neutral: null,
+              };
+
+              await setLabel(number, LABELS[state] || null);
+              await upsertCheck(headSha, checkByState[state]);
+              await upsertComment(number, commentByState[state]);
+              core.info(`PR #${number}: state=${state} (approved=${approved}, open=${open}, eyed=${eyed})`);
+            }
+
+            // Driver: one PR for PR-scoped events, all open non-draft PRs on cron.
+            let numbers = [];
+            if (context.payload.pull_request) {
+              numbers = [context.payload.pull_request.number];
+            } else {
+              const prs = await github.paginate(github.rest.pulls.list, {
+                owner, repo, state: 'open', per_page: 100,
+              });
+              numbers = prs.filter(p => !p.draft).map(p => p.number);
+            }
+            for (const n of numbers) {
+              try { await reconcile(n); }
+              catch (e) { core.warning(`PR #${n}: ${e.message}`); }
+            }
