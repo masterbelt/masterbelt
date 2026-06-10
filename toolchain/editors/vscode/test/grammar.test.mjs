@@ -65,6 +65,10 @@ test('grammar assigns the expected scopes', async () => {
     'const Twice = fn(x) -> x',
     'const Release = D2009-03-31T23:59:59.000Z',
     'const Cooldown = 3w4d5h6m7s8ms',
+    'pub type Schema = { match: long }',
+    'const probe = value.of',
+    'pub fn scan(for: long): long -> 0',
+    'const Choice = c ? false : true',
   ].join('\n');
   const lines = tokenize(grammar, source);
 
@@ -83,6 +87,9 @@ test('grammar assigns the expected scopes', async () => {
     ['=', 'keyword.operator'],
     [':', 'keyword.operator'],
     ['->', 'keyword.operator'],
+    // A value keyword before a ":" is a ternary/map value, not a name, so it
+    // keeps its keyword colour (the name-position suppression must not reach it).
+    ['false', 'keyword.control'],
   ];
 
   for (const [substr, want] of cases) {
@@ -94,8 +101,11 @@ test('grammar assigns the expected scopes', async () => {
   }
 
   // Identifiers carry no grammar scope of their own: whether one is a type,
-  // a reference, or a declaration name is not a lexical fact.
-  for (const substr of ['MyConst', 'long']) {
+  // a reference, or a declaration name is not a lexical fact. A reserved word
+  // read as a name — a record field before ":", a member or projection after
+  // ".", a parameter before ":" — is likewise left uncoloured at cold start (the
+  // server's semantic tokens colour it by its role), not painted a keyword.
+  for (const substr of ['MyConst', 'long', 'match', 'of', 'for']) {
     const scopes = scopesOf(lines, substr);
     assert.deepEqual(
       scopes,

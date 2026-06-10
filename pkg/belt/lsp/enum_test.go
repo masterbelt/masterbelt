@@ -94,13 +94,13 @@ func TestEnumDocumentSymbols(t *testing.T) {
 
 func TestEnumSemanticTokens(t *testing.T) {
 	// The enum's declared name colours as a type; its members as enum members.
-	if ty, mods, ok := classifyToken(token.Ident, cst.EnumDecl, false); !ok || ty != stType || mods&smDeclaration == 0 {
+	if ty, mods, ok := classifyToken(token.Ident, cst.EnumDecl, false, false); !ok || ty != stType || mods&smDeclaration == 0 {
 		t.Errorf("enum name token = (%d, %d, %v), want type with declaration", ty, mods, ok)
 	}
-	if ty, mods, ok := classifyToken(token.Ident, cst.EnumMember, false); !ok || ty != stEnumMember || mods&smDeclaration == 0 {
+	if ty, mods, ok := classifyToken(token.Ident, cst.EnumMember, false, false); !ok || ty != stEnumMember || mods&smDeclaration == 0 {
 		t.Errorf("enum member token = (%d, %d, %v), want enumMember with declaration", ty, mods, ok)
 	}
-	if ty, _, ok := classifyToken(token.Enum, cst.EnumDecl, false); !ok || ty != stKeyword {
+	if ty, _, ok := classifyToken(token.Enum, cst.EnumDecl, false, false); !ok || ty != stKeyword {
 		t.Errorf("enum keyword token = (%d, %v), want keyword", ty, ok)
 	}
 }

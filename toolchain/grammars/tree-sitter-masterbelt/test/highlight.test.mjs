@@ -48,6 +48,12 @@ test('the default highlights.scm colours every category', () => {
     ['keyword', 'primary'],
     ['type', 'Skill'], // a master declaration's name
     ['property', 'id'], // a primary-key column
+    // Reserved words used as names colour as their role, not as the keyword: a
+    // record field / value-position member is a property, a type-position
+    // projection is a type, a parameter is a parameter.
+    ['property', 'match'], // a field named with a keyword, and the member s.match
+    ['type', 'of'], // the type-position projection Schema.of
+    ['variable.parameter', 'type'], // a parameter named with a keyword
   ];
 
   for (const [capture, text] of [...lexical, ...structural]) {

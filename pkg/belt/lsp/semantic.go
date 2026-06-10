@@ -178,21 +178,32 @@ func semanticTokensWith(doc *abstract.Document, isReadonlyConst, isFuncCallee, i
 	// its green node, and whether the parent is the callee member access of a
 	// call (which makes the member name a method). selfCallee says t itself is
 	// one, propagated to t's own children.
-	var walk func(t cst.Tree, parent cst.Kind, parentGreen *cst.Node, parentIsCallee, selfIsCallee bool)
-	walk = func(t cst.Tree, parent cst.Kind, parentGreen *cst.Node, parentIsCallee, selfIsCallee bool) {
+	var walk func(t cst.Tree, parent cst.Kind, parentGreen *cst.Node, parentIsCallee, selfIsCallee, typeNameSeg bool)
+	walk = func(t cst.Tree, parent cst.Kind, parentGreen *cst.Node, parentIsCallee, selfIsCallee, typeNameSeg bool) {
 		if leaf, ok := t.Token(); ok {
-			if raw, ok := classifySemanticLeaf(buf, t, leaf, parent, parentGreen, parentIsCallee, res); ok {
+			if raw, ok := classifySemanticLeaf(buf, t, leaf, parent, parentGreen, parentIsCallee, typeNameSeg, res); ok {
 				raws = append(raws, raw)
 			}
 			return
 		}
 		node, _ := t.Node()
 		callee := calleeMemberGreen(node, t)
+		// In a dotted type name the head is the first name token; every name
+		// token after it is a projection segment (Order.customer.id), which a
+		// keyword segment colours by its role rather than as a keyword.
+		headSeen := false
 		for _, child := range t.Children() {
-			walk(child, node.Kind(), node, selfIsCallee, callee != nil && child.Green() == callee)
+			seg := false
+			if node.Kind() == cst.TypeName {
+				if tok, isTok := child.Token(); isTok && isNameToken(tok.Kind()) {
+					seg = headSeen
+					headSeen = true
+				}
+			}
+			walk(child, node.Kind(), node, selfIsCallee, callee != nil && child.Green() == callee, seg)
 		}
 	}
-	walk(doc.Concrete().Tree(), cst.File, nil, false, false)
+	walk(doc.Concrete().Tree(), cst.File, nil, false, false, false)
 
 	return &protocol.SemanticTokens{Data: encodeSemanticTokens(raws)}
 }
@@ -209,8 +220,8 @@ type semanticResolution struct {
 // classifySemanticLeaf classifies a single leaf token into a raw semantic
 // token, layering the resolution-aware overrides over the lexical
 // classification and dropping anything uncoloured or spanning multiple lines.
-func classifySemanticLeaf(buf source.Buffer, t cst.Tree, leaf *cst.Token, parent cst.Kind, parentGreen *cst.Node, parentIsCallee bool, res semanticResolution) (rawSemanticToken, bool) {
-	tokenType, mods, ok := classifyToken(leaf.Kind(), parent, parentIsCallee)
+func classifySemanticLeaf(buf source.Buffer, t cst.Tree, leaf *cst.Token, parent cst.Kind, parentGreen *cst.Node, parentIsCallee, typeNameSeg bool, res semanticResolution) (rawSemanticToken, bool) {
+	tokenType, mods, ok := classifyToken(leaf.Kind(), parent, parentIsCallee, typeNameSeg)
 	if !ok {
 		return rawSemanticToken{}, false
 	}
@@ -296,15 +307,22 @@ func encodeSemanticTokens(raws []rawSemanticToken) []int {
 // kind, the kind of the node that contains it, and — for a member access —
 // whether that access is the callee of a call. ok is false for elements that
 // carry no colour (whitespace, newlines, EOF, illegal bytes).
-func classifyToken(kind token.Kind, parent cst.Kind, calleeMember bool) (tokenType, mods int, ok bool) {
+func classifyToken(kind token.Kind, parent cst.Kind, calleeMember, typeNameSeg bool) (tokenType, mods int, ok bool) {
 	switch kind {
 	case token.Const, token.Pub, token.Assert, token.Where, token.Type, token.Enum, token.Interface, token.Impl,
 		token.Fn, token.Return, token.Self, token.Null, token.Extern, token.Builtin,
 		token.Use, token.From, token.True, token.False,
 		token.Io, token.Async, token.Nondet, token.Await, token.Switch, token.Match, token.If, token.Else, token.Let,
 		token.For, token.Of, token.In:
-		// Every keyword, uniformly — the cold-start grammar colours the same
-		// set keyword.control, so the two layers cannot drift apart per word.
+		// A reserved word read as a name (the parser's nameLike: a member, a
+		// record field, a record-literal field, a parameter, or a type-position
+		// projection segment) colours as that name's role, not as the keyword — the
+		// same classification its identifier sibling would take. A bare type keyword
+		// (null/self/type as a TypeName head, not a projection segment) and every
+		// keyword elsewhere stay keyword.control, matching the cold-start grammar.
+		if isNamePosition(parent) || (parent == cst.TypeName && typeNameSeg) {
+			return classifyIdent(parent, calleeMember)
+		}
 		return stKeyword, 0, true
 	case token.LineComment, token.BlockComment, token.DocComment:
 		return stComment, 0, true
@@ -391,6 +409,28 @@ var identClasses = map[cst.Kind]identClass{
 	cst.LetStmt: {stVariable, smDeclaration},
 	// The declaration's own name.
 	cst.ConstDecl: {stVariable, smDeclaration | smReadonly},
+}
+
+// isNamePosition reports whether a node kind contains a reserved word used as a
+// name directly, by parent kind alone: a member access (the member is always the
+// keyword), a record field or record-literal field name, or a parameter name. A
+// type-position projection is the one ambiguous case — a TypeName holds both a
+// bare type keyword (null/self/type, the head) and a projection segment — so it
+// is decided by position, not here (see the typeNameSeg flag in classifyToken).
+func isNamePosition(parent cst.Kind) bool {
+	switch parent {
+	case cst.MemberExpr, cst.Field, cst.RecordField, cst.Param:
+		return true
+	default:
+		return false
+	}
+}
+
+// isNameToken reports whether a token can be a name segment of a dotted type
+// name — an identifier or a reserved word read as one — so the walk can tell a
+// TypeName's head from its projection segments.
+func isNameToken(kind token.Kind) bool {
+	return kind == token.Ident || kind.Keyword()
 }
 
 // classifyIdent colours an identifier leaf from the kind of node that contains
