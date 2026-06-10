@@ -57,5 +57,39 @@ File
   Enums: ~
   Interfaces: ~
   Funcs: ~
-  Asserts: ~
+  Asserts:
+    AssertDecl
+      Doc: "The same qualified type is equal to itself."
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: MemberExpr
+            Receiver: Identifier
+              Name: "geo"
+            Member: Identifier
+              Name: "Point"
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          MemberExpr
+            Receiver: Identifier
+              Name: "geo"
+            Member: Identifier
+              Name: "Point"
+    AssertDecl
+      Doc: "Two distinct qualified types are unequal, by nominal identity."
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: MemberExpr
+            Receiver: Identifier
+              Name: "geo"
+            Member: Identifier
+              Name: "Point"
+          Member: Identifier
+            Name: "neq"
+        Arguments:
+          MemberExpr
+            Receiver: Identifier
+              Name: "geo"
+            Member: Identifier
+              Name: "Line"
   Masters: ~

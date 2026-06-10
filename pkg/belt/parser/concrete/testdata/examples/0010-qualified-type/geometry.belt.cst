@@ -1,7 +1,7 @@
 # tree
 File
   TypeDecl
-    LineComment "// The exporter: a public type and two public constants."
+    LineComment "// The exporter: two public types and two public constants."
     Newline "\n"
     Newline "\n"
     DocComment "/// A 1-D coordinate."
@@ -16,6 +16,37 @@ File
     Whitespace " "
     TypeName
       Ident "int"
+  TypeDecl
+    Newline "\n"
+    DocComment "/// A segment between two coordinates — a distinct nominal type."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Type "type"
+    Whitespace " "
+    Ident "Line"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    RecordType
+      LBrace "{"
+      Whitespace " "
+      Field
+        From "from"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "int"
+      Comma ","
+      Whitespace " "
+      Field
+        Ident "to"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "int"
+      Whitespace " "
+      RBrace "}"
   ConstDecl
     Newline "\n"
     DocComment "/// The zero point every path starts from."

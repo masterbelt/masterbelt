@@ -1,0 +1,54 @@
+// Generic field-type projection. A field projected off a generic type is
+// instantiated: the type argument is substituted for the parameter through the
+// field's declared type, so Box<string>.value — written Box.value<string> in a
+// type position — is string. Four shapes resolve: a direct application, a
+// concrete alias of one, an applied generic-alias chain, and a forward
+// reference. Nominal identity survives substitution, and the projection is a
+// type — named in a type position or consumed by a comptime assert, never stored.
+
+/// A nominal alias, to show identity survives substitution.
+pub type Level = sbyte
+
+/// A one-field generic container, and a two-field generic pair.
+pub type Box<T> = { value: T }
+pub type Pair<A, B> = { first: A, second: B }
+
+// Type position: the projection carries its arguments, written after the
+// projected field, and instantiates the field's declared type.
+
+/// A direct application: Box<long>.value is long.
+pub type BoxedId = Box.value<long>
+
+/// Each argument of a multi-parameter generic substitutes positionally.
+pub type FirstColumn = Pair.first<Level, long>
+pub type SecondColumn = Pair.second<Level, long>
+
+/// Nominal identity survives: Box<Level>.value is the alias Level, not the sbyte
+/// it unwraps to.
+pub type BoxedLevel = Box.value<Level>
+
+/// An applied generic-alias chain composes substitutions: Crate<T> = Box<T>, so
+/// Crate.value<long> instantiates Crate<long>, then Box<long>, to long.
+pub type Crate<T> = Box<T>
+pub type CrateId = Crate.value<long>
+
+/// A forward reference: the generic is declared after the type projecting it, so
+/// the field type is read from its declaration syntax in its parameter scope,
+/// then the argument is substituted.
+pub type EarlyValue = Late.value<long>
+pub type Late<T> = { value: T }
+
+// Value position: a concrete alias bakes the argument into its body, so the
+// projection instantiates with no written arguments — a comptime type value an
+// assert consumes (a value position has no angle-bracket arguments).
+
+/// A concrete alias of an application, and one preserving a nominal argument.
+pub type StringBox = Box<string>
+pub type LevelBox = Box<Level>
+
+/// The instantiated field type, projected in value position through the alias.
+assert StringBox.value == string
+
+/// Nominal identity in value position: LevelBox.value is Level, not sbyte.
+assert LevelBox.value == Level
+assert LevelBox.value != sbyte

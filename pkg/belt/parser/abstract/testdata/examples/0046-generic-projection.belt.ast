@@ -1,0 +1,322 @@
+File
+  Uses: ~
+  Decls: ~
+  Types:
+    TypeDecl
+      Doc: "A nominal alias, to show identity survives substitution."
+      Public: true
+      Name: "Level"
+      Params: ~
+      Body: NamedType
+        Namespace: ""
+        Name: "sbyte"
+        Args: ~
+        Projections: ~
+      Where: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
+    TypeDecl
+      Doc: "A one-field generic container, and a two-field generic pair."
+      Public: true
+      Name: "Box"
+      Params:
+        TypeParam
+          Name: "T"
+          Constraint: ~
+      Body: RecordType
+        Fields:
+          FieldDef
+            Name: "value"
+            Type: NamedType
+              Namespace: ""
+              Name: "T"
+              Args: ~
+              Projections: ~
+      Where: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
+    TypeDecl
+      Doc: ~
+      Public: true
+      Name: "Pair"
+      Params:
+        TypeParam
+          Name: "A"
+          Constraint: ~
+        TypeParam
+          Name: "B"
+          Constraint: ~
+      Body: RecordType
+        Fields:
+          FieldDef
+            Name: "first"
+            Type: NamedType
+              Namespace: ""
+              Name: "A"
+              Args: ~
+              Projections: ~
+          FieldDef
+            Name: "second"
+            Type: NamedType
+              Namespace: ""
+              Name: "B"
+              Args: ~
+              Projections: ~
+      Where: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
+    TypeDecl
+      Doc: "A direct application: Box<long>.value is long."
+      Public: true
+      Name: "BoxedId"
+      Params: ~
+      Body: NamedType
+        Namespace: "Box"
+        Name: "value"
+        Args:
+          NamedType
+            Namespace: ""
+            Name: "long"
+            Args: ~
+            Projections: ~
+        Projections: ~
+      Where: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
+    TypeDecl
+      Doc: "Each argument of a multi-parameter generic substitutes positionally."
+      Public: true
+      Name: "FirstColumn"
+      Params: ~
+      Body: NamedType
+        Namespace: "Pair"
+        Name: "first"
+        Args:
+          NamedType
+            Namespace: ""
+            Name: "Level"
+            Args: ~
+            Projections: ~
+          NamedType
+            Namespace: ""
+            Name: "long"
+            Args: ~
+            Projections: ~
+        Projections: ~
+      Where: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
+    TypeDecl
+      Doc: ~
+      Public: true
+      Name: "SecondColumn"
+      Params: ~
+      Body: NamedType
+        Namespace: "Pair"
+        Name: "second"
+        Args:
+          NamedType
+            Namespace: ""
+            Name: "Level"
+            Args: ~
+            Projections: ~
+          NamedType
+            Namespace: ""
+            Name: "long"
+            Args: ~
+            Projections: ~
+        Projections: ~
+      Where: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
+    TypeDecl
+      Doc: "Nominal identity survives: Box<Level>.value is the alias Level, not the sbyte" "it unwraps to."
+      Public: true
+      Name: "BoxedLevel"
+      Params: ~
+      Body: NamedType
+        Namespace: "Box"
+        Name: "value"
+        Args:
+          NamedType
+            Namespace: ""
+            Name: "Level"
+            Args: ~
+            Projections: ~
+        Projections: ~
+      Where: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
+    TypeDecl
+      Doc: "An applied generic-alias chain composes substitutions: Crate<T> = Box<T>, so" "Crate.value<long> instantiates Crate<long>, then Box<long>, to long."
+      Public: true
+      Name: "Crate"
+      Params:
+        TypeParam
+          Name: "T"
+          Constraint: ~
+      Body: NamedType
+        Namespace: ""
+        Name: "Box"
+        Args:
+          NamedType
+            Namespace: ""
+            Name: "T"
+            Args: ~
+            Projections: ~
+        Projections: ~
+      Where: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
+    TypeDecl
+      Doc: ~
+      Public: true
+      Name: "CrateId"
+      Params: ~
+      Body: NamedType
+        Namespace: "Crate"
+        Name: "value"
+        Args:
+          NamedType
+            Namespace: ""
+            Name: "long"
+            Args: ~
+            Projections: ~
+        Projections: ~
+      Where: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
+    TypeDecl
+      Doc: "A forward reference: the generic is declared after the type projecting it, so" "the field type is read from its declaration syntax in its parameter scope," "then the argument is substituted."
+      Public: true
+      Name: "EarlyValue"
+      Params: ~
+      Body: NamedType
+        Namespace: "Late"
+        Name: "value"
+        Args:
+          NamedType
+            Namespace: ""
+            Name: "long"
+            Args: ~
+            Projections: ~
+        Projections: ~
+      Where: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
+    TypeDecl
+      Doc: ~
+      Public: true
+      Name: "Late"
+      Params:
+        TypeParam
+          Name: "T"
+          Constraint: ~
+      Body: RecordType
+        Fields:
+          FieldDef
+            Name: "value"
+            Type: NamedType
+              Namespace: ""
+              Name: "T"
+              Args: ~
+              Projections: ~
+      Where: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
+    TypeDecl
+      Doc: "A concrete alias of an application, and one preserving a nominal argument."
+      Public: true
+      Name: "StringBox"
+      Params: ~
+      Body: NamedType
+        Namespace: ""
+        Name: "Box"
+        Args:
+          NamedType
+            Namespace: ""
+            Name: "string"
+            Args: ~
+            Projections: ~
+        Projections: ~
+      Where: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
+    TypeDecl
+      Doc: ~
+      Public: true
+      Name: "LevelBox"
+      Params: ~
+      Body: NamedType
+        Namespace: ""
+        Name: "Box"
+        Args:
+          NamedType
+            Namespace: ""
+            Name: "Level"
+            Args: ~
+            Projections: ~
+        Projections: ~
+      Where: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
+  Enums: ~
+  Interfaces: ~
+  Funcs: ~
+  Asserts:
+    AssertDecl
+      Doc: "The instantiated field type, projected in value position through the alias."
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: MemberExpr
+            Receiver: Identifier
+              Name: "StringBox"
+            Member: Identifier
+              Name: "value"
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          Identifier
+            Name: "string"
+    AssertDecl
+      Doc: "Nominal identity in value position: LevelBox.value is Level, not sbyte."
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: MemberExpr
+            Receiver: Identifier
+              Name: "LevelBox"
+            Member: Identifier
+              Name: "value"
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          Identifier
+            Name: "Level"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: MemberExpr
+            Receiver: Identifier
+              Name: "LevelBox"
+            Member: Identifier
+              Name: "value"
+          Member: Identifier
+            Name: "neq"
+        Arguments:
+          Identifier
+            Name: "sbyte"
+  Masters: ~

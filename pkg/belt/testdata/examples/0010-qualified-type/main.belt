@@ -4,3 +4,13 @@ use geo from "geometry.belt"
 
 const start: geo.Point = geo.Origin
 const path: list<geo.Point> = [geo.Origin, geo.Unit]
+
+// A namespace-qualified type name is also a value: geo.Point used in value
+// position reifies to a type value, the qualified twin of a bare local type
+// name, so two qualified names compare by nominal identity with no field
+// projection. A comptime assert consumes the type value; it is never stored.
+
+/// The same qualified type is equal to itself.
+assert geo.Point == geo.Point
+/// Two distinct qualified types are unequal, by nominal identity.
+assert geo.Point != geo.Line
