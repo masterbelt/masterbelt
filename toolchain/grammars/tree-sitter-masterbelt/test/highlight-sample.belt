@@ -20,3 +20,11 @@ pub master Skill {
   record { id: nint }
   primary id
 }
+
+// Reserved words as names: record fields, a member, a type projection, and a
+// parameter — each colours as its role, not as the keyword.
+pub type Schema = { match: nint, of: nint }
+pub type OfType = Schema.of
+pub fn scan(s: Schema, type: nint): nint {
+  return s.match
+}

@@ -79,6 +79,12 @@
 (record_literal type: (identifier) @type)
 (value_ref (identifier) @variable)
 (member_expr member: (identifier) @property)
+(member_expr member: ["assert" "async" "await" "builtin" "const" "else" "enum" "extern" "false" "fn" "for" "from" "if" "impl" "in" "interface" "io" "let" "match" "nondet" "null" "of" "pub" "return" "self" "switch" "true" "type" "use" "where"] @property)
+(type_name ["assert" "async" "await" "builtin" "const" "else" "enum" "extern" "false" "fn" "for" "from" "if" "impl" "in" "interface" "io" "let" "match" "nondet" "null" "of" "pub" "return" "self" "switch" "true" "type" "use" "where"] @type)
+(field name: ["assert" "async" "await" "builtin" "const" "else" "enum" "extern" "false" "fn" "for" "from" "if" "impl" "in" "interface" "io" "let" "match" "nondet" "null" "of" "pub" "return" "self" "switch" "true" "type" "use" "where"] @property)
+(record_field name: ["assert" "async" "await" "builtin" "const" "else" "enum" "extern" "false" "fn" "for" "from" "if" "impl" "in" "interface" "io" "let" "match" "nondet" "null" "of" "pub" "return" "self" "switch" "true" "type" "use" "where"] @property)
+(param name: ["assert" "async" "await" "builtin" "const" "else" "enum" "extern" "false" "fn" "for" "from" "if" "impl" "in" "interface" "io" "let" "match" "nondet" "null" "of" "pub" "return" "self" "switch" "true" "type" "use" "where"] @variable.parameter)
 
 (call_expr callee: (value_ref (identifier) @function))
 (call_expr callee: (member_expr member: (identifier) @function.method))
+(call_expr callee: (member_expr member: ["assert" "async" "await" "builtin" "const" "else" "enum" "extern" "false" "fn" "for" "from" "if" "impl" "in" "interface" "io" "let" "match" "nondet" "null" "of" "pub" "return" "self" "switch" "true" "type" "use" "where"] @function.method))

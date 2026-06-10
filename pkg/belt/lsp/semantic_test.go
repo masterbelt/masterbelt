@@ -1,6 +1,7 @@
 package lsp
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/masterbelt/masterbelt/pkg/belt/parser/abstract"
@@ -653,6 +654,47 @@ func TestSemanticTokensEffects(t *testing.T) {
 		}
 		if tok.tokenType != stKeyword {
 			t.Errorf("%s = %+v, want keyword", tc.name, tok)
+		}
+	}
+}
+
+func TestSemanticTokensKeywordAsName(t *testing.T) {
+	// A reserved word used as a name colours as that name's role, not as the
+	// keyword: a record field and a value-position member are properties, a
+	// type-position projection is a type, and a parameter is a parameter — the
+	// editor's semantic tokens agree with the cold-start grammar.
+	src := "pub type Schema = { type: long }\n" +
+		"pub type Proj = Schema.type\n" +
+		"pub fn read(s: Schema): long { return s.type }\n" +
+		"pub fn g(for: long): long { return 0 }\n"
+	lines := strings.Split(src, "\n")
+	toks := decode(semanticTokens(abstract.NewDocument([]byte(src))).Data)
+	typeAt := func(line, char int) (int, bool) {
+		for _, tk := range toks {
+			if tk.line == line && tk.char == char {
+				return tk.tokenType, true
+			}
+		}
+		return 0, false
+	}
+	cases := []struct {
+		what       string
+		line, char int
+		want       int
+	}{
+		{"field name `type`", 0, strings.Index(lines[0], "type:"), stProperty},
+		{"type-position projection `type`", 1, strings.LastIndex(lines[1], "type"), stType},
+		{"value-position member `type`", 2, strings.LastIndex(lines[2], "type"), stProperty},
+		{"parameter name `for`", 3, strings.Index(lines[3], "for"), stParameter},
+	}
+	for _, c := range cases {
+		got, ok := typeAt(c.line, c.char)
+		if !ok {
+			t.Errorf("%s: no token at %d:%d", c.what, c.line, c.char)
+			continue
+		}
+		if got != c.want {
+			t.Errorf("%s at %d:%d = token type %d, want %d", c.what, c.line, c.char, got, c.want)
 		}
 	}
 }

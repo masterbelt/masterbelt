@@ -156,6 +156,45 @@ var overrideRules = []highlightRule{
 	{pattern: "(call_expr callee: (member_expr member: (identifier) %s))\n", category: catMethod},
 }
 
+// keywordAlternation is the tree-sitter node alternation matching any reserved
+// word used as a bare token — ["assert" "async" …] — for the name-position rules
+// below. The grammar reads a reserved word as a name (the _name rule) in member,
+// projection, field, and parameter positions, where it appears as the bare
+// keyword token rather than an identifier node; these rules recolour it.
+func keywordAlternation() string {
+	quoted := make([]string, 0, len(token.Keywords()))
+	for _, kw := range token.Keywords() {
+		quoted = append(quoted, fmt.Sprintf("%q", kw))
+	}
+	return "[" + strings.Join(quoted, " ") + "]"
+}
+
+// nameKeywordRules colour a reserved word used as a name as that name's role
+// rather than as the keyword: a member after "." is a property, a type-position
+// projection a type, a record field or record-literal field a property, and a
+// parameter a parameter — the _name positions of the grammar. They are emitted
+// after the keyword block so the role colour wins (later patterns win in
+// tree-sitter), the query twin of semantic.go classifying a keyword in a name
+// position by its parent.
+func nameKeywordRules(kw string) []highlightRule {
+	return []highlightRule{
+		{pattern: "(member_expr member: " + kw + " %s)\n", category: catProperty},
+		{pattern: "(type_name " + kw + " %s)\n", category: catType},
+		{pattern: "(field name: " + kw + " %s)\n", category: catProperty},
+		{pattern: "(record_field name: " + kw + " %s)\n", category: catProperty},
+		{pattern: "(param name: " + kw + " %s)\n", category: catParameter},
+	}
+}
+
+// keywordCalleeRules override a keyword-named member used as a call callee to a
+// method colour, emitted last so it wins over the property colour the
+// name-position member rule gives it — the keyword twin of overrideRules.
+func keywordCalleeRules(kw string) []highlightRule {
+	return []highlightRule{
+		{pattern: "(call_expr callee: (member_expr member: " + kw + " %s))\n", category: catMethod},
+	}
+}
+
 // writeRules renders each rule's pattern with the target's capture name for
 // the rule's category.
 func writeRules(b *strings.Builder, t tsTarget, rules []highlightRule) {
@@ -209,14 +248,19 @@ func buildHighlights(t tsTarget) string {
 	}
 	fmt.Fprintf(&b, "] %s\n\n", t.cap(catOperator))
 
-	// Declared names, then references, then the contextual overrides; later
-	// patterns win, so the overrides follow the general identifier rules. The
-	// blank lines between groups match the original hand-written layout.
+	// Declared names, then references, then the keyword-in-name-position rules,
+	// then the contextual overrides; later patterns win, so a reserved word used
+	// as a name takes its role colour over the keyword block above it, and a call
+	// callee takes the function/method colour over that. The blank lines between
+	// groups match the original hand-written layout.
+	kw := keywordAlternation()
 	writeRules(&b, t, declRules)
 	b.WriteString("\n")
 	writeRules(&b, t, refRules)
+	writeRules(&b, t, nameKeywordRules(kw))
 	b.WriteString("\n")
 	writeRules(&b, t, overrideRules)
+	writeRules(&b, t, keywordCalleeRules(kw))
 
 	return b.String()
 }

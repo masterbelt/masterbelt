@@ -223,14 +223,21 @@ func masterRules() ruleGroup {
 }
 
 // keywordPattern builds a word-bounded alternation of the language's keywords,
-// e.g. `\b(const|pub)\b`, from the single source of truth in package token.
+// e.g. `\b(const|pub)\b`, from the single source of truth in package token. A
+// reserved word read as a name is left uncoloured, the lexical approximation
+// TextMate makes for any name, so the server's semantic tokens colour it by its
+// role rather than the cold start mis-painting it a keyword: the lookbehind drops
+// a member or projection after "." (item.type, Schema.type) and the lookahead a
+// record field or parameter name before ":" ({ type: T }, fn(for: int)). The
+// approximation is one-sided — a keyword name not adjacent to "."/":" still
+// colours — but the server's tokens are authoritative and correct it on load.
 func keywordPattern() string {
 	kws := token.Keywords()
 	escaped := make([]string, len(kws))
 	for i, kw := range kws {
 		escaped[i] = regexp.QuoteMeta(kw)
 	}
-	return `\b(` + strings.Join(escaped, "|") + `)\b`
+	return `(?<!\.)\b(` + strings.Join(escaped, "|") + `)\b(?!\s*:)`
 }
 
 // --- language-configuration ---------------------------------------------------
