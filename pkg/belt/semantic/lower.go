@@ -304,6 +304,16 @@ func constRefFrom(q queries, file FileID) func(*ast.Identifier) *ir.Const {
 	}
 }
 
+// constShadowsFrom builds a body's const-shadowing predicate: whether a name
+// resolves to a top-level declaration — a const (or function) that shadows a
+// same-named namespace import in value position, so a qualified member off it
+// (geo.Item, geo.Item.id) is read as a value rather than reified as the imported
+// type. It is the body twin of the const initializer's resolve check, shared by
+// the type-check, effect, and pure-context body walks so they agree on shadowing.
+func constShadowsFrom(q queries, file FileID) func(*ast.Identifier) bool {
+	return func(id *ast.Identifier) bool { return q.resolve(file, id) != nil }
+}
+
 // nsConstRefFrom builds the nsConstRef channel over the queries, mirroring
 // constRefFrom for a namespace member access.
 func nsConstRefFrom(q queries, file FileID) func(*ast.MemberExpr) *ir.Const {

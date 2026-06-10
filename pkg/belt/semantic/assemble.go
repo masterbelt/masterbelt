@@ -521,10 +521,10 @@ func (a *assembler) resolveTypeDecls() {
 func (a *assembler) resolveFuncDecls() {
 	a.module.Funcs = resolveFuncs(a.file, a.at, a.diags, a.reg, a.q.universe(a.fileID), qualifiedFrom(a.q, a.imp), a.bfns)
 	bodyEnv := a.folder()
-	constShadows := func(id *ast.Identifier) bool { return a.q.resolve(a.fileID, id) != nil }
+	constShadows := constShadowsFrom(a.q, a.fileID)
 	checkMethodBodies(a.reg, a.module.Types, a.q.universe(a.fileID), qualifiedFrom(a.q, a.imp), a.funcs, a.qfns, constShadows, bodyEnv, bodySink(a.at, a.diags, a.reg, bodyEnv, a.res), a.at, a.diags)
 	checkFuncBodies(a.reg, a.file, a.q.universe(a.fileID), qualifiedFrom(a.q, a.imp), a.funcs, a.qfns, constShadows, bodyEnv, bodySink(a.at, a.diags, a.reg, bodyEnv, a.res), a.at, a.diags)
-	checkEffects(a.reg, a.file, a.module.Types, a.q.universe(a.fileID), qualifiedFrom(a.q, a.imp), a.funcs, a.qfns, a.at, a.diags)
+	checkEffects(a.reg, a.file, a.module.Types, a.q.universe(a.fileID), qualifiedFrom(a.q, a.imp), a.funcs, a.qfns, constShadows, a.at, a.diags)
 }
 
 // checkAssocConstRefs reports the reference diagnostics for the associated-
@@ -699,7 +699,7 @@ func (a *assembler) evaluateAssert(decl *ast.AssertDecl, genv graphFoldEnv) {
 // same checkPureContext, so a new fold position cannot be added without a
 // matching purity check.
 func (a *assembler) checkPureContexts() {
-	scope := infer.BodyScope{Reg: a.reg, Universe: a.q.universe(a.fileID), Qualified: qualifiedFrom(a.q, a.imp), Self: ir.Invalid, Funcs: a.funcs, QualifiedFuncs: a.qfns}
+	scope := infer.BodyScope{Reg: a.reg, Universe: a.q.universe(a.fileID), Qualified: qualifiedFrom(a.q, a.imp), Self: ir.Invalid, Funcs: a.funcs, QualifiedFuncs: a.qfns, ConstShadows: constShadowsFrom(a.q, a.fileID)}
 	check := func(e ast.Expr, position string) {
 		if e != nil {
 			checkPureContext(e, position, scope, a.at, a.diags)

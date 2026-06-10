@@ -21,7 +21,7 @@ import (
 
 // checkEffects runs the declaration-completeness check over a file's
 // functions and its types' methods.
-func checkEffects(reg *builtin.Registry, file *ast.File, defs []*ir.TypeDef, universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, funcs map[string][]*ast.FuncDecl, qualifiedFuncs func(namespace, name string) []*ast.FuncDecl, at func(ast.Node) span, diags *diagnostic.List) {
+func checkEffects(reg *builtin.Registry, file *ast.File, defs []*ir.TypeDef, universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, funcs map[string][]*ast.FuncDecl, qualifiedFuncs func(namespace, name string) []*ast.FuncDecl, constShadows func(*ast.Identifier) bool, at func(ast.Node) span, diags *diagnostic.List) {
 	r := &infer.TypeResolver{Defs: universe, Qualified: qualified}
 	for _, fd := range file.Funcs {
 		if fd.Extern || len(fd.Body) == 0 {
@@ -31,7 +31,7 @@ func checkEffects(reg *builtin.Registry, file *ast.File, defs []*ir.TypeDef, uni
 		for _, p := range fd.Params {
 			params[p.Name] = r.ResolveType(p.Type, nil)
 		}
-		bs := infer.BodyScope{Reg: reg, Universe: universe, Qualified: qualified, Self: ir.Invalid, Params: params, Funcs: funcs, QualifiedFuncs: qualifiedFuncs}
+		bs := infer.BodyScope{Reg: reg, Universe: universe, Qualified: qualified, Self: ir.Invalid, Params: params, Funcs: funcs, QualifiedFuncs: qualifiedFuncs, ConstShadows: constShadows}
 		checkDeclEffects(fd.Name, fd.Effects, fd, fd.Body, bs, at, diags)
 	}
 	for _, def := range defs {
@@ -45,7 +45,7 @@ func checkEffects(reg *builtin.Registry, file *ast.File, defs []*ir.TypeDef, uni
 			for _, p := range irm.Params {
 				params[p.Name] = substSelf(p.Type, self)
 			}
-			bs := infer.BodyScope{Reg: reg, Universe: universe, Qualified: qualified, Self: self, Params: params, Funcs: funcs, QualifiedFuncs: qualifiedFuncs}
+			bs := infer.BodyScope{Reg: reg, Universe: universe, Qualified: qualified, Self: self, Params: params, Funcs: funcs, QualifiedFuncs: qualifiedFuncs, ConstShadows: constShadows}
 			checkDeclEffects(def.Name+"."+irm.Name, m.Effects, m, m.Body, bs, at, diags)
 		}
 	}
