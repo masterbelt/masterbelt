@@ -68,13 +68,14 @@ jobs:
             };
             const { owner, repo } = context.repo;
 
+            // Create the label if missing; tolerate the concurrent-create race
+            // (422 = already exists). Never overwrites an existing label, so a
+            // pre-created colour/description is preserved.
             async function ensureLabel(name) {
               try {
-                await github.rest.issues.getLabel({ owner, repo, name });
+                await github.rest.issues.createLabel({ owner, repo, name, color: COLORS[name] || 'ededed' });
               } catch (e) {
-                if (e.status === 404) {
-                  await github.rest.issues.createLabel({ owner, repo, name, color: COLORS[name] || 'ededed' });
-                } else { throw e; }
+                if (e.status !== 422) throw e;
               }
             }
 
