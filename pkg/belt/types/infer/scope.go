@@ -161,9 +161,10 @@ func (s constScope) leaf(e ast.Expr) ir.Type {
 			return s.env.TypeOf(target)
 		}
 		// A member access whose receiver names a type — an enum member
-		// (Rarity.Common) or an associated constant (sbyte.Max, Level.Max) — is a
-		// value of that type, resolved through the single member resolver.
-		if t := typeMemberType(s.universe(), e); t != ir.Invalid {
+		// (Rarity.Common), an associated constant (sbyte.Max, Level.Max), or a field
+		// projected off a local or namespace-qualified type (Item.id, geo.Item.id) —
+		// is a value of that type, resolved through the single member resolver.
+		if t := typeMemberType(s.universe(), s.qualified(), e); t != ir.Invalid {
 			return t
 		}
 		// Otherwise the receiver is a value: a field access on a record-typed
@@ -331,11 +332,13 @@ func (s BodyScope) leaf(e ast.Expr) ir.Type {
 // record-field reading — when the receiver does not name a type, a local or
 // parameter shadows the type name, or it is neither member kind.
 func (s BodyScope) typeMemberValue(e *ast.MemberExpr) (ir.Type, bool) {
-	recv, ok := e.Receiver.(*ast.Identifier)
-	if !ok || s.shadows(recv.Name) {
+	// A local or parameter shadowing a same-named type takes the record-field
+	// reading instead; only a bare type-name receiver can be shadowed, never a
+	// namespace-qualified one (geo.Item).
+	if recv, ok := e.Receiver.(*ast.Identifier); ok && s.shadows(recv.Name) {
 		return ir.Invalid, false
 	}
-	if t := typeMemberType(s.Universe, e); t != ir.Invalid {
+	if t := typeMemberType(s.Universe, s.Qualified, e); t != ir.Invalid {
 		return t, true
 	}
 	return ir.Invalid, false

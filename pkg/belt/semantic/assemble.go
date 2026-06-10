@@ -142,6 +142,12 @@ func wireExprDiagnostics(sink *infer.Sink, at func(ast.Node) span, diags *diagno
 		s := at(lit)
 		diags.Add(newUninferableResultDiagnostic(s.offset, s.width))
 	}
+	sink.MetatypeSlot = func(lit *ast.FuncLit, t *ir.Func) {
+		// A function literal's parameter or result may not be a type value
+		// (fn(x: type)): a type-value function written inline is rejected exactly as
+		// a declared one is, even when the lambda is called rather than stored.
+		reportMetatypeSlot(at, diags, lit, t)
+	}
 }
 
 // wireRecordAndGenericDiagnostics wires the record-literal and generic-call
@@ -363,10 +369,10 @@ func (a *assembler) resolveConst(decl *ast.ConstDecl, cyclic bool) {
 	c.Type = a.q.typeOf(decl)
 	c.Eval = a.q.valueOf(decl)
 
-	// A const may not hold a type value: const x = sbyte (the 0001 const
-	// reification, withdrawn) or const x: type is type_in_value_position. A
-	// projected type is named with a type alias (type X = Character.level), never
-	// bound to a const; the type value lives only inside a comptime expression.
+	// A const may not hold a type value: const x = sbyte or const x: type is
+	// type_in_value_position. A projected type is named with a type alias (type X
+	// = Character.level), never bound to a const; the type value lives only inside
+	// a comptime expression.
 	reportMetatypeSlot(a.at, a.diags, decl, c.Type)
 
 	// Resolve the annotation with reporting enabled, so an unknown type
@@ -734,6 +740,25 @@ func (a *assembler) checkPureContexts() {
 // members the enum does not declare (unknown_enum_member). expectedEnum is the
 // enum a bare member resolves through (a const's annotation; nil for an assert,
 // which has none), so a bare member of it is not reported as undefined.
+// reportUnknownNamespaceMember reports a namespace member access (geo.X) that
+// resolves to no exported constant — unless X is an exported type, which makes
+// geo.X a namespace-qualified type name, a valid field-projection receiver
+// (geo.X.id) rather than an unknown member.
+func reportUnknownNamespaceMember(fileID FileID, m *ast.MemberExpr, q queries, at func(ast.Node) span, diags *diagnostic.List) {
+	if m.Member.Name == "" {
+		return // a recovered `ns.` — already a parse diagnostic
+	}
+	if q.resolveMember(fileID, m) != nil {
+		return
+	}
+	ns, _ := m.Receiver.(*ast.Identifier)
+	if ns != nil && qualifiedFrom(q, q.importsOf(fileID))(ns.Name, m.Member.Name) != nil {
+		return
+	}
+	s := at(m)
+	diags.Add(newUnknownMemberDiagnostic(s.offset, s.width, m.Member.Name, ns.Name))
+}
+
 func reportRefIssues(fileID FileID, e ast.Expr, q queries, at func(ast.Node) span, diags *diagnostic.List, expectedEnum *ir.TypeDef) {
 	walkRefsEnum(fileID, e, q,
 		func(id *ast.Identifier) {
@@ -766,14 +791,7 @@ func reportRefIssues(fileID FileID, e ast.Expr, q queries, at func(ast.Node) spa
 			diags.Add(newUndefinedNameDiagnostic(s.offset, s.width, id.Name))
 		},
 		func(m *ast.MemberExpr) {
-			if m.Member.Name == "" {
-				return // a recovered `ns.` — already a parse diagnostic
-			}
-			if q.resolveMember(fileID, m) == nil {
-				s := at(m)
-				ns, _ := m.Receiver.(*ast.Identifier)
-				diags.Add(newUnknownMemberDiagnostic(s.offset, s.width, m.Member.Name, ns.Name))
-			}
+			reportUnknownNamespaceMember(fileID, m, q, at, diags)
 		},
 		func(m *ast.MemberExpr) {
 			// A qualified type-member access: the receiver names a type, so the

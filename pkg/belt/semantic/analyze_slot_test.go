@@ -1,17 +1,16 @@
 // These tests pin the storage rule: a type value is comptime-only and may
 // not be stored, so a const, let, record field, function parameter, or result
-// whose type is the metatype `type` is type_in_value_position. This is also
-// where the 0001 const reification (const x = sbyte) is withdrawn — it is now an
-// error, not a binding. A type value is still consumable in a comptime
-// expression (asserted in analyze_projection_test.go); only storing it is
-// rejected.
+// whose type is the metatype `type` is type_in_value_position. Binding a type
+// value to a const (const x = sbyte) is therefore an error, not a binding. A
+// type value is still consumable in a comptime expression (asserted in
+// analyze_projection_test.go); only storing it is rejected.
 package semantic
 
 import "testing"
 
 func TestSlotConstBindingWithdrawn(t *testing.T) {
-	// const x = sbyte bound a type value in 0001; under the storage rule its slot
-	// type is the metatype, so it is type_in_value_position.
+	// Binding a type value to a const (const x = sbyte) is rejected: under the
+	// storage rule its slot type is the metatype, so it is type_in_value_position.
 	_, diags := analyze("pub const x = sbyte\n")
 	if !hasCode(diags, CodeTypeInValuePosition) {
 		t.Fatalf("want type_in_value_position, got %v", codes(diags))
@@ -132,6 +131,20 @@ func TestSlotMasterRowFieldMetatype(t *testing.T) {
 	_, diags := analyze(src)
 	if !hasCode(diags, CodeTypeInValuePosition) {
 		t.Fatalf("want type_in_value_position on master row field, got %v", codes(diags))
+	}
+}
+
+func TestSlotLambdaMetatypeRejected(t *testing.T) {
+	// A function literal written inline (not stored) may not be a type-value
+	// function either: a type-value parameter or result is type_in_value_position,
+	// the same rule a declared signature obeys.
+	_, dp := analyze("assert (fn(x: type): bool { return true })(long)\n")
+	if !hasCode(dp, CodeTypeInValuePosition) {
+		t.Fatalf("lambda param: want type_in_value_position, got %v", codes(dp))
+	}
+	_, dr := analyze("assert (fn(): type { return long })() == long\n")
+	if !hasCode(dr, CodeTypeInValuePosition) {
+		t.Fatalf("lambda result: want type_in_value_position, got %v", codes(dr))
 	}
 }
 
