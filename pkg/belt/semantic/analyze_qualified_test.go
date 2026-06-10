@@ -105,6 +105,33 @@ func TestBareQualifiedTypeValueShadowedByValue(t *testing.T) {
 	}
 }
 
+func TestBareQualifiedTypeValueShadowedInBody(t *testing.T) {
+	// A top-level const named like a namespace import shadows it inside a function
+	// or method body too, not only in a const initializer: geo.Item reads the
+	// const's field rather than reifying the imported type, so the body type-checks
+	// against the field type instead of the metatype. The qualified projection
+	// geo.Item.id is shadowed the same way.
+	body := "use geo from \"geometry.belt\"\n" +
+		"pub type Box = { Item: { id: nint } }\n" +
+		"const geo: Box = { Item: { id: 1 } }\n" +
+		"pub fn f(): { id: nint } { return geo.Item }\n" +
+		"pub fn g(): nint { return geo.Item.id }\n"
+	if diags := analyzeProject(t, map[string]string{
+		"geometry.belt": "pub type Item = { id: long }\n",
+		"main.belt":     body,
+	}); len(diags) != 0 {
+		t.Fatalf("want clean (const shadows namespace in a body), got %v", diags)
+	}
+	// Without a shadowing const, a bare qualified type value still folds in a body.
+	if diags := analyzeProject(t, map[string]string{
+		"geometry.belt": "pub type Item = { id: long }\n",
+		"main.belt": "use geo from \"geometry.belt\"\n" +
+			"pub fn f(): nint {\n  assert geo.Item == geo.Item\n  return 1\n}\n",
+	}); len(diags) != 0 {
+		t.Fatalf("want clean (bare qualified type value folds in a body), got %v", diags)
+	}
+}
+
 func TestQualifiedTypeValueProjection(t *testing.T) {
 	root := belttest.WriteFiles(t, map[string]string{
 		"masterbelt.toml": "entry = \"main.belt\"\n",

@@ -521,8 +521,9 @@ func (a *assembler) resolveTypeDecls() {
 func (a *assembler) resolveFuncDecls() {
 	a.module.Funcs = resolveFuncs(a.file, a.at, a.diags, a.reg, a.q.universe(a.fileID), qualifiedFrom(a.q, a.imp), a.bfns)
 	bodyEnv := a.folder()
-	checkMethodBodies(a.reg, a.module.Types, a.q.universe(a.fileID), qualifiedFrom(a.q, a.imp), a.funcs, a.qfns, bodyEnv, bodySink(a.at, a.diags, a.reg, bodyEnv, a.res), a.at, a.diags)
-	checkFuncBodies(a.reg, a.file, a.q.universe(a.fileID), qualifiedFrom(a.q, a.imp), a.funcs, a.qfns, bodyEnv, bodySink(a.at, a.diags, a.reg, bodyEnv, a.res), a.at, a.diags)
+	constShadows := func(id *ast.Identifier) bool { return a.q.resolve(a.fileID, id) != nil }
+	checkMethodBodies(a.reg, a.module.Types, a.q.universe(a.fileID), qualifiedFrom(a.q, a.imp), a.funcs, a.qfns, constShadows, bodyEnv, bodySink(a.at, a.diags, a.reg, bodyEnv, a.res), a.at, a.diags)
+	checkFuncBodies(a.reg, a.file, a.q.universe(a.fileID), qualifiedFrom(a.q, a.imp), a.funcs, a.qfns, constShadows, bodyEnv, bodySink(a.at, a.diags, a.reg, bodyEnv, a.res), a.at, a.diags)
 	checkEffects(a.reg, a.file, a.module.Types, a.q.universe(a.fileID), qualifiedFrom(a.q, a.imp), a.funcs, a.qfns, a.at, a.diags)
 }
 

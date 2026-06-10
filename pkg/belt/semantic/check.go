@@ -305,7 +305,7 @@ func methodTScope(def *ir.TypeDef, m *ast.MethodDecl) infer.TypeScope {
 // ones — and qualified its namespace-qualified lookup, so a type in a body
 // resolves exactly as an annotation does. env folds switch arm values for the
 // exhaustiveness and duplicate checks.
-func checkMethodBodies(reg *builtin.Registry, defs []*ir.TypeDef, universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, funcs map[string][]*ast.FuncDecl, qualifiedFuncs func(namespace, name string) []*ast.FuncDecl, env exprFolder, sink *infer.Sink, at func(ast.Node) span, diags *diagnostic.List) {
+func checkMethodBodies(reg *builtin.Registry, defs []*ir.TypeDef, universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, funcs map[string][]*ast.FuncDecl, qualifiedFuncs func(namespace, name string) []*ast.FuncDecl, constShadows func(*ast.Identifier) bool, env exprFolder, sink *infer.Sink, at func(ast.Node) span, diags *diagnostic.List) {
 	var noSelf func(node ast.Node)
 	if diags != nil {
 		noSelf = func(node ast.Node) {
@@ -335,7 +335,7 @@ func checkMethodBodies(reg *builtin.Registry, defs []*ir.TypeDef, universe map[s
 				params[p.Name] = substSelf(p.Type, self)
 			}
 			want := substSelf(irm.Result, self)
-			bs := infer.BodyScope{Reg: reg, Universe: universe, Qualified: qualified, Self: selfT, Params: params, Funcs: funcs, QualifiedFuncs: qualifiedFuncs, TScope: methodTScope(def, m)}
+			bs := infer.BodyScope{Reg: reg, Universe: universe, Qualified: qualified, Self: selfT, Params: params, Funcs: funcs, QualifiedFuncs: qualifiedFuncs, ConstShadows: constShadows, TScope: methodTScope(def, m)}
 			checkStmts(m.Body, want, bs, env, bodyNoSelf, sink, at, diags)
 			checkBareEnumArgs(m.Body, bs, env, at, diags)
 		}
@@ -356,7 +356,7 @@ func checkMethodBodies(reg *builtin.Registry, defs []*ir.TypeDef, universe map[s
 // func-literal-types path settles the signatures of the lambdas inside a
 // function body without reporting (the self and missing-return diagnostics, and
 // the index-write check, are suppressed) — mirroring checkMethodBodies.
-func checkFuncBodies(reg *builtin.Registry, file *ast.File, universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, funcs map[string][]*ast.FuncDecl, qualifiedFuncs func(namespace, name string) []*ast.FuncDecl, env exprFolder, sink *infer.Sink, at func(ast.Node) span, diags *diagnostic.List) {
+func checkFuncBodies(reg *builtin.Registry, file *ast.File, universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, funcs map[string][]*ast.FuncDecl, qualifiedFuncs func(namespace, name string) []*ast.FuncDecl, constShadows func(*ast.Identifier) bool, env exprFolder, sink *infer.Sink, at func(ast.Node) span, diags *diagnostic.List) {
 	// The resolver reports a failed field-type projection in a parameter or result
 	// annotation (fn f(x: Item.nope)), so an invalid projection there surfaces the
 	// same diagnostic it does in a type or const annotation rather than resolving
@@ -385,7 +385,7 @@ func checkFuncBodies(reg *builtin.Registry, file *ast.File, universe map[string]
 			params[p.Name] = r.ResolveType(p.Type, tscope)
 		}
 		want := r.ResolveType(fd.Result, tscope)
-		bs := infer.BodyScope{Reg: reg, Universe: universe, Qualified: qualified, Self: ir.Invalid, Params: params, Funcs: funcs, QualifiedFuncs: qualifiedFuncs, TScope: tscope}
+		bs := infer.BodyScope{Reg: reg, Universe: universe, Qualified: qualified, Self: ir.Invalid, Params: params, Funcs: funcs, QualifiedFuncs: qualifiedFuncs, ConstShadows: constShadows, TScope: tscope}
 		checkStmts(fd.Body, want, bs, env, noSelf, sink, at, diags)
 		if diags == nil {
 			continue // the sink-only walk wants no further diagnostics
