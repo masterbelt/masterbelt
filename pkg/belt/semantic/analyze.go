@@ -282,6 +282,14 @@ func classifyRefCallee(fileID FileID, e *ast.CallExpr, q queries, funcCallee map
 			case types.IsMetatypeMethod(q.universe(fileID)[builtin.NameType], callee.Member.Name):
 				staticCallee[callee] = true
 			}
+		} else if isQualifiedTypeReceiver(fileID, callee.Receiver, q) &&
+			types.IsMetatypeMethod(q.universe(fileID)[builtin.NameType], callee.Member.Name) {
+			// A metatype method call on a bare qualified type value (geo.Item ==
+			// geo.Item, desugared to geo.Item.eql(geo.Item)) calls the reified type
+			// value's equality, not a member of the qualified type itself, so it is
+			// exempt from the type-member reference check exactly as the local
+			// Level.eql(long) form above is.
+			staticCallee[callee] = true
 		}
 	}
 }

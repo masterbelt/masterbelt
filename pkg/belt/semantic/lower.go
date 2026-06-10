@@ -84,10 +84,17 @@ func (b constBinder) leafConstMember(e *ast.MemberExpr, sub func(ast.Expr) ir.Va
 		return &ir.Reference{Target: b.irOf[target], Syntax: e}
 	}
 	shadowed := func(id *ast.Identifier) bool { return b.q.resolve(b.file, id) != nil }
-	if def := memberReceiverDef(b.uni(), qualifiedFrom(b.q, b.q.importsOf(b.file)), shadowed, e.Receiver); def != nil {
+	qualified := qualifiedFrom(b.q, b.q.importsOf(b.file))
+	if def := memberReceiverDef(b.uni(), qualified, shadowed, e.Receiver); def != nil {
 		if v := typeMemberValue(def, e); v != nil {
 			return v
 		}
+	}
+	// A namespace-qualified type name used as a value (geo.Item, no trailing
+	// projection) reifies to a type value, the qualified twin of a bare local type
+	// name; a value shadowing the namespace name defers to the field access below.
+	if v := qualifiedTypeValue(qualified, shadowed, e); v != nil {
+		return v
 	}
 	return &ir.FieldAccess{Receiver: sub(e.Receiver), Field: e.Member.Name, Syntax: e}
 }
@@ -111,6 +118,28 @@ func memberReceiverDef(universe map[string]*ir.TypeDef, qualified func(namespace
 			}
 			return qualified(ns.Name, r.Member.Name)
 		}
+	}
+	return nil
+}
+
+// qualifiedTypeValue lowers a namespace-qualified type name used as a value
+// (geo.Item) to its reified type value — the qualified twin of a bare local type
+// name (leafConstIdent's Item). The receiver must name a namespace whose export
+// of the member name is a type, and not be shadowed by a same-named value (a
+// const named geo, whose field geo.Item is read instead). It returns nil
+// otherwise, which the caller reads as a record-field access. It is the
+// value-lowering twin of infer.qualifiedTypeValue, so a body and a const agree on
+// a bare qualified type value, and the metatype comparison folds.
+func qualifiedTypeValue(qualified func(namespace, name string) *ir.TypeDef, valueShadows func(*ast.Identifier) bool, e *ast.MemberExpr) ir.Value {
+	ns, ok := e.Receiver.(*ast.Identifier)
+	if !ok || qualified == nil {
+		return nil
+	}
+	if valueShadows != nil && valueShadows(ns) {
+		return nil
+	}
+	if def := qualified(ns.Name, e.Member.Name); def != nil {
+		return &ir.TypeValue{Reified: reifyType(def), Syntax: e}
 	}
 	return nil
 }
@@ -585,7 +614,13 @@ func (b bodyBinder) leafNamespaceOrTypeMember(e *ast.MemberExpr) ir.Value {
 	// caller reads a record-field access. A value shadowing the namespace name
 	// (a local or parameter) defers the qualified form to a value receiver.
 	shadowed := func(id *ast.Identifier) bool { return b.shadows(id.Name) }
-	return typeMemberValue(memberReceiverDef(b.r.Defs, b.r.Qualified, shadowed, e.Receiver), e)
+	if v := typeMemberValue(memberReceiverDef(b.r.Defs, b.r.Qualified, shadowed, e.Receiver), e); v != nil {
+		return v
+	}
+	// A bare namespace-qualified type name used as a value (geo.Item, no trailing
+	// projection) reifies to a type value, the qualified twin of a bare local type
+	// name, so a body folds geo.Item == geo.Item exactly as a const does.
+	return qualifiedTypeValue(b.r.Qualified, shadowed, e)
 }
 
 // leafCall lowers a call in value position. A call whose callee names a type is

@@ -73,6 +73,38 @@ func TestValueShadowsNamespaceProjection(t *testing.T) {
 	}
 }
 
+func TestBareQualifiedTypeValue(t *testing.T) {
+	// A namespace-qualified type name used as a value (geo.Item) reifies to a type
+	// value — the qualified twin of a bare local type name (Item) — so geo.Item ==
+	// geo.Item folds true and geo.Item != geo.Other folds true, by nominal
+	// identity, with no trailing field projection.
+	clean := analyzeProject(t, map[string]string{
+		"geometry.belt": "pub type Item = { id: long }\npub type Other = { id: long }\n",
+		"main.belt": "use geo from \"geometry.belt\"\n" +
+			"assert geo.Item == geo.Item\n" +
+			"assert geo.Item != geo.Other\n",
+	})
+	if len(clean) != 0 {
+		t.Fatalf("want clean (bare qualified type value folds), got %v", clean)
+	}
+}
+
+func TestBareQualifiedTypeValueShadowedByValue(t *testing.T) {
+	// A value named like a namespace import shadows it: geo.Item reads the field
+	// Item of the const named geo, not the imported type as a type value, so the
+	// const settles to that field's type rather than reifying a metatype.
+	diags := analyzeProject(t, map[string]string{
+		"geometry.belt": "pub type Item = { id: long }\n",
+		"main.belt": "use geo from \"geometry.belt\"\n" +
+			"pub type Box = { Item: { id: nint } }\n" +
+			"const geo: Box = { Item: { id: 1 } }\n" +
+			"const X = geo.Item\n",
+	})
+	if len(diags) != 0 {
+		t.Fatalf("want clean (value shadows namespace), got %v", diags)
+	}
+}
+
 func TestQualifiedTypeValueProjection(t *testing.T) {
 	root := belttest.WriteFiles(t, map[string]string{
 		"masterbelt.toml": "entry = \"main.belt\"\n",
