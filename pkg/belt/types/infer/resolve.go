@@ -143,11 +143,16 @@ func (r *TypeResolver) resolveQualified(t *ast.NamedType, scope TypeScope) ir.Ty
 		}
 	}
 	// The qualifier names a type, so Namespace.Name is a field-type projection.
-	// Generic arguments are not applied here — projecting off a generic type is
-	// reported as unsupported by project (the head's definition is generic), so
-	// they neither instantiate nor are silently dropped.
+	// Generic arguments instantiate the projected field (Box.value<string> reads
+	// Box<string>.value): they build a generic application as the projection head,
+	// which project substitutes through the field type. A non-generic head ignores
+	// stray arguments, as before, so its projection is unchanged.
 	if def := r.lookup(t.Namespace); def != nil {
-		head := r.project(r.namedType(def, nil, scope), t.Name, t)
+		args := t.Args
+		if !isGenericDef(def) {
+			args = nil
+		}
+		head := r.project(r.namedType(def, args, scope), t.Name, t)
 		return r.applyProjections(head, t.Projections, t)
 	}
 	r.reportUnknown(t, t.Namespace+"."+t.Name)

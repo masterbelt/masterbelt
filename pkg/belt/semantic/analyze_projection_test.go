@@ -144,15 +144,19 @@ func TestTypeProjectionUnknownField(t *testing.T) {
 	}
 }
 
-func TestTypeProjectionGenericRejected(t *testing.T) {
-	// Projecting a field off a generic type is not supported yet — instantiating a
-	// parameterised field type belongs to the generics work — so it is reported
-	// rather than resolved to an unbound parameter or a silently-dropped argument.
+func TestTypeProjectionGenericInstantiated(t *testing.T) {
+	// Projecting a field off a generic type instantiates it: the application's
+	// argument is substituted for the parameter through the field's type, so
+	// Box<string>.value (written Box.value<string> in type position) is string —
+	// not the unbound parameter T it used to be rejected as.
 	src := "pub type Box<T> = { value: T }\n" +
 		"pub type S = { v: Box.value<string> }\n"
-	_, diags := analyze(src)
-	if !hasCode(diags, CodeGenericTypeProjection) {
-		t.Fatalf("want generic_type_projection, got %v", codes(diags))
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("want clean, got %v", codes(diags))
+	}
+	if got := fieldType(m, "S", "v"); got == nil || got.String() != "string" {
+		t.Fatalf("S.v = %v, want string (Box<string>.value)", got)
 	}
 }
 
@@ -217,17 +221,17 @@ func TestTypeProjectionSameFileMasterForwardRef(t *testing.T) {
 	}
 }
 
-func TestTypeProjectionGenericAliasRejected(t *testing.T) {
+func TestTypeProjectionGenericAliasInstantiated(t *testing.T) {
 	// Projecting a field off an alias to a generic application (Box = Inner<string>)
-	// is not silently resolved to the unbound parameter T — substituting the
-	// application's arguments through the field type is deferred generics work, so
-	// the projection is rejected rather than half-resolved.
+	// instantiates it in value position: the application's argument baked into the
+	// alias body is substituted through the field type, so Box.value folds to a
+	// type value equal to string — not the unbound parameter T, and not rejected.
 	src := "pub type Inner<T> = { value: T }\n" +
 		"pub type Box = Inner<string>\n" +
 		"assert Box.value == string\n"
 	_, diags := analyze(src)
-	if !hasCode(diags, CodeUnknownAssociatedConst) {
-		t.Fatalf("want the projection rejected (not silently the unbound T), got %v", codes(diags))
+	if len(diags) != 0 {
+		t.Fatalf("want clean (Box.value == string folds true), got %v", codes(diags))
 	}
 }
 
