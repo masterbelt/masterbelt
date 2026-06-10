@@ -1,10 +1,13 @@
 # actionlint configuration.
 #
-# The one suppression: GitHub's `code-quality` permission scope (a 2026-05
-# preview, used by the coverage job's upload) is newer than the pinned linter's
-# built-in scope list, so actionlint reports it as unknown. The ignore is scoped
-# to go.yml and names that exact scope, so a typo in any other permission still
-# fails — its message names a different scope and does not match.
+# Suppressions, each scoped to one file and naming one exact message so a typo
+# anywhere else still fails (its message names something different and won't
+# match):
+#  - go.yml: GitHub's `code-quality` permission scope (a 2026-05 preview, used
+#    by the coverage job's upload) is newer than the pinned linter's scope list.
+#  - codex-review-gate.yml: the `pull_request_review_thread` webhook event (used
+#    to recompute the gate the moment a conversation is resolved) is newer than
+#    the pinned linter's event list.
 self-hosted-runner:
   labels: []
 config-variables: null
@@ -12,3 +15,6 @@ paths:
   .github/workflows/go.yml:
     ignore:
       - 'unknown permission scope "code-quality"'
+  .github/workflows/codex-review-gate.yml:
+    ignore:
+      - 'unknown Webhook event "pull_request_review_thread"'
