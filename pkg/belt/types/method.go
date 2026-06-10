@@ -145,14 +145,14 @@ func candidatesOfKind(reg *builtin.Registry, recv ir.Type, method string, kind i
 	if len(ms) == 0 {
 		return nil, nil, false
 	}
-	return ms, receiverSubst(reg, recv), true
+	return ms, receiverSubst(reg, recv, ms[0].Owner), true
 }
 
-// receiverSubst is the substitution a receiver's type arguments pin: a
-// list<int> receiver binds the element parameter T = int. A bounded generic
-// type parameter pins the bound interface's parameters from the bound's
-// arguments — a receiver typed T where T: foldable<int, int> binds the
-// interface's K = int, V = int, so fold's signature reads against them.
+// receiverSubst is the substitution a receiver's type arguments pin for a method
+// the owner definition declares: a list<int> receiver binds the element parameter
+// T = int. A bounded generic type parameter pins the bound interface's parameters
+// from the bound's arguments — a receiver typed T where T: foldable<int, int>
+// binds the interface's K = int, V = int, so fold's signature reads against them.
 //
 // A receiver that opts into an interface also binds that interface's own
 // parameters from its impl tag: a list<int> with impl foldable<int, T> binds
@@ -160,21 +160,28 @@ func candidatesOfKind(reg *builtin.Registry, recv ir.Type, method string, kind i
 // so a provided method whose signature reads against K or V — keys(): list<K>,
 // values(): list<V> — instantiates to the receiver's element type rather than
 // leaving K/V free.
-func receiverSubst(reg *builtin.Registry, recv ir.Type) map[string]ir.Type {
+//
+// owner scopes the chain walk to the definition that declares the method: the
+// substitution is threaded down the receiver's alias chain only as far as owner,
+// so a parameter the method reads resolves to that definition's argument. A
+// getter declared on an alias (Alias<T> = Box<string> impl { get own(): T })
+// reads the alias's T, while a getter inherited from the body (Box<T>'s item)
+// reads the body application's argument. owner nil walks the whole chain, for the
+// callers that collect every method on a receiver rather than resolving one.
+func receiverSubst(reg *builtin.Registry, recv ir.Type, owner *ir.TypeDef) map[string]ir.Type {
 	if v, ok := recv.(*ir.TypeVar); ok && v.Bound != nil {
-		return receiverSubst(reg, v.Bound)
+		return receiverSubst(reg, v.Bound, owner)
 	}
 	subst := map[string]ir.Type{}
-	// Thread the substitution down the receiver's alias chain to the type that
-	// declares the method: at each application bind its constructor's parameters to
-	// its arguments, each argument first resolved through the bindings the shallower
+	// Thread the substitution down the receiver's alias chain to the declaring
+	// definition: at each application bind its constructor's parameters to its
+	// arguments, each argument first resolved through the bindings the shallower
 	// levels made — so Box<U> = Inner<U> over StringBox = Box<string> carries U =
-	// string down to Inner's T, and StringBox.item reads string, not the free T. A
-	// deeper binding wins over a shallower one of the same name (Alias<T> =
-	// Box<string> discards the alias's T for the application's), so a reused
-	// parameter name resolves to the declaring application's argument, mirroring what
-	// the field projection composes through its record body — the getter read and the
-	// field read stay symmetric through a chain of generic aliases.
+	// string down to Inner's T, and StringBox.item reads string, not the free T.
+	// Stop once the owner definition's parameters are bound, so a method declared on
+	// the owner reads the owner's argument and a deeper level of the chain does not
+	// overwrite a reused parameter name — keeping the getter read and the field read
+	// symmetric through a chain of generic aliases.
 	seen := map[*ir.TypeDef]bool{}
 	for cur := recv; cur != nil; {
 		switch t := cur.(type) {
@@ -184,6 +191,10 @@ func receiverSubst(reg *builtin.Registry, recv ir.Type) map[string]ir.Type {
 				continue
 			}
 			seen[t.Def] = true
+			if t.Def == owner {
+				cur = nil // an alias with no parameters of its own; nothing to bind
+				continue
+			}
 			cur = t.Def.Body // follow the alias to its body
 		case *ir.App:
 			if t.Def == nil || seen[t.Def] || len(t.Args) != len(t.Def.Params) {
@@ -193,6 +204,10 @@ func receiverSubst(reg *builtin.Registry, recv ir.Type) map[string]ir.Type {
 			seen[t.Def] = true
 			for i, p := range t.Def.Params {
 				subst[p.Name] = Substitute(t.Args[i], subst)
+			}
+			if t.Def == owner {
+				cur = nil // the declaring definition's parameters are bound; go no deeper
+				continue
 			}
 			cur = t.Def.Body // follow the constructor to its body
 		default:
@@ -340,7 +355,9 @@ func ReceiverMethods(reg *builtin.Registry, recv ir.Type) ([]*ir.Method, map[str
 		}
 		d = defOf(reg, d.Body)
 	}
-	return out, receiverSubst(reg, recv), true
+	// This collects every method on the receiver, across the whole chain, so there
+	// is no single declaring definition to scope the substitution to: walk it all.
+	return out, receiverSubst(reg, recv, nil), true
 }
 
 // defOf returns the type definition whose methods apply to a value of type t:

@@ -69,8 +69,9 @@ func ForElement(reg *builtin.Registry, typ ir.Type, of bool) (ir.Type, bool) {
 		return foldableArg(app, of), true
 	}
 	// typ opts into foldable at its definition site: take K/V from the impl, with
-	// the receiver's type arguments substituted.
-	subst := receiverSubst(reg, typ)
+	// the receiver's type arguments substituted. No single method scopes this read,
+	// so the whole chain is walked (owner nil).
+	subst := receiverSubst(reg, typ, nil)
 	seen := map[*ir.TypeDef]bool{}
 	for def := defOf(reg, typ); def != nil && !seen[def]; {
 		seen[def] = true

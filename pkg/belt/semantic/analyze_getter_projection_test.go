@@ -266,6 +266,27 @@ func TestGetterProjectionAliasParamNameCollision(t *testing.T) {
 	}
 }
 
+func TestGetterProjectionAliasDeclaredGetter(t *testing.T) {
+	// A getter the generic alias declares itself reads the alias's own parameter,
+	// even when the alias body is another application reusing the name: with
+	// Alias<T> = Box<string> and a getter own(): list<T> on Alias, Alias.own<nint> is
+	// list<nint> (Alias's T), not list<string> from Box<string> — the substitution
+	// is scoped to the definition that declares the getter, so the body chain does
+	// not overwrite it.
+	src := "pub type Box<T> = { v: T } impl {\n  pub get item(): T { return self.v }\n}\n" +
+		"pub type Alias<T> = Box<string> impl {\n  pub get own(): list<T> { return [] }\n}\n" +
+		"pub type G = Alias.own<nint>\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("want clean (alias-declared getter reads the alias parameter), got %v", codes(diags))
+	}
+	for _, def := range m.Types {
+		if def.Name == "G" && (def.Body == nil || def.Body.String() != "list<nint>") {
+			t.Fatalf("G = %v, want list<nint> (Alias.own<nint> reads the alias's T)", def.Body)
+		}
+	}
+}
+
 func TestGetterProjectionGenericAliasApplied(t *testing.T) {
 	// A getter reached through an applied generic alias (Alias<U> = Box<U>) composes
 	// the substitution through the chain: Alias.item<string> binds U = string, which
