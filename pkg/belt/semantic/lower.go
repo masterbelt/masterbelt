@@ -533,6 +533,12 @@ func (b bodyBinder) leafIdentifier(e *ast.Identifier) ir.Value {
 			return &ir.Reference{Target: c, Syntax: e}
 		}
 	}
+	// A bare type name reifies to a type value (long == long, the receiver of a
+	// metatype method call) — the same reading the constant binder gives it, so a
+	// body and a const agree, and the metatype comparison folds.
+	if def, ok := b.r.Defs[e.Name]; ok {
+		return &ir.TypeValue{Reified: reifyType(def), Syntax: e}
+	}
 	return nil
 }
 

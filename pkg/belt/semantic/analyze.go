@@ -294,6 +294,15 @@ func classifyRefCallee(fileID FileID, e *ast.CallExpr, q queries, funcCallee map
 func walkRefsMember(fileID FileID, e *ast.MemberExpr, q queries, onMember, onTypeMember func(*ast.MemberExpr), funcMemberCallee, staticCallee map[*ast.MemberExpr]bool) bool {
 	recv, ok := e.Receiver.(*ast.Identifier)
 	if !ok {
+		// A receiver that is itself a namespace-qualified type name (geo.Item) makes
+		// this a qualified type-member reference (geo.Item.id), validated as one unit
+		// exactly as a bare-name type member is.
+		if onTypeMember != nil && isQualifiedTypeReceiver(fileID, e.Receiver, q) {
+			if !staticCallee[e] {
+				onTypeMember(e)
+			}
+			return false
+		}
 		return true
 	}
 	if onTypeMember != nil && isTypeName(fileID, recv, q) {
@@ -309,6 +318,22 @@ func walkRefsMember(fileID FileID, e *ast.MemberExpr, q queries, onMember, onTyp
 		return false
 	}
 	return true
+}
+
+// isQualifiedTypeReceiver reports whether recv is a namespace-qualified type name
+// (geo.Item) — a member access whose receiver is a namespace import and whose
+// member is one of its exported types — so a further member off it (geo.Item.id)
+// is a qualified type-member reference rather than an ordinary expression.
+func isQualifiedTypeReceiver(fileID FileID, recv ast.Expr, q queries) bool {
+	m, ok := recv.(*ast.MemberExpr)
+	if !ok {
+		return false
+	}
+	ns, ok := m.Receiver.(*ast.Identifier)
+	if !ok {
+		return false
+	}
+	return qualifiedFrom(q, q.importsOf(fileID))(ns.Name, m.Member.Name) != nil
 }
 
 // isTypeName reports whether an identifier names a type in its file — and no

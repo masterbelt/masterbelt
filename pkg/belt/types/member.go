@@ -42,6 +42,13 @@ type Member struct {
 // for a member that is not a declared field, or a def with no record at all,
 // which the caller takes as a different member reading.
 func FieldProjection(def *ir.TypeDef, name string) (ir.Type, bool) {
+	// Projecting a field off a generic type would read the field's parameterised
+	// type (Box<T>.value is T), so it is refused here too — the value-position twin
+	// of the type-position generic_type_projection rejection — rather than leaking
+	// an uninstantiated type variable. Instantiating it is the generics work.
+	if def != nil && len(def.Params) > 0 {
+		return nil, false
+	}
 	rec := recordBody(def, map[*ir.TypeDef]bool{})
 	if rec == nil {
 		return nil, false

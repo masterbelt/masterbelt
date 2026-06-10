@@ -148,6 +148,29 @@ func TestSlotLambdaMetatypeRejected(t *testing.T) {
 	}
 }
 
+func TestSlotInferredLetTypeName(t *testing.T) {
+	// An inferred let bound to a bare type name (let t = sbyte) is rejected too: a
+	// body types a bare type name as the metatype, like a constant, so the slot
+	// rule fires rather than binding the type value silently.
+	src := "pub fn f(): nint {\n  let t = sbyte\n  return 0\n}\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeTypeInValuePosition) {
+		t.Fatalf("want type_in_value_position on inferred let, got %v", codes(diags))
+	}
+}
+
+func TestTypeEqualityFoldsInBody(t *testing.T) {
+	// A bare type-name comparison in a function body folds: a body reifies a bare
+	// type name to a type value, so long == long evaluates and a constant reading
+	// the result settles rather than failing to fold.
+	src := "pub fn g(): bool {\n  return long == long\n}\n" +
+		"pub const X = g()\n"
+	_, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("want clean (long == long folds in a body), got %v", codes(diags))
+	}
+}
+
 func TestSlotProjectionAnnotationAllowed(t *testing.T) {
 	// A projected type is not the metatype — it is the field's declared type — so
 	// a const annotated with one is fine: x has type long.

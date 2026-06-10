@@ -309,6 +309,12 @@ func (s BodyScope) leaf(e ast.Expr) ir.Type {
 		if t, ok := s.Params[e.Name]; ok {
 			return t
 		}
+		// A bare type name in value position is a compile-time type value, of the
+		// metatype `type` — the same reading the constant scope gives it, so a body
+		// (let t = sbyte, long == long) types it identically.
+		if _, ok := s.Universe[e.Name]; ok {
+			return metatype()
+		}
 		return ir.Invalid
 	case *ast.MemberExpr:
 		// A member access whose receiver names a type — an enum member

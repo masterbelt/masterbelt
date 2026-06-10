@@ -794,36 +794,71 @@ func reportRefIssues(fileID FileID, e ast.Expr, q queries, at func(ast.Node) spa
 			reportUnknownNamespaceMember(fileID, m, q, at, diags)
 		},
 		func(m *ast.MemberExpr) {
-			// A qualified type-member access: the receiver names a type, so the
-			// member must be one of its own — an enum member (Rarity.Bogus) or an
-			// associated constant (int8.Bogus, Level.Bogus).
-			if m.Member.Name == "" {
-				return // a recovered `Rarity.` — already a parse diagnostic
-			}
-			recv := m.Receiver.(*ast.Identifier)
-			def := q.universe(fileID)[recv.Name]
-			member := types.ResolveMember(def, m.Member.Name)
-			if def != nil && def.Enum != nil {
-				// An enum type: the member must be one of its members. A name that
-				// resolves to anything else (or nothing) is an unknown enum member.
-				if member.Kind != types.MemberEnum {
-					s := at(m)
-					diags.Add(newUnknownEnumMemberDiagnostic(s.offset, s.width, recv.Name, m.Member.Name))
-				}
-				return
-			}
-			// A non-enum type: the member must be an associated constant (a static
-			// fn call was exempted as a static callee, leaving the read forms here)
-			// or a declared field projected in value position (Character.level — a
-			// type value the comptime expression consumes).
-			if member.Kind != types.MemberConst {
-				if _, ok := types.FieldProjection(def, m.Member.Name); ok {
-					return
-				}
-				s := at(m)
-				diags.Add(newUnknownAssociatedConstDiagnostic(s.offset, s.width, recv.Name, m.Member.Name))
-			}
+			reportTypeMemberIssue(fileID, m, q, at, diags)
 		})
+}
+
+// reportTypeMemberIssue validates a type-member read — T.member or the
+// namespace-qualified geo.T.member: the member must be an enum member of an enum
+// T, or an associated constant or declared field of any other T. A member that
+// is none is reported (unknown_enum_member, unknown_associated_const). The
+// receiver is a local type name or a qualified one; a static fn call was already
+// exempted, leaving the read forms here.
+func reportTypeMemberIssue(fileID FileID, m *ast.MemberExpr, q queries, at func(ast.Node) span, diags *diagnostic.List) {
+	if m.Member.Name == "" {
+		return // a recovered `Rarity.` — already a parse diagnostic
+	}
+	def := typeReceiverDef(fileID, m.Receiver, q)
+	recvName := receiverName(m.Receiver)
+	member := types.ResolveMember(def, m.Member.Name)
+	if def != nil && def.Enum != nil {
+		// An enum type: the member must be one of its members. A name that resolves
+		// to anything else (or nothing) is an unknown enum member.
+		if member.Kind != types.MemberEnum {
+			s := at(m)
+			diags.Add(newUnknownEnumMemberDiagnostic(s.offset, s.width, recvName, m.Member.Name))
+		}
+		return
+	}
+	// A non-enum type: the member must be an associated constant or a declared
+	// field projected in value position (Character.level — a type value the
+	// comptime expression consumes).
+	if member.Kind != types.MemberConst {
+		if _, ok := types.FieldProjection(def, m.Member.Name); ok {
+			return
+		}
+		s := at(m)
+		diags.Add(newUnknownAssociatedConstDiagnostic(s.offset, s.width, recvName, m.Member.Name))
+	}
+}
+
+// typeReceiverDef resolves a type-member access's receiver to its definition: a
+// local type name (Item) through the universe, or a namespace-qualified type name
+// (geo.Item) through the import lookup. nil for any other receiver.
+func typeReceiverDef(fileID FileID, recv ast.Expr, q queries) *ir.TypeDef {
+	switch r := recv.(type) {
+	case *ast.Identifier:
+		return q.universe(fileID)[r.Name]
+	case *ast.MemberExpr:
+		if ns, ok := r.Receiver.(*ast.Identifier); ok {
+			return qualifiedFrom(q, q.importsOf(fileID))(ns.Name, r.Member.Name)
+		}
+	}
+	return nil
+}
+
+// receiverName renders a type-member access's receiver for a diagnostic: the bare
+// name (Item) or the qualified name (geo.Item).
+func receiverName(recv ast.Expr) string {
+	switch r := recv.(type) {
+	case *ast.Identifier:
+		return r.Name
+	case *ast.MemberExpr:
+		if ns, ok := r.Receiver.(*ast.Identifier); ok {
+			return ns.Name + "." + r.Member.Name
+		}
+	}
+	return ""
 }
 
 // annotationEnum resolves a constant's type annotation to the enum it names, or

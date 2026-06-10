@@ -186,6 +186,18 @@ func TestTypeProjectionMatchArmError(t *testing.T) {
 	}
 }
 
+func TestTypeProjectionGenericDirectValueRejected(t *testing.T) {
+	// Projecting a field off a generic type directly in value position (Box.value
+	// where Box<T>) is refused — the value-position mirror of the type-position
+	// generic rejection — rather than leaking the unbound parameter T.
+	src := "pub type Box<T> = { value: T }\n" +
+		"assert Box.value == string\n"
+	_, diags := analyze(src)
+	if hasCode(diags, CodeAssertionFailed) || len(diags) == 0 {
+		t.Fatalf("want the projection rejected (not an unbound T comparison), got %v", codes(diags))
+	}
+}
+
 func TestTypeProjectionSameFileMasterForwardRef(t *testing.T) {
 	// A projection off a same-file master whose row is still a shell (resolved
 	// after the projecting type) reads the master's row syntax in the lazy
