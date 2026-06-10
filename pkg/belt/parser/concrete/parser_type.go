@@ -36,14 +36,20 @@ func (p *parser) parsePrimaryType() cst.Green {
 	switch p.kind() {
 	case token.Ident:
 		children := []cst.Green{p.bump()} // the type name, or its namespace qualifier
-		if p.peekSignificant() == token.Dot {
+		// A dotted path: the first dot qualifies a namespace import or heads a
+		// field-type projection (geo.Point, Item.level), and every further dot is
+		// another projection segment (Order.customer.id). The CST keeps the path
+		// flat; the lowering splits it into the head and its projections, and the
+		// resolver decides which the head is.
+		for p.peekSignificant() == token.Dot {
 			p.skipTrivia(&children)
 			children = append(children, p.bump()) // "."
-			if p.peekSignificant() == token.Ident {
+			if p.memberNameAhead() {
 				p.skipTrivia(&children)
-				children = append(children, p.bump()) // the qualified type name
+				children = append(children, p.bump()) // the next path segment — an identifier or a keyword read as a field name (Schema.type)
 			} else {
 				p.report(newExpectedIdentifierDiagnostic(p.lastStart, 0))
+				break
 			}
 		}
 		if p.peekSignificant() == token.Lt {

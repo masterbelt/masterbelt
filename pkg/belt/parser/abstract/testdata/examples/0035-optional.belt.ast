@@ -13,6 +13,8 @@ File
             Namespace: ""
             Name: "nint"
             Args: ~
+            Projections: ~
+        Projections: ~
       Value: IntLit
         Text: "5"
       Builtin: false
@@ -28,6 +30,8 @@ File
             Namespace: ""
             Name: "nint"
             Args: ~
+            Projections: ~
+        Projections: ~
       Value: NullLit
       Builtin: false
     ConstDecl
@@ -88,10 +92,13 @@ File
                 Namespace: ""
                 Name: "nint"
                 Args: ~
+                Projections: ~
+            Projections: ~
       Result: NamedType
         Namespace: ""
         Name: "nint"
         Args: ~
+        Projections: ~
       Body:
         MatchStmt
           Scrutinee: Identifier
@@ -102,6 +109,7 @@ File
                 Namespace: ""
                 Name: "nint"
                 Args: ~
+                Projections: ~
               Bind: "n"
               Body:
                 ReturnStmt
@@ -112,6 +120,7 @@ File
                 Namespace: ""
                 Name: "null"
                 Args: ~
+                Projections: ~
               Bind: ""
               Body:
                 ReturnStmt
@@ -137,16 +146,20 @@ File
                 Namespace: ""
                 Name: "nint"
                 Args: ~
+                Projections: ~
+            Projections: ~
         ParamDef
           Name: "fallback"
           Type: NamedType
             Namespace: ""
             Name: "nint"
             Args: ~
+            Projections: ~
       Result: NamedType
         Namespace: ""
         Name: "nint"
         Args: ~
+        Projections: ~
       Body:
         MatchStmt
           Scrutinee: Identifier
@@ -157,6 +170,7 @@ File
                 Namespace: ""
                 Name: "nint"
                 Args: ~
+                Projections: ~
               Bind: "n"
               Body:
                 ReturnStmt

@@ -83,12 +83,36 @@ func (b constBinder) leafConstMember(e *ast.MemberExpr, sub func(ast.Expr) ir.Va
 	if target := b.q.resolveMember(b.file, e); target != nil {
 		return &ir.Reference{Target: b.irOf[target], Syntax: e}
 	}
-	if recv, ok := e.Receiver.(*ast.Identifier); ok {
-		if v := typeMemberValue(b.uni()[recv.Name], e); v != nil {
+	shadowed := func(id *ast.Identifier) bool { return b.q.resolve(b.file, id) != nil }
+	if def := memberReceiverDef(b.uni(), qualifiedFrom(b.q, b.q.importsOf(b.file)), shadowed, e.Receiver); def != nil {
+		if v := typeMemberValue(def, e); v != nil {
 			return v
 		}
 	}
 	return &ir.FieldAccess{Receiver: sub(e.Receiver), Field: e.Member.Name, Syntax: e}
+}
+
+// memberReceiverDef resolves a member-access receiver to the type definition a
+// member is read off: a local type name (Item) through the universe, or a
+// namespace-qualified type name (geo.Item) through the import lookup — so a field
+// projected off either (Item.id, geo.Item.id) reaches the type member resolver.
+// It is the value-lowering twin of infer.memberReceiverDef; nil for any other
+// receiver, which the caller takes as a record-field access. The qualified form
+// is skipped when the namespace identifier is shadowed by a value (valueShadows),
+// so a const named geo wins over the import.
+func memberReceiverDef(universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, valueShadows func(*ast.Identifier) bool, recv ast.Expr) *ir.TypeDef {
+	switch r := recv.(type) {
+	case *ast.Identifier:
+		return universe[r.Name]
+	case *ast.MemberExpr:
+		if ns, ok := r.Receiver.(*ast.Identifier); ok && qualified != nil {
+			if valueShadows != nil && valueShadows(ns) {
+				return nil
+			}
+			return qualified(ns.Name, r.Member.Name)
+		}
+	}
+	return nil
 }
 
 // leafConstCall lowers a call in a constant initializer: a conversion T(x) when
@@ -173,9 +197,19 @@ func typeMemberValue(def *ir.TypeDef, m *ast.MemberExpr) ir.Value {
 		return &ir.EnumMemberValue{Def: def, Index: r.Index, Syntax: m}
 	case types.MemberConst:
 		return &ir.AssocConstValue{Def: def, Index: r.Index, Syntax: m}
-	default:
-		return nil
+	case types.MemberNone, types.MemberStatic:
+		// A declared field of a record (or master) type, projected in value
+		// position (Character.level), is a type value of the field's declared type
+		// — the comptime projection a consuming expression (assert Character.id ==
+		// long) reads. The field type is read from the settled body, so nominal
+		// identity is preserved. A static fn read without a call, or any other
+		// non-field member, returns nil, which the caller takes as an instance
+		// field access (item.level — the master track's runtime read).
+		if ft, ok := types.FieldProjection(def, m.Member.Name); ok {
+			return &ir.TypeValue{Reified: ft, Syntax: m}
+		}
 	}
+	return nil
 }
 
 // staticFnDef resolves a call whose callee is a member access on a type name to
@@ -189,6 +223,12 @@ func typeMemberValue(def *ir.TypeDef, m *ast.MemberExpr) ir.Value {
 func staticFnDef(universe map[string]*ir.TypeDef, callee *ast.MemberExpr, shadow func(string) bool) *ir.TypeDef {
 	recv, ok := callee.Receiver.(*ast.Identifier)
 	if !ok || (shadow != nil && shadow(recv.Name)) {
+		return nil
+	}
+	// A metatype method (eql/neq) on a type name is type-value equality, never a
+	// static call — even when the type also declares a static of that name — so it
+	// lowers to a method call on the reified type value, mirroring the type rule.
+	if types.IsMetatypeMethod(universe[builtin.NameType], callee.Member.Name) {
 		return nil
 	}
 	def := universe[recv.Name]
@@ -499,6 +539,12 @@ func (b bodyBinder) leafIdentifier(e *ast.Identifier) ir.Value {
 			return &ir.Reference{Target: c, Syntax: e}
 		}
 	}
+	// A bare type name reifies to a type value (long == long, the receiver of a
+	// metatype method call) — the same reading the constant binder gives it, so a
+	// body and a const agree, and the metatype comparison folds.
+	if def, ok := b.r.Defs[e.Name]; ok {
+		return &ir.TypeValue{Reified: reifyType(def), Syntax: e}
+	}
 	return nil
 }
 
@@ -521,8 +567,10 @@ func (b bodyBinder) leafMember(e *ast.MemberExpr, sub func(ast.Expr) ir.Value) i
 // member, or associated constant — or nil when the receiver is shadowed or
 // names neither (the caller then reads it as a record field access).
 func (b bodyBinder) leafNamespaceOrTypeMember(e *ast.MemberExpr) ir.Value {
-	recv, ok := e.Receiver.(*ast.Identifier)
-	if !ok || b.shadows(recv.Name) {
+	// A local or parameter shadowing a same-named type or namespace takes the
+	// record-field reading; only a bare-name receiver can be shadowed, never a
+	// namespace-qualified one (geo.Item).
+	if recv, ok := e.Receiver.(*ast.Identifier); ok && b.shadows(recv.Name) {
 		return nil
 	}
 	if b.funcs.nsConstRef != nil {
@@ -530,11 +578,14 @@ func (b bodyBinder) leafNamespaceOrTypeMember(e *ast.MemberExpr) ir.Value {
 			return &ir.Reference{Target: c, Syntax: e}
 		}
 	}
-	// The type-member reading, through the single resolver — the same enum-member
-	// or associated-constant value the const initializer lowers, so a body and a
-	// const agree on T.member. A static fn, or no match, returns nil and the
-	// caller reads a record-field access.
-	return typeMemberValue(b.r.Defs[recv.Name], e)
+	// The type-member reading, through the single resolver — the same enum-member,
+	// associated-constant, or projected-field value the const initializer lowers,
+	// off a local (Item.id) or namespace-qualified (geo.Item.id) type, so a body
+	// and a const agree on T.member. A static fn, or no match, returns nil and the
+	// caller reads a record-field access. A value shadowing the namespace name
+	// (a local or parameter) defers the qualified form to a value receiver.
+	shadowed := func(id *ast.Identifier) bool { return b.shadows(id.Name) }
+	return typeMemberValue(memberReceiverDef(b.r.Defs, b.r.Qualified, shadowed, e.Receiver), e)
 }
 
 // leafCall lowers a call in value position. A call whose callee names a type is
@@ -730,6 +781,13 @@ func (b funcBinder) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
 		}
 		if b.scope.params[e.Name] {
 			return &ir.ParamRef{Name: e.Name, Syntax: e}
+		}
+	case *ast.MemberExpr:
+		// A member access whose receiver is this lambda's parameter or local is a
+		// field access on that binding, not a type-member read on a same-named type:
+		// the binding shadows the type, so the receiver lowers as a value.
+		if recv, ok := e.Receiver.(*ast.Identifier); ok && b.scope.shadows(recv.Name) {
+			return &ir.FieldAccess{Receiver: sub(e.Receiver), Field: e.Member.Name, Syntax: e}
 		}
 	case *ast.CallExpr:
 		if id, ok := e.Callee.(*ast.Identifier); ok && b.scope.shadows(id.Name) {

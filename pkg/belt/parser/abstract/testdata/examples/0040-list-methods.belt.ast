@@ -148,6 +148,8 @@ File
             Namespace: ""
             Name: "nint"
             Args: ~
+            Projections: ~
+        Projections: ~
       Value: CollectionLit
         Entries: ~
       Builtin: false
@@ -249,10 +251,13 @@ File
                 Namespace: ""
                 Name: "nint"
                 Args: ~
+                Projections: ~
+            Projections: ~
       Result: NamedType
         Namespace: ""
         Name: "nint"
         Args: ~
+        Projections: ~
       Body:
         MatchStmt
           Scrutinee: Identifier
@@ -263,6 +268,7 @@ File
                 Namespace: ""
                 Name: "nint"
                 Args: ~
+                Projections: ~
               Bind: "n"
               Body:
                 ReturnStmt
@@ -273,6 +279,7 @@ File
                 Namespace: ""
                 Name: "null"
                 Args: ~
+                Projections: ~
               Bind: ""
               Body:
                 ReturnStmt

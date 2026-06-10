@@ -387,8 +387,16 @@ func staticCallType(e *ast.CallExpr, member *ast.MemberExpr, s scope, sink *Sink
 		return ir.Invalid, false
 	}
 	recvT := s.conv(id) // the type the receiver names, or Invalid when shadowed/unknown
-	def := namedDef(recvT)
+	def := staticReceiverDef(recvT, s)
 	if def == nil {
+		return ir.Invalid, false
+	}
+	// A bare type name's == / != is metatype equality (Level == long, desugared to
+	// Level.eql(long)): the receiver is the reified type value, so it must take the
+	// method-call path (metatype receiver) even when the named type also declares a
+	// static eql/neq — the metatype equality wins over the static overload set
+	// rather than the static hijacking the comparison.
+	if types.IsMetatypeMethod(s.universe()[builtin.NameType], member.Member.Name) {
 		return ir.Invalid, false
 	}
 	sigs := staticSigs(def, member.Member.Name)
@@ -410,12 +418,16 @@ func staticCallType(e *ast.CallExpr, member *ast.MemberExpr, s scope, sink *Sink
 	return selectFuncOverload(e, name, sigs, s, sink), true
 }
 
-// namedDef returns the type definition a named (non-builtin) type refers to, or
-// nil for any other type. A static call's receiver must name a declared type
-// (the only kind that carries an impl block, and so static fns).
-func namedDef(t ir.Type) *ir.TypeDef {
-	if n, ok := t.(*ir.Named); ok {
-		return n.Def
+// staticReceiverDef returns the definition a static call reads its fns from: a
+// declared type's referent, or a primitive's registry definition (datetime
+// carries the static datetime.now), so a static fn on a builtin type resolves
+// like one on a declared type. Any other receiver type names no static fns.
+func staticReceiverDef(recvT ir.Type, s scope) *ir.TypeDef {
+	switch t := recvT.(type) {
+	case *ir.Named:
+		return t.Def
+	case *ir.Builtin:
+		return s.universe()[t.Name]
 	}
 	return nil
 }

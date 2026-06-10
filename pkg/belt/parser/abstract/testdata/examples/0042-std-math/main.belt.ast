@@ -241,6 +241,8 @@ File
             Namespace: ""
             Name: "nint"
             Args: ~
+            Projections: ~
+        Projections: ~
       Value: CollectionLit
         Entries: ~
       Builtin: false

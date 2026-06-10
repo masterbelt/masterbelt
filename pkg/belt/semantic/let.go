@@ -43,7 +43,7 @@ func checkLet(s *ast.LetStmt, bs infer.BodyScope, env exprFolder, noSelf func(as
 		// member of the annotation's enum (let r: Rarity = Legend) resolves through
 		// the checking walk; a name that is not a member is the unknown_enum_member
 		// the const path reports, not a bare type mismatch.
-		typ = resolveBodyType(bs, s.Type)
+		typ = resolveBodyTypeReporting(bs, s.Type, at, diags)
 		if s.Value != nil {
 			reportBareEnumMember(s.Value, enumDefOf(typ), bs, env, at, diags)
 			infer.CheckBody(s.Value, typ, bs, sink)
@@ -59,6 +59,10 @@ func checkLet(s *ast.LetStmt, bs infer.BodyScope, env exprFolder, noSelf func(as
 		c := at(s)
 		diags.Add(newMissingInitializerDiagnostic(c.offset, c.width, s.Name))
 	}
+
+	// A let may not hold a type value: let x = sbyte or let x: type is
+	// type_in_value_position, the local-binding twin of the const rule.
+	reportMetatypeSlot(at, diags, s, typ)
 
 	// A nameless let (recovered away by the parser) cannot be bound or referenced;
 	// extend nothing.
@@ -302,6 +306,16 @@ func withLocal(bs infer.BodyScope, name string, typ ir.Type) infer.BodyScope {
 // binder); an unknown name there yields ir.Invalid.
 func resolveBodyType(bs infer.BodyScope, t ast.TypeExpr) ir.Type {
 	r := &infer.TypeResolver{Defs: bs.Universe, Qualified: bs.Qualified}
+	return r.ResolveType(t, bs.TScope)
+}
+
+// resolveBodyTypeReporting is resolveBodyType with a projection-error reporter
+// wired in, for an annotation in a context that reports (a let or match arm in a
+// body): a failed field-type projection (let x: Item.nope = 1) surfaces its
+// diagnostic exactly as it does in a const or type annotation, rather than
+// resolving silently to ir.Invalid. A nil diagnostic list keeps it silent.
+func resolveBodyTypeReporting(bs infer.BodyScope, t ast.TypeExpr, at func(ast.Node) span, diags *diagnostic.List) ir.Type {
+	r := &infer.TypeResolver{Defs: bs.Universe, Qualified: bs.Qualified, ProjectionError: projectionErrorReporter(at, diags)}
 	return r.ResolveType(t, bs.TScope)
 }
 

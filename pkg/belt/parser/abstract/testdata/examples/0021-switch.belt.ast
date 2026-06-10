@@ -37,10 +37,12 @@ File
             Namespace: ""
             Name: "Rarity"
             Args: ~
+            Projections: ~
       Result: NamedType
         Namespace: ""
         Name: "string"
         Args: ~
+        Projections: ~
       Body:
         SwitchStmt
           Scrutinee: Identifier
@@ -86,10 +88,12 @@ File
             Namespace: ""
             Name: "nint"
             Args: ~
+            Projections: ~
       Result: NamedType
         Namespace: ""
         Name: "string"
         Args: ~
+        Projections: ~
       Body:
         SwitchStmt
           Scrutinee: Identifier

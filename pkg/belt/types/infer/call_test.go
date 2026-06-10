@@ -104,7 +104,7 @@ func genericFnEnv() stubEnv {
 	env.reg.Install([]*ir.TypeDef{foldable, bag})
 
 	// foldable<int, int> as a type expression for the bound.
-	foldableBound := ast.NewNamedType("", "foldable", []ast.TypeExpr{namedType("nint"), namedType("nint")}, nil)
+	foldableBound := ast.NewNamedType("", "foldable", []ast.TypeExpr{namedType("nint"), namedType("nint")}, nil, nil)
 	total := ast.NewFuncDecl(nil, true, false, nil, "total",
 		[]*ast.TypeParam{ast.NewTypeParam("T", foldableBound, nil)},
 		[]*ast.ParamDef{param("c", namedType("T"))}, namedType("nint"),

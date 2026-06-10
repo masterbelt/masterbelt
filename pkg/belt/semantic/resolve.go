@@ -3,6 +3,7 @@ package semantic
 import (
 	"maps"
 	"math/big"
+	"slices"
 
 	"github.com/masterbelt/masterbelt/pkg/belt/builtin"
 	"github.com/masterbelt/masterbelt/pkg/belt/eval"
@@ -43,6 +44,83 @@ func boundViolationReporter(at func(ast.Node) span, diags *diagnostic.List) func
 	}
 }
 
+// mentionsMetatype reports whether a resolved type is — or contains, anywhere in
+// a composite — the metatype `type` (the type a reified type value carries). A
+// type value is comptime-only and may not be stored, so any storage slot whose
+// resolved type mentions the metatype is rejected; the recursive check closes
+// the escape a bare top-level test would miss (list<type>, fn(type): type).
+func mentionsMetatype(t ir.Type) bool {
+	switch t := t.(type) {
+	case *ir.Builtin:
+		return t.Name == builtin.NameType
+	case *ir.App:
+		return slices.ContainsFunc(t.Args, mentionsMetatype)
+	case *ir.Union:
+		return slices.ContainsFunc(t.Members, mentionsMetatype)
+	case *ir.Record:
+		return slices.ContainsFunc(t.Fields, func(f ir.Field) bool { return mentionsMetatype(f.Type) })
+	case *ir.Func:
+		return slices.ContainsFunc(t.Params, mentionsMetatype) || mentionsMetatype(t.Result)
+	default:
+		return false
+	}
+}
+
+// sigType packs a signature's parameter and result types into an ir.Func, so a
+// single metatype test over it reports one diagnostic per signature however many
+// of its slots are a type value.
+func sigType(params []ir.Param, result ir.Type) *ir.Func {
+	ts := make([]ir.Type, len(params))
+	for i, p := range params {
+		ts[i] = p.Type
+	}
+	return &ir.Func{Params: ts, Result: result}
+}
+
+// reportMetatypeSlot reports type_in_value_position when a storage slot's
+// resolved type mentions the metatype — a const, let, record field, function
+// parameter, or result whose type is (or carries) `type`. A type value is a
+// comptime value and cannot be stored; the alias form (type X = Character.level)
+// is how a projected type is named. It anchors at node and is a no-op without a
+// reporter (a memoized resolution) or when the slot type is metatype-free.
+func reportMetatypeSlot(at func(ast.Node) span, diags *diagnostic.List, node ast.Node, t ir.Type) {
+	if at == nil || diags == nil || node == nil || !mentionsMetatype(t) {
+		return
+	}
+	s := at(node)
+	diags.Add(newTypeInValuePositionDiagnostic(s.offset, s.width))
+}
+
+// projectionErrorReporter builds the callback the type resolver reports a failed
+// field-type projection (T.member in type position) through, anchored at the
+// offending type expression: a value-or-method member (member_is_not_a_type), a
+// fieldless receiver (type_has_no_fields), a record/master missing the field
+// (unknown_field), or an ungrounded cyclic projection (cyclic_type_projection).
+// It returns nil when there is nowhere to report (the prelude, a memoized
+// resolution), so the resolver resolves projections silently for the IR.
+func projectionErrorReporter(at func(ast.Node) span, diags *diagnostic.List) func(ast.Node, infer.ProjectionErrorKind, ir.Type, string) {
+	if at == nil || diags == nil {
+		return nil
+	}
+	return func(node ast.Node, kind infer.ProjectionErrorKind, typ ir.Type, member string) {
+		s := at(node)
+		switch kind {
+		case infer.ProjMemberNotType:
+			diags.Add(newMemberIsNotATypeDiagnostic(s.offset, s.width, typ.String(), member))
+		case infer.ProjNoFields:
+			diags.Add(newTypeHasNoFieldsDiagnostic(s.offset, s.width, typ.String(), member))
+		case infer.ProjUnknownField:
+			// unknown_field is "{typ} has no field {field}": the receiver type is
+			// typ, the missing field is member.
+			diags.Add(newUnknownFieldDiagnostic(s.offset, s.width, member, typ.String()))
+		case infer.ProjCyclic:
+			diags.Add(newCyclicTypeProjectionDiagnostic(s.offset, s.width, typ.String(), member))
+		case infer.ProjGenericUnsupported:
+			diags.Add(newGenericTypeProjectionDiagnostic(s.offset, s.width, typ.String()))
+		}
+	}
+}
+
 // resolveTypes resolves the file's type declarations into ir.TypeDefs, in source
 // order. A type reference resolves against the other declarations in the file
 // (so a declaration may refer to a type defined later in the file), extern —
@@ -67,11 +145,12 @@ func resolveTypes(folder exprFolder, file *ast.File, at func(ast.Node) span, dia
 	// Second pass: resolve parameters, body, method signatures, enum bodies, and
 	// interface members, reporting any unknown type names.
 	r := &infer.TypeResolver{
-		Defs:           defs,
-		Qualified:      qualified,
-		Report:         unknownTypeReporter(at, diags),
-		Registry:       reg,
-		BoundViolation: boundViolationReporter(at, diags),
+		Defs:            defs,
+		Qualified:       qualified,
+		Report:          unknownTypeReporter(at, diags),
+		Registry:        reg,
+		BoundViolation:  boundViolationReporter(at, diags),
+		ProjectionError: projectionErrorReporter(at, diags),
 	}
 	for i, id := range file.Interfaces {
 		resolveInterfaceDecl(r, reg, id, ifaceOut[i], at, diags, fns)
@@ -123,6 +202,16 @@ func resolveTypes(folder exprFolder, file *ast.File, at func(ast.Node) span, dia
 	foldOwners := append(append([]*ir.TypeDef{}, out...), enumOut...)
 	foldOwners = append(foldOwners, masterOut...)
 	foldAssocConsts(folder, defs, foldOwners)
+
+	// An associated constant may not store a type value either, the impl-block
+	// twin of the top-level const rule: the check runs after the fold settles each
+	// constant's type, so it catches both an annotated slot (const C: type) and
+	// one inferred from a type-value initializer (const C = sbyte).
+	for _, owner := range foldOwners {
+		for _, ac := range owner.Consts {
+			reportMetatypeSlot(at, diags, ac.Syntax, ac.Type)
+		}
+	}
 
 	out = append(out, enumOut...)
 	out = append(out, ifaceOut...)
@@ -318,6 +407,10 @@ func resolveInterfaceDecl(r *infer.TypeResolver, reg *builtin.Registry, id *ast.
 	}
 	for _, m := range id.Members {
 		method := resolveInterfaceMember(r, reg, &ir.Named{Def: def}, m, scope, fns)
+		// An interface member's parameter or result may not be a type value, the
+		// same storage rule a concrete method obeys — so an interface cannot expose
+		// a type-valued runtime slot.
+		reportMetatypeSlot(at, diags, m, sigType(method.Params, method.Result))
 		def.AttachMethods(method)
 		if m.Provided() {
 			def.Interface.Provided = append(def.Interface.Provided, m.Name)
@@ -772,6 +865,12 @@ func resolveDecl(r *infer.TypeResolver, reg *builtin.Registry, td *ast.TypeDecl,
 		def.Body = &ir.Builtin{Name: td.Name}
 	} else {
 		def.Body = r.ResolveType(td.Body, scope)
+		// A storage slot may not hold a type value: a record field, a function
+		// type's parameter or result, or the alias itself resolving to the metatype
+		// (type Schema = { type: type }, type Remap = fn(type): type) is
+		// type_in_value_position. The projected-type alias (type X = Character.level)
+		// resolves to the field's declared type, not the metatype, so it is allowed.
+		reportMetatypeSlot(at, diags, td.Body, def.Body)
 	}
 	// The associated constants are resolved before the where-clause, so a
 	// self-referential predicate (`where self <= Percent.Max`) can read them.
@@ -786,6 +885,9 @@ func resolveDecl(r *infer.TypeResolver, reg *builtin.Registry, td *ast.TypeDecl,
 	seen := make(map[string]bool, len(td.Methods))
 	for _, m := range td.Methods {
 		rm := resolveMethod(r, reg, &ir.Named{Def: def}, m, scope, fns)
+		// A method parameter or result may not be a type value (fn f(t: type) — the
+		// "no type-value functions" half of the storage rule).
+		reportMetatypeSlot(at, diags, m, sigType(rm.Params, rm.Result))
 		key := rm.Name + signatureKey(def, rm)
 		if m.Name != "" && seen[key] {
 			reportDuplicateMethod(rm, def, m, at, diags)
@@ -827,6 +929,9 @@ func resolveMasterDecl(r *infer.TypeResolver, reg *builtin.Registry, md *ast.Mas
 	// later, so it is neither reported missing nor read here.
 	rowType := r.ResolveType(md.Record, nil)
 	def.Master.Row = rowType
+	// A row column may not store a type value, the master twin of a record field's
+	// storage rule (the row is the master's record body).
+	reportMetatypeSlot(at, diags, md.Record, rowType)
 	row := underlyingRecord(rowType)
 	// The primary key is stored de-duplicated, so the IR never carries a malformed
 	// doubled key tuple even when the duplicate is also reported below.
@@ -837,6 +942,9 @@ func resolveMasterDecl(r *infer.TypeResolver, reg *builtin.Registry, md *ast.Mas
 	seen := make(map[string]bool, len(md.Methods))
 	for _, m := range md.Methods {
 		rm := resolveMethod(r, reg, &ir.Named{Def: def}, m, nil, fns)
+		// A master method's parameter or result may not be a type value, the same
+		// storage rule a nominal type's method obeys.
+		reportMetatypeSlot(at, diags, m, sigType(rm.Params, rm.Result))
 		key := rm.Name + signatureKey(def, rm)
 		if m.Name != "" && seen[key] {
 			reportDuplicateMethod(rm, def, m, at, diags)
@@ -1035,6 +1143,11 @@ func constantType(v *ir.Constant) ir.Type {
 			return &ir.Named{Def: v.EnumDef}
 		}
 		return ir.Invalid
+	case ir.ConstType:
+		// A type value's own type is the metatype `type` — so an associated
+		// constant inferred from one (const C = sbyte) settles to it and the
+		// storage-rule check then rejects the slot.
+		return &ir.Builtin{Name: builtin.NameType}
 	default:
 		return ir.Invalid
 	}
@@ -1147,6 +1260,9 @@ func resolveEnumMethods(r *infer.TypeResolver, reg *builtin.Registry, ed *ast.En
 	seen := make(map[string]bool, len(ed.Methods))
 	for _, m := range ed.Methods {
 		rm := resolveMethod(r, reg, &ir.Named{Def: def}, m, scope, fns)
+		// An enum method's parameter or result may not be a type value, the same
+		// storage rule a nominal type's method obeys.
+		reportMetatypeSlot(at, diags, m, sigType(rm.Params, rm.Result))
 		key := rm.Name + signatureKey(def, rm)
 		if m.Name != "" && seen[key] {
 			reportDuplicateMethod(rm, def, m, at, diags)

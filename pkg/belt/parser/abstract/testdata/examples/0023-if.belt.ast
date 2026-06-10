@@ -19,22 +19,26 @@ File
             Namespace: ""
             Name: "nint"
             Args: ~
+            Projections: ~
         ParamDef
           Name: "lo"
           Type: NamedType
             Namespace: ""
             Name: "nint"
             Args: ~
+            Projections: ~
         ParamDef
           Name: "hi"
           Type: NamedType
             Namespace: ""
             Name: "nint"
             Args: ~
+            Projections: ~
       Result: NamedType
         Namespace: ""
         Name: "nint"
         Args: ~
+        Projections: ~
       Body:
         IfStmt
           Cond: CallExpr
@@ -84,10 +88,12 @@ File
             Namespace: ""
             Name: "nint"
             Args: ~
+            Projections: ~
       Result: NamedType
         Namespace: ""
         Name: "nint"
         Args: ~
+        Projections: ~
       Body:
         IfStmt
           Cond: CallExpr
@@ -122,10 +128,12 @@ File
             Namespace: ""
             Name: "nint"
             Args: ~
+            Projections: ~
       Result: NamedType
         Namespace: ""
         Name: "string"
         Args: ~
+        Projections: ~
       Body:
         IfStmt
           Cond: CallExpr

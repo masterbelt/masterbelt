@@ -122,11 +122,23 @@ type TypeExpr interface {
 // int8, Coin, Optional<int8>, the type parameter T, or the self/null types. A
 // type reached through a namespace import carries its qualifier — geo.Point
 // has Namespace "geo" and Name "Point"; a plain name has Namespace "".
+//
+// Projections are the field-type-projection segments dotted onto the head name:
+// Item.level parses to Namespace "" Name "Item" — its first dot is the
+// namespace-or-projection head, resolved by context — wait, no: the head's
+// first dot stays the Namespace.Name pair (Item.level is Namespace "Item",
+// Name "level"), and any further dots are Projections. So Order.customer.id is
+// Namespace "Order", Name "customer", Projections ["id"]. The resolver decides
+// the head: a namespace import keeps Namespace.Name a qualified type and
+// applies Projections on top; a type name makes Namespace.Name a field
+// projection and Projections further projections. Projections is empty for a
+// plain or once-dotted name.
 type NamedType struct {
-	Namespace string     // the namespace qualifier, or "" for a plain name
-	Name      string     // the type's own name, or "" if missing (geo.)
-	Args      []TypeExpr // generic arguments, empty if none
-	syntax    *cst.Node
+	Namespace   string     // the namespace qualifier, or "" for a plain name
+	Name        string     // the type's own name, or "" if missing (geo.)
+	Args        []TypeExpr // generic arguments, empty if none
+	Projections []string   // field-type-projection segments after the head, empty if none
+	syntax      *cst.Node
 }
 
 // Syntax returns the green CST node this type was lowered from.
@@ -135,8 +147,8 @@ func (t *NamedType) node()             {}
 func (t *NamedType) typeExpr()         {}
 
 // NewNamedType builds a NamedType node.
-func NewNamedType(namespace, name string, args []TypeExpr, syntax *cst.Node) *NamedType {
-	return &NamedType{Namespace: namespace, Name: name, Args: args, syntax: syntax}
+func NewNamedType(namespace, name string, args []TypeExpr, projections []string, syntax *cst.Node) *NamedType {
+	return &NamedType{Namespace: namespace, Name: name, Args: args, Projections: projections, syntax: syntax}
 }
 
 // UnionType is a union of member types: A | B | ...

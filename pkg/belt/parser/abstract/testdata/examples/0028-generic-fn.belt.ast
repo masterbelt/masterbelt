@@ -41,6 +41,8 @@ File
             Namespace: ""
             Name: "nint"
             Args: ~
+            Projections: ~
+        Projections: ~
       Where: ~
       Methods:
         MethodDecl
@@ -61,6 +63,7 @@ File
                 Namespace: ""
                 Name: "A"
                 Args: ~
+                Projections: ~
             ParamDef
               Name: "step"
               Type: FuncType
@@ -71,26 +74,31 @@ File
                       Namespace: ""
                       Name: "A"
                       Args: ~
+                      Projections: ~
                   ParamDef
                     Name: "key"
                     Type: NamedType
                       Namespace: ""
                       Name: "nint"
                       Args: ~
+                      Projections: ~
                   ParamDef
                     Name: "value"
                     Type: NamedType
                       Namespace: ""
                       Name: "nint"
                       Args: ~
+                      Projections: ~
                 Result: NamedType
                   Namespace: ""
                   Name: "A"
                   Args: ~
+                  Projections: ~
           Result: NamedType
             Namespace: ""
             Name: "A"
             Args: ~
+            Projections: ~
           Body:
             ReturnStmt
               Value: Identifier
@@ -105,10 +113,13 @@ File
               Namespace: ""
               Name: "nint"
               Args: ~
+              Projections: ~
             NamedType
               Namespace: ""
               Name: "nint"
               Args: ~
+              Projections: ~
+          Projections: ~
   Enums: ~
   Interfaces:
     InterfaceDecl
@@ -139,6 +150,7 @@ File
                 Namespace: ""
                 Name: "A"
                 Args: ~
+                Projections: ~
             ParamDef
               Name: "step"
               Type: FuncType
@@ -149,26 +161,31 @@ File
                       Namespace: ""
                       Name: "A"
                       Args: ~
+                      Projections: ~
                   ParamDef
                     Name: "key"
                     Type: NamedType
                       Namespace: ""
                       Name: "K"
                       Args: ~
+                      Projections: ~
                   ParamDef
                     Name: "value"
                     Type: NamedType
                       Namespace: ""
                       Name: "V"
                       Args: ~
+                      Projections: ~
                 Result: NamedType
                   Namespace: ""
                   Name: "A"
                   Args: ~
+                  Projections: ~
           Result: NamedType
             Namespace: ""
             Name: "A"
             Args: ~
+            Projections: ~
           Body: ~
         InterfaceMember
           Doc: "Provided: the number of elements, folded from the primitive."
@@ -180,6 +197,7 @@ File
             Namespace: ""
             Name: "nint"
             Args: ~
+            Projections: ~
           Body:
             ReturnStmt
               Value: CallExpr
@@ -229,10 +247,13 @@ File
                 Namespace: ""
                 Name: "nint"
                 Args: ~
+                Projections: ~
               NamedType
                 Namespace: ""
                 Name: "nint"
                 Args: ~
+                Projections: ~
+            Projections: ~
       Params:
         ParamDef
           Name: "c"
@@ -240,10 +261,12 @@ File
             Namespace: ""
             Name: "T"
             Args: ~
+            Projections: ~
       Result: NamedType
         Namespace: ""
         Name: "nint"
         Args: ~
+        Projections: ~
       Body:
         ReturnStmt
           Value: CallExpr
@@ -295,10 +318,12 @@ File
             Namespace: ""
             Name: "T"
             Args: ~
+            Projections: ~
       Result: NamedType
         Namespace: ""
         Name: "T"
         Args: ~
+        Projections: ~
       Body:
         ReturnStmt
           Value: Identifier
@@ -320,16 +345,19 @@ File
             Namespace: ""
             Name: "T"
             Args: ~
+            Projections: ~
         ParamDef
           Name: "b"
           Type: NamedType
             Namespace: ""
             Name: "T"
             Args: ~
+            Projections: ~
       Result: NamedType
         Namespace: ""
         Name: "T"
         Args: ~
+        Projections: ~
       Body:
         ReturnStmt
           Value: Identifier

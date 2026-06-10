@@ -13,6 +13,8 @@ File
             Namespace: ""
             Name: "nint"
             Args: ~
+            Projections: ~
+        Projections: ~
       Value: CollectionLit
         Entries:
           CollectionEntry
@@ -40,10 +42,13 @@ File
             Namespace: ""
             Name: "string"
             Args: ~
+            Projections: ~
           NamedType
             Namespace: ""
             Name: "nint"
             Args: ~
+            Projections: ~
+        Projections: ~
       Value: CollectionLit
         Entries:
           CollectionEntry
@@ -84,6 +89,8 @@ File
             Namespace: ""
             Name: "sbyte"
             Args: ~
+            Projections: ~
+        Projections: ~
       Value: CollectionLit
         Entries:
           CollectionEntry
@@ -111,6 +118,8 @@ File
             Namespace: ""
             Name: "nint"
             Args: ~
+            Projections: ~
+        Projections: ~
       Value: CollectionLit
         Entries: ~
       Builtin: false
@@ -126,10 +135,13 @@ File
             Namespace: ""
             Name: "string"
             Args: ~
+            Projections: ~
           NamedType
             Namespace: ""
             Name: "nint"
             Args: ~
+            Projections: ~
+        Projections: ~
       Value: CollectionLit
         Entries: ~
       Builtin: false

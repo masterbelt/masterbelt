@@ -70,7 +70,8 @@ Module
                   Args: ~
                   Resolved: ~
                   Subst: ~
-                  Type: ~
+                  Type: Builtin
+                    Name: "datetime"
                 Method: "add"
                 Args:
                   FieldAccess
@@ -83,7 +84,8 @@ Module
                 Setter: false
                 Resolved: ~
                 Subst: ~
-                Type: ~
+                Type: Builtin
+                  Name: "datetime"
           Owner: "Clock"
       Consts: ~
       Builtin: false
@@ -112,7 +114,8 @@ Module
             Args: ~
             Resolved: ~
             Subst: ~
-            Type: ~
+            Type: Builtin
+              Name: "datetime"
     Function
       Name: "double"
       Anchor: "belt:/double"

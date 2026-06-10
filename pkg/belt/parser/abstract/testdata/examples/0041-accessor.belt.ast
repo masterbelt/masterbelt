@@ -100,6 +100,7 @@ File
               Namespace: ""
               Name: "nint"
               Args: ~
+              Projections: ~
       Where: ~
       Methods:
         MethodDecl
@@ -115,6 +116,7 @@ File
             Namespace: ""
             Name: "Celsius"
             Args: ~
+            Projections: ~
           Body:
             ReturnStmt
               Value: RecordLit
@@ -139,10 +141,12 @@ File
                 Namespace: ""
                 Name: "nint"
                 Args: ~
+                Projections: ~
           Result: NamedType
             Namespace: ""
             Name: "Celsius"
             Args: ~
+            Projections: ~
           Body:
             ReturnStmt
               Value: RecordLit
@@ -188,10 +192,12 @@ File
                 Namespace: ""
                 Name: "Celsius"
                 Args: ~
+                Projections: ~
           Result: NamedType
             Namespace: ""
             Name: "Celsius"
             Args: ~
+            Projections: ~
           Body:
             ReturnStmt
               Value: Identifier
@@ -209,6 +215,7 @@ File
             Namespace: ""
             Name: "nint"
             Args: ~
+            Projections: ~
           Body:
             ReturnStmt
               Value: CallExpr
@@ -251,10 +258,12 @@ File
                 Namespace: ""
                 Name: "nint"
                 Args: ~
+                Projections: ~
           Result: NamedType
             Namespace: ""
             Name: "self"
             Args: ~
+            Projections: ~
           Body:
             ReturnStmt
               Value: RecordLit
@@ -296,6 +305,7 @@ File
         Namespace: ""
         Name: "nint"
         Args: ~
+        Projections: ~
       Where: ~
       Methods:
         MethodDecl
@@ -311,6 +321,7 @@ File
             Namespace: ""
             Name: "Health"
             Args: ~
+            Projections: ~
           Body:
             ReturnStmt
               Value: MemberExpr
@@ -331,6 +342,7 @@ File
             Namespace: ""
             Name: "nint"
             Args: ~
+            Projections: ~
           Body:
             ReturnStmt
               Value: CallExpr
@@ -385,6 +397,7 @@ File
             Namespace: ""
             Name: "bool"
             Args: ~
+            Projections: ~
           Body:
             ReturnStmt
               Value: CallExpr
@@ -411,6 +424,7 @@ File
             Namespace: ""
             Name: "Element"
             Args: ~
+            Projections: ~
           Body:
             ReturnStmt
               Value: MemberExpr
@@ -434,6 +448,7 @@ File
         Namespace: ""
         Name: "Celsius"
         Args: ~
+        Projections: ~
       Body:
         LetStmt
           Name: "c"

@@ -49,6 +49,7 @@ File
         Namespace: ""
         Name: "Level"
         Args: ~
+        Projections: ~
       Value: TernaryExpr
         Cond: CallExpr
           Callee: MemberExpr
@@ -139,6 +140,7 @@ File
         Namespace: ""
         Name: "sbyte"
         Args: ~
+        Projections: ~
       Where: ~
       Methods: ~
       Consts:
@@ -160,6 +162,7 @@ File
         Namespace: ""
         Name: "int"
         Args: ~
+        Projections: ~
       Where: ~
       Methods:
         MethodDecl
@@ -175,6 +178,7 @@ File
             Namespace: ""
             Name: "int"
             Args: ~
+            Projections: ~
           Body:
             ReturnStmt
               Value: TernaryExpr

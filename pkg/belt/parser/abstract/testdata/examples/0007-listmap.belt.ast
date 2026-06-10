@@ -33,10 +33,12 @@ File
                   Namespace: ""
                   Name: "nint"
                   Args: ~
+                  Projections: ~
             Result: NamedType
               Namespace: ""
               Name: "nint"
               Args: ~
+              Projections: ~
             Body:
               ReturnStmt
                 Value: CallExpr
@@ -85,10 +87,12 @@ File
                   Namespace: ""
                   Name: "nint"
                   Args: ~
+                  Projections: ~
             Result: NamedType
               Namespace: ""
               Name: "bool"
               Args: ~
+              Projections: ~
             Body:
               ReturnStmt
                 Value: CallExpr

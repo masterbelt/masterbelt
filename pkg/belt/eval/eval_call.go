@@ -51,6 +51,27 @@ func enumComparison(recv *ir.Constant, name string, args []*ir.Constant) *ir.Con
 	return nil
 }
 
+// typeValueComparison folds the equality of two type values — Character.id ==
+// long, the comptime type-equality the design admits. A type value carries
+// nominal identity, so Level and the int8 it aliases are distinct; the
+// comparison is ConstantsEqual's ConstType case (typeValuesEqual). It has no
+// registry intrinsic — the metatype is opaque and declared in no prelude file,
+// so a native would be a dead one — and is folded here directly. The argument
+// must be another type value; the type checker has already required it.
+func typeValueComparison(recv *ir.Constant, name string, args []*ir.Constant) *ir.Constant {
+	if len(args) != 1 || args[0].Kind != ir.ConstType {
+		return nil
+	}
+	eq := ir.ConstantsEqual(recv, args[0])
+	switch name {
+	case builtin.OpEql:
+		return ir.BoolConstant(eq)
+	case builtin.OpNeq:
+		return ir.BoolConstant(!eq)
+	}
+	return nil
+}
+
 // compareEnumValues compares two enum members' base values, returning the sign
 // of the comparison and whether it could be made: integers compare numerically,
 // strings lexicographically. Two values of differing or unsupported kinds (or a

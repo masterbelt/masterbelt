@@ -27,6 +27,7 @@ File
         Namespace: ""
         Name: "int"
         Args: ~
+        Projections: ~
       Where: ~
       Methods: ~
       Consts: ~

@@ -11,6 +11,7 @@ File
         Namespace: ""
         Name: "sbyte"
         Args: ~
+        Projections: ~
       Where: ~
       Methods: ~
       Consts: ~
@@ -24,6 +25,7 @@ File
         Namespace: ""
         Name: "sbyte"
         Args: ~
+        Projections: ~
       Where: ~
       Methods:
         MethodDecl
@@ -39,6 +41,7 @@ File
             Namespace: ""
             Name: "self"
             Args: ~
+            Projections: ~
           Body:
             ReturnStmt
               Value: CallExpr
@@ -62,10 +65,12 @@ File
             Namespace: ""
             Name: "Coin"
             Args: ~
+            Projections: ~
           NamedType
             Namespace: ""
             Name: "Level"
             Args: ~
+            Projections: ~
       Where: ~
       Methods: ~
       Consts: ~
@@ -84,10 +89,12 @@ File
             Namespace: ""
             Name: "T"
             Args: ~
+            Projections: ~
           NamedType
             Namespace: ""
             Name: "null"
             Args: ~
+            Projections: ~
       Where: ~
       Methods: ~
       Consts: ~
@@ -105,20 +112,24 @@ File
                 Namespace: ""
                 Name: "sbyte"
                 Args: ~
+                Projections: ~
               NamedType
                 Namespace: ""
                 Name: "short"
                 Args: ~
+                Projections: ~
       Body: UnionType
         Members:
           NamedType
             Namespace: ""
             Name: "T"
             Args: ~
+            Projections: ~
           NamedType
             Namespace: ""
             Name: "null"
             Args: ~
+            Projections: ~
       Where: ~
       Methods: ~
       Consts: ~
@@ -136,12 +147,14 @@ File
               Namespace: ""
               Name: "sbyte"
               Args: ~
+              Projections: ~
           FieldDef
             Name: "level"
             Type: NamedType
               Namespace: ""
               Name: "Level"
               Args: ~
+              Projections: ~
       Where: ~
       Methods:
         MethodDecl
@@ -157,6 +170,7 @@ File
             Namespace: ""
             Name: "int"
             Args: ~
+            Projections: ~
           Body:
             ReturnStmt
               Value: CallExpr
@@ -195,10 +209,12 @@ File
               Namespace: ""
               Name: "T"
               Args: ~
+              Projections: ~
         Result: NamedType
           Namespace: ""
           Name: "R"
           Args: ~
+          Projections: ~
       Where: ~
       Methods: ~
       Consts: ~

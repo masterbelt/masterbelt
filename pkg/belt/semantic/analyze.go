@@ -26,6 +26,7 @@
 package semantic
 
 import (
+	"github.com/masterbelt/masterbelt/pkg/belt/builtin"
 	"github.com/masterbelt/masterbelt/pkg/belt/parser/abstract"
 	"github.com/masterbelt/masterbelt/pkg/belt/types"
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
@@ -272,8 +273,13 @@ func classifyRefCallee(fileID FileID, e *ast.CallExpr, q queries, funcCallee map
 			// fn call (Celsius.freezing()): the member is not an enum member or
 			// associated constant, so it must be exempt from the type-member
 			// reference check below — whether the static fn exists is the type
-			// checker's unknown_static finding.
-			if types.ResolveMember(q.universe(fileID)[recv.Name], callee.Member.Name).Kind == types.MemberStatic {
+			// checker's unknown_static finding. A metatype method call (Level ==
+			// long, desugared to Level.eql(long)) is exempt the same way: it calls
+			// the reified type value's equality, not a member of the type itself.
+			switch {
+			case types.ResolveMember(q.universe(fileID)[recv.Name], callee.Member.Name).Kind == types.MemberStatic:
+				staticCallee[callee] = true
+			case types.IsMetatypeMethod(q.universe(fileID)[builtin.NameType], callee.Member.Name):
 				staticCallee[callee] = true
 			}
 		}
@@ -288,6 +294,15 @@ func classifyRefCallee(fileID FileID, e *ast.CallExpr, q queries, funcCallee map
 func walkRefsMember(fileID FileID, e *ast.MemberExpr, q queries, onMember, onTypeMember func(*ast.MemberExpr), funcMemberCallee, staticCallee map[*ast.MemberExpr]bool) bool {
 	recv, ok := e.Receiver.(*ast.Identifier)
 	if !ok {
+		// A receiver that is itself a namespace-qualified type name (geo.Item) makes
+		// this a qualified type-member reference (geo.Item.id), validated as one unit
+		// exactly as a bare-name type member is.
+		if onTypeMember != nil && isQualifiedTypeReceiver(fileID, e.Receiver, q) {
+			if !staticCallee[e] {
+				onTypeMember(e)
+			}
+			return false
+		}
 		return true
 	}
 	if onTypeMember != nil && isTypeName(fileID, recv, q) {
@@ -303,6 +318,27 @@ func walkRefsMember(fileID FileID, e *ast.MemberExpr, q queries, onMember, onTyp
 		return false
 	}
 	return true
+}
+
+// isQualifiedTypeReceiver reports whether recv is a namespace-qualified type name
+// (geo.Item) — a member access whose receiver is a namespace import and whose
+// member is one of its exported types — so a further member off it (geo.Item.id)
+// is a qualified type-member reference rather than an ordinary expression.
+func isQualifiedTypeReceiver(fileID FileID, recv ast.Expr, q queries) bool {
+	m, ok := recv.(*ast.MemberExpr)
+	if !ok {
+		return false
+	}
+	ns, ok := m.Receiver.(*ast.Identifier)
+	if !ok {
+		return false
+	}
+	// A value of the namespace's name shadows the import (geo a local or const), so
+	// geo.Item is then a value field read, not a qualified type.
+	if q.resolve(fileID, ns) != nil {
+		return false
+	}
+	return qualifiedFrom(q, q.importsOf(fileID))(ns.Name, m.Member.Name) != nil
 }
 
 // isTypeName reports whether an identifier names a type in its file — and no

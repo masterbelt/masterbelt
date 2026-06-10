@@ -249,13 +249,18 @@ func Default() *Registry {
 		binaryMillis(ir.ConstDuration, ir.ConstDatetime, checkedMillis(addMillis, ir.DatetimeConstant)))
 
 	// type: the metatype — the type a reified type value reports as its own
-	// (type : type). It is opaque (no value range, no operators, no prelude
-	// declaration), so it is registered as a def but not via register: not a
-	// Names() primitive (nothing to validate against the prelude) and with no
-	// NativeType. Lookup resolves it to ir.Builtin{type}, the type every type
-	// value carries; the semantic layer layers it onto the implicit-import surface
-	// so a file resolves `type` the way it resolves a prelude primitive.
-	r.defs[NameType] = &ir.TypeDef{Name: NameType, Public: true, Body: &ir.Builtin{Name: NameType}, Builtin: true}
+	// (type : type). It is opaque (no value range, no prelude declaration), so it
+	// is registered as a def but not via register: not a Names() primitive
+	// (nothing to validate against the prelude) and with no NativeType. Lookup
+	// resolves it to ir.Builtin{type}, the type every type value carries; the
+	// semantic layer layers it onto the implicit-import surface so a file resolves
+	// `type` the way it resolves a prelude primitive. It carries equality (eql/neq)
+	// so a comptime test of type identity — assert Character.id == long — type-
+	// checks; the evaluator folds those directly (no intrinsic), since the
+	// metatype is declared in no prelude file and a native would be a dead one.
+	typeDef := &ir.TypeDef{Name: NameType, Public: true, Body: &ir.Builtin{Name: NameType}, Builtin: true}
+	typeDef.AttachMethods(typeMethods()...)
+	r.defs[NameType] = typeDef
 	return r
 }
 

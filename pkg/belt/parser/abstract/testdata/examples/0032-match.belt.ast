@@ -9,6 +9,7 @@ File
         Namespace: ""
         Name: "GameValue"
         Args: ~
+        Projections: ~
       Value: RecordLit
         TypeName: "Coin"
         Fields:
@@ -43,6 +44,7 @@ File
               Namespace: ""
               Name: "nint"
               Args: ~
+              Projections: ~
       Where: ~
       Methods: ~
       Consts: ~
@@ -60,6 +62,7 @@ File
               Namespace: ""
               Name: "nint"
               Args: ~
+              Projections: ~
       Where: ~
       Methods: ~
       Consts: ~
@@ -75,10 +78,12 @@ File
             Namespace: ""
             Name: "Coin"
             Args: ~
+            Projections: ~
           NamedType
             Namespace: ""
             Name: "Level"
             Args: ~
+            Projections: ~
       Where: ~
       Methods: ~
       Consts: ~
@@ -100,10 +105,12 @@ File
             Namespace: ""
             Name: "GameValue"
             Args: ~
+            Projections: ~
       Result: NamedType
         Namespace: ""
         Name: "string"
         Args: ~
+        Projections: ~
       Body:
         MatchStmt
           Scrutinee: Identifier
@@ -114,6 +121,7 @@ File
                 Namespace: ""
                 Name: "Coin"
                 Args: ~
+                Projections: ~
               Bind: "c"
               Body:
                 ReturnStmt
@@ -124,6 +132,7 @@ File
                 Namespace: ""
                 Name: "Level"
                 Args: ~
+                Projections: ~
               Bind: "l"
               Body:
                 ReturnStmt
@@ -145,10 +154,12 @@ File
             Namespace: ""
             Name: "GameValue"
             Args: ~
+            Projections: ~
       Result: NamedType
         Namespace: ""
         Name: "nint"
         Args: ~
+        Projections: ~
       Body:
         MatchStmt
           Scrutinee: Identifier
@@ -159,6 +170,7 @@ File
                 Namespace: ""
                 Name: "Coin"
                 Args: ~
+                Projections: ~
               Bind: "c"
               Body:
                 ReturnStmt
@@ -172,6 +184,7 @@ File
                 Namespace: ""
                 Name: "Level"
                 Args: ~
+                Projections: ~
               Bind: "l"
               Body:
                 ReturnStmt
@@ -198,20 +211,24 @@ File
                 Namespace: ""
                 Name: "Coin"
                 Args: ~
+                Projections: ~
               NamedType
                 Namespace: ""
                 Name: "null"
                 Args: ~
+                Projections: ~
         ParamDef
           Name: "fallback"
           Type: NamedType
             Namespace: ""
             Name: "nint"
             Args: ~
+            Projections: ~
       Result: NamedType
         Namespace: ""
         Name: "nint"
         Args: ~
+        Projections: ~
       Body:
         MatchStmt
           Scrutinee: Identifier
@@ -222,6 +239,7 @@ File
                 Namespace: ""
                 Name: "Coin"
                 Args: ~
+                Projections: ~
               Bind: "c"
               Body:
                 ReturnStmt
@@ -235,6 +253,7 @@ File
                 Namespace: ""
                 Name: "null"
                 Args: ~
+                Projections: ~
               Bind: ""
               Body:
                 ReturnStmt
@@ -256,10 +275,12 @@ File
             Namespace: ""
             Name: "GameValue"
             Args: ~
+            Projections: ~
       Result: NamedType
         Namespace: ""
         Name: "nint"
         Args: ~
+        Projections: ~
       Body:
         MatchStmt
           Scrutinee: Identifier
@@ -270,6 +291,7 @@ File
                 Namespace: ""
                 Name: "Coin"
                 Args: ~
+                Projections: ~
               Bind: "c"
               Body:
                 ReturnStmt
@@ -301,16 +323,20 @@ File
                 Namespace: ""
                 Name: "nint"
                 Args: ~
+                Projections: ~
+            Projections: ~
         ParamDef
           Name: "fallback"
           Type: NamedType
             Namespace: ""
             Name: "nint"
             Args: ~
+            Projections: ~
       Result: NamedType
         Namespace: ""
         Name: "nint"
         Args: ~
+        Projections: ~
       Body:
         MatchStmt
           Scrutinee: CallExpr
@@ -328,6 +354,7 @@ File
                 Namespace: ""
                 Name: "nint"
                 Args: ~
+                Projections: ~
               Bind: "v"
               Body:
                 ReturnStmt
@@ -338,6 +365,7 @@ File
                 Namespace: ""
                 Name: "error"
                 Args: ~
+                Projections: ~
               Bind: "e"
               Body:
                 ReturnStmt
@@ -359,16 +387,19 @@ File
             Namespace: ""
             Name: "GameValue"
             Args: ~
+            Projections: ~
         ParamDef
           Name: "other"
           Type: NamedType
             Namespace: ""
             Name: "GameValue"
             Args: ~
+            Projections: ~
       Result: NamedType
         Namespace: ""
         Name: "string"
         Args: ~
+        Projections: ~
       Body:
         MatchStmt
           Scrutinee: Identifier
@@ -379,6 +410,7 @@ File
                 Namespace: ""
                 Name: "Coin"
                 Args: ~
+                Projections: ~
               Bind: "c"
               Body:
                 LetStmt
@@ -398,6 +430,7 @@ File
                         Namespace: ""
                         Name: "Coin"
                         Args: ~
+                        Projections: ~
                       Bind: "c2"
                       Body:
                         ReturnStmt
@@ -408,6 +441,7 @@ File
                         Namespace: ""
                         Name: "Level"
                         Args: ~
+                        Projections: ~
                       Bind: "l"
                       Body:
                         ReturnStmt
@@ -420,6 +454,7 @@ File
                 Namespace: ""
                 Name: "Level"
                 Args: ~
+                Projections: ~
               Bind: "l"
               Body:
                 ReturnStmt

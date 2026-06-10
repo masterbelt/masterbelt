@@ -227,10 +227,13 @@ File
                 Namespace: ""
                 Name: "nint"
                 Args: ~
+                Projections: ~
+            Projections: ~
       Result: NamedType
         Namespace: ""
         Name: "nint"
         Args: ~
+        Projections: ~
       Body:
         LetStmt
           Name: "total"
@@ -276,14 +279,18 @@ File
                 Namespace: ""
                 Name: "string"
                 Args: ~
+                Projections: ~
               NamedType
                 Namespace: ""
                 Name: "nint"
                 Args: ~
+                Projections: ~
+            Projections: ~
       Result: NamedType
         Namespace: ""
         Name: "string"
         Args: ~
+        Projections: ~
       Body:
         LetStmt
           Name: "out"
@@ -329,14 +336,18 @@ File
                 Namespace: ""
                 Name: "string"
                 Args: ~
+                Projections: ~
               NamedType
                 Namespace: ""
                 Name: "nint"
                 Args: ~
+                Projections: ~
+            Projections: ~
       Result: NamedType
         Namespace: ""
         Name: "nint"
         Args: ~
+        Projections: ~
       Body:
         LetStmt
           Name: "total"
@@ -382,10 +393,13 @@ File
                 Namespace: ""
                 Name: "nint"
                 Args: ~
+                Projections: ~
+            Projections: ~
       Result: NamedType
         Namespace: ""
         Name: "nint"
         Args: ~
+        Projections: ~
       Body:
         LetStmt
           Name: "total"
@@ -431,10 +445,13 @@ File
                 Namespace: ""
                 Name: "nint"
                 Args: ~
+                Projections: ~
+            Projections: ~
       Result: NamedType
         Namespace: ""
         Name: "nint"
         Args: ~
+        Projections: ~
       Body:
         LetStmt
           Name: "total"
@@ -500,6 +517,8 @@ File
                 Namespace: ""
                 Name: "nint"
                 Args: ~
+                Projections: ~
+            Projections: ~
         ParamDef
           Name: "ys"
           Type: NamedType
@@ -510,10 +529,13 @@ File
                 Namespace: ""
                 Name: "nint"
                 Args: ~
+                Projections: ~
+            Projections: ~
       Result: NamedType
         Namespace: ""
         Name: "nint"
         Args: ~
+        Projections: ~
       Body:
         LetStmt
           Name: "count"
@@ -565,10 +587,13 @@ File
                 Namespace: ""
                 Name: "nint"
                 Args: ~
+                Projections: ~
+            Projections: ~
       Result: NamedType
         Namespace: ""
         Name: "nint"
         Args: ~
+        Projections: ~
       Body:
         LetStmt
           Name: "acc"

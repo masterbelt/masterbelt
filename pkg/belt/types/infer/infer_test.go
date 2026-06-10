@@ -121,8 +121,8 @@ func TestDecl(t *testing.T) {
 		decl *ast.ConstDecl
 		want string
 	}{
-		{"annotation wins", ast.NewConstDecl(nil, false, "X", ast.NewNamedType("", "int", nil, nil), intLit("1"), nil), "int"},
-		{"unknown annotation", ast.NewConstDecl(nil, false, "X", ast.NewNamedType("", "notatype", nil, nil), intLit("1"), nil), "invalid"},
+		{"annotation wins", ast.NewConstDecl(nil, false, "X", ast.NewNamedType("", "int", nil, nil, nil), intLit("1"), nil), "int"},
+		{"unknown annotation", ast.NewConstDecl(nil, false, "X", ast.NewNamedType("", "notatype", nil, nil, nil), intLit("1"), nil), "invalid"},
 		{"inferred from value", ast.NewConstDecl(nil, false, "X", nil, intLit("1"), nil), "nint"},
 		{"no type, no value", ast.NewConstDecl(nil, false, "X", nil, nil, nil), "invalid"},
 	}
@@ -135,7 +135,7 @@ func TestDecl(t *testing.T) {
 
 // --- function literals -------------------------------------------------------
 
-func namedType(name string) *ast.NamedType { return ast.NewNamedType("", name, nil, nil) }
+func namedType(name string) *ast.NamedType { return ast.NewNamedType("", name, nil, nil, nil) }
 func param(name string, typ ast.TypeExpr) *ast.ParamDef {
 	return ast.NewParamDef(name, typ, nil)
 }

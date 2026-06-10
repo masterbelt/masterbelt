@@ -497,13 +497,9 @@ func recordOf(t ir.Type) *ir.Record {
 // no member, or an associated constant has no resolved type — the fall-through
 // the scope's other readings (a namespace import, a record field) take. A
 // type-member access wins over a record-field reading, the one Type.Name path.
-func typeMemberType(universe map[string]*ir.TypeDef, m *ast.MemberExpr) ir.Type {
-	recv, ok := m.Receiver.(*ast.Identifier)
-	if !ok {
-		return ir.Invalid
-	}
-	def, ok := universe[recv.Name]
-	if !ok {
+func typeMemberType(universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, valueShadows func(*ast.Identifier) bool, m *ast.MemberExpr) ir.Type {
+	def := memberReceiverDef(universe, qualified, valueShadows, m.Receiver)
+	if def == nil {
 		return ir.Invalid
 	}
 	switch r := types.ResolveMember(def, m.Member.Name); r.Kind {
@@ -514,10 +510,40 @@ func typeMemberType(universe map[string]*ir.TypeDef, m *ast.MemberExpr) ir.Type 
 			return t
 		}
 	case types.MemberNone, types.MemberStatic:
-		// Not a value-typed member: no match, or a static fn (read without a call,
-		// which the scope's record-field reading takes instead).
+		// A declared field projected in value position (Character.level) is a type
+		// value, whose own type is the metatype `type` — the value half of the
+		// field-type projection, which a comptime test (assert Character.id == long)
+		// consumes. A static fn read without a call falls through to the record-
+		// field reading, as before.
+		if _, ok := types.FieldProjection(def, m.Member.Name); ok {
+			return metatype()
+		}
 	}
 	return ir.Invalid
+}
+
+// memberReceiverDef resolves a member-access receiver to the type definition a
+// member is read off: a local type name (Item) through the universe, or a
+// namespace-qualified type name (geo.Item) through the import lookup. It returns
+// nil when the receiver is neither — a value receiver, or a name that is no type
+// — which the caller takes as a record-field reading. A nil qualified lookup
+// (no namespaces in scope) leaves the qualified form unresolved. The qualified
+// form is skipped when the namespace identifier is shadowed by a value
+// (valueShadows), so geo.Item.id reads the fields of a const named geo rather
+// than projecting the imported type.
+func memberReceiverDef(universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, valueShadows func(*ast.Identifier) bool, recv ast.Expr) *ir.TypeDef {
+	switch r := recv.(type) {
+	case *ast.Identifier:
+		return universe[r.Name]
+	case *ast.MemberExpr:
+		if ns, ok := r.Receiver.(*ast.Identifier); ok && qualified != nil {
+			if valueShadows != nil && valueShadows(ns) {
+				return nil
+			}
+			return qualified(ns.Name, r.Member.Name)
+		}
+	}
+	return nil
 }
 
 // enumMemberIndex returns the index of the named member of an enum definition,
@@ -751,6 +777,14 @@ func observeStreams(w, sink *Sink) {
 	}
 	w.Adapted = func(e ast.Expr, to ir.Type) {
 		sink.adapted(e, to)
+	}
+	// MetatypeSlot fires for every function literal the walk settles, not only a
+	// failing one, so it is forwarded like a stream and never flips *fired — which
+	// signals a call-inference failure, a different thing. The slot diagnostic it
+	// surfaces (for a type-value function) is decided downstream, in the sink the
+	// semantic layer wires, exactly as a declared signature's is.
+	w.MetatypeSlot = func(lit *ast.FuncLit, t *ir.Func) {
+		sink.metatypeSlot(lit, t)
 	}
 }
 

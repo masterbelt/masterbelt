@@ -83,22 +83,26 @@ File
                   Namespace: ""
                   Name: "nint"
                   Args: ~
+                  Projections: ~
               ParamDef
                 Name: "i"
                 Type: NamedType
                   Namespace: ""
                   Name: "nint"
                   Args: ~
+                  Projections: ~
               ParamDef
                 Name: "v"
                 Type: NamedType
                   Namespace: ""
                   Name: "nint"
                   Args: ~
+                  Projections: ~
             Result: NamedType
               Namespace: ""
               Name: "nint"
               Args: ~
+              Projections: ~
             Body:
               ReturnStmt
                 Value: CallExpr
@@ -145,22 +149,26 @@ File
                   Namespace: ""
                   Name: "nint"
                   Args: ~
+                  Projections: ~
               ParamDef
                 Name: "i"
                 Type: NamedType
                   Namespace: ""
                   Name: "nint"
                   Args: ~
+                  Projections: ~
               ParamDef
                 Name: "v"
                 Type: NamedType
                   Namespace: ""
                   Name: "nint"
                   Args: ~
+                  Projections: ~
             Result: NamedType
               Namespace: ""
               Name: "nint"
               Args: ~
+              Projections: ~
             Body:
               ReturnStmt
                 Value: CallExpr
@@ -210,22 +218,26 @@ File
                   Namespace: ""
                   Name: "nint"
                   Args: ~
+                  Projections: ~
               ParamDef
                 Name: "k"
                 Type: NamedType
                   Namespace: ""
                   Name: "string"
                   Args: ~
+                  Projections: ~
               ParamDef
                 Name: "v"
                 Type: NamedType
                   Namespace: ""
                   Name: "nint"
                   Args: ~
+                  Projections: ~
             Result: NamedType
               Namespace: ""
               Name: "nint"
               Args: ~
+              Projections: ~
             Body:
               ReturnStmt
                 Value: CallExpr
@@ -299,10 +311,12 @@ File
                   Namespace: ""
                   Name: "nint"
                   Args: ~
+                  Projections: ~
             Result: NamedType
               Namespace: ""
               Name: "bool"
               Args: ~
+              Projections: ~
             Body:
               ReturnStmt
                 Value: CallExpr
@@ -347,10 +361,12 @@ File
                   Namespace: ""
                   Name: "nint"
                   Args: ~
+                  Projections: ~
             Result: NamedType
               Namespace: ""
               Name: "bool"
               Args: ~
+              Projections: ~
             Body:
               ReturnStmt
                 Value: CallExpr
@@ -395,10 +411,12 @@ File
                   Namespace: ""
                   Name: "nint"
                   Args: ~
+                  Projections: ~
             Result: NamedType
               Namespace: ""
               Name: "nint"
               Args: ~
+              Projections: ~
             Body:
               ReturnStmt
                 Value: CallExpr
@@ -447,10 +465,12 @@ File
                   Namespace: ""
                   Name: "nint"
                   Args: ~
+                  Projections: ~
             Result: NamedType
               Namespace: ""
               Name: "bool"
               Args: ~
+              Projections: ~
             Body:
               ReturnStmt
                 Value: CallExpr
@@ -626,22 +646,26 @@ File
                       Namespace: ""
                       Name: "nint"
                       Args: ~
+                      Projections: ~
                   ParamDef
                     Name: "i"
                     Type: NamedType
                       Namespace: ""
                       Name: "nint"
                       Args: ~
+                      Projections: ~
                   ParamDef
                     Name: "v"
                     Type: NamedType
                       Namespace: ""
                       Name: "nint"
                       Args: ~
+                      Projections: ~
                 Result: NamedType
                   Namespace: ""
                   Name: "nint"
                   Args: ~
+                  Projections: ~
                 Body:
                   ReturnStmt
                     Value: CallExpr
@@ -719,10 +743,12 @@ File
                   Namespace: ""
                   Name: "nint"
                   Args: ~
+                  Projections: ~
             Result: NamedType
               Namespace: ""
               Name: "bool"
               Args: ~
+              Projections: ~
             Body:
               ReturnStmt
                 Value: CallExpr
@@ -763,10 +789,12 @@ File
                   Namespace: ""
                   Name: "nint"
                   Args: ~
+                  Projections: ~
             Result: NamedType
               Namespace: ""
               Name: "bool"
               Args: ~
+              Projections: ~
             Body:
               ReturnStmt
                 Value: CallExpr

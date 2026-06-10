@@ -95,17 +95,17 @@ func lowerTypeName(t cst.Tree, buf source.Buffer, node *cst.Node) ast.TypeExpr {
 	var args []ast.TypeExpr
 	for _, child := range t.Children() {
 		if tok, ok := child.Token(); ok {
-			switch tok.Kind() {
-			case token.Ident:
+			switch {
+			case tok.Kind() == token.Ident:
 				idents = append(idents, child.Text(buf))
-			case token.Dot:
+			case tok.Kind() == token.Dot:
 				dotted = true
-			case token.Self:
-				name = "self"
-			case token.Null:
-				name = "null"
-			case token.Type:
-				name = "type" // the metatype, a builtin type name (type : type)
+			case tok.Kind().Keyword():
+				// A reserved word read as a name: the builtin type names self/null/type
+				// standalone, or a keyword field name in a projection segment
+				// (Schema.type). Collected by spelling alongside the identifiers, so a
+				// keyword segment projects exactly as an ordinary one does.
+				idents = append(idents, child.Text(buf))
 			default:
 				// Any other token (the generic-argument angle brackets and
 				// commas) names no part of the type: it is skipped.
@@ -116,15 +116,24 @@ func lowerTypeName(t cst.Tree, buf source.Buffer, node *cst.Node) ast.TypeExpr {
 			args = lowerGenericArgs(child, buf)
 		}
 	}
+	var projections []string
 	switch {
 	case len(idents) >= 2:
+		// The first dot is the namespace-or-projection head (Namespace.Name);
+		// every further dot is a field-type projection on top of it. Item.level
+		// is Namespace "Item" Name "level" with no projections; Order.customer.id
+		// is Namespace "Order" Name "customer" with projection "id". The resolver
+		// reads the head as a namespace import or a type and applies the rest.
 		namespace, name = idents[0], idents[1]
+		if len(idents) > 2 {
+			projections = idents[2:]
+		}
 	case len(idents) == 1 && dotted:
 		namespace = idents[0] // geo. — the qualified name is missing
 	case len(idents) == 1:
 		name = idents[0]
 	}
-	return ast.NewNamedType(namespace, name, args, node)
+	return ast.NewNamedType(namespace, name, args, projections, node)
 }
 
 // lowerGenericArgs lowers a GenericArgs node to its type arguments.

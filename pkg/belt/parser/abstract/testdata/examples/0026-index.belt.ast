@@ -31,10 +31,12 @@ File
             Namespace: ""
             Name: "nint"
             Args: ~
+            Projections: ~
           NamedType
             Namespace: ""
             Name: "error"
             Args: ~
+            Projections: ~
       Value: CallExpr
         Callee: MemberExpr
           Receiver: Identifier
@@ -55,10 +57,12 @@ File
             Namespace: ""
             Name: "nint"
             Args: ~
+            Projections: ~
           NamedType
             Namespace: ""
             Name: "error"
             Args: ~
+            Projections: ~
       Value: CallExpr
         Callee: MemberExpr
           Receiver: Identifier
@@ -97,10 +101,12 @@ File
             Namespace: ""
             Name: "nint"
             Args: ~
+            Projections: ~
           NamedType
             Namespace: ""
             Name: "error"
             Args: ~
+            Projections: ~
       Value: CallExpr
         Callee: MemberExpr
           Receiver: Identifier
@@ -153,22 +159,27 @@ File
                 Namespace: ""
                 Name: "nint"
                 Args: ~
+                Projections: ~
+            Projections: ~
         ParamDef
           Name: "i"
           Type: NamedType
             Namespace: ""
             Name: "nint"
             Args: ~
+            Projections: ~
       Result: UnionType
         Members:
           NamedType
             Namespace: ""
             Name: "nint"
             Args: ~
+            Projections: ~
           NamedType
             Namespace: ""
             Name: "error"
             Args: ~
+            Projections: ~
       Body:
         ReturnStmt
           Value: CallExpr
@@ -196,6 +207,8 @@ File
             Namespace: ""
             Name: "nint"
             Args: ~
+            Projections: ~
+        Projections: ~
       Body:
         LetStmt
           Name: "xs"
@@ -247,10 +260,13 @@ File
             Namespace: ""
             Name: "string"
             Args: ~
+            Projections: ~
           NamedType
             Namespace: ""
             Name: "nint"
             Args: ~
+            Projections: ~
+        Projections: ~
       Body:
         LetStmt
           Name: "m"

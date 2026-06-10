@@ -11,6 +11,7 @@ File
         Namespace: ""
         Name: "nint"
         Args: ~
+        Projections: ~
       Where: ~
       Methods:
         MethodDecl
@@ -26,6 +27,7 @@ File
             Namespace: ""
             Name: "string"
             Args: ~
+            Projections: ~
           Body:
             ReturnStmt
               Value: StringLit
@@ -43,6 +45,7 @@ File
             Namespace: ""
             Name: "nint"
             Args: ~
+            Projections: ~
           Body:
             ReturnStmt
               Value: IntLit
@@ -62,10 +65,12 @@ File
                 Namespace: ""
                 Name: "self"
                 Args: ~
+                Projections: ~
           Result: NamedType
             Namespace: ""
             Name: "bool"
             Args: ~
+            Projections: ~
           Body:
             ReturnStmt
               Value: CallExpr
@@ -82,6 +87,7 @@ File
           Namespace: ""
           Name: "ordered"
           Args: ~
+          Projections: ~
   Enums: ~
   Interfaces:
     InterfaceDecl
@@ -94,6 +100,7 @@ File
           Namespace: ""
           Name: "comparable"
           Args: ~
+          Projections: ~
       Members:
         InterfaceMember
           Doc: "Render the value as a string."
@@ -105,6 +112,7 @@ File
             Namespace: ""
             Name: "string"
             Args: ~
+            Projections: ~
           Body: ~
     InterfaceDecl
       Doc: "A diamond: ordered inherits comparable through two distinct parents" "(printable and rankable, each comparable). The shared ancestor is deduped by" "definition identity, so ordered's contract carries comparable's members once."
@@ -116,6 +124,7 @@ File
           Namespace: ""
           Name: "comparable"
           Args: ~
+          Projections: ~
       Members:
         InterfaceMember
           Doc: "The value's rank."
@@ -127,6 +136,7 @@ File
             Namespace: ""
             Name: "nint"
             Args: ~
+            Projections: ~
           Body: ~
     InterfaceDecl
       Doc: "The join of two comparable-derived parents: a single shared comparable" "ancestor, reached two ways — the diamond closes cleanly."
@@ -138,10 +148,12 @@ File
           Namespace: ""
           Name: "printable"
           Args: ~
+          Projections: ~
         NamedType
           Namespace: ""
           Name: "rankable"
           Args: ~
+          Projections: ~
       Members:
         InterfaceMember
           Doc: "The < operator."
@@ -155,10 +167,12 @@ File
                 Namespace: ""
                 Name: "self"
                 Args: ~
+                Projections: ~
           Result: NamedType
             Namespace: ""
             Name: "bool"
             Args: ~
+            Projections: ~
           Body: ~
   Funcs:
     FuncDecl
@@ -174,6 +188,7 @@ File
             Namespace: ""
             Name: "ordered"
             Args: ~
+            Projections: ~
       Params:
         ParamDef
           Name: "a"
@@ -181,16 +196,19 @@ File
             Namespace: ""
             Name: "T"
             Args: ~
+            Projections: ~
         ParamDef
           Name: "b"
           Type: NamedType
             Namespace: ""
             Name: "T"
             Args: ~
+            Projections: ~
       Result: NamedType
         Namespace: ""
         Name: "bool"
         Args: ~
+        Projections: ~
       Body:
         ReturnStmt
           Value: CallExpr

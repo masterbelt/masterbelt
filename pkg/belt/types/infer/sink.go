@@ -91,6 +91,11 @@ type Sink struct {
 	// parts combined. It is informational (the editor's hover and inlay hints
 	// read it), never a finding.
 	SolvedFuncLit func(lit *ast.FuncLit, t *ir.Func)
+	// MetatypeSlot fires when a function literal's settled signature has a
+	// parameter or result that is (or carries) the metatype `type`: a lambda is a
+	// value slot like any other, so a type-value function written inline is
+	// rejected exactly as a declared one is.
+	MetatypeSlot func(lit *ast.FuncLit, t *ir.Func)
 	// BoundNotSatisfied fires at a generic-function call whose solved concrete
 	// type for a type parameter does not implement the parameter's interface
 	// bound: the argument's type carries no opt-in impl of the bound.
@@ -277,6 +282,12 @@ func (s *Sink) notARecord(lit *ast.RecordLit, typ ir.Type) {
 func (s *Sink) solvedFuncLit(lit *ast.FuncLit, t *ir.Func) {
 	if s != nil && s.SolvedFuncLit != nil {
 		s.SolvedFuncLit(lit, t)
+	}
+}
+
+func (s *Sink) metatypeSlot(lit *ast.FuncLit, t *ir.Func) {
+	if s != nil && s.MetatypeSlot != nil {
+		s.MetatypeSlot(lit, t)
 	}
 }
 

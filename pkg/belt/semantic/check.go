@@ -357,7 +357,11 @@ func checkMethodBodies(reg *builtin.Registry, defs []*ir.TypeDef, universe map[s
 // function body without reporting (the self and missing-return diagnostics, and
 // the index-write check, are suppressed) — mirroring checkMethodBodies.
 func checkFuncBodies(reg *builtin.Registry, file *ast.File, universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, funcs map[string][]*ast.FuncDecl, qualifiedFuncs func(namespace, name string) []*ast.FuncDecl, env exprFolder, sink *infer.Sink, at func(ast.Node) span, diags *diagnostic.List) {
-	r := &infer.TypeResolver{Defs: universe, Qualified: qualified}
+	// The resolver reports a failed field-type projection in a parameter or result
+	// annotation (fn f(x: Item.nope)), so an invalid projection there surfaces the
+	// same diagnostic it does in a type or const annotation rather than resolving
+	// silently. A sink-only walk (diags nil) keeps it silent.
+	r := &infer.TypeResolver{Defs: universe, Qualified: qualified, ProjectionError: projectionErrorReporter(at, diags)}
 	var noSelf func(node ast.Node)
 	if diags != nil {
 		noSelf = func(node ast.Node) {
@@ -386,6 +390,15 @@ func checkFuncBodies(reg *builtin.Registry, file *ast.File, universe map[string]
 		if diags == nil {
 			continue // the sink-only walk wants no further diagnostics
 		}
+		// A function parameter or result may not be a type value: fn f(t: type) or
+		// fn f(): type is type_in_value_position — there are no type-value functions,
+		// which is why generics stay type parameters rather than type-value
+		// parameters.
+		ptypes := make([]ir.Type, len(fd.Params))
+		for i, p := range fd.Params {
+			ptypes[i] = params[p.Name]
+		}
+		reportMetatypeSlot(at, diags, fd, &ir.Func{Params: ptypes, Result: want})
 		checkBareEnumArgs(fd.Body, bs, env, at, diags)
 		if hasBlockBody(fd) && !bodyReturns(fd.Body, bs) {
 			s := at(fd)

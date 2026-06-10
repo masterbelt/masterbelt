@@ -26,6 +26,7 @@ File
         Namespace: ""
         Name: "Point"
         Args: ~
+        Projections: ~
       Value: RecordLit
         TypeName: ""
         Fields:
@@ -97,6 +98,8 @@ File
             Namespace: ""
             Name: "Point"
             Args: ~
+            Projections: ~
+        Projections: ~
       Value: CollectionLit
         Entries:
           CollectionEntry
@@ -134,6 +137,7 @@ File
         Namespace: ""
         Name: "Unit"
         Args: ~
+        Projections: ~
       Value: RecordLit
         TypeName: ""
         Fields: ~
@@ -152,12 +156,14 @@ File
               Namespace: ""
               Name: "nint"
               Args: ~
+              Projections: ~
           FieldDef
             Name: "y"
             Type: NamedType
               Namespace: ""
               Name: "nint"
               Args: ~
+              Projections: ~
       Where: ~
       Methods: ~
       Consts: ~
@@ -175,18 +181,21 @@ File
               Namespace: ""
               Name: "nint"
               Args: ~
+              Projections: ~
           FieldDef
             Name: "name"
             Type: NamedType
               Namespace: ""
               Name: "string"
               Args: ~
+              Projections: ~
           FieldDef
             Name: "pos"
             Type: NamedType
               Namespace: ""
               Name: "Point"
               Args: ~
+              Projections: ~
       Where: ~
       Methods: ~
       Consts: ~

@@ -34,18 +34,21 @@ File
               Namespace: ""
               Name: "int"
               Args: ~
+              Projections: ~
           FieldDef
             Name: "name"
             Type: NamedType
               Namespace: ""
               Name: "string"
               Args: ~
+              Projections: ~
           FieldDef
             Name: "kind"
             Type: NamedType
               Namespace: ""
               Name: "SkillKind"
               Args: ~
+              Projections: ~
       Where: ~
       Methods:
         MethodDecl
@@ -61,6 +64,7 @@ File
             Namespace: ""
             Name: "string"
             Args: ~
+            Projections: ~
           Body:
             ReturnStmt
               Value: MemberExpr
@@ -82,12 +86,14 @@ File
               Namespace: ""
               Name: "int"
               Args: ~
+              Projections: ~
           FieldDef
             Name: "level"
             Type: NamedType
               Namespace: ""
               Name: "int"
               Args: ~
+              Projections: ~
       Where: ~
       Methods: ~
       Consts: ~

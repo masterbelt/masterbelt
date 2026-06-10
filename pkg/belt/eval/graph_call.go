@@ -237,6 +237,9 @@ func dispatchCall(ctx graphCtx, v *ir.Call, recv *ir.Constant, name string, args
 	if recv.Kind == ir.ConstEnum {
 		return enumComparison(recv, name, args)
 	}
+	if recv.Kind == ir.ConstType {
+		return typeValueComparison(recv, name, args)
+	}
 	kinds := make([]ir.ConstKind, len(args))
 	for i, a := range args {
 		kinds[i] = a.Kind

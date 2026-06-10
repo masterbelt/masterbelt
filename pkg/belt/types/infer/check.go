@@ -364,6 +364,7 @@ func checkFuncLitAgainst(lit *ast.FuncLit, want *ir.Func, s scope, subst map[str
 	result := resolveLitResult(lit, want, r, body, s, subst, sink)
 	t := &ir.Func{Params: params, Result: result}
 	sink.solvedFuncLit(lit, t)
+	sink.metatypeSlot(lit, t)
 	return t
 }
 
@@ -853,5 +854,6 @@ func checkFuncLit(lit *ast.FuncLit, s scope, sink *Sink) ir.Type {
 	}
 	t := &ir.Func{Params: params, Result: result}
 	sink.solvedFuncLit(lit, t)
+	sink.metatypeSlot(lit, t)
 	return t
 }

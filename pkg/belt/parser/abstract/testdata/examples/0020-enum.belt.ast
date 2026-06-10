@@ -9,6 +9,7 @@ File
         Namespace: ""
         Name: "Rarity"
         Args: ~
+        Projections: ~
       Value: MemberExpr
         Receiver: Identifier
           Name: "Rarity"
@@ -23,6 +24,7 @@ File
         Namespace: ""
         Name: "Rarity"
         Args: ~
+        Projections: ~
       Value: Identifier
         Name: "Common"
       Builtin: false
@@ -51,6 +53,7 @@ File
         Namespace: ""
         Name: "byte"
         Args: ~
+        Projections: ~
       Members:
         EnumMember
           Name: "Common"
@@ -96,6 +99,7 @@ File
             Namespace: ""
             Name: "bool"
             Args: ~
+            Projections: ~
           Body:
             ReturnStmt
               Value: CallExpr
@@ -119,6 +123,7 @@ File
         Namespace: ""
         Name: "string"
         Args: ~
+        Projections: ~
       Members:
         EnumMember
           Name: "Ja"
@@ -146,10 +151,12 @@ File
             Namespace: ""
             Name: "Rarity"
             Args: ~
+            Projections: ~
       Result: NamedType
         Namespace: ""
         Name: "Rarity"
         Args: ~
+        Projections: ~
       Body:
         LetStmt
           Name: "best"
@@ -157,6 +164,7 @@ File
             Namespace: ""
             Name: "Rarity"
             Args: ~
+            Projections: ~
           Value: Identifier
             Name: "Common"
         IfStmt

@@ -43,10 +43,12 @@ File
             Namespace: ""
             Name: "bool"
             Args: ~
+            Projections: ~
       Result: NamedType
         Namespace: ""
         Name: "nint"
         Args: ~
+        Projections: ~
       Body:
         LetStmt
           Name: "base"
@@ -93,10 +95,12 @@ File
             Namespace: ""
             Name: "nint"
             Args: ~
+            Projections: ~
       Result: NamedType
         Namespace: ""
         Name: "nint"
         Args: ~
+        Projections: ~
       Body:
         LetStmt
           Name: "acc"
@@ -104,6 +108,7 @@ File
             Namespace: ""
             Name: "nint"
             Args: ~
+            Projections: ~
           Value: Identifier
             Name: "n"
         AssignStmt
@@ -135,10 +140,12 @@ File
             Namespace: ""
             Name: "bool"
             Args: ~
+            Projections: ~
       Result: NamedType
         Namespace: ""
         Name: "nint"
         Args: ~
+        Projections: ~
       Body:
         LetStmt
           Name: "result"

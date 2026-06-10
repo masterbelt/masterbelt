@@ -2720,12 +2720,13 @@ func writeNamedType(w *treetext.Writer, n *NamedType, depth int) error {
 			}
 		}
 	}
+	w.Line(depth, "Projections: "+treetext.QuoteStrings(n.Projections))
 	return nil
 }
 
 // decodeNamedType builds a NamedType from its element.
 func decodeNamedType(e *treetext.Element) (*NamedType, error) {
-	if err := treetext.ExpectFields(e, "Namespace", "Name", "Args"); err != nil {
+	if err := treetext.ExpectFields(e, "Namespace", "Name", "Args", "Projections"); err != nil {
 		return nil, err
 	}
 	n := &NamedType{}
@@ -2758,6 +2759,11 @@ func decodeNamedType(e *treetext.Element) (*NamedType, error) {
 			out = append(out, v)
 		}
 		n.Args = out
+	}
+	if v, err := treetext.Strings(e.Fields[3]); err != nil {
+		return nil, err
+	} else {
+		n.Projections = v
 	}
 	return n, nil
 }

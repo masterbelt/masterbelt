@@ -20,6 +20,11 @@ var streamFields = map[string]bool{
 	"CallSubst":      true,
 	"Typed":          true,
 	"Adapted":        true,
+	// MetatypeSlot fires for every function literal the walk settles, not only a
+	// failing one, so it must not flip *fired (which signals a call-inference
+	// failure). It surfaces a slot diagnostic downstream for a type-value
+	// function, but that is decided in the semantic sink, not on this path.
+	"MetatypeSlot": true,
 }
 
 // TestObserveForwardsEverySinkField is the structural guard against the defect

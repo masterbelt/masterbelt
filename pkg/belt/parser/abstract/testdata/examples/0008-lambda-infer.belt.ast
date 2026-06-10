@@ -128,6 +128,7 @@ File
                   Namespace: ""
                   Name: "nint"
                   Args: ~
+                  Projections: ~
             Result: ~
             Body:
               ReturnStmt
@@ -153,10 +154,12 @@ File
               Namespace: ""
               Name: "nint"
               Args: ~
+              Projections: ~
         Result: NamedType
           Namespace: ""
           Name: "nint"
           Args: ~
+          Projections: ~
       Value: FuncLit
         Params:
           ParamDef
@@ -229,6 +232,8 @@ File
             Namespace: ""
             Name: "sbyte"
             Args: ~
+            Projections: ~
+        Projections: ~
       Value: CollectionLit
         Entries:
           CollectionEntry
@@ -256,6 +261,8 @@ File
             Namespace: ""
             Name: "nint"
             Args: ~
+            Projections: ~
+        Projections: ~
       Value: CollectionLit
         Entries: ~
       Builtin: false
