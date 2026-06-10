@@ -116,6 +116,12 @@ func (r *TypeResolver) projectApp(app *ir.App, def *ir.TypeDef, member string, n
 		if fieldType, ok := recordFieldSyntax(def, member); ok {
 			return r.projectGenericThroughSyntax(app, member, fieldType, node)
 		}
+		// The declaration's record shape is known but has no such field: a missing
+		// field (unknown_field), the same diagnostic the resolved generic gives,
+		// rather than reporting the receiver as unsupported.
+		if recordSyntaxOf(def) != nil {
+			return r.failedProjection(node, app, def, member, true)
+		}
 	}
 	r.reportProjection(node, ProjGenericUnsupported, app, member)
 	return ir.Invalid
@@ -165,11 +171,50 @@ func (r *TypeResolver) projectGenericThroughSyntax(app *ir.App, member string, f
 	r.resolving[key] = true
 	t := r.ResolveType(fieldType, scope)
 	delete(r.resolving, key)
+	r.checkProjectionBounds(app, names, scope, node)
 	subst := make(map[string]ir.Type, len(names))
 	for i, name := range names {
 		subst[name] = app.Args[i]
 	}
 	return types.Substitute(t, subst)
+}
+
+// checkProjectionBounds enforces a forward-referenced generic's parameter bounds
+// on a projection's arguments. The normal app bound check is skipped when the
+// application is built off a shell with no resolved Params (the forward
+// reference), so a violating argument (Box.value<{x: nint}> against
+// Box<T: comparable>) would otherwise pass; this re-checks against the bounds
+// resolved from the declaration syntax, anchored at the offending argument, so a
+// forward projection reports bound_not_satisfied exactly as the resolved one
+// does. It is reached only on the forward-reference path, so it never double-
+// reports a violation app already caught.
+func (r *TypeResolver) checkProjectionBounds(app *ir.App, names []string, scope TypeScope, node ast.Node) {
+	if r.Registry == nil || r.BoundViolation == nil {
+		return
+	}
+	for i, name := range names {
+		bound := scope[name]
+		if bound == nil || i >= len(app.Args) || app.Args[i] == ir.Invalid {
+			continue
+		}
+		if !types.Satisfies(r.Registry, app.Args[i], bound) {
+			r.BoundViolation(projectionArgSyntax(node, i), app.Args[i], &ir.TypeParam{Name: name, Bound: bound})
+		}
+	}
+}
+
+// projectionArgSyntax returns the syntax of the i-th generic argument written on
+// a projection (Box.value<string> -> the string type expression), for anchoring a
+// bound violation. It falls back to the projection node itself when the
+// per-argument syntax is not available (a chained or recovered projection).
+func projectionArgSyntax(node ast.Node, i int) ast.TypeExpr {
+	if nt, ok := node.(*ast.NamedType); ok && i < len(nt.Args) {
+		return nt.Args[i]
+	}
+	if te, ok := node.(ast.TypeExpr); ok {
+		return te
+	}
+	return nil
 }
 
 // genericScope is a generic definition's type-parameter scope — each parameter

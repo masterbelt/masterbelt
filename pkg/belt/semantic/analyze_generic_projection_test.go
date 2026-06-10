@@ -130,6 +130,37 @@ func TestGenericProjectionValueConsumedByAssert(t *testing.T) {
 	}
 }
 
+func TestGenericProjectionForwardBoundEnforced(t *testing.T) {
+	// A forward-referenced generic's parameter bound is enforced on the projection
+	// argument: the application is built off the shell before its Params resolve, so
+	// the normal type-application bound check is skipped; the projection re-checks
+	// against the bound from the declaration syntax, so Box.value<{ x: nint }>
+	// before Box<T: comparable> reports bound_not_satisfied, like the resolved order.
+	forward := "pub type S = { v: Box.value<{ x: nint }> }\n" +
+		"pub type Box<T: comparable> = { value: T }\n"
+	if _, diags := analyze(forward); !hasCode(diags, CodeBoundNotSatisfied) {
+		t.Fatalf("forward: want bound_not_satisfied, got %v", codes(diags))
+	}
+	// The resolved order reports the same, through the ordinary application check.
+	resolved := "pub type Box<T: comparable> = { value: T }\n" +
+		"pub type S = { v: Box.value<{ x: nint }> }\n"
+	if _, diags := analyze(resolved); !hasCode(diags, CodeBoundNotSatisfied) {
+		t.Fatalf("resolved: want bound_not_satisfied, got %v", codes(diags))
+	}
+}
+
+func TestGenericProjectionForwardUnknownField(t *testing.T) {
+	// A typo'd field on a forward-referenced generic whose record shape is known
+	// from its declaration syntax is unknown_field — the same diagnostic the
+	// resolved generic gives — not generic_type_projection.
+	src := "pub type S = { v: Box.nope<string> }\n" +
+		"pub type Box<T> = { value: T }\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeUnknownField) {
+		t.Fatalf("want unknown_field, got %v", codes(diags))
+	}
+}
+
 func TestGenericProjectionBareGenericStillRejected(t *testing.T) {
 	// A bare generic type with no application has no arguments to substitute, so a
 	// type-position projection off it (type S = Box.value, no <...>) stays
