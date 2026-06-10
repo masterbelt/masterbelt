@@ -497,8 +497,8 @@ func recordOf(t ir.Type) *ir.Record {
 // no member, or an associated constant has no resolved type — the fall-through
 // the scope's other readings (a namespace import, a record field) take. A
 // type-member access wins over a record-field reading, the one Type.Name path.
-func typeMemberType(universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, m *ast.MemberExpr) ir.Type {
-	def := memberReceiverDef(universe, qualified, m.Receiver)
+func typeMemberType(universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, valueShadows func(*ast.Identifier) bool, m *ast.MemberExpr) ir.Type {
+	def := memberReceiverDef(universe, qualified, valueShadows, m.Receiver)
 	if def == nil {
 		return ir.Invalid
 	}
@@ -527,13 +527,19 @@ func typeMemberType(universe map[string]*ir.TypeDef, qualified func(namespace, n
 // namespace-qualified type name (geo.Item) through the import lookup. It returns
 // nil when the receiver is neither — a value receiver, or a name that is no type
 // — which the caller takes as a record-field reading. A nil qualified lookup
-// (no namespaces in scope) leaves the qualified form unresolved.
-func memberReceiverDef(universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, recv ast.Expr) *ir.TypeDef {
+// (no namespaces in scope) leaves the qualified form unresolved. The qualified
+// form is skipped when the namespace identifier is shadowed by a value
+// (valueShadows), so geo.Item.id reads the fields of a const named geo rather
+// than projecting the imported type.
+func memberReceiverDef(universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, valueShadows func(*ast.Identifier) bool, recv ast.Expr) *ir.TypeDef {
 	switch r := recv.(type) {
 	case *ast.Identifier:
 		return universe[r.Name]
 	case *ast.MemberExpr:
 		if ns, ok := r.Receiver.(*ast.Identifier); ok && qualified != nil {
+			if valueShadows != nil && valueShadows(ns) {
+				return nil
+			}
 			return qualified(ns.Name, r.Member.Name)
 		}
 	}

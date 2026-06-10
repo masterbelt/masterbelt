@@ -243,6 +243,18 @@ func TestTypeEqualityWinsOverStaticEql(t *testing.T) {
 	}
 }
 
+func TestLambdaParamShadowsTypeInProjection(t *testing.T) {
+	// A function-literal parameter named like a type shadows it: inside the lambda,
+	// Box.id is a field read on the parameter, not a metatype projection from the
+	// type Box, so the body type-checks.
+	src := "pub type Box = { id: nint }\n" +
+		"pub const F: fn(Box: Box): nint = fn(Box) {\n  return Box.id\n}\n"
+	_, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("want clean (lambda param shadows type), got %v", codes(diags))
+	}
+}
+
 func TestTypeProjectionValueConsumedByAssert(t *testing.T) {
 	// A type value projected in value position (Item.id) is comptime-only; an
 	// assert may consume it through == (type equality), which folds to a bool —

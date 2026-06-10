@@ -57,6 +57,22 @@ func TestQualifiedTypeMemberValidated(t *testing.T) {
 	}
 }
 
+func TestValueShadowsNamespaceProjection(t *testing.T) {
+	// A value named like a namespace import shadows it: geo.Item.id reads the
+	// fields of the const named geo, not the imported type's projection, so the
+	// const settles to the field type rather than type_in_value_position.
+	diags := analyzeProject(t, map[string]string{
+		"geometry.belt": "pub type Item = { id: long }\n",
+		"main.belt": "use geo from \"geometry.belt\"\n" +
+			"pub type Box = { Item: { id: nint } }\n" +
+			"const geo: Box = { Item: { id: 1 } }\n" +
+			"const X = geo.Item.id\n",
+	})
+	if len(diags) != 0 {
+		t.Fatalf("want clean (value shadows namespace), got %v", diags)
+	}
+}
+
 func TestQualifiedTypeValueProjection(t *testing.T) {
 	root := belttest.WriteFiles(t, map[string]string{
 		"masterbelt.toml": "entry = \"main.belt\"\n",

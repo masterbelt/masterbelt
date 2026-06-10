@@ -333,6 +333,11 @@ func isQualifiedTypeReceiver(fileID FileID, recv ast.Expr, q queries) bool {
 	if !ok {
 		return false
 	}
+	// A value of the namespace's name shadows the import (geo a local or const), so
+	// geo.Item is then a value field read, not a qualified type.
+	if q.resolve(fileID, ns) != nil {
+		return false
+	}
 	return qualifiedFrom(q, q.importsOf(fileID))(ns.Name, m.Member.Name) != nil
 }
 

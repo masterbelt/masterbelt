@@ -83,7 +83,8 @@ func (b constBinder) leafConstMember(e *ast.MemberExpr, sub func(ast.Expr) ir.Va
 	if target := b.q.resolveMember(b.file, e); target != nil {
 		return &ir.Reference{Target: b.irOf[target], Syntax: e}
 	}
-	if def := memberReceiverDef(b.uni(), qualifiedFrom(b.q, b.q.importsOf(b.file)), e.Receiver); def != nil {
+	shadowed := func(id *ast.Identifier) bool { return b.q.resolve(b.file, id) != nil }
+	if def := memberReceiverDef(b.uni(), qualifiedFrom(b.q, b.q.importsOf(b.file)), shadowed, e.Receiver); def != nil {
 		if v := typeMemberValue(def, e); v != nil {
 			return v
 		}
@@ -96,13 +97,18 @@ func (b constBinder) leafConstMember(e *ast.MemberExpr, sub func(ast.Expr) ir.Va
 // namespace-qualified type name (geo.Item) through the import lookup — so a field
 // projected off either (Item.id, geo.Item.id) reaches the type member resolver.
 // It is the value-lowering twin of infer.memberReceiverDef; nil for any other
-// receiver, which the caller takes as a record-field access.
-func memberReceiverDef(universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, recv ast.Expr) *ir.TypeDef {
+// receiver, which the caller takes as a record-field access. The qualified form
+// is skipped when the namespace identifier is shadowed by a value (valueShadows),
+// so a const named geo wins over the import.
+func memberReceiverDef(universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, valueShadows func(*ast.Identifier) bool, recv ast.Expr) *ir.TypeDef {
 	switch r := recv.(type) {
 	case *ast.Identifier:
 		return universe[r.Name]
 	case *ast.MemberExpr:
 		if ns, ok := r.Receiver.(*ast.Identifier); ok && qualified != nil {
+			if valueShadows != nil && valueShadows(ns) {
+				return nil
+			}
 			return qualified(ns.Name, r.Member.Name)
 		}
 	}
@@ -576,8 +582,10 @@ func (b bodyBinder) leafNamespaceOrTypeMember(e *ast.MemberExpr) ir.Value {
 	// associated-constant, or projected-field value the const initializer lowers,
 	// off a local (Item.id) or namespace-qualified (geo.Item.id) type, so a body
 	// and a const agree on T.member. A static fn, or no match, returns nil and the
-	// caller reads a record-field access.
-	return typeMemberValue(memberReceiverDef(b.r.Defs, b.r.Qualified, e.Receiver), e)
+	// caller reads a record-field access. A value shadowing the namespace name
+	// (a local or parameter) defers the qualified form to a value receiver.
+	shadowed := func(id *ast.Identifier) bool { return b.shadows(id.Name) }
+	return typeMemberValue(memberReceiverDef(b.r.Defs, b.r.Qualified, shadowed, e.Receiver), e)
 }
 
 // leafCall lowers a call in value position. A call whose callee names a type is
@@ -773,6 +781,13 @@ func (b funcBinder) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
 		}
 		if b.scope.params[e.Name] {
 			return &ir.ParamRef{Name: e.Name, Syntax: e}
+		}
+	case *ast.MemberExpr:
+		// A member access whose receiver is this lambda's parameter or local is a
+		// field access on that binding, not a type-member read on a same-named type:
+		// the binding shadows the type, so the receiver lowers as a value.
+		if recv, ok := e.Receiver.(*ast.Identifier); ok && b.scope.shadows(recv.Name) {
+			return &ir.FieldAccess{Receiver: sub(e.Receiver), Field: e.Member.Name, Syntax: e}
 		}
 	case *ast.CallExpr:
 		if id, ok := e.Callee.(*ast.Identifier); ok && b.scope.shadows(id.Name) {

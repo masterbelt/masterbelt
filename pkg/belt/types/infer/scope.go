@@ -77,13 +77,21 @@ func (s funcScope) shadows(name string) bool {
 }
 
 func (s funcScope) leaf(e ast.Expr) ir.Type {
-	if id, ok := e.(*ast.Identifier); ok {
+	switch e := e.(type) {
+	case *ast.Identifier:
 		// A let-bound local shadows a same-named parameter, so it is read first.
-		if t, ok := s.locals[id.Name]; ok {
+		if t, ok := s.locals[e.Name]; ok {
 			return t
 		}
-		if t, ok := s.params[id.Name]; ok {
+		if t, ok := s.params[e.Name]; ok {
 			return t
+		}
+	case *ast.MemberExpr:
+		// A member access whose receiver is this lambda's parameter or local is a
+		// field or getter read on that binding, not a type-member read on a
+		// same-named type: the binding shadows the type, so the receiver is a value.
+		if recv, ok := e.Receiver.(*ast.Identifier); ok && s.shadows(recv.Name) {
+			return memberReadType(s.registry(), s.leaf(recv), e.Member.Name)
 		}
 	}
 	return s.outer.leaf(e)
@@ -140,6 +148,13 @@ func (s constScope) universe() map[string]*ir.TypeDef { return s.env.Universe() 
 
 func (s constScope) qualified() func(namespace, name string) *ir.TypeDef { return s.env.QualifiedType }
 
+// valueShadows reports whether a namespace identifier is shadowed by a value —
+// a constant of the same name — so a qualified type projection (geo.Item.id)
+// defers to the fields of a const named geo.
+func (s constScope) valueShadows(id *ast.Identifier) bool {
+	return s.env.Resolve(id) != nil
+}
+
 func (s constScope) leaf(e ast.Expr) ir.Type {
 	switch e := e.(type) {
 	case *ast.NullLit:
@@ -164,7 +179,7 @@ func (s constScope) leaf(e ast.Expr) ir.Type {
 		// (Rarity.Common), an associated constant (sbyte.Max, Level.Max), or a field
 		// projected off a local or namespace-qualified type (Item.id, geo.Item.id) —
 		// is a value of that type, resolved through the single member resolver.
-		if t := typeMemberType(s.universe(), s.qualified(), e); t != ir.Invalid {
+		if t := typeMemberType(s.universe(), s.qualified(), s.valueShadows, e); t != ir.Invalid {
 			return t
 		}
 		// Otherwise the receiver is a value: a field access on a record-typed
@@ -344,10 +359,17 @@ func (s BodyScope) typeMemberValue(e *ast.MemberExpr) (ir.Type, bool) {
 	if recv, ok := e.Receiver.(*ast.Identifier); ok && s.shadows(recv.Name) {
 		return ir.Invalid, false
 	}
-	if t := typeMemberType(s.Universe, s.Qualified, e); t != ir.Invalid {
+	if t := typeMemberType(s.Universe, s.Qualified, s.valueShadows, e); t != ir.Invalid {
 		return t, true
 	}
 	return ir.Invalid, false
+}
+
+// valueShadows reports whether a namespace identifier is shadowed by a value in
+// scope — a let-bound local or a parameter — so a qualified type projection
+// (geo.Item.id) defers to a value receiver named geo.
+func (s BodyScope) valueShadows(id *ast.Identifier) bool {
+	return s.shadows(id.Name)
 }
 
 // lookupType resolves a type name (a conversion callee) to its type against
