@@ -155,7 +155,10 @@ func ReadableMemberType(reg *builtin.Registry, recv ir.Type, name string) (ir.Ty
 	// FieldProjection's bare-generic guard. An application instantiates it via the
 	// type-position path instead.
 	if reg != nil && !isBareGeneric(recv) {
-		if t, ok := GetterResultType(reg, recv, name); ok {
+		// A getter result still carrying a free type variable (reached through an
+		// uninstantiated generic) is not a concrete type to reify, so it is not a
+		// readable-member projection here; generic getter projection is the follow-up.
+		if t, ok := GetterResultType(reg, recv, name); ok && !HasTypeVar(t) {
 			return t, true
 		}
 	}

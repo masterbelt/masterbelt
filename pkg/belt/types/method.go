@@ -169,8 +169,47 @@ func receiverSubst(reg *builtin.Registry, recv ir.Type) map[string]ir.Type {
 			subst[p.Name] = app.Args[i]
 		}
 	}
+	// An alias of a generic application (StringBox = Box<string>) carries the
+	// methods of the underlying type, so a method or getter found through the alias
+	// must see the application's parameters bound — Box<string>.item is string, not
+	// the free T. Follow the alias body to the first application and bind its
+	// constructor's parameters. (A generic alias itself applied — Alias<U> = Box<U>
+	// then Alias<int> — is not composed here; that substitution chain is the
+	// generic-projection work.)
+	seen := map[*ir.TypeDef]bool{}
+	for body := aliasBody(recv); body != nil; body = aliasBody(body) {
+		if n, ok := body.(*ir.Named); ok {
+			if n.Def == nil || seen[n.Def] {
+				break // an unresolved or cyclic alias chain (reported elsewhere)
+			}
+			seen[n.Def] = true
+			continue
+		}
+		app, ok := body.(*ir.App)
+		if !ok {
+			break
+		}
+		if app.Def != nil && len(app.Args) == len(app.Def.Params) {
+			for i, p := range app.Def.Params {
+				if _, bound := subst[p.Name]; !bound {
+					subst[p.Name] = app.Args[i]
+				}
+			}
+		}
+		break
+	}
 	addImplSubst(reg, def, subst, map[*ir.TypeDef]bool{})
 	return subst
+}
+
+// aliasBody returns the body a named alias resolves to — for following a chain of
+// aliases to the generic application a concrete alias ultimately names. It is nil
+// for any non-alias type.
+func aliasBody(t ir.Type) ir.Type {
+	if n, ok := t.(*ir.Named); ok && n.Def != nil {
+		return n.Def.Body
+	}
+	return nil
 }
 
 // addImplSubst records, into subst, the interface parameters each impl the

@@ -307,7 +307,11 @@ func (r *TypeResolver) hasMethodMember(head ir.Type, name string) bool {
 // the right diagnostic.
 func (r *TypeResolver) projectReadable(head ir.Type, def *ir.TypeDef, member string, node ast.Node, hasFields bool) ir.Type {
 	if r.Registry != nil {
-		if t, ok := types.GetterResultType(r.Registry, head, member); ok {
+		// A getter projects to its result type — but a result still carrying a free
+		// type variable (a getter reached through an uninstantiated generic) is not a
+		// concrete type, so it is not projected here; generic getter projection is the
+		// follow-up slice.
+		if t, ok := types.GetterResultType(r.Registry, head, member); ok && !types.HasTypeVar(t) {
 			return t
 		}
 	}
@@ -328,6 +332,13 @@ func (r *TypeResolver) projectReadable(head ir.Type, def *ir.TypeDef, member str
 // self type. ok is false when def's syntax declares no getter of that name.
 func getterResultSyntax(def *ir.TypeDef, member string) (ast.TypeExpr, bool, bool) {
 	if def.Syntax == nil {
+		return nil, false, false
+	}
+	// A getter on a generic type declared later cannot be projected from syntax
+	// without instantiating its parameters (no application here supplies them), so
+	// it is deferred — the getter twin of the bare-generic field guard. (Generic
+	// getter projection is the follow-up slice.)
+	if len(def.Syntax.Params) > 0 {
 		return nil, false, false
 	}
 	for _, m := range def.Syntax.Methods {

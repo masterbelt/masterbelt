@@ -141,3 +141,47 @@ func TestInheritedMethodNotAType(t *testing.T) {
 		t.Fatalf("want member_is_not_a_type (inherited method), got %v", codes(diags))
 	}
 }
+
+func TestGetterProjectionThroughConcreteAlias(t *testing.T) {
+	// A concrete alias of a generic application (StringBox = Box<string>) composes
+	// the application's substitution, so projecting (and reading) the inherited
+	// getter yields the instantiated type, not the free parameter.
+	src := "pub type Box<T> = { v: T } impl {\n  pub get item(): T { return self.v }\n}\n" +
+		"pub type StringBox = Box<string>\n" +
+		"pub type S = StringBox.item\n" +
+		"assert StringBox.item == string\n" +
+		"pub fn read(x: StringBox): string { return x.item }\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("want clean (alias getter composes T=string), got %v", codes(diags))
+	}
+	for _, def := range m.Types {
+		if def.Name == "S" && (def.Body == nil || def.Body.String() != "string") {
+			t.Fatalf("S = %v, want string (StringBox.item)", def.Body)
+		}
+	}
+}
+
+func TestGetterProjectionForwardBareGenericRejected(t *testing.T) {
+	// A getter on a generic type declared later, projected without an application,
+	// is rejected (deferred), not silently projected as if concrete.
+	src := "pub type C = Box.count\n" +
+		"pub type Box<T> = { v: T } impl {\n  pub get count(): nint { return 0 }\n}\n"
+	_, diags := analyze(src)
+	if len(diags) == 0 {
+		t.Fatalf("want the forward bare-generic getter projection rejected, got clean")
+	}
+}
+
+func TestGetterProjectionGenericAliasNoFreeVar(t *testing.T) {
+	// A getter reached through an applied generic alias (Alias<U> = Box<U>) whose
+	// substitution does not compose to a concrete type is rejected, not reified as
+	// a free type variable.
+	src := "pub type Box<T> = { v: T } impl {\n  pub get item(): T { return self.v }\n}\n" +
+		"pub type Alias<U> = Box<U>\n" +
+		"pub type S = { v: Alias.item<string> }\n"
+	_, diags := analyze(src)
+	if len(diags) == 0 {
+		t.Fatalf("want the generic-alias getter projection rejected (no free T), got clean")
+	}
+}
