@@ -63,6 +63,10 @@ func (r *TypeResolver) reportUnknown(node ast.Node, name string) {
 // onto a body's parameter types — only here at resolution time, from the start.
 type TypeScope = map[string]ir.Type
 
+// selfTypeName is the spelling of the self type in a type expression — the
+// receiver type inside an impl, and a getter's self-returning result.
+const selfTypeName = "self"
+
 // ResolveType resolves a type expression to its ir.Type, with scope holding the
 // generic parameter names in effect (each mapped to its bound, nil if none). A
 // nil or unresolvable type is ir.Invalid.
@@ -102,7 +106,7 @@ func (r *TypeResolver) resolveNamed(t *ast.NamedType, scope TypeScope) ir.Type {
 	if t.Namespace != "" {
 		return r.resolveQualified(t, scope)
 	}
-	if t.Name == "self" {
+	if t.Name == selfTypeName {
 		return &ir.SelfType{}
 	}
 	if bound, ok := scope[t.Name]; ok && len(t.Args) == 0 {
@@ -240,7 +244,7 @@ func (r *TypeResolver) FreeTypeVars(scope TypeScope, ts ...ast.TypeExpr) []strin
 			// A qualified name (geo.Point) is never a type variable: it can
 			// only mean a namespace's export, and resolves (or is reported)
 			// there.
-			if _, inScope := scope[t.Name]; t.Namespace == "" && len(t.Args) == 0 && t.Name != "self" && !inScope && !seen[t.Name] && r.lookup(t.Name) == nil {
+			if _, inScope := scope[t.Name]; t.Namespace == "" && len(t.Args) == 0 && t.Name != selfTypeName && !inScope && !seen[t.Name] && r.lookup(t.Name) == nil {
 				seen[t.Name] = true
 				out = append(out, t.Name)
 			}

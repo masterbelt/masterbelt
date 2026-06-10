@@ -117,6 +117,63 @@ Module
       Enum: ~
       Master: ~
       Where: ~
+    TypeDef
+      Name: "Cell"
+      Anchor: "belt:/Cell"
+      Public: true
+      Doc: "A record with a getter over its field."
+      Params: ~
+      Body: Record
+        Fields:
+          Field
+            Name: "raw"
+            Type: Named
+              Def: "Level"
+      Methods:
+        Method
+          Name: "scaled"
+          Anchor: "belt:/Cell#scaled"
+          Public: true
+          Extern: false
+          Kind: 1
+          Effects: ~
+          Doc: "Read as cell.scaled (no parens), like a field."
+          Params: ~
+          Result: Named
+            Def: "Level"
+          Body:
+            Return
+              Value: FieldAccess
+                Receiver: SelfValue
+                  Type: Named
+                    Def: "Cell"
+                Field: "raw"
+                Type: Named
+                  Def: "Level"
+          Owner: "Cell"
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Master: ~
+      Where: ~
+    TypeDef
+      Name: "Scaled"
+      Anchor: "belt:/Scaled"
+      Public: true
+      Doc: "The getter's result type, recovered by projection in type position — exactly" "as a field projection (Item.level) recovers a field's declared type."
+      Params: ~
+      Body: Named
+        Def: "Level"
+      Methods: ~
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Master: ~
+      Where: ~
   Funcs: ~
   Asserts:
     Assert
@@ -207,3 +264,47 @@ Module
         UnionTag: ~
         Reified: ~
       Diagram: "Schema.type == Level\n       ^    ^  ^\n       |    |  Level\n       |    true\n       Level"
+    Assert
+      Cond: "Cell.scaled == Level"
+      Doc: "And consumed in value position: the same projection, by nominal identity."
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+        Reified: ~
+      Diagram: "Cell.scaled == Level\n     ^      ^  ^\n     Level  |  Level\n            true"
+    Assert
+      Cond: "Cell.scaled != long"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+        Reified: ~
+      Diagram: "Cell.scaled != long\n     ^      ^  ^\n     Level  |  long\n            true"

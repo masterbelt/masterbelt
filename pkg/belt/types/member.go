@@ -7,7 +7,10 @@
 
 package types
 
-import "github.com/masterbelt/masterbelt/pkg/source/ir"
+import (
+	"github.com/masterbelt/masterbelt/pkg/belt/builtin"
+	"github.com/masterbelt/masterbelt/pkg/source/ir"
+)
 
 // MemberKind classifies what a name resolves to in a type's single member
 // namespace: an enum member, an associated constant, or a static fn. The three
@@ -134,6 +137,73 @@ func appRecord(app *ir.App, seen map[*ir.TypeDef]bool) *ir.Record {
 // generic application agrees in type and value position.
 func RecordOf(t ir.Type) *ir.Record {
 	return recordOfType(t, map[*ir.TypeDef]bool{})
+}
+
+// ReadableMemberType returns the type of a readable member recv.name — a record
+// field, or, failing that, a getter — projected as a type. It is the type facet
+// of a value read (memberReadType): the readable members are fields then getters,
+// in that order (a field wins; the two never share a name), so a projection
+// R.name yields the type of what r.name would read. ok is false when name is
+// neither a field nor a getter (a method is not a readable member). reg may be
+// nil, in which case only fields are considered (a getterless resolution).
+func ReadableMemberType(reg *builtin.Registry, recv ir.Type, name string) (ir.Type, bool) {
+	if t, ok := fieldMemberType(recv, name); ok {
+		return t, true
+	}
+	// A getter on a bare generic (Box<T>, no application supplying arguments) would
+	// read the free parameter T, so it is not projectable here — the getter twin of
+	// FieldProjection's bare-generic guard. An application instantiates it via the
+	// type-position path instead.
+	if reg != nil && !isBareGeneric(recv) {
+		// A getter result still carrying a free type variable (reached through an
+		// uninstantiated generic) is not a concrete type to reify, so it is not a
+		// readable-member projection here; generic getter projection is the follow-up.
+		if t, ok := GetterResultType(reg, recv, name); ok && !HasTypeVar(t) {
+			return t, true
+		}
+	}
+	return nil, false
+}
+
+// isBareGeneric reports whether recv is a generic type used without arguments — a
+// Named whose definition takes type parameters — so a member off it would leak a
+// free parameter rather than a concrete type.
+func isBareGeneric(recv ir.Type) bool {
+	n, ok := recv.(*ir.Named)
+	return ok && n.Def != nil && len(n.Def.Params) > 0
+}
+
+// fieldMemberType returns the type of a record field of recv, with the same
+// rules FieldProjection applies — a Named head goes through FieldProjection so a
+// bare generic (Box<T>, no application to instantiate) stays unprojectable, while
+// a generic application or an anonymous record reads its (instantiated) fields
+// directly. ok is false when recv has no such field.
+func fieldMemberType(recv ir.Type, name string) (ir.Type, bool) {
+	switch r := recv.(type) {
+	case *ir.Named:
+		return FieldProjection(r.Def, name)
+	case *ir.App:
+		if rec := RecordOf(r); rec != nil {
+			if f := fieldNamedIn(rec, name); f != nil {
+				return f.Type, true
+			}
+		}
+	case *ir.Record:
+		if f := fieldNamedIn(r, name); f != nil {
+			return f.Type, true
+		}
+	}
+	return nil, false
+}
+
+// fieldNamedIn returns the record field of the given name, or nil.
+func fieldNamedIn(rec *ir.Record, name string) *ir.Field {
+	for i := range rec.Fields {
+		if rec.Fields[i].Name == name {
+			return &rec.Fields[i]
+		}
+	}
+	return nil
 }
 
 // ResolveMember classifies name against def's single member namespace — the one

@@ -813,20 +813,26 @@ func reportTypeMemberIssue(fileID FileID, m *ast.MemberExpr, q queries, at func(
 	recvName := receiverName(m.Receiver)
 	member := types.ResolveMember(def, m.Member.Name)
 	if def != nil && def.Enum != nil {
-		// An enum type: the member must be one of its members. A name that resolves
-		// to anything else (or nothing) is an unknown enum member.
+		// An enum type: the member must be one of its members, or a readable member
+		// (a getter the enum's impl declares — an enum has no fields). A name that
+		// resolves to neither is an unknown enum member.
 		if member.Kind != types.MemberEnum {
+			if _, ok := types.ReadableMemberType(q.registry(), reifyType(def), m.Member.Name); ok {
+				return
+			}
 			s := at(m)
 			diags.Add(newUnknownEnumMemberDiagnostic(s.offset, s.width, recvName, m.Member.Name))
 		}
 		return
 	}
-	// A non-enum type: the member must be an associated constant or a declared
-	// field projected in value position (Character.level — a type value the
-	// comptime expression consumes).
+	// A non-enum type: the member must be an associated constant or a readable
+	// member (a declared field or a getter) projected in value position
+	// (Character.level — a type value the comptime expression consumes).
 	if member.Kind != types.MemberConst {
-		if _, ok := types.FieldProjection(def, m.Member.Name); ok {
-			return
+		if def != nil {
+			if _, ok := types.ReadableMemberType(q.registry(), reifyType(def), m.Member.Name); ok {
+				return
+			}
 		}
 		s := at(m)
 		diags.Add(newUnknownAssociatedConstDiagnostic(s.offset, s.width, recvName, m.Member.Name))

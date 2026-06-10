@@ -60,3 +60,25 @@ pub type SchemaType = Schema.type
 
 /// That column's declared type, recovered by projection in value position too.
 assert Schema.type == Level
+
+// A getter is a readable member too. It is read as `.X` (no parens), the same as
+// a field, so it projects the same way: R.X recovers the type of what r.X reads,
+// over fields and getters alike. The projection is the type-facet of the read.
+
+/// A record with a getter over its field.
+pub type Cell = {
+  raw: Level,
+} impl {
+  /// Read as cell.scaled (no parens), like a field.
+  pub get scaled(): Level {
+    return self.raw
+  }
+}
+
+/// The getter's result type, recovered by projection in type position — exactly
+/// as a field projection (Item.level) recovers a field's declared type.
+pub type Scaled = Cell.scaled
+
+/// And consumed in value position: the same projection, by nominal identity.
+assert Cell.scaled == Level
+assert Cell.scaled != long

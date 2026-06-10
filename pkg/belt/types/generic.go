@@ -53,6 +53,43 @@ func Substitute(t ir.Type, subst map[string]ir.Type) ir.Type {
 	}
 }
 
+// SubstituteSelf replaces every self type in t with self, recursing through the
+// composite types — so a getter returning list<self> read or projected off a
+// receiver yields list<receiver>, not a type still carrying the receiver-only
+// self marker. A non-self type with no self inside is returned unchanged.
+func SubstituteSelf(t, self ir.Type) ir.Type {
+	switch t := t.(type) {
+	case *ir.SelfType:
+		return self
+	case *ir.App:
+		args := make([]ir.Type, len(t.Args))
+		for i, a := range t.Args {
+			args[i] = SubstituteSelf(a, self)
+		}
+		return &ir.App{Def: t.Def, Args: args}
+	case *ir.Func:
+		params := make([]ir.Type, len(t.Params))
+		for i, p := range t.Params {
+			params[i] = SubstituteSelf(p, self)
+		}
+		return &ir.Func{Params: params, Result: SubstituteSelf(t.Result, self)}
+	case *ir.Union:
+		members := make([]ir.Type, len(t.Members))
+		for i, m := range t.Members {
+			members[i] = SubstituteSelf(m, self)
+		}
+		return &ir.Union{Members: members}
+	case *ir.Record:
+		fields := make([]ir.Field, len(t.Fields))
+		for i, f := range t.Fields {
+			fields[i] = ir.Field{Name: f.Name, Type: SubstituteSelf(f.Type, self)}
+		}
+		return &ir.Record{Fields: fields}
+	default:
+		return t
+	}
+}
+
 // Match matches a parameter pattern — which may contain still-unbound method
 // type variables — against a concrete argument type, recording each variable it
 // solves in subst. A bare variable binds to the argument (and, if already bound,
