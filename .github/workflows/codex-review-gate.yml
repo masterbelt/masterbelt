@@ -18,10 +18,12 @@ name: codex-review-gate
 #   open     = unresolved review threads on the PR,
 #   eyes     = a `eyes` body reaction exists.
 #
-# Reactions have no webhook trigger, so a light `schedule` poll reconciles open
-# non-draft PRs to catch the `eyes` (-> in review) and the `+1` (-> accepted),
-# which Codex emits as reactions only (verified: its approve is never an
-# APPROVED review). Events handle the findings/resolution transitions promptly.
+# Reactions (eyes, +1) and conversation-resolution have no usable workflow
+# trigger -- pull_request_review_thread is NOT a valid Actions event, do not add
+# it -- so a light `schedule` poll reconciles open non-draft PRs to catch them.
+# The pull_request / pull_request_review / pull_request_review_comment events
+# drive the open / push / new-findings transitions promptly. Codex's approve is
+# a body reaction only (verified: never an APPROVED review).
 
 on:
   pull_request:
@@ -30,8 +32,6 @@ on:
     types: [submitted, dismissed, edited]
   pull_request_review_comment:
     types: [created, edited, deleted]
-  pull_request_review_thread:
-    types: [resolved, unresolved]
   schedule:
     - cron: '*/10 * * * *'
 
