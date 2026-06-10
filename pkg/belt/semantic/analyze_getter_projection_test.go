@@ -173,6 +173,25 @@ func TestGetterProjectionForwardBareGenericRejected(t *testing.T) {
 	}
 }
 
+func TestGetterProjectionNestedSelf(t *testing.T) {
+	// A getter whose result carries self inside a constructor (list<self>) projects
+	// with the receiver substituted throughout — Item.items is list<Item>, not a
+	// public type still carrying the receiver-only self marker. The same receiver
+	// substitution is what makes the value-position read x.items type as list<Item>.
+	src := "pub type Item = { n: nint } impl {\n  pub get items(): list<self> { return [] }\n}\n" +
+		"pub type Items = Item.items\n" +
+		"pub fn read(x: Item): list<Item> { return x.items }\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("want clean (nested self resolves to receiver), got %v", codes(diags))
+	}
+	for _, def := range m.Types {
+		if def.Name == "Items" && (def.Body == nil || def.Body.String() != "list<Item>") {
+			t.Fatalf("Items = %v, want list<Item> (nested self resolved)", def.Body)
+		}
+	}
+}
+
 func TestGetterProjectionGenericAliasNoFreeVar(t *testing.T) {
 	// A getter reached through an applied generic alias (Alias<U> = Box<U>) whose
 	// substitution does not compose to a concrete type is rejected, not reified as

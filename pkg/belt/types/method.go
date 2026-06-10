@@ -101,9 +101,10 @@ func Getter(reg *builtin.Registry, recv ir.Type, name string) (*ir.Method, map[s
 }
 
 // GetterResultType returns the type a getter read recv.name produces: the
-// getter's result, with self resolving to the receiver (a getter that returns
-// self yields the receiver's type), and the receiver's generic substitution
-// applied. ok is false when the receiver declares no getter of that name. It is
+// getter's result, with self resolving to the receiver throughout (a getter
+// returning self yields the receiver, one returning list<self> yields a list of
+// it), and the receiver's generic substitution applied. ok is false when the
+// receiver declares no getter of that name. It is
 // the one place a getter's read/projection type is computed, shared by the
 // value-position read and the type-position projection so the two cannot drift.
 func GetterResultType(reg *builtin.Registry, recv ir.Type, name string) (ir.Type, bool) {
@@ -111,10 +112,11 @@ func GetterResultType(reg *builtin.Registry, recv ir.Type, name string) (ir.Type
 	if !ok {
 		return nil, false
 	}
-	if _, isSelf := m.Result.(*ir.SelfType); isSelf {
-		return recv, true
-	}
-	return Substitute(m.Result, subst), true
+	// The receiver replaces self throughout the result, not only when the result
+	// is exactly self: a getter returning list<self> read or projected off Box
+	// yields list<Box>, never a public type still carrying the receiver-only self
+	// marker. The generic parameters are substituted first, then self.
+	return SubstituteSelf(Substitute(m.Result, subst), recv), true
 }
 
 // Setter returns the setter named name on the receiver's type — the accessor a
