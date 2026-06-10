@@ -76,6 +76,30 @@ Module
       Enum: ~
       Master: ~
       Where: ~
+    TypeDef
+      Name: "Line"
+      Anchor: "belt:geometry/Line"
+      Public: true
+      Doc: "A segment between two coordinates — a distinct nominal type."
+      Params: ~
+      Body: Record
+        Fields:
+          Field
+            Name: "from"
+            Type: Builtin
+              Name: "int"
+          Field
+            Name: "to"
+            Type: Builtin
+              Name: "int"
+      Methods: ~
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Master: ~
+      Where: ~
   Funcs: ~
   Asserts: ~
 # main.belt
@@ -208,4 +232,48 @@ Module
         Reified: ~
   Types: ~
   Funcs: ~
-  Asserts: ~
+  Asserts:
+    Assert
+      Cond: "geo.Point == geo.Point"
+      Doc: "The same qualified type is equal to itself."
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+        Reified: ~
+      Diagram: "geo.Point == geo.Point\n    ^     ^      ^\n    Point true   Point"
+    Assert
+      Cond: "geo.Point != geo.Line"
+      Doc: "Two distinct qualified types are unequal, by nominal identity."
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+        Reified: ~
+      Diagram: "geo.Point != geo.Line\n    ^     ^      ^\n    Point true   Line"

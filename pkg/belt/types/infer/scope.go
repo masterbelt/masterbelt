@@ -236,6 +236,14 @@ type BodyScope struct {
 	// its overload set in source order — or nil when none are in scope (a
 	// refinement predicate).
 	Funcs map[string][]*ast.FuncDecl
+	// ConstShadows reports whether a name is bound by a top-level constant — a
+	// value that shadows a same-named namespace import in value position, so a
+	// qualified member off it (geo.Item) is read as a field of the const rather
+	// than reified as the imported type. It is the body's reach to the constant
+	// surface BodyScope does not otherwise carry (locals and params it does); nil
+	// where there is none (a refinement predicate), leaving only locals and params
+	// to shadow. The const initializer's resolve check is the const-position twin.
+	ConstShadows func(*ast.Identifier) bool
 	// QualifiedFuncs is the namespace-qualified function lookup
 	// (geo.area -> the target's exported overload set), or nil when no
 	// namespaces are in scope.
@@ -366,10 +374,15 @@ func (s BodyScope) typeMemberValue(e *ast.MemberExpr) (ir.Type, bool) {
 }
 
 // valueShadows reports whether a namespace identifier is shadowed by a value in
-// scope — a let-bound local or a parameter — so a qualified type projection
-// (geo.Item.id) defers to a value receiver named geo.
+// scope — a let-bound local, a parameter, or a top-level constant — so a
+// qualified type member (geo.Item.id, or the bare geo.Item type value) defers to
+// a value receiver named geo. It is the body twin of the const initializer's
+// resolve check, which catches a same-named const the same way.
 func (s BodyScope) valueShadows(id *ast.Identifier) bool {
-	return s.shadows(id.Name)
+	if s.shadows(id.Name) {
+		return true
+	}
+	return s.ConstShadows != nil && s.ConstShadows(id)
 }
 
 // lookupType resolves a type name (a conversion callee) to its type against

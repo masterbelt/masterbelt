@@ -70,6 +70,56 @@ File
           Dot "."
           Ident "Unit"
         RBracket "]"
+  AssertDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// A namespace-qualified type name is also a value: geo.Point used in value"
+    Newline "\n"
+    LineComment "// position reifies to a type value, the qualified twin of a bare local type"
+    Newline "\n"
+    LineComment "// name, so two qualified names compare by nominal identity with no field"
+    Newline "\n"
+    LineComment "// projection. A comptime assert consumes the type value; it is never stored."
+    Newline "\n"
+    Newline "\n"
+    DocComment "/// The same qualified type is equal to itself."
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      MemberExpr
+        NameRef
+          Ident "geo"
+        Dot "."
+        Ident "Point"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      MemberExpr
+        NameRef
+          Ident "geo"
+        Dot "."
+        Ident "Point"
+  AssertDecl
+    Newline "\n"
+    DocComment "/// Two distinct qualified types are unequal, by nominal identity."
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      MemberExpr
+        NameRef
+          Ident "geo"
+        Dot "."
+        Ident "Point"
+      Whitespace " "
+      BangEq "!="
+      Whitespace " "
+      MemberExpr
+        NameRef
+          Ident "geo"
+        Dot "."
+        Ident "Line"
   Newline "\n"
   EOF ""
 # diagnostics

@@ -84,10 +84,17 @@ func (b constBinder) leafConstMember(e *ast.MemberExpr, sub func(ast.Expr) ir.Va
 		return &ir.Reference{Target: b.irOf[target], Syntax: e}
 	}
 	shadowed := func(id *ast.Identifier) bool { return b.q.resolve(b.file, id) != nil }
-	if def := memberReceiverDef(b.uni(), qualifiedFrom(b.q, b.q.importsOf(b.file)), shadowed, e.Receiver); def != nil {
+	qualified := qualifiedFrom(b.q, b.q.importsOf(b.file))
+	if def := memberReceiverDef(b.uni(), qualified, shadowed, e.Receiver); def != nil {
 		if v := typeMemberValue(def, e); v != nil {
 			return v
 		}
+	}
+	// A namespace-qualified type name used as a value (geo.Item, no trailing
+	// projection) reifies to a type value, the qualified twin of a bare local type
+	// name; a value shadowing the namespace name defers to the field access below.
+	if v := qualifiedTypeValue(qualified, shadowed, e); v != nil {
+		return v
 	}
 	return &ir.FieldAccess{Receiver: sub(e.Receiver), Field: e.Member.Name, Syntax: e}
 }
@@ -111,6 +118,28 @@ func memberReceiverDef(universe map[string]*ir.TypeDef, qualified func(namespace
 			}
 			return qualified(ns.Name, r.Member.Name)
 		}
+	}
+	return nil
+}
+
+// qualifiedTypeValue lowers a namespace-qualified type name used as a value
+// (geo.Item) to its reified type value — the qualified twin of a bare local type
+// name (leafConstIdent's Item). The receiver must name a namespace whose export
+// of the member name is a type, and not be shadowed by a same-named value (a
+// const named geo, whose field geo.Item is read instead). It returns nil
+// otherwise, which the caller reads as a record-field access. It is the
+// value-lowering twin of infer.qualifiedTypeValue, so a body and a const agree on
+// a bare qualified type value, and the metatype comparison folds.
+func qualifiedTypeValue(qualified func(namespace, name string) *ir.TypeDef, valueShadows func(*ast.Identifier) bool, e *ast.MemberExpr) ir.Value {
+	ns, ok := e.Receiver.(*ast.Identifier)
+	if !ok || qualified == nil {
+		return nil
+	}
+	if valueShadows != nil && valueShadows(ns) {
+		return nil
+	}
+	if def := qualified(ns.Name, e.Member.Name); def != nil {
+		return &ir.TypeValue{Reified: reifyType(def), Syntax: e}
 	}
 	return nil
 }
@@ -275,6 +304,16 @@ func constRefFrom(q queries, file FileID) func(*ast.Identifier) *ir.Const {
 	}
 }
 
+// constShadowsFrom builds a body's const-shadowing predicate: whether a name
+// resolves to a top-level declaration — a const (or function) that shadows a
+// same-named namespace import in value position, so a qualified member off it
+// (geo.Item, geo.Item.id) is read as a value rather than reified as the imported
+// type. It is the body twin of the const initializer's resolve check, shared by
+// the type-check, effect, and pure-context body walks so they agree on shadowing.
+func constShadowsFrom(q queries, file FileID) func(*ast.Identifier) bool {
+	return func(id *ast.Identifier) bool { return q.resolve(file, id) != nil }
+}
+
 // nsConstRefFrom builds the nsConstRef channel over the queries, mirroring
 // constRefFrom for a namespace member access.
 func nsConstRefFrom(q queries, file FileID) func(*ast.MemberExpr) *ir.Const {
@@ -383,7 +422,16 @@ func (b bodyBinder) bodyScope() infer.BodyScope {
 		Locals:         b.locals,
 		Funcs:          b.funcs.astByName(),
 		QualifiedFuncs: b.funcs.qualified,
+		ConstShadows:   b.constShadows,
 	}
+}
+
+// constShadows reports whether a name is bound by a top-level constant, so an
+// inferred let's value (let x = geo.Item) settles its qualified member against a
+// const receiver named geo rather than the imported type — agreeing with the
+// lowering's own valueShadows. It is nil-safe through constRef.
+func (b bodyBinder) constShadows(id *ast.Identifier) bool {
+	return b.funcs.constRef != nil && b.funcs.constRef(id) != nil
 }
 
 // ExpectedEnum returns the enum definition a switch scrutinee's static type
@@ -504,6 +552,18 @@ func (b bodyBinder) shadows(name string) bool {
 	return b.params[name]
 }
 
+// valueShadows reports whether a namespace identifier is shadowed by a value in
+// the body — a let-bound local, a parameter, or a top-level const named like the
+// import — so a qualified type member (geo.Item, geo.Item.id) defers to that value
+// receiver rather than reifying the imported type. It is the body twin of the
+// const initializer's resolve check, which already catches a same-named const.
+func (b bodyBinder) valueShadows(id *ast.Identifier) bool {
+	if b.shadows(id.Name) {
+		return true
+	}
+	return b.funcs.constRef != nil && b.funcs.constRef(id) != nil
+}
+
 func (b bodyBinder) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
 	switch e := e.(type) {
 	case *ast.SelfExpr:
@@ -582,10 +642,18 @@ func (b bodyBinder) leafNamespaceOrTypeMember(e *ast.MemberExpr) ir.Value {
 	// associated-constant, or projected-field value the const initializer lowers,
 	// off a local (Item.id) or namespace-qualified (geo.Item.id) type, so a body
 	// and a const agree on T.member. A static fn, or no match, returns nil and the
-	// caller reads a record-field access. A value shadowing the namespace name
-	// (a local or parameter) defers the qualified form to a value receiver.
-	shadowed := func(id *ast.Identifier) bool { return b.shadows(id.Name) }
-	return typeMemberValue(memberReceiverDef(b.r.Defs, b.r.Qualified, shadowed, e.Receiver), e)
+	// caller reads a record-field access. A value shadowing the namespace name —
+	// a local, a parameter, or a top-level const named like the import — defers the
+	// qualified form to a value receiver, the body twin of the const initializer's
+	// resolve check.
+	shadowed := b.valueShadows
+	if v := typeMemberValue(memberReceiverDef(b.r.Defs, b.r.Qualified, shadowed, e.Receiver), e); v != nil {
+		return v
+	}
+	// A bare namespace-qualified type name used as a value (geo.Item, no trailing
+	// projection) reifies to a type value, the qualified twin of a bare local type
+	// name, so a body folds geo.Item == geo.Item exactly as a const does.
+	return qualifiedTypeValue(b.r.Qualified, shadowed, e)
 }
 
 // leafCall lowers a call in value position. A call whose callee names a type is

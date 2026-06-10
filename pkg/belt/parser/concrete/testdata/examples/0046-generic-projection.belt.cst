@@ -1,0 +1,412 @@
+# tree
+File
+  TypeDecl
+    LineComment "// Generic field-type projection. A field projected off a generic type is"
+    Newline "\n"
+    LineComment "// instantiated: the type argument is substituted for the parameter through the"
+    Newline "\n"
+    LineComment "// field's declared type, so Box<string>.value — written Box.value<string> in a"
+    Newline "\n"
+    LineComment "// type position — is string. Four shapes resolve: a direct application, a"
+    Newline "\n"
+    LineComment "// concrete alias of one, an applied generic-alias chain, and a forward"
+    Newline "\n"
+    LineComment "// reference. Nominal identity survives substitution, and the projection is a"
+    Newline "\n"
+    LineComment "// type — named in a type position or consumed by a comptime assert, never stored."
+    Newline "\n"
+    Newline "\n"
+    DocComment "/// A nominal alias, to show identity survives substitution."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Type "type"
+    Whitespace " "
+    Ident "Level"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    TypeName
+      Ident "sbyte"
+  TypeDecl
+    Newline "\n"
+    Newline "\n"
+    DocComment "/// A one-field generic container, and a two-field generic pair."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Type "type"
+    Whitespace " "
+    Ident "Box"
+    GenericParams
+      Lt "<"
+      GenericParam
+        Ident "T"
+      Gt ">"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    RecordType
+      LBrace "{"
+      Whitespace " "
+      Field
+        Ident "value"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "T"
+      Whitespace " "
+      RBrace "}"
+  TypeDecl
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Type "type"
+    Whitespace " "
+    Ident "Pair"
+    GenericParams
+      Lt "<"
+      GenericParam
+        Ident "A"
+      Comma ","
+      Whitespace " "
+      GenericParam
+        Ident "B"
+      Gt ">"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    RecordType
+      LBrace "{"
+      Whitespace " "
+      Field
+        Ident "first"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "A"
+      Comma ","
+      Whitespace " "
+      Field
+        Ident "second"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "B"
+      Whitespace " "
+      RBrace "}"
+  TypeDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// Type position: the projection carries its arguments, written after the"
+    Newline "\n"
+    LineComment "// projected field, and instantiates the field's declared type."
+    Newline "\n"
+    Newline "\n"
+    DocComment "/// A direct application: Box<long>.value is long."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Type "type"
+    Whitespace " "
+    Ident "BoxedId"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    TypeName
+      Ident "Box"
+      Dot "."
+      Ident "value"
+      GenericArgs
+        Lt "<"
+        TypeName
+          Ident "long"
+        Gt ">"
+  TypeDecl
+    Newline "\n"
+    Newline "\n"
+    DocComment "/// Each argument of a multi-parameter generic substitutes positionally."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Type "type"
+    Whitespace " "
+    Ident "FirstColumn"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    TypeName
+      Ident "Pair"
+      Dot "."
+      Ident "first"
+      GenericArgs
+        Lt "<"
+        TypeName
+          Ident "Level"
+        Comma ","
+        Whitespace " "
+        TypeName
+          Ident "long"
+        Gt ">"
+  TypeDecl
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Type "type"
+    Whitespace " "
+    Ident "SecondColumn"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    TypeName
+      Ident "Pair"
+      Dot "."
+      Ident "second"
+      GenericArgs
+        Lt "<"
+        TypeName
+          Ident "Level"
+        Comma ","
+        Whitespace " "
+        TypeName
+          Ident "long"
+        Gt ">"
+  TypeDecl
+    Newline "\n"
+    Newline "\n"
+    DocComment "/// Nominal identity survives: Box<Level>.value is the alias Level, not the sbyte"
+    Newline "\n"
+    DocComment "/// it unwraps to."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Type "type"
+    Whitespace " "
+    Ident "BoxedLevel"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    TypeName
+      Ident "Box"
+      Dot "."
+      Ident "value"
+      GenericArgs
+        Lt "<"
+        TypeName
+          Ident "Level"
+        Gt ">"
+  TypeDecl
+    Newline "\n"
+    Newline "\n"
+    DocComment "/// An applied generic-alias chain composes substitutions: Crate<T> = Box<T>, so"
+    Newline "\n"
+    DocComment "/// Crate.value<long> instantiates Crate<long>, then Box<long>, to long."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Type "type"
+    Whitespace " "
+    Ident "Crate"
+    GenericParams
+      Lt "<"
+      GenericParam
+        Ident "T"
+      Gt ">"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    TypeName
+      Ident "Box"
+      GenericArgs
+        Lt "<"
+        TypeName
+          Ident "T"
+        Gt ">"
+  TypeDecl
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Type "type"
+    Whitespace " "
+    Ident "CrateId"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    TypeName
+      Ident "Crate"
+      Dot "."
+      Ident "value"
+      GenericArgs
+        Lt "<"
+        TypeName
+          Ident "long"
+        Gt ">"
+  TypeDecl
+    Newline "\n"
+    Newline "\n"
+    DocComment "/// A forward reference: the generic is declared after the type projecting it, so"
+    Newline "\n"
+    DocComment "/// the field type is read from its declaration syntax in its parameter scope,"
+    Newline "\n"
+    DocComment "/// then the argument is substituted."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Type "type"
+    Whitespace " "
+    Ident "EarlyValue"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    TypeName
+      Ident "Late"
+      Dot "."
+      Ident "value"
+      GenericArgs
+        Lt "<"
+        TypeName
+          Ident "long"
+        Gt ">"
+  TypeDecl
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Type "type"
+    Whitespace " "
+    Ident "Late"
+    GenericParams
+      Lt "<"
+      GenericParam
+        Ident "T"
+      Gt ">"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    RecordType
+      LBrace "{"
+      Whitespace " "
+      Field
+        Ident "value"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "T"
+      Whitespace " "
+      RBrace "}"
+  TypeDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// Value position: a concrete alias bakes the argument into its body, so the"
+    Newline "\n"
+    LineComment "// projection instantiates with no written arguments — a comptime type value an"
+    Newline "\n"
+    LineComment "// assert consumes (a value position has no angle-bracket arguments)."
+    Newline "\n"
+    Newline "\n"
+    DocComment "/// A concrete alias of an application, and one preserving a nominal argument."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Type "type"
+    Whitespace " "
+    Ident "StringBox"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    TypeName
+      Ident "Box"
+      GenericArgs
+        Lt "<"
+        TypeName
+          Ident "string"
+        Gt ">"
+  TypeDecl
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Type "type"
+    Whitespace " "
+    Ident "LevelBox"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    TypeName
+      Ident "Box"
+      GenericArgs
+        Lt "<"
+        TypeName
+          Ident "Level"
+        Gt ">"
+  TypeDecl
+    Newline "\n"
+    Newline "\n"
+    DocComment "/// Projecting through the concrete alias agrees in type position: StringBox.value"
+    Newline "\n"
+    DocComment "/// instantiates the alias body's application to string, exactly as value position."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Type "type"
+    Whitespace " "
+    Ident "Unwrapped"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    TypeName
+      Ident "StringBox"
+      Dot "."
+      Ident "value"
+  AssertDecl
+    Newline "\n"
+    Newline "\n"
+    DocComment "/// The instantiated field type, projected in value position through the alias."
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      MemberExpr
+        NameRef
+          Ident "StringBox"
+        Dot "."
+        Ident "value"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      NameRef
+        Ident "string"
+  AssertDecl
+    Newline "\n"
+    Newline "\n"
+    DocComment "/// Nominal identity in value position: LevelBox.value is Level, not sbyte."
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      MemberExpr
+        NameRef
+          Ident "LevelBox"
+        Dot "."
+        Ident "value"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      NameRef
+        Ident "Level"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      MemberExpr
+        NameRef
+          Ident "LevelBox"
+        Dot "."
+        Ident "value"
+      Whitespace " "
+      BangEq "!="
+      Whitespace " "
+      NameRef
+        Ident "sbyte"
+  Newline "\n"
+  EOF ""
+# diagnostics

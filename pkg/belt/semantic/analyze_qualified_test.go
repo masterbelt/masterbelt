@@ -73,6 +73,65 @@ func TestValueShadowsNamespaceProjection(t *testing.T) {
 	}
 }
 
+func TestBareQualifiedTypeValue(t *testing.T) {
+	// A namespace-qualified type name used as a value (geo.Item) reifies to a type
+	// value — the qualified twin of a bare local type name (Item) — so geo.Item ==
+	// geo.Item folds true and geo.Item != geo.Other folds true, by nominal
+	// identity, with no trailing field projection.
+	clean := analyzeProject(t, map[string]string{
+		"geometry.belt": "pub type Item = { id: long }\npub type Other = { id: long }\n",
+		"main.belt": "use geo from \"geometry.belt\"\n" +
+			"assert geo.Item == geo.Item\n" +
+			"assert geo.Item != geo.Other\n",
+	})
+	if len(clean) != 0 {
+		t.Fatalf("want clean (bare qualified type value folds), got %v", clean)
+	}
+}
+
+func TestBareQualifiedTypeValueShadowedByValue(t *testing.T) {
+	// A value named like a namespace import shadows it: geo.Item reads the field
+	// Item of the const named geo, not the imported type as a type value, so the
+	// const settles to that field's type rather than reifying a metatype.
+	diags := analyzeProject(t, map[string]string{
+		"geometry.belt": "pub type Item = { id: long }\n",
+		"main.belt": "use geo from \"geometry.belt\"\n" +
+			"pub type Box = { Item: { id: nint } }\n" +
+			"const geo: Box = { Item: { id: 1 } }\n" +
+			"const X = geo.Item\n",
+	})
+	if len(diags) != 0 {
+		t.Fatalf("want clean (value shadows namespace), got %v", diags)
+	}
+}
+
+func TestBareQualifiedTypeValueShadowedInBody(t *testing.T) {
+	// A top-level const named like a namespace import shadows it inside a function
+	// or method body too, not only in a const initializer: geo.Item reads the
+	// const's field rather than reifying the imported type, so the body type-checks
+	// against the field type instead of the metatype. The qualified projection
+	// geo.Item.id is shadowed the same way.
+	body := "use geo from \"geometry.belt\"\n" +
+		"pub type Box = { Item: { id: nint } }\n" +
+		"const geo: Box = { Item: { id: 1 } }\n" +
+		"pub fn f(): { id: nint } { return geo.Item }\n" +
+		"pub fn g(): nint { return geo.Item.id }\n"
+	if diags := analyzeProject(t, map[string]string{
+		"geometry.belt": "pub type Item = { id: long }\n",
+		"main.belt":     body,
+	}); len(diags) != 0 {
+		t.Fatalf("want clean (const shadows namespace in a body), got %v", diags)
+	}
+	// Without a shadowing const, a bare qualified type value still folds in a body.
+	if diags := analyzeProject(t, map[string]string{
+		"geometry.belt": "pub type Item = { id: long }\n",
+		"main.belt": "use geo from \"geometry.belt\"\n" +
+			"pub fn f(): nint {\n  assert geo.Item == geo.Item\n  return 1\n}\n",
+	}); len(diags) != 0 {
+		t.Fatalf("want clean (bare qualified type value folds in a body), got %v", diags)
+	}
+}
+
 func TestQualifiedTypeValueProjection(t *testing.T) {
 	root := belttest.WriteFiles(t, map[string]string{
 		"masterbelt.toml": "entry = \"main.belt\"\n",

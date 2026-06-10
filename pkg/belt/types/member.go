@@ -42,10 +42,12 @@ type Member struct {
 // for a member that is not a declared field, or a def with no record at all,
 // which the caller takes as a different member reading.
 func FieldProjection(def *ir.TypeDef, name string) (ir.Type, bool) {
-	// Projecting a field off a generic type would read the field's parameterised
-	// type (Box<T>.value is T), so it is refused here too — the value-position twin
-	// of the type-position generic_type_projection rejection — rather than leaking
-	// an uninstantiated type variable. Instantiating it is the generics work.
+	// A bare generic type (Box<T>) has no application here in value position to
+	// supply its arguments, so its parameterised field type (Box<T>.value is T)
+	// cannot be instantiated — it stays unprojectable rather than leaking an
+	// uninstantiated type variable. A concrete alias of a generic application
+	// (Box = Inner<string>) is not generic itself, so it projects here through its
+	// body's application, instantiated by recordBody below.
 	if def != nil && len(def.Params) > 0 {
 		return nil, false
 	}
@@ -62,33 +64,76 @@ func FieldProjection(def *ir.TypeDef, name string) (ir.Type, bool) {
 }
 
 // recordBody returns the record a definition ultimately carries — its own record
-// body, the record of a nominal type it aliases (through the chain), or a
-// master's row record — or nil for a def with no record. A generic application
-// (a body or alias of Inner<string>) is deliberately not followed: projecting a
-// field off it needs the application's arguments substituted through the field
-// type, which the generics work owns, so it is left unprojectable here rather
-// than yielding an unbound parameter. seen guards a cyclic alias chain (reported
-// elsewhere) from looping.
+// body, the record of a nominal type or generic application it aliases (through
+// the chain, with the application's arguments substituted for the definition's
+// parameters), or a master's row record — or nil for a def with no record. seen
+// guards a cyclic alias chain (reported elsewhere) from looping.
 func recordBody(def *ir.TypeDef, seen map[*ir.TypeDef]bool) *ir.Record {
 	if def == nil || seen[def] {
 		return nil
 	}
 	seen[def] = true
-	switch b := def.Body.(type) {
-	case *ir.Record:
-		return b
-	case *ir.Named:
-		return recordBody(b.Def, seen)
+	if rec := recordOfType(def.Body, seen); rec != nil {
+		return rec
 	}
 	if def.Master != nil {
-		switch row := def.Master.Row.(type) {
-		case *ir.Record:
-			return row
-		case *ir.Named:
-			return recordBody(row.Def, seen)
-		}
+		return recordOfType(def.Master.Row, seen)
 	}
 	return nil
+}
+
+// recordOfType returns the record a resolved type carries — an anonymous record,
+// a named alias's body (through the chain), or a generic application instantiated
+// with its arguments (Box<string> over Box<T> = { value: T } yields { value:
+// string }) — or nil for a type carrying no record. seen guards a cyclic chain.
+func recordOfType(t ir.Type, seen map[*ir.TypeDef]bool) *ir.Record {
+	switch t := t.(type) {
+	case *ir.Record:
+		return t
+	case *ir.Named:
+		return recordBody(t.Def, seen)
+	case *ir.App:
+		return appRecord(t, seen)
+	}
+	return nil
+}
+
+// appRecord instantiates a generic application's record: the definition's record
+// — reached through its body, a nominal alias, or a nested application — with the
+// application's arguments substituted for the definition's parameters. A composed
+// alias (Box<T> = Inner<T>) substitutes through each step, so the substitution is
+// applied to the body before the next is resolved. It returns nil when the arity
+// does not match or the definition carries no record.
+func appRecord(app *ir.App, seen map[*ir.TypeDef]bool) *ir.Record {
+	def := app.Def
+	if def == nil || seen[def] || len(def.Params) != len(app.Args) {
+		return nil
+	}
+	seen[def] = true
+	subst := make(map[string]ir.Type, len(def.Params))
+	for i, p := range def.Params {
+		subst[p.Name] = app.Args[i]
+	}
+	body := def.Body
+	if body == nil && def.Master != nil {
+		body = def.Master.Row
+	}
+	if body == nil {
+		return nil
+	}
+	return recordOfType(Substitute(body, subst), seen)
+}
+
+// RecordOf returns the record a resolved type carries — an anonymous record, a
+// named alias's body through the chain, a generic application instantiated with
+// its arguments (Box<string> over Box<T> = { value: T } yields { value: string },
+// composing substitutions through an alias of an application), or a nominal type's
+// master row — or nil for a type carrying no resolved record (a fieldless type, or
+// a forward reference whose body is not settled yet). It is the type-position twin
+// of FieldProjection's record resolution, so a projection off the same alias of a
+// generic application agrees in type and value position.
+func RecordOf(t ir.Type) *ir.Record {
+	return recordOfType(t, map[*ir.TypeDef]bool{})
 }
 
 // ResolveMember classifies name against def's single member namespace — the one

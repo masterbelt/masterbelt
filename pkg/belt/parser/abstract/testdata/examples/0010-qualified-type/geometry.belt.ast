@@ -32,6 +32,31 @@ File
       Methods: ~
       Consts: ~
       Impls: ~
+    TypeDecl
+      Doc: "A segment between two coordinates — a distinct nominal type."
+      Public: true
+      Name: "Line"
+      Params: ~
+      Body: RecordType
+        Fields:
+          FieldDef
+            Name: "from"
+            Type: NamedType
+              Namespace: ""
+              Name: "int"
+              Args: ~
+              Projections: ~
+          FieldDef
+            Name: "to"
+            Type: NamedType
+              Namespace: ""
+              Name: "int"
+              Args: ~
+              Projections: ~
+      Where: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
   Enums: ~
   Interfaces: ~
   Funcs: ~

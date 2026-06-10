@@ -1,0 +1,340 @@
+Module
+  Consts: ~
+  Types:
+    TypeDef
+      Name: "Level"
+      Anchor: "belt:/Level"
+      Public: true
+      Doc: "A nominal alias, to show identity survives substitution."
+      Params: ~
+      Body: Builtin
+        Name: "sbyte"
+      Methods: ~
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Master: ~
+      Where: ~
+    TypeDef
+      Name: "Box"
+      Anchor: "belt:/Box"
+      Public: true
+      Doc: "A one-field generic container, and a two-field generic pair."
+      Params:
+        TypeParam
+          Name: "T"
+          Bound: ~
+      Body: Record
+        Fields:
+          Field
+            Name: "value"
+            Type: TypeVar
+              Name: "T"
+              Bound: ~
+      Methods: ~
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Master: ~
+      Where: ~
+    TypeDef
+      Name: "Pair"
+      Anchor: "belt:/Pair"
+      Public: true
+      Doc: ~
+      Params:
+        TypeParam
+          Name: "A"
+          Bound: ~
+        TypeParam
+          Name: "B"
+          Bound: ~
+      Body: Record
+        Fields:
+          Field
+            Name: "first"
+            Type: TypeVar
+              Name: "A"
+              Bound: ~
+          Field
+            Name: "second"
+            Type: TypeVar
+              Name: "B"
+              Bound: ~
+      Methods: ~
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Master: ~
+      Where: ~
+    TypeDef
+      Name: "BoxedId"
+      Anchor: "belt:/BoxedId"
+      Public: true
+      Doc: "A direct application: Box<long>.value is long."
+      Params: ~
+      Body: Builtin
+        Name: "long"
+      Methods: ~
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Master: ~
+      Where: ~
+    TypeDef
+      Name: "FirstColumn"
+      Anchor: "belt:/FirstColumn"
+      Public: true
+      Doc: "Each argument of a multi-parameter generic substitutes positionally."
+      Params: ~
+      Body: Named
+        Def: "Level"
+      Methods: ~
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Master: ~
+      Where: ~
+    TypeDef
+      Name: "SecondColumn"
+      Anchor: "belt:/SecondColumn"
+      Public: true
+      Doc: ~
+      Params: ~
+      Body: Builtin
+        Name: "long"
+      Methods: ~
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Master: ~
+      Where: ~
+    TypeDef
+      Name: "BoxedLevel"
+      Anchor: "belt:/BoxedLevel"
+      Public: true
+      Doc: "Nominal identity survives: Box<Level>.value is the alias Level, not the sbyte" "it unwraps to."
+      Params: ~
+      Body: Named
+        Def: "Level"
+      Methods: ~
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Master: ~
+      Where: ~
+    TypeDef
+      Name: "Crate"
+      Anchor: "belt:/Crate"
+      Public: true
+      Doc: "An applied generic-alias chain composes substitutions: Crate<T> = Box<T>, so" "Crate.value<long> instantiates Crate<long>, then Box<long>, to long."
+      Params:
+        TypeParam
+          Name: "T"
+          Bound: ~
+      Body: App
+        Def: "Box"
+        Args:
+          TypeVar
+            Name: "T"
+            Bound: ~
+      Methods: ~
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Master: ~
+      Where: ~
+    TypeDef
+      Name: "CrateId"
+      Anchor: "belt:/CrateId"
+      Public: true
+      Doc: ~
+      Params: ~
+      Body: Builtin
+        Name: "long"
+      Methods: ~
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Master: ~
+      Where: ~
+    TypeDef
+      Name: "EarlyValue"
+      Anchor: "belt:/EarlyValue"
+      Public: true
+      Doc: "A forward reference: the generic is declared after the type projecting it, so" "the field type is read from its declaration syntax in its parameter scope," "then the argument is substituted."
+      Params: ~
+      Body: Builtin
+        Name: "long"
+      Methods: ~
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Master: ~
+      Where: ~
+    TypeDef
+      Name: "Late"
+      Anchor: "belt:/Late"
+      Public: true
+      Doc: ~
+      Params:
+        TypeParam
+          Name: "T"
+          Bound: ~
+      Body: Record
+        Fields:
+          Field
+            Name: "value"
+            Type: TypeVar
+              Name: "T"
+              Bound: ~
+      Methods: ~
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Master: ~
+      Where: ~
+    TypeDef
+      Name: "StringBox"
+      Anchor: "belt:/StringBox"
+      Public: true
+      Doc: "A concrete alias of an application, and one preserving a nominal argument."
+      Params: ~
+      Body: App
+        Def: "Box"
+        Args:
+          Builtin
+            Name: "string"
+      Methods: ~
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Master: ~
+      Where: ~
+    TypeDef
+      Name: "LevelBox"
+      Anchor: "belt:/LevelBox"
+      Public: true
+      Doc: ~
+      Params: ~
+      Body: App
+        Def: "Box"
+        Args:
+          Named
+            Def: "Level"
+      Methods: ~
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Master: ~
+      Where: ~
+    TypeDef
+      Name: "Unwrapped"
+      Anchor: "belt:/Unwrapped"
+      Public: true
+      Doc: "Projecting through the concrete alias agrees in type position: StringBox.value" "instantiates the alias body's application to string, exactly as value position."
+      Params: ~
+      Body: Builtin
+        Name: "string"
+      Methods: ~
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Master: ~
+      Where: ~
+  Funcs: ~
+  Asserts:
+    Assert
+      Cond: "StringBox.value == string"
+      Doc: "The instantiated field type, projected in value position through the alias."
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+        Reified: ~
+      Diagram: "StringBox.value == string\n          ^     ^  ^\n          |     |  string\n          |     true\n          string"
+    Assert
+      Cond: "LevelBox.value == Level"
+      Doc: "Nominal identity in value position: LevelBox.value is Level, not sbyte."
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+        Reified: ~
+      Diagram: "LevelBox.value == Level\n         ^     ^  ^\n         Level |  Level\n               true"
+    Assert
+      Cond: "LevelBox.value != sbyte"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+        Reified: ~
+      Diagram: "LevelBox.value != sbyte\n         ^     ^  ^\n         Level |  sbyte\n               true"
