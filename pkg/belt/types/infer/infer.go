@@ -468,14 +468,10 @@ func memberReadType(reg *builtin.Registry, recv ir.Type, name string) ir.Type {
 // the receiver's type, exactly as a self-returning method does). It is
 // ir.Invalid when the receiver declares no getter of that name.
 func getterType(reg *builtin.Registry, recv ir.Type, name string) ir.Type {
-	m, subst, ok := types.Getter(reg, recv, name)
-	if !ok {
-		return ir.Invalid
+	if t, ok := types.GetterResultType(reg, recv, name); ok {
+		return t
 	}
-	if _, isSelf := m.Result.(*ir.SelfType); isSelf {
-		return recv
-	}
-	return types.Substitute(m.Result, subst)
+	return ir.Invalid
 }
 
 func recordOf(t ir.Type) *ir.Record {
@@ -497,7 +493,16 @@ func recordOf(t ir.Type) *ir.Record {
 // no member, or an associated constant has no resolved type — the fall-through
 // the scope's other readings (a namespace import, a record field) take. A
 // type-member access wins over a record-field reading, the one Type.Name path.
-func typeMemberType(universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, valueShadows func(*ast.Identifier) bool, m *ast.MemberExpr) ir.Type {
+// reifiedType is the type a definition denotes as a receiver — a primitive's
+// Builtin, any other def's Named — the head a member projection reads off.
+func reifiedType(def *ir.TypeDef) ir.Type {
+	if def.Builtin {
+		return &ir.Builtin{Name: def.Name}
+	}
+	return &ir.Named{Def: def}
+}
+
+func typeMemberType(reg *builtin.Registry, universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, valueShadows func(*ast.Identifier) bool, m *ast.MemberExpr) ir.Type {
 	def := memberReceiverDef(universe, qualified, valueShadows, m.Receiver)
 	if def == nil {
 		// A namespace-qualified type name used as a value (geo.Item, no trailing
@@ -514,12 +519,12 @@ func typeMemberType(universe map[string]*ir.TypeDef, qualified func(namespace, n
 			return t
 		}
 	case types.MemberNone, types.MemberStatic:
-		// A declared field projected in value position (Character.level) is a type
-		// value, whose own type is the metatype `type` — the value half of the
-		// field-type projection, which a comptime test (assert Character.id == long)
-		// consumes. A static fn read without a call falls through to the record-
-		// field reading, as before.
-		if _, ok := types.FieldProjection(def, m.Member.Name); ok {
+		// A readable member (a declared field or a getter) projected in value
+		// position (Character.level) is a type value, whose own type is the
+		// metatype `type` — the value half of the projection, which a comptime test
+		// (assert Character.id == long) consumes. A static fn read without a call
+		// falls through to the record-field reading, as before.
+		if _, ok := types.ReadableMemberType(reg, reifiedType(def), m.Member.Name); ok {
 			return metatype()
 		}
 	}

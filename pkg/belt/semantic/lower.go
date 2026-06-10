@@ -86,7 +86,7 @@ func (b constBinder) leafConstMember(e *ast.MemberExpr, sub func(ast.Expr) ir.Va
 	shadowed := func(id *ast.Identifier) bool { return b.q.resolve(b.file, id) != nil }
 	qualified := qualifiedFrom(b.q, b.q.importsOf(b.file))
 	if def := memberReceiverDef(b.uni(), qualified, shadowed, e.Receiver); def != nil {
-		if v := typeMemberValue(def, e); v != nil {
+		if v := typeMemberValue(b.q.registry(), def, e); v != nil {
 			return v
 		}
 	}
@@ -220,22 +220,25 @@ func enumIndex(def *ir.TypeDef, name string) int {
 // without a call) or no match, which the caller takes as a record-field access.
 // It is the one place T.member becomes a value, shared by the const and the
 // method-body value lowering, so there is no second member resolution.
-func typeMemberValue(def *ir.TypeDef, m *ast.MemberExpr) ir.Value {
+func typeMemberValue(reg *builtin.Registry, def *ir.TypeDef, m *ast.MemberExpr) ir.Value {
+	if def == nil {
+		return nil // the receiver names no type; the caller reads a record-field access
+	}
 	switch r := types.ResolveMember(def, m.Member.Name); r.Kind {
 	case types.MemberEnum:
 		return &ir.EnumMemberValue{Def: def, Index: r.Index, Syntax: m}
 	case types.MemberConst:
 		return &ir.AssocConstValue{Def: def, Index: r.Index, Syntax: m}
 	case types.MemberNone, types.MemberStatic:
-		// A declared field of a record (or master) type, projected in value
-		// position (Character.level), is a type value of the field's declared type
-		// — the comptime projection a consuming expression (assert Character.id ==
-		// long) reads. The field type is read from the settled body, so nominal
-		// identity is preserved. A static fn read without a call, or any other
-		// non-field member, returns nil, which the caller takes as an instance
-		// field access (item.level — the master track's runtime read).
-		if ft, ok := types.FieldProjection(def, m.Member.Name); ok {
-			return &ir.TypeValue{Reified: ft, Syntax: m}
+		// A readable member of a type — a declared field of a record (or master),
+		// or a getter — projected in value position (Character.level), is a type
+		// value of that member's type: the comptime projection a consuming
+		// expression (assert Character.id == long) reads. The type is read from the
+		// settled body, so nominal identity is preserved. A static fn read without a
+		// call, or any other non-readable member, returns nil, which the caller
+		// takes as an instance field access (item.level — the runtime read).
+		if t, ok := types.ReadableMemberType(reg, reifyType(def), m.Member.Name); ok {
+			return &ir.TypeValue{Reified: t, Syntax: m}
 		}
 	}
 	return nil
@@ -647,7 +650,7 @@ func (b bodyBinder) leafNamespaceOrTypeMember(e *ast.MemberExpr) ir.Value {
 	// qualified form to a value receiver, the body twin of the const initializer's
 	// resolve check.
 	shadowed := b.valueShadows
-	if v := typeMemberValue(memberReceiverDef(b.r.Defs, b.r.Qualified, shadowed, e.Receiver), e); v != nil {
+	if v := typeMemberValue(b.reg, memberReceiverDef(b.r.Defs, b.r.Qualified, shadowed, e.Receiver), e); v != nil {
 		return v
 	}
 	// A bare namespace-qualified type name used as a value (geo.Item, no trailing

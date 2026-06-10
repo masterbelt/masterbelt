@@ -179,7 +179,7 @@ func (s constScope) leaf(e ast.Expr) ir.Type {
 		// (Rarity.Common), an associated constant (sbyte.Max, Level.Max), or a field
 		// projected off a local or namespace-qualified type (Item.id, geo.Item.id) —
 		// is a value of that type, resolved through the single member resolver.
-		if t := typeMemberType(s.universe(), s.qualified(), s.valueShadows, e); t != ir.Invalid {
+		if t := typeMemberType(s.registry(), s.universe(), s.qualified(), s.valueShadows, e); t != ir.Invalid {
 			return t
 		}
 		// Otherwise the receiver is a value: a field access on a record-typed
@@ -367,7 +367,7 @@ func (s BodyScope) typeMemberValue(e *ast.MemberExpr) (ir.Type, bool) {
 	if recv, ok := e.Receiver.(*ast.Identifier); ok && s.shadows(recv.Name) {
 		return ir.Invalid, false
 	}
-	if t := typeMemberType(s.Universe, s.Qualified, s.valueShadows, e); t != ir.Invalid {
+	if t := typeMemberType(s.Reg, s.Universe, s.Qualified, s.valueShadows, e); t != ir.Invalid {
 		return t, true
 	}
 	return ir.Invalid, false

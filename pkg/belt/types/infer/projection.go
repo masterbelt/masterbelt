@@ -82,7 +82,7 @@ func (r *TypeResolver) project(head ir.Type, member string, node ast.Node) ir.Ty
 		if f := fieldNamed(rec, member); f != nil {
 			return f.Type
 		}
-		return r.failedProjection(node, head, def, member, true)
+		return r.projectReadable(head, def, member, node, true) // not a field; a getter, else unknown
 	}
 	// A declared type whose body is not resolved yet — a forward or mutual
 	// reference reached mid-pass: resolve the one field's type from the
@@ -92,10 +92,10 @@ func (r *TypeResolver) project(head ir.Type, member string, node ast.Node) ir.Ty
 			return r.projectThroughSyntax(def, member, fieldType, node)
 		}
 		if recordSyntaxOf(def) != nil {
-			return r.failedProjection(node, head, def, member, true) // a record, but no such field
+			return r.projectReadable(head, def, member, node, true) // a record, but no such field
 		}
 	}
-	return r.failedProjection(node, head, def, member, false)
+	return r.projectReadable(head, def, member, node, false)
 }
 
 // projectApp resolves a field-type projection off a generic application
@@ -110,7 +110,7 @@ func (r *TypeResolver) projectApp(app *ir.App, def *ir.TypeDef, member string, n
 		if f := fieldNamed(rec, member); f != nil {
 			return f.Type
 		}
-		return r.failedProjection(node, app, def, member, true)
+		return r.projectReadable(app, def, member, node, true) // not a field; a getter, else unknown
 	}
 	if def != nil {
 		if fieldType, ok := recordFieldSyntax(def, member); ok {
@@ -120,7 +120,7 @@ func (r *TypeResolver) projectApp(app *ir.App, def *ir.TypeDef, member string, n
 		// field (unknown_field), the same diagnostic the resolved generic gives,
 		// rather than reporting the receiver as unsupported.
 		if recordSyntaxOf(def) != nil {
-			return r.failedProjection(node, app, def, member, true)
+			return r.projectReadable(app, def, member, node, true)
 		}
 	}
 	r.reportProjection(node, ProjGenericUnsupported, app, member)
@@ -270,7 +270,11 @@ func isGenericDef(def *ir.TypeDef) bool {
 // a fieldless receiver is type_has_no_fields.
 func (r *TypeResolver) failedProjection(node ast.Node, head ir.Type, def *ir.TypeDef, member string, hasFields bool) ir.Type {
 	switch {
-	case def != nil && types.ResolveMember(def, member).Kind != types.MemberNone:
+	case def != nil && (types.ResolveMember(def, member).Kind != types.MemberNone || hasMethodNamed(def, member)):
+		// A value member, not a type: an enum member, associated constant, or
+		// static fn (ResolveMember), or a plain method/setter (hasMethodNamed). A
+		// getter is a readable member and was already projected, so it does not
+		// reach here; what remains is a member that is a value, not a type.
 		r.reportProjection(node, ProjMemberNotType, head, member)
 	case hasFields:
 		r.reportProjection(node, ProjUnknownField, head, member)
@@ -278,6 +282,32 @@ func (r *TypeResolver) failedProjection(node ast.Node, head ir.Type, def *ir.Typ
 		r.reportProjection(node, ProjNoFields, head, member)
 	}
 	return ir.Invalid
+}
+
+// hasMethodNamed reports whether def declares a method of the given name (of any
+// kind) — used to classify a projected non-field, non-getter member as a value
+// (member_is_not_a_type) rather than an unknown field.
+func hasMethodNamed(def *ir.TypeDef, name string) bool {
+	for _, m := range def.Methods {
+		if m.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+// projectReadable returns a getter projection off head when member names a
+// getter — the second readable member, tried after the field paths in project
+// did not match — and otherwise reports the field-projection failure. So a
+// getter projects to its result type, while a method or unknown name falls to
+// the right diagnostic.
+func (r *TypeResolver) projectReadable(head ir.Type, def *ir.TypeDef, member string, node ast.Node, hasFields bool) ir.Type {
+	if r.Registry != nil {
+		if t, ok := types.GetterResultType(r.Registry, head, member); ok {
+			return t
+		}
+	}
+	return r.failedProjection(node, head, def, member, hasFields)
 }
 
 func (r *TypeResolver) reportProjection(node ast.Node, kind ProjectionErrorKind, typ ir.Type, member string) {

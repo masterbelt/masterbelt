@@ -100,6 +100,23 @@ func Getter(reg *builtin.Registry, recv ir.Type, name string) (*ir.Method, map[s
 	return ms[0], subst, true
 }
 
+// GetterResultType returns the type a getter read recv.name produces: the
+// getter's result, with self resolving to the receiver (a getter that returns
+// self yields the receiver's type), and the receiver's generic substitution
+// applied. ok is false when the receiver declares no getter of that name. It is
+// the one place a getter's read/projection type is computed, shared by the
+// value-position read and the type-position projection so the two cannot drift.
+func GetterResultType(reg *builtin.Registry, recv ir.Type, name string) (ir.Type, bool) {
+	m, subst, ok := Getter(reg, recv, name)
+	if !ok {
+		return nil, false
+	}
+	if _, isSelf := m.Result.(*ir.SelfType); isSelf {
+		return recv, true
+	}
+	return Substitute(m.Result, subst), true
+}
+
 // Setter returns the setter named name on the receiver's type — the accessor a
 // property write value.name = v computes the next value through — together with
 // the receiver's substitution, or false when the receiver has no such setter. A

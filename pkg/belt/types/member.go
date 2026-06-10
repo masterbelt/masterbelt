@@ -7,7 +7,10 @@
 
 package types
 
-import "github.com/masterbelt/masterbelt/pkg/source/ir"
+import (
+	"github.com/masterbelt/masterbelt/pkg/belt/builtin"
+	"github.com/masterbelt/masterbelt/pkg/source/ir"
+)
 
 // MemberKind classifies what a name resolves to in a type's single member
 // namespace: an enum member, an associated constant, or a static fn. The three
@@ -134,6 +137,58 @@ func appRecord(app *ir.App, seen map[*ir.TypeDef]bool) *ir.Record {
 // generic application agrees in type and value position.
 func RecordOf(t ir.Type) *ir.Record {
 	return recordOfType(t, map[*ir.TypeDef]bool{})
+}
+
+// ReadableMemberType returns the type of a readable member recv.name — a record
+// field, or, failing that, a getter — projected as a type. It is the type facet
+// of a value read (memberReadType): the readable members are fields then getters,
+// in that order (a field wins; the two never share a name), so a projection
+// R.name yields the type of what r.name would read. ok is false when name is
+// neither a field nor a getter (a method is not a readable member). reg may be
+// nil, in which case only fields are considered (a getterless resolution).
+func ReadableMemberType(reg *builtin.Registry, recv ir.Type, name string) (ir.Type, bool) {
+	if t, ok := fieldMemberType(recv, name); ok {
+		return t, true
+	}
+	if reg != nil {
+		if t, ok := GetterResultType(reg, recv, name); ok {
+			return t, true
+		}
+	}
+	return nil, false
+}
+
+// fieldMemberType returns the type of a record field of recv, with the same
+// rules FieldProjection applies — a Named head goes through FieldProjection so a
+// bare generic (Box<T>, no application to instantiate) stays unprojectable, while
+// a generic application or an anonymous record reads its (instantiated) fields
+// directly. ok is false when recv has no such field.
+func fieldMemberType(recv ir.Type, name string) (ir.Type, bool) {
+	switch r := recv.(type) {
+	case *ir.Named:
+		return FieldProjection(r.Def, name)
+	case *ir.App:
+		if rec := RecordOf(r); rec != nil {
+			if f := fieldNamedIn(rec, name); f != nil {
+				return f.Type, true
+			}
+		}
+	case *ir.Record:
+		if f := fieldNamedIn(r, name); f != nil {
+			return f.Type, true
+		}
+	}
+	return nil, false
+}
+
+// fieldNamedIn returns the record field of the given name, or nil.
+func fieldNamedIn(rec *ir.Record, name string) *ir.Field {
+	for i := range rec.Fields {
+		if rec.Fields[i].Name == name {
+			return &rec.Fields[i]
+		}
+	}
+	return nil
 }
 
 // ResolveMember classifies name against def's single member namespace — the one

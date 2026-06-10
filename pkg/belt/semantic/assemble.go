@@ -821,12 +821,14 @@ func reportTypeMemberIssue(fileID FileID, m *ast.MemberExpr, q queries, at func(
 		}
 		return
 	}
-	// A non-enum type: the member must be an associated constant or a declared
-	// field projected in value position (Character.level — a type value the
-	// comptime expression consumes).
+	// A non-enum type: the member must be an associated constant or a readable
+	// member (a declared field or a getter) projected in value position
+	// (Character.level — a type value the comptime expression consumes).
 	if member.Kind != types.MemberConst {
-		if _, ok := types.FieldProjection(def, m.Member.Name); ok {
-			return
+		if def != nil {
+			if _, ok := types.ReadableMemberType(q.registry(), reifyType(def), m.Member.Name); ok {
+				return
+			}
 		}
 		s := at(m)
 		diags.Add(newUnknownAssociatedConstDiagnostic(s.offset, s.width, recvName, m.Member.Name))
