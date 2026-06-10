@@ -320,7 +320,11 @@ func (r *TypeResolver) projectReadable(head ir.Type, def *ir.TypeDef, member str
 			if isSelf {
 				return head // a self-returning getter projects the receiver
 			}
-			return r.projectThroughSyntax(def, member, result, node)
+			// The receiver replaces self throughout the resolved result, so a forward
+			// getter returning list<self> projects to list<receiver>, not a type still
+			// carrying the receiver-only self marker — the forward twin of the resolved
+			// path's self substitution.
+			return types.SubstituteSelf(r.projectThroughSyntax(def, member, result, node), head)
 		}
 	}
 	return r.failedProjection(node, head, def, member, hasFields)
@@ -331,23 +335,40 @@ func (r *TypeResolver) projectReadable(head ir.Type, def *ir.TypeDef, member str
 // method is not attached to the resolved def yet — and whether that result is the
 // self type. ok is false when def's syntax declares no getter of that name.
 func getterResultSyntax(def *ir.TypeDef, member string) (ast.TypeExpr, bool, bool) {
-	if def.Syntax == nil {
+	methods, generic, ok := declSyntaxMethods(def)
+	if !ok {
 		return nil, false, false
 	}
 	// A getter on a generic type declared later cannot be projected from syntax
 	// without instantiating its parameters (no application here supplies them), so
 	// it is deferred — the getter twin of the bare-generic field guard. (Generic
 	// getter projection is the follow-up slice.)
-	if len(def.Syntax.Params) > 0 {
+	if generic {
 		return nil, false, false
 	}
-	for _, m := range def.Syntax.Methods {
+	for _, m := range methods {
 		if m.Kind == ast.MethodGetter && m.Name == member {
 			if nt, ok := m.Result.(*ast.NamedType); ok && nt.Namespace == "" && nt.Name == selfTypeName {
 				return m.Result, true, true
 			}
 			return m.Result, false, true
 		}
+	}
+	return nil, false, false
+}
+
+// declSyntaxMethods returns the impl-block methods carried by a def's declaration
+// syntax for the forward-reference paths — a type declaration's, or an enum
+// declaration's (an enum carries its syntax on EnumSyntax, not Syntax, so a
+// forward getter on an enum declared later is read here too) — together with
+// whether the declaration is generic (a type with parameters; an enum never is).
+// ok is false when the def carries no declaration syntax to read.
+func declSyntaxMethods(def *ir.TypeDef) (methods []*ast.MethodDecl, generic bool, ok bool) {
+	switch {
+	case def.Syntax != nil:
+		return def.Syntax.Methods, len(def.Syntax.Params) > 0, true
+	case def.EnumSyntax != nil:
+		return def.EnumSyntax.Methods, false, true
 	}
 	return nil, false, false
 }

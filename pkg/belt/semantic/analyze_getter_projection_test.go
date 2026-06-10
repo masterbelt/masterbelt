@@ -192,6 +192,40 @@ func TestGetterProjectionNestedSelf(t *testing.T) {
 	}
 }
 
+func TestGetterProjectionForwardNestedSelf(t *testing.T) {
+	// The forward path (the getter's type declared after the projecting alias, read
+	// from declaration syntax) substitutes the receiver for self throughout too — a
+	// forward getter returning list<self> projects to list<Item>, not list<self>.
+	src := "pub type Items = Item.items\n" +
+		"pub type Item = { n: nint } impl {\n  pub get items(): list<self> { return [] }\n}\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("want clean (forward nested self resolves to receiver), got %v", codes(diags))
+	}
+	for _, def := range m.Types {
+		if def.Name == "Items" && (def.Body == nil || def.Body.String() != "list<Item>") {
+			t.Fatalf("Items = %v, want list<Item> (forward nested self resolved)", def.Body)
+		}
+	}
+}
+
+func TestGetterProjectionForwardEnumGetter(t *testing.T) {
+	// An enum carries its declaration on EnumSyntax, not Syntax, so the forward path
+	// must read enum declaration syntax too: a getter on an enum declared after the
+	// projecting alias projects to its result type, not type_has_no_fields.
+	src := "pub type C = R.code\n" +
+		"pub enum R { A } impl {\n  pub get code(): long { return 0 }\n}\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("want clean (forward enum getter projection), got %v", codes(diags))
+	}
+	for _, def := range m.Types {
+		if def.Name == "C" && (def.Body == nil || def.Body.String() != "long") {
+			t.Fatalf("C = %v, want long (forward enum getter)", def.Body)
+		}
+	}
+}
+
 func TestGetterProjectionGenericAliasNoFreeVar(t *testing.T) {
 	// A getter reached through an applied generic alias (Alias<U> = Box<U>) whose
 	// substitution does not compose to a concrete type is rejected, not reified as
