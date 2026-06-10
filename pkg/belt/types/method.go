@@ -165,53 +165,42 @@ func receiverSubst(reg *builtin.Registry, recv ir.Type) map[string]ir.Type {
 		return receiverSubst(reg, v.Bound)
 	}
 	subst := map[string]ir.Type{}
-	def := defOf(reg, recv)
-	if app, ok := recv.(*ir.App); ok && def != nil && len(app.Args) == len(def.Params) {
-		for i, p := range def.Params {
-			subst[p.Name] = app.Args[i]
-		}
-	}
-	// An alias of a generic application (StringBox = Box<string>) carries the
-	// methods of the underlying type, so a method or getter found through the alias
-	// must see the application's parameters bound — Box<string>.item is string, not
-	// the free T. Follow the alias body to the first application and bind its
-	// constructor's parameters. (A generic alias itself applied — Alias<U> = Box<U>
-	// then Alias<int> — is not composed here; that substitution chain is the
-	// generic-projection work.)
+	// Thread the substitution down the receiver's alias chain to the type that
+	// declares the method: at each application bind its constructor's parameters to
+	// its arguments, each argument first resolved through the bindings the shallower
+	// levels made — so Box<U> = Inner<U> over StringBox = Box<string> carries U =
+	// string down to Inner's T, and StringBox.item reads string, not the free T. A
+	// deeper binding wins over a shallower one of the same name (Alias<T> =
+	// Box<string> discards the alias's T for the application's), so a reused
+	// parameter name resolves to the declaring application's argument, mirroring what
+	// the field projection composes through its record body — the getter read and the
+	// field read stay symmetric through a chain of generic aliases.
 	seen := map[*ir.TypeDef]bool{}
-	for body := aliasBody(recv); body != nil; body = aliasBody(body) {
-		if n, ok := body.(*ir.Named); ok {
-			if n.Def == nil || seen[n.Def] {
-				break // an unresolved or cyclic alias chain (reported elsewhere)
+	for cur := recv; cur != nil; {
+		switch t := cur.(type) {
+		case *ir.Named:
+			if t.Def == nil || seen[t.Def] {
+				cur = nil // an unresolved or cyclic alias chain (reported elsewhere)
+				continue
 			}
-			seen[n.Def] = true
-			continue
-		}
-		app, ok := body.(*ir.App)
-		if !ok {
-			break
-		}
-		if app.Def != nil && len(app.Args) == len(app.Def.Params) {
-			for i, p := range app.Def.Params {
-				if _, bound := subst[p.Name]; !bound {
-					subst[p.Name] = app.Args[i]
-				}
+			seen[t.Def] = true
+			cur = t.Def.Body // follow the alias to its body
+		case *ir.App:
+			if t.Def == nil || seen[t.Def] || len(t.Args) != len(t.Def.Params) {
+				cur = nil
+				continue
 			}
+			seen[t.Def] = true
+			for i, p := range t.Def.Params {
+				subst[p.Name] = Substitute(t.Args[i], subst)
+			}
+			cur = t.Def.Body // follow the constructor to its body
+		default:
+			cur = nil
 		}
-		break
 	}
-	addImplSubst(reg, def, subst, map[*ir.TypeDef]bool{})
+	addImplSubst(reg, defOf(reg, recv), subst, map[*ir.TypeDef]bool{})
 	return subst
-}
-
-// aliasBody returns the body a named alias resolves to — for following a chain of
-// aliases to the generic application a concrete alias ultimately names. It is nil
-// for any non-alias type.
-func aliasBody(t ir.Type) ir.Type {
-	if n, ok := t.(*ir.Named); ok && n.Def != nil {
-		return n.Def.Body
-	}
-	return nil
 }
 
 // addImplSubst records, into subst, the interface parameters each impl the

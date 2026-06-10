@@ -226,15 +226,65 @@ func TestGetterProjectionForwardEnumGetter(t *testing.T) {
 	}
 }
 
-func TestGetterProjectionGenericAliasNoFreeVar(t *testing.T) {
-	// A getter reached through an applied generic alias (Alias<U> = Box<U>) whose
-	// substitution does not compose to a concrete type is rejected, not reified as
-	// a free type variable.
+func TestGetterProjectionThroughGenericAliasChain(t *testing.T) {
+	// A concrete alias through a chain of generic aliases (StringBox = Box<string>,
+	// Box<U> = Inner<U>) carries the argument down to the getter's declaring type, so
+	// StringBox.item reads Inner's T as string — symmetric with the field projection
+	// StringBox.v, which already composes through the chain.
+	src := "pub type Inner<T> = { v: T } impl {\n  pub get item(): T { return self.v }\n}\n" +
+		"pub type Box<U> = Inner<U>\n" +
+		"pub type StringBox = Box<string>\n" +
+		"pub type G = StringBox.item\n" +
+		"pub fn read(x: StringBox): string { return x.item }\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("want clean (chain composes T=string), got %v", codes(diags))
+	}
+	for _, def := range m.Types {
+		if def.Name == "G" && (def.Body == nil || def.Body.String() != "string") {
+			t.Fatalf("G = %v, want string (StringBox.item through the chain)", def.Body)
+		}
+	}
+}
+
+func TestGetterProjectionAliasParamNameCollision(t *testing.T) {
+	// When a generic alias reuses the declaring type's parameter name and pins the
+	// underlying application concretely (Alias<T> = Box<string>), the getter sees the
+	// application's argument, not the alias's: Alias.item<nint> reads string (Box's T
+	// = string), not nint — the same answer the field projection Alias.v<nint> gives.
+	src := "pub type Box<T> = { v: T } impl {\n  pub get item(): T { return self.v }\n}\n" +
+		"pub type Alias<T> = Box<string>\n" +
+		"pub type G = Alias.item<nint>\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("want clean (collision resolves to the application's arg), got %v", codes(diags))
+	}
+	for _, def := range m.Types {
+		if def.Name == "G" && (def.Body == nil || def.Body.String() != "string") {
+			t.Fatalf("G = %v, want string (Alias.item<nint> = Box<string>.item)", def.Body)
+		}
+	}
+}
+
+func TestGetterProjectionGenericAliasApplied(t *testing.T) {
+	// A getter reached through an applied generic alias (Alias<U> = Box<U>) composes
+	// the substitution through the chain: Alias.item<string> binds U = string, which
+	// flows to Box's T, so the projection is string — symmetric with the field
+	// projection Alias.v<string>. A free type variable with no application to pin it
+	// — a bare generic Box.item — stays rejected (TestGetterProjectionBareGenericRejected).
 	src := "pub type Box<T> = { v: T } impl {\n  pub get item(): T { return self.v }\n}\n" +
 		"pub type Alias<U> = Box<U>\n" +
 		"pub type S = { v: Alias.item<string> }\n"
-	_, diags := analyze(src)
-	if len(diags) == 0 {
-		t.Fatalf("want the generic-alias getter projection rejected (no free T), got clean")
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("want clean (applied generic alias composes U=string), got %v", codes(diags))
+	}
+	for _, def := range m.Types {
+		if def.Name == "S" {
+			rec, ok := def.Body.(*ir.Record)
+			if !ok || len(rec.Fields) != 1 || rec.Fields[0].Type.String() != "string" {
+				t.Fatalf("S = %v, want { v: string } (Alias.item<string>)", def.Body)
+			}
+		}
 	}
 }
