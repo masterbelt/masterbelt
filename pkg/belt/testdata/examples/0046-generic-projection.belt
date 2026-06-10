@@ -46,6 +46,10 @@ pub type Late<T> = { value: T }
 pub type StringBox = Box<string>
 pub type LevelBox = Box<Level>
 
+/// Projecting through the concrete alias agrees in type position: StringBox.value
+/// instantiates the alias body's application to string, exactly as value position.
+pub type Unwrapped = StringBox.value
+
 /// The instantiated field type, projected in value position through the alias.
 assert StringBox.value == string
 

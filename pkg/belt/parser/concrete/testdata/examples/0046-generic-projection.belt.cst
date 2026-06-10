@@ -337,6 +337,25 @@ File
         TypeName
           Ident "Level"
         Gt ">"
+  TypeDecl
+    Newline "\n"
+    Newline "\n"
+    DocComment "/// Projecting through the concrete alias agrees in type position: StringBox.value"
+    Newline "\n"
+    DocComment "/// instantiates the alias body's application to string, exactly as value position."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Type "type"
+    Whitespace " "
+    Ident "Unwrapped"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    TypeName
+      Ident "StringBox"
+      Dot "."
+      Ident "value"
   AssertDecl
     Newline "\n"
     Newline "\n"

@@ -106,7 +106,7 @@ func (r *TypeResolver) project(head ir.Type, member string, node ast.Node) ir.Ty
 // An application whose record is resolvable by neither (a forward-referenced
 // generic alias chain) is generic_type_projection rather than an unbound guess.
 func (r *TypeResolver) projectApp(app *ir.App, def *ir.TypeDef, member string, node ast.Node) ir.Type {
-	if rec := types.InstantiatedRecord(app); rec != nil {
+	if rec := types.RecordOf(app); rec != nil {
 		if f := fieldNamed(rec, member); f != nil {
 			return f.Type
 		}
@@ -259,16 +259,19 @@ func (r *TypeResolver) projectionDef(t ir.Type) *ir.TypeDef {
 }
 
 // resolvedRecord returns the resolved record a head projects fields from — an
-// anonymous record, a record alias's body (through any chain of named aliases),
-// or a master's row — or nil when the head is not a (resolved) record. A nil
-// return is either a fieldless type or a body not resolved yet; project tells
-// them apart through the declaration syntax.
+// anonymous record, a record alias's body (through any chain of named aliases,
+// including one whose body is a generic application instantiated with its
+// arguments, so a concrete alias of a generic — type StringBox = Box<string> —
+// projects in type position exactly as it does in value position), or a master's
+// row — or nil when the head is not a (resolved) record. A nil return is either a
+// fieldless type or a body not resolved yet; project tells them apart through the
+// declaration syntax.
 func resolvedRecord(head ir.Type, def *ir.TypeDef) *ir.Record {
-	if rec := recordOf(head); rec != nil {
+	if rec := types.RecordOf(head); rec != nil {
 		return rec
 	}
 	if def != nil && def.Master != nil {
-		return recordOf(def.Master.Row)
+		return types.RecordOf(def.Master.Row)
 	}
 	return nil
 }

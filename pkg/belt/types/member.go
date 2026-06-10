@@ -124,15 +124,16 @@ func appRecord(app *ir.App, seen map[*ir.TypeDef]bool) *ir.Record {
 	return recordOfType(Substitute(body, subst), seen)
 }
 
-// InstantiatedRecord returns the record a generic application denotes, with its
-// arguments substituted for the definition's parameters — Box<string> over
-// Box<T> = { value: T } yields { value: string }, composing substitutions
-// through an alias of an application (Box<T> = Inner<T>). It returns nil when the
-// application's definition carries no resolved record (a forward reference whose
-// body is not settled yet, or an arity mismatch), which the caller resolves
-// through the declaration syntax instead.
-func InstantiatedRecord(app *ir.App) *ir.Record {
-	return appRecord(app, map[*ir.TypeDef]bool{})
+// RecordOf returns the record a resolved type carries — an anonymous record, a
+// named alias's body through the chain, a generic application instantiated with
+// its arguments (Box<string> over Box<T> = { value: T } yields { value: string },
+// composing substitutions through an alias of an application), or a nominal type's
+// master row — or nil for a type carrying no resolved record (a fieldless type, or
+// a forward reference whose body is not settled yet). It is the type-position twin
+// of FieldProjection's record resolution, so a projection off the same alias of a
+// generic application agrees in type and value position.
+func RecordOf(t ir.Type) *ir.Record {
+	return recordOfType(t, map[*ir.TypeDef]bool{})
 }
 
 // ResolveMember classifies name against def's single member namespace — the one

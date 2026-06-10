@@ -1,10 +1,9 @@
 // These tests pin generic field-type projection: projecting a field off a
 // generic type instantiates it, substituting the application's arguments for the
-// definition's parameters through the field's declared type. The four forms the
-// 0004 slice lands — a direct generic application, a concrete alias of one, an
-// applied generic-alias chain, and a forward-referenced generic — all resolve;
-// a bare generic with no application (no arguments to substitute) stays
-// generic_type_projection.
+// definition's parameters through the field's declared type. The four forms — a
+// direct generic application, a concrete alias of one, an applied generic-alias
+// chain, and a forward-referenced generic — all resolve; a bare generic with no
+// application (no arguments to substitute) stays generic_type_projection.
 package semantic
 
 import (
@@ -76,6 +75,27 @@ func TestGenericProjectionAliasChainTypePosition(t *testing.T) {
 	}
 	if got := fieldType(m, "S", "v"); got == nil || got.String() != "string" {
 		t.Fatalf("S.v = %v, want string (through the alias chain)", got)
+	}
+}
+
+func TestGenericProjectionConcreteAliasTypePosition(t *testing.T) {
+	// A concrete alias of a generic application (StringBox = Box<string>) reaches
+	// the projector as a Named, not an App, so projecting its field in type
+	// position must still instantiate through the alias body's application — and
+	// agree with the value position — rather than reporting type_has_no_fields.
+	src := "pub type Box<T> = { value: T }\n" +
+		"pub type StringBox = Box<string>\n" +
+		"pub type Aliased = StringBox.value\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("want clean, got %v", codes(diags))
+	}
+	for _, def := range m.Types {
+		if def.Name == "Aliased" {
+			if def.Body == nil || def.Body.String() != "string" {
+				t.Fatalf("Aliased = %v, want string (StringBox.value through the alias)", def.Body)
+			}
+		}
 	}
 }
 
