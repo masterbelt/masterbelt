@@ -109,6 +109,7 @@ const (
 )
 
 func buildGrammar() grammar {
+	valueKw, nameKw := keywordPatterns()
 	return grammar{
 		Schema:    "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
 		Name:      langName,
@@ -140,7 +141,8 @@ func buildGrammar() grammar {
 			// token when the theme defines no semanticTokenColors, so the
 			// keywords wear the same colour before and after the server is up.
 			"keywords": {Patterns: []rule{
-				{Name: lexKeyword.tmScope(), Match: keywordPattern()},
+				{Name: lexKeyword.tmScope(), Match: valueKw},
+				{Name: lexKeyword.tmScope(), Match: nameKw},
 			}},
 			"modifiers": modifierRules(),
 			"masters":   masterRules(),
@@ -222,22 +224,36 @@ func masterRules() ruleGroup {
 	}}
 }
 
-// keywordPattern builds a word-bounded alternation of the language's keywords,
-// e.g. `\b(const|pub)\b`, from the single source of truth in package token. A
-// reserved word read as a name is left uncoloured, the lexical approximation
-// TextMate makes for any name, so the server's semantic tokens colour it by its
-// role rather than the cold start mis-painting it a keyword: the lookbehind drops
-// a member or projection after "." (item.type, Schema.type) and the lookahead a
-// record field or parameter name before ":" ({ type: T }, fn(for: int)). The
-// approximation is one-sided — a keyword name not adjacent to "."/":" still
-// colours — but the server's tokens are authoritative and correct it on load.
-func keywordPattern() string {
-	kws := token.Keywords()
-	escaped := make([]string, len(kws))
-	for i, kw := range kws {
-		escaped[i] = regexp.QuoteMeta(kw)
+// valueKeywords are the reserved words that denote a value — the boolean and
+// null literals and self. Unlike the others they can legitimately sit before a
+// ":" (a ternary branch `c ? false : true`, a map entry `[null: 1]`), so the
+// name-position approximation below must not suppress them there; only the
+// after-"." member case applies to them.
+var valueKeywords = map[string]bool{"true": true, "false": true, "null": true, "self": true}
+
+// keywordPatterns builds the two word-bounded keyword alternations the cold-start
+// grammar colours, from the single source of truth in package token. A reserved
+// word read as a name is left uncoloured — the lexical approximation TextMate
+// makes for any name — so the server's semantic tokens colour it by its role
+// rather than the cold start mis-painting it a keyword: the lookbehind drops a
+// member or projection after "." (item.type, Schema.type) for every keyword, and
+// the lookahead drops a record field or parameter name before ":" ({ type: T },
+// fn(for: int)) — but only for the non-value keywords, since a value keyword
+// before ":" is a ternary/map value, not a name. The approximation is one-sided
+// (a keyword name not adjacent to "."/":" still colours), and the server's tokens
+// are authoritative and correct it on load.
+func keywordPatterns() (value, name string) {
+	var valueKws, nameKws []string
+	for _, kw := range token.Keywords() {
+		if valueKeywords[kw] {
+			valueKws = append(valueKws, regexp.QuoteMeta(kw))
+		} else {
+			nameKws = append(nameKws, regexp.QuoteMeta(kw))
+		}
 	}
-	return `(?<!\.)\b(` + strings.Join(escaped, "|") + `)\b(?!\s*:)`
+	value = `(?<!\.)\b(` + strings.Join(valueKws, "|") + `)\b`
+	name = `(?<!\.)\b(` + strings.Join(nameKws, "|") + `)\b(?!\s*:)`
+	return value, name
 }
 
 // --- language-configuration ---------------------------------------------------

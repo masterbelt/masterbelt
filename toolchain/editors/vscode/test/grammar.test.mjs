@@ -68,6 +68,7 @@ test('grammar assigns the expected scopes', async () => {
     'pub type Schema = { match: long }',
     'const probe = value.of',
     'pub fn scan(for: long): long -> 0',
+    'const Choice = c ? false : true',
   ].join('\n');
   const lines = tokenize(grammar, source);
 
@@ -86,6 +87,9 @@ test('grammar assigns the expected scopes', async () => {
     ['=', 'keyword.operator'],
     [':', 'keyword.operator'],
     ['->', 'keyword.operator'],
+    // A value keyword before a ":" is a ternary/map value, not a name, so it
+    // keeps its keyword colour (the name-position suppression must not reach it).
+    ['false', 'keyword.control'],
   ];
 
   for (const [substr, want] of cases) {
