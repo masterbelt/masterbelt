@@ -112,6 +112,58 @@ File
       Methods: ~
       Consts: ~
       Impls: ~
+    TypeDecl
+      Doc: "A record with a getter over its field."
+      Public: true
+      Name: "Cell"
+      Params: ~
+      Body: RecordType
+        Fields:
+          FieldDef
+            Name: "raw"
+            Type: NamedType
+              Namespace: ""
+              Name: "Level"
+              Args: ~
+              Projections: ~
+      Where: ~
+      Methods:
+        MethodDecl
+          Doc: "Read as cell.scaled (no parens), like a field."
+          Public: true
+          Extern: false
+          Kind: 1
+          Effects: ~
+          Name: "scaled"
+          TypeParams: ~
+          Params: ~
+          Result: NamedType
+            Namespace: ""
+            Name: "Level"
+            Args: ~
+            Projections: ~
+          Body:
+            ReturnStmt
+              Value: MemberExpr
+                Receiver: SelfExpr
+                Member: Identifier
+                  Name: "raw"
+      Consts: ~
+      Impls: ~
+    TypeDecl
+      Doc: "The getter's result type, recovered by projection in type position — exactly" "as a field projection (Item.level) recovers a field's declared type."
+      Public: true
+      Name: "Scaled"
+      Params: ~
+      Body: NamedType
+        Namespace: "Cell"
+        Name: "scaled"
+        Args: ~
+        Projections: ~
+      Where: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
   Enums: ~
   Interfaces: ~
   Funcs: ~
@@ -169,4 +221,32 @@ File
         Arguments:
           Identifier
             Name: "Level"
+    AssertDecl
+      Doc: "And consumed in value position: the same projection, by nominal identity."
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: MemberExpr
+            Receiver: Identifier
+              Name: "Cell"
+            Member: Identifier
+              Name: "scaled"
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          Identifier
+            Name: "Level"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: MemberExpr
+            Receiver: Identifier
+              Name: "Cell"
+            Member: Identifier
+              Name: "scaled"
+          Member: Identifier
+            Name: "neq"
+        Arguments:
+          Identifier
+            Name: "long"
   Masters: ~
