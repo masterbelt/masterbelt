@@ -270,6 +270,170 @@ Module
       Enum: ~
       Master: ~
       Where: ~
+    TypeDef
+      Name: "Cell"
+      Anchor: "belt:/Cell"
+      Public: true
+      Doc: "A generic cell with a getter over its field."
+      Params:
+        TypeParam
+          Name: "T"
+          Bound: ~
+      Body: Record
+        Fields:
+          Field
+            Name: "raw"
+            Type: TypeVar
+              Name: "T"
+              Bound: ~
+      Methods:
+        Method
+          Name: "held"
+          Anchor: "belt:/Cell#held"
+          Public: true
+          Extern: false
+          Kind: 1
+          Effects: ~
+          Doc: "Read as cell.held (no parens), like a field."
+          Params: ~
+          Result: TypeVar
+            Name: "T"
+            Bound: ~
+          Body:
+            Return
+              Value: FieldAccess
+                Receiver: SelfValue
+                  Type: Named
+                    Def: "Cell"
+                Field: "raw"
+                Type: TypeVar
+                  Name: "T"
+                  Bound: ~
+          Owner: "Cell"
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Master: ~
+      Where: ~
+    TypeDef
+      Name: "HeldId"
+      Anchor: "belt:/HeldId"
+      Public: true
+      Doc: "A direct application instantiates the getter's result: Cell<long>.held — written" "Cell.held<long> in type position — is long, exactly as the field Box.value<long>."
+      Params: ~
+      Body: Builtin
+        Name: "long"
+      Methods: ~
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Master: ~
+      Where: ~
+    TypeDef
+      Name: "EarlyHeld"
+      Anchor: "belt:/EarlyHeld"
+      Public: true
+      Doc: "A forward reference: the generic carrying the getter is declared after the type" "projecting it, so the getter's result is read from the declaration syntax in the" "parameter scope, then the argument is substituted — the getter twin of EarlyValue."
+      Params: ~
+      Body: Builtin
+        Name: "long"
+      Methods: ~
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Master: ~
+      Where: ~
+    TypeDef
+      Name: "LateCell"
+      Anchor: "belt:/LateCell"
+      Public: true
+      Doc: ~
+      Params:
+        TypeParam
+          Name: "T"
+          Bound: ~
+      Body: Record
+        Fields:
+          Field
+            Name: "raw"
+            Type: TypeVar
+              Name: "T"
+              Bound: ~
+      Methods:
+        Method
+          Name: "held"
+          Anchor: "belt:/LateCell#held"
+          Public: true
+          Extern: false
+          Kind: 1
+          Effects: ~
+          Doc: ~
+          Params: ~
+          Result: TypeVar
+            Name: "T"
+            Bound: ~
+          Body:
+            Return
+              Value: FieldAccess
+                Receiver: SelfValue
+                  Type: Named
+                    Def: "LateCell"
+                Field: "raw"
+                Type: TypeVar
+                  Name: "T"
+                  Bound: ~
+          Owner: "LateCell"
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Master: ~
+      Where: ~
+    TypeDef
+      Name: "StringCell"
+      Anchor: "belt:/StringCell"
+      Public: true
+      Doc: "Value position: a concrete alias bakes the argument in, so the inherited getter" "instantiates with no written arguments — a comptime type value an assert consumes."
+      Params: ~
+      Body: App
+        Def: "Cell"
+        Args:
+          Builtin
+            Name: "string"
+      Methods: ~
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Master: ~
+      Where: ~
+    TypeDef
+      Name: "LevelCell"
+      Anchor: "belt:/LevelCell"
+      Public: true
+      Doc: "Nominal identity survives substitution through the getter too: a Level cell's" "held is the alias Level, not the sbyte it unwraps to."
+      Params: ~
+      Body: App
+        Def: "Cell"
+        Args:
+          Named
+            Def: "Level"
+      Methods: ~
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Master: ~
+      Where: ~
   Funcs: ~
   Asserts:
     Assert
@@ -338,3 +502,69 @@ Module
         UnionTag: ~
         Reified: ~
       Diagram: "LevelBox.value != sbyte\n         ^     ^  ^\n         Level |  sbyte\n               true"
+    Assert
+      Cond: "StringCell.held == string"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+        Reified: ~
+      Diagram: "StringCell.held == string\n           ^    ^  ^\n           |    |  string\n           |    true\n           string"
+    Assert
+      Cond: "LevelCell.held == Level"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+        Reified: ~
+      Diagram: "LevelCell.held == Level\n          ^    ^  ^\n          |    |  Level\n          |    true\n          Level"
+    Assert
+      Cond: "LevelCell.held != sbyte"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+        Reified: ~
+      Diagram: "LevelCell.held != sbyte\n          ^    ^  ^\n          |    |  sbyte\n          |    true\n          Level"

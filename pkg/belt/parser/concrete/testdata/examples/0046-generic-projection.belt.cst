@@ -1,11 +1,11 @@
 # tree
 File
   TypeDecl
-    LineComment "// Generic field-type projection. A field projected off a generic type is"
+    LineComment "// Generic readable-member projection. A member projected off a generic type is"
     Newline "\n"
     LineComment "// instantiated: the type argument is substituted for the parameter through the"
     Newline "\n"
-    LineComment "// field's declared type, so Box<string>.value — written Box.value<string> in a"
+    LineComment "// member's declared type, so Box<string>.value — written Box.value<string> in a"
     Newline "\n"
     LineComment "// type position — is string. Four shapes resolve: a direct application, a"
     Newline "\n"
@@ -14,6 +14,10 @@ File
     LineComment "// reference. Nominal identity survives substitution, and the projection is a"
     Newline "\n"
     LineComment "// type — named in a type position or consumed by a comptime assert, never stored."
+    Newline "\n"
+    LineComment "// A getter is a readable member too, so it projects through a generic exactly as"
+    Newline "\n"
+    LineComment "// a field does — the symmetry closed at the end of this file."
     Newline "\n"
     Newline "\n"
     DocComment "/// A nominal alias, to show identity survives substitution."
@@ -402,6 +406,294 @@ File
           Ident "LevelBox"
         Dot "."
         Ident "value"
+      Whitespace " "
+      BangEq "!="
+      Whitespace " "
+      NameRef
+        Ident "sbyte"
+  TypeDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// The getter twin. A getter is read as r.X (no parens), the same as a field, so"
+    Newline "\n"
+    LineComment "// R.X projects it the same way: the getter's result type, instantiated by the"
+    Newline "\n"
+    LineComment "// application and with the receiver substituted for self. Read and projection"
+    Newline "\n"
+    LineComment "// agree over a generic, just as they do over a field."
+    Newline "\n"
+    Newline "\n"
+    DocComment "/// A generic cell with a getter over its field."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Type "type"
+    Whitespace " "
+    Ident "Cell"
+    GenericParams
+      Lt "<"
+      GenericParam
+        Ident "T"
+      Gt ">"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    RecordType
+      LBrace "{"
+      Newline "\n"
+      Whitespace "  "
+      Field
+        Ident "raw"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "T"
+      Comma ","
+      Newline "\n"
+      RBrace "}"
+    Whitespace " "
+    ImplBlock
+      Impl "impl"
+      Whitespace " "
+      LBrace "{"
+      MethodDecl
+        Newline "\n"
+        Whitespace "  "
+        DocComment "/// Read as cell.held (no parens), like a field."
+        Newline "\n"
+        Whitespace "  "
+        Pub "pub"
+        Whitespace " "
+        Modifier
+          Ident "get"
+        Whitespace " "
+        Ident "held"
+        ParamList
+          LParen "("
+          RParen ")"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "T"
+        Whitespace " "
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            MemberExpr
+              SelfExpr
+                Self "self"
+              Dot "."
+              Ident "raw"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
+      Newline "\n"
+      RBrace "}"
+  TypeDecl
+    Newline "\n"
+    Newline "\n"
+    DocComment "/// A direct application instantiates the getter's result: Cell<long>.held — written"
+    Newline "\n"
+    DocComment "/// Cell.held<long> in type position — is long, exactly as the field Box.value<long>."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Type "type"
+    Whitespace " "
+    Ident "HeldId"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    TypeName
+      Ident "Cell"
+      Dot "."
+      Ident "held"
+      GenericArgs
+        Lt "<"
+        TypeName
+          Ident "long"
+        Gt ">"
+  TypeDecl
+    Newline "\n"
+    Newline "\n"
+    DocComment "/// A forward reference: the generic carrying the getter is declared after the type"
+    Newline "\n"
+    DocComment "/// projecting it, so the getter's result is read from the declaration syntax in the"
+    Newline "\n"
+    DocComment "/// parameter scope, then the argument is substituted — the getter twin of EarlyValue."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Type "type"
+    Whitespace " "
+    Ident "EarlyHeld"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    TypeName
+      Ident "LateCell"
+      Dot "."
+      Ident "held"
+      GenericArgs
+        Lt "<"
+        TypeName
+          Ident "long"
+        Gt ">"
+  TypeDecl
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Type "type"
+    Whitespace " "
+    Ident "LateCell"
+    GenericParams
+      Lt "<"
+      GenericParam
+        Ident "T"
+      Gt ">"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    RecordType
+      LBrace "{"
+      Newline "\n"
+      Whitespace "  "
+      Field
+        Ident "raw"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "T"
+      Comma ","
+      Newline "\n"
+      RBrace "}"
+    Whitespace " "
+    ImplBlock
+      Impl "impl"
+      Whitespace " "
+      LBrace "{"
+      MethodDecl
+        Newline "\n"
+        Whitespace "  "
+        Pub "pub"
+        Whitespace " "
+        Modifier
+          Ident "get"
+        Whitespace " "
+        Ident "held"
+        ParamList
+          LParen "("
+          RParen ")"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "T"
+        Whitespace " "
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            MemberExpr
+              SelfExpr
+                Self "self"
+              Dot "."
+              Ident "raw"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
+      Newline "\n"
+      RBrace "}"
+  TypeDecl
+    Newline "\n"
+    Newline "\n"
+    DocComment "/// Value position: a concrete alias bakes the argument in, so the inherited getter"
+    Newline "\n"
+    DocComment "/// instantiates with no written arguments — a comptime type value an assert consumes."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Type "type"
+    Whitespace " "
+    Ident "StringCell"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    TypeName
+      Ident "Cell"
+      GenericArgs
+        Lt "<"
+        TypeName
+          Ident "string"
+        Gt ">"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      MemberExpr
+        NameRef
+          Ident "StringCell"
+        Dot "."
+        Ident "held"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      NameRef
+        Ident "string"
+  TypeDecl
+    Newline "\n"
+    Newline "\n"
+    DocComment "/// Nominal identity survives substitution through the getter too: a Level cell's"
+    Newline "\n"
+    DocComment "/// held is the alias Level, not the sbyte it unwraps to."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Type "type"
+    Whitespace " "
+    Ident "LevelCell"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    TypeName
+      Ident "Cell"
+      GenericArgs
+        Lt "<"
+        TypeName
+          Ident "Level"
+        Gt ">"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      MemberExpr
+        NameRef
+          Ident "LevelCell"
+        Dot "."
+        Ident "held"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      NameRef
+        Ident "Level"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      MemberExpr
+        NameRef
+          Ident "LevelCell"
+        Dot "."
+        Ident "held"
       Whitespace " "
       BangEq "!="
       Whitespace " "
