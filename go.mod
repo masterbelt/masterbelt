@@ -3,7 +3,7 @@ module github.com/masterbelt/masterbelt
 go 1.26.3
 
 require (
-	github.com/owenrumney/go-lsp v0.2.2
+	github.com/owenrumney/go-lsp v0.2.3
 	github.com/pelletier/go-toml/v2 v2.3.1
 	github.com/spf13/cobra v1.10.2
 	golang.org/x/tools v0.45.0
