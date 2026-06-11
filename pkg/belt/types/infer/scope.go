@@ -127,6 +127,13 @@ func (s funcScope) nsReceiver(recv ast.Expr) bool {
 	return s.outer.nsReceiver(recv)
 }
 
+// valueName: a lambda's own local or parameter is a value; otherwise the
+// enclosing scope's bindings (its parameters, an outer lambda's) decide, mirroring
+// how conv and fn delegate their shadowing outward.
+func (s funcScope) valueName(name string) bool {
+	return s.shadows(name) || s.outer.valueName(name)
+}
+
 // metatype is the type of a reified type value — the builtin `type` (type :
 // type), the type a bare type name carries in value position. It is built fresh
 // per call, like the other primitive types the scopes synthesize.
@@ -220,6 +227,10 @@ func (s constScope) fnMember(m *ast.MemberExpr) []*ast.FuncDecl {
 // receiver takes is irrelevant here, and the namespace member read keeps its
 // existing reading.
 func (s constScope) nsReceiver(ast.Expr) bool { return false }
+
+// valueName: a constant initializer has no locals or parameters, so no name is a
+// value binding that shadows a type parameter — it has none of either.
+func (s constScope) valueName(string) bool { return false }
 
 // BodyScope types a method or function body: the receiver type (Self —
 // ir.Invalid in a function, which has none), the parameter types (Params),
@@ -326,14 +337,6 @@ func (s BodyScope) conv(id *ast.Identifier) ir.Type {
 	if s.shadows(id.Name) {
 		return ir.Invalid // a local or parameter shadows a same-named type
 	}
-	// A generic type parameter names a type in conversion position (T(x)): it
-	// resolves to the type variable carrying its bound, the same as a written
-	// annotation does, and shadows a same-named declared type — so a conversion
-	// through it is a type position, its arguments checked, not a value use of the
-	// parameter.
-	if bound, ok := s.TScope[id.Name]; ok {
-		return &ir.TypeVar{Name: id.Name, Bound: bound}
-	}
 	return s.lookupType(id.Name)
 }
 
@@ -362,6 +365,10 @@ func (s BodyScope) nsReceiver(recv ast.Expr) bool {
 	}
 	return s.NamespaceShadows != nil && s.NamespaceShadows(id)
 }
+
+// valueName reports whether name is a let local or a parameter — a value binding
+// that shadows a same-named type or type parameter in value position.
+func (s BodyScope) valueName(name string) bool { return s.shadows(name) }
 
 func (s BodyScope) leaf(e ast.Expr) ir.Type {
 	switch e := e.(type) {

@@ -110,6 +110,34 @@ func TestValuePositionBareNamespaceNameStillRejected(t *testing.T) {
 	}
 }
 
+func TestValuePositionTypeParamConversionStaysUnresolved(t *testing.T) {
+	// A conversion through a type parameter (T(v)) is left unresolved, as it is for
+	// any non-foldable type parameter — it is not resolved to a typed conversion the
+	// checker would accept while the lowering types it invalid, which would diverge
+	// from the IR. Assigning it where a string is wanted reports no mismatch (an
+	// invalid value conflicts with nothing), proving the checker did not type it as
+	// the parameter; the type checker and the lowering agree it is invalid.
+	src := "pub fn f<T>(v: T): nint {\n  let bad: string = T(v)\n  return 1\n}\n"
+	_, diags := analyze(src)
+	if hasCode(diags, CodeTypeMismatch) {
+		t.Fatalf("want no type_mismatch (T(v) is unresolved, not a typed conversion), got %v", codes(diags))
+	}
+}
+
+func TestValuePositionTypeParamStaticCallNoSpuriousEffect(t *testing.T) {
+	// A static call through a type parameter (T.foo()) is read consistently by the
+	// type checker and the effect walker: the checker treats T as the type parameter
+	// (not a same-named declared type), so the effect walker must not follow the
+	// declared type's static fn and report effects from a callee that was not
+	// selected — no spurious missing_effect.
+	src := "pub type T = nint impl {\n  pub fn io foo(): nint {\n    return 1\n  }\n}\n" +
+		"pub fn f<T>(): nint {\n  return T.foo()\n}\n"
+	_, diags := analyze(src)
+	if hasCode(diags, CodeMissingEffect) {
+		t.Fatalf("want no missing_effect (the effect walker must not follow a declared type the checker did not select), got %v", codes(diags))
+	}
+}
+
 func TestValuePositionTypePositionUsesNotRejected(t *testing.T) {
 	// A type-position use of the parameter is not a value-position projection: a
 	// conversion T(x) names the type, and a let annotation (let y: T) is a type
