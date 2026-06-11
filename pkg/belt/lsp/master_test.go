@@ -99,6 +99,34 @@ func TestMasterDocumentHighlights(t *testing.T) {
 	}
 }
 
+// masterOccSrc references a top-level constant from inside a master's per-row
+// method body, so the occurrence engines must walk master method bodies — like
+// they walk type/enum/interface/function bodies — to see it.
+const masterOccSrc = "const Base = 10\n" +
+	"master Skill {\n" +
+	"  record {\n    id: int,\n  } impl {\n" +
+	"    pub bumped(): int {\n      return self.id + Base\n    }\n  }\n" +
+	"  primary id\n}\n"
+
+func TestMasterMethodBodyOccurrences(t *testing.T) {
+	doc := testView(masterOccSrc)
+
+	// From the Base declaration, including it: the declaration + the reference in
+	// the master method body.
+	if got := references(doc, strings.Index(masterOccSrc, "Base = 10"), true); len(got) != 2 {
+		t.Fatalf("references(Base) = %d, want 2 (declaration + master-method-body use)", len(got))
+	}
+	// From the reference inside the method body, definition jumps to the
+	// declaration — the cursor-resolution walk reaches the master body too.
+	locs := definition(doc, strings.Index(masterOccSrc, "+ Base")+len("+ "))
+	if len(locs) != 1 {
+		t.Fatalf("definition(Base in method body) = %d, want 1", len(locs))
+	}
+	if locs[0].Range.Start.Line != 0 {
+		t.Errorf("definition jumped to line %d, want 0 (the const Base)", locs[0].Range.Start.Line)
+	}
+}
+
 // TestEnumTypeDefinition and TestInterfaceTypeDefinition pin the consistency the
 // shared declSyntax helper buys: an enum and an interface carry their declaration
 // backpointer on EnumSyntax / InterfaceSyntax (not Syntax), exactly as a master

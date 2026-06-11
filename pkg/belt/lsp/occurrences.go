@@ -128,10 +128,11 @@ func bodyOccurrenceAt(doc view, offset int, trees map[cst.Green]cst.Tree) (occur
 }
 
 // forEachBodyExpr calls fn for every top-level expression of every method,
-// enum-method, interface-default, and function body in the file — the shared
-// statement walk over each body, descending into a function literal's own body
-// — so the occurrence engines reach a reference living in a body (or in a
-// lambda nested in one) the same way they reach those in a const initializer.
+// enum-method, interface-default, master per-row method, and function body in
+// the file — the shared statement walk over each body, descending into a
+// function literal's own body — so the occurrence engines reach a reference
+// living in a body (or in a lambda nested in one) the same way they reach those
+// in a const initializer.
 func forEachBodyExpr(file *ast.File, fn func(ast.Expr)) {
 	var walk func(body []ast.Stmt)
 	walk = func(body []ast.Stmt) {
@@ -161,6 +162,11 @@ func forEachBodyExpr(file *ast.File, fn func(ast.Expr)) {
 	}
 	for _, id := range file.Interfaces {
 		for _, m := range id.Members {
+			walk(m.Body)
+		}
+	}
+	for _, md := range file.Masters {
+		for _, m := range md.Methods {
 			walk(m.Body)
 		}
 	}
