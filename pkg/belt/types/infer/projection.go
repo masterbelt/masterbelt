@@ -286,6 +286,22 @@ func isGenericDef(def *ir.TypeDef) bool {
 	return len(def.Params) > 0 || (def.Syntax != nil && len(def.Syntax.Params) > 0)
 }
 
+// paramCount is the number of type parameters a definition declares — its
+// resolved parameters, or, for a shell not resolved yet (a forward reference),
+// the count from its declaration syntax. It is zero for a non-generic type and
+// for a builtin generic, whose parameters are not tracked on the def — so a
+// caller gating on paramCount > 0 checks only a declared generic's arity, the
+// count being the same whichever side of its declaration the use sits on.
+func paramCount(def *ir.TypeDef) int {
+	if len(def.Params) > 0 {
+		return len(def.Params)
+	}
+	if def.Syntax != nil {
+		return len(def.Syntax.Params)
+	}
+	return 0
+}
+
 // failedProjection reports the right diagnostic for a projection that named no
 // declared field and returns ir.Invalid: a value-or-method member is
 // member_is_not_a_type, a record/master missing the field is unknown_field, and

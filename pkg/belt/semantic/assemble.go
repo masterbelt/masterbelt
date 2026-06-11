@@ -387,6 +387,7 @@ func (a *assembler) resolveConst(decl *ast.ConstDecl, cyclic bool) {
 			Report:          typeNameReporter(a.fileID, a.q, a.at, a.diags),
 			Registry:        a.reg,
 			BoundViolation:  boundViolationReporter(a.at, a.diags),
+			ArityMismatch:   arityMismatchReporter(a.at, a.diags),
 			ProjectionError: projectionErrorReporter(a.at, a.diags),
 		}
 		annType = r.ResolveType(decl.Type, nil)

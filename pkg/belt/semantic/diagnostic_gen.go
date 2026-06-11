@@ -81,6 +81,7 @@ const (
 	CodeStaticCollision            diagnostic.Code = "belt.semantic.static_collision"
 	CodeTernaryBranchMismatch      diagnostic.Code = "belt.semantic.ternary_branch_mismatch"
 	CodeTernaryConditionNotBool    diagnostic.Code = "belt.semantic.ternary_condition_not_bool"
+	CodeTypeArityMismatch          diagnostic.Code = "belt.semantic.type_arity_mismatch"
 	CodeTypeHasNoFields            diagnostic.Code = "belt.semantic.type_has_no_fields"
 	CodeTypeInValuePosition        diagnostic.Code = "belt.semantic.type_in_value_position"
 	CodeTypeMismatch               diagnostic.Code = "belt.semantic.type_mismatch"
@@ -1130,6 +1131,22 @@ func newTernaryConditionNotBoolDiagnostic(offset int, width int, typ string) dia
 		Severity: diagnostic.Error,
 		Code:     CodeTernaryConditionNotBool,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeTernaryConditionNotBool, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newTypeArityMismatchDiagnostic(offset int, width int, name string, actual int, expected int) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"name":     diagnostic.Str(name),
+		"actual":   diagnostic.Int(actual),
+		"expected": diagnostic.Int(expected),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeTypeArityMismatch,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeTypeArityMismatch, fields),
 		Fields:   fields,
 		Offset:   offset,
 		Width:    width,

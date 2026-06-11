@@ -32,6 +32,14 @@ type TypeResolver struct {
 	// It is nil wherever bound violations are not reported (a memoized resolution
 	// without diagnostics); the App is still built so typing proceeds.
 	BoundViolation func(arg ast.TypeExpr, argType ir.Type, param *ir.TypeParam)
+	// ArityMismatch fires when a generic type application supplies the wrong number
+	// of type arguments (Box<long, string> for Box<T>, or Pair<long> for Pair<A, B>),
+	// anchored at the application's syntax. The expected count is read from the
+	// definition's parameters, or — for a forward shell not resolved yet — from its
+	// declaration syntax, so the order of declaration does not change it. Like
+	// BoundViolation it is purely diagnostic and nil where diagnostics are not
+	// reported; the App is still built so typing proceeds with the written arguments.
+	ArityMismatch func(node ast.Node, name string, actual, expected int)
 	// ProjectionError reports a field-type projection (T.member in type position)
 	// that does not resolve to a type — the member is a value, the receiver has no
 	// such field or no fields at all, or the projection is cyclic. It is nil
@@ -198,6 +206,18 @@ func (r *TypeResolver) app(def *ir.TypeDef, argExprs []ast.TypeExpr, scope TypeS
 	for i, a := range argExprs {
 		args[i] = r.ResolveType(a, scope)
 	}
+	// The type-application arity check: a declared generic applied to the wrong
+	// number of type arguments — too many (Box<long, string> for Box<T>) or too few
+	// but nonzero (Pair<long> for Pair<A, B>) — is reported against the offending
+	// argument. The expected count comes from paramCount, which reads the
+	// declaration syntax for a forward shell, so the order of declaration does not
+	// change the diagnostic. expected > 0 scopes the check to a known-arity generic:
+	// a builtin generic (list, map — no tracked parameters) and a non-generic name
+	// given stray arguments are left as before. As with the bound check the App is
+	// built regardless, so typing proceeds with the written arguments.
+	if expected := paramCount(def); expected > 0 && len(argExprs) != expected && r.ArityMismatch != nil {
+		r.ArityMismatch(arityAnchor(argExprs, expected), def.Name, len(argExprs), expected)
+	}
 	if r.Registry != nil && r.BoundViolation != nil {
 		for i := range argExprs {
 			if i >= len(def.Params) {
@@ -213,6 +233,18 @@ func (r *TypeResolver) app(def *ir.TypeDef, argExprs []ast.TypeExpr, scope TypeS
 		}
 	}
 	return &ir.App{Def: def, Args: args}
+}
+
+// arityAnchor picks the syntax a type-arity diagnostic points at: the first
+// surplus argument when too many are given (Box<long, string> anchors string),
+// otherwise the last argument written, the vicinity where one more was expected
+// (Pair<long> anchors long). app is only reached with at least one argument, so
+// there is always one to anchor on.
+func arityAnchor(argExprs []ast.TypeExpr, expected int) ast.Node {
+	if expected < len(argExprs) {
+		return argExprs[expected]
+	}
+	return argExprs[len(argExprs)-1]
 }
 
 // ResolveName resolves a bare type name (a conversion's callee) to its type, or

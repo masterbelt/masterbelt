@@ -759,6 +759,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "ternary condition must be a bool; got " + f["typ"].String()
 		}
 	},
+	"belt.semantic.type_arity_mismatch": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "型 " + f["name"].String() + " は型引数を " + f["expected"].String() + " 個取りますが、" + f["actual"].String() + " 個が渡されています"
+		default:
+			return "type " + f["name"].String() + " takes " + f["expected"].String() + " type argument(s); " + f["actual"].String() + " given"
+		}
+	},
 	"belt.semantic.type_has_no_fields": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
