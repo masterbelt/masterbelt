@@ -95,6 +95,7 @@ File
           Public: false
           Name: "level"
           Readable: true
+          Static: false
           HasBody: false
           TypeParams: ~
           Params: ~
@@ -109,6 +110,7 @@ File
           Public: false
           Name: "best"
           Readable: true
+          Static: false
           HasBody: false
           TypeParams: ~
           Params: ~

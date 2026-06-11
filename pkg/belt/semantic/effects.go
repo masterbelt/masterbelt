@@ -235,6 +235,19 @@ func collectStaticCallEffectUses(e *ast.CallExpr, callee *ast.MemberExpr, bs inf
 	}
 	def := bs.Universe[recv.Name]
 	if def == nil {
+		// A bounded type-parameter receiver (T.foo()) is a static call through the
+		// bound, the same reading the checker and the lowering give it. An interface's
+		// static requirement declares no effects, so it contributes none; it is claimed
+		// here (its arguments still walked) so the method-call path does not mis-read it
+		// — keeping the effect walker consistent with the other passes.
+		if bound, ok := bs.TScope[recv.Name]; ok && bound != nil {
+			if ms, _, ok := types.StaticCandidates(bs.Reg, &ir.TypeVar{Name: recv.Name, Bound: bound}, callee.Member.Name); ok && len(ms) > 0 {
+				for _, a := range e.Arguments {
+					collectEffectUses(a, bs, use)
+				}
+				return true
+			}
+		}
 		return false
 	}
 	used := staticEffects(def, callee.Member.Name)

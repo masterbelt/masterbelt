@@ -140,6 +140,7 @@ File
           Public: false
           Name: "fold"
           Readable: false
+          Static: false
           HasBody: false
           TypeParams:
             TypeParam
@@ -194,6 +195,7 @@ File
           Public: true
           Name: "count"
           Readable: false
+          Static: false
           HasBody: true
           TypeParams: ~
           Params: ~

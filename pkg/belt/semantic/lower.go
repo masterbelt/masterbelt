@@ -264,6 +264,12 @@ func staticFnDef(universe map[string]*ir.TypeDef, callee *ast.MemberExpr, shadow
 		return nil
 	}
 	def := universe[recv.Name]
+	// An interface's static entries are requirements, not implementations, so a
+	// direct I.make() has nothing to lower (and the checker rejects it); only a
+	// concrete type's static, or a bounded parameter's (boundStaticDef), is a call.
+	if def != nil && def.Interface != nil {
+		return nil
+	}
 	if types.ResolveMember(def, callee.Member.Name).Kind != types.MemberStatic {
 		return nil
 	}
@@ -724,10 +730,37 @@ func (b bodyBinder) leafMemberCall(e *ast.CallExpr, callee *ast.MemberExpr, sub 
 			return funcCall(b.funcs.shells[pickOverload(cands, len(e.Arguments))], e, sub)
 		}
 	}
+	// A bounded type parameter wins over a same-named declared type here, the same
+	// precedence the type checker applies (it resolves the receiver through the type
+	// scope first), so the lowered callee matches the one that was type-checked.
+	if def := b.boundStaticDef(recv.Name, callee.Member.Name); def != nil {
+		return staticCall(def, callee.Member.Name, e, sub)
+	}
 	if def := staticFnDef(b.r.Defs, callee, b.shadows); def != nil {
 		return staticCall(def, callee.Member.Name, e, sub)
 	}
 	return nil
+}
+
+// boundStaticDef returns the interface definition that requires a static fn named
+// member of the bound of the type parameter named recv — so a call T.member() on a
+// bounded parameter lowers to a static call the way Type.member() does, the static
+// twin of an instance method resolved through the bound. It returns nil when recv
+// is not a bounded parameter or its bound requires no such static, leaving the call
+// to the type checker's value-position reading (the checker and the lowering agree).
+func (b bodyBinder) boundStaticDef(recv, member string) *ir.TypeDef {
+	if b.shadows(recv) {
+		return nil
+	}
+	bound, ok := b.tscope[recv]
+	if !ok || bound == nil {
+		return nil
+	}
+	ms, _, ok := types.StaticCandidates(b.reg, &ir.TypeVar{Name: recv, Bound: bound}, member)
+	if !ok || len(ms) == 0 {
+		return nil
+	}
+	return ms[0].Owner
 }
 
 // pickShellOverload is pickOverload over function shells: the arity reads off

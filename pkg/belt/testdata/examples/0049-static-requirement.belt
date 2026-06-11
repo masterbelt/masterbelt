@@ -1,0 +1,34 @@
+// Static member requirement: an interface may require a static fn — no receiver,
+// called through the type (Counter.defaultValue()) — and a type parameter bounded
+// by that interface calls it through the bound (T.defaultValue()). The static call
+// resolves to the requirement's result, the static twin of a method requirement
+// called on a value. A type opts in by declaring a matching static fn; the
+// receiver T of a static call is a type position, never consumed as a value.
+
+/// A behaviour for anything with a default value of its own: a required static fn
+/// (no receiver), called through the type. `static name(): R` is a required static
+/// member, the static twin of a method requirement `name(): R`.
+pub interface HasDefault {
+  /// A required static fn: every HasDefault type supplies `defaultValue()`,
+  /// called through the type rather than a value.
+  static defaultValue(): nint
+}
+
+/// A counter meets the requirement with a matching static fn — the way a type opts
+/// into a static-member bound.
+pub type Counter = {
+  n: nint,
+} impl HasDefault {
+  pub static fn defaultValue(): nint {
+    return 0
+  }
+}
+
+// Static call through the bound: `T.defaultValue()` resolves to the requirement's
+// result (nint) — the static twin of reading a member off a bounded parameter. The
+// parameter T is the receiver of a static call, a type position, not a value.
+/// Read a bounded parameter's default through its static requirement — resolved
+/// through the bound, the static twin of `v.method()` on a value of type T.
+pub fn startValue<T: HasDefault>(): nint {
+  return T.defaultValue()
+}

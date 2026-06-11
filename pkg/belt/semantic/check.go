@@ -162,6 +162,11 @@ func shortCircuits(member *ast.MemberExpr, args []ast.Expr, env exprFolder) bool
 // (a fresh scope per let, a copy per nested block), so a comparison against a
 // let-bound enum local resolves its receiver from the local in scope.
 func checkBareEnumArgs(body []ast.Stmt, bs infer.BodyScope, env exprFolder, at func(ast.Node) span, diags *diagnostic.List) {
+	// This walk types a member-call receiver only to see whether it is an enum; it
+	// is not the value-position reporting walk (the checking walk above is), so it
+	// must not report a type parameter typed here — a static call's receiver (T.foo())
+	// is a type position the checking walk resolves without reporting.
+	bs.ReportTypeParamValue = nil
 	for _, stmt := range body {
 		switch s := stmt.(type) {
 		case *ast.LetStmt:

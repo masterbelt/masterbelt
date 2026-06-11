@@ -706,6 +706,7 @@ func lowerInterfaceMember(t cst.Tree, buf source.Buffer) *ast.InterfaceMember {
 		body       []ast.Stmt
 		hasParams  bool
 		hasBody    bool
+		static     bool
 	)
 	for _, child := range t.Children() {
 		if tok, ok := child.Token(); ok {
@@ -726,6 +727,10 @@ func lowerInterfaceMember(t cst.Tree, buf source.Buffer) *ast.InterfaceMember {
 		}
 		node, _ := child.Node()
 		switch {
+		case node.Kind() == cst.Modifier:
+			// The only interface modifier is static (a static-fn requirement); its
+			// keyword precedes the name, so it is read here and never mistaken for it.
+			static = modifierKind(child, buf) == ast.MethodStatic
 		case node.Kind() == cst.GenericParams:
 			typeParams = lowerGenericParams(child, buf)
 		case node.Kind() == cst.ParamList:
@@ -740,6 +745,9 @@ func lowerInterfaceMember(t cst.Tree, buf source.Buffer) *ast.InterfaceMember {
 	}
 	// No parameter list distinguishes a readable-member requirement (Name: T) from
 	// a nullary method requirement (Name(): T), which both lower to empty Params.
-	// hasBody records a written block even when empty, which lowers to a nil Body.
-	return ast.NewInterfaceMember(doc, public, name, !hasParams, hasBody, typeParams, params, result, body, green)
+	// A static modifier with no parameter list (static Name: T) sets both Readable
+	// and Static, which the semantic layer rejects — a static requirement needs a
+	// parameter list. hasBody records a written block even when empty, which lowers
+	// to a nil Body.
+	return ast.NewInterfaceMember(doc, public, name, !hasParams, static, hasBody, typeParams, params, result, body, green)
 }

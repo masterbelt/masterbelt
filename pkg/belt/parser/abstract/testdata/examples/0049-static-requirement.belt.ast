@@ -1,0 +1,101 @@
+File
+  Uses: ~
+  Decls: ~
+  Types:
+    TypeDecl
+      Doc: "A counter meets the requirement with a matching static fn — the way a type opts" "into a static-member bound."
+      Public: true
+      Name: "Counter"
+      Params: ~
+      Body: RecordType
+        Fields:
+          FieldDef
+            Name: "n"
+            Type: NamedType
+              Namespace: ""
+              Name: "nint"
+              Args: ~
+              Projections: ~
+      Where: ~
+      Methods:
+        MethodDecl
+          Doc: ~
+          Public: true
+          Extern: false
+          Kind: 3
+          Effects: ~
+          Name: "defaultValue"
+          TypeParams: ~
+          Params: ~
+          Result: NamedType
+            Namespace: ""
+            Name: "nint"
+            Args: ~
+            Projections: ~
+          Body:
+            ReturnStmt
+              Value: IntLit
+                Text: "0"
+      Consts: ~
+      Impls:
+        NamedType
+          Namespace: ""
+          Name: "HasDefault"
+          Args: ~
+          Projections: ~
+  Enums: ~
+  Interfaces:
+    InterfaceDecl
+      Doc: "A behaviour for anything with a default value of its own: a required static fn" "(no receiver), called through the type. `static name(): R` is a required static" "member, the static twin of a method requirement `name(): R`."
+      Public: true
+      Name: "HasDefault"
+      Params: ~
+      Parents: ~
+      Members:
+        InterfaceMember
+          Doc: "A required static fn: every HasDefault type supplies `defaultValue()`," "called through the type rather than a value."
+          Public: false
+          Name: "defaultValue"
+          Readable: false
+          Static: true
+          HasBody: false
+          TypeParams: ~
+          Params: ~
+          Result: NamedType
+            Namespace: ""
+            Name: "nint"
+            Args: ~
+            Projections: ~
+          Body: ~
+  Funcs:
+    FuncDecl
+      Doc: "Read a bounded parameter's default through its static requirement — resolved" "through the bound, the static twin of `v.method()` on a value of type T."
+      Public: true
+      Extern: false
+      Effects: ~
+      Name: "startValue"
+      TypeParams:
+        TypeParam
+          Name: "T"
+          Constraint: NamedType
+            Namespace: ""
+            Name: "HasDefault"
+            Args: ~
+            Projections: ~
+      Params: ~
+      Result: NamedType
+        Namespace: ""
+        Name: "nint"
+        Args: ~
+        Projections: ~
+      Body:
+        ReturnStmt
+          Value: CallExpr
+            Callee: MemberExpr
+              Receiver: Identifier
+                Name: "T"
+              Member: Identifier
+                Name: "defaultValue"
+            Arguments: ~
+  Asserts: ~
+  Masters: ~

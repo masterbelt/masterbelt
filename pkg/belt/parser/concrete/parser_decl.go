@@ -323,6 +323,7 @@ func (p *parser) parseInterfaceMember(lead []cst.Green) *cst.Node {
 	if p.kind() == token.Pub {
 		children = append(children, p.bump())
 	}
+	p.interfaceModifier(&children)
 	if p.peekSignificant() == token.Ident {
 		p.skipTrivia(&children)
 		children = append(children, p.bump()) // the member name
@@ -1016,6 +1017,31 @@ func (p *parser) parseMethodDecl(lead []cst.Green) *cst.Node {
 	return p.finishMethodDecl(children)
 }
 
+// interfaceModifier recognizes the static modifier on an interface member — the
+// context keyword static followed by the member name (an identifier) on the same
+// line, the static-fn requirement `static name(): T` (no fn keyword, mirroring how
+// an interface method requirement omits fn). It wraps static in a Modifier node
+// appended to children and reports true. A static at a line's end, or one followed
+// by ":" (a readable member named static) or "(" (a method named static), is the
+// member's own name, not a modifier — the same line-bounded lookahead the
+// accessor modifiers use.
+// kwStatic is the context keyword that introduces a static modifier — on a
+// method (static fn) or an interface member's static-fn requirement.
+const kwStatic = "static"
+
+func (p *parser) interfaceModifier(children *[]cst.Green) bool {
+	i := p.nextSignificantIndex(p.pos)
+	if p.toks[i].Kind != token.Ident || p.identText(i) != kwStatic {
+		return false
+	}
+	if p.nextOnLine(i+1) != token.Ident {
+		return false
+	}
+	p.skipTrivia(children)
+	*children = append(*children, p.modifier())
+	return true
+}
+
 // methodModifier recognizes an accessor or static modifier at the cursor and, if
 // it finds one, wraps its context-keyword identifier in a Modifier node appended
 // to children (consuming the following fn keyword for a static modifier) and
@@ -1040,7 +1066,7 @@ func (p *parser) methodModifier(children *[]cst.Green) bool {
 		p.skipTrivia(children)
 		*children = append(*children, p.modifier())
 		return true
-	case "static":
+	case kwStatic:
 		return p.staticModifier(children)
 	default:
 		return false
@@ -1057,7 +1083,7 @@ func (p *parser) methodModifier(children *[]cst.Green) bool {
 // accessors.
 func (p *parser) staticModifier(children *[]cst.Green) bool {
 	i := p.nextSignificantIndex(p.pos)
-	if p.toks[i].Kind != token.Ident || p.identText(i) != "static" {
+	if p.toks[i].Kind != token.Ident || p.identText(i) != kwStatic {
 		return false
 	}
 	switch p.nextOnLine(i + 1) {
