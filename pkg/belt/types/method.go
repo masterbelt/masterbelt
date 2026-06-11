@@ -86,6 +86,16 @@ func Candidates(reg *builtin.Registry, recv ir.Type, method string) ([]*ir.Metho
 	return candidatesOfKind(reg, recv, method, ir.MethodNormal)
 }
 
+// StaticCandidates returns the static fns named method reachable through the
+// receiver's type — the static twin of Candidates — together with the receiver's
+// substitution. For a bounded type parameter (recv a TypeVar) it reaches the
+// static-fn requirements of the bound interface and its parents, so T.method()
+// resolves through the bound the way v.method() resolves an instance method; the
+// substitution binds the bound interface's parameters from the bound's arguments.
+func StaticCandidates(reg *builtin.Registry, recv ir.Type, method string) ([]*ir.Method, map[string]ir.Type, bool) {
+	return candidatesOfKind(reg, recv, method, ir.MethodStatic)
+}
+
 // Getter returns the getter named name on the receiver's type — the property
 // read value.name folds to — together with the receiver's substitution, or
 // false when the receiver has no such getter. A getter takes no overloads (it

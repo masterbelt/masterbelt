@@ -392,6 +392,13 @@ func staticCallType(e *ast.CallExpr, member *ast.MemberExpr, s scope, sink *Sink
 		return ir.Invalid, false
 	}
 	recvT := s.conv(id) // the type the receiver names, or Invalid when shadowed/unknown
+	// A bounded type-parameter receiver (T.foo() where T: I) resolves the static fn
+	// through the bound interface's requirement, the static twin of v.method()
+	// resolving an instance method through the bound. The receiver T is a type
+	// position here, not a value, so this never reports it as a value-position use.
+	if tv, ok := recvT.(*ir.TypeVar); ok {
+		return staticCallThroughBound(e, member, tv, s, sink)
+	}
 	def := staticReceiverDef(recvT, s)
 	if def == nil {
 		return ir.Invalid, false
@@ -454,6 +461,52 @@ func staticSigs(def *ir.TypeDef, name string) []funcSig {
 			params[i] = substituteSelf(p.Type, self)
 		}
 		sigs = append(sigs, funcSig{m: m, params: params, result: substituteSelf(m.Result, self)})
+	}
+	return sigs
+}
+
+// staticCallThroughBound types a static call on a bounded type parameter
+// (T.foo()): when the bound interface requires a static fn of that name, the call
+// is read from the requirement — with self resolved to the parameter and the
+// bound's generic arguments substituted — and checked against that signature the
+// same way a declared type's static call is. A name the bound does not require as
+// a static is not a static call on the parameter: it falls through (ok=false) to
+// the method-call path, which reports T consumed as a value (type_param_in_value_
+// position) — so an operator desugaring (T == U is T.eql(U)) or a typo is not
+// mistaken for a static the bound never promised.
+func staticCallThroughBound(e *ast.CallExpr, member *ast.MemberExpr, tv *ir.TypeVar, s scope, sink *Sink) (ir.Type, bool) {
+	if tv.Bound == nil {
+		return ir.Invalid, false
+	}
+	sigs := staticSigsThroughBound(s.registry(), tv, member.Member.Name)
+	if len(sigs) == 0 {
+		return ir.Invalid, false
+	}
+	name := tv.Name + "." + member.Member.Name
+	if len(sigs) == 1 {
+		return checkFuncCall(e, name, sigs[0], s, sink), true
+	}
+	return selectFuncOverload(e, name, sigs, s, sink), true
+}
+
+// staticSigsThroughBound builds the overload set for the static fns named name a
+// bounded type parameter's bound requires: each requirement's parameter and result
+// types with the bound's generic arguments substituted and self resolved to the
+// parameter itself (a static fn returning self yields the parameter, a factory
+// through the bound). It is the bound twin of staticSigs.
+func staticSigsThroughBound(reg *builtin.Registry, tv *ir.TypeVar, name string) []funcSig {
+	ms, subst, ok := types.StaticCandidates(reg, tv, name)
+	if !ok {
+		return nil
+	}
+	var sigs []funcSig
+	for _, m := range ms {
+		params := make([]ir.Type, len(m.Params))
+		for i, p := range m.Params {
+			params[i] = types.SubstituteSelf(types.Substitute(p.Type, subst), tv)
+		}
+		result := types.SubstituteSelf(types.Substitute(m.Result, subst), tv)
+		sigs = append(sigs, funcSig{m: m, params: params, result: result})
 	}
 	return sigs
 }
