@@ -317,6 +317,14 @@ func constShadowsFrom(q queries, file FileID) func(*ast.Identifier) bool {
 	return func(id *ast.Identifier) bool { return q.resolve(file, id) != nil }
 }
 
+// namespaceShadowsFrom builds the namespace-import predicate the value-position
+// type-parameter check consults: a name that is a namespace import (and no value)
+// shadows a same-named type parameter in value position, so a member read off it
+// (T.x reading the import's exported member) is not a value use of the parameter.
+func namespaceShadowsFrom(q queries, file FileID) func(*ast.Identifier) bool {
+	return func(id *ast.Identifier) bool { return isNamespace(file, id, q) }
+}
+
 // nsConstRefFrom builds the nsConstRef channel over the queries, mirroring
 // constRefFrom for a namespace member access.
 func nsConstRefFrom(q queries, file FileID) func(*ast.MemberExpr) *ir.Const {

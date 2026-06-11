@@ -120,6 +120,20 @@ func (s funcScope) fnMember(m *ast.MemberExpr) []*ast.FuncDecl {
 	return s.outer.fnMember(m)
 }
 
+func (s funcScope) nsReceiver(recv ast.Expr) bool {
+	if id, ok := recv.(*ast.Identifier); ok && s.shadows(id.Name) {
+		return false // a lambda local or parameter shadows the namespace import
+	}
+	return s.outer.nsReceiver(recv)
+}
+
+// valueName: a lambda's own local or parameter is a value; otherwise the
+// enclosing scope's bindings (its parameters, an outer lambda's) decide, mirroring
+// how conv and fn delegate their shadowing outward.
+func (s funcScope) valueName(name string) bool {
+	return s.shadows(name) || s.outer.valueName(name)
+}
+
 // metatype is the type of a reified type value — the builtin `type` (type :
 // type), the type a bare type name carries in value position. It is built fresh
 // per call, like the other primitive types the scopes synthesize.
@@ -208,6 +222,16 @@ func (s constScope) fnMember(m *ast.MemberExpr) []*ast.FuncDecl {
 	return s.env.ResolveFuncMember(m)
 }
 
+// nsReceiver: a constant initializer has no generic type parameters, so it never
+// reports a type parameter in value position; the value-walk shortcut a namespace
+// receiver takes is irrelevant here, and the namespace member read keeps its
+// existing reading.
+func (s constScope) nsReceiver(ast.Expr) bool { return false }
+
+// valueName: a constant initializer has no locals or parameters, so no name is a
+// value binding that shadows a type parameter — it has none of either.
+func (s constScope) valueName(string) bool { return false }
+
 // BodyScope types a method or function body: the receiver type (Self —
 // ir.Invalid in a function, which has none), the parameter types (Params),
 // the type universe (Universe) a conversion resolves against, and the
@@ -248,6 +272,22 @@ type BodyScope struct {
 	// (geo.area -> the target's exported overload set), or nil when no
 	// namespaces are in scope.
 	QualifiedFuncs func(namespace, name string) []*ast.FuncDecl
+	// NamespaceShadows reports whether a name is a namespace import in the file, so
+	// a member read off it (T.x reading the import's exported member) is a namespace
+	// access whose receiver is not a value — not a value-position use of a same-named
+	// type parameter. It is nil where no namespaces are in scope.
+	NamespaceShadows func(*ast.Identifier) bool
+	// ReportTypeParamValue reports a generic type parameter consumed as a value —
+	// a bare T (T == string, return T) or the receiver of a value member read T.x —
+	// at the value leaf where the name resolves to nothing but a type parameter:
+	// not a local, parameter, or constant, each of which the leaf resolves first
+	// and so shadows it by construction. The one value-position shadow the leaf
+	// does not itself carry, a namespace import, is filtered by the reporter, which
+	// holds the file's import set. It is the value leaf's reach to the diagnostic
+	// surface BodyScope does not otherwise carry; nil in a non-reporting walk (the
+	// sink-only func-literal settling pass, the effect and refinement walks),
+	// leaving the use to its prior silent reading.
+	ReportTypeParamValue func(node ast.Node, name string)
 }
 
 // Body infers the type of a method-body expression: self, a parameter, a
@@ -318,6 +358,18 @@ func (s BodyScope) fnMember(m *ast.MemberExpr) []*ast.FuncDecl {
 	return s.QualifiedFuncs(recv.Name, m.Member.Name)
 }
 
+func (s BodyScope) nsReceiver(recv ast.Expr) bool {
+	id, ok := recv.(*ast.Identifier)
+	if !ok || s.shadows(id.Name) {
+		return false // a local or parameter shadows the namespace import
+	}
+	return s.NamespaceShadows != nil && s.NamespaceShadows(id)
+}
+
+// valueName reports whether name is a let local or a parameter — a value binding
+// that shadows a same-named type or type parameter in value position.
+func (s BodyScope) valueName(name string) bool { return s.shadows(name) }
+
 func (s BodyScope) leaf(e ast.Expr) ir.Type {
 	switch e := e.(type) {
 	case *ast.SelfExpr:
@@ -331,6 +383,22 @@ func (s BodyScope) leaf(e ast.Expr) ir.Type {
 		}
 		if t, ok := s.Params[e.Name]; ok {
 			return t
+		}
+		// A generic type parameter consumed as a value (T == string, return T, or the
+		// receiver of a value read T.x reached through exprType below) is a compile-
+		// time type, not a foldable value: it is rejected, and reported in a reporting
+		// walk. This is checked before the type-name reading below, so a parameter
+		// whose name also names a declared or builtin type wins over that type —
+		// mirroring how an annotation in the same scope resolves T to the parameter. A
+		// top-level constant of the same name shadows it (the body reads the constant),
+		// so the constant case is excluded; a namespace import — the one value-position
+		// shadow this scope does not carry — is excluded upstream, where a namespace
+		// member read T.x resolves before its receiver is taken as a value.
+		if s.rigid(e.Name) && (s.ConstShadows == nil || !s.ConstShadows(e)) {
+			if s.ReportTypeParamValue != nil {
+				s.ReportTypeParamValue(e, e.Name)
+			}
+			return ir.Invalid
 		}
 		// A bare type name in value position is a compile-time type value, of the
 		// metatype `type` — the same reading the constant scope gives it, so a body
@@ -346,6 +414,14 @@ func (s BodyScope) leaf(e ast.Expr) ir.Type {
 		// the record-field reading instead.
 		if t, ok := s.typeMemberValue(e); ok {
 			return t
+		}
+		// A namespace-import receiver (T.x reading the import's exported member) is
+		// not a value: the receiver is left unread rather than taken as one, which
+		// would misreport a same-named type parameter as used in value position. The
+		// member read itself is unresolved here, as it was — the import's value
+		// surface is not carried by the body scope.
+		if s.nsReceiver(e.Receiver) {
+			return ir.Invalid
 		}
 		// A member access used as a value is a record field access or a getter read
 		// (value.name) the receiver's type declares.

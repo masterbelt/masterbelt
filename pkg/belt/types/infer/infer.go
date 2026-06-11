@@ -89,6 +89,14 @@ type scope interface {
 	// overload set the namespace's target exports, or nil when the receiver
 	// names no namespace (a value's method call).
 	fnMember(m *ast.MemberExpr) []*ast.FuncDecl
+	// nsReceiver reports whether recv, a member access's receiver, names a
+	// namespace import — so the access (geo.Origin, T.x where T is imported) is a
+	// namespace member read whose receiver is not a value. A local or parameter of
+	// the same name shadows the import, making it a value receiver; it is false
+	// where no namespaces are in scope. The value walk uses it to leave a namespace
+	// receiver unread rather than taking it as a value, which would misreport a
+	// same-named type parameter as used in value position.
+	nsReceiver(recv ast.Expr) bool
 	// self is the receiver type in scope, or ir.Invalid where there is none
 	// (a constant initializer, a function body). A bare call of one of its
 	// methods is an implicit self-call; a function literal inherits the
@@ -101,6 +109,11 @@ type scope interface {
 	// body is perfectly inferred, where an unpinned method-local variable (the
 	// R of map at a call site) is uninferable.
 	rigid(name string) bool
+	// valueName reports whether name is bound by a value in scope — a let local or
+	// a parameter, including an enclosing lambda's — so a same-named generic type
+	// parameter is shadowed in value position. A call of such a name is a function-
+	// value call, not a conversion through the type parameter.
+	valueName(name string) bool
 	// tscope is the generic type-parameter scope in effect — the enclosing
 	// declaration's type parameters, each mapped to its bound — that a written
 	// type annotation in this scope (a lambda parameter or result, a let, a

@@ -307,13 +307,14 @@ func methodTScope(r *infer.TypeResolver, def *ir.TypeDef, m *ast.MethodDecl) inf
 // ones — and qualified its namespace-qualified lookup, so a type in a body
 // resolves exactly as an annotation does. env folds switch arm values for the
 // exhaustiveness and duplicate checks.
-func checkMethodBodies(reg *builtin.Registry, defs []*ir.TypeDef, universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, funcs map[string][]*ast.FuncDecl, qualifiedFuncs func(namespace, name string) []*ast.FuncDecl, constShadows func(*ast.Identifier) bool, env exprFolder, sink *infer.Sink, at func(ast.Node) span, diags *diagnostic.List) {
+func checkMethodBodies(reg *builtin.Registry, defs []*ir.TypeDef, universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, funcs map[string][]*ast.FuncDecl, qualifiedFuncs func(namespace, name string) []*ast.FuncDecl, constShadows func(*ast.Identifier) bool, nsShadows func(*ast.Identifier) bool, env exprFolder, sink *infer.Sink, at func(ast.Node) span, diags *diagnostic.List) {
 	// The resolver that builds each method's body type-parameter scope: it resolves
 	// a method type parameter's bound (fn g<T: HasX>) so a body annotation
 	// projecting off it (let y: T.x) sees the bound, the same registry-backed
 	// resolution the signature uses.
 	tscopeResolver := &infer.TypeResolver{Defs: universe, Qualified: qualified, Registry: reg}
 	var noSelf func(node ast.Node)
+	reportTypeParamValue := typeParamValueReporter(at, diags)
 	if diags != nil {
 		noSelf = func(node ast.Node) {
 			s := at(node)
@@ -342,7 +343,7 @@ func checkMethodBodies(reg *builtin.Registry, defs []*ir.TypeDef, universe map[s
 				params[p.Name] = substSelf(p.Type, self)
 			}
 			want := substSelf(irm.Result, self)
-			bs := infer.BodyScope{Reg: reg, Universe: universe, Qualified: qualified, Self: selfT, Params: params, Funcs: funcs, QualifiedFuncs: qualifiedFuncs, ConstShadows: constShadows, TScope: methodTScope(tscopeResolver, def, m)}
+			bs := infer.BodyScope{Reg: reg, Universe: universe, Qualified: qualified, Self: selfT, Params: params, Funcs: funcs, QualifiedFuncs: qualifiedFuncs, ConstShadows: constShadows, NamespaceShadows: nsShadows, TScope: methodTScope(tscopeResolver, def, m), ReportTypeParamValue: reportTypeParamValue}
 			checkStmts(m.Body, want, bs, env, bodyNoSelf, sink, at, diags)
 			checkBareEnumArgs(m.Body, bs, env, at, diags)
 		}
@@ -363,7 +364,7 @@ func checkMethodBodies(reg *builtin.Registry, defs []*ir.TypeDef, universe map[s
 // func-literal-types path settles the signatures of the lambdas inside a
 // function body without reporting (the self and missing-return diagnostics, and
 // the index-write check, are suppressed) — mirroring checkMethodBodies.
-func checkFuncBodies(reg *builtin.Registry, file *ast.File, universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, funcs map[string][]*ast.FuncDecl, qualifiedFuncs func(namespace, name string) []*ast.FuncDecl, constShadows func(*ast.Identifier) bool, env exprFolder, sink *infer.Sink, at func(ast.Node) span, diags *diagnostic.List) {
+func checkFuncBodies(reg *builtin.Registry, file *ast.File, universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, funcs map[string][]*ast.FuncDecl, qualifiedFuncs func(namespace, name string) []*ast.FuncDecl, constShadows func(*ast.Identifier) bool, nsShadows func(*ast.Identifier) bool, env exprFolder, sink *infer.Sink, at func(ast.Node) span, diags *diagnostic.List) {
 	// The resolver reports a failed field-type projection in a parameter or result
 	// annotation (fn f(x: Item.nope)), so an invalid projection there surfaces the
 	// same diagnostic it does in a type or const annotation rather than resolving
@@ -372,6 +373,7 @@ func checkFuncBodies(reg *builtin.Registry, file *ast.File, universe map[string]
 	// A sink-only walk (diags nil) keeps it silent.
 	r := &infer.TypeResolver{Defs: universe, Qualified: qualified, Registry: reg, ProjectionError: projectionErrorReporter(at, diags)}
 	var noSelf func(node ast.Node)
+	reportTypeParamValue := typeParamValueReporter(at, diags)
 	if diags != nil {
 		noSelf = func(node ast.Node) {
 			s := at(node)
@@ -394,7 +396,7 @@ func checkFuncBodies(reg *builtin.Registry, file *ast.File, universe map[string]
 			params[p.Name] = r.ResolveType(p.Type, tscope)
 		}
 		want := r.ResolveType(fd.Result, tscope)
-		bs := infer.BodyScope{Reg: reg, Universe: universe, Qualified: qualified, Self: ir.Invalid, Params: params, Funcs: funcs, QualifiedFuncs: qualifiedFuncs, ConstShadows: constShadows, TScope: tscope}
+		bs := infer.BodyScope{Reg: reg, Universe: universe, Qualified: qualified, Self: ir.Invalid, Params: params, Funcs: funcs, QualifiedFuncs: qualifiedFuncs, ConstShadows: constShadows, NamespaceShadows: nsShadows, TScope: tscope, ReportTypeParamValue: reportTypeParamValue}
 		checkStmts(fd.Body, want, bs, env, noSelf, sink, at, diags)
 		if diags == nil {
 			continue // the sink-only walk wants no further diagnostics
