@@ -219,16 +219,19 @@ pkg.dependencies = { 'node-addon-api': '^8.2.2', 'node-gyp-build': '^4.8.2' };
 // The tree-sitter runtime peer must be able to load this parser's ABI. Runtimes
 // are not forward-compatible — a parser generated for a newer ABI than the
 // runtime supports fails at setLanguage — so the peer floor is tied to the
-// committed parser's LANGUAGE_VERSION. ABI 15 is first loadable by the Node
-// runtime tree-sitter@0.25.0. Assert the ABI is the one this floor targets, so a
-// CLI ABI bump fails the assembly here instead of shipping a mismatched range.
-const EXPECTED_ABI = 15; // tree-sitter@^0.25.0 loads ABI 15
+// committed parser's LANGUAGE_VERSION. The grammar is generated at ABI 14
+// (`tree-sitter generate --abi 14`) because that is the newest ABI the whole
+// runtime matrix supports — notably go-tree-sitter, whose latest release tops out
+// at ABI 14. Every published Node runtime from tree-sitter@0.21.1 up loads ABI 14.
+// Assert the ABI matches, so a change to the generated parser fails the assembly
+// here instead of shipping a peer range that cannot load it.
+const EXPECTED_ABI = 14; // every tree-sitter Node runtime >= 0.21.1 loads ABI 14
 const abiMatch = fs.readFileSync(dir + '/src/parser.c', 'utf8').match(/#define\s+LANGUAGE_VERSION\s+(\d+)/);
 const abi = abiMatch ? Number(abiMatch[1]) : NaN;
 if (abi !== EXPECTED_ABI) {
-  throw new Error(`src/parser.c ABI ${abi} != ${EXPECTED_ABI}: raise the tree-sitter peer range to a runtime that loads ABI ${abi} and bump EXPECTED_ABI`);
+  throw new Error(`src/parser.c ABI ${abi} != ${EXPECTED_ABI}: align the tree-sitter peer range (and the generate --abi flag) with the parser ABI and bump EXPECTED_ABI`);
 }
-pkg.peerDependencies = { 'tree-sitter': '^0.25.0' };
+pkg.peerDependencies = { 'tree-sitter': '>=0.21.1' };
 pkg.peerDependenciesMeta = { 'tree-sitter': { optional: true } };
 pkg.devDependencies = Object.assign({}, pkg.devDependencies, { prebuildify: '^6.0.1' });
 pkg.scripts = Object.assign({}, pkg.scripts, { install: 'node-gyp-build' });
