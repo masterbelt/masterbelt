@@ -5,6 +5,7 @@ import (
 
 	protocol "github.com/owenrumney/go-lsp/lsp"
 
+	"github.com/masterbelt/masterbelt/pkg/belt/types"
 	"github.com/masterbelt/masterbelt/pkg/source"
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/source/cst"
@@ -347,16 +348,18 @@ func writeEnumSignature(b *strings.Builder, t *ir.TypeDef) {
 }
 
 // writeMasterSignature writes a master's signature laid out like its declaration
-// — the master keyword and name, its row record one field per line, and its
-// primary key in the source's single-or-parenthesised form — so the card reads
-// like the source rather than as a bare type. The row is projected with recordOf
-// (the row is a record or a record alias, never opaque), and a row that did not
-// resolve renders as an empty record rather than dropping the card.
+// — the master keyword and name, its row record one field per line, its primary
+// key in the source's single-or-parenthesised form, and the interfaces the row
+// opts into — so the card reads like the source rather than as a bare type. The
+// row is projected with the canonical types.RecordOf (the same the checker uses),
+// so a row written as a generic record alias (record Box<int>) instantiates into
+// its fields; a row that did not resolve renders as an empty record rather than
+// dropping the card.
 func writeMasterSignature(b *strings.Builder, t *ir.TypeDef) {
 	b.WriteString("master ")
 	b.WriteString(t.Name)
 	b.WriteString(" {\n  record {")
-	if rec, ok := recordOf(t.Master.Row); ok && len(rec.Fields) > 0 {
+	if rec := types.RecordOf(t.Master.Row); rec != nil && len(rec.Fields) > 0 {
 		b.WriteString("\n")
 		for _, f := range rec.Fields {
 			b.WriteString("    " + f.Name + ": " + f.Type.String() + "\n")
@@ -371,4 +374,9 @@ func writeMasterSignature(b *strings.Builder, t *ir.TypeDef) {
 		b.WriteString("\n  primary (" + strings.Join(t.Master.Primary, ", ") + ")")
 	}
 	b.WriteString("\n}")
+	// The interfaces the row opts into (record { ... } impl Named), the way the
+	// type card shows a type's impls, so master hover does not hide conformance.
+	for _, impl := range t.Impls {
+		b.WriteString(" impl " + impl.String())
+	}
 }

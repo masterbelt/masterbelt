@@ -314,22 +314,17 @@ func recordOf(t ir.Type) (*ir.Record, bool) {
 	return nil, false
 }
 
-// memberRecordOf returns the record whose fields a value member access reads: a
-// plain record body, or an opaque master's row record from its descriptor. A
-// master row is readable through a value (s.field) even though the master is not
-// constructible as a record literal, so this read path projects the row — with
-// the same types.RecordOf the checker's member access uses — while recordOf keeps
-// the literal paths opaque.
+// memberRecordOf returns the record whose fields a value member access reads,
+// through the same types.RecordOf the checker's member access uses: an anonymous
+// record, a named alias's body through the chain, a generic application
+// instantiated with its arguments, or a master's row — including a master reached
+// through an alias (type SkillRef = Skill). A master row is readable through a
+// value (s.field) even though the master is not constructible as a record
+// literal, so this read path projects the row while recordOf keeps the literal
+// paths opaque.
 func memberRecordOf(t ir.Type) (*ir.Record, bool) {
-	if rec, ok := recordOf(t); ok {
-		return rec, true
-	}
-	if n, ok := t.(*ir.Named); ok && n.Def != nil && n.Def.Master != nil {
-		if rec := types.RecordOf(n.Def.Master.Row); rec != nil {
-			return rec, true
-		}
-	}
-	return nil, false
+	rec := types.RecordOf(t)
+	return rec, rec != nil
 }
 
 // callSnippet renders a method as an insertable call: each parameter a tab

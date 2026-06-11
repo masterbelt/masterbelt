@@ -233,6 +233,63 @@ func TestMasterRecordLiteralStaysOpaque(t *testing.T) {
 	}
 }
 
+// TestMasterAliasMemberCompletionAndHover pins that a master reached through a
+// type alias still completes and hovers its row fields: the checker accepts
+// s.field on a `type SkillRef = Skill` value because the canonical RecordOf
+// follows the alias to the master row, so the read paths must follow it too — a
+// manual Master-on-the-receiver check would miss the alias.
+func TestMasterAliasMemberCompletionAndHover(t *testing.T) {
+	src := "master Skill {\n  record {\n    id: int,\n    name: string,\n  }\n  primary id\n}\n" +
+		"type SkillRef = Skill\n" +
+		"fn describe(s: SkillRef): string {\n  return s.name\n}\n"
+	doc := testView(src)
+
+	got := byLabel(completion(doc, strings.Index(src, "s.name")+len("s.")).Items)
+	if _, ok := got["name"]; !ok {
+		t.Errorf("alias-to-master completion missing row field name: %v", labels(got))
+	}
+	h := hover(doc, strings.Index(src, "s.name")+len("s."))
+	if h == nil || !strings.Contains(h.Contents.Value, "name: string") {
+		t.Errorf("alias-to-master hover = %v, want name: string", h)
+	}
+}
+
+// TestMasterGenericRowAliasHover pins that a master whose row is a generic record
+// alias renders its instantiated fields, not an empty record: the row is an
+// application (Box<int>), which the canonical RecordOf instantiates and the local
+// record projection does not.
+func TestMasterGenericRowAliasHover(t *testing.T) {
+	src := "type Box<T> = { value: T }\n" +
+		"master M {\n  record Box<int>\n  primary value\n}\n"
+	doc := testView(src)
+
+	h := hover(doc, strings.Index(src, "master M")+len("master "))
+	if h == nil {
+		t.Fatal("no hover on the master declaration")
+	}
+	if !strings.Contains(h.Contents.Value, "value: int") {
+		t.Errorf("generic-row master hover = %q, want it to contain value: int", h.Contents.Value)
+	}
+}
+
+// TestMasterDeclarationHoverShowsImpls pins that a master card shows the
+// interfaces its row opts into (record { ... } impl Named), the way the type card
+// shows a type's impls — so hover does not hide interface conformance.
+func TestMasterDeclarationHoverShowsImpls(t *testing.T) {
+	src := "interface Named {\n  name(): string\n}\n" +
+		"master Skill {\n  record {\n    id: int,\n    name: string,\n  } impl Named {\n" +
+		"    name(): string {\n      return self.name\n    }\n  }\n  primary id\n}\n"
+	doc := testView(src)
+
+	h := hover(doc, strings.Index(src, "master Skill")+len("master "))
+	if h == nil {
+		t.Fatal("no hover on the master declaration")
+	}
+	if !strings.Contains(h.Contents.Value, "impl Named") {
+		t.Errorf("master hover = %q, want it to contain impl Named", h.Contents.Value)
+	}
+}
+
 // TestEnumTypeDefinition and TestInterfaceTypeDefinition pin the consistency the
 // shared declSyntax helper buys: an enum and an interface carry their declaration
 // backpointer on EnumSyntax / InterfaceSyntax (not Syntax), exactly as a master

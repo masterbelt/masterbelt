@@ -405,19 +405,15 @@ func fieldOf(t ir.Type, name string) (ir.Field, bool) {
 	return ir.Field{}, false
 }
 
-// memberFieldOf returns the record field a value member access reads under name:
-// a plain record field, or an opaque master's row field from its descriptor. A
-// master row field is readable through a value (s.field) though the master is not
-// constructible, so this read path projects the row while fieldOf keeps the
-// literal paths opaque.
+// memberFieldOf returns the record field a value member access reads under name,
+// through the same types.RecordOf the checker's member access uses — so it
+// follows a named alias, instantiates a generic application, and projects a
+// master's row, including a master reached through an alias. A master row field
+// is readable through a value (s.field) though the master is not constructible,
+// so this read path projects the row while fieldOf keeps the literal paths opaque.
 func memberFieldOf(t ir.Type, name string) (ir.Field, bool) {
-	if f, ok := fieldOf(t, name); ok {
-		return f, true
-	}
-	if n, ok := t.(*ir.Named); ok && n.Def != nil && n.Def.Master != nil {
-		if rec := types.RecordOf(n.Def.Master.Row); rec != nil {
-			return fieldOf(rec, name)
-		}
+	if rec := types.RecordOf(t); rec != nil {
+		return fieldOf(rec, name)
 	}
 	return ir.Field{}, false
 }
