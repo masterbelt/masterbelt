@@ -258,17 +258,8 @@ func receiverGetter(doc view, recv ir.Type, name string) (*ir.Method, map[string
 func receiverTypeOf(doc view, e ast.Expr, trees map[cst.Green]cst.Tree, offset int) ir.Type {
 	switch e := e.(type) {
 	case *ast.SelfExpr:
-		file := doc.AST().File()
-		module := doc.Module()
-		for i, td := range file.Types {
-			if i >= len(module.Types) {
-				break
-			}
-			for _, m := range td.Methods {
-				if t, ok := trees[m.Syntax()]; ok && within(t, offset) {
-					return &ir.Named{Def: module.Types[i]}
-				}
-			}
+		if def := enclosingMethodOwner(doc, trees, offset); def != nil {
+			return &ir.Named{Def: def}
 		}
 		return nil
 	case *ast.Identifier:
@@ -289,6 +280,25 @@ func receiverTypeOf(doc view, e ast.Expr, trees map[cst.Green]cst.Tree, offset i
 	}
 	if t := doc.TypeOfExpr(e); t != ir.Invalid {
 		return t
+	}
+	return nil
+}
+
+// enclosingMethodOwner returns the type definition whose impl method body spans
+// offset — what self denotes there — across every kind that carries methods: a
+// type, an enum, or a master's per-row impl. It reads the resolved methods off
+// the IR definitions (each method links back to its declaration syntax), so a
+// master method, indexed nowhere in file.Types, resolves the same as a type's.
+func enclosingMethodOwner(doc view, trees map[cst.Green]cst.Tree, offset int) *ir.TypeDef {
+	for _, def := range doc.Module().Types {
+		for _, m := range def.Methods {
+			if m.Syntax == nil {
+				continue
+			}
+			if t, ok := trees[m.Syntax.Syntax()]; ok && within(t, offset) {
+				return def
+			}
+		}
 	}
 	return nil
 }

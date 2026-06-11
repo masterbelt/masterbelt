@@ -233,6 +233,25 @@ func TestMasterRecordLiteralStaysOpaque(t *testing.T) {
 	}
 }
 
+// TestMasterSelfMemberCompletionAndHover pins that a row field read through self
+// inside a master's per-row method completes and hovers: self must resolve to the
+// master type, which means the enclosing-method scan has to reach master methods,
+// not only the ones indexed in file.Types.
+func TestMasterSelfMemberCompletionAndHover(t *testing.T) {
+	src := "master Skill {\n  record {\n    id: int,\n    name: string,\n  } impl {\n" +
+		"    pub label(): string {\n      return self.name\n    }\n  }\n  primary id\n}\n"
+	doc := testView(src)
+
+	got := byLabel(completion(doc, strings.Index(src, "self.name")+len("self.")).Items)
+	if _, ok := got["name"]; !ok {
+		t.Errorf("self.* completion missing the row field name in a master method: %v", labels(got))
+	}
+	h := hover(doc, strings.Index(src, "self.name")+len("self."))
+	if h == nil || !strings.Contains(h.Contents.Value, "name: string") {
+		t.Errorf("self.name hover in a master method = %v, want name: string", h)
+	}
+}
+
 // TestMasterAliasMemberCompletionAndHover pins that a master reached through a
 // type alias still completes and hovers its row fields: the checker accepts
 // s.field on a `type SkillRef = Skill` value because the canonical RecordOf
