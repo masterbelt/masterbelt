@@ -277,15 +277,29 @@ func typeHover(t *ir.TypeDef, buf source.Buffer, rng cst.Tree) *protocol.Hover {
 }
 
 // writeTypeSignature writes the signature line of a type, enum, or interface: the
-// keyword, name, generic parameters, and body (or, for an interface, its
-// supertraits), then the refinement and implemented interfaces.
+// keyword, name, generic parameters, and body (or, for an enum its members, for
+// an interface its supertraits), then the refinement and — for every kind — the
+// implemented interfaces.
 func writeTypeSignature(b *strings.Builder, t *ir.TypeDef) {
 	// An enum lists its base and members, the way a master lists its row, so the
 	// card reads as an enum rather than as a bare type alias.
 	if t.Enum != nil {
 		writeEnumSignature(b, t)
-		return
+	} else {
+		writeAliasSignature(b, t)
 	}
+	// The interfaces the type implements, right on the signature card — for an
+	// enum this is the comparable/orderable it derives plus any it opts into
+	// explicitly, which the hover deliberately surfaces.
+	for _, impl := range t.Impls {
+		b.WriteString(" impl " + impl.String())
+	}
+}
+
+// writeAliasSignature writes a plain type's or an interface's signature: the
+// keyword, name, generic parameters, body (or an interface's supertraits), and
+// refinement predicate.
+func writeAliasSignature(b *strings.Builder, t *ir.TypeDef) {
 	// An interface declares a behaviour rather than aliasing a type, so it leads
 	// with the interface keyword and shows no body.
 	if t.Interface != nil {
@@ -317,16 +331,13 @@ func writeTypeSignature(b *strings.Builder, t *ir.TypeDef) {
 		// the type admits, right on the signature.
 		b.WriteString(" where " + ast.Render(t.WhereSyntax()))
 	}
-	// The interfaces the type implements, right on the signature card.
-	for _, impl := range t.Impls {
-		b.WriteString(" impl " + impl.String())
-	}
 }
 
 // writeEnumSignature writes an enum's signature laid out like its declaration —
 // the enum keyword and name, its base type, and its members one per line with
-// their values — so the card reads like the source. The interfaces an enum
-// derives (comparable, orderable) are implicit to every enum and left off.
+// their values — so the card reads like the source. The interfaces it opts into
+// (the derived comparable/orderable and any explicit ones) are appended by the
+// caller, the same way they are for a plain type.
 func writeEnumSignature(b *strings.Builder, t *ir.TypeDef) {
 	b.WriteString("enum ")
 	b.WriteString(t.Name)

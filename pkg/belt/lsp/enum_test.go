@@ -81,7 +81,12 @@ func TestEnumTypeNameHover(t *testing.T) {
 				t.Fatal("no hover on the enum type name")
 			}
 			val := h.Contents.Value
-			for _, want := range []string{"enum Rarity: byte", "Common = 1", "Legend = 10"} {
+			for _, want := range []string{
+				"enum Rarity: byte", "Common = 1", "Legend = 10",
+				// Every enum opts into comparable and orderable; the hover surfaces
+				// that conformance, the way a plain type's impls are shown.
+				"impl comparable", "impl orderable",
+			} {
 				if !strings.Contains(val, want) {
 					t.Errorf("enum hover = %q, want it to contain %q", val, want)
 				}
