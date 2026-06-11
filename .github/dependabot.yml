@@ -1,7 +1,9 @@
 # Dependabot keeps the project's dependencies — and the SHA-pinned workflow
 # actions — current. A pin with no updater rots: this is the other half of
 # pinning. Each ecosystem's updates are grouped into a single weekly PR to keep
-# the noise down.
+# the noise down. A 3-day cooldown holds each update back until the new version
+# has aged, matching pnpm's minimumReleaseAge (pnpm-workspace.yaml) so Dependabot
+# never proposes a version the install rejects as too fresh.
 version: 2
 updates:
   # The workflow actions, pinned by commit SHA: Dependabot bumps the SHA and its
@@ -10,6 +12,8 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 3
     groups:
       actions:
         patterns: ['*']
@@ -24,6 +28,8 @@ updates:
     directory: /toolchain/grammars/tree-sitter-masterbelt
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 3
     groups:
       mirror-actions:
         patterns: ['*']
@@ -35,6 +41,8 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 3
     groups:
       go-modules:
         patterns: ['*']
@@ -46,6 +54,8 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 3
     groups:
       npm:
         patterns: ['*']
