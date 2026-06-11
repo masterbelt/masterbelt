@@ -359,6 +359,15 @@ func (r *TypeResolver) hasMethodMember(head ir.Type, name string) bool {
 // bound does not require is unknown_field, and an unbounded parameter — with no
 // bound to require anything — has no members at all (type_has_no_fields).
 func (r *TypeResolver) projectTypeVar(tv *ir.TypeVar, member string, node ast.Node) ir.Type {
+	// A bare generic bound (T: Box where Box<U> is generic) is an uninstantiated
+	// generic: a member off it reads the bound's own free parameter (Box's U in
+	// value: U), not a concrete type, so it would leak that variable into the
+	// resolved type. It is rejected the same way a projection off a bare generic
+	// type is, rather than resolved to the leaked variable.
+	if n, ok := tv.Bound.(*ir.Named); ok && n.Def != nil && len(n.Def.Params) > 0 {
+		r.reportProjection(node, ProjGenericUnsupported, tv.Bound, member)
+		return ir.Invalid
+	}
 	if tv.Bound != nil && r.Registry != nil {
 		if t, ok := types.GetterResultType(r.Registry, tv, member); ok {
 			return t

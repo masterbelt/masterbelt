@@ -242,3 +242,39 @@ func TestBoundedProjectionForwardGenericProjectionBoundSettles(t *testing.T) {
 		t.Fatalf("want U.x to settle (no type_has_no_fields), got %v", codes(diags))
 	}
 }
+
+func TestBoundedProjectionBoundNamingLaterParamSettles(t *testing.T) {
+	// A bound that merely names a later bounded parameter (T: Box<U>, U: HasX, where
+	// Box<E: HasX>) is syntactically valid in the first pass but carries U unbounded
+	// there; the second pass takes the re-resolved type, so U inside T's bound
+	// carries its HasX bound and a projection through it (T.e.x) resolves.
+	src := "pub interface HasX {\n  x: nint\n}\n" +
+		"pub interface Box<E: HasX> {\n  e: E\n}\n" +
+		"pub fn f<T: Box<U>, U: HasX>(t: T): T.e.x {\n  return t.e.x\n}\n"
+	if _, diags := analyze(src); len(diags) != 0 {
+		t.Fatalf("want clean (U's bound reaches T's bound), got %v", codes(diags))
+	}
+}
+
+func TestBoundedProjectionBareGenericBoundRejected(t *testing.T) {
+	// A bare generic bound (T: Box where Box<U> is generic) is uninstantiated, so a
+	// member off it would read the bound's own free parameter; it is rejected as a
+	// generic projection rather than leaking that variable into the resolved type.
+	src := "pub interface Box<U> {\n  value: U\n}\n" +
+		"pub type R<T: Box> = { y: T.value }\n"
+	if _, diags := analyze(src); !hasCode(diags, CodeGenericTypeProjection) {
+		t.Fatalf("want generic_type_projection (bare generic bound), got %v", codes(diags))
+	}
+}
+
+func TestBoundedProjectionEffectThroughProjectedParam(t *testing.T) {
+	// A function parameter typed by a bounded projection (c: T.c) resolves in the
+	// effect checker too, so an effectful call on it is counted: page calls an io
+	// method on c but declares no effect, which is missing_effect.
+	src := "pub type Widget = { n: nint } impl {\n  pub fn io refresh(): nint {\n    return self.n\n  }\n}\n" +
+		"pub interface HasC {\n  c: Widget\n}\n" +
+		"pub fn page<T: HasC>(c: T.c): nint {\n  return c.refresh()\n}\n"
+	if _, diags := analyze(src); !hasCode(diags, CodeMissingEffect) {
+		t.Fatalf("want missing_effect (io call on a projected-type parameter), got %v", codes(diags))
+	}
+}
