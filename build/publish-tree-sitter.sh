@@ -133,25 +133,62 @@ NODE
 # Materialise the language bindings into the assembled tree. `init` reads the
 # patched tree-sitter.json, so go.mod's module path, Cargo's `repository`, and
 # pyproject's `Homepage` all come out as the mirror — no post-init URL patching.
-# It scaffolds for the bindings enabled in tree-sitter.json (go/python/rust/swift
-# /c; node stays off — no node-gyp native addon, the wasm is the JS path).
+# It scaffolds for the bindings enabled in tree-sitter.json (node/go/python/rust/
+# swift/c).
 ( cd "$out" && "$ts_bin" init >/dev/null )
 
 # init leaves build scaffolding a published library tree should not carry.
 rm -rf "$out/target" "$out/Cargo.lock" "$out/node_modules"
 
-# Make package.json publish-ready. init stamps the version into the Rust and
-# Python manifests itself (it reads tree-sitter.json's metadata.version, patched
-# above), so they need no touching here — we only assert it took. package.json is
-# not init's concern (node bindings are off), so it keeps the source's private
-# 0.1.0 placeholder until patched here. The npm package stays the lean
-# web-tree-sitter path — grammar.js, the committed parser, the queries, and the
-# wasm — so it lists only those, never the other bindings; the registry is chosen
-# per-publish by the mirror workflow (npm + GitHub Packages), so no publishConfig
-# is pinned here.
-node - "$out" "$version" <<'NODE'
+# The Node binding's loader. init (cli 0.26.9) writes an ESM bindings/node/index.js
+# (import / top-level await), which would force "type": "module" on the package
+# and break the CommonJS grammar.js / lexical.js. The grammar stays CommonJS and
+# untouched, so replace the loader with a CommonJS one that loads the prebuilt
+# addon via node-gyp-build (no node-gyp on the consumer when a prebuild matches),
+# and drop init's ESM dev test (not published).
+rm -f "$out/bindings/node/binding_test.js"
+cat >"$out/bindings/node/index.js" <<'JS'
+const { join } = require("node:path");
+const { readFileSync } = require("node:fs");
+
+const root = join(__dirname, "..", "..");
+const binding = require("node-gyp-build")(root);
+
+try {
+  binding.nodeTypeInfo = require(join(root, "src", "node-types.json"));
+} catch (_) {
+  // node-types.json is optional metadata; ignore when absent.
+}
+
+Object.defineProperty(binding, "HIGHLIGHTS_QUERY", {
+  configurable: true,
+  enumerable: true,
+  get() {
+    delete binding.HIGHLIGHTS_QUERY;
+    try {
+      binding.HIGHLIGHTS_QUERY = readFileSync(join(root, "queries", "highlights.scm"), "utf8");
+    } catch (_) {
+      // queries are optional; leave undefined when absent.
+    }
+    return binding.HIGHLIGHTS_QUERY;
+  },
+});
+
+module.exports = binding;
+JS
+
+# Make package.json publish-ready, shaped like an npm-published tree-sitter
+# grammar (the tree-sitter-ruby model): the Node native binding is the primary
+# entry (a prebuilt addon loaded by node-gyp-build — the mirror's release-npm
+# workflow builds the prebuilds), with the wasm shipped alongside for
+# web-tree-sitter and advertised through `exports`. init stamps the version into
+# the Rust and Python manifests itself (it reads tree-sitter.json's
+# metadata.version, patched above), so they need no touching here — we only assert
+# it took. The publish registry is chosen per-publish by the mirror workflow (npm
+# + GitHub Packages), so no publishConfig is pinned here.
+node - "$out" "$version" "$mirror_url" <<'NODE'
 const fs = require('fs');
-const [dir, version] = process.argv.slice(2);
+const [dir, version, mirror] = process.argv.slice(2);
 
 // init derives these from tree-sitter.json's metadata.version; assert, so a
 // future CLI change that drops that linkage fails loudly instead of shipping a
@@ -168,8 +205,36 @@ const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
 pkg.version = version;
 delete pkg.private;
 delete pkg.publishConfig;
-pkg.keywords = ['tree-sitter', 'masterbelt', 'parser', 'grammar'];
-pkg.files = ['grammar.js', 'lexical.js', 'tree-sitter.json', 'src/', 'queries/', '*.wasm'];
+pkg.description = 'masterbelt grammar for tree-sitter';
+pkg.repository = mirror;
+pkg.keywords = ['incremental', 'parsing', 'tree-sitter', 'masterbelt', 'parser', 'grammar'];
+
+// The Node native binding is the package entry; node-gyp-build loads the prebuilt
+// addon for the host platform (built by the release-npm prebuild matrix), falling
+// back to a source build only when no prebuild matches.
+pkg.main = 'bindings/node';
+pkg.types = 'bindings/node';
+pkg.dependencies = { 'node-addon-api': '^8.2.2', 'node-gyp-build': '^4.8.2' };
+pkg.peerDependencies = { 'tree-sitter': '^0.21.1' };
+pkg.peerDependenciesMeta = { 'tree-sitter': { optional: true } };
+pkg.devDependencies = Object.assign({}, pkg.devDependencies, { prebuildify: '^6.0.1' });
+pkg.scripts = Object.assign({}, pkg.scripts, { install: 'node-gyp-build' });
+pkg.files = [
+  'grammar.js', 'lexical.js', 'tree-sitter.json',
+  'binding.gyp', 'bindings/node/*', 'prebuilds/**',
+  'queries/*', 'src/**', '*.wasm',
+];
+// Advertise both entries explicitly — the native binding (`.`) and the wasm —
+// while keeping the other shipped files resolvable (exports otherwise hides them).
+pkg.exports = {
+  '.': { types: './bindings/node/index.d.ts', default: './bindings/node/index.js' },
+  './tree-sitter-masterbelt.wasm': './tree-sitter-masterbelt.wasm',
+  './grammar.js': './grammar.js',
+  './tree-sitter.json': './tree-sitter.json',
+  './queries/*': './queries/*',
+  './src/*': './src/*',
+  './package.json': './package.json',
+};
 fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
 NODE
 
@@ -192,44 +257,30 @@ rev="$(git rev-parse HEAD)"
 cat >"$out/README.md" <<EOF
 # tree-sitter-masterbelt
 
-The [tree-sitter](https://tree-sitter.github.io/) grammar for the
-[masterbelt](https://github.com/masterbelt/masterbelt) language.
+The [tree-sitter](https://tree-sitter.github.io/) grammar for the [masterbelt](https://github.com/masterbelt/masterbelt) language.
 
-> **This repository is a generated mirror — do not edit it here.** The source is
-> \`toolchain/grammars/tree-sitter-masterbelt\` in the masterbelt monorepo; this
-> tree is assembled and published from there (\`build/publish-tree-sitter.sh\`).
-> Version \`$version\`, cut from masterbelt commit \`$rev\` — the grammar ships
-> under the same version as the language it tracks.
+> **This repository is a generated mirror — do not edit it here.** The source is \`toolchain/grammars/tree-sitter-masterbelt\` in the masterbelt monorepo; this tree is assembled and published from there (\`build/publish-tree-sitter.sh\`). Version \`$version\`, cut from masterbelt commit \`$rev\` — the grammar ships under the same version as the language it tracks.
 
-The committed \`src/parser.c\` means consumers need no tree-sitter CLI — only a C
-compiler, which the editors and bindings invoke for you.
+The committed \`src/parser.c\` means consumers need no tree-sitter CLI — only a C compiler, which the editors and bindings invoke for you.
 
 ## Editors
 
-Pin a tag or commit (never a moving branch — a moving reference breaks
-reproducibility):
+Pin a tag or commit (never a moving branch — a moving reference breaks reproducibility):
 
-- **Neovim** (nvim-treesitter): register \`masterbelt\` pointing at this repo's
-  URL and a fixed revision, then \`:TSInstall masterbelt\`.
-- **Helix** (\`languages.toml\`): a \`[[grammar]]\` with \`source.git\` = this repo and
-  \`source.rev\` = a fixed revision, plus the matching \`[[language]]\`.
+- **Neovim** (nvim-treesitter): register \`masterbelt\` pointing at this repo's URL and a fixed revision, then \`:TSInstall masterbelt\`.
+- **Helix** (\`languages.toml\`): a \`[[grammar]]\` with \`source.git\` = this repo and \`source.rev\` = a fixed revision, plus the matching \`[[language]]\`.
 - **Zed**: a language extension referencing this repo's grammar at a fixed rev.
 - **GitHub**: registered through Linguist alongside the \`.belt\` file type.
 
-The highlight queries live in \`queries/highlights.scm\` (nvim-treesitter capture
-names, which GitHub also reads); \`queries/helix\` and \`queries/zed\` hold the
-variants whose capture vocabulary differs.
+The highlight queries live in \`queries/highlights.scm\` (nvim-treesitter capture names, which GitHub also reads); \`queries/helix\` and \`queries/zed\` hold the variants whose capture vocabulary differs.
 
 ## Language bindings
 
-- **Go** — \`go get github.com/masterbelt/tree-sitter-masterbelt@v$version\`
-  (\`bindings/go\`, cgo over \`src/parser.c\`).
+- **Go** — \`go get github.com/masterbelt/tree-sitter-masterbelt@v$version\` (\`bindings/go\`, cgo over \`src/parser.c\`).
 - **Rust** — \`tree-sitter-masterbelt\` on crates.io (\`bindings/rust\`).
 - **Python** — \`tree-sitter-masterbelt\` on PyPI (\`bindings/python\`).
 - **Swift** — a SwiftPM package at this repo + tag (\`Package.swift\`).
-- **JavaScript** — \`@masterbelt/tree-sitter-masterbelt\` (npm + GitHub Packages):
-  the WebAssembly build for \`web-tree-sitter\`, plus \`grammar.js\` and the parser
-  source. No native node addon is shipped.
+- **JavaScript** — \`@masterbelt/tree-sitter-masterbelt\` (npm + GitHub Packages): a prebuilt native addon for Node (used with the \`tree-sitter\` runtime) plus the WebAssembly build for \`web-tree-sitter\`.
 EOF
 
 echo "assembled tree-sitter-masterbelt $version -> $out (from $rev)"
