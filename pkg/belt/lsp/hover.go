@@ -5,6 +5,7 @@ import (
 
 	protocol "github.com/owenrumney/go-lsp/lsp"
 
+	"github.com/masterbelt/masterbelt/pkg/belt/types"
 	"github.com/masterbelt/masterbelt/pkg/source"
 	"github.com/masterbelt/masterbelt/pkg/source/ast"
 	"github.com/masterbelt/masterbelt/pkg/source/cst"
@@ -78,8 +79,10 @@ func definition(doc view, offset int) []protocol.Location {
 	if occ, ok := occurrenceAt(doc, offset, doc.Trees()); ok {
 		return declLocation(doc.viewOf(occ.target))(occ.target.Syntax.Syntax())
 	}
-	if t, _, ok := typeAt(doc, offset); ok && t.Syntax != nil {
-		return declLocation(doc.viewOfType(t))(t.Syntax.Syntax())
+	if t, _, ok := typeAt(doc, offset); ok {
+		if decl := t.DeclSyntax(); decl != nil {
+			return declLocation(doc.viewOfType(t))(decl.Syntax())
+		}
 	}
 	if fns, _, ok := funcAt(doc, offset); ok {
 		// Every overload is a target, in its own file — an imported callee
@@ -132,10 +135,10 @@ func typeAt(doc view, offset int) (*ir.TypeDef, cst.Tree, bool) {
 	name := leaf.Text(buf)
 
 	switch kind {
-	case cst.TypeDecl, cst.InterfaceDecl:
-		// The declaration's own name — a type or an interface. The file's own
-		// definitions lead TypeNames, so the name finds the local declaration,
-		// not an import it shadows.
+	case cst.TypeDecl, cst.InterfaceDecl, cst.EnumDecl, cst.MasterDecl:
+		// The declaration's own name — a type, interface, enum, or master, each of
+		// which resolves to a TypeDef. The file's own definitions lead TypeNames, so
+		// the name finds the local declaration, not an import it shadows.
 		if t := findTypeDef(doc.TypeNames(), name); t != nil {
 			return t, leaf, true
 		}
@@ -236,6 +239,67 @@ func typeHover(t *ir.TypeDef, buf source.Buffer, rng cst.Tree) *protocol.Hover {
 	if t.Public {
 		b.WriteString("pub ")
 	}
+	// A master is its own kind of declaration — the master keyword, its row record,
+	// and its primary key — so it renders its own signature rather than aliasing a
+	// type the way the other kinds do.
+	if t.Master != nil {
+		writeMasterSignature(&b, t)
+	} else {
+		writeTypeSignature(&b, t)
+	}
+	b.WriteString("\n```")
+	if len(t.Doc) > 0 {
+		b.WriteString("\n\n")
+		b.WriteString(strings.Join(t.Doc, "\n"))
+	}
+	if len(t.Methods) > 0 {
+		b.WriteString("\n\n```masterbelt\n")
+		for i, m := range t.Methods {
+			// Each method renders as declared, its doc comment above it, so
+			// the card reads like the impl block itself.
+			if i > 0 && len(m.Doc) > 0 {
+				b.WriteString("\n")
+			}
+			for _, doc := range m.Doc {
+				b.WriteString("/// " + doc + "\n")
+			}
+			b.WriteString(methodSignature(m))
+			b.WriteString("\n")
+		}
+		b.WriteString("```")
+	}
+
+	r := toRange(buf, rng.Offset(), rng.End())
+	return &protocol.Hover{
+		Contents: protocol.MarkupContent{Kind: protocol.Markdown, Value: b.String()},
+		Range:    &r,
+	}
+}
+
+// writeTypeSignature writes the signature line of a type, enum, or interface: the
+// keyword, name, generic parameters, and body (or, for an enum its members, for
+// an interface its supertraits), then the refinement and — for every kind — the
+// implemented interfaces.
+func writeTypeSignature(b *strings.Builder, t *ir.TypeDef) {
+	// An enum lists its base and members, the way a master lists its row, so the
+	// card reads as an enum rather than as a bare type alias.
+	if t.Enum != nil {
+		writeEnumSignature(b, t)
+	} else {
+		writeAliasSignature(b, t)
+	}
+	// The interfaces the type implements, right on the signature card — for an
+	// enum this is the comparable/orderable it derives plus any it opts into
+	// explicitly, which the hover deliberately surfaces.
+	for _, impl := range t.Impls {
+		b.WriteString(" impl " + impl.String())
+	}
+}
+
+// writeAliasSignature writes a plain type's or an interface's signature: the
+// keyword, name, generic parameters, body (or an interface's supertraits), and
+// refinement predicate.
+func writeAliasSignature(b *strings.Builder, t *ir.TypeDef) {
 	// An interface declares a behaviour rather than aliasing a type, so it leads
 	// with the interface keyword and shows no body.
 	if t.Interface != nil {
@@ -267,35 +331,63 @@ func typeHover(t *ir.TypeDef, buf source.Buffer, rng cst.Tree) *protocol.Hover {
 		// the type admits, right on the signature.
 		b.WriteString(" where " + ast.Render(t.WhereSyntax()))
 	}
-	// The interfaces the type implements, right on the signature card.
+}
+
+// writeEnumSignature writes an enum's signature laid out like its declaration —
+// the enum keyword and name, its base type, and its members one per line with
+// their values — so the card reads like the source. The interfaces it opts into
+// (the derived comparable/orderable and any explicit ones) are appended by the
+// caller, the same way they are for a plain type.
+func writeEnumSignature(b *strings.Builder, t *ir.TypeDef) {
+	b.WriteString("enum ")
+	b.WriteString(t.Name)
+	if t.Enum.Base != "" {
+		b.WriteString(": " + t.Enum.Base)
+	}
+	if len(t.Enum.Members) == 0 {
+		return
+	}
+	b.WriteString(" {\n")
+	for _, m := range t.Enum.Members {
+		b.WriteString("  " + m.Name)
+		if m.Value != nil {
+			b.WriteString(" = " + m.Value.String())
+		}
+		b.WriteString("\n")
+	}
+	b.WriteString("}")
+}
+
+// writeMasterSignature writes a master's signature laid out like its declaration
+// — the master keyword and name, its row record one field per line, its primary
+// key in the source's single-or-parenthesised form, and the interfaces the row
+// opts into — so the card reads like the source rather than as a bare type. The
+// row is projected with the canonical types.RecordOf (the same the checker uses),
+// so a row written as a generic record alias (record Box<int>) instantiates into
+// its fields; a row that did not resolve renders as an empty record rather than
+// dropping the card.
+func writeMasterSignature(b *strings.Builder, t *ir.TypeDef) {
+	b.WriteString("master ")
+	b.WriteString(t.Name)
+	b.WriteString(" {\n  record {")
+	if rec := types.RecordOf(t.Master.Row); rec != nil && len(rec.Fields) > 0 {
+		b.WriteString("\n")
+		for _, f := range rec.Fields {
+			b.WriteString("    " + f.Name + ": " + f.Type.String() + "\n")
+		}
+		b.WriteString("  }")
+	} else {
+		b.WriteString("}")
+	}
+	if len(t.Master.Primary) == 1 {
+		b.WriteString("\n  primary " + t.Master.Primary[0])
+	} else if len(t.Master.Primary) > 1 {
+		b.WriteString("\n  primary (" + strings.Join(t.Master.Primary, ", ") + ")")
+	}
+	b.WriteString("\n}")
+	// The interfaces the row opts into (record { ... } impl Named), the way the
+	// type card shows a type's impls, so master hover does not hide conformance.
 	for _, impl := range t.Impls {
 		b.WriteString(" impl " + impl.String())
-	}
-	b.WriteString("\n```")
-	if len(t.Doc) > 0 {
-		b.WriteString("\n\n")
-		b.WriteString(strings.Join(t.Doc, "\n"))
-	}
-	if len(t.Methods) > 0 {
-		b.WriteString("\n\n```masterbelt\n")
-		for i, m := range t.Methods {
-			// Each method renders as declared, its doc comment above it, so
-			// the card reads like the impl block itself.
-			if i > 0 && len(m.Doc) > 0 {
-				b.WriteString("\n")
-			}
-			for _, doc := range m.Doc {
-				b.WriteString("/// " + doc + "\n")
-			}
-			b.WriteString(methodSignature(m))
-			b.WriteString("\n")
-		}
-		b.WriteString("```")
-	}
-
-	r := toRange(buf, rng.Offset(), rng.End())
-	return &protocol.Hover{
-		Contents: protocol.MarkupContent{Kind: protocol.Markdown, Value: b.String()},
-		Range:    &r,
 	}
 }

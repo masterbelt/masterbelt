@@ -150,7 +150,7 @@ func memberItems(doc view, offset int) ([]protocol.CompletionItem, bool) {
 			}
 		}
 	}
-	if rec, ok := recordOf(recv); ok {
+	if rec, ok := memberRecordOf(recv); ok {
 		kind := protocol.CompletionItemKindField
 		for _, f := range rec.Fields {
 			items = append(items, protocol.CompletionItem{
@@ -298,7 +298,10 @@ func memberNodeAt(doc view, offset int) (*cst.Node, bool) {
 }
 
 // recordOf returns the record body behind a type — directly, or through a
-// named type's definition.
+// named type's definition. It deliberately does not look through a master: a
+// master is opaque (no record literal), so the record-literal paths that read it
+// keep treating a master as fieldless. The value member-access read paths, where
+// a master row is readable, go through memberRecordOf instead.
 func recordOf(t ir.Type) (*ir.Record, bool) {
 	switch t := t.(type) {
 	case *ir.Record:
@@ -309,6 +312,19 @@ func recordOf(t ir.Type) (*ir.Record, bool) {
 		}
 	}
 	return nil, false
+}
+
+// memberRecordOf returns the record whose fields a value member access reads,
+// through the same types.RecordOf the checker's member access uses: an anonymous
+// record, a named alias's body through the chain, a generic application
+// instantiated with its arguments, or a master's row — including a master reached
+// through an alias (type SkillRef = Skill). A master row is readable through a
+// value (s.field) even though the master is not constructible as a record
+// literal, so this read path projects the row while recordOf keeps the literal
+// paths opaque.
+func memberRecordOf(t ir.Type) (*ir.Record, bool) {
+	rec := types.RecordOf(t)
+	return rec, rec != nil
 }
 
 // callSnippet renders a method as an insertable call: each parameter a tab

@@ -158,7 +158,7 @@ func memberHover(doc view, offset int, trees map[cst.Green]cst.Tree) *protocol.H
 	if ms, subst, ok := doc.MethodCandidates(recv, name); ok {
 		return memberMethodHover(ms, subst, r)
 	}
-	if f, ok := fieldOf(recv, name); ok {
+	if f, ok := memberFieldOf(recv, name); ok {
 		return memberFieldHover(f, r)
 	}
 	if g, subst, ok := receiverGetter(doc, recv, name); ok {
@@ -258,17 +258,8 @@ func receiverGetter(doc view, recv ir.Type, name string) (*ir.Method, map[string
 func receiverTypeOf(doc view, e ast.Expr, trees map[cst.Green]cst.Tree, offset int) ir.Type {
 	switch e := e.(type) {
 	case *ast.SelfExpr:
-		file := doc.AST().File()
-		module := doc.Module()
-		for i, td := range file.Types {
-			if i >= len(module.Types) {
-				break
-			}
-			for _, m := range td.Methods {
-				if t, ok := trees[m.Syntax()]; ok && within(t, offset) {
-					return &ir.Named{Def: module.Types[i]}
-				}
-			}
+		if def := enclosingMethodOwner(doc, trees, offset); def != nil {
+			return &ir.Named{Def: def}
 		}
 		return nil
 	case *ast.Identifier:
@@ -281,7 +272,7 @@ func receiverTypeOf(doc view, e ast.Expr, trees map[cst.Green]cst.Tree, offset i
 			return c.Type
 		}
 		if inner := receiverTypeOf(doc, e.Receiver, trees, offset); inner != nil {
-			if f, ok := fieldOf(inner, e.Member.Name); ok {
+			if f, ok := memberFieldOf(inner, e.Member.Name); ok {
 				return f.Type
 			}
 		}
@@ -289,6 +280,25 @@ func receiverTypeOf(doc view, e ast.Expr, trees map[cst.Green]cst.Tree, offset i
 	}
 	if t := doc.TypeOfExpr(e); t != ir.Invalid {
 		return t
+	}
+	return nil
+}
+
+// enclosingMethodOwner returns the type definition whose impl method body spans
+// offset — what self denotes there — across every kind that carries methods: a
+// type, an enum, or a master's per-row impl. It reads the resolved methods off
+// the IR definitions (each method links back to its declaration syntax), so a
+// master method, indexed nowhere in file.Types, resolves the same as a type's.
+func enclosingMethodOwner(doc view, trees map[cst.Green]cst.Tree, offset int) *ir.TypeDef {
+	for _, def := range doc.Module().Types {
+		for _, m := range def.Methods {
+			if m.Syntax == nil {
+				continue
+			}
+			if t, ok := trees[m.Syntax.Syntax()]; ok && within(t, offset) {
+				return def
+			}
+		}
 	}
 	return nil
 }
@@ -386,7 +396,9 @@ func funcParamTypeAt(doc view, name string, trees map[cst.Green]cst.Tree, offset
 }
 
 // fieldOf returns the record field a type carries under name — directly, or
-// through a named type's record body.
+// through a named type's record body. Like recordOf, it does not look through a
+// master: the record-literal paths keep a master opaque. The value member-access
+// read paths use memberFieldOf, which projects the master row.
 func fieldOf(t ir.Type, name string) (ir.Field, bool) {
 	switch t := t.(type) {
 	case *ir.Record:
@@ -399,6 +411,19 @@ func fieldOf(t ir.Type, name string) (ir.Field, bool) {
 		if t.Def != nil {
 			return fieldOf(t.Def.Body, name)
 		}
+	}
+	return ir.Field{}, false
+}
+
+// memberFieldOf returns the record field a value member access reads under name,
+// through the same types.RecordOf the checker's member access uses — so it
+// follows a named alias, instantiates a generic application, and projects a
+// master's row, including a master reached through an alias. A master row field
+// is readable through a value (s.field) though the master is not constructible,
+// so this read path projects the row while fieldOf keeps the literal paths opaque.
+func memberFieldOf(t ir.Type, name string) (ir.Field, bool) {
+	if rec := types.RecordOf(t); rec != nil {
+		return fieldOf(rec, name)
 	}
 	return ir.Field{}, false
 }

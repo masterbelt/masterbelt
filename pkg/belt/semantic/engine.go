@@ -128,7 +128,7 @@ type database struct {
 	revision       int
 	files          map[FileID]fileInput
 	declFile       map[*ast.ConstDecl]FileID      // which file each declaration sits in
-	typeFile       map[*ast.TypeDecl]FileID       // which file each type declaration sits in
+	typeFile       map[ast.Node]FileID            // which file each type declaration sits in (type/enum/interface/master, keyed by the declaration node)
 	shells         map[*ast.ConstDecl]*ir.Const   // the identity ir.Const of every declaration
 	fnShells       map[*ast.FuncDecl]*ir.Function // the identity ir.Function of every function
 	reg            *builtin.Registry
@@ -147,7 +147,7 @@ func newDatabase(u builtins) *database {
 		prelude:        u.prelude,
 		files:          map[FileID]fileInput{},
 		declFile:       map[*ast.ConstDecl]FileID{},
-		typeFile:       map[*ast.TypeDecl]FileID{},
+		typeFile:       map[ast.Node]FileID{},
 		shells:         map[*ast.ConstDecl]*ir.Const{},
 		fnShells:       map[*ast.FuncDecl]*ir.Function{},
 		inputChangedAt: map[FileID]int{},
@@ -198,7 +198,6 @@ func (db *database) dropInput(id FileID) {
 // refreshes) keep binding the same ir.Const objects.
 func (db *database) rebindDecls(id FileID, old, fresh *ast.File) {
 	keep := map[*ast.ConstDecl]bool{}
-	keepTypes := map[*ast.TypeDecl]bool{}
 	keepFuncs := map[*ast.FuncDecl]bool{}
 	if fresh != nil {
 		module := moduleSegment(id)
@@ -209,10 +208,6 @@ func (db *database) rebindDecls(id FileID, old, fresh *ast.File) {
 				db.shells[d] = &ir.Const{Name: d.Name, Anchor: declAnchor(module, d.Name), Public: d.Public, Doc: d.Doc, Syntax: d}
 			}
 		}
-		for _, t := range fresh.Types {
-			keepTypes[t] = true
-			db.typeFile[t] = id
-		}
 		for _, fd := range fresh.Funcs {
 			keepFuncs[fd] = true
 			if db.fnShells[fd] == nil {
@@ -220,6 +215,7 @@ func (db *database) rebindDecls(id FileID, old, fresh *ast.File) {
 			}
 		}
 	}
+	db.rebindTypeDecls(id, old, fresh)
 	if old != nil {
 		for _, d := range old.Decls {
 			if !keep[d] {
@@ -227,16 +223,58 @@ func (db *database) rebindDecls(id FileID, old, fresh *ast.File) {
 				delete(db.shells, d)
 			}
 		}
-		for _, t := range old.Types {
-			if !keepTypes[t] {
-				delete(db.typeFile, t)
-			}
-		}
 		for _, fd := range old.Funcs {
 			if !keepFuncs[fd] {
 				delete(db.fnShells, fd)
 			}
 		}
+	}
+}
+
+// rebindTypeDecls re-files a refreshed file's type-like declarations — type,
+// enum, interface, and master — by their declaration node: each fresh one is
+// filed under id, and one the new tree dropped is unfiled, so FileOfType stays
+// exact across an edit. The node keys match TypeDef.DeclSyntax, the one accessor
+// that knows where each kind keeps its backpointer.
+func (db *database) rebindTypeDecls(id FileID, old, fresh *ast.File) {
+	keep := map[ast.Node]bool{}
+	file := func(n ast.Node) {
+		keep[n] = true
+		db.typeFile[n] = id
+	}
+	if fresh != nil {
+		for _, t := range fresh.Types {
+			file(t)
+		}
+		for _, e := range fresh.Enums {
+			file(e)
+		}
+		for _, in := range fresh.Interfaces {
+			file(in)
+		}
+		for _, m := range fresh.Masters {
+			file(m)
+		}
+	}
+	if old == nil {
+		return
+	}
+	unfile := func(n ast.Node) {
+		if !keep[n] {
+			delete(db.typeFile, n)
+		}
+	}
+	for _, t := range old.Types {
+		unfile(t)
+	}
+	for _, e := range old.Enums {
+		unfile(e)
+	}
+	for _, in := range old.Interfaces {
+		unfile(in)
+	}
+	for _, m := range old.Masters {
+		unfile(m)
 	}
 }
 

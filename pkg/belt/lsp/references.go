@@ -100,8 +100,8 @@ func documentHighlights(doc view, offset int) []protocol.DocumentHighlight {
 		declSyntax = occ.target.Syntax.Syntax()
 		reads = occurrencesOf(doc, occ.target, trees, false)
 	} else if t, _, ok := typeAt(doc, offset); ok {
-		if t.Syntax != nil {
-			declSyntax = t.Syntax.Syntax()
+		if decl := t.DeclSyntax(); decl != nil {
+			declSyntax = decl.Syntax()
 		}
 		reads = typeOccurrencesOf(doc, t, trees, false)
 	} else {

@@ -128,10 +128,11 @@ func bodyOccurrenceAt(doc view, offset int, trees map[cst.Green]cst.Tree) (occur
 }
 
 // forEachBodyExpr calls fn for every top-level expression of every method,
-// enum-method, interface-default, and function body in the file — the shared
-// statement walk over each body, descending into a function literal's own body
-// — so the occurrence engines reach a reference living in a body (or in a
-// lambda nested in one) the same way they reach those in a const initializer.
+// enum-method, interface-default, master per-row method, and function body in
+// the file — the shared statement walk over each body, descending into a
+// function literal's own body — so the occurrence engines reach a reference
+// living in a body (or in a lambda nested in one) the same way they reach those
+// in a const initializer.
 func forEachBodyExpr(file *ast.File, fn func(ast.Expr)) {
 	var walk func(body []ast.Stmt)
 	walk = func(body []ast.Stmt) {
@@ -161,6 +162,11 @@ func forEachBodyExpr(file *ast.File, fn func(ast.Expr)) {
 	}
 	for _, id := range file.Interfaces {
 		for _, m := range id.Members {
+			walk(m.Body)
+		}
+	}
+	for _, md := range file.Masters {
+		for _, m := range md.Methods {
 			walk(m.Body)
 		}
 	}
@@ -353,8 +359,8 @@ func programOccurrences(v view, target *ir.Const, includeDecl bool) map[protocol
 func typeOccurrencesOf(fv view, target *ir.TypeDef, trees map[cst.Green]cst.Tree, includeDecl bool) []cst.Tree {
 	var tokens []cst.Tree
 
-	if includeDecl && target.Syntax != nil {
-		if declTree, ok := trees[target.Syntax.Syntax()]; ok {
+	if decl := target.DeclSyntax(); includeDecl && decl != nil {
+		if declTree, ok := trees[decl.Syntax()]; ok {
 			if nameTok, ok := nameToken(declTree); ok {
 				tokens = append(tokens, nameTok)
 			}
