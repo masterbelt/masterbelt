@@ -434,6 +434,11 @@ func (b bodyBinder) bodyScope() infer.BodyScope {
 		Funcs:          b.funcs.astByName(),
 		QualifiedFuncs: b.funcs.qualified,
 		ConstShadows:   b.constShadows,
+		// The generic type parameters in scope, so an inferred let's value that
+		// names one (let y = T(v)) settles to the same type the checking walk gives
+		// it — the conversion's parameter type — rather than an unknown type, keeping
+		// the binding's IR type consistent with the lowered conversion.
+		TScope: b.tscope,
 	}
 }
 

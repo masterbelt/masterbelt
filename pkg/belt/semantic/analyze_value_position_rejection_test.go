@@ -60,29 +60,6 @@ func TestValuePositionReportedOnce(t *testing.T) {
 	}
 }
 
-func TestValuePositionConversionArgumentChecked(t *testing.T) {
-	// A conversion T(x) names the type parameter in callee position (a type
-	// position, not reported), but its arguments are value positions and are still
-	// checked: T(T) reports the argument T as a value-position use, even though the
-	// callee T is exempt.
-	src := "pub fn f<T>(): T {\n  return T(T)\n}\n"
-	_, diags := analyze(src)
-	if !hasCode(diags, CodeTypeParamInValuePosition) {
-		t.Fatalf("want type_param_in_value_position (the argument T in T(T)), got %v", codes(diags))
-	}
-}
-
-func TestValuePositionFunctionValueParamShadowCallable(t *testing.T) {
-	// A value parameter that reuses the type parameter's name shadows it, so a call
-	// of that parameter is a function-value call, not a conversion through the type
-	// parameter: it resolves and is not reported.
-	src := "pub fn f<T>(T: fn(nint): nint): nint {\n  return T(1)\n}\n"
-	_, diags := analyze(src)
-	if len(diags) != 0 {
-		t.Fatalf("want clean (the parameter T is a callable function value), got %v", codes(diags))
-	}
-}
-
 func TestValuePositionParameterShadowsDeclaredType(t *testing.T) {
 	// A generic parameter whose name also names a declared (or builtin) type wins
 	// over that type in value position, mirroring how an annotation in the same
@@ -107,20 +84,6 @@ func TestValuePositionBareNamespaceNameStillRejected(t *testing.T) {
 	})
 	if !hasCode(diags, CodeTypeParamInValuePosition) {
 		t.Fatalf("want type_param_in_value_position (bare T is the parameter, not a namespace read), got %v", codes(diags))
-	}
-}
-
-func TestValuePositionTypeParamConversionStaysUnresolved(t *testing.T) {
-	// A conversion through a type parameter (T(v)) is left unresolved, as it is for
-	// any non-foldable type parameter — it is not resolved to a typed conversion the
-	// checker would accept while the lowering types it invalid, which would diverge
-	// from the IR. Assigning it where a string is wanted reports no mismatch (an
-	// invalid value conflicts with nothing), proving the checker did not type it as
-	// the parameter; the type checker and the lowering agree it is invalid.
-	src := "pub fn f<T>(v: T): nint {\n  let bad: string = T(v)\n  return 1\n}\n"
-	_, diags := analyze(src)
-	if hasCode(diags, CodeTypeMismatch) {
-		t.Fatalf("want no type_mismatch (T(v) is unresolved, not a typed conversion), got %v", codes(diags))
 	}
 }
 

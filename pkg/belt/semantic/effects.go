@@ -53,7 +53,11 @@ func checkEffects(reg *builtin.Registry, file *ast.File, defs []*ir.TypeDef, uni
 			for _, p := range irm.Params {
 				params[p.Name] = substSelf(p.Type, self)
 			}
-			bs := infer.BodyScope{Reg: reg, Universe: universe, Qualified: qualified, Self: self, Params: params, Funcs: funcs, QualifiedFuncs: qualifiedFuncs, ConstShadows: constShadows}
+			// The method's generic type parameters — the enclosing type's and the
+			// method's own — are in scope for its body, so a type-parameter callee
+			// (T(v)) is read as a conversion here, the same as in the function path and
+			// in the checker, rather than falling through to a same-named function.
+			bs := infer.BodyScope{Reg: reg, Universe: universe, Qualified: qualified, Self: self, Params: params, Funcs: funcs, QualifiedFuncs: qualifiedFuncs, ConstShadows: constShadows, TScope: methodTScope(r, def, m)}
 			checkDeclEffects(def.Name+"."+irm.Name, m.Effects, m, m.Body, bs, at, diags)
 		}
 	}
@@ -180,6 +184,14 @@ func collectNameCallEffectUses(e *ast.CallExpr, callee *ast.Identifier, bs infer
 		return
 	}
 	if _, isType := bs.Universe[callee.Name]; isType {
+		return
+	}
+	if _, isTypeParam := bs.TScope[callee.Name]; isTypeParam {
+		// A generic type-parameter callee is a conversion (T(x)) — a type position,
+		// not a function call — so it carries no effect, exactly as a declared-type
+		// conversion above. It wins over a same-named top-level function, the same
+		// precedence the type checker and the lowering apply, so the function's
+		// effects below are not collected for it.
 		return
 	}
 	for _, eff := range declaredEffects(bs.Funcs[callee.Name]) {
