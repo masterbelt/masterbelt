@@ -119,7 +119,7 @@ type scope interface {
 // pass resolves it again with reporting enabled.
 func Decl(decl *ast.ConstDecl, env Env) ir.Type {
 	if decl.Type != nil {
-		r := &TypeResolver{Defs: env.Universe(), Qualified: env.QualifiedType}
+		r := &TypeResolver{Defs: env.Universe(), Qualified: env.QualifiedType, Registry: env.Registry()}
 		return r.ResolveType(decl.Type, nil)
 	}
 	if decl.Value == nil {
@@ -245,7 +245,7 @@ func namedRecord(name string, s scope) (ir.Type, *ir.Record) {
 // values, typed in a funcScope over s; an omitted parameter type is ir.Invalid
 // here (only a checking context can supply it).
 func funcLitType(e *ast.FuncLit, s scope) ir.Type {
-	r := &TypeResolver{Defs: s.universe(), Qualified: s.qualified()}
+	r := &TypeResolver{Defs: s.universe(), Qualified: s.qualified(), Registry: s.registry()}
 	params := make([]ir.Type, len(e.Params))
 	names := make(map[string]ir.Type, len(e.Params))
 	for i, p := range e.Params {
@@ -370,7 +370,7 @@ func letScope(stmt *ast.LetStmt, s funcScope) funcScope {
 	var typ ir.Type
 	switch {
 	case stmt.Type != nil:
-		r := &TypeResolver{Defs: s.universe(), Qualified: s.qualified()}
+		r := &TypeResolver{Defs: s.universe(), Qualified: s.qualified(), Registry: s.registry()}
 		typ = r.ResolveType(stmt.Type, s.tscope())
 	case stmt.Value != nil:
 		typ = exprType(stmt.Value, s)

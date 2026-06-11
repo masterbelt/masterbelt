@@ -491,7 +491,7 @@ type funcSig struct {
 // own reporting pass resolves them in; an unresolved annotation was reported
 // there, so an Invalid parameter or result type stays silent here.
 func funcCallType(e *ast.CallExpr, name string, cands []*ast.FuncDecl, s scope, sink *Sink) ir.Type {
-	r := &TypeResolver{Defs: s.universe(), Qualified: s.qualified()}
+	r := &TypeResolver{Defs: s.universe(), Qualified: s.qualified(), Registry: s.registry()}
 
 	// Resolve every candidate's signature, dropping a later one that repeats
 	// an earlier signature — the declaration pass reports the duplicate, and
@@ -801,30 +801,82 @@ func FuncTypeParamScope(params []*ast.TypeParam) TypeScope {
 	return scope
 }
 
+// SettleBounds resolves each parameter's constraint into scope and returns the
+// resolved bound per parameter, in two passes so a bound may project off another
+// parameter's readable member (T: Box<U.x>) regardless of declaration order: the
+// bounds are all resolved against a scope where every parameter is still an
+// unbounded placeholder, so a projection off one reads an unbounded variable
+// until the others are in place.
+//
+// The first pass resolves every bound silently and back-fills it, settling the
+// scope; the second pass re-resolves — with reporting restored — only the bounds
+// that stayed invalid, now that every other parameter's bound is in the scope, so
+// a genuinely malformed projection reports in the live pass rather than the
+// throwaway one. A parameter's own name is left unbounded while its bound
+// resolves, so a self-referential bound (T: foo<T>) reads it as a free variable
+// rather than recursing, and a bound that resolved cleanly in the first pass is
+// untouched, so the ordinary case is unchanged. scope must already contain every
+// parameter name; entries the caller seeded for an enclosing scope (an outer
+// type's parameters, in a method) are left as they are.
+func SettleBounds(r *TypeResolver, params []*ast.TypeParam, scope TypeScope) []ir.Type {
+	bounds := make([]ir.Type, len(params))
+	backfill := func() {
+		for i, p := range params {
+			if p.Name != "" {
+				scope[p.Name] = bounds[i]
+			}
+		}
+	}
+	report, projErr, boundV, arity := r.Report, r.ProjectionError, r.BoundViolation, r.ArityMismatch
+	r.Report, r.ProjectionError, r.BoundViolation, r.ArityMismatch = nil, nil, nil, nil
+	for i, p := range params {
+		if p.Constraint != nil {
+			bounds[i] = r.ResolveType(p.Constraint, scope)
+		}
+	}
+	r.Report, r.ProjectionError, r.BoundViolation, r.ArityMismatch = report, projErr, boundV, arity
+	backfill()
+	// Second pass, with reporting restored: re-resolve every bound now that the
+	// others are settled, and take the re-resolved type. A bound resolved in the
+	// first pass against unsettled placeholders — a projection off another
+	// parameter (T: Box<U.x>), or a bound merely naming one (T: Box<U>, U: HasX) —
+	// only carries that parameter's settled bound once it is re-resolved here, so
+	// the second-pass type is the correct one even when the first stayed
+	// syntactically valid. Re-resolving also reports a diagnostic a bound fires
+	// without becoming invalid (a type_arity_mismatch on Box<a, b>, a
+	// bound_not_satisfied on its argument), which the silent first pass dropped. A
+	// parameter's own name is unbounded while its bound resolves, so a
+	// self-referential bound reads it as a free variable.
+	for i, p := range params {
+		if p.Constraint == nil {
+			continue
+		}
+		if p.Name != "" {
+			scope[p.Name] = nil
+		}
+		bounds[i] = r.ResolveType(p.Constraint, scope)
+		if p.Name != "" {
+			scope[p.Name] = bounds[i]
+		}
+	}
+	backfill()
+	return bounds
+}
+
 // ResolveFuncTypeParams resolves a function's generic type parameters into
-// ir.TypeParams (name plus optional resolved bound), each bound resolved in the
-// full type-parameter scope so it may name a later parameter (the U in
-// fn first<T: foldable<U>, U>). It also back-fills each resolved bound into the
+// ir.TypeParams (name plus optional resolved bound) through SettleBounds, so a
+// bound may name a later parameter (the U in fn first<T: foldable<U>, U>) or
+// project off one (T: Box<U.x>). The resolved bounds are back-filled into the
 // scope, so a subsequent resolution of the parameter and result types sees the
-// bound on each TypeVar (the canonical map<K, V> with K: comparable). The bound
-// is resolved against the scope before it is back-filled, so a self-referential
-// bound (T: foo<T>) reads T as an unbounded variable, not recursively.
+// bound on each TypeVar (the canonical map<K, V> with K: comparable).
 func ResolveFuncTypeParams(r *TypeResolver, params []*ast.TypeParam, scope TypeScope) []*ir.TypeParam {
 	if len(params) == 0 {
 		return nil
 	}
-	out := make([]*ir.TypeParam, 0, len(params))
-	for _, p := range params {
-		var bound ir.Type
-		if p.Constraint != nil {
-			bound = r.ResolveType(p.Constraint, scope)
-		}
-		out = append(out, &ir.TypeParam{Name: p.Name, Bound: bound})
-	}
-	for _, tp := range out {
-		if tp.Name != "" {
-			scope[tp.Name] = tp.Bound
-		}
+	bounds := SettleBounds(r, params, scope)
+	out := make([]*ir.TypeParam, len(params))
+	for i, p := range params {
+		out[i] = &ir.TypeParam{Name: p.Name, Bound: bounds[i]}
 	}
 	return out
 }

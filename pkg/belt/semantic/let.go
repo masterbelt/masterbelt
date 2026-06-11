@@ -305,7 +305,7 @@ func withLocal(bs infer.BodyScope, name string, typ ir.Type) infer.BodyScope {
 // reports nothing (the type names a let already resolved through the body
 // binder); an unknown name there yields ir.Invalid.
 func resolveBodyType(bs infer.BodyScope, t ast.TypeExpr) ir.Type {
-	r := &infer.TypeResolver{Defs: bs.Universe, Qualified: bs.Qualified}
+	r := &infer.TypeResolver{Defs: bs.Universe, Qualified: bs.Qualified, Registry: bs.Reg}
 	return r.ResolveType(t, bs.TScope)
 }
 
@@ -315,7 +315,7 @@ func resolveBodyType(bs infer.BodyScope, t ast.TypeExpr) ir.Type {
 // diagnostic exactly as it does in a const or type annotation, rather than
 // resolving silently to ir.Invalid. A nil diagnostic list keeps it silent.
 func resolveBodyTypeReporting(bs infer.BodyScope, t ast.TypeExpr, at func(ast.Node) span, diags *diagnostic.List) ir.Type {
-	r := &infer.TypeResolver{Defs: bs.Universe, Qualified: bs.Qualified, ProjectionError: projectionErrorReporter(at, diags)}
+	r := &infer.TypeResolver{Defs: bs.Universe, Qualified: bs.Qualified, Registry: bs.Reg, ProjectionError: projectionErrorReporter(at, diags)}
 	return r.ResolveType(t, bs.TScope)
 }
 

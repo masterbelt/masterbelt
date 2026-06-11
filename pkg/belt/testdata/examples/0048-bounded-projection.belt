@@ -1,0 +1,51 @@
+// Bounded projection: `T.X` where T is a generic parameter whose bound is an
+// interface that requires a readable member X. The projection resolves to X's
+// required read type — the bound version of read/projection symmetry. A
+// requirement typed `self` resolves to the parameter itself, and the value read
+// `v.X` on a value of type T resolves through the same bound, so the type-position
+// projection and the value read agree. A type parameter is a compile-time type,
+// not a value: it projects in type position (T.X) and reads off a value (v.X), but
+// is never consumed as a value itself.
+
+/// A behaviour for anything with a readable level and a readable best of its own
+/// type. Both are readable-member requirements (`X: T`, no parentheses), so a
+/// field or a getter meets them.
+pub interface Levelled {
+  /// A readable member: every Levelled is read as `v.level` for its level.
+  level: nint
+
+  /// A readable member typed self: read as `v.best`, a value of the same type.
+  best: self
+}
+
+/// A card meets the level requirement with a stored field and the self-typed best
+/// requirement with a getter — the two readable members, one of each kind, the way
+/// a type opts into a readable-member bound.
+pub type Card = {
+  level: nint,
+  rank: nint,
+} impl Levelled {
+  pub get best(): self {
+    return self
+  }
+}
+
+// Type-position projection off the bound: `T.level` is the required read type
+// (nint), and `T.best` is self resolved to the parameter (T itself) — the field
+// types of a record generic over a bounded parameter are projected off its bound.
+/// A summary whose field types are projected off the bounded parameter:
+/// `T.level` is nint, `T.best` is T — the requirement typed self resolving to the
+/// parameter.
+pub type Summary<T: Levelled> = {
+  score: T.level,
+  top: T.best,
+}
+
+// The value half: `v.level` reads the bound's requirement through a value of type
+// T, resolving to the same nint the type-position projection `T.level` yields —
+// read and projection symmetric over the bound.
+/// Read the level off a bounded parameter's value — resolved through the bound,
+/// the value twin of the `T.level` projection.
+pub fn levelOf<T: Levelled>(v: T): nint {
+  return v.level
+}

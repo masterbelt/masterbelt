@@ -154,6 +154,14 @@ func (r *TypeResolver) resolveQualified(t *ast.NamedType, scope TypeScope) ir.Ty
 			return r.applyProjections(r.namedType(def, t.Args, scope), t.Projections, t)
 		}
 	}
+	// The qualifier names a type parameter in scope (T.X where T: I): the head is
+	// the parameter itself, and project resolves X off its bound — a bounded
+	// projection. A parameter shadows a same-named declared type, so this is tried
+	// before the lookup below.
+	if bound, inScope := scope[t.Namespace]; inScope {
+		head := r.project(&ir.TypeVar{Name: t.Namespace, Bound: bound}, t.Name, t)
+		return r.applyProjections(head, t.Projections, t)
+	}
 	// The qualifier names a type, so Namespace.Name is a field-type projection.
 	// Generic arguments instantiate the projected field (Box.value<string> reads
 	// Box<string>.value): they build a generic application as the projection head,

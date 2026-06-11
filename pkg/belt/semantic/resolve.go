@@ -389,20 +389,17 @@ func foldOneAssocConst(folder exprFolder, defs map[string]*ir.TypeDef, fenv asso
 // versus provided, for the conformance check; Interface.Parents records the
 // resolved parent applications, for the inheritance closure.
 func resolveInterfaceDecl(r *infer.TypeResolver, reg *builtin.Registry, id *ast.InterfaceDecl, def *ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List, fns bodyFuncs) {
+	// Resolve every parameter bound through the two-pass settle, so a bound may
+	// name a later parameter or project off one (T: Box<U.x>); the resolved bounds
+	// are back-filled into the scope, so a member signature naming a parameter as a
+	// bounded constructor's argument sees the bound on its TypeVar.
 	scope := make(infer.TypeScope, len(id.Params))
 	for _, p := range id.Params {
 		scope[p.Name] = nil
 	}
-	for _, p := range id.Params {
-		var bound ir.Type
-		if p.Constraint != nil {
-			bound = r.ResolveType(p.Constraint, scope)
-		}
-		def.Params = append(def.Params, &ir.TypeParam{Name: p.Name, Bound: bound})
-		// Back-fill the resolved bound into the scope, so a member signature that
-		// names this parameter as a bounded constructor's argument resolves it to a
-		// TypeVar carrying the bound (the declaration-site bound check then sees it).
-		scope[p.Name] = bound
+	bounds := infer.SettleBounds(r, id.Params, scope)
+	for i, p := range id.Params {
+		def.Params = append(def.Params, &ir.TypeParam{Name: p.Name, Bound: bounds[i]})
 	}
 	// The parents (supertraits): each must resolve to an interface, the way an
 	// impl tag must. A parent that is not an interface is reported here
@@ -693,12 +690,9 @@ func resolveInterfaceMember(r *infer.TypeResolver, reg *builtin.Registry, self i
 			mscope[n] = nil
 		}
 		// Resolve each explicit member type parameter's bound in the full member
-		// scope and back-fill it, so a member naming it carries the bound.
-		for _, tp := range m.TypeParams {
-			if tp.Constraint != nil {
-				mscope[tp.Name] = r.ResolveType(tp.Constraint, mscope)
-			}
-		}
+		// scope and back-fill it, so a member naming it carries the bound. The
+		// two-pass settle lets a bound project off another parameter (T: Box<U.x>).
+		infer.SettleBounds(r, m.TypeParams, mscope)
 	}
 
 	params := make(map[string]bool, len(m.Params))
@@ -1060,22 +1054,20 @@ func bodyDef(reg *builtin.Registry, t ir.Type) *ir.TypeDef {
 // env folds the associated-constant initializers (it is nil in callers that do
 // not evaluate).
 func resolveDecl(r *infer.TypeResolver, reg *builtin.Registry, td *ast.TypeDecl, def *ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List, res *callResolutions, fns bodyFuncs) {
+	// Resolve every parameter bound through the two-pass settle, so a bound may
+	// name a later parameter or project off one (T: Box<U.x>); the resolved bounds
+	// are back-filled, so the body, associated constants, and methods that name a
+	// parameter as a bounded constructor's argument (type Index<K: comparable> =
+	// map<K, nint>) resolve it to a TypeVar carrying the bound — the declaration-
+	// site bound check then passes for a sufficiently-bounded parameter and fires
+	// for an unbounded one.
 	scope := make(infer.TypeScope, len(td.Params))
 	for _, p := range td.Params {
 		scope[p.Name] = nil
 	}
-	for _, p := range td.Params {
-		var bound ir.Type
-		if p.Constraint != nil {
-			bound = r.ResolveType(p.Constraint, scope)
-		}
-		def.Params = append(def.Params, &ir.TypeParam{Name: p.Name, Bound: bound})
-		// Back-fill the resolved bound, so the body, associated constants, and
-		// methods that name this parameter as a bounded constructor's argument
-		// (type Index<K: comparable> = map<K, nint>) resolve it to a TypeVar
-		// carrying the bound — the declaration-site bound check then passes for a
-		// sufficiently-bounded parameter and fires for an unbounded one.
-		scope[p.Name] = bound
+	bounds := infer.SettleBounds(r, td.Params, scope)
+	for i, p := range td.Params {
+		def.Params = append(def.Params, &ir.TypeParam{Name: p.Name, Bound: bounds[i]})
 	}
 	// A `= builtin` body marks a primitive: its type is itself, and its native
 	// semantics come from the registry rather than from a defining type.
@@ -1703,12 +1695,9 @@ func resolveMethod(r *infer.TypeResolver, reg *builtin.Registry, self ir.Type, m
 			mscope[v] = nil
 		}
 		// Resolve each explicit method type parameter's bound in the full method
-		// scope and back-fill it, so a parameter naming it carries the bound.
-		for _, tp := range m.TypeParams {
-			if tp.Constraint != nil {
-				mscope[tp.Name] = r.ResolveType(tp.Constraint, mscope)
-			}
-		}
+		// scope and back-fill it, so a parameter naming it carries the bound. The
+		// two-pass settle lets a bound project off another parameter (T: Box<U.x>).
+		infer.SettleBounds(r, m.TypeParams, mscope)
 	}
 
 	params := make(map[string]bool, len(m.Params))

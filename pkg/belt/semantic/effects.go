@@ -22,16 +22,24 @@ import (
 // checkEffects runs the declaration-completeness check over a file's
 // functions and its types' methods.
 func checkEffects(reg *builtin.Registry, file *ast.File, defs []*ir.TypeDef, universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, funcs map[string][]*ast.FuncDecl, qualifiedFuncs func(namespace, name string) []*ast.FuncDecl, constShadows func(*ast.Identifier) bool, at func(ast.Node) span, diags *diagnostic.List) {
-	r := &infer.TypeResolver{Defs: universe, Qualified: qualified}
+	// The registry lets a parameter typed by a bounded projection (fn f<T: HasC>(c:
+	// T.c)) resolve to the bound's member type rather than ir.Invalid, so the effect
+	// collector sees the real type of such a parameter and the calls made on it.
+	r := &infer.TypeResolver{Defs: universe, Qualified: qualified, Registry: reg}
 	for _, fd := range file.Funcs {
 		if fd.Extern || len(fd.Body) == 0 {
 			continue // a root's effects are axiomatic; a missing body was reported
 		}
+		// The function's type parameters are in scope for its parameter types, each
+		// carrying its resolved bound, so a parameter projecting off one (c: T.c)
+		// resolves the same way the body checker resolves it.
+		tscope := infer.FuncTypeParamScope(fd.TypeParams)
+		infer.ResolveFuncTypeParams(r, fd.TypeParams, tscope)
 		params := make(map[string]ir.Type, len(fd.Params))
 		for _, p := range fd.Params {
-			params[p.Name] = r.ResolveType(p.Type, nil)
+			params[p.Name] = r.ResolveType(p.Type, tscope)
 		}
-		bs := infer.BodyScope{Reg: reg, Universe: universe, Qualified: qualified, Self: ir.Invalid, Params: params, Funcs: funcs, QualifiedFuncs: qualifiedFuncs, ConstShadows: constShadows}
+		bs := infer.BodyScope{Reg: reg, Universe: universe, Qualified: qualified, Self: ir.Invalid, Params: params, Funcs: funcs, QualifiedFuncs: qualifiedFuncs, ConstShadows: constShadows, TScope: tscope}
 		checkDeclEffects(fd.Name, fd.Effects, fd, fd.Body, bs, at, diags)
 	}
 	for _, def := range defs {

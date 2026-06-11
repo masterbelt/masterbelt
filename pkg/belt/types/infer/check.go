@@ -358,7 +358,7 @@ func checkFuncLitAgainst(lit *ast.FuncLit, want *ir.Func, s scope, subst map[str
 		sink.arityMismatchLit(lit, len(lit.Params), len(want.Params))
 		return ir.Invalid
 	}
-	r := &TypeResolver{Defs: s.universe(), Qualified: s.qualified()}
+	r := &TypeResolver{Defs: s.universe(), Qualified: s.qualified(), Registry: s.registry()}
 	params, names := resolveLitParams(lit, want, r, s, subst, sink)
 	body := funcScope{outer: s, params: names}
 	result := resolveLitResult(lit, want, r, body, s, subst, sink)
@@ -562,7 +562,7 @@ func walkLet(stmt *ast.LetStmt, s funcScope, sink *Sink) funcScope {
 	var typ ir.Type
 	switch {
 	case stmt.Type != nil:
-		r := &TypeResolver{Defs: s.universe(), Qualified: s.qualified()}
+		r := &TypeResolver{Defs: s.universe(), Qualified: s.qualified(), Registry: s.registry()}
 		typ = r.ResolveType(stmt.Type, s.tscope())
 		if stmt.Value != nil {
 			checkType(stmt.Value, typ, s, map[string]ir.Type{}, sink)
@@ -656,7 +656,7 @@ func narrowArmScope(s funcScope, arm *ast.MatchArm) funcScope {
 	if arm.Bind == "" || arm.Type == nil {
 		return s
 	}
-	r := &TypeResolver{Defs: s.universe(), Qualified: s.qualified()}
+	r := &TypeResolver{Defs: s.universe(), Qualified: s.qualified(), Registry: s.registry()}
 	return s.withLocal(arm.Bind, r.ResolveType(arm.Type, s.tscope()))
 }
 
@@ -824,7 +824,7 @@ func checkOrInvalid(e ast.Expr, s scope, sink *Sink) ir.Type {
 // returns is built from the same walk, so it agrees with funcLitType's (the
 // silent twin over exprType) without typing the body a second time.
 func checkFuncLit(lit *ast.FuncLit, s scope, sink *Sink) ir.Type {
-	r := &TypeResolver{Defs: s.universe(), Qualified: s.qualified()}
+	r := &TypeResolver{Defs: s.universe(), Qualified: s.qualified(), Registry: s.registry()}
 	params := make([]ir.Type, len(lit.Params))
 	names := make(map[string]ir.Type, len(lit.Params))
 	for i, p := range lit.Params {

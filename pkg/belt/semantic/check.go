@@ -272,13 +272,14 @@ func forEachBodyExpr(body []ast.Stmt, fn func(ast.Expr)) {
 // the enclosing type's parameters (each with its resolved bound) plus the
 // method's own explicit type parameters (fold<A>). A body type annotation naming
 // one of these (a let, a match/switch arm) then resolves to a TypeVar rather than
-// an unknown type. The enclosing parameters' bounds are carried through; a method
-// type parameter is left unbounded here (a body annotation only needs its name in
-// scope, and the signature already carries the bound). A method-introduced
+// an unknown type. Each method type parameter's bound is resolved in the full
+// scope and back-filled, the way the signature resolves it, so a body annotation
+// projecting off a bounded method parameter (let y: T.x where T: HasX) sees the
+// bound rather than an unbounded variable that has no members. A method-introduced
 // inference variable (the implicit R in map(func: fn(T): R)) is deliberately not
 // added: it is an inference hole, not a name a body annotation may pin, and
 // adding it would risk shadowing a same-named real type.
-func methodTScope(def *ir.TypeDef, m *ast.MethodDecl) infer.TypeScope {
+func methodTScope(r *infer.TypeResolver, def *ir.TypeDef, m *ast.MethodDecl) infer.TypeScope {
 	if len(def.Params) == 0 && len(m.TypeParams) == 0 {
 		return nil
 	}
@@ -291,6 +292,7 @@ func methodTScope(def *ir.TypeDef, m *ast.MethodDecl) infer.TypeScope {
 			scope[tp.Name] = nil
 		}
 	}
+	infer.SettleBounds(r, m.TypeParams, scope)
 	return scope
 }
 
@@ -306,6 +308,11 @@ func methodTScope(def *ir.TypeDef, m *ast.MethodDecl) infer.TypeScope {
 // resolves exactly as an annotation does. env folds switch arm values for the
 // exhaustiveness and duplicate checks.
 func checkMethodBodies(reg *builtin.Registry, defs []*ir.TypeDef, universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, funcs map[string][]*ast.FuncDecl, qualifiedFuncs func(namespace, name string) []*ast.FuncDecl, constShadows func(*ast.Identifier) bool, env exprFolder, sink *infer.Sink, at func(ast.Node) span, diags *diagnostic.List) {
+	// The resolver that builds each method's body type-parameter scope: it resolves
+	// a method type parameter's bound (fn g<T: HasX>) so a body annotation
+	// projecting off it (let y: T.x) sees the bound, the same registry-backed
+	// resolution the signature uses.
+	tscopeResolver := &infer.TypeResolver{Defs: universe, Qualified: qualified, Registry: reg}
 	var noSelf func(node ast.Node)
 	if diags != nil {
 		noSelf = func(node ast.Node) {
@@ -335,7 +342,7 @@ func checkMethodBodies(reg *builtin.Registry, defs []*ir.TypeDef, universe map[s
 				params[p.Name] = substSelf(p.Type, self)
 			}
 			want := substSelf(irm.Result, self)
-			bs := infer.BodyScope{Reg: reg, Universe: universe, Qualified: qualified, Self: selfT, Params: params, Funcs: funcs, QualifiedFuncs: qualifiedFuncs, ConstShadows: constShadows, TScope: methodTScope(def, m)}
+			bs := infer.BodyScope{Reg: reg, Universe: universe, Qualified: qualified, Self: selfT, Params: params, Funcs: funcs, QualifiedFuncs: qualifiedFuncs, ConstShadows: constShadows, TScope: methodTScope(tscopeResolver, def, m)}
 			checkStmts(m.Body, want, bs, env, bodyNoSelf, sink, at, diags)
 			checkBareEnumArgs(m.Body, bs, env, at, diags)
 		}
@@ -360,8 +367,10 @@ func checkFuncBodies(reg *builtin.Registry, file *ast.File, universe map[string]
 	// The resolver reports a failed field-type projection in a parameter or result
 	// annotation (fn f(x: Item.nope)), so an invalid projection there surfaces the
 	// same diagnostic it does in a type or const annotation rather than resolving
-	// silently. A sink-only walk (diags nil) keeps it silent.
-	r := &infer.TypeResolver{Defs: universe, Qualified: qualified, ProjectionError: projectionErrorReporter(at, diags)}
+	// silently. The registry lets a bounded projection (fn f<T: HasX>(): T.x) read
+	// the bound's readable member, the same as the top-level type-declaration path.
+	// A sink-only walk (diags nil) keeps it silent.
+	r := &infer.TypeResolver{Defs: universe, Qualified: qualified, Registry: reg, ProjectionError: projectionErrorReporter(at, diags)}
 	var noSelf func(node ast.Node)
 	if diags != nil {
 		noSelf = func(node ast.Node) {
