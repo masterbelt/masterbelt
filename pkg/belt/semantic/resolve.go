@@ -421,8 +421,20 @@ func resolveInterfaceDecl(r *infer.TypeResolver, reg *builtin.Registry, id *ast.
 		}
 		def.Interface.Parents = append(def.Interface.Parents, t)
 	}
+	seenReadable := map[string]bool{}
 	for _, m := range id.Members {
 		method := resolveInterfaceMember(r, reg, &ir.Named{Def: def}, m, scope, fns)
+		// Two readable requirements of one name are a duplicate, not an overload —
+		// a readable member takes no arguments to distinguish them, so the second
+		// only contradicts the first (value: string then value: nint can satisfy no
+		// implementor at once). It is reported at the declaration.
+		if m.Readable && at != nil && diags != nil {
+			if seenReadable[m.Name] {
+				s := at(m)
+				diags.Add(newDuplicateDeclarationDiagnostic(s.offset, s.width, m.Name))
+			}
+			seenReadable[m.Name] = true
+		}
 		// An interface member's parameter or result may not be a type value, the
 		// same storage rule a concrete method obeys — so an interface cannot expose
 		// a type-valued runtime slot.
@@ -492,6 +504,7 @@ func checkOneInterfaceInheritance(decl *ast.InterfaceDecl, def *ir.TypeDef, at f
 		diags.Add(newCyclicReferenceDiagnostic(s.offset, s.width, def.Name))
 		return
 	}
+	checkConflictingAncestors(decl, def, at, diags)
 	contributors := interfaceContributors(def)
 	// Override: a child member an ancestor already carries — matched by name and
 	// kind, so a child method name() does not override an ancestor readable name (a
@@ -536,6 +549,35 @@ func memberKeyOf(m *ast.InterfaceMember) memberKey {
 		kind = ir.MethodGetter
 	}
 	return memberKey{name: m.Name, kind: kind}
+}
+
+// checkConflictingAncestors reports a generic interface inherited through two
+// incompatible applications (D<X, Y>: A<X>, A<Y>), which would make an inherited
+// member's type depend on the order the parents are written. It gathers every
+// ancestor application reachable through the parents (each parent's closure with
+// its arguments substituted) and flags a definition reached with two
+// non-identical applications. A diamond that reaches one ancestor with the same
+// application twice is consistent and not reported.
+func checkConflictingAncestors(decl *ast.InterfaceDecl, def *ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List) {
+	first := map[*ir.TypeDef]ir.Type{}
+	for _, parent := range def.Interface.Parents {
+		for _, anc := range interfaceClosure(parent) {
+			adef := interfaceDefOf(anc)
+			if adef == nil {
+				continue
+			}
+			prev, ok := first[adef]
+			if !ok {
+				first[adef] = anc
+				continue
+			}
+			if !types.Identical(prev, anc) {
+				s := at(decl)
+				diags.Add(newConflictingGenericAncestorDiagnostic(s.offset, s.width, def.Name, adef.Name, prev.String(), anc.String()))
+				return
+			}
+		}
+	}
 }
 
 // interfaceContributors maps each member an ancestor of def declares — keyed by

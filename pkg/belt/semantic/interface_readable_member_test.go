@@ -223,6 +223,36 @@ func TestReadableRequirementTypeParamsRejected(t *testing.T) {
 	}
 }
 
+func TestDuplicateReadableRequirementRejected(t *testing.T) {
+	// One interface declaring the same readable member twice is a duplicate, not an
+	// overload — a readable member has no arguments to tell them apart — so it is
+	// reported rather than accepted as an internally contradictory contract.
+	src := "pub interface I {\n  value: string\n  value: nint\n}\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeDuplicateDeclaration) {
+		t.Fatalf("want duplicate_declaration, got %v", codes(diags))
+	}
+}
+
+func TestConflictingGenericAncestorRejected(t *testing.T) {
+	// Inheriting one generic interface through two incompatible applications makes
+	// an inherited member's type depend on parent order, so it is reported.
+	bad := "pub interface A<T> {\n  f(): T\n}\n" +
+		"pub interface D<X, Y>: A<X>, A<Y> {}\n"
+	if _, diags := analyze(bad); !hasCode(diags, CodeConflictingGenericAncestor) {
+		t.Fatalf("want conflicting_generic_ancestor, got %v", codes(diags))
+	}
+	// A diamond that reaches one ancestor with the same application twice is
+	// consistent and accepted.
+	ok := "pub interface A<T> {\n  f(): T\n}\n" +
+		"pub interface B<U>: A<U> {}\n" +
+		"pub interface C<V>: A<V> {}\n" +
+		"pub interface D<W>: B<W>, C<W> {}\n"
+	if _, diags := analyze(ok); hasCode(diags, CodeConflictingGenericAncestor) {
+		t.Fatalf("want no conflict (a consistent diamond), got %v", codes(diags))
+	}
+}
+
 func TestReadableRequirementGenericInterface(t *testing.T) {
 	// A readable requirement on a generic interface checks the read type with the
 	// interface's argument substituted: impl Box<string> needs a value readable as

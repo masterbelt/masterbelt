@@ -26,6 +26,7 @@ const (
 	CodeBoundNotSatisfied          diagnostic.Code = "belt.semantic.bound_not_satisfied"
 	CodeBuiltinOutsideBuiltin      diagnostic.Code = "belt.semantic.builtin_outside_builtin"
 	CodeConditionNotBool           diagnostic.Code = "belt.semantic.condition_not_bool"
+	CodeConflictingGenericAncestor diagnostic.Code = "belt.semantic.conflicting_generic_ancestor"
 	CodeConstantOverflow           diagnostic.Code = "belt.semantic.constant_overflow"
 	CodeCyclicModule               diagnostic.Code = "belt.semantic.cyclic_module"
 	CodeCyclicReference            diagnostic.Code = "belt.semantic.cyclic_reference"
@@ -348,6 +349,23 @@ func newConditionNotBoolDiagnostic(offset int, width int, typ string) diagnostic
 		Severity: diagnostic.Error,
 		Code:     CodeConditionNotBool,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeConditionNotBool, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newConflictingGenericAncestorDiagnostic(offset int, width int, child string, ancestor string, first string, second string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"child":    diagnostic.Str(child),
+		"ancestor": diagnostic.Str(ancestor),
+		"first":    diagnostic.Str(first),
+		"second":   diagnostic.Str(second),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeConflictingGenericAncestor,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeConflictingGenericAncestor, fields),
 		Fields:   fields,
 		Offset:   offset,
 		Width:    width,

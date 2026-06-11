@@ -319,6 +319,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "if condition must be a bool; got " + f["typ"].String()
 		}
 	},
+	"belt.semantic.conflicting_generic_ancestor": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return f["child"].String() + " は " + f["ancestor"].String() + " を矛盾する適用 (" + f["first"].String() + " と " + f["second"].String() + ") で継承しています"
+		default:
+			return f["child"].String() + " inherits " + f["ancestor"].String() + " through conflicting applications (" + f["first"].String() + " and " + f["second"].String() + ")"
+		}
+	},
 	"belt.semantic.constant_overflow": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
