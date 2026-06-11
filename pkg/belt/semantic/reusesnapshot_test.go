@@ -113,22 +113,23 @@ func (tc reuseCase) editFor(t *testing.T) source.Edit {
 // consumer edit recomputes little) and a legitimate cascade (a widely-
 // referenced root edit recomputes much). Each case's golden documents its
 // invalidation footprint.
+// chain is the canonical reuse fixture. The "  // pad" tail on the chain lines is
+// slack the length-preserving cases edit into: it lets a value or body grow or
+// shrink while the line — and every downstream offset — keeps its width.
+const chain = "const A: long = 1   // pad\n" +
+	"const B = A\n" +
+	"const C = B         // pad\n" +
+	"pub type T = { n: nint } impl {\n" +
+	"  pub get size(): nint {\n" +
+	"    return self.n       // pad\n" +
+	"  }\n" +
+	"}\n" +
+	"pub fn twice(x: nint): nint {\n" +
+	"  return x + x      // pad\n" +
+	"}\n" +
+	"assert C > 0\n"
+
 func reuseCases() []reuseCase {
-	// chain is the canonical fixture. The "  // pad" tail on the chain lines is
-	// slack the length-preserving cases edit into: it lets a value or body grow
-	// or shrink while the line — and every downstream offset — keeps its width.
-	const chain = "const A: long = 1   // pad\n" +
-		"const B = A\n" +
-		"const C = B         // pad\n" +
-		"pub type T = { n: nint } impl {\n" +
-		"  pub get size(): nint {\n" +
-		"    return self.n       // pad\n" +
-		"  }\n" +
-		"}\n" +
-		"pub fn twice(x: nint): nint {\n" +
-		"  return x + x      // pad\n" +
-		"}\n" +
-		"assert C > 0\n"
 
 	// masterChain is the chain fixture with a master appended: a master is a
 	// TypeDef, so editing its row method re-resolves the type-defs
@@ -136,6 +137,26 @@ func reuseCases() []reuseCase {
 	// memoized types and values — the cutoff the master shares with every other
 	// type. The "// pad" tail is slack the length-preserving edit grows into so
 	// downstream offsets stay put.
+	// staticChain is the chain fixture with a static-fn requirement appended: an
+	// interface requiring a static fn, a type meeting it, and a generic function
+	// calling it through the bound. Editing the implementor's static fn body
+	// re-checks that body, but the interface's requirement, the conformance, the
+	// generic function's resolved call, and the unrelated value chain keep their
+	// memoized facts. The "// pad" tail is slack the length-preserving edit grows
+	// into so downstream offsets stay put.
+	const staticChain = chain +
+		"pub interface HasDefault {\n" +
+		"  static defaultValue(): nint\n" +
+		"}\n" +
+		"pub type Counter = { c: nint } impl HasDefault {\n" +
+		"  pub static fn defaultValue(): nint {\n" +
+		"    return 0       // pad\n" +
+		"  }\n" +
+		"}\n" +
+		"pub fn startValue<T: HasDefault>(): nint {\n" +
+		"  return T.defaultValue()\n" +
+		"}\n"
+
 	const masterChain = chain +
 		"pub master Skill {\n" +
 		"  record {\n" +
@@ -209,6 +230,13 @@ func reuseCases() []reuseCase {
 		// slack absorbs the edit's extra characters.
 		{name: "master_method_body", src: masterChain, keepsLen: true, minReused: 5,
 			find: "return self.name       ", repl: "return self.name + \"\"  "},
+		// Static-fn body edit (length-preserving): the implementor's static fn
+		// re-checks, but the interface's static requirement, the conformance, the
+		// generic function calling T.defaultValue() through the bound, and the value
+		// chain keep their memoized facts. return 0 and return 0 + 0 both type as
+		// nint, so no dependent re-types; the pad slack absorbs the extra characters.
+		{name: "static_fn_body", src: staticChain, keepsLen: true, minReused: 5,
+			find: "return 0       ", repl: "return 0 + 0   "},
 	}
 }
 
