@@ -450,6 +450,13 @@ func staticReceiverDef(recvT ir.Type, s scope) *ir.TypeDef {
 // the owning type. Static fns are not generic in the MVP, so the signatures carry
 // no type parameters.
 func staticSigs(def *ir.TypeDef, name string) []funcSig {
+	// An interface's MethodStatic entries are requirements, not implementations:
+	// there is nothing to call directly (I.make()), so a static call resolves them
+	// only through a bounded type parameter (T.make(), via staticSigsThroughBound) or
+	// an implementing concrete type, never the interface definition itself.
+	if def.Interface != nil {
+		return nil
+	}
 	self := ir.Type(&ir.Named{Def: def})
 	var sigs []funcSig
 	for _, m := range def.Methods {

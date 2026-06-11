@@ -97,6 +97,7 @@ belt.semantic.missing_required_static,{typ} does not implement {iface}: missing 
 belt.semantic.missing_readable_member,{typ} does not implement {iface}: missing readable member {member}: {want}
 belt.semantic.readable_member_has_body,a readable-member requirement {member} cannot have a body; remove the block or write it as a method
 belt.semantic.static_member_has_body,a static-fn requirement {member} cannot have a body; a provided default static is not supported
+belt.semantic.static_member_needs_params,a static-fn requirement {member} needs a parameter list; write it as static {member}(): T
 belt.semantic.readable_member_type_params,a readable-member requirement {member} cannot declare type parameters; there is no call to instantiate them
 belt.semantic.conflicting_generic_ancestor,{child} inherits {ancestor} through conflicting applications ({first} and {second})
 belt.semantic.not_an_interface,{name} is not an interface

@@ -85,6 +85,7 @@ const (
 	CodeSelfOutsideMethod          diagnostic.Code = "belt.semantic.self_outside_method"
 	CodeStaticCollision            diagnostic.Code = "belt.semantic.static_collision"
 	CodeStaticMemberHasBody        diagnostic.Code = "belt.semantic.static_member_has_body"
+	CodeStaticMemberNeedsParams    diagnostic.Code = "belt.semantic.static_member_needs_params"
 	CodeTernaryBranchMismatch      diagnostic.Code = "belt.semantic.ternary_branch_mismatch"
 	CodeTernaryConditionNotBool    diagnostic.Code = "belt.semantic.ternary_condition_not_bool"
 	CodeTypeArityMismatch          diagnostic.Code = "belt.semantic.type_arity_mismatch"
@@ -1201,6 +1202,20 @@ func newStaticMemberHasBodyDiagnostic(offset int, width int, member string) diag
 		Severity: diagnostic.Error,
 		Code:     CodeStaticMemberHasBody,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeStaticMemberHasBody, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newStaticMemberNeedsParamsDiagnostic(offset int, width int, member string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"member": diagnostic.Str(member),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeStaticMemberNeedsParams,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeStaticMemberNeedsParams, fields),
 		Fields:   fields,
 		Offset:   offset,
 		Width:    width,

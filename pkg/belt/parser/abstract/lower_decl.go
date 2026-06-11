@@ -744,8 +744,10 @@ func lowerInterfaceMember(t cst.Tree, buf source.Buffer) *ast.InterfaceMember {
 		}
 	}
 	// No parameter list distinguishes a readable-member requirement (Name: T) from
-	// a nullary method requirement (Name(): T), which both lower to empty Params; a
-	// static requirement is never readable (it carries a parameter list). hasBody
-	// records a written block even when empty, which lowers to a nil Body.
-	return ast.NewInterfaceMember(doc, public, name, !hasParams && !static, static, hasBody, typeParams, params, result, body, green)
+	// a nullary method requirement (Name(): T), which both lower to empty Params.
+	// A static modifier with no parameter list (static Name: T) sets both Readable
+	// and Static, which the semantic layer rejects — a static requirement needs a
+	// parameter list. hasBody records a written block even when empty, which lowers
+	// to a nil Body.
+	return ast.NewInterfaceMember(doc, public, name, !hasParams, static, hasBody, typeParams, params, result, body, green)
 }

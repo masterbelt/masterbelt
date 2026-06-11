@@ -125,6 +125,74 @@ func TestStaticRequirementNonStaticMemberFallsThrough(t *testing.T) {
 	}
 }
 
+func TestStaticRequirementNeedsParamList(t *testing.T) {
+	// A static requirement needs a parameter list (static x(): T). Without one
+	// (static x: T) the modifier still parses, but it is reported rather than
+	// silently accepted as a zero-argument static.
+	src := "pub interface I {\n  static x: nint\n}\n"
+	if _, diags := analyze(src); !hasCode(diags, CodeStaticMemberNeedsParams) {
+		t.Fatalf("want static_member_needs_params (static x: nint has no parameter list), got %v", codes(diags))
+	}
+}
+
+func TestStaticRequirementNotGeneric(t *testing.T) {
+	// A static fn is not generic, so a generic static requirement is rejected — the
+	// same as a concrete static fn, since the bound-call signature carries no type
+	// parameters to instantiate.
+	src := "pub interface I {\n  static id<A>(x: A): A\n}\n"
+	if _, diags := analyze(src); !hasCode(diags, CodeGenericStatic) {
+		t.Fatalf("want generic_static, got %v", codes(diags))
+	}
+}
+
+func TestStaticRequirementNotCallableOnInterface(t *testing.T) {
+	// A static requirement is reachable only through a bounded type parameter or an
+	// implementing concrete type, never the interface itself: I.make() has no
+	// implementation to call, so it is unknown rather than silently accepted.
+	src := "pub interface I {\n  static make(): nint\n}\n" +
+		"pub fn f(): nint {\n  return I.make()\n}\n"
+	if _, diags := analyze(src); !hasCode(diags, CodeUnknownStatic) {
+		t.Fatalf("want unknown_static (a requirement is not callable on the interface), got %v", codes(diags))
+	}
+}
+
+func TestStaticRequirementSignatureMustMatch(t *testing.T) {
+	// Conformance compares the required static's signature, not just the name: an
+	// implementor whose static has a different arity or result does not satisfy it,
+	// since a call through the bound is typed against the requirement.
+	src := "pub interface I {\n  static make(): nint\n}\n" +
+		"pub type W = { n: nint } impl I {\n  pub static fn make(s: string): string {\n    return s\n  }\n}\n"
+	if _, diags := analyze(src); !hasCode(diags, CodeMissingRequiredStatic) {
+		t.Fatalf("want missing_required_static (the static's signature does not match), got %v", codes(diags))
+	}
+}
+
+func TestStaticRequirementNotInheritedThroughAlias(t *testing.T) {
+	// A static is read off the named type itself, so it is not inherited through a
+	// nominal alias: an alias over a type with a matching static does not satisfy the
+	// requirement unless it declares its own — the conformance and the static-call
+	// path stay consistent (Alias.make() would be unknown too).
+	src := "pub interface I {\n  static make(): nint\n}\n" +
+		"pub type Base = { n: nint } impl {\n  pub static fn make(): nint {\n    return 0\n  }\n}\n" +
+		"pub type Alias = Base impl I {}\n"
+	if _, diags := analyze(src); !hasCode(diags, CodeMissingRequiredStatic) {
+		t.Fatalf("want missing_required_static (a static is not inherited through a nominal alias), got %v", codes(diags))
+	}
+}
+
+func TestStaticRequirementTypeParameterWinsOverDeclaredType(t *testing.T) {
+	// A type parameter wins over a same-named declared type in a static call, in the
+	// checker and the lowering alike: f<T: I> calling T.foo() with a top-level type T
+	// that also defines foo resolves through the bound I, not the declared type, so
+	// the IR points at the callee that was type-checked. It analyzes clean.
+	src := "pub interface I {\n  static foo(): nint\n}\n" +
+		"pub type T = { v: nint } impl I {\n  pub static fn foo(): nint {\n    return 9\n  }\n}\n" +
+		"pub fn f<T: I>(): nint {\n  return T.foo()\n}\n"
+	if _, diags := analyze(src); len(diags) != 0 {
+		t.Fatalf("want clean (T.foo() resolves through the bound, not the same-named declared type), got %v", codes(diags))
+	}
+}
+
 func TestStaticRequirementEffectConsistent(t *testing.T) {
 	// A static requirement declares no effects, so a pure generic function calling it
 	// is not reported as missing one — the effect walker reads T.foo() as a static

@@ -446,52 +446,68 @@ func resolveInterfaceDecl(r *infer.TypeResolver, reg *builtin.Registry, id *ast.
 	seenReadable := map[string]bool{}
 	for _, m := range id.Members {
 		method := resolveInterfaceMember(r, reg, &ir.Named{Def: def}, m, scope, fns)
-		// Two readable requirements of one name are a duplicate, not an overload —
-		// a readable member takes no arguments to distinguish them, so the second
-		// only contradicts the first (value: string then value: nint can satisfy no
-		// implementor at once). It is reported at the declaration.
-		if m.Readable && at != nil && diags != nil {
-			if seenReadable[m.Name] {
-				s := at(m)
-				diags.Add(newDuplicateDeclarationDiagnostic(s.offset, s.width, m.Name))
-			}
-			seenReadable[m.Name] = true
-		}
 		// An interface member's parameter or result may not be a type value, the
 		// same storage rule a concrete method obeys — so an interface cannot expose
 		// a type-valued runtime slot.
 		reportMetatypeSlot(at, diags, m, sigType(method.Params, method.Result))
 		def.AttachMethods(method)
-		// A readable-member requirement is always required — it carries no default,
-		// so a written body does not make it provided (which would let any implementor
-		// inherit it and satisfy the requirement vacuously); the body is reported. A
-		// block is rejected even when empty (HasBody, not a non-nil Body, which an
-		// empty block does not produce).
-		if m.Readable && m.HasBody && at != nil && diags != nil {
-			s := at(m)
-			diags.Add(newReadableMemberHasBodyDiagnostic(s.offset, s.width, m.Name))
-		}
-		// A readable member is read as value.X, with no call to supply type
-		// arguments, so its own type parameters (value<T>: T) can never be
-		// instantiated — they are reported rather than left as a free variable a
-		// same-named implementor parameter would spuriously satisfy.
-		if m.Readable && len(m.TypeParams) > 0 && at != nil && diags != nil {
-			s := at(m)
-			diags.Add(newReadableMemberTypeParamsDiagnostic(s.offset, s.width, m.Name))
-		}
-		// A static-fn requirement is always required: a provided (default) static is
-		// not supported, so a written body does not make it provided — it is reported,
-		// the way a readable member's body is. A static carries a parameter list, so it
-		// is never a readable member.
-		if m.Static && m.HasBody && at != nil && diags != nil {
-			s := at(m)
-			diags.Add(newStaticMemberHasBodyDiagnostic(s.offset, s.width, m.Name))
-		}
+		reportInterfaceMemberIssues(m, seenReadable, at, diags)
+		// A readable member and a static requirement are always required (neither
+		// carries a usable default); only a method with a body is provided.
 		if m.Provided() && !m.Readable && !m.Static {
 			def.Interface.Provided = append(def.Interface.Provided, m.Name)
 		} else {
 			def.Interface.Required = append(def.Interface.Required, m.Name)
 		}
+	}
+}
+
+// reportInterfaceMemberIssues reports the per-member diagnostics of an interface
+// declaration: a duplicate readable requirement, a readable member written with a
+// body or its own type parameters (neither of which it can use), and the static-fn
+// requirement faults — no parameter list, a provided body, or type parameters (a
+// static is not generic). seenReadable carries the readable names seen so far, so
+// the second of a duplicate pair is the one reported.
+func reportInterfaceMemberIssues(m *ast.InterfaceMember, seenReadable map[string]bool, at func(ast.Node) span, diags *diagnostic.List) {
+	if at == nil || diags == nil {
+		return
+	}
+	s := at(m)
+	if m.Readable && !m.Static {
+		// Two readable requirements of one name are a duplicate, not an overload — a
+		// readable member takes no arguments to distinguish them, so the second only
+		// contradicts the first (value: string then value: nint can satisfy no
+		// implementor at once).
+		if seenReadable[m.Name] {
+			diags.Add(newDuplicateDeclarationDiagnostic(s.offset, s.width, m.Name))
+		}
+		seenReadable[m.Name] = true
+		// A readable member carries no default, so a written body would let any
+		// implementor satisfy it vacuously; and read as value.X with no call, its own
+		// type parameters could never be instantiated. Both are reported.
+		if m.HasBody {
+			diags.Add(newReadableMemberHasBodyDiagnostic(s.offset, s.width, m.Name))
+		}
+		if len(m.TypeParams) > 0 {
+			diags.Add(newReadableMemberTypeParamsDiagnostic(s.offset, s.width, m.Name))
+		}
+	}
+	if !m.Static {
+		return
+	}
+	// A static-fn requirement needs a parameter list (static X(): T); without one the
+	// parser still sets the modifier (static X: T), leaving a member that is both
+	// static and readable. A provided default static is unsupported, so a body is
+	// reported. And a static fn is not generic, so type parameters are reported — the
+	// bound-call signature carries none to instantiate.
+	if m.Readable {
+		diags.Add(newStaticMemberNeedsParamsDiagnostic(s.offset, s.width, m.Name))
+	}
+	if m.HasBody {
+		diags.Add(newStaticMemberHasBodyDiagnostic(s.offset, s.width, m.Name))
+	}
+	if len(m.TypeParams) > 0 {
+		diags.Add(newGenericStaticDiagnostic(s.offset, s.width, m.Name))
 	}
 }
 
@@ -700,10 +716,10 @@ func resolveInterfaceMember(r *infer.TypeResolver, reg *builtin.Registry, self i
 	// branches on to demand a static fn and which a bounded parameter's T.X() call
 	// resolves through.
 	switch {
-	case m.Readable:
-		method.Kind = ir.MethodGetter
 	case m.Static:
 		method.Kind = ir.MethodStatic
+	case m.Readable:
+		method.Kind = ir.MethodGetter
 	}
 
 	// The member's own type variables join a fresh scope: the explicit ones
@@ -1051,9 +1067,11 @@ func unmetRequirement(reg *builtin.Registry, def, adef *ir.TypeDef, req *ir.Meth
 		return diagnostic.Diagnostic{}, false
 	}
 	if req.Kind == ir.MethodStatic {
-		// A static-fn requirement demands a static fn of the name, the static twin of
-		// a method requirement — checked by name and kind, the way a method is.
-		if !suppliesStatic(reg, def, req.Name, map[*ir.TypeDef]bool{}) {
+		// A static-fn requirement demands a static fn of the name whose signature
+		// matches the requirement: a call T.foo() through a bounded parameter is typed
+		// against the requirement, so an implementor whose static has a different arity
+		// or result would be called with the wrong signature.
+		if !suppliesStatic(def, req, subst) {
 			return newMissingRequiredStaticDiagnostic(s.offset, s.width, def.Name, adef.Name, req.Name), true
 		}
 		return diagnostic.Diagnostic{}, false
@@ -1064,27 +1082,42 @@ func unmetRequirement(reg *builtin.Registry, def, adef *ir.TypeDef, req *ir.Meth
 	return diagnostic.Diagnostic{}, false
 }
 
-// suppliesStatic reports whether def supplies a static fn of the given name — what
-// a static-fn requirement (static X(): T) demands — checked by name and kind, the
-// static twin of suppliesMethod. The underlying definition of a nominal type is
-// walked, so a static inherited through an alias chain counts.
-func suppliesStatic(reg *builtin.Registry, def *ir.TypeDef, name string, seen map[*ir.TypeDef]bool) bool {
-	if def == nil || seen[def] {
-		return false
-	}
-	seen[def] = true
+// suppliesStatic reports whether def declares a static fn meeting the requirement
+// req: a static of the same name whose parameter and result types match the
+// requirement's, with the interface's arguments substituted and self resolved to
+// the implementing type (a static make(): self is met by static fn make(): Widget
+// on Widget). A static is read off the named type itself — the static-call path
+// reads only the type's own methods, never an underlying alias — so conformance
+// reads only def's own statics, the two staying consistent.
+func suppliesStatic(def *ir.TypeDef, req *ir.Method, subst map[string]ir.Type) bool {
+	recv := ir.Type(&ir.Named{Def: def})
 	for _, m := range def.Methods {
-		if m.Name == name && m.Kind == ir.MethodStatic {
+		if m.Name != req.Name || m.Kind != ir.MethodStatic {
+			continue
+		}
+		if staticSigMatches(m, req, subst, recv) {
 			return true
 		}
 	}
-	if def.Builtin {
+	return false
+}
+
+// staticSigMatches reports whether a candidate static fn m has the parameter and
+// result types the requirement req demands, with req's types instantiated — the
+// interface's arguments substituted and self resolved to the implementing receiver
+// — and compared by identity, the way a static call site would resolve them.
+func staticSigMatches(m, req *ir.Method, subst map[string]ir.Type, recv ir.Type) bool {
+	if len(m.Params) != len(req.Params) {
 		return false
 	}
-	if ud := bodyDef(reg, def.Body); ud != nil {
-		return suppliesStatic(reg, ud, name, seen)
+	for i := range req.Params {
+		want := types.SubstituteSelf(types.Substitute(req.Params[i].Type, subst), recv)
+		if !types.Identical(m.Params[i].Type, want) {
+			return false
+		}
 	}
-	return false
+	want := types.SubstituteSelf(types.Substitute(req.Result, subst), recv)
+	return types.Identical(m.Result, want)
 }
 
 // interfaceArgSubst maps an interface's type parameters to the arguments of an

@@ -791,6 +791,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "a static-fn requirement " + f["member"].String() + " cannot have a body; a provided default static is not supported"
 		}
 	},
+	"belt.semantic.static_member_needs_params": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "static fn 要求 " + f["member"].String() + " はパラメータリストが必要です。static " + f["member"].String() + "(): T と書いてください"
+		default:
+			return "a static-fn requirement " + f["member"].String() + " needs a parameter list; write it as static " + f["member"].String() + "(): T"
+		}
+	},
 	"belt.semantic.ternary_branch_mismatch": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":

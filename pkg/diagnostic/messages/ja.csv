@@ -97,6 +97,7 @@ belt.semantic.missing_required_static,{typ} は {iface} を実装していませ
 belt.semantic.missing_readable_member,{typ} は {iface} を実装していません: 読める member {member}: {want} がありません
 belt.semantic.readable_member_has_body,読める member 要求 {member} は本体を持てません。ブロックを削除するかメソッドとして書いてください
 belt.semantic.static_member_has_body,static fn 要求 {member} は本体を持てません。デフォルト実装付き static はサポートされていません
+belt.semantic.static_member_needs_params,static fn 要求 {member} はパラメータリストが必要です。static {member}(): T と書いてください
 belt.semantic.readable_member_type_params,読める member 要求 {member} は型パラメータを宣言できません。インスタンス化する呼び出しがありません
 belt.semantic.conflicting_generic_ancestor,{child} は {ancestor} を矛盾する適用 ({first} と {second}) で継承しています
 belt.semantic.not_an_interface,{name} は interface ではありません

@@ -264,6 +264,12 @@ func staticFnDef(universe map[string]*ir.TypeDef, callee *ast.MemberExpr, shadow
 		return nil
 	}
 	def := universe[recv.Name]
+	// An interface's static entries are requirements, not implementations, so a
+	// direct I.make() has nothing to lower (and the checker rejects it); only a
+	// concrete type's static, or a bounded parameter's (boundStaticDef), is a call.
+	if def != nil && def.Interface != nil {
+		return nil
+	}
 	if types.ResolveMember(def, callee.Member.Name).Kind != types.MemberStatic {
 		return nil
 	}
@@ -724,10 +730,13 @@ func (b bodyBinder) leafMemberCall(e *ast.CallExpr, callee *ast.MemberExpr, sub 
 			return funcCall(b.funcs.shells[pickOverload(cands, len(e.Arguments))], e, sub)
 		}
 	}
-	if def := staticFnDef(b.r.Defs, callee, b.shadows); def != nil {
+	// A bounded type parameter wins over a same-named declared type here, the same
+	// precedence the type checker applies (it resolves the receiver through the type
+	// scope first), so the lowered callee matches the one that was type-checked.
+	if def := b.boundStaticDef(recv.Name, callee.Member.Name); def != nil {
 		return staticCall(def, callee.Member.Name, e, sub)
 	}
-	if def := b.boundStaticDef(recv.Name, callee.Member.Name); def != nil {
+	if def := staticFnDef(b.r.Defs, callee, b.shadows); def != nil {
 		return staticCall(def, callee.Member.Name, e, sub)
 	}
 	return nil

@@ -97,6 +97,7 @@ belt.semantic.missing_required_static,error,typ:string iface:string method:strin
 belt.semantic.missing_readable_member,error,typ:string iface:string member:string want:string
 belt.semantic.readable_member_has_body,error,member:string
 belt.semantic.static_member_has_body,error,member:string
+belt.semantic.static_member_needs_params,error,member:string
 belt.semantic.readable_member_type_params,error,member:string
 belt.semantic.conflicting_generic_ancestor,error,child:string ancestor:string first:string second:string
 belt.semantic.not_an_interface,error,name:string
