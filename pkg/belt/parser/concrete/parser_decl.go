@@ -1025,9 +1025,13 @@ func (p *parser) parseMethodDecl(lead []cst.Green) *cst.Node {
 // by ":" (a readable member named static) or "(" (a method named static), is the
 // member's own name, not a modifier — the same line-bounded lookahead the
 // accessor modifiers use.
+// kwStatic is the context keyword that introduces a static modifier — on a
+// method (static fn) or an interface member's static-fn requirement.
+const kwStatic = "static"
+
 func (p *parser) interfaceModifier(children *[]cst.Green) bool {
 	i := p.nextSignificantIndex(p.pos)
-	if p.toks[i].Kind != token.Ident || p.identText(i) != "static" {
+	if p.toks[i].Kind != token.Ident || p.identText(i) != kwStatic {
 		return false
 	}
 	if p.nextOnLine(i+1) != token.Ident {
@@ -1062,7 +1066,7 @@ func (p *parser) methodModifier(children *[]cst.Green) bool {
 		p.skipTrivia(children)
 		*children = append(*children, p.modifier())
 		return true
-	case "static":
+	case kwStatic:
 		return p.staticModifier(children)
 	default:
 		return false
@@ -1079,7 +1083,7 @@ func (p *parser) methodModifier(children *[]cst.Green) bool {
 // accessors.
 func (p *parser) staticModifier(children *[]cst.Green) bool {
 	i := p.nextSignificantIndex(p.pos)
-	if p.toks[i].Kind != token.Ident || p.identText(i) != "static" {
+	if p.toks[i].Kind != token.Ident || p.identText(i) != kwStatic {
 		return false
 	}
 	switch p.nextOnLine(i + 1) {
