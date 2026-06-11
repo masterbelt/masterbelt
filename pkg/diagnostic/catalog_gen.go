@@ -703,6 +703,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "range step cannot be zero"
 		}
 	},
+	"belt.semantic.readable_member_has_body": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "読める member 要求 " + f["member"].String() + " は本体を持てません。ブロックを削除するかメソッドとして書いてください"
+		default:
+			return "a readable-member requirement " + f["member"].String() + " cannot have a body; remove the block or write it as a method"
+		}
+	},
 	"belt.semantic.refinement_not_bool": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":

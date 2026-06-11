@@ -74,6 +74,7 @@ const (
 	CodeNotExported                diagnostic.Code = "belt.semantic.not_exported"
 	CodeNotIterable                diagnostic.Code = "belt.semantic.not_iterable"
 	CodeRangeStepZero              diagnostic.Code = "belt.semantic.range_step_zero"
+	CodeReadableMemberHasBody      diagnostic.Code = "belt.semantic.readable_member_has_body"
 	CodeRefinementNotBool          diagnostic.Code = "belt.semantic.refinement_not_bool"
 	CodeRefinementNotConstant      diagnostic.Code = "belt.semantic.refinement_not_constant"
 	CodeRefinementViolation        diagnostic.Code = "belt.semantic.refinement_violation"
@@ -1039,6 +1040,20 @@ func newRangeStepZeroDiagnostic(offset int, width int) diagnostic.Diagnostic {
 		Code:     CodeRangeStepZero,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeRangeStepZero, nil),
 		Fields:   nil,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newReadableMemberHasBodyDiagnostic(offset int, width int, member string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"member": diagnostic.Str(member),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeReadableMemberHasBody,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeReadableMemberHasBody, fields),
+		Fields:   fields,
 		Offset:   offset,
 		Width:    width,
 	}

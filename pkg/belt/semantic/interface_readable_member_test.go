@@ -84,6 +84,60 @@ func TestMethodRequirementMethodSatisfies(t *testing.T) {
 	}
 }
 
+func TestReadableRequirementBodyRejected(t *testing.T) {
+	// A readable-member requirement carries no default, so a stray body is reported
+	// and the member stays required — it does not become a provided default that an
+	// implementor inherits and satisfies vacuously.
+	src := "pub interface Named {\n  name: string { return \"x\" }\n}\n" +
+		"pub type Person = { other: nint } impl Named {}\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeReadableMemberHasBody) {
+		t.Fatalf("want readable_member_has_body, got %v", codes(diags))
+	}
+	if !hasCode(diags, CodeMissingReadableMember) {
+		t.Fatalf("want the requirement still unmet (not vacuously provided), got %v", codes(diags))
+	}
+}
+
+func TestReadableRequirementSelfType(t *testing.T) {
+	// A readable requirement typed self is met by a self-returning getter: both the
+	// requirement's self and the getter's self resolve to the implementing type, so
+	// they compare equal rather than self-against-receiver.
+	src := "pub interface Ident {\n  me: self\n}\n" +
+		"pub type Person = { n: nint } impl Ident {\n  pub get me(): self { return self }\n}\n"
+	_, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("want clean (self requirement met by self getter), got %v", codes(diags))
+	}
+}
+
+func TestSameNameReadableAndMethodRequirements(t *testing.T) {
+	// An interface requiring both a readable name and a method name checks each by
+	// its own kind: a type with only a name field meets the readable requirement but
+	// not the method one, so the method requirement is reported — the two are not
+	// collapsed to the first by name.
+	src := "pub interface Both {\n  name: string\n  name(): string\n}\n" +
+		"pub type P = { name: string } impl Both {}\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeMissingRequiredMethod) {
+		t.Fatalf("want missing_required_method (the method requirement is distinct), got %v", codes(diags))
+	}
+}
+
+func TestReadableRequirementInheritedGenericGetter(t *testing.T) {
+	// A getter inherited through a concrete alias of a generic (StringBox =
+	// Box<string>, Box<T> supplying get value(): T) is read with the application's
+	// argument substituted, so StringBox.value reads string and meets value: string
+	// — the receiver's arguments are not dropped when walking the underlying type.
+	src := "pub interface HasValue<T> {\n  value: T\n}\n" +
+		"pub type Box<T> = { v: T } impl {\n  pub get value(): T { return self.v }\n}\n" +
+		"pub type StringBox = Box<string> impl HasValue<string> {}\n"
+	_, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("want clean (inherited generic getter reads string), got %v", codes(diags))
+	}
+}
+
 func TestReadableRequirementGenericInterface(t *testing.T) {
 	// A readable requirement on a generic interface checks the read type with the
 	// interface's argument substituted: impl Box<string> needs a value readable as

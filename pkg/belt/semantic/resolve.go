@@ -428,7 +428,14 @@ func resolveInterfaceDecl(r *infer.TypeResolver, reg *builtin.Registry, id *ast.
 		// a type-valued runtime slot.
 		reportMetatypeSlot(at, diags, m, sigType(method.Params, method.Result))
 		def.AttachMethods(method)
-		if m.Provided() {
+		// A readable-member requirement is always required — it carries no default,
+		// so a stray body does not make it provided (which would let any implementor
+		// inherit it and satisfy the requirement vacuously); the body is reported.
+		if m.Readable && m.Body != nil && at != nil && diags != nil {
+			s := at(m)
+			diags.Add(newReadableMemberHasBodyDiagnostic(s.offset, s.width, m.Name))
+		}
+		if m.Provided() && !m.Readable {
 			def.Interface.Provided = append(def.Interface.Provided, m.Name)
 		} else {
 			def.Interface.Required = append(def.Interface.Required, m.Name)
@@ -627,7 +634,7 @@ func resolveInterfaceMember(r *infer.TypeResolver, reg *builtin.Registry, self i
 		resolvedParams[p.Name] = t
 	}
 	method.Result = r.ResolveType(m.Result, mscope)
-	if m.Body != nil {
+	if m.Body != nil && !m.Readable {
 		method.Body = lower.Body(m.Body, bodyBinder{r: r, reg: reg, params: params, paramTypes: resolvedParams, selfType: self, tscope: mscope, funcs: fns, self: true})
 		// A provided member carries an AST syntax link, the way a concrete method
 		// does, so the constant folder reaches its body: it folds a provided method
@@ -694,8 +701,15 @@ func resolveImpls(r *infer.TypeResolver, reg *builtin.Registry, impls []ast.Type
 				continue
 			}
 			subst := interfaceArgSubst(anc, adef)
-			for _, name := range adef.Interface.Required {
-				if d, unmet := unmetRequirement(reg, def, adef, name, subst, at(impl)); unmet {
+			for _, req := range adef.Methods {
+				// A required member has no default body; iterating the resolved members
+				// (not their names) keeps each requirement's kind, so a readable and a
+				// method requirement that share a name are checked as the distinct
+				// requirements they are.
+				if req.Body != nil {
+					continue
+				}
+				if d, unmet := unmetRequirement(reg, def, adef, req, subst, at(impl)); unmet {
 					diags.Add(d)
 				}
 			}
@@ -844,74 +858,89 @@ func suppliesMethod(reg *builtin.Registry, def *ir.TypeDef, name string, seen ma
 
 // suppliesReadable reports whether def supplies a readable member of the given
 // name and read type — a field of that type, or a getter whose result is that
-// type — which is what a readable-member requirement (X: T) demands. It reads the
-// type's own fields and getters and walks its underlying type (so a nominal type
-// satisfies the requirement through its base's fields and getters, exactly as a
-// method requirement is satisfied through its methods), but deliberately does not
-// consult the type's interfaces through the registry: that lookup would find the
-// very requirement being checked on the implemented interface and satisfy it with
-// itself. The read type must match the requirement's type by nominal identity.
-func suppliesReadable(reg *builtin.Registry, def *ir.TypeDef, name string, want ir.Type, seen map[*ir.TypeDef]bool) bool {
-	if def == nil || seen[def] {
-		return false
-	}
-	seen[def] = true
-	if rec := types.RecordOf(def.Body); rec != nil {
+// type — which is what a readable-member requirement (X: T) demands. The field is
+// read from the receiver's fully instantiated record, and the getter is read off
+// the type and its underlying chain with the receiver's generic arguments and self
+// substituted in, but deliberately not through the registry: that lookup would
+// find the very requirement being checked on the implemented interface and satisfy
+// it with itself. The read type must match the requirement's type by identity.
+func suppliesReadable(reg *builtin.Registry, def *ir.TypeDef, name string, want ir.Type) bool {
+	recv := ir.Type(&ir.Named{Def: def})
+	// A field of the requirement's type — the record is instantiated, so a field
+	// reached through a generic alias (StringBox = Box<string>) carries the
+	// application's argument (value: string, not the parameter T).
+	if rec := types.RecordOf(recv); rec != nil {
 		for i := range rec.Fields {
 			if rec.Fields[i].Name == name {
-				return types.Identical(rec.Fields[i].Type, want)
+				return types.Identical(types.SubstituteSelf(rec.Fields[i].Type, recv), want)
 			}
 		}
 	}
+	if t, ok := readableGetterType(reg, recv, def, name, nil, map[*ir.TypeDef]bool{}); ok {
+		return types.Identical(t, want)
+	}
+	return false
+}
+
+// readableGetterType returns the result type of a getter named name declared on
+// def or the type underlying it, with the generic substitution accumulated down
+// the alias chain and self resolved to recv (the original receiver). It walks the
+// body — an application binds its arguments to the next definition's parameters,
+// so a getter inherited through StringBox = Box<string> reads string, not the
+// parameter T — without consulting def's interfaces. A method or setter of the
+// same name is the wrong kind and is skipped.
+func readableGetterType(reg *builtin.Registry, recv ir.Type, def *ir.TypeDef, name string, subst map[string]ir.Type, seen map[*ir.TypeDef]bool) (ir.Type, bool) {
+	if def == nil || seen[def] {
+		return nil, false
+	}
+	seen[def] = true
 	for _, m := range def.Methods {
-		// A getter the type itself declares (read as x.name). A method or setter of
-		// the same name is the wrong kind for a readable member. self in the result
-		// resolves to the receiver, so a getter returning self matches a self-typed
-		// requirement.
 		if m.Name == name && m.Kind == ir.MethodGetter {
-			return types.Identical(types.SubstituteSelf(m.Result, &ir.Named{Def: def}), want)
+			return types.SubstituteSelf(types.Substitute(m.Result, subst), recv), true
 		}
 	}
 	if def.Builtin {
-		return false
+		return nil, false
 	}
-	if ud := bodyDef(reg, def.Body); ud != nil {
-		return suppliesReadable(reg, ud, name, want, seen)
+	switch b := def.Body.(type) {
+	case *ir.App:
+		if b.Def != nil && len(b.Def.Params) == len(b.Args) {
+			next := make(map[string]ir.Type, len(b.Args))
+			for i, p := range b.Def.Params {
+				next[p.Name] = types.Substitute(b.Args[i], subst)
+			}
+			return readableGetterType(reg, recv, b.Def, name, next, seen)
+		}
+	case *ir.Named:
+		return readableGetterType(reg, recv, b.Def, name, subst, seen)
+	case *ir.Builtin:
+		if d, ok := reg.Lookup(b.Name); ok {
+			return readableGetterType(reg, recv, d, name, subst, seen)
+		}
 	}
-	return false
+	return nil, false
 }
 
 // unmetRequirement reports the diagnostic for a required member def does not
 // supply, and whether one is unmet. A readable-member requirement (carried as a
 // getter) demands a field or getter of the required read type; a method
 // requirement demands a method. The interface's own type arguments are
-// substituted into the required type, so a generic interface (Box<T> requiring
-// value: T) checks against the application's argument (Box<string> needs value:
-// string). The span anchors the diagnostic at the impl tag.
-func unmetRequirement(reg *builtin.Registry, def, adef *ir.TypeDef, name string, subst map[string]ir.Type, s span) (diagnostic.Diagnostic, bool) {
-	if req := interfaceMember(adef, name); req != nil && req.Kind == ir.MethodGetter {
-		want := types.Substitute(req.Result, subst)
-		if !suppliesReadable(reg, def, name, want, map[*ir.TypeDef]bool{}) {
-			return newMissingReadableMemberDiagnostic(s.offset, s.width, def.Name, adef.Name, name, want.String()), true
+// substituted into the required type, and self is resolved to the implementing
+// type, so a generic interface (Box<T> requiring value: T) checks against the
+// application's argument and a self-typed requirement (me: self) against the
+// implementor. The span anchors the diagnostic at the impl tag.
+func unmetRequirement(reg *builtin.Registry, def, adef *ir.TypeDef, req *ir.Method, subst map[string]ir.Type, s span) (diagnostic.Diagnostic, bool) {
+	if req.Kind == ir.MethodGetter {
+		want := types.SubstituteSelf(types.Substitute(req.Result, subst), &ir.Named{Def: def})
+		if !suppliesReadable(reg, def, req.Name, want) {
+			return newMissingReadableMemberDiagnostic(s.offset, s.width, def.Name, adef.Name, req.Name, want.String()), true
 		}
 		return diagnostic.Diagnostic{}, false
 	}
-	if !suppliesMethod(reg, def, name, map[*ir.TypeDef]bool{}) {
-		return newMissingRequiredMethodDiagnostic(s.offset, s.width, def.Name, adef.Name, name), true
+	if !suppliesMethod(reg, def, req.Name, map[*ir.TypeDef]bool{}) {
+		return newMissingRequiredMethodDiagnostic(s.offset, s.width, def.Name, adef.Name, req.Name), true
 	}
 	return diagnostic.Diagnostic{}, false
-}
-
-// interfaceMember returns the interface's resolved member of the given name — its
-// signature carries the requirement's kind (a readable member is a getter) and
-// read/result type — or nil when the interface declares no such member.
-func interfaceMember(def *ir.TypeDef, name string) *ir.Method {
-	for _, m := range def.Methods {
-		if m.Name == name {
-			return m
-		}
-	}
-	return nil
 }
 
 // interfaceArgSubst maps an interface's type parameters to the arguments of an

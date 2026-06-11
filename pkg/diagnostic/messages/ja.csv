@@ -94,6 +94,7 @@ belt.semantic.missing_initializer,let {name} は初期化が必要です。let {
 belt.semantic.index_out_of_range,インデックス {index} は長さ {length} のリストの範囲外です
 belt.semantic.missing_required_method,{typ} は {iface} を実装していません: 必須メソッド {method} がありません
 belt.semantic.missing_readable_member,{typ} は {iface} を実装していません: 読める member {member}: {want} がありません
+belt.semantic.readable_member_has_body,読める member 要求 {member} は本体を持てません。ブロックを削除するかメソッドとして書いてください
 belt.semantic.not_an_interface,{name} は interface ではありません
 belt.semantic.interface_member_override,{child} は {method} を再宣言できません: すでに {ancestor} から継承しています
 belt.semantic.interface_member_conflict,{child} は無関係な 2 つの interface ({first} と {second}) から {method} を継承しています
