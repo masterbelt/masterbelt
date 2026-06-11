@@ -279,3 +279,27 @@ func TestBoundedProjectionEnumMemberArmNotRejected(t *testing.T) {
 		t.Fatalf("want no type_param_in_value_position (T is an enum member pattern), got %v", codes(diags))
 	}
 }
+
+func TestBoundedProjectionBoundProjectsOffAnotherParam(t *testing.T) {
+	// A parameter's bound may project off another parameter's readable member,
+	// regardless of declaration order: T: Box<U.x> reads U's required x (nint)
+	// whether U is declared before or after T. The bounds are settled before any is
+	// read by another, so neither order leaves the projection resolving against an
+	// unbounded placeholder.
+	prelude := "pub interface HasX {\n  x: nint\n}\n" +
+		"pub interface Box<E> {\n  e: E\n}\n"
+	for _, params := range []string{"<T: Box<U.x>, U: HasX>", "<U: HasX, T: Box<U.x>>"} {
+		src := prelude + "pub fn f" + params + "(u: U): nint {\n  return u.x\n}\n"
+		_, diags := analyze(src)
+		if len(diags) != 0 {
+			t.Fatalf("params %q: want clean (U.x projects U's bound member), got %v", params, codes(diags))
+		}
+	}
+	// A genuinely malformed projection in a bound — U has no member nope — still
+	// reports, in the second resolution pass rather than the throwaway first, so a
+	// real error is not lost while the ordering is fixed.
+	bad := prelude + "pub fn f<T: Box<U.nope>, U: HasX>(u: U): nint {\n  return u.x\n}\n"
+	if _, diags := analyze(bad); !hasCode(diags, CodeUnknownField) {
+		t.Fatalf("want unknown_field (U has no member nope), got %v", codes(diags))
+	}
+}

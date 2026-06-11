@@ -813,19 +813,54 @@ func ResolveFuncTypeParams(r *TypeResolver, params []*ast.TypeParam, scope TypeS
 	if len(params) == 0 {
 		return nil
 	}
-	out := make([]*ir.TypeParam, 0, len(params))
-	for _, p := range params {
-		var bound ir.Type
+	out := make([]*ir.TypeParam, len(params))
+	for i, p := range params {
+		out[i] = &ir.TypeParam{Name: p.Name}
+	}
+	backfill := func() {
+		for i, p := range params {
+			if p.Name != "" {
+				scope[p.Name] = out[i].Bound
+			}
+		}
+	}
+	// First pass: resolve every bound silently against the seeded (unbounded)
+	// scope, then back-fill. A bound may project off another parameter
+	// (T: Box<U.x>), which needs that parameter's own bound; that bound is not in
+	// the scope yet, so the projection fails here — but the failure is not
+	// reported. It is left invalid and re-resolved below once every bound is in
+	// place, so a bound that names another parameter's member resolves regardless
+	// of declaration order.
+	report, projErr := r.Report, r.ProjectionError
+	r.Report, r.ProjectionError = nil, nil
+	for i, p := range params {
 		if p.Constraint != nil {
-			bound = r.ResolveType(p.Constraint, scope)
-		}
-		out = append(out, &ir.TypeParam{Name: p.Name, Bound: bound})
-	}
-	for _, tp := range out {
-		if tp.Name != "" {
-			scope[tp.Name] = tp.Bound
+			out[i].Bound = r.ResolveType(p.Constraint, scope)
 		}
 	}
+	r.Report, r.ProjectionError = report, projErr
+	backfill()
+	// Second pass: re-resolve, with reporting restored, only the bounds that stayed
+	// invalid — now every other parameter's bound is in the scope, so a projection
+	// off one resolves to the bound's member, while a genuinely malformed bound
+	// reports its error here rather than in the throwaway first pass. The
+	// parameter's own name is unbounded during its own resolution, so a
+	// self-referential bound (T: foo<T>) reads it as a free variable; a bound that
+	// resolved cleanly in the first pass is left untouched, so the common case is
+	// unchanged.
+	for i, p := range params {
+		if p.Constraint == nil || !ir.HasInvalid(out[i].Bound) {
+			continue
+		}
+		if p.Name != "" {
+			scope[p.Name] = nil
+		}
+		out[i].Bound = r.ResolveType(p.Constraint, scope)
+		if p.Name != "" {
+			scope[p.Name] = out[i].Bound
+		}
+	}
+	backfill()
 	return out
 }
 
