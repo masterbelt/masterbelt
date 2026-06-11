@@ -279,6 +279,12 @@ func typeHover(t *ir.TypeDef, buf source.Buffer, rng cst.Tree) *protocol.Hover {
 // keyword, name, generic parameters, and body (or, for an interface, its
 // supertraits), then the refinement and implemented interfaces.
 func writeTypeSignature(b *strings.Builder, t *ir.TypeDef) {
+	// An enum lists its base and members, the way a master lists its row, so the
+	// card reads as an enum rather than as a bare type alias.
+	if t.Enum != nil {
+		writeEnumSignature(b, t)
+		return
+	}
 	// An interface declares a behaviour rather than aliasing a type, so it leads
 	// with the interface keyword and shows no body.
 	if t.Interface != nil {
@@ -314,6 +320,30 @@ func writeTypeSignature(b *strings.Builder, t *ir.TypeDef) {
 	for _, impl := range t.Impls {
 		b.WriteString(" impl " + impl.String())
 	}
+}
+
+// writeEnumSignature writes an enum's signature laid out like its declaration —
+// the enum keyword and name, its base type, and its members one per line with
+// their values — so the card reads like the source. The interfaces an enum
+// derives (comparable, orderable) are implicit to every enum and left off.
+func writeEnumSignature(b *strings.Builder, t *ir.TypeDef) {
+	b.WriteString("enum ")
+	b.WriteString(t.Name)
+	if t.Enum.Base != "" {
+		b.WriteString(": " + t.Enum.Base)
+	}
+	if len(t.Enum.Members) == 0 {
+		return
+	}
+	b.WriteString(" {\n")
+	for _, m := range t.Enum.Members {
+		b.WriteString("  " + m.Name)
+		if m.Value != nil {
+			b.WriteString(" = " + m.Value.String())
+		}
+		b.WriteString("\n")
+	}
+	b.WriteString("}")
 }
 
 // writeMasterSignature writes a master's signature laid out like its declaration

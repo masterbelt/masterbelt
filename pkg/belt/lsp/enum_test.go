@@ -62,6 +62,37 @@ func TestEnumMemberHover(t *testing.T) {
 	}
 }
 
+// TestEnumTypeNameHover pins that hovering an enum — by a reference annotation or
+// by its own declaration name — reads as an enum: the enum keyword, its base, and
+// its members, not the bare `type Name` the type-alias card would show.
+func TestEnumTypeNameHover(t *testing.T) {
+	doc := testView(enumSrc)
+
+	for _, probe := range []struct {
+		name   string
+		offset int
+	}{
+		{"annotation reference", strings.Index(enumSrc, ": Rarity") + 3},
+		{"declaration name", strings.Index(enumSrc, "enum Rarity") + len("enum ")},
+	} {
+		t.Run(probe.name, func(t *testing.T) {
+			h := hover(doc, probe.offset)
+			if h == nil {
+				t.Fatal("no hover on the enum type name")
+			}
+			val := h.Contents.Value
+			for _, want := range []string{"enum Rarity: byte", "Common = 1", "Legend = 10"} {
+				if !strings.Contains(val, want) {
+					t.Errorf("enum hover = %q, want it to contain %q", val, want)
+				}
+			}
+			if strings.Contains(val, "type Rarity") {
+				t.Errorf("enum hover renders it as a plain type: %q", val)
+			}
+		})
+	}
+}
+
 func TestEnumDocumentSymbols(t *testing.T) {
 	doc := testView(enumSrc)
 	syms := documentSymbols(doc)
