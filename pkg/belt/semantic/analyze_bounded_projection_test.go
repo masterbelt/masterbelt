@@ -107,3 +107,44 @@ func TestBoundedProjectionBodyReadStillWorks(t *testing.T) {
 		t.Fatalf("want clean (v.x reads the bound's requirement), got %v", codes(diags))
 	}
 }
+
+func TestBoundedProjectionValuePositionRejected(t *testing.T) {
+	// A type parameter is a compile-time type, not a foldable value: projecting a
+	// member off it in value position (let y = T.x) cannot fold to a concrete type
+	// value at the definition site, so it is rejected rather than passing vacuously.
+	// The supported surfaces are the type-position projection (type R = T.x) and
+	// the value read off a value of that type (v.x).
+	for _, body := range []string{"  let y = T.x\n  return v.x\n", "  return T.x\n"} {
+		src := "pub interface HasX {\n  x: nint\n}\n" +
+			"pub fn f<T: HasX>(v: T): nint {\n" + body + "}\n"
+		_, diags := analyze(src)
+		if !hasCode(diags, CodeTypeParamInValuePosition) {
+			t.Fatalf("body %q: want type_param_in_value_position, got %v", body, codes(diags))
+		}
+	}
+}
+
+func TestBoundedProjectionBareTypeParamValueRejected(t *testing.T) {
+	// A bare type parameter consumed as a value (T == string) is the same vacuous
+	// fold the projection would be, so it is rejected at the definition site too.
+	src := "pub interface HasX {\n  x: nint\n}\n" +
+		"pub fn f<T: HasX>(v: T): nint {\n  let y = T == string\n  return v.x\n}\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeTypeParamInValuePosition) {
+		t.Fatalf("want type_param_in_value_position (bare T as a value), got %v", codes(diags))
+	}
+}
+
+func TestBoundedProjectionTypePositionUsesNotRejected(t *testing.T) {
+	// A type-position use of the parameter is not a value-position projection: a
+	// conversion T(x) names the type, and a let annotation (let y: T) is a type
+	// expression, so neither is type_param_in_value_position.
+	for _, body := range []string{"  let y = T(v.x)\n  return v.x\n", "  let y: T = v\n  return v.x\n"} {
+		src := "pub interface HasX {\n  x: nint\n}\n" +
+			"pub fn f<T: HasX>(v: T): nint {\n" + body + "}\n"
+		_, diags := analyze(src)
+		if hasCode(diags, CodeTypeParamInValuePosition) {
+			t.Fatalf("body %q: want no type_param_in_value_position (a type position), got %v", body, codes(diags))
+		}
+	}
+}

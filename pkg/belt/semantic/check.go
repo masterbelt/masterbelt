@@ -266,6 +266,75 @@ func forEachBodyExpr(body []ast.Stmt, fn func(ast.Expr)) {
 	ast.WalkBodyExprs(body, fn)
 }
 
+// reportTypeParamValueUse reports each value-position use of a generic type
+// parameter in a function or method body: a type parameter is a compile-time
+// type, not a foldable value, so projecting a member off it (T.x) or consuming
+// it bare (T == string) where a value is expected is type_param_in_value_position
+// — the value-position counterpart of the type-position projection T.x that 0006c
+// resolves through the bound. Without it a bounded parameter projected in value
+// position folds to nothing and the consuming expression passes vacuously
+// (assert T.x == string and == nint both clean), so the read is rejected at the
+// definition site instead.
+//
+// Only a value-position use is reported. A parameter or result annotation, a
+// conversion T(x), and a match/switch arm type are type positions that never
+// reach this value walk (the conversion's bare-name callee is skipped here, the
+// annotations and arm types are TypeExprs the body-expression walk does not
+// visit). A local or parameter of the same name — a value shadowing the type
+// parameter — takes the value reading and is exempt, mirroring the lowering.
+func reportTypeParamValueUse(scope infer.TypeScope, shadow func(string) bool, body []ast.Stmt, at func(ast.Node) span, diags *diagnostic.List) {
+	if len(scope) == 0 || diags == nil {
+		return
+	}
+	isParam := func(name string) bool {
+		if _, ok := scope[name]; !ok {
+			return false
+		}
+		return shadow == nil || !shadow(name)
+	}
+	report := func(node ast.Node, name string) {
+		s := at(node)
+		diags.Add(newTypeParamInValuePositionDiagnostic(s.offset, s.width, name))
+	}
+	forEachBodyExpr(body, func(top ast.Expr) {
+		callee := map[*ast.Identifier]bool{}
+		ast.WalkExprs(top, func(e ast.Expr) bool {
+			switch e := e.(type) {
+			case *ast.CallExpr:
+				// A bare-name callee is a conversion T(x) or a function call — a type-
+				// position or call use of the name, not a value read of it.
+				if id, ok := e.Callee.(*ast.Identifier); ok {
+					callee[id] = true
+				}
+			case *ast.MemberExpr:
+				// A member access whose receiver names a type parameter is the value-
+				// position projection T.member; report it and do not descend into the
+				// receiver, which would double-report the bare parameter.
+				if recv, ok := e.Receiver.(*ast.Identifier); ok && isParam(recv.Name) {
+					report(e, recv.Name)
+					return false
+				}
+			case *ast.Identifier:
+				if !callee[e] && isParam(e.Name) {
+					report(e, e.Name)
+				}
+			}
+			return true
+		})
+	})
+}
+
+// paramShadow reports whether a name is bound by a body's value parameter — the
+// shadow predicate reportTypeParamValueUse consults so a value parameter named
+// like a type parameter (the rare fn f<T>(T: nint)) takes the value reading
+// rather than being flagged as a type parameter in value position.
+func paramShadow(params map[string]ir.Type) func(string) bool {
+	return func(name string) bool {
+		_, ok := params[name]
+		return ok
+	}
+}
+
 // --- method bodies ----------------------------------------------------------
 
 // methodTScope is the generic type-parameter scope in effect in a method body:
@@ -338,6 +407,7 @@ func checkMethodBodies(reg *builtin.Registry, defs []*ir.TypeDef, universe map[s
 			bs := infer.BodyScope{Reg: reg, Universe: universe, Qualified: qualified, Self: selfT, Params: params, Funcs: funcs, QualifiedFuncs: qualifiedFuncs, ConstShadows: constShadows, TScope: methodTScope(def, m)}
 			checkStmts(m.Body, want, bs, env, bodyNoSelf, sink, at, diags)
 			checkBareEnumArgs(m.Body, bs, env, at, diags)
+			reportTypeParamValueUse(bs.TScope, paramShadow(params), m.Body, at, diags)
 		}
 	}
 }
@@ -390,6 +460,7 @@ func checkFuncBodies(reg *builtin.Registry, file *ast.File, universe map[string]
 		if diags == nil {
 			continue // the sink-only walk wants no further diagnostics
 		}
+		reportTypeParamValueUse(tscope, paramShadow(params), fd.Body, at, diags)
 		// A function parameter or result may not be a type value: fn f(t: type) or
 		// fn f(): type is type_in_value_position — there are no type-value functions,
 		// which is why generics stay type parameters rather than type-value
