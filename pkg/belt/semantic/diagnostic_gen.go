@@ -64,6 +64,7 @@ const (
 	CodeMissingInitializer         diagnostic.Code = "belt.semantic.missing_initializer"
 	CodeMissingReadableMember      diagnostic.Code = "belt.semantic.missing_readable_member"
 	CodeMissingRequiredMethod      diagnostic.Code = "belt.semantic.missing_required_method"
+	CodeMissingRequiredStatic      diagnostic.Code = "belt.semantic.missing_required_static"
 	CodeMissingReturn              diagnostic.Code = "belt.semantic.missing_return"
 	CodeNoMatchingFuncOverload     diagnostic.Code = "belt.semantic.no_matching_func_overload"
 	CodeNoMatchingOverload         diagnostic.Code = "belt.semantic.no_matching_overload"
@@ -83,6 +84,7 @@ const (
 	CodeScrutineeNotComparable     diagnostic.Code = "belt.semantic.scrutinee_not_comparable"
 	CodeSelfOutsideMethod          diagnostic.Code = "belt.semantic.self_outside_method"
 	CodeStaticCollision            diagnostic.Code = "belt.semantic.static_collision"
+	CodeStaticMemberHasBody        diagnostic.Code = "belt.semantic.static_member_has_body"
 	CodeTernaryBranchMismatch      diagnostic.Code = "belt.semantic.ternary_branch_mismatch"
 	CodeTernaryConditionNotBool    diagnostic.Code = "belt.semantic.ternary_condition_not_bool"
 	CodeTypeArityMismatch          diagnostic.Code = "belt.semantic.type_arity_mismatch"
@@ -909,6 +911,22 @@ func newMissingRequiredMethodDiagnostic(offset int, width int, typ string, iface
 	}
 }
 
+func newMissingRequiredStaticDiagnostic(offset int, width int, typ string, iface string, method string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"typ":    diagnostic.Str(typ),
+		"iface":  diagnostic.Str(iface),
+		"method": diagnostic.Str(method),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeMissingRequiredStatic,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeMissingRequiredStatic, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
 func newMissingReturnDiagnostic(offset int, width int, name string) diagnostic.Diagnostic {
 	fields := map[string]fmt.Stringer{
 		"name": diagnostic.Str(name),
@@ -1169,6 +1187,20 @@ func newStaticCollisionDiagnostic(offset int, width int, name string, typ string
 		Severity: diagnostic.Error,
 		Code:     CodeStaticCollision,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeStaticCollision, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newStaticMemberHasBodyDiagnostic(offset int, width int, member string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"member": diagnostic.Str(member),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeStaticMemberHasBody,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeStaticMemberHasBody, fields),
 		Fields:   fields,
 		Offset:   offset,
 		Width:    width,

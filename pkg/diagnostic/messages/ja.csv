@@ -93,8 +93,10 @@ belt.semantic.immutable_data,フィールドや要素には代入できません
 belt.semantic.missing_initializer,let {name} は初期化が必要です。let {name} = 値 と書いてください
 belt.semantic.index_out_of_range,インデックス {index} は長さ {length} のリストの範囲外です
 belt.semantic.missing_required_method,{typ} は {iface} を実装していません: 必須メソッド {method} がありません
+belt.semantic.missing_required_static,{typ} は {iface} を実装していません: 必須 static fn {method} がありません
 belt.semantic.missing_readable_member,{typ} は {iface} を実装していません: 読める member {member}: {want} がありません
 belt.semantic.readable_member_has_body,読める member 要求 {member} は本体を持てません。ブロックを削除するかメソッドとして書いてください
+belt.semantic.static_member_has_body,static fn 要求 {member} は本体を持てません。デフォルト実装付き static はサポートされていません
 belt.semantic.readable_member_type_params,読める member 要求 {member} は型パラメータを宣言できません。インスタンス化する呼び出しがありません
 belt.semantic.conflicting_generic_ancestor,{child} は {ancestor} を矛盾する適用 ({first} と {second}) で継承しています
 belt.semantic.not_an_interface,{name} は interface ではありません

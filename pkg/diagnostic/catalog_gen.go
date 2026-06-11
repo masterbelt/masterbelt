@@ -623,6 +623,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return f["typ"].String() + " does not implement " + f["iface"].String() + ": missing required method " + f["method"].String()
 		}
 	},
+	"belt.semantic.missing_required_static": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return f["typ"].String() + " は " + f["iface"].String() + " を実装していません: 必須 static fn " + f["method"].String() + " がありません"
+		default:
+			return f["typ"].String() + " does not implement " + f["iface"].String() + ": missing required static fn " + f["method"].String()
+		}
+	},
 	"belt.semantic.missing_return": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
@@ -773,6 +781,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "static fn " + f["name"].String() + " は " + f["typ"].String() + " の同名の関連定数か enum メンバと衝突しています"
 		default:
 			return "static fn " + f["name"].String() + " collides with an associated constant or enum member of the same name on " + f["typ"].String()
+		}
+	},
+	"belt.semantic.static_member_has_body": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "static fn 要求 " + f["member"].String() + " は本体を持てません。デフォルト実装付き static はサポートされていません"
+		default:
+			return "a static-fn requirement " + f["member"].String() + " cannot have a body; a provided default static is not supported"
 		}
 	},
 	"belt.semantic.ternary_branch_mismatch": func(loc Locale, f map[string]fmt.Stringer) string {

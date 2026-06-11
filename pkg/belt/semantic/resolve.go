@@ -479,7 +479,15 @@ func resolveInterfaceDecl(r *infer.TypeResolver, reg *builtin.Registry, id *ast.
 			s := at(m)
 			diags.Add(newReadableMemberTypeParamsDiagnostic(s.offset, s.width, m.Name))
 		}
-		if m.Provided() && !m.Readable {
+		// A static-fn requirement is always required: a provided (default) static is
+		// not supported, so a written body does not make it provided — it is reported,
+		// the way a readable member's body is. A static carries a parameter list, so it
+		// is never a readable member.
+		if m.Static && m.HasBody && at != nil && diags != nil {
+			s := at(m)
+			diags.Add(newStaticMemberHasBodyDiagnostic(s.offset, s.width, m.Name))
+		}
+		if m.Provided() && !m.Readable && !m.Static {
 			def.Interface.Provided = append(def.Interface.Provided, m.Name)
 		} else {
 			def.Interface.Required = append(def.Interface.Required, m.Name)
@@ -564,11 +572,15 @@ type memberKey struct {
 }
 
 // memberKeyOf is the key of a declared interface member: a readable-member
-// requirement is a getter, every other member a method.
+// requirement is a getter, a static-fn requirement a static, every other member a
+// method.
 func memberKeyOf(m *ast.InterfaceMember) memberKey {
 	kind := ir.MethodNormal
-	if m.Readable {
+	switch {
+	case m.Readable:
 		kind = ir.MethodGetter
+	case m.Static:
+		kind = ir.MethodStatic
 	}
 	return memberKey{name: m.Name, kind: kind}
 }
@@ -683,9 +695,15 @@ func resolveInterfaceMember(r *infer.TypeResolver, reg *builtin.Registry, self i
 	method := &ir.Method{Name: m.Name, Public: m.Public, Doc: m.Doc}
 	// A readable-member requirement (X: T, no parameter list) is the signature of a
 	// getter — read as x.X yielding T — so it is carried as a getter, which is what
-	// conformance branches on to demand a field or getter rather than a method.
-	if m.Readable {
+	// conformance branches on to demand a field or getter rather than a method. A
+	// static-fn requirement (static X(): T) is carried as a static, which conformance
+	// branches on to demand a static fn and which a bounded parameter's T.X() call
+	// resolves through.
+	switch {
+	case m.Readable:
 		method.Kind = ir.MethodGetter
+	case m.Static:
+		method.Kind = ir.MethodStatic
 	}
 
 	// The member's own type variables join a fresh scope: the explicit ones
@@ -729,7 +747,7 @@ func resolveInterfaceMember(r *infer.TypeResolver, reg *builtin.Registry, self i
 		resolvedParams[p.Name] = t
 	}
 	method.Result = r.ResolveType(m.Result, mscope)
-	if m.Body != nil && !m.Readable {
+	if m.Body != nil && !m.Readable && !m.Static {
 		method.Body = lower.Body(m.Body, bodyBinder{r: r, reg: reg, params: params, paramTypes: resolvedParams, selfType: self, tscope: mscope, funcs: fns, self: true})
 		// A provided member carries an AST syntax link, the way a concrete method
 		// does, so the constant folder reaches its body: it folds a provided method
@@ -1032,10 +1050,41 @@ func unmetRequirement(reg *builtin.Registry, def, adef *ir.TypeDef, req *ir.Meth
 		}
 		return diagnostic.Diagnostic{}, false
 	}
+	if req.Kind == ir.MethodStatic {
+		// A static-fn requirement demands a static fn of the name, the static twin of
+		// a method requirement — checked by name and kind, the way a method is.
+		if !suppliesStatic(reg, def, req.Name, map[*ir.TypeDef]bool{}) {
+			return newMissingRequiredStaticDiagnostic(s.offset, s.width, def.Name, adef.Name, req.Name), true
+		}
+		return diagnostic.Diagnostic{}, false
+	}
 	if !suppliesMethod(reg, def, req.Name, map[*ir.TypeDef]bool{}) {
 		return newMissingRequiredMethodDiagnostic(s.offset, s.width, def.Name, adef.Name, req.Name), true
 	}
 	return diagnostic.Diagnostic{}, false
+}
+
+// suppliesStatic reports whether def supplies a static fn of the given name — what
+// a static-fn requirement (static X(): T) demands — checked by name and kind, the
+// static twin of suppliesMethod. The underlying definition of a nominal type is
+// walked, so a static inherited through an alias chain counts.
+func suppliesStatic(reg *builtin.Registry, def *ir.TypeDef, name string, seen map[*ir.TypeDef]bool) bool {
+	if def == nil || seen[def] {
+		return false
+	}
+	seen[def] = true
+	for _, m := range def.Methods {
+		if m.Name == name && m.Kind == ir.MethodStatic {
+			return true
+		}
+	}
+	if def.Builtin {
+		return false
+	}
+	if ud := bodyDef(reg, def.Body); ud != nil {
+		return suppliesStatic(reg, ud, name, seen)
+	}
+	return false
 }
 
 // interfaceArgSubst maps an interface's type parameters to the arguments of an
