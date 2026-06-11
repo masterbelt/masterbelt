@@ -89,6 +89,12 @@ jobs:
     name: Publish to npm and GitHub Packages
     needs: [wasm, node]
     runs-on: ubuntu-latest
+    # Records each publish under the `npm` environment in the repo's Deployments.
+    # The environment is optional on the npm Trusted Publisher (an unset one there
+    # is not checked); set it to `npm` to make it an additional constraint.
+    environment:
+      name: npm
+      url: https://www.npmjs.com/package/@masterbelt/tree-sitter-masterbelt
     permissions:
       contents: read
       id-token: write # OIDC for npm Trusted Publishing

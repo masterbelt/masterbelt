@@ -27,6 +27,12 @@ jobs:
   publish:
     if: ${{ !contains(github.ref_name, '-') }} # stable tags only
     runs-on: ubuntu-latest
+    # Records each publish under the `crates-io` environment in the repo's
+    # Deployments. Set the same environment on the crates.io Trusted Publisher to
+    # make it an additional constraint (an unset one there is not checked).
+    environment:
+      name: crates-io
+      url: https://crates.io/crates/tree-sitter-masterbelt
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
       # dtolnay/rust-toolchain selects the toolchain by its ref (`stable`), so it
