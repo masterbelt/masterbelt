@@ -6,5 +6,13 @@ allowBuilds:
   esbuild: true
   tree-sitter-cli: true
 
+# Reject dependency versions younger than 3 days (4320 minutes) — a supply-chain
+# dwell so a compromised or yanked release is likely caught before we install it.
+# Dependabot's cooldown (.github/dependabot.yml) holds *version* updates to the
+# same window so it never proposes one this policy would reject. Security updates
+# are not held by cooldown, so an urgent fix on a version younger than the window
+# fails the install — add that package to the exclude list below to let it
+# through (the deliberate, reviewed escape hatch).
+minimumReleaseAge: 4320
 minimumReleaseAgeExclude:
   - commitlint-config-agent-coauthor@1.0.0
