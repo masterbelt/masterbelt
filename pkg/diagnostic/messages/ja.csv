@@ -46,6 +46,7 @@ belt.semantic.uninferable_result,この関数リテラルの結果型を推論�
 belt.semantic.uninferable_parameter,パラメータ {name} の型を推論できません。型注釈を付けてください
 belt.semantic.lambda_arity_mismatch,関数リテラルのパラメータが {actual} 個ありますが、{expected} 個が必要です
 belt.semantic.arity_mismatch,関数 {name} は引数を {expected} 個取りますが、{actual} 個が渡されています
+belt.semantic.type_arity_mismatch,型 {name} は型引数を {expected} 個取りますが、{actual} 個が渡されています
 belt.semantic.missing_return,関数 {name} が値を返しません
 belt.semantic.no_matching_func_overload,関数 {name} のどのオーバーロードも {types} に適合しません
 belt.semantic.ambiguous_func_overload,関数 {name} の呼び出しが曖昧です: {types} に複数のオーバーロードが適合します

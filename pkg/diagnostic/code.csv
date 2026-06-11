@@ -46,6 +46,7 @@ belt.semantic.uninferable_result,error,
 belt.semantic.uninferable_parameter,error,name:string
 belt.semantic.lambda_arity_mismatch,error,actual:int expected:int
 belt.semantic.arity_mismatch,error,name:string actual:int expected:int
+belt.semantic.type_arity_mismatch,error,name:string actual:int expected:int
 belt.semantic.missing_return,error,name:string
 belt.semantic.no_matching_func_overload,error,name:string types:string
 belt.semantic.ambiguous_func_overload,error,name:string types:string

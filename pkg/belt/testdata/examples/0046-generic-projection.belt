@@ -1,10 +1,12 @@
-// Generic field-type projection. A field projected off a generic type is
+// Generic readable-member projection. A member projected off a generic type is
 // instantiated: the type argument is substituted for the parameter through the
-// field's declared type, so Box<string>.value — written Box.value<string> in a
+// member's declared type, so Box<string>.value — written Box.value<string> in a
 // type position — is string. Four shapes resolve: a direct application, a
 // concrete alias of one, an applied generic-alias chain, and a forward
 // reference. Nominal identity survives substitution, and the projection is a
 // type — named in a type position or consumed by a comptime assert, never stored.
+// A getter is a readable member too, so it projects through a generic exactly as
+// a field does — the symmetry closed at the end of this file.
 
 /// A nominal alias, to show identity survives substitution.
 pub type Level = sbyte
@@ -56,3 +58,45 @@ assert StringBox.value == string
 /// Nominal identity in value position: LevelBox.value is Level, not sbyte.
 assert LevelBox.value == Level
 assert LevelBox.value != sbyte
+
+// The getter twin. A getter is read as r.X (no parens), the same as a field, so
+// R.X projects it the same way: the getter's result type, instantiated by the
+// application and with the receiver substituted for self. Read and projection
+// agree over a generic, just as they do over a field.
+
+/// A generic cell with a getter over its field.
+pub type Cell<T> = {
+  raw: T,
+} impl {
+  /// Read as cell.held (no parens), like a field.
+  pub get held(): T {
+    return self.raw
+  }
+}
+
+/// A direct application instantiates the getter's result: Cell<long>.held — written
+/// Cell.held<long> in type position — is long, exactly as the field Box.value<long>.
+pub type HeldId = Cell.held<long>
+
+/// A forward reference: the generic carrying the getter is declared after the type
+/// projecting it, so the getter's result is read from the declaration syntax in the
+/// parameter scope, then the argument is substituted — the getter twin of EarlyValue.
+pub type EarlyHeld = LateCell.held<long>
+pub type LateCell<T> = {
+  raw: T,
+} impl {
+  pub get held(): T {
+    return self.raw
+  }
+}
+
+/// Value position: a concrete alias bakes the argument in, so the inherited getter
+/// instantiates with no written arguments — a comptime type value an assert consumes.
+pub type StringCell = Cell<string>
+assert StringCell.held == string
+
+/// Nominal identity survives substitution through the getter too: a Level cell's
+/// held is the alias Level, not the sbyte it unwraps to.
+pub type LevelCell = Cell<Level>
+assert LevelCell.held == Level
+assert LevelCell.held != sbyte

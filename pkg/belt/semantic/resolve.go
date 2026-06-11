@@ -44,6 +44,21 @@ func boundViolationReporter(at func(ast.Node) span, diags *diagnostic.List) func
 	}
 }
 
+// arityMismatchReporter builds the callback the type resolver reports a
+// type-application arity mismatch through, anchoring the diagnostic at the
+// offending argument and naming the applied type with the expected and given
+// counts. It returns nil when there is nowhere to report (the prelude, a memoized
+// resolution), so the resolver leaves the check off.
+func arityMismatchReporter(at func(ast.Node) span, diags *diagnostic.List) func(ast.Node, string, int, int) {
+	if at == nil || diags == nil {
+		return nil
+	}
+	return func(node ast.Node, name string, actual, expected int) {
+		s := at(node)
+		diags.Add(newTypeArityMismatchDiagnostic(s.offset, s.width, name, actual, expected))
+	}
+}
+
 // mentionsMetatype reports whether a resolved type is — or contains, anywhere in
 // a composite — the metatype `type` (the type a reified type value carries). A
 // type value is comptime-only and may not be stored, so any storage slot whose
@@ -150,6 +165,7 @@ func resolveTypes(folder exprFolder, file *ast.File, at func(ast.Node) span, dia
 		Report:          unknownTypeReporter(at, diags),
 		Registry:        reg,
 		BoundViolation:  boundViolationReporter(at, diags),
+		ArityMismatch:   arityMismatchReporter(at, diags),
 		ProjectionError: projectionErrorReporter(at, diags),
 	}
 	for i, id := range file.Interfaces {
@@ -1707,6 +1723,7 @@ func resolveFuncs(file *ast.File, at func(ast.Node) span, diags *diagnostic.List
 		Report:         unknownTypeReporter(at, diags),
 		Registry:       reg,
 		BoundViolation: boundViolationReporter(at, diags),
+		ArityMismatch:  arityMismatchReporter(at, diags),
 	}
 	shells := fns.shells
 	out := make([]*ir.Function, 0, len(file.Funcs))

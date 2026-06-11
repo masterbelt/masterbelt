@@ -287,6 +287,164 @@ File
       Methods: ~
       Consts: ~
       Impls: ~
+    TypeDecl
+      Doc: "A generic cell with a getter over its field."
+      Public: true
+      Name: "Cell"
+      Params:
+        TypeParam
+          Name: "T"
+          Constraint: ~
+      Body: RecordType
+        Fields:
+          FieldDef
+            Name: "raw"
+            Type: NamedType
+              Namespace: ""
+              Name: "T"
+              Args: ~
+              Projections: ~
+      Where: ~
+      Methods:
+        MethodDecl
+          Doc: "Read as cell.held (no parens), like a field."
+          Public: true
+          Extern: false
+          Kind: 1
+          Effects: ~
+          Name: "held"
+          TypeParams: ~
+          Params: ~
+          Result: NamedType
+            Namespace: ""
+            Name: "T"
+            Args: ~
+            Projections: ~
+          Body:
+            ReturnStmt
+              Value: MemberExpr
+                Receiver: SelfExpr
+                Member: Identifier
+                  Name: "raw"
+      Consts: ~
+      Impls: ~
+    TypeDecl
+      Doc: "A direct application instantiates the getter's result: Cell<long>.held — written" "Cell.held<long> in type position — is long, exactly as the field Box.value<long>."
+      Public: true
+      Name: "HeldId"
+      Params: ~
+      Body: NamedType
+        Namespace: "Cell"
+        Name: "held"
+        Args:
+          NamedType
+            Namespace: ""
+            Name: "long"
+            Args: ~
+            Projections: ~
+        Projections: ~
+      Where: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
+    TypeDecl
+      Doc: "A forward reference: the generic carrying the getter is declared after the type" "projecting it, so the getter's result is read from the declaration syntax in the" "parameter scope, then the argument is substituted — the getter twin of EarlyValue."
+      Public: true
+      Name: "EarlyHeld"
+      Params: ~
+      Body: NamedType
+        Namespace: "LateCell"
+        Name: "held"
+        Args:
+          NamedType
+            Namespace: ""
+            Name: "long"
+            Args: ~
+            Projections: ~
+        Projections: ~
+      Where: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
+    TypeDecl
+      Doc: ~
+      Public: true
+      Name: "LateCell"
+      Params:
+        TypeParam
+          Name: "T"
+          Constraint: ~
+      Body: RecordType
+        Fields:
+          FieldDef
+            Name: "raw"
+            Type: NamedType
+              Namespace: ""
+              Name: "T"
+              Args: ~
+              Projections: ~
+      Where: ~
+      Methods:
+        MethodDecl
+          Doc: ~
+          Public: true
+          Extern: false
+          Kind: 1
+          Effects: ~
+          Name: "held"
+          TypeParams: ~
+          Params: ~
+          Result: NamedType
+            Namespace: ""
+            Name: "T"
+            Args: ~
+            Projections: ~
+          Body:
+            ReturnStmt
+              Value: MemberExpr
+                Receiver: SelfExpr
+                Member: Identifier
+                  Name: "raw"
+      Consts: ~
+      Impls: ~
+    TypeDecl
+      Doc: "Value position: a concrete alias bakes the argument in, so the inherited getter" "instantiates with no written arguments — a comptime type value an assert consumes."
+      Public: true
+      Name: "StringCell"
+      Params: ~
+      Body: NamedType
+        Namespace: ""
+        Name: "Cell"
+        Args:
+          NamedType
+            Namespace: ""
+            Name: "string"
+            Args: ~
+            Projections: ~
+        Projections: ~
+      Where: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
+    TypeDecl
+      Doc: "Nominal identity survives substitution through the getter too: a Level cell's" "held is the alias Level, not the sbyte it unwraps to."
+      Public: true
+      Name: "LevelCell"
+      Params: ~
+      Body: NamedType
+        Namespace: ""
+        Name: "Cell"
+        Args:
+          NamedType
+            Namespace: ""
+            Name: "Level"
+            Args: ~
+            Projections: ~
+        Projections: ~
+      Where: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
   Enums: ~
   Interfaces: ~
   Funcs: ~
@@ -328,6 +486,48 @@ File
               Name: "LevelBox"
             Member: Identifier
               Name: "value"
+          Member: Identifier
+            Name: "neq"
+        Arguments:
+          Identifier
+            Name: "sbyte"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: MemberExpr
+            Receiver: Identifier
+              Name: "StringCell"
+            Member: Identifier
+              Name: "held"
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          Identifier
+            Name: "string"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: MemberExpr
+            Receiver: Identifier
+              Name: "LevelCell"
+            Member: Identifier
+              Name: "held"
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          Identifier
+            Name: "Level"
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: MemberExpr
+            Receiver: Identifier
+              Name: "LevelCell"
+            Member: Identifier
+              Name: "held"
           Member: Identifier
             Name: "neq"
         Arguments:

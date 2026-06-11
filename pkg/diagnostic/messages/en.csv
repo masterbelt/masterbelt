@@ -46,6 +46,7 @@ belt.semantic.uninferable_result,cannot infer this function literal's result typ
 belt.semantic.uninferable_parameter,cannot infer the type of parameter {name}; annotate it
 belt.semantic.lambda_arity_mismatch,function literal has {actual} parameters; {expected} expected
 belt.semantic.arity_mismatch,function {name} takes {expected} argument(s); {actual} given
+belt.semantic.type_arity_mismatch,type {name} takes {expected} type argument(s); {actual} given
 belt.semantic.missing_return,function {name} never returns a value
 belt.semantic.no_matching_func_overload,no overload of function {name} accepts {types}
 belt.semantic.ambiguous_func_overload,ambiguous call: more than one overload of function {name} accepts {types}
