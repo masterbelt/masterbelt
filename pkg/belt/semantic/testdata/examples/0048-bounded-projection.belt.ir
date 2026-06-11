@@ -1,0 +1,153 @@
+Module
+  Consts: ~
+  Types:
+    TypeDef
+      Name: "Card"
+      Anchor: "belt:/Card"
+      Public: true
+      Doc: "A card meets the level requirement with a stored field and the self-typed best" "requirement with a getter — the two readable members, one of each kind, the way" "a type opts into a readable-member bound."
+      Params: ~
+      Body: Record
+        Fields:
+          Field
+            Name: "level"
+            Type: Builtin
+              Name: "nint"
+          Field
+            Name: "rank"
+            Type: Builtin
+              Name: "nint"
+      Methods:
+        Method
+          Name: "best"
+          Anchor: "belt:/Card#best"
+          Public: true
+          Extern: false
+          Kind: 1
+          Effects: ~
+          Doc: ~
+          Params: ~
+          Result: SelfType
+          Body:
+            Return
+              Value: SelfValue
+                Type: Named
+                  Def: "Card"
+          Owner: "Card"
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls:
+        Named
+          Def: "Levelled"
+      Enum: ~
+      Master: ~
+      Where: ~
+    TypeDef
+      Name: "Summary"
+      Anchor: "belt:/Summary"
+      Public: true
+      Doc: "A summary whose field types are projected off the bounded parameter:" "`T.level` is nint, `T.best` is T — the requirement typed self resolving to the" "parameter."
+      Params:
+        TypeParam
+          Name: "T"
+          Bound: Named
+            Def: "Levelled"
+      Body: Record
+        Fields:
+          Field
+            Name: "score"
+            Type: Builtin
+              Name: "nint"
+          Field
+            Name: "top"
+            Type: TypeVar
+              Name: "T"
+              Bound: Named
+                Def: "Levelled"
+      Methods: ~
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Master: ~
+      Where: ~
+    TypeDef
+      Name: "Levelled"
+      Anchor: "belt:/Levelled"
+      Public: true
+      Doc: "A behaviour for anything with a readable level and a readable best of its own" "type. Both are readable-member requirements (`X: T`, no parentheses), so a" "field or a getter meets them."
+      Params: ~
+      Body: ~
+      Methods:
+        Method
+          Name: "level"
+          Anchor: "belt:/Levelled#level"
+          Public: false
+          Extern: false
+          Kind: 1
+          Effects: ~
+          Doc: "A readable member: every Levelled is read as `v.level` for its level."
+          Params: ~
+          Result: Builtin
+            Name: "nint"
+          Body: ~
+          Owner: "Levelled"
+        Method
+          Name: "best"
+          Anchor: "belt:/Levelled#best"
+          Public: false
+          Extern: false
+          Kind: 1
+          Effects: ~
+          Doc: "A readable member typed self: read as `v.best`, a value of the same type."
+          Params: ~
+          Result: SelfType
+          Body: ~
+          Owner: "Levelled"
+      Consts: ~
+      Builtin: false
+      Interface: InterfaceDef
+        Required: "level" "best"
+        Provided: ~
+        Parents: ~
+      Impls: ~
+      Enum: ~
+      Master: ~
+      Where: ~
+  Funcs:
+    Function
+      Name: "levelOf"
+      Anchor: "belt:/levelOf"
+      Public: true
+      Extern: false
+      Effects: ~
+      Doc: "Read the level off a bounded parameter's value — resolved through the bound," "the value twin of the `T.level` projection."
+      TypeParams:
+        TypeParam
+          Name: "T"
+          Bound: Named
+            Def: "Levelled"
+      Params:
+        Param
+          Name: "v"
+          Type: TypeVar
+            Name: "T"
+            Bound: Named
+              Def: "Levelled"
+      Result: Builtin
+        Name: "nint"
+      Body:
+        Return
+          Value: FieldAccess
+            Receiver: ParamRef
+              Name: "v"
+              Type: TypeVar
+                Name: "T"
+                Bound: Named
+                  Def: "Levelled"
+            Field: "level"
+            Type: Builtin
+              Name: "nint"
+  Asserts: ~

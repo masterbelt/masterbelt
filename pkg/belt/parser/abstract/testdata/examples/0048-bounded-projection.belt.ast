@@ -1,0 +1,157 @@
+File
+  Uses: ~
+  Decls: ~
+  Types:
+    TypeDecl
+      Doc: "A card meets the level requirement with a stored field and the self-typed best" "requirement with a getter — the two readable members, one of each kind, the way" "a type opts into a readable-member bound."
+      Public: true
+      Name: "Card"
+      Params: ~
+      Body: RecordType
+        Fields:
+          FieldDef
+            Name: "level"
+            Type: NamedType
+              Namespace: ""
+              Name: "nint"
+              Args: ~
+              Projections: ~
+          FieldDef
+            Name: "rank"
+            Type: NamedType
+              Namespace: ""
+              Name: "nint"
+              Args: ~
+              Projections: ~
+      Where: ~
+      Methods:
+        MethodDecl
+          Doc: ~
+          Public: true
+          Extern: false
+          Kind: 1
+          Effects: ~
+          Name: "best"
+          TypeParams: ~
+          Params: ~
+          Result: NamedType
+            Namespace: ""
+            Name: "self"
+            Args: ~
+            Projections: ~
+          Body:
+            ReturnStmt
+              Value: SelfExpr
+      Consts: ~
+      Impls:
+        NamedType
+          Namespace: ""
+          Name: "Levelled"
+          Args: ~
+          Projections: ~
+    TypeDecl
+      Doc: "A summary whose field types are projected off the bounded parameter:" "`T.level` is nint, `T.best` is T — the requirement typed self resolving to the" "parameter."
+      Public: true
+      Name: "Summary"
+      Params:
+        TypeParam
+          Name: "T"
+          Constraint: NamedType
+            Namespace: ""
+            Name: "Levelled"
+            Args: ~
+            Projections: ~
+      Body: RecordType
+        Fields:
+          FieldDef
+            Name: "score"
+            Type: NamedType
+              Namespace: "T"
+              Name: "level"
+              Args: ~
+              Projections: ~
+          FieldDef
+            Name: "top"
+            Type: NamedType
+              Namespace: "T"
+              Name: "best"
+              Args: ~
+              Projections: ~
+      Where: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
+  Enums: ~
+  Interfaces:
+    InterfaceDecl
+      Doc: "A behaviour for anything with a readable level and a readable best of its own" "type. Both are readable-member requirements (`X: T`, no parentheses), so a" "field or a getter meets them."
+      Public: true
+      Name: "Levelled"
+      Params: ~
+      Parents: ~
+      Members:
+        InterfaceMember
+          Doc: "A readable member: every Levelled is read as `v.level` for its level."
+          Public: false
+          Name: "level"
+          Readable: true
+          HasBody: false
+          TypeParams: ~
+          Params: ~
+          Result: NamedType
+            Namespace: ""
+            Name: "nint"
+            Args: ~
+            Projections: ~
+          Body: ~
+        InterfaceMember
+          Doc: "A readable member typed self: read as `v.best`, a value of the same type."
+          Public: false
+          Name: "best"
+          Readable: true
+          HasBody: false
+          TypeParams: ~
+          Params: ~
+          Result: NamedType
+            Namespace: ""
+            Name: "self"
+            Args: ~
+            Projections: ~
+          Body: ~
+  Funcs:
+    FuncDecl
+      Doc: "Read the level off a bounded parameter's value — resolved through the bound," "the value twin of the `T.level` projection."
+      Public: true
+      Extern: false
+      Effects: ~
+      Name: "levelOf"
+      TypeParams:
+        TypeParam
+          Name: "T"
+          Constraint: NamedType
+            Namespace: ""
+            Name: "Levelled"
+            Args: ~
+            Projections: ~
+      Params:
+        ParamDef
+          Name: "v"
+          Type: NamedType
+            Namespace: ""
+            Name: "T"
+            Args: ~
+            Projections: ~
+      Result: NamedType
+        Namespace: ""
+        Name: "nint"
+        Args: ~
+        Projections: ~
+      Body:
+        ReturnStmt
+          Value: MemberExpr
+            Receiver: Identifier
+              Name: "v"
+            Member: Identifier
+              Name: "level"
+  Asserts: ~
+  Masters: ~
