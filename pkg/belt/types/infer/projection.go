@@ -147,13 +147,15 @@ func (r *TypeResolver) projectThroughSyntax(def *ir.TypeDef, member string, fiel
 	return t
 }
 
-// projectGenericThroughSyntax resolves member's field type from the declaration
+// projectGenericThroughSyntax resolves member's written type from the declaration
 // syntax of a forward-referenced generic — its parameter scope in effect, so a
-// field type written in terms of a parameter (Box<T> = { value: T }) resolves to
-// that parameter — then substitutes the application's arguments for the
-// definition's parameters (Box<string>.value -> string). The cycle guard keys on
-// (def, member) exactly as projectThroughSyntax, so an ungrounded generic
-// projection is reported rather than recursing forever.
+// type written in terms of a parameter (a field Box<T> = { value: T }, or a
+// getter item(): T) resolves to that parameter — then substitutes the
+// application's arguments for the definition's parameters (Box<string>.value ->
+// string). The cycle guard keys on (def, member) exactly as projectThroughSyntax,
+// so an ungrounded generic projection is reported rather than recursing forever.
+// It is shared by the field path (directly) and the getter path
+// (projectGenericGetterThroughSyntax, which substitutes self atop the result).
 func (r *TypeResolver) projectGenericThroughSyntax(app *ir.App, member string, fieldType ast.TypeExpr, node ast.Node) ir.Type {
 	def := app.Def
 	scope, names := r.genericScope(def)
@@ -177,6 +179,23 @@ func (r *TypeResolver) projectGenericThroughSyntax(app *ir.App, member string, f
 		subst[name] = app.Args[i]
 	}
 	return types.Substitute(t, subst)
+}
+
+// projectGenericGetterThroughSyntax is the getter twin of
+// projectGenericThroughSyntax: it instantiates a forward-referenced generic
+// getter's result type the same way (parameter scope, then the application's
+// arguments substituted), then replaces self with the receiver application
+// throughout — so a forward generic getter returning self or list<self> projects
+// the application (LateBox<long>) or list of it, not a type still carrying the
+// receiver-only self marker. The parameter is bound before self, matching the
+// resolved path (GetterResultType). The fields' path needs no self substitution
+// — a field type carries no self — so only the getter wraps the shared core.
+func (r *TypeResolver) projectGenericGetterThroughSyntax(app *ir.App, member string, result ast.TypeExpr, node ast.Node) ir.Type {
+	t := r.projectGenericThroughSyntax(app, member, result, node)
+	if t == ir.Invalid {
+		return ir.Invalid // an arity mismatch or cycle was already handled
+	}
+	return types.SubstituteSelf(t, app)
 }
 
 // checkProjectionBounds enforces a forward-referenced generic's parameter bounds
@@ -308,42 +327,58 @@ func (r *TypeResolver) hasMethodMember(head ir.Type, name string) bool {
 func (r *TypeResolver) projectReadable(head ir.Type, def *ir.TypeDef, member string, node ast.Node, hasFields bool) ir.Type {
 	if r.Registry != nil {
 		// A getter projects to its result type — but a result still carrying a free
-		// type variable (a getter reached through an uninstantiated generic) is not a
-		// concrete type, so it is not projected here; generic getter projection is the
-		// follow-up slice.
+		// type variable (a getter reached through an uninstantiated bare generic) is
+		// not a concrete type, so it is not projected here; an application supplies
+		// the arguments through the forward path below instead.
 		if t, ok := types.GetterResultType(r.Registry, head, member); ok && !types.HasTypeVar(t) {
 			return t
 		}
 	}
-	if def != nil {
-		if result, isSelf, ok := getterResultSyntax(def, member); ok {
-			if isSelf {
-				return head // a self-returning getter projects the receiver
-			}
-			// The receiver replaces self throughout the resolved result, so a forward
-			// getter returning list<self> projects to list<receiver>, not a type still
-			// carrying the receiver-only self marker — the forward twin of the resolved
-			// path's self substitution.
-			return types.SubstituteSelf(r.projectThroughSyntax(def, member, result, node), head)
-		}
+	if t, ok := r.projectForwardGetter(head, def, member, node); ok {
+		return t
 	}
 	return r.failedProjection(node, head, def, member, hasFields)
 }
 
-// getterResultSyntax returns the declared result type of a getter named member
-// in def's declaration syntax — for the forward reference where the getter's
-// method is not attached to the resolved def yet — and whether that result is the
-// self type. ok is false when def's syntax declares no getter of that name.
-func getterResultSyntax(def *ir.TypeDef, member string) (ast.TypeExpr, bool, bool) {
-	methods, generic, ok := declSyntaxMethods(def)
-	if !ok {
-		return nil, false, false
+// projectForwardGetter projects a getter read from def's declaration syntax — the
+// forward reference whose methods are not attached to the resolved def yet — and
+// reports whether a getter of that name was found (false falls to the field-
+// projection failure). A generic application instantiates the getter with its
+// arguments through the getter twin of the field's projectGenericThroughSyntax,
+// supplying what the bare-generic guard in getterResultSyntax has none of; a
+// non-application head takes the non-generic forward path, where a self-returning
+// getter projects the receiver and any other result has the receiver substituted
+// for self throughout (so list<self> projects to list<receiver>).
+func (r *TypeResolver) projectForwardGetter(head ir.Type, def *ir.TypeDef, member string, node ast.Node) (ir.Type, bool) {
+	if def == nil {
+		return nil, false
 	}
-	// A getter on a generic type declared later cannot be projected from syntax
-	// without instantiating its parameters (no application here supplies them), so
-	// it is deferred — the getter twin of the bare-generic field guard. (Generic
-	// getter projection is the follow-up slice.)
-	if generic {
+	if app, ok := head.(*ir.App); ok {
+		result, _, ok := getterDeclSyntax(def, member)
+		if !ok {
+			return nil, false
+		}
+		return r.projectGenericGetterThroughSyntax(app, member, result, node), true
+	}
+	result, isSelf, ok := getterResultSyntax(def, member)
+	if !ok {
+		return nil, false
+	}
+	if isSelf {
+		return head, true // a self-returning getter projects the receiver
+	}
+	return types.SubstituteSelf(r.projectThroughSyntax(def, member, result, node), head), true
+}
+
+// getterDeclSyntax returns the declared result type of a getter named member in
+// def's declaration syntax — for the forward reference where the getter's method
+// is not attached to the resolved def yet — and whether that result is exactly
+// the self type. It reads the getter even from a generic declaration: the
+// application path supplies the arguments to instantiate it. ok is false when
+// def's syntax declares no getter of that name.
+func getterDeclSyntax(def *ir.TypeDef, member string) (ast.TypeExpr, bool, bool) {
+	methods, _, ok := declSyntaxMethods(def)
+	if !ok {
 		return nil, false, false
 	}
 	for _, m := range methods {
@@ -355,6 +390,19 @@ func getterResultSyntax(def *ir.TypeDef, member string) (ast.TypeExpr, bool, boo
 		}
 	}
 	return nil, false, false
+}
+
+// getterResultSyntax is getterDeclSyntax restricted to a non-generic declaration.
+// A getter on a generic type declared later cannot be projected from syntax on
+// the non-application path: a bare generic supplies no arguments to instantiate
+// its parameters, so it is deferred — the getter twin of the bare-generic field
+// guard. The application path reads the generic getter through getterDeclSyntax
+// directly, carrying the arguments to projectGenericGetterThroughSyntax.
+func getterResultSyntax(def *ir.TypeDef, member string) (ast.TypeExpr, bool, bool) {
+	if _, generic, ok := declSyntaxMethods(def); !ok || generic {
+		return nil, false, false
+	}
+	return getterDeclSyntax(def, member)
 }
 
 // declSyntaxMethods returns the impl-block methods carried by a def's declaration

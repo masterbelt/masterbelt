@@ -287,6 +287,89 @@ func TestGetterProjectionAliasDeclaredGetter(t *testing.T) {
 	}
 }
 
+func TestGetterProjectionForwardGeneric(t *testing.T) {
+	// A getter on a generic type declared after the projecting alias — a forward
+	// reference whose methods are not attached yet — is read from the declaration
+	// syntax in the parameter scope and instantiated with the application's
+	// argument: LateBox.item<long> is long, the getter twin of the field forward
+	// generic projection (Late.value<long>), so read and projection agree even for
+	// a forward generic.
+	src := "pub type EarlyItem = LateBox.item<long>\n" +
+		"pub type LateBox<T> = { v: T } impl {\n  pub get item(): T { return self.v }\n}\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("want clean (forward generic getter projection), got %v", codes(diags))
+	}
+	for _, def := range m.Types {
+		if def.Name == "EarlyItem" && (def.Body == nil || def.Body.String() != "long") {
+			t.Fatalf("EarlyItem = %v, want long (forward LateBox<long>.item)", def.Body)
+		}
+	}
+}
+
+func TestGetterProjectionForwardGenericNestedSelf(t *testing.T) {
+	// A forward generic getter whose result carries self inside a constructor
+	// (list<self>) substitutes the receiver application for self throughout, after
+	// the parameter is bound: LateBox.items<long> is list<LateBox<long>>, not a type
+	// still carrying the receiver-only self marker — the forward generic twin of the
+	// nested-self substitution the resolved and non-generic forward paths already do.
+	src := "pub type EarlyItems = LateBox.items<long>\n" +
+		"pub type LateBox<T> = { v: T } impl {\n  pub get items(): list<self> { return [] }\n}\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("want clean (forward generic nested self), got %v", codes(diags))
+	}
+	for _, def := range m.Types {
+		if def.Name == "EarlyItems" && (def.Body == nil || def.Body.String() != "list<LateBox<long>>") {
+			t.Fatalf("EarlyItems = %v, want list<LateBox<long>> (forward generic nested self)", def.Body)
+		}
+	}
+}
+
+func TestGetterProjectionForwardGenericValuePosition(t *testing.T) {
+	// A getter projected in value position through a concrete alias of a
+	// forward-declared generic (EB = LateBox<string>, LateBox declared after) is a
+	// comptime type value an assert consumes: EB.item folds to string. The read
+	// agrees, so x.item on an EB reads string too.
+	src := "pub type EB = LateBox<string>\n" +
+		"assert EB.item == string\n" +
+		"pub fn read(x: EB): string { return x.item }\n" +
+		"pub type LateBox<T> = { v: T } impl {\n  pub get item(): T { return self.v }\n}\n"
+	_, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("want clean (forward generic getter value position), got %v", codes(diags))
+	}
+}
+
+func TestGetterProjectionForwardGenericAliasChainRejected(t *testing.T) {
+	// A getter reached through a forward-referenced generic-alias chain (Crate<U> =
+	// Box<U>, both declared after the projecting alias) has no settled record shape
+	// to read the getter from, so it is generic_type_projection — exactly what the
+	// field projection Crate.value<long> reports in the same forward-chain shape.
+	// Keeping it rejected preserves read/projection symmetry: neither field nor
+	// getter projects through a forward generic-alias chain.
+	src := "pub type EarlyItem = Crate.item<long>\n" +
+		"pub type Crate<U> = Box<U>\n" +
+		"pub type Box<T> = { v: T } impl {\n  pub get item(): T { return self.v }\n}\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeGenericTypeProjection) {
+		t.Fatalf("want generic_type_projection (forward generic-alias chain, symmetric with field), got %v", codes(diags))
+	}
+}
+
+func TestGetterProjectionForwardGenericBoundEnforced(t *testing.T) {
+	// A forward generic getter enforces the declaring type's parameter bound on the
+	// projection argument, exactly as the forward field projection does: the
+	// application is built off the shell before its Params resolve, so the
+	// projection re-checks against the bound from the declaration syntax —
+	// LateBox.item<{ x: nint }> before LateBox<T: comparable> is bound_not_satisfied.
+	forward := "pub type S = { v: LateBox.item<{ x: nint }> }\n" +
+		"pub type LateBox<T: comparable> = { v: T } impl {\n  pub get item(): T { return self.v }\n}\n"
+	if _, diags := analyze(forward); !hasCode(diags, CodeBoundNotSatisfied) {
+		t.Fatalf("forward: want bound_not_satisfied, got %v", codes(diags))
+	}
+}
+
 func TestGetterProjectionGenericAliasApplied(t *testing.T) {
 	// A getter reached through an applied generic alias (Alias<U> = Box<U>) composes
 	// the substitution through the chain: Alias.item<string> binds U = string, which
