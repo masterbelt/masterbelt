@@ -260,28 +260,30 @@ jobs:
           path: toolchain/editors/vscode/masterbelt.vsix
           if-no-files-found: error
 
-  # Publish the tree-sitter grammar on the nightly, under the same
-  # commit-derived version as the CLI, to two channels (the way the vsix
-  # publishes to the Marketplace):
-  #   - the dedicated git mirror (editors pin it) — when the masterbelt GitHub
-  #     App is configured, pushing the rolling default branch and an immutable
-  #     v<version> tag; absent, it only uploads the artifact.
-  #   - GitHub Packages (web-tree-sitter consumers) — the npm package with the
-  #     built WebAssembly module, via the built-in GITHUB_TOKEN.
-  # The git mirror is synced before the wasm is built, so the editor channel
-  # never depends on Docker/npm; a wasm or publish failure leaves it intact.
+  # Publish the tree-sitter grammar on the nightly by syncing it to the dedicated
+  # mirror repo and tagging it; the mirror's own workflows then publish to the
+  # package registries (the way the vsix publishes to the Marketplace, but with
+  # the registry step delegated):
+  #   - when the masterbelt GitHub App is configured, the assembled tree is pushed
+  #     to the mirror's default branch (the rolling preview editors track) and an
+  #     immutable v<version> tag. That tag push triggers the mirror's release
+  #     workflows (npm + GitHub Packages always; crates.io + PyPI on stable tags),
+  #     which build the wasm and publish — so this job needs no registry secret,
+  #     no Docker, and no npm here.
+  #   - absent the App, it only uploads the assembled tree as an artifact (never
+  #     fails), so a contributor without the secrets still gets a build.
   tree-sitter:
     name: tree-sitter grammar
     needs: gate
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write # publish the npm package to GitHub Packages
     env:
       # Routed through env so the token step can gate on it (secrets are not
       # usable in `if`). The App mints a short-lived token scoped to the mirror
-      # repo and to Contents alone — no long-lived, account-wide credential, and
-      # the org disallows deploy keys.
+      # repo and to Contents + Workflows — Workflows because the synced tree
+      # carries the mirror's own .github/workflows; no long-lived, account-wide
+      # credential, and the org disallows deploy keys.
       TS_APP_CLIENT_ID: ${{ secrets.TREE_SITTER_APP_CLIENT_ID }}
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
@@ -307,8 +309,9 @@ jobs:
       - name: Assemble the standalone package tree
         run: make publish-tree-sitter
 
-      # Mint the short-lived, repo-scoped, contents-only token from the App.
-      # Skips cleanly when the App is not configured (degrade to artifact).
+      # Mint the short-lived, repo-scoped token from the App, scoped to Contents
+      # + Workflows (the sync pushes the mirror's .github/workflows too). Skips
+      # cleanly when the App is not configured (degrade to artifact).
       - name: Mint a scoped token from the masterbelt GitHub App
         id: app-token
         if: env.TS_APP_CLIENT_ID != ''
@@ -319,13 +322,14 @@ jobs:
           owner: masterbelt
           repositories: tree-sitter-masterbelt
           permission-contents: write
+          permission-workflows: write
 
       # Sync to the dedicated repo with the minted token. The source repo stays
       # the single truth; the mirror is overwritten with the assembled tree (so
       # a removed file propagates), pushed to its default branch (the rolling
-      # preview) and tagged immutably as v<version> for editors to pin — the
-      # version already carries the commit SHA, so the tag is unique and never
-      # moves (C-3 §5).
+      # preview) and tagged immutably as v<version>. The tag both pins the grammar
+      # for editors and triggers the mirror's release workflows; the version
+      # carries the commit SHA, so the tag is unique and never moves.
       - name: Sync to masterbelt/tree-sitter-masterbelt
         if: steps.app-token.outputs.token != ''
         env:
@@ -345,11 +349,17 @@ jobs:
           cd dest
           git add -A
           if git diff --cached --quiet; then
-            echo "dedicated repo already up to date — nothing to publish"
-            exit 0
+            echo "dedicated repo already up to date — no new commit"
+          else
+            git commit -m "sync grammar from masterbelt@${sha}"
+            git push origin HEAD:main
           fi
-          git commit -m "sync grammar from masterbelt@${sha}"
-          git push origin HEAD:main
+          # Ensure the release tag exists regardless of whether the content
+          # changed. The tag is what triggers the mirror's release workflows, so a
+          # missing one — a prior run whose tag push failed, or a mirror
+          # bootstrapped with matching content — must still be created, or that
+          # version never publishes. The version carries the commit SHA, so the tag
+          # is unique; an existing one is left immutable.
           tag="v${version}"
           if git ls-remote --exit-code --tags origin "refs/tags/${tag}" >/dev/null 2>&1; then
             echo "tag ${tag} already exists — leaving it immutable"
@@ -359,40 +369,12 @@ jobs:
             echo "published ${tag}"
           fi
 
-      # Build the WebAssembly module into the assembled tree (web-tree-sitter's
-      # consumption path), then upload the complete package as an artifact. The
-      # mirror was synced above without it, so this Docker step cannot affect the
-      # editor channel.
-      - name: Build the WebAssembly module
-        run: make tree-sitter-wasm
+      # Upload the assembled tree as an artifact — the degrade path when the App
+      # is not configured (the sync is skipped), and a build record otherwise. The
+      # wasm and every registry publish are the mirror's job now (release-npm.yml
+      # builds the wasm there), so this job stays Docker-free and secret-free.
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: tree-sitter-masterbelt
           path: dist/tree-sitter-masterbelt
           if-no-files-found: error
-
-      # Publish the npm package (grammar + wasm) to GitHub Packages with the
-      # built-in token — no extra secret, since the package scope matches the
-      # org. Only from the canonical repo (a fork lacks the scope); a version
-      # already published is skipped rather than failed (npm ignores build
-      # metadata, so a same-day rebuild is the same version).
-      - name: Publish to GitHub Packages
-        if: github.repository == 'masterbelt/masterbelt'
-        working-directory: dist/tree-sitter-masterbelt
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -eu
-          {
-            echo "@masterbelt:registry=https://npm.pkg.github.com"
-            echo "//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}"
-          } > .npmrc
-          if npm publish 2>publish.err; then
-            echo "published $(node -p "require('./package.json').version")"
-          elif grep -qiE "cannot publish over|previously published|already exists|409" publish.err; then
-            echo "version already published — skipping"
-          else
-            cat publish.err >&2
-            exit 1
-          fi
-          rm -f .npmrc publish.err

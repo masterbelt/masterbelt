@@ -1,0 +1,144 @@
+# release-npm — publishes the npm package on every release tag, to BOTH public
+# npm and GitHub Packages. No long-lived registry token is stored.
+#
+# The package ships the Node native binding (prebuilt addons, one per platform,
+# loaded by node-gyp-build — no node-gyp on the consumer) AND the WebAssembly
+# build (for web-tree-sitter), the way a tree-sitter grammar package does. Three
+# stages: build the wasm, build a prebuilt addon on every target platform, then
+# publish a single package carrying them all.
+#
+# Auth, no stored token:
+# - public npm: OIDC Trusted Publishing (`id-token: write`) — npm exchanges the
+#   workflow identity for a short-lived credential and attaches provenance.
+# - GitHub Packages: the workflow's built-in GITHUB_TOKEN, per-run and revoked.
+#
+# A nightly tag is a prerelease (it carries a '-') and goes to the `nightly`
+# dist-tag so `npm install` (latest) never picks it up; a stable tag goes to
+# `latest`. Re-publishing an existing version is skipped, not failed.
+#
+# This repository is a generated mirror — edit the source in the masterbelt
+# monorepo (toolchain/grammars/tree-sitter-masterbelt/.github), not here.
+name: release-npm
+
+on:
+  push:
+    tags: ['v*']
+
+concurrency:
+  group: release-npm-${{ github.ref }}
+
+permissions:
+  contents: read
+
+jobs:
+  wasm:
+    name: Build the WebAssembly module
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 22
+      # The wasm is built by the tree-sitter CLI (a devDependency). Its npm package
+      # is a thin bin wrapper around a platform binary that its install script
+      # downloads, so the install must run scripts — `--ignore-scripts` would leave
+      # the binary absent and the build below would fail. Omit the peer (the
+      # tree-sitter runtime) and optionals, which the wasm build does not need.
+      - run: npm install --omit=peer --omit=optional
+      - run: npx tree-sitter --version # fail fast if the CLI binary did not install
+      # The output name is pinned so it matches package.json (files/exports) and the README.
+      - run: npx tree-sitter build --wasm -o tree-sitter-masterbelt.wasm
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: prebuilds-wasm
+          path: '*.wasm'
+          if-no-files-found: error
+
+  node:
+    name: Build the native addon on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-24.04 # linux x64
+          - ubuntu-24.04-arm # linux arm64
+          - macos-15 # darwin arm64
+          - macos-15-intel # darwin x64
+          - windows-2025 # win32 x64
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 22
+      # Installs node-addon-api + prebuildify (+ node-gyp-build), omitting the peer
+      # (the tree-sitter runtime — not needed to build the addon) and optionals.
+      # --ignore-scripts skips the package's own install (node-gyp-build) so
+      # prebuildify is the only build; the CLI is not needed here either.
+      - run: npm install --ignore-scripts --omit=peer --omit=optional
+      # A Node-API (ABI-stable) prebuild: one per platform works across Node versions.
+      - run: npx prebuildify --napi --strip
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: prebuilds-${{ matrix.os }}
+          path: prebuilds/**
+          if-no-files-found: error
+
+  publish:
+    name: Publish to npm and GitHub Packages
+    needs: [wasm, node]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # OIDC for npm Trusted Publishing
+      packages: write # GitHub Packages
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 22
+      # Trusted Publishing needs npm >= 11.5.1 (newer than Node 22 bundles).
+      - run: npm install -g npm@latest
+
+      # Gather every platform's prebuild and the wasm into the package tree.
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          path: prebuilds
+          pattern: prebuilds-*
+          merge-multiple: true
+      - name: Move the wasm to the package root
+        run: mv -v prebuilds/*.wasm .
+
+      - name: Choose the dist-tag
+        id: t
+        run: |
+          case "$GITHUB_REF_NAME" in
+            *-*) echo "tag=nightly" >> "$GITHUB_OUTPUT" ;; # prerelease
+            *)   echo "tag=latest"  >> "$GITHUB_OUTPUT" ;;
+          esac
+
+      # OIDC — no token. Requires a Trusted Publisher configured on npmjs for this
+      # repo + workflow; npm authenticates via the id-token and adds provenance.
+      # --ignore-scripts so packing never runs the consumer install hook.
+      - name: Publish to npm (public, OIDC Trusted Publishing)
+        run: |
+          npm publish --access public --ignore-scripts --tag ${{ steps.t.outputs.tag }} 2>err \
+            || { grep -qiE "cannot publish over|previously published|already exists|409" err \
+                 && echo "npm: version already published — skipping" \
+                 || { cat err >&2; exit 1; }; }
+          rm -f err
+
+      - name: Publish to GitHub Packages
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          {
+            echo "@masterbelt:registry=https://npm.pkg.github.com"
+            echo "//npm.pkg.github.com/:_authToken=${TOKEN}"
+          } > .npmrc
+          npm publish --registry https://npm.pkg.github.com \
+            --ignore-scripts --tag ${{ steps.t.outputs.tag }} 2>err \
+            || { grep -qiE "cannot publish over|previously published|already exists|409" err \
+                 && echo "GitHub Packages: version already published — skipping" \
+                 || { cat err >&2; exit 1; }; }
+          rm -f .npmrc err

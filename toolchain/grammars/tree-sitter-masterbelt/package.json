@@ -10,7 +10,7 @@
     "directory": "toolchain/grammars/tree-sitter-masterbelt"
   },
   "scripts": {
-    "generate": "tree-sitter generate",
+    "generate": "tree-sitter generate --abi 14",
     "test": "tree-sitter test",
     "parse": "tree-sitter parse"
   },
