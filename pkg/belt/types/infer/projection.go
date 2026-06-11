@@ -62,6 +62,13 @@ func (r *TypeResolver) project(head ir.Type, member string, node ast.Node) ir.Ty
 	if head == nil || head == ir.Invalid {
 		return ir.Invalid // the head already failed and was reported; do not cascade
 	}
+	// A generic type parameter (T.member where T: I) projects off its bound: the
+	// readable members come from the interface the bound requires, not from a
+	// record body, so this is its own path — the bounded twin of the concrete
+	// projections below.
+	if tv, ok := head.(*ir.TypeVar); ok {
+		return r.projectTypeVar(tv, member, node)
+	}
 	def := r.projectionDef(head)
 	// A generic application (Box<string>) instantiates the projected field: the
 	// field's parameterised type is read with the application's arguments
@@ -334,6 +341,29 @@ func (r *TypeResolver) hasMethodMember(head ir.Type, name string) bool {
 	}
 	_, _, ok := types.Candidates(r.Registry, head, name)
 	return ok
+}
+
+// projectTypeVar resolves a bounded projection T.member: the head is a generic
+// type parameter and member a readable member its bound interface requires. The
+// projection is the member's required read type — a requirement x: nint projects
+// to nint, exactly what reading v.x off a value of type T yields — with self
+// resolving to the parameter (a me: self requirement projects to T) and the
+// bound's generic arguments substituted (T: Box<string> requiring value: U
+// projects to string). It reads the getter result directly, without the
+// bare-generic guard projectReadable applies: self off a type parameter is that
+// parameter, and a bound written in terms of another in-scope parameter projects
+// to it — both legitimate types here, not the free variable that guard defers.
+// A member the bound does not require as a readable member falls to the failure
+// classification against the bound: a method is member_is_not_a_type, a name the
+// bound does not require is unknown_field, and an unbounded parameter — with no
+// bound to require anything — has no members at all (type_has_no_fields).
+func (r *TypeResolver) projectTypeVar(tv *ir.TypeVar, member string, node ast.Node) ir.Type {
+	if tv.Bound != nil && r.Registry != nil {
+		if t, ok := types.GetterResultType(r.Registry, tv, member); ok {
+			return t
+		}
+	}
+	return r.failedProjection(node, tv, r.projectionDef(tv.Bound), member, tv.Bound != nil)
 }
 
 // projectReadable returns a getter projection off head when member names a
