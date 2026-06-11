@@ -49,6 +49,19 @@ func TestTypeParamConversionWinsOverFunction(t *testing.T) {
 	}
 }
 
+func TestTypeParamConversionWinsOverFunctionInMethodBody(t *testing.T) {
+	// The same precedence holds in a generic method body, whose effect scope carries
+	// the method's (and its type's) type parameters: T(v) is a conversion to the
+	// parameter, not a call of the same-named effectful top-level function, so the
+	// effect walker collects no effect and the pure method is not missing one.
+	src := "pub fn io T(x: nint): nint {\n  return x\n}\n" +
+		"pub type Box = { n: nint } impl {\n  pub fn f<T>(v: nint): T {\n    return T(v)\n  }\n}\n"
+	_, diags := analyze(src)
+	if hasCode(diags, CodeMissingEffect) {
+		t.Fatalf("want no missing_effect (a method's T(v) is a conversion, not a call of the effectful function), got %v", codes(diags))
+	}
+}
+
 func TestTypeParamConversionValueNameStillCallsFunction(t *testing.T) {
 	// A value of the same name shadows the type parameter, so the call is a function-
 	// value call, not a conversion: a parameter T: fn(...) is applied and the call

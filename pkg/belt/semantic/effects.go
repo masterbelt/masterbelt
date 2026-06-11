@@ -53,7 +53,11 @@ func checkEffects(reg *builtin.Registry, file *ast.File, defs []*ir.TypeDef, uni
 			for _, p := range irm.Params {
 				params[p.Name] = substSelf(p.Type, self)
 			}
-			bs := infer.BodyScope{Reg: reg, Universe: universe, Qualified: qualified, Self: self, Params: params, Funcs: funcs, QualifiedFuncs: qualifiedFuncs, ConstShadows: constShadows}
+			// The method's generic type parameters — the enclosing type's and the
+			// method's own — are in scope for its body, so a type-parameter callee
+			// (T(v)) is read as a conversion here, the same as in the function path and
+			// in the checker, rather than falling through to a same-named function.
+			bs := infer.BodyScope{Reg: reg, Universe: universe, Qualified: qualified, Self: self, Params: params, Funcs: funcs, QualifiedFuncs: qualifiedFuncs, ConstShadows: constShadows, TScope: methodTScope(r, def, m)}
 			checkDeclEffects(def.Name+"."+irm.Name, m.Effects, m, m.Body, bs, at, diags)
 		}
 	}
