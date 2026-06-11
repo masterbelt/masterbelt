@@ -323,6 +323,7 @@ func (p *parser) parseInterfaceMember(lead []cst.Green) *cst.Node {
 	if p.kind() == token.Pub {
 		children = append(children, p.bump())
 	}
+	p.interfaceModifier(&children)
 	if p.peekSignificant() == token.Ident {
 		p.skipTrivia(&children)
 		children = append(children, p.bump()) // the member name
@@ -1014,6 +1015,27 @@ func (p *parser) parseMethodDecl(lead []cst.Green) *cst.Node {
 		children = append(children, p.bump())
 	}
 	return p.finishMethodDecl(children)
+}
+
+// interfaceModifier recognizes the static modifier on an interface member — the
+// context keyword static followed by the member name (an identifier) on the same
+// line, the static-fn requirement `static name(): T` (no fn keyword, mirroring how
+// an interface method requirement omits fn). It wraps static in a Modifier node
+// appended to children and reports true. A static at a line's end, or one followed
+// by ":" (a readable member named static) or "(" (a method named static), is the
+// member's own name, not a modifier — the same line-bounded lookahead the
+// accessor modifiers use.
+func (p *parser) interfaceModifier(children *[]cst.Green) bool {
+	i := p.nextSignificantIndex(p.pos)
+	if p.toks[i].Kind != token.Ident || p.identText(i) != "static" {
+		return false
+	}
+	if p.nextOnLine(i+1) != token.Ident {
+		return false
+	}
+	p.skipTrivia(children)
+	*children = append(*children, p.modifier())
+	return true
 }
 
 // methodModifier recognizes an accessor or static modifier at the cursor and, if
