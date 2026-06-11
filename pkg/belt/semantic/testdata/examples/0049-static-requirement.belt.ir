@@ -1,0 +1,101 @@
+Module
+  Consts: ~
+  Types:
+    TypeDef
+      Name: "Counter"
+      Anchor: "belt:/Counter"
+      Public: true
+      Doc: "A counter meets the requirement with a matching static fn — the way a type opts" "into a static-member bound."
+      Params: ~
+      Body: Record
+        Fields:
+          Field
+            Name: "n"
+            Type: Builtin
+              Name: "nint"
+      Methods:
+        Method
+          Name: "defaultValue"
+          Anchor: "belt:/Counter#defaultValue"
+          Public: true
+          Extern: false
+          Kind: 3
+          Effects: ~
+          Doc: ~
+          Params: ~
+          Result: Builtin
+            Name: "nint"
+          Body:
+            Return
+              Value: IntLiteral
+                Text: "0"
+                Type: Builtin
+                  Name: "nint"
+          Owner: "Counter"
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls:
+        Named
+          Def: "HasDefault"
+      Enum: ~
+      Master: ~
+      Where: ~
+    TypeDef
+      Name: "HasDefault"
+      Anchor: "belt:/HasDefault"
+      Public: true
+      Doc: "A behaviour for anything with a default value of its own: a required static fn" "(no receiver), called through the type. `static name(): R` is a required static" "member, the static twin of a method requirement `name(): R`."
+      Params: ~
+      Body: ~
+      Methods:
+        Method
+          Name: "defaultValue"
+          Anchor: "belt:/HasDefault#defaultValue"
+          Public: false
+          Extern: false
+          Kind: 3
+          Effects: ~
+          Doc: "A required static fn: every HasDefault type supplies `defaultValue()`," "called through the type rather than a value."
+          Params: ~
+          Result: Builtin
+            Name: "nint"
+          Body: ~
+          Owner: "HasDefault"
+      Consts: ~
+      Builtin: false
+      Interface: InterfaceDef
+        Required: "defaultValue"
+        Provided: ~
+        Parents: ~
+      Impls: ~
+      Enum: ~
+      Master: ~
+      Where: ~
+  Funcs:
+    Function
+      Name: "startValue"
+      Anchor: "belt:/startValue"
+      Public: true
+      Extern: false
+      Effects: ~
+      Doc: "Read a bounded parameter's default through its static requirement — resolved" "through the bound, the static twin of `v.method()` on a value of type T."
+      TypeParams:
+        TypeParam
+          Name: "T"
+          Bound: Named
+            Def: "HasDefault"
+      Params: ~
+      Result: Builtin
+        Name: "nint"
+      Body:
+        Return
+          Value: StaticCall
+            Def: "HasDefault"
+            Name: "defaultValue"
+            Args: ~
+            Resolved: ~
+            Subst: ~
+            Type: Builtin
+              Name: "nint"
+  Asserts: ~

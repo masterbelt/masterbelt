@@ -1972,6 +1972,10 @@
           "named": true
         },
         {
+          "type": "modifier",
+          "named": true
+        },
+        {
           "type": "param_list",
           "named": true
         }

@@ -137,6 +137,10 @@ module.exports = grammar({
     interface_member: ($) =>
       seq(
         optional(kw.pub),
+        // The only interface-member modifier is static (a static-fn requirement,
+        // static name(): T); get/set are spelled as readable members (X: T), so the
+        // modifier is restricted here while reusing the shared Modifier node.
+        optional(alias("static", $.modifier)),
         field("name", $.identifier),
         optional($.generic_params),
         optional($.param_list),
