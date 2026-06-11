@@ -1,0 +1,181 @@
+Module
+  Consts: ~
+  Types:
+    TypeDef
+      Name: "Person"
+      Anchor: "belt:/Person"
+      Public: true
+      Doc: "A person meets `name: string` with a stored field, and the method with a fn."
+      Params: ~
+      Body: Record
+        Fields:
+          Field
+            Name: "name"
+            Type: Builtin
+              Name: "string"
+      Methods:
+        Method
+          Name: "greeting"
+          Anchor: "belt:/Person#greeting"
+          Public: true
+          Extern: false
+          Kind: 0
+          Effects: ~
+          Doc: ~
+          Params: ~
+          Result: Builtin
+            Name: "string"
+          Body:
+            Return
+              Value: FieldAccess
+                Receiver: SelfValue
+                  Type: Named
+                    Def: "Person"
+                Field: "name"
+                Type: Builtin
+                  Name: "string"
+          Owner: "Person"
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls:
+        Named
+          Def: "Greetable"
+      Enum: ~
+      Master: ~
+      Where: ~
+    TypeDef
+      Name: "Robot"
+      Anchor: "belt:/Robot"
+      Public: true
+      Doc: "A robot meets the same `name: string` requirement with a getter instead — read" "as `r.name` exactly as a field is, so it conforms the same way."
+      Params: ~
+      Body: Record
+        Fields:
+          Field
+            Name: "id"
+            Type: Builtin
+              Name: "string"
+      Methods:
+        Method
+          Name: "name"
+          Anchor: "belt:/Robot#name"
+          Public: true
+          Extern: false
+          Kind: 1
+          Effects: ~
+          Doc: ~
+          Params: ~
+          Result: Builtin
+            Name: "string"
+          Body:
+            Return
+              Value: FieldAccess
+                Receiver: SelfValue
+                  Type: Named
+                    Def: "Robot"
+                Field: "id"
+                Type: Builtin
+                  Name: "string"
+          Owner: "Robot"
+        Method
+          Name: "greeting"
+          Anchor: "belt:/Robot#greeting"
+          Public: true
+          Extern: false
+          Kind: 0
+          Effects: ~
+          Doc: ~
+          Params: ~
+          Result: Builtin
+            Name: "string"
+          Body:
+            Return
+              Value: FieldAccess
+                Receiver: SelfValue
+                  Type: Named
+                    Def: "Robot"
+                Field: "name"
+                Type: Builtin
+                  Name: "string"
+          Owner: "Robot"
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls:
+        Named
+          Def: "Greetable"
+      Enum: ~
+      Master: ~
+      Where: ~
+    TypeDef
+      Name: "Greetable"
+      Anchor: "belt:/Greetable"
+      Public: true
+      Doc: "A behaviour for anything with a readable name and a callable greeting."
+      Params: ~
+      Body: ~
+      Methods:
+        Method
+          Name: "name"
+          Anchor: "belt:/Greetable#name"
+          Public: false
+          Extern: false
+          Kind: 1
+          Effects: ~
+          Doc: "A readable member: every Greetable is read as `g.name` for its string name."
+          Params: ~
+          Result: Builtin
+            Name: "string"
+          Body: ~
+          Owner: "Greetable"
+        Method
+          Name: "greeting"
+          Anchor: "belt:/Greetable#greeting"
+          Public: false
+          Extern: false
+          Kind: 0
+          Effects: ~
+          Doc: "A method: called as `g.greeting()`."
+          Params: ~
+          Result: Builtin
+            Name: "string"
+          Body: ~
+          Owner: "Greetable"
+      Consts: ~
+      Builtin: false
+      Interface: InterfaceDef
+        Required: "name" "greeting"
+        Provided: ~
+        Parents: ~
+      Impls: ~
+      Enum: ~
+      Master: ~
+      Where: ~
+  Funcs:
+    Function
+      Name: "label"
+      Anchor: "belt:/label"
+      Public: true
+      Extern: false
+      Effects: ~
+      Doc: "Read the name through the interface — a field-backed or getter-backed name" "reads the same."
+      TypeParams: ~
+      Params:
+        Param
+          Name: "g"
+          Type: Named
+            Def: "Greetable"
+      Result: Builtin
+        Name: "string"
+      Body:
+        Return
+          Value: FieldAccess
+            Receiver: ParamRef
+              Name: "g"
+              Type: Named
+                Def: "Greetable"
+            Field: "name"
+            Type: Builtin
+              Name: "string"
+  Asserts: ~

@@ -1,0 +1,175 @@
+File
+  Uses: ~
+  Decls: ~
+  Types:
+    TypeDecl
+      Doc: "A person meets `name: string` with a stored field, and the method with a fn."
+      Public: true
+      Name: "Person"
+      Params: ~
+      Body: RecordType
+        Fields:
+          FieldDef
+            Name: "name"
+            Type: NamedType
+              Namespace: ""
+              Name: "string"
+              Args: ~
+              Projections: ~
+      Where: ~
+      Methods:
+        MethodDecl
+          Doc: ~
+          Public: true
+          Extern: false
+          Kind: 0
+          Effects: ~
+          Name: "greeting"
+          TypeParams: ~
+          Params: ~
+          Result: NamedType
+            Namespace: ""
+            Name: "string"
+            Args: ~
+            Projections: ~
+          Body:
+            ReturnStmt
+              Value: MemberExpr
+                Receiver: SelfExpr
+                Member: Identifier
+                  Name: "name"
+      Consts: ~
+      Impls:
+        NamedType
+          Namespace: ""
+          Name: "Greetable"
+          Args: ~
+          Projections: ~
+    TypeDecl
+      Doc: "A robot meets the same `name: string` requirement with a getter instead — read" "as `r.name` exactly as a field is, so it conforms the same way."
+      Public: true
+      Name: "Robot"
+      Params: ~
+      Body: RecordType
+        Fields:
+          FieldDef
+            Name: "id"
+            Type: NamedType
+              Namespace: ""
+              Name: "string"
+              Args: ~
+              Projections: ~
+      Where: ~
+      Methods:
+        MethodDecl
+          Doc: ~
+          Public: true
+          Extern: false
+          Kind: 1
+          Effects: ~
+          Name: "name"
+          TypeParams: ~
+          Params: ~
+          Result: NamedType
+            Namespace: ""
+            Name: "string"
+            Args: ~
+            Projections: ~
+          Body:
+            ReturnStmt
+              Value: MemberExpr
+                Receiver: SelfExpr
+                Member: Identifier
+                  Name: "id"
+        MethodDecl
+          Doc: ~
+          Public: true
+          Extern: false
+          Kind: 0
+          Effects: ~
+          Name: "greeting"
+          TypeParams: ~
+          Params: ~
+          Result: NamedType
+            Namespace: ""
+            Name: "string"
+            Args: ~
+            Projections: ~
+          Body:
+            ReturnStmt
+              Value: MemberExpr
+                Receiver: SelfExpr
+                Member: Identifier
+                  Name: "name"
+      Consts: ~
+      Impls:
+        NamedType
+          Namespace: ""
+          Name: "Greetable"
+          Args: ~
+          Projections: ~
+  Enums: ~
+  Interfaces:
+    InterfaceDecl
+      Doc: "A behaviour for anything with a readable name and a callable greeting."
+      Public: true
+      Name: "Greetable"
+      Params: ~
+      Parents: ~
+      Members:
+        InterfaceMember
+          Doc: "A readable member: every Greetable is read as `g.name` for its string name."
+          Public: false
+          Name: "name"
+          Readable: true
+          TypeParams: ~
+          Params: ~
+          Result: NamedType
+            Namespace: ""
+            Name: "string"
+            Args: ~
+            Projections: ~
+          Body: ~
+        InterfaceMember
+          Doc: "A method: called as `g.greeting()`."
+          Public: false
+          Name: "greeting"
+          Readable: false
+          TypeParams: ~
+          Params: ~
+          Result: NamedType
+            Namespace: ""
+            Name: "string"
+            Args: ~
+            Projections: ~
+          Body: ~
+  Funcs:
+    FuncDecl
+      Doc: "Read the name through the interface — a field-backed or getter-backed name" "reads the same."
+      Public: true
+      Extern: false
+      Effects: ~
+      Name: "label"
+      TypeParams: ~
+      Params:
+        ParamDef
+          Name: "g"
+          Type: NamedType
+            Namespace: ""
+            Name: "Greetable"
+            Args: ~
+            Projections: ~
+      Result: NamedType
+        Namespace: ""
+        Name: "string"
+        Args: ~
+        Projections: ~
+      Body:
+        ReturnStmt
+          Value: MemberExpr
+            Receiver: Identifier
+              Name: "g"
+            Member: Identifier
+              Name: "name"
+  Asserts: ~
+  Masters: ~
