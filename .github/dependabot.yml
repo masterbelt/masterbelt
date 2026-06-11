@@ -16,6 +16,20 @@ updates:
     commit-message:
       prefix: ci
 
+  # The tree-sitter grammar mirror's own release workflows. They are authored
+  # here and synced to the dedicated mirror repo on publish, so Dependabot must
+  # keep them current HERE — the mirror is a generated, overwritten copy that
+  # would lose any update committed to it directly.
+  - package-ecosystem: github-actions
+    directory: /toolchain/grammars/tree-sitter-masterbelt
+    schedule:
+      interval: weekly
+    groups:
+      mirror-actions:
+        patterns: ['*']
+    commit-message:
+      prefix: ci
+
   # Go modules, including the actionlint tool dependency.
   - package-ecosystem: gomod
     directory: /

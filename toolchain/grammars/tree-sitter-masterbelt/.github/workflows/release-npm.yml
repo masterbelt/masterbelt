@@ -1,0 +1,81 @@
+# release-npm — publishes the npm package on every release tag, to BOTH public
+# npm and GitHub Packages. No long-lived registry token is stored.
+#
+# - public npm: OIDC Trusted Publishing (the `id-token: write` permission). npm
+#   exchanges the workflow's OIDC identity for a short-lived credential and
+#   attaches build provenance — there is no NPM_TOKEN.
+# - GitHub Packages: the workflow's built-in GITHUB_TOKEN, issued per run and
+#   auto-revoked — not a stored secret either.
+#
+# The package is the web-tree-sitter path: grammar.js, the committed parser, the
+# highlight queries, and a WebAssembly build (built here). No native node addon
+# is shipped — there is no node-gyp step.
+#
+# A nightly tag is a prerelease (it carries a '-', e.g. v0.1.20260611-nightly.<sha>)
+# and goes to the `nightly` dist-tag, so `npm install` (which resolves `latest`)
+# never picks it up; a stable tag (v0.1.x / v1.0.0) goes to `latest`. Re-publishing
+# an already-published version is skipped, not failed (a tag can be re-pushed).
+#
+# This repository is a generated mirror — edit the source in the masterbelt
+# monorepo (toolchain/grammars/tree-sitter-masterbelt/.github), not here.
+name: release-npm
+
+on:
+  push:
+    tags: ['v*']
+
+concurrency:
+  group: release-npm-${{ github.ref }}
+
+permissions:
+  contents: read
+  id-token: write # OIDC for npm Trusted Publishing
+  packages: write # GitHub Packages
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 22
+      # Trusted Publishing needs npm >= 11.5.1 (newer than the one bundled with
+      # Node 22). tree-sitter-cli (a devDependency) then builds the wasm; the
+      # emscripten Docker image it pulls is available on GitHub-hosted runners.
+      - run: npm install -g npm@latest
+      - run: npm install --no-save
+      - run: npx tree-sitter build --wasm
+
+      - name: Choose the dist-tag
+        id: t
+        run: |
+          case "$GITHUB_REF_NAME" in
+            *-*) echo "tag=nightly" >> "$GITHUB_OUTPUT" ;; # prerelease
+            *)   echo "tag=latest"  >> "$GITHUB_OUTPUT" ;;
+          esac
+
+      # OIDC — no token. Requires a Trusted Publisher configured on npmjs for this
+      # repo + workflow; npm authenticates via the id-token and adds provenance.
+      - name: Publish to npm (public, OIDC Trusted Publishing)
+        run: |
+          npm publish --access public --tag ${{ steps.t.outputs.tag }} 2>err \
+            || { grep -qiE "cannot publish over|previously published|already exists|409" err \
+                 && echo "npm: version already published — skipping" \
+                 || { cat err >&2; exit 1; }; }
+          rm -f err
+
+      - name: Publish to GitHub Packages
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          {
+            echo "@masterbelt:registry=https://npm.pkg.github.com"
+            echo "//npm.pkg.github.com/:_authToken=${TOKEN}"
+          } > .npmrc
+          npm publish --registry https://npm.pkg.github.com \
+            --tag ${{ steps.t.outputs.tag }} 2>err \
+            || { grep -qiE "cannot publish over|previously published|already exists|409" err \
+                 && echo "GitHub Packages: version already published — skipping" \
+                 || { cat err >&2; exit 1; }; }
+          rm -f .npmrc err
