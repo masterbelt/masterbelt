@@ -141,7 +141,7 @@ func projectionErrorReporter(at func(ast.Node) span, diags *diagnostic.List) fun
 // read T.x), anchored at the offending identifier. It returns nil when there is
 // nowhere to report (a sink-only settling walk passes a nil diags), so that walk
 // types the value-position use silently rather than reporting it twice.
-func typeParamValueReporter(at func(ast.Node) span, diags *diagnostic.List, nsShadows func(*ast.Identifier) bool) func(ast.Node, string) {
+func typeParamValueReporter(at func(ast.Node) span, diags *diagnostic.List) func(ast.Node, string) {
 	if at == nil || diags == nil {
 		return nil
 	}
@@ -152,14 +152,6 @@ func typeParamValueReporter(at func(ast.Node) span, diags *diagnostic.List, nsSh
 	// offending use yields one diagnostic, not one per walk.
 	seen := map[ast.Node]bool{}
 	return func(node ast.Node, name string) {
-		// A namespace import of the same name shadows the type parameter in value
-		// position — the member read T.x reads the import's exported member, not the
-		// parameter — so it is not a value use of the parameter. The leaf resolves
-		// locals, parameters, and constants before reaching here; the namespace import
-		// is the one value-position shadow it does not itself carry.
-		if id, ok := node.(*ast.Identifier); ok && nsShadows != nil && nsShadows(id) {
-			return
-		}
 		if seen[node] {
 			return
 		}

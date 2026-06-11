@@ -60,6 +60,56 @@ func TestValuePositionReportedOnce(t *testing.T) {
 	}
 }
 
+func TestValuePositionConversionArgumentChecked(t *testing.T) {
+	// A conversion T(x) names the type parameter in callee position (a type
+	// position, not reported), but its arguments are value positions and are still
+	// checked: T(T) reports the argument T as a value-position use, even though the
+	// callee T is exempt.
+	src := "pub fn f<T>(): T {\n  return T(T)\n}\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeTypeParamInValuePosition) {
+		t.Fatalf("want type_param_in_value_position (the argument T in T(T)), got %v", codes(diags))
+	}
+}
+
+func TestValuePositionFunctionValueParamShadowCallable(t *testing.T) {
+	// A value parameter that reuses the type parameter's name shadows it, so a call
+	// of that parameter is a function-value call, not a conversion through the type
+	// parameter: it resolves and is not reported.
+	src := "pub fn f<T>(T: fn(nint): nint): nint {\n  return T(1)\n}\n"
+	_, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("want clean (the parameter T is a callable function value), got %v", codes(diags))
+	}
+}
+
+func TestValuePositionParameterShadowsDeclaredType(t *testing.T) {
+	// A generic parameter whose name also names a declared (or builtin) type wins
+	// over that type in value position, mirroring how an annotation in the same
+	// scope resolves the name to the parameter — so consuming it as a value is
+	// reported rather than read as the declared type's compile-time value.
+	src := "pub type T = nint\n" +
+		"pub fn f<T>(): bool {\n  let y = T == string\n  return y\n}\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeTypeParamInValuePosition) {
+		t.Fatalf("want type_param_in_value_position (the parameter shadows the declared type), got %v", codes(diags))
+	}
+}
+
+func TestValuePositionBareNamespaceNameStillRejected(t *testing.T) {
+	// The namespace-shadow exception applies only to a qualified member read (T.x
+	// reads the import's member); a bare use of the name is still the type
+	// parameter consumed as a value, since a namespace cannot supply a value, so it
+	// is reported.
+	diags := analyzeProject(t, map[string]string{
+		"mod.belt":  "pub const x: nint = 5\n",
+		"main.belt": "use T from \"mod.belt\"\npub fn f<T>(): nint {\n  let y = T == string\n  return 1\n}\n",
+	})
+	if !hasCode(diags, CodeTypeParamInValuePosition) {
+		t.Fatalf("want type_param_in_value_position (bare T is the parameter, not a namespace read), got %v", codes(diags))
+	}
+}
+
 func TestValuePositionTypePositionUsesNotRejected(t *testing.T) {
 	// A type-position use of the parameter is not a value-position projection: a
 	// conversion T(x) names the type, and a let annotation (let y: T) is a type

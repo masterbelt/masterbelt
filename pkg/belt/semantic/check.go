@@ -314,7 +314,7 @@ func checkMethodBodies(reg *builtin.Registry, defs []*ir.TypeDef, universe map[s
 	// resolution the signature uses.
 	tscopeResolver := &infer.TypeResolver{Defs: universe, Qualified: qualified, Registry: reg}
 	var noSelf func(node ast.Node)
-	reportTypeParamValue := typeParamValueReporter(at, diags, nsShadows)
+	reportTypeParamValue := typeParamValueReporter(at, diags)
 	if diags != nil {
 		noSelf = func(node ast.Node) {
 			s := at(node)
@@ -343,7 +343,7 @@ func checkMethodBodies(reg *builtin.Registry, defs []*ir.TypeDef, universe map[s
 				params[p.Name] = substSelf(p.Type, self)
 			}
 			want := substSelf(irm.Result, self)
-			bs := infer.BodyScope{Reg: reg, Universe: universe, Qualified: qualified, Self: selfT, Params: params, Funcs: funcs, QualifiedFuncs: qualifiedFuncs, ConstShadows: constShadows, TScope: methodTScope(tscopeResolver, def, m), ReportTypeParamValue: reportTypeParamValue}
+			bs := infer.BodyScope{Reg: reg, Universe: universe, Qualified: qualified, Self: selfT, Params: params, Funcs: funcs, QualifiedFuncs: qualifiedFuncs, ConstShadows: constShadows, NamespaceShadows: nsShadows, TScope: methodTScope(tscopeResolver, def, m), ReportTypeParamValue: reportTypeParamValue}
 			checkStmts(m.Body, want, bs, env, bodyNoSelf, sink, at, diags)
 			checkBareEnumArgs(m.Body, bs, env, at, diags)
 		}
@@ -373,7 +373,7 @@ func checkFuncBodies(reg *builtin.Registry, file *ast.File, universe map[string]
 	// A sink-only walk (diags nil) keeps it silent.
 	r := &infer.TypeResolver{Defs: universe, Qualified: qualified, Registry: reg, ProjectionError: projectionErrorReporter(at, diags)}
 	var noSelf func(node ast.Node)
-	reportTypeParamValue := typeParamValueReporter(at, diags, nsShadows)
+	reportTypeParamValue := typeParamValueReporter(at, diags)
 	if diags != nil {
 		noSelf = func(node ast.Node) {
 			s := at(node)
@@ -396,7 +396,7 @@ func checkFuncBodies(reg *builtin.Registry, file *ast.File, universe map[string]
 			params[p.Name] = r.ResolveType(p.Type, tscope)
 		}
 		want := r.ResolveType(fd.Result, tscope)
-		bs := infer.BodyScope{Reg: reg, Universe: universe, Qualified: qualified, Self: ir.Invalid, Params: params, Funcs: funcs, QualifiedFuncs: qualifiedFuncs, ConstShadows: constShadows, TScope: tscope, ReportTypeParamValue: reportTypeParamValue}
+		bs := infer.BodyScope{Reg: reg, Universe: universe, Qualified: qualified, Self: ir.Invalid, Params: params, Funcs: funcs, QualifiedFuncs: qualifiedFuncs, ConstShadows: constShadows, NamespaceShadows: nsShadows, TScope: tscope, ReportTypeParamValue: reportTypeParamValue}
 		checkStmts(fd.Body, want, bs, env, noSelf, sink, at, diags)
 		if diags == nil {
 			continue // the sink-only walk wants no further diagnostics

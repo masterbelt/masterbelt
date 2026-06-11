@@ -745,8 +745,12 @@ func synthesize(e ast.Expr, s scope, sink *Sink) ir.Type {
 		// the receiver's type silently inside; a value receiver is checked
 		// here first so its own settled type streams out for the typed value
 		// graph (a type-name or namespace receiver settles nothing and stays
-		// silent — an Invalid never streams).
-		check(e.Receiver, s, sink)
+		// silent — an Invalid never streams). A namespace-import receiver is not
+		// checked as a value: it settles nothing, and walking it as one would
+		// misreport a same-named type parameter as used in value position.
+		if !s.nsReceiver(e.Receiver) {
+			check(e.Receiver, s, sink)
+		}
 		return s.leaf(e)
 	default:
 		return s.leaf(e)
