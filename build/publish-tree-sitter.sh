@@ -206,7 +206,9 @@ pkg.version = version;
 delete pkg.private;
 delete pkg.publishConfig;
 pkg.description = 'masterbelt grammar for tree-sitter';
-pkg.repository = mirror;
+// Object form with a git+…git URL — GitHub Packages reads repository.url to
+// connect the published package to its repository; a bare string is not picked up.
+pkg.repository = { type: 'git', url: `git+${mirror}.git` };
 pkg.keywords = ['incremental', 'parsing', 'tree-sitter', 'masterbelt', 'parser', 'grammar'];
 
 // The Node native binding is the package entry; node-gyp-build loads the prebuilt
