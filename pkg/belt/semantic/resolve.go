@@ -576,6 +576,12 @@ func appendDistinct(defs []*ir.TypeDef, def *ir.TypeDef) []*ir.TypeDef {
 // default body lowers to IR. A required member has no body.
 func resolveInterfaceMember(r *infer.TypeResolver, reg *builtin.Registry, self ir.Type, m *ast.InterfaceMember, scope infer.TypeScope, fns bodyFuncs) *ir.Method {
 	method := &ir.Method{Name: m.Name, Public: m.Public, Doc: m.Doc}
+	// A readable-member requirement (X: T, no parameter list) is the signature of a
+	// getter — read as x.X yielding T — so it is carried as a getter, which is what
+	// conformance branches on to demand a field or getter rather than a method.
+	if m.Readable {
+		method.Kind = ir.MethodGetter
+	}
 
 	// The member's own type variables join a fresh scope: the explicit ones
 	// (the A in fold<A>) and the implicit free names appearing in a parameter
@@ -687,10 +693,10 @@ func resolveImpls(r *infer.TypeResolver, reg *builtin.Registry, impls []ast.Type
 			if adef == nil {
 				continue
 			}
+			subst := interfaceArgSubst(anc, adef)
 			for _, name := range adef.Interface.Required {
-				if !suppliesMethod(reg, def, name, map[*ir.TypeDef]bool{}) {
-					s := at(impl)
-					diags.Add(newMissingRequiredMethodDiagnostic(s.offset, s.width, def.Name, adef.Name, name))
+				if d, unmet := unmetRequirement(reg, def, adef, name, subst, at(impl)); unmet {
+					diags.Add(d)
 				}
 			}
 		}
@@ -818,7 +824,10 @@ func suppliesMethod(reg *builtin.Registry, def *ir.TypeDef, name string, seen ma
 	}
 	seen[def] = true
 	for _, m := range def.Methods {
-		if m.Name == name {
+		// A method requirement is met by a method only: a getter (read as x.X, not
+		// callable as x.X()), a setter, or a static is the wrong kind, so the kind is
+		// checked rather than the name alone.
+		if m.Name == name && m.Kind == ir.MethodNormal {
 			return true
 		}
 	}
@@ -831,6 +840,95 @@ func suppliesMethod(reg *builtin.Registry, def *ir.TypeDef, name string, seen ma
 		return suppliesMethod(reg, ud, name, seen)
 	}
 	return false
+}
+
+// suppliesReadable reports whether def supplies a readable member of the given
+// name and read type — a field of that type, or a getter whose result is that
+// type — which is what a readable-member requirement (X: T) demands. It reads the
+// type's own fields and getters and walks its underlying type (so a nominal type
+// satisfies the requirement through its base's fields and getters, exactly as a
+// method requirement is satisfied through its methods), but deliberately does not
+// consult the type's interfaces through the registry: that lookup would find the
+// very requirement being checked on the implemented interface and satisfy it with
+// itself. The read type must match the requirement's type by nominal identity.
+func suppliesReadable(reg *builtin.Registry, def *ir.TypeDef, name string, want ir.Type, seen map[*ir.TypeDef]bool) bool {
+	if def == nil || seen[def] {
+		return false
+	}
+	seen[def] = true
+	if rec := types.RecordOf(def.Body); rec != nil {
+		for i := range rec.Fields {
+			if rec.Fields[i].Name == name {
+				return types.Identical(rec.Fields[i].Type, want)
+			}
+		}
+	}
+	for _, m := range def.Methods {
+		// A getter the type itself declares (read as x.name). A method or setter of
+		// the same name is the wrong kind for a readable member. self in the result
+		// resolves to the receiver, so a getter returning self matches a self-typed
+		// requirement.
+		if m.Name == name && m.Kind == ir.MethodGetter {
+			return types.Identical(types.SubstituteSelf(m.Result, &ir.Named{Def: def}), want)
+		}
+	}
+	if def.Builtin {
+		return false
+	}
+	if ud := bodyDef(reg, def.Body); ud != nil {
+		return suppliesReadable(reg, ud, name, want, seen)
+	}
+	return false
+}
+
+// unmetRequirement reports the diagnostic for a required member def does not
+// supply, and whether one is unmet. A readable-member requirement (carried as a
+// getter) demands a field or getter of the required read type; a method
+// requirement demands a method. The interface's own type arguments are
+// substituted into the required type, so a generic interface (Box<T> requiring
+// value: T) checks against the application's argument (Box<string> needs value:
+// string). The span anchors the diagnostic at the impl tag.
+func unmetRequirement(reg *builtin.Registry, def, adef *ir.TypeDef, name string, subst map[string]ir.Type, s span) (diagnostic.Diagnostic, bool) {
+	if req := interfaceMember(adef, name); req != nil && req.Kind == ir.MethodGetter {
+		want := types.Substitute(req.Result, subst)
+		if !suppliesReadable(reg, def, name, want, map[*ir.TypeDef]bool{}) {
+			return newMissingReadableMemberDiagnostic(s.offset, s.width, def.Name, adef.Name, name, want.String()), true
+		}
+		return diagnostic.Diagnostic{}, false
+	}
+	if !suppliesMethod(reg, def, name, map[*ir.TypeDef]bool{}) {
+		return newMissingRequiredMethodDiagnostic(s.offset, s.width, def.Name, adef.Name, name), true
+	}
+	return diagnostic.Diagnostic{}, false
+}
+
+// interfaceMember returns the interface's resolved member of the given name — its
+// signature carries the requirement's kind (a readable member is a getter) and
+// read/result type — or nil when the interface declares no such member.
+func interfaceMember(def *ir.TypeDef, name string) *ir.Method {
+	for _, m := range def.Methods {
+		if m.Name == name {
+			return m
+		}
+	}
+	return nil
+}
+
+// interfaceArgSubst maps an interface's type parameters to the arguments of an
+// application of it (Box<string> against interface Box<T> binds T to string), so a
+// requirement written in terms of a parameter is checked against the concrete
+// argument. A bare (non-generic) interface, or one reached as a Named with no
+// arguments, yields an empty substitution.
+func interfaceArgSubst(iface ir.Type, def *ir.TypeDef) map[string]ir.Type {
+	app, ok := iface.(*ir.App)
+	if !ok || len(app.Args) != len(def.Params) {
+		return nil
+	}
+	subst := make(map[string]ir.Type, len(def.Params))
+	for i, p := range def.Params {
+		subst[p.Name] = app.Args[i]
+	}
+	return subst
 }
 
 // bodyDef returns the type definition an underlying-type reference resolves to:

@@ -61,6 +61,7 @@ const (
 	CodeMissingEffect              diagnostic.Code = "belt.semantic.missing_effect"
 	CodeMissingField               diagnostic.Code = "belt.semantic.missing_field"
 	CodeMissingInitializer         diagnostic.Code = "belt.semantic.missing_initializer"
+	CodeMissingReadableMember      diagnostic.Code = "belt.semantic.missing_readable_member"
 	CodeMissingRequiredMethod      diagnostic.Code = "belt.semantic.missing_required_method"
 	CodeMissingReturn              diagnostic.Code = "belt.semantic.missing_return"
 	CodeNoMatchingFuncOverload     diagnostic.Code = "belt.semantic.no_matching_func_overload"
@@ -848,6 +849,23 @@ func newMissingInitializerDiagnostic(offset int, width int, name string) diagnos
 		Severity: diagnostic.Error,
 		Code:     CodeMissingInitializer,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeMissingInitializer, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newMissingReadableMemberDiagnostic(offset int, width int, typ string, iface string, member string, want string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"typ":    diagnostic.Str(typ),
+		"iface":  diagnostic.Str(iface),
+		"member": diagnostic.Str(member),
+		"want":   diagnostic.Str(want),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeMissingReadableMember,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeMissingReadableMember, fields),
 		Fields:   fields,
 		Offset:   offset,
 		Width:    width,

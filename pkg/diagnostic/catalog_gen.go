@@ -599,6 +599,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "let " + f["name"].String() + " must be initialized: write let " + f["name"].String() + " = value"
 		}
 	},
+	"belt.semantic.missing_readable_member": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return f["typ"].String() + " は " + f["iface"].String() + " を実装していません: 読める member " + f["member"].String() + ": " + f["want"].String() + " がありません"
+		default:
+			return f["typ"].String() + " does not implement " + f["iface"].String() + ": missing readable member " + f["member"].String() + ": " + f["want"].String()
+		}
+	},
 	"belt.semantic.missing_required_method": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
