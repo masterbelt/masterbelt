@@ -44,6 +44,38 @@ func boundViolationReporter(at func(ast.Node) span, diags *diagnostic.List) func
 	}
 }
 
+// deferredBoundChecks builds a BoundViolation callback that collects each
+// generic-application bound violation instead of reporting it, paired with a
+// recheck function that re-runs every collected check and reports only those still
+// unmet. The body pass resolves a type before its impls are attached, so a
+// user-implemented argument fails its bound there; rechecking once every impl is
+// attached drops those false positives while a genuinely unmet bound (an argument
+// that opts into no matching interface) is still reported. The collector is nil
+// when there is nowhere to report, leaving the check off as the immediate reporter
+// does.
+func deferredBoundChecks(at func(ast.Node) span, diags *diagnostic.List, reg *builtin.Registry) (func(ast.TypeExpr, ir.Type, *ir.TypeParam), func()) {
+	if at == nil || diags == nil {
+		return nil, func() {}
+	}
+	type pending struct {
+		argType ir.Type
+		param   *ir.TypeParam
+		at      span
+	}
+	var deferred []pending
+	collect := func(arg ast.TypeExpr, argType ir.Type, param *ir.TypeParam) {
+		deferred = append(deferred, pending{argType: argType, param: param, at: at(arg)})
+	}
+	recheck := func() {
+		for _, p := range deferred {
+			if !types.Satisfies(reg, p.argType, p.param.Bound) {
+				diags.Add(newBoundNotSatisfiedDiagnostic(p.at.offset, p.at.width, p.argType.String(), p.param.Bound.String()))
+			}
+		}
+	}
+	return collect, recheck
+}
+
 // arityMismatchReporter builds the callback the type resolver reports a
 // type-application arity mismatch through, anchoring the diagnostic at the
 // offending argument and naming the applied type with the expected and given
@@ -183,13 +215,19 @@ func resolveTypes(folder exprFolder, file *ast.File, at func(ast.Node) span, dia
 	defs, out, enumOut, ifaceOut, masterOut := declareTypeShells(file, extern, at, diags)
 
 	// Second pass: resolve parameters, body, method signatures, enum bodies, and
-	// interface members, reporting any unknown type names.
+	// interface members, reporting any unknown type names. A generic application's
+	// bound check (Box<UserImpl> where Box<T: I>) is deferred rather than reported
+	// here: a user-implemented argument opts into its bound through an impl block
+	// that the third pass attaches, so checking the bound now — while the body is
+	// first resolved — would reject a valid argument whose impls are not yet there.
+	// The violations are collected and re-checked once every impl is attached.
+	deferBound, recheckBounds := deferredBoundChecks(at, diags, reg)
 	r := &infer.TypeResolver{
 		Defs:            defs,
 		Qualified:       qualified,
 		Report:          unknownTypeReporter(at, diags),
 		Registry:        reg,
-		BoundViolation:  boundViolationReporter(at, diags),
+		BoundViolation:  deferBound,
 		ArityMismatch:   arityMismatchReporter(at, diags),
 		ProjectionError: projectionErrorReporter(at, diags),
 	}
@@ -233,6 +271,11 @@ func resolveTypes(folder exprFolder, file *ast.File, at func(ast.Node) span, dia
 		// duplicated.
 		addEnumContracts(r, enumOut[i])
 	}
+
+	// Every impl is now attached, so the generic-application bound checks deferred
+	// during the body pass can run: a user-implemented argument that opts into its
+	// bound is accepted, and one that does not is reported.
+	recheckBounds()
 
 	// Fourth pass: fold the associated-constant initializers, deferred until
 	// every type, enum, and impl of the file has resolved so a cross-type
