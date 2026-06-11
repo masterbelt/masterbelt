@@ -278,61 +278,152 @@ func forEachBodyExpr(body []ast.Stmt, fn func(ast.Expr)) {
 //
 // Only a value-position use is reported. A parameter or result annotation, a
 // conversion T(x), and a match/switch arm type are type positions that never
-// reach this value walk (the conversion's bare-name callee is skipped here, the
-// annotations and arm types are TypeExprs the body-expression walk does not
-// visit). A local or parameter of the same name — a value shadowing the type
-// parameter — takes the value reading and is exempt, mirroring the lowering.
-func reportTypeParamValueUse(scope infer.TypeScope, shadow func(string) bool, body []ast.Stmt, at func(ast.Node) span, diags *diagnostic.List) {
+// reach this value walk (the conversion's bare-name callee is skipped, the
+// annotations and arm types are TypeExprs the value walk does not visit). A value
+// binding of the same name — a parameter, a let, a loop variable, a match
+// binding, or a lambda parameter — shadows the type parameter for the statements
+// it scopes and takes the value reading, exactly as the body checker scopes those
+// bindings, so reusing a type parameter's name as a local does not misfire.
+func reportTypeParamValueUse(scope infer.TypeScope, params map[string]ir.Type, body []ast.Stmt, at func(ast.Node) span, diags *diagnostic.List) {
 	if len(scope) == 0 || diags == nil {
 		return
 	}
-	isParam := func(name string) bool {
-		if _, ok := scope[name]; !ok {
-			return false
-		}
-		return shadow == nil || !shadow(name)
+	shadowed := make(map[string]bool, len(params))
+	for name := range params {
+		shadowed[name] = true
 	}
-	report := func(node ast.Node, name string) {
-		s := at(node)
-		diags.Add(newTypeParamInValuePositionDiagnostic(s.offset, s.width, name))
-	}
-	forEachBodyExpr(body, func(top ast.Expr) {
-		callee := map[*ast.Identifier]bool{}
-		ast.WalkExprs(top, func(e ast.Expr) bool {
-			switch e := e.(type) {
-			case *ast.CallExpr:
-				// A bare-name callee is a conversion T(x) or a function call — a type-
-				// position or call use of the name, not a value read of it.
-				if id, ok := e.Callee.(*ast.Identifier); ok {
-					callee[id] = true
-				}
-			case *ast.MemberExpr:
-				// A member access whose receiver names a type parameter is the value-
-				// position projection T.member; report it and do not descend into the
-				// receiver, which would double-report the bare parameter.
-				if recv, ok := e.Receiver.(*ast.Identifier); ok && isParam(recv.Name) {
-					report(e, recv.Name)
-					return false
-				}
-			case *ast.Identifier:
-				if !callee[e] && isParam(e.Name) {
-					report(e, e.Name)
-				}
+	typeParamValueWalk{scope: scope, at: at, diags: diags}.stmts(body, shadowed)
+}
+
+// typeParamValueWalk walks a body for value-position type-parameter uses,
+// threading the value names in scope so a binding that shadows a type parameter
+// suppresses the report for the statements it scopes.
+type typeParamValueWalk struct {
+	scope infer.TypeScope
+	at    func(ast.Node) span
+	diags *diagnostic.List
+}
+
+// stmts walks a statement block with shadowed holding the value names in scope at
+// its start. A let extends the scope for the statements after it (mutating the
+// block's own set); a nested block — an if/for/switch/match body, or a lambda —
+// receives a copy so its bindings do not leak to its siblings. The block's set is
+// owned by this call, so a let mutates it in place.
+func (w typeParamValueWalk) stmts(stmts []ast.Stmt, shadowed map[string]bool) {
+	for _, stmt := range stmts {
+		switch s := stmt.(type) {
+		case *ast.ReturnStmt:
+			w.expr(s.Value, shadowed)
+		case *ast.ExprStmt:
+			w.expr(s.X, shadowed)
+		case *ast.LetStmt:
+			w.expr(s.Value, shadowed) // the initializer is checked before the binding is in scope
+			if s.Name != "" {
+				shadowed[s.Name] = true
 			}
-			return true
-		})
+		case *ast.AssignStmt:
+			w.expr(s.Value, shadowed) // the target is a local name, not a type-parameter read
+		case *ast.IfStmt:
+			w.ifStmt(s, shadowed)
+		case *ast.ForStmt:
+			w.expr(s.Iter, shadowed)
+			w.stmts(s.Body, withName(shadowed, s.Var)) // the loop variable binds in the body
+		case *ast.SwitchStmt:
+			w.expr(s.Scrutinee, shadowed)
+			for _, arm := range s.Arms {
+				for _, v := range arm.Values {
+					w.expr(v, shadowed)
+				}
+				w.stmts(arm.Body, withName(shadowed, ""))
+			}
+			w.stmts(s.Else, withName(shadowed, ""))
+		case *ast.MatchStmt:
+			w.expr(s.Scrutinee, shadowed)
+			for _, arm := range s.Arms {
+				w.stmts(arm.Body, withName(shadowed, arm.Bind)) // the arm binding narrows in the body
+			}
+			w.stmts(s.Else, withName(shadowed, ""))
+		}
+	}
+}
+
+// ifStmt walks an if's condition in the current scope and each branch in its own,
+// recursing through the else-if chain — no branch introduces a binding visible to
+// another, so each gets a copy of the scope.
+func (w typeParamValueWalk) ifStmt(s *ast.IfStmt, shadowed map[string]bool) {
+	w.expr(s.Cond, shadowed)
+	w.stmts(s.Then, withName(shadowed, ""))
+	if s.ElseIf != nil {
+		w.ifStmt(s.ElseIf, shadowed)
+	}
+	w.stmts(s.Else, withName(shadowed, ""))
+}
+
+// expr walks one value expression, reporting a value-position type-parameter use
+// that the current scope does not shadow. A bare-name call callee (a conversion
+// T(x) or a function call) is a type or call use, not a value read, so it is
+// skipped; a member access off a type parameter is the value-position projection
+// T.member, reported without descending into the receiver (which would
+// double-report the bare parameter); and a lambda body is walked with the
+// lambda's parameters added to the scope, since the shared expression walk does
+// not enter it.
+func (w typeParamValueWalk) expr(e ast.Expr, shadowed map[string]bool) {
+	if e == nil {
+		return
+	}
+	callee := map[*ast.Identifier]bool{}
+	ast.WalkExprs(e, func(e ast.Expr) bool {
+		switch e := e.(type) {
+		case *ast.CallExpr:
+			if id, ok := e.Callee.(*ast.Identifier); ok {
+				callee[id] = true
+			}
+		case *ast.FuncLit:
+			inner := withName(shadowed, "")
+			for _, p := range e.Params {
+				inner[p.Name] = true
+			}
+			w.stmts(e.Body, inner)
+			return false
+		case *ast.MemberExpr:
+			if recv, ok := e.Receiver.(*ast.Identifier); ok && w.flagged(recv.Name, shadowed) {
+				w.report(e, recv.Name)
+				return false
+			}
+		case *ast.Identifier:
+			if !callee[e] && w.flagged(e.Name, shadowed) {
+				w.report(e, e.Name)
+			}
+		}
+		return true
 	})
 }
 
-// paramShadow reports whether a name is bound by a body's value parameter — the
-// shadow predicate reportTypeParamValueUse consults so a value parameter named
-// like a type parameter (the rare fn f<T>(T: nint)) takes the value reading
-// rather than being flagged as a type parameter in value position.
-func paramShadow(params map[string]ir.Type) func(string) bool {
-	return func(name string) bool {
-		_, ok := params[name]
-		return ok
+// flagged reports whether name is a type parameter in scope that no value binding
+// shadows — the condition for a value-position use to be reported.
+func (w typeParamValueWalk) flagged(name string, shadowed map[string]bool) bool {
+	if _, ok := w.scope[name]; !ok {
+		return false
 	}
+	return !shadowed[name]
+}
+
+func (w typeParamValueWalk) report(node ast.Node, name string) {
+	s := w.at(node)
+	w.diags.Add(newTypeParamInValuePositionDiagnostic(s.offset, s.width, name))
+}
+
+// withName copies a scope's value-name set, adding name (when non-empty) — the
+// copy a nested block receives so its bindings stay local to it.
+func withName(shadowed map[string]bool, name string) map[string]bool {
+	out := make(map[string]bool, len(shadowed)+1)
+	for k := range shadowed {
+		out[k] = true
+	}
+	if name != "" {
+		out[name] = true
+	}
+	return out
 }
 
 // --- method bodies ----------------------------------------------------------
@@ -407,7 +498,7 @@ func checkMethodBodies(reg *builtin.Registry, defs []*ir.TypeDef, universe map[s
 			bs := infer.BodyScope{Reg: reg, Universe: universe, Qualified: qualified, Self: selfT, Params: params, Funcs: funcs, QualifiedFuncs: qualifiedFuncs, ConstShadows: constShadows, TScope: methodTScope(def, m)}
 			checkStmts(m.Body, want, bs, env, bodyNoSelf, sink, at, diags)
 			checkBareEnumArgs(m.Body, bs, env, at, diags)
-			reportTypeParamValueUse(bs.TScope, paramShadow(params), m.Body, at, diags)
+			reportTypeParamValueUse(bs.TScope, params, m.Body, at, diags)
 		}
 	}
 }
@@ -460,7 +551,7 @@ func checkFuncBodies(reg *builtin.Registry, file *ast.File, universe map[string]
 		if diags == nil {
 			continue // the sink-only walk wants no further diagnostics
 		}
-		reportTypeParamValueUse(tscope, paramShadow(params), fd.Body, at, diags)
+		reportTypeParamValueUse(tscope, params, fd.Body, at, diags)
 		// A function parameter or result may not be a type value: fn f(t: type) or
 		// fn f(): type is type_in_value_position — there are no type-value functions,
 		// which is why generics stay type parameters rather than type-value

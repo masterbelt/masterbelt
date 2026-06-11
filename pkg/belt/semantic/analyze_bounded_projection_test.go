@@ -148,3 +148,43 @@ func TestBoundedProjectionTypePositionUsesNotRejected(t *testing.T) {
 		}
 	}
 }
+
+func TestBoundedProjectionLocalShadowNotRejected(t *testing.T) {
+	// A value binding that reuses the type parameter's name shadows it for the
+	// statements it scopes — a let, a loop variable, a match binding — so the
+	// reused name reads the local value and is not flagged. The body checker
+	// scopes these bindings; the value-position walk must agree.
+	for _, body := range []string{
+		"  let T = 1\n  return T\n",
+		"  let acc = 0\n  for T of [1, 2] {\n    acc = T\n  }\n  return acc\n",
+	} {
+		src := "pub fn f<T>(): nint {\n" + body + "}\n"
+		_, diags := analyze(src)
+		if hasCode(diags, CodeTypeParamInValuePosition) {
+			t.Fatalf("body %q: want no type_param_in_value_position (the name is a local), got %v", body, codes(diags))
+		}
+	}
+}
+
+func TestBoundedProjectionLambdaBodyRejected(t *testing.T) {
+	// A type parameter projected in a lambda body is the same vacuous value-
+	// position read, so it is flagged there too — the shared expression walk does
+	// not enter a lambda body, so the walk descends into it explicitly.
+	src := "pub interface HasX {\n  x: nint\n}\n" +
+		"pub fn f<T: HasX>(v: T): fn(): nint {\n  return fn(): nint {\n    return T.x\n  }\n}\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeTypeParamInValuePosition) {
+		t.Fatalf("want type_param_in_value_position (T.x in a lambda body), got %v", codes(diags))
+	}
+}
+
+func TestBoundedProjectionLambdaParamShadowNotRejected(t *testing.T) {
+	// A lambda parameter that reuses the type parameter's name shadows it within
+	// the lambda body, so the name reads the lambda's value parameter and is not
+	// flagged.
+	src := "pub fn f<T>(): fn(nint): nint {\n  return fn(T: nint): nint {\n    return T\n  }\n}\n"
+	_, diags := analyze(src)
+	if hasCode(diags, CodeTypeParamInValuePosition) {
+		t.Fatalf("want no type_param_in_value_position (T is the lambda parameter), got %v", codes(diags))
+	}
+}
