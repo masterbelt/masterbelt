@@ -270,7 +270,7 @@ func forEachBodyExpr(body []ast.Stmt, fn func(ast.Expr)) {
 // parameter in a function or method body: a type parameter is a compile-time
 // type, not a foldable value, so projecting a member off it (T.x) or consuming
 // it bare (T == string) where a value is expected is type_param_in_value_position
-// — the value-position counterpart of the type-position projection T.x that 0006c
+// — the value-position counterpart of the type-position projection T.x, which
 // resolves through the bound. Without it a bounded parameter projected in value
 // position folds to nothing and the consuming expression passes vacuously
 // (assert T.x == string and == nint both clean), so the read is rejected at the
@@ -284,7 +284,7 @@ func forEachBodyExpr(body []ast.Stmt, fn func(ast.Expr)) {
 // binding, or a lambda parameter — shadows the type parameter for the statements
 // it scopes and takes the value reading, exactly as the body checker scopes those
 // bindings, so reusing a type parameter's name as a local does not misfire.
-func reportTypeParamValueUse(scope infer.TypeScope, params map[string]ir.Type, body []ast.Stmt, at func(ast.Node) span, diags *diagnostic.List) {
+func reportTypeParamValueUse(scope infer.TypeScope, params map[string]ir.Type, constShadows func(*ast.Identifier) bool, body []ast.Stmt, at func(ast.Node) span, diags *diagnostic.List) {
 	if len(scope) == 0 || diags == nil {
 		return
 	}
@@ -292,7 +292,7 @@ func reportTypeParamValueUse(scope infer.TypeScope, params map[string]ir.Type, b
 	for name := range params {
 		shadowed[name] = true
 	}
-	typeParamValueWalk{scope: scope, at: at, diags: diags}.stmts(body, shadowed)
+	typeParamValueWalk{scope: scope, constShadows: constShadows, at: at, diags: diags}.stmts(body, shadowed)
 }
 
 // typeParamValueWalk walks a body for value-position type-parameter uses,
@@ -300,8 +300,12 @@ func reportTypeParamValueUse(scope infer.TypeScope, params map[string]ir.Type, b
 // suppresses the report for the statements it scopes.
 type typeParamValueWalk struct {
 	scope infer.TypeScope
-	at    func(ast.Node) span
-	diags *diagnostic.List
+	// constShadows reports whether a bare name resolves to a top-level constant —
+	// a value the body binder reads before reifying a type, so it shadows a
+	// same-named type parameter exactly as a local binding does.
+	constShadows func(*ast.Identifier) bool
+	at           func(ast.Node) span
+	diags        *diagnostic.List
 }
 
 // stmts walks a statement block with shadowed holding the value names in scope at
@@ -330,7 +334,9 @@ func (w typeParamValueWalk) stmts(stmts []ast.Stmt, shadowed map[string]bool) {
 			w.stmts(s.Body, withName(shadowed, s.Var)) // the loop variable binds in the body
 		case *ast.SwitchStmt:
 			w.expr(s.Scrutinee, shadowed)
-			for _, arm := range s.Arms {
+			// The after-wildcard arms are unreachable but still type-checked so their
+			// own errors surface, so a value-position use in one is reported here too.
+			for _, arm := range append(append([]*ast.SwitchArm{}, s.Arms...), s.AfterElse...) {
 				for _, v := range arm.Values {
 					w.expr(v, shadowed)
 				}
@@ -339,7 +345,7 @@ func (w typeParamValueWalk) stmts(stmts []ast.Stmt, shadowed map[string]bool) {
 			w.stmts(s.Else, withName(shadowed, ""))
 		case *ast.MatchStmt:
 			w.expr(s.Scrutinee, shadowed)
-			for _, arm := range s.Arms {
+			for _, arm := range append(append([]*ast.MatchArm{}, s.Arms...), s.AfterElse...) {
 				w.stmts(arm.Body, withName(shadowed, arm.Bind)) // the arm binding narrows in the body
 			}
 			w.stmts(s.Else, withName(shadowed, ""))
@@ -386,12 +392,12 @@ func (w typeParamValueWalk) expr(e ast.Expr, shadowed map[string]bool) {
 			w.stmts(e.Body, inner)
 			return false
 		case *ast.MemberExpr:
-			if recv, ok := e.Receiver.(*ast.Identifier); ok && w.flagged(recv.Name, shadowed) {
+			if recv, ok := e.Receiver.(*ast.Identifier); ok && w.flagged(recv, shadowed) {
 				w.report(e, recv.Name)
 				return false
 			}
 		case *ast.Identifier:
-			if !callee[e] && w.flagged(e.Name, shadowed) {
+			if !callee[e] && w.flagged(e, shadowed) {
 				w.report(e, e.Name)
 			}
 		}
@@ -399,13 +405,17 @@ func (w typeParamValueWalk) expr(e ast.Expr, shadowed map[string]bool) {
 	})
 }
 
-// flagged reports whether name is a type parameter in scope that no value binding
-// shadows — the condition for a value-position use to be reported.
-func (w typeParamValueWalk) flagged(name string, shadowed map[string]bool) bool {
-	if _, ok := w.scope[name]; !ok {
+// flagged reports whether id names a type parameter in scope that no value
+// shadows — neither a binding in scope here nor a top-level constant — the
+// condition for a value-position use to be reported.
+func (w typeParamValueWalk) flagged(id *ast.Identifier, shadowed map[string]bool) bool {
+	if _, ok := w.scope[id.Name]; !ok {
 		return false
 	}
-	return !shadowed[name]
+	if shadowed[id.Name] {
+		return false
+	}
+	return w.constShadows == nil || !w.constShadows(id)
 }
 
 func (w typeParamValueWalk) report(node ast.Node, name string) {
@@ -432,13 +442,14 @@ func withName(shadowed map[string]bool, name string) map[string]bool {
 // the enclosing type's parameters (each with its resolved bound) plus the
 // method's own explicit type parameters (fold<A>). A body type annotation naming
 // one of these (a let, a match/switch arm) then resolves to a TypeVar rather than
-// an unknown type. The enclosing parameters' bounds are carried through; a method
-// type parameter is left unbounded here (a body annotation only needs its name in
-// scope, and the signature already carries the bound). A method-introduced
+// an unknown type. Each method type parameter's bound is resolved in the full
+// scope and back-filled, the way the signature resolves it, so a body annotation
+// projecting off a bounded method parameter (let y: T.x where T: HasX) sees the
+// bound rather than an unbounded variable that has no members. A method-introduced
 // inference variable (the implicit R in map(func: fn(T): R)) is deliberately not
 // added: it is an inference hole, not a name a body annotation may pin, and
 // adding it would risk shadowing a same-named real type.
-func methodTScope(def *ir.TypeDef, m *ast.MethodDecl) infer.TypeScope {
+func methodTScope(r *infer.TypeResolver, def *ir.TypeDef, m *ast.MethodDecl) infer.TypeScope {
 	if len(def.Params) == 0 && len(m.TypeParams) == 0 {
 		return nil
 	}
@@ -449,6 +460,11 @@ func methodTScope(def *ir.TypeDef, m *ast.MethodDecl) infer.TypeScope {
 	for _, tp := range m.TypeParams {
 		if _, ok := scope[tp.Name]; !ok {
 			scope[tp.Name] = nil
+		}
+	}
+	for _, tp := range m.TypeParams {
+		if tp.Constraint != nil {
+			scope[tp.Name] = r.ResolveType(tp.Constraint, scope)
 		}
 	}
 	return scope
@@ -466,6 +482,11 @@ func methodTScope(def *ir.TypeDef, m *ast.MethodDecl) infer.TypeScope {
 // resolves exactly as an annotation does. env folds switch arm values for the
 // exhaustiveness and duplicate checks.
 func checkMethodBodies(reg *builtin.Registry, defs []*ir.TypeDef, universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, funcs map[string][]*ast.FuncDecl, qualifiedFuncs func(namespace, name string) []*ast.FuncDecl, constShadows func(*ast.Identifier) bool, env exprFolder, sink *infer.Sink, at func(ast.Node) span, diags *diagnostic.List) {
+	// The resolver that builds each method's body type-parameter scope: it resolves
+	// a method type parameter's bound (fn g<T: HasX>) so a body annotation
+	// projecting off it (let y: T.x) sees the bound, the same registry-backed
+	// resolution the signature uses.
+	tscopeResolver := &infer.TypeResolver{Defs: universe, Qualified: qualified, Registry: reg}
 	var noSelf func(node ast.Node)
 	if diags != nil {
 		noSelf = func(node ast.Node) {
@@ -495,10 +516,10 @@ func checkMethodBodies(reg *builtin.Registry, defs []*ir.TypeDef, universe map[s
 				params[p.Name] = substSelf(p.Type, self)
 			}
 			want := substSelf(irm.Result, self)
-			bs := infer.BodyScope{Reg: reg, Universe: universe, Qualified: qualified, Self: selfT, Params: params, Funcs: funcs, QualifiedFuncs: qualifiedFuncs, ConstShadows: constShadows, TScope: methodTScope(def, m)}
+			bs := infer.BodyScope{Reg: reg, Universe: universe, Qualified: qualified, Self: selfT, Params: params, Funcs: funcs, QualifiedFuncs: qualifiedFuncs, ConstShadows: constShadows, TScope: methodTScope(tscopeResolver, def, m)}
 			checkStmts(m.Body, want, bs, env, bodyNoSelf, sink, at, diags)
 			checkBareEnumArgs(m.Body, bs, env, at, diags)
-			reportTypeParamValueUse(bs.TScope, params, m.Body, at, diags)
+			reportTypeParamValueUse(bs.TScope, params, constShadows, m.Body, at, diags)
 		}
 	}
 }
@@ -521,8 +542,10 @@ func checkFuncBodies(reg *builtin.Registry, file *ast.File, universe map[string]
 	// The resolver reports a failed field-type projection in a parameter or result
 	// annotation (fn f(x: Item.nope)), so an invalid projection there surfaces the
 	// same diagnostic it does in a type or const annotation rather than resolving
-	// silently. A sink-only walk (diags nil) keeps it silent.
-	r := &infer.TypeResolver{Defs: universe, Qualified: qualified, ProjectionError: projectionErrorReporter(at, diags)}
+	// silently. The registry lets a bounded projection (fn f<T: HasX>(): T.x) read
+	// the bound's readable member, the same as the top-level type-declaration path.
+	// A sink-only walk (diags nil) keeps it silent.
+	r := &infer.TypeResolver{Defs: universe, Qualified: qualified, Registry: reg, ProjectionError: projectionErrorReporter(at, diags)}
 	var noSelf func(node ast.Node)
 	if diags != nil {
 		noSelf = func(node ast.Node) {
@@ -551,7 +574,7 @@ func checkFuncBodies(reg *builtin.Registry, file *ast.File, universe map[string]
 		if diags == nil {
 			continue // the sink-only walk wants no further diagnostics
 		}
-		reportTypeParamValueUse(tscope, params, fd.Body, at, diags)
+		reportTypeParamValueUse(tscope, params, constShadows, fd.Body, at, diags)
 		// A function parameter or result may not be a type value: fn f(t: type) or
 		// fn f(): type is type_in_value_position — there are no type-value functions,
 		// which is why generics stay type parameters rather than type-value

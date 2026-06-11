@@ -188,3 +188,54 @@ func TestBoundedProjectionLambdaParamShadowNotRejected(t *testing.T) {
 		t.Fatalf("want no type_param_in_value_position (T is the lambda parameter), got %v", codes(diags))
 	}
 }
+
+func TestBoundedProjectionConstShadowNotRejected(t *testing.T) {
+	// A top-level constant of the type parameter's name is a value the body reads
+	// before reifying a type, so it shadows the parameter and the bare read is not
+	// flagged — the same shadowing the body binder applies.
+	src := "pub const T: nint = 1\n" +
+		"pub fn f<T>(): nint {\n  return T\n}\n"
+	_, diags := analyze(src)
+	if hasCode(diags, CodeTypeParamInValuePosition) {
+		t.Fatalf("want no type_param_in_value_position (T is a top-level constant), got %v", codes(diags))
+	}
+}
+
+func TestBoundedProjectionAfterWildcardArmRejected(t *testing.T) {
+	// An after-wildcard switch arm is unreachable but still type-checked, so a
+	// value-position projection in one is flagged there too, not only in a live arm.
+	src := "pub interface HasX {\n  x: nint\n}\n" +
+		"pub fn f<T: HasX>(v: T): nint {\n  switch v.x {\n    _ -> {\n      return v.x\n    }\n    1 -> {\n      return T.x\n    }\n  }\n}\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeTypeParamInValuePosition) {
+		t.Fatalf("want type_param_in_value_position (T.x in an after-wildcard arm), got %v", codes(diags))
+	}
+}
+
+func TestBoundedProjectionInSignatureAndBodyAnnotation(t *testing.T) {
+	// The type-position projection T.x resolves wherever a type annotation reaches a
+	// bounded parameter, not only at a top-level declaration: a function result and
+	// a body let annotation both read the bound's required member through the
+	// registry-backed resolver.
+	for _, src := range []string{
+		"pub interface HasX {\n  x: nint\n}\n" + "pub fn f<T: HasX>(v: T): T.x {\n  return v.x\n}\n",
+		"pub interface HasX {\n  x: nint\n}\n" + "pub fn f<T: HasX>(v: T): nint {\n  let y: T.x = v.x\n  return y\n}\n",
+	} {
+		_, diags := analyze(src)
+		if len(diags) != 0 {
+			t.Fatalf("want clean (T.x resolves in a signature/body annotation), got %v", codes(diags))
+		}
+	}
+}
+
+func TestBoundedProjectionMethodTypeParamAnnotation(t *testing.T) {
+	// A method's own bounded type parameter carries its bound into the body scope,
+	// so a body annotation projecting off it (let y: T.x where T: HasX) resolves
+	// through the bound exactly as a function type parameter does.
+	src := "pub interface HasX {\n  x: nint\n}\n" +
+		"pub type Box = { z: nint } impl {\n  pub fn g<T: HasX>(v: T): nint {\n    let y: T.x = v.x\n    return y\n  }\n}\n"
+	_, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("want clean (a method type parameter's bound reaches its body), got %v", codes(diags))
+	}
+}
