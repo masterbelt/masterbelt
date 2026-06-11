@@ -215,7 +215,38 @@ func receiverSubst(reg *builtin.Registry, recv ir.Type, owner *ir.TypeDef) map[s
 		}
 	}
 	addImplSubst(reg, defOf(reg, recv), subst, map[*ir.TypeDef]bool{})
+	addParentSubst(reg, defOf(reg, recv), subst, map[*ir.TypeDef]bool{})
 	return subst
+}
+
+// addParentSubst records, into subst, the parameters each generic parent
+// interface binds — the inheritance analog of addImplSubst. A member inherited
+// from a generic parent (Child<T>: Has<T>, reading a member declared on Has<U>)
+// is found on the parent, so its signature is written in the parent's parameter
+// U; binding U from the parent application Has<T> (with the child's T already
+// pinned) resolves it to the child's argument, so Child<string>.foo reads string
+// rather than the free U. It composes down the parent chain, with seen guarding a
+// cycle, and never overwrites a binding a nearer level already pinned.
+func addParentSubst(reg *builtin.Registry, def *ir.TypeDef, subst map[string]ir.Type, seen map[*ir.TypeDef]bool) {
+	if def == nil || def.Interface == nil || seen[def] {
+		return
+	}
+	seen[def] = true
+	for _, parent := range def.Interface.Parents {
+		pdef := defOf(reg, parent)
+		if pdef == nil || pdef.Interface == nil {
+			continue
+		}
+		if app, ok := parent.(*ir.App); ok && len(app.Args) == len(pdef.Params) {
+			for i, p := range pdef.Params {
+				if _, pinned := subst[p.Name]; pinned {
+					continue
+				}
+				subst[p.Name] = Substitute(app.Args[i], subst)
+			}
+		}
+		addParentSubst(reg, pdef, subst, seen)
+	}
 }
 
 // addImplSubst records, into subst, the interface parameters each impl the

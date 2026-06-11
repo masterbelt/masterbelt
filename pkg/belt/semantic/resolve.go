@@ -429,9 +429,11 @@ func resolveInterfaceDecl(r *infer.TypeResolver, reg *builtin.Registry, id *ast.
 		reportMetatypeSlot(at, diags, m, sigType(method.Params, method.Result))
 		def.AttachMethods(method)
 		// A readable-member requirement is always required — it carries no default,
-		// so a stray body does not make it provided (which would let any implementor
-		// inherit it and satisfy the requirement vacuously); the body is reported.
-		if m.Readable && m.Body != nil && at != nil && diags != nil {
+		// so a written body does not make it provided (which would let any implementor
+		// inherit it and satisfy the requirement vacuously); the body is reported. A
+		// block is rejected even when empty (HasBody, not a non-nil Body, which an
+		// empty block does not produce).
+		if m.Readable && m.HasBody && at != nil && diags != nil {
 			s := at(m)
 			diags.Add(newReadableMemberHasBodyDiagnostic(s.offset, s.width, m.Name))
 		}
@@ -483,44 +485,65 @@ func checkOneInterfaceInheritance(decl *ast.InterfaceDecl, def *ir.TypeDef, at f
 		return
 	}
 	contributors := interfaceContributors(def)
-	// Override: a child member whose name an ancestor already carries.
+	// Override: a child member an ancestor already carries — matched by name and
+	// kind, so a child method name() does not override an ancestor readable name (a
+	// readable member and a method are distinct members, as a field and a method of
+	// the same name are on a concrete type).
 	for _, m := range decl.Members {
-		if anc := contributors[m.Name]; len(anc) > 0 {
+		if anc := contributors[memberKeyOf(m)]; len(anc) > 0 {
 			s := at(m)
 			diags.Add(newInterfaceMemberOverrideDiagnostic(s.offset, s.width, def.Name, m.Name, anc[0].Name))
 		}
 	}
-	// Conflict: a name two unrelated ancestors both declare, which the child
-	// does not itself redeclare (an override is reported above instead).
-	own := map[string]bool{}
+	// Conflict: a member two unrelated ancestors both declare, which the child does
+	// not itself redeclare (an override is reported above instead).
+	own := map[memberKey]bool{}
 	for _, m := range decl.Members {
-		own[m.Name] = true
+		own[memberKeyOf(m)] = true
 	}
-	for _, name := range interfaceMemberNames(def) {
-		own[name] = true // the IR member names agree with the decl's; belt and braces
+	for _, k := range interfaceMemberKeys(def) {
+		own[k] = true // the IR members agree with the decl's; belt and braces
 	}
-	for name, anc := range contributors {
-		if len(anc) >= 2 && !own[name] {
+	for k, anc := range contributors {
+		if len(anc) >= 2 && !own[k] {
 			s := at(decl)
-			diags.Add(newInterfaceMemberConflictDiagnostic(s.offset, s.width, def.Name, name, anc[0].Name, anc[1].Name))
+			diags.Add(newInterfaceMemberConflictDiagnostic(s.offset, s.width, def.Name, k.name, anc[0].Name, anc[1].Name))
 		}
 	}
 }
 
-// interfaceContributors maps each member name an ancestor of def declares to the
-// distinct ancestor definitions that declare it. A name from a single shared
-// ancestor lands once (the closure dedups by identity); a name from two
-// unrelated ancestors lands twice.
-func interfaceContributors(def *ir.TypeDef) map[string][]*ir.TypeDef {
-	contributors := map[string][]*ir.TypeDef{}
+// memberKey identifies an interface member by name and kind — a readable member
+// (a getter) and a method that share a name are distinct members, so the
+// inheritance checks must not collapse them.
+type memberKey struct {
+	name string
+	kind ir.MethodKind
+}
+
+// memberKeyOf is the key of a declared interface member: a readable-member
+// requirement is a getter, every other member a method.
+func memberKeyOf(m *ast.InterfaceMember) memberKey {
+	kind := ir.MethodNormal
+	if m.Readable {
+		kind = ir.MethodGetter
+	}
+	return memberKey{name: m.Name, kind: kind}
+}
+
+// interfaceContributors maps each member an ancestor of def declares — keyed by
+// name and kind — to the distinct ancestor definitions that declare it. A member
+// from a single shared ancestor lands once (the closure dedups by identity); one
+// from two unrelated ancestors lands twice.
+func interfaceContributors(def *ir.TypeDef) map[memberKey][]*ir.TypeDef {
+	contributors := map[memberKey][]*ir.TypeDef{}
 	for _, parent := range def.Interface.Parents {
 		for _, anc := range interfaceClosure(parent) {
 			adef := interfaceDefOf(anc)
 			if adef == nil {
 				continue
 			}
-			for _, name := range interfaceMemberNames(adef) {
-				contributors[name] = appendDistinct(contributors[name], adef)
+			for _, k := range interfaceMemberKeys(adef) {
+				contributors[k] = appendDistinct(contributors[k], adef)
 			}
 		}
 	}
@@ -553,16 +576,19 @@ func interfaceHasCycle(def *ir.TypeDef) bool {
 	return walk(def)
 }
 
-// interfaceMemberNames returns the names of an interface's own members (required
-// and provided), in a stable order, for the override and conflict checks.
-func interfaceMemberNames(def *ir.TypeDef) []string {
+// interfaceMemberKeys returns the name-and-kind keys of an interface's own
+// members (required and provided), in declaration order, for the override and
+// conflict checks — so a readable member and a method of the same name are kept
+// distinct.
+func interfaceMemberKeys(def *ir.TypeDef) []memberKey {
 	if def.Interface == nil {
 		return nil
 	}
-	names := make([]string, 0, len(def.Interface.Required)+len(def.Interface.Provided))
-	names = append(names, def.Interface.Required...)
-	names = append(names, def.Interface.Provided...)
-	return names
+	keys := make([]memberKey, 0, len(def.Methods))
+	for _, m := range def.Methods {
+		keys = append(keys, memberKey{name: m.Name, kind: m.Kind})
+	}
+	return keys
 }
 
 // appendDistinct appends def to defs unless it is already present, so a single

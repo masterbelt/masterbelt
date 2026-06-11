@@ -140,6 +140,7 @@ File
           Public: false
           Name: "fold"
           Readable: false
+          HasBody: false
           TypeParams:
             TypeParam
               Name: "A"
@@ -193,6 +194,7 @@ File
           Public: true
           Name: "count"
           Readable: false
+          HasBody: true
           TypeParams: ~
           Params: ~
           Result: NamedType

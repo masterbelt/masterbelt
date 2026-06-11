@@ -99,6 +99,34 @@ func TestReadableRequirementBodyRejected(t *testing.T) {
 	}
 }
 
+func TestReadableRequirementEmptyBodyRejected(t *testing.T) {
+	// A written body is rejected even when empty: an empty block lowers to a nil
+	// statement list, so block presence (not body content) is what is checked.
+	src := "pub interface Named {\n  name: string {}\n}\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeReadableMemberHasBody) {
+		t.Fatalf("want readable_member_has_body for an empty block, got %v", codes(diags))
+	}
+}
+
+func TestInheritedReadableAndMethodSameNameAllowed(t *testing.T) {
+	// A child interface may add a method name() over a parent's readable name: a
+	// readable member and a method are distinct members (as a field and a method of
+	// the same name are on a concrete type), so it is not an override.
+	src := "pub interface HasName {\n  name: string\n}\n" +
+		"pub interface Both: HasName {\n  name(): string\n}\n"
+	_, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("want clean (readable and method of one name are distinct), got %v", codes(diags))
+	}
+	// A same-kind redeclaration is still an override.
+	override := "pub interface A {\n  name: string\n}\n" +
+		"pub interface B: A {\n  name: string\n}\n"
+	if _, diags := analyze(override); !hasCode(diags, CodeInterfaceMemberOverride) {
+		t.Fatalf("want interface_member_override for a same-kind redeclaration, got %v", codes(diags))
+	}
+}
+
 func TestReadableRequirementSelfType(t *testing.T) {
 	// A readable requirement typed self is met by a self-returning getter: both the
 	// requirement's self and the getter's self resolve to the implementing type, so
@@ -135,6 +163,33 @@ func TestReadableRequirementInheritedGenericGetter(t *testing.T) {
 	_, diags := analyze(src)
 	if len(diags) != 0 {
 		t.Fatalf("want clean (inherited generic getter reads string), got %v", codes(diags))
+	}
+}
+
+func TestInheritedGenericParentReadableRead(t *testing.T) {
+	// Reading a readable member inherited from a generic parent binds the parent's
+	// parameter through the inheritance: Child<string> inherits value: U from
+	// Has<T> : value reads string, not the free U.
+	src := "pub interface Has<U> {\n  value: U\n}\n" +
+		"pub interface Child<T>: Has<T> {}\n" +
+		"pub fn f(c: Child<string>): string {\n  return c.value\n}\n"
+	_, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("want clean (inherited generic-parent readable reads string), got %v", codes(diags))
+	}
+}
+
+func TestInheritedGenericParentMethodCall(t *testing.T) {
+	// The same parent-parameter binding applies to an inherited method, through two
+	// levels of generic inheritance: C<string> reaches foo(): U on A<U> with U bound
+	// to string, so the call type-checks (the fix is not readable-specific).
+	src := "pub interface A<U> {\n  foo(): U\n}\n" +
+		"pub interface B<V>: A<V> {}\n" +
+		"pub interface C<W>: B<W> {}\n" +
+		"pub fn f(c: C<string>): string {\n  return c.foo()\n}\n"
+	_, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("want clean (inherited generic-parent method binds the parameter), got %v", codes(diags))
 	}
 }
 

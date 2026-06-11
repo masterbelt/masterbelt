@@ -163,6 +163,7 @@ type InterfaceMember struct {
 	Public     bool
 	Name       string
 	Readable   bool         // a readable-member requirement (Name: T, no parameter list)
+	HasBody    bool         // a block was written (even an empty one), distinct from a non-empty Body
 	TypeParams []*TypeParam // explicit method type variables (the A in fold<A>), or nil
 	Params     []*ParamDef
 	Result     TypeExpr
@@ -179,8 +180,8 @@ func (m *InterfaceMember) node()             {}
 func (m *InterfaceMember) Provided() bool { return m.Body != nil }
 
 // NewInterfaceMember builds an InterfaceMember node.
-func NewInterfaceMember(doc []string, public bool, name string, readable bool, typeParams []*TypeParam, params []*ParamDef, result TypeExpr, body []Stmt, syntax *cst.Node) *InterfaceMember {
-	return &InterfaceMember{Doc: doc, Public: public, Name: name, Readable: readable, TypeParams: typeParams, Params: params, Result: result, Body: body, syntax: syntax}
+func NewInterfaceMember(doc []string, public bool, name string, readable, hasBody bool, typeParams []*TypeParam, params []*ParamDef, result TypeExpr, body []Stmt, syntax *cst.Node) *InterfaceMember {
+	return &InterfaceMember{Doc: doc, Public: public, Name: name, Readable: readable, HasBody: hasBody, TypeParams: typeParams, Params: params, Result: result, Body: body, syntax: syntax}
 }
 
 // AssertDecl is a compile-time assertion: an optional run of doc-comment lines

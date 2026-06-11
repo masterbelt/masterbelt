@@ -122,6 +122,7 @@ File
           Public: false
           Name: "name"
           Readable: true
+          HasBody: false
           TypeParams: ~
           Params: ~
           Result: NamedType
@@ -135,6 +136,7 @@ File
           Public: false
           Name: "greeting"
           Readable: false
+          HasBody: false
           TypeParams: ~
           Params: ~
           Result: NamedType

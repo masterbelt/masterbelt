@@ -705,6 +705,7 @@ func lowerInterfaceMember(t cst.Tree, buf source.Buffer) *ast.InterfaceMember {
 		result     ast.TypeExpr
 		body       []ast.Stmt
 		hasParams  bool
+		hasBody    bool
 	)
 	for _, child := range t.Children() {
 		if tok, ok := child.Token(); ok {
@@ -732,11 +733,13 @@ func lowerInterfaceMember(t cst.Tree, buf source.Buffer) *ast.InterfaceMember {
 			hasParams = true
 		case node.Kind() == cst.Block:
 			body = lowerBlock(child, buf)
+			hasBody = true
 		case isTypeExprKind(node.Kind()):
 			result = lowerTypeExpr(child, buf)
 		}
 	}
 	// No parameter list distinguishes a readable-member requirement (Name: T) from
 	// a nullary method requirement (Name(): T), which both lower to empty Params.
-	return ast.NewInterfaceMember(doc, public, name, !hasParams, typeParams, params, result, body, green)
+	// hasBody records a written block even when empty, which lowers to a nil Body.
+	return ast.NewInterfaceMember(doc, public, name, !hasParams, hasBody, typeParams, params, result, body, green)
 }

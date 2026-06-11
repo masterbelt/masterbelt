@@ -107,6 +107,7 @@ File
           Public: false
           Name: "show"
           Readable: false
+          HasBody: false
           TypeParams: ~
           Params: ~
           Result: NamedType
@@ -132,6 +133,7 @@ File
           Public: false
           Name: "rank"
           Readable: false
+          HasBody: false
           TypeParams: ~
           Params: ~
           Result: NamedType
@@ -162,6 +164,7 @@ File
           Public: false
           Name: "before"
           Readable: false
+          HasBody: false
           TypeParams: ~
           Params:
             ParamDef
