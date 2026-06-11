@@ -239,3 +239,43 @@ func TestBoundedProjectionMethodTypeParamAnnotation(t *testing.T) {
 		t.Fatalf("want clean (a method type parameter's bound reaches its body), got %v", codes(diags))
 	}
 }
+
+func TestBoundedProjectionFunctionLiteralSignature(t *testing.T) {
+	// A function literal's signature resolves a bounded projection too: a lambda
+	// fn(w: T): T.x reads the bound's member, so its result is nint. Assigning that
+	// result where a string is wanted is the mismatch that proves it resolved to
+	// nint rather than silently to an invalid type that conflicts with nothing.
+	src := "pub interface HasX {\n  x: nint\n}\n" +
+		"pub fn f<T: HasX>(v: T): nint {\n  let g = fn(w: T): T.x {\n    return w.x\n  }\n  let bad: string = g(v)\n  return v.x\n}\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeTypeMismatch) {
+		t.Fatalf("want type_mismatch (the lambda's T.x result is nint, not string), got %v", codes(diags))
+	}
+}
+
+func TestBoundedProjectionCallSiteResult(t *testing.T) {
+	// A call to a generic function whose result is a bounded projection resolves
+	// that result at the call site: get<T: HasX>(v: T): T.x called on a Point is
+	// nint, so returning it where a string is declared is a mismatch — the result
+	// is not silently invalid, which would lose the call's type checking.
+	src := "pub interface HasX {\n  x: nint\n}\n" +
+		"pub type Point = { x: nint } impl HasX {}\n" +
+		"pub fn get<T: HasX>(v: T): T.x {\n  return v.x\n}\n" +
+		"pub fn caller(p: Point): string {\n  return get(p)\n}\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeTypeMismatch) {
+		t.Fatalf("want type_mismatch (get(p) is nint, not string), got %v", codes(diags))
+	}
+}
+
+func TestBoundedProjectionEnumMemberArmNotRejected(t *testing.T) {
+	// A switch arm pattern is matched against the scrutinee, so a bare name there is
+	// an enum member of the scrutinee's enum, not a value read of a type parameter
+	// — even when an enum member shares a type parameter's name.
+	src := "pub enum R {\n  T\n  U\n}\n" +
+		"pub fn f<T>(r: R): nint {\n  switch r {\n    T -> {\n      return 1\n    }\n    U -> {\n      return 2\n    }\n  }\n}\n"
+	_, diags := analyze(src)
+	if hasCode(diags, CodeTypeParamInValuePosition) {
+		t.Fatalf("want no type_param_in_value_position (T is an enum member pattern), got %v", codes(diags))
+	}
+}

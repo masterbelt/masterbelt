@@ -334,12 +334,12 @@ func (w typeParamValueWalk) stmts(stmts []ast.Stmt, shadowed map[string]bool) {
 			w.stmts(s.Body, withName(shadowed, s.Var)) // the loop variable binds in the body
 		case *ast.SwitchStmt:
 			w.expr(s.Scrutinee, shadowed)
-			// The after-wildcard arms are unreachable but still type-checked so their
-			// own errors surface, so a value-position use in one is reported here too.
+			// An arm's value patterns are matched against the scrutinee — a bare name
+			// there is an enum member or constant resolved from the scrutinee's type,
+			// not a value read of a type parameter — so the patterns are not walked;
+			// only the arm bodies are. The after-wildcard arms are unreachable but
+			// still type-checked, so a value-position use in one is reported as well.
 			for _, arm := range append(append([]*ast.SwitchArm{}, s.Arms...), s.AfterElse...) {
-				for _, v := range arm.Values {
-					w.expr(v, shadowed)
-				}
 				w.stmts(arm.Body, withName(shadowed, ""))
 			}
 			w.stmts(s.Else, withName(shadowed, ""))

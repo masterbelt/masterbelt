@@ -491,7 +491,7 @@ type funcSig struct {
 // own reporting pass resolves them in; an unresolved annotation was reported
 // there, so an Invalid parameter or result type stays silent here.
 func funcCallType(e *ast.CallExpr, name string, cands []*ast.FuncDecl, s scope, sink *Sink) ir.Type {
-	r := &TypeResolver{Defs: s.universe(), Qualified: s.qualified()}
+	r := &TypeResolver{Defs: s.universe(), Qualified: s.qualified(), Registry: s.registry()}
 
 	// Resolve every candidate's signature, dropping a later one that repeats
 	// an earlier signature — the declaration pass reports the duplicate, and
