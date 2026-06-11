@@ -248,6 +248,17 @@ type BodyScope struct {
 	// (geo.area -> the target's exported overload set), or nil when no
 	// namespaces are in scope.
 	QualifiedFuncs func(namespace, name string) []*ast.FuncDecl
+	// ReportTypeParamValue reports a generic type parameter consumed as a value —
+	// a bare T (T == string, return T) or the receiver of a value member read T.x —
+	// at the value leaf where the name resolves to nothing but a type parameter:
+	// not a local, parameter, or constant, each of which the leaf resolves first
+	// and so shadows it by construction. The one value-position shadow the leaf
+	// does not itself carry, a namespace import, is filtered by the reporter, which
+	// holds the file's import set. It is the value leaf's reach to the diagnostic
+	// surface BodyScope does not otherwise carry; nil in a non-reporting walk (the
+	// sink-only func-literal settling pass, the effect and refinement walks),
+	// leaving the use to its prior silent reading.
+	ReportTypeParamValue func(node ast.Node, name string)
 }
 
 // Body infers the type of a method-body expression: self, a parameter, a
@@ -337,6 +348,16 @@ func (s BodyScope) leaf(e ast.Expr) ir.Type {
 		// (let t = sbyte, long == long) types it identically.
 		if _, ok := s.Universe[e.Name]; ok {
 			return metatype()
+		}
+		// The name is neither a local, a parameter, nor a type: a bare generic type
+		// parameter consumed as a value (T == string, return T, or the receiver of a
+		// value read T.x reached through exprType below) is a compile-time type, not
+		// a foldable value, so it is reported. A top-level constant of the same name
+		// shadows it — the body reads the constant, not the parameter — so the
+		// constant case is excluded here; a namespace import (the one shadow this
+		// scope does not carry) is excluded by the reporter, which holds the imports.
+		if s.ReportTypeParamValue != nil && s.rigid(e.Name) && (s.ConstShadows == nil || !s.ConstShadows(e)) {
+			s.ReportTypeParamValue(e, e.Name)
 		}
 		return ir.Invalid
 	case *ast.MemberExpr:

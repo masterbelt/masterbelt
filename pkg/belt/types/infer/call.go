@@ -73,9 +73,14 @@ func nonMemberCallType(e *ast.CallExpr, s scope, sink *Sink) ir.Type {
 	// function-value arm: each argument checks against the function
 	// type's parameter, and the call's type is its result. A callee of
 	// any other type falls through to the leaf forms (whose channels
-	// report an unresolved name).
-	if fn, isFn := check(e.Callee, s, sink).(*ir.Func); isFn {
-		return funcValueCallType(e, fn, s, sink)
+	// report an unresolved name). A bare type-parameter callee is skipped:
+	// T(x) names the type parameter — a conversion, a type position — not a
+	// function value, so it is not walked as a value here (which would report
+	// it as a value-position use of the parameter).
+	if id, isIdent := e.Callee.(*ast.Identifier); !isIdent || !s.rigid(id.Name) {
+		if fn, isFn := check(e.Callee, s, sink).(*ir.Func); isFn {
+			return funcValueCallType(e, fn, s, sink)
+		}
 	}
 	// A bare call whose name is a method of self is an implicit self-call
 	// (self omitted) — the form an interface's provided method uses to

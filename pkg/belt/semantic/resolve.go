@@ -136,6 +136,39 @@ func projectionErrorReporter(at func(ast.Node) span, diags *diagnostic.List) fun
 	}
 }
 
+// typeParamValueReporter returns the callback BodyScope fires when a generic
+// type parameter is consumed as a value (a bare T, or the receiver of a value
+// read T.x), anchored at the offending identifier. It returns nil when there is
+// nowhere to report (a sink-only settling walk passes a nil diags), so that walk
+// types the value-position use silently rather than reporting it twice.
+func typeParamValueReporter(at func(ast.Node) span, diags *diagnostic.List, nsShadows func(*ast.Identifier) bool) func(ast.Node, string) {
+	if at == nil || diags == nil {
+		return nil
+	}
+	// The value leaf is reached more than once per offending identifier: the
+	// checking walk streams a member receiver's type and the leaf re-derives it for
+	// the field read, and the bare-enum-argument walk shares the same body scope —
+	// each carries this reporter. Reporting is keyed by identifier node so each
+	// offending use yields one diagnostic, not one per walk.
+	seen := map[ast.Node]bool{}
+	return func(node ast.Node, name string) {
+		// A namespace import of the same name shadows the type parameter in value
+		// position — the member read T.x reads the import's exported member, not the
+		// parameter — so it is not a value use of the parameter. The leaf resolves
+		// locals, parameters, and constants before reaching here; the namespace import
+		// is the one value-position shadow it does not itself carry.
+		if id, ok := node.(*ast.Identifier); ok && nsShadows != nil && nsShadows(id) {
+			return
+		}
+		if seen[node] {
+			return
+		}
+		seen[node] = true
+		s := at(node)
+		diags.Add(newTypeParamInValuePositionDiagnostic(s.offset, s.width, name))
+	}
+}
+
 // resolveTypes resolves the file's type declarations into ir.TypeDefs, in source
 // order. A type reference resolves against the other declarations in the file
 // (so a declaration may refer to a type defined later in the file), extern —

@@ -89,6 +89,7 @@ const (
 	CodeTypeHasNoFields            diagnostic.Code = "belt.semantic.type_has_no_fields"
 	CodeTypeInValuePosition        diagnostic.Code = "belt.semantic.type_in_value_position"
 	CodeTypeMismatch               diagnostic.Code = "belt.semantic.type_mismatch"
+	CodeTypeParamInValuePosition   diagnostic.Code = "belt.semantic.type_param_in_value_position"
 	CodeUndefinedName              diagnostic.Code = "belt.semantic.undefined_name"
 	CodeUnfoldedConst              diagnostic.Code = "belt.semantic.unfolded_const"
 	CodeUninferableCollection      diagnostic.Code = "belt.semantic.uninferable_collection"
@@ -1254,6 +1255,20 @@ func newTypeMismatchDiagnostic(offset int, width int, actual string, expected st
 		Severity: diagnostic.Error,
 		Code:     CodeTypeMismatch,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeTypeMismatch, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newTypeParamInValuePositionDiagnostic(offset int, width int, name string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"name": diagnostic.Str(name),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeTypeParamInValuePosition,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeTypeParamInValuePosition, fields),
 		Fields:   fields,
 		Offset:   offset,
 		Width:    width,
