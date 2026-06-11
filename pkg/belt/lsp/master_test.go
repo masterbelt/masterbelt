@@ -10,6 +10,8 @@ package lsp
 import (
 	"strings"
 	"testing"
+
+	protocol "github.com/owenrumney/go-lsp/lsp"
 )
 
 // masterNavSrc declares an enum, a master whose row references it, and a
@@ -124,6 +126,70 @@ func TestMasterMethodBodyOccurrences(t *testing.T) {
 	}
 	if locs[0].Range.Start.Line != 0 {
 		t.Errorf("definition jumped to line %d, want 0 (the const Base)", locs[0].Range.Start.Line)
+	}
+}
+
+// masterMemberSrc reads a master-typed value's row fields through member access.
+// A master is opaque (no record literal), but its fields are still readable, so
+// completion and hover must project the row record from Master.Row — the
+// descriptor — since the opaque master's Body is nil. This is the same row path
+// the checker's member projection takes (types.RecordOf(Master.Row)).
+const masterMemberSrc = "master Skill {\n" +
+	"  record {\n    id: int,\n    name: string,\n  }\n" +
+	"  primary id\n}\n" +
+	"fn describe(s: Skill): string {\n  return s.name\n}\n"
+
+func TestMasterMemberCompletion(t *testing.T) {
+	doc := testView(masterMemberSrc)
+
+	// After "s." in the method body: the row's fields, each a Field labelled with
+	// its type.
+	got := byLabel(completion(doc, strings.Index(masterMemberSrc, "s.name")+len("s.")).Items)
+	for _, f := range []struct{ name, detail string }{
+		{"id", ": int"},
+		{"name", ": string"},
+	} {
+		item, ok := got[f.name]
+		if !ok {
+			t.Errorf("master row field %q missing from member completion: %v", f.name, labels(got))
+			continue
+		}
+		if item.Kind == nil || *item.Kind != protocol.CompletionItemKindField {
+			t.Errorf("%s kind = %v, want Field", f.name, item.Kind)
+		}
+		if item.Detail != f.detail {
+			t.Errorf("%s detail = %q, want %q", f.name, item.Detail, f.detail)
+		}
+	}
+}
+
+func TestMasterMemberHover(t *testing.T) {
+	doc := testView(masterMemberSrc)
+
+	h := hover(doc, strings.Index(masterMemberSrc, "s.name")+len("s."))
+	if h == nil {
+		t.Fatal("no hover on the master row field access")
+	}
+	if !strings.Contains(h.Contents.Value, "name: string") {
+		t.Errorf("hover = %q, want it to contain name: string", h.Contents.Value)
+	}
+}
+
+// TestMasterRecordLiteralStaysOpaque pins the opacity boundary the read paths
+// must not erase: a master is not constructible as a record literal, so writing
+// Skill{ } offers none of the row fields — even though reading s.field does. The
+// member-read projection (memberRecordOf/memberFieldOf) is deliberately one-way,
+// so the literal path keeps treating a master as fieldless.
+func TestMasterRecordLiteralStaysOpaque(t *testing.T) {
+	src := "master Skill {\n  record {\n    id: int,\n    name: string,\n  }\n  primary id\n}\n" +
+		"const x = Skill{  }\n"
+	doc := testView(src)
+
+	got := byLabel(completion(doc, strings.Index(src, "Skill{  }")+len("Skill{ ")).Items)
+	for _, f := range []string{"id", "name"} {
+		if _, ok := got[f]; ok {
+			t.Errorf("record-literal completion offered the row field %q; a master is opaque (not constructible): %v", f, labels(got))
+		}
 	}
 }
 

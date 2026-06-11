@@ -158,7 +158,7 @@ func memberHover(doc view, offset int, trees map[cst.Green]cst.Tree) *protocol.H
 	if ms, subst, ok := doc.MethodCandidates(recv, name); ok {
 		return memberMethodHover(ms, subst, r)
 	}
-	if f, ok := fieldOf(recv, name); ok {
+	if f, ok := memberFieldOf(recv, name); ok {
 		return memberFieldHover(f, r)
 	}
 	if g, subst, ok := receiverGetter(doc, recv, name); ok {
@@ -281,7 +281,7 @@ func receiverTypeOf(doc view, e ast.Expr, trees map[cst.Green]cst.Tree, offset i
 			return c.Type
 		}
 		if inner := receiverTypeOf(doc, e.Receiver, trees, offset); inner != nil {
-			if f, ok := fieldOf(inner, e.Member.Name); ok {
+			if f, ok := memberFieldOf(inner, e.Member.Name); ok {
 				return f.Type
 			}
 		}
@@ -386,7 +386,9 @@ func funcParamTypeAt(doc view, name string, trees map[cst.Green]cst.Tree, offset
 }
 
 // fieldOf returns the record field a type carries under name — directly, or
-// through a named type's record body.
+// through a named type's record body. Like recordOf, it does not look through a
+// master: the record-literal paths keep a master opaque. The value member-access
+// read paths use memberFieldOf, which projects the master row.
 func fieldOf(t ir.Type, name string) (ir.Field, bool) {
 	switch t := t.(type) {
 	case *ir.Record:
@@ -398,6 +400,23 @@ func fieldOf(t ir.Type, name string) (ir.Field, bool) {
 	case *ir.Named:
 		if t.Def != nil {
 			return fieldOf(t.Def.Body, name)
+		}
+	}
+	return ir.Field{}, false
+}
+
+// memberFieldOf returns the record field a value member access reads under name:
+// a plain record field, or an opaque master's row field from its descriptor. A
+// master row field is readable through a value (s.field) though the master is not
+// constructible, so this read path projects the row while fieldOf keeps the
+// literal paths opaque.
+func memberFieldOf(t ir.Type, name string) (ir.Field, bool) {
+	if f, ok := fieldOf(t, name); ok {
+		return f, true
+	}
+	if n, ok := t.(*ir.Named); ok && n.Def != nil && n.Def.Master != nil {
+		if rec := types.RecordOf(n.Def.Master.Row); rec != nil {
+			return fieldOf(rec, name)
 		}
 	}
 	return ir.Field{}, false
