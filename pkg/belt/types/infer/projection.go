@@ -271,17 +271,18 @@ func (r *TypeResolver) genericScope(def *ir.TypeDef) (TypeScope, []string) {
 	syn := def.Syntax.Params
 	scope := make(TypeScope, len(syn))
 	names := make([]string, len(syn))
-	for _, p := range syn {
-		scope[p.Name] = nil
-	}
 	for i, p := range syn {
-		var bound ir.Type
-		if p.Constraint != nil {
-			bound = r.ResolveType(p.Constraint, scope)
-		}
-		scope[p.Name] = bound
+		scope[p.Name] = nil
 		names[i] = p.Name
 	}
+	// Settle the forward generic's bounds the same two-pass way the declaration
+	// does, so a bound that projects off another parameter (T: Box<U.x>) resolves
+	// here too. Reporting is silenced: these bounds' diagnostics belong to the
+	// generic's own declaration, not to a projection that reaches it early.
+	report, projErr, boundV, arity := r.Report, r.ProjectionError, r.BoundViolation, r.ArityMismatch
+	r.Report, r.ProjectionError, r.BoundViolation, r.ArityMismatch = nil, nil, nil, nil
+	SettleBounds(r, syn, scope)
+	r.Report, r.ProjectionError, r.BoundViolation, r.ArityMismatch = report, projErr, boundV, arity
 	return scope, names
 }
 

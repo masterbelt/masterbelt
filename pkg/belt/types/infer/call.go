@@ -836,14 +836,27 @@ func SettleBounds(r *TypeResolver, params []*ast.TypeParam, scope TypeScope) []i
 	}
 	r.Report, r.ProjectionError, r.BoundViolation, r.ArityMismatch = report, projErr, boundV, arity
 	backfill()
+	// Second pass, with reporting restored: re-resolve every bound now that the
+	// others are settled. A bound that stayed invalid (it projects off a parameter
+	// whose bound was not yet in place) takes the re-resolved type, which now
+	// resolves; a bound that was already valid keeps its first-pass type — so the
+	// ordinary case is unchanged — but is still re-resolved so a diagnostic it
+	// fires without becoming invalid (a type_arity_mismatch on Box<a, b>, a
+	// bound_not_satisfied on its argument) is reported here rather than lost in the
+	// silent first pass. A parameter's own name is unbounded while its bound
+	// resolves, so a self-referential bound reads it as a free variable.
 	for i, p := range params {
-		if p.Constraint == nil || !ir.HasInvalid(bounds[i]) {
+		if p.Constraint == nil {
 			continue
 		}
+		wasInvalid := ir.HasInvalid(bounds[i])
 		if p.Name != "" {
 			scope[p.Name] = nil
 		}
-		bounds[i] = r.ResolveType(p.Constraint, scope)
+		reResolved := r.ResolveType(p.Constraint, scope)
+		if wasInvalid {
+			bounds[i] = reResolved
+		}
 		if p.Name != "" {
 			scope[p.Name] = bounds[i]
 		}

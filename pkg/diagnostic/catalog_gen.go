@@ -823,14 +823,6 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "cannot use " + f["actual"].String() + " as " + f["expected"].String()
 		}
 	},
-	"belt.semantic.type_param_in_value_position": func(loc Locale, f map[string]fmt.Stringer) string {
-		switch loc {
-		case "ja":
-			return "型パラメータ " + f["name"].String() + " はコンパイル時の型であり、畳み込める値ではありません。型位置で射影する (type X = " + f["name"].String() + ".member) か、その型の値から読み出して (v.member) ください"
-		default:
-			return "the type parameter " + f["name"].String() + " is a compile-time type and not a foldable value; project it in type position (type X = " + f["name"].String() + ".member) or read it off a value of that type (v.member)"
-		}
-	},
 	"belt.semantic.undefined_name": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":

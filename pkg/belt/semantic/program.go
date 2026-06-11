@@ -346,12 +346,11 @@ func funcLitTypesOf(db *database, fileID FileID, file *ast.File) map[*ast.FuncLi
 	funcs := buildFuncSymbols(file)
 	qualifiedFuncs := qualifiedFuncsFrom(q, q.importsOf(fileID))
 	constShadows := constShadowsFrom(q, fileID)
-	nsImport := namespaceImportFrom(q, fileID)
 	// A nil diagnostic list (the sink-only walks) folds nothing, so the fold
 	// channel is the zero folder (its queries unread), exactly as the
 	// method-body walk here always has.
-	checkMethodBodies(reg, q.typeDefs(fileID), q.universe(fileID), qualified, funcs, qualifiedFuncs, constShadows, nsImport, exprFolder{}, sink, nil, nil)
-	checkFuncBodies(reg, file, q.universe(fileID), qualified, funcs, qualifiedFuncs, constShadows, nsImport, exprFolder{}, sink, nil, nil)
+	checkMethodBodies(reg, q.typeDefs(fileID), q.universe(fileID), qualified, funcs, qualifiedFuncs, constShadows, exprFolder{}, sink, nil, nil)
+	checkFuncBodies(reg, file, q.universe(fileID), qualified, funcs, qualifiedFuncs, constShadows, exprFolder{}, sink, nil, nil)
 	return out
 }
 

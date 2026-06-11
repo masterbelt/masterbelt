@@ -108,110 +108,6 @@ func TestBoundedProjectionBodyReadStillWorks(t *testing.T) {
 	}
 }
 
-func TestBoundedProjectionValuePositionRejected(t *testing.T) {
-	// A type parameter is a compile-time type, not a foldable value: projecting a
-	// member off it in value position (let y = T.x) cannot fold to a concrete type
-	// value at the definition site, so it is rejected rather than passing vacuously.
-	// The supported surfaces are the type-position projection (type R = T.x) and
-	// the value read off a value of that type (v.x).
-	for _, body := range []string{"  let y = T.x\n  return v.x\n", "  return T.x\n"} {
-		src := "pub interface HasX {\n  x: nint\n}\n" +
-			"pub fn f<T: HasX>(v: T): nint {\n" + body + "}\n"
-		_, diags := analyze(src)
-		if !hasCode(diags, CodeTypeParamInValuePosition) {
-			t.Fatalf("body %q: want type_param_in_value_position, got %v", body, codes(diags))
-		}
-	}
-}
-
-func TestBoundedProjectionBareTypeParamValueRejected(t *testing.T) {
-	// A bare type parameter consumed as a value (T == string) is the same vacuous
-	// fold the projection would be, so it is rejected at the definition site too.
-	src := "pub interface HasX {\n  x: nint\n}\n" +
-		"pub fn f<T: HasX>(v: T): nint {\n  let y = T == string\n  return v.x\n}\n"
-	_, diags := analyze(src)
-	if !hasCode(diags, CodeTypeParamInValuePosition) {
-		t.Fatalf("want type_param_in_value_position (bare T as a value), got %v", codes(diags))
-	}
-}
-
-func TestBoundedProjectionTypePositionUsesNotRejected(t *testing.T) {
-	// A type-position use of the parameter is not a value-position projection: a
-	// conversion T(x) names the type, and a let annotation (let y: T) is a type
-	// expression, so neither is type_param_in_value_position.
-	for _, body := range []string{"  let y = T(v.x)\n  return v.x\n", "  let y: T = v\n  return v.x\n"} {
-		src := "pub interface HasX {\n  x: nint\n}\n" +
-			"pub fn f<T: HasX>(v: T): nint {\n" + body + "}\n"
-		_, diags := analyze(src)
-		if hasCode(diags, CodeTypeParamInValuePosition) {
-			t.Fatalf("body %q: want no type_param_in_value_position (a type position), got %v", body, codes(diags))
-		}
-	}
-}
-
-func TestBoundedProjectionLocalShadowNotRejected(t *testing.T) {
-	// A value binding that reuses the type parameter's name shadows it for the
-	// statements it scopes — a let, a loop variable, a match binding — so the
-	// reused name reads the local value and is not flagged. The body checker
-	// scopes these bindings; the value-position walk must agree.
-	for _, body := range []string{
-		"  let T = 1\n  return T\n",
-		"  let acc = 0\n  for T of [1, 2] {\n    acc = T\n  }\n  return acc\n",
-	} {
-		src := "pub fn f<T>(): nint {\n" + body + "}\n"
-		_, diags := analyze(src)
-		if hasCode(diags, CodeTypeParamInValuePosition) {
-			t.Fatalf("body %q: want no type_param_in_value_position (the name is a local), got %v", body, codes(diags))
-		}
-	}
-}
-
-func TestBoundedProjectionLambdaBodyRejected(t *testing.T) {
-	// A type parameter projected in a lambda body is the same vacuous value-
-	// position read, so it is flagged there too — the shared expression walk does
-	// not enter a lambda body, so the walk descends into it explicitly.
-	src := "pub interface HasX {\n  x: nint\n}\n" +
-		"pub fn f<T: HasX>(v: T): fn(): nint {\n  return fn(): nint {\n    return T.x\n  }\n}\n"
-	_, diags := analyze(src)
-	if !hasCode(diags, CodeTypeParamInValuePosition) {
-		t.Fatalf("want type_param_in_value_position (T.x in a lambda body), got %v", codes(diags))
-	}
-}
-
-func TestBoundedProjectionLambdaParamShadowNotRejected(t *testing.T) {
-	// A lambda parameter that reuses the type parameter's name shadows it within
-	// the lambda body, so the name reads the lambda's value parameter and is not
-	// flagged.
-	src := "pub fn f<T>(): fn(nint): nint {\n  return fn(T: nint): nint {\n    return T\n  }\n}\n"
-	_, diags := analyze(src)
-	if hasCode(diags, CodeTypeParamInValuePosition) {
-		t.Fatalf("want no type_param_in_value_position (T is the lambda parameter), got %v", codes(diags))
-	}
-}
-
-func TestBoundedProjectionConstShadowNotRejected(t *testing.T) {
-	// A top-level constant of the type parameter's name is a value the body reads
-	// before reifying a type, so it shadows the parameter and the bare read is not
-	// flagged — the same shadowing the body binder applies.
-	src := "pub const T: nint = 1\n" +
-		"pub fn f<T>(): nint {\n  return T\n}\n"
-	_, diags := analyze(src)
-	if hasCode(diags, CodeTypeParamInValuePosition) {
-		t.Fatalf("want no type_param_in_value_position (T is a top-level constant), got %v", codes(diags))
-	}
-}
-
-func TestBoundedProjectionAfterWildcardArmRejected(t *testing.T) {
-	// An after-wildcard switch arm is unreachable but still type-checked, so a
-	// value-position projection in one is flagged there too, not only in a live arm.
-	src := "pub interface HasX {\n  x: nint\n}\n" +
-		"pub fn f<T: HasX>(v: T): nint {\n  switch v.x {\n    _ -> {\n      return v.x\n    }\n    1 -> {\n      return T.x\n    }\n  }\n}\n"
-	_, diags := analyze(src)
-	if !hasCode(diags, CodeTypeParamInValuePosition) {
-		t.Fatalf("want type_param_in_value_position (T.x in an after-wildcard arm), got %v", codes(diags))
-	}
-}
-
 func TestBoundedProjectionInSignatureAndBodyAnnotation(t *testing.T) {
 	// The type-position projection T.x resolves wherever a type annotation reaches a
 	// bounded parameter, not only at a top-level declaration: a function result and
@@ -268,18 +164,6 @@ func TestBoundedProjectionCallSiteResult(t *testing.T) {
 	}
 }
 
-func TestBoundedProjectionEnumMemberArmNotRejected(t *testing.T) {
-	// A switch arm pattern is matched against the scrutinee, so a bare name there is
-	// an enum member of the scrutinee's enum, not a value read of a type parameter
-	// — even when an enum member shares a type parameter's name.
-	src := "pub enum R {\n  T\n  U\n}\n" +
-		"pub fn f<T>(r: R): nint {\n  switch r {\n    T -> {\n      return 1\n    }\n    U -> {\n      return 2\n    }\n  }\n}\n"
-	_, diags := analyze(src)
-	if hasCode(diags, CodeTypeParamInValuePosition) {
-		t.Fatalf("want no type_param_in_value_position (T is an enum member pattern), got %v", codes(diags))
-	}
-}
-
 func TestBoundedProjectionBoundProjectsOffAnotherParam(t *testing.T) {
 	// A parameter's bound may project off another parameter's readable member,
 	// regardless of declaration order: T: Box<U.x> reads U's required x (nint)
@@ -322,27 +206,39 @@ func TestBoundedProjectionDeclAndMethodBoundProjectOffParam(t *testing.T) {
 	}
 }
 
-func TestBoundedProjectionNonEnumSwitchArmRejected(t *testing.T) {
-	// A switch arm value is exempt from the value-position check only when it is an
-	// enum member of the scrutinee's enum. A non-enum scrutinee makes a bare type
-	// parameter in an arm value a compile-time value comparison, so it is flagged.
-	src := "pub interface HasX {\n  x: nint\n}\n" +
-		"pub fn f<T: HasX>(v: T, n: nint): nint {\n  switch n {\n    T -> {\n      return 1\n    }\n    _ -> {\n      return 2\n    }\n  }\n}\n"
-	_, diags := analyze(src)
-	if !hasCode(diags, CodeTypeParamInValuePosition) {
-		t.Fatalf("want type_param_in_value_position (T compared against a non-enum scrutinee), got %v", codes(diags))
+func TestBoundedProjectionBoundDiagnosticsStillReported(t *testing.T) {
+	// Settling the bounds silently before re-resolving must not swallow a bound's
+	// own diagnostic: a bound that resolves to a valid type while still reporting —
+	// a wrong type-argument count, an argument that does not satisfy a nested
+	// bound — is reported in the second pass, not lost in the silent first one.
+	arity := "pub interface Box<E> {\n  e: E\n}\n" +
+		"pub fn f<T: Box<nint, string>>(): nint {\n  return 1\n}\n"
+	if _, diags := analyze(arity); !hasCode(diags, CodeTypeArityMismatch) {
+		t.Fatalf("want type_arity_mismatch (Box takes one argument), got %v", codes(diags))
+	}
+	unsat := "pub interface Ord {\n  cmp(): nint\n}\n" +
+		"pub interface Box<E: Ord> {\n  e: E\n}\n" +
+		"pub fn f<T: Box<nint>>(): nint {\n  return 1\n}\n"
+	if _, diags := analyze(unsat); !hasCode(diags, CodeBoundNotSatisfied) {
+		t.Fatalf("want bound_not_satisfied (nint does not satisfy Ord), got %v", codes(diags))
 	}
 }
 
-func TestBoundedProjectionNamespaceShadowNotRejected(t *testing.T) {
-	// A type parameter spelled like a namespace import is read as a namespace member
-	// access (the import wins in value position), so T.x is not flagged as a value
-	// use of the type parameter.
-	diags := analyzeProject(t, map[string]string{
-		"mod.belt":  "pub const x: nint = 5\n",
-		"main.belt": "use T from \"mod.belt\"\npub fn f<T>(): nint {\n  return T.x\n}\n",
-	})
-	if hasCode(diags, CodeTypeParamInValuePosition) {
-		t.Fatalf("want no type_param_in_value_position (T is a namespace import), got %v", codes(diags))
+func TestBoundedProjectionForwardGenericProjectionBoundSettles(t *testing.T) {
+	// A forward-referenced generic whose bound projects off a later parameter
+	// (Late<T: Box<U.x>, U: HasX>) settles that bound when projected before its
+	// declaration (Late.value<...>), so U.x resolves to the member type rather than
+	// staying invalid — no type_has_no_fields. (The separate bound check of the
+	// projection's own arguments against a user-implemented interface in type
+	// position is a pre-existing materialization-order limitation, not this path.)
+	src := "pub interface HasX {\n  x: nint\n}\n" +
+		"pub interface Boxed<E> {\n  e: E\n}\n" +
+		"pub type Good = { e: nint } impl Boxed<nint> {}\n" +
+		"pub type Point = { x: nint } impl HasX {}\n" +
+		"pub type Early = Late.value<Good, Point>\n" +
+		"pub type Late<T: Boxed<U.x>, U: HasX> = { value: nint }\n"
+	_, diags := analyze(src)
+	if hasCode(diags, CodeTypeHasNoFields) {
+		t.Fatalf("want U.x to settle (no type_has_no_fields), got %v", codes(diags))
 	}
 }

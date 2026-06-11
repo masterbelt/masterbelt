@@ -523,9 +523,8 @@ func (a *assembler) resolveFuncDecls() {
 	a.module.Funcs = resolveFuncs(a.file, a.at, a.diags, a.reg, a.q.universe(a.fileID), qualifiedFrom(a.q, a.imp), a.bfns)
 	bodyEnv := a.folder()
 	constShadows := constShadowsFrom(a.q, a.fileID)
-	nsImport := namespaceImportFrom(a.q, a.fileID)
-	checkMethodBodies(a.reg, a.module.Types, a.q.universe(a.fileID), qualifiedFrom(a.q, a.imp), a.funcs, a.qfns, constShadows, nsImport, bodyEnv, bodySink(a.at, a.diags, a.reg, bodyEnv, a.res), a.at, a.diags)
-	checkFuncBodies(a.reg, a.file, a.q.universe(a.fileID), qualifiedFrom(a.q, a.imp), a.funcs, a.qfns, constShadows, nsImport, bodyEnv, bodySink(a.at, a.diags, a.reg, bodyEnv, a.res), a.at, a.diags)
+	checkMethodBodies(a.reg, a.module.Types, a.q.universe(a.fileID), qualifiedFrom(a.q, a.imp), a.funcs, a.qfns, constShadows, bodyEnv, bodySink(a.at, a.diags, a.reg, bodyEnv, a.res), a.at, a.diags)
+	checkFuncBodies(a.reg, a.file, a.q.universe(a.fileID), qualifiedFrom(a.q, a.imp), a.funcs, a.qfns, constShadows, bodyEnv, bodySink(a.at, a.diags, a.reg, bodyEnv, a.res), a.at, a.diags)
 	checkEffects(a.reg, a.file, a.module.Types, a.q.universe(a.fileID), qualifiedFrom(a.q, a.imp), a.funcs, a.qfns, constShadows, a.at, a.diags)
 }
 
