@@ -134,10 +134,10 @@ func typeAt(doc view, offset int) (*ir.TypeDef, cst.Tree, bool) {
 	name := leaf.Text(buf)
 
 	switch kind {
-	case cst.TypeDecl, cst.InterfaceDecl:
-		// The declaration's own name — a type or an interface. The file's own
-		// definitions lead TypeNames, so the name finds the local declaration,
-		// not an import it shadows.
+	case cst.TypeDecl, cst.InterfaceDecl, cst.EnumDecl, cst.MasterDecl:
+		// The declaration's own name — a type, interface, enum, or master, each of
+		// which resolves to a TypeDef. The file's own definitions lead TypeNames, so
+		// the name finds the local declaration, not an import it shadows.
 		if t := findTypeDef(doc.TypeNames(), name); t != nil {
 			return t, leaf, true
 		}
@@ -238,6 +238,47 @@ func typeHover(t *ir.TypeDef, buf source.Buffer, rng cst.Tree) *protocol.Hover {
 	if t.Public {
 		b.WriteString("pub ")
 	}
+	// A master is its own kind of declaration — the master keyword, its row record,
+	// and its primary key — so it renders its own signature rather than aliasing a
+	// type the way the other kinds do.
+	if t.Master != nil {
+		writeMasterSignature(&b, t)
+	} else {
+		writeTypeSignature(&b, t)
+	}
+	b.WriteString("\n```")
+	if len(t.Doc) > 0 {
+		b.WriteString("\n\n")
+		b.WriteString(strings.Join(t.Doc, "\n"))
+	}
+	if len(t.Methods) > 0 {
+		b.WriteString("\n\n```masterbelt\n")
+		for i, m := range t.Methods {
+			// Each method renders as declared, its doc comment above it, so
+			// the card reads like the impl block itself.
+			if i > 0 && len(m.Doc) > 0 {
+				b.WriteString("\n")
+			}
+			for _, doc := range m.Doc {
+				b.WriteString("/// " + doc + "\n")
+			}
+			b.WriteString(methodSignature(m))
+			b.WriteString("\n")
+		}
+		b.WriteString("```")
+	}
+
+	r := toRange(buf, rng.Offset(), rng.End())
+	return &protocol.Hover{
+		Contents: protocol.MarkupContent{Kind: protocol.Markdown, Value: b.String()},
+		Range:    &r,
+	}
+}
+
+// writeTypeSignature writes the signature line of a type, enum, or interface: the
+// keyword, name, generic parameters, and body (or, for an interface, its
+// supertraits), then the refinement and implemented interfaces.
+func writeTypeSignature(b *strings.Builder, t *ir.TypeDef) {
 	// An interface declares a behaviour rather than aliasing a type, so it leads
 	// with the interface keyword and shows no body.
 	if t.Interface != nil {
@@ -273,31 +314,31 @@ func typeHover(t *ir.TypeDef, buf source.Buffer, rng cst.Tree) *protocol.Hover {
 	for _, impl := range t.Impls {
 		b.WriteString(" impl " + impl.String())
 	}
-	b.WriteString("\n```")
-	if len(t.Doc) > 0 {
-		b.WriteString("\n\n")
-		b.WriteString(strings.Join(t.Doc, "\n"))
-	}
-	if len(t.Methods) > 0 {
-		b.WriteString("\n\n```masterbelt\n")
-		for i, m := range t.Methods {
-			// Each method renders as declared, its doc comment above it, so
-			// the card reads like the impl block itself.
-			if i > 0 && len(m.Doc) > 0 {
-				b.WriteString("\n")
-			}
-			for _, doc := range m.Doc {
-				b.WriteString("/// " + doc + "\n")
-			}
-			b.WriteString(methodSignature(m))
-			b.WriteString("\n")
-		}
-		b.WriteString("```")
-	}
+}
 
-	r := toRange(buf, rng.Offset(), rng.End())
-	return &protocol.Hover{
-		Contents: protocol.MarkupContent{Kind: protocol.Markdown, Value: b.String()},
-		Range:    &r,
+// writeMasterSignature writes a master's signature laid out like its declaration
+// — the master keyword and name, its row record one field per line, and its
+// primary key in the source's single-or-parenthesised form — so the card reads
+// like the source rather than as a bare type. The row is projected with recordOf
+// (the row is a record or a record alias, never opaque), and a row that did not
+// resolve renders as an empty record rather than dropping the card.
+func writeMasterSignature(b *strings.Builder, t *ir.TypeDef) {
+	b.WriteString("master ")
+	b.WriteString(t.Name)
+	b.WriteString(" {\n  record {")
+	if rec, ok := recordOf(t.Master.Row); ok && len(rec.Fields) > 0 {
+		b.WriteString("\n")
+		for _, f := range rec.Fields {
+			b.WriteString("    " + f.Name + ": " + f.Type.String() + "\n")
+		}
+		b.WriteString("  }")
+	} else {
+		b.WriteString("}")
 	}
+	if len(t.Master.Primary) == 1 {
+		b.WriteString("\n  primary " + t.Master.Primary[0])
+	} else if len(t.Master.Primary) > 1 {
+		b.WriteString("\n  primary (" + strings.Join(t.Master.Primary, ", ") + ")")
+	}
+	b.WriteString("\n}")
 }

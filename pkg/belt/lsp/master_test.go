@@ -45,6 +45,14 @@ func TestMasterDefinition(t *testing.T) {
 	if r.Start.Character != 7 || r.End.Character != 12 {
 		t.Errorf("definition range cols = %d..%d, want 7..12 (the name Skill)", r.Start.Character, r.End.Character)
 	}
+
+	// From the master declaration's own name, definition resolves it to itself —
+	// the declaration-name position recognises a master, not only a plain type or
+	// interface.
+	self := definition(doc, strings.Index(masterNavSrc, "master Skill")+len("master "))
+	if len(self) != 1 || self[0].Range.Start.Line != 4 {
+		t.Errorf("definition from the master declaration name = %v, want one location on line 4", self)
+	}
 }
 
 func TestMasterReferences(t *testing.T) {
@@ -129,6 +137,38 @@ func TestMasterMethodBodyOccurrences(t *testing.T) {
 	}
 }
 
+// masterHoverSrc is a master with a row, a primary key, and a documented per-row
+// method, so the declaration hover can be checked for the full card.
+const masterHoverSrc = "master Skill {\n" +
+	"  record {\n    id: int,\n    name: string,\n  } impl {\n" +
+	"    /// the display label\n    pub label(): string {\n      return self.name\n    }\n  }\n" +
+	"  primary id\n}\n"
+
+func TestMasterDeclarationHover(t *testing.T) {
+	doc := testView(masterHoverSrc)
+
+	h := hover(doc, strings.Index(masterHoverSrc, "master Skill")+len("master "))
+	if h == nil {
+		t.Fatal("no hover on the master declaration name")
+	}
+	val := h.Contents.Value
+	for _, want := range []string{
+		"master Skill", // the master keyword and name, not `type Skill`
+		"id: int",      // the row fields
+		"name: string",
+		"primary id",          // the primary key, in declaration form
+		"pub label(): string", // the per-row method signature
+		"the display label",   // its doc
+	} {
+		if !strings.Contains(val, want) {
+			t.Errorf("master hover = %q, want it to contain %q", val, want)
+		}
+	}
+	if strings.Contains(val, "type Skill") {
+		t.Errorf("master hover renders it as a plain type: %q", val)
+	}
+}
+
 // masterMemberSrc reads a master-typed value's row fields through member access.
 // A master is opaque (no record literal), but its fields are still readable, so
 // completion and hover must project the row record from Master.Row — the
@@ -208,6 +248,13 @@ func TestEnumTypeDefinition(t *testing.T) {
 	}
 	if locs[0].Range.Start.Line != 0 {
 		t.Errorf("definition jumped to line %d, want 0 (the enum declaration)", locs[0].Range.Start.Line)
+	}
+
+	// The enum's own declaration name resolves to itself too, the same way a
+	// master's and a plain type's do.
+	self := definition(doc, strings.Index(src, "enum Rarity")+len("enum "))
+	if len(self) != 1 || self[0].Range.Start.Line != 0 {
+		t.Errorf("definition from the enum declaration name = %v, want one location on line 0", self)
 	}
 }
 
