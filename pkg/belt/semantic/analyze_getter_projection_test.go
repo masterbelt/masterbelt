@@ -357,6 +357,28 @@ func TestGetterProjectionForwardGenericAliasChainRejected(t *testing.T) {
 	}
 }
 
+func TestGetterProjectionForwardAliasDeclaredGetter(t *testing.T) {
+	// A getter declared in a generic alias's own impl block projects even when the
+	// alias is a forward reference and its body is another application rather than a
+	// record (so it carries no record shape to read fields from): Alias.own<nint> is
+	// list<nint>, the alias's own T, exactly as the resolved order gives
+	// (TestGetterProjectionAliasDeclaredGetter). A getter declared on the definition
+	// is read from its syntax independently of the body's shape, so the forward order
+	// is not rejected as a forward generic-alias chain.
+	src := "pub type G = Alias.own<nint>\n" +
+		"pub type Box<T> = { v: T } impl {\n  pub get item(): T { return self.v }\n}\n" +
+		"pub type Alias<T> = Box<string> impl {\n  pub get own(): list<T> { return [] }\n}\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("want clean (forward alias-declared getter reads the alias's T), got %v", codes(diags))
+	}
+	for _, def := range m.Types {
+		if def.Name == "G" && (def.Body == nil || def.Body.String() != "list<nint>") {
+			t.Fatalf("G = %v, want list<nint> (forward Alias.own<nint> reads the alias's T)", def.Body)
+		}
+	}
+}
+
 func TestGetterProjectionForwardGenericBoundEnforced(t *testing.T) {
 	// A forward generic getter enforces the declaring type's parameter bound on the
 	// projection argument, exactly as the forward field projection does: the

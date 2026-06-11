@@ -116,11 +116,14 @@ func (r *TypeResolver) projectApp(app *ir.App, def *ir.TypeDef, member string, n
 		if fieldType, ok := recordFieldSyntax(def, member); ok {
 			return r.projectGenericThroughSyntax(app, member, fieldType, node)
 		}
-		// The declaration's record shape is known but has no such field: a missing
-		// field (unknown_field), the same diagnostic the resolved generic gives,
-		// rather than reporting the receiver as unsupported.
-		if recordSyntaxOf(def) != nil {
-			return r.projectReadable(app, def, member, node, true)
+		// A getter declared in the definition's own syntax projects even when the
+		// body is an application rather than a record (so recordSyntaxOf is nil): the
+		// getter is read and instantiated like the resolved alias-declared getter,
+		// not rejected as a forward generic alias. A record shape with no such field
+		// routes here too, to the unknown_field its declaration warrants.
+		hasRecord := recordSyntaxOf(def) != nil
+		if _, _, isGetter := getterDeclSyntax(def, member); isGetter || hasRecord {
+			return r.projectReadable(app, def, member, node, hasRecord)
 		}
 	}
 	r.reportProjection(node, ProjGenericUnsupported, app, member)
