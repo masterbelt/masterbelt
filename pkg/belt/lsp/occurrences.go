@@ -353,8 +353,8 @@ func programOccurrences(v view, target *ir.Const, includeDecl bool) map[protocol
 func typeOccurrencesOf(fv view, target *ir.TypeDef, trees map[cst.Green]cst.Tree, includeDecl bool) []cst.Tree {
 	var tokens []cst.Tree
 
-	if includeDecl && target.Syntax != nil {
-		if declTree, ok := trees[target.Syntax.Syntax()]; ok {
+	if decl := target.DeclSyntax(); includeDecl && decl != nil {
+		if declTree, ok := trees[decl.Syntax()]; ok {
 			if nameTok, ok := nameToken(declTree); ok {
 				tokens = append(tokens, nameTok)
 			}

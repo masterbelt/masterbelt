@@ -37,7 +37,11 @@ func (l *linter) unusedDeclarations(m *ir.Module) {
 	}
 	for _, t := range m.Types {
 		if t != nil && !t.Public && !mk.types[t] {
-			l.reportUnused(typeDeclSyntax(t), t.Name)
+			// DeclSyntax reads the declaration backpointer for whichever kind t is
+			// — a type, enum, interface, or master (a master keeps it on
+			// MasterSyntax, Body being nil for it) — so an unused private one of any
+			// kind is anchored and reported the same way.
+			l.reportUnused(t.DeclSyntax(), t.Name)
 		}
 	}
 }
@@ -51,25 +55,6 @@ func (l *linter) reportUnused(syntax ast.Node, name string) {
 	off, width := l.span(syntax)
 	if width > 0 && !l.brokenWithin(off, width) {
 		l.diags = append(l.diags, unusedDeclaration(off, width, name))
-	}
-}
-
-// typeDeclSyntax returns the declaration a type definition was resolved from —
-// a type, enum, interface, or master declaration — or nil for one built outside
-// source. A master carries its backpointer in MasterSyntax (Body is nil for it),
-// so an unused private master is anchored and reported like the other kinds.
-func typeDeclSyntax(t *ir.TypeDef) ast.Node {
-	switch {
-	case t.Syntax != nil:
-		return t.Syntax
-	case t.EnumSyntax != nil:
-		return t.EnumSyntax
-	case t.InterfaceSyntax != nil:
-		return t.InterfaceSyntax
-	case t.MasterSyntax != nil:
-		return t.MasterSyntax
-	default:
-		return nil
 	}
 }
 

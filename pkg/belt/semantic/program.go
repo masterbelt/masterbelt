@@ -228,13 +228,18 @@ func (p *Program) FileOf(c *ir.Const) (FileID, bool) {
 	return id, ok
 }
 
-// FileOfType returns the file a type definition was declared in. A definition
-// outside the program — the prelude's — is in no file.
+// FileOfType returns the file a type definition was declared in — a type, enum,
+// interface, or master declaration, read through its DeclSyntax backpointer. A
+// definition outside the program — the prelude's — is in no file.
 func (p *Program) FileOfType(t *ir.TypeDef) (FileID, bool) {
-	if t == nil || t.Syntax == nil {
+	if t == nil {
 		return "", false
 	}
-	id, ok := p.db.typeFile[t.Syntax]
+	decl := t.DeclSyntax()
+	if decl == nil {
+		return "", false
+	}
+	id, ok := p.db.typeFile[decl]
 	return id, ok
 }
 

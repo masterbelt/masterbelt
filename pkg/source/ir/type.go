@@ -268,6 +268,29 @@ func (t *TypeDef) WhereSyntax() ast.Expr {
 	return t.Syntax.Where
 }
 
+// DeclSyntax returns the surface declaration this definition was resolved from
+// — a type, enum, interface, or master declaration — as the ast.Node the editor
+// and the linter navigate by, or nil for a definition built outside source (the
+// prelude's). Exactly one backpointer is set per kind: a Body-bearing type on
+// Syntax, the others on their own field, so the first non-nil wins. This is the
+// one place that knows where each kind keeps its declaration, so navigation,
+// find-references, and the unused-decl lint all read it through here rather than
+// re-deriving the switch.
+func (t *TypeDef) DeclSyntax() ast.Node {
+	switch {
+	case t.Syntax != nil:
+		return t.Syntax
+	case t.EnumSyntax != nil:
+		return t.EnumSyntax
+	case t.InterfaceSyntax != nil:
+		return t.InterfaceSyntax
+	case t.MasterSyntax != nil:
+		return t.MasterSyntax
+	default:
+		return nil
+	}
+}
+
 // EnumDef is the description of an enum type: the name of its base type (an
 // integer-family primitive or string) and its members in declaration order.
 // Each member's value is the resolved base-type constant (a ConstInt for an

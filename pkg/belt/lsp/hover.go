@@ -78,8 +78,10 @@ func definition(doc view, offset int) []protocol.Location {
 	if occ, ok := occurrenceAt(doc, offset, doc.Trees()); ok {
 		return declLocation(doc.viewOf(occ.target))(occ.target.Syntax.Syntax())
 	}
-	if t, _, ok := typeAt(doc, offset); ok && t.Syntax != nil {
-		return declLocation(doc.viewOfType(t))(t.Syntax.Syntax())
+	if t, _, ok := typeAt(doc, offset); ok {
+		if decl := t.DeclSyntax(); decl != nil {
+			return declLocation(doc.viewOfType(t))(decl.Syntax())
+		}
 	}
 	if fns, _, ok := funcAt(doc, offset); ok {
 		// Every overload is a target, in its own file — an imported callee
