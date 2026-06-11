@@ -193,6 +193,36 @@ func TestInheritedGenericParentMethodCall(t *testing.T) {
 	}
 }
 
+func TestInheritedSameNameGenericParents(t *testing.T) {
+	// Two generic parents that reuse a parameter name are bound independently: only
+	// the inheritance path to the member's owner binds, so C<string, nint> reads
+	// a() from A<string> as string and b() from B<nint> as nint — the first parent
+	// does not pin the shared name T for the second.
+	const decls = "pub interface A<T> {\n  a(): T\n}\n" +
+		"pub interface B<T> {\n  b(): T\n}\n" +
+		"pub interface C<X, Y>: A<X>, B<Y> {}\n"
+	if _, diags := analyze(decls + "pub fn f(c: C<string, nint>): nint {\n  return c.b()\n}\n"); len(diags) != 0 {
+		t.Fatalf("want clean (b() reads nint from B<nint>), got %v", codes(diags))
+	}
+	if _, diags := analyze(decls + "pub fn f(c: C<string, nint>): string {\n  return c.a()\n}\n"); len(diags) != 0 {
+		t.Fatalf("want clean (a() reads string from A<string>), got %v", codes(diags))
+	}
+	if _, diags := analyze(decls + "pub fn f(c: C<string, nint>): string {\n  return c.b()\n}\n"); !hasCode(diags, CodeTypeMismatch) {
+		t.Fatalf("want type_mismatch (b() is nint, not string), got %v", codes(diags))
+	}
+}
+
+func TestReadableRequirementTypeParamsRejected(t *testing.T) {
+	// A readable member is read as value.X with no call to supply type arguments, so
+	// its own type parameters could never be instantiated: they are rejected rather
+	// than left free for a same-named implementor parameter to satisfy by accident.
+	src := "pub interface I {\n  value<T>: T\n}\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeReadableMemberTypeParams) {
+		t.Fatalf("want readable_member_type_params, got %v", codes(diags))
+	}
+}
+
 func TestReadableRequirementGenericInterface(t *testing.T) {
 	// A readable requirement on a generic interface checks the read type with the
 	// interface's argument substituted: impl Box<string> needs a value readable as

@@ -711,6 +711,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "a readable-member requirement " + f["member"].String() + " cannot have a body; remove the block or write it as a method"
 		}
 	},
+	"belt.semantic.readable_member_type_params": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "読める member 要求 " + f["member"].String() + " は型パラメータを宣言できません。インスタンス化する呼び出しがありません"
+		default:
+			return "a readable-member requirement " + f["member"].String() + " cannot declare type parameters; there is no call to instantiate them"
+		}
+	},
 	"belt.semantic.refinement_not_bool": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":

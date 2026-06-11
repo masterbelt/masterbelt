@@ -437,6 +437,14 @@ func resolveInterfaceDecl(r *infer.TypeResolver, reg *builtin.Registry, id *ast.
 			s := at(m)
 			diags.Add(newReadableMemberHasBodyDiagnostic(s.offset, s.width, m.Name))
 		}
+		// A readable member is read as value.X, with no call to supply type
+		// arguments, so its own type parameters (value<T>: T) can never be
+		// instantiated — they are reported rather than left as a free variable a
+		// same-named implementor parameter would spuriously satisfy.
+		if m.Readable && len(m.TypeParams) > 0 && at != nil && diags != nil {
+			s := at(m)
+			diags.Add(newReadableMemberTypeParamsDiagnostic(s.offset, s.width, m.Name))
+		}
 		if m.Provided() && !m.Readable {
 			def.Interface.Provided = append(def.Interface.Provided, m.Name)
 		} else {

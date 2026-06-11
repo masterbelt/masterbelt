@@ -95,6 +95,7 @@ belt.semantic.index_out_of_range,error,index:string length:string
 belt.semantic.missing_required_method,error,typ:string iface:string method:string
 belt.semantic.missing_readable_member,error,typ:string iface:string member:string want:string
 belt.semantic.readable_member_has_body,error,member:string
+belt.semantic.readable_member_type_params,error,member:string
 belt.semantic.not_an_interface,error,name:string
 belt.semantic.interface_member_override,error,child:string method:string ancestor:string
 belt.semantic.interface_member_conflict,error,child:string method:string first:string second:string

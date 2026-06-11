@@ -95,6 +95,7 @@ belt.semantic.index_out_of_range,index {index} is out of range for a list of len
 belt.semantic.missing_required_method,{typ} does not implement {iface}: missing required method {method}
 belt.semantic.missing_readable_member,{typ} does not implement {iface}: missing readable member {member}: {want}
 belt.semantic.readable_member_has_body,a readable-member requirement {member} cannot have a body; remove the block or write it as a method
+belt.semantic.readable_member_type_params,a readable-member requirement {member} cannot declare type parameters; there is no call to instantiate them
 belt.semantic.not_an_interface,{name} is not an interface
 belt.semantic.interface_member_override,{child} cannot redeclare {method}: it is already inherited from {ancestor}
 belt.semantic.interface_member_conflict,{child} inherits {method} from two unrelated interfaces ({first} and {second})
