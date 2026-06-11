@@ -109,11 +109,6 @@ type scope interface {
 	// body is perfectly inferred, where an unpinned method-local variable (the
 	// R of map at a call site) is uninferable.
 	rigid(name string) bool
-	// valueName reports whether name is bound by a value in scope — a let local or
-	// a parameter, including an enclosing lambda's — so a same-named generic type
-	// parameter is shadowed in value position. A call of such a name is a function-
-	// value call, not a conversion through the type parameter.
-	valueName(name string) bool
 	// tscope is the generic type-parameter scope in effect — the enclosing
 	// declaration's type parameters, each mapped to its bound — that a written
 	// type annotation in this scope (a lambda parameter or result, a let, a

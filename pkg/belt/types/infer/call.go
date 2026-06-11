@@ -60,24 +60,16 @@ func nonMemberCallType(e *ast.CallExpr, s scope, sink *Sink) ir.Type {
 	// wins over a same-named function — and one that names a top-level
 	// function is a function call.
 	if id, isIdent := e.Callee.(*ast.Identifier); isIdent {
+		// conv resolves a generic type parameter (through the type scope) as well as a
+		// declared type, so a type-parameter callee T(x) is a conversion — typed as
+		// the parameter — and wins over a same-named top-level function, the same
+		// precedence the lowering applies. A value of the same name shadows the type
+		// parameter, leaving conv invalid, and takes the function-value path below.
 		if t := s.conv(id); t != ir.Invalid {
 			return convCallType(e, id.Name, t, s, sink)
 		}
 		if cands := s.fn(id); len(cands) > 0 {
 			return funcCallType(e, id.Name, cands, s, sink)
-		}
-		// A bare type-parameter callee that no value shadows names the type — a
-		// conversion T(x), a type position, not a function value. Its arguments are
-		// value positions and are checked, but the callee is not walked as a value
-		// (which would misreport it as a value-position use of the parameter); the
-		// conversion's own type is left unresolved, as it is for any non-foldable
-		// type parameter. A value of the same name (a parameter T: fn(...)) is not a
-		// type parameter here and takes the function-value path below.
-		if s.rigid(id.Name) && !s.valueName(id.Name) {
-			for _, a := range e.Arguments {
-				check(a, s, sink)
-			}
-			return ir.Invalid
 		}
 	}
 	// A callee that itself types as a function value applies — a

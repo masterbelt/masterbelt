@@ -182,6 +182,14 @@ func collectNameCallEffectUses(e *ast.CallExpr, callee *ast.Identifier, bs infer
 	if _, isType := bs.Universe[callee.Name]; isType {
 		return
 	}
+	if _, isTypeParam := bs.TScope[callee.Name]; isTypeParam {
+		// A generic type-parameter callee is a conversion (T(x)) — a type position,
+		// not a function call — so it carries no effect, exactly as a declared-type
+		// conversion above. It wins over a same-named top-level function, the same
+		// precedence the type checker and the lowering apply, so the function's
+		// effects below are not collected for it.
+		return
+	}
 	for _, eff := range declaredEffects(bs.Funcs[callee.Name]) {
 		use(eff, e)
 	}
