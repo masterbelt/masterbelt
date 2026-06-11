@@ -349,11 +349,17 @@ jobs:
           cd dest
           git add -A
           if git diff --cached --quiet; then
-            echo "dedicated repo already up to date — nothing to publish"
-            exit 0
+            echo "dedicated repo already up to date — no new commit"
+          else
+            git commit -m "sync grammar from masterbelt@${sha}"
+            git push origin HEAD:main
           fi
-          git commit -m "sync grammar from masterbelt@${sha}"
-          git push origin HEAD:main
+          # Ensure the release tag exists regardless of whether the content
+          # changed. The tag is what triggers the mirror's release workflows, so a
+          # missing one — a prior run whose tag push failed, or a mirror
+          # bootstrapped with matching content — must still be created, or that
+          # version never publishes. The version carries the commit SHA, so the tag
+          # is unique; an existing one is left immutable.
           tag="v${version}"
           if git ls-remote --exit-code --tags origin "refs/tags/${tag}" >/dev/null 2>&1; then
             echo "tag ${tag} already exists — leaving it immutable"
