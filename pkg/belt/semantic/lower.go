@@ -317,6 +317,18 @@ func constShadowsFrom(q queries, file FileID) func(*ast.Identifier) bool {
 	return func(id *ast.Identifier) bool { return q.resolve(file, id) != nil }
 }
 
+// namespaceImportFrom builds a body's namespace-import predicate: whether a name
+// is one of the file's namespace imports. A member read off such a name (geo.X)
+// is a namespace member access, not a value read of a same-named type parameter,
+// so the value-position walk treats the name as shadowed.
+func namespaceImportFrom(q queries, file FileID) func(string) bool {
+	ns := q.importsOf(file).namespaces
+	return func(name string) bool {
+		_, ok := ns[name]
+		return ok
+	}
+}
+
 // nsConstRefFrom builds the nsConstRef channel over the queries, mirroring
 // constRefFrom for a namespace member access.
 func nsConstRefFrom(q queries, file FileID) func(*ast.MemberExpr) *ir.Const {

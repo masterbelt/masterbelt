@@ -303,3 +303,46 @@ func TestBoundedProjectionBoundProjectsOffAnotherParam(t *testing.T) {
 		t.Fatalf("want unknown_field (U has no member nope), got %v", codes(diags))
 	}
 }
+
+func TestBoundedProjectionDeclAndMethodBoundProjectOffParam(t *testing.T) {
+	// The settle-then-retry bound resolution is shared, so a bound projecting off
+	// another parameter resolves in a type declaration, an interface declaration,
+	// and a method's own type parameters too, not only in a free function.
+	prelude := "pub interface HasX {\n  x: nint\n}\n" +
+		"pub interface Box<E> {\n  e: E\n}\n"
+	srcs := []string{
+		prelude + "pub type R<T: Box<U.x>, U: HasX> = { y: U.x }\n",
+		prelude + "pub interface I<T: Box<U.x>, U: HasX> {\n  v: U.x\n}\n",
+		prelude + "pub type C = { z: nint } impl {\n  pub fn g<T: Box<U.x>, U: HasX>(u: U): nint {\n    return u.x\n  }\n}\n",
+	}
+	for _, src := range srcs {
+		if _, diags := analyze(src); len(diags) != 0 {
+			t.Fatalf("want clean (a bound projects off another parameter), got %v", codes(diags))
+		}
+	}
+}
+
+func TestBoundedProjectionNonEnumSwitchArmRejected(t *testing.T) {
+	// A switch arm value is exempt from the value-position check only when it is an
+	// enum member of the scrutinee's enum. A non-enum scrutinee makes a bare type
+	// parameter in an arm value a compile-time value comparison, so it is flagged.
+	src := "pub interface HasX {\n  x: nint\n}\n" +
+		"pub fn f<T: HasX>(v: T, n: nint): nint {\n  switch n {\n    T -> {\n      return 1\n    }\n    _ -> {\n      return 2\n    }\n  }\n}\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeTypeParamInValuePosition) {
+		t.Fatalf("want type_param_in_value_position (T compared against a non-enum scrutinee), got %v", codes(diags))
+	}
+}
+
+func TestBoundedProjectionNamespaceShadowNotRejected(t *testing.T) {
+	// A type parameter spelled like a namespace import is read as a namespace member
+	// access (the import wins in value position), so T.x is not flagged as a value
+	// use of the type parameter.
+	diags := analyzeProject(t, map[string]string{
+		"mod.belt":  "pub const x: nint = 5\n",
+		"main.belt": "use T from \"mod.belt\"\npub fn f<T>(): nint {\n  return T.x\n}\n",
+	})
+	if hasCode(diags, CodeTypeParamInValuePosition) {
+		t.Fatalf("want no type_param_in_value_position (T is a namespace import), got %v", codes(diags))
+	}
+}

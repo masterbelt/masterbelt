@@ -801,66 +801,72 @@ func FuncTypeParamScope(params []*ast.TypeParam) TypeScope {
 	return scope
 }
 
-// ResolveFuncTypeParams resolves a function's generic type parameters into
-// ir.TypeParams (name plus optional resolved bound), each bound resolved in the
-// full type-parameter scope so it may name a later parameter (the U in
-// fn first<T: foldable<U>, U>). It also back-fills each resolved bound into the
-// scope, so a subsequent resolution of the parameter and result types sees the
-// bound on each TypeVar (the canonical map<K, V> with K: comparable). The bound
-// is resolved against the scope before it is back-filled, so a self-referential
-// bound (T: foo<T>) reads T as an unbounded variable, not recursively.
-func ResolveFuncTypeParams(r *TypeResolver, params []*ast.TypeParam, scope TypeScope) []*ir.TypeParam {
-	if len(params) == 0 {
-		return nil
-	}
-	out := make([]*ir.TypeParam, len(params))
-	for i, p := range params {
-		out[i] = &ir.TypeParam{Name: p.Name}
-	}
+// SettleBounds resolves each parameter's constraint into scope and returns the
+// resolved bound per parameter, in two passes so a bound may project off another
+// parameter's readable member (T: Box<U.x>) regardless of declaration order: the
+// bounds are all resolved against a scope where every parameter is still an
+// unbounded placeholder, so a projection off one reads an unbounded variable
+// until the others are in place.
+//
+// The first pass resolves every bound silently and back-fills it, settling the
+// scope; the second pass re-resolves — with reporting restored — only the bounds
+// that stayed invalid, now that every other parameter's bound is in the scope, so
+// a genuinely malformed projection reports in the live pass rather than the
+// throwaway one. A parameter's own name is left unbounded while its bound
+// resolves, so a self-referential bound (T: foo<T>) reads it as a free variable
+// rather than recursing, and a bound that resolved cleanly in the first pass is
+// untouched, so the ordinary case is unchanged. scope must already contain every
+// parameter name; entries the caller seeded for an enclosing scope (an outer
+// type's parameters, in a method) are left as they are.
+func SettleBounds(r *TypeResolver, params []*ast.TypeParam, scope TypeScope) []ir.Type {
+	bounds := make([]ir.Type, len(params))
 	backfill := func() {
 		for i, p := range params {
 			if p.Name != "" {
-				scope[p.Name] = out[i].Bound
+				scope[p.Name] = bounds[i]
 			}
 		}
 	}
-	// First pass: resolve every bound silently against the seeded (unbounded)
-	// scope, then back-fill. A bound may project off another parameter
-	// (T: Box<U.x>), which needs that parameter's own bound; that bound is not in
-	// the scope yet, so the projection fails here — but the failure is not
-	// reported. It is left invalid and re-resolved below once every bound is in
-	// place, so a bound that names another parameter's member resolves regardless
-	// of declaration order.
-	report, projErr := r.Report, r.ProjectionError
-	r.Report, r.ProjectionError = nil, nil
+	report, projErr, boundV, arity := r.Report, r.ProjectionError, r.BoundViolation, r.ArityMismatch
+	r.Report, r.ProjectionError, r.BoundViolation, r.ArityMismatch = nil, nil, nil, nil
 	for i, p := range params {
 		if p.Constraint != nil {
-			out[i].Bound = r.ResolveType(p.Constraint, scope)
+			bounds[i] = r.ResolveType(p.Constraint, scope)
 		}
 	}
-	r.Report, r.ProjectionError = report, projErr
+	r.Report, r.ProjectionError, r.BoundViolation, r.ArityMismatch = report, projErr, boundV, arity
 	backfill()
-	// Second pass: re-resolve, with reporting restored, only the bounds that stayed
-	// invalid — now every other parameter's bound is in the scope, so a projection
-	// off one resolves to the bound's member, while a genuinely malformed bound
-	// reports its error here rather than in the throwaway first pass. The
-	// parameter's own name is unbounded during its own resolution, so a
-	// self-referential bound (T: foo<T>) reads it as a free variable; a bound that
-	// resolved cleanly in the first pass is left untouched, so the common case is
-	// unchanged.
 	for i, p := range params {
-		if p.Constraint == nil || !ir.HasInvalid(out[i].Bound) {
+		if p.Constraint == nil || !ir.HasInvalid(bounds[i]) {
 			continue
 		}
 		if p.Name != "" {
 			scope[p.Name] = nil
 		}
-		out[i].Bound = r.ResolveType(p.Constraint, scope)
+		bounds[i] = r.ResolveType(p.Constraint, scope)
 		if p.Name != "" {
-			scope[p.Name] = out[i].Bound
+			scope[p.Name] = bounds[i]
 		}
 	}
 	backfill()
+	return bounds
+}
+
+// ResolveFuncTypeParams resolves a function's generic type parameters into
+// ir.TypeParams (name plus optional resolved bound) through SettleBounds, so a
+// bound may name a later parameter (the U in fn first<T: foldable<U>, U>) or
+// project off one (T: Box<U.x>). The resolved bounds are back-filled into the
+// scope, so a subsequent resolution of the parameter and result types sees the
+// bound on each TypeVar (the canonical map<K, V> with K: comparable).
+func ResolveFuncTypeParams(r *TypeResolver, params []*ast.TypeParam, scope TypeScope) []*ir.TypeParam {
+	if len(params) == 0 {
+		return nil
+	}
+	bounds := SettleBounds(r, params, scope)
+	out := make([]*ir.TypeParam, len(params))
+	for i, p := range params {
+		out[i] = &ir.TypeParam{Name: p.Name, Bound: bounds[i]}
+	}
 	return out
 }
 

@@ -284,7 +284,7 @@ func forEachBodyExpr(body []ast.Stmt, fn func(ast.Expr)) {
 // binding, or a lambda parameter — shadows the type parameter for the statements
 // it scopes and takes the value reading, exactly as the body checker scopes those
 // bindings, so reusing a type parameter's name as a local does not misfire.
-func reportTypeParamValueUse(scope infer.TypeScope, params map[string]ir.Type, constShadows func(*ast.Identifier) bool, body []ast.Stmt, at func(ast.Node) span, diags *diagnostic.List) {
+func reportTypeParamValueUse(scope infer.TypeScope, params map[string]ir.Type, valueShadows func(*ast.Identifier) bool, enumArm func(scrutinee ast.Expr, name string) bool, body []ast.Stmt, at func(ast.Node) span, diags *diagnostic.List) {
 	if len(scope) == 0 || diags == nil {
 		return
 	}
@@ -292,7 +292,31 @@ func reportTypeParamValueUse(scope infer.TypeScope, params map[string]ir.Type, c
 	for name := range params {
 		shadowed[name] = true
 	}
-	typeParamValueWalk{scope: scope, constShadows: constShadows, at: at, diags: diags}.stmts(body, shadowed)
+	typeParamValueWalk{scope: scope, valueShadows: valueShadows, enumArm: enumArm, at: at, diags: diags}.stmts(body, shadowed)
+}
+
+// valueShadowPredicate combines the const-shadowing and namespace-import checks
+// into the predicate the value-position walk consults: a name is read as a value,
+// not the type parameter, when it is a top-level constant (constShadows) or a
+// namespace import whose member the body reads (nsImport). Either is nil-safe.
+func valueShadowPredicate(constShadows func(*ast.Identifier) bool, nsImport func(string) bool) func(*ast.Identifier) bool {
+	return func(id *ast.Identifier) bool {
+		if constShadows != nil && constShadows(id) {
+			return true
+		}
+		return nsImport != nil && nsImport(id.Name)
+	}
+}
+
+// enumArmPredicate reports whether a switch arm's bare name is a member of the
+// enum its scrutinee resolves to, typing the scrutinee against the body scope —
+// so a bare enum-member pattern is not mistaken for a value read of a same-named
+// type parameter, while a value compared against a non-enum scrutinee still is.
+func enumArmPredicate(bs infer.BodyScope) func(ast.Expr, string) bool {
+	return func(scrutinee ast.Expr, name string) bool {
+		def := enumDefOf(infer.Body(scrutinee, bs))
+		return def != nil && enumIndex(def, name) >= 0
+	}
 }
 
 // typeParamValueWalk walks a body for value-position type-parameter uses,
@@ -300,12 +324,17 @@ func reportTypeParamValueUse(scope infer.TypeScope, params map[string]ir.Type, c
 // suppresses the report for the statements it scopes.
 type typeParamValueWalk struct {
 	scope infer.TypeScope
-	// constShadows reports whether a bare name resolves to a top-level constant —
-	// a value the body binder reads before reifying a type, so it shadows a
-	// same-named type parameter exactly as a local binding does.
-	constShadows func(*ast.Identifier) bool
-	at           func(ast.Node) span
-	diags        *diagnostic.List
+	// valueShadows reports whether a bare name resolves to a value the body binder
+	// reads before reifying a type — a top-level constant, or a namespace import
+	// whose member it reads — so the name shadows a same-named type parameter
+	// exactly as a local binding does.
+	valueShadows func(*ast.Identifier) bool
+	// enumArm reports whether a name is a member of the enum the scrutinee resolves
+	// to, so a switch arm's bare enum-member pattern is not read as a value use of a
+	// same-named type parameter while a non-enum value pattern still is.
+	enumArm func(scrutinee ast.Expr, name string) bool
+	at      func(ast.Node) span
+	diags   *diagnostic.List
 }
 
 // stmts walks a statement block with shadowed holding the value names in scope at
@@ -334,12 +363,18 @@ func (w typeParamValueWalk) stmts(stmts []ast.Stmt, shadowed map[string]bool) {
 			w.stmts(s.Body, withName(shadowed, s.Var)) // the loop variable binds in the body
 		case *ast.SwitchStmt:
 			w.expr(s.Scrutinee, shadowed)
-			// An arm's value patterns are matched against the scrutinee — a bare name
-			// there is an enum member or constant resolved from the scrutinee's type,
-			// not a value read of a type parameter — so the patterns are not walked;
-			// only the arm bodies are. The after-wildcard arms are unreachable but
-			// still type-checked, so a value-position use in one is reported as well.
+			// An arm value that is a bare name matching a member of the scrutinee's
+			// enum is an enum-member pattern, not a value read of a same-named type
+			// parameter, so it is skipped; any other arm value (a value compared
+			// against a non-enum scrutinee, a projection) is walked. The after-wildcard
+			// arms are unreachable but still type-checked, so a use in one is reported.
 			for _, arm := range append(append([]*ast.SwitchArm{}, s.Arms...), s.AfterElse...) {
+				for _, v := range arm.Values {
+					if id, ok := v.(*ast.Identifier); ok && w.enumArm != nil && w.enumArm(s.Scrutinee, id.Name) {
+						continue
+					}
+					w.expr(v, shadowed)
+				}
 				w.stmts(arm.Body, withName(shadowed, ""))
 			}
 			w.stmts(s.Else, withName(shadowed, ""))
@@ -415,7 +450,7 @@ func (w typeParamValueWalk) flagged(id *ast.Identifier, shadowed map[string]bool
 	if shadowed[id.Name] {
 		return false
 	}
-	return w.constShadows == nil || !w.constShadows(id)
+	return w.valueShadows == nil || !w.valueShadows(id)
 }
 
 func (w typeParamValueWalk) report(node ast.Node, name string) {
@@ -462,11 +497,7 @@ func methodTScope(r *infer.TypeResolver, def *ir.TypeDef, m *ast.MethodDecl) inf
 			scope[tp.Name] = nil
 		}
 	}
-	for _, tp := range m.TypeParams {
-		if tp.Constraint != nil {
-			scope[tp.Name] = r.ResolveType(tp.Constraint, scope)
-		}
-	}
+	infer.SettleBounds(r, m.TypeParams, scope)
 	return scope
 }
 
@@ -481,12 +512,13 @@ func methodTScope(r *infer.TypeResolver, def *ir.TypeDef, m *ast.MethodDecl) inf
 // ones — and qualified its namespace-qualified lookup, so a type in a body
 // resolves exactly as an annotation does. env folds switch arm values for the
 // exhaustiveness and duplicate checks.
-func checkMethodBodies(reg *builtin.Registry, defs []*ir.TypeDef, universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, funcs map[string][]*ast.FuncDecl, qualifiedFuncs func(namespace, name string) []*ast.FuncDecl, constShadows func(*ast.Identifier) bool, env exprFolder, sink *infer.Sink, at func(ast.Node) span, diags *diagnostic.List) {
+func checkMethodBodies(reg *builtin.Registry, defs []*ir.TypeDef, universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, funcs map[string][]*ast.FuncDecl, qualifiedFuncs func(namespace, name string) []*ast.FuncDecl, constShadows func(*ast.Identifier) bool, nsImport func(string) bool, env exprFolder, sink *infer.Sink, at func(ast.Node) span, diags *diagnostic.List) {
 	// The resolver that builds each method's body type-parameter scope: it resolves
 	// a method type parameter's bound (fn g<T: HasX>) so a body annotation
 	// projecting off it (let y: T.x) sees the bound, the same registry-backed
 	// resolution the signature uses.
 	tscopeResolver := &infer.TypeResolver{Defs: universe, Qualified: qualified, Registry: reg}
+	valueShadows := valueShadowPredicate(constShadows, nsImport)
 	var noSelf func(node ast.Node)
 	if diags != nil {
 		noSelf = func(node ast.Node) {
@@ -519,7 +551,7 @@ func checkMethodBodies(reg *builtin.Registry, defs []*ir.TypeDef, universe map[s
 			bs := infer.BodyScope{Reg: reg, Universe: universe, Qualified: qualified, Self: selfT, Params: params, Funcs: funcs, QualifiedFuncs: qualifiedFuncs, ConstShadows: constShadows, TScope: methodTScope(tscopeResolver, def, m)}
 			checkStmts(m.Body, want, bs, env, bodyNoSelf, sink, at, diags)
 			checkBareEnumArgs(m.Body, bs, env, at, diags)
-			reportTypeParamValueUse(bs.TScope, params, constShadows, m.Body, at, diags)
+			reportTypeParamValueUse(bs.TScope, params, valueShadows, enumArmPredicate(bs), m.Body, at, diags)
 		}
 	}
 }
@@ -538,7 +570,7 @@ func checkMethodBodies(reg *builtin.Registry, defs []*ir.TypeDef, universe map[s
 // func-literal-types path settles the signatures of the lambdas inside a
 // function body without reporting (the self and missing-return diagnostics, and
 // the index-write check, are suppressed) — mirroring checkMethodBodies.
-func checkFuncBodies(reg *builtin.Registry, file *ast.File, universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, funcs map[string][]*ast.FuncDecl, qualifiedFuncs func(namespace, name string) []*ast.FuncDecl, constShadows func(*ast.Identifier) bool, env exprFolder, sink *infer.Sink, at func(ast.Node) span, diags *diagnostic.List) {
+func checkFuncBodies(reg *builtin.Registry, file *ast.File, universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, funcs map[string][]*ast.FuncDecl, qualifiedFuncs func(namespace, name string) []*ast.FuncDecl, constShadows func(*ast.Identifier) bool, nsImport func(string) bool, env exprFolder, sink *infer.Sink, at func(ast.Node) span, diags *diagnostic.List) {
 	// The resolver reports a failed field-type projection in a parameter or result
 	// annotation (fn f(x: Item.nope)), so an invalid projection there surfaces the
 	// same diagnostic it does in a type or const annotation rather than resolving
@@ -546,6 +578,7 @@ func checkFuncBodies(reg *builtin.Registry, file *ast.File, universe map[string]
 	// the bound's readable member, the same as the top-level type-declaration path.
 	// A sink-only walk (diags nil) keeps it silent.
 	r := &infer.TypeResolver{Defs: universe, Qualified: qualified, Registry: reg, ProjectionError: projectionErrorReporter(at, diags)}
+	valueShadows := valueShadowPredicate(constShadows, nsImport)
 	var noSelf func(node ast.Node)
 	if diags != nil {
 		noSelf = func(node ast.Node) {
@@ -574,7 +607,7 @@ func checkFuncBodies(reg *builtin.Registry, file *ast.File, universe map[string]
 		if diags == nil {
 			continue // the sink-only walk wants no further diagnostics
 		}
-		reportTypeParamValueUse(tscope, params, constShadows, fd.Body, at, diags)
+		reportTypeParamValueUse(tscope, params, valueShadows, enumArmPredicate(bs), fd.Body, at, diags)
 		// A function parameter or result may not be a type value: fn f(t: type) or
 		// fn f(): type is type_in_value_position — there are no type-value functions,
 		// which is why generics stay type parameters rather than type-value
