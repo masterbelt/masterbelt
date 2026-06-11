@@ -106,6 +106,8 @@ File
           Doc: "Render the value as a string."
           Public: false
           Name: "show"
+          Readable: false
+          HasBody: false
           TypeParams: ~
           Params: ~
           Result: NamedType
@@ -130,6 +132,8 @@ File
           Doc: "The value's rank."
           Public: false
           Name: "rank"
+          Readable: false
+          HasBody: false
           TypeParams: ~
           Params: ~
           Result: NamedType
@@ -159,6 +163,8 @@ File
           Doc: "The < operator."
           Public: false
           Name: "before"
+          Readable: false
+          HasBody: false
           TypeParams: ~
           Params:
             ParamDef

@@ -691,8 +691,9 @@ func lowerInterfaceParents(t cst.Tree, buf source.Buffer) []ast.TypeExpr {
 
 // lowerInterfaceMember lowers one InterfaceMember node: its modifiers, name,
 // explicit type variables, parameters, result type, and optional default body.
-// A member with a Block is a provided method (its body the default); one without
-// is a required method.
+// A member with a ParamList is a method requirement; one without is a readable-
+// member requirement (Name: T). A member with a Block is a provided method (its
+// body the default); one without is a required member.
 func lowerInterfaceMember(t cst.Tree, buf source.Buffer) *ast.InterfaceMember {
 	green, _ := t.Node()
 	var (
@@ -703,6 +704,8 @@ func lowerInterfaceMember(t cst.Tree, buf source.Buffer) *ast.InterfaceMember {
 		params     []*ast.ParamDef
 		result     ast.TypeExpr
 		body       []ast.Stmt
+		hasParams  bool
+		hasBody    bool
 	)
 	for _, child := range t.Children() {
 		if tok, ok := child.Token(); ok {
@@ -727,11 +730,16 @@ func lowerInterfaceMember(t cst.Tree, buf source.Buffer) *ast.InterfaceMember {
 			typeParams = lowerGenericParams(child, buf)
 		case node.Kind() == cst.ParamList:
 			params = lowerParamList(child, buf)
+			hasParams = true
 		case node.Kind() == cst.Block:
 			body = lowerBlock(child, buf)
+			hasBody = true
 		case isTypeExprKind(node.Kind()):
 			result = lowerTypeExpr(child, buf)
 		}
 	}
-	return ast.NewInterfaceMember(doc, public, name, typeParams, params, result, body, green)
+	// No parameter list distinguishes a readable-member requirement (Name: T) from
+	// a nullary method requirement (Name(): T), which both lower to empty Params.
+	// hasBody records a written block even when empty, which lowers to a nil Body.
+	return ast.NewInterfaceMember(doc, public, name, !hasParams, hasBody, typeParams, params, result, body, green)
 }

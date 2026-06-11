@@ -1,0 +1,48 @@
+// A readable-member requirement. An interface member written `X: T` — no
+// parentheses — requires a member readable as `value.X` of type T, met by a field
+// or a getter, the two readable members. It is the requirement side of
+// read/projection symmetry: `X: T` is read (value.X), `X(): T` is called
+// (value.X()). Conformance is kind-aware — a field or getter meets `X: T`, a
+// method meets `X(): T` — so a type opts into the behaviour by being readable the
+// way the interface demands, with the read type checked against the requirement.
+
+/// A behaviour for anything with a readable name and a callable greeting.
+pub interface Greetable {
+  /// A readable member: every Greetable is read as `g.name` for its string name.
+  name: string
+
+  /// A method: called as `g.greeting()`.
+  greeting(): string
+}
+
+/// A person meets `name: string` with a stored field, and the method with a fn.
+pub type Person = {
+  name: string,
+} impl Greetable {
+  pub fn greeting(): string {
+    return self.name
+  }
+}
+
+/// A robot meets the same `name: string` requirement with a getter instead — read
+/// as `r.name` exactly as a field is, so it conforms the same way.
+pub type Robot = {
+  id: string,
+} impl Greetable {
+  pub get name(): string {
+    return self.id
+  }
+
+  pub fn greeting(): string {
+    return self.name
+  }
+}
+
+// In a type-requirement position the readable member is read off the interface
+// value: g.name is the string the requirement promises, over a field-backed and a
+// getter-backed implementor alike.
+/// Read the name through the interface — a field-backed or getter-backed name
+/// reads the same.
+pub fn label(g: Greetable): string {
+  return g.name
+}

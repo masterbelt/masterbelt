@@ -415,8 +415,16 @@
           ]
         },
         {
-          "type": "SYMBOL",
-          "name": "param_list"
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "SYMBOL",
+              "name": "param_list"
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
         },
         {
           "type": "STRING",

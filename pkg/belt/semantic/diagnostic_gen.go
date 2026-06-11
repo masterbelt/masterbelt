@@ -26,6 +26,7 @@ const (
 	CodeBoundNotSatisfied          diagnostic.Code = "belt.semantic.bound_not_satisfied"
 	CodeBuiltinOutsideBuiltin      diagnostic.Code = "belt.semantic.builtin_outside_builtin"
 	CodeConditionNotBool           diagnostic.Code = "belt.semantic.condition_not_bool"
+	CodeConflictingGenericAncestor diagnostic.Code = "belt.semantic.conflicting_generic_ancestor"
 	CodeConstantOverflow           diagnostic.Code = "belt.semantic.constant_overflow"
 	CodeCyclicModule               diagnostic.Code = "belt.semantic.cyclic_module"
 	CodeCyclicReference            diagnostic.Code = "belt.semantic.cyclic_reference"
@@ -61,6 +62,7 @@ const (
 	CodeMissingEffect              diagnostic.Code = "belt.semantic.missing_effect"
 	CodeMissingField               diagnostic.Code = "belt.semantic.missing_field"
 	CodeMissingInitializer         diagnostic.Code = "belt.semantic.missing_initializer"
+	CodeMissingReadableMember      diagnostic.Code = "belt.semantic.missing_readable_member"
 	CodeMissingRequiredMethod      diagnostic.Code = "belt.semantic.missing_required_method"
 	CodeMissingReturn              diagnostic.Code = "belt.semantic.missing_return"
 	CodeNoMatchingFuncOverload     diagnostic.Code = "belt.semantic.no_matching_func_overload"
@@ -73,6 +75,8 @@ const (
 	CodeNotExported                diagnostic.Code = "belt.semantic.not_exported"
 	CodeNotIterable                diagnostic.Code = "belt.semantic.not_iterable"
 	CodeRangeStepZero              diagnostic.Code = "belt.semantic.range_step_zero"
+	CodeReadableMemberHasBody      diagnostic.Code = "belt.semantic.readable_member_has_body"
+	CodeReadableMemberTypeParams   diagnostic.Code = "belt.semantic.readable_member_type_params"
 	CodeRefinementNotBool          diagnostic.Code = "belt.semantic.refinement_not_bool"
 	CodeRefinementNotConstant      diagnostic.Code = "belt.semantic.refinement_not_constant"
 	CodeRefinementViolation        diagnostic.Code = "belt.semantic.refinement_violation"
@@ -345,6 +349,23 @@ func newConditionNotBoolDiagnostic(offset int, width int, typ string) diagnostic
 		Severity: diagnostic.Error,
 		Code:     CodeConditionNotBool,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeConditionNotBool, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newConflictingGenericAncestorDiagnostic(offset int, width int, child string, ancestor string, first string, second string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"child":    diagnostic.Str(child),
+		"ancestor": diagnostic.Str(ancestor),
+		"first":    diagnostic.Str(first),
+		"second":   diagnostic.Str(second),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeConflictingGenericAncestor,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeConflictingGenericAncestor, fields),
 		Fields:   fields,
 		Offset:   offset,
 		Width:    width,
@@ -854,6 +875,23 @@ func newMissingInitializerDiagnostic(offset int, width int, name string) diagnos
 	}
 }
 
+func newMissingReadableMemberDiagnostic(offset int, width int, typ string, iface string, member string, want string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"typ":    diagnostic.Str(typ),
+		"iface":  diagnostic.Str(iface),
+		"member": diagnostic.Str(member),
+		"want":   diagnostic.Str(want),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeMissingReadableMember,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeMissingReadableMember, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
 func newMissingRequiredMethodDiagnostic(offset int, width int, typ string, iface string, method string) diagnostic.Diagnostic {
 	fields := map[string]fmt.Stringer{
 		"typ":    diagnostic.Str(typ),
@@ -1021,6 +1059,34 @@ func newRangeStepZeroDiagnostic(offset int, width int) diagnostic.Diagnostic {
 		Code:     CodeRangeStepZero,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeRangeStepZero, nil),
 		Fields:   nil,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newReadableMemberHasBodyDiagnostic(offset int, width int, member string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"member": diagnostic.Str(member),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeReadableMemberHasBody,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeReadableMemberHasBody, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newReadableMemberTypeParamsDiagnostic(offset int, width int, member string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"member": diagnostic.Str(member),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeReadableMemberTypeParams,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeReadableMemberTypeParams, fields),
+		Fields:   fields,
 		Offset:   offset,
 		Width:    width,
 	}

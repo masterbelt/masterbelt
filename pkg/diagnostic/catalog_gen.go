@@ -319,6 +319,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "if condition must be a bool; got " + f["typ"].String()
 		}
 	},
+	"belt.semantic.conflicting_generic_ancestor": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return f["child"].String() + " は " + f["ancestor"].String() + " を矛盾する適用 (" + f["first"].String() + " と " + f["second"].String() + ") で継承しています"
+		default:
+			return f["child"].String() + " inherits " + f["ancestor"].String() + " through conflicting applications (" + f["first"].String() + " and " + f["second"].String() + ")"
+		}
+	},
 	"belt.semantic.constant_overflow": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
@@ -599,6 +607,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "let " + f["name"].String() + " must be initialized: write let " + f["name"].String() + " = value"
 		}
 	},
+	"belt.semantic.missing_readable_member": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return f["typ"].String() + " は " + f["iface"].String() + " を実装していません: 読める member " + f["member"].String() + ": " + f["want"].String() + " がありません"
+		default:
+			return f["typ"].String() + " does not implement " + f["iface"].String() + ": missing readable member " + f["member"].String() + ": " + f["want"].String()
+		}
+	},
 	"belt.semantic.missing_required_method": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
@@ -693,6 +709,22 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "range のステップに 0 は指定できません"
 		default:
 			return "range step cannot be zero"
+		}
+	},
+	"belt.semantic.readable_member_has_body": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "読める member 要求 " + f["member"].String() + " は本体を持てません。ブロックを削除するかメソッドとして書いてください"
+		default:
+			return "a readable-member requirement " + f["member"].String() + " cannot have a body; remove the block or write it as a method"
+		}
+	},
+	"belt.semantic.readable_member_type_params": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "読める member 要求 " + f["member"].String() + " は型パラメータを宣言できません。インスタンス化する呼び出しがありません"
+		default:
+			return "a readable-member requirement " + f["member"].String() + " cannot declare type parameters; there is no call to instantiate them"
 		}
 	},
 	"belt.semantic.refinement_not_bool": func(loc Locale, f map[string]fmt.Stringer) string {

@@ -116,6 +116,8 @@ File
           Doc: ~
           Public: false
           Name: "fold"
+          Readable: false
+          HasBody: false
           TypeParams:
             TypeParam
               Name: "A"
@@ -168,6 +170,8 @@ File
           Doc: "Provided: the number of elements, folded from the primitive."
           Public: true
           Name: "count"
+          Readable: false
+          HasBody: true
           TypeParams: ~
           Params: ~
           Result: NamedType
@@ -210,6 +214,8 @@ File
           Doc: "Provided: whether any element satisfies the predicate."
           Public: true
           Name: "any"
+          Readable: false
+          HasBody: true
           TypeParams: ~
           Params:
             ParamDef

@@ -139,6 +139,8 @@ File
           Doc: ~
           Public: false
           Name: "fold"
+          Readable: false
+          HasBody: false
           TypeParams:
             TypeParam
               Name: "A"
@@ -191,6 +193,8 @@ File
           Doc: "Provided: the number of elements, folded from the primitive."
           Public: true
           Name: "count"
+          Readable: false
+          HasBody: true
           TypeParams: ~
           Params: ~
           Result: NamedType

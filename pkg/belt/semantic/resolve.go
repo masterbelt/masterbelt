@@ -421,14 +421,43 @@ func resolveInterfaceDecl(r *infer.TypeResolver, reg *builtin.Registry, id *ast.
 		}
 		def.Interface.Parents = append(def.Interface.Parents, t)
 	}
+	seenReadable := map[string]bool{}
 	for _, m := range id.Members {
 		method := resolveInterfaceMember(r, reg, &ir.Named{Def: def}, m, scope, fns)
+		// Two readable requirements of one name are a duplicate, not an overload —
+		// a readable member takes no arguments to distinguish them, so the second
+		// only contradicts the first (value: string then value: nint can satisfy no
+		// implementor at once). It is reported at the declaration.
+		if m.Readable && at != nil && diags != nil {
+			if seenReadable[m.Name] {
+				s := at(m)
+				diags.Add(newDuplicateDeclarationDiagnostic(s.offset, s.width, m.Name))
+			}
+			seenReadable[m.Name] = true
+		}
 		// An interface member's parameter or result may not be a type value, the
 		// same storage rule a concrete method obeys — so an interface cannot expose
 		// a type-valued runtime slot.
 		reportMetatypeSlot(at, diags, m, sigType(method.Params, method.Result))
 		def.AttachMethods(method)
-		if m.Provided() {
+		// A readable-member requirement is always required — it carries no default,
+		// so a written body does not make it provided (which would let any implementor
+		// inherit it and satisfy the requirement vacuously); the body is reported. A
+		// block is rejected even when empty (HasBody, not a non-nil Body, which an
+		// empty block does not produce).
+		if m.Readable && m.HasBody && at != nil && diags != nil {
+			s := at(m)
+			diags.Add(newReadableMemberHasBodyDiagnostic(s.offset, s.width, m.Name))
+		}
+		// A readable member is read as value.X, with no call to supply type
+		// arguments, so its own type parameters (value<T>: T) can never be
+		// instantiated — they are reported rather than left as a free variable a
+		// same-named implementor parameter would spuriously satisfy.
+		if m.Readable && len(m.TypeParams) > 0 && at != nil && diags != nil {
+			s := at(m)
+			diags.Add(newReadableMemberTypeParamsDiagnostic(s.offset, s.width, m.Name))
+		}
+		if m.Provided() && !m.Readable {
 			def.Interface.Provided = append(def.Interface.Provided, m.Name)
 		} else {
 			def.Interface.Required = append(def.Interface.Required, m.Name)
@@ -475,45 +504,96 @@ func checkOneInterfaceInheritance(decl *ast.InterfaceDecl, def *ir.TypeDef, at f
 		diags.Add(newCyclicReferenceDiagnostic(s.offset, s.width, def.Name))
 		return
 	}
+	checkConflictingAncestors(decl, def, at, diags)
 	contributors := interfaceContributors(def)
-	// Override: a child member whose name an ancestor already carries.
+	// Override: a child member an ancestor already carries — matched by name and
+	// kind, so a child method name() does not override an ancestor readable name (a
+	// readable member and a method are distinct members, as a field and a method of
+	// the same name are on a concrete type).
 	for _, m := range decl.Members {
-		if anc := contributors[m.Name]; len(anc) > 0 {
+		if anc := contributors[memberKeyOf(m)]; len(anc) > 0 {
 			s := at(m)
 			diags.Add(newInterfaceMemberOverrideDiagnostic(s.offset, s.width, def.Name, m.Name, anc[0].Name))
 		}
 	}
-	// Conflict: a name two unrelated ancestors both declare, which the child
-	// does not itself redeclare (an override is reported above instead).
-	own := map[string]bool{}
+	// Conflict: a member two unrelated ancestors both declare, which the child does
+	// not itself redeclare (an override is reported above instead).
+	own := map[memberKey]bool{}
 	for _, m := range decl.Members {
-		own[m.Name] = true
+		own[memberKeyOf(m)] = true
 	}
-	for _, name := range interfaceMemberNames(def) {
-		own[name] = true // the IR member names agree with the decl's; belt and braces
+	for _, k := range interfaceMemberKeys(def) {
+		own[k] = true // the IR members agree with the decl's; belt and braces
 	}
-	for name, anc := range contributors {
-		if len(anc) >= 2 && !own[name] {
+	for k, anc := range contributors {
+		if len(anc) >= 2 && !own[k] {
 			s := at(decl)
-			diags.Add(newInterfaceMemberConflictDiagnostic(s.offset, s.width, def.Name, name, anc[0].Name, anc[1].Name))
+			diags.Add(newInterfaceMemberConflictDiagnostic(s.offset, s.width, def.Name, k.name, anc[0].Name, anc[1].Name))
 		}
 	}
 }
 
-// interfaceContributors maps each member name an ancestor of def declares to the
-// distinct ancestor definitions that declare it. A name from a single shared
-// ancestor lands once (the closure dedups by identity); a name from two
-// unrelated ancestors lands twice.
-func interfaceContributors(def *ir.TypeDef) map[string][]*ir.TypeDef {
-	contributors := map[string][]*ir.TypeDef{}
+// memberKey identifies an interface member by name and kind — a readable member
+// (a getter) and a method that share a name are distinct members, so the
+// inheritance checks must not collapse them.
+type memberKey struct {
+	name string
+	kind ir.MethodKind
+}
+
+// memberKeyOf is the key of a declared interface member: a readable-member
+// requirement is a getter, every other member a method.
+func memberKeyOf(m *ast.InterfaceMember) memberKey {
+	kind := ir.MethodNormal
+	if m.Readable {
+		kind = ir.MethodGetter
+	}
+	return memberKey{name: m.Name, kind: kind}
+}
+
+// checkConflictingAncestors reports a generic interface inherited through two
+// incompatible applications (D<X, Y>: A<X>, A<Y>), which would make an inherited
+// member's type depend on the order the parents are written. It gathers every
+// ancestor application reachable through the parents (each parent's closure with
+// its arguments substituted) and flags a definition reached with two
+// non-identical applications. A diamond that reaches one ancestor with the same
+// application twice is consistent and not reported.
+func checkConflictingAncestors(decl *ast.InterfaceDecl, def *ir.TypeDef, at func(ast.Node) span, diags *diagnostic.List) {
+	first := map[*ir.TypeDef]ir.Type{}
 	for _, parent := range def.Interface.Parents {
 		for _, anc := range interfaceClosure(parent) {
 			adef := interfaceDefOf(anc)
 			if adef == nil {
 				continue
 			}
-			for _, name := range interfaceMemberNames(adef) {
-				contributors[name] = appendDistinct(contributors[name], adef)
+			prev, ok := first[adef]
+			if !ok {
+				first[adef] = anc
+				continue
+			}
+			if !types.Identical(prev, anc) {
+				s := at(decl)
+				diags.Add(newConflictingGenericAncestorDiagnostic(s.offset, s.width, def.Name, adef.Name, prev.String(), anc.String()))
+				return
+			}
+		}
+	}
+}
+
+// interfaceContributors maps each member an ancestor of def declares — keyed by
+// name and kind — to the distinct ancestor definitions that declare it. A member
+// from a single shared ancestor lands once (the closure dedups by identity); one
+// from two unrelated ancestors lands twice.
+func interfaceContributors(def *ir.TypeDef) map[memberKey][]*ir.TypeDef {
+	contributors := map[memberKey][]*ir.TypeDef{}
+	for _, parent := range def.Interface.Parents {
+		for _, anc := range interfaceClosure(parent) {
+			adef := interfaceDefOf(anc)
+			if adef == nil {
+				continue
+			}
+			for _, k := range interfaceMemberKeys(adef) {
+				contributors[k] = appendDistinct(contributors[k], adef)
 			}
 		}
 	}
@@ -546,16 +626,19 @@ func interfaceHasCycle(def *ir.TypeDef) bool {
 	return walk(def)
 }
 
-// interfaceMemberNames returns the names of an interface's own members (required
-// and provided), in a stable order, for the override and conflict checks.
-func interfaceMemberNames(def *ir.TypeDef) []string {
+// interfaceMemberKeys returns the name-and-kind keys of an interface's own
+// members (required and provided), in declaration order, for the override and
+// conflict checks — so a readable member and a method of the same name are kept
+// distinct.
+func interfaceMemberKeys(def *ir.TypeDef) []memberKey {
 	if def.Interface == nil {
 		return nil
 	}
-	names := make([]string, 0, len(def.Interface.Required)+len(def.Interface.Provided))
-	names = append(names, def.Interface.Required...)
-	names = append(names, def.Interface.Provided...)
-	return names
+	keys := make([]memberKey, 0, len(def.Methods))
+	for _, m := range def.Methods {
+		keys = append(keys, memberKey{name: m.Name, kind: m.Kind})
+	}
+	return keys
 }
 
 // appendDistinct appends def to defs unless it is already present, so a single
@@ -576,6 +659,12 @@ func appendDistinct(defs []*ir.TypeDef, def *ir.TypeDef) []*ir.TypeDef {
 // default body lowers to IR. A required member has no body.
 func resolveInterfaceMember(r *infer.TypeResolver, reg *builtin.Registry, self ir.Type, m *ast.InterfaceMember, scope infer.TypeScope, fns bodyFuncs) *ir.Method {
 	method := &ir.Method{Name: m.Name, Public: m.Public, Doc: m.Doc}
+	// A readable-member requirement (X: T, no parameter list) is the signature of a
+	// getter — read as x.X yielding T — so it is carried as a getter, which is what
+	// conformance branches on to demand a field or getter rather than a method.
+	if m.Readable {
+		method.Kind = ir.MethodGetter
+	}
 
 	// The member's own type variables join a fresh scope: the explicit ones
 	// (the A in fold<A>) and the implicit free names appearing in a parameter
@@ -621,7 +710,7 @@ func resolveInterfaceMember(r *infer.TypeResolver, reg *builtin.Registry, self i
 		resolvedParams[p.Name] = t
 	}
 	method.Result = r.ResolveType(m.Result, mscope)
-	if m.Body != nil {
+	if m.Body != nil && !m.Readable {
 		method.Body = lower.Body(m.Body, bodyBinder{r: r, reg: reg, params: params, paramTypes: resolvedParams, selfType: self, tscope: mscope, funcs: fns, self: true})
 		// A provided member carries an AST syntax link, the way a concrete method
 		// does, so the constant folder reaches its body: it folds a provided method
@@ -687,10 +776,17 @@ func resolveImpls(r *infer.TypeResolver, reg *builtin.Registry, impls []ast.Type
 			if adef == nil {
 				continue
 			}
-			for _, name := range adef.Interface.Required {
-				if !suppliesMethod(reg, def, name, map[*ir.TypeDef]bool{}) {
-					s := at(impl)
-					diags.Add(newMissingRequiredMethodDiagnostic(s.offset, s.width, def.Name, adef.Name, name))
+			subst := interfaceArgSubst(anc, adef)
+			for _, req := range adef.Methods {
+				// A required member has no default body; iterating the resolved members
+				// (not their names) keeps each requirement's kind, so a readable and a
+				// method requirement that share a name are checked as the distinct
+				// requirements they are.
+				if req.Body != nil {
+					continue
+				}
+				if d, unmet := unmetRequirement(reg, def, adef, req, subst, at(impl)); unmet {
+					diags.Add(d)
 				}
 			}
 		}
@@ -818,7 +914,10 @@ func suppliesMethod(reg *builtin.Registry, def *ir.TypeDef, name string, seen ma
 	}
 	seen[def] = true
 	for _, m := range def.Methods {
-		if m.Name == name {
+		// A method requirement is met by a method only: a getter (read as x.X, not
+		// callable as x.X()), a setter, or a static is the wrong kind, so the kind is
+		// checked rather than the name alone.
+		if m.Name == name && m.Kind == ir.MethodNormal {
 			return true
 		}
 	}
@@ -831,6 +930,110 @@ func suppliesMethod(reg *builtin.Registry, def *ir.TypeDef, name string, seen ma
 		return suppliesMethod(reg, ud, name, seen)
 	}
 	return false
+}
+
+// suppliesReadable reports whether def supplies a readable member of the given
+// name and read type — a field of that type, or a getter whose result is that
+// type — which is what a readable-member requirement (X: T) demands. The field is
+// read from the receiver's fully instantiated record, and the getter is read off
+// the type and its underlying chain with the receiver's generic arguments and self
+// substituted in, but deliberately not through the registry: that lookup would
+// find the very requirement being checked on the implemented interface and satisfy
+// it with itself. The read type must match the requirement's type by identity.
+func suppliesReadable(reg *builtin.Registry, def *ir.TypeDef, name string, want ir.Type) bool {
+	recv := ir.Type(&ir.Named{Def: def})
+	// A field of the requirement's type — the record is instantiated, so a field
+	// reached through a generic alias (StringBox = Box<string>) carries the
+	// application's argument (value: string, not the parameter T).
+	if rec := types.RecordOf(recv); rec != nil {
+		for i := range rec.Fields {
+			if rec.Fields[i].Name == name {
+				return types.Identical(types.SubstituteSelf(rec.Fields[i].Type, recv), want)
+			}
+		}
+	}
+	if t, ok := readableGetterType(reg, recv, def, name, nil, map[*ir.TypeDef]bool{}); ok {
+		return types.Identical(t, want)
+	}
+	return false
+}
+
+// readableGetterType returns the result type of a getter named name declared on
+// def or the type underlying it, with the generic substitution accumulated down
+// the alias chain and self resolved to recv (the original receiver). It walks the
+// body — an application binds its arguments to the next definition's parameters,
+// so a getter inherited through StringBox = Box<string> reads string, not the
+// parameter T — without consulting def's interfaces. A method or setter of the
+// same name is the wrong kind and is skipped.
+func readableGetterType(reg *builtin.Registry, recv ir.Type, def *ir.TypeDef, name string, subst map[string]ir.Type, seen map[*ir.TypeDef]bool) (ir.Type, bool) {
+	if def == nil || seen[def] {
+		return nil, false
+	}
+	seen[def] = true
+	for _, m := range def.Methods {
+		if m.Name == name && m.Kind == ir.MethodGetter {
+			return types.SubstituteSelf(types.Substitute(m.Result, subst), recv), true
+		}
+	}
+	if def.Builtin {
+		return nil, false
+	}
+	switch b := def.Body.(type) {
+	case *ir.App:
+		if b.Def != nil && len(b.Def.Params) == len(b.Args) {
+			next := make(map[string]ir.Type, len(b.Args))
+			for i, p := range b.Def.Params {
+				next[p.Name] = types.Substitute(b.Args[i], subst)
+			}
+			return readableGetterType(reg, recv, b.Def, name, next, seen)
+		}
+	case *ir.Named:
+		return readableGetterType(reg, recv, b.Def, name, subst, seen)
+	case *ir.Builtin:
+		if d, ok := reg.Lookup(b.Name); ok {
+			return readableGetterType(reg, recv, d, name, subst, seen)
+		}
+	}
+	return nil, false
+}
+
+// unmetRequirement reports the diagnostic for a required member def does not
+// supply, and whether one is unmet. A readable-member requirement (carried as a
+// getter) demands a field or getter of the required read type; a method
+// requirement demands a method. The interface's own type arguments are
+// substituted into the required type, and self is resolved to the implementing
+// type, so a generic interface (Box<T> requiring value: T) checks against the
+// application's argument and a self-typed requirement (me: self) against the
+// implementor. The span anchors the diagnostic at the impl tag.
+func unmetRequirement(reg *builtin.Registry, def, adef *ir.TypeDef, req *ir.Method, subst map[string]ir.Type, s span) (diagnostic.Diagnostic, bool) {
+	if req.Kind == ir.MethodGetter {
+		want := types.SubstituteSelf(types.Substitute(req.Result, subst), &ir.Named{Def: def})
+		if !suppliesReadable(reg, def, req.Name, want) {
+			return newMissingReadableMemberDiagnostic(s.offset, s.width, def.Name, adef.Name, req.Name, want.String()), true
+		}
+		return diagnostic.Diagnostic{}, false
+	}
+	if !suppliesMethod(reg, def, req.Name, map[*ir.TypeDef]bool{}) {
+		return newMissingRequiredMethodDiagnostic(s.offset, s.width, def.Name, adef.Name, req.Name), true
+	}
+	return diagnostic.Diagnostic{}, false
+}
+
+// interfaceArgSubst maps an interface's type parameters to the arguments of an
+// application of it (Box<string> against interface Box<T> binds T to string), so a
+// requirement written in terms of a parameter is checked against the concrete
+// argument. A bare (non-generic) interface, or one reached as a Named with no
+// arguments, yields an empty substitution.
+func interfaceArgSubst(iface ir.Type, def *ir.TypeDef) map[string]ir.Type {
+	app, ok := iface.(*ir.App)
+	if !ok || len(app.Args) != len(def.Params) {
+		return nil
+	}
+	subst := make(map[string]ir.Type, len(def.Params))
+	for i, p := range def.Params {
+		subst[p.Name] = app.Args[i]
+	}
+	return subst
 }
 
 // bodyDef returns the type definition an underlying-type reference resolves to:

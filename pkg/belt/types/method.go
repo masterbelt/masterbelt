@@ -215,7 +215,45 @@ func receiverSubst(reg *builtin.Registry, recv ir.Type, owner *ir.TypeDef) map[s
 		}
 	}
 	addImplSubst(reg, defOf(reg, recv), subst, map[*ir.TypeDef]bool{})
+	addParentSubst(reg, defOf(reg, recv), owner, subst, map[*ir.TypeDef]bool{})
 	return subst
+}
+
+// addParentSubst binds, into subst, the parameters of the generic parents on the
+// inheritance path from def to owner — the interface that declares the member
+// being resolved — so a member inherited from a generic parent (Child<T>: Has<T>,
+// reading a member declared on Has<U>) reads the child's argument: U is bound from
+// the parent application Has<T> with the child's T already pinned. It reports
+// whether owner is reachable from def. Only the path to owner binds, so an
+// unrelated parent that reuses a parameter name (C<X, Y>: A<X>, B<Y> with both
+// parents' parameter named T) does not pin it for the other — a tentative copy is
+// committed only when the parent leads to owner. seen guards a cyclic graph.
+func addParentSubst(reg *builtin.Registry, def, owner *ir.TypeDef, subst map[string]ir.Type, seen map[*ir.TypeDef]bool) bool {
+	if def == owner {
+		return true
+	}
+	if def == nil || def.Interface == nil || seen[def] {
+		return false
+	}
+	seen[def] = true
+	for _, parent := range def.Interface.Parents {
+		pdef := defOf(reg, parent)
+		if pdef == nil || pdef.Interface == nil {
+			continue
+		}
+		child := make(map[string]ir.Type, len(subst))
+		maps.Copy(child, subst)
+		if app, ok := parent.(*ir.App); ok && len(app.Args) == len(pdef.Params) {
+			for i, p := range pdef.Params {
+				child[p.Name] = Substitute(app.Args[i], subst)
+			}
+		}
+		if addParentSubst(reg, pdef, owner, child, seen) {
+			maps.Copy(subst, child)
+			return true
+		}
+	}
+	return false
 }
 
 // addImplSubst records, into subst, the interface parameters each impl the

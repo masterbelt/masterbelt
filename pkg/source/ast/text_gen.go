@@ -1908,6 +1908,8 @@ func writeInterfaceMember(w *treetext.Writer, n *InterfaceMember, depth int) err
 	w.Line(depth, "Doc: "+treetext.QuoteStrings(n.Doc))
 	w.Line(depth, "Public: "+strconv.FormatBool(n.Public))
 	w.Line(depth, "Name: "+strconv.Quote(n.Name))
+	w.Line(depth, "Readable: "+strconv.FormatBool(n.Readable))
+	w.Line(depth, "HasBody: "+strconv.FormatBool(n.HasBody))
 	if len(n.TypeParams) == 0 {
 		w.Line(depth, "TypeParams: "+treetext.Nil)
 	} else {
@@ -1956,7 +1958,7 @@ func writeInterfaceMember(w *treetext.Writer, n *InterfaceMember, depth int) err
 
 // decodeInterfaceMember builds a InterfaceMember from its element.
 func decodeInterfaceMember(e *treetext.Element) (*InterfaceMember, error) {
-	if err := treetext.ExpectFields(e, "Doc", "Public", "Name", "TypeParams", "Params", "Result", "Body"); err != nil {
+	if err := treetext.ExpectFields(e, "Doc", "Public", "Name", "Readable", "HasBody", "TypeParams", "Params", "Result", "Body"); err != nil {
 		return nil, err
 	}
 	n := &InterfaceMember{}
@@ -1975,7 +1977,17 @@ func decodeInterfaceMember(e *treetext.Element) (*InterfaceMember, error) {
 	} else {
 		n.Name = v
 	}
-	switch f := e.Fields[3]; {
+	if v, err := treetext.Bool(e.Fields[3]); err != nil {
+		return nil, err
+	} else {
+		n.Readable = v
+	}
+	if v, err := treetext.Bool(e.Fields[4]); err != nil {
+		return nil, err
+	} else {
+		n.HasBody = v
+	}
+	switch f := e.Fields[5]; {
 	case f.Inline == treetext.Nil:
 	case f.Items == nil:
 		return nil, fmt.Errorf("treetext: line %d: field %s: expected a list", f.Line, f.Name)
@@ -1998,7 +2010,7 @@ func decodeInterfaceMember(e *treetext.Element) (*InterfaceMember, error) {
 		}
 		n.TypeParams = out
 	}
-	switch f := e.Fields[4]; {
+	switch f := e.Fields[6]; {
 	case f.Inline == treetext.Nil:
 	case f.Items == nil:
 		return nil, fmt.Errorf("treetext: line %d: field %s: expected a list", f.Line, f.Name)
@@ -2021,12 +2033,12 @@ func decodeInterfaceMember(e *treetext.Element) (*InterfaceMember, error) {
 		}
 		n.Params = out
 	}
-	if v, err := decodeTypeExprField(e.Fields[5]); err != nil {
+	if v, err := decodeTypeExprField(e.Fields[7]); err != nil {
 		return nil, err
 	} else {
 		n.Result = v
 	}
-	switch f := e.Fields[6]; {
+	switch f := e.Fields[8]; {
 	case f.Inline == treetext.Nil:
 	case f.Items == nil:
 		return nil, fmt.Errorf("treetext: line %d: field %s: expected a list", f.Line, f.Name)
