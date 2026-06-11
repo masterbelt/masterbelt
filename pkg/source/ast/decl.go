@@ -150,19 +150,23 @@ func NewInterfaceDecl(doc []string, public bool, name string, params []*TypePara
 	return &InterfaceDecl{Doc: doc, Public: public, Name: name, Params: params, Parents: parents, Members: members, syntax: syntax}
 }
 
-// InterfaceMember is one member of an interface: a method signature and, for a
-// provided method, the default Body computed on top of the required methods. A
-// required method has Body nil; a provided method carries a Body the implementor
-// inherits unless it declares the method directly. TypeParams holds the
-// member's own explicit type variables (the A in fold<A>).
+// InterfaceMember is one member of an interface: a requirement, and for a
+// provided method the default Body computed on top of the required members. A
+// member written with a parameter list is a method requirement (Name(...): T);
+// one written without (Readable) is a readable-member requirement (Name: T),
+// satisfied by a field or a getter. A required member has Body nil; a provided
+// method carries a Body the implementor inherits unless it declares the method
+// directly (only a method form takes a body). TypeParams holds the member's own
+// explicit type variables (the A in fold<A>).
 type InterfaceMember struct {
 	Doc        []string
 	Public     bool
 	Name       string
+	Readable   bool         // a readable-member requirement (Name: T, no parameter list)
 	TypeParams []*TypeParam // explicit method type variables (the A in fold<A>), or nil
 	Params     []*ParamDef
 	Result     TypeExpr
-	Body       []Stmt // the provided default body, or nil for a required method
+	Body       []Stmt // the provided default body, or nil for a required member
 	syntax     *cst.Node
 }
 
@@ -171,12 +175,12 @@ func (m *InterfaceMember) Syntax() *cst.Node { return m.syntax }
 func (m *InterfaceMember) node()             {}
 
 // Provided reports whether the member is a provided method (it carries a default
-// body); a required method has no body.
+// body); a required member has no body.
 func (m *InterfaceMember) Provided() bool { return m.Body != nil }
 
 // NewInterfaceMember builds an InterfaceMember node.
-func NewInterfaceMember(doc []string, public bool, name string, typeParams []*TypeParam, params []*ParamDef, result TypeExpr, body []Stmt, syntax *cst.Node) *InterfaceMember {
-	return &InterfaceMember{Doc: doc, Public: public, Name: name, TypeParams: typeParams, Params: params, Result: result, Body: body, syntax: syntax}
+func NewInterfaceMember(doc []string, public bool, name string, readable bool, typeParams []*TypeParam, params []*ParamDef, result TypeExpr, body []Stmt, syntax *cst.Node) *InterfaceMember {
+	return &InterfaceMember{Doc: doc, Public: public, Name: name, Readable: readable, TypeParams: typeParams, Params: params, Result: result, Body: body, syntax: syntax}
 }
 
 // AssertDecl is a compile-time assertion: an optional run of doc-comment lines

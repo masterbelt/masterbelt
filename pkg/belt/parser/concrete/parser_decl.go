@@ -309,13 +309,15 @@ func (p *parser) parseInterfaceDecl(lead []cst.Green) *cst.Node {
 // parseInterfaceMember parses one member of an interface, prepending the
 // already-collected leading trivia:
 //
-//	[pub] Name [GenericParams] ParamList ":" TypeExpr [Block]
+//	[pub] Name [GenericParams] [ParamList] ":" TypeExpr [Block]
 //
-// A member without a body is a required method (the implementor supplies it); a
-// member with a body Block is a provided method (the default). The result type
-// is required, mirroring a top-level function. The optional GenericParams give
-// a member its own type variables (the A in fold<A>). The cursor sits on pub or
-// the member's name.
+// With a ParamList it is a method requirement (Name(...): T); without one it is a
+// readable-member requirement (Name: T), satisfied by a field or a getter. A
+// member without a body is required (the implementor supplies it); a member with
+// a body Block is a provided method (the default — only a method form takes one).
+// The result type is required, mirroring a top-level function. The optional
+// GenericParams give a member its own type variables (the A in fold<A>). The
+// cursor sits on pub or the member's name.
 func (p *parser) parseInterfaceMember(lead []cst.Green) *cst.Node {
 	children := lead
 	if p.kind() == token.Pub {
@@ -334,7 +336,9 @@ func (p *parser) parseInterfaceMember(lead []cst.Green) *cst.Node {
 	if p.peekSignificant() == token.LParen {
 		p.skipTrivia(&children)
 		children = append(children, p.parseParamList(true))
-	} else {
+	} else if p.peekSignificant() != token.Colon {
+		// Neither a method's "(" nor a readable member's ":" follows the name; a
+		// ":" with no ParamList is the readable-member form, parsed by the block below.
 		p.reportUnexpected()
 	}
 	if p.peekSignificant() == token.Colon {

@@ -139,7 +139,7 @@ module.exports = grammar({
         optional(kw.pub),
         field("name", $.identifier),
         optional($.generic_params),
-        $.param_list,
+        optional($.param_list),
         op.Colon,
         field("return", $._type),
         optional($.block),
