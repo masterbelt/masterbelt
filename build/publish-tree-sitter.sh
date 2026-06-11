@@ -215,7 +215,20 @@ pkg.keywords = ['incremental', 'parsing', 'tree-sitter', 'masterbelt', 'parser',
 pkg.main = 'bindings/node';
 pkg.types = 'bindings/node';
 pkg.dependencies = { 'node-addon-api': '^8.2.2', 'node-gyp-build': '^4.8.2' };
-pkg.peerDependencies = { 'tree-sitter': '^0.21.1' };
+
+// The tree-sitter runtime peer must be able to load this parser's ABI. Runtimes
+// are not forward-compatible — a parser generated for a newer ABI than the
+// runtime supports fails at setLanguage — so the peer floor is tied to the
+// committed parser's LANGUAGE_VERSION. ABI 15 is first loadable by the Node
+// runtime tree-sitter@0.25.0. Assert the ABI is the one this floor targets, so a
+// CLI ABI bump fails the assembly here instead of shipping a mismatched range.
+const EXPECTED_ABI = 15; // tree-sitter@^0.25.0 loads ABI 15
+const abiMatch = fs.readFileSync(dir + '/src/parser.c', 'utf8').match(/#define\s+LANGUAGE_VERSION\s+(\d+)/);
+const abi = abiMatch ? Number(abiMatch[1]) : NaN;
+if (abi !== EXPECTED_ABI) {
+  throw new Error(`src/parser.c ABI ${abi} != ${EXPECTED_ABI}: raise the tree-sitter peer range to a runtime that loads ABI ${abi} and bump EXPECTED_ABI`);
+}
+pkg.peerDependencies = { 'tree-sitter': '^0.25.0' };
 pkg.peerDependenciesMeta = { 'tree-sitter': { optional: true } };
 pkg.devDependencies = Object.assign({}, pkg.devDependencies, { prebuildify: '^6.0.1' });
 pkg.scripts = Object.assign({}, pkg.scripts, { install: 'node-gyp-build' });
