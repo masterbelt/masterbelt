@@ -103,9 +103,11 @@ func cellsOf(reader *encoding_csv.Reader, record []string) []master.Cell {
 // depends on it.
 func delimiter(spec master.SourceSpec, diags *diagnostic.List) (rune, bool) {
 	d, set := spec.Options["delimiter"]
-	if !set || d == "" {
+	if !set {
 		return ',', true
 	}
+	// Only an absent option falls back to a comma; an option set to "" (or to
+	// more than one character) is a malformed configuration, not a default.
 	runes := []rune(d)
 	if len(runes) != 1 {
 		diags.Add(master.SourceUnreadable(spec.Offset, spec.Width, spec.Display, "delimiter must be a single character"))

@@ -73,6 +73,14 @@ func TestReadBadDelimiter(t *testing.T) {
 	singleCode(t, diags, master.CodeSourceUnreadable)
 }
 
+func TestReadEmptyDelimiterRejected(t *testing.T) {
+	// An explicitly empty delimiter is a malformed configuration, not a request
+	// for the comma default.
+	spec := write(t, "id,name\n1,Heal\n", map[string]string{"delimiter": ""})
+	_, diags := New().Read(spec)
+	singleCode(t, diags, master.CodeSourceUnreadable)
+}
+
 func TestReadMissingFile(t *testing.T) {
 	spec := master.SourceSpec{Path: filepath.Join(t.TempDir(), "absent.csv"), Display: "absent.csv", Offset: 7, Width: 3}
 	table, diags := New().Read(spec)
