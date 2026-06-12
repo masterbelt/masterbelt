@@ -15,6 +15,12 @@ import "github.com/masterbelt/masterbelt/pkg/diagnostic"
 // diagnostic model does not address; the precise data location travels in the
 // message instead (see Origin and SourceSpec).
 
+// UnknownFormat reports that a source declaration named a format the toolchain
+// has no reader for.
+func UnknownFormat(offset, width int, format string) diagnostic.Diagnostic {
+	return newUnknownFormatDiagnostic(offset, width, format)
+}
+
 // SourceUnreadable reports that a format could not read a source at all — a
 // missing file, an unreadable one, a malformed body — detail carrying the
 // underlying reason.

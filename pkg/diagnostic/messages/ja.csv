@@ -129,6 +129,7 @@ project.config.entry_not_found,エントリファイルが見つかりません:
 project.config.profile_missing_entry,プロファイル {profile} に entry が指定されていません
 project.config.profile_entry_not_found,プロファイル {profile} のエントリファイルが見つかりません: {path}
 project.config.unknown_profile,プロファイル {profile} は masterbelt.toml に定義されていません
+master.unknown_format,ソースフォーマット {format} は登録されていません
 master.source_unreadable,ソース {path} を読み込めません: {detail}
 master.missing_column,ソース {path} にフィールド {field} に対応する列がありません
 master.unsupported_field_type,フィールド {field} の型 {typ} は csv フォーマットではまだ読み込めません

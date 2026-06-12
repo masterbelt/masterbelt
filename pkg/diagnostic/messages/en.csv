@@ -129,6 +129,7 @@ project.config.entry_not_found,entry file not found: {path}
 project.config.profile_missing_entry,profile {profile} does not set entry
 project.config.profile_entry_not_found,entry file not found for profile {profile}: {path}
 project.config.unknown_profile,profile {profile} is not defined in masterbelt.toml
+master.unknown_format,no source format named {format}
 master.source_unreadable,cannot read source {path}: {detail}
 master.missing_column,source {path} has no column for field {field}
 master.unsupported_field_type,field {field} has type {typ} which the csv format cannot read yet

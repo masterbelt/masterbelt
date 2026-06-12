@@ -1031,6 +1031,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "cannot read source " + f["path"].String() + ": " + f["detail"].String()
 		}
 	},
+	"master.unknown_format": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "ソースフォーマット " + f["format"].String() + " は登録されていません"
+		default:
+			return "no source format named " + f["format"].String()
+		}
+	},
 	"master.unknown_option": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":

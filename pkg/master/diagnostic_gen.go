@@ -14,6 +14,7 @@ const (
 	CodeMissingColumn        diagnostic.Code = "master.missing_column"
 	CodeOptionTypeMismatch   diagnostic.Code = "master.option_type_mismatch"
 	CodeSourceUnreadable     diagnostic.Code = "master.source_unreadable"
+	CodeUnknownFormat        diagnostic.Code = "master.unknown_format"
 	CodeUnknownOption        diagnostic.Code = "master.unknown_option"
 	CodeUnsupportedFieldType diagnostic.Code = "master.unsupported_field_type"
 )
@@ -95,6 +96,20 @@ func newSourceUnreadableDiagnostic(offset int, width int, path string, detail st
 		Severity: diagnostic.Error,
 		Code:     CodeSourceUnreadable,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeSourceUnreadable, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newUnknownFormatDiagnostic(offset int, width int, format string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"format": diagnostic.Str(format),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeUnknownFormat,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeUnknownFormat, fields),
 		Fields:   fields,
 		Offset:   offset,
 		Width:    width,
