@@ -73,7 +73,7 @@
 //	RecordLit     := [Ident] "{" ( RecordField [","] )* "}"
 //	RecordField   := Ident ":" Expr
 //	NameRef       := Ident
-//	Literal       := Int | String | DatetimeLit | DurationLit | "true" | "false" | "null"
+//	Literal       := Int | BinInt | OctInt | HexInt | String | DatetimeLit | DurationLit | "true" | "false" | "null"
 //
 // The binary levels are parsed by precedence climbing (parseExpr) rather than a
 // function per level; the binaryPrec table is the single source of operator

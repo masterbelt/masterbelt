@@ -16,9 +16,7 @@ File
       Assign "="
       Whitespace " "
       Literal
-        Int "0"
-  Error
-    Ident "b1010"
+        BinInt "0b1010"
   ConstDecl
     Newline "\n"
     Const "const"
@@ -29,9 +27,7 @@ File
       Assign "="
       Whitespace " "
       Literal
-        Int "0"
-  Error
-    Ident "o17"
+        OctInt "0o17"
   ConstDecl
     Newline "\n"
     Const "const"
@@ -42,9 +38,7 @@ File
       Assign "="
       Whitespace " "
       Literal
-        Int "0"
-  Error
-    Ident "xFF"
+        HexInt "0xFF"
   ConstDecl
     Newline "\n"
     Newline "\n"
@@ -58,9 +52,7 @@ File
       Assign "="
       Whitespace " "
       Literal
-        Int "0"
-  Error
-    Ident "XCAFE"
+        HexInt "0XCAFE"
   ConstDecl
     Newline "\n"
     Const "const"
@@ -71,9 +63,7 @@ File
       Assign "="
       Whitespace " "
       Literal
-        Int "0"
-  Error
-    Ident "B1010"
+        BinInt "0B1010"
   AssertDecl
     Newline "\n"
     Newline "\n"
@@ -83,38 +73,38 @@ File
     Newline "\n"
     Assert "assert"
     Whitespace " "
-    Literal
-      Int "0"
-  Error
-    Ident "b1010"
-    Whitespace " "
-    EqEq "=="
-    Whitespace " "
-    Int "10"
+    BinaryExpr
+      Literal
+        BinInt "0b1010"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "10"
   AssertDecl
     Newline "\n"
     Assert "assert"
     Whitespace " "
-    Literal
-      Int "0"
-  Error
-    Ident "o17"
-    Whitespace " "
-    EqEq "=="
-    Whitespace " "
-    Int "15"
+    BinaryExpr
+      Literal
+        OctInt "0o17"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "15"
   AssertDecl
     Newline "\n"
     Assert "assert"
     Whitespace " "
-    Literal
-      Int "0"
-  Error
-    Ident "xFF"
-    Whitespace " "
-    EqEq "=="
-    Whitespace " "
-    Int "255"
+    BinaryExpr
+      Literal
+        HexInt "0xFF"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "255"
   ConstDecl
     Newline "\n"
     Newline "\n"
@@ -125,29 +115,20 @@ File
     Initializer
       Assign "="
       Whitespace " "
-      Literal
-        Int "0"
-  Error
-    Ident "x10"
-    Whitespace " "
-    Plus "+"
-    Whitespace " "
-    Int "0"
-    Ident "o10"
-    Whitespace " "
-    Plus "+"
-    Whitespace " "
-    Int "0"
-    Ident "b10"
+      BinaryExpr
+        BinaryExpr
+          Literal
+            HexInt "0x10"
+          Whitespace " "
+          Plus "+"
+          Whitespace " "
+          Literal
+            OctInt "0o10"
+        Whitespace " "
+        Plus "+"
+        Whitespace " "
+        Literal
+          BinInt "0b10"
   Newline "\n"
   EOF ""
 # diagnostics
-error[belt.parser.concrete.unexpected_token] 5:14 unexpected token: Ident
-error[belt.parser.concrete.unexpected_token] 6:14 unexpected token: Ident
-error[belt.parser.concrete.unexpected_token] 7:14 unexpected token: Ident
-error[belt.parser.concrete.unexpected_token] 10:19 unexpected token: Ident
-error[belt.parser.concrete.unexpected_token] 11:19 unexpected token: Ident
-error[belt.parser.concrete.unexpected_token] 15:9 unexpected token: Ident
-error[belt.parser.concrete.unexpected_token] 16:9 unexpected token: Ident
-error[belt.parser.concrete.unexpected_token] 17:9 unexpected token: Ident
-error[belt.parser.concrete.unexpected_token] 19:14 unexpected token: Ident
