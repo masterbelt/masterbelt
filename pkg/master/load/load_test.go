@@ -125,6 +125,17 @@ func TestLoadLocatorEscapesRoot(t *testing.T) {
 	}
 }
 
+func TestLoadAbsoluteLocatorRejected(t *testing.T) {
+	// An absolute locator is refused rather than silently joined under the root
+	// and read with a misleading absolute-looking name.
+	belt := "master M {\n  record { id: int }\n  primary id\n  source { csv \"/etc/data.csv\" }\n}\n"
+	loaded, diags := run(t, belt, nil, nil)
+	single(t, diags, master.CodeLocatorEscapesRoot)
+	if len(loaded) != 0 {
+		t.Errorf("loaded = %v, want nothing for an absolute locator", loaded)
+	}
+}
+
 func TestLoadSkipsCoercionOnReadError(t *testing.T) {
 	// The csv is absent: the read fails, and the failure is reported on its own
 	// — not buried under a missing-column error for every field, nor an empty

@@ -97,7 +97,7 @@ func readMaster(def *ir.TypeDef, doc *abstract.Document, env eval.GraphEnv, root
 		diags = append(diags, optDiags...)
 
 		rel := filepath.Join(bases[entry.Format], entry.Locator)
-		if escapesRoot(rel) {
+		if filepath.IsAbs(entry.Locator) || escapesRoot(rel) {
 			diags = append(diags, master.LocatorEscapesRoot(offset, width, entry.Locator))
 			continue
 		}
@@ -129,7 +129,10 @@ func readMaster(def *ir.TypeDef, doc *abstract.Document, env eval.GraphEnv, root
 // checkRefinements runs each refined field's predicate over its typed cells,
 // reporting the cell a value that fails it came from. Coercion runs no predicate
 // — it needs the engine's evaluator, reached here through the program's eval env
-// — so this is where a where-clause range check fires.
+// — so this is where a where-clause range check fires. Only a predicate the
+// engine compiled to a usable form (def.Where set) is run; the engine compiles
+// one that reads self, literals, and self's own methods, so it folds the same in
+// any of the program's file envs.
 func checkRefinements(typed master.Table, fields []ir.Field, spec master.SourceSpec, env eval.GraphEnv) []diagnostic.Diagnostic {
 	byName := make(map[string]ir.Field, len(fields))
 	for _, f := range fields {
