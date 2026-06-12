@@ -45,10 +45,27 @@ type Config struct {
 	Profiles      map[string]ProfileConfig `toml:"profile"`
 }
 
-// ProfileConfig is one profile's settings: an entry point, relative to the
-// project root.
+// ProfileConfig is one profile's settings: an entry point relative to the
+// project root, and the per-format source settings the data layer reads.
+//
+//	entry = "src/main.belt"
+//
+//	[source.csv]                # settings for the csv format
+//	basePath = "data/csv"       # where its locators resolve, under the root
+//
+// Source is keyed by format name — the same identifier the source grammar
+// (source { csv "..." }) and the format registry use — so a new format adds a
+// section without a schema change.
 type ProfileConfig struct {
-	Entry string `toml:"entry"`
+	Entry  string                  `toml:"entry"`
+	Source map[string]SourceConfig `toml:"source"`
+}
+
+// SourceConfig is one format's source settings. BasePath is the directory the
+// format's locators resolve against, relative to the project root; empty (the
+// section absent or the key unset) means the root itself.
+type SourceConfig struct {
+	BasePath string `toml:"basePath"`
 }
 
 // Load reads and parses the manifest at path. A file that exists but cannot
@@ -89,33 +106,85 @@ func Parse(src []byte) (Config, diagnostic.List) {
 	if cfg.Entry != "" {
 		validateEntry(cfg.Entry, "", &diags)
 	}
+	validateSources(cfg.Source, "", &diags)
 	for _, name := range slices.Sorted(maps.Keys(cfg.Profiles)) {
 		profile := cfg.Profiles[name]
 		if profile.Entry == "" {
 			diags.Add(newProfileMissingEntryDiagnostic(0, 0, name))
-			continue
+		} else {
+			validateEntry(profile.Entry, name, &diags)
 		}
-		validateEntry(profile.Entry, name, &diags)
+		validateSources(profile.Source, name, &diags)
 	}
 	return cfg, diags
 }
 
-// validateEntry checks one profile's entry path policy: relative to the root
-// and staying inside it. profile is "" for the default profile.
-func validateEntry(entry, profile string, diags *diagnostic.List) {
-	var problem string
-	switch cleaned := path.Clean(entry); {
-	case path.IsAbs(entry):
-		problem = "entry must be relative to the project root"
+// confinedPath returns the reason p breaks the root-confinement policy every
+// manifest path obeys — relative to the root, not escaping it — labelled by
+// what kind of path it is (an entry, a base path), or "" when it is allowed.
+// An empty path is reported as allowed; what it means is the caller's (an entry
+// requires one, a base path defaults to the root).
+func confinedPath(p, label string) string {
+	if p == "" {
+		return ""
+	}
+	// A manifest path is meant to be portable, so a backslash is treated as a
+	// separator on every platform (not only where it is the OS separator): path's
+	// forward-slash rules would otherwise treat "..\\shared" as one ordinary
+	// segment, slipping the check while filepath.Join resolves it outside the
+	// root on Windows.
+	slashed := strings.ReplaceAll(p, "\\", "/")
+	switch cleaned := path.Clean(slashed); {
+	case absolutePath(slashed):
+		return label + " must be relative to the project root"
 	case cleaned == ".." || strings.HasPrefix(cleaned, "../"):
-		problem = "entry must not escape the project root"
+		return label + " must not escape the project root"
 	default:
+		return ""
+	}
+}
+
+// absolutePath reports whether a slash-normalized manifest path is absolute on
+// any platform: a leading slash (a Unix path, or a //host UNC share) or a
+// Windows drive prefix (C:/...). path.IsAbs alone misses the drive form, so a
+// drive-qualified path would slip the relative-only policy; the check is
+// cross-platform on purpose, so a manifest is judged the same wherever it runs.
+func absolutePath(slashed string) bool {
+	if path.IsAbs(slashed) {
+		return true
+	}
+	return len(slashed) >= 2 && slashed[1] == ':' &&
+		(slashed[0] >= 'A' && slashed[0] <= 'Z' || slashed[0] >= 'a' && slashed[0] <= 'z')
+}
+
+// validateEntry checks one profile's entry path policy. profile is "" for the
+// default profile.
+func validateEntry(entry, profile string, diags *diagnostic.List) {
+	problem := confinedPath(entry, "entry")
+	if problem == "" {
 		return
 	}
 	if profile != "" {
 		problem = fmt.Sprintf("profile %q: %s", profile, problem)
 	}
 	diags.Add(newInvalidDiagnostic(0, 0, problem))
+}
+
+// validateSources checks each format's base-path policy, the same confinement
+// an entry obeys. Iteration is sorted so a manifest with several offending
+// sections reports them in a stable order.
+func validateSources(sources map[string]SourceConfig, profile string, diags *diagnostic.List) {
+	for _, format := range slices.Sorted(maps.Keys(sources)) {
+		problem := confinedPath(sources[format].BasePath, "base path")
+		if problem == "" {
+			continue
+		}
+		problem = fmt.Sprintf("source %q: %s", format, problem)
+		if profile != "" {
+			problem = fmt.Sprintf("profile %q: %s", profile, problem)
+		}
+		diags.Add(newInvalidDiagnostic(0, 0, problem))
+	}
 }
 
 // invalid adapts a TOML decode error to the config.invalid diagnostic. The

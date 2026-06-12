@@ -34,9 +34,13 @@ import (
 // are two distinct FileIDs.
 type FileID string
 
-// fileID canonicalizes a root-relative path as written in the manifest.
+// fileID canonicalizes a root-relative path as written in the manifest (an
+// entry) or a use declaration. A backslash is treated as a separator on every
+// platform — a manifest or source path is meant to be portable, and
+// filepath.ToSlash converts only the host's separator — so "src\main.belt" and
+// "src/main.belt" name the same file wherever the project is opened.
 func fileID(rel string) FileID {
-	return FileID(path.Clean(filepath.ToSlash(rel)))
+	return FileID(path.Clean(strings.ReplaceAll(filepath.ToSlash(rel), "\\", "/")))
 }
 
 // File is one source file of the project: its identity, its absolute location

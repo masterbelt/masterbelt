@@ -5,6 +5,7 @@ import (
 	"slices"
 
 	"github.com/masterbelt/masterbelt/pkg/belt/builtin"
+	"github.com/masterbelt/masterbelt/pkg/belt/eval"
 	"github.com/masterbelt/masterbelt/pkg/belt/lint"
 	"github.com/masterbelt/masterbelt/pkg/belt/parser/abstract"
 	"github.com/masterbelt/masterbelt/pkg/belt/types"
@@ -85,6 +86,17 @@ func (p *Program) Files() []FileID {
 
 // Module returns a file's resolved, typed IR from the last Refresh.
 func (p *Program) Module(id FileID) *ir.Module { return p.modules[id] }
+
+// EvalEnv returns the evaluation environment a value graph in file folds in —
+// the builtin registry and the file's type universe, the same env the post-check
+// folds use. It is the seam a layer above the engine (the master data layer,
+// checking a coerced cell value against its field type's refinement predicate)
+// reads to run eval.GraphPredicate against the resolved definitions, without
+// reaching into the engine's internals. The env is a thin view over the live
+// query database, so it reflects the last Refresh.
+func (p *Program) EvalEnv(file FileID) eval.GraphEnv {
+	return graphFoldEnv{q: engineQueries{p.db}, file: file}
+}
 
 // Stats returns the query-engine work of the last Refresh: per-kind counts of
 // the queries recomputed versus reused. It is a side-channel read — calling it

@@ -129,3 +129,15 @@ project.config.entry_not_found,エントリファイルが見つかりません:
 project.config.profile_missing_entry,プロファイル {profile} に entry が指定されていません
 project.config.profile_entry_not_found,プロファイル {profile} のエントリファイルが見つかりません: {path}
 project.config.unknown_profile,プロファイル {profile} は masterbelt.toml に定義されていません
+master.unknown_format,ソースフォーマット {format} は登録されていません
+master.locator_escapes_root,ソースロケータ {path} はソースディレクトリの外を指しています
+master.source_unreadable,ソース {path} を読み込めません: {detail}
+master.missing_column,ソース {path} にフィールド {field} に対応する列がありません
+master.unsupported_field_type,フィールド {field} の型 {typ} は csv フォーマットではまだ読み込めません
+master.unsupported_row_type,master {master} の行型はまだ読み込めません
+master.cell_type_mismatch,"{path}:{row},{col}: {value} はフィールド {field} の型 {typ} として不正です"
+master.cell_refinement,"{path}:{row},{col}: {value} はフィールド {field} の型 {typ} を満たしません"
+master.unknown_option,フォーマット {format} にオプション {key} はありません
+master.option_type_mismatch,オプション {key} は {typ} でなければなりません
+master.duplicate_option,フォーマット {format} でオプション {key} が複数回指定されています
+master.duplicate_row_field,master {master} でフィールド {field} が複数回宣言されています
