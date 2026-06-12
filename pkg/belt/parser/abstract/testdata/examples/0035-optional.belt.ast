@@ -17,6 +17,7 @@ File
         Projections: ~
       Value: IntLit
         Text: "5"
+        Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -45,6 +46,7 @@ File
         Arguments:
           IntLit
             Text: "5"
+            Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -69,6 +71,7 @@ File
           NullLit
           IntLit
             Text: "99"
+            Base: 0
       Builtin: false
   Types: ~
   Enums: ~
@@ -126,6 +129,7 @@ File
                 ReturnStmt
                   Value: IntLit
                     Text: "0"
+                    Base: 0
           Else: ~
           AfterElse: ~
     FuncDecl
@@ -192,11 +196,13 @@ File
             Arguments:
               IntLit
                 Text: "5"
+                Base: 0
           Member: Identifier
             Name: "eql"
         Arguments:
           IntLit
             Text: "5"
+            Base: 0
     AssertDecl
       Doc: ~
       Cond: CallExpr
@@ -211,6 +217,7 @@ File
         Arguments:
           IntLit
             Text: "0"
+            Base: 0
     AssertDecl
       Doc: ~
       Cond: CallExpr
@@ -221,13 +228,16 @@ File
             Arguments:
               IntLit
                 Text: "7"
+                Base: 0
               IntLit
                 Text: "99"
+                Base: 0
           Member: Identifier
             Name: "eql"
         Arguments:
           IntLit
             Text: "7"
+            Base: 0
     AssertDecl
       Doc: ~
       Cond: CallExpr
@@ -239,9 +249,11 @@ File
               NullLit
               IntLit
                 Text: "99"
+                Base: 0
           Member: Identifier
             Name: "eql"
         Arguments:
           IntLit
             Text: "99"
+            Base: 0
   Masters: ~

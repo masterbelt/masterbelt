@@ -1,0 +1,19 @@
+// Radix-prefixed integer literals: 0b binary, 0o octal, 0x hex. Each is
+// just another spelling of an integer — the prefix and any hex digits are
+// case-insensitive (0X, 0B, 0O and A-F all accepted).
+
+const Bin = 0b1010
+const Oct = 0o17
+const Hex = 0xFF
+
+// Uppercase prefix and uppercase hex digits spell the same value.
+const HexUpper = 0XCAFE
+const BinUpper = 0B1010
+
+// They are ordinary integers: equal to their decimal value and usable in
+// arithmetic like any other int.
+assert 0b1010 == 10
+assert 0o17 == 15
+assert 0xFF == 255
+
+const Sum = 0x10 + 0o10 + 0b10

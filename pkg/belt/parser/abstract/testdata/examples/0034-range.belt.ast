@@ -44,8 +44,10 @@ File
             Arguments:
               IntLit
                 Text: "0"
+                Base: 0
               IntLit
                 Text: "10"
+                Base: 0
           Member: Identifier
             Name: "count"
         Arguments: ~
@@ -63,8 +65,10 @@ File
             Arguments:
               IntLit
                 Text: "5"
+                Base: 0
               IntLit
                 Text: "4"
+                Base: 0
           Member: Identifier
             Name: "count"
         Arguments: ~
@@ -82,8 +86,10 @@ File
             Arguments:
               IntLit
                 Text: "0"
+                Base: 0
               IntLit
                 Text: "10"
+                Base: 0
           Member: Identifier
             Name: "any"
         Arguments:
@@ -112,6 +118,7 @@ File
                   Arguments:
                     IntLit
                       Text: "8"
+                      Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -126,8 +133,10 @@ File
             Arguments:
               IntLit
                 Text: "0"
+                Base: 0
               IntLit
                 Text: "10"
+                Base: 0
           Member: Identifier
             Name: "all"
         Arguments:
@@ -156,6 +165,7 @@ File
                   Arguments:
                     IntLit
                       Text: "0"
+                      Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -170,8 +180,10 @@ File
             Arguments:
               IntLit
                 Text: "0"
+                Base: 0
               IntLit
                 Text: "5"
+                Base: 0
           Member: Identifier
             Name: "map"
         Arguments:
@@ -200,6 +212,7 @@ File
                   Arguments:
                     IntLit
                       Text: "2"
+                      Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -214,8 +227,10 @@ File
             Arguments:
               IntLit
                 Text: "0"
+                Base: 0
               IntLit
                 Text: "10"
+                Base: 0
           Member: Identifier
             Name: "filter"
         Arguments:
@@ -246,11 +261,13 @@ File
                       Arguments:
                         IntLit
                           Text: "2"
+                          Base: 0
                     Member: Identifier
                       Name: "eql"
                   Arguments:
                     IntLit
                       Text: "0"
+                      Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -265,8 +282,10 @@ File
             Arguments:
               IntLit
                 Text: "3"
+                Base: 0
               IntLit
                 Text: "7"
+                Base: 0
           Member: Identifier
             Name: "values"
         Arguments: ~
@@ -284,8 +303,10 @@ File
             Arguments:
               IntLit
                 Text: "3"
+                Base: 0
               IntLit
                 Text: "7"
+                Base: 0
           Member: Identifier
             Name: "keys"
         Arguments: ~
@@ -303,13 +324,16 @@ File
             Arguments:
               IntLit
                 Text: "0"
+                Base: 0
               IntLit
                 Text: "4"
+                Base: 0
           Member: Identifier
             Name: "fold"
         Arguments:
           IntLit
             Text: "0"
+            Base: 0
           FuncLit
             Params:
               ParamDef
@@ -373,6 +397,7 @@ File
           Type: ~
           Value: IntLit
             Text: "0"
+            Base: 0
         ForStmt
           Var: "i"
           Kind: 0
@@ -382,8 +407,10 @@ File
             Arguments:
               IntLit
                 Text: "0"
+                Base: 0
               IntLit
                 Text: "10"
+                Base: 0
           Body:
             AssignStmt
               Target: Identifier
@@ -419,6 +446,7 @@ File
           Type: ~
           Value: IntLit
             Text: "0"
+            Base: 0
         ForStmt
           Var: "i"
           Kind: 1
@@ -428,8 +456,10 @@ File
             Arguments:
               IntLit
                 Text: "5"
+                Base: 0
               IntLit
                 Text: "10"
+                Base: 0
           Body:
             AssignStmt
               Target: Identifier
@@ -465,6 +495,7 @@ File
           Type: ~
           Value: IntLit
             Text: "100"
+            Base: 0
         ForStmt
           Var: "i"
           Kind: 0
@@ -474,8 +505,10 @@ File
             Arguments:
               IntLit
                 Text: "10"
+                Base: 0
               IntLit
                 Text: "9"
+                Base: 0
           Body:
             AssignStmt
               Target: Identifier
@@ -506,6 +539,7 @@ File
         Arguments:
           IntLit
             Text: "55"
+            Base: 0
     AssertDecl
       Doc: ~
       Cond: CallExpr
@@ -519,6 +553,7 @@ File
         Arguments:
           IntLit
             Text: "15"
+            Base: 0
     AssertDecl
       Doc: ~
       Cond: CallExpr
@@ -532,6 +567,7 @@ File
         Arguments:
           IntLit
             Text: "100"
+            Base: 0
     AssertDecl
       Doc: ~
       Cond: CallExpr
@@ -544,8 +580,10 @@ File
                 Arguments:
                   IntLit
                     Text: "0"
+                    Base: 0
                   IntLit
                     Text: "10"
+                    Base: 0
               Member: Identifier
                 Name: "count"
             Arguments: ~
@@ -554,6 +592,7 @@ File
         Arguments:
           IntLit
             Text: "11"
+            Base: 0
     AssertDecl
       Doc: ~
       Cond: CallExpr
@@ -566,8 +605,10 @@ File
                 Arguments:
                   IntLit
                     Text: "5"
+                    Base: 0
                   IntLit
                     Text: "4"
+                    Base: 0
               Member: Identifier
                 Name: "count"
             Arguments: ~
@@ -576,6 +617,7 @@ File
         Arguments:
           IntLit
             Text: "0"
+            Base: 0
     AssertDecl
       Doc: ~
       Cond: CallExpr
@@ -586,8 +628,10 @@ File
             Arguments:
               IntLit
                 Text: "0"
+                Base: 0
               IntLit
                 Text: "10"
+                Base: 0
           Member: Identifier
             Name: "any"
         Arguments:
@@ -616,6 +660,7 @@ File
                   Arguments:
                     IntLit
                       Text: "8"
+                      Base: 0
     AssertDecl
       Doc: ~
       Cond: CallExpr
@@ -626,8 +671,10 @@ File
             Arguments:
               IntLit
                 Text: "0"
+                Base: 0
               IntLit
                 Text: "10"
+                Base: 0
           Member: Identifier
             Name: "all"
         Arguments:
@@ -656,6 +703,7 @@ File
                   Arguments:
                     IntLit
                       Text: "0"
+                      Base: 0
     AssertDecl
       Doc: ~
       Cond: CallExpr
@@ -670,8 +718,10 @@ File
                     Arguments:
                       IntLit
                         Text: "0"
+                        Base: 0
                       IntLit
                         Text: "5"
+                        Base: 0
                   Member: Identifier
                     Name: "map"
                 Arguments:
@@ -700,6 +750,7 @@ File
                           Arguments:
                             IntLit
                               Text: "2"
+                              Base: 0
               Member: Identifier
                 Name: "len"
             Arguments: ~
@@ -708,6 +759,7 @@ File
         Arguments:
           IntLit
             Text: "6"
+            Base: 0
     AssertDecl
       Doc: ~
       Cond: CallExpr
@@ -722,8 +774,10 @@ File
                     Arguments:
                       IntLit
                         Text: "0"
+                        Base: 0
                       IntLit
                         Text: "5"
+                        Base: 0
                   Member: Identifier
                     Name: "map"
                 Arguments:
@@ -752,11 +806,13 @@ File
                           Arguments:
                             IntLit
                               Text: "2"
+                              Base: 0
               Member: Identifier
                 Name: "fold"
             Arguments:
               IntLit
                 Text: "0"
+                Base: 0
               FuncLit
                 Params:
                   ParamDef
@@ -801,6 +857,7 @@ File
         Arguments:
           IntLit
             Text: "30"
+            Base: 0
     AssertDecl
       Doc: ~
       Cond: CallExpr
@@ -815,8 +872,10 @@ File
                     Arguments:
                       IntLit
                         Text: "0"
+                        Base: 0
                       IntLit
                         Text: "10"
+                        Base: 0
                   Member: Identifier
                     Name: "filter"
                 Arguments:
@@ -847,11 +906,13 @@ File
                               Arguments:
                                 IntLit
                                   Text: "2"
+                                  Base: 0
                             Member: Identifier
                               Name: "eql"
                           Arguments:
                             IntLit
                               Text: "0"
+                              Base: 0
               Member: Identifier
                 Name: "len"
             Arguments: ~
@@ -860,6 +921,7 @@ File
         Arguments:
           IntLit
             Text: "6"
+            Base: 0
     AssertDecl
       Doc: ~
       Cond: CallExpr
@@ -874,8 +936,10 @@ File
                     Arguments:
                       IntLit
                         Text: "3"
+                        Base: 0
                       IntLit
                         Text: "7"
+                        Base: 0
                   Member: Identifier
                     Name: "values"
                 Arguments: ~
@@ -887,6 +951,7 @@ File
         Arguments:
           IntLit
             Text: "5"
+            Base: 0
     AssertDecl
       Doc: ~
       Cond: CallExpr
@@ -901,8 +966,10 @@ File
                     Arguments:
                       IntLit
                         Text: "3"
+                        Base: 0
                       IntLit
                         Text: "7"
+                        Base: 0
                   Member: Identifier
                     Name: "values"
                 Arguments: ~
@@ -911,6 +978,7 @@ File
             Arguments:
               IntLit
                 Text: "0"
+                Base: 0
               FuncLit
                 Params:
                   ParamDef
@@ -955,6 +1023,7 @@ File
         Arguments:
           IntLit
             Text: "25"
+            Base: 0
     AssertDecl
       Doc: ~
       Cond: CallExpr
@@ -969,8 +1038,10 @@ File
                     Arguments:
                       IntLit
                         Text: "3"
+                        Base: 0
                       IntLit
                         Text: "7"
+                        Base: 0
                   Member: Identifier
                     Name: "keys"
                 Arguments: ~
@@ -979,6 +1050,7 @@ File
             Arguments:
               IntLit
                 Text: "0"
+                Base: 0
               FuncLit
                 Params:
                   ParamDef
@@ -1023,6 +1095,7 @@ File
         Arguments:
           IntLit
             Text: "10"
+            Base: 0
     AssertDecl
       Doc: ~
       Cond: CallExpr
@@ -1035,13 +1108,16 @@ File
                 Arguments:
                   IntLit
                     Text: "0"
+                    Base: 0
                   IntLit
                     Text: "4"
+                    Base: 0
               Member: Identifier
                 Name: "fold"
             Arguments:
               IntLit
                 Text: "0"
+                Base: 0
               FuncLit
                 Params:
                   ParamDef
@@ -1086,4 +1162,5 @@ File
         Arguments:
           IntLit
             Text: "10"
+            Base: 0
   Masters: ~

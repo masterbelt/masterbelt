@@ -102,10 +102,14 @@ const (
 	// identifiers uncoloured so it never names this, but the tree-sitter grammar
 	// needs it as its `word` token (keyword extraction keys off it).
 	reIdentifier = `[A-Za-z_][A-Za-z0-9_]*`
-	reInteger    = `[0-9]+`
-	reDatetime   = `D[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]{3})?(Z|[+-][0-9]{2}:[0-9]{2})`
-	reDuration   = `([0-9]+(ms|w|d|h|m|s))+`
-	reEscape     = `\\(u\{[0-9A-Fa-f]{1,6}\}|[nrt0\\"])`
+	// reInteger matches a decimal integer or a 0b/0o/0x radix integer. The radix
+	// alternatives come first so 0xFF matches whole rather than 0 then xFF, and
+	// the bare-decimal alternative is last; callers that anchor it with \b wrap it
+	// in a group so the boundary spans the whole alternation.
+	reInteger  = `0[bB][01]+|0[oO][0-7]+|0[xX][0-9A-Fa-f]+|[0-9]+`
+	reDatetime = `D[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]{3})?(Z|[+-][0-9]{2}:[0-9]{2})`
+	reDuration = `([0-9]+(ms|w|d|h|m|s))+`
+	reEscape   = `\\(u\{[0-9A-Fa-f]{1,6}\}|[nrt0\\"])`
 )
 
 func buildGrammar() grammar {
@@ -160,7 +164,7 @@ func buildGrammar() grammar {
 				{Name: lexNumberDuration.tmScope(), Match: `\b` + reDuration + `\b`},
 			}},
 			"numbers": {Patterns: []rule{
-				{Name: lexNumberInteger.tmScope(), Match: `\b` + reInteger + `\b`},
+				{Name: lexNumberInteger.tmScope(), Match: `\b(?:` + reInteger + `)\b`},
 			}},
 			// A double-quoted string with the escapes the lexer recognizes —
 			// \n \r \t \0 \\ \" and \u{...}. Only a cold-start approximation; the

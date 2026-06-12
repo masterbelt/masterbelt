@@ -11,15 +11,19 @@ File
           Callee: MemberExpr
             Receiver: IntLit
               Text: "3"
+              Base: 0
             Member: Identifier
               Name: "gt"
           Arguments:
             IntLit
               Text: "2"
+              Base: 0
         Then: IntLit
           Text: "10"
+          Base: 0
         Else: IntLit
           Text: "20"
+          Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -31,11 +35,13 @@ File
           Callee: MemberExpr
             Receiver: IntLit
               Text: "7"
+              Base: 0
             Member: Identifier
               Name: "gt"
           Arguments:
             IntLit
               Text: "100"
+              Base: 0
         Then: StringLit
           Value: "high"
         Else: StringLit
@@ -63,6 +69,7 @@ File
           Arguments:
             IntLit
               Text: "50"
+              Base: 0
         Then: MemberExpr
           Receiver: Identifier
             Name: "Level"
@@ -70,6 +77,7 @@ File
             Name: "Max"
         Else: IntLit
           Text: "0"
+          Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -81,27 +89,34 @@ File
           Callee: MemberExpr
             Receiver: IntLit
               Text: "150"
+              Base: 0
             Member: Identifier
               Name: "lt"
           Arguments:
             IntLit
               Text: "0"
+              Base: 0
         Then: IntLit
           Text: "0"
+          Base: 0
         Else: TernaryExpr
           Cond: CallExpr
             Callee: MemberExpr
               Receiver: IntLit
                 Text: "150"
+                Base: 0
               Member: Identifier
                 Name: "gt"
             Arguments:
               IntLit
                 Text: "100"
+                Base: 0
           Then: IntLit
             Text: "100"
+            Base: 0
           Else: IntLit
             Text: "150"
+            Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -115,20 +130,25 @@ File
               Callee: MemberExpr
                 Receiver: IntLit
                   Text: "3"
+                  Base: 0
                 Member: Identifier
                   Name: "gt"
               Arguments:
                 IntLit
                   Text: "2"
+                  Base: 0
             Then: IntLit
               Text: "1"
+              Base: 0
             Else: IntLit
               Text: "0"
+              Base: 0
           Member: Identifier
             Name: "add"
         Arguments:
           IntLit
             Text: "5"
+            Base: 0
       Builtin: false
   Types:
     TypeDecl
@@ -151,6 +171,7 @@ File
           Type: ~
           Value: IntLit
             Text: "100"
+            Base: 0
           Builtin: false
       Impls: ~
     TypeDecl
@@ -190,8 +211,10 @@ File
                   Arguments:
                     IntLit
                       Text: "0"
+                      Base: 0
                 Then: IntLit
                   Text: "1"
+                  Base: 0
                 Else: TernaryExpr
                   Cond: CallExpr
                     Callee: MemberExpr
@@ -201,15 +224,18 @@ File
                     Arguments:
                       IntLit
                         Text: "0"
+                        Base: 0
                   Then: CallExpr
                     Callee: MemberExpr
                       Receiver: IntLit
                         Text: "1"
+                        Base: 0
                       Member: Identifier
                         Name: "neg"
                     Arguments: ~
                   Else: IntLit
                     Text: "0"
+                    Base: 0
       Consts: ~
       Impls: ~
   Enums: ~

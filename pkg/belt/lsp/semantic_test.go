@@ -128,6 +128,38 @@ func TestSemanticTokensLiterals(t *testing.T) {
 	}
 }
 
+func TestSemanticTokensRadixLiterals(t *testing.T) {
+	// Binary, octal, and hexadecimal literals each colour as one number token,
+	// the whole literal including its 0b/0o/0x prefix — matching their
+	// constant.numeric cold-start scope.
+	doc := abstract.NewDocument([]byte("const B = 0b1010\nconst O = 0o17\nconst X = 0xFF\n"))
+	got := decode(semanticTokens(doc).Data)
+
+	want := []decodedToken{
+		{0, 0, 5, stKeyword, 0},
+		{0, 6, 1, stVariable, smDeclaration | smReadonly},
+		{0, 8, 1, stOperator, 0},
+		{0, 10, 6, stNumber, 0}, // 0b1010
+		{1, 0, 5, stKeyword, 0},
+		{1, 6, 1, stVariable, smDeclaration | smReadonly},
+		{1, 8, 1, stOperator, 0},
+		{1, 10, 4, stNumber, 0}, // 0o17
+		{2, 0, 5, stKeyword, 0},
+		{2, 6, 1, stVariable, smDeclaration | smReadonly},
+		{2, 8, 1, stOperator, 0},
+		{2, 10, 4, stNumber, 0}, // 0xFF
+	}
+
+	if len(got) != len(want) {
+		t.Fatalf("got %d tokens, want %d:\n got:  %+v\n want: %+v", len(got), len(want), got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("token[%d] = %+v, want %+v", i, got[i], want[i])
+		}
+	}
+}
+
 func TestSemanticTokensArrowLambda(t *testing.T) {
 	// The arrow of an arrow-bodied lambda colours as an operator, like : and =;
 	// fn stays a keyword.

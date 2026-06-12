@@ -1,0 +1,118 @@
+File
+  Uses: ~
+  Decls:
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Bin"
+      Type: ~
+      Value: IntLit
+        Text: "0b1010"
+        Base: 1
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Oct"
+      Type: ~
+      Value: IntLit
+        Text: "0o17"
+        Base: 2
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Hex"
+      Type: ~
+      Value: IntLit
+        Text: "0xFF"
+        Base: 3
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "HexUpper"
+      Type: ~
+      Value: IntLit
+        Text: "0XCAFE"
+        Base: 3
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "BinUpper"
+      Type: ~
+      Value: IntLit
+        Text: "0B1010"
+        Base: 1
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Sum"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: MemberExpr
+              Receiver: IntLit
+                Text: "0x10"
+                Base: 3
+              Member: Identifier
+                Name: "add"
+            Arguments:
+              IntLit
+                Text: "0o10"
+                Base: 2
+          Member: Identifier
+            Name: "add"
+        Arguments:
+          IntLit
+            Text: "0b10"
+            Base: 1
+      Builtin: false
+  Types: ~
+  Enums: ~
+  Interfaces: ~
+  Funcs: ~
+  Asserts:
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: IntLit
+            Text: "0b1010"
+            Base: 1
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "10"
+            Base: 0
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: IntLit
+            Text: "0o17"
+            Base: 2
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "15"
+            Base: 0
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: IntLit
+            Text: "0xFF"
+            Base: 3
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "255"
+            Base: 0
+  Masters: ~

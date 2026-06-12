@@ -12,6 +12,7 @@ File
         Projections: ~
       Value: IntLit
         Text: "8080"
+        Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -24,6 +25,7 @@ File
         Projections: ~
       Value: IntLit
         Text: "1"
+        Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -36,6 +38,7 @@ File
         Projections: ~
       Value: IntLit
         Text: "65535"
+        Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -48,6 +51,7 @@ File
         Projections: ~
       Value: IntLit
         Text: "100"
+        Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -60,6 +64,7 @@ File
         Projections: ~
       Value: IntLit
         Text: "75"
+        Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -68,6 +73,7 @@ File
       Type: ~
       Value: IntLit
         Text: "70000"
+        Base: 0
       Builtin: false
   Types:
     TypeDecl
@@ -90,6 +96,7 @@ File
             Arguments:
               IntLit
                 Text: "0"
+                Base: 0
           Member: Identifier
             Name: "anan"
         Arguments:
@@ -101,6 +108,7 @@ File
             Arguments:
               IntLit
                 Text: "100"
+                Base: 0
       Methods: ~
       Consts: ~
       Impls: ~
@@ -124,6 +132,7 @@ File
             Arguments:
               IntLit
                 Text: "1"
+                Base: 0
           Member: Identifier
             Name: "anan"
         Arguments:
@@ -135,6 +144,7 @@ File
             Arguments:
               IntLit
                 Text: "65535"
+                Base: 0
       Methods: ~
       Consts: ~
       Impls: ~
@@ -158,6 +168,7 @@ File
             Arguments:
               IntLit
                 Text: "0"
+                Base: 0
           Member: Identifier
             Name: "anan"
         Arguments:
@@ -169,6 +180,7 @@ File
             Arguments:
               IntLit
                 Text: "100"
+                Base: 0
       Methods:
         MethodDecl
           Doc: "The next percentage point."
@@ -194,6 +206,7 @@ File
                 Arguments:
                   IntLit
                     Text: "1"
+                    Base: 0
       Consts: ~
       Impls: ~
     TypeDecl
@@ -239,6 +252,7 @@ File
                     Arguments:
                       IntLit
                         Text: "0"
+                        Base: 0
                   Member: Identifier
                     Name: "anan"
                 Arguments:
@@ -250,6 +264,7 @@ File
                     Arguments:
                       IntLit
                         Text: "100"
+                        Base: 0
       Consts: ~
       Impls: ~
   Enums: ~

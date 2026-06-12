@@ -24,6 +24,7 @@ File
         Arguments:
           IntLit
             Text: "41"
+            Base: 0
       Builtin: false
   Types: ~
   Enums: ~
@@ -55,6 +56,7 @@ File
           Type: ~
           Value: IntLit
             Text: "10"
+            Base: 0
         LetStmt
           Name: "result"
           Type: ~
@@ -76,6 +78,7 @@ File
                 Arguments:
                   IntLit
                     Text: "2"
+                    Base: 0
           ElseIf: ~
           Else: ~
         ReturnStmt
@@ -123,6 +126,7 @@ File
             Arguments:
               IntLit
                 Text: "1"
+                Base: 0
         ReturnStmt
           Value: Identifier
             Name: "acc"
@@ -152,6 +156,7 @@ File
           Type: ~
           Value: IntLit
             Text: "1"
+            Base: 0
         IfStmt
           Cond: Identifier
             Name: "flag"
@@ -161,6 +166,7 @@ File
               Type: ~
               Value: IntLit
                 Text: "2"
+                Base: 0
             AssignStmt
               Target: Identifier
                 Name: "result"
@@ -173,6 +179,7 @@ File
                 Arguments:
                   IntLit
                     Text: "10"
+                    Base: 0
             ReturnStmt
               Value: Identifier
                 Name: "result"
@@ -197,6 +204,7 @@ File
         Arguments:
           IntLit
             Text: "10"
+            Base: 0
     AssertDecl
       Doc: ~
       Cond: CallExpr
@@ -207,9 +215,11 @@ File
             Arguments:
               IntLit
                 Text: "41"
+                Base: 0
           Member: Identifier
             Name: "eql"
         Arguments:
           IntLit
             Text: "42"
+            Base: 0
   Masters: ~

@@ -18,8 +18,10 @@ File
         Arguments:
           IntLit
             Text: "3"
+            Base: 0
           IntLit
             Text: "7"
+            Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -32,8 +34,10 @@ File
         Arguments:
           IntLit
             Text: "3"
+            Base: 0
           IntLit
             Text: "7"
+            Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -46,10 +50,13 @@ File
         Arguments:
           IntLit
             Text: "5"
+            Base: 0
           IntLit
             Text: "0"
+            Base: 0
           IntLit
             Text: "3"
+            Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -64,6 +71,7 @@ File
             Callee: MemberExpr
               Receiver: IntLit
                 Text: "5"
+                Base: 0
               Member: Identifier
                 Name: "neg"
             Arguments: ~
@@ -81,6 +89,7 @@ File
             Callee: MemberExpr
               Receiver: IntLit
                 Text: "9"
+                Base: 0
               Member: Identifier
                 Name: "neg"
             Arguments: ~
@@ -96,8 +105,10 @@ File
         Arguments:
           IntLit
             Text: "12"
+            Base: 0
           IntLit
             Text: "18"
+            Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -110,8 +121,10 @@ File
         Arguments:
           IntLit
             Text: "4"
+            Base: 0
           IntLit
             Text: "6"
+            Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -124,8 +137,10 @@ File
         Arguments:
           IntLit
             Text: "2"
+            Base: 0
           IntLit
             Text: "10"
+            Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -142,12 +157,15 @@ File
                 Key: ~
                 Value: IntLit
                   Text: "1"
+                  Base: 0
               CollectionEntry
                 Key: ~
                 Value: IntLit
                   Text: "2"
+                  Base: 0
           IntLit
             Text: "5"
+            Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -164,14 +182,17 @@ File
                 Key: ~
                 Value: IntLit
                   Text: "3"
+                  Base: 0
               CollectionEntry
                 Key: ~
                 Value: IntLit
                   Text: "1"
+                  Base: 0
               CollectionEntry
                 Key: ~
                 Value: IntLit
                   Text: "7"
+                  Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -188,18 +209,22 @@ File
                 Key: ~
                 Value: IntLit
                   Text: "1"
+                  Base: 0
               CollectionEntry
                 Key: ~
                 Value: IntLit
                   Text: "2"
+                  Base: 0
               CollectionEntry
                 Key: ~
                 Value: IntLit
                   Text: "3"
+                  Base: 0
               CollectionEntry
                 Key: ~
                 Value: IntLit
                   Text: "4"
+                  Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -216,18 +241,22 @@ File
                 Key: ~
                 Value: IntLit
                   Text: "1"
+                  Base: 0
               CollectionEntry
                 Key: ~
                 Value: IntLit
                   Text: "2"
+                  Base: 0
               CollectionEntry
                 Key: ~
                 Value: IntLit
                   Text: "3"
+                  Base: 0
               CollectionEntry
                 Key: ~
                 Value: IntLit
                   Text: "4"
+                  Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -274,6 +303,7 @@ File
         Arguments:
           IntLit
             Text: "7"
+            Base: 0
     AssertDecl
       Doc: ~
       Cond: CallExpr
@@ -285,6 +315,7 @@ File
         Arguments:
           IntLit
             Text: "3"
+            Base: 0
     AssertDecl
       Doc: ~
       Cond: CallExpr
@@ -296,6 +327,7 @@ File
         Arguments:
           IntLit
             Text: "3"
+            Base: 0
     AssertDecl
       Doc: ~
       Cond: CallExpr
@@ -307,6 +339,7 @@ File
         Arguments:
           IntLit
             Text: "5"
+            Base: 0
     AssertDecl
       Doc: ~
       Cond: CallExpr
@@ -320,6 +353,7 @@ File
             Callee: MemberExpr
               Receiver: IntLit
                 Text: "1"
+                Base: 0
               Member: Identifier
                 Name: "neg"
             Arguments: ~
@@ -334,6 +368,7 @@ File
         Arguments:
           IntLit
             Text: "6"
+            Base: 0
     AssertDecl
       Doc: ~
       Cond: CallExpr
@@ -345,6 +380,7 @@ File
         Arguments:
           IntLit
             Text: "12"
+            Base: 0
     AssertDecl
       Doc: ~
       Cond: CallExpr
@@ -356,6 +392,7 @@ File
         Arguments:
           IntLit
             Text: "1024"
+            Base: 0
     AssertDecl
       Doc: ~
       Cond: CallExpr
@@ -367,4 +404,5 @@ File
         Arguments:
           IntLit
             Text: "5"
+            Base: 0
   Masters: ~

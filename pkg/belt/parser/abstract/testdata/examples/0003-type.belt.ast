@@ -52,6 +52,7 @@ File
                 Arguments:
                   IntLit
                     Text: "1"
+                    Base: 0
       Consts: ~
       Impls: ~
     TypeDecl
@@ -188,6 +189,7 @@ File
                 Arguments:
                   IntLit
                     Text: "1000"
+                    Base: 0
       Consts: ~
       Impls: ~
     TypeDecl

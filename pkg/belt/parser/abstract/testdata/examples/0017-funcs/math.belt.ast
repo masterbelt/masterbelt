@@ -36,6 +36,7 @@ File
             Arguments:
               IntLit
                 Text: "2"
+                Base: 0
     FuncDecl
       Doc: "The area of a w-by-h rectangle."
       Public: true
@@ -136,6 +137,7 @@ File
             Arguments:
               IntLit
                 Text: "10"
+                Base: 0
     FuncDecl
       Doc: "Scales every element of a list."
       Public: true
@@ -192,6 +194,7 @@ File
                       Arguments:
                         IntLit
                           Text: "10"
+                          Base: 0
     FuncDecl
       Doc: ~
       Public: false
@@ -209,5 +212,6 @@ File
         ReturnStmt
           Value: IntLit
             Text: "0"
+            Base: 0
   Asserts: ~
   Masters: ~

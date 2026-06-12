@@ -686,7 +686,7 @@ func (p *parser) parseOperand() cst.Green {
 	// again; those contexts clear the flag as they recurse.
 	noRecordLit := p.noRecordLit
 	switch p.kind() {
-	case token.Int, token.String, token.DatetimeLit, token.DurationLit, token.True, token.False, token.Null:
+	case token.Int, token.BinInt, token.OctInt, token.HexInt, token.String, token.DatetimeLit, token.DurationLit, token.True, token.False, token.Null:
 		return cst.NewNode(cst.Literal, []cst.Green{p.bump()})
 	case token.LBracket:
 		return p.parseCollectionLiteral()
@@ -1050,7 +1050,7 @@ func nameLike(kind token.Kind) bool {
 // trailing trivia for the next construct) rather than mis-parsed.
 func startsExpr(kind token.Kind) bool {
 	switch kind {
-	case token.Int, token.String, token.DatetimeLit, token.DurationLit,
+	case token.Int, token.BinInt, token.OctInt, token.HexInt, token.String, token.DatetimeLit, token.DurationLit,
 		token.Ident, token.True, token.False, token.Null, token.Self, token.Type,
 		token.LBracket, token.LBrace, token.Plus, token.Minus, token.Bang,
 		token.Fn, token.LParen, token.Await:

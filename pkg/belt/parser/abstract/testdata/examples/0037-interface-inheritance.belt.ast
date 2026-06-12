@@ -50,6 +50,7 @@ File
             ReturnStmt
               Value: IntLit
                 Text: "1"
+                Base: 0
         MethodDecl
           Doc: "Order tags by value."
           Public: false

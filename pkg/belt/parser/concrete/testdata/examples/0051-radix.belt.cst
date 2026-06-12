@@ -1,0 +1,134 @@
+# tree
+File
+  ConstDecl
+    LineComment "// Radix-prefixed integer literals: 0b binary, 0o octal, 0x hex. Each is"
+    Newline "\n"
+    LineComment "// just another spelling of an integer — the prefix and any hex digits are"
+    Newline "\n"
+    LineComment "// case-insensitive (0X, 0B, 0O and A-F all accepted)."
+    Newline "\n"
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Bin"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      Literal
+        BinInt "0b1010"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Oct"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      Literal
+        OctInt "0o17"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Hex"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      Literal
+        HexInt "0xFF"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// Uppercase prefix and uppercase hex digits spell the same value."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "HexUpper"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      Literal
+        HexInt "0XCAFE"
+  ConstDecl
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "BinUpper"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      Literal
+        BinInt "0B1010"
+  AssertDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// They are ordinary integers: equal to their decimal value and usable in"
+    Newline "\n"
+    LineComment "// arithmetic like any other int."
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      Literal
+        BinInt "0b1010"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "10"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      Literal
+        OctInt "0o17"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "15"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      Literal
+        HexInt "0xFF"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "255"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Sum"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      BinaryExpr
+        BinaryExpr
+          Literal
+            HexInt "0x10"
+          Whitespace " "
+          Plus "+"
+          Whitespace " "
+          Literal
+            OctInt "0o10"
+        Whitespace " "
+        Plus "+"
+        Whitespace " "
+        Literal
+          BinInt "0b10"
+  Newline "\n"
+  EOF ""
+# diagnostics

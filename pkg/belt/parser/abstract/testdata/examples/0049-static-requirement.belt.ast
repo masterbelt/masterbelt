@@ -36,6 +36,7 @@ File
             ReturnStmt
               Value: IntLit
                 Text: "0"
+                Base: 0
       Consts: ~
       Impls:
         NamedType

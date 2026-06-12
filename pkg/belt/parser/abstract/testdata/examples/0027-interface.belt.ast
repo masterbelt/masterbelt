@@ -189,6 +189,7 @@ File
                 Arguments:
                   IntLit
                     Text: "0"
+                    Base: 0
                   FuncLit
                     Params:
                       ParamDef
@@ -212,6 +213,7 @@ File
                           Arguments:
                             IntLit
                               Text: "1"
+                              Base: 0
         InterfaceMember
           Doc: "Provided: whether any element satisfies the predicate."
           Public: true
@@ -319,6 +321,7 @@ File
             Arguments:
               IntLit
                 Text: "0"
+                Base: 0
               FuncLit
                 Params:
                   ParamDef
