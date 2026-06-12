@@ -136,6 +136,28 @@ func TestLoadAbsoluteLocatorRejected(t *testing.T) {
 	}
 }
 
+func TestLoadLocatorEscapesBase(t *testing.T) {
+	// A locator that climbs out of the base path with `..` escapes its source
+	// directory even if it stays under the project root; it is refused.
+	belt := "master M {\n  record { id: int }\n  primary id\n  source { csv \"../m.csv\" }\n}\n"
+	loaded, diags := run(t, belt, map[string]string{"csv": "data"}, nil)
+	single(t, diags, master.CodeLocatorEscapesRoot)
+	if len(loaded) != 0 {
+		t.Errorf("loaded = %v, want nothing for a base-escaping locator", loaded)
+	}
+}
+
+func TestLoadSkipsReadOnOptionError(t *testing.T) {
+	// An invalid option must not be read with a fallback default; the source is
+	// reported and left unread.
+	belt := "master Skill {\n  record { id: int }\n  primary id\n  source { csv \"skills.csv\" { delimiter: 5 } }\n}\n"
+	loaded, diags := run(t, belt, map[string]string{"csv": "data"}, map[string]string{"data/skills.csv": "id\n1\n"})
+	single(t, diags, master.CodeOptionTypeMismatch)
+	if len(loaded) != 0 {
+		t.Errorf("loaded = %v, want nothing read when an option is invalid", loaded)
+	}
+}
+
 func TestLoadSkipsCoercionOnReadError(t *testing.T) {
 	// The csv is absent: the read fails, and the failure is reported on its own
 	// — not buried under a missing-column error for every field, nor an empty

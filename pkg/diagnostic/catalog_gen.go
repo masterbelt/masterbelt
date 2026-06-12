@@ -1010,9 +1010,9 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 	"master.locator_escapes_root": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
-			return "ソースロケータ " + f["path"].String() + " はプロジェクトルートの外を指しています"
+			return "ソースロケータ " + f["path"].String() + " はソースディレクトリの外を指しています"
 		default:
-			return "source locator " + f["path"].String() + " escapes the project root"
+			return "source locator " + f["path"].String() + " escapes its source directory"
 		}
 	},
 	"master.missing_column": func(loc Locale, f map[string]fmt.Stringer) string {

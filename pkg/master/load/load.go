@@ -94,13 +94,21 @@ func readMaster(def *ir.TypeDef, doc *abstract.Document, env eval.GraphEnv, root
 			continue
 		}
 		opts, optDiags := checkOptions(entry, format, offset, width)
-		diags = append(diags, optDiags...)
+		if len(optDiags) > 0 {
+			// An invalid option must not be read with a fallback default; report
+			// it and leave the source unread.
+			diags = append(diags, optDiags...)
+			continue
+		}
 
-		rel := filepath.Join(bases[entry.Format], entry.Locator)
-		if filepath.IsAbs(entry.Locator) || escapesRoot(rel) {
+		// The locator must stay within its format's source directory: not
+		// absolute, and not climbing out of the base path with `..` (which would
+		// read from the project root, or beyond, rather than beneath the base).
+		if filepath.IsAbs(entry.Locator) || climbsOut(entry.Locator) {
 			diags = append(diags, master.LocatorEscapesRoot(offset, width, entry.Locator))
 			continue
 		}
+		rel := filepath.Join(bases[entry.Format], entry.Locator)
 		spec := master.SourceSpec{
 			Path:    filepath.Join(root, rel),
 			Display: filepath.ToSlash(rel),
@@ -179,11 +187,12 @@ func refinedDefs(t ir.Type) []*ir.TypeDef {
 	}
 }
 
-// escapesRoot reports whether a base-relative locator resolves outside the
-// project root — through `..` segments that climb past it. An absolute or
-// deeper-nested locator is joined under the root, so only an upward escape can
-// leave it; this is the same confinement the manifest's base paths obey.
-func escapesRoot(rel string) bool {
+// climbsOut reports whether a relative path escapes the directory it is resolved
+// against — through `..` segments that climb out of it. A locator is resolved
+// against its format's base directory, so a locator that climbs out leaves that
+// directory (and, since the base is itself confined to the root, can leave the
+// root too); this is the same confinement the manifest's base paths obey.
+func climbsOut(rel string) bool {
 	clean := filepath.Clean(rel)
 	return clean == ".." || strings.HasPrefix(clean, ".."+string(filepath.Separator))
 }
