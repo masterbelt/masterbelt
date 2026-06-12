@@ -128,6 +128,24 @@ func TestDataGatesOnWholeProject(t *testing.T) {
 	}
 }
 
+func TestDataNormalizesBackslashBasePath(t *testing.T) {
+	// A portable backslash base path the manifest accepts must resolve to real
+	// directories, not a literal "data\csv" on Unix.
+	root := t.TempDir()
+	belttest.WriteFile(t, root, "masterbelt.toml", "entry = \"skills.belt\"\n\n[source.csv]\nbasePath = \"data\\\\csv\"\n")
+	belttest.WriteFile(t, root, "skills.belt", ""+
+		"master Skill {\n  record { id: int, name: string }\n  primary id\n  source { csv \"skills.csv\" }\n}\n")
+	belttest.WriteFile(t, root, "data/csv/skills.csv", "id,name\n1,Heal\n")
+
+	stdout, _, err := execData(t, root)
+	if err != nil {
+		t.Fatalf("data = %v\nstdout: %s", err, stdout)
+	}
+	if !strings.Contains(stdout, "Skill <- data/csv/skills.csv") {
+		t.Errorf("stdout = %q, want the normalized base path resolved", stdout)
+	}
+}
+
 func TestDataJSONReporterIsCleanDocument(t *testing.T) {
 	// Under --reporter=json a data error must leave a single valid JSON document
 	// on stdout — no text table, and the final error log lands on a stream the

@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -154,11 +155,14 @@ func activeProfile(proj *project.Project) config.ProfileConfig {
 }
 
 // basePaths flattens a profile's per-format source settings to the base path
-// each format resolves its locators under, the form the data loader reads.
+// each format resolves its locators under, the form the data loader reads. A
+// portable backslash base path the manifest accepted is normalized to slashes
+// here, so filepath.Join resolves it to real directories rather than looking for
+// a literal "data\csv" on a platform where the backslash is not a separator.
 func basePaths(cfg config.ProfileConfig) map[string]string {
 	m := make(map[string]string, len(cfg.Source))
 	for name, sc := range cfg.Source {
-		m[name] = sc.BasePath
+		m[name] = strings.ReplaceAll(sc.BasePath, "\\", "/")
 	}
 	return m
 }
