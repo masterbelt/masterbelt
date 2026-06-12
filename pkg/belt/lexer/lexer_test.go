@@ -450,6 +450,52 @@ func TestLexerDuration(t *testing.T) {
 	}
 }
 
+// TestLexerRadixInt covers the radix integer literals: a case-insensitive
+// 0b/0o/0x prefix with at least one base digit is one BinInt/OctInt/HexInt
+// token. A base-foreign digit or letter ends the literal before it, and a
+// prefix with no base digit leaves the 0 a decimal Int with the letters lexed
+// as a name — reported as a unit typo, exactly like any letter after a number.
+func TestLexerRadixInt(t *testing.T) {
+	cases := []struct {
+		src   string
+		kinds []token.Kind
+		texts []string
+		diags int
+	}{
+		{"0b1010", []token.Kind{token.BinInt}, []string{"0b1010"}, 0},
+		{"0o17", []token.Kind{token.OctInt}, []string{"0o17"}, 0},
+		{"0xFF", []token.Kind{token.HexInt}, []string{"0xFF"}, 0},
+		// Uppercase prefix and mixed-case hex digits are accepted.
+		{"0XCAFE", []token.Kind{token.HexInt}, []string{"0XCAFE"}, 0},
+		{"0B1010", []token.Kind{token.BinInt}, []string{"0B1010"}, 0},
+		{"0xdeadBEEF", []token.Kind{token.HexInt}, []string{"0xdeadBEEF"}, 0},
+		{"0o0", []token.Kind{token.OctInt}, []string{"0o0"}, 0},
+		// Adjacent literals via an operator split exactly at the operator.
+		{"0xFF+0b1", []token.Kind{token.HexInt, token.Plus, token.BinInt}, []string{"0xFF", "+", "0b1"}, 0},
+		// A base-foreign digit ends the literal; the rest lexes on its own.
+		{"0b1012", []token.Kind{token.BinInt, token.Int}, []string{"0b101", "2"}, 0},
+		{"0o18", []token.Kind{token.OctInt, token.Int}, []string{"0o1", "8"}, 0},
+		// No base digit after the prefix: the 0 stays a decimal Int and the
+		// prefix letters lex as a name, reported like any unit typo.
+		{"0x", []token.Kind{token.Int, token.Ident}, []string{"0", "x"}, 1},
+		{"0xG", []token.Kind{token.Int, token.Ident}, []string{"0", "xG"}, 1},
+	}
+	for _, c := range cases {
+		kinds, texts, diags := kindsOf(t, c.src)
+		if !slices.Equal(kinds, c.kinds) || !slices.Equal(texts, c.texts) {
+			t.Errorf("%q: lexed %v %v, want %v %v", c.src, kinds, texts, c.kinds, c.texts)
+		}
+		if len(diags) != c.diags {
+			t.Errorf("%q: %d diagnostics %v, want %d", c.src, len(diags), diags, c.diags)
+		}
+		for _, d := range diags {
+			if d.Code != CodeUnknownDurationUnit {
+				t.Errorf("%q: diagnostic %v, want unknown_duration_unit", c.src, d)
+			}
+		}
+	}
+}
+
 // TestLexerStrings checks that a well-formed double-quoted string is one String
 // token whose text includes the quotes, covering every recognized escape, the
 // \u{...} unicode escape, and raw multi-byte UTF-8 — none of which produces a

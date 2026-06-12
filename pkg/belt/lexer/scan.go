@@ -321,6 +321,9 @@ var durationUnits = map[string]bool{"w": true, "d": true, "h": true, "m": true, 
 // with a space is an integer and a name) — and a trailing group without its
 // unit is left for the next token (3w4 → 3w, 4).
 func (l *Lexer) scanNumber(start int) token.Token {
+	if tok, ok := l.scanRadixInt(start); ok {
+		return tok
+	}
 	for l.offset < len(l.src) && isDigit(l.src[l.offset]) {
 		l.offset++
 	}
@@ -357,6 +360,38 @@ func (l *Lexer) scanNumber(start int) token.Token {
 		l.offset = unitEnd
 	}
 	return l.token(token.DurationLit, start)
+}
+
+// scanRadixInt scans a 0b/0o/0x-prefixed integer when start begins one. The
+// prefix is case-insensitive (0B/0O/0X), and at least one digit of that base
+// must follow — so a lone 0 before an identifier (0xZ, 0b) stays a decimal 0
+// and the letters lex separately. It returns the token and true on a match, or
+// leaves l.offset untouched and returns false so the decimal/duration path runs.
+func (l *Lexer) scanRadixInt(start int) (token.Token, bool) {
+	if l.src[start] != '0' || start+1 >= len(l.src) {
+		return token.Token{}, false
+	}
+	var kind token.Kind
+	var isBaseDigit func(byte) bool
+	switch l.src[start+1] {
+	case 'b', 'B':
+		kind, isBaseDigit = token.BinInt, isBinDigit
+	case 'o', 'O':
+		kind, isBaseDigit = token.OctInt, isOctDigit
+	case 'x', 'X':
+		kind, isBaseDigit = token.HexInt, isHexDigit
+	default:
+		return token.Token{}, false
+	}
+	end := start + 2
+	for end < len(l.src) && isBaseDigit(l.src[end]) {
+		end++
+	}
+	if end == start+2 {
+		return token.Token{}, false // no base digit: keep 0 decimal
+	}
+	l.offset = end
+	return l.token(kind, start), true
 }
 
 // scanIllegal consumes one whole rune that begins no valid token, reports it,
@@ -423,6 +458,14 @@ func isDigit(c byte) bool {
 
 func isIdentPart(c byte) bool {
 	return isLetter(c) || isDigit(c)
+}
+
+func isBinDigit(c byte) bool {
+	return c == '0' || c == '1'
+}
+
+func isOctDigit(c byte) bool {
+	return '0' <= c && c <= '7'
 }
 
 func isHexDigit(c byte) bool {

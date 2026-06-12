@@ -27,7 +27,10 @@ const (
 	// Identifiers and literals.
 
 	Ident       // identifier or type name, e.g. MaxLevel, int64
-	Int         // integer literal, e.g. 100
+	Int         // decimal integer literal, e.g. 100
+	BinInt      // binary integer literal, e.g. 0b1010
+	OctInt      // octal integer literal, e.g. 0o17
+	HexInt      // hexadecimal integer literal, e.g. 0xFF
 	String      // string literal, e.g. "label"
 	DatetimeLit // datetime literal, e.g. D2009-03-31T23:59:59.000Z
 	DurationLit // duration literal, e.g. 3w4d5h6m7s8ms
@@ -132,6 +135,9 @@ var kindNames = [...]string{
 	DocComment:   "DocComment",
 	Ident:        "Ident",
 	Int:          "Int",
+	BinInt:       "BinInt",
+	OctInt:       "OctInt",
+	HexInt:       "HexInt",
 	String:       "String",
 	DatetimeLit:  "DatetimeLit",
 	DurationLit:  "DurationLit",
