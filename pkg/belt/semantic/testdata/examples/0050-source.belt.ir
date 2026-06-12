@@ -1,0 +1,31 @@
+Module
+  Consts: ~
+  Types:
+    TypeDef
+      Name: "Skill"
+      Anchor: "belt:/Skill"
+      Public: true
+      Doc: ~
+      Params: ~
+      Body: ~
+      Methods: ~
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Master: MasterDef
+        Row: Record
+          Fields:
+            Field
+              Name: "id"
+              Type: Builtin
+                Name: "int"
+            Field
+              Name: "name"
+              Type: Builtin
+                Name: "string"
+        Primary: "id"
+      Where: ~
+  Funcs: ~
+  Asserts: ~

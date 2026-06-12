@@ -2222,6 +2222,10 @@
         {
           "type": "master_record",
           "named": true
+        },
+        {
+          "type": "master_source",
+          "named": true
         }
       ]
     }
@@ -2313,6 +2317,25 @@
         },
         {
           "type": "where_clause",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "master_source",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "master_keyword",
+          "named": true
+        },
+        {
+          "type": "source_entry",
           "named": true
         }
       ]
@@ -3514,6 +3537,42 @@
     "type": "self_type",
     "named": true,
     "fields": {}
+  },
+  {
+    "type": "source_entry",
+    "named": true,
+    "fields": {
+      "format": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      },
+      "locator": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "string",
+            "named": true
+          }
+        ]
+      },
+      "options": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "record_literal",
+            "named": true
+          }
+        ]
+      }
+    }
   },
   {
     "type": "source_file",

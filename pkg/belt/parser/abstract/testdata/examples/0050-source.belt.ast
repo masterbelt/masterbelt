@@ -1,0 +1,49 @@
+File
+  Uses: ~
+  Decls: ~
+  Types: ~
+  Enums: ~
+  Interfaces: ~
+  Funcs: ~
+  Asserts: ~
+  Masters:
+    MasterDecl
+      Doc: ~
+      Public: true
+      Name: "Skill"
+      Record: RecordType
+        Fields:
+          FieldDef
+            Name: "id"
+            Type: NamedType
+              Namespace: ""
+              Name: "int"
+              Args: ~
+              Projections: ~
+          FieldDef
+            Name: "name"
+            Type: NamedType
+              Namespace: ""
+              Name: "string"
+              Args: ~
+              Projections: ~
+      Where: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
+      Primary: "id"
+      Sources:
+        SourceEntry
+          Format: "csv"
+          Locator: "skills.csv"
+          Options: RecordLit
+            TypeName: ""
+            Fields:
+              FieldInit
+                Name: "delimiter"
+                Value: StringLit
+                  Value: ","
+        SourceEntry
+          Format: "csv"
+          Locator: "skills.override.csv"
+          Options: ~

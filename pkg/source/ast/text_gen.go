@@ -2175,12 +2175,27 @@ func writeMasterDecl(w *treetext.Writer, n *MasterDecl, depth int) error {
 		}
 	}
 	w.Line(depth, "Primary: "+treetext.QuoteStrings(n.Primary))
+	if len(n.Sources) == 0 {
+		w.Line(depth, "Sources: "+treetext.Nil)
+	} else {
+		w.Line(depth, "Sources:")
+		for _, item := range n.Sources {
+			if item == nil {
+				w.Line(depth+1, treetext.Nil)
+				continue
+			}
+			w.Line(depth+1, "SourceEntry")
+			if err := writeSourceEntry(w, item, depth+2); err != nil {
+				return err
+			}
+		}
+	}
 	return nil
 }
 
 // decodeMasterDecl builds a MasterDecl from its element.
 func decodeMasterDecl(e *treetext.Element) (*MasterDecl, error) {
-	if err := treetext.ExpectFields(e, "Doc", "Public", "Name", "Record", "Where", "Methods", "Consts", "Impls", "Primary"); err != nil {
+	if err := treetext.ExpectFields(e, "Doc", "Public", "Name", "Record", "Where", "Methods", "Consts", "Impls", "Primary", "Sources"); err != nil {
 		return nil, err
 	}
 	n := &MasterDecl{}
@@ -2279,6 +2294,29 @@ func decodeMasterDecl(e *treetext.Element) (*MasterDecl, error) {
 		return nil, err
 	} else {
 		n.Primary = v
+	}
+	switch f := e.Fields[9]; {
+	case f.Inline == treetext.Nil:
+	case f.Items == nil:
+		return nil, fmt.Errorf("treetext: line %d: field %s: expected a list", f.Line, f.Name)
+	default:
+		out := make([]*SourceEntry, 0, len(f.Items))
+		for j := range f.Items {
+			item := &f.Items[j]
+			if item.Head == treetext.Nil {
+				out = append(out, nil)
+				continue
+			}
+			if item.Head != "SourceEntry" {
+				return nil, fmt.Errorf("treetext: line %d: %s is not a SourceEntry", item.Line, item.Head)
+			}
+			v, err := decodeSourceEntry(item)
+			if err != nil {
+				return nil, err
+			}
+			out = append(out, v)
+		}
+		n.Sources = out
 	}
 	return n, nil
 }
@@ -3085,6 +3123,50 @@ func (n *SelfExpr) MarshalText() ([]byte, error) {
 	var w treetext.Writer
 	w.Line(0, "SelfExpr")
 	if err := writeSelfExpr(&w, n, 1); err != nil {
+		return nil, err
+	}
+	return w.Bytes(), nil
+}
+
+// writeSourceEntry emits n's fields beneath an already-written heading line.
+func writeSourceEntry(w *treetext.Writer, n *SourceEntry, depth int) error {
+	w.Line(depth, "Format: "+strconv.Quote(n.Format))
+	w.Line(depth, "Locator: "+strconv.Quote(n.Locator))
+	if err := writeExprField(w, depth, "Options", n.Options); err != nil {
+		return err
+	}
+	return nil
+}
+
+// decodeSourceEntry builds a SourceEntry from its element.
+func decodeSourceEntry(e *treetext.Element) (*SourceEntry, error) {
+	if err := treetext.ExpectFields(e, "Format", "Locator", "Options"); err != nil {
+		return nil, err
+	}
+	n := &SourceEntry{}
+	if v, err := treetext.String(e.Fields[0]); err != nil {
+		return nil, err
+	} else {
+		n.Format = v
+	}
+	if v, err := treetext.String(e.Fields[1]); err != nil {
+		return nil, err
+	} else {
+		n.Locator = v
+	}
+	if v, err := decodeExprField(e.Fields[2]); err != nil {
+		return nil, err
+	} else {
+		n.Options = v
+	}
+	return n, nil
+}
+
+// MarshalText renders the node and its subtree in the exact text form.
+func (n *SourceEntry) MarshalText() ([]byte, error) {
+	var w treetext.Writer
+	w.Line(0, "SourceEntry")
+	if err := writeSourceEntry(&w, n, 1); err != nil {
 		return nil, err
 	}
 	return w.Bytes(), nil
@@ -4374,6 +4456,7 @@ var treeStructs = []any{
 	(*RecordType)(nil),
 	(*ReturnStmt)(nil),
 	(*SelfExpr)(nil),
+	(*SourceEntry)(nil),
 	(*StringLit)(nil),
 	(*SwitchArm)(nil),
 	(*SwitchStmt)(nil),
@@ -4508,6 +4591,9 @@ func writeTree(w *treetext.Writer, v any, depth int) (bool, error) {
 	case *SelfExpr:
 		w.Line(depth, "SelfExpr")
 		return true, writeSelfExpr(w, n, depth+1)
+	case *SourceEntry:
+		w.Line(depth, "SourceEntry")
+		return true, writeSourceEntry(w, n, depth+1)
 	case *StringLit:
 		w.Line(depth, "StringLit")
 		return true, writeStringLit(w, n, depth+1)

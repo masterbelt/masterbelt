@@ -13,9 +13,11 @@
 //	InterfaceMember := [pub] Ident [GenericParams] ParamList ":" TypeExpr [Block]
 //	UseDecl       := [pub] use UseTarget from String
 //	AssertDecl    := assert Expr
-//	MasterDecl    := [pub] master Ident "{" ( MasterRecord | MasterPrimary )* "}"   (master/record/primary are context keywords, each wrapped in a MasterKeyword node)
+//	MasterDecl    := [pub] master Ident "{" ( MasterRecord | MasterPrimary | MasterSource )* "}"   (master/record/primary/source are context keywords, each wrapped in a MasterKeyword node)
 //	MasterRecord  := record TypeExpr [WhereClause] [ImplBlock]*   (the row type, reusing the type-body grammar)
 //	MasterPrimary := primary ( Ident | "(" Ident ( "," Ident )* [","] ")" )
+//	MasterSource  := source "{" SourceEntry* "}"   (where the rows are read from)
+//	SourceEntry   := Ident String [RecordLit]   (format name, locator, optional options)
 //	FuncDecl      := [pub] [extern] fn Effect* Ident ParamList ":" TypeExpr ( Block | "->" Expr )
 //	Effect        := io | async | nondet
 //	UseTarget     := Ident | UseList | "*"

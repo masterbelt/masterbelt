@@ -552,10 +552,10 @@ func (p *parser) parseAssertDecl(lead []cst.Green) *cst.Node {
 // parseMasterDecl parses a master declaration, prepending the already-collected
 // leading trivia:
 //
-//	[pub] master Ident "{" ( MasterRecord | MasterPrimary )* "}"
+//	[pub] master Ident "{" ( MasterRecord | MasterPrimary | MasterSource )* "}"
 //
-// master/record/primary are context keywords — ordinary identifiers the lexer
-// leaves plain, recognized only at these positions (the get/set/static
+// master/record/primary/source are context keywords — ordinary identifiers the
+// lexer leaves plain, recognized only at these positions (the get/set/static
 // precedent) and wrapped in a MasterKeyword node so the lowering ignores them
 // and the editor colours them. The record member reuses the type-body grammar
 // (a type expression with an optional where-refinement and impl blocks), so
@@ -608,6 +608,10 @@ func (p *parser) parseMasterDecl(lead []cst.Green) *cst.Node {
 			var lead []cst.Green
 			p.skipTrivia(&lead)
 			children = append(children, p.parseMasterPrimary(lead))
+		case p.masterMemberIs("source"):
+			var lead []cst.Green
+			p.skipTrivia(&lead)
+			children = append(children, p.parseMasterSource(lead))
 		default:
 			p.skipTrivia(&children)
 			p.report(newUnexpectedTokenDiagnostic(p.cur().Offset, p.cur().Width, p.kind().String()))
@@ -708,8 +712,81 @@ func (p *parser) parseMasterPrimary(lead []cst.Green) *cst.Node {
 	return cst.NewNode(cst.MasterPrimary, children)
 }
 
+// parseMasterSource parses the source member of a master declaration, prepending
+// the already-collected leading trivia:
+//
+//	source "{" SourceEntry* "}"
+//
+// A source block names where the master's rows are read from. Each entry is a
+// format name (an ordinary identifier a format handler registers under, so a new
+// format needs no new keyword), a locator string, and optional format options;
+// the entries are newline-separated like the record fields and primary columns
+// are. Reading the data and checking the options against the format are later
+// concerns — the parser only shapes the block. As elsewhere every expected
+// element is optional in the parse, so recovery stays local and the tree
+// lossless. The cursor sits on the source keyword.
+func (p *parser) parseMasterSource(lead []cst.Green) *cst.Node {
+	children := lead
+	children = append(children, p.masterKeyword()) // "source"
+
+	if p.peekSignificant() == token.LBrace {
+		p.skipTrivia(&children)
+		children = append(children, p.bump()) // "{"
+	} else {
+		p.reportUnexpected()
+		return cst.NewNode(cst.MasterSource, children)
+	}
+
+	for {
+		switch {
+		case p.peekSignificant() == token.RBrace:
+			p.skipTrivia(&children)
+			children = append(children, p.bump()) // "}"
+			return cst.NewNode(cst.MasterSource, children)
+		case p.peekSignificant() == token.EOF:
+			return cst.NewNode(cst.MasterSource, children)
+		case p.peekSignificant() == token.Ident:
+			var lead []cst.Green
+			p.skipTrivia(&lead)
+			children = append(children, p.parseSourceEntry(lead))
+		default:
+			p.skipTrivia(&children)
+			p.report(newUnexpectedTokenDiagnostic(p.cur().Offset, p.cur().Width, p.kind().String()))
+			children = append(children, p.bump())
+		}
+	}
+}
+
+// parseSourceEntry parses one entry of a source block, prepending the
+// already-collected leading trivia:
+//
+//	Ident StringLit [RecordLit]
+//
+// The format name is an ordinary identifier; the locator is a string literal; the
+// options, when present, are an inferred record literal ("{" ... "}"), reusing the
+// value grammar wholesale. The options are optional — a format whose defaults
+// suffice needs none — so a missing brace simply ends the entry. The cursor sits
+// on the format-name identifier.
+func (p *parser) parseSourceEntry(lead []cst.Green) *cst.Node {
+	children := lead
+	children = append(children, p.bump()) // the format name
+
+	if p.peekSignificant() == token.String {
+		p.skipTrivia(&children)
+		children = append(children, p.bump()) // the locator string
+	} else {
+		p.report(newExpectedSourceLocatorDiagnostic(p.lastStart, 0))
+	}
+
+	if p.peekSignificant() == token.LBrace {
+		children = append(children, p.parseRecordLit(nil)) // the options, an inferred record literal
+	}
+
+	return cst.NewNode(cst.SourceEntry, children)
+}
+
 // masterKeyword consumes the context-keyword identifier at the cursor
-// (master/record/primary) and wraps it in a MasterKeyword node, so the AST
+// (master/record/primary/source) and wraps it in a MasterKeyword node, so the AST
 // lowering reads it as the construct's keyword rather than as a name, and the
 // editor's token classifier colours it as a keyword — the same role the
 // Modifier node plays for the get/set/static accessors. The cursor sits on the

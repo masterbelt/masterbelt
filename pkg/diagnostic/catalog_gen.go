@@ -167,6 +167,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "expected import path string"
 		}
 	},
+	"belt.parser.concrete.expected_source_locator": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "ソースのロケータ文字列が必要です"
+		default:
+			return "expected a source locator string"
+		}
+	},
 	"belt.parser.concrete.expected_type": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
