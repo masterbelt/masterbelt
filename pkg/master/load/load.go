@@ -101,14 +101,16 @@ func readMaster(def *ir.TypeDef, doc *abstract.Document, env eval.GraphEnv, root
 			continue
 		}
 
-		// The locator must stay within its format's source directory: not
-		// absolute, and not climbing out of the base path with `..` (which would
-		// read from the project root, or beyond, rather than beneath the base).
-		if filepath.IsAbs(entry.Locator) || climbsOut(entry.Locator) {
+		// The locator must stay within its format's source directory on every
+		// platform: not absolute (a leading slash or a Windows drive prefix), and
+		// not climbing out of the base path with `..`. Backslashes are treated as
+		// separators first, so a portable path is judged the same everywhere.
+		loc := strings.ReplaceAll(entry.Locator, "\\", "/")
+		if filepath.IsAbs(loc) || volumeQualified(loc) || climbsOut(loc) {
 			diags = append(diags, master.LocatorEscapesRoot(offset, width, entry.Locator))
 			continue
 		}
-		rel := filepath.Join(bases[entry.Format], entry.Locator)
+		rel := filepath.Join(bases[entry.Format], loc)
 		spec := master.SourceSpec{
 			Path:    filepath.Join(root, rel),
 			Display: filepath.ToSlash(rel),
@@ -195,6 +197,16 @@ func refinedDefs(t ir.Type) []*ir.TypeDef {
 func climbsOut(rel string) bool {
 	clean := filepath.Clean(rel)
 	return clean == ".." || strings.HasPrefix(clean, ".."+string(filepath.Separator))
+}
+
+// volumeQualified reports whether a slash-normalized path carries a Windows
+// drive/volume prefix (C:/...), which is absolute on Windows even though
+// filepath.IsAbs does not recognize it off Windows. A locator must be relative
+// to its source directory on every platform, so this is refused alongside an
+// absolute path — the same cross-platform rule the manifest's paths obey.
+func volumeQualified(p string) bool {
+	return len(p) >= 2 && p[1] == ':' &&
+		(p[0] >= 'A' && p[0] <= 'Z' || p[0] >= 'a' && p[0] <= 'z')
 }
 
 // checkOptions validates a source entry's options against the format's specs and

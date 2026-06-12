@@ -147,6 +147,18 @@ func TestLoadLocatorEscapesBase(t *testing.T) {
 	}
 }
 
+func TestLoadDriveQualifiedLocatorRejected(t *testing.T) {
+	// A Windows drive-qualified locator is absolute on Windows; off Windows
+	// filepath.IsAbs misses it, so it is refused by the cross-platform check
+	// rather than read as $root/C:/data.csv.
+	belt := "master M {\n  record { id: int }\n  primary id\n  source { csv \"C:/data.csv\" }\n}\n"
+	loaded, diags := run(t, belt, nil, nil)
+	single(t, diags, master.CodeLocatorEscapesRoot)
+	if len(loaded) != 0 {
+		t.Errorf("loaded = %v, want nothing for a drive-qualified locator", loaded)
+	}
+}
+
 func TestLoadSkipsReadOnOptionError(t *testing.T) {
 	// An invalid option must not be read with a fallback default; the source is
 	// reported and left unread.
