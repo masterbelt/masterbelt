@@ -124,6 +124,26 @@ func TestParseSourceBasePathBackslashEscaping(t *testing.T) {
 	}
 }
 
+func TestParseSourceBasePathDriveQualified(t *testing.T) {
+	// A Windows drive-qualified path is absolute, not relative, even though its
+	// slash form has no leading slash; it must be rejected on every platform.
+	_, diags := Parse([]byte("entry = \"main.belt\"\n\n[source.csv]\nbasePath = \"C:\\\\data\"\n"))
+	d := singleError(t, diags, CodeInvalid)
+	for _, fragment := range []string{`source "csv"`, "relative"} {
+		if !strings.Contains(d.Message, fragment) {
+			t.Errorf("Message = %q, want it to contain %q", d.Message, fragment)
+		}
+	}
+}
+
+func TestParseDriveQualifiedEntry(t *testing.T) {
+	_, diags := Parse([]byte("entry = \"C:\\\\proj\\\\main.belt\"\n"))
+	d := singleError(t, diags, CodeInvalid)
+	if !strings.Contains(d.Message, "relative") {
+		t.Errorf("Message = %q, want it to explain entry must be relative", d.Message)
+	}
+}
+
 func TestParseProfileSourceBasePathEscaping(t *testing.T) {
 	_, diags := Parse([]byte("entry = \"main.belt\"\n\n[profile.editor]\nentry = \"editor.belt\"\n\n[profile.editor.source.csv]\nbasePath = \"../shared\"\n"))
 	d := singleError(t, diags, CodeInvalid)

@@ -135,13 +135,26 @@ func confinedPath(p, label string) string {
 	// root on Windows.
 	slashed := strings.ReplaceAll(p, "\\", "/")
 	switch cleaned := path.Clean(slashed); {
-	case path.IsAbs(slashed):
+	case absolutePath(slashed):
 		return label + " must be relative to the project root"
 	case cleaned == ".." || strings.HasPrefix(cleaned, "../"):
 		return label + " must not escape the project root"
 	default:
 		return ""
 	}
+}
+
+// absolutePath reports whether a slash-normalized manifest path is absolute on
+// any platform: a leading slash (a Unix path, or a //host UNC share) or a
+// Windows drive prefix (C:/...). path.IsAbs alone misses the drive form, so a
+// drive-qualified path would slip the relative-only policy; the check is
+// cross-platform on purpose, so a manifest is judged the same wherever it runs.
+func absolutePath(slashed string) bool {
+	if path.IsAbs(slashed) {
+		return true
+	}
+	return len(slashed) >= 2 && slashed[1] == ':' &&
+		(slashed[0] >= 'A' && slashed[0] <= 'Z' || slashed[0] >= 'a' && slashed[0] <= 'z')
 }
 
 // validateEntry checks one profile's entry path policy. profile is "" for the
