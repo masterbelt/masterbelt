@@ -343,6 +343,18 @@ func assertSingleError(t *testing.T, diags diagnostic.List, code diagnostic.Code
 	return d
 }
 
+func TestFileIDNormalizesBackslashes(t *testing.T) {
+	// A portable backslash path names the same file as its slash form, on every
+	// platform, so an entry or use path written with Windows separators resolves.
+	for _, in := range []string{"src\\main.belt", "src/main.belt", "a\\b\\c.belt"} {
+		got := fileID(in)
+		want := FileID(strings.ReplaceAll(in, "\\", "/"))
+		if got != want {
+			t.Errorf("fileID(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
 // fileIDList flattens the project's file ids for compact assertions.
 func fileIDList(p *Project) string {
 	ids := make([]string, 0, len(p.Files()))
