@@ -80,6 +80,27 @@ func TestSemanticTokensMaster(t *testing.T) {
 	}
 }
 
+func TestSemanticTokensSource(t *testing.T) {
+	// source is a context keyword coloured through the MasterKeyword node, like
+	// record and primary; the format name is an ordinary identifier and the
+	// locator a string, so only the source keyword reads as a keyword here.
+	src := "master Skill {\n  record {\n    id: int\n  }\n  primary id\n" +
+		"  source {\n    csv \"skills.csv\" { delimiter: \",\" }\n  }\n}\n"
+	doc := abstract.NewDocument([]byte(src))
+	got := decode(semanticTokens(doc).Data)
+
+	want := decodedToken{5, 2, 6, stKeyword, 0} // "source" on line 5, cols 2..8
+	found := false
+	for _, tok := range got {
+		if tok == want {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("no keyword token for `source` at line 5 col 2; tokens = %+v", got)
+	}
+}
+
 func TestSemanticTokensLiterals(t *testing.T) {
 	// Datetime and duration literals colour as numbers, one token each —
 	// matching their cold-start constant.numeric scopes.
