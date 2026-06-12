@@ -134,6 +134,7 @@ master.locator_escapes_root,ソースロケータ {path} はプロジェクト�
 master.source_unreadable,ソース {path} を読み込めません: {detail}
 master.missing_column,ソース {path} にフィールド {field} に対応する列がありません
 master.unsupported_field_type,フィールド {field} の型 {typ} は csv フォーマットではまだ読み込めません
+master.unsupported_row_type,master {master} の行型はまだ読み込めません
 master.cell_type_mismatch,"{path}:{row},{col}: {value} はフィールド {field} の型 {typ} として不正です"
 master.cell_refinement,"{path}:{row},{col}: {value} はフィールド {field} の型 {typ} を満たしません"
 master.unknown_option,フォーマット {format} にオプション {key} はありません

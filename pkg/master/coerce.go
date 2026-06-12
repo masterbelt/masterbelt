@@ -89,18 +89,26 @@ func coerceCell(row Row, col int, field ir.Field, src SourceSpec, diags *[]diagn
 
 // RowFields returns the fields of a master's row type — its record fields,
 // whether the row is written as an inline record or a named record alias — or
-// false when the row is absent or is not a record (a malformed master the
-// engine already reported, so the caller skips it).
+// false when the row is absent, is not a record (a malformed master the engine
+// already reported), or is a shape the reader does not expand (a generic
+// application). Following the alias chain keeps a visited set, so a cyclic alias
+// the engine flags as an error cannot send it into an unbounded recursion.
 func RowFields(row ir.Type) ([]ir.Field, bool) {
-	switch r := row.(type) {
-	case *ir.Record:
-		return r.Fields, true
-	case *ir.Named:
-		if r.Def != nil {
-			return RowFields(r.Def.Body)
+	seen := map[*ir.TypeDef]bool{}
+	for {
+		switch r := row.(type) {
+		case *ir.Record:
+			return r.Fields, true
+		case *ir.Named:
+			if r.Def == nil || seen[r.Def] {
+				return nil, false
+			}
+			seen[r.Def] = true
+			row = r.Def.Body
+		default:
+			return nil, false
 		}
 	}
-	return nil, false
 }
 
 // The primitive type names the data layer reads, named so the same literal is
@@ -165,17 +173,25 @@ func scalarSupported(t ir.Type) bool {
 
 // underlyingBuiltin unwraps a type to the primitive at its base — through a
 // named alias or refinement (whose Body is the underlying type) — or false when
-// the base is not a primitive.
+// the base is not a primitive (an unexpanded generic application, a record). A
+// visited set bounds the walk, so a cyclic alias the engine flags as an error
+// cannot send it into an unbounded recursion.
 func underlyingBuiltin(t ir.Type) (string, bool) {
-	switch tt := t.(type) {
-	case *ir.Builtin:
-		return tt.Name, true
-	case *ir.Named:
-		if tt.Def != nil && tt.Def.Body != nil {
-			return underlyingBuiltin(tt.Def.Body)
+	seen := map[*ir.TypeDef]bool{}
+	for {
+		switch tt := t.(type) {
+		case *ir.Builtin:
+			return tt.Name, true
+		case *ir.Named:
+			if tt.Def == nil || tt.Def.Body == nil || seen[tt.Def] {
+				return "", false
+			}
+			seen[tt.Def] = true
+			t = tt.Def.Body
+		default:
+			return "", false
 		}
 	}
-	return "", false
 }
 
 // coerceScalar converts a raw string cell to a constant of t's primitive, or

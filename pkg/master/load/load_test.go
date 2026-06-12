@@ -155,6 +155,30 @@ func TestLoadFollowsAliasChain(t *testing.T) {
 	}
 }
 
+func TestLoadGenericRowUnsupported(t *testing.T) {
+	// A generic row alias is a shape the reader does not expand; rather than
+	// silently skipping the master's sources, it is reported as unsupported.
+	belt := "type Row<T> = { id: T }\n\n" +
+		"master M {\n  record Row<int>\n  primary id\n  source { csv \"m.csv\" }\n}\n"
+	loaded, diags := run(t, belt, map[string]string{"csv": "data"}, map[string]string{"data/m.csv": "id\n1\n"})
+	single(t, diags, master.CodeUnsupportedRowType)
+	if len(loaded) != 0 {
+		t.Errorf("loaded = %v, want nothing for an unsupported row", loaded)
+	}
+}
+
+func TestLoadGenericFieldUnsupported(t *testing.T) {
+	// A generic-alias field type is reported as unsupported rather than silently
+	// dropped; the concrete fields around it still bind.
+	belt := "type Id<T> = T\n\n" +
+		"master Skill {\n  record { id: int, val: Id<int> }\n  primary id\n  source { csv \"skills.csv\" }\n}\n"
+	_, diags := run(t, belt, map[string]string{"csv": "data"}, map[string]string{"data/skills.csv": "id,val\n1,2\n"})
+	d := single(t, diags, master.CodeUnsupportedFieldType)
+	if !strings.Contains(d.Message, "val") {
+		t.Errorf("message = %q, want it to name the generic field", d.Message)
+	}
+}
+
 func TestLoadUnknownFormat(t *testing.T) {
 	belt := "master Skill {\n  record { id: int }\n  primary id\n  source { xlsx \"skills.xlsx\" }\n}\n"
 	_, diags := run(t, belt, nil, nil)

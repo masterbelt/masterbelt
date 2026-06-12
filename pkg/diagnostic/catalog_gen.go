@@ -1063,6 +1063,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "field " + f["field"].String() + " has type " + f["typ"].String() + " which the csv format cannot read yet"
 		}
 	},
+	"master.unsupported_row_type": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "master " + f["master"].String() + " の行型はまだ読み込めません"
+		default:
+			return "master " + f["master"].String() + " has a row type the reader cannot read yet"
+		}
+	},
 	"project.config.entry_not_found": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":

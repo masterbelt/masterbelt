@@ -134,6 +134,7 @@ master.locator_escapes_root,source locator {path} escapes the project root
 master.source_unreadable,cannot read source {path}: {detail}
 master.missing_column,source {path} has no column for field {field}
 master.unsupported_field_type,field {field} has type {typ} which the csv format cannot read yet
+master.unsupported_row_type,master {master} has a row type the reader cannot read yet
 master.cell_type_mismatch,"{path}:{row},{col}: {value} is not a valid {typ} for field {field}"
 master.cell_refinement,"{path}:{row},{col}: {value} does not satisfy {typ} for field {field}"
 master.unknown_option,format {format} has no option {key}

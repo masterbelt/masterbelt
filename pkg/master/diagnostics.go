@@ -46,6 +46,13 @@ func UnsupportedFieldType(offset, width int, field, typ string) diagnostic.Diagn
 	return newUnsupportedFieldTypeDiagnostic(offset, width, field, typ)
 }
 
+// UnsupportedRowType reports that a master's row is a type the reader cannot
+// expand into fields — a generic row alias the language does not read for
+// masters yet — so its sources are reported rather than silently skipped.
+func UnsupportedRowType(offset, width int, master string) diagnostic.Diagnostic {
+	return newUnsupportedRowTypeDiagnostic(offset, width, master)
+}
+
 // CellTypeMismatch reports that a cell's value is not a valid value of its
 // field's declared type.
 func CellTypeMismatch(offset, width int, path string, row, col int, field, value, typ string) diagnostic.Diagnostic {

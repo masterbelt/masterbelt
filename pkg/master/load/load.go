@@ -73,7 +73,16 @@ func File(prog *semantic.Program, file semantic.FileID, root string, bases map[s
 func readMaster(def *ir.TypeDef, doc *abstract.Document, env eval.GraphEnv, root string, bases map[string]string, reg *master.Registry) ([]Loaded, []diagnostic.Diagnostic) {
 	fields, ok := master.RowFields(def.Master.Row)
 	if !ok {
-		return nil, nil // a malformed row the engine already reported; nothing to read
+		// The row is present and the program checked (the caller skips files with
+		// errors), so this is not a malformed row but one the reader cannot
+		// expand — a generic row alias the language does not read for masters
+		// yet. Report it at the sources rather than silently ignoring them.
+		var diags []diagnostic.Diagnostic
+		if len(def.MasterSyntax.Sources) > 0 {
+			offset, width := locatorSpan(doc, def.MasterSyntax.Sources[0])
+			diags = append(diags, master.UnsupportedRowType(offset, width, def.Name))
+		}
+		return nil, diags
 	}
 	var loaded []Loaded
 	var diags []diagnostic.Diagnostic
@@ -153,11 +162,13 @@ func checkRefinements(typed master.Table, fields []ir.Field, spec master.SourceS
 // predicate runs.
 func refinedDefs(t ir.Type) []*ir.TypeDef {
 	var defs []*ir.TypeDef
+	seen := map[*ir.TypeDef]bool{}
 	for {
 		named, ok := t.(*ir.Named)
-		if !ok || named.Def == nil {
+		if !ok || named.Def == nil || seen[named.Def] {
 			return defs
 		}
+		seen[named.Def] = true
 		if named.Def.Where != nil {
 			defs = append(defs, named.Def)
 		}

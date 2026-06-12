@@ -158,6 +158,27 @@ func TestCoerceBool(t *testing.T) {
 	singleDiag(t, diags, CodeCellTypeMismatch) // "maybe" is not a bool
 }
 
+func TestCoerceCyclicAliasTerminates(t *testing.T) {
+	// type A = B; type B = A — a cycle the engine flags as an error. The unwrap
+	// walks must bound it (a visited set) rather than recurse until the stack
+	// overflows; both report it as unreadable.
+	a := &ir.TypeDef{Name: "A"}
+	b := &ir.TypeDef{Name: "B"}
+	a.Body = &ir.Named{Def: b}
+	b.Body = &ir.Named{Def: a}
+	cyclic := &ir.Named{Def: a}
+
+	if _, ok := RowFields(cyclic); ok {
+		t.Error("RowFields(cyclic) = ok, want false")
+	}
+	if scalarSupported(cyclic) {
+		t.Error("scalarSupported(cyclic) = true, want false")
+	}
+	raw := Table{Columns: []string{"x"}, Rows: []Row{{Cells: []Cell{rawCell("1", 2, 1)}}}}
+	_, diags := Coerce(raw, []ir.Field{{Name: "x", Type: cyclic}}, spec())
+	singleDiag(t, diags, CodeUnsupportedFieldType)
+}
+
 func TestRowFields(t *testing.T) {
 	rec := &ir.Record{Fields: []ir.Field{field("id", "int")}}
 	if fs, ok := RowFields(rec); !ok || len(fs) != 1 || fs[0].Name != "id" {

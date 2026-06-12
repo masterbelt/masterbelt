@@ -86,24 +86,39 @@ func dumpData(cmd *cobra.Command, rep reporter.Reporter, proj *project.Project) 
 	sort.Slice(files, func(i, j int) bool { return files[i].ID < files[j].ID })
 	for _, f := range files {
 		id := semantic.FileID(f.ID)
-		loaded, dataDiags := load.File(prog, id, proj.Root, bases, reg)
-		for _, l := range loaded {
-			if _, err := fmt.Fprintf(cmd.OutOrStdout(), "%s <- %s\n%s\n", l.Master, l.Display, l.Table.String()); err != nil {
-				return err
+		// A data run over an unchecked file would accept broken source as
+		// successfully read — and the resolved types it reads against are
+		// unreliable, down to a cyclic alias the loader must not follow. So the
+		// file's own lexer, parser, and semantic diagnostics gate it: when the
+		// file does not check, those are reported and its data is left unread;
+		// only a clean file is loaded. Lint is advisory (check's concern) and
+		// left out — a data dump reports what is wrong, not what is unused.
+		diags := gatherDiagnostics(f.AST, prog, id)
+		if !hasError(diags) {
+			loaded, dataDiags := load.File(prog, id, proj.Root, bases, reg)
+			for _, l := range loaded {
+				if _, err := fmt.Fprintf(cmd.OutOrStdout(), "%s <- %s\n%s\n", l.Master, l.Display, l.Table.String()); err != nil {
+					return err
+				}
 			}
+			diags = append(diags, dataDiags...)
 		}
-		// A data run over an unchecked project would accept broken source as
-		// successfully read, so the file's own lexer, parser, and semantic
-		// diagnostics are reported alongside the data ones — the run only
-		// succeeds when the project itself checks. Lint is advisory (check's
-		// concern), so it is left out: a data dump reports what is wrong, not
-		// what is merely unused.
-		diags := append(gatherDiagnostics(f.AST, prog, id), dataDiags...)
 		if len(diags) > 0 {
 			rep.Report(source.NewFile(displayPath(f.Path), f.Data), diags)
 		}
 	}
 	return nil
+}
+
+// hasError reports whether any diagnostic is an error — the gate on whether a
+// file's data is trustworthy enough to read.
+func hasError(diags []diagnostic.Diagnostic) bool {
+	for _, d := range diags {
+		if d.Severity == diagnostic.Error {
+			return true
+		}
+	}
+	return false
 }
 
 // activeProfile is the profile config the project was opened with — a named one,

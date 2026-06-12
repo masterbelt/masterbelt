@@ -98,3 +98,29 @@ func TestDataReportsProjectErrors(t *testing.T) {
 		t.Errorf("stderr = %q, want the project's own error surfaced", stderr)
 	}
 }
+
+func TestDataCyclicAliasDoesNotCrash(t *testing.T) {
+	// A cyclic alias is a semantic error; the command must report it and leave
+	// the data unread, not follow the cycle into a stack overflow.
+	root := t.TempDir()
+	belttest.WriteFile(t, root, "masterbelt.toml", "entry = \"m.belt\"\n")
+	belttest.WriteFile(t, root, "m.belt", ""+
+		"type A = B\n"+
+		"type B = A\n\n"+
+		"master M {\n"+
+		"  record { id: A }\n"+
+		"  primary id\n"+
+		"  source { csv \"m.csv\" }\n"+
+		"}\n")
+	belttest.WriteFile(t, root, "m.csv", "id\n1\n")
+
+	// Reaching the assertions at all means the unwrap terminated rather than
+	// overflowing the stack; the command reports the unreadable field and fails.
+	_, stderr, err := execData(t, root)
+	if err == nil {
+		t.Fatal("data succeeded on a cyclic alias, want an error")
+	}
+	if stderr == "" {
+		t.Error("stderr empty, want the cyclic field reported")
+	}
+}

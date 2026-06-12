@@ -18,6 +18,7 @@ const (
 	CodeUnknownFormat        diagnostic.Code = "master.unknown_format"
 	CodeUnknownOption        diagnostic.Code = "master.unknown_option"
 	CodeUnsupportedFieldType diagnostic.Code = "master.unsupported_field_type"
+	CodeUnsupportedRowType   diagnostic.Code = "master.unsupported_row_type"
 )
 
 func newCellRefinementDiagnostic(offset int, width int, path string, row int, col int, field string, value string, typ string) diagnostic.Diagnostic {
@@ -155,6 +156,20 @@ func newUnsupportedFieldTypeDiagnostic(offset int, width int, field string, typ 
 		Severity: diagnostic.Error,
 		Code:     CodeUnsupportedFieldType,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeUnsupportedFieldType, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newUnsupportedRowTypeDiagnostic(offset int, width int, master string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"master": diagnostic.Str(master),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeUnsupportedRowType,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeUnsupportedRowType, fields),
 		Fields:   fields,
 		Offset:   offset,
 		Width:    width,
