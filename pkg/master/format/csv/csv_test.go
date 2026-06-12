@@ -3,6 +3,7 @@ package csv
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/masterbelt/masterbelt/pkg/diagnostic"
@@ -89,6 +90,17 @@ func TestReadLongRowRejected(t *testing.T) {
 	singleUnreadable(t, diags)
 	if len(table.Rows) != 0 {
 		t.Errorf("rows = %d, want the over-long row skipped", len(table.Rows))
+	}
+}
+
+func TestReadDuplicateHeaderRejected(t *testing.T) {
+	// Two columns sharing a name would let one shadow the other's data, since
+	// columns bind by name; the header is malformed.
+	spec := write(t, "id,power,power\n1,30,-5\n", nil)
+	_, diags := New().Read(spec)
+	d := singleUnreadable(t, diags)
+	if !strings.Contains(d.Message, "power") {
+		t.Errorf("message = %q, want it to name the duplicated column", d.Message)
 	}
 }
 

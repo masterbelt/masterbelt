@@ -139,3 +139,5 @@ master.cell_type_mismatch,error,path:string row:int col:int field:string value:s
 master.cell_refinement,error,path:string row:int col:int field:string value:string typ:string
 master.unknown_option,error,format:string key:string
 master.option_type_mismatch,error,key:string typ:string
+master.duplicate_option,error,format:string key:string
+master.duplicate_row_field,error,field:string master:string

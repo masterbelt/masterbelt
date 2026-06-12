@@ -77,12 +77,17 @@ func readMaster(def *ir.TypeDef, doc *abstract.Document, env eval.GraphEnv, root
 		// errors), so this is not a malformed row but one the reader cannot
 		// expand — a generic row alias the language does not read for masters
 		// yet. Report it at the sources rather than silently ignoring them.
-		var diags []diagnostic.Diagnostic
-		if len(def.MasterSyntax.Sources) > 0 {
-			offset, width := locatorSpan(doc, def.MasterSyntax.Sources[0])
-			diags = append(diags, master.UnsupportedRowType(offset, width, def.Name))
-		}
-		return nil, diags
+		return nil, atFirstSource(doc, def, func(offset, width int) diagnostic.Diagnostic {
+			return master.UnsupportedRowType(offset, width, def.Name)
+		})
+	}
+	if dup, ok := firstDuplicate(fieldNames(fields)); ok {
+		// A row with a repeated field name binds its cells and runs its
+		// refinements ambiguously (the later field shadows the earlier); report
+		// it rather than load an ambiguous table.
+		return nil, atFirstSource(doc, def, func(offset, width int) diagnostic.Diagnostic {
+			return master.DuplicateRowField(offset, width, dup, def.Name)
+		})
 	}
 	var loaded []Loaded
 	var diags []diagnostic.Diagnostic
@@ -167,6 +172,39 @@ func checkRefinements(typed master.Table, fields []ir.Field, spec master.SourceS
 	return diags
 }
 
+// atFirstSource builds a master-level diagnostic anchored at the first source
+// declaration's locator (where a master-wide problem is shown), or nothing when
+// the master declares no source to anchor to.
+func atFirstSource(doc *abstract.Document, def *ir.TypeDef, build func(offset, width int) diagnostic.Diagnostic) []diagnostic.Diagnostic {
+	if len(def.MasterSyntax.Sources) == 0 {
+		return nil
+	}
+	offset, width := locatorSpan(doc, def.MasterSyntax.Sources[0])
+	return []diagnostic.Diagnostic{build(offset, width)}
+}
+
+// fieldNames lists a row's field names in order.
+func fieldNames(fields []ir.Field) []string {
+	names := make([]string, len(fields))
+	for i, f := range fields {
+		names[i] = f.Name
+	}
+	return names
+}
+
+// firstDuplicate returns the first value that appears more than once in order,
+// or false when every value is distinct.
+func firstDuplicate(values []string) (string, bool) {
+	seen := make(map[string]bool, len(values))
+	for _, v := range values {
+		if seen[v] {
+			return v, true
+		}
+		seen[v] = true
+	}
+	return "", false
+}
+
 // refinedDefs collects the refined definitions in a field type's alias chain,
 // outermost first — every named type with a where-clause reached by following
 // each alias to its underlying type. A plain alias of a refined type
@@ -224,7 +262,15 @@ func checkOptions(entry *ast.SourceEntry, format master.Format, offset, width in
 		specs[s.Name] = s.Kind
 	}
 	var diags []diagnostic.Diagnostic
+	seen := make(map[string]bool, len(lit.Fields))
 	for _, field := range lit.Fields {
+		if seen[field.Name] {
+			// A repeated option would silently resolve to whichever value came
+			// last; an ambiguous declaration is reported, not interpreted.
+			diags = append(diags, master.DuplicateOption(offset, width, format.Name(), field.Name))
+			continue
+		}
+		seen[field.Name] = true
 		want, known := specs[field.Name]
 		if !known {
 			diags = append(diags, master.UnknownOption(offset, width, format.Name(), field.Name))

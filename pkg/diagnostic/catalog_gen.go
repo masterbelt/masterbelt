@@ -1007,6 +1007,22 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return f["path"].String() + ":" + f["row"].String() + "," + f["col"].String() + ": " + f["value"].String() + " is not a valid " + f["typ"].String() + " for field " + f["field"].String()
 		}
 	},
+	"master.duplicate_option": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "フォーマット " + f["format"].String() + " でオプション " + f["key"].String() + " が複数回指定されています"
+		default:
+			return "format " + f["format"].String() + " sets option " + f["key"].String() + " more than once"
+		}
+	},
+	"master.duplicate_row_field": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "master " + f["master"].String() + " でフィールド " + f["field"].String() + " が複数回宣言されています"
+		default:
+			return "master " + f["master"].String() + " declares field " + f["field"].String() + " more than once"
+		}
+	},
 	"master.locator_escapes_root": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":

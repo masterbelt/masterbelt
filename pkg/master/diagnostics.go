@@ -76,3 +76,15 @@ func UnknownOption(offset, width int, format, key string) diagnostic.Diagnostic 
 func OptionTypeMismatch(offset, width int, key, typ string) diagnostic.Diagnostic {
 	return newOptionTypeMismatchDiagnostic(offset, width, key, typ)
 }
+
+// DuplicateOption reports that a source declaration set the same option more
+// than once, which would silently resolve to whichever value came last.
+func DuplicateOption(offset, width int, format, key string) diagnostic.Diagnostic {
+	return newDuplicateOptionDiagnostic(offset, width, format, key)
+}
+
+// DuplicateRowField reports that a master's row declares the same field name
+// more than once, leaving its cells and refinements ambiguous.
+func DuplicateRowField(offset, width int, field, master string) diagnostic.Diagnostic {
+	return newDuplicateRowFieldDiagnostic(offset, width, field, master)
+}

@@ -79,6 +79,11 @@ func (Format) Read(spec master.SourceSpec) (master.Table, *diagnostic.List) {
 		if !header {
 			table.Columns = append([]string(nil), record...)
 			header = true
+			// Columns bind by name, so two columns sharing a name would let one
+			// silently shadow the other's data; a duplicate header is malformed.
+			if dup, ok := firstDuplicate(table.Columns); ok {
+				diags.Add(master.SourceUnreadable(spec.Offset, spec.Width, spec.Display, fmt.Sprintf("duplicate column %q", dup)))
+			}
 			continue
 		}
 		// A row longer than the header carries cells no column names, which bind
@@ -100,6 +105,19 @@ func (Format) Read(spec master.SourceSpec) (master.Table, *diagnostic.List) {
 		diags.Add(master.SourceUnreadable(spec.Offset, spec.Width, spec.Display, "the source has no header row"))
 	}
 	return table, &diags
+}
+
+// firstDuplicate returns the first value that appears more than once in order,
+// or false when every value is distinct.
+func firstDuplicate(values []string) (string, bool) {
+	seen := make(map[string]bool, len(values))
+	for _, v := range values {
+		if seen[v] {
+			return v, true
+		}
+		seen[v] = true
+	}
+	return "", false
 }
 
 // cellsOf builds one record's cells, each carrying the line and column the

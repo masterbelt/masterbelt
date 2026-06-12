@@ -224,6 +224,32 @@ func TestLoadGenericFieldUnsupported(t *testing.T) {
 	}
 }
 
+func TestLoadDuplicateRowFieldRejected(t *testing.T) {
+	// A row declaring the same field twice is ambiguous (which type binds the
+	// cell, which refinement runs); it is reported rather than loaded.
+	belt := "type Positive = int where self > 0\n\n" +
+		"master Skill {\n  record { id: int, x: Positive, x: int }\n  primary id\n  source { csv \"skills.csv\" }\n}\n"
+	loaded, diags := run(t, belt, map[string]string{"csv": "data"}, map[string]string{"data/skills.csv": "id,x\n1,-5\n"})
+	d := single(t, diags, master.CodeDuplicateRowField)
+	if !strings.Contains(d.Message, "x") {
+		t.Errorf("message = %q, want it to name the duplicated field", d.Message)
+	}
+	if len(loaded) != 0 {
+		t.Errorf("loaded = %v, want nothing for a duplicate-field row", loaded)
+	}
+}
+
+func TestLoadDuplicateOptionRejected(t *testing.T) {
+	// A repeated option would resolve to the last value silently; it is reported
+	// and the source left unread.
+	belt := "master Skill {\n  record { id: int }\n  primary id\n  source { csv \"skills.csv\" { delimiter: \";\", delimiter: \",\" } }\n}\n"
+	loaded, diags := run(t, belt, map[string]string{"csv": "data"}, map[string]string{"data/skills.csv": "id\n1\n"})
+	single(t, diags, master.CodeDuplicateOption)
+	if len(loaded) != 0 {
+		t.Errorf("loaded = %v, want nothing read for a duplicate option", loaded)
+	}
+}
+
 func TestLoadUnknownFormat(t *testing.T) {
 	belt := "master Skill {\n  record { id: int }\n  primary id\n  source { xlsx \"skills.xlsx\" }\n}\n"
 	_, diags := run(t, belt, nil, nil)

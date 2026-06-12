@@ -139,3 +139,5 @@ master.cell_type_mismatch,"{path}:{row},{col}: {value} はフィールド {field
 master.cell_refinement,"{path}:{row},{col}: {value} はフィールド {field} の型 {typ} を満たしません"
 master.unknown_option,フォーマット {format} にオプション {key} はありません
 master.option_type_mismatch,オプション {key} は {typ} でなければなりません
+master.duplicate_option,フォーマット {format} でオプション {key} が複数回指定されています
+master.duplicate_row_field,master {master} でフィールド {field} が複数回宣言されています

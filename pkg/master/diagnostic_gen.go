@@ -11,6 +11,8 @@ import (
 const (
 	CodeCellRefinement       diagnostic.Code = "master.cell_refinement"
 	CodeCellTypeMismatch     diagnostic.Code = "master.cell_type_mismatch"
+	CodeDuplicateOption      diagnostic.Code = "master.duplicate_option"
+	CodeDuplicateRowField    diagnostic.Code = "master.duplicate_row_field"
 	CodeLocatorEscapesRoot   diagnostic.Code = "master.locator_escapes_root"
 	CodeMissingColumn        diagnostic.Code = "master.missing_column"
 	CodeOptionTypeMismatch   diagnostic.Code = "master.option_type_mismatch"
@@ -53,6 +55,36 @@ func newCellTypeMismatchDiagnostic(offset int, width int, path string, row int, 
 		Severity: diagnostic.Error,
 		Code:     CodeCellTypeMismatch,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeCellTypeMismatch, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newDuplicateOptionDiagnostic(offset int, width int, format string, key string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"format": diagnostic.Str(format),
+		"key":    diagnostic.Str(key),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeDuplicateOption,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeDuplicateOption, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newDuplicateRowFieldDiagnostic(offset int, width int, field string, master string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"field":  diagnostic.Str(field),
+		"master": diagnostic.Str(master),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeDuplicateRowField,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeDuplicateRowField, fields),
 		Fields:   fields,
 		Offset:   offset,
 		Width:    width,
