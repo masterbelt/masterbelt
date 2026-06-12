@@ -12,9 +12,15 @@
 #   workflow identity for a short-lived credential and attaches provenance.
 # - GitHub Packages: the workflow's built-in GITHUB_TOKEN, per-run and revoked.
 #
-# A nightly tag is a prerelease (it carries a '-') and goes to the `nightly`
-# dist-tag so `npm install` (latest) never picks it up; a stable tag goes to
-# `latest`. Re-publishing an existing version is skipped, not failed.
+# A stable tag publishes to BOTH public npm (`latest`) and GitHub Packages; a
+# nightly tag (a prerelease — it carries a '-') publishes ONLY to GitHub Packages,
+# under the `nightly` dist-tag. Public npm is kept stable-only on purpose: every
+# nightly is a new immutable version, and accumulating them bloats the public
+# packument (the all-versions metadata document) until new publishes start
+# failing. GitHub Packages has no such ceiling and its versions are freely
+# deletable, so it carries the nightly churn; nightly grammar consumers track it
+# there, or the mirror's immutable v<version> git tag. Re-publishing an existing
+# version is skipped, not failed.
 #
 # This repository is a generated mirror — edit the source in the masterbelt
 # monorepo (toolchain/grammars/tree-sitter-masterbelt/.github), not here.
@@ -126,8 +132,13 @@ jobs:
 
       # OIDC — no token. Requires a Trusted Publisher configured on npmjs for this
       # repo + workflow; npm authenticates via the id-token and adds provenance.
+      # Stable only: a nightly here would add an immutable version to the public
+      # packument that can never be reclaimed (OIDC can't unpublish, and the
+      # registry burns the version string forever), so the document grows until
+      # publishing breaks. Nightlies go to GitHub Packages below instead.
       # --ignore-scripts so packing never runs the consumer install hook.
       - name: Publish to npm (public, OIDC Trusted Publishing)
+        if: steps.t.outputs.tag == 'latest'
         run: |
           npm publish --access public --ignore-scripts --tag ${{ steps.t.outputs.tag }} 2>err \
             || { grep -qiE "cannot publish over|previously published|already exists|409" err \
@@ -135,6 +146,9 @@ jobs:
                  || { cat err >&2; exit 1; }; }
           rm -f err
 
+      # GitHub Packages carries BOTH stable and nightly — it is the nightly home
+      # (see the header): versions here are deletable and not subject to the
+      # public-registry packument ceiling.
       - name: Publish to GitHub Packages
         env:
           TOKEN: ${{ secrets.GITHUB_TOKEN }}
