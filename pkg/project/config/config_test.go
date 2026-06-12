@@ -66,6 +66,73 @@ func TestParseProfileEscapingEntry(t *testing.T) {
 	}
 }
 
+func TestParseSourceBasePath(t *testing.T) {
+	// A [source.<format>] section sets the directory a format resolves its
+	// locators against, keyed by the same format name the grammar and the
+	// format registry use.
+	src := []byte("entry = \"main.belt\"\n\n[source.csv]\nbasePath = \"data/csv\"\n")
+	cfg, diags := Parse(src)
+	if diags.Len() != 0 {
+		t.Fatalf("Parse() diagnostics = %v, want none", diags.Items())
+	}
+	if got := cfg.Source["csv"].BasePath; got != "data/csv" {
+		t.Errorf("Source[csv].BasePath = %q, want %q", got, "data/csv")
+	}
+}
+
+func TestParseProfileSourceBasePath(t *testing.T) {
+	// A named profile carries its own per-format base paths.
+	src := []byte("entry = \"main.belt\"\n\n[profile.editor]\nentry = \"editor.belt\"\n\n[profile.editor.source.csv]\nbasePath = \"fixtures\"\n")
+	cfg, diags := Parse(src)
+	if diags.Len() != 0 {
+		t.Fatalf("Parse() diagnostics = %v, want none", diags.Items())
+	}
+	if got := cfg.Profiles["editor"].Source["csv"].BasePath; got != "fixtures" {
+		t.Errorf("Profiles[editor].Source[csv].BasePath = %q, want %q", got, "fixtures")
+	}
+}
+
+func TestParseSourceBasePathAbsolute(t *testing.T) {
+	_, diags := Parse([]byte("entry = \"main.belt\"\n\n[source.csv]\nbasePath = \"/data\"\n"))
+	d := singleError(t, diags, CodeInvalid)
+	for _, fragment := range []string{`source "csv"`, "relative"} {
+		if !strings.Contains(d.Message, fragment) {
+			t.Errorf("Message = %q, want it to contain %q", d.Message, fragment)
+		}
+	}
+}
+
+func TestParseSourceBasePathEscaping(t *testing.T) {
+	_, diags := Parse([]byte("entry = \"main.belt\"\n\n[source.csv]\nbasePath = \"../shared\"\n"))
+	d := singleError(t, diags, CodeInvalid)
+	for _, fragment := range []string{`source "csv"`, "escape"} {
+		if !strings.Contains(d.Message, fragment) {
+			t.Errorf("Message = %q, want it to contain %q", d.Message, fragment)
+		}
+	}
+}
+
+func TestParseProfileSourceBasePathEscaping(t *testing.T) {
+	_, diags := Parse([]byte("entry = \"main.belt\"\n\n[profile.editor]\nentry = \"editor.belt\"\n\n[profile.editor.source.csv]\nbasePath = \"../shared\"\n"))
+	d := singleError(t, diags, CodeInvalid)
+	for _, fragment := range []string{`profile "editor"`, `source "csv"`, "escape"} {
+		if !strings.Contains(d.Message, fragment) {
+			t.Errorf("Message = %q, want it to contain %q", d.Message, fragment)
+		}
+	}
+}
+
+func TestParseEmptyBasePathIsRoot(t *testing.T) {
+	// An unset (or empty) base path means the project root and is not an error.
+	cfg, diags := Parse([]byte("entry = \"main.belt\"\n\n[source.csv]\n"))
+	if diags.Len() != 0 {
+		t.Fatalf("Parse() diagnostics = %v, want none", diags.Items())
+	}
+	if got := cfg.Source["csv"].BasePath; got != "" {
+		t.Errorf("Source[csv].BasePath = %q, want empty (the project root)", got)
+	}
+}
+
 func TestParseIgnoresUnknownKeys(t *testing.T) {
 	// Keys and sections the toolchain does not read must not break it,
 	// whichever side is older.
