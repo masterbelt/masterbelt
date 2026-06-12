@@ -11,6 +11,7 @@ import (
 const (
 	CodeCellRefinement       diagnostic.Code = "master.cell_refinement"
 	CodeCellTypeMismatch     diagnostic.Code = "master.cell_type_mismatch"
+	CodeLocatorEscapesRoot   diagnostic.Code = "master.locator_escapes_root"
 	CodeMissingColumn        diagnostic.Code = "master.missing_column"
 	CodeOptionTypeMismatch   diagnostic.Code = "master.option_type_mismatch"
 	CodeSourceUnreadable     diagnostic.Code = "master.source_unreadable"
@@ -51,6 +52,20 @@ func newCellTypeMismatchDiagnostic(offset int, width int, path string, row int, 
 		Severity: diagnostic.Error,
 		Code:     CodeCellTypeMismatch,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeCellTypeMismatch, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newLocatorEscapesRootDiagnostic(offset int, width int, path string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"path": diagnostic.Str(path),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeLocatorEscapesRoot,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeLocatorEscapesRoot, fields),
 		Fields:   fields,
 		Offset:   offset,
 		Width:    width,

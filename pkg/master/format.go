@@ -60,11 +60,11 @@ const (
 func (k OptionKind) String() string {
 	switch k {
 	case OptionBool:
-		return "bool"
+		return primBool
 	case OptionInt:
 		return "int"
 	default:
-		return "string"
+		return primString
 	}
 }
 

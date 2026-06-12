@@ -21,6 +21,13 @@ func UnknownFormat(offset, width int, format string) diagnostic.Diagnostic {
 	return newUnknownFormatDiagnostic(offset, width, format)
 }
 
+// LocatorEscapesRoot reports that a source locator resolves outside the project
+// root — through `..` segments or an absolute path — which the data command does
+// not read, the same confinement the manifest's base paths obey.
+func LocatorEscapesRoot(offset, width int, path string) diagnostic.Diagnostic {
+	return newLocatorEscapesRootDiagnostic(offset, width, path)
+}
+
 // SourceUnreadable reports that a format could not read a source at all — a
 // missing file, an unreadable one, a malformed body — detail carrying the
 // underlying reason.

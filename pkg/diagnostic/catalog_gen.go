@@ -1007,6 +1007,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return f["path"].String() + ":" + f["row"].String() + "," + f["col"].String() + ": " + f["value"].String() + " is not a valid " + f["typ"].String() + " for field " + f["field"].String()
 		}
 	},
+	"master.locator_escapes_root": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "ソースロケータ " + f["path"].String() + " はプロジェクトルートの外を指しています"
+		default:
+			return "source locator " + f["path"].String() + " escapes the project root"
+		}
+	},
 	"master.missing_column": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
