@@ -45,7 +45,7 @@ func Coerce(raw Table, fields []ir.Field, src SourceSpec) (Table, []diagnostic.D
 	bindings := make([]binding, 0, len(fields))
 	cols := make([]string, 0, len(fields))
 	for _, f := range fields {
-		if _, ok := scalarKind(f.Type); !ok {
+		if !scalarSupported(f.Type) {
 			diags = append(diags, UnsupportedFieldType(src.Offset, src.Width, f.Name, typeName(f.Type)))
 			continue
 		}
@@ -103,42 +103,63 @@ func RowFields(row ir.Type) ([]ir.Field, bool) {
 	return nil, false
 }
 
-// scalar is the family of primitive a cell text is read as.
-type scalar int
-
+// The primitive type names the data layer reads, named so the same literal is
+// not spelled in several places.
 const (
-	scalarSignedInt   scalar = iota // the signed integer family (int, long, nint, ...)
-	scalarUnsignedInt               // the unsigned integer family (uint, byte, ...)
-	scalarBool
-	scalarString
+	primBool   = "bool"
+	primString = "string"
 )
 
-// intFamily names the integer primitives and their signedness. The csv reader
-// cannot import the builtin registry that owns these names (the one-way import
-// boundary), so the vocabulary is spelled here; an integer primitive added to
-// the registry but not here simply reads as unsupported until it is added.
-var intFamily = map[string]scalar{
-	"nint": scalarSignedInt, "sbyte": scalarSignedInt, "short": scalarSignedInt, "int": scalarSignedInt, "long": scalarSignedInt,
-	"nuint": scalarUnsignedInt, "byte": scalarUnsignedInt, "ushort": scalarUnsignedInt, "uint": scalarUnsignedInt, "ulong": scalarUnsignedInt,
+// intType describes an integer primitive: its signedness and bit width (0 width
+// is the arbitrary-precision nint/nuint, which have no fixed range).
+type intType struct {
+	signed bool
+	bits   int
 }
 
-// scalarKind classifies a field type as the primitive a cell converts to, or
-// false when the type is not a scalar the format reads (a record, an enum, a
-// collection). A refined or aliased type is looked through to its underlying
-// primitive, so type Level = int where ... reads as an integer.
-func scalarKind(t ir.Type) (scalar, bool) {
+// intFamily names the integer primitives with their signedness and width. The
+// reader cannot import the builtin registry that owns these (the one-way import
+// boundary), so the vocabulary is spelled here; an integer primitive added to
+// the registry but not here simply reads as unsupported until it is added.
+var intFamily = map[string]intType{
+	"nint": {true, 0}, "sbyte": {true, 8}, "short": {true, 16}, "int": {true, 32}, "long": {true, 64},
+	"nuint": {false, 0}, "byte": {false, 8}, "ushort": {false, 16}, "uint": {false, 32}, "ulong": {false, 64},
+}
+
+// fits reports whether n is in range for the integer type: its sign for an
+// unsigned one, and its two's-complement bounds for a fixed width (a 0 width is
+// arbitrary precision, so only the sign constrains it).
+func (k intType) fits(n *big.Int) bool {
+	if !k.signed && n.Sign() < 0 {
+		return false
+	}
+	if k.bits == 0 {
+		return true
+	}
+	if k.signed {
+		hi := new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), uint(k.bits-1)), big.NewInt(1))
+		lo := new(big.Int).Neg(new(big.Int).Lsh(big.NewInt(1), uint(k.bits-1)))
+		return n.Cmp(lo) >= 0 && n.Cmp(hi) <= 0
+	}
+	hi := new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), uint(k.bits)), big.NewInt(1))
+	return n.Cmp(hi) <= 0
+}
+
+// scalarSupported reports whether a field type is a scalar the format reads — a
+// primitive integer, bool, or string. A refined or aliased type is looked
+// through to its underlying primitive, so type Level = int where ... is a scalar.
+// A record, enum, collection, or foreign-key reference is not.
+func scalarSupported(t ir.Type) bool {
 	name, ok := underlyingBuiltin(t)
 	if !ok {
-		return 0, false
+		return false
 	}
 	switch name {
-	case "bool":
-		return scalarBool, true
-	case "string":
-		return scalarString, true
+	case primBool, primString:
+		return true
 	default:
-		k, ok := intFamily[name]
-		return k, ok
+		_, ok := intFamily[name]
+		return ok
 	}
 }
 
@@ -158,22 +179,21 @@ func underlyingBuiltin(t ir.Type) (string, bool) {
 }
 
 // coerceScalar converts a raw string cell to a constant of t's primitive, or
-// false when the text is not a valid value of it. An out-of-range value for a
-// sized integer is not range-checked here (only its sign, for an unsigned one);
-// the type's own range is a later concern.
+// false when the text is not a valid value of it — including an integer outside
+// its field's fixed-width range (300 is not a byte).
 func coerceScalar(raw *ir.Constant, t ir.Type) (*ir.Constant, bool) {
 	if raw == nil || raw.Kind != ir.ConstString {
 		return nil, false
 	}
-	kind, ok := scalarKind(t)
+	name, ok := underlyingBuiltin(t)
 	if !ok {
 		return nil, false
 	}
 	s := raw.Str
-	switch kind {
-	case scalarString:
+	switch name {
+	case primString:
 		return ir.StringConstant(s), true
-	case scalarBool:
+	case primBool:
 		switch s {
 		case "true":
 			return ir.BoolConstant(true), true
@@ -182,11 +202,12 @@ func coerceScalar(raw *ir.Constant, t ir.Type) (*ir.Constant, bool) {
 		}
 		return nil, false
 	default:
-		n, ok := new(big.Int).SetString(s, 10)
+		kind, ok := intFamily[name]
 		if !ok {
 			return nil, false
 		}
-		if kind == scalarUnsignedInt && n.Sign() < 0 {
+		n, ok := new(big.Int).SetString(s, 10)
+		if !ok || !kind.fits(n) {
 			return nil, false
 		}
 		return ir.IntConstant(n), true

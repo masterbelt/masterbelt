@@ -127,6 +127,25 @@ func TestCoerceUnsignedRejectsNegative(t *testing.T) {
 	singleDiag(t, diags, CodeCellTypeMismatch)
 }
 
+func TestCoerceIntegerRange(t *testing.T) {
+	oneN := func(s string) Table {
+		return Table{Columns: []string{"n"}, Rows: []Row{{Cells: []Cell{rawCell(s, 2, 1)}}}}
+	}
+	// 255 is the largest byte; 300 does not inhabit the type.
+	if _, d := Coerce(oneN("255"), []ir.Field{field("n", "byte")}, spec()); len(d) != 0 {
+		t.Errorf("255 as byte = %v, want accepted", d)
+	}
+	_, over := Coerce(oneN("300"), []ir.Field{field("n", "byte")}, spec())
+	singleDiag(t, over, CodeCellTypeMismatch)
+	// A signed 32-bit int rejects a value past its range too.
+	_, big := Coerce(oneN("99999999999"), []ir.Field{field("n", "int")}, spec())
+	singleDiag(t, big, CodeCellTypeMismatch)
+	// nint is arbitrary-precision: the same value fits.
+	if _, d := Coerce(oneN("99999999999"), []ir.Field{field("n", "nint")}, spec()); len(d) != 0 {
+		t.Errorf("big value as nint = %v, want accepted", d)
+	}
+}
+
 func TestCoerceBool(t *testing.T) {
 	raw := Table{
 		Columns: []string{"ok"},
