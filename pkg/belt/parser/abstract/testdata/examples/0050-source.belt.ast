@@ -32,3 +32,18 @@ File
       Consts: ~
       Impls: ~
       Primary: "id"
+      Sources:
+        SourceEntry
+          Format: "csv"
+          Locator: "skills.csv"
+          Options: RecordLit
+            TypeName: ""
+            Fields:
+              FieldInit
+                Name: "delimiter"
+                Value: StringLit
+                  Value: ","
+        SourceEntry
+          Format: "csv"
+          Locator: "skills.override.csv"
+          Options: ~

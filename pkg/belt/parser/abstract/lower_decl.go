@@ -291,6 +291,7 @@ func lowerMasterDecl(t cst.Tree, buf source.Buffer) *ast.MasterDecl {
 		consts   []*ast.ConstDecl
 		impls    []ast.TypeExpr
 		primary  []string
+		sources  []*ast.SourceEntry
 	)
 	for _, child := range t.Children() {
 		if tok, ok := child.Token(); ok {
@@ -322,12 +323,60 @@ func lowerMasterDecl(t cst.Tree, buf source.Buffer) *ast.MasterDecl {
 			record, where, methods, consts, impls = lowerMasterRecord(child, buf)
 		case cst.MasterPrimary:
 			primary = lowerMasterPrimary(child, buf)
+		case cst.MasterSource:
+			sources = append(sources, lowerMasterSource(child, buf)...)
 		default:
 			// Any other child node (the MasterKeyword wrapping the master keyword)
 			// contributes no field of the master.
 		}
 	}
-	return ast.NewMasterDecl(doc, public, name, record, where, methods, consts, impls, primary, green)
+	return ast.NewMasterDecl(doc, public, name, record, where, methods, consts, impls, primary, sources, green)
+}
+
+// lowerMasterSource lowers a master's source member to its entries, in
+// declaration order. Each SourceEntry child becomes one ast.SourceEntry; the
+// source keyword (a MasterKeyword node) and the braces carry no entry.
+func lowerMasterSource(t cst.Tree, buf source.Buffer) []*ast.SourceEntry {
+	var entries []*ast.SourceEntry
+	for _, child := range t.Children() {
+		if node, ok := child.Node(); ok && node.Kind() == cst.SourceEntry {
+			entries = append(entries, lowerSourceEntry(child, buf))
+		}
+	}
+	return entries
+}
+
+// lowerSourceEntry lowers one entry of a source block: the format name (the first
+// Ident), the locator (the String token, with its quoting decoded), and the
+// options (the RecordLit expression, when present). The format name and locator
+// are read as their decoded values; the options are lowered as the record-literal
+// expression a later type-check reads.
+func lowerSourceEntry(t cst.Tree, buf source.Buffer) *ast.SourceEntry {
+	green, _ := t.Node()
+	var (
+		format  string
+		locator string
+		options ast.Expr
+	)
+	for _, child := range t.Children() {
+		if tok, ok := child.Token(); ok {
+			switch tok.Kind() {
+			case token.Ident:
+				if format == "" {
+					format = child.Text(buf)
+				}
+			case token.String:
+				locator = decodeString(child.Text(buf))
+			default:
+				// Whitespace and newline trivia carry nothing.
+			}
+			continue
+		}
+		if node, ok := child.Node(); ok && node.Kind() == cst.RecordLit {
+			options = lowerExpr(child, buf)
+		}
+	}
+	return ast.NewSourceEntry(format, locator, options, green)
 }
 
 // lowerMasterRecord lowers a master's record member — the row type and the

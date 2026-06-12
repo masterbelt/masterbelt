@@ -74,6 +74,7 @@ File
       Consts: ~
       Impls: ~
       Primary: "id"
+      Sources: ~
     MasterDecl
       Doc: ~
       Public: false
@@ -99,3 +100,4 @@ File
       Consts: ~
       Impls: ~
       Primary: "skill" "level"
+      Sources: ~

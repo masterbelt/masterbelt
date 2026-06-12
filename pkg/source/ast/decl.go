@@ -220,13 +220,14 @@ func NewAssertDecl(doc []string, cond Expr, syntax *cst.Node) *AssertDecl {
 type MasterDecl struct {
 	Doc     []string
 	Public  bool
-	Name    string        // the declared identifier, or "" if missing
-	Record  TypeExpr      // the row record type, or nil if missing
-	Where   Expr          // the refinement predicate over a row, or nil if none
-	Methods []*MethodDecl // the record impl blocks' per-row methods
-	Consts  []*ConstDecl  // the record impl blocks' associated constants, in source order
-	Impls   []TypeExpr    // the interfaces the record opts into (see TypeDecl.Impls)
-	Primary []string      // the primary-key column names, in declaration order
+	Name    string         // the declared identifier, or "" if missing
+	Record  TypeExpr       // the row record type, or nil if missing
+	Where   Expr           // the refinement predicate over a row, or nil if none
+	Methods []*MethodDecl  // the record impl blocks' per-row methods
+	Consts  []*ConstDecl   // the record impl blocks' associated constants, in source order
+	Impls   []TypeExpr     // the interfaces the record opts into (see TypeDecl.Impls)
+	Primary []string       // the primary-key column names, in declaration order
+	Sources []*SourceEntry // the source-block entries naming where the rows are read from
 	syntax  *cst.Node
 }
 
@@ -242,6 +243,30 @@ func (d *MasterDecl) node()             {}
 var _ Node = (*MasterDecl)(nil)
 
 // NewMasterDecl builds a MasterDecl node.
-func NewMasterDecl(doc []string, public bool, name string, record TypeExpr, where Expr, methods []*MethodDecl, consts []*ConstDecl, impls []TypeExpr, primary []string, syntax *cst.Node) *MasterDecl {
-	return &MasterDecl{Doc: doc, Public: public, Name: name, Record: record, Where: where, Methods: methods, Consts: consts, Impls: impls, Primary: primary, syntax: syntax}
+func NewMasterDecl(doc []string, public bool, name string, record TypeExpr, where Expr, methods []*MethodDecl, consts []*ConstDecl, impls []TypeExpr, primary []string, sources []*SourceEntry, syntax *cst.Node) *MasterDecl {
+	return &MasterDecl{Doc: doc, Public: public, Name: name, Record: record, Where: where, Methods: methods, Consts: consts, Impls: impls, Primary: primary, Sources: sources, syntax: syntax}
+}
+
+// SourceEntry is one entry of a master's source block: the format that reads it
+// (an identifier a format handler registers under, kept as a name — resolving it
+// to a handler is the data layer's concern), the locator string with its quoting
+// decoded, and the optional format options as a record-literal expression (nil
+// when omitted). The AST carries only the entry's shape; reading the data and
+// checking the options against the format come later.
+type SourceEntry struct {
+	Format  string // the format name
+	Locator string // the locator string, decoded
+	Options Expr   // the format options, a record literal, or nil
+	syntax  *cst.Node
+}
+
+// Syntax returns the green CST node this entry was lowered from.
+func (e *SourceEntry) Syntax() *cst.Node { return e.syntax }
+func (e *SourceEntry) node()             {}
+
+var _ Node = (*SourceEntry)(nil)
+
+// NewSourceEntry builds a SourceEntry node.
+func NewSourceEntry(format, locator string, options Expr, syntax *cst.Node) *SourceEntry {
+	return &SourceEntry{Format: format, Locator: locator, Options: options, syntax: syntax}
 }
