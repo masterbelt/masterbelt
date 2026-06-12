@@ -1,0 +1,69 @@
+File
+  Uses: ~
+  Decls:
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Bin"
+      Type: ~
+      Value: IntLit
+        Text: "0"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Oct"
+      Type: ~
+      Value: IntLit
+        Text: "0"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Hex"
+      Type: ~
+      Value: IntLit
+        Text: "0"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "HexUpper"
+      Type: ~
+      Value: IntLit
+        Text: "0"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "BinUpper"
+      Type: ~
+      Value: IntLit
+        Text: "0"
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Sum"
+      Type: ~
+      Value: IntLit
+        Text: "0"
+      Builtin: false
+  Types: ~
+  Enums: ~
+  Interfaces: ~
+  Funcs: ~
+  Asserts:
+    AssertDecl
+      Doc: ~
+      Cond: IntLit
+        Text: "0"
+    AssertDecl
+      Doc: ~
+      Cond: IntLit
+        Text: "0"
+    AssertDecl
+      Doc: ~
+      Cond: IntLit
+        Text: "0"
+  Masters: ~
