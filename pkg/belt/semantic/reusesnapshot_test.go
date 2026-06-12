@@ -183,6 +183,15 @@ const sourceChain = chain +
 	"  }\n" +
 	"}\n"
 
+// radixChain is the chain fixture with a leaf const written as a hex literal, so
+// a same-width edit to its digits exercises the radix-literal fold on the
+// incremental path. The leaf is read by nothing, so the hex edit keeps every
+// downstream offset put and recomputes only the leaf. The "// pad" tail is slack
+// the edit could grow into, kept for symmetry with the other length-preserving
+// cases.
+const radixChain = chain +
+	"const H = 0xFF      // pad\n"
+
 func reuseCases() []reuseCase {
 	return []reuseCase{
 		// Leaf-value edit (length-preserving): C is read by nothing, so changing
@@ -190,6 +199,12 @@ func reuseCases() []reuseCase {
 		// downstream offset put and is the smallest footprint cutoff allows.
 		{name: "leaf_value", src: chain, keepsLen: true,
 			find: "const C = B         ", repl: "const C = B + 0 - 0 "},
+		// Radix-literal leaf edit (length-preserving): H is read by nothing, so
+		// re-folding its hex literal to an equal-width hex value (0xFF -> 0xAB)
+		// stays as local as any other leaf-value edit while exercising the radix
+		// fold on the incremental path.
+		{name: "radix_leaf_value", src: radixChain, keepsLen: true,
+			find: "0xFF", repl: "0xAB"},
 		// Root-value edit that legitimately cascades (length-preserving): A feeds
 		// B feeds C feeds the assert, so re-evaluating A flows the whole chain —
 		// and because the edit keeps offsets, the cascade is the engine's, not
