@@ -42,7 +42,10 @@ var DataCmd = &cobra.Command{
 			target = args[0]
 		}
 		profile, _ := cmd.Flags().GetString("profile")
-		rep, err := newReporter(cmd, cmd.ErrOrStderr())
+		// Diagnostics go to stdout, the way check emits them, so the final error
+		// log (which main writes to stderr) never lands in the same stream — a
+		// --reporter=json run leaves a single clean JSON document on stdout.
+		rep, err := newReporter(cmd, cmd.OutOrStdout())
 		if err != nil {
 			return err
 		}
@@ -78,30 +81,44 @@ func dumpData(cmd *cobra.Command, rep reporter.Reporter, proj *project.Project) 
 	}
 	prog.Refresh()
 
+	files := append([]*project.File(nil), proj.Files()...)
+	sort.Slice(files, func(i, j int) bool { return files[i].ID < files[j].ID })
+
+	// A master's resolved types can depend on any file in the project (a row type
+	// imported from another), so one broken file makes every resolution suspect.
+	// Gather every file's own diagnostics first; if the project does not check,
+	// report them and read nothing — data is only loaded against a clean project.
+	// (Lint is advisory, check's concern, and left out.)
+	progDiags := make(map[*project.File][]diagnostic.Diagnostic, len(files))
+	broken := false
+	for _, f := range files {
+		d := gatherDiagnostics(f.AST, prog, semantic.FileID(f.ID))
+		progDiags[f] = d
+		broken = broken || hasError(d)
+	}
+	if broken {
+		for _, f := range files {
+			if len(progDiags[f]) > 0 {
+				rep.Report(source.NewFile(displayPath(f.Path), f.Data), progDiags[f])
+			}
+		}
+		return nil
+	}
+
 	reg := master.NewRegistry()
 	reg.Register(csv.New())
 	bases := basePaths(activeProfile(proj))
-
-	files := append([]*project.File(nil), proj.Files()...)
-	sort.Slice(files, func(i, j int) bool { return files[i].ID < files[j].ID })
+	text := reporterKind(cmd) == reporterText
 	for _, f := range files {
-		id := semantic.FileID(f.ID)
-		// A data run over an unchecked file would accept broken source as
-		// successfully read — and the resolved types it reads against are
-		// unreliable, down to a cyclic alias the loader must not follow. So the
-		// file's own lexer, parser, and semantic diagnostics gate it: when the
-		// file does not check, those are reported and its data is left unread;
-		// only a clean file is loaded. Lint is advisory (check's concern) and
-		// left out — a data dump reports what is wrong, not what is unused.
-		diags := gatherDiagnostics(f.AST, prog, id)
-		if !hasError(diags) {
-			loaded, dataDiags := load.File(prog, id, proj.Root, bases, reg)
+		loaded, diags := load.File(prog, semantic.FileID(f.ID), proj.Root, bases, reg)
+		// The typed tables are a text rendering; under --reporter=json only the
+		// diagnostics document is emitted, so the tables do not pollute it.
+		if text {
 			for _, l := range loaded {
 				if _, err := fmt.Fprintf(cmd.OutOrStdout(), "%s <- %s\n%s\n", l.Master, l.Display, l.Table.String()); err != nil {
 					return err
 				}
 			}
-			diags = append(diags, dataDiags...)
 		}
 		if len(diags) > 0 {
 			rep.Report(source.NewFile(displayPath(f.Path), f.Data), diags)
@@ -110,8 +127,8 @@ func dumpData(cmd *cobra.Command, rep reporter.Reporter, proj *project.Project) 
 	return nil
 }
 
-// hasError reports whether any diagnostic is an error — the gate on whether a
-// file's data is trustworthy enough to read.
+// hasError reports whether any diagnostic is an error — the gate on whether the
+// project is trustworthy enough to read data against.
 func hasError(diags []diagnostic.Diagnostic) bool {
 	for _, d := range diags {
 		if d.Severity == diagnostic.Error {
@@ -119,6 +136,12 @@ func hasError(diags []diagnostic.Diagnostic) bool {
 		}
 	}
 	return false
+}
+
+// reporterKind is the --reporter value in effect for this run.
+func reporterKind(cmd *cobra.Command) string {
+	kind, _ := cmd.Flags().GetString("reporter")
+	return kind
 }
 
 // activeProfile is the profile config the project was opened with — a named one,

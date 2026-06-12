@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -65,14 +66,14 @@ func TestDataTypedRows(t *testing.T) {
 }
 
 func TestDataExitsNonzeroOnDataError(t *testing.T) {
-	// A refinement violation routes to stderr and fails the command.
+	// A refinement violation is reported (on stdout, where check emits) and fails.
 	root := skillProject(t, "id,name,power\n1,Drain,-5\n")
-	_, stderr, err := execData(t, root)
+	stdout, _, err := execData(t, root)
 	if err == nil {
 		t.Fatal("data succeeded, want an error")
 	}
-	if !strings.Contains(stderr, "data/skills.csv:2,9") {
-		t.Errorf("stderr = %q, want it to point at the bad cell", stderr)
+	if !strings.Contains(stdout, "data/skills.csv:2,9") {
+		t.Errorf("stdout = %q, want it to point at the bad cell", stdout)
 	}
 }
 
@@ -90,18 +91,62 @@ func TestDataReportsProjectErrors(t *testing.T) {
 		"}\n")
 	belttest.WriteFile(t, root, "data/skills.csv", "id,name\n1,Heal\n")
 
-	_, stderr, err := execData(t, root)
+	stdout, _, err := execData(t, root)
 	if err == nil {
-		t.Fatalf("data succeeded on a broken project, want an error\nstderr: %s", stderr)
+		t.Fatalf("data succeeded on a broken project, want an error\nstdout: %s", stdout)
 	}
-	if !strings.Contains(stderr, "skills.belt") {
-		t.Errorf("stderr = %q, want the project's own error surfaced", stderr)
+	if !strings.Contains(stdout, "skills.belt") {
+		t.Errorf("stdout = %q, want the project's own error surfaced", stdout)
+	}
+	if strings.Contains(stdout, "Skill <-") {
+		t.Errorf("stdout = %q, want no table read for a broken project", stdout)
+	}
+}
+
+func TestDataGatesOnWholeProject(t *testing.T) {
+	// A clean file declaring a master must not be read when another file in the
+	// project is broken — the master's resolved types could depend on it.
+	root := t.TempDir()
+	belttest.WriteFile(t, root, "masterbelt.toml", "entry = \"main.belt\"\n\n[source.csv]\nbasePath = \"data\"\n")
+	belttest.WriteFile(t, root, "types.belt", "pub const Helper = 1\nconst Broken: int = \"x\"\n")
+	belttest.WriteFile(t, root, "main.belt", ""+
+		"use types from \"types.belt\"\n\n"+
+		"const useIt = types.Helper\n\n"+
+		"master Skill {\n"+
+		"  record { id: int }\n"+
+		"  primary id\n"+
+		"  source { csv \"skills.csv\" }\n"+
+		"}\n")
+	belttest.WriteFile(t, root, "data/skills.csv", "id\n1\n")
+
+	stdout, _, err := execData(t, root)
+	if err == nil {
+		t.Fatal("data succeeded with a broken file in the project, want an error")
+	}
+	if strings.Contains(stdout, "Skill <-") {
+		t.Errorf("stdout = %q, want no table read while any project file is broken", stdout)
+	}
+}
+
+func TestDataJSONReporterIsCleanDocument(t *testing.T) {
+	// Under --reporter=json a data error must leave a single valid JSON document
+	// on stdout — no text table, and the final error log lands on a stream the
+	// test does not capture here.
+	root := skillProject(t, "id,name,power\n1,Drain,-5\n")
+	stdout, _, err := execData(t, "--reporter", "json", root)
+	if err == nil {
+		t.Fatal("data succeeded, want an error")
+	}
+	if strings.Contains(stdout, "Skill <-") {
+		t.Errorf("stdout = %q, want no text table in JSON mode", stdout)
+	}
+	if !json.Valid([]byte(stdout)) {
+		t.Errorf("stdout is not a valid JSON document:\n%s", stdout)
 	}
 }
 
 func TestDataCyclicAliasDoesNotCrash(t *testing.T) {
-	// A cyclic alias is a semantic error; the command must report it and leave
-	// the data unread, not follow the cycle into a stack overflow.
+	// A cyclic alias must not send the unwrap into a stack overflow.
 	root := t.TempDir()
 	belttest.WriteFile(t, root, "masterbelt.toml", "entry = \"m.belt\"\n")
 	belttest.WriteFile(t, root, "m.belt", ""+
@@ -115,12 +160,12 @@ func TestDataCyclicAliasDoesNotCrash(t *testing.T) {
 	belttest.WriteFile(t, root, "m.csv", "id\n1\n")
 
 	// Reaching the assertions at all means the unwrap terminated rather than
-	// overflowing the stack; the command reports the unreadable field and fails.
-	_, stderr, err := execData(t, root)
+	// overflowing the stack; the command reports the problem and fails.
+	stdout, _, err := execData(t, root)
 	if err == nil {
 		t.Fatal("data succeeded on a cyclic alias, want an error")
 	}
-	if stderr == "" {
-		t.Error("stderr empty, want the cyclic field reported")
+	if stdout == "" {
+		t.Error("stdout empty, want the problem reported")
 	}
 }
