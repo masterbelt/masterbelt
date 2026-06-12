@@ -70,7 +70,7 @@ func TestReadDelimiter(t *testing.T) {
 func TestReadBadDelimiter(t *testing.T) {
 	spec := write(t, "id,name\n", map[string]string{"delimiter": "++"})
 	_, diags := New().Read(spec)
-	singleCode(t, diags, master.CodeSourceUnreadable)
+	singleUnreadable(t, diags)
 }
 
 func TestReadEmptyDelimiterRejected(t *testing.T) {
@@ -78,13 +78,31 @@ func TestReadEmptyDelimiterRejected(t *testing.T) {
 	// for the comma default.
 	spec := write(t, "id,name\n1,Heal\n", map[string]string{"delimiter": ""})
 	_, diags := New().Read(spec)
-	singleCode(t, diags, master.CodeSourceUnreadable)
+	singleUnreadable(t, diags)
+}
+
+func TestReadLongRowRejected(t *testing.T) {
+	// A row with more cells than the header would lose its trailing data (cells
+	// bind by header name), so it is reported rather than silently truncated.
+	spec := write(t, "id,name\n1,Alice,EXTRA\n", nil)
+	table, diags := New().Read(spec)
+	singleUnreadable(t, diags)
+	if len(table.Rows) != 0 {
+		t.Errorf("rows = %d, want the over-long row skipped", len(table.Rows))
+	}
+}
+
+func TestReadNoHeaderRejected(t *testing.T) {
+	// The first row is the required header; a source with none is malformed.
+	spec := write(t, "", nil)
+	_, diags := New().Read(spec)
+	singleUnreadable(t, diags)
 }
 
 func TestReadMissingFile(t *testing.T) {
 	spec := master.SourceSpec{Path: filepath.Join(t.TempDir(), "absent.csv"), Display: "absent.csv", Offset: 7, Width: 3}
 	table, diags := New().Read(spec)
-	d := singleCode(t, diags, master.CodeSourceUnreadable)
+	d := singleUnreadable(t, diags)
 	if d.Offset != 7 || d.Width != 3 {
 		t.Errorf("anchor = %d/%d, want the source entry span 7/3", d.Offset, d.Width)
 	}
@@ -106,15 +124,16 @@ func TestReadRaggedRowSurvives(t *testing.T) {
 	}
 }
 
-// singleCode asserts the list holds exactly one diagnostic of the given code.
-func singleCode(t *testing.T, diags *diagnostic.List, code diagnostic.Code) diagnostic.Diagnostic {
+// singleUnreadable asserts the list holds exactly one source_unreadable
+// diagnostic — the only failure the csv reader reports.
+func singleUnreadable(t *testing.T, diags *diagnostic.List) diagnostic.Diagnostic {
 	t.Helper()
 	if diags.Len() != 1 {
 		t.Fatalf("diagnostics = %v, want exactly one", diags.Items())
 	}
 	d := diags.Items()[0]
-	if d.Code != code {
-		t.Fatalf("code = %s, want %s", d.Code, code)
+	if d.Code != master.CodeSourceUnreadable {
+		t.Fatalf("code = %s, want %s", d.Code, master.CodeSourceUnreadable)
 	}
 	return d
 }

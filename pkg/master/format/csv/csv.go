@@ -15,6 +15,7 @@ package csv
 import (
 	encoding_csv "encoding/csv"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 
@@ -80,7 +81,23 @@ func (Format) Read(spec master.SourceSpec) (master.Table, *diagnostic.List) {
 			header = true
 			continue
 		}
+		// A row longer than the header carries cells no column names, which bind
+		// by name, would ever read — silently lost data. A shorter row is left to
+		// the core to reconcile against the fields (a missing cell), so only an
+		// over-long row is rejected here.
+		if len(record) > len(table.Columns) {
+			line, _ := reader.FieldPos(0)
+			diags.Add(master.SourceUnreadable(spec.Offset, spec.Width, spec.Display, fmt.Sprintf("row %d has more fields than the header", line)))
+			continue
+		}
 		table.Rows = append(table.Rows, master.Row{Cells: cellsOf(reader, record)})
+	}
+	// The first row is the header that names the columns; a source with none (an
+	// empty file) is malformed, not a table with no columns — reported so the
+	// reader does not coerce a column-less table into a missing-column-per-field
+	// pile-up.
+	if !header {
+		diags.Add(master.SourceUnreadable(spec.Offset, spec.Width, spec.Display, "the source has no header row"))
 	}
 	return table, &diags
 }
