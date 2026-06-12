@@ -112,6 +112,18 @@ func TestParseSourceBasePathEscaping(t *testing.T) {
 	}
 }
 
+func TestParseSourceBasePathBackslashEscaping(t *testing.T) {
+	// A base path authored with Windows separators must obey the same confinement:
+	// "..\shared" escapes the root once backslashes are normalized.
+	_, diags := Parse([]byte("entry = \"main.belt\"\n\n[source.csv]\nbasePath = \"..\\\\shared\"\n"))
+	d := singleError(t, diags, CodeInvalid)
+	for _, fragment := range []string{`source "csv"`, "escape"} {
+		if !strings.Contains(d.Message, fragment) {
+			t.Errorf("Message = %q, want it to contain %q", d.Message, fragment)
+		}
+	}
+}
+
 func TestParseProfileSourceBasePathEscaping(t *testing.T) {
 	_, diags := Parse([]byte("entry = \"main.belt\"\n\n[profile.editor]\nentry = \"editor.belt\"\n\n[profile.editor.source.csv]\nbasePath = \"../shared\"\n"))
 	d := singleError(t, diags, CodeInvalid)

@@ -125,10 +125,17 @@ func Parse(src []byte) (Config, diagnostic.List) {
 // An empty path is reported as allowed; what it means is the caller's (an entry
 // requires one, a base path defaults to the root).
 func confinedPath(p, label string) string {
-	switch cleaned := path.Clean(p); {
-	case p == "":
+	if p == "" {
 		return ""
-	case path.IsAbs(p):
+	}
+	// A manifest path is meant to be portable, so a backslash is treated as a
+	// separator on every platform (not only where it is the OS separator): path's
+	// forward-slash rules would otherwise treat "..\\shared" as one ordinary
+	// segment, slipping the check while filepath.Join resolves it outside the
+	// root on Windows.
+	slashed := strings.ReplaceAll(p, "\\", "/")
+	switch cleaned := path.Clean(slashed); {
+	case path.IsAbs(slashed):
 		return label + " must be relative to the project root"
 	case cleaned == ".." || strings.HasPrefix(cleaned, "../"):
 		return label + " must not escape the project root"
