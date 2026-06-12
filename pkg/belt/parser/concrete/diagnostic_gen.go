@@ -9,19 +9,20 @@ import (
 )
 
 const (
-	CodeArrowBlockBody     diagnostic.Code = "belt.parser.concrete.arrow_block_body"
-	CodeExpectedAssign     diagnostic.Code = "belt.parser.concrete.expected_assign"
-	CodeExpectedConst      diagnostic.Code = "belt.parser.concrete.expected_const"
-	CodeExpectedExpression diagnostic.Code = "belt.parser.concrete.expected_expression"
-	CodeExpectedFn         diagnostic.Code = "belt.parser.concrete.expected_fn"
-	CodeExpectedFrom       diagnostic.Code = "belt.parser.concrete.expected_from"
-	CodeExpectedFuncBody   diagnostic.Code = "belt.parser.concrete.expected_func_body"
-	CodeExpectedIdentifier diagnostic.Code = "belt.parser.concrete.expected_identifier"
-	CodeExpectedOperand    diagnostic.Code = "belt.parser.concrete.expected_operand"
-	CodeExpectedParamList  diagnostic.Code = "belt.parser.concrete.expected_param_list"
-	CodeExpectedPath       diagnostic.Code = "belt.parser.concrete.expected_path"
-	CodeExpectedType       diagnostic.Code = "belt.parser.concrete.expected_type"
-	CodeUnexpectedToken    diagnostic.Code = "belt.parser.concrete.unexpected_token"
+	CodeArrowBlockBody        diagnostic.Code = "belt.parser.concrete.arrow_block_body"
+	CodeExpectedAssign        diagnostic.Code = "belt.parser.concrete.expected_assign"
+	CodeExpectedConst         diagnostic.Code = "belt.parser.concrete.expected_const"
+	CodeExpectedExpression    diagnostic.Code = "belt.parser.concrete.expected_expression"
+	CodeExpectedFn            diagnostic.Code = "belt.parser.concrete.expected_fn"
+	CodeExpectedFrom          diagnostic.Code = "belt.parser.concrete.expected_from"
+	CodeExpectedFuncBody      diagnostic.Code = "belt.parser.concrete.expected_func_body"
+	CodeExpectedIdentifier    diagnostic.Code = "belt.parser.concrete.expected_identifier"
+	CodeExpectedOperand       diagnostic.Code = "belt.parser.concrete.expected_operand"
+	CodeExpectedParamList     diagnostic.Code = "belt.parser.concrete.expected_param_list"
+	CodeExpectedPath          diagnostic.Code = "belt.parser.concrete.expected_path"
+	CodeExpectedSourceLocator diagnostic.Code = "belt.parser.concrete.expected_source_locator"
+	CodeExpectedType          diagnostic.Code = "belt.parser.concrete.expected_type"
+	CodeUnexpectedToken       diagnostic.Code = "belt.parser.concrete.unexpected_token"
 )
 
 func newArrowBlockBodyDiagnostic(offset int, width int) diagnostic.Diagnostic {
@@ -142,6 +143,17 @@ func newExpectedPathDiagnostic(offset int, width int) diagnostic.Diagnostic {
 		Severity: diagnostic.Error,
 		Code:     CodeExpectedPath,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeExpectedPath, nil),
+		Fields:   nil,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newExpectedSourceLocatorDiagnostic(offset int, width int) diagnostic.Diagnostic {
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeExpectedSourceLocator,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeExpectedSourceLocator, nil),
 		Fields:   nil,
 		Offset:   offset,
 		Width:    width,

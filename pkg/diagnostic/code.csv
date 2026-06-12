@@ -17,6 +17,7 @@ belt.parser.concrete.unexpected_token,error,kind:string
 belt.parser.concrete.expected_operand,error,operator:string
 belt.parser.concrete.expected_from,error,
 belt.parser.concrete.expected_path,error,
+belt.parser.concrete.expected_source_locator,error,
 belt.parser.concrete.expected_param_list,error,
 belt.parser.concrete.expected_func_body,error,
 belt.parser.concrete.expected_fn,error,

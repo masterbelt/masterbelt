@@ -17,6 +17,7 @@ belt.parser.concrete.unexpected_token,unexpected token: {kind}
 belt.parser.concrete.expected_operand,expected operand after '{operator}'
 belt.parser.concrete.expected_from,expected 'from'
 belt.parser.concrete.expected_path,expected import path string
+belt.parser.concrete.expected_source_locator,expected a source locator string
 belt.parser.concrete.expected_param_list,expected '('
 belt.parser.concrete.expected_func_body,expected '->' or '{'
 belt.parser.concrete.expected_fn,expected 'fn' after 'static'

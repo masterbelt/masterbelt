@@ -198,7 +198,7 @@ module.exports = grammar({
         $.master_keyword,
         field("name", $.identifier),
         op.LBrace,
-        repeat(choice($.master_record, $.master_primary)),
+        repeat(choice($.master_record, $.master_primary, $.master_source)),
         op.RBrace,
       ),
 
@@ -222,6 +222,34 @@ module.exports = grammar({
           seq(op.LParen, commaSep1($.identifier), optional(op.Comma), op.RParen),
         ),
       ),
+
+    // The source member names where the rows are read from: a block of entries,
+    // each a format name (an ordinary identifier), a locator string, and optional
+    // options (a record literal, reused). source is a context keyword aliased to
+    // master_keyword like record/primary.
+    master_source: ($) =>
+      seq(
+        alias("source", $.master_keyword),
+        op.LBrace,
+        repeat($.source_entry),
+        op.RBrace,
+      ),
+
+    source_entry: ($) =>
+      seq(
+        field("format", $.identifier),
+        field("locator", $.string),
+        optional(field("options", alias($._source_options, $.record_literal))),
+      ),
+
+    // The options are the inferred record literal only (brace-first): the concrete
+    // parser takes them solely when a "{" follows the locator, so an identifier
+    // there opens the next entry rather than a typed record literal's type. Spelt
+    // out here and aliased to record_literal so the tree mirrors the CST's
+    // RecordLit without the typed form's leading identifier (which would be
+    // ambiguous with the next entry's format name).
+    _source_options: ($) =>
+      seq(op.LBrace, repeat(seq($.record_field, optional(op.Comma))), op.RBrace),
 
     // --- impl blocks and methods --------------------------------------------
 

@@ -1,0 +1,19 @@
+// A source block names where a master's rows are read from. Each entry is a
+// format — an ordinary identifier a format handler registers under, so a new
+// format needs no new keyword — a locator string, and an optional record literal
+// of format options (the same record-literal grammar a value uses). A master may
+// list several sources; reading the data, merging the sources, and checking the
+// options against the format are later concerns, so here the block is only
+// parsed. source is a context keyword, like record and primary.
+
+pub master Skill {
+  record {
+    id: int,
+    name: string,
+  }
+  primary id
+  source {
+    csv "skills.csv" { delimiter: "," }
+    csv "skills.override.csv"
+  }
+}

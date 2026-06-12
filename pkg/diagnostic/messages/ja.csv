@@ -17,6 +17,7 @@ belt.parser.concrete.unexpected_token,予期しないトークン: {kind}
 belt.parser.concrete.expected_operand,'{operator}' の後にオペランドが必要です
 belt.parser.concrete.expected_from,'from' が必要です
 belt.parser.concrete.expected_path,インポートパスの文字列が必要です
+belt.parser.concrete.expected_source_locator,ソースのロケータ文字列が必要です
 belt.parser.concrete.expected_param_list,'(' が必要です
 belt.parser.concrete.expected_func_body,'->' か '{' が必要です
 belt.parser.concrete.expected_fn,'static' の後には 'fn' が必要です
