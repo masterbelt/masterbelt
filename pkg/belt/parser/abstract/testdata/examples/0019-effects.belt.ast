@@ -12,6 +12,7 @@ File
         Arguments:
           IntLit
             Text: "21"
+            Base: 0
       Builtin: false
   Types:
     TypeDecl
@@ -120,6 +121,7 @@ File
             Arguments:
               IntLit
                 Text: "2"
+                Base: 0
   Asserts:
     AssertDecl
       Doc: ~
@@ -131,9 +133,11 @@ File
             Arguments:
               IntLit
                 Text: "2"
+                Base: 0
           Member: Identifier
             Name: "eql"
         Arguments:
           IntLit
             Text: "4"
+            Base: 0
   Masters: ~

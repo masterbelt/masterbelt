@@ -12,6 +12,7 @@ File
         Arguments:
           IntLit
             Text: "42"
+            Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -24,8 +25,10 @@ File
         Arguments:
           IntLit
             Text: "7"
+            Base: 0
           IntLit
             Text: "9"
+            Base: 0
       Builtin: false
   Types:
     TypeDecl
@@ -212,6 +215,7 @@ File
                 Arguments:
                   IntLit
                     Text: "0"
+                    Base: 0
                   FuncLit
                     Params:
                       ParamDef
@@ -235,6 +239,7 @@ File
                           Arguments:
                             IntLit
                               Text: "1"
+                              Base: 0
   Funcs:
     FuncDecl
       Doc: "The total of any foldable collection of ints, folded with addition."
@@ -284,6 +289,7 @@ File
             Arguments:
               IntLit
                 Text: "0"
+                Base: 0
               FuncLit
                 Params:
                   ParamDef

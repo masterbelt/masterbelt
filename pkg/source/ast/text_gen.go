@@ -1728,12 +1728,13 @@ func (n *IfStmt) MarshalText() ([]byte, error) {
 // writeIntLit emits n's fields beneath an already-written heading line.
 func writeIntLit(w *treetext.Writer, n *IntLit, depth int) error {
 	w.Line(depth, "Text: "+strconv.Quote(n.Text))
+	w.Line(depth, "Base: "+strconv.Itoa(int(n.Base)))
 	return nil
 }
 
 // decodeIntLit builds a IntLit from its element.
 func decodeIntLit(e *treetext.Element) (*IntLit, error) {
-	if err := treetext.ExpectFields(e, "Text"); err != nil {
+	if err := treetext.ExpectFields(e, "Text", "Base"); err != nil {
 		return nil, err
 	}
 	n := &IntLit{}
@@ -1741,6 +1742,11 @@ func decodeIntLit(e *treetext.Element) (*IntLit, error) {
 		return nil, err
 	} else {
 		n.Text = v
+	}
+	if v, err := treetext.Int(e.Fields[1]); err != nil {
+		return nil, err
+	} else {
+		n.Base = IntBase(v)
 	}
 	return n, nil
 }

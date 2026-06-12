@@ -103,6 +103,7 @@ File
               Values:
                 IntLit
                   Text: "0"
+                  Base: 0
               Body:
                 ReturnStmt
                   Value: StringLit
@@ -111,10 +112,13 @@ File
               Values:
                 IntLit
                   Text: "1"
+                  Base: 0
                 IntLit
                   Text: "2"
+                  Base: 0
                 IntLit
                   Text: "3"
+                  Base: 0
               Body:
                 ReturnStmt
                   Value: StringLit

@@ -17,6 +17,7 @@ File
             Name: "amount"
             Value: IntLit
               Text: "7"
+              Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -304,6 +305,7 @@ File
             ReturnStmt
               Value: IntLit
                 Text: "0"
+                Base: 0
           AfterElse: ~
     FuncDecl
       Doc: ~
@@ -348,6 +350,7 @@ File
             Arguments:
               IntLit
                 Text: "0"
+                Base: 0
           Arms:
             MatchArm
               Type: NamedType

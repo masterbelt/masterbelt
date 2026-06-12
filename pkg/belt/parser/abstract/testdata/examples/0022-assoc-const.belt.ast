@@ -75,6 +75,7 @@ File
         Projections: ~
       Value: IntLit
         Text: "8080"
+        Base: 0
       Builtin: false
   Types:
     TypeDecl
@@ -113,6 +114,7 @@ File
                 Arguments:
                   IntLit
                     Text: "1"
+                    Base: 0
       Consts:
         ConstDecl
           Doc: "The highest level."
@@ -121,6 +123,7 @@ File
           Type: ~
           Value: IntLit
             Text: "100"
+            Base: 0
           Builtin: false
         ConstDecl
           Doc: "The lowest level."
@@ -129,6 +132,7 @@ File
           Type: ~
           Value: IntLit
             Text: "0"
+            Base: 0
           Builtin: false
       Impls: ~
     TypeDecl
@@ -155,6 +159,7 @@ File
             Projections: ~
           Value: IntLit
             Text: "32"
+            Base: 0
           Builtin: false
       Impls: ~
     TypeDecl
@@ -177,6 +182,7 @@ File
             Arguments:
               IntLit
                 Text: "1"
+                Base: 0
           Member: Identifier
             Name: "anan"
         Arguments:

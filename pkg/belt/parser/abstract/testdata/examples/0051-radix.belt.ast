@@ -7,7 +7,8 @@ File
       Name: "Bin"
       Type: ~
       Value: IntLit
-        Text: "0"
+        Text: "0b1010"
+        Base: 1
       Builtin: false
     ConstDecl
       Doc: ~
@@ -15,7 +16,8 @@ File
       Name: "Oct"
       Type: ~
       Value: IntLit
-        Text: "0"
+        Text: "0o17"
+        Base: 2
       Builtin: false
     ConstDecl
       Doc: ~
@@ -23,7 +25,8 @@ File
       Name: "Hex"
       Type: ~
       Value: IntLit
-        Text: "0"
+        Text: "0xFF"
+        Base: 3
       Builtin: false
     ConstDecl
       Doc: ~
@@ -31,7 +34,8 @@ File
       Name: "HexUpper"
       Type: ~
       Value: IntLit
-        Text: "0"
+        Text: "0XCAFE"
+        Base: 3
       Builtin: false
     ConstDecl
       Doc: ~
@@ -39,15 +43,33 @@ File
       Name: "BinUpper"
       Type: ~
       Value: IntLit
-        Text: "0"
+        Text: "0B1010"
+        Base: 1
       Builtin: false
     ConstDecl
       Doc: ~
       Public: false
       Name: "Sum"
       Type: ~
-      Value: IntLit
-        Text: "0"
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: MemberExpr
+              Receiver: IntLit
+                Text: "0x10"
+                Base: 3
+              Member: Identifier
+                Name: "add"
+            Arguments:
+              IntLit
+                Text: "0o10"
+                Base: 2
+          Member: Identifier
+            Name: "add"
+        Arguments:
+          IntLit
+            Text: "0b10"
+            Base: 1
       Builtin: false
   Types: ~
   Enums: ~
@@ -56,14 +78,41 @@ File
   Asserts:
     AssertDecl
       Doc: ~
-      Cond: IntLit
-        Text: "0"
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: IntLit
+            Text: "0b1010"
+            Base: 1
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "10"
+            Base: 0
     AssertDecl
       Doc: ~
-      Cond: IntLit
-        Text: "0"
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: IntLit
+            Text: "0o17"
+            Base: 2
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "15"
+            Base: 0
     AssertDecl
       Doc: ~
-      Cond: IntLit
-        Text: "0"
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: IntLit
+            Text: "0xFF"
+            Base: 3
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "255"
+            Base: 0
   Masters: ~

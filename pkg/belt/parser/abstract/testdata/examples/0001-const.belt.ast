@@ -12,6 +12,7 @@ File
         Projections: ~
       Value: IntLit
         Text: "100"
+        Base: 0
       Builtin: false
     ConstDecl
       Doc: "DocComment for MinLevel" "with multiline."
@@ -20,6 +21,7 @@ File
       Type: ~
       Value: IntLit
         Text: "0"
+        Base: 0
       Builtin: false
     ConstDecl
       Doc: ~

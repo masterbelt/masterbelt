@@ -9,8 +9,10 @@ File
       Value: RangeExpr
         Lower: IntLit
           Text: "0"
+          Base: 0
         Upper: IntLit
           Text: "9"
+          Base: 0
         HalfOpen: false
       Builtin: false
     ConstDecl
@@ -21,8 +23,10 @@ File
       Value: RangeExpr
         Lower: IntLit
           Text: "0"
+          Base: 0
         Upper: IntLit
           Text: "9"
+          Base: 0
         HalfOpen: true
       Builtin: false
     ConstDecl
@@ -33,8 +37,10 @@ File
       Value: RangeExpr
         Lower: IntLit
           Text: "9"
+          Base: 0
         Upper: IntLit
           Text: "0"
+          Base: 0
         HalfOpen: false
       Builtin: false
     ConstDecl
@@ -45,8 +51,10 @@ File
       Value: RangeExpr
         Lower: IntLit
           Text: "9"
+          Base: 0
         Upper: IntLit
           Text: "0"
+          Base: 0
         HalfOpen: true
       Builtin: false
     ConstDecl
@@ -60,8 +68,10 @@ File
         Arguments:
           IntLit
             Text: "0"
+            Base: 0
           IntLit
             Text: "9"
+            Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -74,8 +84,10 @@ File
         Arguments:
           IntLit
             Text: "0"
+            Base: 0
           IntLit
             Text: "8"
+            Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -88,12 +100,15 @@ File
         Arguments:
           IntLit
             Text: "9"
+            Base: 0
           IntLit
             Text: "0"
+            Base: 0
           CallExpr
             Callee: MemberExpr
               Receiver: IntLit
                 Text: "1"
+                Base: 0
               Member: Identifier
                 Name: "neg"
             Arguments: ~
@@ -109,12 +124,15 @@ File
         Arguments:
           IntLit
             Text: "8"
+            Base: 0
           IntLit
             Text: "0"
+            Base: 0
           CallExpr
             Callee: MemberExpr
               Receiver: IntLit
                 Text: "1"
+                Base: 0
               Member: Identifier
                 Name: "neg"
             Arguments: ~
@@ -127,8 +145,10 @@ File
       Value: RangeExpr
         Lower: IntLit
           Text: "5"
+          Base: 0
         Upper: IntLit
           Text: "5"
+          Base: 0
         HalfOpen: false
       Builtin: false
     ConstDecl
@@ -139,8 +159,10 @@ File
       Value: RangeExpr
         Lower: IntLit
           Text: "5"
+          Base: 0
         Upper: IntLit
           Text: "5"
+          Base: 0
         HalfOpen: true
       Builtin: false
     ConstDecl
@@ -154,6 +176,7 @@ File
         Arguments:
           IntLit
             Text: "4"
+            Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -166,10 +189,13 @@ File
         Arguments:
           IntLit
             Text: "0"
+            Base: 0
           IntLit
             Text: "10"
+            Base: 0
           IntLit
             Text: "2"
+            Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -182,12 +208,15 @@ File
         Arguments:
           IntLit
             Text: "10"
+            Base: 0
           IntLit
             Text: "0"
+            Base: 0
           CallExpr
             Callee: MemberExpr
               Receiver: IntLit
                 Text: "2"
+                Base: 0
               Member: Identifier
                 Name: "neg"
             Arguments: ~
@@ -242,8 +271,10 @@ File
           Receiver: RangeExpr
             Lower: IntLit
               Text: "0"
+              Base: 0
             Upper: IntLit
               Text: "9"
+              Base: 0
             HalfOpen: false
           Member: Identifier
             Name: "count"
@@ -259,8 +290,10 @@ File
           Receiver: RangeExpr
             Lower: IntLit
               Text: "0"
+              Base: 0
             Upper: IntLit
               Text: "9"
+              Base: 0
             HalfOpen: true
           Member: Identifier
             Name: "count"
@@ -279,10 +312,13 @@ File
             Arguments:
               IntLit
                 Text: "0"
+                Base: 0
               IntLit
                 Text: "10"
+                Base: 0
               IntLit
                 Text: "2"
+                Base: 0
           Member: Identifier
             Name: "count"
         Arguments: ~
@@ -297,14 +333,17 @@ File
           Receiver: RangeExpr
             Lower: IntLit
               Text: "0"
+              Base: 0
             Upper: IntLit
               Text: "4"
+              Base: 0
             HalfOpen: false
           Member: Identifier
             Name: "fold"
         Arguments:
           IntLit
             Text: "0"
+            Base: 0
           FuncLit
             Params:
               ParamDef
@@ -358,15 +397,19 @@ File
             Arguments:
               IntLit
                 Text: "0"
+                Base: 0
               IntLit
                 Text: "10"
+                Base: 0
               IntLit
                 Text: "2"
+                Base: 0
           Member: Identifier
             Name: "fold"
         Arguments:
           IntLit
             Text: "0"
+            Base: 0
           FuncLit
             Params:
               ParamDef
@@ -436,6 +479,7 @@ File
           Value: RangeExpr
             Lower: IntLit
               Text: "0"
+              Base: 0
             Upper: CallExpr
               Callee: MemberExpr
                 Receiver: Identifier
@@ -445,6 +489,7 @@ File
               Arguments:
                 IntLit
                   Text: "1"
+                  Base: 0
             HalfOpen: false
     FuncDecl
       Doc: ~
@@ -465,14 +510,17 @@ File
           Type: ~
           Value: IntLit
             Text: "0"
+            Base: 0
         ForStmt
           Var: "i"
           Kind: 0
           Iter: RangeExpr
             Lower: IntLit
               Text: "0"
+              Base: 0
             Upper: IntLit
               Text: "10"
+              Base: 0
             HalfOpen: false
           Body:
             AssignStmt
@@ -509,14 +557,17 @@ File
           Type: ~
           Value: IntLit
             Text: "0"
+            Base: 0
         ForStmt
           Var: "i"
           Kind: 0
           Iter: RangeExpr
             Lower: IntLit
               Text: "5"
+              Base: 0
             Upper: IntLit
               Text: "1"
+              Base: 0
             HalfOpen: false
           Body:
             AssignStmt
@@ -553,14 +604,17 @@ File
           Type: ~
           Value: IntLit
             Text: "0"
+            Base: 0
         ForStmt
           Var: "i"
           Kind: 0
           Iter: RangeExpr
             Lower: IntLit
               Text: "0"
+              Base: 0
             Upper: IntLit
               Text: "5"
+              Base: 0
             HalfOpen: true
           Body:
             AssignStmt
@@ -597,6 +651,7 @@ File
           Type: ~
           Value: IntLit
             Text: "0"
+            Base: 0
         ForStmt
           Var: "i"
           Kind: 0
@@ -606,10 +661,13 @@ File
             Arguments:
               IntLit
                 Text: "0"
+                Base: 0
               IntLit
                 Text: "10"
+                Base: 0
               IntLit
                 Text: "2"
+                Base: 0
           Body:
             AssignStmt
               Target: Identifier
@@ -634,8 +692,10 @@ File
           Receiver: RangeExpr
             Lower: IntLit
               Text: "0"
+              Base: 0
             Upper: IntLit
               Text: "9"
+              Base: 0
             HalfOpen: false
           Member: Identifier
             Name: "eql"
@@ -646,8 +706,10 @@ File
             Arguments:
               IntLit
                 Text: "0"
+                Base: 0
               IntLit
                 Text: "9"
+                Base: 0
     AssertDecl
       Doc: ~
       Cond: CallExpr
@@ -655,8 +717,10 @@ File
           Receiver: RangeExpr
             Lower: IntLit
               Text: "0"
+              Base: 0
             Upper: IntLit
               Text: "9"
+              Base: 0
             HalfOpen: true
           Member: Identifier
             Name: "eql"
@@ -667,8 +731,10 @@ File
             Arguments:
               IntLit
                 Text: "0"
+                Base: 0
               IntLit
                 Text: "8"
+                Base: 0
     AssertDecl
       Doc: ~
       Cond: CallExpr
@@ -676,8 +742,10 @@ File
           Receiver: RangeExpr
             Lower: IntLit
               Text: "9"
+              Base: 0
             Upper: IntLit
               Text: "0"
+              Base: 0
             HalfOpen: false
           Member: Identifier
             Name: "eql"
@@ -688,12 +756,15 @@ File
             Arguments:
               IntLit
                 Text: "9"
+                Base: 0
               IntLit
                 Text: "0"
+                Base: 0
               CallExpr
                 Callee: MemberExpr
                   Receiver: IntLit
                     Text: "1"
+                    Base: 0
                   Member: Identifier
                     Name: "neg"
                 Arguments: ~
@@ -704,8 +775,10 @@ File
           Receiver: RangeExpr
             Lower: IntLit
               Text: "9"
+              Base: 0
             Upper: IntLit
               Text: "0"
+              Base: 0
             HalfOpen: true
           Member: Identifier
             Name: "eql"
@@ -716,12 +789,15 @@ File
             Arguments:
               IntLit
                 Text: "8"
+                Base: 0
               IntLit
                 Text: "0"
+                Base: 0
               CallExpr
                 Callee: MemberExpr
                   Receiver: IntLit
                     Text: "1"
+                    Base: 0
                   Member: Identifier
                     Name: "neg"
                 Arguments: ~
@@ -732,8 +808,10 @@ File
           Receiver: RangeExpr
             Lower: IntLit
               Text: "5"
+              Base: 0
             Upper: IntLit
               Text: "5"
+              Base: 0
             HalfOpen: false
           Member: Identifier
             Name: "eql"
@@ -744,8 +822,10 @@ File
             Arguments:
               IntLit
                 Text: "5"
+                Base: 0
               IntLit
                 Text: "5"
+                Base: 0
     AssertDecl
       Doc: ~
       Cond: CallExpr
@@ -759,6 +839,7 @@ File
         Arguments:
           IntLit
             Text: "55"
+            Base: 0
     AssertDecl
       Doc: ~
       Cond: CallExpr
@@ -772,6 +853,7 @@ File
         Arguments:
           IntLit
             Text: "15"
+            Base: 0
     AssertDecl
       Doc: ~
       Cond: CallExpr
@@ -785,6 +867,7 @@ File
         Arguments:
           IntLit
             Text: "10"
+            Base: 0
     AssertDecl
       Doc: ~
       Cond: CallExpr
@@ -798,6 +881,7 @@ File
         Arguments:
           IntLit
             Text: "30"
+            Base: 0
     AssertDecl
       Doc: ~
       Cond: CallExpr
@@ -807,8 +891,10 @@ File
               Receiver: RangeExpr
                 Lower: IntLit
                   Text: "0"
+                  Base: 0
                 Upper: IntLit
                   Text: "9"
+                  Base: 0
                 HalfOpen: false
               Member: Identifier
                 Name: "count"
@@ -818,6 +904,7 @@ File
         Arguments:
           IntLit
             Text: "10"
+            Base: 0
     AssertDecl
       Doc: ~
       Cond: CallExpr
@@ -827,8 +914,10 @@ File
               Receiver: RangeExpr
                 Lower: IntLit
                   Text: "0"
+                  Base: 0
                 Upper: IntLit
                   Text: "9"
+                  Base: 0
                 HalfOpen: true
               Member: Identifier
                 Name: "count"
@@ -838,6 +927,7 @@ File
         Arguments:
           IntLit
             Text: "9"
+            Base: 0
     AssertDecl
       Doc: ~
       Cond: CallExpr
@@ -850,10 +940,13 @@ File
                 Arguments:
                   IntLit
                     Text: "0"
+                    Base: 0
                   IntLit
                     Text: "10"
+                    Base: 0
                   IntLit
                     Text: "2"
+                    Base: 0
               Member: Identifier
                 Name: "count"
             Arguments: ~
@@ -862,6 +955,7 @@ File
         Arguments:
           IntLit
             Text: "6"
+            Base: 0
     AssertDecl
       Doc: ~
       Cond: CallExpr
@@ -874,12 +968,15 @@ File
                 Arguments:
                   IntLit
                     Text: "10"
+                    Base: 0
                   IntLit
                     Text: "0"
+                    Base: 0
                   CallExpr
                     Callee: MemberExpr
                       Receiver: IntLit
                         Text: "2"
+                        Base: 0
                       Member: Identifier
                         Name: "neg"
                     Arguments: ~
@@ -891,6 +988,7 @@ File
         Arguments:
           IntLit
             Text: "6"
+            Base: 0
     AssertDecl
       Doc: ~
       Cond: CallExpr
@@ -900,14 +998,17 @@ File
               Receiver: RangeExpr
                 Lower: IntLit
                   Text: "0"
+                  Base: 0
                 Upper: IntLit
                   Text: "4"
+                  Base: 0
                 HalfOpen: false
               Member: Identifier
                 Name: "fold"
             Arguments:
               IntLit
                 Text: "0"
+                Base: 0
               FuncLit
                 Params:
                   ParamDef
@@ -952,6 +1053,7 @@ File
         Arguments:
           IntLit
             Text: "10"
+            Base: 0
     AssertDecl
       Doc: ~
       Cond: CallExpr
@@ -964,15 +1066,19 @@ File
                 Arguments:
                   IntLit
                     Text: "0"
+                    Base: 0
                   IntLit
                     Text: "10"
+                    Base: 0
                   IntLit
                     Text: "2"
+                    Base: 0
               Member: Identifier
                 Name: "fold"
             Arguments:
               IntLit
                 Text: "0"
+                Base: 0
               FuncLit
                 Params:
                   ParamDef
@@ -1017,4 +1123,5 @@ File
         Arguments:
           IntLit
             Text: "30"
+            Base: 0
   Masters: ~

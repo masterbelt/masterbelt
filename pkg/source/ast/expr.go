@@ -11,10 +11,39 @@ type Expr interface {
 	expr()
 }
 
-// IntLit is an integer literal. Its Text is the literal as written; no numeric
-// parsing or range checking happens at this layer.
+// IntBase is the radix an integer literal was written in. It records the
+// literal's spelling — the 0b/0o/0x prefix, or none — so a consumer such as a
+// formatter can reproduce or normalize the prefix without re-parsing Text. The
+// numeric value Text denotes is independent of it.
+type IntBase int
+
+// The integer-literal radices, one per accepted prefix; see each comment.
+const (
+	BaseDecimal IntBase = iota // no prefix, e.g. 100
+	BaseBinary                 // 0b prefix, e.g. 0b1010
+	BaseOctal                  // 0o prefix, e.g. 0o17
+	BaseHex                    // 0x prefix, e.g. 0xFF
+)
+
+func (b IntBase) String() string {
+	switch b {
+	case BaseBinary:
+		return "binary"
+	case BaseOctal:
+		return "octal"
+	case BaseHex:
+		return "hexadecimal"
+	default:
+		return "decimal"
+	}
+}
+
+// IntLit is an integer literal. Its Text is the literal as written (including
+// any 0b/0o/0x prefix) and Base records that radix; no numeric parsing or range
+// checking happens at this layer.
 type IntLit struct {
 	Text   string
+	Base   IntBase
 	syntax *cst.Node
 }
 
@@ -23,9 +52,9 @@ func (l *IntLit) Syntax() *cst.Node { return l.syntax }
 func (l *IntLit) node()             {}
 func (l *IntLit) expr()             {}
 
-// NewIntLit builds an IntLit node.
-func NewIntLit(text string, syntax *cst.Node) *IntLit {
-	return &IntLit{Text: text, syntax: syntax}
+// NewIntLit builds an IntLit node of the given radix.
+func NewIntLit(text string, base IntBase, syntax *cst.Node) *IntLit {
+	return &IntLit{Text: text, Base: base, syntax: syntax}
 }
 
 // DatetimeLit is a datetime literal: a D-prefixed ISO-8601 instant

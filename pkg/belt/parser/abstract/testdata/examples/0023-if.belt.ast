@@ -105,10 +105,12 @@ File
             Arguments:
               IntLit
                 Text: "100"
+                Base: 0
           Then:
             ReturnStmt
               Value: IntLit
                 Text: "0"
+                Base: 0
           ElseIf: ~
           Else: ~
         ReturnStmt
@@ -145,6 +147,7 @@ File
             Arguments:
               IntLit
                 Text: "0"
+                Base: 0
           Then:
             ReturnStmt
               Value: StringLit
@@ -161,6 +164,7 @@ File
                 Arguments:
                   IntLit
                     Text: "0"
+                    Base: 0
               Then:
                 ReturnStmt
                   Value: StringLit

@@ -115,6 +115,7 @@ File
         Arguments:
           IntLit
             Text: "3"
+            Base: 0
       Builtin: false
   Types:
     TypeDecl

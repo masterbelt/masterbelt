@@ -11,7 +11,7 @@ import (
 
 // --- ast builders (nil syntax: the type rules never read Syntax) ------------
 
-func intLit(text string) *ast.IntLit    { return ast.NewIntLit(text, nil) }
+func intLit(text string) *ast.IntLit    { return ast.NewIntLit(text, ast.BaseDecimal, nil) }
 func boolLit(v bool) *ast.BoolLit       { return ast.NewBoolLit(v, nil) }
 func ident(name string) *ast.Identifier { return ast.NewIdentifier(name, nil) }
 

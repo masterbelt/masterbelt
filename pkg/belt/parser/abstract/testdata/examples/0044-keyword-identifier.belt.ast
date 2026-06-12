@@ -107,10 +107,12 @@ File
             Callee: MemberExpr
               Receiver: IntLit
                 Text: "2"
+                Base: 0
               Member: Identifier
                 Name: "mul"
             Arguments:
               IntLit
                 Text: "2"
+                Base: 0
   Asserts: ~
   Masters: ~

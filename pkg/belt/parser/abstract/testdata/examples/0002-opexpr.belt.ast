@@ -10,11 +10,13 @@ File
         Callee: MemberExpr
           Receiver: IntLit
             Text: "1"
+            Base: 0
           Member: Identifier
             Name: "add"
         Arguments:
           IntLit
             Text: "2"
+            Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -25,11 +27,13 @@ File
         Callee: MemberExpr
           Receiver: IntLit
             Text: "1"
+            Base: 0
           Member: Identifier
             Name: "sub"
         Arguments:
           IntLit
             Text: "2"
+            Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -40,11 +44,13 @@ File
         Callee: MemberExpr
           Receiver: IntLit
             Text: "1"
+            Base: 0
           Member: Identifier
             Name: "mul"
         Arguments:
           IntLit
             Text: "2"
+            Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -55,11 +61,13 @@ File
         Callee: MemberExpr
           Receiver: IntLit
             Text: "1"
+            Base: 0
           Member: Identifier
             Name: "div"
         Arguments:
           IntLit
             Text: "2"
+            Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -70,11 +78,13 @@ File
         Callee: MemberExpr
           Receiver: IntLit
             Text: "1"
+            Base: 0
           Member: Identifier
             Name: "rem"
         Arguments:
           IntLit
             Text: "2"
+            Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -85,11 +95,13 @@ File
         Callee: MemberExpr
           Receiver: IntLit
             Text: "1"
+            Base: 0
           Member: Identifier
             Name: "eql"
         Arguments:
           IntLit
             Text: "1"
+            Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -100,11 +112,13 @@ File
         Callee: MemberExpr
           Receiver: IntLit
             Text: "1"
+            Base: 0
           Member: Identifier
             Name: "neq"
         Arguments:
           IntLit
             Text: "1"
+            Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -115,11 +129,13 @@ File
         Callee: MemberExpr
           Receiver: IntLit
             Text: "1"
+            Base: 0
           Member: Identifier
             Name: "lt"
         Arguments:
           IntLit
             Text: "2"
+            Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -130,11 +146,13 @@ File
         Callee: MemberExpr
           Receiver: IntLit
             Text: "1"
+            Base: 0
           Member: Identifier
             Name: "lteq"
         Arguments:
           IntLit
             Text: "2"
+            Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -145,11 +163,13 @@ File
         Callee: MemberExpr
           Receiver: IntLit
             Text: "1"
+            Base: 0
           Member: Identifier
             Name: "gt"
         Arguments:
           IntLit
             Text: "2"
+            Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -160,11 +180,13 @@ File
         Callee: MemberExpr
           Receiver: IntLit
             Text: "1"
+            Base: 0
           Member: Identifier
             Name: "gteq"
         Arguments:
           IntLit
             Text: "2"
+            Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -205,6 +227,7 @@ File
         Callee: MemberExpr
           Receiver: IntLit
             Text: "1"
+            Base: 0
           Member: Identifier
             Name: "pos"
         Arguments: ~
@@ -218,6 +241,7 @@ File
         Callee: MemberExpr
           Receiver: IntLit
             Text: "1"
+            Base: 0
           Member: Identifier
             Name: "neg"
         Arguments: ~
@@ -246,16 +270,19 @@ File
             Callee: MemberExpr
               Receiver: IntLit
                 Text: "1"
+                Base: 0
               Member: Identifier
                 Name: "add"
             Arguments:
               IntLit
                 Text: "2"
+                Base: 0
           Member: Identifier
             Name: "mul"
         Arguments:
           IntLit
             Text: "3"
+            Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -268,11 +295,13 @@ File
             Callee: MemberExpr
               Receiver: IntLit
                 Text: "1"
+                Base: 0
               Member: Identifier
                 Name: "gt"
             Arguments:
               IntLit
                 Text: "2"
+                Base: 0
           Member: Identifier
             Name: "not"
         Arguments: ~

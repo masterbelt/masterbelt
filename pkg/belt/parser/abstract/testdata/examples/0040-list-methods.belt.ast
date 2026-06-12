@@ -14,10 +14,12 @@ File
                 Key: ~
                 Value: IntLit
                   Text: "1"
+                  Base: 0
               CollectionEntry
                 Key: ~
                 Value: IntLit
                   Text: "2"
+                  Base: 0
           Member: Identifier
             Name: "add"
         Arguments:
@@ -27,10 +29,12 @@ File
                 Key: ~
                 Value: IntLit
                   Text: "3"
+                  Base: 0
               CollectionEntry
                 Key: ~
                 Value: IntLit
                   Text: "4"
+                  Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -45,15 +49,18 @@ File
                 Key: ~
                 Value: IntLit
                   Text: "1"
+                  Base: 0
               CollectionEntry
                 Key: ~
                 Value: IntLit
                   Text: "2"
+                  Base: 0
           Member: Identifier
             Name: "add"
         Arguments:
           IntLit
             Text: "3"
+            Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -72,6 +79,7 @@ File
                       Key: ~
                       Value: IntLit
                         Text: "1"
+                        Base: 0
               CollectionEntry
                 Key: ~
                 Value: CollectionLit
@@ -80,6 +88,7 @@ File
                       Key: ~
                       Value: IntLit
                         Text: "2"
+                        Base: 0
           Member: Identifier
             Name: "add"
         Arguments:
@@ -89,6 +98,7 @@ File
                 Key: ~
                 Value: IntLit
                   Text: "3"
+                  Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -103,15 +113,18 @@ File
                 Key: ~
                 Value: IntLit
                   Text: "1"
+                  Base: 0
               CollectionEntry
                 Key: ~
                 Value: IntLit
                   Text: "2"
+                  Base: 0
           Member: Identifier
             Name: "push"
         Arguments:
           IntLit
             Text: "3"
+            Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -126,15 +139,18 @@ File
                 Key: ~
                 Value: IntLit
                   Text: "2"
+                  Base: 0
               CollectionEntry
                 Key: ~
                 Value: IntLit
                   Text: "3"
+                  Base: 0
           Member: Identifier
             Name: "unshift"
         Arguments:
           IntLit
             Text: "1"
+            Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -166,14 +182,17 @@ File
                 Key: ~
                 Value: IntLit
                   Text: "1"
+                  Base: 0
               CollectionEntry
                 Key: ~
                 Value: IntLit
                   Text: "2"
+                  Base: 0
               CollectionEntry
                 Key: ~
                 Value: IntLit
                   Text: "3"
+                  Base: 0
           Member: Identifier
             Name: "pop"
         Arguments: ~
@@ -204,14 +223,17 @@ File
                 Key: ~
                 Value: IntLit
                   Text: "1"
+                  Base: 0
               CollectionEntry
                 Key: ~
                 Value: IntLit
                   Text: "2"
+                  Base: 0
               CollectionEntry
                 Key: ~
                 Value: IntLit
                   Text: "3"
+                  Base: 0
           Member: Identifier
             Name: "shift"
         Arguments: ~
@@ -285,6 +307,7 @@ File
                 ReturnStmt
                   Value: IntLit
                     Text: "0"
+                    Base: 0
           Else: ~
           AfterElse: ~
   Asserts:
@@ -302,10 +325,12 @@ File
                         Key: ~
                         Value: IntLit
                           Text: "1"
+                          Base: 0
                       CollectionEntry
                         Key: ~
                         Value: IntLit
                           Text: "2"
+                          Base: 0
                   Member: Identifier
                     Name: "add"
                 Arguments:
@@ -315,10 +340,12 @@ File
                         Key: ~
                         Value: IntLit
                           Text: "3"
+                          Base: 0
                       CollectionEntry
                         Key: ~
                         Value: IntLit
                           Text: "4"
+                          Base: 0
               Member: Identifier
                 Name: "len"
             Arguments: ~
@@ -327,6 +354,7 @@ File
         Arguments:
           IntLit
             Text: "4"
+            Base: 0
     AssertDecl
       Doc: ~
       Cond: CallExpr
@@ -341,15 +369,18 @@ File
                         Key: ~
                         Value: IntLit
                           Text: "1"
+                          Base: 0
                       CollectionEntry
                         Key: ~
                         Value: IntLit
                           Text: "2"
+                          Base: 0
                   Member: Identifier
                     Name: "add"
                 Arguments:
                   IntLit
                     Text: "3"
+                    Base: 0
               Member: Identifier
                 Name: "len"
             Arguments: ~
@@ -358,6 +389,7 @@ File
         Arguments:
           IntLit
             Text: "3"
+            Base: 0
     AssertDecl
       Doc: ~
       Cond: CallExpr
@@ -372,15 +404,18 @@ File
                         Key: ~
                         Value: IntLit
                           Text: "1"
+                          Base: 0
                       CollectionEntry
                         Key: ~
                         Value: IntLit
                           Text: "2"
+                          Base: 0
                   Member: Identifier
                     Name: "push"
                 Arguments:
                   IntLit
                     Text: "3"
+                    Base: 0
               Member: Identifier
                 Name: "len"
             Arguments: ~
@@ -389,6 +424,7 @@ File
         Arguments:
           IntLit
             Text: "3"
+            Base: 0
     AssertDecl
       Doc: ~
       Cond: CallExpr
@@ -403,15 +439,18 @@ File
                         Key: ~
                         Value: IntLit
                           Text: "2"
+                          Base: 0
                       CollectionEntry
                         Key: ~
                         Value: IntLit
                           Text: "3"
+                          Base: 0
                   Member: Identifier
                     Name: "unshift"
                 Arguments:
                   IntLit
                     Text: "1"
+                    Base: 0
               Member: Identifier
                 Name: "len"
             Arguments: ~
@@ -420,6 +459,7 @@ File
         Arguments:
           IntLit
             Text: "3"
+            Base: 0
     AssertDecl
       Doc: ~
       Cond: CallExpr
@@ -438,6 +478,7 @@ File
                               Key: ~
                               Value: IntLit
                                 Text: "1"
+                                Base: 0
                       CollectionEntry
                         Key: ~
                         Value: CollectionLit
@@ -446,6 +487,7 @@ File
                               Key: ~
                               Value: IntLit
                                 Text: "2"
+                                Base: 0
                   Member: Identifier
                     Name: "add"
                 Arguments:
@@ -455,6 +497,7 @@ File
                         Key: ~
                         Value: IntLit
                           Text: "3"
+                          Base: 0
               Member: Identifier
                 Name: "len"
             Arguments: ~
@@ -463,6 +506,7 @@ File
         Arguments:
           IntLit
             Text: "3"
+            Base: 0
     AssertDecl
       Doc: ~
       Cond: CallExpr
@@ -479,14 +523,17 @@ File
                         Key: ~
                         Value: IntLit
                           Text: "1"
+                          Base: 0
                       CollectionEntry
                         Key: ~
                         Value: IntLit
                           Text: "2"
+                          Base: 0
                       CollectionEntry
                         Key: ~
                         Value: IntLit
                           Text: "3"
+                          Base: 0
                   Member: Identifier
                     Name: "pop"
                 Arguments: ~
@@ -495,6 +542,7 @@ File
         Arguments:
           IntLit
             Text: "3"
+            Base: 0
     AssertDecl
       Doc: ~
       Cond: CallExpr
@@ -515,6 +563,7 @@ File
         Arguments:
           IntLit
             Text: "0"
+            Base: 0
     AssertDecl
       Doc: ~
       Cond: CallExpr
@@ -531,14 +580,17 @@ File
                         Key: ~
                         Value: IntLit
                           Text: "1"
+                          Base: 0
                       CollectionEntry
                         Key: ~
                         Value: IntLit
                           Text: "2"
+                          Base: 0
                       CollectionEntry
                         Key: ~
                         Value: IntLit
                           Text: "3"
+                          Base: 0
                   Member: Identifier
                     Name: "shift"
                 Arguments: ~
@@ -547,6 +599,7 @@ File
         Arguments:
           IntLit
             Text: "1"
+            Base: 0
     AssertDecl
       Doc: ~
       Cond: CallExpr
@@ -567,4 +620,5 @@ File
         Arguments:
           IntLit
             Text: "0"
+            Base: 0
   Masters: ~

@@ -8,6 +8,7 @@ File
       Type: ~
       Value: IntLit
         Text: "100"
+        Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -16,6 +17,7 @@ File
       Type: ~
       Value: IntLit
         Text: "0"
+        Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -52,6 +54,7 @@ File
         Arguments:
           IntLit
             Text: "0"
+            Base: 0
     AssertDecl
       Doc: ~
       Cond: CallExpr
@@ -70,6 +73,7 @@ File
         Arguments:
           IntLit
             Text: "100"
+            Base: 0
     AssertDecl
       Doc: ~
       Cond: CallExpr
@@ -99,6 +103,7 @@ File
             Arguments:
               IntLit
                 Text: "0"
+                Base: 0
           Member: Identifier
             Name: "anan"
         Arguments:
@@ -113,6 +118,7 @@ File
                 Arguments:
                   IntLit
                     Text: "0"
+                    Base: 0
               Member: Identifier
                 Name: "not"
             Arguments: ~

@@ -12,8 +12,10 @@ File
         Arguments:
           IntLit
             Text: "3"
+            Base: 0
           IntLit
             Text: "7"
+            Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -54,6 +56,7 @@ File
         Arguments:
           IntLit
             Text: "21"
+            Base: 0
       Builtin: false
   Types: ~
   Enums: ~

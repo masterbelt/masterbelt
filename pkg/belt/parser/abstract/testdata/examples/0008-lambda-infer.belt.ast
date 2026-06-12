@@ -14,14 +14,17 @@ File
                 Key: ~
                 Value: IntLit
                   Text: "1"
+                  Base: 0
               CollectionEntry
                 Key: ~
                 Value: IntLit
                   Text: "2"
+                  Base: 0
               CollectionEntry
                 Key: ~
                 Value: IntLit
                   Text: "3"
+                  Base: 0
           Member: Identifier
             Name: "map"
         Arguments:
@@ -42,6 +45,7 @@ File
                   Arguments:
                     IntLit
                       Text: "2"
+                      Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -56,18 +60,22 @@ File
                 Key: ~
                 Value: IntLit
                   Text: "1"
+                  Base: 0
               CollectionEntry
                 Key: ~
                 Value: IntLit
                   Text: "2"
+                  Base: 0
               CollectionEntry
                 Key: ~
                 Value: IntLit
                   Text: "3"
+                  Base: 0
               CollectionEntry
                 Key: ~
                 Value: IntLit
                   Text: "4"
+                  Base: 0
           Member: Identifier
             Name: "map"
         Arguments:
@@ -90,11 +98,13 @@ File
                       Arguments:
                         IntLit
                           Text: "2"
+                          Base: 0
                     Member: Identifier
                       Name: "eql"
                   Arguments:
                     IntLit
                       Text: "0"
+                      Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -109,14 +119,17 @@ File
                 Key: ~
                 Value: IntLit
                   Text: "1"
+                  Base: 0
               CollectionEntry
                 Key: ~
                 Value: IntLit
                   Text: "2"
+                  Base: 0
               CollectionEntry
                 Key: ~
                 Value: IntLit
                   Text: "3"
+                  Base: 0
           Member: Identifier
             Name: "map"
         Arguments:
@@ -141,6 +154,7 @@ File
                   Arguments:
                     IntLit
                       Text: "3"
+                      Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -177,6 +191,7 @@ File
               Arguments:
                 IntLit
                   Text: "2"
+                  Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -191,14 +206,17 @@ File
                 Key: ~
                 Value: IntLit
                   Text: "1"
+                  Base: 0
               CollectionEntry
                 Key: ~
                 Value: IntLit
                   Text: "2"
+                  Base: 0
               CollectionEntry
                 Key: ~
                 Value: IntLit
                   Text: "3"
+                  Base: 0
           Member: Identifier
             Name: "map"
         Arguments:
@@ -219,6 +237,7 @@ File
                   Arguments:
                     IntLit
                       Text: "1"
+                      Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -240,14 +259,17 @@ File
             Key: ~
             Value: IntLit
               Text: "1"
+              Base: 0
           CollectionEntry
             Key: ~
             Value: IntLit
               Text: "2"
+              Base: 0
           CollectionEntry
             Key: ~
             Value: IntLit
               Text: "3"
+              Base: 0
       Builtin: false
     ConstDecl
       Doc: ~

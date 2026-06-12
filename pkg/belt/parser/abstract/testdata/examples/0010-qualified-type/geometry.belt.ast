@@ -8,6 +8,7 @@ File
       Type: ~
       Value: IntLit
         Text: "0"
+        Base: 0
       Builtin: false
     ConstDecl
       Doc: "One step along the axis."
@@ -16,6 +17,7 @@ File
       Type: ~
       Value: IntLit
         Text: "1"
+        Base: 0
       Builtin: false
   Types:
     TypeDecl

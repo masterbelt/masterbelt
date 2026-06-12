@@ -12,6 +12,7 @@ File
         Projections: ~
       Value: IntLit
         Text: "100"
+        Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -27,6 +28,7 @@ File
         Arguments:
           IntLit
             Text: "50"
+            Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -54,6 +56,7 @@ File
         Projections: ~
       Value: IntLit
         Text: "1"
+        Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -82,6 +85,7 @@ File
         Arguments:
           IntLit
             Text: "4"
+            Base: 0
       Builtin: false
   Types:
     TypeDecl
@@ -165,6 +169,7 @@ File
                     Arguments:
                       IntLit
                         Text: "0"
+                        Base: 0
       Consts: ~
       Impls: ~
     TypeDecl
@@ -203,6 +208,7 @@ File
                 Arguments:
                   IntLit
                     Text: "1"
+                    Base: 0
         MethodDecl
           Doc: "The level a number of steps up."
           Public: true

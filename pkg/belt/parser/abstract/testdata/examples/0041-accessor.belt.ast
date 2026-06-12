@@ -39,6 +39,7 @@ File
         Arguments:
           IntLit
             Text: "212"
+            Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -126,6 +127,7 @@ File
                     Name: "deg"
                     Value: IntLit
                       Text: "0"
+                      Base: 0
         MethodDecl
           Doc: "A degree reading converted from a fahrenheit value."
           Public: true
@@ -167,16 +169,19 @@ File
                               Arguments:
                                 IntLit
                                   Text: "32"
+                                  Base: 0
                             Member: Identifier
                               Name: "mul"
                           Arguments:
                             IntLit
                               Text: "5"
+                              Base: 0
                         Member: Identifier
                           Name: "div"
                       Arguments:
                         IntLit
                           Text: "9"
+                          Base: 0
         MethodDecl
           Doc: "A degree reading converted from a celsius value (the static overload:" "same name, a Celsius argument rather than a nint)."
           Public: true
@@ -233,16 +238,19 @@ File
                         Arguments:
                           IntLit
                             Text: "9"
+                            Base: 0
                       Member: Identifier
                         Name: "div"
                     Arguments:
                       IntLit
                         Text: "5"
+                        Base: 0
                   Member: Identifier
                     Name: "add"
                 Arguments:
                   IntLit
                     Text: "32"
+                    Base: 0
         MethodDecl
           Doc: "Fahrenheit write: c.fahrenheit = 212 (c is a let local)."
           Public: true
@@ -284,16 +292,19 @@ File
                               Arguments:
                                 IntLit
                                   Text: "32"
+                                  Base: 0
                             Member: Identifier
                               Name: "mul"
                           Arguments:
                             IntLit
                               Text: "5"
+                              Base: 0
                         Member: Identifier
                           Name: "div"
                       Arguments:
                         IntLit
                           Text: "9"
+                          Base: 0
       Consts: ~
       Impls: ~
     TypeDecl
@@ -357,6 +368,7 @@ File
                 Arguments:
                   IntLit
                     Text: "10"
+                    Base: 0
       Consts:
         ConstDecl
           Doc: "The maximum health."
@@ -365,6 +377,7 @@ File
           Type: ~
           Value: IntLit
             Text: "100"
+            Base: 0
           Builtin: false
       Impls: ~
   Enums:
@@ -468,6 +481,7 @@ File
               Name: "fahrenheit"
           Value: IntLit
             Text: "212"
+            Base: 0
         ReturnStmt
           Value: Identifier
             Name: "c"
@@ -483,6 +497,7 @@ File
         Arguments:
           IntLit
             Text: "32"
+            Base: 0
     AssertDecl
       Doc: ~
       Cond: CallExpr
@@ -497,6 +512,7 @@ File
         Arguments:
           IntLit
             Text: "100"
+            Base: 0
     AssertDecl
       Doc: ~
       Cond: CallExpr
@@ -511,6 +527,7 @@ File
         Arguments:
           IntLit
             Text: "0"
+            Base: 0
     AssertDecl
       Doc: ~
       Cond: CallExpr
@@ -527,6 +544,7 @@ File
         Arguments:
           IntLit
             Text: "100"
+            Base: 0
     AssertDecl
       Doc: ~
       Cond: CallExpr
@@ -541,6 +559,7 @@ File
         Arguments:
           IntLit
             Text: "10"
+            Base: 0
     AssertDecl
       Doc: ~
       Cond: CallExpr
@@ -555,6 +574,7 @@ File
         Arguments:
           IntLit
             Text: "100"
+            Base: 0
     AssertDecl
       Doc: ~
       Cond: MemberExpr

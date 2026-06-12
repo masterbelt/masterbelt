@@ -66,6 +66,7 @@ File
             Arguments:
               IntLit
                 Text: "5"
+                Base: 0
           Member: Identifier
             Name: "increment"
         Arguments: ~
@@ -81,6 +82,7 @@ File
         Projections: ~
       Value: IntLit
         Text: "10"
+        Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -109,6 +111,7 @@ File
         Arguments:
           IntLit
             Text: "3"
+            Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -150,6 +153,7 @@ File
               Arguments:
                 IntLit
                   Text: "5"
+                  Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -192,6 +196,7 @@ File
                     Arguments:
                       IntLit
                         Text: "8"
+                        Base: 0
       Builtin: false
     ConstDecl
       Doc: ~
@@ -249,6 +254,7 @@ File
                 Arguments:
                   IntLit
                     Text: "1"
+                    Base: 0
         MethodDecl
           Doc: "This level a number of steps up. The base value lifts into the nominal" "type through the conversion: a Level derives sbyte's operators, but their" "self-typed operands stay nominal, so mixing in a bare sbyte is a type" "error — Level(steps) is the explicit lift."
           Public: true
@@ -424,11 +430,13 @@ File
                 ReturnStmt
                   Value: IntLit
                     Text: "1"
+                    Base: 0
               ElseIf: ~
               Else: ~
             ReturnStmt
               Value: IntLit
                 Text: "0"
+                Base: 0
       Consts: ~
       Impls: ~
   Interfaces: ~
@@ -454,6 +462,7 @@ File
             Arguments:
               IntLit
                 Text: "1"
+                Base: 0
   Asserts:
     AssertDecl
       Doc: ~
@@ -498,6 +507,7 @@ File
         Arguments:
           IntLit
             Text: "1"
+            Base: 0
     AssertDecl
       Doc: ~
       Cond: CallExpr
@@ -517,6 +527,7 @@ File
         Arguments:
           IntLit
             Text: "0"
+            Base: 0
     AssertDecl
       Doc: ~
       Cond: CallExpr
@@ -533,6 +544,7 @@ File
         Arguments:
           IntLit
             Text: "11"
+            Base: 0
     AssertDecl
       Doc: ~
       Cond: CallExpr
@@ -548,11 +560,13 @@ File
             Arguments:
               IntLit
                 Text: "4"
+                Base: 0
           Member: Identifier
             Name: "eql"
         Arguments:
           IntLit
             Text: "5"
+            Base: 0
     AssertDecl
       Doc: ~
       Cond: CallExpr
@@ -572,6 +586,7 @@ File
         Arguments:
           IntLit
             Text: "6"
+            Base: 0
     AssertDecl
       Doc: ~
       Cond: CallExpr
@@ -599,4 +614,5 @@ File
         Arguments:
           IntLit
             Text: "10"
+            Base: 0
   Masters: ~

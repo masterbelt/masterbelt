@@ -59,14 +59,17 @@ File
           Name: "Common"
           Value: IntLit
             Text: "1"
+            Base: 0
         EnumMember
           Name: "Rare"
           Value: IntLit
             Text: "2"
+            Base: 0
         EnumMember
           Name: "Legend"
           Value: IntLit
             Text: "10"
+            Base: 0
       Methods: ~
       Consts: ~
       Impls: ~
