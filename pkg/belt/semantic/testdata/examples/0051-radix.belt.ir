@@ -8,12 +8,12 @@ Module
       Type: Builtin
         Name: "nint"
       Value: IntLiteral
-        Text: "0"
+        Text: "0b1010"
         Type: Builtin
           Name: "nint"
       Eval: Constant
         Kind: 0
-        Int: 0
+        Int: 10
         Bool: false
         Str: ""
         Coll: ~
@@ -37,12 +37,12 @@ Module
       Type: Builtin
         Name: "nint"
       Value: IntLiteral
-        Text: "0"
+        Text: "0o17"
         Type: Builtin
           Name: "nint"
       Eval: Constant
         Kind: 0
-        Int: 0
+        Int: 15
         Bool: false
         Str: ""
         Coll: ~
@@ -66,12 +66,12 @@ Module
       Type: Builtin
         Name: "nint"
       Value: IntLiteral
-        Text: "0"
+        Text: "0xFF"
         Type: Builtin
           Name: "nint"
       Eval: Constant
         Kind: 0
-        Int: 0
+        Int: 255
         Bool: false
         Str: ""
         Coll: ~
@@ -95,12 +95,12 @@ Module
       Type: Builtin
         Name: "nint"
       Value: IntLiteral
-        Text: "0"
+        Text: "0XCAFE"
         Type: Builtin
           Name: "nint"
       Eval: Constant
         Kind: 0
-        Int: 0
+        Int: 51966
         Bool: false
         Str: ""
         Coll: ~
@@ -124,12 +124,12 @@ Module
       Type: Builtin
         Name: "nint"
       Value: IntLiteral
-        Text: "0"
+        Text: "0B1010"
         Type: Builtin
           Name: "nint"
       Eval: Constant
         Kind: 0
-        Int: 0
+        Int: 10
         Bool: false
         Str: ""
         Coll: ~
@@ -152,13 +152,37 @@ Module
       Doc: ~
       Type: Builtin
         Name: "nint"
-      Value: IntLiteral
-        Text: "0"
+      Value: Call
+        Receiver: Call
+          Receiver: IntLiteral
+            Text: "0x10"
+            Type: Builtin
+              Name: "nint"
+          Method: "add"
+          Args:
+            IntLiteral
+              Text: "0o10"
+              Type: Builtin
+                Name: "nint"
+          Setter: false
+          Resolved: ~
+          Subst: ~
+          Type: Builtin
+            Name: "nint"
+        Method: "add"
+        Args:
+          IntLiteral
+            Text: "0b10"
+            Type: Builtin
+              Name: "nint"
+        Setter: false
+        Resolved: ~
+        Subst: ~
         Type: Builtin
           Name: "nint"
       Eval: Constant
         Kind: 0
-        Int: 0
+        Int: 26
         Bool: false
         Str: ""
         Coll: ~
@@ -178,12 +202,12 @@ Module
   Funcs: ~
   Asserts:
     Assert
-      Cond: "0"
+      Cond: "0b1010 == 10"
       Doc: ~
       Eval: Constant
-        Kind: 0
-        Int: 0
-        Bool: false
+        Kind: 1
+        Int: ~
+        Bool: true
         Str: ""
         Coll: ~
         Fields: ~
@@ -198,14 +222,14 @@ Module
         Step: ~
         UnionTag: ~
         Reified: ~
-      Diagram: "0"
+      Diagram: "0b1010 == 10\n       ^\n       true"
     Assert
-      Cond: "0"
+      Cond: "0o17 == 15"
       Doc: ~
       Eval: Constant
-        Kind: 0
-        Int: 0
-        Bool: false
+        Kind: 1
+        Int: ~
+        Bool: true
         Str: ""
         Coll: ~
         Fields: ~
@@ -220,14 +244,14 @@ Module
         Step: ~
         UnionTag: ~
         Reified: ~
-      Diagram: "0"
+      Diagram: "0o17 == 15\n     ^\n     true"
     Assert
-      Cond: "0"
+      Cond: "0xFF == 255"
       Doc: ~
       Eval: Constant
-        Kind: 0
-        Int: 0
-        Bool: false
+        Kind: 1
+        Int: ~
+        Bool: true
         Str: ""
         Coll: ~
         Fields: ~
@@ -242,4 +266,4 @@ Module
         Step: ~
         UnionTag: ~
         Reified: ~
-      Diagram: "0"
+      Diagram: "0xFF == 255\n     ^\n     true"

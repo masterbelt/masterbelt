@@ -264,13 +264,34 @@ func graphValueRaw(v ir.Value, ctx graphCtx) *ir.Constant {
 	}
 }
 
-// graphIntLiteral folds an integer literal to its arbitrary-precision value.
+// graphIntLiteral folds an integer literal to its arbitrary-precision value,
+// honouring a 0b/0o/0x radix prefix.
 func graphIntLiteral(v *ir.IntLiteral) *ir.Constant {
-	n, ok := new(big.Int).SetString(v.Text, 10)
+	digits, base := intRadix(v.Text)
+	n, ok := new(big.Int).SetString(digits, base)
 	if !ok {
 		return nil
 	}
 	return ir.IntConstant(n)
+}
+
+// intRadix splits an integer literal's text into the digits to parse and the
+// base to parse them in: a case-insensitive 0b/0o/0x prefix selects base 2/8/16
+// and is stripped, anything else is decimal. A bare leading zero stays decimal
+// (0100 is 100, not octal), matching the lexer, which tags a radix literal only
+// when its prefix letter is present.
+func intRadix(text string) (digits string, base int) {
+	if len(text) >= 2 && text[0] == '0' {
+		switch text[1] {
+		case 'b', 'B':
+			return text[2:], 2
+		case 'o', 'O':
+			return text[2:], 8
+		case 'x', 'X':
+			return text[2:], 16
+		}
+	}
+	return text, 10
 }
 
 // graphDatetimeLiteral folds a datetime literal to its UTC epoch instant.
