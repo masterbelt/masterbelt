@@ -84,7 +84,7 @@ module.exports = {
   // Literal token regexes. grammar.js tries datetime and duration before a
   // bare integer; tree-sitter's longest-match then makes "3w4d" a duration
   // and "100" an integer.
-  integer: /[0-9]+/,
+  integer: /0[bB][01]+|0[oO][0-7]+|0[xX][0-9A-Fa-f]+|[0-9]+/,
   datetime: /D[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]{3})?(Z|[+-][0-9]{2}:[0-9]{2})/,
   duration: /([0-9]+(ms|w|d|h|m|s))+/,
 

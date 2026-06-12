@@ -326,8 +326,8 @@ func classifyToken(kind token.Kind, parent cst.Kind, calleeMember, typeNameSeg b
 		return stKeyword, 0, true
 	case token.LineComment, token.BlockComment, token.DocComment:
 		return stComment, 0, true
-	case token.Int, token.DatetimeLit, token.DurationLit:
-		// The datetime and duration literals colour as numbers: their
+	case token.Int, token.BinInt, token.OctInt, token.HexInt, token.DatetimeLit, token.DurationLit:
+		// The radix, datetime, and duration literals colour as numbers: their
 		// cold-start grammar scopes are constant.numeric too.
 		return stNumber, 0, true
 	case token.String:
