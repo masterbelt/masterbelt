@@ -267,7 +267,8 @@ jobs:
   #   - when the masterbelt GitHub App is configured, the assembled tree is pushed
   #     to the mirror's default branch (the rolling preview editors track) and an
   #     immutable v<version> tag. That tag push triggers the mirror's release
-  #     workflows (npm + GitHub Packages always; crates.io + PyPI on stable tags),
+  #     workflows (GitHub Packages on every tag; public npm + crates.io + PyPI on
+  #     stable tags only — a nightly on public npm would bloat its packument),
   #     which build the wasm and publish — so this job needs no registry secret,
   #     no Docker, and no npm here.
   #   - absent the App, it only uploads the assembled tree as an artifact (never
