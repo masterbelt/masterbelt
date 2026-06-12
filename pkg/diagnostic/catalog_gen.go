@@ -991,6 +991,62 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "imported file not found: " + f["path"].String()
 		}
 	},
+	"master.cell_refinement": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return f["path"].String() + ":" + f["row"].String() + "," + f["col"].String() + ": " + f["value"].String() + " はフィールド " + f["field"].String() + " の型 " + f["typ"].String() + " を満たしません"
+		default:
+			return f["path"].String() + ":" + f["row"].String() + "," + f["col"].String() + ": " + f["value"].String() + " does not satisfy " + f["typ"].String() + " for field " + f["field"].String()
+		}
+	},
+	"master.cell_type_mismatch": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return f["path"].String() + ":" + f["row"].String() + "," + f["col"].String() + ": " + f["value"].String() + " はフィールド " + f["field"].String() + " の型 " + f["typ"].String() + " として不正です"
+		default:
+			return f["path"].String() + ":" + f["row"].String() + "," + f["col"].String() + ": " + f["value"].String() + " is not a valid " + f["typ"].String() + " for field " + f["field"].String()
+		}
+	},
+	"master.missing_column": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "ソース " + f["path"].String() + " にフィールド " + f["field"].String() + " に対応する列がありません"
+		default:
+			return "source " + f["path"].String() + " has no column for field " + f["field"].String()
+		}
+	},
+	"master.option_type_mismatch": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "オプション " + f["key"].String() + " は " + f["typ"].String() + " でなければなりません"
+		default:
+			return "option " + f["key"].String() + " must be a " + f["typ"].String()
+		}
+	},
+	"master.source_unreadable": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "ソース " + f["path"].String() + " を読み込めません: " + f["detail"].String()
+		default:
+			return "cannot read source " + f["path"].String() + ": " + f["detail"].String()
+		}
+	},
+	"master.unknown_option": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "フォーマット " + f["format"].String() + " にオプション " + f["key"].String() + " はありません"
+		default:
+			return "format " + f["format"].String() + " has no option " + f["key"].String()
+		}
+	},
+	"master.unsupported_field_type": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "フィールド " + f["field"].String() + " の型 " + f["typ"].String() + " は csv フォーマットではまだ読み込めません"
+		default:
+			return "field " + f["field"].String() + " has type " + f["typ"].String() + " which the csv format cannot read yet"
+		}
+	},
 	"project.config.entry_not_found": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":

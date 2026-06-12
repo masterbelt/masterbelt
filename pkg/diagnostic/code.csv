@@ -129,3 +129,10 @@ project.config.entry_not_found,error,path:string
 project.config.profile_missing_entry,error,profile:string
 project.config.profile_entry_not_found,error,profile:string path:string
 project.config.unknown_profile,error,profile:string
+master.source_unreadable,error,path:string detail:string
+master.missing_column,error,field:string path:string
+master.unsupported_field_type,error,field:string typ:string
+master.cell_type_mismatch,error,path:string row:int col:int field:string value:string typ:string
+master.cell_refinement,error,path:string row:int col:int field:string value:string typ:string
+master.unknown_option,error,format:string key:string
+master.option_type_mismatch,error,key:string typ:string

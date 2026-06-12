@@ -129,3 +129,10 @@ project.config.entry_not_found,entry file not found: {path}
 project.config.profile_missing_entry,profile {profile} does not set entry
 project.config.profile_entry_not_found,entry file not found for profile {profile}: {path}
 project.config.unknown_profile,profile {profile} is not defined in masterbelt.toml
+master.source_unreadable,cannot read source {path}: {detail}
+master.missing_column,source {path} has no column for field {field}
+master.unsupported_field_type,field {field} has type {typ} which the csv format cannot read yet
+master.cell_type_mismatch,"{path}:{row},{col}: {value} is not a valid {typ} for field {field}"
+master.cell_refinement,"{path}:{row},{col}: {value} does not satisfy {typ} for field {field}"
+master.unknown_option,format {format} has no option {key}
+master.option_type_mismatch,option {key} must be a {typ}
