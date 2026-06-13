@@ -786,9 +786,9 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 	"belt.semantic.self_member_name_clash": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
-			return f["name"].String() + " は self の読めるメンバ (フィールド/getter) と同名のローカルまたはパラメータの両方に該当し曖昧です。どちらかを別名にするか self." + f["name"].String() + " と明示してください"
+			return f["name"].String() + " は曖昧です: self の読めるメンバ (フィールド/getter) を指しますが、同名がこの位置で別の解釈 (ローカル/パラメータ・enum メンバ・メソッド・型) も持ちます。self." + f["name"].String() + " か、もう一方の明示形で区別してください"
 		default:
-			return f["name"].String() + " names both a readable member of self (a field or getter) and a local or parameter and is ambiguous; rename one or write self." + f["name"].String()
+			return f["name"].String() + " is ambiguous: it reads a member of self (a field or getter) but the same name also resolves another way here — a local or parameter / an enum member / a method / a type; write self." + f["name"].String() + " or the explicit form of the other meaning to disambiguate"
 		}
 	},
 	"belt.semantic.self_outside_method": func(loc Locale, f map[string]fmt.Stringer) string {

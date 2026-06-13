@@ -123,7 +123,7 @@ belt.semantic.type_has_no_fields,{typ} has no fields to project {member} from
 belt.semantic.cyclic_type_projection,the type projection of {member} on {typ} is cyclic with no grounding type
 belt.semantic.generic_type_projection,projecting a field off the generic type {typ} is not supported yet
 belt.semantic.type_param_in_value_position,the type parameter {name} is a compile-time type and not a foldable value; project it in type position (type X = {name}.member) or read it off a value of that type (v.member)
-belt.semantic.self_member_name_clash,{name} names both a readable member of self (a field or getter) and a local or parameter and is ambiguous; rename one or write self.{name}
+belt.semantic.self_member_name_clash,{name} is ambiguous: it reads a member of self (a field or getter) but the same name also resolves another way here — a local or parameter / an enum member / a method / a type; write self.{name} or the explicit form of the other meaning to disambiguate
 project.config.missing,masterbelt.toml not found in this directory or any parent
 project.config.invalid,invalid masterbelt.toml: {detail}
 project.config.missing_entry,masterbelt.toml does not set entry

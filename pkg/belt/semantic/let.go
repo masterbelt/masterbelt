@@ -194,6 +194,16 @@ func checkBareEnumAssign(s *ast.AssignStmt, enumDef *ir.TypeDef, want ir.Type, b
 	if !ok || enumIndex(enumDef, id.Name) < 0 {
 		return false
 	}
+	// A bare value that is both an enum member and a readable member of self is
+	// ambiguous between the enum member and the implicit self read: report the
+	// clash rather than silently taking the enum member here while the lowering
+	// reads self.name, the same clash a comparison or a return raises. It is
+	// handled (returns true) so the caller does not also synthesize the value.
+	if diags != nil && infer.IsReadableMember(bs.Reg, bs.Self, id.Name) {
+		c := at(id)
+		diags.Add(newSelfMemberNameClashDiagnostic(c.offset, c.width, id.Name))
+		return true
+	}
 	if member := (&ir.Named{Def: enumDef}); sink != nil && sink.Adapted != nil && !types.Identical(member, want) {
 		sink.Adapted(s.Value, want)
 	}

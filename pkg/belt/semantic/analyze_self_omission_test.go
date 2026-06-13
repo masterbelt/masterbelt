@@ -143,9 +143,9 @@ func TestSelfOmissionParameterStillReadsBare(t *testing.T) {
 	}
 }
 
-// TestSelfOmissionMethodNotBareResolved pins decision #3: a bare method name (no
-// parens) is not a readable member, so it does not resolve the way a field or
-// getter does — a method still needs self.foo(). The bare name lowers to nothing
+// TestSelfOmissionMethodNotBareResolved pins that a bare method name (no parens)
+// is not a readable member, so it does not resolve the way a field or getter does
+// — a method still needs self.foo(). The bare name lowers to nothing
 // rather than silently to self.area(), so a const consuming it does not fold
 // (unfolded_const) — unlike a bare field read, which folds.
 func TestSelfOmissionMethodNotBareResolved(t *testing.T) {
@@ -169,10 +169,10 @@ func TestSelfOmissionMethodNotBareResolved(t *testing.T) {
 	}
 }
 
-// TestSelfOmissionAssocConstNotBareResolved pins decision #4: a table-level
-// associated constant is read off the type (Type.Max), not bare — it is not a
-// row-level readable member (field ∪ getter), so a bare reference does not
-// resolve to it and a const consuming it does not fold.
+// TestSelfOmissionAssocConstNotBareResolved pins that a table-level associated
+// constant is read off the type (Type.Max), not bare — it is not a row-level
+// readable member (field ∪ getter), so a bare reference does not resolve to it
+// and a const consuming it does not fold.
 func TestSelfOmissionAssocConstNotBareResolved(t *testing.T) {
 	src := "pub type Health = nint impl {\n" +
 		"  pub const Max = 100\n" +
@@ -323,6 +323,44 @@ func TestSelfOmissionEnumShorthandMatchesExplicit(t *testing.T) {
 	// Neither form reports a type error on Rare; they resolve it the same way.
 	if hasCode(bareDiags, CodeUnknownEnumMember) != hasCode(explicitDiags, CodeUnknownEnumMember) {
 		t.Fatalf("bare and explicit disagree on Rare resolution: bare=%v explicit=%v", codes(bareDiags), codes(explicitDiags))
+	}
+}
+
+// TestSelfMemberNameClashEnumAssignment pins that the clash reaches the bare-enum
+// assignment fast path: a bare value that is both an enum member and a readable
+// member of self is a clash on the right-hand side of a reassignment too, so the
+// checker (enum member) and the lowering (self read) cannot silently diverge.
+func TestSelfMemberNameClashEnumAssignment(t *testing.T) {
+	src := "pub enum Rarity { Common, Rare }\n" +
+		"pub type Card = { Rare: bool } impl {\n" +
+		"  pub pick(): Rarity {\n" +
+		"    let r: Rarity = Rarity.Common\n" +
+		"    r = Rare\n" +
+		"    return r\n  }\n" +
+		"}\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeSelfMemberNameClash) {
+		t.Fatalf("want self_member_name_clash (Rare is both a self field and an enum member on an assignment RHS), got %v", codes(diags))
+	}
+}
+
+// TestSelfOmissionSwitchScrutineeMatchesExplicit pins that a bare enum-typed self
+// field as a switch scrutinee behaves exactly as the explicit self. form. (Folding
+// a switch over a member-receiver scrutinee is a separate, pre-existing concern
+// that affects the explicit self. form identically and is out of this scope.)
+func TestSelfOmissionSwitchScrutineeMatchesExplicit(t *testing.T) {
+	body := func(scrut string) string {
+		return "pub enum Rarity { Common, Rare }\n" +
+			"pub type Card = { rarity: Rarity } impl {\n  pub tag(): nint {\n    switch " + scrut +
+			" {\n      Rare -> return 1\n      _ -> return 0\n    }\n  }\n}\n"
+	}
+	_, bareDiags := analyze(body("rarity"))
+	_, explicitDiags := analyze(body("self.rarity"))
+	if hasCode(bareDiags, CodeSelfMemberNameClash) {
+		t.Fatalf("bare switch rarity should not clash (rarity is the field, Rare an enum arm): %v", codes(bareDiags))
+	}
+	if hasCode(bareDiags, CodeUnknownEnumMember) != hasCode(explicitDiags, CodeUnknownEnumMember) {
+		t.Fatalf("bare and explicit switch disagree on arm resolution: bare=%v explicit=%v", codes(bareDiags), codes(explicitDiags))
 	}
 }
 
