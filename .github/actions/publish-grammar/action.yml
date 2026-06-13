@@ -24,6 +24,13 @@ inputs:
   app-private-key:
     description: GitHub App private key, paired with app-client-id.
     default: ''
+  push-default-branch:
+    description: >
+      Push the assembled tree to the mirror's default branch — its rolling
+      preview. True for the nightly, which the preview tracks; false for a stable
+      release, which must not move that rolling branch (especially a release/v*
+      maintenance release, which would regress it) and publishes only the tag.
+    default: 'true'
 
 runs:
   using: composite
@@ -70,6 +77,7 @@ runs:
       shell: bash
       env:
         GH_PUSH_TOKEN: ${{ steps.app-token.outputs.token }}
+        PUSH_DEFAULT_BRANCH: ${{ inputs.push-default-branch }}
       run: |
         set -eu
         src="$PWD/dist/tree-sitter-masterbelt"
@@ -88,7 +96,14 @@ runs:
           echo "dedicated repo already up to date — no new commit"
         else
           git commit -m "sync grammar from masterbelt@${sha}"
-          git push origin HEAD:main
+          # Only the nightly moves the mirror's rolling default branch; a stable
+          # release leaves it and ships the tag below, so it cannot overwrite the
+          # preview with an older (e.g. maintenance) tree.
+          if [ "$PUSH_DEFAULT_BRANCH" = true ]; then
+            git push origin HEAD:main
+          else
+            echo "stable release — leaving the mirror's rolling main untouched; publishing the tag only"
+          fi
         fi
         # Ensure the release tag exists regardless of whether the content changed.
         # The tag is what triggers the mirror's release workflows, so a missing one

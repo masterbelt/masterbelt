@@ -44,6 +44,7 @@ jobs:
       tag: ${{ steps.tag.outputs.tag }}
       version: ${{ steps.tag.outputs.version }}
       sha: ${{ steps.tag.outputs.sha }}
+      latest: ${{ steps.provenance.outputs.latest }}
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
@@ -67,20 +68,32 @@ jobs:
       # release/v* maintenance branch); a tag cut from an unreviewed commit must
       # not run its build scripts with this workflow's write/OIDC permissions.
       - name: Verify the tag is on a protected branch
+        id: provenance
         run: |
           git fetch --quiet --no-tags origin \
             '+refs/heads/main:refs/remotes/origin/main' \
             '+refs/heads/release/v*:refs/remotes/origin/release/v*' || true
           sha="$(git rev-parse HEAD)"
+          on_protected=
           for ref in $(git for-each-ref --format='%(refname)' \
               refs/remotes/origin/main refs/remotes/origin/release/v*); do
             if git merge-base --is-ancestor "$sha" "$ref"; then
               echo "tag commit $sha is on ${ref#refs/remotes/}"
-              exit 0
+              on_protected=yes
+              break
             fi
           done
-          echo "::error::tag commit $sha is not on main or a release/v* branch"
-          exit 1
+          if [ -z "$on_protected" ]; then
+            echo "::error::tag commit $sha is not on main or a release/v* branch"
+            exit 1
+          fi
+          # :latest must move only for a release on the main line; a release/v*
+          # maintenance release must not pull :latest back to an older line.
+          if git merge-base --is-ancestor "$sha" refs/remotes/origin/main 2>/dev/null; then
+            echo "latest=true" >>"$GITHUB_OUTPUT"
+          else
+            echo "latest=false" >>"$GITHUB_OUTPUT"
+          fi
 
       - name: Verify the tag matches the recorded release version
         env:
@@ -161,16 +174,19 @@ jobs:
         id: tags
         env:
           V: ${{ needs.verify.outputs.version }}
+          LATEST: ${{ needs.verify.outputs.latest }}
         run: |
           repo="ghcr.io/${{ github.repository }}"
           major="${V%%.*}"   # X
           minor="${V%.*}"    # X.Y
+          # :X.Y and :X stay within their line, so a maintenance release may move
+          # them; :latest is global, so move it only for a main-line release.
           {
             echo 'tags<<EOF'
             echo "$repo:$V"
             echo "$repo:$minor"
             echo "$repo:$major"
-            echo "$repo:latest"
+            if [ "$LATEST" = true ]; then echo "$repo:latest"; fi
             echo 'EOF'
           } >>"$GITHUB_OUTPUT"
       - uses: ./.github/actions/build-image
@@ -237,6 +253,8 @@ jobs:
           ts-version: ${{ needs.verify.outputs.version }}
           app-client-id: ${{ secrets.TREE_SITTER_APP_CLIENT_ID }}
           app-private-key: ${{ secrets.TREE_SITTER_APP_PRIVATE_KEY }}
+          # A stable tag must not move the mirror's rolling default branch.
+          push-default-branch: 'false'
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: tree-sitter-masterbelt
