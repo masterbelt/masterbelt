@@ -109,9 +109,10 @@ func defBacksKind(reg *builtin.Registry, def *ir.TypeDef, kind ir.ConstKind) boo
 		// A master backs its row record: a row is a record value, so a row
 		// method or getter (a per-row validate check that calls self.isValid(),
 		// an exported toString) folds on the row the same way a record type's
-		// method does. The record is in Master.Row, not Body, so recordOf does
-		// not see it on its own.
-		return def.Master != nil && recordOf(def.Master.Row) != nil
+		// method does. The record is in Master.Row, not Body, and may be reached
+		// through an alias chain (record Row, type Row = Base), so it is unwrapped
+		// recursively rather than with the one-step recordOf.
+		return def.Master != nil && masterRowRecord(def.Master.Row) != nil
 	}
 	n := underlyingPrimitive(reg, def, map[*ir.TypeDef]bool{})
 	if n == nil {
@@ -240,6 +241,35 @@ func recordOf(t ir.Type) *ir.Record {
 		}
 	}
 	return nil
+}
+
+// masterRowRecord unwraps a master's row type to the record it ultimately is,
+// following an alias chain (record Row, type Row = Base = { ... }) under a cycle
+// guard — the recursive counterpart to the one-step recordOf, which a master row
+// needs because the row may be a named alias of a record rather than the record
+// itself. It returns nil for a non-record (or cyclic) row.
+func masterRowRecord(t ir.Type) *ir.Record {
+	seen := map[*ir.TypeDef]bool{}
+	for {
+		switch x := t.(type) {
+		case *ir.Record:
+			return x
+		case *ir.Named:
+			if x.Def == nil || x.Def.Body == nil || seen[x.Def] {
+				return nil
+			}
+			seen[x.Def] = true
+			t = x.Def.Body
+		case *ir.App:
+			if x.Def == nil || x.Def.Body == nil || seen[x.Def] {
+				return nil
+			}
+			seen[x.Def] = true
+			t = x.Def.Body
+		default:
+			return nil
+		}
+	}
 }
 
 // namedOf wraps a definition as its nominal type, or nil for a nil def — the

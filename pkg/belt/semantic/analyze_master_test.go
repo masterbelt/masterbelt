@@ -263,6 +263,31 @@ func TestMasterValidateCyclicRowDoesNotCrash(t *testing.T) {
 	}
 }
 
+// TestMasterValidateOverloadFolds pins that the foldability probe runs after the
+// write-back binds overload selections: a recursive ok(long) declared before a
+// foldable ok(int), with the int overload selected for ok(self.id) on an int
+// row, must fold the selected overload — not the first same-arity one — so the
+// check is not falsely reported non-constant.
+func TestMasterValidateOverloadFolds(t *testing.T) {
+	src := "fn ok(x: long): bool {\n  return ok(x)\n}\nfn ok(x: int): bool {\n  return x > 0\n}\nmaster M {\n  record { id: int }\n  primary id\n  validate {\n    each {\n      assert ok(self.id)\n    }\n  }\n}\n"
+	_, diags := analyze(src)
+	if hasCode(diags, CodeMasterValidateNotConstant) {
+		t.Errorf("the selected ok(int) overload folds, so the check is constant: %v", codes(diags))
+	}
+}
+
+// TestMasterValidateAliasedRowMethod pins that a row method folds when the row is
+// reached through an alias chain (record Row, type Row = Base): the evaluator
+// unwraps the row recursively to find the record the master backs, so self.ok()
+// folds rather than reporting the check non-constant.
+func TestMasterValidateAliasedRowMethod(t *testing.T) {
+	src := "type Base = { id: int }\ntype Row = Base\nmaster M {\n  record Row impl {\n    ok(): bool { return self.id > 0 }\n  }\n  primary id\n  validate {\n    each {\n      assert self.ok()\n    }\n  }\n}\n"
+	_, diags := analyze(src)
+	if hasCode(diags, CodeMasterValidateNotConstant) {
+		t.Errorf("a row method on an aliased row folds: %v", codes(diags))
+	}
+}
+
 // TestMasterValidateRejectsUnfoldable pins that a validate check that cannot
 // fold to a bool — here an unbounded recursion the interpreter cannot settle — is
 // reported once at compile time, rather than folding to nil and failing every

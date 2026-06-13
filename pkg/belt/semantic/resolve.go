@@ -1314,7 +1314,7 @@ func resolveMasterDecl(r *infer.TypeResolver, reg *builtin.Registry, md *ast.Mas
 		seen[key] = true
 		def.AttachMethods(rm)
 	}
-	resolveMasterValidations(r, reg, def, md, at, diags, fns)
+	resolveMasterValidations(r, reg, def, md, fns)
 	checkMemberDecls(def, at, diags)
 	checkMaster(md, row, isGenericRecordAlias(rowType), at, diags)
 }
@@ -1328,9 +1328,8 @@ func resolveMasterDecl(r *infer.TypeResolver, reg *builtin.Registry, md *ast.Mas
 // lowered untyped here and typed by the write-back (writeBackResolutions), whose
 // facts the checking walk (checkMasterValidations) streams — exactly as a method
 // body and the refinement predicate are.
-func resolveMasterValidations(r *infer.TypeResolver, reg *builtin.Registry, def *ir.TypeDef, md *ast.MasterDecl, at func(ast.Node) span, diags *diagnostic.List, fns bodyFuncs) {
+func resolveMasterValidations(r *infer.TypeResolver, reg *builtin.Registry, def *ir.TypeDef, md *ast.MasterDecl, fns bodyFuncs) {
 	self := ir.Type(&ir.Named{Def: def})
-	var checks []*ir.AssertStmt
 	for _, clause := range md.Validations {
 		if !clause.PerRow {
 			continue // a per-table check (validate all) is a later concern
@@ -1338,32 +1337,14 @@ func resolveMasterValidations(r *infer.TypeResolver, reg *builtin.Registry, def 
 		binder := bodyBinder{r: r, reg: reg, selfType: self, funcs: fns, self: true}
 		for _, s := range lower.Body(clause.Body, binder) {
 			if a, ok := s.(*ir.AssertStmt); ok {
-				checks = append(checks, a)
+				def.Master.RowChecks = append(def.Master.RowChecks, a)
 			}
 		}
 	}
-	def.Master.RowChecks = checks
-	// A per-row check must fold to a bool for every row, the row twin of a
-	// refinement predicate's compile-time foldability: a fold is value-independent
-	// for everything the type rules let through, so a witness row that folds proves
-	// every loaded row will. A check that does not fold against the witness (an
-	// unbounded recursion, a value the interpreter cannot settle) is reported once
-	// here rather than folding to nil and failing every loaded row at data time.
-	// The witness only probes foldability, so one that folds to false is fine.
-	if at == nil || diags == nil || len(checks) == 0 {
-		return
-	}
-	wit := witnessRow(reg, underlyingRecord(def.Master.Row))
-	if wit == nil {
-		return // a non-scalar (or cyclic) row field has no witness; the data layer folds it
-	}
-	env := predicateEnv{reg: reg, universe: r.Defs, qualified: r.Qualified}
-	for _, check := range checks {
-		if v := eval.GraphPredicate(check.Cond, wit, def, env); v == nil || v.Kind != ir.ConstBool {
-			s := at(check.Syntax)
-			diags.Add(newMasterValidateNotConstantDiagnostic(s.offset, s.width, def.Name))
-		}
-	}
+	// Whether each check folds to a bool is probed after the write-back fills the
+	// overload selections their calls resolve through (checkMasterFoldability), not
+	// here: a check over an overloaded callee folds the wrong declaration before
+	// that, and would report a usable check as non-constant.
 }
 
 // witnessRow builds a representative row value for the validate-check foldability

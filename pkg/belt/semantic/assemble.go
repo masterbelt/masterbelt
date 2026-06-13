@@ -280,6 +280,7 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 	checkIndexWritesIR(a.module, genv, a.at, a.diags)
 	a.refoldConsts(genv)
 	a.evaluateAsserts(genv)
+	a.checkMasterFoldability(genv)
 	a.checkPureContexts()
 	enforceEvalPublication(fileID, file, a.module, shells, q, a.own, genv, a.at, a.diags)
 
@@ -591,6 +592,33 @@ func (a *assembler) refoldConsts(genv graphFoldEnv) {
 				if c.Eval = eval.GraphExpecting(c.Value, c.Type, genv); c.Eval != nil {
 					progress = true
 				}
+			}
+		}
+	}
+}
+
+// checkMasterFoldability probes each master's per-row validate checks for
+// foldability, after the write-back has bound the overload selections their calls
+// resolve through (running before that would fold the wrong declaration of an
+// overloaded callee and report a usable check). A check that does not fold to a
+// bool against a witness row — an unbounded recursion, a value the interpreter
+// cannot settle — is reported once (master_validate_not_constant) rather than
+// folding to nil and failing every loaded row at data time. The witness only
+// probes foldability, so one that folds to false is fine; a master whose row has
+// a non-scalar or cyclic field has no witness and is left to fold at data time.
+func (a *assembler) checkMasterFoldability(genv graphFoldEnv) {
+	for _, def := range a.module.Types {
+		if def.Master == nil || len(def.Master.RowChecks) == 0 {
+			continue
+		}
+		wit := witnessRow(a.reg, underlyingRecord(def.Master.Row))
+		if wit == nil {
+			continue
+		}
+		for _, check := range def.Master.RowChecks {
+			if v := eval.GraphPredicate(check.Cond, wit, def, genv); v == nil || v.Kind != ir.ConstBool {
+				s := a.at(check.Syntax)
+				a.diags.Add(newMasterValidateNotConstantDiagnostic(s.offset, s.width, def.Name))
 			}
 		}
 	}
