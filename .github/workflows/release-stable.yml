@@ -54,11 +54,13 @@ jobs:
         env:
           TAG: ${{ github.event.release.tag_name || inputs.tag }}
         run: |
-          echo "tag=$TAG" >>"$GITHUB_OUTPUT"
-          echo "version=${TAG#v}" >>"$GITHUB_OUTPUT"
           # Pin the exact commit the checks below vet, so every downstream job
           # builds that immutable SHA even if the tag is later moved.
-          echo "sha=$(git rev-parse HEAD)" >>"$GITHUB_OUTPUT"
+          {
+            echo "tag=$TAG"
+            echo "version=${TAG#v}"
+            echo "sha=$(git rev-parse HEAD)"
+          } >>"$GITHUB_OUTPUT"
 
       # Only build and attest code that reached a protected branch. A release tag
       # legitimately points at the commit release-please merged to main (or a
