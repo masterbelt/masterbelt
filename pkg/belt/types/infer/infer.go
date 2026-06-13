@@ -582,23 +582,28 @@ func MemberReceiverDef(universe map[string]*ir.TypeDef, qualified func(namespace
 	return nil
 }
 
-// qualifiedTypeValue types a namespace-qualified type name used as a value
-// (geo.Item) as the metatype `type` — the qualified twin of a bare local type
-// name (Item). The receiver must name a namespace whose export of the member name
-// is a type, and not be shadowed by a same-named value (a const named geo, whose
-// fields geo.Item then reads instead). It returns ir.Invalid otherwise, which the
-// caller takes as a record-field reading. A field projection off the qualified
-// type (geo.Item.id) is the deeper member access memberReceiverDef handles, so
-// only the bare form (the receiver an identifier) reaches here.
-func qualifiedTypeValue(qualified func(namespace, name string) *ir.TypeDef, valueShadows func(*ast.Identifier) bool, m *ast.MemberExpr) ir.Type {
+// QualifiedTypeDef resolves a member access to the type definition it names as a
+// namespace-qualified type value (geo.Item, no trailing projection): the receiver
+// must name a namespace whose export of the member is a type, and not be shadowed
+// by a same-named value (a const named geo, whose field geo.Item is read instead).
+// It returns nil otherwise. It is the one resolver the checker (which reifies the
+// def to the metatype) and the lowering (which reifies it to a type value) share,
+// so the two agree on whether a bare qualified name is a type value.
+func QualifiedTypeDef(qualified func(namespace, name string) *ir.TypeDef, valueShadows func(*ast.Identifier) bool, m *ast.MemberExpr) *ir.TypeDef {
 	ns, ok := m.Receiver.(*ast.Identifier)
 	if !ok || qualified == nil {
-		return ir.Invalid
+		return nil
 	}
 	if valueShadows != nil && valueShadows(ns) {
-		return ir.Invalid
+		return nil
 	}
-	if qualified(ns.Name, m.Member.Name) != nil {
+	return qualified(ns.Name, m.Member.Name)
+}
+
+// qualifiedTypeValue types a bare namespace-qualified type name (geo.Item) as the
+// metatype — the checker's value-position wrapper over the shared QualifiedTypeDef.
+func qualifiedTypeValue(qualified func(namespace, name string) *ir.TypeDef, valueShadows func(*ast.Identifier) bool, m *ast.MemberExpr) ir.Type {
+	if QualifiedTypeDef(qualified, valueShadows, m) != nil {
 		return metatype()
 	}
 	return ir.Invalid

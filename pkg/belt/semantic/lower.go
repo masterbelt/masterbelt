@@ -101,21 +101,12 @@ func (b constBinder) leafConstMember(e *ast.MemberExpr, sub func(ast.Expr) ir.Va
 
 // qualifiedTypeValue lowers a namespace-qualified type name used as a value
 // (geo.Item) to its reified type value — the qualified twin of a bare local type
-// name (leafConstIdent's Item). The receiver must name a namespace whose export
-// of the member name is a type, and not be shadowed by a same-named value (a
-// const named geo, whose field geo.Item is read instead). It returns nil
-// otherwise, which the caller reads as a record-field access. It is the
-// value-lowering twin of infer.qualifiedTypeValue, so a body and a const agree on
-// a bare qualified type value, and the metatype comparison folds.
+// name (leafConstIdent's Item). The resolution decision (a namespace export that
+// is a type, not shadowed by a value) is the shared infer.QualifiedTypeDef the
+// checker uses; this is the value-position wrapper that reifies the def to a type
+// value, so a body and a const agree on a bare qualified type value.
 func qualifiedTypeValue(qualified func(namespace, name string) *ir.TypeDef, valueShadows func(*ast.Identifier) bool, e *ast.MemberExpr) ir.Value {
-	ns, ok := e.Receiver.(*ast.Identifier)
-	if !ok || qualified == nil {
-		return nil
-	}
-	if valueShadows != nil && valueShadows(ns) {
-		return nil
-	}
-	if def := qualified(ns.Name, e.Member.Name); def != nil {
+	if def := infer.QualifiedTypeDef(qualified, valueShadows, e); def != nil {
 		return &ir.TypeValue{Reified: reifyType(def), Syntax: e}
 	}
 	return nil
