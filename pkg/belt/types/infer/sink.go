@@ -131,6 +131,17 @@ type Sink struct {
 	// ResolvedFunc is ResolvedMethod for a call of an overloaded top-level
 	// function: the selected declaration. An informational stream.
 	ResolvedFunc func(call *ast.CallExpr, fd *ast.FuncDecl)
+	// ResolvedEnumMember fires where a bare identifier resolves through an enum
+	// expectation to one of the enum's members — the type-directed reading the
+	// type-blind lowering cannot make on its own, because the expectation comes
+	// from a type it does not carry (a bare member in a return, resolved through
+	// the declared result type). The semantic layer writes it back onto the
+	// lowered IR, filling the placeholder the lowering emitted for the
+	// unresolved name with the member the checker settled. Like the other
+	// resolution streams it is informational, never a finding; a qualified
+	// member (Rarity.Common) and an ordinary name do not fire. e is the bare
+	// identifier, def the enum, index the member's position within it.
+	ResolvedEnumMember func(e ast.Expr, def *ir.TypeDef, index int)
 	// CallSubst fires for every call the walk types successfully whose
 	// resolution pinned at least one type variable — the receiver's type
 	// arguments combined with what the argument matching solved — with the
@@ -336,6 +347,12 @@ func (s *Sink) resolvedStatic(call *ast.CallExpr, m *ir.Method) {
 func (s *Sink) resolvedFunc(call *ast.CallExpr, fd *ast.FuncDecl) {
 	if s != nil && s.ResolvedFunc != nil {
 		s.ResolvedFunc(call, fd)
+	}
+}
+
+func (s *Sink) resolvedEnumMember(e ast.Expr, def *ir.TypeDef, index int) {
+	if s != nil && s.ResolvedEnumMember != nil {
+		s.ResolvedEnumMember(e, def, index)
 	}
 }
 

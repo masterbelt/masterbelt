@@ -57,6 +57,11 @@ func wireResolutionStreams(sink *infer.Sink, res *callResolutions) {
 			res.funcs[call] = fd
 		}
 	}
+	sink.ResolvedEnumMember = func(e ast.Expr, def *ir.TypeDef, index int) {
+		if res != nil {
+			res.enumMembers[e] = enumMember{def: def, index: index}
+		}
+	}
 	sink.CallSubst = func(call *ast.CallExpr, subst map[string]ir.Type) {
 		if res != nil {
 			// Cloned: the checker threads one live map through a call's

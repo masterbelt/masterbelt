@@ -832,6 +832,9 @@ func observeStreams(w, sink *Sink) {
 	w.ResolvedFunc = func(call *ast.CallExpr, fd *ast.FuncDecl) {
 		sink.resolvedFunc(call, fd)
 	}
+	w.ResolvedEnumMember = func(e ast.Expr, def *ir.TypeDef, index int) {
+		sink.resolvedEnumMember(e, def, index)
+	}
 	w.CallSubst = func(call *ast.CallExpr, subst map[string]ir.Type) {
 		sink.callSubst(call, subst)
 	}

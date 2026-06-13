@@ -159,6 +159,14 @@ func checkEnumShorthand(e ast.Expr, want ir.Type, s scope, sink *Sink) (ir.Type,
 	if selfMemberClash(s, id.Name) {
 		return ir.Invalid, false
 	}
+	// Stream the resolution so the write-back can fill the lowering's placeholder
+	// for this bare name with the member settled here — the single source of
+	// truth for the type-directed reading. member is the enum (&ir.Named{Def}),
+	// so its def keys the index. A position the lowering resolves itself (a
+	// switch arm, a let initializer) emits no placeholder, leaving the fact
+	// unused there; only an unresolved position (a return) consumes it.
+	def := member.(*ir.Named).Def
+	sink.resolvedEnumMember(id, def, enumMemberIndex(def, id.Name))
 	if !types.Identical(member, want) {
 		sink.adapted(e, want)
 	}
