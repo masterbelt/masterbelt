@@ -42,6 +42,27 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      # Only build and attest code that reached a protected branch. A release tag
+      # legitimately points at the commit release-please merged to main (or a
+      # release/v* maintenance branch); a tag cut from an unreviewed commit must
+      # not run its build scripts here with this job's contents:write and OIDC
+      # permissions. This runs before any step that executes the checkout's code.
+      - name: Verify the tag is on a protected branch
+        run: |
+          git fetch --quiet --no-tags origin \
+            '+refs/heads/main:refs/remotes/origin/main' \
+            '+refs/heads/release/v*:refs/remotes/origin/release/v*' || true
+          sha="$(git rev-parse HEAD)"
+          for ref in $(git for-each-ref --format='%(refname)' \
+              refs/remotes/origin/main refs/remotes/origin/release/v*); do
+            if git merge-base --is-ancestor "$sha" "$ref"; then
+              echo "tag commit $sha is on ${ref#refs/remotes/}"
+              exit 0
+            fi
+          done
+          echo "::error::tag commit $sha is not on main or a release/v* branch"
+          exit 1
+
       - name: Verify the tag matches the recorded release version
         env:
           TAG: ${{ github.event.release.tag_name || inputs.tag }}
@@ -111,9 +132,9 @@ jobs:
       - name: Upload release assets
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
         run: |
-          tag="${{ github.event.release.tag_name || inputs.tag }}"
-          gh release upload "$tag" \
+          gh release upload "$TAG" \
             dist/masterbelt-*.tar.gz \
             dist/masterbelt-*.zip \
             dist/SHA256SUMS \
