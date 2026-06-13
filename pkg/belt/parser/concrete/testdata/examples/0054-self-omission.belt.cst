@@ -1,0 +1,722 @@
+# tree
+File
+  TypeDecl
+    LineComment "// Self omission (§4.1): in a body with a receiver, a bare name reads one of"
+    Newline "\n"
+    LineComment "// self's readable members — a field or a getter — so power means self.power. A"
+    Newline "\n"
+    LineComment "// method, getter, or refinement body may drop the self. the explicit form still"
+    Newline "\n"
+    LineComment "// accepts, and the two desugar identically: bare power and self.power are the"
+    Newline "\n"
+    LineComment "// same field read, folding to the same value. Only the readable members (field"
+    Newline "\n"
+    LineComment "// or getter) resolve bare; a method still needs self.foo(), and a table-level"
+    Newline "\n"
+    LineComment "// static or associated constant is read off the type (Type.Max), not bare."
+    Newline "\n"
+    Newline "\n"
+    DocComment "/// A combatant whose method and getter bodies read its fields with self omitted."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Type "type"
+    Whitespace " "
+    Ident "Fighter"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    RecordType
+      LBrace "{"
+      Whitespace " "
+      Field
+        Ident "power"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "nint"
+      Comma ","
+      Whitespace " "
+      Field
+        Ident "defense"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "nint"
+      Whitespace " "
+      RBrace "}"
+    Whitespace " "
+    ImplBlock
+      Impl "impl"
+      Whitespace " "
+      LBrace "{"
+      MethodDecl
+        Newline "\n"
+        Whitespace "  "
+        DocComment "/// Total stat budget: power and defense are bare reads of self's fields."
+        Newline "\n"
+        Whitespace "  "
+        Pub "pub"
+        Whitespace " "
+        Ident "rating"
+        ParamList
+          LParen "("
+          RParen ")"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "nint"
+        Whitespace " "
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            BinaryExpr
+              NameRef
+                Ident "power"
+              Whitespace " "
+              Plus "+"
+              Whitespace " "
+              NameRef
+                Ident "defense"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
+      MethodDecl
+        Newline "\n"
+        Whitespace "  "
+        DocComment "/// A bare field read alongside a parameter — bonus is the parameter, power"
+        Newline "\n"
+        Whitespace "  "
+        DocComment "/// and defense the fields; no name is shared, so there is no ambiguity."
+        Newline "\n"
+        Whitespace "  "
+        Pub "pub"
+        Whitespace " "
+        Ident "ratingPlus"
+        ParamList
+          LParen "("
+          Param
+            Ident "bonus"
+            Colon ":"
+            Whitespace " "
+            TypeName
+              Ident "nint"
+          RParen ")"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "nint"
+        Whitespace " "
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            BinaryExpr
+              BinaryExpr
+                NameRef
+                  Ident "power"
+                Whitespace " "
+                Plus "+"
+                Whitespace " "
+                NameRef
+                  Ident "defense"
+              Whitespace " "
+              Plus "+"
+              Whitespace " "
+              NameRef
+                Ident "bonus"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
+      MethodDecl
+        Newline "\n"
+        Whitespace "  "
+        DocComment "/// A getter body reads a sibling field bare."
+        Newline "\n"
+        Whitespace "  "
+        Pub "pub"
+        Whitespace " "
+        Modifier
+          Ident "get"
+        Whitespace " "
+        Ident "doubledPower"
+        ParamList
+          LParen "("
+          RParen ")"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "nint"
+        Whitespace " "
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            BinaryExpr
+              NameRef
+                Ident "power"
+              Whitespace " "
+              Star "*"
+              Whitespace " "
+              Literal
+                Int "2"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
+      MethodDecl
+        Newline "\n"
+        Whitespace "  "
+        DocComment "/// A getter body reads a sibling getter bare (doubledPower means"
+        Newline "\n"
+        Whitespace "  "
+        DocComment "/// self.doubledPower) and a field bare in the same expression."
+        Newline "\n"
+        Whitespace "  "
+        Pub "pub"
+        Whitespace " "
+        Modifier
+          Ident "get"
+        Whitespace " "
+        Ident "scaled"
+        ParamList
+          LParen "("
+          RParen ")"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "nint"
+        Whitespace " "
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            BinaryExpr
+              NameRef
+                Ident "doubledPower"
+              Whitespace " "
+              Plus "+"
+              Whitespace " "
+              NameRef
+                Ident "defense"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
+      Newline "\n"
+      RBrace "}"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// The bare reads fold in const initializers and asserts, exactly as a self."
+    Newline "\n"
+    LineComment "// read does."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Hero"
+    TypeClause
+      Colon ":"
+      Whitespace " "
+      TypeName
+        Ident "Fighter"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      RecordLit
+        LBrace "{"
+        Whitespace " "
+        RecordField
+          Ident "power"
+          Colon ":"
+          Whitespace " "
+          Literal
+            Int "7"
+        Comma ","
+        Whitespace " "
+        RecordField
+          Ident "defense"
+          Colon ":"
+          Whitespace " "
+          Literal
+            Int "3"
+        Whitespace " "
+        RBrace "}"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      CallExpr
+        MemberExpr
+          NameRef
+            Ident "Hero"
+          Dot "."
+          Ident "rating"
+        LParen "("
+        RParen ")"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "10"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      CallExpr
+        MemberExpr
+          NameRef
+            Ident "Hero"
+          Dot "."
+          Ident "ratingPlus"
+        LParen "("
+        Literal
+          Int "5"
+        RParen ")"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "15"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      MemberExpr
+        NameRef
+          Ident "Hero"
+        Dot "."
+        Ident "doubledPower"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "14"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      MemberExpr
+        NameRef
+          Ident "Hero"
+        Dot "."
+        Ident "scaled"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "17"
+  TypeDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// The explicit self. form is unchanged and reads identically — bare is additive."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Type "type"
+    Whitespace " "
+    Ident "FighterExplicit"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    RecordType
+      LBrace "{"
+      Whitespace " "
+      Field
+        Ident "power"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "nint"
+      Comma ","
+      Whitespace " "
+      Field
+        Ident "defense"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "nint"
+      Whitespace " "
+      RBrace "}"
+    Whitespace " "
+    ImplBlock
+      Impl "impl"
+      Whitespace " "
+      LBrace "{"
+      MethodDecl
+        Newline "\n"
+        Whitespace "  "
+        DocComment "/// The same total, written with self. spelled out."
+        Newline "\n"
+        Whitespace "  "
+        Pub "pub"
+        Whitespace " "
+        Ident "rating"
+        ParamList
+          LParen "("
+          RParen ")"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "nint"
+        Whitespace " "
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            BinaryExpr
+              MemberExpr
+                SelfExpr
+                  Self "self"
+                Dot "."
+                Ident "power"
+              Whitespace " "
+              Plus "+"
+              Whitespace " "
+              MemberExpr
+                SelfExpr
+                  Self "self"
+                Dot "."
+                Ident "defense"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
+      Newline "\n"
+      RBrace "}"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Champion"
+    TypeClause
+      Colon ":"
+      Whitespace " "
+      TypeName
+        Ident "FighterExplicit"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      RecordLit
+        LBrace "{"
+        Whitespace " "
+        RecordField
+          Ident "power"
+          Colon ":"
+          Whitespace " "
+          Literal
+            Int "7"
+        Comma ","
+        Whitespace " "
+        RecordField
+          Ident "defense"
+          Colon ":"
+          Whitespace " "
+          Literal
+            Int "3"
+        Whitespace " "
+        RBrace "}"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      CallExpr
+        MemberExpr
+          NameRef
+            Ident "Champion"
+          Dot "."
+          Ident "rating"
+        LParen "("
+        RParen ")"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "10"
+  TypeDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// Self omission works over a nominal type's underlying primitive too: a getter"
+    Newline "\n"
+    LineComment "// reads self through a conversion, and a method reads a sibling getter bare."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Type "type"
+    Whitespace " "
+    Ident "Health"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    TypeName
+      Ident "nint"
+    Whitespace " "
+    ImplBlock
+      Impl "impl"
+      Whitespace " "
+      LBrace "{"
+      MethodDecl
+        Newline "\n"
+        Whitespace "  "
+        DocComment "/// The health expressed in tens — self is the underlying nint."
+        Newline "\n"
+        Whitespace "  "
+        Pub "pub"
+        Whitespace " "
+        Modifier
+          Ident "get"
+        Whitespace " "
+        Ident "band"
+        ParamList
+          LParen "("
+          RParen ")"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "nint"
+        Whitespace " "
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            BinaryExpr
+              CallExpr
+                NameRef
+                  Ident "nint"
+                LParen "("
+                SelfExpr
+                  Self "self"
+                RParen ")"
+              Whitespace " "
+              Slash "/"
+              Whitespace " "
+              Literal
+                Int "10"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
+      MethodDecl
+        Newline "\n"
+        Whitespace "  "
+        DocComment "/// One band above the current one: band is a bare read of the getter above."
+        Newline "\n"
+        Whitespace "  "
+        Pub "pub"
+        Whitespace " "
+        Modifier
+          Ident "get"
+        Whitespace " "
+        Ident "nextBand"
+        ParamList
+          LParen "("
+          RParen ")"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "nint"
+        Whitespace " "
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            BinaryExpr
+              NameRef
+                Ident "band"
+              Whitespace " "
+              Plus "+"
+              Whitespace " "
+              Literal
+                Int "1"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
+      Newline "\n"
+      RBrace "}"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Full"
+    TypeClause
+      Colon ":"
+      Whitespace " "
+      TypeName
+        Ident "Health"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      Literal
+        Int "100"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      MemberExpr
+        NameRef
+          Ident "Full"
+        Dot "."
+        Ident "band"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "10"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      MemberExpr
+        NameRef
+          Ident "Full"
+        Dot "."
+        Ident "nextBand"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "11"
+  TypeDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// A refinement predicate is a body over self the same way: a self method called"
+    Newline "\n"
+    LineComment "// bare folds the predicate, and that method body reads its operand bare."
+    Newline "\n"
+    DocComment "/// A score valid only within the 0..100 band, checked by a self method."
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Type "type"
+    Whitespace " "
+    Ident "Score"
+    Whitespace " "
+    Assign "="
+    Whitespace " "
+    TypeName
+      Ident "int"
+    Whitespace " "
+    WhereClause
+      Where "where"
+      Whitespace " "
+      CallExpr
+        NameRef
+          Ident "inBand"
+        LParen "("
+        RParen ")"
+    Whitespace " "
+    ImplBlock
+      Impl "impl"
+      Whitespace " "
+      LBrace "{"
+      MethodDecl
+        Newline "\n"
+        Whitespace "  "
+        DocComment "/// Whether the score lies in the valid band — a bare read of self."
+        Newline "\n"
+        Whitespace "  "
+        Pub "pub"
+        Whitespace " "
+        Ident "inBand"
+        ParamList
+          LParen "("
+          RParen ")"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "bool"
+        Whitespace " "
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "    "
+          ReturnStmt
+            Return "return"
+            Whitespace " "
+            BinaryExpr
+              BinaryExpr
+                SelfExpr
+                  Self "self"
+                Whitespace " "
+                GtEq ">="
+                Whitespace " "
+                Literal
+                  Int "0"
+              Whitespace " "
+              AmpAmp "&&"
+              Whitespace " "
+              BinaryExpr
+                SelfExpr
+                  Self "self"
+                Whitespace " "
+                LtEq "<="
+                Whitespace " "
+                Literal
+                  Int "100"
+          Newline "\n"
+          Whitespace "  "
+          RBrace "}"
+      Newline "\n"
+      RBrace "}"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "ValidScore"
+    TypeClause
+      Colon ":"
+      Whitespace " "
+      TypeName
+        Ident "Score"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      Literal
+        Int "75"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    CallExpr
+      MemberExpr
+        NameRef
+          Ident "ValidScore"
+        Dot "."
+        Ident "inBand"
+      LParen "("
+      RParen ")"
+  Newline "\n"
+  EOF ""
+# diagnostics

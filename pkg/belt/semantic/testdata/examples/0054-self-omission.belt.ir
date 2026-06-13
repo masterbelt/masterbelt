@@ -1,0 +1,816 @@
+Module
+  Consts:
+    Const
+      Name: "Hero"
+      Anchor: "belt:/Hero"
+      Public: false
+      Doc: ~
+      Type: Named
+        Def: "Fighter"
+      Value: RecordValue
+        TypeName: ""
+        Fields:
+          RecordField
+            Name: "power"
+            Value: IntLiteral
+              Text: "7"
+              Type: Builtin
+                Name: "nint"
+          RecordField
+            Name: "defense"
+            Value: IntLiteral
+              Text: "3"
+              Type: Builtin
+                Name: "nint"
+        Type: Named
+          Def: "Fighter"
+      Eval: Constant
+        Kind: 7
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields:
+          ConstField
+            Name: "defense"
+            Value: Constant
+              Kind: 0
+              Int: 3
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+              Reified: ~
+          ConstField
+            Name: "power"
+            Value: Constant
+              Kind: 0
+              Int: 7
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+              Reified: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+        Reified: ~
+    Const
+      Name: "Champion"
+      Anchor: "belt:/Champion"
+      Public: false
+      Doc: ~
+      Type: Named
+        Def: "FighterExplicit"
+      Value: RecordValue
+        TypeName: ""
+        Fields:
+          RecordField
+            Name: "power"
+            Value: IntLiteral
+              Text: "7"
+              Type: Builtin
+                Name: "nint"
+          RecordField
+            Name: "defense"
+            Value: IntLiteral
+              Text: "3"
+              Type: Builtin
+                Name: "nint"
+        Type: Named
+          Def: "FighterExplicit"
+      Eval: Constant
+        Kind: 7
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields:
+          ConstField
+            Name: "defense"
+            Value: Constant
+              Kind: 0
+              Int: 3
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+              Reified: ~
+          ConstField
+            Name: "power"
+            Value: Constant
+              Kind: 0
+              Int: 7
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+              Reified: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+        Reified: ~
+    Const
+      Name: "Full"
+      Anchor: "belt:/Full"
+      Public: false
+      Doc: ~
+      Type: Named
+        Def: "Health"
+      Value: Adapt
+        Value: IntLiteral
+          Text: "100"
+          Type: Builtin
+            Name: "nint"
+        To: Named
+          Def: "Health"
+      Eval: Constant
+        Kind: 0
+        Int: 100
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+        Reified: ~
+    Const
+      Name: "ValidScore"
+      Anchor: "belt:/ValidScore"
+      Public: false
+      Doc: ~
+      Type: Named
+        Def: "Score"
+      Value: Adapt
+        Value: IntLiteral
+          Text: "75"
+          Type: Builtin
+            Name: "nint"
+        To: Named
+          Def: "Score"
+      Eval: Constant
+        Kind: 0
+        Int: 75
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+        Reified: ~
+  Types:
+    TypeDef
+      Name: "Fighter"
+      Anchor: "belt:/Fighter"
+      Public: true
+      Doc: "A combatant whose method and getter bodies read its fields with self omitted."
+      Params: ~
+      Body: Record
+        Fields:
+          Field
+            Name: "power"
+            Type: Builtin
+              Name: "nint"
+          Field
+            Name: "defense"
+            Type: Builtin
+              Name: "nint"
+      Methods:
+        Method
+          Name: "rating"
+          Anchor: "belt:/Fighter#rating"
+          Public: true
+          Extern: false
+          Kind: 0
+          Effects: ~
+          Doc: "Total stat budget: power and defense are bare reads of self's fields."
+          Params: ~
+          Result: Builtin
+            Name: "nint"
+          Body:
+            Return
+              Value: Call
+                Receiver: FieldAccess
+                  Receiver: SelfValue
+                    Type: Named
+                      Def: "Fighter"
+                  Field: "power"
+                  Type: Builtin
+                    Name: "nint"
+                Method: "add"
+                Args:
+                  FieldAccess
+                    Receiver: SelfValue
+                      Type: Named
+                        Def: "Fighter"
+                    Field: "defense"
+                    Type: Builtin
+                      Name: "nint"
+                Setter: false
+                Resolved: ~
+                Subst: ~
+                Type: Builtin
+                  Name: "nint"
+          Owner: "Fighter"
+        Method
+          Name: "ratingPlus"
+          Anchor: "belt:/Fighter#ratingPlus"
+          Public: true
+          Extern: false
+          Kind: 0
+          Effects: ~
+          Doc: "A bare field read alongside a parameter — bonus is the parameter, power" "and defense the fields; no name is shared, so there is no ambiguity."
+          Params:
+            Param
+              Name: "bonus"
+              Type: Builtin
+                Name: "nint"
+          Result: Builtin
+            Name: "nint"
+          Body:
+            Return
+              Value: Call
+                Receiver: Call
+                  Receiver: FieldAccess
+                    Receiver: SelfValue
+                      Type: Named
+                        Def: "Fighter"
+                    Field: "power"
+                    Type: Builtin
+                      Name: "nint"
+                  Method: "add"
+                  Args:
+                    FieldAccess
+                      Receiver: SelfValue
+                        Type: Named
+                          Def: "Fighter"
+                      Field: "defense"
+                      Type: Builtin
+                        Name: "nint"
+                  Setter: false
+                  Resolved: ~
+                  Subst: ~
+                  Type: Builtin
+                    Name: "nint"
+                Method: "add"
+                Args:
+                  ParamRef
+                    Name: "bonus"
+                    Type: Builtin
+                      Name: "nint"
+                Setter: false
+                Resolved: ~
+                Subst: ~
+                Type: Builtin
+                  Name: "nint"
+          Owner: "Fighter"
+        Method
+          Name: "doubledPower"
+          Anchor: "belt:/Fighter#doubledPower"
+          Public: true
+          Extern: false
+          Kind: 1
+          Effects: ~
+          Doc: "A getter body reads a sibling field bare."
+          Params: ~
+          Result: Builtin
+            Name: "nint"
+          Body:
+            Return
+              Value: Call
+                Receiver: FieldAccess
+                  Receiver: SelfValue
+                    Type: Named
+                      Def: "Fighter"
+                  Field: "power"
+                  Type: Builtin
+                    Name: "nint"
+                Method: "mul"
+                Args:
+                  IntLiteral
+                    Text: "2"
+                    Type: Builtin
+                      Name: "nint"
+                Setter: false
+                Resolved: ~
+                Subst: ~
+                Type: Builtin
+                  Name: "nint"
+          Owner: "Fighter"
+        Method
+          Name: "scaled"
+          Anchor: "belt:/Fighter#scaled"
+          Public: true
+          Extern: false
+          Kind: 1
+          Effects: ~
+          Doc: "A getter body reads a sibling getter bare (doubledPower means" "self.doubledPower) and a field bare in the same expression."
+          Params: ~
+          Result: Builtin
+            Name: "nint"
+          Body:
+            Return
+              Value: Call
+                Receiver: FieldAccess
+                  Receiver: SelfValue
+                    Type: Named
+                      Def: "Fighter"
+                  Field: "doubledPower"
+                  Type: Builtin
+                    Name: "nint"
+                Method: "add"
+                Args:
+                  FieldAccess
+                    Receiver: SelfValue
+                      Type: Named
+                        Def: "Fighter"
+                    Field: "defense"
+                    Type: Builtin
+                      Name: "nint"
+                Setter: false
+                Resolved: ~
+                Subst: ~
+                Type: Builtin
+                  Name: "nint"
+          Owner: "Fighter"
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Master: ~
+      Where: ~
+    TypeDef
+      Name: "FighterExplicit"
+      Anchor: "belt:/FighterExplicit"
+      Public: true
+      Doc: ~
+      Params: ~
+      Body: Record
+        Fields:
+          Field
+            Name: "power"
+            Type: Builtin
+              Name: "nint"
+          Field
+            Name: "defense"
+            Type: Builtin
+              Name: "nint"
+      Methods:
+        Method
+          Name: "rating"
+          Anchor: "belt:/FighterExplicit#rating"
+          Public: true
+          Extern: false
+          Kind: 0
+          Effects: ~
+          Doc: "The same total, written with self. spelled out."
+          Params: ~
+          Result: Builtin
+            Name: "nint"
+          Body:
+            Return
+              Value: Call
+                Receiver: FieldAccess
+                  Receiver: SelfValue
+                    Type: Named
+                      Def: "FighterExplicit"
+                  Field: "power"
+                  Type: Builtin
+                    Name: "nint"
+                Method: "add"
+                Args:
+                  FieldAccess
+                    Receiver: SelfValue
+                      Type: Named
+                        Def: "FighterExplicit"
+                    Field: "defense"
+                    Type: Builtin
+                      Name: "nint"
+                Setter: false
+                Resolved: ~
+                Subst: ~
+                Type: Builtin
+                  Name: "nint"
+          Owner: "FighterExplicit"
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Master: ~
+      Where: ~
+    TypeDef
+      Name: "Health"
+      Anchor: "belt:/Health"
+      Public: true
+      Doc: ~
+      Params: ~
+      Body: Builtin
+        Name: "nint"
+      Methods:
+        Method
+          Name: "band"
+          Anchor: "belt:/Health#band"
+          Public: true
+          Extern: false
+          Kind: 1
+          Effects: ~
+          Doc: "The health expressed in tens — self is the underlying nint."
+          Params: ~
+          Result: Builtin
+            Name: "nint"
+          Body:
+            Return
+              Value: Call
+                Receiver: Conversion
+                  Type: Builtin
+                    Name: "nint"
+                  Args:
+                    SelfValue
+                      Type: Named
+                        Def: "Health"
+                Method: "div"
+                Args:
+                  IntLiteral
+                    Text: "10"
+                    Type: Builtin
+                      Name: "nint"
+                Setter: false
+                Resolved: ~
+                Subst: ~
+                Type: Builtin
+                  Name: "nint"
+          Owner: "Health"
+        Method
+          Name: "nextBand"
+          Anchor: "belt:/Health#nextBand"
+          Public: true
+          Extern: false
+          Kind: 1
+          Effects: ~
+          Doc: "One band above the current one: band is a bare read of the getter above."
+          Params: ~
+          Result: Builtin
+            Name: "nint"
+          Body:
+            Return
+              Value: Call
+                Receiver: FieldAccess
+                  Receiver: SelfValue
+                    Type: Named
+                      Def: "Health"
+                  Field: "band"
+                  Type: Builtin
+                    Name: "nint"
+                Method: "add"
+                Args:
+                  IntLiteral
+                    Text: "1"
+                    Type: Builtin
+                      Name: "nint"
+                Setter: false
+                Resolved: ~
+                Subst: ~
+                Type: Builtin
+                  Name: "nint"
+          Owner: "Health"
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Master: ~
+      Where: ~
+    TypeDef
+      Name: "Score"
+      Anchor: "belt:/Score"
+      Public: true
+      Doc: "A score valid only within the 0..100 band, checked by a self method."
+      Params: ~
+      Body: Builtin
+        Name: "int"
+      Methods:
+        Method
+          Name: "inBand"
+          Anchor: "belt:/Score#inBand"
+          Public: true
+          Extern: false
+          Kind: 0
+          Effects: ~
+          Doc: "Whether the score lies in the valid band — a bare read of self."
+          Params: ~
+          Result: Builtin
+            Name: "bool"
+          Body:
+            Return
+              Value: Call
+                Receiver: Call
+                  Receiver: SelfValue
+                    Type: Named
+                      Def: "Score"
+                  Method: "gteq"
+                  Args:
+                    Adapt
+                      Value: IntLiteral
+                        Text: "0"
+                        Type: Builtin
+                          Name: "nint"
+                      To: Named
+                        Def: "Score"
+                  Setter: false
+                  Resolved: ~
+                  Subst: ~
+                  Type: Builtin
+                    Name: "bool"
+                Method: "anan"
+                Args:
+                  Call
+                    Receiver: SelfValue
+                      Type: Named
+                        Def: "Score"
+                    Method: "lteq"
+                    Args:
+                      Adapt
+                        Value: IntLiteral
+                          Text: "100"
+                          Type: Builtin
+                            Name: "nint"
+                        To: Named
+                          Def: "Score"
+                    Setter: false
+                    Resolved: ~
+                    Subst: ~
+                    Type: Builtin
+                      Name: "bool"
+                Setter: false
+                Resolved: ~
+                Subst: ~
+                Type: Builtin
+                  Name: "bool"
+          Owner: "Score"
+      Consts: ~
+      Builtin: false
+      Interface: ~
+      Impls: ~
+      Enum: ~
+      Master: ~
+      Where: Call
+        Receiver: SelfValue
+          Type: Named
+            Def: "Score"
+        Method: "inBand"
+        Args: ~
+        Setter: false
+        Resolved: ~
+        Subst: ~
+        Type: Builtin
+          Name: "bool"
+  Funcs: ~
+  Asserts:
+    Assert
+      Cond: "Hero.rating() == 10"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+        Reified: ~
+      Diagram: "Hero.rating() == 10\n^    ^        ^\n|    10       true\n{ defense: 3, power: 7 }"
+    Assert
+      Cond: "Hero.ratingPlus(5) == 15"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+        Reified: ~
+      Diagram: "Hero.ratingPlus(5) == 15\n^    ^             ^\n|    15            true\n{ defense: 3, power: 7 }"
+    Assert
+      Cond: "Hero.doubledPower == 14"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+        Reified: ~
+      Diagram: "Hero.doubledPower == 14\n^    ^            ^\n|    14           true\n{ defense: 3, power: 7 }"
+    Assert
+      Cond: "Hero.scaled == 17"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+        Reified: ~
+      Diagram: "Hero.scaled == 17\n^    ^      ^\n|    17     true\n{ defense: 3, power: 7 }"
+    Assert
+      Cond: "Champion.rating() == 10"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+        Reified: ~
+      Diagram: "Champion.rating() == 10\n^        ^        ^\n|        10       true\n{ defense: 3, power: 7 }"
+    Assert
+      Cond: "Full.band == 10"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+        Reified: ~
+      Diagram: "Full.band == 10\n^    ^    ^\n100  10   true"
+    Assert
+      Cond: "Full.nextBand == 11"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+        Reified: ~
+      Diagram: "Full.nextBand == 11\n^    ^        ^\n100  11       true"
+    Assert
+      Cond: "ValidScore.inBand()"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+        Reified: ~
+      Diagram: "ValidScore.inBand()\n^          ^\n75         true"
