@@ -1,0 +1,53 @@
+# package-vsix — package the VS Code extension as a .vsix and, when a Marketplace
+# token is configured, publish it. The channel decides the version and whether it
+# is a pre-release; the packaging and the degrade-without-a-token behaviour are
+# shared, so the nightly pre-release and the stable release build the .vsix the
+# same way. The caller checks out, sets up pnpm/node, and runs `pnpm install`
+# first, then uploads the resulting masterbelt.vsix as an artifact.
+name: package-vsix
+description: Package the VS Code extension and optionally publish it to the Marketplace.
+
+inputs:
+  version:
+    description: The version to stamp into the package (no build metadata).
+    required: true
+  pre-release:
+    description: Whether to package and publish on the pre-release channel.
+    default: 'false'
+  vsce-pat:
+    description: Marketplace PAT; when empty the publish step is skipped (degrade).
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: Package the extension
+      shell: bash
+      working-directory: toolchain/editors/vscode
+      env:
+        VERSION: ${{ inputs.version }}
+        PRE_RELEASE: ${{ inputs.pre-release }}
+      run: |
+        # vsce wants a LICENSE in the package; copy the repo's single MIT license
+        # in rather than committing a second copy that could drift.
+        cp "$GITHUB_WORKSPACE/LICENSE" LICENSE
+        npm pkg set version="$VERSION"
+        flag=""
+        [ "$PRE_RELEASE" = true ] && flag="--pre-release"
+        # Version-free filename for a deterministic download URL; vsce reads the
+        # version from package.json (set above), not the file name.
+        # shellcheck disable=SC2086
+        pnpm dlx @vscode/vsce package $flag --no-dependencies -o masterbelt.vsix
+
+    - name: Publish to the Marketplace (when a PAT is configured)
+      if: inputs.vsce-pat != ''
+      shell: bash
+      working-directory: toolchain/editors/vscode
+      env:
+        VSCE_PAT: ${{ inputs.vsce-pat }}
+        PRE_RELEASE: ${{ inputs.pre-release }}
+      run: |
+        flag=""
+        [ "$PRE_RELEASE" = true ] && flag="--pre-release"
+        # shellcheck disable=SC2086
+        pnpm dlx @vscode/vsce publish $flag --packagePath masterbelt.vsix

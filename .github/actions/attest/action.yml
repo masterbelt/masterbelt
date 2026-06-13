@@ -1,0 +1,56 @@
+# attest — provenance attestation with the availability guard built in. Artifact
+# attestations need a public repo or an org plan that includes them; on a private
+# repo without it the attest API returns "Feature not available" and reds the
+# build. Probing visibility here, in one place, means the nightly CLI build, the
+# nightly image, and the stable release all share the exact same guard — it can
+# never drift, and a private repo skips attestation instead of failing, picking
+# it back up automatically once the repo is public.
+#
+# Pass either subject-path (file globs, for the archives) or subject-name +
+# subject-digest (for a container image); the matching attest step runs.
+name: attest
+description: Attest build provenance for files or an image, when the repo can.
+
+inputs:
+  subject-path:
+    description: Newline-separated file globs to attest (the release archives).
+    default: ''
+  subject-name:
+    description: Fully-qualified image name to attest (with subject-digest).
+    default: ''
+  subject-digest:
+    description: The image digest, paired with subject-name.
+    default: ''
+  push-to-registry:
+    description: Whether to push the image attestation to the registry.
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    - name: Decide whether provenance attestation is available
+      id: gate
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        if [ "$(gh repo view --json visibility -q .visibility 2>/dev/null || echo private)" = public ]; then
+          echo "available=true" >>"$GITHUB_OUTPUT"
+        else
+          echo "provenance attestation unavailable for a private repo on this plan — skipping it"
+          echo "available=false" >>"$GITHUB_OUTPUT"
+        fi
+
+    - name: Attest archives
+      if: steps.gate.outputs.available == 'true' && inputs.subject-path != ''
+      uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
+      with:
+        subject-path: ${{ inputs.subject-path }}
+
+    - name: Attest image
+      if: steps.gate.outputs.available == 'true' && inputs.subject-name != ''
+      uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
+      with:
+        subject-name: ${{ inputs.subject-name }}
+        subject-digest: ${{ inputs.subject-digest }}
+        push-to-registry: ${{ inputs.push-to-registry }}
