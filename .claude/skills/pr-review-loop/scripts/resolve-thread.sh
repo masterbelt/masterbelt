@@ -20,6 +20,12 @@ case "${1:-}" in
 esac
 [ $# -ge 1 ] || { echo "usage: resolve-thread.sh [--list|--map-only] <pr> [<comment-id> ...]" >&2; exit 2; }
 PR=$1; shift
+# resolve/map act on comment ids; without any, the loop below would no-op and exit
+# 0, falsely signalling "all resolved". Only --list may run with just a PR.
+if [ "$MODE" != list ] && [ $# -lt 1 ]; then
+  echo "error: no comment ids given (resolve/map needs at least one; use --list to inspect)" >&2
+  exit 2
+fi
 
 threads_tsv(){ # emits "<thread-id>\t<cid,cid,...>" for UNRESOLVED threads
   if [ -n "${RESOLVE_THREAD_FIXTURE:-}" ]; then

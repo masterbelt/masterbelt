@@ -12,12 +12,17 @@
 #
 #   OUTCOME=FINDINGS             new bot inline comments OR a submitted COMMENTED
 #                                review after SINCE → back to Stage 1
-#   OUTCOME=APPROVED             a "Didn't find any major issues" comment for <head-sha>
-#                                posted after SINCE → Stage 8. Approval requires this
-#                                COMMIT-SCOPED artifact; a bare +1 is NOT enough (it
-#                                carries no sha, and a slow prior run's +1 can land
-#                                after a new trigger), so +1 is corroboration only.
+#   OUTCOME=APPROVED             the review is clean for this round: a "Didn't find any
+#                                major issues" comment for <head-sha> after SINCE, OR a
+#                                +1 reaction after SINCE → Stage 8. The +1 is honored by
+#                                an explicit decision so a reaction-only clean review
+#                                still converges; its residual risk (a prior run's late
+#                                +1) is bounded only by the SINCE round scope.
 #   OUTCOME=RUNNING              only 👀 / nothing terminal yet (single probe)
+#   OUTCOME=NO_EYES              --watch saw no 👀 within the grace window (default 3
+#                                polls; env EYES_GRACE_POLLS) and nothing terminal: the
+#                                push was not picked up — re-post "@codex review" and
+#                                re-watch, rather than wait out a review that never began
 #   OUTCOME=TIMEOUT_NO_FINDINGS  --watch elapsed with no findings and no commit-scoped
 #                                verdict. NOT an approval — keep waiting or surface to
 #                                the human; do not advance to Stage 8 on silence alone.
@@ -37,6 +42,7 @@ PR=$1; SINCE=$2; SHA=$3; shift 3
 WATCH=0; MAXP=20; INT=90
 if [ "${1:-}" = "--watch" ]; then WATCH=1; MAXP=${2:-20}; INT=${3:-90}; fi
 SHA9=${SHA:0:9}
+EYES_GRACE=${EYES_GRACE_POLLS:-3}  # polls to wait for 👀 before declaring the trigger missed
 
 # fetch <api-path> <fixture-file> — echoes a JSON array; returns non-zero if the
 # source could not be read (so callers can fail closed).
@@ -86,20 +92,26 @@ probe(){
   #     (created_at>$SINCE) — the only COMMIT-SCOPED approval artifact.
   V=$(printf '%s' "$icraw" | jq --arg b "$BOT" --arg s "$SINCE" --arg sha "$SHA9" \
         '[.[]|select(.user.login==$b and .created_at>$s and (.body|test("Didn.t find any major issues")) and (.body|test($sha)))]|length')
-  # corroboration only: a +1 after the trigger. Reactions carry no sha, so this
-  #     never gates APPROVED — a prior run's +1 can land after a new trigger.
+  # a +1 after the trigger. By an explicit project decision this counts as
+  #     approval (so a clean review that leaves only the reaction still converges).
+  #     Reactions carry no sha, so the only guard against a prior run's late +1 is
+  #     the created_at>$SINCE round scope — an accepted residual risk.
   P=$(printf '%s' "$rxraw" | jq --arg b "$BOT" --arg s "$SINCE" \
         '[.[]|select(.user.login==$b and .content=="+1" and .created_at>$s)]|length')
+  # liveness: did the review actually start this round? An 👀 after the trigger
+  #     means it started; its prolonged absence means the trigger never took.
+  EYES=$(printf '%s' "$rxraw" | jq --arg b "$BOT" --arg s "$SINCE" \
+        '[.[]|select(.user.login==$b and .content=="eyes" and .created_at>$s)]|length')
 }
 
 decide(){
   if   [ "${F:-0}" -gt 0 ] || [ "${REV:-0}" -gt 0 ]; then echo FINDINGS
   elif [ "${PROBE_ERR:-0}" -ne 0 ];                  then echo ERROR
-  elif [ "${V:-0}" -gt 0 ];                          then echo APPROVED
+  elif [ "${V:-0}" -gt 0 ] || [ "${P:-0}" -gt 0 ];   then echo APPROVED
   else echo RUNNING; fi
 }
 
-line(){ echo "findings_inline=$F new_reviews=$REV clean_verdict=$V plus1=$P(corrob) err=$PROBE_ERR"; }
+line(){ echo "findings_inline=$F new_reviews=$REV clean_verdict=$V eyes=$EYES plus1=$P(corrob) err=$PROBE_ERR"; }
 
 if [ "$WATCH" -eq 0 ]; then
   probe; d=$(decide)
@@ -108,11 +120,19 @@ if [ "$WATCH" -eq 0 ]; then
   [ "$d" = ERROR ] && exit 1 || exit 0
 fi
 
-last=RUNNING
+last=RUNNING; eyes_seen=0
 for i in $(seq 1 "$MAXP"); do
   probe; d=$(decide); last=$d
+  [ "${EYES:-0}" -gt 0 ] && eyes_seen=1
   echo "[poll $i $(date -u +%H:%M:%SZ)] $(line) -> $d"
   case "$d" in FINDINGS|APPROVED) echo "OUTCOME=$d"; exit 0 ;; esac
+  # The trigger never took: no 👀 within the grace window and nothing terminal.
+  # Surface NO_EYES so the caller can re-post "@codex review" instead of waiting
+  # out a review that never started. Only when probes are healthy — an ERROR poll
+  # cannot read reactions reliably, so it keeps polling rather than misfire here.
+  if [ "$d" != ERROR ] && [ "$eyes_seen" -eq 0 ] && [ "$i" -ge "$EYES_GRACE" ]; then
+    echo "OUTCOME=NO_EYES"; exit 0
+  fi
   # ERROR or RUNNING → keep polling (a transient failure may clear next round).
   [ "$i" -lt "$MAXP" ] && sleep "$INT"
 done
