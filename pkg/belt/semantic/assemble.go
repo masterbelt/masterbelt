@@ -851,11 +851,30 @@ func reportRefIssues(fileID FileID, e ast.Expr, q queries, at func(ast.Node) spa
 			diags.Add(newUndefinedNameDiagnostic(s.offset, s.width, id.Name))
 		},
 		func(m *ast.MemberExpr) {
+			// A receiver that reads a readable member of the row (a per-row check's
+			// self) navigates self.recv.x; the type checker resolves it or reports the
+			// self-member clash, so the reference walk leaves it rather than reporting
+			// the namespace/type member it is not.
+			if isSelfMember != nil && receiverIsSelfMember(m.Receiver, isSelfMember) {
+				return
+			}
 			reportUnknownNamespaceMember(fileID, m, q, at, diags)
 		},
 		func(m *ast.MemberExpr) {
+			if isSelfMember != nil && receiverIsSelfMember(m.Receiver, isSelfMember) {
+				return
+			}
 			reportTypeMemberIssue(fileID, m, q, at, diags)
 		})
+}
+
+// receiverIsSelfMember reports whether a member access's receiver is a bare name
+// that reads a readable member of the row — so recv.x navigates self.recv.x and
+// the reference walk leaves it to the type checker rather than reporting a type
+// or namespace member.
+func receiverIsSelfMember(recv ast.Expr, isSelfMember func(string) bool) bool {
+	id, ok := recv.(*ast.Identifier)
+	return ok && isSelfMember(id.Name)
 }
 
 // reportTypeMemberIssue validates a type-member read — T.member or the

@@ -36,14 +36,20 @@ func callType(e *ast.CallExpr, s scope, sink *Sink) ir.Type {
 	if !ok {
 		return nonMemberCallType(e, s, sink)
 	}
-	// A member-access callee whose receiver is a self readable-member that also
-	// names a type or namespace is ambiguous between the implicit self read
-	// (self.recv.m()) and the static-fn call or imported-function call the type or
-	// namespace reading would take — the clash the value forms raise for Item.Max
-	// and geo.X, here for Item.make() and geo.fn().
-	if id, isIdent := member.Receiver.(*ast.Identifier); isIdent && selfMemberReceiverClash(s, member.Receiver) {
-		s.reportSelfMemberClash(id, id.Name)
-		return ir.Invalid
+	// A member-access callee whose receiver reads a readable member of self
+	// navigates the implicit self read (self.recv.m()) unless the receiver also
+	// names a namespace exporting a function of that name, or a type providing a
+	// static fn of that name — then the call is genuinely ambiguous and reported as
+	// a clash. The existence checks are side-effect free, so a receiver that names a
+	// type or namespace without the member falls straight through to the self-member
+	// method call rather than reporting an unknown static or imported member.
+	if id, isIdent := member.Receiver.(*ast.Identifier); isIdent && selfMemberClash(s, id.Name) {
+		_, _, hasStatic := types.StaticCandidates(s.registry(), s.conv(id), member.Member.Name)
+		if len(s.fnMember(member)) > 0 || hasStatic {
+			s.reportSelfMemberClash(id, id.Name)
+			return ir.Invalid
+		}
+		return methodCallType(e, member.Receiver, check(member.Receiver, s, sink), member.Member.Name, s, sink)
 	}
 	// A member-access callee whose receiver names a namespace is a call of an
 	// imported function (geo.area(...)), never a method call.
@@ -236,6 +242,16 @@ func synthMethodArgs(e *ast.CallExpr, recv ir.Type, args []ir.Type, bad *bool, s
 	known := make([]ir.Type, len(e.Arguments))
 	for i, a := range e.Arguments {
 		if _, isLit := a.(*ast.FuncLit); isLit {
+			continue
+		}
+		// A bare argument that is both a readable member of self and a member of the
+		// receiver's enum is ambiguous between the implicit self read and the enum
+		// shorthand — the argument-position twin of the clash checkEnumShorthand
+		// raises in a checked position. It is reported before check resolves it to
+		// the self member, which would otherwise win silently.
+		if id, ok := a.(*ast.Identifier); ok && selfMemberClash(s, id.Name) && enumMemberExpectation(recv, id.Name) != nil {
+			s.reportSelfMemberClash(id, id.Name)
+			*bad = true
 			continue
 		}
 		args[i] = check(a, s, sink)

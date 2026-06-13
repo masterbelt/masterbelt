@@ -406,18 +406,85 @@ func TestSelfMemberNameClashConversionCallee(t *testing.T) {
 	}
 }
 
-// TestSelfMemberNameClashNamespaceReceiver pins that a member-access receiver
-// that is both a readable member of self and a namespace import is a clash — the
-// access would otherwise read the imported member (geo.X) instead of navigating
-// the self field (self.geo.X), the namespace twin of the type-receiver clash.
+// TestSelfMemberNameClashNamespaceReceiver pins that a call whose receiver is
+// both a readable member of self and a namespace exporting a function of that
+// name is a clash — the call would otherwise invoke the imported function
+// (geo.ping()) instead of navigating the self field (self.geo.ping()). A genuine
+// ambiguity: the field's type has a ping method and the namespace exports ping.
 func TestSelfMemberNameClashNamespaceReceiver(t *testing.T) {
 	diags := analyzeProject(t, map[string]string{
-		"geometry.belt": "pub const X: long = 5\n",
+		"geometry.belt": "pub fn ping(): nint { return 1 }\n",
 		"main.belt": "use geo from \"geometry.belt\"\n" +
-			"pub type Box = { geo: long } impl {\n  pub peek(): long { return geo.X }\n}\n",
+			"pub type Widget = { v: nint } impl { pub ping(): nint { return v } }\n" +
+			"pub type Box = { geo: Widget } impl {\n  pub call(): nint { return geo.ping() }\n}\n",
 	})
 	if !hasCode(diags, CodeSelfMemberNameClash) {
-		t.Fatalf("want self_member_name_clash (geo is both a self field and a namespace import), got %v", codes(diags))
+		t.Fatalf("want self_member_name_clash (geo is both a self field and a namespace exporting ping), got %v", codes(diags))
+	}
+}
+
+// TestSelfOmissionReceiverNoCompetingMemberReadsSelf pins that a member access
+// or call whose receiver is a self field does NOT clash when the same-named type
+// or namespace has no such member — there is no ambiguity, so it reads
+// self.recv.x / self.recv.m() and folds. This guards against over-clashing: the
+// clash fires only when the competing reading actually claims the member.
+func TestSelfOmissionReceiverNoCompetingMemberReadsSelf(t *testing.T) {
+	// Item names a type (nint) with no member x; the field's type (Inner) has x,
+	// so Item.x reads self.Item.x and folds.
+	valSrc := "pub type Item = nint\npub type Inner = { x: nint }\n" +
+		"pub type Holder = { Item: Inner } impl { pub peek(): nint { return Item.x } }\n" +
+		"const H: Holder = { Item: { x: 7 } }\nconst V = H.peek()\n"
+	mv, vdiags := analyze(valSrc)
+	if hasCode(vdiags, CodeSelfMemberNameClash) {
+		t.Fatalf("Item.x should not clash (the type Item has no member x): %v", codes(vdiags))
+	}
+	if ev := constEval(mv, "V"); ev == nil || ev.Int.Int64() != 7 {
+		t.Fatalf("V did not fold to 7 (self.Item.x)")
+	}
+	// Pt names a type with no static area; the field's type has an area method, so
+	// Pt.area() reads self.Pt.area() and folds.
+	callSrc := "pub type Pt = { x: nint } impl { pub area(): nint { return x } }\n" +
+		"pub type Box = { Pt: Pt } impl { pub a(): nint { return Pt.area() } }\n" +
+		"const B: Box = { Pt: { x: 5 } }\nconst A = B.a()\n"
+	mc, cdiags := analyze(callSrc)
+	if hasCode(cdiags, CodeSelfMemberNameClash) {
+		t.Fatalf("Pt.area() should not clash (the type Pt has no static area): %v", codes(cdiags))
+	}
+	if ev := constEval(mc, "A"); ev == nil || ev.Int.Int64() != 5 {
+		t.Fatalf("A did not fold to 5 (self.Pt.area())")
+	}
+}
+
+// TestSelfMemberNameClashEnumArgument pins that a bare method/operator argument
+// that is both a readable member of self and a member of the receiver's enum is a
+// clash — the argument-position twin of the checked-position enum clash.
+func TestSelfMemberNameClashEnumArgument(t *testing.T) {
+	src := "pub enum Rarity { Common, Rare }\n" +
+		"pub type Card = { rarity: Rarity, Rare: Rarity } impl {\n" +
+		"  pub eq(): bool { return rarity == Rare }\n" +
+		"}\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeSelfMemberNameClash) {
+		t.Fatalf("want self_member_name_clash (Rare is both a self field and the receiver's enum member), got %v", codes(diags))
+	}
+}
+
+// TestSelfOmissionMasterValidateMemberReceiver pins that a per-row check reads a
+// member off a row field (self.Item.x) without the reference walk reporting the
+// same-named type's missing member: the receiver is a row member, so the type
+// checker resolves it rather than the reference walk reporting a type member.
+func TestSelfOmissionMasterValidateMemberReceiver(t *testing.T) {
+	// Item is a row field (a record with x) and also names a type (nint) with no x.
+	// Item.x in the per-row check reads self.Item.x, not the type's member.
+	src := "pub type Item = nint\n" +
+		"pub master M {\n" +
+		"  record { id: int, Item: { x: int } }\n" +
+		"  primary id\n" +
+		"  validate { each { assert Item.x > 0 } }\n" +
+		"}\n"
+	_, diags := analyze(src)
+	if hasCode(diags, CodeUnknownAssociatedConst) || hasCode(diags, CodeUnknownStatic) {
+		t.Fatalf("a per-row member read off a row field should not report a type-member issue: %v", codes(diags))
 	}
 }
 

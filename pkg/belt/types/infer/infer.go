@@ -501,21 +501,6 @@ func selfMemberClash(s scope, name string) bool {
 	return self != nil && self != ir.Invalid && memberReadType(s.registry(), self, name) != ir.Invalid
 }
 
-// selfMemberReceiverClash reports whether a member access's receiver is a bare
-// identifier that reads a readable member of self — so recv.x should navigate
-// self.recv.x — while recv also names a type or a namespace import, which the
-// type-member, namespace, or static-call paths would otherwise resolve instead.
-// It is the receiver twin of selfMemberClash for the Type.x / geo.x value reads
-// and the Type.m() / geo.fn() calls: the ambiguity is reported rather than
-// silently taking the type or namespace reading over the innermost self member.
-func selfMemberReceiverClash(s scope, recv ast.Expr) bool {
-	id, ok := recv.(*ast.Identifier)
-	if !ok || !selfMemberClash(s, id.Name) {
-		return false
-	}
-	return s.conv(id) != ir.Invalid || s.nsReceiver(recv)
-}
-
 // getterType returns the type a getter read value.name produces: the getter's
 // result, with self resolving to the receiver (a getter that returns self yields
 // the receiver's type, exactly as a self-returning method does). It is
