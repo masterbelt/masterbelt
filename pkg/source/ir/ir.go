@@ -395,8 +395,8 @@ func (*LocalRef) value() {}
 // surface form: Receiver.Field. Syntax is the expression this lowered from —
 // the settled-type write-back key and the editor's position anchor only, never
 // semantics. It is the member expression for an explicit self.field or value.field
-// read, or the bare identifier for the implicit-self read of §4.1 (power, lowered
-// to self.power), so either keys the checker's typed-value stream by the node the
+// read, or the bare identifier for an implicit-self read (power, lowered to
+// self.power), so either keys the checker's typed-value stream by the node the
 // checker streamed it under.
 type FieldAccess struct {
 	Receiver Value

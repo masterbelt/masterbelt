@@ -1,11 +1,10 @@
-// These tests pin self omission (§4.1): in a body with a receiver, a bare name
-// reads one of self's readable members (a field or getter), so power means
-// self.power. The bare and explicit forms desugar to the same field/getter read
-// and fold to the same value; a bare name that also names a parameter or local
-// is the §4.1 ambiguity ("列名と引数名の衝突はエラー") and is reported rather than
-// silently shadowed. Only readable members resolve bare — a method still needs
-// self.foo(), and a table-level associated constant is read off the type
-// (Type.Max), not bare.
+// These tests pin self omission: in a body with a receiver, a bare name reads
+// one of self's readable members (a field or getter), so power means self.power.
+// The bare and explicit forms desugar to the same field/getter read and fold to
+// the same value; a bare name that also names a parameter or local is ambiguous
+// and is reported rather than silently shadowed. Only readable members resolve
+// bare — a method still needs self.foo(), and a table-level associated constant
+// is read off the type (Type.Max), not bare.
 package semantic
 
 import (
@@ -16,7 +15,7 @@ import (
 
 // TestSelfOmissionFoldsLikeExplicit pins that a bare field read in a method body
 // folds to the same value the explicit self. form does — the additive guarantee
-// of §4.1. It is a red→green gate: drop the self-member step from the body leaf
+// of self omission. It is a red→green gate: drop the self-member step from the body leaf
 // and lowering and the bare reads no longer resolve, so the const stops folding
 // and the test fails.
 func TestSelfOmissionFoldsLikeExplicit(t *testing.T) {
@@ -56,7 +55,7 @@ func TestSelfOmissionGetterReadsGetter(t *testing.T) {
 }
 
 // TestSelfOmissionLowersToSelfFieldAccess pins that a bare member read lowers to
-// the same FieldAccess-over-SelfValue the explicit self. form does — the §4.1
+// the same FieldAccess-over-SelfValue the explicit self. form does — the
 // "same desugar" guarantee, checked on the IR rather than only the folded value.
 func TestSelfOmissionLowersToSelfFieldAccess(t *testing.T) {
 	src := "pub type Fighter = { power: nint } impl {\n" +
@@ -86,9 +85,9 @@ func TestSelfOmissionLowersToSelfFieldAccess(t *testing.T) {
 	}
 }
 
-// TestSelfMemberNameClashParam pins the §4.1 ambiguity: a bare name that is at
-// once a readable member of self and a parameter is reported, not resolved to
-// either. It is the canonical "列名と引数名の衝突はエラー" rule.
+// TestSelfMemberNameClashParam pins the ambiguity: a bare name that is at once a
+// readable member of self and a parameter is reported, not resolved to either.
+// A column name and an argument name that collide are an error, not a shadow.
 func TestSelfMemberNameClashParam(t *testing.T) {
 	src := "pub type Box = { value: nint } impl {\n" +
 		"  pub pick(value: nint): nint {\n    return value\n  }\n" +
@@ -101,7 +100,7 @@ func TestSelfMemberNameClashParam(t *testing.T) {
 
 // TestSelfMemberNameClashLocal pins that the clash rule covers a let-bound local
 // the same as a parameter — the general body has lets the scope DSL does not, and
-// §4.1's rule is applied uniformly rather than split between body kinds.
+// the clash rule is applied uniformly rather than split between body kinds.
 func TestSelfMemberNameClashLocal(t *testing.T) {
 	src := "pub type Box = { value: nint } impl {\n" +
 		"  pub pick(): nint {\n    let value = 1\n    return value\n  }\n" +
@@ -184,6 +183,80 @@ func TestSelfOmissionAssocConstNotBareResolved(t *testing.T) {
 	_, diags := analyze(src)
 	if !hasCode(diags, CodeUnfoldedConst) {
 		t.Fatalf("want unfolded_const (bare Max is an associated constant, not a field or getter; read it as Health.Max), got %v", codes(diags))
+	}
+}
+
+// TestSelfOmissionBareEnumFieldNotUnknownMember pins that a bare enum-typed self
+// field used where an enum is expected (a comparison desugars to an enum-typed
+// method argument) is recognized as a resolved self read, not flagged as an
+// unknown enum shorthand. The bare-enum-argument check exempts readable self
+// members the same way it exempts a parameter, local, function, or constant.
+func TestSelfOmissionBareEnumFieldNotUnknownMember(t *testing.T) {
+	src := "pub enum Rarity { Common, Rare }\n" +
+		"pub type Card = { rarity: Rarity } impl {\n" +
+		"  pub same(): bool {\n    return rarity == rarity\n  }\n" +
+		"}\n" +
+		"const C: Card = { rarity: Rarity.Rare }\n" +
+		"const Same = C.same()\n"
+	m, diags := analyze(src)
+	if hasCode(diags, CodeUnknownEnumMember) {
+		t.Fatalf("bare enum-typed self field reported as unknown_enum_member; want it recognized as a self read: %v", codes(diags))
+	}
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", codes(diags))
+	}
+	if ev := constEval(m, "Same"); ev == nil || ev.Kind != ir.ConstBool || !ev.Bool {
+		t.Fatalf("Same did not fold to true (bare self enum field == itself)")
+	}
+}
+
+// TestSelfOmissionMasterValidateBareFields pins that a master per-row check reads
+// the row's fields bare — the validate block is a body over the row (self), so the
+// reference-checking pass recognizes a bare field as a self read rather than an
+// undefined name.
+func TestSelfOmissionMasterValidateBareFields(t *testing.T) {
+	src := "pub master Skill {\n" +
+		"  record {\n    id: int,\n    cost: int,\n    power: int,\n  }\n" +
+		"  primary id\n" +
+		"  validate {\n    each {\n      assert power >= cost\n    }\n  }\n" +
+		"}\n"
+	_, diags := analyze(src)
+	if hasCode(diags, CodeUndefinedName) {
+		t.Fatalf("bare row field in a master validate reported as undefined_name; want it read as a self field: %v", codes(diags))
+	}
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", codes(diags))
+	}
+}
+
+// TestSelfOmissionStaticBodyReadsConstNotSelf pins that a static method body has
+// no receiver: a bare name there reads a top-level constant (or a type), never an
+// implicit self.field. The lowering matches the checker, which types a static body
+// with self unbound, so the const folds rather than mismatching as a self read.
+func TestSelfOmissionStaticBodyReadsConstNotSelf(t *testing.T) {
+	src := "pub type Box = { value: nint } impl {\n" +
+		"  pub static fetch(): nint {\n    return value\n  }\n" +
+		"}\n" +
+		"const value = 5\n" +
+		"const Fetched = Box.fetch()\n"
+	if got := evalOf(t, src, "Fetched").Int.Int64(); got != 5 {
+		t.Fatalf("Fetched = %d, want 5 (a static body reads the top-level const, not self.value)", got)
+	}
+}
+
+// TestSelfMemberNameClashLambdaParam pins that the clash rule reaches a function
+// literal's own binding: a lambda inside a method body inherits self, so a lambda
+// parameter that shadows a readable self member is the same ambiguity a method
+// parameter is, and is reported rather than silently taking the lambda parameter.
+func TestSelfMemberNameClashLambdaParam(t *testing.T) {
+	src := "pub type Box = { value: nint } impl {\n" +
+		"  pub apply(): nint {\n" +
+		"    let f = fn(value: nint): nint { return value }\n" +
+		"    return f(1)\n  }\n" +
+		"}\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeSelfMemberNameClash) {
+		t.Fatalf("want self_member_name_clash (lambda parameter shadows a self member), got %v", codes(diags))
 	}
 }
 

@@ -117,6 +117,14 @@ type scope interface {
 	// optional<invalid>); with it T resolves to the TypeVar carrying its bound.
 	// It is nil where no type parameters are in scope (a constant initializer).
 	tscope() TypeScope
+	// reportSelfMemberClash reports a bare name that is at once a readable member
+	// of the receiver and a binding (a parameter or local) of the same name — the
+	// ambiguity self omission forbids. The body leaf calls it directly; a function
+	// literal forwards it to the enclosing scope, so a lambda parameter that shadows
+	// a reachable self member is reported the same as a method-level one. It is a
+	// no-op where there is nothing to report through (a constant initializer, or a
+	// non-reporting walk whose body scope carries no reporter).
+	reportSelfMemberClash(node ast.Node, name string)
 }
 
 // Decl is the type rule for a declaration: an annotation gives a concrete type,
@@ -474,10 +482,10 @@ func memberReadType(reg *builtin.Registry, recv ir.Type, name string) ir.Type {
 // IsReadableMember reports whether name reads one of recv's readable members — a
 // field or a getter (a method is not readable). It is the membership facet of
 // memberReadType, exported so the lowering decides a bare name's implicit-self
-// reading (the §4.1 self-omission) with the same field∪getter rule the checker's
-// body leaf uses, rather than the type-position ReadableMemberType, whose
-// bare-generic getter guard the value read does not share — keeping bare X and
-// self.X the same in every walk.
+// reading (self omission) with the same field∪getter rule the checker's body leaf
+// uses, rather than the type-position ReadableMemberType, whose bare-generic
+// getter guard the value read does not share — keeping bare X and self.X the same
+// in every walk.
 func IsReadableMember(reg *builtin.Registry, recv ir.Type, name string) bool {
 	return recv != nil && recv != ir.Invalid && memberReadType(reg, recv, name) != ir.Invalid
 }

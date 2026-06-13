@@ -79,6 +79,19 @@ func (s funcScope) shadows(name string) bool {
 func (s funcScope) leaf(e ast.Expr) ir.Type {
 	switch e := e.(type) {
 	case *ast.Identifier:
+		_, isLocal := s.locals[e.Name]
+		_, isParam := s.params[e.Name]
+		if isLocal || isParam {
+			// A lambda local or parameter that also names a readable member of the
+			// inherited self is the same ambiguity the method body forbids: a bare name
+			// that could read self.X or this binding. Report it and resolve to neither,
+			// the way the body leaf reports a method-level clash, rather than silently
+			// taking the binding — a function literal in a method body sees self.
+			if self := s.self(); self != nil && self != ir.Invalid && memberReadType(s.registry(), self, e.Name) != ir.Invalid {
+				s.reportSelfMemberClash(e, e.Name)
+				return ir.Invalid
+			}
+		}
 		// A let-bound local shadows a same-named parameter, so it is read first.
 		if t, ok := s.locals[e.Name]; ok {
 			return t
@@ -125,6 +138,13 @@ func (s funcScope) nsReceiver(recv ast.Expr) bool {
 		return false // a lambda local or parameter shadows the namespace import
 	}
 	return s.outer.nsReceiver(recv)
+}
+
+// reportSelfMemberClash forwards to the enclosing scope: a function literal in a
+// method body inherits that body's receiver and its clash reporter, so a lambda
+// binding that shadows a reachable self member is reported there.
+func (s funcScope) reportSelfMemberClash(node ast.Node, name string) {
+	s.outer.reportSelfMemberClash(node, name)
 }
 
 // metatype is the type of a reified type value — the builtin `type` (type :
@@ -221,6 +241,10 @@ func (s constScope) fnMember(m *ast.MemberExpr) []*ast.FuncDecl {
 // existing reading.
 func (s constScope) nsReceiver(ast.Expr) bool { return false }
 
+// reportSelfMemberClash: a constant initializer has no receiver, so a bare name
+// never clashes with a self member here; nothing to report.
+func (s constScope) reportSelfMemberClash(ast.Node, string) {}
+
 // BodyScope types a method or function body: the receiver type (Self —
 // ir.Invalid in a function, which has none), the parameter types (Params),
 // the type universe (Universe) a conversion resolves against, and the
@@ -278,15 +302,15 @@ type BodyScope struct {
 	// leaving the use to its prior silent reading.
 	ReportTypeParamValue func(node ast.Node, name string)
 	// ReportSelfMemberClash reports a bare name that is at once a readable member
-	// of self (a field or getter, the implicit-self read of §4.1) and a local or
-	// parameter of the same name — the ambiguity §4.1 forbids ("列名と引数名の衝突
-	// はエラー"), so the leaf resolves it to neither and reports it here rather than
-	// silently picking one. It is the self-omission twin of ReportTypeParamValue,
-	// reached only in a body with a receiver; nil in a non-reporting walk (the
-	// effect and refinement walks, the func-literal settling pass), where the leaf
-	// returns ir.Invalid for the clash without a diagnostic. A refinement predicate
-	// and a master per-row check have no parameters or locals, so the clash never
-	// arises there even when the reporter is nil.
+	// of self (a field or getter, read with self omitted) and a local or parameter
+	// of the same name — an ambiguity the self-omission rule forbids, so the leaf
+	// resolves it to neither and reports it here rather than silently picking one.
+	// It is the self-omission twin of ReportTypeParamValue, reached only in a body
+	// with a receiver; nil in a non-reporting walk (the effect and refinement walks,
+	// the func-literal settling pass), where the leaf returns ir.Invalid for the
+	// clash without a diagnostic. A refinement predicate and a master per-row check
+	// have no parameters or locals, so the clash never arises there even when the
+	// reporter is nil.
 	ReportSelfMemberClash func(node ast.Node, name string)
 }
 
@@ -312,6 +336,15 @@ func (s BodyScope) self() ir.Type {
 func (s BodyScope) rigid(name string) bool {
 	_, ok := s.TScope[name]
 	return ok
+}
+
+// reportSelfMemberClash forwards a member/binding name clash to the body's
+// reporter, the one a reporting walk wires in; it is a no-op in a walk that
+// carries none.
+func (s BodyScope) reportSelfMemberClash(node ast.Node, name string) {
+	if s.ReportSelfMemberClash != nil {
+		s.ReportSelfMemberClash(node, name)
+	}
 }
 
 // tscope is the body's generic type-parameter scope — the enclosing function's
@@ -384,13 +417,13 @@ func (s BodyScope) leaf(e ast.Expr) ir.Type {
 		return &ir.Builtin{Name: "null"}
 	case *ast.Identifier:
 		// A bare name in a body with a receiver may read one of self's readable
-		// members — a field or getter — the implicit-self form of self.X (§4.1
-		// self omission), typed exactly as the explicit self.X member read below
-		// is. The member is "inner": it beats a type name and a top-level constant
-		// of the same name (which the leaf reads as a type value or, in lowering, a
+		// members — a field or getter — the implicit-self form of self.X (self
+		// omission), typed exactly as the explicit self.X member read below is. The
+		// member is "inner": it beats a type name and a top-level constant of the
+		// same name (which the leaf reads as a type value or, in lowering, a
 		// reference). It does not silently beat a local or parameter of the same
-		// name, though: that clash is the ambiguity §4.1 forbids, so it is reported
-		// and resolved to neither, rather than shadowing one with the other.
+		// name, though: that clash is an ambiguity, so it is reported and resolved
+		// to neither, rather than shadowing one with the other.
 		selfMember := ir.Invalid
 		if s.Self != nil {
 			selfMember = memberReadType(s.registry(), s.Self, e.Name)
@@ -411,8 +444,8 @@ func (s BodyScope) leaf(e ast.Expr) ir.Type {
 			return s.Params[e.Name]
 		}
 		// The implicit-self member read, before the type-name and type-parameter
-		// readings below — a self field or getter wins over a same-named type (§4.1
-		// member innermost), and over the type-parameter rejection, since a real
+		// readings below — a self field or getter wins over a same-named type (the
+		// member is inner), and over the type-parameter rejection, since a real
 		// readable value is not a type parameter consumed as a value.
 		if selfMember != ir.Invalid {
 			return selfMember

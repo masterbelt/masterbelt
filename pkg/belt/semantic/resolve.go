@@ -195,8 +195,8 @@ func typeParamValueReporter(at func(ast.Node) span, diags *diagnostic.List) func
 
 // selfMemberClashReporter builds the body leaf's reach to the self-member-clash
 // diagnostic: a bare name that is at once a readable member of self (a field or
-// getter) and a local or parameter, the ambiguity §4.1 forbids. It mirrors
-// typeParamValueReporter, keying by identifier node so the several body walks
+// getter) and a local or parameter, an ambiguity the self-omission rule forbids.
+// It mirrors typeParamValueReporter, keying by identifier node so the several body walks
 // that share a scope (the type walk, the checking walk re-deriving a member
 // receiver, the bare-enum-argument walk) yield one diagnostic per offending use,
 // not one per walk. It is nil when there is nothing to report through, leaving
@@ -1907,7 +1907,15 @@ func resolveMethod(r *infer.TypeResolver, reg *builtin.Registry, self ir.Type, m
 		resolvedParams[p.Name] = t
 	}
 	method.Result = r.ResolveType(m.Result, mscope)
-	method.Body = lower.Body(m.Body, bodyBinder{r: r, reg: reg, params: params, paramTypes: resolvedParams, selfType: self, tscope: mscope, funcs: fns, self: true})
+	// A static fn has no receiver: its body lowers with self unbound, exactly as the
+	// checker types it (Self ir.Invalid), so a bare name there reads a top-level
+	// constant or a type — never an implicit self.field — and the lowered IR matches
+	// the checked expression. An instance method, getter, or setter binds self.
+	selfType, hasSelf := self, true
+	if m.Kind == ast.MethodStatic {
+		selfType, hasSelf = ir.Invalid, false
+	}
+	method.Body = lower.Body(m.Body, bodyBinder{r: r, reg: reg, params: params, paramTypes: resolvedParams, selfType: selfType, tscope: mscope, funcs: fns, self: hasSelf})
 	return method
 }
 

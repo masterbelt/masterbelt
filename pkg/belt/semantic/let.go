@@ -275,6 +275,9 @@ func reportBareEnumMember(value ast.Expr, enumDef *ir.TypeDef, bs infer.BodyScop
 	if _, isFunc := bs.Funcs[id.Name]; isFunc {
 		return
 	}
+	if infer.IsReadableMember(bs.Reg, bs.Self, id.Name) {
+		return // a readable member of self read with self omitted: a resolved field/getter, not an enum shorthand
+	}
 	if env.q != nil && env.q.resolve(env.file, id) != nil {
 		return // a top-level constant: a legitimate reference
 	}
