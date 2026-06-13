@@ -91,5 +91,24 @@ JSON
 assert "watch, eyes present => not NO_EYES" TIMEOUT_NO_FINDINGS \
   "$(EYES_GRACE_POLLS=2 CODEX_OUTCOME_FIXTURE="$D" bash "$SUT" 43 "$SINCE" "$SHA" --watch 3 0 | sed -n 's/^OUTCOME=//p')"
 
+# an empty-body COMMENTED review with no inline comments is not an actionable finding
+D="$TMP/empty_review_body"; mk "$D"
+cat > "$D/pulls_reviews.json" <<JSON
+[{"user":{"login":"$BOT"},"state":"COMMENTED","submitted_at":"2026-06-13T03:46:39Z","body":""}]
+JSON
+assert "empty-body review => not findings" RUNNING "$(run "$D")"
+
+# an artifact created in the same wall-clock second as SINCE still counts this round
+D="$TMP/same_second"; mk "$D"
+cat > "$D/issues_reactions.json" <<JSON
+[{"user":{"login":"$BOT"},"content":"+1","created_at":"$SINCE"}]
+JSON
+assert "same-second +1 => APPROVED" APPROVED "$(run "$D")"
+
+# a reactions read error must not be read as "no eyes" and fire a false NO_EYES
+D="$TMP/rx_err_watch"; mk "$D"; echo 'ERROR' > "$D/issues_reactions.json"
+assert "watch, reactions unreadable => not NO_EYES" TIMEOUT_NO_FINDINGS \
+  "$(EYES_GRACE_POLLS=2 CODEX_OUTCOME_FIXTURE="$D" bash "$SUT" 43 "$SINCE" "$SHA" --watch 3 0 | sed -n 's/^OUTCOME=//p')"
+
 echo "---"
 [ "$fails" -eq 0 ] && { echo "all green"; exit 0; } || { echo "$fails failed"; exit 1; }

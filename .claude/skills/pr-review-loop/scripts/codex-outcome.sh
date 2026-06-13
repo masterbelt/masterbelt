@@ -43,6 +43,11 @@ WATCH=0; MAXP=20; INT=90
 if [ "${1:-}" = "--watch" ]; then WATCH=1; MAXP=${2:-20}; INT=${3:-90}; fi
 SHA9=${SHA:0:9}
 EYES_GRACE=${EYES_GRACE_POLLS:-3}  # polls to wait for 👀 before declaring the trigger missed
+# Bias the round cutoff a couple seconds earlier: GitHub timestamps are second-
+# precision, so an artifact created in the same wall-clock second the trigger was
+# recorded would be dropped by a strict ">". Prior-round artifacts are minutes old,
+# so the small backward bias cannot pull them into this round.
+SINCE_EFF=$(date -u -d "$SINCE - 2 seconds" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo "$SINCE")
 
 # fetch <api-path> <fixture-file> — echoes a JSON array; returns non-zero if the
 # source could not be read (so callers can fail closed).
@@ -74,33 +79,36 @@ probe(){
   pc=$(fetch     "repos/$REPO/pulls/$PR/comments"   pulls_comments.json)  || rc=1
   revraw=$(fetch "repos/$REPO/pulls/$PR/reviews"    pulls_reviews.json)   || rc=1
   icraw=$(fetch  "repos/$REPO/issues/$PR/comments"  issues_comments.json) || rc=1
-  # Corroboration only — its failure does not gate the decision.
-  rxraw=$(fetch  "repos/$REPO/issues/$PR/reactions" issues_reactions.json) || rxraw='[]'
+  # Reactions feed the +1 approval and the NO_EYES liveness check, so a read
+  # failure must be carried (RX_ERR), not silently read as "no reactions".
+  rxraw=$(fetch  "repos/$REPO/issues/$PR/reactions" issues_reactions.json) && RX_ERR=0 || { rxraw='[]'; RX_ERR=1; }
   PROBE_ERR=$rc
   [ -n "$pc" ]     || pc='[]'
   [ -n "$revraw" ] || revraw='[]'
   [ -n "$icraw" ]  || icraw='[]'
   [ -n "$rxraw" ]  || rxraw='[]'
   # findings: inline review comments after the trigger ...
-  F=$(printf '%s' "$pc" | jq --arg b "$BOT" --arg s "$SINCE" \
+  F=$(printf '%s' "$pc" | jq --arg b "$BOT" --arg s "$SINCE_EFF" \
         '[.[]|select(.user.login==$b and .created_at>$s)]|length')
-  # ... OR a submitted COMMENTED review after the trigger (findings can ride the
-  #     review body with no inline comments).
-  REV=$(printf '%s' "$revraw" | jq --arg b "$BOT" --arg s "$SINCE" \
-        '[.[]|select(.user.login==$b and (.submitted_at//"")>$s and .state=="COMMENTED")]|length')
+  # ... OR a submitted COMMENTED review with a NON-EMPTY body after the trigger
+  #     (findings can ride the review body with no inline comments). The body check
+  #     mirrors fetch-findings.sh, so an empty-body review never reports FINDINGS
+  #     with nothing for Stage 1 to triage.
+  REV=$(printf '%s' "$revraw" | jq --arg b "$BOT" --arg s "$SINCE_EFF" \
+        '[.[]|select(.user.login==$b and (.submitted_at//"")>$s and .state=="COMMENTED" and ((.body//"")|length>0))]|length')
   # clean verdict: the "no issues" comment, pinned to YOUR sha AND this round
   #     (created_at>$SINCE) — the only COMMIT-SCOPED approval artifact.
-  V=$(printf '%s' "$icraw" | jq --arg b "$BOT" --arg s "$SINCE" --arg sha "$SHA9" \
+  V=$(printf '%s' "$icraw" | jq --arg b "$BOT" --arg s "$SINCE_EFF" --arg sha "$SHA9" \
         '[.[]|select(.user.login==$b and .created_at>$s and (.body|test("Didn.t find any major issues")) and (.body|test($sha)))]|length')
   # a +1 after the trigger. By an explicit project decision this counts as
   #     approval (so a clean review that leaves only the reaction still converges).
   #     Reactions carry no sha, so the only guard against a prior run's late +1 is
   #     the created_at>$SINCE round scope — an accepted residual risk.
-  P=$(printf '%s' "$rxraw" | jq --arg b "$BOT" --arg s "$SINCE" \
+  P=$(printf '%s' "$rxraw" | jq --arg b "$BOT" --arg s "$SINCE_EFF" \
         '[.[]|select(.user.login==$b and .content=="+1" and .created_at>$s)]|length')
   # liveness: did the review actually start this round? An 👀 after the trigger
   #     means it started; its prolonged absence means the trigger never took.
-  EYES=$(printf '%s' "$rxraw" | jq --arg b "$BOT" --arg s "$SINCE" \
+  EYES=$(printf '%s' "$rxraw" | jq --arg b "$BOT" --arg s "$SINCE_EFF" \
         '[.[]|select(.user.login==$b and .content=="eyes" and .created_at>$s)]|length')
 }
 
@@ -111,7 +119,7 @@ decide(){
   else echo RUNNING; fi
 }
 
-line(){ echo "findings_inline=$F new_reviews=$REV clean_verdict=$V eyes=$EYES plus1=$P(corrob) err=$PROBE_ERR"; }
+line(){ echo "findings_inline=$F new_reviews=$REV clean_verdict=$V eyes=$EYES plus1=$P err=$PROBE_ERR rx_err=$RX_ERR"; }
 
 if [ "$WATCH" -eq 0 ]; then
   probe; d=$(decide)
@@ -130,7 +138,7 @@ for i in $(seq 1 "$MAXP"); do
   # Surface NO_EYES so the caller can re-post "@codex review" instead of waiting
   # out a review that never started. Only when probes are healthy — an ERROR poll
   # cannot read reactions reliably, so it keeps polling rather than misfire here.
-  if [ "$d" != ERROR ] && [ "$eyes_seen" -eq 0 ] && [ "$i" -ge "$EYES_GRACE" ]; then
+  if [ "$d" != ERROR ] && [ "${RX_ERR:-0}" -eq 0 ] && [ "$eyes_seen" -eq 0 ] && [ "$i" -ge "$EYES_GRACE" ]; then
     echo "OUTCOME=NO_EYES"; exit 0
   fi
   # ERROR or RUNNING → keep polling (a transient failure may clear next round).

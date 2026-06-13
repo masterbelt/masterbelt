@@ -123,7 +123,7 @@ scripts/codex-outcome.sh <n> "$SINCE" "$HEAD_SHA" [--watch [max_polls] [interval
 # → OUTCOME=FINDINGS | APPROVED | RUNNING | TIMEOUT_NO_FINDINGS | NO_EYES | ERROR
 ```
 
-`FINDINGS` → Stage 1; `APPROVED` → Stage 8; `NO_EYES` → **the push was never picked up** (no 👀 within the grace window), so re-post `@codex review` once and re-run the watch — do not sit out a review that never started (observed here: a push whose 👀 only landed ~18 min later); `RUNNING` / `TIMEOUT_NO_FINDINGS` → keep waiting, and on a long-stalled 👀 (review *did* start but never finished) surface it to the human — the helper never infers approval from silence, and neither should you. The snippets below are what it runs, kept here so you can read and extend it. Two rules or every probe misfires: **paginate** (`gh api --paginate … | jq -s 'add'`, since `--slurp` is rejected with `--jq`) so a later page is not hidden, and **scope to this round** — apply a `created_at > $SINCE` cutoff to *every* time-based probe (the clean verdict included, or a re-review of the same SHA matches a prior round's verdict) and additionally pin the verdict to the pushed SHA. Record `SINCE` = the moment you triggered/pushed (ISO 8601) and `HEAD_SHA` = the SHA you pushed:
+`FINDINGS` → Stage 1; `APPROVED` → Stage 8; `NO_EYES` → **the push was never picked up** (no 👀 within the grace window), so re-post `@codex review` once and re-run the watch — do not sit out a review that never started (observed here: a push whose 👀 only landed ~18 min later); `RUNNING` / `TIMEOUT_NO_FINDINGS` → keep waiting, and on a long-stalled 👀 (review *did* start but never finished) surface it to the human — the helper never infers approval from silence, and neither should you. The snippets below are what it runs, kept here so you can read and extend it. Two rules or every probe misfires: **paginate** (`gh api --paginate … | jq -s 'add'`, since `--slurp` is rejected with `--jq`) so a later page is not hidden, and **scope to this round** — apply a `created_at > $SINCE` cutoff to *every* time-based probe (the clean verdict included, or a re-review of the same SHA matches a prior round's verdict) and additionally pin the verdict to the pushed SHA. GitHub timestamps are second-precision, so bias the cutoff a couple seconds *before* the trigger — a strict `>` would otherwise drop an artifact created in the trigger's own second (the helper does this for you). Record `SINCE` = the moment you triggered/pushed (ISO 8601) and `HEAD_SHA` = the SHA you pushed:
 
 ```
 SINCE=<your trigger/push time, e.g. 2026-01-02T03:04:05Z>
@@ -134,10 +134,12 @@ BOT="chatgpt-codex-connector[bot]"
 gh api --paginate repos/<owner>/<repo>/pulls/<n>/comments \
   | jq -s --arg b "$BOT" --arg since "$SINCE" '[add[] | select(.user.login==$b and .created_at > $since)] | length'
 
-# findings (primary) — OR a submitted COMMENTED review after your trigger: Codex can put
-# findings in the review body with NO inline comments, which the probe above would miss
+# findings (primary) — OR a submitted COMMENTED review with a NON-EMPTY body after your
+# trigger: Codex can put findings in the review body with no inline comments. The body
+# check matches Stage 1's fetch, so an empty-body review never reports FINDINGS with
+# nothing for Stage 1 to triage.
 gh api --paginate repos/<owner>/<repo>/pulls/<n>/reviews \
-  | jq -s --arg b "$BOT" --arg since "$SINCE" '[add[] | select(.user.login==$b and (.submitted_at // "") > $since and .state=="COMMENTED")] | length'
+  | jq -s --arg b "$BOT" --arg since "$SINCE" '[add[] | select(.user.login==$b and (.submitted_at // "") > $since and .state=="COMMENTED" and ((.body // "")|length>0))] | length'
 
 # clean verdict (primary) — the "no issues" comment pinned to YOUR sha AND this round
 # (created_at > $SINCE), so a prior verdict for the same sha cannot false-converge; 1 ⇒ approved
