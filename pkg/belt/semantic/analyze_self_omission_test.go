@@ -229,6 +229,31 @@ func TestSelfOmissionMasterValidateBareFields(t *testing.T) {
 	}
 }
 
+// TestSelfOmissionTopLevelConstWins pins that a top-level constant wins over a
+// same-named self field — self omission is last resort, and the lowering reads
+// the constant before the self fallback, so the checker must too (it leaves the
+// name to the constant scope rather than typing it as the field). Without this
+// the checker would see the field while the lowering reads the constant — a
+// divergence that shows as a spurious type_mismatch when the types differ.
+func TestSelfOmissionTopLevelConstWins(t *testing.T) {
+	src := "const value = 5\n" +
+		"pub type Box = { value: bool } impl {\n" +
+		"  pub get v(): nint { return value }\n" +
+		"}\n" +
+		"const B: Box = { value: false }\n" +
+		"const V = B.v\n"
+	m, diags := analyze(src)
+	if hasCode(diags, CodeTypeMismatch) {
+		t.Fatalf("type_mismatch: the checker read the bool self field while the lowering read the nint const — they must agree on the const: %v", codes(diags))
+	}
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", codes(diags))
+	}
+	if ev := constEval(m, "V"); ev == nil || ev.Int.Int64() != 5 {
+		t.Fatalf("V did not fold to 5 (the top-level const wins over the self field)")
+	}
+}
+
 // methodBody returns the lowered statement body of a named method on a named
 // type — the IR the bare-read desugar produces.
 func methodBody(t *testing.T, m *ir.Module, typ, method string) []ir.Stmt {

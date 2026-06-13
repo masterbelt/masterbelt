@@ -433,10 +433,18 @@ func (s BodyScope) identifierLeaf(e *ast.Identifier) ir.Type {
 	if _, ok := s.Universe[e.Name]; ok {
 		return metatype()
 	}
+	// A top-level constant of the same name resolves through the constant scope —
+	// the lowering reads it through constRef, before the implicit-self fallback —
+	// so self omission, being last resort, does not read self.name over it. Left
+	// ir.Invalid the way a bare constant reference is here (the write-back types it
+	// from the constant), so the checker and lowering agree the name is the constant.
+	if s.ConstShadows != nil && s.ConstShadows(e) {
+		return ir.Invalid
+	}
 	// Last resort: a bare name that resolves no other way reads a readable member
 	// of self (self omitted) — power means self.power only where power is not a
-	// local, parameter, type parameter, or type. Typed exactly as the explicit
-	// self.power member read is.
+	// local, parameter, type parameter, type, or constant. Typed exactly as the
+	// explicit self.power member read is.
 	if s.Self != nil {
 		if t := memberReadType(s.registry(), s.Self, e.Name); t != ir.Invalid {
 			return t
