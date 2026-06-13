@@ -3,6 +3,7 @@ package semantic
 import (
 	"testing"
 
+	"github.com/masterbelt/masterbelt/pkg/diagnostic"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
 )
 
@@ -99,6 +100,67 @@ func TestBareMemberAssignUnknown(t *testing.T) {
 	_, diags := analyze(src)
 	if !hasCode(diags, CodeUnknownEnumMember) {
 		t.Errorf("unknown bare member in assign: want unknown_enum_member, got %v", codes(diags))
+	}
+}
+
+func TestBareMemberReturn(t *testing.T) {
+	src := bareMemberPrelude + "pub fn f(): Rarity {\n  return Legend\n}\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", codes(diags))
+	}
+	ret, ok := fnNamed(t, m, "f").Body[0].(*ir.Return)
+	if !ok || enumMemberOf(ret.Value) != "Rarity.Legend" {
+		t.Errorf("return did not resolve the bare member: %+v", ret)
+	}
+	if typ := ir.TypeOf(ret.Value); typ == nil || typ.String() != "Rarity" {
+		t.Errorf("return value's settled type = %v, want Rarity", typ)
+	}
+}
+
+func TestBareMemberReturnUnknown(t *testing.T) {
+	src := bareMemberPrelude + "pub fn f(): Rarity {\n  return Bogus\n}\n"
+	m, diags := analyze(src)
+	if !hasCode(diags, CodeUnknownEnumMember) {
+		t.Errorf("unknown bare member in return: want unknown_enum_member, got %v", codes(diags))
+	}
+	// The placeholder the lowering emitted is left a hole — no resolution filled
+	// it — so it never folds to a wrong member.
+	ret, ok := fnNamed(t, m, "f").Body[0].(*ir.Return)
+	if !ok {
+		t.Fatal("body did not lower to a return")
+	}
+	if _, isUnresolved := ret.Value.(*ir.Unresolved); !isUnresolved {
+		t.Errorf("unknown bare member should stay an unresolved hole, got %T", ret.Value)
+	}
+}
+
+func TestBareMemberEnumPositionTypeName(t *testing.T) {
+	// A bare type name or generic type parameter in an enum-expecting body
+	// position is a compile-time type value that fails its own check (a type name
+	// is a type_mismatch, a type parameter is type_param_in_value_position) —
+	// never a mistyped enum member, so it earns no unknown_enum_member. The same
+	// exemptions the const path makes, applied across the body positions that
+	// share the reporter: a return and a let annotation.
+	for _, c := range []struct {
+		name string
+		src  string
+		own  diagnostic.Code
+	}{
+		{"return type name", bareMemberPrelude + "pub fn f(): Rarity {\n  return byte\n}\n", CodeTypeMismatch},
+		{"let type name", bareMemberPrelude + "pub fn g(): Rarity {\n  let r: Rarity = byte\n  return r\n}\n", CodeTypeMismatch},
+		{"return type param", bareMemberPrelude + "pub fn h<T>(): Rarity {\n  return T\n}\n", CodeTypeParamInValuePosition},
+		{"let type param", bareMemberPrelude + "pub fn k<T>(): Rarity {\n  let r: Rarity = T\n  return r\n}\n", CodeTypeParamInValuePosition},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			_, diags := analyze(c.src)
+			if hasCode(diags, CodeUnknownEnumMember) {
+				t.Errorf("a bare type/type-param should not report unknown_enum_member, got %v", codes(diags))
+			}
+			if !hasCode(diags, c.own) {
+				t.Errorf("want the value-position diagnostic %s, got %v", c.own, codes(diags))
+			}
+		})
 	}
 }
 
@@ -244,12 +306,22 @@ func TestBareMemberAssocConstInit(t *testing.T) {
 func TestBareMemberFoldsEndToEnd(t *testing.T) {
 	src := bareMemberPrelude +
 		"pub fn pick(): Rarity {\n  let r: Rarity = Legend\n  return r\n}\n" +
+		"pub fn pickDirect(): Rarity {\n  return Legend\n}\n" +
 		"pub fn isTop(rarity: Rarity): bool {\n  return rarity == Legend\n}\n" +
 		"assert pick() == Rarity.Legend\n" +
+		"assert pickDirect() == Rarity.Legend\n" +
 		"assert isTop(Rarity.Legend)\n" +
 		"assert !isTop(Rarity.Common)\n"
-	_, diags := analyze(src)
+	m, diags := analyze(src)
 	if len(diags) != 0 {
 		t.Fatalf("end-to-end fold produced diagnostics: %v", codes(diags))
+	}
+	// The direct-return shorthand folds through the placeholder the write-back
+	// fills: every assert holds, so a body returning a bare member is foldable
+	// the same way one returning a let-bound member is.
+	for _, a := range m.Asserts {
+		if !a.Held() {
+			t.Errorf("assert did not hold (a bare-member return did not fold): %s", a.Cond)
+		}
 	}
 }

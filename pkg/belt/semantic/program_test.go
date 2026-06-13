@@ -245,6 +245,26 @@ func TestProgramAmbiguousImport(t *testing.T) {
 	assertClean(t, p, "main.belt")
 }
 
+func TestProgramAmbiguousImportEnumReturn(t *testing.T) {
+	// A bare name two wildcard imports both export, used in an enum-return
+	// position, is an ambiguous import — the real conflict — not a missing member
+	// of the result enum. The return's enum-position reporter must surface it the
+	// way the const path does, never masking it as unknown_enum_member.
+	srcs := map[string]string{
+		"a.belt":    "pub const X = 1\n",
+		"b.belt":    "pub const X = 2\n",
+		"main.belt": "use * from \"a.belt\"\nuse * from \"b.belt\"\npub enum R: byte {\n  Q = 1\n}\npub fn f(): R {\n  return X\n}\n",
+	}
+	p := buildProgram(srcs)
+	d := findDiag(t, p, "main.belt", CodeAmbiguousImport)
+	if !strings.Contains(d.Message, "X") {
+		t.Errorf("Message = %q, want it to name X", d.Message)
+	}
+	if hasCode(p.Diagnostics("main.belt"), CodeUnknownEnumMember) {
+		t.Errorf("the ambiguous import must not be masked as unknown_enum_member: [%s]", codesOf(p, "main.belt"))
+	}
+}
+
 func TestProgramCyclicModule(t *testing.T) {
 	p := buildProgram(map[string]string{
 		"a.belt": "use b from \"b.belt\"\npub const A = 1\n",

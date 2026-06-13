@@ -237,7 +237,7 @@ func Body(body []ast.Stmt, b Binder) []ir.Stmt {
 	for _, s := range body {
 		switch s := s.(type) {
 		case *ast.ReturnStmt:
-			stmts = append(stmts, &ir.Return{Value: Value(s.Value, b), Syntax: s})
+			stmts = append(stmts, &ir.Return{Value: returnValue(s.Value, b), Syntax: s})
 		case *ast.ExprStmt:
 			stmts = append(stmts, &ir.ExprStmt{Value: Value(s.X, b), Syntax: s})
 		case *ast.LetStmt:
@@ -272,6 +272,31 @@ func Body(body []ast.Stmt, b Binder) []ir.Stmt {
 		}
 	}
 	return stmts
+}
+
+// returnValue lowers a return statement's value. A bare name the binder cannot
+// resolve in this scope becomes an ir.Unresolved placeholder rather than
+// nothing: the type-blind lowering has no result-type surface, so a bare enum
+// member resolved through the declared result type (return Legend, in a fn
+// whose result is an enum) is left for the post-check write-back to fill from
+// the checker's resolution — the one position whose enum expectation the binder
+// genuinely cannot see, unlike a switch arm, a let annotation, or an operator
+// argument, each of which the lowering already resolves through an expected-enum
+// binder. (A bare member nested in a returned ternary or collection still relies
+// on that direct resolution; widening the placeholder to reach through nested
+// expressions is the next migration slice, which also streams the call-argument
+// enum resolution the operator channel uses today.) Every resolved value, and a
+// non-identifier or recovered (nil) value, lowers as before; a placeholder that
+// no resolution fills is a hole that folds to nothing, exactly as the nil it
+// replaced did.
+func returnValue(e ast.Expr, b Binder) ir.Value {
+	if v := Value(e, b); v != nil {
+		return v
+	}
+	if id, ok := e.(*ast.Identifier); ok {
+		return &ir.Unresolved{Name: id.Name, Syntax: id}
+	}
+	return nil
 }
 
 // assignStmt lowers a reassignment. A plain identifier target names the let local

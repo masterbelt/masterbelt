@@ -309,6 +309,43 @@ func TestCheckAgainstMapLiteral(t *testing.T) {
 	}
 }
 
+// TestCheckAgainstEnumShorthandStream pins that a bare member resolved through
+// an enum expectation streams its resolution (ResolvedEnumMember with the enum
+// and the member's index) — the fact the write-back fills the lowering's
+// placeholder from, for a bare member in a position the type-blind lowering
+// cannot resolve itself (a return). The member also types as the enum, and a
+// non-member name streams nothing.
+func TestCheckAgainstEnumShorthandStream(t *testing.T) {
+	env := emptyEnv()
+	rarity := &ir.TypeDef{Name: "Rarity", Enum: &ir.EnumDef{
+		Base:    "byte",
+		Members: []ir.EnumMember{{Name: "Common"}, {Name: "Rare"}, {Name: "Legend"}},
+	}}
+	want := ir.Type(&ir.Named{Def: rarity})
+
+	var gotDef *ir.TypeDef
+	gotIndex, calls := -1, 0
+	sink := &Sink{ResolvedEnumMember: func(_ ast.Expr, def *ir.TypeDef, index int) {
+		calls++
+		gotDef, gotIndex = def, index
+	}}
+
+	if got := CheckAgainst(ident("Legend"), want, env, sink); got.String() != "Rarity" {
+		t.Errorf("CheckAgainst(Legend) = %s, want Rarity", got)
+	}
+	if calls != 1 || gotDef != rarity || gotIndex != 2 {
+		t.Errorf("ResolvedEnumMember fired %d time(s) with (%v, %d), want once with (Rarity, 2)", calls, gotDef, gotIndex)
+	}
+
+	// A name that is not a member of the expected enum is no shorthand: it falls
+	// through to ordinary resolution and streams nothing.
+	calls = 0
+	CheckAgainst(ident("Nope"), want, env, sink)
+	if calls != 0 {
+		t.Errorf("ResolvedEnumMember fired %d time(s) for a non-member, want 0", calls)
+	}
+}
+
 // TestCheckAgainstNominalCollection pins that a collection literal checked
 // against a *nominal* list/map (type Names = list<string>) reaches the element
 // types through the wrapper and adapts to it — the collection twin of a record

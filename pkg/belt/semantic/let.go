@@ -288,7 +288,24 @@ func reportBareEnumMember(value ast.Expr, enumDef *ir.TypeDef, bs infer.BodyScop
 	if env.q != nil && env.q.resolve(env.file, id) != nil {
 		return // a top-level constant: a legitimate reference
 	}
+	if env.q != nil && env.q.universe(env.file)[id.Name] != nil {
+		return // a bare type name: a compile-time type value, not a mistyped member
+		// (it fails its own type check) — the same exemption the const path's
+		// reportRefIssues makes before issuing an enum-member diagnostic.
+	}
+	if _, isTypeParam := bs.TScope[id.Name]; isTypeParam {
+		return // a generic type parameter used as a value (fn f<T>(): R { return T }):
+		// it is type_param_in_value_position, the body leaf's own finding, not a
+		// mistyped member — the type-parameter twin of the type-name exemption above.
+	}
 	s := at(id)
+	// A name two wildcard imports both export is an ambiguous import, not a
+	// mistyped member: report the real conflict the way the const path's
+	// reportRefIssues does, so the enum-member report never hides it.
+	if env.q != nil && env.q.ambiguousImport(env.file, id) {
+		diags.Add(newAmbiguousImportDiagnostic(s.offset, s.width, id.Name))
+		return
+	}
 	diags.Add(newUnknownEnumMemberDiagnostic(s.offset, s.width, enumDef.Name, id.Name))
 }
 

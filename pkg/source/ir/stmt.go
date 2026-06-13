@@ -64,6 +64,7 @@ func ValueKinds() []Value {
 		&EnumMemberValue{},
 		&AssocConstValue{},
 		&TypeValue{},
+		&Unresolved{},
 	}
 }
 

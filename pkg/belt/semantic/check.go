@@ -477,6 +477,12 @@ func checkStmts(stmts []ast.Stmt, want ir.Type, bs infer.BodyScope, env exprFold
 			if noSelf != nil {
 				checkNoSelf(stmt.Value, noSelf)
 			}
+			// A bare member of the result type's enum (return Legend, in a fn whose
+			// result is an enum) resolves through the checking walk and folds; a name
+			// that is not a member is the unknown_enum_member the let and assignment
+			// positions report, not a silent hole — the return is a bare-member
+			// channel like them now that the write-back fills its placeholder.
+			reportBareEnumMember(stmt.Value, enumDefOf(want), bs, env, at, diags)
 			infer.CheckBody(stmt.Value, want, bs, sink)
 		case *ast.LetStmt:
 			bs = checkLet(stmt, bs, env, noSelf, sink, at, diags)

@@ -37,16 +37,29 @@ type callResolutions struct {
 	// with the adapted-to type — the write-back wraps each one in an explicit
 	// ir.Adapt.
 	adapts map[ast.Expr]ir.Type
+	// enumMembers accumulates the ResolvedEnumMember stream: a bare identifier
+	// the checker resolved through an enum expectation, keyed by the identifier,
+	// with the enum and the member's index — the write-back's source for filling
+	// the lowering's ir.Unresolved placeholder (a bare member in a return).
+	enumMembers map[ast.Expr]enumMember
+}
+
+// enumMember is one resolved bare-member fact: the enum and the member's index
+// within it, the EnumMemberValue the write-back rebuilds from a placeholder.
+type enumMember struct {
+	def   *ir.TypeDef
+	index int
 }
 
 func newCallResolutions() *callResolutions {
 	return &callResolutions{
-		methods: map[*ast.CallExpr]*ir.Method{},
-		statics: map[*ast.CallExpr]*ir.Method{},
-		funcs:   map[*ast.CallExpr]*ast.FuncDecl{},
-		substs:  map[*ast.CallExpr]map[string]ir.Type{},
-		types:   map[ast.Expr]ir.Type{},
-		adapts:  map[ast.Expr]ir.Type{},
+		methods:     map[*ast.CallExpr]*ir.Method{},
+		statics:     map[*ast.CallExpr]*ir.Method{},
+		funcs:       map[*ast.CallExpr]*ast.FuncDecl{},
+		substs:      map[*ast.CallExpr]map[string]ir.Type{},
+		types:       map[ast.Expr]ir.Type{},
+		adapts:      map[ast.Expr]ir.Type{},
+		enumMembers: map[ast.Expr]enumMember{},
 	}
 }
 
@@ -205,10 +218,7 @@ func (w resolutionWriter) value(v ir.Value, bd bindings) ir.Value {
 	case *ir.RecordValue:
 		w.valueRecordValue(v, bd)
 	case *ir.Conversion:
-		// Born typed: its target is its type. Only the arguments take facts.
-		for i, a := range v.Args {
-			v.Args[i] = w.value(a, bd)
-		}
+		w.valueConversion(v, bd)
 	case *ir.FieldAccess:
 		v.Type = w.res.types[v.Syntax]
 		v.Receiver = w.value(v.Receiver, bd)
@@ -229,6 +239,8 @@ func (w resolutionWriter) value(v ir.Value, bd bindings) ir.Value {
 		// capture of the enclosing scope rides along in bd).
 		v.Type = w.res.types[v.Syntax]
 		w.stmts(v.Body, lambdaBindings(bd, v))
+	case *ir.Unresolved:
+		return w.valueUnresolved(v, bd)
 	case nil:
 		// A hole in the graph (a recovered expression): nothing to bind.
 		return nil
@@ -287,6 +299,28 @@ func (w resolutionWriter) valueLeaf(v ir.Value, bd bindings) {
 		// loudly rather than publish an unannotated graph.
 		panic(fmt.Sprintf("semantic: write-back has no rule for %T", v))
 	}
+}
+
+// valueConversion is the *ir.Conversion arm of value: a conversion is born
+// typed (its target is its type), so only its arguments take facts.
+func (w resolutionWriter) valueConversion(v *ir.Conversion, bd bindings) {
+	for i, a := range v.Args {
+		v.Args[i] = w.value(a, bd)
+	}
+}
+
+// valueUnresolved is the *ir.Unresolved arm of value: it fills the placeholder
+// the type-blind lowering emitted for a bare name it could not resolve. A member
+// the checker settled through an enum expectation becomes the EnumMemberValue it
+// would have lowered to had the expectation been visible — typed and adapted
+// like any other member by recursing through value. No fact means a genuine hole
+// (an undefined name, reported at the reference): it stays a placeholder and
+// folds to nothing, as the nil it replaced did.
+func (w resolutionWriter) valueUnresolved(v *ir.Unresolved, bd bindings) ir.Value {
+	if m, ok := w.res.enumMembers[v.Syntax]; ok {
+		return w.value(&ir.EnumMemberValue{Def: m.def, Index: m.index, Syntax: v.Syntax}, bd)
+	}
+	return v
 }
 
 // valueCall is the *ir.Call arm of value: it binds the method selection, the

@@ -187,7 +187,7 @@ func graphValue(v ir.Value, ctx graphCtx) *ir.Constant {
 // every case delegates to its form's helper, so the length is the case count,
 // not control complexity (the Lexer.Next class of exception).
 //
-//nolint:funlen // a flat exhaustive dispatch over the 25 sealed Value forms:
+//nolint:funlen // a flat exhaustive dispatch over the 26 sealed Value forms:
 func graphValueRaw(v ir.Value, ctx graphCtx) *ir.Constant {
 	sub := ctx
 	sub.expectedColl = ir.CollUnknown
@@ -257,6 +257,11 @@ func graphValueRaw(v ir.Value, ctx graphCtx) *ir.Constant {
 		return graphFuncCall(v, sub)
 	case *ir.StaticCall:
 		return graphStaticCall(v, sub)
+	case *ir.Unresolved:
+		// A placeholder the write-back did not fill: a genuine hole (a name that
+		// resolved to nothing the checker could type, reported at the reference).
+		// It folds to nothing, exactly as the unresolved nil it replaced did.
+		return nil
 	case nil:
 		return nil
 	default:

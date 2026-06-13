@@ -513,7 +513,7 @@ func (*EnumMemberValue) value() {}
 // one case = one field read, so the length is the case count, not control
 // complexity (the Lexer.Next class of exception).
 //
-//nolint:funlen // a flat exhaustive dispatch over the 25 sealed Value forms:
+//nolint:funlen // a flat exhaustive dispatch over the 26 sealed Value forms:
 func TypeOf(v Value) Type {
 	switch v := v.(type) {
 	case nil:
@@ -571,6 +571,10 @@ func TypeOf(v Value) Type {
 		return v.Type
 	case *TypeValue:
 		return v.Type
+	case *Unresolved:
+		// A placeholder carries no type: it is a hole until the write-back fills
+		// it, and a hole that survives reads as untyped — never invented.
+		return nil
 	default:
 		panic(fmt.Sprintf("ir: unhandled Value kind %T", v))
 	}
@@ -586,7 +590,7 @@ func TypeOf(v Value) Type {
 // silently anchoring nowhere.
 // one case = one anchor read (the Lexer.Next class of exception).
 //
-//nolint:funlen // a flat exhaustive dispatch over the 25 sealed Value forms:
+//nolint:funlen // a flat exhaustive dispatch over the 26 sealed Value forms:
 func SyntaxOf(v Value) ast.Expr {
 	switch v := v.(type) {
 	case nil:
@@ -643,6 +647,8 @@ func SyntaxOf(v Value) ast.Expr {
 		return exprOrNil(v.Syntax)
 	case *TypeValue:
 		return v.Syntax // already the interface form; nil stays nil
+	case *Unresolved:
+		return exprOrNil(v.Syntax)
 	default:
 		panic(fmt.Sprintf("ir: unhandled Value kind %T", v))
 	}
@@ -692,3 +698,22 @@ type TypeValue struct {
 }
 
 func (*TypeValue) value() {}
+
+// Unresolved is a placeholder the type-blind lowering emits for a bare name it
+// cannot resolve in a position whose resolution needs a type the lowering does
+// not carry — a bare enum member in a return, resolved through the declared
+// result type the checker has but the binder does not. The post-check
+// write-back fills it from the checker's resolution (it becomes the
+// EnumMemberValue the checker settled), so the lowering stays type-blind and
+// the checker is the single source of truth for the type-directed reading. A
+// placeholder that survives the write-back is a genuine hole — a name that
+// resolved to nothing the checker could type, its own diagnostic reported at the
+// reference — so it folds to nothing, exactly as the unresolved nil it replaced
+// did. Name is the bare name as written; Syntax is the identifier, the
+// write-back's pairing key.
+type Unresolved struct {
+	Name   string
+	Syntax *ast.Identifier `tree:"-"`
+}
+
+func (*Unresolved) value() {}

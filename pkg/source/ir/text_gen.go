@@ -3744,6 +3744,36 @@ func (n *TypeValue) MarshalText() ([]byte, error) {
 	return w.Bytes(), nil
 }
 
+// writeUnresolved emits n's fields beneath an already-written heading line.
+func writeUnresolved(w *treetext.Writer, n *Unresolved, depth int) error {
+	w.Line(depth, "Name: "+strconv.Quote(n.Name))
+	return nil
+}
+
+// decodeUnresolved builds a Unresolved from its element.
+func decodeUnresolved(e *treetext.Element) (*Unresolved, error) {
+	if err := treetext.ExpectFields(e, "Name"); err != nil {
+		return nil, err
+	}
+	n := &Unresolved{}
+	if v, err := treetext.String(e.Fields[0]); err != nil {
+		return nil, err
+	} else {
+		n.Name = v
+	}
+	return n, nil
+}
+
+// MarshalText renders the node and its subtree in the exact text form.
+func (n *Unresolved) MarshalText() ([]byte, error) {
+	var w treetext.Writer
+	w.Line(0, "Unresolved")
+	if err := writeUnresolved(&w, n, 1); err != nil {
+		return nil, err
+	}
+	return w.Bytes(), nil
+}
+
 // writeStmtField emits one Stmt-typed field: the nil marker or the concrete
 // node behind its heading.
 func writeStmtField(w *treetext.Writer, depth int, name string, v Stmt) error {
@@ -4120,6 +4150,13 @@ func writeValueField(w *treetext.Writer, depth int, name string, v Value) error 
 		}
 		w.Line(depth, name+": TypeValue")
 		return writeTypeValue(w, n, depth+1)
+	case *Unresolved:
+		if n == nil {
+			w.Line(depth, name+": "+treetext.Nil)
+			return nil
+		}
+		w.Line(depth, name+": Unresolved")
+		return writeUnresolved(w, n, depth+1)
 	default:
 		return fmt.Errorf("treetext: field %s: unsupported Value %T", name, v)
 	}
@@ -4314,6 +4351,13 @@ func writeValueItem(w *treetext.Writer, depth int, v Value) error {
 		}
 		w.Line(depth, "TypeValue")
 		return writeTypeValue(w, n, depth+1)
+	case *Unresolved:
+		if n == nil {
+			w.Line(depth, treetext.Nil)
+			return nil
+		}
+		w.Line(depth, "Unresolved")
+		return writeUnresolved(w, n, depth+1)
 	default:
 		return fmt.Errorf("treetext: unsupported Value %T", v)
 	}
@@ -4374,6 +4418,8 @@ func decodeValue(e *treetext.Element) (Value, error) {
 		return decodeTernary(e)
 	case "TypeValue":
 		return decodeTypeValue(e)
+	case "Unresolved":
+		return decodeUnresolved(e)
 	default:
 		return nil, fmt.Errorf("treetext: line %d: %s is not a known Value", e.Line, e.Head)
 	}
@@ -4448,6 +4494,7 @@ var treeStructs = []any{
 	(*TypeDef)(nil),
 	(*TypeParam)(nil),
 	(*TypeValue)(nil),
+	(*Unresolved)(nil),
 }
 
 // writeTree dispatches a tree struct to its writer (test support); the
@@ -4619,6 +4666,9 @@ func writeTree(w *treetext.Writer, v any, depth int) (bool, error) {
 	case *TypeValue:
 		w.Line(depth, "TypeValue")
 		return true, writeTypeValue(w, n, depth+1)
+	case *Unresolved:
+		w.Line(depth, "Unresolved")
+		return true, writeUnresolved(w, n, depth+1)
 	default:
 		return false, nil
 	}
@@ -4670,4 +4720,5 @@ var treeExcluded = map[string][]string{
 	"Ternary":           {"Syntax"},
 	"TypeDef":           {"Syntax", "EnumSyntax", "InterfaceSyntax", "MasterSyntax"},
 	"TypeValue":         {"Syntax"},
+	"Unresolved":        {"Syntax"},
 }

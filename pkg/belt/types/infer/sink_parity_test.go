@@ -12,14 +12,15 @@ import (
 // explicit means a new field defaults to "is a finding" — the safe direction:
 // if it is really a stream, this set is updated deliberately.
 var streamFields = map[string]bool{
-	"Checked":        true,
-	"SolvedFuncLit":  true,
-	"ResolvedMethod": true,
-	"ResolvedStatic": true,
-	"ResolvedFunc":   true,
-	"CallSubst":      true,
-	"Typed":          true,
-	"Adapted":        true,
+	"Checked":            true,
+	"SolvedFuncLit":      true,
+	"ResolvedMethod":     true,
+	"ResolvedStatic":     true,
+	"ResolvedFunc":       true,
+	"ResolvedEnumMember": true,
+	"CallSubst":          true,
+	"Typed":              true,
+	"Adapted":            true,
 	// MetatypeSlot fires for every function literal the walk settles, not only a
 	// failing one, so it must not flip *fired (which signals a call-inference
 	// failure). It surfaces a slot diagnostic downstream for a type-value
