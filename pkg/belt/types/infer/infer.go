@@ -471,6 +471,17 @@ func memberReadType(reg *builtin.Registry, recv ir.Type, name string) ir.Type {
 	return getterType(reg, recv, name)
 }
 
+// IsReadableMember reports whether name reads one of recv's readable members — a
+// field or a getter (a method is not readable). It is the membership facet of
+// memberReadType, exported so the lowering decides a bare name's implicit-self
+// reading (the §4.1 self-omission) with the same field∪getter rule the checker's
+// body leaf uses, rather than the type-position ReadableMemberType, whose
+// bare-generic getter guard the value read does not share — keeping bare X and
+// self.X the same in every walk.
+func IsReadableMember(reg *builtin.Registry, recv ir.Type, name string) bool {
+	return recv != nil && recv != ir.Invalid && memberReadType(reg, recv, name) != ir.Invalid
+}
+
 // getterType returns the type a getter read value.name produces: the getter's
 // result, with self resolving to the receiver (a getter that returns self yields
 // the receiver's type, exactly as a self-returning method does). It is

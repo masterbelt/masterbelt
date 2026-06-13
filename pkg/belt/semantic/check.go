@@ -322,6 +322,7 @@ func checkMethodBodies(reg *builtin.Registry, defs []*ir.TypeDef, universe map[s
 	tscopeResolver := &infer.TypeResolver{Defs: universe, Qualified: qualified, Registry: reg}
 	var noSelf func(node ast.Node)
 	reportTypeParamValue := typeParamValueReporter(at, diags)
+	reportSelfMemberClash := selfMemberClashReporter(at, diags)
 	if diags != nil {
 		noSelf = func(node ast.Node) {
 			s := at(node)
@@ -350,12 +351,12 @@ func checkMethodBodies(reg *builtin.Registry, defs []*ir.TypeDef, universe map[s
 				params[p.Name] = substSelf(p.Type, self)
 			}
 			want := substSelf(irm.Result, self)
-			bs := infer.BodyScope{Reg: reg, Universe: universe, Qualified: qualified, Self: selfT, Params: params, Funcs: funcs, QualifiedFuncs: qualifiedFuncs, ConstShadows: constShadows, NamespaceShadows: nsShadows, TScope: methodTScope(tscopeResolver, def, m), ReportTypeParamValue: reportTypeParamValue}
+			bs := infer.BodyScope{Reg: reg, Universe: universe, Qualified: qualified, Self: selfT, Params: params, Funcs: funcs, QualifiedFuncs: qualifiedFuncs, ConstShadows: constShadows, NamespaceShadows: nsShadows, TScope: methodTScope(tscopeResolver, def, m), ReportTypeParamValue: reportTypeParamValue, ReportSelfMemberClash: reportSelfMemberClash}
 			checkStmts(m.Body, want, bs, env, bodyNoSelf, sink, at, diags)
 			checkBareEnumArgs(m.Body, bs, env, at, diags)
 		}
 		if def.Master != nil && def.MasterSyntax != nil {
-			bs := infer.BodyScope{Reg: reg, Universe: universe, Qualified: qualified, Self: ir.Type(self), Funcs: funcs, QualifiedFuncs: qualifiedFuncs, ConstShadows: constShadows, NamespaceShadows: nsShadows, ReportTypeParamValue: reportTypeParamValue}
+			bs := infer.BodyScope{Reg: reg, Universe: universe, Qualified: qualified, Self: ir.Type(self), Funcs: funcs, QualifiedFuncs: qualifiedFuncs, ConstShadows: constShadows, NamespaceShadows: nsShadows, ReportTypeParamValue: reportTypeParamValue, ReportSelfMemberClash: reportSelfMemberClash}
 			checkMasterValidations(def, bs, env, sink, at, diags)
 		}
 	}

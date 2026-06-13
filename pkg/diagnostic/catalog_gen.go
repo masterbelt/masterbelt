@@ -783,6 +783,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "switch needs a comparable scrutinee (" + f["typ"].String() + "); use match to branch on a record or union type"
 		}
 	},
+	"belt.semantic.self_member_name_clash": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return f["name"].String() + " は self の読めるメンバ (フィールド/getter) と同名のローカルまたはパラメータの両方に該当し曖昧です。どちらかを別名にするか self." + f["name"].String() + " と明示してください"
+		default:
+			return f["name"].String() + " names both a readable member of self (a field or getter) and a local or parameter and is ambiguous; rename one or write self." + f["name"].String()
+		}
+	},
 	"belt.semantic.self_outside_method": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":

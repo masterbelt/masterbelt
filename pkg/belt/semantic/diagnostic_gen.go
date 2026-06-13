@@ -83,6 +83,7 @@ const (
 	CodeRefinementNotConstant      diagnostic.Code = "belt.semantic.refinement_not_constant"
 	CodeRefinementViolation        diagnostic.Code = "belt.semantic.refinement_violation"
 	CodeScrutineeNotComparable     diagnostic.Code = "belt.semantic.scrutinee_not_comparable"
+	CodeSelfMemberNameClash        diagnostic.Code = "belt.semantic.self_member_name_clash"
 	CodeSelfOutsideMethod          diagnostic.Code = "belt.semantic.self_outside_method"
 	CodeStaticCollision            diagnostic.Code = "belt.semantic.static_collision"
 	CodeStaticMemberHasBody        diagnostic.Code = "belt.semantic.static_member_has_body"
@@ -1177,6 +1178,20 @@ func newScrutineeNotComparableDiagnostic(offset int, width int, typ string) diag
 		Severity: diagnostic.Error,
 		Code:     CodeScrutineeNotComparable,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeScrutineeNotComparable, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newSelfMemberNameClashDiagnostic(offset int, width int, name string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"name": diagnostic.Str(name),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeSelfMemberNameClash,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeSelfMemberNameClash, fields),
 		Fields:   fields,
 		Offset:   offset,
 		Width:    width,

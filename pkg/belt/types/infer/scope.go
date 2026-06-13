@@ -277,6 +277,17 @@ type BodyScope struct {
 	// sink-only func-literal settling pass, the effect and refinement walks),
 	// leaving the use to its prior silent reading.
 	ReportTypeParamValue func(node ast.Node, name string)
+	// ReportSelfMemberClash reports a bare name that is at once a readable member
+	// of self (a field or getter, the implicit-self read of §4.1) and a local or
+	// parameter of the same name — the ambiguity §4.1 forbids ("列名と引数名の衝突
+	// はエラー"), so the leaf resolves it to neither and reports it here rather than
+	// silently picking one. It is the self-omission twin of ReportTypeParamValue,
+	// reached only in a body with a receiver; nil in a non-reporting walk (the
+	// effect and refinement walks, the func-literal settling pass), where the leaf
+	// returns ir.Invalid for the clash without a diagnostic. A refinement predicate
+	// and a master per-row check have no parameters or locals, so the clash never
+	// arises there even when the reporter is nil.
+	ReportSelfMemberClash func(node ast.Node, name string)
 }
 
 // Body infers the type of a method-body expression: self, a parameter, a
@@ -372,12 +383,39 @@ func (s BodyScope) leaf(e ast.Expr) ir.Type {
 	case *ast.NullLit:
 		return &ir.Builtin{Name: "null"}
 	case *ast.Identifier:
-		// A let-bound local shadows a same-named parameter, so it is read first.
-		if t, ok := s.Locals[e.Name]; ok {
-			return t
+		// A bare name in a body with a receiver may read one of self's readable
+		// members — a field or getter — the implicit-self form of self.X (§4.1
+		// self omission), typed exactly as the explicit self.X member read below
+		// is. The member is "inner": it beats a type name and a top-level constant
+		// of the same name (which the leaf reads as a type value or, in lowering, a
+		// reference). It does not silently beat a local or parameter of the same
+		// name, though: that clash is the ambiguity §4.1 forbids, so it is reported
+		// and resolved to neither, rather than shadowing one with the other.
+		selfMember := ir.Invalid
+		if s.Self != nil {
+			selfMember = memberReadType(s.registry(), s.Self, e.Name)
 		}
-		if t, ok := s.Params[e.Name]; ok {
-			return t
+		_, isLocal := s.Locals[e.Name]
+		_, isParam := s.Params[e.Name]
+		if selfMember != ir.Invalid && (isLocal || isParam) {
+			if s.ReportSelfMemberClash != nil {
+				s.ReportSelfMemberClash(e, e.Name)
+			}
+			return ir.Invalid
+		}
+		// A let-bound local shadows a same-named parameter, so it is read first.
+		if isLocal {
+			return s.Locals[e.Name]
+		}
+		if isParam {
+			return s.Params[e.Name]
+		}
+		// The implicit-self member read, before the type-name and type-parameter
+		// readings below — a self field or getter wins over a same-named type (§4.1
+		// member innermost), and over the type-parameter rejection, since a real
+		// readable value is not a type parameter consumed as a value.
+		if selfMember != ir.Invalid {
+			return selfMember
 		}
 		// A generic type parameter consumed as a value (T == string, return T, or the
 		// receiver of a value read T.x reached through exprType below) is a compile-

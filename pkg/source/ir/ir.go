@@ -392,14 +392,17 @@ type LocalRef struct {
 func (*LocalRef) value() {}
 
 // FieldAccess is a record field access — or a getter read, which shares the
-// surface form: Receiver.Field. Syntax is the member expression this lowered
-// from — the settled-type write-back key and the editor's position anchor
-// only, never semantics.
+// surface form: Receiver.Field. Syntax is the expression this lowered from —
+// the settled-type write-back key and the editor's position anchor only, never
+// semantics. It is the member expression for an explicit self.field or value.field
+// read, or the bare identifier for the implicit-self read of §4.1 (power, lowered
+// to self.power), so either keys the checker's typed-value stream by the node the
+// checker streamed it under.
 type FieldAccess struct {
 	Receiver Value
 	Field    string
 	Type     Type
-	Syntax   *ast.MemberExpr `tree:"-"`
+	Syntax   ast.Expr `tree:"-"`
 }
 
 func (*FieldAccess) value() {}
@@ -623,7 +626,7 @@ func SyntaxOf(v Value) ast.Expr {
 	case *LocalRef:
 		return exprOrNil(v.Syntax)
 	case *FieldAccess:
-		return exprOrNil(v.Syntax)
+		return v.Syntax // already the interface form; nil stays nil
 	case *Conversion:
 		return exprOrNil(v.Syntax)
 	case *Await:
