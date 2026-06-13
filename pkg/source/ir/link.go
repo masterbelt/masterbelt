@@ -308,6 +308,8 @@ func (l *linker) linkBody(body []Stmt) {
 			l.linkType(&s.VarType)
 			l.linkValue(&s.Iter)
 			l.linkBody(s.Body)
+		case *AssertStmt:
+			l.linkValue(&s.Cond)
 		default:
 			panic(fmt.Sprintf("ir: link: unhandled Stmt %T", s))
 		}

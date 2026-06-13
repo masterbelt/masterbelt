@@ -1,0 +1,12 @@
+// An assert statement requires its condition to hold where it stands. Unlike a
+// top-level assert declaration — a compile-time, closed assertion folded once —
+// an assert statement is an ordinary statement: it sits in a block, and its
+// condition reads the parameters, locals, and self in scope. At this layer it
+// need only type as a bool; firing it is a run-time concern (and, for a master's
+// validate block, a per-row one). assert is a keyword in a statement position
+// just as it is at the top level.
+
+pub fn checked(x: int): int {
+  assert x >= 0
+  return x
+}

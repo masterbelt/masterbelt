@@ -68,6 +68,8 @@ func (p *parser) parseStmt() cst.Green {
 		return p.parseIfStmt()
 	case p.kind() == token.For:
 		return p.parseForStmt()
+	case p.kind() == token.Assert:
+		return p.parseAssertStmt()
 	case startsExpr(p.kind()):
 		target := p.parseExpr()
 		if p.peekSignificant() == token.Assign {
@@ -126,6 +128,27 @@ func (p *parser) parseAssignTail(target cst.Green) *cst.Node {
 		p.report(newExpectedExpressionDiagnostic(p.lastStart, 0))
 	}
 	return cst.NewNode(cst.AssignStmt, children)
+}
+
+// parseAssertStmt parses a statement-form assertion:
+//
+//	assert Expr
+//
+// Unlike the top-level AssertDecl — a compile-time, closed assertion folded once
+// — an assert statement stands inside a block and is evaluated where it runs, so
+// its condition may read the self and locals in scope (a master's validate each
+// block runs it once per row). assert is a real keyword here, so it is taken
+// directly. As elsewhere the expression is optional in the parse: a missing one
+// is reported and left absent. The cursor sits on "assert".
+func (p *parser) parseAssertStmt() *cst.Node {
+	children := []cst.Green{p.bump()} // "assert"
+	if startsExpr(p.peekSignificant()) {
+		p.skipTrivia(&children)
+		children = append(children, p.parseExpr())
+	} else {
+		p.report(newExpectedExpressionDiagnostic(p.lastStart, 0))
+	}
+	return cst.NewNode(cst.AssertStmt, children)
 }
 
 // parseIfStmt parses an if statement:

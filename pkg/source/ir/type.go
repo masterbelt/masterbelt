@@ -470,6 +470,19 @@ type ExprStmt struct {
 
 func (*ExprStmt) stmt() {}
 
+// AssertStmt is a resolved statement-form assertion: it requires Cond (a bool
+// value graph) to hold where it stands. Unlike a top-level Assert — a
+// compile-time, closed declaration folded once — an assert statement's condition
+// reads the self and locals in scope, so it is folded where it runs: per row for
+// a master's validate each block, evaluated through the interpreter against that
+// row's value.
+type AssertStmt struct {
+	Cond   Value
+	Syntax *ast.AssertStmt `tree:"-"`
+}
+
+func (*AssertStmt) stmt() {}
+
 // Let is a resolved mutable block-local binding: "let Name = Value". The slot is
 // referenced by a LocalRef and updated by an Assign. Type is the binding's
 // settled type — the annotation when written, otherwise the value's inferred
@@ -591,6 +604,8 @@ func SyntaxOfStmt(s Stmt) ast.Stmt {
 	case *If:
 		return stmtOrNil(s.Syntax)
 	case *For:
+		return stmtOrNil(s.Syntax)
+	case *AssertStmt:
 		return stmtOrNil(s.Syntax)
 	default:
 		panic(unhandledStmt(s))

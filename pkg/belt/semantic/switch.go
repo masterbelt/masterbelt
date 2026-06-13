@@ -315,7 +315,7 @@ func stmtReturns(s ast.Stmt, bs infer.BodyScope) bool {
 		// entirely, so even a body that always returns may not run. Control falls
 		// through to the statement after the loop.
 		return false
-	case *ast.LetStmt, *ast.AssignStmt, *ast.ExprStmt:
+	case *ast.LetStmt, *ast.AssignStmt, *ast.ExprStmt, *ast.AssertStmt:
 		// None of these guarantees a return: control falls through to the next
 		// statement. Listed explicitly rather than folded into a `default:
 		// return false` so a statement kind added later (one that might end a

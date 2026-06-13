@@ -19,6 +19,7 @@ func StmtKinds() []Stmt {
 		&Match{},
 		&If{},
 		&For{},
+		&AssertStmt{},
 	}
 }
 

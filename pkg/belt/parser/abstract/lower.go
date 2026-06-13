@@ -161,6 +161,14 @@ func lowerStmt(t cst.Tree, buf source.Buffer, node *cst.Node) ast.Stmt {
 		return lowerIfStmt(t, buf, node)
 	case node.Kind() == cst.ForStmt:
 		return lowerForStmt(t, buf, node)
+	case node.Kind() == cst.AssertStmt:
+		var cond ast.Expr
+		for _, child := range t.Children() {
+			if n, ok := child.Node(); ok && isExprKind(n.Kind()) {
+				cond = lowerExpr(child, buf)
+			}
+		}
+		return ast.NewAssertStmt(cond, node)
 	case isExprKind(node.Kind()):
 		return ast.NewExprStmt(lowerExpr(t, buf), node)
 	default:

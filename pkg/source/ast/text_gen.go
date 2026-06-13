@@ -52,6 +52,38 @@ func (n *AssertDecl) MarshalText() ([]byte, error) {
 	return w.Bytes(), nil
 }
 
+// writeAssertStmt emits n's fields beneath an already-written heading line.
+func writeAssertStmt(w *treetext.Writer, n *AssertStmt, depth int) error {
+	if err := writeExprField(w, depth, "Cond", n.Cond); err != nil {
+		return err
+	}
+	return nil
+}
+
+// decodeAssertStmt builds a AssertStmt from its element.
+func decodeAssertStmt(e *treetext.Element) (*AssertStmt, error) {
+	if err := treetext.ExpectFields(e, "Cond"); err != nil {
+		return nil, err
+	}
+	n := &AssertStmt{}
+	if v, err := decodeExprField(e.Fields[0]); err != nil {
+		return nil, err
+	} else {
+		n.Cond = v
+	}
+	return n, nil
+}
+
+// MarshalText renders the node and its subtree in the exact text form.
+func (n *AssertStmt) MarshalText() ([]byte, error) {
+	var w treetext.Writer
+	w.Line(0, "AssertStmt")
+	if err := writeAssertStmt(&w, n, 1); err != nil {
+		return nil, err
+	}
+	return w.Bytes(), nil
+}
+
 // writeAssignStmt emits n's fields beneath an already-written heading line.
 func writeAssignStmt(w *treetext.Writer, n *AssignStmt, depth int) error {
 	if err := writeExprField(w, depth, "Target", n.Target); err != nil {
@@ -4132,6 +4164,13 @@ func writeStmtField(w *treetext.Writer, depth int, name string, v Stmt) error {
 	case nil:
 		w.Line(depth, name+": "+treetext.Nil)
 		return nil
+	case *AssertStmt:
+		if n == nil {
+			w.Line(depth, name+": "+treetext.Nil)
+			return nil
+		}
+		w.Line(depth, name+": AssertStmt")
+		return writeAssertStmt(w, n, depth+1)
 	case *AssignStmt:
 		if n == nil {
 			w.Line(depth, name+": "+treetext.Nil)
@@ -4200,6 +4239,13 @@ func writeStmtItem(w *treetext.Writer, depth int, v Stmt) error {
 	case nil:
 		w.Line(depth, treetext.Nil)
 		return nil
+	case *AssertStmt:
+		if n == nil {
+			w.Line(depth, treetext.Nil)
+			return nil
+		}
+		w.Line(depth, "AssertStmt")
+		return writeAssertStmt(w, n, depth+1)
 	case *AssignStmt:
 		if n == nil {
 			w.Line(depth, treetext.Nil)
@@ -4264,6 +4310,8 @@ func writeStmtItem(w *treetext.Writer, depth int, v Stmt) error {
 // decodeStmt decodes an element into its Stmt implementation.
 func decodeStmt(e *treetext.Element) (Stmt, error) {
 	switch e.Head {
+	case "AssertStmt":
+		return decodeAssertStmt(e)
 	case "AssignStmt":
 		return decodeAssignStmt(e)
 	case "ExprStmt":
@@ -4423,6 +4471,7 @@ func decodeTypeExprField(f treetext.Field) (TypeExpr, error) {
 // field-sensitivity pin.
 var treeStructs = []any{
 	(*AssertDecl)(nil),
+	(*AssertStmt)(nil),
 	(*AssignStmt)(nil),
 	(*AwaitExpr)(nil),
 	(*BoolLit)(nil),
@@ -4480,6 +4529,9 @@ func writeTree(w *treetext.Writer, v any, depth int) (bool, error) {
 	case *AssertDecl:
 		w.Line(depth, "AssertDecl")
 		return true, writeAssertDecl(w, n, depth+1)
+	case *AssertStmt:
+		w.Line(depth, "AssertStmt")
+		return true, writeAssertStmt(w, n, depth+1)
 	case *AssignStmt:
 		w.Line(depth, "AssignStmt")
 		return true, writeAssignStmt(w, n, depth+1)

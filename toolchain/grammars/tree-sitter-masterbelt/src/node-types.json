@@ -142,6 +142,77 @@
     }
   },
   {
+    "type": "assert_stmt",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "await_expr",
+          "named": true
+        },
+        {
+          "type": "binary_expr",
+          "named": true
+        },
+        {
+          "type": "call_expr",
+          "named": true
+        },
+        {
+          "type": "collection_literal",
+          "named": true
+        },
+        {
+          "type": "func_literal",
+          "named": true
+        },
+        {
+          "type": "index_expr",
+          "named": true
+        },
+        {
+          "type": "literal",
+          "named": true
+        },
+        {
+          "type": "member_expr",
+          "named": true
+        },
+        {
+          "type": "paren_expr",
+          "named": true
+        },
+        {
+          "type": "range_expr",
+          "named": true
+        },
+        {
+          "type": "record_literal",
+          "named": true
+        },
+        {
+          "type": "self_expr",
+          "named": true
+        },
+        {
+          "type": "ternary_expr",
+          "named": true
+        },
+        {
+          "type": "unary_expr",
+          "named": true
+        },
+        {
+          "type": "value_ref",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "assign_stmt",
     "named": true,
     "fields": {
@@ -554,6 +625,10 @@
       "multiple": true,
       "required": false,
       "types": [
+        {
+          "type": "assert_stmt",
+          "named": true
+        },
         {
           "type": "assign_stmt",
           "named": true
@@ -2350,6 +2425,10 @@
       "required": true,
       "types": [
         {
+          "type": "assert_stmt",
+          "named": true
+        },
+        {
           "type": "assign_stmt",
           "named": true
         },
@@ -3641,6 +3720,10 @@
       "multiple": true,
       "required": true,
       "types": [
+        {
+          "type": "assert_stmt",
+          "named": true
+        },
         {
           "type": "assign_stmt",
           "named": true

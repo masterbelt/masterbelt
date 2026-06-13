@@ -109,6 +109,7 @@ const (
 	MatchArm     // MatchPattern "->" ( Stmt | Block )
 	MatchPattern // ( PrimaryType [Ident] ) | "_"  (a member type with an optional binding, or the wildcard)
 	ForStmt      // for Ident ( "of" | "in" ) Expr Block  (a collection-iteration statement)
+	AssertStmt   // assert Expr  (a statement-form assertion, evaluated where it stands — unlike the top-level AssertDecl)
 
 	// Top-level functions.
 
@@ -196,6 +197,7 @@ var kindNames = [...]string{
 	MatchArm:         "MatchArm",
 	MatchPattern:     "MatchPattern",
 	ForStmt:          "ForStmt",
+	AssertStmt:       "AssertStmt",
 	FuncDecl:         "FuncDecl",
 	UseDecl:          "UseDecl",
 	UseList:          "UseList",

@@ -1814,6 +1814,10 @@
         {
           "type": "SYMBOL",
           "name": "for_stmt"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "assert_stmt"
         }
       ]
     },
@@ -1823,6 +1827,19 @@
         {
           "type": "STRING",
           "value": "return"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "_expr"
+        }
+      ]
+    },
+    "assert_stmt": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "assert"
         },
         {
           "type": "SYMBOL",

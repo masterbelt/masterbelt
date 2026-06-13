@@ -147,10 +147,10 @@ func pushRecordBody(doc view, out map[*ast.RecordLit]ir.Type, body []ast.Stmt, r
 			// so a record literal returned from a for needs its field typing the
 			// same way a returned-from-a-branch one does.
 			pushRecordBody(doc, out, stmt.Body, result)
-		case *ast.ExprStmt, *ast.AssignStmt:
-			// Neither carries a result-typed slot for a record literal: a
-			// bare expression has no expected type to push, and an
-			// assignment's target is a let local, not a return position.
+		case *ast.ExprStmt, *ast.AssignStmt, *ast.AssertStmt:
+			// None carries a result-typed slot for a record literal: a bare
+			// expression and an assert condition have no expected type to push,
+			// and an assignment's target is a let local, not a return position.
 			// Listed so a new statement kind hits the default.
 		default:
 			panic(ast.UnhandledStmt(stmt))

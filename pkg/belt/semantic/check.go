@@ -202,6 +202,8 @@ func checkBareEnumArgs(body []ast.Stmt, bs infer.BodyScope, env exprFolder, at f
 		case *ast.ForStmt:
 			reportBareEnumArgsIn(s.Iter, bs, env, at, diags)
 			checkBareEnumArgs(s.Body, forNarrowedScope(bs, s), env, at, diags)
+		case *ast.AssertStmt:
+			reportBareEnumArgsIn(s.Cond, bs, env, at, diags)
 		default:
 			panic(ast.UnhandledStmt(stmt))
 		}
@@ -470,6 +472,8 @@ func checkStmts(stmts []ast.Stmt, want ir.Type, bs infer.BodyScope, env exprFold
 			checkIf(stmt, want, bs, env, noSelf, sink, at, diags)
 		case *ast.ForStmt:
 			checkForStmt(stmt, want, bs, env, noSelf, sink, at, diags)
+		case *ast.AssertStmt:
+			checkAssertStmt(stmt, bs, noSelf, sink, at, diags)
 		default:
 			panic(ast.UnhandledStmt(stmt))
 		}

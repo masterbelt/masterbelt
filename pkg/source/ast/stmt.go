@@ -24,6 +24,7 @@ func StmtKinds() []Stmt {
 		&MatchStmt{},
 		&IfStmt{},
 		&ForStmt{},
+		&AssertStmt{},
 	}
 }
 

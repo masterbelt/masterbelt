@@ -373,9 +373,15 @@ module.exports = grammar({
         $.switch_stmt,
         $.match_stmt,
         $.for_stmt,
+        $.assert_stmt,
       ),
 
     return_stmt: ($) => seq(kw.return, $._expr),
+
+    // A statement-form assertion: `assert Expr`. Distinct from the top-level
+    // assert_decl (a compile-time, closed assertion) — the same keyword in a
+    // statement position, its condition checked where it runs.
+    assert_stmt: ($) => seq(kw.assert, $._expr),
 
     // The `= expr` is an initializer node, as in a const declaration (the CST
     // reuses the Initializer kind here).

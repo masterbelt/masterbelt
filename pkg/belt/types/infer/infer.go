@@ -334,9 +334,9 @@ func returnedTypeIn(body []ast.Stmt, s funcScope) ir.Type {
 			// to the iter's element type, so a return that reads the variable
 			// synthesizes against it — the same scope walkFor and the IR lowering use.
 			merge(returnedTypeIn(stmt.Body, forScope(s, stmt)))
-		case *ast.ExprStmt, *ast.AssignStmt:
-			// Neither yields a return nor binds a new local that a later return
-			// reads, so neither changes the inferred result. Listed so a new
+		case *ast.ExprStmt, *ast.AssignStmt, *ast.AssertStmt:
+			// None yields a return nor binds a new local that a later return
+			// reads, so none changes the inferred result. Listed so a new
 			// statement kind hits the default instead of being silently ignored.
 		default:
 			panic(ast.UnhandledStmt(stmt))

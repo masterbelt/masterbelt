@@ -131,6 +131,14 @@ func graphStmts(body []ir.Stmt, ctx graphCtx, scope *graphScope) (*ir.Constant, 
 				continue
 			}
 			return v, out
+		case *ir.AssertStmt:
+			// Folding a body does not fire its assert statements: an assert's
+			// firing is the data layer's per-row concern (a master's validate each
+			// block folds the condition against each row directly) and the target's
+			// runtime concern, not a value the body folds to. So it neither binds
+			// nor returns — the fold continues past it, exactly as a bare
+			// expression statement does.
+			continue
 		default:
 			panic(unhandledGraphStmt(stmt))
 		}
