@@ -99,36 +99,39 @@ The PR's "unresolved conversations" count is the human's at-a-glance progress ba
 
 ## Stage 7 — Trigger if needed, then detect the outcome (no human webhook)
 
-This is the step that removes the human from the relay. The reviewer signals its state with **reactions on the PR body** (PRs live in the issues namespace) and with review comments — learn the three:
+This is the step that removes the human from the relay. **Key off Codex's first-class artifacts, not its reaction.** The reaction is the one GitHub signal that never arrives over a webhook and is cleared on merge, and Codex's own contract is "if it has suggestions it comments, *otherwise it reacts with 👍*" — so on a clean pass the 👍 may be the **only** thing it leaves (observed on this repo: a no-findings approval that posted just `+1` and no text, and reactions that were gone after merge). Anchoring convergence on that reaction is the root cause of the loop stalling. Treat the artifacts as the source of truth and the reaction as mere corroboration:
 
-- **👀 `eyes`** — the review has *started* and is running. This is **not** a verdict; keep waiting. It lands within seconds of a trigger.
-- **👍 `+1`** — *approved, no findings*. This is **convergence** → Stage 8.
-- **inline comments / a submitted review** — *findings* → back to Stage 1.
+- **findings** — new bot **inline review comments**, or a submitted **review** (state `COMMENTED`, body opening `### 💡 Codex Review`), after your push → back to Stage 1. Always first-class, always reliable.
+- **clean approval** — Codex *may* post a PR issue-comment `Codex Review: Didn't find any major issues …` carrying a `**Reviewed commit:** <sha>` line, *or* it may leave only a 👍 `+1` reaction with no text at all (both observed here). So the robust approve test is **"a review ran against the SHA I pushed and introduced no findings artifact"** (see below) — with the verdict comment / 👍 as confirmation, never as the sole gate → Stage 8.
+- **👀 `eyes`** — the review *started*: corroboration that the trigger took, **not** a verdict. Keep waiting. It lands within seconds of a trigger.
 
 Triggering — the part the earlier "never touch `@codex review`" advice got wrong:
 
 - A **fix push to an already-open PR auto-triggers** a fresh review; you normally do not comment `@codex review`.
 - But the **first review on a PR you opened yourself may not auto-start** — the "opened / ready-for-review" event is unreliable or slow here. **Post `@codex review` once** to kick it off; within seconds you should see the 👀 reaction. The same applies to any push that produces no 👀 after a few minutes — re-post `@codex review` to (re)trigger that one.
 
-Detecting the outcome: after the trigger/push, poll for the **terminal** signal — a 👍 `+1` (approve) or new comments (findings) — and treat 👀 `eyes` as "still running", never as the answer:
+Detecting the outcome: after the trigger/push, poll the **first-class artifacts**. Convergence is **"the run completed and introduced no findings artifact"**; the reaction only corroborates.
 
-Every terminal probe must do two things or it misfires: **paginate** (pipe `gh api --paginate` to `jq -s 'add'`, since `--slurp` is rejected with `--jq`) so a later page is not hidden, and **cut off by your trigger time** so a *previous* round's verdict does not count — an old `+1` would falsely converge, old comments would falsely send you back to Stage 1. Record `SINCE` = the moment you triggered/pushed (ISO 8601), and gate every decision on it:
+Every probe must do two things or it misfires: **paginate** (pipe `gh api --paginate` to `jq -s 'add'`, since `--slurp` is rejected with `--jq`) so a later page is not hidden, and **scope to this round**. For the time-based probes that means a `created_at > $SINCE` cutoff so a *previous* round's verdict does not count (old comments would falsely send you back to Stage 1). Better still, pin the clean verdict to the **SHA you actually pushed** by matching the comment's `**Reviewed commit:** <sha>` line — that ties the approval to your round more reliably than any timestamp. Record `SINCE` = the moment you triggered/pushed (ISO 8601) and `HEAD_SHA` = the SHA you pushed:
 
 ```
 SINCE=<your trigger/push time, e.g. 2026-01-02T03:04:05Z>
+HEAD_SHA=<the SHA you pushed, e.g. 9bf8482978>
 
-# convergence — a +1 from the bot newer than your trigger (never eyes, never an old +1)
-gh api --paginate repos/<owner>/<repo>/issues/<n>/reactions \
-  | jq -s --arg since "$SINCE" '[add[] | select((.user.login=="chatgpt-codex-connector[bot]") and .content=="+1" and .created_at > $since)] | length'
-
-# findings — bot inline comments newer than your trigger
+# findings (primary) — bot inline review-comments newer than your trigger; >0 ⇒ back to Stage 1
 gh api --paginate repos/<owner>/<repo>/pulls/<n>/comments \
   | jq -s --arg since "$SINCE" '[add[] | select((.user.login=="chatgpt-codex-connector[bot]") and .created_at > $since)] | length'
 
-# state, for context — the bot's reactions (eyes = running, +1 = approved)
+# clean verdict (primary) — the "no issues" comment pinned to YOUR sha; 1 ⇒ approved
+gh api --paginate repos/<owner>/<repo>/issues/<n>/comments \
+  | jq -s --arg sha "$HEAD_SHA" '[add[] | select(.user.login=="chatgpt-codex-connector[bot]" and (.body|test("Didn.t find any major issues")) and (.body|test($sha[0:9])))] | length'
+
+# corroboration only — the bot's reactions (eyes = running, +1 = approved); never the sole gate
 gh api --paginate repos/<owner>/<repo>/issues/<n>/reactions \
-  | jq -s 'add | map(select(.user.login=="chatgpt-codex-connector[bot]")) | .[] | "\(.content)\t\(.created_at)"'
+  | jq -s --arg since "$SINCE" 'add | map(select(.user.login=="chatgpt-codex-connector[bot]" and .created_at > $since)) | .[] | "\(.content)\t\(.created_at)"'
 ```
+
+Then decide: **findings > 0 → Stage 1.** Otherwise, once the run is confirmed complete — the verdict comment for your SHA appeared, *or* a 👀 was followed by a quiet window with no findings artifact — treat it as **approved → Stage 8**. Do **not** block on the 👍 existing: a clean pass has shipped here with no text and a since-cleared reaction, so "no findings artifact after a confirmed run" is the gate, not the presence of the thumbs-up.
 
 - **Poll in modest intervals**, not tightly — the verdict takes minutes (observed on this repo: the 👀 lands within seconds of the trigger, but the 👍 / comments arrive roughly 10–20 minutes later). Schedule a wake-up / background poll rather than blocking the turn. Record your trigger/push time so you only count signals newer than it.
 - **No 👀 a few minutes after your trigger means the trigger did not take** — re-post `@codex review`. A 👀 but no verdict after a generous wait is worth surfacing to the human.
@@ -146,8 +149,9 @@ When the review has converged and every gate plus CI is green:
 
 - **Being the human webhook in reverse** — fixing, pushing, and then stopping to be *told* the auto-review came. Detect it yourself: poll for the new comments or the approve reaction (Stage 7).
 - **Assuming the first review auto-starts** — relying on the "opened / ready-for-review" event to kick off the first review on a PR you opened. It is unreliable here; post `@codex review` once and watch for the 👀.
-- **Mistaking 👀 for approval** — the `eyes` reaction means the review *started*, not that it passed. Wait for 👍 `+1` (approve) or comments (findings); never converge on `eyes`.
-- **Missing the silent approve** — treating "no new comments" as "still waiting" forever. No-findings is signalled by the 👍 `+1` reaction / a comment-free review, not by a comment; poll for that signal too, or the loop never finishes.
+- **Mistaking 👀 for approval** — the `eyes` reaction means the review *started*, not that it passed. Wait for the findings artifacts or the no-findings verdict (the "Didn't find any major issues" comment, or a completed run that introduced no comment); never converge on `eyes`.
+- **Anchoring on the reaction** — making the 👍 `+1` the load-bearing approve signal. It never arrives over a webhook, clears on merge, and on a clean pass may be the only thing Codex leaves — so a loop that waits for it can stall on an approval that has already vanished. Key off the artifacts (the verdict comment pinned to your SHA, or "a confirmed run with no findings comment"); treat the 👍 as corroboration only.
+- **Missing the silent approve** — treating "no new comments" as "still waiting" forever. No-findings is signalled by the verdict comment *or* simply by a completed run that introduced no findings artifact — not necessarily by any reaction; test for that, or the loop never finishes.
 - **Fixing a misfire** because pushing back feels confrontational. Disprove it.
 - **Flip-flopping** to satisfy a self-contradicting reviewer. Escalate the contradiction (Stage 5).
 - **A fix with no gate.** The same finding returns; the loop never converges.
