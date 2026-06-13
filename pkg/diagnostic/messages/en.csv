@@ -142,3 +142,4 @@ master.option_type_mismatch,option {key} must be a {typ}
 master.duplicate_option,format {format} sets option {key} more than once
 master.duplicate_row_field,master {master} declares field {field} more than once
 master.row_validation_failed,"row {path}:{row} does not satisfy this validate each check"
+master.duplicate_primary_key,"{path}:{row},{col}: duplicate primary key {key} (first at row {first})"

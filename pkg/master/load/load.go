@@ -136,6 +136,7 @@ func readMaster(def *ir.TypeDef, doc *abstract.Document, env eval.GraphEnv, root
 		diags = append(diags, coerceDiags...)
 		diags = append(diags, checkRefinements(typed, fields, spec, env)...)
 		diags = append(diags, checkRowValidations(typed, def, doc, spec, env)...)
+		diags = append(diags, checkDuplicatePrimaryKeys(typed, def, spec)...)
 
 		loaded = append(loaded, Loaded{Master: def.Name, Display: spec.Display, Table: typed})
 	}
@@ -223,6 +224,93 @@ func rowConstant(columns []string, row master.Row) (*ir.Constant, int, bool) {
 		fields = append(fields, ir.ConstField{Name: col, Value: cell.Value})
 	}
 	return ir.RecordConstant(fields), line, true
+}
+
+// keyColumn pairs a primary-key column's name with its index in the typed
+// table — the column the key reads, named for the diagnostic.
+type keyColumn struct {
+	name  string
+	index int
+}
+
+// checkDuplicatePrimaryKeys reports a row whose primary key repeats one an
+// earlier row already carries — the duplicate that breaks the master's row
+// identity (the primary key is the row's identity, §5). It reads the key tuple of
+// each row from its primary columns, keeping the first occurrence of each as the
+// baseline and faulting every later one at its own key cell. A key cell that is a
+// coercion gap is skipped (already reported), and a primary that names a column
+// the source did not supply is left to the missing-column report rather than
+// faulted again here.
+func checkDuplicatePrimaryKeys(typed master.Table, def *ir.TypeDef, spec master.SourceSpec) []diagnostic.Diagnostic {
+	cols, ok := primaryColumns(typed.Columns, def.Master.Primary)
+	if !ok {
+		return nil
+	}
+	var diags []diagnostic.Diagnostic
+	first := make(map[string]int, len(typed.Rows))
+	for _, row := range typed.Rows {
+		key, rendered, anchor, ok := primaryKey(row, cols)
+		if !ok {
+			continue // a coercion gap in a key cell, already reported
+		}
+		if at, dup := first[key]; dup {
+			diags = append(diags, master.DuplicatePrimaryKey(spec.Offset, spec.Width, spec.Display, anchor.Row, anchor.Col, rendered, at))
+			continue
+		}
+		first[key] = anchor.Row
+	}
+	return diags
+}
+
+// primaryColumns resolves each primary-key column name to its index in the typed
+// table, in key order. It returns false when a key names a column the table does
+// not have — a missing column the coercion already reported — so the duplicate
+// check does not run on an incomplete key.
+func primaryColumns(columns []string, primary []string) ([]keyColumn, bool) {
+	if len(primary) == 0 {
+		return nil, false
+	}
+	index := make(map[string]int, len(columns))
+	for i, c := range columns {
+		index[c] = i
+	}
+	cols := make([]keyColumn, 0, len(primary))
+	for _, name := range primary {
+		i, ok := index[name]
+		if !ok {
+			return nil, false
+		}
+		cols = append(cols, keyColumn{name: name, index: i})
+	}
+	return cols, true
+}
+
+// primaryKey reads a row's primary-key tuple: a comparison key uniquely
+// determined by the cell values (the NUL-joined canonical forms — equal keys
+// share it, distinct keys do not, since each value's String is its canonical
+// text), a rendered "col=value" form for the diagnostic, and the anchor cell (the
+// first key column's, where a duplicate is faulted). It returns false when any
+// key cell is a coercion gap (a nil value), which leaves the row's identity
+// unknown and already reported.
+func primaryKey(row master.Row, cols []keyColumn) (key, rendered string, anchor master.Origin, ok bool) {
+	var keyB, renderedB strings.Builder
+	for i, c := range cols {
+		cell := row.Cells[c.index]
+		if cell.Value == nil {
+			return "", "", master.Origin{}, false
+		}
+		if i == 0 {
+			anchor = cell.Origin
+		} else {
+			keyB.WriteByte(0)
+			renderedB.WriteString(", ")
+		}
+		keyB.WriteString(cell.Value.String())
+		renderedB.WriteString(c.name)
+		renderedB.WriteByte('=')
+		renderedB.WriteString(cell.Value.String())
+	}
+	return keyB.String(), renderedB.String(), anchor, true
 }
 
 // assertSpan is the byte span of a validate check's assert statement in its .belt

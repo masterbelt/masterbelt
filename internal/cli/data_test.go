@@ -104,6 +104,19 @@ func TestDataExitsNonzeroOnRowValidation(t *testing.T) {
 	}
 }
 
+func TestDataExitsNonzeroOnDuplicatePrimaryKey(t *testing.T) {
+	// Two rows share a primary key; the data command surfaces the duplicate
+	// (pointing at its cell) and exits nonzero.
+	root := skillProject(t, "id,name,power\n1,Fireball,30\n1,Heal,12\n")
+	stdout, _, err := execData(t, root)
+	if err == nil {
+		t.Fatalf("data succeeded on a duplicate key, want an error\nstdout: %s", stdout)
+	}
+	if !strings.Contains(stdout, "data/skills.csv:3,1") {
+		t.Errorf("stdout = %q, want it to point at the duplicate key cell", stdout)
+	}
+}
+
 func TestDataReportsProjectErrors(t *testing.T) {
 	// A data run over a project that does not type-check must not report success:
 	// an unrelated semantic error fails the command, just as check would.

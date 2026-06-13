@@ -1015,6 +1015,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "format " + f["format"].String() + " sets option " + f["key"].String() + " more than once"
 		}
 	},
+	"master.duplicate_primary_key": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return f["path"].String() + ":" + f["row"].String() + "," + f["col"].String() + ": 主キー " + f["key"].String() + " が重複しています(最初の出現は行 " + f["first"].String() + ")"
+		default:
+			return f["path"].String() + ":" + f["row"].String() + "," + f["col"].String() + ": duplicate primary key " + f["key"].String() + " (first at row " + f["first"].String() + ")"
+		}
+	},
 	"master.duplicate_row_field": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":

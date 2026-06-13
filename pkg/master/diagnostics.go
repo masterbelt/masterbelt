@@ -97,3 +97,12 @@ func DuplicateRowField(offset, width int, field, master string) diagnostic.Diagn
 func RowValidationFailed(offset, width int, path string, row int) diagnostic.Diagnostic {
 	return newRowValidationFailedDiagnostic(offset, width, path, row)
 }
+
+// DuplicatePrimaryKey reports that a row's primary key repeats one an earlier row
+// already carries — the master's rows are not uniquely identified. It anchors at
+// the source declaration like the other cell diagnostics, naming the duplicate
+// cell as path:row,col (the later occurrence, the one to change — the first is
+// kept as the baseline), the repeated key value, and the first occurrence's row.
+func DuplicatePrimaryKey(offset, width int, path string, row, col int, key string, first int) diagnostic.Diagnostic {
+	return newDuplicatePrimaryKeyDiagnostic(offset, width, path, row, col, key, first)
+}

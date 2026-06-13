@@ -125,6 +125,48 @@ func TestLoadRowValidationClean(t *testing.T) {
 	}
 }
 
+func TestLoadDuplicatePrimaryKey(t *testing.T) {
+	// The third data row repeats id 1, so it is the duplicate; the diagnostic
+	// points at its key cell and names the first occurrence's row.
+	belt := "master Skill {\n  record { id: int, name: string }\n  primary id\n  source { csv \"skills.csv\" }\n}\n"
+	_, diags := run(t, belt, map[string]string{"csv": "data"}, map[string]string{
+		"data/skills.csv": "id,name\n1,Heal\n2,Fire\n1,Frost\n",
+	})
+	d := single(t, diags, master.CodeDuplicatePrimaryKey)
+	for _, frag := range []string{"data/skills.csv:4,1", "id=1", "first at row 2"} {
+		if !strings.Contains(d.Message, frag) {
+			t.Errorf("message = %q, want %q", d.Message, frag)
+		}
+	}
+}
+
+func TestLoadDuplicateCompositePrimaryKey(t *testing.T) {
+	// The third row repeats the (skill, level) = (1, 1) tuple; the diagnostic
+	// renders the whole key and anchors at the row's first key column.
+	belt := "master Upgrade {\n  record { skill: int, level: int, cost: int }\n  primary (skill, level)\n  source { csv \"u.csv\" }\n}\n"
+	_, diags := run(t, belt, map[string]string{"csv": "data"}, map[string]string{
+		"data/u.csv": "skill,level,cost\n1,1,10\n1,2,20\n1,1,30\n",
+	})
+	d := single(t, diags, master.CodeDuplicatePrimaryKey)
+	for _, frag := range []string{"data/u.csv:4,1", "skill=1, level=1", "first at row 2"} {
+		if !strings.Contains(d.Message, frag) {
+			t.Errorf("message = %q, want %q", d.Message, frag)
+		}
+	}
+}
+
+func TestLoadUniquePrimaryKeyClean(t *testing.T) {
+	// Distinct keys report nothing — the same value in a non-key column does not
+	// collide.
+	belt := "master Skill {\n  record { id: int, name: string }\n  primary id\n  source { csv \"skills.csv\" }\n}\n"
+	_, diags := run(t, belt, map[string]string{"csv": "data"}, map[string]string{
+		"data/skills.csv": "id,name\n1,Heal\n2,Heal\n",
+	})
+	if len(diags) != 0 {
+		t.Fatalf("diagnostics = %v, want none", diags)
+	}
+}
+
 func TestLoadMissingColumn(t *testing.T) {
 	_, diags := run(t, skillBelt, map[string]string{"csv": "data"}, map[string]string{
 		"data/skills.csv": "id,name\n1,Heal\n",

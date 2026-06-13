@@ -142,3 +142,4 @@ master.option_type_mismatch,error,key:string typ:string
 master.duplicate_option,error,format:string key:string
 master.duplicate_row_field,error,field:string master:string
 master.row_validation_failed,error,path:string row:int
+master.duplicate_primary_key,error,path:string row:int col:int key:string first:int
