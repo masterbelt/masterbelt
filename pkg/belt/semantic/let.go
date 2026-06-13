@@ -293,6 +293,11 @@ func reportBareEnumMember(value ast.Expr, enumDef *ir.TypeDef, bs infer.BodyScop
 		// (it fails its own type check) — the same exemption the const path's
 		// reportRefIssues makes before issuing an enum-member diagnostic.
 	}
+	if _, isTypeParam := bs.TScope[id.Name]; isTypeParam {
+		return // a generic type parameter used as a value (fn f<T>(): R { return T }):
+		// it is type_param_in_value_position, the body leaf's own finding, not a
+		// mistyped member — the type-parameter twin of the type-name exemption above.
+	}
 	s := at(id)
 	diags.Add(newUnknownEnumMemberDiagnostic(s.offset, s.width, enumDef.Name, id.Name))
 }

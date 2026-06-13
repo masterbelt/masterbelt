@@ -3,6 +3,7 @@ package semantic
 import (
 	"testing"
 
+	"github.com/masterbelt/masterbelt/pkg/diagnostic"
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
 )
 
@@ -135,25 +136,29 @@ func TestBareMemberReturnUnknown(t *testing.T) {
 }
 
 func TestBareMemberEnumPositionTypeName(t *testing.T) {
-	// A bare type name in an enum-expecting body position is a compile-time type
-	// value that fails its own type check (type_mismatch) — never a mistyped enum
-	// member, so it earns no unknown_enum_member. The same exemption the const
-	// path makes, applied across the body positions that share the reporter: a
-	// return and a let annotation.
+	// A bare type name or generic type parameter in an enum-expecting body
+	// position is a compile-time type value that fails its own check (a type name
+	// is a type_mismatch, a type parameter is type_param_in_value_position) —
+	// never a mistyped enum member, so it earns no unknown_enum_member. The same
+	// exemptions the const path makes, applied across the body positions that
+	// share the reporter: a return and a let annotation.
 	for _, c := range []struct {
 		name string
 		src  string
+		own  diagnostic.Code
 	}{
-		{"return", bareMemberPrelude + "pub fn f(): Rarity {\n  return byte\n}\n"},
-		{"let", bareMemberPrelude + "pub fn g(): Rarity {\n  let r: Rarity = byte\n  return r\n}\n"},
+		{"return type name", bareMemberPrelude + "pub fn f(): Rarity {\n  return byte\n}\n", CodeTypeMismatch},
+		{"let type name", bareMemberPrelude + "pub fn g(): Rarity {\n  let r: Rarity = byte\n  return r\n}\n", CodeTypeMismatch},
+		{"return type param", bareMemberPrelude + "pub fn h<T>(): Rarity {\n  return T\n}\n", CodeTypeParamInValuePosition},
+		{"let type param", bareMemberPrelude + "pub fn k<T>(): Rarity {\n  let r: Rarity = T\n  return r\n}\n", CodeTypeParamInValuePosition},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			_, diags := analyze(c.src)
 			if hasCode(diags, CodeUnknownEnumMember) {
-				t.Errorf("a bare type name should not report unknown_enum_member, got %v", codes(diags))
+				t.Errorf("a bare type/type-param should not report unknown_enum_member, got %v", codes(diags))
 			}
-			if !hasCode(diags, CodeTypeMismatch) {
-				t.Errorf("a bare type name in an enum position should be a type mismatch, got %v", codes(diags))
+			if !hasCode(diags, c.own) {
+				t.Errorf("want the value-position diagnostic %s, got %v", c.own, codes(diags))
 			}
 		})
 	}
