@@ -23,11 +23,17 @@ The point is the triage and the escalation, not the mechanics. Three things make
 
 ## Stage 1 — Fetch the current review, fresh
 
-Pull the inline comments (the substance — the review *body* is usually boilerplate). **Paginate**, or on a multi-page PR you see only the first page and can miss fresh findings (and Stage 7 can falsely declare convergence). `gh api`'s own `--slurp` is rejected together with `--jq`, so paginate and merge the pages through an external `jq -s 'add'` before sorting:
+Pull the inline comments (the usual substance) **and** the submitted review *bodies*. The inline comments are where findings normally live, but Codex can also post a finding in the review body with no inline comment — Stage 7 detects that as `FINDINGS`, so a comments-only fetch would bounce you back here with nothing to triage and the loop would spin. **Paginate** both, or on a multi-page PR you see only the first page and can miss fresh findings (and Stage 7 can falsely declare convergence). `gh api`'s own `--slurp` is rejected together with `--jq`, so paginate and merge the pages through an external `jq -s 'add'` before sorting:
 
 ```
+# inline review comments (the usual substance)
 gh api --paginate repos/<owner>/<repo>/pulls/<n>/comments \
   | jq -s 'add | sort_by(.created_at) | reverse | .[] | "ID:\(.id)|\(.user.login)|\(.path):\(.line // .original_line)|\(.original_commit_id[0:9])|\(.created_at)\nIN_REPLY_TO:\(.in_reply_to_id // "none")\n\(.body)\n==="'
+
+# submitted review BODIES from the bot, scoped to this round — catches a finding
+# that rides the review body with no inline comment (else FINDINGS → Stage 1 spins)
+gh api --paginate repos/<owner>/<repo>/pulls/<n>/reviews \
+  | jq -s --arg b "chatgpt-codex-connector[bot]" --arg since "$SINCE" 'add | map(select(.user.login==$b and .state=="COMMENTED" and (.submitted_at // "") > $since and (.body|length>0))) | .[] | "REVIEW:\(.submitted_at)\n\(.body)\n==="'
 ```
 
 - Process only comments **from the reviewer** that you have **not addressed yet**. Decide "mine vs the bot's" by the comment's author (`user.login`), **not** by `in_reply_to_id`: the reviewer can post a *fresh finding* as a reply inside an existing thread, so it carries `in_reply_to_id` too — skipping every reply with that field set would silently drop it. A comment is "already handled" only when *you* authored it or its id is in the set you have already addressed.
@@ -79,7 +85,7 @@ gh api repos/<owner>/<repo>/pulls/<n>/comments/<comment-id>/replies \
 
 A reply per comment is what lets the reviewer (and the human) see the loop is actually closing, not stalling.
 
-- **Resolve the thread once it is handled** — a reply is not the same as resolving, and an open thread reads as "still outstanding". After you have *fixed* or *disproven* a finding, mark its review thread resolved (leave a thread you escalated to the human open — that one is theirs to close). Resolving is a GraphQL mutation keyed by the thread id, so map the comment you addressed to its thread, then resolve. Two traps: a finding posted as a *reply* is **not** the thread's first comment, so match against **any** comment's `databaseId`; and the threads connection is paginated, so follow `pageInfo` (`gh api graphql --paginate` does this when the query carries `$endCursor` and `pageInfo{ hasNextPage endCursor }`):
+- **Resolve the thread once it is handled** — a reply is not the same as resolving, and an open thread reads as "still outstanding" and **keeps the PR from going merge-ready**, so you must resolve, not just reply. After you have *fixed* or *disproven* a finding, mark its review thread resolved (leave a thread you escalated to the human open — that one is theirs to close). Resolving is a GraphQL mutation keyed by the thread id, so map the comment you addressed to its thread, then resolve. Heads-up: resolving the *bot's* thread is a separate external write, so an automated-permission mode may gate it independently of your replies — if it gets denied, surface it so the human can authorize it or add a permission rule (e.g. allow the `resolveReviewThread` mutation); do not treat the denial as "resolving is optional". Two traps: a finding posted as a *reply* is **not** the thread's first comment, so match against **any** comment's `databaseId`; and the threads connection is paginated, so follow `pageInfo` (`gh api graphql --paginate` does this when the query carries `$endCursor` and `pageInfo{ hasNextPage endCursor }`):
 
 ```
 # every unresolved thread, paged, with ALL of its comment ids
@@ -102,7 +108,7 @@ The PR's "unresolved conversations" count is the human's at-a-glance progress ba
 This is the step that removes the human from the relay. **Key off Codex's first-class artifacts, not its reaction.** The reaction is the one GitHub signal that never arrives over a webhook and is cleared on merge, and Codex's own contract is "if it has suggestions it comments, *otherwise it reacts with 👍*" — so on a clean pass the 👍 may be the **only** thing it leaves (observed on this repo: a no-findings approval that posted just `+1` and no text, and reactions that were gone after merge). Anchoring convergence on that reaction is the root cause of the loop stalling. Treat the artifacts as the source of truth and the reaction as mere corroboration:
 
 - **findings** — new bot **inline review comments**, or a submitted **review** (state `COMMENTED`, body opening `### 💡 Codex Review`), after your push → back to Stage 1. Always first-class, always reliable.
-- **clean approval** — Codex *may* post a PR issue-comment `Codex Review: Didn't find any major issues …` carrying a `**Reviewed commit:** <sha>` line, *or* it may leave only a 👍 `+1` reaction with no text at all (both observed here). Approve on a **positive artifact scoped to your round** — that verdict comment for your SHA, or the `+1` after your trigger — never on the mere *absence* of findings, which cannot tell "passed" from "still running" → Stage 8.
+- **clean approval** — Codex *may* post a PR issue-comment `Codex Review: Didn't find any major issues …` carrying a `**Reviewed commit:** <sha>` line, *or* it may leave only a 👍 `+1` reaction with no text at all (both observed here). Approve **only on that commit-scoped verdict comment for your SHA** (posted after your trigger). The `+1` is *corroboration only* — it carries no commit, so a slow prior run's `+1` can land after your new trigger and "approve" the wrong HEAD; never gate on it, and never approve on the mere *absence* of findings, which cannot tell "passed" from "still running" → Stage 8.
 - **👀 `eyes`** — the review *started*: corroboration that the trigger took, **not** a verdict. Keep waiting. It lands within seconds of a trigger.
 
 Triggering — the part the earlier "never touch `@codex review`" advice got wrong:
@@ -114,7 +120,7 @@ Detecting the outcome: after the trigger/push, run the bundled helper instead of
 
 ```
 scripts/codex-outcome.sh <n> "$SINCE" "$HEAD_SHA" [--watch [max_polls] [interval_sec]]
-# → OUTCOME=FINDINGS | APPROVED | RUNNING | TIMEOUT_NO_FINDINGS
+# → OUTCOME=FINDINGS | APPROVED | RUNNING | TIMEOUT_NO_FINDINGS | ERROR
 ```
 
 `FINDINGS` → Stage 1; `APPROVED` → Stage 8; `RUNNING` / `TIMEOUT_NO_FINDINGS` → keep waiting, and on a long-stalled 👀 surface it to the human — the helper never infers approval from silence, and neither should you. The snippets below are what it runs, kept here so you can read and extend it. Two rules or every probe misfires: **paginate** (`gh api --paginate … | jq -s 'add'`, since `--slurp` is rejected with `--jq`) so a later page is not hidden, and **scope to this round** — apply a `created_at > $SINCE` cutoff to *every* time-based probe (the clean verdict included, or a re-review of the same SHA matches a prior round's verdict) and additionally pin the verdict to the pushed SHA. Record `SINCE` = the moment you triggered/pushed (ISO 8601) and `HEAD_SHA` = the SHA you pushed:
@@ -143,11 +149,11 @@ gh api --paginate repos/<owner>/<repo>/issues/<n>/reactions \
   | jq -s --arg b "$BOT" --arg since "$SINCE" 'add | map(select(.user.login==$b and .created_at > $since)) | .[] | "\(.content)\t\(.created_at)"'
 ```
 
-Then decide: **any findings probe > 0 → Stage 1.** Approve **only on a positive artifact** — the verdict comment for your SHA, a `+1` after your trigger, or a fresh review that added no actionable comment — never on silence. A 👀 with nothing after it means the review is still running or has stalled, **not** that it passed: keep polling, and after a generous wait surface it to the human, because delayed findings still arrive. The 👍 is corroboration and clears on merge, so you poll it as one positive signal among several during the loop — you never *wait on it alone*, and you never treat 👀 as the verdict.
+Then decide: **any findings probe > 0 → Stage 1.** Approve **only on the commit-scoped verdict comment for your SHA** (the helper's `APPROVED`) — it is the one positive artifact that pins the pass to *your* HEAD. The `+1` is corroboration: it carries no commit, so a slow prior run's `+1` can land after your trigger and "approve" the wrong HEAD; never gate on it, and never approve on silence. A 👀 with nothing after it means the review is still running or has stalled, **not** that it passed: keep polling, and after a generous wait surface it to the human, because delayed findings still arrive. And **fail closed** — if a findings source cannot be read (a transient `gh`/API failure → the helper's `ERROR`), retry; never read an unread source as "no findings".
 
 - **Poll in modest intervals**, not tightly — the verdict takes minutes (observed on this repo: the 👀 lands within seconds of the trigger, but the 👍 / comments arrive roughly 10–20 minutes later). Schedule a wake-up / background poll rather than blocking the turn. Record your trigger/push time so you only count signals newer than it.
 - **No 👀 a few minutes after your trigger means the trigger did not take** — re-post `@codex review`. A 👀 but no verdict after a generous wait is worth surfacing to the human.
-- **A findings-free review counts as approval too** — if a new bot review lands with no new inline comments and no unresolved threads, treat it as the approve signal even if you did not catch the reaction (reactions can be cleared, e.g. on merge). The robust test for convergence is "a fresh review happened and it introduced no actionable comment."
+- **Convergence is the commit-scoped verdict, not a quiet reaction** — a clean pass is the "Didn't find any major issues" comment for *your* SHA (the helper's `APPROVED`). Reactions clear on merge and a `+1` carries no commit, so never converge on a reaction alone; if that verdict comment never lands but everything is quiet, that is a stall to surface to the human, not an approval.
 - **Non-convergence guard:** if the loop keeps surfacing *new substantive* issues after several rounds, or the same finding keeps coming back, that is itself a signal — pause and summarize to the human rather than grinding. A reviewer can also drift into self-contradiction or nits; recognising "this has converged enough" or "this needs a human" is part of the skill.
 
 ## Stage 8 — Finish
@@ -159,15 +165,15 @@ When the review has converged and every gate plus CI is green:
 
 ## Anti-patterns
 
-- **Being the human webhook in reverse** — fixing, pushing, and then stopping to be *told* the auto-review came. Detect it yourself: poll for the new comments or the approve reaction (Stage 7).
+- **Being the human webhook in reverse** — fixing, pushing, and then stopping to be *told* the auto-review came. Detect it yourself: poll for the new comments or the verdict (Stage 7).
 - **Assuming the first review auto-starts** — relying on the "opened / ready-for-review" event to kick off the first review on a PR you opened. It is unreliable here; post `@codex review` once and watch for the 👀.
-- **Mistaking 👀 for approval** — the `eyes` reaction means the review *started*, not that it passed. Wait for the findings artifacts or a positive approval signal (the "Didn't find any major issues" comment for your SHA, or the `+1`); never converge on `eyes`.
-- **Approving on silence** — inferring a pass from "no findings yet" while a 👀 has landed but nothing terminal has. That cannot tell "approved" from "still running", and delayed findings still arrive: wait for a positive artifact (the verdict comment for your SHA, or the `+1`), and surface a long-stalled 👀 to the human. The 👍 is a fine positive signal to poll — just never treat 👀 as the verdict, and don't expect any reaction to survive merge.
+- **Mistaking 👀 for approval** — the `eyes` reaction means the review *started*, not that it passed. Wait for the findings artifacts or the commit-scoped verdict (the "Didn't find any major issues" comment for your SHA); never converge on `eyes`.
+- **Approving on silence or a bare reaction** — inferring a pass from "no findings yet" while a 👀 has landed but nothing terminal has, or from a lone `+1`. Silence cannot tell "approved" from "still running" (delayed findings still arrive), and the `+1` carries no commit — a slow prior run's `+1` can land after your trigger and "approve" the wrong HEAD. Wait for the commit-scoped verdict comment for your SHA; treat 👀/👍 as corroboration only, surface a long-stalled review to the human, and expect no reaction to survive merge.
 - **Probing only inline comments for findings** — Codex can post a finding as a `COMMENTED` review *body* with no inline comment; an inline-only probe reports zero and the loop false-approves. Probe `/pulls/<n>/reviews` too, scoped to your trigger (the helper does both).
 - **Fixing a misfire** because pushing back feels confrontational. Disprove it.
 - **Flip-flopping** to satisfy a self-contradicting reviewer. Escalate the contradiction (Stage 5).
 - **A fix with no gate.** The same finding returns; the loop never converges.
-- **Replying but not resolving.** An answered-but-open thread reads as outstanding and hides your progress; resolve every thread you fixed or disproved (leave only the escalated ones open).
+- **Replying but not resolving.** A reply is not a resolve: an answered-but-open thread reads as outstanding, hides your progress, and keeps the PR from going merge-ready. Resolve every thread you fixed or disproved (leave only the escalated ones open). The resolve is a *separate* write on the bot's thread that an automated-permission mode can gate on its own — if it is blocked, that is a permissions rule to add, not a step to skip.
 - **Reading only the first REST page.** Without pagination you miss findings or the approval on a later page; `gh api --paginate … | jq -s 'add | …'` (gh's `--slurp` is rejected with `--jq`).
 - **Force-pushing** a reviewed branch, or squashing mid-review.
 - **Plan/section refs in commit messages or code comments.** State the concept.
