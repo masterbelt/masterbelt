@@ -71,6 +71,32 @@ func TestVCSStamp(t *testing.T) {
 	}
 }
 
+// A stable release build stamps Stable with the tag it was cut from, and the
+// binary then names that exact version on the stable channel — overriding the
+// rolling commit-dated line even when the build still carries VCS facts.
+func TestStableRelease(t *testing.T) {
+	defer func(s string) { Stable = s }(Stable)
+	defer func(p, c, d string) { Patch, Commit, Date = p, c, d }(Patch, Commit, Date)
+	// A nightly-style override is present, but the stable stamp wins.
+	Patch, Commit, Date = "20260608", "dfbe69acc6163073", "2026-06-08T15:48:31+09:00"
+	Stable = "0.1.1"
+
+	if got := String(); got != "0.1.1" {
+		t.Errorf("String() = %q, want 0.1.1", got)
+	}
+	if got := Channel(); got != "stable" {
+		t.Errorf("Channel() = %q, want stable", got)
+	}
+	g := Get()
+	if g.Version != "0.1.1" || g.Channel != "stable" {
+		t.Errorf("Get() identity = %+v, want version 0.1.1 on the stable channel", g)
+	}
+	// The commit and date still come from the build the release was cut from.
+	if g.Commit != "dfbe69acc6163073" || g.Date == "" {
+		t.Errorf("Get() dropped the build facts: %+v", g)
+	}
+}
+
 // The override variables take precedence over the build info and assemble the
 // whole identity — what a build with no VCS information of its own would stamp.
 func TestInjectedOverride(t *testing.T) {

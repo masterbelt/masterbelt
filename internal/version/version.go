@@ -39,6 +39,14 @@ var (
 	Date   string // the commit date in RFC3339
 )
 
+// Stable is the semantic version a stable release build reports. The release
+// workflow stamps it with the tag the build was cut from
+// (-ldflags -X github.com/masterbelt/masterbelt/internal/version.Stable=X.Y.Z),
+// so the binary names that exact version on the stable channel. Every other
+// build — the nightly, a local `make dist` — leaves it empty and reports the
+// rolling commit-dated line derived from Line instead.
+var Stable string
+
 // shortSHA is how many leading hex characters of the commit the version string
 // carries as build metadata.
 const shortSHA = 7
@@ -161,16 +169,29 @@ func isHex(s string) bool {
 	return true
 }
 
+// identity resolves the build's version string and channel together with the
+// commit and date behind them. A stable release build (Stable stamped in) names
+// that version verbatim; every other build reports the rolling line resolve
+// derives from the commit.
+func identity() (ver, channel, commit, date string) {
+	var patch string
+	patch, commit, date = resolve()
+	if Stable != "" {
+		return Stable, "stable", commit, date
+	}
+	return format(patch, commit), channelFor(patch), commit, date
+}
+
 // String returns the build's version string.
 func String() string {
-	patch, commit, _ := resolve()
-	return format(patch, commit)
+	ver, _, _, _ := identity()
+	return ver
 }
 
 // Channel returns the build's release channel: "dev", "nightly", or "stable".
 func Channel() string {
-	patch, _, _ := resolve()
-	return channelFor(patch)
+	_, channel, _, _ := identity()
+	return channel
 }
 
 // Info is the full build identity, the shape `version --format=json` and any
@@ -188,10 +209,10 @@ type Info struct {
 // Get returns the build identity: the version facts plus the Go toolchain and
 // target this binary was built for.
 func Get() Info {
-	patch, commit, date := resolve()
+	ver, channel, commit, date := identity()
 	return Info{
-		Version: format(patch, commit),
-		Channel: channelFor(patch),
+		Version: ver,
+		Channel: channel,
 		Commit:  commit,
 		Date:    date,
 		Go:      runtime.Version(),

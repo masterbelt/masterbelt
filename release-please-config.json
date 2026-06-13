@@ -7,9 +7,6 @@
       "changelog-path": "CHANGELOG.md",
       "include-component-in-tag": false,
       "tag-separator": "",
-      "extra-files": [
-        "VERSION"
-      ],
       "changelog-sections": [
         {
           "type": "feat",

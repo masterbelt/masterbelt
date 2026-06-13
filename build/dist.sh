@@ -31,10 +31,21 @@ export SOURCE_DATE_EPOCH CGO_ENABLED=0
 build_flags="-trimpath -buildvcs=true"
 ldflags="-s -w -buildid="
 
+# A stable release build stamps the release version (the tag it is cut from,
+# passed in as STABLE_VERSION) into the binary, so it reports that exact semver
+# on the stable channel instead of the rolling commit-dated line. An ordinary
+# build — the nightly, a local `make dist` — leaves STABLE_VERSION unset and
+# keeps the commit-derived version. The stamp is a constant, so the build stays
+# reproducible.
+if [ -n "${STABLE_VERSION:-}" ]; then
+	ldflags="$ldflags -X github.com/masterbelt/masterbelt/internal/version.Stable=${STABLE_VERSION}"
+fi
+
 # The version the binary reports: build it natively so we can run it, then write
-# the string to a VERSION file beside the archives (below). It is commit-derived,
-# so identical across targets; keeping it out of the archive names is what makes
-# a download URL deterministic — the names are masterbelt-<os>-<arch>.tar.gz.
+# the string to a VERSION file beside the archives (below). It is commit-derived
+# (or the stable stamp above), so identical across targets; keeping it out of the
+# archive names is what makes a download URL deterministic — the names are
+# masterbelt-<os>-<arch>.tar.gz.
 native="$(mktemp -d)"
 # shellcheck disable=SC2086
 go build $build_flags -ldflags "$ldflags" -o "$native/masterbelt" ./cmd/masterbelt
