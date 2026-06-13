@@ -76,20 +76,8 @@ func checkTypeAgainst(e ast.Expr, want ir.Type, s scope, subst map[string]ir.Typ
 	}
 	want = types.Substitute(want, subst) // pin what the context already solved
 	sink.checked(e, want)
-	// A bare member resolves through an enum expectation (const Top: Rarity =
-	// Legend), including a union that carries the enum (const x: R | error =
-	// Legend): when e is a bare identifier naming a member of the expected enum,
-	// the expression is that enum. A bare name that is not a member falls through
-	// to ordinary identifier resolution (an undefined name).
-	if id, ok := e.(*ast.Identifier); ok {
-		if member := enumMemberExpectation(want, id.Name); member != nil {
-			// A member under a union expectation (R | error) flows into the
-			// union — an adaption the IR makes explicit.
-			if !types.Identical(member, want) {
-				sink.adapted(e, want)
-			}
-			return member
-		}
+	if t, ok := checkEnumShorthand(e, want, s, sink); ok {
+		return t
 	}
 	switch e := e.(type) {
 	case *ast.AwaitExpr:
@@ -142,6 +130,34 @@ func checkTypeAgainst(e ast.Expr, want ir.Type, s scope, subst map[string]ir.Typ
 		}
 		return got
 	}
+}
+
+// checkEnumShorthand types a bare member resolved through an enum expectation
+// (const Top: Rarity = Legend), including a union that carries the enum (const x:
+// R | error = Legend): when e is a bare identifier naming a member of the expected
+// enum, the expression is that enum, and a member under a union expectation flows
+// into the union (an adaption the IR makes explicit). ok is false when e is not
+// such a shorthand, leaving the caller's ordinary synthesis (an undefined name).
+// A name that is also a readable member of self is ambiguous between the shorthand
+// and the implicit self read; it is reported as a clash and ok stays true, since
+// the shorthand reading is the one consumed here.
+func checkEnumShorthand(e ast.Expr, want ir.Type, s scope, sink *Sink) (ir.Type, bool) {
+	id, ok := e.(*ast.Identifier)
+	if !ok {
+		return ir.Invalid, false
+	}
+	member := enumMemberExpectation(want, id.Name)
+	if member == nil {
+		return ir.Invalid, false
+	}
+	if selfMemberClash(s, id.Name) {
+		s.reportSelfMemberClash(id, id.Name)
+		return ir.Invalid, true
+	}
+	if !types.Identical(member, want) {
+		sink.adapted(e, want)
+	}
+	return member, true
 }
 
 // checkRecordAgainst checks a record literal against an expected type. The

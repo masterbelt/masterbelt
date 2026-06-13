@@ -260,6 +260,72 @@ func TestSelfMemberNameClashLambdaParam(t *testing.T) {
 	}
 }
 
+// TestSelfMemberNameClashEnumShorthand pins that a bare name that is both a
+// readable member of self and a valid enum shorthand (against the expected type)
+// is a clash, not silently the enum member: the checker would otherwise accept the
+// enum member while the implicit-self read sees the field, a silent divergence.
+func TestSelfMemberNameClashEnumShorthand(t *testing.T) {
+	src := "pub enum Rarity { Rare }\n" +
+		"pub type Card = { Rare: bool } impl {\n" +
+		"  pub pick(): Rarity {\n    return Rare\n  }\n" +
+		"}\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeSelfMemberNameClash) {
+		t.Fatalf("want self_member_name_clash (Rare is both a self field and an enum shorthand), got %v", codes(diags))
+	}
+}
+
+// TestSelfMemberNameClashCallableFieldAndMethod pins that a bare callee that is
+// both a function-valued readable member of self and a method of self is a clash:
+// applying the field value or the implicit self-method call would otherwise differ
+// silently between the checker and the lowering.
+func TestSelfMemberNameClashCallableFieldAndMethod(t *testing.T) {
+	src := "pub type Box = { f: fn(): nint } impl {\n" +
+		"  pub f(): nint { return 9 }\n" +
+		"  pub call(): nint { return f() }\n" +
+		"}\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeSelfMemberNameClash) {
+		t.Fatalf("want self_member_name_clash (f is both a function-valued field and a method), got %v", codes(diags))
+	}
+}
+
+// TestSelfMemberNameClashTypeMemberReceiver pins that a member-access receiver
+// that is both a readable member of self and a type name is a clash: reading
+// Item.Max as the type's associated constant or as self.Item.Max would otherwise
+// be silently ambiguous.
+func TestSelfMemberNameClashTypeMemberReceiver(t *testing.T) {
+	src := "pub type Item = nint impl { pub const Max = 100 }\n" +
+		"pub type Holder = { Item: Item } impl {\n" +
+		"  pub peek(): nint { return Item.Max }\n" +
+		"}\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeSelfMemberNameClash) {
+		t.Fatalf("want self_member_name_clash (Item is both a self field and a type with member Max), got %v", codes(diags))
+	}
+}
+
+// TestSelfOmissionEnumShorthandMatchesExplicit pins that a bare enum-typed self
+// field used in a comparison behaves exactly as the explicit self. form — both
+// type-check the same way, so self omission stays additive. (Folding such a
+// comparison through a member receiver is a separate, pre-existing concern that
+// affects the explicit self. form identically and is out of this scope.)
+func TestSelfOmissionEnumShorthandMatchesExplicit(t *testing.T) {
+	bareSrc := "pub enum Rarity { Common, Rare }\n" +
+		"pub type Card = { rarity: Rarity } impl {\n  pub isRare(): bool {\n    return rarity == Rare\n  }\n}\n"
+	explicitSrc := "pub enum Rarity { Common, Rare }\n" +
+		"pub type Card = { rarity: Rarity } impl {\n  pub isRare(): bool {\n    return self.rarity == Rare\n  }\n}\n"
+	_, bareDiags := analyze(bareSrc)
+	_, explicitDiags := analyze(explicitSrc)
+	if hasCode(bareDiags, CodeSelfMemberNameClash) {
+		t.Fatalf("bare rarity == Rare should not clash (rarity is the field, Rare the enum shorthand): %v", codes(bareDiags))
+	}
+	// Neither form reports a type error on Rare; they resolve it the same way.
+	if hasCode(bareDiags, CodeUnknownEnumMember) != hasCode(explicitDiags, CodeUnknownEnumMember) {
+		t.Fatalf("bare and explicit disagree on Rare resolution: bare=%v explicit=%v", codes(bareDiags), codes(explicitDiags))
+	}
+}
+
 // methodBody returns the lowered statement body of a named method on a named
 // type — the IR the bare-read desugar produces.
 func methodBody(t *testing.T, m *ir.Module, typ, method string) []ir.Stmt {

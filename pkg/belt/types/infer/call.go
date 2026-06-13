@@ -72,6 +72,17 @@ func nonMemberCallType(e *ast.CallExpr, s scope, sink *Sink) ir.Type {
 			return funcCallType(e, id.Name, cands, s, sink)
 		}
 	}
+	// A bare callee that is both a readable member of self (a function-valued field
+	// or getter) and a method of self is ambiguous: applying the field value (the
+	// implicit self read) or the implicit self-method call. Report the clash rather
+	// than silently taking one — the checker would read the field, the lowering the
+	// method — so the author writes self.name() or self.name(...) to disambiguate.
+	if id, isIdent := e.Callee.(*ast.Identifier); isIdent && selfMemberClash(s, id.Name) {
+		if _, _, found := types.Candidates(s.registry(), s.self(), id.Name); found {
+			s.reportSelfMemberClash(id, id.Name)
+			return ir.Invalid
+		}
+	}
 	// A callee that itself types as a function value applies — a
 	// function-typed constant (F(2)), a local or parameter bound to one,
 	// an immediately applied literal — mirroring the folder's general
