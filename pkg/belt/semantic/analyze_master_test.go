@@ -227,6 +227,39 @@ func TestMasterDuplicatePrimaryKey(t *testing.T) {
 	}
 }
 
+// TestMasterValidateRejectsNonAssert pins that a validate each block holds only
+// assert statements: a let (or any non-assert) is reported rather than carried
+// and silently dropped from the per-row fold, where its local would leave the
+// assertion unfoldable and fail every row.
+func TestMasterValidateRejectsNonAssert(t *testing.T) {
+	src := "master M {\n  record { id: int }\n  primary id\n  validate {\n    each {\n      let x = 1\n      assert self.id > x\n    }\n  }\n}\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeMasterValidateNotAssert) {
+		t.Fatalf("want master_validate_not_assert, got %v", codes(diags))
+	}
+}
+
+// TestMasterValidateAcceptsAsserts pins the clean case: a validate each block of
+// only assert statements resolves without the not-assert diagnostic.
+func TestMasterValidateAcceptsAsserts(t *testing.T) {
+	src := "master M {\n  record { id: int, cost: int }\n  primary id\n  validate {\n    each {\n      assert self.id > 0\n      assert self.cost >= 0\n    }\n  }\n}\n"
+	_, diags := analyze(src)
+	if hasCode(diags, CodeMasterValidateNotAssert) {
+		t.Errorf("an assert-only validate block should be accepted: %v", codes(diags))
+	}
+}
+
+// TestMasterValidateRejectsEffect pins that a validate check is pure: an
+// effectful call in one is reported as a missing effect (validate has nowhere to
+// declare one), rather than silently failing every row at fold time.
+func TestMasterValidateRejectsEffect(t *testing.T) {
+	src := "extern fn nondet roll(): int\nmaster M {\n  record { id: int }\n  primary id\n  validate {\n    each {\n      assert self.id > roll()\n    }\n  }\n}\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeMissingEffect) {
+		t.Fatalf("want missing_effect for an effectful validate check, got %v", codes(diags))
+	}
+}
+
 // TestEnclosingDeclMaster pins that an offset inside a master maps to the
 // master's stable anchor — the anchor lookup reads the master backpointer like
 // it does a type/enum/interface, so a diagnostic anchored in a master resolves.

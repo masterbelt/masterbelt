@@ -575,6 +575,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "master " + f["master"].String() + " has no field " + f["key"].String() + " named by its primary key"
 		}
 	},
+	"belt.semantic.master_validate_not_assert": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "master " + f["master"].String() + " の validate ブロックには assert 文のみ記述できます"
+		default:
+			return "a validate block of master " + f["master"].String() + " may contain only assert statements"
+		}
+	},
 	"belt.semantic.master_where_unsupported": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":

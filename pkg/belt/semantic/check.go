@@ -354,19 +354,35 @@ func checkMethodBodies(reg *builtin.Registry, defs []*ir.TypeDef, universe map[s
 			checkStmts(m.Body, want, bs, env, bodyNoSelf, sink, at, diags)
 			checkBareEnumArgs(m.Body, bs, env, at, diags)
 		}
-		// A master's per-row validate checks are bodies over self the same way a
-		// row method is: self is the row, no parameters, and each assert's
-		// condition must type as a bool. Checking them here streams their facts to
-		// the same sink, so the write-back types their conditions like any body's,
-		// and reports a non-bool assert (assertion_not_bool) in the reporting pass.
 		if def.Master != nil && def.MasterSyntax != nil {
 			bs := infer.BodyScope{Reg: reg, Universe: universe, Qualified: qualified, Self: ir.Type(self), Funcs: funcs, QualifiedFuncs: qualifiedFuncs, ConstShadows: constShadows, NamespaceShadows: nsShadows, ReportTypeParamValue: reportTypeParamValue}
-			for _, clause := range def.MasterSyntax.Validations {
-				if !clause.PerRow {
-					continue // a per-table check (validate all) is a later concern
-				}
-				checkStmts(clause.Body, ir.Invalid, bs, env, nil, sink, at, diags)
-				checkBareEnumArgs(clause.Body, bs, env, at, diags)
+			checkMasterValidations(def, bs, env, sink, at, diags)
+		}
+	}
+}
+
+// checkMasterValidations type-checks a master's per-row validate checks. They are
+// bodies over self the same way a row method is — self is the row, no parameters
+// — so each assert's condition is checked for a bool (assertion_not_bool), and
+// the facts stream to the same sink so the write-back types the conditions like
+// any body's. A statement that is not an assert is rejected
+// (master_validate_not_assert) rather than carried and silently dropped from the
+// per-row fold, where its local would leave a later assertion unfoldable and fail
+// every row, so the block's meaning stays exactly the asserts it lists.
+func checkMasterValidations(def *ir.TypeDef, bs infer.BodyScope, env exprFolder, sink *infer.Sink, at func(ast.Node) span, diags *diagnostic.List) {
+	for _, clause := range def.MasterSyntax.Validations {
+		if !clause.PerRow {
+			continue // a per-table check (validate all) is a later concern
+		}
+		checkStmts(clause.Body, ir.Invalid, bs, env, nil, sink, at, diags)
+		checkBareEnumArgs(clause.Body, bs, env, at, diags)
+		if diags == nil {
+			continue
+		}
+		for _, stmt := range clause.Body {
+			if _, ok := stmt.(*ast.AssertStmt); !ok {
+				s := at(stmt)
+				diags.Add(newMasterValidateNotAssertDiagnostic(s.offset, s.width, def.Name))
 			}
 		}
 	}
