@@ -34,7 +34,10 @@ runs:
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
-        if [ "$(gh repo view --json visibility -q .visibility 2>/dev/null || echo private)" = public ]; then
+        # gh reports visibility as an enum (PUBLIC/PRIVATE/INTERNAL); lowercase it
+        # before comparing so a public repo is recognized and actually attests.
+        visibility="$(gh repo view --json visibility -q .visibility 2>/dev/null || echo private)"
+        if [ "$(echo "$visibility" | tr '[:upper:]' '[:lower:]')" = public ]; then
           echo "available=true" >>"$GITHUB_OUTPUT"
         else
           echo "provenance attestation unavailable for a private repo on this plan — skipping it"
