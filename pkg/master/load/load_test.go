@@ -138,6 +138,26 @@ func TestLoadRowValidationSkippedOnMissingColumn(t *testing.T) {
 	}
 }
 
+func TestLoadRowValidationSkippedAfterRefinementFailure(t *testing.T) {
+	// A row whose cell fails its field refinement is reported once
+	// (cell_refinement); the per-row check is not run over the value the row type
+	// already rejected, so no derived row_validation_failed piles onto it. (Without
+	// the skip, 100 / self.id on id=0 would fold to nothing and fail the row too.)
+	belt := "type NonZero = int where self != 0\nmaster Skill {\n" +
+		"  record { id: NonZero }\n" +
+		"  primary id\n" +
+		"  source { csv \"skills.csv\" }\n" +
+		"  validate { each { assert 100 / self.id > 0 } }\n" +
+		"}\n"
+	_, diags := run(t, belt, map[string]string{"csv": "data"}, map[string]string{
+		"data/skills.csv": "id\n5\n0\n",
+	})
+	d := single(t, diags, master.CodeCellRefinement)
+	if !strings.Contains(d.Message, "data/skills.csv:3") {
+		t.Errorf("message = %q, want only the refinement on row 3", d.Message)
+	}
+}
+
 func TestLoadRowValidationCallsRowMethod(t *testing.T) {
 	// A per-row check may call a row method: self.balanced() folds on the row
 	// record, so the master backs its row's method table here. The second row is

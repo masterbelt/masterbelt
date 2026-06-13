@@ -134,8 +134,9 @@ func readMaster(def *ir.TypeDef, doc *abstract.Document, env eval.GraphEnv, root
 
 		typed, coerceDiags := master.Coerce(raw, fields, spec)
 		diags = append(diags, coerceDiags...)
-		diags = append(diags, checkRefinements(typed, fields, spec, env)...)
-		diags = append(diags, checkRowValidations(typed, fields, def, doc, spec, env)...)
+		refineDiags, refined := checkRefinements(typed, fields, spec, env)
+		diags = append(diags, refineDiags...)
+		diags = append(diags, checkRowValidations(typed, fields, refined, def, doc, spec, env)...)
 		diags = append(diags, checkDuplicatePrimaryKeys(typed, def, spec)...)
 
 		loaded = append(loaded, Loaded{Master: def.Name, Display: spec.Display, Table: typed})
@@ -150,13 +151,17 @@ func readMaster(def *ir.TypeDef, doc *abstract.Document, env eval.GraphEnv, root
 // engine compiled to a usable form (def.Where set) is run; the engine compiles
 // one that reads self, literals, and self's own methods, so it folds the same in
 // any of the program's file envs.
-func checkRefinements(typed master.Table, fields []ir.Field, spec master.SourceSpec, env eval.GraphEnv) []diagnostic.Diagnostic {
+// It also returns the set of rows (by index) a cell of which failed its
+// refinement, so the per-row validate checks can skip them — a value the row type
+// already rejected must not draw a second, derived row-validation error.
+func checkRefinements(typed master.Table, fields []ir.Field, spec master.SourceSpec, env eval.GraphEnv) ([]diagnostic.Diagnostic, map[int]bool) {
 	byName := make(map[string]ir.Field, len(fields))
 	for _, f := range fields {
 		byName[f.Name] = f
 	}
 	var diags []diagnostic.Diagnostic
-	for _, row := range typed.Rows {
+	refined := map[int]bool{}
+	for ri, row := range typed.Rows {
 		for i, col := range typed.Columns {
 			cell := row.Cells[i]
 			if cell.Value == nil {
@@ -166,12 +171,13 @@ func checkRefinements(typed master.Table, fields []ir.Field, spec master.SourceS
 				v := eval.GraphPredicate(def.Where, cell.Value, def, env)
 				if v == nil || v.Kind != ir.ConstBool || !v.Bool {
 					diags = append(diags, master.CellRefinement(spec.Offset, spec.Width, spec.Display, cell.Origin.Row, cell.Origin.Col, col, cell.Value.String(), def.Name))
+					refined[ri] = true
 					break // one violation per cell is enough
 				}
 			}
 		}
 	}
-	return diags
+	return diags, refined
 }
 
 // checkRowValidations folds each of the master's per-row validate checks over
@@ -184,7 +190,7 @@ func checkRefinements(typed master.Table, fields []ir.Field, spec master.SourceS
 // over a missing field would only pile a second, derived error onto it. A
 // failure anchors at the assert in the .belt declaration — the check that failed
 // — and names the failing row as path:row in the message.
-func checkRowValidations(typed master.Table, fields []ir.Field, def *ir.TypeDef, doc *abstract.Document, spec master.SourceSpec, env eval.GraphEnv) []diagnostic.Diagnostic {
+func checkRowValidations(typed master.Table, fields []ir.Field, refined map[int]bool, def *ir.TypeDef, doc *abstract.Document, spec master.SourceSpec, env eval.GraphEnv) []diagnostic.Diagnostic {
 	if len(def.Master.RowChecks) == 0 || !tableHasFields(typed, fields) {
 		// A source missing a declared column already reported missing_column and
 		// dropped that field, so a self record built here would lack it and every
@@ -193,7 +199,10 @@ func checkRowValidations(typed master.Table, fields []ir.Field, def *ir.TypeDef,
 		return nil
 	}
 	var diags []diagnostic.Diagnostic
-	for _, row := range typed.Rows {
+	for ri, row := range typed.Rows {
+		if refined[ri] {
+			continue // a cell of this row failed its refinement, already reported
+		}
 		self, line, ok := rowConstant(typed.Columns, row)
 		if !ok {
 			continue // a coercion gap, already reported
