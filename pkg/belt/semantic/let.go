@@ -299,6 +299,13 @@ func reportBareEnumMember(value ast.Expr, enumDef *ir.TypeDef, bs infer.BodyScop
 		// mistyped member — the type-parameter twin of the type-name exemption above.
 	}
 	s := at(id)
+	// A name two wildcard imports both export is an ambiguous import, not a
+	// mistyped member: report the real conflict the way the const path's
+	// reportRefIssues does, so the enum-member report never hides it.
+	if env.q != nil && env.q.ambiguousImport(env.file, id) {
+		diags.Add(newAmbiguousImportDiagnostic(s.offset, s.width, id.Name))
+		return
+	}
 	diags.Add(newUnknownEnumMemberDiagnostic(s.offset, s.width, enumDef.Name, id.Name))
 }
 
