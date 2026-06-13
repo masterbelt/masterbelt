@@ -42,6 +42,7 @@ belt.semantic.master_missing_row,master {master} has no row record
 belt.semantic.master_duplicate_primary_key,master {master} repeats primary-key column {key}
 belt.semantic.master_where_unsupported,master {master} does not support a row predicate (where) yet
 belt.semantic.master_validate_not_assert,a validate block of master {master} may contain only assert statements
+belt.semantic.master_validate_not_constant,a validate each check of master {master} must fold to a bool for every row
 belt.semantic.uninferable_record,cannot infer the type of this record literal; name its type or annotate it
 belt.semantic.not_a_record,{typ} is not a record type
 belt.semantic.uninferable_result,cannot infer this function literal's result type; annotate it or return a value

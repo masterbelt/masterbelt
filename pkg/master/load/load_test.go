@@ -159,6 +159,25 @@ func TestLoadRowValidationCallsRowMethod(t *testing.T) {
 	}
 }
 
+func TestLoadRowValidationNilIsNotFailure(t *testing.T) {
+	// A check folds for most rows but not for one whose divisor is zero. A nil
+	// fold means the predicate could not be evaluated for that row, not that the
+	// row failed it, so no row-validation error is reported for it. (The witness
+	// row, cost 1, folds, so the check itself is accepted.)
+	belt := "master Skill {\n" +
+		"  record { id: int, cost: int }\n" +
+		"  primary id\n" +
+		"  source { csv \"skills.csv\" }\n" +
+		"  validate { each { assert 100 / self.cost >= 0 } }\n" +
+		"}\n"
+	_, diags := run(t, belt, map[string]string{"csv": "data"}, map[string]string{
+		"data/skills.csv": "id,cost\n1,5\n2,0\n",
+	})
+	if len(diags) != 0 {
+		t.Fatalf("diagnostics = %v, want none (a nil fold is not a failed row)", diags)
+	}
+}
+
 func TestLoadDuplicatePrimaryKey(t *testing.T) {
 	// The third data row repeats id 1, so it is the duplicate; the diagnostic
 	// points at its key cell and names the first occurrence's row.

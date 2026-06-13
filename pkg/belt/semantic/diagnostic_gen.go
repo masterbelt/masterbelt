@@ -58,6 +58,7 @@ const (
 	CodeMasterMissingRow           diagnostic.Code = "belt.semantic.master_missing_row"
 	CodeMasterPrimaryUnknownField  diagnostic.Code = "belt.semantic.master_primary_unknown_field"
 	CodeMasterValidateNotAssert    diagnostic.Code = "belt.semantic.master_validate_not_assert"
+	CodeMasterValidateNotConstant  diagnostic.Code = "belt.semantic.master_validate_not_constant"
 	CodeMasterWhereUnsupported     diagnostic.Code = "belt.semantic.master_where_unsupported"
 	CodeMemberIsNotAType           diagnostic.Code = "belt.semantic.member_is_not_a_type"
 	CodeMissingEffect              diagnostic.Code = "belt.semantic.missing_effect"
@@ -815,6 +816,20 @@ func newMasterValidateNotAssertDiagnostic(offset int, width int, master string) 
 		Severity: diagnostic.Error,
 		Code:     CodeMasterValidateNotAssert,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeMasterValidateNotAssert, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newMasterValidateNotConstantDiagnostic(offset int, width int, master string) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"master": diagnostic.Str(master),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeMasterValidateNotConstant,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeMasterValidateNotConstant, fields),
 		Fields:   fields,
 		Offset:   offset,
 		Width:    width,

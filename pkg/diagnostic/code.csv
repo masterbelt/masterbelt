@@ -42,6 +42,7 @@ belt.semantic.master_missing_row,error,master:string
 belt.semantic.master_duplicate_primary_key,error,key:string master:string
 belt.semantic.master_where_unsupported,error,master:string
 belt.semantic.master_validate_not_assert,error,master:string
+belt.semantic.master_validate_not_constant,error,master:string
 belt.semantic.uninferable_record,error,
 belt.semantic.not_a_record,error,typ:string
 belt.semantic.uninferable_result,error,

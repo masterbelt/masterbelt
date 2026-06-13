@@ -249,6 +249,32 @@ func TestMasterValidateAcceptsAsserts(t *testing.T) {
 	}
 }
 
+// TestMasterValidateCyclicRowDoesNotCrash pins that a validate check on a master
+// whose row type is a cyclic alias does not send the foldability probe chasing
+// the cycle: the ill-formed row is already reported, and building a witness for
+// it is skipped rather than overflowing the stack.
+func TestMasterValidateCyclicRowDoesNotCrash(t *testing.T) {
+	src := "type A = B\ntype B = A\nmaster M {\n  record { id: A }\n  primary id\n  validate {\n    each {\n      assert self.id > 0\n    }\n  }\n}\n"
+	// Returning at all means the foldability probe terminated rather than chasing
+	// the cycle into a stack overflow; the ill-formed row is reported.
+	_, diags := analyze(src)
+	if len(diags) == 0 {
+		t.Fatal("want the ill-formed cyclic row reported, got none")
+	}
+}
+
+// TestMasterValidateRejectsUnfoldable pins that a validate check that cannot
+// fold to a bool — here an unbounded recursion the interpreter cannot settle — is
+// reported once at compile time, rather than folding to nil and failing every
+// loaded row as a row-validation error.
+func TestMasterValidateRejectsUnfoldable(t *testing.T) {
+	src := "fn loop(x: int): bool {\n  return loop(x)\n}\nmaster M {\n  record { id: int }\n  primary id\n  validate {\n    each {\n      assert loop(self.id)\n    }\n  }\n}\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeMasterValidateNotConstant) {
+		t.Fatalf("want master_validate_not_constant for an unfoldable check, got %v", codes(diags))
+	}
+}
+
 // TestMasterValidateRejectsEffect pins that a validate check is pure: an
 // effectful call in one is reported as a missing effect (validate has nowhere to
 // declare one), rather than silently failing every row at fold time.
