@@ -8,6 +8,7 @@ package builtin
 import (
 	"math"
 	"math/big"
+	"unicode/utf8"
 
 	"github.com/masterbelt/masterbelt/pkg/source/ir"
 )
@@ -125,18 +126,103 @@ func errorIntrinsics() map[string]Intrinsic {
 	}
 }
 
-// stringIntrinsics evaluates the string operators: add concatenates, and the
-// comparisons use Go's lexicographic byte ordering on the operands.
+// stringIntrinsics evaluates the string operators and the introspection
+// substrate. add concatenates and the comparisons use Go's lexicographic byte
+// ordering; len/at/slice/chars/bytes read the contents — by Unicode codepoint
+// (rune) for the first four, by UTF-8 byte for the last — so the std string
+// module's split/trim/case folding can be written in pure belt on top of them.
 func stringIntrinsics() map[string]Intrinsic {
 	return map[string]Intrinsic{
-		"add":  binaryStr(func(a, b string) *ir.Constant { return ir.StringConstant(a + b) }),
-		OpEql:  binaryStr(func(a, b string) *ir.Constant { return ir.BoolConstant(a == b) }),
-		OpNeq:  binaryStr(func(a, b string) *ir.Constant { return ir.BoolConstant(a != b) }),
-		OpLt:   binaryStr(func(a, b string) *ir.Constant { return ir.BoolConstant(a < b) }),
-		OpLteq: binaryStr(func(a, b string) *ir.Constant { return ir.BoolConstant(a <= b) }),
-		OpGt:   binaryStr(func(a, b string) *ir.Constant { return ir.BoolConstant(a > b) }),
-		OpGteq: binaryStr(func(a, b string) *ir.Constant { return ir.BoolConstant(a >= b) }),
+		"add":   binaryStr(func(a, b string) *ir.Constant { return ir.StringConstant(a + b) }),
+		"len":   stringLen,
+		"at":    stringAt,
+		"slice": stringSlice,
+		"chars": stringChars,
+		"bytes": stringBytes,
+		OpEql:   binaryStr(func(a, b string) *ir.Constant { return ir.BoolConstant(a == b) }),
+		OpNeq:   binaryStr(func(a, b string) *ir.Constant { return ir.BoolConstant(a != b) }),
+		OpLt:    binaryStr(func(a, b string) *ir.Constant { return ir.BoolConstant(a < b) }),
+		OpLteq:  binaryStr(func(a, b string) *ir.Constant { return ir.BoolConstant(a <= b) }),
+		OpGt:    binaryStr(func(a, b string) *ir.Constant { return ir.BoolConstant(a > b) }),
+		OpGteq:  binaryStr(func(a, b string) *ir.Constant { return ir.BoolConstant(a >= b) }),
 	}
+}
+
+// stringLen folds string.len() to the number of Unicode codepoints (runes) —
+// the rune count, not the byte length, so a multi-byte character counts once.
+func stringLen(r *ir.Constant, args []*ir.Constant) *ir.Constant {
+	if len(args) != 0 || r.Kind != ir.ConstString {
+		return nil
+	}
+	return ir.IntConstant(big.NewInt(int64(utf8.RuneCountInString(r.Str))))
+}
+
+// stringAt folds string.at(i) to the i-th rune (0-based) as a length-1 string,
+// or to an index-out-of-range error when i falls outside the rune sequence — a
+// read can miss, so the result is a value to branch on (string | error), the
+// same shape a list's get carries.
+func stringAt(r *ir.Constant, args []*ir.Constant) *ir.Constant {
+	if len(args) != 1 || r.Kind != ir.ConstString || args[0].Kind != ir.ConstInt {
+		return nil
+	}
+	runes := []rune(r.Str)
+	if !args[0].Int.IsInt64() {
+		return ir.ErrorConstant("index out of range")
+	}
+	i := args[0].Int.Int64()
+	if i < 0 || i >= int64(len(runes)) {
+		return ir.ErrorConstant("index out of range")
+	}
+	return ir.StringConstant(string(runes[i]))
+}
+
+// stringSlice folds string.slice(start, end) to the substring of the runes in
+// [start, end) — 0-based, half-open — or to an index-out-of-range error when a
+// bound falls outside the sequence or start is past end. It carries the same
+// fallible-read shape at does (string | error).
+func stringSlice(r *ir.Constant, args []*ir.Constant) *ir.Constant {
+	if len(args) != 2 || r.Kind != ir.ConstString || args[0].Kind != ir.ConstInt || args[1].Kind != ir.ConstInt {
+		return nil
+	}
+	if !args[0].Int.IsInt64() || !args[1].Int.IsInt64() {
+		return ir.ErrorConstant("index out of range")
+	}
+	runes := []rune(r.Str)
+	n := int64(len(runes))
+	start, end := args[0].Int.Int64(), args[1].Int.Int64()
+	if start < 0 || end > n || start > end {
+		return ir.ErrorConstant("index out of range")
+	}
+	return ir.StringConstant(string(runes[start:end]))
+}
+
+// stringChars folds string.chars() to the list of the string's runes, each a
+// length-1 string in order — the decode the std string module's split, trim,
+// and case folding are built on.
+func stringChars(r *ir.Constant, args []*ir.Constant) *ir.Constant {
+	if len(args) != 0 || r.Kind != ir.ConstString {
+		return nil
+	}
+	runes := []rune(r.Str)
+	out := make([]ir.ConstEntry, len(runes))
+	for i, c := range runes {
+		out[i] = ir.ConstEntry{Value: ir.StringConstant(string(c))}
+	}
+	return ir.CollectionConstantOf(out, ir.CollList)
+}
+
+// stringBytes folds string.bytes() to the list of the string's UTF-8 bytes, in
+// order.
+func stringBytes(r *ir.Constant, args []*ir.Constant) *ir.Constant {
+	if len(args) != 0 || r.Kind != ir.ConstString {
+		return nil
+	}
+	bs := []byte(r.Str)
+	out := make([]ir.ConstEntry, len(bs))
+	for i, b := range bs {
+		out[i] = ir.ConstEntry{Value: ir.IntConstant(big.NewInt(int64(b)))}
+	}
+	return ir.CollectionConstantOf(out, ir.CollList)
 }
 
 // binaryMillis is a one-argument intrinsic over two millisecond-carrying

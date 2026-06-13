@@ -1,0 +1,430 @@
+# tree
+File
+  ConstDecl
+    LineComment "// The string introspection substrate: len, at, slice, chars, and bytes read an"
+    Newline "\n"
+    LineComment "// immutable string's contents, and every one folds at compile time. Length,"
+    Newline "\n"
+    LineComment "// indexing, and slicing count Unicode codepoints (runes), not bytes — \"héllo\""
+    Newline "\n"
+    LineComment "// is five runes though its UTF-8 form is six bytes — so the substrate the std"
+    Newline "\n"
+    LineComment "// string module is built on is rune-correct from the start."
+    Newline "\n"
+    Newline "\n"
+    LineComment "// len counts runes; it folds, so the assert is checked when the file compiles."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Len"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        MemberExpr
+          Literal
+            String "\"héllo\""
+          Dot "."
+          Ident "len"
+        LParen "("
+        RParen ")"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      NameRef
+        Ident "Len"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "5"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// chars decodes the string into its runes, each a length-1 string. It folds to"
+    Newline "\n"
+    LineComment "// a list — the primitive split, trim, and case folding are written on."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Chars"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        MemberExpr
+          Literal
+            String "\"héllo\""
+          Dot "."
+          Ident "chars"
+        LParen "("
+        RParen ")"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      CallExpr
+        MemberExpr
+          NameRef
+            Ident "Chars"
+          Dot "."
+          Ident "len"
+        LParen "("
+        RParen ")"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "5"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// bytes is the UTF-8 byte view: six bytes, because é encodes as two."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Bytes"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        MemberExpr
+          Literal
+            String "\"héllo\""
+          Dot "."
+          Ident "bytes"
+        LParen "("
+        RParen ")"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      CallExpr
+        MemberExpr
+          NameRef
+            Ident "Bytes"
+          Dot "."
+          Ident "len"
+        LParen "("
+        RParen ")"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        Int "6"
+  ConstDecl
+    Newline "\n"
+    Newline "\n"
+    LineComment "// at and slice are fallible reads: an out-of-range index is an error value to"
+    Newline "\n"
+    LineComment "// branch on (string | error), the shape a list's get carries. A present read"
+    Newline "\n"
+    LineComment "// folds to the rune (at) or the run of runes (slice); an out-of-range one folds"
+    Newline "\n"
+    LineComment "// to the error."
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Second"
+    TypeClause
+      Colon ":"
+      Whitespace " "
+      UnionType
+        TypeName
+          Ident "string"
+        Whitespace " "
+        Pipe "|"
+        Whitespace " "
+        TypeName
+          Ident "error"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        MemberExpr
+          Literal
+            String "\"héllo\""
+          Dot "."
+          Ident "at"
+        LParen "("
+        Literal
+          Int "1"
+        RParen ")"
+  ConstDecl
+    Whitespace " "
+    LineComment "// \"é\""
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Head"
+    TypeClause
+      Colon ":"
+      Whitespace " "
+      UnionType
+        TypeName
+          Ident "string"
+        Whitespace " "
+        Pipe "|"
+        Whitespace " "
+        TypeName
+          Ident "error"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        MemberExpr
+          Literal
+            String "\"héllo\""
+          Dot "."
+          Ident "slice"
+        LParen "("
+        Literal
+          Int "0"
+        Comma ","
+        Whitespace " "
+        Literal
+          Int "2"
+        RParen ")"
+  ConstDecl
+    Whitespace " "
+    LineComment "// \"hé\""
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "Tail"
+    TypeClause
+      Colon ":"
+      Whitespace " "
+      UnionType
+        TypeName
+          Ident "string"
+        Whitespace " "
+        Pipe "|"
+        Whitespace " "
+        TypeName
+          Ident "error"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        MemberExpr
+          Literal
+            String "\"héllo\""
+          Dot "."
+          Ident "slice"
+        LParen "("
+        Literal
+          Int "1"
+        Comma ","
+        Whitespace " "
+        Literal
+          Int "5"
+        RParen ")"
+  ConstDecl
+    Whitespace " "
+    LineComment "// \"éllo\""
+    Newline "\n"
+    Const "const"
+    Whitespace " "
+    Ident "OffEnd"
+    TypeClause
+      Colon ":"
+      Whitespace " "
+      UnionType
+        TypeName
+          Ident "string"
+        Whitespace " "
+        Pipe "|"
+        Whitespace " "
+        TypeName
+          Ident "error"
+    Whitespace " "
+    Initializer
+      Assign "="
+      Whitespace " "
+      CallExpr
+        MemberExpr
+          Literal
+            String "\"héllo\""
+          Dot "."
+          Ident "at"
+        LParen "("
+        Literal
+          Int "9"
+        RParen ")"
+  FuncDecl
+    Whitespace " "
+    LineComment "// index out of range"
+    Newline "\n"
+    Newline "\n"
+    LineComment "// The substrate composes in pure belt: isEmpty and a rune reverse are the kind"
+    Newline "\n"
+    LineComment "// of helper the std string module writes on len and chars — no new native."
+    Newline "\n"
+    Fn "fn"
+    Whitespace " "
+    Ident "isEmpty"
+    ParamList
+      LParen "("
+      Param
+        Ident "s"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "string"
+      RParen ")"
+    Colon ":"
+    Whitespace " "
+    TypeName
+      Ident "bool"
+    Whitespace " "
+    Block
+      LBrace "{"
+      Newline "\n"
+      Whitespace "  "
+      ReturnStmt
+        Return "return"
+        Whitespace " "
+        BinaryExpr
+          CallExpr
+            MemberExpr
+              NameRef
+                Ident "s"
+              Dot "."
+              Ident "len"
+            LParen "("
+            RParen ")"
+          Whitespace " "
+          EqEq "=="
+          Whitespace " "
+          Literal
+            Int "0"
+      Newline "\n"
+      RBrace "}"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    CallExpr
+      NameRef
+        Ident "isEmpty"
+      LParen "("
+      Literal
+        String "\"\""
+      RParen ")"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    UnaryExpr
+      Bang "!"
+      CallExpr
+        NameRef
+          Ident "isEmpty"
+        LParen "("
+        Literal
+          String "\"x\""
+        RParen ")"
+  FuncDecl
+    Newline "\n"
+    Newline "\n"
+    Fn "fn"
+    Whitespace " "
+    Ident "reverse"
+    ParamList
+      LParen "("
+      Param
+        Ident "s"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "string"
+      RParen ")"
+    Colon ":"
+    Whitespace " "
+    TypeName
+      Ident "string"
+    Whitespace " "
+    Block
+      LBrace "{"
+      Newline "\n"
+      Whitespace "  "
+      ReturnStmt
+        Return "return"
+        Whitespace " "
+        CallExpr
+          MemberExpr
+            CallExpr
+              MemberExpr
+                NameRef
+                  Ident "s"
+                Dot "."
+                Ident "chars"
+              LParen "("
+              RParen ")"
+            Dot "."
+            Ident "fold"
+          LParen "("
+          Literal
+            String "\"\""
+          Comma ","
+          Whitespace " "
+          FuncLit
+            Fn "fn"
+            ParamList
+              LParen "("
+              Param
+                Ident "acc"
+              Comma ","
+              Whitespace " "
+              Param
+                Ident "i"
+              Comma ","
+              Whitespace " "
+              Param
+                Ident "c"
+              RParen ")"
+            Whitespace " "
+            Arrow "->"
+            Whitespace " "
+            BinaryExpr
+              NameRef
+                Ident "c"
+              Whitespace " "
+              Plus "+"
+              Whitespace " "
+              NameRef
+                Ident "acc"
+          RParen ")"
+      Newline "\n"
+      RBrace "}"
+  AssertDecl
+    Newline "\n"
+    Assert "assert"
+    Whitespace " "
+    BinaryExpr
+      CallExpr
+        NameRef
+          Ident "reverse"
+        LParen "("
+        Literal
+          String "\"abc\""
+        RParen ")"
+      Whitespace " "
+      EqEq "=="
+      Whitespace " "
+      Literal
+        String "\"cba\""
+  Newline "\n"
+  EOF ""
+# diagnostics

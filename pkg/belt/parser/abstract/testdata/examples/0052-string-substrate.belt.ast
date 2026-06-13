@@ -1,0 +1,340 @@
+File
+  Uses: ~
+  Decls:
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Len"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: StringLit
+            Value: "héllo"
+          Member: Identifier
+            Name: "len"
+        Arguments: ~
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Chars"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: StringLit
+            Value: "héllo"
+          Member: Identifier
+            Name: "chars"
+        Arguments: ~
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Bytes"
+      Type: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: StringLit
+            Value: "héllo"
+          Member: Identifier
+            Name: "bytes"
+        Arguments: ~
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Second"
+      Type: UnionType
+        Members:
+          NamedType
+            Namespace: ""
+            Name: "string"
+            Args: ~
+            Projections: ~
+          NamedType
+            Namespace: ""
+            Name: "error"
+            Args: ~
+            Projections: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: StringLit
+            Value: "héllo"
+          Member: Identifier
+            Name: "at"
+        Arguments:
+          IntLit
+            Text: "1"
+            Base: 0
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Head"
+      Type: UnionType
+        Members:
+          NamedType
+            Namespace: ""
+            Name: "string"
+            Args: ~
+            Projections: ~
+          NamedType
+            Namespace: ""
+            Name: "error"
+            Args: ~
+            Projections: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: StringLit
+            Value: "héllo"
+          Member: Identifier
+            Name: "slice"
+        Arguments:
+          IntLit
+            Text: "0"
+            Base: 0
+          IntLit
+            Text: "2"
+            Base: 0
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Tail"
+      Type: UnionType
+        Members:
+          NamedType
+            Namespace: ""
+            Name: "string"
+            Args: ~
+            Projections: ~
+          NamedType
+            Namespace: ""
+            Name: "error"
+            Args: ~
+            Projections: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: StringLit
+            Value: "héllo"
+          Member: Identifier
+            Name: "slice"
+        Arguments:
+          IntLit
+            Text: "1"
+            Base: 0
+          IntLit
+            Text: "5"
+            Base: 0
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "OffEnd"
+      Type: UnionType
+        Members:
+          NamedType
+            Namespace: ""
+            Name: "string"
+            Args: ~
+            Projections: ~
+          NamedType
+            Namespace: ""
+            Name: "error"
+            Args: ~
+            Projections: ~
+      Value: CallExpr
+        Callee: MemberExpr
+          Receiver: StringLit
+            Value: "héllo"
+          Member: Identifier
+            Name: "at"
+        Arguments:
+          IntLit
+            Text: "9"
+            Base: 0
+      Builtin: false
+  Types: ~
+  Enums: ~
+  Interfaces: ~
+  Funcs:
+    FuncDecl
+      Doc: ~
+      Public: false
+      Extern: false
+      Effects: ~
+      Name: "isEmpty"
+      TypeParams: ~
+      Params:
+        ParamDef
+          Name: "s"
+          Type: NamedType
+            Namespace: ""
+            Name: "string"
+            Args: ~
+            Projections: ~
+      Result: NamedType
+        Namespace: ""
+        Name: "bool"
+        Args: ~
+        Projections: ~
+      Body:
+        ReturnStmt
+          Value: CallExpr
+            Callee: MemberExpr
+              Receiver: CallExpr
+                Callee: MemberExpr
+                  Receiver: Identifier
+                    Name: "s"
+                  Member: Identifier
+                    Name: "len"
+                Arguments: ~
+              Member: Identifier
+                Name: "eql"
+            Arguments:
+              IntLit
+                Text: "0"
+                Base: 0
+    FuncDecl
+      Doc: ~
+      Public: false
+      Extern: false
+      Effects: ~
+      Name: "reverse"
+      TypeParams: ~
+      Params:
+        ParamDef
+          Name: "s"
+          Type: NamedType
+            Namespace: ""
+            Name: "string"
+            Args: ~
+            Projections: ~
+      Result: NamedType
+        Namespace: ""
+        Name: "string"
+        Args: ~
+        Projections: ~
+      Body:
+        ReturnStmt
+          Value: CallExpr
+            Callee: MemberExpr
+              Receiver: CallExpr
+                Callee: MemberExpr
+                  Receiver: Identifier
+                    Name: "s"
+                  Member: Identifier
+                    Name: "chars"
+                Arguments: ~
+              Member: Identifier
+                Name: "fold"
+            Arguments:
+              StringLit
+                Value: ""
+              FuncLit
+                Params:
+                  ParamDef
+                    Name: "acc"
+                    Type: ~
+                  ParamDef
+                    Name: "i"
+                    Type: ~
+                  ParamDef
+                    Name: "c"
+                    Type: ~
+                Result: ~
+                Body:
+                  ReturnStmt
+                    Value: CallExpr
+                      Callee: MemberExpr
+                        Receiver: Identifier
+                          Name: "c"
+                        Member: Identifier
+                          Name: "add"
+                      Arguments:
+                        Identifier
+                          Name: "acc"
+  Asserts:
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: Identifier
+            Name: "Len"
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "5"
+            Base: 0
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: MemberExpr
+              Receiver: Identifier
+                Name: "Chars"
+              Member: Identifier
+                Name: "len"
+            Arguments: ~
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "5"
+            Base: 0
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: MemberExpr
+              Receiver: Identifier
+                Name: "Bytes"
+              Member: Identifier
+                Name: "len"
+            Arguments: ~
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "6"
+            Base: 0
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: Identifier
+          Name: "isEmpty"
+        Arguments:
+          StringLit
+            Value: ""
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: Identifier
+              Name: "isEmpty"
+            Arguments:
+              StringLit
+                Value: "x"
+          Member: Identifier
+            Name: "not"
+        Arguments: ~
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: Identifier
+              Name: "reverse"
+            Arguments:
+              StringLit
+                Value: "abc"
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          StringLit
+            Value: "cba"
+  Masters: ~

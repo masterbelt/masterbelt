@@ -141,11 +141,22 @@ func booleanMethods() []*ir.Method {
 	}
 }
 
-// stringMethods is the operator-method signature set of the string primitive:
-// add concatenates (returning self), and equality and the lexicographic
-// comparisons return bool. It mirrors the prelude's string.belt.
+// stringMethods is the operator-method signature set of the string primitive
+// together with the rune-introspection reads the registry backs: add
+// concatenates (returning self); equality and the lexicographic comparisons
+// return bool; len is the rune count, and at/slice are fallible reads
+// (string | error). chars/bytes are deliberately absent here — they return the
+// eval-implemented list, which is declared only in the prelude and is never a
+// bootstrap primitive, so the bootstrap descriptor has no list to name (and the
+// one path that uses this descriptor, the degraded prelude-load fallback, has
+// no list either, so the omission introduces no breakage the fallback does not
+// already carry). It otherwise mirrors the prelude's string.belt.
 func stringMethods() []*ir.Method {
+	stringOrError := &ir.Union{Members: []ir.Type{stringType, &ir.Builtin{Name: NameError}}}
 	return []*ir.Method{
+		externMethod("len", intType),
+		externMethod("at", stringOrError, intType),
+		externMethod("slice", stringOrError, intType, intType),
 		externMethod("add", self(), self()),
 		externMethod("eql", boolType, self()),
 		externMethod("neq", boolType, self()),
