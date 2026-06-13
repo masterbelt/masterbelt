@@ -103,7 +103,15 @@ func defBacksKind(reg *builtin.Registry, def *ir.TypeDef, kind ir.ConstKind) boo
 	// through the receiver's annotation, the same syntactic channel a primitive
 	// uses, so value.name folds on a record exactly as it does on a wrapped int.
 	if kind == ir.ConstRecord {
-		return recordOf(&ir.Named{Def: def}) != nil
+		if recordOf(&ir.Named{Def: def}) != nil {
+			return true
+		}
+		// A master backs its row record: a row is a record value, so a row
+		// method or getter (a per-row validate check that calls self.isValid(),
+		// an exported toString) folds on the row the same way a record type's
+		// method does. The record is in Master.Row, not Body, so recordOf does
+		// not see it on its own.
+		return def.Master != nil && recordOf(def.Master.Row) != nil
 	}
 	n := underlyingPrimitive(reg, def, map[*ir.TypeDef]bool{})
 	if n == nil {

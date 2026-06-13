@@ -135,7 +135,7 @@ func readMaster(def *ir.TypeDef, doc *abstract.Document, env eval.GraphEnv, root
 		typed, coerceDiags := master.Coerce(raw, fields, spec)
 		diags = append(diags, coerceDiags...)
 		diags = append(diags, checkRefinements(typed, fields, spec, env)...)
-		diags = append(diags, checkRowValidations(typed, def, doc, spec, env)...)
+		diags = append(diags, checkRowValidations(typed, fields, def, doc, spec, env)...)
 		diags = append(diags, checkDuplicatePrimaryKeys(typed, def, spec)...)
 
 		loaded = append(loaded, Loaded{Master: def.Name, Display: spec.Display, Table: typed})
@@ -184,8 +184,12 @@ func checkRefinements(typed master.Table, fields []ir.Field, spec master.SourceS
 // over a missing field would only pile a second, derived error onto it. A
 // failure anchors at the assert in the .belt declaration — the check that failed
 // — and names the failing row as path:row in the message.
-func checkRowValidations(typed master.Table, def *ir.TypeDef, doc *abstract.Document, spec master.SourceSpec, env eval.GraphEnv) []diagnostic.Diagnostic {
-	if len(def.Master.RowChecks) == 0 {
+func checkRowValidations(typed master.Table, fields []ir.Field, def *ir.TypeDef, doc *abstract.Document, spec master.SourceSpec, env eval.GraphEnv) []diagnostic.Diagnostic {
+	if len(def.Master.RowChecks) == 0 || !tableHasFields(typed, fields) {
+		// A source missing a declared column already reported missing_column and
+		// dropped that field, so a self record built here would lack it and every
+		// check reading it would fold to nil and fail — a derived error on every
+		// row. Leave the malformed source to its own report.
 		return nil
 	}
 	var diags []diagnostic.Diagnostic
@@ -203,6 +207,23 @@ func checkRowValidations(typed master.Table, def *ir.TypeDef, doc *abstract.Docu
 		}
 	}
 	return diags
+}
+
+// tableHasFields reports whether the coerced table carries a column for every
+// field the master declares — the precondition a per-row check needs, since a
+// self record missing a field folds every read of it to nil. A missing column is
+// already reported by the coercion, so this only gates the derived check.
+func tableHasFields(typed master.Table, fields []ir.Field) bool {
+	present := make(map[string]bool, len(typed.Columns))
+	for _, c := range typed.Columns {
+		present[c] = true
+	}
+	for _, f := range fields {
+		if !present[f.Name] {
+			return false
+		}
+	}
+	return true
 }
 
 // rowConstant builds the record constant a row's per-row checks fold self
@@ -235,7 +256,7 @@ type keyColumn struct {
 
 // checkDuplicatePrimaryKeys reports a row whose primary key repeats one an
 // earlier row already carries — the duplicate that breaks the master's row
-// identity (the primary key is the row's identity, §5). It reads the key tuple of
+// identity (the primary key is what identifies a row). It reads the key tuple of
 // each row from its primary columns, keeping the first occurrence of each as the
 // baseline and faulting every later one at its own key cell. A key cell that is a
 // coercion gap is skipped (already reported), and a primary that names a column

@@ -125,6 +125,40 @@ func TestLoadRowValidationClean(t *testing.T) {
 	}
 }
 
+func TestLoadRowValidationSkippedOnMissingColumn(t *testing.T) {
+	// The source has no power column, which a check reads. The missing column is
+	// reported once; the validation does not run, so no derived row-validation
+	// error is piled on every row.
+	_, diags := run(t, validateBelt, map[string]string{"csv": "data"}, map[string]string{
+		"data/skills.csv": "id,cost\n1,10\n2,20\n",
+	})
+	d := single(t, diags, master.CodeMissingColumn)
+	if !strings.Contains(d.Message, "power") {
+		t.Errorf("message = %q, want the missing power column", d.Message)
+	}
+}
+
+func TestLoadRowValidationCallsRowMethod(t *testing.T) {
+	// A per-row check may call a row method: self.balanced() folds on the row
+	// record, so the master backs its row's method table here. The second row is
+	// unbalanced (power < cost) and is the only one reported.
+	belt := "master Skill {\n" +
+		"  record { id: int, cost: int, power: int } impl {\n" +
+		"    pub balanced(): bool { return self.power >= self.cost }\n" +
+		"  }\n" +
+		"  primary id\n" +
+		"  source { csv \"skills.csv\" }\n" +
+		"  validate { each { assert self.balanced() } }\n" +
+		"}\n"
+	_, diags := run(t, belt, map[string]string{"csv": "data"}, map[string]string{
+		"data/skills.csv": "id,cost,power\n1,10,30\n2,50,20\n",
+	})
+	d := single(t, diags, master.CodeRowValidationFailed)
+	if !strings.Contains(d.Message, "data/skills.csv:3") {
+		t.Errorf("message = %q, want the failing row data/skills.csv:3", d.Message)
+	}
+}
+
 func TestLoadDuplicatePrimaryKey(t *testing.T) {
 	// The third data row repeats id 1, so it is the duplicate; the diagnostic
 	// points at its key cell and names the first occurrence's row.
