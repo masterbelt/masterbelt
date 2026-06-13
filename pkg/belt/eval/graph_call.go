@@ -58,7 +58,7 @@ func graphApplyBody(c graphCallable, self *ir.Constant, vals []*ir.Constant, sub
 	}
 	return graphBody(c.body, graphCtx{
 		env: ctx.env, locals: locals, self: self,
-		selfDef: c.selfDef, depth: ctx.depth + 1, budgetHit: ctx.budgetHit, assertViolated: ctx.assertViolated,
+		selfDef: c.selfDef, depth: ctx.depth + 1, budgetHit: ctx.budgetHit,
 		resultColl: CollKindOf(c.result),
 		resultType: c.result,
 		subst:      subst,

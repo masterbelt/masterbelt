@@ -201,6 +201,25 @@ func TestLoadRowValidationMethodAssertThroughExpr(t *testing.T) {
 	}
 }
 
+func TestLoadRowValidationLambdaClosesOverSelf(t *testing.T) {
+	// A check may wrap its row predicate in a function literal that closes over
+	// self; the lambda folds against the row, so a valid row passes and only the
+	// failing one (id <= 0) is reported — proving self reaches the lambda body.
+	belt := "master Skill {\n" +
+		"  record { id: int }\n" +
+		"  primary id\n" +
+		"  source { csv \"skills.csv\" }\n" +
+		"  validate { each { assert (fn(): bool { return self.id > 0 })() } }\n" +
+		"}\n"
+	_, diags := run(t, belt, map[string]string{"csv": "data"}, map[string]string{
+		"data/skills.csv": "id\n1\n-1\n",
+	})
+	d := single(t, diags, master.CodeRowValidationFailed)
+	if !strings.Contains(d.Message, "data/skills.csv:3") {
+		t.Errorf("message = %q, want the failing row data/skills.csv:3", d.Message)
+	}
+}
+
 func TestLoadRowValidationAliasedRowMethod(t *testing.T) {
 	// The row is reached through an alias chain (record Row, type Row = Base); a
 	// row method on it still folds, so a row failing the method (power < cost) is
@@ -223,11 +242,10 @@ func TestLoadRowValidationAliasedRowMethod(t *testing.T) {
 	}
 }
 
-func TestLoadRowValidationNilIsNotFailure(t *testing.T) {
-	// A check folds for most rows but not for one whose divisor is zero. A nil
-	// fold means the predicate could not be evaluated for that row, not that the
-	// row failed it, so no row-validation error is reported for it. (The witness
-	// row, cost 1, folds, so the check itself is accepted.)
+func TestLoadRowValidationUnevaluableRowFails(t *testing.T) {
+	// A check folds to a definite true for most rows but not for one whose divisor
+	// is zero, where it cannot be evaluated. A check that cannot confirm a row is
+	// valid fails it (fail-safe), so that row — and only that row — is reported.
 	belt := "master Skill {\n" +
 		"  record { id: int, cost: int }\n" +
 		"  primary id\n" +
@@ -237,8 +255,9 @@ func TestLoadRowValidationNilIsNotFailure(t *testing.T) {
 	_, diags := run(t, belt, map[string]string{"csv": "data"}, map[string]string{
 		"data/skills.csv": "id,cost\n1,5\n2,0\n",
 	})
-	if len(diags) != 0 {
-		t.Fatalf("diagnostics = %v, want none (a nil fold is not a failed row)", diags)
+	d := single(t, diags, master.CodeRowValidationFailed)
+	if !strings.Contains(d.Message, "data/skills.csv:3") {
+		t.Errorf("message = %q, want the unevaluable row data/skills.csv:3", d.Message)
 	}
 }
 

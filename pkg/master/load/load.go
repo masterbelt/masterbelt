@@ -199,13 +199,13 @@ func checkRowValidations(typed master.Table, fields []ir.Field, def *ir.TypeDef,
 			continue // a coercion gap, already reported
 		}
 		for _, check := range def.Master.RowChecks {
-			// A row fails a check when its predicate folds to a definite false, or
-			// when a violated assertion was reached folding it — an assert in a row
-			// method the predicate calls whose condition was false for this row. A
-			// nil fold with no violation means the predicate could not be evaluated
-			// for this row (not that the row fails it), so it is left alone.
-			v, violated := eval.GraphPredicateViolation(check.Cond, self, def, env)
-			if violated || (v != nil && v.Kind == ir.ConstBool && !v.Bool) {
+			// A row passes a check only when its predicate folds to a definite true.
+			// A definite false fails it; so does a predicate that does not fold to a
+			// bool at all (a violated assertion in a row method it calls, an
+			// unevaluable expression) — a check that cannot confirm the row is valid
+			// fails it rather than passing silently, the fail-safe a data check wants.
+			v := eval.GraphPredicate(check.Cond, self, def, env)
+			if v == nil || v.Kind != ir.ConstBool || !v.Bool {
 				offset, width := assertSpan(doc, check.Syntax)
 				diags = append(diags, master.RowValidationFailed(offset, width, spec.Display, line))
 			}

@@ -271,6 +271,17 @@ func TestMasterValidateRejectsUndefinedName(t *testing.T) {
 	}
 }
 
+// TestMasterValidateRejectsUndefinedNameInLambda pins that the reference check
+// descends into a function literal in a validate check: an undefined name inside
+// a lambda is reported, not left to fold to nothing.
+func TestMasterValidateRejectsUndefinedNameInLambda(t *testing.T) {
+	src := "master M {\n  record { id: int }\n  primary id\n  validate {\n    each {\n      assert (fn(): bool { return Limit > 0 })()\n    }\n  }\n}\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeUndefinedName) {
+		t.Fatalf("want undefined_name for an undefined name in a validate lambda, got %v", codes(diags))
+	}
+}
+
 // TestAssertStatementFailsConstFold pins that a violated assert in a folded body
 // leaves the fold without a value rather than publishing an error as a typed
 // result: a const folding a function whose assertion fails is reported as
