@@ -59,6 +59,15 @@ func TestIntegerBitwiseIntrinsics(t *testing.T) {
 		t.Errorf("shl(1, 64) = %v, want 2^64", got)
 	}
 
+	// A zero receiver folds any non-negative shift to zero cheaply, even past the
+	// fold cap and past uint64 — 0 << n is 0, no wide integer to materialize.
+	if got := bin("shl", 0, maxShiftFoldBits+1); got == nil || got.Int.Sign() != 0 {
+		t.Errorf("shl(0, %d) = %v, want 0", maxShiftFoldBits+1, got)
+	}
+	if got := ii["shl"](intConst(0), []*ir.Constant{ir.IntConstant(huge)}); got == nil || got.Int.Sign() != 0 {
+		t.Errorf("shl(0, 2^64) = %v, want 0", got)
+	}
+
 	// A shift amount past the fold cap is left unfolded rather than materialized
 	// into an astronomically large value at compile time.
 	if got := bin("shl", 1, maxShiftFoldBits+1); got != nil {

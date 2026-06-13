@@ -36,6 +36,28 @@ func TestBitwiseShiftOverflow(t *testing.T) {
 	}
 }
 
+// TestBitwiseZeroShiftFolds pins that a zero receiver folds any non-negative
+// shift to zero cheaply — even past the fold cap — rather than refusing the wide
+// amount: 0 << n is 0, with no wide integer to build.
+func TestBitwiseZeroShiftFolds(t *testing.T) {
+	_, diags := analyze("const X: byte = byte(0).shl(2097153)\n")
+	if len(diags) != 0 {
+		t.Errorf("byte(0).shl(2097153): want no diagnostics (folds to 0), got %v", codes(diags))
+	}
+}
+
+// TestBitwiseNegativeShiftNotBudget pins that a negative shift amount reaching
+// the intrinsic through a non-constant signed parameter is not mislabeled a
+// budget refusal: noteBudget fires only for a non-negative oversized shift.
+func TestBitwiseNegativeShiftNotBudget(t *testing.T) {
+	_, diags := analyze("pub fn f(n: nint): byte { return byte(1).shl(n) }\nconst X = f(-1)\n")
+	for _, d := range diags {
+		if d.Code == CodeUnfoldedConst && strings.Contains(d.Message, "no compile-time value: depth") {
+			t.Errorf("f(-1): a negative shift mislabeled as a budget refusal: %q", d.Message)
+		}
+	}
+}
+
 // TestBitwiseShiftBudget pins that a shift too wide to materialize is classified
 // as a budget refusal, not an evaluator gap: it cannot fold (so the const is
 // unfolded), but the failure must not read as an internal masterbelt bug.

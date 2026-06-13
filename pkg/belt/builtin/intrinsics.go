@@ -104,10 +104,16 @@ func integerIntrinsics() map[string]Intrinsic {
 		"bor":  binaryInt(func(a, b *big.Int) *ir.Constant { return ir.IntConstant(new(big.Int).Or(a, b)) }),
 		"bxor": binaryInt(func(a, b *big.Int) *ir.Constant { return ir.IntConstant(new(big.Int).Xor(a, b)) }),
 		"shl": binaryInt(func(a, n *big.Int) *ir.Constant {
-			if n.Sign() < 0 || !n.IsUint64() || n.Uint64() > maxShiftFoldBits {
-				// A negative count is type-incorrect; a giant one is left unfolded —
+			if n.Sign() < 0 {
+				return nil // a negative count is type-incorrect, not a budget matter
+			}
+			if a.Sign() == 0 {
+				return ir.IntConstant(big.NewInt(0)) // 0 << n is 0, however wide n is
+			}
+			if !n.IsUint64() || n.Uint64() > maxShiftFoldBits {
+				// A non-negative count too wide to materialize: left unfolded, and
 				// the dispatcher turns this nil into a budget refusal (not an
-				// evaluator gap), since the value is simply too wide to materialize.
+				// evaluator gap), since the value is simply too wide to build.
 				return nil
 			}
 			return ir.IntConstant(new(big.Int).Lsh(a, uint(n.Uint64())))
