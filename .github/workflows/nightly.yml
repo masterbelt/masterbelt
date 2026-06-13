@@ -5,7 +5,7 @@
 #
 #   - the cross-platform CLI archives, attached to the rolling `nightly` release;
 #   - the multi-arch container image (ghcr :nightly and a pinned :nightly-<date>-<sha>);
-#   - the VS Code extension .vsix (Marketplace pre-release channel);
+#   - the VS Code extension .vsix (attached to the release; Marketplace is stable-only);
 #   - the tree-sitter grammar, synced and tagged to its mirror.
 #
 # The stable counterpart (release-stable.yml) calls the same actions with the
@@ -132,10 +132,11 @@ jobs:
           subject-digest: ${{ steps.image.outputs.digest }}
           push-to-registry: 'true'
 
-  # Package the VS Code extension as a .vsix and, when a Marketplace token is
-  # configured, publish it to the pre-release channel. Without the token the
-  # .vsix is still built and uploaded (publish degrades, never fails) — so forks
-  # and token-less setups stay green.
+  # Build the VS Code extension .vsix and attach it to the nightly release (it is
+  # uploaded as an artifact here and picked up by the publish job). The nightly is
+  # NOT published to the Marketplace — only stable releases go there, so the
+  # Marketplace keeps a single, clean version lane and a stable version is never
+  # shadowed by a higher-numbered nightly pre-release.
   vsix:
     name: editor extension package
     needs: gate
@@ -154,11 +155,11 @@ jobs:
           # The CLI version without build metadata — 0.1.<UTC commit date>,
           # monotonic for the rolling pre-release.
           echo "version=0.1.$(TZ=UTC0 git show -s --date=format-local:%Y%m%d --format=%cd HEAD)" >>"$GITHUB_OUTPUT"
+      # No vsce-pat: the nightly builds the .vsix but does not publish it to the
+      # Marketplace (stable-only lane).
       - uses: ./.github/actions/package-vsix
         with:
           version: ${{ steps.ver.outputs.version }}
-          pre-release: 'true'
-          vsce-pat: ${{ secrets.VSCE_PAT }}
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: masterbelt-vsix
