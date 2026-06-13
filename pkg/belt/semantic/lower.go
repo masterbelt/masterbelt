@@ -606,9 +606,12 @@ func (b bodyBinder) Leaf(e ast.Expr, sub func(ast.Expr) ir.Value) ir.Value {
 	}
 }
 
-// leafIdentifier lowers a bare name in value position. A let-bound local
-// shadows a same-named parameter or type, so it is resolved first; a top-level
-// constant in scope is the last reading.
+// leafIdentifier lowers a bare name in value position. The ordinary scope is
+// read first — a let local (which shadows a same-named parameter), a parameter, a
+// top-level constant, a type name — and a readable member of self is the last
+// resort: a bare name lowers to self.X only where it resolves no other way (self
+// omission), so power means self.power exactly where the checker's body leaf reads
+// it as one, in every walk.
 func (b bodyBinder) leafIdentifier(e *ast.Identifier) ir.Value {
 	if _, ok := b.locals[e.Name]; ok {
 		return &ir.LocalRef{Name: e.Name, Syntax: e}
@@ -626,6 +629,14 @@ func (b bodyBinder) leafIdentifier(e *ast.Identifier) ir.Value {
 	// body and a const agree, and the metatype comparison folds.
 	if def, ok := b.r.Defs[e.Name]; ok {
 		return &ir.TypeValue{Reified: reifyType(def), Syntax: e}
+	}
+	// Last resort: a bare name that resolves no other way reads a readable member
+	// of self (a field or getter), lowering to the same self.X access the explicit
+	// form does so power and self.power desugar identically. The membership test is
+	// the checker's exact field∪getter rule, so a name the body leaf typed as a self
+	// member lowers to a member read in every walk.
+	if b.self && infer.IsReadableMember(b.reg, b.selfType, e.Name) {
+		return &ir.FieldAccess{Receiver: &ir.SelfValue{}, Field: e.Name, Syntax: e}
 	}
 	return nil
 }

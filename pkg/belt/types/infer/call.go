@@ -37,7 +37,10 @@ func callType(e *ast.CallExpr, s scope, sink *Sink) ir.Type {
 		return nonMemberCallType(e, s, sink)
 	}
 	// A member-access callee whose receiver names a namespace is a call of an
-	// imported function (geo.area(...)), never a method call.
+	// imported function (geo.area(...)), never a method call. Self omission is last
+	// resort: a receiver that also reads a self member takes the self.recv.m()
+	// reading only where it names no namespace or type with the member, through the
+	// method-call path below.
 	if cands := s.fnMember(member); len(cands) > 0 {
 		return funcCallType(e, member.Member.Name, cands, s, sink)
 	}

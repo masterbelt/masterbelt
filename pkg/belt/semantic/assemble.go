@@ -432,7 +432,7 @@ func (a *assembler) checkConstValue(decl *ast.ConstDecl, annType ir.Type) {
 	// (unknown_member). Method names are not value references; the walk
 	// skips them, and it treats a namespace access as one unit, so its
 	// receiver is never reported as an undefined value.
-	reportRefIssues(a.fileID, decl.Value, a.q, a.at, a.diags, annotationEnum(a.q, a.fileID, decl))
+	reportRefIssues(a.fileID, decl.Value, a.q, a.at, a.diags, annotationEnum(a.q, a.fileID, decl), nil)
 	// One checking walk reports the expression diagnostics: operator
 	// type errors, type mismatches (against the annotation when there
 	// is one, and inside function-literal bodies), and literals whose
@@ -542,7 +542,7 @@ func (a *assembler) checkAssocConstRefs() {
 			if c.Value == nil {
 				continue
 			}
-			reportRefIssues(a.fileID, c.Value, a.q, a.at, a.diags, typeExprEnum(a.q, a.fileID, c.Type))
+			reportRefIssues(a.fileID, c.Value, a.q, a.at, a.diags, typeExprEnum(a.q, a.fileID, c.Type), nil)
 			checkNoSelf(c.Value, func(node ast.Node) {
 				s := a.at(node)
 				a.diags.Add(newSelfOutsideMethodDiagnostic(s.offset, s.width))
@@ -605,6 +605,15 @@ func (a *assembler) refoldConsts(genv graphFoldEnv) {
 // is bound to the row here, so a self reference is left alone (unlike a const).
 func (a *assembler) reportMasterValidationRefs() {
 	for _, md := range a.file.Masters {
+		// A per-row check is a body over the row (self), so a bare name reading a
+		// readable member of the row — a field or getter, self omitted — is a
+		// resolved reference, not an undefined name. The row receiver is the master's
+		// own resolved type, the same self the checker and lowering bind there.
+		var rowMember func(string) bool
+		if def := a.masterDef(md.Name); def != nil {
+			row := ir.Type(&ir.Named{Def: def})
+			rowMember = func(name string) bool { return infer.IsReadableMember(a.reg, row, name) }
+		}
 		for _, clause := range md.Validations {
 			if !clause.PerRow {
 				continue
@@ -616,11 +625,26 @@ func (a *assembler) reportMasterValidationRefs() {
 					// parameter) is not seen here and not misreported, and an undefined
 					// name inside a lambda body is left to the fold, which yields no
 					// value and fails the row under the data layer's fail-safe.
-					reportRefIssues(a.fileID, as.Cond, a.q, a.at, a.diags, nil)
+					reportRefIssues(a.fileID, as.Cond, a.q, a.at, a.diags, nil, rowMember)
 				}
 			}
 		}
 	}
+}
+
+// masterDef returns the assembled type definition of the named master, or nil
+// when no master of that name resolved — the row receiver a per-row check's bare
+// names read their fields and getters off.
+func (a *assembler) masterDef(name string) *ir.TypeDef {
+	if name == "" {
+		return nil
+	}
+	for _, def := range a.module.Types {
+		if def != nil && def.Name == name && def.Master != nil {
+			return def
+		}
+	}
+	return nil
 }
 
 // evaluateAsserts checks the compile-time assertions: each condition must
@@ -649,7 +673,7 @@ func (a *assembler) evaluateAssert(decl *ast.AssertDecl, genv graphFoldEnv) {
 	// member is not in scope (nil expected enum). Then the operator type
 	// errors, zero divisors, and stray selfs, through the same checking
 	// walks the const path uses.
-	reportRefIssues(a.fileID, decl.Cond, a.q, a.at, a.diags, nil)
+	reportRefIssues(a.fileID, decl.Cond, a.q, a.at, a.diags, nil, nil)
 	condType := infer.Check(decl.Cond, a.env, exprSink(a.at, a.diags, a.res))
 	a.checkExprDiagnostics(decl.Cond)
 
@@ -789,7 +813,7 @@ func reportUnknownNamespaceMember(fileID FileID, m *ast.MemberExpr, q queries, a
 	diags.Add(newUnknownMemberDiagnostic(s.offset, s.width, m.Member.Name, ns.Name))
 }
 
-func reportRefIssues(fileID FileID, e ast.Expr, q queries, at func(ast.Node) span, diags *diagnostic.List, expectedEnum *ir.TypeDef) {
+func reportRefIssues(fileID FileID, e ast.Expr, q queries, at func(ast.Node) span, diags *diagnostic.List, expectedEnum *ir.TypeDef, isSelfMember func(string) bool) {
 	walkRefsEnum(fileID, e, q,
 		func(id *ast.Identifier) {
 			if id.Name == "" || q.resolve(fileID, id) != nil {
@@ -798,6 +822,12 @@ func reportRefIssues(fileID FileID, e ast.Expr, q queries, at func(ast.Node) spa
 			// A bare member of the expected enum is a resolved reference, not an
 			// undefined name.
 			if expectedEnum != nil && enumIndex(expectedEnum, id.Name) >= 0 {
+				return
+			}
+			// In a body with a receiver (a master per-row check), a bare name that
+			// reads a readable member of the row — a field or getter — is a resolved
+			// self read with self omitted, not an undefined name.
+			if isSelfMember != nil && isSelfMember(id.Name) {
 				return
 			}
 			// A bare type name is a compile-time type value (const x = int8), not

@@ -189,8 +189,15 @@ func checkLocalAssign(s *ast.AssignStmt, id *ast.Identifier, want ir.Type, bs in
 // in which case a member flowing into a union local (an alias like
 // optional<Rarity>) is the explicit adaption the IR records.
 func checkBareEnumAssign(s *ast.AssignStmt, enumDef *ir.TypeDef, want ir.Type, bs infer.BodyScope, env exprFolder, sink *infer.Sink, at func(ast.Node) span, diags *diagnostic.List) bool {
-	reportBareEnumMember(s.Value, enumDef, bs, env, at, diags)
 	id, ok := s.Value.(*ast.Identifier)
+	// Self omission is last resort: a value that reads a readable member of self is
+	// left to the ordinary synthesis (which the leaf resolves to self.name) rather
+	// than taken as the enum member here, matching the lowering's enum-assignment
+	// binder, which also defers to the leaf. The non-self-member shorthand stays.
+	if ok && infer.IsReadableMember(bs.Reg, bs.Self, id.Name) {
+		return false
+	}
+	reportBareEnumMember(s.Value, enumDef, bs, env, at, diags)
 	if !ok || enumIndex(enumDef, id.Name) < 0 {
 		return false
 	}
@@ -274,6 +281,9 @@ func reportBareEnumMember(value ast.Expr, enumDef *ir.TypeDef, bs infer.BodyScop
 	}
 	if _, isFunc := bs.Funcs[id.Name]; isFunc {
 		return
+	}
+	if infer.IsReadableMember(bs.Reg, bs.Self, id.Name) {
+		return // a readable member of self read with self omitted: a resolved field/getter, not an enum shorthand
 	}
 	if env.q != nil && env.q.resolve(env.file, id) != nil {
 		return // a top-level constant: a legitimate reference

@@ -1,0 +1,523 @@
+File
+  Uses: ~
+  Decls:
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Hero"
+      Type: NamedType
+        Namespace: ""
+        Name: "Fighter"
+        Args: ~
+        Projections: ~
+      Value: RecordLit
+        TypeName: ""
+        Fields:
+          FieldInit
+            Name: "power"
+            Value: IntLit
+              Text: "7"
+              Base: 0
+          FieldInit
+            Name: "defense"
+            Value: IntLit
+              Text: "3"
+              Base: 0
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Champion"
+      Type: NamedType
+        Namespace: ""
+        Name: "FighterExplicit"
+        Args: ~
+        Projections: ~
+      Value: RecordLit
+        TypeName: ""
+        Fields:
+          FieldInit
+            Name: "power"
+            Value: IntLit
+              Text: "7"
+              Base: 0
+          FieldInit
+            Name: "defense"
+            Value: IntLit
+              Text: "3"
+              Base: 0
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "Full"
+      Type: NamedType
+        Namespace: ""
+        Name: "Health"
+        Args: ~
+        Projections: ~
+      Value: IntLit
+        Text: "100"
+        Base: 0
+      Builtin: false
+    ConstDecl
+      Doc: ~
+      Public: false
+      Name: "ValidScore"
+      Type: NamedType
+        Namespace: ""
+        Name: "Score"
+        Args: ~
+        Projections: ~
+      Value: IntLit
+        Text: "75"
+        Base: 0
+      Builtin: false
+  Types:
+    TypeDecl
+      Doc: "A combatant whose method and getter bodies read its fields with self omitted."
+      Public: true
+      Name: "Fighter"
+      Params: ~
+      Body: RecordType
+        Fields:
+          FieldDef
+            Name: "power"
+            Type: NamedType
+              Namespace: ""
+              Name: "nint"
+              Args: ~
+              Projections: ~
+          FieldDef
+            Name: "defense"
+            Type: NamedType
+              Namespace: ""
+              Name: "nint"
+              Args: ~
+              Projections: ~
+      Where: ~
+      Methods:
+        MethodDecl
+          Doc: "Total stat budget: power and defense are bare reads of self's fields."
+          Public: true
+          Extern: false
+          Kind: 0
+          Effects: ~
+          Name: "rating"
+          TypeParams: ~
+          Params: ~
+          Result: NamedType
+            Namespace: ""
+            Name: "nint"
+            Args: ~
+            Projections: ~
+          Body:
+            ReturnStmt
+              Value: CallExpr
+                Callee: MemberExpr
+                  Receiver: Identifier
+                    Name: "power"
+                  Member: Identifier
+                    Name: "add"
+                Arguments:
+                  Identifier
+                    Name: "defense"
+        MethodDecl
+          Doc: "A bare field read alongside a parameter — bonus is the parameter, power" "and defense the fields; no name is shared, so there is no ambiguity."
+          Public: true
+          Extern: false
+          Kind: 0
+          Effects: ~
+          Name: "ratingPlus"
+          TypeParams: ~
+          Params:
+            ParamDef
+              Name: "bonus"
+              Type: NamedType
+                Namespace: ""
+                Name: "nint"
+                Args: ~
+                Projections: ~
+          Result: NamedType
+            Namespace: ""
+            Name: "nint"
+            Args: ~
+            Projections: ~
+          Body:
+            ReturnStmt
+              Value: CallExpr
+                Callee: MemberExpr
+                  Receiver: CallExpr
+                    Callee: MemberExpr
+                      Receiver: Identifier
+                        Name: "power"
+                      Member: Identifier
+                        Name: "add"
+                    Arguments:
+                      Identifier
+                        Name: "defense"
+                  Member: Identifier
+                    Name: "add"
+                Arguments:
+                  Identifier
+                    Name: "bonus"
+        MethodDecl
+          Doc: "A getter body reads a sibling field bare."
+          Public: true
+          Extern: false
+          Kind: 1
+          Effects: ~
+          Name: "doubledPower"
+          TypeParams: ~
+          Params: ~
+          Result: NamedType
+            Namespace: ""
+            Name: "nint"
+            Args: ~
+            Projections: ~
+          Body:
+            ReturnStmt
+              Value: CallExpr
+                Callee: MemberExpr
+                  Receiver: Identifier
+                    Name: "power"
+                  Member: Identifier
+                    Name: "mul"
+                Arguments:
+                  IntLit
+                    Text: "2"
+                    Base: 0
+        MethodDecl
+          Doc: "A getter body reads a sibling getter bare (doubledPower means" "self.doubledPower) and a field bare in the same expression."
+          Public: true
+          Extern: false
+          Kind: 1
+          Effects: ~
+          Name: "scaled"
+          TypeParams: ~
+          Params: ~
+          Result: NamedType
+            Namespace: ""
+            Name: "nint"
+            Args: ~
+            Projections: ~
+          Body:
+            ReturnStmt
+              Value: CallExpr
+                Callee: MemberExpr
+                  Receiver: Identifier
+                    Name: "doubledPower"
+                  Member: Identifier
+                    Name: "add"
+                Arguments:
+                  Identifier
+                    Name: "defense"
+      Consts: ~
+      Impls: ~
+    TypeDecl
+      Doc: ~
+      Public: true
+      Name: "FighterExplicit"
+      Params: ~
+      Body: RecordType
+        Fields:
+          FieldDef
+            Name: "power"
+            Type: NamedType
+              Namespace: ""
+              Name: "nint"
+              Args: ~
+              Projections: ~
+          FieldDef
+            Name: "defense"
+            Type: NamedType
+              Namespace: ""
+              Name: "nint"
+              Args: ~
+              Projections: ~
+      Where: ~
+      Methods:
+        MethodDecl
+          Doc: "The same total, written with self. spelled out."
+          Public: true
+          Extern: false
+          Kind: 0
+          Effects: ~
+          Name: "rating"
+          TypeParams: ~
+          Params: ~
+          Result: NamedType
+            Namespace: ""
+            Name: "nint"
+            Args: ~
+            Projections: ~
+          Body:
+            ReturnStmt
+              Value: CallExpr
+                Callee: MemberExpr
+                  Receiver: MemberExpr
+                    Receiver: SelfExpr
+                    Member: Identifier
+                      Name: "power"
+                  Member: Identifier
+                    Name: "add"
+                Arguments:
+                  MemberExpr
+                    Receiver: SelfExpr
+                    Member: Identifier
+                      Name: "defense"
+      Consts: ~
+      Impls: ~
+    TypeDecl
+      Doc: ~
+      Public: true
+      Name: "Health"
+      Params: ~
+      Body: NamedType
+        Namespace: ""
+        Name: "nint"
+        Args: ~
+        Projections: ~
+      Where: ~
+      Methods:
+        MethodDecl
+          Doc: "The health expressed in tens — self is the underlying nint."
+          Public: true
+          Extern: false
+          Kind: 1
+          Effects: ~
+          Name: "band"
+          TypeParams: ~
+          Params: ~
+          Result: NamedType
+            Namespace: ""
+            Name: "nint"
+            Args: ~
+            Projections: ~
+          Body:
+            ReturnStmt
+              Value: CallExpr
+                Callee: MemberExpr
+                  Receiver: CallExpr
+                    Callee: Identifier
+                      Name: "nint"
+                    Arguments:
+                      SelfExpr
+                  Member: Identifier
+                    Name: "div"
+                Arguments:
+                  IntLit
+                    Text: "10"
+                    Base: 0
+        MethodDecl
+          Doc: "One band above the current one: band is a bare read of the getter above."
+          Public: true
+          Extern: false
+          Kind: 1
+          Effects: ~
+          Name: "nextBand"
+          TypeParams: ~
+          Params: ~
+          Result: NamedType
+            Namespace: ""
+            Name: "nint"
+            Args: ~
+            Projections: ~
+          Body:
+            ReturnStmt
+              Value: CallExpr
+                Callee: MemberExpr
+                  Receiver: Identifier
+                    Name: "band"
+                  Member: Identifier
+                    Name: "add"
+                Arguments:
+                  IntLit
+                    Text: "1"
+                    Base: 0
+      Consts: ~
+      Impls: ~
+    TypeDecl
+      Doc: "A score valid only within the 0..100 band, checked by a self method."
+      Public: true
+      Name: "Score"
+      Params: ~
+      Body: NamedType
+        Namespace: ""
+        Name: "int"
+        Args: ~
+        Projections: ~
+      Where: CallExpr
+        Callee: Identifier
+          Name: "inBand"
+        Arguments: ~
+      Methods:
+        MethodDecl
+          Doc: "Whether the score lies in the valid band — a bare read of self."
+          Public: true
+          Extern: false
+          Kind: 0
+          Effects: ~
+          Name: "inBand"
+          TypeParams: ~
+          Params: ~
+          Result: NamedType
+            Namespace: ""
+            Name: "bool"
+            Args: ~
+            Projections: ~
+          Body:
+            ReturnStmt
+              Value: CallExpr
+                Callee: MemberExpr
+                  Receiver: CallExpr
+                    Callee: MemberExpr
+                      Receiver: SelfExpr
+                      Member: Identifier
+                        Name: "gteq"
+                    Arguments:
+                      IntLit
+                        Text: "0"
+                        Base: 0
+                  Member: Identifier
+                    Name: "anan"
+                Arguments:
+                  CallExpr
+                    Callee: MemberExpr
+                      Receiver: SelfExpr
+                      Member: Identifier
+                        Name: "lteq"
+                    Arguments:
+                      IntLit
+                        Text: "100"
+                        Base: 0
+      Consts: ~
+      Impls: ~
+  Enums: ~
+  Interfaces: ~
+  Funcs: ~
+  Asserts:
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: MemberExpr
+              Receiver: Identifier
+                Name: "Hero"
+              Member: Identifier
+                Name: "rating"
+            Arguments: ~
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "10"
+            Base: 0
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: MemberExpr
+              Receiver: Identifier
+                Name: "Hero"
+              Member: Identifier
+                Name: "ratingPlus"
+            Arguments:
+              IntLit
+                Text: "5"
+                Base: 0
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "15"
+            Base: 0
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: MemberExpr
+            Receiver: Identifier
+              Name: "Hero"
+            Member: Identifier
+              Name: "doubledPower"
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "14"
+            Base: 0
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: MemberExpr
+            Receiver: Identifier
+              Name: "Hero"
+            Member: Identifier
+              Name: "scaled"
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "17"
+            Base: 0
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: MemberExpr
+              Receiver: Identifier
+                Name: "Champion"
+              Member: Identifier
+                Name: "rating"
+            Arguments: ~
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "10"
+            Base: 0
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: MemberExpr
+            Receiver: Identifier
+              Name: "Full"
+            Member: Identifier
+              Name: "band"
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "10"
+            Base: 0
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: MemberExpr
+            Receiver: Identifier
+              Name: "Full"
+            Member: Identifier
+              Name: "nextBand"
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "11"
+            Base: 0
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: Identifier
+            Name: "ValidScore"
+          Member: Identifier
+            Name: "inBand"
+        Arguments: ~
+  Masters: ~

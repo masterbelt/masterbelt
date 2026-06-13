@@ -53,11 +53,19 @@ func checkEffects(reg *builtin.Registry, file *ast.File, defs []*ir.TypeDef, uni
 			for _, p := range irm.Params {
 				params[p.Name] = substSelf(p.Type, self)
 			}
+			// A static fn has no receiver: its body walks with self unbound, the same
+			// as the checker and lowering type and lower it, so a bare name there reads
+			// a top-level constant — never an implicit self.field — and the effect
+			// collector inspects the constant's effects rather than a same-named field's.
+			methodSelf := ir.Type(self)
+			if irm.Kind == ir.MethodStatic {
+				methodSelf = ir.Invalid
+			}
 			// The method's generic type parameters — the enclosing type's and the
 			// method's own — are in scope for its body, so a type-parameter callee
 			// (T(v)) is read as a conversion here, the same as in the function path and
 			// in the checker, rather than falling through to a same-named function.
-			bs := infer.BodyScope{Reg: reg, Universe: universe, Qualified: qualified, Self: self, Params: params, Funcs: funcs, QualifiedFuncs: qualifiedFuncs, ConstShadows: constShadows, TScope: methodTScope(r, def, m)}
+			bs := infer.BodyScope{Reg: reg, Universe: universe, Qualified: qualified, Self: methodSelf, Params: params, Funcs: funcs, QualifiedFuncs: qualifiedFuncs, ConstShadows: constShadows, TScope: methodTScope(r, def, m)}
 			checkDeclEffects(def.Name+"."+irm.Name, m.Effects, m, m.Body, bs, at, diags)
 		}
 		// A master's per-row validate checks are pure: they fold against each row

@@ -1,0 +1,78 @@
+// Self omission: in a body with a receiver, a bare name reads one of self's
+// readable members — a field or a getter — so power means self.power. A method,
+// getter, or refinement body may drop the self. the explicit form still accepts,
+// and the two desugar identically: bare power and self.power are the same field
+// read, folding to the same value. Only the readable members (field or getter)
+// resolve bare; a method still needs self.foo(), and a table-level static or
+// associated constant is read off the type (Type.Max), not bare.
+
+/// A combatant whose method and getter bodies read its fields with self omitted.
+pub type Fighter = { power: nint, defense: nint } impl {
+  /// Total stat budget: power and defense are bare reads of self's fields.
+  pub rating(): nint {
+    return power + defense
+  }
+  /// A bare field read alongside a parameter — bonus is the parameter, power
+  /// and defense the fields; no name is shared, so there is no ambiguity.
+  pub ratingPlus(bonus: nint): nint {
+    return power + defense + bonus
+  }
+  /// A getter body reads a sibling field bare.
+  pub get doubledPower(): nint {
+    return power * 2
+  }
+  /// A getter body reads a sibling getter bare (doubledPower means
+  /// self.doubledPower) and a field bare in the same expression.
+  pub get scaled(): nint {
+    return doubledPower + defense
+  }
+}
+
+// The bare reads fold in const initializers and asserts, exactly as a self.
+// read does.
+const Hero: Fighter = { power: 7, defense: 3 }
+assert Hero.rating() == 10
+assert Hero.ratingPlus(5) == 15
+assert Hero.doubledPower == 14
+assert Hero.scaled == 17
+
+// The explicit self. form is unchanged and reads identically — bare is additive.
+pub type FighterExplicit = { power: nint, defense: nint } impl {
+  /// The same total, written with self. spelled out.
+  pub rating(): nint {
+    return self.power + self.defense
+  }
+}
+
+const Champion: FighterExplicit = { power: 7, defense: 3 }
+assert Champion.rating() == 10
+
+// Self omission works over a nominal type's underlying primitive too: a getter
+// reads self through a conversion, and a method reads a sibling getter bare.
+pub type Health = nint impl {
+  /// The health expressed in tens — self is the underlying nint.
+  pub get band(): nint {
+    return nint(self) / 10
+  }
+  /// One band above the current one: band is a bare read of the getter above.
+  pub get nextBand(): nint {
+    return band + 1
+  }
+}
+
+const Full: Health = 100
+assert Full.band == 10
+assert Full.nextBand == 11
+
+// A refinement predicate is a body over self the same way: a self method called
+// bare folds the predicate, and that method body reads its operand bare.
+/// A score valid only within the 0..100 band, checked by a self method.
+pub type Score = int where inBand() impl {
+  /// Whether the score lies in the valid band — a bare read of self.
+  pub inBand(): bool {
+    return self >= 0 && self <= 100
+  }
+}
+
+const ValidScore: Score = 75
+assert ValidScore.inBand()

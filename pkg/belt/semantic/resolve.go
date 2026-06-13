@@ -1884,7 +1884,15 @@ func resolveMethod(r *infer.TypeResolver, reg *builtin.Registry, self ir.Type, m
 		resolvedParams[p.Name] = t
 	}
 	method.Result = r.ResolveType(m.Result, mscope)
-	method.Body = lower.Body(m.Body, bodyBinder{r: r, reg: reg, params: params, paramTypes: resolvedParams, selfType: self, tscope: mscope, funcs: fns, self: true})
+	// A static fn has no receiver: its body lowers with self unbound, exactly as the
+	// checker types it (Self ir.Invalid), so a bare name there reads a top-level
+	// constant or a type — never an implicit self.field — and the lowered IR matches
+	// the checked expression. An instance method, getter, or setter binds self.
+	selfType, hasSelf := self, true
+	if m.Kind == ast.MethodStatic {
+		selfType, hasSelf = ir.Invalid, false
+	}
+	method.Body = lower.Body(m.Body, bodyBinder{r: r, reg: reg, params: params, paramTypes: resolvedParams, selfType: selfType, tscope: mscope, funcs: fns, self: hasSelf})
 	return method
 }
 
