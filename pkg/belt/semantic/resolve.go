@@ -193,29 +193,6 @@ func typeParamValueReporter(at func(ast.Node) span, diags *diagnostic.List) func
 	}
 }
 
-// selfMemberClashReporter builds the body leaf's reach to the self-member-clash
-// diagnostic: a bare name that is at once a readable member of self (a field or
-// getter) and a local or parameter, an ambiguity the self-omission rule forbids.
-// It mirrors typeParamValueReporter, keying by identifier node so the several body walks
-// that share a scope (the type walk, the checking walk re-deriving a member
-// receiver, the bare-enum-argument walk) yield one diagnostic per offending use,
-// not one per walk. It is nil when there is nothing to report through, leaving
-// the leaf's silent ir.Invalid reading.
-func selfMemberClashReporter(at func(ast.Node) span, diags *diagnostic.List) func(ast.Node, string) {
-	if at == nil || diags == nil {
-		return nil
-	}
-	seen := map[ast.Node]bool{}
-	return func(node ast.Node, name string) {
-		if seen[node] {
-			return
-		}
-		seen[node] = true
-		s := at(node)
-		diags.Add(newSelfMemberNameClashDiagnostic(s.offset, s.width, name))
-	}
-}
-
 // resolveTypes resolves the file's type declarations into ir.TypeDefs, in source
 // order. A type reference resolves against the other declarations in the file
 // (so a declaration may refer to a type defined later in the file), extern —

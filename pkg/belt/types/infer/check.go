@@ -150,9 +150,14 @@ func checkEnumShorthand(e ast.Expr, want ir.Type, s scope, sink *Sink) (ir.Type,
 	if member == nil {
 		return ir.Invalid, false
 	}
+	// Self omission is last resort, and the value leaf resolves a self member
+	// before this enum shorthand would, so a name that reads a readable member of
+	// self is left to the leaf's self.X reading rather than taken as the enum
+	// member here — matching the lowering, whose enum-expectation binder also
+	// defers to the leaf. The non-self-member shorthand (const Top: Rarity =
+	// Legend) is unaffected.
 	if selfMemberClash(s, id.Name) {
-		s.reportSelfMemberClash(id, id.Name)
-		return ir.Invalid, true
+		return ir.Invalid, false
 	}
 	if !types.Identical(member, want) {
 		sink.adapted(e, want)

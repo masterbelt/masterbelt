@@ -123,7 +123,6 @@ belt.semantic.type_has_no_fields,error,typ:string member:string
 belt.semantic.cyclic_type_projection,error,typ:string member:string
 belt.semantic.generic_type_projection,error,typ:string
 belt.semantic.type_param_in_value_position,error,name:string
-belt.semantic.self_member_name_clash,error,name:string
 project.config.missing,error,
 project.config.invalid,error,detail:string
 project.config.missing_entry,error,

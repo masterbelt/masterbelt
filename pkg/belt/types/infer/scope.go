@@ -79,19 +79,6 @@ func (s funcScope) shadows(name string) bool {
 func (s funcScope) leaf(e ast.Expr) ir.Type {
 	switch e := e.(type) {
 	case *ast.Identifier:
-		_, isLocal := s.locals[e.Name]
-		_, isParam := s.params[e.Name]
-		if isLocal || isParam {
-			// A lambda local or parameter that also names a readable member of the
-			// inherited self is the same ambiguity the method body forbids: a bare name
-			// that could read self.X or this binding. Report it and resolve to neither,
-			// the way the body leaf reports a method-level clash, rather than silently
-			// taking the binding — a function literal in a method body sees self.
-			if self := s.self(); self != nil && self != ir.Invalid && memberReadType(s.registry(), self, e.Name) != ir.Invalid {
-				s.reportSelfMemberClash(e, e.Name)
-				return ir.Invalid
-			}
-		}
 		// A let-bound local shadows a same-named parameter, so it is read first.
 		if t, ok := s.locals[e.Name]; ok {
 			return t
@@ -138,13 +125,6 @@ func (s funcScope) nsReceiver(recv ast.Expr) bool {
 		return false // a lambda local or parameter shadows the namespace import
 	}
 	return s.outer.nsReceiver(recv)
-}
-
-// reportSelfMemberClash forwards to the enclosing scope: a function literal in a
-// method body inherits that body's receiver and its clash reporter, so a lambda
-// binding that shadows a reachable self member is reported there.
-func (s funcScope) reportSelfMemberClash(node ast.Node, name string) {
-	s.outer.reportSelfMemberClash(node, name)
 }
 
 // metatype is the type of a reified type value — the builtin `type` (type :
@@ -241,10 +221,6 @@ func (s constScope) fnMember(m *ast.MemberExpr) []*ast.FuncDecl {
 // existing reading.
 func (s constScope) nsReceiver(ast.Expr) bool { return false }
 
-// reportSelfMemberClash: a constant initializer has no receiver, so a bare name
-// never clashes with a self member here; nothing to report.
-func (s constScope) reportSelfMemberClash(ast.Node, string) {}
-
 // BodyScope types a method or function body: the receiver type (Self —
 // ir.Invalid in a function, which has none), the parameter types (Params),
 // the type universe (Universe) a conversion resolves against, and the
@@ -301,17 +277,6 @@ type BodyScope struct {
 	// sink-only func-literal settling pass, the effect and refinement walks),
 	// leaving the use to its prior silent reading.
 	ReportTypeParamValue func(node ast.Node, name string)
-	// ReportSelfMemberClash reports a bare name that is at once a readable member
-	// of self (a field or getter, read with self omitted) and a local or parameter
-	// of the same name — an ambiguity the self-omission rule forbids, so the leaf
-	// resolves it to neither and reports it here rather than silently picking one.
-	// It is the self-omission twin of ReportTypeParamValue, reached only in a body
-	// with a receiver; nil in a non-reporting walk (the effect and refinement walks,
-	// the func-literal settling pass), where the leaf returns ir.Invalid for the
-	// clash without a diagnostic. A refinement predicate and a master per-row check
-	// have no parameters or locals, so the clash never arises there even when the
-	// reporter is nil.
-	ReportSelfMemberClash func(node ast.Node, name string)
 }
 
 // Body infers the type of a method-body expression: self, a parameter, a
@@ -336,15 +301,6 @@ func (s BodyScope) self() ir.Type {
 func (s BodyScope) rigid(name string) bool {
 	_, ok := s.TScope[name]
 	return ok
-}
-
-// reportSelfMemberClash forwards a member/binding name clash to the body's
-// reporter, the one a reporting walk wires in; it is a no-op in a walk that
-// carries none.
-func (s BodyScope) reportSelfMemberClash(node ast.Node, name string) {
-	if s.ReportSelfMemberClash != nil {
-		s.ReportSelfMemberClash(node, name)
-	}
 }
 
 // tscope is the body's generic type-parameter scope — the enclosing function's
@@ -421,17 +377,10 @@ func (s BodyScope) leaf(e ast.Expr) ir.Type {
 		// A member access whose receiver names a type — an enum member
 		// (Element.Fire) or an associated constant (int8.Max, Level.Max) — is a
 		// value of that type; a local or parameter shadowing the type name takes
-		// the record-field reading instead.
+		// the record-field reading instead. A receiver that also reads a self member
+		// (self omission is last resort) only takes the self.recv.x reading below
+		// when the type member does not resolve here.
 		if t, ok := s.typeMemberValue(e); ok {
-			// The type member resolved, so when the receiver is also a readable
-			// member of self the read is genuinely ambiguous between the type-member
-			// reading (Item.Max) and the implicit self read (self.Item.Max): report
-			// the clash. A receiver that names a type without the member never reaches
-			// here (typeMemberValue is false), so self.recv.x reads through below.
-			if recv, ok := e.Receiver.(*ast.Identifier); ok && selfMemberClash(s, recv.Name) {
-				s.reportSelfMemberClash(recv, recv.Name)
-				return ir.Invalid
-			}
 			return t
 		}
 		// A namespace-import receiver (T.x reading the import's exported member) is
@@ -450,51 +399,28 @@ func (s BodyScope) leaf(e ast.Expr) ir.Type {
 	}
 }
 
-// identifierLeaf types a bare name in value position. A bare name in a body with
-// a receiver may read one of self's readable members — a field or getter — the
-// implicit-self form of self.X (self omission), typed exactly as the explicit
-// self.X member read is. The member is "inner": it beats a type name and a
-// top-level constant of the same name (which the leaf reads as a type value or,
-// in lowering, a reference). It does not silently beat a local or parameter of
-// the same name, though: that clash is an ambiguity, so it is reported and
-// resolved to neither, rather than shadowing one with the other.
+// identifierLeaf types a bare name in value position. The ordinary scope is read
+// first — a let local, a parameter, a type parameter, a type name — and a
+// readable member of self (a field or getter) is the last resort: a bare name
+// reads self.X only where it resolves no other way (self omission). This makes
+// the feature purely additive — a name that already resolves keeps its meaning,
+// and a name that collides with a type, parameter, or local takes that reading,
+// not the self member.
 func (s BodyScope) identifierLeaf(e *ast.Identifier) ir.Type {
-	selfMember := ir.Invalid
-	if s.Self != nil {
-		selfMember = memberReadType(s.registry(), s.Self, e.Name)
-	}
-	_, isLocal := s.Locals[e.Name]
-	_, isParam := s.Params[e.Name]
-	if selfMember != ir.Invalid && (isLocal || isParam) {
-		if s.ReportSelfMemberClash != nil {
-			s.ReportSelfMemberClash(e, e.Name)
-		}
-		return ir.Invalid
-	}
 	// A let-bound local shadows a same-named parameter, so it is read first.
-	if isLocal {
-		return s.Locals[e.Name]
+	if t, ok := s.Locals[e.Name]; ok {
+		return t
 	}
-	if isParam {
-		return s.Params[e.Name]
-	}
-	// The implicit-self member read, before the type-name and type-parameter
-	// readings below — a self field or getter wins over a same-named type (the
-	// member is inner), and over the type-parameter rejection, since a real
-	// readable value is not a type parameter consumed as a value.
-	if selfMember != ir.Invalid {
-		return selfMember
+	if t, ok := s.Params[e.Name]; ok {
+		return t
 	}
 	// A generic type parameter consumed as a value (T == string, return T, or the
 	// receiver of a value read T.x reached through exprType below) is a compile-
 	// time type, not a foldable value: it is rejected, and reported in a reporting
-	// walk. This is checked before the type-name reading below, so a parameter
-	// whose name also names a declared or builtin type wins over that type —
-	// mirroring how an annotation in the same scope resolves T to the parameter. A
-	// top-level constant of the same name shadows it (the body reads the constant),
-	// so the constant case is excluded; a namespace import — the one value-position
-	// shadow this scope does not carry — is excluded upstream, where a namespace
-	// member read T.x resolves before its receiver is taken as a value.
+	// walk. A top-level constant of the same name shadows it (the body reads the
+	// constant), so the constant case is excluded; a namespace import — the one
+	// value-position shadow this scope does not carry — is excluded upstream, where
+	// a namespace member read T.x resolves before its receiver is taken as a value.
 	if s.rigid(e.Name) && (s.ConstShadows == nil || !s.ConstShadows(e)) {
 		if s.ReportTypeParamValue != nil {
 			s.ReportTypeParamValue(e, e.Name)
@@ -506,6 +432,15 @@ func (s BodyScope) identifierLeaf(e *ast.Identifier) ir.Type {
 	// (let t = sbyte, long == long) types it identically.
 	if _, ok := s.Universe[e.Name]; ok {
 		return metatype()
+	}
+	// Last resort: a bare name that resolves no other way reads a readable member
+	// of self (self omitted) — power means self.power only where power is not a
+	// local, parameter, type parameter, or type. Typed exactly as the explicit
+	// self.power member read is.
+	if s.Self != nil {
+		if t := memberReadType(s.registry(), s.Self, e.Name); t != ir.Invalid {
+			return t
+		}
 	}
 	return ir.Invalid
 }

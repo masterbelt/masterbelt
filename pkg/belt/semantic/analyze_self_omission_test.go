@@ -1,10 +1,11 @@
 // These tests pin self omission: in a body with a receiver, a bare name reads
 // one of self's readable members (a field or getter), so power means self.power.
-// The bare and explicit forms desugar to the same field/getter read and fold to
-// the same value; a bare name that also names a parameter or local is ambiguous
-// and is reported rather than silently shadowed. Only readable members resolve
-// bare — a method still needs self.foo(), and a table-level associated constant
-// is read off the type (Type.Max), not bare.
+// Resolution is last resort — a bare name reads a self member only where it
+// resolves no other way (a local, parameter, type, function, namespace, or enum
+// member of the same name takes that reading instead), so the feature is purely
+// additive: a name that already resolves keeps its meaning, and self.X is the
+// explicit form for a member that collides with another name. The bare and
+// explicit forms desugar to the same field/getter read and fold to the same value.
 package semantic
 
 import (
@@ -14,10 +15,9 @@ import (
 )
 
 // TestSelfOmissionFoldsLikeExplicit pins that a bare field read in a method body
-// folds to the same value the explicit self. form does — the additive guarantee
-// of self omission. It is a red→green gate: drop the self-member step from the body leaf
-// and lowering and the bare reads no longer resolve, so the const stops folding
-// and the test fails.
+// folds to the same value the explicit self. form does. It is a red→green gate:
+// drop the self-member step from the body leaf and lowering and the bare reads no
+// longer resolve, so the const stops folding and the test fails.
 func TestSelfOmissionFoldsLikeExplicit(t *testing.T) {
 	src := "pub type Fighter = { power: nint, defense: nint } impl {\n" +
 		"  pub rating(): nint {\n    return power + defense\n  }\n" +
@@ -40,8 +40,8 @@ func TestSelfOmissionFoldsLikeExplicit(t *testing.T) {
 }
 
 // TestSelfOmissionGetterReadsGetter pins that a getter body reads a sibling
-// getter bare (doubledPower means self.doubledPower) and folds — readable members
-// are field ∪ getter, so a bare getter read resolves like a bare field read.
+// getter bare (doubled means self.doubled) and folds — readable members are
+// field ∪ getter, so a bare getter read resolves like a bare field read.
 func TestSelfOmissionGetterReadsGetter(t *testing.T) {
 	src := "pub type Fighter = { power: nint } impl {\n" +
 		"  pub get doubled(): nint {\n    return power * 2\n  }\n" +
@@ -85,69 +85,57 @@ func TestSelfOmissionLowersToSelfFieldAccess(t *testing.T) {
 	}
 }
 
-// TestSelfMemberNameClashParam pins the ambiguity: a bare name that is at once a
-// readable member of self and a parameter is reported, not resolved to either.
-// A column name and an argument name that collide are an error, not a shadow.
-func TestSelfMemberNameClashParam(t *testing.T) {
-	src := "pub type Box = { value: nint } impl {\n" +
-		"  pub pick(value: nint): nint {\n    return value\n  }\n" +
-		"}\n"
-	_, diags := analyze(src)
-	if !hasCode(diags, CodeSelfMemberNameClash) {
-		t.Fatalf("want self_member_name_clash (value is both a field and a parameter), got %v", codes(diags))
-	}
-}
-
-// TestSelfMemberNameClashLocal pins that the clash rule covers a let-bound local
-// the same as a parameter — the general body has lets the scope DSL does not, and
-// the clash rule is applied uniformly rather than split between body kinds.
-func TestSelfMemberNameClashLocal(t *testing.T) {
-	src := "pub type Box = { value: nint } impl {\n" +
-		"  pub pick(): nint {\n    let value = 1\n    return value\n  }\n" +
-		"}\n"
-	_, diags := analyze(src)
-	if !hasCode(diags, CodeSelfMemberNameClash) {
-		t.Fatalf("want self_member_name_clash (value is both a field and a local), got %v", codes(diags))
-	}
-}
-
-// TestSelfMemberNameClashReportedOnce pins that the several body walks sharing a
-// scope yield exactly one clash diagnostic per offending use, keyed by node.
-func TestSelfMemberNameClashReportedOnce(t *testing.T) {
-	src := "pub type Box = { value: nint } impl {\n" +
-		"  pub pick(value: nint): nint {\n    return value\n  }\n" +
-		"}\n"
-	_, diags := analyze(src)
-	n := 0
-	for _, d := range diags {
-		if d.Code == CodeSelfMemberNameClash {
-			n++
-		}
-	}
-	if n != 1 {
-		t.Fatalf("self_member_name_clash count = %d, want 1 (all: %v)", n, codes(diags))
-	}
-}
-
-// TestSelfOmissionParameterStillReadsBare pins that a parameter that does NOT
-// clash with a member is read bare as before — the clash rule fires only on a
-// shared name, leaving an ordinary parameter read untouched.
-func TestSelfOmissionParameterStillReadsBare(t *testing.T) {
+// TestSelfOmissionParameterWins pins that self omission is additive: a parameter
+// (or local) named like a self field takes the parameter reading, not the self
+// member, so a name that already resolves keeps its meaning and no diagnostic is
+// raised.
+func TestSelfOmissionParameterWins(t *testing.T) {
 	src := "pub type Fighter = { power: nint } impl {\n" +
-		"  pub boosted(bonus: nint): nint {\n    return power + bonus\n  }\n" +
+		"  pub boosted(power: nint): nint {\n    return power\n  }\n" +
 		"}\n" +
 		"const Hero: Fighter = { power: 7 }\n" +
 		"const Boosted = Hero.boosted(5)\n"
-	if got := evalOf(t, src, "Boosted").Int.Int64(); got != 12 {
-		t.Fatalf("Boosted = %d, want 12 (7+5)", got)
+	if got := evalOf(t, src, "Boosted").Int.Int64(); got != 5 {
+		t.Fatalf("Boosted = %d, want 5 (the parameter wins over the self field)", got)
+	}
+}
+
+// TestSelfOmissionTypeMemberWins pins that a member access whose receiver names a
+// type reads the type member (Item.Max, an associated constant) even when the
+// receiver also names a self field — self omission is last resort, so the type
+// reading wins and self.Item.Max is the explicit form.
+func TestSelfOmissionTypeMemberWins(t *testing.T) {
+	src := "pub type Item = nint impl { pub const Max = 100 }\n" +
+		"pub type Holder = { Item: Item } impl {\n" +
+		"  pub peek(): nint { return Item.Max }\n" +
+		"}\n" +
+		"const H: Holder = { Item: 3 }\n" +
+		"const V = H.peek()\n"
+	if got := evalOf(t, src, "V").Int.Int64(); got != 100 {
+		t.Fatalf("V = %d, want 100 (Item.Max reads the type's associated constant, not self.Item.Max)", got)
+	}
+}
+
+// TestSelfOmissionTopLevelFunctionWins pins that a bare callee that names a
+// top-level function calls that function even when the receiver type has a
+// function-valued field of the same name — self omission is last resort, so the
+// top-level function wins and self.f() is the explicit form.
+func TestSelfOmissionTopLevelFunctionWins(t *testing.T) {
+	src := "pub fn f(): nint { return 99 }\n" +
+		"pub type Box = { f: fn(): nint } impl {\n" +
+		"  pub call(): nint { return f() }\n" +
+		"}\n" +
+		"const B: Box = { f: fn(): nint { return 1 } }\n" +
+		"const V = B.call()\n"
+	if got := evalOf(t, src, "V").Int.Int64(); got != 99 {
+		t.Fatalf("V = %d, want 99 (the top-level function wins over the self field)", got)
 	}
 }
 
 // TestSelfOmissionMethodNotBareResolved pins that a bare method name (no parens)
 // is not a readable member, so it does not resolve the way a field or getter does
-// — a method still needs self.foo(). The bare name lowers to nothing
-// rather than silently to self.area(), so a const consuming it does not fold
-// (unfolded_const) — unlike a bare field read, which folds.
+// — a method still needs self.foo(). The bare name lowers to nothing rather than
+// silently to self.area(), so a const consuming it does not fold (unfolded_const).
 func TestSelfOmissionMethodNotBareResolved(t *testing.T) {
 	src := "pub type Widget = { size: nint } impl {\n" +
 		"  pub area(): nint {\n    return size\n  }\n" +
@@ -159,8 +147,6 @@ func TestSelfOmissionMethodNotBareResolved(t *testing.T) {
 	if !hasCode(diags, CodeUnfoldedConst) {
 		t.Fatalf("want unfolded_const (bare area is a method, not a readable member, so it does not resolve), got %v", codes(diags))
 	}
-	// The body return value did not lower to a self.area() call: the bare method
-	// name resolved to nothing, not silently to an implicit-self method call.
 	body := methodBody(t, m, "Widget", "aliasArea")
 	if ret, ok := body[0].(*ir.Return); ok {
 		if _, isCall := ret.Value.(*ir.Call); isCall {
@@ -186,11 +172,25 @@ func TestSelfOmissionAssocConstNotBareResolved(t *testing.T) {
 	}
 }
 
+// TestSelfOmissionStaticBodyReadsConstNotSelf pins that a static method body has
+// no receiver: a bare name there reads a top-level constant (or a type), never an
+// implicit self.field. The lowering matches the checker, which types a static body
+// with self unbound, so the const folds rather than mismatching as a self read.
+func TestSelfOmissionStaticBodyReadsConstNotSelf(t *testing.T) {
+	src := "pub type Box = { value: nint } impl {\n" +
+		"  pub static fetch(): nint {\n    return value\n  }\n" +
+		"}\n" +
+		"const value = 5\n" +
+		"const Fetched = Box.fetch()\n"
+	if got := evalOf(t, src, "Fetched").Int.Int64(); got != 5 {
+		t.Fatalf("Fetched = %d, want 5 (a static body reads the top-level const, not self.value)", got)
+	}
+}
+
 // TestSelfOmissionBareEnumFieldNotUnknownMember pins that a bare enum-typed self
 // field used where an enum is expected (a comparison desugars to an enum-typed
 // method argument) is recognized as a resolved self read, not flagged as an
-// unknown enum shorthand. The bare-enum-argument check exempts readable self
-// members the same way it exempts a parameter, local, function, or constant.
+// unknown enum shorthand.
 func TestSelfOmissionBareEnumFieldNotUnknownMember(t *testing.T) {
 	src := "pub enum Rarity { Common, Rare }\n" +
 		"pub type Card = { rarity: Rarity } impl {\n" +
@@ -226,265 +226,6 @@ func TestSelfOmissionMasterValidateBareFields(t *testing.T) {
 	}
 	if len(diags) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", codes(diags))
-	}
-}
-
-// TestSelfOmissionStaticBodyReadsConstNotSelf pins that a static method body has
-// no receiver: a bare name there reads a top-level constant (or a type), never an
-// implicit self.field. The lowering matches the checker, which types a static body
-// with self unbound, so the const folds rather than mismatching as a self read.
-func TestSelfOmissionStaticBodyReadsConstNotSelf(t *testing.T) {
-	src := "pub type Box = { value: nint } impl {\n" +
-		"  pub static fetch(): nint {\n    return value\n  }\n" +
-		"}\n" +
-		"const value = 5\n" +
-		"const Fetched = Box.fetch()\n"
-	if got := evalOf(t, src, "Fetched").Int.Int64(); got != 5 {
-		t.Fatalf("Fetched = %d, want 5 (a static body reads the top-level const, not self.value)", got)
-	}
-}
-
-// TestSelfMemberNameClashLambdaParam pins that the clash rule reaches a function
-// literal's own binding: a lambda inside a method body inherits self, so a lambda
-// parameter that shadows a readable self member is the same ambiguity a method
-// parameter is, and is reported rather than silently taking the lambda parameter.
-func TestSelfMemberNameClashLambdaParam(t *testing.T) {
-	src := "pub type Box = { value: nint } impl {\n" +
-		"  pub apply(): nint {\n" +
-		"    let f = fn(value: nint): nint { return value }\n" +
-		"    return f(1)\n  }\n" +
-		"}\n"
-	_, diags := analyze(src)
-	if !hasCode(diags, CodeSelfMemberNameClash) {
-		t.Fatalf("want self_member_name_clash (lambda parameter shadows a self member), got %v", codes(diags))
-	}
-}
-
-// TestSelfMemberNameClashEnumShorthand pins that a bare name that is both a
-// readable member of self and a valid enum shorthand (against the expected type)
-// is a clash, not silently the enum member: the checker would otherwise accept the
-// enum member while the implicit-self read sees the field, a silent divergence.
-func TestSelfMemberNameClashEnumShorthand(t *testing.T) {
-	src := "pub enum Rarity { Rare }\n" +
-		"pub type Card = { Rare: bool } impl {\n" +
-		"  pub pick(): Rarity {\n    return Rare\n  }\n" +
-		"}\n"
-	_, diags := analyze(src)
-	if !hasCode(diags, CodeSelfMemberNameClash) {
-		t.Fatalf("want self_member_name_clash (Rare is both a self field and an enum shorthand), got %v", codes(diags))
-	}
-}
-
-// TestSelfMemberNameClashCallableFieldAndMethod pins that a bare callee that is
-// both a function-valued readable member of self and a method of self is a clash:
-// applying the field value or the implicit self-method call would otherwise differ
-// silently between the checker and the lowering.
-func TestSelfMemberNameClashCallableFieldAndMethod(t *testing.T) {
-	src := "pub type Box = { f: fn(): nint } impl {\n" +
-		"  pub f(): nint { return 9 }\n" +
-		"  pub call(): nint { return f() }\n" +
-		"}\n"
-	_, diags := analyze(src)
-	if !hasCode(diags, CodeSelfMemberNameClash) {
-		t.Fatalf("want self_member_name_clash (f is both a function-valued field and a method), got %v", codes(diags))
-	}
-}
-
-// TestSelfMemberNameClashTypeMemberReceiver pins that a member-access receiver
-// that is both a readable member of self and a type name is a clash: reading
-// Item.Max as the type's associated constant or as self.Item.Max would otherwise
-// be silently ambiguous.
-func TestSelfMemberNameClashTypeMemberReceiver(t *testing.T) {
-	src := "pub type Item = nint impl { pub const Max = 100 }\n" +
-		"pub type Holder = { Item: Item } impl {\n" +
-		"  pub peek(): nint { return Item.Max }\n" +
-		"}\n"
-	_, diags := analyze(src)
-	if !hasCode(diags, CodeSelfMemberNameClash) {
-		t.Fatalf("want self_member_name_clash (Item is both a self field and a type with member Max), got %v", codes(diags))
-	}
-}
-
-// TestSelfOmissionEnumShorthandMatchesExplicit pins that a bare enum-typed self
-// field used in a comparison behaves exactly as the explicit self. form — both
-// type-check the same way, so self omission stays additive. (Folding such a
-// comparison through a member receiver is a separate, pre-existing concern that
-// affects the explicit self. form identically and is out of this scope.)
-func TestSelfOmissionEnumShorthandMatchesExplicit(t *testing.T) {
-	bareSrc := "pub enum Rarity { Common, Rare }\n" +
-		"pub type Card = { rarity: Rarity } impl {\n  pub isRare(): bool {\n    return rarity == Rare\n  }\n}\n"
-	explicitSrc := "pub enum Rarity { Common, Rare }\n" +
-		"pub type Card = { rarity: Rarity } impl {\n  pub isRare(): bool {\n    return self.rarity == Rare\n  }\n}\n"
-	_, bareDiags := analyze(bareSrc)
-	_, explicitDiags := analyze(explicitSrc)
-	if hasCode(bareDiags, CodeSelfMemberNameClash) {
-		t.Fatalf("bare rarity == Rare should not clash (rarity is the field, Rare the enum shorthand): %v", codes(bareDiags))
-	}
-	// Neither form reports a type error on Rare; they resolve it the same way.
-	if hasCode(bareDiags, CodeUnknownEnumMember) != hasCode(explicitDiags, CodeUnknownEnumMember) {
-		t.Fatalf("bare and explicit disagree on Rare resolution: bare=%v explicit=%v", codes(bareDiags), codes(explicitDiags))
-	}
-}
-
-// TestSelfMemberNameClashEnumAssignment pins that the clash reaches the bare-enum
-// assignment fast path: a bare value that is both an enum member and a readable
-// member of self is a clash on the right-hand side of a reassignment too, so the
-// checker (enum member) and the lowering (self read) cannot silently diverge.
-func TestSelfMemberNameClashEnumAssignment(t *testing.T) {
-	src := "pub enum Rarity { Common, Rare }\n" +
-		"pub type Card = { Rare: bool } impl {\n" +
-		"  pub pick(): Rarity {\n" +
-		"    let r: Rarity = Rarity.Common\n" +
-		"    r = Rare\n" +
-		"    return r\n  }\n" +
-		"}\n"
-	_, diags := analyze(src)
-	if !hasCode(diags, CodeSelfMemberNameClash) {
-		t.Fatalf("want self_member_name_clash (Rare is both a self field and an enum member on an assignment RHS), got %v", codes(diags))
-	}
-}
-
-// TestSelfOmissionSwitchScrutineeMatchesExplicit pins that a bare enum-typed self
-// field as a switch scrutinee behaves exactly as the explicit self. form. (Folding
-// a switch over a member-receiver scrutinee is a separate, pre-existing concern
-// that affects the explicit self. form identically and is out of this scope.)
-func TestSelfOmissionSwitchScrutineeMatchesExplicit(t *testing.T) {
-	body := func(scrut string) string {
-		return "pub enum Rarity { Common, Rare }\n" +
-			"pub type Card = { rarity: Rarity } impl {\n  pub tag(): nint {\n    switch " + scrut +
-			" {\n      Rare -> return 1\n      _ -> return 0\n    }\n  }\n}\n"
-	}
-	_, bareDiags := analyze(body("rarity"))
-	_, explicitDiags := analyze(body("self.rarity"))
-	if hasCode(bareDiags, CodeSelfMemberNameClash) {
-		t.Fatalf("bare switch rarity should not clash (rarity is the field, Rare an enum arm): %v", codes(bareDiags))
-	}
-	if hasCode(bareDiags, CodeUnknownEnumMember) != hasCode(explicitDiags, CodeUnknownEnumMember) {
-		t.Fatalf("bare and explicit switch disagree on arm resolution: bare=%v explicit=%v", codes(bareDiags), codes(explicitDiags))
-	}
-}
-
-// TestSelfMemberNameClashStaticCallReceiver pins that a static-fn call whose
-// receiver is both a readable member of self and a type is a clash — the call
-// would otherwise silently invoke the static fn instead of navigating self.recv,
-// the call-position twin of the Item.Max value clash.
-func TestSelfMemberNameClashStaticCallReceiver(t *testing.T) {
-	src := "pub type Item = nint impl { pub static fn make(): Item { return Item(7) } }\n" +
-		"pub type Holder = { Item: Item } impl {\n" +
-		"  pub mk(): Item { return Item.make() }\n" +
-		"}\n"
-	_, diags := analyze(src)
-	if !hasCode(diags, CodeSelfMemberNameClash) {
-		t.Fatalf("want self_member_name_clash (Item is both a self field and a type with a static fn), got %v", codes(diags))
-	}
-}
-
-// TestSelfMemberNameClashFunctionCallee pins that a bare callee that is both a
-// readable member of self and a top-level function is a clash — the call would
-// otherwise bind the outer function over the innermost self member.
-func TestSelfMemberNameClashFunctionCallee(t *testing.T) {
-	src := "pub fn f(): nint { return 99 }\n" +
-		"pub type Box = { f: fn(): nint } impl {\n" +
-		"  pub call(): nint { return f() }\n" +
-		"}\n"
-	_, diags := analyze(src)
-	if !hasCode(diags, CodeSelfMemberNameClash) {
-		t.Fatalf("want self_member_name_clash (f is both a self field and a top-level function), got %v", codes(diags))
-	}
-}
-
-// TestSelfMemberNameClashConversionCallee pins that a bare callee that is both a
-// readable member of self and a type (a conversion T(x)) is a clash.
-func TestSelfMemberNameClashConversionCallee(t *testing.T) {
-	src := "pub type T = nint\n" +
-		"pub type Box = { T: nint } impl {\n" +
-		"  pub mk(): T { return T(1) }\n" +
-		"}\n"
-	_, diags := analyze(src)
-	if !hasCode(diags, CodeSelfMemberNameClash) {
-		t.Fatalf("want self_member_name_clash (T is both a self field and a type used as a conversion), got %v", codes(diags))
-	}
-}
-
-// TestSelfMemberNameClashNamespaceReceiver pins that a call whose receiver is
-// both a readable member of self and a namespace exporting a function of that
-// name is a clash — the call would otherwise invoke the imported function
-// (geo.ping()) instead of navigating the self field (self.geo.ping()). A genuine
-// ambiguity: the field's type has a ping method and the namespace exports ping.
-func TestSelfMemberNameClashNamespaceReceiver(t *testing.T) {
-	diags := analyzeProject(t, map[string]string{
-		"geometry.belt": "pub fn ping(): nint { return 1 }\n",
-		"main.belt": "use geo from \"geometry.belt\"\n" +
-			"pub type Widget = { v: nint } impl { pub ping(): nint { return v } }\n" +
-			"pub type Box = { geo: Widget } impl {\n  pub call(): nint { return geo.ping() }\n}\n",
-	})
-	if !hasCode(diags, CodeSelfMemberNameClash) {
-		t.Fatalf("want self_member_name_clash (geo is both a self field and a namespace exporting ping), got %v", codes(diags))
-	}
-}
-
-// TestSelfOmissionReceiverNoCompetingMemberReadsSelf pins that a member access
-// or call whose receiver is a self field does NOT clash when the same-named type
-// or namespace has no such member — there is no ambiguity, so it reads
-// self.recv.x / self.recv.m() and folds. This guards against over-clashing: the
-// clash fires only when the competing reading actually claims the member.
-func TestSelfOmissionReceiverNoCompetingMemberReadsSelf(t *testing.T) {
-	// Item names a type (nint) with no member x; the field's type (Inner) has x,
-	// so Item.x reads self.Item.x and folds.
-	valSrc := "pub type Item = nint\npub type Inner = { x: nint }\n" +
-		"pub type Holder = { Item: Inner } impl { pub peek(): nint { return Item.x } }\n" +
-		"const H: Holder = { Item: { x: 7 } }\nconst V = H.peek()\n"
-	mv, vdiags := analyze(valSrc)
-	if hasCode(vdiags, CodeSelfMemberNameClash) {
-		t.Fatalf("Item.x should not clash (the type Item has no member x): %v", codes(vdiags))
-	}
-	if ev := constEval(mv, "V"); ev == nil || ev.Int.Int64() != 7 {
-		t.Fatalf("V did not fold to 7 (self.Item.x)")
-	}
-	// Pt names a type with no static area; the field's type has an area method, so
-	// Pt.area() reads self.Pt.area() and folds.
-	callSrc := "pub type Pt = { x: nint } impl { pub area(): nint { return x } }\n" +
-		"pub type Box = { Pt: Pt } impl { pub a(): nint { return Pt.area() } }\n" +
-		"const B: Box = { Pt: { x: 5 } }\nconst A = B.a()\n"
-	mc, cdiags := analyze(callSrc)
-	if hasCode(cdiags, CodeSelfMemberNameClash) {
-		t.Fatalf("Pt.area() should not clash (the type Pt has no static area): %v", codes(cdiags))
-	}
-	if ev := constEval(mc, "A"); ev == nil || ev.Int.Int64() != 5 {
-		t.Fatalf("A did not fold to 5 (self.Pt.area())")
-	}
-}
-
-// TestSelfMemberNameClashEnumArgument pins that a bare method/operator argument
-// that is both a readable member of self and a member of the receiver's enum is a
-// clash — the argument-position twin of the checked-position enum clash.
-func TestSelfMemberNameClashEnumArgument(t *testing.T) {
-	src := "pub enum Rarity { Common, Rare }\n" +
-		"pub type Card = { rarity: Rarity, Rare: Rarity } impl {\n" +
-		"  pub eq(): bool { return rarity == Rare }\n" +
-		"}\n"
-	_, diags := analyze(src)
-	if !hasCode(diags, CodeSelfMemberNameClash) {
-		t.Fatalf("want self_member_name_clash (Rare is both a self field and the receiver's enum member), got %v", codes(diags))
-	}
-}
-
-// TestSelfOmissionMasterValidateMemberReceiver pins that a per-row check reads a
-// member off a row field (self.Item.x) without the reference walk reporting the
-// same-named type's missing member: the receiver is a row member, so the type
-// checker resolves it rather than the reference walk reporting a type member.
-func TestSelfOmissionMasterValidateMemberReceiver(t *testing.T) {
-	// Item is a row field (a record with x) and also names a type (nint) with no x.
-	// Item.x in the per-row check reads self.Item.x, not the type's member.
-	src := "pub type Item = nint\n" +
-		"pub master M {\n" +
-		"  record { id: int, Item: { x: int } }\n" +
-		"  primary id\n" +
-		"  validate { each { assert Item.x > 0 } }\n" +
-		"}\n"
-	_, diags := analyze(src)
-	if hasCode(diags, CodeUnknownAssociatedConst) || hasCode(diags, CodeUnknownStatic) {
-		t.Fatalf("a per-row member read off a row field should not report a type-member issue: %v", codes(diags))
 	}
 }
 

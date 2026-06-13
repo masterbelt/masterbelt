@@ -783,14 +783,6 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "switch needs a comparable scrutinee (" + f["typ"].String() + "); use match to branch on a record or union type"
 		}
 	},
-	"belt.semantic.self_member_name_clash": func(loc Locale, f map[string]fmt.Stringer) string {
-		switch loc {
-		case "ja":
-			return f["name"].String() + " は曖昧です: self の読めるメンバ (フィールド/getter) を指しますが、同名がこの位置で別の解釈 (ローカル/パラメータ・enum メンバ・メソッド・型) も持ちます。self." + f["name"].String() + " か、もう一方の明示形で区別してください"
-		default:
-			return f["name"].String() + " is ambiguous: it reads a member of self (a field or getter) but the same name also resolves another way here — a local or parameter / an enum member / a method / a type; write self." + f["name"].String() + " or the explicit form of the other meaning to disambiguate"
-		}
-	},
 	"belt.semantic.self_outside_method": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":

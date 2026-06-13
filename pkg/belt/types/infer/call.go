@@ -36,23 +36,11 @@ func callType(e *ast.CallExpr, s scope, sink *Sink) ir.Type {
 	if !ok {
 		return nonMemberCallType(e, s, sink)
 	}
-	// A member-access callee whose receiver reads a readable member of self
-	// navigates the implicit self read (self.recv.m()) unless the receiver also
-	// names a namespace exporting a function of that name, or a type providing a
-	// static fn of that name — then the call is genuinely ambiguous and reported as
-	// a clash. The existence checks are side-effect free, so a receiver that names a
-	// type or namespace without the member falls straight through to the self-member
-	// method call rather than reporting an unknown static or imported member.
-	if id, isIdent := member.Receiver.(*ast.Identifier); isIdent && selfMemberClash(s, id.Name) {
-		_, _, hasStatic := types.StaticCandidates(s.registry(), s.conv(id), member.Member.Name)
-		if len(s.fnMember(member)) > 0 || hasStatic {
-			s.reportSelfMemberClash(id, id.Name)
-			return ir.Invalid
-		}
-		return methodCallType(e, member.Receiver, check(member.Receiver, s, sink), member.Member.Name, s, sink)
-	}
 	// A member-access callee whose receiver names a namespace is a call of an
-	// imported function (geo.area(...)), never a method call.
+	// imported function (geo.area(...)), never a method call. Self omission is last
+	// resort: a receiver that also reads a self member takes the self.recv.m()
+	// reading only where it names no namespace or type with the member, through the
+	// method-call path below.
 	if cands := s.fnMember(member); len(cands) > 0 {
 		return funcCallType(e, member.Member.Name, cands, s, sink)
 	}
@@ -71,19 +59,6 @@ func callType(e *ast.CallExpr, s scope, sink *Sink) ir.Type {
 // applied directly, an implicit self-call, or a leaf form. It is the !ok arm of
 // callType, extracted so the dispatch stays flat.
 func nonMemberCallType(e *ast.CallExpr, s scope, sink *Sink) ir.Type {
-	// A bare callee that reads a readable member of self is ambiguous when the same
-	// name also names a type (a conversion T(x)), a top-level function, or a method
-	// of self: applying the self member's value vs taking that other callee. Report
-	// the clash — the same ambiguity the value positions raise — before the type and
-	// function branches below claim it; with no competing callee the self member's
-	// function value applies through the function-value arm.
-	if id, isIdent := e.Callee.(*ast.Identifier); isIdent && selfMemberClash(s, id.Name) {
-		_, _, hasMethod := types.Candidates(s.registry(), s.self(), id.Name)
-		if s.conv(id) != ir.Invalid || len(s.fn(id)) > 0 || hasMethod {
-			s.reportSelfMemberClash(id, id.Name)
-			return ir.Invalid
-		}
-	}
 	// A call whose callee names a type is a conversion T(x) — the type
 	// wins over a same-named function — and one that names a top-level
 	// function is a function call.
@@ -242,16 +217,6 @@ func synthMethodArgs(e *ast.CallExpr, recv ir.Type, args []ir.Type, bad *bool, s
 	known := make([]ir.Type, len(e.Arguments))
 	for i, a := range e.Arguments {
 		if _, isLit := a.(*ast.FuncLit); isLit {
-			continue
-		}
-		// A bare argument that is both a readable member of self and a member of the
-		// receiver's enum is ambiguous between the implicit self read and the enum
-		// shorthand — the argument-position twin of the clash checkEnumShorthand
-		// raises in a checked position. It is reported before check resolves it to
-		// the self member, which would otherwise win silently.
-		if id, ok := a.(*ast.Identifier); ok && selfMemberClash(s, id.Name) && enumMemberExpectation(recv, id.Name) != nil {
-			s.reportSelfMemberClash(id, id.Name)
-			*bad = true
 			continue
 		}
 		args[i] = check(a, s, sink)
