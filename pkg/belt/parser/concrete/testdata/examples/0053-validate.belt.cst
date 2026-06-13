@@ -1,0 +1,132 @@
+# tree
+File
+  MasterDecl
+    LineComment "// A validate block holds a master's data checks. Its each clause runs once per"
+    Newline "\n"
+    LineComment "// row: every assert inside reads the row through self, so unlike a top-level"
+    Newline "\n"
+    LineComment "// assert (a compile-time, closed declaration) it is checked against each loaded"
+    Newline "\n"
+    LineComment "// row. validate and each are context keywords, like record, primary, and source;"
+    Newline "\n"
+    LineComment "// all (a per-table check) shares the each clause's node, told apart by the"
+    Newline "\n"
+    LineComment "// keyword, and is a later concern. Here the block is only parsed — resolving and"
+    Newline "\n"
+    LineComment "// running the checks come later — so a validate-bearing master analyzes as before."
+    Newline "\n"
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    MasterKeyword
+      Ident "master"
+    Whitespace " "
+    Ident "Skill"
+    Whitespace " "
+    LBrace "{"
+    MasterRecord
+      Newline "\n"
+      Whitespace "  "
+      MasterKeyword
+        Ident "record"
+      Whitespace " "
+      RecordType
+        LBrace "{"
+        Newline "\n"
+        Whitespace "    "
+        Field
+          Ident "id"
+          Colon ":"
+          Whitespace " "
+          TypeName
+            Ident "int"
+        Comma ","
+        Newline "\n"
+        Whitespace "    "
+        Field
+          Ident "cost"
+          Colon ":"
+          Whitespace " "
+          TypeName
+            Ident "int"
+        Comma ","
+        Newline "\n"
+        Whitespace "    "
+        Field
+          Ident "power"
+          Colon ":"
+          Whitespace " "
+          TypeName
+            Ident "int"
+        Comma ","
+        Newline "\n"
+        Whitespace "  "
+        RBrace "}"
+    MasterPrimary
+      Newline "\n"
+      Whitespace "  "
+      MasterKeyword
+        Ident "primary"
+      Whitespace " "
+      Ident "id"
+    MasterValidate
+      Newline "\n"
+      Whitespace "  "
+      MasterKeyword
+        Ident "validate"
+      Whitespace " "
+      LBrace "{"
+      ValidateClause
+        Newline "\n"
+        Whitespace "    "
+        MasterKeyword
+          Ident "each"
+        Whitespace " "
+        Block
+          LBrace "{"
+          Newline "\n"
+          Whitespace "      "
+          AssertStmt
+            Assert "assert"
+            Whitespace " "
+            BinaryExpr
+              MemberExpr
+                SelfExpr
+                  Self "self"
+                Dot "."
+                Ident "power"
+              Whitespace " "
+              GtEq ">="
+              Whitespace " "
+              MemberExpr
+                SelfExpr
+                  Self "self"
+                Dot "."
+                Ident "cost"
+          Newline "\n"
+          Whitespace "      "
+          AssertStmt
+            Assert "assert"
+            Whitespace " "
+            BinaryExpr
+              MemberExpr
+                SelfExpr
+                  Self "self"
+                Dot "."
+                Ident "id"
+              Whitespace " "
+              Gt ">"
+              Whitespace " "
+              Literal
+                Int "0"
+          Newline "\n"
+          Whitespace "    "
+          RBrace "}"
+      Newline "\n"
+      Whitespace "  "
+      RBrace "}"
+    Newline "\n"
+    RBrace "}"
+  Newline "\n"
+  EOF ""
+# diagnostics

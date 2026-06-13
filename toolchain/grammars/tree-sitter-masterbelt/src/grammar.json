@@ -727,6 +727,10 @@
               {
                 "type": "SYMBOL",
                 "name": "master_source"
+              },
+              {
+                "type": "SYMBOL",
+                "name": "master_validate"
               }
             ]
           }
@@ -964,6 +968,53 @@
         {
           "type": "STRING",
           "value": "}"
+        }
+      ]
+    },
+    "master_validate": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "STRING",
+            "value": "validate"
+          },
+          "named": true,
+          "value": "master_keyword"
+        },
+        {
+          "type": "STRING",
+          "value": "{"
+        },
+        {
+          "type": "REPEAT",
+          "content": {
+            "type": "SYMBOL",
+            "name": "validate_clause"
+          }
+        },
+        {
+          "type": "STRING",
+          "value": "}"
+        }
+      ]
+    },
+    "validate_clause": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "STRING",
+            "value": "each"
+          },
+          "named": true,
+          "value": "master_keyword"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "block"
         }
       ]
     },

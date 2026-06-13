@@ -2301,6 +2301,10 @@
         {
           "type": "master_source",
           "named": true
+        },
+        {
+          "type": "master_validate",
+          "named": true
         }
       ]
     }
@@ -2411,6 +2415,25 @@
         },
         {
           "type": "source_entry",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "master_validate",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "master_keyword",
+          "named": true
+        },
+        {
+          "type": "validate_clause",
           "named": true
         }
       ]
@@ -4414,6 +4437,25 @@
       "types": [
         {
           "type": "identifier",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "validate_clause",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "block",
+          "named": true
+        },
+        {
+          "type": "master_keyword",
           "named": true
         }
       ]

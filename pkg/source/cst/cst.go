@@ -130,12 +130,14 @@ const (
 	// lexer leaves plain, each wrapped in a MasterKeyword node where it is
 	// recognized (the Modifier precedent for get/set/static).
 
-	MasterDecl    // [doc] [pub] master Ident "{" ( MasterRecord | MasterPrimary | MasterSource )* "}"
-	MasterRecord  // record TypeExpr [WhereClause] [ImplBlock]*  (the row type, reusing the type-body grammar)
-	MasterPrimary // primary ( Ident | "(" Ident ("," Ident)* ")" )  (the key column(s))
-	MasterSource  // source "{" SourceEntry* "}"  (where the master's rows are read from)
-	SourceEntry   // Ident StringLit [RecordLit]  (a format name, a locator string, and optional format options)
-	MasterKeyword // a context keyword in a master declaration: master, record, primary, or source (an Ident the parser recognizes by position)
+	MasterDecl     // [doc] [pub] master Ident "{" ( MasterRecord | MasterPrimary | MasterSource )* "}"
+	MasterRecord   // record TypeExpr [WhereClause] [ImplBlock]*  (the row type, reusing the type-body grammar)
+	MasterPrimary  // primary ( Ident | "(" Ident ("," Ident)* ")" )  (the key column(s))
+	MasterSource   // source "{" SourceEntry* "}"  (where the master's rows are read from)
+	SourceEntry    // Ident StringLit [RecordLit]  (a format name, a locator string, and optional format options)
+	MasterValidate // validate "{" ValidateClause* "}"  (the per-row and per-table data checks)
+	ValidateClause // ( each | all ) Block  (one check block; the keyword names its scope — each is per-row, all per-table)
+	MasterKeyword  // a context keyword in a master declaration: master, record, primary, source, validate, each, or all (an Ident the parser recognizes by position)
 
 	Error // a run of tokens that did not fit the grammar
 
@@ -207,6 +209,8 @@ var kindNames = [...]string{
 	MasterPrimary:    "MasterPrimary",
 	MasterSource:     "MasterSource",
 	SourceEntry:      "SourceEntry",
+	MasterValidate:   "MasterValidate",
+	ValidateClause:   "ValidateClause",
 	MasterKeyword:    "MasterKeyword",
 	Error:            "Error",
 }
