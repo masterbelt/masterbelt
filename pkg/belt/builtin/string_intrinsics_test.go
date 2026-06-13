@@ -114,6 +114,29 @@ func TestStringChars(t *testing.T) {
 	}
 }
 
+// TestStringBootstrapDescriptorBacksRuneReads pins that the bootstrap registry
+// descriptor — the surface a string method resolves against before the prelude
+// is installed, and the degraded fallback when the prelude fails to load —
+// declares the rune reads the registry has intrinsics for, so len/at/slice are
+// not seen as missing on Default(). chars/bytes are excluded by design: they
+// return the eval-implemented list, which is not a bootstrap primitive (and is
+// absent in the same fallback), so the bootstrap descriptor cannot name it.
+func TestStringBootstrapDescriptorBacksRuneReads(t *testing.T) {
+	def, ok := Default().Lookup(NameString)
+	if !ok {
+		t.Fatal("bootstrap registry has no string descriptor")
+	}
+	have := map[string]bool{}
+	for _, m := range def.Methods {
+		have[m.Name] = true
+	}
+	for _, m := range []string{"len", "at", "slice"} {
+		if !have[m] {
+			t.Errorf("bootstrap string descriptor is missing %q though the registry has its intrinsic; it must mirror the prelude's bootstrap-expressible methods", m)
+		}
+	}
+}
+
 // TestStringBytes pins the UTF-8 byte view: "héllo" is six bytes because é
 // encodes as two (0xC3 0xA9 = 195 169).
 func TestStringBytes(t *testing.T) {
