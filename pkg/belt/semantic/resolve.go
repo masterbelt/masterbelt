@@ -1341,50 +1341,6 @@ func resolveMasterValidations(r *infer.TypeResolver, reg *builtin.Registry, def 
 			}
 		}
 	}
-	// Whether each check folds to a bool is probed after the write-back fills the
-	// overload selections their calls resolve through (checkMasterFoldability), not
-	// here: a check over an overloaded callee folds the wrong declaration before
-	// that, and would report a usable check as non-constant.
-}
-
-// witnessRow builds a representative row value for the validate-check foldability
-// probe: a record of one witness per field (1 for an integer, "" for a string,
-// true for a bool), the row twin of witness. It returns nil when a field has no
-// scalar witness (a record or collection field the csv reader does not produce
-// yet, or a cyclic alias), leaving that master's checks to fold at data time.
-func witnessRow(reg *builtin.Registry, rec *ir.Record) *ir.Constant {
-	if rec == nil {
-		return nil
-	}
-	fields := make([]ir.ConstField, 0, len(rec.Fields))
-	for _, f := range rec.Fields {
-		w := fieldWitness(reg, f.Type)
-		if w == nil {
-			return nil
-		}
-		fields = append(fields, ir.ConstField{Name: f.Name, Value: w})
-	}
-	return ir.RecordConstant(fields)
-}
-
-// fieldWitness builds a witness for a row field's type, unwrapping its alias
-// chain with a cycle guard first so a cyclic alias (already reported) returns nil
-// rather than chasing the cycle into a stack overflow. The unwrapped type reaches
-// witness as a builtin (or a non-scalar that yields nil), which terminates.
-func fieldWitness(reg *builtin.Registry, t ir.Type) *ir.Constant {
-	seen := map[*ir.TypeDef]bool{}
-	for {
-		named, ok := t.(*ir.Named)
-		if !ok {
-			break
-		}
-		if named.Def == nil || named.Def.Body == nil || seen[named.Def] {
-			return nil
-		}
-		seen[named.Def] = true
-		t = named.Def.Body
-	}
-	return witness(reg, t)
 }
 
 // checkMaster reports a master's well-formedness problems: an absent or

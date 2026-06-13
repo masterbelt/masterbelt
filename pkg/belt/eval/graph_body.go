@@ -132,18 +132,33 @@ func graphStmts(body []ir.Stmt, ctx graphCtx, scope *graphScope) (*ir.Constant, 
 			}
 			return v, out
 		case *ir.AssertStmt:
-			// Folding a body does not fire its assert statements: an assert's
-			// firing is the data layer's per-row concern (a master's validate each
-			// block folds the condition against each row directly) and the target's
-			// runtime concern, not a value the body folds to. So it neither binds
-			// nor returns — the fold continues past it, exactly as a bare
-			// expression statement does.
-			continue
+			if v, out, halt := graphAssertStmt(s, ctx); halt {
+				return v, out
+			}
 		default:
 			panic(unhandledGraphStmt(stmt))
 		}
 	}
 	return nil, graphFellThrough
+}
+
+// graphAssertStmt folds an assert statement, honouring it where it runs. halt is
+// true when the body cannot continue past it: a condition that folds to a
+// definite false is a violated assertion, so the body yields an error value (the
+// fold of a body whose invariant was broken is that error, not the value it would
+// have returned — a master's validate check that calls such a body sees the error
+// and faults the row), and a condition that cannot fold leaves the body unable to
+// fold. A condition that holds returns halt false, and the fold continues past it
+// like a bare expression statement.
+func graphAssertStmt(s *ir.AssertStmt, ctx graphCtx) (*ir.Constant, graphOutcome, bool) {
+	cond := graphValue(s.Cond, ctx)
+	if cond == nil {
+		return nil, graphUnknown, true
+	}
+	if cond.Kind == ir.ConstBool && !cond.Bool {
+		return ir.ErrorConstant("assertion failed"), graphReturned, true
+	}
+	return nil, graphFellThrough, false
 }
 
 // graphReturn folds a return statement's value under the body's result

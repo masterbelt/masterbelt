@@ -583,14 +583,6 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "a validate block of master " + f["master"].String() + " may contain only assert statements"
 		}
 	},
-	"belt.semantic.master_validate_not_constant": func(loc Locale, f map[string]fmt.Stringer) string {
-		switch loc {
-		case "ja":
-			return "master " + f["master"].String() + " の validate each の検査は全ての行で bool に畳み込めなければなりません"
-		default:
-			return "a validate each check of master " + f["master"].String() + " must fold to a bool for every row"
-		}
-	},
 	"belt.semantic.master_where_unsupported": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":

@@ -159,6 +159,49 @@ func TestLoadRowValidationCallsRowMethod(t *testing.T) {
 	}
 }
 
+func TestLoadRowValidationMethodAssertFires(t *testing.T) {
+	// A row method called by a check carries its own assert. A row that violates
+	// it (power < 0) fails validation: the assert fires during the fold — the
+	// method folds to an error the check faults — rather than being skipped.
+	belt := "master Skill {\n" +
+		"  record { id: int, power: int } impl {\n" +
+		"    pub ok(): bool {\n      assert self.power >= 0\n      return true\n    }\n" +
+		"  }\n" +
+		"  primary id\n" +
+		"  source { csv \"skills.csv\" }\n" +
+		"  validate { each { assert self.ok() } }\n" +
+		"}\n"
+	_, diags := run(t, belt, map[string]string{"csv": "data"}, map[string]string{
+		"data/skills.csv": "id,power\n1,5\n2,-1\n",
+	})
+	d := single(t, diags, master.CodeRowValidationFailed)
+	if !strings.Contains(d.Message, "data/skills.csv:3") {
+		t.Errorf("message = %q, want the failing row data/skills.csv:3", d.Message)
+	}
+}
+
+func TestLoadRowValidationAliasedRowMethod(t *testing.T) {
+	// The row is reached through an alias chain (record Row, type Row = Base); a
+	// row method on it still folds, so a row failing the method (power < cost) is
+	// reported.
+	belt := "type Base = { id: int, cost: int, power: int }\ntype Row = Base\n" +
+		"master Skill {\n" +
+		"  record Row impl {\n" +
+		"    pub ok(): bool { return self.power >= self.cost }\n" +
+		"  }\n" +
+		"  primary id\n" +
+		"  source { csv \"skills.csv\" }\n" +
+		"  validate { each { assert self.ok() } }\n" +
+		"}\n"
+	_, diags := run(t, belt, map[string]string{"csv": "data"}, map[string]string{
+		"data/skills.csv": "id,cost,power\n1,10,30\n2,50,20\n",
+	})
+	d := single(t, diags, master.CodeRowValidationFailed)
+	if !strings.Contains(d.Message, "data/skills.csv:3") {
+		t.Errorf("message = %q, want the failing row data/skills.csv:3", d.Message)
+	}
+}
+
 func TestLoadRowValidationNilIsNotFailure(t *testing.T) {
 	// A check folds for most rows but not for one whose divisor is zero. A nil
 	// fold means the predicate could not be evaluated for that row, not that the

@@ -199,13 +199,13 @@ func checkRowValidations(typed master.Table, fields []ir.Field, def *ir.TypeDef,
 			continue // a coercion gap, already reported
 		}
 		for _, check := range def.Master.RowChecks {
-			// Only a predicate that folds to a definite false is a failed check. A
-			// nil fold means the predicate could not be evaluated for this row, not
-			// that the row fails it — a check that never folds is already reported
-			// once (master_validate_not_constant), so a nil here is left alone
+			// A row fails a check when its predicate folds to a definite false, or to
+			// an error — a violated assertion inside a row method the predicate calls
+			// folds to an error value. A nil fold means the predicate could not be
+			// evaluated for this row (not that the row fails it), so it is left alone
 			// rather than faulting the row.
 			v := eval.GraphPredicate(check.Cond, self, def, env)
-			if v != nil && v.Kind == ir.ConstBool && !v.Bool {
+			if v != nil && (v.Kind == ir.ConstError || (v.Kind == ir.ConstBool && !v.Bool)) {
 				offset, width := assertSpan(doc, check.Syntax)
 				diags = append(diags, master.RowValidationFailed(offset, width, spec.Display, line))
 			}
