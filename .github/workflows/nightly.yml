@@ -1,10 +1,16 @@
-# nightly — the cross-platform CLI build. It runs the test gate, cross-builds
-# every release target with `make dist`, checks the build is reproducible,
-# smoke-runs the native binary, and uploads the archives as workflow artifacts.
+# nightly — the rolling pre-release. It runs the test gate, then builds and
+# publishes the same four artifacts a stable release does, from the shared
+# composite actions in .github/actions (build-cli, attest, build-image,
+# package-vsix, publish-grammar) so the two channels can never drift:
 #
-# It does NOT publish a release yet: the rolling nightly release (and the
-# unchanged-since-last-nightly guard that needs a release to compare against)
-# come later. Until then the artifacts are the distribution, kept for two weeks.
+#   - the cross-platform CLI archives, attached to the rolling `nightly` release;
+#   - the multi-arch container image (ghcr :nightly and a pinned :nightly-<date>-<sha>);
+#   - the VS Code extension .vsix (attached to the release; Marketplace is stable-only);
+#   - the tree-sitter grammar, synced and tagged to its mirror.
+#
+# The stable counterpart (release-stable.yml) calls the same actions with the
+# release version and the stable tags. This workflow adds only what is
+# nightly-specific: the skip-if-unchanged guard and the rolling release publish.
 name: nightly
 
 on:
@@ -32,7 +38,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       build: ${{ steps.decide.outputs.build }}
-      attest: ${{ steps.decide.outputs.attest }}
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
       - id: decide
@@ -52,19 +57,6 @@ jobs:
             echo "build=true" >>"$GITHUB_OUTPUT"
           fi
 
-          # Build provenance attestation needs a public repo or an org plan that
-          # includes artifact attestations; on a private repo without it the
-          # attest API returns "Feature not available" and reds the build. Probe
-          # visibility so the build skips the attest steps instead of failing,
-          # and picks them back up automatically once the repo is public. (If the
-          # plan gains attestations while the repo stays private, widen this.)
-          if [ "$(gh repo view --json visibility -q .visibility 2>/dev/null || echo private)" = public ]; then
-            echo "attest=true" >>"$GITHUB_OUTPUT"
-          else
-            echo "provenance attestation unavailable for a private repo on this plan — skipping it"
-            echo "attest=false" >>"$GITHUB_OUTPUT"
-          fi
-
   # Don't ship red: the same tests CI runs must pass before anything is built.
   gate:
     needs: guard
@@ -81,37 +73,13 @@ jobs:
       attestations: write # write the SLSA provenance attestation
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
-      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
-        with:
-          go-version-file: go.mod
-          cache: true
-
-      # Fail before the full cross-build if the build is not reproducible.
-      - name: Reproducibility check
-        run: make repro-check
-
-      - name: Cross-build and archive
-        run: make dist
-
-      # The cross-built linux/amd64 binary runs on this runner: confirm it starts
-      # and type-checks a real project before the artifacts are kept.
-      - name: Smoke test
-        run: |
-          tmp="$(mktemp -d)"
-          tar -xzf dist/masterbelt-linux-amd64.tar.gz -C "$tmp"
-          "$tmp/masterbelt" version
-          "$tmp/masterbelt" check pkg/belt/testdata/examples/0009-project
-
-      # Attestation needs a public repo or a plan with artifact attestations;
-      # guard probes for it so a private repo skips this rather than failing.
-      - name: Attest build provenance
-        if: needs.guard.outputs.attest == 'true'
-        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
+      - uses: ./.github/actions/build-cli
+      - uses: ./.github/actions/attest
         with:
           subject-path: |
             dist/masterbelt-*.tar.gz
             dist/masterbelt-*.zip
-
+            dist/SHA256SUMS
       - name: Upload artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -124,9 +92,117 @@ jobs:
           retention-days: 14
           if-no-files-found: error
 
-  # Overwrite the single rolling `nightly` pre-release with this build's archives,
-  # moving its tag to the built commit. Past builds live on as the 14-day
-  # artifacts above; this release always points at the latest.
+  # Push the multi-arch container image to ghcr: the same static binaries the
+  # release ships, copied onto distroless. The :nightly tag rolls; the
+  # :nightly-<date>-<sha> tag is immutable for pinning.
+  image:
+    name: container image
+    needs: [guard, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write     # mint the OIDC token the attestation is signed with
+      attestations: write # write the SLSA provenance attestation
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: masterbelt-nightly
+          path: dist
+      - name: Nightly image tags
+        id: tags
+        run: |
+          version="$(cat dist/VERSION)"
+          patch="${version%+*}"; patch="${patch##*.}"   # the commit date
+          sha="${version#*+}"                            # the short SHA
+          {
+            echo 'tags<<EOF'
+            echo "ghcr.io/${{ github.repository }}:nightly"
+            echo "ghcr.io/${{ github.repository }}:nightly-${patch}-${sha}"
+            echo 'EOF'
+          } >>"$GITHUB_OUTPUT"
+      - uses: ./.github/actions/build-image
+        id: image
+        with:
+          tags: ${{ steps.tags.outputs.tags }}
+      - uses: ./.github/actions/attest
+        with:
+          subject-name: ghcr.io/${{ github.repository }}
+          subject-digest: ${{ steps.image.outputs.digest }}
+          push-to-registry: 'true'
+
+  # Build the VS Code extension .vsix and attach it to the nightly release (it is
+  # uploaded as an artifact here and picked up by the publish job). The nightly is
+  # NOT published to the Marketplace — only stable releases go there, so the
+  # Marketplace keeps a single, clean version lane and a stable version is never
+  # shadowed by a higher-numbered nightly pre-release.
+  vsix:
+    name: editor extension package
+    needs: gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6.0.8
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version-file: .tool-versions
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - name: Nightly extension version
+        id: ver
+        run: |
+          # The CLI version without build metadata — 0.1.<UTC commit date>,
+          # monotonic for the rolling pre-release.
+          echo "version=0.1.$(TZ=UTC0 git show -s --date=format-local:%Y%m%d --format=%cd HEAD)" >>"$GITHUB_OUTPUT"
+      # Mark the .vsix as a pre-release build; no vsce-pat, so it is built but not
+      # published to the Marketplace (stable-only lane) — just attached below.
+      - uses: ./.github/actions/package-vsix
+        with:
+          version: ${{ steps.ver.outputs.version }}
+          pre-release: 'true'
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: masterbelt-vsix
+          path: toolchain/editors/vscode/masterbelt.vsix
+          if-no-files-found: error
+
+  # Publish the tree-sitter grammar by syncing it to the dedicated mirror repo and
+  # tagging it; the mirror's own workflows publish to the registries. The nightly
+  # carries a -nightly.<sha> prerelease version, so its tag publishes to GitHub
+  # Packages only (a nightly on public npm would bloat the packument); the stable
+  # release's clean v<semver> tag is what reaches public npm + crates.io + PyPI.
+  tree-sitter:
+    name: tree-sitter grammar
+    needs: gate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6.0.8
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version-file: .tool-versions
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/publish-grammar
+        with:
+          app-client-id: ${{ secrets.TREE_SITTER_APP_CLIENT_ID }}
+          app-private-key: ${{ secrets.TREE_SITTER_APP_PRIVATE_KEY }}
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: tree-sitter-masterbelt
+          path: dist/tree-sitter-masterbelt
+          if-no-files-found: error
+
+  # Overwrite the single rolling `nightly` pre-release with this build's archives
+  # and the .vsix, moving its tag to the built commit. Past builds live on as the
+  # 14-day artifacts above; this release always points at the latest.
   publish:
     name: publish nightly release
     needs: [build, vsix]
@@ -159,223 +235,3 @@ jobs:
             --title "nightly $version" \
             --notes-file notes.md \
             --prerelease
-
-  # Push the multi-arch container image to ghcr: the same static binaries the
-  # release ships, copied onto distroless. The :nightly tag rolls; the
-  # :nightly-<date>-<sha> tag is immutable for pinning.
-  image:
-    name: container image
-    needs: [guard, build]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-      id-token: write     # mint the OIDC token the attestation is signed with
-      attestations: write # write the SLSA provenance attestation
-    steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: masterbelt-nightly
-          path: dist
-      - name: Stage the linux binaries into the build context
-        run: |
-          for arch in amd64 arm64; do
-            mkdir -p build/ctx/linux/"$arch"
-            tar -xzf dist/masterbelt-linux-"$arch".tar.gz -C build/ctx/linux/"$arch"
-          done
-      - name: Image metadata
-        id: meta
-        run: |
-          version="$(cat dist/VERSION)"
-          patch="${version%+*}"; patch="${patch##*.}"   # the commit date
-          sha="${version#*+}"                            # the short SHA
-          echo "datesha=$patch-$sha" >>"$GITHUB_OUTPUT"
-          echo "created=$(git show -s --format=%cI HEAD)" >>"$GITHUB_OUTPUT"
-      - uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
-      - uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4.2.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ github.token }}
-      - uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
-        id: build
-        with:
-          context: build
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: |
-            ghcr.io/${{ github.repository }}:nightly
-            ghcr.io/${{ github.repository }}:nightly-${{ steps.meta.outputs.datesha }}
-          labels: |
-            org.opencontainers.image.source=https://github.com/${{ github.repository }}
-            org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.created=${{ steps.meta.outputs.created }}
-      - name: Attest image provenance
-        if: needs.guard.outputs.attest == 'true'
-        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
-        with:
-          subject-name: ghcr.io/${{ github.repository }}
-          subject-digest: ${{ steps.build.outputs.digest }}
-          push-to-registry: true
-
-  # Package the VS Code extension as a .vsix and, when a Marketplace token is
-  # configured, publish it to the pre-release channel. Without the token the
-  # .vsix is still built and attached to the release (publish degrades, never
-  # fails) — so forks and token-less setups stay green.
-  vsix:
-    name: editor extension package
-    needs: gate
-    runs-on: ubuntu-latest
-    env:
-      VSCE_PAT: ${{ secrets.VSCE_PAT }}
-    steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
-      - uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6.0.8
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
-        with:
-          node-version-file: .tool-versions
-          cache: 'pnpm'
-      - run: pnpm install --frozen-lockfile
-      - name: Package the extension
-        working-directory: toolchain/editors/vscode
-        run: |
-          # vsce wants a LICENSE in the package; copy the repo's single MIT
-          # license in rather than committing a second copy that could drift.
-          cp "$GITHUB_WORKSPACE/LICENSE" LICENSE
-          # The marketplace version is the CLI version without build metadata —
-          # 0.1.<UTC commit date>, monotonic for the rolling pre-release.
-          version="0.1.$(TZ=UTC0 git show -s --date=format-local:%Y%m%d --format=%cd HEAD)"
-          npm pkg set version="$version"
-          # Version-free filename for a deterministic download URL; vsce reads
-          # the version from package.json (set above), not the file name.
-          pnpm dlx @vscode/vsce package --pre-release --no-dependencies -o masterbelt.vsix
-      - name: Publish to the Marketplace (when a PAT is configured)
-        if: env.VSCE_PAT != ''
-        working-directory: toolchain/editors/vscode
-        run: pnpm dlx @vscode/vsce publish --pre-release --packagePath masterbelt.vsix
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: masterbelt-vsix
-          path: toolchain/editors/vscode/masterbelt.vsix
-          if-no-files-found: error
-
-  # Publish the tree-sitter grammar on the nightly by syncing it to the dedicated
-  # mirror repo and tagging it; the mirror's own workflows then publish to the
-  # package registries (the way the vsix publishes to the Marketplace, but with
-  # the registry step delegated):
-  #   - when the masterbelt GitHub App is configured, the assembled tree is pushed
-  #     to the mirror's default branch (the rolling preview editors track) and an
-  #     immutable v<version> tag. That tag push triggers the mirror's release
-  #     workflows (GitHub Packages on every tag; public npm + crates.io + PyPI on
-  #     stable tags only — a nightly on public npm would bloat its packument),
-  #     which build the wasm and publish — so this job needs no registry secret,
-  #     no Docker, and no npm here.
-  #   - absent the App, it only uploads the assembled tree as an artifact (never
-  #     fails), so a contributor without the secrets still gets a build.
-  tree-sitter:
-    name: tree-sitter grammar
-    needs: gate
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    env:
-      # Routed through env so the token step can gate on it (secrets are not
-      # usable in `if`). The App mints a short-lived token scoped to the mirror
-      # repo and to Contents + Workflows — Workflows because the synced tree
-      # carries the mirror's own .github/workflows; no long-lived, account-wide
-      # credential, and the org disallows deploy keys.
-      TS_APP_CLIENT_ID: ${{ secrets.TREE_SITTER_APP_CLIENT_ID }}
-    steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
-      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
-        with:
-          go-version-file: go.mod
-          cache: true
-      - uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6.0.8
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
-        with:
-          node-version-file: .tool-versions
-          cache: 'pnpm'
-      - run: pnpm install --frozen-lockfile
-
-      # Don't ship a stale or broken grammar: the committed parser must be fresh
-      # and the CST-pin / highlight golden must pass before assembling.
-      - name: Verify the generated grammar is fresh
-        run: make verify-generated
-      - name: Grammar tests (CST-pin + highlight golden)
-        run: cd toolchain/grammars/tree-sitter-masterbelt && node --test
-
-      # Assemble the standalone tree (stamps the masterbelt version into it).
-      - name: Assemble the standalone package tree
-        run: make publish-tree-sitter
-
-      # Mint the short-lived, repo-scoped token from the App, scoped to Contents
-      # + Workflows (the sync pushes the mirror's .github/workflows too). Skips
-      # cleanly when the App is not configured (degrade to artifact).
-      - name: Mint a scoped token from the masterbelt GitHub App
-        id: app-token
-        if: env.TS_APP_CLIENT_ID != ''
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
-        with:
-          client-id: ${{ secrets.TREE_SITTER_APP_CLIENT_ID }}
-          private-key: ${{ secrets.TREE_SITTER_APP_PRIVATE_KEY }}
-          owner: masterbelt
-          repositories: tree-sitter-masterbelt
-          permission-contents: write
-          permission-workflows: write
-
-      # Sync to the dedicated repo with the minted token. The source repo stays
-      # the single truth; the mirror is overwritten with the assembled tree (so
-      # a removed file propagates), pushed to its default branch (the rolling
-      # preview) and tagged immutably as v<version>. The tag both pins the grammar
-      # for editors and triggers the mirror's release workflows; the version
-      # carries the commit SHA, so the tag is unique and never moves.
-      - name: Sync to masterbelt/tree-sitter-masterbelt
-        if: steps.app-token.outputs.token != ''
-        env:
-          GH_PUSH_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: |
-          set -eu
-          src="$PWD/dist/tree-sitter-masterbelt"
-          version="$(node -p "require('$src/package.json').version")"
-          sha="$(git rev-parse --short HEAD)"
-          git config --global user.name 'masterbelt-bot'
-          git config --global user.email 'noreply@masterbelt.dev'
-          git clone --depth=1 \
-            "https://x-access-token:${GH_PUSH_TOKEN}@github.com/masterbelt/tree-sitter-masterbelt.git" dest
-          # Replace tracked content (keep .git) so deletions propagate.
-          find dest -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
-          cp -R "$src"/. dest/
-          cd dest
-          git add -A
-          if git diff --cached --quiet; then
-            echo "dedicated repo already up to date — no new commit"
-          else
-            git commit -m "sync grammar from masterbelt@${sha}"
-            git push origin HEAD:main
-          fi
-          # Ensure the release tag exists regardless of whether the content
-          # changed. The tag is what triggers the mirror's release workflows, so a
-          # missing one — a prior run whose tag push failed, or a mirror
-          # bootstrapped with matching content — must still be created, or that
-          # version never publishes. The version carries the commit SHA, so the tag
-          # is unique; an existing one is left immutable.
-          tag="v${version}"
-          if git ls-remote --exit-code --tags origin "refs/tags/${tag}" >/dev/null 2>&1; then
-            echo "tag ${tag} already exists — leaving it immutable"
-          else
-            git tag "$tag"
-            git push origin "$tag"
-            echo "published ${tag}"
-          fi
-
-      # Upload the assembled tree as an artifact — the degrade path when the App
-      # is not configured (the sync is skipped), and a build record otherwise. The
-      # wasm and every registry publish are the mirror's job now (release-npm.yml
-      # builds the wasm there), so this job stays Docker-free and secret-free.
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: tree-sitter-masterbelt
-          path: dist/tree-sitter-masterbelt
-          if-no-files-found: error

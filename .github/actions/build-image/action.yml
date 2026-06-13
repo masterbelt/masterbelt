@@ -1,0 +1,55 @@
+# build-image — build and push the multi-arch container image from the binaries
+# staged in dist/ (the caller downloads the CLI archives first). The tags differ
+# per channel (rolling :nightly vs the stable semver ladder), so they are passed
+# in; everything else — staging, buildx, the OCI labels — is shared. The digest
+# is an output so the caller can attest the image with the shared attest action.
+name: build-image
+description: Build and push the multi-arch container image from the staged binaries.
+
+inputs:
+  tags:
+    description: Newline-separated ghcr.io image tags to push.
+    required: true
+
+outputs:
+  digest:
+    description: The pushed image digest, for provenance attestation.
+    value: ${{ steps.build.outputs.digest }}
+
+runs:
+  using: composite
+  steps:
+    - name: Stage the linux binaries into the build context
+      shell: bash
+      run: |
+        for arch in amd64 arm64; do
+          mkdir -p build/ctx/linux/"$arch"
+          tar -xzf dist/masterbelt-linux-"$arch".tar.gz -C build/ctx/linux/"$arch"
+        done
+
+    # The revision and created label come from the checked-out commit (the tag's
+    # commit for a stable build), not github.sha, so they are right on both paths.
+    - name: Image metadata
+      id: meta
+      shell: bash
+      run: |
+        echo "revision=$(git rev-parse HEAD)" >>"$GITHUB_OUTPUT"
+        echo "created=$(git show -s --format=%cI HEAD)" >>"$GITHUB_OUTPUT"
+
+    - uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
+    - uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4.2.0
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ github.token }}
+    - uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
+      id: build
+      with:
+        context: build
+        platforms: linux/amd64,linux/arm64
+        push: true
+        tags: ${{ inputs.tags }}
+        labels: |
+          org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          org.opencontainers.image.revision=${{ steps.meta.outputs.revision }}
+          org.opencontainers.image.created=${{ steps.meta.outputs.created }}

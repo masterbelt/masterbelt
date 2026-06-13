@@ -1,0 +1,119 @@
+# publish-grammar — verify, assemble, and (when the App is configured) sync the
+# tree-sitter grammar to the dedicated mirror repo and tag it; the mirror's own
+# workflows publish to the registries (GitHub Packages on every tag; public npm +
+# crates.io + PyPI on stable tags only). The channel only changes the version
+# stamped into the package: a nightly derives masterbelt's commit-based version
+# (a -nightly.<sha> prerelease), a stable build passes the clean release semver,
+# whose v<semver> tag is what unlocks the public-registry publish. Everything
+# else is shared, so the grammar ships identically on both paths. Without the App
+# the sync is skipped and the assembled tree is left for the caller to upload as
+# an artifact (degrade, never fail). The caller checks out and sets up
+# go/pnpm/node + `pnpm install` first.
+name: publish-grammar
+description: Assemble the tree-sitter grammar and sync+tag it to the mirror repo.
+
+inputs:
+  ts-version:
+    description: >
+      The version to stamp into the grammar package (the release semver for a
+      stable build). Empty derives masterbelt's commit-based version.
+    default: ''
+  app-client-id:
+    description: GitHub App client id; empty skips the sync (degrade to artifact).
+    default: ''
+  app-private-key:
+    description: GitHub App private key, paired with app-client-id.
+    default: ''
+  push-default-branch:
+    description: >
+      Push the assembled tree to the mirror's default branch — its rolling
+      preview. True for the nightly, which the preview tracks; false for a stable
+      release, which must not move that rolling branch (especially a release/v*
+      maintenance release, which would regress it) and publishes only the tag.
+    default: 'true'
+
+runs:
+  using: composite
+  steps:
+    # Don't ship a stale or broken grammar: the committed parser must be fresh
+    # and the CST-pin / highlight golden must pass before assembling.
+    - name: Verify the generated grammar is fresh
+      shell: bash
+      run: make verify-generated
+    - name: Grammar tests (CST-pin + highlight golden)
+      shell: bash
+      run: cd toolchain/grammars/tree-sitter-masterbelt && node --test
+
+    # Assemble the standalone tree, stamping the version (TS_VERSION when set,
+    # else masterbelt's own commit-derived version).
+    - name: Assemble the standalone package tree
+      shell: bash
+      env:
+        TS_VERSION: ${{ inputs.ts-version }}
+      run: make publish-tree-sitter
+
+    # Mint a short-lived, repo-scoped token from the App, scoped to Contents +
+    # Workflows (the sync pushes the mirror's .github/workflows too). Skips
+    # cleanly when the App is not configured (degrade to artifact).
+    - name: Mint a scoped token from the masterbelt GitHub App
+      id: app-token
+      if: inputs.app-client-id != ''
+      uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+      with:
+        client-id: ${{ inputs.app-client-id }}
+        private-key: ${{ inputs.app-private-key }}
+        owner: masterbelt
+        repositories: tree-sitter-masterbelt
+        permission-contents: write
+        permission-workflows: write
+
+    # Sync to the dedicated repo with the minted token. The source repo stays the
+    # single truth; the mirror is overwritten with the assembled tree (so a removed
+    # file propagates), pushed to its default branch (the rolling preview) and
+    # tagged as v<version>. The tag both pins the grammar for editors and triggers
+    # the mirror's release workflows.
+    - name: Sync to masterbelt/tree-sitter-masterbelt
+      if: steps.app-token.outputs.token != ''
+      shell: bash
+      env:
+        GH_PUSH_TOKEN: ${{ steps.app-token.outputs.token }}
+        PUSH_DEFAULT_BRANCH: ${{ inputs.push-default-branch }}
+      run: |
+        set -eu
+        src="$PWD/dist/tree-sitter-masterbelt"
+        version="$(node -p "require('$src/package.json').version")"
+        sha="$(git rev-parse --short HEAD)"
+        git config --global user.name 'masterbelt-bot'
+        git config --global user.email 'noreply@masterbelt.dev'
+        git clone --depth=1 \
+          "https://x-access-token:${GH_PUSH_TOKEN}@github.com/masterbelt/tree-sitter-masterbelt.git" dest
+        # Replace tracked content (keep .git) so deletions propagate.
+        find dest -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+        cp -R "$src"/. dest/
+        cd dest
+        git add -A
+        if git diff --cached --quiet; then
+          echo "dedicated repo already up to date — no new commit"
+        else
+          git commit -m "sync grammar from masterbelt@${sha}"
+          # Only the nightly moves the mirror's rolling default branch; a stable
+          # release leaves it and ships the tag below, so it cannot overwrite the
+          # preview with an older (e.g. maintenance) tree.
+          if [ "$PUSH_DEFAULT_BRANCH" = true ]; then
+            git push origin HEAD:main
+          else
+            echo "stable release — leaving the mirror's rolling main untouched; publishing the tag only"
+          fi
+        fi
+        # Ensure the release tag exists regardless of whether the content changed.
+        # The tag is what triggers the mirror's release workflows, so a missing one
+        # must still be created, or that version never publishes. A stable v<semver>
+        # is immutable; a nightly tag carries the sha, so it too is unique.
+        tag="v${version}"
+        if git ls-remote --exit-code --tags origin "refs/tags/${tag}" >/dev/null 2>&1; then
+          echo "tag ${tag} already exists — leaving it immutable"
+        else
+          git tag "$tag"
+          git push origin "$tag"
+          echo "published ${tag}"
+        fi
