@@ -276,6 +276,7 @@ func assemble(fileID FileID, file *ast.File, positions map[cst.Green]span, q que
 		checkBuiltinSurface(file, a.at, a.diags)
 	}
 	a.checkAssocConstRefs()
+	a.reportMasterValidationRefs()
 	genv := a.writeBack()
 	checkIndexWritesIR(a.module, genv, a.at, a.diags)
 	a.refoldConsts(genv)
@@ -590,6 +591,27 @@ func (a *assembler) refoldConsts(genv graphFoldEnv) {
 			if c.Eval == nil && c.Value != nil {
 				if c.Eval = eval.GraphExpecting(c.Value, c.Type, genv); c.Eval != nil {
 					progress = true
+				}
+			}
+		}
+	}
+}
+
+// reportMasterValidationRefs reports the reference problems of a master's per-row
+// validate checks — an undefined name or an unknown namespace member — the same
+// reference diagnostics a constant initializer and a top-level assert run, since
+// a validate check is a predicate folded over data the same way. Without it an
+// undefined name in a check folds to nothing and every row passes silently. self
+// is bound to the row here, so a self reference is left alone (unlike a const).
+func (a *assembler) reportMasterValidationRefs() {
+	for _, md := range a.file.Masters {
+		for _, clause := range md.Validations {
+			if !clause.PerRow {
+				continue
+			}
+			for _, stmt := range clause.Body {
+				if as, ok := stmt.(*ast.AssertStmt); ok && as.Cond != nil {
+					reportRefIssues(a.fileID, as.Cond, a.q, a.at, a.diags, nil)
 				}
 			}
 		}

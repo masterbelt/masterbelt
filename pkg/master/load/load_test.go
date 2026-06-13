@@ -180,6 +180,27 @@ func TestLoadRowValidationMethodAssertFires(t *testing.T) {
 	}
 }
 
+func TestLoadRowValidationMethodAssertThroughExpr(t *testing.T) {
+	// A helper's failed assert is faulted even when the call is wrapped in another
+	// expression (== true): the violation travels on its own channel, not as a
+	// value the surrounding fold would swallow to nil.
+	belt := "master Skill {\n" +
+		"  record { id: int, power: int } impl {\n" +
+		"    pub ok(): bool {\n      assert self.power >= 0\n      return true\n    }\n" +
+		"  }\n" +
+		"  primary id\n" +
+		"  source { csv \"skills.csv\" }\n" +
+		"  validate { each { assert self.ok() == true } }\n" +
+		"}\n"
+	_, diags := run(t, belt, map[string]string{"csv": "data"}, map[string]string{
+		"data/skills.csv": "id,power\n1,5\n2,-1\n",
+	})
+	d := single(t, diags, master.CodeRowValidationFailed)
+	if !strings.Contains(d.Message, "data/skills.csv:3") {
+		t.Errorf("message = %q, want the failing row data/skills.csv:3", d.Message)
+	}
+}
+
 func TestLoadRowValidationAliasedRowMethod(t *testing.T) {
 	// The row is reached through an alias chain (record Row, type Row = Base); a
 	// row method on it still folds, so a row failing the method (power < cost) is

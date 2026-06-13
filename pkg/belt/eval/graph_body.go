@@ -49,7 +49,7 @@ func graphApply(ctx graphCtx, fn *ir.Constant, args []*ir.Constant) *ir.Constant
 		}
 	}
 	return graphBody(fn.Fn.Body, graphCtx{
-		env: ctx.env, locals: locals, depth: ctx.depth + 1, budgetHit: ctx.budgetHit,
+		env: ctx.env, locals: locals, depth: ctx.depth + 1, budgetHit: ctx.budgetHit, assertViolated: ctx.assertViolated,
 		resultColl: CollKindOf(resultType), resultType: resultType,
 		// A closure captures its defining environment's type parameters, so a
 		// match in its body folds under the same substitution as the routine the
@@ -132,8 +132,8 @@ func graphStmts(body []ir.Stmt, ctx graphCtx, scope *graphScope) (*ir.Constant, 
 			}
 			return v, out
 		case *ir.AssertStmt:
-			if v, out, halt := graphAssertStmt(s, ctx); halt {
-				return v, out
+			if out, halt := graphAssertStmt(s, ctx); halt {
+				return nil, out
 			}
 		default:
 			panic(unhandledGraphStmt(stmt))
@@ -144,21 +144,22 @@ func graphStmts(body []ir.Stmt, ctx graphCtx, scope *graphScope) (*ir.Constant, 
 
 // graphAssertStmt folds an assert statement, honouring it where it runs. halt is
 // true when the body cannot continue past it: a condition that folds to a
-// definite false is a violated assertion, so the body yields an error value (the
-// fold of a body whose invariant was broken is that error, not the value it would
-// have returned — a master's validate check that calls such a body sees the error
-// and faults the row), and a condition that cannot fold leaves the body unable to
-// fold. A condition that holds returns halt false, and the fold continues past it
-// like a bare expression statement.
-func graphAssertStmt(s *ir.AssertStmt, ctx graphCtx) (*ir.Constant, graphOutcome, bool) {
+// definite false is a violated assertion, which notes the violation on the
+// caller's channel (a master's validate check reads it to fault the row) and
+// leaves the body without a value; a condition that cannot fold leaves the body
+// unable to fold without noting a violation. Either way the body yields no value
+// rather than an error escaping as a typed result. A condition that holds returns
+// halt false, and the fold continues past it like a bare expression statement.
+func graphAssertStmt(s *ir.AssertStmt, ctx graphCtx) (graphOutcome, bool) {
 	cond := graphValue(s.Cond, ctx)
 	if cond == nil {
-		return nil, graphUnknown, true
+		return graphUnknown, true
 	}
 	if cond.Kind == ir.ConstBool && !cond.Bool {
-		return ir.ErrorConstant("assertion failed"), graphReturned, true
+		ctx.noteAssertViolation()
+		return graphUnknown, true
 	}
-	return nil, graphFellThrough, false
+	return graphFellThrough, false
 }
 
 // graphReturn folds a return statement's value under the body's result

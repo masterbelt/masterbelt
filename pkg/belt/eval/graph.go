@@ -109,6 +109,18 @@ func GraphPredicate(pred ir.Value, self *ir.Constant, selfDef *ir.TypeDef, env G
 	return graphValue(pred, graphCtx{env: env, self: self, selfDef: selfDef})
 }
 
+// GraphPredicateViolation folds a predicate like GraphPredicate and also reports
+// whether a violated assertion was reached during the fold — an assert statement,
+// in the predicate or in a body it calls, whose condition folded to a definite
+// false. A master's validate check reads this to tell a row that violated an
+// assertion (faulted) from a predicate that merely could not be folded for the
+// row (left alone): both return a nil value, but only the first sets the flag.
+func GraphPredicateViolation(pred ir.Value, self *ir.Constant, selfDef *ir.TypeDef, env GraphEnv) (*ir.Constant, bool) {
+	violated := false
+	v := graphValue(pred, graphCtx{env: env, self: self, selfDef: selfDef, assertViolated: &violated})
+	return v, violated
+}
+
 // graphCtx carries the interpretation context through the recursive fold: the
 // driver's environment, the local bindings of the enclosing applied routine or
 // function literals, the self value (and its owning definition, the static
@@ -147,12 +159,27 @@ type graphCtx struct {
 	// budgetHit is the failure-classification channel: a budget guard that
 	// refuses to fold sets it. See evalCtx.budgetHit.
 	budgetHit *bool
+	// assertViolated is the assert-failure channel: folding an assert statement
+	// whose condition is a definite false sets it, so a caller (a master's
+	// validate check) can tell a violated assertion from a value that merely
+	// could not be folded — both leave the fold without a value. It threads into
+	// applied bodies like budgetHit, so an assert in a row method a check calls
+	// reaches the check's flag.
+	assertViolated *bool
 }
 
 // noteBudget mirrors evalCtx.noteBudget for the graph context.
 func (ctx graphCtx) noteBudget() {
 	if ctx.budgetHit != nil {
 		*ctx.budgetHit = true
+	}
+}
+
+// noteAssertViolation records that a folded assert statement's condition was a
+// definite false — a violated assertion — for the caller that armed the channel.
+func (ctx graphCtx) noteAssertViolation() {
+	if ctx.assertViolated != nil {
+		*ctx.assertViolated = true
 	}
 }
 

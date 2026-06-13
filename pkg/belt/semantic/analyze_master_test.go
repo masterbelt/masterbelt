@@ -260,6 +260,29 @@ func TestMasterValidateCyclicRowDoesNotCrash(t *testing.T) {
 	}
 }
 
+// TestMasterValidateRejectsUndefinedName pins that an undefined name in a
+// validate check is reported, the same reference diagnostics a const initializer
+// runs — without it the check folds to nothing and every row passes silently.
+func TestMasterValidateRejectsUndefinedName(t *testing.T) {
+	src := "master M {\n  record { id: int }\n  primary id\n  validate {\n    each {\n      assert Limit > self.id\n    }\n  }\n}\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeUndefinedName) {
+		t.Fatalf("want undefined_name for an undefined name in a validate check, got %v", codes(diags))
+	}
+}
+
+// TestAssertStatementFailsConstFold pins that a violated assert in a folded body
+// leaves the fold without a value rather than publishing an error as a typed
+// result: a const folding a function whose assertion fails is reported as
+// unfolded, not silently given an error value typed as its result.
+func TestAssertStatementFailsConstFold(t *testing.T) {
+	src := "fn f(): int {\n  assert false\n  return 1\n}\nconst X: int = f()\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeUnfoldedConst) {
+		t.Fatalf("want unfolded_const for a const folding a failed assertion, got %v", codes(diags))
+	}
+}
+
 // TestMasterValidateRejectsEffect pins that a validate check is pure: an
 // effectful call in one is reported as a missing effect (validate has nowhere to
 // declare one), rather than silently failing every row at fold time.
