@@ -1,0 +1,819 @@
+Module
+  Consts:
+    Const
+      Name: "Len"
+      Anchor: "belt:/Len"
+      Public: false
+      Doc: ~
+      Type: Builtin
+        Name: "nint"
+      Value: Call
+        Receiver: StringLiteral
+          Value: "héllo"
+          Type: Builtin
+            Name: "string"
+        Method: "len"
+        Args: ~
+        Setter: false
+        Resolved: ~
+        Subst: ~
+        Type: Builtin
+          Name: "nint"
+      Eval: Constant
+        Kind: 0
+        Int: 5
+        Bool: false
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+        Reified: ~
+    Const
+      Name: "Chars"
+      Anchor: "belt:/Chars"
+      Public: false
+      Doc: ~
+      Type: App
+        Def: "list"
+        Args:
+          Builtin
+            Name: "string"
+      Value: Call
+        Receiver: StringLiteral
+          Value: "héllo"
+          Type: Builtin
+            Name: "string"
+        Method: "chars"
+        Args: ~
+        Setter: false
+        Resolved: ~
+        Subst: ~
+        Type: App
+          Def: "list"
+          Args:
+            Builtin
+              Name: "string"
+      Eval: Constant
+        Kind: 3
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll:
+          ConstEntry
+            Key: ~
+            Value: Constant
+              Kind: 2
+              Int: ~
+              Bool: false
+              Str: "h"
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+              Reified: ~
+          ConstEntry
+            Key: ~
+            Value: Constant
+              Kind: 2
+              Int: ~
+              Bool: false
+              Str: "é"
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+              Reified: ~
+          ConstEntry
+            Key: ~
+            Value: Constant
+              Kind: 2
+              Int: ~
+              Bool: false
+              Str: "l"
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+              Reified: ~
+          ConstEntry
+            Key: ~
+            Value: Constant
+              Kind: 2
+              Int: ~
+              Bool: false
+              Str: "l"
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+              Reified: ~
+          ConstEntry
+            Key: ~
+            Value: Constant
+              Kind: 2
+              Int: ~
+              Bool: false
+              Str: "o"
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+              Reified: ~
+        Fields: ~
+        CollMapness: 1
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+        Reified: ~
+    Const
+      Name: "Bytes"
+      Anchor: "belt:/Bytes"
+      Public: false
+      Doc: ~
+      Type: App
+        Def: "list"
+        Args:
+          Builtin
+            Name: "byte"
+      Value: Call
+        Receiver: StringLiteral
+          Value: "héllo"
+          Type: Builtin
+            Name: "string"
+        Method: "bytes"
+        Args: ~
+        Setter: false
+        Resolved: ~
+        Subst: ~
+        Type: App
+          Def: "list"
+          Args:
+            Builtin
+              Name: "byte"
+      Eval: Constant
+        Kind: 3
+        Int: ~
+        Bool: false
+        Str: ""
+        Coll:
+          ConstEntry
+            Key: ~
+            Value: Constant
+              Kind: 0
+              Int: 104
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+              Reified: ~
+          ConstEntry
+            Key: ~
+            Value: Constant
+              Kind: 0
+              Int: 195
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+              Reified: ~
+          ConstEntry
+            Key: ~
+            Value: Constant
+              Kind: 0
+              Int: 169
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+              Reified: ~
+          ConstEntry
+            Key: ~
+            Value: Constant
+              Kind: 0
+              Int: 108
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+              Reified: ~
+          ConstEntry
+            Key: ~
+            Value: Constant
+              Kind: 0
+              Int: 108
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+              Reified: ~
+          ConstEntry
+            Key: ~
+            Value: Constant
+              Kind: 0
+              Int: 111
+              Bool: false
+              Str: ""
+              Coll: ~
+              Fields: ~
+              CollMapness: 0
+              Millis: 0
+              Fn: ~
+              Captured: ~
+              EnumDef: ~
+              EnumIndex: 0
+              Start: ~
+              End: ~
+              Step: ~
+              UnionTag: ~
+              Reified: ~
+        Fields: ~
+        CollMapness: 1
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+        Reified: ~
+    Const
+      Name: "Second"
+      Anchor: "belt:/Second"
+      Public: false
+      Doc: ~
+      Type: Union
+        Members:
+          Builtin
+            Name: "string"
+          Builtin
+            Name: "error"
+      Value: Call
+        Receiver: StringLiteral
+          Value: "héllo"
+          Type: Builtin
+            Name: "string"
+        Method: "at"
+        Args:
+          IntLiteral
+            Text: "1"
+            Type: Builtin
+              Name: "nint"
+        Setter: false
+        Resolved: ~
+        Subst: ~
+        Type: Union
+          Members:
+            Builtin
+              Name: "string"
+            Builtin
+              Name: "error"
+      Eval: Constant
+        Kind: 2
+        Int: ~
+        Bool: false
+        Str: "é"
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: Builtin
+          Name: "string"
+        Reified: ~
+    Const
+      Name: "Head"
+      Anchor: "belt:/Head"
+      Public: false
+      Doc: ~
+      Type: Union
+        Members:
+          Builtin
+            Name: "string"
+          Builtin
+            Name: "error"
+      Value: Call
+        Receiver: StringLiteral
+          Value: "héllo"
+          Type: Builtin
+            Name: "string"
+        Method: "slice"
+        Args:
+          IntLiteral
+            Text: "0"
+            Type: Builtin
+              Name: "nint"
+          IntLiteral
+            Text: "2"
+            Type: Builtin
+              Name: "nint"
+        Setter: false
+        Resolved: ~
+        Subst: ~
+        Type: Union
+          Members:
+            Builtin
+              Name: "string"
+            Builtin
+              Name: "error"
+      Eval: Constant
+        Kind: 2
+        Int: ~
+        Bool: false
+        Str: "hé"
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: Builtin
+          Name: "string"
+        Reified: ~
+    Const
+      Name: "Tail"
+      Anchor: "belt:/Tail"
+      Public: false
+      Doc: ~
+      Type: Union
+        Members:
+          Builtin
+            Name: "string"
+          Builtin
+            Name: "error"
+      Value: Call
+        Receiver: StringLiteral
+          Value: "héllo"
+          Type: Builtin
+            Name: "string"
+        Method: "slice"
+        Args:
+          IntLiteral
+            Text: "1"
+            Type: Builtin
+              Name: "nint"
+          IntLiteral
+            Text: "5"
+            Type: Builtin
+              Name: "nint"
+        Setter: false
+        Resolved: ~
+        Subst: ~
+        Type: Union
+          Members:
+            Builtin
+              Name: "string"
+            Builtin
+              Name: "error"
+      Eval: Constant
+        Kind: 2
+        Int: ~
+        Bool: false
+        Str: "éllo"
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: Builtin
+          Name: "string"
+        Reified: ~
+    Const
+      Name: "OffEnd"
+      Anchor: "belt:/OffEnd"
+      Public: false
+      Doc: ~
+      Type: Union
+        Members:
+          Builtin
+            Name: "string"
+          Builtin
+            Name: "error"
+      Value: Call
+        Receiver: StringLiteral
+          Value: "héllo"
+          Type: Builtin
+            Name: "string"
+        Method: "at"
+        Args:
+          IntLiteral
+            Text: "9"
+            Type: Builtin
+              Name: "nint"
+        Setter: false
+        Resolved: ~
+        Subst: ~
+        Type: Union
+          Members:
+            Builtin
+              Name: "string"
+            Builtin
+              Name: "error"
+      Eval: Constant
+        Kind: 8
+        Int: ~
+        Bool: false
+        Str: "index out of range"
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: Builtin
+          Name: "error"
+        Reified: ~
+  Types: ~
+  Funcs:
+    Function
+      Name: "isEmpty"
+      Anchor: "belt:/isEmpty"
+      Public: false
+      Extern: false
+      Effects: ~
+      Doc: ~
+      TypeParams: ~
+      Params:
+        Param
+          Name: "s"
+          Type: Builtin
+            Name: "string"
+      Result: Builtin
+        Name: "bool"
+      Body:
+        Return
+          Value: Call
+            Receiver: Call
+              Receiver: ParamRef
+                Name: "s"
+                Type: Builtin
+                  Name: "string"
+              Method: "len"
+              Args: ~
+              Setter: false
+              Resolved: ~
+              Subst: ~
+              Type: Builtin
+                Name: "nint"
+            Method: "eql"
+            Args:
+              IntLiteral
+                Text: "0"
+                Type: Builtin
+                  Name: "nint"
+            Setter: false
+            Resolved: ~
+            Subst: ~
+            Type: Builtin
+              Name: "bool"
+    Function
+      Name: "reverse"
+      Anchor: "belt:/reverse"
+      Public: false
+      Extern: false
+      Effects: ~
+      Doc: ~
+      TypeParams: ~
+      Params:
+        Param
+          Name: "s"
+          Type: Builtin
+            Name: "string"
+      Result: Builtin
+        Name: "string"
+      Body:
+        Return
+          Value: Call
+            Receiver: Call
+              Receiver: ParamRef
+                Name: "s"
+                Type: Builtin
+                  Name: "string"
+              Method: "chars"
+              Args: ~
+              Setter: false
+              Resolved: ~
+              Subst: ~
+              Type: App
+                Def: "list"
+                Args:
+                  Builtin
+                    Name: "string"
+            Method: "fold"
+            Args:
+              StringLiteral
+                Value: ""
+                Type: Builtin
+                  Name: "string"
+              FuncLiteral
+                Params: "acc" "i" "c"
+                Body:
+                  Return
+                    Value: Call
+                      Receiver: ParamRef
+                        Name: "c"
+                        Type: Builtin
+                          Name: "string"
+                      Method: "add"
+                      Args:
+                        ParamRef
+                          Name: "acc"
+                          Type: Builtin
+                            Name: "string"
+                      Setter: false
+                      Resolved: ~
+                      Subst: ~
+                      Type: Builtin
+                        Name: "string"
+                Type: Func
+                  Params:
+                    Builtin
+                      Name: "string"
+                    Builtin
+                      Name: "nint"
+                    Builtin
+                      Name: "string"
+                  Result: Builtin
+                    Name: "string"
+            Setter: false
+            Resolved: ~
+            Subst:
+              Entry
+                Key: "A"
+                Value: Builtin
+                  Name: "string"
+              Entry
+                Key: "K"
+                Value: Builtin
+                  Name: "nint"
+              Entry
+                Key: "T"
+                Value: Builtin
+                  Name: "string"
+              Entry
+                Key: "V"
+                Value: Builtin
+                  Name: "string"
+            Type: Builtin
+              Name: "string"
+  Asserts:
+    Assert
+      Cond: "Len == 5"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+        Reified: ~
+      Diagram: "Len == 5\n^   ^\n5   true"
+    Assert
+      Cond: "Chars.len() == 5"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+        Reified: ~
+      Diagram: "Chars.len() == 5\n^     ^     ^\n|     5     true\n[\"h\", \"é\", \"l\", \"l\", \"o\"]"
+    Assert
+      Cond: "Bytes.len() == 6"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+        Reified: ~
+      Diagram: "Bytes.len() == 6\n^     ^     ^\n|     6     true\n[104, 195, 169, 108, 108, 111]"
+    Assert
+      Cond: "isEmpty(\"\")"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+        Reified: ~
+      Diagram: "isEmpty(\"\")\n^\ntrue"
+    Assert
+      Cond: "!isEmpty(\"x\")"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+        Reified: ~
+      Diagram: "!isEmpty(\"x\")\n^^\n|false\ntrue"
+    Assert
+      Cond: "reverse(\"abc\") == \"cba\""
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+        Reified: ~
+      Diagram: "reverse(\"abc\") == \"cba\"\n^              ^\n\"cba\"          true"

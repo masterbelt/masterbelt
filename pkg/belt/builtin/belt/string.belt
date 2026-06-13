@@ -1,5 +1,27 @@
 /// An immutable UTF-8 string, written "...".
 pub type string = builtin impl {
+  /// The number of Unicode codepoints (runes) — the rune count, not the byte
+  /// length, so a multi-byte character counts once.
+  pub extern fn len(): nint
+
+  /// The rune at index (0-based) as a length-1 string, or an error when the
+  /// index is out of range. A read can miss; handle the error, as a list's
+  /// get does. There is no separate character type — a rune is a length-1
+  /// string.
+  pub extern fn at(index: nint): string | error
+
+  /// The substring of the runes in [start, end) — 0-based, half-open — or an
+  /// error when a bound is out of range or start is past end. Like at, it is a
+  /// fallible read (string | error).
+  pub extern fn slice(start: nint, end: nint): string | error
+
+  /// The runes, each as a length-1 string, in order. The decode the std string
+  /// module builds split, trim, and case folding on.
+  pub extern fn chars(): list<string>
+
+  /// The UTF-8 bytes, in order.
+  pub extern fn bytes(): list<byte>
+
   /// The + operator: the concatenation.
   pub extern fn add(other: self): self
 } impl comparable {

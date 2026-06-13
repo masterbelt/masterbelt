@@ -1,0 +1,40 @@
+// The string introspection substrate: len, at, slice, chars, and bytes read an
+// immutable string's contents, and every one folds at compile time. Length,
+// indexing, and slicing count Unicode codepoints (runes), not bytes — "héllo"
+// is five runes though its UTF-8 form is six bytes — so the substrate the std
+// string module is built on is rune-correct from the start.
+
+// len counts runes; it folds, so the assert is checked when the file compiles.
+const Len = "héllo".len()
+assert Len == 5
+
+// chars decodes the string into its runes, each a length-1 string. It folds to
+// a list — the primitive split, trim, and case folding are written on.
+const Chars = "héllo".chars()
+assert Chars.len() == 5
+
+// bytes is the UTF-8 byte view: six bytes, because é encodes as two.
+const Bytes = "héllo".bytes()
+assert Bytes.len() == 6
+
+// at and slice are fallible reads: an out-of-range index is an error value to
+// branch on (string | error), the shape a list's get carries. A present read
+// folds to the rune (at) or the run of runes (slice); an out-of-range one folds
+// to the error.
+const Second: string | error = "héllo".at(1) // "é"
+const Head: string | error = "héllo".slice(0, 2) // "hé"
+const Tail: string | error = "héllo".slice(1, 5) // "éllo"
+const OffEnd: string | error = "héllo".at(9) // index out of range
+
+// The substrate composes in pure belt: isEmpty and a rune reverse are the kind
+// of helper the std string module writes on len and chars — no new native.
+fn isEmpty(s: string): bool {
+  return s.len() == 0
+}
+assert isEmpty("")
+assert !isEmpty("x")
+
+fn reverse(s: string): string {
+  return s.chars().fold("", fn(acc, i, c) -> c + acc)
+}
+assert reverse("abc") == "cba"
