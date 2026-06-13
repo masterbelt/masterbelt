@@ -1,0 +1,46 @@
+Module
+  Consts: ~
+  Types: ~
+  Funcs:
+    Function
+      Name: "checked"
+      Anchor: "belt:/checked"
+      Public: true
+      Extern: false
+      Effects: ~
+      Doc: ~
+      TypeParams: ~
+      Params:
+        Param
+          Name: "x"
+          Type: Builtin
+            Name: "int"
+      Result: Builtin
+        Name: "int"
+      Body:
+        AssertStmt
+          Cond: Call
+            Receiver: ParamRef
+              Name: "x"
+              Type: Builtin
+                Name: "int"
+            Method: "gteq"
+            Args:
+              Adapt
+                Value: IntLiteral
+                  Text: "0"
+                  Type: Builtin
+                    Name: "nint"
+                To: Builtin
+                  Name: "int"
+            Setter: false
+            Resolved: ~
+            Subst: ~
+            Type: Builtin
+              Name: "bool"
+        Return
+          Value: ParamRef
+            Name: "x"
+            Type: Builtin
+              Name: "int"
+  Asserts: ~

@@ -575,6 +575,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "master " + f["master"].String() + " has no field " + f["key"].String() + " named by its primary key"
 		}
 	},
+	"belt.semantic.master_validate_not_assert": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "master " + f["master"].String() + " の validate ブロックには assert 文のみ記述できます"
+		default:
+			return "a validate block of master " + f["master"].String() + " may contain only assert statements"
+		}
+	},
 	"belt.semantic.master_where_unsupported": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
@@ -1015,6 +1023,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "format " + f["format"].String() + " sets option " + f["key"].String() + " more than once"
 		}
 	},
+	"master.duplicate_primary_key": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return f["path"].String() + ":" + f["row"].String() + "," + f["col"].String() + ": 主キー " + f["key"].String() + " が重複しています(最初の出現は行 " + f["first"].String() + ")"
+		default:
+			return f["path"].String() + ":" + f["row"].String() + "," + f["col"].String() + ": duplicate primary key " + f["key"].String() + " (first at row " + f["first"].String() + ")"
+		}
+	},
 	"master.duplicate_row_field": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":
@@ -1045,6 +1061,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "オプション " + f["key"].String() + " は " + f["typ"].String() + " でなければなりません"
 		default:
 			return "option " + f["key"].String() + " must be a " + f["typ"].String()
+		}
+	},
+	"master.row_validation_failed": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "行 " + f["path"].String() + ":" + f["row"].String() + " は validate each の検査を満たしません"
+		default:
+			return "row " + f["path"].String() + ":" + f["row"].String() + " does not satisfy this validate each check"
 		}
 	},
 	"master.source_unreadable": func(loc Locale, f map[string]fmt.Stringer) string {

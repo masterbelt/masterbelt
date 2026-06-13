@@ -75,6 +75,7 @@ File
       Impls: ~
       Primary: "id"
       Sources: ~
+      Validations: ~
     MasterDecl
       Doc: ~
       Public: false
@@ -101,3 +102,4 @@ File
       Impls: ~
       Primary: "skill" "level"
       Sources: ~
+      Validations: ~

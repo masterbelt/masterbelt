@@ -190,6 +190,14 @@ func (mk *marker) reachType(t *ir.TypeDef) {
 	// (a field typed by an enum keeps that enum live).
 	if t.Master != nil {
 		mk.reachTypeRef(t.Master.Row)
+		// The per-row validate checks read the row through value graphs, so a
+		// declaration used only from one (a const a check compares against) is
+		// reached here — otherwise it would read as unused.
+		for _, c := range t.Master.RowChecks {
+			if c != nil {
+				mk.walkValue(c.Cond)
+			}
+		}
 	}
 	for _, meth := range t.Methods {
 		mk.reachMethod(meth)

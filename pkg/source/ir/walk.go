@@ -109,6 +109,8 @@ func WalkBody(body []Stmt, fn func(Value) bool) {
 		case *For:
 			WalkValues(s.Iter, fn)
 			WalkBody(s.Body, fn)
+		case *AssertStmt:
+			WalkValues(s.Cond, fn)
 		default:
 			panic(unhandledStmt(s))
 		}

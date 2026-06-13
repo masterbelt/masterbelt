@@ -257,6 +257,8 @@ func dumpStmtInline(s ast.Stmt) string {
 		return dumpIfInline(s)
 	case *ast.ForStmt:
 		return dumpForInline(s)
+	case *ast.AssertStmt:
+		return "(assert " + dumpExpr(s.Cond) + ")"
 	default:
 		panic(ast.UnhandledStmt(s))
 	}

@@ -547,6 +547,10 @@ func walkBody(body []ast.Stmt, s funcScope, sink *Sink, onReturn func(*ast.Retur
 			walkMatch(stmt, s, sink, onReturn)
 		case *ast.ForStmt:
 			walkFor(stmt, s, sink, onReturn)
+		case *ast.AssertStmt:
+			if stmt.Cond != nil {
+				check(stmt.Cond, s, sink)
+			}
 		default:
 			panic(ast.UnhandledStmt(stmt))
 		}

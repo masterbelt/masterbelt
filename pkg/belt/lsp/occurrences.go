@@ -169,6 +169,13 @@ func forEachBodyExpr(file *ast.File, fn func(ast.Expr)) {
 		for _, m := range md.Methods {
 			walk(m.Body)
 		}
+		// A per-row validate check reads the row and the constants it compares
+		// against, so its body is a reference site too — walk it, or a constant
+		// used only from a validate block is not found and a rename leaves it
+		// dangling.
+		for _, c := range md.Validations {
+			walk(c.Body)
+		}
 	}
 	for _, fd := range file.Funcs {
 		walk(fd.Body)

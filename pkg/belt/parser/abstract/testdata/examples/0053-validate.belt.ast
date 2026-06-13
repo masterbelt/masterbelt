@@ -1,0 +1,73 @@
+File
+  Uses: ~
+  Decls: ~
+  Types: ~
+  Enums: ~
+  Interfaces: ~
+  Funcs: ~
+  Asserts: ~
+  Masters:
+    MasterDecl
+      Doc: ~
+      Public: true
+      Name: "Skill"
+      Record: RecordType
+        Fields:
+          FieldDef
+            Name: "id"
+            Type: NamedType
+              Namespace: ""
+              Name: "int"
+              Args: ~
+              Projections: ~
+          FieldDef
+            Name: "cost"
+            Type: NamedType
+              Namespace: ""
+              Name: "int"
+              Args: ~
+              Projections: ~
+          FieldDef
+            Name: "power"
+            Type: NamedType
+              Namespace: ""
+              Name: "int"
+              Args: ~
+              Projections: ~
+      Where: ~
+      Methods: ~
+      Consts: ~
+      Impls: ~
+      Primary: "id"
+      Sources: ~
+      Validations:
+        ValidateClause
+          PerRow: true
+          Body:
+            AssertStmt
+              Cond: CallExpr
+                Callee: MemberExpr
+                  Receiver: MemberExpr
+                    Receiver: SelfExpr
+                    Member: Identifier
+                      Name: "power"
+                  Member: Identifier
+                    Name: "gteq"
+                Arguments:
+                  MemberExpr
+                    Receiver: SelfExpr
+                    Member: Identifier
+                      Name: "cost"
+            AssertStmt
+              Cond: CallExpr
+                Callee: MemberExpr
+                  Receiver: MemberExpr
+                    Receiver: SelfExpr
+                    Member: Identifier
+                      Name: "id"
+                  Member: Identifier
+                    Name: "gt"
+                Arguments:
+                  IntLit
+                    Text: "0"
+                    Base: 0

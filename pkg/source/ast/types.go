@@ -355,6 +355,26 @@ func NewExprStmt(x Expr, syntax *cst.Node) *ExprStmt {
 	return &ExprStmt{X: x, syntax: syntax}
 }
 
+// AssertStmt is an "assert Expr" statement: a condition required to hold where
+// the statement stands. Unlike a top-level AssertDecl — a compile-time, closed
+// assertion folded once — an assert statement is checked where it runs, so its
+// condition may read the self and locals in scope. Cond is nil if the source
+// omitted the expression (a recovered "assert").
+type AssertStmt struct {
+	Cond   Expr
+	syntax *cst.Node
+}
+
+// Syntax returns the green CST node this statement was lowered from.
+func (s *AssertStmt) Syntax() *cst.Node { return s.syntax }
+func (s *AssertStmt) node()             {}
+func (s *AssertStmt) stmt()             {}
+
+// NewAssertStmt builds an AssertStmt node.
+func NewAssertStmt(cond Expr, syntax *cst.Node) *AssertStmt {
+	return &AssertStmt{Cond: cond, syntax: syntax}
+}
+
 // LetStmt is a "let Name [: Type] = Value" statement: a mutable block-local
 // binding. Unlike a constant it may be reassigned (by an AssignStmt) later in
 // the same scope, but it is still local to a body — there is no top-level let.

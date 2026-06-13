@@ -265,6 +265,8 @@ func Body(body []ast.Stmt, b Binder) []ir.Stmt {
 			stmts = append(stmts, ifStmt(s, b))
 		case *ast.ForStmt:
 			stmts = append(stmts, forStmt(s, b))
+		case *ast.AssertStmt:
+			stmts = append(stmts, &ir.AssertStmt{Cond: Value(s.Cond, b), Syntax: s})
 		default:
 			panic(ast.UnhandledStmt(s))
 		}

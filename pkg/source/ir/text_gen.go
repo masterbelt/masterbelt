@@ -177,6 +177,38 @@ func decodeAssert(e *treetext.Element) (*Assert, error) {
 	return n, nil
 }
 
+// writeAssertStmt emits n's fields beneath an already-written heading line.
+func writeAssertStmt(w *treetext.Writer, n *AssertStmt, depth int) error {
+	if err := writeValueField(w, depth, "Cond", n.Cond); err != nil {
+		return err
+	}
+	return nil
+}
+
+// decodeAssertStmt builds a AssertStmt from its element.
+func decodeAssertStmt(e *treetext.Element) (*AssertStmt, error) {
+	if err := treetext.ExpectFields(e, "Cond"); err != nil {
+		return nil, err
+	}
+	n := &AssertStmt{}
+	if v, err := decodeValueField(e.Fields[0]); err != nil {
+		return nil, err
+	} else {
+		n.Cond = v
+	}
+	return n, nil
+}
+
+// MarshalText renders the node and its subtree in the exact text form.
+func (n *AssertStmt) MarshalText() ([]byte, error) {
+	var w treetext.Writer
+	w.Line(0, "AssertStmt")
+	if err := writeAssertStmt(&w, n, 1); err != nil {
+		return nil, err
+	}
+	return w.Bytes(), nil
+}
+
 // writeAssign emits n's fields beneath an already-written heading line.
 func writeAssign(w *treetext.Writer, n *Assign, depth int) error {
 	w.Line(depth, "Name: "+strconv.Quote(n.Name))
@@ -2121,12 +2153,27 @@ func writeMasterDef(w *treetext.Writer, n *MasterDef, depth int) error {
 		return err
 	}
 	w.Line(depth, "Primary: "+treetext.QuoteStrings(n.Primary))
+	if len(n.RowChecks) == 0 {
+		w.Line(depth, "RowChecks: "+treetext.Nil)
+	} else {
+		w.Line(depth, "RowChecks:")
+		for _, item := range n.RowChecks {
+			if item == nil {
+				w.Line(depth+1, treetext.Nil)
+				continue
+			}
+			w.Line(depth+1, "AssertStmt")
+			if err := writeAssertStmt(w, item, depth+2); err != nil {
+				return err
+			}
+		}
+	}
 	return nil
 }
 
 // decodeMasterDef builds a MasterDef from its element.
 func decodeMasterDef(e *treetext.Element) (*MasterDef, error) {
-	if err := treetext.ExpectFields(e, "Row", "Primary"); err != nil {
+	if err := treetext.ExpectFields(e, "Row", "Primary", "RowChecks"); err != nil {
 		return nil, err
 	}
 	n := &MasterDef{}
@@ -2139,6 +2186,29 @@ func decodeMasterDef(e *treetext.Element) (*MasterDef, error) {
 		return nil, err
 	} else {
 		n.Primary = v
+	}
+	switch f := e.Fields[2]; {
+	case f.Inline == treetext.Nil:
+	case f.Items == nil:
+		return nil, fmt.Errorf("treetext: line %d: field %s: expected a list", f.Line, f.Name)
+	default:
+		out := make([]*AssertStmt, 0, len(f.Items))
+		for j := range f.Items {
+			item := &f.Items[j]
+			if item.Head == treetext.Nil {
+				out = append(out, nil)
+				continue
+			}
+			if item.Head != "AssertStmt" {
+				return nil, fmt.Errorf("treetext: line %d: %s is not a AssertStmt", item.Line, item.Head)
+			}
+			v, err := decodeAssertStmt(item)
+			if err != nil {
+				return nil, err
+			}
+			out = append(out, v)
+		}
+		n.RowChecks = out
 	}
 	return n, nil
 }
@@ -3681,6 +3751,13 @@ func writeStmtField(w *treetext.Writer, depth int, name string, v Stmt) error {
 	case nil:
 		w.Line(depth, name+": "+treetext.Nil)
 		return nil
+	case *AssertStmt:
+		if n == nil {
+			w.Line(depth, name+": "+treetext.Nil)
+			return nil
+		}
+		w.Line(depth, name+": AssertStmt")
+		return writeAssertStmt(w, n, depth+1)
 	case *Assign:
 		if n == nil {
 			w.Line(depth, name+": "+treetext.Nil)
@@ -3749,6 +3826,13 @@ func writeStmtItem(w *treetext.Writer, depth int, v Stmt) error {
 	case nil:
 		w.Line(depth, treetext.Nil)
 		return nil
+	case *AssertStmt:
+		if n == nil {
+			w.Line(depth, treetext.Nil)
+			return nil
+		}
+		w.Line(depth, "AssertStmt")
+		return writeAssertStmt(w, n, depth+1)
 	case *Assign:
 		if n == nil {
 			w.Line(depth, treetext.Nil)
@@ -3813,6 +3897,8 @@ func writeStmtItem(w *treetext.Writer, depth int, v Stmt) error {
 // decodeStmt decodes an element into its Stmt implementation.
 func decodeStmt(e *treetext.Element) (Stmt, error) {
 	switch e.Head {
+	case "AssertStmt":
+		return decodeAssertStmt(e)
 	case "Assign":
 		return decodeAssign(e)
 	case "ExprStmt":
@@ -4310,6 +4396,7 @@ var treeStructs = []any{
 	(*Adapt)(nil),
 	(*Apply)(nil),
 	(*Assert)(nil),
+	(*AssertStmt)(nil),
 	(*Assign)(nil),
 	(*AssocConst)(nil),
 	(*AssocConstValue)(nil),
@@ -4376,6 +4463,9 @@ func writeTree(w *treetext.Writer, v any, depth int) (bool, error) {
 	case *Assert:
 		w.Line(depth, "Assert")
 		return true, writeAssert(w, n, depth+1)
+	case *AssertStmt:
+		w.Line(depth, "AssertStmt")
+		return true, writeAssertStmt(w, n, depth+1)
 	case *Assign:
 		w.Line(depth, "Assign")
 		return true, writeAssign(w, n, depth+1)
@@ -4541,6 +4631,7 @@ func writeTree(w *treetext.Writer, v any, depth int) (bool, error) {
 var treeExcluded = map[string][]string{
 	"Apply":             {"Syntax"},
 	"Assert":            {"CondGraph", "Syntax"},
+	"AssertStmt":        {"Syntax"},
 	"Assign":            {"Syntax"},
 	"AssocConst":        {"ValueGraph", "Syntax"},
 	"AssocConstValue":   {"Syntax"},

@@ -1,0 +1,64 @@
+# tree
+File
+  FuncDecl
+    LineComment "// An assert statement requires its condition to hold where it stands. Unlike a"
+    Newline "\n"
+    LineComment "// top-level assert declaration — a compile-time, closed assertion folded once —"
+    Newline "\n"
+    LineComment "// an assert statement is an ordinary statement: it sits in a block, and its"
+    Newline "\n"
+    LineComment "// condition reads the parameters, locals, and self in scope. At this layer it"
+    Newline "\n"
+    LineComment "// need only type as a bool; firing it is a run-time concern (and, for a master's"
+    Newline "\n"
+    LineComment "// validate block, a per-row one). assert is a keyword in a statement position"
+    Newline "\n"
+    LineComment "// just as it is at the top level."
+    Newline "\n"
+    Newline "\n"
+    Pub "pub"
+    Whitespace " "
+    Fn "fn"
+    Whitespace " "
+    Ident "checked"
+    ParamList
+      LParen "("
+      Param
+        Ident "x"
+        Colon ":"
+        Whitespace " "
+        TypeName
+          Ident "int"
+      RParen ")"
+    Colon ":"
+    Whitespace " "
+    TypeName
+      Ident "int"
+    Whitespace " "
+    Block
+      LBrace "{"
+      Newline "\n"
+      Whitespace "  "
+      AssertStmt
+        Assert "assert"
+        Whitespace " "
+        BinaryExpr
+          NameRef
+            Ident "x"
+          Whitespace " "
+          GtEq ">="
+          Whitespace " "
+          Literal
+            Int "0"
+      Newline "\n"
+      Whitespace "  "
+      ReturnStmt
+        Return "return"
+        Whitespace " "
+        NameRef
+          Ident "x"
+      Newline "\n"
+      RBrace "}"
+  Newline "\n"
+  EOF ""
+# diagnostics

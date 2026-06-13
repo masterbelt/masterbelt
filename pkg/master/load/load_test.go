@@ -88,6 +88,241 @@ func TestLoadRefinementViolation(t *testing.T) {
 	}
 }
 
+// validateBelt is a master whose per-row validate each checks compare two
+// columns of the row through self — the row predicate the evaluator folds
+// against every loaded row.
+const validateBelt = "master Skill {\n" +
+	"  record { id: int, cost: int, power: int }\n" +
+	"  primary id\n" +
+	"  source { csv \"skills.csv\" }\n" +
+	"  validate {\n" +
+	"    each {\n" +
+	"      assert self.power >= self.cost\n" +
+	"      assert self.id > 0\n" +
+	"    }\n" +
+	"  }\n" +
+	"}\n"
+
+func TestLoadRowValidationFailed(t *testing.T) {
+	// The second row's power (20) is below its cost (50), so its per-row check
+	// fails; the diagnostic names the failing data row as path:row.
+	_, diags := run(t, validateBelt, map[string]string{"csv": "data"}, map[string]string{
+		"data/skills.csv": "id,cost,power\n1,10,30\n2,50,20\n",
+	})
+	d := single(t, diags, master.CodeRowValidationFailed)
+	if !strings.Contains(d.Message, "data/skills.csv:3") {
+		t.Errorf("message = %q, want it to name the failing row data/skills.csv:3", d.Message)
+	}
+}
+
+func TestLoadRowValidationClean(t *testing.T) {
+	// Every row satisfies both checks, so the loader reports nothing.
+	_, diags := run(t, validateBelt, map[string]string{"csv": "data"}, map[string]string{
+		"data/skills.csv": "id,cost,power\n1,10,30\n2,5,20\n",
+	})
+	if len(diags) != 0 {
+		t.Fatalf("diagnostics = %v, want none", diags)
+	}
+}
+
+func TestLoadRowValidationSkippedOnMissingColumn(t *testing.T) {
+	// The source has no power column, which a check reads. The missing column is
+	// reported once; the validation does not run, so no derived row-validation
+	// error is piled on every row.
+	_, diags := run(t, validateBelt, map[string]string{"csv": "data"}, map[string]string{
+		"data/skills.csv": "id,cost\n1,10\n2,20\n",
+	})
+	d := single(t, diags, master.CodeMissingColumn)
+	if !strings.Contains(d.Message, "power") {
+		t.Errorf("message = %q, want the missing power column", d.Message)
+	}
+}
+
+func TestLoadRowValidationSkippedAfterRefinementFailure(t *testing.T) {
+	// A row whose cell fails its field refinement is reported once
+	// (cell_refinement); the per-row check is not run over the value the row type
+	// already rejected, so no derived row_validation_failed piles onto it. (Without
+	// the skip, 100 / self.id on id=0 would fold to nothing and fail the row too.)
+	belt := "type NonZero = int where self != 0\nmaster Skill {\n" +
+		"  record { id: NonZero }\n" +
+		"  primary id\n" +
+		"  source { csv \"skills.csv\" }\n" +
+		"  validate { each { assert 100 / self.id > 0 } }\n" +
+		"}\n"
+	_, diags := run(t, belt, map[string]string{"csv": "data"}, map[string]string{
+		"data/skills.csv": "id\n5\n0\n",
+	})
+	d := single(t, diags, master.CodeCellRefinement)
+	if !strings.Contains(d.Message, "data/skills.csv:3") {
+		t.Errorf("message = %q, want only the refinement on row 3", d.Message)
+	}
+}
+
+func TestLoadRowValidationCallsRowMethod(t *testing.T) {
+	// A per-row check may call a row method: self.balanced() folds on the row
+	// record, so the master backs its row's method table here. The second row is
+	// unbalanced (power < cost) and is the only one reported.
+	belt := "master Skill {\n" +
+		"  record { id: int, cost: int, power: int } impl {\n" +
+		"    pub balanced(): bool { return self.power >= self.cost }\n" +
+		"  }\n" +
+		"  primary id\n" +
+		"  source { csv \"skills.csv\" }\n" +
+		"  validate { each { assert self.balanced() } }\n" +
+		"}\n"
+	_, diags := run(t, belt, map[string]string{"csv": "data"}, map[string]string{
+		"data/skills.csv": "id,cost,power\n1,10,30\n2,50,20\n",
+	})
+	d := single(t, diags, master.CodeRowValidationFailed)
+	if !strings.Contains(d.Message, "data/skills.csv:3") {
+		t.Errorf("message = %q, want the failing row data/skills.csv:3", d.Message)
+	}
+}
+
+func TestLoadRowValidationMethodAssertFires(t *testing.T) {
+	// A row method called by a check carries its own assert. A row that violates
+	// it (power < 0) fails validation: the assert fires during the fold — the
+	// method folds to an error the check faults — rather than being skipped.
+	belt := "master Skill {\n" +
+		"  record { id: int, power: int } impl {\n" +
+		"    pub ok(): bool {\n      assert self.power >= 0\n      return true\n    }\n" +
+		"  }\n" +
+		"  primary id\n" +
+		"  source { csv \"skills.csv\" }\n" +
+		"  validate { each { assert self.ok() } }\n" +
+		"}\n"
+	_, diags := run(t, belt, map[string]string{"csv": "data"}, map[string]string{
+		"data/skills.csv": "id,power\n1,5\n2,-1\n",
+	})
+	d := single(t, diags, master.CodeRowValidationFailed)
+	if !strings.Contains(d.Message, "data/skills.csv:3") {
+		t.Errorf("message = %q, want the failing row data/skills.csv:3", d.Message)
+	}
+}
+
+func TestLoadRowValidationMethodAssertThroughExpr(t *testing.T) {
+	// A helper's failed assert is faulted even when the call is wrapped in another
+	// expression (== true): the violation travels on its own channel, not as a
+	// value the surrounding fold would swallow to nil.
+	belt := "master Skill {\n" +
+		"  record { id: int, power: int } impl {\n" +
+		"    pub ok(): bool {\n      assert self.power >= 0\n      return true\n    }\n" +
+		"  }\n" +
+		"  primary id\n" +
+		"  source { csv \"skills.csv\" }\n" +
+		"  validate { each { assert self.ok() == true } }\n" +
+		"}\n"
+	_, diags := run(t, belt, map[string]string{"csv": "data"}, map[string]string{
+		"data/skills.csv": "id,power\n1,5\n2,-1\n",
+	})
+	d := single(t, diags, master.CodeRowValidationFailed)
+	if !strings.Contains(d.Message, "data/skills.csv:3") {
+		t.Errorf("message = %q, want the failing row data/skills.csv:3", d.Message)
+	}
+}
+
+func TestLoadRowValidationLambdaClosesOverSelf(t *testing.T) {
+	// A check may wrap its row predicate in a function literal that closes over
+	// self; the lambda folds against the row, so a valid row passes and only the
+	// failing one (id <= 0) is reported — proving self reaches the lambda body.
+	belt := "master Skill {\n" +
+		"  record { id: int }\n" +
+		"  primary id\n" +
+		"  source { csv \"skills.csv\" }\n" +
+		"  validate { each { assert (fn(): bool { return self.id > 0 })() } }\n" +
+		"}\n"
+	_, diags := run(t, belt, map[string]string{"csv": "data"}, map[string]string{
+		"data/skills.csv": "id\n1\n-1\n",
+	})
+	d := single(t, diags, master.CodeRowValidationFailed)
+	if !strings.Contains(d.Message, "data/skills.csv:3") {
+		t.Errorf("message = %q, want the failing row data/skills.csv:3", d.Message)
+	}
+}
+
+func TestLoadRowValidationAliasedRowMethod(t *testing.T) {
+	// The row is reached through an alias chain (record Row, type Row = Base); a
+	// row method on it still folds, so a row failing the method (power < cost) is
+	// reported.
+	belt := "type Base = { id: int, cost: int, power: int }\ntype Row = Base\n" +
+		"master Skill {\n" +
+		"  record Row impl {\n" +
+		"    pub ok(): bool { return self.power >= self.cost }\n" +
+		"  }\n" +
+		"  primary id\n" +
+		"  source { csv \"skills.csv\" }\n" +
+		"  validate { each { assert self.ok() } }\n" +
+		"}\n"
+	_, diags := run(t, belt, map[string]string{"csv": "data"}, map[string]string{
+		"data/skills.csv": "id,cost,power\n1,10,30\n2,50,20\n",
+	})
+	d := single(t, diags, master.CodeRowValidationFailed)
+	if !strings.Contains(d.Message, "data/skills.csv:3") {
+		t.Errorf("message = %q, want the failing row data/skills.csv:3", d.Message)
+	}
+}
+
+func TestLoadRowValidationUnevaluableRowFails(t *testing.T) {
+	// A check folds to a definite true for most rows but not for one whose divisor
+	// is zero, where it cannot be evaluated. A check that cannot confirm a row is
+	// valid fails it (fail-safe), so that row — and only that row — is reported.
+	belt := "master Skill {\n" +
+		"  record { id: int, cost: int }\n" +
+		"  primary id\n" +
+		"  source { csv \"skills.csv\" }\n" +
+		"  validate { each { assert 100 / self.cost >= 0 } }\n" +
+		"}\n"
+	_, diags := run(t, belt, map[string]string{"csv": "data"}, map[string]string{
+		"data/skills.csv": "id,cost\n1,5\n2,0\n",
+	})
+	d := single(t, diags, master.CodeRowValidationFailed)
+	if !strings.Contains(d.Message, "data/skills.csv:3") {
+		t.Errorf("message = %q, want the unevaluable row data/skills.csv:3", d.Message)
+	}
+}
+
+func TestLoadDuplicatePrimaryKey(t *testing.T) {
+	// The third data row repeats id 1, so it is the duplicate; the diagnostic
+	// points at its key cell and names the first occurrence's row.
+	belt := "master Skill {\n  record { id: int, name: string }\n  primary id\n  source { csv \"skills.csv\" }\n}\n"
+	_, diags := run(t, belt, map[string]string{"csv": "data"}, map[string]string{
+		"data/skills.csv": "id,name\n1,Heal\n2,Fire\n1,Frost\n",
+	})
+	d := single(t, diags, master.CodeDuplicatePrimaryKey)
+	for _, frag := range []string{"data/skills.csv:4,1", "id=1", "first at row 2"} {
+		if !strings.Contains(d.Message, frag) {
+			t.Errorf("message = %q, want %q", d.Message, frag)
+		}
+	}
+}
+
+func TestLoadDuplicateCompositePrimaryKey(t *testing.T) {
+	// The third row repeats the (skill, level) = (1, 1) tuple; the diagnostic
+	// renders the whole key and anchors at the row's first key column.
+	belt := "master Upgrade {\n  record { skill: int, level: int, cost: int }\n  primary (skill, level)\n  source { csv \"u.csv\" }\n}\n"
+	_, diags := run(t, belt, map[string]string{"csv": "data"}, map[string]string{
+		"data/u.csv": "skill,level,cost\n1,1,10\n1,2,20\n1,1,30\n",
+	})
+	d := single(t, diags, master.CodeDuplicatePrimaryKey)
+	for _, frag := range []string{"data/u.csv:4,1", "skill=1, level=1", "first at row 2"} {
+		if !strings.Contains(d.Message, frag) {
+			t.Errorf("message = %q, want %q", d.Message, frag)
+		}
+	}
+}
+
+func TestLoadUniquePrimaryKeyClean(t *testing.T) {
+	// Distinct keys report nothing — the same value in a non-key column does not
+	// collide.
+	belt := "master Skill {\n  record { id: int, name: string }\n  primary id\n  source { csv \"skills.csv\" }\n}\n"
+	_, diags := run(t, belt, map[string]string{"csv": "data"}, map[string]string{
+		"data/skills.csv": "id,name\n1,Heal\n2,Heal\n",
+	})
+	if len(diags) != 0 {
+		t.Fatalf("diagnostics = %v, want none", diags)
+	}
+}
+
 func TestLoadMissingColumn(t *testing.T) {
 	_, diags := run(t, skillBelt, map[string]string{"csv": "data"}, map[string]string{
 		"data/skills.csv": "id,name\n1,Heal\n",

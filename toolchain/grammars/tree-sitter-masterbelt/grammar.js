@@ -198,7 +198,7 @@ module.exports = grammar({
         $.master_keyword,
         field("name", $.identifier),
         op.LBrace,
-        repeat(choice($.master_record, $.master_primary, $.master_source)),
+        repeat(choice($.master_record, $.master_primary, $.master_source, $.master_validate)),
         op.RBrace,
       ),
 
@@ -250,6 +250,20 @@ module.exports = grammar({
     // ambiguous with the next entry's format name).
     _source_options: ($) =>
       seq(op.LBrace, repeat(seq($.record_field, optional(op.Comma))), op.RBrace),
+
+    // The validate member holds the master's data checks: a block of clauses,
+    // each a context keyword naming its scope (each is per-row; all, per-table,
+    // is a later concern) and a statement block of asserts. validate and each are
+    // context keywords aliased to master_keyword like record/primary/source.
+    master_validate: ($) =>
+      seq(
+        alias("validate", $.master_keyword),
+        op.LBrace,
+        repeat($.validate_clause),
+        op.RBrace,
+      ),
+
+    validate_clause: ($) => seq(alias("each", $.master_keyword), $.block),
 
     // --- impl blocks and methods --------------------------------------------
 
@@ -373,9 +387,15 @@ module.exports = grammar({
         $.switch_stmt,
         $.match_stmt,
         $.for_stmt,
+        $.assert_stmt,
       ),
 
     return_stmt: ($) => seq(kw.return, $._expr),
+
+    // A statement-form assertion: `assert Expr`. Distinct from the top-level
+    // assert_decl (a compile-time, closed assertion) — the same keyword in a
+    // statement position, its condition checked where it runs.
+    assert_stmt: ($) => seq(kw.assert, $._expr),
 
     // The `= expr` is an initializer node, as in a const declaration (the CST
     // reuses the Initializer kind here).

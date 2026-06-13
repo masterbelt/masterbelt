@@ -218,17 +218,18 @@ func NewAssertDecl(doc []string, cond Expr, syntax *cst.Node) *AssertDecl {
 // when the source omitted them (or when it was malformed and the parser
 // recovered).
 type MasterDecl struct {
-	Doc     []string
-	Public  bool
-	Name    string         // the declared identifier, or "" if missing
-	Record  TypeExpr       // the row record type, or nil if missing
-	Where   Expr           // the refinement predicate over a row, or nil if none
-	Methods []*MethodDecl  // the record impl blocks' per-row methods
-	Consts  []*ConstDecl   // the record impl blocks' associated constants, in source order
-	Impls   []TypeExpr     // the interfaces the record opts into (see TypeDecl.Impls)
-	Primary []string       // the primary-key column names, in declaration order
-	Sources []*SourceEntry // the source-block entries naming where the rows are read from
-	syntax  *cst.Node
+	Doc         []string
+	Public      bool
+	Name        string            // the declared identifier, or "" if missing
+	Record      TypeExpr          // the row record type, or nil if missing
+	Where       Expr              // the refinement predicate over a row, or nil if none
+	Methods     []*MethodDecl     // the record impl blocks' per-row methods
+	Consts      []*ConstDecl      // the record impl blocks' associated constants, in source order
+	Impls       []TypeExpr        // the interfaces the record opts into (see TypeDecl.Impls)
+	Primary     []string          // the primary-key column names, in declaration order
+	Sources     []*SourceEntry    // the source-block entries naming where the rows are read from
+	Validations []*ValidateClause // the validate-block clauses, in declaration order
+	syntax      *cst.Node
 }
 
 // Syntax returns the green CST node this declaration was lowered from.
@@ -243,8 +244,32 @@ func (d *MasterDecl) node()             {}
 var _ Node = (*MasterDecl)(nil)
 
 // NewMasterDecl builds a MasterDecl node.
-func NewMasterDecl(doc []string, public bool, name string, record TypeExpr, where Expr, methods []*MethodDecl, consts []*ConstDecl, impls []TypeExpr, primary []string, sources []*SourceEntry, syntax *cst.Node) *MasterDecl {
-	return &MasterDecl{Doc: doc, Public: public, Name: name, Record: record, Where: where, Methods: methods, Consts: consts, Impls: impls, Primary: primary, Sources: sources, syntax: syntax}
+func NewMasterDecl(doc []string, public bool, name string, record TypeExpr, where Expr, methods []*MethodDecl, consts []*ConstDecl, impls []TypeExpr, primary []string, sources []*SourceEntry, validations []*ValidateClause, syntax *cst.Node) *MasterDecl {
+	return &MasterDecl{Doc: doc, Public: public, Name: name, Record: record, Where: where, Methods: methods, Consts: consts, Impls: impls, Primary: primary, Sources: sources, Validations: validations, syntax: syntax}
+}
+
+// ValidateClause is one clause of a master's validate block: a per-row check
+// (each) or, later, a per-table one (all), and the statement body it runs —
+// assert statements in practice, each reading the row through self. PerRow tells
+// the two scopes apart (each is per-row; all, a later concern, is per-table); the
+// body and its checking are otherwise identical, so the one node carries both.
+// The AST carries only the clause's shape; resolving and running the checks is
+// the semantic and data layers' concern.
+type ValidateClause struct {
+	PerRow bool   // true for an each clause (per-row); false for an all clause (per-table)
+	Body   []Stmt // the clause's statements, the per-row/per-table checks
+	syntax *cst.Node
+}
+
+// Syntax returns the green CST node this clause was lowered from.
+func (c *ValidateClause) Syntax() *cst.Node { return c.syntax }
+func (c *ValidateClause) node()             {}
+
+var _ Node = (*ValidateClause)(nil)
+
+// NewValidateClause builds a ValidateClause node.
+func NewValidateClause(perRow bool, body []Stmt, syntax *cst.Node) *ValidateClause {
+	return &ValidateClause{PerRow: perRow, Body: body, syntax: syntax}
 }
 
 // SourceEntry is one entry of a master's source block: the format that reads it

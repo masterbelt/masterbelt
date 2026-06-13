@@ -12,10 +12,12 @@ const (
 	CodeCellRefinement       diagnostic.Code = "master.cell_refinement"
 	CodeCellTypeMismatch     diagnostic.Code = "master.cell_type_mismatch"
 	CodeDuplicateOption      diagnostic.Code = "master.duplicate_option"
+	CodeDuplicatePrimaryKey  diagnostic.Code = "master.duplicate_primary_key"
 	CodeDuplicateRowField    diagnostic.Code = "master.duplicate_row_field"
 	CodeLocatorEscapesRoot   diagnostic.Code = "master.locator_escapes_root"
 	CodeMissingColumn        diagnostic.Code = "master.missing_column"
 	CodeOptionTypeMismatch   diagnostic.Code = "master.option_type_mismatch"
+	CodeRowValidationFailed  diagnostic.Code = "master.row_validation_failed"
 	CodeSourceUnreadable     diagnostic.Code = "master.source_unreadable"
 	CodeUnknownFormat        diagnostic.Code = "master.unknown_format"
 	CodeUnknownOption        diagnostic.Code = "master.unknown_option"
@@ -76,6 +78,24 @@ func newDuplicateOptionDiagnostic(offset int, width int, format string, key stri
 	}
 }
 
+func newDuplicatePrimaryKeyDiagnostic(offset int, width int, path string, row int, col int, key string, first int) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"path":  diagnostic.Str(path),
+		"row":   diagnostic.Int(row),
+		"col":   diagnostic.Int(col),
+		"key":   diagnostic.Str(key),
+		"first": diagnostic.Int(first),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeDuplicatePrimaryKey,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeDuplicatePrimaryKey, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
 func newDuplicateRowFieldDiagnostic(offset int, width int, field string, master string) diagnostic.Diagnostic {
 	fields := map[string]fmt.Stringer{
 		"field":  diagnostic.Str(field),
@@ -129,6 +149,21 @@ func newOptionTypeMismatchDiagnostic(offset int, width int, key string, typ stri
 		Severity: diagnostic.Error,
 		Code:     CodeOptionTypeMismatch,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeOptionTypeMismatch, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newRowValidationFailedDiagnostic(offset int, width int, path string, row int) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"path": diagnostic.Str(path),
+		"row":  diagnostic.Int(row),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeRowValidationFailed,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeRowValidationFailed, fields),
 		Fields:   fields,
 		Offset:   offset,
 		Width:    width,

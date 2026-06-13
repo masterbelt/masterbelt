@@ -191,6 +191,18 @@ func TestReferencesInMethodBody(t *testing.T) {
 	}
 }
 
+// TestReferencesInMasterValidate pins that a constant read only from a master's
+// per-row validate check is found by references and rewritten by rename: the
+// walk descends file.Masters' validation clauses, not only their methods.
+func TestReferencesInMasterValidate(t *testing.T) {
+	src := "const Limit = 100\nmaster M {\n  record { id: int }\n  primary id\n  validate {\n    each {\n      assert self.id < Limit\n    }\n  }\n}\n"
+	doc := testView(src)
+
+	if got := references(doc, strings.Index(src, "const Limit")+6, true); len(got) != 2 {
+		t.Fatalf("references(Limit decl) = %d, want 2 (decl + validate-body ref)", len(got))
+	}
+}
+
 // TestRecordFieldCompletionInLetBinding pins that an inferred record literal
 // bound by an annotated let gets field-name completion inside its braces:
 // recordTypes pushed the type only through a top-level ReturnStmt before, so a

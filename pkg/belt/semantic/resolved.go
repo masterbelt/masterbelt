@@ -95,7 +95,26 @@ func writeBackResolutions(module *ir.Module, res *callResolutions, fnShells map[
 		if def.Where != nil {
 			def.Where = w.value(def.Where, bindings{self: self})
 		}
+		// A master's per-row validate checks are statements over self (the row)
+		// the same way a row method body is, so they bind through the statement
+		// walk with self in scope — typing each assert condition from the facts
+		// the checking walk streamed.
+		if def.Master != nil && len(def.Master.RowChecks) > 0 {
+			w.stmts(masterCheckStmts(def.Master.RowChecks), bindings{self: self})
+		}
 	}
+}
+
+// masterCheckStmts widens a master's resolved row checks to a statement slice the
+// write-back's statement walk binds — the assert statements keep their identity
+// (the slice holds the same pointers def.Master.RowChecks does), so binding them
+// here annotates the conditions the data layer folds.
+func masterCheckStmts(checks []*ir.AssertStmt) []ir.Stmt {
+	stmts := make([]ir.Stmt, len(checks))
+	for i, c := range checks {
+		stmts[i] = c
+	}
+	return stmts
 }
 
 // annotateGraph runs the write-back over one standalone value graph (an assert
@@ -431,38 +450,71 @@ func (w resolutionWriter) stmts(body []ir.Stmt, bd bindings) {
 		case *ir.Assign:
 			s.Value = w.value(s.Value, bd)
 		case *ir.Switch:
-			s.Scrutinee = w.value(s.Scrutinee, bd)
-			for _, arm := range s.Arms {
-				for i, pat := range arm.Values {
-					arm.Values[i] = w.value(pat, bd)
-				}
-				w.stmts(arm.Body, bd)
-			}
-			w.stmts(s.Else, bd)
+			w.stmtSwitch(s, bd)
 		case *ir.Match:
-			s.Scrutinee = w.value(s.Scrutinee, bd)
-			for _, arm := range s.Arms {
-				abd := bd
-				if arm.Name != "" {
-					abd = bd.withLocal(arm.Name, arm.Type)
-				}
-				w.stmts(arm.Body, abd)
-			}
-			w.stmts(s.Else, bd)
+			w.stmtMatch(s, bd)
 		case *ir.If:
-			s.Cond = w.value(s.Cond, bd)
-			w.stmts(s.Then, bd)
-			if s.ElseIf != nil {
-				w.stmts([]ir.Stmt{s.ElseIf}, bd)
-			}
-			w.stmts(s.Else, bd)
+			w.stmtIf(s, bd)
 		case *ir.For:
-			s.Iter = w.value(s.Iter, bd)
-			fbd := bd
-			if s.Var != "" {
-				fbd = bd.withLocal(s.Var, s.VarType)
-			}
-			w.stmts(s.Body, fbd)
+			w.stmtFor(s, bd)
+		case *ir.AssertStmt:
+			s.Cond = w.value(s.Cond, bd)
+		default:
+			// Every statement that carries a value graph must bind it here, or
+			// that graph stays untyped (its references unresolved, its calls
+			// unselected) and folds wrong. A statement form added without a case
+			// reaches this panic rather than being silently skipped — the gap that
+			// left an assert condition untyped until this case was added.
+			panic(fmt.Sprintf("semantic: write-back has no rule for stmt %T", s))
 		}
 	}
+}
+
+// stmtSwitch binds a switch's scrutinee, each arm's value patterns, and every
+// arm and wildcard body.
+func (w resolutionWriter) stmtSwitch(s *ir.Switch, bd bindings) {
+	s.Scrutinee = w.value(s.Scrutinee, bd)
+	for _, arm := range s.Arms {
+		for i, pat := range arm.Values {
+			arm.Values[i] = w.value(pat, bd)
+		}
+		w.stmts(arm.Body, bd)
+	}
+	w.stmts(s.Else, bd)
+}
+
+// stmtMatch binds a match's scrutinee and each arm body in the scope where its
+// binding is narrowed to the arm's member type.
+func (w resolutionWriter) stmtMatch(s *ir.Match, bd bindings) {
+	s.Scrutinee = w.value(s.Scrutinee, bd)
+	for _, arm := range s.Arms {
+		abd := bd
+		if arm.Name != "" {
+			abd = bd.withLocal(arm.Name, arm.Type)
+		}
+		w.stmts(arm.Body, abd)
+	}
+	w.stmts(s.Else, bd)
+}
+
+// stmtIf binds an if's condition and recurses into its then, else-if, and else
+// bodies.
+func (w resolutionWriter) stmtIf(s *ir.If, bd bindings) {
+	s.Cond = w.value(s.Cond, bd)
+	w.stmts(s.Then, bd)
+	if s.ElseIf != nil {
+		w.stmts([]ir.Stmt{s.ElseIf}, bd)
+	}
+	w.stmts(s.Else, bd)
+}
+
+// stmtFor binds a for's iterable and its body in the scope where the loop
+// variable is bound.
+func (w resolutionWriter) stmtFor(s *ir.For, bd bindings) {
+	s.Iter = w.value(s.Iter, bd)
+	fbd := bd
+	if s.Var != "" {
+		fbd = bd.withLocal(s.Var, s.VarType)
+	}
+	w.stmts(s.Body, fbd)
 }

@@ -281,17 +281,18 @@ func lowerMasterDecl(t cst.Tree, buf source.Buffer) *ast.MasterDecl {
 	green, _ := t.Node()
 
 	var (
-		doc      []string
-		public   bool
-		name     string
-		seenBody bool
-		record   ast.TypeExpr
-		where    ast.Expr
-		methods  []*ast.MethodDecl
-		consts   []*ast.ConstDecl
-		impls    []ast.TypeExpr
-		primary  []string
-		sources  []*ast.SourceEntry
+		doc         []string
+		public      bool
+		name        string
+		seenBody    bool
+		record      ast.TypeExpr
+		where       ast.Expr
+		methods     []*ast.MethodDecl
+		consts      []*ast.ConstDecl
+		impls       []ast.TypeExpr
+		primary     []string
+		sources     []*ast.SourceEntry
+		validations []*ast.ValidateClause
 	)
 	for _, child := range t.Children() {
 		if tok, ok := child.Token(); ok {
@@ -325,12 +326,63 @@ func lowerMasterDecl(t cst.Tree, buf source.Buffer) *ast.MasterDecl {
 			primary = lowerMasterPrimary(child, buf)
 		case cst.MasterSource:
 			sources = append(sources, lowerMasterSource(child, buf)...)
+		case cst.MasterValidate:
+			validations = append(validations, lowerMasterValidate(child, buf)...)
 		default:
 			// Any other child node (the MasterKeyword wrapping the master keyword)
 			// contributes no field of the master.
 		}
 	}
-	return ast.NewMasterDecl(doc, public, name, record, where, methods, consts, impls, primary, sources, green)
+	return ast.NewMasterDecl(doc, public, name, record, where, methods, consts, impls, primary, sources, validations, green)
+}
+
+// lowerMasterValidate lowers a master's validate member to its clauses, in
+// declaration order. Each ValidateClause child becomes one ast.ValidateClause;
+// the validate keyword (a MasterKeyword node) and the braces carry no clause.
+func lowerMasterValidate(t cst.Tree, buf source.Buffer) []*ast.ValidateClause {
+	var clauses []*ast.ValidateClause
+	for _, child := range t.Children() {
+		if node, ok := child.Node(); ok && node.Kind() == cst.ValidateClause {
+			clauses = append(clauses, lowerValidateClause(child, buf))
+		}
+	}
+	return clauses
+}
+
+// lowerValidateClause lowers one clause of a validate block: its scope keyword
+// (each, a per-row check — all, per-table, is a later concern) and the statement
+// body the keyword introduces. The scope is read from the MasterKeyword's text;
+// the body is the Block's statements, lowered like any statement body.
+func lowerValidateClause(t cst.Tree, buf source.Buffer) *ast.ValidateClause {
+	green, _ := t.Node()
+	perRow := true
+	var body []ast.Stmt
+	for _, child := range t.Children() {
+		node, ok := child.Node()
+		if !ok {
+			continue
+		}
+		switch node.Kind() {
+		case cst.MasterKeyword:
+			perRow = masterKeywordText(child, buf) != "all"
+		case cst.Block:
+			body = lowerBlock(child, buf)
+		default:
+			// No other child carries the clause's scope or body.
+		}
+	}
+	return ast.NewValidateClause(perRow, body, green)
+}
+
+// masterKeywordText returns the text of the context keyword a MasterKeyword node
+// wraps (master, record, primary, source, validate, each, or all).
+func masterKeywordText(t cst.Tree, buf source.Buffer) string {
+	for _, child := range t.Children() {
+		if _, ok := child.Token(); ok {
+			return child.Text(buf)
+		}
+	}
+	return ""
 }
 
 // lowerMasterSource lowers a master's source member to its entries, in

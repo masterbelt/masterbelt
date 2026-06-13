@@ -68,6 +68,8 @@ func (p *parser) parseStmt() cst.Green {
 		return p.parseIfStmt()
 	case p.kind() == token.For:
 		return p.parseForStmt()
+	case p.kind() == token.Assert:
+		return p.parseAssertStmt()
 	case startsExpr(p.kind()):
 		target := p.parseExpr()
 		if p.peekSignificant() == token.Assign {
@@ -126,6 +128,27 @@ func (p *parser) parseAssignTail(target cst.Green) *cst.Node {
 		p.report(newExpectedExpressionDiagnostic(p.lastStart, 0))
 	}
 	return cst.NewNode(cst.AssignStmt, children)
+}
+
+// parseAssertStmt parses a statement-form assertion:
+//
+//	assert Expr
+//
+// Unlike the top-level AssertDecl — a compile-time, closed assertion folded once
+// — an assert statement stands inside a block and is evaluated where it runs, so
+// its condition may read the self and locals in scope (a master's validate each
+// block runs it once per row). assert is a real keyword here, so it is taken
+// directly. As elsewhere the expression is optional in the parse: a missing one
+// is reported and left absent. The cursor sits on "assert".
+func (p *parser) parseAssertStmt() *cst.Node {
+	children := []cst.Green{p.bump()} // "assert"
+	if startsExpr(p.peekSignificant()) {
+		p.skipTrivia(&children)
+		children = append(children, p.parseExpr())
+	} else {
+		p.report(newExpectedExpressionDiagnostic(p.lastStart, 0))
+	}
+	return cst.NewNode(cst.AssertStmt, children)
 }
 
 // parseIfStmt parses an if statement:
@@ -409,10 +432,12 @@ func startsMatchPattern(kind token.Kind) bool {
 }
 
 // startsStmt reports whether kind can begin a statement: a let, a return, a
-// switch, a match, an if, or any expression (which may continue into an
-// assignment).
+// switch, a match, an if, an assert, or any expression (which may continue into
+// an assignment). It gates the single-statement body a switch or match arm takes
+// after "->", so every statement form parseStmt accepts must appear here or it
+// is rejected there.
 func startsStmt(kind token.Kind) bool {
-	return kind == token.Let || kind == token.Return || kind == token.Switch || kind == token.Match || kind == token.If || startsExpr(kind)
+	return kind == token.Let || kind == token.Return || kind == token.Switch || kind == token.Match || kind == token.If || kind == token.Assert || startsExpr(kind)
 }
 
 // parseReturnStmt parses "return Expr". The cursor sits on "return".

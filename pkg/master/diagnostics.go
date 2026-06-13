@@ -88,3 +88,21 @@ func DuplicateOption(offset, width int, format, key string) diagnostic.Diagnosti
 func DuplicateRowField(offset, width int, field, master string) diagnostic.Diagnostic {
 	return newDuplicateRowFieldDiagnostic(offset, width, field, master)
 }
+
+// RowValidationFailed reports that a loaded row does not satisfy one of its
+// master's per-row validate each checks. It anchors at the assert in the .belt
+// declaration — the check that failed, the span the editor shows it on — while
+// the failing row travels in the message as path:row, since the data lives in a
+// separate file the diagnostic model does not address.
+func RowValidationFailed(offset, width int, path string, row int) diagnostic.Diagnostic {
+	return newRowValidationFailedDiagnostic(offset, width, path, row)
+}
+
+// DuplicatePrimaryKey reports that a row's primary key repeats one an earlier row
+// already carries — the master's rows are not uniquely identified. It anchors at
+// the source declaration like the other cell diagnostics, naming the duplicate
+// cell as path:row,col (the later occurrence, the one to change — the first is
+// kept as the baseline), the repeated key value, and the first occurrence's row.
+func DuplicatePrimaryKey(offset, width int, path string, row, col int, key string, first int) diagnostic.Diagnostic {
+	return newDuplicatePrimaryKeyDiagnostic(offset, width, path, row, col, key, first)
+}

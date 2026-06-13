@@ -1,0 +1,44 @@
+File
+  Uses: ~
+  Decls: ~
+  Types: ~
+  Enums: ~
+  Interfaces: ~
+  Funcs:
+    FuncDecl
+      Doc: ~
+      Public: true
+      Extern: false
+      Effects: ~
+      Name: "checked"
+      TypeParams: ~
+      Params:
+        ParamDef
+          Name: "x"
+          Type: NamedType
+            Namespace: ""
+            Name: "int"
+            Args: ~
+            Projections: ~
+      Result: NamedType
+        Namespace: ""
+        Name: "int"
+        Args: ~
+        Projections: ~
+      Body:
+        AssertStmt
+          Cond: CallExpr
+            Callee: MemberExpr
+              Receiver: Identifier
+                Name: "x"
+              Member: Identifier
+                Name: "gteq"
+            Arguments:
+              IntLit
+                Text: "0"
+                Base: 0
+        ReturnStmt
+          Value: Identifier
+            Name: "x"
+  Asserts: ~
+  Masters: ~

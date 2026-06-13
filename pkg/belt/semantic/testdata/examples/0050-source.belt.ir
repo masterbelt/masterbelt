@@ -26,6 +26,7 @@ Module
               Type: Builtin
                 Name: "string"
         Primary: "id"
+        RowChecks: ~
       Where: ~
   Funcs: ~
   Asserts: ~

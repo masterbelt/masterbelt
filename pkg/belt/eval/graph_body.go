@@ -49,7 +49,10 @@ func graphApply(ctx graphCtx, fn *ir.Constant, args []*ir.Constant) *ir.Constant
 		}
 	}
 	return graphBody(fn.Fn.Body, graphCtx{
-		env: ctx.env, locals: locals, depth: ctx.depth + 1, budgetHit: ctx.budgetHit,
+		// A function literal inherits the enclosing receiver, so self in its body
+		// (a validate check's (fn(): bool { return self.id > 0 })()) folds to the
+		// same row the enclosing predicate runs against, not nil.
+		env: ctx.env, locals: locals, self: ctx.self, selfDef: ctx.selfDef, depth: ctx.depth + 1, budgetHit: ctx.budgetHit,
 		resultColl: CollKindOf(resultType), resultType: resultType,
 		// A closure captures its defining environment's type parameters, so a
 		// match in its body folds under the same substitution as the routine the
@@ -131,11 +134,31 @@ func graphStmts(body []ir.Stmt, ctx graphCtx, scope *graphScope) (*ir.Constant, 
 				continue
 			}
 			return v, out
+		case *ir.AssertStmt:
+			if out, halt := graphAssertStmt(s, ctx); halt {
+				return nil, out
+			}
 		default:
 			panic(unhandledGraphStmt(stmt))
 		}
 	}
 	return nil, graphFellThrough
+}
+
+// graphAssertStmt folds an assert statement, honouring it where it runs. halt is
+// true when the body cannot continue past it: a condition that folds to a
+// definite false is a violated assertion, and one that cannot fold leaves the
+// body unable to fold — either way the body yields no value rather than an error
+// escaping as a typed result, so a caller that folds the body (a const, a master
+// validate check) sees no value and treats it as a failure to produce one. A
+// condition that holds returns halt false, and the fold continues past it like a
+// bare expression statement.
+func graphAssertStmt(s *ir.AssertStmt, ctx graphCtx) (graphOutcome, bool) {
+	cond := graphValue(s.Cond, ctx)
+	if cond == nil || (cond.Kind == ir.ConstBool && !cond.Bool) {
+		return graphUnknown, true
+	}
+	return graphFellThrough, false
 }
 
 // graphReturn folds a return statement's value under the body's result

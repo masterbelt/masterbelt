@@ -41,6 +41,7 @@ belt.semantic.master_missing_primary,master {master} に primary キーがあり
 belt.semantic.master_missing_row,master {master} に行レコードがありません
 belt.semantic.master_duplicate_primary_key,master {master} は primary キー列 {key} を重複させています
 belt.semantic.master_where_unsupported,master {master} の行述語(where)はまだサポートされていません
+belt.semantic.master_validate_not_assert,master {master} の validate ブロックには assert 文のみ記述できます
 belt.semantic.uninferable_record,このレコードリテラルの型を推論できません。型名を付けるか型注釈を付けてください
 belt.semantic.not_a_record,{typ} はレコード型ではありません
 belt.semantic.uninferable_result,この関数リテラルの結果型を推論できません。注釈を付けるか値を返してください
@@ -141,3 +142,5 @@ master.unknown_option,フォーマット {format} にオプション {key} は�
 master.option_type_mismatch,オプション {key} は {typ} でなければなりません
 master.duplicate_option,フォーマット {format} でオプション {key} が複数回指定されています
 master.duplicate_row_field,master {master} でフィールド {field} が複数回宣言されています
+master.row_validation_failed,"行 {path}:{row} は validate each の検査を満たしません"
+master.duplicate_primary_key,"{path}:{row},{col}: 主キー {key} が重複しています(最初の出現は行 {first})"

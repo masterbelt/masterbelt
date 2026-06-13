@@ -299,6 +299,16 @@ func enclosingMethodOwner(doc view, trees map[cst.Green]cst.Tree, offset int) *i
 				return def
 			}
 		}
+		// A master's per-row validate checks read the row through self, so an
+		// offset inside a validate clause resolves self to the master the same way
+		// a row method body does — completion and hover then see the row's fields.
+		if def.MasterSyntax != nil {
+			for _, c := range def.MasterSyntax.Validations {
+				if t, ok := trees[c.Syntax()]; ok && within(t, offset) {
+					return def
+				}
+			}
+		}
 	}
 	return nil
 }

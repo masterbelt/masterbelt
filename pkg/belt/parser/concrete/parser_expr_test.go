@@ -913,3 +913,20 @@ func TestParseLetAssignLossless(t *testing.T) {
 		assertLossless(t, src)
 	}
 }
+
+// TestArmAssertStatement pins that an assert statement is a valid
+// single-statement arm body of a switch and a match: every statement parseStmt
+// accepts must be in startsStmt, which gates the body an arm takes after "->",
+// or the assert is rejected and read as the next arm.
+func TestArmAssertStatement(t *testing.T) {
+	cases := []string{
+		"fn f(x: int): int {\n  switch x {\n    1 -> assert x > 0\n    _ -> {}\n  }\n  return x\n}\n",
+		"fn f(x: int): int {\n  match x {\n    int -> assert x > 0\n    _ -> {}\n  }\n  return x\n}\n",
+	}
+	for _, src := range cases {
+		if _, diags := Parse([]byte(src)); len(diags) != 0 {
+			t.Errorf("%q: unexpected diagnostics: %v", src, diags)
+		}
+		assertLossless(t, src)
+	}
+}

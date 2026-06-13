@@ -1,0 +1,22 @@
+// A validate block holds a master's data checks. Its each clause runs once per
+// row: every assert inside reads the row through self, so unlike a top-level
+// assert (a compile-time, closed declaration) it is checked against each loaded
+// row. validate and each are context keywords, like record, primary, and source;
+// all (a per-table check) shares the each clause's node, told apart by the
+// keyword, and is a later concern. Here the block is only parsed — resolving and
+// running the checks come later — so a validate-bearing master analyzes as before.
+
+pub master Skill {
+  record {
+    id: int,
+    cost: int,
+    power: int,
+  }
+  primary id
+  validate {
+    each {
+      assert self.power >= self.cost
+      assert self.id > 0
+    }
+  }
+}

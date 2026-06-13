@@ -134,7 +134,10 @@ func readMaster(def *ir.TypeDef, doc *abstract.Document, env eval.GraphEnv, root
 
 		typed, coerceDiags := master.Coerce(raw, fields, spec)
 		diags = append(diags, coerceDiags...)
-		diags = append(diags, checkRefinements(typed, fields, spec, env)...)
+		refineDiags, refined := checkRefinements(typed, fields, spec, env)
+		diags = append(diags, refineDiags...)
+		diags = append(diags, checkRowValidations(typed, fields, refined, def, doc, spec, env)...)
+		diags = append(diags, checkDuplicatePrimaryKeys(typed, def, spec)...)
 
 		loaded = append(loaded, Loaded{Master: def.Name, Display: spec.Display, Table: typed})
 	}
@@ -148,13 +151,17 @@ func readMaster(def *ir.TypeDef, doc *abstract.Document, env eval.GraphEnv, root
 // engine compiled to a usable form (def.Where set) is run; the engine compiles
 // one that reads self, literals, and self's own methods, so it folds the same in
 // any of the program's file envs.
-func checkRefinements(typed master.Table, fields []ir.Field, spec master.SourceSpec, env eval.GraphEnv) []diagnostic.Diagnostic {
+// It also returns the set of rows (by index) a cell of which failed its
+// refinement, so the per-row validate checks can skip them — a value the row type
+// already rejected must not draw a second, derived row-validation error.
+func checkRefinements(typed master.Table, fields []ir.Field, spec master.SourceSpec, env eval.GraphEnv) ([]diagnostic.Diagnostic, map[int]bool) {
 	byName := make(map[string]ir.Field, len(fields))
 	for _, f := range fields {
 		byName[f.Name] = f
 	}
 	var diags []diagnostic.Diagnostic
-	for _, row := range typed.Rows {
+	refined := map[int]bool{}
+	for ri, row := range typed.Rows {
 		for i, col := range typed.Columns {
 			cell := row.Cells[i]
 			if cell.Value == nil {
@@ -164,12 +171,196 @@ func checkRefinements(typed master.Table, fields []ir.Field, spec master.SourceS
 				v := eval.GraphPredicate(def.Where, cell.Value, def, env)
 				if v == nil || v.Kind != ir.ConstBool || !v.Bool {
 					diags = append(diags, master.CellRefinement(spec.Offset, spec.Width, spec.Display, cell.Origin.Row, cell.Origin.Col, col, cell.Value.String(), def.Name))
+					refined[ri] = true
 					break // one violation per cell is enough
 				}
 			}
 		}
 	}
+	return diags, refined
+}
+
+// checkRowValidations folds each of the master's per-row validate checks over
+// every loaded row, reporting a row that fails one. Each check is an assert
+// condition resolved to a value graph over self (the row), so a row is bound as
+// a record constant of its cells and the predicate folds against it through the
+// interpreter — the per-row evaluator the north star keeps validation on (the
+// aggregate and join checks are a SQLite concern, not this one). A row carrying a
+// coercion gap is skipped: the gap was already reported, and folding a predicate
+// over a missing field would only pile a second, derived error onto it. A
+// failure anchors at the assert in the .belt declaration — the check that failed
+// — and names the failing row as path:row in the message.
+func checkRowValidations(typed master.Table, fields []ir.Field, refined map[int]bool, def *ir.TypeDef, doc *abstract.Document, spec master.SourceSpec, env eval.GraphEnv) []diagnostic.Diagnostic {
+	if len(def.Master.RowChecks) == 0 || !tableHasFields(typed, fields) {
+		// A source missing a declared column already reported missing_column and
+		// dropped that field, so a self record built here would lack it and every
+		// check reading it would fold to nil and fail — a derived error on every
+		// row. Leave the malformed source to its own report.
+		return nil
+	}
+	var diags []diagnostic.Diagnostic
+	for ri, row := range typed.Rows {
+		if refined[ri] {
+			continue // a cell of this row failed its refinement, already reported
+		}
+		self, line, ok := rowConstant(typed.Columns, row)
+		if !ok {
+			continue // a coercion gap, already reported
+		}
+		for _, check := range def.Master.RowChecks {
+			// A row passes a check only when its predicate folds to a definite true.
+			// A definite false fails it; so does a predicate that does not fold to a
+			// bool at all (a violated assertion in a row method it calls, an
+			// unevaluable expression) — a check that cannot confirm the row is valid
+			// fails it rather than passing silently, the fail-safe a data check wants.
+			v := eval.GraphPredicate(check.Cond, self, def, env)
+			if v == nil || v.Kind != ir.ConstBool || !v.Bool {
+				offset, width := assertSpan(doc, check.Syntax)
+				diags = append(diags, master.RowValidationFailed(offset, width, spec.Display, line))
+			}
+		}
+	}
 	return diags
+}
+
+// tableHasFields reports whether the coerced table carries a column for every
+// field the master declares — the precondition a per-row check needs, since a
+// self record missing a field folds every read of it to nil. A missing column is
+// already reported by the coercion, so this only gates the derived check.
+func tableHasFields(typed master.Table, fields []ir.Field) bool {
+	present := make(map[string]bool, len(typed.Columns))
+	for _, c := range typed.Columns {
+		present[c] = true
+	}
+	for _, f := range fields {
+		if !present[f.Name] {
+			return false
+		}
+	}
+	return true
+}
+
+// rowConstant builds the record constant a row's per-row checks fold self
+// against — one field per column, in the canonical order RecordConstant settles
+// — and the row's source line for the diagnostic. It returns false when any cell
+// is a coercion gap (a nil value): the row is already faulted, so its checks are
+// not run on a record missing a field.
+func rowConstant(columns []string, row master.Row) (*ir.Constant, int, bool) {
+	fields := make([]ir.ConstField, 0, len(columns))
+	line := 0
+	for i, col := range columns {
+		cell := row.Cells[i]
+		if cell.Value == nil {
+			return nil, 0, false
+		}
+		if line == 0 {
+			line = cell.Origin.Row
+		}
+		fields = append(fields, ir.ConstField{Name: col, Value: cell.Value})
+	}
+	return ir.RecordConstant(fields), line, true
+}
+
+// keyColumn pairs a primary-key column's name with its index in the typed
+// table — the column the key reads, named for the diagnostic.
+type keyColumn struct {
+	name  string
+	index int
+}
+
+// checkDuplicatePrimaryKeys reports a row whose primary key repeats one an
+// earlier row already carries — the duplicate that breaks the master's row
+// identity (the primary key is what identifies a row). It reads the key tuple of
+// each row from its primary columns, keeping the first occurrence of each as the
+// baseline and faulting every later one at its own key cell. A key cell that is a
+// coercion gap is skipped (already reported), and a primary that names a column
+// the source did not supply is left to the missing-column report rather than
+// faulted again here.
+func checkDuplicatePrimaryKeys(typed master.Table, def *ir.TypeDef, spec master.SourceSpec) []diagnostic.Diagnostic {
+	cols, ok := primaryColumns(typed.Columns, def.Master.Primary)
+	if !ok {
+		return nil
+	}
+	var diags []diagnostic.Diagnostic
+	first := make(map[string]int, len(typed.Rows))
+	for _, row := range typed.Rows {
+		key, rendered, anchor, ok := primaryKey(row, cols)
+		if !ok {
+			continue // a coercion gap in a key cell, already reported
+		}
+		if at, dup := first[key]; dup {
+			diags = append(diags, master.DuplicatePrimaryKey(spec.Offset, spec.Width, spec.Display, anchor.Row, anchor.Col, rendered, at))
+			continue
+		}
+		first[key] = anchor.Row
+	}
+	return diags
+}
+
+// primaryColumns resolves each primary-key column name to its index in the typed
+// table, in key order. It returns false when a key names a column the table does
+// not have — a missing column the coercion already reported — so the duplicate
+// check does not run on an incomplete key.
+func primaryColumns(columns []string, primary []string) ([]keyColumn, bool) {
+	if len(primary) == 0 {
+		return nil, false
+	}
+	index := make(map[string]int, len(columns))
+	for i, c := range columns {
+		index[c] = i
+	}
+	cols := make([]keyColumn, 0, len(primary))
+	for _, name := range primary {
+		i, ok := index[name]
+		if !ok {
+			return nil, false
+		}
+		cols = append(cols, keyColumn{name: name, index: i})
+	}
+	return cols, true
+}
+
+// primaryKey reads a row's primary-key tuple: a comparison key uniquely
+// determined by the cell values (the NUL-joined canonical forms — equal keys
+// share it, distinct keys do not, since each value's String is its canonical
+// text), a rendered "col=value" form for the diagnostic, and the anchor cell (the
+// first key column's, where a duplicate is faulted). It returns false when any
+// key cell is a coercion gap (a nil value), which leaves the row's identity
+// unknown and already reported.
+func primaryKey(row master.Row, cols []keyColumn) (key, rendered string, anchor master.Origin, ok bool) {
+	var keyB, renderedB strings.Builder
+	for i, c := range cols {
+		cell := row.Cells[c.index]
+		if cell.Value == nil {
+			return "", "", master.Origin{}, false
+		}
+		if i == 0 {
+			anchor = cell.Origin
+		} else {
+			keyB.WriteByte(0)
+			renderedB.WriteString(", ")
+		}
+		keyB.WriteString(cell.Value.String())
+		renderedB.WriteString(c.name)
+		renderedB.WriteByte('=')
+		renderedB.WriteString(cell.Value.String())
+	}
+	return keyB.String(), renderedB.String(), anchor, true
+}
+
+// assertSpan is the byte span of a validate check's assert statement in its .belt
+// file — what a row-validation diagnostic anchors to, since the row it faults
+// lives in a data file the diagnostic model does not address. It falls back to no
+// span when the statement has no syntax (a check built outside source).
+func assertSpan(doc *abstract.Document, syntax *ast.AssertStmt) (int, int) {
+	if syntax == nil {
+		return 0, 0
+	}
+	tree, ok := findGreen(doc.Concrete().Tree(), syntax.Syntax())
+	if !ok {
+		return 0, 0
+	}
+	return tree.Offset(), tree.Width()
 }
 
 // atFirstSource builds a master-level diagnostic anchored at the first source
