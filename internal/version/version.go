@@ -19,15 +19,53 @@
 package version
 
 import (
+	_ "embed"
+	"encoding/json"
 	"runtime"
 	"runtime/debug"
+	"strconv"
 	"strings"
 	"time"
 )
 
-// Line is the release line this source tree builds — the major.minor managed
-// here, bumped by hand toward the first stable release (1.0).
-const Line = "0.1"
+// versionJSON is the last released version, embedded from version.json.
+// release-please keeps that file current (it updates it on every release through
+// the extra-files entry in release-please-config.json), so the development line
+// below is derived from that single source rather than a hand-edited constant
+// that drifts as releases ship. It mirrors the "." entry of the release-please
+// manifest; a test pins the two together.
+//
+//go:embed version.json
+var versionJSON []byte
+
+// Line is the development line these builds sit on — the next minor after the
+// last released version. A dev or nightly build dates its patch onto it (e.g.
+// 0.2.<date> once 0.1.0 is released, heading toward 0.2.0); a stable build
+// reports its tag verbatim (see Stable). Deriving it from the release manifest
+// means it advances on its own with each release and never drifts.
+var Line = devLine(versionJSON)
+
+// devLine reads version.json's released "version" and returns the next minor as
+// major.minor (0.1.0 -> "0.2"). It panics on a malformed file: the version is
+// embedded at build time, so a bad value is a build-time bug, not a runtime
+// condition to tolerate.
+func devLine(b []byte) string {
+	var doc struct {
+		Version string `json:"version"`
+	}
+	if err := json.Unmarshal(b, &doc); err != nil {
+		panic("version: malformed embedded version.json: " + err.Error())
+	}
+	parts := strings.SplitN(doc.Version, ".", 3)
+	if len(parts) < 3 {
+		panic("version: version.json is not major.minor.patch: " + doc.Version)
+	}
+	minor, err := strconv.Atoi(parts[1])
+	if err != nil {
+		panic("version: version.json minor is not a number: " + doc.Version)
+	}
+	return parts[0] + "." + strconv.Itoa(minor+1)
+}
 
 // Patch, Commit, and Date are an explicit override, set via
 // -ldflags -X github.com/masterbelt/masterbelt/internal/version.<field>=…, for a

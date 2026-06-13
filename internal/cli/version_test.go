@@ -39,8 +39,8 @@ func execVersion(t *testing.T, args ...string) string {
 func TestVersionText(t *testing.T) {
 	stampVersion(t)
 	out := execVersion(t)
-	if !strings.Contains(out, "masterbelt 0.1.20260608+dfbe69a (nightly)") {
-		t.Errorf("version text = %q, want the stamped identity line", out)
+	if want := "masterbelt " + version.Line + ".20260608+dfbe69a (nightly)"; !strings.Contains(out, want) {
+		t.Errorf("version text = %q, want %q", out, want)
 	}
 	for _, want := range []string{"commit:", "go:", "os/arch:"} {
 		if !strings.Contains(out, want) {
@@ -58,8 +58,8 @@ func TestVersionJSON(t *testing.T) {
 	if err := json.Unmarshal([]byte(out), &got); err != nil {
 		t.Fatalf("version --reporter=json is not JSON: %v\n%s", err, out)
 	}
-	if got.Version != "0.1.20260608+dfbe69a" || got.Channel != "nightly" {
-		t.Errorf("json identity = %+v", got)
+	if want := version.Line + ".20260608+dfbe69a"; got.Version != want || got.Channel != "nightly" {
+		t.Errorf("json identity = %+v, want version %q", got, want)
 	}
 	if got.Commit != "dfbe69acc6163073" || got.Go == "" || got.OS == "" || got.Arch == "" {
 		t.Errorf("json is missing facts: %+v", got)

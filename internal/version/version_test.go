@@ -1,18 +1,22 @@
 package version
 
 import (
+	"encoding/json"
+	"os"
 	"runtime/debug"
 	"testing"
 )
 
 func TestFormat(t *testing.T) {
+	// The line prefix is read from version.json, so build the wants from Line
+	// rather than hard-coding it — the test pins the format, not the release.
 	cases := []struct {
 		patch, commit, want string
 	}{
-		{"", "", "0.1.0-dev"}, // nothing dates the build
-		{"20260608", "dfbe69acc6163", "0.1.20260608+dfbe69a"}, // dated patch + short SHA
-		{"20260608", "short", "0.1.20260608"},                 // commit shorter than the short SHA: no metadata
-		{"0", "abc1234ff", "0.1.0+abc1234"},                   // a non-dated patch still formats
+		{"", "", Line + ".0-dev"},                                 // nothing dates the build
+		{"20260608", "dfbe69acc6163", Line + ".20260608+dfbe69a"}, // dated patch + short SHA
+		{"20260608", "short", Line + ".20260608"},                 // commit shorter than the short SHA: no metadata
+		{"0", "abc1234ff", Line + ".0+abc1234"},                   // a non-dated patch still formats
 	}
 	for _, c := range cases {
 		if got := format(c.patch, c.commit); got != c.want {
@@ -103,17 +107,60 @@ func TestInjectedOverride(t *testing.T) {
 	defer func(p, c, d string) { Patch, Commit, Date = p, c, d }(Patch, Commit, Date)
 	Patch, Commit, Date = "20260608", "dfbe69acc6163073", "2026-06-08T15:48:31+09:00"
 
-	if got := String(); got != "0.1.20260608+dfbe69a" {
-		t.Errorf("String() = %q, want 0.1.20260608+dfbe69a", got)
+	want := Line + ".20260608+dfbe69a"
+	if got := String(); got != want {
+		t.Errorf("String() = %q, want %q", got, want)
 	}
 	if got := Channel(); got != "nightly" {
 		t.Errorf("Channel() = %q, want nightly", got)
 	}
 	g := Get()
-	if g.Version != "0.1.20260608+dfbe69a" || g.Channel != "nightly" || g.Commit != "dfbe69acc6163073" || g.Date == "" {
+	if g.Version != want || g.Channel != "nightly" || g.Commit != "dfbe69acc6163073" || g.Date == "" {
 		t.Errorf("Get() identity = %+v", g)
 	}
 	if g.Go == "" || g.OS == "" || g.Arch == "" {
 		t.Errorf("Get() is missing runtime facts: %+v", g)
+	}
+}
+
+// devLine is the next minor after the released version, so a build sits a line
+// ahead of the last release (0.2.x once 0.1.0 is out) rather than alongside it.
+func TestDevLine(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{`{"version":"0.0.0"}`, "0.1"},
+		{`{"version":"0.1.0"}`, "0.2"},
+		{`{"version":"0.9.0"}`, "0.10"},
+		{`{"version":"1.2.3"}`, "1.3"},
+	}
+	for _, c := range cases {
+		if got := devLine([]byte(c.in)); got != c.want {
+			t.Errorf("devLine(%s) = %q, want %q", c.in, got, c.want)
+		}
+	}
+}
+
+// version.json (the embedded build source) must equal the release-please manifest
+// it mirrors; release-please updates both on a release, so a divergence is a
+// hand-edit that would build the wrong line.
+func TestVersionJSONMatchesManifest(t *testing.T) {
+	var vj struct {
+		Version string `json:"version"`
+	}
+	readJSON(t, "version.json", &vj)
+	var manifest map[string]string
+	readJSON(t, "../../.release-please-manifest.json", &manifest)
+	if vj.Version != manifest["."] {
+		t.Errorf("version.json %q != release-please manifest %q", vj.Version, manifest["."])
+	}
+}
+
+func readJSON(t *testing.T, path string, v any) {
+	t.Helper()
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read %s: %v", path, err)
+	}
+	if err := json.Unmarshal(b, v); err != nil {
+		t.Fatalf("%s: %v", path, err)
 	}
 }
