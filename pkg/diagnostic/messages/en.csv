@@ -141,3 +141,4 @@ master.unknown_option,format {format} has no option {key}
 master.option_type_mismatch,option {key} must be a {typ}
 master.duplicate_option,format {format} sets option {key} more than once
 master.duplicate_row_field,master {master} declares field {field} more than once
+master.row_validation_failed,"row {path}:{row} does not satisfy this validate each check"

@@ -30,6 +30,53 @@ Module
               Type: Builtin
                 Name: "int"
         Primary: "id"
+        RowChecks:
+          AssertStmt
+            Cond: Call
+              Receiver: FieldAccess
+                Receiver: SelfValue
+                  Type: Named
+                    Def: "Skill"
+                Field: "power"
+                Type: Builtin
+                  Name: "int"
+              Method: "gteq"
+              Args:
+                FieldAccess
+                  Receiver: SelfValue
+                    Type: Named
+                      Def: "Skill"
+                  Field: "cost"
+                  Type: Builtin
+                    Name: "int"
+              Setter: false
+              Resolved: ~
+              Subst: ~
+              Type: Builtin
+                Name: "bool"
+          AssertStmt
+            Cond: Call
+              Receiver: FieldAccess
+                Receiver: SelfValue
+                  Type: Named
+                    Def: "Skill"
+                Field: "id"
+                Type: Builtin
+                  Name: "int"
+              Method: "gt"
+              Args:
+                Adapt
+                  Value: IntLiteral
+                    Text: "0"
+                    Type: Builtin
+                      Name: "nint"
+                  To: Builtin
+                    Name: "int"
+              Setter: false
+              Resolved: ~
+              Subst: ~
+              Type: Builtin
+                Name: "bool"
       Where: ~
   Funcs: ~
   Asserts: ~

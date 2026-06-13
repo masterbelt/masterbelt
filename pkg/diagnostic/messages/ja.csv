@@ -141,3 +141,4 @@ master.unknown_option,フォーマット {format} にオプション {key} は�
 master.option_type_mismatch,オプション {key} は {typ} でなければなりません
 master.duplicate_option,フォーマット {format} でオプション {key} が複数回指定されています
 master.duplicate_row_field,master {master} でフィールド {field} が複数回宣言されています
+master.row_validation_failed,"行 {path}:{row} は validate each の検査を満たしません"

@@ -1047,6 +1047,14 @@ var renderers = map[Code]func(Locale, map[string]fmt.Stringer) string{
 			return "option " + f["key"].String() + " must be a " + f["typ"].String()
 		}
 	},
+	"master.row_validation_failed": func(loc Locale, f map[string]fmt.Stringer) string {
+		switch loc {
+		case "ja":
+			return "行 " + f["path"].String() + ":" + f["row"].String() + " は validate each の検査を満たしません"
+		default:
+			return "row " + f["path"].String() + ":" + f["row"].String() + " does not satisfy this validate each check"
+		}
+	},
 	"master.source_unreadable": func(loc Locale, f map[string]fmt.Stringer) string {
 		switch loc {
 		case "ja":

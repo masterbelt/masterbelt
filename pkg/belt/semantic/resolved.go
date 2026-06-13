@@ -95,7 +95,26 @@ func writeBackResolutions(module *ir.Module, res *callResolutions, fnShells map[
 		if def.Where != nil {
 			def.Where = w.value(def.Where, bindings{self: self})
 		}
+		// A master's per-row validate checks are statements over self (the row)
+		// the same way a row method body is, so they bind through the statement
+		// walk with self in scope — typing each assert condition from the facts
+		// the checking walk streamed.
+		if def.Master != nil && len(def.Master.RowChecks) > 0 {
+			w.stmts(masterCheckStmts(def.Master.RowChecks), bindings{self: self})
+		}
 	}
+}
+
+// masterCheckStmts widens a master's resolved row checks to a statement slice the
+// write-back's statement walk binds — the assert statements keep their identity
+// (the slice holds the same pointers def.Master.RowChecks does), so binding them
+// here annotates the conditions the data layer folds.
+func masterCheckStmts(checks []*ir.AssertStmt) []ir.Stmt {
+	stmts := make([]ir.Stmt, len(checks))
+	for i, c := range checks {
+		stmts[i] = c
+	}
+	return stmts
 }
 
 // annotateGraph runs the write-back over one standalone value graph (an assert

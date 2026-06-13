@@ -141,3 +141,4 @@ master.unknown_option,error,format:string key:string
 master.option_type_mismatch,error,key:string typ:string
 master.duplicate_option,error,format:string key:string
 master.duplicate_row_field,error,field:string master:string
+master.row_validation_failed,error,path:string row:int

@@ -1314,8 +1314,33 @@ func resolveMasterDecl(r *infer.TypeResolver, reg *builtin.Registry, md *ast.Mas
 		seen[key] = true
 		def.AttachMethods(rm)
 	}
+	resolveMasterValidations(r, reg, def, md, fns)
 	checkMemberDecls(def, at, diags)
 	checkMaster(md, row, isGenericRecordAlias(rowType), at, diags)
+}
+
+// resolveMasterValidations lowers a master's per-row validate checks onto its
+// definition: each each-clause assert becomes a resolved ir.AssertStmt whose
+// condition is a value graph over self (the row), the same lowering a row method
+// body gets, so self and the row's fields resolve and the data layer can fold it
+// against every loaded row. A per-table check (validate all) folds once over the
+// whole table, not per row, so it is left for a later step. The conditions are
+// lowered untyped here and typed by the write-back (writeBackResolutions), whose
+// facts the checking walk (checkMasterValidations) streams — exactly as a method
+// body and the refinement predicate are.
+func resolveMasterValidations(r *infer.TypeResolver, reg *builtin.Registry, def *ir.TypeDef, md *ast.MasterDecl, fns bodyFuncs) {
+	self := ir.Type(&ir.Named{Def: def})
+	for _, clause := range md.Validations {
+		if !clause.PerRow {
+			continue // a per-table check (validate all) is a later concern
+		}
+		binder := bodyBinder{r: r, reg: reg, selfType: self, funcs: fns, self: true}
+		for _, s := range lower.Body(clause.Body, binder) {
+			if a, ok := s.(*ir.AssertStmt); ok {
+				def.Master.RowChecks = append(def.Master.RowChecks, a)
+			}
+		}
+	}
 }
 
 // checkMaster reports a master's well-formedness problems: an absent or

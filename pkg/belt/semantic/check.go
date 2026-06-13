@@ -354,6 +354,21 @@ func checkMethodBodies(reg *builtin.Registry, defs []*ir.TypeDef, universe map[s
 			checkStmts(m.Body, want, bs, env, bodyNoSelf, sink, at, diags)
 			checkBareEnumArgs(m.Body, bs, env, at, diags)
 		}
+		// A master's per-row validate checks are bodies over self the same way a
+		// row method is: self is the row, no parameters, and each assert's
+		// condition must type as a bool. Checking them here streams their facts to
+		// the same sink, so the write-back types their conditions like any body's,
+		// and reports a non-bool assert (assertion_not_bool) in the reporting pass.
+		if def.Master != nil && def.MasterSyntax != nil {
+			bs := infer.BodyScope{Reg: reg, Universe: universe, Qualified: qualified, Self: ir.Type(self), Funcs: funcs, QualifiedFuncs: qualifiedFuncs, ConstShadows: constShadows, NamespaceShadows: nsShadows, ReportTypeParamValue: reportTypeParamValue}
+			for _, clause := range def.MasterSyntax.Validations {
+				if !clause.PerRow {
+					continue // a per-table check (validate all) is a later concern
+				}
+				checkStmts(clause.Body, ir.Invalid, bs, env, nil, sink, at, diags)
+				checkBareEnumArgs(clause.Body, bs, env, at, diags)
+			}
+		}
 	}
 }
 

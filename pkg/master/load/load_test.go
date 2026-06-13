@@ -88,6 +88,43 @@ func TestLoadRefinementViolation(t *testing.T) {
 	}
 }
 
+// validateBelt is a master whose per-row validate each checks compare two
+// columns of the row through self — the row predicate the evaluator folds
+// against every loaded row.
+const validateBelt = "master Skill {\n" +
+	"  record { id: int, cost: int, power: int }\n" +
+	"  primary id\n" +
+	"  source { csv \"skills.csv\" }\n" +
+	"  validate {\n" +
+	"    each {\n" +
+	"      assert self.power >= self.cost\n" +
+	"      assert self.id > 0\n" +
+	"    }\n" +
+	"  }\n" +
+	"}\n"
+
+func TestLoadRowValidationFailed(t *testing.T) {
+	// The second row's power (20) is below its cost (50), so its per-row check
+	// fails; the diagnostic names the failing data row as path:row.
+	_, diags := run(t, validateBelt, map[string]string{"csv": "data"}, map[string]string{
+		"data/skills.csv": "id,cost,power\n1,10,30\n2,50,20\n",
+	})
+	d := single(t, diags, master.CodeRowValidationFailed)
+	if !strings.Contains(d.Message, "data/skills.csv:3") {
+		t.Errorf("message = %q, want it to name the failing row data/skills.csv:3", d.Message)
+	}
+}
+
+func TestLoadRowValidationClean(t *testing.T) {
+	// Every row satisfies both checks, so the loader reports nothing.
+	_, diags := run(t, validateBelt, map[string]string{"csv": "data"}, map[string]string{
+		"data/skills.csv": "id,cost,power\n1,10,30\n2,5,20\n",
+	})
+	if len(diags) != 0 {
+		t.Fatalf("diagnostics = %v, want none", diags)
+	}
+}
+
 func TestLoadMissingColumn(t *testing.T) {
 	_, diags := run(t, skillBelt, map[string]string{"csv": "data"}, map[string]string{
 		"data/skills.csv": "id,name\n1,Heal\n",

@@ -77,6 +77,33 @@ func TestDataExitsNonzeroOnDataError(t *testing.T) {
 	}
 }
 
+func TestDataExitsNonzeroOnRowValidation(t *testing.T) {
+	// A master's per-row validate each check fails for a row, and the data command
+	// surfaces it (naming the failing row) and exits nonzero.
+	root := t.TempDir()
+	belttest.WriteFile(t, root, "masterbelt.toml", "entry = \"skills.belt\"\n\n[source.csv]\nbasePath = \"data\"\n")
+	belttest.WriteFile(t, root, "skills.belt", ""+
+		"master Skill {\n"+
+		"  record { id: int, cost: int, power: int }\n"+
+		"  primary id\n"+
+		"  source { csv \"skills.csv\" }\n"+
+		"  validate {\n"+
+		"    each {\n"+
+		"      assert self.power >= self.cost\n"+
+		"    }\n"+
+		"  }\n"+
+		"}\n")
+	belttest.WriteFile(t, root, "data/skills.csv", "id,cost,power\n1,10,30\n2,50,20\n")
+
+	stdout, _, err := execData(t, root)
+	if err == nil {
+		t.Fatalf("data succeeded on a failing row, want an error\nstdout: %s", stdout)
+	}
+	if !strings.Contains(stdout, "data/skills.csv:3") {
+		t.Errorf("stdout = %q, want it to name the failing row", stdout)
+	}
+}
+
 func TestDataReportsProjectErrors(t *testing.T) {
 	// A data run over a project that does not type-check must not report success:
 	// an unrelated semantic error fails the command, just as check would.

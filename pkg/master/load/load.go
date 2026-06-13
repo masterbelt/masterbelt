@@ -135,6 +135,7 @@ func readMaster(def *ir.TypeDef, doc *abstract.Document, env eval.GraphEnv, root
 		typed, coerceDiags := master.Coerce(raw, fields, spec)
 		diags = append(diags, coerceDiags...)
 		diags = append(diags, checkRefinements(typed, fields, spec, env)...)
+		diags = append(diags, checkRowValidations(typed, def, doc, spec, env)...)
 
 		loaded = append(loaded, Loaded{Master: def.Name, Display: spec.Display, Table: typed})
 	}
@@ -170,6 +171,73 @@ func checkRefinements(typed master.Table, fields []ir.Field, spec master.SourceS
 		}
 	}
 	return diags
+}
+
+// checkRowValidations folds each of the master's per-row validate checks over
+// every loaded row, reporting a row that fails one. Each check is an assert
+// condition resolved to a value graph over self (the row), so a row is bound as
+// a record constant of its cells and the predicate folds against it through the
+// interpreter — the per-row evaluator the north star keeps validation on (the
+// aggregate and join checks are a SQLite concern, not this one). A row carrying a
+// coercion gap is skipped: the gap was already reported, and folding a predicate
+// over a missing field would only pile a second, derived error onto it. A
+// failure anchors at the assert in the .belt declaration — the check that failed
+// — and names the failing row as path:row in the message.
+func checkRowValidations(typed master.Table, def *ir.TypeDef, doc *abstract.Document, spec master.SourceSpec, env eval.GraphEnv) []diagnostic.Diagnostic {
+	if len(def.Master.RowChecks) == 0 {
+		return nil
+	}
+	var diags []diagnostic.Diagnostic
+	for _, row := range typed.Rows {
+		self, line, ok := rowConstant(typed.Columns, row)
+		if !ok {
+			continue // a coercion gap, already reported
+		}
+		for _, check := range def.Master.RowChecks {
+			v := eval.GraphPredicate(check.Cond, self, def, env)
+			if v == nil || v.Kind != ir.ConstBool || !v.Bool {
+				offset, width := assertSpan(doc, check.Syntax)
+				diags = append(diags, master.RowValidationFailed(offset, width, spec.Display, line))
+			}
+		}
+	}
+	return diags
+}
+
+// rowConstant builds the record constant a row's per-row checks fold self
+// against — one field per column, in the canonical order RecordConstant settles
+// — and the row's source line for the diagnostic. It returns false when any cell
+// is a coercion gap (a nil value): the row is already faulted, so its checks are
+// not run on a record missing a field.
+func rowConstant(columns []string, row master.Row) (*ir.Constant, int, bool) {
+	fields := make([]ir.ConstField, 0, len(columns))
+	line := 0
+	for i, col := range columns {
+		cell := row.Cells[i]
+		if cell.Value == nil {
+			return nil, 0, false
+		}
+		if line == 0 {
+			line = cell.Origin.Row
+		}
+		fields = append(fields, ir.ConstField{Name: col, Value: cell.Value})
+	}
+	return ir.RecordConstant(fields), line, true
+}
+
+// assertSpan is the byte span of a validate check's assert statement in its .belt
+// file — what a row-validation diagnostic anchors to, since the row it faults
+// lives in a data file the diagnostic model does not address. It falls back to no
+// span when the statement has no syntax (a check built outside source).
+func assertSpan(doc *abstract.Document, syntax *ast.AssertStmt) (int, int) {
+	if syntax == nil {
+		return 0, 0
+	}
+	tree, ok := findGreen(doc.Concrete().Tree(), syntax.Syntax())
+	if !ok {
+		return 0, 0
+	}
+	return tree.Offset(), tree.Width()
 }
 
 // atFirstSource builds a master-level diagnostic anchored at the first source

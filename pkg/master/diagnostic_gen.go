@@ -16,6 +16,7 @@ const (
 	CodeLocatorEscapesRoot   diagnostic.Code = "master.locator_escapes_root"
 	CodeMissingColumn        diagnostic.Code = "master.missing_column"
 	CodeOptionTypeMismatch   diagnostic.Code = "master.option_type_mismatch"
+	CodeRowValidationFailed  diagnostic.Code = "master.row_validation_failed"
 	CodeSourceUnreadable     diagnostic.Code = "master.source_unreadable"
 	CodeUnknownFormat        diagnostic.Code = "master.unknown_format"
 	CodeUnknownOption        diagnostic.Code = "master.unknown_option"
@@ -129,6 +130,21 @@ func newOptionTypeMismatchDiagnostic(offset int, width int, key string, typ stri
 		Severity: diagnostic.Error,
 		Code:     CodeOptionTypeMismatch,
 		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeOptionTypeMismatch, fields),
+		Fields:   fields,
+		Offset:   offset,
+		Width:    width,
+	}
+}
+
+func newRowValidationFailedDiagnostic(offset int, width int, path string, row int) diagnostic.Diagnostic {
+	fields := map[string]fmt.Stringer{
+		"path": diagnostic.Str(path),
+		"row":  diagnostic.Int(row),
+	}
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.Error,
+		Code:     CodeRowValidationFailed,
+		Message:  diagnostic.Render(diagnostic.DefaultLocale, CodeRowValidationFailed, fields),
 		Fields:   fields,
 		Offset:   offset,
 		Width:    width,

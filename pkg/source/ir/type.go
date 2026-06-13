@@ -254,6 +254,13 @@ type TypeDef struct {
 type MasterDef struct {
 	Row     Type     // the row record type, as written (nil when absent or invalid)
 	Primary []string // the primary-key column names, in declaration order
+	// RowChecks are the resolved per-row validate checks — the assert statements
+	// of the master's validate each clauses, in declaration order, each condition
+	// a value graph over self (the row). The data layer folds each against every
+	// loaded row. A per-table check (validate all) is a later concern and will
+	// carry its own field, since it folds once over the whole table rather than
+	// per row.
+	RowChecks []*AssertStmt
 }
 
 // WhereSyntax returns the surface form of the refinement predicate — the

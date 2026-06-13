@@ -88,3 +88,12 @@ func DuplicateOption(offset, width int, format, key string) diagnostic.Diagnosti
 func DuplicateRowField(offset, width int, field, master string) diagnostic.Diagnostic {
 	return newDuplicateRowFieldDiagnostic(offset, width, field, master)
 }
+
+// RowValidationFailed reports that a loaded row does not satisfy one of its
+// master's per-row validate each checks. It anchors at the assert in the .belt
+// declaration — the check that failed, the span the editor shows it on — while
+// the failing row travels in the message as path:row, since the data lives in a
+// separate file the diagnostic model does not address.
+func RowValidationFailed(offset, width int, path string, row int) diagnostic.Diagnostic {
+	return newRowValidationFailedDiagnostic(offset, width, path, row)
+}

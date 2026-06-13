@@ -2153,12 +2153,27 @@ func writeMasterDef(w *treetext.Writer, n *MasterDef, depth int) error {
 		return err
 	}
 	w.Line(depth, "Primary: "+treetext.QuoteStrings(n.Primary))
+	if len(n.RowChecks) == 0 {
+		w.Line(depth, "RowChecks: "+treetext.Nil)
+	} else {
+		w.Line(depth, "RowChecks:")
+		for _, item := range n.RowChecks {
+			if item == nil {
+				w.Line(depth+1, treetext.Nil)
+				continue
+			}
+			w.Line(depth+1, "AssertStmt")
+			if err := writeAssertStmt(w, item, depth+2); err != nil {
+				return err
+			}
+		}
+	}
 	return nil
 }
 
 // decodeMasterDef builds a MasterDef from its element.
 func decodeMasterDef(e *treetext.Element) (*MasterDef, error) {
-	if err := treetext.ExpectFields(e, "Row", "Primary"); err != nil {
+	if err := treetext.ExpectFields(e, "Row", "Primary", "RowChecks"); err != nil {
 		return nil, err
 	}
 	n := &MasterDef{}
@@ -2171,6 +2186,29 @@ func decodeMasterDef(e *treetext.Element) (*MasterDef, error) {
 		return nil, err
 	} else {
 		n.Primary = v
+	}
+	switch f := e.Fields[2]; {
+	case f.Inline == treetext.Nil:
+	case f.Items == nil:
+		return nil, fmt.Errorf("treetext: line %d: field %s: expected a list", f.Line, f.Name)
+	default:
+		out := make([]*AssertStmt, 0, len(f.Items))
+		for j := range f.Items {
+			item := &f.Items[j]
+			if item.Head == treetext.Nil {
+				out = append(out, nil)
+				continue
+			}
+			if item.Head != "AssertStmt" {
+				return nil, fmt.Errorf("treetext: line %d: %s is not a AssertStmt", item.Line, item.Head)
+			}
+			v, err := decodeAssertStmt(item)
+			if err != nil {
+				return nil, err
+			}
+			out = append(out, v)
+		}
+		n.RowChecks = out
 	}
 	return n, nil
 }
