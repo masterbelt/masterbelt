@@ -1,10 +1,15 @@
-# release-assets attaches the binaries to a stable GitHub Release after
-# release-please publishes it. The release tag is the source of truth: the job
-# checks out that exact ref, verifies it matches VERSION, then builds the same
-# reproducible archives the nightly workflow exercises.
+# release-assets attaches the binaries to a stable GitHub Release. The release
+# tag is the source of truth: the job checks out that exact ref, verifies it
+# matches the recorded release version, then builds the same reproducible
+# archives the nightly workflow exercises — stamped to report the release
+# version on the stable channel.
 name: release assets
 
 on:
+  # The primary path: release-please dispatches this with the tag it created,
+  # because its GITHUB_TOKEN-published release cannot raise a `release` event
+  # that starts a workflow. `release: published` stays as a fallback for a
+  # release published by hand (a human token does raise the event).
   release:
     types: [published]
   workflow_dispatch:
@@ -37,12 +42,13 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - name: Verify tag and VERSION agree
+      - name: Verify the tag matches the recorded release version
+        env:
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
         run: |
-          tag="${{ github.event.release.tag_name || inputs.tag }}"
-          version="$(cat VERSION)"
-          if [ "$tag" != "v$version" ]; then
-            echo "::error::release tag $tag does not match VERSION $version"
+          version="$(jq -r '."."' .release-please-manifest.json)"
+          if [ "$TAG" != "v$version" ]; then
+            echo "::error::release tag $TAG does not match the release-please version $version"
             exit 1
           fi
 
@@ -53,7 +59,21 @@ jobs:
         run: make repro-check
 
       - name: Cross-build and archive
-        run: make dist
+        # Stamp the binaries with the release version (the tag, minus its v) so
+        # they report it on the stable channel rather than the rolling line.
+        env:
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: STABLE_VERSION="${TAG#v}" make dist
+
+      - name: Verify the built binaries report the release version
+        env:
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: |
+          built="$(cat dist/VERSION)"
+          if [ "$built" != "${TAG#v}" ]; then
+            echo "::error::built version $built does not match release tag $TAG"
+            exit 1
+          fi
 
       - name: Smoke test
         run: |
@@ -62,7 +82,25 @@ jobs:
           "$tmp/masterbelt" version
           "$tmp/masterbelt" check pkg/belt/testdata/examples/0009-project
 
+      # Build provenance attestation needs a public repo or an org plan that
+      # includes artifact attestations; on a private repo without it the attest
+      # API returns "Feature not available" and reds the build. Probe visibility
+      # so the build skips the attest step instead of failing, and picks it back
+      # up automatically once the repo is public — the same guard nightly uses.
+      - name: Decide whether provenance attestation is available
+        id: attest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "$(gh repo view --json visibility -q .visibility 2>/dev/null || echo private)" = public ]; then
+            echo "attest=true" >>"$GITHUB_OUTPUT"
+          else
+            echo "provenance attestation unavailable for a private repo on this plan — skipping it"
+            echo "attest=false" >>"$GITHUB_OUTPUT"
+          fi
+
       - name: Attest build provenance
+        if: steps.attest.outputs.attest == 'true'
         uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
         with:
           subject-path: |

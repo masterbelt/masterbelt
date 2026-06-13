@@ -1,6 +1,7 @@
 # release-please keeps the stable-release bookkeeping reviewable. Commits on a
-# release branch update a single Release PR with the next VERSION and CHANGELOG;
-# merging that PR makes release-please create the vX.Y.Z tag and GitHub Release.
+# release branch update a single Release PR with the next version and CHANGELOG;
+# merging that PR makes release-please create the vX.Y.Z tag and GitHub Release,
+# then this workflow dispatches release-assets to build and attach the binaries.
 name: release-please
 
 on:
@@ -17,6 +18,10 @@ concurrency:
 permissions:
   contents: write
   pull-requests: write
+  # release-please labels the Release PR with its autorelease:* status labels.
+  issues: write
+  # Dispatch the release-assets workflow once a release is created (below).
+  actions: write
 
 jobs:
   release-please:
@@ -24,6 +29,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        id: release
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+          # Prepare the Release PR against the branch the commit landed on, so a
+          # release/v* maintenance branch updates its own PR rather than main's.
+          target-branch: ${{ github.ref_name }}
+
+      # release-please publishes the GitHub Release with GITHUB_TOKEN, and a
+      # release event raised by GITHUB_TOKEN does not start another workflow run
+      # — so release-assets' `release: published` trigger never fires for an
+      # automated release. Dispatch it explicitly instead (workflow_dispatch IS
+      # delivered for GITHUB_TOKEN), passing the tag release-please just created.
+      - name: Build and attach the release assets
+        if: ${{ steps.release.outputs.release_created == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow run release-assets.yml \
+            --ref "${{ github.ref_name }}" \
+            -f tag="${{ steps.release.outputs.tag_name }}"
