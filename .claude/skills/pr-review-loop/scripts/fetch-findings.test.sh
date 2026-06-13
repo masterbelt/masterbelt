@@ -43,5 +43,13 @@ echo 'ERROR' > "$D2/pulls_comments.json"
 FINDINGS_FIXTURE="$D2" bash "$SUT" 43 "$SINCE" >/dev/null 2>&1
 assert "unreadable findings source => non-zero exit" 1 "$?"
 
+# a comment in the same second as SINCE is still printed (cutoff matches codex-outcome.sh)
+D3="$TMP/same_second"; mkdir -p "$D3"; for f in pulls_comments pulls_reviews; do echo '[]' > "$D3/$f.json"; done
+cat > "$D3/pulls_comments.json" <<JSON
+[{"id":9,"user":{"login":"$BOT"},"path":"x.go","line":1,"original_commit_id":"abc0000000","created_at":"$SINCE","in_reply_to_id":null,"body":"same-second finding"}]
+JSON
+OUT3=$(FINDINGS_FIXTURE="$D3" bash "$SUT" 43 "$SINCE")
+assert "same-second inline finding printed" 1 "$(grep -c '^ID:9|' <<<"$OUT3")"
+
 echo "---"
 [ "$fails" -eq 0 ] && { echo "all green"; exit 0; } || { echo "$fails failed"; exit 1; }

@@ -110,5 +110,18 @@ D="$TMP/rx_err_watch"; mk "$D"; echo 'ERROR' > "$D/issues_reactions.json"
 assert "watch, reactions unreadable => not NO_EYES" TIMEOUT_NO_FINDINGS \
   "$(EYES_GRACE_POLLS=2 CODEX_OUTCOME_FIXTURE="$D" bash "$SUT" 43 "$SINCE" "$SHA" --watch 3 0 | sed -n 's/^OUTCOME=//p')"
 
+# a jq parse/filter failure on a findings source must fail closed, not approve
+D="$TMP/jq_fail"; mk "$D"
+echo '{"not":"an array"}' > "$D/pulls_comments.json"
+cat > "$D/issues_comments.json" <<JSON
+[{"user":{"login":"$BOT"},"created_at":"2026-06-13T03:55:00Z","body":"Codex Review: Didn't find any major issues. Reviewed commit: $SHA"}]
+JSON
+assert "jq failure on a findings source => ERROR" ERROR "$(run "$D")"
+
+# the default 👀 grace is generous, so a short watch must not declare NO_EYES early
+D="$TMP/no_eyes_default"; mk "$D"
+assert "default grace not exceeded in 3 polls => not NO_EYES" TIMEOUT_NO_FINDINGS \
+  "$(CODEX_OUTCOME_FIXTURE="$D" bash "$SUT" 43 "$SINCE" "$SHA" --watch 3 0 | sed -n 's/^OUTCOME=//p')"
+
 echo "---"
 [ "$fails" -eq 0 ] && { echo "all green"; exit 0; } || { echo "$fails failed"; exit 1; }

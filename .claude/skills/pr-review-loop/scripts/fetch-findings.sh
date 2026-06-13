@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # fetch-findings.sh — print the current review's findings for triage: the bot's
 # inline review comments AND its submitted review bodies, paginated and (optionally)
-# scoped to this round. Stabilizes the Stage 1 fetch so a review-body-only finding
+# scoped to this round. Stabilizes the triage fetch so a review-body-only finding
 # is never dropped and pagination is never forgotten.
 #
 # Usage: fetch-findings.sh <pr> [since-iso8601]
@@ -21,6 +21,10 @@ set -uo pipefail
 BOT='chatgpt-codex-connector[bot]'
 [ $# -ge 1 ] || { echo "usage: fetch-findings.sh <pr> [since-iso8601]" >&2; exit 2; }
 PR=$1; SINCE=${2:-1970-01-01T00:00:00Z}
+# Bias the cutoff a couple seconds earlier so a same-second artifact is not dropped by
+# the strict ">". This must match codex-outcome.sh, or a finding it counts as this round
+# goes unprinted here and the loop bounces back with nothing to triage.
+SINCE_EFF=$(date -u -d "$SINCE - 2 seconds" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo "$SINCE")
 
 fetch(){ # <api-path> <fixture-file>; returns non-zero if the source cannot be read
   if [ -n "${FINDINGS_FIXTURE:-}" ]; then
@@ -45,12 +49,12 @@ fi
 inline=$(fetch  "repos/$REPO/pulls/$PR/comments" pulls_comments.json) || { echo "ERROR: failed to read inline comments" >&2; exit 1; }
 reviews=$(fetch "repos/$REPO/pulls/$PR/reviews"  pulls_reviews.json)  || { echo "ERROR: failed to read reviews" >&2; exit 1; }
 
-printf '%s' "$inline" | jq -r --arg b "$BOT" --arg s "$SINCE" '
+printf '%s' "$inline" | jq -r --arg b "$BOT" --arg s "$SINCE_EFF" '
   [.[] | select(.user.login==$b and .created_at>$s)]
   | sort_by(.created_at) | reverse | .[]
   | "ID:\(.id)|\(.path):\(.line // .original_line)|\((.original_commit_id // "")[0:9])|\(.created_at)\nIN_REPLY_TO:\(.in_reply_to_id // "none")\n\(.body)\n==="'
 
-printf '%s' "$reviews" | jq -r --arg b "$BOT" --arg s "$SINCE" '
+printf '%s' "$reviews" | jq -r --arg b "$BOT" --arg s "$SINCE_EFF" '
   [.[] | select(.user.login==$b and .state=="COMMENTED" and (.submitted_at // "")>$s and ((.body // "")|length>0))]
   | sort_by(.submitted_at) | .[]
   | "REVIEW:\(.submitted_at)|\((.commit_id // "")[0:9])\n\(.body)\n==="'

@@ -2,30 +2,30 @@
 # codex-outcome.sh — detect a Codex (chatgpt-codex-connector[bot]) review outcome
 # on a PR from FIRST-CLASS ARTIFACTS, not the ephemeral 👀/👍 reaction.
 #
-# Packages the Stage 7 probes (paginated, SHA-pinned, SINCE-scoped) so the loop
+# Packages the review-outcome probes (paginated, SHA-pinned, SINCE-scoped) so the loop
 # does not re-derive fragile jq each round. It reports an OUTCOME and nothing
 # more: it deliberately does NOT triage findings, and it never infers approval
-# from silence — those are model judgment (see SKILL.md Stages 2-5, 7).
+# from silence — those are model judgment (see SKILL.md).
 #
 # Usage:
 #   codex-outcome.sh <pr> <since-iso8601> <head-sha> [--watch [max_polls] [interval_sec]]
 #
 #   OUTCOME=FINDINGS             new bot inline comments OR a submitted COMMENTED
-#                                review after SINCE → back to Stage 1
+#                                review after SINCE → findings to triage
 #   OUTCOME=APPROVED             the review is clean for this round: a "Didn't find any
 #                                major issues" comment for <head-sha> after SINCE, OR a
-#                                +1 reaction after SINCE → Stage 8. The +1 is honored by
+#                                +1 reaction after SINCE → the review is clean. The +1 is honored by
 #                                an explicit decision so a reaction-only clean review
 #                                still converges; its residual risk (a prior run's late
 #                                +1) is bounded only by the SINCE round scope.
 #   OUTCOME=RUNNING              only 👀 / nothing terminal yet (single probe)
-#   OUTCOME=NO_EYES              --watch saw no 👀 within the grace window (default 3
+#   OUTCOME=NO_EYES              --watch saw no 👀 within the grace window (default 12
 #                                polls; env EYES_GRACE_POLLS) and nothing terminal: the
 #                                push was not picked up — re-post "@codex review" and
 #                                re-watch, rather than wait out a review that never began
 #   OUTCOME=TIMEOUT_NO_FINDINGS  --watch elapsed with no findings and no commit-scoped
 #                                verdict. NOT an approval — keep waiting or surface to
-#                                the human; do not advance to Stage 8 on silence alone.
+#                                the human; do not treat silence alone as approval.
 #   OUTCOME=ERROR                a required probe could not be read (e.g. a transient gh
 #                                failure). Fails closed — never reports APPROVED on a
 #                                findings source it could not actually check.
@@ -42,7 +42,10 @@ PR=$1; SINCE=$2; SHA=$3; shift 3
 WATCH=0; MAXP=20; INT=90
 if [ "${1:-}" = "--watch" ]; then WATCH=1; MAXP=${2:-20}; INT=${3:-90}; fi
 SHA9=${SHA:0:9}
-EYES_GRACE=${EYES_GRACE_POLLS:-3}  # polls to wait for 👀 before declaring the trigger missed
+# Polls to wait for 👀 before declaring the trigger missed. The default is generous
+# because a review here has been seen to start anywhere from seconds to ~18 minutes
+# after a push; too small a grace re-triggers a review that was merely slow to start.
+EYES_GRACE=${EYES_GRACE_POLLS:-12}
 # Bias the round cutoff a couple seconds earlier: GitHub timestamps are second-
 # precision, so an artifact created in the same wall-clock second the trigger was
 # recorded would be dropped by a strict ">". Prior-round artifacts are minutes old,
@@ -75,41 +78,42 @@ fi
 
 probe(){
   local rc=0 pc revraw icraw rxraw
-  # Decision sources — a read failure on any of these must fail closed.
+  # Decision sources — a read OR jq-parse failure on any of these must fail closed,
+  # so an unreadable findings source is never silently read as "no findings".
   pc=$(fetch     "repos/$REPO/pulls/$PR/comments"   pulls_comments.json)  || rc=1
   revraw=$(fetch "repos/$REPO/pulls/$PR/reviews"    pulls_reviews.json)   || rc=1
   icraw=$(fetch  "repos/$REPO/issues/$PR/comments"  issues_comments.json) || rc=1
   # Reactions feed the +1 approval and the NO_EYES liveness check, so a read
   # failure must be carried (RX_ERR), not silently read as "no reactions".
   rxraw=$(fetch  "repos/$REPO/issues/$PR/reactions" issues_reactions.json) && RX_ERR=0 || { rxraw='[]'; RX_ERR=1; }
-  PROBE_ERR=$rc
   [ -n "$pc" ]     || pc='[]'
   [ -n "$revraw" ] || revraw='[]'
   [ -n "$icraw" ]  || icraw='[]'
   [ -n "$rxraw" ]  || rxraw='[]'
   # findings: inline review comments after the trigger ...
   F=$(printf '%s' "$pc" | jq --arg b "$BOT" --arg s "$SINCE_EFF" \
-        '[.[]|select(.user.login==$b and .created_at>$s)]|length')
+        '[.[]|select(.user.login==$b and .created_at>$s)]|length') || rc=1
   # ... OR a submitted COMMENTED review with a NON-EMPTY body after the trigger
   #     (findings can ride the review body with no inline comments). The body check
   #     mirrors fetch-findings.sh, so an empty-body review never reports FINDINGS
-  #     with nothing for Stage 1 to triage.
+  #     with nothing to triage.
   REV=$(printf '%s' "$revraw" | jq --arg b "$BOT" --arg s "$SINCE_EFF" \
-        '[.[]|select(.user.login==$b and (.submitted_at//"")>$s and .state=="COMMENTED" and ((.body//"")|length>0))]|length')
+        '[.[]|select(.user.login==$b and (.submitted_at//"")>$s and .state=="COMMENTED" and ((.body//"")|length>0))]|length') || rc=1
   # clean verdict: the "no issues" comment, pinned to YOUR sha AND this round
   #     (created_at>$SINCE) — the only COMMIT-SCOPED approval artifact.
   V=$(printf '%s' "$icraw" | jq --arg b "$BOT" --arg s "$SINCE_EFF" --arg sha "$SHA9" \
-        '[.[]|select(.user.login==$b and .created_at>$s and (.body|test("Didn.t find any major issues")) and (.body|test($sha)))]|length')
+        '[.[]|select(.user.login==$b and .created_at>$s and (.body|test("Didn.t find any major issues")) and (.body|test($sha)))]|length') || rc=1
   # a +1 after the trigger. By an explicit project decision this counts as
   #     approval (so a clean review that leaves only the reaction still converges).
   #     Reactions carry no sha, so the only guard against a prior run's late +1 is
   #     the created_at>$SINCE round scope — an accepted residual risk.
   P=$(printf '%s' "$rxraw" | jq --arg b "$BOT" --arg s "$SINCE_EFF" \
-        '[.[]|select(.user.login==$b and .content=="+1" and .created_at>$s)]|length')
+        '[.[]|select(.user.login==$b and .content=="+1" and .created_at>$s)]|length') || rc=1
   # liveness: did the review actually start this round? An 👀 after the trigger
   #     means it started; its prolonged absence means the trigger never took.
   EYES=$(printf '%s' "$rxraw" | jq --arg b "$BOT" --arg s "$SINCE_EFF" \
-        '[.[]|select(.user.login==$b and .content=="eyes" and .created_at>$s)]|length')
+        '[.[]|select(.user.login==$b and .content=="eyes" and .created_at>$s)]|length') || RX_ERR=1
+  PROBE_ERR=$rc
 }
 
 decide(){
