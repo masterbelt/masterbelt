@@ -1,9 +1,10 @@
 # package-vsix — package the VS Code extension as a .vsix and, when a Marketplace
 # token is given, publish it to the (stable) Marketplace channel. Only the stable
 # release passes a token, so the Marketplace has a single, clean version lane; the
-# nightly builds the .vsix the same way but publishes nowhere — it is attached to
-# the nightly GitHub release for download instead. The caller checks out, sets up
-# pnpm/node, and runs `pnpm install` first, then uploads masterbelt.vsix.
+# nightly builds the .vsix the same way — marked pre-release — but publishes
+# nowhere: it is attached to the nightly GitHub release for download instead. The
+# caller checks out, sets up pnpm/node, and runs `pnpm install` first, then
+# uploads masterbelt.vsix.
 name: package-vsix
 description: Package the VS Code extension and, with a token, publish it to the Marketplace.
 
@@ -11,11 +12,17 @@ inputs:
   version:
     description: The version to stamp into the package (no build metadata).
     required: true
+  pre-release:
+    description: >
+      Mark the packaged .vsix as a pre-release build. The nightly sets this so its
+      downloadable .vsix is flagged pre-release rather than looking like a normal
+      release at 0.1.<date>; a stable release leaves it false.
+    default: 'false'
   vsce-pat:
     description: >
-      Marketplace PAT. When given, the .vsix is published to the Marketplace;
-      when empty the publish step is skipped (the nightly, and any token-less
-      setup, degrade to building the .vsix only).
+      Marketplace PAT. When given, the .vsix is published to the Marketplace; when
+      empty the publish step is skipped (the nightly, and any token-less setup,
+      degrade to building the .vsix only).
     default: ''
 
 runs:
@@ -26,14 +33,18 @@ runs:
       working-directory: toolchain/editors/vscode
       env:
         VERSION: ${{ inputs.version }}
+        PRE_RELEASE: ${{ inputs.pre-release }}
       run: |
         # vsce wants a LICENSE in the package; copy the repo's single MIT license
         # in rather than committing a second copy that could drift.
         cp "$GITHUB_WORKSPACE/LICENSE" LICENSE
         npm pkg set version="$VERSION"
+        flag=""
+        [ "$PRE_RELEASE" = true ] && flag="--pre-release"
         # Version-free filename for a deterministic download URL; vsce reads the
         # version from package.json (set above), not the file name.
-        pnpm dlx @vscode/vsce package --no-dependencies -o masterbelt.vsix
+        # shellcheck disable=SC2086
+        pnpm dlx @vscode/vsce package $flag --no-dependencies -o masterbelt.vsix
 
     - name: Publish to the Marketplace (when a PAT is configured)
       if: inputs.vsce-pat != ''
@@ -41,4 +52,16 @@ runs:
       working-directory: toolchain/editors/vscode
       env:
         VSCE_PAT: ${{ inputs.vsce-pat }}
-      run: pnpm dlx @vscode/vsce publish --packagePath masterbelt.vsix
+      run: |
+        # Idempotent: a full re-run of an already-published release would hit a
+        # duplicate-version error. The rest of the release path is re-runnable
+        # (gh release upload --clobber, the grammar tag skips when it exists), so
+        # treat an already-published version as success and let recovery finish
+        # the remaining artifacts. Any other failure still fails.
+        if out="$(pnpm dlx @vscode/vsce publish --packagePath masterbelt.vsix 2>&1)"; then
+          echo "$out"
+        else
+          echo "$out"
+          echo "$out" | grep -qiE 'already exists|already published' || exit 1
+          echo "version is already on the Marketplace — treating as published"
+        fi

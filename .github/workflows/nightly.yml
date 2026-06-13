@@ -155,11 +155,12 @@ jobs:
           # The CLI version without build metadata — 0.1.<UTC commit date>,
           # monotonic for the rolling pre-release.
           echo "version=0.1.$(TZ=UTC0 git show -s --date=format-local:%Y%m%d --format=%cd HEAD)" >>"$GITHUB_OUTPUT"
-      # No vsce-pat: the nightly builds the .vsix but does not publish it to the
-      # Marketplace (stable-only lane).
+      # Mark the .vsix as a pre-release build; no vsce-pat, so it is built but not
+      # published to the Marketplace (stable-only lane) — just attached below.
       - uses: ./.github/actions/package-vsix
         with:
           version: ${{ steps.ver.outputs.version }}
+          pre-release: 'true'
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: masterbelt-vsix
