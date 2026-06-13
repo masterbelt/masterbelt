@@ -432,10 +432,12 @@ func startsMatchPattern(kind token.Kind) bool {
 }
 
 // startsStmt reports whether kind can begin a statement: a let, a return, a
-// switch, a match, an if, or any expression (which may continue into an
-// assignment).
+// switch, a match, an if, an assert, or any expression (which may continue into
+// an assignment). It gates the single-statement body a switch or match arm takes
+// after "->", so every statement form parseStmt accepts must appear here or it
+// is rejected there.
 func startsStmt(kind token.Kind) bool {
-	return kind == token.Let || kind == token.Return || kind == token.Switch || kind == token.Match || kind == token.If || startsExpr(kind)
+	return kind == token.Let || kind == token.Return || kind == token.Switch || kind == token.Match || kind == token.If || kind == token.Assert || startsExpr(kind)
 }
 
 // parseReturnStmt parses "return Expr". The cursor sits on "return".
