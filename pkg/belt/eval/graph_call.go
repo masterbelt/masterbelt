@@ -252,7 +252,18 @@ func dispatchCall(ctx graphCtx, v *ir.Call, recv *ir.Constant, name string, args
 	if !ok {
 		return nil
 	}
-	return fn(recv, args)
+	result := fn(recv, args)
+	if result == nil && name == "shl" && recv.Kind == ir.ConstInt &&
+		len(args) == 1 && args[0].Kind == ir.ConstInt && args[0].Int.Sign() >= 0 {
+		// A left shift by a non-negative amount yields no value only when the
+		// amount is too wide to materialize without building an astronomically
+		// large integer — a budget refusal (a shift the caller can shrink), not an
+		// evaluator gap, so arm the budget channel before returning nil. A negative
+		// amount is type-incorrect, not a budget matter, so it is left to its own
+		// classification.
+		ctx.noteBudget()
+	}
+	return result
 }
 
 // intrinsicTypeName is the registry key a scalar receiver's intrinsics live

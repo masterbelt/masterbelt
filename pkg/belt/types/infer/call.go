@@ -301,6 +301,14 @@ func adaptedOperands(e *ast.CallExpr, recvExpr ast.Expr, recv ir.Type, m *ir.Met
 		pt := types.Substitute(m.Params[i].Type, subst)
 		if _, isSelf := pt.(*ir.SelfType); isSelf {
 			pt = operand
+		} else if !hasTypeVar(pt) {
+			// A concrete (non-self) parameter range-checks its argument the way a
+			// free function's parameter does — a constant that cannot inhabit the
+			// type (a negative amount in a shift's nuint operand, say) is
+			// constant_overflow at the argument. A self-typed operand unifies with
+			// the receiver and is range-checked at the call's own result site, so it
+			// is not re-checked here.
+			sink.checked(a, pt)
 		}
 		if !hasTypeVar(pt) && !types.Identical(args[i], pt) {
 			sink.adapted(a, pt)

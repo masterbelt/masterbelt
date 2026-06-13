@@ -1,0 +1,38 @@
+// The bitwise contract on the integers: band/bor/bxor combine two bit patterns
+// and shl/shr shift, the same width-blind way the arithmetic works — a result
+// that does not fit its type overflows at the assignment, exactly as + and *
+// do, so a shift never wraps. They are methods on every integer kind, not
+// operators. There is no native complement: ~x within a width is x.bxor(T.Max),
+// built in pure belt on these. All fold at compile time.
+
+// and / or / xor on a byte. The result of any of the three fits the width.
+assert byte(0b1100).band(byte(0b1010)) == byte(0b1000)
+assert byte(0b1100).bor(byte(0b1010)) == byte(0b1110)
+assert byte(0b1100).bxor(byte(0b1010)) == byte(0b0110)
+
+// shl multiplies by a power of two, shr divides by one (a logical shift here,
+// the operands being unsigned).
+assert byte(1).shl(3) == byte(8)
+assert byte(0b10110).shr(2) == byte(0b101)
+
+// The contract is on every integer kind — signed and unsigned, sized and the
+// unbounded nint. A signed value's bits are its two's complement, so -1 (all
+// ones) anded with 255 keeps the low eight bits.
+assert uint(0xF0).band(uint(0x3C)) == uint(0x30)
+assert int(-1).band(int(255)) == 255
+assert nint(5).bor(nint(2)) == 7
+
+// The within-a-width complement is built in pure belt on bxor and the type's
+// all-ones Max, the way the std bits module would — no native bnot needed.
+fn bnot(x: byte): byte {
+  return x.bxor(byte.Max)
+}
+assert bnot(byte(0)) == byte(255)
+assert bnot(byte(0b00001111)) == byte(0b11110000)
+
+// A flag-set test on band, the way std:bits builds testBit.
+fn hasFlag(flags: byte, mask: byte): bool {
+  return flags.band(mask) != byte(0)
+}
+assert hasFlag(byte(0b110), byte(0b010))
+assert !hasFlag(byte(0b100), byte(0b010))
