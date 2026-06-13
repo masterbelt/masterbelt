@@ -610,30 +610,17 @@ func (a *assembler) reportMasterValidationRefs() {
 				continue
 			}
 			for _, stmt := range clause.Body {
-				if as, ok := stmt.(*ast.AssertStmt); ok {
-					a.reportValidationExprRefs(as.Cond)
+				if as, ok := stmt.(*ast.AssertStmt); ok && as.Cond != nil {
+					// reportRefIssues walks with ast.WalkExprs, which stops at a
+					// function literal's boundary — so a name a lambda binds (its own
+					// parameter) is not seen here and not misreported, and an undefined
+					// name inside a lambda body is left to the fold, which yields no
+					// value and fails the row under the data layer's fail-safe.
+					reportRefIssues(a.fileID, as.Cond, a.q, a.at, a.diags, nil)
 				}
 			}
 		}
 	}
-}
-
-// reportValidationExprRefs reports the reference problems of a validate check's
-// condition, descending into any function literal it contains. reportRefIssues
-// walks with ast.WalkExprs, which stops at a function literal's boundary, so a
-// lambda's own body is walked here too — otherwise an undefined name inside
-// (fn(): bool { return Limit > 0 })() would go unreported.
-func (a *assembler) reportValidationExprRefs(e ast.Expr) {
-	if e == nil {
-		return
-	}
-	reportRefIssues(a.fileID, e, a.q, a.at, a.diags, nil)
-	ast.WalkExprs(e, func(x ast.Expr) bool {
-		if lit, ok := x.(*ast.FuncLit); ok {
-			ast.WalkBodyExprs(lit.Body, a.reportValidationExprRefs)
-		}
-		return true
-	})
 }
 
 // evaluateAsserts checks the compile-time assertions: each condition must
