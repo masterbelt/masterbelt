@@ -418,19 +418,20 @@ func (s BodyScope) leaf(e ast.Expr) ir.Type {
 	case *ast.Identifier:
 		return s.identifierLeaf(e)
 	case *ast.MemberExpr:
+		// A receiver that is a self readable-member and also names a type or a
+		// namespace is ambiguous between the implicit self read (self.recv.x) and the
+		// type-member read (Item.Max) or namespace member read (geo.X): report the
+		// clash rather than silently taking the type or namespace reading over the
+		// innermost self member.
+		if id, ok := e.Receiver.(*ast.Identifier); ok && selfMemberReceiverClash(s, e.Receiver) {
+			s.reportSelfMemberClash(id, id.Name)
+			return ir.Invalid
+		}
 		// A member access whose receiver names a type — an enum member
 		// (Element.Fire) or an associated constant (int8.Max, Level.Max) — is a
 		// value of that type; a local or parameter shadowing the type name takes
 		// the record-field reading instead.
 		if t, ok := s.typeMemberValue(e); ok {
-			// A receiver that is also a readable member of self is ambiguous between
-			// the type-member read (Item.Max) and the implicit self read
-			// (self.Item.Max): report the clash rather than silently taking the type
-			// member, which the body leaf for a bare receiver would not.
-			if recv, ok := e.Receiver.(*ast.Identifier); ok && selfMemberClash(s, recv.Name) {
-				s.reportSelfMemberClash(recv, recv.Name)
-				return ir.Invalid
-			}
 			return t
 		}
 		// A namespace-import receiver (T.x reading the import's exported member) is

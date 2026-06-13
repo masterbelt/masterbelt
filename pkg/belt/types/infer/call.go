@@ -36,6 +36,15 @@ func callType(e *ast.CallExpr, s scope, sink *Sink) ir.Type {
 	if !ok {
 		return nonMemberCallType(e, s, sink)
 	}
+	// A member-access callee whose receiver is a self readable-member that also
+	// names a type or namespace is ambiguous between the implicit self read
+	// (self.recv.m()) and the static-fn call or imported-function call the type or
+	// namespace reading would take — the clash the value forms raise for Item.Max
+	// and geo.X, here for Item.make() and geo.fn().
+	if id, isIdent := member.Receiver.(*ast.Identifier); isIdent && selfMemberReceiverClash(s, member.Receiver) {
+		s.reportSelfMemberClash(id, id.Name)
+		return ir.Invalid
+	}
 	// A member-access callee whose receiver names a namespace is a call of an
 	// imported function (geo.area(...)), never a method call.
 	if cands := s.fnMember(member); len(cands) > 0 {
@@ -56,6 +65,19 @@ func callType(e *ast.CallExpr, s scope, sink *Sink) ir.Type {
 // applied directly, an implicit self-call, or a leaf form. It is the !ok arm of
 // callType, extracted so the dispatch stays flat.
 func nonMemberCallType(e *ast.CallExpr, s scope, sink *Sink) ir.Type {
+	// A bare callee that reads a readable member of self is ambiguous when the same
+	// name also names a type (a conversion T(x)), a top-level function, or a method
+	// of self: applying the self member's value vs taking that other callee. Report
+	// the clash — the same ambiguity the value positions raise — before the type and
+	// function branches below claim it; with no competing callee the self member's
+	// function value applies through the function-value arm.
+	if id, isIdent := e.Callee.(*ast.Identifier); isIdent && selfMemberClash(s, id.Name) {
+		_, _, hasMethod := types.Candidates(s.registry(), s.self(), id.Name)
+		if s.conv(id) != ir.Invalid || len(s.fn(id)) > 0 || hasMethod {
+			s.reportSelfMemberClash(id, id.Name)
+			return ir.Invalid
+		}
+	}
 	// A call whose callee names a type is a conversion T(x) — the type
 	// wins over a same-named function — and one that names a top-level
 	// function is a function call.
@@ -70,17 +92,6 @@ func nonMemberCallType(e *ast.CallExpr, s scope, sink *Sink) ir.Type {
 		}
 		if cands := s.fn(id); len(cands) > 0 {
 			return funcCallType(e, id.Name, cands, s, sink)
-		}
-	}
-	// A bare callee that is both a readable member of self (a function-valued field
-	// or getter) and a method of self is ambiguous: applying the field value (the
-	// implicit self read) or the implicit self-method call. Report the clash rather
-	// than silently taking one — the checker would read the field, the lowering the
-	// method — so the author writes self.name() or self.name(...) to disambiguate.
-	if id, isIdent := e.Callee.(*ast.Identifier); isIdent && selfMemberClash(s, id.Name) {
-		if _, _, found := types.Candidates(s.registry(), s.self(), id.Name); found {
-			s.reportSelfMemberClash(id, id.Name)
-			return ir.Invalid
 		}
 	}
 	// A callee that itself types as a function value applies — a

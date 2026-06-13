@@ -364,6 +364,63 @@ func TestSelfOmissionSwitchScrutineeMatchesExplicit(t *testing.T) {
 	}
 }
 
+// TestSelfMemberNameClashStaticCallReceiver pins that a static-fn call whose
+// receiver is both a readable member of self and a type is a clash — the call
+// would otherwise silently invoke the static fn instead of navigating self.recv,
+// the call-position twin of the Item.Max value clash.
+func TestSelfMemberNameClashStaticCallReceiver(t *testing.T) {
+	src := "pub type Item = nint impl { pub static fn make(): Item { return Item(7) } }\n" +
+		"pub type Holder = { Item: Item } impl {\n" +
+		"  pub mk(): Item { return Item.make() }\n" +
+		"}\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeSelfMemberNameClash) {
+		t.Fatalf("want self_member_name_clash (Item is both a self field and a type with a static fn), got %v", codes(diags))
+	}
+}
+
+// TestSelfMemberNameClashFunctionCallee pins that a bare callee that is both a
+// readable member of self and a top-level function is a clash — the call would
+// otherwise bind the outer function over the innermost self member.
+func TestSelfMemberNameClashFunctionCallee(t *testing.T) {
+	src := "pub fn f(): nint { return 99 }\n" +
+		"pub type Box = { f: fn(): nint } impl {\n" +
+		"  pub call(): nint { return f() }\n" +
+		"}\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeSelfMemberNameClash) {
+		t.Fatalf("want self_member_name_clash (f is both a self field and a top-level function), got %v", codes(diags))
+	}
+}
+
+// TestSelfMemberNameClashConversionCallee pins that a bare callee that is both a
+// readable member of self and a type (a conversion T(x)) is a clash.
+func TestSelfMemberNameClashConversionCallee(t *testing.T) {
+	src := "pub type T = nint\n" +
+		"pub type Box = { T: nint } impl {\n" +
+		"  pub mk(): T { return T(1) }\n" +
+		"}\n"
+	_, diags := analyze(src)
+	if !hasCode(diags, CodeSelfMemberNameClash) {
+		t.Fatalf("want self_member_name_clash (T is both a self field and a type used as a conversion), got %v", codes(diags))
+	}
+}
+
+// TestSelfMemberNameClashNamespaceReceiver pins that a member-access receiver
+// that is both a readable member of self and a namespace import is a clash — the
+// access would otherwise read the imported member (geo.X) instead of navigating
+// the self field (self.geo.X), the namespace twin of the type-receiver clash.
+func TestSelfMemberNameClashNamespaceReceiver(t *testing.T) {
+	diags := analyzeProject(t, map[string]string{
+		"geometry.belt": "pub const X: long = 5\n",
+		"main.belt": "use geo from \"geometry.belt\"\n" +
+			"pub type Box = { geo: long } impl {\n  pub peek(): long { return geo.X }\n}\n",
+	})
+	if !hasCode(diags, CodeSelfMemberNameClash) {
+		t.Fatalf("want self_member_name_clash (geo is both a self field and a namespace import), got %v", codes(diags))
+	}
+}
+
 // methodBody returns the lowered statement body of a named method on a named
 // type — the IR the bare-read desugar produces.
 func methodBody(t *testing.T, m *ir.Module, typ, method string) []ir.Stmt {
