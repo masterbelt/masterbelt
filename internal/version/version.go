@@ -168,16 +168,23 @@ func format(patch, commit string) string {
 	return v
 }
 
+// The release channels a build reports.
+const (
+	channelDev     = "dev"
+	channelNightly = "nightly"
+	channelStable  = "stable"
+)
+
 // channelFor names the release channel a patch implies: no patch is a dev
 // build, an 8-digit date is a rolling nightly, anything else a stable release.
 func channelFor(patch string) string {
 	switch {
 	case patch == "":
-		return "dev"
+		return channelDev
 	case len(patch) == 8 && isDigits(patch):
-		return "nightly"
+		return channelNightly
 	default:
-		return "stable"
+		return channelStable
 	}
 }
 
@@ -207,15 +214,50 @@ func isHex(s string) bool {
 	return true
 }
 
+// releaseTag returns the released semantic version when the binary was built
+// from a real release tag — `go install …@vX.Y.Z` records that tag as the main
+// module version, where a pseudo-version (`@latest`) or "(devel)" (an in-repo
+// build) would not. It is empty otherwise, so an ordinary build falls through to
+// the rolling line.
+func releaseTag() string {
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return ""
+	}
+	return releaseFromModuleVersion(info.Main.Version)
+}
+
+// releaseFromModuleVersion returns the X.Y.Z of a module version string when it
+// is a real release tag (vX.Y.Z, optionally with a -prerelease/+meta suffix),
+// and "" for a pseudo-version, "(devel)", or anything else.
+func releaseFromModuleVersion(v string) string {
+	if !strings.HasPrefix(v, "v") {
+		return ""
+	}
+	if _, _, _, ok := pseudoVersion(v); ok {
+		return "" // a -<timestamp>-<sha> pseudo-version is a nightly, not a release
+	}
+	semver := v[len("v"):]
+	parts := strings.SplitN(semver, ".", 3)
+	if len(parts) < 3 || !isDigits(parts[0]) || !isDigits(parts[1]) {
+		return ""
+	}
+	return semver
+}
+
 // identity resolves the build's version string and channel together with the
-// commit and date behind them. A stable release build (Stable stamped in) names
-// that version verbatim; every other build reports the rolling line resolve
+// commit and date behind them. A stable build names its version verbatim —
+// stamped in (Stable) for a release archive, or the module's own release tag for
+// a `go install …@vX.Y.Z`; every other build reports the rolling line resolve
 // derives from the commit.
 func identity() (ver, channel, commit, date string) {
 	var patch string
 	patch, commit, date = resolve()
 	if Stable != "" {
-		return Stable, "stable", commit, date
+		return Stable, channelStable, commit, date
+	}
+	if tag := releaseTag(); tag != "" {
+		return tag, channelStable, commit, date
 	}
 	return format(patch, commit), channelFor(patch), commit, date
 }

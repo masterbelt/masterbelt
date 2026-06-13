@@ -139,6 +139,25 @@ func TestDevLine(t *testing.T) {
 	}
 }
 
+// A binary installed from a real release tag (go install …@vX.Y.Z) reports that
+// version on the stable channel, not the rolling dev line.
+func TestReleaseFromModuleVersion(t *testing.T) {
+	cases := []struct{ v, want string }{
+		{"v0.1.0", "0.1.0"},
+		{"v1.2.3", "1.2.3"},
+		{"v0.1.0-rc.1", "0.1.0-rc.1"},
+		{"v0.0.0-20260608064831-dfbe69acc616", ""}, // a pseudo-version, not a release
+		{"(devel)", ""},                            // an in-repo build
+		{"", ""},
+		{"0.1.0", ""}, // missing the v prefix
+	}
+	for _, c := range cases {
+		if got := releaseFromModuleVersion(c.v); got != c.want {
+			t.Errorf("releaseFromModuleVersion(%q) = %q, want %q", c.v, got, c.want)
+		}
+	}
+}
+
 // version.json (the embedded build source) must equal the release-please manifest
 // it mirrors; release-please updates both on a release, so a divergence is a
 // hand-edit that would build the wrong line.
