@@ -93,8 +93,40 @@ func integerIntrinsics() map[string]Intrinsic {
 		OpLteq: binaryInt(func(a, b *big.Int) *ir.Constant { return ir.BoolConstant(a.Cmp(b) <= 0) }),
 		OpGt:   binaryInt(func(a, b *big.Int) *ir.Constant { return ir.BoolConstant(a.Cmp(b) > 0) }),
 		OpGteq: binaryInt(func(a, b *big.Int) *ir.Constant { return ir.BoolConstant(a.Cmp(b) >= 0) }),
+		// The bitwise contract, width-blind like the arithmetic above: and/or/xor
+		// combine the two-of-the-same operands, and the shifts move bits by a
+		// nuint amount. A result that does not fit a sized receiver overflows at
+		// the assignment (the Fits check), exactly as add/mul do, so shl does not
+		// wrap. There is no bitwise complement here: ~x within a width is the
+		// width-bearing operation, written x.bxor(T.Max) on top of these (T.Max is
+		// the per-type all-ones), so it stays out of the width-blind set.
+		"band": binaryInt(func(a, b *big.Int) *ir.Constant { return ir.IntConstant(new(big.Int).And(a, b)) }),
+		"bor":  binaryInt(func(a, b *big.Int) *ir.Constant { return ir.IntConstant(new(big.Int).Or(a, b)) }),
+		"bxor": binaryInt(func(a, b *big.Int) *ir.Constant { return ir.IntConstant(new(big.Int).Xor(a, b)) }),
+		"shl": binaryInt(func(a, n *big.Int) *ir.Constant {
+			if n.Sign() < 0 || !n.IsUint64() || n.Uint64() > maxShiftFoldBits {
+				return nil // a negative count is type-incorrect; a giant one is left unfolded
+			}
+			return ir.IntConstant(new(big.Int).Lsh(a, uint(n.Uint64())))
+		}),
+		"shr": binaryInt(func(a, n *big.Int) *ir.Constant {
+			if n.Sign() < 0 {
+				return nil
+			}
+			if !n.IsUint64() {
+				return ir.IntConstant(big.NewInt(0)) // shifting a finite value that far is zero
+			}
+			return ir.IntConstant(new(big.Int).Rsh(a, uint(n.Uint64())))
+		}),
 	}
 }
+
+// maxShiftFoldBits caps the shift amount the folder will materialize for shl:
+// a constant shift this wide already overflows any sized integer (caught at the
+// assignment), and on the unbounded nint/nuint a wider shift would build an
+// astronomically large value, so beyond the cap the shift is left unfolded
+// rather than risk exhausting memory at compile time.
+const maxShiftFoldBits = 1 << 16
 
 func booleanIntrinsics() map[string]Intrinsic {
 	return map[string]Intrinsic{

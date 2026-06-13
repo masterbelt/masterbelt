@@ -30,6 +30,17 @@ pub type nint = builtin impl {
   pub extern fn div(other: self): self
   /// The % operator: the remainder. A zero divisor is a compile-time error.
   pub extern fn rem(other: self): self
+} impl bitwise {
+  /// The bitwise and.
+  pub extern fn band(other: self): self
+  /// The bitwise or.
+  pub extern fn bor(other: self): self
+  /// The bitwise exclusive or.
+  pub extern fn bxor(other: self): self
+  /// A left shift by amount; a result past this type's range overflows at its assignment.
+  pub extern fn shl(amount: nuint): self
+  /// A right shift by amount (the value divided by two to the amount).
+  pub extern fn shr(amount: nuint): self
 }
 
 /// A signed 8-bit integer (-128 to 127).
@@ -69,6 +80,17 @@ pub type sbyte = builtin impl {
   pub extern fn div(other: self): self
   /// The % operator: the remainder. A zero divisor is a compile-time error.
   pub extern fn rem(other: self): self
+} impl bitwise {
+  /// The bitwise and.
+  pub extern fn band(other: self): self
+  /// The bitwise or.
+  pub extern fn bor(other: self): self
+  /// The bitwise exclusive or.
+  pub extern fn bxor(other: self): self
+  /// A left shift by amount; a result past this type's range overflows at its assignment.
+  pub extern fn shl(amount: nuint): self
+  /// A right shift by amount (the value divided by two to the amount).
+  pub extern fn shr(amount: nuint): self
 }
 
 /// A signed 16-bit integer (-32768 to 32767).
@@ -108,6 +130,17 @@ pub type short = builtin impl {
   pub extern fn div(other: self): self
   /// The % operator: the remainder. A zero divisor is a compile-time error.
   pub extern fn rem(other: self): self
+} impl bitwise {
+  /// The bitwise and.
+  pub extern fn band(other: self): self
+  /// The bitwise or.
+  pub extern fn bor(other: self): self
+  /// The bitwise exclusive or.
+  pub extern fn bxor(other: self): self
+  /// A left shift by amount; a result past this type's range overflows at its assignment.
+  pub extern fn shl(amount: nuint): self
+  /// A right shift by amount (the value divided by two to the amount).
+  pub extern fn shr(amount: nuint): self
 }
 
 /// A signed 32-bit integer (-2147483648 to 2147483647).
@@ -147,6 +180,17 @@ pub type int = builtin impl {
   pub extern fn div(other: self): self
   /// The % operator: the remainder. A zero divisor is a compile-time error.
   pub extern fn rem(other: self): self
+} impl bitwise {
+  /// The bitwise and.
+  pub extern fn band(other: self): self
+  /// The bitwise or.
+  pub extern fn bor(other: self): self
+  /// The bitwise exclusive or.
+  pub extern fn bxor(other: self): self
+  /// A left shift by amount; a result past this type's range overflows at its assignment.
+  pub extern fn shl(amount: nuint): self
+  /// A right shift by amount (the value divided by two to the amount).
+  pub extern fn shr(amount: nuint): self
 }
 
 /// A signed 64-bit integer (-9223372036854775808 to 9223372036854775807).
@@ -186,4 +230,15 @@ pub type long = builtin impl {
   pub extern fn div(other: self): self
   /// The % operator: the remainder. A zero divisor is a compile-time error.
   pub extern fn rem(other: self): self
+} impl bitwise {
+  /// The bitwise and.
+  pub extern fn band(other: self): self
+  /// The bitwise or.
+  pub extern fn bor(other: self): self
+  /// The bitwise exclusive or.
+  pub extern fn bxor(other: self): self
+  /// A left shift by amount; a result past this type's range overflows at its assignment.
+  pub extern fn shl(amount: nuint): self
+  /// A right shift by amount (the value divided by two to the amount).
+  pub extern fn shr(amount: nuint): self
 }

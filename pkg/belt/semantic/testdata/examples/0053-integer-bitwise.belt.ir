@@ -1,0 +1,359 @@
+Module
+  Consts: ~
+  Types: ~
+  Funcs:
+    Function
+      Name: "bnot"
+      Anchor: "belt:/bnot"
+      Public: false
+      Extern: false
+      Effects: ~
+      Doc: ~
+      TypeParams: ~
+      Params:
+        Param
+          Name: "x"
+          Type: Builtin
+            Name: "byte"
+      Result: Builtin
+        Name: "byte"
+      Body:
+        Return
+          Value: Call
+            Receiver: ParamRef
+              Name: "x"
+              Type: Builtin
+                Name: "byte"
+            Method: "bxor"
+            Args:
+              Adapt
+                Value: AssocConstValue
+                  Def: "byte"
+                  Index: 0
+                  Type: Builtin
+                    Name: "nint"
+                To: Builtin
+                  Name: "byte"
+            Setter: false
+            Resolved: ~
+            Subst: ~
+            Type: Builtin
+              Name: "byte"
+    Function
+      Name: "hasFlag"
+      Anchor: "belt:/hasFlag"
+      Public: false
+      Extern: false
+      Effects: ~
+      Doc: ~
+      TypeParams: ~
+      Params:
+        Param
+          Name: "flags"
+          Type: Builtin
+            Name: "byte"
+        Param
+          Name: "mask"
+          Type: Builtin
+            Name: "byte"
+      Result: Builtin
+        Name: "bool"
+      Body:
+        Return
+          Value: Call
+            Receiver: Call
+              Receiver: ParamRef
+                Name: "flags"
+                Type: Builtin
+                  Name: "byte"
+              Method: "band"
+              Args:
+                ParamRef
+                  Name: "mask"
+                  Type: Builtin
+                    Name: "byte"
+              Setter: false
+              Resolved: ~
+              Subst: ~
+              Type: Builtin
+                Name: "byte"
+            Method: "neq"
+            Args:
+              Conversion
+                Type: Builtin
+                  Name: "byte"
+                Args:
+                  IntLiteral
+                    Text: "0"
+                    Type: Builtin
+                      Name: "nint"
+            Setter: false
+            Resolved: ~
+            Subst: ~
+            Type: Builtin
+              Name: "bool"
+  Asserts:
+    Assert
+      Cond: "byte(0b1100).band(byte(0b1010)) == byte(0b1000)"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+        Reified: ~
+      Diagram: "byte(0b1100).band(byte(0b1010)) == byte(0b1000)\n^            ^    ^             ^  ^\n12           8    10            |  8\n                                true"
+    Assert
+      Cond: "byte(0b1100).bor(byte(0b1010)) == byte(0b1110)"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+        Reified: ~
+      Diagram: "byte(0b1100).bor(byte(0b1010)) == byte(0b1110)\n^            ^   ^             ^  ^\n12           14  10            |  14\n                               true"
+    Assert
+      Cond: "byte(0b1100).bxor(byte(0b1010)) == byte(0b0110)"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+        Reified: ~
+      Diagram: "byte(0b1100).bxor(byte(0b1010)) == byte(0b0110)\n^            ^    ^             ^  ^\n12           6    10            |  6\n                                true"
+    Assert
+      Cond: "byte(1).shl(3) == byte(8)"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+        Reified: ~
+      Diagram: "byte(1).shl(3) == byte(8)\n^       ^      ^  ^\n1       8      |  8\n               true"
+    Assert
+      Cond: "byte(0b10110).shr(2) == byte(0b101)"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+        Reified: ~
+      Diagram: "byte(0b10110).shr(2) == byte(0b101)\n^             ^      ^  ^\n22            5      |  5\n                     true"
+    Assert
+      Cond: "uint(0xF0).band(uint(0x3C)) == uint(0x30)"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+        Reified: ~
+      Diagram: "uint(0xF0).band(uint(0x3C)) == uint(0x30)\n^          ^    ^           ^  ^\n240        48   60          |  48\n                            true"
+    Assert
+      Cond: "int(-1).band(int(255)) == 255"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+        Reified: ~
+      Diagram: "int(-1).band(int(255)) == 255\n^   ^   ^    ^         ^\n-1  -1  255  255       true"
+    Assert
+      Cond: "nint(5).bor(nint(2)) == 7"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+        Reified: ~
+      Diagram: "nint(5).bor(nint(2)) == 7\n^       ^   ^        ^\n5       7   2        true"
+    Assert
+      Cond: "bnot(byte(0)) == byte(255)"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+        Reified: ~
+      Diagram: "bnot(byte(0)) == byte(255)\n^    ^        ^  ^\n255  0        |  255\n              true"
+    Assert
+      Cond: "bnot(byte(0b00001111)) == byte(0b11110000)"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+        Reified: ~
+      Diagram: "bnot(byte(0b00001111)) == byte(0b11110000)\n^    ^                 ^  ^\n240  15                |  240\n                       true"
+    Assert
+      Cond: "hasFlag(byte(0b110), byte(0b010))"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+        Reified: ~
+      Diagram: "hasFlag(byte(0b110), byte(0b010))\n^       ^            ^\ntrue    6            2"
+    Assert
+      Cond: "!hasFlag(byte(0b100), byte(0b010))"
+      Doc: ~
+      Eval: Constant
+        Kind: 1
+        Int: ~
+        Bool: true
+        Str: ""
+        Coll: ~
+        Fields: ~
+        CollMapness: 0
+        Millis: 0
+        Fn: ~
+        Captured: ~
+        EnumDef: ~
+        EnumIndex: 0
+        Start: ~
+        End: ~
+        Step: ~
+        UnionTag: ~
+        Reified: ~
+      Diagram: "!hasFlag(byte(0b100), byte(0b010))\n^^       ^            ^\n|false   4            2\ntrue"

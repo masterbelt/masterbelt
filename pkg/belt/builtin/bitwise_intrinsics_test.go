@@ -1,0 +1,56 @@
+package builtin
+
+import (
+	"math/big"
+	"testing"
+
+	"github.com/masterbelt/masterbelt/pkg/source/ir"
+)
+
+// TestIntegerBitwiseIntrinsics pins the width-blind bitwise folds the integer
+// intrinsics supply: and/or/xor combine two values (a signed value's bits are
+// its two's complement, so the negative cases hold), shl multiplies by a power
+// of two without wrapping (a sized receiver's overflow is caught later, at the
+// assignment), and shr divides by one (an arithmetic, floor-ward shift on a
+// negative). The width-dependent complement is not here — it is x.bxor(T.Max),
+// pinned by example 0053 — so these never need the receiver's width.
+func TestIntegerBitwiseIntrinsics(t *testing.T) {
+	ii := integerIntrinsics()
+	bin := func(name string, a, b int64) *ir.Constant {
+		return ii[name](intConst(a), []*ir.Constant{intConst(b)})
+	}
+
+	for _, tc := range []struct {
+		op   string
+		a, b int64
+		want int64
+	}{
+		{"band", 0b1100, 0b1010, 0b1000},
+		{"bor", 0b1100, 0b1010, 0b1110},
+		{"bxor", 0b1100, 0b1010, 0b0110},
+		{"band", -1, 255, 255}, // -1 is all ones in two's complement
+		{"bor", -1, 0, -1},     // all ones | anything is all ones
+		{"bxor", 5, -1, -6},    // x ^ all-ones is ~x
+		{"shl", 1, 10, 1024},   // width-blind product, no wrap
+		{"shr", 0b10110, 2, 0b101},
+		{"shr", 255, 100, 0}, // a finite value shifted that far is zero
+		{"shr", -8, 1, -4},   // arithmetic (floor-ward) shift
+	} {
+		got := bin(tc.op, tc.a, tc.b)
+		if got == nil || got.Kind != ir.ConstInt || got.Int.Int64() != tc.want {
+			t.Errorf("%s(%d, %d) = %v, want %d", tc.op, tc.a, tc.b, got, tc.want)
+		}
+	}
+
+	// On the unbounded nint, shl widens without wrapping: 1 << 64 is kept as 2^64
+	// (a sized receiver would instead overflow at its assignment).
+	if got := bin("shl", 1, 64); got == nil || got.Int.Cmp(new(big.Int).Lsh(big.NewInt(1), 64)) != 0 {
+		t.Errorf("shl(1, 64) = %v, want 2^64", got)
+	}
+
+	// A shift amount past the fold cap is left unfolded rather than materialized
+	// into an astronomically large value at compile time.
+	if got := bin("shl", 1, maxShiftFoldBits+1); got != nil {
+		t.Errorf("shl(1, %d) = %v, want nil (past the fold cap)", maxShiftFoldBits+1, got)
+	}
+}

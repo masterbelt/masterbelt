@@ -48,3 +48,24 @@ pub interface numeric {
   /// The % operator: the remainder. A zero divisor is a compile-time error.
   rem(other: self): self
 }
+
+/// The bitwise operations on an integer: and, or, xor, and the left/right
+/// shifts. They are width-blind, like the arithmetic in numeric — a result that
+/// does not fit a sized integer overflows at its assignment rather than wrapping
+/// — so every integer kind conforms, signed and unsigned, sized and unbounded.
+/// The complement is deliberately not a member: the within-a-width ~x is
+/// x.bxor(T.Max) (T.Max being the per-type all-ones), the one width-bearing
+/// operation, built on top rather than carried in the contract.
+pub interface bitwise {
+  /// The bitwise and.
+  band(other: self): self
+  /// The bitwise or.
+  bor(other: self): self
+  /// The bitwise exclusive or.
+  bxor(other: self): self
+  /// A left shift by amount: the value times two to the amount. A result past a
+  /// sized integer's range overflows at its assignment (the shift does not wrap).
+  shl(amount: nuint): self
+  /// A right shift by amount: the value divided by two to the amount.
+  shr(amount: nuint): self
+}

@@ -109,8 +109,12 @@ func externMethod(name string, result ir.Type, params ...ir.Type) *ir.Method {
 }
 
 // integerMethods is the operator-method signature set shared by every integer
-// primitive: arithmetic returns self, comparisons and equality return bool, and
-// the unary signs return self.
+// primitive: arithmetic returns self, comparisons and equality return bool, the
+// unary signs return self, and the bitwise contract (and/or/xor against self,
+// the shifts against a nuint amount) returns self. The bitwise methods are
+// width-blind, like the arithmetic — a result that does not fit a sized integer
+// overflows at the assignment — so they belong to every integer kind alike. The
+// width-bearing complement is not here: x.bxor(T.Max) builds it on top.
 func integerMethods() []*ir.Method {
 	return []*ir.Method{
 		externMethod("pos", self()),
@@ -126,6 +130,11 @@ func integerMethods() []*ir.Method {
 		externMethod("lteq", boolType, self()),
 		externMethod("gt", boolType, self()),
 		externMethod("gteq", boolType, self()),
+		externMethod("band", self(), self()),
+		externMethod("bor", self(), self()),
+		externMethod("bxor", self(), self()),
+		externMethod("shl", self(), nuintType),
+		externMethod("shr", self(), nuintType),
 	}
 }
 
@@ -174,6 +183,7 @@ var (
 	datetimeType ir.Type = &ir.Builtin{Name: NameDatetime}
 	durationType ir.Type = &ir.Builtin{Name: "duration"}
 	intType      ir.Type = &ir.Builtin{Name: "nint"}
+	nuintType    ir.Type = &ir.Builtin{Name: "nuint"}
 )
 
 // comparisonMethods is the equality and ordering signature set shared by the

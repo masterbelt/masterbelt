@@ -1,0 +1,441 @@
+File
+  Uses: ~
+  Decls: ~
+  Types: ~
+  Enums: ~
+  Interfaces: ~
+  Funcs:
+    FuncDecl
+      Doc: ~
+      Public: false
+      Extern: false
+      Effects: ~
+      Name: "bnot"
+      TypeParams: ~
+      Params:
+        ParamDef
+          Name: "x"
+          Type: NamedType
+            Namespace: ""
+            Name: "byte"
+            Args: ~
+            Projections: ~
+      Result: NamedType
+        Namespace: ""
+        Name: "byte"
+        Args: ~
+        Projections: ~
+      Body:
+        ReturnStmt
+          Value: CallExpr
+            Callee: MemberExpr
+              Receiver: Identifier
+                Name: "x"
+              Member: Identifier
+                Name: "bxor"
+            Arguments:
+              MemberExpr
+                Receiver: Identifier
+                  Name: "byte"
+                Member: Identifier
+                  Name: "Max"
+    FuncDecl
+      Doc: ~
+      Public: false
+      Extern: false
+      Effects: ~
+      Name: "hasFlag"
+      TypeParams: ~
+      Params:
+        ParamDef
+          Name: "flags"
+          Type: NamedType
+            Namespace: ""
+            Name: "byte"
+            Args: ~
+            Projections: ~
+        ParamDef
+          Name: "mask"
+          Type: NamedType
+            Namespace: ""
+            Name: "byte"
+            Args: ~
+            Projections: ~
+      Result: NamedType
+        Namespace: ""
+        Name: "bool"
+        Args: ~
+        Projections: ~
+      Body:
+        ReturnStmt
+          Value: CallExpr
+            Callee: MemberExpr
+              Receiver: CallExpr
+                Callee: MemberExpr
+                  Receiver: Identifier
+                    Name: "flags"
+                  Member: Identifier
+                    Name: "band"
+                Arguments:
+                  Identifier
+                    Name: "mask"
+              Member: Identifier
+                Name: "neq"
+            Arguments:
+              CallExpr
+                Callee: Identifier
+                  Name: "byte"
+                Arguments:
+                  IntLit
+                    Text: "0"
+                    Base: 0
+  Asserts:
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: MemberExpr
+              Receiver: CallExpr
+                Callee: Identifier
+                  Name: "byte"
+                Arguments:
+                  IntLit
+                    Text: "0b1100"
+                    Base: 1
+              Member: Identifier
+                Name: "band"
+            Arguments:
+              CallExpr
+                Callee: Identifier
+                  Name: "byte"
+                Arguments:
+                  IntLit
+                    Text: "0b1010"
+                    Base: 1
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          CallExpr
+            Callee: Identifier
+              Name: "byte"
+            Arguments:
+              IntLit
+                Text: "0b1000"
+                Base: 1
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: MemberExpr
+              Receiver: CallExpr
+                Callee: Identifier
+                  Name: "byte"
+                Arguments:
+                  IntLit
+                    Text: "0b1100"
+                    Base: 1
+              Member: Identifier
+                Name: "bor"
+            Arguments:
+              CallExpr
+                Callee: Identifier
+                  Name: "byte"
+                Arguments:
+                  IntLit
+                    Text: "0b1010"
+                    Base: 1
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          CallExpr
+            Callee: Identifier
+              Name: "byte"
+            Arguments:
+              IntLit
+                Text: "0b1110"
+                Base: 1
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: MemberExpr
+              Receiver: CallExpr
+                Callee: Identifier
+                  Name: "byte"
+                Arguments:
+                  IntLit
+                    Text: "0b1100"
+                    Base: 1
+              Member: Identifier
+                Name: "bxor"
+            Arguments:
+              CallExpr
+                Callee: Identifier
+                  Name: "byte"
+                Arguments:
+                  IntLit
+                    Text: "0b1010"
+                    Base: 1
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          CallExpr
+            Callee: Identifier
+              Name: "byte"
+            Arguments:
+              IntLit
+                Text: "0b0110"
+                Base: 1
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: MemberExpr
+              Receiver: CallExpr
+                Callee: Identifier
+                  Name: "byte"
+                Arguments:
+                  IntLit
+                    Text: "1"
+                    Base: 0
+              Member: Identifier
+                Name: "shl"
+            Arguments:
+              IntLit
+                Text: "3"
+                Base: 0
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          CallExpr
+            Callee: Identifier
+              Name: "byte"
+            Arguments:
+              IntLit
+                Text: "8"
+                Base: 0
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: MemberExpr
+              Receiver: CallExpr
+                Callee: Identifier
+                  Name: "byte"
+                Arguments:
+                  IntLit
+                    Text: "0b10110"
+                    Base: 1
+              Member: Identifier
+                Name: "shr"
+            Arguments:
+              IntLit
+                Text: "2"
+                Base: 0
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          CallExpr
+            Callee: Identifier
+              Name: "byte"
+            Arguments:
+              IntLit
+                Text: "0b101"
+                Base: 1
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: MemberExpr
+              Receiver: CallExpr
+                Callee: Identifier
+                  Name: "uint"
+                Arguments:
+                  IntLit
+                    Text: "0xF0"
+                    Base: 3
+              Member: Identifier
+                Name: "band"
+            Arguments:
+              CallExpr
+                Callee: Identifier
+                  Name: "uint"
+                Arguments:
+                  IntLit
+                    Text: "0x3C"
+                    Base: 3
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          CallExpr
+            Callee: Identifier
+              Name: "uint"
+            Arguments:
+              IntLit
+                Text: "0x30"
+                Base: 3
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: MemberExpr
+              Receiver: CallExpr
+                Callee: Identifier
+                  Name: "int"
+                Arguments:
+                  CallExpr
+                    Callee: MemberExpr
+                      Receiver: IntLit
+                        Text: "1"
+                        Base: 0
+                      Member: Identifier
+                        Name: "neg"
+                    Arguments: ~
+              Member: Identifier
+                Name: "band"
+            Arguments:
+              CallExpr
+                Callee: Identifier
+                  Name: "int"
+                Arguments:
+                  IntLit
+                    Text: "255"
+                    Base: 0
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "255"
+            Base: 0
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: MemberExpr
+              Receiver: CallExpr
+                Callee: Identifier
+                  Name: "nint"
+                Arguments:
+                  IntLit
+                    Text: "5"
+                    Base: 0
+              Member: Identifier
+                Name: "bor"
+            Arguments:
+              CallExpr
+                Callee: Identifier
+                  Name: "nint"
+                Arguments:
+                  IntLit
+                    Text: "2"
+                    Base: 0
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          IntLit
+            Text: "7"
+            Base: 0
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: Identifier
+              Name: "bnot"
+            Arguments:
+              CallExpr
+                Callee: Identifier
+                  Name: "byte"
+                Arguments:
+                  IntLit
+                    Text: "0"
+                    Base: 0
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          CallExpr
+            Callee: Identifier
+              Name: "byte"
+            Arguments:
+              IntLit
+                Text: "255"
+                Base: 0
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: Identifier
+              Name: "bnot"
+            Arguments:
+              CallExpr
+                Callee: Identifier
+                  Name: "byte"
+                Arguments:
+                  IntLit
+                    Text: "0b00001111"
+                    Base: 1
+          Member: Identifier
+            Name: "eql"
+        Arguments:
+          CallExpr
+            Callee: Identifier
+              Name: "byte"
+            Arguments:
+              IntLit
+                Text: "0b11110000"
+                Base: 1
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: Identifier
+          Name: "hasFlag"
+        Arguments:
+          CallExpr
+            Callee: Identifier
+              Name: "byte"
+            Arguments:
+              IntLit
+                Text: "0b110"
+                Base: 1
+          CallExpr
+            Callee: Identifier
+              Name: "byte"
+            Arguments:
+              IntLit
+                Text: "0b010"
+                Base: 1
+    AssertDecl
+      Doc: ~
+      Cond: CallExpr
+        Callee: MemberExpr
+          Receiver: CallExpr
+            Callee: Identifier
+              Name: "hasFlag"
+            Arguments:
+              CallExpr
+                Callee: Identifier
+                  Name: "byte"
+                Arguments:
+                  IntLit
+                    Text: "0b100"
+                    Base: 1
+              CallExpr
+                Callee: Identifier
+                  Name: "byte"
+                Arguments:
+                  IntLit
+                    Text: "0b010"
+                    Base: 1
+          Member: Identifier
+            Name: "not"
+        Arguments: ~
+  Masters: ~
