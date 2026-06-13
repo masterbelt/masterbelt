@@ -1,7 +1,7 @@
 # release-please keeps the stable-release bookkeeping reviewable. Commits on a
 # release branch update a single Release PR with the next version and CHANGELOG;
 # merging that PR makes release-please create the vX.Y.Z tag and GitHub Release,
-# then this workflow dispatches release-assets to build and attach the binaries.
+# then this workflow dispatches release-stable to build and publish the artifacts.
 name: release-please
 
 on:
@@ -20,7 +20,7 @@ permissions:
   pull-requests: write
   # release-please labels the Release PR with its autorelease:* status labels.
   issues: write
-  # Dispatch the release-assets workflow once a release is created (below).
+  # Dispatch the release-stable workflow once a release is created (below).
   actions: write
 
 jobs:
@@ -39,14 +39,14 @@ jobs:
 
       # release-please publishes the GitHub Release with GITHUB_TOKEN, and a
       # release event raised by GITHUB_TOKEN does not start another workflow run
-      # — so release-assets' `release: published` trigger never fires for an
+      # — so release-stable's `release: published` trigger never fires for an
       # automated release. Dispatch it explicitly instead (workflow_dispatch IS
       # delivered for GITHUB_TOKEN), passing the tag release-please just created.
-      - name: Build and attach the release assets
+      - name: Build and publish the release artifacts
         if: ${{ steps.release.outputs.release_created == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh workflow run release-assets.yml \
+          gh workflow run release-stable.yml \
             --ref "${{ github.ref_name }}" \
             -f tag="${{ steps.release.outputs.tag_name }}"
