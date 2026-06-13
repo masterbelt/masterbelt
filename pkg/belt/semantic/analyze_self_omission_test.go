@@ -254,6 +254,34 @@ func TestSelfOmissionTopLevelConstWins(t *testing.T) {
 	}
 }
 
+// TestSelfOmissionEnumNamedFieldReadsField pins the one place self omission and an
+// enum shorthand meet: a field named exactly like a member of the expected enum,
+// read where that enum is expected, resolves to the field (self.Rare), consistently
+// in the checker and the lowering, and folds to the field's value. Reading the
+// field — which is itself a value of the enum type — is the defined behavior here;
+// the enum-member reading is not foldable for a bare return regardless (returns do
+// not carry an enum shorthand expectation, a separate pre-existing concern), so the
+// field read is the consistent result. Writing Rarity.Rare selects the member.
+func TestSelfOmissionEnumNamedFieldReadsField(t *testing.T) {
+	src := "pub enum Rarity { Common, Rare }\n" +
+		"pub type Card = { Rare: Rarity } impl {\n" +
+		"  pub pick(): Rarity { return Rare }\n" +
+		"}\n" +
+		"const C: Card = { Rare: Rarity.Common }\n" +
+		"const P = C.pick()\n"
+	m, diags := analyze(src)
+	if len(diags) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", codes(diags))
+	}
+	ev := constEval(m, "P")
+	if ev == nil || ev.Kind != ir.ConstEnum {
+		t.Fatalf("P did not fold to an enum value: %v", ev)
+	}
+	if ev.EnumIndex != 0 {
+		t.Fatalf("P folded to enum index %d, want 0 (the field's value Common, read as self.Rare)", ev.EnumIndex)
+	}
+}
+
 // methodBody returns the lowered statement body of a named method on a named
 // type — the IR the bare-read desugar produces.
 func methodBody(t *testing.T, m *ir.Module, typ, method string) []ir.Stmt {
