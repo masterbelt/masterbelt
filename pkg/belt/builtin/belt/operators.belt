@@ -53,9 +53,12 @@ pub interface numeric {
 /// shifts. They are width-blind, like the arithmetic in numeric — a result that
 /// does not fit a sized integer overflows at its assignment rather than wrapping
 /// — so every integer kind conforms, signed and unsigned, sized and unbounded.
-/// The complement is deliberately not a member: the within-a-width ~x is
-/// x.bxor(T.Max) (T.Max being the per-type all-ones), the one width-bearing
-/// operation, built on top rather than carried in the contract.
+/// A signed value's bits are its two's complement. The complement is
+/// deliberately not a member: ~x within a fixed width is width-bearing, so it
+/// composes on top rather than sitting in this width-blind contract. For an
+/// unsigned type it is x.bxor(T.Max) — T.Max being that type's all-ones; a
+/// signed type's Max is its largest positive, not all-ones, so that recipe is
+/// the unsigned one, not a general formula.
 pub interface bitwise {
   /// The bitwise and.
   band(other: self): self
@@ -66,6 +69,8 @@ pub interface bitwise {
   /// A left shift by amount: the value times two to the amount. A result past a
   /// sized integer's range overflows at its assignment (the shift does not wrap).
   shl(amount: nuint): self
-  /// A right shift by amount: the value divided by two to the amount.
+  /// A right shift by amount. It is arithmetic — sign-extending — so on a
+  /// negative value it floors toward minus infinity rather than truncating
+  /// toward zero the way the / operator does.
   shr(amount: nuint): self
 }

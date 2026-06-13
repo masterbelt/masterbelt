@@ -98,14 +98,17 @@ func integerIntrinsics() map[string]Intrinsic {
 		// nuint amount. A result that does not fit a sized receiver overflows at
 		// the assignment (the Fits check), exactly as add/mul do, so shl does not
 		// wrap. There is no bitwise complement here: ~x within a width is the
-		// width-bearing operation, written x.bxor(T.Max) on top of these (T.Max is
-		// the per-type all-ones), so it stays out of the width-blind set.
+		// width-bearing operation, written on top of these — x.bxor(T.Max) for an
+		// unsigned type, T.Max being its all-ones — so it stays out of the set.
 		"band": binaryInt(func(a, b *big.Int) *ir.Constant { return ir.IntConstant(new(big.Int).And(a, b)) }),
 		"bor":  binaryInt(func(a, b *big.Int) *ir.Constant { return ir.IntConstant(new(big.Int).Or(a, b)) }),
 		"bxor": binaryInt(func(a, b *big.Int) *ir.Constant { return ir.IntConstant(new(big.Int).Xor(a, b)) }),
 		"shl": binaryInt(func(a, n *big.Int) *ir.Constant {
 			if n.Sign() < 0 || !n.IsUint64() || n.Uint64() > maxShiftFoldBits {
-				return nil // a negative count is type-incorrect; a giant one is left unfolded
+				// A negative count is type-incorrect; a giant one is left unfolded —
+				// the dispatcher turns this nil into a budget refusal (not an
+				// evaluator gap), since the value is simply too wide to materialize.
+				return nil
 			}
 			return ir.IntConstant(new(big.Int).Lsh(a, uint(n.Uint64())))
 		}),
@@ -114,7 +117,14 @@ func integerIntrinsics() map[string]Intrinsic {
 				return nil
 			}
 			if !n.IsUint64() {
-				return ir.IntConstant(big.NewInt(0)) // shifting a finite value that far is zero
+				// A finite value arithmetically shifted past its width converges to
+				// its sign bit: zero for a non-negative receiver, -1 (all sign bits)
+				// for a negative one — the same limit big.Int.Rsh reaches for the
+				// in-range counts, so the fold stays consistent across the boundary.
+				if a.Sign() < 0 {
+					return ir.IntConstant(big.NewInt(-1))
+				}
+				return ir.IntConstant(big.NewInt(0))
 			}
 			return ir.IntConstant(new(big.Int).Rsh(a, uint(n.Uint64())))
 		}),
@@ -122,11 +132,12 @@ func integerIntrinsics() map[string]Intrinsic {
 }
 
 // maxShiftFoldBits caps the shift amount the folder will materialize for shl:
-// a constant shift this wide already overflows any sized integer (caught at the
-// assignment), and on the unbounded nint/nuint a wider shift would build an
-// astronomically large value, so beyond the cap the shift is left unfolded
-// rather than risk exhausting memory at compile time.
-const maxShiftFoldBits = 1 << 16
+// the cap is wide enough that any shift overflowing a sized integer still folds
+// to a value (so the assignment reports constant_overflow), and only an
+// unreasonably wide shift on the unbounded nint/nuint — one that would build an
+// astronomically large value — is left unfolded, where the dispatcher reports it
+// as a budget refusal rather than an evaluator gap.
+const maxShiftFoldBits = 1 << 20
 
 func booleanIntrinsics() map[string]Intrinsic {
 	return map[string]Intrinsic{

@@ -42,6 +42,17 @@ func TestIntegerBitwiseIntrinsics(t *testing.T) {
 		}
 	}
 
+	// A right shift by an amount too large for uint64 converges to the sign bit:
+	// 0 for a non-negative receiver, -1 (all sign bits) for a negative one — the
+	// arithmetic-shift limit, consistent with the in-range counts above.
+	huge := new(big.Int).Lsh(big.NewInt(1), 64) // 2^64, past uint64
+	if got := ii["shr"](intConst(-8), []*ir.Constant{ir.IntConstant(huge)}); got == nil || got.Int.Int64() != -1 {
+		t.Errorf("shr(-8, 2^64) = %v, want -1", got)
+	}
+	if got := ii["shr"](intConst(255), []*ir.Constant{ir.IntConstant(huge)}); got == nil || got.Int.Sign() != 0 {
+		t.Errorf("shr(255, 2^64) = %v, want 0", got)
+	}
+
 	// On the unbounded nint, shl widens without wrapping: 1 << 64 is kept as 2^64
 	// (a sized receiver would instead overflow at its assignment).
 	if got := bin("shl", 1, 64); got == nil || got.Int.Cmp(new(big.Int).Lsh(big.NewInt(1), 64)) != 0 {

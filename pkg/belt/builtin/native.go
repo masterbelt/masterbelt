@@ -114,7 +114,8 @@ func externMethod(name string, result ir.Type, params ...ir.Type) *ir.Method {
 // the shifts against a nuint amount) returns self. The bitwise methods are
 // width-blind, like the arithmetic — a result that does not fit a sized integer
 // overflows at the assignment — so they belong to every integer kind alike. The
-// width-bearing complement is not here: x.bxor(T.Max) builds it on top.
+// width-bearing complement is not here: on an unsigned type it is x.bxor(T.Max),
+// built on top (a signed Max is not all-ones, so that is the unsigned recipe).
 func integerMethods() []*ir.Method {
 	return []*ir.Method{
 		externMethod("pos", self()),

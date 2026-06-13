@@ -39,7 +39,8 @@ pub type nint = builtin impl {
   pub extern fn bxor(other: self): self
   /// A left shift by amount; a result past this type's range overflows at its assignment.
   pub extern fn shl(amount: nuint): self
-  /// A right shift by amount (the value divided by two to the amount).
+  /// A right shift by amount; arithmetic (sign-extending), so on a negative
+  /// value it floors toward minus infinity rather than truncating as / would.
   pub extern fn shr(amount: nuint): self
 }
 
@@ -89,7 +90,8 @@ pub type sbyte = builtin impl {
   pub extern fn bxor(other: self): self
   /// A left shift by amount; a result past this type's range overflows at its assignment.
   pub extern fn shl(amount: nuint): self
-  /// A right shift by amount (the value divided by two to the amount).
+  /// A right shift by amount; arithmetic (sign-extending), so on a negative
+  /// value it floors toward minus infinity rather than truncating as / would.
   pub extern fn shr(amount: nuint): self
 }
 
@@ -139,7 +141,8 @@ pub type short = builtin impl {
   pub extern fn bxor(other: self): self
   /// A left shift by amount; a result past this type's range overflows at its assignment.
   pub extern fn shl(amount: nuint): self
-  /// A right shift by amount (the value divided by two to the amount).
+  /// A right shift by amount; arithmetic (sign-extending), so on a negative
+  /// value it floors toward minus infinity rather than truncating as / would.
   pub extern fn shr(amount: nuint): self
 }
 
@@ -189,7 +192,8 @@ pub type int = builtin impl {
   pub extern fn bxor(other: self): self
   /// A left shift by amount; a result past this type's range overflows at its assignment.
   pub extern fn shl(amount: nuint): self
-  /// A right shift by amount (the value divided by two to the amount).
+  /// A right shift by amount; arithmetic (sign-extending), so on a negative
+  /// value it floors toward minus infinity rather than truncating as / would.
   pub extern fn shr(amount: nuint): self
 }
 
@@ -239,6 +243,7 @@ pub type long = builtin impl {
   pub extern fn bxor(other: self): self
   /// A left shift by amount; a result past this type's range overflows at its assignment.
   pub extern fn shl(amount: nuint): self
-  /// A right shift by amount (the value divided by two to the amount).
+  /// A right shift by amount; arithmetic (sign-extending), so on a negative
+  /// value it floors toward minus infinity rather than truncating as / would.
   pub extern fn shr(amount: nuint): self
 }
