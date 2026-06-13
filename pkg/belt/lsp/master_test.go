@@ -252,6 +252,25 @@ func TestMasterSelfMemberCompletionAndHover(t *testing.T) {
 	}
 }
 
+// TestMasterValidateSelfMemberCompletionAndHover pins that self inside a per-row
+// validate check resolves to the master, so its row fields complete and hover —
+// the enclosing-receiver scan has to reach a master's validate clauses, not only
+// its methods.
+func TestMasterValidateSelfMemberCompletionAndHover(t *testing.T) {
+	src := "master Skill {\n  record {\n    id: int,\n    name: string,\n  }\n  primary id\n" +
+		"  validate {\n    each {\n      assert self.name != \"\"\n    }\n  }\n}\n"
+	doc := testView(src)
+
+	got := byLabel(completion(doc, strings.Index(src, "self.name")+len("self.")).Items)
+	if _, ok := got["name"]; !ok {
+		t.Errorf("self.* completion missing the row field name in a validate check: %v", labels(got))
+	}
+	h := hover(doc, strings.Index(src, "self.name")+len("self."))
+	if h == nil || !strings.Contains(h.Contents.Value, "name: string") {
+		t.Errorf("self.name hover in a validate check = %v, want name: string", h)
+	}
+}
+
 // TestMasterAliasMemberCompletionAndHover pins that a master reached through a
 // type alias still completes and hovers its row fields: the checker accepts
 // s.field on a `type SkillRef = Skill` value because the canonical RecordOf
