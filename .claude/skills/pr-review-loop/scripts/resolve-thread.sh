@@ -40,13 +40,18 @@ map_cid(){ # <tsv> <cid> -> thread id (EXACT match on any comment); empty if non
   awk -F'\t' -v c="$2" '{n=split($2,a,","); for(i=1;i<=n;i++) if(a[i]==c){print $1; exit}}' <<<"$1"
 }
 
-resolve_tid(){ # <thread-id>
+resolve_tid(){ # <thread-id>; returns non-zero if the resolve did not succeed
   if [ -n "${RESOLVE_THREAD_FIXTURE:-}" ]; then
-    echo "(dry) would resolve $1"
-  else
-    gh api graphql -f query='mutation($t:ID!){ resolveReviewThread(input:{threadId:$t}){ thread{ isResolved } } }' -f t="$1" \
-      --jq '.data.resolveReviewThread.thread.isResolved' | sed "s#^#$1 resolved=#"
+    case "$1" in
+      *FAIL*) echo "(dry) FAILED $1"; return 1 ;;
+      *)      echo "(dry) would resolve $1"; return 0 ;;
+    esac
   fi
+  local res
+  res=$(gh api graphql -f query='mutation($t:ID!){ resolveReviewThread(input:{threadId:$t}){ thread{ isResolved } } }' -f t="$1" \
+          --jq '.data.resolveReviewThread.thread.isResolved') || return 1
+  echo "$1 resolved=$res"
+  [ "$res" = "true" ]
 }
 
 TSV=$(threads_tsv) || { echo "ERROR: cannot read review threads" >&2; exit 1; }
@@ -57,6 +62,9 @@ rc=0
 for CID in "$@"; do
   TID=$(map_cid "$TSV" "$CID")
   if [ -z "$TID" ]; then echo "$CID -> no unresolved thread"; rc=1; continue; fi
-  if [ "$MODE" = map ]; then printf '%s\t%s\n' "$CID" "$TID"; else echo "$CID -> $(resolve_tid "$TID")"; fi
+  if [ "$MODE" = map ]; then printf '%s\t%s\n' "$CID" "$TID"; continue; fi
+  out=$(resolve_tid "$TID"); st=$?
+  echo "$CID -> $out"
+  [ "$st" -eq 0 ] || rc=1
 done
 exit $rc

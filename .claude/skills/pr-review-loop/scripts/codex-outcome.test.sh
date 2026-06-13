@@ -66,5 +66,10 @@ cat > "$D/pulls_comments.json" <<JSON
 JSON
 assert "inline comment => FINDINGS" FINDINGS "$(run "$D")"
 
+# 8) --watch that only ever sees an unreadable findings source must end ERROR, not TIMEOUT (round-3)
+D="$TMP/watch_error"; mk "$D"; echo 'ERROR' > "$D/pulls_comments.json"
+assert "watch persistent error => ERROR (not TIMEOUT)" ERROR \
+  "$(CODEX_OUTCOME_FIXTURE="$D" bash "$SUT" 43 "$SINCE" "$SHA" --watch 1 0 | sed -n 's/^OUTCOME=//p')"
+
 echo "---"
 [ "$fails" -eq 0 ] && { echo "all green"; exit 0; } || { echo "$fails failed"; exit 1; }

@@ -37,5 +37,11 @@ assert "empty-body review hidden"               0 "$(grep -c '^REVIEW:2026-06-13
 assert "non-COMMENTED (approved) review hidden" 0 "$(grep -c 'lgtm' <<<"$OUT")"
 assert "exactly two finding blocks"             2 "$(grep -c '^===' <<<"$OUT")"
 
+# a read error must fail closed (non-zero exit), not emit empty triage with exit 0 (round-3)
+D2="$TMP/fx_err"; mkdir -p "$D2"; for f in pulls_comments pulls_reviews; do echo '[]' > "$D2/$f.json"; done
+echo 'ERROR' > "$D2/pulls_comments.json"
+FINDINGS_FIXTURE="$D2" bash "$SUT" 43 "$SINCE" >/dev/null 2>&1
+assert "unreadable findings source => non-zero exit" 1 "$?"
+
 echo "---"
 [ "$fails" -eq 0 ] && { echo "all green"; exit 0; } || { echo "$fails failed"; exit 1; }

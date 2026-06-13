@@ -108,12 +108,16 @@ if [ "$WATCH" -eq 0 ]; then
   [ "$d" = ERROR ] && exit 1 || exit 0
 fi
 
+last=RUNNING
 for i in $(seq 1 "$MAXP"); do
-  probe; d=$(decide)
+  probe; d=$(decide); last=$d
   echo "[poll $i $(date -u +%H:%M:%SZ)] $(line) -> $d"
   case "$d" in FINDINGS|APPROVED) echo "OUTCOME=$d"; exit 0 ;; esac
   # ERROR or RUNNING → keep polling (a transient failure may clear next round).
   [ "$i" -lt "$MAXP" ] && sleep "$INT"
 done
+# Don't bury a persistent read failure as "no findings": if the last poll could
+# not read a findings source, surface ERROR rather than TIMEOUT_NO_FINDINGS.
+if [ "$last" = ERROR ]; then echo "OUTCOME=ERROR"; exit 1; fi
 echo "OUTCOME=TIMEOUT_NO_FINDINGS"
 exit 0

@@ -22,9 +22,15 @@ BOT='chatgpt-codex-connector[bot]'
 [ $# -ge 1 ] || { echo "usage: fetch-findings.sh <pr> [since-iso8601]" >&2; exit 2; }
 PR=$1; SINCE=${2:-1970-01-01T00:00:00Z}
 
-fetch(){ # <api-path> <fixture-file>
+fetch(){ # <api-path> <fixture-file>; returns non-zero if the source cannot be read
   if [ -n "${FINDINGS_FIXTURE:-}" ]; then
-    [ -f "$FINDINGS_FIXTURE/$2" ] && cat "$FINDINGS_FIXTURE/$2" || echo '[]'
+    local f="$FINDINGS_FIXTURE/$2"
+    if [ -f "$f" ]; then
+      [ "$(cat "$f")" = "ERROR" ] && return 1
+      cat "$f"
+    else
+      echo '[]'
+    fi
   else
     gh api --paginate "$1" 2>/dev/null | jq -s 'add // []'
   fi
@@ -36,8 +42,8 @@ else
   REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner) || { echo "ERROR: cannot resolve repo" >&2; exit 1; }
 fi
 
-inline=$(fetch  "repos/$REPO/pulls/$PR/comments" pulls_comments.json)
-reviews=$(fetch "repos/$REPO/pulls/$PR/reviews"  pulls_reviews.json)
+inline=$(fetch  "repos/$REPO/pulls/$PR/comments" pulls_comments.json) || { echo "ERROR: failed to read inline comments" >&2; exit 1; }
+reviews=$(fetch "repos/$REPO/pulls/$PR/reviews"  pulls_reviews.json)  || { echo "ERROR: failed to read reviews" >&2; exit 1; }
 
 printf '%s' "$inline" | jq -r --arg b "$BOT" --arg s "$SINCE" '
   [.[] | select(.user.login==$b and .created_at>$s)]
