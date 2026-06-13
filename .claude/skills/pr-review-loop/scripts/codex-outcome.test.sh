@@ -19,7 +19,7 @@ TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT
 # 1) findings posted as a review BODY only, no inline comments
 D="$TMP/review_body_only"; mk "$D"
 cat > "$D/pulls_reviews.json" <<JSON
-[{"user":{"login":"$BOT"},"state":"COMMENTED","submitted_at":"2026-06-13T03:46:39Z","body":"### Codex Review"}]
+[{"user":{"login":"$BOT"},"state":"COMMENTED","commit_id":"f0a483e061f5e37dbb","submitted_at":"2026-06-13T03:46:39Z","body":"### Codex Review"}]
 JSON
 assert "review-body-only => FINDINGS" FINDINGS "$(run "$D")"
 
@@ -69,7 +69,7 @@ assert "fresh verdict => APPROVED" APPROVED "$(run "$D")"
 # 7) inline finding after SINCE => FINDINGS (happy path)
 D="$TMP/inline"; mk "$D"
 cat > "$D/pulls_comments.json" <<JSON
-[{"user":{"login":"$BOT"},"created_at":"2026-06-13T03:46:40Z","body":"P2 reject ..."}]
+[{"user":{"login":"$BOT"},"created_at":"2026-06-13T03:46:40Z","original_commit_id":"f0a483e061f5e37dbb","body":"P2 reject ..."}]
 JSON
 assert "inline comment => FINDINGS" FINDINGS "$(run "$D")"
 
@@ -98,12 +98,33 @@ cat > "$D/pulls_reviews.json" <<JSON
 JSON
 assert "empty-body review => not findings" RUNNING "$(run "$D")"
 
-# an artifact created in the same wall-clock second as SINCE still counts this round
-D="$TMP/same_second"; mk "$D"
+# a same-second FINDING (inline, on the head) still counts this round (the 2s bias)
+D="$TMP/same_second_find"; mk "$D"
+cat > "$D/pulls_comments.json" <<JSON
+[{"user":{"login":"$BOT"},"created_at":"$SINCE","original_commit_id":"f0a483e061f5e37dbb","body":"same-second finding"}]
+JSON
+assert "same-second inline finding (head) => FINDINGS" FINDINGS "$(run "$D")"
+
+# but a +1 AT or before the trigger second must not approve (approval uses the unbiased cutoff)
+D="$TMP/plus1_trigger_second"; mk "$D"
 cat > "$D/issues_reactions.json" <<JSON
 [{"user":{"login":"$BOT"},"content":"+1","created_at":"$SINCE"}]
 JSON
-assert "same-second +1 => APPROVED" APPROVED "$(run "$D")"
+assert "+1 at the trigger second => not approved" RUNNING "$(run "$D")"
+
+# a finding on an OLD head landing after SINCE is stale, not a finding for the new head
+D="$TMP/stale_head_inline"; mk "$D"
+cat > "$D/pulls_comments.json" <<JSON
+[{"user":{"login":"$BOT"},"created_at":"2026-06-13T03:46:40Z","original_commit_id":"deadbeef00cafe","body":"old-head finding"}]
+JSON
+assert "stale-head inline finding => not findings" RUNNING "$(run "$D")"
+
+# likewise a COMMENTED review whose commit_id is not the pushed head is stale
+D="$TMP/stale_head_review"; mk "$D"
+cat > "$D/pulls_reviews.json" <<JSON
+[{"user":{"login":"$BOT"},"state":"COMMENTED","commit_id":"deadbeef00cafe","submitted_at":"2026-06-13T03:46:39Z","body":"old-head review body"}]
+JSON
+assert "stale-head review => not findings" RUNNING "$(run "$D")"
 
 # a reactions read error must not be read as "no eyes" and fire a false NO_EYES
 D="$TMP/rx_err_watch"; mk "$D"; echo 'ERROR' > "$D/issues_reactions.json"

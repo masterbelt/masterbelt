@@ -130,23 +130,27 @@ SINCE=<your trigger/push time, e.g. 2026-01-02T03:04:05Z>
 HEAD_SHA=<the SHA you pushed, e.g. 9bf8482978>
 BOT="chatgpt-codex-connector[bot]"
 
-# findings (primary) — bot inline review-comments after your trigger; >0 ⇒ Stage 1
+# findings (primary) — bot inline review-comments after your trigger, pinned to the pushed
+# head (original_commit_id) so a prior run's comments landing late on the OLD head are not
+# mistaken for findings on the new one; >0 ⇒ Stage 1
 gh api --paginate repos/<owner>/<repo>/pulls/<n>/comments \
-  | jq -s --arg b "$BOT" --arg since "$SINCE" '[add[] | select(.user.login==$b and .created_at > $since)] | length'
+  | jq -s --arg b "$BOT" --arg since "$SINCE" --arg sha "$HEAD_SHA" '[add[] | select(.user.login==$b and .created_at > $since and ((.original_commit_id // "")|startswith($sha[0:9])))] | length'
 
 # findings (primary) — OR a submitted COMMENTED review with a NON-EMPTY body after your
 # trigger: Codex can put findings in the review body with no inline comments. The body
 # check matches Stage 1's fetch, so an empty-body review never reports FINDINGS with
 # nothing for Stage 1 to triage.
 gh api --paginate repos/<owner>/<repo>/pulls/<n>/reviews \
-  | jq -s --arg b "$BOT" --arg since "$SINCE" '[add[] | select(.user.login==$b and (.submitted_at // "") > $since and .state=="COMMENTED" and ((.body // "")|length>0))] | length'
+  | jq -s --arg b "$BOT" --arg since "$SINCE" --arg sha "$HEAD_SHA" '[add[] | select(.user.login==$b and (.submitted_at // "") > $since and .state=="COMMENTED" and ((.body // "")|length>0) and ((.commit_id // "")|startswith($sha[0:9])))] | length'
 
 # clean verdict (primary) — the "no issues" comment pinned to YOUR sha AND this round
 # (created_at > $SINCE), so a prior verdict for the same sha cannot false-converge; 1 ⇒ approved
 gh api --paginate repos/<owner>/<repo>/issues/<n>/comments \
   | jq -s --arg b "$BOT" --arg since "$SINCE" --arg sha "$HEAD_SHA" '[add[] | select(.user.login==$b and .created_at > $since and (.body|test("Didn.t find any major issues")) and (.body|test($sha[0:9])))] | length'
 
-# reactions — eyes = still running; a +1 after your trigger (round-scoped) counts as a clean-pass approval
+# reactions — eyes = still running; a +1 STRICTLY after your trigger counts as a clean-pass
+# approval (use the unbiased $SINCE, never a back-biased cutoff, so a prior run's +1 from just
+# before the push cannot approve the new head)
 gh api --paginate repos/<owner>/<repo>/issues/<n>/reactions \
   | jq -s --arg b "$BOT" --arg since "$SINCE" 'add | map(select(.user.login==$b and .created_at > $since)) | .[] | "\(.content)\t\(.created_at)"'
 ```

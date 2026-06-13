@@ -91,24 +91,27 @@ probe(){
   [ -n "$revraw" ] || revraw='[]'
   [ -n "$icraw" ]  || icraw='[]'
   [ -n "$rxraw" ]  || rxraw='[]'
-  # findings: inline review comments after the trigger ...
-  F=$(printf '%s' "$pc" | jq --arg b "$BOT" --arg s "$SINCE_EFF" \
-        '[.[]|select(.user.login==$b and .created_at>$s)]|length') || rc=1
+  # findings: inline review comments after the trigger, pinned to the pushed head
+  #     (original_commit_id) so a prior run's comments landing late on the OLD head
+  #     are not mistaken for findings on the new one ...
+  F=$(printf '%s' "$pc" | jq --arg b "$BOT" --arg s "$SINCE_EFF" --arg sha "$SHA9" \
+        '[.[]|select(.user.login==$b and .created_at>$s and ((.original_commit_id // "")|startswith($sha)))]|length') || rc=1
   # ... OR a submitted COMMENTED review with a NON-EMPTY body after the trigger
   #     (findings can ride the review body with no inline comments). The body check
   #     mirrors fetch-findings.sh, so an empty-body review never reports FINDINGS
   #     with nothing to triage.
-  REV=$(printf '%s' "$revraw" | jq --arg b "$BOT" --arg s "$SINCE_EFF" \
-        '[.[]|select(.user.login==$b and (.submitted_at//"")>$s and .state=="COMMENTED" and ((.body//"")|length>0))]|length') || rc=1
+  REV=$(printf '%s' "$revraw" | jq --arg b "$BOT" --arg s "$SINCE_EFF" --arg sha "$SHA9" \
+        '[.[]|select(.user.login==$b and (.submitted_at//"")>$s and .state=="COMMENTED" and ((.body//"")|length>0) and ((.commit_id // "")|startswith($sha)))]|length') || rc=1
   # clean verdict: the "no issues" comment, pinned to YOUR sha AND this round
   #     (created_at>$SINCE) — the only COMMIT-SCOPED approval artifact.
   V=$(printf '%s' "$icraw" | jq --arg b "$BOT" --arg s "$SINCE_EFF" --arg sha "$SHA9" \
         '[.[]|select(.user.login==$b and .created_at>$s and (.body|test("Didn.t find any major issues")) and (.body|test($sha)))]|length') || rc=1
-  # a +1 after the trigger. By an explicit project decision this counts as
+  # a +1 STRICTLY after the trigger. By an explicit project decision this counts as
   #     approval (so a clean review that leaves only the reaction still converges).
-  #     Reactions carry no sha, so the only guard against a prior run's late +1 is
-  #     the created_at>$SINCE round scope — an accepted residual risk.
-  P=$(printf '%s' "$rxraw" | jq --arg b "$BOT" --arg s "$SINCE_EFF" \
+  #     Reactions carry no sha, so this uses the unbiased $SINCE (not $SINCE_EFF):
+  #     the 2s same-second bias is right for findings but would let a prior run's
+  #     +1 from just before the push count as approval.
+  P=$(printf '%s' "$rxraw" | jq --arg b "$BOT" --arg s "$SINCE" \
         '[.[]|select(.user.login==$b and .content=="+1" and .created_at>$s)]|length') || rc=1
   # liveness: did the review actually start this round? An 👀 after the trigger
   #     means it started; its prolonged absence means the trigger never took.
