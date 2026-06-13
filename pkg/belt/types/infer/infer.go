@@ -533,7 +533,7 @@ func reifiedType(def *ir.TypeDef) ir.Type {
 }
 
 func typeMemberType(reg *builtin.Registry, universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, valueShadows func(*ast.Identifier) bool, m *ast.MemberExpr) ir.Type {
-	def := memberReceiverDef(universe, qualified, valueShadows, m.Receiver)
+	def := MemberReceiverDef(universe, qualified, valueShadows, m.Receiver)
 	if def == nil {
 		// A namespace-qualified type name used as a value (geo.Item, no trailing
 		// projection) reifies to a type value of the metatype `type` — the qualified
@@ -561,16 +561,13 @@ func typeMemberType(reg *builtin.Registry, universe map[string]*ir.TypeDef, qual
 	return ir.Invalid
 }
 
-// memberReceiverDef resolves a member-access receiver to the type definition a
-// member is read off: a local type name (Item) through the universe, or a
-// namespace-qualified type name (geo.Item) through the import lookup. It returns
-// nil when the receiver is neither — a value receiver, or a name that is no type
-// — which the caller takes as a record-field reading. A nil qualified lookup
-// (no namespaces in scope) leaves the qualified form unresolved. The qualified
-// form is skipped when the namespace identifier is shadowed by a value
-// (valueShadows), so geo.Item.id reads the fields of a const named geo rather
-// than projecting the imported type.
-func memberReceiverDef(universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, valueShadows func(*ast.Identifier) bool, recv ast.Expr) *ir.TypeDef {
+// MemberReceiverDef resolves a member access's receiver to the type definition it
+// names — a bare type name through the universe, or a namespace-qualified type name
+// (geo.Item) through the qualified lookup — or nil for any other receiver (a value,
+// or a name a value shadows). It is the one resolver the checker (type position) and
+// the lowering (value position) share, so the two cannot drift on what a
+// member-access receiver names.
+func MemberReceiverDef(universe map[string]*ir.TypeDef, qualified func(namespace, name string) *ir.TypeDef, valueShadows func(*ast.Identifier) bool, recv ast.Expr) *ir.TypeDef {
 	switch r := recv.(type) {
 	case *ast.Identifier:
 		return universe[r.Name]
@@ -585,23 +582,28 @@ func memberReceiverDef(universe map[string]*ir.TypeDef, qualified func(namespace
 	return nil
 }
 
-// qualifiedTypeValue types a namespace-qualified type name used as a value
-// (geo.Item) as the metatype `type` — the qualified twin of a bare local type
-// name (Item). The receiver must name a namespace whose export of the member name
-// is a type, and not be shadowed by a same-named value (a const named geo, whose
-// fields geo.Item then reads instead). It returns ir.Invalid otherwise, which the
-// caller takes as a record-field reading. A field projection off the qualified
-// type (geo.Item.id) is the deeper member access memberReceiverDef handles, so
-// only the bare form (the receiver an identifier) reaches here.
-func qualifiedTypeValue(qualified func(namespace, name string) *ir.TypeDef, valueShadows func(*ast.Identifier) bool, m *ast.MemberExpr) ir.Type {
+// QualifiedTypeDef resolves a member access to the type definition it names as a
+// namespace-qualified type value (geo.Item, no trailing projection): the receiver
+// must name a namespace whose export of the member is a type, and not be shadowed
+// by a same-named value (a const named geo, whose field geo.Item is read instead).
+// It returns nil otherwise. It is the one resolver the checker (which reifies the
+// def to the metatype) and the lowering (which reifies it to a type value) share,
+// so the two agree on whether a bare qualified name is a type value.
+func QualifiedTypeDef(qualified func(namespace, name string) *ir.TypeDef, valueShadows func(*ast.Identifier) bool, m *ast.MemberExpr) *ir.TypeDef {
 	ns, ok := m.Receiver.(*ast.Identifier)
 	if !ok || qualified == nil {
-		return ir.Invalid
+		return nil
 	}
 	if valueShadows != nil && valueShadows(ns) {
-		return ir.Invalid
+		return nil
 	}
-	if qualified(ns.Name, m.Member.Name) != nil {
+	return qualified(ns.Name, m.Member.Name)
+}
+
+// qualifiedTypeValue types a bare namespace-qualified type name (geo.Item) as the
+// metatype — the checker's value-position wrapper over the shared QualifiedTypeDef.
+func qualifiedTypeValue(qualified func(namespace, name string) *ir.TypeDef, valueShadows func(*ast.Identifier) bool, m *ast.MemberExpr) ir.Type {
+	if QualifiedTypeDef(qualified, valueShadows, m) != nil {
 		return metatype()
 	}
 	return ir.Invalid
